@@ -7,6 +7,7 @@
 package adminv1
 
 import (
+	v1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -20,6 +21,73 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+type OsUpdateState int32
+
+const (
+	OsUpdateState_OS_UPDATE_STATE_UNSPECIFIED     OsUpdateState = 0
+	OsUpdateState_OS_UPDATE_STATE_UNSUPPORTED     OsUpdateState = 1
+	OsUpdateState_OS_UPDATE_STATE_OFFLINE         OsUpdateState = 2
+	OsUpdateState_OS_UPDATE_STATE_UNKNOWN         OsUpdateState = 3
+	OsUpdateState_OS_UPDATE_STATE_BUSY            OsUpdateState = 4
+	OsUpdateState_OS_UPDATE_STATE_FAILED          OsUpdateState = 5
+	OsUpdateState_OS_UPDATE_STATE_REBOOT_REQUIRED OsUpdateState = 6
+	OsUpdateState_OS_UPDATE_STATE_UPDATES         OsUpdateState = 7
+	OsUpdateState_OS_UPDATE_STATE_UP_TO_DATE      OsUpdateState = 8
+)
+
+// Enum value maps for OsUpdateState.
+var (
+	OsUpdateState_name = map[int32]string{
+		0: "OS_UPDATE_STATE_UNSPECIFIED",
+		1: "OS_UPDATE_STATE_UNSUPPORTED",
+		2: "OS_UPDATE_STATE_OFFLINE",
+		3: "OS_UPDATE_STATE_UNKNOWN",
+		4: "OS_UPDATE_STATE_BUSY",
+		5: "OS_UPDATE_STATE_FAILED",
+		6: "OS_UPDATE_STATE_REBOOT_REQUIRED",
+		7: "OS_UPDATE_STATE_UPDATES",
+		8: "OS_UPDATE_STATE_UP_TO_DATE",
+	}
+	OsUpdateState_value = map[string]int32{
+		"OS_UPDATE_STATE_UNSPECIFIED":     0,
+		"OS_UPDATE_STATE_UNSUPPORTED":     1,
+		"OS_UPDATE_STATE_OFFLINE":         2,
+		"OS_UPDATE_STATE_UNKNOWN":         3,
+		"OS_UPDATE_STATE_BUSY":            4,
+		"OS_UPDATE_STATE_FAILED":          5,
+		"OS_UPDATE_STATE_REBOOT_REQUIRED": 6,
+		"OS_UPDATE_STATE_UPDATES":         7,
+		"OS_UPDATE_STATE_UP_TO_DATE":      8,
+	}
+)
+
+func (x OsUpdateState) Enum() *OsUpdateState {
+	p := new(OsUpdateState)
+	*p = x
+	return p
+}
+
+func (x OsUpdateState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (OsUpdateState) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_update_proto_enumTypes[0].Descriptor()
+}
+
+func (OsUpdateState) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_update_proto_enumTypes[0]
+}
+
+func (x OsUpdateState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use OsUpdateState.Descriptor instead.
+func (OsUpdateState) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{0}
+}
 
 type BundleStatus int32
 
@@ -66,11 +134,11 @@ func (x BundleStatus) String() string {
 }
 
 func (BundleStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_update_proto_enumTypes[0].Descriptor()
+	return file_mistgate_admin_v1_update_proto_enumTypes[1].Descriptor()
 }
 
 func (BundleStatus) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_update_proto_enumTypes[0]
+	return &file_mistgate_admin_v1_update_proto_enumTypes[1]
 }
 
 func (x BundleStatus) Number() protoreflect.EnumNumber {
@@ -79,7 +147,7 @@ func (x BundleStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BundleStatus.Descriptor instead.
 func (BundleStatus) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{0}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{1}
 }
 
 type NodeUpdateState int32
@@ -139,11 +207,11 @@ func (x NodeUpdateState) String() string {
 }
 
 func (NodeUpdateState) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_update_proto_enumTypes[1].Descriptor()
+	return file_mistgate_admin_v1_update_proto_enumTypes[2].Descriptor()
 }
 
 func (NodeUpdateState) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_update_proto_enumTypes[1]
+	return &file_mistgate_admin_v1_update_proto_enumTypes[2]
 }
 
 func (x NodeUpdateState) Number() protoreflect.EnumNumber {
@@ -152,7 +220,7 @@ func (x NodeUpdateState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use NodeUpdateState.Descriptor instead.
 func (NodeUpdateState) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{1}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{2}
 }
 
 type RolloutStatus int32
@@ -200,11 +268,11 @@ func (x RolloutStatus) String() string {
 }
 
 func (RolloutStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_update_proto_enumTypes[2].Descriptor()
+	return file_mistgate_admin_v1_update_proto_enumTypes[3].Descriptor()
 }
 
 func (RolloutStatus) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_update_proto_enumTypes[2]
+	return &file_mistgate_admin_v1_update_proto_enumTypes[3]
 }
 
 func (x RolloutStatus) Number() protoreflect.EnumNumber {
@@ -213,7 +281,7 @@ func (x RolloutStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RolloutStatus.Descriptor instead.
 func (RolloutStatus) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{2}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{3}
 }
 
 type StepState int32
@@ -272,11 +340,11 @@ func (x StepState) String() string {
 }
 
 func (StepState) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_update_proto_enumTypes[3].Descriptor()
+	return file_mistgate_admin_v1_update_proto_enumTypes[4].Descriptor()
 }
 
 func (StepState) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_update_proto_enumTypes[3]
+	return &file_mistgate_admin_v1_update_proto_enumTypes[4]
 }
 
 func (x StepState) Number() protoreflect.EnumNumber {
@@ -285,7 +353,211 @@ func (x StepState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StepState.Descriptor instead.
 func (StepState) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{4}
+}
+
+type GetOsUpdatesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOsUpdatesRequest) Reset() {
+	*x = GetOsUpdatesRequest{}
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOsUpdatesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOsUpdatesRequest) ProtoMessage() {}
+
+func (x *GetOsUpdatesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOsUpdatesRequest.ProtoReflect.Descriptor instead.
+func (*GetOsUpdatesRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{0}
+}
+
+type NodeOs struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Connected     bool                   `protobuf:"varint,3,opt,name=connected,proto3" json:"connected,omitempty"`
+	Supported     bool                   `protobuf:"varint,4,opt,name=supported,proto3" json:"supported,omitempty"`
+	OnlineUsers   uint32                 `protobuf:"varint,5,opt,name=online_users,json=onlineUsers,proto3" json:"online_users,omitempty"`
+	OnPanelServer bool                   `protobuf:"varint,6,opt,name=on_panel_server,json=onPanelServer,proto3" json:"on_panel_server,omitempty"`
+	State         OsUpdateState          `protobuf:"varint,7,opt,name=state,proto3,enum=mistgate.admin.v1.OsUpdateState" json:"state,omitempty"`
+	Status        *v1.OsStatus           `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeOs) Reset() {
+	*x = NodeOs{}
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeOs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeOs) ProtoMessage() {}
+
+func (x *NodeOs) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeOs.ProtoReflect.Descriptor instead.
+func (*NodeOs) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *NodeOs) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *NodeOs) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *NodeOs) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+func (x *NodeOs) GetSupported() bool {
+	if x != nil {
+		return x.Supported
+	}
+	return false
+}
+
+func (x *NodeOs) GetOnlineUsers() uint32 {
+	if x != nil {
+		return x.OnlineUsers
+	}
+	return 0
+}
+
+func (x *NodeOs) GetOnPanelServer() bool {
+	if x != nil {
+		return x.OnPanelServer
+	}
+	return false
+}
+
+func (x *NodeOs) GetState() OsUpdateState {
+	if x != nil {
+		return x.State
+	}
+	return OsUpdateState_OS_UPDATE_STATE_UNSPECIFIED
+}
+
+func (x *NodeOs) GetStatus() *v1.OsStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type GetOsUpdatesResponse struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	NowUnix                       int64                  `protobuf:"varint,1,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
+	Nodes                         []*NodeOs              `protobuf:"bytes,2,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	PanelHost                     *v1.OsStatus           `protobuf:"bytes,3,opt,name=panel_host,json=panelHost,proto3" json:"panel_host,omitempty"`
+	ScheduleTimezoneOffsetMinutes int32                  `protobuf:"varint,4,opt,name=schedule_timezone_offset_minutes,json=scheduleTimezoneOffsetMinutes,proto3" json:"schedule_timezone_offset_minutes,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *GetOsUpdatesResponse) Reset() {
+	*x = GetOsUpdatesResponse{}
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOsUpdatesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOsUpdatesResponse) ProtoMessage() {}
+
+func (x *GetOsUpdatesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOsUpdatesResponse.ProtoReflect.Descriptor instead.
+func (*GetOsUpdatesResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetOsUpdatesResponse) GetNowUnix() int64 {
+	if x != nil {
+		return x.NowUnix
+	}
+	return 0
+}
+
+func (x *GetOsUpdatesResponse) GetNodes() []*NodeOs {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
+func (x *GetOsUpdatesResponse) GetPanelHost() *v1.OsStatus {
+	if x != nil {
+		return x.PanelHost
+	}
+	return nil
+}
+
+func (x *GetOsUpdatesResponse) GetScheduleTimezoneOffsetMinutes() int32 {
+	if x != nil {
+		return x.ScheduleTimezoneOffsetMinutes
+	}
+	return 0
 }
 
 type PanelBuild struct {
@@ -306,7 +578,7 @@ type PanelBuild struct {
 
 func (x *PanelBuild) Reset() {
 	*x = PanelBuild{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[0]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -318,7 +590,7 @@ func (x *PanelBuild) String() string {
 func (*PanelBuild) ProtoMessage() {}
 
 func (x *PanelBuild) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[0]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -331,7 +603,7 @@ func (x *PanelBuild) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PanelBuild.ProtoReflect.Descriptor instead.
 func (*PanelBuild) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{0}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PanelBuild) GetVersion() string {
@@ -395,7 +667,7 @@ type PanelUpdate struct {
 
 func (x *PanelUpdate) Reset() {
 	*x = PanelUpdate{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -407,7 +679,7 @@ func (x *PanelUpdate) String() string {
 func (*PanelUpdate) ProtoMessage() {}
 
 func (x *PanelUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -420,7 +692,7 @@ func (x *PanelUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PanelUpdate.ProtoReflect.Descriptor instead.
 func (*PanelUpdate) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{1}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PanelUpdate) GetVersion() string {
@@ -514,7 +786,7 @@ type BundleFile struct {
 
 func (x *BundleFile) Reset() {
 	*x = BundleFile{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -526,7 +798,7 @@ func (x *BundleFile) String() string {
 func (*BundleFile) ProtoMessage() {}
 
 func (x *BundleFile) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -539,7 +811,7 @@ func (x *BundleFile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BundleFile.ProtoReflect.Descriptor instead.
 func (*BundleFile) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{2}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *BundleFile) GetOs() string {
@@ -601,7 +873,7 @@ type Bundle struct {
 
 func (x *Bundle) Reset() {
 	*x = Bundle{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -613,7 +885,7 @@ func (x *Bundle) String() string {
 func (*Bundle) ProtoMessage() {}
 
 func (x *Bundle) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -626,7 +898,7 @@ func (x *Bundle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Bundle.ProtoReflect.Descriptor instead.
 func (*Bundle) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Bundle) GetStatus() BundleStatus {
@@ -713,7 +985,7 @@ type LastUpdate struct {
 
 func (x *LastUpdate) Reset() {
 	*x = LastUpdate{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +997,7 @@ func (x *LastUpdate) String() string {
 func (*LastUpdate) ProtoMessage() {}
 
 func (x *LastUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +1010,7 @@ func (x *LastUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LastUpdate.ProtoReflect.Descriptor instead.
 func (*LastUpdate) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LastUpdate) GetOutcome() string {
@@ -827,7 +1099,7 @@ type NodeUpdate struct {
 
 func (x *NodeUpdate) Reset() {
 	*x = NodeUpdate{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -839,7 +1111,7 @@ func (x *NodeUpdate) String() string {
 func (*NodeUpdate) ProtoMessage() {}
 
 func (x *NodeUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -852,7 +1124,7 @@ func (x *NodeUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeUpdate.ProtoReflect.Descriptor instead.
 func (*NodeUpdate) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *NodeUpdate) GetNodeId() string {
@@ -1002,7 +1274,7 @@ type RolloutStep struct {
 
 func (x *RolloutStep) Reset() {
 	*x = RolloutStep{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1014,7 +1286,7 @@ func (x *RolloutStep) String() string {
 func (*RolloutStep) ProtoMessage() {}
 
 func (x *RolloutStep) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1027,7 +1299,7 @@ func (x *RolloutStep) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RolloutStep.ProtoReflect.Descriptor instead.
 func (*RolloutStep) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RolloutStep) GetNodeId() string {
@@ -1155,7 +1427,7 @@ type Rollout struct {
 
 func (x *Rollout) Reset() {
 	*x = Rollout{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1439,7 @@ func (x *Rollout) String() string {
 func (*Rollout) ProtoMessage() {}
 
 func (x *Rollout) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1452,7 @@ func (x *Rollout) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rollout.ProtoReflect.Descriptor instead.
 func (*Rollout) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Rollout) GetId() string {
@@ -1261,7 +1533,7 @@ type GetUpdatesRequest struct {
 
 func (x *GetUpdatesRequest) Reset() {
 	*x = GetUpdatesRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1273,7 +1545,7 @@ func (x *GetUpdatesRequest) String() string {
 func (*GetUpdatesRequest) ProtoMessage() {}
 
 func (x *GetUpdatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1286,7 +1558,7 @@ func (x *GetUpdatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUpdatesRequest.ProtoReflect.Descriptor instead.
 func (*GetUpdatesRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{11}
 }
 
 type GetUpdatesResponse struct {
@@ -1326,7 +1598,7 @@ type GetUpdatesResponse struct {
 
 func (x *GetUpdatesResponse) Reset() {
 	*x = GetUpdatesResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1338,7 +1610,7 @@ func (x *GetUpdatesResponse) String() string {
 func (*GetUpdatesResponse) ProtoMessage() {}
 
 func (x *GetUpdatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1351,7 +1623,7 @@ func (x *GetUpdatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUpdatesResponse.ProtoReflect.Descriptor instead.
 func (*GetUpdatesResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetUpdatesResponse) GetNowUnix() int64 {
@@ -1480,7 +1752,7 @@ type ReleaseNote struct {
 
 func (x *ReleaseNote) Reset() {
 	*x = ReleaseNote{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1492,7 +1764,7 @@ func (x *ReleaseNote) String() string {
 func (*ReleaseNote) ProtoMessage() {}
 
 func (x *ReleaseNote) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1505,7 +1777,7 @@ func (x *ReleaseNote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseNote.ProtoReflect.Descriptor instead.
 func (*ReleaseNote) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ReleaseNote) GetVersion() string {
@@ -1572,7 +1844,7 @@ type CheckPanelUpdateRequest struct {
 
 func (x *CheckPanelUpdateRequest) Reset() {
 	*x = CheckPanelUpdateRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1584,7 +1856,7 @@ func (x *CheckPanelUpdateRequest) String() string {
 func (*CheckPanelUpdateRequest) ProtoMessage() {}
 
 func (x *CheckPanelUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1597,7 +1869,7 @@ func (x *CheckPanelUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckPanelUpdateRequest.ProtoReflect.Descriptor instead.
 func (*CheckPanelUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{14}
 }
 
 type CheckPanelUpdateResponse struct {
@@ -1609,7 +1881,7 @@ type CheckPanelUpdateResponse struct {
 
 func (x *CheckPanelUpdateResponse) Reset() {
 	*x = CheckPanelUpdateResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1621,7 +1893,7 @@ func (x *CheckPanelUpdateResponse) String() string {
 func (*CheckPanelUpdateResponse) ProtoMessage() {}
 
 func (x *CheckPanelUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1634,7 +1906,7 @@ func (x *CheckPanelUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckPanelUpdateResponse.ProtoReflect.Descriptor instead.
 func (*CheckPanelUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CheckPanelUpdateResponse) GetUpdate() *PanelUpdate {
@@ -1656,7 +1928,7 @@ type InstallPanelUpdateRequest struct {
 
 func (x *InstallPanelUpdateRequest) Reset() {
 	*x = InstallPanelUpdateRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1668,7 +1940,7 @@ func (x *InstallPanelUpdateRequest) String() string {
 func (*InstallPanelUpdateRequest) ProtoMessage() {}
 
 func (x *InstallPanelUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1681,7 +1953,7 @@ func (x *InstallPanelUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallPanelUpdateRequest.ProtoReflect.Descriptor instead.
 func (*InstallPanelUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *InstallPanelUpdateRequest) GetExpectedVersion() string {
@@ -1707,7 +1979,7 @@ type InstallPanelUpdateResponse struct {
 
 func (x *InstallPanelUpdateResponse) Reset() {
 	*x = InstallPanelUpdateResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1719,7 +1991,7 @@ func (x *InstallPanelUpdateResponse) String() string {
 func (*InstallPanelUpdateResponse) ProtoMessage() {}
 
 func (x *InstallPanelUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1732,7 +2004,7 @@ func (x *InstallPanelUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallPanelUpdateResponse.ProtoReflect.Descriptor instead.
 func (*InstallPanelUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *InstallPanelUpdateResponse) GetUpdate() *PanelUpdate {
@@ -1759,7 +2031,7 @@ type StartRolloutRequest struct {
 
 func (x *StartRolloutRequest) Reset() {
 	*x = StartRolloutRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1771,7 +2043,7 @@ func (x *StartRolloutRequest) String() string {
 func (*StartRolloutRequest) ProtoMessage() {}
 
 func (x *StartRolloutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1784,7 +2056,7 @@ func (x *StartRolloutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRolloutRequest.ProtoReflect.Descriptor instead.
 func (*StartRolloutRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StartRolloutRequest) GetNodeIds() []string {
@@ -1824,7 +2096,7 @@ type StartRolloutResponse struct {
 
 func (x *StartRolloutResponse) Reset() {
 	*x = StartRolloutResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1836,7 +2108,7 @@ func (x *StartRolloutResponse) String() string {
 func (*StartRolloutResponse) ProtoMessage() {}
 
 func (x *StartRolloutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1849,7 +2121,7 @@ func (x *StartRolloutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRolloutResponse.ProtoReflect.Descriptor instead.
 func (*StartRolloutResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *StartRolloutResponse) GetRollout() *Rollout {
@@ -1868,7 +2140,7 @@ type PauseRolloutRequest struct {
 
 func (x *PauseRolloutRequest) Reset() {
 	*x = PauseRolloutRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1880,7 +2152,7 @@ func (x *PauseRolloutRequest) String() string {
 func (*PauseRolloutRequest) ProtoMessage() {}
 
 func (x *PauseRolloutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1893,7 +2165,7 @@ func (x *PauseRolloutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseRolloutRequest.ProtoReflect.Descriptor instead.
 func (*PauseRolloutRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PauseRolloutRequest) GetRolloutId() string {
@@ -1912,7 +2184,7 @@ type PauseRolloutResponse struct {
 
 func (x *PauseRolloutResponse) Reset() {
 	*x = PauseRolloutResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1924,7 +2196,7 @@ func (x *PauseRolloutResponse) String() string {
 func (*PauseRolloutResponse) ProtoMessage() {}
 
 func (x *PauseRolloutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1937,7 +2209,7 @@ func (x *PauseRolloutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseRolloutResponse.ProtoReflect.Descriptor instead.
 func (*PauseRolloutResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *PauseRolloutResponse) GetRollout() *Rollout {
@@ -1956,7 +2228,7 @@ type ResumeRolloutRequest struct {
 
 func (x *ResumeRolloutRequest) Reset() {
 	*x = ResumeRolloutRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1968,7 +2240,7 @@ func (x *ResumeRolloutRequest) String() string {
 func (*ResumeRolloutRequest) ProtoMessage() {}
 
 func (x *ResumeRolloutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1981,7 +2253,7 @@ func (x *ResumeRolloutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRolloutRequest.ProtoReflect.Descriptor instead.
 func (*ResumeRolloutRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ResumeRolloutRequest) GetRolloutId() string {
@@ -2000,7 +2272,7 @@ type ResumeRolloutResponse struct {
 
 func (x *ResumeRolloutResponse) Reset() {
 	*x = ResumeRolloutResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2012,7 +2284,7 @@ func (x *ResumeRolloutResponse) String() string {
 func (*ResumeRolloutResponse) ProtoMessage() {}
 
 func (x *ResumeRolloutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2025,7 +2297,7 @@ func (x *ResumeRolloutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRolloutResponse.ProtoReflect.Descriptor instead.
 func (*ResumeRolloutResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{20}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ResumeRolloutResponse) GetRollout() *Rollout {
@@ -2044,7 +2316,7 @@ type CancelRolloutRequest struct {
 
 func (x *CancelRolloutRequest) Reset() {
 	*x = CancelRolloutRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2056,7 +2328,7 @@ func (x *CancelRolloutRequest) String() string {
 func (*CancelRolloutRequest) ProtoMessage() {}
 
 func (x *CancelRolloutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2069,7 +2341,7 @@ func (x *CancelRolloutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRolloutRequest.ProtoReflect.Descriptor instead.
 func (*CancelRolloutRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{21}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CancelRolloutRequest) GetRolloutId() string {
@@ -2088,7 +2360,7 @@ type CancelRolloutResponse struct {
 
 func (x *CancelRolloutResponse) Reset() {
 	*x = CancelRolloutResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2100,7 +2372,7 @@ func (x *CancelRolloutResponse) String() string {
 func (*CancelRolloutResponse) ProtoMessage() {}
 
 func (x *CancelRolloutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2113,7 +2385,7 @@ func (x *CancelRolloutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRolloutResponse.ProtoReflect.Descriptor instead.
 func (*CancelRolloutResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *CancelRolloutResponse) GetRollout() *Rollout {
@@ -2132,7 +2404,7 @@ type RollbackNodeRequest struct {
 
 func (x *RollbackNodeRequest) Reset() {
 	*x = RollbackNodeRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2144,7 +2416,7 @@ func (x *RollbackNodeRequest) String() string {
 func (*RollbackNodeRequest) ProtoMessage() {}
 
 func (x *RollbackNodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2157,7 +2429,7 @@ func (x *RollbackNodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackNodeRequest.ProtoReflect.Descriptor instead.
 func (*RollbackNodeRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RollbackNodeRequest) GetNodeId() string {
@@ -2179,7 +2451,7 @@ type RollbackNodeResponse struct {
 
 func (x *RollbackNodeResponse) Reset() {
 	*x = RollbackNodeResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2191,7 +2463,7 @@ func (x *RollbackNodeResponse) String() string {
 func (*RollbackNodeResponse) ProtoMessage() {}
 
 func (x *RollbackNodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2204,7 +2476,7 @@ func (x *RollbackNodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackNodeResponse.ProtoReflect.Descriptor instead.
 func (*RollbackNodeResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RollbackNodeResponse) GetNode() *NodeUpdate {
@@ -2222,7 +2494,7 @@ type RescanBundleRequest struct {
 
 func (x *RescanBundleRequest) Reset() {
 	*x = RescanBundleRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2234,7 +2506,7 @@ func (x *RescanBundleRequest) String() string {
 func (*RescanBundleRequest) ProtoMessage() {}
 
 func (x *RescanBundleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2247,7 +2519,7 @@ func (x *RescanBundleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RescanBundleRequest.ProtoReflect.Descriptor instead.
 func (*RescanBundleRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{28}
 }
 
 type RescanBundleResponse struct {
@@ -2259,7 +2531,7 @@ type RescanBundleResponse struct {
 
 func (x *RescanBundleResponse) Reset() {
 	*x = RescanBundleResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2271,7 +2543,7 @@ func (x *RescanBundleResponse) String() string {
 func (*RescanBundleResponse) ProtoMessage() {}
 
 func (x *RescanBundleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2284,7 +2556,7 @@ func (x *RescanBundleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RescanBundleResponse.ProtoReflect.Descriptor instead.
 func (*RescanBundleResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RescanBundleResponse) GetBundle() *Bundle {
@@ -2308,7 +2580,7 @@ type ScheduleNodeUpdateRequest struct {
 
 func (x *ScheduleNodeUpdateRequest) Reset() {
 	*x = ScheduleNodeUpdateRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2320,7 +2592,7 @@ func (x *ScheduleNodeUpdateRequest) String() string {
 func (*ScheduleNodeUpdateRequest) ProtoMessage() {}
 
 func (x *ScheduleNodeUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2333,7 +2605,7 @@ func (x *ScheduleNodeUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduleNodeUpdateRequest.ProtoReflect.Descriptor instead.
 func (*ScheduleNodeUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ScheduleNodeUpdateRequest) GetNodeId() string {
@@ -2383,7 +2655,7 @@ type ScheduleNodeUpdateResponse struct {
 
 func (x *ScheduleNodeUpdateResponse) Reset() {
 	*x = ScheduleNodeUpdateResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2395,7 +2667,7 @@ func (x *ScheduleNodeUpdateResponse) String() string {
 func (*ScheduleNodeUpdateResponse) ProtoMessage() {}
 
 func (x *ScheduleNodeUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2408,7 +2680,7 @@ func (x *ScheduleNodeUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduleNodeUpdateResponse.ProtoReflect.Descriptor instead.
 func (*ScheduleNodeUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{28}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ScheduleNodeUpdateResponse) GetScheduledUnix() int64 {
@@ -2448,7 +2720,7 @@ type CancelNodeUpdateScheduleRequest struct {
 
 func (x *CancelNodeUpdateScheduleRequest) Reset() {
 	*x = CancelNodeUpdateScheduleRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2460,7 +2732,7 @@ func (x *CancelNodeUpdateScheduleRequest) String() string {
 func (*CancelNodeUpdateScheduleRequest) ProtoMessage() {}
 
 func (x *CancelNodeUpdateScheduleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2473,7 +2745,7 @@ func (x *CancelNodeUpdateScheduleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelNodeUpdateScheduleRequest.ProtoReflect.Descriptor instead.
 func (*CancelNodeUpdateScheduleRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{29}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *CancelNodeUpdateScheduleRequest) GetNodeId() string {
@@ -2492,7 +2764,7 @@ type CancelNodeUpdateScheduleResponse struct {
 
 func (x *CancelNodeUpdateScheduleResponse) Reset() {
 	*x = CancelNodeUpdateScheduleResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2504,7 +2776,7 @@ func (x *CancelNodeUpdateScheduleResponse) String() string {
 func (*CancelNodeUpdateScheduleResponse) ProtoMessage() {}
 
 func (x *CancelNodeUpdateScheduleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2517,7 +2789,7 @@ func (x *CancelNodeUpdateScheduleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelNodeUpdateScheduleResponse.ProtoReflect.Descriptor instead.
 func (*CancelNodeUpdateScheduleResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{30}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *CancelNodeUpdateScheduleResponse) GetCancelled() bool {
@@ -2536,7 +2808,7 @@ type SetUpdateTimezoneRequest struct {
 
 func (x *SetUpdateTimezoneRequest) Reset() {
 	*x = SetUpdateTimezoneRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2548,7 +2820,7 @@ func (x *SetUpdateTimezoneRequest) String() string {
 func (*SetUpdateTimezoneRequest) ProtoMessage() {}
 
 func (x *SetUpdateTimezoneRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2561,7 +2833,7 @@ func (x *SetUpdateTimezoneRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUpdateTimezoneRequest.ProtoReflect.Descriptor instead.
 func (*SetUpdateTimezoneRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{31}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SetUpdateTimezoneRequest) GetTimezoneOffsetMinutes() int32 {
@@ -2580,7 +2852,7 @@ type SetUpdateTimezoneResponse struct {
 
 func (x *SetUpdateTimezoneResponse) Reset() {
 	*x = SetUpdateTimezoneResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2592,7 +2864,7 @@ func (x *SetUpdateTimezoneResponse) String() string {
 func (*SetUpdateTimezoneResponse) ProtoMessage() {}
 
 func (x *SetUpdateTimezoneResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2605,7 +2877,7 @@ func (x *SetUpdateTimezoneResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUpdateTimezoneResponse.ProtoReflect.Descriptor instead.
 func (*SetUpdateTimezoneResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{32}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SetUpdateTimezoneResponse) GetTimezoneOffsetMinutes() int32 {
@@ -2625,7 +2897,7 @@ type SetUpdateChannelRequest struct {
 
 func (x *SetUpdateChannelRequest) Reset() {
 	*x = SetUpdateChannelRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2637,7 +2909,7 @@ func (x *SetUpdateChannelRequest) String() string {
 func (*SetUpdateChannelRequest) ProtoMessage() {}
 
 func (x *SetUpdateChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2650,7 +2922,7 @@ func (x *SetUpdateChannelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUpdateChannelRequest.ProtoReflect.Descriptor instead.
 func (*SetUpdateChannelRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{33}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SetUpdateChannelRequest) GetChannel() string {
@@ -2669,7 +2941,7 @@ type SetUpdateChannelResponse struct {
 
 func (x *SetUpdateChannelResponse) Reset() {
 	*x = SetUpdateChannelResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2681,7 +2953,7 @@ func (x *SetUpdateChannelResponse) String() string {
 func (*SetUpdateChannelResponse) ProtoMessage() {}
 
 func (x *SetUpdateChannelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2694,7 +2966,7 @@ func (x *SetUpdateChannelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUpdateChannelResponse.ProtoReflect.Descriptor instead.
 func (*SetUpdateChannelResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{34}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SetUpdateChannelResponse) GetChannel() string {
@@ -2713,7 +2985,7 @@ type SetUpdateDownloadTimeoutRequest struct {
 
 func (x *SetUpdateDownloadTimeoutRequest) Reset() {
 	*x = SetUpdateDownloadTimeoutRequest{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2725,7 +2997,7 @@ func (x *SetUpdateDownloadTimeoutRequest) String() string {
 func (*SetUpdateDownloadTimeoutRequest) ProtoMessage() {}
 
 func (x *SetUpdateDownloadTimeoutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2738,7 +3010,7 @@ func (x *SetUpdateDownloadTimeoutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUpdateDownloadTimeoutRequest.ProtoReflect.Descriptor instead.
 func (*SetUpdateDownloadTimeoutRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{35}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *SetUpdateDownloadTimeoutRequest) GetTimeoutSeconds() uint32 {
@@ -2757,7 +3029,7 @@ type SetUpdateDownloadTimeoutResponse struct {
 
 func (x *SetUpdateDownloadTimeoutResponse) Reset() {
 	*x = SetUpdateDownloadTimeoutResponse{}
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2769,7 +3041,7 @@ func (x *SetUpdateDownloadTimeoutResponse) String() string {
 func (*SetUpdateDownloadTimeoutResponse) ProtoMessage() {}
 
 func (x *SetUpdateDownloadTimeoutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_update_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_update_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2782,7 +3054,7 @@ func (x *SetUpdateDownloadTimeoutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUpdateDownloadTimeoutResponse.ProtoReflect.Descriptor instead.
 func (*SetUpdateDownloadTimeoutResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{36}
+	return file_mistgate_admin_v1_update_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SetUpdateDownloadTimeoutResponse) GetTimeoutSeconds() uint32 {
@@ -2796,7 +3068,23 @@ var File_mistgate_admin_v1_update_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\n" +
-	"\x1emistgate/admin/v1/update.proto\x12\x11mistgate.admin.v1\"\xd8\x01\n" +
+	"\x1emistgate/admin/v1/update.proto\x12\x11mistgate.admin.v1\x1a\x1dmistgate/agent/v1/agent.proto\"\x15\n" +
+	"\x13GetOsUpdatesRequest\"\xa9\x02\n" +
+	"\x06NodeOs\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
+	"\tconnected\x18\x03 \x01(\bR\tconnected\x12\x1c\n" +
+	"\tsupported\x18\x04 \x01(\bR\tsupported\x12!\n" +
+	"\fonline_users\x18\x05 \x01(\rR\vonlineUsers\x12&\n" +
+	"\x0fon_panel_server\x18\x06 \x01(\bR\ronPanelServer\x126\n" +
+	"\x05state\x18\a \x01(\x0e2 .mistgate.admin.v1.OsUpdateStateR\x05state\x123\n" +
+	"\x06status\x18\b \x01(\v2\x1b.mistgate.agent.v1.OsStatusR\x06status\"\xeb\x01\n" +
+	"\x14GetOsUpdatesResponse\x12\x1d\n" +
+	"\bnow_unix\x18\x01 \x01(\x03B\x020\x02R\anowUnix\x12/\n" +
+	"\x05nodes\x18\x02 \x03(\v2\x19.mistgate.admin.v1.NodeOsR\x05nodes\x12:\n" +
+	"\n" +
+	"panel_host\x18\x03 \x01(\v2\x1b.mistgate.agent.v1.OsStatusR\tpanelHost\x12G\n" +
+	" schedule_timezone_offset_minutes\x18\x04 \x01(\x05R\x1dscheduleTimezoneOffsetMinutes\"\xd8\x01\n" +
 	"\n" +
 	"PanelBuild\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
@@ -3002,7 +3290,17 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\x1fSetUpdateDownloadTimeoutRequest\x12'\n" +
 	"\x0ftimeout_seconds\x18\x01 \x01(\rR\x0etimeoutSeconds\"K\n" +
 	" SetUpdateDownloadTimeoutResponse\x12'\n" +
-	"\x0ftimeout_seconds\x18\x01 \x01(\rR\x0etimeoutSeconds*\x9a\x01\n" +
+	"\x0ftimeout_seconds\x18\x01 \x01(\rR\x0etimeoutSeconds*\xa3\x02\n" +
+	"\rOsUpdateState\x12\x1f\n" +
+	"\x1bOS_UPDATE_STATE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bOS_UPDATE_STATE_UNSUPPORTED\x10\x01\x12\x1b\n" +
+	"\x17OS_UPDATE_STATE_OFFLINE\x10\x02\x12\x1b\n" +
+	"\x17OS_UPDATE_STATE_UNKNOWN\x10\x03\x12\x18\n" +
+	"\x14OS_UPDATE_STATE_BUSY\x10\x04\x12\x1a\n" +
+	"\x16OS_UPDATE_STATE_FAILED\x10\x05\x12#\n" +
+	"\x1fOS_UPDATE_STATE_REBOOT_REQUIRED\x10\x06\x12\x1b\n" +
+	"\x17OS_UPDATE_STATE_UPDATES\x10\a\x12\x1e\n" +
+	"\x1aOS_UPDATE_STATE_UP_TO_DATE\x10\b*\x9a\x01\n" +
 	"\fBundleStatus\x12\x1d\n" +
 	"\x19BUNDLE_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15BUNDLE_STATUS_MISSING\x10\x01\x12\x19\n" +
@@ -3033,10 +3331,11 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\x11STEP_STATE_PASSED\x10\x04\x12\x15\n" +
 	"\x11STEP_STATE_FAILED\x10\x05\x12\x1a\n" +
 	"\x16STEP_STATE_ROLLED_BACK\x10\x06\x12\x16\n" +
-	"\x12STEP_STATE_SKIPPED\x10\a2\xf2\v\n" +
+	"\x12STEP_STATE_SKIPPED\x10\a2\xd3\f\n" +
 	"\rUpdateService\x12Y\n" +
 	"\n" +
-	"GetUpdates\x12$.mistgate.admin.v1.GetUpdatesRequest\x1a%.mistgate.admin.v1.GetUpdatesResponse\x12k\n" +
+	"GetUpdates\x12$.mistgate.admin.v1.GetUpdatesRequest\x1a%.mistgate.admin.v1.GetUpdatesResponse\x12_\n" +
+	"\fGetOsUpdates\x12&.mistgate.admin.v1.GetOsUpdatesRequest\x1a'.mistgate.admin.v1.GetOsUpdatesResponse\x12k\n" +
 	"\x10CheckPanelUpdate\x12*.mistgate.admin.v1.CheckPanelUpdateRequest\x1a+.mistgate.admin.v1.CheckPanelUpdateResponse\x12q\n" +
 	"\x12InstallPanelUpdate\x12,.mistgate.admin.v1.InstallPanelUpdateRequest\x1a-.mistgate.admin.v1.InstallPanelUpdateResponse\x12_\n" +
 	"\fStartRollout\x12&.mistgate.admin.v1.StartRolloutRequest\x1a'.mistgate.admin.v1.StartRolloutResponse\x12_\n" +
@@ -3064,113 +3363,124 @@ func file_mistgate_admin_v1_update_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_update_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_update_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_mistgate_admin_v1_update_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_mistgate_admin_v1_update_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_mistgate_admin_v1_update_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
 var file_mistgate_admin_v1_update_proto_goTypes = []any{
-	(BundleStatus)(0),                        // 0: mistgate.admin.v1.BundleStatus
-	(NodeUpdateState)(0),                     // 1: mistgate.admin.v1.NodeUpdateState
-	(RolloutStatus)(0),                       // 2: mistgate.admin.v1.RolloutStatus
-	(StepState)(0),                           // 3: mistgate.admin.v1.StepState
-	(*PanelBuild)(nil),                       // 4: mistgate.admin.v1.PanelBuild
-	(*PanelUpdate)(nil),                      // 5: mistgate.admin.v1.PanelUpdate
-	(*BundleFile)(nil),                       // 6: mistgate.admin.v1.BundleFile
-	(*Bundle)(nil),                           // 7: mistgate.admin.v1.Bundle
-	(*LastUpdate)(nil),                       // 8: mistgate.admin.v1.LastUpdate
-	(*NodeUpdate)(nil),                       // 9: mistgate.admin.v1.NodeUpdate
-	(*RolloutStep)(nil),                      // 10: mistgate.admin.v1.RolloutStep
-	(*Rollout)(nil),                          // 11: mistgate.admin.v1.Rollout
-	(*GetUpdatesRequest)(nil),                // 12: mistgate.admin.v1.GetUpdatesRequest
-	(*GetUpdatesResponse)(nil),               // 13: mistgate.admin.v1.GetUpdatesResponse
-	(*ReleaseNote)(nil),                      // 14: mistgate.admin.v1.ReleaseNote
-	(*CheckPanelUpdateRequest)(nil),          // 15: mistgate.admin.v1.CheckPanelUpdateRequest
-	(*CheckPanelUpdateResponse)(nil),         // 16: mistgate.admin.v1.CheckPanelUpdateResponse
-	(*InstallPanelUpdateRequest)(nil),        // 17: mistgate.admin.v1.InstallPanelUpdateRequest
-	(*InstallPanelUpdateResponse)(nil),       // 18: mistgate.admin.v1.InstallPanelUpdateResponse
-	(*StartRolloutRequest)(nil),              // 19: mistgate.admin.v1.StartRolloutRequest
-	(*StartRolloutResponse)(nil),             // 20: mistgate.admin.v1.StartRolloutResponse
-	(*PauseRolloutRequest)(nil),              // 21: mistgate.admin.v1.PauseRolloutRequest
-	(*PauseRolloutResponse)(nil),             // 22: mistgate.admin.v1.PauseRolloutResponse
-	(*ResumeRolloutRequest)(nil),             // 23: mistgate.admin.v1.ResumeRolloutRequest
-	(*ResumeRolloutResponse)(nil),            // 24: mistgate.admin.v1.ResumeRolloutResponse
-	(*CancelRolloutRequest)(nil),             // 25: mistgate.admin.v1.CancelRolloutRequest
-	(*CancelRolloutResponse)(nil),            // 26: mistgate.admin.v1.CancelRolloutResponse
-	(*RollbackNodeRequest)(nil),              // 27: mistgate.admin.v1.RollbackNodeRequest
-	(*RollbackNodeResponse)(nil),             // 28: mistgate.admin.v1.RollbackNodeResponse
-	(*RescanBundleRequest)(nil),              // 29: mistgate.admin.v1.RescanBundleRequest
-	(*RescanBundleResponse)(nil),             // 30: mistgate.admin.v1.RescanBundleResponse
-	(*ScheduleNodeUpdateRequest)(nil),        // 31: mistgate.admin.v1.ScheduleNodeUpdateRequest
-	(*ScheduleNodeUpdateResponse)(nil),       // 32: mistgate.admin.v1.ScheduleNodeUpdateResponse
-	(*CancelNodeUpdateScheduleRequest)(nil),  // 33: mistgate.admin.v1.CancelNodeUpdateScheduleRequest
-	(*CancelNodeUpdateScheduleResponse)(nil), // 34: mistgate.admin.v1.CancelNodeUpdateScheduleResponse
-	(*SetUpdateTimezoneRequest)(nil),         // 35: mistgate.admin.v1.SetUpdateTimezoneRequest
-	(*SetUpdateTimezoneResponse)(nil),        // 36: mistgate.admin.v1.SetUpdateTimezoneResponse
-	(*SetUpdateChannelRequest)(nil),          // 37: mistgate.admin.v1.SetUpdateChannelRequest
-	(*SetUpdateChannelResponse)(nil),         // 38: mistgate.admin.v1.SetUpdateChannelResponse
-	(*SetUpdateDownloadTimeoutRequest)(nil),  // 39: mistgate.admin.v1.SetUpdateDownloadTimeoutRequest
-	(*SetUpdateDownloadTimeoutResponse)(nil), // 40: mistgate.admin.v1.SetUpdateDownloadTimeoutResponse
-	nil,                                      // 41: mistgate.admin.v1.Bundle.ParamsEntry
-	nil,                                      // 42: mistgate.admin.v1.RolloutStep.ParamsEntry
-	nil,                                      // 43: mistgate.admin.v1.Rollout.PauseParamsEntry
+	(OsUpdateState)(0),                       // 0: mistgate.admin.v1.OsUpdateState
+	(BundleStatus)(0),                        // 1: mistgate.admin.v1.BundleStatus
+	(NodeUpdateState)(0),                     // 2: mistgate.admin.v1.NodeUpdateState
+	(RolloutStatus)(0),                       // 3: mistgate.admin.v1.RolloutStatus
+	(StepState)(0),                           // 4: mistgate.admin.v1.StepState
+	(*GetOsUpdatesRequest)(nil),              // 5: mistgate.admin.v1.GetOsUpdatesRequest
+	(*NodeOs)(nil),                           // 6: mistgate.admin.v1.NodeOs
+	(*GetOsUpdatesResponse)(nil),             // 7: mistgate.admin.v1.GetOsUpdatesResponse
+	(*PanelBuild)(nil),                       // 8: mistgate.admin.v1.PanelBuild
+	(*PanelUpdate)(nil),                      // 9: mistgate.admin.v1.PanelUpdate
+	(*BundleFile)(nil),                       // 10: mistgate.admin.v1.BundleFile
+	(*Bundle)(nil),                           // 11: mistgate.admin.v1.Bundle
+	(*LastUpdate)(nil),                       // 12: mistgate.admin.v1.LastUpdate
+	(*NodeUpdate)(nil),                       // 13: mistgate.admin.v1.NodeUpdate
+	(*RolloutStep)(nil),                      // 14: mistgate.admin.v1.RolloutStep
+	(*Rollout)(nil),                          // 15: mistgate.admin.v1.Rollout
+	(*GetUpdatesRequest)(nil),                // 16: mistgate.admin.v1.GetUpdatesRequest
+	(*GetUpdatesResponse)(nil),               // 17: mistgate.admin.v1.GetUpdatesResponse
+	(*ReleaseNote)(nil),                      // 18: mistgate.admin.v1.ReleaseNote
+	(*CheckPanelUpdateRequest)(nil),          // 19: mistgate.admin.v1.CheckPanelUpdateRequest
+	(*CheckPanelUpdateResponse)(nil),         // 20: mistgate.admin.v1.CheckPanelUpdateResponse
+	(*InstallPanelUpdateRequest)(nil),        // 21: mistgate.admin.v1.InstallPanelUpdateRequest
+	(*InstallPanelUpdateResponse)(nil),       // 22: mistgate.admin.v1.InstallPanelUpdateResponse
+	(*StartRolloutRequest)(nil),              // 23: mistgate.admin.v1.StartRolloutRequest
+	(*StartRolloutResponse)(nil),             // 24: mistgate.admin.v1.StartRolloutResponse
+	(*PauseRolloutRequest)(nil),              // 25: mistgate.admin.v1.PauseRolloutRequest
+	(*PauseRolloutResponse)(nil),             // 26: mistgate.admin.v1.PauseRolloutResponse
+	(*ResumeRolloutRequest)(nil),             // 27: mistgate.admin.v1.ResumeRolloutRequest
+	(*ResumeRolloutResponse)(nil),            // 28: mistgate.admin.v1.ResumeRolloutResponse
+	(*CancelRolloutRequest)(nil),             // 29: mistgate.admin.v1.CancelRolloutRequest
+	(*CancelRolloutResponse)(nil),            // 30: mistgate.admin.v1.CancelRolloutResponse
+	(*RollbackNodeRequest)(nil),              // 31: mistgate.admin.v1.RollbackNodeRequest
+	(*RollbackNodeResponse)(nil),             // 32: mistgate.admin.v1.RollbackNodeResponse
+	(*RescanBundleRequest)(nil),              // 33: mistgate.admin.v1.RescanBundleRequest
+	(*RescanBundleResponse)(nil),             // 34: mistgate.admin.v1.RescanBundleResponse
+	(*ScheduleNodeUpdateRequest)(nil),        // 35: mistgate.admin.v1.ScheduleNodeUpdateRequest
+	(*ScheduleNodeUpdateResponse)(nil),       // 36: mistgate.admin.v1.ScheduleNodeUpdateResponse
+	(*CancelNodeUpdateScheduleRequest)(nil),  // 37: mistgate.admin.v1.CancelNodeUpdateScheduleRequest
+	(*CancelNodeUpdateScheduleResponse)(nil), // 38: mistgate.admin.v1.CancelNodeUpdateScheduleResponse
+	(*SetUpdateTimezoneRequest)(nil),         // 39: mistgate.admin.v1.SetUpdateTimezoneRequest
+	(*SetUpdateTimezoneResponse)(nil),        // 40: mistgate.admin.v1.SetUpdateTimezoneResponse
+	(*SetUpdateChannelRequest)(nil),          // 41: mistgate.admin.v1.SetUpdateChannelRequest
+	(*SetUpdateChannelResponse)(nil),         // 42: mistgate.admin.v1.SetUpdateChannelResponse
+	(*SetUpdateDownloadTimeoutRequest)(nil),  // 43: mistgate.admin.v1.SetUpdateDownloadTimeoutRequest
+	(*SetUpdateDownloadTimeoutResponse)(nil), // 44: mistgate.admin.v1.SetUpdateDownloadTimeoutResponse
+	nil,                                      // 45: mistgate.admin.v1.Bundle.ParamsEntry
+	nil,                                      // 46: mistgate.admin.v1.RolloutStep.ParamsEntry
+	nil,                                      // 47: mistgate.admin.v1.Rollout.PauseParamsEntry
+	(*v1.OsStatus)(nil),                      // 48: mistgate.agent.v1.OsStatus
 }
 var file_mistgate_admin_v1_update_proto_depIdxs = []int32{
-	5,  // 0: mistgate.admin.v1.PanelBuild.update:type_name -> mistgate.admin.v1.PanelUpdate
-	0,  // 1: mistgate.admin.v1.Bundle.status:type_name -> mistgate.admin.v1.BundleStatus
-	6,  // 2: mistgate.admin.v1.Bundle.files:type_name -> mistgate.admin.v1.BundleFile
-	41, // 3: mistgate.admin.v1.Bundle.params:type_name -> mistgate.admin.v1.Bundle.ParamsEntry
-	1,  // 4: mistgate.admin.v1.NodeUpdate.state:type_name -> mistgate.admin.v1.NodeUpdateState
-	8,  // 5: mistgate.admin.v1.NodeUpdate.last_update:type_name -> mistgate.admin.v1.LastUpdate
-	3,  // 6: mistgate.admin.v1.RolloutStep.state:type_name -> mistgate.admin.v1.StepState
-	42, // 7: mistgate.admin.v1.RolloutStep.params:type_name -> mistgate.admin.v1.RolloutStep.ParamsEntry
-	2,  // 8: mistgate.admin.v1.Rollout.status:type_name -> mistgate.admin.v1.RolloutStatus
-	43, // 9: mistgate.admin.v1.Rollout.pause_params:type_name -> mistgate.admin.v1.Rollout.PauseParamsEntry
-	10, // 10: mistgate.admin.v1.Rollout.steps:type_name -> mistgate.admin.v1.RolloutStep
-	4,  // 11: mistgate.admin.v1.GetUpdatesResponse.panel:type_name -> mistgate.admin.v1.PanelBuild
-	7,  // 12: mistgate.admin.v1.GetUpdatesResponse.bundle:type_name -> mistgate.admin.v1.Bundle
-	9,  // 13: mistgate.admin.v1.GetUpdatesResponse.nodes:type_name -> mistgate.admin.v1.NodeUpdate
-	11, // 14: mistgate.admin.v1.GetUpdatesResponse.rollout:type_name -> mistgate.admin.v1.Rollout
-	14, // 15: mistgate.admin.v1.GetUpdatesResponse.agent_notes:type_name -> mistgate.admin.v1.ReleaseNote
-	14, // 16: mistgate.admin.v1.GetUpdatesResponse.panel_notes:type_name -> mistgate.admin.v1.ReleaseNote
-	5,  // 17: mistgate.admin.v1.CheckPanelUpdateResponse.update:type_name -> mistgate.admin.v1.PanelUpdate
-	5,  // 18: mistgate.admin.v1.InstallPanelUpdateResponse.update:type_name -> mistgate.admin.v1.PanelUpdate
-	11, // 19: mistgate.admin.v1.StartRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
-	11, // 20: mistgate.admin.v1.PauseRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
-	11, // 21: mistgate.admin.v1.ResumeRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
-	11, // 22: mistgate.admin.v1.CancelRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
-	9,  // 23: mistgate.admin.v1.RollbackNodeResponse.node:type_name -> mistgate.admin.v1.NodeUpdate
-	7,  // 24: mistgate.admin.v1.RescanBundleResponse.bundle:type_name -> mistgate.admin.v1.Bundle
-	12, // 25: mistgate.admin.v1.UpdateService.GetUpdates:input_type -> mistgate.admin.v1.GetUpdatesRequest
-	15, // 26: mistgate.admin.v1.UpdateService.CheckPanelUpdate:input_type -> mistgate.admin.v1.CheckPanelUpdateRequest
-	17, // 27: mistgate.admin.v1.UpdateService.InstallPanelUpdate:input_type -> mistgate.admin.v1.InstallPanelUpdateRequest
-	19, // 28: mistgate.admin.v1.UpdateService.StartRollout:input_type -> mistgate.admin.v1.StartRolloutRequest
-	21, // 29: mistgate.admin.v1.UpdateService.PauseRollout:input_type -> mistgate.admin.v1.PauseRolloutRequest
-	23, // 30: mistgate.admin.v1.UpdateService.ResumeRollout:input_type -> mistgate.admin.v1.ResumeRolloutRequest
-	25, // 31: mistgate.admin.v1.UpdateService.CancelRollout:input_type -> mistgate.admin.v1.CancelRolloutRequest
-	27, // 32: mistgate.admin.v1.UpdateService.RollbackNode:input_type -> mistgate.admin.v1.RollbackNodeRequest
-	29, // 33: mistgate.admin.v1.UpdateService.RescanBundle:input_type -> mistgate.admin.v1.RescanBundleRequest
-	31, // 34: mistgate.admin.v1.UpdateService.ScheduleNodeUpdate:input_type -> mistgate.admin.v1.ScheduleNodeUpdateRequest
-	33, // 35: mistgate.admin.v1.UpdateService.CancelNodeUpdateSchedule:input_type -> mistgate.admin.v1.CancelNodeUpdateScheduleRequest
-	35, // 36: mistgate.admin.v1.UpdateService.SetUpdateTimezone:input_type -> mistgate.admin.v1.SetUpdateTimezoneRequest
-	37, // 37: mistgate.admin.v1.UpdateService.SetUpdateChannel:input_type -> mistgate.admin.v1.SetUpdateChannelRequest
-	39, // 38: mistgate.admin.v1.UpdateService.SetUpdateDownloadTimeout:input_type -> mistgate.admin.v1.SetUpdateDownloadTimeoutRequest
-	13, // 39: mistgate.admin.v1.UpdateService.GetUpdates:output_type -> mistgate.admin.v1.GetUpdatesResponse
-	16, // 40: mistgate.admin.v1.UpdateService.CheckPanelUpdate:output_type -> mistgate.admin.v1.CheckPanelUpdateResponse
-	18, // 41: mistgate.admin.v1.UpdateService.InstallPanelUpdate:output_type -> mistgate.admin.v1.InstallPanelUpdateResponse
-	20, // 42: mistgate.admin.v1.UpdateService.StartRollout:output_type -> mistgate.admin.v1.StartRolloutResponse
-	22, // 43: mistgate.admin.v1.UpdateService.PauseRollout:output_type -> mistgate.admin.v1.PauseRolloutResponse
-	24, // 44: mistgate.admin.v1.UpdateService.ResumeRollout:output_type -> mistgate.admin.v1.ResumeRolloutResponse
-	26, // 45: mistgate.admin.v1.UpdateService.CancelRollout:output_type -> mistgate.admin.v1.CancelRolloutResponse
-	28, // 46: mistgate.admin.v1.UpdateService.RollbackNode:output_type -> mistgate.admin.v1.RollbackNodeResponse
-	30, // 47: mistgate.admin.v1.UpdateService.RescanBundle:output_type -> mistgate.admin.v1.RescanBundleResponse
-	32, // 48: mistgate.admin.v1.UpdateService.ScheduleNodeUpdate:output_type -> mistgate.admin.v1.ScheduleNodeUpdateResponse
-	34, // 49: mistgate.admin.v1.UpdateService.CancelNodeUpdateSchedule:output_type -> mistgate.admin.v1.CancelNodeUpdateScheduleResponse
-	36, // 50: mistgate.admin.v1.UpdateService.SetUpdateTimezone:output_type -> mistgate.admin.v1.SetUpdateTimezoneResponse
-	38, // 51: mistgate.admin.v1.UpdateService.SetUpdateChannel:output_type -> mistgate.admin.v1.SetUpdateChannelResponse
-	40, // 52: mistgate.admin.v1.UpdateService.SetUpdateDownloadTimeout:output_type -> mistgate.admin.v1.SetUpdateDownloadTimeoutResponse
-	39, // [39:53] is the sub-list for method output_type
-	25, // [25:39] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	0,  // 0: mistgate.admin.v1.NodeOs.state:type_name -> mistgate.admin.v1.OsUpdateState
+	48, // 1: mistgate.admin.v1.NodeOs.status:type_name -> mistgate.agent.v1.OsStatus
+	6,  // 2: mistgate.admin.v1.GetOsUpdatesResponse.nodes:type_name -> mistgate.admin.v1.NodeOs
+	48, // 3: mistgate.admin.v1.GetOsUpdatesResponse.panel_host:type_name -> mistgate.agent.v1.OsStatus
+	9,  // 4: mistgate.admin.v1.PanelBuild.update:type_name -> mistgate.admin.v1.PanelUpdate
+	1,  // 5: mistgate.admin.v1.Bundle.status:type_name -> mistgate.admin.v1.BundleStatus
+	10, // 6: mistgate.admin.v1.Bundle.files:type_name -> mistgate.admin.v1.BundleFile
+	45, // 7: mistgate.admin.v1.Bundle.params:type_name -> mistgate.admin.v1.Bundle.ParamsEntry
+	2,  // 8: mistgate.admin.v1.NodeUpdate.state:type_name -> mistgate.admin.v1.NodeUpdateState
+	12, // 9: mistgate.admin.v1.NodeUpdate.last_update:type_name -> mistgate.admin.v1.LastUpdate
+	4,  // 10: mistgate.admin.v1.RolloutStep.state:type_name -> mistgate.admin.v1.StepState
+	46, // 11: mistgate.admin.v1.RolloutStep.params:type_name -> mistgate.admin.v1.RolloutStep.ParamsEntry
+	3,  // 12: mistgate.admin.v1.Rollout.status:type_name -> mistgate.admin.v1.RolloutStatus
+	47, // 13: mistgate.admin.v1.Rollout.pause_params:type_name -> mistgate.admin.v1.Rollout.PauseParamsEntry
+	14, // 14: mistgate.admin.v1.Rollout.steps:type_name -> mistgate.admin.v1.RolloutStep
+	8,  // 15: mistgate.admin.v1.GetUpdatesResponse.panel:type_name -> mistgate.admin.v1.PanelBuild
+	11, // 16: mistgate.admin.v1.GetUpdatesResponse.bundle:type_name -> mistgate.admin.v1.Bundle
+	13, // 17: mistgate.admin.v1.GetUpdatesResponse.nodes:type_name -> mistgate.admin.v1.NodeUpdate
+	15, // 18: mistgate.admin.v1.GetUpdatesResponse.rollout:type_name -> mistgate.admin.v1.Rollout
+	18, // 19: mistgate.admin.v1.GetUpdatesResponse.agent_notes:type_name -> mistgate.admin.v1.ReleaseNote
+	18, // 20: mistgate.admin.v1.GetUpdatesResponse.panel_notes:type_name -> mistgate.admin.v1.ReleaseNote
+	9,  // 21: mistgate.admin.v1.CheckPanelUpdateResponse.update:type_name -> mistgate.admin.v1.PanelUpdate
+	9,  // 22: mistgate.admin.v1.InstallPanelUpdateResponse.update:type_name -> mistgate.admin.v1.PanelUpdate
+	15, // 23: mistgate.admin.v1.StartRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
+	15, // 24: mistgate.admin.v1.PauseRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
+	15, // 25: mistgate.admin.v1.ResumeRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
+	15, // 26: mistgate.admin.v1.CancelRolloutResponse.rollout:type_name -> mistgate.admin.v1.Rollout
+	13, // 27: mistgate.admin.v1.RollbackNodeResponse.node:type_name -> mistgate.admin.v1.NodeUpdate
+	11, // 28: mistgate.admin.v1.RescanBundleResponse.bundle:type_name -> mistgate.admin.v1.Bundle
+	16, // 29: mistgate.admin.v1.UpdateService.GetUpdates:input_type -> mistgate.admin.v1.GetUpdatesRequest
+	5,  // 30: mistgate.admin.v1.UpdateService.GetOsUpdates:input_type -> mistgate.admin.v1.GetOsUpdatesRequest
+	19, // 31: mistgate.admin.v1.UpdateService.CheckPanelUpdate:input_type -> mistgate.admin.v1.CheckPanelUpdateRequest
+	21, // 32: mistgate.admin.v1.UpdateService.InstallPanelUpdate:input_type -> mistgate.admin.v1.InstallPanelUpdateRequest
+	23, // 33: mistgate.admin.v1.UpdateService.StartRollout:input_type -> mistgate.admin.v1.StartRolloutRequest
+	25, // 34: mistgate.admin.v1.UpdateService.PauseRollout:input_type -> mistgate.admin.v1.PauseRolloutRequest
+	27, // 35: mistgate.admin.v1.UpdateService.ResumeRollout:input_type -> mistgate.admin.v1.ResumeRolloutRequest
+	29, // 36: mistgate.admin.v1.UpdateService.CancelRollout:input_type -> mistgate.admin.v1.CancelRolloutRequest
+	31, // 37: mistgate.admin.v1.UpdateService.RollbackNode:input_type -> mistgate.admin.v1.RollbackNodeRequest
+	33, // 38: mistgate.admin.v1.UpdateService.RescanBundle:input_type -> mistgate.admin.v1.RescanBundleRequest
+	35, // 39: mistgate.admin.v1.UpdateService.ScheduleNodeUpdate:input_type -> mistgate.admin.v1.ScheduleNodeUpdateRequest
+	37, // 40: mistgate.admin.v1.UpdateService.CancelNodeUpdateSchedule:input_type -> mistgate.admin.v1.CancelNodeUpdateScheduleRequest
+	39, // 41: mistgate.admin.v1.UpdateService.SetUpdateTimezone:input_type -> mistgate.admin.v1.SetUpdateTimezoneRequest
+	41, // 42: mistgate.admin.v1.UpdateService.SetUpdateChannel:input_type -> mistgate.admin.v1.SetUpdateChannelRequest
+	43, // 43: mistgate.admin.v1.UpdateService.SetUpdateDownloadTimeout:input_type -> mistgate.admin.v1.SetUpdateDownloadTimeoutRequest
+	17, // 44: mistgate.admin.v1.UpdateService.GetUpdates:output_type -> mistgate.admin.v1.GetUpdatesResponse
+	7,  // 45: mistgate.admin.v1.UpdateService.GetOsUpdates:output_type -> mistgate.admin.v1.GetOsUpdatesResponse
+	20, // 46: mistgate.admin.v1.UpdateService.CheckPanelUpdate:output_type -> mistgate.admin.v1.CheckPanelUpdateResponse
+	22, // 47: mistgate.admin.v1.UpdateService.InstallPanelUpdate:output_type -> mistgate.admin.v1.InstallPanelUpdateResponse
+	24, // 48: mistgate.admin.v1.UpdateService.StartRollout:output_type -> mistgate.admin.v1.StartRolloutResponse
+	26, // 49: mistgate.admin.v1.UpdateService.PauseRollout:output_type -> mistgate.admin.v1.PauseRolloutResponse
+	28, // 50: mistgate.admin.v1.UpdateService.ResumeRollout:output_type -> mistgate.admin.v1.ResumeRolloutResponse
+	30, // 51: mistgate.admin.v1.UpdateService.CancelRollout:output_type -> mistgate.admin.v1.CancelRolloutResponse
+	32, // 52: mistgate.admin.v1.UpdateService.RollbackNode:output_type -> mistgate.admin.v1.RollbackNodeResponse
+	34, // 53: mistgate.admin.v1.UpdateService.RescanBundle:output_type -> mistgate.admin.v1.RescanBundleResponse
+	36, // 54: mistgate.admin.v1.UpdateService.ScheduleNodeUpdate:output_type -> mistgate.admin.v1.ScheduleNodeUpdateResponse
+	38, // 55: mistgate.admin.v1.UpdateService.CancelNodeUpdateSchedule:output_type -> mistgate.admin.v1.CancelNodeUpdateScheduleResponse
+	40, // 56: mistgate.admin.v1.UpdateService.SetUpdateTimezone:output_type -> mistgate.admin.v1.SetUpdateTimezoneResponse
+	42, // 57: mistgate.admin.v1.UpdateService.SetUpdateChannel:output_type -> mistgate.admin.v1.SetUpdateChannelResponse
+	44, // 58: mistgate.admin.v1.UpdateService.SetUpdateDownloadTimeout:output_type -> mistgate.admin.v1.SetUpdateDownloadTimeoutResponse
+	44, // [44:59] is the sub-list for method output_type
+	29, // [29:44] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_update_proto_init() }
@@ -3183,8 +3493,8 @@ func file_mistgate_admin_v1_update_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_update_proto_rawDesc), len(file_mistgate_admin_v1_update_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   40,
+			NumEnums:      5,
+			NumMessages:   43,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

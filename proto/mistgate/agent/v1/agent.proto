@@ -658,6 +658,54 @@ message RenewResponse {
 // ---------------------------------------------------------------------------------------------------
 // Node -> panel
 
+// The newest read-only package, kernel and reboot state already present on a node. This message is a snapshot,
+// not reliable: the next full read or a new session replaces a lost copy. S1 only reads local files and apt's
+// simulation; it never runs apt-get update.
+message OsStatus {
+  int64 measured_unix = 1 [jstype = JS_NUMBER];
+  string distro_id = 2; // os-release ID: ubuntu, debian, or another detected value
+  string distro_version = 3; // VERSION_ID
+  uint32 pending = 4;
+  uint32 security = 5;
+  repeated string notable = 6; // at most 16: "name old new s|-" for security/non-security updates
+  string kernel_running = 7;
+  string kernel_newest = 8; // empty in a container or when linux-version is unavailable
+  bool reboot_required = 9;
+  repeated string reboot_reasons = 10; // "kernel" and/or package names
+  repeated string held = 11;
+  string apt = 12; // ok | locked | half_configured | no_lists | unknown
+  repeated string half_configured = 13;
+  int64 lists_unix = 14 [jstype = JS_NUMBER];
+  int64 dpkg_unix = 15 [jstype = JS_NUMBER];
+  string auto_updates = 16; // on | off | not_installed | unknown
+  bool auto_reboot = 17;
+  string awg_module_next = 18; // ready | missing | empty when not relevant
+  string container = 19;
+  string boot_id_hash = 20; // first 16 hex characters of SHA-256(boot_id), never the raw boot id
+  OsJob job = 21; // reserved for the later update-job stage; unset in S1
+  string error = 22; // not_apt | no_systemd | read_failed
+}
+
+// Reserved S1 data shape for the job stages. S1 never populates or starts a job.
+message OsJob {
+  string job_id = 1;
+  string action = 2;
+  string mode = 3;
+  string state = 4;
+  string phase = 5;
+  int64 started_unix = 6 [jstype = JS_NUMBER];
+  int64 updated_unix = 7 [jstype = JS_NUMBER];
+  int64 finished_unix = 8 [jstype = JS_NUMBER];
+  string code = 9;
+  string reason = 10;
+  uint32 upgraded = 11;
+  string reboot = 12;
+  string held_reason = 13;
+  repeated string sources_failed = 14;
+  string kernel_from = 15;
+  string kernel_to = 16;
+}
+
 message ConnectRequest {
   // Non-zero only for stats and event (see "RELIABLE MESSAGES").
   uint64 seq = 1;
@@ -679,6 +727,8 @@ message ConnectRequest {
     RenewRequest renew = 18;
     // Best-effort progress for an UpdateAgent command. The latest value is enough for the panel UI.
     UpdateProgress update_progress = 19;
+    // Read-only host snapshot (seq = 0, newest wins). Sent only after NodeSettings.os_status is true.
+    OsStatus os_status = 20;
     // The records of a debug capture (seq = 0, see "DEBUG CAPTURE"). Sent only by agents that list "debug/1".
     DebugCaptureReport debug_report = 40;
   }
@@ -731,6 +781,7 @@ message Hello {
   // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
+  // "os-status/1" permits read-only OsStatus snapshots. It never advertises a write action: "os-update/1" is reserved for the write steps.
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
   // Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -1514,6 +1565,9 @@ message NodeSettings {
   string networks_db_name = 13;
   // SHA-256 of the named database file, lowercase hex. Client addresses are never sent.
   string networks_db_sha256 = 14;
+  // The panel explicitly asks a capable agent to read local apt/dpkg/kernel state and send OsStatus snapshots.
+  // False is the default; old panels leave the agent silent and running no apt simulation.
+  bool os_status = 15;
 }
 
 message DesiredState {

@@ -1,10 +1,13 @@
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { EditionNotice } from "@/components/edition-notice";
 import { PageTitle } from "@/components/ui/bits";
 import { Pending, QueryError } from "@/components/ui/query-error";
+import type { StatusKind } from "@/components/ui/status";
 import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
 import { useEdition } from "@/lib/edition";
+import { osRows, osSummary, useOsUpdates } from "@/lib/os-updates";
 import {
   heroOf,
   isActive,
@@ -16,11 +19,14 @@ import {
   type NodeUpdate,
   type Updates,
 } from "@/lib/updates";
-import { PanelBar } from "./cards";
+import { PanelBar, panelUpdate } from "./cards";
 import { CancelDialog, RollbackDialog, RolloutDialog, UpdateNodeDialog } from "./dialogs";
 import { HeroCard } from "./hero";
+import { Layers, type Layer } from "./layers";
 import { NodeTable } from "./nodes";
+import { OsSection } from "./os";
 import { RolloutCard } from "./rollout";
+import type { UpdateTab } from "./tabs";
 
 type Dialog =
   | { kind: "update"; node: NodeUpdate; mode?: "now" | "schedule" }
@@ -50,7 +56,14 @@ export function UpdatesScreen() {
   const q = useUpdates();
   // no update, schedule, roll back or bundle rescan there: the buttons go and the nodes stay listed
   const isOwner = useIsOwner();
-  const owner = !useEdition().off("agent_updates") && isOwner;
+  const edition = useEdition();
+  const owner = !edition.off("agent_updates") && isOwner;
+  // the servers' operating system is a tab of its own; the edition without it keeps the page as one list
+  const hasOs = !edition.off("os_updates");
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as { tab?: UpdateTab };
+  const setTab = (next: UpdateTab) => void navigate({ to: "/updates", search: { tab: next }, replace: true });
+  const os = useOsUpdates(hasOs);
   const actions = useUpdateActions();
   const [dialog, setDialog] = useState<Dialog>(null);
   const d = q.data;
@@ -89,11 +102,8 @@ export function UpdatesScreen() {
           : activeRollout && !activeBundleMatches ? "differentRelease"
             : !canUpdateNow ? "unavailable" : undefined;
 
-  return (
+  const agents = (
     <div className="flex flex-col gap-3.5">
-      {header}
-      <PanelBar data={d} owner={isOwner} actions={actions} />
-      <EditionNotice feature="agent_updates" />
       <HeroCard
         data={d}
         owner={owner}
@@ -113,6 +123,53 @@ export function UpdatesScreen() {
         onRollback={(n) => setDialog({ kind: "rollback", node: n })}
       />
       {d.rollout && !activeRollout && <RolloutCard rollout={d.rollout} />}
+    </div>
+  );
+  // ---- the three layers: each card says where its layer stands, the chosen one opens below
+  const panelLook = panelUpdate(t, d, edition.edge);
+  const hero = heroOf(d);
+  const outdated = outdatedNodes(d.nodes).length;
+  const agentsPill: { kind: StatusKind; label: string } =
+    hero.id === "running" ? { kind: "busy", label: t("up.layer.pill.running") }
+      : hero.id === "paused" ? { kind: "warn", label: t("up.layer.pill.paused") }
+        : hero.id === "none" ? { kind: "off", label: t("up.nodes.empty") }
+          : outdated > 0 ? { kind: "warn", label: t("up.layer.pill.outdated", { n: outdated }) }
+            : hero.id === "current" ? { kind: "ok", label: t("up.layer.pill.ok") }
+              : { kind: "warn", label: t("up.layer.pill.attention") };
+  const osNeeds = os.data ? osSummary(osRows(os.data)) : undefined;
+  const osPill: { kind: StatusKind; label: string } = !osNeeds || osNeeds.known === 0 ? { kind: "off", label: t("up.os.state.unknown") }
+    : osNeeds.reboot > 0 ? { kind: "warn", label: t("up.layer.pill.reboot", { n: osNeeds.reboot }) }
+      : osNeeds.security > 0 ? { kind: "warn", label: t("up.layer.pill.security", { n: osNeeds.security }) }
+        : osNeeds.updates > 0 ? { kind: "off", label: t("up.layer.pill.updates", { n: osNeeds.updates }) }
+          : { kind: "ok", label: t("up.layer.pill.ok") };
+  const layers: Layer[] = [
+    {
+      value: "panel", icon: "server", tone: "lavender", title: t("up.panel.title"), fact: d.panel?.version || "—",
+      pill: { kind: panelLook.kind, label: panelLook.label },
+      content: <PanelBar data={d} owner={isOwner} actions={actions} />,
+    },
+    {
+      value: "agents", icon: "network", tone: "sky", title: t("up.tab.agents"),
+      fact: d.nodes.length === 0 ? "—" : t("up.layer.agents.fact", { ok: d.nodes.length - outdated, n: d.nodes.length }),
+      pill: agentsPill, content: agents,
+    },
+    ...(hasOs
+      ? [{
+          value: "os" as const, icon: "cpu" as const, tone: "mint" as const, title: t("up.tab.os"),
+          fact: os.data ? t("up.layer.os.fact", { n: os.data.nodes.length + 1 }) : "—",
+          pill: osPill, content: <OsSection />,
+        }]
+      : []),
+  ];
+  // without a choice in the address the page opens on the layer that needs a hand: the panel is updated before its nodes
+  const wanted = search.tab && layers.some((l) => l.value === search.tab) ? search.tab : undefined;
+  const tab: UpdateTab = wanted ?? (panelLook.update?.available ? "panel" : "agents");
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      {header}
+      <EditionNotice feature="agent_updates" />
+      <Layers aria-label={t("up.tabs")} layers={layers} value={tab} onValueChange={setTab} />
       {dialog?.kind === "rollout" && currentBundle && (
         <RolloutDialog
           version={currentBundle.version}

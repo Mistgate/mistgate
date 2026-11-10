@@ -208,7 +208,7 @@ func TestWarpReregisterRejectedOrExpiredPlanNeverRuns(t *testing.T) {
 
 func TestWarpToolsProfiles(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 42, ProfileOperator: 86, ProfileAdmin: 161}
+	want := map[Profile]int{ProfileReadonly: 43, ProfileOperator: 87, ProfileAdmin: 162}
 	for profile, n := range want {
 		_, secret := e.token(profile)
 		if got := len(toolNames(t, e.session(secret))); got != n {

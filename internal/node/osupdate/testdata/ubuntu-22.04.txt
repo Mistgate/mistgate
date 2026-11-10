@@ -1,0 +1,37 @@
+### os-release
+NAME="Ubuntu"
+ID=ubuntu
+VERSION_ID="22.04"
+VERSION_CODENAME=jammy
+### apt-version
+apt 2.4.13 (amd64)
+### apt-simulation
+NOTE: This is only a simulation!
+Inst linux-image-5.15.0-111-generic (5.15.0-111.121 Ubuntu:22.04/jammy-updates [amd64])
+Inst linux-image-generic [5.15.0.110.108] (5.15.0.111.109 Ubuntu:22.04/jammy-updates [amd64])
+Inst libssl3 [3.0.2-0ubuntu1.18] (3.0.2-0ubuntu1.19 Ubuntu:22.04/jammy-security [amd64])
+Inst openssh-client [1:8.9p1-3ubuntu0.10] (1:8.9p1-3ubuntu0.11 Ubuntu:22.04/jammy-security [amd64])
+### dpkg-status
+ii	base-files
+hi	linux-image-5.15.0-111-generic
+iF	fixture-config
+### linux-version-list
+5.15.0-110-generic
+5.15.0-111-generic
+### linux-version-sort
+5.15.0-111-generic
+5.15.0-110-generic
+### uname
+5.15.0-110-generic
+### reboot-required
+System restart required
+### reboot-required.pkgs
+linux-image-5.15.0-111-generic
+libc6
+### boot-listing
+vmlinuz-5.15.0-110-generic
+initrd.img-5.15.0-110-generic
+vmlinuz-5.15.0-111-generic
+initrd.img-5.15.0-111-generic
+### apt-config
+L='1'; U='1'; R='false';

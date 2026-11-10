@@ -1,0 +1,36 @@
+### os-release
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+ID=debian
+VERSION_ID="13"
+VERSION_CODENAME=trixie
+### apt-version
+apt 3.0.3 (amd64)
+### apt-simulation
+NOTE: This is only a simulation!
+Inst linux-image-amd64 [6.12.38-1] (6.12.43-1 Debian:13/stable [amd64])
+Inst openssl [3.5.1-1] (3.5.2-1 Debian-Security:13/stable-security [amd64])
+Inst libc6:amd64 [2.41-9] (2.41-10 Debian:13/stable [amd64])
+### dpkg-status
+ii	base-files
+hi	linux-image-amd64
+iU	fixture-config:amd64
+### linux-version-list
+6.12.42-amd64
+6.12.43-amd64
+### linux-version-sort
+6.12.43-amd64
+6.12.42-amd64
+### uname
+6.12.42-amd64
+### reboot-required
+System restart required
+### reboot-required.pkgs
+linux-image-amd64
+libc6
+### boot-listing
+vmlinuz-6.12.42-amd64
+initrd.img-6.12.42-amd64
+vmlinuz-6.12.43-amd64
+initrd.img-6.12.43-amd64
+### apt-config
+L='1'; U='1'; R='true';

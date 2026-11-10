@@ -223,6 +223,7 @@ var procedureLevels = map[string]level{
 	// nodes (or on the panel itself), so it is owner-only and the handler also requires a fresh step-up
 	// (auth.Service.RequireStepUp, like passkey removal). Not relaxed for helpers.
 	adminv1connect.UpdateServiceGetUpdatesProcedure:               levelRead,
+	adminv1connect.UpdateServiceGetOsUpdatesProcedure:             levelRead,
 	adminv1connect.UpdateServiceCheckPanelUpdateProcedure:         levelRead,
 	adminv1connect.UpdateServiceInstallPanelUpdateProcedure:       levelOwner, // also needs a step-up
 	adminv1connect.UpdateServiceStartRolloutProcedure:             levelOwner, // also needs a step-up

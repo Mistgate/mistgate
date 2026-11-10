@@ -51,9 +51,11 @@ The panel serves the bundle's files only to agents with a valid node certificate
 
 Everyone can view the page. Updating, scheduling, pausing, resuming and cancelling, rolling a node back and **Read the folder again** need the owner and a fresh step-up (see [Security](security.md)).
 
-From top to bottom, by what needs you:
+The page has three layers, a card for each in a row at the top: **This panel**, **Node agents** and **Server systems**. Each card says where its layer stands and carries a status, so all three are in view whichever is open; the chosen one opens below. The page opens on the panel when a panel update is out, because the panel is updated before the nodes, and otherwise on the node agents; the address remembers the layer. The Cloudflare edition has the first two.
 
-- **This panel** comes first, because the panel is updated before the nodes: one line with its version, build date, state and **Check GitHub**. When a signed release is out, the card stands out and carries **Update panel**. The release key fingerprint, the SHA-256 and the explanation are behind **Details**; a panel that cannot update itself opens its steps on its own.
+What the layers hold (the fleet card, the rollout and the nodes are under **Node agents**; **Server systems** is described in [Server operating system](#server-operating-system)):
+
+- **This panel**: one line with its version, build date, state and **Check GitHub**. When a signed release is out, the card stands out and carries **Update panel**. The release key fingerprint, the SHA-256 and the explanation are behind **Details**; a panel that cannot update itself opens its steps on its own.
 - **The fleet card**: where the fleet stands ("2 of 4 nodes on v0.1.24"), a bar with one segment per node, the count of each state under it, and the one main button. With something to update that is **Update N nodes** (below); while a rollout runs, **Pause** / **Resume** / **Cancel rollout**. Its last line is the **Release bundle**: the bundle in `<data-dir>/dist`, the verdict of the signature check, its version and dates, **Read the folder again**, and the folded details (files, the reason for a refusal, the steps to make a bundle yourself).
 - **The rollout**: a running one sits right under the fleet card, by stage (the canary, the batches) with the nodes of each; while a compatible agent downloads its file, its phase, progress, downloaded size and recent transfer speed are shown; the last finished one comes after the node list, folded to one line (**Show stages**) when it ended well.
 - **Nodes**: every node with its agent version and build date, its state and its last update on one line. The owner gets one main button per row, **Update** (or **Schedule** when an update is already scheduled), and a **⋯** menu beside it with **Schedule…** and **Roll back…**. A node that belongs to the running rollout says so in its row ("Queued · batch 2", "Updating…") and has no update or schedule of its own; **Roll back…** stays where it was allowed.
@@ -286,6 +288,29 @@ What happens around the restart:
 - Admin sessions survive the restart.
 
 > **Warning:** Migrations only go forward. An older panel binary is not guaranteed to work with a database a newer one has migrated. To go back, stop the panel, restore the data directory from the backup taken before the update, put the old binary back and start it. Changes made after the backup are lost.
+
+## Server operating system
+
+The **Server systems** layer of the Updates page shows the operating system of every server: this panel's own server first, then each node. It answers which servers wait for a new kernel, a reboot or security updates, without a login to each of them.
+
+| Column | What it shows |
+|---|---|
+| Server | The node (or **This panel's server**) and how many people are online on it. |
+| System | The distribution and its version. |
+| Kernel | The running kernel and, when a newer one is installed, the one a reboot would start. |
+| Updates | How many packages wait and how many of them are security updates, and how old the server's package lists are. |
+| State | **Up to date**, **Updates available**, **Security updates**, **Reboot needed**, **Offline**, **Not available** or **Not read yet**. |
+
+Under a row the page names what needs a hand: why a reboot is needed (a new kernel, or the packages that ask for it), packages held back, interrupted installs, automatic security updates switched off or not installed, another package manager running at the moment, and a new kernel for which the AmneziaWG module is not built yet. On a container the kernel is the provider's, and the row says so.
+
+How it is read:
+
+- The node agent reads it on the server itself, from the package lists already on disk and a simulated upgrade (`apt-get -s`). It does not contact the package mirrors, does not run `apt update` and changes nothing on the server. The counts are therefore as fresh as the lists: "lists: 9 days ago" means the server has not refreshed them for nine days, and a server with no lists at all asks for one `apt update` by hand.
+- The agent reads in full every six hours, and sooner when something on the server changed (a package installed, the lists refreshed, a reboot); it sends the result when it connects. A connected node whose last reading is older than 18 hours shows **Not read yet**.
+- It works on Debian and Ubuntu with systemd. Other systems, and nodes whose agent is older than this feature, show **Not available** with the reason.
+- The panel's own server is read only when the panel runs as root; otherwise the row says to check it by hand.
+
+The layer is read-only for now: installing updates and rebooting from the panel come in a later release, and until then a server is updated over SSH. The Cloudflare edition does not have this layer. The MCP tool `os_updates_status` returns the same stored readings; it never contacts a node.
 
 ## Updates through the API and MCP
 

@@ -59,6 +59,10 @@ func (c *call) getUser(id string) (*adminv1.GetUserResponse, error) {
 
 type noArgs struct{}
 
+type osUpdatesArg struct {
+	Node string `json:"node,omitempty" jsonschema:"node id or exact name; empty = every node"`
+}
+
 type nodeArg struct {
 	Node string `json:"node" jsonschema:"node id or its exact name"`
 }
@@ -551,6 +555,29 @@ func readTools() []toolDef {
 				}
 				v.NextBeforeID = r.Msg.GetNextBeforeId()
 				return v, nil
+			}),
+
+		readTool("os_updates_status", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.UpdateServiceGetOsUpdatesProcedure),
+			"Read the latest stored operating-system status for every node and the panel host. This never contacts a node, runs apt, or refreshes package lists. Optionally select one node by id or exact name.",
+			func(c *call, in osUpdatesArg) (any, error) {
+				r, err := c.cl.Update.GetOsUpdates(c.ctx, connect.NewRequest(&adminv1.GetOsUpdatesRequest{}))
+				if err != nil {
+					return nil, apiError(err)
+				}
+				if in.Node != "" {
+					id, _, err := c.nodeRef(in.Node)
+					if err != nil {
+						return nil, err
+					}
+					selected := r.Msg.GetNodes()[:0]
+					for _, node := range r.Msg.GetNodes() {
+						if node.GetNodeId() == id {
+							selected = append(selected, node)
+						}
+					}
+					r.Msg.Nodes = selected
+				}
+				return osUpdatesView(r.Msg), nil
 			}),
 
 		readTool("updates_status", ProfileReadonly, procs(adminv1connect.UpdateServiceGetUpdatesProcedure),

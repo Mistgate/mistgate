@@ -171,7 +171,7 @@ func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 42, ProfileOperator: 86, ProfileAdmin: 161}
+	want := map[Profile]int{ProfileReadonly: 43, ProfileOperator: 87, ProfileAdmin: 162}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)
@@ -198,6 +198,9 @@ func TestToolsPerProfile(t *testing.T) {
 		if !slices.Contains(got[ProfileAdmin], n) {
 			t.Errorf("admin lacks %s", n)
 		}
+	}
+	if !slices.Contains(got[ProfileReadonly], "os_updates_status") {
+		t.Error("readonly profile lacks stored OS update status")
 	}
 }
 

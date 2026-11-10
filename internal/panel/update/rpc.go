@@ -2,17 +2,22 @@ package update
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // rpc is the admin UpdateService (update.proto). Roles are decided by auth/policy.go before a call gets here;
@@ -188,6 +193,66 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 		}
 	}
 	resp.AgentNotes, resp.PanelNotes = s.releaseNotes(b, views, resp.Panel.Update)
+	return connect.NewResponse(resp), nil
+}
+
+func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsUpdatesRequest]) (*connect.Response[adminv1.GetOsUpdatesResponse], error) {
+	s := r.s
+	if err := edition.Check(!s.OSUpdatesEnabled(), edition.OSUpdates); err != nil {
+		return nil, err
+	}
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
+	nodes, err := s.st.Nodes(ctx, false)
+	if err != nil {
+		return nil, s.internal("load OS update nodes", err)
+	}
+	liveRows, err := s.fl.Live(ctx)
+	if err != nil {
+		return nil, s.internal("load OS update liveness", err)
+	}
+	live := make(map[string]store.NodeLiveRow, len(liveRows))
+	for _, row := range liveRows {
+		live[row.NodeID] = row
+	}
+	stored, err := s.st.OsStatuses(ctx)
+	if err != nil {
+		return nil, s.internal("load OS update snapshots", err)
+	}
+	host := s.PanelHostOsStatus()
+	resp := &adminv1.GetOsUpdatesResponse{NowUnix: s.now().Unix(), Nodes: []*adminv1.NodeOs{}, PanelHost: host}
+	resp.ScheduleTimezoneOffsetMinutes, err = s.scheduleTimezoneOffset(ctx)
+	if err != nil {
+		return nil, s.internal("load update timezone", err)
+	}
+	for _, node := range nodes {
+		if node.State != "active" {
+			continue
+		}
+		row := live[node.ID]
+		var status *agentv1.OsStatus
+		if saved, ok := stored[node.ID]; ok {
+			status = &agentv1.OsStatus{}
+			if err := protojson.Unmarshal([]byte(saved.StatusJSON), status); err != nil {
+				s.log.Warn("stored OS status is invalid", "code", "os_status_decode_failed", "node", node.ID)
+				status = nil
+			}
+		}
+		var online uint32
+		if row.Connected && row.UsersJSON != "" {
+			var users map[string]int64
+			if json.Unmarshal([]byte(row.UsersJSON), &users) == nil {
+				online = uint32(len(users))
+			}
+		}
+		capable := slices.Contains(node.AgentCaps, osupdate.Capability)
+		supported := osUpdateSupported(capable, status)
+		// Containers on one kernel share the boot id, so a match only means "same kernel", not "the panel's own server".
+		// Step S3 must not rely on it alone before it skips a node as the panel host: it needs a second signal.
+		onPanel := status != nil && host != nil && status.GetBootIdHash() != "" && status.GetBootIdHash() == host.GetBootIdHash()
+		resp.Nodes = append(resp.Nodes, &adminv1.NodeOs{NodeId: node.ID, Name: node.Name, Connected: row.Connected,
+			Supported: supported, OnlineUsers: online, OnPanelServer: onPanel, State: osUpdateState(capable, row.Connected, status, resp.NowUnix), Status: status})
+	}
 	return connect.NewResponse(resp), nil
 }
 

@@ -1,0 +1,36 @@
+### os-release
+PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"
+ID=debian
+VERSION_ID="12"
+VERSION_CODENAME=bookworm
+### apt-version
+apt 2.6.1 (amd64)
+### apt-simulation
+NOTE: This is only a simulation!
+Inst linux-image-amd64 [6.1.128-1] (6.1.129-1 Debian:12/oldstable [amd64])
+Inst openssl [3.0.11-1~deb12u2] (3.0.11-1~deb12u3 Debian-Security:12/oldstable-security [amd64])
+Inst libssl3 [3.0.11-1~deb12u2] (3.0.11-1~deb12u3 Debian-Security:12/oldstable-security [amd64])
+### dpkg-status
+ii	base-files
+hi	linux-image-amd64
+iF	fixture-config
+### linux-version-list
+6.1.0-30-amd64
+6.1.0-31-amd64
+### linux-version-sort
+6.1.0-31-amd64
+6.1.0-30-amd64
+### uname
+6.1.0-30-amd64
+### reboot-required
+System restart required
+### reboot-required.pkgs
+linux-image-amd64
+libc6
+### boot-listing
+vmlinuz-6.1.0-30-amd64
+initrd.img-6.1.0-30-amd64
+vmlinuz-6.1.0-31-amd64
+initrd.img-6.1.0-31-amd64
+### apt-config
+L='1'; U='1'; R='false';

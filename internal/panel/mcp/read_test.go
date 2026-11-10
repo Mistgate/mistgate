@@ -58,6 +58,7 @@ func TestReadToolsLeakNothing(t *testing.T) {
 		{"node_journal", map[string]any{}},
 		{"node_journal", map[string]any{"node": "de1", "query": "failed"}},
 		{"audit_search", map[string]any{}},
+		{"os_updates_status", map[string]any{}},
 		{"updates_status", map[string]any{}},
 		{"capacity_report", map[string]any{}},
 		{"capacity_report", map[string]any{"node": "de1", "hours": 720}},
@@ -76,6 +77,33 @@ func TestReadToolsLeakNothing(t *testing.T) {
 	// the fixtures' secrets are not in the world's log of what the panel was asked either
 	if got := len(e.w.fixReqs); got != 0 {
 		t.Errorf("a read tool changed something: %d ApplyFix calls", got)
+	}
+}
+
+func TestOsUpdatesStatusIsStoredOnlyAndScrubsUntrustedText(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	out := mustOK(t, s, "os_updates_status", map[string]any{"node": "de1"})
+	if strings.Contains(out, "203.0.113.77") {
+		t.Fatalf("OS status returned a documentation address: %s", out)
+	}
+	if !strings.Contains(out, "[addr]") {
+		t.Fatalf("OS status did not mark the removed address text: %s", out)
+	}
+	// Ubuntu 22.04's kernel meta-packages are versioned like an address; a version is not run through the address scrub.
+	if !strings.Contains(out, "linux-image-generic 5.15.0.125.123 5.15.0.126.125 s") {
+		t.Fatalf("a dotted-quad package version was altered: %s", out)
+	}
+	v := decode[OsUpdatesV](t, out)
+	if len(v.Nodes) != 1 || v.Nodes[0].NodeID != nodeA || v.Nodes[0].Name != "de1" || v.Nodes[0].Status == nil {
+		t.Fatalf("selected OS status = %+v", v)
+	}
+	e.w.mu.Lock()
+	calls := e.w.osUpdatesCalls
+	e.w.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("GetOsUpdates calls = %d, want one stored-data read", calls)
 	}
 }
 

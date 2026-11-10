@@ -193,7 +193,7 @@ func main() {
 | `ProfileService.ListProfiles`, `ProfileService.GetProfile`（密钥已遮蔽） | 是 | 是 | 是 |
 | `ProfileService.ListProtocols`, `ProfileService.PreviewProfile` | 是 | 是 | 是 |
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | 是 | 是 | 是 |
-| `UpdateService.GetUpdates` | 是 | 是 | 是 |
+| `UpdateService.GetUpdates`、`GetOsUpdates` | 是 | 是 | 是 |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | 否 | 是 | 是 |
 | `HealthService.MuteAlert`, `DismissAlert`, `RunChecksNow`, `RunDoctor` | 否 | 是 | 是 |
 | `AuthService.ListAudit` | 否 | 否 | 是 |

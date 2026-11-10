@@ -65,6 +65,7 @@ type SessionState struct {
 	SentStateHash         string                    `json:"sh,omitempty"`
 	SentWithheld          []string                  `json:"wh,omitempty"`
 	SentSettingsHash      string                    `json:"ss,omitempty"`
+	OsStatusEnabled       bool                      `json:"os_status,omitempty"`
 	DriftResent           bool                      `json:"dr,omitempty"`
 	Drift                 bool                      `json:"dt,omitempty"`
 	FullResendPending     bool                      `json:"fr,omitempty"`
@@ -347,6 +348,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	autoMeasure = autoMeasure && slices.Contains(info.Caps, capBandwidth)
 	tr.state.AgentCaps = slices.Clone(info.Caps)
 	settings := c.f.nodeSettings(node, info.Caps)
+	tr.state.OsStatusEnabled = settings.GetOsStatus()
 	tr.state.SentSettingsHash = settingsSig(settings)
 	if autoMeasure {
 		tr.state.AutoBandwidthDeadline = event.At.Add(c.f.measureDelay)
@@ -509,6 +511,10 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 			}
 			deletePending(tr.state, r.RequestId)
 			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: r.RequestId, Reply: event.Frame})
+		}
+	case m.GetOsStatus() != nil:
+		if tr.state.OsStatusEnabled {
+			c.f.recordOsStatus(ctx, tr.state.NodeID, m.GetOsStatus(), event.At)
 		}
 	case m.GetUpdateProgress() != nil:
 		if u := c.f.updates(); u != nil {
@@ -1226,6 +1232,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 	}
 	state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	settings := c.f.nodeSettings(node, node.AgentCaps)
+	state.OsStatusEnabled = settings.GetOsStatus()
 	sig := settingsSig(settings)
 	digest := prepared.digest
 	if !state.FullResendPending && state.SentRevision == 0 {

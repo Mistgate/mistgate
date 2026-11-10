@@ -51,6 +51,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.DnsServiceListDnsPresetsProcedure:                   TokenAccessDirect,
 	adminv1connect.BackupServiceGetBackupSettingsProcedure:             TokenAccessDirect,
 	adminv1connect.UpdateServiceGetUpdatesProcedure:                    TokenAccessDirect,
+	adminv1connect.UpdateServiceGetOsUpdatesProcedure:                  TokenAccessDirect,
 	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
 	adminv1connect.WarpServiceRestartWarpProcedure:                     TokenAccessDirect,
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       TokenAccessPlanning, // node_install_plan only

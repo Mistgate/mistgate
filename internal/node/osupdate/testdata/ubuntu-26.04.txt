@@ -1,0 +1,36 @@
+### os-release
+NAME="Ubuntu"
+ID=ubuntu
+VERSION_ID="26.04"
+VERSION_CODENAME=resolute
+### apt-version
+apt 3.0.2 (amd64)
+### apt-simulation
+NOTE: This is only a simulation!
+Inst linux-image-6.17.0-8-generic (6.17.0-8.8 Ubuntu:26.04/resolute-updates [amd64])
+Inst openssl [3.0.13-0ubuntu3.5] (3.0.13-0ubuntu3.6 Ubuntu:26.04/resolute-security [amd64])
+Inst systemd [257.4-1ubuntu8.2] (257.4-1ubuntu8.3 Ubuntu:26.04/resolute-updates [amd64])
+### dpkg-status
+ii	base-files
+hi	linux-image-6.17.0-8-generic
+iW	fixture-config
+### linux-version-list
+6.17.0-7-generic
+6.17.0-8-generic
+### linux-version-sort
+6.17.0-8-generic
+6.17.0-7-generic
+### uname
+6.17.0-7-generic
+### reboot-required
+System restart required
+### reboot-required.pkgs
+linux-image-6.17.0-8-generic
+libc6
+### boot-listing
+vmlinuz-6.17.0-7-generic
+initrd.img-6.17.0-7-generic
+vmlinuz-6.17.0-8-generic
+initrd.img-6.17.0-8-generic
+### apt-config
+L='1'; U='1'; R='false';

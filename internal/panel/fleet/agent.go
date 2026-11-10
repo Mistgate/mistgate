@@ -648,6 +648,10 @@ func runState(s agentv1.InboundRunState) string {
 // An empty resolver list stays empty: the node then uses the server's own resolver (some hosters allow only theirs);
 // country defaults are a preset the owner picks, never a silent substitute.
 func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
+	return nodeSettingsFor(n, caps, true)
+}
+
+func nodeSettingsFor(n store.NodeRow, caps []string, allowOSStatus bool) *agentv1.NodeSettings {
 	s := &agentv1.NodeSettings{StatsIntervalS: defaultStatsIntervalS, KeepaliveIntervalS: defaultKeepaliveInterval,
 		KeepaliveTimeoutS: defaultKeepaliveTimeout, DialTimeoutS: uint32(n.DialTimeoutS), DnsResolvers: slices.Clone(n.DNSResolvers),
 		CountryCode: n.CountryCode}
@@ -665,6 +669,9 @@ func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 		// agent's addresses alone.
 		s.Ipv6AddressesManaged = true
 		s.Ipv6Addresses = ownedIPv6Addresses(n)
+	}
+	if allowOSStatus && slices.Contains(caps, capOSStatus) {
+		s.OsStatus = true
 	}
 	return s
 }
@@ -694,6 +701,9 @@ func settingsSig(s *agentv1.NodeSettings) string {
 	}
 	if s.NetworksDbSha256 != "" {
 		sig += "|networks-db-sha256=" + s.NetworksDbSha256
+	}
+	if s.GetOsStatus() {
+		sig += "|os-status=1"
 	}
 	return sig
 }

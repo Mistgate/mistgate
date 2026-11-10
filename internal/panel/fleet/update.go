@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 )
@@ -24,6 +25,8 @@ const capUpdate = "update/1"
 
 // capUpdateLink is the edge link-only agent update capability; VPS updates continue to require capUpdate.
 const capUpdateLink = "update-link/1"
+
+const capOSStatus = osupdate.Capability
 
 // Updates is implemented by the updates module. Its three metadata methods are cheap; Serve blocks for a download.
 type Updates interface {
@@ -55,6 +58,16 @@ func (f *Fleet) updates() Updates {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.upd
+}
+
+// osStatusAllowed reports whether this panel asks agents for their operating-system status: a VPS panel whose update
+// service reads it. The edge edition never does.
+func (f *Fleet) osStatusAllowed() bool {
+	if f.cfg.Remote != nil {
+		return false
+	}
+	u, ok := f.updates().(interface{ OSUpdatesEnabled() bool })
+	return ok && u.OSUpdatesEnabled()
 }
 
 func (f *Fleet) updating(nodeID string) bool {

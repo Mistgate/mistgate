@@ -18,6 +18,7 @@ import { validatePaging, type PagingSearch } from "@/lib/paging";
 import { validateSort, type SortSearch } from "@/screens/users/sort";
 import { goToSignIn, meQuery, queryClient, setSignedOutHandler } from "@/lib/session";
 import { validateHealthSearch } from "@/screens/health/tabs";
+import { validateUpdatesSearch } from "@/screens/updates/tabs";
 import { upgradeNodeLink, validateNodeSearch } from "@/screens/node/tabs";
 import { validateReachSearch } from "@/screens/reachability/search";
 import { validateNewProfileSearch, validateProfilesSearch } from "@/screens/profiles/search";
@@ -231,6 +232,8 @@ const reachability = createRoute({
 const updates = createRoute({
   getParentRoute: () => app,
   path: "/updates",
+  // the open tab (the node agents, or the servers' operating system), so a reload or a link keeps it
+  validateSearch: validateUpdatesSearch,
   component: lazyRouteComponent(() => import("@/screens/updates"), "UpdatesScreen"),
 });
 

@@ -193,7 +193,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `ProfileService.ListProfiles`, `ProfileService.GetProfile` (secrets masked) | yes | yes | yes |
 | `ProfileService.ListProtocols`, `ProfileService.PreviewProfile` | yes | yes | yes |
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | yes | yes | yes |
-| `UpdateService.GetUpdates` | yes | yes | yes |
+| `UpdateService.GetUpdates`, `GetOsUpdates` | yes | yes | yes |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | no | yes | yes |
 | `HealthService.MuteAlert`, `DismissAlert`, `RunChecksNow`, `RunDoctor` | no | yes | yes |
 | `AuthService.ListAudit` | no | no | yes |

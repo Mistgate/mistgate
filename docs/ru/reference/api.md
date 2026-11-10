@@ -193,7 +193,7 @@ func main() {
 | `ProfileService.ListProfiles`, `ProfileService.GetProfile` (секреты скрыты) | да | да | да |
 | `ProfileService.ListProtocols`, `ProfileService.PreviewProfile` | да | да | да |
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | да | да | да |
-| `UpdateService.GetUpdates` | да | да | да |
+| `UpdateService.GetUpdates`, `GetOsUpdates` | да | да | да |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | нет | да | да |
 | `HealthService.MuteAlert`, `DismissAlert`, `RunChecksNow`, `RunDoctor` | нет | да | да |
 | `AuthService.ListAudit` | нет | нет | да |

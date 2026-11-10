@@ -36,6 +36,9 @@ const (
 	// UpdateServiceGetUpdatesProcedure is the fully-qualified name of the UpdateService's GetUpdates
 	// RPC.
 	UpdateServiceGetUpdatesProcedure = "/mistgate.admin.v1.UpdateService/GetUpdates"
+	// UpdateServiceGetOsUpdatesProcedure is the fully-qualified name of the UpdateService's
+	// GetOsUpdates RPC.
+	UpdateServiceGetOsUpdatesProcedure = "/mistgate.admin.v1.UpdateService/GetOsUpdates"
 	// UpdateServiceCheckPanelUpdateProcedure is the fully-qualified name of the UpdateService's
 	// CheckPanelUpdate RPC.
 	UpdateServiceCheckPanelUpdateProcedure = "/mistgate.admin.v1.UpdateService/CheckPanelUpdate"
@@ -82,6 +85,8 @@ type UpdateServiceClient interface {
 	// The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
 	// contacts a node and never rescans the bundle directory (RescanBundle does).
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
+	// Stored snapshots only: does not contact nodes, run apt, or refresh package lists.
+	GetOsUpdates(context.Context, *connect.Request[v1.GetOsUpdatesRequest]) (*connect.Response[v1.GetOsUpdatesResponse], error)
 	// Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
 	CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error)
 	// Install the latest signed panel release through the root helper (a transient systemd unit or the fixed
@@ -132,6 +137,12 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+UpdateServiceGetUpdatesProcedure,
 			connect.WithSchema(updateServiceMethods.ByName("GetUpdates")),
+			connect.WithClientOptions(opts...),
+		),
+		getOsUpdates: connect.NewClient[v1.GetOsUpdatesRequest, v1.GetOsUpdatesResponse](
+			httpClient,
+			baseURL+UpdateServiceGetOsUpdatesProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("GetOsUpdates")),
 			connect.WithClientOptions(opts...),
 		),
 		checkPanelUpdate: connect.NewClient[v1.CheckPanelUpdateRequest, v1.CheckPanelUpdateResponse](
@@ -218,6 +229,7 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 // updateServiceClient implements UpdateServiceClient.
 type updateServiceClient struct {
 	getUpdates               *connect.Client[v1.GetUpdatesRequest, v1.GetUpdatesResponse]
+	getOsUpdates             *connect.Client[v1.GetOsUpdatesRequest, v1.GetOsUpdatesResponse]
 	checkPanelUpdate         *connect.Client[v1.CheckPanelUpdateRequest, v1.CheckPanelUpdateResponse]
 	installPanelUpdate       *connect.Client[v1.InstallPanelUpdateRequest, v1.InstallPanelUpdateResponse]
 	startRollout             *connect.Client[v1.StartRolloutRequest, v1.StartRolloutResponse]
@@ -236,6 +248,11 @@ type updateServiceClient struct {
 // GetUpdates calls mistgate.admin.v1.UpdateService.GetUpdates.
 func (c *updateServiceClient) GetUpdates(ctx context.Context, req *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error) {
 	return c.getUpdates.CallUnary(ctx, req)
+}
+
+// GetOsUpdates calls mistgate.admin.v1.UpdateService.GetOsUpdates.
+func (c *updateServiceClient) GetOsUpdates(ctx context.Context, req *connect.Request[v1.GetOsUpdatesRequest]) (*connect.Response[v1.GetOsUpdatesResponse], error) {
+	return c.getOsUpdates.CallUnary(ctx, req)
 }
 
 // CheckPanelUpdate calls mistgate.admin.v1.UpdateService.CheckPanelUpdate.
@@ -308,6 +325,8 @@ type UpdateServiceHandler interface {
 	// The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
 	// contacts a node and never rescans the bundle directory (RescanBundle does).
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
+	// Stored snapshots only: does not contact nodes, run apt, or refresh package lists.
+	GetOsUpdates(context.Context, *connect.Request[v1.GetOsUpdatesRequest]) (*connect.Response[v1.GetOsUpdatesResponse], error)
 	// Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
 	CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error)
 	// Install the latest signed panel release through the root helper (a transient systemd unit or the fixed
@@ -354,6 +373,12 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		UpdateServiceGetUpdatesProcedure,
 		svc.GetUpdates,
 		connect.WithSchema(updateServiceMethods.ByName("GetUpdates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	updateServiceGetOsUpdatesHandler := connect.NewUnaryHandler(
+		UpdateServiceGetOsUpdatesProcedure,
+		svc.GetOsUpdates,
+		connect.WithSchema(updateServiceMethods.ByName("GetOsUpdates")),
 		connect.WithHandlerOptions(opts...),
 	)
 	updateServiceCheckPanelUpdateHandler := connect.NewUnaryHandler(
@@ -438,6 +463,8 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		switch r.URL.Path {
 		case UpdateServiceGetUpdatesProcedure:
 			updateServiceGetUpdatesHandler.ServeHTTP(w, r)
+		case UpdateServiceGetOsUpdatesProcedure:
+			updateServiceGetOsUpdatesHandler.ServeHTTP(w, r)
 		case UpdateServiceCheckPanelUpdateProcedure:
 			updateServiceCheckPanelUpdateHandler.ServeHTTP(w, r)
 		case UpdateServiceInstallPanelUpdateProcedure:
@@ -475,6 +502,10 @@ type UnimplementedUpdateServiceHandler struct{}
 
 func (UnimplementedUpdateServiceHandler) GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.GetUpdates is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) GetOsUpdates(context.Context, *connect.Request[v1.GetOsUpdatesRequest]) (*connect.Response[v1.GetOsUpdatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.GetOsUpdates is not implemented"))
 }
 
 func (UnimplementedUpdateServiceHandler) CheckPanelUpdate(context.Context, *connect.Request[v1.CheckPanelUpdateRequest]) (*connect.Response[v1.CheckPanelUpdateResponse], error) {

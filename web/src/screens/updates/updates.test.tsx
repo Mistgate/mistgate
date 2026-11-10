@@ -43,7 +43,10 @@ vi.mock("@/lib/api", () => ({
   webauthnSupported: () => false,
 }));
 // the screen is tested without a router: a link is just an anchor here, with where it goes
+const route = vi.hoisted(() => ({ search: {} as { tab?: string }, navigate: vi.fn() }));
 vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => route.navigate,
+  useSearch: () => route.search,
   Link: ({ children, to, params, search, className, ...rest }: { children?: ReactNode; to: string; params?: object; search?: object; className?: string }) => (
     <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(search ?? {})} className={className} aria-label={(rest as { "aria-label"?: string })["aria-label"]}>
       {children}
@@ -65,6 +68,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
+  route.search = {};
   for (const m of [getUpdates, startRollout, scheduleNodeUpdate, cancelNodeUpdateSchedule, setUpdateTimezone, pauseRollout, resumeRollout, cancelRollout, rollbackNode, rescanBundle, checkPanelUpdate, installPanelUpdate]) m.mockReset();
 });
 
@@ -662,6 +666,7 @@ describe("the folds of the Updates screen", () => {
   });
 
   it("opens the panel's steps by itself when it cannot update itself, and leaves the details folded otherwise", async () => {
+    route.search = { tab: "panel" }; // the panel's own layer
     await mount(page({ nodes: [node()] }));
     expect(detailsOf("up-panel-details")!.getAttribute("aria-expanded")).toBe("false");
     expect(text()).not.toContain("Updating the panel itself");
@@ -951,6 +956,7 @@ describe("the Cloudflare edition", () => {
   });
 
   it("says the panel row is updated with mistgate edge deploy, without systemd, and gives the command", async () => {
+    route.search = { tab: "panel" }; // the panel's own layer
     await mount(edgePage({ nodes: [node()] }));
     expect(text()).toContain("Updated with mistgate edge deploy");
     expect(text()).toContain("This panel runs on Cloudflare. Update it from your computer with this command; --rollback in place of --version returns the previous version.");

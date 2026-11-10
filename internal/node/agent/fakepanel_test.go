@@ -70,6 +70,7 @@ type fakePanel struct {
 	debugs    chan *pb.DebugCaptureReport
 	connects  chan struct{}
 	doctors   chan *pb.DoctorReport
+	osStatus  chan *pb.OsStatus
 	bundle    map[string][]byte // FetchUpdate serves these by name (guarded by mu)
 	fetches   []uint64          // offsets FetchUpdate was asked for
 	fetchBusy int               // answer RESOURCE_EXHAUSTED this many times first
@@ -95,7 +96,7 @@ func newFakePanel(t *testing.T) *fakePanel {
 		lastSeq: map[string]uint64{}, up: map[string]uint64{}, down: map[string]uint64{},
 		hellos: make(chan *pb.Hello, 64), applies: make(chan *pb.ApplyResult, 64),
 		cmds: make(chan *pb.CommandResult, 64), logs: make(chan *pb.LogChunk, 256), debugs: make(chan *pb.DebugCaptureReport, 256), connects: make(chan struct{}, 64),
-		doctors: make(chan *pb.DoctorReport, 64),
+		doctors: make(chan *pb.DoctorReport, 64), osStatus: make(chan *pb.OsStatus, 16),
 	}
 	p.ackedOverride.Store(-1)
 	p.settings.Store(&pb.NodeSettings{StatsIntervalS: 10, DnsResolvers: []string{"192.0.2.53"}})
@@ -329,6 +330,11 @@ func (p *fakePanel) handle(stream *connect.BidiStream[pb.ConnectRequest, pb.Conn
 		p.logs <- msg.LogChunk
 	case *pb.ConnectRequest_DebugReport:
 		p.debugs <- msg.DebugReport
+	case *pb.ConnectRequest_OsStatus:
+		select {
+		case p.osStatus <- msg.OsStatus:
+		default:
+		}
 	case *pb.ConnectRequest_DoctorReport:
 		if m.Seq != 0 {
 			p.badSeq.Add(1)

@@ -12,6 +12,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/node/update"
 	"github.com/mistgate/mistgate/internal/node/warp"
@@ -150,6 +151,9 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
 	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capLinks3, capJournal, capProbe, capSpeed, capDebug}
+	if a.canOSUpdate() {
+		caps = append(caps, osupdate.Capability)
+	}
 	if !a.linkOnly() {
 		caps = append(caps, capNets)
 	}

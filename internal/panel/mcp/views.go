@@ -4,9 +4,12 @@ package mcp
 
 import (
 	"math"
+	"regexp"
+	"strings"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 )
 
 // The projections: every tool has its own output struct and builds it from the fields it chose.
@@ -17,6 +20,141 @@ import (
 // the exit IP of a check, anything of the token store.
 
 func nm(s string) string { return clean(s, maxName) }
+
+var mcpOSPackage = regexp.MustCompile("^[a-z0-9][a-z0-9.+-]{0,63}$")
+
+type osJobV struct {
+	ID         string `json:"id,omitempty"`
+	Action     string `json:"action,omitempty"`
+	Mode       string `json:"mode,omitempty"`
+	State      string `json:"state,omitempty"`
+	Phase      string `json:"phase,omitempty"`
+	Started    int64  `json:"started_unix,omitempty"`
+	Updated    int64  `json:"updated_unix,omitempty"`
+	Finished   int64  `json:"finished_unix,omitempty"`
+	Code       string `json:"code,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	Upgraded   uint32 `json:"upgraded,omitempty"`
+	Reboot     string `json:"reboot,omitempty"`
+	HeldReason string `json:"held_reason,omitempty"`
+	KernelFrom string `json:"kernel_from,omitempty"`
+	KernelTo   string `json:"kernel_to,omitempty"`
+}
+
+type osStatusV struct {
+	MeasuredUnix   int64    `json:"measured_unix"`
+	DistroID       string   `json:"distro_id,omitempty"`
+	DistroVersion  string   `json:"distro_version,omitempty"`
+	Pending        uint32   `json:"pending"`
+	Security       uint32   `json:"security"`
+	Notable        []string `json:"notable"`
+	KernelRunning  string   `json:"kernel_running,omitempty"`
+	KernelNewest   string   `json:"kernel_newest,omitempty"`
+	Reboot         bool     `json:"reboot_required"`
+	Reasons        []string `json:"reboot_reasons"`
+	Held           []string `json:"held"`
+	Apt            string   `json:"apt,omitempty"`
+	HalfConfigured []string `json:"half_configured"`
+	ListsUnix      int64    `json:"lists_unix"`
+	DpkgUnix       int64    `json:"dpkg_unix"`
+	AutoUpdates    string   `json:"auto_updates,omitempty"`
+	AutoReboot     bool     `json:"auto_reboot"`
+	AwgModuleNext  string   `json:"awg_module_next,omitempty"`
+	Container      string   `json:"container,omitempty"`
+	BootIDHash     string   `json:"boot_id_hash,omitempty"`
+	Job            *osJobV  `json:"job,omitempty"`
+	Error          string   `json:"error,omitempty"`
+}
+
+type osNodeV struct {
+	NodeID      string     `json:"node_id"`
+	Name        string     `json:"name"`
+	Connected   bool       `json:"connected"`
+	Supported   bool       `json:"supported"`
+	OnlineUsers uint32     `json:"online_users"`
+	OnPanel     bool       `json:"on_panel_server"`
+	State       string     `json:"state"`
+	Status      *osStatusV `json:"status,omitempty"`
+}
+
+// OsUpdatesV is the os_updates_status result; package and node strings are untrusted input.
+type OsUpdatesV struct {
+	NowUnix          int64      `json:"now_unix"`
+	Nodes            []osNodeV  `json:"nodes"`
+	PanelHost        *osStatusV `json:"panel_host,omitempty"`
+	ScheduleTimezone int32      `json:"schedule_timezone_offset_minutes"`
+	Truncated        bool       `json:"truncated,omitempty"`
+}
+
+func (v *OsUpdatesV) shrink() bool {
+	v.Truncated = true
+	if len(v.Nodes) > 1 {
+		v.Nodes = v.Nodes[:len(v.Nodes)/2]
+		return true
+	}
+	if v.PanelHost != nil {
+		v.PanelHost.Notable = nil
+		v.PanelHost.Held = nil
+		v.PanelHost.HalfConfigured = nil
+		return true
+	}
+	return false
+}
+
+func osStatusView(s *agentv1.OsStatus) *osStatusV {
+	if s == nil {
+		return nil
+	}
+	v := &osStatusV{
+		MeasuredUnix: s.GetMeasuredUnix(), DistroID: clean(s.GetDistroId(), 64), DistroVersion: clean(s.GetDistroVersion(), 64),
+		Pending: s.GetPending(), Security: s.GetSecurity(), Notable: []string{}, KernelRunning: noAddr(clean(s.GetKernelRunning(), 128)),
+		KernelNewest: noAddr(clean(s.GetKernelNewest(), 128)), Reboot: s.GetRebootRequired(), Reasons: []string{}, Held: []string{},
+		Apt: clean(s.GetApt(), 32), HalfConfigured: []string{}, ListsUnix: s.GetListsUnix(), DpkgUnix: s.GetDpkgUnix(),
+		AutoUpdates: clean(s.GetAutoUpdates(), 32), AutoReboot: s.GetAutoReboot(), AwgModuleNext: clean(s.GetAwgModuleNext(), 32),
+		Container: noAddr(clean(s.GetContainer(), 64)), BootIDHash: clean(s.GetBootIdHash(), 16), Error: clean(s.GetError(), 32),
+	}
+	for _, raw := range s.GetNotable() {
+		parts := strings.Fields(raw)
+		if len(parts) != 4 || !mcpOSPackage.MatchString(parts[0]) || (parts[3] != "s" && parts[3] != "-") {
+			continue
+		}
+		v.Notable = append(v.Notable, strings.Join([]string{noAddr(clean(parts[0], 64)), clean(parts[1], 80), clean(parts[2], 80), parts[3]}, " "))
+	}
+	for _, name := range s.GetRebootReasons() {
+		if name == "kernel" || mcpOSPackage.MatchString(name) {
+			v.Reasons = append(v.Reasons, noAddr(clean(name, 64)))
+		}
+	}
+	for _, name := range s.GetHeld() {
+		if mcpOSPackage.MatchString(name) {
+			v.Held = append(v.Held, noAddr(clean(name, 64)))
+		}
+	}
+	for _, name := range s.GetHalfConfigured() {
+		if mcpOSPackage.MatchString(name) {
+			v.HalfConfigured = append(v.HalfConfigured, noAddr(clean(name, 64)))
+		}
+	}
+	if j := s.GetJob(); j != nil {
+		v.Job = &osJobV{ID: clean(j.GetJobId(), 80), Action: clean(j.GetAction(), 24), Mode: clean(j.GetMode(), 16),
+			State: clean(j.GetState(), 24), Phase: clean(j.GetPhase(), 32), Started: j.GetStartedUnix(), Updated: j.GetUpdatedUnix(),
+			Finished: j.GetFinishedUnix(), Code: clean(j.GetCode(), 48), Reason: noAddr(clean(j.GetReason(), 160)),
+			Upgraded: j.GetUpgraded(), Reboot: clean(j.GetReboot(), 24), HeldReason: clean(j.GetHeldReason(), 32),
+			KernelFrom: noAddr(clean(j.GetKernelFrom(), 128)), KernelTo: noAddr(clean(j.GetKernelTo(), 128))}
+	}
+	return v
+}
+
+func osUpdatesView(r *adminv1.GetOsUpdatesResponse) *OsUpdatesV {
+	v := &OsUpdatesV{NowUnix: r.GetNowUnix(), Nodes: []osNodeV{}, PanelHost: osStatusView(r.GetPanelHost()),
+		ScheduleTimezone: r.GetScheduleTimezoneOffsetMinutes()}
+	for _, n := range r.GetNodes() {
+		v.Nodes = append(v.Nodes, osNodeV{NodeID: clean(n.GetNodeId(), 80), Name: nm(n.GetName()), Connected: n.GetConnected(),
+			Supported: n.GetSupported(), OnlineUsers: n.GetOnlineUsers(), OnPanel: n.GetOnPanelServer(),
+			State: enumName("OS_UPDATE_STATE_", n.GetState().String()), Status: osStatusView(n.GetStatus())})
+	}
+	return v
+}
 
 func sumUsers(pc []*adminv1.ProtocolCount) uint32 {
 	var n uint32

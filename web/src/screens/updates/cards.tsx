@@ -180,7 +180,7 @@ const errorKinds = new Set(["check_failed", "install_failed"]);
  * What the panel says about its own update, as a word, and how it should look. Shared by both cards of the panel. On the
  * Cloudflare edition "unsupported" is how it always is (the owner deploys a release from their computer), not a fault.
  */
-function panelUpdate(t: ReturnType<typeof useT>, data: Updates, edge: boolean) {
+export function panelUpdate(t: ReturnType<typeof useT>, data: Updates, edge: boolean) {
   const p = data.panel;
   const update = p?.update;
   const unsupported = edge ? t("up.panel.edge") : t("up.panel.unsupported");

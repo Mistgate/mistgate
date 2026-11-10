@@ -15,6 +15,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/blocklist"
@@ -397,6 +398,9 @@ func wireCore(c Config) (*core, error) {
 		})
 	}
 	updateConfig, gateHealth := nodeUpdateConfig(c.DataDir, edge, onEdge, relKey, authSvc.RequireStepUp, panelUpdater, nodeBundleSource, hl, log)
+	if !onEdge {
+		updateConfig.OSStatusReader = osupdate.NewReader()
+	}
 	k.upd, err = update.New(st, fl, gateHealth, updateConfig)
 	if err != nil {
 		return nil, err

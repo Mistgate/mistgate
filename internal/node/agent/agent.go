@@ -42,6 +42,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/node/nets"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/node/speedtest"
 	"github.com/mistgate/mistgate/internal/node/update"
@@ -94,6 +95,10 @@ type Config struct {
 	// SecurityUpdatesLauncher starts the bounded apt configuration job in its own transient root systemd unit.
 	// Nil disables the fix on builds or hosts that cannot launch it.
 	SecurityUpdatesLauncher func(context.Context) error
+	// OSUpdateReader replaces the read-only operating-system snapshot source in tests.
+	OSUpdateReader *osupdate.Reader
+	// OSUpdateCapability replaces host detection in tests; nil uses Linux/root/systemd detection.
+	OSUpdateCapability func() bool
 	// AwgPrepare builds the AmneziaWG kernel module on request (internal/node/awgprep). Nil = this agent does not list
 	// "awg-prepare/1", and the admin UI keeps showing the manual command.
 	AwgPrepare *awgprep.Controller
@@ -130,6 +135,9 @@ type Agent struct {
 	networkTarget      atomic.Pointer[networkTableTarget]
 	networkFetchMu     sync.Mutex
 	networkFetchCancel context.CancelFunc
+	osUpdateMonitor    *osupdate.Monitor
+	osStatusWake       chan struct{}
+	osStatusDelay      time.Duration
 
 	torrentEventsMu sync.Mutex
 	torrentEvents   map[string]time.Time
@@ -387,6 +395,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		decoySite:     site,
 		nets:          nets.New(0),
 		networkWake:   make(chan struct{}, 1),
+		osStatusWake:  make(chan struct{}, 1),
+		osStatusDelay: osStatusConnectDelay,
 		log:           slog.New(&ringHandler{ring: ring, journal: journal, dbg: dbg, inner: inner}),
 		engines:       map[string]engine.Engine{},
 		torrentEvents: map[string]time.Time{},
@@ -402,6 +412,12 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		renewEvery: time.Hour, sweepEvery: 30 * time.Second,
 		commitTick: commitTick, commitSettle: commitSettle, upd: cfg.Updater,
 	}
+	reader := cfg.OSUpdateReader
+	if reader == nil {
+		reader = osupdate.NewReader()
+	}
+	reader.Now = a.now
+	a.osUpdateMonitor = osupdate.NewMonitor(reader)
 	if siteErr != nil {
 		a.log.Warn("persisted decoy site ignored", "err", siteErr)
 	}
@@ -531,7 +547,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.warm = true
 
 	var wg sync.WaitGroup
-	loops := []func(context.Context){a.worker, a.collectLoop, a.renewLoop, a.sweepLoop, a.networkTableLoop}
+	loops := []func(context.Context){a.worker, a.collectLoop, a.renewLoop, a.sweepLoop, a.networkTableLoop, a.osStatusLoop}
 	if a.cfg.Warp != nil {
 		loops = append(loops, a.cfg.Warp.Run)
 	}
@@ -982,6 +998,10 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	}
 	a.cur.Store(s)
 	defer a.cur.CompareAndSwap(s, nil)
+	if a.settings.Load().GetOsStatus() {
+		a.sendOsStatusSnapshot(s)
+		a.wakeOsStatusReader()
+	}
 	a.goBusy(func() { a.debugResume(s) }) // a capture that ended while the link was down
 	if a.clientIPv6DoctorPending.Load() {
 		a.submit(s, job{sweep: true}) // apply HelloAck settings before their doctor re-check

@@ -30,6 +30,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/asndb"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
@@ -121,6 +122,8 @@ type Config struct {
 	// NodeBundleSource polls the official GitHub release for a bundle signed by this installation's release key.
 	// A trusted newer bundle is installed into dist and made available for owner-triggered node updates.
 	NodeBundleSource NodeBundleSource
+	// OSStatusReader enables the read-only panel-host snapshot on the VPS edition. Nil disables the reader (tests/edge).
+	OSStatusReader *osupdate.Reader
 	// Edge uses the panel's own signed release and link-only commands for node updates. RPC availability is edition policy.
 	Edge bool
 	// StepUp is auth.Service.RequireStepUp: every change calls it first. Required.
@@ -173,6 +176,7 @@ type Service struct {
 	progressMu      sync.RWMutex
 	progress        map[string]progressState // node id -> latest update progress
 	progressActive  map[string]progressExpectation
+	osStatusMonitor *osupdate.Monitor
 
 	updMu             sync.RWMutex
 	updating          map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)
@@ -226,6 +230,9 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 		parseNetworkTable: asndb.Parse,
 		inflight:          map[string]bool{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
 		updating: map[string]bool{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
+	if shouldReadPanelHostStatus(cfg.Edge, osupdate.IsRoot(), cfg.OSStatusReader != nil) {
+		s.osStatusMonitor = osupdate.NewMonitor(cfg.OSStatusReader)
+	}
 	if cfg.DataDir != "" { // without one there is no bundle (and no relative "dist" in whatever the working directory is)
 		s.dist = filepath.Join(cfg.DataDir, "dist")
 	}
@@ -268,6 +275,13 @@ func (s *Service) Run(ctx context.Context) {
 		go func() {
 			defer s.wg.Done()
 			s.cfg.PanelUpdater.Run(ctx)
+		}()
+	}
+	if s.osStatusMonitor != nil {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.osStatusMonitor.Run(ctx, nil)
 		}()
 	}
 	tick := time.NewTicker(s.cfg.Tick)

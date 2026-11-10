@@ -57,6 +57,9 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	}
 	if ds.Settings != nil {
 		a.settings.Store(ds.Settings)
+		if ds.Settings.GetOsStatus() {
+			a.wakeOsStatusReader()
+		}
 		a.configureNetworks(ds.Settings)
 	}
 	if ds.StateHash != "" && ds.StateHash != next.hash() {

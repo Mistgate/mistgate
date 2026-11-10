@@ -26,6 +26,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
@@ -419,6 +420,8 @@ type world struct {
 	nodeStatuses           map[string]adminv1.NodeStatus
 	rolloutStat            adminv1.RolloutStatus
 	bundleStat             adminv1.BundleStatus
+	osUpdates              *adminv1.GetOsUpdatesResponse
+	osUpdatesCalls         int
 	bundleBuilt            int64 // 0 = the default bundle's 1700000200
 	scheduleTimezoneOffset int32
 	downloadTimeoutSeconds uint32
@@ -473,6 +476,14 @@ func newWorld() *world {
 		dnsPresets: map[string]*adminv1.DnsPreset{}, nodePatches: map[string]*adminv1.UpdateNodeRequest{}, inboundDirect: map[string]bool{}, warp: map[string]*adminv1.GetWarpResponse{},
 		nodeStatuses: map[string]adminv1.NodeStatus{nodeA: adminv1.NodeStatus_NODE_STATUS_ONLINE, nodeB: adminv1.NodeStatus_NODE_STATUS_DOWN},
 		rolloutStat:  adminv1.RolloutStatus_ROLLOUT_STATUS_DONE, bundleStat: adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED, scheduleTimezoneOffset: 180, downloadTimeoutSeconds: 1800, scheduledUnix: 1700009000}
+	osStatus := &agentv1.OsStatus{MeasuredUnix: 1700000000, DistroId: "ubuntu", DistroVersion: "24.04", Pending: 3, Security: 1,
+		Notable: []string{"openssl 3.0.0 3.0.1 s", "203.0.113.77 1 2 -", "linux-image-generic 5.15.0.125.123 5.15.0.126.125 s"}, KernelRunning: "6.8.0-1-generic", KernelNewest: "6.8.0-2-generic",
+		RebootRequired: true, RebootReasons: []string{"kernel", "linux-image-6.8.0-2-generic"}, Held: []string{"linux-image-6.8.0-2-generic", "203.0.113.77"},
+		Apt: "ok", ListsUnix: 1699990000, DpkgUnix: 1699980000, AutoUpdates: "on", BootIdHash: "0123456789abcdef"}
+	w.osUpdates = &adminv1.GetOsUpdatesResponse{NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: 180, PanelHost: proto.Clone(osStatus).(*agentv1.OsStatus), Nodes: []*adminv1.NodeOs{
+		{NodeId: nodeA, Name: "de1", Connected: true, Supported: true, OnlineUsers: 3, State: adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES, Status: proto.Clone(osStatus).(*agentv1.OsStatus)},
+		{NodeId: nodeB, Name: "nl1", Connected: false, Supported: true, State: adminv1.OsUpdateState_OS_UPDATE_STATE_OFFLINE},
+	}}
 	w.relay = newRelayFixture()
 	w.tasks = newFakeTasks()
 	w.groups["grp_1"] = &adminv1.Group{Id: "grp_1", Name: "family", ProfileIds: []string{"prf_1", "prf_2"}, UserCount: 3, DnsPresetId: "dns_1"}
@@ -1470,6 +1481,16 @@ func (w *world) GetUpdates(context.Context, *connect.Request[adminv1.GetUpdatesR
 		Rollout: &adminv1.Rollout{Id: "rol_1", Status: w.rolloutStat, ToVersion: "v2", BatchSize: 1, Steps: []*adminv1.RolloutStep{{NodeId: nodeA, NodeName: "de1", State: adminv1.StepState_STEP_STATE_SENT}}},
 	}
 	return connect.NewResponse(r), nil
+}
+
+func (w *world) GetOsUpdates(context.Context, *connect.Request[adminv1.GetOsUpdatesRequest]) (*connect.Response[adminv1.GetOsUpdatesResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.osUpdatesCalls++
+	if w.osUpdates == nil {
+		return connect.NewResponse(&adminv1.GetOsUpdatesResponse{}), nil
+	}
+	return connect.NewResponse(proto.Clone(w.osUpdates).(*adminv1.GetOsUpdatesResponse)), nil
 }
 
 func (w *world) StartRollout(_ context.Context, r *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {

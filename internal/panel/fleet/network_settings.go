@@ -20,9 +20,11 @@ type networkTableReader interface {
 	Built() time.Time
 }
 
-// nodeSettings includes network settings only for agents that advertise nets/1.
+// nodeSettings is what one agent is sent: the node's own settings, the operating-system status request for agents
+// with os-status/1 and the network settings for agents with nets/1. An agent without a capability gets nothing of it,
+// so its settings and their signature stay what they were.
 func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
-	s := nodeSettings(n, caps)
+	s := nodeSettingsFor(n, caps, f.osStatusAllowed())
 	if !store.CapabilityPresent(caps, capNetworks) {
 		return s
 	}

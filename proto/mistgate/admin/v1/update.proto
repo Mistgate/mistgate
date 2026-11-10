@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
+import "mistgate/agent/v1/agent.proto";
+
 // Updates screen: the panel release, the release bundle it holds, what every node runs, and explicit
 // per-node agent updates (with the rollout gate and automatic rollback of a failed node).
 // Conventions: common.proto.
@@ -22,6 +24,8 @@ service UpdateService {
   // The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
   // contacts a node and never rescans the bundle directory (RescanBundle does).
   rpc GetUpdates(GetUpdatesRequest) returns (GetUpdatesResponse);
+  // Stored snapshots only: does not contact nodes, run apt, or refresh package lists.
+  rpc GetOsUpdates(GetOsUpdatesRequest) returns (GetOsUpdatesResponse);
   // Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
   rpc CheckPanelUpdate(CheckPanelUpdateRequest) returns (CheckPanelUpdateResponse);
   // Install the latest signed panel release through the root helper (a transient systemd unit or the fixed
@@ -55,6 +59,38 @@ service UpdateService {
   rpc SetUpdateChannel(SetUpdateChannelRequest) returns (SetUpdateChannelResponse);
   // Change the maximum time an agent may spend downloading one update binary. Owner-only with a fresh step-up.
   rpc SetUpdateDownloadTimeout(SetUpdateDownloadTimeoutRequest) returns (SetUpdateDownloadTimeoutResponse);
+}
+
+enum OsUpdateState {
+  OS_UPDATE_STATE_UNSPECIFIED = 0;
+  OS_UPDATE_STATE_UNSUPPORTED = 1;
+  OS_UPDATE_STATE_OFFLINE = 2;
+  OS_UPDATE_STATE_UNKNOWN = 3;
+  OS_UPDATE_STATE_BUSY = 4;
+  OS_UPDATE_STATE_FAILED = 5;
+  OS_UPDATE_STATE_REBOOT_REQUIRED = 6;
+  OS_UPDATE_STATE_UPDATES = 7;
+  OS_UPDATE_STATE_UP_TO_DATE = 8;
+}
+
+message GetOsUpdatesRequest {}
+
+message NodeOs {
+  string node_id = 1;
+  string name = 2;
+  bool connected = 3;
+  bool supported = 4;
+  uint32 online_users = 5;
+  bool on_panel_server = 6;
+  OsUpdateState state = 7;
+  mistgate.agent.v1.OsStatus status = 8;
+}
+
+message GetOsUpdatesResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  repeated NodeOs nodes = 2;
+  mistgate.agent.v1.OsStatus panel_host = 3;
+  int32 schedule_timezone_offset_minutes = 4;
 }
 
 // ---------------------------------------------------------------------------------------------------

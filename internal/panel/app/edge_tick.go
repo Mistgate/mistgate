@@ -50,7 +50,7 @@ var edgeDeferred = map[string]string{
 var edgeDeferredFeatures = map[string][]string{
 	"fleet":               {edition.AgentLogs},
 	"health":              {edition.HealthChecks},
-	"updates":             {edition.PanelUpdate},
+	"updates":             {edition.PanelUpdate, edition.OSUpdates},
 	"backups":             {edition.Backups},
 	"mcp-plan-sweep":      {edition.MCP},
 	"assistant-retention": {edition.Assistant},
