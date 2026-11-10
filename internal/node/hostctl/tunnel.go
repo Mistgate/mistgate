@@ -164,9 +164,11 @@ func renderTunnels(ts []Tunnel, v6verdict string) (string, error) {
 	if len(addrs6) > 0 {
 		fmt.Fprintf(&b, "\t\tiifname %s ip6 daddr { %s } drop\n", wild, strings.Join(addrs6, ", "))
 	}
-	// HTTPS at the host's other (public) addresses: a full-tunnel client reaches a panel that shares the node's address,
-	// as anyone on the internet does, and nothing more: not SSH, not a management listener (issue #41).
-	fmt.Fprintf(&b, "\t\tiifname %s tcp dport 443 accept\n", wild)
+	// Node public services: allow full-tunnel clients (0.0.0.0/0) to reach published node listeners
+	// (HTTPS web panel, MTProto Telegram proxy, VLESS Reality, SOCKS) co-located on the node's public IP,
+	// while keeping host management listeners (SSH, agent RPC, private cluster ports) strictly dropped.
+	// Fixes hairpin drop where MTProto or proxy listeners time out when VPN is active on the client.
+	fmt.Fprintf(&b, "\t\tiifname %s tcp dport { 443, 1080, 1083, 1084, 1090, 8108, 8460, 8461, 8462, 24443, 24445 } accept\n", wild)
 	fmt.Fprintf(&b, "\t\tiifname %s drop\n\t}\n", wild)
 
 	// Forward: no client-to-client traffic, and the MSS clamp in both directions of a tunnel.
