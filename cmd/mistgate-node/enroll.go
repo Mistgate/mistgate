@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -68,6 +69,9 @@ func cmdEnroll(args []string) int {
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "enroll:", err)
+		if hint := enrollHint(err, *linkURL != ""); hint != "" {
+			fmt.Fprintln(os.Stderr, hint)
+		}
 		return 1
 	}
 	sd := ""
@@ -104,4 +108,19 @@ func resolveEnrollmentToken(input io.Reader, explicit, environment string, fromS
 		return "", errors.New("invalid token")
 	}
 	return token, nil
+}
+
+// enrollHint says what a TLS alert from the other side means. The panel answers its agent name with a certificate of
+// its own CA, which --ca-sha256 pins; an alert instead of that certificate comes from a server that does not know
+// the name. The message alone ("handshake failure") reads as if a certificate had to be replaced.
+func enrollHint(err error, link bool) string {
+	var op *net.OpError
+	if link || !errors.As(err, &op) || op.Op != "remote error" {
+		return ""
+	}
+	return "The server at --panel did not accept the panel's agent name. Either something else ends TLS on that address " +
+		"(a CDN proxy, a reverse proxy, another service on the port) or the command is from another panel. " +
+		"The agent needs a direct TLS connection to the panel: use the server's own IP or a DNS-only name in --agent-addr, " +
+		"or give agents a port of their own with --agent-listen, then make a new install command. " +
+		"The certificate behind that name is the panel's own on purpose; there is nothing to replace."
 }

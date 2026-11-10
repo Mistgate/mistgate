@@ -47,6 +47,7 @@ journalctl -u mistgate-node -n 100 --no-pager
 | `already enrolled; use --force to replace the identity` | 状态目录中已存在身份信息。 | 在新命令中添加 `--force`，或先移除旧节点。 |
 | `too many failed attempts, try later` | 此地址在最近一分钟内的失败次数过多。 | 等待一分钟。 |
 | `node retired` | 面板中的节点已退役。 | 将服务器作为新节点添加。 |
+| `remote error: tls: handshake failure`（或 `unrecognized name`、`internal error`） | 该地址上的服务器没有接受面板的 Agent 名称，说明应答的不是面板本身：TLS 在那里被 CDN 代理（Cloudflare 中开启代理的记录）、反向代理或主机控制面板终止，端口被其他服务占用，或者命令来自另一个面板。Agent 名称背后的证书是特意由面板自己的 CA 签发的，并通过 `--ca-sha256` 固定：无需更换或配置。 | 让 Agent 直接通过 TLS 连接面板：在 `--agent-addr` 中填写服务器自己的 IP 或仅 DNS（不经代理）的域名；在反向代理之后，用 `--agent-listen` 给 Agent 单独的端口（见[安装面板](../getting-started/install-panel.md)中的「在反向代理后运行」以及[面板可以运行在 Cloudflare 代理之后吗？](../reference/faq.md)）。然后生成**新安装命令**。 |
 | 连接错误或超时 | 无法通过该地址和端口连接面板。 | 检查 DNS、防火墙以及面板是否在该地址提供 TLS（见上文）。 |
 
 `install` 需要 root 权限和已注册的状态目录：先运行 `enroll`；如果更改过 `--state-dir`，两条命令使用相同的设置。
