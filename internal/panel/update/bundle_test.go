@@ -199,6 +199,62 @@ func (c *chunkSink) send(chunk []byte, total uint64) error {
 
 func (c *chunkSink) bytes() []byte { return bytes.Join(c.chunks, nil) }
 
+type heldServe struct {
+	started <-chan struct{}
+	done    <-chan error
+	release func()
+}
+
+func startHeldServe(wg *sync.WaitGroup, s *Service, ctx context.Context, node, name string) heldServe {
+	hold, started := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(hold) }) }
+	done := make(chan error, 1)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		first := true
+		done <- s.Serve(ctx, node, name, 0, func([]byte, uint64) error {
+			if first {
+				first = false
+				close(started)
+				<-hold
+			}
+			return nil
+		})
+	}()
+	return heldServe{started: started, done: done, release: release}
+}
+
+func waitHeldStarted(t *testing.T, held heldServe) {
+	t.Helper()
+	select {
+	case <-held.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("download did not reach its blocked send")
+	}
+}
+
+func waitHeldDone(t *testing.T, held heldServe) error {
+	t.Helper()
+	select {
+	case err := <-held.done:
+		return err
+	case <-time.After(2 * time.Second):
+		t.Fatal("blocked download did not return after release")
+		return nil
+	}
+}
+
+func assertServeSlotsZero(t *testing.T, s *Service) {
+	t.Helper()
+	s.bmu.Lock()
+	defer s.bmu.Unlock()
+	if s.serves != 0 || len(s.servingNodes) != 0 || s.zombieTotal != 0 || len(s.zombies) != 0 {
+		t.Fatalf("download slots remain: live=%d nodes=%v zombies=%v total=%d", s.serves, s.servingNodes, s.zombies, s.zombieTotal)
+	}
+}
+
 func connectCode(err error) connect.Code {
 	if err == nil {
 		return 0
@@ -303,7 +359,7 @@ func TestServeConcurrencyCap(t *testing.T) {
 		<-started
 	}
 	var sink chunkSink
-	if err := e.s.Serve(e.ctx, "nod_b", name, 0, sink.send); connectCode(err) != connect.CodeResourceExhausted {
+	if err := e.s.Serve(e.ctx, "nod_uk1", name, 0, sink.send); connectCode(err) != connect.CodeResourceExhausted {
 		t.Errorf("fifth download: %v, want RESOURCE_EXHAUSTED", err)
 	}
 	close(hold)
@@ -311,51 +367,225 @@ func TestServeConcurrencyCap(t *testing.T) {
 	if err := e.s.Serve(e.ctx, "nod_b", name, 0, sink.send); err != nil {
 		t.Errorf("after the others finished: %v", err)
 	}
+	assertServeSlotsZero(t, e.s)
 }
 
 func TestServeAllowsOnlyOneDownloadPerNode(t *testing.T) {
 	e := newEnv(t)
-	e.bundle("1.0", 10, map[string][]byte{"mistgate-node-linux-amd64": randBytes(300 << 10)})
-	started, hold, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(finished)
-		_ = e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, func([]byte, uint64) error {
-			select {
-			case <-started:
-			default:
-				close(started)
-			}
-			<-hold
-			return nil
-		})
+	want := randBytes(600 << 10)
+	name := "mistgate-node-linux-amd64"
+	e.bundle("1.0", 10, map[string][]byte{name: want})
+	e.s.nodeSlotWait = 5 * time.Second
+	var wg sync.WaitGroup
+	first := startHeldServe(&wg, e.s, e.ctx, "nod_de1", name)
+	defer func() {
+		first.release()
+		wg.Wait()
 	}()
-	<-started
-	// a second download that outlasts the short wait is refused
-	e.s.nodeSlotWait = 20 * time.Millisecond
-	var sink chunkSink
-	if err := e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, sink.send); connectCode(err) != connect.CodeResourceExhausted {
-		t.Fatalf("second download for one node: %v", err)
+	waitHeldStarted(t, first)
+
+	type result struct {
+		err  error
+		sink chunkSink
 	}
-	// a resume asks again before the dropped download has ended: it waits for the slot and then runs
-	e.s.nodeSlotWait = 10 * time.Second
-	resumed := make(chan error, 1)
+	resumed := make(chan result, 1)
+	startedAt := time.Now()
 	go func() {
-		var resumeSink chunkSink
-		resumed <- e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, resumeSink.send)
+		var sink chunkSink
+		err := e.s.Serve(e.ctx, "nod_de1", name, 0, sink.send)
+		resumed <- result{err: err, sink: sink}
 	}()
+	var got result
 	select {
-	case err := <-resumed:
-		t.Fatalf("the resume did not wait for the first download: %v", err)
-	case <-time.After(50 * time.Millisecond):
+	case got = <-resumed:
+	case <-time.After(time.Second):
+		t.Fatalf("same-file resume did not complete while the first send was blocked")
 	}
-	close(hold)
-	<-finished
-	if err := <-resumed; err != nil {
-		t.Fatalf("resume after the first download ended: %v", err)
+	if took := time.Since(startedAt); took > time.Second {
+		t.Fatalf("same-file resume took %s, want an immediate hand-over", took)
 	}
-	if err := e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, sink.send); err != nil {
-		t.Fatalf("download after the first finished: %v", err)
+	if got.err != nil || !bytes.Equal(got.sink.bytes(), want) {
+		t.Fatalf("resume error=%v, bytes=%d, want %d intact bytes", got.err, len(got.sink.bytes()), len(want))
 	}
+	select {
+	case err := <-first.done:
+		t.Fatalf("first send returned before it was released: %v", err)
+	default:
+	}
+	first.release()
+	if err := waitHeldDone(t, first); !errors.Is(err, context.Canceled) {
+		t.Fatalf("superseded download returned %v, want context.Canceled", err)
+	}
+	assertServeSlotsZero(t, e.s)
+}
+
+func TestServeWaitsForAnotherFileOnTheSameNode(t *testing.T) {
+	e := newEnv(t)
+	binary, table := "mistgate-node-linux-amd64", "mistgate-asndb-data-any"
+	e.bundle("1.0", 10, map[string][]byte{binary: randBytes(300 << 10), table: randBytes(300 << 10)})
+	e.s.nodeSlotWait = 30 * time.Millisecond
+	var wg sync.WaitGroup
+	first := startHeldServe(&wg, e.s, e.ctx, "nod_de1", binary)
+	defer func() {
+		first.release()
+		wg.Wait()
+	}()
+	waitHeldStarted(t, first)
+
+	startedAt := time.Now()
+	var sink chunkSink
+	err := e.s.Serve(e.ctx, "nod_de1", table, 0, sink.send)
+	if connectCode(err) != connect.CodeResourceExhausted {
+		t.Fatalf("different file for a busy node: %v, want RESOURCE_EXHAUSTED", err)
+	}
+	if took := time.Since(startedAt); took < 20*time.Millisecond {
+		t.Fatalf("different-file request was refused after %s, want it to wait", took)
+	}
+	first.release()
+	if err := waitHeldDone(t, first); err != nil {
+		t.Fatalf("original download returned %v", err)
+	}
+	assertServeSlotsZero(t, e.s)
+}
+
+func TestServeNodeZombieCapWaitsUntilZombieReturns(t *testing.T) {
+	e := newEnv(t)
+	want := randBytes(300 << 10)
+	name := "mistgate-node-linux-amd64"
+	e.bundle("1.0", 10, map[string][]byte{name: want})
+	e.s.nodeSlotWait = 30 * time.Millisecond
+	var wg sync.WaitGroup
+	first := startHeldServe(&wg, e.s, e.ctx, "nod_de1", name)
+	defer func() {
+		first.release()
+		wg.Wait()
+	}()
+	waitHeldStarted(t, first)
+	second := startHeldServe(&wg, e.s, e.ctx, "nod_de1", name)
+	defer second.release()
+	waitHeldStarted(t, second)
+
+	thirdSent := make(chan struct{}, 1)
+	startedAt := time.Now()
+	err := e.s.Serve(e.ctx, "nod_de1", name, 0, func([]byte, uint64) error {
+		thirdSent <- struct{}{}
+		return nil
+	})
+	if connectCode(err) != connect.CodeResourceExhausted {
+		t.Fatalf("third same-file request while a zombie exists: %v, want RESOURCE_EXHAUSTED", err)
+	}
+	if took := time.Since(startedAt); took < 20*time.Millisecond {
+		t.Fatalf("third request was refused after %s, want it to wait", took)
+	}
+	select {
+	case <-thirdSent:
+		t.Fatal("third request sent data while the per-node zombie cap was full")
+	default:
+	}
+
+	first.release()
+	if err := waitHeldDone(t, first); !errors.Is(err, context.Canceled) {
+		t.Fatalf("first superseded download returned %v, want context.Canceled", err)
+	}
+	var resumed chunkSink
+	if err := e.s.Serve(e.ctx, "nod_de1", name, 0, resumed.send); err != nil {
+		t.Fatalf("request after the zombie returned: %v", err)
+	}
+	if !bytes.Equal(resumed.bytes(), want) {
+		t.Fatalf("request after zombie return got %d bytes, want %d", len(resumed.bytes()), len(want))
+	}
+	select {
+	case err := <-second.done:
+		t.Fatalf("second blocked send returned before release: %v", err)
+	default:
+	}
+	second.release()
+	if err := waitHeldDone(t, second); !errors.Is(err, context.Canceled) {
+		t.Fatalf("second superseded download returned %v, want context.Canceled", err)
+	}
+	assertServeSlotsZero(t, e.s)
+}
+
+func TestServeGlobalZombieCapWithFiveNodes(t *testing.T) {
+	e := newEnv(t)
+	name := "mistgate-node-linux-amd64"
+	e.bundle("1.0", 10, map[string][]byte{name: randBytes(300 << 10)})
+	e.s.nodeSlotWait = 30 * time.Millisecond
+	var wg sync.WaitGroup
+	var held []heldServe
+	defer func() {
+		for _, download := range held {
+			download.release()
+		}
+		wg.Wait()
+	}()
+	nodes := []string{"nod_de1", "nod_nl1", "nod_fi1", "nod_pl1"}
+	first := make([]heldServe, len(nodes))
+	second := make([]heldServe, len(nodes))
+	for i, node := range nodes {
+		first[i] = startHeldServe(&wg, e.s, e.ctx, node, name)
+		held = append(held, first[i])
+		waitHeldStarted(t, first[i])
+	}
+	for i, node := range nodes {
+		second[i] = startHeldServe(&wg, e.s, e.ctx, node, name)
+		held = append(held, second[i])
+		waitHeldStarted(t, second[i])
+	}
+
+	second[0].release()
+	if err := waitHeldDone(t, second[0]); err != nil {
+		t.Fatalf("first live replacement returned %v", err)
+	}
+	fifth := startHeldServe(&wg, e.s, e.ctx, "nod_uk1", name)
+	held = append(held, fifth)
+	waitHeldStarted(t, fifth)
+
+	fifthSent := make(chan struct{}, 1)
+	startedAt := time.Now()
+	err := e.s.Serve(e.ctx, "nod_uk1", name, 0, func([]byte, uint64) error {
+		fifthSent <- struct{}{}
+		return nil
+	})
+	if connectCode(err) != connect.CodeResourceExhausted {
+		t.Fatalf("fifth zombie: %v, want RESOURCE_EXHAUSTED", err)
+	}
+	if took := time.Since(startedAt); took < 20*time.Millisecond {
+		t.Fatalf("fifth node was refused after %s, want it to wait", took)
+	}
+	select {
+	case <-fifthSent:
+		t.Fatal("fifth node sent data while the global zombie cap was full")
+	default:
+	}
+
+	first[0].release()
+	if err := waitHeldDone(t, first[0]); !errors.Is(err, context.Canceled) {
+		t.Fatalf("released zombie returned %v, want context.Canceled", err)
+	}
+	var resumed chunkSink
+	if err := e.s.Serve(e.ctx, "nod_uk1", name, 0, resumed.send); err != nil {
+		t.Fatalf("fifth node after a zombie returned: %v", err)
+	}
+	if len(resumed.bytes()) == 0 {
+		t.Fatal("fifth node resumed without receiving data")
+	}
+
+	for i := 1; i < len(nodes); i++ {
+		first[i].release()
+		second[i].release()
+		if err := waitHeldDone(t, first[i]); !errors.Is(err, context.Canceled) {
+			t.Errorf("node %s superseded download returned %v, want context.Canceled", nodes[i], err)
+		}
+		if err := waitHeldDone(t, second[i]); err != nil {
+			t.Errorf("node %s live download returned %v", nodes[i], err)
+		}
+	}
+	fifth.release()
+	if err := waitHeldDone(t, fifth); !errors.Is(err, context.Canceled) {
+		t.Errorf("fifth node superseded download returned %v, want context.Canceled", err)
+	}
+	assertServeSlotsZero(t, e.s)
 }
 
 func TestServeArmsAndClearsWriteDeadlineWhenChunkSendStalls(t *testing.T) {

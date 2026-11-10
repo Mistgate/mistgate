@@ -168,8 +168,8 @@ type AgentServiceClient interface {
 	Connect(context.Context) *connect.BidiStreamForClient[v1.ConnectRequest, v1.ConnectResponse]
 	// Download one file of the panel's release bundle (see "UPDATE"). Server streaming, mutual TLS: the same
 	// agent middleware as Connect, so only a valid, non-revoked node certificate gets bytes. Errors: NOT_FOUND
-	// (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (too many concurrent
-	// downloads, retry in a few seconds), FAILED_PRECONDITION (the panel has no bundle).
+	// (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (another file is active for
+	// the node or a concurrency limit was reached; retry), FAILED_PRECONDITION (the panel has no bundle).
 	FetchUpdate(context.Context, *connect.Request[v1.FetchUpdateRequest]) (*connect.ServerStreamForClient[v1.FetchUpdateResponse], error)
 }
 
@@ -222,8 +222,8 @@ type AgentServiceHandler interface {
 	Connect(context.Context, *connect.BidiStream[v1.ConnectRequest, v1.ConnectResponse]) error
 	// Download one file of the panel's release bundle (see "UPDATE"). Server streaming, mutual TLS: the same
 	// agent middleware as Connect, so only a valid, non-revoked node certificate gets bytes. Errors: NOT_FOUND
-	// (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (too many concurrent
-	// downloads, retry in a few seconds), FAILED_PRECONDITION (the panel has no bundle).
+	// (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (another file is active for
+	// the node or a concurrency limit was reached; retry), FAILED_PRECONDITION (the panel has no bundle).
 	FetchUpdate(context.Context, *connect.Request[v1.FetchUpdateRequest], *connect.ServerStream[v1.FetchUpdateResponse]) error
 }
 

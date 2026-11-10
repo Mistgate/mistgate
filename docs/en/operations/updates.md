@@ -45,7 +45,7 @@ The **Release bundle** line at the foot of the fleet card of the Updates page sh
 | A file listed in the manifest is missing | Copy every file of the bundle. |
 | A file differs from the manifest (size or checksum) | The copy is incomplete or the file was changed: copy it again. |
 
-The panel serves the bundle's files only to agents with a valid node certificate, through the agent endpoint, at most four downloads at a time, in resumable chunks. Only regular files in `dist` count (a symbolic link is not followed). Replace a hand-made bundle at once, as a whole; changing it while a rollout runs pauses the rollout.
+The panel serves the bundle's files only to agents with a valid node certificate, through the agent endpoint, with at most four live downloads at a time, in resumable chunks. A resume of the same file takes over that node's slot at once while the previous handler finishes its write. Only regular files in `dist` count (a symbolic link is not followed). Replace a hand-made bundle at once, as a whole; changing it while a rollout runs pauses the rollout.
 
 ## The Updates page
 

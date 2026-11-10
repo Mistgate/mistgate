@@ -4590,8 +4590,8 @@ export const AgentService: GenService<{
   /**
    * Download one file of the panel's release bundle (see "UPDATE"). Server streaming, mutual TLS: the same
    * agent middleware as Connect, so only a valid, non-revoked node certificate gets bytes. Errors: NOT_FOUND
-   * (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (too many concurrent
-   * downloads, retry in a few seconds), FAILED_PRECONDITION (the panel has no bundle).
+   * (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (another file is active for
+   * the node or a concurrency limit was reached; retry), FAILED_PRECONDITION (the panel has no bundle).
    *
    * @generated from rpc mistgate.agent.v1.AgentService.FetchUpdate
    */

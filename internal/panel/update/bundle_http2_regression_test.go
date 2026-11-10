@@ -1,6 +1,7 @@
 package update
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -21,9 +22,15 @@ import (
 
 type rb2Svc struct {
 	agentv1connect.UnimplementedAgentServiceHandler
-	s    *Service
-	node string
-	ret  chan error
+	s        *Service
+	node     string
+	ret      chan error
+	returned chan rb2Return
+}
+
+type rb2Return struct {
+	offset uint64
+	err    error
 }
 
 // rb2Svc adapts the update service to the Connect handler used by these transport regressions.
@@ -33,6 +40,10 @@ func (a rb2Svc) FetchUpdate(ctx context.Context, req *connect.Request[agentv1.Fe
 	})
 	select {
 	case a.ret <- err:
+	default:
+	}
+	select {
+	case a.returned <- rb2Return{offset: req.Msg.Offset, err: err}:
 	default:
 	}
 	return err
@@ -47,7 +58,7 @@ type rb2Server struct {
 
 // newRB2Server wires the update stream with the agent listener's production timeouts.
 func newRB2Server(t *testing.T, s *Service, h2 bool, ln net.Listener, h2conf *http.HTTP2Config) *rb2Server {
-	r := &rb2Server{svc: rb2Svc{s: s, node: "nod_de1", ret: make(chan error, 64)}}
+	r := &rb2Server{svc: rb2Svc{s: s, node: "nod_de1", ret: make(chan error, 64), returned: make(chan rb2Return, 64)}}
 	path, rpc := agentv1connect.NewAgentServiceHandler(r.svc)
 	mux := http.NewServeMux()
 	mux.Handle(path, rpc)
@@ -95,6 +106,18 @@ func (r *rb2Server) client() agentv1connect.AgentServiceClient {
 	return agentv1connect.NewAgentServiceClient(r.srv.Client(), r.srv.URL)
 }
 
+func (r *rb2Server) freshClient(t *testing.T) agentv1connect.AgentServiceClient {
+	t.Helper()
+	base, ok := r.srv.Client().Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("httptest client transport has type %T, want *http.Transport", r.srv.Client().Transport)
+	}
+	transport := base.Clone()
+	transport.DisableKeepAlives = true
+	t.Cleanup(transport.CloseIdleConnections)
+	return agentv1connect.NewAgentServiceClient(&http.Client{Transport: transport}, r.srv.URL)
+}
+
 func rb2Wait(ch <-chan error, d time.Duration) (error, bool) {
 	select {
 	case err := <-ch:
@@ -106,7 +129,7 @@ func rb2Wait(ch <-chan error, d time.Duration) (error, bool) {
 
 const rb2Name = "mistgate-node-linux-amd64"
 
-// The crash scenario of round 1: the client stops reading, the stall fires, and the client resets the stream later.
+// A fresh connection resumes a blackholed stream while its old handler is still inside the blocked write.
 func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 	for _, h2 := range []bool{true, false} {
 		name := "http1"
@@ -115,38 +138,121 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e := newEnv(t)
-			e.bundle("1.0", 10, map[string][]byte{rb2Name: randBytes(24 << 20)})
-			e.s.sendTimeout = 300 * time.Millisecond
-			r := newRB2Server(t, e.s, h2, nil, nil)
-			cl := r.client()
+			want := randBytes(24 << 20)
+			e.bundle("1.0", 10, map[string][]byte{rb2Name: want})
+			e.s.sendTimeout = 2 * time.Second
+			var h2conf *http.HTTP2Config
+			if h2 {
+				// HTTP/2 applies its deadline at the connection writer, which releases a blackholed stream's blocked send.
+				h2conf = &http.HTTP2Config{WriteByteTimeout: e.s.sendTimeout}
+			}
+			inner, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			ln := &blackholeLn{Listener: inner}
+			r := newRB2Server(t, e.s, h2, ln, h2conf)
 			for round := 0; round < 6; round++ {
-				ctx, cancel := context.WithCancel(context.Background())
-				stream, err := cl.FetchUpdate(ctx, connect.NewRequest(&agentv1.FetchUpdateRequest{Name: rb2Name}))
+				firstCtx, cancelFirst := context.WithCancel(context.Background())
+				first, err := r.freshClient(t).FetchUpdate(firstCtx,
+					connect.NewRequest(&agentv1.FetchUpdateRequest{Name: rb2Name}))
 				if err != nil {
-					cancel()
+					cancelFirst()
 					t.Fatal(err)
 				}
-				serveErr, ok := rb2Wait(r.svc.ret, 10*time.Second)
-				if !ok {
-					cancel()
-					t.Fatalf("round %d: Serve did not return after the write deadline", round)
+				t.Cleanup(func() {
+					cancelFirst()
+					_ = first.Close()
+				})
+				if !first.Receive() {
+					cancelFirst()
+					_ = first.Close()
+					t.Fatalf("round %d: initial download had no first chunk: %v", round, first.Err())
 				}
-				if connect.CodeOf(serveErr) != connect.CodeUnavailable || !errors.Is(serveErr, os.ErrDeadlineExceeded) {
-					t.Errorf("round %d: serve error %v", round, serveErr)
+				prefix := append([]byte(nil), first.Msg().Data...)
+				if len(prefix) == 0 || len(prefix) >= len(want) {
+					cancelFirst()
+					_ = first.Close()
+					t.Fatalf("round %d: first chunk length %d, want a non-empty prefix of %d bytes", round, len(prefix), len(want))
 				}
-				time.Sleep(200 * time.Millisecond)
-				cancel() // the peer resets after the deadline fired
-				_ = stream.Close()
-				var sink chunkSink
-				if err := e.s.Serve(e.ctx, "nod_de1", rb2Name, 0, sink.send); err != nil {
-					t.Fatalf("round %d: slot not free: %v", round, err)
+				blocked := ln.hole()
+				if blocked == nil {
+					cancelFirst()
+					t.Fatalf("round %d: no accepted connection to blackhole", round)
 				}
+				select {
+				case <-blocked.blocked:
+				case <-time.After(5 * time.Second):
+					cancelFirst()
+					_ = first.Close()
+					t.Fatalf("round %d: the first connection did not block in a write", round)
+				}
+				if deadline := blocked.deadline.Load(); deadline == 0 {
+					cancelFirst()
+					t.Fatalf("round %d: the blocked connection has no write timeout", round)
+				}
+				e.s.bmu.Lock()
+				live := e.s.serves == 1 && e.s.servingNodes["nod_de1"] != nil
+				e.s.bmu.Unlock()
+				if !live {
+					t.Fatalf("round %d: blackholed Serve returned before the resume", round)
+				}
+
+				beforeResume := r.newConns.Load()
+				resumeOffset := uint64(len(prefix))
+				handoverAt := time.Now()
+				resumed, err := r.freshClient(t).FetchUpdate(context.Background(),
+					connect.NewRequest(&agentv1.FetchUpdateRequest{Name: rb2Name, Offset: resumeOffset}))
+				if err != nil {
+					t.Fatalf("round %d: resume on a fresh connection: %v", round, err)
+				}
+				suffix := make([]byte, 0, len(want)-len(prefix))
+				for resumed.Receive() {
+					suffix = append(suffix, resumed.Msg().Data...)
+				}
+				if resumed.Err() != nil || !bytes.Equal(append(prefix, suffix...), want) {
+					t.Fatalf("round %d: resumed stream error=%v, combined bytes=%d, want %d", round, resumed.Err(), len(prefix)+len(suffix), len(want))
+				}
+				if r.newConns.Load() <= beforeResume {
+					t.Fatalf("round %d: resume did not use a fresh connection", round)
+				}
+				e.s.bmu.Lock()
+				zombies := e.s.zombieTotal == 1 && e.s.zombies["nod_de1"] == 1
+				e.s.bmu.Unlock()
+				if !zombies {
+					t.Fatalf("round %d: old Serve returned before the resumed stream completed", round)
+				}
+
+				newReturned, oldReturned := false, false
+				for !newReturned || !oldReturned {
+					select {
+					case result := <-r.svc.returned:
+						switch result.offset {
+						case resumeOffset:
+							if result.err != nil {
+								t.Fatalf("round %d: resumed Serve returned %v, want nil", round, result.err)
+							}
+							newReturned = true
+						case 0:
+							if result.err == nil {
+								t.Fatalf("round %d: superseded Serve returned nil, want its blocked write to fail", round)
+							}
+							oldReturned = true
+						default:
+							t.Fatalf("round %d: unexpected returned offset %d", round, result.offset)
+						}
+					case <-time.After(e.s.sendTimeout + time.Second):
+						t.Fatalf("round %d: both Serve calls did not return within %s", round, e.s.sendTimeout+time.Second)
+					}
+				}
+				if took := time.Since(handoverAt); took > e.s.sendTimeout+500*time.Millisecond {
+					t.Fatalf("round %d: superseded Serve returned after %s, want within the send timeout", round, took)
+				}
+				cancelFirst()
+				_ = first.Close()
+				assertServeSlotsZero(t, e.s)
 			}
-			time.Sleep(time.Second)
-			if r.in.Load() != r.out.Load() {
-				t.Errorf("handlers entered=%d returned=%d", r.in.Load(), r.out.Load())
-			}
-			t.Logf("6 stall+reset rounds: no panic, handlers entered=%d returned=%d, conns=%d", r.in.Load(), r.out.Load(), r.newConns.Load())
+			t.Logf("6 blackhole hand-overs: live slots and zombies cleared, handlers entered=%d returned=%d, conns=%d", r.in.Load(), r.out.Load(), r.newConns.Load())
 		})
 	}
 }
@@ -252,19 +358,23 @@ func (l *blackholeLn) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	bc := &blackholeConn{Conn: c, closed: make(chan struct{})}
+	bc := &blackholeConn{Conn: c, blocked: make(chan struct{}), closed: make(chan struct{})}
 	l.mu.Lock()
 	l.conns = append(l.conns, bc)
 	l.mu.Unlock()
 	return bc, nil
 }
 
-func (l *blackholeLn) hole() {
+func (l *blackholeLn) hole() *blackholeConn {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, c := range l.conns {
 		c.hole.Store(true)
 	}
+	if len(l.conns) == 0 {
+		return nil
+	}
+	return l.conns[len(l.conns)-1]
 }
 
 type blackholeConn struct {
@@ -273,6 +383,8 @@ type blackholeConn struct {
 	writeFailed atomic.Bool
 	deadline    atomic.Int64
 	once        sync.Once
+	blockOnce   sync.Once
+	blocked     chan struct{}
 	closed      chan struct{}
 }
 
@@ -280,6 +392,7 @@ func (c *blackholeConn) Write(b []byte) (int, error) {
 	if !c.hole.Load() {
 		return c.Conn.Write(b)
 	}
+	c.blockOnce.Do(func() { close(c.blocked) })
 	if c.writeFailed.Load() {
 		return 0, net.ErrClosed
 	}

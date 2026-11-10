@@ -44,8 +44,20 @@ func WriteDeadlineFromContext(ctx context.Context) func(time.Time) error {
 const (
 	errKeyPrefix = "updates.bundle.err."
 	chunkSize    = 256 << 10
-	maxServes    = 4 // concurrent FetchUpdate streams
+	maxServes    = 4 // live FetchUpdate streams; superseded handlers are counted apart, below
+	// A handler blocked in a write cannot be cancelled: it stays until the write returns or its deadline passes. So
+	// the handlers a resume left behind are bounded too, per node and for the whole fleet.
+	maxNodeZombies = 1
+	maxZombies     = maxServes
 )
+
+// serveSlot tracks one Serve call so a same-file resume can cancel its context without touching its ResponseWriter.
+type serveSlot struct {
+	name       string
+	cancel     context.CancelFunc
+	done       chan struct{}
+	superseded bool
+}
 
 // fileStamp is what a scan saw of one listed file; Serve compares it with the file it opens.
 type fileStamp struct {
@@ -470,8 +482,9 @@ func (s *Service) OpenNodeBinary(_ context.Context, goos, goarch string) (io.Rea
 }
 
 // Serve is fleet.Updates.Serve: it streams one file of the current trusted bundle to an agent that already
-// authenticated with its node certificate. Only names in the trusted manifest are served, at most maxServes at a
-// time; the descriptor is opened once, so a file replaced during a download cannot corrupt it.
+// authenticated with its node certificate. Only names in the trusted manifest are served. Live downloads are
+// limited to maxServes; a same-file resume can replace its node's live slot while the old handler finishes its write.
+// The descriptor is opened once, so a file replaced during a download cannot corrupt it.
 func (s *Service) Serve(ctx context.Context, nodeID, name string, offset uint64, send func(chunk []byte, total uint64) error) error {
 	return s.serve(ctx, nodeID, name, offset, nil, send)
 }
@@ -484,6 +497,9 @@ func (s *Service) ServeWithWriteDeadline(ctx context.Context, nodeID, name strin
 
 func (s *Service) serve(ctx context.Context, nodeID, name string, offset uint64,
 	setWriteDeadline func(time.Time) error, send func(chunk []byte, total uint64) error) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	b := s.current()
 	if b == nil || !b.trusted {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("no trusted bundle"))
@@ -496,40 +512,67 @@ func (s *Service) serve(ctx context.Context, nodeID, name string, offset uint64,
 	if offset > total {
 		return connect.NewError(connect.CodeNotFound, errors.New("offset beyond the end of the file"))
 	}
-	// A node has one download at a time. An agent that resumes closes its stream and asks again at once, before the
-	// handler of the dropped stream has returned: the new request waits a moment for that slot instead of being
-	// refused, so a resume does not depend on which of the two the panel notices first.
+	// A node has one live download at a time. A same-file resume takes that slot over immediately when the bounded
+	// zombie allowance has room; other files and requests that hit either zombie cap wait for the old live slot.
 	wait := time.NewTimer(s.nodeSlotWait)
 	defer wait.Stop()
+	var slot *serveSlot
 	for {
 		s.bmu.Lock()
+		if err := ctx.Err(); err != nil {
+			s.bmu.Unlock()
+			return connect.NewError(connect.CodeCanceled, err)
+		}
 		previous, busy := s.servingNodes[nodeID]
-		if !busy {
-			break
+		if busy {
+			if previous.name == name && s.zombies[nodeID] < maxNodeZombies && s.zombieTotal < maxZombies {
+				previous.superseded = true
+				previous.cancel()
+				s.serves--
+				s.zombies[nodeID]++
+				s.zombieTotal++
+				slot = &serveSlot{name: name, cancel: cancel, done: make(chan struct{})}
+				s.serves++
+				s.servingNodes[nodeID] = slot
+				s.bmu.Unlock()
+				break
+			}
+			s.bmu.Unlock()
+			select {
+			case <-previous.done:
+			case <-wait.C:
+				return connect.NewError(connect.CodeResourceExhausted, errors.New("a download is already active for this node, retry later"))
+			case <-ctx.Done():
+				return connect.NewError(connect.CodeCanceled, ctx.Err())
+			}
+			continue
 		}
-		s.bmu.Unlock()
-		select {
-		case <-previous:
-		case <-wait.C:
-			return connect.NewError(connect.CodeResourceExhausted, errors.New("a download is already active for this node, retry later"))
-		case <-ctx.Done():
-			return connect.NewError(connect.CodeCanceled, ctx.Err())
+		if s.serves >= maxServes {
+			s.bmu.Unlock()
+			return connect.NewError(connect.CodeResourceExhausted, errors.New("too many downloads, retry in a few seconds"))
 		}
-	}
-	if s.serves >= maxServes {
+		slot = &serveSlot{name: name, cancel: cancel, done: make(chan struct{})}
+		s.serves++
+		s.servingNodes[nodeID] = slot
 		s.bmu.Unlock()
-		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many downloads, retry in a few seconds"))
+		break
 	}
-	s.serves++
-	done := make(chan struct{})
-	s.servingNodes[nodeID] = done
-	s.bmu.Unlock()
 	defer func() {
 		s.bmu.Lock()
-		s.serves--
-		delete(s.servingNodes, nodeID)
+		if slot.superseded {
+			s.zombies[nodeID]--
+			if s.zombies[nodeID] == 0 {
+				delete(s.zombies, nodeID)
+			}
+			s.zombieTotal--
+		} else {
+			s.serves--
+			if s.servingNodes[nodeID] == slot {
+				delete(s.servingNodes, nodeID)
+			}
+		}
 		s.bmu.Unlock()
-		close(done)
+		close(slot.done)
 	}()
 
 	f, err := os.Open(filepath.Join(s.dist, entry.Name))

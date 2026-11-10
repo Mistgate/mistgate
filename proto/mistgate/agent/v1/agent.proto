@@ -276,7 +276,8 @@ package mistgate.agent.v1;
 //   - FetchUpdate is a server-streaming RPC on AgentService (mTLS like Connect, same agent SNI). The panel
 //     streams the named file of its bundle directory in chunks of at most 256 KiB, from the byte offset asked
 //     for, so an interrupted download resumes. It serves only a file name listed in the panel's current
-//     manifest, to any valid node certificate, at most 4 concurrent streams (RESOURCE_EXHAUSTED: retry).
+//     manifest, to any valid node certificate, at most 4 live downloads. A same-file resume can take over its node's
+//     live slot while the previous handler finishes its write; RESOURCE_EXHAUSTED means retry.
 //   - LAST_UPDATE. Hello.last_update carries the outcome of the most recent self-update that this node has not
 //     reported yet (ok after a commit, rolled_back / failed after a rollback). The agent keeps it on disk and
 //     repeats it in every Hello until a HelloAck for that Hello arrives; then it forgets it (one report per
@@ -614,8 +615,8 @@ service AgentService {
 
   // Download one file of the panel's release bundle (see "UPDATE"). Server streaming, mutual TLS: the same
   // agent middleware as Connect, so only a valid, non-revoked node certificate gets bytes. Errors: NOT_FOUND
-  // (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (too many concurrent
-  // downloads, retry in a few seconds), FAILED_PRECONDITION (the panel has no bundle).
+  // (name not in the current manifest, or offset beyond the end), RESOURCE_EXHAUSTED (another file is active for
+  // the node or a concurrency limit was reached; retry), FAILED_PRECONDITION (the panel has no bundle).
   rpc FetchUpdate(FetchUpdateRequest) returns (stream FetchUpdateResponse);
 }
 
