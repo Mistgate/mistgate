@@ -3,24 +3,23 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.83`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.84`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.83
+  meta: v0.1.0 – v0.1.84
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.83
+      release: v0.1.84
       current: true
       points:
+        - "**Security: fixes from a code audit (v0.1.84).** The sign-in lockout held only against attempts made one after another, a network blocked for guessing subscription links lost its valid links too, an MCP plan for a DNS preset showed the owner a count instead of the resolver addresses, and a node could hold every download slot of an update or report more traffic than its link carries. These and the smaller findings of the same audit are closed; update the panel and the nodes. See [Security](../operations/security.md)."
+        - "**Automatic server choice in Xray JSON too.** The Xray JSON profile starts with an `Auto` config: a balancer that sends each new connection through the server that answered fastest at the last check. See [Automatic server choice](../guide/subscriptions.md#automatic-server-choice)."
+        - "**Enrollment and the debug capture say more.** `mistgate-node enroll` explains a refused TLS handshake (a CDN or a reverse proxy in front of the panel) and names the flags that fix it; the AmneziaWG kernel capture counts its handshakes on real nodes. Needs the agent v0.1.84. See [Troubleshooting](../operations/troubleshooting.md#enrollment-fails)."
         - "**Security: no Multipath TCP on our listeners (v0.1.83).** Go opens every listener with MPTCP by default, and CVE-2026-98432, a flaw in the Linux kernel's TCP (CVSS 9.8), was shown as remote root through an MPTCP listener. The panel and the node agent, with the Xray listeners it hosts, now open plain TCP; update the panel and the nodes. The bug itself is in the kernel: also set `net.mptcp.enabled=0` and install your distribution's patched kernel when it is out. See [Troubleshooting](../operations/troubleshooting.md#multipath-tcp-and-cve-2026-98432)."
-        - "**Automatic server choice in the apps.** kl!ck and the other Mihomo apps, and sing-box, get an **Auto** group first: every five minutes the app tests each server through that server, takes a fast working one and moves on by itself when it fails; a server the person picked by hand still wins. On by default, with a switch under **Subscriptions → Who gets what**; Happ and AmneziaVPN are not affected. See [Automatic server choice](../guide/subscriptions.md#automatic-server-choice)."
-        - "**Updates over slow links.** The agent's download has its own window, 30 minutes by default and 5 minutes to 2 hours in **Settings → System → Download timeout**, and the rollout shows each node's download as it goes: the phase, the progress, the size and the speed. Needs the agent v0.1.82; older agents keep their 10 minutes. See [One node's update](../operations/updates.md#one-nodes-update)."
-        - "**Load reads the usual peaks.** **Nodes → Load** no longer calls a node overloaded for a few moments at 100% CPU, such as the server's own updates: the status reads the peak most hours stay under, and the details show the usual and the highest peaks. See [Load](../guide/nodes.md#load)."
-        - "**The AmneziaWG kernel log in a debug capture.** A capture of a node on the AmneziaWG kernel module turns the module's debug output on and sums up its handshakes per interface; in v0.1.81 it read no AmneziaWG lines on real nodes. Needs the agent v0.1.82. See [Debug capture](../operations/troubleshooting.md#debug-capture-of-one-node)."
     - title: Profiles
       section: profiles
       points:
@@ -53,7 +52,7 @@ Mistgate is in **beta**; the current release is `v0.1.83`. It runs in production
         - "The [device limit for apps on the link](../guide/subscriptions.md#device-limit-for-apps-on-the-link) in the modes **Only count**, **Limit** and **Strict**."
         - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, `vpn://` keys for AmneziaVPN, and the person's own devices, which they can [rename and remove](../guide/user-page.md#self-service-devices), with a button to copy the link."
         - "[DNS presets](../guide/dns.md), with country lists for \"direct\" (China: Chinese sites direct) and [ads blocked in the apps](../guide/dns.md#ads-and-trackers); on the user page, a DNS choice for the link apps and one per server for the keys."
-        - "[Automatic server choice](../guide/subscriptions.md#automatic-server-choice): an **Auto** group in the Mihomo and sing-box profiles that moves the app to a working server by itself."
+        - "[Automatic server choice](../guide/subscriptions.md#automatic-server-choice): an **Auto** group in the Mihomo and sing-box profiles, and an `Auto` config in Xray JSON, that moves the app to a working server by itself."
     - title: Health
       section: health
       points:
