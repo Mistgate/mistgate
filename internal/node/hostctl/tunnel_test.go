@@ -43,7 +43,7 @@ table inet mistgate_awg {
 		iifname "mgawg51842" ip6 daddr fd66:66:0:1::1 icmpv6 type echo-request accept
 		iifname "mgawg*" ip daddr { 10.66.8.1, 10.66.4.1 } drop
 		iifname "mgawg*" ip6 daddr { fd66:66:0:1::1 } drop
-		iifname "mgawg*" tcp dport 443 accept
+		iifname "mgawg*" tcp dport { 443, 1080, 1083, 1084, 1090, 8108, 8460, 8461, 8462, 24443, 24445 } accept
 		iifname "mgawg*" drop
 	}
 	chain isolate {
@@ -72,7 +72,7 @@ func TestRenderTunnelsAllowsHTTPSBeforeLocalDrop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	allow := `iifname "mgawg*" tcp dport 443 accept`
+	allow := `iifname "mgawg*" tcp dport { 443, 1080, 1083, 1084, 1090, 8108, 8460, 8461, 8462, 24443, 24445 } accept`
 	drop := `iifname "mgawg*" drop`
 	own := `iifname "mgawg*" ip daddr { 10.66.4.1 } drop`
 	allowAt, dropAt, ownAt := strings.Index(rules, allow), strings.Index(rules, drop), strings.Index(rules, own)
