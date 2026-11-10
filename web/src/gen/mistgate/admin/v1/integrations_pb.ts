@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/integrations.proto.
  */
 export const file_mistgate_admin_v1_integrations: GenFile = /*@__PURE__*/
-  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9pbnRlZ3JhdGlvbnMucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxItECCghBcGlUb2tlbhIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEjAKB3Byb2ZpbGUYAyABKA4yHy5taXN0Z2F0ZS5hZG1pbi52MS5Ub2tlblByb2ZpbGUSGAoMY3JlYXRlZF91bml4GAQgASgDQgIwAhIYCgxleHBpcmVzX3VuaXgYBSABKANCAjACEhoKDmxhc3RfdXNlZF91bml4GAYgASgDQgIwAhIUCgxsYXN0X3VzZWRfaXAYByABKAkSNgoNbGFzdF91c2VkX3ZpYRgIIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLlRva2VuQ2hhbm5lbBIYCgxyZXZva2VkX3VuaXgYCSABKANCAjACEhcKD2NyZWF0ZWRfYnlfbmFtZRgKIAEoCRIaChJyYXRlX2xpbWl0X3Blcl9taW4YCyABKA0SDAoEaGludBgMIAEoCSKFAQoVQ3JlYXRlQXBpVG9rZW5SZXF1ZXN0EgwKBG5hbWUYASABKAkSMAoHcHJvZmlsZRgCIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLlRva2VuUHJvZmlsZRIQCgh0dGxfZGF5cxgDIAEoDRIaChJyYXRlX2xpbWl0X3Blcl9taW4YBCABKA0iVAoWQ3JlYXRlQXBpVG9rZW5SZXNwb25zZRIqCgV0b2tlbhgBIAEoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkFwaVRva2VuEg4KBnNlY3JldBgCIAEoCSIWChRMaXN0QXBpVG9rZW5zUmVxdWVzdCJaChVMaXN0QXBpVG9rZW5zUmVzcG9uc2USKwoGdG9rZW5zGAEgAygLMhsubWlzdGdhdGUuYWRtaW4udjEuQXBpVG9rZW4SFAoIbm93X3VuaXgYAiABKANCAjACIiMKFVJldm9rZUFwaVRva2VuUmVxdWVzdBIKCgJpZBgBIAEoCSJEChZSZXZva2VBcGlUb2tlblJlc3BvbnNlEioKBXRva2VuGAEgASgLMhsubWlzdGdhdGUuYWRtaW4udjEuQXBpVG9rZW4i0QEKDEFwcHJvdmFsRmFjdBILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAkSEQoJdW50cnVzdGVkGAMgASgIEgwKBGNvZGUYBCABKAkSOwoGcGFyYW1zGAUgAygLMisubWlzdGdhdGUuYWRtaW4udjEuQXBwcm92YWxGYWN0LlBhcmFtc0VudHJ5EhgKEHVudHJ1c3RlZF9wYXJhbXMYBiADKAkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASK3BAoIQXBwcm92YWwSCgoCaWQYASABKAkSEAoIdG9rZW5faWQYAiABKAkSEgoKdG9rZW5fbmFtZRgDIAEoCRI2Cg10b2tlbl9wcm9maWxlGAQgASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuVG9rZW5Qcm9maWxlEgwKBHRvb2wYBSABKAkSLgoFZmFjdHMYBiADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5BcHByb3ZhbEZhY3QSDgoGZGFuZ2VyGAcgAygJEg4KBnJlYXNvbhgIIAEoCRIvCgVzdGF0ZRgJIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLkFwcHJvdmFsU3RhdGUSGAoMY3JlYXRlZF91bml4GAogASgDQgIwAhIYCgxleHBpcmVzX3VuaXgYCyABKANCAjACEhcKD2RlY2lkZWRfYnlfbmFtZRgMIAEoCRIYCgxkZWNpZGVkX3VuaXgYDSABKANCAjACEhgKDGFwcGxpZWRfdW5peBgOIAEoA0ICMAISDgoGcmVzdWx0GA8gASgJEg0KBWVycm9yGBAgASgJEhQKDG91dGNvbWVfY29kZRgRIAEoCRJGCg5vdXRjb21lX3BhcmFtcxgSIAMoCzIuLm1pc3RnYXRlLmFkbWluLnYxLkFwcHJvdmFsLk91dGNvbWVQYXJhbXNFbnRyeRo0ChJPdXRjb21lUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJEChRMaXN0QXBwcm92YWxzUmVxdWVzdBIVCg1hd2FpdGluZ19vbmx5GAEgASgIEhUKDWhpc3RvcnlfbGltaXQYAiABKA0ibwoVTGlzdEFwcHJvdmFsc1Jlc3BvbnNlEi4KCWFwcHJvdmFscxgBIAMoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkFwcHJvdmFsEhAKCGF3YWl0aW5nGAIgASgNEhQKCG5vd191bml4GAMgASgDQgIwAiJoCg5BcHByb3ZlUmVxdWVzdBIKCgJpZBgBIAEoCRIUCgxzc2hfcGFzc3dvcmQYAiABKAkSHQoVY29uZmlybWVkX2ZpbmdlcnByaW50GAMgASgJEhUKDXVzZV9wYW5lbF9rZXkYBCABKAgiQAoPQXBwcm92ZVJlc3BvbnNlEi0KCGFwcHJvdmFsGAEgASgLMhsubWlzdGdhdGUuYWRtaW4udjEuQXBwcm92YWwiGwoNUmVqZWN0UmVxdWVzdBIKCgJpZBgBIAEoCSI/Cg5SZWplY3RSZXNwb25zZRItCghhcHByb3ZhbBgBIAEoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkFwcHJvdmFsKn4KDFRva2VuUHJvZmlsZRIdChlUT0tFTl9QUk9GSUxFX1VOU1BFQ0lGSUVEEAASGgoWVE9LRU5fUFJPRklMRV9SRUFET05MWRABEhoKFlRPS0VOX1BST0ZJTEVfT1BFUkFUT1IQAhIXChNUT0tFTl9QUk9GSUxFX0FETUlOEAMqWwoMVG9rZW5DaGFubmVsEh0KGVRPS0VOX0NIQU5ORUxfVU5TUEVDSUZJRUQQABIVChFUT0tFTl9DSEFOTkVMX0FQSRABEhUKEVRPS0VOX0NIQU5ORUxfTUNQEAIqlAIKDUFwcHJvdmFsU3RhdGUSHgoaQVBQUk9WQUxfU1RBVEVfVU5TUEVDSUZJRUQQABIbChdBUFBST1ZBTF9TVEFURV9BV0FJVElORxABEhsKF0FQUFJPVkFMX1NUQVRFX0FQUFJPVkVEEAISGwoXQVBQUk9WQUxfU1RBVEVfUkVKRUNURUQQAxIaChZBUFBST1ZBTF9TVEFURV9FWFBJUkVEEAQSGwoXQVBQUk9WQUxfU1RBVEVfQVBQTFlJTkcQBRIaChZBUFBST1ZBTF9TVEFURV9BUFBMSUVEEAYSGQoVQVBQUk9WQUxfU1RBVEVfRkFJTEVEEAcSHAoYQVBQUk9WQUxfU1RBVEVfQ0FOQ0VMTEVEEAgywwIKD0FwaVRva2VuU2VydmljZRJlCg5DcmVhdGVBcGlUb2tlbhIoLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUFwaVRva2VuUmVxdWVzdBopLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUFwaVRva2VuUmVzcG9uc2USYgoNTGlzdEFwaVRva2VucxInLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RBcGlUb2tlbnNSZXF1ZXN0GigubWlzdGdhdGUuYWRtaW4udjEuTGlzdEFwaVRva2Vuc1Jlc3BvbnNlEmUKDlJldm9rZUFwaVRva2VuEigubWlzdGdhdGUuYWRtaW4udjEuUmV2b2tlQXBpVG9rZW5SZXF1ZXN0GikubWlzdGdhdGUuYWRtaW4udjEuUmV2b2tlQXBpVG9rZW5SZXNwb25zZTKWAgoPQXBwcm92YWxTZXJ2aWNlEmIKDUxpc3RBcHByb3ZhbHMSJy5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0QXBwcm92YWxzUmVxdWVzdBooLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RBcHByb3ZhbHNSZXNwb25zZRJQCgdBcHByb3ZlEiEubWlzdGdhdGUuYWRtaW4udjEuQXBwcm92ZVJlcXVlc3QaIi5taXN0Z2F0ZS5hZG1pbi52MS5BcHByb3ZlUmVzcG9uc2USTQoGUmVqZWN0EiAubWlzdGdhdGUuYWRtaW4udjEuUmVqZWN0UmVxdWVzdBohLm1pc3RnYXRlLmFkbWluLnYxLlJlamVjdFJlc3BvbnNlQswBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCEUludGVncmF0aW9uc1Byb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
+  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9pbnRlZ3JhdGlvbnMucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIvICCghBcGlUb2tlbhIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEjAKB3Byb2ZpbGUYAyABKA4yHy5taXN0Z2F0ZS5hZG1pbi52MS5Ub2tlblByb2ZpbGUSGAoMY3JlYXRlZF91bml4GAQgASgDQgIwAhIYCgxleHBpcmVzX3VuaXgYBSABKANCAjACEhoKDmxhc3RfdXNlZF91bml4GAYgASgDQgIwAhIUCgxsYXN0X3VzZWRfaXAYByABKAkSNgoNbGFzdF91c2VkX3ZpYRgIIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLlRva2VuQ2hhbm5lbBIYCgxyZXZva2VkX3VuaXgYCSABKANCAjACEhcKD2NyZWF0ZWRfYnlfbmFtZRgKIAEoCRIaChJyYXRlX2xpbWl0X3Blcl9taW4YCyABKA0SDAoEaGludBgMIAEoCRIfChdhbGxvd19idWxrX3VzZXJfY2hhbmdlcxgNIAEoCCKmAQoVQ3JlYXRlQXBpVG9rZW5SZXF1ZXN0EgwKBG5hbWUYASABKAkSMAoHcHJvZmlsZRgCIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLlRva2VuUHJvZmlsZRIQCgh0dGxfZGF5cxgDIAEoDRIaChJyYXRlX2xpbWl0X3Blcl9taW4YBCABKA0SHwoXYWxsb3dfYnVsa191c2VyX2NoYW5nZXMYBSABKAgiVAoWQ3JlYXRlQXBpVG9rZW5SZXNwb25zZRIqCgV0b2tlbhgBIAEoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkFwaVRva2VuEg4KBnNlY3JldBgCIAEoCSIzChZTZXRBcGlUb2tlbkJ1bGtSZXF1ZXN0EgoKAmlkGAEgASgJEg0KBWFsbG93GAIgASgIIkUKF1NldEFwaVRva2VuQnVsa1Jlc3BvbnNlEioKBXRva2VuGAEgASgLMhsubWlzdGdhdGUuYWRtaW4udjEuQXBpVG9rZW4iFgoUTGlzdEFwaVRva2Vuc1JlcXVlc3QiWgoVTGlzdEFwaVRva2Vuc1Jlc3BvbnNlEisKBnRva2VucxgBIAMoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkFwaVRva2VuEhQKCG5vd191bml4GAIgASgDQgIwAiIjChVSZXZva2VBcGlUb2tlblJlcXVlc3QSCgoCaWQYASABKAkiRAoWUmV2b2tlQXBpVG9rZW5SZXNwb25zZRIqCgV0b2tlbhgBIAEoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkFwaVRva2VuItEBCgxBcHByb3ZhbEZhY3QSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJEhEKCXVudHJ1c3RlZBgDIAEoCBIMCgRjb2RlGAQgASgJEjsKBnBhcmFtcxgFIAMoCzIrLm1pc3RnYXRlLmFkbWluLnYxLkFwcHJvdmFsRmFjdC5QYXJhbXNFbnRyeRIYChB1bnRydXN0ZWRfcGFyYW1zGAYgAygJGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEitwQKCEFwcHJvdmFsEgoKAmlkGAEgASgJEhAKCHRva2VuX2lkGAIgASgJEhIKCnRva2VuX25hbWUYAyABKAkSNgoNdG9rZW5fcHJvZmlsZRgEIAEoDjIfLm1pc3RnYXRlLmFkbWluLnYxLlRva2VuUHJvZmlsZRIMCgR0b29sGAUgASgJEi4KBWZhY3RzGAYgAygLMh8ubWlzdGdhdGUuYWRtaW4udjEuQXBwcm92YWxGYWN0Eg4KBmRhbmdlchgHIAMoCRIOCgZyZWFzb24YCCABKAkSLwoFc3RhdGUYCSABKA4yIC5taXN0Z2F0ZS5hZG1pbi52MS5BcHByb3ZhbFN0YXRlEhgKDGNyZWF0ZWRfdW5peBgKIAEoA0ICMAISGAoMZXhwaXJlc191bml4GAsgASgDQgIwAhIXCg9kZWNpZGVkX2J5X25hbWUYDCABKAkSGAoMZGVjaWRlZF91bml4GA0gASgDQgIwAhIYCgxhcHBsaWVkX3VuaXgYDiABKANCAjACEg4KBnJlc3VsdBgPIAEoCRINCgVlcnJvchgQIAEoCRIUCgxvdXRjb21lX2NvZGUYESABKAkSRgoOb3V0Y29tZV9wYXJhbXMYEiADKAsyLi5taXN0Z2F0ZS5hZG1pbi52MS5BcHByb3ZhbC5PdXRjb21lUGFyYW1zRW50cnkaNAoST3V0Y29tZVBhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiRAoUTGlzdEFwcHJvdmFsc1JlcXVlc3QSFQoNYXdhaXRpbmdfb25seRgBIAEoCBIVCg1oaXN0b3J5X2xpbWl0GAIgASgNIm8KFUxpc3RBcHByb3ZhbHNSZXNwb25zZRIuCglhcHByb3ZhbHMYASADKAsyGy5taXN0Z2F0ZS5hZG1pbi52MS5BcHByb3ZhbBIQCghhd2FpdGluZxgCIAEoDRIUCghub3dfdW5peBgDIAEoA0ICMAIiaAoOQXBwcm92ZVJlcXVlc3QSCgoCaWQYASABKAkSFAoMc3NoX3Bhc3N3b3JkGAIgASgJEh0KFWNvbmZpcm1lZF9maW5nZXJwcmludBgDIAEoCRIVCg11c2VfcGFuZWxfa2V5GAQgASgIIkAKD0FwcHJvdmVSZXNwb25zZRItCghhcHByb3ZhbBgBIAEoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkFwcHJvdmFsIhsKDVJlamVjdFJlcXVlc3QSCgoCaWQYASABKAkiPwoOUmVqZWN0UmVzcG9uc2USLQoIYXBwcm92YWwYASABKAsyGy5taXN0Z2F0ZS5hZG1pbi52MS5BcHByb3ZhbCp+CgxUb2tlblByb2ZpbGUSHQoZVE9LRU5fUFJPRklMRV9VTlNQRUNJRklFRBAAEhoKFlRPS0VOX1BST0ZJTEVfUkVBRE9OTFkQARIaChZUT0tFTl9QUk9GSUxFX09QRVJBVE9SEAISFwoTVE9LRU5fUFJPRklMRV9BRE1JThADKlsKDFRva2VuQ2hhbm5lbBIdChlUT0tFTl9DSEFOTkVMX1VOU1BFQ0lGSUVEEAASFQoRVE9LRU5fQ0hBTk5FTF9BUEkQARIVChFUT0tFTl9DSEFOTkVMX01DUBACKpQCCg1BcHByb3ZhbFN0YXRlEh4KGkFQUFJPVkFMX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXQVBQUk9WQUxfU1RBVEVfQVdBSVRJTkcQARIbChdBUFBST1ZBTF9TVEFURV9BUFBST1ZFRBACEhsKF0FQUFJPVkFMX1NUQVRFX1JFSkVDVEVEEAMSGgoWQVBQUk9WQUxfU1RBVEVfRVhQSVJFRBAEEhsKF0FQUFJPVkFMX1NUQVRFX0FQUExZSU5HEAUSGgoWQVBQUk9WQUxfU1RBVEVfQVBQTElFRBAGEhkKFUFQUFJPVkFMX1NUQVRFX0ZBSUxFRBAHEhwKGEFQUFJPVkFMX1NUQVRFX0NBTkNFTExFRBAIMq0DCg9BcGlUb2tlblNlcnZpY2USZQoOQ3JlYXRlQXBpVG9rZW4SKC5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVBcGlUb2tlblJlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVBcGlUb2tlblJlc3BvbnNlEmgKD1NldEFwaVRva2VuQnVsaxIpLm1pc3RnYXRlLmFkbWluLnYxLlNldEFwaVRva2VuQnVsa1JlcXVlc3QaKi5taXN0Z2F0ZS5hZG1pbi52MS5TZXRBcGlUb2tlbkJ1bGtSZXNwb25zZRJiCg1MaXN0QXBpVG9rZW5zEicubWlzdGdhdGUuYWRtaW4udjEuTGlzdEFwaVRva2Vuc1JlcXVlc3QaKC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0QXBpVG9rZW5zUmVzcG9uc2USZQoOUmV2b2tlQXBpVG9rZW4SKC5taXN0Z2F0ZS5hZG1pbi52MS5SZXZva2VBcGlUb2tlblJlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5SZXZva2VBcGlUb2tlblJlc3BvbnNlMpYCCg9BcHByb3ZhbFNlcnZpY2USYgoNTGlzdEFwcHJvdmFscxInLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RBcHByb3ZhbHNSZXF1ZXN0GigubWlzdGdhdGUuYWRtaW4udjEuTGlzdEFwcHJvdmFsc1Jlc3BvbnNlElAKB0FwcHJvdmUSIS5taXN0Z2F0ZS5hZG1pbi52MS5BcHByb3ZlUmVxdWVzdBoiLm1pc3RnYXRlLmFkbWluLnYxLkFwcHJvdmVSZXNwb25zZRJNCgZSZWplY3QSIC5taXN0Z2F0ZS5hZG1pbi52MS5SZWplY3RSZXF1ZXN0GiEubWlzdGdhdGUuYWRtaW4udjEuUmVqZWN0UmVzcG9uc2VCzAEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIRSW50ZWdyYXRpb25zUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message mistgate.admin.v1.ApiToken
@@ -91,6 +91,13 @@ export type ApiToken = Message<"mistgate.admin.v1.ApiToken"> & {
    * @generated from field: string hint = 12;
    */
   hint: string;
+
+  /**
+   * May exceed the ordinary ten-user hourly change budget without an MCP owner approval.
+   *
+   * @generated from field: bool allow_bulk_user_changes = 13;
+   */
+  allowBulkUserChanges: boolean;
 };
 
 /**
@@ -131,6 +138,13 @@ export type CreateApiTokenRequest = Message<"mistgate.admin.v1.CreateApiTokenReq
    * @generated from field: uint32 rate_limit_per_min = 4;
    */
   rateLimitPerMin: number;
+
+  /**
+   * May exceed the ordinary ten-user hourly change budget without an MCP owner approval.
+   *
+   * @generated from field: bool allow_bulk_user_changes = 5;
+   */
+  allowBulkUserChanges: boolean;
 };
 
 /**
@@ -165,6 +179,45 @@ export const CreateApiTokenResponseSchema: GenMessage<CreateApiTokenResponse> = 
   messageDesc(file_mistgate_admin_v1_integrations, 2);
 
 /**
+ * @generated from message mistgate.admin.v1.SetApiTokenBulkRequest
+ */
+export type SetApiTokenBulkRequest = Message<"mistgate.admin.v1.SetApiTokenBulkRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: bool allow = 2;
+   */
+  allow: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetApiTokenBulkRequest.
+ * Use `create(SetApiTokenBulkRequestSchema)` to create a new message.
+ */
+export const SetApiTokenBulkRequestSchema: GenMessage<SetApiTokenBulkRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_integrations, 3);
+
+/**
+ * @generated from message mistgate.admin.v1.SetApiTokenBulkResponse
+ */
+export type SetApiTokenBulkResponse = Message<"mistgate.admin.v1.SetApiTokenBulkResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.ApiToken token = 1;
+   */
+  token?: ApiToken | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SetApiTokenBulkResponse.
+ * Use `create(SetApiTokenBulkResponseSchema)` to create a new message.
+ */
+export const SetApiTokenBulkResponseSchema: GenMessage<SetApiTokenBulkResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_integrations, 4);
+
+/**
  * @generated from message mistgate.admin.v1.ListApiTokensRequest
  */
 export type ListApiTokensRequest = Message<"mistgate.admin.v1.ListApiTokensRequest"> & {
@@ -175,7 +228,7 @@ export type ListApiTokensRequest = Message<"mistgate.admin.v1.ListApiTokensReque
  * Use `create(ListApiTokensRequestSchema)` to create a new message.
  */
 export const ListApiTokensRequestSchema: GenMessage<ListApiTokensRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 3);
+  messageDesc(file_mistgate_admin_v1_integrations, 5);
 
 /**
  * @generated from message mistgate.admin.v1.ListApiTokensResponse
@@ -199,7 +252,7 @@ export type ListApiTokensResponse = Message<"mistgate.admin.v1.ListApiTokensResp
  * Use `create(ListApiTokensResponseSchema)` to create a new message.
  */
 export const ListApiTokensResponseSchema: GenMessage<ListApiTokensResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 4);
+  messageDesc(file_mistgate_admin_v1_integrations, 6);
 
 /**
  * @generated from message mistgate.admin.v1.RevokeApiTokenRequest
@@ -216,7 +269,7 @@ export type RevokeApiTokenRequest = Message<"mistgate.admin.v1.RevokeApiTokenReq
  * Use `create(RevokeApiTokenRequestSchema)` to create a new message.
  */
 export const RevokeApiTokenRequestSchema: GenMessage<RevokeApiTokenRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 5);
+  messageDesc(file_mistgate_admin_v1_integrations, 7);
 
 /**
  * @generated from message mistgate.admin.v1.RevokeApiTokenResponse
@@ -233,7 +286,7 @@ export type RevokeApiTokenResponse = Message<"mistgate.admin.v1.RevokeApiTokenRe
  * Use `create(RevokeApiTokenResponseSchema)` to create a new message.
  */
 export const RevokeApiTokenResponseSchema: GenMessage<RevokeApiTokenResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 6);
+  messageDesc(file_mistgate_admin_v1_integrations, 8);
 
 /**
  * One line of "what this will do". Built by the panel from the structured parameters, never copied from what
@@ -292,7 +345,7 @@ export type ApprovalFact = Message<"mistgate.admin.v1.ApprovalFact"> & {
  * Use `create(ApprovalFactSchema)` to create a new message.
  */
 export const ApprovalFactSchema: GenMessage<ApprovalFact> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 7);
+  messageDesc(file_mistgate_admin_v1_integrations, 9);
 
 /**
  * @generated from message mistgate.admin.v1.Approval
@@ -417,7 +470,7 @@ export type Approval = Message<"mistgate.admin.v1.Approval"> & {
  * Use `create(ApprovalSchema)` to create a new message.
  */
 export const ApprovalSchema: GenMessage<Approval> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 8);
+  messageDesc(file_mistgate_admin_v1_integrations, 10);
 
 /**
  * @generated from message mistgate.admin.v1.ListApprovalsRequest
@@ -443,7 +496,7 @@ export type ListApprovalsRequest = Message<"mistgate.admin.v1.ListApprovalsReque
  * Use `create(ListApprovalsRequestSchema)` to create a new message.
  */
 export const ListApprovalsRequestSchema: GenMessage<ListApprovalsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 9);
+  messageDesc(file_mistgate_admin_v1_integrations, 11);
 
 /**
  * @generated from message mistgate.admin.v1.ListApprovalsResponse
@@ -472,7 +525,7 @@ export type ListApprovalsResponse = Message<"mistgate.admin.v1.ListApprovalsResp
  * Use `create(ListApprovalsResponseSchema)` to create a new message.
  */
 export const ListApprovalsResponseSchema: GenMessage<ListApprovalsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 10);
+  messageDesc(file_mistgate_admin_v1_integrations, 12);
 
 /**
  * @generated from message mistgate.admin.v1.ApproveRequest
@@ -509,7 +562,7 @@ export type ApproveRequest = Message<"mistgate.admin.v1.ApproveRequest"> & {
  * Use `create(ApproveRequestSchema)` to create a new message.
  */
 export const ApproveRequestSchema: GenMessage<ApproveRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 11);
+  messageDesc(file_mistgate_admin_v1_integrations, 13);
 
 /**
  * @generated from message mistgate.admin.v1.ApproveResponse
@@ -526,7 +579,7 @@ export type ApproveResponse = Message<"mistgate.admin.v1.ApproveResponse"> & {
  * Use `create(ApproveResponseSchema)` to create a new message.
  */
 export const ApproveResponseSchema: GenMessage<ApproveResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 12);
+  messageDesc(file_mistgate_admin_v1_integrations, 14);
 
 /**
  * @generated from message mistgate.admin.v1.RejectRequest
@@ -543,7 +596,7 @@ export type RejectRequest = Message<"mistgate.admin.v1.RejectRequest"> & {
  * Use `create(RejectRequestSchema)` to create a new message.
  */
 export const RejectRequestSchema: GenMessage<RejectRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 13);
+  messageDesc(file_mistgate_admin_v1_integrations, 15);
 
 /**
  * @generated from message mistgate.admin.v1.RejectResponse
@@ -560,7 +613,7 @@ export type RejectResponse = Message<"mistgate.admin.v1.RejectResponse"> & {
  * Use `create(RejectResponseSchema)` to create a new message.
  */
 export const RejectResponseSchema: GenMessage<RejectResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_integrations, 14);
+  messageDesc(file_mistgate_admin_v1_integrations, 16);
 
 /**
  * @generated from enum mistgate.admin.v1.TokenProfile
@@ -704,8 +757,8 @@ export const ApprovalStateSchema: GenEnum<ApprovalState> = /*@__PURE__*/
  * (Connect-RPC with "Authorization: Bearer <secret>") and the MCP server. Conventions: common.proto.
  *
  * Everything here is OWNER-ONLY and is reached only from the signed-in admin UI: a token itself can never call
- * these procedures (they are not on the token allow-list). Creating and revoking a token and
- * approving a change also need a fresh step-up (auth.Service.RequireStepUp), like removing a passkey.
+ * these procedures (they are not on the token allow-list). Creating a token, changing its bulk user-change permission,
+ * revoking it and approving a change need a fresh step-up (auth.Service.RequireStepUp), like removing a passkey.
  *
  * TOKENS. A token has a name, a profile (what it may do: readonly, operator, admin, mapped to the roles
  * readonly, helper, owner), a lifetime (default 90 days, at most 365: "never expires" does not exist), a
@@ -740,6 +793,16 @@ export const ApiTokenService: GenService<{
     methodKind: "unary";
     input: typeof CreateApiTokenRequestSchema;
     output: typeof CreateApiTokenResponseSchema;
+  },
+  /**
+   * Lets this token change more than ten users in an hour without an MCP approval. Needs a step-up.
+   *
+   * @generated from rpc mistgate.admin.v1.ApiTokenService.SetApiTokenBulk
+   */
+  setApiTokenBulk: {
+    methodKind: "unary";
+    input: typeof SetApiTokenBulkRequestSchema;
+    output: typeof SetApiTokenBulkResponseSchema;
   },
   /**
    * Every token, newest first, revoked and expired ones included (they stay for the audit trail). No secrets.

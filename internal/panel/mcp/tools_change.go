@@ -26,10 +26,38 @@ import (
 // for its approved grant. A summary never embeds untrusted text: names go in the facts, marked untrusted.
 
 const (
-	dangerStepUp = "step_up" // the operation itself asks for a step-up
-	dangerFleet  = "fleet"   // it changes what runs on the nodes
-	dangerBulk   = "bulk"    // many users at once
+	dangerStepUp          = "step_up"           // the operation itself asks for a step-up
+	dangerFleet           = "fleet"             // it changes what runs on the nodes
+	dangerBulk            = "bulk"              // many users at once
+	dangerUserChangeLimit = "user_change_limit" // this plan exceeds the token's unattended user-change limit
 )
+
+const tokenUserChangeDescription = "A token may make at most 10 user changes without owner approval during the fixed one-hour window that starts with its first counted change."
+
+func (c *call) userChangeBudget(asked int) ([]string, []Fact, error) {
+	if c.e.cfg.UserChangeBudget == nil {
+		return nil, nil, nil
+	}
+	used, limit, exempt, err := c.e.cfg.UserChangeBudget(c.ctx)
+	if err != nil {
+		return nil, nil, errors.New("cannot check the token's fixed one-hour user-change limit")
+	}
+	if exempt || used+asked <= limit {
+		return nil, nil, nil
+	}
+	fact := codedFact("user_change_limit", fmt.Sprintf("this token has used %d of %d user changes in its fixed one-hour window", used, limit),
+		"user_change_limit", "used", strconv.Itoa(used), "limit", strconv.Itoa(limit))
+	return []string{dangerUserChangeLimit}, []Fact{fact}, nil
+}
+
+func mergeDanger(dst []string, add ...string) []string {
+	for _, v := range add {
+		if v != "" && !slices.Contains(dst, v) {
+			dst = append(dst, v)
+		}
+	}
+	return dst
+}
 
 func changeTools() []toolDef {
 	var out []toolDef
@@ -705,7 +733,7 @@ func checkSubscriptionName(name string) error {
 var userUpdate = changeSpec[userUpdateArgs]{
 	name: "user_update", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceUpdateUserProcedure),
-	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too.",
+	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too. " + tokenUserChangeDescription,
 	plan: func(c *call, a userUpdateArgs) (*planned, error) {
 		cur, err := c.getUser(a.UserID)
 		if err != nil {
@@ -806,7 +834,12 @@ var userUpdate = changeSpec[userUpdateArgs]{
 		if n == 0 {
 			return nil, errors.New("nothing to change: give at least one field")
 		}
-		return &planned{Summary: "Change " + plural(n, "setting", "settings") + " of one user.", Facts: facts, Params: a}, nil
+		danger, budgetFacts, err := c.userChangeBudget(1)
+		if err != nil {
+			return nil, err
+		}
+		facts = append(facts, budgetFacts...)
+		return &planned{Summary: "Change " + plural(n, "setting", "settings") + " of one user.", Facts: facts, Danger: danger, Params: a}, nil
 	},
 	apply: func(c *call, a userUpdateArgs, _ Plan) (done, error) {
 		req := &adminv1.UpdateUserRequest{
@@ -839,26 +872,39 @@ func usersPlan(enable bool) func(c *call, a usersArgs) (*planned, error) {
 			return nil, err
 		}
 		var facts []Fact
+		changes := 0 // the people a disable really disables: what the panel will count
 		for _, id := range ids {
 			r, err := c.getUser(id)
 			if err != nil {
 				return nil, err
 			}
+			if r.GetUser().GetStatus() != adminv1.UserStatus_USER_STATUS_DISABLED {
+				changes++
+			}
 			facts = append(facts, Fact{Key: "users", Value: nm(r.GetUser().GetName()), Untrusted: true})
 		}
 		verb, effect, code := "Disable", "their connections end and their devices are dropped from the nodes", "disable"
+		// Enabling gives access back: it is not counted against the token's hourly limit and never waits for the owner
+		// because of how many people it names. Disabling is counted, and more than MaxUnattendedBulk at once waits.
 		var danger []string
+		var budgetFacts []Fact
 		if enable {
 			verb, effect, code = "Enable", "they can connect again", "enable"
-		} else if len(ids) > MaxUnattendedBulk {
-			danger = []string{dangerBulk}
+		} else {
+			var err error
+			if danger, budgetFacts, err = c.userChangeBudget(changes); err != nil {
+				return nil, err
+			}
+			if len(ids) > MaxUnattendedBulk {
+				danger = mergeDanger(danger, dangerBulk)
+			}
 		}
 		return &planned{
 			Summary: verb + " " + plural(len(ids), "user", "users") + ": " + effect + ".",
 			Facts: append([]Fact{
 				{Key: "count", Value: strconv.Itoa(len(ids))},
 				codedFact("effect", effect, code),
-			}, facts...),
+			}, append(facts, budgetFacts...)...),
 			Danger: danger, Params: usersArgs{UserIDs: ids},
 		}, nil
 	}
@@ -881,7 +927,7 @@ func usersApply(enable bool) func(c *call, a usersArgs, _ Plan) (done, error) {
 var userDisable = changeSpec[usersArgs]{
 	name: "user_disable", min: ProfileOperator, danger: true,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceSetUsersEnabledProcedure),
-	desc:  fmt.Sprintf("Disable up to 50 users: their connections end and their devices leave the nodes. More than %d users at once needs the owner's approval.", MaxUnattendedBulk),
+	desc:  fmt.Sprintf("Disable up to 50 users: their connections end and their devices leave the nodes. More than %d users at once needs the owner's approval. %s", MaxUnattendedBulk, tokenUserChangeDescription),
 	plan:  usersPlan(false), apply: usersApply(false),
 }
 
@@ -899,7 +945,7 @@ var userResetTraffic = changeSpec[usersArgs]{
 	name: "user_reset_traffic", min: ProfileOperator, danger: true,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceResetUserTrafficProcedure),
 	desc: fmt.Sprintf("Zero the traffic counter of the current quota period for up to 50 users (a user that hit the quota is active again). "+
-		"History is kept; the counter cannot be restored. More than %d users at once needs the owner's approval.", MaxUnattendedBulk),
+		"History is kept; the counter cannot be restored. More than %d users at once needs the owner's approval. %s", MaxUnattendedBulk, tokenUserChangeDescription),
 	plan: func(c *call, a usersArgs) (*planned, error) {
 		ids, err := uniqueIDs("user_ids", a.UserIDs, false)
 		if err != nil {
@@ -907,17 +953,24 @@ var userResetTraffic = changeSpec[usersArgs]{
 		}
 		var facts []Fact
 		var used uint64
+		changes := 0 // the people whose counter or status the reset really changes: what the panel will count
 		for _, id := range ids {
 			r, err := c.getUser(id)
 			if err != nil {
 				return nil, err
 			}
 			used += r.GetUser().GetUsedBytes()
+			if r.GetUser().GetUsedBytes() > 0 || r.GetUser().GetStatus() == adminv1.UserStatus_USER_STATUS_LIMITED {
+				changes++
+			}
 			facts = append(facts, Fact{Key: "users", Value: nm(r.GetUser().GetName()), Untrusted: true})
 		}
-		var danger []string
+		danger, budgetFacts, err := c.userChangeBudget(changes)
+		if err != nil {
+			return nil, err
+		}
 		if len(ids) > MaxUnattendedBulk {
-			danger = []string{dangerBulk}
+			danger = mergeDanger(danger, dangerBulk)
 		}
 		return &planned{
 			Summary: "Reset the traffic counter of " + plural(len(ids), "user", "users") + " to zero.",
@@ -925,7 +978,7 @@ var userResetTraffic = changeSpec[usersArgs]{
 				{Key: "count", Value: strconv.Itoa(len(ids))},
 				codedFact("used", fmtBytes(used)+" in all", "bytes", "bytes", strconv.FormatUint(used, 10)),
 				codedFact("effect", "the used traffic of the current period becomes 0; a user stopped by the quota can connect again", "traffic_reset"),
-			}, facts...),
+			}, append(facts, budgetFacts...)...),
 			Danger: danger, Params: usersArgs{UserIDs: ids},
 		}, nil
 	},
@@ -953,7 +1006,7 @@ var deviceRevoke = changeSpec[deviceRevokeArgs]{
 	name: "device_revoke", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceRevokeDeviceProcedure),
 	desc: "Revoke one device of a user: its credentials are dropped from every node and the device must be set up again. With block, its device ID is refused " +
-		"until the owner unblocks it in the admin panel (unblocking is not offered here); an app reporting another ID would be a new device.",
+		"until the owner unblocks it in the admin panel (unblocking is not offered here); an app reporting another ID would be a new device. " + tokenUserChangeDescription,
 	plan: func(c *call, a deviceRevokeArgs) (*planned, error) {
 		if err := validID("device_id", a.DeviceID); err != nil {
 			return nil, err
@@ -983,7 +1036,12 @@ var deviceRevoke = changeSpec[deviceRevokeArgs]{
 					facts = append(facts, Fact{Key: "fingerprint", Value: d.GetFingerprint()})
 				}
 			}
-			return &planned{Summary: summary, Facts: facts}, nil
+			danger, budgetFacts, err := c.userChangeBudget(1)
+			if err != nil {
+				return nil, err
+			}
+			facts = append(facts, budgetFacts...)
+			return &planned{Summary: summary, Facts: facts, Danger: danger}, nil
 		}
 		return nil, errors.New("this user has no such device")
 	},

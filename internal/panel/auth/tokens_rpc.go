@@ -92,6 +92,7 @@ func toProtoToken(t store.APIToken) *adminv1.ApiToken {
 		CreatedUnix: t.CreatedAt.Unix(), ExpiresUnix: t.ExpiresAt.Unix(), LastUsedUnix: unixOrZero(t.LastUsedAt),
 		LastUsedIp: t.LastUsedIP, LastUsedVia: via, RevokedUnix: unixOrZero(t.RevokedAt),
 		CreatedByName: t.CreatedByName, RateLimitPerMin: uint32(t.RatePerMin), Hint: t.Hint,
+		AllowBulkUserChanges: t.AllowBulkUserChanges,
 	}
 }
 
@@ -153,6 +154,7 @@ func (r *tokenRPC) CreateApiToken(ctx context.Context, req *connect.Request[admi
 	tok := store.APIToken{
 		ID: store.NewID("tok_"), Name: name, Profile: profile, Hint: secret[len(secret)-tokenHintLen:], RatePerMin: rate,
 		CreatedBy: admin.ID, CreatedByName: admin.DisplayName, CreatedAt: now.UTC(), ExpiresAt: now.UTC().Add(time.Duration(days) * 24 * time.Hour),
+		AllowBulkUserChanges: m.AllowBulkUserChanges,
 	}
 	switch err := s.st.CreateAPIToken(ctx, tok, hashToken(secret)); {
 	case errors.Is(err, store.ErrNameTaken):
@@ -164,8 +166,39 @@ func (r *tokenRPC) CreateApiToken(ctx context.Context, req *connect.Request[admi
 		return nil, errInternal(err)
 	}
 	s.audit(ctx, admin.ID, "token_create", "ok", s.clientIP(req), map[string]any{
-		"token_id": tok.ID, "name": tok.Name, "profile": tok.Profile, "ttl_days": days})
+		"token_id": tok.ID, "name": tok.Name, "profile": tok.Profile, "ttl_days": days, "allow_bulk_user_changes": tok.AllowBulkUserChanges})
 	return connect.NewResponse(&adminv1.CreateApiTokenResponse{Token: toProtoToken(tok), Secret: secret}), nil
+}
+
+// SetApiTokenBulk changes the owner-authorized exemption from the unattended hourly user-change limit.
+func (r *tokenRPC) SetApiTokenBulk(ctx context.Context, req *connect.Request[adminv1.SetApiTokenBulkRequest]) (*connect.Response[adminv1.SetApiTokenBulkResponse], error) {
+	s := r.s
+	admin, err := ownerSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := edition.Check(s.edge.Load(), edition.MCP); err != nil {
+		return nil, err
+	}
+	if err := s.RequireStepUp(ctx); err != nil {
+		return nil, err
+	}
+	id := req.Msg.Id
+	if id == "" || len(id) > maxTokenIDLen {
+		return nil, invalid("which token?")
+	}
+	tok, err := s.st.SetAPITokenBulk(ctx, id, req.Msg.Allow, s.now())
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such token"))
+	}
+	if err != nil {
+		s.log.Error("set api token bulk permission", "code", "api_token_bulk_failed", "err", err)
+		return nil, errInternal(err)
+	}
+	s.audit(ctx, admin.ID, "api_token_bulk", "ok", s.clientIP(req), map[string]any{
+		"id": tok.ID, "name": tok.Name, "allow": tok.AllowBulkUserChanges,
+	})
+	return connect.NewResponse(&adminv1.SetApiTokenBulkResponse{Token: toProtoToken(tok)}), nil
 }
 
 // ListApiTokens lists every token, newest first, with the server's clock.

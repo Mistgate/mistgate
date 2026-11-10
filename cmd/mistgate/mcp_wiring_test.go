@@ -273,9 +273,12 @@ func TestMCPEndToEnd(t *testing.T) {
 			t.Errorf("%s is %s", u.Name, u.Status)
 		}
 	}
-	// the same chain, rejected
-	rej := decodeJSON[mcp.PlanOut](t, ok(op, "user_enable_plan", map[string]any{"user_ids": ids}))
-	ok(op, "user_enable_apply", map[string]any{"confirm_token": rej.ConfirmToken}) // enabling needs no owner
+	// Enabling three users is within the bulk threshold and their owner-approved disable spent no unattended budget.
+	rej := decodeJSON[mcp.PlanOut](t, ok(op, "user_enable_plan", map[string]any{"user_ids": ids[:3]}))
+	if rej.NeedsApproval {
+		t.Fatalf("enabling three users needs the owner: %+v", rej)
+	}
+	ok(op, "user_enable_apply", map[string]any{"confirm_token": rej.ConfirmToken})
 	dis2 := decodeJSON[mcp.PlanOut](t, ok(op, "user_disable_plan", map[string]any{"user_ids": ids}))
 	if code, body := rpc("owner", "", "ApprovalService", "Reject", `{"id":"`+dis2.PlanID+`"}`); code != 200 {
 		t.Fatalf("Reject: %d %s", code, body)
@@ -283,6 +286,47 @@ func TestMCPEndToEnd(t *testing.T) {
 	if out, isErr := tool(op, "user_disable_apply", map[string]any{"confirm_token": dis2.ConfirmToken}); !isErr || !strings.Contains(out, "rejected by the owner") {
 		t.Errorf("apply after a reject: %s", out)
 	}
+
+	// -- the hourly cap on what a token changes without the owner, on the real limiter and the real principal. Three disables
+	// of three users fit under ten units (the owner-approved four above spent none), the fourth asks for no more than three
+	// users and still waits for the owner, and the same token is refused whole over /api.
+	// A token of its own, so that the earlier calls do not eat into its request-rate burst.
+	_, capSecret := mkToken("capped", store.ProfileOperator)
+	capped, capRPC := session(capSecret), capSecret
+	for i := 1; i <= 3; i++ {
+		if i > 1 {
+			if code, body := rpc("owner", "", "UserService", "SetUsersEnabled", `{"user_ids":["`+ids[0]+`","`+ids[1]+`","`+ids[2]+`"],"enabled":true}`); code != 200 {
+				t.Fatalf("owner resetting users before disable %d: %d %s", i, code, body)
+			}
+		}
+		pl := decodeJSON[mcp.PlanOut](t, ok(capped, "user_disable_plan", map[string]any{"user_ids": ids[:3]}))
+		if pl.NeedsApproval {
+			t.Fatalf("disable plan %d of three users needs the owner: %+v", i, pl)
+		}
+		ok(capped, "user_disable_apply", map[string]any{"confirm_token": pl.ConfirmToken})
+	}
+	if code, body := rpc("owner", "", "UserService", "SetUsersEnabled", `{"user_ids":["`+ids[0]+`","`+ids[1]+`","`+ids[2]+`"],"enabled":true}`); code != 200 {
+		t.Fatalf("owner resetting users before over-limit plan: %d %s", code, body)
+	}
+	over := decodeJSON[mcp.PlanOut](t, ok(capped, "user_disable_plan", map[string]any{"user_ids": ids[:3]}))
+	if !over.NeedsApproval || len(over.Danger) != 1 || over.Danger[0] != "user_change_limit" {
+		t.Fatalf("the fourth disable plan of three users: %+v", over)
+	}
+	if code, body := rpc("", capRPC, "UserService", "SetUsersEnabled", `{"user_ids":["`+ids[0]+`","`+ids[1]+`"],"enabled":false}`); code != 429 ||
+		!strings.Contains(body, "token_user_change_limit") || !strings.Contains(body, "used=9") {
+		t.Errorf("a disable over /api past the cap: %d %s", code, body)
+	}
+	// An owner's session has no budget.
+	if code, body := rpc("owner", "", "UserService", "SetUsersEnabled", `{"user_ids":["`+ids[0]+`"],"enabled":false}`); code != 200 {
+		t.Errorf("an owner disabling a user: %d %s", code, body)
+	}
+	re := decodeJSON[mcp.PlanOut](t, ok(capped, "user_enable_plan", map[string]any{"user_ids": ids}))
+	// Enabling gives access back: it waits for the owner only because it names many people, never because of the
+	// token's hourly limit, even with that limit spent.
+	if re.NeedsApproval || len(re.Danger) != 0 {
+		t.Fatalf("enabling people with the user-change limit spent: %+v", re)
+	}
+	ok(capped, "user_enable_apply", map[string]any{"confirm_token": re.ConfirmToken})
 
 	// -- a fleet change through the owner's grant. The real UpdateService answers 400 "no release key" in this test build, which
 	// is its own answer: it was reached, past the allow-list, the role check and its step-up, only because the plan is approved.

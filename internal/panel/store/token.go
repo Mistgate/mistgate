@@ -41,6 +41,7 @@ type APIToken struct {
 	RevokedAt, LastUsedAt    time.Time
 	LastUsedIP, LastUsedVia  string
 	AssistantOnly            bool
+	AllowBulkUserChanges     bool
 }
 
 // Revoked reports whether the token was revoked.
@@ -50,15 +51,15 @@ func (t APIToken) Revoked() bool { return !t.RevokedAt.IsZero() }
 func (t APIToken) Expired(now time.Time) bool { return !now.Before(t.ExpiresAt) }
 
 const tokenColumns = `t.id, t.name, t.profile, t.hint, t.rate_per_min, t.created_by, COALESCE(a.display_name, '') AS created_by_name,
-	t.revoked_by, t.created_at, t.expires_at, t.revoked_at, t.last_used_at, t.last_used_ip, t.last_used_via, t.assistant_only`
+	t.revoked_by, t.created_at, t.expires_at, t.revoked_at, t.last_used_at, t.last_used_ip, t.last_used_via, t.assistant_only, t.allow_bulk_user_changes`
 
 const tokenFrom = ` FROM api_token t LEFT JOIN admin a ON a.id = t.created_by `
 
 func scanToken(r rowScanner) (APIToken, error) {
 	var t APIToken
-	var created, expires, revoked, used int64
+	var created, expires, revoked, used, allowBulk int64
 	err := r.Scan(&t.ID, &t.Name, &t.Profile, &t.Hint, &t.RatePerMin, &t.CreatedBy, &t.CreatedByName,
-		&t.RevokedBy, &created, &expires, &revoked, &used, &t.LastUsedIP, &t.LastUsedVia, &t.AssistantOnly)
+		&t.RevokedBy, &created, &expires, &revoked, &used, &t.LastUsedIP, &t.LastUsedVia, &t.AssistantOnly, &allowBulk)
 	if errors.Is(err, sql.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -72,6 +73,7 @@ func scanToken(r rowScanner) (APIToken, error) {
 	if used != 0 {
 		t.LastUsedAt = fromUnix(used)
 	}
+	t.AllowBulkUserChanges = allowBulk != 0
 	return t, nil
 }
 
@@ -83,12 +85,12 @@ func (s *Store) CreateAPIToken(ctx context.Context, t APIToken, secretHash []byt
 		Stmt{Query: `SELECT count(*) AS live_tokens FROM api_token WHERE assistant_only = 0 AND revoked_at = 0 AND expires_at > ?`,
 			Args: []any{unix(t.CreatedAt)}, Returning: true},
 		Stmt{Query: `INSERT INTO api_token
-		(id, name, name_key, profile, secret_hash, hint, rate_per_min, created_by, created_at, expires_at)
-		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		(id, name, name_key, profile, secret_hash, hint, rate_per_min, created_by, created_at, expires_at, allow_bulk_user_changes)
+		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 		WHERE (SELECT count(*) FROM api_token WHERE assistant_only = 0 AND revoked_at = 0 AND expires_at > ?) < ?
 		AND NOT EXISTS (SELECT 1 FROM api_token WHERE assistant_only = 0 AND name_key = ? AND revoked_at = 0)`,
 			Args: []any{t.ID, t.Name, strings.ToLower(t.Name), t.Profile, secretHash, t.Hint, int64(t.RatePerMin), t.CreatedBy,
-				unix(t.CreatedAt), unix(t.ExpiresAt), unix(t.CreatedAt), int64(MaxLiveTokens), strings.ToLower(t.Name)}},
+				unix(t.CreatedAt), unix(t.ExpiresAt), int64(boolInt(t.AllowBulkUserChanges)), unix(t.CreatedAt), int64(MaxLiveTokens), strings.ToLower(t.Name)}},
 	)
 	if err != nil {
 		if accIsUnique(err) && strings.Contains(err.Error(), "name_key") {
@@ -115,6 +117,28 @@ func (s *Store) APITokenBySecretHash(ctx context.Context, h []byte) (APIToken, e
 // GetAPIToken returns one token. ErrNotFound if there is none.
 func (s *Store) GetAPIToken(ctx context.Context, id string) (APIToken, error) {
 	return scanToken(s.R.QueryRowContext(ctx, `SELECT `+tokenColumns+tokenFrom+`WHERE t.id = ? AND t.assistant_only = 0`, id))
+}
+
+// SetAPITokenBulk changes whether a live API token may change more than the ordinary fixed one-hour user budget.
+func (s *Store) SetAPITokenBulk(ctx context.Context, id string, allow bool, now time.Time) (APIToken, error) {
+	res, err := s.W.ExecContext(ctx, `UPDATE api_token SET allow_bulk_user_changes = ?
+		WHERE id = ? AND assistant_only = 0 AND revoked_at = 0 AND expires_at > ?`, boolInt(allow), id, unix(now))
+	if err != nil {
+		return APIToken{}, err
+	}
+	if changed, err := res.RowsAffected(); err != nil {
+		return APIToken{}, err
+	} else if changed == 0 {
+		tok, err := s.GetAPIToken(ctx, id)
+		if err != nil {
+			return APIToken{}, err
+		}
+		if tok.Revoked() || tok.Expired(now) {
+			return APIToken{}, ErrNotFound
+		}
+		return tok, nil
+	}
+	return s.GetAPIToken(ctx, id)
 }
 
 // GetAssistantToken is reserved for the in-process assistant authenticator. User-facing token APIs must use GetAPIToken.

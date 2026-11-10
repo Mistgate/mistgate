@@ -28,13 +28,14 @@ const (
 
 // Principal describes the token behind a request. The zero value is a signed-in admin (a cookie session).
 type Principal struct {
-	Token     bool   // false: an admin signed in with a cookie session
-	TokenID   string // "tok_..." when Token
-	Profile   string // store.ProfileReadonly | ProfileOperator | ProfileAdmin
-	Channel   Channel
-	Name      string    // the token's name
-	ExpiresAt time.Time // when the token stops working
-	Assistant bool      // a hidden per-admin identity; never accepted from bearer auth
+	Token                bool   // false: an admin signed in with a cookie session
+	TokenID              string // "tok_..." when Token
+	Profile              string // store.ProfileReadonly | ProfileOperator | ProfileAdmin
+	Channel              Channel
+	Name                 string    // the token's name
+	ExpiresAt            time.Time // when the token stops working
+	Assistant            bool      // a hidden per-admin identity; never accepted from bearer auth
+	AllowBulkUserChanges bool      // owner-authorized exemption from the hourly user-change cap
 }
 
 // ActorID is the id the audit log shows for the principal: "token:<id>" for the API channel, "mcp:<id>" for MCP.
@@ -100,6 +101,26 @@ type approvedGrant struct {
 // The MCP layer derives it only while that apply is running.
 func (s *Service) WithApprovedStepUp(ctx context.Context, planID string) context.Context {
 	return context.WithValue(ctx, grantKey{}, approvedGrant{s: s, planID: planID})
+}
+
+// HasApprovedUserChangePlan reports whether this exact MCP procedure is running inside an owner-approved user-change
+// plan. The access service uses it to exempt the approved apply from the token's unattended hourly budget.
+func HasApprovedUserChangePlan(ctx context.Context) bool {
+	p := PrincipalFrom(ctx)
+	g, ok := ctx.Value(grantKey{}).(approvedGrant)
+	procedure := procedureFrom(ctx)
+	if !ok || g.s == nil || g.planID == "" || !p.Token || p.Assistant || p.Channel != ChannelMCP || procedure == "" {
+		return false
+	}
+	plan, err := g.s.st.GetMCPPlan(ctx, g.planID)
+	if err != nil || plan.TokenID != p.TokenID || plan.Status != store.PlanApplying || !plan.NeedsApproval ||
+		plan.DecidedBy == "" || plan.DecidedAt.IsZero() {
+		return false
+	}
+	// The procedures the plan's own grant opens count too: a group or profile change reaches the user service only
+	// through the owner's approval, and counting its members would refuse an approved plan on any group of more
+	// than ten people.
+	return slices.Contains(userChangePlanProcedures[plan.Tool], procedure) || slices.Contains(grantProcedures[plan.Tool], procedure)
 }
 
 // grantAllows reports whether the approved grant in ctx is valid for tokenID calling the procedure in ctx.

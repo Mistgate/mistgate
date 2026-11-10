@@ -1008,6 +1008,7 @@ func TestTokenAllowList(t *testing.T) {
 		adminv1connect.AuthServiceBeginTotpEnrollmentProcedure,
 		adminv1connect.AuthServiceFinishTotpEnrollmentProcedure,
 		adminv1connect.ApiTokenServiceCreateApiTokenProcedure,
+		adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure,
 		adminv1connect.ApiTokenServiceListApiTokensProcedure,
 		adminv1connect.ApiTokenServiceRevokeApiTokenProcedure,
 		adminv1connect.ApprovalServiceListApprovalsProcedure,
@@ -1053,8 +1054,8 @@ func TestTokenAllowList(t *testing.T) {
 	}
 	// Step-up procedures include the protected handlers, credential reveal/rotation, password changes,
 	// authenticator enrollment, login captcha, and sensitive infrastructure operations.
-	if len(stepUpProcedures) != 61 {
-		t.Errorf("%d step-up procedures, want 61", len(stepUpProcedures))
+	if len(stepUpProcedures) != 62 {
+		t.Errorf("%d step-up procedures, want 62", len(stepUpProcedures))
 	}
 }
 
@@ -1118,6 +1119,7 @@ func TestTokenServicesOwnerOnlyOverHTTP(t *testing.T) {
 	_, adminToken := e.mkToken("ad", store.ProfileAdmin, 600)
 	for _, p := range []string{
 		adminv1connect.ApiTokenServiceListApiTokensProcedure, adminv1connect.ApiTokenServiceCreateApiTokenProcedure,
+		adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure,
 		adminv1connect.ApiTokenServiceRevokeApiTokenProcedure, adminv1connect.ApprovalServiceListApprovalsProcedure,
 		adminv1connect.ApprovalServiceApproveProcedure, adminv1connect.ApprovalServiceRejectProcedure,
 	} {

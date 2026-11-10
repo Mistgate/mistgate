@@ -18,6 +18,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -74,7 +75,8 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e := &env{t: t, st: st, notify: &fakeNotify{}, online: fakeOnline{}, clock: ts("2026-09-30T12:00:00Z"), ctx: ctx}
-	s, err := New(st, v, builtin.Registry(), e.notify, e.online, Config{SubscriptionBaseURL: "https://sub.example.com/k3xq/", StepUp: func(context.Context) error { return nil }})
+	limiter := securitylimit.NewMemory(func() time.Time { return e.clock }, 0)
+	s, err := New(st, v, builtin.Registry(), e.notify, e.online, Config{SubscriptionBaseURL: "https://sub.example.com/k3xq/", StepUp: func(context.Context) error { return nil }, Limiter: limiter})
 	if err != nil {
 		t.Fatal(err)
 	}

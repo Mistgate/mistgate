@@ -34,6 +34,14 @@ func (*recoveryTestLimiter) Record(context.Context, securitylimit.Window, string
 	return securitylimit.Decision{Allowed: true}, nil
 }
 
+func (*recoveryTestLimiter) RecordN(context.Context, securitylimit.Window, string, int) (securitylimit.Decision, error) {
+	return securitylimit.Decision{Allowed: true}, nil
+}
+
+func (*recoveryTestLimiter) UndoN(context.Context, securitylimit.Window, string, int, time.Time) error {
+	return nil
+}
+
 func (*recoveryTestLimiter) Reset(context.Context, securitylimit.Window, string) error { return nil }
 
 func TestRecoveryHTTPResetsOnceAndLimitsGenericRefusals(t *testing.T) {

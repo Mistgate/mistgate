@@ -182,6 +182,9 @@ func TestTokenManagementNeedsStepUpAndTheOwner(t *testing.T) {
 	if _, err := e.tok.RevokeApiToken(stale, connect.NewRequest(&adminv1.RevokeApiTokenRequest{Id: id})); connect.CodeOf(err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "step-up") {
 		t.Errorf("revoke without a fresh step-up: %v", err)
 	}
+	if _, err := e.tok.SetApiTokenBulk(stale, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: id, Allow: true})); connect.CodeOf(err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "step-up") {
+		t.Errorf("bulk permission without a fresh step-up: %v", err)
+	}
 	if got, _ := e.st.GetAPIToken(context.Background(), id); got.Revoked() {
 		t.Fatal("the token was revoked without a step-up")
 	}
@@ -215,6 +218,9 @@ func TestTokenManagementNeedsStepUpAndTheOwner(t *testing.T) {
 	if _, err := e.tok.RevokeApiToken(tctx, connect.NewRequest(&adminv1.RevokeApiTokenRequest{Id: id})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Errorf("a token revokes a token: %v", err)
 	}
+	if _, err := e.tok.SetApiTokenBulk(tctx, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: id, Allow: true})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Errorf("a token changes its bulk permission: %v", err)
+	}
 	if _, err := e.apr.ListApprovals(tctx, connect.NewRequest(&adminv1.ListApprovalsRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Errorf("a token lists approvals: %v", err)
 	}
@@ -223,6 +229,68 @@ func TestTokenManagementNeedsStepUpAndTheOwner(t *testing.T) {
 	}
 	if _, err := e.apr.Reject(tctx, connect.NewRequest(&adminv1.RejectRequest{Id: "pln_x"})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Errorf("a token rejects: %v", err)
+	}
+}
+
+func TestSetApiTokenBulk(t *testing.T) {
+	e := newRPCEnv(t)
+	created, err := create(e, e.ctx, &adminv1.CreateApiTokenRequest{
+		Name: "bulk-cap", Profile: adminv1.TokenProfile_TOKEN_PROFILE_OPERATOR, AllowBulkUserChanges: false,
+	})
+	if err != nil || created.Token.GetAllowBulkUserChanges() {
+		t.Fatalf("create default token: %+v %v", created, err)
+	}
+
+	updated, err := e.tok.SetApiTokenBulk(e.ctx, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: created.Token.Id, Allow: true}))
+	if err != nil || !updated.Msg.Token.GetAllowBulkUserChanges() {
+		t.Fatalf("allow bulk changes: %+v %v", updated, err)
+	}
+	stored, err := e.st.GetAPIToken(context.Background(), created.Token.Id)
+	if err != nil || !stored.AllowBulkUserChanges {
+		t.Fatalf("stored token: %+v %v", stored, err)
+	}
+	audit := e.audits("api_token_bulk")
+	if len(audit) != 1 || audit[0].Actor != e.owner.ID || audit[0].Result != "ok" ||
+		!strings.Contains(audit[0].Params, `"id":"`+created.Token.Id+`"`) ||
+		!strings.Contains(audit[0].Params, `"name":"bulk-cap"`) || !strings.Contains(audit[0].Params, `"allow":true`) {
+		t.Fatalf("bulk permission audit: %+v", audit)
+	}
+
+	stale := e.stale()
+	if _, err := e.tok.SetApiTokenBulk(stale, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: created.Token.Id, Allow: false})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("stale step-up: %v", err)
+	}
+	// A step-up is the age of the session, so a fresh one needs a session made after the clock moved.
+	fresh, err := e.s.newSession(context.Background(), e.owner.ID, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshCtx := authed(t, e.s, fresh.Value)
+	updated, err = e.tok.SetApiTokenBulk(freshCtx, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: created.Token.Id, Allow: false}))
+	if err != nil || updated.Msg.Token.GetAllowBulkUserChanges() {
+		t.Fatalf("deny bulk changes: %+v %v", updated, err)
+	}
+	if _, err := e.tok.SetApiTokenBulk(freshCtx, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: "tok_nothere", Allow: true})); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Fatalf("unknown token: %v", err)
+	}
+	expired, err := create(e, freshCtx, &adminv1.CreateApiTokenRequest{Name: "expired-bulk", Profile: adminv1.TokenProfile_TOKEN_PROFILE_OPERATOR})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.st.W.ExecContext(freshCtx, `UPDATE api_token SET expires_at = ? WHERE id = ?`, e.s.now().Unix()-1, expired.Token.Id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.tok.SetApiTokenBulk(freshCtx, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: expired.Token.Id, Allow: true})); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Fatalf("expired token: %v", err)
+	}
+	if _, err := e.st.RevokeAPIToken(freshCtx, created.Token.Id, e.owner.ID, e.s.now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.tok.SetApiTokenBulk(freshCtx, connect.NewRequest(&adminv1.SetApiTokenBulkRequest{Id: created.Token.Id, Allow: true})); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Fatalf("revoked token: %v", err)
+	}
+	if got := len(e.audits("api_token_bulk")); got != 2 {
+		t.Fatalf("dead-token refusals added a bulk audit row; count = %d, want 2", got)
 	}
 }
 

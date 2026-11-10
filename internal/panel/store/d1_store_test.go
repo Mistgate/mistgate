@@ -71,6 +71,39 @@ func TestD1MigrationParity(t *testing.T) {
 	}
 }
 
+func TestD1APITokenBulkUserChangesRoundTrip(t *testing.T) {
+	binding := js.Global().Get("__d1")
+	binding.Call("__reset")
+	st, err := OpenD1(context.Background(), binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	now := time.Unix(123, 0).UTC()
+	tok := APIToken{ID: "tok_bulk", Name: "bulk", Profile: ProfileOperator, Hint: "wxyz", RatePerMin: 120,
+		CreatedBy: "adm_owner", CreatedAt: now, ExpiresAt: now.Add(24 * time.Hour), AllowBulkUserChanges: true}
+	hash := sha256.Sum256([]byte("bulk-secret"))
+	if err := st.CreateAPIToken(ctx, tok, hash[:]); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetAPIToken(ctx, tok.ID)
+	if err != nil || !got.AllowBulkUserChanges {
+		t.Fatalf("get created token: %+v %v", got, err)
+	}
+	listed, err := st.ListAPITokens(ctx)
+	if err != nil || len(listed) != 1 || !listed[0].AllowBulkUserChanges {
+		t.Fatalf("list token: %+v %v", listed, err)
+	}
+	got, err = st.SetAPITokenBulk(ctx, tok.ID, false, now)
+	if err != nil || got.AllowBulkUserChanges {
+		t.Fatalf("set token: %+v %v", got, err)
+	}
+	if _, err := st.SetAPITokenBulk(ctx, "tok_missing", true, now); err != ErrNotFound {
+		t.Fatalf("set unknown token = %v, want ErrNotFound", err)
+	}
+}
+
 func TestD1InboundDirectInSubscriptionsRoundTripsAndDefaultsTrue(t *testing.T) {
 	binding := js.Global().Get("__d1")
 	binding.Call("__reset")

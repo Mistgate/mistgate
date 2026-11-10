@@ -114,6 +114,14 @@ func apiError(err error) error {
 		case connect.CodePermissionDenied:
 			return failure("not_allowed", "not allowed for this token: "+clean(ce.Message(), maxError))
 		case connect.CodeResourceExhausted:
+			code, params := panelCode(ce.Message())
+			if code == "token_user_change_limit" {
+				msg := "The token's hourly user-change limit was reached. Make a new plan; it will wait for the owner to approve it."
+				if strings.Contains(ce.Message(), "reason=over_hourly_limit") {
+					msg = "This call changes more people than the token's hourly limit allows in one call. Make a new plan; it will wait for the owner to approve it."
+				}
+				return &outcomeError{msg: msg, out: Outcome{Code: code, Params: params}}
+			}
 			return failure("rate_limited", "rate limit: slow down")
 		}
 		code, params := panelCode(ce.Message())

@@ -26,7 +26,7 @@ func (k *core) attachAssistantRuntime(api http.Handler) {
 	if k.asst == nil {
 		return
 	}
-	runtime, err := mcp.NewAssistant(mcpConfig(k.authSvc, k.st, k.log, k.tg.PlanWaiting, k.c.Clock, api))
+	runtime, err := mcp.NewAssistant(mcpConfig(k.authSvc, k.st, k.limiter, k.log, k.tg.PlanWaiting, k.c.Clock, api))
 	if err != nil {
 		k.log.Error("assistant MCP tools are off", "err", err)
 		return

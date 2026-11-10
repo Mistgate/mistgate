@@ -173,6 +173,7 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.WarpServiceImportWarpProcedure:                       true,
 	adminv1connect.WarpServiceDeleteWarpProcedure:                       true,
 	adminv1connect.ApiTokenServiceCreateApiTokenProcedure:               true,
+	adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure:              true,
 	adminv1connect.ApiTokenServiceRevokeApiTokenProcedure:               true,
 	adminv1connect.ApprovalServiceApproveProcedure:                      true,
 	adminv1connect.BackupServiceUpdateBackupSettingsProcedure:           true,
@@ -203,6 +204,15 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.UserServiceDeleteUsersProcedure:            true,
 	adminv1connect.AssistantServiceSetProviderKeyProcedure:    true,
 	adminv1connect.AssistantServiceRemoveProviderKeyProcedure: true,
+}
+
+// userChangePlanProcedures identifies direct-write procedures whose owner-approved plan may exceed the unattended
+// hourly user-change budget. These procedures remain outside TokenAccessApproved.
+var userChangePlanProcedures = map[string][]string{
+	"user_update":        {adminv1connect.UserServiceUpdateUserProcedure},
+	"user_disable":       {adminv1connect.UserServiceSetUsersEnabledProcedure},
+	"user_reset_traffic": {adminv1connect.UserServiceResetUserTrafficProcedure},
+	"device_revoke":      {adminv1connect.UserServiceRevokeDeviceProcedure},
 }
 
 // grantProcedures says which procedures the approved plan of an MCP tool may open with its grant: the grant of

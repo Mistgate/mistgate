@@ -133,7 +133,7 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 
 // accessConfig is the access service's configuration, the same in every role.
 func (b base) accessConfig(fl *fleet.Fleet, stepUp func(context.Context) error) access.Config {
-	return access.Config{SubscriptionBaseURL: b.subBase, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts, CheckRelay: fl.CheckRelay}
+	return access.Config{SubscriptionBaseURL: b.subBase, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts, CheckRelay: fl.CheckRelay, Limiter: b.limiter}
 }
 
 // usageRecompute is fleet.Config.OnUsage: a quota overrun takes effect right after the stats batch that crossed it.

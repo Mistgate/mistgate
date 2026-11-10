@@ -25,11 +25,13 @@ type vectorScenario struct {
 }
 
 type vectorEntry struct {
-	Op     string `json:"op"`
-	AtMS   int64  `json:"at_ms"`
-	Name   string `json:"name"`
-	Key    string `json:"key"`
-	Bucket *struct {
+	Op            string `json:"op"`
+	AtMS          int64  `json:"at_ms"`
+	Name          string `json:"name"`
+	Key           string `json:"key"`
+	Units         int    `json:"units,omitempty"`
+	WindowStartMS *int64 `json:"window_start_ms,omitempty"`
+	Bucket        *struct {
 		Name     string  `json:"name"`
 		Burst    float64 `json:"burst"`
 		RefillMS float64 `json:"refill_ms"`
@@ -44,10 +46,11 @@ type vectorEntry struct {
 }
 
 type vectorDecision struct {
-	Allowed      bool  `json:"allowed"`
-	RetryAfterMS int64 `json:"retry_after_ms"`
-	Remaining    int   `json:"remaining"`
-	First        bool  `json:"first"`
+	Allowed       bool   `json:"allowed"`
+	RetryAfterMS  int64  `json:"retry_after_ms"`
+	Remaining     int    `json:"remaining"`
+	First         bool   `json:"first"`
+	WindowStartMS *int64 `json:"window_start_ms,omitempty"`
 }
 
 func TestSharedVectors(t *testing.T) {
@@ -71,7 +74,7 @@ func TestSharedVectors(t *testing.T) {
 					got, err = limiter.Take(context.Background(), Bucket{
 						Name: op.Bucket.Name, Burst: op.Bucket.Burst, Refill: time.Duration(op.Bucket.RefillMS * float64(time.Millisecond)),
 					}, op.Key)
-				case "peek", "record":
+				case "peek", "record", "recordN", "undoN":
 					if op.Window == nil {
 						t.Fatalf("operation %d has no window", i)
 					}
@@ -82,8 +85,16 @@ func TestSharedVectors(t *testing.T) {
 					}
 					if op.Op == "peek" {
 						got, err = limiter.Peek(context.Background(), spec, op.Key)
-					} else {
+					} else if op.Op == "record" {
 						got, err = limiter.Record(context.Background(), spec, op.Key)
+					} else if op.Op == "recordN" {
+						got, err = limiter.RecordN(context.Background(), spec, op.Key, op.Units)
+					} else {
+						if op.WindowStartMS == nil {
+							t.Fatalf("operation %d has no reservation window start", i)
+						}
+						err = limiter.UndoN(context.Background(), spec, op.Key, op.Units, time.UnixMilli(*op.WindowStartMS))
+						got.Allowed = err == nil
 					}
 				case "reset":
 					err = limiter.Reset(context.Background(), Window{Name: op.Name}, op.Key)
@@ -97,6 +108,9 @@ func TestSharedVectors(t *testing.T) {
 				gotRetryAfterMS := int64(math.Ceil(float64(got.RetryAfter) / float64(time.Millisecond)))
 				if got.Allowed != op.Want.Allowed || gotRetryAfterMS != op.Want.RetryAfterMS || got.Remaining != op.Want.Remaining || got.First != op.Want.First {
 					t.Errorf("operation %d (%s): got %+v (retry_after_ms=%d), want %+v", i, op.Op, got, gotRetryAfterMS, op.Want)
+				}
+				if op.Want.WindowStartMS != nil && got.WindowStart.UnixMilli() != *op.Want.WindowStartMS {
+					t.Errorf("operation %d (%s): window start %d, want %d", i, op.Op, got.WindowStart.UnixMilli(), *op.Want.WindowStartMS)
 				}
 			}
 		})
@@ -321,5 +335,117 @@ func TestBucketEvictionDropsTheOldestState(t *testing.T) {
 	}
 	if got := limiter.bucketOrderByName[spec.Name].Len(); got != 2 {
 		t.Fatalf("bucket count = %d, want cap 2", got)
+	}
+}
+
+func TestRecordNReservesWholeWeightAndRefundsFailures(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	limiter := NewMemory(func() time.Time { return clock }, 8)
+	spec := Window{Name: "weighted", Limit: 10, Span: time.Hour}
+	ctx := context.Background()
+	first, err := limiter.RecordN(ctx, spec, "tok", 8)
+	if err != nil || !first.Allowed || first.Remaining != 2 || !first.WindowStart.Equal(clock) {
+		t.Fatalf("reserve eight: %+v, %v", first, err)
+	}
+	if d, err := limiter.RecordN(ctx, spec, "tok", 3); err != nil || d.Allowed || d.Remaining != 2 || d.RetryAfter != time.Hour {
+		t.Fatalf("reserve three over limit: %+v, %v", d, err)
+	}
+	if d, err := limiter.Peek(ctx, spec, "tok"); err != nil || !d.Allowed || d.Remaining != 2 {
+		t.Fatalf("refused reservation changed usage: %+v, %v", d, err)
+	}
+	final, err := limiter.RecordN(ctx, spec, "tok", 2)
+	if err != nil || !final.Allowed || final.Remaining != 0 || !final.WindowStart.Equal(first.WindowStart) {
+		t.Fatalf("reserve final two: %+v, %v", final, err)
+	}
+	if err := limiter.UndoN(ctx, spec, "tok", 2, final.WindowStart); err != nil {
+		t.Fatal(err)
+	}
+	if d, err := limiter.Peek(ctx, spec, "tok"); err != nil || !d.Allowed || d.Remaining != 2 {
+		t.Fatalf("refund did not restore the two failed units: %+v, %v", d, err)
+	}
+	if d, err := limiter.RecordN(ctx, spec, "tok", 2); err != nil || !d.Allowed || d.Remaining != 0 || !d.WindowStart.Equal(first.WindowStart) {
+		t.Fatalf("reserve remaining two after refund: %+v, %v", d, err)
+	}
+	clock = clock.Add(time.Hour)
+	if d, err := limiter.Peek(ctx, spec, "tok"); err != nil || !d.Allowed || d.Remaining != 10 {
+		t.Fatalf("window did not expire after an hour: %+v, %v", d, err)
+	}
+}
+
+func TestRecordNOverLimitRequestHasNoRetryAndDoesNotStartWindow(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	limiter := NewMemory(func() time.Time { return clock }, 8)
+	spec := Window{Name: "weighted-oversize", Limit: 10, Span: time.Hour}
+	ctx := context.Background()
+	if d, err := limiter.RecordN(ctx, spec, "tok", 11); err != nil || d.Allowed || d.RetryAfter != 0 || d.Remaining != 10 || !d.WindowStart.IsZero() {
+		t.Fatalf("oversize reservation: %+v, %v", d, err)
+	}
+	clock = clock.Add(time.Minute)
+	d, err := limiter.RecordN(ctx, spec, "tok", 10)
+	if err != nil || !d.Allowed || d.Remaining != 0 || !d.WindowStart.Equal(clock) {
+		t.Fatalf("first valid reservation after oversize request: %+v, %v", d, err)
+	}
+}
+
+func TestUndoNDoesNotRefundIntoAnotherWindow(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	limiter := NewMemory(func() time.Time { return clock }, 8)
+	spec := Window{Name: "weighted-window-identity", Limit: 10, Span: time.Hour}
+	ctx := context.Background()
+	old, err := limiter.RecordN(ctx, spec, "tok", 8)
+	if err != nil || !old.Allowed {
+		t.Fatalf("reserve old window: %+v, %v", old, err)
+	}
+	clock = clock.Add(time.Hour)
+	next, err := limiter.RecordN(ctx, spec, "tok", 3)
+	if err != nil || !next.Allowed || !next.WindowStart.Equal(clock) {
+		t.Fatalf("reserve next window: %+v, %v", next, err)
+	}
+	if err := limiter.UndoN(ctx, spec, "tok", 8, old.WindowStart); err != nil {
+		t.Fatal(err)
+	}
+	d, err := limiter.RecordN(ctx, spec, "tok", 7)
+	if err != nil || !d.Allowed || d.Remaining != 0 || !d.WindowStart.Equal(next.WindowStart) {
+		t.Fatalf("old-window refund changed the new window: %+v, %v", d, err)
+	}
+}
+
+func TestRecordNIsAtomicForOneKey(t *testing.T) {
+	limiter := NewMemory(nil, 100)
+	spec := Window{Name: "weighted-concurrent", Limit: 10, Span: time.Hour}
+	const callers = 20
+	var wg sync.WaitGroup
+	results := make(chan Decision, callers)
+	errs := make(chan error, callers)
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			d, err := limiter.RecordN(context.Background(), spec, "same-token", 3)
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- d
+		}()
+	}
+	wg.Wait()
+	close(results)
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	allowed := 0
+	for d := range results {
+		if d.Allowed {
+			allowed++
+		}
+	}
+	if allowed != 3 {
+		t.Fatalf("allowed %d three-unit reservations, want 3", allowed)
+	}
+	d, err := limiter.Peek(context.Background(), spec, "same-token")
+	if err != nil || !d.Allowed || d.Remaining != 1 {
+		t.Fatalf("final reservation state: %+v, %v", d, err)
 	}
 }

@@ -415,6 +415,8 @@ export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untru
       return [t("approval.value.progress", { done: p.done ?? "", total: p.total ?? "" })];
     case "alert":
       return [alertWords(t, p.kind ?? "", p.severity ?? "")];
+    case "user_change_limit":
+      return [t("approval.value.user_change_limit", { used: p.used ?? "", limit: p.limit ?? "" })];
   }
   const apps = f.key === "apps" ? appsKey[f.code] : undefined;
   if (apps) return [t(apps)];
@@ -466,7 +468,10 @@ export function callErrorText(e: unknown, t: T): string {
   }
 }
 
-export type NewToken = { name: string; profile: TokenProfile; ttlDays: number; rateLimitPerMin: number };
+export type NewToken = { name: string; profile: TokenProfile; ttlDays: number; rateLimitPerMin: number; allowBulkUserChanges: boolean };
+
+/** A read-only token changes nobody: the hourly limit of user changes and its exemption mean nothing for it. */
+export const changesUsers = (profile: TokenProfile) => profile !== TokenProfile.READONLY;
 
 export function useTokenActions() {
   const t = useT();
@@ -498,7 +503,17 @@ export function useTokenActions() {
     onError: fail,
     onSettled: refresh,
   });
-  return { create, revoke };
+  // The exemption from the hourly limit of user changes: the owner's call, behind the step-up like the token itself.
+  const setBulk = useMutation({
+    mutationFn: async (tok: { id: string; name: string; allow: boolean }) => {
+      await guard(() => apiTokens.setApiTokenBulk({ id: tok.id, allow: tok.allow }));
+      return tok;
+    },
+    onSuccess: (tok) => toast(t(tok.allow ? "int.tok.bulk.saved.on" : "int.tok.bulk.saved.off", { name: tok.name })),
+    onError: fail,
+    onSettled: refresh,
+  });
+  return { create, revoke, setBulk };
 }
 
 export function useApprovalActions() {

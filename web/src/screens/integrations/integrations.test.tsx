@@ -12,6 +12,7 @@ import { IntegrationsScreen } from "./index";
 const listApiTokens = vi.fn();
 const createApiToken = vi.fn();
 const revokeApiToken = vi.fn();
+const setApiTokenBulk = vi.fn();
 const listApprovals = vi.fn();
 const approve = vi.fn();
 const reject = vi.fn();
@@ -23,6 +24,7 @@ vi.mock("@/lib/api", () => ({
     listApiTokens: (...a: unknown[]) => listApiTokens(...a),
     createApiToken: (...a: unknown[]) => createApiToken(...a),
     revokeApiToken: (...a: unknown[]) => revokeApiToken(...a),
+    setApiTokenBulk: (...a: unknown[]) => setApiTokenBulk(...a),
   },
   approvals: {
     listApprovals: (...a: unknown[]) => listApprovals(...a),
@@ -69,7 +71,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [listApiTokens, createApiToken, revokeApiToken, listApprovals, approve, reject, navigate]) m.mockReset();
+  for (const m of [listApiTokens, createApiToken, revokeApiToken, setApiTokenBulk, listApprovals, approve, reject, navigate]) m.mockReset();
 });
 
 const NOW = Math.floor(Date.now() / 1000);
@@ -86,6 +88,7 @@ const token = (over: Record<string, unknown> = {}) => ({
   createdByName: "Owner",
   rateLimitPerMin: 120,
   hint: "ab12",
+  allowBulkUserChanges: false,
   ...over,
 });
 const approval = (over: Record<string, unknown> = {}) => ({
@@ -184,7 +187,8 @@ describe("the Integrations screen: tokens", () => {
     await click([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent === "180 days"));
     await click(button("Create token"));
     await settle();
-    expect(createApiToken).toHaveBeenCalledWith({ name: "grafana", profile: TokenProfile.OPERATOR, ttlDays: 180, rateLimitPerMin: 120 });
+    // the hourly limit of user changes stays on unless the owner switches it off for this token
+    expect(createApiToken).toHaveBeenCalledWith({ name: "grafana", profile: TokenProfile.OPERATOR, ttlDays: 180, rateLimitPerMin: 120, allowBulkUserChanges: false });
     expect(dialog()!.textContent).toContain("Copy the token now");
     expect(document.querySelector("[data-testid=token-secret]")?.textContent).toBe("tk1_exampleexampleexampleexampleexampleexample1");
 
@@ -234,6 +238,44 @@ describe("the Integrations screen: tokens", () => {
     await settle();
     expect(revokeApiToken).toHaveBeenCalledWith({ id: "tok_1" });
     expect(dialog()).toBeNull();
+  });
+
+  it("shows each token's limit of user changes and lets the owner lift it and put it back", async () => {
+    setApiTokenBulk.mockResolvedValue({});
+    await mount(tokens([token(), token({ id: "tok_2", name: "billing", allowBulkUserChanges: true }), token({ id: "tok_3", name: "grafana", profile: TokenProfile.READONLY })]));
+    expect(text()).toContain("up to 10 user changes an hour");
+    expect(text()).toContain("bulk user changes allowed");
+    expect(text()).toContain("No hourly limit"); // the pill of the exempt token
+    // a read-only token changes nobody: no limit line and no control
+    expect(document.querySelector("button[aria-label='User change limit of token grafana']")).toBeNull();
+
+    await click(document.querySelector("button[aria-label='User change limit of token claude-ops']"));
+    expect(dialog()!.textContent).toContain("at most 10 people in an hour");
+    expect(dialog()!.textContent).toContain("Every person in every call counts");
+    expect(dialog()!.textContent).toContain("Without the limit"); // what lifting the limit risks, before the button
+    expect(setApiTokenBulk).not.toHaveBeenCalled();
+    await click(inDialog("Allow bulk changes"));
+    await settle();
+    expect(setApiTokenBulk).toHaveBeenCalledWith({ id: "tok_1", allow: true });
+    expect(dialog()).toBeNull();
+
+    await click(document.querySelector("button[aria-label='User change limit of token billing']"));
+    await click(inDialog("Put the limit back"));
+    await settle();
+    expect(setApiTokenBulk).toHaveBeenLastCalledWith({ id: "tok_2", allow: false });
+  });
+
+  it("offers the exemption in the create form only to a token that can change users", async () => {
+    createApiToken.mockResolvedValue({ token: token({ id: "tok_9", name: "billing" }), secret: "tk1_exampleexampleexampleexampleexampleexample1" });
+    await mount(tokens([]));
+    await click(button("New token"));
+    expect(document.querySelector("[role=switch][aria-label='Bulk user changes without approval']")).toBeNull(); // read only is preselected
+    await type(document.querySelector("input[placeholder^='e.g.']"), "billing");
+    await click(radio("Operator"));
+    await click(document.querySelector("[role=switch][aria-label='Bulk user changes without approval']"));
+    await click(button("Create token"));
+    await settle();
+    expect(createApiToken).toHaveBeenCalledWith({ name: "billing", profile: TokenProfile.OPERATOR, ttlDays: 90, rateLimitPerMin: 120, allowBulkUserChanges: true });
   });
 
   it("says only the owner manages tokens and MCP, and asks the panel for nothing", async () => {
@@ -496,7 +538,9 @@ describe("the Integrations screen: approvals", () => {
             { key: "quota", value: "93.1 GiB, reset month", untrusted: false, code: "quota", params: { bytes: "100000000000", reset: "month" } },
             { key: "term", value: "never expires", untrusted: false, code: "never" },
             { key: "effect", value: "the used traffic of the current period becomes 0", untrusted: false, code: "traffic_reset" },
+            { key: "user_change_limit", value: "this token has used 9 of 10 user changes in its fixed one-hour window", untrusted: false, code: "user_change_limit", params: { used: "9", limit: "10" } },
           ],
+          danger: ["user_change_limit"],
         }),
         approval({ id: "pln_6", tool: "user_disable", state: ApprovalState.APPLIED, result: "3 users disabled.", outcomeCode: "users_disabled", outcomeParams: { n: "3" } }),
         approval({ id: "pln_7", tool: "rollout_start", state: ApprovalState.FAILED, error: "failed_precondition: no trusted bundle", outcomeCode: "no_trusted_bundle", outcomeParams: {} }),
@@ -509,6 +553,10 @@ describe("the Integrations screen: approvals", () => {
     expect(text()).toContain("100 GB, resets on the 1st");
     expect(text()).toContain("no end date");
     expect(text()).toContain("users stopped by the quota can connect again");
+    // the token's hourly limit: a label and a sentence in the admin's words, and why the plan waits
+    expect(text()).toMatch(/Token's hourly limit\s*9 of 10 user changes used in this hour/);
+    expect(text()).toContain("With this change the token would pass its hourly limit of user changes (10)");
+    expect(text()).not.toContain("fixed one-hour window");
     expect(text()).toContain("3 users disabled");
     expect(text()).not.toContain("3 users disabled.");
     expect(text()).toContain("Error: no trusted update bundle");

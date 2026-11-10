@@ -23,9 +23,10 @@ type edgeLimiter struct {
 	once     sync.Once
 }
 
-// The init limit callback receives {operation, name, key} plus operation fields:
-// take adds burst/refillMs; peek and record add limit/spanMs/lockoutMs.
-// Every call resolves to {ok, retryAfterMs, remaining, first}.
+// The init limit callback receives {operation, name, key} and the fields for that operation.
+// A take request adds burst/refillMs, and a window request adds limit/spanMs/lockoutMs.
+// A weighted recordN request adds units and returns the windowStartMs for undoN; undoN adds units and windowStartMs.
+// Each reply has {ok, retryAfterMs, remaining, first}, and a weighted reservation also returns windowStartMs.
 func newEdgeLimiter(callback js.Value, log *slog.Logger) securitylimit.Limiter {
 	if log == nil {
 		log = slog.Default()
@@ -46,6 +47,20 @@ func (l *edgeLimiter) Peek(ctx context.Context, spec securitylimit.Window, key s
 
 func (l *edgeLimiter) Record(ctx context.Context, spec securitylimit.Window, key string) (securitylimit.Decision, error) {
 	return l.call(ctx, l.windowRequest("record", spec, key))
+}
+
+func (l *edgeLimiter) RecordN(ctx context.Context, spec securitylimit.Window, key string, n int) (securitylimit.Decision, error) {
+	request := l.windowRequest("recordN", spec, key)
+	request.Set("units", n)
+	return l.call(ctx, request)
+}
+
+func (l *edgeLimiter) UndoN(ctx context.Context, spec securitylimit.Window, key string, n int, windowStart time.Time) error {
+	request := l.windowRequest("undoN", spec, key)
+	request.Set("units", n)
+	request.Set("windowStartMs", windowStart.UnixMilli())
+	_, err := l.call(ctx, request)
+	return err
 }
 
 func (l *edgeLimiter) Reset(ctx context.Context, spec securitylimit.Window, key string) error {
@@ -89,10 +104,21 @@ func (l *edgeLimiter) call(ctx context.Context, request js.Value) (securitylimit
 	if math.IsNaN(ms) || math.IsInf(ms, 0) || ms < 0 || math.IsNaN(left) || math.IsInf(left, 0) || left < 0 || left != math.Trunc(left) {
 		return securitylimit.Decision{}, l.unavailable()
 	}
-	return securitylimit.Decision{
+	d := securitylimit.Decision{
 		Allowed: ok.Bool(), RetryAfter: time.Duration(ms * float64(time.Millisecond)),
 		Remaining: remaining.Int(), First: first.Bool(),
-	}, nil
+	}
+	windowStart := value.Get("windowStartMs")
+	if windowStart.Type() == js.TypeNumber {
+		ms := windowStart.Float()
+		if math.IsNaN(ms) || math.IsInf(ms, 0) || ms != math.Trunc(ms) {
+			return securitylimit.Decision{}, l.unavailable()
+		}
+		d.WindowStart = time.UnixMilli(int64(ms))
+	} else if windowStart.Type() != js.TypeUndefined {
+		return securitylimit.Decision{}, l.unavailable()
+	}
+	return d, nil
 }
 
 func (l *edgeLimiter) unavailable() error {

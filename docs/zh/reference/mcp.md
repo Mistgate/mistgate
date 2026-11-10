@@ -259,6 +259,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 | `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`update_download_timeout`、`retention``node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
 | `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
+| `user_change_limit` | 加上此计划，令牌将超出每小时用户更改限额（10 次，见[限制](api.md#限制)），因此计划不会被拒绝，而是等待所有者批准。卡片会显示限额已用多少。 | `user_disable`、`user_reset_traffic`、`user_update`、`device_revoke` |
 | `traffic` | 它会在节点之间发送大量测试流量。 | `path_speed` |
 | `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |
 | `schedule` | 会让面板自动地一次又一次运行工具或助手。 | `task_create`、`task_update`、`task_delete` |

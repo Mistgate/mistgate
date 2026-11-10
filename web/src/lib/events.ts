@@ -13,6 +13,7 @@ const textKeys: Record<string, MessageKey> = {
   node_blip: "event.node_blip",
   node_recovered: "event.node_recovered",
   agent_restarted: "event.agent_restarted",
+  user_change_limit: "event.user_change_limit",
   traffic_stopped: "event.traffic_stopped",
   traffic_resumed: "event.traffic_resumed",
   check_failing: "event.check_failing",

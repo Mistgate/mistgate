@@ -222,6 +222,22 @@ async function securityLimit(input, now = Date.now()) {
   if (request.operation === "peek") {
     return limitMath.peekWindow(saved.window, now, request.limit, request.spanMs);
   }
+  if (request.operation === "recordN") {
+    const result = limitMath.recordWindowN(saved.window, now, request.limit, request.spanMs, request.units);
+    if (result.state) saved.window = result.state;
+    else delete saved.window;
+    if (Object.keys(saved).length) securityLimits.set(id, saved);
+    else securityLimits.delete(id);
+    return result.reply;
+  }
+  if (request.operation === "undoN") {
+    const window = limitMath.undoWindowN(saved.window, now, request.spanMs, request.units, request.windowStartMs);
+    if (window) saved.window = window;
+    else delete saved.window;
+    if (Object.keys(saved).length) securityLimits.set(id, saved);
+    else securityLimits.delete(id);
+    return { ok: true, retryAfterMs: 0, remaining: 0, first: false };
+  }
   const result = limitMath.recordWindow(saved.window, now, request.limit, request.spanMs, request.lockoutMs);
   saved.window = result.state;
   securityLimits.set(id, saved);
@@ -245,6 +261,8 @@ async function assertSharedLimitVectors() {
         input.spanMs = operation.window.span_ms;
         input.lockoutMs = operation.window.lockout_ms;
       }
+      if (operation.units !== undefined) input.units = operation.units;
+      if (operation.window_start_ms !== undefined) input.windowStartMs = operation.window_start_ms;
       const got = await securityLimit(input, operation.at_ms);
       const want = {
         ok: operation.want.allowed,
@@ -252,6 +270,7 @@ async function assertSharedLimitVectors() {
         remaining: operation.want.remaining,
         first: operation.want.first,
       };
+      if (operation.want.window_start_ms !== undefined) want.windowStartMs = operation.want.window_start_ms;
       assert.deepEqual(got, want, `${scenario.name}, operation ${index} (${operation.op})`);
     }
   }

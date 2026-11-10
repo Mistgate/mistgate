@@ -242,7 +242,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	}
 	cfg.AdminAPIReady = func(api http.Handler) { k.attachAssistantRuntime(api) }
 	cfg.AdminPages = []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: forwardPage(forward, prov.PageHandler())}}
-	cfg.MCP = mcpEndpoint(k.authSvc, k.st, k.log, k.tg.PlanWaiting, k.c.Clock)
+	cfg.MCP = mcpEndpoint(k.authSvc, k.st, k.limiter, k.log, k.tg.PlanWaiting, k.c.Clock)
 	// The admin's framed preview of the public user page (session and read role are checked by the server).
 	cfg.UserPagePreview = subs.PreviewHandler(k.acc, parts.cfg)
 	k.addOps(&cfg)

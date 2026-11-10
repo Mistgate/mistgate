@@ -3,6 +3,8 @@
 export type LimitRequest =
   | { operation: "take"; name: string; key: string; burst: number; refillMs: number }
   | { operation: "peek" | "record"; name: string; key: string; limit: number; spanMs: number; lockoutMs: number }
+  | { operation: "recordN"; name: string; key: string; limit: number; spanMs: number; lockoutMs: number; units: number }
+  | { operation: "undoN"; name: string; key: string; limit: number; spanMs: number; lockoutMs: number; units: number; windowStartMs: number }
   | { operation: "reset"; name: string; key: string };
 
 /** What every operation resolves to; Go (edge/bridge/limiter_js.go) checks the four types. */
@@ -11,6 +13,7 @@ export interface LimitReply {
   retryAfterMs: number;
   remaining: number;
   first: boolean;
+  windowStartMs?: number;
 }
 
 /** A token bucket. `fullAt` is when it has refilled to the burst again: from then on the state is the same as none. */
@@ -65,6 +68,24 @@ export function parseRequest(raw: unknown): LimitRequest {
       return {
         operation: r.operation, name, key, limit,
         spanMs: positive(r.spanMs, "spanMs"), lockoutMs: nonnegative(r.lockoutMs, "lockoutMs"),
+      };
+    }
+    case "recordN":
+    case "undoN": {
+      const limit = positive(r.limit, "limit");
+      if (!Number.isInteger(limit)) throw new Error("limiter: invalid limit");
+      const units = positive(r.units, "units");
+      if (!Number.isInteger(units)) throw new Error("limiter: invalid units");
+      const lockoutMs = nonnegative(r.lockoutMs, "lockoutMs");
+      if (lockoutMs !== 0) throw new Error("limiter: weighted windows do not support lockouts");
+      if (r.operation === "undoN") {
+        const windowStartMs = nonnegative(r.windowStartMs, "windowStartMs");
+        if (!Number.isInteger(windowStartMs)) throw new Error("limiter: invalid windowStartMs");
+        return { operation: "undoN", name, key, limit, spanMs: positive(r.spanMs, "spanMs"), lockoutMs, units, windowStartMs };
+      }
+      return {
+        operation: r.operation, name, key, limit,
+        spanMs: positive(r.spanMs, "spanMs"), lockoutMs, units,
       };
     }
     case "reset":
@@ -135,4 +156,47 @@ export function recordWindow(
   }
   w.n++;
   return { state: w, reply: allowed(limit - w.n) };
+}
+
+/** Reserves every requested unit or none, so a caller can guard one all-or-nothing change. */
+export function recordWindowN(
+  prev: WindowState | undefined,
+  now: number,
+  limit: number,
+  spanMs: number,
+  units: number,
+): { state?: WindowState; reply: LimitReply } {
+  if (units > limit) {
+    const live = prev && now - prev.start < spanMs ? prev : undefined;
+    return {
+      state: live,
+      reply: {
+        ok: false, retryAfterMs: 0, remaining: live ? Math.max(0, limit - live.n) : limit, first: false,
+        ...(live ? { windowStartMs: live.start } : {}),
+      },
+    };
+  }
+  const w = current(prev, now, spanMs);
+  if (w.n + units > limit) {
+    return {
+      state: w,
+      reply: { ok: false, retryAfterMs: Math.max(0, w.start + spanMs - now), remaining: Math.max(0, limit - w.n), first: false, windowStartMs: w.start },
+    };
+  }
+  w.n += units;
+  return { state: w, reply: { ...allowed(limit - w.n), windowStartMs: w.start } };
+}
+
+/** Returns unsuccessful reserved units while keeping the rest of the live window intact. */
+export function undoWindowN(
+  prev: WindowState | undefined,
+  now: number,
+  spanMs: number,
+  units: number,
+  windowStartMs: number,
+): WindowState | undefined {
+  if (!prev || prev.start !== windowStartMs || now - prev.start >= spanMs) return prev;
+  const w = { ...prev };
+  w.n = Math.max(0, w.n - units);
+  return w;
 }

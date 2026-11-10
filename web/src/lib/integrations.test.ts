@@ -43,6 +43,7 @@ const token = (over: Partial<Token> = {}): Token => ({
   createdByName: "Owner",
   rateLimitPerMin: 120,
   hint: "ab12",
+  allowBulkUserChanges: false,
   ...over,
 });
 

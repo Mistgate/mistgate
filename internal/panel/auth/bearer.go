@@ -161,7 +161,10 @@ func (s *Service) touchToken(ctx context.Context, tok store.APIToken, ip netip.A
 }
 
 func principalOf(tok store.APIToken, ch Channel) Principal {
-	return Principal{Token: true, TokenID: tok.ID, Profile: tok.Profile, Channel: ch, Name: tok.Name, ExpiresAt: tok.ExpiresAt}
+	return Principal{
+		Token: true, TokenID: tok.ID, Profile: tok.Profile, Channel: ch, Name: tok.Name, ExpiresAt: tok.ExpiresAt,
+		AllowBulkUserChanges: tok.AllowBulkUserChanges,
+	}
 }
 
 // auditCall writes the "call" row of a token request (section 8): who, over which channel, which procedure,

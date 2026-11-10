@@ -95,6 +95,8 @@ const keys: Record<string, MessageKey> = {
   export_data: "audit.export_data",
   token_create: "audit.token_create",
   token_revoke: "audit.token_revoke",
+  api_token_bulk: "audit.api_token_bulk",
+  user_change_limit: "audit.user_change_limit",
   approval_approve: "audit.approval_approve",
   approval_reject: "audit.approval_reject",
   mcp_plan: "audit.mcp_plan",
@@ -183,6 +185,11 @@ function sentenceKey(e: Pick<AuditEntry, "action" | "result">, p: Record<string,
       return p.preset ? { key: base, worded: false } : variant("default");
     case "reset_login":
       return p.created === "true" ? variant("added") : { key: base, worded: false };
+    case "api_token_bulk":
+      return variant(p.allow === "true" ? "on" : "off");
+    case "user_change_limit":
+      // the limiter itself failed: there is no count to show
+      return p.reason === "limiter_unavailable" ? variant("unavailable", true) : { key: base, worded: true };
     case "mcp_plan":
       return p.needs_approval === "true" ? { key: "audit.mcp_plan_owner", worded: false } : { key: base, worded: false };
   }

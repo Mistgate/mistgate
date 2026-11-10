@@ -30,6 +30,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -64,6 +65,8 @@ type Config struct {
 	// CheckRelay runs the fleet's check of a relay (fleet.CheckRelay): the stages it names (store.RelayStageLeg, RelayStagePath;
 	// none = both), the result stored in the relay and returned. nil: relays cannot be checked, so none is switched on.
 	CheckRelay func(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
+	// Limiter is the shared backend for token user-change budgets and their refusal-event gate.
+	Limiter securitylimit.Limiter
 }
 
 // Service implements ProfileService, UserService, GroupService, DeviceService, AwgService and RelayService (adminv1connect
@@ -77,6 +80,7 @@ type Service struct {
 	dns           *dns.Service
 	cfg           Config
 	log           *slog.Logger
+	limiter       securitylimit.Limiter
 	now           func() time.Time
 	afterResponse AfterResponseRunner
 
@@ -119,7 +123,7 @@ func (noOnline) OnlineDevices() map[string][]string { return nil }
 // New builds the service. notify and online may be nil (nothing to notify, nobody online).
 func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, notify StateNotifier, online OnlineSource, cfg Config) (*Service, error) {
 	s := &Service{
-		st: st, vault: v, reg: reg, notify: notify, online: online, cfg: cfg, log: cfg.Log, now: time.Now,
+		st: st, vault: v, reg: reg, notify: notify, online: online, cfg: cfg, log: cfg.Log, limiter: cfg.Limiter, now: time.Now,
 		afterResponse: cfg.AfterResponse,
 		dns:           dns.New(st),
 		secretPtrs:    map[string][]string{}, criticalPtrs: map[string][]string{},

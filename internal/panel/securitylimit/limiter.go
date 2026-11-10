@@ -13,10 +13,11 @@ import (
 // Decision describes a limiter operation. First is set on the first request that
 // reaches a window limit, so callers can report that lockout once.
 type Decision struct {
-	Allowed    bool
-	RetryAfter time.Duration
-	Remaining  int
-	First      bool
+	Allowed     bool
+	RetryAfter  time.Duration
+	Remaining   int
+	First       bool
+	WindowStart time.Time
 }
 
 // Bucket describes a token bucket.
@@ -40,6 +41,10 @@ type Limiter interface {
 	Take(ctx context.Context, b Bucket, key string) (Decision, error)
 	Peek(ctx context.Context, w Window, key string) (Decision, error)
 	Record(ctx context.Context, w Window, key string) (Decision, error)
+	// RecordN atomically reserves n successful units when all of them fit in the window and returns that window's start.
+	RecordN(ctx context.Context, w Window, key string, n int) (Decision, error)
+	// UndoN refunds a reservation only if its original window is still current.
+	UndoN(ctx context.Context, w Window, key string, n int, windowStart time.Time) error
 	Reset(ctx context.Context, w Window, key string) error
 }
 
@@ -268,6 +273,104 @@ func (m *Memory) Record(ctx context.Context, spec Window, key string) (Decision,
 	}
 	state.n++
 	return Decision{Allowed: true, Remaining: spec.Limit - state.n}, nil
+}
+
+// RecordN reserves n successful units atomically. Unlike Record, it never records a partial
+// reservation: callers can reject a whole operation before changing any users.
+func (m *Memory) RecordN(ctx context.Context, spec Window, key string, n int) (Decision, error) {
+	if err := contextErr(ctx); err != nil {
+		return Decision{}, err
+	}
+	if err := validateWindow(spec); err != nil {
+		return Decision{}, err
+	}
+	if n <= 0 || spec.Lockout != 0 {
+		return Decision{}, errors.New("security limit: invalid weighted window reservation")
+	}
+	now := m.now()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	k := limiterKey{name: spec.Name, key: key}
+	if n > spec.Limit {
+		remaining := spec.Limit
+		var windowStart time.Time
+		if e := m.windows[k]; e != nil {
+			state := e.Value.(*windowState)
+			if now.Sub(state.start) < spec.Span {
+				remaining = max(0, spec.Limit-state.n)
+				windowStart = state.start
+			}
+		}
+		return Decision{Remaining: remaining, WindowStart: windowStart}, nil
+	}
+	order := m.windowOrderByName[spec.Name]
+	if order == nil {
+		order = m.getWindowOrder(spec.Name)
+	}
+	m.expireWindowLocks(order, now)
+	e := m.windows[k]
+	if e == nil {
+		if order.entries.Len() >= m.maxKeysPerName {
+			oldest := order.unlocked.Back()
+			if oldest == nil {
+				oldest = order.entries.Back()
+			}
+			m.removeWindow(oldest)
+		}
+		state := &windowState{key: k, start: now, lockIndex: -1}
+		e = order.entries.PushFront(state)
+		state.unlockedElement = order.unlocked.PushFront(state)
+		m.windows[k] = e
+		m.windowCountsByName[spec.Name]++
+	} else {
+		state := e.Value.(*windowState)
+		order.entries.MoveToFront(e)
+		if state.unlockedElement != nil {
+			order.unlocked.MoveToFront(state.unlockedElement)
+		}
+	}
+	state := e.Value.(*windowState)
+	if _, expired := m.windowDecision(state, spec, now); expired {
+		state.start = now
+		state.n = 0
+		state.logged = false
+		state.lockedUntil = time.Time{}
+	}
+	if now.Before(state.lockedUntil) || state.n+n > spec.Limit {
+		retryAfter := state.start.Add(spec.Span).Sub(now)
+		return Decision{RetryAfter: retryAfter, Remaining: max(0, spec.Limit-state.n), WindowStart: state.start}, nil
+	}
+	state.n += n
+	return Decision{Allowed: true, Remaining: spec.Limit - state.n, WindowStart: state.start}, nil
+}
+
+// UndoN removes an unsuccessful reservation only from the exact window that accepted it.
+func (m *Memory) UndoN(ctx context.Context, spec Window, key string, n int, windowStart time.Time) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
+	if err := validateWindow(spec); err != nil {
+		return err
+	}
+	if n <= 0 || spec.Lockout != 0 {
+		return errors.New("security limit: invalid weighted window refund")
+	}
+	now := m.now()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if e := m.windows[limiterKey{name: spec.Name, key: key}]; e != nil {
+		state := e.Value.(*windowState)
+		if !state.start.Equal(windowStart) {
+			return nil
+		}
+		if _, expired := m.windowDecision(state, spec, now); expired {
+			m.removeWindow(e)
+			return nil
+		}
+		state.n = max(0, state.n-n)
+	}
+	return nil
 }
 
 func validateWindow(spec Window) error {

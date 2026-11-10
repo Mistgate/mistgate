@@ -6,8 +6,8 @@ package mistgate.admin.v1;
 // (Connect-RPC with "Authorization: Bearer <secret>") and the MCP server. Conventions: common.proto.
 //
 // Everything here is OWNER-ONLY and is reached only from the signed-in admin UI: a token itself can never call
-// these procedures (they are not on the token allow-list). Creating and revoking a token and
-// approving a change also need a fresh step-up (auth.Service.RequireStepUp), like removing a passkey.
+// these procedures (they are not on the token allow-list). Creating a token, changing its bulk user-change permission,
+// revoking it and approving a change need a fresh step-up (auth.Service.RequireStepUp), like removing a passkey.
 //
 // TOKENS. A token has a name, a profile (what it may do: readonly, operator, admin, mapped to the roles
 // readonly, helper, owner), a lifetime (default 90 days, at most 365: "never expires" does not exist), a
@@ -32,6 +32,8 @@ package mistgate.admin.v1;
 service ApiTokenService {
   // Creates a token and returns its secret once. Needs a step-up.
   rpc CreateApiToken(CreateApiTokenRequest) returns (CreateApiTokenResponse);
+  // Lets this token change more than ten users in an hour without an MCP approval. Needs a step-up.
+  rpc SetApiTokenBulk(SetApiTokenBulkRequest) returns (SetApiTokenBulkResponse);
   // Every token, newest first, revoked and expired ones included (they stay for the audit trail). No secrets.
   rpc ListApiTokens(ListApiTokensRequest) returns (ListApiTokensResponse);
   // Revokes a token at once: its next request is refused and its pending changes are cancelled. Idempotent.
@@ -92,6 +94,8 @@ message ApiToken {
   uint32 rate_limit_per_min = 11;
   // The last four characters of the secret, to tell tokens apart in a list. Not usable for anything.
   string hint = 12;
+  // May exceed the ordinary ten-user hourly change budget without an MCP owner approval.
+  bool allow_bulk_user_changes = 13;
 }
 
 message CreateApiTokenRequest {
@@ -103,12 +107,23 @@ message CreateApiTokenRequest {
   uint32 ttl_days = 3;
   // Requests per minute. 0 = 120. At most 600.
   uint32 rate_limit_per_min = 4;
+  // May exceed the ordinary ten-user hourly change budget without an MCP owner approval.
+  bool allow_bulk_user_changes = 5;
 }
 
 message CreateApiTokenResponse {
   ApiToken token = 1;
   // The secret, "tk1_" + 43 URL-safe characters. Shown once here; the panel keeps only its hash.
   string secret = 2;
+}
+
+message SetApiTokenBulkRequest {
+  string id = 1;
+  bool allow = 2;
+}
+
+message SetApiTokenBulkResponse {
+  ApiToken token = 1;
 }
 
 message ListApiTokensRequest {}

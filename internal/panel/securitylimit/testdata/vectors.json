@@ -242,6 +242,32 @@
         {"op":"record","at_ms":5,"name":"window-eviction","key":"new-3","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":true,"retry_after_ms":0,"remaining":1,"first":false}},
         {"op":"peek","at_ms":6,"name":"window-eviction","key":"locked","window":{"name":"window-eviction","limit":2,"span_ms":60000,"lockout_ms":60000},"want":{"allowed":false,"retry_after_ms":59995,"remaining":0,"first":false}}
       ]
+    },
+    {
+      "name": "weighted refunds to zero keep the fixed window start",
+      "operations": [
+        {"op":"recordN","at_ms":1000,"name":"token-changes","key":"tok_alice","units":10,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false,"window_start_ms":1000}},
+        {"op":"undoN","at_ms":1001,"name":"token-changes","key":"tok_alice","units":10,"window_start_ms":1000,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"recordN","at_ms":1801000,"name":"token-changes","key":"tok_alice","units":1,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":9,"first":false,"window_start_ms":1000}},
+        {"op":"recordN","at_ms":3599999,"name":"token-changes","key":"tok_alice","units":1,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":8,"first":false,"window_start_ms":1000}},
+        {"op":"recordN","at_ms":3601000,"name":"token-changes","key":"tok_alice","units":1,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":9,"first":false,"window_start_ms":3601000}}
+      ]
+    },
+    {
+      "name": "a refund cannot decrement a later weighted window",
+      "operations": [
+        {"op":"recordN","at_ms":0,"name":"token-changes","key":"tok_bob","units":8,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":2,"first":false,"window_start_ms":0}},
+        {"op":"recordN","at_ms":3600000,"name":"token-changes","key":"tok_bob","units":3,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":7,"first":false,"window_start_ms":3600000}},
+        {"op":"undoN","at_ms":3600001,"name":"token-changes","key":"tok_bob","units":8,"window_start_ms":0,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false}},
+        {"op":"recordN","at_ms":3600002,"name":"token-changes","key":"tok_bob","units":7,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false,"window_start_ms":3600000}}
+      ]
+    },
+    {
+      "name": "an oversized weighted reservation has no retry delay or window",
+      "operations": [
+        {"op":"recordN","at_ms":1000,"name":"token-changes","key":"tok_carol","units":11,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":false,"retry_after_ms":0,"remaining":10,"first":false}},
+        {"op":"recordN","at_ms":2000,"name":"token-changes","key":"tok_carol","units":10,"window":{"name":"token-changes","limit":10,"span_ms":3600000,"lockout_ms":0},"want":{"allowed":true,"retry_after_ms":0,"remaining":0,"first":false,"window_start_ms":2000}}
+      ]
     }
   ]
 }

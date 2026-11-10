@@ -11,12 +11,13 @@ import (
 // who holds a token or what an agent is waiting to do (the handlers add the step-up where it is noted).
 func TestIntegrationsServicesAreOwnerOnly(t *testing.T) {
 	for name, path := range map[string]string{
-		"CreateApiToken": adminv1connect.ApiTokenServiceCreateApiTokenProcedure,
-		"ListApiTokens":  adminv1connect.ApiTokenServiceListApiTokensProcedure,
-		"RevokeApiToken": adminv1connect.ApiTokenServiceRevokeApiTokenProcedure,
-		"ListApprovals":  adminv1connect.ApprovalServiceListApprovalsProcedure,
-		"Approve":        adminv1connect.ApprovalServiceApproveProcedure,
-		"Reject":         adminv1connect.ApprovalServiceRejectProcedure,
+		"CreateApiToken":  adminv1connect.ApiTokenServiceCreateApiTokenProcedure,
+		"SetApiTokenBulk": adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure,
+		"ListApiTokens":   adminv1connect.ApiTokenServiceListApiTokensProcedure,
+		"RevokeApiToken":  adminv1connect.ApiTokenServiceRevokeApiTokenProcedure,
+		"ListApprovals":   adminv1connect.ApprovalServiceListApprovalsProcedure,
+		"Approve":         adminv1connect.ApprovalServiceApproveProcedure,
+		"Reject":          adminv1connect.ApprovalServiceRejectProcedure,
 	} {
 		if _, listed := procedureLevels[path]; !listed {
 			t.Errorf("%s has no explicit level (it would silently be owner-only)", name)
@@ -27,6 +28,16 @@ func TestIntegrationsServicesAreOwnerOnly(t *testing.T) {
 				t.Errorf("%s as %s: allowed = %v, want %v", name, role, got, want)
 			}
 		}
+	}
+}
+
+func TestSetApiTokenBulkIsProtectedAndClosedToTokens(t *testing.T) {
+	path := adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure
+	if !NeedsStepUp(path) {
+		t.Fatal("SetApiTokenBulk must require a fresh step-up")
+	}
+	if access, allowed := TokenAccess(path); allowed {
+		t.Fatalf("SetApiTokenBulk is open to tokens with access %d", access)
 	}
 }
 

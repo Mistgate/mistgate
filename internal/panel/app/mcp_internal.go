@@ -10,12 +10,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
+	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-func mcpConfig(authSvc *auth.Service, st *store.Store, log *slog.Logger, onWaiting func(tool, tokenName string), now func() time.Time, api http.Handler) mcp.Config {
+func mcpConfig(authSvc *auth.Service, st *store.Store, limiter securitylimit.Limiter, log *slog.Logger, onWaiting func(tool, tokenName string), now func() time.Time, api http.Handler) mcp.Config {
 	return mcp.Config{
 		Plans: planStore{st: st, onWaiting: onWaiting},
 		Auth:  mcpAuth{authSvc},
@@ -38,6 +40,20 @@ func mcpConfig(authSvc *auth.Service, st *store.Store, log *slog.Logger, onWaiti
 			}); err != nil {
 				log.Warn("audit mcp row", "action", e.Action, "err", err)
 			}
+		},
+		UserChangeBudget: func(ctx context.Context) (int, int, bool, error) {
+			p := auth.PrincipalFrom(ctx)
+			if !p.Token || p.Assistant || p.AllowBulkUserChanges {
+				return 0, access.TokenUserChangeLimit, true, nil
+			}
+			if p.TokenID == "" || limiter == nil {
+				return 0, access.TokenUserChangeLimit, false, errors.New("user change limit unavailable")
+			}
+			d, err := limiter.Peek(ctx, access.TokenUserChangeWindow(), p.TokenID)
+			if err != nil {
+				return 0, access.TokenUserChangeLimit, false, err
+			}
+			return access.TokenUserChangeLimit - d.Remaining, access.TokenUserChangeLimit, false, nil
 		},
 		Now: now,
 		Log: log,

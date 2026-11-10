@@ -264,14 +264,15 @@ var procedureLevels = map[string]level{
 	adminv1connect.WarpServiceUpdateWarpRegistrationParamsProcedure: levelOwner,
 
 	// ApiTokenService and ApprovalService: the owner only, in the signed-in UI, never with a
-	// token. Creating and revoking a token and approving a change decide what an agent may do, so the handlers
+	// token. Creating or changing a token's bulk permission, revoking a token and approving a change decide what an agent may do, so the handlers
 	// also require a fresh step-up (auth.Service.RequireStepUp). Rejecting is safe and needs none.
-	adminv1connect.ApiTokenServiceCreateApiTokenProcedure: levelOwner, // also needs a step-up
-	adminv1connect.ApiTokenServiceListApiTokensProcedure:  levelOwner,
-	adminv1connect.ApiTokenServiceRevokeApiTokenProcedure: levelOwner, // also needs a step-up
-	adminv1connect.ApprovalServiceListApprovalsProcedure:  levelOwner,
-	adminv1connect.ApprovalServiceApproveProcedure:        levelOwner, // also needs a step-up
-	adminv1connect.ApprovalServiceRejectProcedure:         levelOwner,
+	adminv1connect.ApiTokenServiceCreateApiTokenProcedure:  levelOwner, // also needs a step-up
+	adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure: levelOwner, // also needs a step-up
+	adminv1connect.ApiTokenServiceListApiTokensProcedure:   levelOwner,
+	adminv1connect.ApiTokenServiceRevokeApiTokenProcedure:  levelOwner, // also needs a step-up
+	adminv1connect.ApprovalServiceListApprovalsProcedure:   levelOwner,
+	adminv1connect.ApprovalServiceApproveProcedure:         levelOwner, // also needs a step-up
+	adminv1connect.ApprovalServiceRejectProcedure:          levelOwner,
 
 	// Backups hold the panel database and encrypted server credentials. Only the owner can manage them.
 	adminv1connect.BackupServiceGetBackupSettingsProcedure:    levelOwner,

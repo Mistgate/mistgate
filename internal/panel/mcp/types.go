@@ -125,6 +125,8 @@ type Config struct {
 	API http.Handler
 	// Audit writes a row; nil drops them (tests).
 	Audit func(ctx context.Context, e AuditEntry)
-	Now   func() time.Time // default time.Now
-	Log   *slog.Logger
+	// UserChangeBudget reports the token's current fixed one-hour user-change usage before an affected plan is stored.
+	UserChangeBudget func(ctx context.Context) (used, limit int, exempt bool, err error)
+	Now              func() time.Time // default time.Now
+	Log              *slog.Logger
 }

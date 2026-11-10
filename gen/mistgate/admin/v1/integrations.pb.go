@@ -222,9 +222,11 @@ type ApiToken struct {
 	// Requests per minute the token may make (the effective value, never 0).
 	RateLimitPerMin uint32 `protobuf:"varint,11,opt,name=rate_limit_per_min,json=rateLimitPerMin,proto3" json:"rate_limit_per_min,omitempty"`
 	// The last four characters of the secret, to tell tokens apart in a list. Not usable for anything.
-	Hint          string `protobuf:"bytes,12,opt,name=hint,proto3" json:"hint,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Hint string `protobuf:"bytes,12,opt,name=hint,proto3" json:"hint,omitempty"`
+	// May exceed the ordinary ten-user hourly change budget without an MCP owner approval.
+	AllowBulkUserChanges bool `protobuf:"varint,13,opt,name=allow_bulk_user_changes,json=allowBulkUserChanges,proto3" json:"allow_bulk_user_changes,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ApiToken) Reset() {
@@ -341,6 +343,13 @@ func (x *ApiToken) GetHint() string {
 	return ""
 }
 
+func (x *ApiToken) GetAllowBulkUserChanges() bool {
+	if x != nil {
+		return x.AllowBulkUserChanges
+	}
+	return false
+}
+
 type CreateApiTokenRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 1..64 characters, unique among the live tokens ignoring case ("claude-ops", "backup-script").
@@ -351,8 +360,10 @@ type CreateApiTokenRequest struct {
 	TtlDays uint32 `protobuf:"varint,3,opt,name=ttl_days,json=ttlDays,proto3" json:"ttl_days,omitempty"`
 	// Requests per minute. 0 = 120. At most 600.
 	RateLimitPerMin uint32 `protobuf:"varint,4,opt,name=rate_limit_per_min,json=rateLimitPerMin,proto3" json:"rate_limit_per_min,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// May exceed the ordinary ten-user hourly change budget without an MCP owner approval.
+	AllowBulkUserChanges bool `protobuf:"varint,5,opt,name=allow_bulk_user_changes,json=allowBulkUserChanges,proto3" json:"allow_bulk_user_changes,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CreateApiTokenRequest) Reset() {
@@ -413,6 +424,13 @@ func (x *CreateApiTokenRequest) GetRateLimitPerMin() uint32 {
 	return 0
 }
 
+func (x *CreateApiTokenRequest) GetAllowBulkUserChanges() bool {
+	if x != nil {
+		return x.AllowBulkUserChanges
+	}
+	return false
+}
+
 type CreateApiTokenResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Token *ApiToken              `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
@@ -466,6 +484,102 @@ func (x *CreateApiTokenResponse) GetSecret() string {
 	return ""
 }
 
+type SetApiTokenBulkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Allow         bool                   `protobuf:"varint,2,opt,name=allow,proto3" json:"allow,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetApiTokenBulkRequest) Reset() {
+	*x = SetApiTokenBulkRequest{}
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetApiTokenBulkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetApiTokenBulkRequest) ProtoMessage() {}
+
+func (x *SetApiTokenBulkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetApiTokenBulkRequest.ProtoReflect.Descriptor instead.
+func (*SetApiTokenBulkRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SetApiTokenBulkRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SetApiTokenBulkRequest) GetAllow() bool {
+	if x != nil {
+		return x.Allow
+	}
+	return false
+}
+
+type SetApiTokenBulkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         *ApiToken              `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetApiTokenBulkResponse) Reset() {
+	*x = SetApiTokenBulkResponse{}
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetApiTokenBulkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetApiTokenBulkResponse) ProtoMessage() {}
+
+func (x *SetApiTokenBulkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetApiTokenBulkResponse.ProtoReflect.Descriptor instead.
+func (*SetApiTokenBulkResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SetApiTokenBulkResponse) GetToken() *ApiToken {
+	if x != nil {
+		return x.Token
+	}
+	return nil
+}
+
 type ListApiTokensRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -474,7 +588,7 @@ type ListApiTokensRequest struct {
 
 func (x *ListApiTokensRequest) Reset() {
 	*x = ListApiTokensRequest{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -486,7 +600,7 @@ func (x *ListApiTokensRequest) String() string {
 func (*ListApiTokensRequest) ProtoMessage() {}
 
 func (x *ListApiTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -499,7 +613,7 @@ func (x *ListApiTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiTokensRequest.ProtoReflect.Descriptor instead.
 func (*ListApiTokensRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{5}
 }
 
 type ListApiTokensResponse struct {
@@ -513,7 +627,7 @@ type ListApiTokensResponse struct {
 
 func (x *ListApiTokensResponse) Reset() {
 	*x = ListApiTokensResponse{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -525,7 +639,7 @@ func (x *ListApiTokensResponse) String() string {
 func (*ListApiTokensResponse) ProtoMessage() {}
 
 func (x *ListApiTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -538,7 +652,7 @@ func (x *ListApiTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiTokensResponse.ProtoReflect.Descriptor instead.
 func (*ListApiTokensResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListApiTokensResponse) GetTokens() []*ApiToken {
@@ -564,7 +678,7 @@ type RevokeApiTokenRequest struct {
 
 func (x *RevokeApiTokenRequest) Reset() {
 	*x = RevokeApiTokenRequest{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -576,7 +690,7 @@ func (x *RevokeApiTokenRequest) String() string {
 func (*RevokeApiTokenRequest) ProtoMessage() {}
 
 func (x *RevokeApiTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -589,7 +703,7 @@ func (x *RevokeApiTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeApiTokenRequest.ProtoReflect.Descriptor instead.
 func (*RevokeApiTokenRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RevokeApiTokenRequest) GetId() string {
@@ -608,7 +722,7 @@ type RevokeApiTokenResponse struct {
 
 func (x *RevokeApiTokenResponse) Reset() {
 	*x = RevokeApiTokenResponse{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -620,7 +734,7 @@ func (x *RevokeApiTokenResponse) String() string {
 func (*RevokeApiTokenResponse) ProtoMessage() {}
 
 func (x *RevokeApiTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -633,7 +747,7 @@ func (x *RevokeApiTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeApiTokenResponse.ProtoReflect.Descriptor instead.
 func (*RevokeApiTokenResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RevokeApiTokenResponse) GetToken() *ApiToken {
@@ -668,7 +782,7 @@ type ApprovalFact struct {
 
 func (x *ApprovalFact) Reset() {
 	*x = ApprovalFact{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -680,7 +794,7 @@ func (x *ApprovalFact) String() string {
 func (*ApprovalFact) ProtoMessage() {}
 
 func (x *ApprovalFact) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -693,7 +807,7 @@ func (x *ApprovalFact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApprovalFact.ProtoReflect.Descriptor instead.
 func (*ApprovalFact) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ApprovalFact) GetKey() string {
@@ -777,7 +891,7 @@ type Approval struct {
 
 func (x *Approval) Reset() {
 	*x = Approval{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -789,7 +903,7 @@ func (x *Approval) String() string {
 func (*Approval) ProtoMessage() {}
 
 func (x *Approval) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -802,7 +916,7 @@ func (x *Approval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Approval.ProtoReflect.Descriptor instead.
 func (*Approval) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Approval) GetId() string {
@@ -943,7 +1057,7 @@ type ListApprovalsRequest struct {
 
 func (x *ListApprovalsRequest) Reset() {
 	*x = ListApprovalsRequest{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -955,7 +1069,7 @@ func (x *ListApprovalsRequest) String() string {
 func (*ListApprovalsRequest) ProtoMessage() {}
 
 func (x *ListApprovalsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -968,7 +1082,7 @@ func (x *ListApprovalsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovalsRequest.ProtoReflect.Descriptor instead.
 func (*ListApprovalsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListApprovalsRequest) GetAwaitingOnly() bool {
@@ -997,7 +1111,7 @@ type ListApprovalsResponse struct {
 
 func (x *ListApprovalsResponse) Reset() {
 	*x = ListApprovalsResponse{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1009,7 +1123,7 @@ func (x *ListApprovalsResponse) String() string {
 func (*ListApprovalsResponse) ProtoMessage() {}
 
 func (x *ListApprovalsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1022,7 +1136,7 @@ func (x *ListApprovalsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovalsResponse.ProtoReflect.Descriptor instead.
 func (*ListApprovalsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListApprovalsResponse) GetApprovals() []*Approval {
@@ -1061,7 +1175,7 @@ type ApproveRequest struct {
 
 func (x *ApproveRequest) Reset() {
 	*x = ApproveRequest{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1073,7 +1187,7 @@ func (x *ApproveRequest) String() string {
 func (*ApproveRequest) ProtoMessage() {}
 
 func (x *ApproveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1086,7 +1200,7 @@ func (x *ApproveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveRequest.ProtoReflect.Descriptor instead.
 func (*ApproveRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ApproveRequest) GetId() string {
@@ -1126,7 +1240,7 @@ type ApproveResponse struct {
 
 func (x *ApproveResponse) Reset() {
 	*x = ApproveResponse{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1138,7 +1252,7 @@ func (x *ApproveResponse) String() string {
 func (*ApproveResponse) ProtoMessage() {}
 
 func (x *ApproveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1151,7 +1265,7 @@ func (x *ApproveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveResponse.ProtoReflect.Descriptor instead.
 func (*ApproveResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ApproveResponse) GetApproval() *Approval {
@@ -1170,7 +1284,7 @@ type RejectRequest struct {
 
 func (x *RejectRequest) Reset() {
 	*x = RejectRequest{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1182,7 +1296,7 @@ func (x *RejectRequest) String() string {
 func (*RejectRequest) ProtoMessage() {}
 
 func (x *RejectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1195,7 +1309,7 @@ func (x *RejectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectRequest.ProtoReflect.Descriptor instead.
 func (*RejectRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RejectRequest) GetId() string {
@@ -1214,7 +1328,7 @@ type RejectResponse struct {
 
 func (x *RejectResponse) Reset() {
 	*x = RejectResponse{}
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1226,7 +1340,7 @@ func (x *RejectResponse) String() string {
 func (*RejectResponse) ProtoMessage() {}
 
 func (x *RejectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_integrations_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1239,7 +1353,7 @@ func (x *RejectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectResponse.ProtoReflect.Descriptor instead.
 func (*RejectResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_admin_v1_integrations_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RejectResponse) GetApproval() *Approval {
@@ -1253,7 +1367,7 @@ var File_mistgate_admin_v1_integrations_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_integrations_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/integrations.proto\x12\x11mistgate.admin.v1\"\xd8\x03\n" +
+	"$mistgate/admin/v1/integrations.proto\x12\x11mistgate.admin.v1\"\x8f\x04\n" +
 	"\bApiToken\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
@@ -1268,15 +1382,22 @@ const file_mistgate_admin_v1_integrations_proto_rawDesc = "" +
 	"\x0fcreated_by_name\x18\n" +
 	" \x01(\tR\rcreatedByName\x12+\n" +
 	"\x12rate_limit_per_min\x18\v \x01(\rR\x0frateLimitPerMin\x12\x12\n" +
-	"\x04hint\x18\f \x01(\tR\x04hint\"\xae\x01\n" +
+	"\x04hint\x18\f \x01(\tR\x04hint\x125\n" +
+	"\x17allow_bulk_user_changes\x18\r \x01(\bR\x14allowBulkUserChanges\"\xe5\x01\n" +
 	"\x15CreateApiTokenRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x129\n" +
 	"\aprofile\x18\x02 \x01(\x0e2\x1f.mistgate.admin.v1.TokenProfileR\aprofile\x12\x19\n" +
 	"\bttl_days\x18\x03 \x01(\rR\attlDays\x12+\n" +
-	"\x12rate_limit_per_min\x18\x04 \x01(\rR\x0frateLimitPerMin\"c\n" +
+	"\x12rate_limit_per_min\x18\x04 \x01(\rR\x0frateLimitPerMin\x125\n" +
+	"\x17allow_bulk_user_changes\x18\x05 \x01(\bR\x14allowBulkUserChanges\"c\n" +
 	"\x16CreateApiTokenResponse\x121\n" +
 	"\x05token\x18\x01 \x01(\v2\x1b.mistgate.admin.v1.ApiTokenR\x05token\x12\x16\n" +
-	"\x06secret\x18\x02 \x01(\tR\x06secret\"\x16\n" +
+	"\x06secret\x18\x02 \x01(\tR\x06secret\">\n" +
+	"\x16SetApiTokenBulkRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05allow\x18\x02 \x01(\bR\x05allow\"L\n" +
+	"\x17SetApiTokenBulkResponse\x121\n" +
+	"\x05token\x18\x01 \x01(\v2\x1b.mistgate.admin.v1.ApiTokenR\x05token\"\x16\n" +
 	"\x14ListApiTokensRequest\"k\n" +
 	"\x15ListApiTokensResponse\x123\n" +
 	"\x06tokens\x18\x01 \x03(\v2\x1b.mistgate.admin.v1.ApiTokenR\x06tokens\x12\x1d\n" +
@@ -1355,9 +1476,10 @@ const file_mistgate_admin_v1_integrations_proto_rawDesc = "" +
 	"\x17APPROVAL_STATE_APPLYING\x10\x05\x12\x1a\n" +
 	"\x16APPROVAL_STATE_APPLIED\x10\x06\x12\x19\n" +
 	"\x15APPROVAL_STATE_FAILED\x10\a\x12\x1c\n" +
-	"\x18APPROVAL_STATE_CANCELLED\x10\b2\xc3\x02\n" +
+	"\x18APPROVAL_STATE_CANCELLED\x10\b2\xad\x03\n" +
 	"\x0fApiTokenService\x12e\n" +
-	"\x0eCreateApiToken\x12(.mistgate.admin.v1.CreateApiTokenRequest\x1a).mistgate.admin.v1.CreateApiTokenResponse\x12b\n" +
+	"\x0eCreateApiToken\x12(.mistgate.admin.v1.CreateApiTokenRequest\x1a).mistgate.admin.v1.CreateApiTokenResponse\x12h\n" +
+	"\x0fSetApiTokenBulk\x12).mistgate.admin.v1.SetApiTokenBulkRequest\x1a*.mistgate.admin.v1.SetApiTokenBulkResponse\x12b\n" +
 	"\rListApiTokens\x12'.mistgate.admin.v1.ListApiTokensRequest\x1a(.mistgate.admin.v1.ListApiTokensResponse\x12e\n" +
 	"\x0eRevokeApiToken\x12(.mistgate.admin.v1.RevokeApiTokenRequest\x1a).mistgate.admin.v1.RevokeApiTokenResponse2\x96\x02\n" +
 	"\x0fApprovalService\x12b\n" +
@@ -1379,61 +1501,66 @@ func file_mistgate_admin_v1_integrations_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_integrations_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_mistgate_admin_v1_integrations_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_mistgate_admin_v1_integrations_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_mistgate_admin_v1_integrations_proto_goTypes = []any{
-	(TokenProfile)(0),              // 0: mistgate.admin.v1.TokenProfile
-	(TokenChannel)(0),              // 1: mistgate.admin.v1.TokenChannel
-	(ApprovalState)(0),             // 2: mistgate.admin.v1.ApprovalState
-	(*ApiToken)(nil),               // 3: mistgate.admin.v1.ApiToken
-	(*CreateApiTokenRequest)(nil),  // 4: mistgate.admin.v1.CreateApiTokenRequest
-	(*CreateApiTokenResponse)(nil), // 5: mistgate.admin.v1.CreateApiTokenResponse
-	(*ListApiTokensRequest)(nil),   // 6: mistgate.admin.v1.ListApiTokensRequest
-	(*ListApiTokensResponse)(nil),  // 7: mistgate.admin.v1.ListApiTokensResponse
-	(*RevokeApiTokenRequest)(nil),  // 8: mistgate.admin.v1.RevokeApiTokenRequest
-	(*RevokeApiTokenResponse)(nil), // 9: mistgate.admin.v1.RevokeApiTokenResponse
-	(*ApprovalFact)(nil),           // 10: mistgate.admin.v1.ApprovalFact
-	(*Approval)(nil),               // 11: mistgate.admin.v1.Approval
-	(*ListApprovalsRequest)(nil),   // 12: mistgate.admin.v1.ListApprovalsRequest
-	(*ListApprovalsResponse)(nil),  // 13: mistgate.admin.v1.ListApprovalsResponse
-	(*ApproveRequest)(nil),         // 14: mistgate.admin.v1.ApproveRequest
-	(*ApproveResponse)(nil),        // 15: mistgate.admin.v1.ApproveResponse
-	(*RejectRequest)(nil),          // 16: mistgate.admin.v1.RejectRequest
-	(*RejectResponse)(nil),         // 17: mistgate.admin.v1.RejectResponse
-	nil,                            // 18: mistgate.admin.v1.ApprovalFact.ParamsEntry
-	nil,                            // 19: mistgate.admin.v1.Approval.OutcomeParamsEntry
+	(TokenProfile)(0),               // 0: mistgate.admin.v1.TokenProfile
+	(TokenChannel)(0),               // 1: mistgate.admin.v1.TokenChannel
+	(ApprovalState)(0),              // 2: mistgate.admin.v1.ApprovalState
+	(*ApiToken)(nil),                // 3: mistgate.admin.v1.ApiToken
+	(*CreateApiTokenRequest)(nil),   // 4: mistgate.admin.v1.CreateApiTokenRequest
+	(*CreateApiTokenResponse)(nil),  // 5: mistgate.admin.v1.CreateApiTokenResponse
+	(*SetApiTokenBulkRequest)(nil),  // 6: mistgate.admin.v1.SetApiTokenBulkRequest
+	(*SetApiTokenBulkResponse)(nil), // 7: mistgate.admin.v1.SetApiTokenBulkResponse
+	(*ListApiTokensRequest)(nil),    // 8: mistgate.admin.v1.ListApiTokensRequest
+	(*ListApiTokensResponse)(nil),   // 9: mistgate.admin.v1.ListApiTokensResponse
+	(*RevokeApiTokenRequest)(nil),   // 10: mistgate.admin.v1.RevokeApiTokenRequest
+	(*RevokeApiTokenResponse)(nil),  // 11: mistgate.admin.v1.RevokeApiTokenResponse
+	(*ApprovalFact)(nil),            // 12: mistgate.admin.v1.ApprovalFact
+	(*Approval)(nil),                // 13: mistgate.admin.v1.Approval
+	(*ListApprovalsRequest)(nil),    // 14: mistgate.admin.v1.ListApprovalsRequest
+	(*ListApprovalsResponse)(nil),   // 15: mistgate.admin.v1.ListApprovalsResponse
+	(*ApproveRequest)(nil),          // 16: mistgate.admin.v1.ApproveRequest
+	(*ApproveResponse)(nil),         // 17: mistgate.admin.v1.ApproveResponse
+	(*RejectRequest)(nil),           // 18: mistgate.admin.v1.RejectRequest
+	(*RejectResponse)(nil),          // 19: mistgate.admin.v1.RejectResponse
+	nil,                             // 20: mistgate.admin.v1.ApprovalFact.ParamsEntry
+	nil,                             // 21: mistgate.admin.v1.Approval.OutcomeParamsEntry
 }
 var file_mistgate_admin_v1_integrations_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.ApiToken.profile:type_name -> mistgate.admin.v1.TokenProfile
 	1,  // 1: mistgate.admin.v1.ApiToken.last_used_via:type_name -> mistgate.admin.v1.TokenChannel
 	0,  // 2: mistgate.admin.v1.CreateApiTokenRequest.profile:type_name -> mistgate.admin.v1.TokenProfile
 	3,  // 3: mistgate.admin.v1.CreateApiTokenResponse.token:type_name -> mistgate.admin.v1.ApiToken
-	3,  // 4: mistgate.admin.v1.ListApiTokensResponse.tokens:type_name -> mistgate.admin.v1.ApiToken
-	3,  // 5: mistgate.admin.v1.RevokeApiTokenResponse.token:type_name -> mistgate.admin.v1.ApiToken
-	18, // 6: mistgate.admin.v1.ApprovalFact.params:type_name -> mistgate.admin.v1.ApprovalFact.ParamsEntry
-	0,  // 7: mistgate.admin.v1.Approval.token_profile:type_name -> mistgate.admin.v1.TokenProfile
-	10, // 8: mistgate.admin.v1.Approval.facts:type_name -> mistgate.admin.v1.ApprovalFact
-	2,  // 9: mistgate.admin.v1.Approval.state:type_name -> mistgate.admin.v1.ApprovalState
-	19, // 10: mistgate.admin.v1.Approval.outcome_params:type_name -> mistgate.admin.v1.Approval.OutcomeParamsEntry
-	11, // 11: mistgate.admin.v1.ListApprovalsResponse.approvals:type_name -> mistgate.admin.v1.Approval
-	11, // 12: mistgate.admin.v1.ApproveResponse.approval:type_name -> mistgate.admin.v1.Approval
-	11, // 13: mistgate.admin.v1.RejectResponse.approval:type_name -> mistgate.admin.v1.Approval
-	4,  // 14: mistgate.admin.v1.ApiTokenService.CreateApiToken:input_type -> mistgate.admin.v1.CreateApiTokenRequest
-	6,  // 15: mistgate.admin.v1.ApiTokenService.ListApiTokens:input_type -> mistgate.admin.v1.ListApiTokensRequest
-	8,  // 16: mistgate.admin.v1.ApiTokenService.RevokeApiToken:input_type -> mistgate.admin.v1.RevokeApiTokenRequest
-	12, // 17: mistgate.admin.v1.ApprovalService.ListApprovals:input_type -> mistgate.admin.v1.ListApprovalsRequest
-	14, // 18: mistgate.admin.v1.ApprovalService.Approve:input_type -> mistgate.admin.v1.ApproveRequest
-	16, // 19: mistgate.admin.v1.ApprovalService.Reject:input_type -> mistgate.admin.v1.RejectRequest
-	5,  // 20: mistgate.admin.v1.ApiTokenService.CreateApiToken:output_type -> mistgate.admin.v1.CreateApiTokenResponse
-	7,  // 21: mistgate.admin.v1.ApiTokenService.ListApiTokens:output_type -> mistgate.admin.v1.ListApiTokensResponse
-	9,  // 22: mistgate.admin.v1.ApiTokenService.RevokeApiToken:output_type -> mistgate.admin.v1.RevokeApiTokenResponse
-	13, // 23: mistgate.admin.v1.ApprovalService.ListApprovals:output_type -> mistgate.admin.v1.ListApprovalsResponse
-	15, // 24: mistgate.admin.v1.ApprovalService.Approve:output_type -> mistgate.admin.v1.ApproveResponse
-	17, // 25: mistgate.admin.v1.ApprovalService.Reject:output_type -> mistgate.admin.v1.RejectResponse
-	20, // [20:26] is the sub-list for method output_type
-	14, // [14:20] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	3,  // 4: mistgate.admin.v1.SetApiTokenBulkResponse.token:type_name -> mistgate.admin.v1.ApiToken
+	3,  // 5: mistgate.admin.v1.ListApiTokensResponse.tokens:type_name -> mistgate.admin.v1.ApiToken
+	3,  // 6: mistgate.admin.v1.RevokeApiTokenResponse.token:type_name -> mistgate.admin.v1.ApiToken
+	20, // 7: mistgate.admin.v1.ApprovalFact.params:type_name -> mistgate.admin.v1.ApprovalFact.ParamsEntry
+	0,  // 8: mistgate.admin.v1.Approval.token_profile:type_name -> mistgate.admin.v1.TokenProfile
+	12, // 9: mistgate.admin.v1.Approval.facts:type_name -> mistgate.admin.v1.ApprovalFact
+	2,  // 10: mistgate.admin.v1.Approval.state:type_name -> mistgate.admin.v1.ApprovalState
+	21, // 11: mistgate.admin.v1.Approval.outcome_params:type_name -> mistgate.admin.v1.Approval.OutcomeParamsEntry
+	13, // 12: mistgate.admin.v1.ListApprovalsResponse.approvals:type_name -> mistgate.admin.v1.Approval
+	13, // 13: mistgate.admin.v1.ApproveResponse.approval:type_name -> mistgate.admin.v1.Approval
+	13, // 14: mistgate.admin.v1.RejectResponse.approval:type_name -> mistgate.admin.v1.Approval
+	4,  // 15: mistgate.admin.v1.ApiTokenService.CreateApiToken:input_type -> mistgate.admin.v1.CreateApiTokenRequest
+	6,  // 16: mistgate.admin.v1.ApiTokenService.SetApiTokenBulk:input_type -> mistgate.admin.v1.SetApiTokenBulkRequest
+	8,  // 17: mistgate.admin.v1.ApiTokenService.ListApiTokens:input_type -> mistgate.admin.v1.ListApiTokensRequest
+	10, // 18: mistgate.admin.v1.ApiTokenService.RevokeApiToken:input_type -> mistgate.admin.v1.RevokeApiTokenRequest
+	14, // 19: mistgate.admin.v1.ApprovalService.ListApprovals:input_type -> mistgate.admin.v1.ListApprovalsRequest
+	16, // 20: mistgate.admin.v1.ApprovalService.Approve:input_type -> mistgate.admin.v1.ApproveRequest
+	18, // 21: mistgate.admin.v1.ApprovalService.Reject:input_type -> mistgate.admin.v1.RejectRequest
+	5,  // 22: mistgate.admin.v1.ApiTokenService.CreateApiToken:output_type -> mistgate.admin.v1.CreateApiTokenResponse
+	7,  // 23: mistgate.admin.v1.ApiTokenService.SetApiTokenBulk:output_type -> mistgate.admin.v1.SetApiTokenBulkResponse
+	9,  // 24: mistgate.admin.v1.ApiTokenService.ListApiTokens:output_type -> mistgate.admin.v1.ListApiTokensResponse
+	11, // 25: mistgate.admin.v1.ApiTokenService.RevokeApiToken:output_type -> mistgate.admin.v1.RevokeApiTokenResponse
+	15, // 26: mistgate.admin.v1.ApprovalService.ListApprovals:output_type -> mistgate.admin.v1.ListApprovalsResponse
+	17, // 27: mistgate.admin.v1.ApprovalService.Approve:output_type -> mistgate.admin.v1.ApproveResponse
+	19, // 28: mistgate.admin.v1.ApprovalService.Reject:output_type -> mistgate.admin.v1.RejectResponse
+	22, // [22:29] is the sub-list for method output_type
+	15, // [15:22] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_integrations_proto_init() }
@@ -1447,7 +1574,7 @@ func file_mistgate_admin_v1_integrations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_integrations_proto_rawDesc), len(file_mistgate_admin_v1_integrations_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

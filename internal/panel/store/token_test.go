@@ -44,8 +44,20 @@ func TestAPITokenLifecycle(t *testing.T) {
 	}
 	if got.ID != tok.ID || got.Name != "Claude-Ops" || got.Profile != ProfileOperator || got.CreatedByName != "Ada" ||
 		got.RatePerMin != 120 || !got.CreatedAt.Equal(t0) || !got.ExpiresAt.Equal(tok.ExpiresAt) ||
-		got.Revoked() || !got.LastUsedAt.IsZero() || got.Hint != "wxyz" {
+		got.Revoked() || !got.LastUsedAt.IsZero() || got.Hint != "wxyz" || got.AllowBulkUserChanges {
 		t.Fatalf("token read back: %+v", got)
+	}
+	got, err = s.SetAPITokenBulk(ctx, tok.ID, true, t0)
+	if err != nil || !got.AllowBulkUserChanges {
+		t.Fatalf("enable bulk user changes: %+v %v", got, err)
+	}
+	got, err = s.GetAPIToken(ctx, tok.ID)
+	if err != nil || !got.AllowBulkUserChanges {
+		t.Fatalf("read bulk user change setting: %+v %v", got, err)
+	}
+	got, err = s.SetAPITokenBulk(ctx, tok.ID, false, t0)
+	if err != nil || got.AllowBulkUserChanges {
+		t.Fatalf("disable bulk user changes: %+v %v", got, err)
 	}
 	if got.Expired(t0) || !got.Expired(tok.ExpiresAt) {
 		t.Fatal("Expired: the token lives up to, not including, expires_at")
@@ -96,6 +108,54 @@ func TestAPITokenLifecycle(t *testing.T) {
 	list, err := s.ListAPITokens(ctx)
 	if err != nil || len(list) != 2 || list[0].ID != dup.ID || list[1].ID != tok.ID {
 		t.Fatalf("list: %+v %v", list, err)
+	}
+}
+
+func TestSetAPITokenBulkRequiresLiveToken(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	mkAdmin(t, s, "adm_a", "Ada")
+	expired := APIToken{ID: NewID("tok_"), Name: "expired", Profile: ProfileOperator, Hint: "wxyz", RatePerMin: 120,
+		CreatedBy: "adm_a", CreatedAt: t0.Add(-time.Hour), ExpiresAt: t0}
+	if err := s.CreateAPIToken(ctx, expired, hashOf("expired-secret")); err != nil {
+		t.Fatal(err)
+	}
+	revoked := newTok(t, s, "revoked", ProfileOperator)
+	if _, err := s.RevokeAPIToken(ctx, revoked.ID, "adm_a", t0); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{expired.ID, revoked.ID, "tok_missing"} {
+		if _, err := s.SetAPITokenBulk(ctx, id, true, t0); !errors.Is(err, ErrNotFound) {
+			t.Errorf("set %s: got %v, want ErrNotFound", id, err)
+		}
+	}
+	for _, id := range []string{expired.ID, revoked.ID} {
+		got, err := s.GetAPIToken(ctx, id)
+		if err != nil || got.AllowBulkUserChanges {
+			t.Errorf("dead token %s changed: %+v %v", id, got, err)
+		}
+	}
+}
+
+func TestCreateAPITokenWithBulkUserChanges(t *testing.T) {
+	s := openTemp(t)
+	mkAdmin(t, s, "adm_a", "Ada")
+	tok := APIToken{ID: NewID("tok_"), Name: "bulk-enabled", Profile: ProfileOperator, Hint: "wxyz", RatePerMin: 120,
+		CreatedBy: "adm_a", CreatedAt: t0, ExpiresAt: t0.Add(90 * 24 * time.Hour), AllowBulkUserChanges: true}
+	// A token created with the exemption persists it through both lookup paths.
+	if err := s.CreateAPIToken(context.Background(), tok, hashOf("bulk-secret-enabled")); err != nil {
+		t.Fatal(err)
+	}
+	for name, read := range map[string]func() (APIToken, error){
+		"get": func() (APIToken, error) { return s.GetAPIToken(context.Background(), tok.ID) },
+		"secret": func() (APIToken, error) {
+			return s.APITokenBySecretHash(context.Background(), hashOf("bulk-secret-enabled"))
+		},
+	} {
+		got, err := read()
+		if err != nil || !got.AllowBulkUserChanges {
+			t.Errorf("%s: %+v %v", name, got, err)
+		}
 	}
 }
 

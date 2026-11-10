@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -196,11 +197,18 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 			return nil, err
 		}
 	}
+	asked := groupUpdateUserChangeCount(before, profiles, disabledNodeIDs, m.DryRun)
+	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.GroupServiceUpdateGroupProcedure, asked)
+	if err != nil {
+		return nil, err
+	}
+	defer reservation.finish()
 	got := before
 	if !m.DryRun {
 		if err := a.UpdateGroupWithDisabledNodes(ctx, m.GroupId, name, profiles, m.DnsPresetId, m.Color, disabledNodeIDs); err != nil {
 			return nil, groupErr(s, "update group", err)
 		}
+		reservation.markTouched(asked)
 		if got, err = a.Group(ctx, m.GroupId); err != nil {
 			return nil, s.internal("get group", err)
 		}
@@ -216,6 +224,18 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 	return connect.NewResponse(&adminv1.UpdateGroupResponse{Group: out[0], Impact: impact}), nil
 }
 
+// groupUpdateUserChangeCount counts a group's users when an update changes its profile or available-node set.
+func groupUpdateUserChangeCount(before store.AccessGroup, profiles, disabledNodeIDs *[]string, dryRun bool) int {
+	if dryRun {
+		return 0
+	}
+	if profiles != nil && !slices.Equal(before.ProfileIDs, *profiles) ||
+		disabledNodeIDs != nil && !slices.Equal(before.DisabledNodeIDs, *disabledNodeIDs) {
+		return before.UserCount
+	}
+	return 0
+}
+
 func (s *Service) DeleteGroup(ctx context.Context, req *connect.Request[adminv1.DeleteGroupRequest]) (*connect.Response[adminv1.DeleteGroupResponse], error) {
 	m := req.Msg
 	if m.MoveUsersTo != "" && m.MoveUsersTo == m.GroupId {
@@ -226,14 +246,23 @@ func (s *Service) DeleteGroup(ctx context.Context, req *connect.Request[adminv1.
 	if err != nil {
 		return nil, groupErr(s, "get group", err)
 	}
+	asked := 0
+	if m.MoveUsersTo != "" {
+		asked = g.UserCount
+	}
+	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.GroupServiceDeleteGroupProcedure, asked)
+	if err != nil {
+		return nil, err
+	}
+	defer reservation.finish()
 	switch err := a.DeleteGroup(ctx, m.GroupId, m.MoveUsersTo); {
 	case errors.Is(err, store.ErrAccessInUse):
 		return nil, coded(connect.CodeFailedPrecondition, "group_not_empty", "users", strconv.Itoa(g.UserCount))
 	case err != nil:
 		return nil, groupErr(s, "delete group", err)
 	}
-	// The moved users now get the other group's profiles. Not g.UserCount: it was read before the move, and a user
-	// created into the group since then was moved too.
+	reservation.markTouched(asked)
+	// DeleteGroup may move a user created after the count was read, so notify from the move request rather than g.UserCount.
 	if m.MoveUsersTo != "" {
 		s.notify.StateChanged()
 	}

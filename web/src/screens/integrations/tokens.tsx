@@ -12,6 +12,8 @@ import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { Pending, QueryError } from "@/components/ui/query-error";
+import { StatusPill } from "@/components/ui/status";
+import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT, type T } from "@/i18n";
@@ -19,6 +21,7 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
 import {
+  changesUsers,
   defaultRate,
   defaultTtl,
   maxName,
@@ -51,10 +54,12 @@ function metaParts(t: T, fmt: Fmt, tok: Token, now: number): string[] {
       : tok.lastUsedIp && channel
         ? t("int.tok.lastUsedFrom", { when: fmt.ago(tok.lastUsedUnix), ip: tok.lastUsedIp, channel })
         : t("int.tok.lastUsed", { when: fmt.ago(tok.lastUsedUnix) });
-  return [life, used, t("int.tok.rateOf", { n: tok.rateLimitPerMin })];
+  const parts = [life, used, t("int.tok.rateOf", { n: tok.rateLimitPerMin })];
+  if (changesUsers(tok.profile)) parts.push(t(tok.allowBulkUserChanges ? "int.tok.bulk.allowed" : "int.tok.bulk.limited"));
+  return parts;
 }
 
-function TokenRow({ tok, now, onRevoke }: { tok: Token; now: number; onRevoke: () => void }) {
+function TokenRow({ tok, now, onRevoke, onBulk }: { tok: Token; now: number; onRevoke: () => void; onBulk?: () => void }) {
   const t = useT();
   const fmt = useFmt();
   const state = tokenState(tok, now);
@@ -76,11 +81,20 @@ function TokenRow({ tok, now, onRevoke }: { tok: Token; now: number; onRevoke: (
       </div>
       {/* the chip and the action wrap together, so a narrow row never strands the action alone */}
       <div className="ms-auto flex flex-none items-center gap-3">
+        {/* a token without the hourly limit stands out: it is the one whose leak costs the most */}
+        {changesUsers(tok.profile) && tok.allowBulkUserChanges && <StatusPill kind="warn" label={t("int.tok.bulk.pill")} sm />}
         <ProfileChip profile={tok.profile} />
         {state === "active" ? (
-          <button type="button" onClick={onRevoke} aria-label={t("int.tok.revoke.aria", { name: tok.name })} className="text-xs font-bold text-danger-text">
-            {t("int.tok.revoke")}
-          </button>
+          <>
+            {onBulk && changesUsers(tok.profile) && (
+              <button type="button" onClick={onBulk} aria-label={t("int.tok.bulk.action.aria", { name: tok.name })} className="text-xs font-bold text-muted hover:text-fg">
+                {t("int.tok.bulk.action")}
+              </button>
+            )}
+            <button type="button" onClick={onRevoke} aria-label={t("int.tok.revoke.aria", { name: tok.name })} className="text-xs font-bold text-danger-text">
+              {t("int.tok.revoke")}
+            </button>
+          </>
         ) : (
           <span className="text-xs font-semibold text-muted">{t(state === "revoked" ? "int.tok.state.revoked" : "int.tok.state.expired")}</span>
         )}
@@ -125,6 +139,7 @@ function CreateForm({ busy, onCreate, onCancel }: { busy: boolean; onCreate: (to
   const [profile, setProfile] = useState(TokenProfile.READONLY);
   const [ttl, setTtl] = useState<number>(defaultTtl);
   const [rate, setRate] = useState(String(defaultRate));
+  const [bulk, setBulk] = useState(false);
   const [tried, setTried] = useState(false);
   const nameOk = validName(name);
   const rateValue = parseRate(rate);
@@ -133,7 +148,7 @@ function CreateForm({ busy, onCreate, onCancel }: { busy: boolean; onCreate: (to
     e.preventDefault();
     setTried(true);
     if (busy || !nameOk || rateValue === null) return;
-    onCreate({ name: name.trim(), profile, ttlDays: ttl, rateLimitPerMin: rateValue });
+    onCreate({ name: name.trim(), profile, ttlDays: ttl, rateLimitPerMin: rateValue, allowBulkUserChanges: changesUsers(profile) && bulk });
   }
 
   return (
@@ -174,6 +189,16 @@ function CreateForm({ busy, onCreate, onCancel }: { busy: boolean; onCreate: (to
         mono
         className="md:max-w-[220px]"
       />
+      {/* a read-only token changes nobody, so the limit has nothing to say there */}
+      {changesUsers(profile) && (
+        <label className="flex items-start gap-3 rounded-field border border-line bg-surface p-3">
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[13px] font-bold">{t("int.tok.bulk.label")}</span>
+            <span className="text-xs leading-snug text-pretty text-muted">{t("int.tok.bulk.hint")}</span>
+          </span>
+          <Switch checked={bulk} onCheckedChange={setBulk} aria-label={t("int.tok.bulk.label")} />
+        </label>
+      )}
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="ghost" size="md" disabled={busy} onClick={onCancel}>
           {t("common.cancel")}
@@ -239,11 +264,37 @@ function RevokeDialog({ tok, busy, onConfirm, onClose }: { tok: Token; busy: boo
   );
 }
 
+/** What the token may do to users without the owner, and the one button that changes it. */
+function BulkDialog({ tok, busy, onConfirm, onClose }: { tok: Token; busy: boolean; onConfirm: () => void; onClose: () => void }) {
+  const t = useT();
+  const allowed = tok.allowBulkUserChanges;
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && !busy && onClose()}
+      title={t("int.tok.bulk.title", { name: tok.name })}
+      description={t(allowed ? "int.tok.bulk.body.allowed" : "int.tok.bulk.body.limited")}
+      footer={
+        <>
+          <Button variant="ghost" size="md" disabled={busy} onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant={allowed ? "primary" : "danger"} size="md" disabled={busy} onClick={onConfirm}>
+            {t(allowed ? "int.tok.bulk.limit" : "int.tok.bulk.allow")}
+          </Button>
+        </>
+      }
+    >
+      {!allowed && <Notice>{t("int.tok.bulk.warn")}</Notice>}
+    </Modal>
+  );
+}
+
 /** API tokens: the list (last use, expiry, revoke) and the create form. The secret is shown once, in a dialog, and never stored here. */
 export function TokensCard() {
   const t = useT();
   const q = useQuery(tokensQuery);
-  const { create, revoke } = useTokenActions();
+  const { create, revoke, setBulk } = useTokenActions();
   const [creating, setCreating] = useState(false);
   const noCreate = useEdition().off("mcp"); // the edition refuses CreateApiToken: the list stays, the way to a new token goes
   // "?new=token" (the palette's "New API token") opens the form, then leaves the address
@@ -259,6 +310,7 @@ export function TokensCard() {
   }, [wantsNew, navigate]);
   const [secret, setSecret] = useState<{ name: string; value: string } | null>(null);
   const [revoking, setRevoking] = useState<Token | null>(null);
+  const [bulkOf, setBulkOf] = useState<Token | null>(null);
   const [showOld, setShowOld] = useState(false);
   const now = q.data?.nowUnix ?? 0;
   const { live, old } = splitTokens(q.data?.tokens ?? [], now);
@@ -305,7 +357,7 @@ export function TokensCard() {
       {live.length > 0 && (
         <ul className="flex flex-col">
           {live.map((tok) => (
-            <TokenRow key={tok.id} tok={tok} now={now} onRevoke={() => setRevoking(tok)} />
+            <TokenRow key={tok.id} tok={tok} now={now} onRevoke={() => setRevoking(tok)} onBulk={() => setBulkOf(tok)} />
           ))}
         </ul>
       )}
@@ -324,6 +376,14 @@ export function TokensCard() {
         </>
       )}
       {secret && <SecretDialog name={secret.name} secret={secret.value} onClose={() => setSecret(null)} />}
+      {bulkOf && (
+        <BulkDialog
+          tok={bulkOf}
+          busy={setBulk.isPending}
+          onClose={() => setBulkOf(null)}
+          onConfirm={() => setBulk.mutate({ id: bulkOf.id, name: bulkOf.name, allow: !bulkOf.allowBulkUserChanges }, { onSuccess: () => setBulkOf(null) })}
+        />
+      )}
       {revoking && (
         <RevokeDialog
           tok={revoking}

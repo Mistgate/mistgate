@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/pagepass"
@@ -278,6 +279,8 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 			return nil, err
 		}
 	}
+	// Creating a person is not counted against a token's hourly limit of user changes: the limit is for what takes
+	// access away or rewrites a person, and a billing script creates, extends and enables people all day.
 	switch err := s.st.Access().CreateUser(ctx, u, keyDev, keyCreds); {
 	case errors.Is(err, store.ErrAccessExists):
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
@@ -616,6 +619,15 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		}
 		return connect.NewResponse(&adminv1.UpdateUserResponse{User: users[0], Impact: impact}), nil
 	}
+	asked := 0
+	if userUpdateChanges(old, u) {
+		asked = 1
+	}
+	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.UserServiceUpdateUserProcedure, asked)
+	if err != nil {
+		return nil, err
+	}
+	defer reservation.finish()
 	if u.AppTelegram && !old.AppTelegram {
 		// Before the update, so that an update that fails leaves no person with Telegram on and no key.
 		if _, err := s.issueTelegramKey(ctx, actor(ctx), u); err != nil {
@@ -630,6 +642,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	case err != nil:
 		return nil, s.internal("update user", err)
 	}
+	reservation.markTouched(asked)
 	if !u.AppTelegram && old.AppTelegram {
 		if err := s.revokeTelegramKey(ctx, actor(ctx), u.ID); err != nil {
 			return nil, err
@@ -683,9 +696,29 @@ func (s *Service) SetUsersEnabled(ctx context.Context, req *connect.Request[admi
 	if err := checkIDs(req.Msg.UserIds); err != nil {
 		return nil, err
 	}
+	usersBefore, err := s.st.Access().UsersByIDs(ctx, req.Msg.UserIds)
+	if err != nil {
+		return nil, s.internal("load users to update", err)
+	}
+	// Only disabling counts against a token's hourly limit, and only the people it really disables: enabling gives
+	// access back, and repeating a call changes nobody.
+	asked := 0
+	if !req.Msg.Enabled {
+		for _, u := range usersBefore {
+			if !u.Disabled {
+				asked++
+			}
+		}
+	}
+	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.UserServiceSetUsersEnabledProcedure, asked)
+	if err != nil {
+		return nil, err
+	}
+	defer reservation.finish()
 	if err := s.st.Access().SetUsersDisabled(ctx, req.Msg.UserIds, !req.Msg.Enabled); err != nil {
 		return nil, s.internal("set disabled", err)
 	}
+	reservation.markTouched(asked)
 	if err := s.Recompute(ctx, req.Msg.UserIds); err != nil {
 		return nil, s.internal("recompute", err)
 	}
@@ -714,6 +747,7 @@ func (s *Service) ExtendUsers(ctx context.Context, req *connect.Request[adminv1.
 		return nil, s.internal("load users", err)
 	}
 	now := s.now()
+	// Extending is not counted against a token's hourly limit of user changes: it only gives people more time.
 	for _, u := range us {
 		if u.ExpiresAt.IsZero() {
 			continue
@@ -752,12 +786,27 @@ func (s *Service) ResetUserTraffic(ctx context.Context, req *connect.Request[adm
 		return nil, notFound("user")
 	}
 	now := s.now()
+	asked := 0
+	for _, u := range us {
+		status := ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, 0, now)
+		if u.UsedBytes > 0 || status != u.Status {
+			asked++
+		}
+	}
+	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.UserServiceResetUserTrafficProcedure, asked)
+	if err != nil {
+		return nil, err
+	}
+	defer reservation.finish()
 	changed := false
 	ids := make([]string, 0, len(us))
 	for _, u := range us {
 		status := ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, 0, now)
-		if err := a.ResetUserTraffic(ctx, u.ID, status); err != nil {
-			return nil, s.internal("reset traffic", err)
+		if u.UsedBytes > 0 || status != u.Status {
+			if err := a.ResetUserTraffic(ctx, u.ID, status); err != nil {
+				return nil, s.internal("reset traffic", err)
+			}
+			reservation.markTouched(1)
 		}
 		changed = changed || status != u.Status
 		ids = append(ids, u.ID)
@@ -808,6 +857,16 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 	return strings.Join(f, ",")
 }
 
+// userUpdateChanges reports whether the normalized update differs from a stored, admin-editable user field.
+func userUpdateChanges(old, next store.AccessUser) bool {
+	return old.Name != next.Name || old.SubscriptionName != next.SubscriptionName || old.GroupID != next.GroupID ||
+		old.Disabled != next.Disabled || old.Status != next.Status || old.AppHapp != next.AppHapp ||
+		old.AppAmnezia != next.AppAmnezia || old.AppTelegram != next.AppTelegram || old.AllNodes != next.AllNodes ||
+		!slices.Equal(old.NodeIDs, next.NodeIDs) || old.QuotaBytes != next.QuotaBytes || old.QuotaReset != next.QuotaReset ||
+		!old.PeriodStart.Equal(next.PeriodStart) || !old.ExpiresAt.Equal(next.ExpiresAt) || old.DeviceLimit != next.DeviceLimit ||
+		old.SpeedLimitBps != next.SpeedLimitBps || old.DeviceSpeedLimitBps != next.DeviceSpeedLimitBps || old.DNSPresetID != next.DNSPresetID
+}
+
 func maxTime(a, b time.Time) time.Time {
 	if a.After(b) {
 		return a
@@ -819,8 +878,12 @@ func maxTime(a, b time.Time) time.Time {
 // "device_blocked" instead of servers) until UnblockDevice; the shared device and a key have no HWID to block
 // (FailedPrecondition cannot_block). Both write the audit entry device_revoke.
 func (s *Service) RevokeDevice(ctx context.Context, req *connect.Request[adminv1.RevokeDeviceRequest]) (*connect.Response[adminv1.RevokeDeviceResponse], error) {
+	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.UserServiceRevokeDeviceProcedure, 1)
+	if err != nil {
+		return nil, err
+	}
+	defer reservation.finish()
 	var userID string
-	var err error
 	if req.Msg.Block {
 		userID, err = s.st.Access().BlockDevice(ctx, req.Msg.DeviceId, s.now())
 	} else {
@@ -834,6 +897,7 @@ func (s *Service) RevokeDevice(ctx context.Context, req *connect.Request[adminv1
 	case err != nil:
 		return nil, s.internal("revoke device", err)
 	}
+	reservation.markTouched(1)
 	s.notify.StateChanged()
 	s.audit(ctx, actor(ctx), "device_revoke", map[string]any{"user": userID, "device": req.Msg.DeviceId, "block": req.Msg.Block})
 	users, err := s.loadUsers(ctx, userID)

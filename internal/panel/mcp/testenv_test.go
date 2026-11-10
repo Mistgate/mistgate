@@ -329,7 +329,8 @@ type callRec struct {
 
 // world is the fixture the fake services serve and the log of what they were asked.
 type world struct {
-	tasks *fakeTasks // the scheduled tasks (tools_tasks_test.go)
+	tasks            *fakeTasks // the scheduled tasks (tools_tasks_test.go)
+	recordUserChange func(context.Context, int)
 	adminv1connect.UnimplementedFleetServiceHandler
 	adminv1connect.UnimplementedNodeServiceHandler
 	adminv1connect.UnimplementedHealthServiceHandler
@@ -863,17 +864,23 @@ func (w *world) CreateUser(_ context.Context, r *connect.Request[adminv1.CreateU
 	return connect.NewResponse(&adminv1.CreateUserResponse{User: &adminv1.User{Id: "usr_new"}, SubscriptionUrl: canarySubURL, PagePassword: canaryPagePassword}), nil
 }
 
-func (w *world) UpdateUser(_ context.Context, r *connect.Request[adminv1.UpdateUserRequest]) (*connect.Response[adminv1.UpdateUserResponse], error) {
+func (w *world) UpdateUser(ctx context.Context, r *connect.Request[adminv1.UpdateUserRequest]) (*connect.Response[adminv1.UpdateUserResponse], error) {
 	w.mu.Lock()
 	w.updateReq = append(w.updateReq, r.Msg)
 	w.mu.Unlock()
+	if w.recordUserChange != nil {
+		w.recordUserChange(ctx, 1)
+	}
 	return connect.NewResponse(&adminv1.UpdateUserResponse{User: &adminv1.User{Id: r.Msg.GetUserId()}}), nil
 }
 
-func (w *world) SetUsersEnabled(_ context.Context, r *connect.Request[adminv1.SetUsersEnabledRequest]) (*connect.Response[adminv1.SetUsersEnabledResponse], error) {
+func (w *world) SetUsersEnabled(ctx context.Context, r *connect.Request[adminv1.SetUsersEnabledRequest]) (*connect.Response[adminv1.SetUsersEnabledResponse], error) {
 	w.mu.Lock()
 	w.disableReq = append(w.disableReq, r.Msg)
 	w.mu.Unlock()
+	if !r.Msg.GetEnabled() && w.recordUserChange != nil {
+		w.recordUserChange(ctx, len(r.Msg.GetUserIds()))
+	}
 	var us []*adminv1.User
 	for _, id := range r.Msg.GetUserIds() {
 		us = append(us, &adminv1.User{Id: id})
@@ -881,17 +888,23 @@ func (w *world) SetUsersEnabled(_ context.Context, r *connect.Request[adminv1.Se
 	return connect.NewResponse(&adminv1.SetUsersEnabledResponse{Users: us}), nil
 }
 
-func (w *world) RevokeDevice(_ context.Context, r *connect.Request[adminv1.RevokeDeviceRequest]) (*connect.Response[adminv1.RevokeDeviceResponse], error) {
+func (w *world) RevokeDevice(ctx context.Context, r *connect.Request[adminv1.RevokeDeviceRequest]) (*connect.Response[adminv1.RevokeDeviceResponse], error) {
 	w.mu.Lock()
 	w.revokeReq = append(w.revokeReq, r.Msg)
 	w.mu.Unlock()
+	if w.recordUserChange != nil {
+		w.recordUserChange(ctx, 1)
+	}
 	return connect.NewResponse(&adminv1.RevokeDeviceResponse{}), nil
 }
 
-func (w *world) ResetUserTraffic(_ context.Context, r *connect.Request[adminv1.ResetUserTrafficRequest]) (*connect.Response[adminv1.ResetUserTrafficResponse], error) {
+func (w *world) ResetUserTraffic(ctx context.Context, r *connect.Request[adminv1.ResetUserTrafficRequest]) (*connect.Response[adminv1.ResetUserTrafficResponse], error) {
 	w.mu.Lock()
 	w.resetReq = append(w.resetReq, r.Msg)
 	w.mu.Unlock()
+	if w.recordUserChange != nil {
+		w.recordUserChange(ctx, len(r.Msg.GetUserIds()))
+	}
 	var us []*adminv1.User
 	for _, id := range r.Msg.GetUserIds() {
 		us = append(us, &adminv1.User{Id: id})
@@ -1794,9 +1807,10 @@ type testEnv struct {
 	srv   *httptest.Server
 	url   string
 
-	mu    sync.Mutex
-	clock time.Time
-	audit []AuditEntry
+	mu          sync.Mutex
+	clock       time.Time
+	audit       []AuditEntry
+	userChanges map[string]int
 }
 
 func (e *testEnv) now() time.Time {
@@ -1826,11 +1840,38 @@ func (e *testEnv) audits(action string) []AuditEntry {
 // newTestEnv serves the MCP endpoint at /mcp on a loopback listener (no firewall prompt on Windows).
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
-	e := &testEnv{t: t, w: newWorld(), clock: time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)}
+	e := &testEnv{t: t, w: newWorld(), clock: time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC), userChanges: map[string]int{}}
 	e.plans = &fakePlans{byID: map[string]*Plan{}, now: e.now}
 	e.auth = &fakeAuth{tokens: map[string]*fakeToken{}, plans: e.plans, w: e.w}
+	e.w.recordUserChange = func(ctx context.Context, n int) {
+		if approved, _ := ctx.Value(keyApproved).(string); approved != "" {
+			return
+		}
+		if _, assistant := ctx.Value(keyAssistant).(AssistantIdentity); assistant {
+			return
+		}
+		p, ok := ctx.Value(keyPrincipal).(Principal)
+		if !ok || p.TokenID == "" {
+			return
+		}
+		e.mu.Lock()
+		e.userChanges[p.TokenID] += n
+		e.mu.Unlock()
+	}
 	h, err := New(Config{
 		Plans: e.plans, Auth: e.auth, API: e.w.api(e.auth), Now: e.now,
+		UserChangeBudget: func(ctx context.Context) (int, int, bool, error) {
+			p, ok := e.auth.Principal(ctx)
+			if !ok {
+				if _, assistant := assistantCallIdentity(ctx); assistant {
+					return 0, 10, true, nil
+				}
+				return 0, 10, true, nil
+			}
+			e.mu.Lock()
+			defer e.mu.Unlock()
+			return e.userChanges[p.TokenID], 10, false, nil
+		},
 		Audit: func(_ context.Context, a AuditEntry) {
 			e.mu.Lock()
 			e.audit = append(e.audit, a)

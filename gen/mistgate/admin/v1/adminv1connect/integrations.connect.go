@@ -38,6 +38,9 @@ const (
 	// ApiTokenServiceCreateApiTokenProcedure is the fully-qualified name of the ApiTokenService's
 	// CreateApiToken RPC.
 	ApiTokenServiceCreateApiTokenProcedure = "/mistgate.admin.v1.ApiTokenService/CreateApiToken"
+	// ApiTokenServiceSetApiTokenBulkProcedure is the fully-qualified name of the ApiTokenService's
+	// SetApiTokenBulk RPC.
+	ApiTokenServiceSetApiTokenBulkProcedure = "/mistgate.admin.v1.ApiTokenService/SetApiTokenBulk"
 	// ApiTokenServiceListApiTokensProcedure is the fully-qualified name of the ApiTokenService's
 	// ListApiTokens RPC.
 	ApiTokenServiceListApiTokensProcedure = "/mistgate.admin.v1.ApiTokenService/ListApiTokens"
@@ -57,6 +60,8 @@ const (
 type ApiTokenServiceClient interface {
 	// Creates a token and returns its secret once. Needs a step-up.
 	CreateApiToken(context.Context, *connect.Request[v1.CreateApiTokenRequest]) (*connect.Response[v1.CreateApiTokenResponse], error)
+	// Lets this token change more than ten users in an hour without an MCP approval. Needs a step-up.
+	SetApiTokenBulk(context.Context, *connect.Request[v1.SetApiTokenBulkRequest]) (*connect.Response[v1.SetApiTokenBulkResponse], error)
 	// Every token, newest first, revoked and expired ones included (they stay for the audit trail). No secrets.
 	ListApiTokens(context.Context, *connect.Request[v1.ListApiTokensRequest]) (*connect.Response[v1.ListApiTokensResponse], error)
 	// Revokes a token at once: its next request is refused and its pending changes are cancelled. Idempotent.
@@ -81,6 +86,12 @@ func NewApiTokenServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(apiTokenServiceMethods.ByName("CreateApiToken")),
 			connect.WithClientOptions(opts...),
 		),
+		setApiTokenBulk: connect.NewClient[v1.SetApiTokenBulkRequest, v1.SetApiTokenBulkResponse](
+			httpClient,
+			baseURL+ApiTokenServiceSetApiTokenBulkProcedure,
+			connect.WithSchema(apiTokenServiceMethods.ByName("SetApiTokenBulk")),
+			connect.WithClientOptions(opts...),
+		),
 		listApiTokens: connect.NewClient[v1.ListApiTokensRequest, v1.ListApiTokensResponse](
 			httpClient,
 			baseURL+ApiTokenServiceListApiTokensProcedure,
@@ -98,14 +109,20 @@ func NewApiTokenServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // apiTokenServiceClient implements ApiTokenServiceClient.
 type apiTokenServiceClient struct {
-	createApiToken *connect.Client[v1.CreateApiTokenRequest, v1.CreateApiTokenResponse]
-	listApiTokens  *connect.Client[v1.ListApiTokensRequest, v1.ListApiTokensResponse]
-	revokeApiToken *connect.Client[v1.RevokeApiTokenRequest, v1.RevokeApiTokenResponse]
+	createApiToken  *connect.Client[v1.CreateApiTokenRequest, v1.CreateApiTokenResponse]
+	setApiTokenBulk *connect.Client[v1.SetApiTokenBulkRequest, v1.SetApiTokenBulkResponse]
+	listApiTokens   *connect.Client[v1.ListApiTokensRequest, v1.ListApiTokensResponse]
+	revokeApiToken  *connect.Client[v1.RevokeApiTokenRequest, v1.RevokeApiTokenResponse]
 }
 
 // CreateApiToken calls mistgate.admin.v1.ApiTokenService.CreateApiToken.
 func (c *apiTokenServiceClient) CreateApiToken(ctx context.Context, req *connect.Request[v1.CreateApiTokenRequest]) (*connect.Response[v1.CreateApiTokenResponse], error) {
 	return c.createApiToken.CallUnary(ctx, req)
+}
+
+// SetApiTokenBulk calls mistgate.admin.v1.ApiTokenService.SetApiTokenBulk.
+func (c *apiTokenServiceClient) SetApiTokenBulk(ctx context.Context, req *connect.Request[v1.SetApiTokenBulkRequest]) (*connect.Response[v1.SetApiTokenBulkResponse], error) {
+	return c.setApiTokenBulk.CallUnary(ctx, req)
 }
 
 // ListApiTokens calls mistgate.admin.v1.ApiTokenService.ListApiTokens.
@@ -122,6 +139,8 @@ func (c *apiTokenServiceClient) RevokeApiToken(ctx context.Context, req *connect
 type ApiTokenServiceHandler interface {
 	// Creates a token and returns its secret once. Needs a step-up.
 	CreateApiToken(context.Context, *connect.Request[v1.CreateApiTokenRequest]) (*connect.Response[v1.CreateApiTokenResponse], error)
+	// Lets this token change more than ten users in an hour without an MCP approval. Needs a step-up.
+	SetApiTokenBulk(context.Context, *connect.Request[v1.SetApiTokenBulkRequest]) (*connect.Response[v1.SetApiTokenBulkResponse], error)
 	// Every token, newest first, revoked and expired ones included (they stay for the audit trail). No secrets.
 	ListApiTokens(context.Context, *connect.Request[v1.ListApiTokensRequest]) (*connect.Response[v1.ListApiTokensResponse], error)
 	// Revokes a token at once: its next request is refused and its pending changes are cancelled. Idempotent.
@@ -142,6 +161,12 @@ func NewApiTokenServiceHandler(svc ApiTokenServiceHandler, opts ...connect.Handl
 		connect.WithSchema(apiTokenServiceMethods.ByName("CreateApiToken")),
 		connect.WithHandlerOptions(opts...),
 	)
+	apiTokenServiceSetApiTokenBulkHandler := connect.NewUnaryHandler(
+		ApiTokenServiceSetApiTokenBulkProcedure,
+		svc.SetApiTokenBulk,
+		connect.WithSchema(apiTokenServiceMethods.ByName("SetApiTokenBulk")),
+		connect.WithHandlerOptions(opts...),
+	)
 	apiTokenServiceListApiTokensHandler := connect.NewUnaryHandler(
 		ApiTokenServiceListApiTokensProcedure,
 		svc.ListApiTokens,
@@ -158,6 +183,8 @@ func NewApiTokenServiceHandler(svc ApiTokenServiceHandler, opts ...connect.Handl
 		switch r.URL.Path {
 		case ApiTokenServiceCreateApiTokenProcedure:
 			apiTokenServiceCreateApiTokenHandler.ServeHTTP(w, r)
+		case ApiTokenServiceSetApiTokenBulkProcedure:
+			apiTokenServiceSetApiTokenBulkHandler.ServeHTTP(w, r)
 		case ApiTokenServiceListApiTokensProcedure:
 			apiTokenServiceListApiTokensHandler.ServeHTTP(w, r)
 		case ApiTokenServiceRevokeApiTokenProcedure:
@@ -173,6 +200,10 @@ type UnimplementedApiTokenServiceHandler struct{}
 
 func (UnimplementedApiTokenServiceHandler) CreateApiToken(context.Context, *connect.Request[v1.CreateApiTokenRequest]) (*connect.Response[v1.CreateApiTokenResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ApiTokenService.CreateApiToken is not implemented"))
+}
+
+func (UnimplementedApiTokenServiceHandler) SetApiTokenBulk(context.Context, *connect.Request[v1.SetApiTokenBulkRequest]) (*connect.Response[v1.SetApiTokenBulkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ApiTokenService.SetApiTokenBulk is not implemented"))
 }
 
 func (UnimplementedApiTokenServiceHandler) ListApiTokens(context.Context, *connect.Request[v1.ListApiTokensRequest]) (*connect.Response[v1.ListApiTokensResponse], error) {

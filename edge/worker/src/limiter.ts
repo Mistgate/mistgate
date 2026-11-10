@@ -1,6 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
-import { type Bucket, type LimitReply, type WindowState, parseRequest, peekWindow, recordWindow, takeBucket } from "./limitmath";
+import {
+  type Bucket, type LimitReply, type WindowState, parseRequest, peekWindow, recordWindow, recordWindowN, takeBucket, undoWindowN,
+} from "./limitmath";
 
 // One Durable Object per (name, key) pair (see routeLimit in shell.ts): it holds the token bucket and/or the failure
 // window of that one pair, which is all internal/panel/securitylimit.Memory keeps per key. The Worker isolates share no
@@ -15,7 +17,7 @@ import { type Bucket, type LimitReply, type WindowState, parseRequest, peekWindo
 const MAX_ALARM_MS = 30 * 24 * 3600 * 1000;
 
 export class Limiter extends DurableObject<Env> {
-  /** The only RPC method: the four operations of edge/bridge/limiter_js.go. A bad request throws (Go refuses the guarded request). */
+  /** The only RPC method: the operations of edge/bridge/limiter_js.go. A bad request throws (Go refuses the guarded request). */
   async limit(raw: unknown): Promise<LimitReply> {
     const req = parseRequest(raw);
     const now = Date.now(); // this object's clock is authoritative
@@ -37,6 +39,21 @@ export class Limiter extends DurableObject<Env> {
         reply = r.reply;
         break;
       }
+      case "recordN": {
+        const r = recordWindowN(kv.get<WindowState>("w"), now, req.limit, req.spanMs, req.units);
+        if (r.state) kv.put("w", r.state);
+        else kv.delete("w");
+        reply = r.reply;
+        break;
+      }
+      case "undoN":
+        {
+          const state = undoWindowN(kv.get<WindowState>("w"), now, req.spanMs, req.units, req.windowStartMs);
+          if (state) kv.put("w", state);
+          else kv.delete("w");
+        }
+        reply = { ok: true, retryAfterMs: 0, remaining: 0, first: false };
+        break;
       case "reset": // Memory.Reset drops the failure window only; a token bucket of the same key stays
         kv.delete("w");
         reply = { ok: true, retryAfterMs: 0, remaining: 0, first: false };
