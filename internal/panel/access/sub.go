@@ -71,8 +71,8 @@ type SubView struct {
 	// LinkMode is the mode of the device limit for the apps on the link (store.LinkModeTrack, LinkModeEnforce or LinkModeStrict):
 	// the page words the shared place and the full limit by it.
 	LinkMode string
-	// Refusal says why an app that is entitled to servers gets none: RefusalDeviceLimit, RefusalDeviceBlocked or
-	// RefusalNoDeviceID. "" for everyone served, for a person without access (Status says why) and for the page, which never
+	// Refusal says why an app that is entitled to servers gets none: RefusalDeviceLimit, RefusalDeviceBlocked,
+	// RefusalNoDeviceID or RefusalClientAPIEnrolled. "" for everyone served, for a person without access (Status says why) and for the page, which never
 	// registers a device. Lines and Servers are empty with it; the subscription handler answers with one entry that says why.
 	Refusal string
 }
@@ -86,6 +86,9 @@ const (
 	RefusalDeviceBlocked = "device_blocked"
 	// RefusalNoDeviceID: STRICT, and the app reports no device ID (X-HWID).
 	RefusalNoDeviceID = "no_device_id"
+	// RefusalClientAPIEnrolled: the device of the app was enrolled in the client API, so its credentials go to the holder of its key
+	// only, not to whoever sends its HWID with the link.
+	RefusalClientAPIEnrolled = "client_api_enrolled"
 )
 
 // SubNode is one node as the page's server list shows it.
@@ -345,6 +348,9 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	if err != nil {
 		return SubView{}, err
 	}
+	if hook := s.snapshotHookForTest; hook != nil {
+		hook()
+	}
 	made := make(map[string]int, len(data.Inbounds)) // the store returns creation order: SubServer.Made
 	for i, f := range data.Inbounds {
 		made[f.Inbound.ID] = i
@@ -390,7 +396,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	v.DevicesUsed, v.LinkMode = data.LimitCount(), data.LinkMode // the Telegram key is listed but fills no place
 	if v.Status != StatusActive {
 		// The app keeps fetching after access ended: the touch is what lets health notice that the person is trying.
-		if touch {
+		if touch && !(len(data.Device.KeyHash) > 0 && hash != nil) { // an enrolled device is the client API's: a basic fetch writes nothing on it
 			if opt.Format == plugin.FormatMihomo && opt.NoLinkAWG {
 				dropped, err := a.RevokeLinkAWGCreds(ctx, data.Device, now)
 				if err != nil {
@@ -416,6 +422,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	rd := requestDevice{dev: data.Device, creds: data.DeviceCreds, hash: hash}
 	g, full := data.Group, data.Inbounds
 	if touch {
+		if len(data.Device.KeyHash) > 0 && hash != nil {
+			// The HWID is no secret and the link is shared: the credentials of an enrolled device leave only through its key.
+			v.Refusal = RefusalClientAPIEnrolled
+			return v, nil
+		}
 		if rd, v.Refusal, err = s.ensureLinkCreds(ctx, u, opt.Device, rd, data); err != nil {
 			return SubView{}, err
 		}
@@ -835,6 +846,8 @@ func (s *Service) refusalOf(u store.AccessUser, err error) (refusal string, fall
 	switch {
 	case errors.Is(err, store.ErrAccessBlocked):
 		return RefusalDeviceBlocked, false
+	case errors.Is(err, store.ErrDeviceEnrolled):
+		return RefusalClientAPIEnrolled, false // enrolled since the snapshot of this fetch was read
 	case errors.Is(err, store.ErrNoSharedDevice):
 		return RefusalNoDeviceID, false
 	case errors.As(err, &limit):
@@ -852,8 +865,14 @@ func (s *Service) refusalOf(u store.AccessUser, err error) (refusal string, fall
 // placed records what a device that was made in this request means for the limit: in TRACK, a person who now has more
 // devices than the limit is an event for the owner to see. A place that a silent device gave away is no such case.
 func (s *Service) placed(u store.AccessUser, data store.SubscriptionData, res store.LinkDeviceResult) {
-	if res.Born && u.DeviceLimit > 0 && res.Replaced == "" && data.LimitCount() >= u.DeviceLimit {
-		s.limitReached(u.ID, data.LimitCount()+1, u.DeviceLimit, data.LinkMode, false)
+	s.placedAt(u, data.LimitCount(), data.LinkMode, res)
+}
+
+// placedAt is placed for a caller that knows the count and the mode it decided on (the snapshot of the fetch, or the store's
+// result for an enrolment): used is the person's devices that count before the new one.
+func (s *Service) placedAt(u store.AccessUser, used int, mode string, res store.LinkDeviceResult) {
+	if res.Born && u.DeviceLimit > 0 && res.Replaced == "" && used >= u.DeviceLimit {
+		s.limitReached(u.ID, used+1, u.DeviceLimit, mode, false)
 	}
 }
 
@@ -1004,6 +1023,10 @@ func (s *Service) touchDevice(id string, now time.Time, m deviceMeta) {
 		}
 	})
 }
+
+// SetSnapshotHookForTest runs hook between a subscription view's read of the person's state and the writes that follow it: the
+// window in which another request can enrol a device.
+func (s *Service) SetSnapshotHookForTest(hook func()) { s.snapshotHookForTest = hook }
 
 // SetTouchHookForTest observes when an asynchronous subscription touch starts and finishes.
 func (s *Service) SetTouchHookForTest(hook func(started bool)) { s.touchHookForTest = hook }

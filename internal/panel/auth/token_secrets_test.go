@@ -54,6 +54,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.WarpAccount.tos_url":                               "the public Cloudflare terms link",
 		"mistgate.admin.v1.GetWarpResponse.tos_url":                           "the public Cloudflare terms link",
 		"mistgate.admin.v1.GetClientProbeResponse.settings":                   "the kl!ck reports' switch and two counts",
+		"mistgate.admin.v1.GetClientApiResponse.settings":                     "a bool for the discovery switch",
 		"mistgate.admin.v1.NodeServerAccess.password_saved":                   "a bool: whether a password is saved, not the password",
 		"mistgate.admin.v1.NodeServerAccess.password_login":                   "a bool: whether the saved password last logged in over SSH",
 		"mistgate.admin.v1.NodeServerAccess.panel_key_fingerprint":            "the fingerprint of the panel's public SSH key",

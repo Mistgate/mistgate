@@ -330,7 +330,7 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		result.Device, result.Creds = own.Device, own.Creds
 		fresh := dev
 		fresh.ID = "" // the template's id may be that of a device revoked since: a new device always gets a new id
-		b, err := st.birth(fresh, limit, now)
+		b, err := st.birth(fresh, limit, now, false)
 		if err != nil {
 			return nil, err
 		}
@@ -372,7 +372,7 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		result.Replaced, result.Born = b.replaced, b.born
 		for _, issue := range issues {
 			stmts = append(stmts, guard(`
-				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL)
+				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL AND key_hash IS NULL)
 				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
 				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND revoked_at IS NULL)
 				AND ?3 NOT IN (`+awgTakenSQL+`)`,

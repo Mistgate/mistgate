@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -53,9 +54,24 @@ const LinkEvictAfter = 30 * 24 * time.Hour
 var (
 	// ErrAccessBlocked is returned when the HWID of a new device was blocked by the owner (device.blocked_at).
 	ErrAccessBlocked = errors.New("store: device blocked")
+	// ErrDeviceRevoked is returned when a device key belongs to a revoked device.
+	ErrDeviceRevoked = errors.New("store: device revoked")
+	// ErrDeviceEnrolled is returned by the basic paths (EnsureLinkDevice, EnsureLinkAWGCreds) for the HWID of an enrolled device: its
+	// credentials leave only with its key, never to whoever sends the HWID with the link.
+	ErrDeviceEnrolled = errors.New("store: device is enrolled in the client API")
 	// ErrNoSharedDevice is returned when the shared device would have to be made under STRICT, which has none.
 	ErrNoSharedDevice = errors.New("store: no shared device in strict mode")
+	// ErrNoLinkCredentials is returned by EnrolLinkDevice when the issuer has no credential to give: an enrolled device is never
+	// left without any, and nothing was written.
+	ErrNoLinkCredentials = errors.New("store: no credentials to issue to the enrolled device")
 )
+
+// LinkDeviceKeyOwner is the user state needed by a client API device lookup: the id and the hash of the current link, which is
+// all that sync needs to tell a moved link (the status it computes itself). It deliberately omits the sealed subscription token.
+type LinkDeviceKeyOwner struct {
+	UserID       string
+	SubTokenHash []byte
+}
 
 // linkCeiling is how many live devices a user may have before one more link device is refused (0 = no limit). TRACK counts
 // only: a HWID device has twice the limit as a ceiling (what a client that sends a new HWID with every request runs into)
@@ -101,8 +117,13 @@ const linkModeGuard = `coalesce((SELECT v FROM setting WHERE k = ?1), '') = ?2`
 // revokeDeviceStmts soft-deletes the device and its credentials; the tunnel addresses of its AWG credentials go into
 // quarantine (released_at > 0).
 func revokeDeviceStmts(id string, now time.Time) []Stmt {
+	stmts := []Stmt{{Query: `UPDATE device SET revoked_at = ? WHERE id = ?`, Args: []any{unix(now), id}}}
+	return append(stmts, revokeDeviceCredentialStmts(id, now)...)
+}
+
+// revokeDeviceCredentialStmts revokes credentials and quarantines their AWG peers without revoking the owning device row.
+func revokeDeviceCredentialStmts(id string, now time.Time) []Stmt {
 	return []Stmt{
-		{Query: `UPDATE device SET revoked_at = ? WHERE id = ?`, Args: []any{unix(now), id}},
 		{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN
 		   (SELECT id FROM device_credential WHERE device_id = ? AND revoked_at IS NULL)`, Args: []any{unix(now), id}},
 		{Query: `UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL`, Args: []any{unix(now), id}},
@@ -134,6 +155,10 @@ type LinkDeviceResult struct {
 	Replaced string
 	// Born: the device is new (not found, not taken over from the shared one).
 	Born bool
+	// Used and Mode are what the attempt decided on: the user's live devices that count against the limit before this call, and the
+	// mode of the limit. Callers that report a limit reached (access.placed) need them without a second read.
+	Used int
+	Mode string
 }
 
 // linkDeviceState is what one attempt decides on, read in one batch.
@@ -193,17 +218,43 @@ type linkBirth struct {
 	exists   bool         // the device is there: nothing to write for it
 	born     bool         // the device is new
 	replaced string       // born in the place of this device (revoked by stmts)
+	enrol    bool         // keyless existing device: credentials are replaced and the new hashes set in this batch
 }
 
 // birth decides it. dev is the request's device (its ID is the id a new one gets, "" = generated); limit is the user's
 // device limit (0 = none) and the stored mode turns it into the ceiling for a new device (linkCeiling). Refusals, all made
 // without a write: *AccessLimitError (at the ceiling, and no silent device to replace), ErrAccessBlocked (the owner blocked
 // the HWID) and ErrNoSharedDevice (STRICT has no shared device). Every statement that rests on the mode carries a guard on it.
-func (st *linkDeviceState) birth(dev AccessDevice, limit int, now time.Time) (linkBirth, error) {
+// enrol (EnrolLinkDevice) changes three things: the shared device is never adopted, an existing device with a key is refused
+// (ErrAccessExists), and an existing keyless device keeps its row while its credentials are revoked and the hashes written.
+// Without enrol an existing device with a key is ErrDeviceEnrolled.
+func (st *linkDeviceState) birth(dev AccessDevice, limit int, now time.Time, enrol bool) (linkBirth, error) {
 	own := linkDeviceSnapshotOf(st.own)
 	if own.Device.ID != "" {
+		if enrol {
+			if len(own.Device.KeyHash) != 0 {
+				return linkBirth{}, ErrAccessExists
+			}
+			stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM device WHERE id = ?1 AND user_id = ?2
+				AND hwid_hash = ?3 AND kind = 'link' AND revoked_at IS NULL AND key_hash IS NULL)`,
+				own.Device.ID, dev.UserID, dev.HWIDHash)}
+			stmts = append(stmts, revokeDeviceCredentialStmts(own.Device.ID, now)...)
+			// The enrolling client says more about itself than the headers of a basic fetch did: what it says replaces what the row held.
+			stmts = append(stmts, Stmt{Query: `UPDATE device SET key_hash = ?4, enrol_token_hash = ?5,
+					platform = coalesce(nullif(?6, ''), platform), model = coalesce(nullif(?7, ''), model),
+					os_version = coalesce(nullif(?8, ''), os_version), client = coalesce(nullif(?9, ''), client),
+					first_seen_at = CASE WHEN first_seen_at = 0 THEN ?10 ELSE first_seen_at END, last_seen_at = max(last_seen_at, ?10)
+				WHERE id = ?1 AND user_id = ?2 AND hwid_hash = ?3 AND kind = 'link' AND revoked_at IS NULL AND key_hash IS NULL`,
+				Args: []any{own.Device.ID, dev.UserID, dev.HWIDHash, dev.KeyHash, dev.EnrolTokenHash,
+					dev.Platform, dev.Model, dev.OSVersion, dev.Client, unix(now)}})
+			return linkBirth{deviceID: own.Device.ID, exists: true, enrol: true, stmts: stmts}, nil
+		}
+		if len(own.Device.KeyHash) != 0 {
+			return linkBirth{}, ErrDeviceEnrolled
+		}
+		// key_hash IS NULL: a device enrolled since the read (the snapshot is older than the enrolment) is neither filled nor returned.
 		return linkBirth{deviceID: own.Device.ID, creds: own.Creds, exists: true, stmts: []Stmt{
-			guard(`EXISTS (SELECT 1 FROM device WHERE id = ?1 AND user_id = ?2 AND hwid_hash IS ?3 AND kind = 'link' AND revoked_at IS NULL)`,
+			guard(`EXISTS (SELECT 1 FROM device WHERE id = ?1 AND user_id = ?2 AND hwid_hash IS ?3 AND kind = 'link' AND revoked_at IS NULL AND key_hash IS NULL)`,
 				own.Device.ID, dev.UserID, hwidArg(dev.HWIDHash))}}, nil
 	}
 	mode, hasHWID := LinkModeOf(st.mode), len(dev.HWIDHash) > 0
@@ -214,7 +265,7 @@ func (st *linkDeviceState) birth(dev AccessDevice, limit int, now time.Time) (li
 		return linkBirth{}, ErrNoSharedDevice
 	}
 	modeGuard := guard(linkModeGuard, SettingLinkDeviceLimit, st.mode)
-	if shared := linkDeviceSnapshotOf(st.shared); hasHWID && shared.Device.ID != "" && len(shared.Creds) > 0 && st.hwidDevices == 0 {
+	if shared := linkDeviceSnapshotOf(st.shared); !enrol && hasHWID && shared.Device.ID != "" && len(shared.Creds) > 0 && st.hwidDevices == 0 {
 		return linkBirth{deviceID: shared.Device.ID, creds: shared.Creds, stmts: []Stmt{
 			modeGuard,
 			guard(linkAdoptGuard, shared.Device.ID, dev.UserID, dev.HWIDHash),
@@ -246,6 +297,7 @@ func (st *linkDeviceState) birth(dev AccessDevice, limit int, now time.Time) (li
 		return b, nil
 	}
 	b.replaced = victim.ID
+	// The silent device is revoked with its credentials and peers, the event says so, and the new device takes its place.
 	b.stmts = []Stmt{modeGuard, guard(linkDeviceEvictGuard, dev.UserID, hwidArg(dev.HWIDHash), int64(ceiling), victim.ID, unix(now.Add(-LinkEvictAfter)))}
 	b.stmts = append(b.stmts, revokeDeviceStmts(victim.ID, now)...)
 	b.stmts = append(b.stmts, Stmt{Query: `INSERT INTO event (ts, severity, code, source, user_id, device_id, params_json) VALUES (?, 1, 'device_replaced', 'panel', ?, ?, ?)`,
@@ -272,6 +324,23 @@ func deviceReplacedParams(v linkVictim) string {
 // one, a block or a mode switch between the read and the write is read by the repeat. ErrNotFound when the user is gone;
 // ErrAccessBlocked and ErrNoSharedDevice as in birth.
 func (a Access) EnsureLinkDevice(ctx context.Context, dev AccessDevice, limit int, now time.Time, issue LinkIssue) (LinkDeviceResult, error) {
+	return a.ensureLinkDevice(ctx, dev, limit, now, issue, false)
+}
+
+// EnrolLinkDevice enrols one request device with credentials in the same guarded batch. It never adopts a shared device. A
+// matching keyless device keeps its row while its old credentials and AWG peers are revoked/quarantined and fresh credentials
+// and hashes are written. An already enrolled row is not replaced.
+func (a Access) EnrolLinkDevice(ctx context.Context, dev AccessDevice, limit int, now time.Time, issue LinkIssue) (LinkDeviceResult, error) {
+	if dev.UserID == "" || len(dev.HWIDHash) != sha256.Size || len(dev.KeyHash) != sha256.Size || len(dev.EnrolTokenHash) != sha256.Size {
+		return LinkDeviceResult{}, errors.New("store: invalid device key hash")
+	}
+	dev.Kind, dev.Implicit, dev.AWG, dev.Key, dev.CreatedAt = DeviceKindLink, false, false, false, now
+	dev.KeyHash = append([]byte(nil), dev.KeyHash...)
+	dev.EnrolTokenHash = append([]byte(nil), dev.EnrolTokenHash...)
+	return a.ensureLinkDevice(ctx, dev, limit, now, issue, true)
+}
+
+func (a Access) ensureLinkDevice(ctx context.Context, dev AccessDevice, limit int, now time.Time, issue LinkIssue, enrol bool) (LinkDeviceResult, error) {
 	var result LinkDeviceResult
 	results, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
 		result = LinkDeviceResult{}
@@ -286,7 +355,7 @@ func (a Access) EnsureLinkDevice(ctx context.Context, dev AccessDevice, limit in
 		}
 		own := linkDeviceSnapshotOf(st.own)
 		result.Device, result.Creds = own.Device, own.Creds
-		b, err := st.birth(dev, limit, now)
+		b, err := st.birth(dev, limit, now, enrol)
 		if err != nil {
 			return nil, err
 		}
@@ -294,14 +363,20 @@ func (a Access) EnsureLinkDevice(ctx context.Context, dev AccessDevice, limit in
 		for _, c := range b.creds {
 			have[c.Protocol] = true
 		}
+		if b.enrol {
+			have = make(map[string]bool)
+		}
 		added, err := issue(b.deviceID, have)
 		if err != nil {
 			return nil, accMapErr(err)
 		}
+		if enrol && len(added) == 0 {
+			return nil, ErrNoLinkCredentials
+		}
 		if len(added) == 0 && (b.exists || b.born) {
 			return nil, nil // nothing to fill, and no device is born empty
 		}
-		result.Replaced, result.Born = b.replaced, b.born
+		result.Replaced, result.Born, result.Used, result.Mode = b.replaced, b.born, st.used, LinkModeOf(st.mode)
 		stmts := append([]Stmt{}, b.stmts...)
 		result.Added = make([]AccessCred, len(added))
 		for i, cred := range added {
@@ -326,4 +401,69 @@ func (a Access) EnsureLinkDevice(ctx context.Context, dev AccessDevice, limit in
 		result.Device, result.Creds = snapshot.Device, snapshot.Creds
 	}
 	return result, nil
+}
+
+// linkDeviceByKeyHashSQL is an index search on device_key_hash (the partial unique index; "key_hash = ?" implies its
+// "IS NOT NULL"), then the owner by primary key. TestLinkDeviceByKeyHashUsesTheKeyIndex holds the plan.
+const linkDeviceByKeyHashSQL = `SELECT d.id, d.user_id, d.hwid_hash, d.key_hash, d.enrol_token_hash, d.kind,
+	coalesce(d.platform, ''), coalesce(d.model, ''), coalesce(d.os_version, ''), coalesce(d.client, ''),
+	coalesce(d.first_seen_at, 0), coalesce(d.last_seen_at, 0), d.created_at, d.revoked_at, d.blocked_at, u.id, u.sub_token_hash
+	FROM device d JOIN user u ON u.id = d.user_id
+	WHERE d.key_hash = ? AND d.kind = 'link'`
+
+// LinkDeviceByKeyHash finds a link device by its globally unique key hash and the owner's small projection (what sync needs).
+// A live device comes back with its owner; a key of a removed device is ErrDeviceRevoked, of a blocked one ErrAccessBlocked, and
+// an unknown key ErrNotFound. For the first two the device is empty (a caller cannot serve it by mistake) and only the owner
+// is returned, so a caller can answer "removed" or "blocked" to the one who holds the key. Revoked rows keep their hashes: a key
+// is never reusable.
+func (a Access) LinkDeviceByKeyHash(ctx context.Context, keyHash []byte) (AccessDevice, LinkDeviceKeyOwner, error) {
+	if len(keyHash) != sha256.Size {
+		return AccessDevice{}, LinkDeviceKeyOwner{}, errors.New("store: invalid device key hash")
+	}
+	var d AccessDevice
+	var user LinkDeviceKeyOwner
+	var first, last, created int64
+	var revoked, blocked sql.NullInt64
+	err := a.s.R.QueryRowContext(ctx, linkDeviceByKeyHashSQL, keyHash).Scan(
+		&d.ID, &d.UserID, &d.HWIDHash, &d.KeyHash, &d.EnrolTokenHash, &d.Kind,
+		&d.Platform, &d.Model, &d.OSVersion, &d.Client, &first, &last, &created,
+		&revoked, &blocked, &user.UserID, &user.SubTokenHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return AccessDevice{}, LinkDeviceKeyOwner{}, ErrNotFound
+	}
+	if err != nil {
+		return AccessDevice{}, LinkDeviceKeyOwner{}, err
+	}
+	user.SubTokenHash = append([]byte(nil), user.SubTokenHash...)
+	if blocked.Valid {
+		return AccessDevice{}, user, ErrAccessBlocked
+	}
+	if revoked.Valid {
+		return AccessDevice{}, user, ErrDeviceRevoked
+	}
+	d.Implicit = d.HWIDHash == nil
+	d.FirstSeenAt, d.LastSeenAt, d.CreatedAt = accTimeIfNonzero(sql.NullInt64{Int64: first, Valid: true}), accTimeIfNonzero(sql.NullInt64{Int64: last, Valid: true}), fromUnix(created)
+	return d, user, nil
+}
+
+// SetLinkDeviceKeyHash changes the key and enrol-token hashes only while the user's live link device has the expected current
+// key hash (nil for a first set). The one-statement guard is atomic on both SQLite and D1.
+func (a Access) SetLinkDeviceKeyHash(ctx context.Context, userID, deviceID string, expectedKeyHash, keyHash, enrolTokenHash []byte) (bool, error) {
+	if userID == "" || deviceID == "" || len(keyHash) != sha256.Size || len(enrolTokenHash) != sha256.Size || (len(expectedKeyHash) != 0 && len(expectedKeyHash) != sha256.Size) {
+		return false, errors.New("store: invalid device key hash")
+	}
+	var expected any
+	if len(expectedKeyHash) > 0 {
+		expected = expectedKeyHash
+	}
+	results, err := a.s.batch(ctx, Stmt{Query: `UPDATE device SET key_hash = ?, enrol_token_hash = ?
+		WHERE id = ? AND user_id = ? AND kind = 'link' AND revoked_at IS NULL AND key_hash IS ?`,
+		Args: []any{keyHash, enrolTokenHash, deviceID, userID, expected}})
+	if accIsUnique(err) {
+		return false, ErrAccessExists
+	}
+	if err != nil {
+		return false, err
+	}
+	return len(results) == 1 && results[0].RowsAffected == 1, nil
 }

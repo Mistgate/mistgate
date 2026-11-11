@@ -346,6 +346,7 @@ type world struct {
 	adminv1connect.UnimplementedProvisioningServiceHandler
 	adminv1connect.UnimplementedWarpServiceHandler
 	adminv1connect.UnimplementedClientProbeServiceHandler
+	adminv1connect.UnimplementedClientApiServiceHandler
 	adminv1connect.UnimplementedRelayServiceHandler
 	opsv1connect.UnimplementedOpsServiceHandler
 
@@ -372,6 +373,7 @@ type world struct {
 	speedReqs          []*probev1.PathSpeedRequest
 	speedCode          string // the error code PathSpeed answers with
 	probeRateLimited   bool   // PathProbe answers resource exhausted
+	clientAPIEnabled   bool
 	mu                 sync.Mutex
 	log                []callRec
 	fixReqs            []*adminv1.ApplyFixRequest
@@ -1653,6 +1655,10 @@ func (w *world) GetClientProbe(context.Context, *connect.Request[adminv1.GetClie
 	}), nil
 }
 
+func (w *world) GetClientApi(context.Context, *connect.Request[adminv1.GetClientApiRequest]) (*connect.Response[adminv1.GetClientApiResponse], error) {
+	return connect.NewResponse(&adminv1.GetClientApiResponse{Settings: &adminv1.ClientApiSettings{Enabled: w.clientAPIEnabled}}), nil
+}
+
 // connWindow is the window the fake connection counters echo: since = now - hours (24 when empty), so a test sees what the tool sent.
 func connWindow(hours uint32) (since, now int64) {
 	if hours == 0 {
@@ -1799,6 +1805,7 @@ func (w *world) api(a *fakeAuth) http.Handler {
 		func() (string, http.Handler) { return adminv1connect.NewProvisioningServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewWarpServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewClientProbeServiceHandler(w) },
+		func() (string, http.Handler) { return adminv1connect.NewClientApiServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewRelayServiceHandler(w) },
 		func() (string, http.Handler) { return probev1connect.NewProbeServiceHandler(w) },
 		func() (string, http.Handler) { return opsv1connect.NewOpsServiceHandler(w) },

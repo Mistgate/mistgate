@@ -85,6 +85,7 @@ type AccessDevice struct {
 	AWG bool
 	// Key marks a Telegram key made by AddTelegramKey: kind key with a synthetic hwid_hash, like an AWG device, and no seen times.
 	Key                                bool
+	KeyHash, EnrolTokenHash            []byte // client API hashes; nil until the device enrols
 	FirstSeenAt, LastSeenAt, CreatedAt time.Time
 	Protocols                          []string // protocols with a live credential
 }
@@ -130,9 +131,19 @@ func accInsertDeviceStmt(d AccessDevice) Stmt {
 		// Only tests take this branch: a link device with a HWID of its own.
 		hwid = []byte(d.ID)
 	}
-	return Stmt{Query: `INSERT INTO device (id, user_id, hwid_hash, kind, platform, model, os_version, client, first_seen_at, last_seen_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		Args: []any{d.ID, d.UserID, hwid, kind, d.Platform, d.Model, d.OSVersion, d.Client, seen, seen, unix(d.CreatedAt)}}
+	keyHash, enrolHash := nullableClientDeviceHash(d.KeyHash), nullableClientDeviceHash(d.EnrolTokenHash)
+	return Stmt{Query: `INSERT INTO device (id, user_id, hwid_hash, kind, platform, model, os_version, client, first_seen_at, last_seen_at, created_at, key_hash, enrol_token_hash)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		Args: []any{d.ID, d.UserID, hwid, kind, d.Platform, d.Model, d.OSVersion, d.Client, seen, seen, unix(d.CreatedAt), keyHash, enrolHash}}
+}
+
+// nullableClientDeviceHash returns untyped nil for an absent hash so both SQL drivers bind NULL. D1's JS adapter otherwise
+// sees a nil []byte as a zero-length Uint8Array, which fails the 32-byte column check.
+func nullableClientDeviceHash(hash []byte) any {
+	if len(hash) == 0 {
+		return nil
+	}
+	return hash
 }
 
 func accInsertCredStmts(creds []AccessCred) []Stmt {
@@ -682,12 +693,14 @@ func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	var d AccessDevice
 	var id, userID, kind, platform, model, osVersion, client, protocols, fingerprint sql.NullString
 	var implicit, first, last, created, used sql.NullInt64
-	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &client, &first, &last, &created, &protocols, &used, &fingerprint); err != nil {
+	var keyHash, enrolTokenHash []byte
+	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &client, &first, &last, &created, &protocols, &used, &fingerprint, &keyHash, &enrolTokenHash); err != nil {
 		return AccessDevice{}, err
 	}
 	d.ID, d.UserID, d.Platform, d.Model, d.OSVersion = id.String, userID.String, platform.String, model.String, osVersion.String
 	d.Kind, d.Client = kind.String, client.String
 	d.UsedBytes, d.Fingerprint = uint64(max(used.Int64, 0)), fingerprint.String
+	d.KeyHash, d.EnrolTokenHash = keyHash, enrolTokenHash
 	d.Implicit = implicit.Int64 == 1
 	if first.Valid && first.Int64 != 0 {
 		d.FirstSeenAt = fromUnix(first.Int64)
@@ -708,6 +721,7 @@ func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 const linkDeviceCredsSQL = `
 	SELECT d.id AS device_id, d.user_id AS user_id, coalesce(d.platform, '') AS platform, coalesce(d.model, '') AS model,
 		coalesce(d.os_version, '') AS os_version, coalesce(d.client, '') AS client, d.hwid_hash IS NULL AS shared,
+		d.key_hash, d.enrol_token_hash,
 		coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at,
 		d.created_at AS device_created_at, coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol,
 		coalesce(c.profile_id, '') AS profile_id, coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json,
@@ -776,6 +790,7 @@ func scanLinkDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) 
 	var id, protocol, profile, data string
 	var secret []byte
 	if err := row.Scan(&device.ID, &device.UserID, &device.Platform, &device.Model, &device.OSVersion, &device.Client, &shared,
+		&device.KeyHash, &device.EnrolTokenHash,
 		&first, &last, &deviceCreated, &id, &protocol, &profile, &secret, &data, &configEpoch, &credCreated); err != nil {
 		return AccessDevice{}, AccessCred{}, false, err
 	}
@@ -964,7 +979,8 @@ func (a Access) NodeTraffic(ctx context.Context, userID string, since time.Time)
 // ---- devices and credentials ----
 
 // accDeviceTail is what scanAccessDevice reads after the protocols: the device's traffic and its fingerprint.
-const accDeviceTail = `, d.used_bytes, CASE WHEN d.kind = 'link' THEN lower(hex(substr(d.hwid_hash, 1, 3))) ELSE '' END`
+const accDeviceTail = `, d.used_bytes, CASE WHEN d.kind = 'link' THEN lower(hex(substr(d.hwid_hash, 1, 3))) ELSE '' END,
+	d.key_hash, d.enrol_token_hash`
 
 // accDeviceLive is the SQL condition "device d holds a live credential".
 const accDeviceLive = `EXISTS (SELECT 1 FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL)`

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// ClientApiService controls the Mistgate desktop client API switch.
+// The switch opens two things: the opt-in discovery header on valid
+// subscription app responses, and device enrolment by the subscription link
+// (POST <link>/client/enrol). A device that is already enrolled does not depend
+// on it, and a basic subscription fetch that carries the HWID of an enrolled
+// device is refused whatever the switch says.
+//
+// GetClientApi is a read for every admin role and API token. UpdateClientApi is
+// owner-only and requires a step-up.
+service ClientApiService {
+  rpc GetClientApi(GetClientApiRequest) returns (GetClientApiResponse);
+  rpc UpdateClientApi(UpdateClientApiRequest) returns (UpdateClientApiResponse);
+}
+
+message ClientApiSettings {
+  // Whether valid subscription app answers may advertise client API discovery
+  // and the panel takes enrolments. This is off by default.
+  bool enabled = 1;
+}
+
+message GetClientApiRequest {}
+message GetClientApiResponse {
+  ClientApiSettings settings = 1;
+}
+
+message UpdateClientApiRequest {
+  // Absent leaves the setting unchanged.
+  optional bool enabled = 1;
+}
+message UpdateClientApiResponse {
+  ClientApiSettings settings = 1;
+}

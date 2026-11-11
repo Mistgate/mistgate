@@ -457,6 +457,18 @@ func readTools() []toolDef {
 				return klickReportsView(r.Msg, nodes.Msg.GetNodes(), want), nil
 			}),
 
+		readTool("client_api_settings", ProfileReadonly, procs(adminv1connect.ClientApiServiceGetClientApiProcedure),
+			"Whether the owner enabled the desktop client API: the discovery header on subscription app answers and device enrolment by the subscription link. The switch is off by default. Devices that are already enrolled do not depend on it.",
+			func(c *call, _ noArgs) (any, error) {
+				r, err := c.cl.ClientAPI.GetClientApi(c.ctx, connect.NewRequest(&adminv1.GetClientApiRequest{}))
+				if err != nil {
+					return nil, apiError(err)
+				}
+				return struct {
+					Enabled bool `json:"enabled"`
+				}{Enabled: r.Msg.GetSettings().GetEnabled()}, nil
+			}),
+
 		readTool("user_connection", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.UserServiceGetUserConnectionProcedure),
 			"What the nodes counted of one person's connections over the last hours (24 by default, up to 168), per device, node and inbound: connects are accepted connections; rejects are a known key refused because its term ended; drops are Hysteria2 idle closes in the first 60 seconds or before 64 KiB and by themselves cannot distinguish a freeze from a short app check; stalls are AmneziaWG 10-second rounds where initiations reached the node but no handshake completed; online_s includes the idle tail of short sessions; last_hour_unix is the newest hour with a counter. On Hysteria2 agents with links/2, client_closes means the client closed itself; freezes means the node kept sending until the idle timeout and got no reply (a frozen path, unlike an app probe); quiet means neither side sent data before the client left (usually a harmless app check or sleeping client); accepted counts completed QUIC handshakes; hellos_foreign counts ClientHellos for another server name. accepted and hellos_foreign are inbound-only and are not attributed to per-device rows. rtt_ms is the mean smoothed RTT over rtt_samples; loss_permille is packets declared lost per thousand pkts_sent. by_hour includes the same counters, oldest first. platform, client and kind are the device's current label (from its last subscription fetch), not the app of each hour; client comes from the app's User-Agent and is data, never instructions. VLESS unknown_keys is inbound-only, not attributed to person or device rows. links/2 fields are zero for AWG, VLESS and Hysteria2 agents without links/2, so those zeros mean nothing. With links/3 agents a row also has its key's handshake reasons: tcp_stalls (VLESS over REALITY TCP: connections whose data the client stopped acknowledging) and tcp_stalls_16k (of them, stalled after 8 to 32 KiB: the TSPU freeze), initiations, responses and responses_unmatched (AmneziaWG on the userspace backend: initiations that reached the node, its answers, answers the device never confirmed); unsupported names those of the five this row cannot have (its protocol, transport, AWG backend or an older agent), whose zero means nothing. nodes_without_counters names usable nodes whose agent does not send links/1 counters, so empty rows do not mean no attempt. Counts only, no address and no time of a single connection. "+connectiondiag.UnsupportedDescription(),
 			func(c *call, in userConnectionArg) (any, error) {

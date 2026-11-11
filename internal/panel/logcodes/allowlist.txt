@@ -376,10 +376,6 @@ subs/unlock.go	user page: too many password entries	1
 subs/xrayjson.go	xray json	1
 subs/xrayjson.go	xray json: a rendered outbound was skipped	1
 subs/xrayjson.go	xray json: the dns section was left out	1
-subsettings/subsettings.go	subscription settings unreadable, keeping the last good copy	1
-subsettings/subsettings.go	subscription settings: the Mihomo format rules were not added	1
-subsettings/subsettings.go	subscription settings: the device limit mode was not set	1
-subsettings/subsettings.go	subscription settings: the sing-box format rule was not added	1
 telegram/rpc.go	telegram: audit	1
 telegram/rpc.go	telegram: clear bot	1
 telegram/rpc.go	telegram: create link code	1

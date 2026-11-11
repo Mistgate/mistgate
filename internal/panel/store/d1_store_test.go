@@ -1798,6 +1798,136 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 	})
 }
 
+func TestD1ClientDeviceKeyMethodsUseGuardedBatch(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_client_api", Name: "Client API", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	u := AccessUser{ID: "usr_alice", Name: "alice", GroupID: "grp_client_api", Status: "active", AppHapp: true, AppAmnezia: true,
+		AllNodes: true, QuotaReset: "month", PeriodStart: now, DeviceLimit: 5, SubTokenHash: []byte("subscription-hash"),
+		SubTokenEnc: []byte("sealed"), CreatedAt: now}
+	if err := st.Access().CreateUser(ctx, u, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSettings(ctx, map[string]string{SettingLinkDeviceLimit: LinkModeEnforce}); err != nil {
+		t.Fatal(err)
+	}
+	issue := func(tag string) LinkIssue {
+		return func(string, map[string]bool) ([]AccessCred, error) {
+			return []AccessCred{{ID: "crd_" + tag, UserID: u.ID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`}}, nil
+		}
+	}
+	hwid := HWIDHash(u.ID, "aaaaaaaaaaaaaaaa")
+	old, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_basic", UserID: u.ID, HWIDHash: hwid, Kind: DeviceKindLink}, 5, now, issue("basic"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyHash, enrolHash := sha256.Sum256([]byte("key")), sha256.Sum256([]byte("enrol"))
+	var enrolled LinkDeviceResult
+	counts := countD1Queries(t, js.Global().Get("__d1"), "client-api-enrol-keyless", func() {
+		enrolled, err = st.Access().EnrolLinkDevice(ctx,
+			AccessDevice{ID: "dev_ignored", UserID: u.ID, HWIDHash: hwid, KeyHash: keyHash[:], EnrolTokenHash: enrolHash[:]}, 5, now.Add(time.Minute), issue("enrolled"))
+		if err != nil {
+			t.Fatalf("enrol over a keyless device: %v", err)
+		}
+	})
+	if counts.batches != 2 { // the state is read in one batch, and everything the enrolment writes goes in one
+		t.Fatalf("enrolment over a keyless device made %d batches, want a read batch and one atomic write batch", counts.batches)
+	}
+	if enrolled.Device.ID != old.Device.ID || !bytes.Equal(enrolled.Device.KeyHash, keyHash[:]) || len(enrolled.Creds) != 1 || enrolled.Creds[0].ID != "crd_enrolled" {
+		t.Fatalf("enrolment result = %+v", enrolled)
+	}
+	var liveOld, liveNew int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_basic' AND revoked_at IS NULL AND id = 'crd_basic'`).Scan(&liveOld); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_basic' AND revoked_at IS NULL AND id = 'crd_enrolled'`).Scan(&liveNew); err != nil {
+		t.Fatal(err)
+	}
+	if liveOld != 0 || liveNew != 1 {
+		t.Fatalf("live credentials: old %d, new %d; want 0 and 1", liveOld, liveNew)
+	}
+	device, owner, err := st.Access().LinkDeviceByKeyHash(ctx, keyHash[:])
+	if err != nil || device.ID != "dev_basic" || owner.UserID != u.ID || !bytes.Equal(device.EnrolTokenHash, enrolHash[:]) {
+		t.Fatalf("lookup = device %+v owner %+v err %v", device, owner, err)
+	}
+
+	// A new HWID: one batch for the device, its credentials and both hashes.
+	secondKey := sha256.Sum256([]byte("second key"))
+	counts = countD1Queries(t, js.Global().Get("__d1"), "client-api-enrol-new", func() {
+		enrolled, err = st.Access().EnrolLinkDevice(ctx,
+			AccessDevice{ID: "dev_second", UserID: u.ID, HWIDHash: HWIDHash(u.ID, "bbbbbbbbbbbbbbbb"), KeyHash: secondKey[:], EnrolTokenHash: enrolHash[:]}, 5, now.Add(time.Minute), issue("second"))
+		if err != nil {
+			t.Fatalf("enrol a new HWID: %v", err)
+		}
+	})
+	if counts.batches != 2 || enrolled.Device.ID != "dev_second" || !enrolled.Born || len(enrolled.Creds) != 1 {
+		t.Fatalf("new HWID enrolment: %d batches, %+v", counts.batches, enrolled)
+	}
+	// The same HWID again is refused before any write; a repeated key hash fails the batch as a whole and writes nothing.
+	if _, err := st.Access().EnrolLinkDevice(ctx,
+		AccessDevice{UserID: u.ID, HWIDHash: HWIDHash(u.ID, "bbbbbbbbbbbbbbbb"), KeyHash: keyHash[:], EnrolTokenHash: enrolHash[:]}, 5, now.Add(time.Minute), issue("again")); !errors.Is(err, ErrAccessExists) {
+		t.Fatalf("enrol of an enrolled HWID = %v, want ErrAccessExists", err)
+	}
+	counts = countD1Queries(t, js.Global().Get("__d1"), "client-api-enrol-duplicate-key", func() {
+		_, err = st.Access().EnrolLinkDevice(ctx,
+			AccessDevice{ID: "dev_dup", UserID: u.ID, HWIDHash: HWIDHash(u.ID, "cccccccccccccccc"), KeyHash: keyHash[:], EnrolTokenHash: enrolHash[:]}, 5, now.Add(time.Minute), issue("dup"))
+	})
+	if !errors.Is(err, ErrAccessExists) || counts.batches != 2 {
+		t.Fatalf("enrol with a duplicate key hash = %v after %d batches; want ErrAccessExists after the read and one failed write (not retried)", err, counts.batches)
+	}
+	var dupRows int
+	if err := st.R.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM device WHERE id = 'dev_dup') + (SELECT count(*) FROM device_credential WHERE id = 'crd_dup')`).Scan(&dupRows); err != nil || dupRows != 0 {
+		t.Fatalf("the failed batch left %d rows (%v)", dupRows, err)
+	}
+
+	// The key hash of a device that was set is compared to the expected one, with the user in the guard.
+	if changed, err := st.Access().SetLinkDeviceKeyHash(ctx, "usr_bob", device.ID, keyHash[:], secondKey[:], enrolHash[:]); err != nil || changed {
+		t.Fatalf("set by a foreign user = %v, %v; want no change", changed, err)
+	}
+	if _, err := st.Access().SetLinkDeviceKeyHash(ctx, u.ID, device.ID, keyHash[:], secondKey[:], enrolHash[:]); !errors.Is(err, ErrAccessExists) {
+		t.Fatalf("set of a key hash that is taken = %v, want ErrAccessExists", err)
+	}
+	rotatedHash := sha256.Sum256([]byte("rotated-key"))
+	counts = countD1Queries(t, js.Global().Get("__d1"), "client-api-key-rotation", func() {
+		changed, err := st.Access().SetLinkDeviceKeyHash(ctx, u.ID, device.ID, keyHash[:], rotatedHash[:], enrolHash[:])
+		if err != nil || !changed {
+			t.Fatalf("rotate device key = %v, %v", changed, err)
+		}
+	})
+	if counts.batches != 1 {
+		t.Fatalf("key update made %d batches, want one atomic update", counts.batches)
+	}
+	if _, _, err := st.Access().LinkDeviceByKeyHash(ctx, keyHash[:]); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("old key lookup after rotation = %v", err)
+	}
+	if device, _, err := st.Access().LinkDeviceByKeyHash(ctx, rotatedHash[:]); err != nil || device.ID != "dev_basic" {
+		t.Fatalf("rotated key lookup = %+v, %v", device, err)
+	}
+
+	// Removed and blocked devices keep their hashes: the lookup says so and returns no device.
+	if _, err := st.Access().RevokeDevice(ctx, "dev_basic", now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if device, owner, err := st.Access().LinkDeviceByKeyHash(ctx, rotatedHash[:]); !errors.Is(err, ErrDeviceRevoked) || device.ID != "" || owner.UserID != u.ID {
+		t.Fatalf("removed device lookup = %+v %+v %v", device, owner, err)
+	}
+	if _, err := st.Access().BlockDevice(ctx, "dev_second", now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if device, owner, err := st.Access().LinkDeviceByKeyHash(ctx, secondKey[:]); !errors.Is(err, ErrAccessBlocked) || device.ID != "" || owner.UserID != u.ID {
+		t.Fatalf("blocked device lookup = %+v %+v %v", device, owner, err)
+	}
+	if _, _, err := st.Access().LinkDeviceByKeyHash(ctx, sha256.New().Sum(nil)); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown key lookup = %v", err)
+	}
+	if changed, err := st.Access().SetLinkDeviceKeyHash(ctx, u.ID, old.Device.ID, nil, keyHash[:], enrolHash[:]); err != nil || changed {
+		t.Fatalf("set key on revoked row = %v, %v; want no change", changed, err)
+	}
+}
+
 func TestD1LinkAWGKeyCountAndRevoke(t *testing.T) {
 	ctx := context.Background()
 	st := openD1Store(t)

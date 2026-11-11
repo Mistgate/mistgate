@@ -487,25 +487,25 @@ var (
 // Load reads the stored settings; an install that never saved any gets Defaults(). The mode of the device limit, which has a
 // setting of its own (see linkModeKey), is merged in: a panel that was never given one reads as TRACK.
 func Load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, error) {
-	set, _, err := load(ctx, st)
+	set, _, _, err := load(ctx, st)
 	return set, err
 }
 
-// load is Load that also reads the switch of the kl!ck reports (store.SettingClientProbe) in the same query: every
-// subscription answer needs it for the Probe-Report header, and a read of its own would cost each cold answer one more.
-func load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, bool, error) {
-	kv, err := st.SettingValues(ctx, []string{Key, store.SettingLinkDeviceLimit, store.SettingClientProbe})
+// load is Load that also reads the kl!ck reports and client API discovery switches in the same query: every subscription
+// answer needs them for response headers, and separate reads would cost each cold answer one more query.
+func load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, bool, bool, error) {
+	kv, err := st.SettingValues(ctx, []string{Key, store.SettingLinkDeviceLimit, store.SettingClientProbe, store.SettingClientAPI})
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	set := Defaults()
 	if v, ok := kv[Key]; ok {
 		if set, err = Parse(v); err != nil {
-			return nil, false, err
+			return nil, false, false, err
 		}
 	}
 	set.LinkDeviceLimit = linkModeProto(kv[store.SettingLinkDeviceLimit]).Enum()
-	return set, kv[store.SettingClientProbe] == "1", nil
+	return set, kv[store.SettingClientProbe] == "1", kv[store.SettingClientAPI] == "1", nil
 }
 
 // Parse reads a stored subscription-settings document. Missing documents should use Defaults instead.
@@ -528,10 +528,11 @@ type Cache struct {
 	now func() time.Time
 	ttl time.Duration
 
-	mu    sync.Mutex
-	cur   *adminv1.SubscriptionSettings
-	probe bool // the kl!ck reports are on, read with cur
-	at    time.Time
+	mu        sync.Mutex
+	cur       *adminv1.SubscriptionSettings
+	probe     bool // the kl!ck reports are on, read with cur
+	clientAPI bool // client API discovery is on, read with cur
+	at        time.Time
 }
 
 // NewCache makes the cache. log may be nil. It also runs MigrateM3, MigrateSingbox and MigrateLinkDeviceLimit (the panel builds the cache
@@ -543,13 +544,13 @@ func NewCache(st *store.Store, log *slog.Logger) *Cache {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := MigrateM3(ctx, st); err != nil {
-		log.Warn("subscription settings: the Mihomo format rules were not added", "err", err)
+		log.Warn("subscription settings: the Mihomo format rules were not added", "code", "m3_rules_migration_failed", "err", err)
 	}
 	if err := MigrateSingbox(ctx, st); err != nil {
-		log.Warn("subscription settings: the sing-box format rule was not added", "err", err)
+		log.Warn("subscription settings: the sing-box format rule was not added", "code", "singbox_rule_migration_failed", "err", err)
 	}
 	if err := MigrateLinkDeviceLimit(ctx, st); err != nil {
-		log.Warn("subscription settings: the device limit mode was not set", "err", err)
+		log.Warn("subscription settings: the device limit mode was not set", "code", "link_device_limit_migration_failed", "err", err)
 	}
 	return NewCacheWithoutMigrations(st, log)
 }
@@ -568,35 +569,41 @@ func NewCacheWithoutMigrations(st *store.Store, log *slog.Logger) *Cache {
 // are returned without being cached. The read does not end with the caller's context: one app that gave up on a slow
 // panel must not decide what everyone else is served for the next minute.
 func (c *Cache) Get(ctx context.Context) *adminv1.SubscriptionSettings {
-	s, _ := c.get(ctx)
+	s, _, _ := c.get(ctx)
 	return s
 }
 
 // ProbeReports says whether the panel takes the reports of the kl!ck probe (store.SettingClientProbe), as cached with the
 // settings: a switch reaches the subscription answers within the TTL. Off while nothing could be read yet.
 func (c *Cache) ProbeReports(ctx context.Context) bool {
-	_, on := c.get(ctx)
+	_, on, _ := c.get(ctx)
 	return on
 }
 
-func (c *Cache) get(ctx context.Context) (*adminv1.SubscriptionSettings, bool) {
+// ClientAPIEnabled reports whether the owner enabled client API discovery; it shares the subscription settings cache.
+func (c *Cache) ClientAPIEnabled(ctx context.Context) bool {
+	_, _, on := c.get(ctx)
+	return on
+}
+
+func (c *Cache) get(ctx context.Context) (*adminv1.SubscriptionSettings, bool, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.cur != nil && c.now().Sub(c.at) < c.ttl {
-		return c.cur, c.probe
+		return c.cur, c.probe, c.clientAPI
 	}
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), loadTimeout)
 	defer cancel()
-	s, probe, err := load(rctx, c.st)
+	s, probe, clientAPI, err := load(rctx, c.st)
 	if err != nil {
-		c.log.Warn("subscription settings unreadable, keeping the last good copy", "err", err)
+		c.log.Warn("subscription settings unreadable, keeping the last good copy", "code", "subscription_settings_read_failed", "err", err)
 		if c.cur != nil {
-			return c.cur, c.probe
+			return c.cur, c.probe, c.clientAPI
 		}
-		return Defaults(), false
+		return Defaults(), false, false
 	}
-	c.cur, c.probe, c.at = s, probe, c.now()
-	return s, probe
+	c.cur, c.probe, c.clientAPI, c.at = s, probe, clientAPI, c.now()
+	return s, probe, clientAPI
 }
 
 // loadTimeout bounds one read of the document, which runs under the cache lock.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/backup"
+	"github.com/mistgate/mistgate/internal/panel/clientapi"
 	"github.com/mistgate/mistgate/internal/panel/clientprobe"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
@@ -212,6 +213,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	subSvc.NotifyWith(k.fl) // a switch to STRICT revokes the shared devices
 	// The kl!ck reports: the owner's switch (it rides with the subscription settings, hence their cache) and the counts.
 	probe := clientprobe.New(clientprobe.Config{Store: k.st, StepUp: k.authSvc.RequireStepUp, Invalidate: parts.cache.Invalidate, Log: k.log, Now: k.c.Clock})
+	clientAPI := clientapi.New(clientapi.Config{Store: k.st, StepUp: k.authSvc.RequireStepUp, Invalidate: parts.cache.Invalidate, Log: k.log, Now: k.c.Clock})
 	for _, h := range []func() (string, http.Handler){
 		func() (string, http.Handler) { return k.fl.NodeHandler() },
 		func() (string, http.Handler) { return k.fl.FleetHandler() },
@@ -229,6 +231,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 		func() (string, http.Handler) { return k.bl.Handler() },
 		func() (string, http.Handler) { return k.cp.Handler() },
 		func() (string, http.Handler) { return probe.Handler() },
+		func() (string, http.Handler) { return clientAPI.Handler() },
 		bkp.DownloadHandler,
 	} {
 		path, handler := h()

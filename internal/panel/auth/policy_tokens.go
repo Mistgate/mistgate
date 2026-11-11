@@ -65,6 +65,8 @@ var tokenProcedures = map[string]int{
 	adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure: TokenAccessDirect,
 	// The kl!ck reports per node, operator and region: counts and the names the app saw, no address or person.
 	adminv1connect.ClientProbeServiceGetClientProbeProcedure: TokenAccessDirect,
+	// Whether desktop client API discovery is enabled; no token, link or device data is returned.
+	adminv1connect.ClientApiServiceGetClientApiProcedure: TokenAccessDirect,
 	// What the nodes saw of connection attempts (agent.proto LinkCounters): counts per key and inbound, no address.
 	adminv1connect.NodeServiceGetNodeConnectionsProcedure:  TokenAccessDirect,
 	adminv1connect.UserServiceGetUserConnectionProcedure:   TokenAccessDirect,
@@ -197,6 +199,7 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.TspuProbeServiceDisconnectTspuProbeProcedure:         true,
 	adminv1connect.ClientProbeServiceUpdateClientProbeProcedure:         true,
 	adminv1connect.ClientProbeServiceDisconnectClientProbeProcedure:     true,
+	adminv1connect.ClientApiServiceUpdateClientApiProcedure:             true,
 
 	// the password + authenticator-code login (credentials.go)
 	adminv1connect.AuthServiceChangePasswordProcedure:         true,

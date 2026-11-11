@@ -2,8 +2,8 @@
 // client lines (hysteria2:// and vless:// URIs) with the headers Happ and other Xray/sing-box apps read, or, for a client the
 // settings send to the Mihomo format, a Mihomo YAML profile (mihomo.go), to the Xray JSON format an array of Xray configs (xrayjson.go), to the
 // sing-box format a sing-box profile (singbox.go; a hidden ?format=xray-json|sing-box on the link picks one of the two for a request); a browser gets the user page. Under the same
-// prefix the page's self-service endpoints manage the user's AmneziaWG devices (devices.go), and the kl!ck app sends the reports
-// of its local server check (probe.go). Unknown tokens get the decoy, so the endpoint cannot be told from any other path of the site.
+// prefix the page's self-service endpoints manage the user's AmneziaWG devices (devices.go), the kl!ck app sends the reports
+// of its local server check (probe.go) and a client enrols its device by the link (clientenrol.go). Unknown tokens get the decoy, so the endpoint cannot be told from any other path of the site.
 //
 // Abuse protection, all in memory and bounded, none of it logging a token or an address:
 //   - Per-client-network miss and cold-miss windows limit database work from unknown links. Cold valid links do not
@@ -129,6 +129,9 @@ type Config struct {
 	// MaxWritesPerHour is the self-service writes (device add, configs, rotate, revoke, rename, pick a DNS) per token an hour;
 	// default 20, negative = no limit. Separate from MaxPerHour.
 	MaxWritesPerHour int
+	// MaxEnrolsPerHour is the client API enrolments (POST <link>/client/enrol) per link an hour, on top of the writes above;
+	// default enrolPerHour, negative = no limit (tests).
+	MaxEnrolsPerHour int
 	BrandTTL         time.Duration // how long a read of the brand is reused; default 5 seconds
 
 	// PageKey is the key of the page passwords and their cookies (vault.Derive(pagepass.KeyLabel)). Empty = the
@@ -171,6 +174,9 @@ func (c *Config) defaults() {
 	}
 	if c.MaxWritesPerHour == 0 {
 		c.MaxWritesPerHour = 20
+	}
+	if c.MaxEnrolsPerHour == 0 {
+		c.MaxEnrolsPerHour = enrolPerHour
 	}
 	if c.DNS == nil {
 		c.DNS, _ = c.Routing.(Effective)
@@ -243,6 +249,7 @@ type handler struct {
 	fsrc   FormatSource // src when it can render a format, else nil
 	dev    Devices      // src when it manages devices, else nil
 	pdns   PageDNS      // src when it takes the DNS pick of the page, else nil
+	enrol  ClientEnrol  // src when it enrols client API devices, else nil
 	cop    *http.CrossOriginProtection
 	decoy  http.Handler
 	prefix string
@@ -265,6 +272,7 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 	h.fsrc, _ = src.(FormatSource)
 	h.dev, _ = src.(Devices)
 	h.pdns, _ = src.(PageDNS)
+	h.enrol, _ = src.(ClientEnrol)
 	if o := originOf(cfg.BaseURL); o != "" {
 		// Behind a proxy that rewrites Host the Origin of a browser is still the public address.
 		if err := h.cop.AddTrustedOrigin(o); err != nil {
@@ -336,6 +344,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case sub == "probe":
 		h.serveProbe(w, r, token, client, now)
+		return
+	case sub == "client/enrol":
+		h.serveEnrol(w, r, token, client, now)
 		return
 	case sub != "":
 		h.serveDevices(w, r, token, sub, client, now)
@@ -619,6 +630,10 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 		// kl!ck sends the reports of its local server check only to a panel that says it takes them, and of what version.
 		hd.Set("Probe-Report", strconv.Itoa(clientprobe.Version))
 	}
+	if clientCapsPresent(r) && h.cfg.Settings != nil && h.cfg.Settings.ClientAPIEnabled(ctx) {
+		// This is written only by the app response writers; the public HTML page has its own writer above.
+		hd.Set("Mistgate-Client-Api", "1")
+	}
 	if v.Refusal != "" {
 		// The headers of Remnawave, 3x-ui and v2RayTun, so the apps that read them say the same: the HWID check is on, and
 		// the limit is reached or the app has no device ID to give. A blocked device gets neither: the limit is not why,
@@ -650,6 +665,15 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 			hd.Set("Routing", val)
 		}
 	}
+}
+
+func clientCapsPresent(r *http.Request) bool {
+	for _, value := range r.Header.Values("X-Mistgate-Caps") {
+		if strings.TrimSpace(value) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // writeMihomo answers with the Mihomo YAML profile: the proxies of the view (named like the base64 list names its
@@ -890,7 +914,7 @@ func routeOf(r *http.Request, prefix string) (token, sub string, ok bool) {
 	switch {
 	case sub == "" && (r.Method == http.MethodGet || r.Method == http.MethodHead):
 		return token, "", true
-	case r.Method == http.MethodPost && (sub == "unlock" || sub == "dns" || sub == "probe" || sub == "devices" || strings.HasPrefix(sub, "devices/")):
+	case r.Method == http.MethodPost && (sub == "unlock" || sub == "dns" || sub == "probe" || sub == "client/enrol" || sub == "devices" || strings.HasPrefix(sub, "devices/")):
 		return token, sub, true
 	}
 	return "", "", false

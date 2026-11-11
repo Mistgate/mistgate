@@ -181,6 +181,12 @@
   },
   {
     "type": "index",
+    "name": "device_key_hash",
+    "tbl_name": "device",
+    "sql": "CREATE UNIQUE INDEX device_key_hash ON device (key_hash) WHERE key_hash IS NOT NULL"
+  },
+  {
+    "type": "index",
     "name": "device_user",
     "tbl_name": "device",
     "sql": "CREATE INDEX device_user ON device (user_id)"
@@ -699,7 +705,7 @@
     "type": "table",
     "name": "device",
     "tbl_name": "device",
-    "sql": "CREATE TABLE device ( id TEXT PRIMARY KEY, -- dev_... user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, -- sha256 of the client HWID header (Happ etc.). NULL = the implicit per-user device used -- for subscription fetches without a HWID (one shared token, counted as 1 device). hwid_hash BLOB, platform TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', os_version TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER -- soft delete: stats of a revoked device must still resolve , kind TEXT NOT NULL DEFAULT 'link' CHECK (kind IN ('link', 'key')), client TEXT NOT NULL DEFAULT '', blocked_at INTEGER, used_bytes INTEGER NOT NULL DEFAULT 0) STRICT"
+    "sql": "CREATE TABLE device ( id TEXT PRIMARY KEY, -- dev_... user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, -- sha256 of the client HWID header (Happ etc.). NULL = the implicit per-user device used -- for subscription fetches without a HWID (one shared token, counted as 1 device). hwid_hash BLOB, platform TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', os_version TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER -- soft delete: stats of a revoked device must still resolve , kind TEXT NOT NULL DEFAULT 'link' CHECK (kind IN ('link', 'key')), client TEXT NOT NULL DEFAULT '', blocked_at INTEGER, used_bytes INTEGER NOT NULL DEFAULT 0, key_hash BLOB CHECK (key_hash IS NULL OR length(key_hash) = 32), enrol_token_hash BLOB CHECK (enrol_token_hash IS NULL OR length(enrol_token_hash) = 32)) STRICT"
   },
   {
     "type": "table",

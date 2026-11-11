@@ -15,7 +15,7 @@ func TestRefusalNotes(t *testing.T) {
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	for _, lang := range []string{"en", "ru", "zh", "fa", "tr"} {
 		seen := map[string]bool{}
-		for _, refusal := range []string{access.RefusalDeviceLimit, access.RefusalDeviceBlocked, access.RefusalNoDeviceID} {
+		for _, refusal := range []string{access.RefusalDeviceLimit, access.RefusalDeviceBlocked, access.RefusalNoDeviceID, access.RefusalClientAPIEnrolled} {
 			v := access.SubView{Status: access.StatusActive, Refusal: refusal, DeviceLimit: 5, DevicesUsed: 5}
 			note := stateNote(v, lang, now)
 			if note == "" || seen[note] || utf8.RuneCountInString(note) > announceMax || strings.ContainsAny(note, "\r\n") {
@@ -38,7 +38,7 @@ func TestRefusalNotes(t *testing.T) {
 		}
 	}
 	// zh follows the glossary of the user page: full-width marks, no spaces around 你, nothing in Latin punctuation but numbers.
-	for _, refusal := range []string{access.RefusalDeviceLimit, access.RefusalDeviceBlocked, access.RefusalNoDeviceID} {
+	for _, refusal := range []string{access.RefusalDeviceLimit, access.RefusalDeviceBlocked, access.RefusalNoDeviceID, access.RefusalClientAPIEnrolled} {
 		note := stateNote(access.SubView{Status: access.StatusActive, Refusal: refusal, DeviceLimit: 5, DevicesUsed: 5}, "zh", now)
 		if strings.ContainsAny(note, ",;:()") || strings.Contains(note, ". ") {
 			t.Errorf("zh %s: Latin punctuation in %q", refusal, note)

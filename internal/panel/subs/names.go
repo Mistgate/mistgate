@@ -339,6 +339,9 @@ func refusalNote(v access.SubView, pick func(ru, en, zh, fa, tr string) string) 
 	case access.RefusalDeviceBlocked:
 		return pick("Это устройство отключено владельцем", "This device was turned off by the owner", "此设备已被所有者停用",
 			"مدیر این دستگاه را خاموش کرده است", "Bu cihaz yönetici tarafından kapatıldı")
+	case access.RefusalClientAPIEnrolled:
+		return pick("Это устройство получает серверы в своём приложении по ключу, а не по ссылке", "This device gets its servers in its own app with its key, not through the link", "此设备在自己的应用中凭密钥获取服务器，而不是通过链接",
+			"این دستگاه سرورها را در برنامهٔ خودش با کلید می‌گیرد، نه از طریق پیوند", "Bu cihaz sunucuları bağlantıdan değil, kendi uygulamasında anahtarıyla alır")
 	case access.RefusalNoDeviceID:
 		return pick("Приложение не сообщает ID устройства. Включите HWID в настройках Happ или возьмите kl!ck", "This app does not report a device ID. Turn on HWID in the settings of Happ, or use kl!ck", "此应用未提供设备 ID。请在 Happ 设置中开启 HWID，或改用 kl!ck",
 			"این برنامه شناسهٔ دستگاه را نمی‌فرستد. HWID را در تنظیمات Happ روشن کنید یا از kl!ck استفاده کنید", "Bu uygulama cihaz kimliği göndermiyor. Happ ayarlarında HWID'yi açın ya da kl!ck kullanın")

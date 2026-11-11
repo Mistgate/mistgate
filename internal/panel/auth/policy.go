@@ -203,6 +203,9 @@ var procedureLevels = map[string]level{
 	adminv1connect.ClientProbeServiceGetClientProbeProcedure:        levelRead,
 	adminv1connect.ClientProbeServiceUpdateClientProbeProcedure:     levelOwner, // also needs a step-up
 	adminv1connect.ClientProbeServiceDisconnectClientProbeProcedure: levelOwner, // also needs a step-up
+	// ClientApiService: the client API discovery switch is a read for every role and token; changing it belongs to the owner and needs a step-up.
+	adminv1connect.ClientApiServiceGetClientApiProcedure:    levelRead,
+	adminv1connect.ClientApiServiceUpdateClientApiProcedure: levelOwner,
 	// CountryReachabilityService: the country every source of the country check looks from. Owner's; it sends nothing anywhere,
 	// so no step-up. Not open to tokens. The history of the verdicts is a read like GetChecks: every role, and tokens.
 	adminv1connect.CountryReachabilityServiceGetCountryReachabilityProcedure:    levelOwner,

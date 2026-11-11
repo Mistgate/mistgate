@@ -21,6 +21,29 @@ func openStore(t *testing.T) *store.Store {
 	return st
 }
 
+func TestClientAPISwitchSharesTheSubscriptionCacheAndDefaultsOff(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	cache := NewCacheWithoutMigrations(st, nil)
+	if cache.ClientAPIEnabled(ctx) {
+		t.Fatal("client API discovery is on by default")
+	}
+	if err := st.SetSettings(ctx, map[string]string{store.SettingClientAPI: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	cache.Invalidate()
+	if !cache.ClientAPIEnabled(ctx) {
+		t.Fatal("client API setting was not read with subscription settings")
+	}
+	if err := st.SetSettings(ctx, map[string]string{store.SettingClientAPI: "0"}); err != nil {
+		t.Fatal(err)
+	}
+	cache.Invalidate()
+	if cache.ClientAPIEnabled(ctx) {
+		t.Fatal("client API switch stayed on after cache invalidation")
+	}
+}
+
 func TestDefaultsAreValidAndMatchThePlan(t *testing.T) {
 	d := Defaults()
 	if err := Validate(d); err != nil {

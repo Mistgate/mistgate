@@ -56,6 +56,11 @@ func cleanDeviceInput(platform, label string, needPlatform bool) (string, string
 	return platform, label, nil
 }
 
+// CleanClientDeviceInput applies the platform and model rules used by the device page to client API enrolment.
+func CleanClientDeviceInput(platform, model string) (string, string, error) {
+	return cleanDeviceInput(platform, model, true)
+}
+
 // actor names the caller of an admin RPC for the audit log.
 func actor(ctx context.Context) string {
 	if a, ok := auth.AdminFrom(ctx); ok {
