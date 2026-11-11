@@ -52,7 +52,7 @@ Her [GitHub sürümü](https://github.com/Mistgate/mistgate/releases/latest), ik
 
 | Araç | Sürüm |
 |:--|:--|
-| Go | 1.27. `go.mod` araç zincirini belirtir (`go1.27.3`); `GOTOOLCHAIN=auto` ile (varsayılan) daha eski bir Go onu indirir. |
+| Go | 1.27. `go.mod` araç zincirini belirtir (`go1.27.4`); `GOTOOLCHAIN=auto` ile (varsayılan) daha eski bir Go onu indirir. |
 | Node.js | 22 (CI'ın derlediği sürüm) ya da daha yenisi: yönetim paneli SPA'sı derlenir ve panel ikili dosyasına gömülür. |
 | pnpm | 10: `web/package.json` `pnpm@10.33.2` sürümünü sabitler; Corepack açıksa onu kullanır. |
 | make ve bir POSIX kabuğu | Windows'ta Git Bash ya da WSL. |

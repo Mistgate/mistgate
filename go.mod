@@ -2,7 +2,7 @@ module github.com/mistgate/mistgate
 
 go 1.27
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 // Go opens every listener with Multipath TCP by default since 1.24. CVE-2026-98432 (a use-after-free in the kernel's
 // IPv4 TCP, remote root shown through an MPTCP listener) makes that the way in, and nothing here needs MPTCP: the
