@@ -111,7 +111,7 @@ The panel's checks connect with the panel's own key, so a green check says nothi
 
 ## A proxy on the same server stops working when the VPN is on
 
-A full-tunnel AmneziaWG client can reach the panel on TCP 443 when it shares the node's address, plus other enabled inbounds and the Hysteria2 HTTPS decoy on their configured ports. The AWG UDP listener ports, SSH, and node management ports stay closed from inside the tunnel.
+A full-tunnel AmneziaWG client can reach the panel on TCP 443 when it shares the node's address, plus other enabled inbounds and the Hysteria2 HTTPS decoy on their configured ports. The AWG UDP listener ports, SSH, and node management ports stay closed from inside the tunnel. This needs the node agent v0.1.85; on an older agent only TCP 443 is open.
 
 ## The hoster blocks UDP
 

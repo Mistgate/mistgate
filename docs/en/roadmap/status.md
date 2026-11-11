@@ -3,22 +3,25 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.84`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.84
+  meta: v0.1.0 – v0.1.85
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.84
+      release: v0.1.85
       current: true
       points:
-        - "**Security: fixes from a code audit (v0.1.84).** The sign-in lockout held only against attempts made one after another, a network blocked for guessing subscription links lost its valid links too, an MCP plan for a DNS preset showed the owner a count instead of the resolver addresses, and a node could hold every download slot of an update or report more traffic than its link carries. These and the smaller findings of the same audit are closed; update the panel and the nodes. See [Security](../operations/security.md)."
-        - "**Automatic server choice in Xray JSON too.** The Xray JSON profile starts with an `Auto` config: a balancer that sends each new connection through the server that answered fastest at the last check. See [Automatic server choice](../guide/subscriptions.md#automatic-server-choice)."
-        - "**Enrollment and the debug capture say more.** `mistgate-node enroll` explains a refused TLS handshake (a CDN or a reverse proxy in front of the panel) and names the flags that fix it; the AmneziaWG kernel capture counts its handshakes on real nodes. Needs the agent v0.1.84. See [Troubleshooting](../operations/troubleshooting.md#enrollment-fails)."
+        - "**The Updates page in three layers, and the servers' operating system.** Three cards at the top: **This panel**, **Node agents** and **Server systems**. The new layer only reads: the distribution, the kernel, waiting and security updates, whether a reboot is needed and whether the AmneziaWG module is built for the next kernel; installing updates and rebooting from the panel are not there yet. Needs the agent v0.1.85. See [Server operating system](../operations/updates.md#server-operating-system)."
+        - "**A resumed update download takes the slot at once.** When a node's link to the panel stalled, the resume waited and was refused, and on a bad link the minutes of the window were lost. A resume of the same file now takes the node's slot immediately. See [Where the bundle comes from](../operations/updates.md#where-the-bundle-comes-from)."
+        - "**GitHub as a fallback update source.** A node can finish an update from several sources in turn; the panel offers GitHub second when the release there is signed by its key and carries the same files. On by default, switched off in **Settings → System → Download sources**; GitHub sees the nodes' addresses. Needs the agent v0.1.85. See [Download sources](../operations/updates.md#download-sources)."
+        - "**An hourly limit on user changes for API tokens.** A token without the owner may take access away from, or rewrite, at most 10 people an hour, so a leaked token cannot switch everyone off at once; creating, extending and enabling people do not count. The owner lifts the limit with a switch on the token; existing tokens are limited after the update. See [Limits](../reference/api.md#limits)."
+        - "**A node's own ports from the tunnel.** A full-tunnel AmneziaWG client now reaches the node's other published inbounds (a Telegram proxy, VLESS and Hysteria2 on other ports), not only TCP 443. Needs the agent v0.1.85. See [Troubleshooting](../operations/troubleshooting.md#a-proxy-on-the-same-server-stops-working-when-the-vpn-is-on)."
+        - "**Groundwork for Mistgate's own app.** The panel has a client API: the owner's switch, enrolling a device by a key, sync and leaving. It is off by default, and nothing changes for existing apps."
         - "**Security: no Multipath TCP on our listeners (v0.1.83).** Go opens every listener with MPTCP by default, and CVE-2026-98432, a flaw in the Linux kernel's TCP (CVSS 9.8), was shown as remote root through an MPTCP listener. The panel and the node agent, with the Xray listeners it hosts, now open plain TCP; update the panel and the nodes. The bug itself is in the kernel: also set `net.mptcp.enabled=0` and install your distribution's patched kernel when it is out. See [Troubleshooting](../operations/troubleshooting.md#multipath-tcp-and-cve-2026-98432)."
     - title: Profiles
       section: profiles
@@ -32,6 +35,7 @@ Mistgate is in **beta**; the current release is `v0.1.84`. It runs in production
       section: nodes
       points:
         - "[SSH installation](../getting-started/ssh-install.md) from the admin, and through MCP with the owner's approval: a pinned host key, checks before any change, jobs that can be cancelled, retried and resumed after an interruption."
+        - "[Enrolling a node by command](../operations/troubleshooting.md#enrollment-fails): `mistgate-node enroll` explains a refused TLS handshake (a CDN or a reverse proxy in front of the panel) and names the flags that fix it."
         - "Saved SSH access, encrypted, with a verified password change; the panel's own SSH key, the server's `authorized_keys` from the node card, and access for nodes installed by command."
         - "[WARP egress](../guide/warp.md) that fails closed when the WARP link drops, and [torrent protection](../guide/torrent-protection.md) on every node."
         - "[Check ports](../guide/nodes.md#ports): UDP delivery and a TCP connection to every port of the node from another node of the fleet."
@@ -86,6 +90,7 @@ Mistgate is in **beta**; the current release is `v0.1.84`. It runs in production
       section: settings
       points:
         - "The admin, the user page, the node install page, Telegram messages and these docs in English, Russian and Simplified Chinese, the admin and the user page also in Persian and Turkish; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
+        - "A code audit (v0.1.84) went over sign-in, subscriptions, the node link, MCP and the assistant; the gaps it found are closed. See [Security](../operations/security.md)."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, or to a file on the owner's computer; restore in the panel or on a new server with the installer."
         - "[Panel logs, retention, export and metrics](../operations/troubleshooting.md#panel-logs-retention-export-and-metrics) for the owner, and an opt-in reveal animation (Beta)."
@@ -139,7 +144,10 @@ Mistgate is in **beta**; the current release is `v0.1.84`. It runs in production
   cards:
     - title: Mistgate client
       icon: monitor
-      text: "Our own desktop app, Windows first. It talks to the panel natively, not only through a subscription link, speaks Hysteria2 and AmneziaWG itself, has built-in detectors of TSPU and other blocking, and sends debug reports to the panel with the person's consent. The work starts in a separate repository. Until then people connect with existing apps: see [Client apps](../guide/client-apps.md)."
+      text: "Our own desktop app, Windows first. It talks to the panel natively, not only through a subscription link, speaks Hysteria2 and AmneziaWG itself, has built-in detectors of TSPU and other blocking, and sends debug reports to the panel with the person's consent. The panel side is ready and off by default: the owner switches it on in **Subscriptions → Who gets what**, and the app will be able to enrol a device by a key and fetch servers directly; nothing changes for existing apps. The app itself is not released yet, and until then people connect with existing apps: see [Client apps](../guide/client-apps.md)."
+    - title: Update from another node
+      section: updates
+      text: "A node with a poor link to the panel gets the update file from a neighbouring node of the fleet that already has it. For now there is one fallback source, GitHub. See [Download sources](../operations/updates.md#download-sources)."
     - title: Which operator a connection comes from
       section: reachability
       text: "The network (ASN) of each connection, counted per hour, never the address: an aggregate per operator, on by default, and a mode per person, off by default, both kept 7 days. It lets the diagnosis tell operators apart. Today the panel learns operators only from the country check's probes and the reports of kl!ck users. See [Assistant](../guide/assistant.md#work-out-what-does-not-open)."

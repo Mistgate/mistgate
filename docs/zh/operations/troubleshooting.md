@@ -111,7 +111,7 @@ journalctl -u mistgate-node -n 100 --no-pager
 
 ## VPN 开启后，同一台服务器上的代理无法连接
 
-AmneziaWG 全隧道客户端可以通过节点共用的地址访问面板 TCP 443，也可以访问其他已启用入站，包括在配置端口上的 Hysteria2 HTTPS 伪装站点。隧道内无法访问 AWG 自身的 UDP 端口、SSH 和节点管理端口。
+AmneziaWG 全隧道客户端可以通过节点共用的地址访问面板 TCP 443，也可以访问其他已启用入站，包括在配置端口上的 Hysteria2 HTTPS 伪装站点。隧道内无法访问 AWG 自身的 UDP 端口、SSH 和节点管理端口。这需要节点 Agent v0.1.85；较旧的 Agent 只开放 TCP 443。
 
 ## 服务商封锁 UDP
 

@@ -34,7 +34,7 @@ You put the panel on one server and add your VPN servers to it as nodes. Each pe
 - Optional checks of whether your servers open from inside a country, network by network: Globalping probes on home and mobile networks over IPv4 and IPv6, volunteer and SIM probes, block lists and a TSPU probe from your own node. Most sources work only in Russia. [Reachability](docs/en/operations/reachability.md)
 - No Docker, no database server. The panel idles at 16-20 MiB of memory on a 1 vCPU / 1 GB server. [Benchmarks](docs/en/reference/benchmarks.md), including where Mistgate is slower.
 - Strangers who open the panel's address see a decoy site; the admin is behind a secret path or host name.
-- A built-in assistant (a cloud model you connect with your own key) answers about your nodes and people and prepares changes you apply. MCP lets an outside AI agent read the fleet, test paths between your nodes and plan changes; risky ones wait for your approval in the admin. [Assistant](docs/en/guide/assistant.md), [MCP](docs/en/reference/mcp.md)
+- A built-in assistant (a cloud model you connect with your own key) answers about your nodes and people and prepares changes you apply. MCP lets an outside AI agent read the fleet, test paths between your nodes and plan changes; risky ones wait for your approval in the admin. An API token can disable or rewrite at most 10 people an hour unless you lift the limit for it. [Assistant](docs/en/guide/assistant.md), [MCP](docs/en/reference/mcp.md)
 
 Not there yet: an app of our own (planned), a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](docs/en/getting-started/install-edge.md). Some defaults lean towards users in Russia; all of them are settings.
 
@@ -71,6 +71,7 @@ Updating ([Updates](docs/en/operations/updates.md)):
 
 - Nodes never update on their own. A rollout updates one canary node first and gives it 5 minutes to pass a health gate, then goes on in batches of one or two. A node that fails gets its previous build back, and the rollout pauses.
 - The agent also rolls itself back if a new build does not connect within 5 minutes or keeps crashing. Any node can be rolled back by hand.
+- A node whose link to the panel stalls can finish the download from GitHub. The panel offers it as a second source only when the release there is signed by the panel's own key and has the same files; it is on by default, a switch in Settings turns it off, and GitHub sees the node's address.
 - The panel updates itself only when you confirm. It backs up its data first and restores the old binary and data if the new one does not stay up for 45 seconds.
 - Keep [encrypted backups](docs/en/operations/backups.md) of `/var/lib/mistgate` anyway.
 

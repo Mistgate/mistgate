@@ -34,7 +34,7 @@ Paneli bir sunucuya kurar, VPN sunucularınızı ona düğüm olarak eklersiniz.
 - İsteğe bağlı olarak, sunucularınızın bir ülkenin içinden açılıp açılmadığını ağ ağ kontrol edebilirsiniz: ev ve mobil ağlarda IPv4 ve IPv6 üzerinden Globalping ölçümleri, gönüllü ve SIM ölçüm noktaları, engelleme listeleri ve kendi düğümünüzden bir TSPU ölçümü. Kaynakların çoğu yalnızca Rusya'da çalışır. [Erişilebilirlik](docs/en/operations/reachability.md)
 - Docker yok, veritabanı sunucusu yok. Panel boştayken 1 vCPU / 1 GB'lık bir sunucuda 16-20 MiB bellek kullanır. [Performans testleri](docs/en/reference/benchmarks.md), Mistgate'in daha yavaş kaldığı yerler dahil.
 - Panelin adresini açan yabancılar bir kamuflaj sitesi görür; yönetim paneli gizli bir yolun ya da ana bilgisayar adının arkasındadır.
-- Yerleşik asistan (kendi anahtarınızla bağladığınız bir bulut modeli) düğümleriniz ve kişiler hakkındaki sorulara yanıt verir ve değişiklikleri sizin uygulayacağınız kartlar olarak hazırlar. MCP, dışarıdaki bir yapay zekâ ajanının düğümlerin durumunu okumasına, düğümler arasındaki yolları sınamasına ve değişiklik planlamasına izin verir; riskli olanlar yönetim panelinde sizin onayınızı bekler. [Asistan](docs/en/guide/assistant.md), [MCP](docs/en/reference/mcp.md)
+- Yerleşik asistan (kendi anahtarınızla bağladığınız bir bulut modeli) düğümleriniz ve kişiler hakkındaki sorulara yanıt verir ve değişiklikleri sizin uygulayacağınız kartlar olarak hazırlar. MCP, dışarıdaki bir yapay zekâ ajanının düğümlerin durumunu okumasına, düğümler arasındaki yolları sınamasına ve değişiklik planlamasına izin verir; riskli olanlar yönetim panelinde sizin onayınızı bekler. Bir API token'ı, siz onun için sınırı kaldırmadıkça saatte en çok 10 kişiyi devre dışı bırakabilir ya da yeniden yazabilir. [Asistan](docs/en/guide/assistant.md), [MCP](docs/en/reference/mcp.md)
 
 Henüz olmayanlar: kendi uygulamamız (planlandı); Telegram botu şimdilik yalnızca uyarı gönderir, Cloudflare Workers sürümü de hâlâ bir [önizleme](docs/en/getting-started/install-edge.md). Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir; hepsi ayarlardan değiştirilebilir.
 
@@ -71,6 +71,7 @@ Güncelleme ([Güncellemeler](docs/en/operations/updates.md)):
 
 - Düğümler asla kendiliğinden güncellenmez. Bir dağıtım önce tek bir kanarya düğümünü günceller ve sağlık kontrolünü geçmesi için ona 5 dakika tanır, sonra birer ya da ikişer düğümlük gruplarla devam eder. Başarısız olan düğüm önceki derlemesine döner ve dağıtım duraklar.
 - Yeni derleme 5 dakika içinde bağlanamazsa ya da sürekli çökerse ajan kendini de geri alır. Her düğüm elle de geri alınabilir.
+- Panelle bağlantısı takılan bir düğüm, güncellemenin indirmesini GitHub'dan tamamlayabilir. Panel onu ikinci kaynak olarak yalnızca oradaki sürüm panelin kendi anahtarıyla imzalıysa ve aynı dosyaları içeriyorsa sunar; varsayılan olarak açıktır, ayarlardan kapatılır ve GitHub düğümün adresini görür.
 - Panel kendini yalnızca siz onayladığınızda günceller. Önce verilerini yedekler; yeni sürüm 45 saniye ayakta kalamazsa eski ikili dosyayı ve verileri geri yükler.
 - Yine de `/var/lib/mistgate` dizininin [şifreli yedeklerini](docs/en/operations/backups.md) alın.
 
