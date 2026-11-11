@@ -67,6 +67,10 @@ func newCheckEnv(t *testing.T, online ...string) *checkEnv {
 			// The exit can run an MTProto server (mtprotoRelay); without the capability the panel withholds that inbound from it and
 			// marks it failed, and a failed server is not forwarded to.
 			x.xc, _, _ = connectCaps(x.exit, "exit", append([]string{capMTProto}, caps...)...)
+			// connectCaps only SENDS the ApplyResult. When the panel stores it, it also writes the outcome of the inbounds it
+			// withheld from this agent (state, an empty certificate pin), so a test that sets a pin right after connecting
+			// lost it about once in forty runs under the race detector. Wait until the result is stored.
+			x.waitApplied(x.exit.nodeID)
 		case "s1":
 			x.c1, _, _ = connectCaps(x.s1, "s1", caps...)
 		case "s2":
@@ -74,6 +78,23 @@ func newCheckEnv(t *testing.T, online ...string) *checkEnv {
 		}
 	}
 	return x
+}
+
+// waitApplied returns once the panel has stored the node's ApplyResult.
+func (x *checkEnv) waitApplied(nodeID string) {
+	x.t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		var hash string
+		if err := x.st.W.QueryRowContext(x.ctx, `SELECT applied_hash FROM node WHERE id = ?`, nodeID).Scan(&hash); err != nil {
+			x.t.Fatal(err)
+		}
+		if hash != "" {
+			return
+		}
+		if time.Now().After(deadline) {
+			x.t.Fatal("the node's ApplyResult was not stored")
+		}
+	}
 }
 
 // tcpRelay stores a relay of the entry to the exit's TCP server, on port 7443.
