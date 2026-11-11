@@ -1576,9 +1576,15 @@ type Device struct {
 	// 19 is not used: a blocked device is listed in GetUserResponse.blocked_devices, not here.
 	// The first 6 hex characters of the device's hash, to tell two phones of one model apart. Empty for the shared device
 	// and for keys.
-	Fingerprint   string `protobuf:"bytes,20,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Fingerprint string `protobuf:"bytes,20,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	// The device is connected through the Mistgate app's own API (it holds a device key): the servers arrive in the app, not by
+	// the subscription link. Never the key itself.
+	Enrolled bool `protobuf:"varint,21,opt,name=enrolled,proto3" json:"enrolled,omitempty"`
+	// With enrolled: the user's link was changed since the device connected, so it waits to reconnect on its own (the app
+	// gets link_changed and enrols again at its next sync).
+	EnrolLinkStale bool `protobuf:"varint,22,opt,name=enrol_link_stale,json=enrolLinkStale,proto3" json:"enrol_link_stale,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -1742,6 +1748,20 @@ func (x *Device) GetFingerprint() string {
 		return x.Fingerprint
 	}
 	return ""
+}
+
+func (x *Device) GetEnrolled() bool {
+	if x != nil {
+		return x.Enrolled
+	}
+	return false
+}
+
+func (x *Device) GetEnrolLinkStale() bool {
+	if x != nil {
+		return x.EnrolLinkStale
+	}
+	return false
 }
 
 type DayTraffic struct {
@@ -4022,7 +4042,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x125\n" +
 	"\x06counts\x18\x03 \x01(\v2\x1d.mistgate.admin.v1.UserCountsR\x06counts\")\n" +
 	"\x0eGetUserRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x82\x05\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xc8\x05\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x14\n" +
@@ -4046,7 +4066,9 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"used_bytes\x18\x11 \x01(\x04B\x020\x02R\tusedBytes\x12&\n" +
 	"\x0fonline_node_ids\x18\x12 \x03(\tR\ronlineNodeIds\x12 \n" +
-	"\vfingerprint\x18\x14 \x01(\tR\vfingerprint\"E\n" +
+	"\vfingerprint\x18\x14 \x01(\tR\vfingerprint\x12\x1a\n" +
+	"\benrolled\x18\x15 \x01(\bR\benrolled\x12(\n" +
+	"\x10enrol_link_stale\x18\x16 \x01(\bR\x0eenrolLinkStale\"E\n" +
 	"\n" +
 	"DayTraffic\x12\x1d\n" +
 	"\bday_unix\x18\x01 \x01(\x03B\x020\x02R\adayUnix\x12\x18\n" +

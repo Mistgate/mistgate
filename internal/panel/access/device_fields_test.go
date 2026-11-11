@@ -1,9 +1,13 @@
 package access
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"slices"
 	"testing"
+
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 )
@@ -72,5 +76,58 @@ func TestGetUserShowsEachDeviceWithItsOwnOnlineAndTraffic(t *testing.T) {
 	}
 	if len(online) != 3 || !online[tabletID] || online[phoneID] || online[sharedID] {
 		t.Errorf("page devices online = %v, want only the tablet", online)
+	}
+}
+
+// A device that enrolled through the Mistgate app's API says so (Enrolled), and says when the person's link has changed since
+// (EnrolLinkStale); a device on the plain link says neither, and no hash of a key or a link is on the wire.
+func TestGetUserFlagsDevicesEnrolledByKey(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	r := e.userBare("alice", f.group, nil)
+	token := e.tokenOf(r.User.Id)
+	fetchAs(e, token, phone(), "")
+	key := sha256.Sum256([]byte("a key of the app"))
+	res, err := e.s.EnrolLinkDevice(e.ctx, r.User.Id, token, tablet(), key[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := func() map[string]*adminv1.Device {
+		got := map[string]*adminv1.Device{}
+		msg := must(e.s.GetUser(e.ctx, req(&adminv1.GetUserRequest{UserId: r.User.Id}))).Msg
+		raw, err := proto.Marshal(msg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		linkHash := hashToken(token)
+		if bytes.Contains(raw, key[:]) || bytes.Contains(raw, linkHash) {
+			t.Error("a key hash or a link hash is in the response")
+		}
+		for _, d := range msg.Devices {
+			got[d.Id] = d
+		}
+		return got
+	}
+	phoneID := ""
+	got := list()
+	for id := range got {
+		if id != res.Device.ID && got[id].Kind == adminv1.DeviceKind_DEVICE_KIND_LINK {
+			phoneID = id
+		}
+	}
+	if d := got[res.Device.ID]; d == nil || !d.Enrolled || d.EnrolLinkStale {
+		t.Errorf("enrolled device = %+v", d)
+	}
+	if d := got[phoneID]; d == nil || d.Enrolled || d.EnrolLinkStale {
+		t.Errorf("plain link device = %+v", d)
+	}
+	// the person's link is replaced: the enrolled device waits for the app to enrol again
+	e.sql(`UPDATE user SET sub_token_hash = ? WHERE id = ?`, hashToken("a new link token"), r.User.Id)
+	got = list()
+	if d := got[res.Device.ID]; !d.Enrolled || !d.EnrolLinkStale {
+		t.Errorf("enrolled device after the link changed = %+v", d)
+	}
+	if d := got[phoneID]; d.Enrolled || d.EnrolLinkStale {
+		t.Errorf("plain link device after the link changed = %+v", d)
 	}
 }

@@ -740,6 +740,9 @@ func TestUserDevicesShowsKindTrafficOnlineNodesAndBlocked(t *testing.T) {
 	if byID["dev_shared"].Kind != "link_shared" {
 		t.Errorf("shared device = %+v", byID["dev_shared"])
 	}
+	if link.Enrolled || link.EnrolLinkStale || !byID["dev_app"].Enrolled || byID["dev_app"].EnrolLinkStale || !byID["dev_app_old"].Enrolled || !byID["dev_app_old"].EnrolLinkStale {
+		t.Errorf("enrolled flags: link %+v, app %+v, app after a link change %+v", link, byID["dev_app"], byID["dev_app_old"])
+	}
 	if len(got.Blocked) != 1 || got.Blocked[0].ID != "dev_blocked" || got.Blocked[0].Fingerprint != "d4e5f6" || got.Blocked[0].BlockedUnix != 1700000000 || got.Blocked[0].Client != "mihomo/1.19.31" {
 		t.Errorf("blocked = %+v", got.Blocked)
 	}

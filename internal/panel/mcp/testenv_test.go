@@ -535,7 +535,9 @@ func newWorld() *world {
 	mk("usr_alice", "alice", &adminv1.Device{Id: "dev_1", Platform: "ios", Model: "iPhone", Address: "10.8.0.2", Online: true},
 		&adminv1.Device{Id: "dev_link", Kind: adminv1.DeviceKind_DEVICE_KIND_LINK, Platform: "android", Model: "Pixel", OsVersion: "15", Client: "Happ/3.4.2",
 			UsedBytes: 5 << 20, Online: true, OnlineNodeIds: []string{nodeA, "nod_gone"}, Fingerprint: "a1b2c3"},
-		&adminv1.Device{Id: "dev_shared", Kind: adminv1.DeviceKind_DEVICE_KIND_LINK_SHARED})
+		&adminv1.Device{Id: "dev_shared", Kind: adminv1.DeviceKind_DEVICE_KIND_LINK_SHARED},
+		&adminv1.Device{Id: "dev_app", Kind: adminv1.DeviceKind_DEVICE_KIND_LINK, Platform: "windows", Client: "Mistgate/1.0", Enrolled: true},
+		&adminv1.Device{Id: "dev_app_old", Kind: adminv1.DeviceKind_DEVICE_KIND_LINK, Platform: "macos", Client: "Mistgate/1.0", Enrolled: true, EnrolLinkStale: true})
 	w.users["usr_alice"].User.SpeedLimitBps, w.users["usr_alice"].User.DeviceSpeedLimitBps = 20_000_000, 5_000_000
 	w.users["usr_alice"].BlockedDevices = []*adminv1.BlockedDevice{{Id: "dev_blocked", Platform: "windows", Model: "PC", Client: "mihomo/1.19.31", BlockedUnix: 1700000000, Fingerprint: "d4e5f6"}}
 	// A name an attacker chose: a line break, a zero-width space, a bidi override and an instruction.

@@ -837,8 +837,12 @@ type deviceV struct {
 	AwgProfile  string     `json:"awg_profile,omitempty"`
 	AwgVersion  string     `json:"awg_version,omitempty"`
 	Stale       bool       `json:"stale,omitempty"`
-	Address     string     `json:"address,omitempty"`
-	LastHandsh  int64      `json:"last_handshake_unix,omitempty"`
+	// Enrolled: connected through the Mistgate app's own API by a device key (the servers arrive in the app, not by the link).
+	// EnrolLinkStale: the user's link changed since; the app reconnects at its next sync.
+	Enrolled       bool   `json:"enrolled,omitempty"`
+	EnrolLinkStale bool   `json:"enrol_link_stale,omitempty"`
+	Address        string `json:"address,omitempty"`
+	LastHandsh     int64  `json:"last_handshake_unix,omitempty"`
 }
 
 type nodeRefV struct {
@@ -873,7 +877,7 @@ func deviceViews(ds []*adminv1.Device, nodes map[string]string) []deviceV {
 			OSVersion: clean(d.GetOsVersion(), 40), Client: clean(d.GetClient(), 40), UsedBytes: d.GetUsedBytes(), Fingerprint: clean(d.GetFingerprint(), 12),
 			FirstSeen: d.GetFirstSeenUnix(),
 			LastSeen:  d.GetLastSeenUnix(), Online: d.GetOnline(), AwgProfile: nm(d.GetAwgProfileName()),
-			AwgVersion: clean(d.GetAwgVersion(), 20), Stale: d.GetStale(), Address: clean(d.GetAddress(), 64),
+			AwgVersion: clean(d.GetAwgVersion(), 20), Stale: d.GetStale(), Enrolled: d.GetEnrolled(), EnrolLinkStale: d.GetEnrolLinkStale(), Address: clean(d.GetAddress(), 64),
 			LastHandsh: d.GetLastHandshakeUnix(),
 		}
 		for _, p := range d.GetProtocols() {

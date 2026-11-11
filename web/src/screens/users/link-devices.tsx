@@ -199,6 +199,32 @@ export function RowMenu({ label, details = [], items }: { label: string; details
   );
 }
 
+/**
+ * A small label after the name of a device the Mistgate app connected through its own API (it holds a key of its own, so the
+ * servers come to the app, not by the link): quiet grey; amber when the person's link has changed since and the app will
+ * connect again on its own. The tooltip says what each means; the label is also the focusable text a screen reader reads.
+ */
+export function EnrolBadge({ d, t }: { d: Pick<Device, "enrolled" | "enrolLinkStale">; t: Tx }) {
+  if (!d.enrolled) return null;
+  const stale = d.enrolLinkStale;
+  const label = t(stale ? "users.dev.linkChanged" : "users.dev.byKey");
+  const tip = t(stale ? "users.dev.linkChangedTip" : "users.dev.byKeyTip");
+  return (
+    <Tip label={tip}>
+      <span
+        tabIndex={0}
+        aria-label={`${label}. ${tip}`}
+        className={cx(
+          "flex-none cursor-default rounded-md border px-1.5 py-px text-[10px] font-extrabold whitespace-nowrap",
+          stale ? "border-warn-line bg-warn-soft text-warn-text" : "border-line bg-surface-2 text-muted",
+        )}
+      >
+        {label}
+      </span>
+    </Tip>
+  );
+}
+
 /** The name a device goes by: its label (a rename writes it over the model), else the model, else the platform. */
 export const deviceName = (d: { model: string; platform: string }, t: Tx) => d.model || platformLabel(d.platform || "other", t);
 
@@ -247,6 +273,7 @@ export function LinkDeviceRows({ devices, nodeName, now, onChanged }: { devices:
             key={d.id}
             tile={<Tile icon={platformGlyph(d)} tone="sky" />}
             name={n}
+            badge={<EnrolBadge d={d} t={t} />}
             line={<Secondary text={appLine(d) || platformLabel(d.platform || "other", t)} details={details} />}
             right={<Seen online={d.online} nodes={nodes} lastSeen={d.lastSeenUnix} t={t} now={now} />}
             menu={

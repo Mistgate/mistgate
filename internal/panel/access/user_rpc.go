@@ -1,6 +1,7 @@
 package access
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"slices"
@@ -434,6 +435,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			Id: d.ID, Platform: d.Platform, Model: d.Model, FirstSeenUnix: unixOrZero(d.FirstSeenAt), LastSeenUnix: unixOrZero(d.LastSeenAt),
 			Online: len(nodes) > 0, Protocols: d.Protocols, Kind: kind, OsVersion: d.OSVersion, Client: d.Client, UsedBytes: d.UsedBytes,
 			OnlineNodeIds: nodes, Fingerprint: d.Fingerprint,
+			Enrolled: len(d.KeyHash) > 0, EnrolLinkStale: len(d.KeyHash) > 0 && !bytes.Equal(d.EnrolTokenHash, u.SubTokenHash),
 		})
 	}
 

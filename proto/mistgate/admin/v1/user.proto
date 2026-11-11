@@ -340,6 +340,12 @@ message Device {
   // The first 6 hex characters of the device's hash, to tell two phones of one model apart. Empty for the shared device
   // and for keys.
   string fingerprint = 20;
+  // The device is connected through the Mistgate app's own API (it holds a device key): the servers arrive in the app, not by
+  // the subscription link. Never the key itself.
+  bool enrolled = 21;
+  // With enrolled: the user's link was changed since the device connected, so it waits to reconnect on its own (the app
+  // gets link_changed and enrols again at its next sync).
+  bool enrol_link_stale = 22;
 }
 
 enum DeviceKind {

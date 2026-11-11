@@ -211,6 +211,9 @@ const kitDevices = [
   // kind: 1 an app on the link with its device ID, 2 the place the apps without one share, 3 an AmneziaVPN key
   { id: "dev_l", kind: 1, platform: "ios", model: "iPhone 15", osVersion: "iOS 18.1", client: "Happ/3.4.2", fingerprint: "a1b2c3", usedBytes: 4.8e9, onlineNodeIds: ["de1"], awgProfileId: "", awgProfileName: "", awgVersion: "", protocols: ["hysteria2"], online: true, lastSeenUnix: Math.floor(Date.now() / 1000) - 60, firstSeenUnix: Math.floor(Date.now() / 1000) - 9 * 86400, lastHandshakeUnix: 0, stale: false, address: "" },
   { id: "dev_i", kind: 2, platform: "", model: "", osVersion: "", client: "Hiddify/2.5.7", fingerprint: "", usedBytes: 0, onlineNodeIds: [], awgProfileId: "", awgProfileName: "", awgVersion: "", protocols: ["hysteria2"], online: false, lastSeenUnix: Math.floor(Date.now() / 1000) - 7200, firstSeenUnix: 0, lastHandshakeUnix: 0, stale: false, address: "" },
+  // an app that connected through the Mistgate API by its own key ("By key"), and one whose link changed since ("Link changed")
+  { id: "dev_e", kind: 1, platform: "windows", model: "Office PC", osVersion: "Windows 11", client: "Mistgate/1.0", fingerprint: "c3d4e5", usedBytes: 1.2e9, onlineNodeIds: ["de1"], awgProfileId: "", awgProfileName: "", awgVersion: "", protocols: ["hysteria2"], online: true, lastSeenUnix: Math.floor(Date.now() / 1000) - 30, firstSeenUnix: Math.floor(Date.now() / 1000) - 3 * 86400, lastHandshakeUnix: 0, stale: false, address: "", enrolled: true, enrolLinkStale: false },
+  { id: "dev_r", kind: 1, platform: "macos", model: "MacBook Air", osVersion: "macOS 15", client: "Mistgate/1.0", fingerprint: "f6a7b8", usedBytes: 3e8, onlineNodeIds: [], awgProfileId: "", awgProfileName: "", awgVersion: "", protocols: ["hysteria2"], online: false, lastSeenUnix: Math.floor(Date.now() / 1000) - 3600, firstSeenUnix: Math.floor(Date.now() / 1000) - 5 * 86400, lastHandshakeUnix: 0, stale: false, address: "", enrolled: true, enrolLinkStale: true },
   {
     id: "dev_k",
     kind: 3,
@@ -517,7 +520,7 @@ export default function DevKit() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <SectionLabel>User card: devices in the two ways</SectionLabel>
+        <SectionLabel>User card: devices in the two ways (Office PC: "By key"; MacBook Air: "Link changed")</SectionLabel>
         <KitCache>
           <DevicesPanel user={kitUser} devices={kitDevices} profiles={[{ id: "p_awg", name: "AWG 3.1 · QUIC", protocol: "awg" } as never]} actions={{ refresh: async () => {}, revoke: async () => {} } as never} onEditGroup={() => {}} />
         </KitCache>
