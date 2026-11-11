@@ -20,6 +20,7 @@ import { fa as journalFa } from "./journal";
 import { fa as relayFa } from "./relay";
 import { fa as waysFa } from "./ways";
 import { fa as tgproxyFa } from "./tgproxy";
+import { fa as clientcompatFa } from "./clientcompat";
 import { fa as protocolsFa } from "./protocols";
 import { fa as aiFa } from "./ai";
 import { fa as graphFa } from "./graph";
@@ -288,4 +289,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "سایت همین نود یا سایتی دیگر",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa };

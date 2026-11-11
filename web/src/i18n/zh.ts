@@ -20,6 +20,7 @@ import { zh as journalZh } from "./journal";
 import { zh as relayZh } from "./relay";
 import { zh as waysZh } from "./ways";
 import { zh as tgproxyZh } from "./tgproxy";
+import { zh as clientcompatZh } from "./clientcompat";
 import { zh as protocolsZh } from "./protocols";
 import { zh as aiZh } from "./ai";
 import { zh as graphZh } from "./graph";
@@ -291,4 +292,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "本节点站点或其他站点",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh };

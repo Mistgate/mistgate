@@ -24,7 +24,9 @@ entries=(
   # 47 MiB with the November 2026 audit fixes (46.01 MiB measured): the sign-in reservations, the cold-link window of
   # subscriptions, the per-node stats budget and the event limits are code of the public, link and admin Workers, each
   # of which stays within its own limit below; this entry is their sum.
-  "mistgate-edge:47"
+  # 48 MiB with the client compatibility catalogue (46.94 MiB measured): its admin service and the devices query are code of
+  # the admin Worker, which keeps 1.5 MiB under its own limit; this entry still ships nowhere.
+  "mistgate-edge:48"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.

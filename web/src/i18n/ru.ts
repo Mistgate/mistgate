@@ -20,6 +20,7 @@ import { ru as journalRu } from "./journal";
 import { ru as relayRu } from "./relay";
 import { ru as waysRu } from "./ways";
 import { ru as tgproxyRu } from "./tgproxy";
+import { ru as clientcompatRu } from "./clientcompat";
 import { ru as protocolsRu } from "./protocols";
 import { ru as aiRu } from "./ai";
 import { ru as graphRu } from "./graph";
@@ -295,4 +296,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Сайт этой ноды или другой сайт",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu };

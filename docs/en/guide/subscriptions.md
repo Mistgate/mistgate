@@ -3,7 +3,7 @@ title: Subscriptions
 description: "One link per person for every app: which format each app gets and how the panel decides, how servers are named, what the apps show, and the settings of the subscription."
 ---
 
-Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has five tabs: **Apps & formats**, **Who gets what**, **Names & texts**, **User page** and **DNS**.
+Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has six tabs: **Apps & formats**, **Who gets what**, **App versions**, **Names & texts**, **User page** and **DNS**.
 
 ![One link per person: a new user, their subscription link and their own page on a phone](../../images/video/link-poster-en.webp)
 
@@ -144,6 +144,43 @@ The default depends on the panel. A panel that already has users gets **Only cou
 3. Switch the mode to **Limit**. The confirmation shows who is still over. Move to **Strict** later, and only once you know who uses an app without a device ID.
 
 After the switch, the alert "An app was turned away at the device limit" tells you when someone was actually refused (see [Health](../operations/health.md)).
+
+## App versions
+
+A REALITY handshake can carry a post-quantum key share (X25519MLKEM768). Newer Xray servers can insist on it: an app that does not send the share is taken for a stranger and sent to the cover site. The tab **App versions** shows, for every device that receives a VLESS REALITY server, whether its app is known to send the share. It is knowledge for you as the owner, and today it changes nothing: no device is refused, no person is told anything, and the servers each app gets stay the same. Use it before you ever limit a profile to post-quantum handshakes.
+
+A device is on the list when it is a subscription-link device with a VLESS key, its person is active, and their group holds a VLESS REALITY profile with a live inbound on an active node. Each device gets one state, judged against the fingerprints of the REALITY profiles that person can use (the worst one counts):
+
+| State | Meaning |
+|:--|:--|
+| **OK** | The app and version are known to send the share. |
+| **Below the minimum** | The app is known, the version is lower than the lowest one known to work; the row says which version is needed. |
+| **Not supported** | No version of the app can do it (sing-box and the apps built on it), or the profile's fingerprint (`ios`, `edge` or `random`) builds a classical handshake in any app. Updating the app does not help; the row says which of the two. |
+| **Unknown** | The table cannot tell: an app it does not know, no known good version for that platform, or an app that reported no version. Unknown is never reported as outdated. |
+
+The cards on top count devices and people in each state and are the filter; **Need attention** (the default) is everything but OK. The table shows the person (a link to their card), the device, the app and version as it reported them, the state, what is missing, and the last activity. Add `?tab=clients&user=<user id>` to the address to see one person's devices.
+
+### The table of minimum versions
+
+Below the list, **Minimum versions** holds the table behind the states: per app and platform, the lowest version that sends the share with a Chrome-like fingerprint and with a Firefox or Safari one, or "does not work". A blank version is "unknown". The built-in values come with the panel and move with its releases; they follow the release notes of the apps and of the Xray and Mihomo cores inside them:
+
+| App | Chrome fingerprint | Firefox / Safari fingerprint |
+|:--|:--|:--|
+| Happ, Android | 3.1.1 | 3.20.0 |
+| Happ, Windows, macOS, Linux | 0.3.6 | 2.10.0 |
+| Happ, iOS | unknown | 4.8.0 |
+| v2rayNG | 1.10.1 | 2.0.16 |
+| v2rayN | 7.12.6 | 7.20.0 |
+| Mihomo core (the version comes from the User-Agent) | 1.19.9 | 1.19.9 |
+| kl!ck (its own version; it is Mihomo inside) | 0.4.0 | 0.4.0 |
+| sing-box (SFA, SFI, SFM), Karing, NekoBox | does not work | does not work |
+| Hiddify, Streisand, FoXray, v2RayTun, INCY, OneXray, Shadowrocket, FlClash, Clash Verge, Mihomo Party, Clash Meta for Android | unknown | unknown |
+
+Mihomo and kl!ck send the share only when the config asks for it (`support-x25519mlkem768`), and the panel's Mihomo profile does not ask today; for them the table says what the core can do, not what it does now. A device is judged by the app string it reported last, so a shared place reports whichever app fetched last.
+
+The owner can correct any value, add an app (its name is what it writes in the User-Agent before the `/`, in lower case) and return a row to the built-in value. Saving needs a step-up and is written to the audit log as `client_compat.update`. Only the differences from the built-in table are stored, so a row you never touched follows the panel's releases. Helpers and read-only admins see the table without the fields.
+
+Through MCP the list is the read tool [`outdated_devices`](../reference/mcp.md); the table itself is changed only in the panel, by the owner.
 
 ## What the apps receive
 

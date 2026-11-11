@@ -22,6 +22,7 @@ import { en as journalEn } from "./journal";
 import { en as relayEn } from "./relay";
 import { en as waysEn } from "./ways";
 import { en as tgproxyEn } from "./tgproxy";
+import { en as clientcompatEn } from "./clientcompat";
 import { en as protocolsEn } from "./protocols";
 import { en as aiEn } from "./ai";
 import { en as graphEn } from "./graph";
@@ -306,7 +307,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

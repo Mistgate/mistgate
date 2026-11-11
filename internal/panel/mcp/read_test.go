@@ -53,6 +53,8 @@ func TestReadToolsLeakNothing(t *testing.T) {
 		{"klick_reports", map[string]any{}},
 		{"klick_reports", map[string]any{"node": "de1"}},
 		{"client_api_settings", map[string]any{}},
+		{"outdated_devices", map[string]any{}},
+		{"outdated_devices", map[string]any{"state": "unknown", "user_id": "usr_bob"}},
 		{"user_connection", map[string]any{"user_id": "usr_alice"}},
 		{"node_connections", map[string]any{"node": "de1"}},
 		{"node_connections", map[string]any{"node": "nl1"}},

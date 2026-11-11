@@ -4,6 +4,7 @@ import { PageTitle } from "@/components/ui/bits";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { useTx } from "@/screens/users/t";
 import { Pending, QueryError } from "@/components/ui/query-error";
+import { ClientsTab } from "./clients";
 import { DnsTab } from "./dns";
 import { FormatsTab } from "./formats";
 import { PageTab } from "./page";
@@ -16,7 +17,8 @@ import { TextsTab } from "./texts";
 export function SubscriptionsScreen() {
   const t = useTx();
   const navigate = useNavigate();
-  const tab = (useSearch({ strict: false }) as { tab?: SubsTab }).tab ?? "formats";
+  const search = useSearch({ strict: false }) as { tab?: SubsTab; user?: string };
+  const tab = search.tab ?? "formats";
   const q = useQuery(settingsQuery);
 
   const go = (next: string) => void navigate({ to: "/subscriptions", search: next === "formats" ? {} : { tab: next as SubsTab }, replace: true } as never);
@@ -27,11 +29,13 @@ export function SubscriptionsScreen() {
     value: id,
     label: t(`subs.tab.${id}`),
     content:
-      id === "dns"
-        ? <DnsTab />
-        : body((d) =>
-            id === "formats" ? <FormatsTab go={go} /> : id === "rules" ? <RulesTab settings={d.settings} /> : id === "texts" ? <TextsTab data={d} /> : <PageTab settings={d.settings} />,
-          ),
+      id === "dns" ? (
+        <DnsTab />
+      ) : id === "clients" ? (
+        <ClientsTab userId={search.user} onClearUser={() => void navigate({ to: "/subscriptions", search: { tab: "clients" }, replace: true } as never)} />
+      ) : (
+        body((d) => (id === "formats" ? <FormatsTab go={go} /> : id === "rules" ? <RulesTab settings={d.settings} /> : id === "texts" ? <TextsTab data={d} /> : <PageTab settings={d.settings} />))
+      ),
   }));
 
   return (

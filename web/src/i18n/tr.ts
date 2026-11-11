@@ -20,6 +20,7 @@ import { tr as journalTr } from "./journal";
 import { tr as relayTr } from "./relay";
 import { tr as waysTr } from "./ways";
 import { tr as tgproxyTr } from "./tgproxy";
+import { tr as clientcompatTr } from "./clientcompat";
 import { tr as protocolsTr } from "./protocols";
 import { tr as aiTr } from "./ai";
 import { tr as graphTr } from "./graph";
@@ -289,4 +290,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Bu düğümün sitesi ya da başka bir site",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr };

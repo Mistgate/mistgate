@@ -2602,3 +2602,40 @@ func TestD1LinkDNS(t *testing.T) {
 func TestD1NodeRuntimeStorage(t *testing.T) {
 	nodeRuntimeStoreProof(t, openD1Store(t))
 }
+
+// The client catalogue's device query is a plain read of the link devices with a VLESS credential; D1 answers it like SQLite.
+func TestD1ClientCompatDevices(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_compat", Name: "Compat", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	u := AccessUser{ID: "usr_alice", Name: "alice", GroupID: "grp_compat", Status: "active", AppHapp: true, AppAmnezia: true,
+		AllNodes: true, QuotaReset: "month", PeriodStart: now, DeviceLimit: 5, SubTokenHash: []byte("subscription-hash"),
+		SubTokenEnc: []byte("sealed"), CreatedAt: now}
+	if err := st.Access().CreateUser(ctx, u, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	issue := func(tag, protocol string) LinkIssue {
+		return func(string, map[string]bool) ([]AccessCred, error) {
+			return []AccessCred{{ID: "crd_" + tag, UserID: u.ID, Protocol: protocol, SecretEnc: []byte("sealed"), DataJSON: `{}`}}, nil
+		}
+	}
+	dev := func(tag string) AccessDevice {
+		return AccessDevice{ID: "dev_" + tag, UserID: u.ID, HWIDHash: HWIDHash(u.ID, tag+"aaaaaaaaaaaaaaaa"), Kind: DeviceKindLink, Platform: "android", Client: "Happ/3.4.2"}
+	}
+	if _, err := st.Access().EnsureLinkDevice(ctx, dev("vless"), 5, now, issue("vless", "vless")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Access().EnsureLinkDevice(ctx, dev("hy2"), 5, now, issue("hy2", "hysteria2")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.Access().ClientCompatDevices(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "dev_vless" || got[0].Client != "Happ/3.4.2" || got[0].Platform != "android" || got[0].Shared || got[0].LastSeenAt.IsZero() {
+		t.Fatalf("devices = %+v", got)
+	}
+}

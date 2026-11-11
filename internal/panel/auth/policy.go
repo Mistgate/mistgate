@@ -206,6 +206,11 @@ var procedureLevels = map[string]level{
 	// ClientApiService: the client API discovery switch is a read for every role and token; changing it belongs to the owner and needs a step-up.
 	adminv1connect.ClientApiServiceGetClientApiProcedure:    levelRead,
 	adminv1connect.ClientApiServiceUpdateClientApiProcedure: levelOwner,
+	// ClientCompatService: the client catalogue and the list of devices below its line are reads for every role; ListOutdatedDevices is
+	// also open to tokens (the MCP tool outdated_devices). Changing the table belongs to the owner and needs a step-up.
+	adminv1connect.ClientCompatServiceGetClientCompatProcedure:     levelRead,
+	adminv1connect.ClientCompatServiceListOutdatedDevicesProcedure: levelRead,
+	adminv1connect.ClientCompatServiceUpdateClientCompatProcedure:  levelOwner,
 	// CountryReachabilityService: the country every source of the country check looks from. Owner's; it sends nothing anywhere,
 	// so no step-up. Not open to tokens. The history of the verdicts is a read like GetChecks: every role, and tokens.
 	adminv1connect.CountryReachabilityServiceGetCountryReachabilityProcedure:    levelOwner,

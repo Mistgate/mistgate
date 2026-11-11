@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 44 || b != 88 || c != 163 {
+	if a, b, c := count(ro), count(op), count(ad); a != 45 || b != 89 || c != 164 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -179,6 +179,11 @@ func TestMCPEndToEnd(t *testing.T) {
 	// the kl!ck reports are off by default: a readonly token reads the switch and no nodes
 	if out := ok(ro, "klick_reports", map[string]any{}); !strings.Contains(out, `"enabled":false`) || !strings.Contains(out, `"nodes":[]`) {
 		t.Errorf("klick_reports: %s", out)
+	}
+	// the client catalogue on the real access module and the real token policy: a readonly token reads the four counts of an empty
+	// panel; the table itself is not an MCP tool
+	if out := ok(ro, "outdated_devices", map[string]any{}); !strings.Contains(out, `"total":0`) || !strings.Contains(out, `"state":"below_minimum"`) || !strings.Contains(out, `"devices":[]`) {
+		t.Errorf("outdated_devices: %s", out)
 	}
 	// relays on the real access module and the real token policy: a readonly token reads (none yet); the check and the changes
 	// are the admin profile's; no token reaches the procedures over /api
@@ -520,7 +525,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 44 {
+	if n := count(ps); n != 45 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {

@@ -1481,6 +1481,81 @@ type udpLossV struct {
 	NodeLostPermille uint32 `json:"node_lost_permille,omitempty"`
 }
 
+// OutdatedDevicesV is the outdated_devices result: the counts of every state over the devices that receive REALITY and one page of
+// the devices, worst first.
+type OutdatedDevicesV struct {
+	Counts       []outdatedCountV  `json:"counts"`
+	Fingerprints []string          `json:"fingerprints,omitempty"`
+	Total        uint32            `json:"total"`
+	HasMore      bool              `json:"has_more,omitempty"`
+	NextOffset   int               `json:"next_offset,omitempty"`
+	Devices      []outdatedDeviceV `json:"devices"`
+	Truncated    bool              `json:"truncated,omitempty"`
+	offset       int
+}
+
+type outdatedCountV struct {
+	State   string `json:"state"`
+	Devices uint32 `json:"devices"`
+	People  uint32 `json:"people"`
+}
+
+type outdatedDeviceV struct {
+	DeviceID    string `json:"device_id"`
+	UserID      string `json:"user_id"`
+	UserName    string `json:"user_name"`
+	Client      string `json:"client,omitempty"`
+	App         string `json:"app,omitempty"`
+	Platform    string `json:"platform,omitempty"`
+	Shared      bool   `json:"shared,omitempty"`
+	LastUnix    int64  `json:"last_seen_unix,omitempty"`
+	State       string `json:"state"`
+	Reason      string `json:"reason,omitempty"`
+	NeedVersion string `json:"need_version,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty"`
+}
+
+var compatStateNames = map[adminv1.ClientCompatState]string{
+	adminv1.ClientCompatState_CLIENT_COMPAT_STATE_OK:            "ok",
+	adminv1.ClientCompatState_CLIENT_COMPAT_STATE_BELOW_MINIMUM: "below_minimum",
+	adminv1.ClientCompatState_CLIENT_COMPAT_STATE_UNSUPPORTED:   "unsupported",
+	adminv1.ClientCompatState_CLIENT_COMPAT_STATE_UNKNOWN:       "unknown",
+}
+
+func outdatedDevicesView(r *adminv1.ListOutdatedDevicesResponse, offset int) *OutdatedDevicesV {
+	v := &OutdatedDevicesV{Counts: []outdatedCountV{}, Total: r.GetTotal(), Devices: []outdatedDeviceV{}, offset: offset}
+	for _, c := range r.GetCounts() {
+		v.Counts = append(v.Counts, outdatedCountV{State: compatStateNames[c.GetState()], Devices: c.GetDevices(), People: c.GetPeople()})
+	}
+	for _, fp := range r.GetFingerprints() {
+		v.Fingerprints = append(v.Fingerprints, clean(fp, 16))
+	}
+	for _, d := range r.GetDevices() {
+		v.Devices = append(v.Devices, outdatedDeviceV{
+			DeviceID: d.GetDeviceId(), UserID: d.GetUserId(), UserName: nm(d.GetUserName()), Client: clean(d.GetClient(), 40), App: clean(d.GetAppTitle(), 40),
+			Platform: clean(d.GetPlatform(), 16), Shared: d.GetShared(), LastUnix: d.GetLastSeenUnix(), State: compatStateNames[d.GetState()],
+			Reason: d.GetReason(), NeedVersion: clean(d.GetNeedVersion(), 24), Fingerprint: clean(d.GetFingerprint(), 16),
+		})
+	}
+	v.setPaging()
+	return v
+}
+
+func (v *OutdatedDevicesV) setPaging() {
+	if end := v.offset + len(v.Devices); end < int(v.Total) {
+		v.HasMore, v.NextOffset = true, end
+	} else {
+		v.HasMore, v.NextOffset = false, 0
+	}
+}
+
+func (v *OutdatedDevicesV) shrink() bool {
+	v.Truncated = true
+	ok := cut(&v.Devices)
+	v.setPaging() // a shorter page continues where it now ends
+	return ok
+}
+
 // KlickReportsV is the klick_reports result: the switch of the kl!ck reports and, while it is on, what they say per node.
 type KlickReportsV struct {
 	Enabled   bool         `json:"enabled"`

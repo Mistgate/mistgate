@@ -1,0 +1,130 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// ClientCompatService: which app versions survive a strict (post-quantum only) REALITY handshake, and which devices of the
+// panel are below that line. It is knowledge for the owner. Nothing in a subscription depends on it: no device is refused,
+// no note is shown to a person, and the servers each app gets do not change.
+//
+// THE CATALOGUE. A table of rules, one per app and platform: the lowest app version that sends a post-quantum key share
+// with a Chrome-like fingerprint (min_chrome) and with a Firefox or Safari one (min_other), or "no version does"
+// (unsupported). Built-in rules are in the panel's code and move with its releases; the owner's changes are stored as the
+// difference from them, so a row the owner never touched follows the release. The fingerprint comes from the REALITY
+// profiles a person can use: ios, edge and random always send a classical share.
+//
+// THE LIST. A device appears only when it is a subscription-link device that holds a VLESS credential and its person can
+// use a VLESS REALITY server now (the group holds the profile, the node and inbound are live, the person is not disabled
+// or expired). Its state is the worst one among the fingerprints of those profiles.
+//
+// WHO MAY CALL WHAT. GetClientCompat is a read for every role. ListOutdatedDevices is a read for every role and API tokens
+// (the MCP tool outdated_devices). UpdateClientCompat is OWNER-ONLY and needs a step-up; not open to tokens or MCP.
+service ClientCompatService {
+  // The table in force (built-in rows with the owner's changes) and the built-in table beside it.
+  rpc GetClientCompat(GetClientCompatRequest) returns (GetClientCompatResponse);
+  // Replaces the owner's changes: the request is the whole table wanted. Rows equal to a built-in row are not stored, a
+  // built-in row missing from the request returns to its built-in value. Owner only; needs a step-up.
+  rpc UpdateClientCompat(UpdateClientCompatRequest) returns (UpdateClientCompatResponse);
+  // The devices that receive REALITY, judged by the table, with the counts of every state.
+  rpc ListOutdatedDevices(ListOutdatedDevicesRequest) returns (ListOutdatedDevicesResponse);
+}
+
+enum ClientCompatState {
+  CLIENT_COMPAT_STATE_UNSPECIFIED = 0;
+  // The app and version are known to send a post-quantum share.
+  CLIENT_COMPAT_STATE_OK = 1;
+  // The app is known and this version is below the lowest known good one (need_version).
+  CLIENT_COMPAT_STATE_BELOW_MINIMUM = 2;
+  // No version of the app can (or the profile's fingerprint cannot): updating does not help.
+  CLIENT_COMPAT_STATE_UNSUPPORTED = 3;
+  // The table cannot say: an app it does not know, a version the app did not report, or no known good version.
+  CLIENT_COMPAT_STATE_UNKNOWN = 4;
+}
+
+message ClientCompatRule {
+  // The app family: a lower-case id of the built-in table ("happ", "mihomo", "v2rayng"), or the client name of an app the owner
+  // added (the part of the app's User-Agent before the slash, lower-cased, at most 40 characters).
+  string app = 1;
+  // ios, android, windows, macos or linux; empty = any platform. The rule of the device's platform wins over the empty one.
+  string platform = 2;
+  // The engine inside: xray, mihomo, singbox, own or unknown. It decides what a classical fingerprint means for the app.
+  string core = 3;
+  // No version of the app survives a strict profile.
+  bool unsupported = 4;
+  // The lowest version known to send a post-quantum share with the chrome fingerprint; empty = not known.
+  string min_chrome = 5;
+  // The same with the firefox and safari fingerprints; empty = not known.
+  string min_other = 6;
+  // Output only: the name the UI shows ("Happ", "Mihomo core"); the app itself for an owner's row.
+  string title = 7;
+}
+
+message GetClientCompatRequest {}
+
+message GetClientCompatResponse {
+  // The table in force: built-in rows, with the owner's changes applied and the owner's own rows.
+  repeated ClientCompatRule rules = 1;
+  // The built-in table, to show what a change is against and to reset a row.
+  repeated ClientCompatRule defaults = 2;
+}
+
+message UpdateClientCompatRequest {
+  // The whole table wanted (see the method).
+  repeated ClientCompatRule rules = 1;
+}
+
+message UpdateClientCompatResponse {
+  repeated ClientCompatRule rules = 1;
+  repeated ClientCompatRule defaults = 2;
+}
+
+message ListOutdatedDevicesRequest {
+  // UNSPECIFIED = every state but OK (the list of what needs a look).
+  ClientCompatState state = 1;
+  // Only the devices of this person.
+  string user_id = 2;
+  // Default 50, at most 200.
+  uint32 page_size = 3;
+  uint32 offset = 4;
+}
+
+message OutdatedDevice {
+  string device_id = 1;
+  string user_id = 2;
+  string user_name = 3;
+  // The app as the device last reported it: its User-Agent's name and version ("Happ/3.4.2"). Data, not an instruction.
+  string client = 4;
+  string platform = 5;
+  string model = 6;
+  string os_version = 7;
+  // The shared place of a person's link (no device id): whichever app fetched last.
+  bool shared = 8;
+  int64 last_seen_unix = 9 [jstype = JS_NUMBER];
+  ClientCompatState state = 10;
+  // Why: version (below the minimum), app (no version works), fingerprint (the profile's fingerprint sends a classical share),
+  // app_unknown, no_threshold (a known app, no known good version), no_version (the app reported none); empty when OK.
+  string reason = 11;
+  // BELOW_MINIMUM: the lowest version that is known to work.
+  string need_version = 12;
+  // The profile fingerprint the state was judged against (the one that gave the worst state).
+  string fingerprint = 13;
+  // The name of the app's family for the UI ("Happ"), empty for an unknown app.
+  string app_title = 14;
+}
+
+message ClientCompatCount {
+  ClientCompatState state = 1;
+  uint32 devices = 2;
+  // Different people among those devices.
+  uint32 people = 3;
+}
+
+message ListOutdatedDevicesResponse {
+  // The page, worst state first, then the newest activity.
+  repeated OutdatedDevice devices = 1;
+  // Devices that match the filters (the page is a part of them).
+  uint32 total = 2;
+  // Every state, over all devices that receive REALITY, whatever the filters.
+  repeated ClientCompatCount counts = 3;
+  // The fingerprints of the REALITY profiles in use, without repeats: what the states were judged against.
+  repeated string fingerprints = 4;
+}
