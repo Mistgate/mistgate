@@ -17,9 +17,9 @@ require (
 	filippo.io/age v1.3.2
 	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828
 	github.com/anthropics/anthropic-sdk-go/v2 v2.7.0
-	github.com/apernet/hysteria/core/v2 v2.12.3
-	github.com/apernet/hysteria/extras/v2 v2.12.3
-	github.com/apernet/quic-go v0.62.1-0.20260912175848-73339f7edbb9
+	github.com/apernet/hysteria/core/v2 v2.13.0
+	github.com/apernet/hysteria/extras/v2 v2.13.0
+	github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c
 	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.6

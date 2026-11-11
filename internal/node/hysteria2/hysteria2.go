@@ -114,7 +114,7 @@ func New(env engine.Env) (engine.Engine, error) {
 func (e *eng) Protocol() string { return Protocol }
 
 func (e *eng) Version() string {
-	v := "v2.12.3"
+	v := "v2.13.0"
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, d := range bi.Deps {
 			if d.Path == "github.com/apernet/hysteria/core/v2" && d.Version != "" {

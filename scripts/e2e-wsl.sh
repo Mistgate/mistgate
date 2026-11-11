@@ -526,7 +526,7 @@ burst() {
 # build_hysteria: the Hysteria2 client, built from source, never downloaded. `go install ...app/v2@version` is refused
 # (the app module's go.mod has replace directives pointing at ../core and ../extras), so build it from a scratch
 # module that requires the app and pins core and extras to the same published tag.
-HYV=v2.12.3 HYM=github.com/apernet/hysteria
+HYV=${HYV:-v2.13.0} HYM=github.com/apernet/hysteria # HYV=<tag> bash scripts/e2e-wsl.sh ... runs another client against the node (an older one checks compatibility)
 build_hysteria() {
   mkdir "$WORK/hy"
   (
@@ -730,7 +730,7 @@ if [ -n "$OLD_NODE" ]; then
   say "COMPATIBILITY RUN: the node agent is the older build $("$NODE_BIN" version 2>&1 | head -1)"
 fi
 build_hysteria
-pass "built mistgate, mistgate-node, h3get and hysteria v2.12.3 ($(du -h "$BIN/mistgate" | cut -f1) panel, $(du -h "$BIN/mistgate-node" | cut -f1) node)"
+pass "built mistgate, mistgate-node, h3get and hysteria $HYV ($(du -h "$BIN/mistgate" | cut -f1) panel, $(du -h "$BIN/mistgate-node" | cut -f1) node)"
 
 PUB=$(free_port tcp) ADM=$(free_port tcp) HY2=$(free_port udp) HY2_PLAIN=$(free_port udp)
 SOCKS=$(free_port tcp)

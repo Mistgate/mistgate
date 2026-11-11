@@ -414,7 +414,7 @@ func exchange(conn net.Conn, payload []byte) error {
 	return nil
 }
 
-// payload starts with a byte the sniffer recognises as neither HTTP nor TLS, so only 3 bytes are "put back".
+// payload starts with a byte the sniffer recognises as neither HTTP nor TLS; what the sniffer reads is "put back" and still counted.
 func payload(n int) []byte {
 	b := make([]byte, n)
 	b[0], b[1], b[2] = 0x01, 0x02, 0x03
@@ -551,7 +551,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 	col := r.collect()
 	up, down := trafficOf(col, a.CredID)
-	if down != 5000 || up < 5000-3 || up > 5000 { // the sniffer's 3 "put back" bytes bypass the traffic callback
+	if down != 5000 || up != 5000 { // the sniffer's "put back" bytes are counted too (third_party/hysteria-core/MISTGATE.md)
 		t.Fatalf("traffic up=%d down=%d, want ~5000/5000", up, down)
 	}
 	if n := sessionsOf(col, a.CredID); n != 1 {

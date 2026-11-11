@@ -24,7 +24,7 @@ import (
 type Engine interface {
 	// Protocol is the plugin id ("hysteria2"), equal to InboundSpec.Protocol it serves.
 	Protocol() string
-	// Version is shown in Hello and on the node page: "hysteria core v2.12.3".
+	// Version is shown in Hello and on the node page: "hysteria core v2.13.0".
 	Version() string
 	Capabilities() Capabilities
 

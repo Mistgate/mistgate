@@ -33,13 +33,15 @@ func (h *routeOnlyRequestHook) TCP(stream server.HyStream, reqAddr *string) ([]b
 	return putback, err
 }
 
-func (h *routeOnlyRequestHook) UDP(data []byte, reqAddr *string) error {
-	original := *reqAddr
-	err := h.delegate.UDP(data, reqAddr)
-	if isIPLiteralRequestAddr(original) {
-		*reqAddr = original
+// UDP: since core v2.13.0 the server holds a session's first packets until the hook says done, and the sniffer asks for more
+// while a QUIC ClientHello spans several packets. An IP literal keeps its address whatever the sniffer finds, so there is
+// nothing to wait for: it is done at once and the packets are not delayed. A domain request goes through the sniffer, which
+// may ask for more (done=false).
+func (h *routeOnlyRequestHook) UDP(packets [][]byte, reqAddr *string) (bool, error) {
+	if isIPLiteralRequestAddr(*reqAddr) {
+		return true, nil
 	}
-	return err
+	return h.delegate.UDP(packets, reqAddr)
 }
 
 func isIPLiteralRequestAddr(addr string) bool {
