@@ -386,6 +386,11 @@ func buildClientSync(in clientSyncInput) clientSyncAnswer {
 		Debug:   clientSyncDebug{Intake: false}, // no intake exists yet
 		Servers: []clientSyncServer{},
 	}
+	// "none" is the contract's word for a period that never ends, and then there is no reset time (the page does the same). The
+	// period of a person without a quota is kept: their used counter is zeroed by it, which they see.
+	if answer.Plan.QuotaReset == "" || answer.Plan.QuotaReset == access.ResetNone {
+		answer.Plan.QuotaReset, answer.Plan.NextResetUnix = access.ResetNone, 0
+	}
 	if in.Brand.BrandTail != "" {
 		answer.Brand.Parts = append(answer.Brand.Parts, in.Brand.BrandTail)
 	}

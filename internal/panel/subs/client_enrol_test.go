@@ -76,6 +76,27 @@ func (l *recordCounter) Record(ctx context.Context, w securitylimit.Window, key 
 	return l.Limiter.Record(ctx, w, key)
 }
 
+// RecordN is counted with Record under the same name; UndoN has a count of its own (refunded).
+func (l *recordCounter) RecordN(ctx context.Context, w securitylimit.Window, key string, n int) (securitylimit.Decision, error) {
+	l.mu.Lock()
+	if l.byName == nil {
+		l.byName = map[string]int{}
+	}
+	l.byName[w.Name] += n
+	l.mu.Unlock()
+	return l.Limiter.RecordN(ctx, w, key, n)
+}
+
+func (l *recordCounter) UndoN(ctx context.Context, w securitylimit.Window, key string, n int, start time.Time) error {
+	l.mu.Lock()
+	if l.byName == nil {
+		l.byName = map[string]int{}
+	}
+	l.byName["undo:"+w.Name] += n
+	l.mu.Unlock()
+	return l.Limiter.UndoN(ctx, w, key, n, start)
+}
+
 func (l *recordCounter) count(name string) int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -771,6 +792,102 @@ func TestEnrolBudgets(t *testing.T) {
 		}
 		if got := e.limiter.count("subscription-writes"); got != 3 {
 			t.Errorf("writes recorded %d times, want 3", got)
+		}
+	})
+}
+
+// The budget of enrols limits making devices, not refusals: a refusal gives its unit back, so a person who lost a key and is told
+// device_exists again and again is not locked out, and the real enrols that follow still get the whole budget.
+func TestEnrolBudgetIsSpentOnlyByWhatItMakes(t *testing.T) {
+	const name = "subscription-client-enrol"
+	hwid := func(n int) string { return fmt.Sprintf("c0ffee00-c0ff-ee00-c0ff-ee00c0ffee%02d", n) }
+	net := func(e *enrolEnv) int { return e.limiter.count(name) - e.limiter.count("undo:"+name) }
+
+	t.Run("six device_exists, then five real enrols and a sixth that is refused", func(t *testing.T) {
+		e := newEnrolEnv(t, func(c *subs.Config) { c.MaxEnrolsPerHour = 0 }) // the default: five
+		e.switchAPI(true)
+		_, tok := e.user("alice", nil)
+		e.enrolOK(tok, hwid(1)) // the key of this one is "lost"
+		for i := range 6 {
+			if rec := e.post(tok, enrolBody(hwid(1))); rec.Code != 409 || errorCode(t, rec) != "device_exists" {
+				t.Fatalf("lost key, try %d = %d %q, want 409 device_exists", i+1, rec.Code, rec.Body.String())
+			}
+		}
+		if got := net(e); got != 1 {
+			t.Fatalf("the budget holds %d units after one enrol and six refusals, want 1", got)
+		}
+		for n := 2; n <= 5; n++ {
+			e.enrolOK(tok, hwid(n))
+		}
+		if rec := e.post(tok, enrolBody(hwid(6))); rec.Code != 429 || errorCode(t, rec) != "too_many_requests" || rec.Header().Get("Retry-After") == "" {
+			t.Fatalf("sixth real enrol = %d %q, want 429 with Retry-After", rec.Code, rec.Body.String())
+		}
+	})
+	t.Run("device_limit, device_blocked and app_disabled give the unit back too", func(t *testing.T) {
+		e := newEnrolEnv(t, func(c *subs.Config) { c.MaxEnrolsPerHour = 0 })
+		e.switchAPI(true)
+		e.setLinkMode(store.LinkModeEnforce)
+		_, tok := e.user("alice", func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 1 })
+		e.enrolOK(tok, hwid(1))
+		for range 6 {
+			if rec := e.post(tok, enrolBody(hwid(2))); rec.Code != 409 || errorCode(t, rec) != "device_limit" {
+				t.Fatalf("second device = %d %q, want 409 device_limit", rec.Code, rec.Body.String())
+			}
+		}
+		_, amnezia := e.user("bob", func(m *adminv1.CreateUserRequest) { m.Apps = &adminv1.AppToggles{Amnezia: true} })
+		for range 6 {
+			if rec := e.post(amnezia, enrolBody(hwid(1))); rec.Code != 409 || errorCode(t, rec) != "app_disabled" {
+				t.Fatalf("no link app = %d %q, want 409 app_disabled", rec.Code, rec.Body.String())
+			}
+		}
+		if got := net(e); got != 1 {
+			t.Fatalf("the budget holds %d units, want 1 (the one device)", got)
+		}
+	})
+	t.Run("the write budget of the link still ends a run of refusals", func(t *testing.T) {
+		e := newEnrolEnv(t, func(c *subs.Config) { c.MaxEnrolsPerHour = 0; c.MaxWritesPerHour = 4 })
+		e.switchAPI(true)
+		_, tok := e.user("alice", nil)
+		e.enrolOK(tok, hwid(1))
+		for range 3 {
+			if rec := e.post(tok, enrolBody(hwid(1))); rec.Code != 409 {
+				t.Fatalf("lost key = %d %q, want 409", rec.Code, rec.Body.String())
+			}
+		}
+		if rec := e.post(tok, enrolBody(hwid(1))); rec.Code != 429 {
+			t.Fatalf("fifth request of the hour = %d %q, want 429 from the write budget", rec.Code, rec.Body.String())
+		}
+	})
+	t.Run("parallel enrols at the limit make no more than the limit", func(t *testing.T) {
+		e := newEnrolEnv(t, func(c *subs.Config) { c.MaxEnrolsPerHour = 0 })
+		e.switchAPI(true)
+		uid, tok := e.user("alice", nil)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		ok, limited := 0, 0
+		for n := 1; n <= 16; n++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				rec := e.post(tok, enrolBody(hwid(n)))
+				mu.Lock()
+				defer mu.Unlock()
+				switch rec.Code {
+				case 200:
+					ok++
+				case 429:
+					limited++
+				default:
+					t.Errorf("enrol %d = %d %q", n, rec.Code, rec.Body.String())
+				}
+			}()
+		}
+		close(start)
+		wg.Wait()
+		if devices := e.count(`SELECT count(*) FROM device WHERE user_id = ? AND revoked_at IS NULL`, uid); ok != 5 || limited != 11 || devices != 5 {
+			t.Fatalf("%d enrolled, %d refused, %d devices; want 5, 11 and 5", ok, limited, devices)
 		}
 	})
 }

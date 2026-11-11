@@ -99,6 +99,42 @@ func TestClientSyncBodyGolden(t *testing.T) {
 	goldenJSON(t, "client_sync_limited.json", marshalSync(t, in))
 }
 
+// The plan's reset: "none" means no reset time; a period is kept with its time whether or not there is a quota, because it zeroes
+// the used counter the person sees (the page shows the same).
+func TestClientSyncPlanReset(t *testing.T) {
+	next := time.Unix(1_790_000_000, 0)
+	for _, c := range []struct {
+		name      string
+		total     uint64
+		reset     string
+		next      time.Time
+		wantReset string
+		wantNext  int64
+	}{
+		{"quota and a month", 10 << 30, "month", next, "month", 1_790_000_000},
+		{"no quota and a month", 0, "month", next, "month", 1_790_000_000},
+		{"quota and none", 10 << 30, access.ResetNone, time.Time{}, "none", 0},
+		{"no quota and none", 0, access.ResetNone, time.Time{}, "none", 0},
+		{"no quota and an empty period", 0, "", next, "none", 0},
+	} {
+		in := syncInput(t)
+		in.View.Total, in.View.QuotaReset, in.View.NextReset = c.total, c.reset, c.next
+		var doc struct {
+			Plan struct {
+				QuotaBytes    uint64 `json:"quota_bytes"`
+				QuotaReset    string `json:"quota_reset"`
+				NextResetUnix int64  `json:"next_reset_unix"`
+			}
+		}
+		if err := json.Unmarshal(marshalSync(t, in), &doc); err != nil {
+			t.Fatal(err)
+		}
+		if doc.Plan.QuotaBytes != c.total || doc.Plan.QuotaReset != c.wantReset || doc.Plan.NextResetUnix != c.wantNext {
+			t.Errorf("%s: plan %+v, want reset %q next %d", c.name, doc.Plan, c.wantReset, c.wantNext)
+		}
+	}
+}
+
 // The structure of the answer: what is there when, and in what shape.
 func TestClientSyncBodyShape(t *testing.T) {
 	var doc struct {

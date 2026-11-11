@@ -67,7 +67,8 @@ type enrolAnswer struct {
 //     lost, 200 with the same device and nothing written, nothing counted;
 //   - the Bearer key is the key of this user's live device of this HWID: re-enrolment, the device takes the new key and keeps its
 //     credentials (no budget: no credentials are made);
-//   - otherwise the device is made, or the keyless device of this HWID is enrolled, within the budget of enrols of the link.
+//   - otherwise the device is made, or the keyless device of this HWID is enrolled, within the budget of enrols of the link: a unit
+//     is kept only by an enrol that made or took over a device, a refusal gives it back (every request spends the write budget).
 //
 // Nothing of the body, the keys or the answer is logged, nor is the address.
 func (h *handler) serveEnrol(w http.ResponseWriter, r *http.Request, token, client string, now time.Time) {
@@ -191,14 +192,22 @@ func (h *handler) serveEnrol(w http.ResponseWriter, r *http.Request, token, clie
 			jsonError(w, http.StatusConflict, "user_inactive", v.Status)
 			return
 		}
-		// Only the path that makes credentials is counted: a re-enrolment or a repeat makes none.
+		// Only the path that makes credentials is counted, and only when it makes them: the unit is reserved before the write (two
+		// parallel enrols cannot both pass the last one) and given back when nothing was made (a refusal, or a twin's answer).
+		refund := func() {}
 		if h.cfg.MaxEnrolsPerHour > 0 {
-			if d, err := h.cfg.Limiter.Record(ctx, h.enrolWindow(), "t:"+token); err != nil {
+			d, err := h.cfg.Limiter.RecordN(ctx, h.enrolWindow(), "t:"+token, 1)
+			if err != nil {
 				tooManyWrites(w, time.Hour) // the shared limiter did not answer: "later", not a free pass
 				return
 			} else if !d.Allowed {
 				tooManyWrites(w, d.RetryAfter)
 				return
+			}
+			refund = func() { // a client that hung up must not keep the unit
+				if err := h.cfg.Limiter.UndoN(context.WithoutCancel(ctx), h.enrolWindow(), "t:"+token, 1, d.WindowStart); err != nil {
+					h.cfg.Log.Warn("refund client API enrol budget", "code", "client_api_enrol_refund_failed", "err", err)
+				}
 			}
 		}
 		hint := access.DeviceHint{HWID: hwid, OS: platform, OSVersion: in.OSVersion, Model: model, Agent: r.UserAgent()}
@@ -206,6 +215,9 @@ func (h *handler) serveEnrol(w http.ResponseWriter, r *http.Request, token, clie
 			hint.OSVersion = firstHeader(r, "X-Ver-Os")
 		}
 		res, err := h.enrol.EnrolLinkDevice(ctx, v.UserID, token, hint, newHash[:])
+		if err != nil {
+			refund()
+		}
 		var limit *store.AccessLimitError
 		switch {
 		case err == nil:
