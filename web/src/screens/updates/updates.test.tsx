@@ -330,6 +330,13 @@ describe("the Updates screen", () => {
     expect(text()).toContain("Signature verified");
   });
 
+  it("counts a node as up to date only when it said so: offline nodes are named apart", async () => {
+    const off = (id: string, name: string) => node({ nodeId: id, name, state: NodeUpdateState.OFFLINE });
+    await mount(page({ nodes: [...outdated, off("nod_3", "fi1"), off("nod_4", "se1"), off("nod_5", "lv1")] }));
+    expect(text()).toContain("0 of 5 up to date · 3 offline");
+    expect(text()).not.toContain("3 of 5 up to date");
+  });
+
   it("says how far the fleet is and leads with one button that updates the rest, plus one button per node", async () => {
     await mount(page({ nodes: [...outdated, node({ nodeId: "nod_3", name: "fi1" }), node({ nodeId: "nod_4", name: "se1" })] }));
     expect(text()).toContain("2 of 4 nodes on 0.2.0-bbb");

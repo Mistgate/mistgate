@@ -66,7 +66,9 @@ func newCheckEnv(t *testing.T, online ...string) *checkEnv {
 		case "exit":
 			// The exit can run an MTProto server (mtprotoRelay); without the capability the panel withholds that inbound from it and
 			// marks it failed, and a failed server is not forwarded to.
-			x.xc, _, _ = connectCaps(x.exit, "exit", append([]string{capMTProto}, caps...)...)
+			// It serves the VLESS inbound of these tests too: without vless/1 the panel withheld that inbound and the tests ran
+			// against a server marked failed.
+			x.xc, _, _ = connectCaps(x.exit, "exit", append([]string{capMTProto, capVLESS}, caps...)...)
 			// connectCaps only SENDS the ApplyResult. When the panel stores it, it also writes the outcome of the inbounds it
 			// withheld from this agent (state, an empty certificate pin), so a test that sets a pin right after connecting
 			// lost it about once in forty runs under the race detector. Wait until the result is stored.

@@ -129,6 +129,10 @@ export function UpdatesScreen() {
   const panelLook = panelUpdate(t, d, edition.edge);
   const hero = heroOf(d);
   const outdated = outdatedNodes(d.nodes).length;
+  // "up to date" is what the node itself reported, not "whatever is not outdated": an offline node's version is unknown
+  // against a new bundle, and counting it as current made the card say 3 of 11 when the three were simply offline.
+  const upToDate = d.nodes.filter((n) => n.state === NodeUpdateState.UP_TO_DATE).length;
+  const offline = d.nodes.filter((n) => n.state === NodeUpdateState.OFFLINE).length;
   const agentsPill: { kind: StatusKind; label: string } =
     hero.id === "running" ? { kind: "busy", label: t("up.layer.pill.running") }
       : hero.id === "paused" ? { kind: "warn", label: t("up.layer.pill.paused") }
@@ -150,7 +154,8 @@ export function UpdatesScreen() {
     },
     {
       value: "agents", icon: "network", tone: "sky", title: t("up.tab.agents"),
-      fact: d.nodes.length === 0 ? "—" : t("up.layer.agents.fact", { ok: d.nodes.length - outdated, n: d.nodes.length }),
+      fact: d.nodes.length === 0 ? "—"
+        : t("up.layer.agents.fact", { ok: upToDate, n: d.nodes.length }) + (offline > 0 ? " · " + t("up.layer.agents.offline", { n: offline }) : ""),
       pill: agentsPill, content: agents,
     },
     ...(hasOs
