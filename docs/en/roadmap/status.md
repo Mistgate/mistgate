@@ -183,6 +183,9 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
     - title: Any geosite or geoip category in a split rule
       section: subscriptions
       text: "The split-rule editor suggests every category of the lists, not only countries."
+    - title: A choice of the protocol core per node
+      section: updates
+      text: "The protocol cores (Xray, Hysteria2) are built into the node agent, so today a node runs the core its agent was built with. If a core ever changes in a way old client apps cannot follow and that cannot be bridged on the server, the panel will offer two agent builds, one with the older core and one with the newer, and let you pick one per node, with the same signed rollout and rollback. Until then a new core ships with the compatibility old clients need."
     - title: More protocols
       section: profiles
       text: "Candidates: TUIC, NaiveProxy and MASQUE. Each plugs into the same subscription link through the protocol contract."

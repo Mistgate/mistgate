@@ -183,6 +183,9 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.85`�
     - title: 分流规则中可用任意 geosite 和 geoip 类别
       section: subscriptions
       text: "分流规则编辑器会提示列表中的所有类别，而不只是国家。"
+    - title: 按节点选择协议内核
+      section: updates
+      text: "协议内核（Xray、Hysteria2）内置于节点 Agent 中，因此目前节点运行的是其 Agent 构建时所带的内核。如果某个内核将来的改动使旧客户端无法连接，且无法在服务器端兼容，面板将提供两个 Agent 构建版本（旧内核与新内核），并允许为每个节点选择其一，使用同样的签名发布与回滚流程。在此之前，新内核会带着旧客户端所需的兼容性发布。"
     - title: 更多协议
       section: profiles
       text: "候选：TUIC、NaiveProxy 和 MASQUE。每个都通过协议接口接入同一个订阅链接。"
