@@ -912,6 +912,9 @@ func (f *Fleet) readyForRequest(ctx context.Context, nodeID string, frame *agent
 	if capability, message := requestCapability(frame, f.cfg.Remote != nil); capability != "" && !slices.Contains(live.AgentCaps, capability) {
 		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New(message))
 	}
+	if update := frame.GetUpdateAgent(); update != nil && len(update.Sources) > 0 && !slices.Contains(live.AgentCaps, capUpdateSources) {
+		update.Sources = nil
+	}
 	if fix := frame.GetApplyFix(); fix != nil && fix.GetFixId() == "refresh_unit" && !slices.Contains(live.AgentCaps, capUnitRefresh) {
 		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}

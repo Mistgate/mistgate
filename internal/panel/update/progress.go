@@ -44,7 +44,7 @@ func (s *Service) RecordProgress(ctx context.Context, nodeID string, p *agentv1.
 	}
 	rank := progressPhaseOrder[p.Phase]
 	accepted, err := s.st.RecordStepProgress(ctx, nodeID, p.RequestId, p.Phase, rank, p.BytesDownloaded, p.BytesTotal,
-		p.BytesPerSecond, p.UpdatedUnix, p.Error)
+		p.BytesPerSecond, p.UpdatedUnix, p.Error, reportedDownloadSource(p.Source))
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,8 @@ func (s *Service) RecordProgress(ctx context.Context, nodeID string, p *agentv1.
 		}
 		p.BytesDownloaded, p.BytesTotal = downloaded, total
 	}
-	s.progress[nodeID] = progressState{RequestID: p.RequestId, Phase: p.Phase, Downloaded: p.BytesDownloaded, Total: p.BytesTotal, Speed: p.BytesPerSecond, UpdatedUnix: p.UpdatedUnix}
+	s.progress[nodeID] = progressState{RequestID: p.RequestId, Phase: p.Phase, Downloaded: p.BytesDownloaded, Total: p.BytesTotal,
+		Speed: p.BytesPerSecond, UpdatedUnix: p.UpdatedUnix, Source: reportedDownloadSource(p.Source)}
 	return nil
 }
 

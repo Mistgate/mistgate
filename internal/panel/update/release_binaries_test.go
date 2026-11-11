@@ -136,7 +136,7 @@ func TestReleaseNodeBinariesRefusesAnUntrustedRelease(t *testing.T) {
 		text    string // or a message it must contain
 	}{
 		{name: "manifest signed by another key", opts: fakeReleaseOptions{signWith: otherPriv}, want: release.ErrBadSignature},
-		{name: "manifest of another version", opts: fakeReleaseOptions{version: "v1.2.4"}, text: `the manifest is for "v1.2.4"`},
+		{name: "manifest of another version", opts: fakeReleaseOptions{version: "v1.2.4"}, want: errReleaseManifestTagMismatch},
 		{name: "expired manifest", opts: fakeReleaseOptions{expires: 2_000}, want: release.ErrExpired},
 		{name: "no file for the platform", opts: fakeReleaseOptions{platform: [2]string{"linux", "arm64"}}, want: release.ErrNoFile},
 		{name: "size differs from the manifest", opts: fakeReleaseOptions{manifestN: 99}, want: release.ErrSizeMismatch},

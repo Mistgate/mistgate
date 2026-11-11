@@ -248,6 +248,17 @@ package mistgate.agent.v1;
 //     "Authorization: Bearer <token>" and "Range: bytes=N-" to resume. The token is good for that node's step
 //     while it waits for the answer and for files of the manifest in the same UpdateAgent. The edge panel does
 //     not wait for the CommandResult: it records it and acts on it at its next scheduled pass.
+//   - OPTIONAL SOURCES. An agent lists "update-sources/1" only when it reports UpdateProgress.source. Only then
+//     may UpdateAgent.sources add optional kinds after "panel"; an older agent keeps the panel-only path. The VPS
+//     panel offers "github" only when enabled and after a signed manifest at the release tag verifies under the
+//     panel's key and lists the same files as the rollout manifest. The list is kinds, never URLs. The agent tries
+//     the panel first, then the listed sources within the same download window. A transfer failure may fall through;
+//     a final size or SHA-256 mismatch ends visibly and is not downloaded again from another source. GitHub receives
+//     direct requests from the node, without a node ID, panel address, authorization header or panel token. A full
+//     panel download slot (RESOURCE_EXHAUSTED) therefore lets the agent continue from GitHub instead of waiting in a
+//     panel queue. UpdateProgress.source is the current byte source; the final CommandResult reports comma-separated
+//     "sources_used" and, for "download_failed", allow-listed "sources_failed" entries such as "panel:stalled,github:http_404".
+//     The panel emits "update_download_source" when any source beyond panel was used.
 //   - MANIFEST. manifest is the exact byte string that was signed (JSON, schema 1: version, built, expires,
 //     files[{os, arch, name, size, sha256}]); signature is a detached ed25519 signature over those bytes. The
 //     agent never re-serialises it. "built" is the Unix time of the source commit: it, not the version string,
@@ -1844,9 +1855,9 @@ message UpdateAgent {
   string download_token = 4;
   // Maximum time allowed for downloading the selected bundle file. Zero keeps the agent default.
   uint32 download_timeout_seconds = 5;
-  // Download sources in the order to try ("UPDATE SOURCES"). Empty means "panel" only. Known: "panel"
-  // (FetchUpdate, or the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated
-  // kinds are ignored.
+  // Download sources in the order to try ("UPDATE SOURCES"). Empty means the legacy panel-only path. The panel source
+  // is first; optional sources are sent only to agents advertising update-sources/1. Known: "panel" (FetchUpdate, or
+  // the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated kinds are ignored.
   repeated string sources = 6;
   // Reserved for "peer": donor host:port, SHA-256 of its one-time certificate, and a 32-byte one-time token.
   // Peer downloads are not implemented by this agent stage.

@@ -241,11 +241,11 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 						default:
 							t.Fatalf("round %d: unexpected returned offset %d", round, result.offset)
 						}
-					case <-time.After(e.s.sendTimeout + time.Second):
-						t.Fatalf("round %d: both Serve calls did not return within %s", round, e.s.sendTimeout+time.Second)
+					case <-time.After(e.s.sendTimeout + stallSlack):
+						t.Fatalf("round %d: both Serve calls did not return within %s", round, e.s.sendTimeout+stallSlack)
 					}
 				}
-				if took := time.Since(handoverAt); took > e.s.sendTimeout+500*time.Millisecond {
+				if took := time.Since(handoverAt); took > e.s.sendTimeout+stallSlack {
 					t.Fatalf("round %d: superseded Serve returned after %s, want within the send timeout", round, took)
 				}
 				cancelFirst()
@@ -483,3 +483,7 @@ func TestBundleHTTP2BlackholedPeerReleasesNodeSlot(t *testing.T) {
 		t.Fatal("HTTP/2 reader did not finish after the server closed the blackholed connection")
 	}
 }
+
+// stallSlack is the scheduling allowance on top of the send timeout. The bound under test is the send timeout itself;
+// a second was not enough on a machine running other builds (the test failed about once in a few full runs).
+const stallSlack = 5 * time.Second

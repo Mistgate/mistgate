@@ -51,6 +51,7 @@ type fakeFleet struct {
 	drift           map[string]bool
 	online          map[string]int
 	updates         []string // node ids UpdateAgent was sent to, in order
+	updateOptions   map[string][]UpdateAgentOptions
 	rollback        []string
 	sendFrames      []sentUpdateFrame
 	rollbackFrames  []sentRollbackFrame
@@ -64,7 +65,7 @@ type fakeFleet struct {
 }
 
 func newFakeFleet() *fakeFleet {
-	return &fakeFleet{live: map[string]bool{}, noSession: map[string]bool{}, caps: map[string][]string{}, drift: map[string]bool{}, online: map[string]int{}}
+	return &fakeFleet{live: map[string]bool{}, noSession: map[string]bool{}, caps: map[string][]string{}, drift: map[string]bool{}, online: map[string]int{}, updateOptions: map[string][]UpdateAgentOptions{}}
 }
 
 func (f *fakeFleet) HasSession(nodeID string) bool {
@@ -144,16 +145,22 @@ func (f *fakeFleet) UpdateAgent(_ context.Context, id string, _, _ []byte, _, _ 
 	return f.updateAgent(id)
 }
 
-func (f *fakeFleet) UpdateAgentWithRequestID(_ context.Context, id, _ string, _, _ []byte, _, _ time.Duration) (*agentv1.CommandResult, error) {
-	return f.updateAgent(id)
+func (f *fakeFleet) UpdateAgentWithRequestID(_ context.Context, id, _ string, _, _ []byte, _, _ time.Duration, options UpdateAgentOptions) (*agentv1.CommandResult, error) {
+	return f.updateAgentWithOptions(id, options)
 }
 
 func (f *fakeFleet) updateAgent(id string) (*agentv1.CommandResult, error) {
+	return f.updateAgentWithOptions(id, UpdateAgentOptions{})
+}
+
+func (f *fakeFleet) updateAgentWithOptions(id string, options UpdateAgentOptions) (*agentv1.CommandResult, error) {
 	if err := f.precondition(id); err != nil {
 		return nil, err
 	}
 	f.mu.Lock()
 	f.updates = append(f.updates, id)
+	options.Sources = append([]string(nil), options.Sources...)
+	f.updateOptions[id] = append(f.updateOptions[id], options)
 	fn := f.onUpdate
 	f.mu.Unlock()
 	if fn != nil {

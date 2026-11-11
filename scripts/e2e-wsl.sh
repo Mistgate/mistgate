@@ -220,7 +220,7 @@ SYSCTL_FILE=/etc/sysctl.d/90-mistgate.conf
 JOURNALD_FILE=/etc/systemd/journald.conf.d/90-mistgate.conf
 
 RESULTS=() SECRETS=() PIDS=()
-STEP=start PANEL_PID="" NODE_PID="" COOKIE="" LAST_PID=""
+STEP=start PANEL_PID="" NODE_PID="" COOKIE="" LAST_PID="" GH_PROGRESS_PID=""
 DL_BYTES=0 USED_BYTES=0
 
 # ---------------------------------------------------------------- output helpers
@@ -287,6 +287,7 @@ cleanup() {
   fi
   [ -e "$WORK/sampling" ] && rm -f "$WORK/sampling"
   rm -f "$WORK/owner.env" # --hold: the owner session and authenticator secret never outlive the run
+  if [ -n "$GH_PROGRESS_PID" ]; then stop_pid "$GH_PROGRESS_PID"; GH_PROGRESS_PID=""; fi
   for ((p = ${#PIDS[@]} - 1; p >= 0; p--)); do stop_pid "${PIDS[$p]}"; done
   ! declare -F edge_reap >/dev/null || edge_reap # workerd and the wrangler processes that outlived their parent
   sshn_reap # the agent an SSH install started on the test host, and its sshd sessions
@@ -596,8 +597,13 @@ cd "$REPO"
 # Release keys for the self-update steps: two throwaway keys of this run (A trusted by the builds under test, B
 # "someone else's"), and build times that order the releases. See step 2d.
 BI=github.com/mistgate/mistgate/internal/buildinfo
+PANEL_UPDATE_PKG=github.com/mistgate/mistgate/internal/panel/update
+NODE_AGENT_PKG=github.com/mistgate/mistgate/internal/node/agent
 ARCH=$(go env GOARCH)
 B1=1780000000 B2=1781000000 B3A=1782000000 B3A_MANIFEST=1782500000 B3B=1783000000 B5=1784000000
+GH_TAG=v0.0.90-dev.1 GH_BUILT=1785000000
+REL_PORT=$(free_port tcp)
+NODE_RELEASE_BASE="https://127.0.0.1:$REL_PORT/"
 go build -trimpath -o "$BIN/mistgate-tool" ./cmd/mistgate # keygen only
 go build -trimpath -o "$BIN/signbundle" ./scripts/e2e/signbundle
 keygen() { "$BIN/mistgate-tool" release keygen --out "$1" | sed -n 's/^public key: //p'; }
@@ -607,10 +613,12 @@ SECRETS+=("$(cat "$WORK/release-a.key")" "$(cat "$WORK/release-b.key")")
 ldf() { echo "-X $BI.Version=$1 -X $BI.Built=$2 -X $BI.ReleaseKey=$3"; } # <version> <built> <public key>
 # node_build <release dir> <version> <built> <public key> [go build args]: $WORK/rel/<dir>/mistgate-node-linux-<arch>
 node_build() {
-  local d=$WORK/rel/$1 v=$2 b=$3 k=$4
+  local d=$WORK/rel/$1 v=$2 b=$3 k=$4 flags
   shift 4
   mkdir -p "$d"
-  go build -trimpath -ldflags "$(ldf "$v" "$b" "$k")" "$@" -o "$d/mistgate-node-linux-$ARCH" ./cmd/mistgate-node
+  flags=$(ldf "$v" "$b" "$k")
+  [ -z "$NODE_RELEASE_BASE" ] || flags+=" -X $NODE_AGENT_PKG.githubReleaseBase=$NODE_RELEASE_BASE"
+  go build -trimpath -ldflags "$flags" "$@" -o "$d/mistgate-node-linux-$ARCH" ./cmd/mistgate-node
 }
 # the panel under test trusts key A, a second panel binary (step 2d, the foreign signature) trusts key B
 go build -trimpath -ldflags "$(ldf 0.1.0-e2e-v2 "$B2" "$KEY_A")" -o "$BIN/mistgate" ./cmd/mistgate
@@ -639,6 +647,77 @@ sed '/^func (a \*Agent) observedHash/,/^}/ s/return statehash\./return "00drift"
 ! cmp -s "$OVL/apply.go" "$REPO/internal/node/agent/apply.go" || die "e2e overlay: the wrong-hash patch did not apply (observedHash changed?)"
 jq -nc --arg a "$REPO/internal/node/agent/apply.go" --arg b "$OVL/apply.go" '{Replace: {($a): $b}}' >"$OVL/drift.json"
 node_build v1d 0.1.0-e2e-v1d "$B1" "$KEY_A" -overlay "$OVL/drift.json"
+
+if [ -z "$OLD_NODE" ]; then
+  # The tag-shaped release is the same signed directory installed as the panel bundle and served by the local fake release.
+  node_build github "$GH_TAG" "$GH_BUILT" "$KEY_A"
+  mkdir -p "$WORK/fake-release" "$WORK/bundles"
+  "$BIN/signbundle" --key "$WORK/release-a.key" --version "$GH_TAG" --built "$GH_BUILT" \
+    --out "$WORK/fake-release/$GH_TAG" "$WORK/rel/github/mistgate-node-linux-$ARCH" >>"$WORK/release.log" \
+    || die "signing the fake GitHub fallback release failed"
+  mkdir -p "$WORK/bundles/github"
+  cp -a "$WORK/fake-release/$GH_TAG/." "$WORK/bundles/github/"
+
+  # Only this test build cuts the panel stream after 1 MiB while the flag exists.
+  python3 - "$REPO/internal/panel/update/bundle.go" "$OVL/panel-bundle.go" <<'PY'
+import pathlib, sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace("type writeDeadlineContextKey struct{}", "type writeDeadlineContextKey struct{}\n\nvar e2ePanelCutFlag string", 1)
+needle = "\tbuf := make([]byte, chunkSize)\n\tsent := false\n\tfor {"
+replacement = "\tbuf := make([]byte, chunkSize)\n\tcutAfter := int64(-1)\n\tif e2ePanelCutFlag != \"\" && strings.HasPrefix(name, \"mistgate-node-\") {\n\t\tif _, err := os.Stat(e2ePanelCutFlag); err == nil {\n\t\t\tcutAfter = (1 << 20) - int64(offset)\n\t\t\tif cutAfter <= 0 {\n\t\t\t\treturn connect.NewError(connect.CodeUnavailable, errors.New(\"temporary update source interruption\"))\n\t\t\t}\n\t\t}\n\t}\n\tsentBytes := int64(0)\n\tsent := false\n\tfor {"
+if source.count(needle) != 1:
+    raise SystemExit("panel e2e overlay: Serve loop marker changed")
+source = source.replace(needle, replacement, 1)
+needle = "\t\tif n > 0 {\n\t\t\tif err := s.sendBundleChunk(ctx, setWriteDeadline, send, buf[:n], total); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tsent = true\n\t\t}"
+replacement = "\t\tif n > 0 {\n\t\t\tif cutAfter >= 0 && int64(n) > cutAfter-sentBytes {\n\t\t\t\tn = int(cutAfter - sentBytes)\n\t\t\t}\n\t\t\tif n > 0 {\n\t\t\t\tif err := s.sendBundleChunk(ctx, setWriteDeadline, send, buf[:n], total); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t\tsentBytes += int64(n)\n\t\t\t\tsent = true\n\t\t\t}\n\t\t\tif cutAfter >= 0 && sentBytes >= cutAfter {\n\t\t\t\treturn connect.NewError(connect.CodeUnavailable, errors.New(\"temporary update source interruption\"))\n\t\t\t}\n\t\t}"
+if source.count(needle) != 1:
+    raise SystemExit("panel e2e overlay: Serve send marker changed")
+source = source.replace(needle, replacement, 1)
+pathlib.Path(sys.argv[2]).write_text(source)
+PY
+  jq -nc --arg a "$REPO/internal/panel/update/bundle.go" --arg b "$OVL/panel-bundle.go" '{Replace: {($a): $b}}' >"$OVL/panel.json"
+  PANEL_CUT_FLAG=$WORK/panel-cut
+  # $REL_FLAGS/slow flushes each fake release chunk, then pauses 20 ms to make the agent move to a faster source.
+  go build -trimpath -overlay "$OVL/panel.json" \
+    -ldflags "$(ldf 0.1.0-e2e-v2 "$B2" "$KEY_A") -X $PANEL_UPDATE_PKG.releaseDownloadBase=$NODE_RELEASE_BASE -X $PANEL_UPDATE_PKG.e2ePanelCutFlag=$PANEL_CUT_FLAG" \
+    -o "$BIN/mistgate-github" ./cmd/mistgate
+
+  REL_FLAGS=$WORK/fake-release.flags
+  mkdir -p "$REL_FLAGS"
+  : >"$WORK/fake-release.log"
+  GH_RELEASE_CA=$WORK/fake-release-ca.pem GH_RELEASE_KEY=$WORK/fake-release-key.pem
+  spawn python3 "$REPO/scripts/e2e/fake-release.py" "$WORK/fake-release" "$REL_PORT" "$WORK/fake-release.log" "$REL_FLAGS" "$GH_RELEASE_CA" "$GH_RELEASE_KEY"
+  fake_release_tls_up() {
+    [ -s "$GH_RELEASE_CA" ] && [ -s "$GH_RELEASE_KEY" ] && \
+      curl --cacert "$GH_RELEASE_CA" -sf -o /dev/null "https://127.0.0.1:$REL_PORT/$GH_TAG/manifest.json"
+  }
+  wait_for 10 "the fake release to answer over TLS" fake_release_tls_up || die "the fake release server did not start"
+  merge_release_ca() {
+    python3 - "$1" "$GH_RELEASE_CA" "$2" <<'PY'
+import ssl, sys
+
+source, extra, destination = sys.argv[1:]
+try:
+    base = source or ssl.get_default_verify_paths().cafile
+    if not base:
+        raise OSError
+    with open(base, "rb") as f:
+        bundle = f.read()
+    with open(extra, "rb") as f:
+        cert = f.read()
+    with open(destination, "wb") as f:
+        f.write(bundle.rstrip() + b"\n" + cert)
+except OSError:
+    raise SystemExit("cannot prepare the fake release trust bundle")
+PY
+  }
+  merge_release_ca "${NODE_SSL_CERT_FILE:-}" "$WORK/node-release-trust.pem"
+  merge_release_ca "${PANEL_SSL_CERT_FILE:-}" "$WORK/panel-release-trust.pem"
+  NODE_SSL_CERT_FILE=$WORK/node-release-trust.pem
+  PANEL_SSL_CERT_FILE=$WORK/panel-release-trust.pem
+  : >"$WORK/fake-release.log"
+fi
 fi
 cp "$WORK/rel/v1/mistgate-node-linux-$ARCH" "$BIN/mistgate-node"
 go build -trimpath -o "$BIN/h3get" ./scripts/e2e/h3get
@@ -928,10 +1007,68 @@ else
   wait_for 60 "the agent to commit the second update" test ! -e "$NODE_STATE/update.pending" || die "the second update never committed"
   pass "a rolled-back node takes the bundle again: rollout DONE, built $B2"
 
+  # ---- 2d.1: the panel stops after 1 MiB; the node resumes from the local fake GitHub release.
+  step "2d.1. updates: panel download falls back to GitHub"
+  stop_pid "$PANEL_PID"
+  PANEL_BIN=$BIN/mistgate-github
+  start_panel
+  wait_for 90 "node ONLINE after the fallback panel restart" node_online || die "2d.1: node did not reconnect"
+  install_bundle github
+  [ "$(bundle_status)" = BUNDLE_STATUS_TRUSTED ] || die "2d.1: tag-shaped bundle is not TRUSTED: $(upd | jq -c .bundle)"
+  upd | jq -e '.updateDownloadSources | index("github") != null' >/dev/null || die "2d.1: GitHub fallback is not enabled by default"
+
+  : >"$WORK/fake-release.log"
+  : >"$WORK/github-progress"
+  touch "$PANEL_CUT_FLAG" "$REL_FLAGS/slow"
+  EVENT_MARK_GH=$(api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":1}" | jq -r '(.events[0].id // "0") | tonumber')
+  RID=$(start_rollout "{\"nodeIds\":[\"$NODE_ID\"]}")
+  (
+    for ((i = 0; i < 300; i++)); do
+      if upd | jq -e --arg v "$GH_TAG" '.rollout.toVersion == $v and any(.rollout.steps[]?; .downloadSource == "github")' >/dev/null 2>&1; then
+        printf 'github\n' >"$WORK/github-progress"
+        exit 0
+      fi
+      sleep 0.2
+    done
+  ) &
+  GH_PROGRESS_PID=$!
+  wait_for 300 "the GitHub fallback rollout to settle" ro_settled || die "2d.1: rollout did not settle: $(ro_brief)"
+  [ "$(ro_status)" = ROLLOUT_STATUS_DONE ] || die "2d.1: rollout ended as $(ro_status): $(ro_brief)"
+  ro_step | jq -e '.state == "STEP_STATE_PASSED"' >/dev/null || die "2d.1: step did not pass: $(ro_step)"
+  node_built_is "$GH_BUILT" || die "2d.1: node reports built $(node_built), want $GH_BUILT"
+  wait_for 60 "the agent to commit the GitHub update" test ! -e "$NODE_STATE/update.pending" || die "2d.1: update.pending did not clear"
+  GH_PROGRESS_REAP=$GH_PROGRESS_PID
+  GH_PROGRESS_PID=""
+  wait "$GH_PROGRESS_REAP" || true
+  [ "$(cat "$WORK/github-progress")" = github ] || die "2d.1: GetUpdates never showed GitHub download progress"
+  grep -F "GET /$GH_TAG/mistgate-node-linux-$ARCH HTTP" "$WORK/fake-release.log" | grep -Fq 'range=bytes=1048576-' \
+    || die "2d.1: fake release did not receive the resumed Range request: $(cat "$WORK/fake-release.log")"
+  ! grep -Eq 'authorization=present|cookie=present' "$WORK/fake-release.log" \
+    || die "2d.1: the node sent credentials to the fake release host"
+  api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":200}" \
+    | jq -e --arg v "$GH_TAG" --argjson mark "$EVENT_MARK_GH" \
+      '[.events[] | select((.id | tonumber) > $mark and .code == "update_download_source" and .params.to_version == $v and .params.sources_used == "panel,github")] | length > 0' \
+    >/dev/null || die "2d.1: no update_download_source event for panel,github"
+  pass "panel transfer stopped at 1 MiB; the node resumed at byte 1048576 from GitHub without credentials, progress showed github, the step PASSED and the source event recorded panel,github"
+
+  rm -f "$PANEL_CUT_FLAG" "$REL_FLAGS/slow"
+  mutate UpdateService/RollbackNode "{\"nodeId\":\"$NODE_ID\"}" >/dev/null || die "2d.1: RollbackNode refused the test update"
+  wait_for 90 "node restored to built $B2" node_built_is "$B2" || die "2d.1: rollback left built $(node_built)"
+  wait_for 60 "node ONLINE after the fallback rollback" node_online || die "2d.1: node did not reconnect after rollback"
+  install_bundle v2
+  [ "$(bundle_status)" = BUNDLE_STATUS_TRUSTED ] || die "2d.1: v2 bundle did not restore"
+  stop_pid "$PANEL_PID"
+  PANEL_BIN=$BIN/mistgate
+  start_panel
+  wait_for 90 "node ONLINE at the regular panel" node_online || die "2d.1: node did not reconnect to the regular panel"
+  [ "$(node_ustate)" = NODE_UPDATE_STATE_UP_TO_DATE ] || die "2d.1: restored node is $(node_ustate), want UP_TO_DATE"
+
   # ---- v3a: a manifest that claims a later build time than the binary has; the agent notices at once and goes back
   publish_bundle v3a "$WORK/release-a.key" 0.1.0-e2e-v3a "$B3A_MANIFEST" "$WORK/rel/v3a/mistgate-node-linux-$ARCH"
   install_bundle v3a
-  upd_node | jq -e '.state == "NODE_UPDATE_STATE_OUTDATED"' >/dev/null || die "v3a: node should be OUTDATED: $(upd_node)"
+  # 2d.1 ended with a manual rollback, so a node that is behind the bundle reads ROLLED_BACK here, not OUTDATED; both
+  # mean "not on the bundle" and both take a rollout (the rolled-back case is exercised in 2d above).
+  upd_node | jq -e '.state == "NODE_UPDATE_STATE_OUTDATED" or .state == "NODE_UPDATE_STATE_ROLLED_BACK"' >/dev/null || die "v3a: node should be behind the bundle: $(upd_node)"
   RID=$(start_rollout "{\"nodeIds\":[\"$NODE_ID\"]}")
   wait_for 240 "the rollout v3a to settle" ro_settled || die "rollout v3a did not settle: $(ro_brief)"
   [ "$(ro_status)" = ROLLOUT_STATUS_PAUSED ] || die "rollout v3a: expected PAUSED, got: $(ro_brief)"

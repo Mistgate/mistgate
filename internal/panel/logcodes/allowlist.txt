@@ -409,7 +409,6 @@ update/bundle_auto.go	update: installed node bundle does not match the GitHub re
 update/bundle_auto.go	update: sync signed node bundle from GitHub	1
 update/panel_update.go	check GitHub panel release	1
 update/panel_update.go	the panel update helper finished but the panel was not replaced	1
-update/rollout.go	<"update: " + what>	1
 update/rollout.go	update: create link download token	1
 update/rollout.go	update: decode recorded rollback answer	1
 update/rollout.go	update: decode recorded update answer	1
@@ -434,7 +433,6 @@ update/schedule.go	update: load node update schedules	1
 update/schedule.go	update: mark missed node update schedules	1
 update/schedule.go	update: remove obsolete node update schedule	1
 update/schedule.go	update: start scheduled node update	1
-update/update.go	update: audit	1
 update/update.go	update: prune rollouts	1
 warp/service.go	<"warp: " + what>	1
 warp/service.go	warp: audit	1

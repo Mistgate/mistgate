@@ -19,6 +19,7 @@ import { useFixFlow } from "@/screens/health/fix";
 import { ApprovalHistory } from "@/screens/integrations/approvals";
 import { EventsTab } from "@/screens/node/events";
 import { AuditPage } from "@/screens/settings-pages/audit";
+import { UpdateDownloadSourcesCard, UpdateDownloadTimeoutCard } from "@/screens/settings-pages/system";
 import { UpdatesScreen } from "@/screens/updates";
 import { UsersScreen } from "@/screens/users/list";
 import { groupsQuery } from "@/screens/users/rpc";
@@ -261,6 +262,8 @@ export const page = (over: object) => ({
   distDir: "/var/lib/mistgate/dist",
   agentNotes: [],
   panelNotes: [],
+  updateDownloadTimeoutSeconds: 1800,
+  updateDownloadSources: ["github"],
   ...over,
 });
 const doneStep = (nodeId: string, nodeName: string, stage: number, from: number) => ({ nodeId, nodeName, stage, state: StepState.PASSED, fromVersion: V_OLD, fromBuilt: B_OLD, startedUnix: NOW - from, finishedUnix: NOW - from + 420, errorKey: "", params: {} });
@@ -310,6 +313,46 @@ const running = page({
       runningStep("nod_se1", "se1", 3, StepState.PENDING),
     ],
   },
+});
+// A node that falls back to GitHub is still "updating"; the one that tried both sources and lost has stopped the rollout.
+const githubNodes = [
+  upNode({ nodeId: "nod_nl1", name: "nl1", onlineUsers: 1, address: "nl1.example.com", lastUpdate: lastOk(V_OLD, V_NEW, 20 * 60) }),
+  upNode({ nodeId: "nod_de1", name: "de1", version: V_OLD, built: B_OLD, state: NodeUpdateState.UPDATING, onlineUsers: 5 }),
+  upNode({ nodeId: "nod_fi1", name: "fi1", version: V_OLD, built: B_OLD, state: NodeUpdateState.OUTDATED, onlineUsers: 2, address: "fi1.example.com" }),
+];
+const sourcesRollout = (status: RolloutStatus, steps: object[], over: object = {}) => ({
+  id: "rol_2",
+  status,
+  toVersion: V_NEW,
+  toBuilt: B_NEW,
+  batchSize: 1,
+  createdUnix: NOW - 25 * 60,
+  finishedUnix: 0,
+  pauseKey: "",
+  pauseParams: {},
+  steps,
+  ...over,
+});
+const canaryDone = { ...doneStep("nod_nl1", "nl1", 0, 25 * 60), finishedUnix: NOW - 20 * 60 };
+const viaGithub = page({
+  nodes: githubNodes,
+  rollout: sourcesRollout(RolloutStatus.RUNNING, [
+    canaryDone,
+    { ...runningStep("nod_de1", "de1", 1, StepState.SENT), downloadPhase: "downloading", downloadedBytes: 10_530_000, totalBytes: 23_400_000, bytesPerSecond: 1_258_291, downloadSource: "github" },
+    runningStep("nod_fi1", "fi1", 2, StepState.PENDING),
+  ]),
+});
+const bothFailed = page({
+  nodes: githubNodes.map((n) => (n.name === "de1" ? { ...n, state: NodeUpdateState.FAILED } : n)),
+  rollout: sourcesRollout(
+    RolloutStatus.PAUSED,
+    [
+      canaryDone,
+      { ...runningStep("nod_de1", "de1", 1, StepState.FAILED), finishedUnix: NOW - 60, errorKey: "updates.step.err.download_failed", params: { sources_failed: "panel:stalled,github:http_404" } },
+      runningStep("nod_fi1", "fi1", 2, StepState.PENDING),
+    ],
+    { pauseKey: "updates.pause.step_failed", pauseParams: { node: "de1", reason: "download_failed" } },
+  ),
 });
 export const panelOffer = page({
   panel: {
@@ -427,6 +470,18 @@ export function UpdatesKit() {
       </Shot>
       <Shot id="updates-running" title="Updates: a rollout of 4 nodes running, one stage at a time (the server's batch plan: the canary, then 1 at a time while fewer than 5 are to be updated)" seed={[[updatesQuery.queryKey, running]]}>
         <UpdatesScreen />
+      </Shot>
+      <Shot id="updates-source-github" title="Updates: a node that fell back to GitHub says so on its progress line" seed={[[updatesQuery.queryKey, viaGithub]]}>
+        <UpdatesScreen />
+      </Shot>
+      <Shot id="updates-source-failed" title="Updates: a download that failed on every source lists what was tried, under the error" seed={[[updatesQuery.queryKey, bothFailed]]}>
+        <UpdatesScreen />
+      </Shot>
+      <Shot id="settings-download-sources" title="Settings → System: the download timeout and the download sources (GitHub on, GitHub off, read-only for a non-owner)">
+        <UpdateDownloadTimeoutCard data={page({}) as never} owner busy={false} onChange={async () => true} />
+        <UpdateDownloadSourcesCard data={page({}) as never} owner busy={false} onChange={async () => true} />
+        <UpdateDownloadSourcesCard data={page({ updateDownloadSources: [] }) as never} owner busy={false} onChange={async () => true} />
+        <UpdateDownloadSourcesCard data={page({}) as never} owner={false} busy={false} onChange={async () => true} />
       </Shot>
       <Shot id="updates-panel" title="Updates: every node current, a signed panel release is out" seed={[[updatesQuery.queryKey, panelOffer]]}>
         <UpdatesScreen />

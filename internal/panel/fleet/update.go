@@ -26,6 +26,9 @@ const capUpdate = "update/1"
 // capUpdateLink is the edge link-only agent update capability; VPS updates continue to require capUpdate.
 const capUpdateLink = "update-link/1"
 
+// capUpdateSources gates UpdateAgent.sources and UpdateProgress.source.
+const capUpdateSources = "update-sources/1"
+
 const capOSStatus = osupdate.Capability
 
 // Updates is implemented by the updates module. Its three metadata methods are cheap; Serve blocks for a download.
@@ -102,8 +105,10 @@ func (f *Fleet) UpdateAgent(ctx context.Context, nodeID string, manifest, signat
 
 // UpdateAgentWithRequestID is the rollout path. The caller persists the request ID with the step so progress and
 // command replies from a previous attempt cannot be mistaken for the current update after a reconnect or restart.
-func (f *Fleet) UpdateAgentWithRequestID(ctx context.Context, nodeID, requestID string, manifest, signature []byte, wait, downloadTimeout time.Duration) (*agentv1.CommandResult, error) {
-	return f.commandWithRequestID(ctx, nodeID, requestID, wait, updateAgentFrame(requestID, manifest, signature, downloadTimeout))
+func (f *Fleet) UpdateAgentWithRequestID(ctx context.Context, nodeID, requestID string, manifest, signature []byte, wait, downloadTimeout time.Duration, options panelupdate.UpdateAgentOptions) (*agentv1.CommandResult, error) {
+	frame := updateAgentFrame(requestID, manifest, signature, downloadTimeout)
+	frame.GetUpdateAgent().Sources = append([]string(nil), options.Sources...)
+	return f.commandWithRequestID(ctx, nodeID, requestID, wait, frame)
 }
 
 func updateAgentFrame(requestID string, manifest, signature []byte, downloadTimeout time.Duration) *agentv1.ConnectResponse {

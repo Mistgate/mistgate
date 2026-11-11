@@ -20,6 +20,7 @@ var releaseDownloadBase = panelReleasePrefix
 const releaseMetadataTimeout = 30 * time.Second
 
 var errFetchReleaseMetadata = errors.New("update: release metadata fetch failed")
+var errReleaseManifestTagMismatch = errors.New("update: release manifest tag mismatch")
 
 // ReleaseNodeBinaries is a provision.BinarySource that has no bundle directory (the edge edition has no disk): it streams
 // the node binary of this panel's own release from the release download URLs, so the node needs no route to GitHub.
@@ -108,7 +109,7 @@ func fetchReleaseManifest(ctx context.Context, key ed25519.PublicKey, version, b
 		return nil, nil, nil, fmt.Errorf("update: verify the release manifest: %w", err)
 	}
 	if manifest.Version != version {
-		return nil, nil, nil, fmt.Errorf("update: the manifest is for %q, not %q", manifest.Version, version)
+		return nil, nil, nil, fmt.Errorf("%w: the manifest is for a different release tag", errReleaseManifestTagMismatch)
 	}
 	if now.Unix() > manifest.Expires {
 		return nil, nil, nil, fmt.Errorf("update: the release manifest: %w", release.ErrExpired)

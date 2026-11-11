@@ -86,7 +86,7 @@ func TestRolloutOverTheAgentEndpoint(t *testing.T) {
 
 	// the agent is connected with its old build and the capability
 	c := a.open()
-	c.send(0, helloWithUpdate("inst1", oldBuilt, "update/1", "update-guard/1"))
+	c.send(0, helloWithUpdate("inst1", oldBuilt, "update/1", "update-guard/1", capUpdateSources))
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
 	ds := c.desired()
 	model := newModel()
@@ -118,6 +118,9 @@ func TestRolloutOverTheAgentEndpoint(t *testing.T) {
 
 	// --- the agent's side of the update
 	msg := c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetUpdateAgent() != nil }).GetUpdateAgent()
+	if len(msg.GetSources()) != 0 {
+		t.Fatalf("UpdateAgent sources = %v, want the legacy empty panel-only path for this non-release bundle", msg.GetSources())
+	}
 	man, err := release.Verify(pub, msg.Manifest, msg.Signature)
 	if err != nil {
 		t.Fatalf("the manifest the panel relays does not verify: %v", err)

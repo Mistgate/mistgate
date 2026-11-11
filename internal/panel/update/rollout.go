@@ -69,7 +69,7 @@ func notFound(what string) error {
 var errInternal = connect.NewError(connect.CodeInternal, errors.New("internal error"))
 
 func (s *Service) internal(what string, err error) error {
-	s.log.Error("update: "+what, "err", err)
+	s.log.Error("update: "+what, "code", "update_internal_error", "err", err)
 	return errInternal
 }
 
@@ -576,7 +576,7 @@ func (p *pass) finish(x *store.StepRow, state, key string, params map[string]str
 	updated := *x
 	updated.State, updated.ErrorKey, updated.Params, updated.FinishedAt = state, key, params, p.now
 	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA, updated.AnswerWait = "", time.Time{}, "", "", 0
-	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError = "", -1, 0, 0, 0, 0, ""
+	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError, updated.ProgressSource = "", -1, 0, 0, 0, 0, "", ""
 	if !p.save(&updated) {
 		return false
 	}
@@ -1119,17 +1119,53 @@ func (p *pass) launch() {
 // send marks the step SENT (with the inbounds that are FAILED right now) and hands the command to its goroutine.
 func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 	s := p.s
-	preFailed := p.preFailed(x)
 	if s.cfg.Edge {
-		p.sendLink(x, n, preFailed)
+		p.sendLink(x, n, p.preFailed(x))
 		return
 	}
+	if slices.Contains(n.AgentCaps, updateSourcesCapability) {
+		if s.preparing[x.NodeID] == p.ro.ID {
+			return
+		}
+		s.preparing[x.NodeID] = p.ro.ID
+		rolloutID, nodeID, manifest, runCtx := p.ro.ID, x.NodeID, p.ro.Manifest, s.runCtx
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			sources := s.sourcesForStep(runCtx, manifest, true)
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			if s.preparing[nodeID] != rolloutID {
+				return
+			}
+			delete(s.preparing, nodeID)
+			prepared, step := s.stepPass(runCtx, rolloutID, nodeID)
+			if prepared == nil || prepared.ro.Status != store.RolloutRunning || step.State != store.StepPending {
+				return
+			}
+			currentNode, err := s.st.Node(runCtx, nodeID)
+			if err != nil {
+				return
+			}
+			if !slices.Contains(currentNode.AgentCaps, updateSourcesCapability) {
+				sources = nil
+			}
+			prepared.sendPrepared(step, currentNode, sources)
+		}()
+		return
+	}
+	p.sendPrepared(x, n, nil)
+}
+
+func (p *pass) sendPrepared(x *store.StepRow, n store.NodeRow, sources []string) {
+	s := p.s
+	preFailed := p.preFailed(x)
 	x.PreFailed = preFailed
 	s.clearProgress(x.NodeID)
 	x.State, x.SentAt, x.FromVersion, x.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
 	x.RequestID, x.RequestAt = store.NewID("req_"), p.now
 	x.AnswerWait = p.configuredAnswerWait(n)
-	x.ProgressPhase, x.ProgressRank, x.ProgressDownloaded, x.ProgressTotal, x.ProgressSpeed, x.ProgressUpdatedUnix, x.ProgressError = "", -1, 0, 0, 0, 0, ""
+	x.ProgressPhase, x.ProgressRank, x.ProgressDownloaded, x.ProgressTotal, x.ProgressSpeed, x.ProgressUpdatedUnix, x.ProgressError, x.ProgressSource = "", -1, 0, 0, 0, 0, "", ""
 	if !p.save(x) {
 		return
 	}
@@ -1141,10 +1177,12 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 	downloadTimeout := p.downloadTimeoutFor(n)
 	answerWait := x.AnswerWait
 	requestID := x.RequestID
+	sources = slices.Clone(sources)
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		res, err := s.fl.UpdateAgentWithRequestID(runCtx, nodeID, requestID, manifest, sig, answerWait, downloadTimeout)
+		res, err := s.fl.UpdateAgentWithRequestID(runCtx, nodeID, requestID, manifest, sig, answerWait, downloadTimeout,
+			UpdateAgentOptions{Sources: sources})
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		delete(s.inflight, nodeID)
@@ -1179,7 +1217,7 @@ func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {
 	updated.State, updated.SentAt, updated.FromVersion, updated.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
 	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = store.NewID("req_"), p.now, "", digest
 	updated.AnswerWait = p.configuredAnswerWait(n)
-	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError = "", -1, 0, 0, 0, 0, ""
+	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError, updated.ProgressSource = "", -1, 0, 0, 0, 0, "", ""
 	ok, err := s.st.MarkStepSent(p.ctx, &updated)
 	if err != nil {
 		s.log.Warn("update: mark link update sent", "node", x.NodeID, "err", err)
@@ -1221,6 +1259,9 @@ func (s *Service) onUpdateAnswer(rolloutID, nodeID string, res *agentv1.CommandR
 
 // applyUpdateAnswer contains the shared outcome handling for the VPS reply goroutine and an edge tick's recorded reply.
 func (s *Service) applyUpdateAnswer(p *pass, x *store.StepRow, res *agentv1.CommandResult, err error) {
+	if res != nil && !s.cfg.Edge {
+		p.recordDownloadSourceEvent(x, res)
+	}
 	switch {
 	case err != nil:
 		switch connect.CodeOf(err) {
@@ -1250,6 +1291,11 @@ func (s *Service) applyUpdateAnswer(p *pass, x *store.StepRow, res *agentv1.Comm
 	case !res.Ok:
 		code := agentCode(res.Error)
 		params := map[string]string{}
+		if code == "download_failed" {
+			if failed := safeSourcesFailed(res.GetParams()["sources_failed"]); failed != "" {
+				params["sources_failed"] = failed
+			}
+		}
 		if code == "failed" && res.Error != "" {
 			params["detail"] = store.Clip(res.Error, 200)
 		}
@@ -1259,6 +1305,19 @@ func (s *Service) applyUpdateAnswer(p *pass, x *store.StepRow, res *agentv1.Comm
 	default:
 		x.AckedAt = p.now
 		p.save(x)
+	}
+}
+
+func (p *pass) recordDownloadSourceEvent(x *store.StepRow, result *agentv1.CommandResult) {
+	used := safeSourcesUsed(result.GetParams()["sources_used"])
+	if used == "" || used == "panel" {
+		return
+	}
+	if err := p.s.st.InsertEvent(p.ctx, store.EventRow{
+		Time: p.now, Severity: 1, Code: "update_download_source", Source: "panel", NodeID: x.NodeID,
+		Params: map[string]string{"to_version": store.Clip(p.ro.ToVersion, 60), "sources_used": used},
+	}); err != nil {
+		p.s.log.Warn("update: download source event", "code", "update_download_source_event_failed", "node", x.NodeID, "err", err)
 	}
 }
 

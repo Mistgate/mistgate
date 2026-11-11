@@ -13,6 +13,7 @@ const startRollout = vi.fn();
 const scheduleNodeUpdate = vi.fn();
 const cancelNodeUpdateSchedule = vi.fn();
 const setUpdateTimezone = vi.fn();
+const setUpdateDownloadSources = vi.fn();
 const pauseRollout = vi.fn();
 const resumeRollout = vi.fn();
 const cancelRollout = vi.fn();
@@ -30,6 +31,7 @@ vi.mock("@/lib/api", () => ({
     scheduleNodeUpdate: (...a: unknown[]) => scheduleNodeUpdate(...a),
     cancelNodeUpdateSchedule: (...a: unknown[]) => cancelNodeUpdateSchedule(...a),
     setUpdateTimezone: (...a: unknown[]) => setUpdateTimezone(...a),
+    setUpdateDownloadSources: (...a: unknown[]) => setUpdateDownloadSources(...a),
     pauseRollout: (...a: unknown[]) => pauseRollout(...a),
     resumeRollout: (...a: unknown[]) => resumeRollout(...a),
     cancelRollout: (...a: unknown[]) => cancelRollout(...a),
@@ -69,7 +71,7 @@ afterEach(() => {
   host?.remove();
   root = host = null;
   route.search = {};
-  for (const m of [getUpdates, startRollout, scheduleNodeUpdate, cancelNodeUpdateSchedule, setUpdateTimezone, pauseRollout, resumeRollout, cancelRollout, rollbackNode, rescanBundle, checkPanelUpdate, installPanelUpdate]) m.mockReset();
+  for (const m of [getUpdates, startRollout, scheduleNodeUpdate, cancelNodeUpdateSchedule, setUpdateTimezone, setUpdateDownloadSources, pauseRollout, resumeRollout, cancelRollout, rollbackNode, rescanBundle, checkPanelUpdate, installPanelUpdate]) m.mockReset();
 });
 
 const node = (over: Record<string, unknown> = {}) => ({
@@ -113,6 +115,7 @@ const step = (over: Record<string, unknown> = {}) => ({
   finishedUnix: 0,
   errorKey: "",
   params: {},
+  downloadSource: "",
   ...over,
 });
 const rollout = (over: Record<string, unknown> = {}) => ({
@@ -138,6 +141,8 @@ const page = (over: Record<string, unknown> = {}) => ({
   bundle: bundle(),
   nodes: [],
   distDir: "/var/lib/mistgate/dist",
+  updateDownloadTimeoutSeconds: 1800,
+  updateDownloadSources: ["github"],
   ...over,
 });
 const outdated = [
@@ -238,6 +243,56 @@ describe("panel self-update", () => {
     expect(document.querySelector('a[href="https://mistgate.app/"]')).toBeTruthy();
     expect(document.querySelector('a[href="https://github.com/Mistgate/mistgate"]')).toBeTruthy();
     expect(document.querySelector('a[href="https://github.com/Mistgate/mistgate/blob/main/LICENSE"]')).toBeTruthy();
+  });
+});
+
+describe("Settings → System → download sources", () => {
+  const sw = () => document.querySelector<HTMLElement>('[role=switch][aria-label="GitHub"]');
+  async function remount(data: unknown) {
+    await act(async () => root!.unmount());
+    host!.remove();
+    await mount(data, <SystemPage />);
+  }
+
+  it("shows the panel as always first, without a switch, and GitHub on or off as the panel reports", async () => {
+    await mount(page(), <SystemPage />);
+    expect(text()).toContain("Download sources");
+    expect(text()).toContain("Always first. It cannot be turned off.");
+    expect(text()).toContain("Always on");
+    expect(text()).toContain("Used only if the download from the panel fails.");
+    expect(text()).toContain("GitHub sees the addresses of the nodes that download.");
+    expect(text()).toContain("signed with this panel’s key");
+    // one switch, for GitHub; the panel row has none
+    expect(document.querySelectorAll("[role=switch]")).toHaveLength(1);
+    expect(sw()?.getAttribute("aria-checked")).toBe("true");
+    await remount(page({ updateDownloadSources: [] }));
+    expect(sw()?.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("turns GitHub off and on by sending the whole list of optional sources", async () => {
+    setUpdateDownloadSources.mockResolvedValue({ sources: [] });
+    await mount(page(), <SystemPage />);
+    await click(sw());
+    expect(setUpdateDownloadSources).toHaveBeenLastCalledWith({ sources: [] });
+    await remount(page({ updateDownloadSources: [] }));
+    await click(sw());
+    expect(setUpdateDownloadSources).toHaveBeenLastCalledWith({ sources: ["github"] });
+  });
+
+  it("gives a non-owner the state in words and no switch", async () => {
+    role = Role.READONLY;
+    await mount(page(), <SystemPage />);
+    expect(document.querySelector("[role=switch]")).toBeNull();
+    expect(text()).toContain("Download sources");
+    expect(document.querySelector("section:has(h2) ul")?.textContent).toContain("On");
+  });
+
+  it("is not drawn on the Cloudflare edition, where the call is not implemented", async () => {
+    edition = { edition: "edge", unavailable: ["backups"] };
+    await mount(page({ updateDownloadSources: [] }), <SystemPage />);
+    expect(text()).toContain("Download timeout");
+    expect(text()).not.toContain("Download sources");
+    expect(document.querySelector("[role=switch]")).toBeNull();
   });
 });
 /** Base UI opens a menu on the press, not on the click. */
@@ -732,6 +787,42 @@ describe("the nodes of a rollout in progress", () => {
     expect(progress?.getAttribute("aria-label")).toBe("Download progress: 50%");
     expect(progress?.textContent).toContain("50% · 128 B/s");
     expect(progress?.textContent).toContain("512 B / 1 KiB");
+    // the panel is the usual source: it says nothing
+    expect(progress?.textContent).not.toContain("GitHub");
+  });
+
+  it("says GitHub on the progress line only while the bytes come from there", async () => {
+    const sent = (downloadSource: string) =>
+      page({
+        nodes: [node({ nodeId: "nod_1", name: "de1", state: NodeUpdateState.UPDATING })],
+        rollout: rollout({ steps: [step({ nodeId: "nod_1", nodeName: "de1", state: StepState.SENT, downloadPhase: "downloading", downloadedBytes: 512, totalBytes: 1024, bytesPerSecond: 128, downloadSource })] }),
+      });
+    await mount(sent("github"));
+    expect(document.querySelector('div[role="progressbar"][aria-valuenow="50"]')?.textContent).toContain("50% · 128 B/s · from GitHub");
+    // a name the node made up is not worded
+    await act(async () => root!.unmount());
+    host!.remove();
+    await mount(sent("<b>evil</b>"));
+    expect(document.querySelector('div[role="progressbar"][aria-valuenow="50"]')?.textContent).toContain("50% · 128 B/s");
+    expect(document.querySelector('div[role="progressbar"][aria-valuenow="50"]')?.textContent).not.toContain("from");
+  });
+
+  it("lists what a failed download tried under the error, and keeps the node's odd text out of it", async () => {
+    const failed = (sources_failed?: string) =>
+      page({
+        nodes: [node({ state: NodeUpdateState.FAILED })],
+        rollout: rollout({ status: RolloutStatus.FAILED, steps: [step({ state: StepState.FAILED, errorKey: "updates.step.err.download_failed", params: sources_failed === undefined ? {} : { sources_failed } })] }),
+      });
+    await mount(failed("panel:stalled,github:http_404"));
+    expect(text()).toContain("The node could not download the file.");
+    expect(text()).toContain("Tried: panel (stalled), GitHub (HTTP 404)");
+    for (const raw of [undefined, "", "<img src=x onerror=alert(1)>", "peer:stalled", "x".repeat(300)]) {
+      await act(async () => root!.unmount());
+      host!.remove();
+      await mount(failed(raw));
+      expect(text()).not.toContain("Tried:");
+      expect(document.querySelector("img")).toBeNull();
+    }
   });
 
   it("subtitle a stage of one node neutrally (it is not always the next one) and a stage of several as together", async () => {

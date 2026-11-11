@@ -4,6 +4,7 @@ import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { minutesText } from "./format";
 import { lossPct, senderLabel } from "./port-check";
+import { usedText } from "./update-sources";
 
 // Events carry an open vocabulary of codes (panel codes, agent codes, plugin codes). The UI owns the wording:
 // a known code gets a localized sentence, an unknown one is shown as its code, so nothing is ever hidden.
@@ -57,6 +58,7 @@ const textKeys: Record<string, MessageKey> = {
   update_step_passed: "event.update_step_passed",
   update_step_failed: "event.update_step_failed",
   update_step_rolled_back: "event.update_step_rolled_back",
+  update_download_source: "event.update_download_source",
   awg_backend_unavailable: "event.awg_backend_unavailable",
   awg_kernel_prepare_started: "event.awg_kernel_prepare_started",
   awg_kernel_prepare_done: "event.awg_kernel_prepare_done",
@@ -105,6 +107,9 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       const since = (e.timeUnix ?? 0) - Number(p.minutes) * 60;
       return { text: stamp && e.timeUnix && p.minutes ? t(key, { since: stamp(since) }) : t("event.node_down.plain"), detail };
     }
+    case "update_download_source":
+      // sources_used is the node's word: only the kinds we know are named
+      return { text: t(key, { to_version: p.to_version ?? "", sources: usedText(t, p.sources_used) || "—" }), detail };
     case "node_blip":
       return { text: t(p.rebooted === "true" ? "event.node_blip.rebooted" : key, { span }), detail };
     case "node_recovered":

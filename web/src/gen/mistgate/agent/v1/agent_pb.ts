@@ -4054,9 +4054,9 @@ export type UpdateAgent = Message<"mistgate.agent.v1.UpdateAgent"> & {
   downloadTimeoutSeconds: number;
 
   /**
-   * Download sources in the order to try ("UPDATE SOURCES"). Empty means "panel" only. Known: "panel"
-   * (FetchUpdate, or the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated
-   * kinds are ignored.
+   * Download sources in the order to try ("UPDATE SOURCES"). Empty means the legacy panel-only path. The panel source
+   * is first; optional sources are sent only to agents advertising update-sources/1. Known: "panel" (FetchUpdate, or
+   * the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated kinds are ignored.
    *
    * @generated from field: repeated string sources = 6;
    */

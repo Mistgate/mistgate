@@ -1,6 +1,8 @@
-import { PageTitle, SectionLabel } from "@/components/ui/bits";
+import { Chip, PageTitle, SectionLabel } from "@/components/ui/bits";
 import { Pending, QueryError } from "@/components/ui/query-error";
+import { Switch } from "@/components/ui/switch";
 import { useT, useLang } from "@/i18n";
+import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { updateTimezoneName, useIsOwner, useUpdateActions, useUpdates, type Updates } from "@/lib/updates";
 import { PanelCard } from "@/screens/updates/cards";
@@ -23,6 +25,7 @@ export function SystemPage() {
           <PanelCard data={q.data} owner={owner} actions={actions} />
           <UpdateTimezoneCard data={q.data} owner={owner} busy={actions.busy} onChange={actions.setUpdateTimezone} />
           <UpdateDownloadTimeoutCard data={q.data} owner={owner} busy={actions.busy} onChange={actions.setDownloadTimeout} />
+          <UpdateDownloadSourcesCard data={q.data} owner={owner} busy={actions.busy} onChange={actions.setDownloadSources} />
         </>
       ) : q.isError ? (
         <QueryError error={q.error} onRetry={() => void q.refetch()} />
@@ -70,7 +73,7 @@ function UpdateTimezoneCard({ data, owner, busy, onChange }: { data: Updates; ow
   );
 }
 
-function UpdateDownloadTimeoutCard({ data, owner, busy, onChange }: { data: Updates; owner: boolean; busy: boolean; onChange: (seconds: number) => Promise<boolean> }) {
+export function UpdateDownloadTimeoutCard({ data, owner, busy, onChange }: { data: Updates; owner: boolean; busy: boolean; onChange: (seconds: number) => Promise<boolean> }) {
   const t = useT();
   const current = data.updateDownloadTimeoutSeconds || 1800;
   const options = [300, 600, 1800, 3600, 7200];
@@ -97,6 +100,52 @@ function UpdateDownloadTimeoutCard({ data, owner, busy, onChange }: { data: Upda
       ) : (
         <p className="font-mono text-sm font-semibold">{t(current < 3600 ? "up.downloadTimeout.minutes" : "up.downloadTimeout.hours", { n: current < 3600 ? current / 60 : current / 3600 })}</p>
       )}
+    </section>
+  );
+}
+
+/**
+ * Where a node may fetch the update file besides the panel. The panel is always first and has no switch; GitHub is the one
+ * optional fallback. The Cloudflare edition has no such setting (the call answers UNIMPLEMENTED), so the card is not drawn there.
+ */
+export function UpdateDownloadSourcesCard({ data, owner, busy, onChange }: { data: Updates; owner: boolean; busy: boolean; onChange: (sources: string[]) => Promise<boolean> }) {
+  const t = useT();
+  const edge = useEdition().edge;
+  if (edge) return null;
+  const github = data.updateDownloadSources.includes("github");
+  const row = "flex min-h-14 items-center gap-3 px-3.5 py-2.5";
+  return (
+    <section className={card}>
+      <SectionLabel as="h2" icon="cloud" tone="sky">
+        {t("up.downloadSources")}
+      </SectionLabel>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-pretty text-muted">{t("up.downloadSources.body")}</p>
+      <ul className="max-w-2xl divide-y divide-line overflow-hidden rounded-field border border-line bg-canvas">
+        <li className={row}>
+          <span className="flex size-5 flex-none items-center justify-center rounded-full bg-surface-2 font-mono text-[11px] font-bold text-muted" aria-hidden>
+            1
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <b className="text-[13px]">{t("up.downloadSources.panel")}</b>
+            <span className="text-xs leading-snug text-pretty text-muted">{t("up.downloadSources.panel.hint")}</span>
+          </div>
+          <Chip>{t("up.downloadSources.always")}</Chip>
+        </li>
+        <li className={row}>
+          <span className="flex size-5 flex-none items-center justify-center rounded-full bg-surface-2 font-mono text-[11px] font-bold text-muted" aria-hidden>
+            2
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <b className="text-[13px]">{t("up.downloadSources.github")}</b>
+            <span className="text-xs leading-snug text-pretty text-muted">{t("up.downloadSources.github.hint")}</span>
+          </div>
+          {owner ? (
+            <Switch checked={github} aria-label={t("up.downloadSources.github")} disabled={busy} onCheckedChange={(on) => void onChange(on ? ["github"] : [])} />
+          ) : (
+            <Chip>{t(github ? "up.downloadSources.on" : "up.downloadSources.off")}</Chip>
+          )}
+        </li>
+      </ul>
     </section>
   );
 }

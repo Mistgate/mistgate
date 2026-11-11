@@ -85,10 +85,11 @@ func rolloutMsgWithProgress(ro store.RolloutRow, steps []store.StepRow, progress
 		p, ok := progress[x.NodeID]
 		if !ok && x.ProgressPhase != "" {
 			p, ok = progressState{RequestID: x.RequestID, Phase: x.ProgressPhase, Downloaded: x.ProgressDownloaded,
-				Total: x.ProgressTotal, Speed: x.ProgressSpeed, UpdatedUnix: x.ProgressUpdatedUnix}, true
+				Total: x.ProgressTotal, Speed: x.ProgressSpeed, UpdatedUnix: x.ProgressUpdatedUnix, Source: x.ProgressSource}, true
 		}
 		if ok && x.State == store.StepSent && x.RequestID != "" && p.RequestID == x.RequestID {
 			st.DownloadPhase, st.DownloadedBytes, st.TotalBytes, st.BytesPerSecond = p.Phase, p.Downloaded, p.Total, p.Speed
+			st.DownloadSource = reportedDownloadSource(p.Source)
 		}
 		m.Steps = append(m.Steps, st)
 	}
@@ -156,6 +157,13 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 		return nil, s.internal("load update download timeout", err)
 	}
 	resp.UpdateDownloadTimeoutSeconds = uint32(timeout / time.Second)
+	if !s.cfg.Edge {
+		sources, err := s.updateDownloadSources(ctx)
+		if err != nil {
+			return nil, s.internal("load update download sources", err)
+		}
+		resp.UpdateDownloadSources = sources
+	}
 	if !ro.Active() {
 		steps = nil // only an active rollout makes a node UPDATING
 	}
@@ -517,6 +525,22 @@ func (r rpc) SetUpdateDownloadTimeout(ctx context.Context, req *connect.Request[
 		return nil, err
 	}
 	return connect.NewResponse(&adminv1.SetUpdateDownloadTimeoutResponse{TimeoutSeconds: req.Msg.TimeoutSeconds}), nil
+}
+
+func (r rpc) SetUpdateDownloadSources(ctx context.Context, req *connect.Request[adminv1.SetUpdateDownloadSourcesRequest]) (*connect.Response[adminv1.SetUpdateDownloadSourcesResponse], error) {
+	if r.s.cfg.Edge {
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("optional update download sources are not available in this edition"))
+	}
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	sources, err := r.s.setUpdateDownloadSources(ctx, req.Msg.GetSources())
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.SetUpdateDownloadSourcesResponse{Sources: sources}), nil
 }
 
 // Conditions is the health condition source (health.Service.AddConditionSource): while the active rollout is paused

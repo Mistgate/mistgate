@@ -71,6 +71,7 @@ const step = (over: Partial<Step> = {}): Step => ({
   downloadedBytes: 0,
   totalBytes: 0,
   bytesPerSecond: 0,
+  downloadSource: "",
   ...over,
 });
 const rollout = (over: Partial<Rollout> = {}): Rollout => ({
@@ -112,6 +113,7 @@ const updates = (over: Partial<Updates> = {}): Updates => ({
   agentNotes: [],
   panelNotes: [],
   updateDownloadTimeoutSeconds: 1800,
+  updateDownloadSources: ["github"],
   ...over,
 });
 

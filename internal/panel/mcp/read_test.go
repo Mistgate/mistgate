@@ -107,6 +107,21 @@ func TestOsUpdatesStatusIsStoredOnlyAndScrubsUntrustedText(t *testing.T) {
 	}
 }
 
+func TestUpdatesStatusShowsDownloadSourcesAndFailedSourceCodes(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	out := mustOK(t, s, "updates_status", map[string]any{})
+	v := decode[UpdatesV](t, out)
+	if !reflect.DeepEqual(v.UpdateDownloadSources, []string{"github"}) {
+		t.Fatalf("update_download_sources = %v", v.UpdateDownloadSources)
+	}
+	if v.Rollout == nil || len(v.Rollout.Steps) != 2 || v.Rollout.Steps[0].DownloadSource != "github" ||
+		v.Rollout.Steps[1].SourcesFailed != "panel:stalled,github:http_404" {
+		t.Fatalf("rollout sources = %+v", v.Rollout)
+	}
+}
+
 func TestAuditSearchDropsNodeAddressesFromParams(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileAdmin)

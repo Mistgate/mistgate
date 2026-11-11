@@ -5,11 +5,13 @@ package mcp
 import (
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/release"
 )
 
 // The projections: every tool has its own output struct and builds it from the fields it chose.
@@ -2036,12 +2038,14 @@ type nodeUpdateV struct {
 }
 
 type rolloutStepV struct {
-	NodeID   string `json:"node_id"`
-	NodeName string `json:"node_name"`
-	Stage    uint32 `json:"stage"`
-	State    string `json:"state"`
-	From     string `json:"from_version,omitempty"`
-	ErrorKey string `json:"error_key,omitempty"`
+	NodeID         string `json:"node_id"`
+	NodeName       string `json:"node_name"`
+	Stage          uint32 `json:"stage"`
+	State          string `json:"state"`
+	From           string `json:"from_version,omitempty"`
+	ErrorKey       string `json:"error_key,omitempty"`
+	DownloadSource string `json:"download_source,omitempty"`
+	SourcesFailed  string `json:"sources_failed,omitempty"`
 }
 
 type rolloutV struct {
@@ -2073,6 +2077,7 @@ type UpdatesV struct {
 	RunningVersionChannel         string        `json:"running_version_channel,omitempty"`
 	OfferedReleaseChannel         string        `json:"offered_release_channel,omitempty"`
 	RunningNewerThanChannelOffers bool          `json:"running_newer_than_channel_offers"`
+	UpdateDownloadSources         []string      `json:"update_download_sources"`
 	Bundle                        *bundleV      `json:"bundle,omitempty"`
 	Nodes                         []nodeUpdateV `json:"nodes"`
 	Rollout                       *rolloutV     `json:"rollout,omitempty"`
@@ -2097,10 +2102,14 @@ func rolloutView(r *adminv1.Rollout) *rolloutV {
 		Steps: []rolloutStepV{},
 	}
 	for _, s := range r.GetSteps() {
-		v.Steps = append(v.Steps, rolloutStepV{
+		step := rolloutStepV{
 			NodeID: s.GetNodeId(), NodeName: nm(s.GetNodeName()), Stage: s.GetStage(), State: enumName("STEP_STATE_", s.GetState().String()),
-			From: clean(s.GetFromVersion(), 60), ErrorKey: clean(s.GetErrorKey(), 80),
-		})
+			From: clean(s.GetFromVersion(), 60), ErrorKey: clean(s.GetErrorKey(), 80), DownloadSource: safeDownloadSource(s.GetDownloadSource()),
+		}
+		if step.State == "failed" {
+			step.SourcesFailed = safeSourcesFailedProjection(s.GetParams()["sources_failed"])
+		}
+		v.Steps = append(v.Steps, step)
 	}
 	return v
 }
@@ -2111,6 +2120,7 @@ func updatesView(r *adminv1.GetUpdatesResponse) *UpdatesV {
 		UpdateChannel: clean(r.GetUpdateChannel(), 16), RunningVersionChannel: clean(r.GetRunningVersionChannel(), 16),
 		OfferedReleaseChannel:         clean(r.GetOfferedReleaseChannel(), 16),
 		RunningNewerThanChannelOffers: r.GetRunningNewerThanChannelOffers(), Nodes: []nodeUpdateV{},
+		UpdateDownloadSources: safeOptionalDownloadSources(r.GetUpdateDownloadSources()),
 	}
 	if b := r.GetBundle(); b != nil {
 		v.Bundle = &bundleV{
@@ -2133,4 +2143,30 @@ func updatesView(r *adminv1.GetUpdatesResponse) *UpdatesV {
 	}
 	v.Rollout = rolloutView(r.GetRollout())
 	return v
+}
+
+func safeDownloadSource(source string) string {
+	switch source {
+	case "panel", "github", "peer", "cloudflare":
+		return source
+	default:
+		return ""
+	}
+}
+
+func safeOptionalDownloadSources(sources []string) []string {
+	var out []string
+	for _, source := range sources {
+		if source == "github" && !slices.Contains(out, source) {
+			out = append(out, source)
+		}
+	}
+	if out == nil {
+		return []string{}
+	}
+	return out
+}
+
+func safeSourcesFailedProjection(raw string) string {
+	return release.SanitizeSourceFailures(raw)
 }

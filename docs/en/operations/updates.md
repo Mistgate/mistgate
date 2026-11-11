@@ -13,7 +13,7 @@ The signed node bundle also carries an IPv4 and IPv6 range table with ASN operat
 
 - There is one Ed25519 key pair, the **release key**. Its private half stays offline with whoever signs the releases; both binaries carry the public half, stamped in at build time. The official binaries carry the project's key. The panel also saves the key in `<data-dir>/release.pub` on its first start.
 - Every release has two signed manifests: the node bundle (`manifest.json` with `manifest.sig`) and the panel manifest (`panel-manifest.json` with `panel-manifest.sig`). Each lists the version, the build time, an expiry date and, for every binary, its name, OS, architecture, size and SHA-256. The panel manifest is signed in its own Ed25519 context, so an agent never accepts it as its update and the panel never installs a node binary as itself.
-- The agent checks, in this order: the signature against its compiled-in key, the manifest format, the expiry, that the release is newer than itself, and that the bundle has a file for its OS and architecture. Then it downloads the file from the panel over its mutual-TLS connection (on the [Cloudflare edition](#on-the-cloudflare-edition), over its link) and checks the size and the SHA-256. Any failure leaves the installed binary untouched.
+- The agent checks, in this order: the signature against its compiled-in key, the manifest format, the expiry, that the release is newer than itself, and that the bundle has a file for its OS and architecture. It downloads from the panel first over mutual TLS (on the [Cloudflare edition](#on-the-cloudflare-edition), over its link); when the VPS panel offers GitHub to a capable agent, it can continue there after a transfer failure. The agent checks the downloaded size and SHA-256 against the signed manifest. A final digest mismatch fails visibly and is not retried from another source. Any failure leaves the installed binary untouched.
 - The panel is only a courier: a compromised panel cannot make a node run code that was not signed with the release key.
 - Releases are ordered by their build time (the Unix time of the source commit), not by the version string. A release with the same build time as the node is "already current"; an older one is refused as a downgrade.
 - A node agent built without a release key cannot update itself; `mistgate-node version` prints the fingerprint of the key it carries. If the key compiled into the panel and `release.pub` differ, the panel logs `release key mismatch` and trusts no bundle until the new key is confirmed: see "Rotate the release key" in [Releases and signing](releases.md).
@@ -133,7 +133,7 @@ Each update is pinned to a release:
 ### One node's update
 
 1. The panel sends the signed manifest. The agent checks it, downloads its file, keeps its current binary as `<binary>.prev`, puts the new one in its place and restarts itself in place (systemd sees nothing). The node is offline for a few seconds; the admin shows it as updating, not as an outage.
-2. The panel gives agents with `update-timeout/1` the configured download window (30 minutes by default, changed in **Settings → System → Download timeout**); the window is captured when the command is sent, and a transfer that sends nothing for 90 seconds is resumed where it stopped, up to three times, within the window. Changing the setting affects later steps. Older agents keep their built-in 10-minute limit. After the agent answers, the panel allows up to 3 minutes for the node to come back with the new build.
+2. The panel gives agents with `update-timeout/1` the configured download window (30 minutes by default, changed in **Settings → System → Download timeout**); the window is captured when the command is sent, and a transfer that sends nothing for 90 seconds is resumed where it stopped, up to three times, within the window. The panel sends its bundle first and, when enabled and verified for this release, GitHub second to agents with `update-sources/1`. Changing a setting affects later steps. Older agents keep their built-in 10-minute limit. After the agent answers, the panel allows up to 3 minutes for the node to come back with the new build.
 3. The **gate** runs for up to 5 minutes after the node is back. It passes when all of this holds:
    - the new build has committed: it connected and applied its configuration without a failed profile;
    - the configuration the node applied is the panel's;
@@ -181,10 +181,17 @@ Common step errors:
 | The release is older than what the node already runs | A newer signed build is needed. |
 | The bundle has no file for this node's system and architecture | The bundle lacks the binary for its architecture (for example `arm64`). |
 | The node could not download the file from the panel | Look at the node's link to the panel. |
+| The node could not download the file from any offered source | The failed step shows `sources_failed`, for example `panel:stalled,github:http_404`; check the node's panel connection and its access to GitHub. |
 | The node cannot write next to its program file | Check the disk of the node; apply **Refresh the service** in Health → Doctor when offered, or run `mistgate-node install` once with a current binary. |
 | The node did not answer the update command within its download window (30 minutes by default; 10 minutes for older agents) | Look at the node and its download progress. |
 | The node did not come back within 3 minutes | Look at the node and its logs. |
 | The client-eye check failed after the update | See [Health](health.md); the node is back on the previous version. |
+
+### Download sources
+
+On a VPS panel, **Settings → System → Download sources** enables GitHub fallback by default. The panel is always first and cannot be disabled; GitHub is the only optional source currently available. The panel offers GitHub only when its own release key verifies the signed manifest for the exact release tag and that manifest lists the same files as the rollout bundle. A re-signed manifest with a later expiry is accepted when the file list is unchanged. Hand-made bundles and bundles from a panel built with another key are not offered from GitHub. The Cloudflare edition has no setting for this source.
+
+When enabled and offered, the node can request the release binary directly from GitHub if the panel is busy, too slow, or a panel transfer fails. GitHub can see the node's public IP, release tag, binary filename, and `User-Agent: Mistgate-Update/1`, which names the software. The request carries no node ID, panel address, authorization header or panel token. The Updates page shows the current source while a compatible agent downloads; a switch between polls is expected. A failed download lists only source names and short error codes, such as `panel:stalled,github:http_404`.
 
 ### Roll back by hand
 

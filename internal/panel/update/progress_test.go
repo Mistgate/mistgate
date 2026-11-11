@@ -2,9 +2,12 @@ package update
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 )
 
@@ -42,7 +45,7 @@ func TestRecordProgressRejectsStaleAndRegressingFrames(t *testing.T) {
 	}
 
 	if err := e.s.RecordProgress(e.ctx, "nod_a", &agentv1.UpdateProgress{
-		RequestId: "req_current", Phase: "downloading", BytesDownloaded: 40, BytesTotal: 100, UpdatedUnix: now.Add(time.Second).Unix(),
+		RequestId: "req_current", Phase: "downloading", BytesDownloaded: 40, BytesTotal: 100, UpdatedUnix: now.Add(time.Second).Unix(), Source: "panel",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +74,7 @@ func TestRecordProgressRejectsStaleAndRegressingFrames(t *testing.T) {
 		t.Fatalf("progress total changed to %d, want 100", got)
 	}
 	if err := e.s.RecordProgress(e.ctx, "nod_a", &agentv1.UpdateProgress{
-		RequestId: "req_current", Phase: "failed", UpdatedUnix: now.Add(5 * time.Second).Unix(), Error: "download_failed",
+		RequestId: "req_current", Phase: "failed", UpdatedUnix: now.Add(5 * time.Second).Unix(), Error: "download_failed", Source: "github",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +85,7 @@ func TestRecordProgressRejectsStaleAndRegressingFrames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(steps) != 1 || steps[0].ProgressPhase != "failed" || steps[0].ProgressDownloaded != 40 || steps[0].ProgressTotal != 100 {
+	if len(steps) != 1 || steps[0].ProgressPhase != "failed" || steps[0].ProgressDownloaded != 40 || steps[0].ProgressTotal != 100 || steps[0].ProgressSource != "github" {
 		t.Fatalf("persisted progress = %+v", steps)
 	}
 
@@ -98,4 +101,40 @@ func TestRecordProgressRejectsStaleAndRegressingFrames(t *testing.T) {
 	if len(e.s.progress) != 0 {
 		t.Fatalf("progress after step cleanup was recorded: %+v", e.s.progress)
 	}
+}
+
+func TestGetUpdatesProjectsDownloadSourceForRunningStep(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	nodeID := e.addNode("progress-source", nodeOpts{})
+	hold, onWire := make(chan struct{}), make(chan struct{})
+	var release sync.Once
+	defer func() {
+		release.Do(func() { close(hold) })
+		e.s.wg.Wait()
+	}()
+	e.fl.onUpdate = func(string) (*agentv1.CommandResult, error) {
+		close(onWire)
+		<-hold
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("test command stopped"))
+	}
+	e.startRollout(nodeID)
+	e.s.tick(e.ctx) // deliberately don't wait: the step must still be running below
+	<-onWire
+	step := e.step(nodeID)
+	if step.State != "sent" {
+		t.Fatalf("step state = %q, want sent", step.State)
+	}
+	if err := e.s.RecordProgress(e.ctx, nodeID, &agentv1.UpdateProgress{
+		RequestId: step.RequestID, Phase: "downloading", BytesDownloaded: 1, BytesTotal: 10,
+		UpdatedUnix: e.clk.Now().Add(time.Second).Unix(), Source: "github",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	response := e.get()
+	if response.GetRollout() == nil || len(response.GetRollout().GetSteps()) != 1 || response.GetRollout().GetSteps()[0].GetDownloadSource() != "github" {
+		t.Fatalf("GetUpdates rollout step = %+v, want download_source=github", response.GetRollout())
+	}
+	release.Do(func() { close(hold) })
+	e.s.wg.Wait()
 }

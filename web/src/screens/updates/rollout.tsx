@@ -8,6 +8,7 @@ import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
+import { triedText } from "@/lib/update-sources";
 import { isActive, progressOf, rolloutInfo, stagesOf, stepErrorText, stepInfo, type Rollout, type Stage, type Step } from "@/lib/updates";
 
 const decided = (s: Step) => s.state === StepState.PASSED || s.state === StepState.FAILED || s.state === StepState.ROLLED_BACK || s.state === StepState.SKIPPED;
@@ -49,7 +50,11 @@ function DownloadProgress({ step }: { step: Step }) {
     >
       <div className="flex items-center justify-between gap-2 font-mono">
         <span>{t(downloadPhaseKeys[step.downloadPhase] ?? "up.download.phase.downloading")}</span>
-        <span>{total ? `${percent}%${downloading ? ` · ${size(step.bytesPerSecond)}/s` : ""}` : t("up.download.phase.waiting")}</span>
+        <span>
+          {total ? `${percent}%${downloading ? ` · ${size(step.bytesPerSecond)}/s` : ""}` : t("up.download.phase.waiting")}
+          {/* the panel is the usual source and says nothing; only the fallback is worth a word */}
+          {total > 0 && downloading && step.downloadSource === "github" && ` · ${t("up.downloadSource.fromGithub")}`}
+        </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
         <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${percent}%` }} />
@@ -57,6 +62,13 @@ function DownloadProgress({ step }: { step: Step }) {
       {total > 0 && <span className="font-mono">{size(done)} / {size(total)}</span>}
     </div>
   );
+}
+
+/** "Tried: panel (stalled), GitHub (HTTP 404)": the node's own list, worded only as far as it is understood. */
+function Tried({ raw }: { raw: string | undefined }) {
+  const t = useT();
+  const text = triedText(t, raw);
+  return text ? <span className="mt-0.5 block font-normal text-muted">{text}</span> : null;
 }
 
 function stageTexts(t: T, st: Stage): { name: string; what: string } {
@@ -115,6 +127,7 @@ function Stages({ rollout }: { rollout: Rollout }) {
               {why.map((s) => (
                 <p key={s.nodeId} className={cx("text-xs leading-snug text-pretty", s.state === StepState.SKIPPED ? "text-muted" : kindTextClass[stepInfo(s.state).kind])}>
                   <b className="font-mono">{s.nodeName}</b> · {stepErrorText(t, s.errorKey, s.params)}
+                  {s.errorKey.endsWith(".download_failed") && <Tried raw={s.params.sources_failed} />}
                 </p>
               ))}
             </div>

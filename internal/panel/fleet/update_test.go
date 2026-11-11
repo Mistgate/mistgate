@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -133,6 +134,40 @@ func connectUpdater(a *agent, instance string, built int64, caps ...string) *con
 	m.apply(ds)
 	c.send(0, applied(ds, m.hash()))
 	return c
+}
+
+func TestUpdateSourcesAreSentOnlyToCapableAgents(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		capability bool
+	}{
+		{name: "older agent"},
+		{name: "source capable agent", capability: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			a := e.enroll("de1")
+			caps := []string{"update/1"}
+			if tc.capability {
+				caps = append(caps, capUpdateSources)
+			}
+			c := connectUpdater(a, "inst1", 1_790_000_000, caps...)
+			defer func() { c.st.CloseRequest(); c.ended() }()
+
+			frame := updateAgentFrame("req_test", nil, nil, 0)
+			frame.GetUpdateAgent().Sources = []string{"panel", "github"}
+			if _, err := e.f.readyForRequest(e.ctx, a.nodeID, frame, nil); err != nil {
+				t.Fatal(err)
+			}
+			got := frame.GetUpdateAgent().GetSources()
+			if tc.capability && !slices.Equal(got, []string{"panel", "github"}) {
+				t.Fatalf("source-capable agent sources = %v", got)
+			}
+			if !tc.capability && len(got) != 0 {
+				t.Fatalf("older agent received sources %v", got)
+			}
+		})
+	}
 }
 
 // Hello.built, the capabilities and Hello.last_update end up on the node row (what an offline node keeps showing).

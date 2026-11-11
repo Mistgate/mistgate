@@ -52,6 +52,12 @@ describe("events", () => {
     expect(describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "x" } }).text).toBe(en["event.host_firewall_sync_failed.plain"]);
     expect(describeEvent(t as never, { code: "host_firewall_sync_recovered", params: { resolved_error: "x" } }).text).toBe(en["event.host_firewall_sync_recovered"]);
   });
+  it("tells which sources a node's update came from, and names only the ones it knows", () => {
+    const p = (sources_used: string) => ({ code: "update_download_source", params: { to_version: "0.3.1", sources_used } });
+    expect(describeEvent(t as never, p("panel,github")).text).toBe("downloaded 0.3.1, sources: panel + GitHub");
+    expect(describeEvent(t as never, p("github")).text).toBe("downloaded 0.3.1, sources: GitHub");
+    expect(describeEvent(t as never, p("<b>x</b>")).text).toBe("downloaded 0.3.1, sources: —");
+  });
   it("shows an unknown code with its params, so nothing is hidden", () => {
     expect(describeEvent(t as never, { code: "brand_new", params: { a: "1", b: "2" } })).toEqual({ text: "brand_new", detail: "a=1 b=2" });
   });

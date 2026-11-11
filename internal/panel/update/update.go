@@ -46,13 +46,18 @@ type Fleet interface {
 	HasSession(nodeID string) bool
 	// UpdateAgent sends a signed manifest and waits for the CommandResult (the download is part of it).
 	// FAILED_PRECONDITION when the node is not connected or did not list "update/1": nothing was sent.
-	UpdateAgentWithRequestID(ctx context.Context, nodeID, requestID string, manifest, signature []byte, wait, downloadTimeout time.Duration) (*agentv1.CommandResult, error)
+	UpdateAgentWithRequestID(ctx context.Context, nodeID, requestID string, manifest, signature []byte, wait, downloadTimeout time.Duration, options UpdateAgentOptions) (*agentv1.CommandResult, error)
 	// RollbackAgent asks the node to put its previous binary back; same preconditions.
 	RollbackAgent(ctx context.Context, nodeID string, wait time.Duration) (*agentv1.CommandResult, error)
 	// SendUpdateAgent hands an edge update command to the live node link without waiting for its result.
 	SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time, downloadTimeout time.Duration) error
 	// SendRollbackAgent hands an edge rollback command to the live node link without waiting for its result.
 	SendRollbackAgent(ctx context.Context, nodeID, requestID string, deadline time.Time) error
+}
+
+// UpdateAgentOptions carries optional fields for an agent that advertised the matching capability.
+type UpdateAgentOptions struct {
+	Sources []string
 }
 
 const updateTimeoutCapability = "update-timeout/1"
@@ -72,21 +77,23 @@ type Health interface {
 
 // Timing of the module. The zero value is production; tests shorten what they need.
 type Timing struct {
-	Tick          time.Duration // worker period; default 5 s
-	Rescan        time.Duration // bundle directory poll; default 60 s
-	BundlePoll    time.Duration // GitHub agent bundle poll; default 10 min
-	AnswerWait    time.Duration // UpdateAgent: the agent's CommandResult, download included; default 10 min
-	ReconnectWait time.Duration // after the answer: the node is back with the new build; default 3 min
-	GateWait      time.Duration // after the reconnect: the gate passes or fails; default 5 min
-	RollbackWait  time.Duration // RollbackAgent answer; default 60 s
-	InboundGrace  time.Duration // an inbound FAILED that long (two evaluations) fails the gate at once; default 30 s
-	Prune         time.Duration // retention sweep period; default 6 h
+	Tick              time.Duration // worker period; default 5 s
+	Rescan            time.Duration // bundle directory poll; default 60 s
+	BundlePoll        time.Duration // GitHub agent bundle poll; default 10 min
+	GitHubSourceCheck time.Duration // bound for the optional GitHub manifest check; default 10 s
+	AnswerWait        time.Duration // UpdateAgent: the agent's CommandResult, download included; default 10 min
+	ReconnectWait     time.Duration // after the answer: the node is back with the new build; default 3 min
+	GateWait          time.Duration // after the reconnect: the gate passes or fails; default 5 min
+	RollbackWait      time.Duration // RollbackAgent answer; default 60 s
+	InboundGrace      time.Duration // an inbound FAILED that long (two evaluations) fails the gate at once; default 30 s
+	Prune             time.Duration // retention sweep period; default 6 h
 }
 
 func (t *Timing) defaults() {
 	for p, d := range map[*time.Duration]time.Duration{
 		&t.Tick: 5 * time.Second, &t.Rescan: time.Minute, &t.BundlePoll: 10 * time.Minute,
-		&t.AnswerWait: 10 * time.Minute, &t.ReconnectWait: 3 * time.Minute,
+		&t.GitHubSourceCheck: 10 * time.Second,
+		&t.AnswerWait:        10 * time.Minute, &t.ReconnectWait: 3 * time.Minute,
 		&t.GateWait: 5 * time.Minute, &t.RollbackWait: time.Minute, &t.InboundGrace: 30 * time.Second, &t.Prune: 6 * time.Hour,
 	} {
 		if *p <= 0 {
@@ -144,6 +151,9 @@ type Service struct {
 	now  func() time.Time
 	dist string
 
+	sourceMu    sync.Mutex
+	sourceCheck releaseSourceCheck
+
 	bmu          sync.Mutex // guards the bundle state and the file hash cache
 	scanMu       sync.Mutex // serializes scans and their follow-up table reloads
 	bundle       *bundleState
@@ -172,6 +182,7 @@ type Service struct {
 	runCtx          context.Context
 	wg              sync.WaitGroup
 	inflight        map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
+	preparing       map[string]string    // node id -> rollout id while a source check runs before the step is SENT
 	orphans         map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
 	failing         map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
 	progressMu      sync.RWMutex
@@ -194,6 +205,7 @@ type progressState struct {
 	Total       uint64
 	Speed       uint64
 	UpdatedUnix int64
+	Source      string
 }
 
 // New builds the module and reads the bundle directory once. Call Run to start the worker, fleet.SetUpdates and
@@ -229,7 +241,7 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 		hashes: map[string]hashEntry{}, runCtx: context.Background(),
 		servingNodes: map[string]*serveSlot{}, zombies: map[string]int{}, nodeSlotWait: bundleNodeSlotWait, sendTimeout: bundleSendStallTimeout,
 		parseNetworkTable: asndb.Parse,
-		inflight:          map[string]bool{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
+		inflight:          map[string]bool{}, preparing: map[string]string{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
 		updating: map[string]bool{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
 	if shouldReadPanelHostStatus(cfg.Edge, osupdate.IsRoot(), cfg.OSStatusReader != nil) {
 		s.osStatusMonitor = osupdate.NewMonitor(cfg.OSStatusReader)
@@ -341,7 +353,7 @@ func (s *Service) audit(ctx context.Context, action string, params map[string]st
 func (s *Service) auditAs(ctx context.Context, actor, action string, params map[string]string) {
 	b := jsonString(params)
 	if err := s.st.Audit(ctx, s.now(), store.AuditEntry{Actor: actor, Action: action, Params: b, Result: "ok"}); err != nil {
-		s.log.Warn("update: audit", "action", action, "err", err)
+		s.log.Warn("update: audit", "code", "update_audit_failed", "action", action, "err", err)
 	}
 }
 

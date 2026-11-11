@@ -383,6 +383,7 @@ type world struct {
 	cancelScheduleReq  []*adminv1.CancelNodeUpdateScheduleRequest
 	timezoneReq        []*adminv1.SetUpdateTimezoneRequest
 	timeoutReq         []*adminv1.SetUpdateDownloadTimeoutRequest
+	sourcesReq         []*adminv1.SetUpdateDownloadSourcesRequest
 	pauseReq           []*adminv1.PauseRolloutRequest
 	revokeReq          []*adminv1.RevokeDeviceRequest
 	resetReq           []*adminv1.ResetUserTrafficRequest
@@ -1485,13 +1486,18 @@ func (w *world) GetUpdates(context.Context, *connect.Request[adminv1.GetUpdatesR
 		built = 1700000200
 	}
 	r := &adminv1.GetUpdatesResponse{
-		NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: w.scheduleTimezoneOffset, UpdateDownloadTimeoutSeconds: w.downloadTimeoutSeconds, Panel: &adminv1.PanelBuild{Version: "v1"},
+		NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: w.scheduleTimezoneOffset, UpdateDownloadTimeoutSeconds: w.downloadTimeoutSeconds,
+		UpdateDownloadSources: []string{"github"}, Panel: &adminv1.PanelBuild{Version: "v1"},
 		Bundle: &adminv1.Bundle{Status: w.bundleStat, Version: "v2", Built: built, Files: []*adminv1.BundleFile{{Name: "f", Sha256: "abc"}}},
 		Nodes: []*adminv1.NodeUpdate{
 			{NodeId: nodeA, Name: "de1", Version: "v1", Built: 1700000100, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED, SupportsUpdate: true, LastUpdate: &adminv1.LastUpdate{Outcome: "ok", FromVersion: "v0"}},
 			{NodeId: nodeB, Name: "nl1", Version: "v2", Built: 1700000200, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE, SupportsUpdate: true, ScheduledUnix: 1700009000, ScheduledVersion: "v2"},
 		},
-		Rollout: &adminv1.Rollout{Id: "rol_1", Status: w.rolloutStat, ToVersion: "v2", BatchSize: 1, Steps: []*adminv1.RolloutStep{{NodeId: nodeA, NodeName: "de1", State: adminv1.StepState_STEP_STATE_SENT}}},
+		Rollout: &adminv1.Rollout{Id: "rol_1", Status: w.rolloutStat, ToVersion: "v2", BatchSize: 1, Steps: []*adminv1.RolloutStep{
+			{NodeId: nodeA, NodeName: "de1", State: adminv1.StepState_STEP_STATE_SENT, DownloadSource: "github"},
+			{NodeId: nodeB, NodeName: "nl1", State: adminv1.StepState_STEP_STATE_FAILED,
+				Params: map[string]string{"sources_failed": "panel:stalled,github:http_404"}},
+		}},
 	}
 	return connect.NewResponse(r), nil
 }
@@ -1545,6 +1551,13 @@ func (w *world) SetUpdateDownloadTimeout(_ context.Context, r *connect.Request[a
 	w.downloadTimeoutSeconds = r.Msg.GetTimeoutSeconds()
 	w.mu.Unlock()
 	return connect.NewResponse(&adminv1.SetUpdateDownloadTimeoutResponse{TimeoutSeconds: r.Msg.GetTimeoutSeconds()}), nil
+}
+
+func (w *world) SetUpdateDownloadSources(_ context.Context, r *connect.Request[adminv1.SetUpdateDownloadSourcesRequest]) (*connect.Response[adminv1.SetUpdateDownloadSourcesResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.sourcesReq = append(w.sourcesReq, proto.Clone(r.Msg).(*adminv1.SetUpdateDownloadSourcesRequest))
+	return connect.NewResponse(&adminv1.SetUpdateDownloadSourcesResponse{Sources: append([]string(nil), r.Msg.GetSources()...)}), nil
 }
 
 func (w *world) PauseRollout(_ context.Context, r *connect.Request[adminv1.PauseRolloutRequest]) (*connect.Response[adminv1.PauseRolloutResponse], error) {

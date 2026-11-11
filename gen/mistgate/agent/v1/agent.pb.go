@@ -7562,9 +7562,9 @@ type UpdateAgent struct {
 	DownloadToken string `protobuf:"bytes,4,opt,name=download_token,json=downloadToken,proto3" json:"download_token,omitempty"`
 	// Maximum time allowed for downloading the selected bundle file. Zero keeps the agent default.
 	DownloadTimeoutSeconds uint32 `protobuf:"varint,5,opt,name=download_timeout_seconds,json=downloadTimeoutSeconds,proto3" json:"download_timeout_seconds,omitempty"`
-	// Download sources in the order to try ("UPDATE SOURCES"). Empty means "panel" only. Known: "panel"
-	// (FetchUpdate, or the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated
-	// kinds are ignored.
+	// Download sources in the order to try ("UPDATE SOURCES"). Empty means the legacy panel-only path. The panel source
+	// is first; optional sources are sent only to agents advertising update-sources/1. Known: "panel" (FetchUpdate, or
+	// the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated kinds are ignored.
 	Sources []string `protobuf:"bytes,6,rep,name=sources,proto3" json:"sources,omitempty"`
 	// Reserved for "peer": donor host:port, SHA-256 of its one-time certificate, and a 32-byte one-time token.
 	// Peer downloads are not implemented by this agent stage.

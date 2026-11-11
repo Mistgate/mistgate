@@ -78,6 +78,9 @@ const (
 	// UpdateServiceSetUpdateDownloadTimeoutProcedure is the fully-qualified name of the UpdateService's
 	// SetUpdateDownloadTimeout RPC.
 	UpdateServiceSetUpdateDownloadTimeoutProcedure = "/mistgate.admin.v1.UpdateService/SetUpdateDownloadTimeout"
+	// UpdateServiceSetUpdateDownloadSourcesProcedure is the fully-qualified name of the UpdateService's
+	// SetUpdateDownloadSources RPC.
+	UpdateServiceSetUpdateDownloadSourcesProcedure = "/mistgate.admin.v1.UpdateService/SetUpdateDownloadSources"
 )
 
 // UpdateServiceClient is a client for the mistgate.admin.v1.UpdateService service.
@@ -120,6 +123,8 @@ type UpdateServiceClient interface {
 	SetUpdateChannel(context.Context, *connect.Request[v1.SetUpdateChannelRequest]) (*connect.Response[v1.SetUpdateChannelResponse], error)
 	// Change the maximum time an agent may spend downloading one update binary. Owner-only with a fresh step-up.
 	SetUpdateDownloadTimeout(context.Context, *connect.Request[v1.SetUpdateDownloadTimeoutRequest]) (*connect.Response[v1.SetUpdateDownloadTimeoutResponse], error)
+	// Select optional node-update download sources. The panel always remains first. Owner-only with a fresh step-up.
+	SetUpdateDownloadSources(context.Context, *connect.Request[v1.SetUpdateDownloadSourcesRequest]) (*connect.Response[v1.SetUpdateDownloadSourcesResponse], error)
 }
 
 // NewUpdateServiceClient constructs a client for the mistgate.admin.v1.UpdateService service. By
@@ -223,6 +228,12 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(updateServiceMethods.ByName("SetUpdateDownloadTimeout")),
 			connect.WithClientOptions(opts...),
 		),
+		setUpdateDownloadSources: connect.NewClient[v1.SetUpdateDownloadSourcesRequest, v1.SetUpdateDownloadSourcesResponse](
+			httpClient,
+			baseURL+UpdateServiceSetUpdateDownloadSourcesProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("SetUpdateDownloadSources")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -243,6 +254,7 @@ type updateServiceClient struct {
 	setUpdateTimezone        *connect.Client[v1.SetUpdateTimezoneRequest, v1.SetUpdateTimezoneResponse]
 	setUpdateChannel         *connect.Client[v1.SetUpdateChannelRequest, v1.SetUpdateChannelResponse]
 	setUpdateDownloadTimeout *connect.Client[v1.SetUpdateDownloadTimeoutRequest, v1.SetUpdateDownloadTimeoutResponse]
+	setUpdateDownloadSources *connect.Client[v1.SetUpdateDownloadSourcesRequest, v1.SetUpdateDownloadSourcesResponse]
 }
 
 // GetUpdates calls mistgate.admin.v1.UpdateService.GetUpdates.
@@ -320,6 +332,11 @@ func (c *updateServiceClient) SetUpdateDownloadTimeout(ctx context.Context, req 
 	return c.setUpdateDownloadTimeout.CallUnary(ctx, req)
 }
 
+// SetUpdateDownloadSources calls mistgate.admin.v1.UpdateService.SetUpdateDownloadSources.
+func (c *updateServiceClient) SetUpdateDownloadSources(ctx context.Context, req *connect.Request[v1.SetUpdateDownloadSourcesRequest]) (*connect.Response[v1.SetUpdateDownloadSourcesResponse], error) {
+	return c.setUpdateDownloadSources.CallUnary(ctx, req)
+}
+
 // UpdateServiceHandler is an implementation of the mistgate.admin.v1.UpdateService service.
 type UpdateServiceHandler interface {
 	// The whole page in one call: this panel, the bundle, every node and the active or last rollout. Never
@@ -360,6 +377,8 @@ type UpdateServiceHandler interface {
 	SetUpdateChannel(context.Context, *connect.Request[v1.SetUpdateChannelRequest]) (*connect.Response[v1.SetUpdateChannelResponse], error)
 	// Change the maximum time an agent may spend downloading one update binary. Owner-only with a fresh step-up.
 	SetUpdateDownloadTimeout(context.Context, *connect.Request[v1.SetUpdateDownloadTimeoutRequest]) (*connect.Response[v1.SetUpdateDownloadTimeoutResponse], error)
+	// Select optional node-update download sources. The panel always remains first. Owner-only with a fresh step-up.
+	SetUpdateDownloadSources(context.Context, *connect.Request[v1.SetUpdateDownloadSourcesRequest]) (*connect.Response[v1.SetUpdateDownloadSourcesResponse], error)
 }
 
 // NewUpdateServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -459,6 +478,12 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(updateServiceMethods.ByName("SetUpdateDownloadTimeout")),
 		connect.WithHandlerOptions(opts...),
 	)
+	updateServiceSetUpdateDownloadSourcesHandler := connect.NewUnaryHandler(
+		UpdateServiceSetUpdateDownloadSourcesProcedure,
+		svc.SetUpdateDownloadSources,
+		connect.WithSchema(updateServiceMethods.ByName("SetUpdateDownloadSources")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.UpdateService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UpdateServiceGetUpdatesProcedure:
@@ -491,6 +516,8 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 			updateServiceSetUpdateChannelHandler.ServeHTTP(w, r)
 		case UpdateServiceSetUpdateDownloadTimeoutProcedure:
 			updateServiceSetUpdateDownloadTimeoutHandler.ServeHTTP(w, r)
+		case UpdateServiceSetUpdateDownloadSourcesProcedure:
+			updateServiceSetUpdateDownloadSourcesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -558,4 +585,8 @@ func (UnimplementedUpdateServiceHandler) SetUpdateChannel(context.Context, *conn
 
 func (UnimplementedUpdateServiceHandler) SetUpdateDownloadTimeout(context.Context, *connect.Request[v1.SetUpdateDownloadTimeoutRequest]) (*connect.Response[v1.SetUpdateDownloadTimeoutResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.SetUpdateDownloadTimeout is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) SetUpdateDownloadSources(context.Context, *connect.Request[v1.SetUpdateDownloadSourcesRequest]) (*connect.Response[v1.SetUpdateDownloadSourcesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.SetUpdateDownloadSources is not implemented"))
 }

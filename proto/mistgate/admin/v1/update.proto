@@ -59,6 +59,8 @@ service UpdateService {
   rpc SetUpdateChannel(SetUpdateChannelRequest) returns (SetUpdateChannelResponse);
   // Change the maximum time an agent may spend downloading one update binary. Owner-only with a fresh step-up.
   rpc SetUpdateDownloadTimeout(SetUpdateDownloadTimeoutRequest) returns (SetUpdateDownloadTimeoutResponse);
+  // Select optional node-update download sources. The panel always remains first. Owner-only with a fresh step-up.
+  rpc SetUpdateDownloadSources(SetUpdateDownloadSourcesRequest) returns (SetUpdateDownloadSourcesResponse);
 }
 
 enum OsUpdateState {
@@ -298,6 +300,8 @@ message RolloutStep {
   uint64 downloaded_bytes = 12 [jstype = JS_NUMBER];
   uint64 total_bytes = 13 [jstype = JS_NUMBER];
   uint64 bytes_per_second = 14 [jstype = JS_NUMBER];
+  // Current source supplying bytes, when the agent supports update-sources/1.
+  string download_source = 15;
 }
 
 message Rollout {
@@ -357,6 +361,9 @@ message GetUpdatesResponse {
   bool running_newer_than_channel_offers = 13;
   // Maximum time sent to new UpdateAgent commands, in seconds.
   uint32 update_download_timeout_seconds = 14;
+  // Optional sources enabled for new VPS node updates (currently github only). The panel is always first; edge
+  // panels return an empty list.
+  repeated string update_download_sources = 15;
 }
 
 // The notes of one GitHub release, as the maintainers wrote them in the release description. They are INFORMATIONAL and
@@ -497,4 +504,13 @@ message SetUpdateDownloadTimeoutRequest {
 
 message SetUpdateDownloadTimeoutResponse {
   uint32 timeout_seconds = 1;
+}
+
+message SetUpdateDownloadSourcesRequest {
+  // Optional source kinds. Currently only "github" is accepted; the panel source is always enabled and first.
+  repeated string sources = 1;
+}
+
+message SetUpdateDownloadSourcesResponse {
+  repeated string sources = 1;
 }

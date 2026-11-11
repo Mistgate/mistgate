@@ -94,6 +94,8 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["update_rollout_cancel", {}],
   ["update_rollback_node", { node_id: "nod_1", node: "de1" }],
   ["update_rescan", { status: "ok" }],
+  ["update_download_sources", { sources: "github" }],
+  ["update_download_sources", { sources: "" }],
   ["warp_params", {}],
   ["warp_register", { node: "de1" }],
   ["warp_import", { node: "de1" }],
@@ -142,6 +144,11 @@ describe("audit dictionary", () => {
         if (lang === "ru") expect(s, `ru ${action} ${result ?? ""}`).not.toMatch(/\b(fail|locked|rejected|denied|limited|error)\b/);
       }
     }
+  });
+  it("says GitHub was turned on or off as the fallback download of node updates", () => {
+    expect(describe2(tRu, "update_download_sources", { sources: "github" })).toBe("включил(а) запасную загрузку обновлений нод с GitHub");
+    expect(describe2(tRu, "update_download_sources", { sources: "" })).toBe("выключил(а) запасную загрузку обновлений нод с GitHub");
+    expect(describe2(tEn, "update_download_sources", { sources: "" })).toBe("turned off the GitHub fallback for node update downloads");
   });
   it("tells a sign-in by its method and a failed one by what was tried, never as a passkey sign-in", () => {
     expect(describe2(tRu, "login", { method: "passkey" })).toBe("вошёл(а) по passkey");
