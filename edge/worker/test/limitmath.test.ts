@@ -165,7 +165,7 @@ describe("weighted window reservations", () => {
     expect(first.reply).toEqual({ ok: true, retryAfterMs: 0, remaining: 2, first: false, windowStartMs: 1_000 });
     const refused = recordWindowN(first.state, 1_000, spec.limit, spec.spanMs, 3);
     expect(refused.reply).toEqual({ ok: false, retryAfterMs: spec.spanMs, remaining: 2, first: false, windowStartMs: 1_000 });
-    expect(refused.state.n).toBe(8);
+    expect(refused.state?.n).toBe(8);
     const final = recordWindowN(first.state, 1_000, spec.limit, spec.spanMs, 2);
     expect(final.reply).toEqual({ ok: true, retryAfterMs: 0, remaining: 0, first: false, windowStartMs: 1_000 });
     expect(undoWindowN(final.state!, 1_001, spec.spanMs, 2, 1_000)?.n).toBe(8);

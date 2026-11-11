@@ -439,7 +439,7 @@ func externalReadArgs() map[string]map[string]any {
 		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"},
 		"panel_logs": {"min_level": "debug"}, "retention_status": {}, "access_report": {}, "block_diagnosis": {}, "node_debug_logs": {"node": "de1"}, "capacity_report": {"hours": 24}, "panel_resources": {},
 		"tasks_list": {}, "task_get": {"task_id": "tsk_missing"}, "task_runs": {"task_id": "tsk_missing"}, "task_run_now": {"task_id": "tsk_missing"},
-		"os_updates_status": {},
+		"os_updates_status": {}, "client_api_settings": {},
 	}
 }
 
@@ -1026,7 +1026,7 @@ func (e *env) scenario() {
 		// they send test traffic between nodes, so they are not read-only; the throwaway panel has no connected nodes (needsFixture)
 		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"},
 		"panel_logs": {"min_level": "debug"}, "retention_status": {}, "access_report": {}, "block_diagnosis": {}, "node_debug_logs": {}, "capacity_report": {"hours": 24}, "panel_resources": {},
-		"tasks_list": {}, "os_updates_status": {},
+		"tasks_list": {}, "os_updates_status": {}, "client_api_settings": {},
 	}
 	// These need a fixture the throwaway panel does not have (a connected node, a profile, a relay): a clean tool error is
 	// an answer; a protocol error never is.
