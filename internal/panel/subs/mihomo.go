@@ -127,7 +127,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 		m, own, ok := proxyNode(line)
 		if !ok {
 			if p.log != nil {
-				p.log.Warn("mihomo profile: a rendered proxy was skipped", "index", i)
+				p.log.Warn("mihomo profile: a rendered proxy was skipped", "code", "mihomo_proxy_skipped", "index", i)
 			}
 			continue
 		}
@@ -171,7 +171,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 		d, err := p.preset.MihomoDNS(group)
 		if err != nil {
 			if p.log != nil {
-				p.log.Warn("mihomo profile: the dns section was left out", "err", err)
+				p.log.Warn("mihomo profile: the dns section was left out", "code", "mihomo_dns_render_failed", "err", err)
 			}
 		} else {
 			root.set("dns", dnsNode(d))

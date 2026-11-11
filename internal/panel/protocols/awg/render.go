@@ -151,7 +151,7 @@ func buildClient(in protocols.RenderInput) (clientConfig, bool) {
 // Render implements protocols.Protocol.
 func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	switch in.Format {
-	case plugin.FormatAWGConf, plugin.FormatAmneziaVPN, plugin.FormatMihomo:
+	case plugin.FormatAWGConf, plugin.FormatAmneziaVPN, plugin.FormatMihomo, plugin.FormatMistgate:
 	default:
 		return plugin.Skipped(plugin.NoteAWG) // Happ and the URI list cannot carry AWG, nor can Xray or sing-box
 	}
@@ -160,6 +160,9 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	}
 	c, ok := buildClient(in)
 	if !ok {
+		return plugin.Fragment{}, false
+	}
+	if in.Format == plugin.FormatMistgate && !protocols.HasCapability(in.Capabilities, "awg", c.s.Version) {
 		return plugin.Fragment{}, false
 	}
 	var data []byte
@@ -175,6 +178,11 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	case plugin.FormatMihomo:
 		var err error
 		if data, err = c.mihomo(); err != nil {
+			return plugin.Fragment{}, false
+		}
+	case plugin.FormatMistgate:
+		var err error
+		if data, err = c.mistgate(); err != nil {
 			return plugin.Fragment{}, false
 		}
 	}

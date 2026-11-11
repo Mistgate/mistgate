@@ -106,6 +106,9 @@ type Config struct {
 	// context (the public listener resolves it under the trusted-proxy rules). An invalid address
 	// (unknown client) is never limited or counted.
 	ClientIP func(*http.Request) netip.Addr
+	// ClientASN is an in-process lookup against the VPS edition's networks table. It is called only for X-Mistgate-Direct: 1;
+	// nil in the edge edition and when no trusted table is loaded.
+	ClientASN func(netip.Addr) uint32
 	// Events, if set, receives subscription_shared_suspect events. Log, if set, gets their write errors.
 	Events Events
 	Log    *slog.Logger
@@ -250,6 +253,7 @@ type handler struct {
 	dev    Devices      // src when it manages devices, else nil
 	pdns   PageDNS      // src when it takes the DNS pick of the page, else nil
 	enrol  ClientEnrol  // src when it enrols client API devices, else nil
+	client ClientAPI    // src when it serves client API sync and leave, else nil
 	cop    *http.CrossOriginProtection
 	decoy  http.Handler
 	prefix string
@@ -273,10 +277,11 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 	h.dev, _ = src.(Devices)
 	h.pdns, _ = src.(PageDNS)
 	h.enrol, _ = src.(ClientEnrol)
+	h.client, _ = src.(ClientAPI)
 	if o := originOf(cfg.BaseURL); o != "" {
 		// Behind a proxy that rewrites Host the Origin of a browser is still the public address.
 		if err := h.cop.AddTrustedOrigin(o); err != nil {
-			cfg.Log.Warn("subscription base URL is not a usable origin", "err", err)
+			cfg.Log.Warn("subscription base URL is not a usable origin", "code", "subscription_base_origin_invalid", "err", err)
 		}
 	}
 	return h
@@ -297,6 +302,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client := ""
 	if ip.IsValid() {
 		client = auth.SourceKey(ip)
+	}
+	if route := clientAPIRoute(r, h.prefix); route != "" {
+		h.serveClientAPI(w, r, route, client)
+		return
 	}
 	token, sub, ok := routeOf(r, h.prefix)
 	checkedColdToken := false
@@ -506,7 +515,7 @@ func (h *handler) respond(w http.ResponseWriter, r *http.Request, token string, 
 			return
 		}
 		h.noPage.Do(func() {
-			h.cfg.Log.Warn("user page is not available, serving the base64 list to browsers", "err", h.pageErr)
+			h.cfg.Log.Warn("user page is not available, serving the base64 list to browsers", "code", "subscription_page_unavailable", "err", h.pageErr)
 		})
 	case adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML:
 		if format == plugin.FormatMihomo { // a Source without formats leaves the rule on the base64 list
@@ -587,7 +596,7 @@ func (h *handler) linkPreset(ctx context.Context, v access.SubView) *dns.Preset 
 	}
 	pre, err := h.cfg.DNS.LinkEffective(ctx, v.UserID)
 	if err != nil {
-		h.cfg.Log.Warn("profile: no dns section", "err", err)
+		h.cfg.Log.Warn("profile: no dns section", "code", "subscription_dns_unavailable", "err", err)
 		return nil
 	}
 	return &pre
@@ -660,7 +669,7 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	}
 	if format == plugin.FormatURIList && h.cfg.Routing != nil && v.Status == access.StatusActive && v.UserID != "" && isHapp(r.UserAgent()) {
 		if val, err := h.cfg.Routing.HappRouting(ctx, v.UserID); err != nil {
-			h.cfg.Log.Warn("happ routing header skipped", "err", err) // no user id, no token in the log
+			h.cfg.Log.Warn("happ routing header skipped", "code", "subscription_happ_routing_unavailable", "err", err) // no user id, no token in the log
 		} else if val != "" {
 			hd.Set("Routing", val)
 		}
@@ -693,7 +702,7 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 	p.preset = h.linkPreset(ctx, v)
 	body, err := p.build()
 	if err != nil {
-		h.cfg.Log.Error("mihomo profile", "err", err)
+		h.cfg.Log.Error("mihomo profile", "code", "subscription_mihomo_render_failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -780,7 +789,7 @@ func (h *handler) miss(ctx context.Context, client string) {
 	}
 	_, err := h.cfg.Limiter.Record(ctx, h.missWindow(), "c:"+client)
 	if err != nil && h.cfg.Log != nil {
-		h.cfg.Log.Warn("subscription miss limit unavailable")
+		h.cfg.Log.Warn("subscription miss limit unavailable", "code", "subscription_miss_limit_unavailable")
 	}
 }
 
@@ -883,7 +892,7 @@ func (h *handler) suspect(user string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := h.cfg.Events.InsertEvent(ctx, e); err != nil && h.cfg.Log != nil {
-			h.cfg.Log.Warn("write subscription event", "err", err)
+			h.cfg.Log.Warn("write subscription event", "code", "subscription_shared_event_write_failed", "err", err)
 		}
 	})
 }

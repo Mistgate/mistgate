@@ -136,3 +136,21 @@ func TestChangedPointers(t *testing.T) {
 		t.Errorf("changed = %v", got)
 	}
 }
+
+func TestHasCapability(t *testing.T) {
+	caps := []string{"v=1", "hysteria2=2", "awg=2.0, 3.1", " gecko = 1 ", "probe"}
+	for _, c := range []struct {
+		name, value string
+		want        bool
+	}{
+		{"awg", "2.0", true}, {"awg", "3.1", true}, {"awg", "3", false}, {"awg", "", false}, {"gecko", "1", true}, {"hysteria2", "2", true},
+		{"hysteria2", "1", false}, {"probe", "", false}, {"v", "1", true}, {"aw", "2.0", false}, {"wg", "2.0", false},
+	} {
+		if got := HasCapability(caps, c.name, c.value); got != c.want {
+			t.Errorf("HasCapability(%q, %q) = %v, want %v", c.name, c.value, got, c.want)
+		}
+	}
+	if HasCapability(nil, "awg", "2.0") {
+		t.Error("capabilities from nowhere")
+	}
+}

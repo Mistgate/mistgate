@@ -26,6 +26,8 @@ type ClientEnrol interface {
 	ReenrolLinkDevice(ctx context.Context, userID, deviceID, token string, expectedKeyHash, keyHash []byte) (bool, error)
 }
 
+var _ ClientEnrol = (*access.Service)(nil)
+
 const (
 	// enrolSyncEvery is sync_every_s of the answer: how often the client asks the panel for its subscription.
 	enrolSyncEvery = 3600

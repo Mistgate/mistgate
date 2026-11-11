@@ -58,7 +58,7 @@ func (s *Service) Handler() (string, http.Handler) {
 }
 
 func (s *Service) internal(what string, err error) error {
-	s.log.Error("subscription settings: "+what, "err", err)
+	s.log.Error("subscription settings: "+what, "code", "subscription_settings_operation_failed", "err", err)
 	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 }
 
@@ -83,7 +83,7 @@ func (s *Service) effectiveTitle(ctx context.Context, set *adminv1.SubscriptionS
 	}
 	b, err := s.brand(ctx)
 	if err != nil {
-		s.log.Warn("read brand", "err", err)
+		s.log.Warn("read brand", "code", "subscription_brand_read_failed", "err", err)
 	}
 	return b.BrandName()
 }
@@ -236,7 +236,7 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 		entry.IP = ip.String()
 	}
 	if err := s.st.Audit(ctx, time.Now(), entry); err != nil {
-		s.log.Warn("audit", "action", entry.Action, "err", err)
+		s.log.Warn("audit", "code", "subscription_audit_write_failed", "action", entry.Action, "err", err)
 	}
 	return connect.NewResponse(&adminv1.UpdateSubscriptionSettingsResponse{Settings: set}), nil
 }

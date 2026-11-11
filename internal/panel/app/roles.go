@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/netip"
 	"sort"
 	"time"
 
@@ -69,6 +70,14 @@ func Build(c Config) (*Panel, error) {
 	k.newTasksService()
 	c = k.c
 	parts := k.base.newSubParts(true)
+	if !k.base.edge && k.upd != nil {
+		parts.cfg.ClientASN = func(ip netip.Addr) uint32 {
+			if table := k.upd.NetworksTable(); table != nil {
+				return table.Lookup(ip)
+			}
+			return 0
+		}
+	}
 	prov, bkp, err := k.provisionAndBackup()
 	if err != nil {
 		return nil, err

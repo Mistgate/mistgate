@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The client API enrols a device by its subscription link and gives it a key of its own (client-api.md). These are the calls the
@@ -15,6 +16,36 @@ import (
 // blocked device comes back with store.ErrDeviceRevoked or store.ErrAccessBlocked and no device, only its owner.
 func (s *Service) ClientDeviceByKey(ctx context.Context, keyHash []byte) (store.AccessDevice, store.LinkDeviceKeyOwner, error) {
 	return s.st.Access().LinkDeviceByKeyHash(ctx, keyHash)
+}
+
+// ClientSubscription builds the subscription of the link device dev, authorised by its key, in the Mistgate format: structured
+// protocol settings, not links. Unlike the basic link fetch it may issue missing credentials to this exact device (the store
+// checks the key again in the write batch); the basic fetch refuses a device that holds a key, and still does. caps are the
+// X-Mistgate-Caps entries (Gecko and the AmneziaWG versions are handed out only to a client that announced them); noLinkAWG is
+// the owner's switch that takes AmneziaWG off the link apps. Errors are the store's: ErrNotFound and ErrAccessExists when the
+// device was removed, blocked or re-keyed meanwhile.
+func (s *Service) ClientSubscription(ctx context.Context, dev store.AccessDevice, hint DeviceHint, caps []string, noLinkAWG bool) (SubView, error) {
+	u, err := s.st.Access().User(ctx, dev.UserID)
+	if errors.Is(err, store.ErrNotFound) {
+		return SubView{}, ErrUnknownToken
+	}
+	if err != nil {
+		return SubView{}, err
+	}
+	return s.subView(ctx, u, true, SubOptions{Format: plugin.FormatMistgate, Device: hint, EnrolledDevice: &dev, Capabilities: caps,
+		NoPageData: true, IncludeEffectiveDNS: true, NoLinkAWG: noLinkAWG})
+}
+
+// ClientLeaveDevice removes the device the key belongs to: the same operation as the person removing it on the page (its
+// credentials leave the nodes with the next desired state, its AWG peers are quarantined), tied to the key that authorised the
+// call. ErrNotFound when the key stopped being the device's meanwhile. The audit row has the user and the device, no address.
+func (s *Service) ClientLeaveDevice(ctx context.Context, dev store.AccessDevice) error {
+	if err := s.st.Access().RevokeEnrolledLinkDevice(ctx, dev, s.now()); err != nil {
+		return err
+	}
+	s.notify.StateChanged()
+	s.auditClientEnrolment(ctx, dev.UserID, dev.ID, "client_device_left")
+	return nil
 }
 
 // EnrolLinkDevice makes the device of hint (its canonical HWID, platform, model and agent) hold credentials and the key whose

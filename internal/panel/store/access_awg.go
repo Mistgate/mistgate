@@ -281,7 +281,22 @@ func scanAWGDeviceProfile(r rowScanner) (awgDeviceProfile, error) {
 // ceiling of the stored mode (*AccessLimitError at it, a silent device replaced past it, ErrAccessBlocked, ErrNoSharedDevice:
 // see linkDeviceState.birth); limit is the user's device limit. A subscription fetch must not fail for them.
 func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit int, now time.Time, want []AWGImplicitWant) (LinkDeviceResult, error) {
-	if len(want) == 0 {
+	return a.ensureLinkAWGCreds(ctx, dev, limit, now, nil, want, false)
+}
+
+// EnsureEnrolledLinkDevice fills an already enrolled link device with ordinary and per-profile credentials in one guarded
+// write batch. The key hash, and that the device is still enrolled under the user's current link, are checked again in the
+// batch, so a concurrent leave, block, re-key or link rotation cannot issue credentials to a stale request (ErrAccessExists).
+// Basic link issuance keeps its key_hash IS NULL guards.
+func (a Access) EnsureEnrolledLinkDevice(ctx context.Context, dev AccessDevice, now time.Time, issue LinkIssue, want []AWGImplicitWant) (LinkDeviceResult, error) {
+	if dev.ID == "" || dev.UserID == "" || len(dev.HWIDHash) != sha256.Size || len(dev.KeyHash) != sha256.Size || issue == nil {
+		return LinkDeviceResult{}, errors.New("store: invalid enrolled link device")
+	}
+	return a.ensureLinkAWGCreds(ctx, dev, 0, now, issue, want, true)
+}
+
+func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit int, now time.Time, issue LinkIssue, want []AWGImplicitWant, enrolled bool) (LinkDeviceResult, error) {
+	if len(want) == 0 && issue == nil {
 		return LinkDeviceResult{}, nil
 	}
 	userID := dev.UserID
@@ -293,7 +308,7 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 			profileIDs = append(profileIDs, w.ProfileID)
 		}
 	}
-	if len(profileIDs) == 0 {
+	if len(profileIDs) == 0 && issue == nil {
 		return LinkDeviceResult{}, nil
 	}
 	cutoff := unix(now.Add(-awgQuarantine))
@@ -303,8 +318,12 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		var st linkDeviceState
 		var profileEpochs []accessProfileEpoch
 		var taken []awgTakenIndex
+		var linkCurrent int // enrolled: 1 while the device was enrolled under the user's current link
 		r := reads{}
 		st.add(&r, userID, dev.HWIDHash, now)
+		if enrolled {
+			r.add(oneRow(&linkCurrent, scanCount), `SELECT count(*) AS n FROM device d JOIN user u ON u.id = d.user_id WHERE d.id = ? AND d.enrol_token_hash = u.sub_token_hash`, dev.ID)
+		}
 		r.add(appendRows(&profileEpochs, scanAccessProfileEpoch), `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, accJSON(profileIDs))
 		for _, profileID := range profileIDs {
 			r.add(appendRows(&taken, scanAWGTakenIndex), `SELECT ?1 AS profile_id, taken.idx FROM (`+awgTakenSQL+`) taken`, profileID, cutoff)
@@ -328,17 +347,32 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		}
 		own := linkDeviceSnapshotOf(st.own)
 		result.Device, result.Creds = own.Device, own.Creds
-		fresh := dev
-		fresh.ID = "" // the template's id may be that of a device revoked since: a new device always gets a new id
-		b, err := st.birth(fresh, limit, now, false)
+		var b linkBirth
+		var err error
+		if enrolled {
+			b, err = st.enrolled(dev, linkCurrent == 1)
+		} else {
+			fresh := dev
+			fresh.ID = "" // the template's id may be that of a device revoked since: a new device always gets a new id
+			b, err = st.birth(fresh, limit, now, false)
+		}
 		if err != nil {
 			return nil, err
 		}
 		deviceID := b.deviceID
 		have := map[string]bool{}
+		haveProtocol := map[string]bool{}
 		for _, cred := range b.creds {
+			haveProtocol[cred.Protocol] = true
 			if cred.ProfileID != "" {
 				have[cred.ProfileID] = true
+			}
+		}
+		var added []AccessCred
+		if issue != nil {
+			added, err = issue(deviceID, haveProtocol)
+			if err != nil {
+				return nil, accMapErr(err)
 			}
 		}
 		var issues []awgBatchIssue
@@ -364,26 +398,35 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 			occupied[w.ProfileID][idx] = true
 			have[w.ProfileID] = true
 		}
-		if len(issues) == 0 && (b.exists || b.born) {
+		if len(issues) == 0 && len(added) == 0 && (b.exists || b.born) {
 			return nil, nil // nothing to add, and no device is born empty; an adoption still happens
 		}
-		stmts := make([]Stmt, 0, len(b.stmts)+len(issues)*4+1)
+		stmts := make([]Stmt, 0, len(b.stmts)+len(added)*2+len(issues)*4+1)
 		stmts = append(stmts, b.stmts...)
 		result.Replaced, result.Born = b.replaced, b.born
+		result.Added = make([]AccessCred, 0, len(added)+len(issues))
+		for _, cred := range added {
+			cred.DeviceID, cred.UserID, cred.CreatedAt = deviceID, userID, now
+			result.Added = append(result.Added, cred)
+			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?1 AND protocol = ?2 AND coalesce(profile_id, '') = ?3 AND revoked_at IS NULL)`,
+				deviceID, cred.Protocol, cred.ProfileID))
+			stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
+		}
 		for _, issue := range issues {
-			stmts = append(stmts, guard(`
-				EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL AND key_hash IS NULL)
+			deviceGuard := `EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL AND key_hash IS NULL)`
+			args := []any{issue.profileID, cutoff, int64(issue.idx), deviceID, userID, issue.epoch, hwidArg(dev.HWIDHash)}
+			if enrolled {
+				deviceGuard = `EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL AND blocked_at IS NULL AND key_hash = ?8 AND enrol_token_hash = (SELECT sub_token_hash FROM user WHERE id = ?5))`
+				args = append(args, dev.KeyHash)
+			}
+			stmts = append(stmts, guard(deviceGuard+`
 				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
 				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND revoked_at IS NULL)
-				AND ?3 NOT IN (`+awgTakenSQL+`)`,
-				issue.profileID, cutoff, int64(issue.idx), deviceID, userID, issue.epoch, hwidArg(dev.HWIDHash)))
+				AND ?3 NOT IN (`+awgTakenSQL+`)`, args...))
 			stmts = append(stmts, awgPurgeExpiredStmt(issue.profileID, cutoff))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{issue.cred})...)
 			stmts = append(stmts, awgInsertPeerStmt(issue.cred.ID, issue.profileID, issue.idx, issue.publicKey, now))
-		}
-		result.Added = make([]AccessCred, len(issues))
-		for i, issue := range issues {
-			result.Added[i] = issue.cred
+			result.Added = append(result.Added, issue.cred)
 		}
 		stmts = append(stmts, Stmt{Query: linkDeviceCredsSQL, Args: []any{userID, hwidArg(dev.HWIDHash)}, Returning: true})
 		return stmts, nil

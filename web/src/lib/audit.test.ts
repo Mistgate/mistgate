@@ -40,6 +40,12 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["sessions_end_others", { count: 2 }],
   ["instance_update", {}],
   ["subscription_settings_update", {}],
+  // the desktop client API (internal/panel/clientapi/service.go, internal/panel/access/client_api.go)
+  ["client_api_update", { enabled: true }],
+  ["client_api_update", { enabled: false }],
+  ["client_device_enrolled", { user: "usr_1", device: "dev_1" }],
+  ["client_device_reenrolled", { user: "usr_1", device: "dev_1" }],
+  ["client_device_left", { user: "usr_1", device: "dev_1" }],
   ["page_unlock_lockout", { user: "usr_1", scope: "token" }, "locked"],
   ["node.create_enrollment", { node_id: "nod_1", name: "de1" }],
   ["node.update", { node_id: "nod_1" }],
@@ -185,6 +191,14 @@ describe("audit dictionary", () => {
     expect(describe2(tEn, "relay.check", { ...r, ok: true, verified: true })).toBe("checked the relay msk1 → de1: it works");
     expect(describe2(tEn, "relay.check", { ...r, ok: true, verified: false })).toBe("checked the relay msk1 → de1");
     expect(describe2(tRu, "relay.check", { ...r, ok: false, verified: false })).toBe("проверил(а) ретрансляцию msk1 → de1: проверка не прошла");
+  });
+  it("tells the client API switched on or off, and a device of the Mistgate app coming, getting a new key and leaving", () => {
+    expect(describe2(tEn, "client_api_update", { enabled: true })).toBe("turned the client API on: the Mistgate app can connect to the panel directly");
+    expect(describe2(tRu, "client_api_update", { enabled: false })).toBe("выключил(а) API клиента: новые устройства через приложение Mistgate подключаться не смогут");
+    expect(describe2(tRu, "client_api_update", {})).toBe("изменил(а) настройку API клиента");
+    expect(describe2(tRu, "client_device_enrolled", { user: "usr_1", device: "dev_1" })).toBe("подключил(а) устройство через приложение Mistgate");
+    expect(describe2(tEn, "client_device_reenrolled", { user: "usr_1", device: "dev_1" })).toBe("got a new key for a device in the Mistgate app");
+    expect(describe2(tEn, "client_device_left", { user: "usr_1", device: "dev_1" })).toBe("removed a device through the Mistgate app");
   });
   it("says what failed in the UI language, after the sentence, when the sentence itself does not", () => {
     expect(describe2(tRu, "mcp_apply", { tool: "user_enable" }, "fail")).toBe("выполнил(а) запланированное изменение: Включить пользователей — не удалось");

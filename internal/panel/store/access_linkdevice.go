@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -306,6 +307,23 @@ func (st *linkDeviceState) birth(dev AccessDevice, limit int, now time.Time, enr
 	return b, nil
 }
 
+// enrolled finds the existing link device held by the supplied key and returns the guard that keeps credential
+// issuance tied to that same live, unblocked key, and to the link it was enrolled under, through the write batch. linkCurrent is
+// the read that says the device's enrol_token_hash is still the hash of the user's link: a rotation takes the device's
+// credentials' right to grow away until it enrols again with the new link.
+func (st *linkDeviceState) enrolled(dev AccessDevice, linkCurrent bool) (linkBirth, error) {
+	own := linkDeviceSnapshotOf(st.own)
+	if !linkCurrent || own.Device.ID == "" || own.Device.ID != dev.ID || len(dev.KeyHash) != sha256.Size || !bytes.Equal(own.Device.KeyHash, dev.KeyHash) {
+		return linkBirth{}, ErrAccessExists
+	}
+	return linkBirth{deviceID: own.Device.ID, creds: own.Creds, exists: true, stmts: []Stmt{
+		guard(`EXISTS (SELECT 1 FROM device WHERE id = ?1 AND user_id = ?2 AND hwid_hash = ?3
+			AND kind = 'link' AND revoked_at IS NULL AND blocked_at IS NULL AND key_hash = ?4
+			AND enrol_token_hash = (SELECT sub_token_hash FROM user WHERE id = ?2))`,
+			dev.ID, dev.UserID, dev.HWIDHash, dev.KeyHash),
+	}}, nil
+}
+
 // deviceReplacedParams is the params_json of the device_replaced event: the device that gave its place away.
 func deviceReplacedParams(v linkVictim) string {
 	b, _ := json.Marshal(map[string]string{"old_device": v.ID, "platform": v.Platform, "model": v.Model, "last_seen": strconv.FormatInt(v.LastSeen, 10)})
@@ -466,4 +484,36 @@ func (a Access) SetLinkDeviceKeyHash(ctx context.Context, userID, deviceID strin
 		return false, err
 	}
 	return len(results) == 1 && results[0].RowsAffected == 1, nil
+}
+
+// RevokeEnrolledLinkDevice removes a link device only while the key that authorized the request is still current. It uses
+// the same revoke statements as the user's device page, so credentials are removed from desired node state and AWG peers are
+// quarantined. A concurrent key rotation, block or removal makes this a no-op.
+func (a Access) RevokeEnrolledLinkDevice(ctx context.Context, dev AccessDevice, now time.Time) error {
+	if dev.ID == "" || dev.UserID == "" || len(dev.KeyHash) != sha256.Size {
+		return errors.New("store: invalid enrolled device revocation")
+	}
+	stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM device WHERE id = ?1 AND user_id = ?2 AND kind = 'link'
+		AND revoked_at IS NULL AND blocked_at IS NULL AND key_hash = ?3)`, dev.ID, dev.UserID, dev.KeyHash)}
+	stmts = append(stmts, revokeDeviceStmts(dev.ID, now)...)
+	stmts = append(stmts, Stmt{Query: `SELECT user_id FROM device WHERE id = ?`, Args: []any{dev.ID}, Returning: true})
+	results, err := a.s.batch(ctx, stmts...)
+	if errors.Is(err, errGuard) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return accMapErr(err)
+	}
+	rows := results[len(results)-1].Rows
+	if len(rows) == 0 {
+		return ErrNotFound
+	}
+	var userID string
+	if err := batchRow(rows[0]).Scan(&userID); err != nil {
+		return err
+	}
+	if userID != dev.UserID {
+		return ErrNotFound
+	}
+	return nil
 }

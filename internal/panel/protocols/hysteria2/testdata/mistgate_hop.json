@@ -1,0 +1,16 @@
+{
+  "server": "de2.example.com",
+  "port": 443,
+  "ports": "20000-30000",
+  "hop_interval_s": 30,
+  "auth": "tok-DEVICE_secret_0123456789abcdefghijklmn",
+  "tls": "ca",
+  "sni": "de1.example.com",
+  "alpn": [
+    "h3"
+  ],
+  "obfs": {
+    "type": "salamander",
+    "password": "gawrgura-pw"
+  }
+}

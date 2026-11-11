@@ -1977,6 +1977,108 @@ func TestD1LinkAWGKeyCountAndRevoke(t *testing.T) {
 	}
 }
 
+// Sync and leave of the client API on D1: the credentials an enrolled device is missing are issued in one write batch after the
+// read, a sync with nothing to issue is the read alone, and a leave is one atomic batch. The basic guards stay.
+func TestD1EnrolledDeviceIssueAndLeaveAreOneWriteBatch(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_enrolled_sync", Name: "Enrolled sync", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	u := AccessUser{ID: "usr_enrolled_sync", Name: "alice", GroupID: "grp_enrolled_sync", Status: "active", AppHapp: true, AppAmnezia: true,
+		AllNodes: true, QuotaReset: "none", PeriodStart: now, DeviceLimit: 5, SubTokenHash: []byte("enrolled-sync-hash"),
+		SubTokenEnc: []byte("sealed"), CreatedAt: now}
+	if err := st.Access().CreateUser(ctx, u, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSettings(ctx, map[string]string{SettingLinkDeviceLimit: LinkModeEnforce}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Access().CreateProfile(ctx, AccessProfile{ID: "prf_enrolled_sync", Protocol: "awg", Name: "awg", SettingsJSON: "{}", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	basic := func(string, map[string]bool) ([]AccessCred, error) {
+		return []AccessCred{{ID: "crd_enrolled_sync_hy2", UserID: u.ID, Protocol: "hysteria2", SecretEnc: []byte("sealed"), DataJSON: `{}`}}, nil
+	}
+	none := func(string, map[string]bool) ([]AccessCred, error) { return nil, nil }
+	hwid := HWIDHash(u.ID, "aaaaaaaaaaaaaaaa")
+	keyHash, enrolHash := sha256.Sum256([]byte("enrolled-sync-key")), sha256.Sum256([]byte("enrolled-sync-link"))
+	if _, err := st.W.ExecContext(ctx, `UPDATE user SET sub_token_hash = ? WHERE id = ?`, enrolHash[:], u.ID); err != nil { // the device's link is the current one
+		t.Fatal(err)
+	}
+	if _, err := st.Access().EnrolLinkDevice(ctx, AccessDevice{ID: "dev_enrolled_sync", UserID: u.ID, HWIDHash: hwid, KeyHash: keyHash[:], EnrolTokenHash: enrolHash[:]}, 5, now, basic); err != nil {
+		t.Fatal(err)
+	}
+	dev, _, err := st.Access().LinkDeviceByKeyHash(ctx, keyHash[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []AWGImplicitWant{{ProfileID: "prf_enrolled_sync", MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_enrolled_sync_awg", Protocol: "awg", SecretEnc: []byte("sealed"), DataJSON: `{}`}, "pub_enrolled_sync", nil
+	}}}
+
+	var issued LinkDeviceResult
+	counts := countD1Queries(t, js.Global().Get("__d1"), "enrolled-issue", func() {
+		issued, err = st.Access().EnsureEnrolledLinkDevice(ctx, dev, now.Add(time.Minute), none, want)
+		if err != nil {
+			t.Fatalf("issue to an enrolled device: %v", err)
+		}
+	})
+	if counts.batches != 2 { // the state is read in one batch, and the peer, its credential and its address go in one
+		t.Fatalf("issuing to an enrolled device made %d batches, want a read batch and one atomic write batch", counts.batches)
+	}
+	if issued.Device.ID != dev.ID || len(issued.Added) != 1 || issued.Added[0].Protocol != "awg" || len(issued.Creds) != 2 {
+		t.Fatalf("issue result = %+v", issued)
+	}
+	var peers int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM awg_peer WHERE credential_id = 'crd_enrolled_sync_awg' AND released_at = 0`).Scan(&peers); err != nil || peers != 1 {
+		t.Fatalf("live peers = %d, %v", peers, err)
+	}
+	counts = countD1Queries(t, js.Global().Get("__d1"), "enrolled-nothing-to-issue", func() {
+		issued, err = st.Access().EnsureEnrolledLinkDevice(ctx, dev, now.Add(2*time.Minute), none, want)
+		if err != nil || len(issued.Added) != 0 || issued.Device.ID != dev.ID {
+			t.Fatalf("nothing to issue = %+v, %v", issued, err)
+		}
+	})
+	if counts.batches != 1 {
+		t.Fatalf("a sync with nothing to issue made %d batches, want the read alone", counts.batches)
+	}
+	// The basic paths still refuse the HWID of the enrolled device.
+	if _, err := st.Access().EnsureLinkAWGCreds(ctx, AccessDevice{ID: "dev_ignored", UserID: u.ID, HWIDHash: hwid}, 5, now, want); !errors.Is(err, ErrDeviceEnrolled) {
+		t.Fatalf("basic AWG path on an enrolled HWID = %v, want ErrDeviceEnrolled", err)
+	}
+	if _, err := st.Access().EnsureLinkDevice(ctx, AccessDevice{ID: "dev_ignored", UserID: u.ID, HWIDHash: hwid}, 5, now, basic); !errors.Is(err, ErrDeviceEnrolled) {
+		t.Fatalf("basic device path on an enrolled HWID = %v, want ErrDeviceEnrolled", err)
+	}
+	// A key that is no longer the device's gets nothing, and the failed write is not retried into success.
+	stale := dev
+	stale.KeyHash = sha256.New().Sum(nil)
+	if _, err := st.Access().EnsureEnrolledLinkDevice(ctx, stale, now.Add(3*time.Minute), none, want); !errors.Is(err, ErrAccessExists) {
+		t.Fatalf("issue with a stale key = %v, want ErrAccessExists", err)
+	}
+
+	counts = countD1Queries(t, js.Global().Get("__d1"), "enrolled-leave", func() {
+		if err := st.Access().RevokeEnrolledLinkDevice(ctx, dev, now.Add(4*time.Minute)); err != nil {
+			t.Fatalf("leave: %v", err)
+		}
+	})
+	if counts.batches != 1 {
+		t.Fatalf("a leave made %d batches, want one atomic batch", counts.batches)
+	}
+	var live, quarantined int
+	if err := st.R.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM device_credential WHERE device_id = 'dev_enrolled_sync' AND revoked_at IS NULL),
+		(SELECT count(*) FROM awg_peer WHERE credential_id = 'crd_enrolled_sync_awg' AND released_at > 0)`).Scan(&live, &quarantined); err != nil || live != 0 || quarantined != 1 {
+		t.Fatalf("after the leave: %d live credentials, %d quarantined peers, %v", live, quarantined, err)
+	}
+	if _, _, err := st.Access().LinkDeviceByKeyHash(ctx, keyHash[:]); !errors.Is(err, ErrDeviceRevoked) {
+		t.Fatalf("key after the leave = %v, want ErrDeviceRevoked", err)
+	}
+	if err := st.Access().RevokeEnrolledLinkDevice(ctx, dev, now.Add(5*time.Minute)); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second leave = %v, want ErrNotFound", err)
+	}
+}
+
 func TestD1RewrittenDNSAndSettingsMethods(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(1_800_000_000, 0).UTC()

@@ -182,6 +182,7 @@ const (
 	FormatXrayJSON   ClientFormat = "xray-json" // one Xray outbound as a JSON object, see Fragment
 	FormatSingbox    ClientFormat = "singbox"   // one sing-box outbound as a JSON object, see Fragment
 	FormatMihomo     ClientFormat = "mihomo-yaml"
+	FormatMistgate   ClientFormat = "mistgate"    // the first-party client API's structured protocol settings
 	FormatAmneziaVPN ClientFormat = "amnezia-vpn" // vpn://
 	FormatAWGConf    ClientFormat = "awg-conf"
 	// FormatTelegramLink is one tg://proxy link. It is no subscription format: no subscription carries it, the person's

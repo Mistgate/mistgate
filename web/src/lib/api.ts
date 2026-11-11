@@ -5,6 +5,7 @@ import { BackupService } from "@/gen/mistgate/admin/v1/backup_pb";
 import { BlocklistService } from "@/gen/mistgate/admin/v1/blocklist_pb";
 import { BsbordService } from "@/gen/mistgate/admin/v1/bsbord_pb";
 import { CheburcheckService } from "@/gen/mistgate/admin/v1/cheburcheck_pb";
+import { ClientApiService } from "@/gen/mistgate/admin/v1/client_api_pb";
 import { ClientProbeService } from "@/gen/mistgate/admin/v1/client_probe_pb";
 import { CountryReachabilityService } from "@/gen/mistgate/admin/v1/country_reachability_pb";
 import { AwgService } from "@/gen/mistgate/admin/v1/awg_pb";
@@ -68,6 +69,8 @@ export const blocklist = createClient(BlocklistService, transport);
 // TestTspuProbe runs for minutes: no call here sets a deadline (timeoutMs), and the transport has none of its own.
 export const tspuProbe = createClient(TspuProbeService, transport);
 export const clientProbe = createClient(ClientProbeService, transport);
+// The owner's switch for the Mistgate desktop app's direct connection (client_api.proto); both editions.
+export const clientApi = createClient(ClientApiService, transport);
 export const cheburcheck = createClient(CheburcheckService, transport);
 export const bsbord = createClient(BsbordService, transport);
 // The panel's own logs, retention, export and metrics settings (the VPS edition; the edge answers UNIMPLEMENTED).

@@ -381,6 +381,8 @@ func (*Protocol) Doctor() []protocols.Check { return nil }
 // form is verified against Happ.
 func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	switch in.Format {
+	case plugin.FormatMistgate:
+		return renderMistgate(in)
 	case plugin.FormatURIList:
 	case plugin.FormatMihomo:
 		return renderMihomo(in)

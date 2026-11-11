@@ -1,0 +1,10 @@
+{
+  "server": "203.0.113.10",
+  "port": 443,
+  "auth": "tok-DEVICE_secret_0123456789abcdefghijklmn",
+  "tls": "pin",
+  "pin_sha256": "abababababababababababababababababababababababababababababababab",
+  "alpn": [
+    "h3"
+  ]
+}

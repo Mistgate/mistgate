@@ -65,7 +65,7 @@ func (c *common) brand(ctx context.Context) instance.Settings {
 			c.brandV, c.brandAt, c.brandOK = v, now, true
 			return v
 		}
-		c.cfg.Log.Warn("read brand for subscription", "err", err)
+		c.cfg.Log.Warn("read brand for subscription", "code", "subscription_brand_read_failed", "err", err)
 		if c.brandOK {
 			return c.brandV
 		}
@@ -143,7 +143,7 @@ func (c *common) writeLocked(w http.ResponseWriter, r *http.Request, link string
 func (c *common) writeData(w http.ResponseWriter, r *http.Request, d pageData, ancestors string) {
 	html, err := c.page.render(d)
 	if err != nil {
-		c.cfg.Log.Error("render user page", "err", err)
+		c.cfg.Log.Error("render user page", "code", "user_page_render_failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -183,7 +183,7 @@ func PreviewHandler(src Previewer, cfg Config) func(w http.ResponseWriter, r *ht
 			return
 		}
 		if err != nil {
-			cfg.Log.Error("user page preview", "err", err)
+			cfg.Log.Error("user page preview", "code", "user_page_preview_failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}

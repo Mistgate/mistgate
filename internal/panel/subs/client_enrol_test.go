@@ -95,6 +95,16 @@ type enrolEnv struct {
 // and no budget of self-service writes (the tests that look at the budgets say so), and logs everything to e.logs.
 func newEnrolEnv(t *testing.T, mut func(*subs.Config)) *enrolEnv {
 	t.Helper()
+	return newEnrolEnvWith(t, func(c *subs.Config, _ *store.Store) {
+		if mut != nil {
+			mut(c)
+		}
+	})
+}
+
+// newEnrolEnvWith is newEnrolEnv for a change of the config that needs the store (the DNS module is built over it).
+func newEnrolEnvWith(t *testing.T, mut func(*subs.Config, *store.Store)) *enrolEnv {
+	t.Helper()
 	ctx := context.Background()
 	logs := &lockedBuffer{}
 	log := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -133,7 +143,7 @@ func newEnrolEnv(t *testing.T, mut func(*subs.Config)) *enrolEnv {
 		c.ClientIP = func(*http.Request) netip.Addr { return netip.MustParseAddr(enrolIP) }
 		c.AfterResponse = func(f func()) { f() }
 		if mut != nil {
-			mut(c)
+			mut(c, st)
 		}
 	})
 	r.h = h

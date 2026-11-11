@@ -38,6 +38,10 @@ const keys: Record<string, MessageKey> = {
   security_update: "audit.security_update",
   page_unlock_lockout: "audit.page_unlock_lockout",
   subscription_settings_update: "audit.subscription_settings_update",
+  client_api_update: "audit.client_api_update",
+  client_device_enrolled: "audit.client_device_enrolled",
+  client_device_reenrolled: "audit.client_device_reenrolled",
+  client_device_left: "audit.client_device_left",
   user_create: "audit.user_create",
   user_update: "audit.user_update",
   user_delete: "audit.user_delete",
@@ -188,6 +192,8 @@ function sentenceKey(e: Pick<AuditEntry, "action" | "result">, p: Record<string,
       return p.created === "true" ? variant("added") : { key: base, worded: false };
     case "update_download_sources":
       return p.sources ? { key: base, worded: false } : variant("off");
+    case "client_api_update":
+      return p.enabled === "true" || p.enabled === "false" ? variant(p.enabled === "true" ? "on" : "off") : { key: base, worded: false };
     case "api_token_bulk":
       return variant(p.allow === "true" ? "on" : "off");
     case "user_change_limit":

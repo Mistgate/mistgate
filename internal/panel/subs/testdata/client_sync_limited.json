@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "device_id": "dev_laptop_1",
+  "status": "limited",
+  "sync_every_s": 3600,
+  "brand": {
+    "parts": [
+      "Mist",
+      "gate"
+    ],
+    "accent": "#7c6cff",
+    "logo_svg": "\u003csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 8 8\"\u003e\u003ccircle cx=\"4\" cy=\"4\" r=\"3\"/\u003e\u003c/svg\u003e"
+  },
+  "support_url": "https://support.example.com",
+  "notice": {
+    "id": "9689ca7f4d4fef58382e22e4462b1cd51b4dc67639b11b5cd5714cf919f6e031",
+    "text": "Maintenance on Friday."
+  },
+  "plan": {
+    "expires_unix": 1800000000,
+    "quota_bytes": 10737418240,
+    "used_bytes": 4194304,
+    "quota_reset": "month",
+    "next_reset_unix": 1790000000
+  },
+  "probe": {
+    "intake": true,
+    "v": 1
+  },
+  "debug": {
+    "intake": false
+  },
+  "servers": []
+}

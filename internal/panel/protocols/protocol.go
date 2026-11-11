@@ -3,6 +3,7 @@ package protocols
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -176,14 +177,15 @@ type InboundView struct {
 }
 
 type RenderInput struct {
-	Format      plugin.ClientFormat
-	Settings    json.RawMessage // merged, secrets in place
-	Inbound     InboundView
-	UserID      string
-	UserName    string
-	DeviceID    string
-	Secret      string // decrypted credential secret
-	MaskSecrets bool   // profile preview: render secrets as "••••"
+	Format       plugin.ClientFormat
+	Capabilities []string        // name=value entries from X-Mistgate-Caps; used by FormatMistgate only
+	Settings     json.RawMessage // merged, secrets in place
+	Inbound      InboundView
+	UserID       string
+	UserName     string
+	DeviceID     string
+	Secret       string // decrypted credential secret
+	MaskSecrets  bool   // profile preview: render secrets as "••••"
 
 	// L3 protocols (awg). For FormatMihomo, Fragment.Data is ONE proxy as an element of a YAML list built
 	// from yaml.v3 nodes (never string templates: node and user names are hostile input); the assembler
@@ -194,6 +196,23 @@ type RenderInput struct {
 	InboundPublic json.RawMessage // InboundInit.Public of this inbound
 	DNS           []string        // at most 2 plain IPv4 servers (the pair an AWG client carries)
 	NodeAddr      string          // host clients connect to (Inbound.Node.Address)
+}
+
+// HasCapability reports whether the client announced value for name. Comma-separated values in the header
+// (for example awg=2.0,3.1) are treated as a set; blanks around names and values do not matter ("awg=2.0, 3.1").
+func HasCapability(caps []string, name, value string) bool {
+	for _, cap := range caps {
+		key, values, ok := strings.Cut(cap, "=")
+		if !ok || strings.TrimSpace(key) != name {
+			continue
+		}
+		for _, v := range strings.Split(values, ",") {
+			if strings.TrimSpace(v) == value {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Check is one doctor rule. The runner calls Run for every node that has an inbound of this protocol

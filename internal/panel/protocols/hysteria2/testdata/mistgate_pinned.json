@@ -1,0 +1,15 @@
+{
+  "server": "de2.example.com",
+  "port": 443,
+  "auth": "tok-DEVICE_secret_0123456789abcdefghijklmn",
+  "tls": "pin",
+  "pin_sha256": "abababababababababababababababababababababababababababababababab",
+  "sni": "de1.example.com",
+  "alpn": [
+    "h3"
+  ],
+  "obfs": {
+    "type": "salamander",
+    "password": "gawrgura-pw"
+  }
+}

@@ -16,6 +16,7 @@ import { formatKey, move, ruleFormats, singboxAgents, type Rule, type Settings }
 import { testAgentQuery, useSaveSettings } from "./queries";
 import { DeviceLimitCard } from "./device-limit";
 import { LinkAutoCard } from "./link-auto";
+import { ClientApiCard } from "./client-api";
 import { LinkAwgCard } from "./link-awg";
 import { Lead } from "./ui";
 
@@ -158,6 +159,7 @@ export function RulesTab({ settings }: { settings: Settings }) {
       </div>
       <LinkAutoCard settings={settings} />
       <LinkAwgCard settings={settings} />
+      <ClientApiCard />
       <DeviceLimitCard settings={settings} />
     </div>
   );

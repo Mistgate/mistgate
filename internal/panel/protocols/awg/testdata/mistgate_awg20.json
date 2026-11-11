@@ -1,0 +1,35 @@
+{
+  "version": "2.0",
+  "endpoint": {
+    "host": "203.0.113.10",
+    "port": 43210
+  },
+  "public_key": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8=",
+  "private_key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+  "preshared_key": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8=",
+  "address_v4": "10.66.8.5/32",
+  "allowed_ips": [
+    "0.0.0.0/0",
+    "::/0"
+  ],
+  "dns": [
+    "1.1.1.1",
+    "8.8.8.8"
+  ],
+  "mtu": 1280,
+  "keepalive_s": 25,
+  "params": {
+    "h1": "100000-200000",
+    "h2": "300000-400000",
+    "h3": "500000-600000",
+    "h4": "700000-800000",
+    "i1": "\u003cr 2\u003e\u003cb 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737\u003e",
+    "jc": 5,
+    "jmax": 60,
+    "jmin": 12,
+    "s1": 40,
+    "s2": 60,
+    "s3": 25,
+    "s4": 18
+  }
+}
