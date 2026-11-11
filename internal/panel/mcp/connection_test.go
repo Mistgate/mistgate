@@ -27,6 +27,10 @@ func TestConnectionToolsContent(t *testing.T) {
 		r.Hours[1].LossPermille == nil || *r.Hours[1].LossPermille != 10 || r.Hours[1].Accepted != 5 || r.Hours[1].HellosForeign != 4 {
 		t.Errorf("row: %+v", r)
 	}
+	if len(u.HelloKex) != 1 || u.HelloKex[0].DeviceID != "dev_phone" || u.HelloKex[0].UserName != "alice" || u.HelloKex[0].HelloPQ != 4 ||
+		u.HelloKex[0].HelloClassic != 1 || u.HelloKex[0].HelloUnknown != 2 || strings.Contains(u.HelloKex[0].Client, canaryTK) {
+		t.Errorf("hello counts of the person: %+v", u.HelloKex)
+	}
 	if strings.Contains(u.Rows[1].Profile, canaryTK) {
 		t.Errorf("a profile name carried a token through: %q", u.Rows[1].Profile)
 	}
@@ -73,6 +77,15 @@ func TestConnectionToolsContent(t *testing.T) {
 	if fleet.NowUnix-fleet.SinceUnix != 168*3600 || len(fleet.Nodes) != 2 || fleet.Nodes[0].NodeID != nodeA || !fleet.Nodes[0].Supported ||
 		len(fleet.Nodes[0].Inbounds) != 2 || fleet.Nodes[0].Inbounds[1].AWG == nil || fleet.Nodes[1].Supported || len(fleet.Nodes[1].Inbounds) != 0 {
 		t.Errorf("fleet connections: %+v", fleet)
+	}
+	if k := fleet.HelloKex; k.PQOnly != 7 || k.ClassicOnly != 2 || k.Mixed != 1 || k.UnknownOnly != 3 || len(k.ClassicDevices) != 2 ||
+		k.ClassicDevices[0].DeviceID != "dev_phone" || k.ClassicDevices[0].UserName != "alice" || k.ClassicDevices[0].HelloClassic != 9 ||
+		k.ClassicDevices[0].HelloPQ != 1 || k.ClassicDevices[0].Platform != "ios" || k.ClassicDevices[1].HelloUnknown != 1 ||
+		len(k.NodesWithout) != 2 || k.NodesWithout[0].NodeName != "nl1" || k.NodesWithout[1].NodeName != "" {
+		t.Errorf("fleet hello key exchange: %+v", k)
+	}
+	if strings.Contains(fleetRaw, canaryTK) {
+		t.Errorf("fleet view carried a token from a client string: %s", fleetRaw)
 	}
 	if strings.Contains(fleetRaw, `"clients"`) || strings.Contains(fleetRaw, `"hours"`) {
 		t.Errorf("fleet view includes per-client or hourly detail: %s", fleetRaw)

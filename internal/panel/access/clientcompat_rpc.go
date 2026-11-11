@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/protocols/vless"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -27,6 +29,9 @@ func (s *Service) ClientCompatHandler() (string, http.Handler) {
 const (
 	outdatedPageDefault = 50
 	outdatedPageMax     = 200
+	// outdatedHelloWindow is how far back the measured ClientHellos of a device are summed: 168 hours is all the panel keeps of
+	// them (store.LinkKeepHours), and a week is long enough for a phone that connects now and then to show up.
+	outdatedHelloWindow = store.LinkKeepHours * time.Hour
 )
 
 // compatInternal logs a failure with its code and answers the caller with a bare internal error.
@@ -142,6 +147,42 @@ type CompatDevice struct {
 	UserName    string
 	Verdict     ClientVerdict
 	Fingerprint string // the one that gave the verdict
+	// What the nodes counted of the device's ClientHellos (ListOutdatedDevices fills these in), the class of the counts, and
+	// where the class and the verdict disagree ("worse", "better" or "").
+	Hello    store.HelloKexSums
+	Actual   adminv1.ClientCompatActual
+	Mismatch string
+}
+
+// helloActual is the class of a device's hello counts: unreadable hellos tell nothing, so a device with only those has NONE.
+func helloActual(h store.HelloKexSums) adminv1.ClientCompatActual {
+	switch {
+	case h.PQ > 0 && h.Classic > 0:
+		return adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_MIXED
+	case h.Classic > 0:
+		return adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_CLASSIC
+	case h.PQ > 0:
+		return adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_PQ
+	}
+	return adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_NONE
+}
+
+// tableMismatch says where the nodes saw something the table did not predict: "worse" (the table says ok, the device sent classic
+// hellos) or "better" (the table says it is not ok, every hello had the post-quantum share). Mixed hellos next to a state that is
+// not ok agree with the table; a device nobody measured has no mismatch.
+func tableMismatch(state string, a adminv1.ClientCompatActual) string {
+	switch {
+	case state == ClientOK && (a == adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_CLASSIC || a == adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_MIXED):
+		return "worse"
+	case state != ClientOK && a == adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_PQ:
+		return "better"
+	}
+	return ""
+}
+
+var compatActuals = []adminv1.ClientCompatActual{
+	adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_NONE, adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_PQ,
+	adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_CLASSIC, adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_MIXED,
 }
 
 // realityFingerprint is the fingerprint of a VLESS REALITY profile ("" for anything else, a profile the panel cannot read too).
@@ -161,20 +202,21 @@ func realityFingerprint(f store.AccessInboundFull) string {
 
 // CompatDevices lists the devices that receive a VLESS REALITY server now (userID restricts it to one person), each judged by the
 // table against every fingerprint its person's REALITY profiles use; the worst verdict stands. The fingerprints in use are
-// returned too, sorted. A device is on the list when it is a live, not blocked link device with a VLESS credential and its
+// returned too, sorted, and so are the names of the nodes with a live REALITY inbound whose agent does not count hellos
+// (vless-hello-kex/1). A device is on the list when it is a live, not blocked link device with a VLESS credential and its
 // person is active and can use a live inbound of a REALITY profile (the subscription's own rule, usable).
-func (s *Service) CompatDevices(ctx context.Context, userID string) ([]CompatDevice, []string, error) {
+func (s *Service) CompatDevices(ctx context.Context, userID string) (devices []CompatDevice, fingerprints, nodesWithoutHello []string, err error) {
 	table, err := s.clientTable(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	a := s.st.Access()
 	devs, err := a.ClientCompatDevices(ctx, userID)
 	if err != nil {
-		return nil, nil, s.compatInternal("client_compat_devices_failed", err)
+		return nil, nil, nil, s.compatInternal("client_compat_devices_failed", err)
 	}
 	if len(devs) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	var ids []string
 	for _, d := range devs {
@@ -184,15 +226,15 @@ func (s *Service) CompatDevices(ctx context.Context, userID string) ([]CompatDev
 	}
 	users, err := a.UsersByIDs(ctx, ids)
 	if err != nil {
-		return nil, nil, s.compatInternal("client_compat_users_failed", err)
+		return nil, nil, nil, s.compatInternal("client_compat_users_failed", err)
 	}
 	groups, err := a.Groups(ctx)
 	if err != nil {
-		return nil, nil, s.compatInternal("client_compat_groups_failed", err)
+		return nil, nil, nil, s.compatInternal("client_compat_groups_failed", err)
 	}
 	full, err := a.InboundsFull(ctx, "")
 	if err != nil {
-		return nil, nil, s.compatInternal("client_compat_inbounds_failed", err)
+		return nil, nil, nil, s.compatInternal("client_compat_inbounds_failed", err)
 	}
 	var reality []store.AccessInboundFull
 	fpOf := map[string]string{}
@@ -200,6 +242,9 @@ func (s *Service) CompatDevices(ctx context.Context, userID string) ([]CompatDev
 		if fp := realityFingerprint(f); fp != "" && liveInbound(f) {
 			reality = append(reality, f)
 			fpOf[f.Inbound.ID] = fp
+			if name := f.Node.Name; !slices.Contains(f.Node.AgentCaps, connectiondiag.VLESSHelloKexCapability) && !slices.Contains(nodesWithoutHello, name) {
+				nodesWithoutHello = append(nodesWithoutHello, name)
+			}
 		}
 	}
 	groupOf := map[string]store.AccessGroup{}
@@ -251,7 +296,8 @@ func (s *Service) CompatDevices(ctx context.Context, userID string) ([]CompatDev
 		}
 		out = append(out, best)
 	}
-	return out, inUse, nil
+	slices.Sort(nodesWithoutHello)
+	return out, inUse, nodesWithoutHello, nil
 }
 
 var compatStates = []string{ClientOK, ClientBelow, ClientUnsupported, ClientUnknown}
@@ -288,25 +334,61 @@ func (s *Service) ListOutdatedDevices(ctx context.Context, req *connect.Request[
 	}
 	// ponytail: every REALITY device is loaded and judged per call (a few thousand rows of a few words); a cache or SQL paging
 	// when a panel with tens of thousands of devices makes the screen slow.
-	all, fps, err := s.CompatDevices(ctx, "")
+	all, fps, withoutHello, err := s.CompatDevices(ctx, "")
 	if err != nil {
 		return nil, err
 	}
+	switch m.Actual {
+	case adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_UNSPECIFIED, adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_NONE, adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_PQ,
+		adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_CLASSIC, adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_MIXED:
+	default:
+		return nil, invalid("unknown actual")
+	}
+	// ponytail: the measured counts of every device that has any come in one small statement (ids and sums); a statement with the ids
+	// of the page would not do, because the counts of the summary and the filter by class need all of them.
+	sums := map[string]store.HelloKexSums{}
+	if len(all) > 0 {
+		if sums, err = s.st.DevicesHelloKex(ctx, s.now().Add(-outdatedHelloWindow)); err != nil {
+			return nil, s.compatInternal("client_compat_hello_failed", err)
+		}
+	}
 	devices, people := map[string]uint32{}, map[string]map[string]bool{}
-	for _, d := range all {
+	actDevices, actPeople := map[adminv1.ClientCompatActual]uint32{}, map[adminv1.ClientCompatActual]map[string]bool{}
+	var worse, better uint32
+	for i := range all {
+		d := &all[i]
+		d.Hello = sums[d.ID]
+		d.Actual = helloActual(d.Hello)
+		d.Mismatch = tableMismatch(d.Verdict.State, d.Actual)
+		switch d.Mismatch {
+		case "worse":
+			worse++
+		case "better":
+			better++
+		}
 		devices[d.Verdict.State]++
 		if people[d.Verdict.State] == nil {
 			people[d.Verdict.State] = map[string]bool{}
 		}
 		people[d.Verdict.State][d.UserID] = true
+		actDevices[d.Actual]++
+		if actPeople[d.Actual] == nil {
+			actPeople[d.Actual] = map[string]bool{}
+		}
+		actPeople[d.Actual][d.UserID] = true
 	}
-	resp := &adminv1.ListOutdatedDevicesResponse{Fingerprints: fps}
+	resp := &adminv1.ListOutdatedDevicesResponse{Fingerprints: fps, HelloWindowHours: uint32(outdatedHelloWindow / time.Hour), MismatchWorse: worse, MismatchBetter: better, HelloKexNodesWithout: withoutHello}
 	for _, st := range compatStates {
 		resp.Counts = append(resp.Counts, &adminv1.ClientCompatCount{State: compatStateProto(st), Devices: devices[st], People: uint32(len(people[st]))})
 	}
+	for _, a := range compatActuals {
+		resp.ActualCounts = append(resp.ActualCounts, &adminv1.ClientCompatActualCount{Actual: a, Devices: actDevices[a], People: uint32(len(actPeople[a]))})
+	}
 	var rows []CompatDevice
 	for _, d := range all {
-		if (want == "" && d.Verdict.State != ClientOK || want != "" && d.Verdict.State == want) && (m.UserId == "" || d.UserID == m.UserId) {
+		// without a state asked for, the default list is what needs a look; a class asked for shows the devices of every state
+		inState := d.Verdict.State == want || want == "" && (m.Actual != adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_UNSPECIFIED || d.Verdict.State != ClientOK)
+		if inState && (m.Actual == adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_UNSPECIFIED || d.Actual == m.Actual) && (m.UserId == "" || d.UserID == m.UserId) {
 			rows = append(rows, d)
 		}
 	}
@@ -338,6 +420,7 @@ func (s *Service) ListOutdatedDevices(ctx context.Context, req *connect.Request[
 			DeviceId: d.ID, UserId: d.UserID, UserName: d.UserName, Client: d.Client, Platform: d.Platform, Model: d.Model, OsVersion: d.OSVersion,
 			Shared: d.Shared, LastSeenUnix: last, State: compatStateProto(d.Verdict.State), Reason: d.Verdict.Reason,
 			NeedVersion: d.Verdict.Need, Fingerprint: d.Fingerprint, AppTitle: d.Verdict.Title,
+			Actual: d.Actual, HelloPq: clamp32(d.Hello.PQ), HelloClassic: clamp32(d.Hello.Classic), HelloUnknown: clamp32(d.Hello.Unknown), TableMismatch: d.Mismatch,
 		})
 	}
 	return connect.NewResponse(resp), nil

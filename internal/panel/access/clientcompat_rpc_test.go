@@ -19,6 +19,7 @@ import (
 type compatEnv struct {
 	*env
 	vless map[string]string // user name -> id
+	seq   uint64            // the stats batches of hello
 }
 
 // fetchWith lets an app with a device ID fetch the person's subscription once: the device and its credentials are made.

@@ -69,7 +69,7 @@ func linkRowEmpty(row *pb.LinkCounters) bool {
 	return row.Connects|row.Rejects|row.Drops|row.Stalls|row.OnlineS|row.UnknownKeys|row.Hellos|row.Handshakes|row.ClientCloses|
 		row.Freezes|row.Quiet|row.Accepted|row.HellosForeign|row.RttSamples|row.HsUnfinished|row.TlsAlertsSent|row.TlsAlertsRecv|
 		row.TlsCertRefused|row.RealityFallback|row.AuthFailed|row.TcpStalls|row.TcpStalls_16K|row.Initiations|row.Responses|
-		row.ResponsesUnmatched == 0 && row.RttMsSum|row.PktsSent|row.PktsLost == 0
+		row.ResponsesUnmatched|row.HelloPq|row.HelloClassic|row.HelloUnknown == 0 && row.RttMsSum|row.PktsSent|row.PktsLost == 0
 }
 
 // collectLoop produces one StatsBatch per stats interval, even when it is empty (it doubles as the
@@ -174,7 +174,8 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 	}
 	for _, stat := range stats {
 		key := linkCounterKey{credID: stat.CredID, inboundID: stat.InboundID}
-		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.ClientCloses|stat.Freezes|stat.Quiet|stat.TCPStalls|stat.TCPStalls16K != 0 {
+		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.ClientCloses|stat.Freezes|stat.Quiet|stat.TCPStalls|stat.TCPStalls16K|
+			stat.HelloPQ|stat.HelloClassic|stat.HelloUnknown != 0 {
 			row := rowFor(key)
 			row.Connects += stat.Connects
 			row.Rejects += stat.Rejects
@@ -186,6 +187,9 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 			row.Quiet += stat.Quiet
 			row.TcpStalls += stat.TCPStalls
 			row.TcpStalls_16K += stat.TCPStalls16K
+			row.HelloPq += stat.HelloPQ
+			row.HelloClassic += stat.HelloClassic
+			row.HelloUnknown += stat.HelloUnknown
 		}
 		if hasLinkVolume(stat) {
 			a.linkCounterMu.Lock()

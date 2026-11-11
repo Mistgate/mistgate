@@ -16,6 +16,13 @@ package mistgate.admin.v1;
 // use a VLESS REALITY server now (the group holds the profile, the node and inbound are live, the person is not disabled
 // or expired). Its state is the worst one among the fingerprints of those profiles.
 //
+// WHAT THE NODES SAW. Next to the verdict of the table every device carries what the nodes measured: the ClientHellos it sent over
+// VLESS REALITY in the last 168 hours (hello_window_hours), counted by agents with "vless-hello-kex/1" (hello_pq: an
+// X25519MLKEM768 share before any X25519 share, hello_classic: a hello without it, hello_unknown: could not be read). actual is
+// the class of those counts. The table says what the panel KNOWS about the app; actual says what the nodes SAW; where the two
+// disagree (table_mismatch) the table is wrong or too careful. Counts come from nodes that are not retired, and a device on a
+// node whose agent does not count has none.
+//
 // WHO MAY CALL WHAT. GetClientCompat is a read for every role. ListOutdatedDevices is a read for every role and API tokens
 // (the MCP tool outdated_devices). UpdateClientCompat is OWNER-ONLY and needs a step-up; not open to tokens or MCP.
 service ClientCompatService {
@@ -38,6 +45,19 @@ enum ClientCompatState {
   CLIENT_COMPAT_STATE_UNSUPPORTED = 3;
   // The table cannot say: an app it does not know, a version the app did not report, or no known good version.
   CLIENT_COMPAT_STATE_UNKNOWN = 4;
+}
+
+// What the nodes saw of a device's ClientHellos. In a request: UNSPECIFIED = no filter.
+enum ClientCompatActual {
+  CLIENT_COMPAT_ACTUAL_UNSPECIFIED = 0;
+  // Nothing readable was counted: no hello in the window (or only ones that could not be read), or no node that counts.
+  CLIENT_COMPAT_ACTUAL_NONE = 1;
+  // Every counted hello had the post-quantum share (hello_pq > 0, hello_classic = 0).
+  CLIENT_COMPAT_ACTUAL_PQ = 2;
+  // Every counted hello lacked it (hello_classic > 0, hello_pq = 0): a strict profile would turn the device away.
+  CLIENT_COMPAT_ACTUAL_CLASSIC = 3;
+  // Both kinds (an app that switches fingerprints, or two apps on one key).
+  CLIENT_COMPAT_ACTUAL_MIXED = 4;
 }
 
 message ClientCompatRule {
@@ -85,6 +105,9 @@ message ListOutdatedDevicesRequest {
   // Default 50, at most 200.
   uint32 page_size = 3;
   uint32 offset = 4;
+  // Only the devices with this measured class. UNSPECIFIED = all. Chosen together with an UNSPECIFIED state it takes in the
+  // devices of every state, ok included (the list "every state but ok" is only the default when nothing else is asked).
+  ClientCompatActual actual = 5;
 }
 
 message OutdatedDevice {
@@ -109,10 +132,27 @@ message OutdatedDevice {
   string fingerprint = 13;
   // The name of the app's family for the UI ("Happ"), empty for an unknown app.
   string app_title = 14;
+  // What the nodes saw over hello_window_hours (see WHAT THE NODES SAW); actual is never UNSPECIFIED here.
+  ClientCompatActual actual = 15;
+  uint32 hello_pq = 16;
+  uint32 hello_classic = 17;
+  uint32 hello_unknown = 18;
+  // "worse" when the table says ok but the nodes saw classic hellos (actual CLASSIC or MIXED): the table is too optimistic.
+  // "better" when the table says below minimum, unsupported or unknown but every hello had the share (actual PQ): the table is too
+  // careful. Empty when they agree or nothing was measured.
+  string table_mismatch = 19;
 }
 
 message ClientCompatCount {
   ClientCompatState state = 1;
+  uint32 devices = 2;
+  // Different people among those devices.
+  uint32 people = 3;
+}
+
+message ClientCompatActualCount {
+  // NONE, PQ, CLASSIC or MIXED.
+  ClientCompatActual actual = 1;
   uint32 devices = 2;
   // Different people among those devices.
   uint32 people = 3;
@@ -127,4 +167,14 @@ message ListOutdatedDevicesResponse {
   repeated ClientCompatCount counts = 3;
   // The fingerprints of the REALITY profiles in use, without repeats: what the states were judged against.
   repeated string fingerprints = 4;
+  // The measured classes (NONE, PQ, CLASSIC, MIXED, in this order), over all devices that receive REALITY, whatever the filters.
+  repeated ClientCompatActualCount actual_counts = 5;
+  // The window the hello counts cover, in hours (168: all the panel keeps).
+  uint32 hello_window_hours = 6;
+  // Devices over all of them whose measured class disagrees with the table, by the direction of table_mismatch.
+  uint32 mismatch_worse = 7;
+  uint32 mismatch_better = 8;
+  // Names of the nodes that serve a live VLESS REALITY inbound and whose agent does not list "vless-hello-kex/1": the devices on
+  // them are missing from the counts until the agent is updated. Sorted.
+  repeated string hello_kex_nodes_without = 9;
 }

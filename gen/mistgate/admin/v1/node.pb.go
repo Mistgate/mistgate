@@ -3640,9 +3640,23 @@ type GetFleetConnectionsResponse struct {
 	SinceUnix int64                  `protobuf:"varint,1,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
 	NowUnix   int64                  `protobuf:"varint,2,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
 	// Every node that is not retired, by name.
-	Nodes         []*NodeConnections `protobuf:"bytes,3,rep,name=nodes,proto3" json:"nodes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Nodes []*NodeConnections `protobuf:"bytes,3,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	// The key exchange of the ClientHellos that REALITY devices sent over the window (agents with "vless-hello-kex/1"), counted on
+	// the nodes on the current core. A device is pq when it sent only hellos with an X25519MLKEM768 share before any X25519 share
+	// (the condition a strict REALITY library demands), classic when it sent only hellos without it, mixed when it sent both
+	// (an app that switches fingerprints, or two apps on one key), unknown when none of its hellos could be read. The devices
+	// are counted once however many nodes and inbounds they used.
+	HelloKexPqOnly      uint32 `protobuf:"varint,4,opt,name=hello_kex_pq_only,json=helloKexPqOnly,proto3" json:"hello_kex_pq_only,omitempty"`
+	HelloKexClassicOnly uint32 `protobuf:"varint,5,opt,name=hello_kex_classic_only,json=helloKexClassicOnly,proto3" json:"hello_kex_classic_only,omitempty"`
+	HelloKexMixed       uint32 `protobuf:"varint,6,opt,name=hello_kex_mixed,json=helloKexMixed,proto3" json:"hello_kex_mixed,omitempty"`
+	HelloKexUnknownOnly uint32 `protobuf:"varint,7,opt,name=hello_kex_unknown_only,json=helloKexUnknownOnly,proto3" json:"hello_kex_unknown_only,omitempty"`
+	// The devices that sent at least one classic hello, most classic hellos first, at most 50.
+	HelloKexClassic []*HelloKexDevice `protobuf:"bytes,8,rep,name=hello_kex_classic,json=helloKexClassic,proto3" json:"hello_kex_classic,omitempty"`
+	// Nodes that serve a VLESS REALITY inbound whose agent does not list "vless-hello-kex/1": their devices are missing from the
+	// counts above.
+	HelloKexNodesWithout []string `protobuf:"bytes,9,rep,name=hello_kex_nodes_without,json=helloKexNodesWithout,proto3" json:"hello_kex_nodes_without,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *GetFleetConnectionsResponse) Reset() {
@@ -3692,6 +3706,48 @@ func (x *GetFleetConnectionsResponse) GetNowUnix() int64 {
 func (x *GetFleetConnectionsResponse) GetNodes() []*NodeConnections {
 	if x != nil {
 		return x.Nodes
+	}
+	return nil
+}
+
+func (x *GetFleetConnectionsResponse) GetHelloKexPqOnly() uint32 {
+	if x != nil {
+		return x.HelloKexPqOnly
+	}
+	return 0
+}
+
+func (x *GetFleetConnectionsResponse) GetHelloKexClassicOnly() uint32 {
+	if x != nil {
+		return x.HelloKexClassicOnly
+	}
+	return 0
+}
+
+func (x *GetFleetConnectionsResponse) GetHelloKexMixed() uint32 {
+	if x != nil {
+		return x.HelloKexMixed
+	}
+	return 0
+}
+
+func (x *GetFleetConnectionsResponse) GetHelloKexUnknownOnly() uint32 {
+	if x != nil {
+		return x.HelloKexUnknownOnly
+	}
+	return 0
+}
+
+func (x *GetFleetConnectionsResponse) GetHelloKexClassic() []*HelloKexDevice {
+	if x != nil {
+		return x.HelloKexClassic
+	}
+	return nil
+}
+
+func (x *GetFleetConnectionsResponse) GetHelloKexNodesWithout() []string {
+	if x != nil {
+		return x.HelloKexNodesWithout
 	}
 	return nil
 }
@@ -6729,12 +6785,18 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12!\n" +
 	"\fcountry_code\x18\x03 \x01(\tR\vcountryCode\x12\x1c\n" +
 	"\tsupported\x18\x04 \x01(\bR\tsupported\x12A\n" +
-	"\binbounds\x18\x05 \x03(\v2%.mistgate.admin.v1.InboundConnectionsR\binbounds\"\x99\x01\n" +
+	"\binbounds\x18\x05 \x03(\v2%.mistgate.admin.v1.InboundConnectionsR\binbounds\"\xdc\x03\n" +
 	"\x1bGetFleetConnectionsResponse\x12!\n" +
 	"\n" +
 	"since_unix\x18\x01 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +
 	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x128\n" +
-	"\x05nodes\x18\x03 \x03(\v2\".mistgate.admin.v1.NodeConnectionsR\x05nodes\"C\n" +
+	"\x05nodes\x18\x03 \x03(\v2\".mistgate.admin.v1.NodeConnectionsR\x05nodes\x12)\n" +
+	"\x11hello_kex_pq_only\x18\x04 \x01(\rR\x0ehelloKexPqOnly\x123\n" +
+	"\x16hello_kex_classic_only\x18\x05 \x01(\rR\x13helloKexClassicOnly\x12&\n" +
+	"\x0fhello_kex_mixed\x18\x06 \x01(\rR\rhelloKexMixed\x123\n" +
+	"\x16hello_kex_unknown_only\x18\a \x01(\rR\x13helloKexUnknownOnly\x12M\n" +
+	"\x11hello_kex_classic\x18\b \x03(\v2!.mistgate.admin.v1.HelloKexDeviceR\x0fhelloKexClassic\x125\n" +
+	"\x17hello_kex_nodes_without\x18\t \x03(\tR\x14helloKexNodesWithout\"C\n" +
 	"\x12GetNetworksRequest\x12\x14\n" +
 	"\x05hours\x18\x01 \x01(\rR\x05hours\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\"F\n" +
@@ -7167,8 +7229,9 @@ var file_mistgate_admin_v1_node_proto_goTypes = []any{
 	(*Inbound)(nil),                     // 78: mistgate.admin.v1.Inbound
 	(*PortCheck)(nil),                   // 79: mistgate.admin.v1.PortCheck
 	(*TcpCheck)(nil),                    // 80: mistgate.admin.v1.TcpCheck
-	(EventSeverity)(0),                  // 81: mistgate.admin.v1.EventSeverity
-	(*LinkHour)(nil),                    // 82: mistgate.admin.v1.LinkHour
+	(*HelloKexDevice)(nil),              // 81: mistgate.admin.v1.HelloKexDevice
+	(EventSeverity)(0),                  // 82: mistgate.admin.v1.EventSeverity
+	(*LinkHour)(nil),                    // 83: mistgate.admin.v1.LinkHour
 }
 var file_mistgate_admin_v1_node_proto_depIdxs = []int32{
 	74, // 0: mistgate.admin.v1.Node.status:type_name -> mistgate.admin.v1.NodeStatus
@@ -7208,74 +7271,75 @@ var file_mistgate_admin_v1_node_proto_depIdxs = []int32{
 	39, // 34: mistgate.admin.v1.UpdateIpv6EntryResponse.check:type_name -> mistgate.admin.v1.CheckIpv6Response
 	55, // 35: mistgate.admin.v1.NodeConnections.inbounds:type_name -> mistgate.admin.v1.InboundConnections
 	46, // 36: mistgate.admin.v1.GetFleetConnectionsResponse.nodes:type_name -> mistgate.admin.v1.NodeConnections
-	50, // 37: mistgate.admin.v1.GetNetworksResponse.rows:type_name -> mistgate.admin.v1.NetworkHourRow
-	49, // 38: mistgate.admin.v1.GetNetworksResponse.nodes_without_nets:type_name -> mistgate.admin.v1.NetworkNodeRef
-	49, // 39: mistgate.admin.v1.GetNetworksResponse.nodes_without_table:type_name -> mistgate.admin.v1.NetworkNodeRef
-	81, // 40: mistgate.admin.v1.GetNodeJournalRequest.min_level:type_name -> mistgate.admin.v1.EventSeverity
-	81, // 41: mistgate.admin.v1.NodeJournalEntry.level:type_name -> mistgate.admin.v1.EventSeverity
-	73, // 42: mistgate.admin.v1.NodeJournalEntry.attrs:type_name -> mistgate.admin.v1.NodeJournalEntry.AttrsEntry
-	53, // 43: mistgate.admin.v1.GetNodeJournalResponse.entries:type_name -> mistgate.admin.v1.NodeJournalEntry
-	82, // 44: mistgate.admin.v1.InboundConnections.hours:type_name -> mistgate.admin.v1.LinkHour
-	56, // 45: mistgate.admin.v1.InboundConnections.clients:type_name -> mistgate.admin.v1.ClientConnections
-	57, // 46: mistgate.admin.v1.InboundConnections.awg:type_name -> mistgate.admin.v1.AwgPackets
-	55, // 47: mistgate.admin.v1.GetNodeConnectionsResponse.inbounds:type_name -> mistgate.admin.v1.InboundConnections
-	3,  // 48: mistgate.admin.v1.StreamLogsRequest.min_level:type_name -> mistgate.admin.v1.LogLevel
-	3,  // 49: mistgate.admin.v1.LogLine.level:type_name -> mistgate.admin.v1.LogLevel
-	60, // 50: mistgate.admin.v1.StreamLogsResponse.lines:type_name -> mistgate.admin.v1.LogLine
-	63, // 51: mistgate.admin.v1.NodeRuntime.inbounds:type_name -> mistgate.admin.v1.InboundRuntime
-	64, // 52: mistgate.admin.v1.GetNodeRuntimeResponse.nodes:type_name -> mistgate.admin.v1.NodeRuntime
-	67, // 53: mistgate.admin.v1.GetNodeHostHistoryResponse.hours:type_name -> mistgate.admin.v1.HostHour
-	70, // 54: mistgate.admin.v1.GetPathLossResponse.rows:type_name -> mistgate.admin.v1.PathLossRow
-	71, // 55: mistgate.admin.v1.GetPathLossResponse.targets:type_name -> mistgate.admin.v1.PathLossTarget
-	8,  // 56: mistgate.admin.v1.NodeService.ListNodes:input_type -> mistgate.admin.v1.ListNodesRequest
-	10, // 57: mistgate.admin.v1.NodeService.GetNode:input_type -> mistgate.admin.v1.GetNodeRequest
-	18, // 58: mistgate.admin.v1.NodeService.CreateEnrollment:input_type -> mistgate.admin.v1.CreateEnrollmentRequest
-	20, // 59: mistgate.admin.v1.NodeService.UpdateNode:input_type -> mistgate.admin.v1.UpdateNodeRequest
-	23, // 60: mistgate.admin.v1.NodeService.SetNodeDecoyMode:input_type -> mistgate.admin.v1.SetNodeDecoyModeRequest
-	25, // 61: mistgate.admin.v1.NodeService.UploadNodeDecoy:input_type -> mistgate.admin.v1.UploadNodeDecoyRequest
-	27, // 62: mistgate.admin.v1.NodeService.SetNodesDecoyMode:input_type -> mistgate.admin.v1.SetNodesDecoyModeRequest
-	29, // 63: mistgate.admin.v1.NodeService.RestartInbounds:input_type -> mistgate.admin.v1.RestartInboundsRequest
-	31, // 64: mistgate.admin.v1.NodeService.PrepareAwgKernel:input_type -> mistgate.admin.v1.PrepareAwgKernelRequest
-	33, // 65: mistgate.admin.v1.NodeService.MeasureBandwidth:input_type -> mistgate.admin.v1.MeasureBandwidthRequest
-	35, // 66: mistgate.admin.v1.NodeService.CheckPorts:input_type -> mistgate.admin.v1.CheckPortsRequest
-	37, // 67: mistgate.admin.v1.NodeService.CheckIpv6:input_type -> mistgate.admin.v1.CheckIpv6Request
-	40, // 68: mistgate.admin.v1.NodeService.UpdateIpv6Entry:input_type -> mistgate.admin.v1.UpdateIpv6EntryRequest
-	42, // 69: mistgate.admin.v1.NodeService.RetireNode:input_type -> mistgate.admin.v1.RetireNodeRequest
-	59, // 70: mistgate.admin.v1.NodeService.StreamLogs:input_type -> mistgate.admin.v1.StreamLogsRequest
-	44, // 71: mistgate.admin.v1.NodeService.GetNodeConnections:input_type -> mistgate.admin.v1.GetNodeConnectionsRequest
-	52, // 72: mistgate.admin.v1.NodeService.GetNodeJournal:input_type -> mistgate.admin.v1.GetNodeJournalRequest
-	45, // 73: mistgate.admin.v1.NodeService.GetFleetConnections:input_type -> mistgate.admin.v1.GetFleetConnectionsRequest
-	48, // 74: mistgate.admin.v1.NodeService.GetNetworks:input_type -> mistgate.admin.v1.GetNetworksRequest
-	62, // 75: mistgate.admin.v1.NodeService.GetNodeRuntime:input_type -> mistgate.admin.v1.GetNodeRuntimeRequest
-	66, // 76: mistgate.admin.v1.NodeService.GetNodeHostHistory:input_type -> mistgate.admin.v1.GetNodeHostHistoryRequest
-	69, // 77: mistgate.admin.v1.NodeService.GetPathLoss:input_type -> mistgate.admin.v1.GetPathLossRequest
-	9,  // 78: mistgate.admin.v1.NodeService.ListNodes:output_type -> mistgate.admin.v1.ListNodesResponse
-	17, // 79: mistgate.admin.v1.NodeService.GetNode:output_type -> mistgate.admin.v1.GetNodeResponse
-	19, // 80: mistgate.admin.v1.NodeService.CreateEnrollment:output_type -> mistgate.admin.v1.CreateEnrollmentResponse
-	22, // 81: mistgate.admin.v1.NodeService.UpdateNode:output_type -> mistgate.admin.v1.UpdateNodeResponse
-	24, // 82: mistgate.admin.v1.NodeService.SetNodeDecoyMode:output_type -> mistgate.admin.v1.SetNodeDecoyModeResponse
-	26, // 83: mistgate.admin.v1.NodeService.UploadNodeDecoy:output_type -> mistgate.admin.v1.UploadNodeDecoyResponse
-	28, // 84: mistgate.admin.v1.NodeService.SetNodesDecoyMode:output_type -> mistgate.admin.v1.SetNodesDecoyModeResponse
-	30, // 85: mistgate.admin.v1.NodeService.RestartInbounds:output_type -> mistgate.admin.v1.RestartInboundsResponse
-	32, // 86: mistgate.admin.v1.NodeService.PrepareAwgKernel:output_type -> mistgate.admin.v1.PrepareAwgKernelResponse
-	34, // 87: mistgate.admin.v1.NodeService.MeasureBandwidth:output_type -> mistgate.admin.v1.MeasureBandwidthResponse
-	36, // 88: mistgate.admin.v1.NodeService.CheckPorts:output_type -> mistgate.admin.v1.CheckPortsResponse
-	39, // 89: mistgate.admin.v1.NodeService.CheckIpv6:output_type -> mistgate.admin.v1.CheckIpv6Response
-	41, // 90: mistgate.admin.v1.NodeService.UpdateIpv6Entry:output_type -> mistgate.admin.v1.UpdateIpv6EntryResponse
-	43, // 91: mistgate.admin.v1.NodeService.RetireNode:output_type -> mistgate.admin.v1.RetireNodeResponse
-	61, // 92: mistgate.admin.v1.NodeService.StreamLogs:output_type -> mistgate.admin.v1.StreamLogsResponse
-	58, // 93: mistgate.admin.v1.NodeService.GetNodeConnections:output_type -> mistgate.admin.v1.GetNodeConnectionsResponse
-	54, // 94: mistgate.admin.v1.NodeService.GetNodeJournal:output_type -> mistgate.admin.v1.GetNodeJournalResponse
-	47, // 95: mistgate.admin.v1.NodeService.GetFleetConnections:output_type -> mistgate.admin.v1.GetFleetConnectionsResponse
-	51, // 96: mistgate.admin.v1.NodeService.GetNetworks:output_type -> mistgate.admin.v1.GetNetworksResponse
-	65, // 97: mistgate.admin.v1.NodeService.GetNodeRuntime:output_type -> mistgate.admin.v1.GetNodeRuntimeResponse
-	68, // 98: mistgate.admin.v1.NodeService.GetNodeHostHistory:output_type -> mistgate.admin.v1.GetNodeHostHistoryResponse
-	72, // 99: mistgate.admin.v1.NodeService.GetPathLoss:output_type -> mistgate.admin.v1.GetPathLossResponse
-	78, // [78:100] is the sub-list for method output_type
-	56, // [56:78] is the sub-list for method input_type
-	56, // [56:56] is the sub-list for extension type_name
-	56, // [56:56] is the sub-list for extension extendee
-	0,  // [0:56] is the sub-list for field type_name
+	81, // 37: mistgate.admin.v1.GetFleetConnectionsResponse.hello_kex_classic:type_name -> mistgate.admin.v1.HelloKexDevice
+	50, // 38: mistgate.admin.v1.GetNetworksResponse.rows:type_name -> mistgate.admin.v1.NetworkHourRow
+	49, // 39: mistgate.admin.v1.GetNetworksResponse.nodes_without_nets:type_name -> mistgate.admin.v1.NetworkNodeRef
+	49, // 40: mistgate.admin.v1.GetNetworksResponse.nodes_without_table:type_name -> mistgate.admin.v1.NetworkNodeRef
+	82, // 41: mistgate.admin.v1.GetNodeJournalRequest.min_level:type_name -> mistgate.admin.v1.EventSeverity
+	82, // 42: mistgate.admin.v1.NodeJournalEntry.level:type_name -> mistgate.admin.v1.EventSeverity
+	73, // 43: mistgate.admin.v1.NodeJournalEntry.attrs:type_name -> mistgate.admin.v1.NodeJournalEntry.AttrsEntry
+	53, // 44: mistgate.admin.v1.GetNodeJournalResponse.entries:type_name -> mistgate.admin.v1.NodeJournalEntry
+	83, // 45: mistgate.admin.v1.InboundConnections.hours:type_name -> mistgate.admin.v1.LinkHour
+	56, // 46: mistgate.admin.v1.InboundConnections.clients:type_name -> mistgate.admin.v1.ClientConnections
+	57, // 47: mistgate.admin.v1.InboundConnections.awg:type_name -> mistgate.admin.v1.AwgPackets
+	55, // 48: mistgate.admin.v1.GetNodeConnectionsResponse.inbounds:type_name -> mistgate.admin.v1.InboundConnections
+	3,  // 49: mistgate.admin.v1.StreamLogsRequest.min_level:type_name -> mistgate.admin.v1.LogLevel
+	3,  // 50: mistgate.admin.v1.LogLine.level:type_name -> mistgate.admin.v1.LogLevel
+	60, // 51: mistgate.admin.v1.StreamLogsResponse.lines:type_name -> mistgate.admin.v1.LogLine
+	63, // 52: mistgate.admin.v1.NodeRuntime.inbounds:type_name -> mistgate.admin.v1.InboundRuntime
+	64, // 53: mistgate.admin.v1.GetNodeRuntimeResponse.nodes:type_name -> mistgate.admin.v1.NodeRuntime
+	67, // 54: mistgate.admin.v1.GetNodeHostHistoryResponse.hours:type_name -> mistgate.admin.v1.HostHour
+	70, // 55: mistgate.admin.v1.GetPathLossResponse.rows:type_name -> mistgate.admin.v1.PathLossRow
+	71, // 56: mistgate.admin.v1.GetPathLossResponse.targets:type_name -> mistgate.admin.v1.PathLossTarget
+	8,  // 57: mistgate.admin.v1.NodeService.ListNodes:input_type -> mistgate.admin.v1.ListNodesRequest
+	10, // 58: mistgate.admin.v1.NodeService.GetNode:input_type -> mistgate.admin.v1.GetNodeRequest
+	18, // 59: mistgate.admin.v1.NodeService.CreateEnrollment:input_type -> mistgate.admin.v1.CreateEnrollmentRequest
+	20, // 60: mistgate.admin.v1.NodeService.UpdateNode:input_type -> mistgate.admin.v1.UpdateNodeRequest
+	23, // 61: mistgate.admin.v1.NodeService.SetNodeDecoyMode:input_type -> mistgate.admin.v1.SetNodeDecoyModeRequest
+	25, // 62: mistgate.admin.v1.NodeService.UploadNodeDecoy:input_type -> mistgate.admin.v1.UploadNodeDecoyRequest
+	27, // 63: mistgate.admin.v1.NodeService.SetNodesDecoyMode:input_type -> mistgate.admin.v1.SetNodesDecoyModeRequest
+	29, // 64: mistgate.admin.v1.NodeService.RestartInbounds:input_type -> mistgate.admin.v1.RestartInboundsRequest
+	31, // 65: mistgate.admin.v1.NodeService.PrepareAwgKernel:input_type -> mistgate.admin.v1.PrepareAwgKernelRequest
+	33, // 66: mistgate.admin.v1.NodeService.MeasureBandwidth:input_type -> mistgate.admin.v1.MeasureBandwidthRequest
+	35, // 67: mistgate.admin.v1.NodeService.CheckPorts:input_type -> mistgate.admin.v1.CheckPortsRequest
+	37, // 68: mistgate.admin.v1.NodeService.CheckIpv6:input_type -> mistgate.admin.v1.CheckIpv6Request
+	40, // 69: mistgate.admin.v1.NodeService.UpdateIpv6Entry:input_type -> mistgate.admin.v1.UpdateIpv6EntryRequest
+	42, // 70: mistgate.admin.v1.NodeService.RetireNode:input_type -> mistgate.admin.v1.RetireNodeRequest
+	59, // 71: mistgate.admin.v1.NodeService.StreamLogs:input_type -> mistgate.admin.v1.StreamLogsRequest
+	44, // 72: mistgate.admin.v1.NodeService.GetNodeConnections:input_type -> mistgate.admin.v1.GetNodeConnectionsRequest
+	52, // 73: mistgate.admin.v1.NodeService.GetNodeJournal:input_type -> mistgate.admin.v1.GetNodeJournalRequest
+	45, // 74: mistgate.admin.v1.NodeService.GetFleetConnections:input_type -> mistgate.admin.v1.GetFleetConnectionsRequest
+	48, // 75: mistgate.admin.v1.NodeService.GetNetworks:input_type -> mistgate.admin.v1.GetNetworksRequest
+	62, // 76: mistgate.admin.v1.NodeService.GetNodeRuntime:input_type -> mistgate.admin.v1.GetNodeRuntimeRequest
+	66, // 77: mistgate.admin.v1.NodeService.GetNodeHostHistory:input_type -> mistgate.admin.v1.GetNodeHostHistoryRequest
+	69, // 78: mistgate.admin.v1.NodeService.GetPathLoss:input_type -> mistgate.admin.v1.GetPathLossRequest
+	9,  // 79: mistgate.admin.v1.NodeService.ListNodes:output_type -> mistgate.admin.v1.ListNodesResponse
+	17, // 80: mistgate.admin.v1.NodeService.GetNode:output_type -> mistgate.admin.v1.GetNodeResponse
+	19, // 81: mistgate.admin.v1.NodeService.CreateEnrollment:output_type -> mistgate.admin.v1.CreateEnrollmentResponse
+	22, // 82: mistgate.admin.v1.NodeService.UpdateNode:output_type -> mistgate.admin.v1.UpdateNodeResponse
+	24, // 83: mistgate.admin.v1.NodeService.SetNodeDecoyMode:output_type -> mistgate.admin.v1.SetNodeDecoyModeResponse
+	26, // 84: mistgate.admin.v1.NodeService.UploadNodeDecoy:output_type -> mistgate.admin.v1.UploadNodeDecoyResponse
+	28, // 85: mistgate.admin.v1.NodeService.SetNodesDecoyMode:output_type -> mistgate.admin.v1.SetNodesDecoyModeResponse
+	30, // 86: mistgate.admin.v1.NodeService.RestartInbounds:output_type -> mistgate.admin.v1.RestartInboundsResponse
+	32, // 87: mistgate.admin.v1.NodeService.PrepareAwgKernel:output_type -> mistgate.admin.v1.PrepareAwgKernelResponse
+	34, // 88: mistgate.admin.v1.NodeService.MeasureBandwidth:output_type -> mistgate.admin.v1.MeasureBandwidthResponse
+	36, // 89: mistgate.admin.v1.NodeService.CheckPorts:output_type -> mistgate.admin.v1.CheckPortsResponse
+	39, // 90: mistgate.admin.v1.NodeService.CheckIpv6:output_type -> mistgate.admin.v1.CheckIpv6Response
+	41, // 91: mistgate.admin.v1.NodeService.UpdateIpv6Entry:output_type -> mistgate.admin.v1.UpdateIpv6EntryResponse
+	43, // 92: mistgate.admin.v1.NodeService.RetireNode:output_type -> mistgate.admin.v1.RetireNodeResponse
+	61, // 93: mistgate.admin.v1.NodeService.StreamLogs:output_type -> mistgate.admin.v1.StreamLogsResponse
+	58, // 94: mistgate.admin.v1.NodeService.GetNodeConnections:output_type -> mistgate.admin.v1.GetNodeConnectionsResponse
+	54, // 95: mistgate.admin.v1.NodeService.GetNodeJournal:output_type -> mistgate.admin.v1.GetNodeJournalResponse
+	47, // 96: mistgate.admin.v1.NodeService.GetFleetConnections:output_type -> mistgate.admin.v1.GetFleetConnectionsResponse
+	51, // 97: mistgate.admin.v1.NodeService.GetNetworks:output_type -> mistgate.admin.v1.GetNetworksResponse
+	65, // 98: mistgate.admin.v1.NodeService.GetNodeRuntime:output_type -> mistgate.admin.v1.GetNodeRuntimeResponse
+	68, // 99: mistgate.admin.v1.NodeService.GetNodeHostHistory:output_type -> mistgate.admin.v1.GetNodeHostHistoryResponse
+	72, // 100: mistgate.admin.v1.NodeService.GetPathLoss:output_type -> mistgate.admin.v1.GetPathLossResponse
+	79, // [79:101] is the sub-list for method output_type
+	57, // [57:79] is the sub-list for method input_type
+	57, // [57:57] is the sub-list for extension type_name
+	57, // [57:57] is the sub-list for extension extendee
+	0,  // [0:57] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_node_proto_init() }

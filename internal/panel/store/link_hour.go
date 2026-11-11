@@ -20,6 +20,8 @@ type FleetLink struct {
 	HsUnfinished, TLSAlertsSent, TLSAlertsRecv, TLSCertRefused uint32
 	RealityFallback, AuthFailed, TCPStalls, TCPStalls16K       uint32
 	Initiations, Responses, ResponsesUnmatched                 uint32
+	// vless-hello-kex/1 (migration 00127)
+	HelloPQ, HelloClassic, HelloUnknown uint32
 }
 
 // linkRow is one row of the link_hour statement: the key, its person and the counters in the order of linkHourColumns. A
@@ -31,7 +33,7 @@ type linkRow struct {
 }
 
 // linkHourCounters is len(linkHourColumns).
-const linkHourCounters = 31
+const linkHourCounters = 34
 
 // Positions in linkRow.n (linkHourColumns).
 const (
@@ -67,7 +69,8 @@ func (l FleetLink) row(user string) linkRow {
 		c(l.Handshakes), 0, c(l.ClientCloses), c(l.Freezes), c(l.Quiet), c(l.Accepted), c(l.HellosForeign), w(l.RttMSSum),
 		c(l.RttSamples), w(l.PktsSent), w(l.PktsLost), 0, 0,
 		c(l.HsUnfinished), c(l.TLSAlertsSent), c(l.TLSAlertsRecv), c(l.TLSCertRefused), c(l.RealityFallback), c(l.AuthFailed),
-		c(l.TCPStalls), c(l.TCPStalls16K), c(l.Initiations), c(l.Responses), c(l.ResponsesUnmatched)})
+		c(l.TCPStalls), c(l.TCPStalls16K), c(l.Initiations), c(l.Responses), c(l.ResponsesUnmatched),
+		c(l.HelloPQ), c(l.HelloClassic), c(l.HelloUnknown)})
 	return r
 }
 
@@ -121,7 +124,8 @@ const maxLinkSum = 1 << 32
 func (l FleetLink) zero() bool {
 	return l.Connects|l.Rejects|l.Drops|l.Stalls|l.OnlineS|l.UnknownKeys|l.Hellos|l.Handshakes|
 		l.ClientCloses|l.Freezes|l.Quiet|l.Accepted|l.HellosForeign|l.RttSamples|l.HsUnfinished|l.TLSAlertsSent|l.TLSAlertsRecv|
-		l.TLSCertRefused|l.RealityFallback|l.AuthFailed|l.TCPStalls|l.TCPStalls16K|l.Initiations|l.Responses|l.ResponsesUnmatched == 0 &&
+		l.TLSCertRefused|l.RealityFallback|l.AuthFailed|l.TCPStalls|l.TCPStalls16K|l.Initiations|l.Responses|l.ResponsesUnmatched|
+		l.HelloPQ|l.HelloClassic|l.HelloUnknown == 0 &&
 		l.RttMSSum|l.PktsSent|l.PktsLost == 0
 }
 
@@ -131,7 +135,7 @@ var linkHourColumns = []string{"connects", "rejects", "drops", "stalls", "online
 	"probe_handshakes", "client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms_sum", "rtt_samples", "pkts_sent",
 	"pkts_lost", "probe_pkts_sent", "probe_pkts_lost",
 	"hs_unfinished", "tls_alerts_sent", "tls_alerts_recv", "tls_cert_refused", "reality_fallback", "auth_failed", "tcp_stalls",
-	"tcp_stalls_16k", "initiations", "responses", "responses_unmatched"}
+	"tcp_stalls_16k", "initiations", "responses", "responses_unmatched", "hello_pq", "hello_classic", "hello_unknown"}
 
 // linkHourParts is how many JSON arguments the rows are split into: one bound value stays under D1's 2,000,000 bytes at the
 // 10,000-row edge cap (TestD1IngestStatsAtEdgeCap) with every counter of every row at its clamp.

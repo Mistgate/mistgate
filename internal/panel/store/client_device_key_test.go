@@ -651,7 +651,12 @@ func TestClientDeviceKeyMigrationLeavesExistingDeviceUntouched(t *testing.T) {
 	if _, err := s.W.ExecContext(ctx, `ALTER TABLE device DROP COLUMN key_hash`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.W.ExecContext(ctx, `DELETE FROM goose_db_version WHERE version_id = 126`); err != nil {
+	for _, column := range []string{"hello_unknown", "hello_classic", "hello_pq"} { // migration 00127, applied after 00126
+		if _, err := s.W.ExecContext(ctx, `ALTER TABLE link_hour DROP COLUMN `+column); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.W.ExecContext(ctx, `DELETE FROM goose_db_version WHERE version_id IN (126, 127)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.migrate(ctx); err != nil {

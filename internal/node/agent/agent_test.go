@@ -40,6 +40,9 @@ func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {
 	if slices.Contains((&Agent{engines: map[string]engine.Engine{}}).capabilities(), capVLESSUnknownKeys) {
 		t.Fatal("VLESS unknown-key capability is advertised without a VLESS engine")
 	}
+	if !slices.Contains(caps, "vless-hello-kex/1") || slices.Contains((&Agent{engines: map[string]engine.Engine{}}).capabilities(), "vless-hello-kex/1") {
+		t.Fatalf("vless-hello-kex/1 must be listed with a VLESS engine and without it not: %v", caps)
+	}
 }
 
 // vless-self/1 says the engine can serve the node's own site: it needs the certificate source, and an agent that has vless/1

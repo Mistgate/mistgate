@@ -11,6 +11,10 @@ const Links2Capability = "links/2"
 const Links3Capability = "links/3"
 const VLESSUnknownKeysCapability = "vless-unknown-keys/1"
 
+// VLESSHelloKexCapability marks agents that count the key exchange of the ClientHellos of REALITY connections per key
+// (agent.proto LinkCounters hello_pq, hello_classic, hello_unknown).
+const VLESSHelloKexCapability = "vless-hello-kex/1"
+
 var (
 	link2Fields = []string{"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"}
 	// Link3Fields are the counters of agents that list links/3 (agent.proto LinkCounters from hs_unfinished on).

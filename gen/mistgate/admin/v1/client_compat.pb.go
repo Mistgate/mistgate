@@ -80,6 +80,66 @@ func (ClientCompatState) EnumDescriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_client_compat_proto_rawDescGZIP(), []int{0}
 }
 
+// What the nodes saw of a device's ClientHellos. In a request: UNSPECIFIED = no filter.
+type ClientCompatActual int32
+
+const (
+	ClientCompatActual_CLIENT_COMPAT_ACTUAL_UNSPECIFIED ClientCompatActual = 0
+	// Nothing readable was counted: no hello in the window (or only ones that could not be read), or no node that counts.
+	ClientCompatActual_CLIENT_COMPAT_ACTUAL_NONE ClientCompatActual = 1
+	// Every counted hello had the post-quantum share (hello_pq > 0, hello_classic = 0).
+	ClientCompatActual_CLIENT_COMPAT_ACTUAL_PQ ClientCompatActual = 2
+	// Every counted hello lacked it (hello_classic > 0, hello_pq = 0): a strict profile would turn the device away.
+	ClientCompatActual_CLIENT_COMPAT_ACTUAL_CLASSIC ClientCompatActual = 3
+	// Both kinds (an app that switches fingerprints, or two apps on one key).
+	ClientCompatActual_CLIENT_COMPAT_ACTUAL_MIXED ClientCompatActual = 4
+)
+
+// Enum value maps for ClientCompatActual.
+var (
+	ClientCompatActual_name = map[int32]string{
+		0: "CLIENT_COMPAT_ACTUAL_UNSPECIFIED",
+		1: "CLIENT_COMPAT_ACTUAL_NONE",
+		2: "CLIENT_COMPAT_ACTUAL_PQ",
+		3: "CLIENT_COMPAT_ACTUAL_CLASSIC",
+		4: "CLIENT_COMPAT_ACTUAL_MIXED",
+	}
+	ClientCompatActual_value = map[string]int32{
+		"CLIENT_COMPAT_ACTUAL_UNSPECIFIED": 0,
+		"CLIENT_COMPAT_ACTUAL_NONE":        1,
+		"CLIENT_COMPAT_ACTUAL_PQ":          2,
+		"CLIENT_COMPAT_ACTUAL_CLASSIC":     3,
+		"CLIENT_COMPAT_ACTUAL_MIXED":       4,
+	}
+)
+
+func (x ClientCompatActual) Enum() *ClientCompatActual {
+	p := new(ClientCompatActual)
+	*p = x
+	return p
+}
+
+func (x ClientCompatActual) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ClientCompatActual) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_client_compat_proto_enumTypes[1].Descriptor()
+}
+
+func (ClientCompatActual) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_client_compat_proto_enumTypes[1]
+}
+
+func (x ClientCompatActual) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ClientCompatActual.Descriptor instead.
+func (ClientCompatActual) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_client_compat_proto_rawDescGZIP(), []int{1}
+}
+
 type ClientCompatRule struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The app family: a lower-case id of the built-in table ("happ", "mihomo", "v2rayng"), or the client name of an app the owner
@@ -374,8 +434,11 @@ type ListOutdatedDevicesRequest struct {
 	// Only the devices of this person.
 	UserId string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	// Default 50, at most 200.
-	PageSize      uint32 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Offset        uint32 `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	PageSize uint32 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Offset   uint32 `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	// Only the devices with this measured class. UNSPECIFIED = all. Chosen together with an UNSPECIFIED state it takes in the
+	// devices of every state, ok included (the list "every state but ok" is only the default when nothing else is asked).
+	Actual        ClientCompatActual `protobuf:"varint,5,opt,name=actual,proto3,enum=mistgate.admin.v1.ClientCompatActual" json:"actual,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -438,6 +501,13 @@ func (x *ListOutdatedDevicesRequest) GetOffset() uint32 {
 	return 0
 }
 
+func (x *ListOutdatedDevicesRequest) GetActual() ClientCompatActual {
+	if x != nil {
+		return x.Actual
+	}
+	return ClientCompatActual_CLIENT_COMPAT_ACTUAL_UNSPECIFIED
+}
+
 type OutdatedDevice struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	DeviceId string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
@@ -460,7 +530,16 @@ type OutdatedDevice struct {
 	// The profile fingerprint the state was judged against (the one that gave the worst state).
 	Fingerprint string `protobuf:"bytes,13,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
 	// The name of the app's family for the UI ("Happ"), empty for an unknown app.
-	AppTitle      string `protobuf:"bytes,14,opt,name=app_title,json=appTitle,proto3" json:"app_title,omitempty"`
+	AppTitle string `protobuf:"bytes,14,opt,name=app_title,json=appTitle,proto3" json:"app_title,omitempty"`
+	// What the nodes saw over hello_window_hours (see WHAT THE NODES SAW); actual is never UNSPECIFIED here.
+	Actual       ClientCompatActual `protobuf:"varint,15,opt,name=actual,proto3,enum=mistgate.admin.v1.ClientCompatActual" json:"actual,omitempty"`
+	HelloPq      uint32             `protobuf:"varint,16,opt,name=hello_pq,json=helloPq,proto3" json:"hello_pq,omitempty"`
+	HelloClassic uint32             `protobuf:"varint,17,opt,name=hello_classic,json=helloClassic,proto3" json:"hello_classic,omitempty"`
+	HelloUnknown uint32             `protobuf:"varint,18,opt,name=hello_unknown,json=helloUnknown,proto3" json:"hello_unknown,omitempty"`
+	// "worse" when the table says ok but the nodes saw classic hellos (actual CLASSIC or MIXED): the table is too optimistic.
+	// "better" when the table says below minimum, unsupported or unknown but every hello had the share (actual PQ): the table is too
+	// careful. Empty when they agree or nothing was measured.
+	TableMismatch string `protobuf:"bytes,19,opt,name=table_mismatch,json=tableMismatch,proto3" json:"table_mismatch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -593,6 +672,41 @@ func (x *OutdatedDevice) GetAppTitle() string {
 	return ""
 }
 
+func (x *OutdatedDevice) GetActual() ClientCompatActual {
+	if x != nil {
+		return x.Actual
+	}
+	return ClientCompatActual_CLIENT_COMPAT_ACTUAL_UNSPECIFIED
+}
+
+func (x *OutdatedDevice) GetHelloPq() uint32 {
+	if x != nil {
+		return x.HelloPq
+	}
+	return 0
+}
+
+func (x *OutdatedDevice) GetHelloClassic() uint32 {
+	if x != nil {
+		return x.HelloClassic
+	}
+	return 0
+}
+
+func (x *OutdatedDevice) GetHelloUnknown() uint32 {
+	if x != nil {
+		return x.HelloUnknown
+	}
+	return 0
+}
+
+func (x *OutdatedDevice) GetTableMismatch() string {
+	if x != nil {
+		return x.TableMismatch
+	}
+	return ""
+}
+
 type ClientCompatCount struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	State   ClientCompatState      `protobuf:"varint,1,opt,name=state,proto3,enum=mistgate.admin.v1.ClientCompatState" json:"state,omitempty"`
@@ -654,6 +768,68 @@ func (x *ClientCompatCount) GetPeople() uint32 {
 	return 0
 }
 
+type ClientCompatActualCount struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// NONE, PQ, CLASSIC or MIXED.
+	Actual  ClientCompatActual `protobuf:"varint,1,opt,name=actual,proto3,enum=mistgate.admin.v1.ClientCompatActual" json:"actual,omitempty"`
+	Devices uint32             `protobuf:"varint,2,opt,name=devices,proto3" json:"devices,omitempty"`
+	// Different people among those devices.
+	People        uint32 `protobuf:"varint,3,opt,name=people,proto3" json:"people,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClientCompatActualCount) Reset() {
+	*x = ClientCompatActualCount{}
+	mi := &file_mistgate_admin_v1_client_compat_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientCompatActualCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientCompatActualCount) ProtoMessage() {}
+
+func (x *ClientCompatActualCount) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_client_compat_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientCompatActualCount.ProtoReflect.Descriptor instead.
+func (*ClientCompatActualCount) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_client_compat_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ClientCompatActualCount) GetActual() ClientCompatActual {
+	if x != nil {
+		return x.Actual
+	}
+	return ClientCompatActual_CLIENT_COMPAT_ACTUAL_UNSPECIFIED
+}
+
+func (x *ClientCompatActualCount) GetDevices() uint32 {
+	if x != nil {
+		return x.Devices
+	}
+	return 0
+}
+
+func (x *ClientCompatActualCount) GetPeople() uint32 {
+	if x != nil {
+		return x.People
+	}
+	return 0
+}
+
 type ListOutdatedDevicesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The page, worst state first, then the newest activity.
@@ -663,14 +839,24 @@ type ListOutdatedDevicesResponse struct {
 	// Every state, over all devices that receive REALITY, whatever the filters.
 	Counts []*ClientCompatCount `protobuf:"bytes,3,rep,name=counts,proto3" json:"counts,omitempty"`
 	// The fingerprints of the REALITY profiles in use, without repeats: what the states were judged against.
-	Fingerprints  []string `protobuf:"bytes,4,rep,name=fingerprints,proto3" json:"fingerprints,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Fingerprints []string `protobuf:"bytes,4,rep,name=fingerprints,proto3" json:"fingerprints,omitempty"`
+	// The measured classes (NONE, PQ, CLASSIC, MIXED, in this order), over all devices that receive REALITY, whatever the filters.
+	ActualCounts []*ClientCompatActualCount `protobuf:"bytes,5,rep,name=actual_counts,json=actualCounts,proto3" json:"actual_counts,omitempty"`
+	// The window the hello counts cover, in hours (168: all the panel keeps).
+	HelloWindowHours uint32 `protobuf:"varint,6,opt,name=hello_window_hours,json=helloWindowHours,proto3" json:"hello_window_hours,omitempty"`
+	// Devices over all of them whose measured class disagrees with the table, by the direction of table_mismatch.
+	MismatchWorse  uint32 `protobuf:"varint,7,opt,name=mismatch_worse,json=mismatchWorse,proto3" json:"mismatch_worse,omitempty"`
+	MismatchBetter uint32 `protobuf:"varint,8,opt,name=mismatch_better,json=mismatchBetter,proto3" json:"mismatch_better,omitempty"`
+	// Names of the nodes that serve a live VLESS REALITY inbound and whose agent does not list "vless-hello-kex/1": the devices on
+	// them are missing from the counts until the agent is updated. Sorted.
+	HelloKexNodesWithout []string `protobuf:"bytes,9,rep,name=hello_kex_nodes_without,json=helloKexNodesWithout,proto3" json:"hello_kex_nodes_without,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ListOutdatedDevicesResponse) Reset() {
 	*x = ListOutdatedDevicesResponse{}
-	mi := &file_mistgate_admin_v1_client_compat_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_client_compat_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +868,7 @@ func (x *ListOutdatedDevicesResponse) String() string {
 func (*ListOutdatedDevicesResponse) ProtoMessage() {}
 
 func (x *ListOutdatedDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_compat_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_client_compat_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +881,7 @@ func (x *ListOutdatedDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOutdatedDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ListOutdatedDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_compat_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_client_compat_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListOutdatedDevicesResponse) GetDevices() []*OutdatedDevice {
@@ -726,6 +912,41 @@ func (x *ListOutdatedDevicesResponse) GetFingerprints() []string {
 	return nil
 }
 
+func (x *ListOutdatedDevicesResponse) GetActualCounts() []*ClientCompatActualCount {
+	if x != nil {
+		return x.ActualCounts
+	}
+	return nil
+}
+
+func (x *ListOutdatedDevicesResponse) GetHelloWindowHours() uint32 {
+	if x != nil {
+		return x.HelloWindowHours
+	}
+	return 0
+}
+
+func (x *ListOutdatedDevicesResponse) GetMismatchWorse() uint32 {
+	if x != nil {
+		return x.MismatchWorse
+	}
+	return 0
+}
+
+func (x *ListOutdatedDevicesResponse) GetMismatchBetter() uint32 {
+	if x != nil {
+		return x.MismatchBetter
+	}
+	return 0
+}
+
+func (x *ListOutdatedDevicesResponse) GetHelloKexNodesWithout() []string {
+	if x != nil {
+		return x.HelloKexNodesWithout
+	}
+	return nil
+}
+
 var File_mistgate_admin_v1_client_compat_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_client_compat_proto_rawDesc = "" +
@@ -748,12 +969,13 @@ const file_mistgate_admin_v1_client_compat_proto_rawDesc = "" +
 	"\x05rules\x18\x01 \x03(\v2#.mistgate.admin.v1.ClientCompatRuleR\x05rules\"\x98\x01\n" +
 	"\x1aUpdateClientCompatResponse\x129\n" +
 	"\x05rules\x18\x01 \x03(\v2#.mistgate.admin.v1.ClientCompatRuleR\x05rules\x12?\n" +
-	"\bdefaults\x18\x02 \x03(\v2#.mistgate.admin.v1.ClientCompatRuleR\bdefaults\"\xa6\x01\n" +
+	"\bdefaults\x18\x02 \x03(\v2#.mistgate.admin.v1.ClientCompatRuleR\bdefaults\"\xe5\x01\n" +
 	"\x1aListOutdatedDevicesRequest\x12:\n" +
 	"\x05state\x18\x01 \x01(\x0e2$.mistgate.admin.v1.ClientCompatStateR\x05state\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tpage_size\x18\x03 \x01(\rR\bpageSize\x12\x16\n" +
-	"\x06offset\x18\x04 \x01(\rR\x06offset\"\xc4\x03\n" +
+	"\x06offset\x18\x04 \x01(\rR\x06offset\x12=\n" +
+	"\x06actual\x18\x05 \x01(\x0e2%.mistgate.admin.v1.ClientCompatActualR\x06actual\"\x8f\x05\n" +
 	"\x0eOutdatedDevice\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
@@ -770,22 +992,42 @@ const file_mistgate_admin_v1_client_compat_proto_rawDesc = "" +
 	"\x06reason\x18\v \x01(\tR\x06reason\x12!\n" +
 	"\fneed_version\x18\f \x01(\tR\vneedVersion\x12 \n" +
 	"\vfingerprint\x18\r \x01(\tR\vfingerprint\x12\x1b\n" +
-	"\tapp_title\x18\x0e \x01(\tR\bappTitle\"\x81\x01\n" +
+	"\tapp_title\x18\x0e \x01(\tR\bappTitle\x12=\n" +
+	"\x06actual\x18\x0f \x01(\x0e2%.mistgate.admin.v1.ClientCompatActualR\x06actual\x12\x19\n" +
+	"\bhello_pq\x18\x10 \x01(\rR\ahelloPq\x12#\n" +
+	"\rhello_classic\x18\x11 \x01(\rR\fhelloClassic\x12#\n" +
+	"\rhello_unknown\x18\x12 \x01(\rR\fhelloUnknown\x12%\n" +
+	"\x0etable_mismatch\x18\x13 \x01(\tR\rtableMismatch\"\x81\x01\n" +
 	"\x11ClientCompatCount\x12:\n" +
 	"\x05state\x18\x01 \x01(\x0e2$.mistgate.admin.v1.ClientCompatStateR\x05state\x12\x18\n" +
 	"\adevices\x18\x02 \x01(\rR\adevices\x12\x16\n" +
-	"\x06people\x18\x03 \x01(\rR\x06people\"\xd2\x01\n" +
+	"\x06people\x18\x03 \x01(\rR\x06people\"\x8a\x01\n" +
+	"\x17ClientCompatActualCount\x12=\n" +
+	"\x06actual\x18\x01 \x01(\x0e2%.mistgate.admin.v1.ClientCompatActualR\x06actual\x12\x18\n" +
+	"\adevices\x18\x02 \x01(\rR\adevices\x12\x16\n" +
+	"\x06people\x18\x03 \x01(\rR\x06people\"\xd8\x03\n" +
 	"\x1bListOutdatedDevicesResponse\x12;\n" +
 	"\adevices\x18\x01 \x03(\v2!.mistgate.admin.v1.OutdatedDeviceR\adevices\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\rR\x05total\x12<\n" +
 	"\x06counts\x18\x03 \x03(\v2$.mistgate.admin.v1.ClientCompatCountR\x06counts\x12\"\n" +
-	"\ffingerprints\x18\x04 \x03(\tR\ffingerprints*\xc1\x01\n" +
+	"\ffingerprints\x18\x04 \x03(\tR\ffingerprints\x12O\n" +
+	"\ractual_counts\x18\x05 \x03(\v2*.mistgate.admin.v1.ClientCompatActualCountR\factualCounts\x12,\n" +
+	"\x12hello_window_hours\x18\x06 \x01(\rR\x10helloWindowHours\x12%\n" +
+	"\x0emismatch_worse\x18\a \x01(\rR\rmismatchWorse\x12'\n" +
+	"\x0fmismatch_better\x18\b \x01(\rR\x0emismatchBetter\x125\n" +
+	"\x17hello_kex_nodes_without\x18\t \x03(\tR\x14helloKexNodesWithout*\xc1\x01\n" +
 	"\x11ClientCompatState\x12#\n" +
 	"\x1fCLIENT_COMPAT_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16CLIENT_COMPAT_STATE_OK\x10\x01\x12%\n" +
 	"!CLIENT_COMPAT_STATE_BELOW_MINIMUM\x10\x02\x12#\n" +
 	"\x1fCLIENT_COMPAT_STATE_UNSUPPORTED\x10\x03\x12\x1f\n" +
-	"\x1bCLIENT_COMPAT_STATE_UNKNOWN\x10\x042\xe8\x02\n" +
+	"\x1bCLIENT_COMPAT_STATE_UNKNOWN\x10\x04*\xb8\x01\n" +
+	"\x12ClientCompatActual\x12$\n" +
+	" CLIENT_COMPAT_ACTUAL_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19CLIENT_COMPAT_ACTUAL_NONE\x10\x01\x12\x1b\n" +
+	"\x17CLIENT_COMPAT_ACTUAL_PQ\x10\x02\x12 \n" +
+	"\x1cCLIENT_COMPAT_ACTUAL_CLASSIC\x10\x03\x12\x1e\n" +
+	"\x1aCLIENT_COMPAT_ACTUAL_MIXED\x10\x042\xe8\x02\n" +
 	"\x13ClientCompatService\x12h\n" +
 	"\x0fGetClientCompat\x12).mistgate.admin.v1.GetClientCompatRequest\x1a*.mistgate.admin.v1.GetClientCompatResponse\x12q\n" +
 	"\x12UpdateClientCompat\x12,.mistgate.admin.v1.UpdateClientCompatRequest\x1a-.mistgate.admin.v1.UpdateClientCompatResponse\x12t\n" +
@@ -804,42 +1046,48 @@ func file_mistgate_admin_v1_client_compat_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_client_compat_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_client_compat_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_mistgate_admin_v1_client_compat_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_mistgate_admin_v1_client_compat_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_mistgate_admin_v1_client_compat_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_mistgate_admin_v1_client_compat_proto_goTypes = []any{
 	(ClientCompatState)(0),              // 0: mistgate.admin.v1.ClientCompatState
-	(*ClientCompatRule)(nil),            // 1: mistgate.admin.v1.ClientCompatRule
-	(*GetClientCompatRequest)(nil),      // 2: mistgate.admin.v1.GetClientCompatRequest
-	(*GetClientCompatResponse)(nil),     // 3: mistgate.admin.v1.GetClientCompatResponse
-	(*UpdateClientCompatRequest)(nil),   // 4: mistgate.admin.v1.UpdateClientCompatRequest
-	(*UpdateClientCompatResponse)(nil),  // 5: mistgate.admin.v1.UpdateClientCompatResponse
-	(*ListOutdatedDevicesRequest)(nil),  // 6: mistgate.admin.v1.ListOutdatedDevicesRequest
-	(*OutdatedDevice)(nil),              // 7: mistgate.admin.v1.OutdatedDevice
-	(*ClientCompatCount)(nil),           // 8: mistgate.admin.v1.ClientCompatCount
-	(*ListOutdatedDevicesResponse)(nil), // 9: mistgate.admin.v1.ListOutdatedDevicesResponse
+	(ClientCompatActual)(0),             // 1: mistgate.admin.v1.ClientCompatActual
+	(*ClientCompatRule)(nil),            // 2: mistgate.admin.v1.ClientCompatRule
+	(*GetClientCompatRequest)(nil),      // 3: mistgate.admin.v1.GetClientCompatRequest
+	(*GetClientCompatResponse)(nil),     // 4: mistgate.admin.v1.GetClientCompatResponse
+	(*UpdateClientCompatRequest)(nil),   // 5: mistgate.admin.v1.UpdateClientCompatRequest
+	(*UpdateClientCompatResponse)(nil),  // 6: mistgate.admin.v1.UpdateClientCompatResponse
+	(*ListOutdatedDevicesRequest)(nil),  // 7: mistgate.admin.v1.ListOutdatedDevicesRequest
+	(*OutdatedDevice)(nil),              // 8: mistgate.admin.v1.OutdatedDevice
+	(*ClientCompatCount)(nil),           // 9: mistgate.admin.v1.ClientCompatCount
+	(*ClientCompatActualCount)(nil),     // 10: mistgate.admin.v1.ClientCompatActualCount
+	(*ListOutdatedDevicesResponse)(nil), // 11: mistgate.admin.v1.ListOutdatedDevicesResponse
 }
 var file_mistgate_admin_v1_client_compat_proto_depIdxs = []int32{
-	1,  // 0: mistgate.admin.v1.GetClientCompatResponse.rules:type_name -> mistgate.admin.v1.ClientCompatRule
-	1,  // 1: mistgate.admin.v1.GetClientCompatResponse.defaults:type_name -> mistgate.admin.v1.ClientCompatRule
-	1,  // 2: mistgate.admin.v1.UpdateClientCompatRequest.rules:type_name -> mistgate.admin.v1.ClientCompatRule
-	1,  // 3: mistgate.admin.v1.UpdateClientCompatResponse.rules:type_name -> mistgate.admin.v1.ClientCompatRule
-	1,  // 4: mistgate.admin.v1.UpdateClientCompatResponse.defaults:type_name -> mistgate.admin.v1.ClientCompatRule
+	2,  // 0: mistgate.admin.v1.GetClientCompatResponse.rules:type_name -> mistgate.admin.v1.ClientCompatRule
+	2,  // 1: mistgate.admin.v1.GetClientCompatResponse.defaults:type_name -> mistgate.admin.v1.ClientCompatRule
+	2,  // 2: mistgate.admin.v1.UpdateClientCompatRequest.rules:type_name -> mistgate.admin.v1.ClientCompatRule
+	2,  // 3: mistgate.admin.v1.UpdateClientCompatResponse.rules:type_name -> mistgate.admin.v1.ClientCompatRule
+	2,  // 4: mistgate.admin.v1.UpdateClientCompatResponse.defaults:type_name -> mistgate.admin.v1.ClientCompatRule
 	0,  // 5: mistgate.admin.v1.ListOutdatedDevicesRequest.state:type_name -> mistgate.admin.v1.ClientCompatState
-	0,  // 6: mistgate.admin.v1.OutdatedDevice.state:type_name -> mistgate.admin.v1.ClientCompatState
-	0,  // 7: mistgate.admin.v1.ClientCompatCount.state:type_name -> mistgate.admin.v1.ClientCompatState
-	7,  // 8: mistgate.admin.v1.ListOutdatedDevicesResponse.devices:type_name -> mistgate.admin.v1.OutdatedDevice
-	8,  // 9: mistgate.admin.v1.ListOutdatedDevicesResponse.counts:type_name -> mistgate.admin.v1.ClientCompatCount
-	2,  // 10: mistgate.admin.v1.ClientCompatService.GetClientCompat:input_type -> mistgate.admin.v1.GetClientCompatRequest
-	4,  // 11: mistgate.admin.v1.ClientCompatService.UpdateClientCompat:input_type -> mistgate.admin.v1.UpdateClientCompatRequest
-	6,  // 12: mistgate.admin.v1.ClientCompatService.ListOutdatedDevices:input_type -> mistgate.admin.v1.ListOutdatedDevicesRequest
-	3,  // 13: mistgate.admin.v1.ClientCompatService.GetClientCompat:output_type -> mistgate.admin.v1.GetClientCompatResponse
-	5,  // 14: mistgate.admin.v1.ClientCompatService.UpdateClientCompat:output_type -> mistgate.admin.v1.UpdateClientCompatResponse
-	9,  // 15: mistgate.admin.v1.ClientCompatService.ListOutdatedDevices:output_type -> mistgate.admin.v1.ListOutdatedDevicesResponse
-	13, // [13:16] is the sub-list for method output_type
-	10, // [10:13] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	1,  // 6: mistgate.admin.v1.ListOutdatedDevicesRequest.actual:type_name -> mistgate.admin.v1.ClientCompatActual
+	0,  // 7: mistgate.admin.v1.OutdatedDevice.state:type_name -> mistgate.admin.v1.ClientCompatState
+	1,  // 8: mistgate.admin.v1.OutdatedDevice.actual:type_name -> mistgate.admin.v1.ClientCompatActual
+	0,  // 9: mistgate.admin.v1.ClientCompatCount.state:type_name -> mistgate.admin.v1.ClientCompatState
+	1,  // 10: mistgate.admin.v1.ClientCompatActualCount.actual:type_name -> mistgate.admin.v1.ClientCompatActual
+	8,  // 11: mistgate.admin.v1.ListOutdatedDevicesResponse.devices:type_name -> mistgate.admin.v1.OutdatedDevice
+	9,  // 12: mistgate.admin.v1.ListOutdatedDevicesResponse.counts:type_name -> mistgate.admin.v1.ClientCompatCount
+	10, // 13: mistgate.admin.v1.ListOutdatedDevicesResponse.actual_counts:type_name -> mistgate.admin.v1.ClientCompatActualCount
+	3,  // 14: mistgate.admin.v1.ClientCompatService.GetClientCompat:input_type -> mistgate.admin.v1.GetClientCompatRequest
+	5,  // 15: mistgate.admin.v1.ClientCompatService.UpdateClientCompat:input_type -> mistgate.admin.v1.UpdateClientCompatRequest
+	7,  // 16: mistgate.admin.v1.ClientCompatService.ListOutdatedDevices:input_type -> mistgate.admin.v1.ListOutdatedDevicesRequest
+	4,  // 17: mistgate.admin.v1.ClientCompatService.GetClientCompat:output_type -> mistgate.admin.v1.GetClientCompatResponse
+	6,  // 18: mistgate.admin.v1.ClientCompatService.UpdateClientCompat:output_type -> mistgate.admin.v1.UpdateClientCompatResponse
+	11, // 19: mistgate.admin.v1.ClientCompatService.ListOutdatedDevices:output_type -> mistgate.admin.v1.ListOutdatedDevicesResponse
+	17, // [17:20] is the sub-list for method output_type
+	14, // [14:17] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_client_compat_proto_init() }
@@ -852,8 +1100,8 @@ func file_mistgate_admin_v1_client_compat_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_client_compat_proto_rawDesc), len(file_mistgate_admin_v1_client_compat_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   9,
+			NumEnums:      2,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

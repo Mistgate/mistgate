@@ -12,6 +12,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -255,6 +256,52 @@ func TestStatsLinks3ReasonsAreStoredAndRead(t *testing.T) {
 		if in.InboundId == ids.i2 && !contains(in.Unsupported, "initiations") {
 			t.Errorf("AWG kernel backend unsupported = %v, want initiations", in.Unsupported)
 		}
+	}
+}
+
+// vless-hello-kex/1: the hello counts of a REALITY key are stored by the hour, summed per device and read back for the fleet, with
+// the nodes that do not count yet; an agent without the capability sends none and the panel reads none; an absurd number is clamped.
+func TestStatsHelloKexIsStoredAndRead(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	ids := e.fixture(a.nodeID)
+	e.exec(`UPDATE profile SET protocol = 'vless', settings_json = '{"security":"reality","transport":"xhttp","reality":{"target":"www.example.com:443"}}' WHERE id = 'prf_1'`)
+	e.exec(`UPDATE device_credential SET protocol = 'vless', profile_id = 'prf_1' WHERE id IN ('crd_alice_hy', 'crd_bob_hy')`)
+	e.exec(`UPDATE device SET platform = 'ios', client = 'Streisand/1.7' WHERE id = 'dev_bob'`)
+	c := connectLinksWithCaps(a, "inst-kex", capLinks, connectiondiag.Links3Capability, connectiondiag.VLESSHelloKexCapability)
+	c.send(1, linksBatch(
+		&agentv1.LinkCounters{CredId: "crd_alice_hy", InboundId: ids.i1, HelloPq: 3, HelloClassic: 1},
+		&agentv1.LinkCounters{CredId: "crd_bob_hy", InboundId: ids.i1, HelloClassic: 2, HelloUnknown: 1},
+		&agentv1.LinkCounters{CredId: "crd_alice_hy", InboundId: ids.i1, HelloPq: 4294967295}, // clamped, not believed
+	))
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
+
+	node := nodeService{e.f}
+	fleet, err := node.GetFleetConnections(e.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := fleet.Msg
+	if m.HelloKexMixed != 1 || m.HelloKexClassicOnly != 1 || m.HelloKexPqOnly != 0 || m.HelloKexUnknownOnly != 0 || len(m.HelloKexClassic) != 2 {
+		t.Fatalf("fleet hello key exchange = %+v", m)
+	}
+	if d := m.HelloKexClassic[0]; d.DeviceId != "dev_bob" || d.UserName != "bob" || d.Client != "Streisand/1.7" || d.Platform != "ios" ||
+		d.HelloClassic != 2 || d.HelloUnknown != 1 || d.HelloPq != 0 {
+		t.Errorf("most classic device = %+v", d)
+	}
+	if d := m.HelloKexClassic[1]; d.DeviceId != "dev_alice" || d.HelloPq != uint32(store.MaxLinkCount)+3 || d.HelloClassic != 1 {
+		t.Errorf("alice's device = %+v; want the clamped sum", d)
+	}
+	// nodeb serves the same profile and has no agent that lists the capability; nodea lists it
+	if !equalStrings(m.HelloKexNodesWithout, []string{ids.nodeB}) {
+		t.Errorf("nodes without the capability = %v, want only %s", m.HelloKexNodesWithout, ids.nodeB)
+	}
+
+	// an agent that does not list the capability: the node is named too
+	e.exec(`UPDATE node SET agent_caps = 'links/1 links/3' WHERE id = ?`, a.nodeID)
+	fleet, err = node.GetFleetConnections(e.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{}))
+	if err != nil || len(fleet.Msg.HelloKexNodesWithout) != 2 || !contains(fleet.Msg.HelloKexNodesWithout, a.nodeID) {
+		t.Errorf("nodes without the capability = %+v, %v; want %s and %s", fleet.Msg.GetHelloKexNodesWithout(), err, a.nodeID, ids.nodeB)
 	}
 }
 

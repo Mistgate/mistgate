@@ -125,6 +125,10 @@ message GetUserConnectionResponse {
   repeated DeviceConnection rows = 3;
   // Nodes the person can use whose agent does not send connection counters: nothing from them is in rows.
   repeated string nodes_without_counters = 4;
+  // The person's devices that sent ClientHellos over VLESS REALITY in the window (agents with "vless-hello-kex/1"), counted on the
+  // nodes: how many offered the post-quantum key exchange and how many a classic one (HelloKexDevice says what each means). Each
+  // device once, however many nodes it used, by device id; a device of a node whose agent does not count is missing.
+  repeated HelloKexDevice hello_kex = 5;
 }
 
 enum UserStatus {

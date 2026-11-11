@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/netip"
 	"runtime/debug"
 	"sort"
 	"sync"
@@ -244,6 +245,9 @@ func (in *inbound) start(ctx context.Context) error {
 	tracker.nets = in.e.env.Nets
 	tracker.reality = in.cfg.security == "reality"
 	tracker.stalls = tracker.reality && in.cfg.transport == "tcp"
+	if tracker.reality && in.cfg.transport == "xhttp" {
+		tracker.byAddr = make(map[netip.AddrPort]*trackedTCPConn)
+	}
 	tracker.register()
 	in.connTracker = tracker
 	started := false

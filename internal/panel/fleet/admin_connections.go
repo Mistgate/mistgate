@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"slices"
 	"time"
 
 	"connectrpc.com/connect"
@@ -121,6 +122,19 @@ func setHourReasons(h *adminv1.LinkHour, r store.LinkReasons) {
 	h.Initiations, h.Responses, h.ResponsesUnmatched = clamp32(r.Initiations), clamp32(r.Responses), clamp32(r.ResponsesUnmatched)
 }
 
+// helloKexListLimit is how many devices with classic hellos GetFleetConnections lists.
+const helloKexListLimit = 50
+
+// servesVLESSReality says whether the node has a VLESS inbound with security reality.
+func servesVLESSReality(n store.FleetConnectionNode) bool {
+	for _, in := range n.Inbounds {
+		if in.Protocol == "vless" && linkVariant(in).Security == "reality" {
+			return true
+		}
+	}
+	return false
+}
+
 // GetFleetConnections returns the counters of every non-retired node, with one metadata read and one link_hour read.
 func (s nodeService) GetFleetConnections(ctx context.Context, req *connect.Request[adminv1.GetFleetConnectionsRequest]) (*connect.Response[adminv1.GetFleetConnectionsResponse], error) {
 	f := s.f
@@ -142,7 +156,22 @@ func (s nodeService) GetFleetConnections(ctx context.Context, req *connect.Reque
 		byNode[sum.NodeID][sum.InboundID] = sum.LinkInboundSums
 	}
 	resp := &adminv1.GetFleetConnectionsResponse{SinceUnix: since.Unix(), NowUnix: now.Unix(), Nodes: []*adminv1.NodeConnections{}}
+	kex, err := f.st.HelloKex(ctx, since, helloKexListLimit)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "fleet hello key exchange", err)
+	}
+	resp.HelloKexPqOnly, resp.HelloKexClassicOnly = clamp32(kex.PQOnly), clamp32(kex.ClassicOnly)
+	resp.HelloKexMixed, resp.HelloKexUnknownOnly = clamp32(kex.Mixed), clamp32(kex.UnknownOnly)
+	resp.HelloKexClassic = make([]*adminv1.HelloKexDevice, 0, len(kex.Classic))
+	for _, d := range kex.Classic {
+		resp.HelloKexClassic = append(resp.HelloKexClassic, &adminv1.HelloKexDevice{DeviceId: d.DeviceID, UserId: d.UserID, UserName: d.UserName,
+			Client: d.Client, Platform: d.Platform, HelloPq: clamp32(d.PQ), HelloClassic: clamp32(d.Classic), HelloUnknown: clamp32(d.Unknown),
+			LastHourUnix: d.LastHour.Unix()})
+	}
 	for _, n := range nodes {
+		if !slices.Contains(n.AgentCaps, connectiondiag.VLESSHelloKexCapability) && servesVLESSReality(n) {
+			resp.HelloKexNodesWithout = append(resp.HelloKexNodesWithout, n.ID)
+		}
 		node := &adminv1.NodeConnections{NodeId: n.ID, NodeName: n.Name, CountryCode: n.CountryCode,
 			Supported: store.CapabilityPresent(n.AgentCaps, capLinks), Inbounds: []*adminv1.InboundConnections{}}
 		if node.Supported {

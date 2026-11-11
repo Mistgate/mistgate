@@ -619,6 +619,20 @@ message GetFleetConnectionsResponse {
   int64 now_unix = 2 [jstype = JS_NUMBER];
   // Every node that is not retired, by name.
   repeated NodeConnections nodes = 3;
+  // The key exchange of the ClientHellos that REALITY devices sent over the window (agents with "vless-hello-kex/1"), counted on
+  // the nodes on the current core. A device is pq when it sent only hellos with an X25519MLKEM768 share before any X25519 share
+  // (the condition a strict REALITY library demands), classic when it sent only hellos without it, mixed when it sent both
+  // (an app that switches fingerprints, or two apps on one key), unknown when none of its hellos could be read. The devices
+  // are counted once however many nodes and inbounds they used.
+  uint32 hello_kex_pq_only = 4;
+  uint32 hello_kex_classic_only = 5;
+  uint32 hello_kex_mixed = 6;
+  uint32 hello_kex_unknown_only = 7;
+  // The devices that sent at least one classic hello, most classic hellos first, at most 50.
+  repeated HelloKexDevice hello_kex_classic = 8;
+  // Nodes that serve a VLESS REALITY inbound whose agent does not list "vless-hello-kex/1": their devices are missing from the
+  // counts above.
+  repeated string hello_kex_nodes_without = 9;
 }
 
 message GetNetworksRequest {

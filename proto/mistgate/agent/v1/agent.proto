@@ -792,7 +792,7 @@ message Hello {
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
-  // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "journal/1" (StatsBatch.journal; see
+  // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "vless-hello-kex/1" (the LinkCounters fields hello_pq, hello_classic and hello_unknown), and "journal/1" (StatsBatch.journal; see
   // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
@@ -965,7 +965,8 @@ message JournalEntry {
 //     says "not known").
 //   - vless: unknown_keys (agents with "vless-unknown-keys/1"), and with links/3 hellos, hellos_foreign, connects (RAW
 //     transport), hs_unfinished, reality_fallback and auth_failed (REALITY), tls_alerts_sent, tls_alerts_recv and
-//     tls_cert_refused (security tls), tcp_stalls and tcp_stalls_16k (RAW transport, Linux).
+//     tls_cert_refused (security tls), tcp_stalls and tcp_stalls_16k (RAW transport, Linux), and with
+//     "vless-hello-kex/1" hello_pq, hello_classic and hello_unknown on the keys' rows (REALITY, both transports).
 message LinkCounters {
   // "" = the inbound itself.
   string cred_id = 1;
@@ -1045,6 +1046,15 @@ message LinkCounters {
   uint32 initiations = 28;
   uint32 responses = 29;
   uint32 responses_unmatched = 30;
+  // Event, on a key's row (vless REALITY, agents with "vless-hello-kex/1"): the ClientHellos of the key's connections by the
+  // key exchange they offer. hello_pq: an X25519MLKEM768 key share comes before any X25519 share, the condition a strict
+  // REALITY library (xtls/reality 4bb46b2a and later) demands; hello_classic: a hello that was read and does not meet it
+  // (such a client is turned away by that library); hello_unknown: a hello that could not be read (cut short, spread over
+  // several records, malformed). A connection counts once, for the key of its first request (RAW), or of the first session on
+  // it (XHTTP). No address is counted or sent.
+  uint32 hello_pq = 31;
+  uint32 hello_classic = 32;
+  uint32 hello_unknown = 33;
 }
 
 // Directions are from the END USER's point of view, not the server-remote view used inside the

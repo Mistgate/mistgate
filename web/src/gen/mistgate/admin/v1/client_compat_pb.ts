@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/client_compat.proto.
  */
 export const file_mistgate_admin_v1_client_compat: GenFile = /*@__PURE__*/
-  fileDesc("CiVtaXN0Z2F0ZS9hZG1pbi92MS9jbGllbnRfY29tcGF0LnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSKKAQoQQ2xpZW50Q29tcGF0UnVsZRILCgNhcHAYASABKAkSEAoIcGxhdGZvcm0YAiABKAkSDAoEY29yZRgDIAEoCRITCgt1bnN1cHBvcnRlZBgEIAEoCBISCgptaW5fY2hyb21lGAUgASgJEhEKCW1pbl9vdGhlchgGIAEoCRINCgV0aXRsZRgHIAEoCSIYChZHZXRDbGllbnRDb21wYXRSZXF1ZXN0IoQBChdHZXRDbGllbnRDb21wYXRSZXNwb25zZRIyCgVydWxlcxgBIAMoCzIjLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFJ1bGUSNQoIZGVmYXVsdHMYAiADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRSdWxlIk8KGVVwZGF0ZUNsaWVudENvbXBhdFJlcXVlc3QSMgoFcnVsZXMYASADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRSdWxlIocBChpVcGRhdGVDbGllbnRDb21wYXRSZXNwb25zZRIyCgVydWxlcxgBIAMoCzIjLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFJ1bGUSNQoIZGVmYXVsdHMYAiADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRSdWxlIoUBChpMaXN0T3V0ZGF0ZWREZXZpY2VzUmVxdWVzdBIzCgVzdGF0ZRgBIAEoDjIkLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFN0YXRlEg8KB3VzZXJfaWQYAiABKAkSEQoJcGFnZV9zaXplGAMgASgNEg4KBm9mZnNldBgEIAEoDSK7AgoOT3V0ZGF0ZWREZXZpY2USEQoJZGV2aWNlX2lkGAEgASgJEg8KB3VzZXJfaWQYAiABKAkSEQoJdXNlcl9uYW1lGAMgASgJEg4KBmNsaWVudBgEIAEoCRIQCghwbGF0Zm9ybRgFIAEoCRINCgVtb2RlbBgGIAEoCRISCgpvc192ZXJzaW9uGAcgASgJEg4KBnNoYXJlZBgIIAEoCBIaCg5sYXN0X3NlZW5fdW5peBgJIAEoA0ICMAISMwoFc3RhdGUYCiABKA4yJC5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRTdGF0ZRIOCgZyZWFzb24YCyABKAkSFAoMbmVlZF92ZXJzaW9uGAwgASgJEhMKC2ZpbmdlcnByaW50GA0gASgJEhEKCWFwcF90aXRsZRgOIAEoCSJpChFDbGllbnRDb21wYXRDb3VudBIzCgVzdGF0ZRgBIAEoDjIkLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFN0YXRlEg8KB2RldmljZXMYAiABKA0SDgoGcGVvcGxlGAMgASgNIqwBChtMaXN0T3V0ZGF0ZWREZXZpY2VzUmVzcG9uc2USMgoHZGV2aWNlcxgBIAMoCzIhLm1pc3RnYXRlLmFkbWluLnYxLk91dGRhdGVkRGV2aWNlEg0KBXRvdGFsGAIgASgNEjQKBmNvdW50cxgDIAMoCzIkLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdENvdW50EhQKDGZpbmdlcnByaW50cxgEIAMoCSrBAQoRQ2xpZW50Q29tcGF0U3RhdGUSIwofQ0xJRU5UX0NPTVBBVF9TVEFURV9VTlNQRUNJRklFRBAAEhoKFkNMSUVOVF9DT01QQVRfU1RBVEVfT0sQARIlCiFDTElFTlRfQ09NUEFUX1NUQVRFX0JFTE9XX01JTklNVU0QAhIjCh9DTElFTlRfQ09NUEFUX1NUQVRFX1VOU1VQUE9SVEVEEAMSHwobQ0xJRU5UX0NPTVBBVF9TVEFURV9VTktOT1dOEAQy6AIKE0NsaWVudENvbXBhdFNlcnZpY2USaAoPR2V0Q2xpZW50Q29tcGF0EikubWlzdGdhdGUuYWRtaW4udjEuR2V0Q2xpZW50Q29tcGF0UmVxdWVzdBoqLm1pc3RnYXRlLmFkbWluLnYxLkdldENsaWVudENvbXBhdFJlc3BvbnNlEnEKElVwZGF0ZUNsaWVudENvbXBhdBIsLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUNsaWVudENvbXBhdFJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVDbGllbnRDb21wYXRSZXNwb25zZRJ0ChNMaXN0T3V0ZGF0ZWREZXZpY2VzEi0ubWlzdGdhdGUuYWRtaW4udjEuTGlzdE91dGRhdGVkRGV2aWNlc1JlcXVlc3QaLi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0T3V0ZGF0ZWREZXZpY2VzUmVzcG9uc2VCzAEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIRQ2xpZW50Q29tcGF0UHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
+  fileDesc("CiVtaXN0Z2F0ZS9hZG1pbi92MS9jbGllbnRfY29tcGF0LnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSKKAQoQQ2xpZW50Q29tcGF0UnVsZRILCgNhcHAYASABKAkSEAoIcGxhdGZvcm0YAiABKAkSDAoEY29yZRgDIAEoCRITCgt1bnN1cHBvcnRlZBgEIAEoCBISCgptaW5fY2hyb21lGAUgASgJEhEKCW1pbl9vdGhlchgGIAEoCRINCgV0aXRsZRgHIAEoCSIYChZHZXRDbGllbnRDb21wYXRSZXF1ZXN0IoQBChdHZXRDbGllbnRDb21wYXRSZXNwb25zZRIyCgVydWxlcxgBIAMoCzIjLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFJ1bGUSNQoIZGVmYXVsdHMYAiADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRSdWxlIk8KGVVwZGF0ZUNsaWVudENvbXBhdFJlcXVlc3QSMgoFcnVsZXMYASADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRSdWxlIocBChpVcGRhdGVDbGllbnRDb21wYXRSZXNwb25zZRIyCgVydWxlcxgBIAMoCzIjLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFJ1bGUSNQoIZGVmYXVsdHMYAiADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRSdWxlIrwBChpMaXN0T3V0ZGF0ZWREZXZpY2VzUmVxdWVzdBIzCgVzdGF0ZRgBIAEoDjIkLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFN0YXRlEg8KB3VzZXJfaWQYAiABKAkSEQoJcGFnZV9zaXplGAMgASgNEg4KBm9mZnNldBgEIAEoDRI1CgZhY3R1YWwYBSABKA4yJS5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRBY3R1YWwiygMKDk91dGRhdGVkRGV2aWNlEhEKCWRldmljZV9pZBgBIAEoCRIPCgd1c2VyX2lkGAIgASgJEhEKCXVzZXJfbmFtZRgDIAEoCRIOCgZjbGllbnQYBCABKAkSEAoIcGxhdGZvcm0YBSABKAkSDQoFbW9kZWwYBiABKAkSEgoKb3NfdmVyc2lvbhgHIAEoCRIOCgZzaGFyZWQYCCABKAgSGgoObGFzdF9zZWVuX3VuaXgYCSABKANCAjACEjMKBXN0YXRlGAogASgOMiQubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50Q29tcGF0U3RhdGUSDgoGcmVhc29uGAsgASgJEhQKDG5lZWRfdmVyc2lvbhgMIAEoCRITCgtmaW5nZXJwcmludBgNIAEoCRIRCglhcHBfdGl0bGUYDiABKAkSNQoGYWN0dWFsGA8gASgOMiUubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50Q29tcGF0QWN0dWFsEhAKCGhlbGxvX3BxGBAgASgNEhUKDWhlbGxvX2NsYXNzaWMYESABKA0SFQoNaGVsbG9fdW5rbm93bhgSIAEoDRIWCg50YWJsZV9taXNtYXRjaBgTIAEoCSJpChFDbGllbnRDb21wYXRDb3VudBIzCgVzdGF0ZRgBIAEoDjIkLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdFN0YXRlEg8KB2RldmljZXMYAiABKA0SDgoGcGVvcGxlGAMgASgNInEKF0NsaWVudENvbXBhdEFjdHVhbENvdW50EjUKBmFjdHVhbBgBIAEoDjIlLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdEFjdHVhbBIPCgdkZXZpY2VzGAIgASgNEg4KBnBlb3BsZRgDIAEoDSLdAgobTGlzdE91dGRhdGVkRGV2aWNlc1Jlc3BvbnNlEjIKB2RldmljZXMYASADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5PdXRkYXRlZERldmljZRINCgV0b3RhbBgCIAEoDRI0CgZjb3VudHMYAyADKAsyJC5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRDb21wYXRDb3VudBIUCgxmaW5nZXJwcmludHMYBCADKAkSQQoNYWN0dWFsX2NvdW50cxgFIAMoCzIqLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudENvbXBhdEFjdHVhbENvdW50EhoKEmhlbGxvX3dpbmRvd19ob3VycxgGIAEoDRIWCg5taXNtYXRjaF93b3JzZRgHIAEoDRIXCg9taXNtYXRjaF9iZXR0ZXIYCCABKA0SHwoXaGVsbG9fa2V4X25vZGVzX3dpdGhvdXQYCSADKAkqwQEKEUNsaWVudENvbXBhdFN0YXRlEiMKH0NMSUVOVF9DT01QQVRfU1RBVEVfVU5TUEVDSUZJRUQQABIaChZDTElFTlRfQ09NUEFUX1NUQVRFX09LEAESJQohQ0xJRU5UX0NPTVBBVF9TVEFURV9CRUxPV19NSU5JTVVNEAISIwofQ0xJRU5UX0NPTVBBVF9TVEFURV9VTlNVUFBPUlRFRBADEh8KG0NMSUVOVF9DT01QQVRfU1RBVEVfVU5LTk9XThAEKrgBChJDbGllbnRDb21wYXRBY3R1YWwSJAogQ0xJRU5UX0NPTVBBVF9BQ1RVQUxfVU5TUEVDSUZJRUQQABIdChlDTElFTlRfQ09NUEFUX0FDVFVBTF9OT05FEAESGwoXQ0xJRU5UX0NPTVBBVF9BQ1RVQUxfUFEQAhIgChxDTElFTlRfQ09NUEFUX0FDVFVBTF9DTEFTU0lDEAMSHgoaQ0xJRU5UX0NPTVBBVF9BQ1RVQUxfTUlYRUQQBDLoAgoTQ2xpZW50Q29tcGF0U2VydmljZRJoCg9HZXRDbGllbnRDb21wYXQSKS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDbGllbnRDb21wYXRSZXF1ZXN0GioubWlzdGdhdGUuYWRtaW4udjEuR2V0Q2xpZW50Q29tcGF0UmVzcG9uc2UScQoSVXBkYXRlQ2xpZW50Q29tcGF0EiwubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlQ2xpZW50Q29tcGF0UmVxdWVzdBotLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUNsaWVudENvbXBhdFJlc3BvbnNlEnQKE0xpc3RPdXRkYXRlZERldmljZXMSLS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0T3V0ZGF0ZWREZXZpY2VzUmVxdWVzdBouLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RPdXRkYXRlZERldmljZXNSZXNwb25zZULMAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQhFDbGllbnRDb21wYXRQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message mistgate.admin.v1.ClientCompatRule
@@ -183,6 +183,14 @@ export type ListOutdatedDevicesRequest = Message<"mistgate.admin.v1.ListOutdated
    * @generated from field: uint32 offset = 4;
    */
   offset: number;
+
+  /**
+   * Only the devices with this measured class. UNSPECIFIED = all. Chosen together with an UNSPECIFIED state it takes in the
+   * devices of every state, ok included (the list "every state but ok" is only the default when nothing else is asked).
+   *
+   * @generated from field: mistgate.admin.v1.ClientCompatActual actual = 5;
+   */
+  actual: ClientCompatActual;
 };
 
 /**
@@ -278,6 +286,37 @@ export type OutdatedDevice = Message<"mistgate.admin.v1.OutdatedDevice"> & {
    * @generated from field: string app_title = 14;
    */
   appTitle: string;
+
+  /**
+   * What the nodes saw over hello_window_hours (see WHAT THE NODES SAW); actual is never UNSPECIFIED here.
+   *
+   * @generated from field: mistgate.admin.v1.ClientCompatActual actual = 15;
+   */
+  actual: ClientCompatActual;
+
+  /**
+   * @generated from field: uint32 hello_pq = 16;
+   */
+  helloPq: number;
+
+  /**
+   * @generated from field: uint32 hello_classic = 17;
+   */
+  helloClassic: number;
+
+  /**
+   * @generated from field: uint32 hello_unknown = 18;
+   */
+  helloUnknown: number;
+
+  /**
+   * "worse" when the table says ok but the nodes saw classic hellos (actual CLASSIC or MIXED): the table is too optimistic.
+   * "better" when the table says below minimum, unsupported or unknown but every hello had the share (actual PQ): the table is too
+   * careful. Empty when they agree or nothing was measured.
+   *
+   * @generated from field: string table_mismatch = 19;
+   */
+  tableMismatch: string;
 };
 
 /**
@@ -317,6 +356,37 @@ export const ClientCompatCountSchema: GenMessage<ClientCompatCount> = /*@__PURE_
   messageDesc(file_mistgate_admin_v1_client_compat, 7);
 
 /**
+ * @generated from message mistgate.admin.v1.ClientCompatActualCount
+ */
+export type ClientCompatActualCount = Message<"mistgate.admin.v1.ClientCompatActualCount"> & {
+  /**
+   * NONE, PQ, CLASSIC or MIXED.
+   *
+   * @generated from field: mistgate.admin.v1.ClientCompatActual actual = 1;
+   */
+  actual: ClientCompatActual;
+
+  /**
+   * @generated from field: uint32 devices = 2;
+   */
+  devices: number;
+
+  /**
+   * Different people among those devices.
+   *
+   * @generated from field: uint32 people = 3;
+   */
+  people: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ClientCompatActualCount.
+ * Use `create(ClientCompatActualCountSchema)` to create a new message.
+ */
+export const ClientCompatActualCountSchema: GenMessage<ClientCompatActualCount> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_client_compat, 8);
+
+/**
  * @generated from message mistgate.admin.v1.ListOutdatedDevicesResponse
  */
 export type ListOutdatedDevicesResponse = Message<"mistgate.admin.v1.ListOutdatedDevicesResponse"> & {
@@ -347,6 +417,40 @@ export type ListOutdatedDevicesResponse = Message<"mistgate.admin.v1.ListOutdate
    * @generated from field: repeated string fingerprints = 4;
    */
   fingerprints: string[];
+
+  /**
+   * The measured classes (NONE, PQ, CLASSIC, MIXED, in this order), over all devices that receive REALITY, whatever the filters.
+   *
+   * @generated from field: repeated mistgate.admin.v1.ClientCompatActualCount actual_counts = 5;
+   */
+  actualCounts: ClientCompatActualCount[];
+
+  /**
+   * The window the hello counts cover, in hours (168: all the panel keeps).
+   *
+   * @generated from field: uint32 hello_window_hours = 6;
+   */
+  helloWindowHours: number;
+
+  /**
+   * Devices over all of them whose measured class disagrees with the table, by the direction of table_mismatch.
+   *
+   * @generated from field: uint32 mismatch_worse = 7;
+   */
+  mismatchWorse: number;
+
+  /**
+   * @generated from field: uint32 mismatch_better = 8;
+   */
+  mismatchBetter: number;
+
+  /**
+   * Names of the nodes that serve a live VLESS REALITY inbound and whose agent does not list "vless-hello-kex/1": the devices on
+   * them are missing from the counts until the agent is updated. Sorted.
+   *
+   * @generated from field: repeated string hello_kex_nodes_without = 9;
+   */
+  helloKexNodesWithout: string[];
 };
 
 /**
@@ -354,7 +458,7 @@ export type ListOutdatedDevicesResponse = Message<"mistgate.admin.v1.ListOutdate
  * Use `create(ListOutdatedDevicesResponseSchema)` to create a new message.
  */
 export const ListOutdatedDevicesResponseSchema: GenMessage<ListOutdatedDevicesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_compat, 8);
+  messageDesc(file_mistgate_admin_v1_client_compat, 9);
 
 /**
  * @generated from enum mistgate.admin.v1.ClientCompatState
@@ -401,6 +505,52 @@ export const ClientCompatStateSchema: GenEnum<ClientCompatState> = /*@__PURE__*/
   enumDesc(file_mistgate_admin_v1_client_compat, 0);
 
 /**
+ * What the nodes saw of a device's ClientHellos. In a request: UNSPECIFIED = no filter.
+ *
+ * @generated from enum mistgate.admin.v1.ClientCompatActual
+ */
+export enum ClientCompatActual {
+  /**
+   * @generated from enum value: CLIENT_COMPAT_ACTUAL_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Nothing readable was counted: no hello in the window (or only ones that could not be read), or no node that counts.
+   *
+   * @generated from enum value: CLIENT_COMPAT_ACTUAL_NONE = 1;
+   */
+  NONE = 1,
+
+  /**
+   * Every counted hello had the post-quantum share (hello_pq > 0, hello_classic = 0).
+   *
+   * @generated from enum value: CLIENT_COMPAT_ACTUAL_PQ = 2;
+   */
+  PQ = 2,
+
+  /**
+   * Every counted hello lacked it (hello_classic > 0, hello_pq = 0): a strict profile would turn the device away.
+   *
+   * @generated from enum value: CLIENT_COMPAT_ACTUAL_CLASSIC = 3;
+   */
+  CLASSIC = 3,
+
+  /**
+   * Both kinds (an app that switches fingerprints, or two apps on one key).
+   *
+   * @generated from enum value: CLIENT_COMPAT_ACTUAL_MIXED = 4;
+   */
+  MIXED = 4,
+}
+
+/**
+ * Describes the enum mistgate.admin.v1.ClientCompatActual.
+ */
+export const ClientCompatActualSchema: GenEnum<ClientCompatActual> = /*@__PURE__*/
+  enumDesc(file_mistgate_admin_v1_client_compat, 1);
+
+/**
  * ClientCompatService: which app versions survive a strict (post-quantum only) REALITY handshake, and which devices of the
  * panel are below that line. It is knowledge for the owner. Nothing in a subscription depends on it: no device is refused,
  * no note is shown to a person, and the servers each app gets do not change.
@@ -414,6 +564,13 @@ export const ClientCompatStateSchema: GenEnum<ClientCompatState> = /*@__PURE__*/
  * THE LIST. A device appears only when it is a subscription-link device that holds a VLESS credential and its person can
  * use a VLESS REALITY server now (the group holds the profile, the node and inbound are live, the person is not disabled
  * or expired). Its state is the worst one among the fingerprints of those profiles.
+ *
+ * WHAT THE NODES SAW. Next to the verdict of the table every device carries what the nodes measured: the ClientHellos it sent over
+ * VLESS REALITY in the last 168 hours (hello_window_hours), counted by agents with "vless-hello-kex/1" (hello_pq: an
+ * X25519MLKEM768 share before any X25519 share, hello_classic: a hello without it, hello_unknown: could not be read). actual is
+ * the class of those counts. The table says what the panel KNOWS about the app; actual says what the nodes SAW; where the two
+ * disagree (table_mismatch) the table is wrong or too careful. Counts come from nodes that are not retired, and a device on a
+ * node whose agent does not count has none.
  *
  * WHO MAY CALL WHAT. GetClientCompat is a read for every role. ListOutdatedDevices is a read for every role and API tokens
  * (the MCP tool outdated_devices). UpdateClientCompat is OWNER-ONLY and needs a step-up; not open to tokens or MCP.

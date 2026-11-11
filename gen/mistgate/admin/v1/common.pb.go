@@ -1395,6 +1395,120 @@ func (x *LinkHour) GetResponsesUnmatched() uint32 {
 	return 0
 }
 
+// One device's ClientHello counts over the window (GetFleetConnectionsResponse.hello_kex_classic, GetUserConnectionResponse.hello_kex).
+// A device is pq in a window when every hello counted had an X25519MLKEM768 key share before any X25519 share (the condition a
+// strict REALITY library demands), classic when one lacked it: that library turns the device away. unknown ones could not be read
+// (cut short, spread over several records, malformed). Counted by the nodes on the current core, per connection.
+type HelloKexDevice struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	UserId   string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserName string                 `protobuf:"bytes,3,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
+	// The device as the panel knows it now (the app and platform of its last subscription fetch).
+	Client       string `protobuf:"bytes,4,opt,name=client,proto3" json:"client,omitempty"`
+	Platform     string `protobuf:"bytes,5,opt,name=platform,proto3" json:"platform,omitempty"`
+	HelloPq      uint32 `protobuf:"varint,6,opt,name=hello_pq,json=helloPq,proto3" json:"hello_pq,omitempty"`
+	HelloClassic uint32 `protobuf:"varint,7,opt,name=hello_classic,json=helloClassic,proto3" json:"hello_classic,omitempty"`
+	HelloUnknown uint32 `protobuf:"varint,8,opt,name=hello_unknown,json=helloUnknown,proto3" json:"hello_unknown,omitempty"`
+	// Start of the newest hour with a hello counter.
+	LastHourUnix  int64 `protobuf:"varint,9,opt,name=last_hour_unix,json=lastHourUnix,proto3" json:"last_hour_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HelloKexDevice) Reset() {
+	*x = HelloKexDevice{}
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HelloKexDevice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HelloKexDevice) ProtoMessage() {}
+
+func (x *HelloKexDevice) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HelloKexDevice.ProtoReflect.Descriptor instead.
+func (*HelloKexDevice) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *HelloKexDevice) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *HelloKexDevice) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *HelloKexDevice) GetUserName() string {
+	if x != nil {
+		return x.UserName
+	}
+	return ""
+}
+
+func (x *HelloKexDevice) GetClient() string {
+	if x != nil {
+		return x.Client
+	}
+	return ""
+}
+
+func (x *HelloKexDevice) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
+func (x *HelloKexDevice) GetHelloPq() uint32 {
+	if x != nil {
+		return x.HelloPq
+	}
+	return 0
+}
+
+func (x *HelloKexDevice) GetHelloClassic() uint32 {
+	if x != nil {
+		return x.HelloClassic
+	}
+	return 0
+}
+
+func (x *HelloKexDevice) GetHelloUnknown() uint32 {
+	if x != nil {
+		return x.HelloUnknown
+	}
+	return 0
+}
+
+func (x *HelloKexDevice) GetLastHourUnix() int64 {
+	if x != nil {
+		return x.LastHourUnix
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -1512,7 +1626,17 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x0etcp_stalls_16k\x18\x1a \x01(\rR\ftcpStalls16k\x12 \n" +
 	"\vinitiations\x18\x1b \x01(\rR\vinitiations\x12\x1c\n" +
 	"\tresponses\x18\x1c \x01(\rR\tresponses\x12/\n" +
-	"\x13responses_unmatched\x18\x1d \x01(\rR\x12responsesUnmatched*\xd5\x01\n" +
+	"\x13responses_unmatched\x18\x1d \x01(\rR\x12responsesUnmatched\"\xa6\x02\n" +
+	"\x0eHelloKexDevice\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tuser_name\x18\x03 \x01(\tR\buserName\x12\x16\n" +
+	"\x06client\x18\x04 \x01(\tR\x06client\x12\x1a\n" +
+	"\bplatform\x18\x05 \x01(\tR\bplatform\x12\x19\n" +
+	"\bhello_pq\x18\x06 \x01(\rR\ahelloPq\x12#\n" +
+	"\rhello_classic\x18\a \x01(\rR\fhelloClassic\x12#\n" +
+	"\rhello_unknown\x18\b \x01(\rR\fhelloUnknown\x12(\n" +
+	"\x0elast_hour_unix\x18\t \x01(\x03B\x020\x02R\flastHourUnix*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
@@ -1563,7 +1687,7 @@ func file_mistgate_admin_v1_common_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(NodeStatus)(0),          // 0: mistgate.admin.v1.NodeStatus
 	(App)(0),                 // 1: mistgate.admin.v1.App
@@ -1578,10 +1702,11 @@ var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(*PortCheck)(nil),        // 10: mistgate.admin.v1.PortCheck
 	(*TcpCheck)(nil),         // 11: mistgate.admin.v1.TcpCheck
 	(*LinkHour)(nil),         // 12: mistgate.admin.v1.LinkHour
-	nil,                      // 13: mistgate.admin.v1.StatusReason.ParamsEntry
+	(*HelloKexDevice)(nil),   // 13: mistgate.admin.v1.HelloKexDevice
+	nil,                      // 14: mistgate.admin.v1.StatusReason.ParamsEntry
 }
 var file_mistgate_admin_v1_common_proto_depIdxs = []int32{
-	13, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
+	14, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
 	2,  // 1: mistgate.admin.v1.Inbound.state:type_name -> mistgate.admin.v1.InboundState
 	8,  // 2: mistgate.admin.v1.Inbound.awg:type_name -> mistgate.admin.v1.AwgInboundStatus
 	3,  // 3: mistgate.admin.v1.WarpSummary.state:type_name -> mistgate.admin.v1.WarpState
@@ -1604,7 +1729,7 @@ func file_mistgate_admin_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_common_proto_rawDesc), len(file_mistgate_admin_v1_common_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

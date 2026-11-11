@@ -56,6 +56,8 @@ type credState struct {
 	removed    atomic.Bool
 	// links/3 events (links.go): connections whose first request carried this key, and how many of them stalled.
 	connects, tcpStalls, tcpStalls16K atomic.Uint32
+	// vless-hello-kex/1 (hellokex.go): the key exchange the ClientHellos of this key's REALITY connections offered. Event.
+	helloPQ, helloClassic, helloUnknown atomic.Uint32
 
 	now   func() time.Time
 	after afterFunc
@@ -265,7 +267,8 @@ func (cs *credState) stall(stalled, first16K bool) {
 
 func (cs *credState) takeLinkStats() plugin.LinkStat {
 	return plugin.LinkStat{CredID: cs.id, InboundID: cs.inboundID, Connects: cs.connects.Swap(0), TCPStalls: cs.tcpStalls.Swap(0),
-		TCPStalls16K: cs.tcpStalls16K.Swap(0)}
+		TCPStalls16K: cs.tcpStalls16K.Swap(0), HelloPQ: cs.helloPQ.Swap(0), HelloClassic: cs.helloClassic.Swap(0),
+		HelloUnknown: cs.helloUnknown.Swap(0)}
 }
 
 func (cs *credState) session() (time.Time, bool) {
@@ -440,8 +443,12 @@ func (in *inbound) dispatch(ctx context.Context, link *transport.Link) error {
 		return errors.New("credential unavailable")
 	}
 	// The first request of a TCP connection makes it a connection of this key (a mux or XUDP connection carries more).
-	if tc := trackedConnOf(inboundSession.Conn); tc != nil && tc.markSession(cs) {
-		cs.connects.Add(1)
+	if tc := trackedConnOf(inboundSession.Conn); tc != nil {
+		if tc.markSession(cs) {
+			cs.connects.Add(1)
+		}
+	} else if t := in.connTracker; t != nil && t.byAddr != nil {
+		t.sessionKex(cs, inboundSession.Source) // XHTTP: the session is not one TCP connection; its first request names it
 	}
 	stopOnInbound := context.AfterFunc(in.ctx, handle.stop)
 	if in.ctx.Err() != nil {

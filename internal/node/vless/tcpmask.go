@@ -1,13 +1,16 @@
 package vless
 
 import (
+	"encoding/binary"
 	"errors"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/node/nets"
+	xnet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -45,6 +48,10 @@ type tcpConnTracker struct {
 	nets     *nets.Aggregator
 	reality  bool
 	stalls   bool
+	// byAddr finds the connection under an XHTTP request, which carries the TCP peer's address and not the connection (the
+	// dispatch of an XHTTP session; kexOfAddr). It lives in this process's memory only, like recentCloses. nil when the inbound
+	// is not REALITY over XHTTP.
+	byAddr map[netip.AddrPort]*trackedTCPConn
 
 	mu     sync.Mutex
 	conns  map[*trackedTCPConn]struct{}
@@ -97,6 +104,12 @@ func (t *tcpConnTracker) track(conn net.Conn) net.Conn {
 		return tracked
 	}
 	t.conns[tracked] = struct{}{}
+	if t.byAddr != nil {
+		if ap, ok := addrPortOf(conn.RemoteAddr()); ok {
+			tracked.addr = ap
+			t.byAddr[ap] = tracked
+		}
+	}
 	t.mu.Unlock()
 	return tracked
 }
@@ -104,7 +117,32 @@ func (t *tcpConnTracker) track(conn net.Conn) net.Conn {
 func (t *tcpConnTracker) remove(conn *trackedTCPConn) {
 	t.mu.Lock()
 	delete(t.conns, conn)
+	if t.byAddr != nil && t.byAddr[conn.addr] == conn {
+		delete(t.byAddr, conn.addr)
+	}
 	t.mu.Unlock()
+}
+
+// kexOfAddr is the hello classification of the live connection from addr, and claims it for one key: the first session of an
+// XHTTP connection counts (an h2 connection carries many sessions, a TCP connection has one ClientHello). found is false
+// when no live connection has that address (a forwarded address, or the connection is gone).
+func (t *tcpConnTracker) kexOfAddr(addr netip.AddrPort) (kex helloKex, first, found bool) {
+	t.mu.Lock()
+	c := t.byAddr[addr]
+	t.mu.Unlock()
+	if c == nil {
+		return kexUnknown, false, false
+	}
+	return c.kexKind(), c.kexClaimed.CompareAndSwap(false, true), true
+}
+
+// addrPortOf reads a TCP peer address without allocating.
+func addrPortOf(a net.Addr) (netip.AddrPort, bool) {
+	if tcp, ok := a.(*net.TCPAddr); ok {
+		ap := tcp.AddrPort()
+		return netip.AddrPortFrom(ap.Addr().Unmap(), ap.Port()), ap.IsValid()
+	}
+	return netip.AddrPort{}, false
 }
 
 type trackedTCPConn struct {
@@ -112,17 +150,29 @@ type trackedTCPConn struct {
 	tracker *tcpConnTracker
 	asn     uint32
 	once    sync.Once
+	addr    netip.AddrPort // the key in tracker.byAddr, when it has one
 
-	// links/3. The first six bytes, read by one reader at a time (REALITY, then the VLESS handler) until peeked; session is
-	// the key of the first request on the connection (dispatch).
-	head    [6]byte
-	headLen int
-	peeked  atomic.Bool
-	session atomic.Pointer[credState]
+	// links/3. The start of the connection (hello), read by one reader at a time (REALITY, then the VLESS handler) until
+	// peeked; session is the key of the first request on the connection (dispatch). kex is the ClientHello classification
+	// (hellokex.go), final once peeked; kexClaimed says a key has counted it.
+	hello      *helloBuf
+	peeked     atomic.Bool
+	kex        atomic.Uint32
+	kexClaimed atomic.Bool
+	session    atomic.Pointer[credState]
 }
 
-// Read passes through; until the first six bytes are in it notes whether the connection opened with a ClientHello. Vision
-// reads the raw socket past the handshake (RawConn), so this costs one atomic load per read of the handshake at most.
+// kexKind is the classification of the connection's ClientHello: unknown for a connection that is not (or not yet) read.
+func (c *trackedTCPConn) kexKind() helloKex {
+	if k := helloKex(c.kex.Load()); k != kexPending {
+		return k
+	}
+	return kexUnknown
+}
+
+// Read passes through; until the connection's first TLS record is in it notes whether the connection opened with a ClientHello
+// and which key exchange it offers. Vision reads the raw socket past the handshake (RawConn), so this costs one atomic load per
+// read of the handshake at most.
 func (c *trackedTCPConn) Read(b []byte) (int, error) {
 	n, err := c.Conn.Read(b)
 	if n > 0 && !c.peeked.Load() {
@@ -131,18 +181,58 @@ func (c *trackedTCPConn) Read(b []byte) (int, error) {
 	return n, err
 }
 
+// peek copies the bytes REALITY has just read (never more, never earlier) until the first record is whole or hellokexCap is
+// full, counts the hello at its sixth byte, and classifies it.
 func (c *trackedTCPConn) peek(b []byte) {
-	c.headLen += copy(c.head[c.headLen:], b)
-	if c.headLen > 0 && c.head[0] != 0x16 {
-		c.peeked.Store(true) // not TLS
+	if c.hello == nil {
+		if b[0] != 0x16 {
+			c.finishPeek(kexUnknown) // not TLS
+			return
+		}
+		h := helloBufs.Get().(*helloBuf)
+		h.n, h.counted = 0, false
+		c.hello = h
+	}
+	h := c.hello
+	h.n += copy(h.b[h.n:], b)
+	if h.n < 6 {
 		return
 	}
-	if c.headLen < len(c.head) {
+	if !h.counted {
+		h.counted = true
+		if !isClientHello([6]byte(h.b[:6])) {
+			c.finishPeek(kexUnknown) // TLS, but no ClientHello
+			return
+		}
+		if c.tracker.reality && c.tracker.counters != nil {
+			c.tracker.counters.hellos.Add(1)
+		}
+	}
+	want := min(tlsRecordHeaderLen+int(binary.BigEndian.Uint16(h.b[3:5])), len(h.b))
+	if h.n < want {
 		return
 	}
+	c.finishPeek(classifyHello(h.b[:want]))
+}
+
+func (c *trackedTCPConn) finishPeek(k helloKex) {
+	if h := c.hello; h != nil {
+		c.hello = nil
+		helloBufs.Put(h)
+	}
+	c.kex.Store(uint32(k))
 	c.peeked.Store(true)
-	if c.tracker.reality && c.tracker.counters != nil && isClientHello(c.head) {
-		c.tracker.counters.hellos.Add(1)
+}
+
+// countKex adds the connection's hello classification to the key that has just claimed it.
+func (cs *credState) countKex(k helloKex) {
+	switch k {
+	case kexPQ:
+		cs.helloPQ.Add(1)
+	case kexClassic:
+		cs.helloClassic.Add(1)
+	default:
+		cs.helloUnknown.Add(1)
 	}
 }
 
@@ -150,6 +240,9 @@ func (c *trackedTCPConn) peek(b []byte) {
 func (c *trackedTCPConn) markSession(cs *credState) bool {
 	if !c.session.CompareAndSwap(nil, cs) {
 		return false
+	}
+	if c.tracker.reality && c.kexClaimed.CompareAndSwap(false, true) {
+		cs.countKex(c.kexKind())
 	}
 	if c.tracker.stalls && c.tracker.nets != nil {
 		userID := ""
@@ -310,3 +403,20 @@ var (
 	_ finalmask.Tcpmask     = (*tcpConnMaskConfig)(nil)
 	_ finalmask.TcpMaskConn = (*trackedTCPConn)(nil)
 )
+
+// sessionKex counts the ClientHello of the XHTTP request that opened a session for its key: the request's source is the TCP
+// peer (the engine never sets trustedXForwardedFor, so a forwarded address has port 0 and finds nothing: unknown).
+func (t *tcpConnTracker) sessionKex(cs *credState, src xnet.Destination) {
+	var ap netip.AddrPort
+	if src.Address != nil && src.Address.Family().IsIP() {
+		if ip, ok := netip.AddrFromSlice(src.Address.IP()); ok {
+			ap = netip.AddrPortFrom(ip.Unmap(), uint16(src.Port))
+		}
+	}
+	kex, first, found := t.kexOfAddr(ap)
+	if !found {
+		cs.countKex(kexUnknown)
+	} else if first {
+		cs.countKex(kex)
+	}
+}

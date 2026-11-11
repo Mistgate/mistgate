@@ -127,6 +127,34 @@ func TestBuildBatchLinkCountersV3(t *testing.T) {
 	}
 }
 
+// vless-hello-kex/1: the hello counts of a key are event counters, sent in the next batch with the key's connects.
+func TestBuildBatchHelloKexCounters(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	h.a.statsEvery = 10 * time.Second
+	h.a.linkWindow = 10 * time.Minute
+	start := time.Date(2026, 11, 7, 12, 9, 40, 0, time.UTC)
+	collect := func(from, to time.Time, c engine.Collected) *pb.StatsBatch {
+		t.Helper()
+		h.eng.mu.Lock()
+		h.eng.collectQueue = append(h.eng.collectQueue, c)
+		h.eng.mu.Unlock()
+		return h.a.buildBatch(context.Background(), from, to)
+	}
+	first := collect(start, start.Add(10*time.Second), engine.Collected{Links: []plugin.LinkStat{
+		{CredID: "crd_a", InboundID: "inb_v", Connects: 1, HelloPQ: 2, HelloClassic: 1},
+		{CredID: "crd_a", InboundID: "inb_v", HelloPQ: 1, HelloUnknown: 4},
+	}})
+	if len(first.Links) != 1 {
+		t.Fatalf("rows = %+v", first.Links)
+	}
+	if r := first.Links[0]; r.CredId != "crd_a" || r.Connects != 1 || r.HelloPq != 3 || r.HelloClassic != 1 || r.HelloUnknown != 4 {
+		t.Fatalf("key row = %+v; want 1 connect, pq 3, classic 1, unknown 4", r)
+	}
+	if after := collect(start.Add(10*time.Second), start.Add(20*time.Second), engine.Collected{}); len(after.Links) != 0 {
+		t.Fatalf("the counts were sent twice: %+v", after.Links)
+	}
+}
+
 func TestCapabilitiesAdvertiseLinkCountersV3(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true})
 	if !contains(h.a.capabilities(), "links/3") {

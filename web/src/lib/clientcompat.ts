@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions, useMutation, useQueryClient } from "@ta
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { useToast } from "@/components/ui/toast";
 import type { StatusKind } from "@/components/ui/status";
-import { ClientCompatState, type ClientCompatRule, type ListOutdatedDevicesResponse, type OutdatedDevice } from "@/gen/mistgate/admin/v1/client_compat_pb";
+import { ClientCompatActual, ClientCompatState, type ClientCompatRule, type ListOutdatedDevicesResponse, type OutdatedDevice } from "@/gen/mistgate/admin/v1/client_compat_pb";
 import { useT, type T } from "@/i18n";
 import { clientCompat } from "./api";
 import { errorText } from "./errors";
@@ -13,7 +13,7 @@ import { plain, type Plain } from "./plain";
 // unsupported / unknown) and keeps the table of minimum versions (the built-in one plus the owner's edits). Nothing here
 // disconnects anybody or shows anything to a person. The words are in i18n/clientcompat.ts ("cc.").
 
-export { ClientCompatState };
+export { ClientCompatActual, ClientCompatState };
 export type CompatRule = Plain<ClientCompatRule>;
 export type CompatDevice = Plain<OutdatedDevice>;
 export type CompatDevices = Plain<ListOutdatedDevicesResponse>;
@@ -25,11 +25,15 @@ export const clientCompatQuery = queryOptions({
 
 export const pageSizes = [25, 50, 100] as const;
 
-/** One page of the devices: `state` UNSPECIFIED is everything but ok, `userId` "" is everybody; `page` is 1-based. */
-export const outdatedDevicesQuery = (o: { state: ClientCompatState; userId: string; page: number; size: number }) =>
+/**
+ * One page of the devices: `state` UNSPECIFIED is everything but ok (every state while an `actual` is asked for), `actual`
+ * UNSPECIFIED is any class of what the nodes saw, `userId` "" is everybody; `page` is 1-based.
+ */
+export const outdatedDevicesQuery = (o: { state: ClientCompatState; actual: ClientCompatActual; userId: string; page: number; size: number }) =>
   queryOptions({
-    queryKey: ["clientCompat", "devices", o.state, o.userId, o.page, o.size],
-    queryFn: async ({ signal }) => plain(await clientCompat.listOutdatedDevices({ state: o.state, userId: o.userId, pageSize: o.size, offset: (o.page - 1) * o.size }, { signal })),
+    queryKey: ["clientCompat", "devices", o.state, o.actual, o.userId, o.page, o.size],
+    queryFn: async ({ signal }) =>
+      plain(await clientCompat.listOutdatedDevices({ state: o.state, actual: o.actual, userId: o.userId, pageSize: o.size, offset: (o.page - 1) * o.size }, { signal })),
     // the old rows stay while the next page loads
     placeholderData: keepPreviousData,
   });
@@ -55,6 +59,71 @@ export const stateWord = {
   [ClientCompatState.UNSUPPORTED]: "cc.state.unsupported",
   [ClientCompatState.UNKNOWN]: "cc.state.unknown",
 } as const;
+
+// "In fact": what the nodes saw of the ClientHellos of a device (new-style = with the post-quantum share, old-style = without it).
+
+/** The pill of a measured class: new-style is fine, old-style is what a strict profile would refuse, mixed is in between, no data stays quiet. */
+export function actualKind(a: ClientCompatActual): StatusKind {
+  switch (a) {
+    case ClientCompatActual.PQ:
+      return "ok";
+    case ClientCompatActual.CLASSIC:
+      return "bad";
+    case ClientCompatActual.MIXED:
+      return "warn";
+    default:
+      return "blip";
+  }
+}
+
+export const actualWord = {
+  [ClientCompatActual.UNSPECIFIED]: "cc.act.any",
+  [ClientCompatActual.NONE]: "cc.act.none",
+  [ClientCompatActual.PQ]: "cc.act.pq",
+  [ClientCompatActual.CLASSIC]: "cc.act.classic",
+  [ClientCompatActual.MIXED]: "cc.act.mixed",
+} as const;
+
+const actualTipKey = {
+  [ClientCompatActual.UNSPECIFIED]: "cc.act.tip.none",
+  [ClientCompatActual.NONE]: "cc.act.tip.none",
+  [ClientCompatActual.PQ]: "cc.act.tip.pq",
+  [ClientCompatActual.CLASSIC]: "cc.act.tip.classic",
+  [ClientCompatActual.MIXED]: "cc.act.tip.mixed",
+} as const;
+
+/** The window of the counts in whole days (the panel answers in hours; 168 is a week). */
+export const windowDays = (hours: number) => Math.max(1, Math.round(hours / 24));
+
+type Measured = Pick<CompatDevice, "actual" | "helloPq" | "helloClassic" | "helloUnknown" | "tableMismatch">;
+
+/** "new 41 · old 0" (and "3 unreadable" when some could not be read); empty when nothing was counted. */
+export function helloLine(t: T, d: Measured): string {
+  const parts = [];
+  if (d.helloPq + d.helloClassic > 0) parts.push(t("cc.act.counts", { pq: d.helloPq, classic: d.helloClassic }));
+  if (d.helloUnknown > 0) parts.push(t("cc.act.unread", { n: d.helloUnknown }));
+  return parts.join(" · ");
+}
+
+/** The tooltip of the pill: what the class means, then the counts over the window. */
+export function actualTip(t: T, d: Measured, windowHours: number): string {
+  const days = windowDays(windowHours);
+  const what = t(actualTipKey[d.actual], { days });
+  if (d.helloPq + d.helloClassic + d.helloUnknown === 0) return what;
+  return `${what} ${t("cc.act.tipCounts", { days, pq: d.helloPq, classic: d.helloClassic, unread: d.helloUnknown })}`;
+}
+
+/** Where the table and the nodes disagree: the table is too optimistic ("worse") or too careful ("better"); "" when they agree. */
+export function mismatchText(t: T, d: Pick<CompatDevice, "tableMismatch">): string {
+  switch (d.tableMismatch) {
+    case "worse":
+      return t("cc.mis.worse");
+    case "better":
+      return t("cc.mis.better");
+    default:
+      return "";
+  }
+}
 
 /** "What is missing" for a device: the version to update to, or why nothing helps; "—" for a device that is fine. */
 export function needText(t: T, d: Pick<CompatDevice, "state" | "reason" | "needVersion" | "fingerprint">): string {

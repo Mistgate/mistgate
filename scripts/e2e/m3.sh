@@ -953,6 +953,14 @@ xray_bin() {
   echo "$p"
 }
 
+# hello_kex <user id>: "<pq> <classic> <unknown>", the sums over the user's devices of the ClientHello counts the nodes keep per
+# key (vless-hello-kex/1, UserService/GetUserConnection helloKex): an X25519MLKEM768 share before any X25519 share, a hello
+# without it, a hello that could not be read. The counts leave the node with the next stats batch (10 s).
+hello_kex() {
+  api UserService/GetUserConnection "{\"userId\":\"$1\",\"hours\":1}" \
+    | jq -r '[.helloKex[]?] | "\(map(.helloPq // 0) | add // 0) \(map(.helloClassic // 0) | add // 0) \(map(.helloUnknown // 0) | add // 0)"'
+}
+
 # write_vless2xray: $WORK/vless2xray.py <vless:// uri> <socks port> <out file> makes an xray client config (a socks inbound and
 # one VLESS outbound) from a subscription line and prints "<label> <uuid>" (label: tcp, xhttp-<mode>)
 write_vless2xray() {
@@ -1189,6 +1197,16 @@ m3_vless() {
     pass "$l: 20 MB through the node in ${out#* } s, the panel counted $delta bytes (ratio $ratio)"
   done
 
+  # ---- the node counted the key exchange of the ClientHellos of the three REALITY xray clients (vless-hello-kex/1): this xray
+  # (chrome and firefox fingerprints of its uTLS) offers an X25519MLKEM768 share before X25519, so every hello is pq; the TLS
+  # profiles end in the node's own TLS front and count nothing
+  local hk_pq hk_classic hk_unknown
+  hk_pq_seen() { read -r hk_pq hk_classic hk_unknown < <(hello_kex "$vera"); [ "$hk_pq" -ge 3 ]; }
+  wait_for 40 "the node's hello counters for the xray clients (pq >= 3)" hk_pq_seen \
+    || die "the panel counted pq $hk_pq, classic $hk_classic, unknown $hk_unknown ClientHellos of the REALITY xray clients (want pq >= 3): $(api UserService/GetUserConnection "{\"userId\":\"$vera\",\"hours\":1}" | jq -c '[.helloKex[]? | {deviceId, helloPq, helloClassic, helloUnknown}]')"
+  [ "$hk_classic" = 0 ] || die "the panel counted $hk_classic classic ClientHellos for xray clients with the chrome and firefox fingerprints (pq $hk_pq)"
+  pass "hello key exchange (vless-hello-kex/1): after the xray clients' traffic over REALITY XHTTP, RAW+Vision and packet-up the panel has pq=$hk_pq classic=$hk_classic unknown=$hk_unknown for the user"
+
   # ---- disable: the running downloads die and new connections are refused; enable restores
   local -A dl dead
   local t_off t_gone kicks="" ndead=0 egress_open
@@ -1243,7 +1261,13 @@ m3_vless() {
   pass "re-enabled user: requests work again through all six clients after$back"
 
   # ---- the Mihomo profile of the same user: mihomo -t, then traffic through each proxy
+  local hk_p0=$hk_pq hk_c0=$hk_classic
   m3_vless_mihomo "$vera_url"
+  if [ -s "$WORK/mihomo-vless.yaml" ]; then # mihomo ran: what its REALITY hellos looked like (no support-x25519mlkem768 in the profile; informational)
+    sleep 12 # one more stats batch
+    read -r hk_pq hk_classic hk_unknown < <(hello_kex "$vera")
+    say "hello key exchange of the mihomo clients (profile without support-x25519mlkem768): pq +$((hk_pq - hk_p0)), classic +$((hk_classic - hk_c0)) (informational)"
+  fi
 
   # ---- the memory of the node with every inbound this run has made
   for l in "${labels[@]}"; do stop_pid "${pid[$l]}"; done
@@ -1695,6 +1719,11 @@ PY
     say "xray $label: the fake internet sees $src; DNS to a dead address: blocked name -> $dns_bad, other -> $dns_ok (via the preset's resolver)"
     stop_pid "$cp"
   done
+  local hk7_pq hk7_classic hk7_unknown
+  hk7_seen() { read -r hk7_pq hk7_classic hk7_unknown < <(hello_kex "$gina"); [ "$hk7_pq" -ge 2 ]; }
+  wait_for 40 "the node's hello counters for the xray clients of the JSON document (pq >= 2)" hk7_seen \
+    || die "the panel counted pq $hk7_pq, classic $hk7_classic, unknown $hk7_unknown ClientHellos for the REALITY xray clients of the JSON document (want pq >= 2)"
+  pass "hello key exchange: the real xray clients of the Xray JSON document (REALITY XHTTP and TCP Vision, fingerprint chrome) sent post-quantum hellos: pq=$hk7_pq classic=$hk7_classic unknown=$hk7_unknown"
   if [ "$want_x" -gt 1 ]; then
     # Pin the WebSocket certificate just as the individual-server check does, then kill proxy-1, the configured fallback. Auto can
     # reach whoami only after its first observatory results exclude that dead outbound.
@@ -1738,7 +1767,9 @@ PY
   pass "real xray ($(basename "$XRAY")): all $want_x server elements run (hy2 with its pin, REALITY XHTTP and TCP Vision, TLS WebSocket${twin:+, both WARP twins}), and the Auto element switches away from dead proxy-1 after probing; the fake internet sees the node (the WARP address for the twins), and DNS to an unreachable resolver is intercepted and answered from the preset (blocked name -> 0.0.0.0)"
 
   # ---- sing-box: the TUN inbound is replaced by a mixed one, the selector is pointed at one server at a time
-  local mport sconf sdir sp sbl
+  local mport sconf sdir sp sbl hk7_p0 hk7_c0
+  sleep 12 # the hellos of the xray clients above (the Auto one included) are all in the panel; sing-box adds to this
+  read -r hk7_p0 hk7_c0 _ < <(hello_kex "$gina")
   for ver in $SB_VERSIONS; do
     sb=$M3_CACHE/sing-box-$ver
     for label in "${!in_s[@]}"; do
@@ -1778,6 +1809,12 @@ PY
     [ "$src" = "$DIRECT_SRC" ] || { redact <"$sbl" | tail -n 8; die "sing-box $ver hy2 probe: the fake internet saw '$src', expected $DIRECT_SRC"; }
     stop_pid "$sp"
   done
+  # sing-box strips the X25519MLKEM768 share from the REALITY hello whatever its version: every hello it sent is classic
+  sleep 12 # one more stats batch
+  read -r hk7_pq hk7_classic hk7_unknown < <(hello_kex "$gina")
+  [ "$hk7_classic" -gt "$hk7_c0" ] || die "the panel counted no classic ClientHello for the sing-box REALITY clients (pq $hk7_pq, classic $hk7_classic, unknown $hk7_unknown)"
+  [ "$hk7_pq" = "$hk7_p0" ] || die "sing-box ($SB_VERSIONS) sent post-quantum ClientHellos: pq $hk7_p0 -> $hk7_pq (it strips X25519MLKEM768 from the REALITY hello)"
+  pass "hello key exchange: real sing-box ($SB_VERSIONS) over REALITY RAW sent classic hellos only: classic +$((hk7_classic - hk7_c0)), pq +$((hk7_pq - hk7_p0)); the user's totals are pq=$hk7_pq classic=$hk7_classic unknown=$hk7_unknown"
   pass "real sing-box ($SB_VERSIONS): the served profile runs server by server (${!in_s[*]}), the fake internet sees the node (the WARP address for the twin); a hand-made hysteria2 + Salamander outbound with the credentials of the Xray document also reaches it"
 
   # ---- placeholders: a disabled person gets one entry that connects nowhere

@@ -138,3 +138,38 @@ func TestGetUserConnectionLinks3(t *testing.T) {
 		t.Errorf("an agent without links/3: unsupported = %v, want responses_unmatched", row.Unsupported)
 	}
 }
+
+// vless-hello-kex/1 per device: the person's REALITY devices come back with their hello counts summed over nodes and hours, in the
+// response and not in the rows; another person's counts and a window that has ended are not in it.
+func TestGetUserConnectionHelloKex(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	e.sql(`UPDATE node SET agent_caps = 'links/1 links/2 links/3 vless/1 vless-hello-kex/1' WHERE id = 'nod_de1'`)
+	e.sql(`UPDATE profile SET protocol = 'vless', settings_json = '{"security":"reality","transport":"tcp","reality":{"target":"www.example.com:443"}}' WHERE id = ?`, f.profile)
+	g := e.group("vless", f.profile)
+	alice := e.user("alice", g, nil).User
+	bob := e.user("bob", g, nil).User
+	cred := func(user string) string {
+		var id string
+		if err := e.st.R.QueryRow(`SELECT id FROM device_credential WHERE user_id = ? ORDER BY id LIMIT 1`, user).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	hour := e.clock.Unix() / 3600 * 3600
+	e.sql(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, connects, hello_pq, hello_classic, hello_unknown)
+		VALUES ('nod_de1', ?, ?, ?, ?, 3, 6, 2, 1), ('nod_de1', ?, ?, ?, ?, 0, 1, 0, 0), ('nod_de1', ?, ?, ?, ?, 1, 0, 9, 0)`,
+		hour, f.inbound, cred(alice.Id), alice.Id, hour-3600, f.inbound, cred(alice.Id), alice.Id, hour, f.inbound, cred(bob.Id), bob.Id)
+	resp, err := e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: alice.Id}))
+	if err != nil || len(resp.Msg.HelloKex) != 1 {
+		t.Fatalf("GetUserConnection = %+v, %v", resp, err)
+	}
+	if d := resp.Msg.HelloKex[0]; d.UserId != alice.Id || d.UserName != "alice" || d.HelloPq != 7 || d.HelloClassic != 2 || d.HelloUnknown != 1 || d.LastHourUnix != hour {
+		t.Errorf("alice's hello counts = %+v, want pq 7, classic 2, unknown 1 (two hours added up)", d)
+	}
+	// a one-hour window sees the current hour only (the bucket that holds the window's start counts whole)
+	resp, err = e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: bob.Id, Hours: 1}))
+	if err != nil || len(resp.Msg.HelloKex) != 1 || resp.Msg.HelloKex[0].HelloClassic != 9 {
+		t.Errorf("bob's hello counts = %+v, %v", resp.Msg.GetHelloKex(), err)
+	}
+}

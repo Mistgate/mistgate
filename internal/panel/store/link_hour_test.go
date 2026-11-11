@@ -16,6 +16,10 @@ func TestLinkReasonsSQLite(t *testing.T) {
 	linkReasonsStoreProof(t, openTemp(t))
 }
 
+func TestHelloKexSQLite(t *testing.T) {
+	helloKexStoreProof(t, openTemp(t))
+}
+
 func TestLinkHourD1PayloadAtEdgeCap(t *testing.T) {
 	const rowsAtCap = 10_000
 	const d1ValueLimit = 2_000_000

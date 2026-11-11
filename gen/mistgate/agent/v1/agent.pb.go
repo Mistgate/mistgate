@@ -1466,7 +1466,7 @@ type Hello struct {
 	// "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
 	// "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
 	// LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
-	// hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "journal/1" (StatsBatch.journal; see
+	// hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "vless-hello-kex/1" (the LinkCounters fields hello_pq, hello_classic and hello_unknown), and "journal/1" (StatsBatch.journal; see
 	// JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
 	// An agent that predates the field sends none, which the panel reads as "no optional features".
 	// "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
@@ -2361,7 +2361,8 @@ func (x *JournalEntry) GetLastUnix() int64 {
 //     says "not known").
 //   - vless: unknown_keys (agents with "vless-unknown-keys/1"), and with links/3 hellos, hellos_foreign, connects (RAW
 //     transport), hs_unfinished, reality_fallback and auth_failed (REALITY), tls_alerts_sent, tls_alerts_recv and
-//     tls_cert_refused (security tls), tcp_stalls and tcp_stalls_16k (RAW transport, Linux).
+//     tls_cert_refused (security tls), tcp_stalls and tcp_stalls_16k (RAW transport, Linux), and with
+//     "vless-hello-kex/1" hello_pq, hello_classic and hello_unknown on the keys' rows (REALITY, both transports).
 type LinkCounters struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "" = the inbound itself.
@@ -2440,8 +2441,17 @@ type LinkCounters struct {
 	Initiations        uint32 `protobuf:"varint,28,opt,name=initiations,proto3" json:"initiations,omitempty"`
 	Responses          uint32 `protobuf:"varint,29,opt,name=responses,proto3" json:"responses,omitempty"`
 	ResponsesUnmatched uint32 `protobuf:"varint,30,opt,name=responses_unmatched,json=responsesUnmatched,proto3" json:"responses_unmatched,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Event, on a key's row (vless REALITY, agents with "vless-hello-kex/1"): the ClientHellos of the key's connections by the
+	// key exchange they offer. hello_pq: an X25519MLKEM768 key share comes before any X25519 share, the condition a strict
+	// REALITY library (xtls/reality 4bb46b2a and later) demands; hello_classic: a hello that was read and does not meet it
+	// (such a client is turned away by that library); hello_unknown: a hello that could not be read (cut short, spread over
+	// several records, malformed). A connection counts once, for the key of its first request (RAW), or of the first session on
+	// it (XHTTP). No address is counted or sent.
+	HelloPq       uint32 `protobuf:"varint,31,opt,name=hello_pq,json=helloPq,proto3" json:"hello_pq,omitempty"`
+	HelloClassic  uint32 `protobuf:"varint,32,opt,name=hello_classic,json=helloClassic,proto3" json:"hello_classic,omitempty"`
+	HelloUnknown  uint32 `protobuf:"varint,33,opt,name=hello_unknown,json=helloUnknown,proto3" json:"hello_unknown,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LinkCounters) Reset() {
@@ -2680,6 +2690,27 @@ func (x *LinkCounters) GetResponses() uint32 {
 func (x *LinkCounters) GetResponsesUnmatched() uint32 {
 	if x != nil {
 		return x.ResponsesUnmatched
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetHelloPq() uint32 {
+	if x != nil {
+		return x.HelloPq
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetHelloClassic() uint32 {
+	if x != nil {
+		return x.HelloClassic
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetHelloUnknown() uint32 {
+	if x != nil {
+		return x.HelloUnknown
 	}
 	return 0
 }
@@ -8259,7 +8290,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"AttrsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd2\a\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb7\b\n" +
 	"\fLinkCounters\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +
@@ -8298,7 +8329,10 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x0etcp_stalls_16k\x18\x1b \x01(\rR\ftcpStalls16k\x12 \n" +
 	"\vinitiations\x18\x1c \x01(\rR\vinitiations\x12\x1c\n" +
 	"\tresponses\x18\x1d \x01(\rR\tresponses\x12/\n" +
-	"\x13responses_unmatched\x18\x1e \x01(\rR\x12responsesUnmatched\"\x80\x01\n" +
+	"\x13responses_unmatched\x18\x1e \x01(\rR\x12responsesUnmatched\x12\x19\n" +
+	"\bhello_pq\x18\x1f \x01(\rR\ahelloPq\x12#\n" +
+	"\rhello_classic\x18  \x01(\rR\fhelloClassic\x12#\n" +
+	"\rhello_unknown\x18! \x01(\rR\fhelloUnknown\"\x80\x01\n" +
 	"\fTrafficDelta\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +

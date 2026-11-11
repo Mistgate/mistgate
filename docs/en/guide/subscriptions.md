@@ -158,7 +158,15 @@ A device is on the list when it is a subscription-link device with a VLESS key, 
 | **Not supported** | No version of the app can do it (sing-box and the apps built on it), or the profile's fingerprint (`ios`, `edge` or `random`) builds a classical handshake in any app. Updating the app does not help; the row says which of the two. |
 | **Unknown** | The table cannot tell: an app it does not know, no known good version for that platform, or an app that reported no version. Unknown is never reported as outdated. |
 
-The cards on top count devices and people in each state and are the filter; **Need attention** (the default) is everything but OK. The table shows the person (a link to their card), the device, the app and version as it reported them, the state, what is missing, and the last activity. Add `?tab=clients&user=<user id>` to the address to see one person's devices.
+The cards on top count devices and people in each state and are the filter; **Need attention** (the default) is everything but OK. The table shows the person (a link to their card), the device, the app and version as it reported them, the state, what the nodes saw (see below), what is missing, and the last activity under the person. Add `?tab=clients&user=<user id>` to the address to see one person's devices.
+
+### What the nodes saw
+
+The **State** column is what the panel *knows* about the app, from the table of minimum versions. The column **In fact** is what the nodes *saw*: over the last 7 days every node with an up-to-date agent counts, per device, the handshakes that came in over VLESS REALITY, and the panel adds them up. A device is **New-style** when every handshake it sent carried the post-quantum key exchange, **Old-style** when none did (a strict profile would turn it away), **Mixed** when some did and some did not (an app that switches fingerprints, or two apps on one key), and **No data** when nothing readable was counted. The small numbers under the pill are the counts (new, old, and the ones that could not be read); the tooltip of the pill says the same in words.
+
+The two columns together are the useful part. A **≠** mark sits next to the pill where they disagree: the table says OK but the nodes saw old-style handshakes (the table is wrong for that app, fix the row in the table of minimum versions), or the table says there is a problem but the nodes saw only new-style handshakes (nothing to worry about). Under the cards, the chips **New-style**, **Old-style**, **Mixed** and **No data** count the devices by what the nodes saw and filter the list; a class chosen there takes in devices of every state, so the OK device that sends old-style handshakes is on the **Old-style** list. That list is who a strict mode would turn away entirely; the mixed ones it would turn away only in part.
+
+A device has data only when its node's agent is new enough (it lists `vless-hello-kex/1`). While some node with a REALITY server is older, a line says how many nodes do not count yet; update their agents, and until then the devices that connect through them show **No data**.
 
 ### The table of minimum versions
 

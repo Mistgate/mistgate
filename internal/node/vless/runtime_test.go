@@ -370,6 +370,12 @@ func newXrayClientShortID(t *testing.T, serverName, shortIDHex string, serverPor
 
 func newXrayClientShortIDFrom(t *testing.T, serverName, shortIDHex string, serverPort uint16, transport, credID, userID, flow string, mux bool, sourceIP string) *xrayClient {
 	t.Helper()
+	return newXrayClientFingerprint(t, "chrome", serverName, shortIDHex, serverPort, transport, credID, userID, flow, mux, sourceIP)
+}
+
+// newXrayClientFingerprint is the in-process client with the uTLS fingerprint of its choice.
+func newXrayClientFingerprint(t *testing.T, fingerprint, serverName, shortIDHex string, serverPort uint16, transport, credID, userID, flow string, mux bool, sourceIP string) *xrayClient {
+	t.Helper()
 	socksPort := reservePort(t)
 	transportName := "tcp"
 	var transportSettings []*internet.TransportConfig
@@ -395,7 +401,7 @@ func newXrayClientShortIDFrom(t *testing.T, serverName, shortIDHex string, serve
 		TransportSettings: transportSettings,
 		SecurityType:      serial.GetMessageType(&reality.Config{}),
 		SecuritySettings: []*serial.TypedMessage{serial.ToTypedMessage(&reality.Config{
-			Fingerprint: "chrome", ServerName: serverName, PublicKey: publicKey, ShortId: shortID, SpiderX: "/",
+			Fingerprint: fingerprint, ServerName: serverName, PublicKey: publicKey, ShortId: shortID, SpiderX: "/",
 		})},
 	}
 	sender := &proxyman.SenderConfig{StreamSettings: stream}

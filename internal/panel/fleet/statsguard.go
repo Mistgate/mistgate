@@ -279,7 +279,8 @@ func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
 			RttMSSum: l.RttMsSum, RttSamples: l.RttSamples, PktsSent: l.PktsSent, PktsLost: l.PktsLost,
 			HsUnfinished: l.HsUnfinished, TLSAlertsSent: l.TlsAlertsSent, TLSAlertsRecv: l.TlsAlertsRecv, TLSCertRefused: l.TlsCertRefused,
 			RealityFallback: l.RealityFallback, AuthFailed: l.AuthFailed, TCPStalls: l.TcpStalls, TCPStalls16K: l.TcpStalls_16K,
-			Initiations: l.Initiations, Responses: l.Responses, ResponsesUnmatched: l.ResponsesUnmatched})
+			Initiations: l.Initiations, Responses: l.Responses, ResponsesUnmatched: l.ResponsesUnmatched,
+			HelloPQ: l.HelloPq, HelloClassic: l.HelloClassic, HelloUnknown: l.HelloUnknown})
 	}
 	return out
 }

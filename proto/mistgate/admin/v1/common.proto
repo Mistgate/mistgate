@@ -251,3 +251,21 @@ message LinkHour {
   uint32 responses = 28;
   uint32 responses_unmatched = 29;
 }
+
+// One device's ClientHello counts over the window (GetFleetConnectionsResponse.hello_kex_classic, GetUserConnectionResponse.hello_kex).
+// A device is pq in a window when every hello counted had an X25519MLKEM768 key share before any X25519 share (the condition a
+// strict REALITY library demands), classic when one lacked it: that library turns the device away. unknown ones could not be read
+// (cut short, spread over several records, malformed). Counted by the nodes on the current core, per connection.
+message HelloKexDevice {
+  string device_id = 1;
+  string user_id = 2;
+  string user_name = 3;
+  // The device as the panel knows it now (the app and platform of its last subscription fetch).
+  string client = 4;
+  string platform = 5;
+  uint32 hello_pq = 6;
+  uint32 hello_classic = 7;
+  uint32 hello_unknown = 8;
+  // Start of the newest hour with a hello counter.
+  int64 last_hour_unix = 9 [jstype = JS_NUMBER];
+}

@@ -88,6 +88,15 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 		}
 		resp.Rows = append(resp.Rows, msg)
 	}
+	kex, err := s.st.UserHelloKex(ctx, u.ID, since)
+	if err != nil {
+		return nil, s.internal("hello key exchange", err)
+	}
+	resp.HelloKex = make([]*adminv1.HelloKexDevice, 0, len(kex))
+	for _, d := range kex {
+		resp.HelloKex = append(resp.HelloKex, &adminv1.HelloKexDevice{DeviceId: d.DeviceID, UserId: d.UserID, UserName: d.UserName, Client: d.Client,
+			Platform: d.Platform, HelloPq: clamp32(d.PQ), HelloClassic: clamp32(d.Classic), HelloUnknown: clamp32(d.Unknown), LastHourUnix: d.LastHour.Unix()})
+	}
 	return connect.NewResponse(resp), nil
 }
 

@@ -123,13 +123,15 @@ type LinkStat struct {
 	RealityFallback, AuthFailed                                uint32
 	TCPStalls, TCPStalls16K                                    uint32
 	Initiations, Responses, ResponsesUnmatched                 uint32
+	// vless-hello-kex/1. Event, on a VLESS REALITY key: the ClientHellos of its connections by key exchange.
+	HelloPQ, HelloClassic, HelloUnknown uint32
 }
 
 // Zero reports a delta without any counter (an engine leaves it out).
 func (s LinkStat) Zero() bool {
 	return s.Connects|s.Rejects|s.Drops|s.Stalls|s.UnknownKeys|s.Hellos|s.Handshakes|s.ClientCloses|s.Freezes|s.Quiet|s.Accepted|
 		s.HellosForeign|s.RTTSamples|s.HsUnfinished|s.TLSAlertsSent|s.TLSAlertsRecv|s.TLSCertRefused|s.RealityFallback|s.AuthFailed|
-		s.TCPStalls|s.TCPStalls16K|s.Initiations|s.Responses|s.ResponsesUnmatched == 0 && s.RTTMSSum|s.PktsSent|s.PktsLost == 0
+		s.TCPStalls|s.TCPStalls16K|s.Initiations|s.Responses|s.ResponsesUnmatched|s.HelloPQ|s.HelloClassic|s.HelloUnknown == 0 && s.RTTMSSum|s.PktsSent|s.PktsLost == 0
 }
 
 // Session is one open client connection (QUIC connection for Hysteria2, recent handshake for AWG).

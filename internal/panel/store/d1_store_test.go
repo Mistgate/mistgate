@@ -2488,6 +2488,10 @@ func TestD1LinkReasonsStorage(t *testing.T) {
 	linkReasonsStoreProof(t, openD1Store(t))
 }
 
+func TestD1HelloKexStorage(t *testing.T) {
+	helloKexStoreProof(t, openD1Store(t))
+}
+
 func TestD1LinkHourStorage(t *testing.T) {
 	st := openD1Store(t)
 	linkHourStoreProof(t, st)

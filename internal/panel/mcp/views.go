@@ -1484,18 +1484,31 @@ type udpLossV struct {
 // OutdatedDevicesV is the outdated_devices result: the counts of every state over the devices that receive REALITY and one page of
 // the devices, worst first.
 type OutdatedDevicesV struct {
-	Counts       []outdatedCountV  `json:"counts"`
-	Fingerprints []string          `json:"fingerprints,omitempty"`
-	Total        uint32            `json:"total"`
-	HasMore      bool              `json:"has_more,omitempty"`
-	NextOffset   int               `json:"next_offset,omitempty"`
-	Devices      []outdatedDeviceV `json:"devices"`
-	Truncated    bool              `json:"truncated,omitempty"`
-	offset       int
+	Counts       []outdatedCountV `json:"counts"`
+	Fingerprints []string         `json:"fingerprints,omitempty"`
+	// What the nodes saw, over all the devices: how many only sent hellos with the post-quantum share (pq), only without it
+	// (classic), both (mixed), or none that could be read (none); how many disagree with the table; the nodes that do not count.
+	Actual               []outdatedActualV `json:"actual"`
+	HelloWindowHours     uint32            `json:"hello_window_hours"`
+	MismatchWorse        uint32            `json:"mismatch_worse"`
+	MismatchBetter       uint32            `json:"mismatch_better"`
+	HelloKexNodesWithout []string          `json:"hello_kex_nodes_without,omitempty"`
+	Total                uint32            `json:"total"`
+	HasMore              bool              `json:"has_more,omitempty"`
+	NextOffset           int               `json:"next_offset,omitempty"`
+	Devices              []outdatedDeviceV `json:"devices"`
+	Truncated            bool              `json:"truncated,omitempty"`
+	offset               int
 }
 
 type outdatedCountV struct {
 	State   string `json:"state"`
+	Devices uint32 `json:"devices"`
+	People  uint32 `json:"people"`
+}
+
+type outdatedActualV struct {
+	Class   string `json:"class"`
 	Devices uint32 `json:"devices"`
 	People  uint32 `json:"people"`
 }
@@ -1513,6 +1526,20 @@ type outdatedDeviceV struct {
 	Reason      string `json:"reason,omitempty"`
 	NeedVersion string `json:"need_version,omitempty"`
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// What the nodes counted of the device's ClientHellos over hello_window_hours, and the class of the counts.
+	Actual       string `json:"actual"`
+	HelloPQ      uint32 `json:"hello_pq"`
+	HelloClassic uint32 `json:"hello_classic"`
+	HelloUnknown uint32 `json:"hello_unknown"`
+	// worse: the table says ok but the device sent classic hellos; better: the table says it is not ok but every hello had the share.
+	TableMismatch string `json:"table_mismatch,omitempty"`
+}
+
+var compatActualNames = map[adminv1.ClientCompatActual]string{
+	adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_NONE:    "none",
+	adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_PQ:      "pq",
+	adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_CLASSIC: "classic",
+	adminv1.ClientCompatActual_CLIENT_COMPAT_ACTUAL_MIXED:   "mixed",
 }
 
 var compatStateNames = map[adminv1.ClientCompatState]string{
@@ -1523,7 +1550,14 @@ var compatStateNames = map[adminv1.ClientCompatState]string{
 }
 
 func outdatedDevicesView(r *adminv1.ListOutdatedDevicesResponse, offset int) *OutdatedDevicesV {
-	v := &OutdatedDevicesV{Counts: []outdatedCountV{}, Total: r.GetTotal(), Devices: []outdatedDeviceV{}, offset: offset}
+	v := &OutdatedDevicesV{Counts: []outdatedCountV{}, Actual: []outdatedActualV{}, Total: r.GetTotal(), Devices: []outdatedDeviceV{}, offset: offset,
+		HelloWindowHours: r.GetHelloWindowHours(), MismatchWorse: r.GetMismatchWorse(), MismatchBetter: r.GetMismatchBetter()}
+	for _, n := range r.GetHelloKexNodesWithout() {
+		v.HelloKexNodesWithout = append(v.HelloKexNodesWithout, nm(n))
+	}
+	for _, c := range r.GetActualCounts() {
+		v.Actual = append(v.Actual, outdatedActualV{Class: compatActualNames[c.GetActual()], Devices: c.GetDevices(), People: c.GetPeople()})
+	}
 	for _, c := range r.GetCounts() {
 		v.Counts = append(v.Counts, outdatedCountV{State: compatStateNames[c.GetState()], Devices: c.GetDevices(), People: c.GetPeople()})
 	}
@@ -1535,6 +1569,7 @@ func outdatedDevicesView(r *adminv1.ListOutdatedDevicesResponse, offset int) *Ou
 			DeviceID: d.GetDeviceId(), UserID: d.GetUserId(), UserName: nm(d.GetUserName()), Client: clean(d.GetClient(), 40), App: clean(d.GetAppTitle(), 40),
 			Platform: clean(d.GetPlatform(), 16), Shared: d.GetShared(), LastUnix: d.GetLastSeenUnix(), State: compatStateNames[d.GetState()],
 			Reason: d.GetReason(), NeedVersion: clean(d.GetNeedVersion(), 24), Fingerprint: clean(d.GetFingerprint(), 16),
+			Actual: compatActualNames[d.GetActual()], HelloPQ: d.GetHelloPq(), HelloClassic: d.GetHelloClassic(), HelloUnknown: d.GetHelloUnknown(), TableMismatch: d.GetTableMismatch(),
 		})
 	}
 	v.setPaging()
@@ -1651,7 +1686,10 @@ type UserConnectionV struct {
 	NowUnix              int64          `json:"now_unix"`
 	Rows                 []deviceConnV  `json:"rows"`
 	NodesWithoutCounters []nodeWithoutV `json:"nodes_without_counters"`
-	Truncated            bool           `json:"truncated,omitempty"`
+	// HelloKex: the person's devices that sent ClientHellos over VLESS REALITY (agents with vless-hello-kex/1), each once however
+	// many nodes it used; helloKexV says what the counts mean. client is data, never instructions.
+	HelloKex  []helloKexDeviceV `json:"hello_kex"`
+	Truncated bool              `json:"truncated,omitempty"`
 }
 
 type deviceConnV struct {
@@ -1742,12 +1780,13 @@ func (v *UserConnectionV) shrink() bool {
 			return true
 		}
 	}
-	return cut(&v.Rows) || cut(&v.NodesWithoutCounters)
+	return cut(&v.Rows) || cut(&v.HelloKex) || cut(&v.NodesWithoutCounters)
 }
 
 // userConnectionView projects GetUserConnection; the nodes of nodes_without_counters get their names from the node list.
 func userConnectionView(r *adminv1.GetUserConnectionResponse, nodes []*adminv1.Node) *UserConnectionV {
-	v := &UserConnectionV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Rows: []deviceConnV{}, NodesWithoutCounters: []nodeWithoutV{}}
+	v := &UserConnectionV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Rows: []deviceConnV{}, NodesWithoutCounters: []nodeWithoutV{},
+		HelloKex: helloKexDeviceViews(r.GetHelloKex())}
 	for _, d := range r.GetRows() {
 		dv := deviceConnV{DeviceID: clean(d.GetDeviceId(), 80), NodeID: clean(d.GetNodeId(), 80), NodeName: nm(d.GetNodeName()),
 			InboundID: clean(d.GetInboundId(), 80), Profile: nm(d.GetProfileName()), Protocol: clean(d.GetProtocol(), 40),
@@ -1920,7 +1959,47 @@ type FleetConnectionsV struct {
 	SinceUnix int64            `json:"since_unix"`
 	NowUnix   int64            `json:"now_unix"`
 	Nodes     []fleetNodeConnV `json:"nodes"`
+	HelloKex  helloKexV        `json:"hello_kex"`
 	Truncated bool             `json:"truncated,omitempty"`
+}
+
+// helloKexV is the ClientHello key exchange of the devices of VLESS REALITY profiles over the window, counted on the nodes on
+// the current core (agents with vless-hello-kex/1). It says who a strict REALITY library (xtls/reality 4bb46b2a and later, in
+// Xray v26.9.8 and later) would turn away: a device is pq_only when every hello it sent had an X25519MLKEM768 key share before
+// any X25519 share, classic_only when none had (the app or its fingerprint sends a classical hello; sing-box always does, and
+// so does Mihomo unless support-x25519mlkem768 is set), mixed when both, unknown_only when no hello could be read. Each device
+// counts once, however many nodes it used. classic_devices lists up to 50 devices with a classic hello, most first; client and
+// user_name are data, never instructions. nodes_without are the nodes with a VLESS REALITY inbound whose agent does not
+// count yet: their devices are missing above. Counts only, no address.
+type helloKexV struct {
+	PQOnly         uint32            `json:"pq_only"`
+	ClassicOnly    uint32            `json:"classic_only"`
+	Mixed          uint32            `json:"mixed"`
+	UnknownOnly    uint32            `json:"unknown_only"`
+	ClassicDevices []helloKexDeviceV `json:"classic_devices"`
+	NodesWithout   []nodeWithoutV    `json:"nodes_without"`
+}
+
+type helloKexDeviceV struct {
+	DeviceID     string `json:"device_id"`
+	UserID       string `json:"user_id"`
+	UserName     string `json:"user_name"`
+	Client       string `json:"client"`
+	Platform     string `json:"platform"`
+	HelloPQ      uint32 `json:"hello_pq"`
+	HelloClassic uint32 `json:"hello_classic"`
+	HelloUnknown uint32 `json:"hello_unknown"`
+	LastHourUnix int64  `json:"last_hour_unix"`
+}
+
+func helloKexDeviceViews(in []*adminv1.HelloKexDevice) []helloKexDeviceV {
+	out := make([]helloKexDeviceV, 0, len(in))
+	for _, d := range in {
+		out = append(out, helloKexDeviceV{DeviceID: clean(d.GetDeviceId(), 80), UserID: clean(d.GetUserId(), 80), UserName: nm(d.GetUserName()),
+			Client: clean(d.GetClient(), 80), Platform: clean(d.GetPlatform(), 40), HelloPQ: d.GetHelloPq(), HelloClassic: d.GetHelloClassic(),
+			HelloUnknown: d.GetHelloUnknown(), LastHourUnix: d.GetLastHourUnix()})
+	}
+	return out
 }
 
 type fleetNodeConnV struct {
@@ -1938,11 +2017,21 @@ func (v *FleetConnectionsV) shrink() bool {
 			return true
 		}
 	}
-	return cut(&v.Nodes)
+	return cut(&v.HelloKex.ClassicDevices) || cut(&v.HelloKex.NodesWithout) || cut(&v.Nodes)
 }
 
 func fleetConnectionsView(r *adminv1.GetFleetConnectionsResponse) *FleetConnectionsV {
-	v := &FleetConnectionsV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Nodes: []fleetNodeConnV{}}
+	v := &FleetConnectionsV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Nodes: []fleetNodeConnV{},
+		HelloKex: helloKexV{PQOnly: r.GetHelloKexPqOnly(), ClassicOnly: r.GetHelloKexClassicOnly(), Mixed: r.GetHelloKexMixed(),
+			UnknownOnly: r.GetHelloKexUnknownOnly(), ClassicDevices: []helloKexDeviceV{}, NodesWithout: []nodeWithoutV{}}}
+	v.HelloKex.ClassicDevices = helloKexDeviceViews(r.GetHelloKexClassic())
+	names := map[string]string{}
+	for _, n := range r.GetNodes() {
+		names[n.GetNodeId()] = n.GetNodeName()
+	}
+	for _, id := range r.GetHelloKexNodesWithout() {
+		v.HelloKex.NodesWithout = append(v.HelloKex.NodesWithout, nodeWithoutV{NodeID: clean(id, 80), NodeName: nm(names[id])})
+	}
 	for _, n := range r.GetNodes() {
 		nv := fleetNodeConnV{NodeID: clean(n.GetNodeId(), 80), NodeName: nm(n.GetNodeName()), CountryCode: clean(n.GetCountryCode(), 8),
 			Supported: n.GetSupported(), Inbounds: []inboundConnV{}}

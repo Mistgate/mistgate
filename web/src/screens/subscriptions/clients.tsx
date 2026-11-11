@@ -7,9 +7,10 @@ import { Icon } from "@/components/ui/icons";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { StatusPill } from "@/components/ui/status";
 import { cx } from "@/lib/cx";
-import { ClientCompatState, outdatedDevicesQuery, pageSizes, stateKind, stateWord, type CompatDevices } from "@/lib/clientcompat";
+import { ClientCompatActual, ClientCompatState, outdatedDevicesQuery, pageSizes, stateKind, stateWord, windowDays, type CompatDevices } from "@/lib/clientcompat";
 import { clampPage } from "@/lib/paging";
 import { useTx } from "@/screens/users/t";
+import { ActualBar } from "./clients-actual";
 import { MinimumsCard } from "./clients-rules";
 import { DevicesTable } from "./clients-table";
 import { Lead } from "./ui";
@@ -30,22 +31,31 @@ const countOf = (data: CompatDevices, state: ClientCompatState) => data.counts.f
 /**
  * "App versions": the devices that get REALITY servers, each with a verdict from the known versions of the apps that send a
  * post-quantum key share, and the table of the minimum versions below. It changes nothing for anybody yet. `userId` keeps the
- * list to one person (?user=); `rulesOpen` unfolds the table of minimum versions at once.
+ * list to one person (?user=); `rulesOpen` unfolds the table of minimum versions at once; `initialActual` starts on a class of what the
+ * nodes saw (the dev kit).
  */
-export function ClientsTab({ userId = "", onClearUser, rulesOpen }: { userId?: string; onClearUser?: () => void; rulesOpen?: boolean }) {
+export function ClientsTab({ userId = "", onClearUser, rulesOpen, initialActual = ClientCompatActual.UNSPECIFIED }: { userId?: string; onClearUser?: () => void; rulesOpen?: boolean; initialActual?: ClientCompatActual }) {
   const t = useTx();
   const [pick, setPick] = useState<Pick>("attention");
+  const [actual, setActual] = useState(initialActual);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState<number>(50);
-  const list = useQuery(outdatedDevicesQuery({ state: stateOf[pick], userId, page, size }));
+  const list = useQuery(outdatedDevicesQuery({ state: stateOf[pick], actual, userId, page, size }));
   const data = list.data;
   const total = data?.total ?? 0;
   const shown = clampPage(page, total, size);
   // rows went away and the page is past the end now: step back to the last one
   if (data && shown !== page) setPage(shown);
 
+  // "Need attention" is the default view: choosing it again drops the class too. A class asked for under it takes in devices of every
+  // state (the panel does so), which is why the card is not shown as chosen then.
   const choose = (next: Pick) => {
     setPick(next);
+    if (next === "attention") setActual(ClientCompatActual.UNSPECIFIED);
+    setPage(1);
+  };
+  const chooseActual = (next: ClientCompatActual) => {
+    setActual(next);
     setPage(1);
   };
   const pager = { total, page: shown, size, sizes: pageSizes, onPage: setPage, onSize: (n: number) => (setSize(n), setPage(1)), busy: list.isPlaceholderData };
@@ -53,7 +63,9 @@ export function ClientsTab({ userId = "", onClearUser, rulesOpen }: { userId?: s
 
   return (
     <div className="@container flex flex-col gap-3.5">
-      <Lead>{t("cc.lead")}</Lead>
+      <Lead>
+        {t("cc.lead")} {data && t("cc.leadActual", { days: windowDays(data.helloWindowHours) })}
+      </Lead>
       {list.isPending ? (
         <Pending />
       ) : !data ? (
@@ -64,7 +76,8 @@ export function ClientsTab({ userId = "", onClearUser, rulesOpen }: { userId?: s
         </Card>
       ) : (
         <>
-          <Summary data={data} pick={pick} onPick={choose} />
+          <Summary data={data} pick={pick === "attention" && actual !== ClientCompatActual.UNSPECIFIED ? null : pick} onPick={choose} />
+          <ActualBar data={data} actual={actual} onPick={chooseActual} />
           {(userId || data.fingerprints.length > 0) && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               {userId && (
@@ -83,10 +96,10 @@ export function ClientsTab({ userId = "", onClearUser, rulesOpen }: { userId?: s
           )}
           {list.isError && <QueryError compact error={list.error} onRetry={() => void list.refetch()} />}
           {data.devices.length > 0 ? (
-            <DevicesTable rows={data.devices} pager={pager} />
+            <DevicesTable rows={data.devices} windowHours={data.helloWindowHours} pager={pager} />
           ) : (
             <Card lg className="flex flex-col items-center gap-2 p-8 text-center">
-              {pick === "attention" ? (
+              {pick === "attention" && actual === ClientCompatActual.UNSPECIFIED ? (
                 <StatusPill kind="ok" label={t("cc.empty.ok")} />
               ) : (
                 <p className="text-[13px] text-muted">{t("cc.empty.state")}</p>
@@ -104,11 +117,11 @@ export function ClientsTab({ userId = "", onClearUser, rulesOpen }: { userId?: s
  * The four states as cards with the count, and "Need attention" (everything but OK) first. They are the filter: one is
  * chosen at a time, a second tap on it goes back to "Need attention".
  */
-function Summary({ data, pick, onPick }: { data: CompatDevices; pick: Pick; onPick: (p: Pick) => void }) {
+function Summary({ data, pick, onPick }: { data: CompatDevices; pick: Pick | null; onPick: (p: Pick) => void }) {
   const t = useTx();
   const attention = [ClientCompatState.BELOW_MINIMUM, ClientCompatState.UNSUPPORTED, ClientCompatState.UNKNOWN].reduce((n, s) => n + countOf(data, s).devices, 0);
   return (
-    <RadioGroup aria-label={t("cc.sum.label")} value={pick} onValueChange={(v) => onPick(v as Pick)} className="grid grid-cols-2 gap-2 @min-[640px]:grid-cols-5">
+    <RadioGroup aria-label={t("cc.sum.label")} value={pick ?? ""} onValueChange={(v) => onPick(v as Pick)} className="grid grid-cols-2 gap-2 @min-[640px]:grid-cols-5">
       {picks.map((p) => {
         const state = stateOf[p];
         const c = p === "attention" ? { devices: attention, people: 0 } : countOf(data, state);
