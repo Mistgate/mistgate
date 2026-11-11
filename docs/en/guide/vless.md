@@ -157,7 +157,7 @@ A server whose node address is not a plain host name or IP address gets no link 
 
 ## What the apps need
 
-- An app that reads VLESS REALITY links (Happ and most apps of the Xray family) or an app on the mihomo core. Mistgate checks its Mihomo output against Mihomo 1.19.32.
+- An app that reads VLESS REALITY links (Happ and most apps of the Xray family) or an app on the mihomo core. Mistgate checks its Mihomo output against Mihomo 1.19.33.
 - XHTTP is newer than TCP with Vision. If an older app does not connect to an XHTTP server, make a second profile with the TCP transport; people then see both.
 - The TCP port must reach the node. If the provider filters it, the app times out.
 

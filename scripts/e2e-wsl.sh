@@ -51,7 +51,7 @@
 #
 # --json: the Xray JSON and sing-box documents of the subscription (?format=xray-json, ?format=sing-box, and sing-box by its UA)
 # run in real clients, one server at a time, each in its own namespace: Xray (the version of go.mod) and sing-box 1.12.25 and
-# 1.14.3 (built from source with go install into the cache; with_quic, with_utls). A fixture user's group holds the Hysteria2
+# 1.14.4 (built from source with go install into the cache; with_quic, with_utls). A fixture user's group holds the Hysteria2
 # inbound of step 2, the VLESS inbounds of --vless (so --json turns it on) and, with --warp, a WARP twin of each of Hysteria2
 # and VLESS REALITY. The step asserts the matrix of present and absent servers (sing-box has no self-signed Hysteria2 and no
 # XHTTP), headers and gzip, that every server connects, that a WARP twin leaves through the WARP address, that a preset DNS
@@ -1232,7 +1232,7 @@ have_line() {
 wait_for 40 "hysteria2:// line in the subscription" have_line || die "subscription has no hysteria2:// line"
 
 BODY_HAPP=$(fetch_sub 'Happ/3.0' "$WORK/sub-happ.hdr")
-BODY_MIHOMO=$(fetch_sub 'mihomo/1.19.31' "$WORK/sub-mihomo.hdr")
+BODY_MIHOMO=$(fetch_sub 'mihomo/1.19.33' "$WORK/sub-mihomo.hdr")
 hdr() { tr -d '\r' <"$1" | sed -n "s/^$2: *//Ip" | head -1; }
 for ua in happ mihomo; do
   f=$WORK/sub-$ua.hdr

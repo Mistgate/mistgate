@@ -112,6 +112,8 @@ m3_lab() {
 
 # who_from <ns pid> <tag>: the address whoami saw for a request made from a namespace ("" = no answer)
 who_from() { cns "$1" curl -s -m 10 "http://$WHOAMI/$2" 2>/dev/null | tr -d '\n' || true; }
+# who_from_retry: the same, asked again for a few seconds while there is no answer (the first request through a fresh tunnel can be lost)
+who_from_retry() { local i out=; for i in 1 2 3 4 5; do out=$(who_from "$1" "$2"); [ -n "$out" ] && break; sleep 1; done; printf '%s' "$out"; }
 who_socks() { curl -s -m 15 --socks5-hostname "127.0.0.1:$1" "http://$WHOAMI/$2" 2>/dev/null | tr -d '\n' || true; }
 # log_srcs <path prefix>: the distinct sources whoami logged for paths that start with it
 log_srcs() { awk -v p="/$1" 'index($3, p) == 1 {print $2}' "$WORK/whoami.log" | sort -u | tr '\n' ' '; }
@@ -150,9 +152,9 @@ m3_build() {
   fi
   if [ -n "$M3_JSON" ]; then
     singbox_bin 1.12.25 >/dev/null || { tail -n 5 "$WORK/build-singbox-1.12.25.log" 2>/dev/null; die "building sing-box 1.12.25 failed"; }
-    if singbox_bin 1.14.3 >/dev/null; then SB_VERSIONS="1.12.25 1.14.3"; else
-      tail -n 3 "$WORK/build-singbox-1.14.3.log" 2>/dev/null
-      note "sing-box 1.14.3 could not be built: the profiles are run with 1.12.25 only"
+    if singbox_bin 1.14.4 >/dev/null; then SB_VERSIONS="1.12.25 1.14.4"; else
+      tail -n 3 "$WORK/build-singbox-1.14.4.log" 2>/dev/null
+      note "sing-box 1.14.4 could not be built: the profiles are run with 1.12.25 only"
       SB_VERSIONS="1.12.25"
     fi
     say "sing-box clients: $SB_VERSIONS ($M3_CACHE)"
@@ -328,13 +330,13 @@ m3_awg() {
   C31=$LAST_PID C31_SOCK=$AWG_SOCK
   wait_for 40 "a ping to the node through the 3.1 tunnel" ping_ok "$cli1_PID" "$GW31" || { tail -n 8 "$WORK/client-awg-c31.log" | redact; die "no handshake: the 3.1 client cannot ping $GW31"; }
   [ "$(hs_of "$C31_SOCK")" -ge "$T_HS" ] || die "the client counts no fresh handshake"
-  SRC=$(who_from "$cli1_PID" awg31)
+  SRC=$(who_from_retry "$cli1_PID" awg31)
   [ "$SRC" = "$DIRECT_SRC" ] || die "3.1: the fake internet saw '$SRC', expected the node's $DIRECT_SRC (masquerade)"
   pass "3.1 client: handshake in $(($(date +%s) - T_HS)) s, ping to $GW31 through the tunnel, the fake internet sees the node ($SRC)"
   start_awg_client c20 cli2 "$WORK/dev-dev20.conf" 2.0 "$cli2_GW:$AWG20_PORT" || { tail -n 8 "$WORK/client-awg-c20.log" | redact; die "the 2.0 client did not start"; }
   C20=$LAST_PID
   wait_for 40 "a ping through the 2.0 tunnel" ping_ok "$cli2_PID" "$GW20" || { tail -n 8 "$WORK/client-awg-c20.log" | redact; die "no handshake: the 2.0 client (v0.2.17) cannot ping $GW20"; }
-  SRC=$(who_from "$cli2_PID" awg20)
+  SRC=$(who_from_retry "$cli2_PID" awg20)
   [ "$SRC" = "$DIRECT_SRC" ] || die "2.0: the fake internet saw '$SRC'"
   pass "2.0 client (v0.2.17) on the other profile of the same node: handshake, ping, the fake internet sees the node"
   # the internet itself, as the owner's users would use it: the address a public service sees is the node's
@@ -658,12 +660,22 @@ m3_awg_signatures() {
 }
 
 # ================================================================ Mihomo
+# mihomo_bin: the Mihomo core, built from the module source (never downloaded) and cached. `go install ...@version` is refused
+# because the go.mod of mihomo has a replace directive, so the module is fetched into the module cache and built from a copy.
 mihomo_bin() {
-  local p=$M3_CACHE/mihomo-v1.19.32
+  local v=1.19.33 p src
+  p=$M3_CACHE/mihomo-v$v
   if [ ! -x "$p" ]; then
-    mkdir -p "$M3_CACHE/mihomo-build"
-    (cd "$WORK" && GOBIN=$M3_CACHE/mihomo-build GOFLAGS=-mod=mod GOTOOLCHAIN=auto go install github.com/metacubex/mihomo@v1.19.32) >"$WORK/build-mihomo.log" 2>&1 \
-      && mv "$M3_CACHE/mihomo-build/mihomo" "$p" || return 1
+    mkdir -p "$M3_CACHE"
+    src=$(mktemp -d "$M3_CACHE/mihomo-build.XXXXXX")
+    (
+      cd "$WORK" && export GOFLAGS=-mod=mod GOTOOLCHAIN=auto
+      go mod download "github.com/metacubex/mihomo@v$v" || exit 1
+      cp -r "$(go list -m -f '{{.Dir}}' "github.com/metacubex/mihomo@v$v")/." "$src/" || exit 1
+      chmod -R u+w "$src" && cd "$src" || exit 1
+      go build -trimpath -ldflags "-X github.com/metacubex/mihomo/constant.Version=$v" -o "$src/mihomo" .
+    ) >"$WORK/build-mihomo.log" 2>&1 && mv "$src/mihomo" "$p" || { rm -rf "$src"; return 1; }
+    rm -rf "$src"
   fi
   echo "$p"
 }
@@ -672,13 +684,13 @@ m3_mihomo() {
   local mh code
   if ! mh=$(mihomo_bin); then
     tail -n 3 "$WORK/build-mihomo.log" 2>/dev/null
-    note "mihomo v1.19.32 is not in $M3_CACHE and could not be built: the Mihomo steps are skipped"
+    note "mihomo v1.19.33 is not in $M3_CACHE and could not be built: the Mihomo steps are skipped"
     return 0
   fi
   # the user gets the hysteria2 profile as well, so the profile has all three kinds of proxy
   mutate GroupService/UpdateGroup "$(jq -nc --arg g "$AWG_GROUP" --arg a "$AWG31" --arg b "$AWG20" --arg c "$PROFILE_ID" '{groupId:$g, profileIds:{values:[$a,$b,$c]}}')" >/dev/null \
     || die "could not add the hysteria2 profile to carol's group"
-  have_yaml() { curl -sk -m 15 -A 'mihomo/1.19.32' -D "$WORK/mh.hdr" "$CAROL_URL" -o "$WORK/mihomo.yaml" && grep -q '^proxies:' "$WORK/mihomo.yaml" && python3 -c "
+  have_yaml() { curl -sk -m 15 -A 'mihomo/1.19.33' -D "$WORK/mh.hdr" "$CAROL_URL" -o "$WORK/mihomo.yaml" && grep -q '^proxies:' "$WORK/mihomo.yaml" && python3 -c "
 import sys, yaml
 d = yaml.safe_load(open('$WORK/mihomo.yaml'))
 sys.exit(0 if len(d.get('proxies') or []) >= 3 else 1)"; }
@@ -1282,10 +1294,10 @@ m3_vless_mihomo() {
   local url=$1 mh n i name code port
   if ! mh=$(mihomo_bin); then
     tail -n 3 "$WORK/build-mihomo.log" 2>/dev/null
-    note "mihomo v1.19.32 is not in $M3_CACHE and could not be built: the VLESS Mihomo steps are skipped"
+    note "mihomo v1.19.33 is not in $M3_CACHE and could not be built: the VLESS Mihomo steps are skipped"
     return 0
   fi
-  have_vyaml() { curl -sk -m 15 -A 'mihomo/1.19.31' -D "$WORK/mhv.hdr" "$url" -o "$WORK/mihomo-vless.yaml" && grep -q '^proxies:' "$WORK/mihomo-vless.yaml"; }
+  have_vyaml() { curl -sk -m 15 -A 'mihomo/1.19.33' -D "$WORK/mhv.hdr" "$url" -o "$WORK/mihomo-vless.yaml" && grep -q '^proxies:' "$WORK/mihomo-vless.yaml"; }
   wait_for 40 "a Mihomo profile for the VLESS user" have_vyaml || die "no Mihomo profile for the VLESS user: $(head -c 300 "$WORK/mihomo-vless.yaml" | redact)"
   grep -qi '^content-type: text/yaml' "$WORK/mhv.hdr" || die "the Mihomo profile is not served as text/yaml"
   python3 - "$WORK/mihomo-vless.yaml" <<'PY' || die "the VLESS Mihomo profile is not what the clients expect"
@@ -1471,7 +1483,7 @@ json_secrets() {
 }
 
 # m3_json: the Xray JSON and sing-box documents of a fixture user, run by the real clients (Xray from go.mod, sing-box 1.12.25 and
-# 1.14.3 built from source) one server at a time, each in the namespace cli7, which has nothing but the veth to this namespace. The
+# 1.14.4 built from source) one server at a time, each in the namespace cli7, which has nothing but the veth to this namespace. The
 # user's group holds the profiles that are already on the node (the Hysteria2 inbound of step 2, the VLESS inbounds of --vless and the
 # WARP twin of --warp), so the coverage is the matrix of the plan:
 #
@@ -1539,7 +1551,7 @@ m3_json() {
   wait_for 60 "the Xray JSON ($want_x servers plus Auto when eligible) and the sing-box profile ($want_s servers)" docs_ready \
     || die "the documents are not what the group holds: xray $(jq -c 'if type == "array" then length else "not an array" end' "$XF" 2>&1 | head -c 80), sing-box $(jq -c '[.outbounds[] | .type]' "$SF" 2>&1 | head -c 200)"
   json_secrets "$XF" "$SF"
-  jget '' 'SFA (sing-box 1.14.3; language en_US)' "$UF" "$WORK/json-singbox-ua.hdr" || die "the fetch by the sing-box UA failed"
+  jget '' 'SFA (sing-box 1.14.4; language en_US)' "$UF" "$WORK/json-singbox-ua.hdr" || die "the fetch by the sing-box UA failed"
   jget sing-box 'v2rayNG/1.10.20' "$GF.gz" "$WORK/json-singbox-gz.hdr" gzip || die "the gzip fetch failed"
   local h
   for h in json-xray json-singbox json-singbox-ua json-singbox-gz; do
@@ -1632,7 +1644,7 @@ m3_json() {
     "$M3_CACHE/sing-box-$ver" check -c "$AF" >"$WORK/client-singbox-check.log" 2>&1 || { redact <"$WORK/client-singbox-check.log" | tail -n 5; die "sing-box $ver rejects the profile with the ads block"; }
   done
   if mh=$(mihomo_bin); then
-    curl -sk -m 15 -A 'mihomo/1.19.32' -o "$MF" "$j_url" || die "the Mihomo profile with the ads block did not download"
+    curl -sk -m 15 -A 'mihomo/1.19.33' -o "$MF" "$j_url" || die "the Mihomo profile with the ads block did not download"
     python3 - "$MF" <<'PY' || die "the Mihomo profile does not start with the ads block"
 import sys, yaml
 d = yaml.safe_load(open(sys.argv[1]))

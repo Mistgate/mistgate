@@ -11,7 +11,7 @@ import (
 )
 
 // The Mihomo core is the judge of the profile: `mihomo -t` parses every field of every proxy and of the dns section.
-// The test needs the binary (Linux; scripts/e2e/m3.sh builds v1.19.32 once into ~/.cache/mistgate-tests/) and is skipped without
+// The test needs the binary (Linux; scripts/e2e/m3.sh builds v1.19.33 once into ~/.cache/mistgate-tests/) and is skipped without
 // it: set MIHOMO_BIN to use another one.
 //
 //	wsl -d Ubuntu -u root -- bash -c 'cd <repo> && go test ./internal/panel/subs -run MihomoCore -v'
@@ -22,9 +22,9 @@ func mihomoBin(t *testing.T) string {
 		return p
 	}
 	home, _ := os.UserHomeDir()
-	p := filepath.Join(home, ".cache", "mistgate-tests", "mihomo-v1.19.32")
+	p := filepath.Join(home, ".cache", "mistgate-tests", "mihomo-v1.19.33")
 	if _, err := os.Stat(p); err != nil {
-		t.Skip("no mihomo binary: set MIHOMO_BIN or build v1.19.32 into ~/.cache/mistgate-tests/mihomo-v1.19.32")
+		t.Skip("no mihomo binary: set MIHOMO_BIN or build v1.19.33 into ~/.cache/mistgate-tests/mihomo-v1.19.33")
 	}
 	return p
 }

@@ -157,7 +157,7 @@ vless://<uuid>@de1.example.com:443?encryption=none&fp=chrome&mode=auto&path=%2Fq
 
 ## 应用要求
 
-- 使用 VLESS REALITY 链接的应用（Happ 和大多数 Xray 系应用），或基于 mihomo 内核的应用。Mistgate 会根据 Mihomo 1.19.32 检查其 Mihomo 输出。
+- 使用 VLESS REALITY 链接的应用（Happ 和大多数 Xray 系应用），或基于 mihomo 内核的应用。Mistgate 会根据 Mihomo 1.19.33 检查其 Mihomo 输出。
 - XHTTP 比使用 Vision 的 TCP 更新。如果旧版应用无法连接 XHTTP 服务器，请新建一个使用 TCP 传输方式的协议配置；之后用户会同时看到两种配置。
 - TCP 端口必须能连接到节点。如果服务商过滤该端口，应用连接会超时。
 
