@@ -38,7 +38,7 @@ func TestCompareVersions(t *testing.T) {
 		a, b string
 		want int
 	}{
-		{"1.19.9", "1.19.9", 0}, {"1.19.10", "1.19.9", 1}, {"1.19.8", "1.19.9", -1}, {"1.19", "1.19.0", 0}, {"2.0.16", "1.10.1", 1},
+		{"1.19.9", "1.19.9", 0}, {"1.19.10", "1.19.9", 1}, {"1.19.8", "1.19.9", -1}, {"1.19", "1.19.0", 0}, {"2.0.16", "1.10.3", 1},
 		{"v7.12.6", "7.12.6", 0}, {"3.20.0", "3.4.2", 1}, {"4.8.0-beta.1", "4.8.0", 0}, {"0.4.0", "0.10.0", -1}, {"6.0.0", "4.8.0", 1},
 	} {
 		a, ok1 := parseVersion(c.a)
@@ -76,7 +76,11 @@ func TestClientVerdicts(t *testing.T) {
 		{"Happ iOS 4.2 with firefox", "Happ/4.2.0", "ios", "firefox", ClientBelow, ReasonVersion, "4.8.0"},
 		{"Happ on a platform the table has no row for", "Happ/3.4.2", "other", "chrome", ClientUnknown, ReasonNoThreshold, ""},
 		{"Happ with no platform", "Happ/3.4.2", "", "chrome", ClientUnknown, ReasonNoThreshold, ""},
-		{"v2rayNG 1.9.45 (Xray 25.3.31) is below", "v2rayNG/1.9.45", "", "chrome", ClientBelow, ReasonVersion, "1.10.1"},
+		{"v2rayNG 1.9.45 (Xray 25.3.31) is below", "v2rayNG/1.9.45", "", "chrome", ClientBelow, ReasonVersion, "1.10.3"},
+		{"v2rayNG 1.10.1 (Xray 25.4.30, chrome = HelloChrome_120) is below", "v2rayNG/1.10.1", "android", "chrome", ClientBelow, ReasonVersion, "1.10.3"},
+		{"v2rayNG 1.10.2 (Xray 25.4.30) is below", "v2rayNG/1.10.2", "android", "chrome", ClientBelow, ReasonVersion, "1.10.3"},
+		{"v2rayNG 1.10.3 (Xray 25.5.16)", "v2rayNG/1.10.3", "android", "chrome", ClientOK, "", ""},
+		{"v2rayNG 1.10.3 with firefox needs 2.0.16", "v2rayNG/1.10.3", "android", "firefox", ClientBelow, ReasonVersion, "2.0.16"},
 		{"v2rayNG 2.3.15", "v2rayNG/2.3.15", "android", "firefox", ClientOK, "", ""},
 		{"v2rayN 7.12.6", "v2rayN/7.12.6", "windows", "chrome", ClientOK, "", ""},
 		{"sing-box SFA: no version works", "SFA/1.14.3", "android", "chrome", ClientUnsupported, ReasonApp, ""},
@@ -84,8 +88,14 @@ func TestClientVerdicts(t *testing.T) {
 		{"NekoBox", "NekoBox/Android", "android", "chrome", ClientUnsupported, ReasonApp, ""},
 		{"Mihomo 1.19.8 is below", "mihomo/1.19.8", "windows", "chrome", ClientBelow, ReasonVersion, "1.19.9"},
 		{"Mihomo 1.19.9", "mihomo/1.19.9", "linux", "chrome", ClientOK, "", ""},
-		{"Mihomo 1.19.33", "mihomo/1.19.33", "", "firefox", ClientOK, "", ""},
+		{"Mihomo 1.19.33 with chrome", "mihomo/1.19.33", "", "chrome", ClientOK, "", ""},
+		{"Mihomo 1.19.33: firefox is Firefox_120, no share", "mihomo/1.19.33", "", "firefox", ClientUnsupported, ReasonFingerprint, ""},
+		{"Mihomo 1.19.33: safari is Safari_16_0, no share", "mihomo/1.19.33", "", "safari", ClientUnsupported, ReasonFingerprint, ""},
+		{"Mihomo with firefox is the fingerprint even for an old core", "mihomo/1.19.8", "", "firefox", ClientUnsupported, ReasonFingerprint, ""},
+		{"Mihomo with firefox is the fingerprint without a version", "mihomo", "", "firefox", ClientUnsupported, ReasonFingerprint, ""},
 		{"kl!ck 0.5.1", "kl!ck/0.5.1", "windows", "chrome", ClientOK, "", ""},
+		{"kl!ck 0.5.1 with firefox", "kl!ck/0.5.1", "windows", "firefox", ClientUnsupported, ReasonFingerprint, ""},
+		{"kl!ck 0.5.1 with safari", "kl!ck/0.5.1", "macos", "safari", ClientUnsupported, ReasonFingerprint, ""},
 		{"FlClash: the core is not in its User-Agent", "FlClash/v0.8.60", "windows", "chrome", ClientUnknown, ReasonNoThreshold, ""},
 		{"Shadowrocket: an own implementation", "Shadowrocket/2086", "ios", "chrome", ClientUnknown, ReasonNoThreshold, ""},
 		{"Streisand: Xray-based, no version found", "Streisand/1.4", "ios", "chrome", ClientUnknown, ReasonNoThreshold, ""},
@@ -151,7 +161,8 @@ func TestClientDefaultsAreWellFormed(t *testing.T) {
 	// the numbers of the plan are the ones in code
 	for _, c := range []struct{ app, platform, chrome, other string }{
 		{"happ", "android", "3.1.1", "3.20.0"}, {"happ", "windows", "0.3.6", "2.10.0"}, {"happ", "ios", "", "4.8.0"},
-		{"v2rayng", "", "1.10.1", "2.0.16"}, {"v2rayn", "", "7.12.6", "7.20.0"}, {"mihomo", "", "1.19.9", "1.19.9"},
+		{"v2rayng", "", "1.10.3", "2.0.16"}, {"v2rayn", "", "7.12.6", "7.20.0"},
+		{"mihomo", "", "1.19.9", NeverVersion}, {"klick", "", "0.4.0", NeverVersion},
 	} {
 		i := slices.IndexFunc(clientDefaults, func(r ClientRule) bool { return r.App == c.app && r.Platform == c.platform })
 		if i < 0 || clientDefaults[i].MinChrome != c.chrome || clientDefaults[i].MinOther != c.other {
@@ -218,20 +229,24 @@ func TestOwnerChangesAreStoredAsTheDifference(t *testing.T) {
 func TestClientRulesRefuseWhatCannotBeOne(t *testing.T) {
 	ok := ClientRule{App: "supervpn", Core: CoreXray, MinChrome: "1.2.3"}
 	for name, r := range map[string]ClientRule{
-		"empty app":            {Core: CoreXray},
-		"long app":             {App: strings.Repeat("a", 41), Core: CoreXray},
-		"space in app":         {App: "super vpn", Core: CoreXray},
-		"app with a slash":     {App: "a/b", Core: CoreXray},
-		"app starts with dash": {App: "-a", Core: CoreXray},
-		"platform":             {App: "a", Platform: "other", Core: CoreXray},
-		"core":                 {App: "a", Core: "v2ray"},
-		"empty core":           {App: "a"},
-		"version words":        {App: "a", Core: CoreXray, MinChrome: "latest"},
-		"version dots":         {App: "a", Core: CoreXray, MinChrome: "1..2"},
-		"version tail dot":     {App: "a", Core: CoreXray, MinOther: "1.2."},
-		"version too deep":     {App: "a", Core: CoreXray, MinOther: "1.2.3.4.5"},
-		"version beta":         {App: "a", Core: CoreXray, MinOther: "1.2.3-beta"},
-		"never with a minimum": {App: "a", Core: CoreXray, Unsupported: true, MinOther: "1.2.3"},
+		"empty app":                       {Core: CoreXray},
+		"long app":                        {App: strings.Repeat("a", 41), Core: CoreXray},
+		"space in app":                    {App: "super vpn", Core: CoreXray},
+		"app with a slash":                {App: "a/b", Core: CoreXray},
+		"app starts with dash":            {App: "-a", Core: CoreXray},
+		"platform":                        {App: "a", Platform: "other", Core: CoreXray},
+		"core":                            {App: "a", Core: "v2ray"},
+		"empty core":                      {App: "a"},
+		"version words":                   {App: "a", Core: CoreXray, MinChrome: "latest"},
+		"version dots":                    {App: "a", Core: CoreXray, MinChrome: "1..2"},
+		"version tail dot":                {App: "a", Core: CoreXray, MinOther: "1.2."},
+		"version too deep":                {App: "a", Core: CoreXray, MinOther: "1.2.3.4.5"},
+		"version beta":                    {App: "a", Core: CoreXray, MinOther: "1.2.3-beta"},
+		"never with a minimum":            {App: "a", Core: CoreXray, Unsupported: true, MinOther: "1.2.3"},
+		"unsupported with the never mark": {App: "a", Core: CoreXray, Unsupported: true, MinOther: "never"},
+		"never for chrome":                {App: "a", Core: CoreXray, MinChrome: "never"},
+		"never half-typed":                {App: "a", Core: CoreXray, MinOther: "nev"},
+		"never with a suffix":             {App: "a", Core: CoreXray, MinOther: "never1"},
 	} {
 		if _, err := ClientOverridesOf([]ClientRule{r}); err == nil || !errors.Is(err, ErrClientRules) {
 			t.Errorf("%s: accepted (%v)", name, err)
@@ -255,5 +270,39 @@ func TestClientRulesRefuseWhatCannotBeOne(t *testing.T) {
 	}
 	if rows, err := ParseClientOverrides(" "); err != nil || rows != nil {
 		t.Errorf("empty stored value: %v, %v", rows, err)
+	}
+}
+
+// "never" is the mark of MinOther for an app whose core builds no post-quantum hello for firefox and safari: it is accepted (in any
+// case), stored as written in the table, never parsed as a version, and gives the fingerprint verdict for those two only.
+func TestNeverMark(t *testing.T) {
+	rows, err := ClientOverridesOf([]ClientRule{{App: "SuperVPN", Core: "mihomo", MinChrome: "v1.2.3", MinOther: " Never "}})
+	if err != nil || len(rows) != 1 || rows[0].MinOther != NeverVersion || rows[0].MinChrome != "1.2.3" {
+		t.Fatalf("never was not kept: %+v, %v", rows, err)
+	}
+	if _, ok := parseVersion(NeverVersion); ok {
+		t.Error("never read as a version")
+	}
+	raw, err := MarshalClientOverrides(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := ParseClientOverrides(raw)
+	if err != nil || len(back) != 1 || back[0].MinOther != NeverVersion {
+		t.Fatalf("round trip %q: %+v, %v", raw, back, err)
+	}
+	table := NewClientTable(back)
+	for _, c := range []struct{ fp, state, reason, need string }{
+		{"chrome", ClientBelow, ReasonVersion, "1.2.3"}, {"", ClientBelow, ReasonVersion, "1.2.3"},
+		{"firefox", ClientUnsupported, ReasonFingerprint, ""}, {"safari", ClientUnsupported, ReasonFingerprint, ""},
+	} {
+		if v := table.Verdict("supervpn/1.0.0", "", c.fp); v.State != c.state || v.Reason != c.reason || v.Need != c.need {
+			t.Errorf("never, %q: %+v", c.fp, v)
+		}
+	}
+	// no chrome threshold and "never" for the others: chrome stays unknown, it is not read from the mark
+	only := NewClientTable([]ClientRule{{App: "supervpn", Core: CoreMihomo, MinOther: NeverVersion}})
+	if v := only.Verdict("supervpn/9.0.0", "", "chrome"); v.State != ClientUnknown || v.Reason != ReasonNoThreshold {
+		t.Errorf("never without a chrome threshold, chrome: %+v", v)
 	}
 }

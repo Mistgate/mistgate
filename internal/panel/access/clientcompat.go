@@ -16,7 +16,8 @@ import (
 //
 // A rule is one app on one platform. Two thresholds, because the fingerprint of the profile decides which hello an app builds:
 // MinChrome for the Chrome-like one, MinOther for Firefox and Safari. ios, edge and random always send a classical share. An
-// empty threshold means "not known", and "not known" is a state of its own (unknown), never "outdated".
+// empty threshold means "not known", and "not known" is a state of its own (unknown), never "outdated". MinOther may also be
+// NeverVersion: no version of the app sends the share with a Firefox or Safari fingerprint (the verdict is the same as for ios).
 
 // The cores an app can run on. xray, mihomo and singbox send a classical share for a classical fingerprint without exception;
 // own (an own implementation) and unknown say nothing about it.
@@ -27,6 +28,9 @@ const (
 	CoreOwn     = "own"
 	CoreUnknown = "unknown"
 )
+
+// NeverVersion is the value of MinOther for an app that never sends the share with a Firefox or Safari fingerprint.
+const NeverVersion = "never"
 
 // The states of a device against the table.
 const (
@@ -68,18 +72,20 @@ func (r ClientRule) same(o ClientRule) bool {
 // clientDefaults is the built-in table. Every threshold is a release of the app (or of the core inside it) that was read in the
 // release notes or the source; the numbers are in the plan of the compatibility work (core-compat-plan, section 2.3):
 //
-//	Xray-core: chrome fingerprint from v25.4.30 (uTLS 1.7: Chrome 131 carries the share), firefox and safari from v26.3.23.
+//	Xray-core: chrome fingerprint from v25.5.16 (uTLS 1.7: Chrome 131 carries the share; v25.4.30 still builds HelloChrome_120,
+//	  a classical hello, and the share came with commit 7ddc4a25, first in the tag v25.5.16), firefox and safari from v26.3.23.
 //	Happ Android: 3.1.1 ships Xray 25.8.3, 3.20.0 ships 26.3.27 (2.7.1 ships 25.3.6: bad). Versions between are not documented;
 //	  the rule says "need 3.1.1", which is true for all of them.
 //	Happ Desktop (Windows, macOS, Linux): alpha 0.3.6 ships 25.8.3, 2.10.0 ships 26.3.27 (2.5.2 ships 26.2.6: bad). The App Store
 //	  build for macOS numbers like the iPhone one (4.x) and is not told apart from Desktop by its User-Agent.
 //	Happ iOS: 4.8.0 ships 26.3.27 (the chrome threshold of older ones is not found, so it stays empty).
-//	v2rayNG: 1.10.1 ships 25.4.30 (1.9.45 ships 25.3.31: bad), 2.0.16 ships 26.3.23.
+//	v2rayNG: 1.10.3 ships 25.5.16 (1.10.1 and 1.10.2 ship 25.4.30, 1.9.45 ships 25.3.31: bad), 2.0.16 ships 26.3.23.
 //	v2rayN: the app does not pin the core (it can be updated separately); the bundle of 7.12.6 has 25.5.16, of 7.20.0 has 26.3.27.
 //	Mihomo: the core sends the share only from 1.19.9 on and only when the profile asks for it (support-x25519mlkem768), which
-//	  a strict profile does. Older cores never.
-//	kl!ck: Mihomo unmodified; its first release (0.4.0) asks as mihomo/1.19.31, so every release has the share. The device row keeps
-//	  kl!ck's own version, not its core's.
+//	  a strict profile does. Older cores never. The flag acts on the chrome fingerprint only: metacubex/utls builds firefox as
+//	  Firefox_120 and safari as Safari_16_0, which carry no share in any version, so MinOther is NeverVersion.
+//	kl!ck: Mihomo unmodified; its first release (0.4.0) asks as mihomo/1.19.31, so every release has the share with chrome and
+//	  none with firefox or safari. The device row keeps kl!ck's own version, not its core's.
 //	sing-box (SFA, SFI, SFM, SFT), Karing, NekoBox: the REALITY client removes the share unconditionally; no version helps.
 //	Hiddify (its sing-box fork added a key_share option on 2026-10-27), Streisand, FoXray, v2RayTun, INCY, OneXray, Shadowrocket,
 //	FlClash, Clash Verge, Mihomo Party, Clash Meta for Android: the version-to-core mapping is not published; unknown.
@@ -89,10 +95,10 @@ var clientDefaults = []ClientRule{
 	{App: "happ", Platform: "macos", Core: CoreXray, MinChrome: "0.3.6", MinOther: "2.10.0", Title: "Happ"},
 	{App: "happ", Platform: "linux", Core: CoreXray, MinChrome: "0.3.6", MinOther: "2.10.0", Title: "Happ"},
 	{App: "happ", Platform: "ios", Core: CoreXray, MinOther: "4.8.0", Title: "Happ"},
-	{App: "v2rayng", Core: CoreXray, MinChrome: "1.10.1", MinOther: "2.0.16", Title: "v2rayNG"},
+	{App: "v2rayng", Core: CoreXray, MinChrome: "1.10.3", MinOther: "2.0.16", Title: "v2rayNG"},
 	{App: "v2rayn", Core: CoreXray, MinChrome: "7.12.6", MinOther: "7.20.0", Title: "v2rayN"},
-	{App: "klick", Core: CoreMihomo, MinChrome: "0.4.0", MinOther: "0.4.0", Title: "kl!ck"},
-	{App: "mihomo", Core: CoreMihomo, MinChrome: "1.19.9", MinOther: "1.19.9", Title: "Mihomo core"},
+	{App: "klick", Core: CoreMihomo, MinChrome: "0.4.0", MinOther: NeverVersion, Title: "kl!ck"},
+	{App: "mihomo", Core: CoreMihomo, MinChrome: "1.19.9", MinOther: NeverVersion, Title: "Mihomo core"},
 	{App: "singbox", Core: CoreSingbox, Unsupported: true, Title: "sing-box (SFA, SFI, SFM)"},
 	{App: "karing", Core: CoreSingbox, Unsupported: true, Title: "Karing"},
 	{App: "nekobox", Core: CoreSingbox, Unsupported: true, Title: "NekoBox"},
@@ -159,12 +165,15 @@ func cleanClientRule(r ClientRule) (ClientRule, error) {
 	}
 	for _, v := range []*string{&r.MinChrome, &r.MinOther} {
 		*v = strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(*v), "v"), "V")
-		if *v == "" {
+		if *v == "" || (v == &r.MinOther && strings.EqualFold(*v, NeverVersion)) {
 			continue
 		}
 		if !clientVersionRE.MatchString(*v) {
-			return r, badRule("version %q: digits and dots, like 1.19.9", *v)
+			return r, badRule("version %q: digits and dots, like 1.19.9 (\"never\" for firefox/safari only)", *v)
 		}
+	}
+	if strings.EqualFold(r.MinOther, NeverVersion) {
+		r.MinOther = NeverVersion
 	}
 	if r.Unsupported && (r.MinChrome != "" || r.MinOther != "") {
 		return r, badRule("%s: an app that does not work has no minimum version", r.App)
@@ -326,6 +335,8 @@ func (t ClientTable) Verdict(client, platform, fingerprint string) ClientVerdict
 			return ClientVerdict{State: ClientUnsupported, Reason: ReasonFingerprint, Title: title}
 		}
 		return ClientVerdict{State: ClientUnknown, Reason: ReasonNoThreshold, Title: title}
+	case (fp == "firefox" || fp == "safari") && r.MinOther == NeverVersion:
+		return ClientVerdict{State: ClientUnsupported, Reason: ReasonFingerprint, Title: title}
 	}
 	v, ok := parseVersion(ver)
 	if !ok {
@@ -343,7 +354,7 @@ func (t ClientTable) Verdict(client, platform, fingerprint string) ClientVerdict
 			return ClientVerdict{State: ClientOK, Title: title}
 		}
 		return ClientVerdict{State: ClientBelow, Reason: ReasonVersion, Need: own, Title: title}
-	case other != "" && (fp != "firefox" && fp != "safari"):
+	case other != "" && other != NeverVersion && (fp != "firefox" && fp != "safari"):
 		if min, _ := parseVersion(other); compareVersions(v, min) >= 0 {
 			return ClientVerdict{State: ClientOK, Title: title}
 		}

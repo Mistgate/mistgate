@@ -177,14 +177,14 @@ REALITY 握手可以携带后量子密钥份额（X25519MLKEM768）。较新的 
 | Happ，Android | 3.1.1 | 3.20.0 |
 | Happ，Windows、macOS、Linux | 0.3.6 | 2.10.0 |
 | Happ，iOS | 未知 | 4.8.0 |
-| v2rayNG | 1.10.1 | 2.0.16 |
+| v2rayNG | 1.10.3 | 2.0.16 |
 | v2rayN | 7.12.6 | 7.20.0 |
-| Mihomo 内核（版本取自 User-Agent） | 1.19.9 | 1.19.9 |
-| kl!ck（按其自身版本；内部是 Mihomo） | 0.4.0 | 0.4.0 |
+| Mihomo 内核（版本取自 User-Agent） | 1.19.9 | 从不（Firefox_120 / Safari_16_0 不带该份额） |
+| kl!ck（按其自身版本；内部是 Mihomo） | 0.4.0 | 从不（Firefox_120 / Safari_16_0 不带该份额） |
 | sing-box（SFA、SFI、SFM）、Karing、NekoBox | 不可用 | 不可用 |
 | Hiddify、Streisand、FoXray、v2RayTun、INCY、OneXray、Shadowrocket、FlClash、Clash Verge、Mihomo Party、Clash Meta for Android | 未知 | 未知 |
 
-Mihomo 与 kl!ck 只有在配置要求时才会发送该份额（`support-x25519mlkem768`），而面板目前的 Mihomo 配置并不要求；对它们而言，表格说明的是内核能做什么，而不是现在做了什么。设备按其最近一次上报的应用字符串判断，因此链接的共用位置显示的是最后一次访问的那个应用。
+Mihomo 内核只在 chrome fingerprint 下发送该份额：`support-x25519mlkem768` 开关只对它生效，而 firefox 和 safari 在 Mihomo 中由不带该份额的指纹构建，所有版本皆然。因此在 firefox 或 safari 配置下，Mihomo 与 kl!ck 会因 fingerprint 显示为不支持。Mihomo 与 kl!ck 只有在配置要求时才会发送该份额（`support-x25519mlkem768`），而面板目前的 Mihomo 配置并不要求；对它们而言，表格说明的是内核能做什么，而不是现在做了什么。设备按其最近一次上报的应用字符串判断，因此链接的共用位置显示的是最后一次访问的那个应用。
 
 所有者可以修改任意值、添加应用（名称为该应用在 User-Agent 中 `/` 之前写的内容，小写），并把某一行恢复为内置值。保存需要 step-up，并以 `client_compat.update` 写入审计日志。只保存与内置表的差异，所以你没动过的行会跟随面板的版本更新。协作者和只读管理员只能看到表格，没有输入框。
 

@@ -17,8 +17,13 @@ const cols = "@min-[720px]:grid-cols-[minmax(0,1fr)_72px_120px_120px_80px_96px]"
 const versionCls = `${inputCls} max-w-24 font-mono`;
 const selectCls = "h-10! rounded-field! text-[13px]!";
 
-/** Only digits and dots: a version, not a sentence. */
-const versionOnly = (v: string) => v.replace(/[^0-9.]/g, "").slice(0, 32);
+/** The mark of the firefox/safari field for an app that never sends the share with those fingerprints (the server's "never"). */
+const never = "never";
+/** Only digits and dots: a version, not a sentence; the firefox/safari field also takes the word "never" (typed letter by letter). */
+const versionOnly = (v: string, canNever: boolean) => {
+  const w = v.trim().toLowerCase();
+  return canNever && w && never.startsWith(w) ? w : v.replace(/[^0-9.]/g, "").slice(0, 32);
+};
 /** The name an app writes in its User-Agent before "/", the way the table keeps it. */
 const appId = (v: string) => v.toLowerCase().replace(/[\s/]/g, "").slice(0, 40);
 
@@ -130,17 +135,17 @@ function RuleRow({ t, rule, def, owner, onPatch, onRevert, onRemove }: { t: Tx; 
     owner ? (
       <input
         type="text"
-        inputMode="decimal"
+        inputMode={field === "minOther" ? "text" : "decimal"}
         autoComplete="off"
         spellCheck={false}
         aria-label={aria}
         placeholder="?"
         value={value}
-        onChange={(e) => onPatch({ [field]: versionOnly(e.target.value) })}
+        onChange={(e) => onPatch({ [field]: versionOnly(e.target.value, field === "minOther") })}
         className={versionCls}
       />
     ) : value ? (
-      <span className="font-mono text-[13px]">{value}</span>
+      <span className="font-mono text-[13px]">{field === "minOther" && value === never ? t("cc.min.never") : value}</span>
     ) : (
       <span title={t("cc.min.unknownVer")} className="font-mono text-[13px] text-faint">
         ?

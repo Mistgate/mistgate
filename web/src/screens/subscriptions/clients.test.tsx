@@ -455,6 +455,21 @@ describe("minimum versions", () => {
     expect(text()).not.toContain("Unsaved changes");
   });
 
+  it("takes the word never in the firefox/safari field only, and keeps nothing else that is not a version", async () => {
+    await mount();
+    await click(button("Show the table"));
+    const other = document.querySelector<HTMLInputElement>("input[aria-label='Mihomo: version for firefox/safari']")!;
+    await typeInto(other, "never");
+    expect(other.value).toBe("never");
+    await typeInto(other, "nevx");
+    expect(other.value).toBe("");
+    await typeInto(other, "x1.2");
+    expect(other.value).toBe("1.2");
+    const chrome = document.querySelector<HTMLInputElement>("input[aria-label='Mihomo: version for chrome']")!;
+    await typeInto(chrome, "never");
+    expect(chrome.value).toBe("");
+  });
+
   it("takes a change back with Revert and shows no bar for an edit that ends where it began", async () => {
     await mount();
     await click(button("Show the table"));

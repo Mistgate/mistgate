@@ -177,14 +177,14 @@ Below the list, **Minimum versions** holds the table behind the states: per app 
 | Happ, Android | 3.1.1 | 3.20.0 |
 | Happ, Windows, macOS, Linux | 0.3.6 | 2.10.0 |
 | Happ, iOS | unknown | 4.8.0 |
-| v2rayNG | 1.10.1 | 2.0.16 |
+| v2rayNG | 1.10.3 | 2.0.16 |
 | v2rayN | 7.12.6 | 7.20.0 |
-| Mihomo core (the version comes from the User-Agent) | 1.19.9 | 1.19.9 |
-| kl!ck (its own version; it is Mihomo inside) | 0.4.0 | 0.4.0 |
+| Mihomo core (the version comes from the User-Agent) | 1.19.9 | never (Firefox_120 / Safari_16_0 carry no share) |
+| kl!ck (its own version; it is Mihomo inside) | 0.4.0 | never (Firefox_120 / Safari_16_0 carry no share) |
 | sing-box (SFA, SFI, SFM), Karing, NekoBox | does not work | does not work |
 | Hiddify, Streisand, FoXray, v2RayTun, INCY, OneXray, Shadowrocket, FlClash, Clash Verge, Mihomo Party, Clash Meta for Android | unknown | unknown |
 
-Mihomo and kl!ck send the share only when the config asks for it (`support-x25519mlkem768`), and the panel's Mihomo profile does not ask today; for them the table says what the core can do, not what it does now. A device is judged by the app string it reported last, so a shared place reports whichever app fetched last.
+The Mihomo core sends the share only with the chrome fingerprint: the `support-x25519mlkem768` flag acts on it alone, and Mihomo builds firefox and safari from fingerprints without the share, in every version. So with a firefox or safari profile Mihomo and kl!ck are shown as unsupported by the fingerprint. Mihomo and kl!ck send the share only when the config asks for it (`support-x25519mlkem768`), and the panel's Mihomo profile does not ask today; for them the table says what the core can do, not what it does now. A device is judged by the app string it reported last, so a shared place reports whichever app fetched last.
 
 The owner can correct any value, add an app (its name is what it writes in the User-Agent before the `/`, in lower case) and return a row to the built-in value. Saving needs a step-up and is written to the audit log as `client_compat.update`. Only the differences from the built-in table are stored, so a row you never touched follows the panel's releases. Helpers and read-only admins see the table without the fields.
 
