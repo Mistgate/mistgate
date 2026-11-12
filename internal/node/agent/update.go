@@ -257,6 +257,10 @@ func (a *Agent) commitWatch(ctx context.Context, m *update.Marker) {
 // applyUpdate answers one UpdateAgent. Everything but the exec itself happens here; the CommandResult is on the wire
 // before the engines are drained and the process is replaced.
 func (a *Agent) applyUpdate(s *session, r *pb.UpdateAgent) {
+	if a.osJobActive() { // dpkg is busy and the host may reboot: not the time to replace this binary
+		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "busy", Detail: "an OS update job is running"}))
+		return
+	}
 	if a.upd == nil {
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "unsigned_build"}))
 		return
@@ -271,6 +275,10 @@ func (a *Agent) applyUpdate(s *session, r *pb.UpdateAgent) {
 }
 
 func (a *Agent) rollbackUpdate(s *session, r *pb.RollbackAgent) {
+	if a.osJobActive() {
+		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "busy", Detail: "an OS update job is running"}))
+		return
+	}
 	if a.upd == nil {
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "unsigned_build"}))
 		return

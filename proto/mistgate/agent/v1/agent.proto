@@ -115,7 +115,7 @@ package mistgate.agent.v1;
 //     empty list hash alike (no lines), so the hash of a node without forwards is what it was before they existed.
 //
 // COMMANDS
-//   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel, MeasureBandwidth, UdpCount, UdpSend, HttpMark and TcpProbe carry a request_id and get exactly one CommandResult. Removing a
+//   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel, UpdateOs, MeasureBandwidth, UdpCount, UdpSend, HttpMark and TcpProbe carry a request_id and get exactly one CommandResult. Removing a
 //   credential from the desired state implicitly kicks its sessions; the explicit Kick is for "kick now,
 //   keep access" and for diagnostics.
 //   Kick is best effort in Hysteria2: the core can only close a connection from inside a traffic callback,
@@ -357,6 +357,58 @@ package mistgate.agent.v1;
 //     A run that ended while the agent was down is reported when it starts again; a run whose job stopped writing its
 //     status (the host rebooted, the unit was killed) ends as failed / interrupted.
 //
+// OS UPDATES (additive, protocol api_version stays 1)
+//   "os-status/1" is the read-only half (OsStatus, NodeSettings.os_status). "os-update/1" is the write half: UpdateOs asks the
+//   node to run ONE job. The panel does not send UpdateOs yet (a later step); the node can also run the same job by hand:
+//   `mistgate-node host os-update` (docs: operations/updates.md).
+//   - WHAT RUNS. The agent never installs a package inside its own sandboxed unit. A job is `<this binary> host os-update
+//     --yes ...`, started as a separate transient systemd unit (systemd-run, name mistgate-os-update, RuntimeMaxSec 75
+//     minutes, KillMode=mixed: a stop signals the job only and the job waits for the apt step it is in). The command line is built from the enumerated UpdateOs fields only; no package name, path or shell string
+//     comes from the wire. One job per host: UpdateOs while one runs (or while an agent update, a unit refresh, the
+//     AmneziaWG kernel module build or the security-updates task runs) is answered running / unsupported code busy.
+//   - UpdateOs combinations: refresh+never, upgrade+(security|all)+(never|if_required), reboot+(if_required|always).
+//     Anything else is answered unsupported / bad_request. Unsupported distributions answer unsupported_os (supported:
+//     Ubuntu 22.04, 24.04, 26.04, Debian 12, 13, with systemd as PID 1).
+//   - CommandResult params.state: started (job_id) | running (job_id of the one going) | finished (the request repeats the job_id of
+//     the last job, which is over: params result done | failed, code, reason; nothing is started, so a repeated "reboot
+//     always" is never a second reboot) | unsupported (code, reason). Only the last job is remembered. After unsupported, a busy
+//     answer or a failed job, the panel sends its next attempt under a NEW job_id; the same id only ever returns the old result.
+//   - BEFORE A REBOOT the job refuses (reboot = held, state = failed, code = the first reason, reason names all of them) when:
+//     the host booted less than 10 minutes ago (too_soon); for a job whose id starts with osj_, the node was rebooted by such a
+//     job less than an hour ago or three times in 24 hours, or the reboot history kept next to the status file cannot be trusted
+//     (reboot_limit; jobs started by hand, manual- ids, are not limited); apt or dpkg is busy, or the dpkg lock cannot be taken
+//     (apt_lock); a package is half-installed or half-configured (dpkg_interrupted); the kernel the next boot starts cannot be
+//     told (kernel_unknown) or is older than the running one (kernel_older); the AmneziaWG module is loaded (or the agent says its
+//     engine runs on the kernel module: UpdateOs needs no field for it) and is not built for every kernel the boot menu can end up
+//     on, i.e. the newest installed one and each lower one that is not older than the running kernel (awg_module_missing); the
+//     image or initramfs of one of those kernels is missing or cut short (initramfs_missing); /boot is nearly full while the
+//     kernel changes (boot_full); GRUB may not start its first entry: no /boot/grub/grub.cfg, GRUB_DEFAULT other than 0 in
+//     /etc/default/grub or /etc/default/grub.d/*.cfg, a saved_entry or next_entry in grub-editenv, or grub-editenv unreadable
+//     (boot_default_custom). The checks look at the kernels of the next boot also when none is new. After the checks pass the
+//     dpkg lock (an open file description lock) is held until the reboot. "reboot always" skips only the "is a reboot needed" test.
+//   - THE MODULE'S PACKAGES are never removed by the job, and it installs no package for the module (not the kernel headers
+//     either). When the module's own DKMS build fails (dpkg's repair, the install, or dkms autoinstall for the new kernel), the
+//     job stops with failed / awg_module_build_failed, package = linux-headers-<kernel> whose configuration runs the build, the
+//     kernel in the reason: nothing is removed, nothing more is installed, the reboot is held (when one was asked for), and the
+//     module that is loaded serves until the next boot. A dkms build that fails without a make.log of the module (headers
+//     missing) only leaves the module missing for that kernel: awg_module_missing.
+//   - OsJob.state running | done | failed; phase preflight | waiting_lock | repairing | refreshing | installing | awg_module |
+//     checking | rebooting; reboot done | not_required | held | not_asked; code (failed) unsupported_os | no_systemd |
+//     bad_request | busy | disk_full | apt_lock | dpkg_broken | security_source_failed | refresh_failed | install_failed |
+//     auto_reboot_conflict | dpkg_interrupted | awg_module_missing | awg_module_build_failed | kernel_unknown | kernel_older |
+//     boot_full | initramfs_missing | boot_default_custom | too_soon | reboot_limit | reboot_failed | timeout | interrupted |
+//     cancelled | launch_failed, and after a
+//     reboot kernel_not_switched | awg_module_not_loaded | inbound_failed (the job did reboot the host; reboot = done).
+//     reason is one fixed English sentence (package names are checked against ^[a-z0-9][a-z0-9.+-]{0,63}$, addresses are
+//     never in it); apt's own output stays in the journal of the unit, cut and without addresses.
+//   - SURVIVING A RESTART. The job keeps its state in a file in the state directory, with a heartbeat every 15 seconds. The
+//     agent follows it (also after its own restart) and raises one event per job: os_update_started {job_id, action, mode},
+//     os_update_done {job_id, upgraded, reboot, kernel}, os_update_failed {job_id, code, reason, package}, os_reboot_started
+//     {job_id, kernel_from, kernel_to}. A job whose heartbeat stopped while it was rebooting is done when the boot id changed
+//     (the host really restarted) and failed / reboot_failed when it did not; any other silent job is failed / interrupted.
+//     After a reboot the agent checks the kernel it expected and that the AmneziaWG module is loaded again.
+//   - OsStatus.job carries the running job or the last unreported one; the snapshot is sent when the job file changes.
+
 // RELAY FORWARDS (additive, protocol api_version stays 1)
 //   A node can pass the encrypted traffic of a port straight on to a server on another node (an "entry" in front of an
 //   "exit"): the kernel rewrites the destination (nftables DNAT) and the source (masquerade), the entry never decrypts
@@ -694,11 +746,12 @@ message OsStatus {
   string awg_module_next = 18; // ready | missing | empty when not relevant
   string container = 19;
   string boot_id_hash = 20; // first 16 hex characters of SHA-256(boot_id), never the raw boot id
-  OsJob job = 21; // reserved for the later update-job stage; unset in S1
+  OsJob job = 21; // the running OS job, or the last one not yet reported; unset when there is none
   string error = 22; // not_apt | no_systemd | read_failed
 }
 
-// Reserved S1 data shape for the job stages. S1 never populates or starts a job.
+// The running OS job, or the last one the panel has not been told about yet (OsStatus.job). Strings are the vocabulary of
+// "OS UPDATES"; reason is one fixed English sentence, never package-manager output.
 message OsJob {
   string job_id = 1;
   string action = 2;
@@ -796,7 +849,8 @@ message Hello {
   // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
-  // "os-status/1" permits read-only OsStatus snapshots. It never advertises a write action: "os-update/1" is reserved for the write steps.
+  // "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
+  // by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
   // Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -1241,6 +1295,7 @@ enum Severity {
 // restart_command | config_changed. state_applied {revision, inbounds, added, removed, changed, users}.
 // AWG and WARP (see "AWG AND WARP"): awg_backend_unavailable, warp_state, warp_needs_attention, awg_kernel_prepare_started,
 // awg_kernel_prepare_done, awg_kernel_prepare_failed.
+// OS jobs (see "OS UPDATES"): os_update_started, os_update_done, os_update_failed, os_reboot_started.
 message Event {
   Severity severity = 1;
   string code = 2;
@@ -1379,6 +1434,8 @@ message ConnectResponse {
     DebugCapture debug_capture = 40;
     // Acknowledges a stored DebugCaptureReport eof. The agent keeps the finished capture until this arrives.
     DebugCaptureAck debug_capture_ack = 41;
+    // Only sent to agents with "os-update/1" in Hello.capabilities (see UpdateOs).
+    UpdateOs update_os = 34;
   }
 }
 
@@ -1515,6 +1572,28 @@ message CountryProbeTarget {
 message PrepareAwgKernel {
   string request_id = 1;
   bool dry_run = 2;
+}
+
+// Ask the node to run one OS job: refresh the package lists, install updates, and/or reboot. Only sent to a stream that
+// listed "os-update/1". Answered with exactly one CommandResult (ok = true unless the job could not be started: error
+// "failed: <short>"); params.state is started (job_id) | running (job_id of the one going) | finished (job_id repeats the
+// last job, which is over: result, code, reason) | unsupported (code, reason).
+//
+// Every field is an enumeration or an opaque id. The panel never sends a package name, a path or a command line, and the
+// node checks every value again: an unknown action, mode or reboot value, or a combination below that is not allowed,
+// is answered unsupported / code bad_request and nothing is run. What runs is decided on the node (see "OS UPDATES").
+message UpdateOs {
+  string request_id = 1;
+  // refresh: apt-get update only. upgrade: install updates (mode), then reboot per `reboot`. reboot: no package change,
+  // only the reboot.
+  string action = 2;
+  // upgrade only (empty otherwise): security (unattended-upgrade) | all (apt-get upgrade --with-new-pkgs).
+  string mode = 3;
+  // never (refresh, upgrade) | if_required (upgrade, reboot) | always (reboot). refresh needs never; reboot needs
+  // if_required or always.
+  string reboot = 4;
+  // osj_ + [a-z0-9_-]{1,48}, made by the panel; echoed in OsJob and the events. Empty = the node makes one.
+  string job_id = 5;
 }
 
 message HelloAck {

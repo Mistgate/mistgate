@@ -101,6 +101,8 @@ type Config struct {
 	OSUpdateReader *osupdate.Reader
 	// OSUpdateCapability replaces host detection in tests; nil uses Linux/root/systemd detection.
 	OSUpdateCapability func() bool
+	// OSUpdate runs OS jobs on request (internal/node/osupdate). Nil = this agent does not list "os-update/1".
+	OSUpdate *osupdate.Controller
 	// AwgPrepare builds the AmneziaWG kernel module on request (internal/node/awgprep). Nil = this agent does not list
 	// "awg-prepare/1", and the admin UI keeps showing the manual command.
 	AwgPrepare *awgprep.Controller
@@ -140,6 +142,8 @@ type Agent struct {
 	osUpdateMonitor    *osupdate.Monitor
 	osStatusWake       chan struct{}
 	osStatusDelay      time.Duration
+	osJobWake          chan struct{}
+	osJobWatch         time.Duration // 0 = 5 s: how often the OS job's status file is read
 
 	torrentEventsMu sync.Mutex
 	torrentEvents   map[string]time.Time
@@ -400,6 +404,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		nets:          nets.New(0),
 		networkWake:   make(chan struct{}, 1),
 		osStatusWake:  make(chan struct{}, 1),
+		osJobWake:     make(chan struct{}, 1),
 		osStatusDelay: osStatusConnectDelay,
 		log:           slog.New(&ringHandler{ring: ring, journal: journal, dbg: dbg, inner: inner}),
 		engines:       map[string]engine.Engine{},
@@ -557,6 +562,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.cfg.AwgPrepare != nil {
 		loops = append(loops, a.prepareLoop)
+	}
+	if a.cfg.OSUpdate != nil {
+		a.cfg.OSUpdate.SetSettled(a.osSettled)
+		loops = append(loops, a.osUpdateLoop)
 	}
 	for _, f := range loops {
 		wg.Add(1)
@@ -1129,6 +1138,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.applyFix(s, m.ApplyFix) })
 	case *pb.ConnectResponse_PrepareAwgKernel:
 		a.goBusy(func() { a.prepareAwgKernel(s, m.PrepareAwgKernel) })
+	case *pb.ConnectResponse_UpdateOs:
+		a.goBusy(func() { a.updateOs(s, m.UpdateOs) })
 	case *pb.ConnectResponse_MeasureBandwidth:
 		a.goBusy(func() { a.measureBandwidth(s, m.MeasureBandwidth) })
 	case *pb.ConnectResponse_UdpCount:

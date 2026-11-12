@@ -374,6 +374,7 @@ func requestKind(frame *agentv1.ConnectResponse) PendingRequestKind {
 		frame.GetRollbackAgent() != nil,
 		frame.GetMeasureBandwidth() != nil,
 		frame.GetPrepareAwgKernel() != nil,
+		frame.GetUpdateOs() != nil,
 		frame.GetUdpCount() != nil,
 		frame.GetUdpSend() != nil,
 		frame.GetHttpMark() != nil,

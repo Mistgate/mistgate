@@ -317,7 +317,45 @@ journalctl -u mistgate -n 50
 - 适用于带 systemd 的 Debian 和 Ubuntu。其他系统以及 Agent 版本早于此功能的节点显示**不可用**并说明原因。
 - 只有面板以 root 运行时才会读取面板自己所在的服务器；否则该行会提示手动检查。
 
-目前这一层只做展示：从面板安装更新和重启将在后续版本中提供，在此之前请通过 SSH 更新服务器。Cloudflare 版没有这一层。MCP 工具 `os_updates_status` 返回同样的已保存数据；它不会联系节点。
+目前这一层只做展示：从面板安装更新和重启将在后续版本中提供，在此之前请通过 SSH 或[在节点上手动运行](#在节点上手动运行)中的命令更新服务器。Cloudflare 版没有这一层。MCP 工具 `os_updates_status` 返回同样的已保存数据；它不会联系节点。
+
+### 在节点上手动运行
+
+从面板运行将在下一个版本提供；目前面板不会发送操作系统任务。节点自己可以执行这个任务，所有者可以通过 SSH 在单台服务器上启动它（以 root 运行；Debian 12 或 13，Ubuntu 22.04、24.04 或 26.04，需带 systemd）：
+
+```
+mistgate-node host os-update --action upgrade --mode security --reboot if-required        # 只打印计划，不执行
+systemd-run --unit=mistgate-os-update --collect --property=KillMode=mixed --property=TimeoutStopSec=600 \
+  mistgate-node host os-update --yes --action upgrade --mode security --reboot if-required
+```
+
+| 选项 | 取值 |
+|---|---|
+| `--action` | `refresh`（只刷新软件包列表）、`upgrade`（安装更新；默认）、`reboot`（不改动软件包，只重启）。 |
+| `--mode` | `security`（`unattended-upgrade` 所安装的内容；默认）或 `all`（`apt-get upgrade --with-new-pkgs`）。仅与 `upgrade` 一起使用。 |
+| `--reboot` | `never`（默认）、`if-required`（仅在需要重启时）或 `always`。`refresh` 只能用 `never`，`upgrade` 用 `never` 或 `if-required`，`reboot` 用 `if-required` 或 `always`。 |
+| `--awg-required` | 将 AmneziaWG 内核模块视为必需。只要该模块已加载，命令本来就将其视为必需。 |
+
+不带 `--yes` 时，命令只打印计划。请像第二行那样把它作为独立的 unit 运行，这样断开的 SSH 会话不会打断 `dpkg`。它按顺序执行：检查系统和可用空间；最多等待其他包管理器 15 分钟；若有被中断的软件包安装，先用 `dpkg --configure -a` 完成；运行 `apt-get update`；安装更新；在 Ubuntu 上为新安装的内核构建 AmneziaWG 模块（DKMS）；仅在最后一步、且仅在被要求时才重启。
+
+重启之前，命令会检查，并在以下情况下拒绝：不会重启任何东西，任务以失败结束，重启状态为**已暂缓**：
+
+- apt 或 `dpkg` 正忙（`apt_lock`）；
+- 有软件包安装被中断、处于半安装或半配置状态（`dpkg_interrupted`，会列出软件包名）；
+- 无法确定下次启动所用的内核（`kernel_unknown`），或它比正在运行的内核更旧（`kernel_older`）；
+- AmneziaWG 模块已加载（或给出了 `--awg-required`），而尚未为启动菜单可能进入的每个内核构建：已安装的最新内核，以及每个不比正在运行的内核更旧的较低内核（`awg_module_missing`）；
+- 这些内核之一的映像或 initramfs 缺失或不完整（`initramfs_missing`），或内核变更时 `/boot` 可用空间不足 50 MB（`boot_full`）；
+- GRUB 可能不会启动第一项：没有 `/boot/grub/grub.cfg`，`/etc/default/grub` 或 `/etc/default/grub.d/*.cfg` 中的 `GRUB_DEFAULT` 不是 `0`，`grub-editenv list` 显示 `saved_entry` 或 `next_entry`，或 `grub-editenv` 无法读取（`boot_default_custom`）；
+- 服务器启动不足 10 分钟（`too_soon`）：节点不会被循环重启；
+- 对面板发送的任务（标识以 `osj_` 开头）：该节点不足一小时前已被此类任务重启过，或 24 小时内已重启三次，或 `os-update.json` 旁边的重启历史无法读取或比时钟更超前（`reboot_limit`）。手动启动的命令不受此限制。
+
+检查通过后，命令会获取 dpkg 锁并一直持有到重启，避免其间有其他包管理器启动。
+
+`--reboot always` 只跳过“是否需要重启”这一问题，不会跳过这些检查。命令从不移除 AmneziaWG 软件包，也不为该模块安装任何软件包，连内核头文件也不装。模块自己的 DKMS 构建失败时，命令以 `awg_module_build_failed` 停止，并指出内核以及其配置会触发构建的 `linux-headers-<内核>` 软件包：不移除任何东西，之后也不再安装任何东西，（若要求重启）重启被暂缓，已加载的模块继续工作到下次启动。请在任何重启之前修复构建（其 `make.log` 位于 `/var/lib/dkms/amneziawg`）。DKMS 因其他原因失败时，例如新内核的头文件未安装，只会使模块缺少该内核的版本并暂缓重启（`awg_module_missing`）。其他拒绝原因：`unsupported_os`（上述列表之外的任何系统）、`no_systemd`、`disk_full`、`security_source_failed`（无法刷新安全软件源；其他失败的源只会被列出）、`install_failed`（会指出软件包）、`auto_reboot_conflict`（`unattended-upgrades` 被设置为自行重启，这会绕过上述检查：请关闭 `Automatic-Reboot` 或使用 `--mode all`）、`busy`（另一个操作系统任务、Agent 更新或模块构建正在进行）。
+
+状态保存在 Agent 状态目录（默认 `/var/lib/mistgate-node`）的 `os-update.json` 中，因此在 Agent 重启和重启本身之后依然保留。重启后，Agent 找到该文件，检查服务器是否回到预期的内核、此前使用过 AmneziaWG 模块的地方该模块是否已重新加载、节点的入站是否已恢复；结果是节点“历史”标签页上的一条事件（`os_update_done`，或带代码的 `os_update_failed`）。`apt` 的输出保留在该 unit 的日志中（`journalctl -u mistgate-os-update`），经过截断且不含地址。安装开始之前可用 `systemctl stop mistgate-os-update` 取消：在 `KillMode=mixed` 下，信号只发给命令本身，已经开始的 `apt` 会让它运行完（至多到 `TimeoutStopSec`）。向 Agent 再次发送相同的任务标识时，返回该任务的结果，不会启动任何东西；被拒绝或失败后，面板会用新的任务标识发送下一次尝试。
+
+它不会做的事：不修改软件源，不运行 `dist-upgrade` 和 `autoremove`（旧内核会保留），不升级发行版，不更改节点的 AmneziaWG 后端设置，也不触碰 Agent 自身的二进制文件。Agent 版本早于此版本的节点没有这个命令。
 
 ## 通过 API 和 MCP 更新
 

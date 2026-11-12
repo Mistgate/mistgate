@@ -31,7 +31,7 @@ func (a *Agent) sendOsStatusSnapshot(s *session) {
 		return
 	}
 	if status := a.osUpdateMonitor.Snapshot(); status != nil {
-		s.send(osStatusMessage(status))
+		s.send(osStatusMessage(a.withOsJob(status)))
 	}
 }
 
@@ -50,7 +50,7 @@ func (a *Agent) pollOsStatus(ctx context.Context) (*pb.OsStatus, bool) {
 	}
 	if read && changed && status != nil {
 		if s := a.cur.Load(); s != nil {
-			s.send(osStatusMessage(status))
+			s.send(osStatusMessage(a.withOsJob(status)))
 		}
 	}
 	return status, read

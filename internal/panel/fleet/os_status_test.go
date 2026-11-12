@@ -6,6 +6,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/proto"
 )
@@ -46,7 +47,6 @@ func TestOsStatusValidationBoundsUntrustedFieldsAndRejectsAddresses(t *testing.T
 		{"IPv6 version", func(s *agentv1.OsStatus) { s.DistroVersion = "release-2001:db8::77" }},
 		{"IPv4 kernel", func(s *agentv1.OsStatus) { s.KernelRunning = netip.MustParseAddr("198.51.100.7").String() }},
 		{"address package", func(s *agentv1.OsStatus) { s.Held = []string{"203.0.113.77"} }},
-		{"S1 job", func(s *agentv1.OsStatus) { s.Job = &agentv1.OsJob{Reason: "future job"} }},
 		{"invalid apt state", func(s *agentv1.OsStatus) { s.Apt = "apt says 203.0.113.77" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -123,4 +123,87 @@ func TestOsStatusAcceptsEmptyDistroFields(t *testing.T) {
 func osStatusFixture(now time.Time) *agentv1.OsStatus {
 	return &agentv1.OsStatus{MeasuredUnix: now.Unix(), DistroId: "ubuntu", DistroVersion: "22.04", Pending: 4, Security: 4,
 		KernelRunning: "5.15.0-125-generic", KernelNewest: "5.15.0-126-generic", Apt: "ok", AutoUpdates: "on", BootIdHash: "0123456789abcdef"}
+}
+
+// The job of S2 is part of the snapshot. A good one is stored; one that does not check out is dropped on its own, and the
+// snapshot around it is kept.
+func TestOsStatusJobIsValidatedAndDroppedAlone(t *testing.T) {
+	now := time.Unix(1794000000, 0)
+	good := func() *agentv1.OsJob {
+		return &agentv1.OsJob{JobId: "osj_ab12", Action: "upgrade", Mode: "security", State: "failed", Phase: "rebooting",
+			StartedUnix: now.Unix() - 600, UpdatedUnix: now.Unix(), FinishedUnix: now.Unix(), Code: "awg_module_missing",
+			Reason: "reboot refused: the AmneziaWG module is not built for kernel 7.0.0-38-generic and AmneziaWG runs on the kernel module",
+			Reboot: "held", HeldReason: "awg_module_missing", Upgraded: 12, KernelFrom: "7.0.0-37-generic", KernelTo: "7.0.0-38-generic",
+			SourcesFailed: []string{"ppa.example.org", "a source"}}
+	}
+	s := osStatusFixture(now)
+	s.Job = good()
+	if !validOsStatus(s, now) || s.Job == nil {
+		t.Fatalf("a valid job was dropped or rejected: %+v", s.Job)
+	}
+	for name, change := range map[string]func(*agentv1.OsJob){
+		"job id":            func(j *agentv1.OsJob) { j.JobId = "osj_a;b" },
+		"empty job id":      func(j *agentv1.OsJob) { j.JobId = "" },
+		"action":            func(j *agentv1.OsJob) { j.Action = "format" },
+		"mode":              func(j *agentv1.OsJob) { j.Mode = "dist-upgrade" },
+		"state":             func(j *agentv1.OsJob) { j.State = "paused" },
+		"phase":             func(j *agentv1.OsJob) { j.Phase = "sleeping" },
+		"code":              func(j *agentv1.OsJob) { j.Code = "boom" },
+		"held reason":       func(j *agentv1.OsJob) { j.HeldReason = "boom" },
+		"reboot":            func(j *agentv1.OsJob) { j.Reboot = "yes" },
+		"address in reason": func(j *agentv1.OsJob) { j.Reason = "refused by 203.0.113.9" },
+		"newline in reason": func(j *agentv1.OsJob) { j.Reason = "one" + string(rune(10)) + "two" },
+		"long reason":       func(j *agentv1.OsJob) { j.Reason = string(make([]byte, 301)) },
+		"future time":       func(j *agentv1.OsJob) { j.UpdatedUnix = now.Unix() + 3600 },
+		"negative time":     func(j *agentv1.OsJob) { j.StartedUnix = -1 },
+		"many sources":      func(j *agentv1.OsJob) { j.SourcesFailed = make([]string, 9) },
+		"source address":    func(j *agentv1.OsJob) { j.SourcesFailed = []string{"203.0.113.9"} },
+		"kernel":            func(j *agentv1.OsJob) { j.KernelTo = "7 0;rm" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := osStatusFixture(now)
+			j := good()
+			change(j)
+			s.Job = j
+			if !validOsStatus(s, now) {
+				t.Fatal("a bad job rejected the whole snapshot")
+			}
+			if s.Job != nil {
+				t.Fatalf("the bad job was kept: %+v", s.Job)
+			}
+		})
+	}
+}
+
+// UpdateOs is a request like the others: the session core knows it, and the panel sends it only to a stream that listed
+// os-update/1 (the read-only os-status/1 is not enough). Nothing in the panel sends it yet.
+func TestUpdateOsFrameNeedsTheWriteCapability(t *testing.T) {
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateOs{UpdateOs: &agentv1.UpdateOs{RequestId: "r"}}}
+	if capability, message := requestCapability(frame, false); capability != "os-update/1" || message != "agent too old" {
+		t.Fatalf("capability = %q %q", capability, message)
+	}
+	if capability, _ := requestCapability(frame, false); capability == capOSStatus {
+		t.Fatal("the read-only capability must not allow the write command")
+	}
+	if requestKind(frame) != PendingCommand {
+		t.Fatalf("request kind = %v", requestKind(frame))
+	}
+}
+
+// Every code and phase the node can write is accepted by the panel (the lists come from the node's own package), so a new code
+// of a job never costs a node its job in the snapshot.
+func TestOsStatusJobAcceptsEveryCodeAndPhaseOfTheNode(t *testing.T) {
+	now := time.Unix(1794000000, 0)
+	for _, code := range osupdate.Codes {
+		j := &agentv1.OsJob{JobId: "osj_x", Action: "upgrade", Mode: "all", State: "failed", Code: code, HeldReason: code, Reboot: "held", Reason: "a sentence"}
+		if !validOsJob(j, now) {
+			t.Errorf("code %q is not accepted", code)
+		}
+	}
+	for _, phase := range osupdate.Phases {
+		j := &agentv1.OsJob{JobId: "osj_x", Action: "upgrade", Mode: "all", State: "running", Phase: phase}
+		if !validOsJob(j, now) {
+			t.Errorf("phase %q is not accepted", phase)
+		}
+	}
 }

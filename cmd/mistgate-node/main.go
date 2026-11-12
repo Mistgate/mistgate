@@ -19,7 +19,8 @@ commands:
   cleanup-net  remove the tunnel interfaces, the WARP routes and the nft tables of the agent (what the unit runs after every stop);
             --ipv6-addresses also removes the IPv6 addresses it added (a hand clean of the server)
   awg       awg prepare-kernel: install the AmneziaWG kernel module (root, explicit; the default userspace backend needs none)
-  host      host enable-security-updates: enable unattended security updates (root, Linux; -h for details)
+  host      host enable-security-updates: enable unattended security updates; host os-update: install updates and/or reboot
+            this server (root, Linux; -h for details)
   version   print the version
 
 Both enroll and run take --state-dir (default /var/lib/mistgate-node); give them the same one.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -80,9 +81,49 @@ func validOsStatus(s *agentv1.OsStatus, now time.Time) bool {
 		}
 	}
 	s.Notable = slices.DeleteFunc(s.Notable, func(notable string) bool { return !validNotable(notable) })
-	// Jobs are reserved in the S1 wire shape but are never populated until a later write-capable step.
-	if s.Job != nil {
+	// A job that does not check out is dropped on its own, like a bad notable entry: the rest of the snapshot is stored.
+	if s.Job != nil && !validOsJob(s.Job, now) {
+		s.Job = nil
+	}
+	return true
+}
+
+var (
+	osJobID     = regexp.MustCompile("^(osj_|manual-)[a-z0-9_-]{1,48}$")
+	osHostName  = regexp.MustCompile("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(?:[.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$")
+	osReasonBad = regexp.MustCompile("[\x00-\x1f\x7f]")
+)
+
+// validOsJob checks the job of a snapshot: every word is from the vocabulary of agent.proto "OS UPDATES", the sentence is
+// one short line without an address, the times are sane.
+func validOsJob(j *agentv1.OsJob, now time.Time) bool {
+	if !osJobID.MatchString(j.JobId) || !oneOf(j.Action, "refresh", "upgrade", "reboot") || !oneOf(j.Mode, "", "security", "all") ||
+		!oneOf(j.State, "running", "done", "failed") || !oneOf(j.Reboot, "", "done", "not_required", "held", "not_asked") {
 		return false
+	}
+	if j.Phase != "" && !slices.Contains(osupdate.Phases, j.Phase) || j.Code != "" && !slices.Contains(osupdate.Codes, j.Code) ||
+		j.HeldReason != "" && !slices.Contains(osupdate.Codes, j.HeldReason) {
+		return false
+	}
+	limit := now.Add(5 * time.Minute).Unix()
+	for _, t := range []int64{j.StartedUnix, j.UpdatedUnix, j.FinishedUnix} {
+		if t < 0 || t > limit {
+			return false
+		}
+	}
+	if j.Upgraded > 100000 || len(j.SourcesFailed) > 8 || len(j.Reason) > 300 || osReasonBad.MatchString(j.Reason) ||
+		osIPText.MatchString(j.Reason) || osIPv6Text.MatchString(j.Reason) {
+		return false
+	}
+	for _, h := range j.SourcesFailed {
+		if h != "a source" && (!osHostName.MatchString(h) || !safeOSValue(h)) {
+			return false
+		}
+	}
+	for _, k := range []string{j.KernelFrom, j.KernelTo} {
+		if k != "" && (!osKernelText.MatchString(k) || !safeOSValue(k)) {
+			return false
+		}
 	}
 	return true
 }

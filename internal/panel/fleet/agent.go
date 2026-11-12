@@ -15,6 +15,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -871,6 +872,8 @@ func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capabilit
 		return capBandwidth, "agent too old"
 	case frame.GetPrepareAwgKernel() != nil:
 		return capAwgPrepare, "agent too old"
+	case frame.GetUpdateOs() != nil:
+		return osupdate.CapabilityUpdate, "agent too old"
 	case frame.GetUdpCount() != nil, frame.GetUdpSend() != nil:
 		return capUDPCheck, "agent too old"
 	case frame.GetHttpMark() != nil, frame.GetTcpProbe() != nil:

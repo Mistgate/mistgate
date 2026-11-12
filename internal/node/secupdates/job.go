@@ -246,6 +246,10 @@ func readTimerStates(ctx context.Context, out io.Writer, run awgprep.Runner, ver
 	return states, err // systemctl returns nonzero when a timer is disabled, masked or inactive; its lines are still useful.
 }
 
+// InstallArgs is the apt-get argument list that installs unattended-upgrades without questions and without touching the
+// timers; the OS update job installs it the same way when its security mode finds it missing.
+func InstallArgs() []string { return installArgs() }
+
 func installArgs() []string {
 	return []string{
 		"-o", fmt.Sprintf("DPkg::Lock::Timeout=%d", aptLockTimeoutSeconds),

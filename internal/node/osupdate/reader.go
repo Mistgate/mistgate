@@ -398,7 +398,7 @@ func (r *Reader) autoUpdates(ctx context.Context, s *agentv1.OsStatus) {
 		return
 	}
 	config, configErr := r.Run(ctx, "apt-config", "shell", "E", "APT::Periodic::Enable", "L", "APT::Periodic::Update-Package-Lists",
-		"U", "APT::Periodic::Unattended-Upgrade", "R", "Unattended-Upgrade::Automatic-Reboot")
+		"U", "APT::Periodic::Unattended-Upgrade", "R", "Unattended-Upgrade::Automatic-Reboot/b")
 	enabled, _ := r.Run(ctx, "systemctl", "is-enabled", "apt-daily.timer", "apt-daily-upgrade.timer")
 	active, _ := r.Run(ctx, "systemctl", "is-active", "apt-daily.timer", "apt-daily-upgrade.timer")
 	if configErr != nil {

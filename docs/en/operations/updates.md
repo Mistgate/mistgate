@@ -317,7 +317,45 @@ How it is read:
 - It works on Debian and Ubuntu with systemd. Other systems, and nodes whose agent is older than this feature, show **Not available** with the reason.
 - The panel's own server is read only when the panel runs as root; otherwise the row says to check it by hand.
 
-The layer is read-only for now: installing updates and rebooting from the panel come in a later release, and until then a server is updated over SSH. The Cloudflare edition does not have this layer. The MCP tool `os_updates_status` returns the same stored readings; it never contacts a node.
+The layer is read-only for now: installing updates and rebooting from the panel come in a later release, and until then a server is updated over SSH or by the command under [Running by hand on a node](#running-by-hand-on-a-node). The Cloudflare edition does not have this layer. The MCP tool `os_updates_status` returns the same stored readings; it never contacts a node.
+
+### Running by hand on a node
+
+From the panel this arrives in the next release; today the panel does not send OS jobs. The node can run one itself, and the owner can start it on one server over SSH (as root; Debian 12 or 13, Ubuntu 22.04, 24.04 or 26.04 with systemd):
+
+```
+mistgate-node host os-update --action upgrade --mode security --reboot if-required        # prints the plan, runs nothing
+systemd-run --unit=mistgate-os-update --collect --property=KillMode=mixed --property=TimeoutStopSec=600 \
+  mistgate-node host os-update --yes --action upgrade --mode security --reboot if-required
+```
+
+| Option | Values |
+|---|---|
+| `--action` | `refresh` (only refresh the package lists), `upgrade` (install updates; the default), `reboot` (no package change, only the reboot). |
+| `--mode` | `security` (what `unattended-upgrade` installs; the default) or `all` (`apt-get upgrade --with-new-pkgs`). Only with `upgrade`. |
+| `--reboot` | `never` (the default), `if-required` (only when a reboot is needed) or `always`. `refresh` takes `never`, `upgrade` takes `never` or `if-required`, `reboot` takes `if-required` or `always`. |
+| `--awg-required` | Treat the AmneziaWG kernel module as needed. The command treats it as needed anyway whenever the module is loaded. |
+
+Without `--yes` the command only prints the plan. Run it as its own unit, as in the second line, so that a dropped SSH session cannot interrupt `dpkg`. What it does, in order: checks the system and the free space; waits up to 15 minutes for another package manager; finishes interrupted package installs (`dpkg --configure -a`) if there are any; runs `apt-get update`; installs the updates; on Ubuntu builds the AmneziaWG module (DKMS) for a newly installed kernel; and, only as the last step and only when asked, reboots.
+
+Before it reboots, the command checks and refuses, rebooting nothing and ending as failed with the reboot **held**, when:
+
+- apt or `dpkg` is busy (`apt_lock`);
+- a package install was interrupted, half installed or half configured (`dpkg_interrupted`, the packages are named);
+- the kernel the next boot starts cannot be told (`kernel_unknown`) or is older than the running one (`kernel_older`);
+- the AmneziaWG module is loaded (or `--awg-required` is given) and is not built for every kernel the boot menu can end up on: the newest installed one and each lower one that is not older than the running kernel (`awg_module_missing`);
+- the image or initramfs of one of those kernels is missing or cut short (`initramfs_missing`), or, when the kernel changes, `/boot` has under 50 MB free (`boot_full`);
+- GRUB may not start its first entry: there is no `/boot/grub/grub.cfg`, `GRUB_DEFAULT` is set to anything but `0` in `/etc/default/grub` or `/etc/default/grub.d/*.cfg`, `grub-editenv list` shows a `saved_entry` or a `next_entry`, or `grub-editenv` cannot be read (`boot_default_custom`);
+- the host booted less than 10 minutes ago (`too_soon`): a node is not rebooted in a loop;
+- for a job sent by the panel (an id that starts with `osj_`): the node was rebooted by such a job less than an hour ago or three times in the last 24 hours, or the reboot history, kept next to `os-update.json`, is unreadable or ahead of the clock (`reboot_limit`). Commands started by hand are not limited.
+
+When the checks pass, the command takes the dpkg lock and keeps it until the reboot, so that no other package manager starts in between.
+
+`--reboot always` skips only the question "is a reboot needed", never these checks. The command never removes the AmneziaWG packages and installs no package for the module, not even the kernel headers. When the module's own DKMS build fails, the command stops with `awg_module_build_failed`, naming the kernel and the `linux-headers-<kernel>` package whose configuration runs the build: nothing is removed, nothing more is installed, the reboot (if one was asked for) is held, and the module that is loaded keeps serving until the next boot. Fix the build (its `make.log` is under `/var/lib/dkms/amneziawg`) before any reboot. A DKMS build that fails for another reason, for instance because the headers of the new kernel are not installed, only leaves the module missing for that kernel and holds the reboot (`awg_module_missing`). Other refusals: `unsupported_os` (any system outside the list above), `no_systemd`, `disk_full`, `security_source_failed` (the security package source could not be refreshed; other sources that fail are only listed), `install_failed` (names the package), `auto_reboot_conflict` (`unattended-upgrades` is set to reboot by itself, which would bypass these checks: turn `Automatic-Reboot` off or use `--mode all`), `busy` (another OS job, an agent update or the module build is running).
+
+The state is kept in `os-update.json` in the agent's state directory (default `/var/lib/mistgate-node`), so it survives an agent restart and the reboot itself. After the reboot the agent finds the file and checks that the host came back on the expected kernel, that the AmneziaWG module is loaded again where it was in use, and that the node's inbounds are up; the result is one event on the node's History tab (`os_update_done`, or `os_update_failed` with a code). The output of `apt` stays in the journal of the unit (`journalctl -u mistgate-os-update`), cut and without addresses. To cancel before the install starts, run `systemctl stop mistgate-os-update`: with `KillMode=mixed` the signal reaches the command only, and an `apt` that has already started is let finish (up to `TimeoutStopSec`). The same job id, sent again to the agent, is answered with the result of that job and starts nothing; after a refusal or a failure the panel sends its next attempt under a new job id.
+
+What it does not do: it does not edit package sources, does not run `dist-upgrade` or `autoremove` (old kernels stay installed), does not upgrade the release, does not change the node's AmneziaWG backend setting and does not touch the agent's own binary. A node whose agent is older than this release has no such command.
 
 ## Updates through the API and MCP
 

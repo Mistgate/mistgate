@@ -8,6 +8,6 @@ import (
 )
 
 func cmdHost([]string) int {
-	fmt.Fprintln(os.Stderr, "host enable-security-updates: Linux only")
+	fmt.Fprintln(os.Stderr, "host: Linux only")
 	return 1
 }

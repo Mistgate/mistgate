@@ -13,6 +13,7 @@ import (
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -53,10 +54,33 @@ func (a *Agent) doctorEnv() doctor.Env {
 	e.UnitGen = a.cfg.UnitGen
 	e.UnderSystemd = a.cfg.UnitUnderSystemd
 	e.UnitSkipReason = a.cfg.UnitSkipReason
-	e.UnitRefreshBusy = a.cfg.UnitRefreshBusy
-	e.UnitRefreshReserve = a.cfg.UnitRefreshReserve
+	e.UnitRefreshBusy, e.UnitRefreshReserve = a.cfg.UnitRefreshBusy, a.cfg.UnitRefreshReserve
+	if base := a.cfg.UnitRefreshBusy; base != nil {
+		e.UnitRefreshBusy = func(ctx context.Context) error {
+			if a.osJobActive() { // the refresh restarts this service; an OS job may be in the middle of dpkg
+				return unit.ErrBusy
+			}
+			return base(ctx)
+		}
+	}
+	if base := a.cfg.UnitRefreshReserve; base != nil {
+		e.UnitRefreshReserve = func(ctx context.Context) (func(bool), error) {
+			if a.osJobActive() {
+				return nil, unit.ErrBusy
+			}
+			return base(ctx)
+		}
+	}
 	e.LaunchUnitRefresh = a.cfg.UnitRefreshLauncher
 	e.LaunchSecurityUpdates = a.cfg.SecurityUpdatesLauncher
+	if base := a.cfg.SecurityUpdatesLauncher; base != nil {
+		e.LaunchSecurityUpdates = func(ctx context.Context) error {
+			if a.osJobActive() {
+				return unit.ErrBusy
+			}
+			return base(ctx)
+		}
+	}
 	e.AgentStartedAt = a.startedAt
 	e.ApplyBaseline = a.host.ApplyBaseline
 	e.RestartInbound = a.doctorRestart

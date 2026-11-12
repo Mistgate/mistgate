@@ -15,13 +15,19 @@ import (
 )
 
 const hostSecurityUpdatesUsage = `usage: mistgate-node host enable-security-updates [--yes] [--status-file FILE] [--timeout 20m]
+       mistgate-node host os-update [--yes] [--action refresh|upgrade|reboot] [--mode security|all] [--reboot never|if-required|always] ...
 
   enable-security-updates  install unattended-upgrades if needed, enable APT periodic security updates and the apt-daily
                            timers. Without --yes this only describes the changes. It does not install upgrades or reboot.
                            --status-file is for the agent to follow the background task.
+  os-update                refresh the package lists, install updates and/or reboot this server (root; -h for details).
+                           Without --yes it only prints what it would do.
 `
 
 func cmdHost(args []string) int {
+	if len(args) > 0 && args[0] == "os-update" {
+		return cmdHostOSUpdate(args[1:])
+	}
 	if len(args) == 0 || args[0] != "enable-security-updates" {
 		fmt.Fprint(os.Stderr, hostSecurityUpdatesUsage)
 		return 2
