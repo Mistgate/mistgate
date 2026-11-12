@@ -315,9 +315,7 @@ func (c *tcpConnMaskConfig) ProtoReflect() protoreflect.Message {
 	return &tcpConnMaskReflection{Message: c.message, owner: c}
 }
 
-func (*tcpConnMaskConfig) TCP() {}
-
-func (c *tcpConnMaskConfig) WrapConnClient(conn net.Conn) (net.Conn, error) {
+func (c *tcpConnMaskConfig) WrapConnClient(conn net.Conn, _ *xnet.Destination, _ *finalmask.Dialer) (net.Conn, error) {
 	return conn, nil
 }
 
@@ -400,7 +398,7 @@ func init() {
 }
 
 var (
-	_ finalmask.Tcpmask     = (*tcpConnMaskConfig)(nil)
+	_ finalmask.TCPMask     = (*tcpConnMaskConfig)(nil)
 	_ finalmask.TcpMaskConn = (*trackedTCPConn)(nil)
 )
 

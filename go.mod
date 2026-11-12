@@ -32,10 +32,10 @@ require (
 	github.com/mdlayher/netlink v1.11.2
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pressly/goose/v3 v3.28.0
-	github.com/refraction-networking/utls v1.8.3-0.20260301010127-aa6edf4b11af
+	github.com/refraction-networking/utls v1.8.3-0.20261108164504-a13c59ffe98b
 	github.com/vishvananda/netlink v1.3.1
-	github.com/xtls/reality v0.0.0-20260322125925-9234c772ba8f
-	github.com/xtls/xray-core v1.260327.0
+	github.com/xtls/reality v0.0.0-20261108101329-4bb46b2afd8b
+	github.com/xtls/xray-core v1.260327.1-0.20261109052709-676eaf66f8f0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.62.0
@@ -69,7 +69,6 @@ require (
 	connectrpc.com/otelconnect v0.9.0 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.1 // indirect
@@ -92,7 +91,6 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cli/browser v1.3.0 // indirect
-	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
@@ -116,24 +114,31 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.22.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
+	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
+	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jdx/go-netrc v1.0.0 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/klauspost/compress v1.20.2 // indirect
-	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.4.2 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
+	github.com/koron/go-ssdp v0.0.4 // indirect
+	github.com/libp2p/go-nat v1.0.1-0.20250821073202-01afc089f138 // indirect
+	github.com/libp2p/go-netroute v0.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mdlayher/socket v0.6.0 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
-	github.com/miekg/dns v1.1.72 // indirect
+	github.com/miekg/dns v1.1.73 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/moby/api v1.56.0 // indirect
 	github.com/moby/moby/client v0.6.0 // indirect
+	github.com/molecule-man/go-brrr v1.2.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
@@ -141,15 +146,18 @@ require (
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/petermattis/goid v0.0.0-20260820044319-269ab09b5261 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/pires/go-proxyproto v0.11.0 // indirect
+	github.com/pion/dtls/v3 v3.1.5 // indirect
+	github.com/pion/logging v0.2.4 // indirect
+	github.com/pion/stun/v3 v3.1.7 // indirect
+	github.com/pion/transport/v4 v4.1.0 // indirect
+	github.com/pires/go-proxyproto v0.16.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.62.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/sagernet/sing v0.5.1 // indirect
-	github.com/sagernet/sing-shadowsocks v0.2.7 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sethvargo/go-retry v0.4.0 // indirect
@@ -169,8 +177,10 @@ require (
 	github.com/txthinking/runnergroup v0.0.0-20210608031112-152c7c4432bf // indirect
 	github.com/txthinking/socks5 v0.0.0-20230325130024-4230056ae301 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
+	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	github.com/yuin/gopher-lua v1.1.2 // indirect
 	go.lsp.dev/jsonrpc2 v0.10.0 // indirect
 	go.lsp.dev/pkg v0.0.0-20210717090340-384b27a52fb2 // indirect
 	go.lsp.dev/protocol v0.12.0 // indirect
@@ -185,16 +195,18 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20261020153306-9f2b28d4331a // indirect
 	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
-	golang.org/x/tools v0.52.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb // indirect
+	golang.zx2c4.com/wireguard/windows v1.1.1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260904194346-d0f1323225a4 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260904194346-d0f1323225a4 // indirect
-	google.golang.org/grpc v1.83.2 // indirect
+	google.golang.org/grpc v1.85.0 // indirect
 	gvisor.dev/gvisor v0.0.0-20260122175437-89a5d21be8f0 // indirect
+	layeh.com/gopher-luar v1.0.11 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
@@ -205,3 +217,6 @@ require (
 
 // The Hysteria core with a hook for the QUIC connection behind Connect and Disconnect (third_party/hysteria-core/MISTGATE.md).
 replace github.com/apernet/hysteria/core/v2 => ./third_party/hysteria-core
+
+// REALITY that still takes the ClientHellos Xray 26.3.27 took (third_party/reality/MISTGATE.md).
+replace github.com/xtls/reality => ./third_party/reality

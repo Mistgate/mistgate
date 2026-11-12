@@ -13,10 +13,10 @@ jobs:
     # the job past 50 min in November 2026. The tests now open a copy of a database migrated once per binary
     # (internal/panel/store/storetest): fleet takes 137 s under -race on a workstation (was 1790 s), agent 150 s. The limit
     # keeps a wide margin for hosted runners, which are about 1.7 times slower; a package that needs more is a finding.
-    # internal/node/vless is left out: every race it reports is inside xray-core (Vision's TrafficState, shared by both
-    # copy directions and still unsynchronised in v26.11.9; the XHTTP upload queue and client, fixed upstream), and xray's
-    # rawInput offset trick trips checkptr. Recheck after an xray-core bump with
-    # go test -race -gcflags=github.com/xtls/xray-core/...=-d=checkptr=0 -count=5 ./internal/node/vless/
+    # internal/node/vless is left out: the one race it still reports is inside xray-core (Vision's TrafficState, proxy.go
+    # reader at 255/384 against XtlsFilterTls at 629, shared by both copy directions and still unsynchronised in v26.11.9;
+    # TestXrayClientTrafficCountersAndObserved/tcp trips it, the rest of the package is clean). The XHTTP races and the checkptr
+    # reports of earlier cores are gone. Recheck after an xray-core bump with go test -race -count=1 ./internal/node/vless/
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1

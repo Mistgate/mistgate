@@ -232,7 +232,9 @@ func Server(ctx context.Context, conn net.Conn, config *Config) (*Conn, error) {
 				}
 			}
 			if peerPub2 == nil {
-				break // reject outdated/strange Client Hello that doesn't have X25519MLKEM768 before optional X25519
+				if peerPub = legacyPeerPub(config, hs.clientHello.keyShares); peerPub == nil { // Mistgate: the pre-2026-11 rule, mistgate_compat.go
+					break // reject outdated/strange Client Hello that doesn't have X25519MLKEM768 before optional X25519
+				}
 			}
 			if peerPub == nil {
 				peerPub = peerPub2 // secondary choice: X25519 in X25519MLKEM768

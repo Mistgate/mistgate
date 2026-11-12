@@ -137,7 +137,7 @@ func TestXrayClientTLSFrontTransportsAndTraffic(t *testing.T) {
 				t.Fatal(err)
 			}
 			echo := startEchoServer(t)
-			client := newXrayTLSClient(t, spec.Listen.Port, tc.transport, tc.mode, tc.alpn, cred.CredID, stringID(cred))
+			client := newXrayTLSClient(t, certs, spec.Listen.Port, tc.transport, tc.mode, tc.alpn, cred.CredID, stringID(cred))
 			conn := client.dial(t, echo.Addr().String())
 			defer conn.Close()
 			const size = 64 << 10
@@ -161,7 +161,7 @@ func TestTLSCertificateRotationKeepsLiveSessionAndUpdatesHealth(t *testing.T) {
 		t.Fatal(err)
 	}
 	echo := startEchoServer(t)
-	client := newXrayTLSClient(t, spec.Listen.Port, "xhttp", "stream-up", "h2", cred.CredID, stringID(cred))
+	client := newXrayTLSClient(t, certs, spec.Listen.Port, "xhttp", "stream-up", "h2", cred.CredID, stringID(cred))
 	conn := client.dial(t, echo.Addr().String())
 	defer conn.Close()
 	if _, err := exchange(conn, []byte("before certificate rotation")); err != nil {
@@ -193,8 +193,12 @@ func TestTLSCertificateRotationKeepsLiveSessionAndUpdatesHealth(t *testing.T) {
 	}
 }
 
-func newXrayTLSClient(t *testing.T, serverPort uint16, transport, mode, alpn, credID, userID string) *xrayClient {
+func newXrayTLSClient(t *testing.T, certs *fakeCerts, serverPort uint16, transport, mode, alpn, credID, userID string) *xrayClient {
 	t.Helper()
+	// The client pins the served leaf: xray-core 26.11 has no allowInsecure.
+	certs.mu.Lock()
+	pin := sha256.Sum256(certs.acmeChain.Certificate[0])
+	certs.mu.Unlock()
 	socksPort := reservePort(t)
 	transportName := "splithttp"
 	var transportSettings []*internet.TransportConfig
@@ -217,7 +221,8 @@ func newXrayTLSClient(t *testing.T, serverPort uint16, transport, mode, alpn, cr
 		TransportSettings: transportSettings,
 		SecurityType:      serial.GetMessageType(&xraytls.Config{}),
 		SecuritySettings: []*serial.TypedMessage{serial.ToTypedMessage(&xraytls.Config{
-			AllowInsecure: true, ServerName: tlsTestServerName, Fingerprint: "chrome", NextProtocol: []string{alpn},
+			ServerName: tlsTestServerName, Fingerprint: "chrome", NextProtocol: []string{alpn},
+			PinnedPeerCertSha256: [][]byte{pin[:]}, VerifyPeerCertByName: []string{tlsTestServerName},
 		})},
 	}
 	config := &xraycore.Config{

@@ -107,7 +107,7 @@ Engine contract (`internal/node/engine/engine.go`):
 - Health per inbound: state, detail, restarts, cert pin (TLS only); details `listen: …`, `reality_target:
   unreachable|no_tls13|no_mlkem` (the target probed once at start with a TLS 1.3 handshake offering X25519MLKEM768; a
   bad target is a warning, never a failure).
-- Version `"xray-core v26.3.27"` from `debug.ReadBuildInfo`.
+- Version `"xray-core v26.11.9"` from `debug.ReadBuildInfo`.
 - Logs: `xlog.RegisterHandler` once in `New`; `*GeneralMessage` ≤ Warning → slog `source=xray`; access messages and
   everything below Warning dropped (they carry destinations and credential ids).
 - No Vision splice (needs xray's freedom outbound); Vision copies through user space; the CPU cost is accepted.
@@ -230,6 +230,8 @@ Upstream on Windows: xray's readv there is a blocking WSARecv (`common/buf/readv
 ## 6. Decisions on the open questions
 
 1. Xray version: stable v26.3.27, bumped deliberately (not v26.9.x pre-releases). — owner: yes (2026-10-09)
+   Moved to v26.11.9 on 2026-11 (compat plan stage C3): the REALITY library is vendored in `third_party/reality` with a switch that keeps
+   accepting classical (non-post-quantum) ClientHellos, so no client notices; the node turns it on for every inbound.
 2. REALITY target: no default; required; the node probe checks TLS 1.3 and MLKEM; no shared-CDN sites (can be abused as
    a forwarder). — owner: yes (2026-10-09)
 3. CDN host: profile-level `cdn.host`, one origin node per CDN profile in v1; per-inbound later. — owner: yes (2026-10-09)

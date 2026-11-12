@@ -161,6 +161,10 @@ A server whose node address is not a plain host name or IP address gets no link 
 - XHTTP is newer than TCP with Vision. If an older app does not connect to an XHTTP server, make a second profile with the TCP transport; people then see both.
 - The TCP port must reach the node. If the provider filters it, the app times out.
 
+## The core and older apps
+
+Nodes run the Xray 26.11.9 core. Its REALITY library, as released, sends every app that does not offer a post-quantum key share (X25519MLKEM768) to the cover site as if it were a stranger: sing-box and the apps built on it, Mihomo without its post-quantum option, Xray cores older than 25.5.16, and the `ios`, `edge` and `random` fingerprints in any app. Mistgate nodes carry a small patch to that library and keep accepting those apps, so every app that connected before the update connects after it, and nobody has to update anything. A strict mode that accepts only post-quantum handshakes will come later, as a choice per profile; the **App versions** tab of [Subscriptions](subscriptions.md#app-versions) shows which devices would need an update first.
+
 ## Limits today
 
 - The panel's client-eye check tests VLESS with the same resolved client settings used by subscriptions, including the handshake and tunnel. See [Health](../operations/health.md).

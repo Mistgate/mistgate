@@ -87,7 +87,7 @@ func TestXrayCoreReadsTheVlessFields(t *testing.T) {
 	s = st
 	tc := jsoncheck.XraySecurity(t, s).(*xtls.Config)
 	ws := jsoncheck.XrayTransport(t, s, "websocket").(*websocket.Config)
-	if tc.ServerName != "cdn.example.org" || tc.Fingerprint != "chrome" || len(tc.NextProtocol) != 1 || tc.NextProtocol[0] != "http/1.1" || tc.AllowInsecure || ws.Path != "/ws" || ws.Host != "cdn.example.org" {
+	if tc.ServerName != "cdn.example.org" || tc.Fingerprint != "chrome" || len(tc.NextProtocol) != 1 || tc.NextProtocol[0] != "http/1.1" || ws.Path != "/ws" || ws.Host != "cdn.example.org" {
 		t.Errorf("tls ws = %v %v", tc, ws)
 	}
 

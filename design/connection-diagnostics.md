@@ -39,7 +39,7 @@
 - `hellos` — обёртка `cert.GetCertificate` в `server.TLSConfig` (`hysteria2.go:313`): +1 на ClientHello QUIC-слушателя. `handshakes` — вызовы `Authenticate` с любым исходом; `hellos − handshakes` — рукопожатия без auth-запроса (DPI режет ответы или сканер). При TLS 1.3 PSK-возобновлении `GetCertificate` не вызывается → `hellos` занижен, алерт осторожный. Session cache у sing-box/mihomo — **требует проверки**.
 - `drops` — хук `Disconnect(addr, id, err)` (`index.go:245`): `errors.As(err, *quic.IdleTimeoutError)` **и** сессия < 60 с или < 64 КиБ. Байты сессии без горячего пути: в `Collect` копим `cs.flushed`, в `Connect` запоминаем базу, в `Disconnect` — разность (точно при одном соединении на ключ).
 
-### 2.2 VLESS (`internal/node/vless`, xray-core v1.260327.0)
+### 2.2 VLESS (`internal/node/vless`, xray-core v26.11.9)
 
 - `connects` — `credState.addLink` (`egress.go:184`), переход 0→1 открытых ссылок.
 - `rejects` — `inbound.dispatch` (`egress.go:419-425`): ключ `removed` или срок вышел.

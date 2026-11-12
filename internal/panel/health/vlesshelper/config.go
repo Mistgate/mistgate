@@ -146,7 +146,6 @@ func vlessStreamSettings(p panelvless.ClientParams, testPin []byte) (*internet.S
 	case "tls":
 		tlsConfig := &xraytls.Config{ServerName: p.SNI, Fingerprint: p.Fingerprint, NextProtocol: append([]string(nil), p.ALPN...)}
 		if len(testPin) != 0 {
-			tlsConfig.AllowInsecure = true
 			tlsConfig.VerifyPeerCertByName = []string{p.SNI}
 			tlsConfig.PinnedPeerCertSha256 = [][]byte{append([]byte(nil), testPin...)}
 		}

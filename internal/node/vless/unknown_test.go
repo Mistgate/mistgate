@@ -46,7 +46,7 @@ func TestUnknownVLESSUUIDsCountOncePerInbound(t *testing.T) {
 	}
 
 	unknownReality := newXrayClient(t, reality.Listen.Port, "tcp", "stale-reality", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
-	unknownTLS := newXrayTLSClient(t, tls.Listen.Port, "xhttp", "auto", "h2", "stale-tls", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	unknownTLS := newXrayTLSClient(t, certs, tls.Listen.Port, "xhttp", "auto", "h2", "stale-tls", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
 	echo := startEchoServer(t)
 	targetAddr := echo.Addr().String()
 	for range 2 {
@@ -70,7 +70,7 @@ func TestUnknownVLESSUUIDsCountOncePerInbound(t *testing.T) {
 	}
 	_ = connReality.Close()
 
-	knownTLS := newXrayTLSClient(t, tls.Listen.Port, "xhttp", "auto", "h2", credTLS.CredID, stringID(credTLS))
+	knownTLS := newXrayTLSClient(t, certs, tls.Listen.Port, "xhttp", "auto", "h2", credTLS.CredID, stringID(credTLS))
 	connTLS := knownTLS.dial(t, echo.Addr().String())
 	if _, err := exchange(connTLS, []byte("known TLS UUID")); err != nil {
 		t.Fatal(err)

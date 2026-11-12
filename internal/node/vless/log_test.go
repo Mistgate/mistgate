@@ -21,7 +21,7 @@ func TestProtocolVersionAndCapabilities(t *testing.T) {
 	if got := instance.Protocol(); got != "vless" {
 		t.Fatalf("Protocol() = %q", got)
 	}
-	if got := instance.Version(); got != "xray-core v26.3.27" {
+	if got := instance.Version(); got != "xray-core v26.11.9" {
 		t.Fatalf("Version() = %q", got)
 	}
 	if got := instance.Capabilities(); !got.RateLimitPerCred || !got.HardExpiry {

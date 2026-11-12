@@ -662,8 +662,8 @@ m3_awg_signatures() {
 # ================================================================ Mihomo
 # mihomo_bin: the Mihomo core, built from the module source (never downloaded) and cached. `go install ...@version` is refused
 # because the go.mod of mihomo has a replace directive, so the module is fetched into the module cache and built from a copy.
-mihomo_bin() {
-  local v=1.19.33 p src
+mihomo_bin() { # [version, default 1.19.33]
+  local v=${1:-1.19.33} p src
   p=$M3_CACHE/mihomo-v$v
   if [ ! -x "$p" ]; then
     mkdir -p "$M3_CACHE"
@@ -937,10 +937,10 @@ m3_compat() {
 
 # ================================================================ VLESS
 # xray_bin: the xray client, built from the module the node embeds (github.com/xtls/xray-core/main at the version in
-# go.mod, through the Go proxy) and cached
+# go.mod, through the Go proxy) and cached. With an argument: that module version or commit (the old clients of m3_vless_oldclients)
 xray_bin() {
-  local ver p tmp
-  ver=$(sed -n 's|^[[:space:]]*github.com/xtls/xray-core \(v[^ ]*\).*|\1|p' "$REPO/go.mod" | head -1)
+  local ver=${1:-} p tmp
+  [ -n "$ver" ] || ver=$(sed -n 's|^[[:space:]]*github.com/xtls/xray-core \(v[^ ]*\).*|\1|p' "$REPO/go.mod" | head -1)
   [ -n "$ver" ] || die "no xray-core version in go.mod"
   p=$M3_CACHE/xray-$ver
   if [ ! -x "$p" ]; then
@@ -1311,6 +1311,461 @@ m3_vless() {
   pass "first REALITY handshake after an agent start (client-visible, requests sent when the listeners came up):$first_s the second request:$second_s"
   for l in "${rlabels[@]}"; do stop_pid "${pid[$l]}"; done
   wait_for 90 "the node ONLINE and its inbounds ACTIVE again" inbounds_active "$want" || die "the inbounds are not ACTIVE after the agent restart"
+
+  # ---- the old clients: apps that cannot send a post-quantum share keep working against this node. Last, because it adds ~90 users
+  # (the memory budget above is the node's with the users of the steps before)
+  m3_vless_oldclients "$px" "$pt"
+}
+
+# ================================================================ old clients against the upgraded node
+
+# oc_expect <kind> <version> <fingerprint> <flag>: the key exchange the ClientHello of an old client offers (pq, classic or any), as
+# measured by this step: Xray's chrome sends X25519MLKEM768 from 25.5.16 (25.4.30 and older build HelloChrome_120, a classical
+# hello), firefox and safari from 26.3.23, ios and edge never; sing-box strips the share in every version; Mihomo sends it only for
+# chrome and only with support-x25519mlkem768 (1.19.9 and later, 1.19.8 ignores the key); random is any
+oc_expect() {
+  case $1 in
+    xray)
+      case $3 in
+        random) echo any ;;
+        ios | edge) echo classic ;;
+        chrome) case $2 in 25.3.6 | 25.4.30) echo classic ;; *) echo pq ;; esac ;;
+        *) case $2 in 25.3.6 | 25.4.30 | 25.5.16 | 26.2.6) echo classic ;; *) echo pq ;; esac ;;
+      esac ;;
+    singbox) echo classic ;;
+    mihomo)
+      if [ "$3" = random ]; then echo any
+      elif [ "$4" = 1 ] && [ "$2" != 1.19.8 ] && [ "$3" = chrome ]; then echo pq
+      else echo classic; fi ;;
+  esac
+}
+
+# The servers of the fake internet the extra checks need, one process in its namespace: HTTPS on :8443 (TLS 1.3 only, a self-signed
+# certificate) with /pattern/N, N bytes of a fixed pseudo-random stream; a UDP echo on :4433; a DNS server on :5353 that answers
+# every A query with 198.51.100.7. `inetextras.py sha N` prints the sha256 of /pattern/N.
+write_inet_extras() {
+  cat >"$WORK/inetextras.py" <<'PY'
+import hashlib, http.server, socket, socketserver, ssl, sys, threading
+
+def chunk(k):
+    return hashlib.shake_256(b"mistgate-pattern-%d" % k).digest(65536)
+
+def pattern(n):
+    k = 0
+    while n > 0:
+        c = chunk(k)[:min(n, 65536)]
+        yield c
+        n -= len(c)
+        k += 1
+
+if sys.argv[1] == "sha":
+    h = hashlib.sha256()
+    for c in pattern(int(sys.argv[2])):
+        h.update(c)
+    print(h.hexdigest())
+    sys.exit(0)
+
+host, cert, key = sys.argv[1:4]
+
+class H(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    def log_message(self, *a): pass
+    def do_GET(self):
+        n = int(self.path.split("?")[0].split("/")[2])
+        self.send_response(200)
+        self.send_header("Content-Length", str(n))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        try:
+            for c in pattern(n):
+                self.wfile.write(c)
+            self.wfile.flush()
+            self.connection.unwrap()  # close_notify: a clean TLS close
+        except (OSError, ssl.SSLError):
+            pass
+        self.close_connection = True
+
+class S(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+def udp(port, answer):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind((host, port))
+    while True:
+        d, a = s.recvfrom(65535)
+        r = answer(d)
+        if r is not None:
+            s.sendto(r, a)
+
+def dns(q):
+    if len(q) < 17:
+        return None
+    i = 12
+    while i < len(q) and q[i] != 0:
+        i += q[i] + 1
+    qend = i + 5
+    return q[:2] + b"\x81\x80" + q[4:6] + b"\x00\x01\x00\x00\x00\x00" + q[12:qend] + b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04" + bytes([198, 51, 100, 7])
+
+threading.Thread(target=udp, args=(4433, lambda d: d), daemon=True).start()
+threading.Thread(target=udp, args=(5353, dns), daemon=True).start()
+ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ctx.minimum_version = ssl.TLSVersion.TLSv1_3
+ctx.load_cert_chain(cert, key)
+srv = S((host, 8443), H)
+srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+srv.serve_forever()
+PY
+  cat >"$WORK/udpprobe.py" <<'PY'
+# A SOCKS5 UDP client: udpprobe.py <socks port> dns|echo <dest ip> <dest port>. dns: an A query, the answer must hold 198.51.100.7.
+# echo: a datagram that looks like a QUIC Initial (long header, version 1, 1200 bytes; the node sniffs QUIC) and a short one; both
+# must come back unchanged.
+import os, socket, struct, sys
+
+port, mode, dst, dport = int(sys.argv[1]), sys.argv[2], sys.argv[3], int(sys.argv[4])
+tcp = socket.create_connection(("127.0.0.1", port), timeout=10)
+tcp.sendall(b"\x05\x01\x00")
+assert tcp.recv(2) == b"\x05\x00", "no SOCKS5 greeting"
+tcp.sendall(b"\x05\x03\x00\x01\x00\x00\x00\x00\x00\x00")
+
+def need(sock, n):
+    b = b""
+    while len(b) < n:
+        c = sock.recv(n - len(b))
+        assert c, "the SOCKS5 server closed the connection"
+        b += c
+    return b
+
+head = need(tcp, 4)
+assert head[1] == 0, "UDP ASSOCIATE refused: %r" % head
+atyp = head[3]
+if atyp == 1:
+    addr = need(tcp, 4)
+elif atyp == 4:
+    addr = need(tcp, 16)
+else:
+    addr = need(tcp, need(tcp, 1)[0])
+relay_port = struct.unpack(">H", need(tcp, 2))[0]
+relay_ip = "127.0.0.1"  # the relay is the inbound's own address, whatever it reports (0.0.0.0, ::, 127.0.0.1)
+u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+u.settimeout(10)
+
+def exchange(payload, tries=3):
+    hdr = b"\x00\x00\x00\x01" + socket.inet_aton(dst) + struct.pack(">H", dport)
+    for _ in range(tries):
+        u.sendto(hdr + payload, (relay_ip, relay_port))
+        try:
+            d, _ = u.recvfrom(65535)
+            at = d[3]
+            return d[10:] if at == 1 else d[22:] if at == 4 else d[7 + d[4]:]
+        except socket.timeout:
+            continue
+    raise SystemExit("no UDP answer through the tunnel")
+
+if mode == "dns":
+    q = os.urandom(2) + b"\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00" + b"\x07example\x04test\x00\x00\x01\x00\x01"
+    a = exchange(q)
+    assert a[:2] == q[:2] and bytes([198, 51, 100, 7]) in a, "wrong DNS answer %r" % a
+else:
+    quic = bytes([0xc3, 0, 0, 0, 1, 8]) + os.urandom(8) + bytes([8]) + os.urandom(8) + os.urandom(1200 - 24)
+    for p in (quic, os.urandom(40), quic):
+        assert exchange(p) == p, "the echo differs"
+print("ok")
+PY
+}
+
+# oc_label_of <vless:// line>: the label vless2xray.py gives the line (tcp, xhttp-auto, xhttp-packet-up, tls-ws ...)
+oc_label_of() { python3 "$WORK/vless2xray.py" "$1" 0 "$WORK/oc-label.json" 2>/dev/null | cut -d' ' -f1; }
+
+# oc_launch <n> <kind> <version> <fingerprint> <flag> <label> <subscription url> <udp 0|1>: write the client's config for the line
+# or proxy named by <label> from the subscription the panel serves to this user, start the client, wait until it listens. Sets OC_SP
+# (socks/mixed port) and OC_PID; OC_NOTE is "client cannot ..." when the client does not support the transport, and then nothing runs.
+oc_launch() {
+  local n=$1 kind=$2 ver=$3 fp=$4 flag=$5 label=$6 url=$7 udp=$8
+  local conf=$WORK/old-$n.json log=$WORK/client-old-$n.log ua line l i tag uuid
+  OC_SP=$(free_port tcp) OC_PID="" OC_NOTE=""
+  case $kind in xray) ua="Happ/3.0" ;; singbox) ua="sing-box/$ver" ;; *) ua="mihomo/$ver" ;; esac
+  if [ "$kind" = xray ]; then
+    line="" i=0
+    while [ -z "$line" ] && [ $i -lt 20 ]; do
+      i=$((i + 1))
+      while IFS= read -r l; do
+        if [ "$(oc_label_of "$l")" = "$label" ]; then line=$l; break; fi
+      done < <(curl -sk -m 15 -A "$ua" "$url" | base64 -d 2>/dev/null | grep '^vless://' || true)
+      [ -n "$line" ] || sleep 1
+    done
+    [ -n "$line" ] || die "no $label line in the subscription of user $n"
+    SECRETS+=("$(sed 's|^vless://\([^@]*\)@.*|\1|' <<<"$line")")
+    python3 "$WORK/vless2xray.py" "$line" "$OC_SP" "$conf.0" >/dev/null || die "cannot convert the $label line of client $n to an xray config"
+    # Xray 25 has no pinnedPeerCertSha256 on TLS (it is allowInsecure there); the lab certificate is the node's own
+    jq --arg fp "$fp" --argjson udp "$udp" --arg ver "$ver" '
+      (if .outbounds[0].streamSettings.security == "reality" then .outbounds[0].streamSettings.realitySettings.fingerprint = $fp
+       else .outbounds[0].streamSettings.tlsSettings.fingerprint = $fp end)
+      | .inbounds[0].settings.udp = ($udp == 1) | .inbounds[0].settings.ip = "127.0.0.1"
+      | if .outbounds[0].streamSettings.security == "tls" and ($ver | startswith("25.")) then
+          .outbounds[0].streamSettings.tlsSettings |= (del(.pinnedPeerCertSha256) | .allowInsecure = true) else . end' "$conf.0" >"$conf"
+    spawn "${OC_BIN[xray-$ver]}" run -c "$conf" >"$log" 2>&1
+  elif [ "$kind" = singbox ]; then
+    [ "$label" = tcp ] || { OC_NOTE="client cannot: sing-box carries REALITY over RAW only here"; return 0; }
+    curl -sk -m 15 -A "$ua" "$url" -o "$conf.0"
+    jq -e '.outbounds' "$conf.0" >/dev/null 2>&1 || die "no sing-box document for user $n: $(head -c 200 "$conf.0" | redact)"
+    tag=$(jq -r '[.outbounds[] | select(.type == "vless" and .tls.reality.enabled == true)][0].tag' "$conf.0")
+    [ -n "$tag" ] && [ "$tag" != null ] || die "the sing-box document of user $n has no REALITY outbound"
+    SECRETS+=("$(jq -r --arg t "$tag" '.outbounds[] | select(.tag == $t) | .uuid' "$conf.0")")
+    jq --argjson lp "$OC_SP" --arg tag "$tag" --arg fp "$fp" '
+      .inbounds = [{type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: $lp}]
+      | (.outbounds[] | select(.type == "selector")).default = $tag
+      | (.outbounds[] | select(.tag == $tag)).tls.utls.fingerprint = $fp' "$conf.0" >"$conf"
+    mkdir -p "$WORK/old-sb-$n"
+    spawn "${OC_BIN[singbox-$ver]}" run -D "$WORK/old-sb-$n" -c "$conf" >"$log" 2>&1
+  else
+    curl -sk -m 15 -A "$ua" "$url" -o "$conf.0"
+    grep -q '^proxies:' "$conf.0" || die "no Mihomo profile for user $n: $(head -c 200 "$conf.0" | redact)"
+    uuid=$(python3 - "$conf.0" "$conf" "$OC_SP" "$fp" "$flag" "$label" <<'PY' || die "cannot build the Mihomo config of client $n ($label)"
+import hashlib, socket, ssl, sys, yaml
+src, out, port, fp, flag, label = sys.argv[1:7]
+d = yaml.safe_load(open(src))
+want = {  # label -> (network, reality, mode)
+    "tcp": ("tcp", True, None), "xhttp-auto": ("xhttp", True, "auto"), "xhttp-packet-up": ("xhttp", True, "packet-up"),
+    "xhttp-stream-up": ("xhttp", True, "stream-up"), "tls-xhttp-packet-up": ("xhttp", False, "packet-up"),
+    "tls-xhttp-stream-up": ("xhttp", False, "stream-up"), "tls-ws": ("ws", False, None)}[label]
+def mode(x):
+    return (x.get("xhttp-opts") or {}).get("mode")
+cand = [x for x in d["proxies"] if x.get("network") == want[0] and ("reality-opts" in x) == want[1] and (want[2] is None or mode(x) == want[2])]
+p = cand[0]
+p["client-fingerprint"] = fp
+if "reality-opts" in p:
+    if flag == "1":
+        p["reality-opts"]["support-x25519mlkem768"] = True
+else:
+    # the "CDN" is the node itself: dial it and trust its self-signed certificate by its pin
+    ctx = ssl.create_default_context()
+    ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+    with socket.create_connection(("127.0.0.1", p["port"]), timeout=10) as raw, ctx.wrap_socket(raw, server_hostname=p["servername"]) as t:
+        p["fingerprint"] = hashlib.sha256(t.getpeercert(binary_form=True)).hexdigest()
+    p["server"] = "127.0.0.1"
+d = {"mixed-port": int(port), "allow-lan": False, "mode": "rule", "log-level": "info", "proxies": [p], "rules": ["MATCH," + p["name"]]}
+yaml.safe_dump(d, open(out, "w"), allow_unicode=True)
+print(p["uuid"])
+PY
+)
+    SECRETS+=("$uuid")
+    mkdir -p "$WORK/old-mh-$n"
+    case $label in *xhttp*) # the YAML parses, but a Mihomo without the transport carries the traffic nowhere
+      if ! grep -aq xhttp-opts "${OC_BIN[mihomo-$ver]}"; then OC_NOTE="client cannot: Mihomo $ver has no XHTTP transport (no xhttp-opts in the binary)"; return 0; fi ;;
+    esac
+    if ! "${OC_BIN[mihomo-$ver]}" -t -d "$WORK/old-mh-$n" -f "$conf" >"$log" 2>&1; then
+      if grep -qiE 'xhttp|unsupport|unknown|not support' "$log"; then OC_NOTE="client cannot: $(grep -iE 'xhttp|unsupport|unknown|not support' "$log" | head -1 | cut -c1-120)"; return 0; fi
+      redact <"$log" | tail -n 5
+      die "mihomo $ver rejects the $label config of client $n"
+    fi
+    spawn "${OC_BIN[mihomo-$ver]}" -d "$WORK/old-mh-$n" -f "$conf" >"$log" 2>&1
+  fi
+  OC_PID=$LAST_PID
+  if ! { wait_for 20 "old client $n ($kind $ver $fp $label) to listen" listening "$OC_SP" && alive "$OC_PID"; }; then
+    if [ "$kind" = xray ] && grep -qiE 'mode|unsupported|unknown' "$log"; then # the old core does not know the transport setting
+      OC_NOTE="client cannot: $(grep -iE 'mode|unsupported|unknown' "$log" | head -1 | cut -c1-120)"
+      stop_pid "$OC_PID"
+      OC_PID=""
+    fi
+  fi
+}
+
+# oc_https <socks port>: 20 MB over HTTPS (TLS 1.3 inside the tunnel, so Vision leaves the copy loop for the raw socket) from the
+# fake internet, the sha256 checked, curl exit 0 (a close that is not clean, or short, fails it)
+oc_https() {
+  local out rc=0
+  out=$(curl -s -k --tlsv1.3 -m 120 -o "$WORK/oc-https.bin" -w '%{size_download}' --socks5-hostname "127.0.0.1:$1" "https://$WHOAMI:8443/pattern/20000000") || rc=$?
+  [ "$rc" = 0 ] && [ "$out" = 20000000 ] && [ "$(sha256sum <"$WORK/oc-https.bin" | cut -d' ' -f1)" = "$OC_HTTPS_SHA" ]
+}
+
+# oc_udp <socks port> <kind>: a DNS query and a QUIC-looking datagram (echoed) through the tunnel's UDP
+oc_udp() {
+  # sing-box's served document hijacks DNS (a query is answered by the client itself, never tunnelled): only the echo goes through it
+  if [ "$2" != singbox ]; then python3 "$WORK/udpprobe.py" "$1" dns "$WHOAMI" 5353 >"$WORK/oc-udp.err" 2>&1 || return 1; fi
+  python3 "$WORK/udpprobe.py" "$1" echo "$WHOAMI" 4433 >"$WORK/oc-udp.err" 2>&1
+}
+
+# oc_run <rows file> <n> <url> <spec>: one client of the matrix. spec = kind|version|fingerprint|label|flag|extras (extras: s = HTTPS
+# 20 MB, u = UDP). Appends "n<TAB>client<TAB>fp<TAB>label<TAB>http<TAB>https<TAB>udp<TAB>expected" to the rows file.
+oc_run() {
+  local rows=$1 n=$2 url=$3 kind ver ufp label flag extras out http=no https=- udp=- udpflag=0 exp
+  IFS='|' read -r kind ver ufp label flag extras <<<"$4"
+  case $extras in *u*) udpflag=1 ;; esac
+  oc_launch "$n" "$kind" "$ver" "$ufp" "$flag" "$label" "$url" "$udpflag" || true
+  if [ -n "$OC_NOTE" ]; then
+    http="$OC_NOTE"
+  else
+    local i
+    for ((i = 0; i < 4; i++)); do
+      out=$(VL_T=30 vl_get "$OC_SP" "oldclient-$n")
+      if [ "${out%% *}" = 200 ]; then http=ok; break; fi
+      sleep 2
+    done
+    if [ "$http" != ok ]; then http=no; echo "--- $kind $ver $ufp $label did not connect:" >&2; tail -n 6 "$WORK/client-old-$n.log" | redact >&2; fi
+    case $extras in *s*) if [ "$http" = ok ]; then if oc_https "$OC_SP"; then https=ok; else https=FAIL; fi; fi ;; esac
+    case $extras in *u*) if [ "$http" = ok ]; then if oc_udp "$OC_SP" "$kind"; then udp=ok; else udp=FAIL; echo "--- $kind $ver UDP: $(tail -n 2 "$WORK/oc-udp.err" | tr '\n' ' ')" >&2; tail -n 4 "$WORK/client-old-$n.log" | redact >&2; fi; fi ;; esac
+    stop_pid "$OC_PID"
+  fi
+  exp=$(oc_expect "$kind" "$ver" "$ufp" "$flag")
+  case $label in tls-*) exp=none ;; esac # the TLS profiles end in the node's own TLS front: no hello is counted
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$n" "$kind $ver" "$ufp" "$label$([ "$flag" = 1 ] && echo '+flag')" "$http" "$https" "$udp" "$exp" >>"$rows"
+}
+
+# oc_report <rows file> <uid array name>: counters of every user, the table, and the verdicts; prints the table, returns the
+# failures as a text in OC_BAD
+oc_report() {
+  local rows=$1 n who ufp lab http https udp exp pq cl un class res table="" nrows
+  local -n uids=$2
+  OC_BAD="" nrows=$(wc -l <"$rows")
+  for ((n = 1; n <= nrows; n++)); do
+    IFS=$'\t' read -r _ who ufp lab http https udp exp < <(sed -n "${n}p" "$rows")
+    read -r pq cl un < <(hello_kex "${uids[$n]}")
+    class=none
+    if [ "$pq" -gt 0 ] && [ "$cl" = 0 ]; then class=pq
+    elif [ "$cl" -gt 0 ] && [ "$pq" = 0 ]; then class=classic
+    elif [ "$pq" -gt 0 ] && [ "$cl" -gt 0 ]; then class=mixed; fi
+    res=ok
+    if [ "$http" != ok ]; then
+      case $http in "client cannot"*) res="$http" ;; *) res=NOT-CONNECTED ;; esac
+    elif [ "$exp" = none ]; then :
+    elif [ "$exp" = any ]; then [ "$class" = pq ] || [ "$class" = classic ] || res="CLASS(want pq or classic)"
+    elif [ "$class" != "$exp" ]; then res="CLASS(want $exp)"; fi
+    [ "$https" != FAIL ] || res="$res HTTPS-FAIL"
+    [ "$udp" != FAIL ] || res="$res UDP-FAIL"
+    table="$table
+  $(printf '%-16s %-9s %-22s http=%-3s https20MB=%-4s udp=%-4s hello pq=%s classic=%s unknown=%s -> %-7s %s' "$who" "$ufp" "$lab" "${http:0:3}" "$https" "$udp" "$pq" "$cl" "$un" "$class" "$res")"
+    case $res in ok | "client cannot"*) ;; *) OC_BAD="$OC_BAD
+  $who $ufp $lab: $res (pq=$pq classic=$cl unknown=$un)" ;; esac
+  done
+  say "old clients against the upgraded node (compatibility on):$table"
+}
+
+# m3_vless_oldclients <REALITY XHTTP profile id> <REALITY RAW+Vision profile id>: clients of older releases against this (the
+# upgraded) node, each as a user of its own. Xray 25.3.6 25.4.30 25.5.16 26.2.6 26.3.27, sing-box 1.12.25 and 1.14.4, Mihomo 1.19.8
+# and 1.19.33, built from source into $M3_CACHE (a client that cannot be built fails the step), with the fingerprints chrome,
+# firefox, safari, ios, edge and random over REALITY; chrome over both transports for every Xray. The node accepts classical hellos
+# (third_party/reality/MISTGATE.md), so every one must pass traffic, and the panel's hello counters of its user must show the class
+# its hello has (oc_expect). The chrome RAW+Vision clients of the main releases also pull 20 MB over HTTPS (Vision's direct copy)
+# and send UDP (xudp: DNS and a QUIC-looking echo). Then Xray 25.3.6 and Mihomo 1.19.8 over REALITY packet-up and stream-up and
+# over the TLS profiles of the Go front (XHTTP packet-up, stream-up, WebSocket); where the client cannot do a transport, the row says
+# "client cannot".
+m3_vless_oldclients() {
+  local px=$1 pt=$2 fps="chrome firefox safari ios edge random" v fp n=0 i t0=$SECONDS
+  local -A xref=([25.3.6]=v1.250306.0 [25.4.30]=87ab8e512882 [25.5.16]=v1.250516.0 [26.2.6]=v1.260206.0 [26.3.27]=v1.260327.0)
+  local xv="25.3.6 25.4.30 25.5.16 26.2.6 26.3.27"
+  declare -gA OC_BIN=()
+  local specs=() # kind|version|fingerprint|label|flag|extras
+
+  say "old clients: building Xray $xv, sing-box 1.12.25 1.14.4, Mihomo 1.19.8 1.19.33 ($M3_CACHE); the node's own Xray 26.11.9 is built already"
+  for v in $xv; do
+    OC_BIN[xray-$v]=$(xray_bin "${xref[$v]}") || die "NOT BUILT: xray-core $v (${xref[$v]})"
+  done
+  OC_BIN[xray-26.11.9]=$XRAY
+  for v in 1.12.25 1.14.4; do
+    OC_BIN[singbox-$v]=$(singbox_bin "$v") || { tail -n 5 "$WORK/build-singbox-$v.log" 2>/dev/null; die "NOT BUILT: sing-box $v"; }
+  done
+  for v in 1.19.8 1.19.33; do
+    OC_BIN[mihomo-$v]=$(mihomo_bin "$v") || { tail -n 5 "$WORK/build-mihomo.log" 2>/dev/null; die "NOT BUILT: mihomo $v"; }
+  done
+
+  # the fake internet's extra servers: HTTPS (TLS 1.3), a UDP echo, a DNS answerer
+  write_inet_extras
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj /CN=big.example.test -days 2 \
+    -keyout "$WORK/inet-key.pem" -out "$WORK/inet-cert.pem" >/dev/null 2>&1 || die "openssl cannot make the certificate of the HTTPS server of the lab"
+  spawn nsenter -t "$inet_PID" -n -- python3 "$WORK/inetextras.py" "$WHOAMI" "$WORK/inet-cert.pem" "$WORK/inet-key.pem" >"$WORK/inetextras.log" 2>&1
+  local extras_pid=$LAST_PID
+  inet_https_up() { curl -sk --tlsv1.3 -m 3 -o /dev/null "https://$WHOAMI:8443/pattern/1"; }
+  wait_for 15 "the lab's HTTPS server" inet_https_up || die "the lab's HTTPS server does not answer: $(cat "$WORK/inetextras.log")"
+  OC_HTTPS_SHA=$(python3 "$WORK/inetextras.py" sha 20000000)
+
+  # the matrix. Xray: the REALITY transport alternates with the version for the six fingerprints, and chrome runs over the other
+  # one too, so every release is met by both RAW+Vision and XHTTP with the default fingerprint; the node's own version runs
+  # everything on both. sing-box and Mihomo speak RAW+Vision (no XHTTP in sing-box, none in Mihomo 1.19.8).
+  i=0
+  for v in $xv; do
+    for fp in $fps; do
+      specs+=("xray|$v|$fp|$([ $((i % 2)) = 0 ] && echo tcp || echo xhttp-auto)|0|")
+    done
+    specs+=("xray|$v|chrome|$([ $((i % 2)) = 0 ] && echo xhttp-auto || echo tcp)|0|")
+    i=$((i + 1))
+  done
+  for fp in $fps; do specs+=("xray|26.11.9|$fp|tcp|0|" "xray|26.11.9|$fp|xhttp-auto|0|"); done
+  for v in 1.12.25 1.14.4; do for fp in $fps; do specs+=("singbox|$v|$fp|tcp|0|"); done; done
+  for v in 1.19.8 1.19.33; do for fp in $fps; do specs+=("mihomo|$v|$fp|tcp|0|"); done; done
+  specs+=("mihomo|1.19.8|chrome|tcp|1|" "mihomo|1.19.33|chrome|tcp|1|" "mihomo|1.19.33|firefox|tcp|1|" "mihomo|1.19.33|safari|tcp|1|")
+  # HTTPS 20 MB and UDP ride on the chrome RAW+Vision client of the main releases
+  local k
+  for k in "${!specs[@]}"; do
+    case ${specs[$k]} in
+      "xray|25.3.6|chrome|tcp|0|" | "xray|26.3.27|chrome|tcp|0|" | "xray|26.11.9|chrome|tcp|0|" | "singbox|1.12.25|chrome|tcp|0|" | "singbox|1.14.4|chrome|tcp|0|" | "mihomo|1.19.8|chrome|tcp|0|" | "mihomo|1.19.33|chrome|tcp|0|")
+        specs[$k]="${specs[$k]}su" ;;
+    esac
+  done
+
+  local grp
+  grp=$(make_group e2e-oldclients "[\"$px\",\"$pt\"]")
+  local -a uid url
+  local spec rows="$WORK/oldclients.tsv"
+  for spec in "${specs[@]}"; do
+    n=$((n + 1))
+    new_user "oc$n" "$grp"
+    uid[$n]=$U_ID url[$n]=$U_URL
+  done
+  : >"$rows"
+  sleep 8 # the keys of the new users reach the node
+  n=0
+  for spec in "${specs[@]}"; do
+    n=$((n + 1))
+    oc_run "$rows" "$n" "${url[$n]}" "$spec"
+  done
+  local nmain=$n
+
+  # ---- more REALITY transports and the TLS profiles of the Go front, with the oldest Xray and Mihomo 1.19.8
+  # (pp, tp, ts, tw: the profiles of tunnels.6, m3_vless's variables)
+  local pps g2
+  pps=$(make_profile vless e2e-vless-streamup "$(vless_settings "$(free_port tcp)" xhttp www.example.com '.xhttp.mode = "stream-up"')")
+  [ -n "$pps" ] && [ "$pps" != null ] || die "CreateProfile(vless stream-up) returned no id"
+  make_inbound "$pps"
+  wait_for 90 "the stream-up inbound ACTIVE" inbounds_active_all || die "the REALITY stream-up inbound did not become ACTIVE"
+  g2=$(make_group e2e-oldclients2 "[\"$pp\",\"$pps\",\"$tp\",\"$ts\",\"$tw\"]")
+  specs=()
+  for fp in chrome; do
+    specs+=("xray|25.3.6|$fp|xhttp-packet-up|0|" "xray|25.3.6|$fp|xhttp-stream-up|0|" "xray|25.3.6|$fp|tls-xhttp-packet-up|0|" "xray|25.3.6|$fp|tls-xhttp-stream-up|0|" "xray|25.3.6|$fp|tls-ws|0|")
+    specs+=("mihomo|1.19.8|$fp|xhttp-packet-up|0|" "mihomo|1.19.8|$fp|xhttp-stream-up|0|" "mihomo|1.19.8|$fp|tls-xhttp-packet-up|0|" "mihomo|1.19.8|$fp|tls-xhttp-stream-up|0|" "mihomo|1.19.8|$fp|tls-ws|0|")
+  done
+  local -a uid2 url2
+  local m=0
+  for spec in "${specs[@]}"; do
+    m=$((m + 1))
+    new_user "oe$m" "$g2"
+    uid2[$m]=$U_ID url2[$m]=$U_URL
+  done
+  local rows2="$WORK/oldclients2.tsv"
+  : >"$rows2"
+  sleep 8
+  m=0
+  for spec in "${specs[@]}"; do
+    m=$((m + 1))
+    oc_run "$rows2" "$((nmain + m))" "${url2[$m]}" "$spec"
+  done
+
+  # ---- the counters, after the stats batch that carries the last hellos
+  sleep 12
+  local bad=""
+  oc_report "$rows" uid
+  bad="$OC_BAD"
+  oc_report "$rows2" uid2
+  bad="$bad$OC_BAD"
+  say "node RSS after the old clients: $(vmrss_mb "$NODE_PID") MB ($((nmain + m)) users, as many more REALITY connections and the TLS ones)"
+  stop_pid "$extras_pid"
+  if grep -nE 'panic|fatal error|runtime error|checkptr' "$WORK/node.log" >"$WORK/oc-panics.log"; then
+    head -n 3 "$WORK/oc-panics.log" >&2
+    bad="$bad
+  the node log holds a panic or runtime error"
+  fi
+  [ -z "$bad" ] || die "old clients: these differ from what was expected:$bad"
+  pass "old clients ($((nmain + m)) runs in $((SECONDS - t0)) s: Xray $xv 26.11.9, sing-box 1.12.25 1.14.4, Mihomo 1.19.8 1.19.33; REALITY over RAW+Vision and XHTTP, packet-up and stream-up, the TLS profiles; HTTPS 20 MB with sha256 and UDP on the chrome RAW+Vision clients): every one that can do the transport connected, and every hello was counted in the class its core sends"
 }
 
 # m3_vless_mihomo <subscription url>: mihomo -t on the profile the user gets, then a real mihomo per proxy

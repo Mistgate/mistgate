@@ -55,12 +55,12 @@ func TestXrayCoreReadsTheHysteria2Fields(t *testing.T) {
 				t.Errorf("transport %q", s.ProtocolName)
 			}
 			hy := jsoncheck.XrayTransport(t, s, "hysteria").(*xhysteria.Config)
-			if hy.Version != 2 || hy.Auth != "tok-DEVICE_secret_0123456789abcdefghijklmn" {
+			if hy.Auth != "tok-DEVICE_secret_0123456789abcdefghijklmn" {
 				t.Errorf("hysteria config %v", hy)
 			}
 			tc := jsoncheck.XraySecurity(t, s).(*xtls.Config)
-			if c.wantPin != (len(tc.PinnedPeerCertSha256) == 1 && hex.EncodeToString(tc.PinnedPeerCertSha256[0]) == pin) || tc.AllowInsecure {
-				t.Errorf("tls: pins %x, allowInsecure %v", tc.PinnedPeerCertSha256, tc.AllowInsecure)
+			if c.wantPin != (len(tc.PinnedPeerCertSha256) == 1 && hex.EncodeToString(tc.PinnedPeerCertSha256[0]) == pin) {
+				t.Errorf("tls: pins %x", tc.PinnedPeerCertSha256)
 			}
 			if len(tc.NextProtocol) != 1 || tc.NextProtocol[0] != "h3" {
 				t.Errorf("alpn %v", tc.NextProtocol)

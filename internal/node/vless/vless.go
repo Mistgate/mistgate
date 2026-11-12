@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -134,7 +135,7 @@ func New(env engine.Env) (engine.Engine, error) {
 func (e *eng) Protocol() string { return Protocol }
 
 func (e *eng) Version() string {
-	version := "v26.3.27"
+	version := "v26.11.9"
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, dep := range bi.Deps {
 			if dep.Path == "github.com/xtls/xray-core" && dep.Version != "" {
@@ -146,9 +147,15 @@ func (e *eng) Version() string {
 	return "xray-core " + version
 }
 
+// displayVersion turns the module version into the release name Xray uses: v1.260327.0 is v26.3.27. v26.11.9 has no module tag,
+// so go.mod names its commit (a pseudo-version).
 func displayVersion(v string) string {
-	if v == "v1.260327.0" {
-		return "v26.3.27"
+	if strings.HasSuffix(v, "-676eaf66f8f0") {
+		return "v26.11.9"
+	}
+	var date, patch int
+	if _, err := fmt.Sscanf(v, "v1.%d.%d", &date, &patch); err == nil && patch == 0 && date >= 250000 && !strings.Contains(v, "-") {
+		return fmt.Sprintf("v%d.%d.%d", date/10000, date/100%100, date%100)
 	}
 	return v
 }

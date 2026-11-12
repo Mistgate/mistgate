@@ -192,7 +192,6 @@ func (r *vlessProbeRig) openClient(t *testing.T, testPin []byte) Tunnel {
 
 func (r *vlessProbeRig) openClientWithSecret(t *testing.T, secret string, testPin []byte) Tunnel {
 	t.Helper()
-	skipVLESSOutboundCheckptrRace(t)
 	row, actualSecret, err := r.e.s.probeCredSecret(r.e.ctx, r.target)
 	if err != nil {
 		t.Fatal(err)
@@ -252,7 +251,6 @@ func (r *vlessProbeRig) runProbeWithSecret(t *testing.T, secret string, testPin 
 
 func (r *vlessProbeRig) runProbeWithTarget(t *testing.T, target Target, testPin []byte) Result {
 	t.Helper()
-	skipVLESSOutboundCheckptrRace(t)
 	client, err := dialVLESS(r.e.ctx, target, DialOptions{HandshakeTimeout: r.e.s.cfg.HandshakeTimeout, testTLSPin: testPin})
 	if err != nil {
 		t.Fatalf("dialVLESS: %v", err)
@@ -325,7 +323,6 @@ func TestVLESSProbeAgainstTLSXHTTPInbound(t *testing.T) {
 }
 
 func TestVLESSXHTTPHelperProcessesDoNotLeak(t *testing.T) {
-	skipVLESSOutboundCheckptrRace(t)
 	rig := newVLESSProbeRig(t, "tls", "xhttp")
 	rig.warmTunnel(t, rig.pin)
 	// Each round owns a separate client process. Retaining the handles here makes the exit check explicit.

@@ -297,6 +297,8 @@ cleanup() {
   echo
   echo "================ summary"
   printf '%s\n' "${RESULTS[@]}"
+  # exit 0 before the last step ran (a stray signal, an exit inside a step) is not a pass
+  if [ "$rc" = 0 ] && [ -z "${FINISHED:-}" ]; then rc=1; echo "E2E INTERRUPTED: the script exited before its last step"; fi
   if [ "$rc" = 0 ]; then echo "E2E PASSED in $(($(date +%s) - T0)) s"; else echo "E2E FAILED (exit $rc)"; fi
   exit "$rc"
 }
@@ -587,6 +589,7 @@ if [ -n "$EDGE" ]; then
   # shellcheck source=e2e/edge.sh
   . "$REPO/scripts/e2e/edge.sh"
   edge_run
+  FINISHED=1
   exit 0
 fi
 
@@ -1542,6 +1545,7 @@ done
 [ "$LEAKS" = 0 ] || die "$LEAKS secret(s) found in logs"
 pass "no secret (admin password, TOTP, cookie, enrollment token, SNI, subscription tokens, hysteria credentials, the SSH passwords of the test host (in the panel, sshd and installed agent logs too), and with the tunnel steps the AWG client and preshared keys, header protection keys, WARP keys, Mihomo credentials, VLESS user ids) in any log"
 
+FINISHED=1 # every step has run
 # ================================================================ 12. hold (--hold)
 if [ -n "${HOLD:-}" ]; then
   [ -z "$EDGE" ] || die "--hold is for the VPS edition"

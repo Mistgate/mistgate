@@ -74,7 +74,7 @@ func TestTLSFrontCountsDirectPeerWithoutPersonIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	echo := startEchoServer(t)
-	client := newXrayTLSClient(t, spec.Listen.Port, "xhttp", "auto", "h2", cred.CredID, stringID(cred))
+	client := newXrayTLSClient(t, certs, spec.Listen.Port, "xhttp", "auto", "h2", cred.CredID, stringID(cred))
 	conn := client.dial(t, echo.Addr().String())
 	if _, err := exchange(conn, []byte("TLS front network count")); err != nil {
 		t.Fatal(err)

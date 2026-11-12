@@ -89,7 +89,7 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 		Inbound: []*core.InboundHandlerConfig{{
 			Tag:              spec.ID,
 			ReceiverSettings: serial.ToTypedMessage(receiver),
-			ProxySettings:    serial.ToTypedMessage(&vlessin.Config{Clients: clients, Decryption: "none"}),
+			ProxySettings:    serial.ToTypedMessage(&vlessin.Config{Users: clients, Decryption: "none"}),
 		}},
 	}
 }
