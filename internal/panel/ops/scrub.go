@@ -44,7 +44,7 @@ func NewScrubber(secrets []string) *Scrubber {
 // Text cleans one piece of text.
 func (c *Scrubber) Text(s string) string {
 	for _, secret := range c.secrets {
-		s = replaceFold(s, secret, "<secret>")
+		s = logscrub.ReplaceFold(s, secret, "<secret>")
 	}
 	return mcp.ScrubText(logscrub.Addrs(s))
 }
@@ -57,36 +57,9 @@ func (c *Scrubber) Value(s string, n int) string {
 // Line cleans one serialised JSON line (an export row): the same passes, with the JSON-aware credential scrubbers last.
 func (c *Scrubber) Line(s string) string {
 	for _, secret := range c.secrets {
-		s = replaceFold(s, secret, "<secret>")
+		s = logscrub.ReplaceFold(s, secret, "<secret>")
 	}
 	return mcp.ScrubJSON(logscrub.Addrs(s))
-}
-
-// replaceFold replaces every ASCII-case-insensitive occurrence of needle. Only ASCII letters fold, so offsets in the folded
-// copy are those of the original.
-func replaceFold(s, needle, with string) string {
-	lower := asciiLower(needle)
-	var b strings.Builder
-	for {
-		i := strings.Index(asciiLower(s), lower)
-		if i < 0 {
-			b.WriteString(s)
-			return b.String()
-		}
-		b.WriteString(s[:i])
-		b.WriteString(with)
-		s = s[i+len(needle):]
-	}
-}
-
-func asciiLower(s string) string {
-	b := []byte(s)
-	for i, c := range b {
-		if 'A' <= c && c <= 'Z' {
-			b[i] = c + 'a' - 'A'
-		}
-	}
-	return string(b)
 }
 
 func jsonObject(m map[string]string) string {

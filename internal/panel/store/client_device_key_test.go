@@ -9,11 +9,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/pressly/goose/v3"
 )
 
 func deviceHash(label string) []byte {
@@ -642,32 +645,17 @@ func TestClientDeviceKeyMigrationLeavesExistingDeviceUntouched(t *testing.T) {
 	}
 	before := read()
 	credsBefore := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ?`, dev.Device.ID)
-	if _, err := s.W.ExecContext(ctx, `DROP INDEX device_key_hash`); err != nil {
+	// The database goes back to the version before this migration by the Down part of every migration after it (a migration added
+	// later is rolled back too), and migrates forward again.
+	sub, err := fs.Sub(migrationsFS, "migrations")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.W.ExecContext(ctx, `ALTER TABLE device DROP COLUMN enrol_token_hash`); err != nil {
+	provider, err := goose.NewProvider(goose.DialectSQLite3, s.W, sub)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.W.ExecContext(ctx, `ALTER TABLE device DROP COLUMN key_hash`); err != nil {
-		t.Fatal(err)
-	}
-	for _, column := range []string{"hello_unknown", "hello_classic", "hello_pq"} { // migration 00127, applied after 00126
-		if _, err := s.W.ExecContext(ctx, `ALTER TABLE link_hour DROP COLUMN `+column); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := s.W.ExecContext(ctx, `ALTER TABLE user DROP COLUMN app_mistgate_off`); err != nil { // migration 00128, applied after 00126
-		t.Fatal(err)
-	}
-	for _, drop := range []string{`DROP TABLE os_step`, `DROP INDEX os_rollout_created`, `DROP INDEX os_rollout_active`, `DROP TABLE os_rollout`} { // migration 00130, applied after 00126
-		if _, err := s.W.ExecContext(ctx, drop); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := s.W.ExecContext(ctx, `ALTER TABLE node DROP COLUMN public_label`); err != nil { // migration 00129, applied after 00126
-		t.Fatal(err)
-	}
-	if _, err := s.W.ExecContext(ctx, `DELETE FROM goose_db_version WHERE version_id IN (126, 127, 128, 129, 130)`); err != nil {
+	if _, err := provider.DownTo(ctx, 125); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.migrate(ctx); err != nil {

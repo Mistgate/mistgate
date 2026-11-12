@@ -45,6 +45,7 @@ var transactionShape1 = map[string]string{
 	"debug_capture.go:BeginDebugCapture":             "A running-capture check precedes one fixed batch: drop the node's oldest captures and their lines, insert the new one.",
 	"debug_capture.go:appendDebugLines":              "The capture's lines and counters share one fixed batch; sequenced reports guard the last accepted chunk so retries do not store it twice.",
 	"debug_capture.go:PruneDebugCaptures":            "The old captures' lines and the captures themselves are deleted in one fixed batch.",
+	"client_debug.go:PruneClientDebug":               "The old and orphaned requests' lines, the rows themselves and the lines left without a row are deleted in one fixed batch.",
 	"relay.go:RelaysApplied":                         "The reported forwards of one entry update their rows (switched-on relays of that node only) in one fixed batch.",
 	"relay_check.go:SetRelayCounters":                "Updates each enabled relay owned by the reporting entry in one fixed batch.",
 	"provision.go:FinishCancelledNodeProvisionJob":   "The cancellation event and guarded state transition run in one fixed batch.",
@@ -126,6 +127,9 @@ var transactionShape2 = map[string]string{
 	"warp.go:ReplaceWarpAccount":                     "An account-exists guard precedes the delete and replacement insert.",
 	"scheduled_task.go:ClaimScheduledTask":           "A free-lease (and manual cooldown) compare-and-swap takes the lease; the run row is inserted only if that lease holds.",
 	"scheduled_task.go:FinishScheduledRun":           "The run row is updated; the task's outcome update is a compare-and-swap on the run's own lease.",
+	"client_debug.go:CreateClientDebug":              "A live-keyed-device guard and a no-open-request guard follow the expiry of a request that ran out and precede the insert in one atomic batch.",
+	"client_debug.go:closeClientDebug":               "A state and deadline compare-and-swap UPDATE closes one open request of the expected device.",
+	"client_debug.go:ReceiveClientDebug":             "A guard (the open request of this device, or the device's ten-minute spacing and the panel's ceiling) precedes the lines, the state, and the drop of the device's bundles beyond three in one atomic batch; a lost guard rereads the row.",
 }
 
 var transactionShape3 = map[string]string{

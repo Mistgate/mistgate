@@ -109,9 +109,9 @@ func parse(s string) (string, bool) {
 	}
 	a, err := netip.ParseAddr(strings.TrimSuffix(strings.TrimPrefix(s, "["), "]"))
 	if err != nil {
-		// an IPv4 with a port netip refuses (":99999") is still an address
+		// an IPv4 with a port netip refuses (":99999", or in brackets: "[203.0.113.45]:443") is still an address
 		if k := strings.LastIndexByte(s, ':'); k > 0 && !strings.Contains(s[:k], ":") {
-			if a, err := netip.ParseAddr(s[:k]); err == nil && a.Is4() {
+			if a, err := netip.ParseAddr(strings.TrimSuffix(strings.TrimPrefix(s[:k], "["), "]")); err == nil && a.Is4() {
 				if own(a) {
 					return s, true
 				}

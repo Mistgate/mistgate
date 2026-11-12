@@ -46,6 +46,12 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["client_device_enrolled", { user: "usr_1", device: "dev_1" }],
   ["client_device_reenrolled", { user: "usr_1", device: "dev_1" }],
   ["client_device_left", { user: "usr_1", device: "dev_1" }],
+  // logs for support (internal/panel/ops/client_debug.go, internal/panel/clientdebug/service.go)
+  ["client_debug_requested", { user: "usr_1", device: "dev_1", id: "dbr_1", level: "debug", expires: "1763337600" }],
+  ["client_debug_cancelled", { user: "usr_1", device: "dev_1", id: "dbr_1" }],
+  ["client_debug_received", { user: "usr_1", device: "dev_1", id: "dbr_1", lines: "18" }],
+  ["client_debug_received", { user: "usr_1", device: "dev_1", id: "dbr_1", lines: "18", unasked: "true" }],
+  ["client_debug_declined", { user: "usr_1", device: "dev_1", id: "dbr_1" }],
   ["page_unlock_lockout", { user: "usr_1", scope: "token" }, "locked"],
   ["node.create_enrollment", { node_id: "nod_1", name: "de1" }],
   ["node.update", { node_id: "nod_1" }],
@@ -209,6 +215,14 @@ describe("audit dictionary", () => {
     expect(describe2(tRu, "client_device_enrolled", { user: "usr_1", device: "dev_1" })).toBe("подключил(а) устройство через приложение Mistgate");
     expect(describe2(tEn, "client_device_reenrolled", { user: "usr_1", device: "dev_1" })).toBe("got a new key for a device in the Mistgate app");
     expect(describe2(tEn, "client_device_left", { user: "usr_1", device: "dev_1" })).toBe("removed a device through the Mistgate app");
+  });
+  it("tells the logs for support asked for, withdrawn, sent and refused", () => {
+    const p = { user: "usr_1", device: "dev_1", id: "dbr_1" };
+    expect(describe2(tEn, "client_debug_requested", { ...p, level: "debug", expires: "1763337600" })).toBe("asked for the logs of a device");
+    expect(describe2(tRu, "client_debug_cancelled", p)).toBe("отозвал(а) запрос журналов устройства");
+    expect(describe2(tEn, "client_debug_received", { ...p, lines: "18" })).toBe("sent logs from the Mistgate app");
+    expect(describe2(tRu, "client_debug_received", { ...p, unasked: "true" })).toBe("отправил(а) журналы из приложения Mistgate");
+    expect(describe2(tRu, "client_debug_declined", p)).toBe("отказался(-лась) отправлять журналы из приложения Mistgate");
   });
   it("says what failed in the UI language, after the sentence, when the sentence itself does not", () => {
     expect(describe2(tRu, "mcp_apply", { tool: "user_enable" }, "fail")).toBe("выполнил(а) запланированное изменение: Включить пользователей — не удалось");

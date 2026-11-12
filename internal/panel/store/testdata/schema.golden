@@ -103,6 +103,30 @@
   },
   {
     "type": "index",
+    "name": "client_debug_device",
+    "tbl_name": "client_debug",
+    "sql": "CREATE INDEX client_debug_device ON client_debug (device_id, state, closed_at)"
+  },
+  {
+    "type": "index",
+    "name": "client_debug_open",
+    "tbl_name": "client_debug",
+    "sql": "CREATE UNIQUE INDEX client_debug_open ON client_debug (device_id) WHERE state = 'open'"
+  },
+  {
+    "type": "index",
+    "name": "client_debug_requested",
+    "tbl_name": "client_debug",
+    "sql": "CREATE INDEX client_debug_requested ON client_debug (requested_at)"
+  },
+  {
+    "type": "index",
+    "name": "client_debug_user",
+    "tbl_name": "client_debug",
+    "sql": "CREATE INDEX client_debug_user ON client_debug (user_id, requested_at)"
+  },
+  {
+    "type": "index",
     "name": "client_probe_report_at",
     "tbl_name": "client_probe_report",
     "sql": "CREATE INDEX client_probe_report_at ON client_probe_report (at)"
@@ -670,6 +694,12 @@
     "name": "batch_guard",
     "tbl_name": "batch_guard",
     "sql": "CREATE TABLE batch_guard ( failed INTEGER NOT NULL, CONSTRAINT batch_guard CHECK (failed = 0) )"
+  },
+  {
+    "type": "table",
+    "name": "client_debug",
+    "tbl_name": "client_debug",
+    "sql": "CREATE TABLE client_debug ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, device_id TEXT NOT NULL, actor TEXT NOT NULL DEFAULT '', unasked INTEGER NOT NULL DEFAULT 0 CHECK (unasked IN (0, 1)), note TEXT NOT NULL DEFAULT '', level TEXT NOT NULL DEFAULT 'info' CHECK (level IN ('info', 'debug')), requested_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, state TEXT NOT NULL CHECK (state IN ('open', 'received', 'declined', 'cancelled', 'expired')), closed_at INTEGER NOT NULL DEFAULT 0, records INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0, dropped_kv INTEGER NOT NULL DEFAULT 0, first_ms INTEGER NOT NULL DEFAULT 0, last_ms INTEGER NOT NULL DEFAULT 0, app TEXT NOT NULL DEFAULT '', read_at INTEGER NOT NULL DEFAULT 0, read_by TEXT NOT NULL DEFAULT '' ) STRICT"
   },
   {
     "type": "table",

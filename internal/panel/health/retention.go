@@ -89,6 +89,7 @@ func (s *Service) sweep(ctx context.Context) {
 	}
 	s.sweepProbes(ctx, now)        // path probes, 7 days; VPS only
 	s.sweepDebugCaptures(ctx, now) // debug captures of a node, 24 hours; VPS only
+	s.sweepClientDebug(ctx, now)   // logs people sent for support, 7 days; VPS only
 	s.sweepScheduledRuns(ctx, now) // runs of the scheduled tasks: the last 50 of a task, 30 days; VPS only
 	// A device revoked long ago is only a row now (stats of its past traffic never needed it); a blocked one stays.
 	if n, err := s.st.PruneRevokedDevices(ctx, now.Add(-deviceKeep), eventBatch); err != nil && ctx.Err() == nil {

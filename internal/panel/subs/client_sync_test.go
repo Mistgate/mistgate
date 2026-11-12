@@ -41,10 +41,20 @@ type syncEnv struct {
 
 func newSyncEnv(t *testing.T, mut func(*subs.Config)) *syncEnv {
 	t.Helper()
+	return newSyncEnvWith(t, func(c *subs.Config, _ *store.Store) {
+		if mut != nil {
+			mut(c)
+		}
+	})
+}
+
+// newSyncEnvWith is newSyncEnv for a configuration that needs the store.
+func newSyncEnvWith(t *testing.T, mut func(*subs.Config, *store.Store)) *syncEnv {
+	t.Helper()
 	e := newEnrolEnvWith(t, func(c *subs.Config, st *store.Store) {
 		c.Routing = subs.HappRouting(dns.New(st))
 		if mut != nil {
-			mut(c)
+			mut(c, st)
 		}
 	})
 	e.switchAPI(true)

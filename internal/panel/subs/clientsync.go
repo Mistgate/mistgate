@@ -41,7 +41,7 @@ type ClientAPI interface {
 // A drift between the interface and the service would silently turn the endpoints into the decoy.
 var _ ClientAPI = (*access.Service)(nil)
 
-// clientAPIRoute recognizes the tokenless client endpoints (<prefix>/client/sync and /client/leave). They are routed before the
+// clientAPIRoute recognizes the tokenless client endpoints (<prefix>/client/sync, /leave, /debug and /debug/decline). They are routed before the
 // subscription-token lockout so that a valid device key keeps working from a network whose unknown-token misses are locked out.
 func clientAPIRoute(r *http.Request, prefix string) string {
 	p := r.URL.Path
@@ -53,11 +53,15 @@ func clientAPIRoute(r *http.Request, prefix string) string {
 		return "sync"
 	case "/client/leave":
 		return "leave"
+	case "/client/debug":
+		return "debug"
+	case "/client/debug/decline":
+		return "debug/decline"
 	}
 	return ""
 }
 
-// serveClientAPI answers sync and leave. The device key is the only credential; the answers come in this order, and none of
+// serveClientAPI answers sync, leave, debug and debug/decline. The device key is the only credential; the answers come in this order, and none of
 // them is given before the key is known to be a device's: a missing, malformed or unknown key (and a wrong method) is the
 // decoy and a miss, as an unknown subscription token is, and the decoy is exactly the one of any other path (no header of
 // ours before it); a key that is a device's, live or not, is counted in the budget of the device, 429 beyond it; then the key of
@@ -71,7 +75,7 @@ func (h *handler) serveClientAPI(w http.ResponseWriter, r *http.Request, route, 
 	ctx := r.Context()
 	locked := client != "" && h.blocked(ctx, client)
 	key, ok := bearerKey(r)
-	if !ok || h.client == nil || (route == "sync" && r.Method != http.MethodGet) || (route == "leave" && r.Method != http.MethodPost) {
+	if !ok || h.client == nil || (route == "sync" && r.Method != http.MethodGet) || (route != "sync" && r.Method != http.MethodPost) {
 		h.clientAPIMiss(w, r, client, locked) // no database call for what cannot be a key
 		return
 	}
@@ -104,7 +108,7 @@ func (h *handler) serveClientAPI(w http.ResponseWriter, r *http.Request, route, 
 		jsonError(w, http.StatusUnauthorized, refusal, "")
 		return
 	}
-	if route == "sync" && linkMoved(dev, owner) {
+	if route != "leave" && linkMoved(dev, owner) {
 		jsonError(w, http.StatusUnauthorized, "link_changed", "")
 		return
 	}
@@ -112,8 +116,12 @@ func (h *handler) serveClientAPI(w http.ResponseWriter, r *http.Request, route, 
 		jsonError(w, http.StatusForbidden, "cross_origin", "")
 		return
 	}
-	if route == "leave" {
+	switch route {
+	case "leave":
 		h.serveClientLeave(w, r, dev, keyHash[:], client, locked)
+		return
+	case "debug", "debug/decline":
+		h.serveClientDebug(w, r, dev, route)
 		return
 	}
 	h.serveClientSync(w, r, dev, keyHash[:], client, locked)
@@ -165,6 +173,17 @@ func (h *handler) serveClientSync(w http.ResponseWriter, r *http.Request, dev st
 		return
 	}
 	in := clientSyncInput{DeviceID: dev.ID, View: view, Brand: h.brand(ctx), Settings: set, ProbeOn: h.probeOn(ctx)}
+	if cd := h.cfg.ClientDebug; cd != nil {
+		in.DebugOn = true
+		req, open, err := cd.Open(ctx, dev.ID, h.cfg.Now())
+		if err != nil {
+			h.clientAPIFailed(w, "client_api_sync_debug_failed", err)
+			return
+		}
+		if open {
+			in.DebugRequest = &clientSyncDebugRequest{ID: req.ID, Level: req.Level, Note: req.Note, ExpiresUnix: req.ExpiresUnix}
+		}
+	}
 	if view.Status == access.StatusActive && !view.AppMistgateOff {
 		in.DNS = h.linkPreset(ctx, view)
 	}
@@ -314,8 +333,24 @@ type clientSyncProbe struct {
 	V      int  `json:"v"`
 }
 
+// clientSyncDebug tells the app whether the panel takes its logs (the VPS edition does; the Cloudflare edition says intake false and
+// nothing else), that a person may send them on their own (unasked: only a person whose status is active and for whom the Mistgate
+// app is not switched off), and the owner's open request for them, if there is one. Every
+// part of it is in the ETag: a request that is made, answered, cancelled, refused or run out changes the answer. Nothing of it
+// depends on the time of the request.
 type clientSyncDebug struct {
-	Intake bool `json:"intake"`
+	Intake  bool                    `json:"intake"`
+	Unasked bool                    `json:"unasked,omitempty"`
+	Request *clientSyncDebugRequest `json:"request,omitempty"`
+}
+
+// clientSyncDebugRequest: level is "info" or "debug" (the person agrees to a detailed record while the request is open), note is
+// the owner's text for the person (plain text, at most 200 characters), expires_unix is when the request runs out.
+type clientSyncDebugRequest struct {
+	ID          string `json:"id"`
+	Level       string `json:"level"`
+	Note        string `json:"note"`
+	ExpiresUnix int64  `json:"expires_unix"`
 }
 
 type clientSyncDNS struct {
@@ -407,12 +442,14 @@ type clientSyncAnswer struct {
 
 // clientSyncInput is everything the body is made of.
 type clientSyncInput struct {
-	DeviceID string
-	View     access.SubView
-	Brand    instance.Settings
-	Settings *adminv1.SubscriptionSettings
-	ProbeOn  bool
-	DNS      *dns.Preset // the preset of the link apps; nil = none (the field is then absent)
+	DeviceID     string
+	View         access.SubView
+	Brand        instance.Settings
+	Settings     *adminv1.SubscriptionSettings
+	ProbeOn      bool
+	DebugOn      bool                    // the panel takes the logs of the app (the VPS edition)
+	DebugRequest *clientSyncDebugRequest // the device's open request for them
+	DNS          *dns.Preset             // the preset of the link apps; nil = none (the field is then absent)
 }
 
 // buildClientSync makes the body of an answer. A person without access (disabled, expired, over the quota) gets the status, the
@@ -426,7 +463,7 @@ func buildClientSync(in clientSyncInput) clientSyncAnswer {
 			QuotaReset: v.QuotaReset, NextResetUnix: unixOrZero(v.NextReset)},
 		Devices: clientSyncDevices{Used: v.DevicesUsed, Limit: max(v.DeviceLimit, 0)},
 		Probe:   clientSyncProbe{Intake: in.ProbeOn, V: clientprobe.Version},
-		Debug:   clientSyncDebug{Intake: false}, // no intake exists yet
+		Debug:   clientSyncDebug{Intake: in.DebugOn, Unasked: in.DebugOn && v.Status == access.StatusActive && !v.AppMistgateOff, Request: in.DebugRequest},
 		Servers: []clientSyncServer{},
 	}
 	// "none" is the contract's word for a period that never ends, and then there is no reset time (the page does the same). The

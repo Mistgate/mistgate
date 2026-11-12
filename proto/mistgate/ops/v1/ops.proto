@@ -50,6 +50,15 @@ service OpsService {
   rpc GetNetworkSettings(GetNetworkSettingsRequest) returns (GetNetworkSettingsResponse);
   // Changes the mode. Turning networks off removes the stored hourly and per-person rows.
   rpc SetNetworkSettings(SetNetworkSettingsRequest) returns (SetNetworkSettingsResponse);
+  // LOGS FOR SUPPORT: the owner asks one device of the Mistgate app (a device with a key) for its logs. The person sees the request in
+  // the app at its next sync and sends the logs or refuses. At most one request is open per device; it runs out after 72 hours.
+  // NOT_FOUND: no such device with a key. FAILED_PRECONDITION: the device has an open request. Owner-only, closed to tokens, audit-logged.
+  // The panel keeps the logs (and the request) 7 days. Reading them is a later step.
+  rpc RequestClientDebug(RequestClientDebugRequest) returns (RequestClientDebugResponse);
+  // Withdraws an open request. NOT_FOUND: no such request. FAILED_PRECONDITION: it is not open (answered, refused, withdrawn or run out).
+  rpc CancelClientDebug(CancelClientDebugRequest) returns (CancelClientDebugResponse);
+  // The requests and the bundles people sent on their own, newest first, at most 100: of one person, or of everyone.
+  rpc ListClientDebug(ListClientDebugRequest) returns (ListClientDebugResponse);
 }
 
 message GetLogSettingsRequest {}
@@ -467,4 +476,71 @@ message SetNetworkSettingsRequest {
 
 message SetNetworkSettingsResponse {
   GetNetworkSettingsResponse settings = 1;
+}
+
+// A request for the logs of a device of the Mistgate app, or a bundle of logs that came. Names are the panel's today (empty when the
+// person or the device is gone); none of them is a word the app wrote.
+message ClientDebugInfo {
+  string id = 1;
+  string user_id = 2;
+  string user_name = 3;
+  string device_id = 4;
+  // What the device reported about itself ("windows", "iPhone 15").
+  string device_platform = 5;
+  string device_model = 6;
+  // "open" (waiting for the person), "received" (the logs are here), "declined" (the person refused), "cancelled" (the owner
+  // withdrew it) or "expired" (72 hours passed).
+  string state = 7;
+  // "info" or "debug": what the owner asked the app to record while the request is open.
+  string level = 8;
+  // The owner's note, which the person sees in the app; plain text.
+  string note = 9;
+  // The person sent these logs on their own, without a request.
+  bool unasked = 10;
+  // The admin who asked (a name or an id); empty for logs sent unasked.
+  string actor = 11;
+  int64 requested_unix = 12 [jstype = JS_NUMBER];
+  // When an open request runs out.
+  int64 expires_unix = 13 [jstype = JS_NUMBER];
+  // When the request stopped being open, or the logs came; 0 while open.
+  int64 closed_unix = 14 [jstype = JS_NUMBER];
+  // Of a received bundle: records kept, their size, the attributes the panel did not keep, the times of the first and the last
+  // record (unix milliseconds), and the app's name and version.
+  uint32 records = 15;
+  uint32 bytes = 16;
+  uint32 dropped_attrs = 17;
+  int64 first_unix_ms = 18 [jstype = JS_NUMBER];
+  int64 last_unix_ms = 19 [jstype = JS_NUMBER];
+  string app = 20;
+  // When the owner first read the logs; 0 = not yet.
+  int64 read_unix = 21 [jstype = JS_NUMBER];
+}
+
+message RequestClientDebugRequest {
+  string device_id = 1;
+  // At most 200 characters; control and invisible formatting characters are removed. Optional.
+  string note = 2;
+  // "info" or "debug"; "" means "info".
+  string level = 3;
+}
+
+message RequestClientDebugResponse {
+  ClientDebugInfo request = 1;
+}
+
+message CancelClientDebugRequest {
+  string id = 1;
+}
+
+message CancelClientDebugResponse {
+  ClientDebugInfo request = 1;
+}
+
+message ListClientDebugRequest {
+  // "" = every person.
+  string user_id = 1;
+}
+
+message ListClientDebugResponse {
+  repeated ClientDebugInfo items = 1;
 }

@@ -10,6 +10,8 @@ func TestAddrs(t *testing.T) {
 	for _, c := range []struct{ in, want string }{
 		{"handshake from 203.0.113.7:51234 failed", "handshake from <ip>:port failed"},
 		{"peer 203.0.113.7 timed out.", "peer <ip> timed out."},
+		{"from [203.0.113.45]:443 closed", "from <ip>:port closed"},
+		{"from [203.0.113.45] closed", "from <ip> closed"},
 		{"dial [2001:db8::7]:443: i/o timeout", "dial <ip>:port: i/o timeout"},
 		{"from 2001:db8::7, retrying", "from <ip>, retrying"},
 		{"from fe80::1%eth0: no route", "from <ip>: no route"},

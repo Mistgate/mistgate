@@ -35,6 +35,16 @@ func (s *Service) sweepDebugCaptures(ctx context.Context, now time.Time) {
 	}
 }
 
+// sweepClientDebug prunes the logs people sent for support and the owner's requests for them (7 days from the request), with their lines, and
+// the rows whose person or device is gone. VPS only: the Cloudflare edition takes no logs, so its cron does not touch the tables.
+func (s *Service) sweepClientDebug(ctx context.Context, now time.Time) {
+	if n, err := s.st.PruneClientDebug(ctx, now.Add(-store.ClientDebugKeep)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune client logs", "code", "prune_client_debug_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned client logs", "count", n)
+	}
+}
+
 // sweepScheduledRuns prunes the runs of the scheduled tasks (the last 50 of a task, at most 30 days) and the conversations of
 // the assistant tasks alike. VPS only: the Cloudflare edition runs no task.
 func (s *Service) sweepScheduledRuns(ctx context.Context, now time.Time) {

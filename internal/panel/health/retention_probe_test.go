@@ -64,3 +64,33 @@ func TestSweepPrunesDebugCapturesAfterADay(t *testing.T) {
 		t.Errorf("lines left = %d, %v", lines, err)
 	}
 }
+
+// One sweep prunes the logs people sent for support and the owner's requests for them 7 days after the request, with their lines,
+// and the rows whose device or person is gone; the newer ones, and the lines of node captures, stay.
+func TestSweepPrunesClientLogsAfterAWeek(t *testing.T) {
+	e := newEnv(t)
+	now := e.clock.Now()
+	e.exec(`INSERT INTO user_group (id, name, created_at) VALUES ('grp_c', 'g', 1)`)
+	e.exec(`INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_c', 'alice-liddell', 'grp_c', 1, x'01', x'02', 1)`)
+	e.exec(`INSERT INTO device (id, user_id, first_seen_at, last_seen_at, created_at) VALUES ('dev_c', 'usr_c', 1, 1, 1)`)
+	row := func(id, device string, age time.Duration, state string) {
+		at := now.Add(-age).Unix()
+		e.exec(`INSERT INTO client_debug (id, user_id, device_id, requested_at, expires_at, state, closed_at, records) VALUES (?, 'usr_c', ?, ?, ?, ?, ?, 1)`, id, device, at, at+3600, state, at)
+		e.exec(`INSERT INTO debug_capture_line (capture_id, seq, at_ms, level, source, message) VALUES (?, 1, 1, 1, 'service', 'x')`, id)
+	}
+	row("dbr_new", "dev_c", time.Hour, "received")
+	row("dbr_6d", "dev_c", 6*24*time.Hour+23*time.Hour, "received")
+	row("dbr_8d", "dev_c", 8*24*time.Hour, "received")
+	row("dbr_8d_asked", "dev_c", 8*24*time.Hour, "declined")
+	row("dbr_nodev", "dev_gone", time.Hour, "received")
+	e.exec(`INSERT INTO debug_capture_line (capture_id, seq, at_ms, level, source, message) VALUES ('req_node', 1, 1, 1, 'agent', 'x')`)
+	e.s.sweep(e.ctx)
+	rows, err := e.st.ClientDebugList(e.ctx, "", now)
+	if err != nil || len(rows) != 2 || rows[0].ID != "dbr_new" || rows[1].ID != "dbr_6d" {
+		t.Fatalf("rows left after the sweep: %+v, %v; want the two inside 7 days", rows, err)
+	}
+	var lines int
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT COUNT(*) FROM debug_capture_line`).Scan(&lines); err != nil || lines != 3 {
+		t.Errorf("lines left = %d, %v; want the two bundles' and the node capture's", lines, err)
+	}
+}

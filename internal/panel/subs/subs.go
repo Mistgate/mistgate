@@ -119,6 +119,17 @@ type Config struct {
 	// ProbeReports keeps the reports of the kl!ck probe (POST <prefix>/<token>/probe). The owner's switch is read with the
 	// settings (Settings.ProbeReports); while it is on, the app answers carry Probe-Report. Nil = the panel takes none.
 	ProbeReports ProbeStore
+	// ClientDebug keeps the logs people send for support (POST <prefix>/client/debug, internal/panel/clientdebug); sync tells the app
+	// about it. Nil in the Cloudflare edition: sync says debug.intake false and the route answers 403 debug_off.
+	ClientDebug ClientDebug
+	// ClientDebugSlotWait is how long a delivery of logs waits for the one slot of the process (it unpacks, cleans and stores one at a
+	// time); zero = 8 seconds. ClientDebugAttemptsPerHour is how many deliveries a person may bring to the reading of the body in an
+	// hour, broken ones too; zero = 6, negative = no limit.
+	ClientDebugSlotWait        time.Duration
+	ClientDebugAttemptsPerHour int
+	// ClientDebugReaders is how many bodies of deliveries of logs are read at once (each is held in memory up to ClientDebugMaxWire, from
+	// one device at a time); one more is refused with 503 retry before its body is read. Zero = 8.
+	ClientDebugReaders int
 	// Now is the clock (tests); default time.Now.
 	Now func() time.Time
 
@@ -258,6 +269,9 @@ type handler struct {
 	decoy  http.Handler
 	prefix string
 
+	debugBusy    sync.Map      // device id -> struct{}: the devices whose delivery of logs is being read
+	debugReaders chan struct{} // the places of the bodies being read (ClientDebugReaders)
+
 	seed   maphash.Seed
 	tokens *ratelimit.Map[*tokenState]
 }
@@ -278,6 +292,11 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 	h.pdns, _ = src.(PageDNS)
 	h.enrol, _ = src.(ClientEnrol)
 	h.client, _ = src.(ClientAPI)
+	readers := cfg.ClientDebugReaders
+	if readers <= 0 {
+		readers = 8
+	}
+	h.debugReaders = make(chan struct{}, readers)
 	if o := originOf(cfg.BaseURL); o != "" {
 		// Behind a proxy that rewrites Host the Origin of a browser is still the public address.
 		if err := h.cop.AddTrustedOrigin(o); err != nil {

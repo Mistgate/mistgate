@@ -31,6 +31,12 @@ const (
 	OpsGetFleetLoadProcedure       = "/mistgate.ops.v1.OpsService/GetFleetLoad"
 	OpsGetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/GetNetworkSettings"
 	OpsSetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/SetNetworkSettings"
+	// The logs people send for support. A person's own logs, even cleaned, are the owner's to ask for and to read: all of these are the
+	// owner's in the admin UI and closed to tokens (no tokenProcedures line), whatever the profile. The MCP list of requests, metadata only,
+	// is a later line here.
+	OpsRequestClientDebugProcedure = "/mistgate.ops.v1.OpsService/RequestClientDebug"
+	OpsCancelClientDebugProcedure  = "/mistgate.ops.v1.OpsService/CancelClientDebug"
+	OpsListClientDebugProcedure    = "/mistgate.ops.v1.OpsService/ListClientDebug"
 )
 
 func init() {
@@ -39,6 +45,7 @@ func init() {
 		OpsSetRetentionProcedure, OpsExportDataProcedure, OpsGetMetricsSettingsProcedure, OpsSetMetricsSettingsProcedure,
 		OpsStartDebugCaptureProcedure, OpsStopDebugCaptureProcedure, OpsListDebugCapturesProcedure, OpsGetDebugCaptureProcedure,
 		OpsGetNetworkSettingsProcedure, OpsSetNetworkSettingsProcedure,
+		OpsRequestClientDebugProcedure, OpsCancelClientDebugProcedure, OpsListClientDebugProcedure,
 	} {
 		procedureLevels[p] = levelOwner
 	}
