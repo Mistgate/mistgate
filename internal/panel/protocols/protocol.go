@@ -186,7 +186,7 @@ type RenderInput struct {
 	DeviceID     string
 	Secret       string // decrypted credential secret
 	MaskSecrets  bool   // profile preview: render secrets as "••••"
-	// NoIPv6Egress: the client gets no IPv6 out of the exit node, so FormatMistgate carries no IPv6 address of the tunnel (AmneziaWG).
+	// NoIPv6Egress: the client gets no IPv6 out of the exit node, so no format of an AmneziaWG server carries an IPv6 address of the tunnel (AllowedIPs keep ::/0).
 	// The other formats ignore it; false (the zero value) changes nothing.
 	NoIPv6Egress bool
 

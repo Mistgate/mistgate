@@ -24,7 +24,6 @@ proxies:
     server: "de1.example.com"
     port: 0
     ip: "<secret>"
-    ipv6: "fd66:66:0:1::2/128"
     private-key: "<secret>"
     public-key: "<secret>"
     pre-shared-key: "<secret>"
@@ -68,7 +67,6 @@ proxies:
     server: "2001:db8::5"
     port: 0
     ip: "<secret>"
-    ipv6: "fd66:66:0:1::2/128"
     private-key: "<secret>"
     public-key: "<secret>"
     pre-shared-key: "<secret>"

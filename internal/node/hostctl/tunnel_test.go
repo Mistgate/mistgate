@@ -187,8 +187,9 @@ func TestTunnelsEqual(t *testing.T) {
 	}
 }
 
-// "IPv6 for clients" off: a tunnel with an IPv6 subnet that exits directly gets one reject rule for IPv6 towards
-// anything that is not a tunnel interface; nothing else in the table moves.
+// "IPv6 for clients" off: a tunnel with an IPv6 subnet that exits directly gets two reject rules for IPv6 towards
+// anything that is not a tunnel interface (a TCP reset for TCP, ICMPv6 admin-prohibited for the rest); nothing else in the
+// table moves.
 func TestRenderTunnelsRejectV6(t *testing.T) {
 	a := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
 	a.RejectV6 = true
@@ -198,6 +199,7 @@ func TestRenderTunnelsRejectV6(t *testing.T) {
 	}
 	want := `	chain nov6 {
 		type filter hook forward priority filter; policy accept;
+		iifname "mgawg51842" oifname != "mgawg*" meta nfproto ipv6 meta l4proto tcp reject with tcp reset
 		iifname "mgawg51842" oifname != "mgawg*" meta nfproto ipv6 reject with icmpx type admin-prohibited
 	}
 `
@@ -214,8 +216,14 @@ func TestRenderTunnelsRejectV6(t *testing.T) {
 	b := tun(40001, "10.66.8.0/22", "fd66:66:0:2::/64")
 	a.RejectV6 = true
 	two, _ := RenderTunnels([]Tunnel{a, b}, nil)
-	if strings.Count(two, "reject with") != 1 || !strings.Contains(two, `iifname "mgawg51842" oifname != "mgawg*" meta nfproto ipv6 reject`) {
+	if strings.Count(two, "reject with") != 2 || strings.Contains(two, `iifname "mgawg40001" oifname`) ||
+		!strings.Contains(two, `iifname "mgawg51842" oifname != "mgawg*" meta nfproto ipv6 reject`) {
 		t.Errorf("two tunnels, one off:\n%s", two)
+	}
+	// The drop fallback (a kernel without nft reject) is one rule: there is no RST to send.
+	dropped, _ := renderTunnels([]Tunnel{a}, v6Drop, nil)
+	if strings.Contains(dropped, "tcp reset") || strings.Count(dropped, "meta nfproto ipv6 drop") != 1 {
+		t.Errorf("drop fallback:\n%s", dropped)
 	}
 	// Not for a WARP tunnel (the exit is Cloudflare's), not for one without IPv6.
 	w, v4 := a, tun(40002, "10.66.12.0/22", "")

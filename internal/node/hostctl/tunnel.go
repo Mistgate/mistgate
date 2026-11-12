@@ -21,8 +21,10 @@ import (
 //     tunnel's own address is answered, every other packet to a tunnel address (its own or another profile's) is
 //     dropped, TCP 443 and the enabled client inbounds' ports are allowed at the host's other (public) addresses, and
 //     everything else is dropped. The agent leaves SSH and its own AWG UDP listeners out of the allowlist;
-//   - with "IPv6 for clients" off (Tunnel.RejectV6): IPv6 from a tunnel towards the uplink is rejected with ICMPv6
-//     admin-prohibited (chain nov6), not dropped, so apps move to IPv4 immediately;
+//   - with "IPv6 for clients" off (Tunnel.RejectV6): IPv6 from a tunnel towards the uplink is rejected (chain nov6), not
+//     dropped, so apps move to IPv4 immediately: TCP gets a RST (the only answer every stack and every userspace TCP
+//     stack, Mihomo's included, turns into an instant failure; an ICMP error alone makes a Linux client wait for the first
+//     SYN retransmission), the rest an ICMPv6 admin-prohibited (a fatal error for UDP sockets, unlike no-route);
 //   - one named counter per UDP port, AwgHealth.udp_rx_packets: 0 = the provider or a firewall, > 0 without a
 //     handshake = the obfuscation parameters.
 
@@ -51,8 +53,9 @@ type Tunnel struct {
 	// ViaWarp: the egress of this tunnel is WARP. No masquerade here, the WARP table does it.
 	ViaWarp bool
 	// RejectV6: "IPv6 for clients" is off on this node. IPv6 forwarded from this tunnel to anything but a tunnel
-	// interface is answered with ICMPv6 admin-prohibited, so the app falls back to IPv4 at once. The client keeps its
-	// IPv6 address and ::/0 route (without them its real IPv6 would leave outside the tunnel). Not rendered for a ViaWarp
+	// interface is answered with a TCP RST (TCP) or ICMPv6 admin-prohibited (the rest), so the app falls back to IPv4 at
+	// once. The panel gives a client no IPv6 address of the tunnel here, but a config issued earlier still has one: it
+	// keeps the ::/0 route (without it its real IPv6 would leave outside the tunnel). Not rendered for a ViaWarp
 	// tunnel (the exit is Cloudflare's, not this node's uplink) or one without an IPv6 subnet.
 	RejectV6 bool
 }
@@ -109,7 +112,8 @@ func ifaceNameOK(s string) bool {
 	return true
 }
 
-// The verdict of the nov6 chain: reject answers at once, drop is the fallback for a kernel without nft reject.
+// The verdict of the nov6 chain: reject answers at once (a RST for TCP, ICMPv6 admin-prohibited for the rest; icmpx maps
+// to the ICMPv6 code for an IPv6 packet), drop is the fallback for a kernel without nft reject.
 const (
 	v6Reject = "reject with icmpx type admin-prohibited"
 	v6Drop   = "drop"
@@ -237,11 +241,15 @@ func renderTunnels(ts []Tunnel, v6verdict string, published []PublishedPort) (st
 	// Forward: no client-to-client traffic, and the MSS clamp in both directions of a tunnel.
 	fmt.Fprintf(&b, "\tchain isolate {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tiifname %s oifname %s drop\n\t}\n", wild, wild)
 	// "IPv6 for clients" off: reject (not drop) what a tunnel sends to the uplink over IPv6. icmpx maps to ICMPv6
-	// "communication administratively prohibited" for IPv6 packets.
+	// "communication administratively prohibited" for IPv6 packets. TCP gets its RST first.
 	var noV6 strings.Builder
 	for _, t := range sorted {
 		if t.RejectV6 && t.Subnet6.IsValid() && !t.ViaWarp {
-			fmt.Fprintf(&noV6, "\t\tiifname %q oifname != %s meta nfproto ipv6 %s\n", t.Iface, wild, v6verdict)
+			rule := fmt.Sprintf("\t\tiifname %q oifname != %s meta nfproto ipv6 ", t.Iface, wild)
+			if v6verdict == v6Reject {
+				fmt.Fprintf(&noV6, "%smeta l4proto tcp reject with tcp reset\n", rule)
+			}
+			fmt.Fprintf(&noV6, "%s%s\n", rule, v6verdict)
 		}
 	}
 	if noV6.Len() > 0 {

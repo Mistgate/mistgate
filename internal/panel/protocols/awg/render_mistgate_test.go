@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mistgate/mistgate/internal/panel/protocols/awg/vpnkey"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -188,11 +189,10 @@ func TestMistgateIPv6EndpointHasNoBrackets(t *testing.T) {
 	}
 }
 
-// An exit that gives the client no IPv6 (RenderInput.NoIPv6Egress): the Mistgate format has no tunnel IPv6 address, and everything
-// else of it, allowed_ips included (both ranges, so the client's IPv6 cannot go around the tunnel), stays what it was. The other
-// formats are not told.
-func TestMistgateWithoutIPv6Egress(t *testing.T) {
-	render := func(format plugin.ClientFormat, noV6 bool) (string, map[string]any) {
+// An exit that gives the client no IPv6 (RenderInput.NoIPv6Egress): no format has a tunnel IPv6 address, and everything else of
+// them, allowed_ips included (both ranges, so the client's IPv6 cannot go around the tunnel), stays what it was.
+func TestWithoutIPv6Egress(t *testing.T) {
+	render := func(format plugin.ClientFormat, noV6 bool) string {
 		t.Helper()
 		in := renderInput(t, fixture31(), format)
 		in.DeviceID, in.Capabilities, in.NoIPv6Egress = "dev_1", []string{"awg=3.1"}, noV6
@@ -200,36 +200,83 @@ func TestMistgateWithoutIPv6Egress(t *testing.T) {
 		if !ok {
 			t.Fatalf("Render(%s) refused", format)
 		}
-		var doc map[string]any
-		if format == plugin.FormatMistgate {
-			if err := json.Unmarshal(frag.Data, &doc); err != nil {
-				t.Fatal(err)
-			}
-		}
-		return string(frag.Data), doc
+		return string(frag.Data)
 	}
-	_, with := render(plugin.FormatMistgate, false)
-	_, without := render(plugin.FormatMistgate, true)
-	if _, ok := with["address_v6"]; !ok {
+	// The .conf: the Address line loses the /128 and nothing else moves.
+	with, without := render(plugin.FormatAWGConf, false), render(plugin.FormatAWGConf, true)
+	if !strings.Contains(with, "/128") {
+		t.Fatalf("the profile has IPv6 and the .conf carries no IPv6 address by default:\n%s", with)
+	}
+	if strings.Contains(without, "/128") {
+		t.Errorf("an IPv6 address for an exit with no IPv6:\n%s", without)
+	}
+	if !strings.Contains(without, "AllowedIPs = 0.0.0.0/0, ::/0") {
+		t.Errorf("AllowedIPs lost ::/0:\n%s", without)
+	}
+	if a, b := withoutAddress(with), withoutAddress(without); a != b {
+		t.Errorf("something else changed in the .conf:\n%s\n%s", a, b)
+	}
+	// The vpn:// key holds that .conf (last_config.config) and the client address without a mask.
+	keyWith, keyWithout := render(plugin.FormatAmneziaVPN, false), render(plugin.FormatAmneziaVPN, true)
+	docWith, err := vpnkey.Decode(keyWith)
+	if err != nil {
+		t.Fatal(err)
+	}
+	docWithout, err := vpnkey.Decode(keyWithout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(docWithout), "/128") || !strings.Contains(string(docWith), "/128") {
+		t.Errorf("vpn:// key IPv6 address: with=%v without=%v", strings.Contains(string(docWith), "/128"), strings.Contains(string(docWithout), "/128"))
+	}
+	if !strings.Contains(string(docWithout), "::/0") {
+		t.Error("the vpn:// key lost ::/0")
+	}
+	// Mihomo: no ipv6 key, allowed-ips as before.
+	mWith, mWithout := render(plugin.FormatMihomo, false), render(plugin.FormatMihomo, true)
+	if !strings.Contains(mWith, "ipv6:") || strings.Contains(mWithout, "ipv6:") {
+		t.Errorf("Mihomo ipv6 key: with=%v without=%v", strings.Contains(mWith, "ipv6:"), strings.Contains(mWithout, "ipv6:"))
+	}
+	if !strings.Contains(mWithout, "::/0") {
+		t.Errorf("Mihomo allowed-ips lost ::/0:\n%s", mWithout)
+	}
+	if a, b := stripLine(mWith, "ipv6:"), mWithout; a != b {
+		t.Errorf("something else changed in the Mihomo proxy:\n%s\n%s", a, b)
+	}
+	// Mistgate: no address_v6, the rest equal, both ranges.
+	var docA, docB map[string]any
+	if err := json.Unmarshal([]byte(render(plugin.FormatMistgate, false)), &docA); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(render(plugin.FormatMistgate, true)), &docB); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := docA["address_v6"]; !ok {
 		t.Fatal("the profile has IPv6 and the settings carry no address_v6 by default")
 	}
-	if _, ok := without["address_v6"]; ok {
+	if _, ok := docB["address_v6"]; ok {
 		t.Error("address_v6 for an exit with no IPv6")
 	}
-	delete(with, "address_v6")
-	if a, b := mustJSON(t, with), mustJSON(t, without); a != b {
+	delete(docA, "address_v6")
+	if a, b := mustJSON(t, docA), mustJSON(t, docB); a != b {
 		t.Errorf("something else changed:\n%s\n%s", a, b)
 	}
-	if allowed, _ := without["allowed_ips"].([]any); len(allowed) != 2 {
+	if allowed, _ := docB["allowed_ips"].([]any); len(allowed) != 2 {
 		t.Errorf("allowed_ips = %v", allowed)
 	}
-	for _, format := range []plugin.ClientFormat{plugin.FormatAWGConf, plugin.FormatMihomo} {
-		a, _ := render(format, false)
-		b, _ := render(format, true)
-		if a != b {
-			t.Errorf("%s changed with NoIPv6Egress", format)
+}
+
+// withoutAddress is a .conf without its Address line.
+func withoutAddress(conf string) string { return stripLine(conf, "Address = ") }
+
+func stripLine(text, prefix string) string {
+	var out []string
+	for _, l := range strings.Split(text, "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(l), prefix) {
+			out = append(out, l)
 		}
 	}
+	return strings.Join(out, "\n")
 }
 
 func mustJSON(t *testing.T, v any) string {

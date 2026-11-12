@@ -495,6 +495,8 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			UserID: sc.user.ID, UserName: sc.user.Name, DeviceID: sc.dev.ID, Label: sc.dev.Model,
 			Secret: string(pt), Peer: pt, InboundPublic: json.RawMessage(f.Inbound.PluginPublicJSON),
 			DNS: servers, NodeAddr: f.Node.Address, DisplayName: names[i],
+			// Same rule as the subscription: no IPv6 address of the tunnel where the exit gives the client no IPv6.
+			NoIPv6Egress: !ipv6Egress(f.Node, egressOf(sc.merged)),
 		}
 		in.Format = plugin.FormatAWGConf
 		conf, ok1 := sc.proto.Render(in)
