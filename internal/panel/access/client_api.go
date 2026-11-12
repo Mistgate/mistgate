@@ -21,10 +21,10 @@ func (s *Service) ClientDeviceByKey(ctx context.Context, keyHash []byte) (store.
 // ClientSubscription builds the subscription of the link device dev, authorised by its key, in the Mistgate format: structured
 // protocol settings, not links. Unlike the basic link fetch it may issue missing credentials to this exact device (the store
 // checks the key again in the write batch); the basic fetch refuses a device that holds a key, and still does. caps are the
-// X-Mistgate-Caps entries (Gecko and the AmneziaWG versions are handed out only to a client that announced them); noLinkAWG is
-// the owner's switch that takes AmneziaWG off the link apps. Errors are the store's: ErrNotFound and ErrAccessExists when the
+// X-Mistgate-Caps entries (Gecko and the AmneziaWG versions are handed out only to a client that announced them). The owner's switch
+// that takes AmneziaWG off the link apps does not apply to this app. Errors are the store's: ErrNotFound and ErrAccessExists when the
 // device was removed, blocked or re-keyed meanwhile.
-func (s *Service) ClientSubscription(ctx context.Context, dev store.AccessDevice, hint DeviceHint, caps []string, noLinkAWG bool) (SubView, error) {
+func (s *Service) ClientSubscription(ctx context.Context, dev store.AccessDevice, hint DeviceHint, caps []string) (SubView, error) {
 	u, err := s.st.Access().User(ctx, dev.UserID)
 	if errors.Is(err, store.ErrNotFound) {
 		return SubView{}, ErrUnknownToken
@@ -32,8 +32,17 @@ func (s *Service) ClientSubscription(ctx context.Context, dev store.AccessDevice
 	if err != nil {
 		return SubView{}, err
 	}
-	return s.subView(ctx, u, true, SubOptions{Format: plugin.FormatMistgate, Device: hint, EnrolledDevice: &dev, Capabilities: caps,
-		NoPageData: true, IncludeEffectiveDNS: true, NoLinkAWG: noLinkAWG})
+	off := u.AppMistgateOff
+	if off {
+		// The person's Mistgate app is switched off, as an app of theirs can be: with no app allowed nothing is usable, so the device
+		// is served no server and nothing is issued to it. What it holds is kept (the nodes stop taking it, see store.DesiredCreds)
+		// and works again when the switch is on. The status and the plan are the person's own and are still told.
+		u.AppHapp, u.AppAmnezia, u.AppTelegram = false, false, false
+	}
+	v, err := s.subView(ctx, u, true, SubOptions{Format: plugin.FormatMistgate, Device: hint, EnrolledDevice: &dev, Capabilities: caps,
+		NoPageData: true, IncludeEffectiveDNS: true})
+	v.AppMistgateOff = off
+	return v, err
 }
 
 // ClientLeaveDevice removes the device the key belongs to: the same operation as the person removing it on the page (its
@@ -52,11 +61,15 @@ func (s *Service) ClientLeaveDevice(ctx context.Context, dev store.AccessDevice)
 // hash is keyHash, in the store's one guarded batch: a new device (within the user's limit), or the user's own keyless device
 // of that HWID, whose credentials are replaced. token is the subscription link's token, of which only the hash is kept (the
 // device follows a rotated link by it). The errors are the store's: ErrAccessExists (the HWID is enrolled already),
-// ErrAccessBlocked, *store.AccessLimitError, ErrNoLinkCredentials, ErrNotFound (the user is gone).
+// ErrAccessBlocked, *store.AccessLimitError, ErrNoLinkCredentials (none of the person's apps takes a link device, or their Mistgate
+// app is switched off), ErrNotFound (the user is gone).
 func (s *Service) EnrolLinkDevice(ctx context.Context, userID, token string, hint DeviceHint, keyHash []byte) (store.LinkDeviceResult, error) {
 	u, err := s.st.Access().User(ctx, userID)
 	if err != nil {
 		return store.LinkDeviceResult{}, err
+	}
+	if u.AppMistgateOff { // read here, not from a cached view: a switch just turned off closes the door at once
+		return store.LinkDeviceResult{}, store.ErrNoLinkCredentials
 	}
 	canon := CanonHWID(hint.HWID)
 	if canon == "" {

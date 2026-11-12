@@ -24,6 +24,7 @@ const renameDevice = vi.fn();
 const getUserConnection = vi.fn();
 const deleteUsers = vi.fn();
 const subsMode = { v: LinkDeviceLimit.ENFORCE as LinkDeviceLimit };
+const panelApp = { enabled: true }; // the owner's switch of the Mistgate app, as the panel says it
 // the sign-in check in front of a delete: passes the call through, or turns it down as the admin closing the dialog would
 const stepUp = { cancel: false };
 vi.mock("@/components/step-up", async (orig) => {
@@ -49,6 +50,7 @@ vi.mock("@/lib/api", async (orig) => ({
     deleteUsers: (...a: unknown[]) => deleteUsers(...a),
   },
   devices: { renameDevice: (...a: unknown[]) => renameDevice(...a) },
+  clientApi: { getClientApi: () => Promise.resolve({ settings: { enabled: panelApp.enabled } }) },
   groups: {
     listGroups: () =>
       Promise.resolve({
@@ -86,8 +88,8 @@ vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ id: "usr_1" }),
   useSearch: () => ({}),
   useNavigate: () => vi.fn(),
-  Link: ({ children, to, params, search, className, ...rest }: { children?: ReactNode; to: string; params?: object; search?: object; className?: string }) => (
-    <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(search ?? {})} className={className} aria-label={(rest as { "aria-label"?: string })["aria-label"]}>
+  Link: ({ children, to, params, search, hash, className, ...rest }: { children?: ReactNode; to: string; params?: object; search?: object; hash?: string; className?: string }) => (
+    <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(search ?? {})} data-hash={hash} className={className} aria-label={(rest as { "aria-label"?: string })["aria-label"]}>
       {children}
     </a>
   ),
@@ -106,6 +108,7 @@ afterEach(() => {
   for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice, getUserConnection, deleteUsers]) m.mockReset();
   subsMode.v = LinkDeviceLimit.ENFORCE;
   stepUp.cancel = false;
+  panelApp.enabled = true;
 });
 
 const user = {
@@ -454,6 +457,72 @@ describe("the user card", () => {
     await click(button("Undo"));
     await settle();
     expect(setUsersEnabled).toHaveBeenLastCalledWith({ userIds: ["usr_1"], enabled: true });
+  });
+});
+
+describe("the Mistgate app among the apps of a person", () => {
+  const row = () => document.querySelector<HTMLElement>("[data-app=mistgate]")!;
+  const sw = () => row().querySelector<HTMLElement>("[role=switch]")!;
+  const withApps = (apps: object) => ({ ...detail, user: { ...user, apps } });
+
+  it("is the fourth row of the apps, with the panel's mark, its name and what it gives; on when the panel says nothing", async () => {
+    await mount();
+    expect(row()).toBeTruthy();
+    expect(row().textContent).toContain("Mistgate app");
+    expect(row().textContent).toContain("A key of its own on each device: servers, AmneziaWG and Hysteria2 come right into the app");
+    expect(row().querySelector("[aria-label=Mistgate]")).not.toBeNull();
+    expect(sw().getAttribute("aria-checked")).toBe("true"); // a person without the field is the default: on
+    expect(row().getAttribute("data-state")).toBe("on");
+    expect(row().querySelector("a")).toBeNull(); // no pill while the panel has it on
+    // the other three rows are its neighbours in the same block, and it comes last
+    expect(row().parentElement!.querySelectorAll(":scope > label [role=switch]")).toHaveLength(3);
+    expect(row().parentElement!.lastElementChild).toBe(row());
+  });
+
+  it("switches off with the other three kept as they are, and the switch is the person's own", async () => {
+    updateUser.mockResolvedValue({ user });
+    await mount();
+    await click(sw());
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", apps: { happ: true, amnezia: true, telegram: false, mistgate: false } });
+  });
+
+  it("shows an off switch with what off does, and turns on again", async () => {
+    updateUser.mockResolvedValue({ user });
+    await mount(1, [], [], withApps({ happ: true, amnezia: true, mistgate: false }));
+    expect(sw().getAttribute("aria-checked")).toBe("false");
+    expect(row().getAttribute("data-state")).toBe("off");
+    expect(row().textContent).toContain("no new device can connect, and the ones already connected get no servers");
+    await click(sw());
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", apps: { happ: true, amnezia: true, telegram: false, mistgate: true } });
+  });
+
+  it("changing another app keeps the Mistgate switch where it is", async () => {
+    updateUser.mockResolvedValue({ user });
+    await mount(1, [], [], withApps({ happ: true, amnezia: true, mistgate: false }));
+    const amnezia = [...document.querySelectorAll("label")].find((l) => l.textContent?.includes("AmneziaVPN") && l.querySelector("[role=switch]"))!;
+    await click(amnezia.querySelector("[role=switch]"));
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", apps: { happ: true, amnezia: false, telegram: false, mistgate: false } });
+  });
+
+  it("is locked while the subscription link is off, and says why; nothing is sent", async () => {
+    await mount(1, [], [], withApps({ happ: false, amnezia: true, mistgate: true }));
+    expect(row().getAttribute("data-state")).toBe("locked");
+    expect(sw().hasAttribute("data-disabled")).toBe(true);
+    expect(sw().getAttribute("aria-checked")).toBe("false");
+    expect(row().textContent).toContain("Works through the subscription link: turn that on first");
+    await click(sw());
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it("carries a quiet pill to the owner's setting when the app is off for the whole panel", async () => {
+    panelApp.enabled = false;
+    await mount();
+    const pill = row().querySelector("a")!;
+    expect(pill.textContent).toBe("Off for the whole panel");
+    expect(pill.getAttribute("href")).toBe("/subscriptions");
+    expect(pill.getAttribute("data-search")).toBe(JSON.stringify({ tab: "rules" }));
+    expect(pill.getAttribute("data-hash")).toBe("client-api");
+    expect(sw().getAttribute("aria-checked")).toBe("true"); // the person's own choice stays shown
   });
 });
 

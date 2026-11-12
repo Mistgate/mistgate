@@ -32,6 +32,8 @@ Any change to these is pushed to the nodes at once.
 
 Both are offered on the person's page side by side. At least one of the two switches stays on. A third switch, **Telegram proxy**, is separate: it adds a Telegram key and links on top of them (see [Telegram proxy](#telegram-proxy)). See [Subscriptions](subscriptions.md), [AmneziaWG](amneziawg.md), [MTProto](mtproto.md) and [User page](user-page.md).
 
+A fourth row, **Mistgate app**, is the panel's own desktop app, which is not released publicly yet. It takes a key of its own on each device, and the servers, AmneziaWG and Hysteria2 come straight into the app. It rides on the subscription link, so it works only while the link switch is on: with the link off, the row is locked and says why. The AmneziaWG in it does not follow the owner's switch **AmneziaWG in apps on the link** (see [Subscriptions](subscriptions.md#amneziawg-in-apps-on-the-link)): the app gets AmneziaWG as long as its own row is on. The switch is on for everybody by default, so an update changes nothing for people who already connected the app. Switched off for a person, a new device of theirs cannot connect (the app is told "turned off for you"), and the devices already connected get no servers; their keys are kept and work again when the switch goes on. The owner has one more switch for the whole panel in **Subscriptions → Who gets what → Mistgate app**: off there, the app cannot find the panel and no new device connects, whatever the person's switch says, and the person's row shows "Off for the whole panel" with a link to that setting. The same card sums up how many people have the app on and how many devices are connected with a key.
+
 ## The People tab
 
 The header counts people and how many are online. Above the list:

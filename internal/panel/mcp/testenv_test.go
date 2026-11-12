@@ -1699,7 +1699,8 @@ func (w *world) ListOutdatedDevices(_ context.Context, r *connect.Request[adminv
 }
 
 func (w *world) GetClientApi(context.Context, *connect.Request[adminv1.GetClientApiRequest]) (*connect.Response[adminv1.GetClientApiResponse], error) {
-	return connect.NewResponse(&adminv1.GetClientApiResponse{Settings: &adminv1.ClientApiSettings{Enabled: w.clientAPIEnabled}}), nil
+	return connect.NewResponse(&adminv1.GetClientApiResponse{Settings: &adminv1.ClientApiSettings{Enabled: w.clientAPIEnabled},
+		Stats: &adminv1.ClientApiStats{People: 12, PeopleOn: 9, Devices: 14}}), nil
 }
 
 // connWindow is the window the fake connection counters echo: since = now - hours (24 when empty), so a test sees what the tool sent.

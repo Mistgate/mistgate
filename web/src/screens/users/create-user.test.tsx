@@ -85,15 +85,39 @@ describe("the new user form", () => {
     expect(document.querySelector("[role=combobox]")?.textContent).toContain("Все");
     expect(text()).toContain("Subscription (Happ) — 2 nodes");
     expect(text()).toContain("AmneziaVPN keys — no: no AmneziaWG of the group runs on an enabled node");
-    // Happ on, AmneziaVPN off with the reason, "all nodes" on
-    expect(switches()).toEqual(["true", "false", "false", "true"]);
+    // Happ on, AmneziaVPN off with the reason, Telegram off, the Mistgate app on, "all nodes" on
+    expect(switches()).toEqual(["true", "false", "false", "true", "true"]);
     expect(text()).toContain("Off: no AmneziaWG of the group runs on a node");
     expect(text()).not.toContain("gets nothing yet");
 
     await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "Marina");
     await click(button("Create"));
     await settle();
-    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ name: "Marina", groupId: "grp_all", apps: { happ: true, amnezia: false, telegram: false } }));
+    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ name: "Marina", groupId: "grp_all", apps: { happ: true, amnezia: false, telegram: false, mistgate: true } }));
+  });
+
+  it("offers the Mistgate app on for the new person, switches it off alone, and locks it while the subscription link is off", async () => {
+    createUser.mockResolvedValue({});
+    await mount([group()]);
+    const mistgate = () => document.querySelector<HTMLElement>("[data-app=mistgate]")!;
+    const mgSwitch = () => mistgate().querySelector<HTMLElement>("[role=switch]")!;
+    expect(mistgate().textContent).toContain("Mistgate app");
+    expect(mgSwitch().getAttribute("aria-checked")).toBe("true");
+    await click(mgSwitch());
+    expect(mgSwitch().getAttribute("aria-checked")).toBe("false");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "Marina");
+    await click(button("Create"));
+    await settle();
+    expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ apps: { happ: true, amnezia: false, telegram: false, mistgate: false } }));
+
+    // the subscription link off (AmneziaVPN on instead): the app rides on the link, so its row is locked and says so
+    await click(mgSwitch()); // back on
+    const rows = [...document.querySelectorAll("label")].filter((l) => l.querySelector("[role=switch]") && !l.closest("[data-app=mistgate]"));
+    await click(rows[1]!.querySelector("[role=switch]")); // AmneziaVPN on
+    await click(rows[0]!.querySelector("[role=switch]")); // the link off
+    expect(mistgate().getAttribute("data-state")).toBe("locked");
+    expect(mgSwitch().hasAttribute("data-disabled")).toBe(true);
+    expect(mistgate().textContent).toContain("turn that on first");
   });
 
   it("marks the new person fresh, so their row sweeps in once when the list shows it", async () => {

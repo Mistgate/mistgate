@@ -136,7 +136,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		}
 		out[i] = &adminv1.User{
 			Id: u.ID, Name: u.Name, SubscriptionName: u.SubscriptionName, GroupId: u.GroupID, GroupName: u.GroupName, Status: statusProto[u.Status],
-			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia, Telegram: u.AppTelegram}, Via: via,
+			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia, Telegram: u.AppTelegram, Mistgate: new(!u.AppMistgateOff)}, Via: via,
 			DevicesUsed: uint32(devs[u.ID]), DeviceLimit: uint32(u.DeviceLimit),
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
 			ExpiresUnix: unixOrZero(u.ExpiresAt), LastSeenUnix: unixOrZero(u.LastSeenAt), Online: isOnline,
@@ -239,9 +239,9 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	if m.TermDays > 36500 {
 		return nil, invalid("term is too long")
 	}
-	happ, amnezia, telegram := true, true, false
+	happ, amnezia, telegram, mistgateOff := true, true, false, false
 	if m.Apps != nil {
-		happ, amnezia, telegram = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram
+		happ, amnezia, telegram, mistgateOff = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram, m.Apps.Mistgate != nil && !*m.Apps.Mistgate
 	}
 	if !happ && !amnezia {
 		return nil, invalid("at least one of Happ and Amnezia must be on")
@@ -266,7 +266,7 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	id := store.NewID("usr_")
 	u := store.AccessUser{
 		ID: id, Name: name, GroupID: m.GroupId, Status: ComputeStatus(false, expires, m.QuotaBytes, 0, now),
-		AppHapp: happ, AppAmnezia: amnezia, AppTelegram: telegram, AllNodes: all, NodeIDs: nodeIDs,
+		AppHapp: happ, AppAmnezia: amnezia, AppTelegram: telegram, AppMistgateOff: mistgateOff, AllNodes: all, NodeIDs: nodeIDs,
 		QuotaBytes: m.QuotaBytes, QuotaReset: reset, PeriodStart: PeriodStart(reset, now), ExpiresAt: expires,
 		DeviceLimit: limit, SpeedLimitBps: m.SpeedLimitBps, DeviceSpeedLimitBps: m.DeviceSpeedLimitBps, DNSPresetID: m.DnsPresetId,
 		SubTokenHash: hash, SubTokenEnc: s.vault.Seal([]byte(token), id), CreatedAt: now,
@@ -585,6 +585,9 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	}
 	if m.Apps != nil {
 		u.AppHapp, u.AppAmnezia, u.AppTelegram = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram
+		if m.Apps.Mistgate != nil { // absent: the switch stays as it was (an older client does not know it)
+			u.AppMistgateOff = !*m.Apps.Mistgate
+		}
 		if !u.AppHapp && !u.AppAmnezia {
 			return nil, invalid("at least one of Happ and Amnezia must be on")
 		}
@@ -651,7 +654,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		}
 	}
 	// No other credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
-	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram ||
+	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram || u.AppMistgateOff != old.AppMistgateOff ||
 		u.AllNodes != old.AllNodes || !slices.Equal(u.NodeIDs, old.NodeIDs) || u.SpeedLimitBps != old.SpeedLimitBps ||
 		u.DeviceSpeedLimitBps != old.DeviceSpeedLimitBps || !u.ExpiresAt.Equal(old.ExpiresAt) {
 		s.notify.StateChanged()
@@ -849,7 +852,7 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 		name string
 	}{
 		{m.Name != nil, "name"}, {m.GroupId != nil, "group"}, {m.QuotaBytes != nil, "quota"}, {m.QuotaReset != nil, "quota_reset"},
-		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Nodes != nil, "nodes"},
+		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Apps != nil && m.Apps.Mistgate != nil, "app_mistgate"}, {m.Nodes != nil, "nodes"},
 		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DeviceSpeedLimitBps != nil, "device_speed_limit"}, {m.DnsPresetId != nil, "dns"}, {m.SubscriptionName != nil, "subscription_name"},
 	} {
 		if x.set {
@@ -863,7 +866,7 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 func userUpdateChanges(old, next store.AccessUser) bool {
 	return old.Name != next.Name || old.SubscriptionName != next.SubscriptionName || old.GroupID != next.GroupID ||
 		old.Disabled != next.Disabled || old.Status != next.Status || old.AppHapp != next.AppHapp ||
-		old.AppAmnezia != next.AppAmnezia || old.AppTelegram != next.AppTelegram || old.AllNodes != next.AllNodes ||
+		old.AppAmnezia != next.AppAmnezia || old.AppTelegram != next.AppTelegram || old.AppMistgateOff != next.AppMistgateOff || old.AllNodes != next.AllNodes ||
 		!slices.Equal(old.NodeIDs, next.NodeIDs) || old.QuotaBytes != next.QuotaBytes || old.QuotaReset != next.QuotaReset ||
 		!old.PeriodStart.Equal(next.PeriodStart) || !old.ExpiresAt.Equal(next.ExpiresAt) || old.DeviceLimit != next.DeviceLimit ||
 		old.SpeedLimitBps != next.SpeedLimitBps || old.DeviceSpeedLimitBps != next.DeviceSpeedLimitBps || old.DNSPresetID != next.DNSPresetID

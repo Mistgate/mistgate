@@ -58,6 +58,8 @@ type SubView struct {
 	// AppAmnezia is the user's AmneziaVPN toggle alone (AccessAmnezia also needs a live inbound and an active user): a person
 	// whose subscription ended still sees the keys they hold and can remove them.
 	AppAmnezia, AppTelegram bool
+	// AppMistgateOff is the person's Mistgate app switch, off: a client API sync of one of their devices carries no servers.
+	AppMistgateOff bool
 	// Nodes are the servers of the person, one per node, in subscription order: the ones a link carries and the ones a key
 	// can be made for. Empty unless Status is active.
 	Nodes []SubNode
@@ -444,15 +446,8 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if err != nil {
 			return SubView{}, err
 		}
-		if opt.NoLinkAWG { // the owner took AmneziaWG off the link apps: the device's peers go, as a Mihomo fetch drops them
-			dropped, err := a.RevokeLinkAWGCreds(ctx, rd.dev, now)
-			if err != nil {
-				return SubView{}, err
-			}
-			if dropped > 0 {
-				s.notify.StateChanged()
-			}
-		}
+		// The owner's switch "AmneziaWG in apps on the link" (NoLinkAWG) is for the other apps of the link: the Mistgate app gets
+		// AmneziaWG on its own terms (its switch, its caps, the profiles it may use), and its peers are never taken by that switch.
 		if rd.dev.ID != "" && now.Sub(rd.dev.LastSeenAt) >= clientTouchEvery {
 			s.touchDevice(rd.dev.ID, now, opt.Device.meta(), clientTouchEvery)
 		}
@@ -493,7 +488,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			s.touchDevice(rd.dev.ID, now, m, deviceTouchEvery)
 		}
 	}
-	if (opt.Format == plugin.FormatMihomo || opt.EnrolledDevice != nil) && opt.NoLinkAWG {
+	if opt.Format == plugin.FormatMihomo && opt.NoLinkAWG && opt.EnrolledDevice == nil {
 		rd.creds = slices.DeleteFunc(rd.creds, func(c store.AccessCred) bool { return c.Protocol == awg.ID })
 	}
 	secrets := map[string]string{}
@@ -959,10 +954,8 @@ func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, 
 	if dev.ID == "" || len(dev.KeyHash) == 0 {
 		return rd, store.ErrNotFound
 	}
-	var want []store.AWGImplicitWant
-	if !opt.NoLinkAWG {
-		want = s.awgWants(u, g, full, dev.ID, func(version string) bool { return protocols.HasCapability(opt.Capabilities, "awg", version) })
-	}
+	// AmneziaWG does not follow the owner's link switch (opt.NoLinkAWG): the app asks for it with its caps and gets it while it may.
+	want := s.awgWants(u, g, full, dev.ID, func(version string) bool { return protocols.HasCapability(opt.Capabilities, "awg", version) })
 	if s.enrolledDeviceComplete(u, dev, rd, want) {
 		return rd, nil
 	}

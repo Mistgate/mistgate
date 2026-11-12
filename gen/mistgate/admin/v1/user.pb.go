@@ -808,7 +808,12 @@ type AppToggles struct {
 	Happ    bool                   `protobuf:"varint,1,opt,name=happ,proto3" json:"happ,omitempty"`
 	Amnezia bool                   `protobuf:"varint,2,opt,name=amnezia,proto3" json:"amnezia,omitempty"`
 	// Telegram clients receive tg://proxy links for the MTProto profiles of the user's groups.
-	Telegram      bool `protobuf:"varint,3,opt,name=telegram,proto3" json:"telegram,omitempty"`
+	Telegram bool `protobuf:"varint,3,opt,name=telegram,proto3" json:"telegram,omitempty"`
+	// The Mistgate app (the desktop client, one key per device). It rides on the subscription link, so it works only while
+	// happ is on as well. Absent in a request = leave it as it is (a new person: on); a response always carries it. Off: the
+	// person's enrolment is refused (app_disabled) and the devices they already enrolled get no servers (their keys are kept
+	// and work again when it is switched on).
+	Mistgate      *bool `protobuf:"varint,4,opt,name=mistgate,proto3,oneof" json:"mistgate,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -860,6 +865,13 @@ func (x *AppToggles) GetAmnezia() bool {
 func (x *AppToggles) GetTelegram() bool {
 	if x != nil {
 		return x.Telegram
+	}
+	return false
+}
+
+func (x *AppToggles) GetMistgate() bool {
+	if x != nil && x.Mistgate != nil {
+		return *x.Mistgate
 	}
 	return false
 }
@@ -3975,12 +3987,14 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x127\n" +
 	"\x04rows\x18\x03 \x03(\v2#.mistgate.admin.v1.DeviceConnectionR\x04rows\x124\n" +
 	"\x16nodes_without_counters\x18\x04 \x03(\tR\x14nodesWithoutCounters\x12>\n" +
-	"\thello_kex\x18\x05 \x03(\v2!.mistgate.admin.v1.HelloKexDeviceR\bhelloKex\"V\n" +
+	"\thello_kex\x18\x05 \x03(\v2!.mistgate.admin.v1.HelloKexDeviceR\bhelloKex\"\x84\x01\n" +
 	"\n" +
 	"AppToggles\x12\x12\n" +
 	"\x04happ\x18\x01 \x01(\bR\x04happ\x12\x18\n" +
 	"\aamnezia\x18\x02 \x01(\bR\aamnezia\x12\x1a\n" +
-	"\btelegram\x18\x03 \x01(\bR\btelegram\"<\n" +
+	"\btelegram\x18\x03 \x01(\bR\btelegram\x12\x1f\n" +
+	"\bmistgate\x18\x04 \x01(\bH\x00R\bmistgate\x88\x01\x01B\v\n" +
+	"\t_mistgate\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
 	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xae\n" +
@@ -4472,6 +4486,7 @@ func file_mistgate_admin_v1_user_proto_init() {
 	}
 	file_mistgate_admin_v1_common_proto_init()
 	file_mistgate_admin_v1_profile_proto_init()
+	file_mistgate_admin_v1_user_proto_msgTypes[3].OneofWrappers = []any{}
 	file_mistgate_admin_v1_user_proto_msgTypes[19].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

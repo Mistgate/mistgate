@@ -30,8 +30,8 @@ afterEach(() => {
 });
 
 /** The card as `role` sees it, with the panel saying `enabled`. */
-async function mount(enabled: boolean, role = Role.OWNER) {
-  getClientApi.mockResolvedValue({ settings: { enabled } });
+async function mount(enabled: boolean, role = Role.OWNER, stats?: { people: number; peopleOn: number; devices: number }) {
+  getClientApi.mockResolvedValue({ settings: { enabled }, stats });
   updateClientApi.mockImplementation(async (r: { enabled: boolean }) => ({ settings: { enabled: r.enabled } }));
   host = document.createElement("div");
   document.body.append(host);
@@ -56,7 +56,7 @@ const text = () => document.body.textContent ?? "";
 const toggle = () => document.querySelector<HTMLElement>("[role=switch]")!;
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
-describe("client API for the Mistgate app", () => {
+describe("the Mistgate app for the whole panel", () => {
   it("is off by default and says what turning it on gives", async () => {
     await mount(false);
     expect(toggle().getAttribute("aria-checked")).toBe("false");
@@ -71,7 +71,7 @@ describe("client API for the Mistgate app", () => {
     await settle();
     expect(updateClientApi).toHaveBeenCalledTimes(1);
     expect(updateClientApi.mock.calls[0]![0]).toEqual({ enabled: true });
-    expect(text()).toContain("Client API turned on");
+    expect(text()).toContain("Mistgate app turned on for the whole panel");
   });
 
   it("is turned off by the owner, and the card says closing it leaves the connected devices working", async () => {
@@ -82,7 +82,7 @@ describe("client API for the Mistgate app", () => {
     await click(toggle());
     await settle();
     expect(updateClientApi.mock.calls[0]![0]).toEqual({ enabled: false });
-    expect(text()).toContain("Client API turned off");
+    expect(text()).toContain("Mistgate app turned off for the whole panel");
     expect(toggle().getAttribute("aria-checked")).toBe("false");
   });
 
@@ -99,7 +99,36 @@ describe("client API for the Mistgate app", () => {
   it("speaks Russian", async () => {
     setLang("ru");
     await mount(false);
-    expect(text()).toContain("API клиента для приложения Mistgate");
+    expect(document.querySelector("h2")?.textContent).toBe("Приложение Mistgate");
     expect(text()).toContain("Выключено: приложение Mistgate не находит панель");
+  });
+
+  it("carries the name and the mark of the app, one name for the card and the person's row", async () => {
+    await mount(true);
+    expect(document.querySelector("h2")?.textContent).toBe("Mistgate app");
+    expect(document.querySelector("[aria-label=Mistgate]")).not.toBeNull(); // the panel's own mark
+    expect(toggle().getAttribute("aria-label")).toBe("Mistgate app");
+    expect(text()).toContain("set on each person's card");
+  });
+
+  it("sums up the app: people who have it on and devices connected with a key", async () => {
+    await mount(true, Role.OWNER, { people: 24, peopleOn: 17, devices: 31 });
+    const stats = document.querySelector("[data-stats]")!;
+    expect(stats.textContent).toContain("People with the app on");
+    expect(stats.textContent).toContain("17 of 24");
+    expect(stats.textContent).toContain("Devices connected with a key");
+    expect(stats.textContent).toContain("31");
+    // the summary is read-only data: a helper sees it too
+  });
+
+  it("shows the summary to a helper and in Russian, and none when the panel sent no numbers", async () => {
+    setLang("ru");
+    await mount(false, Role.HELPER, { people: 5, peopleOn: 0, devices: 0 });
+    expect(document.querySelector("[data-stats]")!.textContent).toContain("0 из 5");
+    expect(document.querySelector("[data-stats]")!.textContent).toContain("Подключено устройств по ключу");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(true);
+    expect(document.querySelector("[data-stats]")).toBeNull();
   });
 });

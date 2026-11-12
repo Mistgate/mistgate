@@ -188,6 +188,11 @@ message AppToggles {
   bool amnezia = 2;
   // Telegram clients receive tg://proxy links for the MTProto profiles of the user's groups.
   bool telegram = 3;
+  // The Mistgate app (the desktop client, one key per device). It rides on the subscription link, so it works only while
+  // happ is on as well. Absent in a request = leave it as it is (a new person: on); a response always carries it. Off: the
+  // person's enrolment is refused (app_disabled) and the devices they already enrolled get no servers (their keys are kept
+  // and work again when it is switched on).
+  optional bool mistgate = 4;
 }
 
 message NodeSelection {

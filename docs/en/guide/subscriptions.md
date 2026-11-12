@@ -115,7 +115,7 @@ Turn it off when people use AmneziaWG in AmneziaVPN anyway: in a Mihomo app it o
 
 - each Mihomo app gets the subscription without the AmneziaWG servers at its next refresh;
 - at that refresh the AmneziaWG keys of that app are removed, and their addresses in the AmneziaWG network are freed. The confirmation **Take AmneziaWG out of the apps on the link?** says how many keys the apps hold now; when they hold none, the switch turns off at once;
-- AmneziaVPN keys, the person's page and the other formats do not change;
+- AmneziaVPN keys, the person's page and the other formats do not change. The Mistgate app (not released publicly yet) is not one of the apps on the link here: it gets AmneziaWG on its own and keeps it whatever this switch says (its own switch is the row **Mistgate app** on the person's card), and its keys are not counted in the confirmation;
 - a person whose only servers are AmneziaWG gets the placeholder entry in a Mihomo app: see [When no server fits the app](#when-no-server-fits-the-app).
 
 Turned back on, the apps get new keys at their next refresh. While it is off, **Apps & formats** strikes AmneziaWG out on the Mihomo card and links to the switch.

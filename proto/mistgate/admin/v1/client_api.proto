@@ -25,6 +25,17 @@ message ClientApiSettings {
 message GetClientApiRequest {}
 message GetClientApiResponse {
   ClientApiSettings settings = 1;
+  ClientApiStats stats = 2;
+}
+
+// Who uses the Mistgate app, from one cheap read.
+message ClientApiStats {
+  // Everybody on the panel.
+  uint32 people = 1;
+  // People who have the Mistgate app on (the switch on their card, and the subscription link on too).
+  uint32 people_on = 2;
+  // Devices connected with a key of their own and not removed or blocked.
+  uint32 devices = 3;
 }
 
 message UpdateClientApiRequest {

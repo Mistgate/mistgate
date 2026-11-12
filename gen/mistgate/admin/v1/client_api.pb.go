@@ -106,6 +106,7 @@ func (*GetClientApiRequest) Descriptor() ([]byte, []int) {
 type GetClientApiResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Settings      *ClientApiSettings     `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	Stats         *ClientApiStats        `protobuf:"bytes,2,opt,name=stats,proto3" json:"stats,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -147,6 +148,77 @@ func (x *GetClientApiResponse) GetSettings() *ClientApiSettings {
 	return nil
 }
 
+func (x *GetClientApiResponse) GetStats() *ClientApiStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+// Who uses the Mistgate app, from one cheap read.
+type ClientApiStats struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Everybody on the panel.
+	People uint32 `protobuf:"varint,1,opt,name=people,proto3" json:"people,omitempty"`
+	// People who have the Mistgate app on (the switch on their card, and the subscription link on too).
+	PeopleOn uint32 `protobuf:"varint,2,opt,name=people_on,json=peopleOn,proto3" json:"people_on,omitempty"`
+	// Devices connected with a key of their own and not removed or blocked.
+	Devices       uint32 `protobuf:"varint,3,opt,name=devices,proto3" json:"devices,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClientApiStats) Reset() {
+	*x = ClientApiStats{}
+	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientApiStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientApiStats) ProtoMessage() {}
+
+func (x *ClientApiStats) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientApiStats.ProtoReflect.Descriptor instead.
+func (*ClientApiStats) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_client_api_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ClientApiStats) GetPeople() uint32 {
+	if x != nil {
+		return x.People
+	}
+	return 0
+}
+
+func (x *ClientApiStats) GetPeopleOn() uint32 {
+	if x != nil {
+		return x.PeopleOn
+	}
+	return 0
+}
+
+func (x *ClientApiStats) GetDevices() uint32 {
+	if x != nil {
+		return x.Devices
+	}
+	return 0
+}
+
 type UpdateClientApiRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Absent leaves the setting unchanged.
@@ -157,7 +229,7 @@ type UpdateClientApiRequest struct {
 
 func (x *UpdateClientApiRequest) Reset() {
 	*x = UpdateClientApiRequest{}
-	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -169,7 +241,7 @@ func (x *UpdateClientApiRequest) String() string {
 func (*UpdateClientApiRequest) ProtoMessage() {}
 
 func (x *UpdateClientApiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -182,7 +254,7 @@ func (x *UpdateClientApiRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateClientApiRequest.ProtoReflect.Descriptor instead.
 func (*UpdateClientApiRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_api_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_client_api_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UpdateClientApiRequest) GetEnabled() bool {
@@ -201,7 +273,7 @@ type UpdateClientApiResponse struct {
 
 func (x *UpdateClientApiResponse) Reset() {
 	*x = UpdateClientApiResponse{}
-	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -213,7 +285,7 @@ func (x *UpdateClientApiResponse) String() string {
 func (*UpdateClientApiResponse) ProtoMessage() {}
 
 func (x *UpdateClientApiResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_client_api_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -226,7 +298,7 @@ func (x *UpdateClientApiResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateClientApiResponse.ProtoReflect.Descriptor instead.
 func (*UpdateClientApiResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_api_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_client_api_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdateClientApiResponse) GetSettings() *ClientApiSettings {
@@ -243,9 +315,14 @@ const file_mistgate_admin_v1_client_api_proto_rawDesc = "" +
 	"\"mistgate/admin/v1/client_api.proto\x12\x11mistgate.admin.v1\"-\n" +
 	"\x11ClientApiSettings\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\"\x15\n" +
-	"\x13GetClientApiRequest\"X\n" +
+	"\x13GetClientApiRequest\"\x91\x01\n" +
 	"\x14GetClientApiResponse\x12@\n" +
-	"\bsettings\x18\x01 \x01(\v2$.mistgate.admin.v1.ClientApiSettingsR\bsettings\"C\n" +
+	"\bsettings\x18\x01 \x01(\v2$.mistgate.admin.v1.ClientApiSettingsR\bsettings\x127\n" +
+	"\x05stats\x18\x02 \x01(\v2!.mistgate.admin.v1.ClientApiStatsR\x05stats\"_\n" +
+	"\x0eClientApiStats\x12\x16\n" +
+	"\x06people\x18\x01 \x01(\rR\x06people\x12\x1b\n" +
+	"\tpeople_on\x18\x02 \x01(\rR\bpeopleOn\x12\x18\n" +
+	"\adevices\x18\x03 \x01(\rR\adevices\"C\n" +
 	"\x16UpdateClientApiRequest\x12\x1d\n" +
 	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01B\n" +
 	"\n" +
@@ -269,26 +346,28 @@ func file_mistgate_admin_v1_client_api_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_client_api_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_client_api_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_mistgate_admin_v1_client_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_mistgate_admin_v1_client_api_proto_goTypes = []any{
 	(*ClientApiSettings)(nil),       // 0: mistgate.admin.v1.ClientApiSettings
 	(*GetClientApiRequest)(nil),     // 1: mistgate.admin.v1.GetClientApiRequest
 	(*GetClientApiResponse)(nil),    // 2: mistgate.admin.v1.GetClientApiResponse
-	(*UpdateClientApiRequest)(nil),  // 3: mistgate.admin.v1.UpdateClientApiRequest
-	(*UpdateClientApiResponse)(nil), // 4: mistgate.admin.v1.UpdateClientApiResponse
+	(*ClientApiStats)(nil),          // 3: mistgate.admin.v1.ClientApiStats
+	(*UpdateClientApiRequest)(nil),  // 4: mistgate.admin.v1.UpdateClientApiRequest
+	(*UpdateClientApiResponse)(nil), // 5: mistgate.admin.v1.UpdateClientApiResponse
 }
 var file_mistgate_admin_v1_client_api_proto_depIdxs = []int32{
 	0, // 0: mistgate.admin.v1.GetClientApiResponse.settings:type_name -> mistgate.admin.v1.ClientApiSettings
-	0, // 1: mistgate.admin.v1.UpdateClientApiResponse.settings:type_name -> mistgate.admin.v1.ClientApiSettings
-	1, // 2: mistgate.admin.v1.ClientApiService.GetClientApi:input_type -> mistgate.admin.v1.GetClientApiRequest
-	3, // 3: mistgate.admin.v1.ClientApiService.UpdateClientApi:input_type -> mistgate.admin.v1.UpdateClientApiRequest
-	2, // 4: mistgate.admin.v1.ClientApiService.GetClientApi:output_type -> mistgate.admin.v1.GetClientApiResponse
-	4, // 5: mistgate.admin.v1.ClientApiService.UpdateClientApi:output_type -> mistgate.admin.v1.UpdateClientApiResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 1: mistgate.admin.v1.GetClientApiResponse.stats:type_name -> mistgate.admin.v1.ClientApiStats
+	0, // 2: mistgate.admin.v1.UpdateClientApiResponse.settings:type_name -> mistgate.admin.v1.ClientApiSettings
+	1, // 3: mistgate.admin.v1.ClientApiService.GetClientApi:input_type -> mistgate.admin.v1.GetClientApiRequest
+	4, // 4: mistgate.admin.v1.ClientApiService.UpdateClientApi:input_type -> mistgate.admin.v1.UpdateClientApiRequest
+	2, // 5: mistgate.admin.v1.ClientApiService.GetClientApi:output_type -> mistgate.admin.v1.GetClientApiResponse
+	5, // 6: mistgate.admin.v1.ClientApiService.UpdateClientApi:output_type -> mistgate.admin.v1.UpdateClientApiResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_client_api_proto_init() }
@@ -296,14 +375,14 @@ func file_mistgate_admin_v1_client_api_proto_init() {
 	if File_mistgate_admin_v1_client_api_proto != nil {
 		return
 	}
-	file_mistgate_admin_v1_client_api_proto_msgTypes[3].OneofWrappers = []any{}
+	file_mistgate_admin_v1_client_api_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_client_api_proto_rawDesc), len(file_mistgate_admin_v1_client_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

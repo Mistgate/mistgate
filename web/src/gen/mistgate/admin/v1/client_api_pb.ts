@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/client_api.proto.
  */
 export const file_mistgate_admin_v1_client_api: GenFile = /*@__PURE__*/
-  fileDesc("CiJtaXN0Z2F0ZS9hZG1pbi92MS9jbGllbnRfYXBpLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSIkChFDbGllbnRBcGlTZXR0aW5ncxIPCgdlbmFibGVkGAEgASgIIhUKE0dldENsaWVudEFwaVJlcXVlc3QiTgoUR2V0Q2xpZW50QXBpUmVzcG9uc2USNgoIc2V0dGluZ3MYASABKAsyJC5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRBcGlTZXR0aW5ncyI6ChZVcGRhdGVDbGllbnRBcGlSZXF1ZXN0EhQKB2VuYWJsZWQYASABKAhIAIgBAUIKCghfZW5hYmxlZCJRChdVcGRhdGVDbGllbnRBcGlSZXNwb25zZRI2CghzZXR0aW5ncxgBIAEoCzIkLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudEFwaVNldHRpbmdzMt0BChBDbGllbnRBcGlTZXJ2aWNlEl8KDEdldENsaWVudEFwaRImLm1pc3RnYXRlLmFkbWluLnYxLkdldENsaWVudEFwaVJlcXVlc3QaJy5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDbGllbnRBcGlSZXNwb25zZRJoCg9VcGRhdGVDbGllbnRBcGkSKS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVDbGllbnRBcGlSZXF1ZXN0GioubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlQ2xpZW50QXBpUmVzcG9uc2VCyQEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIOQ2xpZW50QXBpUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
+  fileDesc("CiJtaXN0Z2F0ZS9hZG1pbi92MS9jbGllbnRfYXBpLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSIkChFDbGllbnRBcGlTZXR0aW5ncxIPCgdlbmFibGVkGAEgASgIIhUKE0dldENsaWVudEFwaVJlcXVlc3QigAEKFEdldENsaWVudEFwaVJlc3BvbnNlEjYKCHNldHRpbmdzGAEgASgLMiQubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50QXBpU2V0dGluZ3MSMAoFc3RhdHMYAiABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRBcGlTdGF0cyJECg5DbGllbnRBcGlTdGF0cxIOCgZwZW9wbGUYASABKA0SEQoJcGVvcGxlX29uGAIgASgNEg8KB2RldmljZXMYAyABKA0iOgoWVXBkYXRlQ2xpZW50QXBpUmVxdWVzdBIUCgdlbmFibGVkGAEgASgISACIAQFCCgoIX2VuYWJsZWQiUQoXVXBkYXRlQ2xpZW50QXBpUmVzcG9uc2USNgoIc2V0dGluZ3MYASABKAsyJC5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRBcGlTZXR0aW5nczLdAQoQQ2xpZW50QXBpU2VydmljZRJfCgxHZXRDbGllbnRBcGkSJi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDbGllbnRBcGlSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuR2V0Q2xpZW50QXBpUmVzcG9uc2USaAoPVXBkYXRlQ2xpZW50QXBpEikubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlQ2xpZW50QXBpUmVxdWVzdBoqLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUNsaWVudEFwaVJlc3BvbnNlQskBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCDkNsaWVudEFwaVByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
 
 /**
  * @generated from message mistgate.admin.v1.ClientApiSettings
@@ -53,6 +53,11 @@ export type GetClientApiResponse = Message<"mistgate.admin.v1.GetClientApiRespon
    * @generated from field: mistgate.admin.v1.ClientApiSettings settings = 1;
    */
   settings?: ClientApiSettings | undefined;
+
+  /**
+   * @generated from field: mistgate.admin.v1.ClientApiStats stats = 2;
+   */
+  stats?: ClientApiStats | undefined;
 };
 
 /**
@@ -61,6 +66,41 @@ export type GetClientApiResponse = Message<"mistgate.admin.v1.GetClientApiRespon
  */
 export const GetClientApiResponseSchema: GenMessage<GetClientApiResponse> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_client_api, 2);
+
+/**
+ * Who uses the Mistgate app, from one cheap read.
+ *
+ * @generated from message mistgate.admin.v1.ClientApiStats
+ */
+export type ClientApiStats = Message<"mistgate.admin.v1.ClientApiStats"> & {
+  /**
+   * Everybody on the panel.
+   *
+   * @generated from field: uint32 people = 1;
+   */
+  people: number;
+
+  /**
+   * People who have the Mistgate app on (the switch on their card, and the subscription link on too).
+   *
+   * @generated from field: uint32 people_on = 2;
+   */
+  peopleOn: number;
+
+  /**
+   * Devices connected with a key of their own and not removed or blocked.
+   *
+   * @generated from field: uint32 devices = 3;
+   */
+  devices: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ClientApiStats.
+ * Use `create(ClientApiStatsSchema)` to create a new message.
+ */
+export const ClientApiStatsSchema: GenMessage<ClientApiStats> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_client_api, 3);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateClientApiRequest
@@ -79,7 +119,7 @@ export type UpdateClientApiRequest = Message<"mistgate.admin.v1.UpdateClientApiR
  * Use `create(UpdateClientApiRequestSchema)` to create a new message.
  */
 export const UpdateClientApiRequestSchema: GenMessage<UpdateClientApiRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_api, 3);
+  messageDesc(file_mistgate_admin_v1_client_api, 4);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateClientApiResponse
@@ -96,7 +136,7 @@ export type UpdateClientApiResponse = Message<"mistgate.admin.v1.UpdateClientApi
  * Use `create(UpdateClientApiResponseSchema)` to create a new message.
  */
 export const UpdateClientApiResponseSchema: GenMessage<UpdateClientApiResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_api, 4);
+  messageDesc(file_mistgate_admin_v1_client_api, 5);
 
 /**
  * ClientApiService controls the Mistgate desktop client API switch.

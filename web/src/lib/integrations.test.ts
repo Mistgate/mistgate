@@ -134,7 +134,7 @@ describe("words of an approval", () => {
   });
   it("labels every fact key the panel writes, and shows an unknown key as it came", () => {
     const keys = [
-      "name", "subscription_name", "quota", "term", "apps", "nodes", "count", "users", "effect", "user", "device", "last_seen", "alert", "duration", "node", "fix", "detail",
+      "name", "subscription_name", "quota", "term", "apps", "app_mistgate", "nodes", "count", "users", "effect", "user", "device", "last_seen", "alert", "duration", "node", "fix", "detail",
       "drops_sessions", "version", "rollout", "progress", "action", "current_version", "previous_version", "group", "quota_reset", "expires", "device_limit", "speed_limit", "device_speed_limit",
       "dns_preset", "used", "scheduled_at", "scheduled_version", "timezone", "existing_schedule", "from", "to",
       "ssh", "username", "host_key", "host_key_algorithm", "panel_ssh_key", "address", "installation", "recovery",
@@ -205,6 +205,8 @@ describe("coded facts and outcomes, in Russian", () => {
     expect(said(fact("nodes", "some", { n: "3" }))).toBe("3 ноды");
     expect(said(fact("nodes", "all"))).toBe("все ноды");
     expect(said(fact("apps", "happ"))).toBe("только ссылка подписки");
+    expect(said(fact("app_mistgate", "change", { from: "on", to: "off" }))).toBe("включено → выключено"); // the Mistgate app switch has a fact of its own
+    expect(said(fact("app_mistgate", "off"))).toBe("выключено");
     expect(said(fact("quota", "change", { from: "0", to: "50000000000" }))).toBe("без лимита → 50 ГБ");
     expect(said(fact("quota_reset", "change", { from: "month", to: "rolling_month" }))).toBe("сброс 1-го числа → сброс каждые 30 дней");
     expect(said(fact("action", "pause"))).toBe("Пауза");

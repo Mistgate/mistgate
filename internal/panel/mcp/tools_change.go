@@ -407,16 +407,17 @@ type appsArg struct {
 	Happ     *bool `json:"happ,omitempty" jsonschema:"the subscription link (Happ and the other link apps)"`
 	Amnezia  *bool `json:"amnezia,omitempty" jsonschema:"AmneziaVPN keys"`
 	Telegram *bool `json:"telegram,omitempty" jsonschema:"the Telegram proxy (MTProto): the person gets a key and tg:// links; switching it off revokes the key"`
+	Mistgate *bool `json:"mistgate,omitempty" jsonschema:"the Mistgate desktop app, a key for each device; it rides on the subscription link and works only while happ is on too; switching it off refuses new connections and gives the devices already connected no servers (their keys are kept)"`
 }
 
 // appsOn is the three toggles of a user, every one decided.
-type appsOn struct{ Happ, Amnezia, Telegram bool }
+type appsOn struct{ Happ, Amnezia, Telegram, Mistgate bool }
 
 // newUserApps is what a user gets when the apps are not named.
-var newUserApps = appsOn{Happ: true, Amnezia: true}
+var newUserApps = appsOn{Happ: true, Amnezia: true, Mistgate: true}
 
 func appsOf(u *adminv1.User) appsOn {
-	return appsOn{Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(), Telegram: u.GetApps().GetTelegram()}
+	return appsOn{Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(), Telegram: u.GetApps().GetTelegram(), Mistgate: mistgateOn(u.GetApps())}
 }
 
 // over is the toggles with the fields of a laid over base; a == nil is base.
@@ -433,13 +434,28 @@ func (a *appsArg) over(base appsOn) appsOn {
 	if a.Telegram != nil {
 		base.Telegram = *a.Telegram
 	}
+	if a.Mistgate != nil {
+		base.Mistgate = *a.Mistgate
+	}
 	return base
+}
+
+// mistgateOn is the Mistgate app switch of the toggles a user came with; the panel always sends it, and a toggle set without it
+// (an older panel) is the default: on.
+func mistgateOn(a *adminv1.AppToggles) bool { return a == nil || a.Mistgate == nil || a.GetMistgate() }
+
+// onOff is a switch as the facts word it.
+func onOff(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
 }
 
 // explicit is a with every toggle set to the value of o: what a plan stores, so that the apply does what the plan said whatever
 // the user looks like by then.
 func (o appsOn) explicit() *appsArg {
-	return &appsArg{Happ: &o.Happ, Amnezia: &o.Amnezia, Telegram: &o.Telegram}
+	return &appsArg{Happ: &o.Happ, Amnezia: &o.Amnezia, Telegram: &o.Telegram, Mistgate: &o.Mistgate}
 }
 
 type nodesArg struct {
@@ -454,7 +470,7 @@ func (a *appsArg) proto() *adminv1.AppToggles {
 		return nil
 	}
 	o := a.over(newUserApps)
-	return &adminv1.AppToggles{Happ: o.Happ, Amnezia: o.Amnezia, Telegram: o.Telegram}
+	return &adminv1.AppToggles{Happ: o.Happ, Amnezia: o.Amnezia, Telegram: o.Telegram, Mistgate: &o.Mistgate}
 }
 
 func (n *nodesArg) proto() *adminv1.NodeSelection {
@@ -667,6 +683,9 @@ var userCreate = changeSpec[userCreateArgs]{
 			appsFact(a.Apps, apps),
 			nodesFact("nodes", a.Nodes),
 		}
+		if a.Apps != nil && a.Apps.Mistgate != nil {
+			facts = append(facts, codedFact("app_mistgate", onOff(apps.Mistgate), onOff(apps.Mistgate)))
+		}
 		if a.SpeedLimitBps > 0 || a.DeviceSpeedLimitBps > 0 {
 			summary += " Speed limits: " + speedLimitsText(a.SpeedLimitBps, a.DeviceSpeedLimitBps) + "."
 			facts = append(facts,
@@ -733,7 +752,7 @@ func checkSubscriptionName(name string) error {
 var userUpdate = changeSpec[userUpdateArgs]{
 	name: "user_update", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceUpdateUserProcedure),
-	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too. " + tokenUserChangeDescription,
+	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy, Mistgate app), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too. " + tokenUserChangeDescription,
 	plan: func(c *call, a userUpdateArgs) (*planned, error) {
 		cur, err := c.getUser(a.UserID)
 		if err != nil {
@@ -800,7 +819,13 @@ var userUpdate = changeSpec[userUpdateArgs]{
 			if err := now.check(); err != nil {
 				return nil, err
 			}
-			change("apps", was.text()+" -> "+now.text(), was.code(), now.code())
+			// The Mistgate app has a fact of its own (the three words of "apps" would otherwise double): named alone, it is the only one.
+			if a.Apps.Happ != nil || a.Apps.Amnezia != nil || a.Apps.Telegram != nil || a.Apps.Mistgate == nil {
+				change("apps", was.text()+" -> "+now.text(), was.code(), now.code())
+			}
+			if a.Apps.Mistgate != nil {
+				change("app_mistgate", onOff(was.Mistgate)+" -> "+onOff(now.Mistgate), onOff(was.Mistgate), onOff(now.Mistgate))
+			}
 			a.Apps = now.explicit()
 			n++
 		}

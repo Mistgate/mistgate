@@ -65,6 +65,7 @@ describe("AmneziaWG in apps on the link", () => {
     await mount(undefined);
     expect(toggle().getAttribute("aria-checked")).toBe("true");
     expect(text()).toContain("kl!ck and the other Mihomo apps get the AmneziaWG servers");
+    expect(text()).toContain("The Mistgate app is not affected by this switch");
   });
 
   it("asks before taking it out while the link apps hold keys, with how many, and saves only on confirm", async () => {
@@ -91,6 +92,7 @@ describe("AmneziaWG in apps on the link", () => {
     await mount(false);
     expect(toggle().getAttribute("aria-checked")).toBe("false");
     expect(text()).toContain("Off: the apps on the link get no AmneziaWG server");
+    expect(text()).toContain("The Mistgate app is not affected by this switch"); // also while it is off
     await click(toggle());
     await settle();
     expect(dialog()).toBeNull();

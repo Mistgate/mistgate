@@ -447,25 +447,27 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 }
 
 // CountLinkAWGKeys counts live AWG peers held by link devices, across all users. AmneziaVPN keys are separate devices and
-// are not part of the subscription link's count.
+// are not part of the subscription link's count, nor are the peers of the devices of the Mistgate app (they hold a key of their
+// own and do not follow the owner's link switch).
 func (a Access) CountLinkAWGKeys(ctx context.Context) (int, error) {
 	var count int
 	err := a.s.R.QueryRowContext(ctx, `SELECT count(*) FROM device d
 		JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.revoked_at IS NULL
 		JOIN awg_peer p ON p.credential_id = c.id AND p.released_at = 0
-		WHERE d.kind = 'link' AND d.revoked_at IS NULL`).Scan(&count)
+		WHERE d.kind = 'link' AND d.key_hash IS NULL AND d.revoked_at IS NULL`).Scan(&count)
 	return count, err
 }
 
 // RevokeLinkAWGCreds drops the live AWG credentials of one link device and quarantines their peer indexes in one guarded
-// batch. The device identity is checked in the database so an AmneziaVPN key can never be passed through accidentally.
+// batch. The device identity is checked in the database so an AmneziaVPN key can never be passed through accidentally, nor a
+// device of the Mistgate app (one that holds a key): its AmneziaWG does not follow the owner's link switch.
 func (a Access) RevokeLinkAWGCreds(ctx context.Context, dev AccessDevice, now time.Time) (int, error) {
 	if dev.ID == "" || dev.UserID == "" {
 		return 0, nil
 	}
 	const liveCount = `SELECT count(*) AS n FROM device d
 		JOIN device_credential c ON c.device_id = d.id AND c.user_id = d.user_id
-		WHERE d.id = ? AND d.user_id = ? AND d.kind = 'link' AND d.revoked_at IS NULL
+		WHERE d.id = ? AND d.user_id = ? AND d.kind = 'link' AND d.key_hash IS NULL AND d.revoked_at IS NULL
 		AND c.protocol = 'awg' AND c.revoked_at IS NULL`
 	var dropped int
 	_, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
@@ -481,16 +483,16 @@ func (a Access) RevokeLinkAWGCreds(ctx context.Context, dev AccessDevice, now ti
 		}
 		dropped = live
 		return []Stmt{
-			guard(`EXISTS (SELECT 1 FROM device d WHERE d.id = ?1 AND d.user_id = ?2 AND d.kind = 'link' AND d.revoked_at IS NULL)
+			guard(`EXISTS (SELECT 1 FROM device d WHERE d.id = ?1 AND d.user_id = ?2 AND d.kind = 'link' AND d.key_hash IS NULL AND d.revoked_at IS NULL)
 				AND (SELECT count(*) FROM device_credential c WHERE c.device_id = ?1 AND c.user_id = ?2 AND c.protocol = 'awg' AND c.revoked_at IS NULL) = ?3`,
 				dev.ID, dev.UserID, live),
 			{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN
 				(SELECT c.id FROM device_credential c JOIN device d ON d.id = c.device_id
-				 WHERE d.id = ? AND d.user_id = ? AND d.kind = 'link' AND d.revoked_at IS NULL
+				 WHERE d.id = ? AND d.user_id = ? AND d.kind = 'link' AND d.key_hash IS NULL AND d.revoked_at IS NULL
 				 AND c.protocol = 'awg' AND c.revoked_at IS NULL)`, Args: []any{unix(now), dev.ID, dev.UserID}},
 			{Query: `UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND user_id = ? AND protocol = 'awg' AND revoked_at IS NULL
 				AND EXISTS (SELECT 1 FROM device d WHERE d.id = device_credential.device_id AND d.user_id = device_credential.user_id
-				 AND d.kind = 'link' AND d.revoked_at IS NULL)`, Args: []any{unix(now), dev.ID, dev.UserID}},
+				 AND d.kind = 'link' AND d.key_hash IS NULL AND d.revoked_at IS NULL)`, Args: []any{unix(now), dev.ID, dev.UserID}},
 		}, nil
 	})
 	if err != nil {

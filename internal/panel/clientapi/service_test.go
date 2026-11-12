@@ -119,3 +119,40 @@ func TestSwitchDoesNotChangeWhenStepUpFails(t *testing.T) {
 		t.Fatalf("setting after refused step-up = %v, want not found", err)
 	}
 }
+
+// The card of the owner's switch carries a summary: everybody, the people who have the Mistgate app on (their switch, and the
+// subscription link on) and the devices that hold a key. Every role that reads the switch reads it.
+func TestReadCarriesTheSummaryOfTheApp(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "client-api-stats.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if err := st.Access().CreateGroup(ctx, store.AccessGroup{ID: "grp_a", Name: "family", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	for i, u := range []store.AccessUser{{AppHapp: true}, {AppHapp: true, AppMistgateOff: true}, {AppHapp: false, AppAmnezia: true}} {
+		name := []string{"alice", "bob", "cara"}[i]
+		u.ID, u.Name, u.GroupID, u.Status, u.AppAmnezia, u.AllNodes = "usr_"+name, name, "grp_a", "active", true, true
+		u.QuotaReset, u.PeriodStart, u.DeviceLimit, u.SubTokenHash, u.SubTokenEnc, u.CreatedAt = "month", now, 5, []byte(name), []byte("sealed"), now
+		if err := st.Access().CreateUser(ctx, u, store.AccessDevice{}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO device (id, user_id, kind, hwid_hash, first_seen_at, last_seen_at, created_at, key_hash) VALUES
+		('dev_keyed', 'usr_alice', 'link', randomblob(32), 1, 1, 1, randomblob(32)), ('dev_plain', 'usr_alice', 'link', randomblob(32), 1, 1, 1, NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	r := rpc{New(Config{Store: st, StepUp: func(context.Context) error { return nil }})}
+	for _, role := range []string{store.RoleOwner, store.RoleHelper, store.RoleReadonly} {
+		got, err := r.GetClientApi(auth.WithAdmin(ctx, store.Admin{ID: "adm_" + role, Role: role}), connect.NewRequest(&adminv1.GetClientApiRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s := got.Msg.GetStats(); s.GetPeople() != 3 || s.GetPeopleOn() != 1 || s.GetDevices() != 1 {
+			t.Errorf("%s reads stats %v, want 3 people, 1 with the app on, 1 device", role, s)
+		}
+	}
+}

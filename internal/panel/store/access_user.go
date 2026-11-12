@@ -31,9 +31,13 @@ type AccessUser struct {
 	NodeIDs                                        []string // rows of user_node; meaningful while AllNodes is false
 	DNSPresetID                                    string   // "" = inherit (group, then the instance default)
 	GroupDNSPresetID                               string   // the user's group's preset, read-only here ("" = none)
+
+	// AppMistgateOff is the Mistgate app switch of the person, stored as "off" so that the zero value (a row nobody touched) keeps
+	// what the person had before the switch existed: the app works while the subscription link (AppHapp) is on.
+	AppMistgateOff bool
 }
 
-const accUserCols = `u.id, u.name, u.subscription_name, u.group_id, g.name AS group_name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.app_telegram, u.all_nodes,
+const accUserCols = `u.id, u.name, u.subscription_name, u.group_id, g.name AS group_name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.app_telegram, u.app_mistgate_off, u.all_nodes,
 	u.quota_bytes, u.quota_reset, u.period_start, u.used_bytes, u.expires_at, u.device_limit, u.speed_limit_bps, u.device_speed_limit_bps,
 	u.sub_token_hash, u.sub_token_enc, u.last_seen_at, u.last_node_id, u.created_at, u.dns_preset_id, g.dns_preset_id AS group_dns_preset_id`
 
@@ -41,15 +45,15 @@ const accUserFrom = ` FROM user u JOIN user_group g ON g.id = u.group_id `
 
 func scanAccessUser(r rowScanner) (AccessUser, error) {
 	var u AccessUser
-	var dis, happ, amn, tgl, all int
+	var dis, happ, amn, tgl, mgOff, all int
 	var quota, used, speed, deviceSpeed, period, seen, created int64
 	var expires sql.NullInt64
 	var lastNode, dns, gdns sql.NullString
-	err := r.Scan(&u.ID, &u.Name, &u.SubscriptionName, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &tgl, &all,
+	err := r.Scan(&u.ID, &u.Name, &u.SubscriptionName, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &tgl, &mgOff, &all,
 		&quota, &u.QuotaReset, &period, &used, &expires, &u.DeviceLimit, &speed, &deviceSpeed,
 		&u.SubTokenHash, &u.SubTokenEnc, &seen, &lastNode, &created, &dns, &gdns)
 	u.DNSPresetID, u.GroupDNSPresetID = dns.String, gdns.String
-	u.Disabled, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AllNodes = dis == 1, happ == 1, amn == 1, tgl == 1, all == 1
+	u.Disabled, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AppMistgateOff, u.AllNodes = dis == 1, happ == 1, amn == 1, tgl == 1, mgOff == 1, all == 1
 	u.QuotaBytes, u.UsedBytes, u.SpeedLimitBps, u.DeviceSpeedLimitBps = uint64(quota), uint64(used), uint64(speed), uint64(deviceSpeed)
 	u.PeriodStart = fromUnix(period)
 	u.ExpiresAt = accTimeIfNonzero(expires)
@@ -102,10 +106,10 @@ type AccessCred struct {
 }
 
 func accInsertUserStmt(u AccessUser) Stmt {
-	return Stmt{Query: `INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, app_telegram, all_nodes, quota_bytes, quota_reset,
+	return Stmt{Query: `INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, app_telegram, app_mistgate_off, all_nodes, quota_bytes, quota_reset,
 		   period_start, used_bytes, expires_at, device_limit, speed_limit_bps, device_speed_limit_bps, sub_token_hash, sub_token_enc, created_at, dns_preset_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		Args: []any{u.ID, u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AllNodes)),
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		Args: []any{u.ID, u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AppMistgateOff)), int64(accBool(u.AllNodes)),
 			int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps),
 			u.SubTokenHash, u.SubTokenEnc, unix(u.CreatedAt), accNullStr(u.DNSPresetID)}}
 }
@@ -501,11 +505,11 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool) error {
 	stmts := []Stmt{
 		guard(`EXISTS (SELECT 1 FROM user WHERE id = ?)`, u.ID),
-		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, app_telegram = ?, all_nodes = ?,
+		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, app_telegram = ?, app_mistgate_off = ?, all_nodes = ?,
 			   quota_bytes = ?, quota_reset = ?, period_start = ?, expires_at = ?, device_limit = ?, speed_limit_bps = ?, device_speed_limit_bps = ?,
 			   dns_preset_id = ?
 			 WHERE id = ?`,
-			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AllNodes)),
+			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AppMistgateOff)), int64(accBool(u.AllNodes)),
 				int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps), accNullStr(u.DNSPresetID), u.ID}},
 	}
 	if setNodes {
@@ -1063,6 +1067,11 @@ type AccessDesiredCred struct {
 	AppHapp, AppAmnezia, AppTelegram                        bool
 }
 
+// accMistgateAppOn leaves out the credentials of the devices of the Mistgate app (the ones that hold a key of their own) of a
+// person who switched the app off: the nodes stop accepting them, as they stop accepting the credentials of any app that is off,
+// and take them again when it is switched on. The credentials themselves are kept. Needs u (user) and d (device) in scope.
+const accMistgateAppOn = `(d.key_hash IS NULL OR u.app_mistgate_off = 0)`
+
 // DesiredCreds returns the candidate credentials of every enabled inbound of a node.
 func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
 	rows, err := a.s.R.QueryContext(ctx,
@@ -1077,6 +1086,7 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
 		 WHERE i.node_id = ? AND i.enabled = 1
 		   AND NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)
+		   AND `+accMistgateAppOn+`
 		 ORDER BY i.id, c.id`, nodeID)
 	if err != nil {
 		return nil, err
@@ -1114,6 +1124,7 @@ func (a Access) HasUserCredentialOnNode(ctx context.Context, nodeID, userID stri
 			JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
 			WHERE i.node_id = ? AND i.enabled = 1
 			  AND NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)
+			  AND `+accMistgateAppOn+`
 		)`, userID, nodeID).Scan(&found)
 	return found, err
 }

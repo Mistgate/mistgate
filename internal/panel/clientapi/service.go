@@ -79,7 +79,14 @@ func (r rpc) GetClientApi(ctx context.Context, _ *connect.Request[adminv1.GetCli
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminv1.GetClientApiResponse{Settings: settings}), nil
+	resp := &adminv1.GetClientApiResponse{Settings: settings}
+	// The summary is a nicety of the card: when it cannot be read the switch still shows and works, without the numbers.
+	if st, err := r.s.cfg.Store.Access().ClientAPIStats(ctx); err != nil {
+		r.s.cfg.Log.Warn("client API stats read failed", "code", "client_api_stats_read_failed", "err", err)
+	} else {
+		resp.Stats = &adminv1.ClientApiStats{People: uint32(st.People), PeopleOn: uint32(st.PeopleOn), Devices: uint32(st.Devices)}
+	}
+	return connect.NewResponse(resp), nil
 }
 
 func (r rpc) UpdateClientApi(ctx context.Context, req *connect.Request[adminv1.UpdateClientApiRequest]) (*connect.Response[adminv1.UpdateClientApiResponse], error) {

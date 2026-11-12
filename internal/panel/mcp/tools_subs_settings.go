@@ -292,7 +292,7 @@ func linkModeWord(s *adminv1.SubscriptionSettings) string {
 
 var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 	name: "subscription_link_limits_set", min: ProfileOperator, danger: true, procs: settingsProcs,
-	desc: "Set device-limit handling for subscription link apps, whether link apps include AmneziaWG entries, and whether Mihomo and sing-box profiles include automatic server selection. Strict mode refuses shared no-device-id users; turning link_awg off drops their link keys on the next fetch. Always waits for owner approval.",
+	desc: "Set device-limit handling for subscription link apps, whether link apps include AmneziaWG entries, and whether Mihomo and sing-box profiles include automatic server selection. Strict mode refuses shared no-device-id users; turning link_awg off drops the link keys of the link apps on the next fetch (not those of the Mistgate app). Always waits for owner approval.",
 	plan: func(c *call, a subsLinkLimitsArgs) (*planned, error) {
 		if a.Mode == nil && a.LinkAWG == nil && a.LinkAutoSelect == nil {
 			return nil, errors.New("give mode, link_awg, link_auto_select, or a combination")

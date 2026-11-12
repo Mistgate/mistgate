@@ -128,7 +128,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `protocols_list` | 只读 | 协议插件、客户端应用、精简设置结构（包括关键字段和敏感字段）以及默认设置。敏感默认值会被遮蔽。对尚属新协议、还没有在实际环境中得到验证的协议（MTProto），会设置 `experimental`。 |
 | `profiles_list` | 只读 | 协议配置摘要，包括协议、节点数和用户数、警告、订阅格式、版本以及授予访问权限的分组。 |
 | `profile_get` | 只读 | 单个协议配置的摘要和已遮蔽敏感字段的设置；入站包含节点 ID 和名称、生效及覆盖后的端口和服务器名称、启用状态和运行状态、`direct_in_subscriptions`（是否在订阅中列出节点地址）和 `cdn`（客户端是否通过 CDN 主机连接）；还包括授予访问权限的分组。参数为 `profile_id`。 |
-| `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、三个应用开关（`app_happ`、`app_amnezia`、`app_telegram`）、设备、协议配置（每个都带有包含它的订阅格式）和节点访问权限。不含订阅链接或密钥。 |
+| `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、四个应用开关（`app_happ`、`app_amnezia`、`app_telegram`、`app_mistgate`）、设备、协议配置（每个都带有包含它的订阅格式）和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
 | `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置（每个都带有包含它的订阅格式）和节点。不返回订阅内容或链接。 |
@@ -175,7 +175,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |
 | `subscription_rules_set` | 操作员 | 完整的有序 `rules` 列表，每项为 `ua_contains` 加 `format`（`base64_uris`、`user_page`、`decoy`、`mihomo_yaml`、`xray_json`、`singbox_json`）；第一个匹配项生效 | 始终 |
 | `subscription_texts_set` | 操作员 | 仅需更改的字段：`title`、`announcement`、`support_url`、`update_interval_hours`、`server_name_template` | 始终 |
-| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo、sing-box 和 Xray JSON 中把 Auto 放在最前），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥 | 始终 |
+| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo、sing-box 和 Xray JSON 中把 Auto 放在最前），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥（Mistgate 应用的密钥不在其中） | 始终 |
 | `subscription_page_set` | 操作员 | 仅需更改的字段：`show_announcement`、`show_support`、`show_qr`、`device_self_service`、`page_password`、`dns_choice`、`happ_ping`（`off`、`tcp`）和 `happ_ping_on_open` | 始终 |
 | `dns_settings_set` | 操作员 | `default_preset_id`、有序的 `link_preset_ids` 和 `link_default_preset_id`；只需提供要更改的字段 | 始终 |
 | `group_create` | 操作员 | `name`，可选 `profile_ids`、`dns_preset_id`（留空则使用实例默认值）、`color` 和 `disabled_node_ids`。分组没有备注和配额字段 | 否 |
@@ -222,6 +222,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 `subscription_app_upsert` 和 `subscription_app_remove` 会更改每位用户都能看到的页面上的一个应用，按平台和名称（不区分大小写）查找（同一平台上有两个应用同名时会拒绝执行：请在管理后台中更改）。新应用会添加到列表末尾。字段值的验证方式与保存**订阅 → 用户页面**时完全相同：下载链接必须是 http(s)；添加链接模板必须以应用自己的协议开头（`happ://add/{url}`、`myclient://add?url={url_enc}&name={name_enc}`），或使用 http(s)，不得使用 `javascript:`、`data:` 等协议；只能使用已知占位符；应用最多 30 个。此外，智能体提供的文本不能包含不可见格式字符。计划会读取并记住完整设置的状态；如果在执行前有人保存了订阅设置，执行会失败并返回「the subscription settings changed after the plan」，不会覆盖任何内容：请重新制定计划。在 `subscription_settings_get` 和智能体收到的计划副本中，链接查询字符串和较长的路径片段会显示为 `[redacted]`，与其他结果相同；所有者审批卡片会显示完整值。
 
 Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关之一。省略的字段保持用户原有的值，所以 `{"apps": {"telegram": true}}` 只更改 Telegram。开启会生成用户的 Telegram 密钥，关闭则吊销它；计划会把 Telegram 代理列在应用之中。`happ` 和 `amnezia` 中至少要保持开启一个：Telegram 是额外增加的。密钥本身没有对应的工具，也没有工具返回 `tg://proxy` 链接：重新签发或吊销密钥，以及读取链接，都由所有者在管理后台中完成（[MTProto](../guide/mtproto.md)）。
+
+Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。只有 `happ` 开启时它才会工作。计划会把它作为单独的事实 `app_mistgate` 列出，所需的审批与其他用户更改相同。`client_api_settings` 还会读取有多少人开启了应用、有多少设备已用密钥连接（`people`、`people_on`、`devices`）。
 
 ## 制定计划并执行
 

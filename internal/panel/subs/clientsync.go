@@ -20,7 +20,6 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
 const (
@@ -35,7 +34,7 @@ const (
 // endpoints to the decoy.
 type ClientAPI interface {
 	ClientDeviceByKey(ctx context.Context, keyHash []byte) (store.AccessDevice, store.LinkDeviceKeyOwner, error)
-	ClientSubscription(ctx context.Context, dev store.AccessDevice, hint access.DeviceHint, caps []string, noLinkAWG bool) (access.SubView, error)
+	ClientSubscription(ctx context.Context, dev store.AccessDevice, hint access.DeviceHint, caps []string) (access.SubView, error)
 	ClientLeaveDevice(ctx context.Context, dev store.AccessDevice) error
 }
 
@@ -155,7 +154,7 @@ func (h *handler) serveClientSync(w http.ResponseWriter, r *http.Request, dev st
 	ctx := r.Context()
 	set := h.settings(ctx)
 	hint := access.DeviceHint{OSVersion: firstHeader(r, "X-Ver-Os"), Agent: r.UserAgent()}
-	view, err := h.client.ClientSubscription(ctx, dev, hint, clientCapabilities(r), !subsettings.LinkAWG(set))
+	view, err := h.client.ClientSubscription(ctx, dev, hint, clientCapabilities(r))
 	if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrAccessExists) || errors.Is(err, access.ErrUnknownToken) {
 		// Something the snapshot of the request counted on is gone: the device, its key, its link, a profile, the person.
 		h.staleKey(w, r, "sync", keyHash, client, locked, err)
@@ -166,7 +165,7 @@ func (h *handler) serveClientSync(w http.ResponseWriter, r *http.Request, dev st
 		return
 	}
 	in := clientSyncInput{DeviceID: dev.ID, View: view, Brand: h.brand(ctx), Settings: set, ProbeOn: h.probeOn(ctx)}
-	if view.Status == access.StatusActive {
+	if view.Status == access.StatusActive && !view.AppMistgateOff {
 		in.DNS = h.linkPreset(ctx, view)
 	}
 	answer := buildClientSync(in)
@@ -361,6 +360,10 @@ type clientSyncAnswer struct {
 	ASN        uint32             `json:"asn,omitempty"`
 	DNS        *clientSyncDNS     `json:"dns,omitempty"`
 	Servers    []clientSyncServer `json:"servers"`
+
+	// Reason is why an active person gets no servers although they have access: "app_disabled", the Mistgate app is switched off for
+	// them. Absent otherwise.
+	Reason string `json:"reason,omitempty"`
 }
 
 // clientSyncInput is everything the body is made of.
@@ -399,7 +402,9 @@ func buildClientSync(in clientSyncInput) clientSyncAnswer {
 		sum := sha256.Sum256([]byte(text))
 		answer.Notice = &clientSyncNotice{ID: hex.EncodeToString(sum[:]), Text: text}
 	}
-	if v.Status == access.StatusActive {
+	if v.Status == access.StatusActive && v.AppMistgateOff {
+		answer.Reason = "app_disabled" // access is there, the app is not allowed: the status stays active, the servers are none
+	} else if v.Status == access.StatusActive {
 		if in.DNS != nil {
 			answer.DNS = clientDNSOf(*in.DNS)
 		}

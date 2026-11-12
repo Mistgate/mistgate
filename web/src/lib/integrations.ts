@@ -261,6 +261,8 @@ function changeSide(t: T, fmt: Fmt, key: string, v: string): string {
       return n === 0 ? t("approval.value.noLimit") : fmt.mbit(n);
     case "apps":
       return appsKey[v] ? t(appsKey[v]) : v;
+    case "app_mistgate": // the Mistgate app switch: on or off
+      return lookup(t, `approval.value.${v}`) ?? v;
     case "nodes":
       return v === "all" ? t("approval.value.allNodes") : /^\d+$/.test(v) ? t.n("approval.value.nodes", n) : v;
     case "kind": // an app of the subscription page: happ, amnezia

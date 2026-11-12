@@ -129,6 +129,7 @@ type syncBody struct {
 		Accent  string
 		LogoSVG string `json:"logo_svg"`
 	}
+	Reason     string
 	SupportURL string `json:"support_url"`
 	Notice     *struct{ ID, Text string }
 	Plan       map[string]any
@@ -617,28 +618,105 @@ func TestSyncIssuesOnlyWhatTheClientAnnounced(t *testing.T) {
 	}
 }
 
-// The owner took AmneziaWG off the link apps: the enrolled device gets none, and the peers it had are dropped.
-func TestSyncFollowsTheOwnersAWGSwitch(t *testing.T) {
+// The owner's switch "AmneziaWG in apps on the link" is for the other apps of the link. The Mistgate app gets AmneziaWG whatever it
+// says (its own switch, its caps, the profiles of the person decide), and the Mihomo fetch of another device of the same person,
+// which is told no AmneziaWG and drops the peers of its own device, never takes the peer of a device that holds a key.
+func TestSyncAWGDoesNotFollowTheOwnersLinkSwitch(t *testing.T) {
 	e := newSyncEnv(t, nil)
 	_, tok := e.person("alice", nil)
 	a := e.enrolDevice(tok, hwidA)
+	livePeers := func(deviceID string) int {
+		return e.count(`SELECT count(*) FROM awg_peer p JOIN device_credential c ON c.id = p.credential_id WHERE c.device_id = ? AND p.released_at = 0`, deviceID)
+	}
 	if b := e.mustSync(a.Key); len(b.paths("awg")) != 1 {
 		t.Fatalf("no AWG path: %s", b.raw)
 	}
+	// another app of the person, on the plain link with a device ID of its own: a Mihomo fetch makes its AWG peer too
+	if rec := fetch(e.h, "/"+tok, mihomoUA, "X-HWID", hwidB); rec.Code != 200 || !strings.Contains(rec.Body.String(), "type: wireguard") {
+		t.Fatalf("the Mihomo fetch with AWG on = %d, no wireguard proxy:\n%s", rec.Code, rec.Body.String())
+	}
+	var otherID string
+	if err := e.st.R.QueryRow(`SELECT id FROM device WHERE key_hash IS NULL AND hwid_hash IS NOT NULL AND revoked_at IS NULL`).Scan(&otherID); err != nil {
+		t.Fatal(err)
+	}
+	if livePeers(a.DeviceID) != 1 || livePeers(otherID) != 1 {
+		t.Fatalf("peers: app %d, other app %d, want one each", livePeers(a.DeviceID), livePeers(otherID))
+	}
+
 	e.setSettings(func(s *adminv1.SubscriptionSettings) { s.LinkAwg = proto.Bool(false) })
+	// the other app gets no AmneziaWG now, and its own peer goes; the Mistgate app keeps its peer
+	rec := fetch(e.h, "/"+tok, mihomoUA, "X-HWID", hwidB)
+	if rec.Code != 200 || strings.Contains(rec.Body.String(), "wireguard") {
+		t.Fatalf("the Mihomo fetch with the switch off = %d:\n%s", rec.Code, rec.Body.String())
+	}
+	if livePeers(otherID) != 0 {
+		t.Errorf("the other app kept %d peers with the switch off", livePeers(otherID))
+	}
+	if livePeers(a.DeviceID) != 1 {
+		t.Fatalf("the Mihomo fetch took the peer of the Mistgate app: %d live", livePeers(a.DeviceID))
+	}
+	credsBefore := e.liveCredIDs(a.DeviceID)
 	b := e.mustSync(a.Key)
-	if len(b.paths("awg")) != 0 || len(b.paths("hysteria2")) != 1 {
-		t.Fatalf("with AWG off for the link apps: %s", b.raw)
+	if len(b.paths("awg")) != 1 || len(b.paths("hysteria2")) != 1 {
+		t.Fatalf("sync with the link switch off: %s", b.raw)
+	}
+	if e.liveCredIDs(a.DeviceID) != credsBefore || livePeers(a.DeviceID) != 1 {
+		t.Error("sync with the link switch off changed the device's AmneziaWG")
+	}
+	// a fetch with the HWID of the enrolled device is refused, and touches nothing
+	fetch(e.h, "/"+tok, mihomoUA, "X-HWID", hwidA)
+	if livePeers(a.DeviceID) != 1 {
+		t.Error("a refused fetch with the HWID of the Mistgate app took its peer")
+	}
+}
+
+// What the person and the client decide stays in force with the link switch off: the app switched off for the person, and a client
+// that did not announce an AmneziaWG version, get no AmneziaWG.
+func TestSyncAWGWithTheLinkSwitchOffStillFollowsThePersonAndTheCaps(t *testing.T) {
+	e := newSyncEnv(t, nil)
+	uid, tok := e.person("alice", nil)
+	a := e.enrolDevice(tok, hwidA)
+	e.setSettings(func(s *adminv1.SubscriptionSettings) { s.LinkAwg = proto.Bool(false) })
+
+	if b := e.mustSync(a.Key, "X-Mistgate-Caps", "v=1; hysteria2=2"); len(b.paths("awg")) != 0 || len(b.paths("hysteria2")) != 1 {
+		t.Fatalf("a client without the awg capability: %s", b.raw)
 	}
 	if n := e.count(`SELECT count(*) FROM device_credential WHERE device_id = ? AND protocol = 'awg' AND revoked_at IS NULL`, a.DeviceID); n != 0 {
-		t.Errorf("%d live AWG credentials with the switch off", n)
+		t.Fatalf("%d AWG credentials issued to a client that did not ask", n)
 	}
-	if n := e.count(`SELECT count(*) FROM awg_peer WHERE released_at = 0`); n != 0 {
-		t.Errorf("%d live peers with the switch off", n)
-	}
-	e.setSettings(func(s *adminv1.SubscriptionSettings) { s.LinkAwg = proto.Bool(true) })
 	if b := e.mustSync(a.Key); len(b.paths("awg")) != 1 {
-		t.Fatalf("switched on again: %s", b.raw)
+		t.Fatalf("with the capability: %s", b.raw)
+	}
+	e.setApps(uid, &adminv1.AppToggles{Happ: true, Amnezia: true, Mistgate: new(false)})
+	if b := e.mustSync(a.Key); len(b.paths("awg")) != 0 || b.Reason != "app_disabled" {
+		t.Fatalf("the app off for the person: %s", b.raw)
+	}
+}
+
+// A plain Mihomo fetch and the sync of the same person at the same moment, with the link switch off: the sync keeps its peer
+// whatever the order, and the plain app has none.
+func TestSyncAWGAgainstParallelMihomoFetchesWithTheLinkSwitchOff(t *testing.T) {
+	e := newSyncEnv(t, nil)
+	_, tok := e.person("alice", nil)
+	a := e.enrolDevice(tok, hwidA)
+	e.mustSync(a.Key)
+	fetch(e.h, "/"+tok, mihomoUA, "X-HWID", hwidB)
+	e.setSettings(func(s *adminv1.SubscriptionSettings) { s.LinkAwg = proto.Bool(false) })
+	var wg sync.WaitGroup
+	for i := 0; i < 6; i++ {
+		wg.Add(2)
+		go func() { defer wg.Done(); fetch(e.h, "/"+tok, mihomoUA, "X-HWID", hwidB) }()
+		go func() { defer wg.Done(); e.sync(a.Key) }()
+	}
+	wg.Wait()
+	if n := e.count(`SELECT count(*) FROM awg_peer p JOIN device_credential c ON c.id = p.credential_id WHERE c.device_id = ? AND p.released_at = 0`, a.DeviceID); n != 1 {
+		t.Errorf("the Mistgate app has %d live peers after the race, want 1", n)
+	}
+	if n := e.count(`SELECT count(*) FROM awg_peer p JOIN device_credential c ON c.id = p.credential_id JOIN device d ON d.id = c.device_id WHERE d.key_hash IS NULL AND p.released_at = 0`); n != 0 {
+		t.Errorf("the plain app has %d live peers with the switch off", n)
+	}
+	if b := e.mustSync(a.Key); len(b.paths("awg")) != 1 {
+		t.Fatalf("sync after the race: %s", b.raw)
 	}
 }
 

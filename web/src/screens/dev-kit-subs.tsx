@@ -19,7 +19,7 @@ import { protocolsQuery } from "@/screens/users/rpc";
 // Development only (the dev kit): Subscriptions on made-up settings. /dev-kit?only=subs: "Names & texts" with how Happ
 // pings the servers; &state=awg-on|awg-off|awg-ask: the switch "AmneziaWG in apps on the link" on the tab "Who gets
 // what", the Mihomo card of "Apps & formats" while it is off, and its confirmation. The blocks carry data-shot for the
-// screenshot script. &state=client-api: the card "Client API for the Mistgate app" on the tab "Who gets what", on, off and
+// screenshot script. &state=client-api: the card "Mistgate app" on the tab "Who gets what" (with the summary of people and devices), on, off, nobody connected yet and
 // as a helper sees it (read only). &state=clients|clients-empty|clients-readonly|clients-rules: the tab "App versions" with
 // devices of every state and of every class of what the nodes saw (data-shot subs-clients, and subs-clients-classic with the chip "Old-style" chosen: the OK device there is the table's mistake), with no device that gets REALITY servers, as a helper sees it (the table of minimum versions only
 // read), and with that table unfolded for the owner (one row changed from the built-in one, one of their own).
@@ -54,16 +54,16 @@ const protocols = [
 ];
 
 /** The client API card on its own cache: `enabled` is what the panel says, `owner` is who looks at it. */
-function ClientApiShot({ enabled, owner, label }: { enabled: boolean; owner: boolean; label: string }) {
+function ClientApiShot({ enabled, owner, label, empty }: { enabled: boolean; owner: boolean; label: string; empty?: boolean }) {
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
     c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role: owner ? Role.OWNER : Role.HELPER, displayName: owner ? "Owner" : "Helper" }, version: "dev" } as never);
-    c.setQueryData(clientApiQuery.queryKey, { enabled });
+    c.setQueryData(clientApiQuery.queryKey, { enabled, stats: empty ? { people: 24, peopleOn: 0, devices: 0 } : { people: 24, peopleOn: 17, devices: 31 } });
     return c;
   });
   return (
     <QueryClientProvider client={qc}>
-      <div data-shot={`subs-client-api-${owner ? (enabled ? "on" : "off") : "readonly"}`} className="flex flex-col gap-3">
+      <div data-shot={`subs-client-api-${owner ? (empty ? "empty" : enabled ? "on" : "off") : "readonly"}`} className="flex flex-col gap-3">
         <SectionLabel>{label}</SectionLabel>
         <ClientApiCard />
       </div>
@@ -187,9 +187,10 @@ export function SubsKit() {
       <section className="relative left-1/2 flex w-[min(calc(100vw-2rem),1080px)] -translate-x-1/2 flex-col gap-6">
         {(state === "client-api" || state === "") && (
           <div className="flex flex-col gap-6">
-            <ClientApiShot enabled owner label="Subscriptions → Who gets what: Client API for the Mistgate app, on" />
-            <ClientApiShot enabled={false} owner label="Subscriptions → Who gets what: Client API for the Mistgate app, off" />
-            <ClientApiShot enabled owner={false} label="Subscriptions → Who gets what: Client API for the Mistgate app, read only (helper)" />
+            <ClientApiShot enabled owner label="Subscriptions → Who gets what: the Mistgate app, on, with the summary" />
+            <ClientApiShot enabled={false} owner label="Subscriptions → Who gets what: the Mistgate app, off for the whole panel" />
+            <ClientApiShot enabled owner={false} label="Subscriptions → Who gets what: the Mistgate app, read only (helper)" />
+            <ClientApiShot enabled owner empty label="Subscriptions → Who gets what: the Mistgate app, on, nobody has connected yet" />
           </div>
         )}
         {state === "clients" && (

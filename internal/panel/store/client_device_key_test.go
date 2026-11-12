@@ -656,7 +656,10 @@ func TestClientDeviceKeyMigrationLeavesExistingDeviceUntouched(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.W.ExecContext(ctx, `DELETE FROM goose_db_version WHERE version_id IN (126, 127)`); err != nil {
+	if _, err := s.W.ExecContext(ctx, `ALTER TABLE user DROP COLUMN app_mistgate_off`); err != nil { // migration 00128, applied after 00126
+		t.Fatal(err)
+	}
+	if _, err := s.W.ExecContext(ctx, `DELETE FROM goose_db_version WHERE version_id IN (126, 127, 128)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.migrate(ctx); err != nil {

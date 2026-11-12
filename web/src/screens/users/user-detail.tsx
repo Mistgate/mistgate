@@ -41,6 +41,7 @@ import { useGo } from "./nav";
 import { groupsQuery, isCode, protocolsQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
 import { Check, ConfirmModal, Panel, ResetSelect, SettingRow, SpeedPair, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
+import { MistgateAppRow } from "./mistgate-app";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
 // the steppers of the Limits panel, wide enough for "50 Мбит/с" (the speed pair) so they all line up
@@ -940,7 +941,7 @@ function withNode(text: string, slot: string, node: ReactNode): ReactNode {
  * group's profiles in the two ways (each a link to its page), the DNS preset, the app switches and the nodes (each a
  * link to its Profiles tab, where a node's own port and domain live).
  */
-function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
+export function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
   const t = useTx();
   const linkApps = useLinkAppNames();
   const toast = useToast();
@@ -968,8 +969,8 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
   };
   const selected = nodes.all ? allIds.length : nodes.ids.filter((id) => allIds.includes(id)).length;
 
-  const flipApp = (which: "happ" | "amnezia" | "telegram", on: boolean) => {
-    const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, [which]: on };
+  const flipApp = (which: "happ" | "amnezia" | "telegram" | "mistgate", on: boolean) => {
+    const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, mistgate: user.apps?.mistgate !== false, [which]: on };
     if (!apps.happ && !apps.amnezia) return; // at least one of the two link/key apps stays on
     void actions.update({ apps }).catch(() => {});
   };
@@ -1040,6 +1041,7 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
             <SwitchRow label={linkApps} hint={t("users.happHint")} checked={!!user.apps?.happ} onCheckedChange={(on) => flipApp("happ", on)} />
             <SwitchRow label="AmneziaVPN" hint={t("users.awgHint")} checked={!!user.apps?.amnezia} onCheckedChange={(on) => flipApp("amnezia", on)} />
             <SwitchRow label={t("tgproxy.toggle")} hint={t("users.telegramHint")} checked={!!user.apps?.telegram} onCheckedChange={(on) => flipApp("telegram", on)} />
+            <MistgateAppRow checked={user.apps?.mistgate !== false} linkOn={!!user.apps?.happ} onCheckedChange={(on) => flipApp("mistgate", on)} />
           </div>
 
           <div className="flex flex-col border-t border-line pt-1">

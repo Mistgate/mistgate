@@ -941,3 +941,39 @@ func TestAWGProbeCredentialNeedsAFreeAddress(t *testing.T) {
 		t.Fatalf("the probe's address was handed out: %v", err)
 	}
 }
+
+// The device of the Mistgate app (a link device that holds a key) keeps its AmneziaWG peer whatever the owner's switch "AmneziaWG
+// in apps on the link" says: its peer is neither counted among the link keys nor dropped by RevokeLinkAWGCreds.
+func TestLinkAWGKeysLeaveTheDevicesOfTheMistgateApp(t *testing.T) {
+	ctx := context.Background()
+	s := linkFixture(t, "usr_l")
+	rewriteAccessUser(t, s, "usr_k", "keyed", "grp_link")
+	profile, _ := awgNet(t, s, "link_awg_keyed")
+	issue := func(id string) []AWGImplicitWant {
+		return []AWGImplicitWant{{ProfileID: profile, MaxIdx: 16, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: id, Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_" + id, nil
+		}}}
+	}
+	plain, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_l", "plain", nil), 10, linkNow, issue("crd_plain_awg"))
+	if err != nil || len(plain.Added) != 1 {
+		t.Fatalf("plain link credential = %+v, %v", plain, err)
+	}
+	keyed, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_k", "keyed", nil), 10, linkNow, issue("crd_keyed_awg"))
+	if err != nil || len(keyed.Added) != 1 {
+		t.Fatalf("keyed link credential = %+v, %v", keyed, err)
+	}
+	execT(t, s, `UPDATE device SET key_hash = ?, enrol_token_hash = ? WHERE id = ?`, deviceHash("key-k"), deviceHash("token-k"), keyed.Device.ID)
+
+	if got, err := s.Access().CountLinkAWGKeys(ctx); err != nil || got != 1 {
+		t.Fatalf("CountLinkAWGKeys = %d, %v; want the plain link peer only", got, err)
+	}
+	if dropped, err := s.Access().RevokeLinkAWGCreds(ctx, keyed.Device, linkNow); err != nil || dropped != 0 {
+		t.Fatalf("RevokeLinkAWGCreds on the Mistgate app's device = %d, %v; want nothing", dropped, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer p JOIN device_credential c ON c.id = p.credential_id WHERE c.id = 'crd_keyed_awg' AND c.revoked_at IS NULL AND p.released_at = 0`); got != 1 {
+		t.Fatalf("the peer of the Mistgate app's device was taken: %d live", got)
+	}
+	if dropped, err := s.Access().RevokeLinkAWGCreds(ctx, plain.Device, linkNow); err != nil || dropped != 1 {
+		t.Fatalf("RevokeLinkAWGCreds on the plain device = %d, %v; want one", dropped, err)
+	}
+}

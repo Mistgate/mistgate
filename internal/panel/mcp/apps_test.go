@@ -121,3 +121,49 @@ func TestProtocolsListMarksExperimental(t *testing.T) {
 		t.Errorf("experimental %v, apps %v", got, apps)
 	}
 }
+
+// The Mistgate app is a fourth switch with a fact of its own: naming it changes it alone, the other three are carried over, and
+// a user the panel sent without it (an older panel) reads as on.
+func TestUserUpdateMistgateAppSwitch(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileOperator)
+	s := e.session(secret)
+
+	// users_search and user_get read it; the fixture's user carries none, which is the default: on
+	if out := mustOK(t, s, "users_search", map[string]any{"query": "alice"}); !strings.Contains(out, `"app_mistgate":true`) {
+		t.Errorf("the view does not carry app_mistgate: %s", out)
+	}
+
+	p := planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "apps": map[string]any{"mistgate": false}})
+	if f := factOf(t, p, "app_mistgate"); f.Code != "change" || f.Params["from"] != "on" || f.Params["to"] != "off" {
+		t.Errorf("app_mistgate fact: %+v", f)
+	}
+	for _, f := range p.Facts {
+		if f.Key == "apps" {
+			t.Errorf("a change of the Mistgate app alone made an apps fact: %+v", f)
+		}
+	}
+	applyOf(t, s, "user_update", p.ConfirmToken)
+	got := e.w.updateReq[len(e.w.updateReq)-1].GetApps()
+	if !got.GetHapp() || !got.GetAmnezia() || got.GetTelegram() || got.Mistgate == nil || got.GetMistgate() {
+		t.Errorf("request apps: %+v", got)
+	}
+
+	// naming another app keeps the Mistgate switch where it is
+	e.w.users["usr_alice"].User.Apps.Mistgate = new(false)
+	p = planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "apps": map[string]any{"telegram": true}})
+	applyOf(t, s, "user_update", p.ConfirmToken)
+	if got := e.w.updateReq[len(e.w.updateReq)-1].GetApps(); got.Mistgate == nil || got.GetMistgate() || !got.GetTelegram() {
+		t.Errorf("the Mistgate switch did not survive another app's change: %+v", got)
+	}
+
+	// a new person: named off is sent off, named alone with the others unnamed is on for the rest
+	p = planOf(t, s, "user_create", map[string]any{"name": "zoe", "group_id": "grp_1", "apps": map[string]any{"mistgate": false}})
+	if f := factOf(t, p, "app_mistgate"); f.Value != "off" {
+		t.Errorf("app_mistgate fact of a new user: %+v", f)
+	}
+	applyOf(t, s, "user_create", p.ConfirmToken)
+	if got := e.w.createReq[len(e.w.createReq)-1].GetApps(); !got.GetHapp() || !got.GetAmnezia() || got.Mistgate == nil || got.GetMistgate() {
+		t.Errorf("created with apps %+v", got)
+	}
+}

@@ -55,6 +55,7 @@ export function LinkAwgCard({ settings }: { settings: Settings }) {
             {t("subs.linkAwg.title")}
           </SectionLabel>
           <p className="text-xs leading-snug text-pretty text-muted">{t(on ? "subs.linkAwg.on" : "subs.linkAwg.off")}</p>
+          <p className="text-xs leading-snug text-pretty text-muted">{t("subs.linkAwg.mistgate")}</p>
         </div>
         <Switch checked={on} disabled={save.isPending} onCheckedChange={flip} aria-label={t("subs.linkAwg.title")} className="mt-0.5" />
       </Card>

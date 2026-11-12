@@ -10,9 +10,17 @@ import { plain } from "./plain";
 // Everybody who sees Subscriptions reads it; only the owner changes it, with a step-up. Off by default. The words are in
 // i18n/subs.ts ("subs.clientApi.").
 
+/** Who uses the Mistgate app: everybody, the people who have it on, and the devices connected with a key of their own. */
+export type ClientApiStats = { people: number; peopleOn: number; devices: number };
+export type ClientApiState = { enabled: boolean; stats?: ClientApiStats };
+
 export const clientApiQuery = queryOptions({
   queryKey: ["clientApi"],
-  queryFn: async ({ signal }) => plain((await clientApi.getClientApi({}, { signal })).settings ?? { enabled: false }),
+  queryFn: async ({ signal }): Promise<ClientApiState> => {
+    const r = await clientApi.getClientApi({}, { signal });
+    const stats = r.stats && { people: r.stats.people, peopleOn: r.stats.peopleOn, devices: r.stats.devices };
+    return { ...plain(r.settings ?? { enabled: false }), ...(stats && { stats }) };
+  },
 });
 
 /** Switches the client API; the toast says what it is now. */

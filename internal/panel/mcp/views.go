@@ -710,13 +710,15 @@ type userV struct {
 	Node        string `json:"current_node,omitempty"`
 	SpeedLimit  uint64 `json:"speed_limit_bps,omitempty"` // per person: all devices together, on one node
 	// DeviceSpeedLimit: each device alone.
-	DeviceSpeedLimit uint64   `json:"device_speed_limit_bps,omitempty"`
-	Happ             bool     `json:"app_happ"`
-	Amnezia          bool     `json:"app_amnezia"`
-	Telegram         bool     `json:"app_telegram"`
-	AllNodes         bool     `json:"all_nodes"`
-	NodeIDs          []string `json:"node_ids,omitempty"`
-	CreatedUnix      int64    `json:"created_unix"`
+	DeviceSpeedLimit uint64 `json:"device_speed_limit_bps,omitempty"`
+	Happ             bool   `json:"app_happ"`
+	Amnezia          bool   `json:"app_amnezia"`
+	Telegram         bool   `json:"app_telegram"`
+	// Mistgate: the Mistgate app switch (works only while app_happ is on as well).
+	Mistgate    bool     `json:"app_mistgate"`
+	AllNodes    bool     `json:"all_nodes"`
+	NodeIDs     []string `json:"node_ids,omitempty"`
+	CreatedUnix int64    `json:"created_unix"`
 }
 
 func userView(u *adminv1.User) userV {
@@ -726,7 +728,7 @@ func userView(u *adminv1.User) userV {
 		DevicesUsed: u.GetDevicesUsed(), DeviceLimit: u.GetDeviceLimit(), UsedBytes: u.GetUsedBytes(), QuotaBytes: u.GetQuotaBytes(),
 		QuotaReset: enumName("QUOTA_RESET_", u.GetQuotaReset().String()), ExpiresUnix: u.GetExpiresUnix(), LastSeen: u.GetLastSeenUnix(),
 		Node: nm(u.GetCurrentNodeName()), SpeedLimit: u.GetSpeedLimitBps(), DeviceSpeedLimit: u.GetDeviceSpeedLimitBps(), Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(),
-		Telegram: u.GetApps().GetTelegram(), AllNodes: u.GetNodes().GetAll(), CreatedUnix: u.GetCreatedUnix(),
+		Telegram: u.GetApps().GetTelegram(), Mistgate: mistgateOn(u.GetApps()), AllNodes: u.GetNodes().GetAll(), CreatedUnix: u.GetCreatedUnix(),
 	}
 	if !v.AllNodes {
 		for i, id := range u.GetNodes().GetNodeIds() {

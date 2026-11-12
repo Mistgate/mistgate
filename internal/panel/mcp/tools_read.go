@@ -466,15 +466,21 @@ func readTools() []toolDef {
 			}),
 
 		readTool("client_api_settings", ProfileReadonly, procs(adminv1connect.ClientApiServiceGetClientApiProcedure),
-			"Whether the owner enabled the desktop client API: the discovery header on subscription app answers and device enrolment by the subscription link. The switch is off by default. Devices that are already enrolled do not depend on it.",
+			"Whether the owner enabled the desktop client API: the discovery header on subscription app answers and device enrolment by the subscription link. The switch is off by default. Devices that are already enrolled do not depend on it. Also people (everybody), people_on (the Mistgate app is on for them: their own switch, and the subscription link on too) and devices (connected with a key of their own).",
 			func(c *call, _ noArgs) (any, error) {
 				r, err := c.cl.ClientAPI.GetClientApi(c.ctx, connect.NewRequest(&adminv1.GetClientApiRequest{}))
 				if err != nil {
 					return nil, apiError(err)
 				}
+				stats := r.Msg.GetStats()
 				return struct {
 					Enabled bool `json:"enabled"`
-				}{Enabled: r.Msg.GetSettings().GetEnabled()}, nil
+					// People is everybody on the panel; PeopleOn have the Mistgate app on (their switch, and the subscription link on);
+					// Devices are the devices connected with a key of their own and not removed. All three are 0 when the panel did not say.
+					People   uint32 `json:"people"`
+					PeopleOn uint32 `json:"people_on"`
+					Devices  uint32 `json:"devices"`
+				}{Enabled: r.Msg.GetSettings().GetEnabled(), People: stats.GetPeople(), PeopleOn: stats.GetPeopleOn(), Devices: stats.GetDevices()}, nil
 			}),
 
 		readTool("outdated_devices", ProfileReadonly, procs(adminv1connect.ClientCompatServiceListOutdatedDevicesProcedure),
