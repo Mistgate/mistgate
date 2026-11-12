@@ -114,7 +114,7 @@ TCP 443 也用于 Hysteria2 协议配置提供网站。同一节点上的 VLESS 
 
 ## 节点如何处理目标地址
 
-VLESS 仍会分析 HTTP、TLS 和 QUIC，以用于路由和流量归属。如果应用请求的是 IP 地址，节点会保留该 IP 作为目标，即使 HTTP Host、TLS SNI 或 QUIC 中的域名不同。如果应用请求域名，节点会通过此节点的 DNS 服务器解析；WARP 出口也使用节点 DNS。请参阅[DNS](dns.md)和 [WARP](warp.md)。
+VLESS 不分析 HTTP、TLS 和 QUIC：这可能让流的第一个数据报最多延迟 200 毫秒，而节点上没有按此类域名路由的规则。如果应用请求的是 IP 地址，节点会保留该 IP 作为目标，无论数据中带有什么域名。如果应用请求域名，节点会通过此节点的 DNS 服务器解析；WARP 出口也使用节点 DNS。请参阅[DNS](dns.md)和 [WARP](warp.md)。
 
 ## 应用收到的内容
 

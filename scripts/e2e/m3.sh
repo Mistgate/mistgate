@@ -1418,9 +1418,9 @@ srv.serve_forever()
 PY
   cat >"$WORK/udpprobe.py" <<'PY'
 # A SOCKS5 UDP client: udpprobe.py <socks port> dns|echo <dest ip> <dest port>. dns: an A query, the answer must hold 198.51.100.7.
-# echo: a datagram that looks like a QUIC Initial (long header, version 1, 1200 bytes; the node sniffs QUIC) and a short one; both
-# must come back unchanged.
-import os, socket, struct, sys
+# echo: a short datagram, one that looks like a QUIC Initial (long header, version 1, 1200 bytes) and a random one; all must come back
+# unchanged, and the first must not be slower than the rest by 150 ms.
+import os, socket, struct, sys, time
 
 port, mode, dst, dport = int(sys.argv[1]), sys.argv[2], sys.argv[3], int(sys.argv[4])
 tcp = socket.create_connection(("127.0.0.1", port), timeout=10)
@@ -1468,8 +1468,14 @@ if mode == "dns":
     assert a[:2] == q[:2] and bytes([198, 51, 100, 7]) in a, "wrong DNS answer %r" % a
 else:
     quic = bytes([0xc3, 0, 0, 0, 1, 8]) + os.urandom(8) + bytes([8]) + os.urandom(8) + os.urandom(1200 - 24)
-    for p in (quic, os.urandom(40), quic):
+    # The first datagram is short (under 20 bytes): the node must not hold it back to sniff it (xray-core waits 200 ms for a longer one).
+    seq = (b"first-datagram-1", quic, os.urandom(40), quic)
+    times = []
+    for p in seq:
+        t0 = time.monotonic()
         assert exchange(p) == p, "the echo differs"
+        times.append(time.monotonic() - t0)
+    assert times[0] - min(times[1:]) < 0.15, "the first datagram of the flow took %.0f ms, the next %.0f ms" % (times[0] * 1000, min(times[1:]) * 1000)
 print("ok")
 PY
 }

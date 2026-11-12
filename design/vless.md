@@ -40,8 +40,8 @@ v1 combinations (one inbound = one port = one combination):
 
 Features in v1: several REALITY `server_names` and `short_ids` (each credential gets one, chosen deterministically);
 client fingerprint `fp` in links; XHTTP `mode` auto / packet-up / stream-up / stream-one in the link (the server
-accepts all); `x_padding_bytes`; a CDN address override (`cdn.host`, `cdn.port`); sniffing (http, tls, quic) so the
-node resolves sniffed names; egress direct or WARP; per-credential rate limit, hard expiry and kick; torrent guard parity
+accepts all); `x_padding_bytes`; a CDN address override (`cdn.host`, `cdn.port`);
+egress direct or WARP; per-credential rate limit, hard expiry and kick; torrent guard parity
 with hysteria2.
 
 The panel-side synthetic VLESS check runs xray-core in one short-lived helper process per attempt. The panel process
@@ -78,8 +78,7 @@ the AWG PSK); document it in agent.proto next to the AWG `data_json` line.
 
 Instance per inbound: `core.New(&core.Config{...})` with apps `dispatcher.Config{}`, `proxyman.InboundConfig{}`,
 `proxyman.OutboundConfig{}`, `policy.Config{Level: {0: {Buffer: {Connection: 64 KiB}}}}` (explicit). One inbound tagged
-with the inbound id: `ReceiverConfig{PortList, Listen, StreamSettings, SniffingSettings{Enabled, DestinationOverride:
-http,tls,quic}}`, `vlessin.Config{Clients, Decryption:"none"}`. Stream settings: `ProtocolName "splithttp"` with
+with the inbound id: `ReceiverConfig{PortList, Listen, StreamSettings}` (no sniffing: nothing routes by a sniffed name, and the sniffer can hold the first datagram of a flow for up to 200 ms), `vlessin.Config{Clients, Decryption:"none"}`. Stream settings: `ProtocolName "splithttp"` with
 `splithttp.Config{Path, Host, Mode:"auto", XPaddingBytes}`, or `"tcp"`; REALITY `reality.Config{Dest: target,
 Type:"tcp", ServerNames, PrivateKey, ShortIds}`; ws `websocket.Config{Path, Host}`. After `core.New`,
 `outbound.Manager.AddHandler(ctx, egressHandler)` then `Start()`; the first handler added is the default, no router.

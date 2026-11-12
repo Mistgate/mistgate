@@ -64,12 +64,11 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 		}}
 	}
 
-	receiver := &proxyman.ReceiverConfig{
-		StreamSettings: stream,
-		SniffingSettings: &proxyman.SniffingConfig{
-			Enabled: true, RouteOnly: true, DestinationOverride: []string{"http", "tls", "quic"},
-		},
-	}
+	// No sniffing. The node has no routing rules, so a sniffed name would go nowhere, while xray-core's dispatcher sniffer()
+	// holds the first bytes of a flow for up to 200 ms while it looks for one (a UDP datagram under 20 bytes waits the whole
+	// time). Destinations come from the app (an IP is kept, a name is resolved by the node's DNS) and the torrent guard
+	// works on the egress socket, not on the sniffer.
+	receiver := &proxyman.ReceiverConfig{StreamSettings: stream}
 	if cfg.security == "tls" {
 		receiver.Listen = net.NewIPOrDomain(net.DomainAddress(unixAddr))
 	} else {

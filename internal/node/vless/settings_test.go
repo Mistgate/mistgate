@@ -75,7 +75,7 @@ func TestTLSCoreConfigUsesUnixWithoutReality(t *testing.T) {
 	}
 }
 
-func TestSniffingUsesRouteOnly(t *testing.T) {
+func TestSniffingIsOff(t *testing.T) {
 	spec := settingsSpec("tcp", "reality")
 	cfg, err := parseSpec(spec)
 	if err != nil {
@@ -86,12 +86,9 @@ func TestSniffingUsesRouteOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receiver := message.(*proxyman.ReceiverConfig)
-	if receiver.SniffingSettings == nil || !receiver.SniffingSettings.Enabled || !receiver.SniffingSettings.RouteOnly {
-		t.Fatalf("sniffing settings must stay enabled and route-only: %+v", receiver.SniffingSettings)
-	}
-	if !reflect.DeepEqual(receiver.SniffingSettings.DestinationOverride, []string{"http", "tls", "quic"}) {
-		t.Fatalf("sniffing protocols = %v, want HTTP, TLS and QUIC", receiver.SniffingSettings.DestinationOverride)
+	// xray-core's sniffer holds the first bytes of every flow for up to 200 ms; the node routes by nothing it could find.
+	if receiver := message.(*proxyman.ReceiverConfig); receiver.SniffingSettings != nil && receiver.SniffingSettings.Enabled {
+		t.Fatalf("sniffing must stay off: %+v", receiver.SniffingSettings)
 	}
 }
 

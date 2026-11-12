@@ -114,7 +114,7 @@ Two profiles cannot listen on the same TCP port of a node. A TCP port and a UDP 
 
 ## How the node handles destinations
 
-VLESS keeps HTTP, TLS and QUIC sniffing enabled for routing and traffic attribution. If the app asks for a literal IP, the node keeps that IP as the destination even if a sniffed HTTP Host, TLS SNI or QUIC name differs. If the app asks for a domain, the node resolves that name with this node's DNS resolvers; WARP egress uses the same node-side DNS. See [DNS](dns.md) and [WARP](warp.md).
+VLESS does not sniff HTTP, TLS or QUIC: it can hold the first datagram of a flow for up to 200 ms and nothing here routes by a sniffed name. If the app asks for a literal IP, the node keeps that IP as the destination whatever name the traffic carries. If the app asks for a domain, the node resolves that name with this node's DNS resolvers; WARP egress uses the same node-side DNS. See [DNS](dns.md) and [WARP](warp.md).
 
 ## What the apps receive
 

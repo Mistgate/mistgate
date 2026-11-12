@@ -425,7 +425,7 @@ func newXrayClientFingerprint(t *testing.T, fingerprint, serverName, shortIDHex 
 				Listen:         xnet.NewIPOrDomain(xnet.IPAddress(net.ParseIP("127.0.0.1"))),
 				StreamSettings: &internet.StreamConfig{ProtocolName: "tcp"},
 			}),
-			ProxySettings: serial.ToTypedMessage(&xraysocks.ServerConfig{AuthType: xraysocks.AuthType_NO_AUTH}),
+			ProxySettings: serial.ToTypedMessage(&xraysocks.ServerConfig{AuthType: xraysocks.AuthType_NO_AUTH, UdpEnabled: true, Address: xnet.NewIPOrDomain(xnet.IPAddress(net.ParseIP("127.0.0.1")))}),
 		}},
 		Outbound: []*xraycore.OutboundHandlerConfig{{
 			Tag: "vless-out",
