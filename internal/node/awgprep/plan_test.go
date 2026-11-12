@@ -220,6 +220,9 @@ func TestPlanCleansUpAModuleThatDoesNotBuild(t *testing.T) {
 	for _, s := range steps {
 		if len(s.Undo) > 0 {
 			undone++
+			if s.RunKernel != "7.0.0-38-generic" {
+				t.Errorf("an undoing step does not know the running kernel: %+v", s)
+			}
 			if got := strings.Join(s.Undo, " "); got != purge || !strings.Contains(strings.Join(s.Cmd, " "), " install ") {
 				t.Errorf("%s: undo %q", s.Desc, got)
 			}

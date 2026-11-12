@@ -160,7 +160,7 @@ func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner,
 					f.Code = CodeAptLock
 					f.Detail = fmt.Sprintf("step %d of %d: another package manager (apt, dpkg, unattended-upgrades) prevented access to the package lock", i+1, len(steps))
 				case s.Build || dkmsBuildFailed(out):
-					f = buildFailure(ctx, w, run, s, i+1, cmd)
+					f = buildFailure(ctx, w, run, s, i+1, cmd, out)
 				}
 				return f
 			}
@@ -188,11 +188,24 @@ func dkmsBuildFailed(out string) bool {
 // buildFailure is step i failing because the module does not compile for this kernel (an API change it has no answer
 // for yet). The step's Undo, when it has one, removes the half-configured package the failed build left: without that
 // the host's apt refuses every later install.
-func buildFailure(ctx context.Context, w io.Writer, run Runner, s Step, i int, cmd []string) *Failure {
+func buildFailure(ctx context.Context, w io.Writer, run Runner, s Step, i int, cmd []string, out string) *Failure {
 	f := &Failure{Code: CodeBuildFailed, Detail: "the AmneziaWG module does not build for this kernel; the node stays on userspace",
 		Long: fmt.Sprintf("step %d (%s) failed: the AmneziaWG module does not build for this kernel (the compiler's errors are above, or in /var/lib/dkms/amneziawg/*/build/make.log)", i, strings.Join(cmd, " "))}
 	if len(s.Undo) == 0 {
 		f.Long += "; nothing else is rolled back"
+		return f
+	}
+	// Only the module's own build, for the kernel that is running, is undone. apt may configure, on the side, the headers of a
+	// newer kernel whose DKMS build fails while the module for the running kernel is installed and serves: removing the packages
+	// then would take a working module away.
+	if k := DKMSFailureKernel(out); k != "" && s.RunKernel != "" && k != s.RunKernel {
+		f.Detail = fmt.Sprintf("the AmneziaWG module does not build for kernel %s; the module for the running kernel (%s) was not touched and nothing was removed", k, s.RunKernel)
+		f.Long += fmt.Sprintf("; the failed build was for kernel %s, not the running %s: its packages were left as they are (apt may refuse other installs until the headers of %s are configured or removed)", k, s.RunKernel, k)
+		return f
+	}
+	if !OwnDKMSFailure(out) {
+		f.Detail = "the AmneziaWG module could not be installed, and the failure is not clearly the module's own build; nothing was removed"
+		f.Long += "; nothing was removed: the output does not show the module's own DKMS build failing"
 		return f
 	}
 	fmt.Fprintf(w, "\nthe module did not build: removing its half-installed packages\n  $ %s\n", strings.Join(s.Undo, " "))

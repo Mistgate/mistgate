@@ -73,9 +73,12 @@ func debianPlan(t *testing.T) []Step {
 	return steps
 }
 
-func ubuntuPlan(t *testing.T) []Step {
+func ubuntuPlan(t *testing.T) []Step { return ubuntuPlanFor(t, "6.8.0-142-generic") }
+
+// ubuntuPlanFor is the Ubuntu plan of a node whose running kernel is the given release.
+func ubuntuPlanFor(t *testing.T, kernel string) []Step {
 	t.Helper()
-	steps, _, err := Plan(Env{OSRelease: osr("ubuntu", ""), Kernel: "6.8.0-142-generic", CPUs: 1})
+	steps, _, err := Plan(Env{OSRelease: osr("ubuntu", ""), Kernel: kernel, CPUs: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +236,7 @@ func TestRunUndoesAModuleThatDoesNotBuild(t *testing.T) {
 				r.failToo = purgeModule
 			}
 			var wrote string
-			err := Run(context.Background(), io.Discard, ubuntuPlan(t), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
+			err := Run(context.Background(), io.Discard, ubuntuPlanFor(t, "7.0.0-38-generic"), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil) // the build that fails is for the running kernel
 			code, detail := Short(err)
 			if code != CodeBuildFailed || !strings.Contains(detail, tc.want) || strings.Contains(detail, "Bad return status") {
 				t.Fatalf("short = %q %q (err %v)", code, detail, err)
@@ -493,5 +496,54 @@ func TestStatusFile(t *testing.T) {
 	}
 	if _, ok, _ := ReadStatus(path); ok {
 		t.Error("an unknown state counts as nothing")
+	}
+}
+
+// apt installing the module (or its headers) may configure, on the side, the headers of a NEWER kernel that an earlier run or an
+// upgrade left unconfigured; the module's DKMS build then fails for that kernel while the module of the running kernel is
+// installed and serves. Removing the module's packages then would take a working module away: nothing is removed.
+func TestRunLeavesTheModuleAloneWhenTheBuildThatFailedWasForAnotherKernel(t *testing.T) {
+	const running = "6.8.0-142-generic"
+	for _, tc := range []struct {
+		name, failing, out, want string
+	}{
+		{name: "the new kernel's headers configured on the side", failing: aptOpts + "amneziawg", out: dkmsBuildOutput, want: "the module for the running kernel (" + running + ") was not touched"},
+		{name: "the same while installing the headers", failing: aptOpts + "linux-headers", out: dkmsBuildOutput, want: "7.0.0-38-generic"},
+		{name: "not the module's own build at all", failing: aptOpts + "amneziawg",
+			out:  "Building module: amneziawg/3.1 ... done.\nError! Bad return status for module build on kernel: " + running + " (x86_64)\nConsult /var/lib/dkms/xtables-addons/3.25/build/make.log\n",
+			want: "not clearly the module's own build"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &recRun{fail: tc.failing, out: map[string]string{tc.failing: tc.out}}
+			var wrote string
+			err := Run(context.Background(), io.Discard, ubuntuPlanFor(t, running), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
+			code, detail := Short(err)
+			if code != CodeBuildFailed || !strings.Contains(detail, tc.want) {
+				t.Fatalf("short = %q %q (err %v)", code, detail, err)
+			}
+			for _, line := range r.ran {
+				if strings.Contains(line, " purge ") {
+					t.Fatalf("the module's packages were removed: %v", r.ran)
+				}
+			}
+		})
+	}
+}
+
+func TestDKMSFailureHelpers(t *testing.T) {
+	if !OwnDKMSFailure(dkmsBuildOutput) || !OwnDKMSFailure("Consult /var/lib/dkms/amneziawg/3.1/build/make.log for more information.\n") {
+		t.Error("the module's own failure was not recognized")
+	}
+	if OwnDKMSFailure("Consult /var/lib/dkms/zfs/2.2/build/make.log\nbuilding amneziawg ... done\n") {
+		t.Error("another module's failure was taken for ours")
+	}
+	for out, want := range map[string]string{
+		dkmsBuildOutput: "7.0.0-38-generic",
+		" * dkms: running auto installation service for kernel 6.8.0-1-generic\n": "6.8.0-1-generic",
+		"nothing named\n": "",
+	} {
+		if got := DKMSFailureKernel(out); got != want {
+			t.Errorf("DKMSFailureKernel(%q) = %q, want %q", out, got, want)
+		}
 	}
 }

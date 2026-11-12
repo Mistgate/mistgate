@@ -87,6 +87,10 @@ type Step struct {
 	// Undo runs when the step fails because the module did not build. A DKMS package whose build failed stays
 	// half-configured, and apt then refuses every later install on the host; Undo removes it again.
 	Undo []string
+	// RunKernel is the release of the running kernel the plan was made for. Undo only removes the module when the failed build
+	// was for that kernel: a build that fails for another (the new kernel's headers configured on the side) leaves the module
+	// that works for the running kernel alone. "" = not known, which keeps the removal.
+	RunKernel string
 }
 
 // aptInstall is `apt-get install` that never asks, waits for the dpkg lock and does not pull recommended packages (dkms
@@ -137,13 +141,13 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 		}
 		steps = append(steps,
 			Step{Desc: "refresh the package index", Cmd: aptUpdate()},
-			Step{Desc: "install the headers of the running kernel", Cmd: aptInstall(headers), Undo: undo},
+			Step{Desc: "install the headers of the running kernel", Cmd: aptInstall(headers), Undo: undo, RunKernel: e.Kernel},
 			Step{Desc: "add the Amnezia PPA", Files: ppaFiles},
 			Step{Desc: "refresh the package index from the Amnezia PPA", Cmd: aptUpdate()},
-			Step{Desc: "install amneziawg", Cmd: aptInstall("amneziawg"), Undo: undo},
+			Step{Desc: "install amneziawg", Cmd: aptInstall("amneziawg"), Undo: undo, RunKernel: e.Kernel},
 		)
 		notes = append(notes, "DKMS rebuilds the module after a kernel upgrade; the build takes about a minute on a small VPS and also rebuilds the initramfs",
-			"if the module does not build for this kernel, its packages are removed again (apt stays usable) and the node stays on userspace")
+			"if the module does not build for the running kernel, its packages are removed again (apt stays usable) and the node stays on userspace; a build that fails for another kernel (headers configured on the side) removes nothing")
 	case id == "debian" || (strings.Contains(like, "debian") && id != ""):
 		cpus := max(e.CPUs, 1)
 		steps = []Step{

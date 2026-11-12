@@ -12,16 +12,22 @@ import (
 // without taking anything. The job runs as root and only looks.
 func aptBusy() bool {
 	for _, p := range []string{"/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock", "/var/lib/apt/lists/lock", "/var/cache/apt/archives/lock"} {
-		f, err := os.OpenFile(p, os.O_RDWR, 0)
-		if err != nil {
-			continue // not there (not a dpkg host) or unreadable: apt itself will say
-		}
-		lk := syscall.Flock_t{Type: syscall.F_WRLCK}
-		err = syscall.FcntlFlock(f.Fd(), syscall.F_GETLK, &lk)
-		f.Close()
-		if err == nil && lk.Type != syscall.F_UNLCK {
+		if FileLocked(p) {
 			return true
 		}
 	}
 	return false
+}
+
+// FileLocked says whether another process holds a POSIX record lock on the file at path (a missing or unreadable file is
+// not locked). The caller must be able to open it for writing: run as root.
+func FileLocked(path string) bool {
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return false // not there (not a dpkg host) or unreadable: apt itself will say
+	}
+	defer f.Close()
+	lk := syscall.Flock_t{Type: syscall.F_WRLCK}
+	err = syscall.FcntlFlock(f.Fd(), syscall.F_GETLK, &lk)
+	return err == nil && lk.Type != syscall.F_UNLCK
 }
