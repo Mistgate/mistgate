@@ -10,7 +10,9 @@ import { Tip } from "@/components/ui/tooltip";
 import { devices as devicesApi, users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
+import { badgeOf, openRequestOf } from "@/lib/client-debug";
 import { deviceError, platformLabel } from "./awg-devices";
+import { LogsBadge, type LogsCtl } from "./client-logs";
 import { agoText } from "./format";
 import type { BlockedN, DeviceN as Device } from "./model";
 import { useTx, type Tx } from "./t";
@@ -72,8 +74,8 @@ export function DeviceRow({ tile, name, badge, line, right, menu, wrapName }: { 
     <li className="flex min-h-[60px] items-center gap-3 border-t border-line py-2.5 first:border-t-0">
       {tile}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className={cx("min-w-0 text-[13px] leading-tight font-bold", wrapName ? "break-words" : "truncate")}>{name}</span>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className={cx("max-w-full min-w-0 text-[13px] leading-tight font-bold", wrapName ? "break-words" : "truncate")}>{name}</span>
           {badge}
         </span>
         {line}
@@ -233,9 +235,11 @@ type Doing = { what: "rename" | "delete" | "block"; d: Device };
 /**
  * The apps on the link, one row per device: the tile of its platform, the name over "iOS 18.1 · Happ 3.4.2", and online on
  * which servers (or how long ago) on the right. Since when, all-time traffic and the fingerprint wait in a tooltip and in
- * the menu. The menu renames, deletes (the app may come back with new keys) or blocks (it may not, until unblocked).
+ * the menu. The menu renames, deletes (the app may come back with new keys) or blocks (it may not, until unblocked). For the
+ * owner on the VPS edition (`logs` is set), a device of the Mistgate app (it holds a key) can also be asked for its logs
+ * there, and says in a badge that it was asked, answered or refused.
  */
-export function LinkDeviceRows({ devices, nodeName, now, onChanged }: { devices: Device[]; nodeName: (id: string) => string; now: number; onChanged: () => Promise<unknown> }) {
+export function LinkDeviceRows({ devices, nodeName, now, onChanged, logs }: { devices: Device[]; nodeName: (id: string) => string; now: number; onChanged: () => Promise<unknown>; logs?: LogsCtl }) {
   const t = useTx();
   const fmt = useFmt();
   const toast = useToast();
@@ -268,12 +272,19 @@ export function LinkDeviceRows({ devices, nodeName, now, onChanged }: { devices:
         const n = deviceName(d, t);
         const nodes = d.online ? d.onlineNodeIds.map(nodeName) : [];
         const details = detailsOf(d, t, fmt, now);
+        const asked = logs && d.enrolled ? openRequestOf(logs.logs, d.id) : undefined;
+        const logItem = !logs || !d.enrolled ? [] : asked ? [{ label: t("clientlogs.cancelAsk"), onClick: () => logs.cancel(asked.id) }] : [{ label: t("clientlogs.ask"), onClick: () => logs.ask({ id: d.id, name: n }) }];
         return (
           <DeviceRow
             key={d.id}
             tile={<Tile icon={platformGlyph(d)} tone="sky" />}
             name={n}
-            badge={<EnrolBadge d={d} t={t} />}
+            badge={
+              <>
+                <EnrolBadge d={d} t={t} />
+                {logs && d.enrolled && <LogsBadge log={badgeOf(logs.logs, d.id)} ctl={logs} />}
+              </>
+            }
             line={<Secondary text={appLine(d) || platformLabel(d.platform || "other", t)} details={details} />}
             right={<Seen online={d.online} nodes={nodes} lastSeen={d.lastSeenUnix} t={t} now={now} />}
             menu={
@@ -281,6 +292,7 @@ export function LinkDeviceRows({ devices, nodeName, now, onChanged }: { devices:
                 label={t("users.dev.menu", { name: n })}
                 details={nodes.length >= 2 ? [t.n("users.dev.twoNodesTip", nodes.length), ...details] : details}
                 items={[
+                  ...logItem,
                   { label: t("users.dev.rename"), onClick: () => start("rename", d) },
                   { label: t("users.dev.delete"), onClick: () => start("delete", d) },
                   { label: t("users.dev.block"), onClick: () => start("block", d), danger: true },

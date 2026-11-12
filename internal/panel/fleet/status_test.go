@@ -187,7 +187,7 @@ func codesOf(events []*adminv1.Event) []string {
 	return out
 }
 
-// The Overview feed answers "what happened": a fall, a return, a new node, an update, a user, and anything that warns.
+// The Overview feed answers "what happened": a fall, a return, a new node, an update, a user, the logs of a person's app that came or were refused, and anything that warns.
 // It never hides a fall (node_down, a failed profile, every warning and error); profile starts and applied
 // configurations stay on the node's own tab.
 func TestOverviewFeedKeepsWhatMatters(t *testing.T) {
@@ -195,16 +195,16 @@ func TestOverviewFeedKeepsWhatMatters(t *testing.T) {
 	ev := func(sev int, code string) store.EventRow { return store.EventRow{Severity: sev, Code: code} }
 	insertEvents(t, e,
 		ev(1, "engine_started"), ev(1, "engine_restarted"), ev(1, "state_applied"), ev(1, "agent_started"), ev(1, "profiles_restarted"),
-		ev(1, "cert_renewed"), ev(1, "userish"), ev(1, "updates"), // look alike, but not a user_ or update_ code
+		ev(1, "cert_renewed"), ev(1, "userish"), ev(1, "updates"), ev(1, "client_logs_other"), // look alike, but not a user_ or update_ code, nor logs of the app
 		ev(2, "clock_skew"), ev(3, "stats_stale"), ev(3, "node_down"), ev(1, "node_blip"), ev(1, "node_recovered"),
 		ev(1, "node_enrolled"), ev(1, "node_retired"), ev(3, "engine_failed"), ev(1, "update_committed"), ev(1, "update_step_passed"),
-		ev(2, "update_rolled_back"), ev(1, "user_created"), ev(2, "user_over_quota"), ev(2, "subscription_shared_suspect"),
+		ev(1, "client_logs_received"), ev(1, "client_logs_declined"), ev(2, "update_rolled_back"), ev(1, "user_created"), ev(2, "user_over_quota"), ev(2, "subscription_shared_suspect"),
 	)
 	resp, err := fleetService{e.f}.Overview(e.ctx, connect.NewRequest(&adminv1.OverviewRequest{EventLimit: 100}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"clock_skew", "engine_failed", "node_blip", "node_down", "node_enrolled", "node_recovered", "node_retired", "stats_stale",
+	want := []string{"client_logs_declined", "client_logs_received", "clock_skew", "engine_failed", "node_blip", "node_down", "node_enrolled", "node_recovered", "node_retired", "stats_stale",
 		"subscription_shared_suspect", "update_committed", "update_rolled_back", "update_step_passed", "user_created", "user_over_quota"}
 	if got := codesOf(resp.Msg.Events); !slices.Equal(got, want) {
 		t.Fatalf("feed:\n got %v\nwant %v", got, want)

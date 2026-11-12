@@ -1,5 +1,6 @@
-import { keepPreviousData, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { DebugCaptureInfo, GetDebugCaptureResponse } from "@/gen/mistgate/ops/v1/ops_pb";
+import type { RecordFilter } from "@/components/log-viewer";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
 import { ops } from "./api";
@@ -19,9 +20,6 @@ export const debugMinutes = [1, 5, 10, 15] as const;
 export const debugLevels = ["debug", "info"] as const;
 export type DebugLevel = (typeof debugLevels)[number];
 
-export type DebugFilter = { minLevel: "" | "info" | "warn" | "error"; source: string; query: string };
-export const defaultDebugFilter: DebugFilter = { minLevel: "", source: "", query: "" };
-
 /** The node's captures, newest first; the list refreshes every few seconds while one is running (its records are on their way). */
 export const debugListQuery = (nodeId: string) =>
   queryOptions({
@@ -34,19 +32,11 @@ export const debugListQuery = (nodeId: string) =>
 const pageSize = 100;
 
 /** One page of a capture's records, oldest first; `after` is the cursor of the previous page (0 = from the first). */
-export async function debugPage(captureId: string, f: DebugFilter, after: number): Promise<DebugRecords> {
+export async function debugPage(captureId: string, f: Pick<RecordFilter, "minLevel" | "source" | "query">, after: number): Promise<DebugRecords> {
   return plain(
     await ops.getDebugCapture({ captureId, minLevel: f.minLevel, source: f.source, query: f.query.trim().slice(0, 100), limit: pageSize, afterSeq: BigInt(after) }),
   );
 }
-
-export const debugRecordsQuery = (captureId: string, f: DebugFilter, state: string) =>
-  queryOptions({
-    queryKey: ["ops", "debug", "records", captureId, f, state],
-    queryFn: () => debugPage(captureId, f, 0),
-    placeholderData: keepPreviousData,
-    retry: false,
-  });
 
 /** Seconds left of a running capture at `nowMs` (never below 0). */
 export const secondsLeft = (endsUnix: number, nowMs: number) => Math.max(0, Math.ceil(endsUnix - nowMs / 1000));

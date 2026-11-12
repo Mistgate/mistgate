@@ -79,7 +79,9 @@ type DebugLineFilter struct {
 	MinLevel int
 	Source   string
 	AfterSeq int64
-	Limit    int
+	// FromMs and ToMs bound the records' own times (unix milliseconds, both ends in); 0 leaves that side open.
+	FromMs, ToMs int64
+	Limit        int
 }
 
 // BeginDebugCapture records a capture that the node is about to run. A running capture of the same node is ErrDebugBusy; the
@@ -313,9 +315,15 @@ func (s *Store) DebugCaptures(ctx context.Context, nodeID string, now time.Time)
 	return out, rows.Err()
 }
 
-// DebugLines returns the lines of a capture, oldest first after AfterSeq, with the filter applied, and the sources the capture
-// holds.
+// DebugLines returns the lines of a node's capture, oldest first after AfterSeq, with the filter applied, and the sources the
+// capture holds. Every text goes through the node-journal scrubber once more.
 func (s *Store) DebugLines(ctx context.Context, id string, f DebugLineFilter) ([]DebugLineRow, []string, error) {
+	return s.debugLines(ctx, id, f, func(v string) string { return scrubDebugText(v, nil) })
+}
+
+// debugLines is the read of debug_capture_line under an id: scrub is applied to every message and attribute value (nil keeps the
+// stored text).
+func (s *Store) debugLines(ctx context.Context, id string, f DebugLineFilter, scrub func(string) string) ([]DebugLineRow, []string, error) {
 	limit := f.Limit
 	if limit <= 0 {
 		limit = 100
@@ -325,6 +333,14 @@ func (s *Store) DebugLines(ctx context.Context, id string, f DebugLineFilter) ([
 	if f.Source != "" {
 		where = append(where, "source = ?")
 		args = append(args, f.Source)
+	}
+	if f.FromMs > 0 {
+		where = append(where, "at_ms >= ?")
+		args = append(args, f.FromMs)
+	}
+	if f.ToMs > 0 {
+		where = append(where, "at_ms <= ?")
+		args = append(args, f.ToMs)
 	}
 	args = append(args, limit+1) // one more tells whether there is a next page
 	rows, err := s.R.QueryContext(ctx, `SELECT seq, at_ms, level, source, message, attrs_json FROM debug_capture_line
@@ -340,13 +356,15 @@ func (s *Store) DebugLines(ctx context.Context, id string, f DebugLineFilter) ([
 		if err := rows.Scan(&l.Seq, &l.AtMs, &l.Level, &l.Source, &l.Message, &attrsJSON); err != nil {
 			return nil, nil, err
 		}
-		l.Message = scrubDebugText(l.Message, nil)
 		l.Attrs = map[string]string{}
 		if err := json.Unmarshal([]byte(attrsJSON), &l.Attrs); err != nil {
 			return nil, nil, err
 		}
-		for key, value := range l.Attrs {
-			l.Attrs[key] = scrubDebugText(value, nil)
+		if scrub != nil {
+			l.Message = scrub(l.Message)
+			for key, value := range l.Attrs {
+				l.Attrs[key] = scrub(value)
+			}
 		}
 		out = append(out, l)
 	}

@@ -128,6 +128,8 @@ var transactionShape2 = map[string]string{
 	"scheduled_task.go:ClaimScheduledTask":           "A free-lease (and manual cooldown) compare-and-swap takes the lease; the run row is inserted only if that lease holds.",
 	"scheduled_task.go:FinishScheduledRun":           "The run row is updated; the task's outcome update is a compare-and-swap on the run's own lease.",
 	"client_debug.go:CreateClientDebug":              "A live-keyed-device guard and a no-open-request guard follow the expiry of a request that ran out and precede the insert in one atomic batch.",
+	"client_debug.go:DeleteClientDebug":              "A guard (the row exists and is not an open request that has time left) precedes the delete of the lines and of the row in one atomic batch.",
+	"client_debug.go:MarkClientDebugRead":            "One UPDATE compare-and-swap sets the read time and reader only while the bundle was never read.",
 	"client_debug.go:closeClientDebug":               "A state and deadline compare-and-swap UPDATE closes one open request of the expected device.",
 	"client_debug.go:ReceiveClientDebug":             "A guard (the open request of this device, or the device's ten-minute spacing and the panel's ceiling) precedes the lines, the state, and the drop of the device's bundles beyond three in one atomic batch; a lost guard rereads the row.",
 }

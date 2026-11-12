@@ -5,14 +5,24 @@ import { cx } from "@/lib/cx";
 
 // Status is always colour + glyph + word (never colour alone); see .tone-* and .pill in index.css.
 // blip = the hoster dropped for a moment: grey-blue, deliberately not red.
+// `mark` is the glyph as a stroke path in an 8x8 box: drawn, not typed, so it sits in the middle of its disc in any font.
 const kinds = {
-  ok: { glyph: "", word: "status.ok" },
-  warn: { glyph: "!", word: "status.warn" },
-  bad: { glyph: "×", word: "status.bad" },
-  off: { glyph: "–", word: "status.off" },
-  busy: { glyph: "", word: "status.busy" },
-  blip: { glyph: "~", word: "status.blip" },
-} as const satisfies Record<string, { glyph: string; word: MessageKey }>;
+  ok: { mark: "M1.6 4.2l1.6 1.6 3.2-3.5", word: "status.ok" },
+  warn: { mark: "M4 1.3v3.1M4 6.6v.01", word: "status.warn" },
+  bad: { mark: "M2 2l4 4M6 2L2 6", word: "status.bad" },
+  off: { mark: "M1.9 4h4.2", word: "status.off" },
+  busy: { mark: "", word: "status.busy" },
+  blip: { mark: "M1.2 4.7c.9-1.7 1.9-1.7 2.8-.7s1.9 1 2.8-.7", word: "status.blip" },
+} as const satisfies Record<string, { mark: string; word: MessageKey }>;
+
+/** A glyph for the round status disc: a stroke path in an 8x8 box, in the disc's text colour. */
+export function GlyphMark({ d }: { d: string }) {
+  return (
+    <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden className="block">
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export type StatusKind = keyof typeof kinds;
 
@@ -83,11 +93,11 @@ export function StatusGlyph({ kind, glyph }: { kind: StatusKind; glyph?: ReactNo
     <span
       aria-hidden
       className={cx(
-        `tone-${kind} box-border grid size-3.5 flex-none place-items-center rounded-full text-[10px] leading-none font-extrabold text-on-accent`,
+        `tone-${kind} box-border grid size-3.5 flex-none place-items-center rounded-full text-on-accent`,
         kind === "busy" ? "animate-[mg-ui-spin_1s_linear_infinite] border-2 border-(color:--c) border-t-transparent" : "bg-(--c)",
       )}
     >
-      {glyph ?? (kind === "ok" ? <span className="-mt-0.5 h-1.5 w-[3px] rotate-45 border-r-2 border-b-2 border-on-accent" /> : kinds[kind].glyph)}
+      {glyph ?? (kinds[kind].mark && <GlyphMark d={kinds[kind].mark} />)}
     </span>
   );
 }

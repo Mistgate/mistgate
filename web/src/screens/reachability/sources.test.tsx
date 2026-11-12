@@ -191,10 +191,10 @@ describe("the sources", () => {
     expect(tabs().map((x) => x.getAttribute("aria-selected"))).toEqual(["false", "true", "false", "false", "false", "false"]);
     // the row says what the source's own state line says, in a word and a few more
     // (the pill's glyph comes first: – off, × error, ~ waiting; a tick is drawn, not written)
-    expect(tab("Globalping")?.textContent).toBe("Globalping–OffFree · volunteer probesany country");
+    expect(tab("Globalping")?.textContent).toBe("GlobalpingOffFree · volunteer probesany country");
     expect(tab("Block lists")?.textContent).toBe("Block listsWorksFree · registry lists, on the panelRussia onlycompared 2 h ago");
-    expect(tab("TSPU probe")?.textContent).toBe("TSPU probe~Needs setupFree · your own node in RussiaRussia onlypick a probe node; nothing runs until then");
-    expect(tab("cheburcheck")?.textContent).toBe("cheburcheck×ErrorFree · cheburcheck.ru probesRussia onlyThe site does not know the probe token");
+    expect(tab("TSPU probe")?.textContent).toBe("TSPU probeNeeds setupFree · your own node in RussiaRussia onlypick a probe node; nothing runs until then");
+    expect(tab("cheburcheck")?.textContent).toBe("cheburcheckErrorFree · cheburcheck.ru probesRussia onlyThe site does not know the probe token");
     expect(tab("bsbord")?.textContent).toContain("Paid · mobile SIM probes");
     // nothing in a row switches a source: the switch is the open source's own
     expect(document.querySelector("[role=tablist] [role=switch]")).toBeNull();
@@ -695,7 +695,7 @@ describe("the TSPU probe card", () => {
     expect(probeState()?.dataset.state).toBe("run-ok");
     expect(probeState()?.textContent).toBe("Works · last run just now · TSPU after hop 6 · reference 31.13.72.36 · 3 nodes checked");
     const rows = [...card()!.querySelectorAll("[data-testid=tspu-node]")].map((r) => r.textContent);
-    expect(rows).toEqual(["nl1!TCP blockedTCP 443, 8443: blocked", "de1reachableTCP 443: open", "fi1!partly blockedTCP 443: blocked · 8443: refused"]);
+    expect(rows).toEqual(["nl1TCP blockedTCP 443, 8443: blocked", "de1reachableTCP 443: open", "fi1partly blockedTCP 443: blocked · 8443: refused"]);
     expect(card()?.querySelector("ul[aria-label='Result per node']")).not.toBeNull();
     expect(probeButton("Test")?.disabled).toBe(false);
     // the stored run is read again after the test: Health and the Get follow
@@ -810,7 +810,7 @@ describe("the kl!ck card", () => {
     expect(klickState()?.textContent).toBe("Works · 6 reports in 7 days · the last 5 min ago");
     const rows = [...card()!.querySelectorAll("[data-testid=klick-node]")].map((r) => r.textContent);
     expect(rows).toEqual([
-      "de1!freeze 35 reports · 5 min agoOperators: MTS PJSC (4): freeze 3; unknown (1): okRegions: RU · Moscow (5): freeze 3",
+      "de1freeze 35 reports · 5 min agoOperators: MTS PJSC (4): freeze 3; unknown (1): okRegions: RU · Moscow (5): freeze 3",
       "nod_goneok in every report1 report · 5 min ago",
     ]);
   });

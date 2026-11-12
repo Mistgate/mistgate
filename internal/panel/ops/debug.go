@@ -141,17 +141,31 @@ func (r rpc) GetDebugCapture(ctx context.Context, req *connect.Request[opsv1.Get
 		limit = debugDefaultRead
 	}
 	limit = min2(limit, logsMaxLimit)
-	query := strings.ToLower(m.Query)
 	resp := &opsv1.GetDebugCaptureResponse{Capture: s.debugInfo(row)}
-	after := max(m.AfterSeq, 0)
-	filter := store.DebugLineFilter{MinLevel: min, Source: m.Source, Limit: debugPage}
-	var sources []string
-read:
+	filter := store.DebugLineFilter{MinLevel: min, Source: m.Source, AfterSeq: max(m.AfterSeq, 0), Limit: debugPage}
+	records, next, sources, err := s.readLines(ctx, row.ID, filter, s.cfg.Store.DebugLines, s.debugRecord, strings.ToLower(m.Query), limit)
+	if err != nil {
+		return nil, internalErr(s.cfg.Log, "read debug capture lines", err)
+	}
+	resp.Records, resp.NextCursor = records, next
+	for _, src := range sources {
+		resp.Sources = append(resp.Sources, s.scrub.Value(src, 32))
+	}
+	return connect.NewResponse(resp), nil
+}
+
+// readLines pages through the lines of a capture or a bundle until limit records match the query (matched against the record as it
+// would leave, lower case; "" matches all) or the pages are used up (debugPagesMax of debugPage lines). next is the cursor of the
+// next page, 0 when the read reached the end.
+func (s *Service) readLines(ctx context.Context, id string, filter store.DebugLineFilter,
+	load func(context.Context, string, store.DebugLineFilter) ([]store.DebugLineRow, []string, error),
+	record func(*store.DebugLineRow) *opsv1.DebugRecord, query string, limit int) (out []*opsv1.DebugRecord, next int64, sources []string, err error) {
+	after := filter.AfterSeq
 	for page := 0; page < debugPagesMax; page++ {
 		filter.AfterSeq = after
-		lines, srcs, err := s.cfg.Store.DebugLines(ctx, row.ID, filter)
+		lines, srcs, err := load(ctx, id, filter)
 		if err != nil {
-			return nil, internalErr(s.cfg.Log, "read debug capture lines", err)
+			return nil, 0, nil, err
 		}
 		sources = srcs
 		more := len(lines) > debugPage
@@ -160,25 +174,21 @@ read:
 		}
 		for i := range lines {
 			after = lines[i].Seq
-			e := s.debugRecord(&lines[i])
+			e := record(&lines[i])
 			// the query is matched against the cleaned text, like panel_logs: a search must not tell whether a secret is in a record
 			if query != "" && !recordContains(e, query) {
 				continue
 			}
-			if len(resp.Records) == limit {
-				resp.NextCursor = resp.Records[len(resp.Records)-1].Seq
-				break read
+			if len(out) == limit {
+				return out, out[len(out)-1].Seq, sources, nil
 			}
-			resp.Records = append(resp.Records, e)
+			out = append(out, e)
 		}
 		if !more {
 			break
 		}
 	}
-	for _, src := range sources {
-		resp.Sources = append(resp.Sources, s.scrub.Value(src, 32))
-	}
-	return connect.NewResponse(resp), nil
+	return out, 0, sources, nil
 }
 
 // debugRecord is one stored record as it may leave the panel: cleaned again with the panel's secret names, only the journal's

@@ -788,3 +788,70 @@ func TestMutedAlertThatReopensIsNotAnnounced(t *testing.T) {
 	e.svc.AlertTransition(a, false)
 	waitFor(t, "an open after the mute ended", func() bool { return len(e.tg.sentTo(777)) >= 2 })
 }
+
+// The logs of a person's app: the owner (and only the owner) hears that they came, on request or on the person's own, or that the
+// person refused; the text has the names and the count, and nothing a person's log could hold, in the panel's language, with a link
+// to the person's page only when the address is known.
+func TestClientLogsNewsIsTheOwnersAndCarriesOnlyMetadata(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.AdminURL = "https://panel.example/zz/" })
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	helper := e.addAdmin("adm_h", "Helper", store.RoleHelper)
+	e.setBot()
+	e.link(owner, 1)
+	e.link(helper, 2)
+	e.run()
+
+	e.svc.ClientLogs(ClientLogsNews{Kind: "received", UserID: "usr_alice", Person: "alice-liddell", Device: "Office PC", Lines: 40})
+	waitFor(t, "the owner's message", func() bool { return len(e.tg.sentTo(1)) == 1 })
+	got := e.tg.sentTo(1)[0]
+	for _, want := range []string{"The logs of the Mistgate app came", "<b>alice-liddell</b>", "Device: Office PC", "Lines: 40", `href="https://panel.example/zz/users/usr_alice#client-logs"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("message lacks %q: %q", want, got)
+		}
+	}
+	e.quiet(1, 150*time.Millisecond)
+	if n := len(e.tg.sentTo(2)); n != 0 {
+		t.Errorf("a helper got %d messages about a person's logs", n)
+	}
+
+	e.svc.ClientLogs(ClientLogsNews{Kind: "bogus", Person: "x"}) // an unknown kind says nothing
+	e.quiet(1, 150*time.Millisecond)
+}
+
+func TestClientLogsNewsTexts(t *testing.T) {
+	n := func(kind string) ClientLogsNews {
+		return ClientLogsNews{Kind: kind, UserID: "usr_bob", Person: "bob <the>-builder", Device: "iPhone 15", Lines: 22}
+	}
+	for _, tc := range []struct {
+		lang L
+		kind string
+		want []string
+		not  []string
+	}{
+		{"ru", "received", []string{"Пришли журналы приложения Mistgate", "Человек: <b>bob &lt;the&gt;-builder</b>", "Устройство: iPhone 15", "Строк: 22", "Открыть страницу человека"}, nil},
+		{"ru", "unasked", []string{"Человек сам прислал журналы приложения Mistgate", "Строк: 22"}, nil},
+		{"ru", "declined", []string{"Человек отказался присылать журналы приложения Mistgate", "Человек: <b>bob", "Устройство: iPhone 15"}, []string{"Строк"}},
+		{"en", "unasked", []string{"A person sent the logs of the Mistgate app on their own", "Lines: 22"}, nil},
+		{"en", "declined", []string{"A person declined to send the logs of the Mistgate app"}, []string{"Lines"}},
+		{"zh", "received", []string{"收到了 Mistgate 应用的日志", "用户：<b>bob", "设备：iPhone 15", "行数：22", "打开用户页面"}, nil},
+		{"zh", "declined", []string{"拒绝发送"}, []string{"行数"}},
+	} {
+		got := clientLogsText(tc.lang, n(tc.kind), "https://panel.example/zz/")
+		for _, w := range tc.want {
+			if !strings.Contains(got, w) {
+				t.Errorf("%s %s lacks %q: %q", tc.lang, tc.kind, w, got)
+			}
+		}
+		for _, w := range tc.not {
+			if strings.Contains(got, w) {
+				t.Errorf("%s %s has %q: %q", tc.lang, tc.kind, w, got)
+			}
+		}
+		if strings.Contains(got, "<the>") {
+			t.Errorf("a name was not escaped: %q", got)
+		}
+	}
+	if got := clientLogsText("ru", n("received"), ""); strings.Contains(got, "<a ") {
+		t.Errorf("a link without a known address: %q", got)
+	}
+}

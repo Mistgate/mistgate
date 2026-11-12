@@ -239,11 +239,11 @@ describe("the country column", () => {
     expect(fine.getAttribute("aria-label")).toBe("de1, From Russia: Reachable from Russia");
     expect(fine.className).not.toMatch(/tone-/);
     const tcp = countryCell("de2")!;
-    expect(tcp.textContent).toBe("!TCP blockedICMP passes");
+    expect(tcp.textContent).toBe("TCP blockedICMP passes");
     expect(tcp.className).toContain("tone-warn");
     expect(tcp.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked, ICMP passes");
     const cut = countryCell("nl1")!;
-    expect(cut.textContent).toBe("×unreachable");
+    expect(cut.textContent).toBe("unreachable");
     expect(cut.className).toContain("tone-bad");
     const none = countryCell("fi1")!;
     expect(none.textContent).toBe("no data");
@@ -275,8 +275,8 @@ describe("the country column", () => {
     const rows = [...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent);
     expect(rows).toEqual([
       "From RussiareachableRostelecom, Beeline · 4 min ago",
-      "!From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago",
-      "×From RussiaunreachableMTS · 4 min ago",
+      "From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago",
+      "From RussiaunreachableMTS · 4 min ago",
       "From Russiano datatoo few probes answered · 4 min ago",
       "From Russia—not checked yet",
     ]);
@@ -286,8 +286,8 @@ describe("the country column", () => {
     act(() => setLang("ru"));
     await mount(four);
     expect(document.body.textContent).toContain("Из России");
-    expect(countryCell("de2")?.textContent).toBe("!TCP режутICMP проходит");
-    expect(countryCell("nl1")?.textContent).toBe("×недоступна");
+    expect(countryCell("de2")?.textContent).toBe("TCP режутICMP проходит");
+    expect(countryCell("nl1")?.textContent).toBe("недоступна");
     expect(countryCell("de1")?.textContent).toBe("доступна");
     expect(countryCell("fi1")?.getAttribute("aria-label")).toBe("fi1, Из России: Нет данных: ответило слишком мало зондов");
   });
@@ -296,7 +296,7 @@ describe("the country column", () => {
     act(() => setLang("zh"));
     await mount(four);
     expect(document.body.textContent).toContain("从俄罗斯访问");
-    expect(countryCell("de2")?.textContent).toBe("!TCP 被封锁ICMP 可通");
+    expect(countryCell("de2")?.textContent).toBe("TCP 被封锁ICMP 可通");
     expect(countryCell("fi1")?.textContent).toBe("无数据");
   });
 });
@@ -317,7 +317,7 @@ describe("the country row on the node page", () => {
     await mountNode({ ...own, countryChecks: [countryChecks[1]] });
     expect(getChecks).toHaveBeenCalledWith({ nodeId: "nod_2" }, expect.anything());
     const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("!From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago");
+    expect(row.textContent).toBe("From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago");
     expect(row.className).toContain("tone-warn");
     // its title leads to the Reachability section
     expect(row.querySelector('a[href="/reachability"]')?.textContent).toBe("From Russia");
@@ -388,7 +388,7 @@ describe("a block on some networks in the country column", () => {
     expect(partial.textContent).toBe("some networksMTS");
     expect(partial.className).toContain("tone-warn");
     expect(partial.querySelector("svg circle")).not.toBeNull(); // the half disc, not TCP blocked's "!"
-    expect(countryCell("de2")!.textContent).toBe("!TCP blockedICMP passes");
+    expect(countryCell("de2")!.textContent).toBe("TCP blockedICMP passes");
     expect(partial.getAttribute("aria-label")).toBe(
       "de1, From Russia: Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk), MTS (КРЫМ)",
     );
@@ -416,7 +416,7 @@ describe("a block on some networks in the country column", () => {
   it("does not say “some networks” on a full block, though every probe of it is dark", async () => {
     await mount(some);
     const cut = countryCell("nl1")!;
-    expect(cut.textContent).toBe("×unreachable");
+    expect(cut.textContent).toBe("unreachable");
     expect(cut.getAttribute("aria-label")).not.toContain("some networks");
     await act(async () => cut.focus());
     for (let i = 0; i < 3; i++) await settle();
@@ -472,7 +472,7 @@ describe("a block on some networks in the country column", () => {
   it("breaks a full block down as well, in its own tone, instead of the quiet line", async () => {
     await mount(some);
     const cut = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")][2]!;
-    expect(cut.textContent).toBe("×From Russiaunreachable");
+    expect(cut.textContent).toBe("From Russiaunreachable");
     expect(cut.parentElement!.className).toContain("tone-bad");
     const breakdown = cut.parentElement!.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
     expect([...breakdown.querySelectorAll("ul")].map(labelOf)).toEqual(["Cannot reach the node"]);
@@ -582,7 +582,7 @@ describe("the block lists in the country column", () => {
   it("keeps a live verdict with the lists' detail, adds the list mark, and shows both in the tooltip", async () => {
     await mount(withLists);
     const tcp = countryCell("de2")!;
-    expect(tcp.textContent).toBe("!TCP blockedICMP passes");
+    expect(tcp.textContent).toBe("TCP blockedICMP passes");
     expect(tcp.querySelector("[data-testid=also-listed]")).not.toBeNull();
     expect(tcp.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked, ICMP passes · in the RKN registry");
     // the subnet alone adds no mark
@@ -598,7 +598,7 @@ describe("the block lists in the country column", () => {
     await mount(withLists);
     expect([...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent)).toEqual([
       "From RussiareachableRostelecom, Beeline · Hetzner subnet, DE · 4 min ago",
-      "!From RussiaTCP blockedICMP passes · Rostelecom · in the RKN registry · Hetzner subnet, DE · 4 min ago",
+      "From RussiaTCP blockedICMP passes · Rostelecom · in the RKN registry · Hetzner subnet, DE · 4 min ago",
       "From RussialistedRKN registry (antifilter ipsum), community list (antifilter) · Hetzner subnet, DE · 4 min ago",
       "From Russiano datanot in the block lists · 4 min ago",
       "From Russia—not checked yet",
@@ -690,7 +690,7 @@ describe("the TSPU probe in the country column", () => {
   it("says under the verdict that the sources disagree, and the screen reader hears both verdicts", async () => {
     await mount(withProbe);
     const box = countryCell("de2")!;
-    expect(box.textContent).toBe("!TCP blockedsources disagree");
+    expect(box.textContent).toBe("TCP blockedsources disagree");
     expect(box.className).toContain("tone-warn");
     expect(box.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked · The sources disagree · Globalping: reachable · probe: TCP blocked");
     // agreeing sources stay quiet
@@ -720,7 +720,7 @@ describe("the TSPU probe in the country column", () => {
   it("shows a verdict of the probe alone: TCP blocked with the probe's name under it, no word on ICMP", async () => {
     await mount(withProbe);
     const box = countryCell("fi1")!;
-    expect(box.textContent).toBe("!TCP blockedTSPU probe");
+    expect(box.textContent).toBe("TCP blockedTSPU probe");
     expect(box.getAttribute("aria-label")).toBe("fi1, From Russia: TCP is blocked · TSPU probe");
     await act(async () => box.focus());
     for (let i = 0; i < 3; i++) await settle();
@@ -733,9 +733,9 @@ describe("the TSPU probe in the country column", () => {
     await mount(withProbe);
     expect([...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent)).toEqual([
       "From RussiareachableRostelecom, Beeline · probe node probe1 · 4 min ago",
-      "!From RussiaTCP blockedsources disagree · Globalping: reachable · probe: TCP blocked · 4 min ago",
-      "×From RussiaunreachableMTS · 4 min ago",
-      "!From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago",
+      "From RussiaTCP blockedsources disagree · Globalping: reachable · probe: TCP blocked · 4 min ago",
+      "From RussiaunreachableMTS · 4 min ago",
+      "From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago",
       "From Russia—not checked yet",
     ]);
   });
@@ -760,17 +760,17 @@ describe("the TSPU probe in the country column", () => {
   it("speaks Russian and Chinese", async () => {
     act(() => setLang("ru"));
     await mount(withProbe);
-    expect(countryCell("de2")?.textContent).toBe("!TCP режутисточники расходятся");
+    expect(countryCell("de2")?.textContent).toBe("TCP режутисточники расходятся");
     expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2, Из России: TCP режут · Источники расходятся · Globalping: доступна · зонд: TCP режут");
-    expect(countryCell("fi1")?.textContent).toBe("!TCP режутТСПУ-зонд");
+    expect(countryCell("fi1")?.textContent).toBe("TCP режутТСПУ-зонд");
     expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe("ТСПУ-зонд · probe1 · последний запуск 14 мин назад · ТСПУ за 6-м хопом · опорный адрес 31.13.72.36 · проверены 3 ноды");
     act(() => root?.unmount());
     host?.remove();
     act(() => setLang("zh"));
     await mount(withProbe);
-    expect(countryCell("de2")?.textContent).toBe("!TCP 被封锁来源不一致");
+    expect(countryCell("de2")?.textContent).toBe("TCP 被封锁来源不一致");
     expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2，从俄罗斯访问：TCP 被封锁 · 各来源的结果不一致 · Globalping：可访问 · TSPU 探测：TCP 被封锁");
-    expect(countryCell("fi1")?.textContent).toBe("!TCP 被封锁TSPU 探测");
+    expect(countryCell("fi1")?.textContent).toBe("TCP 被封锁TSPU 探测");
   });
 });
 
@@ -784,7 +784,7 @@ describe("the TSPU probe on the node page", () => {
     await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_4" /></QueryClientProvider>));
     for (let i = 0; i < 4; i++) await settle();
     const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("!From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago");
+    expect(row.textContent).toBe("From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago");
     expect(row.className).toContain("tone-warn");
     await act(async () => row.focus());
     for (let i = 0; i < 3; i++) await settle();

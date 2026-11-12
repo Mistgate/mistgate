@@ -37,6 +37,7 @@ Once linked you can switch **Send me alerts** off without unlinking, **Send test
 | Node agents behind the release | Owner | Once per version, with the names of the nodes |
 | A failed [backup](backups.md) | Owner | Once, however often the schedule retries; and when the next backup works |
 | An MCP plan waiting for your approval | Owner | When the plan is made, with a link to **AI → Waiting for you**. You decide in the admin, never in the chat |
+| The logs of a person's Mistgate app: they came after your request, the person sent them on their own, or the person declined the request | Owner | When it happens, with the person's name, the device and the number of lines, never the logs themselves, and a link to the person's page |
 | A lockout after too many failed sign-ins | Owner | When it happens |
 | A sign-in from an address this panel has not seen lately; a passkey added or removed, a password login added, a password or authenticator changed | Owner, and the admin it is about | When it happens |
 

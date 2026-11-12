@@ -70,7 +70,7 @@ func Build(c Config) (*Panel, error) {
 	k.newTasksService()
 	c = k.c
 	parts := k.base.newSubParts(true)
-	parts.cfg.ClientDebug = k.base.clientDebug() // the VPS edition only; the edge edition and the Workers take no logs
+	parts.cfg.ClientDebug = k.base.clientDebug(k.tg) // the VPS edition only; the edge edition and the Workers take no logs
 	if !k.base.edge && k.upd != nil {
 		parts.cfg.ClientASN = func(ip netip.Addr) uint32 {
 			if table := k.upd.NetworksTable(); table != nil {

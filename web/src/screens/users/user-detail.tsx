@@ -42,6 +42,8 @@ import { groupsQuery, isCode, protocolsQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
 import { Check, ConfirmModal, Panel, ResetSelect, SettingRow, SpeedPair, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
 import { MistgateAppRow } from "./mistgate-app";
+import { useClientLogs } from "./client-logs";
+import { ClientLogsSection } from "./client-logs-section";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
 // the steppers of the Limits panel, wide enough for "50 Мбит/с" (the speed pair) so they all line up
@@ -693,6 +695,8 @@ export function DevicesPanel({
 }) {
   const t = useTx();
   const mode = useQuery(settingsQuery).data?.settings.linkDeviceLimit;
+  // logs for support: the owner's, on the VPS edition (ctl is undefined for anyone else and where there are none)
+  const { ctl: logs, dialogs: logDialogs } = useClientLogs(user.id);
   // the device stays set while the dialog fades out, so its text does not go blank
   const [asking, setAsking] = useState<Device | null>(null);
   const [askOpen, setAskOpen] = useState(false);
@@ -745,7 +749,7 @@ export function DevicesPanel({
             <p className="py-2.5 text-xs text-muted">{t("users.devSubNever")}</p>
           ) : (
             <ul className="flex flex-col">
-              <LinkDeviceRows devices={link} nodeName={nodeName} now={now} onChanged={actions.refresh} />
+              <LinkDeviceRows devices={link} nodeName={nodeName} now={now} onChanged={actions.refresh} logs={logs} />
               {shared.map((d) => (
                 <SharedRow key={d.id} d={d} mode={mode} now={now} onDisconnect={() => ask(d)} />
               ))}
@@ -824,7 +828,10 @@ export function DevicesPanel({
         />
       )}
 
+      {logs && <ClientLogsSection ctl={logs} />}
+
       <BlockedList blocked={blocked} onChanged={actions.refresh} />
+      {logDialogs}
 
       <ConfirmModal
         open={askOpen}

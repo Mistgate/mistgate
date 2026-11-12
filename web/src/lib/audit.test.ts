@@ -52,6 +52,9 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["client_debug_received", { user: "usr_1", device: "dev_1", id: "dbr_1", lines: "18" }],
   ["client_debug_received", { user: "usr_1", device: "dev_1", id: "dbr_1", lines: "18", unasked: "true" }],
   ["client_debug_declined", { user: "usr_1", device: "dev_1", id: "dbr_1" }],
+  ["client_debug_read", { user: "usr_1", device: "dev_1", id: "dbr_1" }],
+  ["client_debug_downloaded", { user: "usr_1", device: "dev_1", id: "dbr_1", records: "18" }],
+  ["client_debug_deleted", { user: "usr_1", device: "dev_1", id: "dbr_1", state: "received", records: "18" }],
   ["page_unlock_lockout", { user: "usr_1", scope: "token" }, "locked"],
   ["node.create_enrollment", { node_id: "nod_1", name: "de1" }],
   ["node.update", { node_id: "nod_1" }],
@@ -215,6 +218,14 @@ describe("audit dictionary", () => {
     expect(describe2(tRu, "client_device_enrolled", { user: "usr_1", device: "dev_1" })).toBe("подключил(а) устройство через приложение Mistgate");
     expect(describe2(tEn, "client_device_reenrolled", { user: "usr_1", device: "dev_1" })).toBe("got a new key for a device in the Mistgate app");
     expect(describe2(tEn, "client_device_left", { user: "usr_1", device: "dev_1" })).toBe("removed a device through the Mistgate app");
+  });
+  it("tells the logs for support opened, downloaded and deleted", () => {
+    const p = { user: "usr_1", device: "dev_1", id: "dbr_1" };
+    expect(describe2(tEn, "client_debug_read", p)).toBe("opened the logs from a device");
+    expect(describe2(tRu, "client_debug_read", p)).toBe("открыл(а) журналы с устройства");
+    expect(describe2(tEn, "client_debug_downloaded", { ...p, records: "18" })).toBe("downloaded the logs from a device");
+    expect(describe2(tRu, "client_debug_downloaded", { ...p, records: "18" })).toBe("скачал(а) журналы с устройства");
+    expect(describe2(tRu, "client_debug_deleted", { ...p, state: "received", records: "18" })).toBe("удалил(а) журналы с устройства");
   });
   it("tells the logs for support asked for, withdrawn, sent and refused", () => {
     const p = { user: "usr_1", device: "dev_1", id: "dbr_1" };

@@ -570,3 +570,88 @@ func TestClientDebugCeilingHoldsUnderRace(t *testing.T) {
 	}
 	noStrayLines(t, s)
 }
+
+// ClientDebugLines gives the text as it was stored, where DebugLines (the node journal's read) cleans it again; both take the
+// time window; a node capture's id finds nothing in the bundle read and the other way round.
+func TestClientDebugLinesAreNotCleanedLikeANodeJournal(t *testing.T) {
+	ctx := context.Background()
+	s, devA, _ := debugFixture(t)
+	req := askDebug(t, s, devA, debugNow)
+	stateFile := `cannot write %USERPROFILE%\AppData\Roaming\Mistgate\state.json from C:\Programs\Mistgate\core\deeply\nested\folder\with\a\long\name.dll`
+	lines := []ClientDebugLine{
+		{AtMs: 100, Level: 1, Source: "service", Message: stateFile, Attrs: map[string]string{"path": `C:\ProgramData\Mistgate\state.json`, "code": "c"}},
+		{AtMs: 200, Level: 2, Source: "tunnel", Message: "second"},
+		{AtMs: 300, Level: 3, Source: "tunnel", Message: "third"},
+	}
+	row, _, err := s.ReceiveClientDebug(ctx, ClientDebugIntake{RequestID: req.ID, UserID: req.UserID, DeviceID: req.DeviceID, Lines: lines, Bytes: 300, FirstMs: 100, LastMs: 300, Now: debugNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, sources, err := s.ClientDebugLines(ctx, row.ID, DebugLineFilter{})
+	if err != nil || len(got) != 3 || got[0].Message != stateFile || got[0].Attrs["path"] != `C:\ProgramData\Mistgate\state.json` || strings.Join(sources, ",") != "service,tunnel" {
+		t.Fatalf("ClientDebugLines = %+v %v %v", got, sources, err)
+	}
+	node, _, err := s.DebugLines(ctx, row.ID, DebugLineFilter{})
+	if err != nil || len(node) != 3 || node[0].Message == stateFile || !strings.Contains(node[0].Message, "<host>") {
+		t.Fatalf("the node journal's read did not clean the way it should: %+v %v", node, err)
+	}
+	for name, c := range map[string]struct {
+		f    DebugLineFilter
+		want string
+	}{
+		"all":    {DebugLineFilter{}, "1,2,3"},
+		"from":   {DebugLineFilter{FromMs: 200}, "2,3"},
+		"to":     {DebugLineFilter{ToMs: 200}, "1,2"},
+		"window": {DebugLineFilter{FromMs: 200, ToMs: 200}, "2"},
+		"none":   {DebugLineFilter{FromMs: 201, ToMs: 299}, ""},
+		"after":  {DebugLineFilter{AfterSeq: 1, FromMs: 100}, "2,3"},
+	} {
+		for _, read := range []func(context.Context, string, DebugLineFilter) ([]DebugLineRow, []string, error){s.ClientDebugLines, s.DebugLines} {
+			rows, _, err := read(ctx, row.ID, c.f)
+			var seqs []string
+			for _, r := range rows {
+				seqs = append(seqs, fmt.Sprint(r.Seq))
+			}
+			if err != nil || strings.Join(seqs, ",") != c.want {
+				t.Errorf("%s: %v %v, want %s", name, seqs, err, c.want)
+			}
+		}
+	}
+	// no lines of a node capture are found by a bundle's id, and the lines of a bundle are not found under a capture's id
+	if _, err := s.W.ExecContext(ctx, `INSERT INTO debug_capture_line (capture_id, seq, at_ms, level, source, message, attrs_json) VALUES ('req_node', 1, 150, 1, 'agent', 'node line', '{}')`); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _, err := s.ClientDebugLines(ctx, "req_node", DebugLineFilter{}); err != nil || len(rows) != 1 {
+		t.Fatalf("the lines are keyed by id alone: %v %v", rows, err)
+	}
+	if rows, _, err := s.ClientDebugLines(ctx, row.ID, DebugLineFilter{Source: "agent"}); err != nil || len(rows) != 0 {
+		t.Errorf("a node capture's source in a bundle: %v %v", rows, err)
+	}
+}
+
+func TestDeleteClientDebugKeepsAnOpenRequestAndTakesTheLines(t *testing.T) {
+	ctx := context.Background()
+	s, devA, devB := debugFixture(t)
+	open := askDebug(t, s, devA, debugNow)
+	if _, err := s.DeleteClientDebug(ctx, open.ID, debugNow.Add(time.Minute)); !errors.Is(err, ErrClientDebugStillOpen) {
+		t.Fatalf("delete of an open request: %v", err)
+	}
+	got := answer(t, s, askDebug(t, s, devB, debugNow), 4, debugNow.Add(time.Minute))
+	if countLines(t, s, got.ID) != 4 {
+		t.Fatal("no lines")
+	}
+	row, err := s.DeleteClientDebug(ctx, got.ID, debugNow.Add(time.Hour))
+	if err != nil || row.ID != got.ID || row.State != "received" || row.Records != 4 {
+		t.Fatalf("delete: %+v %v", row, err)
+	}
+	if countLines(t, s, got.ID) != 0 || countT(t, s, `SELECT COUNT(*) FROM client_debug WHERE id = ?`, got.ID) != 0 {
+		t.Error("row or lines left")
+	}
+	if _, err := s.DeleteClientDebug(ctx, got.ID, debugNow.Add(time.Hour)); !errors.Is(err, ErrNotFound) {
+		t.Errorf("second delete: %v", err)
+	}
+	// a request whose time passed reads as expired and may go
+	if _, err := s.DeleteClientDebug(ctx, open.ID, debugNow.Add(ClientDebugRequestTTL+time.Second)); err != nil {
+		t.Errorf("delete of a request that ran out: %v", err)
+	}
+}

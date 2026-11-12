@@ -48,6 +48,8 @@ const textKeys: Record<string, MessageKey> = {
   user_over_quota: "event.user_over_quota",
   user_expired: "event.user_expired",
   device_revoked: "event.device_revoked",
+  client_logs_received: "event.client_logs_received",
+  client_logs_declined: "event.client_logs_declined",
   subscription_shared_suspect: "event.subscription_shared_suspect",
   agent_started: "event.agent_started",
   profile_added: "event.profile_added",
@@ -93,6 +95,9 @@ export function eventKind(e: Pick<Event, "code" | "severity">): StatusKind {
   return "ok";
 }
 
+/** The part of a person's page an event of theirs leads to: the logs for support for the logs of their app, else the top of the page. */
+export const userAnchorOf = (code: string): string | undefined => (code.startsWith("client_logs_") ? "client-logs" : undefined);
+
 type Described = Pick<Event, "code" | "params"> & Partial<Pick<Event, "profileName">> & { timeUnix?: number };
 
 /**
@@ -117,6 +122,9 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
     case "update_download_source":
       // sources_used is the node's word: only the kinds we know are named
       return { text: t(key, { to_version: p.to_version ?? "", sources: usedText(t, p.sources_used) || "—" }), detail };
+    case "client_logs_received":
+      // the count only; the event never carries a word of the logs
+      return { text: t(p.unasked === "true" ? "event.client_logs_received.unasked" : key, { lines: p.lines ?? "?" }), detail: "" };
     case "node_blip":
       return { text: t(p.rebooted === "true" ? "event.node_blip.rebooted" : key, { span }), detail };
     case "node_recovered":

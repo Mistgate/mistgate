@@ -234,7 +234,7 @@ describe("the people list", () => {
     expect(dot("Fine").textContent).toBe(""); // a plain dot
     expect(dot("Fine").querySelector(".tone-ok.rounded-full")).not.toBeNull();
     // a problem reads by its shape as well as its hue
-    expect([dot("Full"), dot("Gone"), dot("Paused")].map((d) => `${d.getAttribute("aria-label")}:${d.textContent}`)).toEqual(["Device limit:!", "Expired:×", "Disabled:–"]);
+    expect([dot("Full"), dot("Gone"), dot("Paused")].map((d) => `${d.getAttribute("aria-label")}:${d.querySelector("path")?.getAttribute("d")}`)).toEqual(["Device limit:M4 1.3v3.1M4 6.6v.01", "Expired:M2 2l4 4M6 2L2 6", "Disabled:M1.9 4h4.2"]);
     expect(dot("Full").querySelector(".tone-warn")).not.toBeNull();
     expect(dot("Gone").querySelector(".tone-bad")).not.toBeNull();
     expect(dot("Paused").querySelector(".tone-off")).not.toBeNull();

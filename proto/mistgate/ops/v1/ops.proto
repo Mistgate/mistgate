@@ -53,12 +53,22 @@ service OpsService {
   // LOGS FOR SUPPORT: the owner asks one device of the Mistgate app (a device with a key) for its logs. The person sees the request in
   // the app at its next sync and sends the logs or refuses. At most one request is open per device; it runs out after 72 hours.
   // NOT_FOUND: no such device with a key. FAILED_PRECONDITION: the device has an open request. Owner-only, closed to tokens, audit-logged.
-  // The panel keeps the logs (and the request) 7 days. Reading them is a later step.
+  // The panel keeps the logs (and the request) 7 days; GetClientDebug, ExportClientDebug and DeleteClientDebug read, download and delete them.
   rpc RequestClientDebug(RequestClientDebugRequest) returns (RequestClientDebugResponse);
   // Withdraws an open request. NOT_FOUND: no such request. FAILED_PRECONDITION: it is not open (answered, refused, withdrawn or run out).
   rpc CancelClientDebug(CancelClientDebugRequest) returns (CancelClientDebugResponse);
   // The requests and the bundles people sent on their own, newest first, at most 100: of one person, or of everyone.
   rpc ListClientDebug(ListClientDebugRequest) returns (ListClientDebugResponse);
+  // The records of one received bundle, oldest first, with filters (GetDebugCapture's shape). The text is what the panel stored when
+  // the bundle came, passed once more through the panel's current secret names; the attributes are the contract's keys. The first read
+  // of a bundle is audit-logged. NOT_FOUND: no such id. FAILED_PRECONDITION: the request holds no logs. Owner-only, closed to tokens.
+  rpc GetClientDebug(GetClientDebugRequest) returns (GetClientDebugResponse);
+  // A bundle as NDJSON (one record per line: seq, ts, lvl, src, msg, kv), the same records GetClientDebug returns. Needs a fresh
+  // sign-in (step-up); every download is audit-logged. Owner-only, closed to tokens.
+  rpc ExportClientDebug(ExportClientDebugRequest) returns (stream ExportClientDebugResponse);
+  // Deletes a request that is closed, or a bundle, with its records. FAILED_PRECONDITION: the request is still open (cancel it).
+  // Audit-logged. Owner-only, closed to tokens.
+  rpc DeleteClientDebug(DeleteClientDebugRequest) returns (DeleteClientDebugResponse);
 }
 
 message GetLogSettingsRequest {}
@@ -544,3 +554,44 @@ message ListClientDebugRequest {
 message ListClientDebugResponse {
   repeated ClientDebugInfo items = 1;
 }
+
+message GetClientDebugRequest {
+  string id = 1;
+  // The lowest level: "debug", "info", "warn" or "error"; "" = everything.
+  string min_level = 2;
+  // One log source; "" = all.
+  string source = 3;
+  // Case-insensitive substring of the message or an attribute value; at most 100 characters.
+  string query = 4;
+  // The window of the records' own times, unix milliseconds; 0 = open on that side.
+  int64 from_ms = 5 [jstype = JS_NUMBER];
+  int64 to_ms = 6 [jstype = JS_NUMBER];
+  // At most 500; 0 means 100.
+  uint32 limit = 7;
+  // The next_cursor of the previous page (0 = from the first record).
+  int64 after_seq = 8 [jstype = JS_NUMBER];
+}
+
+message GetClientDebugResponse {
+  ClientDebugInfo bundle = 1;
+  repeated DebugRecord records = 2;
+  // Pass as after_seq for the next page; 0 when there is none.
+  int64 next_cursor = 3 [jstype = JS_NUMBER];
+  // The sources that appear in the bundle, to fill a filter.
+  repeated string sources = 4;
+}
+
+message ExportClientDebugRequest {
+  string id = 1;
+}
+
+message ExportClientDebugResponse {
+  // A piece of the NDJSON, always ending at a line boundary.
+  bytes data = 1;
+}
+
+message DeleteClientDebugRequest {
+  string id = 1;
+}
+
+message DeleteClientDebugResponse {}

@@ -84,6 +84,15 @@ const (
 	// OpsServiceListClientDebugProcedure is the fully-qualified name of the OpsService's
 	// ListClientDebug RPC.
 	OpsServiceListClientDebugProcedure = "/mistgate.ops.v1.OpsService/ListClientDebug"
+	// OpsServiceGetClientDebugProcedure is the fully-qualified name of the OpsService's GetClientDebug
+	// RPC.
+	OpsServiceGetClientDebugProcedure = "/mistgate.ops.v1.OpsService/GetClientDebug"
+	// OpsServiceExportClientDebugProcedure is the fully-qualified name of the OpsService's
+	// ExportClientDebug RPC.
+	OpsServiceExportClientDebugProcedure = "/mistgate.ops.v1.OpsService/ExportClientDebug"
+	// OpsServiceDeleteClientDebugProcedure is the fully-qualified name of the OpsService's
+	// DeleteClientDebug RPC.
+	OpsServiceDeleteClientDebugProcedure = "/mistgate.ops.v1.OpsService/DeleteClientDebug"
 )
 
 // OpsServiceClient is a client for the mistgate.ops.v1.OpsService service.
@@ -131,12 +140,22 @@ type OpsServiceClient interface {
 	// LOGS FOR SUPPORT: the owner asks one device of the Mistgate app (a device with a key) for its logs. The person sees the request in
 	// the app at its next sync and sends the logs or refuses. At most one request is open per device; it runs out after 72 hours.
 	// NOT_FOUND: no such device with a key. FAILED_PRECONDITION: the device has an open request. Owner-only, closed to tokens, audit-logged.
-	// The panel keeps the logs (and the request) 7 days. Reading them is a later step.
+	// The panel keeps the logs (and the request) 7 days; GetClientDebug, ExportClientDebug and DeleteClientDebug read, download and delete them.
 	RequestClientDebug(context.Context, *connect.Request[v1.RequestClientDebugRequest]) (*connect.Response[v1.RequestClientDebugResponse], error)
 	// Withdraws an open request. NOT_FOUND: no such request. FAILED_PRECONDITION: it is not open (answered, refused, withdrawn or run out).
 	CancelClientDebug(context.Context, *connect.Request[v1.CancelClientDebugRequest]) (*connect.Response[v1.CancelClientDebugResponse], error)
 	// The requests and the bundles people sent on their own, newest first, at most 100: of one person, or of everyone.
 	ListClientDebug(context.Context, *connect.Request[v1.ListClientDebugRequest]) (*connect.Response[v1.ListClientDebugResponse], error)
+	// The records of one received bundle, oldest first, with filters (GetDebugCapture's shape). The text is what the panel stored when
+	// the bundle came, passed once more through the panel's current secret names; the attributes are the contract's keys. The first read
+	// of a bundle is audit-logged. NOT_FOUND: no such id. FAILED_PRECONDITION: the request holds no logs. Owner-only, closed to tokens.
+	GetClientDebug(context.Context, *connect.Request[v1.GetClientDebugRequest]) (*connect.Response[v1.GetClientDebugResponse], error)
+	// A bundle as NDJSON (one record per line: seq, ts, lvl, src, msg, kv), the same records GetClientDebug returns. Needs a fresh
+	// sign-in (step-up); every download is audit-logged. Owner-only, closed to tokens.
+	ExportClientDebug(context.Context, *connect.Request[v1.ExportClientDebugRequest]) (*connect.ServerStreamForClient[v1.ExportClientDebugResponse], error)
+	// Deletes a request that is closed, or a bundle, with its records. FAILED_PRECONDITION: the request is still open (cancel it).
+	// Audit-logged. Owner-only, closed to tokens.
+	DeleteClientDebug(context.Context, *connect.Request[v1.DeleteClientDebugRequest]) (*connect.Response[v1.DeleteClientDebugResponse], error)
 }
 
 // NewOpsServiceClient constructs a client for the mistgate.ops.v1.OpsService service. By default,
@@ -264,6 +283,24 @@ func NewOpsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(opsServiceMethods.ByName("ListClientDebug")),
 			connect.WithClientOptions(opts...),
 		),
+		getClientDebug: connect.NewClient[v1.GetClientDebugRequest, v1.GetClientDebugResponse](
+			httpClient,
+			baseURL+OpsServiceGetClientDebugProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("GetClientDebug")),
+			connect.WithClientOptions(opts...),
+		),
+		exportClientDebug: connect.NewClient[v1.ExportClientDebugRequest, v1.ExportClientDebugResponse](
+			httpClient,
+			baseURL+OpsServiceExportClientDebugProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("ExportClientDebug")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteClientDebug: connect.NewClient[v1.DeleteClientDebugRequest, v1.DeleteClientDebugResponse](
+			httpClient,
+			baseURL+OpsServiceDeleteClientDebugProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("DeleteClientDebug")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -288,6 +325,9 @@ type opsServiceClient struct {
 	requestClientDebug *connect.Client[v1.RequestClientDebugRequest, v1.RequestClientDebugResponse]
 	cancelClientDebug  *connect.Client[v1.CancelClientDebugRequest, v1.CancelClientDebugResponse]
 	listClientDebug    *connect.Client[v1.ListClientDebugRequest, v1.ListClientDebugResponse]
+	getClientDebug     *connect.Client[v1.GetClientDebugRequest, v1.GetClientDebugResponse]
+	exportClientDebug  *connect.Client[v1.ExportClientDebugRequest, v1.ExportClientDebugResponse]
+	deleteClientDebug  *connect.Client[v1.DeleteClientDebugRequest, v1.DeleteClientDebugResponse]
 }
 
 // GetLogSettings calls mistgate.ops.v1.OpsService.GetLogSettings.
@@ -385,6 +425,21 @@ func (c *opsServiceClient) ListClientDebug(ctx context.Context, req *connect.Req
 	return c.listClientDebug.CallUnary(ctx, req)
 }
 
+// GetClientDebug calls mistgate.ops.v1.OpsService.GetClientDebug.
+func (c *opsServiceClient) GetClientDebug(ctx context.Context, req *connect.Request[v1.GetClientDebugRequest]) (*connect.Response[v1.GetClientDebugResponse], error) {
+	return c.getClientDebug.CallUnary(ctx, req)
+}
+
+// ExportClientDebug calls mistgate.ops.v1.OpsService.ExportClientDebug.
+func (c *opsServiceClient) ExportClientDebug(ctx context.Context, req *connect.Request[v1.ExportClientDebugRequest]) (*connect.ServerStreamForClient[v1.ExportClientDebugResponse], error) {
+	return c.exportClientDebug.CallServerStream(ctx, req)
+}
+
+// DeleteClientDebug calls mistgate.ops.v1.OpsService.DeleteClientDebug.
+func (c *opsServiceClient) DeleteClientDebug(ctx context.Context, req *connect.Request[v1.DeleteClientDebugRequest]) (*connect.Response[v1.DeleteClientDebugResponse], error) {
+	return c.deleteClientDebug.CallUnary(ctx, req)
+}
+
 // OpsServiceHandler is an implementation of the mistgate.ops.v1.OpsService service.
 type OpsServiceHandler interface {
 	// The log level now in force, the one the panel started with, and the size of the ring.
@@ -430,12 +485,22 @@ type OpsServiceHandler interface {
 	// LOGS FOR SUPPORT: the owner asks one device of the Mistgate app (a device with a key) for its logs. The person sees the request in
 	// the app at its next sync and sends the logs or refuses. At most one request is open per device; it runs out after 72 hours.
 	// NOT_FOUND: no such device with a key. FAILED_PRECONDITION: the device has an open request. Owner-only, closed to tokens, audit-logged.
-	// The panel keeps the logs (and the request) 7 days. Reading them is a later step.
+	// The panel keeps the logs (and the request) 7 days; GetClientDebug, ExportClientDebug and DeleteClientDebug read, download and delete them.
 	RequestClientDebug(context.Context, *connect.Request[v1.RequestClientDebugRequest]) (*connect.Response[v1.RequestClientDebugResponse], error)
 	// Withdraws an open request. NOT_FOUND: no such request. FAILED_PRECONDITION: it is not open (answered, refused, withdrawn or run out).
 	CancelClientDebug(context.Context, *connect.Request[v1.CancelClientDebugRequest]) (*connect.Response[v1.CancelClientDebugResponse], error)
 	// The requests and the bundles people sent on their own, newest first, at most 100: of one person, or of everyone.
 	ListClientDebug(context.Context, *connect.Request[v1.ListClientDebugRequest]) (*connect.Response[v1.ListClientDebugResponse], error)
+	// The records of one received bundle, oldest first, with filters (GetDebugCapture's shape). The text is what the panel stored when
+	// the bundle came, passed once more through the panel's current secret names; the attributes are the contract's keys. The first read
+	// of a bundle is audit-logged. NOT_FOUND: no such id. FAILED_PRECONDITION: the request holds no logs. Owner-only, closed to tokens.
+	GetClientDebug(context.Context, *connect.Request[v1.GetClientDebugRequest]) (*connect.Response[v1.GetClientDebugResponse], error)
+	// A bundle as NDJSON (one record per line: seq, ts, lvl, src, msg, kv), the same records GetClientDebug returns. Needs a fresh
+	// sign-in (step-up); every download is audit-logged. Owner-only, closed to tokens.
+	ExportClientDebug(context.Context, *connect.Request[v1.ExportClientDebugRequest], *connect.ServerStream[v1.ExportClientDebugResponse]) error
+	// Deletes a request that is closed, or a bundle, with its records. FAILED_PRECONDITION: the request is still open (cancel it).
+	// Audit-logged. Owner-only, closed to tokens.
+	DeleteClientDebug(context.Context, *connect.Request[v1.DeleteClientDebugRequest]) (*connect.Response[v1.DeleteClientDebugResponse], error)
 }
 
 // NewOpsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -559,6 +624,24 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(opsServiceMethods.ByName("ListClientDebug")),
 		connect.WithHandlerOptions(opts...),
 	)
+	opsServiceGetClientDebugHandler := connect.NewUnaryHandler(
+		OpsServiceGetClientDebugProcedure,
+		svc.GetClientDebug,
+		connect.WithSchema(opsServiceMethods.ByName("GetClientDebug")),
+		connect.WithHandlerOptions(opts...),
+	)
+	opsServiceExportClientDebugHandler := connect.NewServerStreamHandler(
+		OpsServiceExportClientDebugProcedure,
+		svc.ExportClientDebug,
+		connect.WithSchema(opsServiceMethods.ByName("ExportClientDebug")),
+		connect.WithHandlerOptions(opts...),
+	)
+	opsServiceDeleteClientDebugHandler := connect.NewUnaryHandler(
+		OpsServiceDeleteClientDebugProcedure,
+		svc.DeleteClientDebug,
+		connect.WithSchema(opsServiceMethods.ByName("DeleteClientDebug")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.ops.v1.OpsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OpsServiceGetLogSettingsProcedure:
@@ -599,6 +682,12 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 			opsServiceCancelClientDebugHandler.ServeHTTP(w, r)
 		case OpsServiceListClientDebugProcedure:
 			opsServiceListClientDebugHandler.ServeHTTP(w, r)
+		case OpsServiceGetClientDebugProcedure:
+			opsServiceGetClientDebugHandler.ServeHTTP(w, r)
+		case OpsServiceExportClientDebugProcedure:
+			opsServiceExportClientDebugHandler.ServeHTTP(w, r)
+		case OpsServiceDeleteClientDebugProcedure:
+			opsServiceDeleteClientDebugHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -682,4 +771,16 @@ func (UnimplementedOpsServiceHandler) CancelClientDebug(context.Context, *connec
 
 func (UnimplementedOpsServiceHandler) ListClientDebug(context.Context, *connect.Request[v1.ListClientDebugRequest]) (*connect.Response[v1.ListClientDebugResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.ListClientDebug is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) GetClientDebug(context.Context, *connect.Request[v1.GetClientDebugRequest]) (*connect.Response[v1.GetClientDebugResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.GetClientDebug is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) ExportClientDebug(context.Context, *connect.Request[v1.ExportClientDebugRequest], *connect.ServerStream[v1.ExportClientDebugResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.ExportClientDebug is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) DeleteClientDebug(context.Context, *connect.Request[v1.DeleteClientDebugRequest]) (*connect.Response[v1.DeleteClientDebugResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.DeleteClientDebug is not implemented"))
 }

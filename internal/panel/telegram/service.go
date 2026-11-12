@@ -659,6 +659,19 @@ func (s *Service) FollowUpProblem(adminID, summary string) {
 	s.enqueue(item{to: func(l store.TelegramLinkRow) bool { return l.AdminID == adminID }, text: func(l L, _ string) string { return followUpProblemText(l, summary, adminURL) }})
 }
 
+// ClientLogs tells the owner (only the owner: a person's logs are the owner's business) that the logs of a person's app came, on
+// request or on the person's own, or that the person refused the request. The text has names and a count, never a word of the logs.
+// How often a device sends on its own is bounded at the intake (once in ten minutes), so there is no throttle here.
+func (s *Service) ClientLogs(n ClientLogsNews) {
+	switch n.Kind {
+	case "received", "unasked", "declined":
+	default:
+		return
+	}
+	adminURL := s.cfg.AdminURL
+	s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return clientLogsText(l, n, adminURL) }})
+}
+
 // AwgPrepareFailed announces a failed build of the AmneziaWG kernel module on a node (the same failure is told once).
 func (s *Service) AwgPrepareFailed(nodeID, code string, at int64) {
 	key := "awgprep/" + nodeID + "/" + strconv.FormatInt(at, 10)

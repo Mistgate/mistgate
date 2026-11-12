@@ -221,9 +221,9 @@ describe("a port whose test is blocked while the protocol works", () => {
 
   it("says the test is blocked in amber, keeps the counts quiet and names the protocol whose check passes", async () => {
     await mount(data({ inbounds, portChecks: [both({}), both({ port: 2053, ...lost, protocolOkUnix: now - 60 })] }));
-    expect(row(2053)?.textContent).toContain("udp/2053!Test blocked");
+    expect(row(2053)?.textContent).toContain("udp/2053Test blocked");
     expect(row(2053)?.textContent).toContain("from minsk1 0/150 · from fi1 0/150 · 2 min ago");
-    expect(row(2053)?.querySelector(".tone-warn.pill")?.textContent).toBe("!Test blocked");
+    expect(row(2053)?.querySelector(".tone-warn.pill")?.textContent).toBe("Test blocked");
     // no red, no amber in the counts, and the line under them clears the port instead of blaming it
     expect(row(2053)?.querySelectorAll(".text-danger-text, .text-warn-text")).toHaveLength(0);
     expect(row(2053)?.querySelector("[data-blame=node]")).toBeNull();

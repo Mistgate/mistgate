@@ -41,6 +41,15 @@ func NewScrubber(secrets []string) *Scrubber {
 	return &Scrubber{secrets: keep}
 }
 
+// Secrets cuts only the panel's secret names out of a text. It is the whole pass over text that was cleaned when it was stored (the
+// logs people send): the names are the one thing that can have changed since.
+func (c *Scrubber) Secrets(s string) string {
+	for _, secret := range c.secrets {
+		s = logscrub.ReplaceFold(s, secret, "<secret>")
+	}
+	return s
+}
+
 // Text cleans one piece of text.
 func (c *Scrubber) Text(s string) string {
 	for _, secret := range c.secrets {

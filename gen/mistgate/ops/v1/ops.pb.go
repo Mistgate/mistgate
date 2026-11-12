@@ -3719,6 +3719,351 @@ func (x *ListClientDebugResponse) GetItems() []*ClientDebugInfo {
 	return nil
 }
 
+type GetClientDebugRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The lowest level: "debug", "info", "warn" or "error"; "" = everything.
+	MinLevel string `protobuf:"bytes,2,opt,name=min_level,json=minLevel,proto3" json:"min_level,omitempty"`
+	// One log source; "" = all.
+	Source string `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	// Case-insensitive substring of the message or an attribute value; at most 100 characters.
+	Query string `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	// The window of the records' own times, unix milliseconds; 0 = open on that side.
+	FromMs int64 `protobuf:"varint,5,opt,name=from_ms,json=fromMs,proto3" json:"from_ms,omitempty"`
+	ToMs   int64 `protobuf:"varint,6,opt,name=to_ms,json=toMs,proto3" json:"to_ms,omitempty"`
+	// At most 500; 0 means 100.
+	Limit uint32 `protobuf:"varint,7,opt,name=limit,proto3" json:"limit,omitempty"`
+	// The next_cursor of the previous page (0 = from the first record).
+	AfterSeq      int64 `protobuf:"varint,8,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetClientDebugRequest) Reset() {
+	*x = GetClientDebugRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetClientDebugRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetClientDebugRequest) ProtoMessage() {}
+
+func (x *GetClientDebugRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetClientDebugRequest.ProtoReflect.Descriptor instead.
+func (*GetClientDebugRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *GetClientDebugRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *GetClientDebugRequest) GetMinLevel() string {
+	if x != nil {
+		return x.MinLevel
+	}
+	return ""
+}
+
+func (x *GetClientDebugRequest) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *GetClientDebugRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *GetClientDebugRequest) GetFromMs() int64 {
+	if x != nil {
+		return x.FromMs
+	}
+	return 0
+}
+
+func (x *GetClientDebugRequest) GetToMs() int64 {
+	if x != nil {
+		return x.ToMs
+	}
+	return 0
+}
+
+func (x *GetClientDebugRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetClientDebugRequest) GetAfterSeq() int64 {
+	if x != nil {
+		return x.AfterSeq
+	}
+	return 0
+}
+
+type GetClientDebugResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Bundle  *ClientDebugInfo       `protobuf:"bytes,1,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Records []*DebugRecord         `protobuf:"bytes,2,rep,name=records,proto3" json:"records,omitempty"`
+	// Pass as after_seq for the next page; 0 when there is none.
+	NextCursor int64 `protobuf:"varint,3,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	// The sources that appear in the bundle, to fill a filter.
+	Sources       []string `protobuf:"bytes,4,rep,name=sources,proto3" json:"sources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetClientDebugResponse) Reset() {
+	*x = GetClientDebugResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetClientDebugResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetClientDebugResponse) ProtoMessage() {}
+
+func (x *GetClientDebugResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetClientDebugResponse.ProtoReflect.Descriptor instead.
+func (*GetClientDebugResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *GetClientDebugResponse) GetBundle() *ClientDebugInfo {
+	if x != nil {
+		return x.Bundle
+	}
+	return nil
+}
+
+func (x *GetClientDebugResponse) GetRecords() []*DebugRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+func (x *GetClientDebugResponse) GetNextCursor() int64 {
+	if x != nil {
+		return x.NextCursor
+	}
+	return 0
+}
+
+func (x *GetClientDebugResponse) GetSources() []string {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+type ExportClientDebugRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportClientDebugRequest) Reset() {
+	*x = ExportClientDebugRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportClientDebugRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportClientDebugRequest) ProtoMessage() {}
+
+func (x *ExportClientDebugRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportClientDebugRequest.ProtoReflect.Descriptor instead.
+func (*ExportClientDebugRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *ExportClientDebugRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type ExportClientDebugResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A piece of the NDJSON, always ending at a line boundary.
+	Data          []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportClientDebugResponse) Reset() {
+	*x = ExportClientDebugResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportClientDebugResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportClientDebugResponse) ProtoMessage() {}
+
+func (x *ExportClientDebugResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportClientDebugResponse.ProtoReflect.Descriptor instead.
+func (*ExportClientDebugResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *ExportClientDebugResponse) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type DeleteClientDebugRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteClientDebugRequest) Reset() {
+	*x = DeleteClientDebugRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteClientDebugRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteClientDebugRequest) ProtoMessage() {}
+
+func (x *DeleteClientDebugRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteClientDebugRequest.ProtoReflect.Descriptor instead.
+func (*DeleteClientDebugRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *DeleteClientDebugRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DeleteClientDebugResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteClientDebugResponse) Reset() {
+	*x = DeleteClientDebugResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteClientDebugResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteClientDebugResponse) ProtoMessage() {}
+
+func (x *DeleteClientDebugResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteClientDebugResponse.ProtoReflect.Descriptor instead.
+func (*DeleteClientDebugResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{56}
+}
+
 var File_mistgate_ops_v1_ops_proto protoreflect.FileDescriptor
 
 const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
@@ -4061,7 +4406,29 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x16ListClientDebugRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"Q\n" +
 	"\x17ListClientDebugResponse\x126\n" +
-	"\x05items\x18\x01 \x03(\v2 .mistgate.ops.v1.ClientDebugInfoR\x05items2\xa6\x0f\n" +
+	"\x05items\x18\x01 \x03(\v2 .mistgate.ops.v1.ClientDebugInfoR\x05items\"\xdf\x01\n" +
+	"\x15GetClientDebugRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tmin_level\x18\x02 \x01(\tR\bminLevel\x12\x16\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12\x1b\n" +
+	"\afrom_ms\x18\x05 \x01(\x03B\x020\x02R\x06fromMs\x12\x17\n" +
+	"\x05to_ms\x18\x06 \x01(\x03B\x020\x02R\x04toMs\x12\x14\n" +
+	"\x05limit\x18\a \x01(\rR\x05limit\x12\x1f\n" +
+	"\tafter_seq\x18\b \x01(\x03B\x020\x02R\bafterSeq\"\xc9\x01\n" +
+	"\x16GetClientDebugResponse\x128\n" +
+	"\x06bundle\x18\x01 \x01(\v2 .mistgate.ops.v1.ClientDebugInfoR\x06bundle\x126\n" +
+	"\arecords\x18\x02 \x03(\v2\x1c.mistgate.ops.v1.DebugRecordR\arecords\x12#\n" +
+	"\vnext_cursor\x18\x03 \x01(\x03B\x020\x02R\n" +
+	"nextCursor\x12\x18\n" +
+	"\asources\x18\x04 \x03(\tR\asources\"*\n" +
+	"\x18ExportClientDebugRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"/\n" +
+	"\x19ExportClientDebugResponse\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\"*\n" +
+	"\x18DeleteClientDebugRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x1b\n" +
+	"\x19DeleteClientDebugResponse2\xe3\x11\n" +
 	"\n" +
 	"OpsService\x12a\n" +
 	"\x0eGetLogSettings\x12&.mistgate.ops.v1.GetLogSettingsRequest\x1a'.mistgate.ops.v1.GetLogSettingsResponse\x12X\n" +
@@ -4083,7 +4450,10 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x12SetNetworkSettings\x12*.mistgate.ops.v1.SetNetworkSettingsRequest\x1a+.mistgate.ops.v1.SetNetworkSettingsResponse\x12m\n" +
 	"\x12RequestClientDebug\x12*.mistgate.ops.v1.RequestClientDebugRequest\x1a+.mistgate.ops.v1.RequestClientDebugResponse\x12j\n" +
 	"\x11CancelClientDebug\x12).mistgate.ops.v1.CancelClientDebugRequest\x1a*.mistgate.ops.v1.CancelClientDebugResponse\x12d\n" +
-	"\x0fListClientDebug\x12'.mistgate.ops.v1.ListClientDebugRequest\x1a(.mistgate.ops.v1.ListClientDebugResponseB\xb5\x01\n" +
+	"\x0fListClientDebug\x12'.mistgate.ops.v1.ListClientDebugRequest\x1a(.mistgate.ops.v1.ListClientDebugResponse\x12a\n" +
+	"\x0eGetClientDebug\x12&.mistgate.ops.v1.GetClientDebugRequest\x1a'.mistgate.ops.v1.GetClientDebugResponse\x12l\n" +
+	"\x11ExportClientDebug\x12).mistgate.ops.v1.ExportClientDebugRequest\x1a*.mistgate.ops.v1.ExportClientDebugResponse0\x01\x12j\n" +
+	"\x11DeleteClientDebug\x12).mistgate.ops.v1.DeleteClientDebugRequest\x1a*.mistgate.ops.v1.DeleteClientDebugResponseB\xb5\x01\n" +
 	"\x13com.mistgate.ops.v1B\bOpsProtoP\x01Z6github.com/mistgate/mistgate/gen/mistgate/ops/v1;opsv1\xa2\x02\x03MOX\xaa\x02\x0fMistgate.Ops.V1\xca\x02\x0fMistgate\\Ops\\V1\xe2\x02\x1bMistgate\\Ops\\V1\\GPBMetadata\xea\x02\x11Mistgate::Ops::V1b\x06proto3"
 
 var (
@@ -4098,7 +4468,7 @@ func file_mistgate_ops_v1_ops_proto_rawDescGZIP() []byte {
 	return file_mistgate_ops_v1_ops_proto_rawDescData
 }
 
-var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
+var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 61)
 var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*GetLogSettingsRequest)(nil),      // 0: mistgate.ops.v1.GetLogSettingsRequest
 	(*GetLogSettingsResponse)(nil),     // 1: mistgate.ops.v1.GetLogSettingsResponse
@@ -4151,28 +4521,34 @@ var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*CancelClientDebugResponse)(nil),  // 48: mistgate.ops.v1.CancelClientDebugResponse
 	(*ListClientDebugRequest)(nil),     // 49: mistgate.ops.v1.ListClientDebugRequest
 	(*ListClientDebugResponse)(nil),    // 50: mistgate.ops.v1.ListClientDebugResponse
-	nil,                                // 51: mistgate.ops.v1.PanelLogEntry.AttrsEntry
-	nil,                                // 52: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
-	nil,                                // 53: mistgate.ops.v1.DebugRecord.AttrsEntry
-	nil,                                // 54: mistgate.ops.v1.LoadRecommendation.ParamsEntry
+	(*GetClientDebugRequest)(nil),      // 51: mistgate.ops.v1.GetClientDebugRequest
+	(*GetClientDebugResponse)(nil),     // 52: mistgate.ops.v1.GetClientDebugResponse
+	(*ExportClientDebugRequest)(nil),   // 53: mistgate.ops.v1.ExportClientDebugRequest
+	(*ExportClientDebugResponse)(nil),  // 54: mistgate.ops.v1.ExportClientDebugResponse
+	(*DeleteClientDebugRequest)(nil),   // 55: mistgate.ops.v1.DeleteClientDebugRequest
+	(*DeleteClientDebugResponse)(nil),  // 56: mistgate.ops.v1.DeleteClientDebugResponse
+	nil,                                // 57: mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	nil,                                // 58: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	nil,                                // 59: mistgate.ops.v1.DebugRecord.AttrsEntry
+	nil,                                // 60: mistgate.ops.v1.LoadRecommendation.ParamsEntry
 }
 var file_mistgate_ops_v1_ops_proto_depIdxs = []int32{
-	51, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	57, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
 	5,  // 1: mistgate.ops.v1.GetPanelLogsResponse.entries:type_name -> mistgate.ops.v1.PanelLogEntry
 	7,  // 2: mistgate.ops.v1.GetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
-	52, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	58, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
 	7,  // 4: mistgate.ops.v1.SetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
 	18, // 5: mistgate.ops.v1.StartDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	18, // 6: mistgate.ops.v1.StopDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	18, // 7: mistgate.ops.v1.ListDebugCapturesResponse.captures:type_name -> mistgate.ops.v1.DebugCaptureInfo
-	53, // 8: mistgate.ops.v1.DebugRecord.attrs:type_name -> mistgate.ops.v1.DebugRecord.AttrsEntry
+	59, // 8: mistgate.ops.v1.DebugRecord.attrs:type_name -> mistgate.ops.v1.DebugRecord.AttrsEntry
 	18, // 9: mistgate.ops.v1.GetDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	26, // 10: mistgate.ops.v1.GetDebugCaptureResponse.records:type_name -> mistgate.ops.v1.DebugRecord
 	29, // 11: mistgate.ops.v1.GetPanelResourcesResponse.process:type_name -> mistgate.ops.v1.PanelProcess
 	30, // 12: mistgate.ops.v1.GetPanelResourcesResponse.host:type_name -> mistgate.ops.v1.PanelHost
 	31, // 13: mistgate.ops.v1.GetPanelResourcesResponse.database:type_name -> mistgate.ops.v1.PanelDatabase
 	32, // 14: mistgate.ops.v1.GetPanelResourcesResponse.rpc:type_name -> mistgate.ops.v1.PanelRpcLoad
-	54, // 15: mistgate.ops.v1.LoadRecommendation.params:type_name -> mistgate.ops.v1.LoadRecommendation.ParamsEntry
+	60, // 15: mistgate.ops.v1.LoadRecommendation.params:type_name -> mistgate.ops.v1.LoadRecommendation.ParamsEntry
 	35, // 16: mistgate.ops.v1.NodeLoad.recommendations:type_name -> mistgate.ops.v1.LoadRecommendation
 	37, // 17: mistgate.ops.v1.FleetLoadSummary.most_loaded:type_name -> mistgate.ops.v1.LoadNodeRef
 	37, // 18: mistgate.ops.v1.FleetLoadSummary.most_free:type_name -> mistgate.ops.v1.LoadNodeRef
@@ -4182,49 +4558,57 @@ var file_mistgate_ops_v1_ops_proto_depIdxs = []int32{
 	44, // 22: mistgate.ops.v1.RequestClientDebugResponse.request:type_name -> mistgate.ops.v1.ClientDebugInfo
 	44, // 23: mistgate.ops.v1.CancelClientDebugResponse.request:type_name -> mistgate.ops.v1.ClientDebugInfo
 	44, // 24: mistgate.ops.v1.ListClientDebugResponse.items:type_name -> mistgate.ops.v1.ClientDebugInfo
-	0,  // 25: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
-	2,  // 26: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
-	4,  // 27: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
-	8,  // 28: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
-	10, // 29: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
-	12, // 30: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
-	14, // 31: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
-	16, // 32: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
-	19, // 33: mistgate.ops.v1.OpsService.StartDebugCapture:input_type -> mistgate.ops.v1.StartDebugCaptureRequest
-	21, // 34: mistgate.ops.v1.OpsService.StopDebugCapture:input_type -> mistgate.ops.v1.StopDebugCaptureRequest
-	23, // 35: mistgate.ops.v1.OpsService.ListDebugCaptures:input_type -> mistgate.ops.v1.ListDebugCapturesRequest
-	25, // 36: mistgate.ops.v1.OpsService.GetDebugCapture:input_type -> mistgate.ops.v1.GetDebugCaptureRequest
-	28, // 37: mistgate.ops.v1.OpsService.GetPanelResources:input_type -> mistgate.ops.v1.GetPanelResourcesRequest
-	34, // 38: mistgate.ops.v1.OpsService.GetFleetLoad:input_type -> mistgate.ops.v1.GetFleetLoadRequest
-	40, // 39: mistgate.ops.v1.OpsService.GetNetworkSettings:input_type -> mistgate.ops.v1.GetNetworkSettingsRequest
-	42, // 40: mistgate.ops.v1.OpsService.SetNetworkSettings:input_type -> mistgate.ops.v1.SetNetworkSettingsRequest
-	45, // 41: mistgate.ops.v1.OpsService.RequestClientDebug:input_type -> mistgate.ops.v1.RequestClientDebugRequest
-	47, // 42: mistgate.ops.v1.OpsService.CancelClientDebug:input_type -> mistgate.ops.v1.CancelClientDebugRequest
-	49, // 43: mistgate.ops.v1.OpsService.ListClientDebug:input_type -> mistgate.ops.v1.ListClientDebugRequest
-	1,  // 44: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
-	3,  // 45: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
-	6,  // 46: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
-	9,  // 47: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
-	11, // 48: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
-	13, // 49: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
-	15, // 50: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
-	17, // 51: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
-	20, // 52: mistgate.ops.v1.OpsService.StartDebugCapture:output_type -> mistgate.ops.v1.StartDebugCaptureResponse
-	22, // 53: mistgate.ops.v1.OpsService.StopDebugCapture:output_type -> mistgate.ops.v1.StopDebugCaptureResponse
-	24, // 54: mistgate.ops.v1.OpsService.ListDebugCaptures:output_type -> mistgate.ops.v1.ListDebugCapturesResponse
-	27, // 55: mistgate.ops.v1.OpsService.GetDebugCapture:output_type -> mistgate.ops.v1.GetDebugCaptureResponse
-	33, // 56: mistgate.ops.v1.OpsService.GetPanelResources:output_type -> mistgate.ops.v1.GetPanelResourcesResponse
-	39, // 57: mistgate.ops.v1.OpsService.GetFleetLoad:output_type -> mistgate.ops.v1.GetFleetLoadResponse
-	41, // 58: mistgate.ops.v1.OpsService.GetNetworkSettings:output_type -> mistgate.ops.v1.GetNetworkSettingsResponse
-	43, // 59: mistgate.ops.v1.OpsService.SetNetworkSettings:output_type -> mistgate.ops.v1.SetNetworkSettingsResponse
-	46, // 60: mistgate.ops.v1.OpsService.RequestClientDebug:output_type -> mistgate.ops.v1.RequestClientDebugResponse
-	48, // 61: mistgate.ops.v1.OpsService.CancelClientDebug:output_type -> mistgate.ops.v1.CancelClientDebugResponse
-	50, // 62: mistgate.ops.v1.OpsService.ListClientDebug:output_type -> mistgate.ops.v1.ListClientDebugResponse
-	44, // [44:63] is the sub-list for method output_type
-	25, // [25:44] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	44, // 25: mistgate.ops.v1.GetClientDebugResponse.bundle:type_name -> mistgate.ops.v1.ClientDebugInfo
+	26, // 26: mistgate.ops.v1.GetClientDebugResponse.records:type_name -> mistgate.ops.v1.DebugRecord
+	0,  // 27: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
+	2,  // 28: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
+	4,  // 29: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
+	8,  // 30: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
+	10, // 31: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
+	12, // 32: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
+	14, // 33: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
+	16, // 34: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
+	19, // 35: mistgate.ops.v1.OpsService.StartDebugCapture:input_type -> mistgate.ops.v1.StartDebugCaptureRequest
+	21, // 36: mistgate.ops.v1.OpsService.StopDebugCapture:input_type -> mistgate.ops.v1.StopDebugCaptureRequest
+	23, // 37: mistgate.ops.v1.OpsService.ListDebugCaptures:input_type -> mistgate.ops.v1.ListDebugCapturesRequest
+	25, // 38: mistgate.ops.v1.OpsService.GetDebugCapture:input_type -> mistgate.ops.v1.GetDebugCaptureRequest
+	28, // 39: mistgate.ops.v1.OpsService.GetPanelResources:input_type -> mistgate.ops.v1.GetPanelResourcesRequest
+	34, // 40: mistgate.ops.v1.OpsService.GetFleetLoad:input_type -> mistgate.ops.v1.GetFleetLoadRequest
+	40, // 41: mistgate.ops.v1.OpsService.GetNetworkSettings:input_type -> mistgate.ops.v1.GetNetworkSettingsRequest
+	42, // 42: mistgate.ops.v1.OpsService.SetNetworkSettings:input_type -> mistgate.ops.v1.SetNetworkSettingsRequest
+	45, // 43: mistgate.ops.v1.OpsService.RequestClientDebug:input_type -> mistgate.ops.v1.RequestClientDebugRequest
+	47, // 44: mistgate.ops.v1.OpsService.CancelClientDebug:input_type -> mistgate.ops.v1.CancelClientDebugRequest
+	49, // 45: mistgate.ops.v1.OpsService.ListClientDebug:input_type -> mistgate.ops.v1.ListClientDebugRequest
+	51, // 46: mistgate.ops.v1.OpsService.GetClientDebug:input_type -> mistgate.ops.v1.GetClientDebugRequest
+	53, // 47: mistgate.ops.v1.OpsService.ExportClientDebug:input_type -> mistgate.ops.v1.ExportClientDebugRequest
+	55, // 48: mistgate.ops.v1.OpsService.DeleteClientDebug:input_type -> mistgate.ops.v1.DeleteClientDebugRequest
+	1,  // 49: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
+	3,  // 50: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
+	6,  // 51: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
+	9,  // 52: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
+	11, // 53: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
+	13, // 54: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
+	15, // 55: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
+	17, // 56: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
+	20, // 57: mistgate.ops.v1.OpsService.StartDebugCapture:output_type -> mistgate.ops.v1.StartDebugCaptureResponse
+	22, // 58: mistgate.ops.v1.OpsService.StopDebugCapture:output_type -> mistgate.ops.v1.StopDebugCaptureResponse
+	24, // 59: mistgate.ops.v1.OpsService.ListDebugCaptures:output_type -> mistgate.ops.v1.ListDebugCapturesResponse
+	27, // 60: mistgate.ops.v1.OpsService.GetDebugCapture:output_type -> mistgate.ops.v1.GetDebugCaptureResponse
+	33, // 61: mistgate.ops.v1.OpsService.GetPanelResources:output_type -> mistgate.ops.v1.GetPanelResourcesResponse
+	39, // 62: mistgate.ops.v1.OpsService.GetFleetLoad:output_type -> mistgate.ops.v1.GetFleetLoadResponse
+	41, // 63: mistgate.ops.v1.OpsService.GetNetworkSettings:output_type -> mistgate.ops.v1.GetNetworkSettingsResponse
+	43, // 64: mistgate.ops.v1.OpsService.SetNetworkSettings:output_type -> mistgate.ops.v1.SetNetworkSettingsResponse
+	46, // 65: mistgate.ops.v1.OpsService.RequestClientDebug:output_type -> mistgate.ops.v1.RequestClientDebugResponse
+	48, // 66: mistgate.ops.v1.OpsService.CancelClientDebug:output_type -> mistgate.ops.v1.CancelClientDebugResponse
+	50, // 67: mistgate.ops.v1.OpsService.ListClientDebug:output_type -> mistgate.ops.v1.ListClientDebugResponse
+	52, // 68: mistgate.ops.v1.OpsService.GetClientDebug:output_type -> mistgate.ops.v1.GetClientDebugResponse
+	54, // 69: mistgate.ops.v1.OpsService.ExportClientDebug:output_type -> mistgate.ops.v1.ExportClientDebugResponse
+	56, // 70: mistgate.ops.v1.OpsService.DeleteClientDebug:output_type -> mistgate.ops.v1.DeleteClientDebugResponse
+	49, // [49:71] is the sub-list for method output_type
+	27, // [27:49] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_ops_v1_ops_proto_init() }
@@ -4241,7 +4625,7 @@ func file_mistgate_ops_v1_ops_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_ops_v1_ops_proto_rawDesc), len(file_mistgate_ops_v1_ops_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   55,
+			NumMessages:   61,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

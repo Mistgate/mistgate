@@ -14,11 +14,11 @@ import (
 type fleetService struct{ f *Fleet }
 
 // feedEvents is what the Overview feed shows: warnings and errors, and the few info events that answer "what happened
-// to the fleet" (a node went away, came back, joined, left; an update; a user). Engine starts, applied configurations
+// to the fleet" (a node went away, came back, joined, left; an update; a user; logs that a person's app sent, or the refusal to). Engine starts, applied configurations
 // and the like stay on the node's own Events tab.
 var feedEvents = &store.CodeMatch{
 	MinSeverity: 2,
-	Codes:       []string{"node_down", "node_blip", "node_recovered", "node_enrolled", "node_retired", "engine_failed"},
+	Codes:       []string{"node_down", "node_blip", "node_recovered", "node_enrolled", "node_retired", "engine_failed", "client_logs_received", "client_logs_declined"},
 	Prefixes:    []string{"update_", "user_"},
 }
 

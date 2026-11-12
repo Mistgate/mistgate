@@ -32,11 +32,15 @@ const (
 	OpsGetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/GetNetworkSettings"
 	OpsSetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/SetNetworkSettings"
 	// The logs people send for support. A person's own logs, even cleaned, are the owner's to ask for and to read: all of these are the
-	// owner's in the admin UI and closed to tokens (no tokenProcedures line), whatever the profile. The MCP list of requests, metadata only,
-	// is a later line here.
+	// owner's in the admin UI and closed to tokens (no tokenProcedures line), whatever the profile: that includes reading the records and
+	// downloading them (the download also needs a fresh sign-in), so what a person's log says never reaches an AI provider. The MCP
+	// list of requests, metadata only, is a later line here.
 	OpsRequestClientDebugProcedure = "/mistgate.ops.v1.OpsService/RequestClientDebug"
 	OpsCancelClientDebugProcedure  = "/mistgate.ops.v1.OpsService/CancelClientDebug"
 	OpsListClientDebugProcedure    = "/mistgate.ops.v1.OpsService/ListClientDebug"
+	OpsGetClientDebugProcedure     = "/mistgate.ops.v1.OpsService/GetClientDebug"
+	OpsExportClientDebugProcedure  = "/mistgate.ops.v1.OpsService/ExportClientDebug"
+	OpsDeleteClientDebugProcedure  = "/mistgate.ops.v1.OpsService/DeleteClientDebug"
 )
 
 func init() {
@@ -46,6 +50,7 @@ func init() {
 		OpsStartDebugCaptureProcedure, OpsStopDebugCaptureProcedure, OpsListDebugCapturesProcedure, OpsGetDebugCaptureProcedure,
 		OpsGetNetworkSettingsProcedure, OpsSetNetworkSettingsProcedure,
 		OpsRequestClientDebugProcedure, OpsCancelClientDebugProcedure, OpsListClientDebugProcedure,
+		OpsGetClientDebugProcedure, OpsExportClientDebugProcedure, OpsDeleteClientDebugProcedure,
 	} {
 		procedureLevels[p] = levelOwner
 	}
@@ -60,7 +65,7 @@ func init() {
 		procedureLevels[p] = levelRead
 		tokenProcedures[p] = TokenAccessDirect
 	}
-	for _, p := range []string{OpsSetRetentionProcedure, OpsExportDataProcedure, OpsSetMetricsSettingsProcedure, OpsSetNetworkSettingsProcedure} {
+	for _, p := range []string{OpsSetRetentionProcedure, OpsExportDataProcedure, OpsSetMetricsSettingsProcedure, OpsSetNetworkSettingsProcedure, OpsExportClientDebugProcedure} {
 		stepUpProcedures[p] = true
 	}
 	grantProcedures["retention"] = []string{OpsSetRetentionProcedure}

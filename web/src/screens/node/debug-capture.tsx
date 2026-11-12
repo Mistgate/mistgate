@@ -1,33 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { LogViewer } from "@/components/log-viewer";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { FilterChips } from "@/components/ui/chips";
 import { Notice } from "@/components/ui/notice";
 import { Pending } from "@/components/ui/query-error";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
-import { TextField } from "@/components/ui/text-field";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
-import { cx } from "@/lib/cx";
 import {
   clockLeft,
   debugLevels,
   debugListQuery,
   debugMinutes,
   debugPage,
-  debugRecordsQuery,
   debugSources,
-  defaultDebugFilter,
   isLive,
   secondsLeft,
   useDebugActions,
   type DebugCapture,
-  type DebugFilter,
   type DebugLevel,
-  type DebugRecords,
 } from "@/lib/debug-capture";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
@@ -36,9 +30,6 @@ import type { Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
 
 type Node = Plain<NodeMsg>;
-type Record = DebugRecords["records"][number];
-
-const levelTone: { [level: string]: string } = { debug: "text-faint", info: "text-accent-text", warn: "text-warn", error: "text-danger" };
 
 /** The seconds clock of a countdown, ticking once a second while `on`. */
 function useNow(on: boolean): number {
@@ -167,38 +158,10 @@ function RunningRow({ capture, now, owner, stopping, onStop }: { capture: DebugC
   );
 }
 
-const stampOf = (fmt: ReturnType<typeof useFmt>, ms: number) => `${fmt.clock(Math.floor(ms / 1000))}.${String(ms % 1000).padStart(3, "0")}`;
-
-/** The records of one finished capture with their filters; "More records" walks the cursor. */
+/** The records of one finished capture: who started it and with what, and the shared reader with its filters and "More records". */
 function Viewer({ capture, captures, onPick }: { capture: DebugCapture; captures: DebugCapture[]; onPick: (id: string) => void }) {
   const t = useT();
   const fmt = useFmt();
-  const [filter, setFilter] = useState<DebugFilter>(defaultDebugFilter);
-  const [draft, setDraft] = useState("");
-  // the pages after the first, for the filter they were read with: a new filter starts over without an effect
-  const [paged, setPaged] = useState<{ filter: DebugFilter; extra: Record[]; cursor: number | null }>({ filter, extra: [], cursor: null });
-  const [loading, setLoading] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setFilter((f) => (f.query === draft.trim() ? f : { ...f, query: draft.trim() })), 300);
-    return () => clearTimeout(id);
-  }, [draft]);
-  const q = useQuery({ ...debugRecordsQuery(capture.captureId, filter, capture.state), enabled: capture.state === "done" });
-  const first = q.data;
-  const pages = paged.filter === filter ? paged : { filter, extra: [], cursor: null }; // null cursor: the first page's own
-  const next = pages.cursor ?? first?.nextCursor ?? 0;
-  const records = [...(first?.records ?? []), ...pages.extra];
-
-  async function more() {
-    setLoading(true);
-    try {
-      const page = await debugPage(capture.captureId, filter, next);
-      setPaged({ filter, extra: [...pages.extra, ...page.records], cursor: page.nextCursor });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const sources = first?.sources ?? [];
   return (
     <div className="flex flex-col gap-2.5 border-t border-line pt-3">
       <div className="flex flex-wrap items-center gap-2.5">
@@ -218,68 +181,7 @@ function Viewer({ capture, captures, onPick }: { capture: DebugCapture; captures
       </div>
       {capture.state === "expired" && <Notice tone="warn">{t("debug.expired")}</Notice>}
       {capture.dropped > 0 && <p className="text-xs text-muted">{t("debug.dropped", { n: capture.dropped })}</p>}
-      {capture.state === "done" && (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterChips
-              aria-label={t("debug.filter.level")}
-              value={filter.minLevel || "all"}
-              onValueChange={(v) => setFilter((f) => ({ ...f, minLevel: v === "all" ? "" : (v as DebugFilter["minLevel"]) }))}
-              options={[
-                { value: "all", label: t("debug.filter.all") },
-                { value: "info", label: t("debug.filter.info") },
-                { value: "warn", label: t("debug.filter.warn") },
-                { value: "error", label: t("debug.filter.error") },
-              ]}
-              className="flex-nowrap gap-1"
-            />
-            <Select
-              compact
-              aria-label={t("debug.filter.source")}
-              value={filter.source || "any"}
-              onValueChange={(v) => setFilter((f) => ({ ...f, source: v === "any" ? "" : v }))}
-              options={[{ value: "any", label: t("debug.filter.anySource") }, ...sources.map((s) => ({ value: s, label: s }))]}
-            />
-            <TextField
-              search
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={t("debug.filter.search")}
-              aria-label={t("debug.filter.search")}
-              className="min-w-40 flex-1"
-            />
-          </div>
-          <div className={cx("overflow-hidden rounded-[14px] border border-line bg-surface", q.isPlaceholderData && "opacity-60")} aria-label={t("debug.records")}>
-            {records.map((r) => (
-              <div key={r.seq} className="flex flex-col gap-0.5 border-b border-line px-3.5 py-2 last:border-b-0">
-                <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-xs">
-                  <span className="text-faint">{stampOf(fmt, r.timeUnixMs)}</span>
-                  <span className={cx("font-mono font-bold uppercase", levelTone[r.level] ?? "text-muted")}>{r.level}</span>
-                  <span className="font-mono text-muted">{r.source}</span>
-                </div>
-                <p className="font-mono text-xs break-words">{r.message}</p>
-                {Object.keys(r.attrs).length > 0 && (
-                  <p className="font-mono text-[11px] break-words text-muted">
-                    {Object.entries(r.attrs)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([k, v]) => `${k}=${v}`)
-                      .join("  ")}
-                  </p>
-                )}
-              </div>
-            ))}
-            {q.isPending && <Pending />}
-            {first && records.length === 0 && <p className="px-3.5 py-3 text-muted">{t("debug.empty")}</p>}
-          </div>
-          {next > 0 && (
-            <div>
-              <Button variant="secondary" size="md" disabled={loading} onClick={() => void more()}>
-                <span>{t("debug.more")}</span>
-              </Button>
-            </div>
-          )}
-        </>
-      )}
+      {capture.state === "done" && <LogViewer queryKey={["ops", "debug", "records", capture.captureId, capture.state]} load={(f, after) => debugPage(capture.captureId, f, after)} />}
     </div>
   );
 }

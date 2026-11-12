@@ -313,7 +313,7 @@ describe("a block on some networks", () => {
     expect(partial.className).toContain("tone-warn");
     expect(partial.querySelector("svg circle")).not.toBeNull();
     expect(partial.textContent).not.toContain("!");
-    expect(document.querySelector("[data-kind=warn]")!.textContent).toContain("!");
+    expect(document.querySelector("[data-kind=warn] svg circle")).toBeNull();
   });
 
   it("names the networks in the pill, its tooltip on keyboard focus, and the source's word now", async () => {
@@ -570,7 +570,7 @@ describe("IPv6 on the Reachability page", () => {
   it("asks for the IPv6 week and puts an IPv6 pill after the IPv4 one, with its lane right under Globalping's", async () => {
     await mount();
     expect(getHistory).toHaveBeenCalledWith({ days: 7, family: 6 }, expect.anything());
-    expect(pills("fi1").map((p) => p.textContent)).toEqual(["IPv4!TCP blocked", "IPv6reachable"]);
+    expect(pills("fi1").map((p) => p.textContent)).toEqual(["IPv4TCP blocked", "IPv6reachable"]);
     expect(pills("fi1")[1]!.getAttribute("aria-label")).toBe("fi1, From Russia · IPv6: Reachable from Russia");
     expect(line("fi1", "globalping").nextElementSibling).toBe(line("fi1", "globalping6"));
     expect(words(line("fi1", "globalping6").children[1])).toBe("reachable");

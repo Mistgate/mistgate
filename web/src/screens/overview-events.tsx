@@ -3,13 +3,13 @@ import { SectionLabel } from "@/components/ui/bits";
 import { StatusDot } from "@/components/ui/status";
 import type { Event } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { useT } from "@/i18n";
-import { describeEvent, eventKind } from "@/lib/events";
+import { describeEvent, eventKind, userAnchorOf } from "@/lib/events";
 import { useFmt } from "@/lib/format";
 import type { Plain } from "@/lib/plain";
 
 /**
  * The fleet feed of the Overview: only what answers "what happened" (the server picks it: falls and returns, new nodes,
- * updates, users, every warning). A node's line opens its Events tab, a user's line the user.
+ * updates, users, every warning). A node's line opens its Events tab, a user's line the user (the logs of their app: down to the "Logs for support" of their devices).
  */
 export function EventsCard({ events }: { events: readonly Plain<Event>[] }) {
   const t = useT();
@@ -40,7 +40,7 @@ export function EventsCard({ events }: { events: readonly Plain<Event>[] }) {
         const cls = "flex min-h-10 items-start gap-2.5 border-t border-line py-[11px]";
         if (e.userId)
           return (
-            <Link key={e.id} to="/users/$id" params={{ id: e.userId }} title={sentence} className={cls}>
+            <Link key={e.id} to="/users/$id" params={{ id: e.userId }} hash={userAnchorOf(e.code)} title={sentence} className={cls}>
               {row}
             </Link>
           );

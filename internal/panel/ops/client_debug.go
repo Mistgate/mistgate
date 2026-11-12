@@ -10,14 +10,13 @@ import (
 	"connectrpc.com/connect"
 
 	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
-	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/clientdebug"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-// The owner's side of the logs people send for support: asking a device for them, withdrawing the request, and the list. The
-// device's side (sync, the delivery, the refusal) is internal/panel/subs with internal/panel/clientdebug. Reading what came is
-// a later step; so is the MCP's list.
+// The owner's side of the logs people send for support: asking a device for them, withdrawing the request, and the list (reading,
+// downloading and deleting are client_debug_read.go). The device's side (sync, the delivery, the refusal) is internal/panel/subs with
+// internal/panel/clientdebug. The MCP's list is a later step; the content of a bundle is never the MCP's.
 
 func (s *Service) clientDebugInfo(row store.ClientDebugRow) *opsv1.ClientDebugInfo {
 	out := &opsv1.ClientDebugInfo{
@@ -49,11 +48,7 @@ func (r rpc) RequestClientDebug(ctx context.Context, req *connect.Request[opsv1.
 	if m.DeviceId == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("name a device"))
 	}
-	actor := "anonymous"
-	if a, ok := auth.AdminFrom(ctx); ok {
-		actor = a.ID
-	}
-	row, err := s.cfg.Store.CreateClientDebug(ctx, store.ClientDebugRow{ID: store.NewClientDebugID(), DeviceID: m.DeviceId, Actor: actor,
+	row, err := s.cfg.Store.CreateClientDebug(ctx, store.ClientDebugRow{ID: store.NewClientDebugID(), DeviceID: m.DeviceId, Actor: adminID(ctx),
 		Note: clientdebug.Note(m.Note), Level: level}, s.cfg.Now())
 	switch {
 	case errors.Is(err, store.ErrNotFound):

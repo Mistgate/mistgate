@@ -24,14 +24,35 @@ const (
 	AuditReceived = "client_debug_received"
 	AuditDeclined = "client_debug_declined"
 	EventReceived = "client_logs_received"
+	EventDeclined = "client_logs_declined"
 )
+
+// The kinds of a Notice: logs came because the owner asked, logs came because the person sent them on their own, the person refused.
+const (
+	NoticeReceived = "received"
+	NoticeUnasked  = "unasked"
+	NoticeDeclined = "declined"
+)
+
+// Notice is what the owner is told when a person answers or sends logs: who, from which device, how many lines. Never a word of the logs.
+// The names are the panel's today (the person's name, the device's model or platform), whatever the person's app wrote about itself.
+type Notice struct {
+	Kind   string
+	UserID string
+	Person string
+	Device string
+	Lines  int
+}
 
 // Config configures Service. Store is required.
 type Config struct {
 	Store *store.Store
 	// Secrets are the panel's secret names (the agent SNI and the secret path prefixes), cut out of every text.
 	Secrets []string
-	Log     *slog.Logger
+	// Notify tells the owner (the Telegram module) that logs came or were refused. nil = nobody is told. It is called once per bundle
+	// and per refusal, after the rows are written, and must not block.
+	Notify func(Notice)
+	Log    *slog.Logger
 }
 
 // Service is subs.ClientDebug: what the app's debug routes and sync call.
@@ -169,6 +190,11 @@ func (s *Service) Decline(ctx context.Context, dev store.AccessDevice, requestID
 		return "", refusal(err)
 	}
 	s.audit(ctx, now, AuditDeclined, row, nil)
+	ev := store.EventRow{Time: now, Severity: 1, Code: EventDeclined, Source: "panel", UserID: row.UserID, DeviceID: row.DeviceID, Params: map[string]string{"id": row.ID}}
+	if err := s.cfg.Store.InsertEvent(ctx, ev); err != nil {
+		s.cfg.Log.Warn("client debug: event write failed", "code", "client_debug_event_failed", "err", err)
+	}
+	s.notify(NoticeDeclined, row)
 	return row.ID, nil
 }
 
@@ -181,6 +207,23 @@ func (s *Service) received(ctx context.Context, row store.ClientDebugRow, now ti
 	if err := s.cfg.Store.InsertEvent(ctx, ev); err != nil {
 		s.cfg.Log.Warn("client debug: event write failed", "code", "client_debug_event_failed", "err", err)
 	}
+	kind := NoticeReceived
+	if row.Unasked {
+		kind = NoticeUnasked
+	}
+	s.notify(kind, row)
+}
+
+// notify hands the owner's news to the Telegram module: metadata only.
+func (s *Service) notify(kind string, row store.ClientDebugRow) {
+	if s.cfg.Notify == nil {
+		return
+	}
+	device := row.DeviceModel
+	if device == "" {
+		device = row.DevicePlatform
+	}
+	s.cfg.Notify(Notice{Kind: kind, UserID: row.UserID, Person: row.UserName, Device: device, Lines: row.Records})
 }
 
 func (s *Service) audit(ctx context.Context, now time.Time, action string, row store.ClientDebugRow, extra map[string]string) {

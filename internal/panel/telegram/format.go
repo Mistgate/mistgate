@@ -935,6 +935,45 @@ func awgPrepareFailedText(l L, node, code, adminURL string) string {
 	)
 }
 
+// ClientLogsNews is the owner's news about the logs of a person's app (clientdebug.Notice, which the app wiring turns into this): the
+// kind is "received" (the owner asked and they came), "unasked" (the person sent them on their own) or "declined" (the person refused
+// the request). Only metadata: who, from which device, how many lines.
+type ClientLogsNews struct {
+	Kind   string
+	UserID string
+	Person string
+	Device string
+	Lines  int
+}
+
+func clientLogsText(l L, n ClientLogsNews, adminURL string) string {
+	var title string
+	switch n.Kind {
+	case "unasked":
+		title = l.pick("A person sent the logs of the Mistgate app on their own", "Человек сам прислал журналы приложения Mistgate", "有用户主动发来了 Mistgate 应用的日志")
+	case "declined":
+		title = l.pick("A person declined to send the logs of the Mistgate app", "Человек отказался присылать журналы приложения Mistgate", "有用户拒绝发送 Mistgate 应用的日志")
+	default:
+		title = l.pick("The logs of the Mistgate app came", "Пришли журналы приложения Mistgate", "收到了 Mistgate 应用的日志")
+	}
+	lines := ""
+	if n.Kind != "declined" {
+		lines = l.pick("Lines: ", "Строк: ", "行数：") + strconv.Itoa(n.Lines)
+	}
+	person, device := "", ""
+	if n.Person != "" {
+		person = l.pick("Person: ", "Человек: ", "用户：") + "<b>" + data(n.Person, 60) + "</b>"
+	}
+	if n.Device != "" {
+		device = l.pick("Device: ", "Устройство: ", "设备：") + data(n.Device, 60)
+	}
+	page := ""
+	if n.UserID != "" {
+		page = link(adminURL, "users/"+n.UserID+"#client-logs", l.pick("Open the person’s page", "Открыть страницу человека", "打开用户页面"))
+	}
+	return join("<b>"+title+"</b>", person, device, lines, page)
+}
+
 func testText(l L, brand string) string {
 	return "<b>" + l.pick("Test message", "Проверка связи", "测试消息") + "</b>\n" +
 		l.pick("Alerts from "+data(brand, 40)+" will arrive in this chat.", "Алерты от «"+data(brand, 40)+"» будут приходить в этот чат.", "来自 "+data(brand, 40)+" 的告警会发送到此聊天。")

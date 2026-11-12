@@ -717,3 +717,69 @@ func TestDebugRouteDoesNotLeakIntoOtherRoutes(t *testing.T) {
 		t.Fatalf("sync = %d", rec.Code)
 	}
 }
+
+// ---- the owner is told ----
+
+// Logs that came for a request, logs the person sent on their own and a refusal each reach the owner's notifier once, with names and a
+// count and nothing of the logs; a repeated delivery of the same answer is not told again; the refusal is an event of the feed.
+func TestTheOwnerIsToldOfLogsAndRefusalsOnceWithMetadataOnly(t *testing.T) {
+	var mu sync.Mutex
+	var told []clientdebug.Notice
+	clk := &tick{t: time.Now().UTC().Truncate(time.Second)}
+	base := newSyncEnvWith(t, func(c *subs.Config, st *store.Store) {
+		c.Now = clk.Now
+		c.ClientDebugAttemptsPerHour = -1
+		c.ClientDebugSlotWait = 300 * time.Millisecond
+		c.ClientDebug = clientdebug.New(clientdebug.Config{Store: st, Secrets: []string{debugSecret}, Notify: func(n clientdebug.Notice) {
+			mu.Lock()
+			defer mu.Unlock()
+			told = append(told, n)
+		}})
+	})
+	e := &debugEnv{syncEnv: base, clock: clk}
+	uid, tok := e.person("alice-liddell", nil)
+	a, b := e.enrolDevice(tok, hwidA), e.enrolDevice(tok, hwidB2)
+	snapshot := func() []clientdebug.Notice {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]clientdebug.Notice(nil), told...)
+	}
+
+	asked := e.ask(a.DeviceID, "info", "")
+	if rec := e.answer(a.Key, asked.ID, e.logLine(debugMarker), e.logLine("two")); rec.Code != 200 {
+		t.Fatalf("answer = %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.answer(a.Key, asked.ID, e.logLine(debugMarker)); rec.Code != 200 { // the app repeats after a lost reply
+		t.Fatalf("repeat = %d", rec.Code)
+	}
+	if got := snapshot(); len(got) != 1 || got[0].Kind != clientdebug.NoticeReceived || got[0].UserID != uid || got[0].Person != "alice-liddell" || got[0].Lines != 2 {
+		t.Fatalf("told after the answer: %+v", got)
+	}
+
+	if rec := e.answer(b.Key, "", e.logLine("own"), e.logLine("own two"), e.logLine("own three")); rec.Code != 200 {
+		t.Fatalf("unasked = %d %s", rec.Code, rec.Body.String())
+	}
+	if got := snapshot(); len(got) != 2 || got[1].Kind != clientdebug.NoticeUnasked || got[1].Lines != 3 {
+		t.Fatalf("told after the unasked bundle: %+v", got)
+	}
+
+	refused := e.ask(b.DeviceID, "info", "")
+	if rec := e.decline(b.Key, refused.ID); rec.Code != 200 {
+		t.Fatalf("decline = %d", rec.Code)
+	}
+	if rec := e.decline(b.Key, refused.ID); rec.Code != 409 {
+		t.Fatalf("second decline = %d", rec.Code)
+	}
+	got := snapshot()
+	if len(got) != 3 || got[2].Kind != clientdebug.NoticeDeclined || got[2].Person != "alice-liddell" || got[2].UserID != uid {
+		t.Fatalf("told after the refusal: %+v", got)
+	}
+	if strings.Contains(fmt.Sprintf("%+v", got), debugMarker) {
+		t.Errorf("a word of the logs went to the notifier: %+v", got)
+	}
+	var params, userID, deviceID string
+	if err := e.st.R.QueryRow(`SELECT params_json, user_id, device_id FROM event WHERE code = 'client_logs_declined'`).Scan(&params, &userID, &deviceID); err != nil ||
+		userID != uid || deviceID != b.DeviceID || !strings.Contains(params, refused.ID) {
+		t.Errorf("refusal event: %q %q %q %v", params, userID, deviceID, err)
+	}
+}

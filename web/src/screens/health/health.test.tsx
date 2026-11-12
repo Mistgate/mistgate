@@ -274,7 +274,7 @@ describe("the node's Doctor tab", () => {
     });
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
     const pills = [...document.querySelectorAll(".pill")].map((p) => p.textContent);
-    expect(pills).toEqual(["×Problem", "!Attention"]);
+    expect(pills).toEqual(["Problem", "Attention"]);
   });
 
   it("opens the steps by hand of a check the panel cannot fix: the exact command with a copy button", async () => {

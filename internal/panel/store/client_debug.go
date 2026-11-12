@@ -45,6 +45,8 @@ var (
 	ErrClientDebugClosed = errors.New("store: the log request is not open")
 	// ErrClientDebugNoRequest: no open request of this device has the id.
 	ErrClientDebugNoRequest = errors.New("store: no open log request")
+	// ErrClientDebugStillOpen: the request is open and has not run out; it is cancelled, not deleted.
+	ErrClientDebugStillOpen = errors.New("store: the log request is still open")
 	// ErrClientDebugFull: the panel keeps ClientDebugMaxBundles bundles already.
 	ErrClientDebugFull = errors.New("store: the panel keeps as many logs as it takes")
 )
@@ -364,3 +366,44 @@ func (s *Store) PruneClientDebug(ctx context.Context, before time.Time) (int64, 
 	return res[1].RowsAffected, nil
 }
 
+// ClientDebugLines returns the records of a bundle, oldest first after AfterSeq, with the filter applied, and the sources the bundle
+// holds. The text comes back as it was stored: the cleaning of a bundle happened on intake, and the node journal's scrubber (which
+// turns state.json into <host> and a long path into <key>) is not applied to it. The caller filters by attribute key and passes the
+// text through the panel's current secret names. A node capture's id finds no lines here: the ids do not meet.
+func (s *Store) ClientDebugLines(ctx context.Context, id string, f DebugLineFilter) ([]DebugLineRow, []string, error) {
+	return s.debugLines(ctx, id, f, nil)
+}
+
+// MarkClientDebugRead records the owner's first read of a received bundle: read_at and read_by are set only while read_at is 0, so
+// first is true for one caller only (the one that writes the audit row).
+func (s *Store) MarkClientDebugRead(ctx context.Context, id, by string, now time.Time) (first bool, err error) {
+	res, err := s.batch(ctx, Stmt{Query: `UPDATE client_debug SET read_at = ?, read_by = ? WHERE id = ? AND read_at = 0 AND state = 'received'`,
+		Args: []any{unix(now), by, id}})
+	if err != nil {
+		return false, err
+	}
+	return len(res) == 1 && res[0].RowsAffected == 1, nil
+}
+
+// DeleteClientDebug deletes a closed request or a bundle, with its lines, in one batch. ErrNotFound: no such row;
+// ErrClientDebugStillOpen: it is open and has not run out. It returns the row as it was.
+func (s *Store) DeleteClientDebug(ctx context.Context, id string, now time.Time) (ClientDebugRow, error) {
+	row, err := s.ClientDebug(ctx, id, now)
+	if err != nil {
+		return row, err
+	}
+	if row.State == "open" {
+		return row, ErrClientDebugStillOpen
+	}
+	_, err = s.batch(ctx,
+		guard(`SELECT 1 FROM client_debug WHERE id = ? AND NOT (state = 'open' AND expires_at > ?)`, id, unix(now)),
+		Stmt{Query: `DELETE FROM debug_capture_line WHERE capture_id = ?`, Args: []any{id}},
+		Stmt{Query: `DELETE FROM client_debug WHERE id = ?`, Args: []any{id}})
+	if errors.Is(err, errGuard) {
+		if _, err := s.ClientDebug(ctx, id, now); errors.Is(err, ErrNotFound) {
+			return row, ErrNotFound
+		}
+		return row, ErrClientDebugStillOpen
+	}
+	return row, err
+}

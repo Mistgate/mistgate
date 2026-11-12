@@ -3,7 +3,7 @@ import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { fill } from "@/i18n";
 import { en } from "@/i18n/en";
 import { describeAudit, isFailure } from "./audit";
-import { describeEvent, eventKind } from "./events";
+import { describeEvent, eventKind, userAnchorOf } from "./events";
 
 const t = Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(en[key], vars), { n: () => "" });
 
@@ -15,6 +15,16 @@ describe("events", () => {
     expect(eventKind({ code: "node_recovered", severity: EventSeverity.INFO })).toBe("ok");
     // a restart that happened is a still dot, never the spinning ring of "in progress"
     expect(eventKind({ code: "engine_restarted", severity: EventSeverity.INFO })).toBe("ok");
+  });
+  it("says logs came from the Mistgate app, on request or on the person's own, with the count and nothing of the logs", () => {
+    expect(describeEvent(t as never, { code: "client_logs_received", params: { id: "dbr_1", lines: "18", unasked: "false" } })).toEqual({ text: "the Mistgate app sent its logs (18 lines)", detail: "" });
+    expect(describeEvent(t as never, { code: "client_logs_received", params: { id: "dbr_1", lines: "22", unasked: "true" } }).text).toBe("a person sent the logs of the Mistgate app on their own (22 lines)");
+  });
+  it("words the refusal to send logs, and leads the logs of the app to the section of the person's page", () => {
+    expect(describeEvent(t as never, { code: "client_logs_declined", params: { id: "dbr_1" } })).toEqual({ text: "a person declined to send the logs of the Mistgate app", detail: "" });
+    expect(userAnchorOf("client_logs_received")).toBe("client-logs");
+    expect(userAnchorOf("client_logs_declined")).toBe("client-logs");
+    expect(userAnchorOf("user_created")).toBeUndefined();
   });
   it("words a known code and keeps the error text as the detail", () => {
     expect(describeEvent(t as never, { code: "engine_failed", params: { error: "bind: address in use" } })).toEqual({
