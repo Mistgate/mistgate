@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 )
@@ -62,6 +64,14 @@ type fakeFleet struct {
 	onRollback func(node string) (*agentv1.CommandResult, error)
 	// afterLive runs (under the lock) once a Live snapshot is built: what it changes is seen by the next read only.
 	afterLive func(f *fakeFleet)
+	// osSent records the OS jobs sent, in order; onOs decides the answer (nil = started under the job id of the request).
+	osSent []sentOsJob
+	onOs   func(node string, req OsJobRequest) (*agentv1.CommandResult, error)
+}
+
+type sentOsJob struct {
+	nodeID string
+	req    OsJobRequest
 }
 
 func newFakeFleet() *fakeFleet {
@@ -137,6 +147,32 @@ func (f *fakeFleet) precondition(id string) error {
 		}
 	}
 	return connect.NewError(connect.CodeFailedPrecondition, errors.New("node cannot update itself"))
+}
+
+// UpdateOs is the fleet's: offline and agents without os-update/1 are refused before anything is sent.
+func (f *fakeFleet) UpdateOs(_ context.Context, id string, req OsJobRequest, _ time.Duration) (*agentv1.CommandResult, error) {
+	f.mu.Lock()
+	if !f.live[id] {
+		f.mu.Unlock()
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
+	}
+	if !slices.Contains(f.caps[id], osupdate.CapabilityUpdate) {
+		f.mu.Unlock()
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
+	}
+	f.osSent = append(f.osSent, sentOsJob{id, req})
+	fn := f.onOs
+	f.mu.Unlock()
+	if fn != nil {
+		return fn(id, req)
+	}
+	return &agentv1.CommandResult{Ok: true, Params: map[string]string{"state": osupdate.AnswerStarted, "job_id": req.JobID}}, nil
+}
+
+func (f *fakeFleet) osJobs() []sentOsJob {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]sentOsJob(nil), f.osSent...)
 }
 
 func okResult() *agentv1.CommandResult { return &agentv1.CommandResult{Ok: true, Affected: 1} }

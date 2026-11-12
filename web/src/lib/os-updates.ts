@@ -1,23 +1,33 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { StatusKind } from "@/components/ui/status";
-import { OsUpdateState, type GetOsUpdatesResponse, type NodeOs } from "@/gen/mistgate/admin/v1/update_pb";
+import { OsRolloutStatus, OsUpdateState, type GetOsUpdatesResponse, type NodeOs, type OsRollout, type OsStep } from "@/gen/mistgate/admin/v1/update_pb";
 import type { OsStatus } from "@/gen/mistgate/agent/v1/agent_pb";
 import type { MessageKey } from "@/i18n/en";
 import { updates } from "./api";
 import { plain, type Plain } from "./plain";
 
-// Updates -> Server operating system: what each server's packages and kernel look like (UpdateService.GetOsUpdates).
-// Read-only for now: the agents read their package lists from disk and the panel shows them; installing and rebooting
-// from the panel come later. The VPS edition only.
+// Updates -> Server operating system: what each server's packages and kernel look like (UpdateService.GetOsUpdates), and
+// the run of one OS update on one node lives in os-run.ts. The VPS edition only.
 
 export type OsUpdates = Plain<GetOsUpdatesResponse>;
 export type OsNode = Plain<NodeOs>;
 export type Os = Plain<OsStatus>;
+export type OsRun = Plain<OsRollout>;
+export type OsStepRow = Plain<OsStep>;
+
+/** How often the page asks while an OS update runs (a step moves in seconds), waits for its Close, or has just ended. */
+export function osPollMs(d: OsUpdates | undefined, nowMs = Date.now()): number {
+  const r = d?.rollout;
+  if (!r) return 60_000;
+  if (r.status === OsRolloutStatus.RUNNING) return 5_000;
+  if (r.status === OsRolloutStatus.PAUSED) return 10_000;
+  return nowMs / 1000 - r.finishedUnix < 120 ? 8_000 : 60_000;
+}
 
 export const osUpdatesQuery = queryOptions({
   queryKey: ["updates", "os"],
   queryFn: async ({ signal }) => plain(await updates.getOsUpdates({}, { signal })),
-  refetchInterval: 60_000,
+  refetchInterval: (q) => osPollMs(q.state.data),
 });
 
 export const useOsUpdates = (enabled: boolean) => useQuery({ ...osUpdatesQuery, enabled });
@@ -34,6 +44,14 @@ export type OsRow = {
   status?: Os;
   /** Why there is nothing to show, as a message key; undefined when there is a status. */
   why?: MessageKey;
+  /** The agent can run an OS job (a node only). */
+  updateCapable: boolean;
+  /** Why "Install updates" / "Reboot" are refused right now, "" = allowed: the key of "os.block.<key>". */
+  updateBlock: string;
+  rebootBlock: string;
+  /** This node's step in the active or last run, and the run itself. */
+  step?: OsStepRow;
+  rollout?: OsRun;
 };
 
 const errorKey = (code: string): MessageKey =>
@@ -46,18 +64,23 @@ function stateOf(s: Os): OsUpdateState {
   return s.pending > 0 ? OsUpdateState.UPDATES : OsUpdateState.UP_TO_DATE;
 }
 
+const noActions = { updateCapable: false, updateBlock: "", rebootBlock: "" };
+
 export function osRows(d: OsUpdates): OsRow[] {
   const host = d.panelHost;
   const panel: OsRow = host
-    ? { id: "panel", onPanelServer: false, state: stateOf(host), status: host, why: host.error ? errorKey(host.error) : undefined }
-    : { id: "panel", onPanelServer: false, state: OsUpdateState.UNSUPPORTED, why: "up.os.why.panel" };
+    ? { ...noActions, id: "panel", onPanelServer: false, state: stateOf(host), status: host, why: host.error ? errorKey(host.error) : undefined }
+    : { ...noActions, id: "panel", onPanelServer: false, state: OsUpdateState.UNSUPPORTED, why: "up.os.why.panel" };
   const nodes = d.nodes.map((n): OsRow => {
     const why: MessageKey | undefined = n.status?.error
       ? errorKey(n.status.error)
       : !n.supported
         ? "up.os.why.agent"
         : undefined;
-    return { id: n.nodeId, name: n.name, nodeId: n.nodeId, online: n.onlineUsers, onPanelServer: n.onPanelServer, state: n.state, status: n.status, why };
+    return {
+      id: n.nodeId, name: n.name, nodeId: n.nodeId, online: n.onlineUsers, onPanelServer: n.onPanelServer, state: n.state, status: n.status, why,
+      updateCapable: n.updateCapable, updateBlock: n.updateBlock, rebootBlock: n.rebootBlock, rollout: d.rollout, step: d.rollout?.steps.find((x) => x.nodeId === n.nodeId),
+    };
   });
   return [panel, ...nodes];
 }

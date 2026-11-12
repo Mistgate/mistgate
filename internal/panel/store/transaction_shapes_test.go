@@ -122,6 +122,7 @@ var transactionShape2 = map[string]string{
 	"token.go:CreateAPIToken":                        "The insert guard enforces the live-token cap and unique active name in SQL.",
 	"update.go:AddNodeToRunningRollout":              "A current-rollout guard precedes stage shifting, insertion, and schedule consumption.",
 	"update.go:createRollout":                        "One SQL guard checks the rollout id, active slot, and optional exact schedule before fixed writes.",
+	"os_rollout.go:CreateOsRollout":                  "One SQL guard checks the rollout id and the active slot before fixed writes.",
 	"warp.go:ReplaceWarpAccount":                     "An account-exists guard precedes the delete and replacement insert.",
 	"scheduled_task.go:ClaimScheduledTask":           "A free-lease (and manual cooldown) compare-and-swap takes the lease; the run row is inserted only if that lease holds.",
 	"scheduled_task.go:FinishScheduledRun":           "The run row is updated; the task's outcome update is a compare-and-swap on the run's own lease.",

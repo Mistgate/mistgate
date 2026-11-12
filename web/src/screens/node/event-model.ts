@@ -90,8 +90,8 @@ const worse = (a: StatusKind, b: StatusKind) => (rank[b] > rank[a] ? b : a);
 function headKind(e: NodeEvent): StatusKind {
   if (e.code === "agent_started") return e.params.reason === "update" ? "ok" : "blip";
   if (e.code === "profile_added" || e.code === "profile_removed" || e.code === "profiles_restarted") return "ok";
-  if (e.code === "update_step_passed") return "ok";
-  if (e.code === "update_step_failed") return "bad";
+  if (e.code === "update_step_passed" || e.code === "os_step_passed" || e.code === "os_update_done") return "ok";
+  if (e.code === "update_step_failed" || e.code === "os_step_failed" || e.code === "os_update_failed") return "bad";
   if (e.code === "update_step_rolled_back") return "warn";
   return eventKind(e);
 }

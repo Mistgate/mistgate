@@ -100,6 +100,10 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["update_rollout_cancel", {}],
   ["update_rollback_node", { node_id: "nod_1", node: "de1" }],
   ["update_rescan", { status: "ok" }],
+  ["os_rollout_start", { rollout_id: "osr_1", node_id: "nod_1", node: "de1", mode: "security", reboot: "if_required" }],
+  ["os_rollout_start", { rollout_id: "osr_1", node_id: "nod_1", node: "de1", mode: "reboot_only", reboot: "always" }],
+  ["os_rollout_cancel", { rollout_id: "osr_1" }],
+  ["os_refresh", { nodes: "2" }],
   ["update_download_sources", { sources: "github" }],
   ["update_download_sources", { sources: "" }],
   ["warp_params", {}],
@@ -150,6 +154,12 @@ describe("audit dictionary", () => {
         if (lang === "ru") expect(s, `ru ${action} ${result ?? ""}`).not.toMatch(/\b(fail|locked|rejected|denied|limited|error)\b/);
       }
     }
+  });
+  it("tells an OS update of a node from its reboot, and names the node", () => {
+    expect(describe2(tEn, "os_rollout_start", { node: "de1", mode: "security", reboot: "never" })).toBe("started an OS update of de1");
+    expect(describe2(tEn, "os_rollout_start", { node: "de1", mode: "reboot_only", reboot: "always" })).toBe("started a reboot of de1");
+    expect(describe2(tRu, "os_rollout_start", { node: "de1", mode: "reboot_only", reboot: "always" })).toBe("запустил(а) перезагрузку de1");
+    expect(describe2(tRu, "os_rollout_cancel", { rollout_id: "osr_1" })).toBe("закрыл(а) обновление ОС");
   });
   it("says GitHub was turned on or off as the fallback download of node updates", () => {
     expect(describe2(tRu, "update_download_sources", { sources: "github" })).toBe("включил(а) запасную загрузку обновлений нод с GitHub");

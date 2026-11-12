@@ -221,6 +221,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("Certificate is about to expire", "Сертификат скоро истечёт", "证书即将到期")
 	case "update_failed":
 		return l.pick("The update is paused", "Обновление остановилось", "更新已暂停")
+	case "os_update_failed":
+		return osUpdateTitle.forLanguage(l)
 	case "quota":
 		return l.pick("A user reached the quota", "Пользователь выбрал квоту", "有用户已达流量配额")
 	case "subscription_shared_suspect":
@@ -348,6 +350,8 @@ func alertReason(l L, a store.HealthAlert) string {
 		case p["days_left"] != "":
 			return l.pick("“"+who+"”: "+data(p["days_left"], 4)+" days left.", "«"+who+"»: осталось "+data(p["days_left"], 4)+" дн.", "「"+who+"」：剩余 "+data(p["days_left"], 4)+" 天。")
 		}
+	case "os_update_failed":
+		return osUpdateReason(l, p)
 	case "update_failed":
 		if v, ok := updateReasons[p["reason"]]; ok {
 			return upperFirst(v.forLanguage(l)) + l.stop()
@@ -879,6 +883,8 @@ var toolTitles = map[string]localizedText{
 	"alert_close":                 {en: "Close an alert", ru: "Закрыть алерт", zh: "关闭告警"},
 	"node_fix":                    {en: "Fix a node", ru: "Исправить ноду", zh: "修复节点"},
 	"rollout_start":               {en: "Update a node now", ru: "Обновить ноду сейчас", zh: "立即更新节点"},
+	"os_rollout_start":            {en: "Update the operating system of a node", ru: "Обновить операционную систему ноды", zh: "更新节点的操作系统"},
+	"os_rollout_cancel":           {en: "Close the OS update of a node", ru: "Закрыть обновление ОС ноды", zh: "关闭节点的系统更新"},
 	"rollout_pause":               {en: "Pause the rollout", ru: "Поставить раскатку на паузу", zh: "暂停滚动更新"},
 	"rollout_resume":              {en: "Resume the rollout", ru: "Продолжить раскатку", zh: "继续滚动更新"},
 	"rollout_cancel":              {en: "Cancel the rollout", ru: "Отменить раскатку", zh: "取消滚动更新"},

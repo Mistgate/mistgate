@@ -161,6 +161,12 @@ enum AlertKind {
   // node_id = "", subject = the task id, params{task, task_id, task_kind, count, reason, telegram}. Closes with the next run that
   // works, or when the task is disabled or deleted.
   ALERT_KIND_SCHEDULED_TASK_FAILING = 23;
+  // An OS update of one node (UpdateService.StartOsRollout) stopped: the node refused the job, the job failed, the node would not
+  // reboot, it did not return in 15 minutes or failed the check after the reboot. WARNING, CRITICAL when the node did not return.
+  // node_id = the node, subject = the rollout id, params{rollout_id, node, reason, code}: reason is the step's error key
+  // (os.step.err.*), code the node's own code (os.job.err.*). Open while the rollout is PAUSED; closes when the owner cancels it.
+  // Produced from the updates module through a health condition source.
+  ALERT_KIND_OS_UPDATE_FAILED = 24;
 }
 
 message Alert {

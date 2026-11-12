@@ -13,6 +13,7 @@
 package update
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"errors"
@@ -20,6 +21,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -53,6 +55,9 @@ type Fleet interface {
 	SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time, downloadTimeout time.Duration) error
 	// SendRollbackAgent hands an edge rollback command to the live node link without waiting for its result.
 	SendRollbackAgent(ctx context.Context, nodeID, requestID string, deadline time.Time) error
+	// UpdateOs sends one OS job and waits up to wait for the CommandResult (params.state: started, running, finished or
+	// unsupported). FAILED_PRECONDITION when the node is offline or did not list "os-update/1": nothing was sent.
+	UpdateOs(ctx context.Context, nodeID string, req OsJobRequest, wait time.Duration) (*agentv1.CommandResult, error)
 }
 
 // UpdateAgentOptions carries optional fields for an agent that advertised the matching capability.
@@ -87,6 +92,12 @@ type Timing struct {
 	RollbackWait      time.Duration // RollbackAgent answer; default 60 s
 	InboundGrace      time.Duration // an inbound FAILED that long (two evaluations) fails the gate at once; default 30 s
 	Prune             time.Duration // retention sweep period; default 6 h
+	OsAnswerWait      time.Duration // UpdateOs: the node's CommandResult; default 45 s
+	OsResendAfter     time.Duration // an unanswered, unseen job id is sent again after this, then after twice this; default 90 s
+	OsJobWait         time.Duration // a job that shows nothing for this long after it was sent fails the step; default 90 min (the unit lives 75 min, then 10 of waiting and 2 of settling)
+	OsBackWait        time.Duration // after the reboot began: the node is back on a new boot; default 15 min
+	OsGateWait        time.Duration // after it is back (or the job ended): the checks pass; default 8 min, the node's own settling takes up to 5
+	OsRefreshGap      time.Duration // one refresh of the package lists per node in this time; default 30 min
 }
 
 func (t *Timing) defaults() {
@@ -95,6 +106,8 @@ func (t *Timing) defaults() {
 		&t.GitHubSourceCheck: 10 * time.Second,
 		&t.AnswerWait:        10 * time.Minute, &t.ReconnectWait: 3 * time.Minute,
 		&t.GateWait: 5 * time.Minute, &t.RollbackWait: time.Minute, &t.InboundGrace: 30 * time.Second, &t.Prune: 6 * time.Hour,
+		&t.OsAnswerWait: 45 * time.Second, &t.OsResendAfter: 90 * time.Second, &t.OsJobWait: 90 * time.Minute, &t.OsBackWait: 15 * time.Minute,
+		&t.OsGateWait: 8 * time.Minute, &t.OsRefreshGap: 30 * time.Minute,
 	} {
 		if *p <= 0 {
 			*p = d
@@ -181,6 +194,9 @@ type Service struct {
 	bundleSyncing   bool
 	runCtx          context.Context
 	wg              sync.WaitGroup
+	osInflight      map[string]bool      // node id -> an UpdateOs goroutine owns its step
+	osMu            sync.Mutex           // guards osRefreshes
+	bootHash        string               // this panel host's boot id as the agents hash it, "" when unknown
 	inflight        map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
 	preparing       map[string]string    // node id -> rollout id while a source check runs before the step is SENT
 	orphans         map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
@@ -189,9 +205,12 @@ type Service struct {
 	progress        map[string]progressState // node id -> latest update progress
 	progressActive  map[string]progressExpectation
 	osStatusMonitor *osupdate.Monitor
+	osRefreshes     map[string]osRefresh // node id -> its last refresh of the package lists, guarded by osMu
+	hostname        string               // this panel's host name, "" when unknown
 
 	updMu             sync.RWMutex
 	updating          map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)
+	osUpdating        map[string]bool // node id -> has an OS step in flight (sent, rebooting, gating)
 	updatingCheckedAt time.Time
 	updRefreshMu      sync.Mutex
 
@@ -242,15 +261,22 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 		servingNodes: map[string]*serveSlot{}, zombies: map[string]int{}, nodeSlotWait: bundleNodeSlotWait, sendTimeout: bundleSendStallTimeout,
 		parseNetworkTable: asndb.Parse,
 		inflight:          map[string]bool{}, preparing: map[string]string{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
-		updating: map[string]bool{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
+		updating: map[string]bool{}, osUpdating: map[string]bool{}, osInflight: map[string]bool{}, osRefreshes: map[string]osRefresh{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
 	if shouldReadPanelHostStatus(cfg.Edge, osupdate.IsRoot(), cfg.OSStatusReader != nil) {
 		s.osStatusMonitor = osupdate.NewMonitor(cfg.OSStatusReader)
 	}
 	if cfg.DataDir != "" { // without one there is no bundle (and no relative "dist" in whatever the working directory is)
 		s.dist = filepath.Join(cfg.DataDir, "dist")
 	}
+	s.hostname, _ = os.Hostname()
+	if !cfg.Edge { // no root is needed to read it
+		if b, err := os.ReadFile("/proc/sys/kernel/random/boot_id"); err == nil && len(bytes.TrimSpace(b)) > 0 {
+			s.bootHash = osupdate.BootIDHash(string(b))
+		}
+	}
 	s.rescan()
 	s.loadUpdating(context.Background())
+	s.loadOsUpdating(context.Background())
 	return s, nil
 }
 
@@ -281,6 +307,7 @@ func (s *Service) Run(ctx context.Context) {
 	s.runCtx = ctx
 	s.mu.Unlock()
 	s.recover(ctx)
+	s.recoverOs(ctx)
 	s.syncNodeBundle(ctx)
 	s.processScheduledNodeUpdates(ctx)
 	if s.cfg.PanelUpdater != nil {
@@ -313,9 +340,11 @@ func (s *Service) Run(ctx context.Context) {
 			return
 		case <-tick.C:
 			s.tick(ctx)
+			s.tickOs(ctx)
 			s.processScheduledNodeUpdates(ctx)
 		case <-s.wake:
 			s.tick(ctx)
+			s.tickOs(ctx)
 			s.processScheduledNodeUpdates(ctx)
 		case <-poll.C:
 			s.rescanIfChanged()
@@ -337,6 +366,7 @@ func (s *Service) kick() {
 }
 
 func (s *Service) pruneOld(ctx context.Context) {
+	s.pruneOsOld(ctx)
 	if n, err := s.st.PruneRollouts(ctx, keepRollouts, s.now().Add(-rolloutAge)); err != nil {
 		if ctx.Err() == nil {
 			s.log.Warn("update: prune rollouts", "err", err)
@@ -357,14 +387,15 @@ func (s *Service) auditAs(ctx context.Context, actor, action string, params map[
 	}
 }
 
-// Updating is fleet.Updates.Updating: a SENT or GATING step of an active rollout exists for the node.
+// Updating is fleet.Updates.Updating: a SENT or GATING step of an active rollout exists for the node, or an OS step is in
+// flight (sent, rebooting, gating): the stream drops when the agent re-executes or the host reboots, neither a blip nor an outage.
 func (s *Service) Updating(nodeID string) bool {
 	if s.cfg.Edge {
 		s.refreshUpdatingIfStale()
 	}
 	s.updMu.RLock()
 	defer s.updMu.RUnlock()
-	return s.updating[nodeID]
+	return s.updating[nodeID] || s.osUpdating[nodeID]
 }
 
 func (s *Service) refreshUpdatingIfStale() {

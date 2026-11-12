@@ -373,6 +373,18 @@
   },
   {
     "type": "index",
+    "name": "os_rollout_active",
+    "tbl_name": "os_rollout",
+    "sql": "CREATE UNIQUE INDEX os_rollout_active ON os_rollout ((1)) WHERE status IN ('running', 'paused')"
+  },
+  {
+    "type": "index",
+    "name": "os_rollout_created",
+    "tbl_name": "os_rollout",
+    "sql": "CREATE INDEX os_rollout_created ON os_rollout (created_at)"
+  },
+  {
+    "type": "index",
     "name": "panel_ca_one_active",
     "tbl_name": "panel_ca",
     "sql": "CREATE UNIQUE INDEX panel_ca_one_active ON panel_ca (active) WHERE active = 1"
@@ -940,6 +952,18 @@
     "name": "node_update_schedule",
     "tbl_name": "node_update_schedule",
     "sql": "CREATE TABLE node_update_schedule ( node_id TEXT PRIMARY KEY REFERENCES node (id) ON DELETE CASCADE, to_version TEXT NOT NULL, to_built INTEGER NOT NULL, scheduled_at INTEGER NOT NULL, timezone_offset_minutes INTEGER NOT NULL CHECK (timezone_offset_minutes BETWEEN -720 AND 840), created_by TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL , missed_at INTEGER NOT NULL DEFAULT 0) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "os_rollout",
+    "tbl_name": "os_rollout",
+    "sql": "CREATE TABLE os_rollout ( id TEXT PRIMARY KEY, -- osr_... status TEXT NOT NULL CHECK (status IN ('running', 'paused', 'done', 'cancelled', 'failed')), mode TEXT NOT NULL CHECK (mode IN ('security', 'all', 'reboot_only')), reboot TEXT NOT NULL CHECK (reboot IN ('never', 'if_required', 'always')), batch_size INTEGER NOT NULL DEFAULT 1 CHECK (batch_size BETWEEN 1 AND 5), window_start INTEGER NOT NULL DEFAULT -1, -- minute of the day, -1 = no window window_end INTEGER NOT NULL DEFAULT -1, tz_offset INTEGER NOT NULL DEFAULT 0, -- the update time zone when it was created max_online INTEGER NOT NULL DEFAULT 0, -- 0 = ignore pause_key TEXT NOT NULL DEFAULT '', pause_params_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(pause_params_json)), created_by TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, finished_at INTEGER NOT NULL DEFAULT 0 ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "os_step",
+    "tbl_name": "os_step",
+    "sql": "CREATE TABLE os_step ( rollout_id TEXT NOT NULL REFERENCES os_rollout (id) ON DELETE CASCADE, node_id TEXT NOT NULL, node_name TEXT NOT NULL, stage INTEGER NOT NULL, state TEXT NOT NULL CHECK (state IN ('pending', 'sent', 'rebooting', 'gating', 'passed', 'failed', 'skipped')), job_id TEXT NOT NULL DEFAULT '', -- osj_...; a new attempt is a new id sends INTEGER NOT NULL DEFAULT 0, -- times UpdateOs was sent under job_id (a lost answer is sent again) acked_at INTEGER NOT NULL DEFAULT 0, -- the node answered started / running with this job id phase TEXT NOT NULL DEFAULT '', phase_at INTEGER NOT NULL DEFAULT 0, boot_before INTEGER NOT NULL DEFAULT 0, -- the node's boot time when the job was sent kernel_from TEXT NOT NULL DEFAULT '', kernel_to TEXT NOT NULL DEFAULT '', pre_failed_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(pre_failed_json)), -- inbounds FAILED before the job sent_at INTEGER NOT NULL DEFAULT 0, reboot_at INTEGER NOT NULL DEFAULT 0, back_at INTEGER NOT NULL DEFAULT 0, -- the check window opened (back after the reboot, or the job ended) finished_at INTEGER NOT NULL DEFAULT 0, error_key TEXT NOT NULL DEFAULT '', params_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(params_json)), PRIMARY KEY (rollout_id, node_id) ) STRICT"
   },
   {
     "type": "table",

@@ -89,6 +89,8 @@ var tokenApproved = map[string]bool{
 	adminv1connect.UpdateServicePauseRolloutProcedure:                     true,
 	adminv1connect.UpdateServiceResumeRolloutProcedure:                    true,
 	adminv1connect.UpdateServiceCancelRolloutProcedure:                    true,
+	adminv1connect.UpdateServiceStartOsRolloutProcedure:                   true,
+	adminv1connect.UpdateServiceCancelOsRolloutProcedure:                  true,
 	adminv1connect.UpdateServiceRollbackNodeProcedure:                     true,
 	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:               true,
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:         true,
@@ -383,6 +385,8 @@ type world struct {
 	updateReq          []*adminv1.UpdateUserRequest
 	disableReq         []*adminv1.SetUsersEnabledRequest
 	startReq           []*adminv1.StartRolloutRequest
+	osStartReq         []*adminv1.StartOsRolloutRequest
+	osCancelReq        []*adminv1.CancelOsRolloutRequest
 	scheduleReq        []*adminv1.ScheduleNodeUpdateRequest
 	cancelScheduleReq  []*adminv1.CancelNodeUpdateScheduleRequest
 	timezoneReq        []*adminv1.SetUpdateTimezoneRequest
@@ -487,8 +491,8 @@ func newWorld() *world {
 		RebootRequired: true, RebootReasons: []string{"kernel", "linux-image-6.8.0-2-generic"}, Held: []string{"linux-image-6.8.0-2-generic", "203.0.113.77"},
 		Apt: "ok", ListsUnix: 1699990000, DpkgUnix: 1699980000, AutoUpdates: "on", BootIdHash: "0123456789abcdef"}
 	w.osUpdates = &adminv1.GetOsUpdatesResponse{NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: 180, PanelHost: proto.Clone(osStatus).(*agentv1.OsStatus), Nodes: []*adminv1.NodeOs{
-		{NodeId: nodeA, Name: "de1", Connected: true, Supported: true, OnlineUsers: 3, State: adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES, Status: proto.Clone(osStatus).(*agentv1.OsStatus)},
-		{NodeId: nodeB, Name: "nl1", Connected: false, Supported: true, State: adminv1.OsUpdateState_OS_UPDATE_STATE_OFFLINE},
+		{NodeId: nodeA, Name: "de1", Connected: true, Supported: true, UpdateCapable: true, OnlineUsers: 3, State: adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES, Status: proto.Clone(osStatus).(*agentv1.OsStatus)},
+		{NodeId: nodeB, Name: "nl1", Connected: false, Supported: true, UpdateCapable: true, UpdateBlock: "offline", RebootBlock: "offline", State: adminv1.OsUpdateState_OS_UPDATE_STATE_OFFLINE},
 	}}
 	w.relay = newRelayFixture()
 	w.tasks = newFakeTasks()
@@ -1516,6 +1520,20 @@ func (w *world) GetOsUpdates(context.Context, *connect.Request[adminv1.GetOsUpda
 		return connect.NewResponse(&adminv1.GetOsUpdatesResponse{}), nil
 	}
 	return connect.NewResponse(proto.Clone(w.osUpdates).(*adminv1.GetOsUpdatesResponse)), nil
+}
+
+func (w *world) StartOsRollout(_ context.Context, r *connect.Request[adminv1.StartOsRolloutRequest]) (*connect.Response[adminv1.StartOsRolloutResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.osStartReq = append(w.osStartReq, r.Msg)
+	return connect.NewResponse(&adminv1.StartOsRolloutResponse{Rollout: &adminv1.OsRollout{Id: "osr_2", Steps: []*adminv1.OsStep{{}}}}), nil
+}
+
+func (w *world) CancelOsRollout(_ context.Context, r *connect.Request[adminv1.CancelOsRolloutRequest]) (*connect.Response[adminv1.CancelOsRolloutResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.osCancelReq = append(w.osCancelReq, r.Msg)
+	return connect.NewResponse(&adminv1.CancelOsRolloutResponse{Rollout: &adminv1.OsRollout{Id: r.Msg.GetRolloutId()}}), nil
 }
 
 func (w *world) StartRollout(_ context.Context, r *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {

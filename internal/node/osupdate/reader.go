@@ -191,7 +191,13 @@ func (r *Reader) bootIDHash() string {
 	if err != nil {
 		return ""
 	}
-	sum := sha256.Sum256([]byte(strings.TrimSpace(string(b))))
+	return BootIDHash(string(b))
+}
+
+// BootIDHash is the first 16 hex characters of the SHA-256 of a boot id (the contents of /proc/sys/kernel/random/boot_id): what
+// OsStatus.boot_id_hash carries, so that the panel can tell its own server from another one without a reading of its own.
+func BootIDHash(bootID string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(bootID)))
 	return hex.EncodeToString(sum[:])[:16]
 }
 

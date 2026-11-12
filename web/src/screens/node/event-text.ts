@@ -1,6 +1,7 @@
 import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { describeEvent } from "@/lib/events";
+import { jobErrorText, reasonLine } from "@/lib/os-run";
 import { torrentEvidenceText } from "@/lib/torrent";
 import { reasonText } from "@/lib/updates";
 import { prepReasonText } from "./awg-kernel";
@@ -143,6 +144,9 @@ function eventSub(t: T, e: NodeEvent): string {
   if (e.code === "update_step_failed") return p.reason ? reasonText(t, p.reason) : "";
   if (e.code === "engine_started" || e.code === "engine_restarted") return p.reason && reasonKeys[p.reason] ? t(reasonKeys[p.reason]!) : "";
   if (e.code === "awg_kernel_prepare_failed") return prepReasonText(t, p.code ?? "", p.reason ?? "");
+  // the node's own code of a failed OS job, and the panel's reason (the step's error key) with that code
+  if (e.code === "os_update_failed") return p.code ? jobErrorText(t, p.code, p.package) : describeEvent(t, e).detail;
+  if (e.code === "os_step_failed") return p.reason ? reasonLine(t, p.reason, { code: p.code ?? "", package: p.package ?? "", mode: p.mode ?? "" }) : "";
   return describeEvent(t, e).detail;
 }
 

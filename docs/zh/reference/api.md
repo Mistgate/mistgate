@@ -199,6 +199,8 @@ func main() {
 | `AuthService.ListAudit` | 否 | 否 | 是 |
 | `HealthService.ApplyFix` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
+| `UpdateService.StartOsRollout`, `CancelOsRollout` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
+| `UpdateService.RefreshOsUpdates` | 否 | 否 | 否（所有者在管理后台点击） |
 | `UpdateService.ScheduleNodeUpdate`, `CancelNodeUpdateSchedule`, `SetUpdateTimezone`, `SetUpdateDownloadTimeout` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 | `ProvisioningService.ListNodeServerAccess`（连接元数据，不含密码） | 否 | 否 | 是 |
 | `ProvisioningService.GetSSHFingerprint` | 否 | 否 | 仅在 MCP 服务器制定 `node_install` 计划时可用 |

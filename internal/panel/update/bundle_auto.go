@@ -39,6 +39,10 @@ func (s *Service) syncNodeBundle(ctx context.Context) bool {
 		s.log.Warn("update: check active rollout before GitHub bundle sync", "err", err)
 		return false
 	}
+	if active, err := s.osRolloutRunning(ctx); err != nil || active {
+		s.mu.Unlock()
+		return false // an OS update of a node is going: the bundle waits
+	}
 	s.bundleSyncing = true
 	s.mu.Unlock()
 	defer func() {

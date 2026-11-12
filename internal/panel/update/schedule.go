@@ -206,6 +206,9 @@ func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 		s.log.Warn("update: check active rollout before scheduled update", "err", err)
 		return
 	}
+	if active, err := s.osRolloutRunning(ctx); err != nil || active {
+		return // an OS update of a node is going: the schedule waits for it
+	}
 	schedules, err := s.st.DueNodeUpdateSchedules(ctx, now)
 	if err != nil {
 		s.log.Warn("update: load due node updates", "err", err)

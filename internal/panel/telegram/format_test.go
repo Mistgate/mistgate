@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"strconv"
 	"strings"
 	"testing"
@@ -659,6 +660,73 @@ func TestUpdateFailedReasonIsASentence(t *testing.T) {
 		a := store.HealthAlert{Kind: "update_failed", Params: map[string]string{"node": "de1", "reason": tc.reason}}
 		if got := alertReason(L(tc.lang), a); got != tc.want {
 			t.Errorf("alertReason(%s, %s) = %q, want %q", tc.lang, tc.reason, got, tc.want)
+		}
+	}
+}
+
+// The alert of an OS update that stopped says what happened to the node and what to do, in the three languages, with no way
+// round the node's refusal in it.
+func TestOsUpdateFailedIsASentenceWithAnAdvice(t *testing.T) {
+	a := store.HealthAlert{Kind: "os_update_failed", Params: map[string]string{"node": "de1", "reason": "reboot_held", "code": "boot_default_custom"}}
+	if got, want := alertTitle("en", a), "The OS update of a node stopped"; got != want {
+		t.Errorf("title = %q, want %q", got, want)
+	}
+	for _, lang := range []L{"en", "ru", "zh"} {
+		got := alertReason(lang, a)
+		if got == "" || got == "reboot_held" || strings.Contains(strings.ToLower(got), "anyway") || strings.Contains(got, "всё равно") {
+			t.Errorf("reason (%s) = %q", lang, got)
+		}
+	}
+	if got := alertReason("en", a); !strings.Contains(got, "installed") || !strings.Contains(got, "GRUB_DEFAULT=0") {
+		t.Errorf("reason = %q: what happened and what to do are both needed", got)
+	}
+	if got := alertReason("zh", a); !hasHan(got) {
+		t.Errorf("Chinese reason %q has no Chinese", got)
+	}
+	// every node code and every step reason has a text in all three languages
+	for code, text := range osJobCodes {
+		if text.en == "" || text.ru == "" || text.zh == "" {
+			t.Errorf("node code %s lacks a language", code)
+		}
+	}
+	for key, text := range osUpdateReasons {
+		if text.en == "" || text.ru == "" || text.zh == "" {
+			t.Errorf("step reason %s lacks a language", key)
+		}
+	}
+	notBack := store.HealthAlert{Kind: "os_update_failed", Params: map[string]string{"node": "de1", "reason": "not_back"}}
+	if got := alertReason("en", notBack); !strings.Contains(got, "previous kernel") {
+		t.Errorf("not_back reason = %q: it has to send the owner to the provider’s console", got)
+	}
+	if got := alertReason("en", store.HealthAlert{Kind: "os_update_failed", Params: map[string]string{"reason": "something_new"}}); got != "something_new" {
+		t.Errorf("an unknown reason = %q, want it as it came", got)
+	}
+}
+
+// the reboot-only run installs nothing: its refusal must not say the updates were installed
+func TestOsUpdateFailedRebootHeldIsToldByMode(t *testing.T) {
+	only := store.HealthAlert{Kind: "os_update_failed", Params: map[string]string{"reason": "reboot_held", "mode": "reboot_only", "code": "reboot_limit"}}
+	sec := store.HealthAlert{Kind: "os_update_failed", Params: map[string]string{"reason": "reboot_held", "mode": "security", "code": "reboot_limit"}}
+	for _, lang := range []L{"en", "ru", "zh"} {
+		o, s := alertReason(lang, only), alertReason(lang, sec)
+		if o == s {
+			t.Errorf("%s: the same text for both modes: %q", lang, o)
+		}
+	}
+	if got := alertReason("en", only); strings.Contains(got, "installed") {
+		t.Errorf("a reboot-only run says it installed something: %q", got)
+	}
+	if got := alertReason("en", store.HealthAlert{Kind: "os_update_failed", Params: map[string]string{"reason": "node_lost"}}); !strings.Contains(got, "dropped off") {
+		t.Errorf("node_lost: %q", got)
+	}
+}
+
+// every code the agent can send has its sentence in the three languages
+func TestEveryOsJobCodeHasATelegramText(t *testing.T) {
+	for _, code := range osupdate.Codes {
+		text, ok := osJobCodes[code]
+		if !ok || text.en == "" || text.ru == "" || text.zh == "" {
+			t.Errorf("code %s has no text in en, ru and zh", code)
 		}
 	}
 }

@@ -91,6 +91,9 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	confirm := req.Msg.Confirm
+	if confirm && f.updating(n.ID) { // an agent update or an OS job is on this node: two package and kernel jobs never run side by side
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_updating"))
+	}
 	prev := n.AwgPrepare()
 	now := f.now().UTC().Unix()
 	restore := func() {

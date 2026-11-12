@@ -26,6 +26,16 @@ service UpdateService {
   rpc GetUpdates(GetUpdatesRequest) returns (GetUpdatesResponse);
   // Stored snapshots only: does not contact nodes, run apt, or refresh package lists.
   rpc GetOsUpdates(GetOsUpdatesRequest) returns (GetOsUpdatesResponse);
+  // Install the security updates of ONE node, or reboot it, now (agent.proto "OS UPDATES"). A rollout of one node; more
+  // nodes at once, windows and the canary come later. Owner-only with a fresh step-up. Only one rollout of any kind is
+  // active at a time (agent update, OS update, panel update, GitHub bundle sync). Audited.
+  rpc StartOsRollout(StartOsRolloutRequest) returns (StartOsRolloutResponse);
+  // End the OS rollout. A step whose job is running finishes (dpkg is never cut short) and is still checked; nothing new
+  // starts. A rollout paused by a failed step ends at once: the alert clears. Owner-only with a fresh step-up.
+  rpc CancelOsRollout(CancelOsRolloutRequest) returns (CancelOsRolloutResponse);
+  // Refresh the package lists of nodes (apt-get update only; nothing is installed or rebooted). At most 3 nodes at a time
+  // and once per node per 30 minutes; the answer says which were started. Owner-only, no step-up.
+  rpc RefreshOsUpdates(RefreshOsUpdatesRequest) returns (RefreshOsUpdatesResponse);
   // Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.
   rpc CheckPanelUpdate(CheckPanelUpdateRequest) returns (CheckPanelUpdateResponse);
   // Install the latest signed panel release through the root helper (a transient systemd unit or the fixed
@@ -86,6 +96,16 @@ message NodeOs {
   bool on_panel_server = 6;
   OsUpdateState state = 7;
   mistgate.agent.v1.OsStatus status = 8;
+  // The agent lists "os-update/1": it can run an OS job. False for an agent that only reads (update the agent).
+  bool update_capable = 9;
+  // Why StartOsRollout would be refused for this node right now, "" when it would not. One of: offline, agent_old,
+  // unsupported, panel_host, node_busy (a job is running on the node, or a refresh of its package lists was just asked for), no_status (nothing read yet), nothing_to_do
+  // (nothing to install: use a reboot), rollout_active (an OS rollout is running or paused: a paused one holds only the next OS update), agent_rollout (a node-agent
+  // rollout is active), panel_busy (the panel itself is being updated or a bundle is being installed), awg_build (the
+  // AmneziaWG module is being built on the node). The SPA resolves "os.block.<key>".
+  string update_block = 10;
+  // The same for a plain reboot (no package change), "" when allowed. Same keys, without no_status and nothing_to_do.
+  string reboot_block = 11;
 }
 
 message GetOsUpdatesResponse {
@@ -93,6 +113,135 @@ message GetOsUpdatesResponse {
   repeated NodeOs nodes = 2;
   mistgate.agent.v1.OsStatus panel_host = 3;
   int32 schedule_timezone_offset_minutes = 4;
+  // The active OS rollout, else the last one; unset when there never was one.
+  OsRollout rollout = 5;
+}
+
+enum OsRolloutStatus {
+  OS_ROLLOUT_STATUS_UNSPECIFIED = 0;
+  OS_ROLLOUT_STATUS_RUNNING = 1;
+  // Something happened on the node and a step failed (the job failed, the reboot was held, the node did not come back, the check
+  // failed): the rollout waits for the owner (CancelOsRollout) and the alert os_update_failed is open. It holds only the next OS
+  // update; agent rollouts, the panel update and the bundle sync go on. A refusal where nothing happened on the node ends the
+  // rollout as FAILED at once, without a pause and without an alert.
+  OS_ROLLOUT_STATUS_PAUSED = 2;
+  OS_ROLLOUT_STATUS_DONE = 3;
+  OS_ROLLOUT_STATUS_CANCELLED = 4;
+  // Finished with a FAILED step (the owner cancelled the paused rollout).
+  OS_ROLLOUT_STATUS_FAILED = 5;
+}
+
+enum OsRolloutMode {
+  OS_ROLLOUT_MODE_UNSPECIFIED = 0;
+  // unattended-upgrade: what the distribution calls a security update.
+  OS_ROLLOUT_MODE_SECURITY = 1;
+  // No package change, only the reboot.
+  OS_ROLLOUT_MODE_REBOOT_ONLY = 2;
+}
+
+enum OsRebootPolicy {
+  OS_REBOOT_POLICY_UNSPECIFIED = 0;
+  OS_REBOOT_POLICY_NEVER = 1;
+  OS_REBOOT_POLICY_IF_REQUIRED = 2;
+  // Reboot even when nothing asks for it (REBOOT_ONLY only). All the node's own checks still apply.
+  OS_REBOOT_POLICY_ALWAYS = 3;
+}
+
+enum OsStepState {
+  OS_STEP_STATE_UNSPECIFIED = 0;
+  OS_STEP_STATE_PENDING = 1;
+  // UpdateOs sent: the job runs on the node (phase says what it does).
+  OS_STEP_STATE_SENT = 2;
+  // The job reached its reboot: the node is down or coming back (15 minutes to return).
+  OS_STEP_STATE_REBOOTING = 3;
+  // The job is over and the node is checked like after an agent update (profiles up, probes pass).
+  OS_STEP_STATE_GATING = 4;
+  OS_STEP_STATE_PASSED = 5;
+  OS_STEP_STATE_FAILED = 6;
+  // Not attempted: offline, unsupported, the panel's own server, nothing to do, or cancelled.
+  OS_STEP_STATE_SKIPPED = 7;
+}
+
+message OsStep {
+  string node_id = 1;
+  string node_name = 2;
+  OsStepState state = 3;
+  // "osj_..." of the job on the node.
+  string job_id = 4;
+  // The node's phase while the job runs (agent.proto OsJob.phase): preflight, waiting_lock, repairing, refreshing,
+  // installing, awg_module, checking, rebooting; "" otherwise.
+  string phase = 5;
+  int64 phase_unix = 6 [jstype = JS_NUMBER];
+  string kernel_from = 7;
+  string kernel_to = 8;
+  int64 sent_unix = 9 [jstype = JS_NUMBER];
+  int64 reboot_unix = 10 [jstype = JS_NUMBER];
+  int64 back_unix = 11 [jstype = JS_NUMBER];
+  int64 finished_unix = 12 [jstype = JS_NUMBER];
+  // "os.step.err.<error_key>" for FAILED and SKIPPED: offline, unsupported, panel_host, up_to_date, not_required,
+  // cancelled (skipped); agent_refused (the node answered unsupported or busy: params.code; nothing happened on it), job_failed (the job ended failed:
+  // params.code, params.package), reboot_held (the job installed what it could but the node refused to reboot:
+  // params.code), no_answer, not_back (15 minutes after the reboot), and the check's own: kernel_not_switched,
+  // state_not_applied, inbounds_unreadable, warp_down, inbound_failed, probe_failed, job_not_settled (the end of the job is not known
+  // after the check window), node_lost (a job without a reboot: the node dropped off while it was checked).
+  string error_key = 13;
+  // params.code is a node code (agent.proto OsJob.code; the SPA resolves "os.job.err.<code>"); also package, upgraded,
+  // reboot (done | not_required | held | not_asked), held_reason, kernel, pending and security (counts when it started), mode
+  // (security | reboot_only: a reboot_only run installed nothing).
+  map<string, string> params = 14;
+}
+
+message OsRollout {
+  // "osr_..." opaque.
+  string id = 1;
+  OsRolloutStatus status = 2;
+  OsRolloutMode mode = 3;
+  OsRebootPolicy reboot = 4;
+  int64 created_unix = 5 [jstype = JS_NUMBER];
+  int64 finished_unix = 6 [jstype = JS_NUMBER];
+  // Set while PAUSED: "os.pause.<code>": step_failed (the node refused or the job failed), reboot_held (installed, but the
+  // node would not reboot), not_back (did not return 15 minutes after the reboot), gate_failed (it returned but a check
+  // failed). pause_params {node, reason: the step's error_key, code: the node's code, mode: security | reboot_only}.
+  string pause_key = 7;
+  map<string, string> pause_params = 8;
+  repeated OsStep steps = 9;
+}
+
+message StartOsRolloutRequest {
+  // Exactly one node for now.
+  repeated string node_ids = 1;
+  OsRolloutMode mode = 2;
+  OsRebootPolicy reboot = 3;
+}
+
+message StartOsRolloutResponse {
+  OsRollout rollout = 1;
+}
+
+message CancelOsRolloutRequest {
+  // Empty = the active rollout.
+  string rollout_id = 1;
+}
+
+message CancelOsRolloutResponse {
+  OsRollout rollout = 1;
+}
+
+message RefreshOsUpdatesRequest {
+  // Empty = every node that can.
+  repeated string node_ids = 1;
+}
+
+message OsRefreshResult {
+  string node_id = 1;
+  // started, running (a job is on the node already), recent (checked less than 30 minutes ago), limit (3 are running),
+  // offline, unsupported (no os-update/1 or not Debian/Ubuntu), refused (the node said no: code).
+  string outcome = 2;
+  string code = 3;
+}
+
+message RefreshOsUpdatesResponse {
+  repeated OsRefreshResult results = 1;
 }
 
 // ---------------------------------------------------------------------------------------------------

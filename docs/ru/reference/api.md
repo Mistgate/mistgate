@@ -199,6 +199,8 @@ func main() {
 | `AuthService.ListAudit` | нет | нет | да |
 | `HealthService.ApplyFix` | нет | нет | только через одобренный план MCP |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | нет | нет | только через одобренный план MCP |
+| `UpdateService.StartOsRollout`, `CancelOsRollout` | нет | нет | только через одобренный план MCP |
+| `UpdateService.RefreshOsUpdates` | нет | нет | нет (нажатие владельца в админке) |
 | `UpdateService.ScheduleNodeUpdate`, `CancelNodeUpdateSchedule`, `SetUpdateTimezone`, `SetUpdateDownloadTimeout` | нет | нет | только через одобренный план MCP |
 | `ProvisioningService.ListNodeServerAccess` (данные подключения, без пароля) | нет | нет | да |
 | `ProvisioningService.GetSSHFingerprint` | нет | нет | только пока MCP-сервер составляет план `node_install` |

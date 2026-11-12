@@ -317,11 +317,70 @@ How it is read:
 - It works on Debian and Ubuntu with systemd. Other systems, and nodes whose agent is older than this feature, show **Not available** with the reason.
 - The panel's own server is read only when the panel runs as root; otherwise the row says to check it by hand.
 
-The layer is read-only for now: installing updates and rebooting from the panel come in a later release, and until then a server is updated over SSH or by the command under [Running by hand on a node](#running-by-hand-on-a-node). The Cloudflare edition does not have this layer. The MCP tool `os_updates_status` returns the same stored readings; it never contacts a node.
+From this layer the panel installs security updates on one node and reboots it: see [Update one server's system](#update-one-servers-system). Several nodes at once and the panel's own server are not done from here yet: update those over SSH or by the command under [Running by hand on a node](#running-by-hand-on-a-node). The Cloudflare edition does not have this layer. The MCP tool `os_updates_status` returns the same stored readings and the last OS update; it never contacts a node.
+
+### Update one server's system
+
+An owner can install security updates on one server, or reboot it, from the panel: on the node's **Server** tab (the **Operating system** card) or in the node's row of the **Server systems** layer. The panel asks for a fresh confirmation first, as for every change that runs as root on a node.
+
+| Button | What it does |
+|---|---|
+| **Install security updates…** | Installs what the distribution calls security updates (`unattended-upgrade`). With **Reboot if needed** (recommended) it then reboots the server when a reboot is needed; with **Don't reboot** it only installs, and the server shows **Reboot needed** until you reboot it. |
+| **Reboot…** | Reboots the server and installs nothing. |
+| **Check for updates** | Refreshes the server's package lists (`apt-get update`) so the counts are current. Installs and reboots nothing. Once per server in 30 minutes, three servers at a time. |
+
+The confirmation window says what will happen: how many packages wait and how many of them are security updates, whether a new kernel is waiting, whether a reboot is already needed, how many people are online on the server, and that they are disconnected while it reboots (usually about two minutes) and reconnect by themselves. It warns about what makes the server refuse: `unattended-upgrades` set to reboot by itself, an AmneziaWG module that is not built for the new kernel, half-installed packages. Old kernels stay installed.
+
+What happens next, in the server's row:
+
+1. The panel gives the job a new id and sends it to the node's agent, which runs it as its own system service, so an agent restart does not cut it. The row shows the phase: checking the server, waiting for another package manager (up to 15 minutes), repairing interrupted packages, checking for updates, installing updates, building the AmneziaWG module for the new kernel, checking before the reboot, rebooting.
+2. After a reboot the panel waits up to 15 minutes for the server to come back on a new boot. The node checks that it started on the kernel it installed, that the AmneziaWG module is loaded where it was in use, and that its profiles are up.
+3. The panel then runs the same check as after an agent update: the configuration is applied, no profile that worked before has failed, WARP is up where a profile leaves through it, and the panel's own client-eye probes pass (up to 8 minutes). The panel passes the server only once it knows how the job ended: a server it found back on a new boot but heard nothing more about waits for the job's own report. If the server drops off during this check and no reboot was involved, the update stops with "the server was lost". Then the row says **Done**, with the number of packages installed and the new kernel.
+
+The node decides whether a reboot is safe, and the panel has no way around its answer: there is no "reboot anyway". When the node refuses, the updates it installed stay installed (a **Reboot…** run installs nothing, and says only that the server was not rebooted), the job ends as failed with the reboot **held**, and the row says why and what to do. The same sentences stand for every refusal and failure of a job:
+
+| Code | What it means and what to do |
+|---|---|
+| `busy` | Another job is running on the server: wait for it to finish. |
+| `too_soon` | The server restarted less than 10 minutes ago, so it was not rebooted again. |
+| `reboot_limit` | The panel already rebooted this server within the last hour or three times today, so it will not do it again yet. |
+| `boot_default_custom` | The boot menu (GRUB) is set to a chosen or saved entry, not the newest kernel, so the node was not rebooted: set GRUB_DEFAULT=0 or reboot from your provider’s panel. |
+| `awg_module_missing` | The AmneziaWG module is not built for the new kernel, so the node was not rebooted: build the module first. |
+| `awg_module_build_failed` | The AmneziaWG module failed to build for the new kernel; the node was not rebooted and the loaded module keeps working: fix the build first. |
+| `kernel_unknown` | The kernel the server will boot could not be determined, so it was not rebooted. |
+| `kernel_older` | The next boot would start an older kernel, so it was not rebooted: check the boot menu (GRUB). |
+| `initramfs_missing` | The files that start the new kernel are missing, so the node was not rebooted: reinstall the kernel package. |
+| `boot_full` | The /boot partition is too full for the new kernel: remove old kernels. |
+| `apt_lock` | Another package manager held the lock too long: try again in a few minutes. |
+| `dpkg_interrupted` | A package installation was interrupted: run sudo dpkg --configure -a on the server. |
+| `dpkg_broken` | The package database is broken: run sudo dpkg --configure -a on the server. |
+| `disk_full` | The disk is too full: free some space. |
+| `security_source_failed` | The server could not reach its security package source: check its mirror and network. |
+| `refresh_failed` | The package lists could not be refreshed: check the server’s network and mirrors. |
+| `install_failed` | Installing the updates failed: see the job’s log on the server (journalctl -u mistgate-os-update). |
+| `auto_reboot_conflict` | Unattended-upgrades is set to reboot by itself, which would bypass the checks: turn Automatic-Reboot off. |
+| `reboot_failed` | The reboot command was refused or the server did not go down: reboot it from your provider’s panel. |
+| `kernel_not_switched` | The server restarted on another kernel than the one installed: check the boot menu (GRUB). |
+| `awg_module_not_loaded` | After the reboot the AmneziaWG module did not load: rebuild it or switch the backend to Auto. |
+| `inbound_failed` | After the reboot some profiles did not start: see the node’s Profiles tab. |
+| `unsupported_os` | This system cannot be updated from the panel: update it by hand. |
+| `no_systemd` | The server has no systemd: update it by hand. |
+| `bad_request` | The node did not accept the request: update the node agent. |
+| `launch_failed` | The job could not be started: check the node’s disk and the agent’s log. |
+| `timeout` | The job took too long and was stopped. |
+| `interrupted` | The job stopped without a result: check the server. |
+| `cancelled` | The job was cancelled before it changed anything. |
+| `unknown` | The node reported a problem the panel does not know: see its History tab. |
+
+**It is not available** (the buttons are grey, with the reason under them) when: the server is offline; its agent is too old to run jobs (update the agent on the Updates page); the system is not Debian 12 or 13 or Ubuntu 22.04, 24.04 or 26.04 with systemd; it is the panel's own server (rebooting it would take the panel down; update it by hand); another job is running on it (an update, the AmneziaWG module build, an agent update); nothing has been read from it yet; there are no security updates to install (use **Reboot…** or **Check for updates**); or another update is running: an OS update of another node (running, or stopped and not yet closed), an agent rollout, a panel update or a bundle install. Only one at a time, so that two reboots or two package managers never overlap. In the other direction, while an OS update is running, agent rollouts, a panel update, a bundle install and scheduled node updates wait for it; an OS update that is only stopped holds nothing but the next OS update.
+
+**When it fails after something happened on the server** (the job failed, the reboot was held, the server did not come back, a check failed) the update is paused, not undone: packages cannot be rolled back. The row and the Updates page show a banner with the reason, the alert **The OS update of a node stopped** (`os_update_failed`) opens, Warning, or Critical when the server did not come back, and Telegram sends it. **Close** clears the alert and frees the way for the next OS update; the next try is a new job. When the server refused the job and nothing happened on it (another job was running, the system is not supported), the run just ends as failed with the reason: no pause, no alert, and you can start again at once. If the server does not come back within 15 minutes after the reboot, open your hoster's console: if it hangs, choose the previous kernel under GRUB's *Advanced options* (old kernels are never removed by an update).
+
+The panel keeps the whole state in its database, so a panel restart in the middle loses nothing: it finds the job by its id and goes on. The node's events `os_update_started`, `os_update_done`, `os_update_failed` and `os_reboot_started` and the panel's `os_step_passed` and `os_step_failed` are on the node's **History** tab; the audit log has `os_rollout_start`, `os_rollout_cancel` and `os_refresh`.
 
 ### Running by hand on a node
 
-From the panel this arrives in the next release; today the panel does not send OS jobs. The node can run one itself, and the owner can start it on one server over SSH (as root; Debian 12 or 13, Ubuntu 22.04, 24.04 or 26.04 with systemd):
+The panel starts this same job for one node (see [Update one server's system](#update-one-servers-system)). The node can also run one itself, and the owner can start it on one server over SSH (as root; Debian 12 or 13, Ubuntu 22.04, 24.04 or 26.04 with systemd):
 
 ```
 mistgate-node host os-update --action upgrade --mode security --reboot if-required        # prints the plan, runs nothing
@@ -359,4 +418,4 @@ What it does not do: it does not edit package sources, does not run `dist-upgrad
 
 ## Updates through the API and MCP
 
-Every API token profile can read the Updates page (`GetUpdates`). Starting, pausing, resuming and cancelling a rollout, scheduling and rolling a node back are refused over the plain API; an MCP agent with the admin profile can only plan them, and the owner approves each plan in the admin. An MCP `rollout_start` updates exactly one node, pinned to the version in the plan. See [API](../reference/api.md) and [MCP](../reference/mcp.md).
+Every API token profile can read the Updates page (`GetUpdates`). Starting, pausing, resuming and cancelling a rollout, scheduling and rolling a node back are refused over the plain API; an MCP agent with the admin profile can only plan them, and the owner approves each plan in the admin. An MCP `rollout_start` updates exactly one node, pinned to the version in the plan. Likewise an OS update of a node (`StartOsRollout`, `CancelOsRollout`) is refused over the plain API and reaches an MCP agent only as the plans `os_rollout_start` (exactly one node: security updates, or a reboot) and `os_rollout_cancel`, which the owner approves with a fresh confirmation; refreshing the package lists (`RefreshOsUpdates`) is the owner's click in the admin and is not open to tokens. See [API](../reference/api.md) and [MCP](../reference/mcp.md).

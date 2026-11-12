@@ -1,0 +1,192 @@
+//go:build !js
+
+package mcp
+
+import (
+	"strings"
+	"testing"
+
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+)
+
+// os_rollout_start and os_rollout_cancel: the owner approves, the apply runs exactly what the plan pinned, and nothing runs before.
+
+func (e *testEnv) setOsRollout(ro *adminv1.OsRollout) {
+	e.w.mu.Lock()
+	e.w.osUpdates.Rollout = ro
+	e.w.mu.Unlock()
+}
+
+func (e *testEnv) osStarts() []*adminv1.StartOsRolloutRequest {
+	e.w.mu.Lock()
+	defer e.w.mu.Unlock()
+	return append([]*adminv1.StartOsRolloutRequest(nil), e.w.osStartReq...)
+}
+
+func (e *testEnv) osCancels() []*adminv1.CancelOsRolloutRequest {
+	e.w.mu.Lock()
+	defer e.w.mu.Unlock()
+	return append([]*adminv1.CancelOsRolloutRequest(nil), e.w.osCancelReq...)
+}
+
+func TestOsRolloutStartNeedsApprovalAndRunsThePinnedNode(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	args := map[string]any{"node_ids": []any{nodeA}, "mode": "security", "reboot": "if_required"}
+
+	p := planOf(t, s, "os_rollout_start", args)
+	if !p.NeedsApproval || len(p.Danger) != 2 || p.Danger[0] != "step_up" || p.Danger[1] != "fleet" {
+		t.Fatalf("plan: %+v", p)
+	}
+	var keys []string
+	for _, f := range p.Facts {
+		keys = append(keys, f.Key)
+		if f.Key == "node" && (!f.Untrusted || f.Value != "de1") {
+			t.Errorf("the node name is data: %+v", f)
+		}
+	}
+	for _, want := range []string{"node", "action", "pending", "security", "kernel", "people_online"} {
+		if !strings.Contains(strings.Join(keys, ","), want) {
+			t.Errorf("plan facts %v lack %q", keys, want)
+		}
+	}
+
+	// before the owner decides, the apply is refused and nothing runs
+	applyError(t, s, "os_rollout_start", p.ConfirmToken)
+	if got := e.osStarts(); len(got) != 0 {
+		t.Fatalf("StartOsRollout ran before the approval: %+v", got)
+	}
+	e.plans.decide(p.PlanID, true)
+	a := applyOf(t, s, "os_rollout_start", p.ConfirmToken)
+	got := e.osStarts()
+	if len(got) != 1 || len(got[0].GetNodeIds()) != 1 || got[0].GetNodeIds()[0] != nodeA ||
+		got[0].GetMode() != adminv1.OsRolloutMode_OS_ROLLOUT_MODE_SECURITY || got[0].GetReboot() != adminv1.OsRebootPolicy_OS_REBOOT_POLICY_IF_REQUIRED {
+		t.Fatalf("StartOsRollout got %+v, want the planned node, mode and reboot", got)
+	}
+	if c := e.w.calls("/mistgate.admin.v1.UpdateService/StartOsRollout"); len(c) != 1 || c[0].Approved != p.PlanID || c[0].Planning {
+		t.Errorf("the call did not run under the owner's grant for this plan: %+v", c)
+	}
+	// a replay returns the stored result and starts nothing
+	if b := applyOf(t, s, "os_rollout_start", p.ConfirmToken); b != a || len(e.osStarts()) != 1 {
+		t.Errorf("replay: %+v vs %+v, starts %d", b, a, len(e.osStarts()))
+	}
+}
+
+func TestOsRolloutStartRebootOnlyPinsItsPolicy(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	p := planOf(t, s, "os_rollout_start", map[string]any{"node_ids": []any{nodeA}, "mode": "reboot_only", "reboot": "always"})
+	e.plans.decide(p.PlanID, true)
+	applyOf(t, s, "os_rollout_start", p.ConfirmToken)
+	got := e.osStarts()
+	if len(got) != 1 || got[0].GetMode() != adminv1.OsRolloutMode_OS_ROLLOUT_MODE_REBOOT_ONLY || got[0].GetReboot() != adminv1.OsRebootPolicy_OS_REBOOT_POLICY_ALWAYS {
+		t.Fatalf("StartOsRollout got %+v", got)
+	}
+}
+
+func TestOsRolloutStartRefusedAtThePlan(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	for name, args := range map[string]map[string]any{
+		"two nodes":         {"node_ids": []any{nodeA, nodeB}, "mode": "security", "reboot": "never"},
+		"no node":           {"node_ids": []any{}, "mode": "security", "reboot": "never"},
+		"an unknown node":   {"node_ids": []any{"nod_nobody"}, "mode": "security", "reboot": "never"},
+		"security always":   {"node_ids": []any{nodeA}, "mode": "security", "reboot": "always"},
+		"reboot only never": {"node_ids": []any{nodeA}, "mode": "reboot_only", "reboot": "never"},
+		"all updates":       {"node_ids": []any{nodeA}, "mode": "all", "reboot": "never"},
+		"an offline node":   {"node_ids": []any{nodeB}, "mode": "security", "reboot": "never"},
+		"a missing mode":    {"node_ids": []any{nodeA}, "reboot": "never"},
+	} {
+		if got := mustFail(t, s, "os_rollout_start_plan", args); got == "" {
+			t.Errorf("%s: no refusal", name)
+		}
+	}
+	// the panel's own word for why it would refuse is in the refusal
+	if got := mustFail(t, s, "os_rollout_start_plan", map[string]any{"node_ids": []any{nodeB}, "mode": "security", "reboot": "never"}); !strings.Contains(got, "offline") {
+		t.Errorf("an offline node: %q", got)
+	}
+}
+
+func TestOsRolloutStartAppliesNothingThatChangedSinceThePlan(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	args := map[string]any{"node_ids": []any{nodeA}, "mode": "security", "reboot": "if_required"}
+
+	p := planOf(t, s, "os_rollout_start", args)
+	e.plans.decide(p.PlanID, true)
+	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING})
+	if got := applyError(t, s, "os_rollout_start", p.ConfirmToken); !strings.Contains(got, "changed since the plan") {
+		t.Errorf("apply with another update running: %q", got)
+	}
+	if len(e.osStarts()) != 0 {
+		t.Fatal("StartOsRollout ran while another OS update was active")
+	}
+	e.setOsRollout(nil)
+
+	p = planOf(t, s, "os_rollout_start", args)
+	e.plans.decide(p.PlanID, true)
+	e.w.mu.Lock()
+	e.w.osUpdates.Nodes[0].UpdateBlock = "node_busy"
+	e.w.mu.Unlock()
+	if got := applyError(t, s, "os_rollout_start", p.ConfirmToken); !strings.Contains(got, "changed since the plan") {
+		t.Errorf("apply after the node got busy: %q", got)
+	}
+	if len(e.osStarts()) != 0 {
+		t.Fatal("StartOsRollout ran for a node that could not take the job")
+	}
+}
+
+func TestOsRolloutCancelPlanIsOnlyOfferedWhenItCanWork(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	args := map[string]any{"rollout_id": "osr_1"}
+
+	if got := mustFail(t, s, "os_rollout_cancel_plan", args); !strings.Contains(got, "no such OS rollout") {
+		t.Errorf("no rollout: %q", got)
+	}
+	step := func(state adminv1.OsStepState) []*adminv1.OsStep {
+		return []*adminv1.OsStep{{NodeId: nodeA, NodeName: "de1", State: state}}
+	}
+	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_DONE, Steps: step(adminv1.OsStepState_OS_STEP_STATE_PASSED)})
+	if got := mustFail(t, s, "os_rollout_cancel_plan", args); !strings.Contains(got, "nothing to cancel") {
+		t.Errorf("a finished rollout: %q", got)
+	}
+	// a job that is running on the node cannot be stopped: the panel would refuse, so the owner is not asked
+	for _, st := range []adminv1.OsStepState{adminv1.OsStepState_OS_STEP_STATE_SENT, adminv1.OsStepState_OS_STEP_STATE_REBOOTING, adminv1.OsStepState_OS_STEP_STATE_GATING} {
+		e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING, Steps: step(st)})
+		if got := mustFail(t, s, "os_rollout_cancel_plan", args); !strings.Contains(got, "cannot be stopped") {
+			t.Errorf("%v: %q", st, got)
+		}
+	}
+
+	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_PAUSED, Steps: step(adminv1.OsStepState_OS_STEP_STATE_FAILED)})
+	p := planOf(t, s, "os_rollout_cancel", args)
+	if !p.NeedsApproval || len(p.Danger) != 2 {
+		t.Fatalf("plan: %+v", p)
+	}
+	applyError(t, s, "os_rollout_cancel", p.ConfirmToken)
+	if n := len(e.osCancels()); n != 0 {
+		t.Fatal("CancelOsRollout ran before the approval")
+	}
+	e.plans.decide(p.PlanID, true)
+	applyOf(t, s, "os_rollout_cancel", p.ConfirmToken)
+	if got := e.osCancels(); len(got) != 1 || got[0].GetRolloutId() != "osr_1" {
+		t.Fatalf("CancelOsRollout got %+v", got)
+	}
+	if c := e.w.calls("/mistgate.admin.v1.UpdateService/CancelOsRollout"); len(c) != 1 || c[0].Approved != p.PlanID {
+		t.Errorf("the call did not run under the owner's grant: %+v", c)
+	}
+
+	// the rollout changed between the plan and the approval
+	p = planOf(t, s, "os_rollout_cancel", args)
+	e.plans.decide(p.PlanID, true)
+	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING, Steps: step(adminv1.OsStepState_OS_STEP_STATE_SENT)})
+	if got := applyError(t, s, "os_rollout_cancel", p.ConfirmToken); !strings.Contains(got, "changed since the plan") {
+		t.Errorf("apply after the rollout moved on: %q", got)
+	}
+}

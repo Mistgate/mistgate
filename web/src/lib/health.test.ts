@@ -182,6 +182,26 @@ describe("alerts", () => {
     const unread = alert({ kind: AlertKind.UPDATE_FAILED, whyKey: "health.alert.update_failed.why.gate_failed", params: { node: "de2", reason: "inbounds_unreadable" } });
     expect(alertWhy(tRu, fmtRu, unread)).toContain("de2 не прошла проверку после обновления: панель не смогла прочитать профили ноды. Где получилось");
   });
+  it("words the alert of a stopped OS update with the node's own reason, in both languages", () => {
+    const stopped = (why: string, params: Record<string, string>) => alert({ kind: AlertKind.OS_UPDATE_FAILED, whyKey: `health.alert.os_update_failed.why.${why}`, params: { node: "fi1", ...params } });
+    // the sentence already says "installed, not rebooted": the reason adds the node's own words, not the step's headline again
+    expect(alertWhy(t, fmt, stopped("reboot_held", { reason: "reboot_held", code: "boot_default_custom", mode: "security" }))).toMatch(
+      /^fi1: the updates are installed, but the server was not rebooted\. The boot menu \(GRUB\) is set to start a chosen or saved entry/,
+    );
+    // a reboot alone installed nothing: it does not say so, in either language
+    const only = stopped("reboot_held", { reason: "reboot_held", code: "too_soon", mode: "reboot_only" });
+    expect(alertWhy(t, fmt, only)).toBe(`fi1: the server was not rebooted, the node refused. ${en["os.job.err.too_soon"]} Fix that, then close the update.`);
+    expect(alertWhy(tRu, fmtRu, only)).toMatch(/^fi1: сервер не перезагружен, нода отказалась\. Сервер перезагружался меньше 10 минут назад/);
+    expect(alertWhy(t, fmt, only)).not.toMatch(/installed/);
+    // a node lost during the check does not "come back"
+    const lost = stopped("gate_failed", { reason: "node_lost", mode: "security" });
+    expect(alertWhy(t, fmt, lost)).toMatch(/^fi1 dropped off the network while the panel was checking it after the update\./);
+    expect(alertWhy(t, fmt, lost)).not.toContain("came back");
+    expect(alertWhy(tRu, fmtRu, lost)).toMatch(/^fi1 пропала из сети, пока панель проверяла её после обновления\./);
+    expect(alertWhy(t, fmt, stopped("step_failed", { reason: "job_failed", code: "install_failed", package: "nginx" }))).toContain("The update failed on the node. Installing the updates failed on nginx.");
+    expect(alertWhy(t, fmt, stopped("not_back", { reason: "not_back" }))).toContain("did not come back within 15 minutes");
+    expect(alertWhy(tRu, fmtRu, stopped("gate_failed", { reason: "probe_failed" }))).toContain("fi1 вернулась, но не прошла проверку после обновления: Нода вернулась, но проверка глазами клиента не прошла.");
+  });
   it("says when access ended and names the protocol people dropped off", () => {
     const ended = alert({ kind: AlertKind.ACCESS_ENDED, whyKey: "health.alert.access_ended.why.expired", params: { user_name: "alice", since: "1700000000" } });
     expect(alertWhy(t, fmt, ended)).toContain(`alice’s subscription ended on ${fmt.stamp(1700000000)}`);

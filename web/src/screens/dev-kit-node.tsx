@@ -21,7 +21,7 @@ import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 const now = Math.floor(Date.now() / 1000);
 const hours = Array.from({ length: 24 }, (_, i) => Math.round((0.4 + Math.sin(i / 3.2) * 0.3 + (i > 17 ? 0.5 : 0)) * 2.1e9));
 
-const inbound = (over: object) => ({
+export const inbound = (over: object) => ({
   id: "inb_1",
   profileId: "prf_main",
   profileName: "hy2 · 443 · Salamander",
@@ -38,7 +38,7 @@ const inbound = (over: object) => ({
   ...over,
 });
 
-const baseNode = (over: object) => ({
+export const baseNode = (over: object) => ({
   id: "nod_de1",
   name: "de1",
   countryCode: "DE",
@@ -64,8 +64,8 @@ const baseNode = (over: object) => ({
   ...over,
 });
 
-const metrics = { cpuPct: 23, softirqPct: 4, load1: 0.42, ramUsedBytes: 610e6, ramTotalBytes: 2e9, diskUsedBytes: 7.1e9, diskTotalBytes: 20e9, netRxBps: 38e6, netTxBps: 41e6, atUnix: now - 5 };
-const facts = { hostname: "de1", os: "Ubuntu 24.04", kernel: "6.8.0-45", arch: "amd64", cpuCount: 2, ramTotalBytes: 2e9, diskTotalBytes: 20e9, virt: "kvm", hasIpv6: true, bootUnix: now - 9 * 86400, engines: ["hysteria2 2.6.1"] };
+export const metrics = { cpuPct: 23, softirqPct: 4, load1: 0.42, ramUsedBytes: 610e6, ramTotalBytes: 2e9, diskUsedBytes: 7.1e9, diskTotalBytes: 20e9, netRxBps: 38e6, netTxBps: 41e6, atUnix: now - 5 };
+export const facts = { hostname: "de1", os: "Ubuntu 24.04", kernel: "6.8.0-45", arch: "amd64", cpuCount: 2, ramTotalBytes: 2e9, diskTotalBytes: 20e9, virt: "kvm", hasIpv6: true, bootUnix: now - 9 * 86400, engines: ["hysteria2 2.6.1"] };
 
 const alert = (over: object) => ({
   id: "alt_1",
@@ -123,7 +123,7 @@ const profiles = [
 type Fill = [readonly unknown[], unknown];
 
 /** A private cache: every query the screens ask is answered from here, nothing is fetched. */
-function Mock({ fill, children }: { fill: Fill[]; children: ReactNode }) {
+export function Mock({ fill, children }: { fill: Fill[]; children: ReactNode }) {
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchInterval: false } } });
     c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role: Role.OWNER } } as never);
@@ -137,7 +137,7 @@ function Mock({ fill, children }: { fill: Fill[]; children: ReactNode }) {
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-const nodeFill = (id: string, over: { alerts?: object; doctor?: object[]; checks?: object } = {}): Fill[] => [
+export const nodeFill = (id: string, over: { alerts?: object; doctor?: object[]; checks?: object } = {}): Fill[] => [
   [nodeAlertsQuery(id).queryKey, { nowUnix: now, active: [], history: [], ...over.alerts }],
   [doctorQuery(id).queryKey, { nowUnix: now, nodes: [{ nodeId: id, nodeName: "de1", nodeStatus: NodeStatus.ONLINE, agentSupported: true, hasReport: true, receivedUnix: now - 60, ageS: 60, stale: false, items: over.doctor ?? [] }] }],
   [checksQuery(id).queryKey, over.checks ?? { nowUnix: now, intervalS: 300, columns, rows: [matrix.rows[0]] }],

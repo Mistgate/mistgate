@@ -39,6 +39,21 @@ func (f *Fleet) recordOsStatus(ctx context.Context, nodeID string, status *agent
 	}
 	if err := f.st.PutOsStatus(ctx, nodeID, string(body), time.Unix(status.MeasuredUnix, 0), at); err != nil {
 		f.log.Warn("OS status could not be stored", "code", "os_status_store_failed", "node", nodeID, "err", err)
+		return
+	}
+	f.osChanged(nodeID)
+}
+
+// osJobEventCode: the events an agent raises about an OS job (agent.proto "OS UPDATES").
+func osJobEventCode(code string) bool {
+	return code == "os_update_started" || code == "os_update_done" || code == "os_update_failed" || code == "os_reboot_started"
+}
+
+// osChanged tells the updates module that something about a node's OS job arrived (a snapshot, or an end-of-job event), so a
+// step that follows the job looks now instead of at its next tick.
+func (f *Fleet) osChanged(nodeID string) {
+	if u, ok := f.updates().(interface{ OsStatusChanged(nodeID string) }); ok {
+		u.OsStatusChanged(nodeID)
 	}
 }
 

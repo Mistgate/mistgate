@@ -28,6 +28,7 @@ import { BandwidthMeasure } from "./bandwidth-measure";
 import { DebugCaptureCard } from "./debug-capture";
 import { DecoyCard } from "./decoy";
 import { useNodeForm, useSaveNode } from "./node-form";
+import { OsCard } from "./os-card";
 import { useRelaysOf } from "./relays";
 import { SSHAccessCard, useServerAccess } from "./ssh-access";
 
@@ -60,8 +61,8 @@ export const retiredCleanupCommand = [
 
 /**
  * Server: what this machine is. From xl two columns: on the left the node's passport, capacity and agent link as one form
- * with one Save at its end, and the agent under it; on the right SSH access, the decoy site, the AmneziaWG backend and
- * the host facts. The danger zone comes last, full width. One column below xl in the same order, the form first.
+ * with one Save at its end, and the agent under it; on the right SSH access, the decoy site, the AmneziaWG backend, the
+ * operating system and the host facts. The danger zone comes last, full width. One column below xl in the same order, the form first.
  */
 export function ServerTab({ data }: { data: Plain<GetNodeResponse> }) {
   const node = data.node!;
@@ -81,6 +82,7 @@ export function ServerTab({ data }: { data: Plain<GetNodeResponse> }) {
           <SSHAccessCard nodeId={node.id} attach={retired ? undefined : { name: node.name, address: node.address }} />
           {!retired && <DecoyCard node={node} />}
           {!retired && <AwgBackendCard data={data} />}
+          {!retired && <OsCard nodeId={node.id} />}
           <HostPanel data={data} />
           {!retired && <DebugCaptureCard node={node} />}
         </div>

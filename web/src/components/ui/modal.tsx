@@ -17,6 +17,8 @@ type Props = {
   closeLabel?: string;
   /** 760 wide instead of 520 (a form in two columns). */
   wide?: boolean;
+  /** `data-shot` of the window, the handle the dev kit's screenshots find it by. */
+  shot?: string;
 };
 
 /**
@@ -24,13 +26,14 @@ type Props = {
  * 18px radius; the sheet has 22px top corners and a grab handle. Esc and the backdrop close it. The title and the footer
  * stay where they are: only the content between them scrolls when it is taller than the window.
  */
-export function Modal({ open, onOpenChange, title, description, children, footer, className, closeLabel, wide }: Props) {
+export function Modal({ open, onOpenChange, title, description, children, footer, className, closeLabel, wide, shot }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Viewport className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto md:items-center md:p-4">
           <Dialog.Popup
+            data-shot={shot}
             className={cx(
               "flex max-h-full w-full flex-col gap-4 overflow-hidden border border-line bg-surface p-5 shadow-(--shadow-toast) outline-none transition-[transform,opacity] duration-300 ease-out-soft md:rounded-card-lg",
               wide ? "md:max-w-[760px]" : "md:max-w-[520px]",

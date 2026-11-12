@@ -85,6 +85,9 @@ const keys: Record<string, MessageKey> = {
   update_rollout_cancel: "audit.update_rollout_cancel",
   update_rollback_node: "audit.update_rollback_node",
   update_rescan: "audit.update_rescan",
+  os_rollout_start: "audit.os_rollout_start",
+  os_rollout_cancel: "audit.os_rollout_cancel",
+  os_refresh: "audit.os_refresh",
   update_download_sources: "audit.update_download_sources",
   warp_params: "audit.warp_params",
   warp_register: "audit.warp_register",
@@ -190,6 +193,8 @@ function sentenceKey(e: Pick<AuditEntry, "action" | "result">, p: Record<string,
       return p.preset ? { key: base, worded: false } : variant("default");
     case "reset_login":
       return p.created === "true" ? variant("added") : { key: base, worded: false };
+    case "os_rollout_start":
+      return p.mode === "reboot_only" ? variant("reboot") : { key: base, worded: false };
     case "update_download_sources":
       return p.sources ? { key: base, worded: false } : variant("off");
     case "client_api_update":

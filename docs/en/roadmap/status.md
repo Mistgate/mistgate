@@ -145,6 +145,9 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
     - title: Mistgate client
       icon: monitor
       text: "Our own desktop app, Windows first. It talks to the panel natively, not only through a subscription link, speaks Hysteria2 and AmneziaWG itself, has built-in detectors of TSPU and other blocking, and sends debug reports to the panel with the person's consent. The panel side is ready and off by default: the owner switches it on in **Subscriptions → Who gets what**, and the app will be able to enrol a device by a key and fetch servers directly; nothing changes for existing apps. The app itself is not released yet, and until then people connect with existing apps: see [Client apps](../guide/client-apps.md)."
+    - title: The servers' operating system from the panel
+      section: updates
+      text: "In the next release the panel installs security updates on one node and reboots it, with your confirmation: the node checks that a reboot is safe, the panel waits for it to come back and checks its profiles, and a failure stops the update and raises an alert. Several nodes at once with a canary, a time window and the panel's own server come next. Refreshing the package lists is the owner's click in the admin: API tokens and MCP cannot do it yet. See [Update one server's system](../operations/updates.md#update-one-servers-system)."
     - title: Update from another node
       section: updates
       text: "A node with a poor link to the panel gets the update file from a neighbouring node of the fleet that already has it. For now there is one fallback source, GitHub. See [Download sources](../operations/updates.md#download-sources)."

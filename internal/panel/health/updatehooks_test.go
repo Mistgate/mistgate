@@ -144,3 +144,44 @@ func TestNodeChecksSince(t *testing.T) {
 		t.Fatal("unknown node")
 	}
 }
+
+// An OS update that stopped (internal/panel/update, os_rollout.go) raises os_update_failed through the same hook: a fact about
+// the rollout, not about the node's link, so it stays while the node is away (the reboot that did not come back) and clears
+// when the owner closes the rollout.
+func TestOsUpdateFailedConditionOpensAndClearsAnAlert(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	var mu sync.Mutex
+	var conds []ExtCond
+	e.s.AddConditionSource(func(context.Context) []ExtCond {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]ExtCond(nil), conds...)
+	})
+	set := func(c ...ExtCond) {
+		mu.Lock()
+		conds = c
+		mu.Unlock()
+		e.evaluate()
+	}
+	notBack := ExtCond{Kind: "os_update_failed", NodeID: "de1", Subject: "osr_1", Severity: sevCritical,
+		Why: "health.alert.os_update_failed.why.not_back", Params: map[string]string{"rollout_id": "osr_1", "node": "de1", "reason": "not_back", "code": ""}}
+	set(notBack)
+	got := e.active()
+	want(t, got, "os_update_failed/de1/osr_1")
+	a := got["os_update_failed/de1/osr_1"]
+	if a.Severity != sevCritical || a.WhyKey != notBack.Why || a.TitleKey != "health.alert.os_update_failed.title" {
+		t.Fatalf("alert %+v", a)
+	}
+	if kindProto["os_update_failed"] != adminv1.AlertKind_ALERT_KIND_OS_UPDATE_FAILED {
+		t.Fatal("kind is not mapped")
+	}
+	e.fl.set("de1", liveState{up: false})
+	e.evaluate()
+	want(t, e.active(), "os_update_failed/de1/osr_1")
+	set()
+	want(t, e.active())
+	if h := e.history(); len(h) != 1 || h[0].Kind != "os_update_failed" || h[0].Resolution != "cleared" {
+		t.Fatalf("history %+v", h)
+	}
+}

@@ -119,6 +119,16 @@ func updateAgentFrame(requestID string, manifest, signature []byte, downloadTime
 	return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: r}}
 }
 
+// UpdateOs sends one OS job to a connected node that listed "os-update/1" (FAILED_PRECONDITION "agent too old" otherwise,
+// "node is offline" when it is not connected: nothing was sent) and waits up to wait for the CommandResult. The result is ok
+// whatever the node decided; params.state says what happened (started, running, finished, unsupported; agent.proto "OS UPDATES").
+func (f *Fleet) UpdateOs(ctx context.Context, nodeID string, req panelupdate.OsJobRequest, wait time.Duration) (*agentv1.CommandResult, error) {
+	return f.command(ctx, nodeID, wait, func(reqID string) *agentv1.ConnectResponse {
+		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateOs{UpdateOs: &agentv1.UpdateOs{
+			RequestId: reqID, Action: req.Action, Mode: req.Mode, Reboot: req.Reboot, JobId: req.JobID}}}
+	})
+}
+
 // RollbackAgent asks a connected node with the update capability to put its previous binary back.
 func (f *Fleet) RollbackAgent(ctx context.Context, nodeID string, wait time.Duration) (*agentv1.CommandResult, error) {
 	return f.command(ctx, nodeID, wait, func(reqID string) *agentv1.ConnectResponse {

@@ -167,6 +167,12 @@ const (
 	// node_id = "", subject = the task id, params{task, task_id, task_kind, count, reason, telegram}. Closes with the next run that
 	// works, or when the task is disabled or deleted.
 	AlertKind_ALERT_KIND_SCHEDULED_TASK_FAILING AlertKind = 23
+	// An OS update of one node (UpdateService.StartOsRollout) stopped: the node refused the job, the job failed, the node would not
+	// reboot, it did not return in 15 minutes or failed the check after the reboot. WARNING, CRITICAL when the node did not return.
+	// node_id = the node, subject = the rollout id, params{rollout_id, node, reason, code}: reason is the step's error key
+	// (os.step.err.*), code the node's own code (os.job.err.*). Open while the rollout is PAUSED; closes when the owner cancels it.
+	// Produced from the updates module through a health condition source.
+	AlertKind_ALERT_KIND_OS_UPDATE_FAILED AlertKind = 24
 )
 
 // Enum value maps for AlertKind.
@@ -196,6 +202,7 @@ var (
 		21: "ALERT_KIND_AGENT_CRASH_LOOP",
 		22: "ALERT_KIND_SCHEDULED_CHECK",
 		23: "ALERT_KIND_SCHEDULED_TASK_FAILING",
+		24: "ALERT_KIND_OS_UPDATE_FAILED",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -222,6 +229,7 @@ var (
 		"ALERT_KIND_AGENT_CRASH_LOOP":            21,
 		"ALERT_KIND_SCHEDULED_CHECK":             22,
 		"ALERT_KIND_SCHEDULED_TASK_FAILING":      23,
+		"ALERT_KIND_OS_UPDATE_FAILED":            24,
 	}
 )
 
@@ -3861,7 +3869,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xcd\x05\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xee\x05\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -3887,7 +3895,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x15ALERT_KIND_PATH_LOSSY\x10\x14\x12\x1f\n" +
 	"\x1bALERT_KIND_AGENT_CRASH_LOOP\x10\x15\x12\x1e\n" +
 	"\x1aALERT_KIND_SCHEDULED_CHECK\x10\x16\x12%\n" +
-	"!ALERT_KIND_SCHEDULED_TASK_FAILING\x10\x17*\x8e\x01\n" +
+	"!ALERT_KIND_SCHEDULED_TASK_FAILING\x10\x17\x12\x1f\n" +
+	"\x1bALERT_KIND_OS_UPDATE_FAILED\x10\x18*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

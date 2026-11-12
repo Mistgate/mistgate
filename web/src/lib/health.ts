@@ -23,6 +23,7 @@ import type { Fmt } from "./format";
 import { plain, type Plain } from "./plain";
 import { pollMs } from "./queries";
 import { protocolName } from "./series";
+import { osAlertReason, osAlertWhyKey } from "./os-run";
 import { meQuery } from "./session";
 import { lossPct, regionWord, senderLabel } from "./port-check";
 import { torrentEvidenceText } from "./torrent";
@@ -129,6 +130,8 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   const params: Params = doctor ? itemParams(t, fmt, a) : { ...a.params };
   // a paused rollout names the step error code of its node: say it in words, the short form of the pause
   if (a.kind === AlertKind.UPDATE_FAILED && a.params.reason) params.reason = pauseReasonText(t, a.params.reason);
+  // a stopped OS update names the step's error key (and the node's job code): say it in words
+  if (a.kind === AlertKind.OS_UPDATE_FAILED) params.reason = osAlertReason(t, a.params);
   if (a.kind === AlertKind.NODE_DOWN && a.params.minutes) params.duration = fmt.duration(Number(a.params.minutes) * 60);
   if (a.kind === AlertKind.ACCESS_ENDED && Number(a.params.since) > 0) params.date = fmt.stamp(Number(a.params.since));
   if (a.kind === AlertKind.USERS_IMPACTED) params.protocol = protocolName(a.subject);
@@ -170,7 +173,8 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
     params.region = regionWord(t, a.params.region ?? "");
     params.other_region = regionWord(t, a.params.other_region ?? "");
   }
-  return lookup(t, a.whyKey, params) ?? "";
+  // a refused reboot with nothing installed, and a node lost during the check, have their own sentences
+  return lookup(t, a.kind === AlertKind.OS_UPDATE_FAILED ? osAlertWhyKey(a.whyKey, a.params) : a.whyKey, params) ?? "";
 }
 
 /** The sentence of a TORRENT alert: "N attempts", then the evidence of the last one and the ports, when the agent said so. */

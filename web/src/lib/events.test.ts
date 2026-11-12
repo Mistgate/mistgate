@@ -52,6 +52,20 @@ describe("events", () => {
     expect(describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "x" } }).text).toBe(en["event.host_firewall_sync_failed.plain"]);
     expect(describeEvent(t as never, { code: "host_firewall_sync_recovered", params: { resolved_error: "x" } }).text).toBe(en["event.host_firewall_sync_recovered"]);
   });
+  it("words the OS update of a node: the agent's job, its reboot, and the panel's verdict", () => {
+    const d = (code: string, params: Record<string, string> = {}) => describeEvent(t as never, { code, params }).text;
+    expect(d("os_update_started", { action: "update" })).toBe("OS update started");
+    expect(d("os_update_started", { action: "refresh" })).toBe("refreshing the package lists");
+    expect(d("os_update_done", { action: "update", upgraded: "6" })).toBe("OS update finished, packages installed: 6");
+    expect(d("os_update_done", { action: "update", upgraded: "0" })).toBe("OS update finished");
+    expect(d("os_update_done", { action: "refresh" })).toBe("package lists refreshed");
+    expect(d("os_update_failed", { code: "disk_full" })).toBe("OS update failed");
+    expect(d("os_reboot_started", { kernel: "6.8.0-150-generic" })).toBe("rebooting after the OS update");
+    expect(d("os_step_passed")).toBe("OS update finished, the node passed the check");
+    expect(d("os_step_failed", { reason: "not_back" })).toBe("OS update of the node stopped");
+    expect(eventKind({ code: "os_update_failed", severity: EventSeverity.ERROR })).toBe("bad");
+    expect(eventKind({ code: "os_step_passed", severity: EventSeverity.INFO })).toBe("ok");
+  });
   it("tells which sources a node's update came from, and names only the ones it knows", () => {
     const p = (sources_used: string) => ({ code: "update_download_source", params: { to_version: "0.3.1", sources_used } });
     expect(describeEvent(t as never, p("panel,github")).text).toBe("downloaded 0.3.1, sources: panel + GitHub");

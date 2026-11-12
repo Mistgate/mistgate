@@ -68,6 +68,13 @@ const textKeys: Record<string, MessageKey> = {
   bandwidth_upload_missing: "event.bandwidth_upload_missing",
   port_lossy: "event.port_lossy",
   path_lossy: "event.path_lossy",
+  // an OS update of the node: the agent's job (os_update_*, os_reboot_started) and the panel's verdict (os_step_*)
+  os_update_started: "event.os_update_started",
+  os_update_done: "event.os_update_done",
+  os_update_failed: "event.os_update_failed",
+  os_reboot_started: "event.os_reboot_started",
+  os_step_passed: "event.os_step_passed",
+  os_step_failed: "event.os_step_failed",
 };
 
 // Dot colour by code first (a blip is grey-blue, never red), else by severity. A restart that happened is a fact, not a
@@ -130,6 +137,12 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       if (p.open) return { text: t("event.path_lossy.filtered", { ...vars, open: p.open }), detail };
       return { text: t(key, { ...vars, lost: lossPct(Number(p.sent), Number(p.got)), arrived: `${p.other_got ?? ""}/${p.sent ?? ""}` }), detail };
     }
+    case "os_update_started":
+      // a refresh of the package lists is a job of its own
+      return { text: t(p.action === "refresh" ? "event.os_update_started.refresh" : key), detail };
+    case "os_update_done":
+      if (p.action === "refresh") return { text: t("event.os_update_done.refresh"), detail };
+      return { text: Number(p.upgraded) > 0 ? t("event.os_update_done.n", { upgraded: p.upgraded ?? "" }) : t(key), detail };
     case "tunnel_v6_fallback":
       return { text: t(p.mode === "none" ? "event.tunnel_v6_fallback.none" : key), detail };
     case "host_firewall_sync_failed":

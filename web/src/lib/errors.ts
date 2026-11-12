@@ -59,6 +59,10 @@ export const errorCodes = [
   "check_unavailable",
   // a debug capture of a node (ops.proto StartDebugCapture): one at a time per node
   "debug_busy",
+  // an OS update of a node (update.proto StartOsRollout / CancelOsRollout), "os_blocked: reason=<key of os.block.*>"; and a node being updated (awgprep)
+  "os_blocked",
+  "os_cancel_inflight",
+  "node_updating",
 ] as const;
 
 /**
@@ -94,6 +98,14 @@ function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
   };
 }
 
+const osBlocks = ["offline", "agent_old", "unsupported", "panel_host", "node_busy", "no_status", "nothing_to_do", "rollout_active", "agent_rollout", "panel_busy", "awg_build"];
+
+/** The words of an OS update refusal's reason (a key of "os.block.*"); a reason from a newer panel reads as sent. */
+function osVars(t: T, vars: Record<string, string>): Record<string, string> {
+  const reason = vars.reason ?? "";
+  return { ...vars, reason: osBlocks.includes(reason) ? t(`os.block.${reason as "offline"}`) : reason };
+}
+
 /** Our sentence for a message whose code is listed, else undefined. */
 function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
@@ -110,7 +122,9 @@ function known(c: ConnectError, t: T): string | undefined {
           ? { path: "?", ...vars }
           : code.startsWith("relay_")
             ? relayVars(t, vars)
-            : vars;
+            : code === "os_blocked"
+              ? osVars(t, vars)
+              : vars;
   return t(`err.${code}`, filled);
 }
 

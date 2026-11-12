@@ -122,6 +122,33 @@ describe("event lines", () => {
     expect(lineText(t as never, odd[0]!).sub).toBe("no space left on /usr");
   });
 
+  // An OS update of the node: the agent's job and the panel's verdict, a failure with the node's reason under it.
+  it("words the events of an OS update, a failure with its reason", () => {
+    const rows = [
+      ev("os_update_started", T0, { job_id: "osj_1", action: "update", mode: "security" }),
+      ev("os_update_failed", T0 + 60, { job_id: "osj_1", code: "disk_full" }, { severity: EventSeverity.ERROR }),
+      ev("os_step_failed", T0 + 61, { job_id: "osj_1", reason: "job_failed", code: "install_failed", package: "nginx" }, { severity: EventSeverity.ERROR, source: "panel" }),
+      ev("os_step_passed", T0 + 900, { job_id: "osj_2", upgraded: "6", reboot: "done", kernel: "6.8.0-150-generic" }, { source: "panel" }),
+    ];
+    const lines = buildLines(rows);
+    const text = (code: string) => lineText(t as never, lines.find((l) => l.head.code === code)!);
+    expect(text("os_update_started")).toEqual({ title: "OS update started", sub: "" });
+    expect(text("os_update_failed")).toEqual({ title: "OS update failed", sub: en["os.job.err.disk_full"] });
+    expect(text("os_step_failed")).toEqual({ title: "OS update of the node stopped", sub: `${en["os.step.err.job_failed"]} ${fill(en["os.job.err.install_failed.pkg"], { package: "nginx" })}` });
+    expect(text("os_step_passed").title).toBe("OS update finished, the node passed the check");
+    expect(lines.find((l) => l.head.code === "os_update_failed")!.status).toBe("bad");
+    expect(lines.find((l) => l.head.code === "os_step_failed")!.status).toBe("bad");
+    expect(lines.find((l) => l.head.code === "os_step_passed")!.status).toBe("ok");
+    // no code with it: the node's own short fact, if there is one
+    const odd = buildLines([ev("os_update_failed", T0, { error: "no space left on /usr" }, { severity: EventSeverity.ERROR })]);
+    expect(lineText(t as never, odd[0]!).sub).toBe("no space left on /usr");
+    // a reboot alone that the node refused, and a node lost during the check, each in its own words
+    const held = buildLines([ev("os_step_failed", T0, { reason: "reboot_held", code: "too_soon", mode: "reboot_only" }, { severity: EventSeverity.ERROR, source: "panel" })]);
+    expect(lineText(t as never, held[0]!).sub).toBe(`${en["os.step.err.reboot_held.only"]} ${en["os.job.err.too_soon"]}`);
+    const lost = buildLines([ev("os_step_failed", T0, { reason: "node_lost" }, { severity: EventSeverity.ERROR, source: "panel" })]);
+    expect(lineText(t as never, lost[0]!).sub).toBe(en["os.step.err.node_lost"]);
+  });
+
   it("filters before it folds", () => {
     const rows = [
       ev("agent_started", T0, { version: "1", reason: "restart" }),

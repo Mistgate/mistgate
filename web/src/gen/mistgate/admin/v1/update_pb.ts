@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/update.proto.
  */
 export const file_mistgate_admin_v1_update: GenFile = /*@__PURE__*/
-  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS91cGRhdGUucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIhUKE0dldE9zVXBkYXRlc1JlcXVlc3Qi2gEKBk5vZGVPcxIPCgdub2RlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEQoJY29ubmVjdGVkGAMgASgIEhEKCXN1cHBvcnRlZBgEIAEoCBIUCgxvbmxpbmVfdXNlcnMYBSABKA0SFwoPb25fcGFuZWxfc2VydmVyGAYgASgIEi8KBXN0YXRlGAcgASgOMiAubWlzdGdhdGUuYWRtaW4udjEuT3NVcGRhdGVTdGF0ZRIrCgZzdGF0dXMYCCABKAsyGy5taXN0Z2F0ZS5hZ2VudC52MS5Pc1N0YXR1cyKxAQoUR2V0T3NVcGRhdGVzUmVzcG9uc2USFAoIbm93X3VuaXgYASABKANCAjACEigKBW5vZGVzGAIgAygLMhkubWlzdGdhdGUuYWRtaW4udjEuTm9kZU9zEi8KCnBhbmVsX2hvc3QYAyABKAsyGy5taXN0Z2F0ZS5hZ2VudC52MS5Pc1N0YXR1cxIoCiBzY2hlZHVsZV90aW1lem9uZV9vZmZzZXRfbWludXRlcxgEIAEoBSKaAQoKUGFuZWxCdWlsZBIPCgd2ZXJzaW9uGAEgASgJEhEKBWJ1aWx0GAIgASgDQgIwAhIXCg9oYXNfcmVsZWFzZV9rZXkYAyABKAgSHwoXcmVsZWFzZV9rZXlfZmluZ2VycHJpbnQYBCABKAkSLgoGdXBkYXRlGAUgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxVcGRhdGUi5gEKC1BhbmVsVXBkYXRlEg8KB3ZlcnNpb24YASABKAkSCwoDdXJsGAIgASgJEhoKDnB1Ymxpc2hlZF91bml4GAMgASgDQgIwAhIYCgxjaGVja2VkX3VuaXgYBCABKANCAjACEhEKCWF2YWlsYWJsZRgFIAEoCBIRCglzdXBwb3J0ZWQYBiABKAgSEwoLaW5zdGFsbGFibGUYByABKAgSEgoKaW5zdGFsbGluZxgIIAEoCBIRCgllcnJvcl9rZXkYCSABKAkSEQoFYnVpbHQYCiABKANCAjACEg4KBnNoYTI1NhgLIAEoCSJWCgpCdW5kbGVGaWxlEgoKAm9zGAEgASgJEgwKBGFyY2gYAiABKAkSDAoEbmFtZRgDIAEoCRIQCgRzaXplGAQgASgEQgIwAhIOCgZzaGEyNTYYBSABKAkizwIKBkJ1bmRsZRIvCgZzdGF0dXMYASABKA4yHy5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGVTdGF0dXMSDwoHdmVyc2lvbhgCIAEoCRIRCgVidWlsdBgDIAEoA0ICMAISGAoMZXhwaXJlc191bml4GAQgASgDQgIwAhIsCgVmaWxlcxgFIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZUZpbGUSEQoJZXJyb3Jfa2V5GAYgASgJEjUKBnBhcmFtcxgHIAMoCzIlLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZS5QYXJhbXNFbnRyeRIYCgxzY2FubmVkX3VuaXgYCCABKANCAjACEhUKDWRvd25sb2FkX2Jhc2UYCSABKAkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKaAQoKTGFzdFVwZGF0ZRIPCgdvdXRjb21lGAEgASgJEhQKDGZyb21fdmVyc2lvbhgCIAEoCRIWCgpmcm9tX2J1aWx0GAMgASgDQgIwAhISCgp0b192ZXJzaW9uGAQgASgJEhQKCHRvX2J1aWx0GAUgASgDQgIwAhIOCgZyZWFzb24YBiABKAkSEwoHYXRfdW5peBgHIAEoA0ICMAIixAMKCk5vZGVVcGRhdGUSDwoHbm9kZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB3ZlcnNpb24YAyABKAkSEQoFYnVpbHQYBCABKANCAjACEhcKD3N1cHBvcnRzX3VwZGF0ZRgFIAEoCBITCgtjcmFzaF9ndWFyZBgGIAEoCBIxCgVzdGF0ZRgHIAEoDjIiLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVVcGRhdGVTdGF0ZRIyCgtsYXN0X3VwZGF0ZRgIIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkxhc3RVcGRhdGUSEAoIaW5ib3VuZHMYCSABKA0SFAoMb25saW5lX3VzZXJzGAogASgNEg8KB2FkZHJlc3MYCyABKAkSDAoEYXJjaBgMIAEoCRIaCg5zY2hlZHVsZWRfdW5peBgNIAEoA0ICMAISGQoRc2NoZWR1bGVkX3ZlcnNpb24YDiABKAkSGwoPc2NoZWR1bGVkX2J1aWx0GA8gASgDQgIwAhIpCiFzY2hlZHVsZWRfdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYECABKAUSGAoQc2NoZWR1bGVkX21pc3NlZBgRIAEoCCLUAwoLUm9sbG91dFN0ZXASDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSDQoFc3RhZ2UYAyABKA0SKwoFc3RhdGUYBCABKA4yHC5taXN0Z2F0ZS5hZG1pbi52MS5TdGVwU3RhdGUSFAoMZnJvbV92ZXJzaW9uGAUgASgJEhYKCmZyb21fYnVpbHQYBiABKANCAjACEhgKDHN0YXJ0ZWRfdW5peBgHIAEoA0ICMAISGQoNZmluaXNoZWRfdW5peBgIIAEoA0ICMAISEQoJZXJyb3Jfa2V5GAkgASgJEjoKBnBhcmFtcxgKIAMoCzIqLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxvdXRTdGVwLlBhcmFtc0VudHJ5EhYKDmRvd25sb2FkX3BoYXNlGAsgASgJEhwKEGRvd25sb2FkZWRfYnl0ZXMYDCABKARCAjACEhcKC3RvdGFsX2J5dGVzGA0gASgEQgIwAhIcChBieXRlc19wZXJfc2Vjb25kGA4gASgEQgIwAhIXCg9kb3dubG9hZF9zb3VyY2UYDyABKAkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLzAgoHUm9sbG91dBIKCgJpZBgBIAEoCRIwCgZzdGF0dXMYAiABKA4yIC5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0U3RhdHVzEhIKCnRvX3ZlcnNpb24YAyABKAkSFAoIdG9fYnVpbHQYBCABKANCAjACEhIKCmJhdGNoX3NpemUYBSABKA0SGAoMY3JlYXRlZF91bml4GAYgASgDQgIwAhIZCg1maW5pc2hlZF91bml4GAcgASgDQgIwAhIRCglwYXVzZV9rZXkYCCABKAkSQQoMcGF1c2VfcGFyYW1zGAkgAygLMisubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dC5QYXVzZVBhcmFtc0VudHJ5Ei0KBXN0ZXBzGAogAygLMh4ubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dFN0ZXAaMgoQUGF1c2VQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhMKEUdldFVwZGF0ZXNSZXF1ZXN0ItMEChJHZXRVcGRhdGVzUmVzcG9uc2USFAoIbm93X3VuaXgYASABKANCAjACEiwKBXBhbmVsGAIgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxCdWlsZBIpCgZidW5kbGUYAyABKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGUSLAoFbm9kZXMYBCADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlVXBkYXRlEisKB3JvbGxvdXQYBSABKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0EhAKCGRpc3RfZGlyGAYgASgJEigKIHNjaGVkdWxlX3RpbWV6b25lX29mZnNldF9taW51dGVzGAcgASgFEjMKC2FnZW50X25vdGVzGAggAygLMh4ubWlzdGdhdGUuYWRtaW4udjEuUmVsZWFzZU5vdGUSMwoLcGFuZWxfbm90ZXMYCSADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5SZWxlYXNlTm90ZRIWCg51cGRhdGVfY2hhbm5lbBgKIAEoCRIfChdydW5uaW5nX3ZlcnNpb25fY2hhbm5lbBgLIAEoCRIfChdvZmZlcmVkX3JlbGVhc2VfY2hhbm5lbBgMIAEoCRIpCiFydW5uaW5nX25ld2VyX3RoYW5fY2hhbm5lbF9vZmZlcnMYDSABKAgSJwofdXBkYXRlX2Rvd25sb2FkX3RpbWVvdXRfc2Vjb25kcxgOIAEoDRIfChd1cGRhdGVfZG93bmxvYWRfc291cmNlcxgPIAMoCSKOAQoLUmVsZWFzZU5vdGUSDwoHdmVyc2lvbhgBIAEoCRILCgN1cmwYAiABKAkSGgoOcHVibGlzaGVkX3VuaXgYAyABKANCAjACEgoKAmVuGAQgASgJEgoKAnJ1GAUgASgJEgoKAnpoGAYgASgJEhAKCHNlY3VyaXR5GAcgASgIEg8KB2NoYW5uZWwYCCABKAkiGQoXQ2hlY2tQYW5lbFVwZGF0ZVJlcXVlc3QiSgoYQ2hlY2tQYW5lbFVwZGF0ZVJlc3BvbnNlEi4KBnVwZGF0ZRgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLlBhbmVsVXBkYXRlIk4KGUluc3RhbGxQYW5lbFVwZGF0ZVJlcXVlc3QSGAoQZXhwZWN0ZWRfdmVyc2lvbhgBIAEoCRIXCg9leHBlY3RlZF9zaGEyNTYYAiABKAkiTAoaSW5zdGFsbFBhbmVsVXBkYXRlUmVzcG9uc2USLgoGdXBkYXRlGAEgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxVcGRhdGUicQoTU3RhcnRSb2xsb3V0UmVxdWVzdBIQCghub2RlX2lkcxgBIAMoCRISCgpiYXRjaF9zaXplGAIgASgNEhgKEGV4cGVjdGVkX3ZlcnNpb24YAyABKAkSGgoOZXhwZWN0ZWRfYnVpbHQYBCABKANCAjACIkMKFFN0YXJ0Um9sbG91dFJlc3BvbnNlEisKB3JvbGxvdXQYASABKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0IikKE1BhdXNlUm9sbG91dFJlcXVlc3QSEgoKcm9sbG91dF9pZBgBIAEoCSJDChRQYXVzZVJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCIqChRSZXN1bWVSb2xsb3V0UmVxdWVzdBISCgpyb2xsb3V0X2lkGAEgASgJIkQKFVJlc3VtZVJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCIqChRDYW5jZWxSb2xsb3V0UmVxdWVzdBISCgpyb2xsb3V0X2lkGAEgASgJIkQKFUNhbmNlbFJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCImChNSb2xsYmFja05vZGVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiQwoUUm9sbGJhY2tOb2RlUmVzcG9uc2USKwoEbm9kZRgBIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVVcGRhdGUiFQoTUmVzY2FuQnVuZGxlUmVxdWVzdCJBChRSZXNjYW5CdW5kbGVSZXNwb25zZRIpCgZidW5kbGUYASABKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGUimwEKGVNjaGVkdWxlTm9kZVVwZGF0ZVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIWCg5sb2NhbF9kYXRldGltZRgCIAEoCRIfChd0aW1lem9uZV9vZmZzZXRfbWludXRlcxgDIAEoBRIYChBleHBlY3RlZF92ZXJzaW9uGAQgASgJEhoKDmV4cGVjdGVkX2J1aWx0GAUgASgDQgIwAiJ9ChpTY2hlZHVsZU5vZGVVcGRhdGVSZXNwb25zZRIaCg5zY2hlZHVsZWRfdW5peBgBIAEoA0ICMAISDwoHdmVyc2lvbhgCIAEoCRIRCgVidWlsdBgDIAEoA0ICMAISHwoXdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYBCABKAUiMgofQ2FuY2VsTm9kZVVwZGF0ZVNjaGVkdWxlUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIjUKIENhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZVJlc3BvbnNlEhEKCWNhbmNlbGxlZBgBIAEoCCI7ChhTZXRVcGRhdGVUaW1lem9uZVJlcXVlc3QSHwoXdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYASABKAUiPAoZU2V0VXBkYXRlVGltZXpvbmVSZXNwb25zZRIfChd0aW1lem9uZV9vZmZzZXRfbWludXRlcxgBIAEoBSIqChdTZXRVcGRhdGVDaGFubmVsUmVxdWVzdBIPCgdjaGFubmVsGAEgASgJIisKGFNldFVwZGF0ZUNoYW5uZWxSZXNwb25zZRIPCgdjaGFubmVsGAEgASgJIjoKH1NldFVwZGF0ZURvd25sb2FkVGltZW91dFJlcXVlc3QSFwoPdGltZW91dF9zZWNvbmRzGAEgASgNIjsKIFNldFVwZGF0ZURvd25sb2FkVGltZW91dFJlc3BvbnNlEhcKD3RpbWVvdXRfc2Vjb25kcxgBIAEoDSIyCh9TZXRVcGRhdGVEb3dubG9hZFNvdXJjZXNSZXF1ZXN0Eg8KB3NvdXJjZXMYASADKAkiMwogU2V0VXBkYXRlRG93bmxvYWRTb3VyY2VzUmVzcG9uc2USDwoHc291cmNlcxgBIAMoCSqjAgoNT3NVcGRhdGVTdGF0ZRIfChtPU19VUERBVEVfU1RBVEVfVU5TUEVDSUZJRUQQABIfChtPU19VUERBVEVfU1RBVEVfVU5TVVBQT1JURUQQARIbChdPU19VUERBVEVfU1RBVEVfT0ZGTElORRACEhsKF09TX1VQREFURV9TVEFURV9VTktOT1dOEAMSGAoUT1NfVVBEQVRFX1NUQVRFX0JVU1kQBBIaChZPU19VUERBVEVfU1RBVEVfRkFJTEVEEAUSIwofT1NfVVBEQVRFX1NUQVRFX1JFQk9PVF9SRVFVSVJFRBAGEhsKF09TX1VQREFURV9TVEFURV9VUERBVEVTEAcSHgoaT1NfVVBEQVRFX1NUQVRFX1VQX1RPX0RBVEUQCCqaAQoMQnVuZGxlU3RhdHVzEh0KGUJVTkRMRV9TVEFUVVNfVU5TUEVDSUZJRUQQABIZChVCVU5ETEVfU1RBVFVTX01JU1NJTkcQARIZChVCVU5ETEVfU1RBVFVTX1RSVVNURUQQAhIbChdCVU5ETEVfU1RBVFVTX1VOVFJVU1RFRBADEhgKFEJVTkRMRV9TVEFUVVNfTk9fS0VZEAQqmQIKD05vZGVVcGRhdGVTdGF0ZRIhCh1OT0RFX1VQREFURV9TVEFURV9VTlNQRUNJRklFRBAAEiAKHE5PREVfVVBEQVRFX1NUQVRFX1VQX1RPX0RBVEUQARIeChpOT0RFX1VQREFURV9TVEFURV9PVVREQVRFRBACEh4KGk5PREVfVVBEQVRFX1NUQVRFX1VQREFUSU5HEAMSIQodTk9ERV9VUERBVEVfU1RBVEVfUk9MTEVEX0JBQ0sQBBIcChhOT0RFX1VQREFURV9TVEFURV9GQUlMRUQQBRIhCh1OT0RFX1VQREFURV9TVEFURV9VTlNVUFBPUlRFRBAGEh0KGU5PREVfVVBEQVRFX1NUQVRFX09GRkxJTkUQByq4AQoNUm9sbG91dFN0YXR1cxIeChpST0xMT1VUX1NUQVRVU19VTlNQRUNJRklFRBAAEhoKFlJPTExPVVRfU1RBVFVTX1JVTk5JTkcQARIZChVST0xMT1VUX1NUQVRVU19QQVVTRUQQAhIXChNST0xMT1VUX1NUQVRVU19ET05FEAMSHAoYUk9MTE9VVF9TVEFUVVNfQ0FOQ0VMTEVEEAQSGQoVUk9MTE9VVF9TVEFUVVNfRkFJTEVEEAUqzQEKCVN0ZXBTdGF0ZRIaChZTVEVQX1NUQVRFX1VOU1BFQ0lGSUVEEAASFgoSU1RFUF9TVEFURV9QRU5ESU5HEAESEwoPU1RFUF9TVEFURV9TRU5UEAISFQoRU1RFUF9TVEFURV9HQVRJTkcQAxIVChFTVEVQX1NUQVRFX1BBU1NFRBAEEhUKEVNURVBfU1RBVEVfRkFJTEVEEAUSGgoWU1RFUF9TVEFURV9ST0xMRURfQkFDSxAGEhYKElNURVBfU1RBVEVfU0tJUFBFRBAHMtkNCg1VcGRhdGVTZXJ2aWNlElkKCkdldFVwZGF0ZXMSJC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRVcGRhdGVzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkdldFVwZGF0ZXNSZXNwb25zZRJfCgxHZXRPc1VwZGF0ZXMSJi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRPc1VwZGF0ZXNSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuR2V0T3NVcGRhdGVzUmVzcG9uc2USawoQQ2hlY2tQYW5lbFVwZGF0ZRIqLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUGFuZWxVcGRhdGVSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tQYW5lbFVwZGF0ZVJlc3BvbnNlEnEKEkluc3RhbGxQYW5lbFVwZGF0ZRIsLm1pc3RnYXRlLmFkbWluLnYxLkluc3RhbGxQYW5lbFVwZGF0ZVJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5JbnN0YWxsUGFuZWxVcGRhdGVSZXNwb25zZRJfCgxTdGFydFJvbGxvdXQSJi5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydFJvbGxvdXRSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuU3RhcnRSb2xsb3V0UmVzcG9uc2USXwoMUGF1c2VSb2xsb3V0EiYubWlzdGdhdGUuYWRtaW4udjEuUGF1c2VSb2xsb3V0UmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlBhdXNlUm9sbG91dFJlc3BvbnNlEmIKDVJlc3VtZVJvbGxvdXQSJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXN1bWVSb2xsb3V0UmVxdWVzdBooLm1pc3RnYXRlLmFkbWluLnYxLlJlc3VtZVJvbGxvdXRSZXNwb25zZRJiCg1DYW5jZWxSb2xsb3V0EicubWlzdGdhdGUuYWRtaW4udjEuQ2FuY2VsUm9sbG91dFJlcXVlc3QaKC5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxSb2xsb3V0UmVzcG9uc2USXwoMUm9sbGJhY2tOb2RlEiYubWlzdGdhdGUuYWRtaW4udjEuUm9sbGJhY2tOb2RlUmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxiYWNrTm9kZVJlc3BvbnNlEl8KDFJlc2NhbkJ1bmRsZRImLm1pc3RnYXRlLmFkbWluLnYxLlJlc2NhbkJ1bmRsZVJlcXVlc3QaJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXNjYW5CdW5kbGVSZXNwb25zZRJxChJTY2hlZHVsZU5vZGVVcGRhdGUSLC5taXN0Z2F0ZS5hZG1pbi52MS5TY2hlZHVsZU5vZGVVcGRhdGVSZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuU2NoZWR1bGVOb2RlVXBkYXRlUmVzcG9uc2USgwEKGENhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZRIyLm1pc3RnYXRlLmFkbWluLnYxLkNhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZVJlcXVlc3QaMy5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxOb2RlVXBkYXRlU2NoZWR1bGVSZXNwb25zZRJuChFTZXRVcGRhdGVUaW1lem9uZRIrLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZVRpbWV6b25lUmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZVRpbWV6b25lUmVzcG9uc2USawoQU2V0VXBkYXRlQ2hhbm5lbBIqLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZUNoYW5uZWxSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuU2V0VXBkYXRlQ2hhbm5lbFJlc3BvbnNlEoMBChhTZXRVcGRhdGVEb3dubG9hZFRpbWVvdXQSMi5taXN0Z2F0ZS5hZG1pbi52MS5TZXRVcGRhdGVEb3dubG9hZFRpbWVvdXRSZXF1ZXN0GjMubWlzdGdhdGUuYWRtaW4udjEuU2V0VXBkYXRlRG93bmxvYWRUaW1lb3V0UmVzcG9uc2USgwEKGFNldFVwZGF0ZURvd25sb2FkU291cmNlcxIyLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZURvd25sb2FkU291cmNlc1JlcXVlc3QaMy5taXN0Z2F0ZS5hZG1pbi52MS5TZXRVcGRhdGVEb3dubG9hZFNvdXJjZXNSZXNwb25zZULGAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgtVcGRhdGVQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_agent_v1_agent]);
+  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS91cGRhdGUucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIhUKE0dldE9zVXBkYXRlc1JlcXVlc3QingIKBk5vZGVPcxIPCgdub2RlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEQoJY29ubmVjdGVkGAMgASgIEhEKCXN1cHBvcnRlZBgEIAEoCBIUCgxvbmxpbmVfdXNlcnMYBSABKA0SFwoPb25fcGFuZWxfc2VydmVyGAYgASgIEi8KBXN0YXRlGAcgASgOMiAubWlzdGdhdGUuYWRtaW4udjEuT3NVcGRhdGVTdGF0ZRIrCgZzdGF0dXMYCCABKAsyGy5taXN0Z2F0ZS5hZ2VudC52MS5Pc1N0YXR1cxIWCg51cGRhdGVfY2FwYWJsZRgJIAEoCBIUCgx1cGRhdGVfYmxvY2sYCiABKAkSFAoMcmVib290X2Jsb2NrGAsgASgJIuABChRHZXRPc1VwZGF0ZXNSZXNwb25zZRIUCghub3dfdW5peBgBIAEoA0ICMAISKAoFbm9kZXMYAiADKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlT3MSLwoKcGFuZWxfaG9zdBgDIAEoCzIbLm1pc3RnYXRlLmFnZW50LnYxLk9zU3RhdHVzEigKIHNjaGVkdWxlX3RpbWV6b25lX29mZnNldF9taW51dGVzGAQgASgFEi0KB3JvbGxvdXQYBSABKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5Pc1JvbGxvdXQilQMKBk9zU3RlcBIPCgdub2RlX2lkGAEgASgJEhEKCW5vZGVfbmFtZRgCIAEoCRItCgVzdGF0ZRgDIAEoDjIeLm1pc3RnYXRlLmFkbWluLnYxLk9zU3RlcFN0YXRlEg4KBmpvYl9pZBgEIAEoCRINCgVwaGFzZRgFIAEoCRIWCgpwaGFzZV91bml4GAYgASgDQgIwAhITCgtrZXJuZWxfZnJvbRgHIAEoCRIRCglrZXJuZWxfdG8YCCABKAkSFQoJc2VudF91bml4GAkgASgDQgIwAhIXCgtyZWJvb3RfdW5peBgKIAEoA0ICMAISFQoJYmFja191bml4GAsgASgDQgIwAhIZCg1maW5pc2hlZF91bml4GAwgASgDQgIwAhIRCgllcnJvcl9rZXkYDSABKAkSNQoGcGFyYW1zGA4gAygLMiUubWlzdGdhdGUuYWRtaW4udjEuT3NTdGVwLlBhcmFtc0VudHJ5Gi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEimQMKCU9zUm9sbG91dBIKCgJpZBgBIAEoCRIyCgZzdGF0dXMYAiABKA4yIi5taXN0Z2F0ZS5hZG1pbi52MS5Pc1JvbGxvdXRTdGF0dXMSLgoEbW9kZRgDIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLk9zUm9sbG91dE1vZGUSMQoGcmVib290GAQgASgOMiEubWlzdGdhdGUuYWRtaW4udjEuT3NSZWJvb3RQb2xpY3kSGAoMY3JlYXRlZF91bml4GAUgASgDQgIwAhIZCg1maW5pc2hlZF91bml4GAYgASgDQgIwAhIRCglwYXVzZV9rZXkYByABKAkSQwoMcGF1c2VfcGFyYW1zGAggAygLMi0ubWlzdGdhdGUuYWRtaW4udjEuT3NSb2xsb3V0LlBhdXNlUGFyYW1zRW50cnkSKAoFc3RlcHMYCSADKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5Pc1N0ZXAaMgoQUGF1c2VQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIowBChVTdGFydE9zUm9sbG91dFJlcXVlc3QSEAoIbm9kZV9pZHMYASADKAkSLgoEbW9kZRgCIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLk9zUm9sbG91dE1vZGUSMQoGcmVib290GAMgASgOMiEubWlzdGdhdGUuYWRtaW4udjEuT3NSZWJvb3RQb2xpY3kiRwoWU3RhcnRPc1JvbGxvdXRSZXNwb25zZRItCgdyb2xsb3V0GAEgASgLMhwubWlzdGdhdGUuYWRtaW4udjEuT3NSb2xsb3V0IiwKFkNhbmNlbE9zUm9sbG91dFJlcXVlc3QSEgoKcm9sbG91dF9pZBgBIAEoCSJIChdDYW5jZWxPc1JvbGxvdXRSZXNwb25zZRItCgdyb2xsb3V0GAEgASgLMhwubWlzdGdhdGUuYWRtaW4udjEuT3NSb2xsb3V0IisKF1JlZnJlc2hPc1VwZGF0ZXNSZXF1ZXN0EhAKCG5vZGVfaWRzGAEgAygJIkEKD09zUmVmcmVzaFJlc3VsdBIPCgdub2RlX2lkGAEgASgJEg8KB291dGNvbWUYAiABKAkSDAoEY29kZRgDIAEoCSJPChhSZWZyZXNoT3NVcGRhdGVzUmVzcG9uc2USMwoHcmVzdWx0cxgBIAMoCzIiLm1pc3RnYXRlLmFkbWluLnYxLk9zUmVmcmVzaFJlc3VsdCKaAQoKUGFuZWxCdWlsZBIPCgd2ZXJzaW9uGAEgASgJEhEKBWJ1aWx0GAIgASgDQgIwAhIXCg9oYXNfcmVsZWFzZV9rZXkYAyABKAgSHwoXcmVsZWFzZV9rZXlfZmluZ2VycHJpbnQYBCABKAkSLgoGdXBkYXRlGAUgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxVcGRhdGUi5gEKC1BhbmVsVXBkYXRlEg8KB3ZlcnNpb24YASABKAkSCwoDdXJsGAIgASgJEhoKDnB1Ymxpc2hlZF91bml4GAMgASgDQgIwAhIYCgxjaGVja2VkX3VuaXgYBCABKANCAjACEhEKCWF2YWlsYWJsZRgFIAEoCBIRCglzdXBwb3J0ZWQYBiABKAgSEwoLaW5zdGFsbGFibGUYByABKAgSEgoKaW5zdGFsbGluZxgIIAEoCBIRCgllcnJvcl9rZXkYCSABKAkSEQoFYnVpbHQYCiABKANCAjACEg4KBnNoYTI1NhgLIAEoCSJWCgpCdW5kbGVGaWxlEgoKAm9zGAEgASgJEgwKBGFyY2gYAiABKAkSDAoEbmFtZRgDIAEoCRIQCgRzaXplGAQgASgEQgIwAhIOCgZzaGEyNTYYBSABKAkizwIKBkJ1bmRsZRIvCgZzdGF0dXMYASABKA4yHy5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGVTdGF0dXMSDwoHdmVyc2lvbhgCIAEoCRIRCgVidWlsdBgDIAEoA0ICMAISGAoMZXhwaXJlc191bml4GAQgASgDQgIwAhIsCgVmaWxlcxgFIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZUZpbGUSEQoJZXJyb3Jfa2V5GAYgASgJEjUKBnBhcmFtcxgHIAMoCzIlLm1pc3RnYXRlLmFkbWluLnYxLkJ1bmRsZS5QYXJhbXNFbnRyeRIYCgxzY2FubmVkX3VuaXgYCCABKANCAjACEhUKDWRvd25sb2FkX2Jhc2UYCSABKAkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKaAQoKTGFzdFVwZGF0ZRIPCgdvdXRjb21lGAEgASgJEhQKDGZyb21fdmVyc2lvbhgCIAEoCRIWCgpmcm9tX2J1aWx0GAMgASgDQgIwAhISCgp0b192ZXJzaW9uGAQgASgJEhQKCHRvX2J1aWx0GAUgASgDQgIwAhIOCgZyZWFzb24YBiABKAkSEwoHYXRfdW5peBgHIAEoA0ICMAIixAMKCk5vZGVVcGRhdGUSDwoHbm9kZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB3ZlcnNpb24YAyABKAkSEQoFYnVpbHQYBCABKANCAjACEhcKD3N1cHBvcnRzX3VwZGF0ZRgFIAEoCBITCgtjcmFzaF9ndWFyZBgGIAEoCBIxCgVzdGF0ZRgHIAEoDjIiLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVVcGRhdGVTdGF0ZRIyCgtsYXN0X3VwZGF0ZRgIIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkxhc3RVcGRhdGUSEAoIaW5ib3VuZHMYCSABKA0SFAoMb25saW5lX3VzZXJzGAogASgNEg8KB2FkZHJlc3MYCyABKAkSDAoEYXJjaBgMIAEoCRIaCg5zY2hlZHVsZWRfdW5peBgNIAEoA0ICMAISGQoRc2NoZWR1bGVkX3ZlcnNpb24YDiABKAkSGwoPc2NoZWR1bGVkX2J1aWx0GA8gASgDQgIwAhIpCiFzY2hlZHVsZWRfdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYECABKAUSGAoQc2NoZWR1bGVkX21pc3NlZBgRIAEoCCLUAwoLUm9sbG91dFN0ZXASDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSDQoFc3RhZ2UYAyABKA0SKwoFc3RhdGUYBCABKA4yHC5taXN0Z2F0ZS5hZG1pbi52MS5TdGVwU3RhdGUSFAoMZnJvbV92ZXJzaW9uGAUgASgJEhYKCmZyb21fYnVpbHQYBiABKANCAjACEhgKDHN0YXJ0ZWRfdW5peBgHIAEoA0ICMAISGQoNZmluaXNoZWRfdW5peBgIIAEoA0ICMAISEQoJZXJyb3Jfa2V5GAkgASgJEjoKBnBhcmFtcxgKIAMoCzIqLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxvdXRTdGVwLlBhcmFtc0VudHJ5EhYKDmRvd25sb2FkX3BoYXNlGAsgASgJEhwKEGRvd25sb2FkZWRfYnl0ZXMYDCABKARCAjACEhcKC3RvdGFsX2J5dGVzGA0gASgEQgIwAhIcChBieXRlc19wZXJfc2Vjb25kGA4gASgEQgIwAhIXCg9kb3dubG9hZF9zb3VyY2UYDyABKAkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLzAgoHUm9sbG91dBIKCgJpZBgBIAEoCRIwCgZzdGF0dXMYAiABKA4yIC5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0U3RhdHVzEhIKCnRvX3ZlcnNpb24YAyABKAkSFAoIdG9fYnVpbHQYBCABKANCAjACEhIKCmJhdGNoX3NpemUYBSABKA0SGAoMY3JlYXRlZF91bml4GAYgASgDQgIwAhIZCg1maW5pc2hlZF91bml4GAcgASgDQgIwAhIRCglwYXVzZV9rZXkYCCABKAkSQQoMcGF1c2VfcGFyYW1zGAkgAygLMisubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dC5QYXVzZVBhcmFtc0VudHJ5Ei0KBXN0ZXBzGAogAygLMh4ubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dFN0ZXAaMgoQUGF1c2VQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhMKEUdldFVwZGF0ZXNSZXF1ZXN0ItMEChJHZXRVcGRhdGVzUmVzcG9uc2USFAoIbm93X3VuaXgYASABKANCAjACEiwKBXBhbmVsGAIgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxCdWlsZBIpCgZidW5kbGUYAyABKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGUSLAoFbm9kZXMYBCADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlVXBkYXRlEisKB3JvbGxvdXQYBSABKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0EhAKCGRpc3RfZGlyGAYgASgJEigKIHNjaGVkdWxlX3RpbWV6b25lX29mZnNldF9taW51dGVzGAcgASgFEjMKC2FnZW50X25vdGVzGAggAygLMh4ubWlzdGdhdGUuYWRtaW4udjEuUmVsZWFzZU5vdGUSMwoLcGFuZWxfbm90ZXMYCSADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5SZWxlYXNlTm90ZRIWCg51cGRhdGVfY2hhbm5lbBgKIAEoCRIfChdydW5uaW5nX3ZlcnNpb25fY2hhbm5lbBgLIAEoCRIfChdvZmZlcmVkX3JlbGVhc2VfY2hhbm5lbBgMIAEoCRIpCiFydW5uaW5nX25ld2VyX3RoYW5fY2hhbm5lbF9vZmZlcnMYDSABKAgSJwofdXBkYXRlX2Rvd25sb2FkX3RpbWVvdXRfc2Vjb25kcxgOIAEoDRIfChd1cGRhdGVfZG93bmxvYWRfc291cmNlcxgPIAMoCSKOAQoLUmVsZWFzZU5vdGUSDwoHdmVyc2lvbhgBIAEoCRILCgN1cmwYAiABKAkSGgoOcHVibGlzaGVkX3VuaXgYAyABKANCAjACEgoKAmVuGAQgASgJEgoKAnJ1GAUgASgJEgoKAnpoGAYgASgJEhAKCHNlY3VyaXR5GAcgASgIEg8KB2NoYW5uZWwYCCABKAkiGQoXQ2hlY2tQYW5lbFVwZGF0ZVJlcXVlc3QiSgoYQ2hlY2tQYW5lbFVwZGF0ZVJlc3BvbnNlEi4KBnVwZGF0ZRgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLlBhbmVsVXBkYXRlIk4KGUluc3RhbGxQYW5lbFVwZGF0ZVJlcXVlc3QSGAoQZXhwZWN0ZWRfdmVyc2lvbhgBIAEoCRIXCg9leHBlY3RlZF9zaGEyNTYYAiABKAkiTAoaSW5zdGFsbFBhbmVsVXBkYXRlUmVzcG9uc2USLgoGdXBkYXRlGAEgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuUGFuZWxVcGRhdGUicQoTU3RhcnRSb2xsb3V0UmVxdWVzdBIQCghub2RlX2lkcxgBIAMoCRISCgpiYXRjaF9zaXplGAIgASgNEhgKEGV4cGVjdGVkX3ZlcnNpb24YAyABKAkSGgoOZXhwZWN0ZWRfYnVpbHQYBCABKANCAjACIkMKFFN0YXJ0Um9sbG91dFJlc3BvbnNlEisKB3JvbGxvdXQYASABKAsyGi5taXN0Z2F0ZS5hZG1pbi52MS5Sb2xsb3V0IikKE1BhdXNlUm9sbG91dFJlcXVlc3QSEgoKcm9sbG91dF9pZBgBIAEoCSJDChRQYXVzZVJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCIqChRSZXN1bWVSb2xsb3V0UmVxdWVzdBISCgpyb2xsb3V0X2lkGAEgASgJIkQKFVJlc3VtZVJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCIqChRDYW5jZWxSb2xsb3V0UmVxdWVzdBISCgpyb2xsb3V0X2lkGAEgASgJIkQKFUNhbmNlbFJvbGxvdXRSZXNwb25zZRIrCgdyb2xsb3V0GAEgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuUm9sbG91dCImChNSb2xsYmFja05vZGVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiQwoUUm9sbGJhY2tOb2RlUmVzcG9uc2USKwoEbm9kZRgBIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVVcGRhdGUiFQoTUmVzY2FuQnVuZGxlUmVxdWVzdCJBChRSZXNjYW5CdW5kbGVSZXNwb25zZRIpCgZidW5kbGUYASABKAsyGS5taXN0Z2F0ZS5hZG1pbi52MS5CdW5kbGUimwEKGVNjaGVkdWxlTm9kZVVwZGF0ZVJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIWCg5sb2NhbF9kYXRldGltZRgCIAEoCRIfChd0aW1lem9uZV9vZmZzZXRfbWludXRlcxgDIAEoBRIYChBleHBlY3RlZF92ZXJzaW9uGAQgASgJEhoKDmV4cGVjdGVkX2J1aWx0GAUgASgDQgIwAiJ9ChpTY2hlZHVsZU5vZGVVcGRhdGVSZXNwb25zZRIaCg5zY2hlZHVsZWRfdW5peBgBIAEoA0ICMAISDwoHdmVyc2lvbhgCIAEoCRIRCgVidWlsdBgDIAEoA0ICMAISHwoXdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYBCABKAUiMgofQ2FuY2VsTm9kZVVwZGF0ZVNjaGVkdWxlUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIjUKIENhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZVJlc3BvbnNlEhEKCWNhbmNlbGxlZBgBIAEoCCI7ChhTZXRVcGRhdGVUaW1lem9uZVJlcXVlc3QSHwoXdGltZXpvbmVfb2Zmc2V0X21pbnV0ZXMYASABKAUiPAoZU2V0VXBkYXRlVGltZXpvbmVSZXNwb25zZRIfChd0aW1lem9uZV9vZmZzZXRfbWludXRlcxgBIAEoBSIqChdTZXRVcGRhdGVDaGFubmVsUmVxdWVzdBIPCgdjaGFubmVsGAEgASgJIisKGFNldFVwZGF0ZUNoYW5uZWxSZXNwb25zZRIPCgdjaGFubmVsGAEgASgJIjoKH1NldFVwZGF0ZURvd25sb2FkVGltZW91dFJlcXVlc3QSFwoPdGltZW91dF9zZWNvbmRzGAEgASgNIjsKIFNldFVwZGF0ZURvd25sb2FkVGltZW91dFJlc3BvbnNlEhcKD3RpbWVvdXRfc2Vjb25kcxgBIAEoDSIyCh9TZXRVcGRhdGVEb3dubG9hZFNvdXJjZXNSZXF1ZXN0Eg8KB3NvdXJjZXMYASADKAkiMwogU2V0VXBkYXRlRG93bmxvYWRTb3VyY2VzUmVzcG9uc2USDwoHc291cmNlcxgBIAMoCSqjAgoNT3NVcGRhdGVTdGF0ZRIfChtPU19VUERBVEVfU1RBVEVfVU5TUEVDSUZJRUQQABIfChtPU19VUERBVEVfU1RBVEVfVU5TVVBQT1JURUQQARIbChdPU19VUERBVEVfU1RBVEVfT0ZGTElORRACEhsKF09TX1VQREFURV9TVEFURV9VTktOT1dOEAMSGAoUT1NfVVBEQVRFX1NUQVRFX0JVU1kQBBIaChZPU19VUERBVEVfU1RBVEVfRkFJTEVEEAUSIwofT1NfVVBEQVRFX1NUQVRFX1JFQk9PVF9SRVFVSVJFRBAGEhsKF09TX1VQREFURV9TVEFURV9VUERBVEVTEAcSHgoaT1NfVVBEQVRFX1NUQVRFX1VQX1RPX0RBVEUQCCrMAQoPT3NSb2xsb3V0U3RhdHVzEiEKHU9TX1JPTExPVVRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHQoZT1NfUk9MTE9VVF9TVEFUVVNfUlVOTklORxABEhwKGE9TX1JPTExPVVRfU1RBVFVTX1BBVVNFRBACEhoKFk9TX1JPTExPVVRfU1RBVFVTX0RPTkUQAxIfChtPU19ST0xMT1VUX1NUQVRVU19DQU5DRUxMRUQQBBIcChhPU19ST0xMT1VUX1NUQVRVU19GQUlMRUQQBSpvCg1Pc1JvbGxvdXRNb2RlEh8KG09TX1JPTExPVVRfTU9ERV9VTlNQRUNJRklFRBAAEhwKGE9TX1JPTExPVVRfTU9ERV9TRUNVUklUWRABEh8KG09TX1JPTExPVVRfTU9ERV9SRUJPT1RfT05MWRACKo0BCg5Pc1JlYm9vdFBvbGljeRIgChxPU19SRUJPT1RfUE9MSUNZX1VOU1BFQ0lGSUVEEAASGgoWT1NfUkVCT09UX1BPTElDWV9ORVZFUhABEiAKHE9TX1JFQk9PVF9QT0xJQ1lfSUZfUkVRVUlSRUQQAhIbChdPU19SRUJPT1RfUE9MSUNZX0FMV0FZUxADKuUBCgtPc1N0ZXBTdGF0ZRIdChlPU19TVEVQX1NUQVRFX1VOU1BFQ0lGSUVEEAASGQoVT1NfU1RFUF9TVEFURV9QRU5ESU5HEAESFgoST1NfU1RFUF9TVEFURV9TRU5UEAISGwoXT1NfU1RFUF9TVEFURV9SRUJPT1RJTkcQAxIYChRPU19TVEVQX1NUQVRFX0dBVElORxAEEhgKFE9TX1NURVBfU1RBVEVfUEFTU0VEEAUSGAoUT1NfU1RFUF9TVEFURV9GQUlMRUQQBhIZChVPU19TVEVQX1NUQVRFX1NLSVBQRUQQByqaAQoMQnVuZGxlU3RhdHVzEh0KGUJVTkRMRV9TVEFUVVNfVU5TUEVDSUZJRUQQABIZChVCVU5ETEVfU1RBVFVTX01JU1NJTkcQARIZChVCVU5ETEVfU1RBVFVTX1RSVVNURUQQAhIbChdCVU5ETEVfU1RBVFVTX1VOVFJVU1RFRBADEhgKFEJVTkRMRV9TVEFUVVNfTk9fS0VZEAQqmQIKD05vZGVVcGRhdGVTdGF0ZRIhCh1OT0RFX1VQREFURV9TVEFURV9VTlNQRUNJRklFRBAAEiAKHE5PREVfVVBEQVRFX1NUQVRFX1VQX1RPX0RBVEUQARIeChpOT0RFX1VQREFURV9TVEFURV9PVVREQVRFRBACEh4KGk5PREVfVVBEQVRFX1NUQVRFX1VQREFUSU5HEAMSIQodTk9ERV9VUERBVEVfU1RBVEVfUk9MTEVEX0JBQ0sQBBIcChhOT0RFX1VQREFURV9TVEFURV9GQUlMRUQQBRIhCh1OT0RFX1VQREFURV9TVEFURV9VTlNVUFBPUlRFRBAGEh0KGU5PREVfVVBEQVRFX1NUQVRFX09GRkxJTkUQByq4AQoNUm9sbG91dFN0YXR1cxIeChpST0xMT1VUX1NUQVRVU19VTlNQRUNJRklFRBAAEhoKFlJPTExPVVRfU1RBVFVTX1JVTk5JTkcQARIZChVST0xMT1VUX1NUQVRVU19QQVVTRUQQAhIXChNST0xMT1VUX1NUQVRVU19ET05FEAMSHAoYUk9MTE9VVF9TVEFUVVNfQ0FOQ0VMTEVEEAQSGQoVUk9MTE9VVF9TVEFUVVNfRkFJTEVEEAUqzQEKCVN0ZXBTdGF0ZRIaChZTVEVQX1NUQVRFX1VOU1BFQ0lGSUVEEAASFgoSU1RFUF9TVEFURV9QRU5ESU5HEAESEwoPU1RFUF9TVEFURV9TRU5UEAISFQoRU1RFUF9TVEFURV9HQVRJTkcQAxIVChFTVEVQX1NUQVRFX1BBU1NFRBAEEhUKEVNURVBfU1RBVEVfRkFJTEVEEAUSGgoWU1RFUF9TVEFURV9ST0xMRURfQkFDSxAGEhYKElNURVBfU1RBVEVfU0tJUFBFRBAHMpcQCg1VcGRhdGVTZXJ2aWNlElkKCkdldFVwZGF0ZXMSJC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRVcGRhdGVzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkdldFVwZGF0ZXNSZXNwb25zZRJfCgxHZXRPc1VwZGF0ZXMSJi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRPc1VwZGF0ZXNSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuR2V0T3NVcGRhdGVzUmVzcG9uc2USZQoOU3RhcnRPc1JvbGxvdXQSKC5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydE9zUm9sbG91dFJlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydE9zUm9sbG91dFJlc3BvbnNlEmgKD0NhbmNlbE9zUm9sbG91dBIpLm1pc3RnYXRlLmFkbWluLnYxLkNhbmNlbE9zUm9sbG91dFJlcXVlc3QaKi5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxPc1JvbGxvdXRSZXNwb25zZRJrChBSZWZyZXNoT3NVcGRhdGVzEioubWlzdGdhdGUuYWRtaW4udjEuUmVmcmVzaE9zVXBkYXRlc1JlcXVlc3QaKy5taXN0Z2F0ZS5hZG1pbi52MS5SZWZyZXNoT3NVcGRhdGVzUmVzcG9uc2USawoQQ2hlY2tQYW5lbFVwZGF0ZRIqLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUGFuZWxVcGRhdGVSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tQYW5lbFVwZGF0ZVJlc3BvbnNlEnEKEkluc3RhbGxQYW5lbFVwZGF0ZRIsLm1pc3RnYXRlLmFkbWluLnYxLkluc3RhbGxQYW5lbFVwZGF0ZVJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5JbnN0YWxsUGFuZWxVcGRhdGVSZXNwb25zZRJfCgxTdGFydFJvbGxvdXQSJi5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydFJvbGxvdXRSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuU3RhcnRSb2xsb3V0UmVzcG9uc2USXwoMUGF1c2VSb2xsb3V0EiYubWlzdGdhdGUuYWRtaW4udjEuUGF1c2VSb2xsb3V0UmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlBhdXNlUm9sbG91dFJlc3BvbnNlEmIKDVJlc3VtZVJvbGxvdXQSJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXN1bWVSb2xsb3V0UmVxdWVzdBooLm1pc3RnYXRlLmFkbWluLnYxLlJlc3VtZVJvbGxvdXRSZXNwb25zZRJiCg1DYW5jZWxSb2xsb3V0EicubWlzdGdhdGUuYWRtaW4udjEuQ2FuY2VsUm9sbG91dFJlcXVlc3QaKC5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxSb2xsb3V0UmVzcG9uc2USXwoMUm9sbGJhY2tOb2RlEiYubWlzdGdhdGUuYWRtaW4udjEuUm9sbGJhY2tOb2RlUmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlJvbGxiYWNrTm9kZVJlc3BvbnNlEl8KDFJlc2NhbkJ1bmRsZRImLm1pc3RnYXRlLmFkbWluLnYxLlJlc2NhbkJ1bmRsZVJlcXVlc3QaJy5taXN0Z2F0ZS5hZG1pbi52MS5SZXNjYW5CdW5kbGVSZXNwb25zZRJxChJTY2hlZHVsZU5vZGVVcGRhdGUSLC5taXN0Z2F0ZS5hZG1pbi52MS5TY2hlZHVsZU5vZGVVcGRhdGVSZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuU2NoZWR1bGVOb2RlVXBkYXRlUmVzcG9uc2USgwEKGENhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZRIyLm1pc3RnYXRlLmFkbWluLnYxLkNhbmNlbE5vZGVVcGRhdGVTY2hlZHVsZVJlcXVlc3QaMy5taXN0Z2F0ZS5hZG1pbi52MS5DYW5jZWxOb2RlVXBkYXRlU2NoZWR1bGVSZXNwb25zZRJuChFTZXRVcGRhdGVUaW1lem9uZRIrLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZVRpbWV6b25lUmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZVRpbWV6b25lUmVzcG9uc2USawoQU2V0VXBkYXRlQ2hhbm5lbBIqLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZUNoYW5uZWxSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuU2V0VXBkYXRlQ2hhbm5lbFJlc3BvbnNlEoMBChhTZXRVcGRhdGVEb3dubG9hZFRpbWVvdXQSMi5taXN0Z2F0ZS5hZG1pbi52MS5TZXRVcGRhdGVEb3dubG9hZFRpbWVvdXRSZXF1ZXN0GjMubWlzdGdhdGUuYWRtaW4udjEuU2V0VXBkYXRlRG93bmxvYWRUaW1lb3V0UmVzcG9uc2USgwEKGFNldFVwZGF0ZURvd25sb2FkU291cmNlcxIyLm1pc3RnYXRlLmFkbWluLnYxLlNldFVwZGF0ZURvd25sb2FkU291cmNlc1JlcXVlc3QaMy5taXN0Z2F0ZS5hZG1pbi52MS5TZXRVcGRhdGVEb3dubG9hZFNvdXJjZXNSZXNwb25zZULGAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgtVcGRhdGVQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_agent_v1_agent]);
 
 /**
  * @generated from message mistgate.admin.v1.GetOsUpdatesRequest
@@ -70,6 +70,31 @@ export type NodeOs = Message<"mistgate.admin.v1.NodeOs"> & {
    * @generated from field: mistgate.agent.v1.OsStatus status = 8;
    */
   status?: OsStatus | undefined;
+
+  /**
+   * The agent lists "os-update/1": it can run an OS job. False for an agent that only reads (update the agent).
+   *
+   * @generated from field: bool update_capable = 9;
+   */
+  updateCapable: boolean;
+
+  /**
+   * Why StartOsRollout would be refused for this node right now, "" when it would not. One of: offline, agent_old,
+   * unsupported, panel_host, node_busy (a job is running on the node, or a refresh of its package lists was just asked for), no_status (nothing read yet), nothing_to_do
+   * (nothing to install: use a reboot), rollout_active (an OS rollout is running or paused: a paused one holds only the next OS update), agent_rollout (a node-agent
+   * rollout is active), panel_busy (the panel itself is being updated or a bundle is being installed), awg_build (the
+   * AmneziaWG module is being built on the node). The SPA resolves "os.block.<key>".
+   *
+   * @generated from field: string update_block = 10;
+   */
+  updateBlock: string;
+
+  /**
+   * The same for a plain reboot (no package change), "" when allowed. Same keys, without no_status and nothing_to_do.
+   *
+   * @generated from field: string reboot_block = 11;
+   */
+  rebootBlock: string;
 };
 
 /**
@@ -102,6 +127,13 @@ export type GetOsUpdatesResponse = Message<"mistgate.admin.v1.GetOsUpdatesRespon
    * @generated from field: int32 schedule_timezone_offset_minutes = 4;
    */
   scheduleTimezoneOffsetMinutes: number;
+
+  /**
+   * The active OS rollout, else the last one; unset when there never was one.
+   *
+   * @generated from field: mistgate.admin.v1.OsRollout rollout = 5;
+   */
+  rollout?: OsRollout | undefined;
 };
 
 /**
@@ -110,6 +142,315 @@ export type GetOsUpdatesResponse = Message<"mistgate.admin.v1.GetOsUpdatesRespon
  */
 export const GetOsUpdatesResponseSchema: GenMessage<GetOsUpdatesResponse> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_update, 2);
+
+/**
+ * @generated from message mistgate.admin.v1.OsStep
+ */
+export type OsStep = Message<"mistgate.admin.v1.OsStep"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 2;
+   */
+  nodeName: string;
+
+  /**
+   * @generated from field: mistgate.admin.v1.OsStepState state = 3;
+   */
+  state: OsStepState;
+
+  /**
+   * "osj_..." of the job on the node.
+   *
+   * @generated from field: string job_id = 4;
+   */
+  jobId: string;
+
+  /**
+   * The node's phase while the job runs (agent.proto OsJob.phase): preflight, waiting_lock, repairing, refreshing,
+   * installing, awg_module, checking, rebooting; "" otherwise.
+   *
+   * @generated from field: string phase = 5;
+   */
+  phase: string;
+
+  /**
+   * @generated from field: int64 phase_unix = 6 [jstype = JS_NUMBER];
+   */
+  phaseUnix: bigint;
+
+  /**
+   * @generated from field: string kernel_from = 7;
+   */
+  kernelFrom: string;
+
+  /**
+   * @generated from field: string kernel_to = 8;
+   */
+  kernelTo: string;
+
+  /**
+   * @generated from field: int64 sent_unix = 9 [jstype = JS_NUMBER];
+   */
+  sentUnix: bigint;
+
+  /**
+   * @generated from field: int64 reboot_unix = 10 [jstype = JS_NUMBER];
+   */
+  rebootUnix: bigint;
+
+  /**
+   * @generated from field: int64 back_unix = 11 [jstype = JS_NUMBER];
+   */
+  backUnix: bigint;
+
+  /**
+   * @generated from field: int64 finished_unix = 12 [jstype = JS_NUMBER];
+   */
+  finishedUnix: bigint;
+
+  /**
+   * "os.step.err.<error_key>" for FAILED and SKIPPED: offline, unsupported, panel_host, up_to_date, not_required,
+   * cancelled (skipped); agent_refused (the node answered unsupported or busy: params.code; nothing happened on it), job_failed (the job ended failed:
+   * params.code, params.package), reboot_held (the job installed what it could but the node refused to reboot:
+   * params.code), no_answer, not_back (15 minutes after the reboot), and the check's own: kernel_not_switched,
+   * state_not_applied, inbounds_unreadable, warp_down, inbound_failed, probe_failed, job_not_settled (the end of the job is not known
+   * after the check window), node_lost (a job without a reboot: the node dropped off while it was checked).
+   *
+   * @generated from field: string error_key = 13;
+   */
+  errorKey: string;
+
+  /**
+   * params.code is a node code (agent.proto OsJob.code; the SPA resolves "os.job.err.<code>"); also package, upgraded,
+   * reboot (done | not_required | held | not_asked), held_reason, kernel, pending and security (counts when it started), mode
+   * (security | reboot_only: a reboot_only run installed nothing).
+   *
+   * @generated from field: map<string, string> params = 14;
+   */
+  params: { [key: string]: string };
+};
+
+/**
+ * Describes the message mistgate.admin.v1.OsStep.
+ * Use `create(OsStepSchema)` to create a new message.
+ */
+export const OsStepSchema: GenMessage<OsStep> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 3);
+
+/**
+ * @generated from message mistgate.admin.v1.OsRollout
+ */
+export type OsRollout = Message<"mistgate.admin.v1.OsRollout"> & {
+  /**
+   * "osr_..." opaque.
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: mistgate.admin.v1.OsRolloutStatus status = 2;
+   */
+  status: OsRolloutStatus;
+
+  /**
+   * @generated from field: mistgate.admin.v1.OsRolloutMode mode = 3;
+   */
+  mode: OsRolloutMode;
+
+  /**
+   * @generated from field: mistgate.admin.v1.OsRebootPolicy reboot = 4;
+   */
+  reboot: OsRebootPolicy;
+
+  /**
+   * @generated from field: int64 created_unix = 5 [jstype = JS_NUMBER];
+   */
+  createdUnix: bigint;
+
+  /**
+   * @generated from field: int64 finished_unix = 6 [jstype = JS_NUMBER];
+   */
+  finishedUnix: bigint;
+
+  /**
+   * Set while PAUSED: "os.pause.<code>": step_failed (the node refused or the job failed), reboot_held (installed, but the
+   * node would not reboot), not_back (did not return 15 minutes after the reboot), gate_failed (it returned but a check
+   * failed). pause_params {node, reason: the step's error_key, code: the node's code, mode: security | reboot_only}.
+   *
+   * @generated from field: string pause_key = 7;
+   */
+  pauseKey: string;
+
+  /**
+   * @generated from field: map<string, string> pause_params = 8;
+   */
+  pauseParams: { [key: string]: string };
+
+  /**
+   * @generated from field: repeated mistgate.admin.v1.OsStep steps = 9;
+   */
+  steps: OsStep[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.OsRollout.
+ * Use `create(OsRolloutSchema)` to create a new message.
+ */
+export const OsRolloutSchema: GenMessage<OsRollout> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 4);
+
+/**
+ * @generated from message mistgate.admin.v1.StartOsRolloutRequest
+ */
+export type StartOsRolloutRequest = Message<"mistgate.admin.v1.StartOsRolloutRequest"> & {
+  /**
+   * Exactly one node for now.
+   *
+   * @generated from field: repeated string node_ids = 1;
+   */
+  nodeIds: string[];
+
+  /**
+   * @generated from field: mistgate.admin.v1.OsRolloutMode mode = 2;
+   */
+  mode: OsRolloutMode;
+
+  /**
+   * @generated from field: mistgate.admin.v1.OsRebootPolicy reboot = 3;
+   */
+  reboot: OsRebootPolicy;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.StartOsRolloutRequest.
+ * Use `create(StartOsRolloutRequestSchema)` to create a new message.
+ */
+export const StartOsRolloutRequestSchema: GenMessage<StartOsRolloutRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 5);
+
+/**
+ * @generated from message mistgate.admin.v1.StartOsRolloutResponse
+ */
+export type StartOsRolloutResponse = Message<"mistgate.admin.v1.StartOsRolloutResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.OsRollout rollout = 1;
+   */
+  rollout?: OsRollout | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.StartOsRolloutResponse.
+ * Use `create(StartOsRolloutResponseSchema)` to create a new message.
+ */
+export const StartOsRolloutResponseSchema: GenMessage<StartOsRolloutResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 6);
+
+/**
+ * @generated from message mistgate.admin.v1.CancelOsRolloutRequest
+ */
+export type CancelOsRolloutRequest = Message<"mistgate.admin.v1.CancelOsRolloutRequest"> & {
+  /**
+   * Empty = the active rollout.
+   *
+   * @generated from field: string rollout_id = 1;
+   */
+  rolloutId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.CancelOsRolloutRequest.
+ * Use `create(CancelOsRolloutRequestSchema)` to create a new message.
+ */
+export const CancelOsRolloutRequestSchema: GenMessage<CancelOsRolloutRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 7);
+
+/**
+ * @generated from message mistgate.admin.v1.CancelOsRolloutResponse
+ */
+export type CancelOsRolloutResponse = Message<"mistgate.admin.v1.CancelOsRolloutResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.OsRollout rollout = 1;
+   */
+  rollout?: OsRollout | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.CancelOsRolloutResponse.
+ * Use `create(CancelOsRolloutResponseSchema)` to create a new message.
+ */
+export const CancelOsRolloutResponseSchema: GenMessage<CancelOsRolloutResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 8);
+
+/**
+ * @generated from message mistgate.admin.v1.RefreshOsUpdatesRequest
+ */
+export type RefreshOsUpdatesRequest = Message<"mistgate.admin.v1.RefreshOsUpdatesRequest"> & {
+  /**
+   * Empty = every node that can.
+   *
+   * @generated from field: repeated string node_ids = 1;
+   */
+  nodeIds: string[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RefreshOsUpdatesRequest.
+ * Use `create(RefreshOsUpdatesRequestSchema)` to create a new message.
+ */
+export const RefreshOsUpdatesRequestSchema: GenMessage<RefreshOsUpdatesRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 9);
+
+/**
+ * @generated from message mistgate.admin.v1.OsRefreshResult
+ */
+export type OsRefreshResult = Message<"mistgate.admin.v1.OsRefreshResult"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * started, running (a job is on the node already), recent (checked less than 30 minutes ago), limit (3 are running),
+   * offline, unsupported (no os-update/1 or not Debian/Ubuntu), refused (the node said no: code).
+   *
+   * @generated from field: string outcome = 2;
+   */
+  outcome: string;
+
+  /**
+   * @generated from field: string code = 3;
+   */
+  code: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.OsRefreshResult.
+ * Use `create(OsRefreshResultSchema)` to create a new message.
+ */
+export const OsRefreshResultSchema: GenMessage<OsRefreshResult> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 10);
+
+/**
+ * @generated from message mistgate.admin.v1.RefreshOsUpdatesResponse
+ */
+export type RefreshOsUpdatesResponse = Message<"mistgate.admin.v1.RefreshOsUpdatesResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.admin.v1.OsRefreshResult results = 1;
+   */
+  results: OsRefreshResult[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RefreshOsUpdatesResponse.
+ * Use `create(RefreshOsUpdatesResponseSchema)` to create a new message.
+ */
+export const RefreshOsUpdatesResponseSchema: GenMessage<RefreshOsUpdatesResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_update, 11);
 
 /**
  * @generated from message mistgate.admin.v1.PanelBuild
@@ -155,7 +496,7 @@ export type PanelBuild = Message<"mistgate.admin.v1.PanelBuild"> & {
  * Use `create(PanelBuildSchema)` to create a new message.
  */
 export const PanelBuildSchema: GenMessage<PanelBuild> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 3);
+  messageDesc(file_mistgate_admin_v1_update, 12);
 
 /**
  * @generated from message mistgate.admin.v1.PanelUpdate
@@ -232,7 +573,7 @@ export type PanelUpdate = Message<"mistgate.admin.v1.PanelUpdate"> & {
  * Use `create(PanelUpdateSchema)` to create a new message.
  */
 export const PanelUpdateSchema: GenMessage<PanelUpdate> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 4);
+  messageDesc(file_mistgate_admin_v1_update, 13);
 
 /**
  * @generated from message mistgate.admin.v1.BundleFile
@@ -271,7 +612,7 @@ export type BundleFile = Message<"mistgate.admin.v1.BundleFile"> & {
  * Use `create(BundleFileSchema)` to create a new message.
  */
 export const BundleFileSchema: GenMessage<BundleFile> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 5);
+  messageDesc(file_mistgate_admin_v1_update, 14);
 
 /**
  * The release bundle read from <data-dir>/dist.
@@ -341,7 +682,7 @@ export type Bundle = Message<"mistgate.admin.v1.Bundle"> & {
  * Use `create(BundleSchema)` to create a new message.
  */
 export const BundleSchema: GenMessage<Bundle> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 6);
+  messageDesc(file_mistgate_admin_v1_update, 15);
 
 /**
  * What the node reported in Hello.last_update. outcome is the agent.proto UpdateOutcome name in lowercase:
@@ -396,7 +737,7 @@ export type LastUpdate = Message<"mistgate.admin.v1.LastUpdate"> & {
  * Use `create(LastUpdateSchema)` to create a new message.
  */
 export const LastUpdateSchema: GenMessage<LastUpdate> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 7);
+  messageDesc(file_mistgate_admin_v1_update, 16);
 
 /**
  * @generated from message mistgate.admin.v1.NodeUpdate
@@ -514,7 +855,7 @@ export type NodeUpdate = Message<"mistgate.admin.v1.NodeUpdate"> & {
  * Use `create(NodeUpdateSchema)` to create a new message.
  */
 export const NodeUpdateSchema: GenMessage<NodeUpdate> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 8);
+  messageDesc(file_mistgate_admin_v1_update, 17);
 
 /**
  * @generated from message mistgate.admin.v1.RolloutStep
@@ -612,7 +953,7 @@ export type RolloutStep = Message<"mistgate.admin.v1.RolloutStep"> & {
  * Use `create(RolloutStepSchema)` to create a new message.
  */
 export const RolloutStepSchema: GenMessage<RolloutStep> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 9);
+  messageDesc(file_mistgate_admin_v1_update, 18);
 
 /**
  * @generated from message mistgate.admin.v1.Rollout
@@ -688,7 +1029,7 @@ export type Rollout = Message<"mistgate.admin.v1.Rollout"> & {
  * Use `create(RolloutSchema)` to create a new message.
  */
 export const RolloutSchema: GenMessage<Rollout> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 10);
+  messageDesc(file_mistgate_admin_v1_update, 19);
 
 /**
  * @generated from message mistgate.admin.v1.GetUpdatesRequest
@@ -701,7 +1042,7 @@ export type GetUpdatesRequest = Message<"mistgate.admin.v1.GetUpdatesRequest"> &
  * Use `create(GetUpdatesRequestSchema)` to create a new message.
  */
 export const GetUpdatesRequestSchema: GenMessage<GetUpdatesRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 11);
+  messageDesc(file_mistgate_admin_v1_update, 20);
 
 /**
  * @generated from message mistgate.admin.v1.GetUpdatesResponse
@@ -816,7 +1157,7 @@ export type GetUpdatesResponse = Message<"mistgate.admin.v1.GetUpdatesResponse">
  * Use `create(GetUpdatesResponseSchema)` to create a new message.
  */
 export const GetUpdatesResponseSchema: GenMessage<GetUpdatesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 12);
+  messageDesc(file_mistgate_admin_v1_update, 21);
 
 /**
  * The notes of one GitHub release, as the maintainers wrote them in the release description. They are INFORMATIONAL and
@@ -886,7 +1227,7 @@ export type ReleaseNote = Message<"mistgate.admin.v1.ReleaseNote"> & {
  * Use `create(ReleaseNoteSchema)` to create a new message.
  */
 export const ReleaseNoteSchema: GenMessage<ReleaseNote> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 13);
+  messageDesc(file_mistgate_admin_v1_update, 22);
 
 /**
  * @generated from message mistgate.admin.v1.CheckPanelUpdateRequest
@@ -899,7 +1240,7 @@ export type CheckPanelUpdateRequest = Message<"mistgate.admin.v1.CheckPanelUpdat
  * Use `create(CheckPanelUpdateRequestSchema)` to create a new message.
  */
 export const CheckPanelUpdateRequestSchema: GenMessage<CheckPanelUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 14);
+  messageDesc(file_mistgate_admin_v1_update, 23);
 
 /**
  * @generated from message mistgate.admin.v1.CheckPanelUpdateResponse
@@ -916,7 +1257,7 @@ export type CheckPanelUpdateResponse = Message<"mistgate.admin.v1.CheckPanelUpda
  * Use `create(CheckPanelUpdateResponseSchema)` to create a new message.
  */
 export const CheckPanelUpdateResponseSchema: GenMessage<CheckPanelUpdateResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 15);
+  messageDesc(file_mistgate_admin_v1_update, 24);
 
 /**
  * @generated from message mistgate.admin.v1.InstallPanelUpdateRequest
@@ -941,7 +1282,7 @@ export type InstallPanelUpdateRequest = Message<"mistgate.admin.v1.InstallPanelU
  * Use `create(InstallPanelUpdateRequestSchema)` to create a new message.
  */
 export const InstallPanelUpdateRequestSchema: GenMessage<InstallPanelUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 16);
+  messageDesc(file_mistgate_admin_v1_update, 25);
 
 /**
  * @generated from message mistgate.admin.v1.InstallPanelUpdateResponse
@@ -958,7 +1299,7 @@ export type InstallPanelUpdateResponse = Message<"mistgate.admin.v1.InstallPanel
  * Use `create(InstallPanelUpdateResponseSchema)` to create a new message.
  */
 export const InstallPanelUpdateResponseSchema: GenMessage<InstallPanelUpdateResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 17);
+  messageDesc(file_mistgate_admin_v1_update, 26);
 
 /**
  * @generated from message mistgate.admin.v1.StartRolloutRequest
@@ -998,7 +1339,7 @@ export type StartRolloutRequest = Message<"mistgate.admin.v1.StartRolloutRequest
  * Use `create(StartRolloutRequestSchema)` to create a new message.
  */
 export const StartRolloutRequestSchema: GenMessage<StartRolloutRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 18);
+  messageDesc(file_mistgate_admin_v1_update, 27);
 
 /**
  * @generated from message mistgate.admin.v1.StartRolloutResponse
@@ -1015,7 +1356,7 @@ export type StartRolloutResponse = Message<"mistgate.admin.v1.StartRolloutRespon
  * Use `create(StartRolloutResponseSchema)` to create a new message.
  */
 export const StartRolloutResponseSchema: GenMessage<StartRolloutResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 19);
+  messageDesc(file_mistgate_admin_v1_update, 28);
 
 /**
  * @generated from message mistgate.admin.v1.PauseRolloutRequest
@@ -1032,7 +1373,7 @@ export type PauseRolloutRequest = Message<"mistgate.admin.v1.PauseRolloutRequest
  * Use `create(PauseRolloutRequestSchema)` to create a new message.
  */
 export const PauseRolloutRequestSchema: GenMessage<PauseRolloutRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 20);
+  messageDesc(file_mistgate_admin_v1_update, 29);
 
 /**
  * @generated from message mistgate.admin.v1.PauseRolloutResponse
@@ -1049,7 +1390,7 @@ export type PauseRolloutResponse = Message<"mistgate.admin.v1.PauseRolloutRespon
  * Use `create(PauseRolloutResponseSchema)` to create a new message.
  */
 export const PauseRolloutResponseSchema: GenMessage<PauseRolloutResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 21);
+  messageDesc(file_mistgate_admin_v1_update, 30);
 
 /**
  * @generated from message mistgate.admin.v1.ResumeRolloutRequest
@@ -1066,7 +1407,7 @@ export type ResumeRolloutRequest = Message<"mistgate.admin.v1.ResumeRolloutReque
  * Use `create(ResumeRolloutRequestSchema)` to create a new message.
  */
 export const ResumeRolloutRequestSchema: GenMessage<ResumeRolloutRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 22);
+  messageDesc(file_mistgate_admin_v1_update, 31);
 
 /**
  * @generated from message mistgate.admin.v1.ResumeRolloutResponse
@@ -1083,7 +1424,7 @@ export type ResumeRolloutResponse = Message<"mistgate.admin.v1.ResumeRolloutResp
  * Use `create(ResumeRolloutResponseSchema)` to create a new message.
  */
 export const ResumeRolloutResponseSchema: GenMessage<ResumeRolloutResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 23);
+  messageDesc(file_mistgate_admin_v1_update, 32);
 
 /**
  * @generated from message mistgate.admin.v1.CancelRolloutRequest
@@ -1100,7 +1441,7 @@ export type CancelRolloutRequest = Message<"mistgate.admin.v1.CancelRolloutReque
  * Use `create(CancelRolloutRequestSchema)` to create a new message.
  */
 export const CancelRolloutRequestSchema: GenMessage<CancelRolloutRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 24);
+  messageDesc(file_mistgate_admin_v1_update, 33);
 
 /**
  * @generated from message mistgate.admin.v1.CancelRolloutResponse
@@ -1117,7 +1458,7 @@ export type CancelRolloutResponse = Message<"mistgate.admin.v1.CancelRolloutResp
  * Use `create(CancelRolloutResponseSchema)` to create a new message.
  */
 export const CancelRolloutResponseSchema: GenMessage<CancelRolloutResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 25);
+  messageDesc(file_mistgate_admin_v1_update, 34);
 
 /**
  * @generated from message mistgate.admin.v1.RollbackNodeRequest
@@ -1134,7 +1475,7 @@ export type RollbackNodeRequest = Message<"mistgate.admin.v1.RollbackNodeRequest
  * Use `create(RollbackNodeRequestSchema)` to create a new message.
  */
 export const RollbackNodeRequestSchema: GenMessage<RollbackNodeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 26);
+  messageDesc(file_mistgate_admin_v1_update, 35);
 
 /**
  * @generated from message mistgate.admin.v1.RollbackNodeResponse
@@ -1155,7 +1496,7 @@ export type RollbackNodeResponse = Message<"mistgate.admin.v1.RollbackNodeRespon
  * Use `create(RollbackNodeResponseSchema)` to create a new message.
  */
 export const RollbackNodeResponseSchema: GenMessage<RollbackNodeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 27);
+  messageDesc(file_mistgate_admin_v1_update, 36);
 
 /**
  * @generated from message mistgate.admin.v1.RescanBundleRequest
@@ -1168,7 +1509,7 @@ export type RescanBundleRequest = Message<"mistgate.admin.v1.RescanBundleRequest
  * Use `create(RescanBundleRequestSchema)` to create a new message.
  */
 export const RescanBundleRequestSchema: GenMessage<RescanBundleRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 28);
+  messageDesc(file_mistgate_admin_v1_update, 37);
 
 /**
  * @generated from message mistgate.admin.v1.RescanBundleResponse
@@ -1185,7 +1526,7 @@ export type RescanBundleResponse = Message<"mistgate.admin.v1.RescanBundleRespon
  * Use `create(RescanBundleResponseSchema)` to create a new message.
  */
 export const RescanBundleResponseSchema: GenMessage<RescanBundleResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 29);
+  messageDesc(file_mistgate_admin_v1_update, 38);
 
 /**
  * @generated from message mistgate.admin.v1.ScheduleNodeUpdateRequest
@@ -1224,7 +1565,7 @@ export type ScheduleNodeUpdateRequest = Message<"mistgate.admin.v1.ScheduleNodeU
  * Use `create(ScheduleNodeUpdateRequestSchema)` to create a new message.
  */
 export const ScheduleNodeUpdateRequestSchema: GenMessage<ScheduleNodeUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 30);
+  messageDesc(file_mistgate_admin_v1_update, 39);
 
 /**
  * @generated from message mistgate.admin.v1.ScheduleNodeUpdateResponse
@@ -1256,7 +1597,7 @@ export type ScheduleNodeUpdateResponse = Message<"mistgate.admin.v1.ScheduleNode
  * Use `create(ScheduleNodeUpdateResponseSchema)` to create a new message.
  */
 export const ScheduleNodeUpdateResponseSchema: GenMessage<ScheduleNodeUpdateResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 31);
+  messageDesc(file_mistgate_admin_v1_update, 40);
 
 /**
  * @generated from message mistgate.admin.v1.CancelNodeUpdateScheduleRequest
@@ -1273,7 +1614,7 @@ export type CancelNodeUpdateScheduleRequest = Message<"mistgate.admin.v1.CancelN
  * Use `create(CancelNodeUpdateScheduleRequestSchema)` to create a new message.
  */
 export const CancelNodeUpdateScheduleRequestSchema: GenMessage<CancelNodeUpdateScheduleRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 32);
+  messageDesc(file_mistgate_admin_v1_update, 41);
 
 /**
  * @generated from message mistgate.admin.v1.CancelNodeUpdateScheduleResponse
@@ -1290,7 +1631,7 @@ export type CancelNodeUpdateScheduleResponse = Message<"mistgate.admin.v1.Cancel
  * Use `create(CancelNodeUpdateScheduleResponseSchema)` to create a new message.
  */
 export const CancelNodeUpdateScheduleResponseSchema: GenMessage<CancelNodeUpdateScheduleResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 33);
+  messageDesc(file_mistgate_admin_v1_update, 42);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateTimezoneRequest
@@ -1307,7 +1648,7 @@ export type SetUpdateTimezoneRequest = Message<"mistgate.admin.v1.SetUpdateTimez
  * Use `create(SetUpdateTimezoneRequestSchema)` to create a new message.
  */
 export const SetUpdateTimezoneRequestSchema: GenMessage<SetUpdateTimezoneRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 34);
+  messageDesc(file_mistgate_admin_v1_update, 43);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateTimezoneResponse
@@ -1324,7 +1665,7 @@ export type SetUpdateTimezoneResponse = Message<"mistgate.admin.v1.SetUpdateTime
  * Use `create(SetUpdateTimezoneResponseSchema)` to create a new message.
  */
 export const SetUpdateTimezoneResponseSchema: GenMessage<SetUpdateTimezoneResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 35);
+  messageDesc(file_mistgate_admin_v1_update, 44);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateChannelRequest
@@ -1343,7 +1684,7 @@ export type SetUpdateChannelRequest = Message<"mistgate.admin.v1.SetUpdateChanne
  * Use `create(SetUpdateChannelRequestSchema)` to create a new message.
  */
 export const SetUpdateChannelRequestSchema: GenMessage<SetUpdateChannelRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 36);
+  messageDesc(file_mistgate_admin_v1_update, 45);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateChannelResponse
@@ -1360,7 +1701,7 @@ export type SetUpdateChannelResponse = Message<"mistgate.admin.v1.SetUpdateChann
  * Use `create(SetUpdateChannelResponseSchema)` to create a new message.
  */
 export const SetUpdateChannelResponseSchema: GenMessage<SetUpdateChannelResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 37);
+  messageDesc(file_mistgate_admin_v1_update, 46);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateDownloadTimeoutRequest
@@ -1377,7 +1718,7 @@ export type SetUpdateDownloadTimeoutRequest = Message<"mistgate.admin.v1.SetUpda
  * Use `create(SetUpdateDownloadTimeoutRequestSchema)` to create a new message.
  */
 export const SetUpdateDownloadTimeoutRequestSchema: GenMessage<SetUpdateDownloadTimeoutRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 38);
+  messageDesc(file_mistgate_admin_v1_update, 47);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateDownloadTimeoutResponse
@@ -1394,7 +1735,7 @@ export type SetUpdateDownloadTimeoutResponse = Message<"mistgate.admin.v1.SetUpd
  * Use `create(SetUpdateDownloadTimeoutResponseSchema)` to create a new message.
  */
 export const SetUpdateDownloadTimeoutResponseSchema: GenMessage<SetUpdateDownloadTimeoutResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 39);
+  messageDesc(file_mistgate_admin_v1_update, 48);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateDownloadSourcesRequest
@@ -1413,7 +1754,7 @@ export type SetUpdateDownloadSourcesRequest = Message<"mistgate.admin.v1.SetUpda
  * Use `create(SetUpdateDownloadSourcesRequestSchema)` to create a new message.
  */
 export const SetUpdateDownloadSourcesRequestSchema: GenMessage<SetUpdateDownloadSourcesRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 40);
+  messageDesc(file_mistgate_admin_v1_update, 49);
 
 /**
  * @generated from message mistgate.admin.v1.SetUpdateDownloadSourcesResponse
@@ -1430,7 +1771,7 @@ export type SetUpdateDownloadSourcesResponse = Message<"mistgate.admin.v1.SetUpd
  * Use `create(SetUpdateDownloadSourcesResponseSchema)` to create a new message.
  */
 export const SetUpdateDownloadSourcesResponseSchema: GenMessage<SetUpdateDownloadSourcesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_update, 41);
+  messageDesc(file_mistgate_admin_v1_update, 50);
 
 /**
  * @generated from enum mistgate.admin.v1.OsUpdateState
@@ -1489,6 +1830,176 @@ export const OsUpdateStateSchema: GenEnum<OsUpdateState> = /*@__PURE__*/
   enumDesc(file_mistgate_admin_v1_update, 0);
 
 /**
+ * @generated from enum mistgate.admin.v1.OsRolloutStatus
+ */
+export enum OsRolloutStatus {
+  /**
+   * @generated from enum value: OS_ROLLOUT_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: OS_ROLLOUT_STATUS_RUNNING = 1;
+   */
+  RUNNING = 1,
+
+  /**
+   * Something happened on the node and a step failed (the job failed, the reboot was held, the node did not come back, the check
+   * failed): the rollout waits for the owner (CancelOsRollout) and the alert os_update_failed is open. It holds only the next OS
+   * update; agent rollouts, the panel update and the bundle sync go on. A refusal where nothing happened on the node ends the
+   * rollout as FAILED at once, without a pause and without an alert.
+   *
+   * @generated from enum value: OS_ROLLOUT_STATUS_PAUSED = 2;
+   */
+  PAUSED = 2,
+
+  /**
+   * @generated from enum value: OS_ROLLOUT_STATUS_DONE = 3;
+   */
+  DONE = 3,
+
+  /**
+   * @generated from enum value: OS_ROLLOUT_STATUS_CANCELLED = 4;
+   */
+  CANCELLED = 4,
+
+  /**
+   * Finished with a FAILED step (the owner cancelled the paused rollout).
+   *
+   * @generated from enum value: OS_ROLLOUT_STATUS_FAILED = 5;
+   */
+  FAILED = 5,
+}
+
+/**
+ * Describes the enum mistgate.admin.v1.OsRolloutStatus.
+ */
+export const OsRolloutStatusSchema: GenEnum<OsRolloutStatus> = /*@__PURE__*/
+  enumDesc(file_mistgate_admin_v1_update, 1);
+
+/**
+ * @generated from enum mistgate.admin.v1.OsRolloutMode
+ */
+export enum OsRolloutMode {
+  /**
+   * @generated from enum value: OS_ROLLOUT_MODE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * unattended-upgrade: what the distribution calls a security update.
+   *
+   * @generated from enum value: OS_ROLLOUT_MODE_SECURITY = 1;
+   */
+  SECURITY = 1,
+
+  /**
+   * No package change, only the reboot.
+   *
+   * @generated from enum value: OS_ROLLOUT_MODE_REBOOT_ONLY = 2;
+   */
+  REBOOT_ONLY = 2,
+}
+
+/**
+ * Describes the enum mistgate.admin.v1.OsRolloutMode.
+ */
+export const OsRolloutModeSchema: GenEnum<OsRolloutMode> = /*@__PURE__*/
+  enumDesc(file_mistgate_admin_v1_update, 2);
+
+/**
+ * @generated from enum mistgate.admin.v1.OsRebootPolicy
+ */
+export enum OsRebootPolicy {
+  /**
+   * @generated from enum value: OS_REBOOT_POLICY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: OS_REBOOT_POLICY_NEVER = 1;
+   */
+  NEVER = 1,
+
+  /**
+   * @generated from enum value: OS_REBOOT_POLICY_IF_REQUIRED = 2;
+   */
+  IF_REQUIRED = 2,
+
+  /**
+   * Reboot even when nothing asks for it (REBOOT_ONLY only). All the node's own checks still apply.
+   *
+   * @generated from enum value: OS_REBOOT_POLICY_ALWAYS = 3;
+   */
+  ALWAYS = 3,
+}
+
+/**
+ * Describes the enum mistgate.admin.v1.OsRebootPolicy.
+ */
+export const OsRebootPolicySchema: GenEnum<OsRebootPolicy> = /*@__PURE__*/
+  enumDesc(file_mistgate_admin_v1_update, 3);
+
+/**
+ * @generated from enum mistgate.admin.v1.OsStepState
+ */
+export enum OsStepState {
+  /**
+   * @generated from enum value: OS_STEP_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: OS_STEP_STATE_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * UpdateOs sent: the job runs on the node (phase says what it does).
+   *
+   * @generated from enum value: OS_STEP_STATE_SENT = 2;
+   */
+  SENT = 2,
+
+  /**
+   * The job reached its reboot: the node is down or coming back (15 minutes to return).
+   *
+   * @generated from enum value: OS_STEP_STATE_REBOOTING = 3;
+   */
+  REBOOTING = 3,
+
+  /**
+   * The job is over and the node is checked like after an agent update (profiles up, probes pass).
+   *
+   * @generated from enum value: OS_STEP_STATE_GATING = 4;
+   */
+  GATING = 4,
+
+  /**
+   * @generated from enum value: OS_STEP_STATE_PASSED = 5;
+   */
+  PASSED = 5,
+
+  /**
+   * @generated from enum value: OS_STEP_STATE_FAILED = 6;
+   */
+  FAILED = 6,
+
+  /**
+   * Not attempted: offline, unsupported, the panel's own server, nothing to do, or cancelled.
+   *
+   * @generated from enum value: OS_STEP_STATE_SKIPPED = 7;
+   */
+  SKIPPED = 7,
+}
+
+/**
+ * Describes the enum mistgate.admin.v1.OsStepState.
+ */
+export const OsStepStateSchema: GenEnum<OsStepState> = /*@__PURE__*/
+  enumDesc(file_mistgate_admin_v1_update, 4);
+
+/**
  * @generated from enum mistgate.admin.v1.BundleStatus
  */
 export enum BundleStatus {
@@ -1532,7 +2043,7 @@ export enum BundleStatus {
  * Describes the enum mistgate.admin.v1.BundleStatus.
  */
 export const BundleStatusSchema: GenEnum<BundleStatus> = /*@__PURE__*/
-  enumDesc(file_mistgate_admin_v1_update, 1);
+  enumDesc(file_mistgate_admin_v1_update, 5);
 
 /**
  * @generated from enum mistgate.admin.v1.NodeUpdateState
@@ -1599,7 +2110,7 @@ export enum NodeUpdateState {
  * Describes the enum mistgate.admin.v1.NodeUpdateState.
  */
 export const NodeUpdateStateSchema: GenEnum<NodeUpdateState> = /*@__PURE__*/
-  enumDesc(file_mistgate_admin_v1_update, 2);
+  enumDesc(file_mistgate_admin_v1_update, 6);
 
 /**
  * @generated from enum mistgate.admin.v1.RolloutStatus
@@ -1646,7 +2157,7 @@ export enum RolloutStatus {
  * Describes the enum mistgate.admin.v1.RolloutStatus.
  */
 export const RolloutStatusSchema: GenEnum<RolloutStatus> = /*@__PURE__*/
-  enumDesc(file_mistgate_admin_v1_update, 3);
+  enumDesc(file_mistgate_admin_v1_update, 7);
 
 /**
  * @generated from enum mistgate.admin.v1.StepState
@@ -1712,7 +2223,7 @@ export enum StepState {
  * Describes the enum mistgate.admin.v1.StepState.
  */
 export const StepStateSchema: GenEnum<StepState> = /*@__PURE__*/
-  enumDesc(file_mistgate_admin_v1_update, 4);
+  enumDesc(file_mistgate_admin_v1_update, 8);
 
 /**
  * Updates screen: the panel release, the release bundle it holds, what every node runs, and explicit
@@ -1755,6 +2266,40 @@ export const UpdateService: GenService<{
     methodKind: "unary";
     input: typeof GetOsUpdatesRequestSchema;
     output: typeof GetOsUpdatesResponseSchema;
+  },
+  /**
+   * Install the security updates of ONE node, or reboot it, now (agent.proto "OS UPDATES"). A rollout of one node; more
+   * nodes at once, windows and the canary come later. Owner-only with a fresh step-up. Only one rollout of any kind is
+   * active at a time (agent update, OS update, panel update, GitHub bundle sync). Audited.
+   *
+   * @generated from rpc mistgate.admin.v1.UpdateService.StartOsRollout
+   */
+  startOsRollout: {
+    methodKind: "unary";
+    input: typeof StartOsRolloutRequestSchema;
+    output: typeof StartOsRolloutResponseSchema;
+  },
+  /**
+   * End the OS rollout. A step whose job is running finishes (dpkg is never cut short) and is still checked; nothing new
+   * starts. A rollout paused by a failed step ends at once: the alert clears. Owner-only with a fresh step-up.
+   *
+   * @generated from rpc mistgate.admin.v1.UpdateService.CancelOsRollout
+   */
+  cancelOsRollout: {
+    methodKind: "unary";
+    input: typeof CancelOsRolloutRequestSchema;
+    output: typeof CancelOsRolloutResponseSchema;
+  },
+  /**
+   * Refresh the package lists of nodes (apt-get update only; nothing is installed or rebooted). At most 3 nodes at a time
+   * and once per node per 30 minutes; the answer says which were started. Owner-only, no step-up.
+   *
+   * @generated from rpc mistgate.admin.v1.UpdateService.RefreshOsUpdates
+   */
+  refreshOsUpdates: {
+    methodKind: "unary";
+    input: typeof RefreshOsUpdatesRequestSchema;
+    output: typeof RefreshOsUpdatesResponseSchema;
   },
   /**
    * Force a fresh lookup of the latest stable GitHub release. The background checker also polls periodically.

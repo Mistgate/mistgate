@@ -148,6 +148,11 @@ func (s *Service) beginPanelUpdate(ctx context.Context) error {
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return s.internal("check active rollout before panel update", err)
 	}
+	if active, err := s.osRolloutRunning(ctx); err != nil {
+		return s.internal("check OS rollout before panel update", err)
+	} else if active {
+		return precondition("an OS update of a node is running; wait for it to finish before updating the panel")
+	}
 	s.panelInstalling = true
 	return nil
 }
@@ -211,6 +216,11 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 	}
 	if pin != nil && (pin.version != b.manifest.Version || pin.built != b.manifest.Built) {
 		return store.RolloutRow{}, precondition("the update bundle changed; review the new version")
+	}
+	if active, err := s.osRolloutRunning(ctx); err != nil {
+		return store.RolloutRow{}, s.internal("check OS rollout", err)
+	} else if active {
+		return store.RolloutRow{}, precondition("an OS update of a node is running; wait for it to finish")
 	}
 	active, activeErr := s.st.ActiveRollout(ctx)
 	if activeErr == nil {
@@ -748,16 +758,10 @@ type gateResult struct {
 	with map[string]string
 }
 
-// gate evaluates the rollout gate for a node that is back with the new build.
+// gate evaluates the rollout gate for a node that is back with the new build: the new build confirmed itself (update_committed),
+// and the node is healthy (healthGate).
 func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 	s := p.s
-	var soft string
-	with := map[string]string{}
-	miss := func(key string) {
-		if soft == "" {
-			soft = key
-		}
-	}
 	committed := false
 	if lu, ok := p.recentLast(n, x); ok && lu.Outcome == "ok" {
 		committed = true
@@ -769,13 +773,29 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 			committed = true
 		}
 	}
-	if !committed {
-		miss(errNotCommitted)
+	g := s.healthGate(p.ctx, x.NodeID, n, drift, x.ReconnectedAt, x.PreFailed, p.now)
+	if g.hard == "" && !committed { // the first thing missing is what the owner reads
+		g.pass, g.soft = false, errNotCommitted
+	}
+	return g
+}
+
+// healthGate is the part of the gate that looks at what the node does, shared by the agent rollout and the OS rollout: the
+// desired state is applied, no profile that worked before is failed (30 s of grace), WARP is up where a profile leaves through
+// it, and the synthetic probes have run since `since` (the node was back). preFailed are the profiles that were already failed
+// before the change.
+func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow, drift bool, since time.Time, preFailed []string, now time.Time) gateResult {
+	var soft string
+	with := map[string]string{}
+	miss := func(key string) {
+		if soft == "" {
+			soft = key
+		}
 	}
 	if drift || (n.DesiredHash != "" && n.AppliedHash != n.DesiredHash) {
 		miss(errStateNotApplied)
 	}
-	inbounds, err := s.st.FleetInbounds(p.ctx, x.NodeID, true)
+	inbounds, err := s.st.FleetInbounds(ctx, nodeID, true)
 	if err != nil {
 		miss(errInboundsUnread)
 	}
@@ -789,33 +809,33 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 		if json.Unmarshal([]byte(in.Settings), &settings) == nil && in.Enabled && settings.Egress == "warp" {
 			warpEgress = true
 		}
-		if in.State == "failed" && !slices.Contains(x.PreFailed, in.ID) {
+		if in.State == "failed" && !slices.Contains(preFailed, in.ID) {
 			newlyFailed = append(newlyFailed, in.ID)
 		}
 	}
-	if warpEgress && !s.warpUpSince(p.ctx, x.NodeID, x.ReconnectedAt) {
+	if warpEgress && !s.warpUpSince(ctx, nodeID, since) {
 		miss(errWarpDown)
 	}
 	if len(newlyFailed) > 0 {
 		with["inbound"] = newlyFailed[0]
-		first, seen := s.failing[x.NodeID]
+		first, seen := s.failing[nodeID]
 		if !seen {
-			s.failing[x.NodeID] = p.now
-		} else if p.now.Sub(first) >= s.cfg.InboundGrace {
+			s.failing[nodeID] = now
+		} else if now.Sub(first) >= s.cfg.InboundGrace {
 			return gateResult{hard: errInboundFailed, with: with}
 		}
 		miss(errInboundFailed)
 	} else {
-		delete(s.failing, x.NodeID)
+		delete(s.failing, nodeID)
 	}
 	if s.hl != nil {
-		probeable, ok, _, err := s.hl.NodeChecksSince(p.ctx, x.NodeID, x.ReconnectedAt)
+		probeable, ok, _, err := s.hl.NodeChecksSince(ctx, nodeID, since)
 		if err != nil {
 			miss(errProbeFailed)
 		} else if probeable > 0 && ok < probeable {
 			miss(errProbeFailed)
-			if _, _, _, err := s.hl.RunChecksNow(p.ctx, x.NodeID); err != nil {
-				s.log.Warn("update: run checks", "node", x.NodeID, "err", err)
+			if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
+				s.log.Warn("update: run checks", "node", nodeID, "err", err)
 			}
 		}
 	}
@@ -1366,6 +1386,17 @@ func (s *Service) rollbackNode(ctx context.Context, nodeID string) (nodeView, er
 	if s.inflight[nodeID] {
 		s.mu.Unlock()
 		return nodeView{}, precondition("a command is already running on this node")
+	}
+	if s.osInflight[nodeID] {
+		s.mu.Unlock()
+		return nodeView{}, precondition("node_updating")
+	}
+	s.updMu.RLock()
+	osBusy := s.osUpdating[nodeID]
+	s.updMu.RUnlock()
+	if osBusy { // an OS job is on this node: the agent does not restart under it
+		s.mu.Unlock()
+		return nodeView{}, precondition("node_updating")
 	}
 	s.inflight[nodeID] = true // the pass leaves the step of this node alone meanwhile
 	s.mu.Unlock()

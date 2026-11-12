@@ -169,6 +169,26 @@ func TestOsUpdatesEditionAndPanelHostRootGates(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "unavailable_in_edition: feature=os_updates") {
 		t.Fatalf("edge GetOsUpdates = %v, want os_updates unavailable", err)
 	}
+	// the changes of the OS layer are refused there too, before the step-up is even asked
+	for name, call := range map[string]func() error{
+		"StartOsRollout": func() error {
+			_, err := (rpc{e.s}).StartOsRollout(e.ctx, connect.NewRequest(&adminv1.StartOsRolloutRequest{NodeIds: []string{"nod_x"},
+				Mode: adminv1.OsRolloutMode_OS_ROLLOUT_MODE_SECURITY, Reboot: adminv1.OsRebootPolicy_OS_REBOOT_POLICY_IF_REQUIRED}))
+			return err
+		},
+		"CancelOsRollout": func() error {
+			_, err := (rpc{e.s}).CancelOsRollout(e.ctx, connect.NewRequest(&adminv1.CancelOsRolloutRequest{}))
+			return err
+		},
+		"RefreshOsUpdates": func() error {
+			_, err := (rpc{e.s}).RefreshOsUpdates(e.ctx, connect.NewRequest(&adminv1.RefreshOsUpdatesRequest{}))
+			return err
+		},
+	} {
+		if err := call(); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "unavailable_in_edition: feature=os_updates") {
+			t.Errorf("edge %s = %v, want os_updates unavailable", name, err)
+		}
+	}
 }
 
 const osStatusNow = 1794000000

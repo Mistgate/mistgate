@@ -511,6 +511,8 @@ func followUpHint(card *adminv1.PlanCard) string {
 		seconds, what = 300, "check that the node is back and on the right version"
 	case "rollout_start":
 		seconds, what = 900, "check the rollout"
+	case "os_rollout_start":
+		seconds, what = 1500, "check the OS update of the node: that it finished, the node is back and its profiles are up"
 	case "relay":
 		seconds, what = 180, "check that the relay carries traffic"
 	default:

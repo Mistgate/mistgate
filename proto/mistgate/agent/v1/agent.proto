@@ -359,7 +359,7 @@ package mistgate.agent.v1;
 //
 // OS UPDATES (additive, protocol api_version stays 1)
 //   "os-status/1" is the read-only half (OsStatus, NodeSettings.os_status). "os-update/1" is the write half: UpdateOs asks the
-//   node to run ONE job. The panel does not send UpdateOs yet (a later step); the node can also run the same job by hand:
+//   node to run ONE job. The panel sends it for one node at a time (UpdateService.StartOsRollout); the node can also run the same job by hand:
 //   `mistgate-node host os-update` (docs: operations/updates.md).
 //   - WHAT RUNS. The agent never installs a package inside its own sandboxed unit. A job is `<this binary> host os-update
 //     --yes ...`, started as a separate transient systemd unit (systemd-run, name mistgate-os-update, RuntimeMaxSec 75

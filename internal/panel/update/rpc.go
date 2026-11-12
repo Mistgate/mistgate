@@ -229,6 +229,13 @@ func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsU
 	}
 	host := s.PanelHostOsStatus()
 	resp := &adminv1.GetOsUpdatesResponse{NowUnix: s.now().Unix(), Nodes: []*adminv1.NodeOs{}, PanelHost: host}
+	g, err := s.osGlobalNow(ctx)
+	if err != nil {
+		return nil, s.internal("check running rollouts", err)
+	}
+	if resp.Rollout, err = s.osRolloutOrLast(ctx); err != nil {
+		return nil, s.internal("load OS rollout", err)
+	}
 	resp.ScheduleTimezoneOffsetMinutes, err = s.scheduleTimezoneOffset(ctx)
 	if err != nil {
 		return nil, s.internal("load update timezone", err)
@@ -254,12 +261,15 @@ func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsU
 			}
 		}
 		capable := slices.Contains(node.AgentCaps, osupdate.Capability)
-		supported := osUpdateSupported(capable, status)
-		// Containers on one kernel share the boot id, so a match only means "same kernel", not "the panel's own server".
-		// Step S3 must not rely on it alone before it skips a node as the panel host: it needs a second signal.
-		onPanel := status != nil && host != nil && status.GetBootIdHash() != "" && status.GetBootIdHash() == host.GetBootIdHash()
+		facts, err := s.st.NodeFacts(ctx, node.ID)
+		if err != nil {
+			return nil, s.internal("read node facts", err)
+		}
+		// Containers on one kernel share the boot id, so a match alone only means "same kernel": see onPanelServer.
+		osn := s.osNodeOf(node, row.Connected, status, host, facts.Hostname, resp.NowUnix)
 		resp.Nodes = append(resp.Nodes, &adminv1.NodeOs{NodeId: node.ID, Name: node.Name, Connected: row.Connected,
-			Supported: supported, OnlineUsers: online, OnPanelServer: onPanel, State: osUpdateState(capable, row.Connected, status, resp.NowUnix), Status: status})
+			Supported: osn.supported, OnlineUsers: online, OnPanelServer: osn.onPanel, State: osUpdateState(capable, row.Connected, status, resp.NowUnix), Status: status,
+			UpdateCapable: osn.updateCap, UpdateBlock: osBlock(g, osn, false), RebootBlock: osBlock(g, osn, true)})
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -547,6 +557,10 @@ func (r rpc) SetUpdateDownloadSources(ctx context.Context, req *connect.Request[
 // because a step failed, the gate failed or the panel lost track of a step, UPDATE_FAILED is raised; resuming,
 // cancelling or a new rollout makes it go away. A pause by the owner or by a changed bundle raises nothing.
 func (s *Service) Conditions(ctx context.Context) []health.ExtCond {
+	return append(s.agentConditions(ctx), s.osConditions(ctx)...)
+}
+
+func (s *Service) agentConditions(ctx context.Context) []health.ExtCond {
 	ro, err := s.st.ActiveRollout(ctx)
 	if err != nil || ro.Status != store.RolloutPaused {
 		return nil

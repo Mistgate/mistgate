@@ -124,7 +124,7 @@ describe("words of an approval", () => {
   it("titles every tool that can plan a change, in both languages", () => {
     const tools = [
       "user_create", "user_update", "user_disable", "user_enable", "user_reset_traffic", "device_revoke", "alert_mute", "alert_close", "node_fix", "rollout_start", "rollout_pause", "rollout_resume",
-      "rollout_cancel", "node_update_schedule", "node_update_schedule_cancel", "update_timezone", "node_rollback", "node_install", "node_server_password_rotate",
+      "rollout_cancel", "os_rollout_start", "os_rollout_cancel", "node_update_schedule", "node_update_schedule_cancel", "update_timezone", "node_rollback", "node_install", "node_server_password_rotate",
     ];
     for (const tool of tools) {
       expect(toolTitle(t, tool), tool).not.toBe(tool);
@@ -137,6 +137,7 @@ describe("words of an approval", () => {
       "name", "subscription_name", "quota", "term", "apps", "app_mistgate", "nodes", "count", "users", "effect", "user", "device", "last_seen", "alert", "duration", "node", "fix", "detail",
       "drops_sessions", "version", "rollout", "progress", "action", "current_version", "previous_version", "group", "quota_reset", "expires", "device_limit", "speed_limit", "device_speed_limit",
       "dns_preset", "used", "scheduled_at", "scheduled_version", "timezone", "existing_schedule", "from", "to",
+      "pending", "security", "kernel", "people_online", "reboot_required", "warning",
       "ssh", "username", "host_key", "host_key_algorithm", "panel_ssh_key", "address", "installation", "recovery",
     ];
     for (const k of keys) {
@@ -194,6 +195,14 @@ describe("coded facts and outcomes, in Russian", () => {
   const fmt = makeFmt("ru", tr);
   const fact = (key: string, code: string, params: Record<string, string> = {}, untrustedParams: string[] = []) => ({ key, value: "the panel's English", untrusted: false, code, params, untrustedParams });
   const said = (f: ReturnType<typeof fact>) => factWords(tr, fmt, f).map((p) => (typeof p === "string" ? p : `[${p.data}]`)).join("");
+
+  it("words the OS update's facts in the owner's voice: you, the hoster, waiting to be installed", () => {
+    expect(said(fact("warning", "os_old_kernels"))).toBe("Старые ядра остаются установленными: если нода не загрузится, выбери прежнее ядро в консоли хостера.");
+    expect(said(fact("warning", "os_awg_module_missing"))).toBe("Модуль AmneziaWG не собран под новое ядро: нода откажется перезагружаться, пока модуля нет.");
+    expect(factLabel(tr, "pending")).toBe("Ожидают установки");
+    expect(factLabel(t, "pending")).toBe("Updates waiting");
+    expect(en["approval.value.os_awg_module_missing"]).toBe("The AmneziaWG module is not built for the new kernel: the node refuses to reboot until it is.");
+  });
 
   it("reads the plan's facts as the owner's sentences", () => {
     expect(said(fact("effect", "traffic_reset"))).toBe("Израсходованный трафик обнулится, остановленные квотой снова смогут подключаться.");

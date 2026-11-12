@@ -7,12 +7,14 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
 import { osPill, osRows, osSummary, osSystem, useOsUpdates, type OsRow } from "@/lib/os-updates";
+import { OsNodeActions, OsRowMenu } from "./os-actions";
 
 // Updates -> Server operating system: the packages and the kernel of the panel's own server and of every node, as the
-// servers read them from disk. Read-only: nothing here installs or reboots yet.
+// servers read them from disk. A node's row ends in the ⋯ menu that installs its security updates, reboots it or checks for
+// updates; the run that is going on, and its outcome, sit under the row (os-actions).
 
-// The same columns for the header and every row: server, system, kernel, updates, state.
-const cols = "md:grid-cols-[minmax(120px,1fr)_110px_minmax(170px,1.1fr)_minmax(190px,1fr)_minmax(180px,1.4fr)]";
+// The same columns for the header and every row: server, system, kernel, updates, state, the ⋯ of the row.
+const cols = "md:grid-cols-[minmax(120px,1fr)_110px_minmax(170px,1.1fr)_minmax(190px,1fr)_minmax(180px,1.4fr)_36px]";
 
 function Server({ row }: { row: OsRow }) {
   const t = useT();
@@ -140,14 +142,22 @@ export function OsSection() {
               {heads.map((h) => (
                 <span key={h}>{h}</span>
               ))}
+              <span aria-hidden />
             </div>
             {rows.map((row) => (
-              <div key={row.id} className={cx("grid min-h-[60px] items-center gap-4 border-b border-line px-5 py-2.5 text-[13px] last:border-b-0", cols)}>
+              <div key={row.id} className={cx("grid min-h-[60px] items-center gap-x-4 gap-y-2.5 border-b border-line px-5 py-2.5 text-[13px] last:border-b-0", cols)}>
                 <Server row={row} />
                 <span className="truncate text-xs text-muted">{osSystem(row.status) || "—"}</span>
                 <Kernel row={row} />
                 <Updates row={row} fmt={fmt} />
                 <State row={row} />
+                <div className="-me-2 flex justify-end">
+                  <OsRowMenu row={row} />
+                </div>
+                {/* under the row, the full width: the run that is going on or its outcome; a row with nothing to report has no such line */}
+                <div className="col-span-full empty:hidden">
+                  <OsNodeActions row={row} compact />
+                </div>
               </div>
             ))}
           </div>
@@ -156,13 +166,19 @@ export function OsSection() {
               <div key={row.id} className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3.5">
                 <div className="flex items-start justify-between gap-2">
                   <Server row={row} />
-                  <span className="shrink-0 text-xs text-muted">{osSystem(row.status)}</span>
+                  <div className="-my-1.5 -me-2 flex shrink-0 items-center gap-1">
+                    <span className="text-xs text-muted">{osSystem(row.status)}</span>
+                    <OsRowMenu row={row} />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Kernel row={row} />
                   <Updates row={row} fmt={fmt} />
                 </div>
                 <State row={row} />
+                <div className="empty:hidden">
+                  <OsNodeActions row={row} compact />
+                </div>
               </div>
             ))}
           </div>

@@ -956,8 +956,10 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 		return
 	}
 	t := time.Unix(ev.TimeUnix, 0).UTC()
-	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) || ev.Code == "update_committed" {
-		t = now // update_committed: the gate compares it with when the panel sent the update, so a node clock behind must not fail it
+	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) || ev.Code == "update_committed" || osJobEventCode(ev.Code) {
+		// update_committed and the events of an OS job: the panel compares them with when it sent the command, so a node clock
+		// behind (or ahead, after the reboot) must not hide one
+		t = now
 	}
 	sev := int(ev.Severity)
 	if sev < 1 || sev > 3 {
@@ -1019,6 +1021,9 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 	}
 	if !dup {
 		c.f.onAwgPrepareEvent(ctx, tr.state.NodeID, row)
+		if row.Code == "os_update_done" || row.Code == "os_update_failed" || row.Code == "os_reboot_started" {
+			c.f.osChanged(tr.state.NodeID)
+		}
 	}
 	if seq != 0 {
 		markCoreAck(tr, seq, now)

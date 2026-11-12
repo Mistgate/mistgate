@@ -66,6 +66,7 @@ func changeTools() []toolDef {
 		change(warpRestart), change(warpReregister),
 		change(nodeFix), change(rolloutStart), change(nodeUpdateSchedule), change(nodeUpdateScheduleCancel), change(updateTimezone), change(updateDownloadTimeout),
 		change(rolloutPause), change(rolloutResume), change(rolloutCancel), change(nodeRollback),
+		change(osRolloutStart), change(osRolloutCancel),
 		change(nodeDecoy),
 	} {
 		out = append(out, g...)

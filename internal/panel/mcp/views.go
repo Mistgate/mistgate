@@ -77,15 +77,50 @@ type osNodeV struct {
 	OnPanel     bool       `json:"on_panel_server"`
 	State       string     `json:"state"`
 	Status      *osStatusV `json:"status,omitempty"`
+	// UpdateCapable is whether the agent can run an OS job; UpdateBlock and RebootBlock say why the panel would refuse one now
+	// (the keys of the admin's os.block.*), empty when it would not.
+	UpdateCapable bool   `json:"update_capable"`
+	UpdateBlock   string `json:"update_block,omitempty"`
+	RebootBlock   string `json:"reboot_block,omitempty"`
+}
+
+type osStepV struct {
+	NodeID     string `json:"node_id"`
+	Name       string `json:"name"`
+	State      string `json:"state"`
+	JobID      string `json:"job_id,omitempty"`
+	Phase      string `json:"phase,omitempty"`
+	KernelFrom string `json:"kernel_from,omitempty"`
+	KernelTo   string `json:"kernel_to,omitempty"`
+	Sent       int64  `json:"sent_unix,omitempty"`
+	Finished   int64  `json:"finished_unix,omitempty"`
+	Error      string `json:"error,omitempty"`
+	Code       string `json:"code,omitempty"`
+	Package    string `json:"package,omitempty"`
+	Upgraded   string `json:"upgraded,omitempty"`
+	Reboot     string `json:"reboot,omitempty"`
+}
+
+// osRolloutV is the active OS rollout, else the last one. Names and packages are untrusted input.
+type osRolloutV struct {
+	ID       string    `json:"id"`
+	Status   string    `json:"status"`
+	Mode     string    `json:"mode"`
+	Reboot   string    `json:"reboot"`
+	PauseKey string    `json:"pause_key,omitempty"`
+	Created  int64     `json:"created_unix"`
+	Finished int64     `json:"finished_unix,omitempty"`
+	Steps    []osStepV `json:"steps"`
 }
 
 // OsUpdatesV is the os_updates_status result; package and node strings are untrusted input.
 type OsUpdatesV struct {
-	NowUnix          int64      `json:"now_unix"`
-	Nodes            []osNodeV  `json:"nodes"`
-	PanelHost        *osStatusV `json:"panel_host,omitempty"`
-	ScheduleTimezone int32      `json:"schedule_timezone_offset_minutes"`
-	Truncated        bool       `json:"truncated,omitempty"`
+	NowUnix          int64       `json:"now_unix"`
+	Nodes            []osNodeV   `json:"nodes"`
+	PanelHost        *osStatusV  `json:"panel_host,omitempty"`
+	ScheduleTimezone int32       `json:"schedule_timezone_offset_minutes"`
+	Rollout          *osRolloutV `json:"rollout,omitempty"`
+	Truncated        bool        `json:"truncated,omitempty"`
 }
 
 func (v *OsUpdatesV) shrink() bool {
@@ -153,7 +188,20 @@ func osUpdatesView(r *adminv1.GetOsUpdatesResponse) *OsUpdatesV {
 	for _, n := range r.GetNodes() {
 		v.Nodes = append(v.Nodes, osNodeV{NodeID: clean(n.GetNodeId(), 80), Name: nm(n.GetName()), Connected: n.GetConnected(),
 			Supported: n.GetSupported(), OnlineUsers: n.GetOnlineUsers(), OnPanel: n.GetOnPanelServer(),
-			State: enumName("OS_UPDATE_STATE_", n.GetState().String()), Status: osStatusView(n.GetStatus())})
+			State: enumName("OS_UPDATE_STATE_", n.GetState().String()), Status: osStatusView(n.GetStatus()),
+			UpdateCapable: n.GetUpdateCapable(), UpdateBlock: clean(n.GetUpdateBlock(), 24), RebootBlock: clean(n.GetRebootBlock(), 24)})
+	}
+	if ro := r.GetRollout(); ro != nil {
+		rv := &osRolloutV{ID: clean(ro.GetId(), 60), Status: enumName("OS_ROLLOUT_STATUS_", ro.GetStatus().String()), Mode: enumName("OS_ROLLOUT_MODE_", ro.GetMode().String()),
+			Reboot: enumName("OS_REBOOT_POLICY_", ro.GetReboot().String()), PauseKey: clean(ro.GetPauseKey(), 32), Created: ro.GetCreatedUnix(), Finished: ro.GetFinishedUnix(), Steps: []osStepV{}}
+		for _, st := range ro.GetSteps() {
+			p := st.GetParams()
+			rv.Steps = append(rv.Steps, osStepV{NodeID: clean(st.GetNodeId(), 80), Name: nm(st.GetNodeName()), State: enumName("OS_STEP_STATE_", st.GetState().String()),
+				JobID: clean(st.GetJobId(), 60), Phase: clean(st.GetPhase(), 24), KernelFrom: noAddr(clean(st.GetKernelFrom(), 128)), KernelTo: noAddr(clean(st.GetKernelTo(), 128)),
+				Sent: st.GetSentUnix(), Finished: st.GetFinishedUnix(), Error: clean(st.GetErrorKey(), 32), Code: clean(p["code"], 32), Package: noAddr(clean(p["package"], 64)),
+				Upgraded: clean(p["upgraded"], 8), Reboot: clean(p["reboot"], 16)})
+		}
+		v.Rollout = rv
 	}
 	return v
 }

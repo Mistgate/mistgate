@@ -281,6 +281,25 @@ When a node misbehaves and its warnings are not enough, the owner can ask it to 
 - **What is in it.** Every record is cleaned on the node (client addresses become `<ip>`, key-shaped text is removed, host names are cut from xray's lines, and only the node journal's short list of attributes is kept), again when the panel stores it, and once more when it is read, with the panel's secret names removed. Debug lines of the chosen sources go only to the capture, not to the node's own log.
 - **Who and what is recorded.** The owner starts and stops a capture in the admin. An admin-profile token starts one with `node_debug_capture_plan` / `node_debug_capture_apply` and reads it with `node_debug_logs` (a capture or a node, filters `min_level`, `source`, `query`, `limit`, `cursor`). Every start is in the audit log with who asked, the node, the sources and the duration. An agent that is too old (it does not list `debug/1`) and a node that is offline are refused without anything being sent. The Cloudflare edition does not have it.
 
+## A node did not come back after an OS update
+
+**How it shows**
+
+- The node's row says **Rebooting…** and, after 15 minutes, the update stops with "did not come back"; the alert "The OS update of a node stopped" is open (Critical) and Telegram has written.
+- The node's events: `os_reboot_started`, then nothing.
+
+**What to do**
+
+1. Open the hoster's console (the panel cannot reach a server that does not boot). If the server shows the boot menu or hangs, choose the previous kernel under GRUB's *Advanced options*: an update never removes old kernels.
+2. When the server is up, the node comes back by itself and the panel reconnects it. Look at **Last update** and the node's **History** tab for why the new kernel did not start.
+3. Press **Close** on the node's row to clear the alert. Do not try the update again before the server runs the kernel you chose on purpose.
+
+A server that did boot but is on another kernel than the one installed shows "started on another kernel" (`kernel_not_switched`): the boot menu (GRUB) does not start the newest kernel; set `GRUB_DEFAULT=0` and run `update-grub`.
+
+## The panel does not reboot a node after installing updates
+
+The update ends with **Reboot not done** and one of the sentences of the table in [Update one server's system](updates.md#update-one-servers-system) (`reboot_held`). The updates are installed. The node checks that a reboot is safe and refuses when it cannot be sure: the AmneziaWG module is not built for the new kernel (`awg_module_missing`, `awg_module_build_failed`), the boot menu is set to a chosen entry (`boot_default_custom`), the files for the new kernel are incomplete (`initramfs_missing`), the server restarted a few minutes ago (`too_soon`) or the panel has rebooted it already within the hour or three times in the day (`reboot_limit`). Fix the cause that the sentence names, or reboot the server yourself from the hoster's panel; the panel has no "reboot anyway" for this.
+
 ## Multipath TCP and CVE-2026-98432
 
 CVE-2026-98432 is a flaw in the Linux kernel's IPv4 TCP (CVSS 9.8) that was shown as remote root through a listener that accepts Multipath TCP (MPTCP). Go opens every listener with MPTCP by default since Go 1.24, so the panel, the node agent and the Xray listeners it hosts accepted it up to v0.1.82. From v0.1.83 they open plain TCP, which nothing in Mistgate needs to change: clients that ask for MPTCP fall back to TCP.

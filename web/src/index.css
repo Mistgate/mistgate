@@ -293,6 +293,15 @@
     transform: rotate(360deg);
   }
 }
+/* a bar of unknown length: a short stretch slides along its track (the OS update of a node), mirrored in right-to-left */
+@keyframes mg-ui-slide {
+  from {
+    transform: translateX(calc(-100% * var(--x-dir)));
+  }
+  to {
+    transform: translateX(calc(300% * var(--x-dir)));
+  }
+}
 /* a page opening: the whole screen settles in at once, short and quiet, from the first frame (no blank flash, no tile
    popping in after another) */
 @keyframes mg-page-in {
