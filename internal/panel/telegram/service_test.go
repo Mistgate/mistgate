@@ -546,13 +546,16 @@ func TestSecurityEvents(t *testing.T) {
 	e.link(owner, 1)
 	e.link(helper, 2)
 	e.link(reader, 3)
-	e.run()
 
+	// Queue the whole burst before the send loop starts: the first item opens the burst window, and a slow store read
+	// (the first Admin lookup costs ~50 ms under -race) would otherwise let the window close between two events and split
+	// the owner's one message in two.
 	e.svc.Security(auth.Event{Kind: auth.EventSignInFailed, IP: "198.51.100.9"})
 	e.svc.Security(auth.Event{Kind: auth.EventLockout, Login: "root", IP: "198.51.100.9", Until: e.clk.now().Add(15 * time.Minute)})
 	e.svc.Security(auth.Event{Kind: auth.EventSignIn, AdminID: helper.ID, Method: "passkey", IP: "203.0.113.5"})
 	e.svc.Security(auth.Event{Kind: auth.EventSignIn, AdminID: helper.ID, Method: "passkey", IP: "203.0.113.5"}) // same place: nothing new
 	e.svc.Security(auth.Event{Kind: auth.EventPasskeyAdded, AdminID: reader.ID, IP: "203.0.113.7"})
+	e.run()
 	waitFor(t, "the owner's and the helper's messages", func() bool { return len(e.tg.sentTo(1)) == 1 && len(e.tg.sentTo(2)) == 1 && len(e.tg.sentTo(3)) == 1 })
 	e.quiet(3, 150*time.Millisecond)
 	ownerMsg := e.tg.sentTo(1)[0]
