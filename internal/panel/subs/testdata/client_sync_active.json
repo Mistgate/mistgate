@@ -23,6 +23,10 @@
     "quota_reset": "month",
     "next_reset_unix": 1790000000
   },
+  "devices": {
+    "used": 3,
+    "limit": 5
+  },
   "probe": {
     "intake": true,
     "v": 1
@@ -84,8 +88,10 @@
         {
           "id": "pth_FXRyQ2m1L7ex9QjG",
           "protocol": "hysteria2",
+          "label": "Hysteria2",
           "via": "direct",
           "ipv6": false,
+          "ipv6_egress": true,
           "settings": {
             "server": "de2.example.com",
             "port": 443,
@@ -106,8 +112,10 @@
         {
           "id": "pth_txIH2lb-kZ8xdZwT",
           "protocol": "hysteria2",
+          "label": "Hysteria2",
           "via": "direct",
           "ipv6": true,
+          "ipv6_egress": true,
           "settings": {
             "server": "de2.example.com",
             "port": 443,
@@ -128,8 +136,11 @@
         {
           "id": "pth_305hEEjSGgQKsOFO",
           "protocol": "hysteria2",
+          "label": "Hysteria2",
           "via": "relay",
+          "via_country": "FI",
           "ipv6": false,
+          "ipv6_egress": true,
           "settings": {
             "server": "de2.example.com",
             "port": 443,
@@ -150,8 +161,10 @@
         {
           "id": "pth_C4A5gQ8zpgnDBsSn",
           "protocol": "awg",
+          "label": "AWG 2.0",
           "via": "direct",
           "ipv6": false,
+          "ipv6_egress": true,
           "settings": {
             "version": "3.1",
             "endpoint": {
@@ -204,13 +217,16 @@
       "id": "srv_jGq_5pRyNbE_xej8",
       "country": "NL",
       "city": "Amsterdam",
+      "label": "Fast",
       "load": "high",
       "paths": [
         {
           "id": "pth_Q_UHGtV4eNLsTzff",
           "protocol": "hysteria2",
+          "label": "Hysteria2 WARP",
           "via": "warp",
           "ipv6": false,
+          "ipv6_egress": true,
           "settings": {
             "server": "de2.example.com",
             "port": 443,
@@ -229,10 +245,54 @@
           }
         },
         {
-          "id": "pth_ApKzRJZgtzBEbtTg",
-          "protocol": "awg",
+          "id": "pth_cTK-bXLe8nONMXXi",
+          "protocol": "vless",
+          "label": "VLESS Reality",
           "via": "direct",
           "ipv6": false,
+          "ipv6_egress": false,
+          "settings": {
+            "server": "de1.example.com",
+            "port": 443,
+            "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+            "flow": "xtls-rprx-vision",
+            "transport": "raw",
+            "security": "reality",
+            "sni": "www.example.org",
+            "fingerprint": "chrome",
+            "public_key": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+            "short_id": "0f1e2d3c4b5a6978",
+            "spider_x": "/57999bb8"
+          }
+        },
+        {
+          "id": "pth_0YTNnyQDjUFid22j",
+          "protocol": "vless",
+          "label": "VLESS Reality",
+          "via": "relay",
+          "ipv6": false,
+          "ipv6_egress": false,
+          "settings": {
+            "server": "de1.example.com",
+            "port": 443,
+            "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+            "flow": "xtls-rprx-vision",
+            "transport": "raw",
+            "security": "reality",
+            "sni": "www.example.org",
+            "fingerprint": "chrome",
+            "public_key": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+            "short_id": "0f1e2d3c4b5a6978",
+            "spider_x": "/57999bb8"
+          }
+        },
+        {
+          "id": "pth_ApKzRJZgtzBEbtTg",
+          "protocol": "awg",
+          "label": "AWG 2.0",
+          "via": "direct",
+          "ipv6": false,
+          "ipv6_egress": false,
           "settings": {
             "version": "3.1",
             "endpoint": {
@@ -279,6 +339,41 @@
           }
         }
       ]
+    }
+  ],
+  "telegram": [
+    {
+      "server_id": "srv_xmTRAZMVWdpi057m",
+      "country": "DE",
+      "city": "Frankfurt",
+      "via": "direct",
+      "ipv6": false,
+      "link": "tg://proxy?server=de2.example.com\u0026port=8443\u0026secret=eeabcdef"
+    },
+    {
+      "server_id": "srv_xmTRAZMVWdpi057m",
+      "country": "DE",
+      "city": "Frankfurt",
+      "via": "direct",
+      "ipv6": true,
+      "link": "tg://proxy?server=2001:db8::5\u0026port=8443\u0026secret=eeabcdef"
+    },
+    {
+      "server_id": "srv_xmTRAZMVWdpi057m",
+      "country": "DE",
+      "city": "Frankfurt",
+      "via": "relay",
+      "via_country": "FI",
+      "ipv6": false,
+      "link": "tg://proxy?server=fi1.example.com\u0026port=8443\u0026secret=eeabcdef"
+    },
+    {
+      "server_id": "srv_xmTRAZMVWdpi057m",
+      "country": "DE",
+      "city": "Frankfurt",
+      "via": "relay",
+      "ipv6": false,
+      "link": "tg://proxy?server=se1.example.com\u0026port=8443\u0026secret=eeabcdef"
     }
   ]
 }

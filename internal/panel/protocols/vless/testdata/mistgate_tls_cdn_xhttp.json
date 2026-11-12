@@ -1,0 +1,17 @@
+{
+  "server": "cdn.example.org",
+  "port": 443,
+  "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+  "transport": "xhttp",
+  "path": "/q8x2kd7w",
+  "host": "cdn.example.org",
+  "mode": "packet-up",
+  "x_padding_bytes": "100-1000",
+  "security": "tls",
+  "sni": "cdn.example.org",
+  "fingerprint": "chrome",
+  "alpn": [
+    "h2",
+    "http/1.1"
+  ]
+}

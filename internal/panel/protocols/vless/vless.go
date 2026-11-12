@@ -737,6 +737,8 @@ func (*Protocol) Doctor() []protocols.Check { return nil }
 
 func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	switch in.Format {
+	case plugin.FormatMistgate:
+		return renderMistgate(in)
 	case plugin.FormatURIList:
 		return renderURI(in)
 	case plugin.FormatMihomo:

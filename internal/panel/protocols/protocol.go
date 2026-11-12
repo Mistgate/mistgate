@@ -186,6 +186,9 @@ type RenderInput struct {
 	DeviceID     string
 	Secret       string // decrypted credential secret
 	MaskSecrets  bool   // profile preview: render secrets as "••••"
+	// NoIPv6Egress: the client gets no IPv6 out of the exit node, so FormatMistgate carries no IPv6 address of the tunnel (AmneziaWG).
+	// The other formats ignore it; false (the zero value) changes nothing.
+	NoIPv6Egress bool
 
 	// L3 protocols (awg). For FormatMihomo, Fragment.Data is ONE proxy as an element of a YAML list built
 	// from yaml.v3 nodes (never string templates: node and user names are hostile input); the assembler

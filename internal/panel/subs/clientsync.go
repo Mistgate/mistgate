@@ -300,6 +300,15 @@ type clientSyncPlan struct {
 	NextResetUnix int64  `json:"next_reset_unix"`
 }
 
+// clientSyncDevices are numbers only, the person's own: how many of their devices fill the device limit (the count the limit is
+// enforced by, access.SubView.DevicesUsed: the Telegram key is not among them) and the limit itself. A person always has a limit (1 to
+// 100, the table refuses anything else), so there is no "none" to express; a 0 would mean none, as quota_bytes 0 means no quota.
+// Nothing of any device.
+type clientSyncDevices struct {
+	Used  int `json:"used"`
+	Limit int `json:"limit"`
+}
+
 type clientSyncProbe struct {
 	Intake bool `json:"intake"`
 	V      int  `json:"v"`
@@ -330,18 +339,44 @@ type clientDNSSplitRule struct {
 	Servers  []clientDNSEndpoint `json:"servers"`
 }
 
+// clientSyncPath is one way to a server. Label tells two profiles of one protocol on one server apart: the owner's name of the
+// profile (the {profile} of the subscription names), never the node's name, a country or the way ("via"). ViaCountry is the
+// country of the entry node of a relay path and is there only on one that has it. "ipv6" says the path goes to the server's IPv6
+// address, nothing about the egress. "ipv6_egress" is that, and is always there: true only when the panel knows the exit hands the
+// client IPv6 (access.ipv6Egress), so false also where it is not known. For a relay it is the exit's, not the relay's. An AmneziaWG path
+// with false has no address_v6.
 type clientSyncPath struct {
-	ID       string          `json:"id"`
-	Protocol string          `json:"protocol"`
-	Via      string          `json:"via"`
-	IPv6     bool            `json:"ipv6"`
-	Settings json.RawMessage `json:"settings"`
+	ID         string          `json:"id"`
+	Protocol   string          `json:"protocol"`
+	Label      string          `json:"label,omitempty"`
+	Via        string          `json:"via"`
+	ViaCountry string          `json:"via_country,omitempty"`
+	IPv6       bool            `json:"ipv6"`
+	IPv6Egress bool            `json:"ipv6_egress"`
+	Settings   json.RawMessage `json:"settings"`
 }
 
+// clientSyncTelegram is one tg://proxy link of the person's Telegram proxy key, for the node it names (server_id is the id the
+// same node has in servers, when it has one there: a node with only MTProto is no server of the app). The node's IPv6 and relay
+// twins carry the same server_id, so they say what they are the way a path does: via ("direct" or "relay"), via_country (the relay's
+// entry country, when it has one) and ipv6.
+type clientSyncTelegram struct {
+	ServerID   string `json:"server_id"`
+	Country    string `json:"country"`
+	City       string `json:"city"`
+	Via        string `json:"via"`
+	ViaCountry string `json:"via_country,omitempty"`
+	IPv6       bool   `json:"ipv6"`
+	Link       string `json:"link"`
+}
+
+// clientSyncServer is a node as people see it: a country and a city, and the owner's public label of it when there is one. The
+// label is a text the owner wrote for people; the node's name is not sent.
 type clientSyncServer struct {
 	ID      string           `json:"id"`
 	Country string           `json:"country"`
 	City    string           `json:"city"`
+	Label   string           `json:"label,omitempty"`
 	Load    string           `json:"load,omitempty"`
 	Paths   []clientSyncPath `json:"paths"`
 }
@@ -355,11 +390,15 @@ type clientSyncAnswer struct {
 	SupportURL string             `json:"support_url,omitempty"`
 	Notice     *clientSyncNotice  `json:"notice,omitempty"`
 	Plan       clientSyncPlan     `json:"plan"`
+	Devices    clientSyncDevices  `json:"devices"`
 	Probe      clientSyncProbe    `json:"probe"`
 	Debug      clientSyncDebug    `json:"debug"`
 	ASN        uint32             `json:"asn,omitempty"`
 	DNS        *clientSyncDNS     `json:"dns,omitempty"`
 	Servers    []clientSyncServer `json:"servers"`
+	// Telegram are the person's Telegram proxy links, as the page of the subscription renders them (the node's IPv6 and relay twins
+	// too). Absent when the person has none: Telegram switched off for them, no MTProto server in their group, or no access.
+	Telegram []clientSyncTelegram `json:"telegram,omitempty"`
 
 	// Reason is why an active person gets no servers although they have access: "app_disabled", the Mistgate app is switched off for
 	// them. Absent otherwise.
@@ -385,6 +424,7 @@ func buildClientSync(in clientSyncInput) clientSyncAnswer {
 		Brand: clientSyncBrand{Parts: []string{in.Brand.BrandHead}, Accent: in.Brand.Accent, LogoSVG: in.Brand.LogoSVG},
 		Plan: clientSyncPlan{ExpiresUnix: unixOrZero(v.Expires), QuotaBytes: v.Total, UsedBytes: v.Up + v.Down,
 			QuotaReset: v.QuotaReset, NextResetUnix: unixOrZero(v.NextReset)},
+		Devices: clientSyncDevices{Used: v.DevicesUsed, Limit: max(v.DeviceLimit, 0)},
 		Probe:   clientSyncProbe{Intake: in.ProbeOn, V: clientprobe.Version},
 		Debug:   clientSyncDebug{Intake: false}, // no intake exists yet
 		Servers: []clientSyncServer{},
@@ -409,6 +449,7 @@ func buildClientSync(in clientSyncInput) clientSyncAnswer {
 			answer.DNS = clientDNSOf(*in.DNS)
 		}
 		answer.Servers = clientServersOf(v.Servers)
+		answer.Telegram = clientTelegramOf(v)
 	}
 	return answer
 }
@@ -437,6 +478,33 @@ func dnsEndpoints(endpoints []dns.Endpoint) []clientDNSEndpoint {
 	return out
 }
 
+// viaOf is how a path reaches its server, "relay" or "direct" (WARP is the caller's to add: a Telegram link has none), and for a
+// relay the country of its entry node ("" when it has none, which leaves the field out).
+func viaOf(server access.SubServer) (via, country string) {
+	if !strings.HasPrefix(server.PathKey, "relay:") {
+		return "direct", ""
+	}
+	country, _ = strings.CutPrefix(server.Mark, access.MarkVia)
+	return "relay", strings.ToUpper(strings.TrimSpace(country))
+}
+
+// clientTelegramOf lists the tg://proxy links the view holds for a person whose Telegram app is on; nil when there are none.
+func clientTelegramOf(v access.SubView) []clientSyncTelegram {
+	if !v.AppTelegram {
+		return nil
+	}
+	var out []clientSyncTelegram
+	for _, server := range v.Telegram {
+		if server.URI == "" {
+			continue
+		}
+		via, viaCountry := viaOf(server)
+		out = append(out, clientSyncTelegram{ServerID: clientOpaqueID("srv", server.NodeID), Country: strings.ToUpper(server.CountryCode),
+			City: server.Location, Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == "ipv6", Link: server.URI})
+	}
+	return out
+}
+
 // clientServersOf groups the paths of the view by exit node, in the order of the view. A server is a country and a city, never a
 // node name; its id and the ids of its paths are hashes of internal ids (opaque, stable). A node whose paths the client cannot
 // use (a protocol without the Mistgate format, a path the client's capabilities leave out) is not listed.
@@ -454,21 +522,19 @@ func clientServersOf(servers []access.SubServer) []clientSyncServer {
 			idx = len(out)
 			byNode[server.NodeID] = idx
 			out = append(out, clientSyncServer{ID: clientOpaqueID("srv", server.NodeID), Country: strings.ToUpper(server.CountryCode),
-				City: server.Location, Paths: []clientSyncPath{}})
+				City: server.Location, Label: strings.TrimSpace(server.PublicLabel), Paths: []clientSyncPath{}})
 			loads = append(loads, -1)
 		}
 		relay := strings.HasPrefix(server.PathKey, "relay:")
 		if !relay && server.LoadPercent != nil && *server.LoadPercent > loads[idx] { // the load of the exit node itself, not of a relay's
 			loads[idx] = *server.LoadPercent
 		}
-		via := "direct"
-		if relay {
-			via = "relay"
-		} else if server.Exit == "warp" {
+		via, viaCountry := viaOf(server)
+		if via == "direct" && server.Exit == "warp" {
 			via = "warp"
 		}
 		out[idx].Paths = append(out[idx].Paths, clientSyncPath{ID: clientOpaqueID("pth", server.NodeID, server.InboundID, server.ProfileID, server.PathKey),
-			Protocol: server.Protocol, Via: via, IPv6: server.PathKey == "ipv6", Settings: settings})
+			Protocol: server.Protocol, Label: clean(server.Profile), Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == "ipv6", IPv6Egress: server.IPv6Egress, Settings: settings})
 	}
 	for i, load := range loads {
 		if load >= 0 {

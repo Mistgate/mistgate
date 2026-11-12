@@ -311,7 +311,10 @@ type Node struct {
 	// The IPv6 entry of this node: unset only for a node message that was built without the doctor's view (never in the lists).
 	Ipv6 *NodeIpv6 `protobuf:"bytes,35,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
 	// Operator notes for the admin list. Not included in user pages or subscription names.
-	Notes         string `protobuf:"bytes,36,opt,name=notes,proto3" json:"notes,omitempty"`
+	Notes string `protobuf:"bytes,36,opt,name=notes,proto3" json:"notes,omitempty"`
+	// The owner's short text for people, shown next to this server in the Mistgate app ("" = none). Up to 40 characters. The node's
+	// name is never shown to them.
+	PublicLabel   string `protobuf:"bytes,37,opt,name=public_label,json=publicLabel,proto3" json:"public_label,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -594,6 +597,13 @@ func (x *Node) GetIpv6() *NodeIpv6 {
 func (x *Node) GetNotes() string {
 	if x != nil {
 		return x.Notes
+	}
+	return ""
+}
+
+func (x *Node) GetPublicLabel() string {
+	if x != nil {
+		return x.PublicLabel
 	}
 	return ""
 }
@@ -1970,7 +1980,9 @@ type UpdateNodeRequest struct {
 	BandwidthMbps *uint32 `protobuf:"varint,12,opt,name=bandwidth_mbps,json=bandwidthMbps,proto3,oneof" json:"bandwidth_mbps,omitempty"`
 	// "IPv6 for clients". Owner only (PERMISSION_DENIED for a helper). Requires an agent with "client-ipv6/1" when false
 	// (FAILED_PRECONDITION "agent too old" otherwise); turning it back on is always allowed.
-	ClientIpv6    *bool `protobuf:"varint,13,opt,name=client_ipv6,json=clientIpv6,proto3,oneof" json:"client_ipv6,omitempty"`
+	ClientIpv6 *bool `protobuf:"varint,13,opt,name=client_ipv6,json=clientIpv6,proto3,oneof" json:"client_ipv6,omitempty"`
+	// The text people see next to the server in the Mistgate app. Up to 40 characters, no control characters; "" = none.
+	PublicLabel   *string `protobuf:"bytes,14,opt,name=public_label,json=publicLabel,proto3,oneof" json:"public_label,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2094,6 +2106,13 @@ func (x *UpdateNodeRequest) GetClientIpv6() bool {
 		return *x.ClientIpv6
 	}
 	return false
+}
+
+func (x *UpdateNodeRequest) GetPublicLabel() string {
+	if x != nil && x.PublicLabel != nil {
+		return *x.PublicLabel
+	}
+	return ""
 }
 
 type DnsResolvers struct {
@@ -6479,7 +6498,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xc3\v\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xe6\v\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -6522,7 +6541,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x12decoy_agent_sha256\x18! \x01(\tR\x10decoyAgentSha256\x129\n" +
 	"\x19user_rate_limit_supported\x18\" \x01(\bR\x16userRateLimitSupported\x12/\n" +
 	"\x04ipv6\x18# \x01(\v2\x1b.mistgate.admin.v1.NodeIpv6R\x04ipv6\x12\x14\n" +
-	"\x05notes\x18$ \x01(\tR\x05notes\"\x8d\x02\n" +
+	"\x05notes\x18$ \x01(\tR\x05notes\x12!\n" +
+	"\fpublic_label\x18% \x01(\tR\vpublicLabel\"\x8d\x02\n" +
 	"\bNodeIpv6\x12\x14\n" +
 	"\x05entry\x18\x01 \x01(\tR\x05entry\x12'\n" +
 	"\x0fentry_supported\x18\x02 \x01(\bR\x0eentrySupported\x12-\n" +
@@ -6651,7 +6671,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x0finstall_command\x18\x02 \x01(\tR\x0einstallCommand\x12%\n" +
 	"\x0eca_fingerprint\x18\x03 \x01(\tR\rcaFingerprint\x12%\n" +
 	"\fexpires_unix\x18\x04 \x01(\x03B\x020\x02R\vexpiresUnix\x12!\n" +
-	"\fcopy_command\x18\x05 \x01(\tR\vcopyCommand\"\xe3\x05\n" +
+	"\fcopy_command\x18\x05 \x01(\tR\vcopyCommand\"\x9c\x06\n" +
 	"\x11UpdateNodeRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
@@ -6669,7 +6689,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x0ebandwidth_mbps\x18\f \x01(\rH\n" +
 	"R\rbandwidthMbps\x88\x01\x01\x12$\n" +
 	"\vclient_ipv6\x18\r \x01(\bH\vR\n" +
-	"clientIpv6\x88\x01\x01B\a\n" +
+	"clientIpv6\x88\x01\x01\x12&\n" +
+	"\fpublic_label\x18\x0e \x01(\tH\fR\vpublicLabel\x88\x01\x01B\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
 	"\b_addressB\x0f\n" +
@@ -6682,7 +6703,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\f_awg_backendB\x1a\n" +
 	"\x18_torrent_blocker_enabledB\x11\n" +
 	"\x0f_bandwidth_mbpsB\x0e\n" +
-	"\f_client_ipv6\"&\n" +
+	"\f_client_ipv6B\x0f\n" +
+	"\r_public_label\"&\n" +
 	"\fDnsResolvers\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\"A\n" +
 	"\x12UpdateNodeResponse\x12+\n" +

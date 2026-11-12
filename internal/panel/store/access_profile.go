@@ -412,7 +412,7 @@ func (a Access) InboundsFull(ctx context.Context, nodeID string) ([]AccessInboun
 }
 
 func scanAccessInboundFull(r rowScanner) (AccessInboundFull, error) {
-	values, err := scanRowValues(r, 37)
+	values, err := scanRowValues(r, 41)
 	if err != nil {
 		return AccessInboundFull{}, err
 	}

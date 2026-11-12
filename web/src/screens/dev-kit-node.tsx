@@ -43,6 +43,7 @@ const baseNode = (over: object) => ({
   name: "de1",
   countryCode: "DE",
   location: "Frankfurt",
+  publicLabel: "Fast route",
   provider: "examplehost",
   address: "de1.example.com",
   status: NodeStatus.ONLINE,

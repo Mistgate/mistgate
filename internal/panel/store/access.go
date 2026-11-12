@@ -81,21 +81,37 @@ type AccessNode struct {
 	AgentCaps                                          []string
 	// IPv6Entry is the node's IPv6 entry (nodes.ipv6_entry): the address of its "· IPv6" server, "" = off.
 	IPv6Entry string
+	// PublicLabel is the owner's short text for people (nodes.public_label): "" = none. Not the node's name.
+	PublicLabel string
+	// ClientIPv6 is the node's "IPv6 for clients" switch (nodes.client_ipv6); false also for a row that was not read from the table.
+	ClientIPv6 bool
+	// IPv6 is what the doctor's ipv6 check last said of the node's uplink (the state the node page words as "IPv6 at the hoster does
+	// not work"); the zero value means it has not reported. WarpIPv6 says the node's enabled WARP account has an IPv6 address, which is
+	// what makes the node route client IPv6 into WARP.
+	IPv6     IPv6Doctor
+	WarpIPv6 bool
 }
 
 const accNodeCols = `n.id AS node_id, n.name AS node_name, n.address AS node_address, n.country_code AS node_country_code,
 	n.location AS node_location, n.provider AS node_provider, n.bandwidth_mbps AS node_bandwidth_mbps, n.state AS node_state,
-	n.last_seen_at AS node_last_seen_at, n.agent_caps AS node_agent_caps, n.ipv6_entry AS node_ipv6_entry`
+	n.last_seen_at AS node_last_seen_at, n.agent_caps AS node_agent_caps, n.ipv6_entry AS node_ipv6_entry, n.public_label AS node_public_label,
+	n.client_ipv6 AS node_client_ipv6, (SELECT d.params_json FROM doctor_result d WHERE d.node_id = n.id AND d.check_id = 'ipv6') AS node_ipv6_params,
+	coalesce((SELECT 1 FROM warp_account w WHERE w.node_id = n.id AND w.enabled = 1 AND w.address_v6 <> ''), 0) AS node_warp_ipv6`
 
 func scanAccessNode(r rowScanner) (AccessNode, error) {
 	var n AccessNode
-	var id, name, address, country, location, provider, state, caps, entry sql.NullString
-	var bandwidth sql.NullInt64
+	var id, name, address, country, location, provider, state, caps, entry, label sql.NullString
+	var bandwidth, clientIPv6, warpIPv6 sql.NullInt64
+	var ipv6Params sql.NullString
 	var seen int64
-	err := r.Scan(&id, &name, &address, &country, &location, &provider, &bandwidth, &state, &seen, &caps, &entry)
+	err := r.Scan(&id, &name, &address, &country, &location, &provider, &bandwidth, &state, &seen, &caps, &entry, &label, &clientIPv6, &ipv6Params, &warpIPv6)
 	n.ID, n.Name, n.Address, n.CountryCode = id.String, name.String, address.String, country.String
 	n.Location, n.Provider, n.BandwidthMbps, n.State = location.String, provider.String, int(bandwidth.Int64), state.String
-	n.LastSeenAt, n.IPv6Entry = fleetTime(seen), entry.String
+	n.LastSeenAt, n.IPv6Entry, n.PublicLabel = fleetTime(seen), entry.String, label.String
+	n.ClientIPv6, n.WarpIPv6 = clientIPv6.Int64 != 0, warpIPv6.Int64 != 0
+	if ipv6Params.Valid {
+		n.IPv6 = DoctorIPv6(&DoctorRow{NodeID: n.ID, CheckID: "ipv6", Params: parseMap(ipv6Params.String)})
+	}
 	if caps.String != "" {
 		n.AgentCaps = strings.Fields(caps.String)
 	}

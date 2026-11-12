@@ -1,0 +1,15 @@
+{
+  "server": "de1.example.com",
+  "port": 443,
+  "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+  "transport": "xhttp",
+  "path": "/q8x2kd7w",
+  "mode": "auto",
+  "x_padding_bytes": "100-1000",
+  "security": "reality",
+  "sni": "www.example.org",
+  "fingerprint": "chrome",
+  "public_key": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+  "short_id": "0f1e2d3c4b5a6978",
+  "spider_x": "/57999bb8"
+}

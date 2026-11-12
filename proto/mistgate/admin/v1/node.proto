@@ -160,6 +160,9 @@ message Node {
   NodeIpv6 ipv6 = 35;
   // Operator notes for the admin list. Not included in user pages or subscription names.
   string notes = 36;
+  // The owner's short text for people, shown next to this server in the Mistgate app ("" = none). Up to 40 characters. The node's
+  // name is never shown to them.
+  string public_label = 37;
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",
@@ -393,6 +396,8 @@ message UpdateNodeRequest {
   // "IPv6 for clients". Owner only (PERMISSION_DENIED for a helper). Requires an agent with "client-ipv6/1" when false
   // (FAILED_PRECONDITION "agent too old" otherwise); turning it back on is always allowed.
   optional bool client_ipv6 = 13;
+  // The text people see next to the server in the Mistgate app. Up to 40 characters, no control characters; "" = none.
+  optional string public_label = 14;
 }
 
 message DnsResolvers {

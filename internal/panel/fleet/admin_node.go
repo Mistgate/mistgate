@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
@@ -64,7 +65,16 @@ func validResolver(r string) bool {
 const (
 	maxNodeText  = 100 // location, provider
 	maxNodeNotes = 500
+	maxNodeLabel = 40 // the public label
 )
+
+// validPublicLabel: the owner's text for people (the Mistgate app shows it). At most maxNodeLabel characters, valid UTF-8, and no
+// control character of any kind (the line and paragraph separators included), so that it is one plain line wherever it is shown.
+func validPublicLabel(s string) bool {
+	return utf8.ValidString(s) && utf8.RuneCountInString(s) <= maxNodeLabel && !strings.ContainsFunc(s, func(r rune) bool {
+		return unicode.IsControl(r) || r == 0x2028 || r == 0x2029
+	})
+}
 
 // validText: at most max characters (runes, like the admin's form fields count them), valid UTF-8, no control characters.
 func validText(s string, max int) bool {
@@ -244,7 +254,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	view := decodeLiveView(live)
 	st := f.statusOfLive(ctx, n, live, enabled, now, health)
 	out := &adminv1.Node{
-		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address, Notes: n.Notes,
+		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address, Notes: n.Notes, PublicLabel: n.PublicLabel,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
 		LastSeenUnix: fleetUnix(live.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
 		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6,
@@ -857,6 +867,13 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	}
 	if m.Notes != nil && !validNotes(*m.Notes) {
 		return nil, invalid("notes must be plain text up to 500 characters")
+	}
+	if m.PublicLabel != nil {
+		label := strings.TrimSpace(*m.PublicLabel)
+		if !validPublicLabel(label) {
+			return nil, invalid("public label must be plain text up to 40 characters")
+		}
+		p.PublicLabel = &label
 	}
 	if m.DnsResolvers != nil {
 		vals := m.DnsResolvers.Values

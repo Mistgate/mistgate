@@ -23,6 +23,10 @@
     "quota_reset": "month",
     "next_reset_unix": 1790000000
   },
+  "devices": {
+    "used": 3,
+    "limit": 5
+  },
   "probe": {
     "intake": true,
     "v": 1

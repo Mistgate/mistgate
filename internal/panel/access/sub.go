@@ -135,8 +135,12 @@ type SubServer struct {
 	Node        string // node name
 	CountryCode string // node country, ISO 3166-1 alpha-2 or ""
 	Location    string
-	Profile     string // profile name
-	Exit        string // "direct" | "warp"
+	// PublicLabel is the node's public label, the owner's short text for people ("" = none). The client API shows it; the node name never.
+	PublicLabel string
+	// IPv6Egress says the client gets IPv6 out of this server's exit node: see ipv6Egress. A relay's twin carries its exit's value.
+	IPv6Egress bool
+	Profile    string // profile name
+	Exit       string // "direct" | "warp"
 	// Made is the inbound's rank in creation order. Servers are listed by country and protocol, but a repeated name is
 	// numbered in creation order, so a server added later never takes the name of an older one (a Mihomo select group
 	// remembers the chosen server by name).
@@ -609,8 +613,9 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if _, pinOK := protocols.NormalizePin(f.Inbound.CertPinSHA256); spec.TLS.Mode == plugin.TLSSelfSigned && !pinOK {
 			continue // the node has not reported its certificate yet: a client could not verify it
 		}
-		srv := SubServer{NodeID: f.Node.ID, InboundID: f.Inbound.ID, PathKey: "direct", Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location,
+		srv := SubServer{NodeID: f.Node.ID, InboundID: f.Inbound.ID, PathKey: "direct", Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location, PublicLabel: f.Node.PublicLabel,
 			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged), Made: made[f.Inbound.ID]}
+		srv.IPv6Egress = ipv6Egress(f.Node, srv.Exit)
 		if usage, ok := networkUsage[f.Node.ID]; ok {
 			srv.LoadPercent = usage.LoadPercent
 		}
@@ -619,6 +624,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			UserID: u.ID, UserName: u.Name, DeviceID: rd.dev.ID, Secret: secret,
 			InboundPublic: json.RawMessage(f.Inbound.PluginPublicJSON),
 		}
+		in.NoIPv6Egress = !srv.IPv6Egress
 		if protocols.IsPerDevice(proto) {
 			// An AmneziaWG proxy carries a resolver of its own: the DNS of its node. (Hysteria2 has none; the URI list has no AWG.)
 			var dnsServers []string
@@ -728,6 +734,21 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	s.nodeDNSData(ctx, &v, n, awgDevs)
 	return v, nil
+}
+
+// ipv6Egress says whether a client of this exit node gets IPv6 out of it. Only what the panel knows for sure counts, and what it does
+// not know is "no": a client that is told there is IPv6 where there is none hangs on it, one that is told there is none uses IPv4.
+//   - through WARP, the node's own uplink is not what the client leaves by: the node routes IPv6 into WARP when the WARP account has an
+//     IPv6 address (the node's own "IPv6 for clients" switch does not apply to WARP), so that is the whole rule;
+//   - direct, the exit's "IPv6 for clients" switch has to be on and the doctor has to have reported that outbound IPv6 works: not "no
+//     IPv6", not "broken" (the node page's no_ipv6 and ipv6_broken), and not "not reported yet".
+//
+// A relay is not asked: the client leaves by the exit.
+func ipv6Egress(n store.AccessNode, exit string) bool {
+	if exit == "warp" {
+		return n.WarpIPv6
+	}
+	return n.ClientIPv6 && n.IPv6.Works()
 }
 
 // subRelays are the relays that give the person a twin server, by the exit's inbound: the ones relayUsable accepts, in the

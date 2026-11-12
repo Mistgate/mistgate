@@ -49,7 +49,7 @@ afterEach(() => {
 
 const data = (status = NodeStatus.DOWN, node: Record<string, unknown> = {}) =>
   ({
-    node: { id: "nod_1", name: "de1", address: "de1.example.com", countryCode: "DE", status, location: "", provider: "", ...node },
+    node: { id: "nod_1", name: "de1", address: "de1.example.com", countryCode: "DE", status, location: "", publicLabel: "", provider: "", ...node },
     notes: "",
     dnsResolvers: [],
     inbounds: [],
@@ -265,6 +265,38 @@ describe("the node form", () => {
     await click(button(en["common.save"]));
     expect(updateNode).toHaveBeenCalledTimes(1);
     expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", notes: "paid until March", timeouts: { livenessTimeoutS: 0, applyTimeoutS: 0, dialTimeoutS: 20 } });
+  });
+
+  it("has a public label, says who sees it, and sends it trimmed and alone", async () => {
+    updateNode.mockResolvedValue({});
+    await mount(NodeStatus.ONLINE, { publicLabel: "Fast" });
+    expect(text()).toContain(en["node.settings.publicLabel"]);
+    expect(text()).toContain(en["node.settings.publicLabelHint"]);
+    const field = [...document.querySelectorAll("input")].find((i) => i.value === "Fast")!;
+    expect(field.maxLength).toBe(40);
+    await type(field, "  Home route ");
+    await click(button(en["common.save"]));
+    expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", publicLabel: "Home route" });
+  });
+
+  it("clears the public label with an empty field, and leaves it alone when it is not touched", async () => {
+    updateNode.mockResolvedValue({});
+    await mount(NodeStatus.ONLINE, { publicLabel: "Fast" });
+    await type([...document.querySelectorAll("input")].find((i) => i.value === "Fast")!, "");
+    await click(button(en["common.save"]));
+    expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", publicLabel: "" });
+    await act(async () => root?.unmount());
+    host?.remove();
+    updateNode.mockClear();
+    await mount(NodeStatus.ONLINE, { publicLabel: "Fast" });
+    await type(document.querySelector<HTMLInputElement>(`input[placeholder="${en["node.settings.notesPh"]}"]`)!, "x");
+    await click(button(en["common.save"]));
+    expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", notes: "x" });
+  });
+
+  it("locks the public label of a retired node", async () => {
+    await mount(NodeStatus.RETIRED, { publicLabel: "Fast" });
+    expect([...document.querySelectorAll("input")].find((i) => i.value === "Fast")!.disabled).toBe(true);
   });
 
   it("puts the agent and the host beside the form", async () => {

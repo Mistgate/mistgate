@@ -1,0 +1,13 @@
+{
+  "server": "de1.example.com",
+  "port": 443,
+  "uuid": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+  "transport": "ws",
+  "path": "/ws",
+  "security": "tls",
+  "sni": "origin.example.com",
+  "fingerprint": "chrome",
+  "alpn": [
+    "http/1.1"
+  ]
+}

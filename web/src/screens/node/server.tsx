@@ -103,6 +103,7 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
     address: node.address,
     country: startCountry,
     location: node.location,
+    publicLabel: node.publicLabel,
     provider: node.provider,
     bandwidth: node.bandwidthMbps ? String(node.bandwidthMbps) : "",
     notes: data.notes,
@@ -139,6 +140,7 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
       address: changed("address") ? f.address.trim() : undefined,
       countryCode: changed("country") ? (f.country === none ? "" : f.country) : undefined,
       location: changed("location") ? f.location.trim() : undefined,
+      publicLabel: changed("publicLabel") ? f.publicLabel.trim() : undefined,
       provider: changed("provider") ? f.provider.trim() : undefined,
       bandwidthMbps: changed("bandwidth") ? Number(f.bandwidth || "0") : undefined,
       notes: changed("notes") ? f.notes : undefined,
@@ -157,7 +159,7 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
   ];
 
   return (
-    <form onSubmit={submit} className="flex min-w-0 flex-col rounded-card-lg border border-line bg-surface">
+    <form onSubmit={submit} data-shot="node-public-label" className="flex min-w-0 flex-col rounded-card-lg border border-line bg-surface">
       <SectionLabel as="h2" icon="server" tone="sky" className="px-4 pt-4 pb-3.5 md:px-5">
         {t("node.server.node")}
       </SectionLabel>
@@ -175,6 +177,7 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
           </div>
           <TextField icon="map" tone="sand" label={t("node.settings.location")} value={f.location} onChange={(e) => set("location", e.target.value)} placeholder={fmt.country(f.country === none ? "" : f.country)} maxLength={100} disabled={retired} />
         </div>
+        <TextField icon="eye" tone="sand" label={t("node.settings.publicLabel")} hint={t("node.settings.publicLabelHint")} value={f.publicLabel} onChange={(e) => set("publicLabel", e.target.value)} maxLength={40} disabled={retired} />
         <TextField icon="server" tone="sky" label={t("node.settings.provider")} value={f.provider} onChange={(e) => set("provider", e.target.value)} maxLength={100} disabled={retired} />
         <TextField icon="text" tone="sand" label={t("node.settings.notes")} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder={t("node.settings.notesPh")} maxLength={500} />
       </Block>

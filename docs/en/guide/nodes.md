@@ -333,6 +333,7 @@ What this machine is. On a wide screen, two columns: on the left one form (**Nod
 | **Address** | The domain or IP clients connect to, without `https://` or a port. Changing it changes the address in every subscription. |
 | **Country** | Two-letter country, or **Not set**. Server names in the apps use it ({flag} {country}); on nodes in Russia the doctor checks gosuslugi.ru and offers Yandex DNS, and on nodes in China it checks www.baidu.com and offers AliDNS and DNSPod. |
 | **Location** | Free text next to the name ("Frankfurt"). Empty shows the country name. |
+| **Public label** | Optional text, up to 40 characters, that people see next to this server in the Mistgate app ("Fast", "Home route"). The node's name is never shown to them; with no label they see the country and city alone. |
 | **Provider** | The hoster, for you. |
 | **Network capacity** | Mbps, optional: the provider's symmetric limit. The node's load is its CPU use, or the busier direction of its link as a share of this capacity when that is higher; without it the load is the CPU alone (on a one-core VPS the CPU usually runs out first). The server names in Happ end with the load (" · 64％"), and the user page shows a level: low, medium or high (from 50% and 80%). Never the rates themselves, and nothing in other apps, whose names must stay stable. 0 means unknown. **Measure** can fill it in: see below. |
 | **Notes** | Free text, up to 500 characters. The first two lines show in the Nodes list; user pages and subscriptions never show them. |

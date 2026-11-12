@@ -61,6 +61,8 @@ type NodeRow struct {
 	// IPv6Entry is the address of the IPv6 entry (migration 00086): the node's "· IPv6" server in subscriptions connects to it;
 	// "" = off. IPv6JSON is the document around it (IPv6State, ipv6_entry.go).
 	IPv6Entry, IPv6JSON string
+	// PublicLabel is the short text the owner shows people in the Mistgate app next to the server (migration 00129); "" = none.
+	PublicLabel string
 }
 
 const nodeCols = `id, name, address, country_code, location, provider, notes, dns_resolvers,
@@ -68,7 +70,7 @@ const nodeCols = `id, name, address, country_code, location, provider, notes, dn
 	boot_at, last_seen_at, last_connected_at, last_disconnected_at, agent_instance_id, last_seq,
 	desired_revision, desired_hash, applied_revision, applied_hash, created_at, retired_at,
 	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps, client_ipv6,
-	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash, ipv6_entry, ipv6_json, networks_db_sha256`
+	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash, ipv6_entry, ipv6_json, networks_db_sha256, public_label`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -85,7 +87,7 @@ func scanNode(r rowScanner) (NodeRow, error) {
 		&boot, &seen, &conn, &disc, &n.AgentInstanceID, &lastSeq,
 		&desRev, &n.DesiredHash, &appRev, &n.AppliedHash, &created, &retired,
 		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps, &n.ClientIPv6,
-		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash, &n.IPv6Entry, &n.IPv6JSON, &n.NetworksDBSHA256)
+		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash, &n.IPv6Entry, &n.IPv6JSON, &n.NetworksDBSHA256, &n.PublicLabel)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeRow{}, ErrNotFound
 	}
@@ -144,13 +146,13 @@ func (s *Store) Nodes(ctx context.Context, includeRetired bool) ([]NodeRow, erro
 
 // NodePatch updates the admin-editable fields; nil = unchanged.
 type NodePatch struct {
-	Name, Address, CountryCode, Location, Provider, Notes *string
-	DNSResolvers                                          *[]string
-	LivenessTimeoutS, ApplyTimeoutS, DialTimeoutS         *int
-	AwgBackend                                            *string // "auto" | "kernel" | "userspace"
-	TorrentBlockerEnabled                                 *bool
-	BandwidthMbps                                         *int
-	ClientIPv6                                            *bool
+	Name, Address, CountryCode, Location, Provider, Notes, PublicLabel *string
+	DNSResolvers                                                       *[]string
+	LivenessTimeoutS, ApplyTimeoutS, DialTimeoutS                      *int
+	AwgBackend                                                         *string // "auto" | "kernel" | "userspace"
+	TorrentBlockerEnabled                                              *bool
+	BandwidthMbps                                                      *int
+	ClientIPv6                                                         *bool
 }
 
 // UpdateNode applies the patch and returns the new row. ErrConflict on a name clash.
@@ -162,7 +164,7 @@ func (s *Store) UpdateNode(ctx context.Context, id string, p NodePatch) (NodeRow
 		col string
 		v   *string
 	}{{"name", p.Name}, {"address", p.Address}, {"country_code", p.CountryCode}, {"location", p.Location},
-		{"provider", p.Provider}, {"notes", p.Notes}, {"awg_backend", p.AwgBackend}} {
+		{"provider", p.Provider}, {"notes", p.Notes}, {"awg_backend", p.AwgBackend}, {"public_label", p.PublicLabel}} {
 		if f.v != nil {
 			add(f.col, *f.v)
 		}

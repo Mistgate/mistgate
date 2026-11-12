@@ -58,6 +58,7 @@ type clientConfig struct {
 	hpk    string
 	server string // server public key
 	masked bool
+	noIPv6 bool // the exit gives the client no IPv6: the Mistgate format leaves out the tunnel's IPv6 address (RenderInput.NoIPv6Egress)
 }
 
 func (c clientConfig) v31() bool { return c.s.Version == Version31 }
@@ -124,6 +125,7 @@ func buildClient(in protocols.RenderInput) (clientConfig, bool) {
 		}
 	}
 	c.ip4, c.ip6 = ps.IP4, ps.IP6
+	c.noIPv6 = in.NoIPv6Egress
 
 	var pub struct {
 		PublicKey string `json:"public_key"`

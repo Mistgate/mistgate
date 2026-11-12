@@ -66,6 +66,11 @@ func DoctorIPv6(row *DoctorRow) IPv6Doctor {
 	return d
 }
 
+// Works says outbound IPv6 is known to work on the node: the check reported it and it passed. Anything else (no address, a broken
+// uplink, no report yet) is false. It is the other side of the reasons the node page gives for an IPv6 entry that cannot be offered,
+// no_ipv6, ipv6_broken and not_checked (fleet.ipv6Unavailable); agent_old is a working uplink, so it counts as working.
+func (d IPv6Doctor) Works() bool { return d.State == IPv6OK }
+
 // FirstAddr is the address the node is measured on when nothing better is known: Src if it is stable, else the first stable address.
 func (d IPv6Doctor) FirstAddr() string {
 	for _, p := range d.Addrs {

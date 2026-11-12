@@ -187,3 +187,56 @@ func TestMistgateIPv6EndpointHasNoBrackets(t *testing.T) {
 		t.Errorf("endpoint %+v (%v)", doc.Endpoint, err)
 	}
 }
+
+// An exit that gives the client no IPv6 (RenderInput.NoIPv6Egress): the Mistgate format has no tunnel IPv6 address, and everything
+// else of it, allowed_ips included (both ranges, so the client's IPv6 cannot go around the tunnel), stays what it was. The other
+// formats are not told.
+func TestMistgateWithoutIPv6Egress(t *testing.T) {
+	render := func(format plugin.ClientFormat, noV6 bool) (string, map[string]any) {
+		t.Helper()
+		in := renderInput(t, fixture31(), format)
+		in.DeviceID, in.Capabilities, in.NoIPv6Egress = "dev_1", []string{"awg=3.1"}, noV6
+		frag, ok := New().Render(in)
+		if !ok {
+			t.Fatalf("Render(%s) refused", format)
+		}
+		var doc map[string]any
+		if format == plugin.FormatMistgate {
+			if err := json.Unmarshal(frag.Data, &doc); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return string(frag.Data), doc
+	}
+	_, with := render(plugin.FormatMistgate, false)
+	_, without := render(plugin.FormatMistgate, true)
+	if _, ok := with["address_v6"]; !ok {
+		t.Fatal("the profile has IPv6 and the settings carry no address_v6 by default")
+	}
+	if _, ok := without["address_v6"]; ok {
+		t.Error("address_v6 for an exit with no IPv6")
+	}
+	delete(with, "address_v6")
+	if a, b := mustJSON(t, with), mustJSON(t, without); a != b {
+		t.Errorf("something else changed:\n%s\n%s", a, b)
+	}
+	if allowed, _ := without["allowed_ips"].([]any); len(allowed) != 2 {
+		t.Errorf("allowed_ips = %v", allowed)
+	}
+	for _, format := range []plugin.ClientFormat{plugin.FormatAWGConf, plugin.FormatMihomo} {
+		a, _ := render(format, false)
+		b, _ := render(format, true)
+		if a != b {
+			t.Errorf("%s changed with NoIPv6Egress", format)
+		}
+	}
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}

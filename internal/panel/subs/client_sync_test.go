@@ -28,7 +28,7 @@ import (
 // AmneziaWG profile. The node is named so that its name can be looked for in the answers.
 
 const (
-	syncCaps  = "v=1; hysteria2=2; gecko=1; awg=2.0,3.1; probe=1"
+	syncCaps  = "v=1; hysteria2=2; vless=1; gecko=1; awg=2.0,3.1; probe=1"
 	syncUA    = "Mistgate/0.3.1 (windows)"
 	nodeAlias = "frankfurt-edge-7"
 	hwidB2    = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
@@ -112,11 +112,14 @@ func (s *syncEnv) mustSync(key string, hdr ...string) syncBody {
 }
 
 type syncPath struct {
-	ID       string
-	Protocol string
-	Via      string
-	IPv6     bool
-	Settings map[string]any
+	ID         string
+	Protocol   string
+	Label      string
+	Via        string
+	ViaCountry string `json:"via_country"`
+	IPv6       bool
+	IPv6Egress bool `json:"ipv6_egress"`
+	Settings   map[string]any
 }
 
 type syncBody struct {
@@ -138,8 +141,17 @@ type syncBody struct {
 	ASN        *uint32
 	DNS        map[string]any
 	Servers    []struct {
-		ID, Country, City, Load string
-		Paths                   []syncPath
+		ID, Country, City, Label, Load string
+		Paths                          []syncPath
+	}
+	Telegram []struct {
+		ServerID   string `json:"server_id"`
+		Country    string
+		City       string
+		Via        string
+		ViaCountry string `json:"via_country"`
+		IPv6       bool
+		Link       string
 	}
 	raw string
 	etg string
@@ -456,6 +468,9 @@ func TestSyncActiveBodyAndWhatIsNeverInIt(t *testing.T) {
 	hy, aw := b.paths("hysteria2"), b.paths("awg")
 	if len(hy) != 1 || len(aw) != 1 || hy[0].Via != "direct" || aw[0].Via != "direct" || hy[0].IPv6 || aw[0].IPv6 {
 		t.Fatalf("paths: %+v %+v", hy, aw)
+	}
+	if hy[0].Label != "p" || aw[0].Label != "awg-profile" || hy[0].ViaCountry != "" || aw[0].ViaCountry != "" || strings.Contains(b.raw, "via_country") {
+		t.Errorf("labels and via_country: %+v %+v", hy[0], aw[0])
 	}
 	if hy[0].Settings["server"] != "de1.example.com" || hy[0].Settings["auth"] == "" || hy[0].Settings["tls"] == nil {
 		t.Errorf("hysteria2 settings: %v", hy[0].Settings)
@@ -1192,6 +1207,9 @@ func TestSyncPathsOfOneServer(t *testing.T) {
 	}
 	if want := "direct/false/de1.example.com direct/true/2001:db8::5 relay/false/fi1.example.com"; strings.Join(got, " ") != want || len(ids) != 3 {
 		t.Errorf("hysteria2 paths: %v, want %s", got, want)
+	}
+	if hy[0].ViaCountry != "" || hy[1].ViaCountry != "" || hy[2].ViaCountry != "FI" || hy[2].Label != hy[0].Label {
+		t.Errorf("via_country of the paths: %q %q %q", hy[0].ViaCountry, hy[1].ViaCountry, hy[2].ViaCountry)
 	}
 	if hy[2].Settings["port"] != float64(8443) {
 		t.Errorf("the relay path keeps the forwarded port: %v", hy[2].Settings["port"])

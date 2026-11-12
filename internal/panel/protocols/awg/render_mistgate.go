@@ -27,7 +27,8 @@ type mistgateAWGSettings struct {
 
 func (c clientConfig) mistgate() ([]byte, error) {
 	// Both ranges whatever the profile's addresses are, as the .conf has them: a client on a dual-stack network must not send its
-	// IPv6 around the tunnel (the server drops what has no address to return to).
+	// IPv6 around the tunnel (the server drops what has no address to return to). That holds when the exit gives the client no IPv6
+	// as well (no address_v6 below): its IPv6 goes into the tunnel, finds no source address and fails at once, and the app uses IPv4.
 	allowed := c.allowedIPs()
 	params := map[string]any{
 		"jc": c.s.Obfuscation.Jc, "jmin": c.s.Obfuscation.Jmin, "jmax": c.s.Obfuscation.Jmax,
@@ -64,7 +65,7 @@ func (c clientConfig) mistgate() ([]byte, error) {
 		AddressV4: c.ip4 + "/32", AllowedIPs: allowed, DNS: []string{c.dns[0], c.dns[1]},
 		MTU: c.s.MTU, KeepaliveS: keepalive, Params: params,
 	}
-	if c.ip6 != "" {
+	if c.ip6 != "" && !c.noIPv6 {
 		settings.AddressV6 = c.ip6 + "/128"
 	}
 	b, err := json.Marshal(settings)
