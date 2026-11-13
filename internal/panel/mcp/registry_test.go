@@ -171,7 +171,7 @@ func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 45, ProfileOperator: 91, ProfileAdmin: 170}
+	want := map[Profile]int{ProfileReadonly: 45, ProfileOperator: 91, ProfileAdmin: 172}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)
@@ -190,11 +190,11 @@ func TestToolsPerProfile(t *testing.T) {
 		}
 	}
 	for _, n := range got[ProfileOperator] {
-		if slices.Contains([]string{"audit_search", "node_fix_plan", "rollout_start_plan", "node_rollback_apply"}, n) {
+		if slices.Contains([]string{"audit_search", "node_fix_plan", "rollout_start_plan", "node_rollback_apply", "node_server_keys_add_plan", "node_server_keys_add_apply"}, n) {
 			t.Errorf("operator sees an admin tool: %s", n)
 		}
 	}
-	for _, n := range []string{"node_fix_plan", "node_fix_apply", "rollout_start_plan", "rollout_pause_plan", "rollout_resume_plan", "rollout_cancel_plan", "node_rollback_plan", "audit_search"} {
+	for _, n := range []string{"node_fix_plan", "node_fix_apply", "rollout_start_plan", "rollout_pause_plan", "rollout_resume_plan", "rollout_cancel_plan", "node_rollback_plan", "node_server_keys_add_plan", "node_server_keys_add_apply", "audit_search"} {
 		if !slices.Contains(got[ProfileAdmin], n) {
 			t.Errorf("admin lacks %s", n)
 		}
@@ -216,6 +216,7 @@ func TestProvisioningToolsKeepSecretsOutOfPlans(t *testing.T) {
 		if tool.Name == "node_install_plan" || tool.Name == "node_install_apply" ||
 			tool.Name == "node_server_password_rotate_plan" || tool.Name == "node_server_password_rotate_apply" ||
 			tool.Name == "node_server_key_add_plan" || tool.Name == "node_server_key_add_apply" ||
+			tool.Name == "node_server_keys_add_plan" || tool.Name == "node_server_keys_add_apply" ||
 			tool.Name == "node_server_key_remove_plan" || tool.Name == "node_server_key_remove_apply" {
 			props, _ := tool.InputSchema.(map[string]any)["properties"].(map[string]any)
 			properties[tool.Name] = props
@@ -235,12 +236,12 @@ func TestProvisioningToolsKeepSecretsOutOfPlans(t *testing.T) {
 	if properties["node_server_password_rotate_apply"]["confirm_token"] == nil {
 		t.Fatal("password rotation still requires an owner-approved plan")
 	}
-	for _, name := range []string{"node_server_key_add_plan", "node_server_key_remove_plan"} {
+	for _, name := range []string{"node_server_key_add_plan", "node_server_keys_add_plan", "node_server_key_remove_plan"} {
 		if properties[name]["private_key"] != nil || properties[name]["private_key_passphrase"] != nil {
 			t.Fatalf("private key appeared in MCP tool %s: %v", name, properties[name])
 		}
 	}
-	for _, name := range []string{"node_server_key_add_apply", "node_server_key_remove_apply"} {
+	for _, name := range []string{"node_server_key_add_apply", "node_server_keys_add_apply", "node_server_key_remove_apply"} {
 		if len(properties[name]) != 1 || properties[name]["confirm_token"] == nil {
 			t.Fatalf("%s must take only confirm_token: %v", name, properties[name])
 		}

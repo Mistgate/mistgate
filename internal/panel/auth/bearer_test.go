@@ -924,6 +924,9 @@ func TestTokenAllowList(t *testing.T) {
 	if got, ok := TokenAccess(adminv1connect.WarpServiceGetWarpProcedure); !ok || got != TokenAccessPlanning {
 		t.Errorf("GetWarp token access = %d, %v; want MCP planning only", got, ok)
 	}
+	if got, ok := TokenAccess(adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure); !ok || got != TokenAccessApproved || !NeedsStepUp(adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure) {
+		t.Errorf("AddNodeServerKey token access = %d, %v; want owner-approved with step-up", got, ok)
+	}
 	// every grant is for a procedure that is on the list as approved
 	wantProfileGrants := map[string][]string{
 		"profile_create": {
@@ -946,6 +949,7 @@ func TestTokenAllowList(t *testing.T) {
 		adminv1connect.RelayServiceDeleteRelayProcedure,
 	}
 	wantProfileGrants["node_ipv6"] = []string{adminv1connect.NodeServiceUpdateIpv6EntryProcedure}
+	wantProfileGrants["node_server_keys_add"] = []string{adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure}
 	wantProfileGrants["node_awg_backend"] = []string{adminv1connect.NodeServiceUpdateNodeProcedure}
 	wantProfileGrants["path_speed"] = []string{PathSpeedProcedure}
 	wantProfileGrants["node_update"] = []string{adminv1connect.NodeServiceUpdateNodeProcedure, adminv1connect.ProfileServiceUpdateInboundProcedure}

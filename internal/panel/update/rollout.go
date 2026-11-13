@@ -103,6 +103,24 @@ func defaultBatch(nodes int) int {
 	return 2
 }
 
+// SortRolloutCandidates applies the canary order used by StartRollout and returns its default batch size.
+func SortRolloutCandidates(nodes []*adminv1.NodeUpdate) int {
+	byID := make(map[string]*adminv1.NodeUpdate, len(nodes))
+	views := make([]nodeView, 0, len(nodes))
+	for _, n := range nodes {
+		byID[n.GetNodeId()] = n
+		views = append(views, nodeView{
+			row:    store.NodeRow{ID: n.GetNodeId(), Name: n.GetName()},
+			online: int(n.GetOnlineUsers()), inbounds: int(n.GetInbounds()),
+		})
+	}
+	canaryOrder(views)
+	for i, view := range views {
+		nodes[i] = byID[view.row.ID]
+	}
+	return defaultBatch(len(nodes))
+}
+
 // canaryOrder puts the node with the fewest online users first, then the fewest inbounds, then by name.
 func canaryOrder(v []nodeView) {
 	sort.SliceStable(v, func(i, j int) bool {

@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -692,6 +694,131 @@ func TestRolloutFlow(t *testing.T) {
 	}
 	if len(e.w.startReq) != 1 {
 		t.Errorf("StartRollout ran for a changed bundle: %+v", e.w.startReq)
+	}
+}
+
+func TestRolloutStartMultiNodeCanaryFactsAndPins(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	e.w.mu.Lock()
+	e.w.updateNodes = []*adminv1.NodeUpdate{
+		{NodeId: nodeA, Name: "de1", Version: "v1", Built: 1700000100, SupportsUpdate: true, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED, OnlineUsers: 2, Inbounds: 1},
+		{NodeId: nodeB, Name: "nl1", Version: "v1.1", Built: 1700000100, SupportsUpdate: true, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_FAILED, OnlineUsers: 1, Inbounds: 4},
+		{NodeId: nodeC, Name: "fi1", Version: "v0.9", Built: 1700000090, SupportsUpdate: true, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK, OnlineUsers: 1, Inbounds: 2},
+		{NodeId: nodeD, Name: "msk1", Version: "v1", Built: 1700000100, SupportsUpdate: true, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED, OnlineUsers: 0, Inbounds: 5},
+	}
+	e.w.mu.Unlock()
+	args := map[string]any{"nodes": []any{nodeA, nodeB, nodeC, nodeD}}
+	p := planOf(t, s, "rollout_start", args)
+	if !p.NeedsApproval || !slices.Contains(p.Danger, dangerBulk) {
+		t.Fatalf("multi-node plan did not require approval and carry the bulk marker: %+v", p)
+	}
+	var names, positions, versions, online []string
+	for _, fact := range p.Facts {
+		switch fact.Key {
+		case "version":
+			if fact.Value != "v2" {
+				t.Errorf("bundle version fact = %q", fact.Value)
+			}
+		case "batch_size":
+			if fact.Value != "1" {
+				t.Errorf("batch size fact = %q, want the panel's one-node batch for four targets", fact.Value)
+			}
+		case "node":
+			names = append(names, fact.Value)
+			if !fact.Untrusted {
+				t.Errorf("node name is not marked untrusted: %+v", fact)
+			}
+		case "canary_position":
+			positions = append(positions, fact.Value)
+		case "agent_version":
+			versions = append(versions, fact.Value)
+		case "people_online":
+			online = append(online, fact.Value)
+		}
+	}
+	if strings.Join(names, ",") != "msk1,fi1,nl1,de1" || strings.Join(positions, ",") != "1,2,3,4" ||
+		strings.Join(versions, ",") != "v1,v0.9,v1.1,v1" || strings.Join(online, ",") != "0,1,1,2" {
+		t.Fatalf("rollout facts are not in canary order: names=%v positions=%v versions=%v online=%v", names, positions, versions, online)
+	}
+	stored, err := e.plans.GetMCPPlan(context.Background(), p.PlanID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pinned rolloutStartArgs
+	if err := json.Unmarshal([]byte(stored.ParamsJSON), &pinned); err != nil || strings.Join(pinned.NodeIDs, ",") != nodeD+","+nodeC+","+nodeB+","+nodeA {
+		t.Fatalf("plan did not pin the ordered exact node set: %+v (%v)", pinned, err)
+	}
+	e.plans.decide(p.PlanID, true)
+	e.w.mu.Lock()
+	e.w.updateNodes[0].State = adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE
+	e.w.mu.Unlock()
+	if got := applyError(t, s, "rollout_start", p.ConfirmToken); !strings.Contains(got, "selected node set changed after planning") {
+		t.Fatalf("apply after a selected node changed: %q", got)
+	}
+	if failed := storedPlan(t, e, p.PlanID); failed.Status != StatusFailed || failed.OutcomeCode != "changed_since_plan" || len(e.w.startReq) != 0 {
+		t.Fatalf("changed node set reached StartRollout or was not recorded: plan=%+v requests=%v", failed, e.w.startReq)
+	}
+	e.w.mu.Lock()
+	e.w.updateNodes[0].State = adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED
+	e.w.mu.Unlock()
+	p = planOf(t, s, "rollout_start", args)
+	e.plans.decide(p.PlanID, true)
+	applyOf(t, s, "rollout_start", p.ConfirmToken)
+	if len(e.w.startReq) != 1 || strings.Join(e.w.startReq[0].GetNodeIds(), ",") != nodeD+","+nodeC+","+nodeB+","+nodeA || e.w.startReq[0].GetExpectedVersion() != "v2" {
+		t.Fatalf("multi-node StartRollout request did not match the approved set and bundle: %+v", e.w.startReq)
+	}
+	p = planOf(t, s, "rollout_start", args)
+	e.plans.decide(p.PlanID, true)
+	e.w.bundleBuilt = 1700000300
+	if got := applyError(t, s, "rollout_start", p.ConfirmToken); !strings.Contains(got, "release changed after planning") {
+		t.Fatalf("apply after bundle drift: %q", got)
+	}
+	if len(e.w.startReq) != 1 || storedPlan(t, e, p.PlanID).OutcomeCode != "changed_since_plan" {
+		t.Fatalf("changed bundle reached StartRollout or was not recorded: requests=%v plan=%+v", e.w.startReq, storedPlan(t, e, p.PlanID))
+	}
+}
+
+func TestRolloutStartNodeListCompatibilityAndLimits(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	if got := mustFail(t, s, "rollout_start_plan", map[string]any{"node_ids": []any{nodeA}, "nodes": []any{nodeA}}); !strings.Contains(got, "not both") {
+		t.Fatalf("both rollout node fields were accepted: %s", got)
+	}
+	if got := mustFail(t, s, "rollout_start_plan", map[string]any{"nodes": []any{nodeA, nodeA}}); !strings.Contains(got, "duplicate node id") {
+		t.Fatalf("duplicate rollout node id was accepted: %s", got)
+	}
+	if got := mustFail(t, s, "rollout_start_plan", map[string]any{"nodes": []any{"nod_unknown00000000000000000000"}}); !strings.Contains(got, "not a node of this panel") {
+		t.Fatalf("unknown rollout node id was accepted: %s", got)
+	}
+	tooMany := make([]any, maxMCPNodeTargets+1)
+	for i := range tooMany {
+		tooMany[i] = fmt.Sprintf("mcp_bulk_%02d", i)
+	}
+	if got := mustFail(t, s, "rollout_start_plan", map[string]any{"nodes": tooMany}); !strings.Contains(got, "at most 20") {
+		t.Fatalf("more than 20 rollout nodes were accepted: %s", got)
+	}
+	if got := mustFail(t, s, "rollout_start_plan", map[string]any{"nodes": []any{}}); !strings.Contains(got, "at least one node id") {
+		t.Fatalf("empty rollout node list was accepted: %s", got)
+	}
+
+	names := []string{"de1", "nl1", "fi1", "msk1"}
+	ids := make([]any, 0, maxMCPNodeTargets)
+	nodes := make([]*adminv1.NodeUpdate, 0, maxMCPNodeTargets)
+	for i := 0; i < maxMCPNodeTargets; i++ {
+		id := fmt.Sprintf("mcp_bulk_%02d", i)
+		ids = append(ids, id)
+		nodes = append(nodes, &adminv1.NodeUpdate{NodeId: id, Name: names[i%len(names)], Version: "v1", Built: 1700000100,
+			SupportsUpdate: true, State: adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED})
+	}
+	e.w.mu.Lock()
+	e.w.updateNodes = nodes
+	e.w.mu.Unlock()
+	p := planOf(t, s, "rollout_start", map[string]any{"nodes": ids})
+	if len(p.Facts) != 3+4*maxMCPNodeTargets || !slices.ContainsFunc(p.Facts, func(f Fact) bool { return f.Key == "batch_size" && f.Value == "2" }) {
+		t.Fatalf("20-node rollout plan facts or batch size: facts=%d", len(p.Facts))
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/decoy"
+	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/panel/warp"
 )
 
@@ -30,6 +31,7 @@ const (
 	dangerFleet           = "fleet"             // it changes what runs on the nodes
 	dangerBulk            = "bulk"              // many users at once
 	dangerUserChangeLimit = "user_change_limit" // this plan exceeds the token's unattended user-change limit
+	maxMCPNodeTargets     = 20
 )
 
 const tokenUserChangeDescription = "A token may make at most 10 user changes without owner approval during the fixed one-hour window that starts with its first counted change."
@@ -411,6 +413,23 @@ func uniqueIDs(what string, ids []string, allowEmpty bool) ([]string, error) {
 		if !slices.Contains(out, id) {
 			out = append(out, id)
 		}
+	}
+	return out, nil
+}
+
+func nodeTargetIDs(what string, ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, errors.New(what + ": at least one node id")
+	}
+	if len(ids) > maxMCPNodeTargets {
+		return nil, fmt.Errorf("%s: at most %d nodes at once", what, maxMCPNodeTargets)
+	}
+	out, err := uniqueIDs(what, ids, false)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) != len(ids) {
+		return nil, errors.New(what + ": duplicate node id")
 	}
 	return out, nil
 }
@@ -1543,8 +1562,9 @@ var updateDownloadTimeout = changeSpec[updateDownloadTimeoutArgs]{
 
 type rolloutStartArgs struct {
 	ReasonField
-	// No batch size: one node is its own canary, and StartRollout's batch limit has nothing to split.
-	NodeIDs []string `json:"node_ids" jsonschema:"exactly one node id from updates_status to update now"`
+	// NodeIDs preserves the original input shape; Nodes is the preferred multi-node form.
+	NodeIDs []string `json:"node_ids,omitempty" jsonschema:"one to 20 node ids from updates_status to update now (legacy input)"`
+	Nodes   []string `json:"nodes,omitempty" jsonschema:"one to 20 node ids from updates_status to update now"`
 	// The bundle of the plan, pinned so the owner approves one exact release (set by the plan, not the agent).
 	ExpectedVersion string `json:"expected_version,omitempty" jsonschema:"-"`
 	ExpectedBuilt   int64  `json:"expected_built,omitempty" jsonschema:"-"`
@@ -1553,14 +1573,18 @@ type rolloutStartArgs struct {
 var rolloutStart = changeSpec[rolloutStartArgs]{
 	name: "rollout_start", min: ProfileAdmin, danger: true,
 	procs: procs(adminv1connect.UpdateServiceGetUpdatesProcedure, adminv1connect.UpdateServiceStartRolloutProcedure),
-	desc:  "Update one selected node now to the signed bundle. For a future time use node_update_schedule. Needs the owner's approval in the admin panel.",
+	desc:  "Update one to 20 selected nodes now to the signed bundle, in the panel's canary order. For a future time use node_update_schedule. Needs the owner's approval in the admin panel.",
 	plan: func(c *call, a rolloutStartArgs) (*planned, error) {
-		ids, err := uniqueIDs("node_ids", a.NodeIDs, true)
+		if a.NodeIDs != nil && a.Nodes != nil {
+			return nil, errors.New("provide either nodes or node_ids, not both")
+		}
+		requested, field := a.Nodes, "nodes"
+		if a.Nodes == nil {
+			requested, field = a.NodeIDs, "node_ids"
+		}
+		ids, err := nodeTargetIDs(field, requested)
 		if err != nil {
 			return nil, err
-		}
-		if len(ids) != 1 {
-			return nil, errors.New("node_ids must contain exactly one node; schedule or update nodes individually")
 		}
 		u, err := c.updates()
 		if err != nil {
@@ -1572,30 +1596,45 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 		if r := u.GetRollout(); r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING || r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED {
 			return nil, errors.New("a rollout is already active (running or paused): wait for it to finish or cancel it first")
 		}
-		var chosen *adminv1.NodeUpdate
+		chosen := make([]*adminv1.NodeUpdate, 0, len(ids))
 		for _, n := range u.GetNodes() {
-			if n.GetNodeId() == ids[0] {
-				chosen = n
-				break
+			if slices.Contains(ids, n.GetNodeId()) {
+				chosen = append(chosen, n)
 			}
 		}
-		if chosen == nil {
-			return nil, errors.New("node_id is not a node of this panel")
+		if len(chosen) != len(ids) {
+			return nil, errors.New("a node id is not a node of this panel")
 		}
-		if !chosen.GetSupportsUpdate() || chosen.GetBuilt() >= u.GetBundle().GetBuilt() ||
-			(chosen.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED &&
-				chosen.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK &&
-				chosen.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_FAILED) {
-			return nil, errors.New("the selected node has no supported online agent older than this bundle")
+		for _, n := range chosen {
+			if !n.GetSupportsUpdate() || n.GetBuilt() >= u.GetBundle().GetBuilt() ||
+				(n.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED &&
+					n.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK &&
+					n.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_FAILED) {
+				return nil, errors.New("a selected node has no supported online agent older than this bundle")
+			}
+		}
+		batchSize := panelupdate.SortRolloutCandidates(chosen)
+		orderedIDs := make([]string, 0, len(chosen))
+		facts := []Fact{{Key: "version", Value: clean(u.GetBundle().GetVersion(), 60)},
+			{Key: "batch_size", Value: strconv.Itoa(batchSize)},
+			codedFact("effect", "each node restarts its agent and passes the update health gate", "restart")}
+		for i, n := range chosen {
+			orderedIDs = append(orderedIDs, n.GetNodeId())
+			facts = append(facts,
+				Fact{Key: "canary_position", Value: strconv.Itoa(i + 1)},
+				Fact{Key: "node", Value: nm(n.GetName()), Untrusted: true},
+				Fact{Key: "agent_version", Value: clean(n.GetVersion(), 60)},
+				Fact{Key: "people_online", Value: strconv.FormatUint(uint64(n.GetOnlineUsers()), 10)},
+			)
+		}
+		danger := slices.Clone(rolloutDanger)
+		if len(ids) > 1 {
+			danger = mergeDanger(danger, dangerBulk)
 		}
 		return &planned{
-			Summary: "Update node " + nm(chosen.GetName()) + " to the signed agent bundle now. The owner has to approve it first.",
-			Facts: []Fact{
-				{Key: "version", Value: clean(u.GetBundle().GetVersion(), 60)},
-				{Key: "node", Value: nm(chosen.GetName()), Untrusted: true},
-				codedFact("effect", "the selected node restarts its agent and passes the update health gate", "restart"),
-			},
-			Danger: rolloutDanger, Params: rolloutStartArgs{NodeIDs: ids, ExpectedVersion: u.GetBundle().GetVersion(), ExpectedBuilt: u.GetBundle().GetBuilt()},
+			Summary: "Update " + plural(len(ids), "selected node", "selected nodes") + " to the signed agent bundle in the panel's canary order. The owner has to approve it first.",
+			Facts:   facts, Danger: danger,
+			Params: rolloutStartArgs{NodeIDs: orderedIDs, ExpectedVersion: u.GetBundle().GetVersion(), ExpectedBuilt: u.GetBundle().GetBuilt()},
 		}, nil
 	},
 	apply: func(c *call, a rolloutStartArgs, _ Plan) (done, error) {
@@ -1608,6 +1647,19 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 		}
 		if u.GetBundle().GetVersion() != a.ExpectedVersion || u.GetBundle().GetBuilt() != a.ExpectedBuilt {
 			return done{}, failure("changed_since_plan", "the release changed after planning; make a new plan")
+		}
+		current := make(map[string]*adminv1.NodeUpdate, len(u.GetNodes()))
+		for _, n := range u.GetNodes() {
+			current[n.GetNodeId()] = n
+		}
+		for _, id := range a.NodeIDs {
+			n := current[id]
+			if n == nil || !n.GetSupportsUpdate() || n.GetBuilt() >= a.ExpectedBuilt ||
+				(n.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_OUTDATED &&
+					n.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK &&
+					n.GetState() != adminv1.NodeUpdateState_NODE_UPDATE_STATE_FAILED) {
+				return done{}, failure("changed_since_plan", "the selected node set changed after planning; make a new plan")
+			}
 		}
 		r, err := c.cl.Update.StartRollout(c.ctx, connect.NewRequest(&adminv1.StartRolloutRequest{
 			NodeIds: a.NodeIDs, ExpectedVersion: a.ExpectedVersion, ExpectedBuilt: a.ExpectedBuilt,

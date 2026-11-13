@@ -94,7 +94,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.NodeServiceRetireNodeProcedure:          levelOwner,
 	adminv1connect.NodeServiceStreamLogsProcedure:          levelOwner, // node logs carry client addresses
 
-	// ProvisioningService can install a root agent over SSH; every operation is owner-only.
+	// ProvisioningService can install a root agent over SSH or change server SSH keys; every operation is owner-only.
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:        levelOwner,
 	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:           levelOwner,
 	adminv1connect.ProvisioningServiceCheckSSHProcedure:                 levelOwner, // sends a root password after host-key confirmation; also needs step-up

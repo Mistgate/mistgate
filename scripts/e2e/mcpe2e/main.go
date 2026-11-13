@@ -943,6 +943,9 @@ func (e *env) scenario() {
 		sameNames(roN, wantRO) && sameNames(opN, wantOP) && sameNames(adN, wantAD),
 		"served %d / %d / %d; registry-only %v; served-only %v", len(roN), len(opN), len(adN),
 		diffNames(wantAD, adN), diffNames(adN, wantAD))
+	for _, name := range []string{"rollout_start_plan", "node_server_keys_add_plan", "node_server_keys_add_apply"} {
+		e.check("admin tool list includes "+name, slices.Contains(adN, name), "")
+	}
 	writes := 0
 	for _, n := range roN {
 		if isWrite(n) {

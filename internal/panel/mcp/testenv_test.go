@@ -373,61 +373,64 @@ type world struct {
 	loadHours     []uint32 // GetFleetLoad windows (tools_capacity_test.go)
 	withResources bool     // GetNode of nodeA carries the resource fields of a current agent
 
-	rotateReq          []*adminv1.RotateNodeServerPasswordRequest
-	installReq         []*adminv1.StartNodeProvisionRequest
-	addServerKeyReq    []*adminv1.AddNodeServerKeyRequest
-	removeServerKeyReq []*adminv1.RemoveNodeServerKeyRequest
-	checkPortsReq      []*adminv1.CheckPortsRequest
-	ipv6Reqs           []*adminv1.CheckIpv6Request
-	ipv6Err            error // CheckIpv6 answers with this
-	ipv6Node           map[string]*adminv1.NodeIpv6
-	ipv6Updates        []*adminv1.UpdateIpv6EntryRequest
-	ipv6UpdateCode     string   // UpdateIpv6Entry answers with this error_code
-	runtimeReqs        []string // GetNodeRuntime node ids (tools_data_test.go)
-	pathLossHours      []uint32
-	hostHours          []int
-	pathLossRows       []*adminv1.PathLossRow // when set, GetPathLoss answers with these
-	probeReqs          []*probev1.PathProbeRequest
-	traceReqs          []*probev1.NodeTraceRequest
-	dnsReqs            []*probev1.NodeDnsCheckRequest
-	speedReqs          []*probev1.PathSpeedRequest
-	speedCode          string // the error code PathSpeed answers with
-	probeRateLimited   bool   // PathProbe answers resource exhausted
-	clientAPIEnabled   bool
-	compatReq          []*adminv1.ListOutdatedDevicesRequest
-	mu                 sync.Mutex
-	log                []callRec
-	fixReqs            []*adminv1.ApplyFixRequest
-	fixGrants          []callRec
-	updateReq          []*adminv1.UpdateUserRequest
-	disableReq         []*adminv1.SetUsersEnabledRequest
-	startReq           []*adminv1.StartRolloutRequest
-	osStartReq         []*adminv1.StartOsRolloutRequest
-	osCancelReq        []*adminv1.CancelOsRolloutRequest
-	scheduleReq        []*adminv1.ScheduleNodeUpdateRequest
-	cancelScheduleReq  []*adminv1.CancelNodeUpdateScheduleRequest
-	timezoneReq        []*adminv1.SetUpdateTimezoneRequest
-	timeoutReq         []*adminv1.SetUpdateDownloadTimeoutRequest
-	sourcesReq         []*adminv1.SetUpdateDownloadSourcesRequest
-	pauseReq           []*adminv1.PauseRolloutRequest
-	revokeReq          []*adminv1.RevokeDeviceRequest
-	resetReq           []*adminv1.ResetUserTrafficRequest
-	createReq          []*adminv1.CreateUserRequest
-	muteReq            []*adminv1.MuteAlertRequest
-	dismissReq         []*adminv1.DismissAlertRequest
-	rollbackReq        []*adminv1.RollbackNodeRequest
-	subsReq            []*adminv1.UpdateSubscriptionSettingsRequest
-	groupCreateReq     []*adminv1.CreateGroupRequest
-	groupDeleteReq     []*adminv1.DeleteGroupRequest
-	dnsCreateReq       []*adminv1.CreateDnsPresetRequest
-	dnsUpdateReq       []*adminv1.UpdateDnsPresetRequest
-	dnsDeleteReq       []*adminv1.DeleteDnsPresetRequest
-	nodeUpdateReq      []*adminv1.UpdateNodeRequest
-	inboundUpdateReq   []*adminv1.UpdateInboundRequest
-	warpRestarts       []*adminv1.RestartWarpRequest
-	warpRegistrations  []*adminv1.RegisterWarpRequest
-	nodeDecoyReqs      []*adminv1.SetNodeDecoyModeRequest
-	relay              relayFixture
+	rotateReq           []*adminv1.RotateNodeServerPasswordRequest
+	installReq          []*adminv1.StartNodeProvisionRequest
+	addServerKeyReq     []*adminv1.AddNodeServerKeyRequest
+	serverKeyAddErrNode string
+	serverKeyAddErr     error
+	removeServerKeyReq  []*adminv1.RemoveNodeServerKeyRequest
+	checkPortsReq       []*adminv1.CheckPortsRequest
+	ipv6Reqs            []*adminv1.CheckIpv6Request
+	ipv6Err             error // CheckIpv6 answers with this
+	ipv6Node            map[string]*adminv1.NodeIpv6
+	ipv6Updates         []*adminv1.UpdateIpv6EntryRequest
+	ipv6UpdateCode      string   // UpdateIpv6Entry answers with this error_code
+	runtimeReqs         []string // GetNodeRuntime node ids (tools_data_test.go)
+	pathLossHours       []uint32
+	hostHours           []int
+	pathLossRows        []*adminv1.PathLossRow // when set, GetPathLoss answers with these
+	probeReqs           []*probev1.PathProbeRequest
+	traceReqs           []*probev1.NodeTraceRequest
+	dnsReqs             []*probev1.NodeDnsCheckRequest
+	speedReqs           []*probev1.PathSpeedRequest
+	speedCode           string // the error code PathSpeed answers with
+	probeRateLimited    bool   // PathProbe answers resource exhausted
+	clientAPIEnabled    bool
+	compatReq           []*adminv1.ListOutdatedDevicesRequest
+	mu                  sync.Mutex
+	log                 []callRec
+	fixReqs             []*adminv1.ApplyFixRequest
+	fixGrants           []callRec
+	updateReq           []*adminv1.UpdateUserRequest
+	disableReq          []*adminv1.SetUsersEnabledRequest
+	startReq            []*adminv1.StartRolloutRequest
+	updateNodes         []*adminv1.NodeUpdate
+	osStartReq          []*adminv1.StartOsRolloutRequest
+	osCancelReq         []*adminv1.CancelOsRolloutRequest
+	scheduleReq         []*adminv1.ScheduleNodeUpdateRequest
+	cancelScheduleReq   []*adminv1.CancelNodeUpdateScheduleRequest
+	timezoneReq         []*adminv1.SetUpdateTimezoneRequest
+	timeoutReq          []*adminv1.SetUpdateDownloadTimeoutRequest
+	sourcesReq          []*adminv1.SetUpdateDownloadSourcesRequest
+	pauseReq            []*adminv1.PauseRolloutRequest
+	revokeReq           []*adminv1.RevokeDeviceRequest
+	resetReq            []*adminv1.ResetUserTrafficRequest
+	createReq           []*adminv1.CreateUserRequest
+	muteReq             []*adminv1.MuteAlertRequest
+	dismissReq          []*adminv1.DismissAlertRequest
+	rollbackReq         []*adminv1.RollbackNodeRequest
+	subsReq             []*adminv1.UpdateSubscriptionSettingsRequest
+	groupCreateReq      []*adminv1.CreateGroupRequest
+	groupDeleteReq      []*adminv1.DeleteGroupRequest
+	dnsCreateReq        []*adminv1.CreateDnsPresetRequest
+	dnsUpdateReq        []*adminv1.UpdateDnsPresetRequest
+	dnsDeleteReq        []*adminv1.DeleteDnsPresetRequest
+	nodeUpdateReq       []*adminv1.UpdateNodeRequest
+	inboundUpdateReq    []*adminv1.UpdateInboundRequest
+	warpRestarts        []*adminv1.RestartWarpRequest
+	warpRegistrations   []*adminv1.RegisterWarpRequest
+	nodeDecoyReqs       []*adminv1.SetNodeDecoyModeRequest
+	relay               relayFixture
 
 	// awgStatus makes a node report one AmneziaWG inbound with this state (nil = the node serves none); awgFallback adds the
 	// doctor finding of the userspace fallback; updateNodeErr is what UpdateNode answers instead of working.
@@ -1561,6 +1564,12 @@ func (w *world) GetUpdates(context.Context, *connect.Request[adminv1.GetUpdatesR
 				Params: map[string]string{"sources_failed": "panel:stalled,github:http_404"}},
 		}},
 	}
+	if w.updateNodes != nil {
+		r.Nodes = make([]*adminv1.NodeUpdate, 0, len(w.updateNodes))
+		for _, n := range w.updateNodes {
+			r.Nodes = append(r.Nodes, proto.Clone(n).(*adminv1.NodeUpdate))
+		}
+	}
 	return connect.NewResponse(r), nil
 }
 
@@ -1662,26 +1671,40 @@ const testHostKey = "SHA256:Vo3wK7ZGgCw1JmQxMZzh3H6pBvO3xuB2Dn8WqzZQyU8"
 // The panel's public SSH key as GetPanelSSHKey returns it (a public key: the plan shows it to the owner).
 const (
 	testPanelKey            = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl mistgate-panel"
-	testPanelKeyFingerprint = "SHA256:qcHuF8cXCmTsZ3S2B4ycqHd7hMGBpvlzQOLaS0R8ZIM"
+	testPanelKeyFingerprint = "SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU"
 )
 
 func (w *world) ListNodeServerAccess(context.Context, *connect.Request[adminv1.ListNodeServerAccessRequest]) (*connect.Response[adminv1.ListNodeServerAccessResponse], error) {
 	return connect.NewResponse(&adminv1.ListNodeServerAccessResponse{Access: []*adminv1.NodeServerAccess{
 		{NodeId: nodeA, NodeName: "de1", Host: "203.0.113.10", Port: 22, Username: "root", Fingerprint: testHostKey, PasswordSaved: true, PasswordLogin: true},
+		{NodeId: nodeB, NodeName: "nl1", Host: "192.0.2.11", Port: 22, Username: "root", Fingerprint: testHostKey, PasswordSaved: true, PasswordLogin: true},
+		{NodeId: nodeC, NodeName: "fi1", Host: "192.0.2.12", Port: 22, Username: "root", Fingerprint: testHostKey, PasswordSaved: true, PasswordLogin: true},
+		{NodeId: nodeD, NodeName: "msk1", Host: "192.0.2.13", Port: 22, Username: "root", Fingerprint: testHostKey, PasswordSaved: true, PasswordLogin: true},
 		{NodeId: nodeRetired, NodeName: "de1", Host: "203.0.113.20", Port: 22, Username: "root", Fingerprint: testHostKey, NodeRetired: true, PasswordGenerated: true},
 	}}), nil
 }
 
-func (w *world) ListNodeServerKeys(context.Context, *connect.Request[adminv1.ListNodeServerKeysRequest]) (*connect.Response[adminv1.ListNodeServerKeysResponse], error) {
-	return connect.NewResponse(&adminv1.ListNodeServerKeysResponse{Keys: []*adminv1.NodeServerKey{{
-		Type: "ssh-ed25519", Bits: 256, Fingerprint: testPanelKeyFingerprint, Comment: "mistgate-panel", PanelKey: true, Lines: 1,
-	}}}), nil
+func (w *world) ListNodeServerKeys(_ context.Context, r *connect.Request[adminv1.ListNodeServerKeysRequest]) (*connect.Response[adminv1.ListNodeServerKeysResponse], error) {
+	var keys []*adminv1.NodeServerKey
+	if r.Msg.GetNodeId() == nodeA {
+		keys = []*adminv1.NodeServerKey{{
+			Type: "ssh-ed25519", Bits: 256, Fingerprint: testPanelKeyFingerprint, Comment: "mistgate-panel", PanelKey: true, Lines: 1,
+		}}
+	}
+	return connect.NewResponse(&adminv1.ListNodeServerKeysResponse{Keys: keys}), nil
 }
 
 func (w *world) AddNodeServerKey(_ context.Context, r *connect.Request[adminv1.AddNodeServerKeyRequest]) (*connect.Response[adminv1.AddNodeServerKeyResponse], error) {
 	w.mu.Lock()
 	w.addServerKeyReq = append(w.addServerKeyReq, r.Msg)
+	err := w.serverKeyAddErr
+	if r.Msg.GetNodeId() != w.serverKeyAddErrNode {
+		err = nil
+	}
 	w.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
 	return connect.NewResponse(&adminv1.AddNodeServerKeyResponse{Key: &adminv1.NodeServerKey{
 		Type: "ssh-ed25519", Bits: 256, Fingerprint: testPanelKeyFingerprint, Comment: "mistgate-panel", PanelKey: r.Msg.GetPanelKey(), Lines: 1,
 	}}), nil

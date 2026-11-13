@@ -3,8 +3,14 @@
 package mcp
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
+
+	"connectrpc.com/connect"
 )
 
 // node_install: the plan reads the host key under the planning grant and shows it with its type; the owner enters the
@@ -109,6 +115,105 @@ func TestNodeServerKeysUseOwnerApprovedPlans(t *testing.T) {
 
 	if out := mustFail(t, s, "node_server_key_add_plan", map[string]any{"node": nodeA, "public_key": "-----BEGIN OPENSSH PRIVATE KEY-----"}); !strings.Contains(out, "private keys are never accepted") {
 		t.Fatalf("private key input was not rejected: %s", out)
+	}
+}
+
+func TestNodeServerKeysAddBulkPlanAndPartialApply(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	p := planOf(t, s, "node_server_keys_add", map[string]any{"nodes": []any{nodeC, nodeA, nodeB}, "panel_key": true})
+	if !p.NeedsApproval || !slices.Contains(p.Danger, dangerStepUp) || !slices.Contains(p.Danger, dangerBulk) {
+		t.Fatalf("bulk SSH key plan did not require owner step-up approval: %+v", p)
+	}
+	var names []string
+	var hasMaskedFingerprint, hasComment, hasSkip bool
+	for _, fact := range p.Facts {
+		switch fact.Key {
+		case "node":
+			names = append(names, fact.Value)
+			if !fact.Untrusted {
+				t.Errorf("node name is not marked untrusted: %+v", fact)
+			}
+		case "fingerprint":
+			hasMaskedFingerprint = fact.Value == "SHA256:[key]"
+		case "comment":
+			hasComment = fact.Value == "mistgate-panel" && fact.Untrusted
+		case "already_present":
+			hasSkip = fact.Value == "skipped"
+		}
+	}
+	if strings.Join(names, ",") != "fi1,de1,nl1" || !hasMaskedFingerprint || !hasComment || !hasSkip {
+		t.Fatalf("bulk SSH key facts missed key metadata or node skip: names=%v fingerprint=%v comment=%v skip=%v facts=%+v", names, hasMaskedFingerprint, hasComment, hasSkip, p.Facts)
+	}
+	stored := storedPlan(t, e, p.PlanID)
+	var storedFacts []Fact
+	if err := json.Unmarshal([]byte(stored.FactsJSON), &storedFacts); err != nil || !slices.ContainsFunc(storedFacts, func(f Fact) bool { return f.Key == "fingerprint" && f.Value == testPanelKeyFingerprint }) {
+		t.Fatalf("owner approval facts do not contain the full key fingerprint: %+v (%v)", storedFacts, err)
+	}
+	var pinned serverKeysAddParams
+	if err := json.Unmarshal([]byte(stored.ParamsJSON), &pinned); err != nil || pinned.Fingerprint != testPanelKeyFingerprint || len(pinned.Nodes) != 3 ||
+		pinned.Nodes[0].NodeID != nodeC || pinned.Nodes[1].NodeID != nodeA || pinned.Nodes[2].NodeID != nodeB {
+		t.Fatalf("bulk plan did not pin the exact key and node set: %+v (%v)", pinned, err)
+	}
+	if err := e.plans.decide(p.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	e.w.mu.Lock()
+	e.w.serverKeyAddErrNode = nodeB
+	e.w.serverKeyAddErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("node_retired"))
+	e.w.mu.Unlock()
+	raw := mustOK(t, s, "node_server_keys_add_apply", map[string]any{"confirm_token": p.ConfirmToken})
+	noCanary(t, "node_server_keys_add_apply", raw)
+	out := decode[serverKeysAddApplyOut](t, raw)
+	if out.Status != StatusApplied || out.PlanID != p.PlanID || !strings.Contains(out.Result, "1 added, 1 already present, 1 failed") {
+		t.Fatalf("bulk SSH key apply result: %+v", out)
+	}
+	if len(out.Results) != 3 || out.Results[0] != (serverKeysAddNodeResult{Node: "fi1", Status: "added"}) ||
+		out.Results[1] != (serverKeysAddNodeResult{Node: "de1", Status: "already_present"}) ||
+		out.Results[2] != (serverKeysAddNodeResult{Node: "nl1", Status: "failed", ErrorCode: "node_retired"}) {
+		t.Fatalf("bulk SSH key per-node results: %+v", out.Results)
+	}
+	if len(e.w.addServerKeyReq) != 2 || e.w.addServerKeyReq[0].GetNodeId() != nodeC || e.w.addServerKeyReq[1].GetNodeId() != nodeB ||
+		!e.w.addServerKeyReq[0].GetPanelKey() || !e.w.addServerKeyReq[1].GetPanelKey() {
+		t.Fatalf("bulk SSH key additions were not sequential or skipped the present key: %+v", e.w.addServerKeyReq)
+	}
+	if calls := e.w.calls("/mistgate.admin.v1.ProvisioningService/AddNodeServerKey"); len(calls) != 2 || calls[0].Approved != p.PlanID || calls[1].Approved != p.PlanID {
+		t.Fatalf("bulk key additions did not use the approved plan grant: %+v", calls)
+	}
+	stored = storedPlan(t, e, p.PlanID)
+	if stored.Status != StatusApplied || stored.OutcomeCode != "node_ssh_keys_add_completed" || !strings.Contains(stored.OutcomeParams, "node_retired") {
+		t.Fatalf("partial key failure was not persisted as an applied plan: %+v", stored)
+	}
+	// A replay returns the same per-node results without adding a key again.
+	replay := decode[serverKeysAddApplyOut](t, mustOK(t, s, "node_server_keys_add_apply", map[string]any{"confirm_token": p.ConfirmToken}))
+	if replay.Status != StatusApplied || len(replay.Results) != 3 || len(e.w.addServerKeyReq) != 2 {
+		t.Fatalf("bulk key result replay changed or repeated side effects: %+v calls=%d", replay, len(e.w.addServerKeyReq))
+	}
+}
+
+func TestNodeServerKeysAddBulkLimitsAndSharedValidation(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	if got := mustFail(t, s, "node_server_keys_add_plan", map[string]any{"nodes": []any{}, "panel_key": true}); !strings.Contains(got, "at least one node id") {
+		t.Fatalf("empty bulk key node list was accepted: %s", got)
+	}
+	if got := mustFail(t, s, "node_server_keys_add_plan", map[string]any{"nodes": []any{nodeA, nodeA}, "panel_key": true}); !strings.Contains(got, "duplicate node id") {
+		t.Fatalf("duplicate bulk key node id was accepted: %s", got)
+	}
+	if got := mustFail(t, s, "node_server_keys_add_plan", map[string]any{"nodes": []any{"nod_unknown00000000000000000000"}, "panel_key": true}); !strings.Contains(got, "no saved SSH access") {
+		t.Fatalf("unknown bulk key node id was accepted: %s", got)
+	}
+	tooMany := make([]any, maxMCPNodeTargets+1)
+	for i := range tooMany {
+		tooMany[i] = fmt.Sprintf("mcp_keys_%02d", i)
+	}
+	if got := mustFail(t, s, "node_server_keys_add_plan", map[string]any{"nodes": tooMany, "panel_key": true}); !strings.Contains(got, "at most 20") {
+		t.Fatalf("more than 20 bulk key nodes were accepted: %s", got)
+	}
+	if got := mustFail(t, s, "node_server_keys_add_plan", map[string]any{"nodes": []any{nodeA, nodeB}, "public_key": "-----BEGIN OPENSSH PRIVATE KEY-----"}); !strings.Contains(got, "private keys are never accepted") {
+		t.Fatalf("bulk key plan did not use single-node public-key validation: %s", got)
 	}
 }
 

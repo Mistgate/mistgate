@@ -187,6 +187,7 @@ const knownValues: Record<string, MessageKey> = {
   cancel: "approval.value.cancel",
   "masked secret -> generated secret": "approval.value.secret_generated",
   "secret field changed": "approval.value.secret_changed",
+  skipped: "approval.value.skipped",
 };
 
 const yesNo = (t: T, v: string) => (v === "true" ? t("int.ap.yes") : v === "false" ? t("int.ap.no") : v);

@@ -55,10 +55,10 @@ var tokenProcedures = map[string]int{
 	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
 	adminv1connect.WarpServiceRestartWarpProcedure:                     TokenAccessDirect,
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       TokenAccessPlanning, // node_install_plan only
-	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:          TokenAccessPlanning, // node_install_plan and node_server_key_add_plan
+	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:          TokenAccessPlanning, // node_install_plan and both SSH key add plans
 	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:    TokenAccessDirect,
 	adminv1connect.ProvisioningServiceListNodeServerKeysProcedure:      TokenAccessDirect,
-	adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure:        TokenAccessApproved,
+	adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure:        TokenAccessApproved, // node_server_key_add and node_server_keys_add
 	adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure:     TokenAccessApproved,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      TokenAccessApproved,
 	// The country verdicts of GetChecks over time (the Reachability page), read like them.
@@ -251,6 +251,7 @@ var grantProcedures = map[string][]string{
 	NodeInstallTool:               {adminv1connect.ProvisioningServiceStartNodeProvisionProcedure},
 	"node_server_password_rotate": {adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure},
 	"node_server_key_add":         {adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure},
+	"node_server_keys_add":        {adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure},
 	"node_server_key_remove":      {adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure},
 	"relay": {
 		adminv1connect.RelayServiceCreateRelayProcedure,

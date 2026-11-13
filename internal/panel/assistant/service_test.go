@@ -262,6 +262,10 @@ func (p assistantMCPPlanStore) BeginApply(ctx context.Context, id, tokenID, tool
 	return mcp.Plan(plan), err
 }
 
+func (p assistantMCPPlanStore) ReleaseApply(ctx context.Context, id, previousStatus string) error {
+	return p.st.ReleaseApply(ctx, id, previousStatus)
+}
+
 func (p assistantMCPPlanStore) FinishApply(ctx context.Context, id string, ok bool, result, errText, outcomeCode, outcomeParams string, now time.Time) error {
 	return p.st.FinishApply(ctx, id, ok, result, errText, outcomeCode, outcomeParams, now)
 }

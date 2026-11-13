@@ -196,7 +196,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `warp_restart` | 管理员 | `node` ID 或精确名称；计划会列出使用 WARP 出口且可能中断几秒的协议配置；执行时只接收 `confirm_token` | 否 |
 | `warp_reregister` | 管理员 | `node` ID 或精确名称，以及可选的 `reason`（最多 300 个字符）；执行时只接收 `confirm_token`。计划会显示 Cloudflare 服务条款链接；所有者批准即表示代表此账户接受条款，并将其替换为新的匿名设备，从而更改 WARP 出口 IP | 始终 |
 | `relay` | 管理员 | 计划参数：`action` 及其参数；执行时只接收 `confirm_token`。`create`：`node`（入口，ID 或精确名称）、`inbound_id`（来自 `relay_candidates`），以及可选的 `port`（443 或 1024 到 65535；省略时，若出口的端口在入口上空闲则用它，否则用一个空闲端口）。`enable`、`disable` 和 `delete`：`relay_id`。`port`：`relay_id` 和 `port`。计划会不带地址地说明这项更改：入口、出口、服务器、端口、国家检测如何看待两端、最近一次检测，以及用户会看到什么 | 始终 |
-| `rollout_start` | 管理员 | `updates_status` 中恰好一个 `node_ids` 条目（立即更新该节点）；计划会固定受信任的版本 | 始终 |
+| `rollout_start` | 管理员 | 计划：`nodes`（`updates_status` 中 1 到 20 个节点 ID；也接受旧参数 `node_ids`，但不能同时提供）；执行：仅 `confirm_token`。计划显示受信任的签名版本、金丝雀顺序（在线人数较少优先，然后是入站较少）、批次大小，以及每个节点的名称、Agent 版本和在线人数；计划固定精确节点集合及发布包版本/构建号 | 始终（step-up） |
 | `os_rollout_start` | 管理员 | 计划：`os_updates_status` 中恰好一个 `node_ids` 条目、`mode`（`security`：安装安全更新；`reboot_only`：只重启）和 `reboot`（`security` 配 `never` 或 `if_required`；`reboot_only` 配 `if_required` 或 `always`）；应用：仅 `confirm_token`。在该节点上运行[更新单个服务器的系统](../operations/updates.md#更新单个服务器的系统)中的任务。计划会显示节点、任务将做什么、等待中的更新和安全更新、内核、是否已需要重启、有多少人在线以及他们会在节点重启时断线；节点会拒绝的情况（unattended-upgrades 自动重启、新内核缺少 AmneziaWG 模块）会提前警告。无法接受任务的节点（离线、Agent 太旧、不是 Debian 或 Ubuntu、面板自己所在的服务器、已有任务在运行、没有安全更新）以及任何其他更新进行期间，在计划阶段就会被拒绝。重启是否安全由节点检查，不安全就拒绝；无法覆盖。 | 始终（step-up） |
 | `os_rollout_cancel` | 管理员 | `os_updates_status` 中的 `rollout_id`。关闭已停止的系统更新（其告警随之清除）或尚未开始的更新；节点上正在运行的任务无法停止，会被拒绝 | 始终（step-up） |
 | `node_update_schedule` | 管理员 | 计划参数：`node_id`、`local_datetime`（使用 `updates_status` 中的偏移量，格式为 `YYYY-MM-DDTHH:mm`，至少提前一分钟且最多提前一年）；计划会固定受信任的版本和偏移量 | 始终 |
@@ -214,6 +214,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_install` | 管理员 | 计划参数：`host`、`port`（默认 22）、`username`（root 或具有免密 sudo 权限的用户）、节点 `name`（2 到 24 个字母、数字或连字符）、`address`，以及可选的 `country_code`、`location`、`provider`；执行时只接收 `confirm_token`。计划只读取服务器的公开主机密钥。所有者在审批页面确认主机密钥，并选择面板密钥或输入 SSH 密码；密码安装默认同时添加面板密钥 | 始终 |
 | `node_server_password_rotate` | 管理员 | 计划参数：运行中节点的 `node` ID 或精确名称（已退役的节点会被拒绝）；执行时只接收 `confirm_token`。面板自行生成新密码，绝不返回密码；所有者可在节点的**服务器**标签页中查看 | 始终 |
 | `node_server_key_add` | 管理员 | 计划参数：`node`，以及一行公开 `public_key` 或 `panel_key: true`；执行时只接收 `confirm_token`。所有者先审批密钥类型、指纹和不可信注释。绝不接受私钥。 | 始终 |
+| `node_server_keys_add` | 管理员 | 计划：`nodes`（1 到 20 个节点 ID）以及一行公开 `public_key` 或 `panel_key: true`；执行：仅 `confirm_token`。所有者一次审批覆盖所有节点。计划显示密钥指纹、不可信注释，以及已存在该密钥并会跳过的节点；执行结果逐节点返回 `added`、`already_present` 或带错误代码的 `failed`。绝不接受私钥 | 始终（step-up） |
 | `node_server_key_remove` | 管理员 | 计划参数：`node` 和 `key`，即 `node_server_keys_list` 返回的 `key_id`（或完整的 SHA256 指纹）；执行时只接收 `confirm_token`。只有面板确认已保存密码可用后，才能移除面板密钥。 | 始终 |
 
 对于 `create` 和 `enable`，`relay_apply` 遵循面板自己的顺序：先创建中转（关闭状态），检测链路，再开启，然后由面板从外部检测路径。检测未通过的中转保持关闭，执行失败并给出阶段（`leg` 或 `path`）及其代码；迁移已开启中转的端口会重新检测路径，失败则关闭中转。第二个服务器会在订阅下次刷新时出现或消失。请参阅[中转](../guide/relays.md)。
@@ -222,7 +223,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 `os_rollout_start_plan` 一次只处理一个节点，并且必须经所有者批准：在所有者于管理后台批准计划之前，不会安装或重启任何东西。节点重启时，其上的人会断线（约两分钟）。该工具无法绕过节点自己的检查。目前还没有针对多个节点、时间窗口、刷新软件包列表或面板自己所在服务器的工具。
 
-`rollout_start_plan` 会立即更新一个选定节点，不能启动全体节点更新。只能选择 Agent 支持自更新且版本早于发布包的节点（版本过旧、更新失败或已回滚）；已有滚动更新正在运行或暂停时，会拒绝执行。计划会固定到制定时受信任的签名发布包：执行前发布包发生变化时，执行会失败，需要重新制定计划。所有者批准后，`node_update_schedule_plan` 会为一个节点保存未来的更新计划；制定计划时节点可以离线，新计划会替换该节点的旧计划。保存的任务会固定到相应签名发布版本和 UTC 固定偏移量。到期时如果节点离线，面板最多等待两小时让节点重新连接，之后会将任务标记为错过，绝不会自行启动任务；若签名发布包发生变化，面板会保留任务并继续显示，不会替换为其他发布版本。使用 `node_update_schedule_cancel_plan` 可取消待执行任务。更改 `update_timezone` 只影响新计划；现有任务会保留已保存的时间点和偏移量。`update_download_timeout` 只改变新发送步骤的下载窗口；支持该能力的 Agent 会在命令中收到新值，旧 Agent 继续使用内置限制，已经开始的步骤会保留发送时捕获的窗口。
+`rollout_start_plan` 会分阶段立即更新 1 到 20 个选定节点。每个节点都必须运行支持自更新且早于签名发布包的在线 Agent（版本过旧、更新失败或已回滚）；已有滚动更新正在运行或暂停时会拒绝启动。面板先选择在线人数最少的节点作为金丝雀，然后按入站数排序；少于 5 个节点时批次大小为 1，否则为 2。计划固定精确节点集合以及签名发布包的版本和构建号；如果选定节点或发布包在执行前发生变化，执行会失败，需要重新制定计划。所有者批准后，`node_update_schedule_plan` 会为一个节点保存未来的更新计划；制定计划时节点可以离线，新计划会替换该节点的旧计划。保存的任务会固定到相应签名发布版本和 UTC 固定偏移量。到期时如果节点离线，面板最多等待两小时让节点重新连接，之后会将任务标记为错过，绝不会自行启动任务；若签名发布包发生变化，面板会保留任务并继续显示，不会替换为其他发布版本。使用 `node_update_schedule_cancel_plan` 可取消待执行任务。更改 `update_timezone` 只影响新计划；现有任务会保留已保存的时间点和偏移量。`update_download_timeout` 只改变新发送步骤的下载窗口；支持该能力的 Agent 会在命令中收到新值，旧 Agent 继续使用内置限制，已经开始的步骤会保留发送时捕获的窗口。
 
 `subscription_app_upsert` 和 `subscription_app_remove` 会更改每位用户都能看到的页面上的一个应用，按平台和名称（不区分大小写）查找（同一平台上有两个应用同名时会拒绝执行：请在管理后台中更改）。新应用会添加到列表末尾。字段值的验证方式与保存**订阅 → 用户页面**时完全相同：下载链接必须是 http(s)；添加链接模板必须以应用自己的协议开头（`happ://add/{url}`、`myclient://add?url={url_enc}&name={name_enc}`），或使用 http(s)，不得使用 `javascript:`、`data:` 等协议；只能使用已知占位符；应用最多 30 个。此外，智能体提供的文本不能包含不可见格式字符。计划会读取并记住完整设置的状态；如果在执行前有人保存了订阅设置，执行会失败并返回「the subscription settings changed after the plan」，不会覆盖任何内容：请重新制定计划。在 `subscription_settings_get` 和智能体收到的计划副本中，链接查询字符串和较长的路径片段会显示为 `[redacted]`，与其他结果相同；所有者审批卡片会显示完整值。
 
@@ -266,9 +267,9 @@ Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。�
 
 | 代码 | 含义 | 工具 |
 |---|---|---|
-| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_awg_backend`、`update_timezone`、`update_download_timeout`、`retention``node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
-| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
-| `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
+| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_awg_backend`、`update_timezone`、`update_download_timeout`、`retention`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_keys_add`、`node_server_key_remove` |
+| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_keys_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
+| `bulk` | 一个计划影响多个目标，或一次影响超过 3 位用户。 | 多节点 `rollout_start`、多节点 `node_server_keys_add`、`user_disable`、`user_reset_traffic` |
 | `user_change_limit` | 加上此计划，令牌将超出每小时用户更改限额（10 次，见[限制](api.md#限制)），因此计划不会被拒绝，而是等待所有者批准。卡片会显示限额已用多少。 | `user_disable`、`user_reset_traffic`、`user_update`、`device_revoke` |
 | `traffic` | 它会在节点之间发送大量测试流量。 | `path_speed` |
 | `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |

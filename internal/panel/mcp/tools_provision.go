@@ -64,7 +64,7 @@ func nodeProvisionTools() []toolDef {
 		})
 	return []toolDef{
 		list, nodeInstallPlanTool(), nodeInstallApplyTool(), passwordRotatePlanTool(), passwordRotateApplyTool(),
-		nodeServerKeysListTool(), nodeServerKeyAddPlanTool(), nodeServerKeyAddApplyTool(),
+		nodeServerKeysListTool(), nodeServerKeyAddPlanTool(), nodeServerKeyAddApplyTool(), nodeServerKeysAddPlanTool(), nodeServerKeysAddApplyTool(),
 		nodeServerKeyRemovePlanTool(), nodeServerKeyRemoveApplyTool(),
 	}
 }
@@ -332,9 +332,84 @@ type serverKeyAddPlanArgs struct {
 	PanelKey  bool   `json:"panel_key,omitempty" jsonschema:"when true, install the panel's public key instead of public_key"`
 }
 
+type serverKeysAddPlanArgs struct {
+	ReasonField
+	Nodes     []string `json:"nodes" jsonschema:"one to 20 installed node ids"`
+	PublicKey string   `json:"public_key,omitempty" jsonschema:"one public authorized_keys line; never a private key"`
+	PanelKey  bool     `json:"panel_key,omitempty" jsonschema:"when true, install the panel's public key instead of public_key"`
+}
+
 type serverKeyChangeParams struct {
 	NodeID, Name, PublicKey, Fingerprint, Type, Comment string
 	PanelKey                                            bool
+}
+
+type serverKeyAddKey struct {
+	PublicKey, Fingerprint, Type, Comment string
+	PanelKey                              bool
+}
+
+func resolveServerKeyAddKey(c *call, panelKey bool, publicKey string) (serverKeyAddKey, error) {
+	if panelKey == (publicKey != "") {
+		return serverKeyAddKey{}, errors.New("choose panel_key=true or provide one public_key")
+	}
+	var canonical string
+	var key *adminv1.NodeServerKey
+	var err error
+	if panelKey {
+		response, callErr := c.cl.Provisioning.GetPanelSSHKey(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetPanelSSHKeyRequest{}))
+		if callErr != nil {
+			return serverKeyAddKey{}, scrubError(apiError(callErr))
+		}
+		canonical, key, err = provision.CanonicalPublicServerKey(response.Msg.GetPublicKey())
+	} else {
+		if strings.Contains(strings.ToUpper(publicKey), "PRIVATE KEY") {
+			return serverKeyAddKey{}, errors.New("private keys are never accepted; provide the .pub line")
+		}
+		canonical, key, err = provision.CanonicalPublicServerKey(publicKey)
+	}
+	if err != nil {
+		return serverKeyAddKey{}, errors.New("public_key must be one supported SSH public key line")
+	}
+	panelKeyUsed := key.GetFingerprint() != "" && panelKey
+	if !panelKey {
+		// Pasting the panel's public key by hand has the same semantics as choosing panel_key.
+		response, callErr := c.cl.Provisioning.GetPanelSSHKey(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetPanelSSHKeyRequest{}))
+		if callErr != nil {
+			return serverKeyAddKey{}, scrubError(apiError(callErr))
+		}
+		panelKeyUsed = response.Msg.GetFingerprint() == key.GetFingerprint()
+	}
+	return serverKeyAddKey{PublicKey: canonical, Fingerprint: key.GetFingerprint(), Type: key.GetType(), Comment: key.GetComment(), PanelKey: panelKeyUsed}, nil
+}
+
+func serverKeyAddForNode(c *call, node string, key serverKeyAddKey) (serverKeyChangeParams, *adminv1.NodeServerAccess, error) {
+	access, err := findProvisionAccess(c, node)
+	if err != nil {
+		return serverKeyChangeParams{}, nil, err
+	}
+	if access.GetNodeRetired() {
+		return serverKeyChangeParams{}, nil, errors.New("the node is retired")
+	}
+	return serverKeyChangeParams{
+		NodeID: access.GetNodeId(), Name: access.GetNodeName(), PublicKey: key.PublicKey,
+		Fingerprint: key.Fingerprint, Type: key.Type, Comment: key.Comment, PanelKey: key.PanelKey,
+	}, access, nil
+}
+
+func addServerKey(c *call, p serverKeyChangeParams) (*adminv1.NodeServerKey, error) {
+	added, err := c.cl.Provisioning.AddNodeServerKey(c.ctx, connect.NewRequest(&adminv1.AddNodeServerKeyRequest{
+		NodeId: p.NodeID, PublicKey: func() string {
+			if p.PanelKey {
+				return ""
+			}
+			return p.PublicKey
+		}(), PanelKey: p.PanelKey, Confirm: true,
+	}))
+	if err != nil {
+		return nil, err
+	}
+	return added.Msg.GetKey(), nil
 }
 
 func nodeServerKeyAddPlanTool() toolDef {
@@ -353,47 +428,15 @@ func nodeServerKeyAddPlanTool() toolDef {
 					}
 					defer c.done()
 					reason := (&in.ReasonField).take()
-					if in.PanelKey == (in.PublicKey != "") {
-						return nil, nil, errors.New("choose panel_key=true or provide one public_key")
-					}
-					access, err := findProvisionAccess(c, in.Node)
+					key, err := resolveServerKeyAddKey(c, in.PanelKey, in.PublicKey)
 					if err != nil {
 						return nil, nil, err
 					}
-					if access.GetNodeRetired() {
-						return nil, nil, errors.New("the node is retired")
-					}
-					var canonical string
-					var key *adminv1.NodeServerKey
-					if in.PanelKey {
-						panelKey, err := c.cl.Provisioning.GetPanelSSHKey(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetPanelSSHKeyRequest{}))
-						if err != nil {
-							return nil, nil, scrubError(apiError(err))
-						}
-						canonical, key, err = provision.CanonicalPublicServerKey(panelKey.Msg.GetPublicKey())
-					} else {
-						if strings.Contains(strings.ToUpper(in.PublicKey), "PRIVATE KEY") {
-							return nil, nil, errors.New("private keys are never accepted; provide the .pub line")
-						}
-						canonical, key, err = provision.CanonicalPublicServerKey(in.PublicKey)
-					}
+					p, access, err := serverKeyAddForNode(c, in.Node, key)
 					if err != nil {
-						return nil, nil, errors.New("public_key must be one supported SSH public key line")
-					}
-					panelKeyUsed := key.GetFingerprint() != "" && in.PanelKey
-					if !in.PanelKey {
-						// Pasting the panel's public key by hand has the same semantics as choosing panel_key.
-						panelKey, panelErr := c.cl.Provisioning.GetPanelSSHKey(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetPanelSSHKeyRequest{}))
-						if panelErr != nil {
-							return nil, nil, scrubError(apiError(panelErr))
-						}
-						panelKeyUsed = panelKey.Msg.GetFingerprint() == key.GetFingerprint()
+						return nil, nil, err
 					}
 					login := serverAccessLogin(access)
-					p := serverKeyChangeParams{
-						NodeID: access.GetNodeId(), Name: access.GetNodeName(), PublicKey: canonical,
-						Fingerprint: key.GetFingerprint(), Type: key.GetType(), Comment: key.GetComment(), PanelKey: panelKeyUsed,
-					}
 					params, err := json.Marshal(p)
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
@@ -402,9 +445,99 @@ func nodeServerKeyAddPlanTool() toolDef {
 					planned := &planned{
 						Summary: "Add one public SSH key to the selected node after owner approval.",
 						Facts: []Fact{{Key: "node", Value: nm(p.Name), Untrusted: true}, {Key: "login", Value: login},
-							{Key: "key_type", Value: clean(p.Type, 80)}, {Key: "fingerprint", Value: clean(p.Fingerprint, 128)},
+							{Key: "key_type", Value: clean(p.Type, 80)}, {Key: "fingerprint", Value: p.Fingerprint},
 							{Key: "comment", Value: nm(p.Comment), Untrusted: true}},
 						Danger: danger, Params: p,
+					}
+					out, err := e.createPlan(c, base, params, reason, planned)
+					if err != nil {
+						return nil, nil, scrubError(err)
+					}
+					return planResult(out)
+				})
+		},
+	}
+}
+
+type serverKeysAddNodePlan struct {
+	NodeID, Name   string
+	AlreadyPresent bool
+}
+
+type serverKeysAddParams struct {
+	PublicKey, Fingerprint, Type, Comment string
+	PanelKey                              bool
+	Nodes                                 []serverKeysAddNodePlan
+}
+
+func nodeServerKeysAddPlanTool() toolDef {
+	const base = "node_server_keys_add"
+	return toolDef{
+		name: base + "_plan", min: ProfileAdmin,
+		procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure, adminv1connect.ProvisioningServiceListNodeServerKeysProcedure, adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure),
+		free:  true, isPlan: true, danger: true,
+		desc: "Prepare to add one public SSH key to 1 to 20 selected nodes. Set panel_key=true to add the panel-owned key, or provide one public_key line. The owner approves once before any server changes.",
+		add: func(s *mcp.Server, e *env, desc string) {
+			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
+				func(ctx context.Context, req *mcp.CallToolRequest, in serverKeysAddPlanArgs) (*mcp.CallToolResult, any, error) {
+					c, err := e.begin(ctx, req, readTimeout)
+					if err != nil {
+						return nil, nil, err
+					}
+					defer c.done()
+					reason := (&in.ReasonField).take()
+					ids, err := nodeTargetIDs("nodes", in.Nodes)
+					if err != nil {
+						return nil, nil, err
+					}
+					key, err := resolveServerKeyAddKey(c, in.PanelKey, in.PublicKey)
+					if err != nil {
+						return nil, nil, err
+					}
+					facts := []Fact{{Key: "key_type", Value: clean(key.Type, 80)},
+						{Key: "fingerprint", Value: key.Fingerprint},
+						{Key: "comment", Value: nm(key.Comment), Untrusted: true}}
+					nodes := make([]serverKeysAddNodePlan, 0, len(ids))
+					seen := make(map[string]struct{}, len(ids))
+					for _, id := range ids {
+						p, _, err := serverKeyAddForNode(c, id, key)
+						if err != nil {
+							return nil, nil, err
+						}
+						if _, ok := seen[p.NodeID]; ok {
+							return nil, nil, errors.New("nodes: duplicate node id")
+						}
+						seen[p.NodeID] = struct{}{}
+						listed, err := c.cl.Provisioning.ListNodeServerKeys(c.ctx, connect.NewRequest(&adminv1.ListNodeServerKeysRequest{NodeId: p.NodeID}))
+						if err != nil {
+							return nil, nil, scrubError(apiError(err))
+						}
+						alreadyPresent := false
+						for _, existing := range listed.Msg.GetKeys() {
+							if existing.GetFingerprint() == key.Fingerprint {
+								alreadyPresent = true
+								break
+							}
+						}
+						nodes = append(nodes, serverKeysAddNodePlan{NodeID: p.NodeID, Name: p.Name, AlreadyPresent: alreadyPresent})
+						facts = append(facts, Fact{Key: "node", Value: nm(p.Name), Untrusted: true})
+						if alreadyPresent {
+							facts = append(facts, Fact{Key: "already_present", Value: "skipped"})
+						}
+					}
+					params, err := json.Marshal(serverKeysAddParams{
+						PublicKey: key.PublicKey, Fingerprint: key.Fingerprint, Type: key.Type, Comment: key.Comment, PanelKey: key.PanelKey, Nodes: nodes,
+					})
+					if err != nil {
+						return nil, nil, errors.New("could not store the plan")
+					}
+					danger := []string{dangerStepUp, "The panel adds the key to each selected login's SSH keys and verifies it."}
+					if len(nodes) > 1 {
+						danger = mergeDanger(danger, dangerBulk)
+					}
+					planned := &planned{
+						Summary: fmt.Sprintf("Add one public SSH key to %d nodes after owner approval.", len(nodes)),
+						Facts:   facts, Danger: danger,
 					}
 					out, err := e.createPlan(c, base, params, reason, planned)
 					if err != nil {
@@ -433,23 +566,106 @@ func nodeServerKeyAddApplyTool() toolDef {
 						if err := strictJSON([]byte(pl.ParamsJSON), &p); err != nil {
 							return done{}, failure("plan_unreadable", "make a new SSH key addition plan")
 						}
-						added, err := c.cl.Provisioning.AddNodeServerKey(c.ctx, connect.NewRequest(&adminv1.AddNodeServerKeyRequest{
-							NodeId: p.NodeID, PublicKey: func() string {
-								if p.PanelKey {
-									return ""
-								}
-								return p.PublicKey
-							}(), PanelKey: p.PanelKey, Confirm: true,
-						}))
+						added, err := addServerKey(c, p)
 						if err != nil {
 							return done{}, apiError(err)
 						}
-						return doneWith("node_ssh_key_added", "Added SSH key "+clean(added.Msg.GetKey().GetFingerprint(), 128)+" to node "+clean(p.Name, 64)+"."), nil
+						return doneWith("node_ssh_key_added", "Added SSH key "+clean(added.GetFingerprint(), 128)+" to node "+clean(p.Name, 64)+"."), nil
 					})
 					if err != nil {
 						return nil, nil, scrubError(err)
 					}
 					return result(out)
+				})
+		},
+	}
+}
+
+type serverKeysAddNodeResult struct {
+	Node      string `json:"node"`
+	Status    string `json:"status"`
+	ErrorCode string `json:"error_code,omitempty"`
+}
+
+type serverKeysAddApplyOut struct {
+	PlanID  string                    `json:"plan_id"`
+	Status  string                    `json:"status"`
+	Result  string                    `json:"result"`
+	Results []serverKeysAddNodeResult `json:"results"`
+}
+
+func serverKeyAddErrorCode(err error) string {
+	if code := outcomeOfError(apiError(err)).Code; code != "" {
+		return code
+	}
+	if code := connect.CodeOf(err); code != connect.CodeUnknown {
+		return code.String()
+	}
+	return "internal"
+}
+
+func nodeServerKeysAddApplyTool() toolDef {
+	const base = "node_server_keys_add"
+	return toolDef{name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure), danger: true,
+		desc: "Apply one owner-approved SSH key addition to up to 20 nodes. Takes only confirm_token and returns each node's result.",
+		add: func(s *mcp.Server, e *env, desc string) {
+			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
+				func(ctx context.Context, req *mcp.CallToolRequest, in applyIn) (*mcp.CallToolResult, any, error) {
+					c, err := e.begin(ctx, req, maxMCPNodeTargets*applyTimeout)
+					if err != nil {
+						return nil, nil, err
+					}
+					defer c.done()
+					out, err := e.apply(c, base, in.ConfirmToken, func(c *call, pl Plan) (done, error) {
+						var p serverKeysAddParams
+						if err := strictJSON([]byte(pl.ParamsJSON), &p); err != nil {
+							return done{}, failure("plan_unreadable", "make a new SSH key addition plan")
+						}
+						results := make([]serverKeysAddNodeResult, 0, len(p.Nodes))
+						var added, skipped, failed int
+						for _, node := range p.Nodes {
+							if node.AlreadyPresent {
+								results = append(results, serverKeysAddNodeResult{Node: nm(node.Name), Status: "already_present"})
+								skipped++
+								continue
+							}
+							_, err := addServerKey(c, serverKeyChangeParams{
+								NodeID: node.NodeID, Name: node.Name, PublicKey: p.PublicKey, Fingerprint: p.Fingerprint,
+								Type: p.Type, Comment: p.Comment, PanelKey: p.PanelKey,
+							})
+							if err != nil {
+								results = append(results, serverKeysAddNodeResult{Node: nm(node.Name), Status: "failed", ErrorCode: serverKeyAddErrorCode(err)})
+								failed++
+								continue
+							}
+							results = append(results, serverKeysAddNodeResult{Node: nm(node.Name), Status: "added"})
+							added++
+						}
+						encoded, err := json.Marshal(results)
+						if err != nil {
+							return done{}, failure("internal_error", "could not store per-node results")
+						}
+						return done{
+							text: fmt.Sprintf("Finished SSH key addition: %d added, %d already present, %d failed.", added, skipped, failed),
+							out:  outcomeOf("node_ssh_keys_add_completed", "results", string(encoded), "added", strconv.Itoa(added), "already_present", strconv.Itoa(skipped), "failed", strconv.Itoa(failed)),
+						}, nil
+					})
+					if err != nil {
+						return nil, nil, scrubError(err)
+					}
+					stored, err := e.cfg.Plans.MCPPlanByConfirm(c.ctx, c.tokenID, hashOf(in.ConfirmToken))
+					if err != nil {
+						return nil, nil, errors.New("could not read SSH key addition results")
+					}
+					var outcomeParams map[string]string
+					if err := json.Unmarshal([]byte(stored.OutcomeParams), &outcomeParams); err != nil || outcomeParams["results"] == "" {
+						return nil, nil, errors.New("could not read SSH key addition results")
+					}
+					var results []serverKeysAddNodeResult
+					if err := json.Unmarshal([]byte(outcomeParams["results"]), &results); err != nil {
+						return nil, nil, errors.New("could not read SSH key addition results")
+					}
+					return result(serverKeysAddApplyOut{PlanID: out.PlanID, Status: out.Status, Result: out.Result, Results: results})
 				})
 		},
 	}

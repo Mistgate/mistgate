@@ -442,4 +442,4 @@ systemd-run --unit=mistgate-os-update --collect --property=KillMode=mixed --prop
 
 ## 通过 API 和 MCP 更新
 
-任何 API 令牌权限级别都可以读取更新页面（`GetUpdates`）。通过普通 API 无法启动、暂停、继续或取消滚动更新，也无法为节点设置定时任务或回滚节点；拥有管理员权限级别的 MCP 智能体也只能制定计划，所有者必须在管理后台批准每项计划。MCP 的 `rollout_start` 只会更新一个节点，并固定到计划中的版本。同样，节点的系统更新（`StartOsRollout`、`CancelOsRollout`）通过普通 API 会被拒绝，只会以计划 `os_rollout_start`（恰好一个节点：安全更新或重启）和 `os_rollout_cancel` 的形式到达 MCP 智能体，由所有者重新确认后批准；刷新软件包列表（`RefreshOsUpdates`）是所有者在管理后台的操作，不对令牌开放。参见 [API](../reference/api.md) 和 [MCP](../reference/mcp.md)。
+任何 API 令牌权限级别都可以读取更新页面（`GetUpdates`）。通过普通 API 无法启动、暂停、继续或取消滚动更新，也无法为节点设置定时任务或回滚节点；拥有管理员权限级别的 MCP 智能体也只能制定计划，所有者必须在管理后台批准每项计划。MCP 的 `rollout_start` 会按金丝雀顺序分阶段更新 1 到 20 个选定节点；计划固定精确节点集合和发布包版本/构建号。同样，节点的系统更新（`StartOsRollout`、`CancelOsRollout`）通过普通 API 会被拒绝，只会以计划 `os_rollout_start`（恰好一个节点：安全更新或重启）和 `os_rollout_cancel` 的形式到达 MCP 智能体，由所有者重新确认后批准；刷新软件包列表（`RefreshOsUpdates`）是所有者在管理后台的操作，不对令牌开放。参见 [API](../reference/api.md) 和 [MCP](../reference/mcp.md)。
