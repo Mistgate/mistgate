@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/awgprep"
 	"github.com/mistgate/mistgate/internal/node/secupdates"
 )
 
@@ -163,7 +165,7 @@ func (r *Reader) Read(ctx context.Context) (*agentv1.OsStatus, error) {
 	}
 	r.autoUpdates(ctx, s)
 	r.awgModule(s, statusRows)
-	// TODO(A1, the module source fix): s.AwgSource (ok | patched | needs_patch | unknown:<12 hex>) is filled once awgprep can tell it; until then it stays empty.
+	s.AwgSource = r.awgSource()
 	return s, simErr
 }
 
@@ -710,6 +712,32 @@ func uniqueStrings(in []string) []string {
 	for _, v := range in[1:] {
 		if v != out[len(out)-1] {
 			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// awgSource says what the module's DKMS source looks like to the source fix (awgprep.FixCompat in check mode: it reads and
+// changes nothing): "ok", "needs_patch" (a known file that does not build on some kernels; the job or the next package run
+// repairs it), "unknown:<12 hex>" (a file Mistgate does not know) or "" (no DKMS source on this node).
+func (r *Reader) awgSource() string {
+	dirs, _ := filepath.Glob(r.path("/usr/src/amneziawg-*"))
+	if len(dirs) == 0 {
+		return ""
+	}
+	out := ""
+	for _, c := range awgprep.FixCompat(awgprep.Sys{ReadFile: os.ReadFile}, dirs, true, io.Discard) {
+		switch c.State {
+		case awgprep.CompatUnknown:
+			if c.SHA12 != "" {
+				return "unknown:" + c.SHA12
+			}
+		case awgprep.CompatNeedsPatch:
+			out = "needs_patch"
+		case awgprep.CompatOK, awgprep.CompatPatched:
+			if out == "" {
+				out = "ok"
+			}
 		}
 	}
 	return out
