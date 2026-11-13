@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -83,6 +84,32 @@ func osBlockFor(n *adminv1.NodeOs, mode string) string {
 		return n.GetRebootBlock()
 	}
 	return n.GetUpdateBlock()
+}
+
+// retryOSBlock classifies only the global, temporary blockers returned by GetOsUpdates and StartOsRollout.
+func retryOSBlock(reason string) error {
+	switch reason {
+	case "rollout_active":
+		return retryLater("rollout_active", "an OS rollout is active now", retryLaterDelay)
+	case "agent_rollout":
+		return retryLater("agent_rollout", "an agent rollout is active now", retryLaterDelay)
+	case "panel_busy":
+		return retryLater("panel_busy", "a panel update or node bundle sync is active now", retryLaterDelay)
+	default:
+		return nil
+	}
+}
+
+func retryOsRolloutStart(err error) error {
+	message, ok := failedPreconditionMessage(err)
+	if !ok {
+		return nil
+	}
+	const prefix = "os_blocked: reason="
+	if !strings.HasPrefix(message, prefix) {
+		return nil
+	}
+	return retryOSBlock(strings.TrimPrefix(message, prefix))
 }
 
 var osRolloutStart = changeSpec[osRolloutStartArgs]{
@@ -168,14 +195,23 @@ var osRolloutStart = changeSpec[osRolloutStartArgs]{
 			return done{}, err
 		}
 		if osRolloutActive(r.GetRollout()) {
-			return done{}, failure("changed_since_plan", "changed since the plan (an OS update is active now): make a new plan")
+			return done{}, retryLater("rollout_active", "an OS rollout is active now", retryLaterDelay)
 		}
 		n := osNodeOfID(r, a.NodeIDs[0])
-		if n == nil || osBlockFor(n, a.Mode) != "" {
+		if n == nil {
+			return done{}, failure("changed_since_plan", "changed since the plan (the node cannot take the job now): make a new plan")
+		}
+		if why := osBlockFor(n, a.Mode); why != "" {
+			if retry := retryOSBlock(why); retry != nil {
+				return done{}, retry
+			}
 			return done{}, failure("changed_since_plan", "changed since the plan (the node cannot take the job now): make a new plan")
 		}
 		mode, reboot, _ := osModeOf(a.Mode, a.Reboot)
 		if _, err := c.cl.Update.StartOsRollout(c.ctx, connect.NewRequest(&adminv1.StartOsRolloutRequest{NodeIds: a.NodeIDs, Mode: mode, Reboot: reboot})); err != nil {
+			if retry := retryOsRolloutStart(err); retry != nil {
+				return done{}, retry
+			}
 			return done{}, apiError(err)
 		}
 		return doneWith("os_rollout_started", fmt.Sprintf("The OS job on node %s was started.", nm(n.GetName()))), nil

@@ -29,6 +29,7 @@ const (
 	planTTL         = 10 * time.Minute
 	maxOpenPerToken = 20
 	maxAwaiting     = 50
+	retryLaterDelay = 10 * time.Second
 )
 
 // env is what the tools share.
@@ -69,6 +70,31 @@ func (e *outcomeError) Error() string { return e.msg }
 // failure is an error for the agent (msg) that the owner's UI words by code.
 func failure(code, msg string, kv ...string) error {
 	return &outcomeError{msg: msg, out: outcomeOf(code, kv...)}
+}
+
+// retryLaterFailure marks an apply refusal that happened before any side effect. The executor returns the plan to the
+// state it had before BeginApply, so the caller can retry the same confirmation until the original expiry.
+type retryLaterFailure struct {
+	code  string
+	msg   string
+	after time.Duration
+}
+
+func retryLater(code, msg string, after time.Duration) error {
+	if after <= 0 {
+		after = time.Second
+	}
+	return &retryLaterFailure{code: code, msg: msg, after: after}
+}
+
+func (e *retryLaterFailure) Error() string { return e.msg }
+
+func (e *retryLaterFailure) response() string {
+	seconds := int((e.after + time.Second - 1) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	return fmt.Sprintf("busy (%s): %s; retry the same confirm_token after %d s", e.code, clean(e.msg, maxError), seconds)
 }
 
 func outcomeOf(code string, kv ...string) Outcome {
@@ -368,6 +394,8 @@ func stateError(p Plan, now time.Time) error {
 		return errors.New("already running")
 	case StatusFailed:
 		return errors.New("failed: " + clean(p.Error, maxError) + ". Make a new plan.")
+	case StatusApplied:
+		return errors.New("already applied")
 	case StatusCancelled:
 		return errors.New("the token was revoked")
 	}
@@ -398,6 +426,7 @@ func (e *env) apply(c *call, tool, confirm string, run func(c *call, pl Plan) (d
 	if err := stateError(pl, e.now()); err != nil {
 		return nil, err
 	}
+	previousStatus := pl.Status
 	// The hash is of the stored arguments as they are now: a row edited behind our back refuses to start.
 	started, err := e.cfg.Plans.BeginApply(c.ctx, pl.ID, c.tokenID, tool, hashOf(pl.ParamsJSON), confirmHash, e.now())
 	if err != nil {
@@ -420,6 +449,17 @@ func (e *env) apply(c *call, tool, confirm string, run func(c *call, pl Plan) (d
 	res, runErr := run(&rc, started)
 	fctx := context.WithoutCancel(c.ctx) // a cancelled request must not leave the plan "applying"
 	if runErr != nil {
+		var retry *retryLaterFailure
+		if errors.As(runErr, &retry) && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(c.ctx.Err(), context.DeadlineExceeded) {
+			msg := retry.response()
+			if ferr := e.cfg.Plans.ReleaseApply(fctx, started.ID, previousStatus); ferr != nil {
+				e.cfg.Log.Error("mcp: release apply", "err", ferr)
+				e.audit(c, "mcp_apply", map[string]any{"plan_id": started.ID, "tool": tool, "result": "busy", "reason_code": retry.code}, "fail")
+				return nil, errors.New("busy (" + retry.code + "): the plan could not be released; check its status before retrying")
+			}
+			e.audit(c, "mcp_apply", map[string]any{"plan_id": started.ID, "tool": tool, "result": "busy", "reason_code": retry.code}, "busy")
+			return nil, errors.New(msg)
+		}
 		msg, out := clean(runErr.Error(), maxError), outcomeOfError(runErr)
 		if errors.Is(runErr, context.DeadlineExceeded) || errors.Is(c.ctx.Err(), context.DeadlineExceeded) {
 			msg = "timeout, outcome unknown: check before retrying"

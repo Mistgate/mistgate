@@ -280,6 +280,23 @@ func (f *fakePlans) BeginApply(_ context.Context, id, tokenID, tool string, ph, 
 	return *q, nil
 }
 
+func (f *fakePlans) ReleaseApply(_ context.Context, id, previousStatus string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	q := f.byID[id]
+	if q == nil {
+		return ErrNotFound
+	}
+	if previousStatus != StatusPlanned && previousStatus != StatusApproved {
+		return errors.New("invalid previous status")
+	}
+	if q.Status != StatusApplying || q.NeedsApproval != (previousStatus == StatusApproved) {
+		return errors.New("plan is not applying with that previous status")
+	}
+	q.Status, q.AppliedAt = previousStatus, time.Time{}
+	return nil
+}
+
 func (f *fakePlans) FinishApply(_ context.Context, id string, ok bool, result, errText, outcomeCode, outcomeParams string, now time.Time) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -437,6 +454,7 @@ type world struct {
 	downloadTimeoutSeconds uint32
 	scheduledUnix          int64
 	startErr               error // StartRollout refuses with it when set
+	osStartErr             error // StartOsRollout refuses with it when set
 	manyEvents             int
 	checksRan              bool  // RunChecksNow was called: GetChecks reports a fresh round
 	checksRunErr           error // RunChecksNow answers with it
@@ -1524,8 +1542,12 @@ func (w *world) GetOsUpdates(context.Context, *connect.Request[adminv1.GetOsUpda
 
 func (w *world) StartOsRollout(_ context.Context, r *connect.Request[adminv1.StartOsRolloutRequest]) (*connect.Response[adminv1.StartOsRolloutResponse], error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	w.osStartReq = append(w.osStartReq, r.Msg)
+	err := w.osStartErr
+	w.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
 	return connect.NewResponse(&adminv1.StartOsRolloutResponse{Rollout: &adminv1.OsRollout{Id: "osr_2", Steps: []*adminv1.OsStep{{}}}}), nil
 }
 

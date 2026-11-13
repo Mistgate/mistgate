@@ -160,6 +160,10 @@ func (p planStore) BeginApply(ctx context.Context, id, tokenID, tool string, par
 	return mcp.Plan(pl), planErr(err)
 }
 
+func (p planStore) ReleaseApply(ctx context.Context, id, previousStatus string) error {
+	return planErr(p.st.ReleaseApply(ctx, id, previousStatus))
+}
+
 func (p planStore) FinishApply(ctx context.Context, id string, ok bool, result, errText, outcomeCode, outcomeParams string, now time.Time) error {
 	return planErr(p.st.FinishApply(ctx, id, ok, result, errText, outcomeCode, outcomeParams, now))
 }

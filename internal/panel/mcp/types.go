@@ -103,6 +103,9 @@ type Plans interface {
 	// BeginApply is the compare-and-swap planned|approved -> applying (same token, tool, hashes, not expired). Any error
 	// means "not started"; the caller reads the plan again to say why.
 	BeginApply(ctx context.Context, id, tokenID, tool string, paramsHash, confirmHash []byte, now time.Time) (Plan, error)
+	// ReleaseApply is the compare-and-swap applying -> previousStatus for a retryable refusal before any side effect.
+	// previousStatus must be planned or approved and must match the plan's approval requirement; expiry is unchanged.
+	ReleaseApply(ctx context.Context, id, previousStatus string) error
 	// FinishApply ends the apply with the agent's English result or error and the outcome (code and JSON params).
 	FinishApply(ctx context.Context, id string, ok bool, result, errText, outcomeCode, outcomeParams string, now time.Time) error
 }
@@ -112,7 +115,7 @@ type AuditEntry struct {
 	Actor  string // "mcp:<token id>"
 	Action string // "mcp_plan", "mcp_apply"
 	Params map[string]any
-	Result string // "ok" | "fail"
+	Result string // "ok" | "fail" | "busy"
 	Source string // AuditMCP for external tools; AuditAssistant for assistant calls.
 }
 

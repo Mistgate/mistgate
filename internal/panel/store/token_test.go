@@ -338,6 +338,44 @@ func TestPlanApplyStateMachine(t *testing.T) {
 	}
 }
 
+func TestReleaseApplyRestoresOnlyMatchingOpenStatus(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	tok := newTok(t, s, "ops", ProfileAdmin)
+	p := newPlan(t, s, tok.ID, "user_update", false, t0)
+	if _, err := s.BeginApply(ctx, p.ID, tok.ID, p.Tool, p.ParamsHash, p.ConfirmHash, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReleaseApply(ctx, p.ID, PlanApproved); !errors.Is(err, ErrPlanState) {
+		t.Fatalf("release with wrong previous status = %v, want ErrPlanState", err)
+	}
+	if got := planStatus(t, s, p.ID); got != PlanApplying {
+		t.Fatalf("wrong previous status changed plan to %s", got)
+	}
+	if err := s.ReleaseApply(ctx, p.ID, PlanPlanned); err != nil {
+		t.Fatalf("release planned apply: %v", err)
+	}
+	got, err := s.GetMCPPlan(ctx, p.ID)
+	if err != nil || got.Status != PlanPlanned || !got.ExpiresAt.Equal(p.ExpiresAt) || !got.AppliedAt.IsZero() {
+		t.Fatalf("released plan = %+v, %v; expiry must stay %s", got, err, p.ExpiresAt)
+	}
+	if err := s.ReleaseApply(ctx, p.ID, PlanPlanned); stateOf(err) != PlanPlanned {
+		t.Fatalf("release from wrong current status = %v, want planned state error", err)
+	}
+	if err := s.ReleaseApply(ctx, p.ID, PlanAwaiting); err == nil {
+		t.Fatal("release accepted a non-retryable previous status")
+	}
+	if _, err := s.BeginApply(ctx, p.ID, tok.ID, p.Tool, p.ParamsHash, p.ConfirmHash, t0.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FinishApply(ctx, p.ID, true, "done", "", "", "", t0.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReleaseApply(ctx, p.ID, PlanPlanned); stateOf(err) != PlanApplied {
+		t.Fatalf("release applied plan = %v, want applied state error", err)
+	}
+}
+
 // What the owner entered when approving (the node_install password) goes to that plan's apply once, and never outlives
 // a plan that can no longer be applied.
 func TestOwnerSecretIsTakenOnceAndNeverOutlivesThePlan(t *testing.T) {

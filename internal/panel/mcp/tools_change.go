@@ -34,6 +34,37 @@ const (
 
 const tokenUserChangeDescription = "A token may make at most 10 user changes without owner approval during the fixed one-hour window that starts with its first counted change."
 
+// failedPreconditionMessage returns only the panel's exact precondition text. Retry classification is intentionally limited
+// to the known rollout-start blockers below; other failures keep the normal failed-plan behavior.
+func failedPreconditionMessage(err error) (string, bool) {
+	var ce *connect.Error
+	if !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
+		return "", false
+	}
+	return ce.Message(), true
+}
+
+func retryRolloutStart(err error) error {
+	message, ok := failedPreconditionMessage(err)
+	if !ok {
+		return nil
+	}
+	switch message {
+	case "a rollout is already active",
+		"the active rollout is paused; resume or cancel it before adding a node",
+		"the active rollout uses a different release; finish it before updating this node":
+		return retryLater("rollout_active", "an agent rollout is active now", retryLaterDelay)
+	case "an OS update of a node is running; wait for it to finish":
+		return retryLater("rollout_active", "an OS rollout is active now", retryLaterDelay)
+	case "the GitHub node bundle is being installed":
+		return retryLater("node_bundle_busy", "the GitHub node bundle is being installed or synced", retryLaterDelay)
+	case "a panel update is being installed":
+		return retryLater("panel_busy", "a panel update is being installed", retryLaterDelay)
+	default:
+		return nil
+	}
+}
+
 func (c *call) userChangeBudget(asked int) ([]string, []Fact, error) {
 	if c.e.cfg.UserChangeBudget == nil {
 		return nil, nil, nil
@@ -1573,7 +1604,7 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 			return done{}, err
 		}
 		if r := u.GetRollout(); r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING || r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED {
-			return done{}, failure("changed_since_plan", "changed since the plan (a rollout is active now): make a new plan")
+			return done{}, retryLater("rollout_active", "an agent rollout is active now", retryLaterDelay)
 		}
 		if u.GetBundle().GetVersion() != a.ExpectedVersion || u.GetBundle().GetBuilt() != a.ExpectedBuilt {
 			return done{}, failure("changed_since_plan", "the release changed after planning; make a new plan")
@@ -1582,6 +1613,9 @@ var rolloutStart = changeSpec[rolloutStartArgs]{
 			NodeIds: a.NodeIDs, ExpectedVersion: a.ExpectedVersion, ExpectedBuilt: a.ExpectedBuilt,
 		}))
 		if err != nil {
+			if retry := retryRolloutStart(err); retry != nil {
+				return done{}, retry
+			}
 			return done{}, apiError(err)
 		}
 		n := len(r.Msg.GetRollout().GetSteps())

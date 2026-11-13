@@ -348,6 +348,37 @@ func (s *Store) BeginApply(ctx context.Context, id, tokenID, tool string, params
 	return current, nil
 }
 
+// ReleaseApply returns an apply refused before side effects to its previous open state (planned or approved). This is a
+// compare-and-swap from applying, leaves expires_at untouched, and clears applied_at because no apply remains active.
+// The prior status must match needs_approval; a plan in any other state returns *PlanStateError.
+func (s *Store) ReleaseApply(ctx context.Context, id, previousStatus string) error {
+	needsApproval := 0
+	switch previousStatus {
+	case PlanPlanned:
+	case PlanApproved:
+		needsApproval = 1
+	default:
+		return fmt.Errorf("store: cannot release apply to status %q", previousStatus)
+	}
+	res, err := s.W.ExecContext(ctx, `UPDATE mcp_plan SET status = ?, applied_at = 0
+		WHERE id = ? AND status = 'applying' AND needs_approval = ?`, previousStatus, id, needsApproval)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		p, err := s.GetMCPPlan(ctx, id)
+		if err != nil {
+			return err
+		}
+		return &PlanStateError{Status: p.Status}
+	}
+	return nil
+}
+
 // TakeMCPPlanOwnerSecret hands out, once, what the owner entered when approving plan id of tool for tokenID, and clears
 // it: only while that plan is applying with a recorded human decision. ErrNotFound otherwise (nothing stored, already
 // taken, another token or tool, or a plan in another state).

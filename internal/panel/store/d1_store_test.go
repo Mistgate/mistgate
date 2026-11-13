@@ -1351,6 +1351,24 @@ func TestD1RewrittenTokenAndMCPPlanMethods(t *testing.T) {
 			t.Fatalf("take twice: %v", err)
 		}
 	})
+	t.Run("ReleaseApply", func(t *testing.T) {
+		if err := st.ReleaseApply(ctx, secretPlan.ID, PlanPlanned); !errors.Is(err, ErrPlanState) {
+			t.Fatalf("release with wrong previous status: %v", err)
+		}
+		if got, err := st.GetMCPPlan(ctx, secretPlan.ID); err != nil || got.Status != PlanApplying {
+			t.Fatalf("wrong previous status changed plan: %+v %v", got, err)
+		}
+		if err := st.ReleaseApply(ctx, secretPlan.ID, PlanApproved); err != nil {
+			t.Fatalf("release approved apply: %v", err)
+		}
+		got, err := st.GetMCPPlan(ctx, secretPlan.ID)
+		if err != nil || got.Status != PlanApproved || !got.ExpiresAt.Equal(now.Add(PlanTTL)) || !got.AppliedAt.IsZero() {
+			t.Fatalf("released plan: %+v %v", got, err)
+		}
+		if err := st.ReleaseApply(ctx, secretPlan.ID, PlanApproved); !errors.Is(err, ErrPlanState) {
+			t.Fatalf("release from wrong current status: %v", err)
+		}
+	})
 
 	t.Run("RevokeAPIToken", func(t *testing.T) {
 		revoked, err := st.RevokeAPIToken(ctx, token.ID, "adm_owner", now.Add(3*time.Minute))

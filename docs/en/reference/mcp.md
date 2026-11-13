@@ -231,6 +231,8 @@ The Mistgate app is a fourth field of `apps` (`mistgate`, on by default). It wor
 
 ## Plan and apply
 
+Some temporary refusals before any work starts leave a plan in `planned` or `approved` until its original expiry; the response says `busy`, gives a reason code and tells you when to retry with the same `confirm_token`. The expiry is not extended, successful applies cannot be repeated, and other failures still mark the plan `failed`.
+
 1. The agent calls `<tool>_plan` with the arguments. The panel validates them, reads what it needs and describes the change in its own words. Nothing changes. The result:
 
    ```json

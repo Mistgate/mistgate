@@ -3,8 +3,12 @@
 package mcp
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
+
+	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 )
@@ -119,7 +123,7 @@ func TestOsRolloutStartAppliesNothingThatChangedSinceThePlan(t *testing.T) {
 	p := planOf(t, s, "os_rollout_start", args)
 	e.plans.decide(p.PlanID, true)
 	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING})
-	if got := applyError(t, s, "os_rollout_start", p.ConfirmToken); !strings.Contains(got, "changed since the plan") {
+	if got := applyError(t, s, "os_rollout_start", p.ConfirmToken); !strings.Contains(got, "busy (rollout_active)") {
 		t.Errorf("apply with another update running: %q", got)
 	}
 	if len(e.osStarts()) != 0 {
@@ -127,16 +131,74 @@ func TestOsRolloutStartAppliesNothingThatChangedSinceThePlan(t *testing.T) {
 	}
 	e.setOsRollout(nil)
 
-	p = planOf(t, s, "os_rollout_start", args)
-	e.plans.decide(p.PlanID, true)
-	e.w.mu.Lock()
-	e.w.osUpdates.Nodes[0].UpdateBlock = "node_busy"
-	e.w.mu.Unlock()
-	if got := applyError(t, s, "os_rollout_start", p.ConfirmToken); !strings.Contains(got, "changed since the plan") {
-		t.Errorf("apply after the node got busy: %q", got)
+	for _, tc := range []struct {
+		block, want string
+		status      string
+	}{
+		{block: "rollout_active", want: "busy (rollout_active)", status: StatusApproved},
+		{block: "agent_rollout", want: "busy (agent_rollout)", status: StatusApproved},
+		{block: "panel_busy", want: "busy (panel_busy)", status: StatusApproved},
+		{block: "node_busy", want: "changed since the plan", status: StatusFailed},
+	} {
+		p = planOf(t, s, "os_rollout_start", args)
+		e.plans.decide(p.PlanID, true)
+		e.w.mu.Lock()
+		e.w.osUpdates.Nodes[0].UpdateBlock = tc.block
+		e.w.mu.Unlock()
+		if got := applyError(t, s, "os_rollout_start", p.ConfirmToken); !strings.Contains(got, tc.want) {
+			t.Errorf("block %s: apply refusal = %q, want %q", tc.block, got, tc.want)
+		}
+		e.w.mu.Lock()
+		e.w.osUpdates.Nodes[0].UpdateBlock = ""
+		e.w.mu.Unlock()
+		stored, err := e.plans.GetMCPPlan(context.Background(), p.PlanID)
+		if err != nil || stored.Status != tc.status {
+			t.Errorf("block %s left plan %+v, %v; want %s", tc.block, stored, err, tc.status)
+		}
 	}
 	if len(e.osStarts()) != 0 {
-		t.Fatal("StartOsRollout ran for a node that could not take the job")
+		t.Fatal("StartOsRollout ran while a refusal was active")
+	}
+}
+
+func TestOsRolloutStartRaceBlockCanRetrySameApproval(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	p := planOf(t, s, "os_rollout_start", map[string]any{"node_ids": []any{nodeA}, "mode": "security", "reboot": "if_required"})
+	e.plans.decide(p.PlanID, true)
+	e.w.mu.Lock()
+	e.w.osStartErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("os_blocked: reason=agent_rollout"))
+	e.w.mu.Unlock()
+	if got := applyError(t, s, "os_rollout_start", p.ConfirmToken); !strings.Contains(got, "busy (agent_rollout)") {
+		t.Fatalf("raced agent rollout refusal = %q", got)
+	}
+	if got, _ := e.plans.GetMCPPlan(context.Background(), p.PlanID); got.Status != StatusApproved {
+		t.Fatalf("retryable refusal left plan %s", got.Status)
+	}
+	e.w.mu.Lock()
+	e.w.osStartErr = nil
+	e.w.mu.Unlock()
+	if out := applyOf(t, s, "os_rollout_start", p.ConfirmToken); out.Status != StatusApplied {
+		t.Fatalf("retry with same approved plan = %+v", out)
+	}
+}
+
+func TestOsRolloutRetryClassificationIsNarrow(t *testing.T) {
+	for reason, code := range map[string]string{
+		"rollout_active": "rollout_active",
+		"agent_rollout":  "agent_rollout",
+		"panel_busy":     "panel_busy",
+	} {
+		err := connect.NewError(connect.CodeFailedPrecondition, errors.New("os_blocked: reason="+reason))
+		retry := retryOsRolloutStart(err)
+		var typed *retryLaterFailure
+		if !errors.As(retry, &typed) || typed.code != code {
+			t.Errorf("%q classified as %v, want %q", reason, retry, code)
+		}
+	}
+	if retry := retryOsRolloutStart(connect.NewError(connect.CodeFailedPrecondition, errors.New("os_blocked: reason=node_busy"))); retry != nil {
+		t.Errorf("node busy classified as retryable: %v", retry)
 	}
 }
 
