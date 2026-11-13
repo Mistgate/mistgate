@@ -19,7 +19,7 @@ const tRu = tOf("ru");
 const NOW = 1_800_000_000;
 const step = (over: Partial<OsStepRow> = {}): OsStepRow => ({
   nodeId: "nod_de1", nodeName: "de1", state: OsStepState.SENT, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: NOW - 200, rebootUnix: 0, backUnix: 0, finishedUnix: 0,
-  errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, ...over,
+  errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, retryCount: 0, retryCode: "", ...over,
 });
 const run = (steps: OsStepRow[], over: Partial<OsRun> = {}): OsRun => ({
   id: "osr_1", status: OsRolloutStatus.RUNNING, mode: 1, reboot: 2, createdUnix: NOW - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, batchSize: 1, ...over,
@@ -173,13 +173,25 @@ describe("the words of a run", () => {
 });
 
 describe("what the buttons may do", () => {
-  const row = (over: Record<string, unknown> = {}) => ({ updateBlock: "", rebootBlock: "", rollout: undefined, step: undefined, ...over }) as never;
+  const row = (over: Record<string, unknown> = {}) => ({ updateBlock: "", updateBlockAll: "", rebootBlock: "", rollout: undefined, step: undefined, ...over }) as never;
   it("follows the server's word for the node, install and reboot apart", () => {
-    expect(blockOf(row({ updateBlock: "nothing_to_do" }), "install")).toBe("nothing_to_do");
-    expect(blockOf(row({ updateBlock: "nothing_to_do" }), "reboot")).toBe("");
-    expect(blockKeys(row({ updateBlock: "offline", rebootBlock: "offline" }))).toEqual(["offline"]);
-    expect(blockKeys(row({ updateBlock: "nothing_to_do" }))).toEqual(["nothing_to_do"]);
+    expect(blockOf(row({ updateBlock: "nothing_to_do", updateBlockAll: "nothing_to_do" }), "install")).toBe("nothing_to_do");
+    expect(blockOf(row({ updateBlock: "nothing_to_do", updateBlockAll: "nothing_to_do" }), "reboot")).toBe("");
+    expect(blockKeys(row({ updateBlock: "offline", updateBlockAll: "offline", rebootBlock: "offline" }))).toEqual(["offline"]);
+    expect(blockKeys(row({ updateBlock: "nothing_to_do", updateBlockAll: "nothing_to_do" }))).toEqual(["nothing_to_do"]);
     expect(blockKeys(row())).toEqual([]);
+  });
+  it("closes the install button only when both kinds are closed, and each kind follows its own field", () => {
+    // only ordinary packages wait: the security kind is closed, the other is open, so the button is open
+    const ordinary = row({ updateBlock: "nothing_to_do", updateBlockAll: "" });
+    expect(blockOf(ordinary, "install")).toBe("");
+    expect(blockOf(ordinary, "security")).toBe("nothing_to_do");
+    expect(blockOf(ordinary, "all")).toBe("");
+    // a block that belongs to the other kind does not close this one
+    const awg = row({ updateBlock: "", updateBlockAll: "awg_build" });
+    expect(blockOf(awg, "security")).toBe("");
+    expect(blockOf(awg, "all")).toBe("awg_build");
+    expect(blockOf(awg, "install")).toBe("");
   });
   it("closes every button while a run is open (running or stopped), even if the server said nothing", () => {
     // a run that finished with a node's refusal is not open: the next one may start at once
@@ -326,7 +338,7 @@ describe("a refusal that closed itself", () => {
   it("is a result that does not stop anything: the next OS update is not held up", () => {
     const r = run([later], { status: OsRolloutStatus.DONE, finishedUnix: NOW - 60 });
     expect(osRunOf({ step: later, rollout: r }, NOW)).toMatchObject({ kind: "result", stopped: false });
-    expect(blockOf({ updateBlock: "", rebootBlock: "", rollout: r, step: later }, "install")).toBe("");
+    expect(blockOf({ updateBlock: "", updateBlockAll: "", rebootBlock: "", rollout: r, step: later }, "install")).toBe("");
   });
 });
 

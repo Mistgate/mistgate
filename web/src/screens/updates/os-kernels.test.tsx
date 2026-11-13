@@ -45,7 +45,7 @@ const broken = [
   kernel("7.0.0-37-generic", { running: true }),
 ];
 const row = (s: Os | undefined, over: Partial<OsRow> = {}): OsRow => ({
-  id: "nod_1", name: "de1", nodeId: "nod_1", online: 2, onPanelServer: false, state: OsUpdateState.REBOOT_REQUIRED, status: s, updateCapable: true, updateBlock: "", rebootBlock: "", ...over,
+  id: "nod_1", name: "de1", nodeId: "nod_1", online: 2, onPanelServer: false, state: OsUpdateState.REBOOT_REQUIRED, status: s, updateCapable: true, updateBlock: "", updateBlockAll: "", rebootBlock: "", ...over,
 });
 
 function mount(r: OsRow, onlyBlocked = false) {

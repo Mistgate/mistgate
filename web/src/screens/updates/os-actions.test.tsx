@@ -54,8 +54,13 @@ const base = {
   rebootRequired: false, rebootReasons: [], held: [], apt: "ok", halfConfigured: [], listsUnix: NOW - 3600, dpkgUnix: NOW - 7200, autoUpdates: "on", autoReboot: false, awgModuleNext: "", container: "", bootIdHash: "", error: "",
 };
 const waiting = { ...base, pending: 12, security: 4, kernelNewest: "6.8.0-150-generic", rebootRequired: true, rebootReasons: ["kernel"] };
+// the server words the block per kind: ordinary packages only close the security kind
+const blockAll = (over: Record<string, unknown>) => {
+  const block = (over.updateBlock as string | undefined) ?? "";
+  return block === "nothing_to_do" && (((over.status as { pending?: number } | undefined) ?? waiting).pending ?? 0) > 0 ? "" : block;
+};
 const node = (over: Record<string, unknown> = {}) => ({
-  nodeId: "nod_de1", name: "de1", connected: true, supported: true, onlineUsers: 5, onPanelServer: false, state: OsUpdateState.REBOOT_REQUIRED, status: waiting, updateCapable: true, updateBlock: "", rebootBlock: "", ...over,
+  nodeId: "nod_de1", name: "de1", connected: true, supported: true, onlineUsers: 5, onPanelServer: false, state: OsUpdateState.REBOOT_REQUIRED, status: waiting, updateCapable: true, updateBlock: "", updateBlockAll: blockAll(over), inbounds: 2, rebootBlock: "", ...over,
 });
 const step = (over: Record<string, unknown> = {}) => ({
   nodeId: "nod_de1", nodeName: "de1", state: OsStepState.SENT, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: NOW - 200, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, ...over,

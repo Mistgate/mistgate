@@ -119,7 +119,7 @@ describe("Server operating system", () => {
     const block = (n: { connected: boolean; supported: boolean }) => (!n.connected ? "offline" : !n.supported ? "agent_old" : "");
     updates.getOsUpdates.mockResolvedValue({
       ...answer,
-      nodes: answer.nodes.map((n) => ({ ...n, updateCapable: n.supported && n.connected, updateBlock: block(n), rebootBlock: block(n) })),
+      nodes: answer.nodes.map((n) => ({ ...n, updateCapable: n.supported && n.connected, updateBlock: block(n), updateBlockAll: block(n), rebootBlock: block(n) })),
       ...extra,
     });
   };
@@ -163,7 +163,7 @@ describe("Server operating system", () => {
   });
 
   it("puts a reason under the item it belongs to when the items have different ones", async () => {
-    owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "nothing_to_do", rebootBlock: "", status: n.status && { ...n.status, pending: 0, security: 0 } })) });
+    owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "nothing_to_do", updateBlockAll: "nothing_to_do", rebootBlock: "", status: n.status && { ...n.status, pending: 0, security: 0 } })) });
     await mount([], Role.OWNER);
     await press(trigger("de1"));
     expect(item("Install updates…")?.hasAttribute("data-disabled")).toBe(true);
@@ -173,7 +173,7 @@ describe("Server operating system", () => {
   });
 
   it("explains that a check for updates that has just started holds the node", async () => {
-    owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "node_busy", rebootBlock: "node_busy" })) });
+    owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "node_busy", updateBlockAll: "node_busy", rebootBlock: "node_busy" })) });
     await mount([], Role.OWNER);
     await press(trigger("de1"));
     expect(items().every((i) => i.hasAttribute("data-disabled"))).toBe(true);

@@ -123,6 +123,8 @@ export const en = {
   "osf.lock.now": "{holder} has been installing packages on the node for {time}.",
   "osf.lock.refused": "{holder} held the package lock for the whole {minutes}-minute wait, so nothing was changed. Try again when it has finished.",
   "osf.lock.leftover": "After the automatic update some security packages are still waiting.",
+  "osf.lock.refusedShort": "{holder} held the package lock the whole time, so nothing was changed. Try again when it has finished.",
+  "osf.note.from": "The node says: {note}",
 
   // ---- inactive devices
   "subs.idle.title": "Inactive devices",
@@ -253,6 +255,8 @@ export const ru: Record<keyof typeof en, string> = {
   "osf.lock.now": "{holder} ставит пакеты на ноде уже {time}.",
   "osf.lock.refused": "{holder} держал блокировку пакетов все {minutes} мин ожидания, поэтому ничего не изменилось. Попробуй снова, когда он закончит.",
   "osf.lock.leftover": "После автообновления часть пакетов безопасности всё ещё ждёт установки.",
+  "osf.lock.refusedShort": "{holder} всё время держал блокировку пакетов, поэтому ничего не изменилось. Попробуй снова, когда он закончит.",
+  "osf.note.from": "Нода пишет: {note}",
 
   "subs.idle.title": "Неактивные устройства",
   "subs.idle.on": "Устройство, которое не подключалось {n} день, не занимает место в лимите.|Устройство, которое не подключалось {n} дня, не занимает место в лимите.|Устройство, которое не подключалось {n} дней, не занимает место в лимите.",
@@ -382,6 +386,8 @@ export const zh: Record<keyof typeof en, string> = {
   "osf.lock.now": "{holder} 已在该节点上安装软件包 {time}。",
   "osf.lock.refused": "{holder} 在整整 {minutes} 分钟的等待期间一直占用软件包锁，所以没有做任何改动。等它结束后再试。",
   "osf.lock.leftover": "自动更新之后仍有部分安全更新在等待。",
+  "osf.lock.refusedShort": "{holder} 一直占用着软件包锁，所以没有做任何改动。等它结束后再试。",
+  "osf.note.from": "节点说明：{note}",
 
   "subs.idle.title": "不活跃的设备",
   "subs.idle.on": "超过 {n} 天没有连接的设备，不再占用上限中的名额。",
@@ -511,6 +517,8 @@ export const fa: Record<keyof typeof en, string> = {
   "osf.lock.now": "{holder} از {time} پیش دارد روی نود بسته نصب می‌کند.",
   "osf.lock.refused": "{holder} در تمام {minutes} دقیقهٔ انتظار قفل بسته‌ها را نگه داشت، پس چیزی تغییر نکرد. وقتی کارش تمام شد دوباره امتحان کن.",
   "osf.lock.leftover": "پس از به‌روزرسانی خودکار، بخشی از بسته‌های امنیتی هنوز منتظر نصب‌اند.",
+  "osf.lock.refusedShort": "{holder} همهٔ این مدت قفل بسته‌ها را نگه داشت، پس چیزی تغییر نکرد. وقتی کارش تمام شد دوباره امتحان کن.",
+  "osf.note.from": "نود می‌گوید: {note}",
 
   "subs.idle.title": "دستگاه‌های غیرفعال",
   "subs.idle.on": "دستگاهی که {n} روز وصل نشده باشد دیگر جایی از سقف را اشغال نمی‌کند.",
@@ -640,6 +648,8 @@ export const tr: Record<keyof typeof en, string> = {
   "osf.lock.now": "{holder} düğümde paket kuruyor, süre: {time}.",
   "osf.lock.refused": "{holder}, {minutes} dakikalık bekleme boyunca paket kilidini tuttu, bu yüzden hiçbir şey değişmedi. İşi bitince yeniden dene.",
   "osf.lock.leftover": "Otomatik güncellemeden sonra bazı güvenlik paketleri hâlâ bekliyor.",
+  "osf.lock.refusedShort": "{holder} paket kilidini tüm süre boyunca tuttu, bu yüzden hiçbir şey değişmedi. İşi bitince yeniden dene.",
+  "osf.note.from": "Düğüm diyor ki: {note}",
 
   "subs.idle.title": "Etkin olmayan cihazlar",
   "subs.idle.on": "{n} gündür bağlanmayan bir cihaz sınırda yer kaplamaz.",

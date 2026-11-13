@@ -10,7 +10,7 @@ import { OsRolloutMode, OsStepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { isFleetRun, lockRefusedText, stepChip, waitText, waitingRetry } from "@/lib/os-fleet";
+import { isFleetRun, lockRefusedText, stepChip, stepNote, waitText, waitingRetry } from "@/lib/os-fleet";
 import { blockKeys, blockOf, blockText, elapsedText, gateWaitText, gateWindowText, osRunOf, pauseCode, pauseText, phaseText, resultLine, stepPill, stepReason, stepSince, useOsActions, type OsNodeRun } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
 import { useIsOwner, vantageNote } from "@/lib/updates";
@@ -90,7 +90,8 @@ function Result({ run, row, owner, busy, onClose }: { run: Extract<OsNodeRun, { 
   const { step, rollout, stopped } = run;
   // a run of several nodes says why it stopped, and offers its buttons, in the queue card above the table
   const banner0 = !isFleetRun(rollout);
-  const lock = lockRefusedText(t, row.status, step.params.code ?? "");
+  const lock = lockRefusedText(t, step.params, step.params.code ?? "");
+  const note0 = stepNote(t, step.params);
   const pill = stepPill(step);
   const reason = stepReason(t, step.errorKey, step.params);
   // the gate's look from another node at the panel's own path: why a pass is not a plain pass, or why a probe failure stands
@@ -109,6 +110,13 @@ function Result({ run, row, owner, busy, onClose }: { run: Extract<OsNodeRun, { 
       </div>
       {note && <span className="text-xs leading-snug text-pretty text-muted">{note}</span>}
       {lock && <span className="text-xs leading-snug text-pretty text-muted">{lock}</span>}
+      {note0 && (
+        <span className="text-xs leading-snug text-pretty text-muted">
+          {note0.text}
+          {note0.text && note0.node && " "}
+          {note0.node && t("osf.note.from", { note: note0.node })}
+        </span>
+      )}
       {stopped && banner0 && (
         <Callout
           kind="bad"

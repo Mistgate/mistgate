@@ -27,9 +27,7 @@ export const rebootOf = (scope: OsScope, choice: "if_required" | "never"): OsReb
 export function scopeBlock(row: OsRow, scope: OsScope): string {
   if (!row.nodeId) return "panel_host";
   if (scope === "reboot") return blockOf(row, "reboot");
-  // blockOf already counts ordinary packages as something to install; for "security" they are not
-  const b = blockOf(row, "install");
-  return scope === "security" && !b && (row.status?.security ?? 0) === 0 && row.status?.apt !== "half_configured" && (row.status?.pending ?? 0) > 0 ? "nothing_to_do" : b;
+  return blockOf(row, scope);
 }
 
 /** The nodes that have anything to install (security or ordinary): what "Select all with something to install" ticks. */
@@ -41,9 +39,12 @@ export function defaultScope(rows: readonly OsRow[]): OsScope {
   return rows.some((r) => scopeBlock(r, "all") === "") ? "all" : "security";
 }
 
-/** The order the panel takes nodes in: fewest people online first (the canary), then by name (it also looks at profiles: not known here). */
-export const canaryFirst = <R extends Pick<OsRow, "online" | "name">>(rows: readonly R[]): R[] =>
-  [...rows].sort((a, b) => (a.online ?? 0) - (b.online ?? 0) || (a.name ?? "").localeCompare(b.name ?? ""));
+/** The order the panel takes nodes in (its own): fewest people online first (the canary), then fewest profiles, then the name without regard to case. */
+export const canaryFirst = <R extends Pick<OsRow, "online" | "inbounds" | "name">>(rows: readonly R[]): R[] =>
+  [...rows].sort((a, b) => {
+    const [x, y] = [(a.name ?? "").toLowerCase(), (b.name ?? "").toLowerCase()];
+    return (a.online ?? 0) - (b.online ?? 0) || (a.inbounds ?? 0) - (b.inbounds ?? 0) || (x < y ? -1 : x > y ? 1 : 0);
+  });
 
 /** Nodes after the canary that go together when the owner has no wish: always one (a reboot cuts people off); 2 to 5 are the owner's choice. */
 export const defaultBatchSize = () => 1;
@@ -147,7 +148,7 @@ export function currentStage(stages: readonly FleetStage[]): number | undefined 
 
 /** The failed step that stopped the run, and whether it was retried already (the server then allows only "skip" or "close"). */
 export const stoppedBy = (r: OsRun) => failedOf(r);
-export const retriedBefore = (s: OsStepRow | undefined) => Number(s?.params.retry_count) > 0;
+export const retriedBefore = (s: OsStepRow | undefined) => (s?.retryCount ?? 0) > 0;
 
 const jobPhases = ["preflight", "waiting_lock", "repairing", "refreshing", "installing", "awg_module", "checking", "rebooting"];
 const waitReasons = ["busy", "apt_lock", "too_soon", "reboot_limit"];
@@ -178,7 +179,7 @@ export function stepChip(t: T, s: OsStepRow, nowSec: number): { kind: StatusKind
 
 /** Why a waiting node waits, in a sentence (who holds the package lock is said on the node's own row). */
 export function waitText(t: T, s: OsStepRow, nowSec: number): string {
-  const code = waitReasons.includes(s.params.retry_code ?? "") ? s.params.retry_code! : "busy";
+  const code = waitReasons.includes(s.retryCode) ? s.retryCode : "busy";
   const reason = t(`osf.wait.${code}` as MessageKey);
   return s.retryAfterUnix > nowSec ? t("osf.wait.line", { reason, time: minutesText(t, minutesUntil(s.retryAfterUnix, nowSec)) }) : t("osf.wait.line.now", { reason });
 }
@@ -192,15 +193,20 @@ export function lockNowText(t: T, s: Pick<Os, "aptLockHolder" | "aptLockSinceUni
   return t("osf.lock.now", { holder: s.aptLockHolder, time: elapsedText(t, s.aptLockSinceUnix, nowSec) });
 }
 
-/** What the node said about the lock when it refused a job (OsJob.apt_lock_holder / apt_lock_minutes); "" when it did not. */
-export function lockRefusedText(t: T, s: Os | undefined, code: string): string {
-  const job = s?.job;
-  if (code !== "apt_lock" || !job?.aptLockHolder) return "";
-  return t("osf.lock.refused", { holder: job.aptLockHolder, minutes: job.aptLockMinutes || 30 });
+/** Who held the package lock when the node refused a job, from what the finished step kept (params apt_lock_holder / apt_lock_minutes); "" when it kept none. */
+export function lockRefusedText(t: T, params: Record<string, string>, code: string): string {
+  const holder = params.apt_lock_holder;
+  if (code !== "apt_lock" || !holder) return "";
+  const minutes = Number(params.apt_lock_minutes) || 0;
+  return minutes > 0 ? t("osf.lock.refused", { holder, minutes }) : t("osf.lock.refusedShort", { holder });
 }
 
-/** The node's note on a finished job (OsJob.note_code): only the one the panel knows, in its own words; the node's sentence is not shown. */
-export const leftoverText = (t: T, s: Os | undefined) => (s?.job?.noteCode === "security_leftover_failed" ? t("osf.lock.leftover") : "");
+/** The node's note on a finished job, from the finished step: the code in the panel's own words, and the node's own sentence as plain text beside it. */
+export function stepNote(t: T, params: Record<string, string>): { text: string; node: string } | null {
+  const text = params.note_code === "security_leftover_failed" ? t("osf.lock.leftover") : "";
+  const node = params.note ?? "";
+  return text || node ? { text, node } : null;
+}
 
 /** The names of the security updates a node lists (at most 32), which of them are stuck, and how many more there are than names. */
 export function securityNames(s: Pick<Os, "security" | "securityPending" | "securityStuck"> | undefined): { names: string[]; stuck: ReadonlySet<string>; more: number } {

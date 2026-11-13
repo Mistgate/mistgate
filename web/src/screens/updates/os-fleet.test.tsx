@@ -48,12 +48,17 @@ const base = {
   rebootRequired: false, rebootReasons: [], held: [], apt: "ok", halfConfigured: [], listsUnix: NOW - 3600, dpkgUnix: NOW - 7200, autoUpdates: "on", autoReboot: false, awgModuleNext: "", container: "", bootIdHash: "", error: "",
   securityPending: [], securityStuck: [], aptLockHolder: "", aptLockSinceUnix: 0,
 };
+// the server words the block per kind: ordinary packages only close the security kind
+const blockAll = (over: Record<string, unknown>, st: Record<string, unknown>) => {
+  const block = (over.updateBlock as string | undefined) ?? "";
+  return block === "nothing_to_do" && Number(st.pending ?? 0) > 0 ? "" : block;
+};
 const node = (id: string, online: number, over: Record<string, unknown> = {}, status: Record<string, unknown> = {}) => ({
   nodeId: `nod_${id}`, name: id, connected: true, supported: true, onlineUsers: online, onPanelServer: false, state: OsUpdateState.UPDATES, status: { ...base, pending: 6, security: 2, ...status },
-  updateCapable: true, updateBlock: "", rebootBlock: "", rebootPossibleUnix: 0, ...over,
+  updateCapable: true, updateBlock: "", updateBlockAll: blockAll(over, { pending: 6, security: 2, ...status }), inbounds: 2, rebootBlock: "", rebootPossibleUnix: 0, ...over,
 });
 const step = (id: string, state: OsStepState, stage: number, over: Record<string, unknown> = {}) => ({
-  nodeId: `nod_${id}`, nodeName: id, state, jobId: "", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, stage, retryAfterUnix: 0, ...over,
+  nodeId: `nod_${id}`, nodeName: id, state, jobId: "", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, stage, retryAfterUnix: 0, retryCount: 0, retryCode: "", ...over,
 });
 const rollout = (steps: unknown[], over: Record<string, unknown> = {}) => ({
   id: "osr_1", status: OsRolloutStatus.RUNNING, mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED, createdUnix: NOW - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, batchSize: 2, ...over,
@@ -261,7 +266,7 @@ describe("the window before the run", () => {
 
 describe("the queue of a run", () => {
   const passed = (id: string, stage = 0) => step(id, OsStepState.PASSED, stage, { finishedUnix: NOW - 60, params: { upgraded: "4", reboot: "done" } });
-  const all = (run: unknown) => data(nodes().map((n) => ({ ...n, updateBlock: "rollout_active", rebootBlock: "rollout_active" })), run);
+  const all = (run: unknown) => data(nodes().map((n) => ({ ...n, updateBlock: "rollout_active", updateBlockAll: "rollout_active", rebootBlock: "rollout_active" })), run);
   const card = () => host!.querySelector<HTMLElement>("[data-shot=os-fleet-run]")!;
 
   it("shows the stages, the state of every node and the progress as 'N of M'", async () => {
@@ -284,9 +289,9 @@ describe("the queue of a run", () => {
   });
 
   it("says a waiting node waits, calmly: the time, the reason and who holds the lock; no red", async () => {
-    const nl1 = node("de1", 3, { updateBlock: "rollout_active", rebootBlock: "rollout_active" }, { apt: "locked", aptLockHolder: "unattended-upgr", aptLockSinceUnix: NOW - 14 * 60 });
+    const nl1 = node("de1", 3, { updateBlock: "rollout_active", updateBlockAll: "rollout_active", rebootBlock: "rollout_active" }, { apt: "locked", aptLockHolder: "unattended-upgr", aptLockSinceUnix: NOW - 14 * 60 });
     await mount(<OsSection />, data([nl1, node("fi1", 5)], rollout([
-      step("de1", OsStepState.PENDING, 1, { phase: "waiting_retry", retryAfterUnix: NOW + 11 * 60 - 5, params: { retry_code: "apt_lock" } }),
+      step("de1", OsStepState.PENDING, 1, { phase: "waiting_retry", retryAfterUnix: NOW + 11 * 60 - 5, retryCode: "apt_lock" }),
       step("fi1", OsStepState.PENDING, 2),
     ])));
     const c = card().textContent!;
@@ -334,9 +339,9 @@ describe("the queue of a run", () => {
     expect(updates.resumeOsRollout).toHaveBeenCalledWith({ rolloutId: "osr_1", skipFailed: false });
   });
 
-  const stopped = (over: Record<string, unknown> = {}) =>
+  const stopped = (retryCount = 0) =>
     all(rollout(
-      [passed("nl1"), step("de1", OsStepState.FAILED, 1, { errorKey: "reboot_held", params: { code: "boot_default_custom", mode: "security", ...over } }), step("fi1", OsStepState.PENDING, 1)],
+      [passed("nl1"), step("de1", OsStepState.FAILED, 1, { errorKey: "reboot_held", retryCount, params: { code: "boot_default_custom", mode: "security" } }), step("fi1", OsStepState.PENDING, 1)],
       { status: OsRolloutStatus.PAUSED, pauseKey: "reboot_held", pauseParams: { node: "de1", reason: "reboot_held", code: "boot_default_custom", mode: "security" } },
     ));
 
@@ -361,7 +366,7 @@ describe("the queue of a run", () => {
   });
 
   it("turns Retry off after a retry that failed again, and says why", async () => {
-    await mount(<OsSection />, stopped({ retry_count: "1" }));
+    await mount(<OsSection />, stopped(1));
     const banner = card().querySelector<HTMLElement>("[role=alert]")!;
     expect(disabled(button("Retry", banner))).toBe(true);
     expect(banner.textContent).toContain("already retried once");
@@ -443,15 +448,19 @@ describe("the names of the security packages", () => {
   });
 
   it("says who held the lock when the node refused for the whole wait", async () => {
-    const refused = rollout([step("de1", OsStepState.SKIPPED, 0, { errorKey: "try_later", finishedUnix: NOW - 60, params: { code: "apt_lock", mode: "security" } })], { status: OsRolloutStatus.DONE, finishedUnix: NOW - 60 });
-    await mount(<OsSection />, data([node("de1", 3, {}, { job: { aptLockHolder: "unattended-upgr", aptLockMinutes: 30, code: "apt_lock", jobId: "osj_1" } }), node("nl1", 0)], refused));
+    // the finished step keeps the holder: the node's live job status is gone by now
+    const refused = rollout([step("de1", OsStepState.SKIPPED, 0, { errorKey: "try_later", finishedUnix: NOW - 60, params: { code: "apt_lock", mode: "security", apt_lock_holder: "unattended-upgr", apt_lock_minutes: "30" } })], { status: OsRolloutStatus.DONE, finishedUnix: NOW - 60 });
+    await mount(<OsSection />, data([node("de1", 3), node("nl1", 0)], refused));
     expect(text()).toContain("unattended-upgr held the package lock for the whole 30-minute wait, so nothing was changed.");
   });
 
   it("notes what an automatic update left behind", async () => {
-    await mount(<OsSection />, data([node("de1", 3, {}, { job: { noteCode: "security_leftover_failed", note: "english from the node" } }), node("nl1", 0)]));
+    const done = rollout([step("de1", OsStepState.PASSED, 0, { finishedUnix: NOW - 60, params: { upgraded: "2", reboot: "not_asked", note_code: "security_leftover_failed", note: "2 packages <b>still</b> pending" } })], { status: OsRolloutStatus.DONE, finishedUnix: NOW - 60 });
+    await mount(<OsSection />, data([node("de1", 3), node("nl1", 0)], done));
     expect(text()).toContain("After the automatic update some security packages are still waiting.");
-    expect(text()).not.toContain("english from the node");
+    // the node's own sentence is shown as plain text, markup and all
+    expect(text()).toContain("The node says: 2 packages <b>still</b> pending");
+    expect(host!.innerHTML).toContain("&lt;b&gt;still&lt;/b&gt;");
   });
 });
 

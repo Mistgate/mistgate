@@ -3,8 +3,8 @@ import { OsRebootPolicy, OsRolloutMode, OsRolloutStatus, OsStepState, OsUpdateSt
 import { dictionaries, fill, langs, pickForm, type Lang, type T } from "@/i18n";
 import type { en } from "@/i18n/en";
 import {
-  canaryFirst, currentStage, defaultBatchSize, defaultScope, fleetCounts, fleetPhase, fleetStages, installable, isFleetRun, leftoverText, lockNowText, lockRefusedText, maxBatchSize,
-  planStages, rebootOf, retriedBefore, scopeBlock, securityNames, stepChip, stoppedBy, waitText,
+  canaryFirst, currentStage, defaultBatchSize, defaultScope, fleetCounts, fleetPhase, fleetStages, installable, isFleetRun, lockNowText, lockRefusedText, maxBatchSize,
+  planStages, rebootOf, retriedBefore, scopeBlock, securityNames, stepChip, stepNote, stoppedBy, waitText,
 } from "./os-fleet";
 import { reasonLine, stepReason } from "./os-run";
 import type { Os, OsRow, OsRun, OsStepRow } from "./os-updates";
@@ -23,16 +23,17 @@ const t = tOf("en");
 const NOW = 1_800_000_000;
 const status = (over: Partial<Os> = {}): Os => ({ pending: 0, security: 0, apt: "ok", securityPending: [], securityStuck: [], aptLockHolder: "", aptLockSinceUnix: 0, ...over }) as unknown as Os;
 const row = (name: string, online: number, over: Partial<OsRow> = {}): OsRow => ({
-  id: `nod_${name}`, name, nodeId: `nod_${name}`, online, onPanelServer: false, state: OsUpdateState.UPDATES, status: status({ pending: 4, security: 2 }), updateCapable: true, updateBlock: "", rebootBlock: "", nowUnix: NOW, ...over,
+  id: `nod_${name}`, name, nodeId: `nod_${name}`, online, onPanelServer: false, state: OsUpdateState.UPDATES, status: status({ pending: 4, security: 2 }), updateCapable: true, updateBlock: "", updateBlockAll: "", rebootBlock: "", nowUnix: NOW, ...over,
 });
 const step = (over: Partial<OsStepRow> = {}): OsStepRow =>
-  ({ nodeId: "nod_de1", nodeName: "de1", state: OsStepState.PENDING, jobId: "", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, ...over }) as OsStepRow;
+  ({ nodeId: "nod_de1", nodeName: "de1", state: OsStepState.PENDING, jobId: "", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, retryCount: 0, retryCode: "", ...over }) as OsStepRow;
 const run = (steps: OsStepRow[], over: Partial<OsRun> = {}): OsRun =>
   ({ id: "osr_1", status: OsRolloutStatus.RUNNING, mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED, createdUnix: NOW - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, batchSize: 2, ...over }) as OsRun;
 
 describe("which nodes a kind of run takes", () => {
-  const ordinary = row("sg1", 2, { updateBlock: "nothing_to_do", status: status({ pending: 18 }) });
-  const nothing = row("nl1", 0, { updateBlock: "nothing_to_do", status: status() });
+  // the server words each kind: ordinary packages only close the security one
+  const ordinary = row("sg1", 2, { updateBlock: "nothing_to_do", updateBlockAll: "", status: status({ pending: 18 }) });
+  const nothing = row("nl1", 0, { updateBlock: "nothing_to_do", updateBlockAll: "nothing_to_do", status: status() });
 
   it("takes a node with security updates for every kind of install", () => {
     expect(scopeBlock(row("de1", 3), "security")).toBe("");
@@ -51,7 +52,11 @@ describe("which nodes a kind of run takes", () => {
   });
 
   it("gives the server's reason for a node that cannot, and a held-up reboot its own", () => {
-    expect(scopeBlock(row("msk1", 0, { updateBlock: "agent_old", rebootBlock: "agent_old" }), "security")).toBe("agent_old");
+    expect(scopeBlock(row("msk1", 0, { updateBlock: "agent_old", updateBlockAll: "agent_old", rebootBlock: "agent_old" }), "security")).toBe("agent_old");
+    expect(scopeBlock(row("msk1", 0, { updateBlock: "agent_old", updateBlockAll: "agent_old", rebootBlock: "agent_old" }), "all")).toBe("agent_old");
+    // each kind follows its own field, not the packages the client counts
+    expect(scopeBlock(row("de1", 3, { updateBlock: "", updateBlockAll: "awg_build", status: status({ pending: 9, security: 2 }) }), "all")).toBe("awg_build");
+    expect(scopeBlock(row("de1", 3, { updateBlock: "no_status", updateBlockAll: "", status: status({ pending: 0, security: 0 }) }), "all")).toBe("");
     expect(scopeBlock(row("fi1", 1, { rebootBlock: "reboot_wait", rebootPossibleUnix: NOW + 600 }), "reboot")).toBe("reboot_wait:10");
     // an open run holds every node
     expect(scopeBlock(row("de1", 3, { rollout: run([step()]) }), "all")).toBe("rollout_active");
@@ -79,6 +84,12 @@ describe("the order and the stages", () => {
 
   it("puts the node with the fewest people online first, ties by name", () => {
     expect(canaryFirst(rows).map((r) => r.name)).toEqual(["nl1", "se1", "sg1", "de1", "fi1"]);
+  });
+
+  it("breaks a tie by the fewest profiles, then by the name without regard to case: the panel's own order", () => {
+    const tied = [row("sg1", 1, { inbounds: 4 }), row("Nl1", 1, { inbounds: 2 }), row("de1", 1, { inbounds: 2 }), row("fi1", 0, { inbounds: 9 })];
+    expect(canaryFirst(tied).map((r) => r.name)).toEqual(["fi1", "de1", "Nl1", "sg1"]);
+    expect(canaryFirst([row("b1", 0), row("A1", 0)]).map((r) => r.name)).toEqual(["A1", "b1"]);
   });
 
   it("makes the canary a stage of its own and fills the next ones by the batch size", () => {
@@ -139,7 +150,9 @@ describe("a run in progress", () => {
   it("finds the failed step and whether it was retried already", () => {
     expect(stoppedBy(run([passed, failed]))?.nodeName).toBe("de1");
     expect(retriedBefore(failed)).toBe(false);
-    expect(retriedBefore({ ...failed, params: { retry_count: "1" } })).toBe(true);
+    expect(retriedBefore({ ...failed, retryCount: 1 })).toBe(true);
+    // the typed field is the one that counts, not the params kept for old clients
+    expect(retriedBefore({ ...failed, params: { retry_count: "1" } })).toBe(false);
     expect(retriedBefore(undefined)).toBe(false);
   });
 });
@@ -147,7 +160,7 @@ describe("a run in progress", () => {
 describe("the state of a node as a chip", () => {
   it("is a quiet grey one while it waits its turn or another try, never red", () => {
     expect(stepChip(t, step(), NOW)).toEqual({ kind: "off", label: "In the queue" });
-    const waiting = step({ phase: "waiting_retry", retryAfterUnix: NOW + 11 * 60 - 5, params: { retry_code: "apt_lock" } });
+    const waiting = step({ phase: "waiting_retry", retryAfterUnix: NOW + 11 * 60 - 5, retryCode: "apt_lock" });
     expect(stepChip(t, waiting, NOW)).toEqual({ kind: "off", label: "Can retry in 11 min" });
     // the time has come: the panel is trying again
     expect(stepChip(t, { ...waiting, retryAfterUnix: NOW - 1 }, NOW)).toEqual({ kind: "busy", label: "Trying again" });
@@ -169,14 +182,14 @@ describe("the state of a node as a chip", () => {
   });
 
   it("explains a wait with its reason and its time; the holder of the lock is said on the node's own row", () => {
-    const s = step({ phase: "waiting_retry", retryAfterUnix: NOW + 600, params: { retry_code: "apt_lock" } });
+    const s = step({ phase: "waiting_retry", retryAfterUnix: NOW + 600, retryCode: "apt_lock" });
     const line = waitText(t, s, NOW);
     expect(line).toContain("another package manager holds the lock");
     expect(line).toContain("next in 10 min");
     expect(line).not.toContain("unattended-upgr");
-    expect(waitText(t, { ...s, params: { retry_code: "too_soon" } }, NOW)).toContain("rebooted only a few minutes ago");
+    expect(waitText(t, { ...s, retryCode: "too_soon" }, NOW)).toContain("rebooted only a few minutes ago");
     // a code nobody knows reads as "another job is running"
-    expect(waitText(t, { ...s, params: { retry_code: "whatever" } }, NOW)).toContain("another job is running");
+    expect(waitText(t, { ...s, retryCode: "whatever" }, NOW)).toContain("another job is running");
     expect(waitText(t, { ...s, retryAfterUnix: NOW - 1 }, NOW)).toContain("trying again");
   });
 });
@@ -199,16 +212,21 @@ describe("the names of the security packages and the package lock", () => {
     expect(lockNowText(t, status(), NOW)).toBe("");
   });
 
-  it("says who held the lock for the whole wait of a refusal, from the node's job", () => {
-    const s = status({ job: { aptLockHolder: "unattended-upgr", aptLockMinutes: 30, code: "apt_lock" } } as Partial<Os>);
-    expect(lockRefusedText(t, s, "apt_lock")).toContain("unattended-upgr held the package lock for the whole 30-minute wait");
-    expect(lockRefusedText(t, s, "disk_full")).toBe("");
-    expect(lockRefusedText(t, status(), "apt_lock")).toBe("");
+  it("says who held the lock for the whole wait of a refusal, from what the finished step kept", () => {
+    const params = { apt_lock_holder: "unattended-upgr", apt_lock_minutes: "30" };
+    expect(lockRefusedText(t, params, "apt_lock")).toContain("unattended-upgr held the package lock for the whole 30-minute wait");
+    expect(lockRefusedText(t, params, "disk_full")).toBe("");
+    expect(lockRefusedText(t, {}, "apt_lock")).toBe("");
+    // a holder without the minutes still reads right
+    expect(lockRefusedText(t, { apt_lock_holder: "apt-get" }, "apt_lock")).toContain("apt-get held the package lock the whole time");
   });
 
-  it("words only the note it knows, in its own words, not the node's", () => {
-    expect(leftoverText(t, status({ job: { noteCode: "security_leftover_failed", note: "some English from the node" } } as Partial<Os>))).toBe("After the automatic update some security packages are still waiting.");
-    expect(leftoverText(t, status({ job: { noteCode: "something_new", note: "x" } } as Partial<Os>))).toBe("");
+  it("words the note code in its own words and keeps the node's sentence apart, as plain text", () => {
+    const n = stepNote(t, { note_code: "security_leftover_failed", note: "security updates remain <b>x</b>" });
+    expect(n).toEqual({ text: "After the automatic update some security packages are still waiting.", node: "security updates remain <b>x</b>" });
+    // a code the panel does not know has no words of its own: only the node's sentence is left
+    expect(stepNote(t, { note_code: "something_new", note: "x" })).toEqual({ text: "", node: "x" });
+    expect(stepNote(t, {})).toBeNull();
   });
 });
 

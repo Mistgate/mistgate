@@ -37,12 +37,17 @@ export const base = {
   rebootRequired: false, rebootReasons: [], held: [], apt: "ok", halfConfigured: [], listsUnix: now - 3600, dpkgUnix: now - 7200, autoUpdates: "on", autoReboot: false,
   awgModuleNext: "", container: "", bootIdHash: "", error: "",
 };
+/** The server words the block per kind: only ordinary packages waiting close the security kind ("nothing_to_do"), not "All packages". */
+const blockAll = (over: Record<string, unknown>) => {
+  const block = (over.updateBlock as string | undefined) ?? "";
+  return block === "nothing_to_do" && (((over.status as { pending?: number } | undefined) ?? base).pending ?? 0) > 0 ? "" : block;
+};
 export const node = (over: Record<string, unknown>) => ({
   nodeId: "nod_de1", name: "de1", connected: true, supported: true, onlineUsers: 0, onPanelServer: false, state: OsUpdateState.UP_TO_DATE, status: { ...base },
-  updateCapable: true, updateBlock: "", rebootBlock: "", rebootPossibleUnix: 0, ...over,
+  updateCapable: true, updateBlock: "", updateBlockAll: blockAll(over), inbounds: 2, rebootBlock: "", rebootPossibleUnix: 0, ...over,
 });
 export const step = (nodeId: string, nodeName: string, over: Record<string, unknown>) => ({
-  nodeId, nodeName, state: OsStepState.PASSED, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, ...over,
+  nodeId, nodeName, state: OsStepState.PASSED, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, retryCount: 0, retryCode: "", ...over,
 });
 export const rollout = (steps: unknown[], over: Record<string, unknown>) => ({
   id: "osr_1", status: OsRolloutStatus.RUNNING, mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED, createdUnix: now - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, batchSize: 1, ...over,

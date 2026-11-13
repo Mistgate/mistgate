@@ -6,7 +6,7 @@ import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
-import { fleetPhase, installable, isFleetRun, leftoverText, lockNowText, phaseOpen } from "@/lib/os-fleet";
+import { fleetPhase, installable, isFleetRun, lockNowText, phaseOpen } from "@/lib/os-fleet";
 import { resultHorizonS, rolloutBlocksOthers, useOsActions } from "@/lib/os-run";
 import { osPill, osRows, osSummary, osSystem, osUpdatesLine, useOsUpdates, type OsRow } from "@/lib/os-updates";
 import { useIsOwner } from "@/lib/updates";
@@ -101,8 +101,6 @@ function notes(t: T, row: OsRow): { text: string; warn: boolean }[] {
   if (s.autoUpdates === "off") out.push({ text: t("up.os.auto.off"), warn: false });
   if (s.autoUpdates === "not_installed") out.push({ text: t("up.os.auto.not_installed"), warn: false });
   if (s.held.length > 0) out.push({ text: t("up.os.held", { names: s.held.slice(0, 3).join(", ") }), warn: false });
-  const leftover = leftoverText(t, s);
-  if (leftover) out.push({ text: leftover, warn: false });
   return out;
 }
 
@@ -247,7 +245,7 @@ export function OsSection({ defaultPicked, defaultOpenNames }: { defaultPicked?:
       ) : (
         <>
           <Summary rows={rows} />
-          {showRun && run && <OsFleetRun run={run} owner={owner} actions={actions} nowSec={nowSec} statusOf={(id) => rows.find((r) => r.nodeId === id)?.status} />}
+          {showRun && run && <OsFleetRun run={run} owner={owner} actions={actions} nowSec={nowSec} />}
           {canPick && (
             <OsSelectionBar
               count={ticked.length}

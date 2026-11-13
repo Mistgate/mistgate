@@ -205,8 +205,9 @@ export function stepPill(step: Pick<OsStepRow, "state"> & Partial<Pick<OsStepRow
 // ---------------------------------------------------------------------------------------------------
 // What the buttons may do
 
-export type OsAction = "install" | "reboot" | "refresh";
-type Blocks = Pick<OsRow, "updateBlock" | "rebootBlock" | "rollout" | "step"> & Partial<Pick<OsRow, "status" | "rebootPossibleUnix" | "nowUnix">>;
+/** "install" is the button (open while either kind of install can go); "security" and "all" are the two kinds of a run. */
+export type OsAction = "install" | "security" | "all" | "reboot" | "refresh";
+type Blocks = Pick<OsRow, "updateBlock" | "updateBlockAll" | "rebootBlock" | "rollout" | "step"> & Partial<Pick<OsRow, "status" | "rebootPossibleUnix" | "nowUnix">>;
 
 /** Whole minutes (rounded up, at least 1) from `nowUnix` to `untilUnix`; 0 when that time has come. */
 export const minutesUntil = (untilUnix: number, nowUnix: number) => (untilUnix > nowUnix ? Math.max(1, Math.ceil((untilUnix - nowUnix) / 60)) : 0);
@@ -218,8 +219,12 @@ export function blockOf(row: Blocks, action: OsAction): string {
     return ["offline", "agent_old", "unsupported", "panel_host", "node_busy"].includes(row.updateBlock) ? row.updateBlock : row.step && stepOpen(row.step) ? "rollout_active" : "";
   }
   // a reboot the node's own kernel table says would be refused is off too, with that reason (the node refuses it all the same)
-  // "nothing to install" only means no security update: the "All packages" run still has ordinary ones to put in
-  const own = action === "reboot" ? rebootWaitKey(row) || row.rebootBlock || kernelBlock(row.status) : row.updateBlock === "nothing_to_do" && (row.status?.pending ?? 0) > 0 ? "" : row.updateBlock;
+  // the server says it per kind: the button is closed only when both kinds are, and then with the security one's reason
+  const own =
+    action === "reboot" ? rebootWaitKey(row) || row.rebootBlock || kernelBlock(row.status)
+    : action === "all" ? row.updateBlockAll
+    : action === "security" ? row.updateBlock
+    : row.updateBlock && row.updateBlockAll ? row.updateBlock : "";
   return own || (rolloutBlocksOthers(row.rollout) ? "rollout_active" : "");
 }
 

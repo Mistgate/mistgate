@@ -52,8 +52,8 @@ export function OsConfirmDialog({ row, mode, actions, onClose, initialPkgs }: { 
   const security = s?.security ?? 0;
   const pending = s?.pending ?? 0;
   // what to install: only the security updates, or every waiting package; a node with only ordinary ones waiting has nothing else to choose
-  const choosePkgs = install && pending > security && (security > 0 || s?.apt === "half_configured");
-  const [pkgs, setPkgs] = useState<"security" | "all">(initialPkgs ?? (security === 0 && pending > 0 ? "all" : "security"));
+  const choosePkgs = install && !row.updateBlock && !row.updateBlockAll && pending > security;
+  const [pkgs, setPkgs] = useState<"security" | "all">(initialPkgs ?? (row.updateBlock && !row.updateBlockAll ? "all" : "security"));
   const all = install && pkgs === "all";
   const online = row.online ?? 0;
   const others = Math.max(0, pending - security);

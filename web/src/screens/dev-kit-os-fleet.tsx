@@ -56,7 +56,7 @@ const scenes = {
     run([
       passedNl1,
       step("nod_de1", "de1", { state: OsStepState.SENT, stage: 1, phase: "installing", phaseUnix: now - 120, sentUnix: now - 150, params: noGate }),
-      queued("nod_fi1", "fi1", 1, { phase: "waiting_retry", phaseUnix: now - 200, retryAfterUnix: now + 11 * min, params: { ...noGate, retry_code: "apt_lock", retry_after_unix: String(now + 11 * min) } }),
+      queued("nod_fi1", "fi1", 1, { phase: "waiting_retry", phaseUnix: now - 200, retryAfterUnix: now + 11 * min, retryCode: "apt_lock", params: { ...noGate, retry_code: "apt_lock", retry_after_unix: String(now + 11 * min) } }),
       queued("nod_sg1", "sg1", 2),
       skippedOld,
     ]),
@@ -97,7 +97,7 @@ const scenes = {
     run(
       [
         passedNl1,
-        step("nod_de1", "de1", { state: OsStepState.FAILED, stage: 1, errorKey: "not_back", sentUnix: now - 2000, rebootUnix: now - 1500, finishedUnix: now - 300, params: { retry_count: "1", mode: "security" } }),
+        step("nod_de1", "de1", { state: OsStepState.FAILED, stage: 1, errorKey: "not_back", sentUnix: now - 2000, rebootUnix: now - 1500, finishedUnix: now - 300, retryCount: 1, params: { retry_count: "1", mode: "security" } }),
         queued("nod_fi1", "fi1", 1),
         queued("nod_sg1", "sg1", 2),
         skippedOld,
@@ -138,19 +138,25 @@ const scenes = {
   lock: answer([nl1(), de1({}, lockedStatus), fi1(), sg1(), msk1()]),
   // the node refused because of the lock for the whole wait; the run closed itself, nothing was changed
   lockRefused: answer(
-    [nl1(), de1({}, { job: { jobId: "osj_9", action: "upgrade", mode: "security", state: "failed", code: "apt_lock", aptLockHolder: "unattended-upgr", aptLockMinutes: 30, upgraded: 0, startedUnix: now - 2000, finishedUnix: now - 200 } }), fi1(), sg1(), msk1()],
+    [nl1(), de1(), fi1(), sg1(), msk1()],
     rollout(
-      [step("nod_de1", "de1", { state: OsStepState.SKIPPED, errorKey: "try_later", finishedUnix: now - 200, params: { code: "apt_lock", mode: "security" } })],
+      [step("nod_de1", "de1", { state: OsStepState.SKIPPED, errorKey: "try_later", finishedUnix: now - 200, params: { code: "apt_lock", mode: "security", apt_lock_holder: "unattended-upgr", apt_lock_minutes: "30" } })],
       { status: OsRolloutStatus.DONE, finishedUnix: now - 200 },
     ),
   ),
   // one node, waiting for another try after "not now": the same calm block as in a run of several
   waitOne: answer(
     [nl1(), de1({ ...busy }, lockedStatus), fi1(), sg1(), msk1()],
-    rollout([step("nod_de1", "de1", { state: OsStepState.PENDING, phase: "waiting_retry", phaseUnix: now - 300, retryAfterUnix: now + 8 * min, params: { retry_code: "apt_lock", retry_after_unix: String(now + 8 * min), mode: "security" } })], { createdUnix: now - 300 }),
+    rollout([step("nod_de1", "de1", { state: OsStepState.PENDING, phase: "waiting_retry", phaseUnix: now - 300, retryAfterUnix: now + 8 * min, retryCode: "apt_lock", params: { retry_code: "apt_lock", retry_after_unix: String(now + 8 * min), mode: "security" } })], { createdUnix: now - 300 }),
   ),
   // an automatic update left part of the security packages behind
-  leftover: answer([nl1(), de1({}, { job: { jobId: "osj_8", action: "upgrade", mode: "security", state: "done", noteCode: "security_leftover_failed", note: "security updates remain", upgraded: 2, finishedUnix: now - 100 } }), fi1(), sg1(), msk1()]),
+  leftover: answer(
+    [nl1(), de1(), fi1(), sg1(), msk1()],
+    rollout(
+      [step("nod_de1", "de1", { state: OsStepState.PASSED, finishedUnix: now - 100, sentUnix: now - 700, params: { upgraded: "2", reboot: "not_asked", mode: "security", note_code: "security_leftover_failed", note: "2 packages still pending after unattended-upgrade" } })],
+      { status: OsRolloutStatus.DONE, finishedUnix: now - 100, reboot: OsRebootPolicy.NEVER },
+    ),
+  ),
 } satisfies Record<string, OsUpdates>;
 
 function fakeCalls() {
@@ -200,8 +206,7 @@ function DialogBlock({ auto }: { auto: string | null }) {
 /** The queue card alone, for the cancel window. */
 function RunBlock({ data, asking }: { data: OsUpdates; asking: boolean }) {
   const actions = useOsActions();
-  const rows = osRows(data);
-  return <OsFleetRun run={data.rollout!} owner actions={actions} nowSec={now} statusOf={(id) => rows.find((r) => r.nodeId === id)?.status} askingCancel={asking} />;
+  return <OsFleetRun run={data.rollout!} owner actions={actions} nowSec={now} askingCancel={asking} />;
 }
 
 export function OsFleetKit() {

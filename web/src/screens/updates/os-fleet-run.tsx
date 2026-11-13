@@ -15,7 +15,7 @@ import {
   currentStage, fleetCounts, fleetPhase, fleetStages, lockRefusedText, phaseOpen, phaseView, retriedBefore, stepChip, stoppedBy, waitText, waitingRetry,
 } from "@/lib/os-fleet";
 import { keyTail, pauseCode, pauseText, stepReason, type OsActions } from "@/lib/os-run";
-import type { Os, OsRun, OsStepRow } from "@/lib/os-updates";
+import type { OsRun, OsStepRow } from "@/lib/os-updates";
 import { vantageNote } from "@/lib/updates";
 
 // The queue of an OS update that goes through several nodes: the stages (the canary, then the batches), the state of each node,
@@ -48,17 +48,17 @@ function Chip({ step, nowSec, t }: { step: OsStepRow; nowSec: number; t: T }) {
 }
 
 /** The line under a stage for a node that waits, failed or was left alone: the reason, calm for a wait and a skip. */
-function note(t: T, s: OsStepRow, status: Os | undefined, nowSec: number): { text: string; kind: StatusKind } | null {
+function note(t: T, s: OsStepRow, nowSec: number): { text: string; kind: StatusKind } | null {
   if (waitingRetry(s)) return { text: waitText(t, s, nowSec), kind: "off" };
   // a skipped node says why on its own row below, and the node that stopped the run in the banner: not said a third time here
   if (s.state !== OsStepState.FAILED || keyTail(s.errorKey) === "cancelled") return null;
   const r = stepReason(t, s.errorKey, s.params);
-  const lock = lockRefusedText(t, status, s.params.code ?? "");
+  const lock = lockRefusedText(t, s.params, s.params.code ?? "");
   const text = [r.title, lock || r.detail].filter(Boolean).join(" ");
   return text ? { text, kind: "bad" } : null;
 }
 
-function Stages({ run, statusOf, nowSec, skipNoteOf }: { run: OsRun; statusOf: (nodeId: string) => Os | undefined; nowSec: number; /** The node the banner above already explains. */ skipNoteOf?: string }) {
+function Stages({ run, nowSec, skipNoteOf }: { run: OsRun; nowSec: number; /** The node the banner above already explains. */ skipNoteOf?: string }) {
   const t = useT();
   const stages = fleetStages(run);
   const phase = fleetPhase(run);
@@ -66,7 +66,7 @@ function Stages({ run, statusOf, nowSec, skipNoteOf }: { run: OsRun; statusOf: (
   return (
     <ol className="flex flex-col">
       {stages.map((st) => {
-        const why = st.steps.filter((s) => s.nodeId !== skipNoteOf).map((s) => ({ s, n: note(t, s, statusOf(s.nodeId), nowSec) })).filter((x) => x.n);
+        const why = st.steps.filter((s) => s.nodeId !== skipNoteOf).map((s) => ({ s, n: note(t, s, nowSec) })).filter((x) => x.n);
         return (
           <li key={st.stage} className="grid gap-x-4 gap-y-1.5 border-t border-line py-3 first:border-t-0 first:pt-1 sm:grid-cols-[150px_minmax(0,1fr)]">
             <div className="flex min-h-7 min-w-0 flex-col justify-center self-start">
@@ -201,7 +201,7 @@ function CancelDialog({ busy, onConfirm, onClose }: { busy: boolean; onConfirm: 
  * The run of several nodes: a header (what, how far, the state), the bar, the banner when it waits for the owner, the stages.
  * A run that has ended folds to its header (the stages one click away) unless it ended badly; one under way is always open.
  */
-export function OsFleetRun({ run, owner, actions, statusOf, nowSec, askingCancel }: { run: OsRun; owner: boolean; actions: OsActions; statusOf: (nodeId: string) => Os | undefined; nowSec: number; /** The dev kit opens the cancel window. */ askingCancel?: boolean }) {
+export function OsFleetRun({ run, owner, actions, nowSec, askingCancel }: { run: OsRun; owner: boolean; actions: OsActions; nowSec: number; /** The dev kit opens the cancel window. */ askingCancel?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const phase = fleetPhase(run);
@@ -258,7 +258,7 @@ export function OsFleetRun({ run, owner, actions, statusOf, nowSec, askingCancel
       {culprit && <StoppedBanner run={run} step={culprit} owner={owner} actions={actions} />}
       {open && (
         <div className="border-t border-line pt-2">
-          <Stages run={run} statusOf={statusOf} nowSec={nowSec} skipNoteOf={culprit?.nodeId} />
+          <Stages run={run} nowSec={nowSec} skipNoteOf={culprit?.nodeId} />
         </div>
       )}
       {asking && (

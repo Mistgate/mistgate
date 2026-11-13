@@ -4,7 +4,7 @@ import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
-import { leftoverText, lockNowText } from "@/lib/os-fleet";
+import { lockNowText } from "@/lib/os-fleet";
 import { osRows, osSystem, osUpdatesLine, useOsUpdates, type OsRow } from "@/lib/os-updates";
 import { OsNodeActions } from "@/screens/updates/os-actions";
 import { OsKernels } from "@/screens/updates/os-kernels";
@@ -32,9 +32,8 @@ export function OsFacts({ row, namesOpen }: { row: OsRow; /** The dev kit shows 
   const packages = s.rebootReasons.filter((r) => r !== "kernel");
   const why = s.rebootReasons.includes("kernel") && s.kernelNewest ? t("up.os.reboot.kernel", { version: s.kernelNewest }) : packages.length > 0 ? t("up.os.reboot.packages", { names: packages.slice(0, 3).join(", ") }) : "";
   const updates = osUpdatesLine(t, s);
-  // who is installing packages right now, and what an automatic update left behind: calm lines under the count
+  // who is installing packages right now: a calm line under the count
   const lock = s.apt === "locked" ? lockNowText(t, s, row.nowUnix ?? 0) : "";
-  const leftover = leftoverText(t, s);
   const auto = s.autoUpdates === "on" || s.autoUpdates === "off" || s.autoUpdates === "not_installed" ? t(`os.auto.${s.autoUpdates}`) : "—";
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
@@ -48,7 +47,6 @@ export function OsFacts({ row, namesOpen }: { row: OsRow; /** The dev kit shows 
         {updates.note && <span className="block text-muted">{updates.note}</span>}
         <SecurityNames status={s} node={row.name ?? ""} defaultOpen={namesOpen} />
         {lock && <span className="block text-muted">{lock}</span>}
-        {leftover && <span className="block text-muted">{leftover}</span>}
       </Fact>
       <Fact label={t("os.fact.reboot")} tone={s.rebootRequired ? "warn" : undefined}>
         {s.rebootRequired ? [t("os.fact.reboot.yes"), why].filter(Boolean).join(" · ") : t("os.fact.reboot.no")}

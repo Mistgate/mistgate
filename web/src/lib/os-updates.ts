@@ -49,11 +49,15 @@ export type OsRow = {
   updateCapable: boolean;
   /** Why "Install updates" / "Reboot" are refused right now, "" = allowed: the key of "os.block.<key>". */
   updateBlock: string;
+  /** The same for an "All packages" run (the server knows the mode: `updateBlock` is the security one). */
+  updateBlockAll: string;
   rebootBlock: string;
   /** Unix time from which a reboot is possible again (`rebootBlock` is "reboot_wait" until then), 0 = now. */
   rebootPossibleUnix?: number;
   /** The server's clock when it answered: "in N min" is counted from it, so a wrong clock of this browser changes nothing. */
   nowUnix?: number;
+  /** Enabled profiles of the node: the third key of the canary order (after the people online). */
+  inbounds?: number;
   /** This node's step in the active or last run, and the run itself. */
   step?: OsStepRow;
   rollout?: OsRun;
@@ -72,7 +76,7 @@ function stateOf(s: Os): OsUpdateState {
   return s.security > 0 || (s.apt === "half_configured" && s.pending > 0) ? OsUpdateState.UPDATES : OsUpdateState.UP_TO_DATE;
 }
 
-const noActions = { updateCapable: false, updateBlock: "", rebootBlock: "", rebootPossibleUnix: 0 };
+const noActions = { updateCapable: false, updateBlock: "", updateBlockAll: "", rebootBlock: "", rebootPossibleUnix: 0 };
 
 export function osRows(d: OsUpdates): OsRow[] {
   const host = d.panelHost;
@@ -87,7 +91,7 @@ export function osRows(d: OsUpdates): OsRow[] {
         : undefined;
     return {
       id: n.nodeId, name: n.name, nodeId: n.nodeId, online: n.onlineUsers, onPanelServer: n.onPanelServer, state: n.state, status: n.status, why,
-      updateCapable: n.updateCapable, updateBlock: n.updateBlock, rebootBlock: n.rebootBlock, rebootPossibleUnix: n.rebootPossibleUnix, nowUnix: d.nowUnix, rollout: d.rollout, step: d.rollout?.steps.find((x) => x.nodeId === n.nodeId),
+      updateCapable: n.updateCapable, updateBlock: n.updateBlock, updateBlockAll: n.updateBlockAll, inbounds: n.inbounds, rebootBlock: n.rebootBlock, rebootPossibleUnix: n.rebootPossibleUnix, nowUnix: d.nowUnix, rollout: d.rollout, step: d.rollout?.steps.find((x) => x.nodeId === n.nodeId),
     };
   });
   return [panel, ...nodes];
