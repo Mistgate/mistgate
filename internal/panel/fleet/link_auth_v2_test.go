@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -213,5 +214,71 @@ func TestLinkMiddleCannotStripSealing(t *testing.T) {
 				t.Fatal("the party in the middle got a session")
 			}
 		})
+	}
+}
+
+// markSealingAgents runs the marking statement of migration 00134 on the test database, as the panel update does for the
+// nodes it already has.
+func markSealingAgents(t *testing.T, e *env) {
+	t.Helper()
+	b, err := os.ReadFile("../store/migrations/00134_node_link_sealed.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := string(b)
+	from, to := strings.Index(sql, "UPDATE node SET link_sealed"), strings.Index(sql, "-- +goose Down")
+	if from < 0 || to < from {
+		t.Fatal("the marking statement is not in the migration")
+	}
+	e.exec(sql[from:to])
+}
+
+// After the panel update, a node that runs a sealing agent (v0.1.66 and later) is already marked, though it has not
+// reconnected yet: the proof a party in the middle forwards with the marker taken out is refused, with the event. A node
+// that really runs an older agent stays unmarked and connects plain, as before.
+func TestLinkMarkAfterPanelUpdate(t *testing.T) {
+	e := newEnv(t)
+	e.f.cfg.LinkServed = true
+	server := httptest.NewServer(e.f.LinkHandler())
+	t.Cleanup(server.Close)
+	current := e.enroll("de1")
+	old := e.enroll("nl1")
+	e.exec(`UPDATE node SET agent_version = 'v0.1.87' WHERE id = ?`, current.nodeID)
+	e.exec(`UPDATE node SET agent_version = 'v0.1.65' WHERE id = ?`, old.nodeID)
+	markSealingAgents(t, e)
+	if n, _ := e.st.Node(e.ctx, current.nodeID); !n.LinkSealed {
+		t.Fatal("the node with a v0.1.87 agent is not marked")
+	}
+	if n, _ := e.st.Node(e.ctx, old.nodeID); n.LinkSealed {
+		t.Fatal("the node with a v0.1.65 agent is marked")
+	}
+
+	// The agent's proof (v1, with the marker) goes through a party in the middle, which sends it with another nonce.
+	ws, challenge := dialPanelLink(t, server.URL, current.nodeID)
+	t.Cleanup(func() { _ = ws.Close(websocket.StatusNormalClosure, "") })
+	sealNonce, err := agentlink.SealNonce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	real := linkAuthFrame(t, current, false, challenge.Audience, challenge.Nonce, sealNonce)
+	forged := &agentv1.LinkAuth{NodeId: real.NodeId, Nonce: plainNonce(t), Signature: real.Signature}
+	if err := agentlink.WriteFrame(context.Background(), ws, forged); err != nil {
+		t.Fatal(err)
+	}
+	assertCloseStatus(t, ws, websocket.StatusPolicyViolation)
+	if e.f.session(current.nodeID) != nil {
+		t.Fatal("the party in the middle got a session")
+	}
+	if got := eventCodes(t, e, current.nodeID); !strings.Contains(got, "link_downgrade_refused") {
+		t.Errorf("no link_downgrade_refused event, events: %q", got)
+	}
+
+	// The node on the old agent connects plain, and stays unmarked.
+	pn, _, _ := LinkChallenge(linkV2Audience)
+	if _, keys, ok := acceptLink(t, e, old, linkAuthFrame(t, old, false, linkV2Audience, pn, plainNonce(t)), pn); !ok || keys != nil {
+		t.Fatalf("a node on an agent older than v0.1.66 was refused a plain session: ok=%v", ok)
+	}
+	if n, _ := e.st.Node(e.ctx, old.nodeID); n.LinkSealed {
+		t.Fatal("a plain session marked the node")
 	}
 }
