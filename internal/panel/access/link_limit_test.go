@@ -310,8 +310,8 @@ func TestBlockedDeviceIsRefusedUntilUnblocked(t *testing.T) {
 	}
 }
 
-// A silent device gives its place away in ENFORCE and STRICT, and the owner can read it in the events.
-func TestSilentDeviceGivesItsPlaceInEnforce(t *testing.T) {
+// An idle device frees a place, remains intact, and is refused on return when that place is full.
+func TestIdleDeviceFreesPlaceAndReturningDeviceIsRefused(t *testing.T) {
 	f := newFixture(t)
 	e := f.e
 	e.syncAfterResponse()
@@ -324,23 +324,54 @@ func TestSilentDeviceGivesItsPlaceInEnforce(t *testing.T) {
 		t.Fatalf("no silent device: refusal %q", v.Refusal)
 	}
 	e.sql(`UPDATE device SET last_seen_at = ? WHERE user_id = ? AND hwid_hash = ?`, e.clock.Add(-31*24*time.Hour).Unix(), r.User.Id, storeHash(r.User.Id, hintN(0)))
+	admin := must(e.s.GetUser(e.ctx, req(&adminv1.GetUserRequest{UserId: r.User.Id}))).Msg
+	var idleDevice *adminv1.Device
+	for _, d := range admin.Devices {
+		if d.Kind == adminv1.DeviceKind_DEVICE_KIND_LINK && d.Idle {
+			idleDevice = d
+			break
+		}
+	}
+	if admin.User.DevicesUsed != 1 || admin.User.DevicesIdle != 1 || idleDevice == nil || idleDevice.IdleSinceUnix != e.clock.Add(-24*time.Hour).Unix() {
+		t.Fatalf("admin idle summary/device = used %d idle %d device %+v", admin.User.DevicesUsed, admin.User.DevicesIdle, idleDevice)
+	}
+	// A returning device counts again when there is room.
+	if v := fetchAs(e, token, hintN(0), ""); v.Refusal != "" || v.DevicesUsed != 2 {
+		t.Fatalf("returning idle device with room: refusal %q used %d", v.Refusal, v.DevicesUsed)
+	}
+	e.sql(`UPDATE device SET last_seen_at = ? WHERE user_id = ? AND hwid_hash = ?`, e.clock.Add(-31*24*time.Hour).Unix(), r.User.Id, storeHash(r.User.Id, hintN(0)))
 	e.resetNotify()
 	v := fetchAs(e, token, hintN(2), "")
 	if v.Refusal != "" || len(v.Lines) != 1 {
-		t.Fatalf("a device silent for 31 days did not give its place: refusal %q", v.Refusal)
+		t.Fatalf("new device with idle capacity: refusal %q", v.Refusal)
 	}
 	if e.notify.n.Load() == 0 {
 		t.Error("the replacement did not notify the nodes")
 	}
-	if got := e.devicesOf(r.User.Id); len(got) != 2 {
-		t.Fatalf("devices = %v, want 2", got)
+	if got := e.devicesOf(r.User.Id); len(got) != 3 {
+		t.Fatalf("devices = %v, want 3 retained rows", got)
 	}
-	// The old one is refused now (a new HWID with no place), the new one is served.
+	// The idle device is the one that left. It is refused now, with no credential or row changes.
 	if v := fetchAs(e, token, hintN(0), ""); v.Refusal != RefusalDeviceLimit {
-		t.Fatalf("the device that gave its place: refusal %q", v.Refusal)
+		t.Fatalf("returning idle device: refusal %q", v.Refusal)
 	}
-	if n := e.events("device_replaced"); n != 1 {
-		t.Fatalf("device_replaced events = %d, want 1", n)
+	var wasIdle, liveCreds int
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND json_extract(params_json, '$.was_idle') = 'true'`, r.User.Id).Scan(&wasIdle); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM device_credential c JOIN device d ON d.id = c.device_id WHERE d.user_id = ? AND d.hwid_hash = ? AND c.revoked_at IS NULL`, r.User.Id, storeHash(r.User.Id, hintN(0))).Scan(&liveCreds); err != nil {
+		t.Fatal(err)
+	}
+	if wasIdle != 1 || liveCreds == 0 || e.events("device_replaced") != 0 {
+		t.Fatalf("idle refusal events=%d, retained credentials=%d, replacement events=%d", wasIdle, liveCreds, e.events("device_replaced"))
+	}
+	// Track observes the returning device but never refuses it.
+	e.setLinkMode(store.LinkModeTrack)
+	if v := fetchAs(e, token, hintN(0), ""); v.Refusal != "" || v.DevicesUsed != 3 {
+		t.Fatalf("returning idle device in track: refusal %q used %d", v.Refusal, v.DevicesUsed)
+	}
+	if got := e.devicesOf(r.User.Id); len(got) != 3 {
+		t.Fatalf("track return changed the other device rows: %v", got)
 	}
 }
 

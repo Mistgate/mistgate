@@ -265,10 +265,11 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 
 type subsLinkLimitsArgs struct {
 	ReasonField
-	Mode           *string `json:"mode,omitempty" jsonschema:"track counts only; enforce refuses new devices over the limit; strict also refuses apps without a device id"`
-	LinkAWG        *bool   `json:"link_awg,omitempty" jsonschema:"include AmneziaWG servers in subscription link apps"`
-	LinkAutoSelect *bool   `json:"link_auto_select,omitempty" jsonschema:"put automatic server selection (Auto) first in the Mihomo, sing-box and Xray JSON subscription documents"`
-	SettingsHash   string  `json:"settings_hash,omitempty" jsonschema:"-"`
+	Mode                *string `json:"mode,omitempty" jsonschema:"track counts only; enforce refuses new devices over the limit; strict also refuses apps without a device id"`
+	DeviceIdleAfterDays *uint32 `json:"device_idle_after_days,omitempty" jsonschema:"idle after this many days without a connection; 0 disables it; otherwise 7 to 365"`
+	LinkAWG             *bool   `json:"link_awg,omitempty" jsonschema:"include AmneziaWG servers in subscription link apps"`
+	LinkAutoSelect      *bool   `json:"link_auto_select,omitempty" jsonschema:"put automatic server selection (Auto) first in the Mihomo, sing-box and Xray JSON subscription documents"`
+	SettingsHash        string  `json:"settings_hash,omitempty" jsonschema:"-"`
 }
 
 var linkModes = map[string]adminv1.LinkDeviceLimit{
@@ -292,10 +293,10 @@ func linkModeWord(s *adminv1.SubscriptionSettings) string {
 
 var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 	name: "subscription_link_limits_set", min: ProfileOperator, danger: true, procs: settingsProcs,
-	desc: "Set device-limit handling for subscription link apps, whether link apps include AmneziaWG entries, and whether Mihomo and sing-box profiles include automatic server selection. Strict mode refuses shared no-device-id users; turning link_awg off drops the link keys of the link apps on the next fetch (not those of the Mistgate app). Always waits for owner approval.",
+	desc: "Set device-limit handling and the idle period for subscription link apps, whether link apps include AmneziaWG entries, and whether Mihomo and sing-box profiles include automatic server selection. The idle period is 30 days by default, 0 disables it, and otherwise accepts 7 to 365 days. Strict mode refuses shared no-device-id users; turning link_awg off drops the link keys of the link apps on the next fetch (not those of the Mistgate app). Always waits for owner approval.",
 	plan: func(c *call, a subsLinkLimitsArgs) (*planned, error) {
-		if a.Mode == nil && a.LinkAWG == nil && a.LinkAutoSelect == nil {
-			return nil, errors.New("give mode, link_awg, link_auto_select, or a combination")
+		if a.Mode == nil && a.DeviceIdleAfterDays == nil && a.LinkAWG == nil && a.LinkAutoSelect == nil {
+			return nil, errors.New("give mode, device_idle_after_days, link_awg, link_auto_select, or a combination")
 		}
 		cur, err := c.subscriptionSnapshot()
 		if err != nil {
@@ -319,6 +320,12 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 				n := strconv.FormatUint(uint64(cur.shared), 10)
 				facts = append(facts, codedFact("shared_link_users", plural(int(cur.shared), "shared user will be refused", "shared users will be refused"), "shared_link_users", "n", n))
 			}
+		}
+		if a.DeviceIdleAfterDays != nil && cur.settings.GetDeviceIdleAfterDays() != *a.DeviceIdleAfterDays {
+			before := strconv.FormatUint(uint64(cur.settings.GetDeviceIdleAfterDays()), 10)
+			after := strconv.FormatUint(uint64(*a.DeviceIdleAfterDays), 10)
+			next.DeviceIdleAfterDays = a.DeviceIdleAfterDays
+			facts = append(facts, changeFact("device_idle_after_days", before+" -> "+after, before, after))
 		}
 		if a.LinkAWG != nil {
 			before := subsettings.LinkAWG(cur.settings)
@@ -358,6 +365,9 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 		if a.Mode != nil {
 			mode := linkModes[*a.Mode]
 			next.LinkDeviceLimit = &mode
+		}
+		if a.DeviceIdleAfterDays != nil {
+			next.DeviceIdleAfterDays = a.DeviceIdleAfterDays
 		}
 		if a.LinkAWG != nil {
 			next.LinkAwg = a.LinkAWG

@@ -419,12 +419,12 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			cert := certByInbound[id]
 			certWrites = append(certWrites, fleetInboundCertWrite{InboundID: cert.InboundID, Pin: cert.Pin, NotAfter: fleetUnix(cert.NotAfter)})
 		}
-		// a key's last use is its newest session: an AmneziaWG key's handshake, a Telegram key's proxy session (a link device's
-		// last_seen_at is its last subscription fetch, so its tunnels do not touch it)
+		// A device's last use is the newest node-observed session, regardless of credential kind. Subscription fetches and
+		// client syncs update the same last_seen_at field, so its value stays the newest evidence the panel has.
 		touchAtByDevice := make(map[string]int64)
 		for _, se := range in.Sessions {
 			ref, ok := creds[se.CredID]
-			if !ok || (ref.Protocol != "awg" && ref.Protocol != TelegramProtocol) || ref.DeviceID == "" || se.ConnectedAt.Unix() <= 0 {
+			if !ok || ref.DeviceID == "" || se.ConnectedAt.Unix() <= 0 {
 				continue
 			}
 			touchedAt := se.ConnectedAt

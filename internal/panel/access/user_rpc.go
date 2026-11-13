@@ -77,7 +77,8 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		ids[i] = u.ID
 	}
 	a := s.st.Access()
-	devs, err := a.DeviceCounts(ctx, ids)
+	now := s.now()
+	devs, err := a.DeviceCounts(ctx, ids, now)
 	if err != nil {
 		return nil, s.internal("device counts", err)
 	}
@@ -134,10 +135,11 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		if !NextReset(u.QuotaReset, u.PeriodStart).IsZero() {
 			next = NextReset(u.QuotaReset, u.PeriodStart).Unix()
 		}
+		deviceCounts := devs[u.ID]
 		out[i] = &adminv1.User{
 			Id: u.ID, Name: u.Name, SubscriptionName: u.SubscriptionName, GroupId: u.GroupID, GroupName: u.GroupName, Status: statusProto[u.Status],
 			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia, Telegram: u.AppTelegram, Mistgate: new(!u.AppMistgateOff)}, Via: via,
-			DevicesUsed: uint32(devs[u.ID]), DeviceLimit: uint32(u.DeviceLimit),
+			DevicesUsed: uint32(deviceCounts.Used), DevicesIdle: uint32(deviceCounts.Idle), DeviceLimit: uint32(u.DeviceLimit),
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
 			ExpiresUnix: unixOrZero(u.ExpiresAt), LastSeenUnix: unixOrZero(u.LastSeenAt), Online: isOnline,
 			SpeedLimitBps: u.SpeedLimitBps, DeviceSpeedLimitBps: u.DeviceSpeedLimitBps, Nodes: &adminv1.NodeSelection{All: u.AllNodes, NodeIds: u.NodeIDs},
@@ -403,7 +405,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 	resp := &adminv1.GetUserResponse{User: protos[0]}
 	now := s.now()
 
-	devs, err := a.Devices(ctx, u.ID)
+	devs, err := a.Devices(ctx, u.ID, now)
 	if err != nil {
 		return nil, s.internal("devices", err)
 	}
@@ -420,6 +422,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 		if ad, ok := awgByID[d.ID]; ok {
 			dev := s.deviceProto(ad)
 			dev.UsedBytes = d.UsedBytes
+			dev.Idle, dev.IdleSinceUnix = d.Idle, unixOrZero(d.IdleSinceAt)
 			resp.Devices = append(resp.Devices, dev)
 			continue
 		}
@@ -434,7 +437,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 		resp.Devices = append(resp.Devices, &adminv1.Device{
 			Id: d.ID, Platform: d.Platform, Model: d.Model, FirstSeenUnix: unixOrZero(d.FirstSeenAt), LastSeenUnix: unixOrZero(d.LastSeenAt),
 			Online: len(nodes) > 0, Protocols: d.Protocols, Kind: kind, OsVersion: d.OSVersion, Client: d.Client, UsedBytes: d.UsedBytes,
-			OnlineNodeIds: nodes, Fingerprint: d.Fingerprint,
+			OnlineNodeIds: nodes, Fingerprint: d.Fingerprint, Idle: d.Idle, IdleSinceUnix: unixOrZero(d.IdleSinceAt),
 			Enrolled: len(d.KeyHash) > 0, EnrolLinkStale: len(d.KeyHash) > 0 && !bytes.Equal(d.EnrolTokenHash, u.SubTokenHash),
 		})
 	}

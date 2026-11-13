@@ -49,6 +49,9 @@ func TestDefaultsAreValidAndMatchThePlan(t *testing.T) {
 	if err := Validate(d); err != nil {
 		t.Fatalf("the defaults do not validate: %v", err)
 	}
+	if d.GetDeviceIdleAfterDays() != 30 {
+		t.Fatalf("default device_idle_after_days = %d, want 30", d.GetDeviceIdleAfterDays())
+	}
 	if d.ServerNameTemplate != DefaultNameTemplate {
 		t.Errorf("default server name template = %q, want %q", d.ServerNameTemplate, DefaultNameTemplate)
 	}
@@ -67,6 +70,35 @@ func TestDefaultsAreValidAndMatchThePlan(t *testing.T) {
 	}
 	if _, linuxHapp := got["PLATFORM_LINUX/APP_HAPP"]; linuxHapp {
 		t.Error("the defaults have no Happ on Linux")
+	}
+}
+
+func TestDeviceIdleAfterDaysBoundsAndPersistence(t *testing.T) {
+	for days, ok := range map[uint32]bool{0: true, 7: true, 30: true, 365: true, 6: false, 366: false} {
+		set := Defaults()
+		set.DeviceIdleAfterDays = proto.Uint32(days)
+		if err := Validate(set); (err == nil) != ok {
+			t.Errorf("device_idle_after_days %d: %v, want ok=%v", days, err, ok)
+		}
+	}
+	ctx := context.Background()
+	st := openStore(t)
+	c := NewCache(st, nil)
+	set := Defaults()
+	set.DeviceIdleAfterDays = proto.Uint32(0)
+	out, err := c.Update(ctx, set)
+	if err != nil || out.GetDeviceIdleAfterDays() != 0 {
+		t.Fatalf("saving the off value = %d, %v", out.GetDeviceIdleAfterDays(), err)
+	}
+	if got, err := st.Setting(ctx, store.SettingDeviceIdleAfterDays); err != nil || got != "0" {
+		t.Fatalf("stored device_idle_after_days = %q, %v", got, err)
+	}
+	// Older callers omit the additive field; omission preserves the current value.
+	set = Defaults()
+	set.DeviceIdleAfterDays = nil
+	out, err = c.Update(ctx, set)
+	if err != nil || out.GetDeviceIdleAfterDays() != 0 {
+		t.Fatalf("omitting the setting reset it: %d, %v", out.GetDeviceIdleAfterDays(), err)
 	}
 }
 

@@ -48,6 +48,7 @@ type SubView struct {
 	// DevicesUsed counts the devices that count against DeviceLimit (live credentials, the Telegram key not among them); Devices
 	// lists all of them, the Telegram key too.
 	DevicesUsed int
+	DevicesIdle int
 	Devices     []SubDevice
 	// AWGProfiles are the AmneziaWG profiles the user could add a device on right now (in the group, with a usable
 	// inbound; empty unless the Amnezia toggle is on).
@@ -82,8 +83,7 @@ type SubView struct {
 
 // The reasons of SubView.Refusal. They are stable words: the subscription handler words them for the apps (subs.stateNote).
 const (
-	// RefusalDeviceLimit: the person has no room for one more device (ENFORCE and STRICT) and none of theirs is silent enough to
-	// give its place away.
+	// RefusalDeviceLimit: the person has no room for a new device or a returning idle device (ENFORCE and STRICT).
 	RefusalDeviceLimit = "device_limit"
 	// RefusalDeviceBlocked: the owner blocked the device of the app.
 	RefusalDeviceBlocked = "device_blocked"
@@ -410,7 +410,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		v.Devices = append(v.Devices, sd)
 	}
-	v.DevicesUsed, v.LinkMode = data.LimitCount(), data.LinkMode // the Telegram key is listed but fills no place
+	v.DevicesUsed, v.DevicesIdle, v.LinkMode = data.LimitCount(), data.IdleCount(), data.LinkMode // the Telegram key is listed but fills no place
 	if v.Status != StatusActive {
 		// The app keeps fetching after access ended: the touch is what lets health notice that the person is trying.
 		if touch && opt.EnrolledDevice != nil {
@@ -446,9 +446,22 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	if touch && opt.EnrolledDevice != nil {
 		// The client API's device, known by its key: the one place where the credentials of an enrolled device are issued.
 		// The basic path below refuses such a device by design, so it is never reached from here.
+		if refusal := s.admit(u, rd, data); refusal != "" {
+			v.Refusal = refusal
+			return v, nil
+		}
+		wasIdle := rd.dev.Idle && len(rd.dev.Protocols) > 0
 		rd, err = s.ensureClientAPICreds(ctx, u, g, full, opt, rd)
 		if err != nil {
+			if refusal, _ := s.refusalOf(u, err); refusal != "" {
+				v.Refusal = refusal
+				return v, nil
+			}
 			return SubView{}, err
+		}
+		if wasIdle {
+			v.DevicesUsed++
+			v.DevicesIdle--
 		}
 		// The owner's switch "AmneziaWG in apps on the link" (NoLinkAWG) is for the other apps of the link: the Mistgate app gets
 		// AmneziaWG on its own terms (its switch, its caps, the profiles it may use), and its peers are never taken by that switch.
@@ -461,8 +474,13 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			v.Refusal = RefusalClientAPIEnrolled
 			return v, nil
 		}
+		wasIdle := rd.dev.Idle && len(rd.dev.Protocols) > 0
 		if rd, v.Refusal, err = s.ensureLinkCreds(ctx, u, opt.Device, rd, data); err != nil {
 			return SubView{}, err
+		}
+		if v.Refusal == "" && wasIdle {
+			v.DevicesUsed++
+			v.DevicesIdle--
 		}
 		changed := rd.added
 		if opt.Format == plugin.FormatMihomo && opt.NoLinkAWG {
@@ -846,15 +864,15 @@ func sharedDevice(devs []store.AccessDevice) store.AccessDevice {
 // In TRACK a user with twice the limit in live devices gets no device for one more HWID: that app takes the shared place, as
 // an app without a HWID does. refusal is a Refusal* reason, "" when the request is served.
 func (s *Service) ensureLinkCreds(ctx context.Context, u store.AccessUser, hint DeviceHint, rd requestDevice, data store.SubscriptionData) (requestDevice, string, error) {
+	if refusal := s.admit(u, rd, data); refusal != "" {
+		return rd, refusal, nil
+	}
 	have := make(map[string]bool, len(rd.dev.Protocols))
 	for _, protocol := range rd.dev.Protocols {
 		have[protocol] = true
 	}
 	if len(s.missingProtocols(u.AppHapp, u.AppAmnezia, u.AppTelegram, have)) == 0 {
 		return rd, "", nil // a user of the Amnezia app alone has none to give, and no device is made for nothing
-	}
-	if refusal := s.admit(u, rd, data); refusal != "" {
-		return rd, refusal, nil
 	}
 	m := hint.meta()
 	template := store.AccessDevice{ID: store.NewID("dev_"), UserID: u.ID, HWIDHash: rd.hash, Implicit: rd.hash == nil,
@@ -878,9 +896,8 @@ func (s *Service) ensureLinkCreds(ctx context.Context, u store.AccessUser, hint 
 	return requestDevice{dev: res.Device, creds: res.Creds, hash: rd.hash, added: len(res.Added) > 0}, "", nil
 }
 
-// admit is the refusal the snapshot of a fetch already holds for a request whose device does not exist yet. The store makes
-// the same decision again, with guards, when it is called; this one only spares the call (and its reads) to an app that is
-// refused on every refresh.
+// admit is the refusal the snapshot already holds for a new request device or a returning idle device. The store makes the same
+// decision again, with guards, when it is called; this one only spares the call (and its reads) to a refused request.
 func (s *Service) admit(u store.AccessUser, rd requestDevice, data store.SubscriptionData) string {
 	err := data.LinkRefusal(u.DeviceLimit, rd.hash != nil, s.now())
 	if err == nil {
@@ -904,7 +921,7 @@ func (s *Service) refusalOf(u store.AccessUser, err error) (refusal string, fall
 	case errors.As(err, &limit):
 		// TRACK refuses nobody: the app takes the shared place, and the event is a sighting. ENFORCE and STRICT turn it away.
 		refused := limit.Mode != store.LinkModeTrack
-		s.limitReached(u.ID, limit.Used, u.DeviceLimit, limit.Mode, refused)
+		s.limitReached(u.ID, limit.Used, u.DeviceLimit, limit.Mode, refused, limit.WasIdle)
 		if !refused {
 			return "", true
 		}
@@ -913,26 +930,25 @@ func (s *Service) refusalOf(u store.AccessUser, err error) (refusal string, fall
 	return "", false
 }
 
-// placed records what a device that was made in this request means for the limit: in TRACK, a person who now has more
-// devices than the limit is an event for the owner to see. A place that a silent device gave away is no such case.
+// placed records a new device in TRACK when it takes the person over their configured limit.
 func (s *Service) placed(u store.AccessUser, data store.SubscriptionData, res store.LinkDeviceResult) {
 	s.placedAt(u, data.LimitCount(), data.LinkMode, res)
 }
 
 // placedAt is placed for a caller that knows the count and the mode it decided on (the snapshot of the fetch, or the store's
-// result for an enrolment): used is the person's devices that count before the new one.
+// result for an enrolment): used is the person's active devices that count before the new one.
 func (s *Service) placedAt(u store.AccessUser, used int, mode string, res store.LinkDeviceResult) {
-	if res.Born && u.DeviceLimit > 0 && res.Replaced == "" && used >= u.DeviceLimit {
-		s.limitReached(u.ID, used+1, u.DeviceLimit, mode, false)
+	if res.Born && u.DeviceLimit > 0 && used >= u.DeviceLimit {
+		s.limitReached(u.ID, used+1, u.DeviceLimit, mode, false, false)
 	}
 }
 
 // limitReached writes the device_limit_reached event off the request (the store keeps one an hour per user; the same hour is
 // remembered here too, so that a refused app that keeps asking does not even queue the read). On Cloudflare the work runs
 // after the response (AfterResponse).
-func (s *Service) limitReached(userID string, used, limit int, mode string, refused bool) {
+func (s *Service) limitReached(userID string, used, limit int, mode string, refused, wasIdle bool) {
 	now := s.now()
-	key := "lim:" + userID + ":" + strconv.FormatBool(refused)
+	key := "lim:" + userID + ":" + strconv.FormatBool(refused) + ":" + strconv.FormatBool(wasIdle)
 	if at, seen := s.limited.LoadOrStore(key, now); seen {
 		if now.Sub(at.(time.Time)) < time.Hour {
 			return
@@ -942,7 +958,7 @@ func (s *Service) limitReached(userID string, used, limit int, mode string, refu
 	s.afterResponse(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := s.st.RecordDeviceLimitReached(ctx, userID, used, limit, mode, refused, now); err != nil {
+		if err := s.st.RecordDeviceLimitReached(ctx, userID, used, limit, mode, refused, wasIdle, now); err != nil {
 			s.log.Warn("access: device limit event", "code", "device_limit_event_write_failed", "user", userID, "err", err)
 		}
 	})
@@ -982,7 +998,7 @@ func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, 
 	}
 	result, err := s.st.Access().EnsureEnrolledLinkDevice(ctx, dev, s.now(), func(deviceID string, have map[string]bool) ([]store.AccessCred, error) {
 		return s.newCreds(u.ID, deviceID, u.AppHapp, u.AppAmnezia, u.AppTelegram, have)
-	}, want)
+	}, want, u.DeviceLimit)
 	if err != nil {
 		return rd, err
 	}
@@ -1117,7 +1133,7 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 const deviceTouchEvery = time.Hour
 
 // clientTouchEvery is the same for a device of the client API, which syncs by itself about hourly: a write at most this often per
-// device keeps last_seen_at honest (a device silent for 30 days is evicted) without a write per request.
+// device keeps last_seen_at current without a write per request.
 const clientTouchEvery = 10 * time.Minute
 
 // touchDevice records a fetch on the device, off the request path and at most once per device at a time. The

@@ -232,7 +232,7 @@ func TestAWGDeviceCreateRejections(t *testing.T) {
 	wantCode(t, err, connect.CodeNotFound)
 	_ = msgOf
 	// Nothing was stored by the rejected calls: one device (the "ok" one).
-	if n := must(e.st.Access().DeviceCounts(e.ctx, []string{f.user}))[f.user]; n != 1 {
+	if n := must(e.st.Access().DeviceCounts(e.ctx, []string{f.user}, e.s.now()))[f.user].Used; n != 1 {
 		t.Errorf("devices = %d", n)
 	}
 }

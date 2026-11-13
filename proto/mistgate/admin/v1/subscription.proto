@@ -55,6 +55,9 @@ message SubscriptionSettings {
   optional bool link_awg = 14;
   // Include automatic server selection in Mihomo and sing-box subscription profiles; absent means on.
   optional bool link_auto_select = 15;
+  // Days without a connection or subscription fetch before a device stops counting. 0 disables idling; otherwise 7 to 365.
+  // Absent in an update = keep the stored setting.
+  optional uint32 device_idle_after_days = 16;
 }
 
 // The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).

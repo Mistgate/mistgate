@@ -148,6 +148,7 @@ type pageUser struct {
 	NextResetUnix int64  `json:"next_reset_unix"`
 	DeviceLimit   int    `json:"device_limit"`
 	DevicesUsed   int    `json:"devices_used"`
+	DevicesIdle   int    `json:"devices_idle"`
 }
 
 type pageOptions struct {
@@ -233,7 +234,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 		Brand: pageBrand{Parts: parts, LogoSVG: b.LogoSVG, Accent: b.Accent},
 		User: pageUser{
 			Name: pageName, Status: v.Status, ExpiresUnix: unixOrZero(v.Expires), UsedBytes: v.Up + v.Down, QuotaBytes: v.Total,
-			QuotaReset: v.QuotaReset, NextResetUnix: unixOrZero(v.NextReset), DeviceLimit: v.DeviceLimit, DevicesUsed: v.DevicesUsed,
+			QuotaReset: v.QuotaReset, NextResetUnix: unixOrZero(v.NextReset), DeviceLimit: v.DeviceLimit, DevicesUsed: v.DevicesUsed, DevicesIdle: v.DevicesIdle,
 		},
 		Announcement: set.GetAnnouncement(), SupportURL: set.GetSupportUrl(),
 		Options: pageOptions{ShowAnnouncement: opt.GetShowAnnouncement(), ShowSupport: opt.GetShowSupport(), ShowQR: opt.GetShowQr()},

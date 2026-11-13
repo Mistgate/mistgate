@@ -59,7 +59,7 @@ func TestSubscriptionFetchIsReadOnly(t *testing.T) {
 	}
 	w.Close()
 
-	if n := len(must(e.st.Access().Devices(e.ctx, r.User.Id))); n != len(hints) {
+	if n := len(must(e.st.Access().Devices(e.ctx, r.User.Id, e.s.now()))); n != len(hints) {
 		t.Errorf("repeated fetches left %d devices, want %d", n, len(hints))
 	}
 }

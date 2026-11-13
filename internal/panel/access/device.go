@@ -274,8 +274,8 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 	var limit *store.AccessLimitError
 	switch {
 	case errors.As(err, &limit):
-		if eventErr := s.st.RecordDeviceLimitReached(ctx, u.ID, limit.Used, limit.Limit, limit.Mode, true, now); eventErr != nil {
-			s.log.Warn("access: device limit event", "user", u.ID, "err", eventErr)
+		if eventErr := s.st.RecordDeviceLimitReached(ctx, u.ID, limit.Used, limit.Limit, limit.Mode, true, limit.WasIdle, now); eventErr != nil {
+			s.log.Warn("access: device limit event", "code", "device_limit_event_write_failed", "user", u.ID, "err", eventErr)
 		}
 		return store.AccessAWGDevice{}, nil, failed("device_limit: %d/%d%s", limit.Used, limit.Limit, s.limitDevices(ctx, u.ID))
 	case errors.Is(err, store.ErrAccessSubnetFull):
@@ -300,7 +300,7 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 // (the label of each device, the apps and the keys alike, "shared" for the common place; at most six, then "…"), or "" when
 // they cannot be read. It is the detail the admin's text puts in brackets, so it holds names and no words of a language.
 func (s *Service) limitDevices(ctx context.Context, userID string) string {
-	devs, err := s.st.Access().Devices(ctx, userID)
+	devs, err := s.st.Access().Devices(ctx, userID, s.now())
 	if err != nil || len(devs) == 0 {
 		return ""
 	}
@@ -377,7 +377,7 @@ func (s *Service) RotateDevice(ctx context.Context, by, owner, deviceID string) 
 // link device).
 func (s *Service) ownDevice(ctx context.Context, owner, deviceID string) (store.AccessDevice, *store.AccessAWGDevice, error) {
 	a := s.st.Access()
-	dev, err := a.Device(ctx, deviceID)
+	dev, err := a.Device(ctx, deviceID, s.now())
 	if errors.Is(err, store.ErrNotFound) || (err == nil && owner != "" && dev.UserID != owner) {
 		return store.AccessDevice{}, nil, notFound("device")
 	} else if err != nil {

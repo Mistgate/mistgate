@@ -129,8 +129,10 @@ The mode is set in the card **Device limit for apps on the link**, under the rul
 | Mode | What it does |
 |:--|:--|
 | **Only count** | Nobody is refused. Devices get their places and keys, the limit is counted, and the users list shows who is over it. A person can have up to twice the limit; beyond that, a new app takes the shared place instead of one of its own, so an app that sends a different ID with every request cannot fill the panel. The event "the device limit is reached" is history only. |
-| **Limit** | A new device over the limit is refused. The devices a person already has stay. A link device silent for 30 days gives its place to a new one. Apps without a device ID share one place, and when the limit is full and there is no shared place yet, such an app is refused too. |
+| **Limit** | A new device over the limit is refused. Idle devices stay with their keys and credentials, but do not fill a place. Apps without a device ID share one place, and when the limit is full and there is no shared place yet, such an app is refused too. |
 | **Strict** | As **Limit**, and an app without a device ID is refused. Switching to it removes every shared place at once. |
+
+By default, a device becomes idle after 30 days without a connection seen by a node or a subscription fetch from that device. Set **Device idle after** to 7–365 days, or 0 to turn idling off. A device that has never connected counts from its creation. Idle devices keep their keys and credentials; when one returns, it counts again and is refused only if the limit is full in **Limit** or **Strict** mode. This applies to link and Mistgate app devices and AmneziaWG key devices.
 
 The default depends on the panel. A panel that already has users gets **Only count** when it is updated, so no one is cut off the day of the update. A new panel with no users gets **Limit**. The owner and helpers change the mode; the change applies at the next fetch.
 

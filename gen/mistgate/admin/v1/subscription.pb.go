@@ -290,8 +290,11 @@ type SubscriptionSettings struct {
 	LinkAwg *bool `protobuf:"varint,14,opt,name=link_awg,json=linkAwg,proto3,oneof" json:"link_awg,omitempty"`
 	// Include automatic server selection in Mihomo and sing-box subscription profiles; absent means on.
 	LinkAutoSelect *bool `protobuf:"varint,15,opt,name=link_auto_select,json=linkAutoSelect,proto3,oneof" json:"link_auto_select,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Days without a connection or subscription fetch before a device stops counting. 0 disables idling; otherwise 7 to 365.
+	// Absent in an update = keep the stored setting.
+	DeviceIdleAfterDays *uint32 `protobuf:"varint,16,opt,name=device_idle_after_days,json=deviceIdleAfterDays,proto3,oneof" json:"device_idle_after_days,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *SubscriptionSettings) Reset() {
@@ -427,6 +430,13 @@ func (x *SubscriptionSettings) GetLinkAutoSelect() bool {
 		return *x.LinkAutoSelect
 	}
 	return false
+}
+
+func (x *SubscriptionSettings) GetDeviceIdleAfterDays() uint32 {
+	if x != nil && x.DeviceIdleAfterDays != nil {
+		return *x.DeviceIdleAfterDays
+	}
+	return 0
 }
 
 // What the owner offers for the link apps. A person's pick applies while it is offered; without one, their link apps get the
@@ -1287,7 +1297,7 @@ var File_mistgate_admin_v1_subscription_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xb2\x06\n" +
+	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x87\a\n" +
 	"\x14SubscriptionSettings\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\"\n" +
 	"\fannouncement\x18\x02 \x01(\tR\fannouncement\x12\x1f\n" +
@@ -1305,10 +1315,12 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\thapp_ping\x18\f \x01(\x0e2\x1b.mistgate.admin.v1.HappPingR\bhappPing\x12)\n" +
 	"\x11happ_ping_on_open\x18\r \x01(\bR\x0ehappPingOnOpen\x12\x1e\n" +
 	"\blink_awg\x18\x0e \x01(\bH\x01R\alinkAwg\x88\x01\x01\x12-\n" +
-	"\x10link_auto_select\x18\x0f \x01(\bH\x02R\x0elinkAutoSelect\x88\x01\x01B\x14\n" +
+	"\x10link_auto_select\x18\x0f \x01(\bH\x02R\x0elinkAutoSelect\x88\x01\x01\x128\n" +
+	"\x16device_idle_after_days\x18\x10 \x01(\rH\x03R\x13deviceIdleAfterDays\x88\x01\x01B\x14\n" +
 	"\x12_link_device_limitB\v\n" +
 	"\t_link_awgB\x13\n" +
-	"\x11_link_auto_select\"[\n" +
+	"\x11_link_auto_selectB\x19\n" +
+	"\x17_device_idle_after_days\"[\n" +
 	"\x0eLinkDnsOptions\x12\x1d\n" +
 	"\n" +
 	"preset_ids\x18\x01 \x03(\tR\tpresetIds\x12*\n" +

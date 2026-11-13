@@ -417,7 +417,7 @@ func TestEnrolLinkDeviceBirthEvictionAndRefusals(t *testing.T) {
 		}
 	})
 
-	t.Run("at the limit a device silent for 30 days gives its place away, with the event", func(t *testing.T) {
+	t.Run("an idle device frees a place without being changed", func(t *testing.T) {
 		s := clientDeviceKeyFixture(t)
 		old, err := s.Access().EnsureLinkDevice(ctx, linkDevice("usr_alice", "old", hwid(1)), 2, linkNow, linkCreds("old", "usr_alice"))
 		if err != nil {
@@ -428,14 +428,17 @@ func TestEnrolLinkDeviceBirthEvictionAndRefusals(t *testing.T) {
 		}
 		silence(t, s, old.Device.ID, linkNow.Add(-LinkEvictAfter-time.Hour))
 		r, err := s.Access().EnrolLinkDevice(ctx, enrolDevice("usr_alice", "new", hwid(3)), 2, linkNow, linkCreds("new", "usr_alice"))
-		if err != nil || r.Device.ID != "dev_new" || r.Replaced != old.Device.ID {
-			t.Fatalf("enrol in the place of a silent device = %+v, %v", r, err)
+		if err != nil || r.Device.ID != "dev_new" || r.Replaced != "" {
+			t.Fatalf("enrol with an idle device = %+v, %v", r, err)
 		}
-		if n := countT(t, s, `SELECT count(*) FROM event WHERE code = 'device_replaced' AND user_id = 'usr_alice'`); n != 1 {
-			t.Fatalf("device_replaced events = %d, want 1", n)
+		if n := countT(t, s, `SELECT count(*) FROM event WHERE code = 'device_replaced' AND user_id = 'usr_alice'`); n != 0 {
+			t.Fatalf("device_replaced events = %d, want 0", n)
 		}
-		if n := liveDevices(t, s, "usr_alice"); n != 2 {
-			t.Fatalf("live devices = %d, want 2", n)
+		if n := liveDevices(t, s, "usr_alice"); n != 3 {
+			t.Fatalf("live devices = %d, want 3", n)
+		}
+		if n := liveCredsOf(t, s, old.Device.ID); n != 2 {
+			t.Fatalf("idle device live credentials = %d, want 2", n)
 		}
 	})
 }

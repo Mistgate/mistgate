@@ -108,7 +108,7 @@ func TestLinkDeviceWithAWGCredentialsIsNotAKey(t *testing.T) {
 		t.Fatalf("health AWG signals = %+v, %v; want only dev_key", signals.AWGDevices, err)
 	}
 	// Both are devices of the user, and the kinds read back.
-	devices, err := s.Access().Devices(ctx, u.ID)
+	devices, err := s.Access().Devices(ctx, u.ID, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

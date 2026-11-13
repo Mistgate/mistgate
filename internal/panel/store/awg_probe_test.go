@@ -67,7 +67,7 @@ func awgNet(t *testing.T, s *Store, suffix string) (profile, inbound string) {
 
 func awgDevice(t *testing.T, s *Store, profile, user, dev string, maxIdx int) (int, error) {
 	t.Helper()
-	return s.Access().AddAWGDevice(context.Background(), AWGDeviceAdd{Device: AccessDevice{ID: dev, UserID: user}, ProfileID: profile, MaxIdx: maxIdx, Limit: 1000}, time.Unix(100, 0),
+	return s.Access().AddAWGDevice(context.Background(), AWGDeviceAdd{Device: AccessDevice{ID: dev, UserID: user}, ProfileID: profile, MaxIdx: maxIdx, Limit: 1000}, linkNow,
 		func(idx int) (AccessCred, string, error) {
 			return AccessCred{ID: "crd_" + dev, Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_" + dev, nil
 		})

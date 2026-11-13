@@ -678,6 +678,30 @@ func TestEnrolRefusalsOfThePersonAndTheLimit(t *testing.T) {
 	}
 }
 
+func TestIdleDeviceFreesAPlaceForClientEnrolment(t *testing.T) {
+	e := newEnrolEnv(t, nil)
+	e.switchAPI(true)
+	e.setLinkMode(store.LinkModeEnforce)
+	uid, tok := e.user("alice", func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 2 })
+	old := e.enrolOK(tok, hwidA)
+	e.enrolOK(tok, hwidB)
+	oldCreds := e.liveCredIDs(old.DeviceID)
+	if _, err := e.st.W.Exec(`UPDATE device SET last_seen_at = ? WHERE id = ?`, time.Now().Add(-31*24*time.Hour).Unix(), old.DeviceID); err != nil {
+		t.Fatal(err)
+	}
+	newDevice := e.enrolOK(tok, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	if newDevice.DeviceID == old.DeviceID || e.count(`SELECT count(*) FROM device WHERE user_id = ? AND revoked_at IS NULL`, uid) != 3 {
+		t.Fatal("idle client enrolment did not add a distinct device while retaining all three rows")
+	}
+	if got := e.liveCredIDs(old.DeviceID); got != oldCreds {
+		t.Fatalf("idle device credentials changed during enrolment: %q -> %q", oldCreds, got)
+	}
+	counts, err := e.st.Access().DeviceCounts(e.ctx, []string{uid}, time.Now())
+	if err != nil || counts[uid] != (store.AccessDeviceCounts{Used: 2, Idle: 1}) {
+		t.Fatalf("device counts after enrolment = %+v, %v", counts[uid], err)
+	}
+}
+
 // The answer of an enrolment can be lost on the way. The client sends the same key again and gets the same answer, once more,
 // with nothing changed: no new credentials, no second audit row, no notification of the nodes and no budget spent.
 func TestEnrolRepeatOfALostAnswerIsIdempotent(t *testing.T) {

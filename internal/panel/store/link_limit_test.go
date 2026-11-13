@@ -3,6 +3,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,11 +12,11 @@ import (
 	"time"
 )
 
-// The limit of link devices: the ceiling per mode, the refusals, the owner's block, the replacement of a silent device, the
-// switch to STRICT, the sweep of old rows, the counts. As in link_device_test.go, a race is staged by letting the competing
+// The limit of link devices: the ceiling per mode, the refusals, idle counting, the owner's block, the switch to STRICT, the
+// sweep of old rows, the counts. As in link_device_test.go, a race is staged by letting the competing
 // writer win between the read and the write of the attempt under test.
 
-var silentSince = linkNow.Add(-LinkEvictAfter - time.Hour) // a last_seen_at older than the replacement window
+var idleSeenAt = linkNow.Add(-LinkEvictAfter - time.Hour) // last_seen_at beyond the default idle interval
 
 func hwidOf(user string, n int) []byte {
 	return HWIDHash(user, fmt.Sprintf("hwid-value-%02d-padding", n))
@@ -246,7 +247,7 @@ func TestBlockedHashIsNeverBornAgain(t *testing.T) {
 		t.Fatalf("BlockDevice = %q, %v", userID, err)
 	}
 	if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_h01' AND revoked_at IS NULL`); n != 0 {
-		t.Fatalf("the blocked device holds %d live credentials", n)
+		t.Fatalf("the blocked device holds %d live credentials, want them revoked", n)
 	}
 	before := countT(t, s, `SELECT count(*) FROM device`)
 	if _, err := s.Access().EnsureLinkDevice(ctx, linkDevice("usr_l", "again", hash), 5, linkNow, linkCreds("again", "usr_l")); !errors.Is(err, ErrAccessBlocked) {
@@ -402,7 +403,7 @@ func TestEnsureLinkAWGCredsHonoursBlockAndLimit(t *testing.T) {
 	}
 }
 
-func TestSilentDeviceGivesItsPlaceToANewHWID(t *testing.T) {
+func TestIdleDeviceFreesPlaceWithoutRevocation(t *testing.T) {
 	ctx := context.Background()
 	s := linkFixture(t, "usr_l")
 	for n := 1; n <= 3; n++ {
@@ -410,78 +411,79 @@ func TestSilentDeviceGivesItsPlaceToANewHWID(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	silence(t, s, "dev_h01", silentSince.Add(-48*time.Hour))
-	silence(t, s, "dev_h02", silentSince) // silent too, but the other one is older
+	silence(t, s, "dev_h01", idleSeenAt.Add(-48*time.Hour))
+	silence(t, s, "dev_h02", idleSeenAt) // idle too; both remain in the store
 	r, err := ensureHWID(ctx, s, "usr_l", 4, 3)
-	if err != nil || r.Device.ID != "dev_h04" || r.Replaced != "dev_h01" || !r.Born || len(r.Added) != 2 {
-		t.Fatalf("a new HWID at the limit with silent devices = %+v, %v; want dev_h04 in the place of dev_h01", r, err)
+	if err != nil || r.Device.ID != "dev_h04" || r.Replaced != "" || !r.Born || len(r.Added) != 2 {
+		t.Fatalf("a new HWID with idle devices = %+v, %v; want dev_h04 and no replacement", r, err)
 	}
-	if n := liveDevices(t, s, "usr_l"); n != 3 {
-		t.Fatalf("live devices = %d, want 3", n)
+	if n := liveDevices(t, s, "usr_l"); n != 4 {
+		t.Fatalf("live devices = %d, want 4", n)
 	}
-	if n := countT(t, s, `SELECT count(*) FROM device WHERE id = 'dev_h01' AND revoked_at IS NOT NULL AND blocked_at IS NULL`); n != 1 {
-		t.Fatal("the oldest silent device was not revoked (or was blocked)")
+	if n := countT(t, s, `SELECT count(*) FROM device WHERE id = 'dev_h01' AND revoked_at IS NULL`); n != 1 {
+		t.Fatal("the idle device row was removed")
 	}
-	if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_h01' AND revoked_at IS NULL`); n != 0 {
-		t.Fatalf("the replaced device keeps %d live credentials", n)
+	if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_h01' AND revoked_at IS NULL`); n != 2 {
+		t.Fatalf("the idle device has %d live credentials, want 2", n)
 	}
 	if n := countT(t, s, `SELECT count(*) FROM device WHERE id = 'dev_h02' AND revoked_at IS NULL`); n != 1 {
-		t.Fatal("a second silent device was revoked for one new HWID")
+		t.Fatal("a second idle device was removed for one new HWID")
 	}
-	var params string
-	if err := s.R.QueryRowContext(ctx, `SELECT params_json FROM event WHERE code = 'device_replaced' AND user_id = 'usr_l' AND device_id = 'dev_h04'`).Scan(&params); err != nil {
-		t.Fatalf("the device_replaced event: %v", err)
-	}
-	if want := `{"last_seen":"` + fmt.Sprint(silentSince.Add(-48*time.Hour).Unix()) + `","model":"","old_device":"dev_h01","platform":"ios"}`; params != want {
-		t.Fatalf("event params %s, want %s", params, want)
+	if n := countT(t, s, `SELECT count(*) FROM event WHERE code = 'device_replaced' AND user_id = 'usr_l'`); n != 0 {
+		t.Fatalf("device_replaced events = %d, want 0", n)
 	}
 }
 
-func TestOnlySilentLinkDevicesGivePlacesAndNeverInTrack(t *testing.T) {
+func TestIdleAWGKeyFreesAPlaceAndKeepsItsCredential(t *testing.T) {
 	ctx := context.Background()
 	s := linkFixture(t, "usr_l")
 	profile, _ := awgNet(t, s, "evict")
 	if _, err := awgDevice(t, s, profile, "usr_l", "dev_key", 8); err != nil {
 		t.Fatal(err)
 	}
-	silence(t, s, "dev_key", silentSince.Add(-24*365*time.Hour)) // a key silent for a year
 	if _, err := ensureHWID(ctx, s, "usr_l", 1, 2); err != nil {
 		t.Fatal(err)
 	}
-	var limit *AccessLimitError
-	// A key is never a place to give away, and a link device silent for less than the window is not one either.
-	silence(t, s, "dev_h01", linkNow.Add(-LinkEvictAfter+time.Hour))
-	if _, err := ensureHWID(ctx, s, "usr_l", 2, 2); !errors.As(err, &limit) {
-		t.Fatalf("at the limit with a silent key and a link device silent for 29 days = %v, want a limit error", err)
+	type awgState struct {
+		ID, DataJSON, PublicKey string
+		Secret                  []byte
+		Idx, Revoked, Released  int64
 	}
-	// The shared device may be made only under the limit, and takes no place from anyone.
-	silence(t, s, "dev_h01", silentSince)
-	if _, err := s.Access().EnsureLinkDevice(ctx, linkDevice("usr_l", "s", nil), 2, linkNow, linkCreds("s", "usr_l")); !errors.As(err, &limit) {
-		t.Fatalf("the shared device at the limit with a silent device = %v, want a limit error", err)
-	}
-	// TRACK has its ceiling instead: twice the limit, and a silent device is no help there.
-	setLinkMode(t, s, LinkModeTrack)
-	for n := 2; n <= 3; n++ {
-		if _, err := ensureHWID(ctx, s, "usr_l", n, 2); err != nil {
-			t.Fatalf("HWID %d in track under twice the limit: %v", n, err)
+	readKey := func() awgState {
+		t.Helper()
+		var got awgState
+		if err := s.R.QueryRowContext(ctx, `SELECT c.id, c.secret_enc, c.data_json, coalesce(c.revoked_at, 0), ap.public_key, ap.idx, ap.released_at
+			FROM device_credential c JOIN awg_peer ap ON ap.credential_id = c.id
+			WHERE c.device_id = 'dev_key' AND c.protocol = 'awg'`).
+			Scan(&got.ID, &got.Secret, &got.DataJSON, &got.Revoked, &got.PublicKey, &got.Idx, &got.Released); err != nil {
+			t.Fatal(err)
 		}
+		return got
 	}
-	if _, err := ensureHWID(ctx, s, "usr_l", 4, 2); !errors.As(err, &limit) || limit.Mode != LinkModeTrack {
-		t.Fatalf("a new HWID in track at twice the limit = %v, want a limit error", err)
+	before := readKey()
+	var limit *AccessLimitError
+	if _, err := ensureHWID(ctx, s, "usr_l", 2, 2); !errors.As(err, &limit) {
+		t.Fatalf("at the limit with an active AWG key = %v, want a limit error", err)
 	}
-	if n := countT(t, s, `SELECT count(*) FROM device WHERE user_id = 'usr_l' AND revoked_at IS NOT NULL`); n != 0 {
-		t.Fatalf("%d devices were revoked without a replacement", n)
+	silence(t, s, "dev_key", linkNow.Add(-31*24*time.Hour))
+	if _, err := ensureHWID(ctx, s, "usr_l", 2, 2); err != nil {
+		t.Fatalf("new device with an idle AWG key = %v", err)
 	}
-	// STRICT replaces too.
-	setLinkMode(t, s, LinkModeStrict)
-	if r, err := ensureHWID(ctx, s, "usr_l", 5, 2); err != nil || r.Replaced != "dev_h01" {
-		t.Fatalf("a new HWID in strict = %+v, %v; want the place of dev_h01", r, err)
+	if n := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_key' AND revoked_at IS NULL`); n != 1 {
+		t.Fatalf("idle AWG credentials = %d, want 1", n)
+	}
+	if n := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id = 'crd_dev_key' AND released_at = 0`); n != 1 {
+		t.Fatalf("idle AWG peer rows = %d, want 1", n)
+	}
+	after := readKey()
+	if before.ID != after.ID || !bytes.Equal(before.Secret, after.Secret) || before.DataJSON != after.DataJSON || before.Revoked != after.Revoked ||
+		before.PublicKey != after.PublicKey || before.Idx != after.Idx || before.Released != after.Released {
+		t.Fatal("the idle AWG key's credential or peer changed")
 	}
 }
 
-// Two new HWIDs find the same silent device and both try to take its place: the one that is late finds it gone and, at the
-// limit again, is refused.
-func TestTwoEvictionsOfOneVictimMakeOneDevice(t *testing.T) {
+// A freed place admits one concurrent new device; neither writer removes the idle device.
+func TestIdleDeviceConcurrentAdmissionKeepsTheOldDevice(t *testing.T) {
 	ctx := context.Background()
 	s := linkFixture(t, "usr_l")
 	for n := 1; n <= 2; n++ {
@@ -489,7 +491,7 @@ func TestTwoEvictionsOfOneVictimMakeOneDevice(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	silence(t, s, "dev_h01", silentSince)
+	silence(t, s, "dev_h01", idleSeenAt)
 	racing := false
 	var inner error
 	var innerRes LinkDeviceResult
@@ -502,24 +504,24 @@ func TestTwoEvictionsOfOneVictimMakeOneDevice(t *testing.T) {
 	}
 	_, err := s.Access().EnsureLinkDevice(ctx, linkDevice("usr_l", "h05", hwidOf("usr_l", 5)), 2, linkNow, issueX)
 	var limit *AccessLimitError
-	if inner != nil || innerRes.Replaced != "dev_h01" || !errors.As(err, &limit) || limit.Used != 2 {
-		t.Fatalf("the early writer got %+v, %v; the late one %v; want the early one in the place and the late one refused", innerRes, inner, err)
+	if inner != nil || innerRes.Device.ID != "dev_h06" || innerRes.Replaced != "" || !errors.As(err, &limit) || limit.Used != 2 {
+		t.Fatalf("first writer %+v, %v; second writer %v; want one admission and one limit refusal", innerRes, inner, err)
 	}
-	if n := liveDevices(t, s, "usr_l"); n != 2 {
-		t.Fatalf("live devices = %d, want 2", n)
+	if n := liveDevices(t, s, "usr_l"); n != 3 {
+		t.Fatalf("live devices = %d, want 3", n)
 	}
-	if n := countT(t, s, `SELECT count(*) FROM event WHERE code = 'device_replaced'`); n != 1 {
-		t.Fatalf("device_replaced events = %d, want 1", n)
+	if n := countT(t, s, `SELECT count(*) FROM device WHERE id = 'dev_h01' AND revoked_at IS NULL`); n != 1 {
+		t.Fatal("the idle device was removed")
 	}
 
-	// With real concurrency: one silent device and six new HWIDs. One takes the place, five are refused.
+	// With real concurrency: one idle device and six new HWIDs. One uses the free place, five are refused.
 	s2 := linkFixture(t, "usr_l")
 	for n := 1; n <= 2; n++ {
 		if _, err := ensureHWID(ctx, s2, "usr_l", n, 2); err != nil {
 			t.Fatal(err)
 		}
 	}
-	silence(t, s2, "dev_h01", silentSince)
+	silence(t, s2, "dev_h01", idleSeenAt)
 	start := make(chan struct{})
 	errs := make(chan error, 6)
 	var wg sync.WaitGroup
@@ -546,13 +548,13 @@ func TestTwoEvictionsOfOneVictimMakeOneDevice(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	}
-	if made != 1 || refused != 5 || liveDevices(t, s2, "usr_l") != 2 || countT(t, s2, `SELECT count(*) FROM event WHERE code = 'device_replaced'`) != 1 {
-		t.Fatalf("made %d, refused %d, live %d; want 1, 5, 2", made, refused, liveDevices(t, s2, "usr_l"))
+	if made != 1 || refused != 5 || liveDevices(t, s2, "usr_l") != 3 || countT(t, s2, `SELECT count(*) FROM device WHERE id = 'dev_h01' AND revoked_at IS NULL`) != 1 {
+		t.Fatalf("made %d, refused %d, live %d; want 1, 5, 3 with idle h01 retained", made, refused, liveDevices(t, s2, "usr_l"))
 	}
 }
 
-// A silent device that was used again after the attempt read it is no longer a place to give away.
-func TestVictimUsedAgainAfterTheReadKeepsItsPlace(t *testing.T) {
+// A device seen again between the idle snapshot and the guarded insert takes its place back; the new HWID is refused.
+func TestIdleDeviceUsedAgainBeforeInsertKeepsItsPlace(t *testing.T) {
 	ctx := context.Background()
 	s := linkFixture(t, "usr_l")
 	for n := 1; n <= 2; n++ {
@@ -560,7 +562,7 @@ func TestVictimUsedAgainAfterTheReadKeepsItsPlace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	silence(t, s, "dev_h01", silentSince)
+	silence(t, s, "dev_h01", idleSeenAt)
 	touched := false
 	_, err := s.Access().EnsureLinkDevice(ctx, linkDevice("usr_l", "h03", hwidOf("usr_l", 3)), 2, linkNow, func(deviceID string, have map[string]bool) ([]AccessCred, error) {
 		if !touched {
@@ -573,7 +575,7 @@ func TestVictimUsedAgainAfterTheReadKeepsItsPlace(t *testing.T) {
 	})
 	var limit *AccessLimitError
 	if !errors.As(err, &limit) {
-		t.Fatalf("a new HWID whose victim was used meanwhile = %v, want a limit error", err)
+		t.Fatalf("a new HWID whose idle device returned meanwhile = %v, want a limit error", err)
 	}
 	if n := countT(t, s, `SELECT count(*) FROM device WHERE id = 'dev_h01' AND revoked_at IS NULL`); n != 1 {
 		t.Fatal("the device that was used again was revoked")
@@ -788,7 +790,7 @@ func TestRenameDeviceNamesEveryDeviceButTheSharedOne(t *testing.T) {
 	if err := s.Access().RenameDevice(ctx, "dev_h01", "Anna's phone"); err != nil {
 		t.Fatalf("renaming a device of an app: %v", err)
 	}
-	dev, err := s.Access().Device(ctx, "dev_h01")
+	dev, err := s.Access().Device(ctx, "dev_h01", linkNow)
 	if err != nil || dev.Model != "Anna's phone" || dev.Kind != DeviceKindLink || dev.Implicit {
 		t.Fatalf("Device = %+v, %v", dev, err)
 	}
@@ -801,7 +803,7 @@ func TestRenameDeviceNamesEveryDeviceButTheSharedOne(t *testing.T) {
 	if _, err := s.Access().RevokeDevice(ctx, "dev_h01", linkNow); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Access().Device(ctx, "dev_h01"); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Access().Device(ctx, "dev_h01", linkNow); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Device(revoked) = %v, want ErrNotFound", err)
 	}
 }

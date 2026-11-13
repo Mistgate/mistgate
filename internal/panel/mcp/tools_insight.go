@@ -1161,6 +1161,7 @@ type diagUserV struct {
 	QuotaReset  string `json:"quota_reset,omitempty"`
 	DeviceLimit uint32 `json:"device_limit"`
 	DevicesUsed uint32 `json:"devices_used"`
+	DevicesIdle uint32 `json:"devices_idle"`
 	LastSeen    int64  `json:"last_seen_unix"`
 	Online      bool   `json:"online"`
 	CreatedUnix int64  `json:"created_unix"`
@@ -1177,6 +1178,8 @@ type diagDeviceV struct {
 	OnlineNodes  []nodeRefV `json:"online_nodes,omitempty"`
 	FirstSeen    int64      `json:"first_seen_unix"`
 	LastSeen     int64      `json:"last_seen_unix"`
+	Idle         bool       `json:"idle"`
+	IdleSince    int64      `json:"idle_since_unix"`
 	Stale        bool       `json:"stale,omitempty"`
 	Protocols    []string   `json:"protocols,omitempty"`
 	Connects     uint32     `json:"connects_in_window"`
@@ -1306,7 +1309,7 @@ func (c *call) userDiagnose(in diagnoseArg) (any, error) {
 	v.User = diagUserV{ID: uid, Name: nm(u.GetName()), Status: status, Enabled: u.GetStatus() != adminv1.UserStatus_USER_STATUS_DISABLED,
 		Expired:     u.GetStatus() == adminv1.UserStatus_USER_STATUS_EXPIRED || u.GetExpiresUnix() > 0 && u.GetExpiresUnix() <= now,
 		ExpiresUnix: u.GetExpiresUnix(), QuotaBytes: u.GetQuotaBytes(), UsedBytes: u.GetUsedBytes(), QuotaReset: enumName("QUOTA_RESET_", u.GetQuotaReset().String()),
-		DeviceLimit: u.GetDeviceLimit(), DevicesUsed: u.GetDevicesUsed(), LastSeen: u.GetLastSeenUnix(), Online: u.GetOnline(), CreatedUnix: u.GetCreatedUnix()}
+		DeviceLimit: u.GetDeviceLimit(), DevicesUsed: u.GetDevicesUsed(), DevicesIdle: u.GetDevicesIdle(), LastSeen: u.GetLastSeenUnix(), Online: u.GetOnline(), CreatedUnix: u.GetCreatedUnix()}
 	add := func(code, sev string, detail map[string]string, evidence ...string) {
 		v.Findings = append(v.Findings, findingV{Code: code, Severity: sev, Evidence: evidence, Detail: detail})
 	}
@@ -1527,7 +1530,7 @@ func (c *call) userDiagnose(in diagnoseArg) (any, error) {
 	// devices
 	for _, d := range deviceViews(ur.GetDevices(), names) {
 		dd := diagDeviceV{ID: d.ID, Kind: d.Kind, Platform: d.Platform, Model: d.Model, Client: d.Client, Fingerprint: d.Fingerprint, Online: d.Online,
-			OnlineNodes: d.OnlineNodes, FirstSeen: d.FirstSeen, LastSeen: d.LastSeen, Stale: d.Stale, Protocols: d.Protocols, Connects: devConnects[d.ID]}
+			OnlineNodes: d.OnlineNodes, FirstSeen: d.FirstSeen, LastSeen: d.LastSeen, Idle: d.Idle, IdleSince: d.IdleSince, Stale: d.Stale, Protocols: d.Protocols, Connects: devConnects[d.ID]}
 		_, dd.SeenInWindow = devConnects[d.ID]
 		v.Devices = append(v.Devices, dd)
 	}

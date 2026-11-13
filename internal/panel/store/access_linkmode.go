@@ -15,14 +15,15 @@ import (
 var ErrCannotBlock = errors.New("store: this device cannot be blocked")
 
 // LinkRefusal is what the snapshot of a subscription fetch already says about a request whose device does not exist yet,
-// decided without a write: ErrAccessBlocked, ErrNoSharedDevice (STRICT, no HWID), or *AccessLimitError (ENFORCE and STRICT:
-// the user is at the limit and no silent device could give its place away). nil: the store has to decide (a device is there,
-// has room, or may take a silent one's place; TRACK always goes there). It is the first half of linkDeviceState.birth on the
-// data SubscriptionData read, so a refused request costs the one read batch and nothing else. limit is the user's device
-// limit. The rule of a place and of replacing one is birth's; a snapshot taken before a writer changed it is corrected there.
+// decided without a write: ErrAccessBlocked, ErrNoSharedDevice (STRICT, no HWID), or *AccessLimitError (ENFORCE and STRICT
+// when a new or returning idle device cannot reclaim a place). nil means the store must make or refresh the device. It is the
+// first half of linkDeviceState.birth on the data SubscriptionData read, so a refused request costs no additional reads.
 func (d SubscriptionData) LinkRefusal(limit int, hasHWID bool, now time.Time) error {
 	if d.Device.ID != "" {
-		return nil // it is there: only filled in
+		if d.Device.Idle && len(d.Device.Protocols) > 0 && d.LinkMode != LinkModeTrack && limit > 0 && d.LimitCount() >= limit {
+			return &AccessLimitError{Used: d.LimitCount(), Limit: limit, Mode: d.LinkMode, WasIdle: true}
+		}
+		return nil
 	}
 	if d.Blocked {
 		return ErrAccessBlocked
@@ -33,45 +34,59 @@ func (d SubscriptionData) LinkRefusal(limit int, hasHWID bool, now time.Time) er
 	if d.LinkMode == LinkModeTrack {
 		return nil
 	}
+	if hasHWID && hasSharedLinkDevice(d.Devices) && !hasHWIDDevice(d.Devices) {
+		for _, dev := range d.Devices {
+			if dev.Kind == DeviceKindLink && dev.Implicit && dev.Idle && limit > 0 && d.LimitCount() >= limit {
+				return &AccessLimitError{Used: d.LimitCount(), Limit: limit, Mode: d.LinkMode, WasIdle: true}
+			}
+		}
+		return nil // the first HWID adopts the shared device without taking another place
+	}
 	ceiling := linkCeiling(d.LinkMode, limit, hasHWID)
 	if ceiling == 0 || d.LimitCount() < ceiling {
 		return nil
 	}
-	if hasHWID {
-		cutoff := now.Add(-LinkEvictAfter)
-		sharedHere := false
-		for _, dev := range d.Devices {
-			if dev.Kind == DeviceKindLink && dev.LastSeenAt.Before(cutoff) {
-				return nil // birth takes the oldest of them
-			}
-			sharedHere = sharedHere || dev.Kind == DeviceKindLink && dev.Implicit
-		}
-		if sharedHere && !hasHWIDDevice(d.Devices) {
-			return nil // the first HWID takes the shared device over and spends no place
+	return &AccessLimitError{Used: d.LimitCount(), Limit: ceiling, Mode: d.LinkMode}
+}
+
+func hasSharedLinkDevice(devices []AccessDevice) bool {
+	for _, dev := range devices {
+		if dev.Kind == DeviceKindLink && dev.Implicit && len(dev.Protocols) > 0 {
+			return true
 		}
 	}
-	return &AccessLimitError{Used: d.LimitCount(), Limit: ceiling, Mode: d.LinkMode}
+	return false
+}
+
+func hasHWIDDevice(devices []AccessDevice) bool {
+	for _, dev := range devices {
+		if dev.Kind == DeviceKindLink && !dev.Implicit {
+			return true
+		}
+	}
+	return false
 }
 
 // LimitCount is how many of the person's devices fill the device limit: all of them but the Telegram key (accLimitDevice).
 func (d SubscriptionData) LimitCount() int {
 	n := 0
 	for _, dev := range d.Devices {
-		if !dev.IsTelegramKey() {
+		if !dev.IsTelegramKey() && !dev.Idle {
 			n++
 		}
 	}
 	return n
 }
 
-// hasHWIDDevice: some link device in the list reported a HWID (it is not the shared one).
-func hasHWIDDevice(devs []AccessDevice) bool {
-	for _, dev := range devs {
-		if dev.Kind == DeviceKindLink && !dev.Implicit {
-			return true
+// IdleCount is the number of currently idle devices that would otherwise fill the device limit.
+func (d SubscriptionData) IdleCount() int {
+	n := 0
+	for _, dev := range d.Devices {
+		if !dev.IsTelegramKey() && dev.Idle {
+			n++
 		}
 	}
-	return false
+	return n
 }
 
 // BlockDevice revokes a live link device that reported a HWID, like RevokeDevice, and marks it blocked: the hash is not born
@@ -148,10 +163,10 @@ func (a Access) BlockedDevices(ctx context.Context, userID string) ([]AccessBloc
 }
 
 // Device returns a live (not revoked) device, with or without credentials; ErrNotFound when there is none.
-func (a Access) Device(ctx context.Context, id string) (AccessDevice, error) {
+func (a Access) Device(ctx context.Context, id string, now time.Time) (AccessDevice, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client, d.first_seen_at, d.last_seen_at, d.created_at,
-		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')`+accDeviceTail+`
+		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')`+accDeviceTail(now)+`
 		 FROM device d WHERE d.id = ? AND d.revoked_at IS NULL`, id)
 	if err != nil {
 		return AccessDevice{}, err

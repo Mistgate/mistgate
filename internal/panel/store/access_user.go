@@ -91,6 +91,8 @@ type AccessDevice struct {
 	Key                                bool
 	KeyHash, EnrolTokenHash            []byte // client API hashes; nil until the device enrols
 	FirstSeenAt, LastSeenAt, CreatedAt time.Time
+	Idle                               bool
+	IdleSinceAt                        time.Time
 	Protocols                          []string // protocols with a live credential
 }
 
@@ -319,6 +321,8 @@ const (
 // AccessUserCounts are the filter chip badges for one query, ignoring the filter itself.
 type AccessUserCounts struct{ All, Online, Expiring, OverQuota, DevicesUsed, DevicesOnline, OverDeviceLimit, Telegram int }
 
+type AccessDeviceCounts struct{ Used, Idle int }
+
 // accOverDeviceLimit is the condition "the user has more live devices than the limit" over the device_counts join (dc): the
 // same count as devices_used. A limit of 0 is no limit, never over.
 const accOverDeviceLimit = `u.device_limit > 0 AND coalesce(dc.devices_used, 0) > u.device_limit`
@@ -334,9 +338,11 @@ func accLike(s string) string {
 // key devices follow their latest handshake; subscription devices follow their sessions (the nodes say which credential a
 // session uses, so a person with four HWID apps and one in use has one device online). The user scope keeps the aggregate
 // bounded by the same query and group_id as the people counts.
-func accUserDeviceCountsCTE(base string) string {
+func accUserDeviceCountsCTE(base string, now time.Time) string {
+	idle, _ := deviceIdleSQL("d", now)
 	return `live_devices AS (
 		SELECT d.id, d.user_id, d.last_seen_at,
+		   ` + idle + ` AS is_idle,
 		   max(CASE WHEN d.kind = 'key' AND c.profile_id IS NOT NULL AND ap.credential_id IS NOT NULL THEN 1 ELSE 0 END) AS is_awg
 		 FROM device d
 		 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
@@ -346,9 +352,10 @@ func accUserDeviceCountsCTE(base string) string {
 		 WHERE ` + base + ` AND d.revoked_at IS NULL AND ` + accNotTelegramKey + `
 		 GROUP BY d.id
 	), device_counts AS (
-		SELECT user_id, count(*) AS devices_used,
-		   sum(CASE WHEN is_awg = 1 AND last_seen_at > ? THEN 1
-		            WHEN is_awg = 0 AND id IN (SELECT value FROM json_each(?)) THEN 1 ELSE 0 END) AS devices_online
+		SELECT user_id, sum(CASE WHEN is_idle = 0 THEN 1 ELSE 0 END) AS devices_used,
+		   sum(CASE WHEN is_idle = 1 THEN 1 ELSE 0 END) AS devices_idle,
+		   sum(CASE WHEN is_idle = 0 AND is_awg = 1 AND last_seen_at > ? THEN 1
+		            WHEN is_idle = 0 AND is_awg = 0 AND id IN (SELECT value FROM json_each(?)) THEN 1 ELSE 0 END) AS devices_online
 		 FROM live_devices GROUP BY user_id
 	)`
 }
@@ -400,7 +407,7 @@ func accUserListQuery(q AccessUserQuery, base string, baseArgs []any, lconds str
 		queryArgs = append(queryArgs, online)
 	}
 	if needsDeviceCounts {
-		query = `WITH ` + accUserDeviceCountsCTE(base) + ` ` + query
+		query = `WITH ` + accUserDeviceCountsCTE(base, q.Now) + ` ` + query
 		cteArgs := append([]any{}, baseArgs...)
 		cteArgs = append(cteArgs, unix(q.DeviceOnlineAfter), accJSON(q.OnlineDeviceIDs))
 		queryArgs = append(cteArgs, queryArgs...)
@@ -430,7 +437,7 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 	now, soon := unix(q.Now), unix(q.Now.Add(accExpiringWindow))
 	online := accJSON(q.OnlineIDs)
 
-	deviceCTE := accUserDeviceCountsCTE(base)
+	deviceCTE := accUserDeviceCountsCTE(base, q.Now)
 	var counts AccessUserCounts
 	countArgs := append([]any{}, args...)
 	countArgs = append(countArgs, unix(q.DeviceOnlineAfter), accJSON(q.OnlineDeviceIDs), online, now, soon)
@@ -696,15 +703,19 @@ func scanTelegramCred(r rowScanner) (AccessCred, error) {
 func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	var d AccessDevice
 	var id, userID, kind, platform, model, osVersion, client, protocols, fingerprint sql.NullString
-	var implicit, first, last, created, used sql.NullInt64
+	var implicit, first, last, created, used, idle, idleSince sql.NullInt64
 	var keyHash, enrolTokenHash []byte
-	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &client, &first, &last, &created, &protocols, &used, &fingerprint, &keyHash, &enrolTokenHash); err != nil {
+	if err := r.Scan(&id, &userID, &implicit, &kind, &platform, &model, &osVersion, &client, &first, &last, &created, &protocols, &used, &fingerprint, &keyHash, &enrolTokenHash, &idle, &idleSince); err != nil {
 		return AccessDevice{}, err
 	}
 	d.ID, d.UserID, d.Platform, d.Model, d.OSVersion = id.String, userID.String, platform.String, model.String, osVersion.String
 	d.Kind, d.Client = kind.String, client.String
 	d.UsedBytes, d.Fingerprint = uint64(max(used.Int64, 0)), fingerprint.String
 	d.KeyHash, d.EnrolTokenHash = keyHash, enrolTokenHash
+	d.Idle = idle.Int64 == 1
+	if idleSince.Valid && idleSince.Int64 != 0 {
+		d.IdleSinceAt = fromUnix(idleSince.Int64)
+	}
 	d.Implicit = implicit.Int64 == 1
 	if first.Valid && first.Int64 != 0 {
 		d.FirstSeenAt = fromUnix(first.Int64)
@@ -719,20 +730,24 @@ func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	return d, nil
 }
 
-// linkDeviceCredsSQL reads one live link device of a user and all its live credentials: ?1 is the user, ?2 the device's
+// linkDeviceCredsSQLAt reads one live link device of a user and all its live credentials: ?1 is the user, ?2 the device's
 // hwid_hash, NULL for the shared device (IS compares NULL too, so one statement serves both). Its aliases are unique so
 // the query can also be the trailing SELECT of a Returning batch.
-const linkDeviceCredsSQL = `
+func linkDeviceCredsSQLAt(now time.Time) string {
+	idle, since := deviceIdleSQL("d", now)
+	return `
 	SELECT d.id AS device_id, d.user_id AS user_id, coalesce(d.platform, '') AS platform, coalesce(d.model, '') AS model,
 		coalesce(d.os_version, '') AS os_version, coalesce(d.client, '') AS client, d.hwid_hash IS NULL AS shared,
 		d.key_hash, d.enrol_token_hash,
 		coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at,
-		d.created_at AS device_created_at, coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol,
+		d.created_at AS device_created_at, ` + idle + ` AS idle, ` + since + ` AS idle_since_unix,
+		coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol,
 		coalesce(c.profile_id, '') AS profile_id, coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json,
 		coalesce(c.config_epoch, 0) AS config_epoch, coalesce(c.created_at, 0) AS credential_created_at
 	FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
 	WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND d.hwid_hash IS ?2 AND d.kind = 'link'
 	ORDER BY c.protocol, c.profile_id, c.id`
+}
 
 // hwidArg is the ?2 of linkDeviceCredsSQL: NULL, not an empty blob, for the shared device.
 func hwidArg(hash []byte) any {
@@ -790,16 +805,20 @@ func (s *linkDeviceSnapshot) scan(row rowScanner) error {
 func scanLinkDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) {
 	var device AccessDevice
 	var shared bool
-	var first, last, deviceCreated, configEpoch, credCreated int64
+	var first, last, deviceCreated, idle, idleSince, configEpoch, credCreated int64
 	var id, protocol, profile, data string
 	var secret []byte
 	if err := row.Scan(&device.ID, &device.UserID, &device.Platform, &device.Model, &device.OSVersion, &device.Client, &shared,
 		&device.KeyHash, &device.EnrolTokenHash,
-		&first, &last, &deviceCreated, &id, &protocol, &profile, &secret, &data, &configEpoch, &credCreated); err != nil {
+		&first, &last, &deviceCreated, &idle, &idleSince, &id, &protocol, &profile, &secret, &data, &configEpoch, &credCreated); err != nil {
 		return AccessDevice{}, AccessCred{}, false, err
 	}
 	device.Kind, device.Implicit = DeviceKindLink, shared
 	device.FirstSeenAt, device.LastSeenAt, device.CreatedAt = fromUnix(first), fromUnix(last), fromUnix(deviceCreated)
+	device.Idle = idle == 1
+	if idleSince != 0 {
+		device.IdleSinceAt = fromUnix(idleSince)
+	}
 	if id == "" {
 		return device, AccessCred{}, false, nil
 	}
@@ -829,7 +848,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	r.add(oneRow(&traffic, scanSubscriptionTraffic), `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, userID, unix(since))
 	r.add(appendRows(&devices, scanAccessDevice), `SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client,
 			coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
-			coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '') AS protocols`+accDeviceTail+`
+			coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '') AS protocols`+accDeviceTail(now)+`
 			FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive+` ORDER BY d.created_at, d.id`, userID)
 	r.add(appendRows(&awgDevices, scanAWGDevice), `SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
 			p.id AS profile_id, p.name AS profile_name, p.settings_json AS profile_settings_json, c.id AS credential_id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig
@@ -839,7 +858,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 			JOIN profile p ON p.id = c.profile_id
 			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.user_id = ? ORDER BY d.created_at, d.id`, userID)
 	// Read without access too: a denied fetch still touches the device (access.subView).
-	r.add(appendRows(&deviceRows, scanLinkDeviceCredRow), linkDeviceCredsSQL, userID, hwidArg(hwidHash))
+	r.add(appendRows(&deviceRows, scanLinkDeviceCredRow), linkDeviceCredsSQLAt(now), userID, hwidArg(hwidHash))
 	r.add(maybeOneRow(&telegram, scanTelegramCred), `SELECT c.id AS credential_id, c.device_id AS device_id, c.user_id AS user_id, c.secret_enc AS secret_enc, c.data_json AS data_json, c.created_at AS credential_created_at
 			FROM device_credential c JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.kind = 'key'
 			WHERE c.user_id = ? AND c.protocol = 'mtproto' AND c.revoked_at IS NULL`, userID)
@@ -911,22 +930,24 @@ func (a Access) UsersProtocolsSince(ctx context.Context, ids []string, since tim
 // DeviceCounts returns the number of devices per user that count against the device limit: not revoked and
 // holding at least one live credential (a device without any is an empty shell, e.g. the implicit device of a
 // user of the Amnezia app only, created by an older version).
-func (a Access) DeviceCounts(ctx context.Context, ids []string) (map[string]int, error) {
+
+func (a Access) DeviceCounts(ctx context.Context, ids []string, now time.Time) (map[string]AccessDeviceCounts, error) {
+	idle, _ := deviceIdleSQL("d", now)
 	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT d.user_id, count(*) FROM device d
+		`SELECT d.user_id, sum(CASE WHEN `+idle+` THEN 0 ELSE 1 END), sum(CASE WHEN `+idle+` THEN 1 ELSE 0 END) FROM device d
 		 WHERE d.revoked_at IS NULL AND `+accLimitDevice+` AND d.user_id IN (SELECT value FROM json_each(?)) GROUP BY d.user_id`, accJSON(ids))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]int{}
+	out := map[string]AccessDeviceCounts{}
 	for rows.Next() {
 		var uid string
-		var n int
-		if err := rows.Scan(&uid, &n); err != nil {
+		var counts AccessDeviceCounts
+		if err := rows.Scan(&uid, &counts.Used, &counts.Idle); err != nil {
 			return nil, err
 		}
-		out[uid] = n
+		out[uid] = counts
 	}
 	return out, rows.Err()
 }
@@ -983,22 +1004,25 @@ func (a Access) NodeTraffic(ctx context.Context, userID string, since time.Time)
 // ---- devices and credentials ----
 
 // accDeviceTail is what scanAccessDevice reads after the protocols: the device's traffic and its fingerprint.
-const accDeviceTail = `, d.used_bytes, CASE WHEN d.kind = 'link' THEN lower(hex(substr(d.hwid_hash, 1, 3))) ELSE '' END,
-	d.key_hash, d.enrol_token_hash`
+func accDeviceTail(now time.Time) string {
+	idle, since := deviceIdleSQL("d", now)
+	return `, d.used_bytes, CASE WHEN d.kind = 'link' THEN lower(hex(substr(d.hwid_hash, 1, 3))) ELSE '' END,
+		d.key_hash, d.enrol_token_hash, ` + idle + `, ` + since
+}
 
 // accDeviceLive is the SQL condition "device d holds a live credential".
 const accDeviceLive = `EXISTS (SELECT 1 FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL)`
 
 // Devices returns the non-revoked devices of a user that hold a live credential, with their credential
 // protocols.
-func (a Access) Devices(ctx context.Context, userID string) ([]AccessDevice, error) {
-	return a.devices(ctx, userID, true)
+func (a Access) Devices(ctx context.Context, userID string, now time.Time) ([]AccessDevice, error) {
+	return a.devices(ctx, userID, true, now)
 }
 
-func (a Access) devices(ctx context.Context, userID string, withCredsOnly bool) ([]AccessDevice, error) {
+func (a Access) devices(ctx context.Context, userID string, withCredsOnly bool, now time.Time) ([]AccessDevice, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT d.id, d.user_id, CASE WHEN d.hwid_hash IS NULL THEN 1 ELSE 0 END AS implicit, d.kind, d.platform, d.model, d.os_version, d.client, d.first_seen_at, d.last_seen_at, d.created_at,
-		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')`+accDeviceTail+`
+		   coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '')`+accDeviceTail(now)+`
 		 FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND (? = 0 OR `+accDeviceLive+`) ORDER BY d.created_at, d.id`,
 		userID, accBool(withCredsOnly))
 	if err != nil {

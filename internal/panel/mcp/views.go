@@ -814,6 +814,7 @@ type userV struct {
 	Status      string `json:"status"`
 	Online      bool   `json:"online"`
 	DevicesUsed uint32 `json:"devices_used"`
+	DevicesIdle uint32 `json:"devices_idle"`
 	DeviceLimit uint32 `json:"device_limit"`
 	UsedBytes   uint64 `json:"used_bytes"`
 	QuotaBytes  uint64 `json:"quota_bytes"`
@@ -838,7 +839,7 @@ func userView(u *adminv1.User) userV {
 	v := userV{
 		ID: u.GetId(), Name: nm(u.GetName()), GroupID: u.GetGroupId(), Group: nm(u.GetGroupName()),
 		Status: enumName("USER_STATUS_", u.GetStatus().String()), Online: u.GetOnline(),
-		DevicesUsed: u.GetDevicesUsed(), DeviceLimit: u.GetDeviceLimit(), UsedBytes: u.GetUsedBytes(), QuotaBytes: u.GetQuotaBytes(),
+		DevicesUsed: u.GetDevicesUsed(), DevicesIdle: u.GetDevicesIdle(), DeviceLimit: u.GetDeviceLimit(), UsedBytes: u.GetUsedBytes(), QuotaBytes: u.GetQuotaBytes(),
 		QuotaReset: enumName("QUOTA_RESET_", u.GetQuotaReset().String()), ExpiresUnix: u.GetExpiresUnix(), LastSeen: u.GetLastSeenUnix(),
 		Node: nm(u.GetCurrentNodeName()), SpeedLimit: u.GetSpeedLimitBps(), DeviceSpeedLimit: u.GetDeviceSpeedLimitBps(), Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(),
 		Telegram: u.GetApps().GetTelegram(), Mistgate: mistgateOn(u.GetApps()), AllNodes: u.GetNodes().GetAll(), CreatedUnix: u.GetCreatedUnix(),
@@ -948,6 +949,8 @@ type deviceV struct {
 	FirstSeen   int64      `json:"first_seen_unix"`
 	LastSeen    int64      `json:"last_seen_unix"`
 	Online      bool       `json:"online"`
+	Idle        bool       `json:"idle"`
+	IdleSince   int64      `json:"idle_since_unix"`
 	Protocols   []string   `json:"protocols,omitempty"`
 	AwgProfile  string     `json:"awg_profile,omitempty"`
 	AwgVersion  string     `json:"awg_version,omitempty"`
@@ -991,7 +994,7 @@ func deviceViews(ds []*adminv1.Device, nodes map[string]string) []deviceV {
 			ID: d.GetId(), Kind: enumName("DEVICE_KIND_", d.GetKind().String()), Platform: clean(d.GetPlatform(), 40), Model: nm(d.GetModel()),
 			OSVersion: clean(d.GetOsVersion(), 40), Client: clean(d.GetClient(), 40), UsedBytes: d.GetUsedBytes(), Fingerprint: clean(d.GetFingerprint(), 12),
 			FirstSeen: d.GetFirstSeenUnix(),
-			LastSeen:  d.GetLastSeenUnix(), Online: d.GetOnline(), AwgProfile: nm(d.GetAwgProfileName()),
+			LastSeen:  d.GetLastSeenUnix(), Online: d.GetOnline(), Idle: d.GetIdle(), IdleSince: d.GetIdleSinceUnix(), AwgProfile: nm(d.GetAwgProfileName()),
 			AwgVersion: clean(d.GetAwgVersion(), 20), Stale: d.GetStale(), Enrolled: d.GetEnrolled(), EnrolLinkStale: d.GetEnrolLinkStale(), Address: clean(d.GetAddress(), 64),
 			LastHandsh: d.GetLastHandshakeUnix(),
 		}
@@ -1134,10 +1137,12 @@ func userTrafficView(r *adminv1.GetUserResponse) *UserTrafficV {
 
 // UserDevicesV is the user_devices result.
 type UserDevicesV struct {
-	UserID  string    `json:"user_id"`
-	Name    string    `json:"name"`
-	Limit   uint32    `json:"device_limit"`
-	Devices []deviceV `json:"devices"`
+	UserID      string    `json:"user_id"`
+	Name        string    `json:"name"`
+	Limit       uint32    `json:"device_limit"`
+	DevicesUsed uint32    `json:"devices_used"`
+	DevicesIdle uint32    `json:"devices_idle"`
+	Devices     []deviceV `json:"devices"`
 	// Blocked: devices the owner revoked and refused; they are not in devices and take no place. Unblocking is in the admin panel.
 	Blocked   []blockedDeviceV `json:"blocked,omitempty"`
 	Truncated bool             `json:"truncated,omitempty"`
@@ -1150,7 +1155,7 @@ func (v *UserDevicesV) shrink() bool {
 
 func userDevicesView(r *adminv1.GetUserResponse) *UserDevicesV {
 	u := r.GetUser()
-	return &UserDevicesV{UserID: u.GetId(), Name: nm(u.GetName()), Limit: u.GetDeviceLimit(), Devices: deviceViews(r.GetDevices(), nodeNames(r)),
+	return &UserDevicesV{UserID: u.GetId(), Name: nm(u.GetName()), Limit: u.GetDeviceLimit(), DevicesUsed: u.GetDevicesUsed(), DevicesIdle: u.GetDevicesIdle(), Devices: deviceViews(r.GetDevices(), nodeNames(r)),
 		Blocked: blockedDeviceViews(r.GetBlockedDevices())}
 }
 

@@ -85,7 +85,7 @@ func (s *Service) EnrolLinkDevice(ctx context.Context, userID, token string, hin
 	})
 	var limit *store.AccessLimitError
 	if errors.As(err, &limit) {
-		s.limitReached(u.ID, limit.Used, u.DeviceLimit, limit.Mode, true)
+		s.limitReached(u.ID, limit.Used, u.DeviceLimit, limit.Mode, true, limit.WasIdle)
 	}
 	if err != nil {
 		return store.LinkDeviceResult{}, err

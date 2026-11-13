@@ -255,6 +255,8 @@ message User {
   // A Telegram key was issued to the person: a live DEVICE_KIND_TELEGRAM_KEY device. The links need the key, the toggle and
   // a usable MTProto inbound (access_telegram). Not called "key": a token-reachable response has no field that looks like a secret.
   bool telegram_issued = 32;
+  // Devices currently idle and omitted from devices_used; their rows and credentials remain.
+  uint32 devices_idle = 33;
 }
 
 enum DnsSource {
@@ -355,6 +357,10 @@ message Device {
   // With enrolled: the user's link was changed since the device connected, so it waits to reconnect on its own (the app
   // gets link_changed and enrols again at its next sync).
   bool enrol_link_stale = 22;
+  // The device has no connection or subscription fetch within the configured idle period; its credentials remain valid.
+  bool idle = 23;
+  // When it crossed the idle threshold (last node connection, else last fetch/sync, else creation time); 0 when not idle.
+  int64 idle_since_unix = 24 [jstype = JS_NUMBER];
 }
 
 enum DeviceKind {

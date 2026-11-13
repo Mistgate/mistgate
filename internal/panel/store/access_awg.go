@@ -57,6 +57,7 @@ func accPublicJSON(s string) string {
 type AccessLimitError struct {
 	Used, Limit int
 	Mode        string
+	WasIdle     bool
 }
 
 func (e *AccessLimitError) Error() string { return fmt.Sprintf("device limit %d/%d", e.Used, e.Limit) }
@@ -98,7 +99,7 @@ func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Tim
 		idx = 0
 		var used int
 		if err := a.s.R.QueryRowContext(ctx,
-			accLimitDevices("?"), add.Device.UserID).Scan(&used); err != nil {
+			accLimitDevices("?", now), add.Device.UserID).Scan(&used); err != nil {
 			return nil, accMapErr(err)
 		}
 		if used >= add.Limit {
@@ -124,7 +125,7 @@ func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Tim
 		device.AWG, device.CreatedAt = true, now
 		cred.DeviceID, cred.UserID, cred.ProfileID, cred.ConfigEpoch, cred.CreatedAt = device.ID, device.UserID, add.ProfileID, epoch, now
 		guardSQL := `(
-			(` + accLimitDevices("?4") + `) < ?5
+			(` + accLimitDevices("?4", now) + `) < ?5
 			AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
 			AND ?3 NOT IN (` + awgTakenSQL + `)
 		)`
@@ -278,8 +279,8 @@ func scanAWGDeviceProfile(r rowScanner) (awgDeviceProfile, error) {
 // A subscription in the Mihomo format carries AmneziaWG proxies, so the device that fetches it needs a peer per profile.
 // A device that does not exist is born here, as in EnsureLinkDevice (the person with only the AmneziaVPN access and a
 // HWID-reporting Mihomo app has no other credential to be born with): taken over from the shared device, or new under the
-// ceiling of the stored mode (*AccessLimitError at it, a silent device replaced past it, ErrAccessBlocked, ErrNoSharedDevice:
-// see linkDeviceState.birth); limit is the user's device limit. A subscription fetch must not fail for them.
+// ceiling of the stored mode (*AccessLimitError at it, ErrAccessBlocked, ErrNoSharedDevice: see linkDeviceState.birth);
+// limit is the user's device limit. No existing device or credential is replaced to make room.
 func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit int, now time.Time, want []AWGImplicitWant) (LinkDeviceResult, error) {
 	return a.ensureLinkAWGCreds(ctx, dev, limit, now, nil, want, false)
 }
@@ -288,11 +289,15 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 // write batch. The key hash, and that the device is still enrolled under the user's current link, are checked again in the
 // batch, so a concurrent leave, block, re-key or link rotation cannot issue credentials to a stale request (ErrAccessExists).
 // Basic link issuance keeps its key_hash IS NULL guards.
-func (a Access) EnsureEnrolledLinkDevice(ctx context.Context, dev AccessDevice, now time.Time, issue LinkIssue, want []AWGImplicitWant) (LinkDeviceResult, error) {
+func (a Access) EnsureEnrolledLinkDevice(ctx context.Context, dev AccessDevice, now time.Time, issue LinkIssue, want []AWGImplicitWant, limits ...int) (LinkDeviceResult, error) {
 	if dev.ID == "" || dev.UserID == "" || len(dev.HWIDHash) != sha256.Size || len(dev.KeyHash) != sha256.Size || issue == nil {
 		return LinkDeviceResult{}, errors.New("store: invalid enrolled link device")
 	}
-	return a.ensureLinkAWGCreds(ctx, dev, 0, now, issue, want, true)
+	limit := 0
+	if len(limits) > 0 {
+		limit = limits[0]
+	}
+	return a.ensureLinkAWGCreds(ctx, dev, limit, now, issue, want, true)
 }
 
 func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit int, now time.Time, issue LinkIssue, want []AWGImplicitWant, enrolled bool) (LinkDeviceResult, error) {
@@ -350,6 +355,10 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		var b linkBirth
 		var err error
 		if enrolled {
+			mode := LinkModeOf(st.mode)
+			if own.Device.ID == dev.ID && own.Device.Idle && len(own.Device.Protocols) > 0 && limit > 0 && mode != LinkModeTrack && st.used >= limit {
+				return nil, &AccessLimitError{Used: st.used, Limit: limit, Mode: mode, WasIdle: true}
+			}
 			b, err = st.enrolled(dev, linkCurrent == 1)
 		} else {
 			fresh := dev
@@ -403,7 +412,7 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		}
 		stmts := make([]Stmt, 0, len(b.stmts)+len(added)*2+len(issues)*4+1)
 		stmts = append(stmts, b.stmts...)
-		result.Replaced, result.Born = b.replaced, b.born
+		result.Born = b.born
 		result.Added = make([]AccessCred, 0, len(added)+len(issues))
 		for _, cred := range added {
 			cred.DeviceID, cred.UserID, cred.CreatedAt = deviceID, userID, now
@@ -428,7 +437,7 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 			stmts = append(stmts, awgInsertPeerStmt(issue.cred.ID, issue.profileID, issue.idx, issue.publicKey, now))
 			result.Added = append(result.Added, issue.cred)
 		}
-		stmts = append(stmts, Stmt{Query: linkDeviceCredsSQL, Args: []any{userID, hwidArg(dev.HWIDHash)}, Returning: true})
+		stmts = append(stmts, Stmt{Query: linkDeviceCredsSQLAt(now), Args: []any{userID, hwidArg(dev.HWIDHash)}, Returning: true})
 		return stmts, nil
 	})
 	if err != nil {

@@ -21,14 +21,18 @@ const TelegramProtocol = "mtproto"
 // accNotTelegramKey is the SQL condition "device d is not a Telegram key": it holds no live mtproto credential.
 const accNotTelegramKey = `NOT EXISTS (SELECT 1 FROM device_credential tk WHERE tk.device_id = d.id AND tk.protocol = '` + TelegramProtocol + `' AND tk.revoked_at IS NULL)`
 
-// accLimitDevice is the SQL condition "device d fills the device limit": it holds a live credential and is not the Telegram key.
-// It is the one definition every count of the limit uses (the AmneziaVPN key and link-device checks, the counts of the user
-// views and lists); to change how the Telegram key counts, change it here and in SubscriptionData.LimitCount.
+// accLimitDevice is the SQL condition "device d is a candidate for the device limit": it holds a live credential and is not
+// the Telegram key. Apply accLimitDeviceAt when evaluating a limit so all counters also exclude idle devices.
 const accLimitDevice = accDeviceLive + ` AND ` + accNotTelegramKey
 
-// accLimitDevices is the SQL that counts the devices of the user (the placeholder user) that fill the device limit.
-func accLimitDevices(user string) string {
-	return `SELECT count(*) FROM device d WHERE d.user_id = ` + user + ` AND d.revoked_at IS NULL AND ` + accLimitDevice
+func accLimitDeviceAt(alias string, now time.Time) string {
+	idle, _ := deviceIdleSQL(alias, now)
+	return accLimitDevice + ` AND NOT ` + idle
+}
+
+// accLimitDevices is the SQL that counts active devices of the user (the placeholder user) that fill the device limit.
+func accLimitDevices(user string, now time.Time) string {
+	return `SELECT count(*) FROM device d WHERE d.user_id = ` + user + ` AND d.revoked_at IS NULL AND ` + accLimitDeviceAt("d", now)
 }
 
 // IsTelegramKey: the device is the person's Telegram key, which the device limit does not count.

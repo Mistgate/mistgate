@@ -146,11 +146,15 @@ type syncBody struct {
 	SupportURL string `json:"support_url"`
 	Notice     *struct{ ID, Text string }
 	Plan       map[string]any
-	Probe      map[string]any
-	Debug      map[string]any
-	ASN        *uint32
-	DNS        map[string]any
-	Servers    []struct {
+	Devices    struct {
+		Used  int `json:"used"`
+		Limit int `json:"limit"`
+	}
+	Probe   map[string]any
+	Debug   map[string]any
+	ASN     *uint32
+	DNS     map[string]any
+	Servers []struct {
 		ID, Country, City, Label, Load string
 		Paths                          []syncPath
 	}
@@ -1083,6 +1087,48 @@ func TestSyncDoesNotExceedThePersonsLimits(t *testing.T) {
 	assertDecoy(t, "unknown key", e.sync(newKey()))
 	if e.count(`SELECT (SELECT count(*) FROM device) + (SELECT count(*) FROM device_credential) + (SELECT count(*) FROM awg_peer)`) != rows {
 		t.Error("a stranger's sync wrote rows")
+	}
+}
+
+func TestIdleEnrolledDeviceFreesAnEnrolmentPlaceAndSyncReturnRespectsMode(t *testing.T) {
+	e := newSyncEnv(t, nil)
+	uid, tok := e.person("alice", func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 2 })
+	e.setLinkMode(store.LinkModeEnforce)
+	a := e.enrolDevice(tok, hwidA)
+	e.mustSync(a.Key) // keep the existing credentials complete: the idle return must be checked before the no-op fast path
+	e.enrolDevice(tok, hwidB2)
+	oldSeen := time.Now().Add(-31 * 24 * time.Hour).Unix()
+	if _, err := e.st.W.Exec(`UPDATE device SET last_seen_at = ? WHERE id = ?`, oldSeen, a.DeviceID); err != nil {
+		t.Fatal(err)
+	}
+	// The idle device leaves a place for a new client enrolment; all three rows and the first device's credentials remain.
+	c := e.enrolDevice(tok, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	if c.DeviceID == a.DeviceID {
+		t.Fatal("new enrolment reused the idle device")
+	}
+	if n := e.count(`SELECT count(*) FROM device WHERE user_id = ? AND revoked_at IS NULL`, uid); n != 3 {
+		t.Fatalf("live devices after enrolment = %d, want 3 retained rows", n)
+	}
+	counts, err := e.st.Access().DeviceCounts(e.ctx, []string{uid}, time.Now())
+	if err != nil || counts[uid] != (store.AccessDeviceCounts{Used: 2, Idle: 1}) {
+		t.Fatalf("counts after enrolment = %+v, %v", counts[uid], err)
+	}
+	creds := e.liveCredIDs(a.DeviceID)
+	refused := e.mustSync(a.Key)
+	if refused.Status != "active" || refused.Devices.Used != 2 || len(refused.Servers) != 0 || e.liveCredIDs(a.DeviceID) != creds {
+		t.Fatalf("full enforce sync: used=%d status=%q servers=%d credentials changed=%v", refused.Devices.Used, refused.Status, len(refused.Servers), e.liveCredIDs(a.DeviceID) != creds)
+	}
+	var seen int64
+	if err := e.st.R.QueryRow(`SELECT last_seen_at FROM device WHERE id = ?`, a.DeviceID).Scan(&seen); err != nil || seen != oldSeen {
+		t.Fatalf("refused sync touched the idle device: last_seen_at=%d, err=%v", seen, err)
+	}
+	e.setLinkMode(store.LinkModeTrack)
+	returned := e.mustSync(a.Key)
+	if returned.Devices.Used != 3 || len(returned.Servers) == 0 || e.liveCredIDs(a.DeviceID) != creds {
+		t.Fatalf("track sync: used=%d servers=%d credentials changed=%v", returned.Devices.Used, len(returned.Servers), e.liveCredIDs(a.DeviceID) != creds)
+	}
+	if n := e.count(`SELECT count(*) FROM device WHERE user_id = ? AND revoked_at IS NULL`, uid); n != 3 {
+		t.Fatalf("track sync changed other device rows: %d remain", n)
 	}
 }
 

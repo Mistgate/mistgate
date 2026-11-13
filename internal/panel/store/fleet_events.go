@@ -30,22 +30,30 @@ const deviceLimitEventWindow = time.Hour
 // that follows it in the same hour. Only the refusals open the device-limit alert (HealthSignals). mode is the link-device mode
 // the decision was made in ("" for an AmneziaVPN key, which has no mode). The read skips repeated writes; the conditional insert
 // protects concurrent refusals from adding duplicate rows.
-func (s *Store) RecordDeviceLimitReached(ctx context.Context, userID string, used, limit int, mode string, refused bool, now time.Time) error {
+func (s *Store) RecordDeviceLimitReached(ctx context.Context, userID string, used, limit int, mode string, refused, wasIdle bool, now time.Time) error {
 	cutoff := unix(now.Add(-deviceLimitEventWindow))
 	flag := "0"
+	idleFlag := "false"
 	if refused {
 		flag = "1"
+	}
+	if wasIdle {
+		idleFlag = "true"
 	}
 	var recorded bool
 	if err := s.R.QueryRowContext(ctx, `SELECT EXISTS (
 		SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ? AND json_extract(params_json, '$.refused') = ?
-	)`, userID, cutoff, flag).Scan(&recorded); err != nil {
+		AND coalesce(json_extract(params_json, '$.was_idle'), 'false') = ?
+	)`, userID, cutoff, flag, idleFlag).Scan(&recorded); err != nil {
 		return err
 	}
 	if recorded {
 		return nil
 	}
 	fields := map[string]string{"used": strconv.Itoa(used), "limit": strconv.Itoa(limit), "refused": flag}
+	if wasIdle {
+		fields["was_idle"] = "true"
+	}
 	if mode != "" {
 		fields["mode"] = mode
 	}
@@ -55,7 +63,8 @@ func (s *Store) RecordDeviceLimitReached(ctx context.Context, userID string, use
 		SELECT ?, 1, 'device_limit_reached', 'panel', ?, ?
 		WHERE NOT EXISTS (
 			SELECT 1 FROM event WHERE user_id = ? AND code = 'device_limit_reached' AND ts > ? AND json_extract(params_json, '$.refused') = ?
-		)`, Args: []any{unix(now), userID, string(params), userID, cutoff, flag}})
+			AND coalesce(json_extract(params_json, '$.was_idle'), 'false') = ?
+		)`, Args: []any{unix(now), userID, string(params), userID, cutoff, flag, idleFlag}})
 	return err
 }
 

@@ -8,7 +8,6 @@ access/desired.go	access: cannot record inbound build error	1
 access/device.go	access: audit write failed	1
 access/device.go	access: cannot build inbound for a device config	1
 access/device.go	access: cannot render a device config	1
-access/device.go	access: device limit event	1
 access/names.go	access: brand unreadable, keys are named after the defaults	1
 access/node_dns.go	access: audit write failed	1
 access/node_dns.go	access: cannot read a dns preset	1

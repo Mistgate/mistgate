@@ -1102,6 +1102,13 @@ func TestDeviceRevokeCanBlock(t *testing.T) {
 // user_devices says what each device is and where it is online, with the nodes by name, and lists the blocked ones apart.
 func TestUserDevicesShowsKindTrafficOnlineNodesAndBlocked(t *testing.T) {
 	e := newTestEnv(t)
+	e.w.users["usr_alice"].User.DevicesUsed = 4
+	e.w.users["usr_alice"].User.DevicesIdle = 1
+	for _, d := range e.w.users["usr_alice"].Devices {
+		if d.Id == "dev_app_old" {
+			d.Idle, d.IdleSinceUnix = true, 1699990000
+		}
+	}
 	_, secret := e.token(ProfileReadonly)
 	s := e.session(secret)
 	var got UserDevicesV
@@ -1116,6 +1123,9 @@ func TestUserDevicesShowsKindTrafficOnlineNodesAndBlocked(t *testing.T) {
 	if link.Kind != "link" || link.OSVersion != "15" || link.Client != "Happ/3.4.2" || link.UsedBytes != 5<<20 || link.Fingerprint != "a1b2c3" ||
 		len(link.OnlineNodes) != 2 || link.OnlineNodes[0].Name != "de1" || link.OnlineNodes[1].ID != "nod_gone" || link.OnlineNodes[1].Name != "" {
 		t.Errorf("link device = %+v", link)
+	}
+	if got.DevicesUsed != 4 || got.DevicesIdle != 1 || !byID["dev_app_old"].Idle || byID["dev_app_old"].IdleSince != 1699990000 {
+		t.Errorf("idle count/device fields: used=%d idle=%d device=%+v", got.DevicesUsed, got.DevicesIdle, byID["dev_app_old"])
 	}
 	if byID["dev_shared"].Kind != "link_shared" {
 		t.Errorf("shared device = %+v", byID["dev_shared"])

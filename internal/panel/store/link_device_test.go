@@ -438,8 +438,8 @@ func TestDeviceCountsCountManyLinkDevicesOnce(t *testing.T) {
 	if _, err := s.Access().EnsureLinkDevice(ctx, linkDevice("usr_o", "one", nil), 0, linkNow, linkCreds("one", "usr_o")); err != nil {
 		t.Fatal(err)
 	}
-	counts, err := s.Access().DeviceCounts(ctx, []string{"usr_l", "usr_o"})
-	if err != nil || counts["usr_l"] != 5 || counts["usr_o"] != 1 {
+	counts, err := s.Access().DeviceCounts(ctx, []string{"usr_l", "usr_o"}, linkNow)
+	if err != nil || counts["usr_l"].Used != 5 || counts["usr_o"].Used != 1 {
 		t.Fatalf("DeviceCounts = %v, %v; want 5 and 1", counts, err)
 	}
 	users, _, listCounts, err := s.Access().ListUsers(ctx, AccessUserQuery{Sort: AccessUserSortDevices, Descending: true, Now: linkNow, Limit: 10})

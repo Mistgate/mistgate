@@ -984,8 +984,10 @@ type User struct {
 	// A Telegram key was issued to the person: a live DEVICE_KIND_TELEGRAM_KEY device. The links need the key, the toggle and
 	// a usable MTProto inbound (access_telegram). Not called "key": a token-reachable response has no field that looks like a secret.
 	TelegramIssued bool `protobuf:"varint,32,opt,name=telegram_issued,json=telegramIssued,proto3" json:"telegram_issued,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Devices currently idle and omitted from devices_used; their rows and credentials remain.
+	DevicesIdle   uint32 `protobuf:"varint,33,opt,name=devices_idle,json=devicesIdle,proto3" json:"devices_idle,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -1240,6 +1242,13 @@ func (x *User) GetTelegramIssued() bool {
 		return x.TelegramIssued
 	}
 	return false
+}
+
+func (x *User) GetDevicesIdle() uint32 {
+	if x != nil {
+		return x.DevicesIdle
+	}
+	return 0
 }
 
 type ListUsersRequest struct {
@@ -1606,8 +1615,12 @@ type Device struct {
 	// With enrolled: the user's link was changed since the device connected, so it waits to reconnect on its own (the app
 	// gets link_changed and enrols again at its next sync).
 	EnrolLinkStale bool `protobuf:"varint,22,opt,name=enrol_link_stale,json=enrolLinkStale,proto3" json:"enrol_link_stale,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The device has no connection or subscription fetch within the configured idle period; its credentials remain valid.
+	Idle bool `protobuf:"varint,23,opt,name=idle,proto3" json:"idle,omitempty"`
+	// When it crossed the idle threshold (last node connection, else last fetch/sync, else creation time); 0 when not idle.
+	IdleSinceUnix int64 `protobuf:"varint,24,opt,name=idle_since_unix,json=idleSinceUnix,proto3" json:"idle_since_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -1785,6 +1798,20 @@ func (x *Device) GetEnrolLinkStale() bool {
 		return x.EnrolLinkStale
 	}
 	return false
+}
+
+func (x *Device) GetIdle() bool {
+	if x != nil {
+		return x.Idle
+	}
+	return false
+}
+
+func (x *Device) GetIdleSinceUnix() int64 {
+	if x != nil {
+		return x.IdleSinceUnix
+	}
+	return 0
 }
 
 type DayTraffic struct {
@@ -3997,7 +4024,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\t_mistgate\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xae\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xd1\n" +
 	"\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -4039,7 +4066,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"groupColor\x127\n" +
 	"\x16device_speed_limit_bps\x18\x1e \x01(\x04B\x020\x02R\x13deviceSpeedLimitBps\x12'\n" +
 	"\x0faccess_telegram\x18\x1f \x01(\bR\x0eaccessTelegram\x12'\n" +
-	"\x0ftelegram_issued\x18  \x01(\bR\x0etelegramIssued\"\x9f\x02\n" +
+	"\x0ftelegram_issued\x18  \x01(\bR\x0etelegramIssued\x12!\n" +
+	"\fdevices_idle\x18! \x01(\rR\vdevicesIdle\"\x9f\x02\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
@@ -4068,7 +4096,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x125\n" +
 	"\x06counts\x18\x03 \x01(\v2\x1d.mistgate.admin.v1.UserCountsR\x06counts\")\n" +
 	"\x0eGetUserRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xc8\x05\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x88\x06\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x14\n" +
@@ -4094,7 +4122,9 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0fonline_node_ids\x18\x12 \x03(\tR\ronlineNodeIds\x12 \n" +
 	"\vfingerprint\x18\x14 \x01(\tR\vfingerprint\x12\x1a\n" +
 	"\benrolled\x18\x15 \x01(\bR\benrolled\x12(\n" +
-	"\x10enrol_link_stale\x18\x16 \x01(\bR\x0eenrolLinkStale\"E\n" +
+	"\x10enrol_link_stale\x18\x16 \x01(\bR\x0eenrolLinkStale\x12\x12\n" +
+	"\x04idle\x18\x17 \x01(\bR\x04idle\x12*\n" +
+	"\x0fidle_since_unix\x18\x18 \x01(\x03B\x020\x02R\ridleSinceUnix\"E\n" +
 	"\n" +
 	"DayTraffic\x12\x1d\n" +
 	"\bday_unix\x18\x01 \x01(\x03B\x020\x02R\adayUnix\x12\x18\n" +

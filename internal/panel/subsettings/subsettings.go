@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -106,6 +107,7 @@ func Defaults() *adminv1.SubscriptionSettings {
 		Rules:               rules,
 		UpdateIntervalHours: DefaultUpdateHours,
 		ServerNameTemplate:  DefaultNameTemplate,
+		DeviceIdleAfterDays: proto.Uint32(store.DefaultDeviceIdleAfterDays),
 		Apps: []*adminv1.PlatformApp{
 			happ(adminv1.Platform_PLATFORM_IOS, "https://apps.apple.com/us/app/happ-proxy-utility/id6504287215", true),
 			happ(adminv1.Platform_PLATFORM_ANDROID, "https://play.google.com/store/apps/details?id=com.happproxy", true),
@@ -376,6 +378,10 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	if _, ok := adminv1.LinkDeviceLimit_name[int32(s.GetLinkDeviceLimit())]; !ok {
 		return invalid("link_device_limit: unknown mode")
 	}
+	if s.DeviceIdleAfterDays != nil && s.GetDeviceIdleAfterDays() != 0 &&
+		(s.GetDeviceIdleAfterDays() < 7 || s.GetDeviceIdleAfterDays() > 365) {
+		return invalid("device_idle_after_days: must be 0 or between 7 and 365")
+	}
 	if _, ok := adminv1.HappPing_name[int32(s.HappPing)]; !ok {
 		return invalid("happ_ping: unknown value")
 	}
@@ -494,7 +500,7 @@ func Load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, 
 // load is Load that also reads the kl!ck reports and client API discovery switches in the same query: every subscription
 // answer needs them for response headers, and separate reads would cost each cold answer one more query.
 func load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, bool, bool, error) {
-	kv, err := st.SettingValues(ctx, []string{Key, store.SettingLinkDeviceLimit, store.SettingClientProbe, store.SettingClientAPI})
+	kv, err := st.SettingValues(ctx, []string{Key, store.SettingLinkDeviceLimit, store.SettingDeviceIdleAfterDays, store.SettingClientProbe, store.SettingClientAPI})
 	if err != nil {
 		return nil, false, false, err
 	}
@@ -504,8 +510,28 @@ func load(ctx context.Context, st *store.Store) (*adminv1.SubscriptionSettings, 
 			return nil, false, false, err
 		}
 	}
+	days, err := parseDeviceIdleAfterDays(kv[store.SettingDeviceIdleAfterDays])
+	if err != nil {
+		return nil, false, false, err
+	}
+	set.DeviceIdleAfterDays = proto.Uint32(days)
 	set.LinkDeviceLimit = linkModeProto(kv[store.SettingLinkDeviceLimit]).Enum()
 	return set, kv[store.SettingClientProbe] == "1", kv[store.SettingClientAPI] == "1", nil
+}
+
+func parseDeviceIdleAfterDays(value string) (uint32, error) {
+	if value == "" {
+		return store.DefaultDeviceIdleAfterDays, nil
+	}
+	n, err := strconv.ParseUint(value, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("stored %s: %w", store.SettingDeviceIdleAfterDays, err)
+	}
+	days := uint32(n)
+	if days != 0 && (days < 7 || days > 365) {
+		return 0, fmt.Errorf("stored %s: out of range", store.SettingDeviceIdleAfterDays)
+	}
+	return days, nil
 }
 
 // Parse reads a stored subscription-settings document. Missing documents should use Defaults instead.
@@ -628,17 +654,32 @@ func (c *Cache) Update(ctx context.Context, s *adminv1.SubscriptionSettings) (*a
 func (c *Cache) UpdateRevoking(ctx context.Context, s *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, int, error) {
 	s = proto.Clone(s).(*adminv1.SubscriptionSettings)
 	s.DefaultDnsPresetId, s.LinkDns = "", nil // live in the DNS module
+	if s.DeviceIdleAfterDays == nil {
+		stored, err := c.st.Setting(ctx, store.SettingDeviceIdleAfterDays)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return nil, 0, err
+		}
+		days, err := parseDeviceIdleAfterDays(stored)
+		if err != nil {
+			return nil, 0, err
+		}
+		s.DeviceIdleAfterDays = proto.Uint32(days)
+	}
 	Normalize(s)
 	if err := Validate(s); err != nil {
 		return nil, 0, err
 	}
 	mode := linkModeStored(s.GetLinkDeviceLimit())
 	s.LinkDeviceLimit = nil // not part of the document
+	idleAfterDays := s.GetDeviceIdleAfterDays()
+	s.DeviceIdleAfterDays = nil // stored separately so access limits can read it in their transaction
 	b, err := marshal.Marshal(s)
 	if err != nil {
 		return nil, 0, err
 	}
-	revoked, err := c.st.SaveSubscriptionSettings(ctx, map[string]string{Key: string(b)}, mode, c.now())
+	revoked, err := c.st.SaveSubscriptionSettings(ctx, map[string]string{
+		Key: string(b), store.SettingDeviceIdleAfterDays: strconv.FormatUint(uint64(idleAfterDays), 10),
+	}, mode, c.now())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -650,6 +691,7 @@ func (c *Cache) UpdateRevoking(ctx context.Context, s *adminv1.SubscriptionSetti
 		mode = stored
 	}
 	s.LinkDeviceLimit = linkModeProto(mode).Enum()
+	s.DeviceIdleAfterDays = proto.Uint32(idleAfterDays)
 	c.mu.Lock()
 	if c.cur != nil { // else the switch of the kl!ck reports was never read: the next Get reads both
 		c.cur, c.at = s, c.now()
