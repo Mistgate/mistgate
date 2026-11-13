@@ -201,6 +201,9 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
     - title: Subscription mirrors
       section: subscriptions
       text: "Copies of the subscription at other addresses, so that apps still get it when the panel's address is unreachable."
+    - title: A shared map of blocks
+      section: reachability
+      text: "Panels whose owners opt in send short anonymous reports of what fails (country, big operator, kind of protocol, what failed), and the project publishes weekly open summaries anyone can mirror. No addresses, names, ports or people ever leave the panel; reports show failures only and are labelled as unverified. Off by default. Not being built yet: first a local preview of what would be sent."
     - title: Moving between the VPS and the Cloudflare edition
       icon: refresh
       text: "Moving users, nodes and subscription links either way, with the links still working. Today a fleet is set up again for the other edition. See [Moving](../getting-started/install-edge.md#moving-between-a-vps-panel-and-the-edge)."

@@ -201,6 +201,9 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.85`�
     - title: 订阅镜像
       section: subscriptions
       text: "在其他地址保存订阅副本，以便面板地址无法连接时，应用仍能获取订阅。"
+    - title: 共享的封锁地图
+      section: reachability
+      text: "由面板所有者自愿开启后，面板发送简短的匿名故障报告（国家、大型运营商、协议类型、具体故障），项目每周发布任何人都可镜像的公开汇总。地址、名称、端口和用户信息不会离开面板；汇总只显示故障，并标注为未经核实。默认关闭。目前尚未开发：先提供本地预览，显示将会发送的内容。"
     - title: 在 VPS 版和 Cloudflare 版之间迁移
       icon: refresh
       text: "在两个版本之间迁移用户、节点和订阅链接，同时保持链接可用。目前要使用另一个版本，需要重新配置集群。参见[迁移](../getting-started/install-edge.md#在-vps-面板和-cloudflare-版之间迁移)。"
