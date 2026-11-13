@@ -54,6 +54,9 @@ func TestReaderParsesAndValidatesAptLockHolder(t *testing.T) {
 			writeRoot(t, root, "/proc/locks", fmt.Sprintf("1: POSIX ADVISORY WRITE %d %s 0 EOF\n", pid, key))
 			writeRoot(t, root, fmt.Sprintf("/proc/%d/comm", pid), tc.comm+"\n")
 			statFields := make([]string, 20) // fields 3 through 22
+			for i := range statFields {
+				statFields[i] = "0"
+			}
 			statFields[0], statFields[19] = "S", "450"
 			writeRoot(t, root, fmt.Sprintf("/proc/%d/stat", pid), fmt.Sprintf("%d (apt-get) %s\n", pid, strings.Join(statFields, " ")))
 			writeRoot(t, root, "/proc/stat", "cpu 1 2 3\nbtime 1800000000\n")
