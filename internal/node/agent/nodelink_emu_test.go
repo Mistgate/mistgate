@@ -312,7 +312,15 @@ func (e *nodeLinkEmu) Poke(ctx context.Context, nodeIDs []string) error {
 
 // runAlarm is the platform calling alarm(). The platform does so only for an armed alarm whose time has come, so this
 // fails the test when none is armed or it is not due yet (move the clock with advance or advanceToAlarm first).
-func (e *nodeLinkEmu) runAlarm(nodeID string) {
+func (e *nodeLinkEmu) runAlarm(nodeID string) { e.callAlarm(nodeID, true) }
+
+// runAlarmIfArmed is runAlarm for a clock moved past a deadline that the object may re-arm at any moment (it does so when it
+// hears a socket's close): the platform fires an alarm that is already due by itself, in real time, so a test that only needs
+// the alarm to have run must not insist on being the one to run it. A due alarm that is armed is run here; none armed means
+// the platform took it, and its event is already queued.
+func (e *nodeLinkEmu) runAlarmIfArmed(nodeID string) { e.callAlarm(nodeID, false) }
+
+func (e *nodeLinkEmu) callAlarm(nodeID string, mustBeArmed bool) {
 	o := e.object(nodeID)
 	o.do(func() {
 		o.tmu.Lock()
@@ -320,7 +328,9 @@ func (e *nodeLinkEmu) runAlarm(nodeID string) {
 		o.tmu.Unlock()
 		now := e.nowMs()
 		if target == 0 {
-			e.t.Errorf("runAlarm(%s): no alarm is armed, the platform would not call alarm()", nodeID)
+			if mustBeArmed {
+				e.t.Errorf("runAlarm(%s): no alarm is armed, the platform would not call alarm()", nodeID)
+			}
 			return
 		}
 		if target > now {

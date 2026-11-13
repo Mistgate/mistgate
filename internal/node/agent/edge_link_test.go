@@ -1013,9 +1013,11 @@ func TestEdgeLinkRetireByAlarmWithSilentClient(t *testing.T) {
 		}
 		break
 	}
-	// The pending socket still has its deadline: it is closed by the alarm, and then nothing is left at all.
+	// The pending socket still has its deadline: it is closed by the alarm, and then nothing is left at all. The raw client's
+	// close echo may reach the object only after the clock has moved; it re-arms the alarm for a deadline that is then already
+	// due, and the platform fires such an alarm by itself.
 	r.em.advance(5 * time.Second)
-	r.em.runAlarm(r.nodeID)
+	r.em.runAlarmIfArmed(r.nodeID)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, _, err := pending.Read(ctx)
