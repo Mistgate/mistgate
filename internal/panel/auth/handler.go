@@ -691,8 +691,8 @@ func nonEmpty(s, def string) string {
 }
 
 // Logout deletes the session (if any) and clears the cookie. Only the end of a real session is audited: the procedure
-// is public, and an audit row per anonymous call would let anyone who reaches the admin grow the (never pruned) audit
-// log and the database at the admin request rate.
+// is public, and an audit row per anonymous call would let anyone who reaches the admin grow the audit log (pruned
+// only after its retention, 400 days by default) and the database at the admin request rate.
 func (s *Service) Logout(ctx context.Context, req *connect.Request[adminv1.LogoutRequest]) (*connect.Response[adminv1.LogoutResponse], error) {
 	if tok := sessionToken(req.Header()); tok != "" {
 		admin, err := s.resolve(ctx, tok)
