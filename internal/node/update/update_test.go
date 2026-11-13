@@ -357,6 +357,19 @@ func readFile(t *testing.T, p string) []byte {
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
+// writePrev leaves body as <exe>.prev with the record Apply writes for it.
+func writePrev(t *testing.T, e *env, body string) {
+	t.Helper()
+	sum := sha256.Sum256([]byte(body))
+	rec, _ := jsonMarshal(prevRecord{SHA256: hex.EncodeToString(sum[:])})
+	if err := os.WriteFile(e.exe+".prev", []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(e.state, FilePrev), rec, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestApplySwapsAndMarks(t *testing.T) {
 	e := newEnv(t)
 	u := e.updater(nil)
@@ -879,7 +892,7 @@ func TestNoUpdateWhileANewBuildIsUncommitted(t *testing.T) {
 func TestRollbackAgent(t *testing.T) {
 	t.Run("restores .prev once", func(t *testing.T) {
 		e := newEnv(t)
-		_ = os.WriteFile(e.exe+".prev", []byte("the previous build"), 0o755)
+		writePrev(t, e, "the previous build")
 		_ = os.WriteFile(filepath.Join(e.state, FileStarts), []byte("2"), 0o600)
 		u := e.updater(nil)
 		res, fin := u.Rollback(context.Background(), &pb.RollbackAgent{RequestId: "rb-1"})
@@ -926,7 +939,7 @@ func TestRollbackAgent(t *testing.T) {
 	})
 	t.Run("an update after a rollback has a fresh .prev; two calls in a row are busy", func(t *testing.T) {
 		e := newEnv(t)
-		_ = os.WriteFile(e.exe+".prev", []byte("x"), 0o755)
+		writePrev(t, e, "x")
 		u := e.updater(nil)
 		if res, _ := u.Rollback(context.Background(), &pb.RollbackAgent{}); !res.Ok {
 			t.Fatal(res)

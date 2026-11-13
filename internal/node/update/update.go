@@ -10,6 +10,9 @@ package update
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +39,7 @@ const (
 	FileRolledBack         = "update.rolledback"
 	FileRolledBackWhy      = "update.rolledback.reason"
 	FileOutcome            = "update.outcome"
+	FilePrev               = "update.prev"
 	FileUnitRefreshPending = "unit-refresh.pending"
 	CapUpdate              = "update/1"
 	CapUpdateTimeout       = "update-timeout/1"
@@ -254,6 +258,8 @@ func (u *Updater) probe() error {
 func (u *Updater) path(name string) string { return filepath.Join(u.cfg.StateDir, name) }
 func (u *Updater) prev() string            { return u.exe + ".prev" }
 func (u *Updater) newPath() string         { return u.exe + ".new" }
+func (u *Updater) prevNew() string         { return u.exe + ".prev.new" }
+func (u *Updater) prevOld() string         { return u.exe + ".prev.old" }
 
 // Outcome is the Hello.last_update to send now (nil = none). AckOutcome forgets it once a HelloAck for that Hello
 // arrived; an outcome that was replaced in between stays.
@@ -509,6 +515,7 @@ func (u *Updater) rollbackFor(m *Marker, reason string) (Finish, error) {
 	}
 	_ = os.Remove(u.path(FilePending))
 	_ = os.Remove(u.path(FileStarts))
+	_ = os.Remove(u.path(FilePrev))
 	syncDir(filepath.Dir(u.exe))
 	u.log.Warn("rolling back to the previous build", "code", "update_rollback_started", "reason", reason, "from", m.FromVersion, "to", m.ToVersion)
 	return u.execFinish(nil), nil
@@ -714,7 +721,10 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 		return fail(err)
 	}
 	report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "installing", BytesDownloaded: uint64(file.Size), BytesTotal: uint64(file.Size), UpdatedUnix: src.Now().Unix()})
-	if err := copyFile(u.exe, u.prev(), 0o755); err != nil {
+	// The copy of the running build is staged beside .prev: .prev (the older rollback target) is replaced only once the
+	// update can no longer be refused before the swap, and put back if the swap itself fails.
+	prevRec, err := u.stagePrev()
+	if err != nil {
 		_ = os.Remove(u.newPath())
 		return fail(step("not_writable", err))
 	}
@@ -725,13 +735,23 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 	b, _ := jsonMarshal(marker)
 	if err := writeAtomic(u.path(FilePending), b, 0o600); err != nil {
 		_ = os.Remove(u.newPath())
+		_ = os.Remove(u.prevNew())
+		return fail(step("not_writable", err))
+	}
+	restorePrev, err := u.swapPrev(prevRec)
+	if err != nil {
+		_ = os.Remove(u.path(FilePending))
+		_ = os.Remove(u.newPath())
+		_ = os.Remove(u.prevNew())
 		return fail(step("not_writable", err))
 	}
 	if err := os.Rename(u.newPath(), u.exe); err != nil {
+		restorePrev()
 		_ = os.Remove(u.path(FilePending))
 		_ = os.Remove(u.newPath())
 		return fail(step("not_writable", err))
 	}
+	_ = os.Remove(u.prevOld())
 	report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "restarting", BytesDownloaded: uint64(file.Size), BytesTotal: uint64(file.Size), UpdatedUnix: src.Now().Unix()})
 	syncDir(filepath.Dir(u.exe))
 	swapped = true
@@ -749,6 +769,7 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 			u.log.Error("cannot restore the previous binary after a failed exec; the marker stays for the next start", "code", "update_exec_restore_failed", "err", err)
 		} else {
 			_ = os.Remove(u.path(FilePending))
+			_ = os.Remove(u.path(FilePrev))
 		}
 		u.setOutcome(pb.UpdateOutcome_UPDATE_OUTCOME_FAILED, marker, ReasonExec)
 	})
@@ -784,6 +805,9 @@ func (u *Updater) Rollback(_ context.Context, req *pb.RollbackAgent) (*pb.Comman
 	if err := u.probe(); err != nil {
 		return fail(step("not_writable", err))
 	}
+	if err := u.verifyPrev(); err != nil {
+		return fail(step("no_previous", err))
+	}
 	// to = the build we leave; from (the restored build) is filled in by the old binary at its start.
 	left := &Marker{ToVersion: u.cfg.Version, ToBuilt: u.cfg.Built}
 	u.setOutcome(pb.UpdateOutcome_UPDATE_OUTCOME_ROLLED_BACK, left, ReasonManual)
@@ -794,6 +818,7 @@ func (u *Updater) Rollback(_ context.Context, req *pb.RollbackAgent) (*pb.Comman
 	}
 	_ = os.Remove(u.path(FilePending))
 	_ = os.Remove(u.path(FileStarts))
+	_ = os.Remove(u.path(FilePrev))
 	syncDir(filepath.Dir(u.exe))
 	done = true
 	u.pend.Store(nil)
@@ -801,6 +826,81 @@ func (u *Updater) Rollback(_ context.Context, req *pb.RollbackAgent) (*pb.Comman
 	res.Ok, res.Affected = true, 1
 	res.Params = map[string]string{"from_version": u.cfg.Version, "from_built": fmt.Sprint(u.cfg.Built)}
 	return res, u.execFinish(nil)
+}
+
+// prevRecord ties <exe>.prev to the build it was copied from: the sha256 of the file and that build's Built.
+type prevRecord struct {
+	SHA256 string `json:"sha256"`
+	Built  int64  `json:"built"`
+}
+
+// stagePrev copies the running executable to <exe>.prev.new and returns the record that describes the copy.
+func (u *Updater) stagePrev() ([]byte, error) {
+	if err := copyFile(u.exe, u.prevNew(), 0o755); err != nil {
+		return nil, err
+	}
+	f, err := os.Open(u.prevNew())
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		_ = os.Remove(u.prevNew())
+		return nil, err
+	}
+	return jsonMarshal(prevRecord{SHA256: hex.EncodeToString(h.Sum(nil)), Built: u.cfg.Built})
+}
+
+// swapPrev makes the staged copy the rollback target together with its record. restore puts the older target back.
+func (u *Updater) swapPrev(rec []byte) (restore func(), err error) {
+	oldRec, _ := os.ReadFile(u.path(FilePrev))
+	hadOld := os.Rename(u.prev(), u.prevOld()) == nil
+	restore = func() {
+		_ = os.Remove(u.prev())
+		if hadOld {
+			_ = os.Rename(u.prevOld(), u.prev())
+		}
+		if oldRec != nil {
+			_ = writeAtomic(u.path(FilePrev), oldRec, 0o600)
+		} else {
+			_ = os.Remove(u.path(FilePrev))
+		}
+	}
+	if err = os.Rename(u.prevNew(), u.prev()); err == nil {
+		err = writeAtomic(u.path(FilePrev), rec, 0o600)
+	}
+	if err != nil {
+		restore()
+		return nil, err
+	}
+	return restore, nil
+}
+
+// verifyPrev checks <exe>.prev against the record Apply wrote for it. A .prev without a matching record (swapped
+// file, or left by an agent that did not write records) is not installed.
+func (u *Updater) verifyPrev() error {
+	b, err := os.ReadFile(u.path(FilePrev))
+	if err != nil {
+		return errors.New("the previous build has no record: it cannot be verified")
+	}
+	var rec prevRecord
+	if err := json.Unmarshal(b, &rec); err != nil || rec.SHA256 == "" {
+		return errors.New("the record of the previous build is unreadable")
+	}
+	f, err := os.Open(u.prev())
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	if hex.EncodeToString(h.Sum(nil)) != rec.SHA256 || rec.Built > u.cfg.Built {
+		return errors.New("the previous build does not match its record")
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------------------------------
