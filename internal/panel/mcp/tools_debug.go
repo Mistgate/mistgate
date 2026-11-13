@@ -198,7 +198,7 @@ var debugCapture = changeSpec[debugCaptureArgs]{
 		return &planned{
 			Summary: "Capture one node's debug log for a short time. The node returns to its normal level by itself; nothing is stored beyond 24 hours.",
 			Facts: []Fact{
-				{Key: "node", Value: name}, {Key: "level", Value: level}, {Key: "sources", Value: sources},
+				{Key: "node", Value: nm(name), Untrusted: true}, {Key: "level", Value: level}, {Key: "sources", Value: sources},
 				{Key: "duration", Value: strconv.Itoa(secs) + " s"}, {Key: "limits", Value: "20000 records, 4 MiB"},
 			},
 			Params: debugCaptureArgs{Node: id, Level: level, Sources: a.Sources, Duration: secs},
