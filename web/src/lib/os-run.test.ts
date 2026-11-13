@@ -19,10 +19,10 @@ const tRu = tOf("ru");
 const NOW = 1_800_000_000;
 const step = (over: Partial<OsStepRow> = {}): OsStepRow => ({
   nodeId: "nod_de1", nodeName: "de1", state: OsStepState.SENT, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: NOW - 200, rebootUnix: 0, backUnix: 0, finishedUnix: 0,
-  errorKey: "", params: {}, ...over,
+  errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, ...over,
 });
 const run = (steps: OsStepRow[], over: Partial<OsRun> = {}): OsRun => ({
-  id: "osr_1", status: OsRolloutStatus.RUNNING, mode: 1, reboot: 2, createdUnix: NOW - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, ...over,
+  id: "osr_1", status: OsRolloutStatus.RUNNING, mode: 1, reboot: 2, createdUnix: NOW - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, batchSize: 1, ...over,
 });
 
 describe("what to show for a node's run", () => {

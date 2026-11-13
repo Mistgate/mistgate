@@ -28,12 +28,12 @@ afterEach(() => {
   root = host = null;
 });
 
-async function mount(devices: DeviceN[]) {
+async function mount(devices: DeviceN[], userOver: Record<string, unknown> = {}) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const user = { id: "usr_alice", name: "alice", groupName: "all", deviceLimit: 5, devicesUsed: devices.length, apps: { happ: true, amnezia: false } } as never;
+  const user = { id: "usr_alice", name: "alice", groupName: "all", deviceLimit: 5, devicesUsed: devices.length, devicesIdle: 0, apps: { happ: true, amnezia: false }, ...userOver } as never;
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
@@ -46,7 +46,7 @@ async function mount(devices: DeviceN[]) {
   for (let i = 0; i < 4; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 }
 const device = (id: string, model: string, over: object = {}) =>
-  ({ id, kind: DeviceKind.LINK, model, platform: "windows", client: "", osVersion: "", awgProfileId: "", onlineNodeIds: [], firstSeenUnix: 0, lastSeenUnix: 0, lastHandshakeUnix: 0, usedBytes: 0, enrolled: false, enrolLinkStale: false, ...over }) as unknown as DeviceN;
+  ({ id, kind: DeviceKind.LINK, model, platform: "windows", client: "", osVersion: "", awgProfileId: "", onlineNodeIds: [], firstSeenUnix: 0, lastSeenUnix: 0, lastHandshakeUnix: 0, usedBytes: 0, enrolled: false, enrolLinkStale: false, idle: false, idleSinceUnix: 0, ...over }) as unknown as DeviceN;
 const row = (name: string) => [...document.querySelectorAll("li")].find((li) => li.textContent?.includes(name));
 const badge = (name: string) => [...(row(name)?.querySelectorAll("span[tabindex]") ?? [])].find((s) => /^(By key|Link changed)$/.test(s.textContent ?? ""));
 
@@ -62,5 +62,45 @@ describe("the app-key labels on a device row", () => {
     // the stale one is amber, the keyed one quiet grey
     expect(badge("Old Link PC")?.className).toContain("text-warn-text");
     expect(badge("Keyed PC")?.className).not.toContain("text-warn-text");
+  });
+});
+
+describe("an inactive device", () => {
+  const IDLE_SINCE = Math.floor(Date.UTC(2026, 9, 12, 12) / 1000);
+  const counter = () => [...document.querySelectorAll("span")].find((s) => /^\d+ of \d+$/.test(s.textContent ?? ""))?.parentElement?.textContent ?? "";
+
+  it("gets a calm plaque with the date and a line that it takes no place, and a live device gets neither", async () => {
+    await mount([device("d1", "Live PC"), device("d2", "Old Tablet", { idle: true, idleSinceUnix: IDLE_SINCE })], { devicesIdle: 1 });
+    expect(row("Live PC")?.textContent).not.toMatch(/Inactive|Takes no place/);
+    const old = row("Old Tablet")!;
+    expect(old.textContent).toContain("Inactive since");
+    expect(old.textContent).toContain("Oct 12");
+    expect(old.textContent).toContain("Takes no place in the limit");
+    const plaque = [...old.querySelectorAll("span[tabindex]")].find((s) => s.textContent?.startsWith("Inactive since"))!;
+    expect(plaque.getAttribute("aria-label")).toContain("its keys keep working, but it does not count toward the limit");
+    // quiet, not an alarm: the grey-blue pill, nothing red or amber on the row
+    expect(old.innerHTML).not.toContain("danger");
+    expect(old.innerHTML).not.toContain("warn");
+  });
+
+  it("is said beside the count: '1 of 5' and '+1 inactive'", async () => {
+    await mount([device("d1", "Live PC"), device("d2", "Old Tablet", { idle: true, idleSinceUnix: IDLE_SINCE })], { devicesUsed: 1, devicesIdle: 1 });
+    expect(counter()).toContain("1 of 5");
+    expect(counter()).toContain("+1 inactive");
+  });
+
+  it("leaves the count alone when no device is inactive", async () => {
+    await mount([device("d1", "Live PC")]);
+    expect(counter()).toContain("1 of 5");
+    expect(counter()).not.toContain("inactive");
+  });
+
+  it("marks an AmneziaWG key the same way", async () => {
+    await mount(
+      [device("k1", "Pixel", { kind: DeviceKind.KEY, awgProfileId: "p1", awgProfileName: "AWG 3.1", platform: "android", idle: true, idleSinceUnix: IDLE_SINCE })],
+      { devicesIdle: 1, devicesUsed: 0, apps: { happ: false, amnezia: true } },
+    );
+    expect(row("Pixel")?.textContent).toContain("Inactive since");
+    expect(row("Pixel")?.textContent).toContain("Takes no place in the limit");
   });
 });

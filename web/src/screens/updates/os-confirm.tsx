@@ -17,7 +17,7 @@ import type { OsRow } from "@/lib/os-updates";
 
 export type OsDialogMode = "install" | "reboot";
 
-function Fact({ icon, children }: { icon: IconName; children: ReactNode }) {
+export function Fact({ icon, children }: { icon: IconName; children: ReactNode }) {
   return (
     <li className="flex items-start gap-2.5 text-[13px] leading-snug">
       <Icon name={icon} size={15} className="mt-0.5 flex-none text-muted" aria-hidden />
@@ -26,8 +26,8 @@ function Fact({ icon, children }: { icon: IconName; children: ReactNode }) {
   );
 }
 
-/** One of two choices with its words under it; the long labels wrap instead of squeezing a segmented control. */
-function Choice({ value, label, hint }: { value: string; label: string; hint: string }) {
+/** One of a few choices with its words under it (`aside`: a quiet line after them); the long labels wrap instead of squeezing a segmented control. */
+export function Choice({ value, label, hint, aside }: { value: string; label: string; hint: string; aside?: string }) {
   return (
     <Radio.Root
       value={value}
@@ -37,14 +37,17 @@ function Choice({ value, label, hint }: { value: string; label: string; hint: st
         <Radio.Indicator className="size-2 rounded-full bg-accent" />
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[13px] font-bold">{label}</span>
+        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <span className="text-[13px] font-bold">{label}</span>
+          {aside && <span className="text-[11px] font-semibold text-muted">{aside}</span>}
+        </span>
         <span className="text-xs leading-snug text-pretty text-muted">{hint}</span>
       </span>
     </Radio.Root>
   );
 }
 
-export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; mode: OsDialogMode; actions: OsActions; onClose: () => void }) {
+export function OsConfirmDialog({ row, mode, actions, onClose, initialPkgs }: { row: OsRow; mode: OsDialogMode; actions: OsActions; onClose: () => void; /** The dev kit opens the window on "All packages". */ initialPkgs?: "security" | "all" }) {
   const t = useT();
   const s = row.status;
   const name = row.name ?? "";
@@ -52,9 +55,14 @@ export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; m
   // a node that was rebooted a short while ago refuses another reboot for now: the install then asks for none, as the safe default
   const rebootWait = minutesUntil(row.rebootPossibleUnix ?? 0, row.nowUnix ?? 0);
   const [reboot, setReboot] = useState<"if_required" | "never">(rebootWait > 0 ? "never" : "if_required");
-  const online = row.online ?? 0;
   const security = s?.security ?? 0;
-  const others = Math.max(0, (s?.pending ?? 0) - security);
+  const pending = s?.pending ?? 0;
+  // what to install: only the security updates, or every waiting package; a node with only ordinary ones waiting has nothing else to choose
+  const choosePkgs = install && pending > security && (security > 0 || s?.apt === "half_configured");
+  const [pkgs, setPkgs] = useState<"security" | "all">(initialPkgs ?? (security === 0 && pending > 0 ? "all" : "security"));
+  const all = install && pkgs === "all";
+  const online = row.online ?? 0;
+  const others = Math.max(0, pending - security);
   const newKernel = !!s?.kernelNewest && !!s.kernelRunning && s.kernelNewest !== s.kernelRunning;
   const packages = (s?.rebootReasons ?? []).filter((r) => r !== "kernel");
   // why a reboot is already due
@@ -72,7 +80,7 @@ export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; m
       .start({
         nodeId: row.nodeId ?? "",
         name,
-        mode: install ? OsRolloutMode.SECURITY : OsRolloutMode.REBOOT_ONLY,
+        mode: install ? (all ? OsRolloutMode.ALL : OsRolloutMode.SECURITY) : OsRolloutMode.REBOOT_ONLY,
         reboot: install ? (reboot === "never" ? OsRebootPolicy.NEVER : OsRebootPolicy.IF_REQUIRED) : OsRebootPolicy.ALWAYS,
       })
       .then((ok) => ok && onClose());
@@ -82,8 +90,8 @@ export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; m
       open
       shot="os-confirm"
       onOpenChange={(o) => !o && !actions.busy && onClose()}
-      title={t(install ? "os.dlg.install.title" : "os.dlg.reboot.title", { node: name })}
-      description={install ? t("os.dlg.install.lead") : undefined}
+      title={t(all ? "osf.one.title.all" : install ? "os.dlg.install.title" : "os.dlg.reboot.title", { node: name })}
+      description={all ? t("osf.one.lead.all") : install ? t("os.dlg.install.lead") : undefined}
       footer={
         <>
           <Button variant="ghost" size="md" disabled={actions.busy} onClick={onClose}>
@@ -111,8 +119,8 @@ export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; m
         {!install && <Fact icon="shield">{t("os.dlg.reboot.lead")}</Fact>}
         {install && (
           <Fact icon="shield">
-            {t.n("os.dlg.security", security)}
-            {others > 0 && <span className="block text-xs text-muted">{t.n("os.dlg.others", others)}</span>}
+            {all ? t.n("osf.one.all.fact", pending) : t.n("os.dlg.security", security)}
+            {!all && others > 0 && <span className="block text-xs text-muted">{t.n("os.dlg.others", others)}</span>}
           </Fact>
         )}
         {newKernel && <Fact icon="cpu">{t("os.dlg.kernel", { from: s?.kernelRunning ?? "", to: s?.kernelNewest ?? "" })}</Fact>}
@@ -131,6 +139,12 @@ export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; m
         <Fact icon="pulse">{t("os.dlg.fact.profiles")}</Fact>
       </ul>
 
+      {choosePkgs && (
+        <RadioGroup value={pkgs} onValueChange={(v) => setPkgs(v as typeof pkgs)} aria-label={t("osf.one.what")} className="flex flex-col gap-2">
+          <Choice value="security" label={t("osf.scope.security")} hint={t.n("osf.one.security.hint", security)} />
+          <Choice value="all" label={t("osf.scope.all")} hint={t.n("osf.one.all.hint", pending)} />
+        </RadioGroup>
+      )}
       {install && (
         <RadioGroup value={reboot} onValueChange={(v) => setReboot(v as typeof reboot)} aria-label={t("os.dlg.after")} className="flex flex-col gap-2">
           <Choice value="if_required" label={t("os.dlg.reboot.ifRequired")} hint={t("os.dlg.reboot.ifRequired.hint")} />

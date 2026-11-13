@@ -6,7 +6,7 @@
 export const en = {
   // ---- the card on the node's Server tab
   "os.card.title": "Operating system",
-  "os.card.body": "Packages and kernel as the server reads them. You can install the security updates and reboot it from here, one node at a time.",
+  "os.card.body": "Packages and kernel as the server reads them. You can install the updates and reboot it from here; several nodes at once from the Updates page.",
   "os.card.noStatus": "The node has not reported its system yet.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -270,7 +270,7 @@ export const en = {
 
 export const ru: Record<keyof typeof en, string> = {
   "os.card.title": "Операционная система",
-  "os.card.body": "Пакеты и ядро в том виде, как их читает сервер. Отсюда можно поставить обновления безопасности и перезагрузить сервер, по одной ноде.",
+  "os.card.body": "Пакеты и ядро в том виде, как их читает сервер. Отсюда можно поставить обновления и перезагрузить сервер; сразу несколько нод — на странице «Обновления».",
   "os.card.noStatus": "Нода ещё не прислала данные о своей системе.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -526,7 +526,7 @@ export const ru: Record<keyof typeof en, string> = {
 
 export const zh: Record<keyof typeof en, string> = {
   "os.card.title": "操作系统",
-  "os.card.body": "服务器自己读取到的软件包和内核。你可以在这里安装安全更新并重启服务器，一次一个节点。",
+  "os.card.body": "服务器自己读取到的软件包和内核。你可以在这里安装更新并重启服务器；要一次处理多个节点，请到“更新”页面。",
   "os.card.noStatus": "节点还没有上报它的系统信息。",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -782,7 +782,7 @@ export const zh: Record<keyof typeof en, string> = {
 
 export const fa: Record<keyof typeof en, string> = {
   "os.card.title": "سیستم‌عامل",
-  "os.card.body": "بسته‌ها و هسته همان‌طور که خود سرور می‌خواند. از اینجا می‌توانی به‌روزرسانی‌های امنیتی را نصب کنی و سرور را راه‌اندازی مجدد کنی، هر بار یک نود.",
+  "os.card.body": "بسته‌ها و هسته همان‌طور که خود سرور می‌خواند. از اینجا می‌توانی به‌روزرسانی‌ها را نصب کنی و سرور را راه‌اندازی مجدد کنی؛ چند نود با هم را از صفحهٔ «به‌روزرسانی‌ها» انجام بده.",
   "os.card.noStatus": "نود هنوز اطلاعات سیستمش را نفرستاده است.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -1038,7 +1038,7 @@ export const fa: Record<keyof typeof en, string> = {
 
 export const tr: Record<keyof typeof en, string> = {
   "os.card.title": "İşletim sistemi",
-  "os.card.body": "Paketler ve çekirdek, sunucunun kendi okuduğu haliyle. Buradan güvenlik güncellemelerini kurabilir ve sunucuyu yeniden başlatabilirsin, her seferinde tek düğüm.",
+  "os.card.body": "Paketler ve çekirdek, sunucunun kendi okuduğu haliyle. Güncellemeleri buradan kurabilir ve sunucuyu yeniden başlatabilirsin; birden çok düğüm için «Güncellemeler» sayfasını kullan.",
   "os.card.noStatus": "Düğüm sistemi hakkında henüz bir şey bildirmedi.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through

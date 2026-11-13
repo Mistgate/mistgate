@@ -33,7 +33,7 @@ import { DAY, GB, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, 
 import { DnsSelect, effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns-select";
 import { AddDeviceModal, DeviceConfigsModal, platformLabel, type DeviceRef } from "./awg-devices";
 import { GroupChip, GroupEditModal, GroupLink, ImpactText, WaysOfGroup } from "./groups";
-import { BlockedList, DeviceRow, LinkDeviceRows, RowMenu, SectionHead, Secondary, Seen, SharedRow, splitDevices, Tile } from "./link-devices";
+import { BlockedList, DeviceRow, IdleBadge, IdleNote, LinkDeviceRows, RowMenu, SectionHead, Secondary, Seen, SharedRow, splitDevices, Tile } from "./link-devices";
 import { TelegramSection, telegramShown } from "./telegram-proxy";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { big, detailN, type BlockedN, type DetailN, type DeviceN as Device, type UserN as User } from "./model";
@@ -725,9 +725,13 @@ export function DevicesPanel({
       icon="phone"
       tone="mint"
       aside={
-        <span className={cx("font-mono text-xs", over ? "font-semibold text-danger-text" : full ? "text-warn-text" : "text-muted")}>
-          {user.deviceLimit > 0 ? t("users.devCount", { n: user.devicesUsed, limit: user.deviceLimit }) : user.devicesUsed}
-        </span>
+        <>
+          <span className={cx("font-mono text-xs", over ? "font-semibold text-danger-text" : full ? "text-warn-text" : "text-muted")}>
+            {user.deviceLimit > 0 ? t("users.devCount", { n: user.devicesUsed, limit: user.deviceLimit }) : user.devicesUsed}
+          </span>
+          {/* devices that have not connected for a long time are not in that count: said beside it, quietly */}
+          {user.devicesIdle > 0 && <span className="ms-2 font-mono text-xs text-muted">{t.n("users.devIdle", user.devicesIdle)}</span>}
+        </>
       }
       // a container: on a narrow card a row's status keeps the servers and drops the word, a key's button its text
       className="@container pb-2"
@@ -787,20 +791,28 @@ export function DevicesPanel({
               {keys.map((d) => (
                 <DeviceRow
                   key={d.id}
-                  tile={<Tile icon="key" tone="mint" />}
+                  tile={<Tile icon="key" tone="mint" muted={d.idle} />}
                   name={nameOf(d)}
-                  badge={d.stale && <span className="flex-none rounded-md border border-warn-line bg-warn-soft px-1.5 py-px text-[10px] font-extrabold text-warn-text">{t("awg.dev.stale")}</span>}
+                  badge={
+                    <>
+                      <IdleBadge d={d} t={t} />
+                      {d.stale && <span className="flex-none rounded-md border border-warn-line bg-warn-soft px-1.5 py-px text-[10px] font-extrabold text-warn-text">{t("awg.dev.stale")}</span>}
+                    </>
+                  }
                   line={
-                    <Secondary
-                      text={
-                        <>
-                          {platformLabel(d.platform, t)} ·{" "}
-                          <Link to="/profiles/$id" params={{ id: d.awgProfileId }} className="font-semibold text-fg hover:text-accent-text hover:underline">
-                            {d.awgProfileName}
-                          </Link>
-                        </>
-                      }
-                    />
+                    <>
+                      <Secondary
+                        text={
+                          <>
+                            {platformLabel(d.platform, t)} ·{" "}
+                            <Link to="/profiles/$id" params={{ id: d.awgProfileId }} className="font-semibold text-fg hover:text-accent-text hover:underline">
+                              {d.awgProfileName}
+                            </Link>
+                          </>
+                        }
+                      />
+                      <IdleNote d={d} t={t} />
+                    </>
                   }
                   right={
                     <>

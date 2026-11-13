@@ -29,25 +29,25 @@ import { OsSection } from "@/screens/updates/os";
 const wantedLang = new URLSearchParams(location.search).get("lang");
 if (isLang(wantedLang)) setLang(wantedLang);
 
-const now = Math.floor(Date.now() / 1000);
+export const now = Math.floor(Date.now() / 1000);
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const base = {
+export const base = {
   measuredUnix: now - 60, distroId: "ubuntu", distroVersion: "24.04", pending: 0, security: 0, notable: [], kernelRunning: "6.8.0-147-generic", kernelNewest: "6.8.0-147-generic",
   rebootRequired: false, rebootReasons: [], held: [], apt: "ok", halfConfigured: [], listsUnix: now - 3600, dpkgUnix: now - 7200, autoUpdates: "on", autoReboot: false,
   awgModuleNext: "", container: "", bootIdHash: "", error: "",
 };
-const node = (over: Record<string, unknown>) => ({
+export const node = (over: Record<string, unknown>) => ({
   nodeId: "nod_de1", name: "de1", connected: true, supported: true, onlineUsers: 0, onPanelServer: false, state: OsUpdateState.UP_TO_DATE, status: { ...base },
   updateCapable: true, updateBlock: "", rebootBlock: "", rebootPossibleUnix: 0, ...over,
 });
-const step = (nodeId: string, nodeName: string, over: Record<string, unknown>) => ({
-  nodeId, nodeName, state: OsStepState.PASSED, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, ...over,
+export const step = (nodeId: string, nodeName: string, over: Record<string, unknown>) => ({
+  nodeId, nodeName, state: OsStepState.PASSED, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, stage: 0, retryAfterUnix: 0, ...over,
 });
-const rollout = (steps: unknown[], over: Record<string, unknown>) => ({
-  id: "osr_1", status: OsRolloutStatus.RUNNING, mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED, createdUnix: now - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, ...over,
+export const rollout = (steps: unknown[], over: Record<string, unknown>) => ({
+  id: "osr_1", status: OsRolloutStatus.RUNNING, mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED, createdUnix: now - 300, finishedUnix: 0, pauseKey: "", pauseParams: {}, steps, batchSize: 1, ...over,
 });
-const answer = (nodes: unknown[], run?: unknown): OsUpdates => ({ nowUnix: now, scheduleTimezoneOffsetMinutes: 180, panelHost: { ...base }, nodes, rollout: run }) as never;
+export const answer = (nodes: unknown[], run?: unknown): OsUpdates => ({ nowUnix: now, scheduleTimezoneOffsetMinutes: 180, panelHost: { ...base }, nodes, rollout: run }) as never;
 
 const waiting = { ...base, pending: 12, security: 4, kernelNewest: "6.8.0-150-generic", rebootRequired: true, rebootReasons: ["kernel"] };
 const de1Waiting = node({ onlineUsers: 5, state: OsUpdateState.REBOOT_REQUIRED, status: waiting });
@@ -192,9 +192,9 @@ function fakeCalls() {
 }
 fakeCalls();
 
-const owner = { admin: { id: "adm_1", login: "owner", role: Role.OWNER }, edition: "vps", unavailable: [] };
+export const owner = { admin: { id: "adm_1", login: "owner", role: Role.OWNER }, edition: "vps", unavailable: [] };
 
-function Shot({ id, title, data, children }: { id: string; title: string; data: OsUpdates; children: ReactNode }) {
+export function Shot({ id, title, data, children }: { id: string; title: string; data: OsUpdates; children: ReactNode }) {
   const [qc] = useState(() => {
     const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false } } });
     client.setQueryData(meQuery.queryKey, owner as never);

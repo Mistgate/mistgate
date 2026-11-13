@@ -5,7 +5,7 @@ import type { BlockedDevice, Device, GetUserResponse, ListUsersResponse, NodeAcc
 // a write, uses BigInt(Math.round(x)) at the call.)
 type Int64 = "usedBytes" | "quotaBytes" | "nextResetUnix" | "expiresUnix" | "lastSeenUnix" | "speedLimitBps" | "deviceSpeedLimitBps" | "createdUnix";
 export type UserN = Omit<User, Int64> & Record<Int64, number>;
-export type DeviceN = Omit<Device, "firstSeenUnix" | "lastSeenUnix" | "lastHandshakeUnix" | "usedBytes"> & { firstSeenUnix: number; lastSeenUnix: number; lastHandshakeUnix: number; usedBytes: number };
+export type DeviceN = Omit<Device, "firstSeenUnix" | "lastSeenUnix" | "lastHandshakeUnix" | "usedBytes" | "idleSinceUnix"> & { firstSeenUnix: number; lastSeenUnix: number; lastHandshakeUnix: number; usedBytes: number; idleSinceUnix: number };
 export type BlockedN = Omit<BlockedDevice, "blockedUnix"> & { blockedUnix: number };
 export type DetailN = {
   user: UserN;
@@ -34,7 +34,7 @@ export const usersPageN = (r: ListUsersResponse) => ({ users: r.users.map(userN)
 export function detailN(r: GetUserResponse): DetailN {
   return {
     user: userN(r.user!),
-    devices: r.devices.map((d) => ({ ...d, firstSeenUnix: Number(d.firstSeenUnix), lastSeenUnix: Number(d.lastSeenUnix), lastHandshakeUnix: Number(d.lastHandshakeUnix), usedBytes: Number(d.usedBytes ?? 0) })),
+    devices: r.devices.map((d) => ({ ...d, firstSeenUnix: Number(d.firstSeenUnix), lastSeenUnix: Number(d.lastSeenUnix), lastHandshakeUnix: Number(d.lastHandshakeUnix), usedBytes: Number(d.usedBytes ?? 0), idleSinceUnix: Number(d.idleSinceUnix ?? 0) })),
     dailyTraffic: r.dailyTraffic.map((d) => ({ dayUnix: Number(d.dayUnix), bytes: Number(d.bytes) })),
     nodeTraffic: r.nodeTraffic.map((n) => ({ nodeId: n.nodeId, nodeName: n.nodeName, protocol: n.protocol, bytes: Number(n.bytes) })),
     profiles: r.profiles,

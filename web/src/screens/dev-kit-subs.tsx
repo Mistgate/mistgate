@@ -9,6 +9,7 @@ import { meQuery } from "@/lib/session";
 import { ClientApiCard } from "@/screens/subscriptions/client-api";
 import { ClientsTab } from "@/screens/subscriptions/clients";
 import { FormatsTab } from "@/screens/subscriptions/formats";
+import { DeviceIdleCard } from "@/screens/subscriptions/device-idle";
 import { LinkAutoCard } from "@/screens/subscriptions/link-auto";
 import { LinkAwgCard, LinkAwgOffDialog } from "@/screens/subscriptions/link-awg";
 import type { Settings } from "@/screens/subscriptions/model";
@@ -202,7 +203,15 @@ export function SubsKit() {
         {state === "clients-empty" && <ClientsShot owner empty shot="subs-clients-empty" label="Subscriptions → App versions: no device gets REALITY servers yet" />}
         {state === "clients-readonly" && <ClientsShot owner={false} rulesOpen shot="subs-clients-readonly" label="Subscriptions → App versions, as a helper sees it (the table of minimum versions is read only)" />}
         {state === "clients-rules" && <ClientsShot owner rulesOpen shot="subs-clients-rules" label="Subscriptions → App versions: the table of minimum versions unfolded (one row changed, one of the owner’s own)" />}
-        {!awg && state !== "client-api" && !state.startsWith("clients") && (
+        {state === "idle" && (
+          <div data-shot="subs-device-idle" className="flex flex-col gap-3">
+            <SectionLabel>Subscriptions → Who gets what: inactive devices, on (30 days), on (7 days) and off</SectionLabel>
+            <DeviceIdleCard settings={{ ...shown, deviceIdleAfterDays: 30 } as Settings} />
+            <DeviceIdleCard settings={{ ...shown, deviceIdleAfterDays: 7 } as Settings} />
+            <DeviceIdleCard settings={{ ...shown, deviceIdleAfterDays: 0 } as Settings} />
+          </div>
+        )}
+        {!awg && state !== "client-api" && state !== "idle" && !state.startsWith("clients") && (
           <div data-shot="subs-texts" className="flex flex-col gap-3">
             <SectionLabel>Subscriptions → Names &amp; texts: ping in Happ</SectionLabel>
             <TextsTab data={{ settings, effectiveTitle: "Mistgate", samples, sampleGroup: state === "many" ? "Default" : "" } as never} />

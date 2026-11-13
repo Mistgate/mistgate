@@ -32,6 +32,7 @@ import { tr as resourcesTr } from "./resources";
 import { tr as tasksTr } from "./tasks";
 import { tr as followupTr } from "./followup";
 import { tr as osupdatesTr } from "./osupdates";
+import { tr as fleetuiTr } from "./fleetui";
 import { tr as clientlogsTr } from "./clientlogs";
 
 // Turkish (tr). Typed against the English shape: a missing or extra key fails `pnpm typecheck`.
@@ -294,4 +295,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Bu düğümün sitesi ya da başka bir site",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...clientlogsTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr };

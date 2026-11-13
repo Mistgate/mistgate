@@ -109,8 +109,9 @@ describe("Server operating system", () => {
     // fi1 has an older agent, msk1 is offline
     expect(text).toContain("Update the node agent to see this server's system");
     expect(text).toContain("Offline");
-    // what the panel can and cannot do yet; not the owner: no button
-    expect(text).toContain("Mistgate can install the security updates and reboot a server from the panel, one node at a time");
+    // what the panel can do (several nodes in one run, ordinary packages) and what stays by hand (its own server); not the owner: no button
+    expect(text).toContain("Mistgate installs the security updates (or every package) and reboots servers from the panel. Tick several nodes to update them in one run, the quietest first.");
+    expect(text).toContain("The panel's own server is updated over SSH.");
     expect(host!.querySelector("button")).toBeNull();
   });
 
@@ -162,7 +163,7 @@ describe("Server operating system", () => {
   });
 
   it("puts a reason under the item it belongs to when the items have different ones", async () => {
-    owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "nothing_to_do", rebootBlock: "" })) });
+    owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "nothing_to_do", rebootBlock: "", status: n.status && { ...n.status, pending: 0, security: 0 } })) });
     await mount([], Role.OWNER);
     await press(trigger("de1"));
     expect(item("Install updates…")?.hasAttribute("data-disabled")).toBe(true);

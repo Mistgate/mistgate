@@ -19,6 +19,7 @@ import { plain } from "./plain";
 const hasKey = (k: string): k is MessageKey => Object.hasOwn(en, k);
 /** The last word of a key the server may send whole ("os.step.err.not_back") or bare ("not_back"). */
 const last = (key: string) => key.slice(key.lastIndexOf(".") + 1);
+export const keyTail = last;
 
 /** A finished run stays on the node for a day; a stopped one (PAUSED) stays until the owner closes it. */
 export const resultHorizonS = 86_400;
@@ -125,6 +126,8 @@ export function jobErrorText(t: T, code: string, pkg = ""): string {
 }
 
 const withJobCode = new Set(["agent_refused", "job_failed", "reboot_held", "try_later"]);
+/** A step the panel left alone because the node's reboot check would have refused (the error key is the node's code). */
+const rebootBlockers = new Set(["initramfs_missing", "boot_entry_missing", "awg_module_missing", "dpkg_interrupted", "kernel_older", "boot_default_custom"]);
 
 /** A reboot the node refused reads differently when nothing was installed first: `params.mode` of a step or a pause is "reboot_only". */
 const onlyReboot = (key: string, params: Record<string, string>) => key === "reboot_held" && params.mode === "reboot_only";
@@ -133,6 +136,7 @@ const onlyReboot = (key: string, params: Record<string, string>) => key === "reb
 export function stepReason(t: T, errorKey: string, params: Record<string, string> = {}): { title: string; detail: string } {
   const key = last(errorKey);
   if (!key) return { title: "", detail: "" };
+  if (rebootBlockers.has(key)) return { title: t("os.step.err.reboot_blocked"), detail: jobErrorText(t, key) };
   const stepKey = `os.step.err.${key}${onlyReboot(key, params) ? ".only" : ""}`;
   const title = hasKey(stepKey) ? t(stepKey) : t("os.step.err.unknown", { code: key });
   return { title, detail: withJobCode.has(key) ? jobErrorText(t, params.code ?? "", params.package) : "" };
@@ -214,7 +218,8 @@ export function blockOf(row: Blocks, action: OsAction): string {
     return ["offline", "agent_old", "unsupported", "panel_host", "node_busy"].includes(row.updateBlock) ? row.updateBlock : row.step && stepOpen(row.step) ? "rollout_active" : "";
   }
   // a reboot the node's own kernel table says would be refused is off too, with that reason (the node refuses it all the same)
-  const own = action === "reboot" ? rebootWaitKey(row) || row.rebootBlock || kernelBlock(row.status) : row.updateBlock;
+  // "nothing to install" only means no security update: the "All packages" run still has ordinary ones to put in
+  const own = action === "reboot" ? rebootWaitKey(row) || row.rebootBlock || kernelBlock(row.status) : row.updateBlock === "nothing_to_do" && (row.status?.pending ?? 0) > 0 ? "" : row.updateBlock;
   return own || (rolloutBlocksOthers(row.rollout) ? "rollout_active" : "");
 }
 
@@ -253,6 +258,8 @@ export function refreshText(t: T, node: string, r: { outcome: string; code: stri
 // dialog is not an error. Refreshing the lists only reads, and needs none.
 
 export type OsStartArgs = { nodeId: string; name: string; mode: OsRolloutMode; reboot: OsRebootPolicy };
+/** Several nodes in one run: the ids in the order the panel will take them (`first` is the canary, named in the toast). */
+export type OsFleetStartArgs = { nodeIds: string[]; first: string; mode: OsRolloutMode; reboot: OsRebootPolicy; batchSize: number };
 export type OsActions = ReturnType<typeof useOsActions>;
 
 export function useOsActions() {
@@ -275,6 +282,22 @@ export function useOsActions() {
     onSettled: invalidate,
     onError: failed,
   });
+  const startFleet = useMutation({
+    mutationFn: (v: OsFleetStartArgs) => guard(() => updates.startOsRollout({ nodeIds: v.nodeIds, mode: v.mode, reboot: v.reboot, batchSize: v.batchSize })),
+    onSuccess: (_, v) => toast(t.n("osf.started", v.nodeIds.length, { first: v.first })),
+    onSettled: invalidate,
+    onError: failed,
+  });
+  const pause = useMutation({
+    mutationFn: (rolloutId: string) => guard(() => updates.pauseOsRollout({ rolloutId })),
+    onSettled: invalidate,
+    onError: failed,
+  });
+  const resume = useMutation({
+    mutationFn: (v: { rolloutId: string; skipFailed: boolean }) => guard(() => updates.resumeOsRollout(v)),
+    onSettled: invalidate,
+    onError: failed,
+  });
   const close = useMutation({
     mutationFn: (rolloutId: string) => guard(() => updates.cancelOsRollout({ rolloutId })),
     onSuccess: () => toast(t("os.closed")),
@@ -290,9 +313,12 @@ export function useOsActions() {
 
   /** Each resolves true when the call went through (the dialog closes on it). */
   return {
-    busy: start.isPending || close.isPending || refresh.isPending,
+    busy: start.isPending || startFleet.isPending || pause.isPending || resume.isPending || close.isPending || refresh.isPending,
     refreshing: refresh.isPending,
     start: (v: OsStartArgs) => start.mutateAsync(v).then(() => true, () => false),
+    startFleet: (v: OsFleetStartArgs) => startFleet.mutateAsync(v).then(() => true, () => false),
+    pause: (rolloutId: string) => pause.mutateAsync(rolloutId).then(() => true, () => false),
+    resume: (rolloutId: string, skipFailed = false) => resume.mutateAsync({ rolloutId, skipFailed }).then(() => true, () => false),
     close: (rolloutId: string) => close.mutateAsync(rolloutId).then(() => true, () => false),
     refresh: (v: { nodeId: string; name: string }) => refresh.mutateAsync(v).then(() => true, () => false),
   };

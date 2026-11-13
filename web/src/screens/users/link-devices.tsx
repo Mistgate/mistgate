@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { DeviceKind } from "@/gen/mistgate/admin/v1/user_pb";
 import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
-import { StatusDot } from "@/components/ui/status";
+import { StatusDot, StatusPill } from "@/components/ui/status";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Tip } from "@/components/ui/tooltip";
@@ -227,6 +227,27 @@ export function EnrolBadge({ d, t }: { d: Pick<Device, "enrolled" | "enrolLinkSt
   );
 }
 
+/**
+ * "Inactive since 12 Oct": the device has not connected for the number of days Subscriptions sets, so it takes no place in the
+ * limit. Not an alarm: the grey-blue pill of a state that is only quiet, with the whole explanation in its tooltip.
+ */
+export function IdleBadge({ d, t }: { d: Pick<Device, "idle" | "idleSinceUnix">; t: Tx }) {
+  const fmt = useFmt();
+  if (!d.idle) return null;
+  const label = t("users.dev.idleSince", { date: fmt.date(d.idleSinceUnix) });
+  const tip = t("users.dev.idleTip");
+  return (
+    <Tip label={tip}>
+      <span tabIndex={0} aria-label={`${label}. ${tip}`} className="flex-none cursor-default rounded-full">
+        <StatusPill kind="blip" label={label} sm />
+      </span>
+    </Tip>
+  );
+}
+
+/** The line under an inactive device's details: it takes no place (visible, not only in the tooltip). */
+export const IdleNote = ({ d, t }: { d: Pick<Device, "idle">; t: Tx }) => (d.idle ? <span className="text-[11px] leading-snug text-muted">{t("users.dev.idleNote")}</span> : null);
+
 /** The name a device goes by: its label (a rename writes it over the model), else the model, else the platform. */
 export const deviceName = (d: { model: string; platform: string }, t: Tx) => d.model || platformLabel(d.platform || "other", t);
 
@@ -277,15 +298,21 @@ export function LinkDeviceRows({ devices, nodeName, now, onChanged, logs }: { de
         return (
           <DeviceRow
             key={d.id}
-            tile={<Tile icon={platformGlyph(d)} tone="sky" />}
+            tile={<Tile icon={platformGlyph(d)} tone="sky" muted={d.idle} />}
             name={n}
             badge={
               <>
+                <IdleBadge d={d} t={t} />
                 <EnrolBadge d={d} t={t} />
                 {logs && d.enrolled && <LogsBadge log={badgeOf(logs.logs, d.id)} ctl={logs} />}
               </>
             }
-            line={<Secondary text={appLine(d) || platformLabel(d.platform || "other", t)} details={details} />}
+            line={
+              <>
+                <Secondary text={appLine(d) || platformLabel(d.platform || "other", t)} details={details} />
+                <IdleNote d={d} t={t} />
+              </>
+            }
             right={<Seen online={d.online} nodes={nodes} lastSeen={d.lastSeenUnix} t={t} now={now} />}
             menu={
               <RowMenu
@@ -346,10 +373,16 @@ export function SharedRow({ d, mode, now, onDisconnect }: { d: Device; mode: Lin
   const what = mode === LinkDeviceLimit.STRICT ? t("users.dev.sharedStrict") : t("users.dev.sharedShare");
   return (
     <DeviceRow
-      tile={<Tile icon="link" tone="sky" />}
+      tile={<Tile icon="link" tone="sky" muted={d.idle} />}
       name={name}
       wrapName
-      line={<Secondary text={[appOf(d.client), what].filter(Boolean).join(" · ")} />}
+      badge={<IdleBadge d={d} t={t} />}
+      line={
+        <>
+          <Secondary text={[appOf(d.client), what].filter(Boolean).join(" · ")} />
+          <IdleNote d={d} t={t} />
+        </>
+      }
       right={<Seen online={d.online} lastSeen={d.lastSeenUnix} t={t} now={now} />}
       menu={<RowMenu label={t("users.dev.menu", { name })} items={[{ label: t("users.dev.disconnect"), onClick: onDisconnect }]} />}
     />

@@ -14,6 +14,7 @@ import { useTx, type Tx } from "@/screens/users/t";
 import { useDebounced } from "@/screens/users/ui";
 import { formatKey, move, ruleFormats, singboxAgents, type Rule, type Settings } from "./model";
 import { testAgentQuery, useSaveSettings } from "./queries";
+import { DeviceIdleCard } from "./device-idle";
 import { DeviceLimitCard } from "./device-limit";
 import { LinkAutoCard } from "./link-auto";
 import { ClientApiCard } from "./client-api";
@@ -161,6 +162,7 @@ export function RulesTab({ settings }: { settings: Settings }) {
       <LinkAwgCard settings={settings} />
       <ClientApiCard />
       <DeviceLimitCard settings={settings} />
+      <DeviceIdleCard settings={settings} />
     </div>
   );
 }
