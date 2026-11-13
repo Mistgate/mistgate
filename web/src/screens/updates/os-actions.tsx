@@ -56,7 +56,7 @@ function Progress({ run, now, compact }: { run: Extract<OsNodeRun, { kind: "runn
       <div
         role="progressbar"
         aria-label={t("os.run.aria")}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-line"
       >
         <div className="h-full w-1/3 animate-[mg-ui-slide_1.6s_ease-in-out_infinite] rounded-full bg-accent" />
       </div>
