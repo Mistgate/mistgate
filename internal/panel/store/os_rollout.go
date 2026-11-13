@@ -31,6 +31,7 @@ const (
 // OsRolloutRow is one OS update rollout.
 type OsRolloutRow struct {
 	ID, Status, Mode, Reboot string
+	BatchSize                int
 	PauseKey                 string
 	PauseParams              map[string]string
 	CreatedBy                string
@@ -66,13 +67,13 @@ func (s OsStepRow) Decided() bool {
 	return s.State != OsStepPending && s.State != OsStepSent && s.State != OsStepRebooting && s.State != OsStepGating
 }
 
-const osRolloutCols = `id, status, mode, reboot, pause_key, pause_params_json, created_by, created_at, finished_at`
+const osRolloutCols = `id, status, mode, reboot, batch_size, pause_key, pause_params_json, created_by, created_at, finished_at`
 
 func scanOsRollout(r rowScanner) (OsRolloutRow, error) {
 	var x OsRolloutRow
 	var params string
-	var created, finished int64
-	err := r.Scan(&x.ID, &x.Status, &x.Mode, &x.Reboot, &x.PauseKey, &params, &x.CreatedBy, &created, &finished)
+	var batch, created, finished int64
+	err := r.Scan(&x.ID, &x.Status, &x.Mode, &x.Reboot, &batch, &x.PauseKey, &params, &x.CreatedBy, &created, &finished)
 	if errors.Is(err, sql.ErrNoRows) {
 		return OsRolloutRow{}, ErrNotFound
 	}
@@ -80,7 +81,7 @@ func scanOsRollout(r rowScanner) (OsRolloutRow, error) {
 		return OsRolloutRow{}, err
 	}
 	_ = json.Unmarshal([]byte(params), &x.PauseParams)
-	x.CreatedAt, x.FinishedAt = fromUnix(created), fleetTime(finished)
+	x.BatchSize, x.CreatedAt, x.FinishedAt = int(batch), fromUnix(created), fleetTime(finished)
 	return x, nil
 }
 
@@ -97,11 +98,15 @@ func insertOsStepStmt(x OsStepRow) Stmt {
 // CreateOsRollout stores a rollout and its steps in one atomic batch. ErrConflict when another OS rollout is active (the
 // unique index of migration 00130 allows one RUNNING or PAUSED).
 func (s *Store) CreateOsRollout(ctx context.Context, r OsRolloutRow, steps []OsStepRow) error {
+	batchSize := r.BatchSize
+	if batchSize == 0 { // old callers use the single-node default
+		batchSize = 1
+	}
 	stmts := []Stmt{guard(`NOT EXISTS (SELECT 1 FROM os_rollout WHERE id = ?) AND NOT EXISTS (SELECT 1 FROM os_rollout WHERE status IN ('running', 'paused'))`, r.ID)}
 	stmts = append(stmts, Stmt{Query: `
-		INSERT INTO os_rollout (id, status, mode, reboot, pause_key, pause_params_json, created_by, created_at, finished_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		Args: []any{r.ID, r.Status, r.Mode, r.Reboot, r.PauseKey, jsonMap(r.PauseParams), r.CreatedBy, unix(r.CreatedAt), fleetUnix(r.FinishedAt)}})
+		INSERT INTO os_rollout (id, status, mode, reboot, batch_size, pause_key, pause_params_json, created_by, created_at, finished_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		Args: []any{r.ID, r.Status, r.Mode, r.Reboot, int64(batchSize), r.PauseKey, jsonMap(r.PauseParams), r.CreatedBy, unix(r.CreatedAt), fleetUnix(r.FinishedAt)}})
 	for _, x := range steps {
 		x.RolloutID = r.ID
 		stmts = append(stmts, insertOsStepStmt(x))

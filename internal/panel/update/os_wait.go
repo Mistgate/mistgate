@@ -19,16 +19,26 @@ import (
 //     the panel asked for more than once an hour or three times in 24 hours (reboot_limit); the screen turns the Reboot action
 //     off until then instead of letting the owner click into a refusal;
 //   - a refusal that only asks to wait (osRetryLater): nothing was changed on the node and nothing is wrong with it, so the step
-//     ends as SKIPPED (try_later), the rollout ends with it, and nothing stays open for the owner to close.
+//     stays pending and retries until the wait ends or its two-hour ceiling is reached.
 
 const (
 	blockRebootWait = "reboot_wait"
 	osErrTryLater   = "try_later"
+	osWaitPhase     = "waiting_retry"
+	osRetryAfter    = "retry_after_unix"
+	osRetryCode     = "retry_code"
+	osRetrySince    = "retry_since_unix" // when the first wait began: kept across the resends, so the two hours are one budget
+	osRetryCount    = "retry_count"
+)
+
+const (
+	osRetryLimit    = 2 * time.Hour
+	osRetryInterval = 30 * time.Second
 )
 
 // osRetryLater are the codes of a refusal that only says "not now": a job of another kind is running (busy), another package
-// manager holds the lock (apt_lock), the host booted a moment ago (too_soon), the reboot limit is spent (reboot_limit). Every
-// other code needs a look at the node and keeps its stop (or its FAILED step).
+// manager holds the lock (apt_lock), the host booted a moment ago (too_soon), the reboot limit is spent (reboot_limit).
+// Every other code needs a look at the node and pauses the rollout.
 var osRetryLater = []string{osupdate.CodeBusy, osupdate.CodeAptLock, osupdate.CodeTooSoon, osupdate.CodeRebootLimit}
 
 // osJobAskedToWait: the job of the snapshot failed only because the node asked to wait, with nothing installed or rebooted.
@@ -97,7 +107,7 @@ func (s *Service) osReboots(ctx context.Context, now time.Time) (map[string][]ti
 	return all, err
 }
 
-// osNothingChanged: the failed or held job only asked to wait, so its step ends as SKIPPED. A reboot_only run installs nothing,
+// osNothingChanged: the failed or held job only asked to wait, so its step returns to its durable retry wait. A reboot_only run installs nothing,
 // so for it the node's code alone decides. A run that installs counts only when the node's own record says that no package was
 // installed and no reboot done (the snapshot of the job; the events carry no package count), and the failure came before the
 // reboot step.
@@ -124,9 +134,79 @@ func (p *osPass) osNothingChanged(v osJobView) (string, bool) {
 	return codes[0], true
 }
 
-// skipTryLater ends the step as SKIPPED with the node's code; finishOsIfDone then ends the rollout.
-func (p *osPass) skipTryLater(x *store.OsStepRow, code string) {
-	p.finish(x, store.OsStepSkipped, osErrTryLater, map[string]string{"code": osCode(code)})
+// waitTryLater returns a self-closing refusal to PENDING. The initial wait time and next retry time are stored in the existing
+// step row, so the two-hour ceiling survives a panel restart.
+func (p *osPass) waitTryLater(x *store.OsStepRow, code string, retryAt time.Time) {
+	code = osCode(code)
+	if !slices.Contains(osRetryLater, code) {
+		p.finishAndPause(x, osErrAgentRefused, map[string]string{"code": code}, pauseStepFailed)
+		return
+	}
+	if p.cancelRequested() { // the answer came after the owner's cancel: the step must not go back to the queue
+		p.finish(x, store.OsStepSkipped, errCancelled, nil)
+		return
+	}
+	started := retryStart(x, p.now)
+	deadline := started.Add(osRetryLimit)
+	if !p.now.Before(deadline) {
+		p.finish(x, store.OsStepSkipped, osErrTryLater, map[string]string{"code": code})
+		return
+	}
+	if retryAt.IsZero() || !retryAt.After(p.now) {
+		retryAt = p.now.Add(osRetryInterval)
+	}
+	if retryAt.After(deadline) {
+		retryAt = deadline
+	}
+	updated := *x
+	updated.State, updated.Phase, updated.PhaseAt = store.OsStepPending, osWaitPhase, started
+	updated.ErrorKey = ""
+	updated.Params = mergeParams(updated.Params, map[string]string{
+		osRetryAfter: strconv.FormatInt(retryAt.Unix(), 10),
+		osRetryCode:  code,
+		osRetrySince: strconv.FormatInt(started.Unix(), 10),
+	})
+	if p.save(&updated) {
+		*x = updated
+	}
+}
+
+// cancelRequested: the owner cancelled while a job was still running, so nothing may be queued again.
+func (p *osPass) cancelRequested() bool {
+	return p.ro.PauseParams["cancel_requested"] == "true" ||
+		slices.ContainsFunc(p.steps, func(x store.OsStepRow) bool { return x.State == store.OsStepSkipped && x.ErrorKey == errCancelled })
+}
+
+func (p *osPass) retryWait(x *store.OsStepRow) (time.Time, bool) {
+	if x.Phase != osWaitPhase {
+		return time.Time{}, false
+	}
+	deadline := retryStart(x, p.now).Add(osRetryLimit)
+	if !p.now.Before(deadline) {
+		return deadline, true
+	}
+	unix, _ := strconv.ParseInt(x.Params[osRetryAfter], 10, 64)
+	return time.Unix(unix, 0), false
+}
+
+// retryStart is when the step began to wait. A resend (the step went to SENT and the node refused again) clears the phase but
+// not osRetrySince, so a node that keeps answering "busy" cannot extend the two hours.
+func retryStart(x *store.OsStepRow, now time.Time) time.Time {
+	if x.Phase == osWaitPhase && !x.PhaseAt.IsZero() {
+		return x.PhaseAt
+	}
+	if unix, err := strconv.ParseInt(x.Params[osRetrySince], 10, 64); err == nil && unix > 0 {
+		return time.Unix(unix, 0)
+	}
+	return now
+}
+
+// clearOsRetryWait ends the wait for good (the step is decided or is retried by the owner).
+func clearOsRetryWait(params map[string]string) map[string]string {
+	delete(params, osRetryAfter)
+	delete(params, osRetryCode)
+	delete(params, osRetrySince)
+	return params
 }
 
 // ---------------------------------------------------------------------------------------------------

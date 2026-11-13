@@ -2,6 +2,7 @@ package update
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
@@ -113,32 +114,32 @@ func TestGetOsUpdatesCountsTheRebootsOfThePanel(t *testing.T) {
 	}
 }
 
-// the node still refuses (a race with the panel's count): a note on the node, no stopped run, nobody else is held up
-func TestOsRebootRefusedByTheNodeClosesItself(t *testing.T) {
+// the node still refuses (a race with the panel's count): the step waits for the limit and retries without an alert
+func TestOsRebootRefusedByTheNodeWaitsAndRetries(t *testing.T) {
 	for _, code := range []string{osupdate.CodeTooSoon, osupdate.CodeRebootLimit} {
 		t.Run(code, func(t *testing.T) {
 			e := newEnv(t)
 			id := e.osNode("de1")
-			other := e.osNode("nl1")
 			e.startOs(id, store.OsModeRebootOnly, store.OsRebootAlways)
 			e.osTick()
 			x := e.osStep(id)
 			e.osJob(id, &agentv1.OsJob{JobId: x.JobID, Action: "reboot", State: "failed", Code: code, Reboot: "held", HeldReason: code})
 			e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": code, "reboot": "held", "reasons": code})
 			e.osTick()
-			got := e.wantOsStep(id, store.OsStepSkipped, osErrTryLater)
-			if got.Params["code"] != code {
-				t.Fatalf("params %+v", got.Params)
+			got := e.wantOsStep(id, store.OsStepPending, "")
+			if got.Phase != osWaitPhase || got.Params[osRetryCode] != code || got.Params[osRetryAfter] == "" {
+				t.Fatalf("retry params %+v", got.Params)
 			}
-			e.wantOsRollout(store.RolloutDone, "")
+			e.wantOsRollout(store.RolloutRunning, "")
 			if c := e.s.Conditions(e.ctx); len(c) != 0 {
 				t.Fatalf("an alert for a refusal that changed nothing: %+v", c)
 			}
-			if n := e.osNodeViews()[id]; n.State == adminv1.OsUpdateState_OS_UPDATE_STATE_FAILED {
-				t.Fatalf("the node reads as failed after a refusal that changed nothing: %+v", n)
+			e.clk.Advance(osRetryInterval)
+			e.osTick()
+			if jobs := e.fl.osJobs(); len(jobs) != 2 || jobs[1].nodeID != id || jobs[1].req.JobID == x.JobID {
+				t.Fatalf("refused job was not retried with a new id: %v", jobs)
 			}
-			// nothing to close: the next OS update, on this node or another, starts at once
-			e.startOs(other, store.OsModeSecurity, store.OsRebootIfRequired)
+			e.wantOsStep(id, store.OsStepSent, "")
 		})
 	}
 }
@@ -158,8 +159,8 @@ func TestOsRebootRefusedForARealReasonStillStops(t *testing.T) {
 	e.wantBlocked(id, store.OsModeSecurity, store.OsRebootIfRequired, blockRolloutOn)
 }
 
-// an install: a lock timeout before anything was installed closes itself; a reboot held after the install, or packages
-// already installed, still stop
+// an install: a lock timeout before anything was installed waits; a reboot held after the install, or packages already
+// installed, still stop
 func TestOsInstallThatChangedNothingClosesItself(t *testing.T) {
 	run := func(job *agentv1.OsJob, event map[string]string) (*env, string) {
 		e := newEnv(t)
@@ -175,8 +176,10 @@ func TestOsInstallThatChangedNothingClosesItself(t *testing.T) {
 		return e, id
 	}
 	e, id := run(&agentv1.OsJob{Code: osupdate.CodeAptLock}, map[string]string{"code": osupdate.CodeAptLock})
-	e.wantOsStep(id, store.OsStepSkipped, osErrTryLater)
-	e.wantOsRollout(store.RolloutDone, "")
+	if x := e.wantOsStep(id, store.OsStepPending, ""); x.Phase != osWaitPhase || x.Params[osRetryCode] != osupdate.CodeAptLock {
+		t.Fatalf("apt lock retry wait %+v", x)
+	}
+	e.wantOsRollout(store.RolloutRunning, "")
 
 	e, id = run(&agentv1.OsJob{Code: osupdate.CodeAptLock, Upgraded: 3}, map[string]string{"code": osupdate.CodeAptLock})
 	e.wantOsStep(id, store.OsStepFailed, osErrJobFailed)
@@ -187,21 +190,25 @@ func TestOsInstallThatChangedNothingClosesItself(t *testing.T) {
 	e.wantOsRollout(store.RolloutPaused, pauseOsRebootHeld)
 }
 
-// a reboot that is not possible yet when its turn comes (the host rebooted by itself meanwhile) ends as a note too
-func TestOsLaunchSkipsARebootThatIsNotPossibleYet(t *testing.T) {
+// a reboot that is not possible yet when its turn comes (the host rebooted by itself meanwhile) waits for the reported time
+func TestOsLaunchWaitsUntilARebootIsPossible(t *testing.T) {
 	e := newEnv(t)
 	id := e.osNode("de1")
 	e.startOs(id, store.OsModeRebootOnly, store.OsRebootAlways)
 	e.osBoot(id, e.clk.Now().Add(-time.Minute), kernelOld)
 	e.osTick()
-	got := e.wantOsStep(id, store.OsStepSkipped, osErrTryLater)
-	if got.Params["code"] != osupdate.CodeTooSoon {
-		t.Fatalf("params %+v", got.Params)
+	got := e.wantOsStep(id, store.OsStepPending, "")
+	wantAt := e.clk.Now().Add(9 * time.Minute).Unix()
+	if got.Phase != osWaitPhase || got.Params[osRetryCode] != osupdate.CodeTooSoon || got.Params[osRetryAfter] != strconv.FormatInt(wantAt, 10) {
+		t.Fatalf("retry params %+v, want time %d", got.Params, wantAt)
 	}
-	e.wantOsRollout(store.RolloutDone, "")
+	e.wantOsRollout(store.RolloutRunning, "")
 	if len(e.fl.osJobs()) != 0 {
 		t.Fatal("a reboot was sent to a node that would refuse it")
 	}
+	e.clk.Advance(9 * time.Minute)
+	e.osTick()
+	e.wantOsStep(id, store.OsStepSent, "")
 }
 
 func gateNamesOf(t *testing.T, x store.OsStepRow) []string {

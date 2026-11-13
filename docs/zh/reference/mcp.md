@@ -197,8 +197,10 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `warp_reregister` | 管理员 | `node` ID 或精确名称，以及可选的 `reason`（最多 300 个字符）；执行时只接收 `confirm_token`。计划会显示 Cloudflare 服务条款链接；所有者批准即表示代表此账户接受条款，并将其替换为新的匿名设备，从而更改 WARP 出口 IP | 始终 |
 | `relay` | 管理员 | 计划参数：`action` 及其参数；执行时只接收 `confirm_token`。`create`：`node`（入口，ID 或精确名称）、`inbound_id`（来自 `relay_candidates`），以及可选的 `port`（443 或 1024 到 65535；省略时，若出口的端口在入口上空闲则用它，否则用一个空闲端口）。`enable`、`disable` 和 `delete`：`relay_id`。`port`：`relay_id` 和 `port`。计划会不带地址地说明这项更改：入口、出口、服务器、端口、国家检测如何看待两端、最近一次检测，以及用户会看到什么 | 始终 |
 | `rollout_start` | 管理员 | 计划：`nodes`（`updates_status` 中 1 到 20 个节点 ID；也接受旧参数 `node_ids`，但不能同时提供）；执行：仅 `confirm_token`。计划显示受信任的签名版本、金丝雀顺序（在线人数较少优先，然后是入站较少）、批次大小，以及每个节点的名称、Agent 版本和在线人数；计划固定精确节点集合及发布包版本/构建号 | 始终（step-up） |
-| `os_rollout_start` | 管理员 | 计划：`os_updates_status` 中恰好一个 `node_ids` 条目、`mode`（`security`：安装安全更新；`reboot_only`：只重启）和 `reboot`（`security` 配 `never` 或 `if_required`；`reboot_only` 配 `if_required` 或 `always`）；应用：仅 `confirm_token`。在该节点上运行[更新单个服务器的系统](../operations/updates.md#更新单个服务器的系统)中的任务。计划会显示节点、任务将做什么、等待中的更新和安全更新、内核、是否已需要重启、有多少人在线以及他们会在节点重启时断线；节点会拒绝的情况（unattended-upgrades 自动重启、新内核缺少 AmneziaWG 模块）会提前警告。无法接受任务的节点（离线、Agent 太旧、不是 Debian 或 Ubuntu、面板自己所在的服务器、已有任务在运行、没有安全更新）以及任何其他更新进行期间，在计划阶段就会被拒绝。重启是否安全由节点检查，不安全就拒绝；无法覆盖。 | 始终（step-up） |
+| `os_rollout_start` | 管理员 | 计划：`node_ids`（`os_updates_status` 中的 1–20 个 id）、`mode`（`security`、`all`：安装普通软件包和安全更新，或 `reboot_only`）、可选 `batch_size`（1–5，默认 1）和 `reboot`（软件包模式用 `never` 或 `if_required`；`reboot_only` 用 `if_required` 或 `always`）；应用：仅 `confirm_token`。计划固定 id、模式、重启策略和批次大小。计划显示金丝雀和顺序（先在线人数较少，再 inbound 较少），以及每个不可信节点名称、待处理/安全更新、下一个内核、是否需要重启、在线人数和重启阻塞原因；还会列出当前会被跳过的节点。会警告 unattended-upgrades 自动重启和缺失的 AmneziaWG 模块。 | 始终（step-up） |
 | `os_rollout_cancel` | 管理员 | `os_updates_status` 中的 `rollout_id`。关闭已停止的系统更新（其告警随之清除）或尚未开始的更新；节点上正在运行的任务无法停止，会被拒绝 | 始终（step-up） |
+| `os_rollout_pause` | 管理员 | 计划：`os_updates_status` 中的 `rollout_id`；应用：仅 `confirm_token`。已在节点上运行的任务会完成并通过健康检查后再暂停；后续任务等待 | 始终（step-up） |
+| `os_rollout_resume` | 管理员 | 计划：`rollout_id`，可选 `skip_failed`；应用：仅 `confirm_token`。默认将失败步骤重试一次；设置 `skip_failed` 则跳过失败步骤并继续 | 始终（step-up） |
 | `node_update_schedule` | 管理员 | 计划参数：`node_id`、`local_datetime`（使用 `updates_status` 中的偏移量，格式为 `YYYY-MM-DDTHH:mm`，至少提前一分钟且最多提前一年）；计划会固定受信任的版本和偏移量 | 始终 |
 | `node_update_schedule_cancel` | 管理员 | `node_id` | 始终 |
 | `update_timezone` | 管理员 | `timezone_offset_minutes`（UTC 固定偏移量，范围为 -720 到 840，每次递增 15 分钟；`180` 表示 GMT+3） | 始终 |
@@ -221,7 +223,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 每个 `_plan` 还接收 `reason`：由智能体自行撰写，最多 300 个字符，并以引文形式显示给所有者。没有工具会接收或返回服务器密码：所有者在审批页面选择面板密钥或输入安装密码，轮换后的密码由面板自行生成。`user_create` 绝不会返回新用户的订阅链接；所有者需在管理后台中复制链接。
 
-`os_rollout_start_plan` 一次只处理一个节点，并且必须经所有者批准：在所有者于管理后台批准计划之前，不会安装或重启任何东西。节点重启时，其上的人会断线（约两分钟）。该工具无法绕过节点自己的检查。目前还没有针对多个节点、时间窗口、刷新软件包列表或面板自己所在服务器的工具。
+`os_rollout_start_plan` 支持 1 到 20 个节点，并须经所有者批准后才会安装或重启。金丝雀是在线人数最少、其次 inbound 最少的节点；只有上一批通过检查，才会启动下一批。`busy`、`apt_lock`、`too_soon` 和 `reboot_limit` 会等待并重试最多两小时，然后以 `try_later` 跳过；硬性阻塞会立即跳过。真实失败会暂停运行。继续时会重试失败步骤一次，或用 `skip_failed` 跳过并继续；取消不会中断节点上正在运行的任务。节点重启时，其上的人会断线约两分钟。不能绕过节点自己的检查。面板服务器不在此功能范围内。
 
 `rollout_start_plan` 会分阶段立即更新 1 到 20 个选定节点。每个节点都必须运行支持自更新且早于签名发布包的在线 Agent（版本过旧、更新失败或已回滚）；已有滚动更新正在运行或暂停时会拒绝启动。面板先选择在线人数最少的节点作为金丝雀，然后按入站数排序；少于 5 个节点时批次大小为 1，否则为 2。计划固定精确节点集合以及签名发布包的版本和构建号；如果选定节点或发布包在执行前发生变化，执行会失败，需要重新制定计划。所有者批准后，`node_update_schedule_plan` 会为一个节点保存未来的更新计划；制定计划时节点可以离线，新计划会替换该节点的旧计划。保存的任务会固定到相应签名发布版本和 UTC 固定偏移量。到期时如果节点离线，面板最多等待两小时让节点重新连接，之后会将任务标记为错过，绝不会自行启动任务；若签名发布包发生变化，面板会保留任务并继续显示，不会替换为其他发布版本。使用 `node_update_schedule_cancel_plan` 可取消待执行任务。更改 `update_timezone` 只影响新计划；现有任务会保留已保存的时间点和偏移量。`update_download_timeout` 只改变新发送步骤的下载窗口；支持该能力的 Agent 会在命令中收到新值，旧 Agent 继续使用内置限制，已经开始的步骤会保留发送时捕获的窗口。
 
@@ -267,8 +269,8 @@ Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。�
 
 | 代码 | 含义 | 工具 |
 |---|---|---|
-| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_awg_backend`、`update_timezone`、`update_download_timeout`、`retention`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_keys_add`、`node_server_key_remove` |
-| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_keys_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
+| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`os_rollout_pause`、`os_rollout_resume`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_awg_backend`、`update_timezone`、`update_download_timeout`、`retention`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_keys_add`、`node_server_key_remove` |
+| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`os_rollout_start`、`os_rollout_cancel`、`os_rollout_pause`、`os_rollout_resume`、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_keys_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一个计划影响多个目标，或一次影响超过 3 位用户。 | 多节点 `rollout_start`、多节点 `node_server_keys_add`、`user_disable`、`user_reset_traffic` |
 | `user_change_limit` | 加上此计划，令牌将超出每小时用户更改限额（10 次，见[限制](api.md#限制)），因此计划不会被拒绝，而是等待所有者批准。卡片会显示限额已用多少。 | `user_disable`、`user_reset_traffic`、`user_update`、`device_revoke` |
 | `traffic` | 它会在节点之间发送大量测试流量。 | `path_speed` |

@@ -234,6 +234,8 @@ var procedureLevels = map[string]level{
 	adminv1connect.UpdateServiceGetOsUpdatesProcedure:             levelRead,
 	adminv1connect.UpdateServiceCheckPanelUpdateProcedure:         levelRead,
 	adminv1connect.UpdateServiceStartOsRolloutProcedure:           levelOwner, // also needs a step-up
+	adminv1connect.UpdateServicePauseOsRolloutProcedure:           levelOwner, // also needs a step-up
+	adminv1connect.UpdateServiceResumeOsRolloutProcedure:          levelOwner, // also needs a step-up
 	adminv1connect.UpdateServiceCancelOsRolloutProcedure:          levelOwner, // also needs a step-up
 	adminv1connect.UpdateServiceRefreshOsUpdatesProcedure:         levelOwner, // no step-up: it installs nothing, and is rate-limited by the panel
 	adminv1connect.UpdateServiceInstallPanelUpdateProcedure:       levelOwner, // also needs a step-up

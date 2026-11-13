@@ -2,6 +2,7 @@ package update
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"slices"
@@ -19,8 +20,8 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-// The OS rollout: an OS job (agent.proto "OS UPDATES") run on one node from the panel, with the owner's approval. Like the agent
-// rollout it is a state machine over database rows that the worker pass (tickOs) looks at every few seconds; a command runs in
+// The OS rollout: OS jobs (agent.proto "OS UPDATES") run on nodes from the panel, with the owner's approval. Like the agent
+// rollout it is a state machine over database rows that the worker pass (tickOs) looks at every few seconds; commands run in
 // its own goroutine because it waits for the node's answer and records only what it got. Everything else is decided from what
 // the pass can observe (the node's snapshot and events of this job id, its connection, its boot time), so a panel restart in
 // any step loses nothing.
@@ -28,16 +29,17 @@ import (
 //	pending   -> sent        UpdateOs went out under a new job id
 //	sent      -> rebooting   the job reached its reboot
 //	sent      -> gating      the job is over without a reboot (or the host rebooted unseen)
-//	sent      -> failed      the node refused, the job failed, or nothing was heard for OsJobWait
+//	sent      -> failed      a hard refusal or job failure, or nothing was heard for OsJobWait
 //	rebooting -> gating      the node is back on a new boot
 //	rebooting -> failed      the job failed after the reboot, or the node did not return within OsBackWait
 //	gating    -> passed      the job is settled and the node's health gate passes
 //	gating    -> failed      the kernel is not the expected one, a profile broke, or the gate did not pass in OsGateWait
-//	pending   -> skipped     offline, unsupported, the panel's own server, busy, nothing to do, or cancelled
+//	pending   -> pending     waiting_retry until a self-closing refusal ends, at most two hours
+//	pending   -> skipped     offline, unsupported, the panel's own server, nothing to do, a hard blocker, timeout, or cancelled
 //
-// A failed step pauses the rollout (the alert os_update_failed is open) until the owner cancels it: packages cannot be rolled
-// back, and no other rollout of any kind starts meanwhile. A refusal where nothing was changed and the node only asks to wait
-// (osRetryLater) is not such a failure: the step is SKIPPED (try_later) and the rollout ends by itself, with a note on the node.
+// A failed step pauses the rollout (the alert os_update_failed is open) until the owner resumes or cancels it: packages cannot
+// be rolled back, and no later batch starts meanwhile. A refusal where nothing was changed and the node only asks to wait
+// (osRetryLater) stays pending and is retried for up to two hours.
 
 // OsJobRequest is the enumerated content of UpdateOs (agent.proto): nothing else is ever sent to a node.
 type OsJobRequest struct{ Action, Mode, Reboot, JobID string }
@@ -60,7 +62,10 @@ const (
 const (
 	pauseOsRebootHeld = "reboot_held"
 	pauseOsNotBack    = "not_back"
+	pauseOsCancelWait = "cancel_wait"
 )
+
+const osErrSkippedAfterFailure = "skipped_after_failure"
 
 // Why StartOsRollout is refused (OsNode.update_block); the same words in the SPA's "os.block.<key>".
 const (
@@ -159,6 +164,14 @@ func osBlock(g osGlobal, n osNode, reboot bool) string {
 	return ""
 }
 
+func osBlockForMode(g osGlobal, n osNode, mode string) string {
+	reason := osBlock(g, n, mode == store.OsModeRebootOnly)
+	if reason == blockNothingToDo && mode == store.OsModeAll && n.status != nil && n.status.GetPending() > 0 {
+		return ""
+	}
+	return reason
+}
+
 // osNodeOf collects the facts of one node for osBlock. nodeHost is the node's host name, "" when unknown.
 func (s *Service) osNodeOf(n store.NodeRow, connected bool, status *agentv1.OsStatus, host *agentv1.OsStatus, nodeHost string, nowUnix int64, reboots []time.Time) osNode {
 	capable := slices.Contains(n.AgentCaps, osupdate.Capability)
@@ -209,68 +222,154 @@ func (s *Service) onPanelServer(status, host *agentv1.OsStatus, nodeHost string)
 
 func osModeStrings(mode, reboot string) (action, jobMode string, err error) {
 	switch {
-	case mode == store.OsModeSecurity && (reboot == store.OsRebootNever || reboot == store.OsRebootIfRequired):
-		return osupdate.ActionUpgrade, osupdate.ModeSecurity, nil
+	case (mode == store.OsModeSecurity || mode == store.OsModeAll) && (reboot == store.OsRebootNever || reboot == store.OsRebootIfRequired):
+		jobMode := osupdate.ModeSecurity
+		if mode == store.OsModeAll {
+			jobMode = osupdate.ModeAll
+		}
+		return osupdate.ActionUpgrade, jobMode, nil
 	case mode == store.OsModeRebootOnly && (reboot == store.OsRebootIfRequired || reboot == store.OsRebootAlways):
 		return osupdate.ActionReboot, "", nil
 	}
 	return "", "", connect.NewError(connect.CodeInvalidArgument, errors.New("this combination of mode and reboot is not available"))
 }
 
-// startOs creates the rollout of one node. mode is security or reboot_only; reboot never or if_required (security), if_required or
-// always (reboot_only).
+// startOs preserves the single-node call shape used by older callers.
 func (s *Service) startOs(ctx context.Context, nodeIDs []string, mode, reboot string) (store.OsRolloutRow, error) {
+	return s.startOsWithBatch(ctx, nodeIDs, mode, reboot, 1)
+}
+
+type osStartNode struct {
+	row    store.NodeRow
+	status *agentv1.OsStatus
+}
+
+// startOsWithBatch stores all selected steps in canary order. Stage zero contains only the canary; following stages use
+// batchSize nodes. Node-level blockers are evaluated as their stage is reached so one blocked node never rejects the fleet.
+func (s *Service) startOsWithBatch(ctx context.Context, nodeIDs []string, mode, reboot string, batchSize int) (store.OsRolloutRow, error) {
 	if _, _, err := osModeStrings(mode, reboot); err != nil {
 		return store.OsRolloutRow{}, err
 	}
-	if len(nodeIDs) != 1 || nodeIDs[0] == "" {
-		return store.OsRolloutRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("node_ids must name exactly one node"))
+	if len(nodeIDs) < 1 || len(nodeIDs) > 20 {
+		return store.OsRolloutRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("node_ids must contain 1 to 20 nodes"))
+	}
+	if batchSize == 0 {
+		batchSize = 1
+	}
+	if batchSize < 1 || batchSize > 5 {
+		return store.OsRolloutRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("batch_size must be 1 to 5"))
+	}
+	seen := make(map[string]bool, len(nodeIDs))
+	for _, id := range nodeIDs {
+		if id == "" || seen[id] {
+			return store.OsRolloutRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("node_ids must contain unique non-empty ids"))
+		}
+		seen[id] = true
 	}
 	actor := s.cfg.Actor(ctx)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	n, err := s.st.Node(ctx, nodeIDs[0])
-	if errors.Is(err, store.ErrNotFound) || (err == nil && n.State != "active") {
-		return store.OsRolloutRow{}, notFound("node")
-	}
-	if err != nil {
-		return store.OsRolloutRow{}, s.internal("load node", err)
-	}
 	g, err := s.osGlobalLocked(ctx)
 	if err != nil {
 		return store.OsRolloutRow{}, s.internal("check running rollouts", err)
 	}
-	live, err := s.fl.NodeLive(ctx, n.ID)
+	switch {
+	case g.rollout:
+		return store.OsRolloutRow{}, precondition("os_blocked: reason=" + blockRolloutOn)
+	case g.agentRollout:
+		return store.OsRolloutRow{}, precondition("os_blocked: reason=" + blockAgentRollout)
+	case g.panelBusy:
+		return store.OsRolloutRow{}, precondition("os_blocked: reason=" + blockPanelBusy)
+	}
+	liveRows, err := s.fl.Live(ctx)
 	if err != nil {
-		return store.OsRolloutRow{}, s.internal("read node liveness", err)
+		return store.OsRolloutRow{}, s.internal("read live nodes", err)
 	}
-	status := s.osStatusOf(ctx, n.ID)
-	facts, err := s.st.NodeFacts(ctx, n.ID)
-	if err != nil {
-		return store.OsRolloutRow{}, s.internal("read node facts", err)
+	liveByID := make(map[string]store.NodeLiveRow, len(liveRows))
+	for _, row := range liveRows {
+		liveByID[row.NodeID] = row
 	}
-	node := s.osNodeOf(n, live.Connected, status, s.PanelHostOsStatus(), facts.Hostname, s.now().Unix(), s.osRebootsOf(ctx, n.ID, s.now()))
-	node.busy = node.busy || s.inflight[n.ID] // a rollback of the agent is on its way
-	reason := osBlock(g, node, mode == store.OsModeRebootOnly)
-	if reason == "" && mode == store.OsModeRebootOnly && reboot == store.OsRebootIfRequired && status != nil && !status.GetRebootRequired() {
-		reason = blockNothingToDo
+	byID := make(map[string]osStartNode, len(nodeIDs))
+	blocked := make(map[string]string, len(nodeIDs))
+	ordered := make([]nodeView, 0, len(nodeIDs))
+	for _, id := range nodeIDs {
+		n, err := s.st.Node(ctx, id)
+		if errors.Is(err, store.ErrNotFound) || (err == nil && n.State != "active") {
+			return store.OsRolloutRow{}, notFound("node")
+		}
+		if err != nil {
+			return store.OsRolloutRow{}, s.internal("load node", err)
+		}
+		live, err := s.fl.NodeLive(ctx, n.ID)
+		if err != nil {
+			return store.OsRolloutRow{}, s.internal("read node liveness", err)
+		}
+		var online int
+		if liveRow := liveByID[n.ID]; live.Connected && liveRow.UsersJSON != "" {
+			var users map[string]int64
+			if json.Unmarshal([]byte(liveRow.UsersJSON), &users) == nil {
+				online = len(users)
+			}
+		}
+		inbounds, err := s.st.FleetInbounds(ctx, n.ID, true)
+		if err != nil {
+			return store.OsRolloutRow{}, s.internal("read node inbounds", err)
+		}
+		st := s.osStatusOf(ctx, n.ID)
+		facts, err := s.st.NodeFacts(ctx, n.ID)
+		if err != nil {
+			return store.OsRolloutRow{}, s.internal("read node facts", err)
+		}
+		node := s.osNodeOf(n, live.Connected, st, s.PanelHostOsStatus(), facts.Hostname, s.now().Unix(), s.osRebootsOf(ctx, n.ID, s.now()))
+		node.busy = node.busy || s.inflight[n.ID] // a rollback of the agent is on its way
+		reason := osBlockForMode(osGlobal{}, node, mode)
+		if reason == "" && mode == store.OsModeRebootOnly && reboot == store.OsRebootIfRequired && st != nil && !st.GetRebootRequired() {
+			reason = blockNothingToDo
+		}
+		blocked[id] = reason
+		byID[id] = osStartNode{row: n, status: st}
+		ordered = append(ordered, nodeView{row: n, online: online, inbounds: len(inbounds)})
 	}
-	if reason != "" {
-		return store.OsRolloutRow{}, precondition("os_blocked: reason=" + reason)
+	canaryOrder(ordered)
+	// One blocked node never rejects the fleet (it waits or is skipped when its stage comes), but a start that could not
+	// begin anywhere is refused, with the canary's reason.
+	if !slices.ContainsFunc(ordered, func(v nodeView) bool { return blocked[v.row.ID] == "" }) {
+		return store.OsRolloutRow{}, precondition("os_blocked: reason=" + blocked[ordered[0].row.ID])
 	}
 	now := s.now()
-	ro := store.OsRolloutRow{ID: store.NewID("osr_"), Status: store.RolloutRunning, Mode: mode, Reboot: reboot, CreatedBy: actor, CreatedAt: now}
-	step := store.OsStepRow{NodeID: n.ID, NodeName: n.Name, State: store.OsStepPending, Params: map[string]string{"mode": mode}}
-	if status != nil {
-		step.Params["pending"], step.Params["security"] = strconv.FormatUint(uint64(status.GetPending()), 10), strconv.FormatUint(uint64(status.GetSecurity()), 10)
+	ro := store.OsRolloutRow{ID: store.NewID("osr_"), Status: store.RolloutRunning, Mode: mode, Reboot: reboot, BatchSize: batchSize, CreatedBy: actor, CreatedAt: now}
+	steps := make([]store.OsStepRow, 0, len(ordered))
+	for i, view := range ordered {
+		candidate := byID[view.row.ID]
+		stage := 0
+		if i > 0 {
+			stage = 1 + (i-1)/batchSize
+		}
+		step := store.OsStepRow{NodeID: candidate.row.ID, NodeName: candidate.row.Name, Stage: stage, State: store.OsStepPending,
+			Params: map[string]string{"mode": mode}}
+		if candidate.status != nil {
+			step.Params["pending"] = strconv.FormatUint(uint64(candidate.status.GetPending()), 10)
+			step.Params["security"] = strconv.FormatUint(uint64(candidate.status.GetSecurity()), 10)
+			if reboot != store.OsRebootNever {
+				for _, code := range candidate.status.GetRebootBlockers() {
+					if slices.Contains(osupdate.RebootBlockers, code) {
+						step.State, step.ErrorKey, step.FinishedAt = store.OsStepSkipped, code, now
+						step.Params["code"] = code
+						break
+					}
+				}
+			}
+		}
+		steps = append(steps, step)
 	}
-	if err := s.st.CreateOsRollout(ctx, ro, []store.OsStepRow{step}); err != nil {
+	if err := s.st.CreateOsRollout(ctx, ro, steps); err != nil {
 		if errors.Is(err, store.ErrConflict) {
 			return store.OsRolloutRow{}, precondition("os_blocked: reason=" + blockRolloutOn)
 		}
 		return store.OsRolloutRow{}, s.internal("create OS rollout", err)
 	}
-	s.auditAs(ctx, actor, "os_rollout_start", map[string]string{"rollout_id": ro.ID, "node_id": n.ID, "node": n.Name, "mode": mode, "reboot": reboot})
+	s.auditAs(ctx, actor, "os_rollout_start", map[string]string{"rollout_id": ro.ID, "nodes": strconv.Itoa(len(steps)), "mode": mode,
+		"reboot": reboot, "batch_size": strconv.Itoa(batchSize), "canary": ordered[0].row.Name})
 	s.loadOsUpdating(ctx)
 	s.kick()
 	return ro, nil
@@ -315,25 +414,71 @@ func (s *Service) cancelOs(ctx context.Context, id string) (store.OsRolloutRow, 
 		return ro, s.internal("load OS rollout", err)
 	}
 	if !ro.Active() {
-		return ro, precondition("rollout is not active")
+		if ro.Status != store.RolloutFailed {
+			return ro, precondition("rollout is not active")
+		}
+		ok, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutFailed}, store.RolloutCancelled, "", nil, s.now())
+		if err != nil {
+			return ro, s.internal("close failed OS rollout", err)
+		}
+		if !ok {
+			return ro, precondition("rollout is not active")
+		}
+		s.audit(ctx, "os_rollout_cancel", map[string]string{"rollout_id": ro.ID})
+		return s.st.OsRollout(ctx, ro.ID)
 	}
 	steps, err := s.st.OsRolloutSteps(ctx, ro.ID)
 	if err != nil {
 		return ro, s.internal("load OS steps", err)
 	}
 	if ro.Status == store.RolloutRunning && !slices.ContainsFunc(steps, func(x store.OsStepRow) bool { return x.State == store.OsStepPending }) {
-		return ro, precondition("os_cancel_inflight") // the job on the node cannot be stopped, and nothing else is waiting
+		inFlight := slices.ContainsFunc(steps, func(x store.OsStepRow) bool {
+			return x.State == store.OsStepSent || x.State == store.OsStepRebooting || x.State == store.OsStepGating
+		})
+		if inFlight {
+			return ro, precondition("os_cancel_inflight") // a node job cannot be stopped, and nothing else is queued
+		}
+		if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutRunning}, store.RolloutCancelled, "", nil, s.now()); err != nil {
+			return ro, s.internal("cancel empty OS rollout", err)
+		}
+		s.audit(ctx, "os_rollout_cancel", map[string]string{"rollout_id": ro.ID})
+		return s.st.OsRollout(ctx, ro.ID)
 	}
 	if err := s.st.SkipPendingOsSteps(ctx, ro.ID, errCancelled, s.now()); err != nil {
 		return ro, s.internal("cancel OS rollout", err)
 	}
 	s.audit(ctx, "os_rollout_cancel", map[string]string{"rollout_id": ro.ID})
 	if ro.Status == store.RolloutPaused {
-		// finishOsIfDone ends a PAUSED rollout only when this cancel skipped a step; with every step decided it would wait for ever
-		if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutRunning, "", nil, time.Time{}); err != nil {
+		steps, err = s.st.OsRolloutSteps(ctx, ro.ID)
+		if err != nil {
+			return ro, s.internal("reload OS steps", err)
+		}
+		inFlight := slices.ContainsFunc(steps, func(x store.OsStepRow) bool {
+			return x.State == store.OsStepSent || x.State == store.OsStepRebooting || x.State == store.OsStepGating
+		})
+		if inFlight {
+			params := cloneStrings(ro.PauseParams)
+			params["cancel_requested"] = "true"
+			if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutPaused, pauseOsCancelWait, params, time.Time{}); err != nil {
+				return ro, s.internal("cancel OS rollout", err)
+			}
+		} else if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutCancelled, "", nil, s.now()); err != nil {
 			return ro, s.internal("cancel OS rollout", err)
 		}
-		ro.Status = store.RolloutRunning
+		if inFlight {
+			got, err := s.st.OsRollout(ctx, ro.ID)
+			if err != nil {
+				return ro, s.internal("reload OS rollout", err)
+			}
+			s.loadOsUpdating(ctx)
+			return got, nil
+		}
+		got, err := s.st.OsRollout(ctx, ro.ID)
+		if err != nil {
+			return ro, s.internal("reload OS rollout", err)
+		}
+		s.loadOsUpdating(ctx)
+		return got, nil
 	}
 	if steps, err := s.st.OsRolloutSteps(ctx, ro.ID); err == nil {
 		s.finishOsIfDone(ctx, ro, steps)
@@ -346,10 +491,115 @@ func (s *Service) cancelOs(ctx context.Context, id string) (store.OsRolloutRow, 
 	return got, nil
 }
 
+func cloneStrings(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in)+1)
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func (s *Service) pauseOs(ctx context.Context, id string) (store.OsRolloutRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var ro store.OsRolloutRow
+	var err error
+	if id == "" {
+		ro, err = s.st.ActiveOsRollout(ctx)
+	} else {
+		ro, err = s.st.OsRollout(ctx, id)
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		if id == "" {
+			return ro, precondition("rollout is not active")
+		}
+		return ro, notFound("rollout")
+	}
+	if err != nil {
+		return ro, s.internal("load OS rollout", err)
+	}
+	if ro.Status == store.RolloutPaused {
+		return ro, nil
+	}
+	if ro.Status != store.RolloutRunning {
+		return ro, precondition("rollout is not running")
+	}
+	if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutRunning}, store.RolloutPaused, pauseOwner, nil, time.Time{}); err != nil {
+		return ro, s.internal("pause OS rollout", err)
+	}
+	s.audit(ctx, "os_rollout_pause", map[string]string{"rollout_id": ro.ID})
+	return s.st.OsRollout(ctx, ro.ID)
+}
+
+func (s *Service) resumeOs(ctx context.Context, id string, skipFailed bool) (store.OsRolloutRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ro, err := s.st.ActiveOsRollout(ctx)
+	if id != "" {
+		ro, err = s.st.OsRollout(ctx, id)
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		if id == "" {
+			return ro, precondition("rollout is not active")
+		}
+		return ro, notFound("rollout")
+	}
+	if err != nil {
+		return ro, s.internal("load OS rollout", err)
+	}
+	if ro.Status != store.RolloutPaused {
+		return ro, precondition("rollout is not paused")
+	}
+	if ro.PauseParams["cancel_requested"] == "true" {
+		return ro, precondition("rollout cancellation is waiting for a job on a node to finish")
+	}
+	steps, err := s.st.OsRolloutSteps(ctx, ro.ID)
+	if err != nil {
+		return ro, s.internal("load OS steps", err)
+	}
+	if !skipFailed {
+		for _, step := range steps {
+			if step.State == store.OsStepFailed && step.Params[osRetryCount] != "" && step.Params[osRetryCount] != "0" {
+				return ro, precondition("the failed step was already retried; resume with skip_failed or cancel")
+			}
+		}
+	}
+	for i := range steps {
+		step := &steps[i]
+		if step.State != store.OsStepFailed {
+			continue
+		}
+		updated := *step
+		if skipFailed {
+			updated.State, updated.ErrorKey, updated.FinishedAt = store.OsStepSkipped, osErrSkippedAfterFailure, s.now()
+			updated.Params = mergeParams(updated.Params, map[string]string{"failed_reason": step.ErrorKey})
+		} else {
+			updated.State, updated.JobID, updated.Sends = store.OsStepPending, "", 0
+			updated.AckedAt, updated.PhaseAt, updated.BootBefore = time.Time{}, time.Time{}, time.Time{}
+			updated.Phase, updated.KernelFrom, updated.KernelTo = "", "", ""
+			updated.PreFailed = nil
+			updated.SentAt, updated.RebootAt, updated.BackAt, updated.FinishedAt = time.Time{}, time.Time{}, time.Time{}, time.Time{}
+			updated.ErrorKey = ""
+			updated.Params = clearOsRetryWait(updated.Params)
+			updated.Params[osRetryCount] = "1"
+		}
+		if err := s.st.SaveOsStep(ctx, &updated); err != nil {
+			return ro, s.internal("prepare OS step resume", err)
+		}
+		*step = updated
+	}
+	if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutRunning, "", nil, time.Time{}); err != nil {
+		return ro, s.internal("resume OS rollout", err)
+	}
+	s.audit(ctx, "os_rollout_resume", map[string]string{"rollout_id": ro.ID, "skip_failed": strconv.FormatBool(skipFailed)})
+	s.kick()
+	return s.st.OsRollout(ctx, ro.ID)
+}
+
 // finishOsIfDone ends a rollout with nothing left to do: DONE, FAILED (a step failed) or CANCELLED (the owner cancelled). A
 // PAUSED rollout is only ended this way after a cancel: otherwise the pause (and its alert) waits for the owner.
 func (s *Service) finishOsIfDone(ctx context.Context, ro store.OsRolloutRow, steps []store.OsStepRow) bool {
-	cancelled, bad := false, false
+	cancelled, bad := ro.PauseParams["cancel_requested"] == "true", false
 	for _, x := range steps {
 		switch {
 		case !x.Decided():
@@ -365,10 +615,10 @@ func (s *Service) finishOsIfDone(ctx context.Context, ro store.OsRolloutRow, ste
 	}
 	status := store.RolloutDone
 	switch {
-	case bad:
-		status = store.RolloutFailed
 	case cancelled:
 		status = store.RolloutCancelled
+	case bad:
+		status = store.RolloutFailed
 	}
 	ok, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutRunning, store.RolloutPaused}, status, "", nil, s.now())
 	if err != nil {
@@ -476,8 +726,8 @@ func (p *osPass) save(x *store.OsStepRow) bool {
 // finish records the outcome of a step. extra is merged into its params (the node's code, package, counts).
 func (p *osPass) finish(x *store.OsStepRow, state, key string, extra map[string]string) bool {
 	updated := *x
-	updated.State, updated.ErrorKey, updated.FinishedAt, updated.Phase = state, key, p.now, ""
-	updated.Params = withoutGateWait(mergeParams(x.Params, extra))
+	updated.State, updated.ErrorKey, updated.FinishedAt, updated.Phase, updated.PhaseAt = state, key, p.now, "", time.Time{}
+	updated.Params = clearOsRetryWait(withoutGateWait(mergeParams(x.Params, extra)))
 	if !p.save(&updated) {
 		return false
 	}
@@ -500,7 +750,7 @@ func mergeParams(base, extra map[string]string) map[string]string {
 	return out
 }
 
-// finishAndPause ends a step as failed and pauses the rollout: the owner decides (cancel) after looking at the node.
+// finishAndPause ends a step as failed and pauses the rollout: the owner decides whether to retry, skip, or cancel.
 func (p *osPass) finishAndPause(x *store.OsStepRow, key string, extra map[string]string, pauseCode string) {
 	if p.finish(x, store.OsStepFailed, key, extra) {
 		p.pause(pauseCode, x, key)
@@ -533,11 +783,12 @@ func (p *osPass) event(x *store.OsStepRow) {
 
 // pause stops the rollout because of a step. The first reason stays.
 func (p *osPass) pause(code string, x *store.OsStepRow, reason string) {
-	if p.ro.Status != store.RolloutRunning {
+	if p.ro.Status != store.RolloutRunning && !(p.ro.Status == store.RolloutPaused && p.ro.PauseKey == pauseOwner) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason, "code": x.Params["code"], "mode": p.ro.Mode}
-	ok, err := p.s.st.SetOsRolloutStatus(p.ctx, p.ro.ID, []string{store.RolloutRunning}, store.RolloutPaused, code, params, time.Time{})
+	previous := p.ro.Status
+	ok, err := p.s.st.SetOsRolloutStatus(p.ctx, p.ro.ID, []string{previous}, store.RolloutPaused, code, params, time.Time{})
 	if err != nil {
 		p.s.log.Warn("update: pause OS rollout", "code", "update_os_pause_os_rollout", "rollout", p.ro.ID, "err", err)
 		return
@@ -551,7 +802,7 @@ func (p *osPass) pause(code string, x *store.OsStepRow, reason string) {
 // ---------------------------------------------------------------------------------------------------
 // Launch
 
-// launch sends the next pending step (there is one node today; the earlier stages come first once there are more).
+// launch sends the pending steps in the earliest unfinished batch. A later stage waits for every earlier step to pass or skip.
 func (p *osPass) launch() {
 	s := p.s
 	stage := -1
@@ -587,17 +838,40 @@ func (p *osPass) launch() {
 		// The rollout itself is the one running: only what is true of the node counts here.
 		node := s.osNodeOf(n, live.Connected, status, s.PanelHostOsStatus(), facts.Hostname, p.now.Unix(), s.osRebootsOf(p.ctx, x.NodeID, p.now))
 		node.busy = node.busy || s.inflight[x.NodeID]
-		switch osBlock(osGlobal{}, node, reboot) {
+		if retryAt, expired := p.retryWait(x); expired {
+			code := x.Params[osRetryCode]
+			if code == "" {
+				code = osupdate.CodeBusy
+			}
+			p.finish(x, store.OsStepSkipped, osErrTryLater, map[string]string{"code": osCode(code)})
+			continue
+		} else if retryAt.After(p.now) {
+			continue
+		}
+		if p.ro.Reboot != store.OsRebootNever && status != nil && len(status.GetRebootBlockers()) > 0 {
+			code := status.GetRebootBlockers()[0]
+			if slices.Contains(osupdate.RebootBlockers, code) {
+				p.finish(x, store.OsStepSkipped, code, map[string]string{"code": code})
+				continue
+			}
+		}
+		if status != nil && status.GetApt() == "locked" {
+			p.waitTryLater(x, osupdate.CodeAptLock, p.now.Add(osRetryInterval))
+			continue
+		}
+		switch osBlockForMode(osGlobal{}, node, p.ro.Mode) {
 		case blockOffline:
 			p.finish(x, store.OsStepSkipped, errOffline, nil)
 		case blockAgentOld, blockUnsupported:
 			p.finish(x, store.OsStepSkipped, errUnsupported, nil)
 		case blockPanelHost:
 			p.finish(x, store.OsStepSkipped, osErrPanelHost, nil)
-		case blockNodeBusy, blockAwgBuild:
+		case blockNodeBusy:
+			p.waitTryLater(x, osupdate.CodeBusy, p.now.Add(osRetryInterval))
+		case blockAwgBuild:
 			p.finish(x, store.OsStepSkipped, osErrBusy, nil)
 		case blockRebootWait:
-			p.skipTryLater(x, node.rebootCode)
+			p.waitTryLater(x, node.rebootCode, node.rebootAt)
 		case blockNothingToDo:
 			if reboot {
 				p.finish(x, store.OsStepSkipped, osErrNotRequired, nil)
@@ -619,9 +893,12 @@ func (p *osPass) send(x *store.OsStepRow, n store.NodeRow, status *agentv1.OsSta
 	s := p.s
 	updated := *x
 	updated.State, updated.JobID, updated.Sends, updated.SentAt = store.OsStepSent, store.NewID("osj_"), 1, p.now
+	updated.Phase, updated.PhaseAt = "", time.Time{}
 	updated.BootBefore, updated.PreFailed = n.BootAt, p.preFailed(x)
 	updated.KernelFrom = status.GetKernelRunning()
 	updated.Params = mergeParams(x.Params, map[string]string{"boot_hash": status.GetBootIdHash()})
+	delete(updated.Params, osRetryAfter) // osRetrySince stays: the two-hour wait is one budget across resends
+	delete(updated.Params, osRetryCode)
 	if !p.save(&updated) {
 		return
 	}
@@ -646,6 +923,18 @@ func (p *osPass) sendCommand(x *store.OsStepRow) {
 		delete(s.osInflight, nodeID)
 		s.onOsAnswer(rolloutID, nodeID, req.JobID, res, err)
 	}()
+}
+
+func (p *osPass) retryNotBefore(nodeID, code string) time.Time {
+	if code == osupdate.CodeTooSoon || code == osupdate.CodeRebootLimit {
+		if n, err := p.s.st.Node(p.ctx, nodeID); err == nil {
+			at, _ := osRebootWait(n.BootAt, p.s.osRebootsOf(p.ctx, nodeID, p.now), p.now)
+			if at.After(p.now) {
+				return at
+			}
+		}
+	}
+	return p.now.Add(osRetryInterval)
 }
 
 func (p *osPass) preFailed(x *store.OsStepRow) []string {
@@ -696,8 +985,8 @@ func (s *Service) onOsAnswer(rolloutID, nodeID, jobID string, res *agentv1.Comma
 
 // applyAnswer is the outcome of the command. The node answers ok whatever it decided; params.state says what happened.
 //
-// A refusal on the first send is conclusive: nothing happened on the node, so the step fails without pausing the rollout (no alert,
-// nothing blocked). After a resend it is not: the first send may have started the job, and the node's own record decides.
+// A self-closing refusal returns the step to its durable retry wait. Other first-send refusals are conclusive failures and pause
+// the rollout. After a resend the first send may have started the job, so the node's own record decides.
 // "finished" only says the job is over: how it ended comes from the events and the snapshot, which carry what the node decided about
 // the reboot (held, done).
 func (p *osPass) applyAnswer(x *store.OsStepRow, res *agentv1.CommandResult, err error) {
@@ -706,10 +995,10 @@ func (p *osPass) applyAnswer(x *store.OsStepRow, res *agentv1.CommandResult, err
 			return
 		}
 		if c := osCode(code); slices.Contains(osRetryLater, c) {
-			p.skipTryLater(x, c) // nothing happened and nothing is wrong: a note on the node, nothing to close
+			p.waitTryLater(x, c, p.retryNotBefore(x.NodeID, c))
 			return
 		}
-		p.finish(x, store.OsStepFailed, osErrAgentRefused, map[string]string{"code": osCode(code)})
+		p.finishAndPause(x, osErrAgentRefused, map[string]string{"code": osCode(code)}, pauseStepFailed)
 	}
 	ack := func() {
 		if x.AckedAt.IsZero() {
@@ -859,7 +1148,7 @@ func (p *osPass) applyJob(x *store.OsStepRow, v osJobView) {
 	case osupdate.StateDone:
 		extra := jobParams(v)
 		if code, ok := p.osNothingChanged(v); ok && v.reboot == osupdate.RebootHeld {
-			p.skipTryLater(x, code)
+			p.waitTryLater(x, code, p.retryNotBefore(x.NodeID, code))
 			return
 		}
 		if v.reboot == osupdate.RebootHeld { // a node that finished with a reboot held
@@ -878,7 +1167,7 @@ func (p *osPass) applyJob(x *store.OsStepRow, v osJobView) {
 	case osupdate.StateFailed:
 		extra := jobParams(v)
 		if code, ok := p.osNothingChanged(v); ok {
-			p.skipTryLater(x, code)
+			p.waitTryLater(x, code, p.retryNotBefore(x.NodeID, code))
 			return
 		}
 		switch {

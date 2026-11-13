@@ -82,6 +82,28 @@ func TestOsRolloutLifecycle(t *testing.T) {
 	}
 }
 
+func TestOsRolloutBatchSizeDefaultsAndPersists(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_790_000_000, 0)
+	for _, tc := range []struct {
+		id          string
+		batch, want int
+	}{{"osr_default", 0, 1}, {"osr_batch", 5, 5}} {
+		ro := OsRolloutRow{ID: tc.id, Status: RolloutRunning, Mode: OsModeAll, Reboot: OsRebootNever, BatchSize: tc.batch, CreatedAt: now}
+		if err := st.CreateOsRollout(ctx, ro, []OsStepRow{{NodeID: "nod_de1", NodeName: "de1", Stage: 0, State: OsStepPending}}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.OsRollout(ctx, ro.ID)
+		if err != nil || got.BatchSize != tc.want {
+			t.Fatalf("rollout %s batch size %d, %v; want %d", tc.id, got.BatchSize, err, tc.want)
+		}
+		if _, err := st.SetOsRolloutStatus(ctx, ro.ID, []string{RolloutRunning}, RolloutDone, "", nil, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestOsJobEventsAreReadByJobID(t *testing.T) {
 	st := openTemp(t)
 	ctx := context.Background()

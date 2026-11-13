@@ -915,8 +915,8 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 39 {
-		t.Errorf("%d procedures need approval, want 39: %v", len(approved), approved)
+	if len(approved) != 41 {
+		t.Errorf("%d procedures need approval, want 41: %v", len(approved), approved)
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)
@@ -1059,8 +1059,8 @@ func TestTokenAllowList(t *testing.T) {
 	}
 	// Step-up procedures include the protected handlers, credential reveal/rotation, password changes,
 	// authenticator enrollment, login captcha, and sensitive infrastructure operations.
-	if len(stepUpProcedures) != 68 {
-		t.Errorf("%d step-up procedures, want 68", len(stepUpProcedures))
+	if len(stepUpProcedures) != 70 {
+		t.Errorf("%d step-up procedures, want 70", len(stepUpProcedures))
 	}
 }
 

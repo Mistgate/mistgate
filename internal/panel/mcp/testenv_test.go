@@ -90,6 +90,8 @@ var tokenApproved = map[string]bool{
 	adminv1connect.UpdateServiceResumeRolloutProcedure:                    true,
 	adminv1connect.UpdateServiceCancelRolloutProcedure:                    true,
 	adminv1connect.UpdateServiceStartOsRolloutProcedure:                   true,
+	adminv1connect.UpdateServicePauseOsRolloutProcedure:                   true,
+	adminv1connect.UpdateServiceResumeOsRolloutProcedure:                  true,
 	adminv1connect.UpdateServiceCancelOsRolloutProcedure:                  true,
 	adminv1connect.UpdateServiceRollbackNodeProcedure:                     true,
 	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:               true,
@@ -406,6 +408,8 @@ type world struct {
 	startReq            []*adminv1.StartRolloutRequest
 	updateNodes         []*adminv1.NodeUpdate
 	osStartReq          []*adminv1.StartOsRolloutRequest
+	osPauseReq          []*adminv1.PauseOsRolloutRequest
+	osResumeReq         []*adminv1.ResumeOsRolloutRequest
 	osCancelReq         []*adminv1.CancelOsRolloutRequest
 	scheduleReq         []*adminv1.ScheduleNodeUpdateRequest
 	cancelScheduleReq   []*adminv1.CancelNodeUpdateScheduleRequest
@@ -1599,6 +1603,20 @@ func (w *world) CancelOsRollout(_ context.Context, r *connect.Request[adminv1.Ca
 	defer w.mu.Unlock()
 	w.osCancelReq = append(w.osCancelReq, r.Msg)
 	return connect.NewResponse(&adminv1.CancelOsRolloutResponse{Rollout: &adminv1.OsRollout{Id: r.Msg.GetRolloutId()}}), nil
+}
+
+func (w *world) PauseOsRollout(_ context.Context, r *connect.Request[adminv1.PauseOsRolloutRequest]) (*connect.Response[adminv1.PauseOsRolloutResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.osPauseReq = append(w.osPauseReq, r.Msg)
+	return connect.NewResponse(&adminv1.PauseOsRolloutResponse{Rollout: &adminv1.OsRollout{Id: r.Msg.GetRolloutId()}}), nil
+}
+
+func (w *world) ResumeOsRollout(_ context.Context, r *connect.Request[adminv1.ResumeOsRolloutRequest]) (*connect.Response[adminv1.ResumeOsRolloutResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.osResumeReq = append(w.osResumeReq, r.Msg)
+	return connect.NewResponse(&adminv1.ResumeOsRolloutResponse{Rollout: &adminv1.OsRollout{Id: r.Msg.GetRolloutId()}}), nil
 }
 
 func (w *world) StartRollout(_ context.Context, r *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {

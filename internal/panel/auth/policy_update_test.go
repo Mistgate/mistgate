@@ -25,6 +25,8 @@ func TestUpdateServiceRolePolicy(t *testing.T) {
 		{"ResumeRollout", adminv1connect.UpdateServiceResumeRolloutProcedure, true, false},
 		{"CancelRollout", adminv1connect.UpdateServiceCancelRolloutProcedure, true, false},
 		{"StartOsRollout", adminv1connect.UpdateServiceStartOsRolloutProcedure, true, false},
+		{"PauseOsRollout", adminv1connect.UpdateServicePauseOsRolloutProcedure, true, false},
+		{"ResumeOsRollout", adminv1connect.UpdateServiceResumeOsRolloutProcedure, true, false},
 		{"CancelOsRollout", adminv1connect.UpdateServiceCancelOsRolloutProcedure, true, false},
 		{"RefreshOsUpdates", adminv1connect.UpdateServiceRefreshOsUpdatesProcedure, true, false},
 		{"RollbackNode", adminv1connect.UpdateServiceRollbackNodeProcedure, true, false},
@@ -47,7 +49,8 @@ func TestUpdateServiceRolePolicy(t *testing.T) {
 		t.Error("GetOsUpdates unexpectedly requires step-up")
 	}
 	// The OS update of a node: a token only plans it (the owner approves with a step-up); refreshing the lists is the owner's click.
-	for _, p := range []string{adminv1connect.UpdateServiceStartOsRolloutProcedure, adminv1connect.UpdateServiceCancelOsRolloutProcedure} {
+	for _, p := range []string{adminv1connect.UpdateServiceStartOsRolloutProcedure, adminv1connect.UpdateServicePauseOsRolloutProcedure,
+		adminv1connect.UpdateServiceResumeOsRolloutProcedure, adminv1connect.UpdateServiceCancelOsRolloutProcedure} {
 		if access, ok := TokenAccess(p); !ok || access != TokenAccessApproved || !NeedsStepUp(p) {
 			t.Errorf("%s: token access %d (present %v), step-up %v; want approved with a step-up", p, access, ok, NeedsStepUp(p))
 		}

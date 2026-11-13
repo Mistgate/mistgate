@@ -195,6 +195,14 @@ func TestOsUpdatesEditionAndPanelHostRootGates(t *testing.T) {
 			_, err := (rpc{e.s}).CancelOsRollout(e.ctx, connect.NewRequest(&adminv1.CancelOsRolloutRequest{}))
 			return err
 		},
+		"PauseOsRollout": func() error {
+			_, err := (rpc{e.s}).PauseOsRollout(e.ctx, connect.NewRequest(&adminv1.PauseOsRolloutRequest{}))
+			return err
+		},
+		"ResumeOsRollout": func() error {
+			_, err := (rpc{e.s}).ResumeOsRollout(e.ctx, connect.NewRequest(&adminv1.ResumeOsRolloutRequest{}))
+			return err
+		},
 		"RefreshOsUpdates": func() error {
 			_, err := (rpc{e.s}).RefreshOsUpdates(e.ctx, connect.NewRequest(&adminv1.RefreshOsUpdatesRequest{}))
 			return err

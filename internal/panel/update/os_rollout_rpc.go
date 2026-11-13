@@ -61,6 +61,8 @@ func osModeProto(m string) adminv1.OsRolloutMode {
 		return adminv1.OsRolloutMode_OS_ROLLOUT_MODE_SECURITY
 	case store.OsModeRebootOnly:
 		return adminv1.OsRolloutMode_OS_ROLLOUT_MODE_REBOOT_ONLY
+	case store.OsModeAll:
+		return adminv1.OsRolloutMode_OS_ROLLOUT_MODE_ALL
 	}
 	return adminv1.OsRolloutMode_OS_ROLLOUT_MODE_UNSPECIFIED
 }
@@ -99,13 +101,16 @@ func osStepStateProto(s string) adminv1.OsStepState {
 
 func osRolloutMsg(ro store.OsRolloutRow, steps []store.OsStepRow) *adminv1.OsRollout {
 	m := &adminv1.OsRollout{Id: ro.ID, Status: osRolloutStatusProto(ro.Status), Mode: osModeProto(ro.Mode), Reboot: osRebootProto(ro.Reboot),
-		CreatedUnix: ro.CreatedAt.Unix(), PauseKey: ro.PauseKey, PauseParams: ro.PauseParams, Steps: []*adminv1.OsStep{}}
+		CreatedUnix: ro.CreatedAt.Unix(), PauseKey: ro.PauseKey, PauseParams: ro.PauseParams, Steps: []*adminv1.OsStep{}, BatchSize: int32(ro.BatchSize)}
 	if !ro.FinishedAt.IsZero() {
 		m.FinishedUnix = ro.FinishedAt.Unix()
 	}
 	for _, x := range steps {
 		st := &adminv1.OsStep{NodeId: x.NodeID, NodeName: x.NodeName, State: osStepStateProto(x.State), JobId: x.JobID, Phase: x.Phase,
-			KernelFrom: x.KernelFrom, KernelTo: x.KernelTo, ErrorKey: x.ErrorKey, Params: x.Params}
+			KernelFrom: x.KernelFrom, KernelTo: x.KernelTo, ErrorKey: x.ErrorKey, Params: x.Params, Stage: int32(x.Stage)}
+		if retryAt, err := strconv.ParseInt(x.Params[osRetryAfter], 10, 64); err == nil && retryAt > 0 {
+			st.RetryAfterUnix = retryAt
+		}
 		for dst, t := range map[*int64]time.Time{&st.PhaseUnix: x.PhaseAt, &st.SentUnix: x.SentAt, &st.RebootUnix: x.RebootAt, &st.BackUnix: x.BackAt, &st.FinishedUnix: x.FinishedAt} {
 			if !t.IsZero() {
 				*dst = t.Unix()
@@ -158,6 +163,8 @@ func (r rpc) StartOsRollout(ctx context.Context, req *connect.Request[adminv1.St
 		mode = store.OsModeSecurity
 	case adminv1.OsRolloutMode_OS_ROLLOUT_MODE_REBOOT_ONLY:
 		mode = store.OsModeRebootOnly
+	case adminv1.OsRolloutMode_OS_ROLLOUT_MODE_ALL:
+		mode = store.OsModeAll
 	}
 	switch req.Msg.Reboot {
 	case adminv1.OsRebootPolicy_OS_REBOOT_POLICY_NEVER:
@@ -167,7 +174,7 @@ func (r rpc) StartOsRollout(ctx context.Context, req *connect.Request[adminv1.St
 	case adminv1.OsRebootPolicy_OS_REBOOT_POLICY_ALWAYS:
 		reboot = store.OsRebootAlways
 	}
-	ro, err := r.s.startOs(ctx, req.Msg.NodeIds, mode, reboot)
+	ro, err := r.s.startOsWithBatch(ctx, req.Msg.NodeIds, mode, reboot, int(req.Msg.GetBatchSize()))
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +203,46 @@ func (r rpc) CancelOsRollout(ctx context.Context, req *connect.Request[adminv1.C
 		return nil, err
 	}
 	return connect.NewResponse(&adminv1.CancelOsRolloutResponse{Rollout: m}), nil
+}
+
+func (r rpc) PauseOsRollout(ctx context.Context, req *connect.Request[adminv1.PauseOsRolloutRequest]) (*connect.Response[adminv1.PauseOsRolloutResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
+	if err := edition.Check(!r.s.OSUpdatesEnabled(), edition.OSUpdates); err != nil {
+		return nil, err
+	}
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	ro, err := r.s.pauseOs(ctx, req.Msg.GetRolloutId())
+	if err != nil {
+		return nil, err
+	}
+	m, err := r.osRolloutResp(ctx, ro)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.PauseOsRolloutResponse{Rollout: m}), nil
+}
+
+func (r rpc) ResumeOsRollout(ctx context.Context, req *connect.Request[adminv1.ResumeOsRolloutRequest]) (*connect.Response[adminv1.ResumeOsRolloutResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
+	if err := edition.Check(!r.s.OSUpdatesEnabled(), edition.OSUpdates); err != nil {
+		return nil, err
+	}
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	ro, err := r.s.resumeOs(ctx, req.Msg.GetRolloutId(), req.Msg.GetSkipFailed())
+	if err != nil {
+		return nil, err
+	}
+	m, err := r.osRolloutResp(ctx, ro)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.ResumeOsRolloutResponse{Rollout: m}), nil
 }
 
 func (r rpc) RefreshOsUpdates(ctx context.Context, req *connect.Request[adminv1.RefreshOsUpdatesRequest]) (*connect.Response[adminv1.RefreshOsUpdatesResponse], error) {

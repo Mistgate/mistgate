@@ -281,14 +281,15 @@ func TestOsStartRefusals(t *testing.T) {
 	sec, ifReq := store.OsModeSecurity, store.OsRebootIfRequired
 	id := e.osNode("de1")
 
-	for _, c := range []struct{ mode, reboot string }{{sec, store.OsRebootAlways}, {store.OsModeRebootOnly, store.OsRebootNever}, {store.OsModeAll, ifReq}, {"", ifReq}, {sec, ""}} {
+	for _, c := range []struct{ mode, reboot string }{{sec, store.OsRebootAlways}, {store.OsModeRebootOnly, store.OsRebootNever},
+		{store.OsModeAll, store.OsRebootAlways}, {"", ifReq}, {sec, ""}} {
 		if _, err := e.s.startOs(e.ctx, []string{id}, c.mode, c.reboot); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Fatalf("%q/%q = %v, want INVALID_ARGUMENT", c.mode, c.reboot, err)
 		}
 	}
-	for _, ids := range [][]string{nil, {""}, {id, "nod_other"}} {
+	for _, ids := range [][]string{nil, {""}, {id, id}} {
 		if _, err := e.s.startOs(e.ctx, ids, sec, ifReq); connect.CodeOf(err) != connect.CodeInvalidArgument {
-			t.Fatalf("nodes %v = %v, want INVALID_ARGUMENT: exactly one node", ids, err)
+			t.Fatalf("nodes %v = %v, want INVALID_ARGUMENT", ids, err)
 		}
 	}
 	if _, err := e.s.startOs(e.ctx, []string{"nod_nobody"}, sec, ifReq); connect.CodeOf(err) != connect.CodeNotFound {
@@ -383,11 +384,10 @@ func TestOsRolloutNodeGoneOfflineBeforeLaunchIsSkipped(t *testing.T) {
 	}
 }
 
-func TestOsRolloutRefusedByTheNodeEndsTheRunWithoutPausingAndNextTryUsesANewJobID(t *testing.T) {
+func TestOsRolloutHardRefusalPausesAndRetryUsesANewJobID(t *testing.T) {
 	e := newEnv(t)
-	e.defaultBundle()
 	id := e.osNode("de1")
-	other := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1", capUpdate, capGuard}})
+	other := e.osNode("nl1")
 	e.fl.onOs = func(_ string, req OsJobRequest) (*agentv1.CommandResult, error) {
 		return &agentv1.CommandResult{Ok: true, Params: map[string]string{"state": osupdate.AnswerUnsupported, "code": osupdate.CodeDiskFull, "reason": "the disk is full"}}, nil
 	}
@@ -397,22 +397,22 @@ func TestOsRolloutRefusedByTheNodeEndsTheRunWithoutPausingAndNextTryUsesANewJobI
 	if x.Params["code"] != osupdate.CodeDiskFull {
 		t.Fatalf("params %+v", x.Params)
 	}
-	// nothing happened on the node: the run is over, not paused, with no alert, and nothing else is held up
-	e.wantOsRollout(store.RolloutFailed, "")
-	if got := e.s.Conditions(e.ctx); len(got) != 0 {
-		t.Fatalf("an alert for a refusal that changed nothing: %+v", got)
+	// a real refusal pauses the run and keeps later nodes queued until the owner decides.
+	ro := e.wantOsRollout(store.RolloutPaused, pauseStepFailed)
+	if got := e.s.Conditions(e.ctx); len(got) != 1 {
+		t.Fatalf("a real refusal must raise a health alert: %+v", got)
 	}
 	e.wantEvent(id, "os_step_failed")
-	if _, err := e.s.start(e.ctx, []string{other}, 0); err != nil {
-		t.Fatalf("an agent rollout after a refusal: %v", err)
+	if _, err := e.s.startOs(e.ctx, []string{other}, store.OsModeSecurity, store.OsRebootIfRequired); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("a second OS rollout beside the paused one = %v", err)
 	}
-	if _, err := e.s.cancel(e.ctx, ""); err != nil {
+	if _, err := e.s.cancelOs(e.ctx, ro.ID); err != nil {
 		t.Fatal(err)
 	}
-	e.tick()
+	e.wantOsRollout(store.RolloutCancelled, "")
 
 	e.fl.onOs = nil
-	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired) // no Close needed first
+	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick()
 	if y := e.wantOsStep(id, store.OsStepSent, ""); y.JobID == x.JobID {
 		t.Fatalf("the next attempt reused the job id %s", y.JobID)
@@ -459,11 +459,11 @@ func TestOsRolloutAnswerRunningOtherJobFailsTheStep(t *testing.T) {
 	}
 	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick()
-	// another job on the node: nothing changed and nothing is wrong, so the step only says "try later" and the run is over
-	if x := e.wantOsStep(id, store.OsStepSkipped, osErrTryLater); x.Params["code"] != osupdate.CodeBusy {
+	// another job on the node: nothing changed and nothing is wrong, so the step waits to retry.
+	if x := e.wantOsStep(id, store.OsStepPending, ""); x.Phase != osWaitPhase || x.Params[osRetryCode] != osupdate.CodeBusy {
 		t.Fatalf("params %+v", x.Params)
 	}
-	e.wantOsRollout(store.RolloutDone, "")
+	e.wantOsRollout(store.RolloutRunning, "")
 }
 
 func TestOsRolloutNodeCodesAreOnlyTheKnownOnes(t *testing.T) {
@@ -477,6 +477,7 @@ func TestOsRolloutNodeCodesAreOnlyTheKnownOnes(t *testing.T) {
 	if x := e.wantOsStep(id, store.OsStepFailed, osErrAgentRefused); x.Params["code"] != "unknown" {
 		t.Fatalf("a code the panel does not know was kept: %+v", x.Params)
 	}
+	e.wantOsRollout(store.RolloutPaused, pauseStepFailed)
 }
 
 func TestOsRolloutRebootHeldPausesWithTheNodesCode(t *testing.T) {

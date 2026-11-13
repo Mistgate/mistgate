@@ -45,6 +45,12 @@ const (
 	// UpdateServiceCancelOsRolloutProcedure is the fully-qualified name of the UpdateService's
 	// CancelOsRollout RPC.
 	UpdateServiceCancelOsRolloutProcedure = "/mistgate.admin.v1.UpdateService/CancelOsRollout"
+	// UpdateServicePauseOsRolloutProcedure is the fully-qualified name of the UpdateService's
+	// PauseOsRollout RPC.
+	UpdateServicePauseOsRolloutProcedure = "/mistgate.admin.v1.UpdateService/PauseOsRollout"
+	// UpdateServiceResumeOsRolloutProcedure is the fully-qualified name of the UpdateService's
+	// ResumeOsRollout RPC.
+	UpdateServiceResumeOsRolloutProcedure = "/mistgate.admin.v1.UpdateService/ResumeOsRollout"
 	// UpdateServiceRefreshOsUpdatesProcedure is the fully-qualified name of the UpdateService's
 	// RefreshOsUpdates RPC.
 	UpdateServiceRefreshOsUpdatesProcedure = "/mistgate.admin.v1.UpdateService/RefreshOsUpdates"
@@ -99,13 +105,17 @@ type UpdateServiceClient interface {
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
 	// Stored snapshots only: does not contact nodes, run apt, or refresh package lists.
 	GetOsUpdates(context.Context, *connect.Request[v1.GetOsUpdatesRequest]) (*connect.Response[v1.GetOsUpdatesResponse], error)
-	// Install the security updates of ONE node, or reboot it, now (agent.proto "OS UPDATES"). A rollout of one node; more
-	// nodes at once, windows and the canary come later. Owner-only with a fresh step-up. Only one rollout of any kind is
-	// active at a time (agent update, OS update, panel update, GitHub bundle sync). Audited.
+	// Start an OS update of 1..20 nodes (agent.proto "OS UPDATES"). The canary runs first, then batches wait for the
+	// previous batch's health gate. Owner-only with a fresh step-up. Only one rollout of any kind is active at a time.
+	// Audited.
 	StartOsRollout(context.Context, *connect.Request[v1.StartOsRolloutRequest]) (*connect.Response[v1.StartOsRolloutResponse], error)
-	// End the OS rollout. A step whose job is running finishes (dpkg is never cut short) and is still checked; nothing new
-	// starts. A rollout paused by a failed step ends at once: the alert clears. Owner-only with a fresh step-up.
+	// Stop a running, queued, paused, or failed OS rollout. A job already running on a node is never interrupted and is still
+	// checked; nothing new starts. Owner-only with a fresh step-up.
 	CancelOsRollout(context.Context, *connect.Request[v1.CancelOsRolloutRequest]) (*connect.Response[v1.CancelOsRolloutResponse], error)
+	// Pause future OS jobs. A job already running on a node is never interrupted and is still checked.
+	PauseOsRollout(context.Context, *connect.Request[v1.PauseOsRolloutRequest]) (*connect.Response[v1.PauseOsRolloutResponse], error)
+	// Resume an OS rollout. A failed step is retried once by default; skip_failed marks it skipped and moves on.
+	ResumeOsRollout(context.Context, *connect.Request[v1.ResumeOsRolloutRequest]) (*connect.Response[v1.ResumeOsRolloutResponse], error)
 	// Refresh the package lists of nodes (apt-get update only; nothing is installed or rebooted). At most 3 nodes at a time
 	// and once per node per 30 minutes; the answer says which were started. Owner-only, no step-up.
 	RefreshOsUpdates(context.Context, *connect.Request[v1.RefreshOsUpdatesRequest]) (*connect.Response[v1.RefreshOsUpdatesResponse], error)
@@ -179,6 +189,18 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+UpdateServiceCancelOsRolloutProcedure,
 			connect.WithSchema(updateServiceMethods.ByName("CancelOsRollout")),
+			connect.WithClientOptions(opts...),
+		),
+		pauseOsRollout: connect.NewClient[v1.PauseOsRolloutRequest, v1.PauseOsRolloutResponse](
+			httpClient,
+			baseURL+UpdateServicePauseOsRolloutProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("PauseOsRollout")),
+			connect.WithClientOptions(opts...),
+		),
+		resumeOsRollout: connect.NewClient[v1.ResumeOsRolloutRequest, v1.ResumeOsRolloutResponse](
+			httpClient,
+			baseURL+UpdateServiceResumeOsRolloutProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("ResumeOsRollout")),
 			connect.WithClientOptions(opts...),
 		),
 		refreshOsUpdates: connect.NewClient[v1.RefreshOsUpdatesRequest, v1.RefreshOsUpdatesResponse](
@@ -280,6 +302,8 @@ type updateServiceClient struct {
 	getOsUpdates             *connect.Client[v1.GetOsUpdatesRequest, v1.GetOsUpdatesResponse]
 	startOsRollout           *connect.Client[v1.StartOsRolloutRequest, v1.StartOsRolloutResponse]
 	cancelOsRollout          *connect.Client[v1.CancelOsRolloutRequest, v1.CancelOsRolloutResponse]
+	pauseOsRollout           *connect.Client[v1.PauseOsRolloutRequest, v1.PauseOsRolloutResponse]
+	resumeOsRollout          *connect.Client[v1.ResumeOsRolloutRequest, v1.ResumeOsRolloutResponse]
 	refreshOsUpdates         *connect.Client[v1.RefreshOsUpdatesRequest, v1.RefreshOsUpdatesResponse]
 	checkPanelUpdate         *connect.Client[v1.CheckPanelUpdateRequest, v1.CheckPanelUpdateResponse]
 	installPanelUpdate       *connect.Client[v1.InstallPanelUpdateRequest, v1.InstallPanelUpdateResponse]
@@ -315,6 +339,16 @@ func (c *updateServiceClient) StartOsRollout(ctx context.Context, req *connect.R
 // CancelOsRollout calls mistgate.admin.v1.UpdateService.CancelOsRollout.
 func (c *updateServiceClient) CancelOsRollout(ctx context.Context, req *connect.Request[v1.CancelOsRolloutRequest]) (*connect.Response[v1.CancelOsRolloutResponse], error) {
 	return c.cancelOsRollout.CallUnary(ctx, req)
+}
+
+// PauseOsRollout calls mistgate.admin.v1.UpdateService.PauseOsRollout.
+func (c *updateServiceClient) PauseOsRollout(ctx context.Context, req *connect.Request[v1.PauseOsRolloutRequest]) (*connect.Response[v1.PauseOsRolloutResponse], error) {
+	return c.pauseOsRollout.CallUnary(ctx, req)
+}
+
+// ResumeOsRollout calls mistgate.admin.v1.UpdateService.ResumeOsRollout.
+func (c *updateServiceClient) ResumeOsRollout(ctx context.Context, req *connect.Request[v1.ResumeOsRolloutRequest]) (*connect.Response[v1.ResumeOsRolloutResponse], error) {
+	return c.resumeOsRollout.CallUnary(ctx, req)
 }
 
 // RefreshOsUpdates calls mistgate.admin.v1.UpdateService.RefreshOsUpdates.
@@ -399,13 +433,17 @@ type UpdateServiceHandler interface {
 	GetUpdates(context.Context, *connect.Request[v1.GetUpdatesRequest]) (*connect.Response[v1.GetUpdatesResponse], error)
 	// Stored snapshots only: does not contact nodes, run apt, or refresh package lists.
 	GetOsUpdates(context.Context, *connect.Request[v1.GetOsUpdatesRequest]) (*connect.Response[v1.GetOsUpdatesResponse], error)
-	// Install the security updates of ONE node, or reboot it, now (agent.proto "OS UPDATES"). A rollout of one node; more
-	// nodes at once, windows and the canary come later. Owner-only with a fresh step-up. Only one rollout of any kind is
-	// active at a time (agent update, OS update, panel update, GitHub bundle sync). Audited.
+	// Start an OS update of 1..20 nodes (agent.proto "OS UPDATES"). The canary runs first, then batches wait for the
+	// previous batch's health gate. Owner-only with a fresh step-up. Only one rollout of any kind is active at a time.
+	// Audited.
 	StartOsRollout(context.Context, *connect.Request[v1.StartOsRolloutRequest]) (*connect.Response[v1.StartOsRolloutResponse], error)
-	// End the OS rollout. A step whose job is running finishes (dpkg is never cut short) and is still checked; nothing new
-	// starts. A rollout paused by a failed step ends at once: the alert clears. Owner-only with a fresh step-up.
+	// Stop a running, queued, paused, or failed OS rollout. A job already running on a node is never interrupted and is still
+	// checked; nothing new starts. Owner-only with a fresh step-up.
 	CancelOsRollout(context.Context, *connect.Request[v1.CancelOsRolloutRequest]) (*connect.Response[v1.CancelOsRolloutResponse], error)
+	// Pause future OS jobs. A job already running on a node is never interrupted and is still checked.
+	PauseOsRollout(context.Context, *connect.Request[v1.PauseOsRolloutRequest]) (*connect.Response[v1.PauseOsRolloutResponse], error)
+	// Resume an OS rollout. A failed step is retried once by default; skip_failed marks it skipped and moves on.
+	ResumeOsRollout(context.Context, *connect.Request[v1.ResumeOsRolloutRequest]) (*connect.Response[v1.ResumeOsRolloutResponse], error)
 	// Refresh the package lists of nodes (apt-get update only; nothing is installed or rebooted). At most 3 nodes at a time
 	// and once per node per 30 minutes; the answer says which were started. Owner-only, no step-up.
 	RefreshOsUpdates(context.Context, *connect.Request[v1.RefreshOsUpdatesRequest]) (*connect.Response[v1.RefreshOsUpdatesResponse], error)
@@ -475,6 +513,18 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		UpdateServiceCancelOsRolloutProcedure,
 		svc.CancelOsRollout,
 		connect.WithSchema(updateServiceMethods.ByName("CancelOsRollout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	updateServicePauseOsRolloutHandler := connect.NewUnaryHandler(
+		UpdateServicePauseOsRolloutProcedure,
+		svc.PauseOsRollout,
+		connect.WithSchema(updateServiceMethods.ByName("PauseOsRollout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	updateServiceResumeOsRolloutHandler := connect.NewUnaryHandler(
+		UpdateServiceResumeOsRolloutProcedure,
+		svc.ResumeOsRollout,
+		connect.WithSchema(updateServiceMethods.ByName("ResumeOsRollout")),
 		connect.WithHandlerOptions(opts...),
 	)
 	updateServiceRefreshOsUpdatesHandler := connect.NewUnaryHandler(
@@ -577,6 +627,10 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 			updateServiceStartOsRolloutHandler.ServeHTTP(w, r)
 		case UpdateServiceCancelOsRolloutProcedure:
 			updateServiceCancelOsRolloutHandler.ServeHTTP(w, r)
+		case UpdateServicePauseOsRolloutProcedure:
+			updateServicePauseOsRolloutHandler.ServeHTTP(w, r)
+		case UpdateServiceResumeOsRolloutProcedure:
+			updateServiceResumeOsRolloutHandler.ServeHTTP(w, r)
 		case UpdateServiceRefreshOsUpdatesProcedure:
 			updateServiceRefreshOsUpdatesHandler.ServeHTTP(w, r)
 		case UpdateServiceCheckPanelUpdateProcedure:
@@ -630,6 +684,14 @@ func (UnimplementedUpdateServiceHandler) StartOsRollout(context.Context, *connec
 
 func (UnimplementedUpdateServiceHandler) CancelOsRollout(context.Context, *connect.Request[v1.CancelOsRolloutRequest]) (*connect.Response[v1.CancelOsRolloutResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.CancelOsRollout is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) PauseOsRollout(context.Context, *connect.Request[v1.PauseOsRolloutRequest]) (*connect.Response[v1.PauseOsRolloutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.PauseOsRollout is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) ResumeOsRollout(context.Context, *connect.Request[v1.ResumeOsRolloutRequest]) (*connect.Response[v1.ResumeOsRolloutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UpdateService.ResumeOsRollout is not implemented"))
 }
 
 func (UnimplementedUpdateServiceHandler) RefreshOsUpdates(context.Context, *connect.Request[v1.RefreshOsUpdatesRequest]) (*connect.Response[v1.RefreshOsUpdatesResponse], error) {

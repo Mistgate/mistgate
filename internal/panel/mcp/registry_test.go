@@ -171,7 +171,7 @@ func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 45, ProfileOperator: 91, ProfileAdmin: 172}
+	want := map[Profile]int{ProfileReadonly: 45, ProfileOperator: 91, ProfileAdmin: 176}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)
@@ -194,7 +194,7 @@ func TestToolsPerProfile(t *testing.T) {
 			t.Errorf("operator sees an admin tool: %s", n)
 		}
 	}
-	for _, n := range []string{"node_fix_plan", "node_fix_apply", "rollout_start_plan", "rollout_pause_plan", "rollout_resume_plan", "rollout_cancel_plan", "node_rollback_plan", "node_server_keys_add_plan", "node_server_keys_add_apply", "audit_search"} {
+	for _, n := range []string{"node_fix_plan", "node_fix_apply", "rollout_start_plan", "rollout_pause_plan", "rollout_resume_plan", "rollout_cancel_plan", "node_rollback_plan", "node_server_keys_add_plan", "node_server_keys_add_apply", "os_rollout_start_plan", "os_rollout_start_apply", "os_rollout_pause_plan", "os_rollout_pause_apply", "os_rollout_resume_plan", "os_rollout_resume_apply", "os_rollout_cancel_plan", "os_rollout_cancel_apply", "audit_search"} {
 		if !slices.Contains(got[ProfileAdmin], n) {
 			t.Errorf("admin lacks %s", n)
 		}

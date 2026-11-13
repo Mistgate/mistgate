@@ -26,13 +26,17 @@ service UpdateService {
   rpc GetUpdates(GetUpdatesRequest) returns (GetUpdatesResponse);
   // Stored snapshots only: does not contact nodes, run apt, or refresh package lists.
   rpc GetOsUpdates(GetOsUpdatesRequest) returns (GetOsUpdatesResponse);
-  // Install the security updates of ONE node, or reboot it, now (agent.proto "OS UPDATES"). A rollout of one node; more
-  // nodes at once, windows and the canary come later. Owner-only with a fresh step-up. Only one rollout of any kind is
-  // active at a time (agent update, OS update, panel update, GitHub bundle sync). Audited.
+  // Start an OS update of 1..20 nodes (agent.proto "OS UPDATES"). The canary runs first, then batches wait for the
+  // previous batch's health gate. Owner-only with a fresh step-up. Only one rollout of any kind is active at a time.
+  // Audited.
   rpc StartOsRollout(StartOsRolloutRequest) returns (StartOsRolloutResponse);
-  // End the OS rollout. A step whose job is running finishes (dpkg is never cut short) and is still checked; nothing new
-  // starts. A rollout paused by a failed step ends at once: the alert clears. Owner-only with a fresh step-up.
+  // Stop a running, queued, paused, or failed OS rollout. A job already running on a node is never interrupted and is still
+  // checked; nothing new starts. Owner-only with a fresh step-up.
   rpc CancelOsRollout(CancelOsRolloutRequest) returns (CancelOsRolloutResponse);
+  // Pause future OS jobs. A job already running on a node is never interrupted and is still checked.
+  rpc PauseOsRollout(PauseOsRolloutRequest) returns (PauseOsRolloutResponse);
+  // Resume an OS rollout. A failed step is retried once by default; skip_failed marks it skipped and moves on.
+  rpc ResumeOsRollout(ResumeOsRolloutRequest) returns (ResumeOsRolloutResponse);
   // Refresh the package lists of nodes (apt-get update only; nothing is installed or rebooted). At most 3 nodes at a time
   // and once per node per 30 minutes; the answer says which were started. Owner-only, no step-up.
   rpc RefreshOsUpdates(RefreshOsUpdatesRequest) returns (RefreshOsUpdatesResponse);
@@ -143,6 +147,8 @@ enum OsRolloutMode {
   OS_ROLLOUT_MODE_SECURITY = 1;
   // No package change, only the reboot.
   OS_ROLLOUT_MODE_REBOOT_ONLY = 2;
+  // Install ordinary and security updates.
+  OS_ROLLOUT_MODE_ALL = 3;
 }
 
 enum OsRebootPolicy {
@@ -175,7 +181,7 @@ message OsStep {
   // "osj_..." of the job on the node.
   string job_id = 4;
   // The node's phase while the job runs (agent.proto OsJob.phase): preflight, waiting_lock, repairing, refreshing,
-  // installing, awg_module, checking, rebooting; "" otherwise.
+  // installing, awg_module, checking, rebooting; "waiting_retry" while a self-closing refusal is being retried.
   string phase = 5;
   int64 phase_unix = 6 [jstype = JS_NUMBER];
   string kernel_from = 7;
@@ -194,10 +200,14 @@ message OsStep {
   string error_key = 13;
   // params.code is a node code (agent.proto OsJob.code; the SPA resolves "os.job.err.<code>"); also package, upgraded,
   // reboot (done | not_required | held | not_asked), held_reason, kernel, pending and security (counts when it started), mode
-  // (security | reboot_only: a reboot_only run installed nothing). While GATING, what the check still waits for: gate_for
+  // (security | all | reboot_only: a reboot_only run installed nothing). While GATING, what the check still waits for: gate_for
   // (profiles | settings | warp | job: the soft miss of the check), gate_names (a JSON array of at most 5 profile names that have
   // not passed yet; with gate_more, how many more), gate_max_s (the check window in seconds; it began at back_unix).
   map<string, string> params = 14;
+  // Zero-based batch: the canary is stage 0, following stages contain batch_size nodes.
+  int32 stage = 15;
+  // If state is PENDING and phase is "waiting_retry", the node may be tried again at this Unix time; zero means now.
+  int64 retry_after_unix = 16 [jstype = JS_NUMBER];
 }
 
 message OsRollout {
@@ -214,13 +224,17 @@ message OsRollout {
   string pause_key = 7;
   map<string, string> pause_params = 8;
   repeated OsStep steps = 9;
+  // Nodes per batch after the single-node canary. Existing single-node rollouts read as 1.
+  int32 batch_size = 10;
 }
 
 message StartOsRolloutRequest {
-  // Exactly one node for now.
+  // One to twenty active node ids. The panel puts the lowest-online, fewest-inbound node first.
   repeated string node_ids = 1;
   OsRolloutMode mode = 2;
   OsRebootPolicy reboot = 3;
+  // One to five nodes per batch after the canary; zero means 1 for clients predating this field.
+  int32 batch_size = 4;
 }
 
 message StartOsRolloutResponse {
@@ -233,6 +247,26 @@ message CancelOsRolloutRequest {
 }
 
 message CancelOsRolloutResponse {
+  OsRollout rollout = 1;
+}
+
+message PauseOsRolloutRequest {
+  // Empty = the active rollout.
+  string rollout_id = 1;
+}
+
+message PauseOsRolloutResponse {
+  OsRollout rollout = 1;
+}
+
+message ResumeOsRolloutRequest {
+  // Empty = the active rollout.
+  string rollout_id = 1;
+  // Skip failed steps and continue. False retries a failed step once; a second failure requires skip_failed or cancel.
+  bool skip_failed = 2;
+}
+
+message ResumeOsRolloutResponse {
   OsRollout rollout = 1;
 }
 

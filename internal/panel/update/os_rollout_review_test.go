@@ -240,7 +240,8 @@ func TestOsStartRightAfterARefreshIsBlockedAsBusy(t *testing.T) {
 	}
 }
 
-func TestOsLaunchSkipsANodeThatWasAskedToRefreshMeanwhile(t *testing.T) {
+// a node asked to refresh after the start is not skipped: the step waits for the refresh (at most two hours) and sends nothing meanwhile
+func TestOsLaunchWaitsForANodeThatWasAskedToRefreshMeanwhile(t *testing.T) {
 	e := newEnv(t)
 	id := e.osNode("de1")
 	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
@@ -248,10 +249,16 @@ func TestOsLaunchSkipsANodeThatWasAskedToRefreshMeanwhile(t *testing.T) {
 	e.s.osRefreshes[id] = osRefresh{at: e.clk.Now(), jobID: "osj_refreshing"}
 	e.s.osMu.Unlock()
 	e.osTick()
-	e.wantOsStep(id, store.OsStepSkipped, osErrBusy)
+	if x := e.wantOsStep(id, store.OsStepPending, ""); x.Phase != osWaitPhase || x.Params[osRetryCode] != osupdate.CodeBusy {
+		t.Fatalf("busy retry wait %+v", x)
+	}
 	if len(e.fl.osJobs()) != 0 {
 		t.Fatal("a job was sent into a node that was refreshing")
 	}
+	e.clk.Advance(osRetryLimit + time.Minute)
+	e.osTick()
+	e.wantOsStep(id, store.OsStepSkipped, osErrTryLater)
+	e.wantOsRollout(store.RolloutDone, "")
 }
 
 func TestOsLaunchSkipsTheNodeOfThePanelAndAnUnneededReboot(t *testing.T) {
@@ -335,7 +342,7 @@ func TestOsSentNodeThatDoesNotComeBack(t *testing.T) {
 			if _, err := e.s.cancelOs(e.ctx, ""); err != nil {
 				t.Fatal(err)
 			}
-			e.wantOsRollout(store.RolloutFailed, "")
+			e.wantOsRollout(store.RolloutCancelled, "")
 		})
 	}
 }
@@ -427,6 +434,12 @@ func TestOsRolloutRPCsNeedTheStepUp(t *testing.T) {
 	ro := e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.stepUp = func(context.Context) error {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("step_up_required"))
+	}
+	if _, err := (rpc{e.s}).PauseOsRollout(e.ctx, connect.NewRequest(&adminv1.PauseOsRolloutRequest{RolloutId: ro.ID})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("PauseOsRollout without the step-up = %v", err)
+	}
+	if _, err := (rpc{e.s}).ResumeOsRollout(e.ctx, connect.NewRequest(&adminv1.ResumeOsRolloutRequest{RolloutId: ro.ID})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("ResumeOsRollout without the step-up = %v", err)
 	}
 	if _, err := (rpc{e.s}).CancelOsRollout(e.ctx, connect.NewRequest(&adminv1.CancelOsRolloutRequest{RolloutId: ro.ID})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("CancelOsRollout without the step-up = %v", err)
