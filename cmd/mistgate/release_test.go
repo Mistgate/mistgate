@@ -484,3 +484,24 @@ func decodeTestKey(b64 string) (ed25519.PublicKey, error) {
 	}
 	return ed25519.PublicKey(b), nil
 }
+
+// A commit time far ahead of the signer's clock is refused: Built orders releases, a later honest one would look older.
+func TestReleaseSignRefusesFutureCommit(t *testing.T) {
+	keyFile, _ := newKeyFile(t)
+	src := makeSource(t, "1.0.0")
+	binDir, bins := makeBinaries(t, "mistgate-node-linux-amd64")
+	rebuildAs(t, binDir)
+	args := func(out string) []string {
+		return []string{"--key", keyFile, "--version", "1.0.0", "--source", src, bins[0], "--out", out}
+	}
+	out := filepath.Join(t.TempDir(), "dist")
+	if err := releaseSign(args(out), &bytes.Buffer{}, time.Unix(testCommitTime-3*24*3600, 0)); err == nil {
+		t.Fatal("a commit three days ahead of the clock was signed")
+	}
+	if _, err := os.Stat(filepath.Join(out, "manifest.json")); err == nil {
+		t.Fatal("a manifest was written")
+	}
+	if err := releaseSign(args(out), &bytes.Buffer{}, time.Unix(testCommitTime-3600, 0)); err != nil {
+		t.Fatalf("a commit one hour ahead (clock skew) was refused: %v", err)
+	}
+}

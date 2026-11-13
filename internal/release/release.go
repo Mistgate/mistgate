@@ -56,6 +56,9 @@ var (
 	ErrUnsupportedSchema = fmt.Errorf("%w: unsupported schema", ErrBadManifest)
 	ErrExpired           = errors.New("release: manifest expired")
 	ErrDowngrade         = errors.New("release: manifest is older than the running build")
+	// ErrFutureBuilt is an ErrBadManifest: Built orders releases, so a Built far ahead of the clock would make every
+	// later honest release a downgrade.
+	ErrFutureBuilt = fmt.Errorf("%w: built lies in the future", ErrBadManifest)
 	// ErrUpToDate is not a failure: the manifest is exactly as new as the running build.
 	ErrUpToDate     = errors.New("release: already current")
 	ErrNoFile       = errors.New("release: no file for this platform")
@@ -96,6 +99,10 @@ type File struct {
 	Size   int64  `json:"size"`
 	SHA256 string `json:"sha256"` // lowercase hex
 }
+
+// MaxBuiltSkew is how far ahead of the clock a manifest's Built may be. Built is a commit time, so it normally lies
+// in the past; a day covers a commit made on a machine with a wrong clock or time zone and a node clock that is slow.
+const MaxBuiltSkew = 24 * time.Hour
 
 // Manifest is what the owner signs. Built (Unix time of the source commit), not Version, orders releases.
 type Manifest struct {
@@ -391,11 +398,14 @@ func unarmorSSHSIG(armored []byte) ([]byte, error) {
 }
 
 // Check decides whether a manifest may be installed by a build whose Built is ownBuilt, at time now: ErrExpired,
-// ErrDowngrade (older), ErrUpToDate (same, a no-op that is not an error for the caller), else nil (newer).
+// ErrFutureBuilt (Built more than MaxBuiltSkew ahead of now), ErrDowngrade (older), ErrUpToDate (same, a no-op that
+// is not an error for the caller), else nil (newer).
 func (m *Manifest) Check(now time.Time, ownBuilt int64) error {
 	switch {
 	case now.Unix() > m.Expires:
 		return ErrExpired
+	case m.Built > now.Add(MaxBuiltSkew).Unix():
+		return ErrFutureBuilt
 	case m.Built < ownBuilt:
 		return ErrDowngrade
 	case m.Built == ownBuilt:

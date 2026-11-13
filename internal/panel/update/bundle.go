@@ -367,6 +367,10 @@ func (s *Service) scan() *bundleState {
 		bundleErr(v, adminv1.BundleStatus_BUNDLE_STATUS_UNTRUSTED, "expired", nil)
 		return bs
 	}
+	if errors.Is(m.Check(now, 0), release.ErrFutureBuilt) {
+		bundleErr(v, adminv1.BundleStatus_BUNDLE_STATUS_UNTRUSTED, "bad_manifest", nil)
+		return bs
+	}
 	stamps := map[string]fileStamp{}
 	for _, f := range m.Files {
 		st, code := s.checkFile(f)

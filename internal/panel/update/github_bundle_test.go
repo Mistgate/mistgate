@@ -83,7 +83,7 @@ func newTestGitHubNodeBundleSourceAt(t *testing.T, pub []byte, apiBody []byte, a
 	})}
 	u := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{
 		DataDir: dataDir, Key: pub, HTTPClient: client,
-		Now: func() time.Time { return time.Unix(1_800_000_000, 0) },
+		Now: func() time.Time { return time.Unix(1_900_000_000, 0) },
 	})
 	return u, dataDir
 }
@@ -182,7 +182,7 @@ func TestGitHubNodeBundleMetadataHasShortBudgetAndAssetsUseCallerBudget(t *testi
 	})}
 	source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{
 		DataDir: t.TempDir(), Key: priv.Public().(ed25519.PublicKey), HTTPClient: client,
-		Now: func() time.Time { return time.Unix(1_800_000_000, 0) },
+		Now: func() time.Time { return time.Unix(1_900_000_000, 0) },
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 	defer cancel()
@@ -244,7 +244,7 @@ func TestGitHubNodeBundleSourceFollowsChannelWithoutDowngrading(t *testing.T) {
 	dataDir := t.TempDir()
 	source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{
 		DataDir: dataDir, Key: priv.Public().(ed25519.PublicKey), Channel: func() release.Channel { return channel }, HTTPClient: client,
-		Now: func() time.Time { return time.Unix(1_800_000_000, 0) },
+		Now: func() time.Time { return time.Unix(1_900_000_000, 0) },
 	})
 	currentBuilt := int64(0)
 	for _, tc := range []struct {
@@ -298,7 +298,7 @@ func TestGitHubNodeBundleSourceRenewsExpiryForSameBuild(t *testing.T) {
 		"mistgate-node-linux-amd64": []byte("same amd64 binary"),
 		"mistgate-node-linux-arm64": []byte("same arm64 binary"),
 	}
-	firstAPI, firstAssets := signedNodeRelease(t, priv, "v0.2.0", 1_800_000_100, 1_850_000_000, files)
+	firstAPI, firstAssets := signedNodeRelease(t, priv, "v0.2.0", 1_800_000_100, 1_950_000_000, files)
 	requested := map[string]int{}
 	u, dataDir := newTestGitHubNodeBundleSource(t, priv.Public().(ed25519.PublicKey), firstAPI, firstAssets, requested)
 	if changed, err := u.Sync(context.Background(), 0); err != nil || !changed {

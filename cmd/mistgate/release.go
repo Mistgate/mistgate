@@ -402,6 +402,9 @@ func releaseSignWithASNDBLimits(args []string, out io.Writer, now time.Time, asn
 	if err != nil {
 		return err
 	}
+	if commitBuilt > now.Add(release.MaxBuiltSkew).Unix() {
+		return fmt.Errorf("the commit time of %s (%d) is more than %s ahead of the clock: fix the commit date, a later release would look older", *version, commitBuilt, release.MaxBuiltSkew)
+	}
 	if *built != 0 && *built != commitBuilt {
 		return fmt.Errorf("--built %d is not the commit time of %s (%d)", *built, *version, commitBuilt)
 	}

@@ -275,6 +275,8 @@ func TestCheck(t *testing.T) {
 		{"expired", m.Expires + 1, m.Built - 1, ErrExpired},
 		{"last second", m.Expires, m.Built - 1, nil},
 		{"expired wins over same built", m.Expires + 1, m.Built, ErrExpired},
+		{"built within the skew", m.Built - int64(MaxBuiltSkew/time.Second), m.Built - 1, nil},
+		{"built beyond the skew", m.Built - int64(MaxBuiltSkew/time.Second) - 1, m.Built - 1, ErrFutureBuilt},
 	} {
 		if got := m.Check(at(tc.now), tc.own); !errors.Is(got, tc.want) && got != tc.want {
 			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
@@ -398,5 +400,20 @@ func TestCode(t *testing.T) {
 		if got := Code(err); got != want {
 			t.Errorf("Code(%v) = %q, want %q", err, got, want)
 		}
+	}
+}
+
+// A manifest whose Built lies far in the future is refused instead of making every honest release a downgrade.
+func TestFutureBuiltIsRefused(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	future := now.AddDate(70, 0, 0).Unix()
+	poison := sampleManifest()
+	poison.Built, poison.Expires = future, future+3600*24*30
+	if err := poison.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	err := poison.Check(now, 1_700_000_000)
+	if !errors.Is(err, ErrFutureBuilt) || !errors.Is(err, ErrBadManifest) || Code(err) != "bad_manifest" {
+		t.Fatalf("Check = %v", err)
 	}
 }
