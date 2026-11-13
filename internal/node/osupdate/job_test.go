@@ -43,6 +43,43 @@ func ownerMachine(t *testing.T) *fakeMachine {
 	return m
 }
 
+func TestAwgModulePhaseUsesTheSharedBuilderLock(t *testing.T) {
+	m := ownerMachine(t)
+	m.setDpkg(cleanTable)
+	host := m.host()
+	lockTried := false
+	host.BuilderLock = func() (func(), bool, error) {
+		lockTried = true
+		return nil, false, nil
+	}
+	j := m.job(Spec{Action: ActionUpgrade, Mode: ModeAll, Reboot: RebootNever}, "")
+	j.Host = host
+	err := j.Do(context.Background())
+	if asFailure(t, err).Code != CodeBusy || !lockTried || m.ran(dkmsAuto) {
+		t.Fatalf("lock result = %v; tried=%v dkms=%v calls=%v", err, lockTried, m.ran(dkmsAuto), m.calls)
+	}
+}
+
+func TestDebianAwgModulePhaseSkipsDKMSBuilderLock(t *testing.T) {
+	m := ownerMachine(t)
+	m.setDpkg(cleanTable)
+	m.files["/etc/os-release"] = "ID=debian\nVERSION_ID=12\n"
+	host := m.host()
+	lockTried := false
+	host.BuilderLock = func() (func(), bool, error) {
+		lockTried = true
+		return nil, true, nil
+	}
+	j := m.job(Spec{Action: ActionUpgrade, Mode: ModeAll, Reboot: RebootNever}, "")
+	j.Host = host
+	if err := j.Do(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if lockTried || m.ran(dkmsAuto) {
+		t.Fatalf("plain Debian build took the DKMS lock or invoked DKMS: lock=%v calls=%v", lockTried, m.calls)
+	}
+}
+
 // healthy makes the new kernel fully usable: clean dpkg, the AmneziaWG module built for it.
 func healthy(m *fakeMachine) {
 	m.setDpkg(cleanTable)

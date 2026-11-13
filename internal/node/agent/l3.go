@@ -553,35 +553,9 @@ func (a *Agent) AwgPeers() int {
 }
 
 // AwgModuleReprober is what the awg engine offers the doctor fix awg_module_repair (cmd/mistgate-node's wrapper does):
-// when the engine runs on the userspace fallback and the module is there now, drop the engine and say so.
+// when the engine runs on the userspace fallback and the kernel backend is usable now, drop the engine and say so.
 type AwgModuleReprober interface {
 	ReprobeKernel(ctx context.Context) (moved bool, err error)
-}
-
-// awgReprobe runs on the worker. After the engine was dropped every awg inbound is applied again, the way a changed
-// NodeSettings.awg_backend does it (engineSettings), which builds a new engine that asks the module first.
-func (a *Agent) awgReprobe(ctx context.Context) *pb.CommandResult {
-	r, ok := a.engines[awg.Protocol].(AwgModuleReprober)
-	if !ok {
-		return &pb.CommandResult{Error: "unsupported_host"}
-	}
-	moved, err := r.ReprobeKernel(ctx)
-	if err != nil {
-		a.log.Warn("awg engine close", "err", err)
-	}
-	if !moved {
-		return &pb.CommandResult{Ok: true}
-	}
-	m := a.snapshotModel()
-	var n uint32
-	for _, id := range m.ids() {
-		if m.inbounds[id].spec.Protocol == awg.Protocol {
-			delete(a.held, id)
-			n++
-		}
-	}
-	a.reconcile(ctx, m, nil)
-	return &pb.CommandResult{Ok: true, Affected: n, Params: map[string]string{"moved": "1"}}
 }
 
 // backendStatuser is what an awg engine offers the doctor (awg.Engine and the lazy wrapper of cmd/mistgate-node do).

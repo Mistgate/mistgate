@@ -36,6 +36,8 @@ func (a *Agent) prepareAwgKernel(s *session, r *pb.PrepareAwgKernel) {
 	var ans awgprep.Answer
 	if r.DryRun {
 		ans = ctl.Check(s.ctx)
+	} else if a.cfg.AwgKmod != nil && a.cfg.AwgKmod.Active() {
+		ans = awgprep.Answer{State: awgprep.AnswerUnsupported, Code: "busy", Reason: "the module rebuild is running"}
 	} else if a.osJobActive() { // both want dpkg, and the host may reboot in the middle of the build
 		ans = awgprep.Answer{State: awgprep.AnswerUnsupported, Code: "busy", Reason: "an OS update job is running"}
 	} else {

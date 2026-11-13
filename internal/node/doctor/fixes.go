@@ -508,13 +508,7 @@ func fixAllowForwarding(ctx context.Context, e *Env, dry bool, params map[string
 		affected, plan.DropChains)}
 }
 
-// moduleDir exists while the AmneziaWG kernel module is loaded.
-const moduleDir = "/sys/module/amneziawg"
-
-// fixAwgModuleRepair is the way back from the userspace fallback of a "kernel" setting (awg.BackendStatus.Fallback). In this
-// version it only asks the module again: when someone built and loaded it, the engine is dropped and every awg inbound applied
-// again on the module, which pauses the connected devices for up to ~20 s; when it is still not loaded there is nothing to
-// move to and it says so. Building the module is not part of it yet.
+// fixAwgModuleRepair starts the repair unit. The agent re-applies AWG inbounds when the unit finishes and the kernel backend is usable.
 func fixAwgModuleRepair(ctx context.Context, e *Env, dry bool, params map[string]string) FixOutcome {
 	if !noParams(params) {
 		return FixOutcome{Err: ErrBadParams}
@@ -528,23 +522,15 @@ func fixAwgModuleRepair(ctx context.Context, e *Env, dry bool, params map[string
 	}
 	rel, _ := e.read("/proc/sys/kernel/osrelease")
 	rel = clip(strings.TrimSpace(rel), 64)
-	if _, err := e.stat(moduleDir); err != nil {
-		return failed(errors.New("the module is still not loaded for kernel " + rel + "; build it first"))
-	}
 	out := FixOutcome{OK: true, Affected: 1, Params: p("kernel", rel)}
 	if dry {
-		out.Detail = "the module for kernel " + rel + " is loaded; AmneziaWG would move back to it and connected devices pause for up to ~20 s"
+		out.Detail = "the AmneziaWG module for kernel " + rel + " would be rebuilt and loaded"
 		return out
 	}
-	moved, err := e.AwgModuleRepair(ctx)
-	if err != nil {
+	if err := e.AwgModuleRepair(ctx); err != nil {
 		return failed(err)
 	}
-	if !moved {
-		return noop("AmneziaWG is not running on the fallback any more; nothing was moved")
-	}
-	out.Params["moved"] = "1"
-	out.Detail = "AmneziaWG moved back to the module for kernel " + rel
+	out.Detail = "repair started for the AmneziaWG module for kernel " + rel
 	return out
 }
 

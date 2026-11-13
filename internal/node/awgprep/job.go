@@ -138,6 +138,18 @@ func (j Job) Do(ctx context.Context) error {
 		return &Failure{Code: code, Detail: clip(msg, 200), Long: msg}
 	}
 	write(func(s *Status) { s.Steps = len(steps) })
+	if j.Sys.TryBuilderLock != nil {
+		release, acquired, err := j.Sys.TryBuilderLock()
+		if err != nil {
+			return fail(&Failure{Code: CodeBusy, Detail: "the shared AmneziaWG module lock could not be taken", Long: err.Error()})
+		}
+		if !acquired {
+			return fail(&Failure{Code: CodeBusy, Detail: "another AmneziaWG module build is running"})
+		}
+		if release != nil {
+			defer release()
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()

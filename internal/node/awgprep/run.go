@@ -57,6 +57,10 @@ type Sys struct {
 	AptBusy func() bool
 	// Sleep waits d or until ctx ends. Nil = the real clock.
 	Sleep func(ctx context.Context, d time.Duration)
+	// TryBuilderLock is the shared non-blocking lock for module builders. Nil = no lock (a test fake).
+	TryBuilderLock func() (release func(), acquired bool, err error)
+	// KernelRelease returns the running kernel. Nil = unavailable.
+	KernelRelease func() string
 }
 
 // configureAll finishes an interrupted dpkg run the way the OS job does: it keeps every configuration file as it is.

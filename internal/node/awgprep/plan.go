@@ -43,6 +43,7 @@ const (
 	CodeBuildFailed    = "module_build_failed" // the module does not compile for this kernel (an API it has no answer for yet)
 	CodeInterrupted    = "interrupted"
 	CodeLaunchFailed   = "launch_failed"
+	CodeBusy           = "busy"
 )
 
 // Unsupported says that the module cannot be put on this machine, and why. It is a fact about the host, not a failure.
@@ -57,6 +58,8 @@ func (u *Unsupported) Error() string { return u.Msg }
 type Env struct {
 	OSRelease  map[string]string // /etc/os-release
 	Kernel     string            // uname -r
+	NodePath   string            // the installed node binary, for the Ubuntu apt hook
+	StateDir   string            // the agent's state directory, for the Ubuntu apt hook
 	CPUs       int
 	Container  string // virtualisation of a container kind ("lxc", "openvz", "docker", ...), "" = none
 	SecureBoot bool
@@ -143,8 +146,16 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 		if len(e.Leftover) > 0 {
 			steps = append(steps, Step{Desc: "remove the module packages an earlier run left half-installed (" + strings.Join(e.Leftover, ", ") + ")", Cmd: undo})
 		}
+		hook, err := ubuntuKmodHook(e)
 		steps = append(steps,
 			Step{Desc: "refresh the package index", Cmd: aptUpdate()},
+		)
+		if err != nil {
+			notes = append(notes, "the apt hook for automatic AmneziaWG module rebuilds was skipped: "+err.Error())
+		} else {
+			steps = append(steps, Step{Desc: "install the apt hook for AmneziaWG module rebuilds", Files: []FileOp{{Path: KmodHookPath, Body: hook}}})
+		}
+		steps = append(steps,
 			Step{Desc: "install the headers of the running kernel", Cmd: aptInstall(headers), Undo: undo, RunKernel: e.Kernel},
 			Step{Desc: "add the Amnezia PPA", Files: ppaFiles},
 			Step{Desc: "refresh the package index from the Amnezia PPA", Cmd: aptUpdate()},

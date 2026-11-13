@@ -745,11 +745,21 @@ func (r *run) awgModule(ctx context.Context) *Failure {
 	if !r.host.ModuleLoaded() && !installedStatus(table, "amneziawg-dkms") {
 		return nil
 	}
-	r.phase(PhaseAwgModule)
 	if r.distro != "ubuntu" {
 		// Debian builds the module by hand, not with DKMS: it stays missing for the new kernel until prepare-kernel runs.
 		fmt.Fprintln(r.out, "the AmneziaWG module of this host is a plain build: it is not rebuilt for the new kernel")
 		return nil
+	}
+	r.phase(PhaseAwgModule)
+	release, acquired, lockErr := r.host.BuilderLock()
+	if lockErr != nil {
+		return fail(CodeBusy, "the AmneziaWG module lock could not be taken")
+	}
+	if !acquired {
+		return fail(CodeBusy, "the module rebuild is running")
+	}
+	if release != nil {
+		defer release()
 	}
 	dkmsOK := func() bool {
 		out, err := r.query(ctx, "dkms", "status", "-m", "amneziawg", "-k", k)

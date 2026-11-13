@@ -116,6 +116,8 @@ AmneziaWG 是经过混淆的 WireGuard：隧道速度相同，但网络传输中
 | **内核模块** | 速度更快。主机必须安装 `amneziawg` 模块。如果它无法加载（内核更新后落下了），较新的 Agent 会暂时以用户态提供协议配置；较旧的 Agent 不会启动它们。 |
 | **用户态** | Agent 内运行 `amneziawg-go`。只要有 `/dev/net/tun` 就可以使用，速度稍慢。 |
 
+在安装 `amneziawg-dkms` 的 Ubuntu 上，Agent 启动时会修复当前内核缺失的模块；apt hook 会在软件包构建前应用已知的源码兼容修复，并在软件包变更后安排同步。使用非 DKMS 构建的主机安装新内核后，仍需手动运行 `mistgate-node awg prepare-kernel`。
+
 更改会立即生效；已连接的设备会重新连接。**当前运行方式**显示节点报告的后端，例如「用户态 · amneziawg-go v3.1…」。
 
 ### 模块无法加载时

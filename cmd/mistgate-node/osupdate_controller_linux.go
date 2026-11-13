@@ -43,6 +43,12 @@ func newOSUpdate(stateDir string, updater *update.Updater) *osupdate.Controller 
 			if updater != nil && updater.RefreshBusy() {
 				return "an agent update or a unit refresh is going"
 			}
+			if unitLoaded(ctx, awgprep.KmodUnitName) {
+				if st, ok, _ := awgprep.ReadKmodStatus(filepath.Join(stateDir, awgprep.KmodStatusFileName)); ok && st.Mode == awgprep.KmodAfterApt && awgprep.RealSys().AptBusy() {
+					return kmodUnitRefusal(st.Mode, true)
+				}
+				return kmodUnitRefusal("", false)
+			}
 			for _, name := range hostWorkUnits {
 				if unitLoaded(ctx, name) {
 					return "other host work is going (" + name + ")"
@@ -51,6 +57,13 @@ func newOSUpdate(stateDir string, updater *update.Updater) *osupdate.Controller 
 			return ""
 		},
 	})
+}
+
+func kmodUnitRefusal(mode awgprep.KmodMode, aptBusy bool) string {
+	if mode == awgprep.KmodAfterApt && aptBusy {
+		return "waiting for the package manager"
+	}
+	return "the module rebuild is running"
 }
 
 // unitLoaded: systemd holds a unit of that name (a running transient unit, or a finished one not yet collected).

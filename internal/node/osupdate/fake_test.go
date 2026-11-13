@@ -260,6 +260,7 @@ func (m *fakeMachine) host() Host {
 			m.locks++
 			return func() { m.unlocks++ }, nil
 		},
+		BuilderLock: func() (func(), bool, error) { return nil, true, nil },
 		Sleep: func(ctx context.Context, d time.Duration) {
 			m.mu.Lock()
 			m.clock = m.clock.Add(d)

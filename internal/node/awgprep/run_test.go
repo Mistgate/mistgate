@@ -191,13 +191,13 @@ func TestRunWritesUbuntuFilesThroughSysAndRemovesTheLegacyList(t *testing.T) {
 	if got := files[sourcePath]; !strings.Contains(got, "Signed-By: /etc/apt/keyrings/amnezia-ppa.asc") {
 		t.Errorf("source write = %q", got)
 	}
-	if len(writes) != 3 || writes[0] != "/etc/apt/keyrings/amnezia-ppa.asc" || writes[1] != sourcePath || writes[2] != modulesLoadFile {
+	if len(writes) != 4 || writes[0] != KmodHookPath || writes[1] != "/etc/apt/keyrings/amnezia-ppa.asc" || writes[2] != sourcePath || writes[3] != modulesLoadFile {
 		t.Errorf("writes = %v", writes)
 	}
 	if len(removes) != 1 || removes[0] != legacy {
 		t.Errorf("removes = %v", removes)
 	}
-	if len(progress) != 6 || progress[0] != [2]int{1, 6} || progress[5] != [2]int{6, 6} {
+	if len(progress) != 7 || progress[0] != [2]int{1, 7} || progress[6] != [2]int{7, 7} {
 		t.Errorf("progress = %v", progress)
 	}
 	for _, cmd := range r.ran {
@@ -373,6 +373,21 @@ func TestJobWritesAStatusFromRunningToDone(t *testing.T) {
 	}
 	if wrote == "" {
 		t.Error("the module was not verified")
+	}
+}
+
+func TestPrepareJobStopsWhenTheSharedModuleLockIsHeld(t *testing.T) {
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "00\n"}}
+	var wrote string
+	job, path := jobFor(t, okEnv, r, &wrote)
+	job.Sys.TryBuilderLock = func() (func(), bool, error) { return nil, false, nil }
+	err := job.Do(context.Background())
+	if codeOf(t, err) != CodeBusy || len(r.ran) != 0 {
+		t.Fatalf("prepare lock result = %v, commands = %v", err, r.ran)
+	}
+	st, ok, readErr := ReadStatus(path)
+	if readErr != nil || !ok || st.State != StateFailed || st.Code != CodeBusy {
+		t.Fatalf("prepare status = %+v, ok=%v err=%v", st, ok, readErr)
 	}
 }
 

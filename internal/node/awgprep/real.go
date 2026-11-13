@@ -84,11 +84,16 @@ func RealSys() Sys {
 			}
 			return err
 		},
-		ReadFile:   os.ReadFile,
-		SourceDirs: RealSourceDirs,
-		Exists:     func(p string) bool { _, err := os.Stat(p); return err == nil },
-		Probe:      probeModule,
-		AptBusy:    aptBusy,
+		ReadFile:       os.ReadFile,
+		SourceDirs:     RealSourceDirs,
+		Exists:         func(p string) bool { _, err := os.Stat(p); return err == nil },
+		Probe:          probeModule,
+		AptBusy:        aptBusy,
+		TryBuilderLock: TryBuilderLock,
+		KernelRelease: func() string {
+			b, _ := os.ReadFile("/proc/sys/kernel/osrelease")
+			return strings.TrimSpace(string(b))
+		},
 	}
 }
 

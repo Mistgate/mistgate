@@ -107,6 +107,10 @@ type Config struct {
 	// AwgPrepare builds the AmneziaWG kernel module on request (internal/node/awgprep). Nil = this agent does not list
 	// "awg-prepare/1", and the admin UI keeps showing the manual command.
 	AwgPrepare *awgprep.Controller
+	// AwgKmod follows the apt-hook and agent-start module sync. Nil disables automatic sync.
+	AwgKmod *awgprep.KmodController
+	// AwgKmodRepair launches the doctor repair as a transient root unit.
+	AwgKmodRepair func(context.Context) error
 	// SpeedTest runs one bandwidth measurement (MeasureBandwidth). Nil = the real one against the public test servers; tests
 	// give a fake, since they have no internet.
 	SpeedTest func(ctx context.Context) (speedtest.Result, error)
@@ -120,17 +124,18 @@ type Config struct {
 
 // Agent is the node agent. Build it with New and run it with Run.
 type Agent struct {
-	cfg         Config
-	startedAt   time.Time
-	log         *slog.Logger
-	ring        *logRing
-	journal     *journal
-	debug       *debugState
-	kernelDebug *kernelDebugEnvironment
-	host        hostctl.Host
-	meta        Meta
-	id          atomic.Pointer[identity]
-	decoySite   *decoy.Site
+	cfg              Config
+	startedAt        time.Time
+	log              *slog.Logger
+	ring             *logRing
+	journal          *journal
+	debug            *debugState
+	kernelDebug      *kernelDebugEnvironment
+	host             hostctl.Host
+	meta             Meta
+	id               atomic.Pointer[identity]
+	awgKmodAttempted atomic.Bool
+	decoySite        *decoy.Site
 
 	engines            map[string]engine.Engine
 	protocols          []string // sorted keys of engines
@@ -244,6 +249,7 @@ type Agent struct {
 	doctorFirst  time.Duration // 0 = 30 s after connect
 	doctorEvery  time.Duration // 0 = 10 min
 	prepWatch    time.Duration // 0 = 5 s: how often the kernel-module job's status file is read
+	kmodWatch    time.Duration // 0 = 1 s: how often kmod-sync status is checked
 	sweepEvery   time.Duration
 	helloTimeout time.Duration // 0 = twice the dial timeout
 	commitTick   time.Duration // update commit watch poll, default 2 s
@@ -574,6 +580,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.cfg.OSUpdate.SetSettled(a.osSettled)
 		loops = append(loops, a.osUpdateLoop)
 	}
+	if a.cfg.AwgKmod != nil {
+		loops = append(loops, a.awgKmodLoop)
+	}
 	for _, f := range loops {
 		wg.Add(1)
 		go func() { defer wg.Done(); f(ctx) }()
@@ -607,12 +616,13 @@ func (a *Agent) restore(ctx context.Context) {
 			a.log.Warn("persisted state ignored", "err", err)
 		}
 	}
-	if m.revision == 0 && len(m.inbounds) == 0 {
-		return
-	}
 	if m.settings != nil {
 		a.settings.Store(m.settings)
 		a.configureNetworks(m.settings)
+	}
+	a.startAwgKmod(ctx, m)
+	if m.revision == 0 && len(m.inbounds) == 0 {
+		return
 	}
 	a.syncOwnedIPv6(ctx) // the addresses come back with the agent, without the panel
 	results := a.reconcile(ctx, m, nil)
@@ -1393,7 +1403,7 @@ type job struct {
 	kick          *pb.Kick
 	restart       *pb.RestartInbound
 	reconnectWarp bool
-	awgReprobe    bool // the doctor fix awg_module_repair
+	kmodReapply   bool // a boot or repair module unit ended and the kernel backend is available
 	retire        *pb.Retire
 	sweep         bool
 	// res, when set, receives the restart's CommandResult instead of the stream (the doctor's restart_inbound).
@@ -1464,11 +1474,8 @@ func (a *Agent) handle(ctx context.Context, j job) {
 		} else {
 			reply(cmdResult(r))
 		}
-	case j.awgReprobe:
-		r := a.awgReprobe(ctx)
-		if j.res != nil {
-			j.res <- r
-		}
+	case j.kmodReapply:
+		a.reapplyAwgAfterKmod(ctx)
 	case j.retire != nil:
 		a.retire(ctx, j)
 	case j.sweep:

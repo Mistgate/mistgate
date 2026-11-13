@@ -80,7 +80,7 @@ func TestAwgBackendCheck(t *testing.T) {
 		b := AwgBackend{Mode: "kernel", Name: "userspace", Version: "amneziawg-go v3", Available: true, Fallback: true, Reason: "the amneziawg kernel module is not loaded"}
 		r := run(t, f.doctor(withInbounds(awgIn("running")), func(e *Env) {
 			e.AwgBackend = func() AwgBackend { return b }
-			e.AwgModuleRepair = func(context.Context) (bool, error) { return false, nil }
+			e.AwgModuleRepair = func(context.Context) error { return nil }
 		}), CheckAwgBackend)
 		want(t, r, Warn, FixAwgModuleRepair)
 		code(t, r, CodeAwgFallback, "backend", "userspace", "mode", "kernel", "kernel", "7.0.0-38-generic", "reason", "the amneziawg kernel module is not loaded", "hint", "fallback")

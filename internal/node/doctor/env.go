@@ -105,9 +105,9 @@ type Env struct {
 	Fixer          hostctl.Fixer                                                      // nil = journal/resolver fixes unsupported
 	ForwardFixer   hostctl.ForwardExceptionFixer                                      // nil = the narrow FORWARD exception fix is unsupported
 
-	// AwgModuleRepair drops the AmneziaWG engine that runs on the userspace fallback and applies the awg inbounds again so
-	// the module is asked first; true when it did. nil = this build cannot (awg_module_repair is then not offered).
-	AwgModuleRepair func(ctx context.Context) (bool, error)
+	// AwgModuleRepair starts the bounded root repair unit. The agent re-applies inbounds after the unit finishes.
+	// nil = this build cannot (awg_module_repair is then not offered).
+	AwgModuleRepair func(ctx context.Context) error
 
 	// Set by Run: the previous result of a check.
 	Prev func(id string) (Result, bool)

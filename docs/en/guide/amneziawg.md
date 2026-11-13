@@ -116,6 +116,8 @@ A node runs AmneziaWG in one of two ways, one setting for all its AmneziaWG prof
 | **Kernel module** | Faster. Needs the `amneziawg` module on the host. If it does not load (a kernel update left it behind), an up-to-date agent serves the profiles in userspace meanwhile; an older agent does not start them. |
 | **Userspace** | `amneziawg-go` inside the agent. Works anywhere with `/dev/net/tun`, a bit slower. |
 
+On Ubuntu with `amneziawg-dkms`, the agent repairs a missing running-kernel module at startup, and an apt hook patches known source incompatibilities before package builds and schedules a sync after package changes. Hosts using a non-DKMS build still need to run `mistgate-node awg prepare-kernel` after installing a kernel.
+
 A change applies at once; connected devices reconnect. **Running now** shows what the node reports, for example "userspace · amneziawg-go v3.1…".
 
 ### When the module does not load

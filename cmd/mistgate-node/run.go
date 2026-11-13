@@ -106,8 +106,13 @@ func newAwgPrepare(stateDir string) *awgprep.Controller {
 		return nil
 	}
 	status := filepath.Join(stateDir, "awg-prepare.json")
+	env := func(ctx context.Context) awgprep.Env {
+		e := awgprep.ReadEnv(ctx)
+		e.NodePath, e.StateDir = exe, stateDir
+		return e
+	}
 	return awgprep.New(awgprep.Config{
-		StatusPath: status, Env: awgprep.ReadEnv, Ready: awgprep.ModuleReady, Launch: awgprep.SystemdRun(exe, status),
+		StatusPath: status, Env: env, Ready: awgprep.ModuleReady, Launch: awgprep.SystemdRun(exe, status),
 	})
 }
 
@@ -128,6 +133,12 @@ func newAgent(stateDir, linkURL string, log *slog.Logger, level *slog.LevelVar) 
 	cfg.UnitUnderSystemd, cfg.UnitSkipReason = refresh.underSystemd, refresh.reason
 	cfg.UnitRefreshBusy, cfg.UnitRefreshReserve, cfg.UnitRefreshLauncher = refresh.busy, refresh.reserve, refresh.launch
 	cfg.AwgPrepare = newAwgPrepare(stateDir)
+	cfg.AwgKmod = newAwgKmod(stateDir)
+	if cfg.AwgKmod != nil {
+		if exe, err := os.Executable(); err == nil {
+			cfg.AwgKmodRepair = awgprep.KmodSystemdRun(exe, cfg.AwgKmod.StatusPath, awgprep.KmodRepair)
+		}
+	}
 	cfg.SecurityUpdatesLauncher = newSecurityUpdatesLauncher(stateDir)
 	cfg.OSUpdate = newOSUpdate(stateDir, cfg.Updater)
 	a, err := agent.New(cfg, engines, hostctl.New(log))

@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -33,32 +32,6 @@ func TestAwgBackendFallbackEventIsForwardedOnce(t *testing.T) {
 	if n != 1 || ev.Severity != pb.Severity_SEVERITY_WARNING || ev.InboundId != "" ||
 		ev.Params["kernel"] != "7.0.0-38-generic" || !strings.Contains(ev.Params["reason"], "not loaded") || ev.Params["secret"] != "" {
 		t.Fatalf("count %d, event %+v", n, ev)
-	}
-}
-
-// awg_module_repair on the worker: a module that is there drops the engine and every awg inbound is applied again; a module
-// that is not there changes nothing.
-func TestAwgModuleRepairAppliesTheInboundsAgain(t *testing.T) {
-	x := newL3(t, 3, false)
-	x.waitConnected()
-	mustApply(t, x.panel, fullState(1, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1"))))
-	before := len(x.ord.all())
-	if moved, err := x.a.doctorAwgReprobe(context.Background()); err != nil || moved {
-		t.Fatalf("no module: moved=%v err=%v", moved, err)
-	}
-	if got := len(x.ord.all()); got != before {
-		t.Fatalf("a repair without a module touched the engine: %v", x.ord.all()[before:])
-	}
-	x.awg.reprobe = true
-	if moved, err := x.a.doctorAwgReprobe(context.Background()); err != nil || !moved {
-		t.Fatalf("module there: moved=%v err=%v", moved, err)
-	}
-	applied := false
-	for _, s := range x.ord.all()[before:] {
-		applied = applied || s == "awg.apply:inb_a"
-	}
-	if !applied {
-		t.Fatalf("the inbound was not applied again: %v", x.ord.all()[before:])
 	}
 }
 

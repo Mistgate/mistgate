@@ -75,6 +75,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 		}
 		a.configureNetworks(ds.Settings)
 	}
+	a.startAwgKmod(ctx, next)
 	if ds.StateHash != "" && ds.StateHash != next.hash() {
 		// Not fatal: the authoritative comparison is the observed hash below, but this tells us whether the
 		// merge itself diverged from the panel's idea of the state.
@@ -252,7 +253,8 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 	// the cache: a running one is stopped, there is never a silent direct exit.
 	why, blocked := a.blocked[spec.ID]
 	blocked = blocked && spec.Enabled
-	if !blocked && in.parseErr == "" && in.applyErr == "" && h != nil && !force && h.spec == sh && h.creds == ch && h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
+	if !blocked && in.parseErr == "" && in.applyErr == "" && h != nil && !force && h.spec == sh && h.creds == ch &&
+		h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
 		res := proto.Clone(h.res).(*pb.InboundResult)
 		a.refreshState(res)
 		return res
@@ -275,8 +277,7 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 	res := &pb.InboundResult{InboundId: spec.ID, SpecHash: sh}
 	wasFailing := h != nil && h.res.State == pb.InboundRunState_INBOUND_RUN_STATE_FAILED
 	if err != nil {
-		res.State = pb.InboundRunState_INBOUND_RUN_STATE_FAILED
-		res.Error = err.Error()
+		res.State, res.Error = pb.InboundRunState_INBOUND_RUN_STATE_FAILED, err.Error()
 		if h == nil || h.res.Error != res.Error || h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
 			if !isEnginePanic(err) {
 				a.log.Error("inbound failed", "inbound", spec.ID, "err", err)

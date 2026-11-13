@@ -30,6 +30,8 @@ type Host struct {
 	// HoldAptLock takes the dpkg frontend lock and keeps it until release is called (or the process ends), so that no other
 	// package manager starts between the last check before a reboot and the reboot. An error means somebody holds it.
 	HoldAptLock func() (release func(), err error)
+	// BuilderLock is the same non-blocking AmneziaWG lock as prepare-kernel and kmod-sync.
+	BuilderLock func() (release func(), acquired bool, err error)
 	// Sleep waits d or until ctx ends.
 	Sleep func(ctx context.Context, d time.Duration)
 	Now   func() time.Time
@@ -57,6 +59,7 @@ func RealHost() Host {
 			return holder, since
 		},
 		HoldAptLock: holdAptLock,
+		BuilderLock: awgprep.TryBuilderLock,
 		Sleep:       sleepCtx,
 		Now:         time.Now,
 	}
@@ -96,6 +99,9 @@ func (h Host) defaults() Host {
 	}
 	if h.HoldAptLock == nil {
 		h.HoldAptLock = real.HoldAptLock
+	}
+	if h.BuilderLock == nil {
+		h.BuilderLock = real.BuilderLock
 	}
 	if h.Sleep == nil {
 		h.Sleep = real.Sleep

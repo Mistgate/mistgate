@@ -51,18 +51,19 @@ func TestPlanUbuntu(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			env := Env{OSRelease: osr("ubuntu", "debian"), Kernel: "6.8.0-142-generic", CPUs: 2}
+			env := Env{OSRelease: osr("ubuntu", "debian"), Kernel: "6.8.0-142-generic", NodePath: "/opt/mistgate/bin/mistgate-node", StateDir: "/var/lib/mistgate-node", CPUs: 2}
 			env.OSRelease["VERSION_ID"] = tc.version
 			env.OSRelease["VERSION_CODENAME"] = tc.codename
 			steps, notes, err := Plan(env)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(steps) != 6 {
-				t.Fatalf("got %d steps, want 6: %+v", len(steps), steps)
+			if len(steps) != 7 {
+				t.Fatalf("got %d steps, want 7: %+v", len(steps), steps)
 			}
 			wantDesc := []string{
 				"refresh the package index",
+				"install the apt hook for AmneziaWG module rebuilds",
 				"install the headers of the running kernel",
 				"add the Amnezia PPA",
 				"refresh the package index from the Amnezia PPA",
@@ -96,7 +97,7 @@ func TestPlanUbuntu(t *testing.T) {
 			if last := cmds(steps)[len(cmds(steps))-1]; last != "modprobe amneziawg" {
 				t.Errorf("the plan must end with the load, not %q", last)
 			}
-			files := steps[2].Files
+			files := steps[3].Files
 			if len(files) == 0 {
 				t.Fatal("the PPA step has no file operations")
 			}
@@ -122,6 +123,10 @@ func TestPlanUbuntu(t *testing.T) {
 			if tc.wantRemove == "" && len(files) != 2 {
 				t.Errorf("Jammy operations = %+v, want key and .list writes", files)
 			}
+			hook := steps[1].Files
+			if len(hook) != 1 || hook[0].Path != KmodHookPath || !strings.Contains(hook[0].Body, "/opt/mistgate/bin/mistgate-node awg kmod-sync --patch-only") || !strings.Contains(hook[0].Body, "/var/lib/mistgate-node/awg-kmod.json") {
+				t.Errorf("Ubuntu module hook step = %+v", hook)
+			}
 			if len(notes) == 0 || !strings.Contains(strings.Join(notes, " "), "DKMS") {
 				t.Errorf("notes = %v", notes)
 			}
@@ -137,6 +142,24 @@ func TestPlanUbuntuMissingCodenameIsUnsupported(t *testing.T) {
 	unsupported(t, err, CodeDistro)
 	if err == nil || !strings.Contains(err.Error(), "VERSION_CODENAME") || !strings.Contains(err.Error(), "UBUNTU_CODENAME") {
 		t.Errorf("missing codename error = %v", err)
+	}
+}
+
+func TestPlanUbuntuSkipsHookWhenNodePathIsUnsafe(t *testing.T) {
+	env := Env{OSRelease: osr("ubuntu", "debian"), Kernel: "6.8.0-142-generic", NodePath: "/bad path/mistgate-node", StateDir: "/var/lib/mistgate-node", CPUs: 2}
+	steps, notes, err := Plan(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range steps {
+		for _, file := range step.Files {
+			if file.Path == KmodHookPath {
+				t.Fatal("unsafe binary path was written into the apt hook")
+			}
+		}
+	}
+	if !strings.Contains(strings.Join(notes, " "), "apt hook") {
+		t.Fatalf("skipping the hook was not explained: %v", notes)
 	}
 }
 
@@ -159,10 +182,10 @@ func TestPlanUbuntuUsesUbuntuCodenameFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(steps) <= 2 || len(steps[2].Files) == 0 {
+	if len(steps) <= 3 || len(steps[3].Files) == 0 {
 		t.Fatalf("plan has no PPA step: %+v", steps)
 	}
-	if got := steps[2].Files[len(steps[2].Files)-1].Path; got != "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list" {
+	if got := steps[3].Files[len(steps[3].Files)-1].Path; got != "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list" {
 		t.Errorf("source path = %q", got)
 	}
 }

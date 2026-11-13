@@ -4,9 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"regexp"
-	"strings"
 
+	"github.com/mistgate/mistgate/internal/node/awgprep"
 	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/node/update"
 )
@@ -25,7 +24,7 @@ const (
 
 // safePath keeps anything that could break out of a unit-file line (spaces, quotes, newlines, %, $) out
 // of the paths we interpolate.
-var safePath = regexp.MustCompile(`^/[A-Za-z0-9_./-]*$`)
+func safePath(p string) bool { return awgprep.SafePath(p) }
 
 // renderUnit returns the hardened systemd unit. ramBytes sizes the memory limits (the memory budget:
 // GOMEMLIMIT about 60% of RAM, MemoryHigh a bit above it); 0 means unknown and assumes 1 GiB.
@@ -42,7 +41,7 @@ var safePath = regexp.MustCompile(`^/[A-Za-z0-9_./-]*$`)
 // updated build crashes three times in a row. Nothing else loosens.
 func renderUnit(bin, stateDir string, ramBytes uint64) (string, error) {
 	for _, p := range []string{bin, stateDir} {
-		if !safePath.MatchString(p) || strings.Contains(p, "..") {
+		if !safePath(p) {
 			return "", fmt.Errorf("unsafe path %q (absolute, letters, digits and _ . / - only)", p)
 		}
 	}

@@ -3,7 +3,6 @@ package doctor
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -114,7 +113,7 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 			e.AwgBackend = func() AwgBackend {
 				return AwgBackend{Mode: "kernel", Name: "userspace", Available: true, Fallback: true, Reason: "the amneziawg kernel module is not loaded"}
 			}
-			e.AwgModuleRepair = func(context.Context) (bool, error) { r.awgRepairs++; return true, nil }
+			e.AwgModuleRepair = func(context.Context) error { r.awgRepairs++; return nil }
 			e.RestartInbound = func(_ context.Context, id string) (uint32, error) { r.restarts = append(r.restarts, id); return 1, nil }
 			e.Warp = func(context.Context) WarpInfo { return WarpInfo{Configured: true, State: "down"} }
 			e.ReconnectWarp = func(context.Context) (bool, error) { r.warpReconnections++; return true, nil }
@@ -596,60 +595,30 @@ func TestApplyForwardingFixPlanAndConfirmation(t *testing.T) {
 	}
 }
 
-// awg_module_repair: in this version it only asks the module again. A module that is there moves the engine back (the dry run
-// says what it would do and pauses), one that is not there is a plain refusal that says to build it, and a node that is not on
-// the fallback has nothing to do.
-func TestAwgModuleRepair(t *testing.T) {
-	ctx := context.Background()
-	t.Run("module loaded: dry run says it, apply moves back once", func(t *testing.T) {
-		r, mk := newFixRig(t)
-		d := mk()
-		plan := d.Apply(ctx, FixAwgModuleRepair, true, nil)
-		if !plan.OK || plan.Params["kernel"] != "7.0.0-38-generic" || plan.Params["noop"] != "" || r.awgRepairs != 0 ||
-			!strings.Contains(plan.Detail, "move back") || !strings.Contains(plan.Detail, "20 s") {
-			t.Fatalf("dry run: %+v repairs=%d", plan, r.awgRepairs)
-		}
-		out := d.Apply(ctx, FixAwgModuleRepair, false, nil)
-		if !out.OK || out.Params["moved"] != "1" || r.awgRepairs != 1 {
-			t.Fatalf("apply: %+v repairs=%d", out, r.awgRepairs)
-		}
-		if got := d.Apply(ctx, FixAwgModuleRepair, false, map[string]string{"x": "1"}); got.Err != ErrBadParams {
-			t.Fatalf("parameters: %+v", got)
-		}
+// The doctor fix starts a bounded systemd unit and leaves reprobe to the agent loop.
+func TestAwgModuleRepairStartsUnit(t *testing.T) {
+	r, mk := newFixRig(t)
+	d := mk()
+	plan := d.Apply(context.Background(), FixAwgModuleRepair, true, nil)
+	if !plan.OK || plan.Params["kernel"] != "7.0.0-38-generic" || !strings.Contains(plan.Detail, "would be rebuilt") || r.awgRepairs != 0 {
+		t.Fatalf("dry run: %+v repairs=%d", plan, r.awgRepairs)
+	}
+	out := d.Apply(context.Background(), FixAwgModuleRepair, false, nil)
+	if !out.OK || out.Params["kernel"] != "7.0.0-38-generic" || out.Params["moved"] != "" || !strings.Contains(out.Detail, "repair started") || r.awgRepairs != 1 {
+		t.Fatalf("apply: %+v repairs=%d", out, r.awgRepairs)
+	}
+	if got := d.Apply(context.Background(), FixAwgModuleRepair, false, map[string]string{"x": "1"}); got.Err != ErrBadParams {
+		t.Fatalf("parameters: %+v", got)
+	}
+	active := mk(func(e *Env) {
+		e.AwgBackend = func() AwgBackend { return AwgBackend{Mode: "kernel", Name: "kernel", Available: true} }
 	})
-	t.Run("module still not loaded: nothing is touched, build it first", func(t *testing.T) {
-		r, _ := newFixRig(t)
-		if err := os.RemoveAll(filepath.Join(r.f.root, "sys")); err != nil {
-			t.Fatal(err)
-		}
-		d := r.f.doctor(func(e *Env) {
-			e.AwgBackend = func() AwgBackend {
-				return AwgBackend{Mode: "kernel", Name: "userspace", Available: true, Fallback: true}
-			}
-			e.AwgModuleRepair = func(context.Context) (bool, error) { r.awgRepairs++; return true, nil }
-		})
-		for _, dry := range []bool{true, false} {
-			out := d.Apply(ctx, FixAwgModuleRepair, dry, nil)
-			if out.OK || !strings.Contains(out.Err, "still not loaded") || !strings.Contains(out.Err, "build it first") || r.awgRepairs != 0 {
-				t.Fatalf("dry=%v: %+v repairs=%d", dry, out, r.awgRepairs)
-			}
-		}
-	})
-	t.Run("not on the fallback: nothing to do", func(t *testing.T) {
-		r, mk := newFixRig(t)
-		d := mk(func(e *Env) {
-			e.AwgBackend = func() AwgBackend { return AwgBackend{Mode: "kernel", Name: "kernel", Available: true} }
-		})
-		if out := d.Apply(ctx, FixAwgModuleRepair, false, nil); !out.OK || out.Params["noop"] != "1" || r.awgRepairs != 0 {
-			t.Fatalf("%+v repairs=%d", out, r.awgRepairs)
-		}
-	})
-	t.Run("a build without the hook cannot", func(t *testing.T) {
-		f := newFake(t)
-		if out := f.doctor().Apply(ctx, FixAwgModuleRepair, true, nil); out.Err != ErrUnsupportedHost {
-			t.Fatalf("%+v", out)
-		}
-	})
+	if got := active.Apply(context.Background(), FixAwgModuleRepair, false, nil); !got.OK || got.Params["noop"] != "1" || r.awgRepairs != 1 {
+		t.Fatalf("already on kernel: %+v repairs=%d", got, r.awgRepairs)
+	}
+	if got := newFake(t).doctor().Apply(context.Background(), FixAwgModuleRepair, true, nil); got.Err != ErrUnsupportedHost {
+		t.Fatalf("unsupported host: %+v", got)
+	}
 }
 
 func TestOneFixAtATime(t *testing.T) {
