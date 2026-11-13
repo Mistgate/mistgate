@@ -342,7 +342,7 @@ func (s *Service) followUpContext(ctx context.Context, adminID, conversationID s
 		if f.DueAt.IsZero() {
 			when = strconv.Itoa(f.DelayS) + " s after plan " + f.PlanID + " is applied"
 		}
-		fmt.Fprintf(&b, "- %s %s: %s\n", f.ID, when, cleanContextText(note, followUpNoteRunes))
+		fmt.Fprintf(&b, "- %s %s: %s\n", f.ID, when, cleanContextLine(note, followUpNoteRunes))
 	}
 	return strings.TrimSpace(b.String()), nil
 }

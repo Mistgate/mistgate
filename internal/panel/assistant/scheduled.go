@@ -183,7 +183,7 @@ func (s *Service) RunScheduled(ctx context.Context, run ScheduledRun) ScheduledO
 	}
 	tools = append(tools, chatTool{AssistantTool: verdictSchema(), local: true})
 
-	note := scheduledNote + "\nThe task is named " + quoteUntrusted(cleanContextText(run.TaskName, 120)) + "."
+	note := scheduledNote + "\nThe task is named " + quoteUntrusted(cleanContextLine(run.TaskName, 120)) + "."
 	system := strings.TrimSpace(note)
 
 	lastCode, attemptedAny := "", false
