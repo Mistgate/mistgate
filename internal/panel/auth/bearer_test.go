@@ -946,6 +946,7 @@ func TestTokenAllowList(t *testing.T) {
 		adminv1connect.RelayServiceDeleteRelayProcedure,
 	}
 	wantProfileGrants["node_ipv6"] = []string{adminv1connect.NodeServiceUpdateIpv6EntryProcedure}
+	wantProfileGrants["node_awg_backend"] = []string{adminv1connect.NodeServiceUpdateNodeProcedure}
 	wantProfileGrants["path_speed"] = []string{PathSpeedProcedure}
 	wantProfileGrants["node_update"] = []string{adminv1connect.NodeServiceUpdateNodeProcedure, adminv1connect.ProfileServiceUpdateInboundProcedure}
 	wantProfileGrants["group_update"] = []string{adminv1connect.GroupServiceUpdateGroupProcedure}

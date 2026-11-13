@@ -16,7 +16,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 )
 
-func nodeSettingsTools() []toolDef { return change(nodeUpdate) }
+func nodeSettingsTools() []toolDef { return append(change(nodeUpdate), change(nodeAWGBackend)...) }
 
 func statusWarningFact(w *adminv1.StatusReason) Fact {
 	code := clean(w.GetCode(), 60)

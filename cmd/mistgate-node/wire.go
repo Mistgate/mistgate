@@ -22,6 +22,7 @@ import (
 type agentHooks struct {
 	dns      func() []string
 	awgMode  func() string
+	awgPeers func() int // the AmneziaWG devices of the node (the userspace fallback's memory ceiling)
 	warpEmit func(warp.Event)
 	// noClientV6 says "IPv6 for clients" is off (NodeSettings.client_ipv6_disabled): the direct egress dials IPv4 only.
 	noClientV6 func() bool
@@ -83,7 +84,14 @@ func wire(stateDir string, log *slog.Logger, hooks *agentHooks) (agent.Config, m
 					}
 					return hooks.awgMode()
 				}
-				return newAwgEngine(env, mode), nil
+				w := newAwgEngine(env, mode)
+				w.peers = func() int {
+					if hooks.awgPeers == nil {
+						return 0
+					}
+					return hooks.awgPeers()
+				}
+				return w, nil
 			},
 		}, nil
 }

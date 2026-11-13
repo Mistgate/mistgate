@@ -113,10 +113,18 @@ A node runs AmneziaWG in one of two ways, one setting for all its AmneziaWG prof
 | Backend | What it is |
 |:--|:--|
 | **Auto** | The kernel module when it is already loaded, else userspace. The node installs nothing. |
-| **Kernel module** | Faster. Needs the `amneziawg` module on the host; without it the AmneziaWG profiles of the node do not start. |
+| **Kernel module** | Faster. Needs the `amneziawg` module on the host. If it does not load (a kernel update left it behind), an up-to-date agent serves the profiles in userspace meanwhile; an older agent does not start them. |
 | **Userspace** | `amneziawg-go` inside the agent. Works anywhere with `/dev/net/tun`, a bit slower. |
 
 A change applies at once; connected devices reconnect. **Running now** shows what the node reports, for example "userspace · amneziawg-go v3.1…".
+
+### When the module does not load
+
+An up-to-date agent does not leave a node set to **Kernel module** without AmneziaWG. When the module does not load for the running kernel, it serves the profiles in userspace, raises the event "AmneziaWG runs in userspace for now" and the doctor's **AmneziaWG backend** check shows a warning, not a failure. Devices stay connected; the node uses more memory per device (about 26 KiB each). A node with so many devices that userspace would not fit in a third of the agent's memory limit (about 8,000 on a 1 GiB server) does not fall back: the profiles stay down and the check says "too many devices for userspace on this RAM".
+
+The node does not move back to the module by itself while people are connected. Once the module is built and loaded, press **Switch back to the module** in the doctor: the profiles are rebuilt on the module and connected devices pause for up to about 20 seconds. The next start of the agent also picks the module up. A system update that reboots the node does not insist on the module while the node serves userspace.
+
+An agent that predates this behaviour stays strict: with the module missing its AmneziaWG profiles do not start, and the doctor card offers **Switch this node to auto** (module when it loads, else userspace). The same setting can be changed through the MCP tool `node_awg_backend`, always with the owner's approval.
 
 ### Preparing the kernel module
 

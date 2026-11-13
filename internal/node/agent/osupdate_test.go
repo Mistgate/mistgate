@@ -403,19 +403,24 @@ func TestOsUpdateBlocksAnAgentUpdateWhileItRuns(t *testing.T) {
 // does not send it and cannot switch it off.
 func TestOsUpdateAwgRequiredComesFromTheRealBackend(t *testing.T) {
 	cases := map[string]struct {
-		backend string // the engine's backend: kernel | userspace
-		inbound bool
-		want    bool
+		backend  string // the engine's backend: kernel | userspace
+		inbound  bool
+		fallback bool // a "kernel" setting that runs on userspace because the module does not load
+		want     bool
 	}{
-		"kernel module with inbounds":    {"kernel", true, true},
-		"userspace with inbounds":        {"userspace", true, false},
-		"kernel module without inbounds": {"kernel", false, false},
+		"kernel module with inbounds":        {"kernel", true, false, true},
+		"userspace with inbounds":            {"userspace", true, false, false},
+		"kernel module without inbounds":     {"kernel", false, false, false},
+		"userspace fallback needs no module": {"userspace", true, true, false},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			n := newOsNode()
 			engineAwg := newFakeAwg(&order{})
-			engineAwg.status = awg.BackendStatus{Mode: "auto", Name: c.backend, Available: true}
+			engineAwg.status = awg.BackendStatus{Mode: "auto", Name: c.backend, Available: true, Fallback: c.fallback}
+			if c.fallback {
+				engineAwg.status.Mode = "kernel"
+			}
 			h := newHarness(t, harnessOpts{
 				extra: map[string]engine.Factory{awg.Protocol: engineAwg.factory()},
 				cfg: func(c *Config) {

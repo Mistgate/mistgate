@@ -93,6 +93,8 @@ const (
 	CodeAwgRunning     = "awg_backend.running"
 	CodeAwgForwardDrop = "awg_backend.forward_drop"
 	CodeAwgUnavailable = "awg_backend.unavailable"
+	// awg_backend.fallback: backend, version, mode, kernel, reason
+	CodeAwgFallback = "awg_backend.fallback"
 	// warp_path: state, backend, colo, inbounds, hint, error
 	CodeWarpNoManager   = "warp_path.no_manager"
 	CodeWarpUnused      = "warp_path.unused"
@@ -142,7 +144,7 @@ var Codes = []string{
 	CodeCertOK, CodeCertAgent, CodeCertInbound, CodeCertUnreadable, CodeCertNone,
 	CodeMemUsage, CodeMemNoInfo, CodeCPULoad, CodeCPUCollecting,
 	CodeHeadersNoAwg, CodeHeadersContainer, CodeHeadersReady, CodeHeadersUserspace, CodeHeadersOptional, CodeHeadersMissing,
-	CodeAwgNone, CodeAwgNoEngine, CodeAwgRunning, CodeAwgForwardDrop, CodeAwgUnavailable,
+	CodeAwgNone, CodeAwgNoEngine, CodeAwgRunning, CodeAwgForwardDrop, CodeAwgUnavailable, CodeAwgFallback,
 	CodeWarpNoManager, CodeWarpUnused, CodeWarpNoAccount, CodeWarpHostClash, CodeWarpUp, CodeWarpCheckFailed, CodeWarpStarting,
 	CodeWarpNoBackend, CodeWarpPausedUsed, CodeWarpPaused, CodeWarpDown, CodeWarpUnknown,
 	CodeUnitCurrent, CodeUnitOutdated, CodeUnitManual, CodeUnitOtherUnit, CodeUnitUnknown, CodeUnitRefreshFailed,

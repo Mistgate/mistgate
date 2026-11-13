@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
 	"sync"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -26,6 +27,10 @@ import (
 type awgEngine struct {
 	env  engine.Env
 	mode func() string // NodeSettings.awg_backend as the agent holds it ("" = auto)
+	// peers counts the AmneziaWG devices of the node, for the memory ceiling of the userspace fallback (nil = none known).
+	peers func() int
+	// moduleLoaded says the kernel module is there now (/sys/module/amneziawg); a field so tests can say yes.
+	moduleLoaded func() bool
 
 	mu    sync.Mutex
 	eng   *awg.Engine
@@ -36,7 +41,12 @@ func newAwgEngine(env engine.Env, mode func() string) *awgEngine {
 	if env.Log == nil {
 		env.Log = slog.Default()
 	}
-	return &awgEngine{env: env, mode: mode}
+	return &awgEngine{env: env, mode: mode, moduleLoaded: awgModuleLoaded}
+}
+
+func awgModuleLoaded() bool {
+	_, err := os.Stat("/sys/module/amneziawg")
+	return err == nil
 }
 
 // normMode maps the setting to one of the three modes; anything else is "auto" (a panel from the future must not
@@ -55,7 +65,7 @@ func (l *awgEngine) get() *awg.Engine {
 	defer l.mu.Unlock()
 	if l.eng == nil {
 		m := normMode(l.mode())
-		e, err := awg.NewWithOptions(l.env, awg.Options{Backend: m})
+		e, err := awg.NewWithOptions(l.env, awg.Options{Backend: m, Peers: l.peers})
 		if err != nil { // only a bad mode, which normMode excludes; keep the agent alive anyway
 			l.env.Log.Error("awg engine", "err", err)
 			e, _ = awg.NewWithOptions(l.env, awg.Options{Backend: "auto"})
@@ -86,6 +96,22 @@ func (l *awgEngine) NodeSettings(ctx context.Context, st *pb.NodeSettings) bool 
 	}
 	l.eng, l.built = nil, ""
 	return true
+}
+
+// ReprobeKernel implements agent.AwgModuleReprober: the engine runs on the userspace fallback of a "kernel" setting and the
+// module is there now (someone built and loaded it). The built engine is dropped (its interfaces go) and the agent applies
+// every awg inbound again, which builds a new engine that asks the module first, the way a changed setting does. This is the
+// ONLY way back besides an agent start: nothing probes the module by itself while people are connected (decision D4).
+func (l *awgEngine) ReprobeKernel(ctx context.Context) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.eng == nil || !l.eng.BackendStatus().Fallback || !l.moduleLoaded() {
+		return false, nil
+	}
+	l.env.Log.Info("the kernel module is loaded now, the engine is rebuilt on it")
+	err := l.eng.Close(ctx)
+	l.eng, l.built = nil, ""
+	return true, err
 }
 
 var _ agent.AWGKernelDebugEngine = (*awgEngine)(nil)

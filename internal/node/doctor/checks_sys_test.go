@@ -413,6 +413,7 @@ func TestKernelHeadersSeverityMatrix(t *testing.T) {
 		{"kernel asked, module loaded, tools missing", &AwgBackend{Mode: "kernel", Name: "kernel", Available: true}, "kvm", false, true, OK, CodeHeadersOptional},
 		{"kernel asked, module missing, tools missing", &AwgBackend{Mode: "kernel", Reason: "not loaded"}, "kvm", false, true, Warn, CodeHeadersMissing},
 		{"auto, userspace runs, tools present", &userspace, "kvm", false, false, OK, CodeHeadersReady},
+		{"kernel asked, the userspace fallback serves, tools missing: awg_backend says it, not this", &AwgBackend{Mode: "kernel", Name: "userspace", Available: true, Fallback: true, Reason: "not loaded"}, "kvm", false, true, OK, CodeHeadersUserspace},
 		{"kernel asked, tools present", &AwgBackend{Mode: "kernel", Reason: "not loaded"}, "kvm", false, false, OK, CodeHeadersReady},
 		{"no awg inbound, whatever is missing", &userspace, "kvm", true, true, Skip, CodeHeadersNoAwg},
 		{"container, kernel asked", &AwgBackend{Mode: "kernel", Reason: "x"}, "lxc", false, true, Skip, CodeHeadersContainer},

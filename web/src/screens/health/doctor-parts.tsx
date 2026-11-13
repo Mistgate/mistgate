@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
-import { health } from "@/lib/api";
+import { health, nodes as nodesApi } from "@/lib/api";
 import { itemDetail, itemParams } from "@/lib/doctor-detail";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
@@ -187,6 +187,7 @@ export function DoctorRow({
       </div>
     );
   else if (item.id === "warp_path" && issue) action = <WarpPathActions nodeId={nodeId} />;
+  else if (issue && item.id === "awg_backend" && item.params.switch_auto === "1" && can.fix) action = <SwitchToAuto nodeId={nodeId} nodeName={nodeName} />;
   else if (steps.length > 0)
     action = (
       <Button variant="secondary" size="md" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
@@ -275,6 +276,30 @@ function ManualSteps({ steps, nodeId }: { steps: readonly ManualStep[]; nodeId: 
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * The way out for an agent that cannot fall back to userspace by itself (no awg-fallback/1; the panel marks the row with
+ * switch_auto): the node's AmneziaWG backend becomes "auto", the same call the settings card makes. The module is used when it
+ * loads and userspace when it does not.
+ */
+function SwitchToAuto({ nodeId, nodeName }: { nodeId: string; nodeName: string }) {
+  const t = useT();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const run = useMutation({
+    mutationFn: () => nodesApi.updateNode({ nodeId, awgBackend: "auto" }),
+    onSuccess: () => {
+      toast(t("awg.switchAuto.done", { node: nodeName }));
+      for (const k of ["health", "node", "nodes", "overview"]) void qc.invalidateQueries({ queryKey: [k] });
+    },
+    onError: (e) => toast.error(errorText(e, t)),
+  });
+  return (
+    <Button variant="primary" size="md" title={t("awg.switchAuto.hint")} disabled={run.isPending} onClick={() => run.mutate()}>
+      {t("awg.switchAuto.label")}
+    </Button>
   );
 }
 

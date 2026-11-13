@@ -220,6 +220,10 @@ package mistgate.agent.v1;
 //                       from a systemd service. The CommandResult reaches the panel before that agent restart.
 //     allow_forwarding  insert Mistgate-only tagged accepts into host FORWARD chains with policy DROP; reasserted by
 //                       the agent sweep and removed by Cleanup. Offered by awg_backend for forward_drop.
+//     awg_module_repair  ask the module again after the userspace fallback: when /sys/module/amneziawg exists the awg engine
+//                       is dropped and every awg inbound applied again on the module (connected devices pause up to ~20 s);
+//                       otherwise "failed: the module is still not loaded for kernel K; build it first". It builds nothing.
+//                       Offered by awg_backend while it warns awg_backend.fallback.
 //     enable_security_updates  start "mistgate-node host enable-security-updates" in the fixed transient root unit
 //                       mistgate-security-updates (systemd-run, no shell) and answer started=1 at once: it installs
 //                       unattended-upgrades if missing, sets the APT::Periodic switches that are off in
@@ -329,6 +333,13 @@ package mistgate.agent.v1;
 //   - Engine.version in EngineInfo for awg names the backend: "amneziawg-go v3.1.20260828" (userspace) or
 //     "amneziawg kernel module, genl v3, maxattr 34" (kernel).
 //   Event codes added: awg_backend_unavailable {reason}, warp_state {state, from}, warp_needs_attention {reason}.
+//   - USERSPACE FALLBACK (additive). An agent lists "awg-fallback/1" when NodeSettings.awg_backend = "kernel" falls back to
+//     userspace if the kernel module does not load (a kernel update left it behind): AwgHealth backend is "userspace", the
+//     doctor check awg_backend warns with detail code awg_backend.fallback {kernel, reason} and offers the fix
+//     awg_module_repair, and the agent raises the event awg_backend_fallback {reason, kernel} (warning) once per engine
+//     build. The fallback is refused (awg_backend stays unavailable, "too many devices for userspace on this RAM") when
+//     devices x 26 KiB exceeds a third of GOMEMLIMIT. The node never moves back to the module by itself while it runs:
+//     only the fix or the next agent start asks the module again. An agent without the string stays strict.
 //   - PREPARE THE KERNEL MODULE (additive). An agent lists "awg-prepare/1" when it can put the
 //     AmneziaWG kernel module on its host by itself. The panel sends PrepareAwgKernel ONLY to a stream that listed
 //     it; for any other agent the admin UI keeps showing the manual command (`mistgate-node awg prepare-kernel`).

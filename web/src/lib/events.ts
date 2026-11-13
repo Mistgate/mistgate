@@ -62,6 +62,7 @@ const textKeys: Record<string, MessageKey> = {
   update_step_rolled_back: "event.update_step_rolled_back",
   update_download_source: "event.update_download_source",
   awg_backend_unavailable: "event.awg_backend_unavailable",
+  awg_backend_fallback: "event.awg_backend_fallback",
   awg_kernel_prepare_started: "event.awg_kernel_prepare_started",
   awg_kernel_prepare_done: "event.awg_kernel_prepare_done",
   awg_kernel_prepare_failed: "event.awg_kernel_prepare_failed",

@@ -92,8 +92,9 @@ func (a *Agent) doctorEnv() doctor.Env {
 	if bs, ok := a.awgStatuser(); ok {
 		e.AwgBackend = func() doctor.AwgBackend {
 			st := bs.BackendStatus() // only called when the node has an awg inbound (the check skips otherwise)
-			return doctor.AwgBackend{Mode: st.Mode, Name: st.Name, Version: st.Version, Available: st.Available, Reason: st.Reason}
+			return doctor.AwgBackend{Mode: st.Mode, Name: st.Name, Version: st.Version, Available: st.Available, Fallback: st.Fallback, Reason: st.Reason}
 		}
+		e.AwgModuleRepair = a.doctorAwgReprobe
 	}
 	if w := a.cfg.Warp; w != nil {
 		e.Warp = func(ctx context.Context) doctor.WarpInfo {
@@ -256,6 +257,25 @@ func (a *Agent) doctorRestart(ctx context.Context, inboundID string) (uint32, er
 		return r.Affected, nil
 	case <-ctx.Done():
 		return 0, ctx.Err()
+	}
+}
+
+// doctorAwgReprobe runs the awg_module_repair step on the worker: true when the engine was rebuilt on the module.
+func (a *Agent) doctorAwgReprobe(ctx context.Context) (bool, error) {
+	ch := make(chan *pb.CommandResult, 1)
+	select {
+	case a.jobs <- job{ctx: ctx, awgReprobe: true, res: ch}:
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+	select {
+	case r := <-ch:
+		if r.Error != "" {
+			return false, errors.New(r.Error)
+		}
+		return r.Params["moved"] == "1", nil
+	case <-ctx.Done():
+		return false, ctx.Err()
 	}
 }
 

@@ -110,5 +110,8 @@ type BackendStatus struct {
 	Name      string // "kernel" | "userspace"; "" when unavailable
 	Version   string
 	Available bool
-	Reason    string // when unavailable: a short English fact, e.g. "no /dev/net/tun"
+	// Fallback: the setting is "kernel", the module does not load and userspace serves instead. Reason then says why the
+	// module is not used. The engine stays on userspace until it is built again (never by itself, choose.go).
+	Fallback bool
+	Reason   string // when unavailable (or Fallback): a short English fact, e.g. "no /dev/net/tun"
 }

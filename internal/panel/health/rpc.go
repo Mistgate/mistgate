@@ -830,7 +830,7 @@ func (r rpc) plan(ctx context.Context, n store.NodeRow, fix string, params map[s
 		planParams = s.restartFacts(ctx, n.ID, params["inbound_id"], cr.Params)
 	}
 	return connect.NewResponse(&adminv1.ApplyFixResponse{
-		Plan:   &adminv1.FixPlan{FixId: fix, TitleKey: "health.fix." + fix + ".plan", Params: planParams, Detail: detail, Disruptive: fix == "restart_inbound" || fix == "reconnect_warp" || fix == "refresh_unit"},
+		Plan:   &adminv1.FixPlan{FixId: fix, TitleKey: "health.fix." + fix + ".plan", Params: planParams, Detail: detail, Disruptive: fix == "restart_inbound" || fix == "reconnect_warp" || fix == "refresh_unit" || fix == "awg_module_repair"},
 		PlanId: id, PlanExpiresUnix: now.Add(planTTL).Unix(),
 	}), nil
 }

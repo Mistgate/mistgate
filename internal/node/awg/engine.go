@@ -38,6 +38,9 @@ import (
 const (
 	ReasonBackendUnavailable = "awg_backend_unavailable"
 	ReasonModuleTooOld       = "awg_module_too_old"
+	// EventBackendFallback is the agent event (warning) of a "kernel" setting that runs on userspace because the module
+	// does not load: {reason, kernel}.
+	EventBackendFallback = "awg_backend_fallback"
 )
 
 const (
@@ -52,6 +55,10 @@ type Options struct {
 	// Backend is NodeSettings.awg_backend: "auto" (the kernel module if it is already loaded, else userspace),
 	// "kernel" or "userspace". "" means auto. Chosen once here; the agent does not install packages.
 	Backend string
+	// Peers counts the AmneziaWG devices the node serves, for the memory ceiling of the userspace fallback in "kernel"
+	// mode (choose.go). nil = unknown, counted as none.
+	Peers func() int
+	probe *probes // tests only
 }
 
 // Factory is the engine.Factory with the default (auto) backend choice; FactoryFor takes the setting.
@@ -80,7 +87,20 @@ func NewWithOptions(env engine.Env, opts Options) (*Engine, error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	be, st := pickBackend(mode, log)
+	var be awgBackend
+	var st BackendStatus
+	if opts.probe != nil {
+		be, st = chooseBackend(mode, log, *opts.probe, opts.Peers)
+	} else {
+		be, st = pickBackend(mode, log, opts.Peers)
+	}
+	if st.Fallback && env.Event != nil { // once per build: the engine is built once per start or settings change
+		rel := runningKernel()
+		if opts.probe != nil {
+			rel = opts.probe.release()
+		}
+		env.Event(engine.Event{Code: EventBackendFallback, Warning: true, Params: map[string]string{"reason": st.Reason, "kernel": rel}})
+	}
 	return newEngine(env, be, st), nil
 }
 

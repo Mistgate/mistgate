@@ -21,7 +21,9 @@ type AwgBackend struct {
 	Name      string // "kernel" | "userspace"; "" when unavailable
 	Version   string
 	Available bool
-	Reason    string // when unavailable: a short English fact
+	// Fallback: mode is "kernel", the module does not load and userspace serves in its place. Reason says why.
+	Fallback bool
+	Reason   string // when unavailable (or Fallback): a short English fact
 }
 
 // WarpInfo is the WARP manager's view at the time of the check.
@@ -81,6 +83,16 @@ func checkAwgBackend(ctx context.Context, e *Env) Result {
 	}
 	r := Result{Status: OK, Code: CodeAwgRunning, Params: p("backend", b.Name, "version", clip(b.Version, 80), "mode", orStr(b.Mode, "auto")),
 		Detail: clip(b.Name+": "+b.Version, 200)}
+	if b.Fallback { // the setting asks for the module; devices stay connected on userspace meanwhile. A warning, not a failure.
+		rel, _ := e.read("/proc/sys/kernel/osrelease")
+		rel = strings.TrimSpace(rel)
+		r.Status, r.Code = Warn, CodeAwgFallback
+		r.Params["kernel"], r.Params["reason"], r.Params["hint"] = clip(rel, 64), clip(b.Reason, 160), "fallback"
+		r.Detail = clip("userspace instead of the module on kernel "+rel+": "+b.Reason, 200)
+		if e.AwgModuleRepair != nil {
+			r.FixID = FixAwgModuleRepair
+		}
+	}
 	if e.HostPath != nil {
 		for _, f := range e.HostPath(ctx) {
 			if f.ID == "forward_drop" { // forwarded client traffic is dropped before it reaches the internet
@@ -96,6 +108,8 @@ func checkAwgBackend(ctx context.Context, e *Env) Result {
 				r.Status, r.Code = Warn, CodeAwgForwardDrop
 				r.Params["hint"] = "docker_forward_drop"
 				r.FixID = FixAllowForwarding
+				delete(r.Params, "kernel")
+				delete(r.Params, "reason")
 				r.Detail = clip("forwarded traffic is dropped: "+f.Detail, 200)
 			}
 		}

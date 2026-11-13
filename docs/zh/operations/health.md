@@ -172,7 +172,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | 连接跟踪表（`conntrack_fill`） | 内核连接跟踪表的条目数与 `nf_conntrack_max` 之比，以及内核统计的丢弃数。表满时所有新连接都会被丢弃。未加载 conntrack 时跳过。 | 使用率达到 80% | 使用率达到 95% | 无：调大 `net.netfilter.nf_conntrack_max`，或迁移用户 |
 | Agent 打开的文件（`agent_fds`） | Agent 打开的文件描述符数量（每条连接占一个）与其软限制之比；服务允许 65,536 个。 | 达到上限的 80% | 达到上限的 95% | 无：以服务方式运行 Agent，或迁移用户 |
 | 内核头文件（`kernel_headers`） | 检查 AmneziaWG 内核模块所需的头文件、`dkms`、`make` 和 `gcc`。没有 AmneziaWG 协议配置时会跳过；仅当 AmneziaWG 运行在用户态时作为信息显示。 | 请求使用内核模式，但工具缺失且模块未运行 | 无 | 无：参见 [AmneziaWG](../guide/amneziawg.md) |
-| AmneziaWG 后端（`awg_backend`） | 检查 AmneziaWG 使用的后端：内核模块或用户态。没有 AmneziaWG 协议配置时会跳过。 | 主机防火墙丢弃转发流量（Docker 中常见） | 没有可用后端：缺少 `/dev/net/tun`、服务文件过旧，或内核模式下缺少模块 | 报告 `unit_outdated` 且 Agent 提供修复时刷新服务单元 |
+| AmneziaWG 后端（`awg_backend`） | 检查 AmneziaWG 使用的后端：内核模块或用户态。没有 AmneziaWG 协议配置时会跳过。 | 主机防火墙丢弃转发流量（Docker 中常见）；内核模式因模块无法加载而在用户态回退运行 | 没有可用后端：缺少 `/dev/net/tun`、服务文件过旧，或内核模式下缺少模块 | 报告 `unit_outdated` 且 Agent 提供修复时刷新服务单元；处于回退时切回内核模块 |
 | WARP 出口（`warp_path`） | 检查节点的 WARP 隧道及路由。节点没有 WARP 账户且没有协议配置经 WARP 出口时会跳过。 | 协议配置经 WARP 出口时，WARP 处于暂停状态；或隧道已建立，但最近一次检测失败 | 协议配置经 WARP 出口，但节点没有账户；主机与 WARP 的路由表、规则优先级或接口名称冲突；没有 WireGuard 后端；或 WARP 离线 | 隧道离线或最近一次检测失败时，检查 WARP；如果离线则重连 |
 | 单元版本（`unit_generation`） | 检查运行 Agent 的 systemd 单元是否与当前构建版本一致。Agent 手动启动时会跳过。 | 单元版本早于当前构建 | 无 | 刷新服务单元；Agent 会重启，连接可能中断几秒 |
 | 安全更新（`security_updates`） | 在 Debian 和 Ubuntu 上检查 unattended-upgrades 是否已安装、有效的 APT::Periodic 设置，以及两个 apt-daily 定时器是否已启用并在运行。此项只读取状态；不会安装更新。Debian 的默认软件源规则也可能包含稳定版更新。 | 未安装软件包，或设置/定时器已关闭 | 无 | 开启安全更新，需所有者确认（Agent 以 root 身份在 systemd 下运行时提供；否则诊断显示手动命令） |
@@ -195,6 +195,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | 刷新服务单元 | 使用固定的临时 systemd 单元运行已安装的二进制，以写入编译好的单元模板、重新加载 systemd 并重启 Agent。节点身份和状态保持不变；连接可能中断几秒。 | 单元版本；报告 `unit_outdated` 的 AmneziaWG 后端 |
 | 允许 Mistgate 转发流量 | 在主机上每条默认策略为 `DROP` 的 `FORWARD` 链开头添加带标记的接受规则。规则只匹配：从 `mgawg*` 隧道进入的流量（客户端发起的新连接，但不包括去往容器网桥 `docker*` 和 `br-*` 的流量）、经 `mgawg*` 返回的属于客户端已建立连接的流量（不放行指向客户端的新连接；经 WARP 的客户端流量同样被覆盖），以及转发到当前 Mistgate 中继目标的 DNAT 流量（双向）。其他流量仍由主机防火墙处理。防火墙重载后，Agent 会在定期同步时恢复这些规则；节点退役时会删除这些规则。 | AmneziaWG 后端检测到转发流量被丢弃时 |
 | 开启安全更新 | 在独立的临时 root systemd 单元中运行内置的 `host enable-security-updates` 命令。若未安装 unattended-upgrades，则从节点现有的 apt 软件源安装；只将已关闭的 APT::Periodic 设置写入 `/etc/apt/apt.conf.d/99mistgate-security-updates`，并取消屏蔽、启用并按原有计划启动 apt-daily 定时器（关闭期间错过的每日运行不会立即开始）。它绝不会运行 `apt-get upgrade` 或 `unattended-upgrade`，不会重启服务器，不会修改 `Automatic-Reboot`，也不会编辑 `50unattended-upgrades`。若另一个 apt 进程持有锁，最多可能需要 20 分钟。 | 安全更新 |
+| 切回内核模块 | 重新询问节点：当前运行内核的 AmneziaWG 模块是否已加载。若已加载，AmneziaWG 协议配置会在模块上重建，已连接设备最多暂停约 20 秒；若未加载，则不做任何更改，节点会提示先构建模块。它不构建也不安装任何内容。 | AmneziaWG 后端（处于用户态回退时） |
 
 如需手动撤销此修复，请删除 `/etc/apt/apt.conf.d/99mistgate-security-updates`。对于修复前处于禁用状态的每个定时器，请运行 `systemctl disable --now <timer>`（`apt-daily.timer` 或 `apt-daily-upgrade.timer`）。如果此修复安装了软件包，请运行 `apt-get remove unattended-upgrades` 将其删除。任务日志（`journalctl -u mistgate-security-updates`）会记录执行内容。
 

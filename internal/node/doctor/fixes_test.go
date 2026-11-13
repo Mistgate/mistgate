@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -67,6 +68,7 @@ type fixRig struct {
 	restarts          []string
 	warpReconnections int
 	warpRechecks      int
+	awgRepairs        int
 }
 
 func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
@@ -89,6 +91,8 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 	f.cmd(securityAPTConfig, "E='0'; L='0'; U='0';", nil)
 	f.cmd(securityTimers, "masked\ndisabled\n", nil)
 	f.cmd(securityTimersActive, "inactive\ninactive\n", nil)
+	f.put("/proc/sys/kernel/osrelease", "7.0.0-38-generic\n")
+	f.put("/sys/module/amneziawg/.keep", "")  // the module is loaded now: the fallback can move back
 	f.cmd(securityJobUnit, unitNotFound, nil) // what systemd says of a unit that never ran: the fix must start it
 	mk := func(tweak ...func(*Env)) *Doctor {
 		return f.doctor(append([]func(*Env){func(e *Env) {
@@ -107,6 +111,10 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 				f.put(hostctl.JournaldFilePath, hostctl.JournaldFileBody)
 				return nil
 			}
+			e.AwgBackend = func() AwgBackend {
+				return AwgBackend{Mode: "kernel", Name: "userspace", Available: true, Fallback: true, Reason: "the amneziawg kernel module is not loaded"}
+			}
+			e.AwgModuleRepair = func(context.Context) (bool, error) { r.awgRepairs++; return true, nil }
 			e.RestartInbound = func(_ context.Context, id string) (uint32, error) { r.restarts = append(r.restarts, id); return 1, nil }
 			e.Warp = func(context.Context) WarpInfo { return WarpInfo{Configured: true, State: "down"} }
 			e.ReconnectWarp = func(context.Context) (bool, error) { r.warpReconnections++; return true, nil }
@@ -144,7 +152,7 @@ func TestDryRunChangesNothing(t *testing.T) {
 			t.Errorf("%s dry run found nothing to do on a host that needs it: %+v", fix, out)
 		}
 	}
-	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 || r.warpReconnections != 0 || r.forward.applies != 0 || r.securityLaunches != 0 {
+	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 || r.warpReconnections != 0 || r.forward.applies != 0 || r.securityLaunches != 0 || r.awgRepairs != 0 {
 		t.Fatalf("a dry run acted: vacuum=%d set=%d baseline=%d restarts=%v warp_reconnects=%d forward_applies=%d security_launches=%d", r.fx.vacuum, r.fx.set, r.baseline, r.restarts, r.warpReconnections, r.forward.applies, r.securityLaunches)
 	}
 	if after := snapshot(t, r.f.root); after != before {
@@ -586,6 +594,62 @@ func TestApplyForwardingFixPlanAndConfirmation(t *testing.T) {
 	if got := d.Apply(context.Background(), FixAllowForwarding, true, nil); !got.OK || got.Params["noop"] != "1" {
 		t.Fatalf("no longer needed: %+v", got)
 	}
+}
+
+// awg_module_repair: in this version it only asks the module again. A module that is there moves the engine back (the dry run
+// says what it would do and pauses), one that is not there is a plain refusal that says to build it, and a node that is not on
+// the fallback has nothing to do.
+func TestAwgModuleRepair(t *testing.T) {
+	ctx := context.Background()
+	t.Run("module loaded: dry run says it, apply moves back once", func(t *testing.T) {
+		r, mk := newFixRig(t)
+		d := mk()
+		plan := d.Apply(ctx, FixAwgModuleRepair, true, nil)
+		if !plan.OK || plan.Params["kernel"] != "7.0.0-38-generic" || plan.Params["noop"] != "" || r.awgRepairs != 0 ||
+			!strings.Contains(plan.Detail, "move back") || !strings.Contains(plan.Detail, "20 s") {
+			t.Fatalf("dry run: %+v repairs=%d", plan, r.awgRepairs)
+		}
+		out := d.Apply(ctx, FixAwgModuleRepair, false, nil)
+		if !out.OK || out.Params["moved"] != "1" || r.awgRepairs != 1 {
+			t.Fatalf("apply: %+v repairs=%d", out, r.awgRepairs)
+		}
+		if got := d.Apply(ctx, FixAwgModuleRepair, false, map[string]string{"x": "1"}); got.Err != ErrBadParams {
+			t.Fatalf("parameters: %+v", got)
+		}
+	})
+	t.Run("module still not loaded: nothing is touched, build it first", func(t *testing.T) {
+		r, _ := newFixRig(t)
+		if err := os.RemoveAll(filepath.Join(r.f.root, "sys")); err != nil {
+			t.Fatal(err)
+		}
+		d := r.f.doctor(func(e *Env) {
+			e.AwgBackend = func() AwgBackend {
+				return AwgBackend{Mode: "kernel", Name: "userspace", Available: true, Fallback: true}
+			}
+			e.AwgModuleRepair = func(context.Context) (bool, error) { r.awgRepairs++; return true, nil }
+		})
+		for _, dry := range []bool{true, false} {
+			out := d.Apply(ctx, FixAwgModuleRepair, dry, nil)
+			if out.OK || !strings.Contains(out.Err, "still not loaded") || !strings.Contains(out.Err, "build it first") || r.awgRepairs != 0 {
+				t.Fatalf("dry=%v: %+v repairs=%d", dry, out, r.awgRepairs)
+			}
+		}
+	})
+	t.Run("not on the fallback: nothing to do", func(t *testing.T) {
+		r, mk := newFixRig(t)
+		d := mk(func(e *Env) {
+			e.AwgBackend = func() AwgBackend { return AwgBackend{Mode: "kernel", Name: "kernel", Available: true} }
+		})
+		if out := d.Apply(ctx, FixAwgModuleRepair, false, nil); !out.OK || out.Params["noop"] != "1" || r.awgRepairs != 0 {
+			t.Fatalf("%+v repairs=%d", out, r.awgRepairs)
+		}
+	})
+	t.Run("a build without the hook cannot", func(t *testing.T) {
+		f := newFake(t)
+		if out := f.doctor().Apply(ctx, FixAwgModuleRepair, true, nil); out.Err != ErrUnsupportedHost {
+			t.Fatalf("%+v", out)
+		}
+	})
 }
 
 func TestOneFixAtATime(t *testing.T) {

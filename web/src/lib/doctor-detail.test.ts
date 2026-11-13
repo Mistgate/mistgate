@@ -74,6 +74,7 @@ const samples: Record<string, Record<string, string>> = {
   "awg_backend.no_engine": {},
   "awg_backend.running": { backend: "userspace", version: "amneziawg-go v3", mode: "auto" },
   "awg_backend.forward_drop": { backend: "kernel", version: "v1", mode: "auto", hint: "docker_forward_drop" },
+  "awg_backend.fallback": { backend: "userspace", version: "amneziawg-go v3", mode: "kernel", kernel: "7.0.0-38-generic", reason: "the amneziawg kernel module is not loaded", hint: "fallback" },
   "awg_backend.unavailable": { mode: "kernel", reason: "the amneziawg kernel module is not loaded", hint: "no_module" },
   "warp_path.no_manager": {},
   "warp_path.unused": {},

@@ -74,6 +74,21 @@ func TestAwgBackendCheck(t *testing.T) {
 		want(t, r, Fail, "")
 		param(t, r, "hint", "no_module")
 	})
+	t.Run("kernel mode on the userspace fallback is a warning with the repair fix", func(t *testing.T) {
+		f := newFake(t)
+		f.put("/proc/sys/kernel/osrelease", "7.0.0-38-generic\n")
+		b := AwgBackend{Mode: "kernel", Name: "userspace", Version: "amneziawg-go v3", Available: true, Fallback: true, Reason: "the amneziawg kernel module is not loaded"}
+		r := run(t, f.doctor(withInbounds(awgIn("running")), func(e *Env) {
+			e.AwgBackend = func() AwgBackend { return b }
+			e.AwgModuleRepair = func(context.Context) (bool, error) { return false, nil }
+		}), CheckAwgBackend)
+		want(t, r, Warn, FixAwgModuleRepair)
+		code(t, r, CodeAwgFallback, "backend", "userspace", "mode", "kernel", "kernel", "7.0.0-38-generic", "reason", "the amneziawg kernel module is not loaded", "hint", "fallback")
+		// a build that cannot repair still says it, without a button
+		r = run(t, f.doctor(withInbounds(awgIn("running")), func(e *Env) { e.AwgBackend = func() AwgBackend { return b } }), CheckAwgBackend)
+		want(t, r, Warn, "")
+		code(t, r, CodeAwgFallback)
+	})
 	t.Run("a FORWARD drop policy offers the narrow fix", func(t *testing.T) {
 		f := newFake(t)
 		r := run(t, f.doctor(withInbounds(awgIn("running")), func(e *Env) {

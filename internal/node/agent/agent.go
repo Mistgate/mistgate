@@ -39,6 +39,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/decoy"
+	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/awgprep"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
@@ -1201,6 +1202,16 @@ func (a *Agent) event(sev pb.Severity, code, inboundID string, params map[string
 // use the existing one-per-inbound and user five-minute throttle (one per inbound without a known user). Only the fixed
 // parameters leave the node: never a client address or a destination address.
 func (a *Agent) engineEvent(ev engine.Event) {
+	if ev.Code == awg.EventBackendFallback { // {reason, kernel}: no inbound, nothing but two short facts
+		params := map[string]string{}
+		for _, k := range []string{"reason", "kernel"} {
+			if v := ev.Params[k]; v != "" {
+				params[k] = v[:min(len(v), 200)]
+			}
+		}
+		a.event(pb.Severity_SEVERITY_WARNING, ev.Code, "", params)
+		return
+	}
 	if ev.Code != "torrent_attempt" {
 		return
 	}
@@ -1370,6 +1381,7 @@ type job struct {
 	kick          *pb.Kick
 	restart       *pb.RestartInbound
 	reconnectWarp bool
+	awgReprobe    bool // the doctor fix awg_module_repair
 	retire        *pb.Retire
 	sweep         bool
 	// res, when set, receives the restart's CommandResult instead of the stream (the doctor's restart_inbound).
@@ -1439,6 +1451,11 @@ func (a *Agent) handle(ctx context.Context, j job) {
 			j.res <- r
 		} else {
 			reply(cmdResult(r))
+		}
+	case j.awgReprobe:
+		r := a.awgReprobe(ctx)
+		if j.res != nil {
+			j.res <- r
 		}
 	case j.retire != nil:
 		a.retire(ctx, j)

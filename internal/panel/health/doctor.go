@@ -20,8 +20,12 @@ import (
 const capDoctor = "doctor/1"
 const capUnitRefresh = unit.CapabilityRefresh
 
+// capAwgFallback is the Hello capability of an agent whose "kernel" backend falls back to userspace when the module does not
+// load (agent.proto "AWG AND WARP"). An agent without it stays strict, and the doctor card offers its owner "switch to auto".
+const capAwgFallback = "awg-fallback/1"
+
 // fixIDs are the fixes the agent has (agent.proto "FIX IDS"). A fix id anywhere else is ignored.
-var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit", "allow_forwarding", "enable_security_updates"}
+var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit", "allow_forwarding", "enable_security_updates", "awg_module_repair"}
 
 func knownFix(id string) string {
 	if slices.Contains(fixIDs, id) {
@@ -184,6 +188,10 @@ func (s *Service) nodeDoctor(ctx context.Context, n store.NodeRow, live store.No
 		}
 		if canFix && (r.FixID != "refresh_unit" || canRefreshUnit) {
 			it.FixId = r.FixID
+		}
+		if r.CheckID == "awg_backend" && r.DetailCode == "awg_backend.unavailable" && r.Params["hint"] == "no_module" &&
+			!slices.Contains(live.AgentCaps, capAwgFallback) {
+			it.Params["switch_auto"] = "1" // the UI offers one click: UpdateNode awg_backend = auto
 		}
 		if a, ok := accepted(r, acc); ok {
 			it.AcceptedUnix, it.AcceptedBy, it.AcceptedByName = fleetUnix(a.At), a.By, a.ByName

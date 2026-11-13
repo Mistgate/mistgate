@@ -306,10 +306,11 @@ func checkKernelHeaders(_ context.Context, e *Env) Result {
 	if len(missing) == 0 {
 		return Result{Status: OK, Code: CodeHeadersReady, Params: p("kernel", rel), Detail: "headers for " + rel + ", dkms, make and gcc are installed"}
 	}
-	mode, running := "auto", ""
+	mode, running, fallback := "auto", "", false
 	if e.AwgBackend != nil {
 		b := e.AwgBackend()
 		mode = orStr(b.Mode, "auto")
+		fallback = b.Fallback
 		if b.Available {
 			running = b.Name
 		}
@@ -317,7 +318,7 @@ func checkKernelHeaders(_ context.Context, e *Env) Result {
 	r := Result{Status: OK, Params: p("kernel", rel, "missing", strings.Join(missing, ","), "mode", mode, "backend", running)}
 	list := strings.Join(missing, ", ")
 	switch {
-	case mode == "kernel" && running != "kernel":
+	case mode == "kernel" && running != "kernel" && !fallback: // while the fallback serves, awg_backend says it once
 		r.Status, r.Code = Warn, CodeHeadersMissing
 		r.Detail = "kernel " + rel + ": missing " + list
 	case running == "userspace":

@@ -290,6 +290,10 @@ export const en = {
 
   // ---- doctor
   "doctor.awg_backend.title": "AmneziaWG backend",
+  "health.doctor.awg_backend.why.fallback": "The backend is set to the kernel module, but it does not load on this kernel, so the node serves AmneziaWG in userspace meanwhile. Devices stay connected; each one costs the node more memory. The node does not move back to the module by itself while people are connected. Build the module (run mistgate-node awg prepare-kernel --yes on the node; it installs packages), then press “Switch back to the module”. Or set the backend to auto in the node’s settings if you do not need the module.",
+  "awg.switchAuto.label": "Switch this node to auto",
+  "awg.switchAuto.done": "{node}: the AmneziaWG backend is auto now",
+  "awg.switchAuto.hint": "This agent is too old to fall back to userspace by itself. Auto uses the module when it loads and userspace when it does not.",
   "health.doctor.awg_backend.why":
     "The AmneziaWG engine on this node has no working backend ({mode}): {reason}. Its profiles are not started until it has one.",
   "health.doctor.awg_backend.why.no_tun":
@@ -580,6 +584,10 @@ export const ru: typeof en = {
   "awg.page.selfServiceHint": "Люди сами добавляют, перевыпускают ключ и удаляют свои устройства AmneziaWG на своей странице, в пределах лимита устройств.",
 
   "doctor.awg_backend.title": "Бэкенд AmneziaWG",
+  "health.doctor.awg_backend.why.fallback": "Бэкенд задан как модуль ядра, но на этом ядре он не загружается, поэтому нода пока обслуживает AmneziaWG в userspace. Устройства остаются подключены, но каждое обходится ноде дороже по памяти. Сама нода на модуль не вернётся, пока люди подключены. Собери модуль (выполни на ноде mistgate-node awg prepare-kernel --yes, команда ставит пакеты) и нажми «Вернуться на модуль». Или поставь бэкенд «авто» в настройках ноды, если модуль не нужен.",
+  "awg.switchAuto.label": "Перевести ноду на «авто»",
+  "awg.switchAuto.done": "{node}: бэкенд AmneziaWG теперь «авто»",
+  "awg.switchAuto.hint": "Этот агент слишком старый, чтобы сам переходить на userspace. «Авто» берёт модуль, если он загружается, а иначе userspace.",
   "health.doctor.awg_backend.why":
     "У движка AmneziaWG на этой ноде нет рабочего бэкенда ({mode}): {reason}. Пока его нет, профили AmneziaWG не запускаются.",
   "health.doctor.awg_backend.why.no_tun":
@@ -877,6 +885,10 @@ export const zh: typeof en = {
 
   // ---- doctor
   "doctor.awg_backend.title": "AmneziaWG 后端",
+  "health.doctor.awg_backend.why.fallback": "后端已设为内核模块，但它在当前内核上无法加载，所以节点暂时以用户态提供 AmneziaWG。设备保持连接，但每台设备占用节点更多内存。有人连接时，节点不会自行切回模块。请先构建模块（在节点上运行 mistgate-node awg prepare-kernel --yes，它会安装软件包），然后点击“切回内核模块”。如果不需要模块，也可以在节点设置中把后端改为自动。",
+  "awg.switchAuto.label": "将此节点切换为自动",
+  "awg.switchAuto.done": "{node}：AmneziaWG 后端现已设为自动",
+  "awg.switchAuto.hint": "此 Agent 版本过旧，无法自行回退到用户态。自动模式在模块可加载时使用模块，否则使用用户态。",
   "health.doctor.awg_backend.why":
     "此节点上的 AmneziaWG 引擎没有可用的后端（{mode}）：{reason}。在有可用后端之前，它的协议配置不会启动。",
   "health.doctor.awg_backend.why.no_tun":
@@ -1159,6 +1171,10 @@ export const fa: typeof en = {
   "awg.page.selfService": "دستگاه‌ها روی صفحه",
   "awg.page.selfServiceHint": "افراد دستگاه‌های AmneziaWG خودشان را در صفحهٔ خودشان اضافه می‌کنند، کلیدشان را عوض می‌کنند و حذف می‌کنند، در حد سقف دستگاه.",
   "doctor.awg_backend.title": "بک‌اند AmneziaWG",
+  "health.doctor.awg_backend.why.fallback": "بک‌اند روی ماژول هسته تنظیم شده، اما روی این هسته بارگذاری نمی‌شود، برای همین نود فعلاً AmneziaWG را در userspace سرویس می‌دهد. دستگاه‌ها وصل می‌مانند، ولی هر دستگاه حافظهٔ بیشتری از نود می‌گیرد. تا وقتی کسی وصل است، نود خودش به ماژول برنمی‌گردد. ماژول را بساز (روی نود mistgate-node awg prepare-kernel \u200E--yes را اجرا کن؛ بسته نصب می‌کند) و بعد «بازگشت به ماژول» را بزن. یا اگر ماژول لازم نیست، بک‌اند را در تنظیمات نود روی «خودکار» بگذار.",
+  "awg.switchAuto.label": "این نود را روی «خودکار» بگذار",
+  "awg.switchAuto.done": "{node}: بک‌اند AmneziaWG حالا «خودکار» است",
+  "awg.switchAuto.hint": "این ایجنت برای رفتن خودکار به userspace خیلی قدیمی است. حالت خودکار اگر ماژول بالا بیاید از آن و در غیر این صورت از userspace استفاده می‌کند.",
   "health.doctor.awg_backend.why": "موتور AmneziaWG روی این نود بک‌اند سالمی ندارد ({mode}): {reason}. تا وقتی بک‌اند نداشته باشد، پروفایل‌هایش راه نمی‌افتند.",
   "health.doctor.awg_backend.why.no_tun": "موتور AmneziaWG به \u200E/dev/net/tun نیاز دارد و ایجنت آن را نمی‌بیند. اگر یونیت سرویس نود قدیمی است، در عیب‌یاب نود «تازه‌سازی سرویس» را بزن؛ در کانتینر یا روی VPS بررسی کن که دستگاه TUN فعال باشد.",
   "health.doctor.awg_backend.why.unit_outdated": "یونیت سرویس نود قدیمی است (نسل {unit_gen}) و \u200E/dev/net/tun را از ایجنت پنهان می‌کند. در عیب‌یاب نود «تازه‌سازی سرویس» را بزن: یونیت را بازنویسی می‌کند (ایجنت فعلی آن را پیشنهاد می‌دهد).",
@@ -1436,6 +1452,10 @@ export const tr: typeof en = {
   "awg.page.selfService": "Sayfada cihazlar",
   "awg.page.selfServiceHint": "Kişiler kendi AmneziaWG cihazlarını kendi sayfalarında, cihaz sınırları içinde ekler, anahtarlarını yeniler ve siler.",
   "doctor.awg_backend.title": "AmneziaWG arka ucu",
+  "health.doctor.awg_backend.why.fallback": "Arka uç çekirdek modülü olarak ayarlı ama bu çekirdekte yüklenmiyor; bu yüzden düğüm AmneziaWG'yi şimdilik kullanıcı alanında sunuyor. Cihazlar bağlı kalır, ama her biri düğümün daha çok belleğine mal olur. İnsanlar bağlıyken düğüm kendi kendine modüle dönmez. Modülü derle (düğümde mistgate-node awg prepare-kernel --yes çalıştır, paketleri kurar), sonra “Modüle geri dön”e bas. Modüle ihtiyacın yoksa düğümün ayarlarından arka ucu “otomatik” yap.",
+  "awg.switchAuto.label": "Bu düğümü otomatiğe al",
+  "awg.switchAuto.done": "{node}: AmneziaWG arka ucu artık otomatik",
+  "awg.switchAuto.hint": "Bu ajan kendi başına userspace'e düşemeyecek kadar eski. Otomatik, modül yüklenirse onu, yüklenmezse userspace'i kullanır.",
   "health.doctor.awg_backend.why": "Bu düğümdeki AmneziaWG motorunun çalışan bir arka ucu yok ({mode}): {reason}. Arka uç olana kadar profilleri başlamaz.",
   "health.doctor.awg_backend.why.no_tun": "AmneziaWG motoru /dev/net/tun istiyor ama ajan onu göremiyor. Düğümün hizmet birimi eskiyse düğümün Teşhis bölümünde “Hizmeti yenile”ye bas; konteynerde ya da VPS'te TUN aygıtının açık olduğunu kontrol et.",
   "health.doctor.awg_backend.why.unit_outdated": "Düğümün hizmet birimi eski (nesil {unit_gen}) ve /dev/net/tun'u ajandan gizliyor. Düğümün Teşhis bölümünde “Hizmeti yenile” düğmesine bas: birimi yeniden yazar (güncel bir ajan bunu sunar).",

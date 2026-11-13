@@ -234,6 +234,7 @@ var grantProcedures = map[string][]string{
 	"warp_reregister":             {adminv1connect.WarpServiceRegisterWarpProcedure},
 	"node_decoy":                  {adminv1connect.NodeServiceSetNodeDecoyModeProcedure},
 	"node_ipv6":                   {adminv1connect.NodeServiceUpdateIpv6EntryProcedure},
+	"node_awg_backend":            {adminv1connect.NodeServiceUpdateNodeProcedure},
 	"path_speed":                  {PathSpeedProcedure},
 	"node_fix":                    {adminv1connect.HealthServiceApplyFixProcedure},
 	"rollout_start":               {adminv1connect.UpdateServiceStartRolloutProcedure},

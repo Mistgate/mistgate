@@ -60,6 +60,9 @@ type fakeAwg struct {
 	status      awg.BackendStatus
 	lastBackend string
 	resets      int
+	// reprobe is what the module repair finds: true = the engine runs on the fallback and the module is there (dropped).
+	reprobe  bool
+	reprobes int
 }
 
 func newFakeAwg(ord *order) *fakeAwg {
@@ -100,6 +103,14 @@ func (e *fakeAwg) BackendStatus() awg.BackendStatus {
 	e.hmu.Lock()
 	defer e.hmu.Unlock()
 	return e.status
+}
+
+// ReprobeKernel is the AwgModuleReprober hook of the doctor fix awg_module_repair.
+func (e *fakeAwg) ReprobeKernel(context.Context) (bool, error) {
+	e.hmu.Lock()
+	defer e.hmu.Unlock()
+	e.reprobes++
+	return e.reprobe, nil
 }
 
 // NodeSettings is the SettingsAware hook: a changed awg_backend drops everything (reset), the first sight only notes it.
@@ -409,7 +420,7 @@ func TestL3CapabilitiesAreListedOnlyWhenTheBuildHasThem(t *testing.T) {
 		}
 	}
 	full := caps(newL3(t, 3, true).harness)
-	for _, c := range []string{"doctor/1", "awg/1", "warp/1", "unit/3"} {
+	for _, c := range []string{"doctor/1", "awg/1", "awg-fallback/1", "warp/1", "unit/3"} {
 		if !full[c] {
 			t.Errorf("a full build does not list %q: %v", c, full)
 		}
@@ -419,7 +430,7 @@ func TestL3CapabilitiesAreListedOnlyWhenTheBuildHasThem(t *testing.T) {
 	}
 	// An engine-less, manager-less build on a generation 2 unit lists none of the new strings.
 	plain := caps(newHarness(t, harnessOpts{cfg: func(c *Config) { c.UnitGen = 2 }}))
-	for _, c := range []string{"awg/1", "warp/1", "unit/3"} {
+	for _, c := range []string{"awg/1", "awg-fallback/1", "warp/1", "unit/3"} {
 		if plain[c] {
 			t.Errorf("a build without the feature lists %q", c)
 		}

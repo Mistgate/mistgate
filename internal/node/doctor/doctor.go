@@ -88,6 +88,7 @@ const (
 	FixRefreshUnit           = "refresh_unit"
 	FixAllowForwarding       = "allow_forwarding"
 	FixEnableSecurityUpdates = "enable_security_updates"
+	FixAwgModuleRepair       = "awg_module_repair"
 )
 
 // Result is one check's outcome; it becomes one DoctorResult.
@@ -159,7 +160,7 @@ func CheckIDs() []string {
 
 // FixIDs returns the fix ids.
 func FixIDs() []string {
-	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp, FixRefreshUnit, FixAllowForwarding, FixEnableSecurityUpdates}
+	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp, FixRefreshUnit, FixAllowForwarding, FixEnableSecurityUpdates, FixAwgModuleRepair}
 }
 
 // fixChecks says which checks offer a fix; the agent re-runs them after the fix (agent.proto "ApplyFix"). A unit
@@ -171,6 +172,7 @@ var fixChecks = map[string][]string{
 	FixSetResolver:           {CheckResolver},
 	FixReconnectWarp:         {CheckWarpPath},
 	FixAllowForwarding:       {CheckAwgBackend},
+	FixAwgModuleRepair:       {CheckAwgBackend, CheckKernelHeaders},
 	FixEnableSecurityUpdates: {CheckSecurityUpdates},
 }
 

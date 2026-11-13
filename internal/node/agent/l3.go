@@ -75,6 +75,11 @@ const (
 	errWarpNotConfigured = "egress warp: not configured on this node"
 )
 
+// capAwgFallback: a "kernel" setting runs on userspace when the module does not load (awg.BackendStatus.Fallback), the doctor
+// says awg_backend.fallback and the fix awg_module_repair moves back. An agent without it stays strict: the panel offers its
+// owner "switch to auto".
+const capAwgFallback = "awg-fallback/1"
+
 // WarpManager is what the agent needs of internal/node/warp.Manager (the real one implements it; tests use a fake).
 // The manager is handed to the engines through Config.Egress; the agent owns its lifecycle and feeds it the spec.
 type WarpManager interface {
@@ -169,7 +174,7 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, capDebug2)
 	}
 	if _, ok := a.engines[awg.Protocol]; ok {
-		caps = append(caps, capAWG)
+		caps = append(caps, capAWG, capAwgFallback)
 	}
 	if _, ok := a.engines["vless"]; ok {
 		caps = append(caps, capVLESS, capVLESSUnknownKeys, capVLESSHelloKex)
@@ -532,6 +537,51 @@ func (a *Agent) l3Health(ctx context.Context, b *pb.StatsBatch, off time.Duratio
 			b.Warp = warpHealthToPB(h, off)
 		}
 	}
+}
+
+// AwgPeers counts the AmneziaWG devices of the enabled awg inbounds: the userspace fallback's memory ceiling asks for it
+// when it builds the engine (awg.Options.Peers).
+func (a *Agent) AwgPeers() int {
+	m := a.snapshotModel()
+	n := 0
+	for _, id := range m.ids() {
+		if in := m.inbounds[id]; in.spec.Protocol == awg.Protocol && in.spec.Enabled {
+			n += len(in.creds)
+		}
+	}
+	return n
+}
+
+// AwgModuleReprober is what the awg engine offers the doctor fix awg_module_repair (cmd/mistgate-node's wrapper does):
+// when the engine runs on the userspace fallback and the module is there now, drop the engine and say so.
+type AwgModuleReprober interface {
+	ReprobeKernel(ctx context.Context) (moved bool, err error)
+}
+
+// awgReprobe runs on the worker. After the engine was dropped every awg inbound is applied again, the way a changed
+// NodeSettings.awg_backend does it (engineSettings), which builds a new engine that asks the module first.
+func (a *Agent) awgReprobe(ctx context.Context) *pb.CommandResult {
+	r, ok := a.engines[awg.Protocol].(AwgModuleReprober)
+	if !ok {
+		return &pb.CommandResult{Error: "unsupported_host"}
+	}
+	moved, err := r.ReprobeKernel(ctx)
+	if err != nil {
+		a.log.Warn("awg engine close", "err", err)
+	}
+	if !moved {
+		return &pb.CommandResult{Ok: true}
+	}
+	m := a.snapshotModel()
+	var n uint32
+	for _, id := range m.ids() {
+		if m.inbounds[id].spec.Protocol == awg.Protocol {
+			delete(a.held, id)
+			n++
+		}
+	}
+	a.reconcile(ctx, m, nil)
+	return &pb.CommandResult{Ok: true, Affected: n, Params: map[string]string{"moved": "1"}}
 }
 
 // backendStatuser is what an awg engine offers the doctor (awg.Engine and the lazy wrapper of cmd/mistgate-node do).

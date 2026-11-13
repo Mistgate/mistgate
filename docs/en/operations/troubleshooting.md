@@ -176,9 +176,11 @@ If authenticator codes for the admin keep failing, check the clock of the panel 
 
 - The profile on the node: "AmneziaWG did not start on the node: see “AmneziaWG backend” on the node's Server tab".
 - The doctor's **AmneziaWG backend** reports no working backend; **Kernel headers** lists what is missing for the module.
+- On an up-to-date agent with the setting on **Kernel module**, the profiles keep working: the doctor warns "AmneziaWG runs in userspace for now: the kernel module does not load on kernel …" (a kernel update usually left the module behind). Build the module as below, then press **Switch back to the module** in the doctor. The node does not move back by itself while people are connected.
 
 **What to do**
 
+- On an agent without this fallback the doctor card offers **Switch this node to auto** in one click.
 - The simplest: set the node's **AmneziaWG backend** to **Auto** (the kernel module when it is already loaded, else userspace) or **Userspace**. Userspace needs no module, only `/dev/net/tun`.
 - To use the kernel module: choose **Kernel module**. An up-to-date agent builds the module itself after you confirm; AmneziaWG keeps running in userspace until it is ready. Otherwise run it on the node yourself; without `--yes` it only prints the plan:
 
