@@ -550,7 +550,7 @@ func (r *dnsRig) countRows(q string, args ...any) int {
 // The same start as the device calls, in the same order: the page password, then the token (unknown = the decoy and a miss),
 // the cross-origin check, the switch, the status, the budget (shared with the devices), and only then the body.
 func TestPickingADNSSharesTheChainOfTheDeviceCalls(t *testing.T) {
-	// 1. A locked page locks the pick, for a token that exists and for one that does not (the same answer).
+	// 1. A locked page locks the pick of a token that exists; a token that does not is the decoy, as on every other route.
 	g := newGate(t, nil)
 	set := subsettings.Defaults()
 	set.UserPage.AllowDnsChoice = proto.Bool(true)
@@ -558,11 +558,11 @@ func TestPickingADNSSharesTheChainOfTheDeviceCalls(t *testing.T) {
 		t.Fatal(err)
 	}
 	uid, tok := g.newUser("alice", nil)
-	for name, token := range map[string]string{"a token": tok, "no such token": strings.Repeat("z", 43)} {
-		rec := call{g.h, t, token}.post("/dns", pickBody("nod_1", ""))
-		if rec.Code != 401 || decodeDNS(t, rec).Error != "locked" {
-			t.Errorf("%s without the cookie: %d %s", name, rec.Code, rec.Body.String())
-		}
+	if rec := (call{g.h, t, tok}).post("/dns", pickBody("nod_1", "")); rec.Code != 401 || decodeDNS(t, rec).Error != "locked" {
+		t.Errorf("a token without the cookie: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := (call{g.h, t, strings.Repeat("z", 43)}).post("/dns", pickBody("nod_1", "")); rec.Code != 404 {
+		t.Errorf("no such token without the cookie: %d %s", rec.Code, rec.Body.String())
 	}
 	cookie := cookieOf(t, g.unlock(t, tok, g.password(uid)))
 	if rec := (call{g.h, t, tok}).post("/dns", pickBody("nod_1", ""), "Cookie", ck(cookie)); rec.Code != 200 {

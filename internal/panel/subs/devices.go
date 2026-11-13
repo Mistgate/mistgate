@@ -306,8 +306,9 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 }
 
 // enter is the start every call under a link shares (the devices and the DNS pick), in this order: the page password (a
-// locked page locks what it calls: answered before the database work, which only a cookie of this token earns; the
-// answer is the same for a token that does not exist), the token (unknown = the decoy and a miss), the Source can do the
+// locked page locks what it calls: a token the handler has not seen is checked first, an unknown one gets the
+// decoy and a miss like on every other route; the identify work behind it only a cookie of this token earns), the
+// token (unknown = the decoy and a miss), the Source can do the
 // call (else the decoy: the endpoint does not exist), the cross-origin check, the owner's switch (403 off). It answers
 // and returns false when the call ends there. exists says whether the Source can do the call.
 //
@@ -320,6 +321,21 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 	ctx := r.Context()
 	set := h.settings(ctx)
 	if exists && h.gated(set) && !h.unlocked(r, token) {
+		// "locked" is the answer of a token that exists; one that does not gets the decoy and a miss, as everywhere else.
+		if _, known := h.tokens.Get(token); !known {
+			if checker, ok := h.src.(TokenChecker); ok {
+				err := checker.CheckSubscriptionToken(ctx, token)
+				if errors.Is(err, access.ErrUnknownToken) {
+					h.miss(ctx, client)
+					h.decoy.ServeHTTP(w, r)
+					return access.SubView{}, nil, false
+				}
+				if err != nil {
+					jsonError(w, http.StatusInternalServerError, "internal", "")
+					return access.SubView{}, nil, false
+				}
+			}
+		}
 		jsonError(w, http.StatusUnauthorized, "locked", "")
 		return access.SubView{}, nil, false
 	}
