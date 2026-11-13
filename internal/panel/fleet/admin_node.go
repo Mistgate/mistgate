@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -1007,11 +1008,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			return nil, internalErr(f.log.Error, "mark devices stale", err)
 		}
 	}
-	audit := map[string]string{"node_id": n.ID}
-	if m.ClientIpv6 != nil {
-		audit["client_ipv6"] = map[bool]string{true: "on", false: "off"}[n.ClientIPv6]
-	}
-	f.audit(ctx, "node.update", audit)
+	f.audit(ctx, "node.update", nodeUpdateAudit(n, m))
 	f.StateChanged() // address, DNS, timeouts and node settings feed the desired state
 	now := f.now().UTC()
 	protos, _ := f.st.FleetNodeProtocols(ctx)
@@ -1019,6 +1016,45 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	panelBundle, _ := f.panelDecoyBundle()
 	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))}), nil
+}
+
+// nodeUpdateAudit is the audit record of an UpdateNode: the names of the fields the request carried and, for the
+// short non-secret settings, their new values (addresses, resolvers and free text stay out).
+func nodeUpdateAudit(n store.NodeRow, m *adminv1.UpdateNodeRequest) map[string]string {
+	onOff := func(v bool) string { return map[bool]string{true: "on", false: "off"}[v] }
+	var fields []string
+	add := func(present bool, name string) bool {
+		if present {
+			fields = append(fields, name)
+		}
+		return present
+	}
+	audit := map[string]string{"node_id": n.ID}
+	add(m.Name != nil, "name")
+	add(m.Address != nil, "address")
+	add(m.CountryCode != nil, "country_code")
+	add(m.Location != nil, "location")
+	add(m.Provider != nil, "provider")
+	add(m.Notes != nil, "notes")
+	add(m.PublicLabel != nil, "public_label")
+	add(m.DnsResolvers != nil, "dns_resolvers")
+	if add(m.Timeouts != nil, "timeouts") {
+		audit["timeouts_s"] = fmt.Sprintf("%d/%d/%d", n.LivenessTimeoutS, n.ApplyTimeoutS, n.DialTimeoutS)
+	}
+	if add(m.AwgBackend != nil, "awg_backend") {
+		audit["awg_backend"] = n.AwgBackend
+	}
+	if add(m.TorrentBlockerEnabled != nil, "torrent_blocker_enabled") {
+		audit["torrent_blocker"] = onOff(n.TorrentBlockerEnabled)
+	}
+	if add(m.BandwidthMbps != nil, "bandwidth_mbps") {
+		audit["bandwidth_mbps"] = strconv.Itoa(n.BandwidthMbps)
+	}
+	if add(m.ClientIpv6 != nil, "client_ipv6") {
+		audit["client_ipv6"] = onOff(n.ClientIPv6)
+	}
+	audit["fields"] = strings.Join(fields, ",")
+	return audit
 }
 
 // staleKeysOn marks the issued configs of every per-device (AmneziaWG) profile on the node stale: each one holds the
