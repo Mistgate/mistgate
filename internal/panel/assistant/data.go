@@ -227,6 +227,13 @@ func cleanContextText(s string, limit int) string {
 	return strings.TrimSpace(out.String())
 }
 
+// cleanContextLine is cleanContextText folded to one line: runs of white space, line breaks included, become one space. A
+// note or a title is listed in the system prompt as one "- " item; with its own line breaks a text that came from a node, a
+// device name or a User-Agent could open what looks like a section of the prompt.
+func cleanContextLine(s string, limit int) string {
+	return strings.Join(strings.Fields(cleanContextText(s, limit)), " ")
+}
+
 var assistantCredentialLabel = regexp.MustCompile(`(?i)(^|[^[:alnum:]_])((?:password|passwd|pwd|pass|secret|token|api[\s_-]*key|private[\s_-]*key|key|license(?:[\s_-]*key)?|licence(?:[\s_-]*key)?|пароль|токен|ключ|лицензия))(\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)`)
 
 func redactUserMessage(s string) string {
