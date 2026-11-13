@@ -93,8 +93,8 @@ func (c *client) do(ctx context.Context, method, path string, body string, key s
 			}
 		}
 		if ae.RetryAfter <= 0 {
-			if n, err := strconv.Atoi(strings.TrimSpace(resp.Header.Get("Retry-After"))); err == nil && n > 0 {
-				ae.RetryAfter = time.Duration(n) * time.Second
+			if n, err := strconv.ParseInt(strings.TrimSpace(resp.Header.Get("Retry-After")), 10, 64); err == nil && n > 0 {
+				ae.RetryAfter = retryFor(n)
 			}
 		}
 		return resp.Header, ae
@@ -118,18 +118,29 @@ func safeCode(s string) string {
 	return s
 }
 
+// maxRetryAfter caps what the upstream may ask us to wait: a hold is stored and is not lifted by a settings save.
+const maxRetryAfter = 24 * time.Hour
+
+// retryFor is n seconds as a wait, at most maxRetryAfter (and safe from overflow).
+func retryFor(n int64) time.Duration {
+	if n >= int64(maxRetryAfter/time.Second) {
+		return maxRetryAfter
+	}
+	return time.Duration(n) * time.Second
+}
+
 func retryAfter(raw json.RawMessage) time.Duration {
 	if len(raw) == 0 || string(raw) == "null" {
 		return 0
 	}
 	var n int64
 	if json.Unmarshal(raw, &n) == nil && n > 0 {
-		return time.Duration(n) * time.Second
+		return retryFor(n)
 	}
 	var s string
 	if json.Unmarshal(raw, &s) == nil {
 		if n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64); err == nil && n > 0 {
-			return time.Duration(n) * time.Second
+			return retryFor(n)
 		}
 	}
 	return 0
