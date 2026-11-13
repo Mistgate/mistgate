@@ -111,7 +111,7 @@ describe("Server operating system", () => {
     expect(text).toContain("Offline");
     // what the panel can do (several nodes in one run, ordinary packages) and what stays by hand (its own server); not the owner: no button
     expect(text).toContain("Mistgate installs the security updates (or every package) and reboots servers from the panel. Tick several nodes to update them in one run, the quietest first.");
-    expect(text).toContain("The panel's own server is updated over SSH.");
+    expect(text).toContain("Update the panel's own server over SSH for now.");
     expect(host!.querySelector("button")).toBeNull();
   });
 
