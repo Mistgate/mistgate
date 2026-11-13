@@ -8,7 +8,7 @@ import { parseInline, safeHttpsUrl, type Inline } from "@/components/mini-markdo
 // notes (components/mini-markdown): React elements built from strings, no raw HTML, no images (an image URL would send data
 // out by itself). On top of the notes' subset: fenced code blocks, headings by level, numbered and nested lists, tables,
 // quotes and rules, and links to the admin's own pages ("/nodes/nod_…") as router links. Other links only when they parse
-// as https, shown with their host and opened apart.
+// as https, shown with their host as text beside the link (what a title would hide) and opened apart.
 
 type Item = { text: Inline[]; children: Inline[][] };
 
@@ -239,10 +239,15 @@ function inline(nodes: Inline[], ctx: Ctx): ReactNode[] {
         const href = safeHttpsUrl(n.href);
         if (!href) return n.text;
         return (
-          <a key={i} href={href} target="_blank" rel="noopener noreferrer" title={href} className="text-accent-text underline decoration-accent-line underline-offset-2">
-            {n.text}
-            <Icon name="externalLink" size={11} className="ms-0.5 inline-block align-[-1px]" />
-          </a>
+          <Fragment key={i}>
+            <a href={href} target="_blank" rel="noopener noreferrer" title={href} className="text-accent-text underline decoration-accent-line underline-offset-2">
+              {n.text}
+              <Icon name="externalLink" size={11} className="ms-0.5 inline-block align-[-1px]" />
+            </a>
+            <span data-link-host="" className="ms-1 text-[0.85em] break-all text-muted">
+              {new URL(href).hostname}
+            </span>
+          </Fragment>
         );
       }
     }

