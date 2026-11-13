@@ -20,7 +20,8 @@ import { OsSection } from "@/screens/updates/os";
 
 // Development only, /dev-kit?only=os: the OS update of a node (Updates -> Server operating system, and the node's Server tab)
 // in each state, on made-up data: updates waiting, a job running (installing, rebooting), a stopped run with its reason and
-// Close, an old agent, an offline node, a finished run, nothing to install. The calls are answered here and nothing goes to
+// Close, an old agent, an offline node, a finished run, nothing to install; a green node with ordinary packages waiting, a reboot
+// that is not possible yet, the check that waits for named profiles, a refusal that closed itself. The calls are answered here and nothing goes to
 // the network. ?dialog=install|reboot|warn opens the confirmation window in its own block; ?menu=open shows the ⋯ menu of a
 // table row open (an open menu holds the page still, so it is not open by default and comes first); ?lang=ru|fa|zh|tr is the page's.
 
@@ -38,7 +39,7 @@ const base = {
 };
 const node = (over: Record<string, unknown>) => ({
   nodeId: "nod_de1", name: "de1", connected: true, supported: true, onlineUsers: 0, onPanelServer: false, state: OsUpdateState.UP_TO_DATE, status: { ...base },
-  updateCapable: true, updateBlock: "", rebootBlock: "", ...over,
+  updateCapable: true, updateBlock: "", rebootBlock: "", rebootPossibleUnix: 0, ...over,
 });
 const step = (nodeId: string, nodeName: string, over: Record<string, unknown>) => ({
   nodeId, nodeName, state: OsStepState.PASSED, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: 0, rebootUnix: 0, backUnix: 0, finishedUnix: 0, errorKey: "", params: {}, ...over,
@@ -97,8 +98,8 @@ const scenes = {
   heldOnly: answer(
     [node({ nodeId: "nod_fi1", name: "fi1", state: OsUpdateState.UP_TO_DATE, updateBlock: "rollout_active", rebootBlock: "rollout_active" })],
     rollout(
-      [step("nod_fi1", "fi1", { state: OsStepState.FAILED, errorKey: "reboot_held", params: { code: "too_soon", mode: "reboot_only" }, sentUnix: now - 900, finishedUnix: now - 420 })],
-      { mode: OsRolloutMode.REBOOT_ONLY, reboot: OsRebootPolicy.ALWAYS, status: OsRolloutStatus.PAUSED, pauseKey: "reboot_held", pauseParams: { node: "fi1", reason: "reboot_held", code: "too_soon", mode: "reboot_only" } },
+      [step("nod_fi1", "fi1", { state: OsStepState.FAILED, errorKey: "reboot_held", params: { code: "boot_entry_missing", mode: "reboot_only" }, sentUnix: now - 900, finishedUnix: now - 420 })],
+      { mode: OsRolloutMode.REBOOT_ONLY, reboot: OsRebootPolicy.ALWAYS, status: OsRolloutStatus.PAUSED, pauseKey: "reboot_held", pauseParams: { node: "fi1", reason: "reboot_held", code: "boot_entry_missing", mode: "reboot_only" } },
     ),
   ),
   lost: answer(
@@ -115,7 +116,7 @@ const scenes = {
   refused: answer(
     [node({ nodeId: "nod_nl1", name: "nl1", state: OsUpdateState.UPDATES, status: { ...base, pending: 6, security: 2 }, onlineUsers: 3 })],
     rollout(
-      [step("nod_nl1", "nl1", { state: OsStepState.FAILED, errorKey: "agent_refused", params: { code: "busy", mode: "security" }, sentUnix: now - 100, finishedUnix: now - 90 })],
+      [step("nod_nl1", "nl1", { state: OsStepState.FAILED, errorKey: "agent_refused", params: { code: "disk_full", mode: "security" }, sentUnix: now - 100, finishedUnix: now - 90 })],
       { status: OsRolloutStatus.FAILED, finishedUnix: now - 90 },
     ),
   ),
@@ -124,6 +125,37 @@ const scenes = {
     rollout(
       [step("nod_fi1", "fi1", { state: OsStepState.FAILED, errorKey: "not_back", sentUnix: now - 2400, rebootUnix: now - 1800, finishedUnix: now - 900 })],
       { status: OsRolloutStatus.PAUSED, pauseKey: "not_back", pauseParams: { node: "fi1" } },
+    ),
+  ),
+  // no security update and no reboot due, but 18 ordinary packages wait: green, the packages are a quiet note beside the count
+  allGood: answer([
+    node({ name: "de1", onlineUsers: 4, updateBlock: "nothing_to_do", status: { ...base, pending: 18 } }),
+    node({ nodeId: "nod_nl1", name: "nl1", onlineUsers: 2, updateBlock: "nothing_to_do" }),
+    node({ nodeId: "nod_fi1", name: "fi1", onlineUsers: 0, state: OsUpdateState.REBOOT_REQUIRED, status: waiting }),
+  ]),
+  // rebooted a short while ago: the Reboot action is off until the node and the panel's own limit allow it
+  rebootWait: answer([
+    node({ name: "de1", onlineUsers: 5, updateBlock: "nothing_to_do", status: { ...base, pending: 7 }, rebootBlock: "reboot_wait", rebootPossibleUnix: now + 11 * 60 + 20 }),
+  ]),
+  // the check after the reboot waits for two profiles; 3 minutes of up to 8
+  gateWaiting: answer(
+    [node({ nodeId: "nod_nl1", name: "nl1", state: OsUpdateState.BUSY, status: { ...base, pending: 6, security: 2 }, updateBlock: "rollout_active", rebootBlock: "rollout_active" })],
+    rollout(
+      [
+        step("nod_nl1", "nl1", {
+          state: OsStepState.GATING, kernelFrom: "6.8.0-147-generic", kernelTo: "6.8.0-150-generic", sentUnix: now - 700, rebootUnix: now - 400, backUnix: now - 190,
+          params: { mode: "security", gate_for: "profiles", gate_names: JSON.stringify(["Berlin main", "Berlin backup"]), gate_max_s: "480" },
+        }),
+      ],
+      {},
+    ),
+  ),
+  // the node asked to wait (a reboot 20 minutes after the last one): the run closed itself, one neutral note stays on the node
+  tryLater: answer(
+    [node({ name: "de1", onlineUsers: 5, updateBlock: "nothing_to_do", status: { ...base, pending: 7 } })],
+    rollout(
+      [step("nod_de1", "de1", { state: OsStepState.SKIPPED, errorKey: "try_later", params: { code: "reboot_limit", mode: "reboot_only" }, sentUnix: now - 100, finishedUnix: now - 90 })],
+      { mode: OsRolloutMode.REBOOT_ONLY, reboot: OsRebootPolicy.ALWAYS, status: OsRolloutStatus.DONE, finishedUnix: now - 90 },
     ),
   ),
   kernelsClean: answer([kernelsClean]),
@@ -251,7 +283,19 @@ export function OsKit() {
       <Shot id="os-gating" title="nl1: updates installed without a reboot, the panel checks the profiles" data={scenes.gating}>
         <Both data={scenes.gating} />
       </Shot>
-      <Shot id="os-refused" title="nl1: the node refused, nothing happened on the server (no Close, no alert)" data={scenes.refused}>
+      <Shot id="os-allgood" title="Security is in order: de1 has 18 ordinary packages waiting and is still green (a quiet note), nl1 has none, fi1 needs a reboot" data={scenes.allGood}>
+        <Both data={scenes.allGood} />
+      </Shot>
+      <Shot id="os-reboot-wait" title="de1: rebooted a short while ago, Reboot is off with &quot;Reboot possible in 12 min&quot;, installing stays on" data={scenes.rebootWait}>
+        <Both data={scenes.rebootWait} />
+      </Shot>
+      <Shot id="os-gate-waiting" title="nl1: back after the reboot, the check waits for two named profiles (3 min of up to 8)" data={scenes.gateWaiting}>
+        <Both data={scenes.gateWaiting} />
+      </Shot>
+      <Shot id="os-try-later" title="de1: the node asked to wait, the run closed itself: a neutral note, no Close, nothing held up" data={scenes.tryLater}>
+        <Both data={scenes.tryLater} />
+      </Shot>
+      <Shot id="os-refused" title="nl1: the node refused (disk full), nothing happened on the server (no Close, no alert, nothing held up)" data={scenes.refused}>
         <Both data={scenes.refused} />
       </Shot>
       <Shot id="os-kernels-clean" title="de1: the kernel table, all in order (Next boot: ready; open it with the title)" data={scenes.kernelsClean}>

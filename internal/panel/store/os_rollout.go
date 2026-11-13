@@ -231,6 +231,26 @@ func (s *Store) PruneOsRollouts(ctx context.Context, keep int, cutoff time.Time)
 	return res.RowsAffected()
 }
 
+// OsRebootsSince lists, per node, when the panel's OS jobs rebooted it (os_step.reboot_at) at or after since, oldest first. A
+// step that never reached its reboot has no such time.
+func (s *Store) OsRebootsSince(ctx context.Context, since time.Time) (map[string][]time.Time, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT node_id, reboot_at FROM os_step WHERE reboot_at > 0 AND reboot_at >= ? ORDER BY reboot_at`, unix(since))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]time.Time{}
+	for rows.Next() {
+		var id string
+		var at int64
+		if err := rows.Scan(&id, &at); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], fromUnix(at))
+	}
+	return out, rows.Err()
+}
+
 // OsJobEvents returns, oldest first, the events an agent raised for one OS job (os_update_started, os_reboot_started,
 // os_update_done, os_update_failed). They are the reliable record of how a job ended: the status snapshot is sent once and
 // may be lost. An agent can raise one more than once; the caller reads them by job id and takes the first end it finds.

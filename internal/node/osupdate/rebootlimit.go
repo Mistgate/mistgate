@@ -16,8 +16,8 @@ import (
 // the keyboard. A history that cannot be trusted (unreadable, or ahead of the clock) stops a panel job's reboot.
 const (
 	RebootsFileName = "os-reboots.json"
-	maxRebootsHour  = 1
-	maxRebootsDay   = 3
+	MaxRebootsHour  = 1
+	MaxRebootsDay   = 3
 	// clockSkew is how far ahead of the clock the newest record may be before the clock is called wrong.
 	clockSkew = time.Minute
 )
@@ -81,10 +81,10 @@ func (r *run) rebootLimitProblem() string {
 		}
 	}
 	switch {
-	case hour >= maxRebootsHour:
-		return fmt.Sprintf("this node was rebooted less than an hour ago; a panel job reboots it %d time per hour at most", maxRebootsHour)
-	case day >= maxRebootsDay:
-		return fmt.Sprintf("this node was rebooted %d times in the last 24 hours; a panel job reboots it %d times a day at most", day, maxRebootsDay)
+	case hour >= MaxRebootsHour:
+		return fmt.Sprintf("this node was rebooted less than an hour ago; a panel job reboots it %d time per hour at most", MaxRebootsHour)
+	case day >= MaxRebootsDay:
+		return fmt.Sprintf("this node was rebooted %d times in the last 24 hours; a panel job reboots it %d times a day at most", day, MaxRebootsDay)
 	}
 	return ""
 }

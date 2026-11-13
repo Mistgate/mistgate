@@ -124,7 +124,7 @@ func TestOsFinishedAnswerOnlyAcknowledges(t *testing.T) {
 		if calls == 1 {
 			return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("no answer"))
 		}
-		return &agentv1.CommandResult{Ok: true, Params: map[string]string{"state": osupdate.AnswerFinished, "job_id": req.JobID, "result": "failed", "code": osupdate.CodeRebootLimit}}, nil
+		return &agentv1.CommandResult{Ok: true, Params: map[string]string{"state": osupdate.AnswerFinished, "job_id": req.JobID, "result": "failed", "code": osupdate.CodeBootEntryMissing}}, nil
 	}
 	e.startOs(id, store.OsModeRebootOnly, store.OsRebootAlways)
 	e.osTick()
@@ -136,10 +136,10 @@ func TestOsFinishedAnswerOnlyAcknowledges(t *testing.T) {
 	}
 	e.wantOsRollout(store.RolloutRunning, "")
 	// the end the node reported by event: a reboot it held
-	e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeRebootLimit, "reboot": "held"})
+	e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeBootEntryMissing, "reboot": "held"})
 	e.osTick()
 	got := e.wantOsStep(id, store.OsStepFailed, osErrRebootHeld)
-	if got.Params["code"] != osupdate.CodeRebootLimit || got.Params["reboot"] != "held" {
+	if got.Params["code"] != osupdate.CodeBootEntryMissing || got.Params["reboot"] != "held" {
 		t.Fatalf("params %+v", got.Params)
 	}
 	e.wantOsRollout(store.RolloutPaused, pauseOsRebootHeld)

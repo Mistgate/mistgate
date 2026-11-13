@@ -4,7 +4,7 @@ import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
-import { osRows, osSystem, useOsUpdates, type OsRow } from "@/lib/os-updates";
+import { osRows, osSystem, osUpdatesLine, useOsUpdates, type OsRow } from "@/lib/os-updates";
 import { OsNodeActions } from "@/screens/updates/os-actions";
 import { OsKernels } from "@/screens/updates/os-kernels";
 import { Panel } from "@/screens/users/ui";
@@ -29,6 +29,7 @@ export function OsFacts({ row }: { row: OsRow }) {
   const next = s.kernelNewest && s.kernelNewest !== s.kernelRunning ? s.kernelNewest : "";
   const packages = s.rebootReasons.filter((r) => r !== "kernel");
   const why = s.rebootReasons.includes("kernel") && s.kernelNewest ? t("up.os.reboot.kernel", { version: s.kernelNewest }) : packages.length > 0 ? t("up.os.reboot.packages", { names: packages.slice(0, 3).join(", ") }) : "";
+  const updates = osUpdatesLine(t, s);
   const auto = s.autoUpdates === "on" || s.autoUpdates === "off" || s.autoUpdates === "not_installed" ? t(`os.auto.${s.autoUpdates}`) : "—";
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
@@ -37,8 +38,9 @@ export function OsFacts({ row }: { row: OsRow }) {
         <span dir="ltr" className="block font-mono whitespace-nowrap">{s.kernelRunning || "—"}</span>
         {next && <span dir="ltr" className={cx("block font-mono whitespace-nowrap", kindTextClass.warn)}>→ {next}</span>}
       </Fact>
-      <Fact label={t("os.fact.updates")} tone={s.security > 0 ? "warn" : undefined}>
-        {s.pending === 0 ? t("up.os.updates.none") : s.security > 0 ? t("up.os.updates.security", { n: s.pending, s: s.security }) : t("up.os.updates.count", { n: s.pending })}
+      <Fact label={t("os.fact.updates")} tone={updates.warn ? "warn" : undefined}>
+        {updates.main}
+        {updates.note && <span className="block text-muted">{updates.note}</span>}
       </Fact>
       <Fact label={t("os.fact.reboot")} tone={s.rebootRequired ? "warn" : undefined}>
         {s.rebootRequired ? [t("os.fact.reboot.yes"), why].filter(Boolean).join(" · ") : t("os.fact.reboot.no")}

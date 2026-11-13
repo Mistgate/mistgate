@@ -78,8 +78,8 @@ const answer = {
   nodes: [
     { nodeId: "nod_1", name: "de1", connected: true, supported: true, onlineUsers: 4, onPanelServer: false, state: OsUpdateState.REBOOT_REQUIRED,
       status: { ...base, pending: 12, security: 4, kernelNewest: "6.8.0-150-generic", rebootRequired: true, rebootReasons: ["kernel"], autoUpdates: "off" } },
-    { nodeId: "nod_2", name: "nl1", connected: true, supported: true, onlineUsers: 0, onPanelServer: false, state: OsUpdateState.UPDATES,
-      status: { ...base, distroId: "debian", distroVersion: "13", pending: 3, apt: "locked" } },
+    { nodeId: "nod_2", name: "nl1", connected: true, supported: true, onlineUsers: 0, onPanelServer: false, state: OsUpdateState.UP_TO_DATE,
+      status: { ...base, distroId: "debian", distroVersion: "13", pending: 3 } },
     { nodeId: "nod_3", name: "fi1", connected: true, supported: false, onlineUsers: 1, onPanelServer: false, state: OsUpdateState.UNSUPPORTED },
     { nodeId: "nod_4", name: "msk1", connected: false, supported: true, onlineUsers: 0, onPanelServer: false, state: OsUpdateState.OFFLINE },
   ],
@@ -100,11 +100,12 @@ describe("Server operating system", () => {
     expect(text).toContain("to start kernel 6.8.0-150-generic");
     expect(text).toContain("12 waiting · 4 security");
     expect(text).toContain("Automatic security updates are off");
-    // nl1: plain updates stay quiet, the busy package manager is called out
+    // nl1: ordinary updates are a quiet note beside the count, and do not take the green away
     expect(text).toContain("Debian 13");
-    expect(text).toContain("3 waiting");
-    expect(text).toContain("Updates available");
-    expect(text).toContain("Another package manager is running there now");
+    expect(text).toContain("No security updates");
+    expect(text).toContain("3 ordinary updates");
+    expect(text).toContain("Security up to date");
+    expect(text).not.toContain("Updates available");
     // fi1 has an older agent, msk1 is offline
     expect(text).toContain("Update the node agent to see this server's system");
     expect(text).toContain("Offline");

@@ -389,12 +389,12 @@ func TestOsRolloutRefusedByTheNodeEndsTheRunWithoutPausingAndNextTryUsesANewJobI
 	id := e.osNode("de1")
 	other := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1", capUpdate, capGuard}})
 	e.fl.onOs = func(_ string, req OsJobRequest) (*agentv1.CommandResult, error) {
-		return &agentv1.CommandResult{Ok: true, Params: map[string]string{"state": osupdate.AnswerUnsupported, "code": osupdate.CodeBusy, "reason": "another OS job is running"}}, nil
+		return &agentv1.CommandResult{Ok: true, Params: map[string]string{"state": osupdate.AnswerUnsupported, "code": osupdate.CodeDiskFull, "reason": "the disk is full"}}, nil
 	}
 	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick()
 	x := e.wantOsStep(id, store.OsStepFailed, osErrAgentRefused)
-	if x.Params["code"] != osupdate.CodeBusy {
+	if x.Params["code"] != osupdate.CodeDiskFull {
 		t.Fatalf("params %+v", x.Params)
 	}
 	// nothing happened on the node: the run is over, not paused, with no alert, and nothing else is held up
@@ -459,9 +459,11 @@ func TestOsRolloutAnswerRunningOtherJobFailsTheStep(t *testing.T) {
 	}
 	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick()
-	if x := e.wantOsStep(id, store.OsStepFailed, osErrAgentRefused); x.Params["code"] != osupdate.CodeBusy {
+	// another job on the node: nothing changed and nothing is wrong, so the step only says "try later" and the run is over
+	if x := e.wantOsStep(id, store.OsStepSkipped, osErrTryLater); x.Params["code"] != osupdate.CodeBusy {
 		t.Fatalf("params %+v", x.Params)
 	}
+	e.wantOsRollout(store.RolloutDone, "")
 }
 
 func TestOsRolloutNodeCodesAreOnlyTheKnownOnes(t *testing.T) {

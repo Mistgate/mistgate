@@ -68,13 +68,25 @@ func (s *Service) extConds(ctx context.Context) []ExtCond {
 // those are the node's own faults, not a lossy path). failedFor is how long the failure has lasted: the shortest, over the
 // failed inbounds, span from the first to the last round of their current failed run.
 func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, timeoutsOnly bool, failedFor time.Duration, err error) {
+	probeable, ok, failed, timeoutsOnly, failedFor, _, err = s.checksSince(ctx, nodeID, since)
+	return probeable, ok, failed, timeoutsOnly, failedFor, err
+}
+
+// NodeChecksPending lists the inbounds NodeChecksSince does not count as ok: probeable, and without an OK round that ended at
+// or after since. The OS update shows their profiles while it waits for the node to settle.
+func (s *Service) NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error) {
+	_, _, _, _, _, pending, err := s.checksSince(ctx, nodeID, since)
+	return pending, err
+}
+
+func (s *Service) checksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, timeoutsOnly bool, failedFor time.Duration, pending []string, err error) {
 	sn, err := s.snapshot(ctx)
 	if err != nil {
-		return 0, 0, 0, false, 0, err
+		return 0, 0, 0, false, 0, nil, err
 	}
 	live, err := s.liveNode(ctx, nodeID)
 	if err != nil {
-		return 0, 0, 0, false, 0, err
+		return 0, 0, 0, false, 0, nil, err
 	}
 	timeoutsOnly = true
 	for _, t := range sn.byNode[nodeID] {
@@ -84,6 +96,7 @@ func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time
 		probeable++
 		c := s.cellOf(ctx, t.in.ID)
 		if c.last == nil || c.last.At.Before(since) {
+			pending = append(pending, t.in.ID)
 			continue
 		}
 		if c.last.Status == adminv1.CheckStatus_CHECK_STATUS_OK {
@@ -91,13 +104,14 @@ func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time
 			continue
 		}
 		failed++
+		pending = append(pending, t.in.ID)
 		only, span := s.failedRun(ctx, t.in.ID, since)
 		timeoutsOnly = timeoutsOnly && only
 		if failed == 1 || span < failedFor {
 			failedFor = span
 		}
 	}
-	return probeable, ok, failed, timeoutsOnly && failed > 0, failedFor, nil
+	return probeable, ok, failed, timeoutsOnly && failed > 0, failedFor, pending, nil
 }
 
 // failedRun reads the stored rounds of an inbound since `since` (newest first): only = every non-OK round among them is a

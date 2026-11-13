@@ -36,7 +36,8 @@ import (
 //	pending   -> skipped     offline, unsupported, the panel's own server, busy, nothing to do, or cancelled
 //
 // A failed step pauses the rollout (the alert os_update_failed is open) until the owner cancels it: packages cannot be rolled
-// back, and no other rollout of any kind starts meanwhile.
+// back, and no other rollout of any kind starts meanwhile. A refusal where nothing was changed and the node only asks to wait
+// (osRetryLater) is not such a failure: the step is SKIPPED (try_later) and the rollout ends by itself, with a note on the node.
 
 // OsJobRequest is the enumerated content of UpdateOs (agent.proto): nothing else is ever sent to a node.
 type OsJobRequest struct{ Action, Mode, Reboot, JobID string }
@@ -118,6 +119,9 @@ func (s *Service) osGlobalNow(ctx context.Context) (osGlobal, error) {
 type osNode struct {
 	connected, updateCap, supported, onPanel, awgBuilding, busy bool
 	status                                                      *agentv1.OsStatus
+	// rebootAt is when a reboot becomes possible (osRebootWait), zero when it is possible now; rebootCode is the limit that holds it.
+	rebootAt   time.Time
+	rebootCode string
 }
 
 // osBlock is why an OS job cannot be started on the node now, "" when it can. reboot asks for a plain reboot, which needs no
@@ -143,6 +147,8 @@ func osBlock(g osGlobal, n osNode, reboot bool) string {
 		return blockAwgBuild
 	case n.busy:
 		return blockNodeBusy
+	case reboot && !n.rebootAt.IsZero():
+		return blockRebootWait
 	case reboot:
 		return ""
 	case n.status == nil:
@@ -154,9 +160,10 @@ func osBlock(g osGlobal, n osNode, reboot bool) string {
 }
 
 // osNodeOf collects the facts of one node for osBlock. nodeHost is the node's host name, "" when unknown.
-func (s *Service) osNodeOf(n store.NodeRow, connected bool, status *agentv1.OsStatus, host *agentv1.OsStatus, nodeHost string, nowUnix int64) osNode {
+func (s *Service) osNodeOf(n store.NodeRow, connected bool, status *agentv1.OsStatus, host *agentv1.OsStatus, nodeHost string, nowUnix int64, reboots []time.Time) osNode {
 	capable := slices.Contains(n.AgentCaps, osupdate.Capability)
-	return osNode{
+	at, code := osRebootWait(n.BootAt, reboots, time.Unix(nowUnix, 0))
+	return osNode{rebootAt: at, rebootCode: code,
 		connected: connected, updateCap: slices.Contains(n.AgentCaps, osupdate.CapabilityUpdate),
 		supported: osUpdateSupported(capable, status), onPanel: s.onPanelServer(status, host, nodeHost),
 		awgBuilding: n.AwgPrepare().State == store.AwgPrepareRunning,
@@ -242,7 +249,7 @@ func (s *Service) startOs(ctx context.Context, nodeIDs []string, mode, reboot st
 	if err != nil {
 		return store.OsRolloutRow{}, s.internal("read node facts", err)
 	}
-	node := s.osNodeOf(n, live.Connected, status, s.PanelHostOsStatus(), facts.Hostname, s.now().Unix())
+	node := s.osNodeOf(n, live.Connected, status, s.PanelHostOsStatus(), facts.Hostname, s.now().Unix(), s.osRebootsOf(ctx, n.ID, s.now()))
 	node.busy = node.busy || s.inflight[n.ID] // a rollback of the agent is on its way
 	reason := osBlock(g, node, mode == store.OsModeRebootOnly)
 	if reason == "" && mode == store.OsModeRebootOnly && reboot == store.OsRebootIfRequired && status != nil && !status.GetRebootRequired() {
@@ -470,7 +477,7 @@ func (p *osPass) save(x *store.OsStepRow) bool {
 func (p *osPass) finish(x *store.OsStepRow, state, key string, extra map[string]string) bool {
 	updated := *x
 	updated.State, updated.ErrorKey, updated.FinishedAt, updated.Phase = state, key, p.now, ""
-	updated.Params = mergeParams(x.Params, extra)
+	updated.Params = withoutGateWait(mergeParams(x.Params, extra))
 	if !p.save(&updated) {
 		return false
 	}
@@ -578,7 +585,7 @@ func (p *osPass) launch() {
 		status := p.status(x.NodeID)
 		reboot := p.ro.Mode == store.OsModeRebootOnly
 		// The rollout itself is the one running: only what is true of the node counts here.
-		node := s.osNodeOf(n, live.Connected, status, s.PanelHostOsStatus(), facts.Hostname, p.now.Unix())
+		node := s.osNodeOf(n, live.Connected, status, s.PanelHostOsStatus(), facts.Hostname, p.now.Unix(), s.osRebootsOf(p.ctx, x.NodeID, p.now))
 		node.busy = node.busy || s.inflight[x.NodeID]
 		switch osBlock(osGlobal{}, node, reboot) {
 		case blockOffline:
@@ -589,6 +596,8 @@ func (p *osPass) launch() {
 			p.finish(x, store.OsStepSkipped, osErrPanelHost, nil)
 		case blockNodeBusy, blockAwgBuild:
 			p.finish(x, store.OsStepSkipped, osErrBusy, nil)
+		case blockRebootWait:
+			p.skipTryLater(x, node.rebootCode)
 		case blockNothingToDo:
 			if reboot {
 				p.finish(x, store.OsStepSkipped, osErrNotRequired, nil)
@@ -696,6 +705,10 @@ func (p *osPass) applyAnswer(x *store.OsStepRow, res *agentv1.CommandResult, err
 		if x.Sends > 1 {
 			return
 		}
+		if c := osCode(code); slices.Contains(osRetryLater, c) {
+			p.skipTryLater(x, c) // nothing happened and nothing is wrong: a note on the node, nothing to close
+			return
+		}
 		p.finish(x, store.OsStepFailed, osErrAgentRefused, map[string]string{"code": osCode(code)})
 	}
 	ack := func() {
@@ -749,7 +762,11 @@ func osCode(c string) string {
 // osJobView is what the panel knows about one job from the node: the snapshot's job and the events raised for it.
 type osJobView struct {
 	state, phase, code, reason, pkg, reboot, heldReason, kernelTo, kernel, upgraded string
-	rebooting                                                                       bool
+	// reasons are all the codes that blocked a reboot, comma separated (the event of a failed job carries them, the snapshot does not).
+	reasons   string
+	rebooting bool
+	// snapshot: state, upgraded and reboot come from the node's snapshot of this job, which counts the packages it installed.
+	snapshot bool
 }
 
 // job reads the job of the step. The snapshot says how far it is; the events are the reliable record of how it ended (the
@@ -759,7 +776,7 @@ func (p *osPass) job(x *store.OsStepRow, status *agentv1.OsStatus) osJobView {
 	var v osJobView
 	if j := status.GetJob(); j != nil && j.GetJobId() == x.JobID {
 		v = osJobView{state: j.GetState(), phase: j.GetPhase(), code: j.GetCode(), reason: j.GetReason(), reboot: j.GetReboot(), heldReason: j.GetHeldReason(),
-			kernelTo: j.GetKernelTo(), upgraded: strconv.FormatUint(uint64(j.GetUpgraded()), 10), rebooting: j.GetPhase() == osupdate.PhaseRebooting}
+			kernelTo: j.GetKernelTo(), upgraded: strconv.FormatUint(uint64(j.GetUpgraded()), 10), rebooting: j.GetPhase() == osupdate.PhaseRebooting, snapshot: true}
 	}
 	events, err := p.s.st.OsJobEvents(p.ctx, x.NodeID, x.JobID, x.SentAt.Add(-10*time.Minute))
 	if err != nil {
@@ -783,6 +800,9 @@ func (p *osPass) job(x *store.OsStepRow, status *agentv1.OsStatus) osJobView {
 				v.upgraded, v.reboot, v.kernel, v.heldReason = e.Params["upgraded"], e.Params["reboot"], e.Params["kernel"], e.Params["held_reason"]
 			}
 		case "os_update_failed":
+			if v.reasons == "" {
+				v.reasons = e.Params["reasons"]
+			}
 			if !ended {
 				v.state, ended = osupdate.StateFailed, true
 				v.code, v.reason, v.pkg, v.reboot, v.kernel = e.Params["code"], e.Params["reason"], e.Params["package"], e.Params["reboot"], e.Params["kernel"]
@@ -838,6 +858,10 @@ func (p *osPass) applyJob(x *store.OsStepRow, v osJobView) {
 		}
 	case osupdate.StateDone:
 		extra := jobParams(v)
+		if code, ok := p.osNothingChanged(v); ok && v.reboot == osupdate.RebootHeld {
+			p.skipTryLater(x, code)
+			return
+		}
 		if v.reboot == osupdate.RebootHeld { // a node that finished with a reboot held
 			p.finishAndPause(x, osErrRebootHeld, extra, pauseOsRebootHeld)
 			return
@@ -853,6 +877,10 @@ func (p *osPass) applyJob(x *store.OsStepRow, v osJobView) {
 		p.save(x)
 	case osupdate.StateFailed:
 		extra := jobParams(v)
+		if code, ok := p.osNothingChanged(v); ok {
+			p.skipTryLater(x, code)
+			return
+		}
 		switch {
 		case v.reboot == osupdate.RebootHeld:
 			p.finishAndPause(x, osErrRebootHeld, extra, pauseOsRebootHeld)
@@ -998,6 +1026,8 @@ func (p *osPass) advanceGate(i int) {
 		p.finishAndPause(x, g.hard, g.with, pauseGateFailed)
 	case deadline && !g.wait:
 		p.finishAndPause(x, g.soft, g.with, pauseGateFailed)
+	default:
+		p.noteGateWait(x, g) // what the screen says while the step sits here
 	}
 }
 

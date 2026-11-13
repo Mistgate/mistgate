@@ -83,6 +83,40 @@ export function elapsedText(t: T, sinceUnix: number, nowSec: number): string {
   return s < 60 ? t("os.run.lessMin") : minutesText(t, Math.floor(s / 60));
 }
 
+/** The profile names a gating step is waiting for (`params.gate_names` is a JSON array the panel wrote); [] when it names none. */
+function gateNames(params: Record<string, string>): string[] {
+  try {
+    const v: unknown = JSON.parse(params.gate_names ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** What the check after the job still waits for, as the panel recorded it on the step; "" until it has said (or for an older panel). */
+export function gateWaitText(t: T, params: Record<string, string> = {}): string {
+  switch (params.gate_for) {
+    case "profiles": {
+      const names = gateNames(params).join(", ");
+      const more = Number(params.gate_more) || 0;
+      return names ? t(more > 0 ? "os.gate.profiles.more" : "os.gate.profiles", { names, n: more }) : "";
+    }
+    case "settings":
+    case "warp":
+    case "job":
+      return t(`os.gate.${params.gate_for}`);
+    default:
+      return "";
+  }
+}
+
+/** "Waited 3 min, up to 8 min": how long the check has gone on and the most it may take (`params.gate_max_s`); "" without the maximum. */
+export function gateWindowText(t: T, params: Record<string, string>, sinceUnix: number, nowSec: number): string {
+  const max = Number(params.gate_max_s) || 0;
+  if (max <= 0) return "";
+  return t("os.gate.window", { time: elapsedText(t, sinceUnix, nowSec), max: minutesText(t, Math.ceil(max / 60)) });
+}
+
 /** Why a node's agent refused or failed a job: "os.job.err.<code>"; a code nobody knows reads as "unknown"; install_failed names its package. */
 export function jobErrorText(t: T, code: string, pkg = ""): string {
   if (code === "install_failed" && pkg) return t("os.job.err.install_failed.pkg", { package: pkg });
@@ -90,7 +124,7 @@ export function jobErrorText(t: T, code: string, pkg = ""): string {
   return hasKey(key) ? t(key) : t("os.job.err.unknown");
 }
 
-const withJobCode = new Set(["agent_refused", "job_failed", "reboot_held"]);
+const withJobCode = new Set(["agent_refused", "job_failed", "reboot_held", "try_later"]);
 
 /** A reboot the node refused reads differently when nothing was installed first: `params.mode` of a step or a pause is "reboot_only". */
 const onlyReboot = (key: string, params: Record<string, string>) => key === "reboot_held" && params.mode === "reboot_only";
@@ -136,8 +170,8 @@ export function osAlertReason(t: T, p: Record<string, string>): string {
 
 /** The line of a finished step: "Done · kernel 6.8.0-150-generic · 6 packages installed · no reboot needed" (`lead` = false drops "Done": a pill beside it says it). */
 export function resultLine(t: T, step: OsStepRow, lead = true): string {
-  if (step.state === OsStepState.SKIPPED) return stepReason(t, step.errorKey, step.params).title;
-  if (step.state === OsStepState.FAILED) return reasonLine(t, step.errorKey, step.params);
+  // a skipped step that only says "not now" adds the node's own words (too soon, busy), as a failed one does
+  if (step.state === OsStepState.SKIPPED || step.state === OsStepState.FAILED) return reasonLine(t, step.errorKey, step.params);
   const p = step.params;
   const upgraded = Number(p.upgraded);
   const to = step.kernelTo || p.kernel || "";
@@ -147,8 +181,9 @@ export function resultLine(t: T, step: OsStepRow, lead = true): string {
   return [lead ? t("os.state.passed") : "", kernel, upgraded > 0 ? t.n("os.done.upgraded", upgraded) : "", reboot].filter(Boolean).join(" · ");
 }
 
-/** The pill of a step. */
-export function stepPill(step: Pick<OsStepRow, "state">): { kind: StatusKind; key: MessageKey } {
+/** The pill of a step. A step the node only asked to wait for ("try_later") is a neutral "Not now", not a skipped or a failed one. */
+export function stepPill(step: Pick<OsStepRow, "state"> & Partial<Pick<OsStepRow, "errorKey">>): { kind: StatusKind; key: MessageKey } {
+  if (step.state === OsStepState.SKIPPED && last(step.errorKey ?? "") === "try_later") return { kind: "off", key: "os.pill.later" };
   switch (step.state) {
     case OsStepState.PASSED:
       return { kind: "ok", key: "os.pill.passed" };
@@ -167,7 +202,10 @@ export function stepPill(step: Pick<OsStepRow, "state">): { kind: StatusKind; ke
 // What the buttons may do
 
 export type OsAction = "install" | "reboot" | "refresh";
-type Blocks = Pick<OsRow, "updateBlock" | "rebootBlock" | "rollout" | "step"> & Partial<Pick<OsRow, "status">>;
+type Blocks = Pick<OsRow, "updateBlock" | "rebootBlock" | "rollout" | "step"> & Partial<Pick<OsRow, "status" | "rebootPossibleUnix" | "nowUnix">>;
+
+/** Whole minutes (rounded up, at least 1) from `nowUnix` to `untilUnix`; 0 when that time has come. */
+export const minutesUntil = (untilUnix: number, nowUnix: number) => (untilUnix > nowUnix ? Math.max(1, Math.ceil((untilUnix - nowUnix) / 60)) : 0);
 
 /** Why an action is not available now ("" = it is): the server's word for the node, and any run that is not closed yet. */
 export function blockOf(row: Blocks, action: OsAction): string {
@@ -176,14 +214,26 @@ export function blockOf(row: Blocks, action: OsAction): string {
     return ["offline", "agent_old", "unsupported", "panel_host", "node_busy"].includes(row.updateBlock) ? row.updateBlock : row.step && stepOpen(row.step) ? "rollout_active" : "";
   }
   // a reboot the node's own kernel table says would be refused is off too, with that reason (the node refuses it all the same)
-  const own = action === "reboot" ? row.rebootBlock || kernelBlock(row.status) : row.updateBlock;
+  const own = action === "reboot" ? rebootWaitKey(row) || row.rebootBlock || kernelBlock(row.status) : row.updateBlock;
   return own || (rolloutBlocksOthers(row.rollout) ? "rollout_active" : "");
+}
+
+/**
+ * "reboot_wait:<minutes>" while the server says a reboot is not possible yet (the node was rebooted a short while ago), as the
+ * kernel table's block is a key with its data in it. A bare "reboot_wait" (from a refusal) reads without the minutes.
+ */
+function rebootWaitKey(row: Blocks): string {
+  if (row.rebootBlock !== "reboot_wait") return "";
+  const min = minutesUntil(row.rebootPossibleUnix ?? 0, row.nowUnix ?? 0);
+  return min > 0 ? `reboot_wait:${min}` : row.rebootBlock;
 }
 
 /** The words for a block key ("os.block.<key>"); a key from a newer panel reads as sent. */
 export function blockText(t: T, key: string): string {
   const kernel = parseKernelBlock(key);
   if (kernel) return t("up.os.kern.refused", { why: t(kernelWhyKey(kernel.code), { kernel: kernel.kernel }) });
+  const wait = /^reboot_wait:(\d+)$/.exec(key);
+  if (wait) return t("os.block.reboot_wait.in", { time: minutesText(t, Number(wait[1])) });
   const k = `os.block.${key}`;
   return hasKey(k) ? t(k) : key;
 }

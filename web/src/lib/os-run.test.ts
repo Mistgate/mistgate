@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { OsRolloutStatus, OsStepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { dictionaries, fill, langs, pickForm, type Lang, type T } from "@/i18n";
 import { en } from "@/i18n/en";
-import { blockKeys, blockOf, blockText, elapsedText, jobErrorText, osAlertReason, osAlertWhyKey, osRunOf, pauseCode, pauseText, phaseText, reasonLine, refreshText, resultLine, stepPill, stepReason, stepSince } from "./os-run";
+import { blockKeys, blockOf, blockText, elapsedText, gateWaitText, gateWindowText, jobErrorText, minutesUntil, osAlertReason, osAlertWhyKey, osRunOf, pauseCode, pauseText, phaseText, reasonLine, refreshText, resultLine, stepPill, stepReason, stepSince } from "./os-run";
 import { osPollMs, type OsRun, type OsStepRow } from "./os-updates";
 
 // The run of an OS update on one node: which text a state gets, and what the buttons may do.
@@ -274,5 +274,82 @@ describe("every sentence has its words in every language", () => {
   });
   it("never offers to reboot anyway", () => {
     for (const lang of langs) for (const [k, v] of Object.entries(dictionaries[lang])) if (k.startsWith("os.")) expect(v, `${lang} ${k}`).not.toMatch(/anyway|всё равно перезагр|force/i);
+  });
+});
+
+describe("a reboot that is not possible yet", () => {
+  const row = (over: Record<string, unknown> = {}) => ({ updateBlock: "", rebootBlock: "reboot_wait", rebootPossibleUnix: NOW + 11 * 60 + 20, nowUnix: NOW, rollout: undefined, step: undefined, ...over }) as never;
+  it("rounds the minutes up and never says 0", () => {
+    expect(minutesUntil(NOW + 1, NOW)).toBe(1);
+    expect(minutesUntil(NOW + 60, NOW)).toBe(1);
+    expect(minutesUntil(NOW + 61, NOW)).toBe(2);
+    expect(minutesUntil(NOW + 11 * 60 + 20, NOW)).toBe(12);
+    expect(minutesUntil(NOW, NOW)).toBe(0);
+    expect(minutesUntil(NOW - 5, NOW)).toBe(0);
+    expect(minutesUntil(0, NOW)).toBe(0);
+  });
+  it("turns the Reboot action off with the minutes, and leaves the install alone", () => {
+    expect(blockOf(row(), "reboot")).toBe("reboot_wait:12");
+    expect(blockOf(row(), "install")).toBe("");
+    expect(blockText(t, "reboot_wait:12")).toBe("Reboot possible in 12 min");
+    expect(blockText(tRu, "reboot_wait:12")).toBe("Перезагрузка возможна через 12 мин");
+    expect(blockText(t, "reboot_wait:95")).toBe("Reboot possible in 1 h 35 min");
+  });
+  it("reads without minutes when the server gave no time", () => {
+    expect(blockOf(row({ rebootPossibleUnix: 0 }), "reboot")).toBe("reboot_wait");
+    expect(blockText(t, "reboot_wait")).toBe("The node was rebooted a short while ago, so a reboot is possible a little later.");
+  });
+  it("is gone once the time has come", () => {
+    expect(blockOf(row({ rebootBlock: "", rebootPossibleUnix: NOW - 1 }), "reboot")).toBe("");
+  });
+  it("is said once for the install and the reboot when both are off for another reason", () => {
+    expect(blockKeys(row())).toEqual(["reboot_wait:12"]);
+    expect(blockKeys(row({ updateBlock: "node_busy", rebootBlock: "node_busy" }))).toEqual(["node_busy"]);
+  });
+});
+
+describe("a refusal that closed itself", () => {
+  const later = step({ state: OsStepState.SKIPPED, errorKey: "try_later", params: { code: "too_soon" }, finishedUnix: NOW - 60 });
+  it("is a neutral \"Not now\", not a failure and not a plain skip", () => {
+    expect(stepPill(later)).toEqual({ kind: "off", key: "os.pill.later" });
+    expect(stepPill(step({ state: OsStepState.SKIPPED, errorKey: "up_to_date" }))).toEqual({ kind: "off", key: "os.pill.skipped" });
+    expect(stepPill(step({ state: OsStepState.FAILED, errorKey: "agent_refused" })).kind).toBe("bad");
+    expect(t("os.pill.later")).toBe("Not now");
+  });
+  it("says that nothing changed, in the node's words", () => {
+    const line = resultLine(t, later, false);
+    expect(line).toContain("Not done, nothing on the server was changed.");
+    expect(line).toContain("The server restarted less than 10 minutes ago");
+    expect(resultLine(t, step({ ...later, params: { code: "busy" } }), false)).toContain("Another job is running on this server");
+    expect(resultLine(tRu, later, false)).toContain("Не выполнено, на сервере ничего не менялось.");
+  });
+  it("is a result that does not stop anything: the next OS update is not held up", () => {
+    const r = run([later], { status: OsRolloutStatus.DONE, finishedUnix: NOW - 60 });
+    expect(osRunOf({ step: later, rollout: r }, NOW)).toMatchObject({ kind: "result", stopped: false });
+    expect(blockOf({ updateBlock: "", rebootBlock: "", rollout: r, step: later }, "install")).toBe("");
+  });
+});
+
+describe("what the check waits for", () => {
+  const params = { gate_for: "profiles", gate_names: JSON.stringify(["Berlin main", "Berlin backup"]), gate_max_s: "480" };
+  it("names the profiles that have not passed", () => {
+    expect(gateWaitText(t, params)).toBe("Waiting for: Berlin main, Berlin backup");
+    expect(gateWaitText(t, { ...params, gate_more: "3" })).toBe("Waiting for: Berlin main, Berlin backup and 3 more");
+    expect(gateWaitText(tRu, params)).toBe("Ожидание профилей: Berlin main, Berlin backup");
+  });
+  it("names the kind of thing when it is not a profile, and stays quiet for an older panel", () => {
+    expect(gateWaitText(t, { gate_for: "warp" })).toBe("Waiting for the WARP exit to start.");
+    expect(gateWaitText(t, { gate_for: "settings" })).toBe("Waiting for the panel to apply the node's settings.");
+    expect(gateWaitText(t, { gate_for: "job" })).toBe("Waiting for the node to finish checking itself.");
+    expect(gateWaitText(t, {})).toBe("");
+    expect(gateWaitText(t, { gate_for: "profiles", gate_names: "not json" })).toBe("");
+    expect(gateWaitText(t, { gate_for: "profiles", gate_names: "[]" })).toBe("");
+  });
+  it("says how long it has waited and the most it may take", () => {
+    expect(gateWindowText(t, params, NOW - 190, NOW)).toBe("Waited 3 min, up to 8 min");
+    expect(gateWindowText(t, params, NOW - 20, NOW)).toBe("Waited under a minute, up to 8 min");
+    expect(gateWindowText(tRu, params, NOW - 190, NOW)).toBe("Прошло 3 мин, максимум 8 мин");
+    expect(gateWindowText(t, { gate_max_s: "500" }, NOW - 190, NOW)).toBe("Waited 3 min, up to 9 min");
+    expect(gateWindowText(t, {}, NOW - 190, NOW)).toBe("");
   });
 });

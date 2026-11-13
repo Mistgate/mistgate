@@ -6,7 +6,7 @@ import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
-import { osPill, osRows, osSummary, osSystem, useOsUpdates, type OsRow } from "@/lib/os-updates";
+import { osPill, osRows, osSummary, osSystem, osUpdatesLine, useOsUpdates, type OsRow } from "@/lib/os-updates";
 import { OsNodeActions, OsRowMenu } from "./os-actions";
 import { OsKernels } from "./os-kernels";
 
@@ -60,11 +60,11 @@ function Updates({ row, fmt }: { row: OsRow; fmt: Fmt }) {
   const t = useT();
   const s = row.status;
   if (!s || s.error) return <span className="text-xs text-faint">—</span>;
+  const line = osUpdatesLine(t, s);
   return (
     <div className="flex min-w-0 flex-col gap-0.5 text-xs">
-      <span className={cx("font-bold md:whitespace-nowrap", s.security > 0 && kindTextClass.warn)}>
-        {s.pending === 0 ? t("up.os.updates.none") : s.security > 0 ? t("up.os.updates.security", { n: s.pending, s: s.security }) : t("up.os.updates.count", { n: s.pending })}
-      </span>
+      <span className={cx("font-bold md:whitespace-nowrap", line.warn && kindTextClass.warn)}>{line.main}</span>
+      {line.note && <span className="text-[11px] text-muted">{line.note}</span>}
       <span className="text-[11px] text-muted">{s.listsUnix > 0 ? t("up.os.lists", { ago: fmt.ago(s.listsUnix) }) : t("up.os.lists.none")}</span>
     </div>
   );
@@ -113,7 +113,7 @@ function Summary({ rows }: { rows: OsRow[] }) {
   const parts: ReactNode[] = [];
   if (s.reboot > 0) parts.push(<span key="reboot" className={kindTextClass.warn}>{t("up.os.summary.reboot", { n: s.reboot })}</span>);
   if (s.security > 0) parts.push(<span key="security" className={kindTextClass.warn}>{t("up.os.summary.security", { n: s.security })}</span>);
-  if (parts.length === 0) parts.push(<span key="ok">{t(s.updates > 0 ? "up.os.summary.updates" : "up.os.summary.ok", { n: s.updates })}</span>);
+  if (parts.length === 0) parts.push(<span key="ok">{s.updates > 0 ? t.n("up.os.summary.updates", s.updates) : t("up.os.summary.ok")}</span>);
   return (
     <p className="flex flex-wrap gap-x-3 gap-y-1 text-[13px] font-semibold text-muted">
       {parts}

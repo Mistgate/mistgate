@@ -117,7 +117,7 @@ var osRolloutStart = changeSpec[osRolloutStartArgs]{
 	procs: procs(adminv1connect.UpdateServiceGetOsUpdatesProcedure, adminv1connect.UpdateServiceStartOsRolloutProcedure),
 	desc: "Install the security updates on ONE node now (mode security, optionally rebooting when a reboot is needed), or only reboot it " +
 		"(mode reboot_only). People on the node are disconnected while it reboots, about two minutes. The node refuses a reboot it cannot do safely; " +
-		"there is no override. For a fleet or a time window there is no tool yet. Needs the owner's approval in the admin panel.",
+		"there is no override. A reboot soon after the node booted, or after the panel last rebooted it, is refused when planning (reboot_block reboot_wait; reboot_possible_unix says when). For a fleet or a time window there is no tool yet. Needs the owner's approval in the admin panel.",
 	plan: func(c *call, a osRolloutStartArgs) (*planned, error) {
 		ids, err := uniqueIDs("node_ids", a.NodeIDs, true)
 		if err != nil {

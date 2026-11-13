@@ -136,7 +136,16 @@ func TestOsUpdateStateDoesNotTreatReadFailuresAsUpToDate(t *testing.T) {
 		// os-release could not be read: the host is unknown, not unsupported.
 		{"os-release unreadable", &agentv1.OsStatus{Apt: "unknown", Error: "read_failed"}, adminv1.OsUpdateState_OS_UPDATE_STATE_UNKNOWN},
 		// Debian testing and sid have no VERSION_ID; the state comes from the rest of the snapshot.
-		{"debian without version", &agentv1.OsStatus{DistroId: "debian", Apt: "ok", Pending: 1}, adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES},
+		{"debian without version", &agentv1.OsStatus{DistroId: "debian", Apt: "ok", Pending: 1, Security: 1}, adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES},
+		// ordinary packages waiting are a note beside the count, not the state: no security update and no reboot is "in order"
+		{"ordinary updates only", &agentv1.OsStatus{DistroId: "ubuntu", Apt: "ok", Pending: 18}, adminv1.OsUpdateState_OS_UPDATE_STATE_UP_TO_DATE},
+		{"security updates among others", &agentv1.OsStatus{DistroId: "ubuntu", Apt: "ok", Pending: 18, Security: 2}, adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES},
+		{"ordinary updates and a reboot due", &agentv1.OsStatus{DistroId: "ubuntu", Apt: "ok", Pending: 18, RebootRequired: true}, adminv1.OsUpdateState_OS_UPDATE_STATE_REBOOT_REQUIRED},
+		{"half-installed packages", &agentv1.OsStatus{DistroId: "ubuntu", Apt: "half_configured", Pending: 3}, adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES},
+		// a job that failed only because the node asked to wait changed nothing: it is not a failure of the server
+		{"job asked to wait", &agentv1.OsStatus{DistroId: "ubuntu", Apt: "ok", Pending: 2, Job: &agentv1.OsJob{State: "failed", Code: osupdate.CodeTooSoon, Reboot: "held", HeldReason: osupdate.CodeTooSoon}}, adminv1.OsUpdateState_OS_UPDATE_STATE_UP_TO_DATE},
+		{"job failed on a package", &agentv1.OsStatus{DistroId: "ubuntu", Apt: "ok", Job: &agentv1.OsJob{State: "failed", Code: osupdate.CodeInstallFailed}}, adminv1.OsUpdateState_OS_UPDATE_STATE_FAILED},
+		{"reboot held after packages were installed", &agentv1.OsStatus{DistroId: "ubuntu", Apt: "ok", Job: &agentv1.OsJob{State: "failed", Code: osupdate.CodeTooSoon, Upgraded: 3}}, adminv1.OsUpdateState_OS_UPDATE_STATE_FAILED},
 		{"other distribution", &agentv1.OsStatus{DistroId: "fedora", Apt: "ok"}, adminv1.OsUpdateState_OS_UPDATE_STATE_UNSUPPORTED},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -232,7 +241,7 @@ func TestGetOsUpdatesMarksAStaleStoredSnapshotUnknown(t *testing.T) {
 	now := e.clk.Now()
 	put := func(nodeID string, measured time.Time) {
 		t.Helper()
-		body, err := protojson.Marshal(&agentv1.OsStatus{MeasuredUnix: measured.Unix(), DistroId: "ubuntu", DistroVersion: "24.04", Pending: 2,
+		body, err := protojson.Marshal(&agentv1.OsStatus{MeasuredUnix: measured.Unix(), DistroId: "ubuntu", DistroVersion: "24.04", Pending: 2, Security: 1,
 			Apt: "ok", AutoUpdates: "on"})
 		if err != nil {
 			t.Fatal(err)

@@ -513,7 +513,8 @@ func newWorld() *world {
 			{Version: "6.8.0-1-generic", Running: true, Candidate: true, Image: true, Initrd: true, GrubEntry: true, Headers: "present", Module: "built", Packages: "ok"}},
 		AwgSource: "ok", RebootBlockers: []string{"initramfs_missing", "awg_module_missing"}}
 	w.osUpdates = &adminv1.GetOsUpdatesResponse{NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: 180, PanelHost: proto.Clone(osStatus).(*agentv1.OsStatus), Nodes: []*adminv1.NodeOs{
-		{NodeId: nodeA, Name: "de1", Connected: true, Supported: true, UpdateCapable: true, OnlineUsers: 3, State: adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES, Status: proto.Clone(osStatus).(*agentv1.OsStatus)},
+		{NodeId: nodeA, Name: "de1", Connected: true, Supported: true, UpdateCapable: true, OnlineUsers: 3, State: adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES, Status: proto.Clone(osStatus).(*agentv1.OsStatus),
+			RebootPossibleUnix: 1700000600},
 		{NodeId: nodeB, Name: "nl1", Connected: false, Supported: true, UpdateCapable: true, UpdateBlock: "offline", RebootBlock: "offline", State: adminv1.OsUpdateState_OS_UPDATE_STATE_OFFLINE},
 	}}
 	w.relay = newRelayFixture()

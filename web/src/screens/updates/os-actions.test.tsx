@@ -472,14 +472,14 @@ describe("a node that refused to start the update", () => {
     );
 
   it("ends the run with the usual result line and says nothing on the server changed: no alert, no Close", async () => {
-    await mount(actions(refused("busy")));
+    await mount(actions(refused("disk_full")));
     const pill = document.querySelector(".pill");
     expect(pill?.className).toContain("tone-bad");
     expect(document.querySelector("[role=alert]")).toBeNull();
     expect(button("Close")).toBeUndefined();
     expect(text()).not.toContain("Closing the update");
     expect(text()).toContain("The node did not start the update. Nothing on the server was changed.");
-    expect(text()).toContain("Another job is running on this server");
+    expect(text()).toContain("The disk is too full to install updates");
   });
 
   it("does not hold the node or any other: the next update may start at once", async () => {
@@ -491,7 +491,7 @@ describe("a node that refused to start the update", () => {
 
   it("says it in Russian too", async () => {
     setLang("ru");
-    await mount(actions(refused("busy")));
+    await mount(actions(refused("disk_full")));
     expect(text()).toContain("Нода не начала обновление. На сервере ничего не менялось.");
     expect(button("Закрыть")).toBeUndefined();
   });
@@ -520,5 +520,133 @@ describe("the card on the node's Server tab", () => {
   it("shows nothing for a node the list does not have (a retired one)", async () => {
     await mount(<OsCard nodeId="nod_gone" />, { seed: data([node()]) });
     expect(host!.textContent).toBe("");
+  });
+});
+
+describe("a reboot that is not possible yet", () => {
+  const waitFor = { rebootBlock: "reboot_wait", rebootPossibleUnix: NOW + 11 * 60 + 20, status: base, state: OsUpdateState.UP_TO_DATE };
+
+  it("turns Reboot off and says in how many minutes, the install stays on", async () => {
+    await mount(actions(data([node(waitFor)])));
+    expect(disabled(button("Reboot…"))).toBe(true);
+    expect(disabled(button("Install updates…"))).toBeFalsy();
+    expect(text()).toContain("Reboot possible in 12 min");
+    expect(text()).not.toContain("reboot_wait");
+  });
+
+  it("says it in Russian", async () => {
+    setLang("ru");
+    await mount(actions(data([node(waitFor)])));
+    expect(text()).toContain("Перезагрузка возможна через 12 мин");
+  });
+
+  it("is gone when the server no longer names a wait", async () => {
+    await mount(actions(data([node({ ...waitFor, rebootBlock: "", rebootPossibleUnix: 0 })])));
+    expect(disabled(button("Reboot…"))).toBeFalsy();
+    expect(text()).not.toContain("Reboot possible in");
+  });
+
+  it("is said in the \u22ef menu of a table row too", async () => {
+    const { OsRowMenu } = await import("./os-actions");
+    await mount(<OsRowMenu row={rowOf(data([node({ ...waitFor, onlineUsers: 0 })]))} defaultOpen />);
+    await settle();
+    const items = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")];
+    const reboot = items.find((i) => i.textContent?.startsWith("Reboot"));
+    expect(reboot?.hasAttribute("data-disabled")).toBe(true);
+    expect(reboot?.textContent).toContain("Reboot possible in 12 min");
+  });
+
+  it("asks an install for no reboot by default, and says why", async () => {
+    await mount(actions(data([node(waitFor)])));
+    await click(button("Install updates\u2026"));
+    expect(dialog()!.textContent).toContain("de1 was rebooted a short while ago and refuses another reboot for 12 min");
+    await click(button("Install updates", dialog()!));
+    expect(updates.startOsRollout).toHaveBeenCalledWith({ nodeIds: ["nod_de1"], mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.NEVER });
+  });
+
+  it("leaves the usual default and no warning when a reboot is possible", async () => {
+    await mount(actions(data([node()])));
+    await click(button("Install updates\u2026"));
+    expect(dialog()!.textContent).not.toContain("refuses another reboot");
+  });
+});
+
+describe("a refusal that closed itself", () => {
+  const later = (code: string) =>
+    data(
+      [node({ status: base, state: OsUpdateState.UP_TO_DATE })],
+      rollout([step({ state: OsStepState.SKIPPED, errorKey: "try_later", params: { code, mode: "reboot_only" }, finishedUnix: NOW - 60 })], {
+        status: OsRolloutStatus.DONE, mode: OsRolloutMode.REBOOT_ONLY, reboot: OsRebootPolicy.ALWAYS, finishedUnix: NOW - 60,
+      }),
+    );
+
+  it("is a neutral note on the node: no red, no alert, no Close", async () => {
+    await mount(actions(later("reboot_limit")));
+    const pill = document.querySelector(".pill");
+    expect(pill?.textContent).toBe("Not now");
+    expect(pill?.className).not.toContain("tone-bad");
+    expect(document.querySelector("[role=alert]")).toBeNull();
+    expect(button("Close")).toBeUndefined();
+    expect(text()).not.toContain("Stopped");
+    expect(text()).toContain("Not done, nothing on the server was changed.");
+    expect(text()).toContain("The panel already rebooted this server less than an hour ago");
+  });
+
+  it("holds nothing: both actions stay on for this node", async () => {
+    await mount(actions(later("too_soon")));
+    expect(disabled(button("Install updates\u2026"))).toBeFalsy();
+    expect(disabled(button("Reboot\u2026"))).toBeFalsy();
+    expect(text()).not.toContain("Another OS update is running");
+  });
+
+  it("is a line under the row of the table as well", async () => {
+    await mount(actions(later("busy"), true));
+    expect(text()).toContain("Not now");
+    expect(text()).toContain("Another job is running on this server");
+  });
+});
+
+describe("the check that waits for profiles", () => {
+  const params = { mode: "security", gate_for: "profiles", gate_names: JSON.stringify(["Berlin main", "Berlin backup"]), gate_max_s: "480" };
+  const gating = (over: Record<string, string> = {}) =>
+    data([node({ state: OsUpdateState.BUSY })], rollout([step({ state: OsStepState.GATING, rebootUnix: NOW - 400, backUnix: NOW - 190, params: { ...params, ...over } })]));
+
+  it("names the profiles that have not passed, how long it has waited and the most it will", async () => {
+    await mount(actions(gating()));
+    expect(text()).toContain("Back, checking profiles\u2026");
+    expect(text()).toContain("Waiting for: Berlin main, Berlin backup");
+    expect(text()).toContain("Waited 3 min, up to 8 min");
+    expect(text()).not.toContain("3 min so far");
+  });
+
+  it("counts the rest when there are more than it names", async () => {
+    await mount(actions(gating({ gate_more: "2" })));
+    expect(text()).toContain("Waiting for: Berlin main, Berlin backup and 2 more");
+  });
+
+  it("is as before when the panel has not said yet", async () => {
+    await mount(actions(gating({ gate_for: "", gate_names: "", gate_max_s: "" })));
+    expect(text()).toContain("Back, checking profiles\u2026");
+    expect(text()).not.toContain("Waiting for");
+    expect(text()).toContain("3 min so far");
+  });
+
+  it("says it in Russian", async () => {
+    setLang("ru");
+    await mount(actions(gating()));
+    expect(text()).toContain("Ожидание профилей: Berlin main, Berlin backup");
+    expect(text()).toContain("Прошло 3 мин, максимум 8 мин");
+  });
+});
+
+describe("a green node with ordinary packages waiting", () => {
+  const green = node({ status: { ...base, pending: 18 }, state: OsUpdateState.UP_TO_DATE, onlineUsers: 0, updateBlock: "nothing_to_do" });
+
+  it("reads the same on the node's card: no security updates, 18 ordinary, nothing in amber", async () => {
+    await mount(<OsCard nodeId="nod_de1" />, { seed: data([green]) });
+    expect(text()).toContain("No security updates");
+    expect(text()).toContain("18 ordinary updates");
+    expect(text()).not.toContain("18 waiting");
+    expect(disabled(button("Reboot\u2026"))).toBeFalsy();
   });
 });

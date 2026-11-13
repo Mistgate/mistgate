@@ -10,7 +10,7 @@ import { OsRolloutMode, OsStepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { blockKeys, blockOf, blockText, elapsedText, osRunOf, pauseCode, pauseText, phaseText, resultLine, stepPill, stepReason, stepSince, useOsActions, type OsNodeRun } from "@/lib/os-run";
+import { blockKeys, blockOf, blockText, elapsedText, gateWaitText, gateWindowText, osRunOf, pauseCode, pauseText, phaseText, resultLine, stepPill, stepReason, stepSince, useOsActions, type OsNodeRun } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
 import { useIsOwner, vantageNote } from "@/lib/updates";
 import { OsConfirmDialog, type OsDialogMode } from "./os-confirm";
@@ -36,6 +36,11 @@ function useNowSec(active: boolean, everyMs = 15_000) {
 function Progress({ run, now, compact }: { run: Extract<OsNodeRun, { kind: "running" }>; now: number; compact: boolean }) {
   const t = useT();
   const { step, rollout } = run;
+  const since = stepSince(step, rollout);
+  // the check after the job: which profiles have not passed yet, and how long it has waited of the most it will
+  const gating = step.state === OsStepState.GATING;
+  const waitingFor = gating ? gateWaitText(t, step.params) : "";
+  const window = gating ? gateWindowText(t, step.params, since, now) : "";
   return (
     <div role="status" className={cx("flex min-w-0 flex-col gap-2 rounded-field border border-line bg-surface-2", compact ? "px-3 py-2" : "px-3 py-2.5")}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -45,8 +50,9 @@ function Progress({ run, now, compact }: { run: Extract<OsNodeRun, { kind: "runn
           </span>
           <b className="min-w-0 text-[13px] text-pretty">{phaseText(t, step)}</b>
         </div>
-        <span className="text-[11px] text-muted max-md:ps-4">{t("os.run.elapsed", { time: elapsedText(t, stepSince(step, rollout), now) })}</span>
+        <span className="text-[11px] text-muted max-md:ps-4">{window || t("os.run.elapsed", { time: elapsedText(t, since, now) })}</span>
       </div>
+      {waitingFor && <p className="ps-4 text-xs leading-snug text-pretty break-words">{waitingFor}</p>}
       <div
         role="progressbar"
         aria-label={t("os.run.aria")}

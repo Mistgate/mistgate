@@ -103,6 +103,9 @@ func TestOsUpdatesStatusIsStoredOnlyAndScrubsUntrustedText(t *testing.T) {
 	if len(v.Nodes) != 1 || v.Nodes[0].NodeID != nodeA || v.Nodes[0].Name != "de1" || v.Nodes[0].Status == nil {
 		t.Fatalf("selected OS status = %+v", v)
 	}
+	if v.Nodes[0].RebootPossible != 1700000600 {
+		t.Fatalf("the time a reboot becomes possible did not reach the tool result: %+v", v.Nodes[0])
+	}
 	st := v.Nodes[0].Status
 	if len(st.Kernels) != 2 || st.Kernels[0].Version != "6.8.0-2-generic" || !st.Kernels[0].NextBoot || st.Kernels[0].Initrd || st.Kernels[0].Module != "missing" ||
 		st.Kernels[0].Packages != "half_configured" || !st.Kernels[1].Running || st.AwgSource != "ok" {

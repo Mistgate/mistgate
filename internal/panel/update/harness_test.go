@@ -303,6 +303,7 @@ type fakeHealth struct {
 	errors    map[string]error
 	timeouts  map[string]bool          // every failed round was a timeout
 	lasted    map[string]time.Duration // how long the failures have lasted
+	pending   map[string][]string      // inbound ids without an OK round, for NodeChecksPending
 }
 
 func newFakeHealth() *fakeHealth {
@@ -329,6 +330,21 @@ func (h *fakeHealth) lossy(id string, timeouts bool, d time.Duration) {
 	h.mu.Lock()
 	h.probeable[id], h.ok[id], h.failed[id] = 1, 0, 1
 	h.timeouts[id], h.lasted[id] = timeouts, d
+	h.mu.Unlock()
+}
+
+func (h *fakeHealth) NodeChecksPending(_ context.Context, id string, _ time.Time) ([]string, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.pending[id], h.errors[id]
+}
+
+func (h *fakeHealth) setPending(id string, inbounds ...string) {
+	h.mu.Lock()
+	if h.pending == nil {
+		h.pending = map[string][]string{}
+	}
+	h.pending[id] = inbounds
 	h.mu.Unlock()
 }
 

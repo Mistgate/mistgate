@@ -7,7 +7,8 @@ import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { OsRebootPolicy, OsRolloutMode } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
-import type { OsActions } from "@/lib/os-run";
+import { minutesText } from "@/lib/format";
+import { minutesUntil, type OsActions } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
 
 // The window before an OS update of one node: what will happen (packages, kernel, who is online), the one choice
@@ -48,7 +49,9 @@ export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; m
   const s = row.status;
   const name = row.name ?? "";
   const install = mode === "install";
-  const [reboot, setReboot] = useState<"if_required" | "never">("if_required");
+  // a node that was rebooted a short while ago refuses another reboot for now: the install then asks for none, as the safe default
+  const rebootWait = minutesUntil(row.rebootPossibleUnix ?? 0, row.nowUnix ?? 0);
+  const [reboot, setReboot] = useState<"if_required" | "never">(rebootWait > 0 ? "never" : "if_required");
   const online = row.online ?? 0;
   const security = s?.security ?? 0;
   const others = Math.max(0, (s?.pending ?? 0) - security);
@@ -100,6 +103,7 @@ export function OsConfirmDialog({ row, mode, actions, onClose }: { row: OsRow; m
         </p>
       )}
       {install && s?.autoReboot && <Notice>{t("os.dlg.warn.autoReboot")}</Notice>}
+      {install && rebootWait > 0 && <Notice>{t("os.dlg.warn.rebootWait", { node: name, time: minutesText(t, rebootWait) })}</Notice>}
       {willReboot && s?.awgModuleNext === "missing" && <Notice>{t("os.dlg.warn.awgMissing")}</Notice>}
       {install && s?.apt === "half_configured" && <Notice>{t("os.dlg.warn.half", { names: s.halfConfigured.slice(0, 3).join(", ") })}</Notice>}
       {install && (s?.held.length ?? 0) > 0 && <Notice tone="quiet">{t("os.dlg.warn.held", { names: s?.held.slice(0, 3).join(", ") ?? "" })}</Notice>}

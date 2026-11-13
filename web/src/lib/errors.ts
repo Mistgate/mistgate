@@ -98,7 +98,7 @@ function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
   };
 }
 
-const osBlocks = ["offline", "agent_old", "unsupported", "panel_host", "node_busy", "no_status", "nothing_to_do", "rollout_active", "agent_rollout", "panel_busy", "awg_build"];
+const osBlocks = ["offline", "agent_old", "unsupported", "panel_host", "node_busy", "no_status", "nothing_to_do", "rollout_active", "agent_rollout", "panel_busy", "awg_build", "reboot_wait"];
 
 /** The words of an OS update refusal's reason (a key of "os.block.*"); a reason from a newer panel reads as sent. */
 function osVars(t: T, vars: Record<string, string>): Record<string, string> {

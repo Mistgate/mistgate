@@ -97,7 +97,8 @@ const (
 	// Something happened on the node and a step failed (the job failed, the reboot was held, the node did not come back, the check
 	// failed): the rollout waits for the owner (CancelOsRollout) and the alert os_update_failed is open. It holds only the next OS
 	// update; agent rollouts, the panel update and the bundle sync go on. A refusal where nothing happened on the node ends the
-	// rollout as FAILED at once, without a pause and without an alert.
+	// rollout at once, without a pause and without an alert: FAILED when the node needs a look (unsupported system, full disk), DONE
+	// with a SKIPPED step (error_key try_later) when it only asked to wait (busy, apt_lock, too_soon, reboot_limit).
 	OsRolloutStatus_OS_ROLLOUT_STATUS_PAUSED    OsRolloutStatus = 2
 	OsRolloutStatus_OS_ROLLOUT_STATUS_DONE      OsRolloutStatus = 3
 	OsRolloutStatus_OS_ROLLOUT_STATUS_CANCELLED OsRolloutStatus = 4
@@ -646,9 +647,14 @@ type NodeOs struct {
 	// AmneziaWG module is being built on the node). The SPA resolves "os.block.<key>".
 	UpdateBlock string `protobuf:"bytes,10,opt,name=update_block,json=updateBlock,proto3" json:"update_block,omitempty"`
 	// The same for a plain reboot (no package change), "" when allowed. Same keys, without no_status and nothing_to_do.
-	RebootBlock   string `protobuf:"bytes,11,opt,name=reboot_block,json=rebootBlock,proto3" json:"reboot_block,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	RebootBlock string `protobuf:"bytes,11,opt,name=reboot_block,json=rebootBlock,proto3" json:"reboot_block,omitempty"`
+	// Unix time from which a reboot of this node is possible again, 0 when it is possible now. The later of two limits: the node
+	// refuses a reboot less than 10 minutes after it booted (too_soon), and a reboot the panel asked for at most once an hour and
+	// three times in 24 hours (reboot_limit); the panel counts the reboots of its own OS rollouts. The SPA turns the Reboot action
+	// off until then. A reboot_only StartOsRollout before that time is refused with os_blocked: reason=reboot_wait.
+	RebootPossibleUnix int64 `protobuf:"varint,12,opt,name=reboot_possible_unix,json=rebootPossibleUnix,proto3" json:"reboot_possible_unix,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *NodeOs) Reset() {
@@ -758,6 +764,13 @@ func (x *NodeOs) GetRebootBlock() string {
 	return ""
 }
 
+func (x *NodeOs) GetRebootPossibleUnix() int64 {
+	if x != nil {
+		return x.RebootPossibleUnix
+	}
+	return 0
+}
+
 type GetOsUpdatesResponse struct {
 	state                         protoimpl.MessageState `protogen:"open.v1"`
 	NowUnix                       int64                  `protobuf:"varint,1,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
@@ -853,7 +866,8 @@ type OsStep struct {
 	BackUnix     int64  `protobuf:"varint,11,opt,name=back_unix,json=backUnix,proto3" json:"back_unix,omitempty"`
 	FinishedUnix int64  `protobuf:"varint,12,opt,name=finished_unix,json=finishedUnix,proto3" json:"finished_unix,omitempty"`
 	// "os.step.err.<error_key>" for FAILED and SKIPPED: offline, unsupported, panel_host, up_to_date, not_required,
-	// cancelled (skipped); agent_refused (the node answered unsupported or busy: params.code; nothing happened on it), job_failed (the job ended failed:
+	// cancelled (skipped); try_later (skipped: the node asked to wait, params.code is busy, apt_lock, too_soon or reboot_limit; nothing
+	// happened on it and the rollout ended by itself), agent_refused (the node refused for another reason: params.code; nothing happened on it), job_failed (the job ended failed:
 	// params.code, params.package), reboot_held (the job installed what it could but the node refused to reboot:
 	// params.code), no_answer, not_back (15 minutes after the reboot), and the check's own: kernel_not_switched,
 	// state_not_applied, inbounds_unreadable, warp_down, inbound_failed, probe_failed, job_not_settled (the end of the job is not known
@@ -861,7 +875,9 @@ type OsStep struct {
 	ErrorKey string `protobuf:"bytes,13,opt,name=error_key,json=errorKey,proto3" json:"error_key,omitempty"`
 	// params.code is a node code (agent.proto OsJob.code; the SPA resolves "os.job.err.<code>"); also package, upgraded,
 	// reboot (done | not_required | held | not_asked), held_reason, kernel, pending and security (counts when it started), mode
-	// (security | reboot_only: a reboot_only run installed nothing).
+	// (security | reboot_only: a reboot_only run installed nothing). While GATING, what the check still waits for: gate_for
+	// (profiles | settings | warp | job: the soft miss of the check), gate_names (a JSON array of at most 5 profile names that have
+	// not passed yet; with gate_more, how many more), gate_max_s (the check window in seconds; it began at back_unix).
 	Params        map[string]string `protobuf:"bytes,14,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4069,7 +4085,7 @@ var File_mistgate_admin_v1_update_proto protoreflect.FileDescriptor
 const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\n" +
 	"\x1emistgate/admin/v1/update.proto\x12\x11mistgate.admin.v1\x1a\x1dmistgate/agent/v1/agent.proto\"\x15\n" +
-	"\x13GetOsUpdatesRequest\"\x96\x03\n" +
+	"\x13GetOsUpdatesRequest\"\xcc\x03\n" +
 	"\x06NodeOs\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
@@ -4082,7 +4098,8 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\x0eupdate_capable\x18\t \x01(\bR\rupdateCapable\x12!\n" +
 	"\fupdate_block\x18\n" +
 	" \x01(\tR\vupdateBlock\x12!\n" +
-	"\freboot_block\x18\v \x01(\tR\vrebootBlock\"\xa3\x02\n" +
+	"\freboot_block\x18\v \x01(\tR\vrebootBlock\x124\n" +
+	"\x14reboot_possible_unix\x18\f \x01(\x03B\x020\x02R\x12rebootPossibleUnix\"\xa3\x02\n" +
 	"\x14GetOsUpdatesResponse\x12\x1d\n" +
 	"\bnow_unix\x18\x01 \x01(\x03B\x020\x02R\anowUnix\x12/\n" +
 	"\x05nodes\x18\x02 \x03(\v2\x19.mistgate.admin.v1.NodeOsR\x05nodes\x12:\n" +

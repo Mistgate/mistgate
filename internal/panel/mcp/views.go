@@ -100,6 +100,8 @@ type osNodeV struct {
 	UpdateCapable bool   `json:"update_capable"`
 	UpdateBlock   string `json:"update_block,omitempty"`
 	RebootBlock   string `json:"reboot_block,omitempty"`
+	// RebootPossible is the Unix time from which a reboot is possible again (RebootBlock is reboot_wait until then), absent when now.
+	RebootPossible int64 `json:"reboot_possible_unix,omitempty"`
 }
 
 type osStepV struct {
@@ -216,7 +218,7 @@ func osUpdatesView(r *adminv1.GetOsUpdatesResponse) *OsUpdatesV {
 		v.Nodes = append(v.Nodes, osNodeV{NodeID: clean(n.GetNodeId(), 80), Name: nm(n.GetName()), Connected: n.GetConnected(),
 			Supported: n.GetSupported(), OnlineUsers: n.GetOnlineUsers(), OnPanel: n.GetOnPanelServer(),
 			State: enumName("OS_UPDATE_STATE_", n.GetState().String()), Status: osStatusView(n.GetStatus()),
-			UpdateCapable: n.GetUpdateCapable(), UpdateBlock: clean(n.GetUpdateBlock(), 24), RebootBlock: clean(n.GetRebootBlock(), 24)})
+			UpdateCapable: n.GetUpdateCapable(), UpdateBlock: clean(n.GetUpdateBlock(), 24), RebootBlock: clean(n.GetRebootBlock(), 24), RebootPossible: n.GetRebootPossibleUnix()})
 	}
 	if ro := r.GetRollout(); ro != nil {
 		rv := &osRolloutV{ID: clean(ro.GetId(), 60), Status: enumName("OS_ROLLOUT_STATUS_", ro.GetStatus().String()), Mode: enumName("OS_ROLLOUT_MODE_", ro.GetMode().String()),

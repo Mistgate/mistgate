@@ -240,6 +240,7 @@ func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsU
 	if err != nil {
 		return nil, s.internal("load update timezone", err)
 	}
+	reboots, _ := s.osReboots(ctx, s.now()) // a read that fails leaves the reboot limits unknown, not the page empty
 	for _, node := range nodes {
 		if node.State != "active" {
 			continue
@@ -266,10 +267,10 @@ func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsU
 			return nil, s.internal("read node facts", err)
 		}
 		// Containers on one kernel share the boot id, so a match alone only means "same kernel": see onPanelServer.
-		osn := s.osNodeOf(node, row.Connected, status, host, facts.Hostname, resp.NowUnix)
+		osn := s.osNodeOf(node, row.Connected, status, host, facts.Hostname, resp.NowUnix, reboots[node.ID])
 		resp.Nodes = append(resp.Nodes, &adminv1.NodeOs{NodeId: node.ID, Name: node.Name, Connected: row.Connected,
 			Supported: osn.supported, OnlineUsers: online, OnPanelServer: osn.onPanel, State: osUpdateState(capable, row.Connected, status, resp.NowUnix), Status: status,
-			UpdateCapable: osn.updateCap, UpdateBlock: osBlock(g, osn, false), RebootBlock: osBlock(g, osn, true)})
+			UpdateCapable: osn.updateCap, UpdateBlock: osBlock(g, osn, false), RebootBlock: osBlock(g, osn, true), RebootPossibleUnix: unixOrZero(osn.rebootAt)})
 	}
 	return connect.NewResponse(resp), nil
 }

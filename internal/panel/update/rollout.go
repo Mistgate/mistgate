@@ -2,6 +2,7 @@ package update
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -757,6 +758,9 @@ type gateResult struct {
 	soft string // what is still missing; it fails the gate only at the deadline
 	with map[string]string
 	wait bool // the second vantage runs: do not fail at the deadline yet (it ends within its own timeout)
+	// waiting are the names of the profiles that have not passed yet (failed since the start, or without an OK round of the
+	// checker): the OS update shows them while it waits.
+	waiting []string
 }
 
 // gate evaluates the rollout gate for a node that is back with the new build: the new build confirmed itself (update_committed),
@@ -801,9 +805,11 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 	if err != nil {
 		miss(errInboundsUnread)
 	}
-	var newlyFailed []string
+	var newlyFailed, pending []string
+	label := map[string]string{} // inbound id -> the name of its profile
 	warpEgress := false
 	for _, in := range inbounds {
+		label[in.ID] = cmp.Or(in.ProfileName, in.Protocol)
 		var settings struct {
 			Egress string `json:"egress"`
 		}
@@ -838,6 +844,13 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		} else if probeable > 0 && ok < probeable {
 			miss(errProbeFailed)
 			pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+			if l, can := s.hl.(interface {
+				NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
+			}); can {
+				if ids, err := l.NodeChecksPending(ctx, nodeID, since); err == nil {
+					pending = append(pending, ids...)
+				}
+			}
 			if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
 				s.log.Warn("update: run checks", "node", nodeID, "err", err)
 			}
@@ -855,7 +868,14 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 			soft = ""
 		}
 	}
-	return gateResult{pass: soft == "", soft: soft, with: with, wait: wait}
+	var waiting []string
+	for _, id := range append(newlyFailed, pending...) {
+		if name := label[id]; name != "" && !slices.Contains(waiting, name) {
+			waiting = append(waiting, name)
+		}
+	}
+	slices.Sort(waiting)
+	return gateResult{pass: soft == "", soft: soft, with: with, wait: wait, waiting: waiting}
 }
 
 // warpUpSince requires a WARP health report from this connection and a usable tunnel. Without a report, or while it is

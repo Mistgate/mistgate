@@ -3,6 +3,7 @@ import type { StatusKind } from "@/components/ui/status";
 import { OsRolloutStatus, OsUpdateState, type GetOsUpdatesResponse, type NodeOs, type OsRollout, type OsStep } from "@/gen/mistgate/admin/v1/update_pb";
 import type { OsStatus } from "@/gen/mistgate/agent/v1/agent_pb";
 import type { MessageKey } from "@/i18n/en";
+import type { T } from "@/i18n";
 import { updates } from "./api";
 import { plain, type Plain } from "./plain";
 
@@ -49,6 +50,10 @@ export type OsRow = {
   /** Why "Install updates" / "Reboot" are refused right now, "" = allowed: the key of "os.block.<key>". */
   updateBlock: string;
   rebootBlock: string;
+  /** Unix time from which a reboot is possible again (`rebootBlock` is "reboot_wait" until then), 0 = now. */
+  rebootPossibleUnix?: number;
+  /** The server's clock when it answered: "in N min" is counted from it, so a wrong clock of this browser changes nothing. */
+  nowUnix?: number;
   /** This node's step in the active or last run, and the run itself. */
   step?: OsStepRow;
   rollout?: OsRun;
@@ -57,20 +62,23 @@ export type OsRow = {
 const errorKey = (code: string): MessageKey =>
   code === "not_apt" ? "up.os.why.not_apt" : code === "no_systemd" ? "up.os.why.no_systemd" : "up.os.why.read_failed";
 
-/** The state of a status the panel read itself (its own server has no NodeOs around it). */
+/**
+ * The state of a status the panel read itself (its own server has no NodeOs around it); the same rule as the server's for a node:
+ * only security updates (or a half-installed package) make "updates", ordinary packages that wait do not.
+ */
 function stateOf(s: Os): OsUpdateState {
   if (s.error) return OsUpdateState.UNSUPPORTED;
   if (s.rebootRequired) return OsUpdateState.REBOOT_REQUIRED;
-  return s.pending > 0 ? OsUpdateState.UPDATES : OsUpdateState.UP_TO_DATE;
+  return s.security > 0 || (s.apt === "half_configured" && s.pending > 0) ? OsUpdateState.UPDATES : OsUpdateState.UP_TO_DATE;
 }
 
-const noActions = { updateCapable: false, updateBlock: "", rebootBlock: "" };
+const noActions = { updateCapable: false, updateBlock: "", rebootBlock: "", rebootPossibleUnix: 0 };
 
 export function osRows(d: OsUpdates): OsRow[] {
   const host = d.panelHost;
   const panel: OsRow = host
-    ? { ...noActions, id: "panel", onPanelServer: false, state: stateOf(host), status: host, why: host.error ? errorKey(host.error) : undefined }
-    : { ...noActions, id: "panel", onPanelServer: false, state: OsUpdateState.UNSUPPORTED, why: "up.os.why.panel" };
+    ? { ...noActions, nowUnix: d.nowUnix, id: "panel", onPanelServer: false, state: stateOf(host), status: host, why: host.error ? errorKey(host.error) : undefined }
+    : { ...noActions, nowUnix: d.nowUnix, id: "panel", onPanelServer: false, state: OsUpdateState.UNSUPPORTED, why: "up.os.why.panel" };
   const nodes = d.nodes.map((n): OsRow => {
     const why: MessageKey | undefined = n.status?.error
       ? errorKey(n.status.error)
@@ -79,20 +87,25 @@ export function osRows(d: OsUpdates): OsRow[] {
         : undefined;
     return {
       id: n.nodeId, name: n.name, nodeId: n.nodeId, online: n.onlineUsers, onPanelServer: n.onPanelServer, state: n.state, status: n.status, why,
-      updateCapable: n.updateCapable, updateBlock: n.updateBlock, rebootBlock: n.rebootBlock, rollout: d.rollout, step: d.rollout?.steps.find((x) => x.nodeId === n.nodeId),
+      updateCapable: n.updateCapable, updateBlock: n.updateBlock, rebootBlock: n.rebootBlock, rebootPossibleUnix: n.rebootPossibleUnix, nowUnix: d.nowUnix, rollout: d.rollout, step: d.rollout?.steps.find((x) => x.nodeId === n.nodeId),
     };
   });
   return [panel, ...nodes];
 }
 
-/** The pill of a row: security updates and a pending reboot ask for attention, plain updates stay quiet. */
+/**
+ * The pill of a row: security updates and a pending reboot ask for attention (amber), a failure is red, and a server with no
+ * security update waiting and no reboot due is green even when ordinary packages wait: those are a note beside the count
+ * (osUpdatesLine), not the state, or the page could never look all good.
+ */
 export function osPill(row: OsRow): { kind: StatusKind; key: MessageKey } {
   switch (row.state) {
     case OsUpdateState.UP_TO_DATE:
-      return { kind: "ok", key: "up.os.state.up_to_date" };
+      return { kind: "ok", key: (row.status?.pending ?? 0) > 0 ? "up.os.state.security_ok" : "up.os.state.up_to_date" };
     case OsUpdateState.REBOOT_REQUIRED:
       return { kind: "warn", key: "up.os.state.reboot" };
     case OsUpdateState.UPDATES:
+      // security updates; or, with none, a half-installed package that the next job repairs
       return (row.status?.security ?? 0) > 0 ? { kind: "warn", key: "up.os.state.security" } : { kind: "off", key: "up.os.state.updates" };
     case OsUpdateState.BUSY:
       return { kind: "busy", key: "up.os.state.busy" };
@@ -126,4 +139,14 @@ export function osSummary(rows: OsRow[]): { reboot: number; security: number; up
     if (r.status.pending > 0) withUpdates++;
   }
   return { reboot, security, updates: withUpdates, known };
+}
+
+/**
+ * The "Updates" cell of a status: `main` is the security count (amber when there is any), `note` the ordinary updates beside it,
+ * quiet. With nothing waiting `main` is "None" and there is no note.
+ */
+export function osUpdatesLine(t: T, s: Pick<Os, "pending" | "security">): { main: string; warn: boolean; note: string } {
+  if (s.pending === 0) return { main: t("up.os.updates.none"), warn: false, note: "" };
+  if (s.security > 0) return { main: t("up.os.updates.security", { n: s.pending, s: s.security }), warn: true, note: "" };
+  return { main: t("up.os.updates.nosec"), warn: false, note: t.n("up.os.updates.ordinary", s.pending) };
 }

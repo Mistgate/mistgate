@@ -58,15 +58,18 @@ func osUpdateState(capable bool, connected bool, status *agentv1.OsStatus, nowUn
 		return adminv1.OsUpdateState_OS_UPDATE_STATE_UNKNOWN
 	case status.GetJob() != nil && status.GetJob().GetState() == "running":
 		return adminv1.OsUpdateState_OS_UPDATE_STATE_BUSY
-	case status.GetJob() != nil && status.GetJob().GetState() == "failed":
+	case status.GetJob() != nil && status.GetJob().GetState() == "failed" && !osJobAskedToWait(status.GetJob()):
 		return adminv1.OsUpdateState_OS_UPDATE_STATE_FAILED
 	case status.GetRebootRequired():
 		return adminv1.OsUpdateState_OS_UPDATE_STATE_REBOOT_REQUIRED
 	case status.GetError() != "" || status.GetApt() != "ok" && !(status.GetApt() == "half_configured" && status.GetPending() > 0):
 		return adminv1.OsUpdateState_OS_UPDATE_STATE_UNKNOWN
-	case status.GetPending() > 0:
+	case status.GetSecurity() > 0 || status.GetApt() == "half_configured" && status.GetPending() > 0:
+		// Security updates ask for an install; so does a half-installed package (the job repairs it first).
 		return adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES
 	default:
+		// Nothing security is waiting and no reboot is due: the server is in order. Ordinary updates (the other packages)
+		// that wait are a note beside the count, not the state: otherwise a server could never look all good.
 		return adminv1.OsUpdateState_OS_UPDATE_STATE_UP_TO_DATE
 	}
 }
