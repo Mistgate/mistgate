@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -50,5 +51,43 @@ func TestAwgSessionMovesTheDevicesLastSeenForward(t *testing.T) {
 	send(3, now+3600) // a clock from the future is clamped to this clock
 	if got := seen(awgDevice); got < now-60 || got > time.Now().Unix()+1 {
 		t.Errorf("a handshake from the future was stored as %d", got)
+	}
+}
+
+// A session of any protocol is a use of its device: it moves last_connected_at, which the idle rule reads, and leaves
+// last_seen_at alone for a link device (that is its last subscription fetch; the page, the admin and the health check mean
+// it so). An app that tunnels daily but never refetches its subscription therefore never goes idle.
+func TestAnySessionMovesTheDevicesLastConnectedNotItsLastFetch(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	ids := e.fixture(a.nodeID)
+	var hyDevice, hyUser string
+	e.st.R.QueryRow(`SELECT device_id, user_id FROM device_credential WHERE id = 'crd_erin_hy'`).Scan(&hyDevice, &hyUser)
+	if hyDevice == "" {
+		t.Fatal("fixture: the hysteria2 credential has no device")
+	}
+	old := time.Now().Add(-40 * 24 * time.Hour).Unix()
+	e.exec(`UPDATE device SET last_seen_at = ?, created_at = ? WHERE id = ?`, old, old, hyDevice)
+	idle := func() bool {
+		counts, err := e.st.Access().DeviceCounts(context.Background(), []string{hyUser}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return counts[hyUser].Idle > 0
+	}
+	if !idle() {
+		t.Fatal("fixture: a device last fetched 40 days ago is not idle")
+	}
+	c, _, _ := connectFull(a, "inst1")
+	now := time.Now().Unix()
+	c.send(1, statsBatch(now-10, now, nil, []*agentv1.Session{{CredId: "crd_erin_hy", InboundId: ids.i1, ConnectedAtUnix: now - 30}}))
+	c.ack()
+	var seen, connected int64
+	e.st.R.QueryRow(`SELECT last_seen_at, last_connected_at FROM device WHERE id = ?`, hyDevice).Scan(&seen, &connected)
+	if seen != old || connected != now-30 {
+		t.Errorf("after a hysteria2 session last_seen_at = %d (want the old fetch %d), last_connected_at = %d (want %d)", seen, old, connected, now-30)
+	}
+	if idle() {
+		t.Error("a device with a session a moment ago is still idle")
 	}
 }

@@ -16,7 +16,8 @@ const DefaultDeviceIdleAfterDays = 30
 func deviceIdleSQL(alias string, now time.Time) (idle, idleSince string) {
 	days := `coalesce((SELECT CAST(v AS INTEGER) FROM setting WHERE k = '` + SettingDeviceIdleAfterDays + `'), ` +
 		strconv.Itoa(DefaultDeviceIdleAfterDays) + `)`
-	lastUse := `coalesce(nullif(` + alias + `.last_seen_at, 0), ` + alias + `.created_at)`
+	// The newest evidence of use: the last fetch/sync/handshake (creation when there is none) or the last session a node saw.
+	lastUse := `max(coalesce(nullif(` + alias + `.last_seen_at, 0), ` + alias + `.created_at), ` + alias + `.last_connected_at)`
 	since := `(` + lastUse + ` + (` + days + `) * 86400)`
 	idle = `((` + days + `) > 0 AND ` + since + ` <= ` + strconv.FormatInt(unix(now), 10) + `)`
 	idleSince = `CASE WHEN ` + idle + ` THEN ` + since + ` ELSE 0 END`

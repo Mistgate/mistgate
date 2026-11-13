@@ -107,6 +107,9 @@ type fleetDeviceTouchWrite struct {
 	DeviceID   string `json:"device_id"`
 	LastSeenAt int64  `json:"last_seen_at"`
 	NotAfter   int64  `json:"not_after"`
+	// ConnectedAt is the newest session a node saw on the device (any protocol); 0 leaves last_connected_at alone. LastSeenAt
+	// moves only where NotAfter is newer than the stored one, so a touch with a zero NotAfter is for last_connected_at only.
+	ConnectedAt int64 `json:"connected_at,omitempty"`
 	// OSVersion and Client are what a subscription fetch reports about its device; a node's touch leaves them out.
 	OSVersion string `json:"os_version,omitempty"`
 	Client    string `json:"client,omitempty"`
@@ -419,9 +422,11 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			cert := certByInbound[id]
 			certWrites = append(certWrites, fleetInboundCertWrite{InboundID: cert.InboundID, Pin: cert.Pin, NotAfter: fleetUnix(cert.NotAfter)})
 		}
-		// A device's last use is the newest node-observed session, regardless of credential kind. Subscription fetches and
-		// client syncs update the same last_seen_at field, so its value stays the newest evidence the panel has.
-		touchAtByDevice := make(map[string]int64)
+		// Every session is a use of its device and moves last_connected_at, the evidence the idle rule reads (device_idle.go).
+		// last_seen_at means something else for a link device, its last subscription fetch (the user page says so and the
+		// health check compares it with the traffic), so only a key's own sessions move it: an AmneziaWG key's handshake, a
+		// Telegram key's proxy session.
+		touchByDevice := make(map[string]fleetDeviceTouchWrite)
 		for _, se := range in.Sessions {
 			ref, ok := creds[se.CredID]
 			if !ok || ref.DeviceID == "" || se.ConnectedAt.Unix() <= 0 {
@@ -432,19 +437,23 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				touchedAt = in.Now
 			}
 			touchedUnix := unix(touchedAt)
-			if previous, ok := touchAtByDevice[ref.DeviceID]; !ok || touchedUnix > previous {
-				touchAtByDevice[ref.DeviceID] = touchedUnix
+			touch := touchByDevice[ref.DeviceID]
+			touch.DeviceID = ref.DeviceID
+			touch.ConnectedAt = max(touch.ConnectedAt, touchedUnix)
+			if ref.Protocol == "awg" || ref.Protocol == TelegramProtocol {
+				touch.LastSeenAt = max(touch.LastSeenAt, touchedUnix)
+				touch.NotAfter = touch.LastSeenAt
 			}
+			touchByDevice[ref.DeviceID] = touch
 		}
-		touchIDs := make([]string, 0, len(touchAtByDevice))
-		for id := range touchAtByDevice {
+		touchIDs := make([]string, 0, len(touchByDevice))
+		for id := range touchByDevice {
 			touchIDs = append(touchIDs, id)
 		}
 		sort.Strings(touchIDs)
 		touchWrites := make([]fleetDeviceTouchWrite, 0, len(touchIDs))
 		for _, id := range touchIDs {
-			seenAt := touchAtByDevice[id]
-			touchWrites = append(touchWrites, fleetDeviceTouchWrite{DeviceID: id, LastSeenAt: seenAt, NotAfter: seenAt})
+			touchWrites = append(touchWrites, touchByDevice[id])
 		}
 		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, deviceWrites, certWrites,
 			touchWrites, linkRows, networkRows, personRows, live)
@@ -597,12 +606,16 @@ func deviceTouchStmt(touches []fleetDeviceTouchWrite) (Stmt, error) {
 		return Stmt{}, err
 	}
 	return Stmt{Query: `
-		UPDATE device SET last_seen_at = CAST(json_extract(touch.value, '$.last_seen_at') AS INTEGER),
+		UPDATE device SET
+			last_seen_at = CASE WHEN device.last_seen_at < CAST(json_extract(touch.value, '$.not_after') AS INTEGER)
+				THEN CAST(json_extract(touch.value, '$.last_seen_at') AS INTEGER) ELSE device.last_seen_at END,
+			last_connected_at = max(device.last_connected_at, coalesce(CAST(json_extract(touch.value, '$.connected_at') AS INTEGER), 0)),
 			os_version = coalesce(nullif(json_extract(touch.value, '$.os_version'), ''), os_version),
 			client = coalesce(nullif(json_extract(touch.value, '$.client'), ''), client)
 		FROM json_each(?1) AS touch
 		WHERE device.id = json_extract(touch.value, '$.device_id')
-			AND device.last_seen_at < CAST(json_extract(touch.value, '$.not_after') AS INTEGER)`,
+			AND (device.last_seen_at < CAST(json_extract(touch.value, '$.not_after') AS INTEGER)
+				OR device.last_connected_at < coalesce(CAST(json_extract(touch.value, '$.connected_at') AS INTEGER), 0))`,
 		Args: []any{string(encoded)}}, nil
 }
 
