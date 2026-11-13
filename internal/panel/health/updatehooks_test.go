@@ -110,38 +110,72 @@ func TestNodeChecksSince(t *testing.T) {
 	e.pass(b)
 
 	since := e.clock.Now()
-	if p, ok, f, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 0 || f != 0 {
+	if p, ok, f, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 0 || f != 0 {
 		t.Fatalf("before any new round: probeable %d ok %d failed %d", p, ok, f)
 	}
 	e.pass(a)
-	if p, ok, f, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 1 || f != 0 {
+	if p, ok, f, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 1 || f != 0 {
 		t.Fatalf("one round ok: %d %d %d", p, ok, f)
 	}
 	e.fail(b, "timeout")
-	if p, ok, f, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 1 || f != 1 {
+	if p, ok, f, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 1 || f != 1 {
 		t.Fatalf("one failed: %d %d %d", p, ok, f)
 	}
 	e.round(b, cDeg, "http_status") // a degraded round is not an ok round
-	if p, ok, f, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 1 || f != 1 {
+	if p, ok, f, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 1 || f != 1 {
 		t.Fatalf("one degraded: %d %d %d", p, ok, f)
 	}
 	e.pass(b)
-	if p, ok, f, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 2 || f != 0 {
+	if p, ok, f, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 2 || ok != 2 || f != 0 {
 		t.Fatalf("both ok: %d %d %d", p, ok, f)
 	}
 	// an inbound that is not active is not probeable; a node that is away has nothing to probe
 	e.exec(`UPDATE inbound SET state = 'pending' WHERE id = ?`, b)
 	e.s.invalidateSnapshot()
-	if p, ok, _, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 1 || ok != 1 {
+	if p, ok, _, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since); err != nil || p != 1 || ok != 1 {
 		t.Fatalf("one inbound pending: %d %d", p, ok)
 	}
 	e.fl.set("de1", liveState{up: false})
 	e.s.invalidateSnapshot()
-	if p, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since.Add(-time.Hour)); err != nil || p != 0 {
+	if p, _, _, _, _, err := e.s.NodeChecksSince(e.ctx, "de1", since.Add(-time.Hour)); err != nil || p != 0 {
 		t.Fatalf("an offline node is probeable: %d", p)
 	}
-	if p, _, _, err := e.s.NodeChecksSince(e.ctx, "nod_nope", since); err != nil || p != 0 {
+	if p, _, _, _, _, err := e.s.NodeChecksSince(e.ctx, "nod_nope", since); err != nil || p != 0 {
 		t.Fatal("unknown node")
+	}
+}
+
+// The gate's second opinion needs to know whether the failures look like a lossy path: timeouts only, for how long.
+func TestNodeChecksSinceTimeouts(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	a, b := e.inbound("de1", 443), e.inbound("de1", 8443)
+	since := e.clock.Now()
+	check := func(wantOnly bool, wantFor time.Duration) {
+		t.Helper()
+		_, _, f, only, span, err := e.s.NodeChecksSince(e.ctx, "de1", since)
+		if err != nil || only != wantOnly || span != wantFor {
+			t.Fatalf("failed %d timeoutsOnly %v span %v err %v, want %v %v", f, only, span, err, wantOnly, wantFor)
+		}
+	}
+	check(false, 0) // nothing failed: not a path problem
+	e.fail(a, "timeout")
+	e.pass(b)
+	check(true, 0) // one round has no duration yet
+	e.clock.Advance(58 * time.Second)
+	e.fail(a, "timeout")
+	check(true, 60*time.Second)
+	e.fail(b, "tls") // a protocol fault of the other inbound
+	check(false, 0)
+	e.pass(b)
+	e.fail(b, "timeout") // the tls round is still a round since: it stays against the rule
+	check(false, 0)
+	e.round(b, cDeg, "http_status")
+	e.pass(a)
+	check(false, time.Second)
+	_, ok, f, _, _, _ := e.s.NodeChecksSince(e.ctx, "de1", since)
+	if ok != 1 || f != 1 {
+		t.Fatalf("ok %d failed %d", ok, f)
 	}
 }
 

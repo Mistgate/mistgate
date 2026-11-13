@@ -346,6 +346,13 @@ describe("the run as it goes", () => {
     expect(text()).toContain("no reboot needed");
   });
 
+  it("says when a pass needed another node's look because the panel's own path loses packets", async () => {
+    const done = step({ state: OsStepState.PASSED, params: { upgraded: "2", reboot: "not_asked", vantage: "nl2", panel_path: "lossy" }, finishedUnix: NOW - 60 });
+    await mount(actions(data([node()], rollout([done], { status: OsRolloutStatus.DONE, finishedUnix: NOW - 60 }))));
+    expect(text()).toContain("Passed: de1 is fine. Its profiles answer from nl2");
+    expect(text()).toContain("the panel's checks may stay red until that path recovers");
+  });
+
   it("forgets a run that ended more than a day ago", async () => {
     const old = step({ state: OsStepState.PASSED, finishedUnix: NOW - 2 * 86_400 });
     await mount(actions(data([node()], rollout([old], { status: OsRolloutStatus.DONE, finishedUnix: NOW - 2 * 86_400 }))));
@@ -374,6 +381,15 @@ describe("a stopped run", () => {
     // the banner already says "installed, not rebooted": the step's own headline does not repeat it
     expect(alert.textContent).not.toContain("refused to reboot");
     expect(button("Close")).toBeTruthy();
+  });
+
+  it("says that no other node saw the profiles either, or that none could look", async () => {
+    await mount(actions(failed({ errorKey: "probe_failed", params: { vantage: "nl2", vantage_verdict: "bad" } }, { pauseKey: "gate_failed" })));
+    expect(document.querySelector("[role=alert]")!.parentElement!.textContent).toContain("Failed: de1's profiles did not answer the panel, and not from nl2 either.");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(actions(failed({ errorKey: "probe_failed", params: { vantage_verdict: "none", no_vantage: "1" } }, { pauseKey: "gate_failed" })));
+    expect(document.body.textContent).toContain("Failed: the panel could not reach de1's profiles, and no other node could check them.");
   });
 
   it("says why for a node that did not come back, with the way out", async () => {

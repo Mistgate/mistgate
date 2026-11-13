@@ -227,6 +227,18 @@ export function stepErrorText(t: T, key: string, params: Params = {}): string {
   return known(t, key, withSentences(t, params)) ?? t("up.err.other", { code: last(key) });
 }
 
+/**
+ * What the gate's second look from another node (internal/panel/update/vantage.go) found about the panel's own path to `node`,
+ * from the step's params: the note of a pass ("the panel's path is lossy") or why a probe failure stands. "" when nobody asked.
+ */
+export function vantageNote(t: T, node: string, params: Params, passed: boolean): string {
+  const vantage = params.vantage ?? "";
+  if (params.panel_path === "lossy") return passed ? t("updates.step.note.lossy", { node, vantage }) : "";
+  if (params.vantage_verdict === "bad") return t("updates.step.note.bad", { node, vantage });
+  if (params.vantage_verdict === "none") return t("updates.step.note.none", { node });
+  return "";
+}
+
 /** Why the rollout waits ("updates.pause.<code>"). */
 export function pauseText(t: T, key: string, params: Params = {}): string {
   if (!key) return "";

@@ -101,6 +101,7 @@ export const en = {
   "event.port_lossy.confirmed": "UDP to port {port} of “{profile}” loses packets from both sides: {lost} % from {sender}, {confirm_lost} % from {confirm_sender}",
   // the node is the sender whose packets get lost; {arrived} is "299/300" of the other sender
   "event.path_lossy": "UDP to {target} gets lost on the way: {lost} % on ports {ports}, while {arrived} arrive from {other}",
+  "event.panel_path_lossy": "The panel's own path to the node loses packets; its profiles answer from {vantage}",
   // a filter on the way, not a lossy line: {open} got through whole, the other ports nothing
   "event.path_lossy.filtered": "UDP to {target} is filtered on the way: only {open} gets through, ports {ports} get nothing, while everything arrives from {other}",
 
@@ -197,6 +198,7 @@ export const ru: typeof en = {
   "event.port_lossy": "UDP до порта {port} профиля «{profile}» теряет {lost} % пакетов (проверка с {sender})",
   "event.port_lossy.confirmed": "UDP до порта {port} профиля «{profile}» теряется с обеих сторон: {lost} % с {sender}, {confirm_lost} % с {confirm_sender}",
   "event.path_lossy": "UDP до {target} теряется по пути: {lost} % на портах {ports}, а с {other} доходит {arrived}",
+  "event.panel_path_lossy": "Путь от панели до ноды теряет пакеты; её профили отвечают с ноды {vantage}",
   "event.path_lossy.filtered": "UDP до {target} режет фильтр по пути: доходит только {open}, на порты {ports} — ничего, а с {other} доходит всё",
 
   "audit.node.ports_check": "проверил(а) доставку UDP на {node}: порты {ports}",
@@ -291,6 +293,7 @@ export const zh: typeof en = {
   "event.port_lossy": "「{profile}」端口 {port} 的 UDP 丢包 {lost}%（由 {sender} 检测）",
   "event.port_lossy.confirmed": "「{profile}」端口 {port} 的 UDP 两边都丢包：来自 {sender} 丢失 {lost}%，来自 {confirm_sender} 丢失 {confirm_lost}%",
   "event.path_lossy": "发往 {target} 的 UDP 在途中丢失：端口 {ports} 丢包 {lost}%，而来自 {other} 的到达 {arrived}",
+  "event.panel_path_lossy": "面板自身到该节点的路径丢包；其协议配置可从 {vantage} 访问",
   "event.path_lossy.filtered": "发往 {target} 的 UDP 在途中被过滤：只有 {open} 能到达，端口 {ports} 完全收不到，而来自 {other} 的全部到达",
 
   "audit.node.ports_check": "检测了 {node} 的 UDP 到达情况：端口 {ports}",
@@ -375,6 +378,7 @@ export const fa: typeof en = {
   "event.port_lossy": "UDP تا پورت {port} پروفایل «{profile}» {lost}% از بسته‌ها را از دست می‌دهد (بررسی از {sender})",
   "event.port_lossy.confirmed": "UDP تا پورت {port} پروفایل «{profile}» از هر دو طرف بسته گم می‌کند: {lost}% از {sender}، {confirm_lost}% از {confirm_sender}",
   "event.path_lossy": "UDP تا {target} در مسیر گم می‌شود: {lost}% روی پورت‌های {ports}، در حالی که از {other} {arrived} می‌رسد",
+  "event.panel_path_lossy": "مسیر خود پنل تا نود بسته از دست می‌دهد؛ پروفایل‌های آن از {vantage} پاسخ می‌دهند",
   "event.path_lossy.filtered": "UDP تا {target} در مسیر فیلتر می‌شود: فقط {open} می‌رسد، به پورت‌های {ports} هیچ چیز نمی‌رسد، در حالی که از {other} همه می‌رسد",
   "audit.node.ports_check": "تحویل UDP روی {node} را بررسی کرد: پورت‌های {ports}",
   "audit.node.ipv6_check": "آدرس IPv6 {address} نود {node} را از بیرون بررسی کرد: جواب می‌دهد",
@@ -458,6 +462,7 @@ export const tr: typeof en = {
   "event.port_lossy": "“{profile}” profilinin {port} portuna giden UDP paketlerinin %{lost} kadarı kayboluyor ({sender} tarafından kontrol edildi)",
   "event.port_lossy.confirmed": "“{profile}” profilinin {port} portuna giden UDP iki taraftan da kayboluyor: {sender} tarafından %{lost}, {confirm_sender} tarafından %{confirm_lost}",
   "event.path_lossy": "{target} düğümüne giden UDP yolda kayboluyor: {ports} portlarında %{lost}, oysa {other} tarafından gönderilenlerden {arrived} ulaşıyor",
+  "event.panel_path_lossy": "Panelin düğüme giden kendi yolu paket kaybediyor; profilleri {vantage} üzerinden yanıt veriyor",
   "event.path_lossy.filtered": "{target} düğümüne giden UDP yolda filtreleniyor: yalnızca {open} ulaşıyor, {ports} portlarına hiçbir şey ulaşmıyor, oysa {other} tarafından gönderilenlerin hepsi ulaşıyor",
   "audit.node.ports_check": "{node} düğümünde UDP iletimini kontrol etti: portlar {ports}",
   "audit.node.ipv6_check": "{node} düğümünün {address} IPv6 adresini dışarıdan kontrol etti: yanıt veriyor",

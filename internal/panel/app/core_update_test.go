@@ -25,8 +25,8 @@ type coreUpdateGate struct{}
 func (coreUpdateGate) RunChecksNow(context.Context, string) (int, int, time.Duration, error) {
 	return 0, 0, 0, nil
 }
-func (coreUpdateGate) NodeChecksSince(context.Context, string, time.Time) (int, int, int, error) {
-	return 0, 0, 0, nil
+func (coreUpdateGate) NodeChecksSince(context.Context, string, time.Time) (int, int, int, bool, time.Duration, error) {
+	return 0, 0, 0, false, 0, nil
 }
 
 func TestEdgeNodeUpdateCoreWiring(t *testing.T) {

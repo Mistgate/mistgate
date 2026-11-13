@@ -19,7 +19,7 @@ import (
 const osUpdateWatchEvery = 5 * time.Second
 
 // osUpdateChecks are the doctor checks that describe the result of a job.
-var osUpdateChecks = []string{"security_updates", "kernel_headers", "awg_backend"}
+var osUpdateChecks = []string{"security_updates", "kernel_headers", "awg_backend", "resolver"}
 
 // osJobActive: an OS job is going. Other host work (an agent update, the module build, the unit refresh) does not start
 // next to it; the controller asks the same questions the other way round before it starts a job.

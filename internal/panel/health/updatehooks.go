@@ -63,16 +63,20 @@ func (s *Service) extConds(ctx context.Context) []ExtCond {
 
 // NodeChecksSince counts the inbounds of the node that the synthetic checker can probe right now (no skip reason)
 // and how many of them have a round that ended at or after since: ok = the newest round is OK, failed = FAILED or
-// DEGRADED. An inbound without such a round is neither.
-func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, err error) {
+// DEGRADED. An inbound without such a round is neither. timeoutsOnly: there is a failed inbound and every FAILED or
+// DEGRADED round since `since` of the node's inbounds ended in the error code "timeout" (not refused, auth, tls, exit_unreachable:
+// those are the node's own faults, not a lossy path). failedFor is how long the failure has lasted: the shortest, over the
+// failed inbounds, span from the first to the last round of their current failed run.
+func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, timeoutsOnly bool, failedFor time.Duration, err error) {
 	sn, err := s.snapshot(ctx)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, false, 0, err
 	}
 	live, err := s.liveNode(ctx, nodeID)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, false, 0, err
 	}
+	timeoutsOnly = true
 	for _, t := range sn.byNode[nodeID] {
 		if s.skipReason(t, live) != "" {
 			continue
@@ -84,9 +88,42 @@ func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time
 		}
 		if c.last.Status == adminv1.CheckStatus_CHECK_STATUS_OK {
 			ok++
-		} else {
-			failed++
+			continue
+		}
+		failed++
+		only, span := s.failedRun(ctx, t.in.ID, since)
+		timeoutsOnly = timeoutsOnly && only
+		if failed == 1 || span < failedFor {
+			failedFor = span
 		}
 	}
-	return probeable, ok, failed, nil
+	return probeable, ok, failed, timeoutsOnly && failed > 0, failedFor, nil
+}
+
+// failedRun reads the stored rounds of an inbound since `since` (newest first): only = every non-OK round among them is a
+// timeout; span = from the first to the last round of the run of non-OK rounds that ends the list.
+func (s *Service) failedRun(ctx context.Context, inboundID string, since time.Time) (only bool, span time.Duration) {
+	rows, err := s.st.RecentSamples(ctx, inboundID, recentSamples)
+	if err != nil {
+		return false, 0
+	}
+	only, running := true, true
+	var newest, oldest time.Time
+	for _, r := range rows {
+		if r.At.Before(since) {
+			break
+		}
+		if r.Status == int(adminv1.CheckStatus_CHECK_STATUS_OK) {
+			running = false
+			continue
+		}
+		only = only && r.ErrorCode == "timeout"
+		if running {
+			if newest.IsZero() {
+				newest = r.At
+			}
+			oldest = r.At
+		}
+	}
+	return only, newest.Sub(oldest)
 }

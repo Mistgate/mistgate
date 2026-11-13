@@ -67,6 +67,29 @@ type fakeFleet struct {
 	// osSent records the OS jobs sent, in order; onOs decides the answer (nil = started under the job id of the request).
 	osSent []sentOsJob
 	onOs   func(node string, req OsJobRequest) (*agentv1.CommandResult, error)
+	// gateChecks counts the second-vantage runs per node; onGate answers them (nil = no other node: "no_sender").
+	gateChecks map[string]int
+	onGate     func(node string, run int) (sender string, udp []store.PortCheck, tcp []store.TCPCheck, code string)
+}
+
+func (f *fakeFleet) CheckPortsForGate(_ context.Context, id string) (string, []store.PortCheck, []store.TCPCheck, string) {
+	f.mu.Lock()
+	if f.gateChecks == nil {
+		f.gateChecks = map[string]int{}
+	}
+	f.gateChecks[id]++
+	run, fn := f.gateChecks[id], f.onGate
+	f.mu.Unlock()
+	if fn == nil {
+		return "", nil, nil, "no_sender"
+	}
+	return fn(id, run)
+}
+
+func (f *fakeFleet) gateRuns(id string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.gateChecks[id]
 }
 
 type sentOsJob struct {
@@ -278,10 +301,13 @@ type fakeHealth struct {
 	runs      map[string]int
 	since     map[string]time.Time
 	errors    map[string]error
+	timeouts  map[string]bool          // every failed round was a timeout
+	lasted    map[string]time.Duration // how long the failures have lasted
 }
 
 func newFakeHealth() *fakeHealth {
-	return &fakeHealth{probeable: map[string]int{}, ok: map[string]int{}, failed: map[string]int{}, runs: map[string]int{}, since: map[string]time.Time{}, errors: map[string]error{}}
+	return &fakeHealth{probeable: map[string]int{}, ok: map[string]int{}, failed: map[string]int{}, runs: map[string]int{}, since: map[string]time.Time{}, errors: map[string]error{},
+		timeouts: map[string]bool{}, lasted: map[string]time.Duration{}}
 }
 
 func (h *fakeHealth) RunChecksNow(_ context.Context, id string) (int, int, time.Duration, error) {
@@ -291,11 +317,19 @@ func (h *fakeHealth) RunChecksNow(_ context.Context, id string) (int, int, time.
 	return 1, 0, 0, nil
 }
 
-func (h *fakeHealth) NodeChecksSince(_ context.Context, id string, since time.Time) (int, int, int, error) {
+func (h *fakeHealth) NodeChecksSince(_ context.Context, id string, since time.Time) (int, int, int, bool, time.Duration, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.since[id] = since
-	return h.probeable[id], h.ok[id], h.failed[id], h.errors[id]
+	return h.probeable[id], h.ok[id], h.failed[id], h.timeouts[id], h.lasted[id], h.errors[id]
+}
+
+// lossy sets what the panel's probes see: one inbound whose failures are timeouts (or not) that have lasted d.
+func (h *fakeHealth) lossy(id string, timeouts bool, d time.Duration) {
+	h.mu.Lock()
+	h.probeable[id], h.ok[id], h.failed[id] = 1, 0, 1
+	h.timeouts[id], h.lasted[id] = timeouts, d
+	h.mu.Unlock()
 }
 
 func (h *fakeHealth) set(id string, probeable, ok, failed int) {

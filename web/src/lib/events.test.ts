@@ -76,6 +76,10 @@ describe("events", () => {
     expect(eventKind({ code: "os_update_failed", severity: EventSeverity.ERROR })).toBe("bad");
     expect(eventKind({ code: "os_step_passed", severity: EventSeverity.INFO })).toBe("ok");
   });
+  it("words the panel's own lossy path to a node as an info event", () => {
+    expect(describeEvent(t as never, { code: "panel_path_lossy", params: { vantage: "nl2" } }).text).toBe("The panel's own path to the node loses packets; its profiles answer from nl2");
+    expect(eventKind({ code: "panel_path_lossy", severity: EventSeverity.INFO })).toBe("ok");
+  });
   it("tells which sources a node's update came from, and names only the ones it knows", () => {
     const p = (sources_used: string) => ({ code: "update_download_source", params: { to_version: "0.3.1", sources_used } });
     expect(describeEvent(t as never, p("panel,github")).text).toBe("downloaded 0.3.1, sources: panel + GitHub");

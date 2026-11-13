@@ -720,6 +720,19 @@ describe("the folds of the Updates screen", () => {
     expect(text()).toContain("The client-eye check failed after the update.");
   });
 
+  it("notes a node that passed because the panel's own path to it loses packets", async () => {
+    const passed = step({ state: StepState.PASSED, params: { vantage: "nl2", panel_path: "lossy" } });
+    await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.DONE, steps: [passed] }) }));
+    act(() => button("Show stages")!.click());
+    expect(text()).toContain("Passed: de1 is fine. Its profiles answer from nl2");
+    act(() => root?.unmount());
+    host?.remove();
+    const failed = step({ state: StepState.ROLLED_BACK, errorKey: "updates.step.err.probe_failed", params: { vantage: "nl2", vantage_verdict: "bad" } });
+    await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.FAILED, steps: [failed] }) }));
+    expect(text()).toContain("The client-eye check failed after the update.");
+    expect(text()).toContain("Failed: de1's profiles did not answer the panel, and not from nl2 either.");
+  });
+
   it("shows a running rollout as chips, one per node, never as bars that run across the page", async () => {
     await mount(page({ nodes: [node({ state: NodeUpdateState.UPDATING })], rollout: rollout({ steps: [step({ nodeName: "de1", state: StepState.GATING })] }) }));
     const chips = [...document.querySelectorAll("ol li ul li")].map((li) => li.textContent);

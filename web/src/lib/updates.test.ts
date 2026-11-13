@@ -27,6 +27,7 @@ import {
   updateDateTimeInputAtOffset,
   updateTimezoneName,
   updatesPollMs,
+  vantageNote,
   type NodeUpdate,
   type Rollout,
   type Step,
@@ -287,6 +288,18 @@ describe("the words of server keys", () => {
     // a rollout stored before the split still says what it said then
     expect(stepErrorText(t, "updates.step.err.state_not_applied")).toBe("The node came back but did not apply its configuration.");
     expect(pauseText(t, "updates.pause.gate_failed", { node: "de1", reason: "warp_down" })).toContain("WARP did not come up after the update.");
+  });
+
+  it("says what the second look from another node found about the panel's own path", () => {
+    const lossy = { vantage: "nl2", panel_path: "lossy" };
+    expect(vantageNote(t, "de1", lossy, true)).toBe(
+      "Passed: de1 is fine. Its profiles answer from nl2 and the node reports itself healthy. The panel's own path to de1 is losing packets, so the panel's checks may stay red until that path recovers.",
+    );
+    expect(vantageNote(t, "de1", { vantage: "nl2", vantage_verdict: "bad" }, false)).toBe("Failed: de1's profiles did not answer the panel, and not from nl2 either.");
+    expect(vantageNote(t, "de1", { vantage_verdict: "none", no_vantage: "1" }, false)).toBe("Failed: the panel could not reach de1's profiles, and no other node could check them.");
+    // a step that was not given the second look, or did not pass although the note says the path is lossy, says nothing
+    expect(vantageNote(t, "de1", {}, true)).toBe("");
+    expect(vantageNote(t, "de1", lossy, false)).toBe("");
   });
 
   it("does not call a rollback the gate made 'yours'", () => {

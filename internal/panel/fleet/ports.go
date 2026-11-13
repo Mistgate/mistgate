@@ -105,6 +105,27 @@ func (f *Fleet) CheckPortsAsSystem(ctx context.Context, nodeID string, requested
 	return out.checks, out.sender, out.errorCode
 }
 
+// CheckPortsForGate is the update gate's second vantage point (internal/panel/update, healthGate): the system port check of
+// a node, UDP and TCP, with the guarantee the gate needs: the sender is another node. A run whose sender (UDP or TCP) is the
+// panel or the target itself says nothing about the panel's own path, so it answers "no_sender" and its rows are dropped.
+// code is "" for a finished run (the verdicts are in the rows), else the check's own error code.
+func (f *Fleet) CheckPortsForGate(ctx context.Context, nodeID string) (sender string, udp []store.PortCheck, tcp []store.TCPCheck, code string) {
+	out := f.checkPorts(ctx, nodeID, nil, "system", true)
+	if out.errorCode != "" {
+		return out.sender, nil, nil, out.errorCode
+	}
+	own := func(id string) bool { return id == "" || id == "panel" || id == nodeID }
+	if own(out.sender) {
+		return out.sender, nil, nil, "no_sender"
+	}
+	for _, row := range out.tcp {
+		if row.Verdict != "" && own(row.Sender) {
+			return out.sender, nil, nil, "no_sender"
+		}
+	}
+	return out.sender, out.checks, out.tcp, ""
+}
+
 // CheckPortsAsSystemUDP is CheckPortsAsSystem without the TCP half: the confirming second sample after UDP loss.
 func (f *Fleet) CheckPortsAsSystemUDP(ctx context.Context, nodeID string, requested []uint16) ([]store.PortCheck, string, string) {
 	out := f.checkPorts(ctx, nodeID, requested, "system", false)

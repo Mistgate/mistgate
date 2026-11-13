@@ -12,7 +12,7 @@ import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { blockKeys, blockOf, blockText, elapsedText, osRunOf, pauseCode, pauseText, phaseText, resultLine, stepPill, stepReason, stepSince, useOsActions, type OsNodeRun } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
-import { useIsOwner } from "@/lib/updates";
+import { useIsOwner, vantageNote } from "@/lib/updates";
 import { OsConfirmDialog, type OsDialogMode } from "./os-confirm";
 
 // What the owner does with one node's operating system, and what is going on there: the buttons (install the security
@@ -66,6 +66,8 @@ function Result({ run, row, owner, busy, onClose }: { run: Extract<OsNodeRun, { 
   const { step, rollout, stopped } = run;
   const pill = stepPill(step);
   const reason = stepReason(t, step.errorKey, step.params);
+  // the gate's look from another node at the panel's own path: why a pass is not a plain pass, or why a probe failure stands
+  const note = vantageNote(t, row.name ?? step.nodeName, step.params, step.state === OsStepState.PASSED);
   // the pause names the step's reason and mode itself; an older answer lacks them, the step has them
   const pause = { ...step.params, reason: step.errorKey, ...rollout.pauseParams };
   const banner = pauseText(t, rollout.pauseKey, row.name ?? step.nodeName, pause);
@@ -78,6 +80,7 @@ function Result({ run, row, owner, busy, onClose }: { run: Extract<OsNodeRun, { 
         <StatusPill kind={pill.kind} label={t(pill.key)} sm />
         <span className="min-w-0 text-xs leading-snug text-pretty text-muted">{stopped ? fmt.ago(step.finishedUnix || rollout.createdUnix) : resultLine(t, step, false)}</span>
       </div>
+      {note && <span className="text-xs leading-snug text-pretty text-muted">{note}</span>}
       {stopped && (
         <Callout
           kind="bad"

@@ -981,7 +981,7 @@ func (p *osPass) advanceGate(i int) {
 	if x.RebootAt.IsZero() {
 		since = x.SentAt
 	}
-	g := s.healthGate(p.ctx, x.NodeID, n, live.Drift, since, x.PreFailed, p.now)
+	g := s.healthGate(p.ctx, x.NodeID, n, live.Drift, since, x.PreFailed, p.now, v.state == osupdate.StateDone)
 	if g.hard == "" && g.soft == "" && v.state != osupdate.StateDone {
 		// How the job ended is not known yet (it is still looking at itself after the reboot, or its end has not reached the
 		// panel): a pass now could be followed by "failed" for a node that was called done.
@@ -993,10 +993,10 @@ func (p *osPass) advanceGate(i int) {
 	}
 	switch {
 	case g.pass:
-		p.finish(x, store.OsStepPassed, "", extra)
+		p.finish(x, store.OsStepPassed, "", mergeParams(extra, g.with))
 	case g.hard != "":
 		p.finishAndPause(x, g.hard, g.with, pauseGateFailed)
-	case deadline:
+	case deadline && !g.wait:
 		p.finishAndPause(x, g.soft, g.with, pauseGateFailed)
 	}
 }

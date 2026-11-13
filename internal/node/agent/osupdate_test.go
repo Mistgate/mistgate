@@ -256,7 +256,7 @@ func TestOsUpdateEndsAreEventsReportedOnce(t *testing.T) {
 		t.Errorf("failed event = %+v", e)
 	}
 	rep := nextDoctor(t, h)
-	if rep.RequestId != "" || !rep.Partial || resultIDs(rep) != "security_updates,kernel_headers,awg_backend" {
+	if rep.RequestId != "" || !rep.Partial || resultIDs(rep) != "security_updates,kernel_headers,awg_backend,resolver" {
 		t.Errorf("the re-check after the end = %+v", rep)
 	}
 	time.Sleep(200 * time.Millisecond)

@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { triedText } from "@/lib/update-sources";
-import { isActive, progressOf, rolloutInfo, stagesOf, stepErrorText, stepInfo, type Rollout, type Stage, type Step } from "@/lib/updates";
+import { isActive, progressOf, rolloutInfo, stagesOf, stepErrorText, stepInfo, vantageNote, type Rollout, type Stage, type Step } from "@/lib/updates";
 
 const decided = (s: Step) => s.state === StepState.PASSED || s.state === StepState.FAILED || s.state === StepState.ROLLED_BACK || s.state === StepState.SKIPPED;
 
@@ -108,7 +108,9 @@ function Stages({ rollout }: { rollout: Rollout }) {
     <ol className="flex flex-col">
       {stages.map((st) => {
         const tx = stageTexts(t, st);
-        const why = st.steps.filter((s) => s.errorKey);
+        // what went wrong, and the gate's note about the panel's own path (a pass that needed it, or a failure it could not explain)
+        const noteOf = (s: Step) => vantageNote(t, s.nodeName, s.params, s.state === StepState.PASSED);
+        const why = st.steps.filter((s) => s.errorKey || noteOf(s));
         return (
           <li key={st.stage} className="grid gap-x-4 gap-y-1.5 border-t border-line py-3 first:border-t-0 first:pt-1 sm:grid-cols-[150px_minmax(0,1fr)]">
             <div className="flex min-w-0 flex-col gap-0.5">
@@ -125,9 +127,14 @@ function Stages({ rollout }: { rollout: Rollout }) {
                 ))}
               </ul>
               {why.map((s) => (
-                <p key={s.nodeId} className={cx("text-xs leading-snug text-pretty", s.state === StepState.SKIPPED ? "text-muted" : kindTextClass[stepInfo(s.state).kind])}>
-                  <b className="font-mono">{s.nodeName}</b> · {stepErrorText(t, s.errorKey, s.params)}
+                <p key={s.nodeId} className={cx("text-xs leading-snug text-pretty", s.state === StepState.SKIPPED || s.state === StepState.PASSED ? "text-muted" : kindTextClass[stepInfo(s.state).kind])}>
+                  {s.errorKey && (
+                    <>
+                      <b className="font-mono">{s.nodeName}</b> · {stepErrorText(t, s.errorKey, s.params)}
+                    </>
+                  )}
                   {s.errorKey.endsWith(".download_failed") && <Tried raw={s.params.sources_failed} />}
+                  {noteOf(s) && <span className={cx(s.errorKey && "block")}>{noteOf(s)}</span>}
                 </p>
               ))}
             </div>

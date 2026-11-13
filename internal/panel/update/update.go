@@ -58,6 +58,9 @@ type Fleet interface {
 	// UpdateOs sends one OS job and waits up to wait for the CommandResult (params.state: started, running, finished or
 	// unsupported). FAILED_PRECONDITION when the node is offline or did not list "os-update/1": nothing was sent.
 	UpdateOs(ctx context.Context, nodeID string, req OsJobRequest, wait time.Duration) (*agentv1.CommandResult, error)
+	// CheckPortsForGate is the gate's second vantage point: the system port check of a node from another node (never the panel or
+	// the target itself). code is "" for a finished run, else the check's own error code ("no_sender", "same_host", ...).
+	CheckPortsForGate(ctx context.Context, nodeID string) (sender string, udp []store.PortCheck, tcp []store.TCPCheck, code string)
 }
 
 // UpdateAgentOptions carries optional fields for an agent that advertised the matching capability.
@@ -77,7 +80,8 @@ type Health interface {
 	// RunChecksNow schedules an immediate synthetic round for the inbounds of a node (rate limited to one per 30 s).
 	RunChecksNow(ctx context.Context, nodeID string) (scheduled, skipped int, retry time.Duration, err error)
 	// NodeChecksSince counts probeable inbounds and rounds ended at or after since; read errors are returned to the gate.
-	NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, err error)
+	// timeoutsOnly: something failed and every failed round since was a timeout; failedFor: how long the failures have lasted.
+	NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, timeoutsOnly bool, failedFor time.Duration, err error)
 }
 
 // Timing of the module. The zero value is production; tests shorten what they need.
@@ -201,6 +205,8 @@ type Service struct {
 	preparing       map[string]string    // node id -> rollout id while a source check runs before the step is SENT
 	orphans         map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
 	failing         map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
+	vantageMu       sync.Mutex           // guards vantage
+	vantage         map[vantageKey]*vantageRun
 	progressMu      sync.RWMutex
 	progress        map[string]progressState // node id -> latest update progress
 	progressActive  map[string]progressExpectation
@@ -260,7 +266,7 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 		hashes: map[string]hashEntry{}, runCtx: context.Background(),
 		servingNodes: map[string]*serveSlot{}, zombies: map[string]int{}, nodeSlotWait: bundleNodeSlotWait, sendTimeout: bundleSendStallTimeout,
 		parseNetworkTable: asndb.Parse,
-		inflight:          map[string]bool{}, preparing: map[string]string{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
+		inflight:          map[string]bool{}, preparing: map[string]string{}, orphans: map[string]bool{}, failing: map[string]time.Time{}, vantage: map[vantageKey]*vantageRun{},
 		updating: map[string]bool{}, osUpdating: map[string]bool{}, osInflight: map[string]bool{}, osRefreshes: map[string]osRefresh{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
 	if shouldReadPanelHostStatus(cfg.Edge, osupdate.IsRoot(), cfg.OSStatusReader != nil) {
 		s.osStatusMonitor = osupdate.NewMonitor(cfg.OSStatusReader)

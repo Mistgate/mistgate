@@ -756,6 +756,7 @@ type gateResult struct {
 	hard string // a failure that ends the gate now
 	soft string // what is still missing; it fails the gate only at the deadline
 	with map[string]string
+	wait bool // the second vantage runs: do not fail at the deadline yet (it ends within its own timeout)
 }
 
 // gate evaluates the rollout gate for a node that is back with the new build: the new build confirmed itself (update_committed),
@@ -773,7 +774,7 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 			committed = true
 		}
 	}
-	g := s.healthGate(p.ctx, x.NodeID, n, drift, x.ReconnectedAt, x.PreFailed, p.now)
+	g := s.healthGate(p.ctx, x.NodeID, n, drift, x.ReconnectedAt, x.PreFailed, p.now, committed)
 	if g.hard == "" && !committed { // the first thing missing is what the owner reads
 		g.pass, g.soft = false, errNotCommitted
 	}
@@ -783,8 +784,9 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 // healthGate is the part of the gate that looks at what the node does, shared by the agent rollout and the OS rollout: the
 // desired state is applied, no profile that worked before is failed (30 s of grace), WARP is up where a profile leaves through
 // it, and the synthetic probes have run since `since` (the node was back). preFailed are the profiles that were already failed
-// before the change.
-func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow, drift bool, since time.Time, preFailed []string, now time.Time) gateResult {
+// before the change. settled: the node's own word that the job is done (the OS job) or the update committed; with it the probes may
+// pass on the relaxed rule of vantage.go when only the panel's own path is lossy.
+func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow, drift bool, since time.Time, preFailed []string, now time.Time, settled bool) gateResult {
 	var soft string
 	with := map[string]string{}
 	miss := func(key string) {
@@ -828,18 +830,32 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 	} else {
 		delete(s.failing, nodeID)
 	}
+	pathLooksLossy := false // T of vantage.go
 	if s.hl != nil {
-		probeable, ok, _, err := s.hl.NodeChecksSince(ctx, nodeID, since)
+		probeable, ok, failed, timeoutsOnly, failedFor, err := s.hl.NodeChecksSince(ctx, nodeID, since)
 		if err != nil {
 			miss(errProbeFailed)
 		} else if probeable > 0 && ok < probeable {
 			miss(errProbeFailed)
+			pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
 			if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
 				s.log.Warn("update: run checks", "node", nodeID, "err", err)
 			}
 		}
 	}
-	return gateResult{pass: soft == "", soft: soft, with: with}
+	wait := false
+	// P: probe_failed is the last thing checked above, so when it is the first miss it is the only one.
+	if soft == errProbeFailed && pathLooksLossy && settled && s.nodeSelfGood(ctx, nodeID, inbounds, since) {
+		v := s.vantageOf(nodeID, since)
+		for k, val := range v.params() {
+			with[k] = val
+		}
+		wait = v.verdict == ""
+		if v.verdict == vantageOK {
+			soft = ""
+		}
+	}
+	return gateResult{pass: soft == "", soft: soft, with: with, wait: wait}
 }
 
 // warpUpSince requires a WARP health report from this connection and a usable tunnel. Without a report, or while it is
@@ -924,7 +940,7 @@ func (p *pass) advanceGate(i int) {
 		return
 	}
 	g := p.gate(x, n, live.Drift)
-	if !g.pass && g.hard == "" && deadline {
+	if !g.pass && g.hard == "" && deadline && !g.wait {
 		// The node and its live row were read when this pass began; a Hello or an ApplyResult that landed since may have put
 		// the node in order. Look once more before undoing anything: a failed look decides nothing (the next pass looks
 		// again), and a node that is gone by now is not sent a rollback.
@@ -940,10 +956,14 @@ func (p *pass) advanceGate(i int) {
 	}
 	switch {
 	case g.pass:
-		p.finish(x, store.StepPassed, "", nil)
+		var note map[string]string // the second vantage's words, when the pass needed it
+		if len(g.with) > 0 {
+			note = g.with
+		}
+		p.finish(x, store.StepPassed, "", note)
 	case g.hard != "":
 		p.failGate(x, g.hard, g.with)
-	case deadline:
+	case deadline && !g.wait:
 		p.failGate(x, g.soft, g.with)
 	}
 }

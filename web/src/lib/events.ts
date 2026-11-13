@@ -70,6 +70,7 @@ const textKeys: Record<string, MessageKey> = {
   bandwidth_upload_missing: "event.bandwidth_upload_missing",
   port_lossy: "event.port_lossy",
   path_lossy: "event.path_lossy",
+  panel_path_lossy: "event.panel_path_lossy",
   // an OS update of the node: the agent's job (os_update_*, os_reboot_started) and the panel's verdict (os_step_*)
   os_update_started: "event.os_update_started",
   os_update_done: "event.os_update_done",
