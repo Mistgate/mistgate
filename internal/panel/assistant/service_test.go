@@ -266,6 +266,10 @@ func (p assistantMCPPlanStore) FinishApply(ctx context.Context, id string, ok bo
 	return p.st.FinishApply(ctx, id, ok, result, errText, outcomeCode, outcomeParams, now)
 }
 
+func (p assistantMCPPlanStore) ReleaseApply(ctx context.Context, id, previousStatus string) error {
+	return p.st.ReleaseApply(ctx, id, previousStatus)
+}
+
 type assistantTestMCPAuth struct{ auth *auth.Service }
 
 func (a assistantTestMCPAuth) Principal(ctx context.Context) (mcp.Principal, bool) {
