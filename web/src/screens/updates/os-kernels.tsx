@@ -46,7 +46,7 @@ function Row({ k }: { k: KernelRow }) {
   return (
     <li className={cx("grid gap-y-1.5 py-1.5", cols)}>
       <div className="col-span-5 flex min-w-0 flex-col sm:col-span-1">
-        <span dir="ltr" className="truncate font-mono text-xs font-bold" title={k.version}>
+        <span dir="ltr" className="break-all font-mono text-xs font-bold leading-snug" title={k.version}>
           {k.version}
         </span>
         {tags && <span className={cx("text-[11px]", k.nextBoot ? "font-semibold text-accent-text" : "text-muted")}>{tags}</span>}
@@ -98,7 +98,7 @@ export function OsKernels({ row, onlyBlocked = false }: { row: OsRow; onlyBlocke
       </button>
       {open && (
         <div className="flex flex-col border-t border-line px-3 pb-1.5 pt-2">
-          <div aria-hidden className={cx("hidden pb-1 text-[10px] font-semibold text-muted sm:grid", cols)}>
+          <div aria-hidden className={cx("hidden pb-1 text-[11px] font-semibold text-muted sm:grid", cols)}>
             <span />
             {kernelMarkIds.map((id) => (
               <span key={id} className="truncate text-center">
