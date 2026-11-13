@@ -125,7 +125,7 @@ func (s *Service) runVantage(ctx context.Context, key vantageKey, since time.Tim
 	if verdict == vantageOK {
 		ev := store.EventRow{Time: s.now(), Severity: 1, Code: "panel_path_lossy", Source: "panel", NodeID: key.node, Params: map[string]string{"vantage": name}}
 		if err := s.st.InsertEvent(ctx, ev); err != nil {
-			s.log.Warn("update: panel path event", "node", key.node, "err", err)
+			s.log.Warn("update: panel path event", "code", "update_panel_path_event_failed", "node", key.node, "err", err)
 		}
 	}
 }
