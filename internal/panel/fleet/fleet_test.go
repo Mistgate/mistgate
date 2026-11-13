@@ -1215,7 +1215,10 @@ func (e *env) adminClients() (adminv1connect.NodeServiceClient, adminv1connect.F
 	mux.Handle(p, h)
 	p, h = e.f.FleetHandler()
 	mux.Handle(p, h)
-	srv := httptest.NewServer(mux)
+	// RequireSession puts the signed-in admin into the context in front of these handlers; the tests act as the owner.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.ServeHTTP(w, r.WithContext(asOwner(r.Context())))
+	}))
 	e.t.Cleanup(srv.Close)
 	return adminv1connect.NewNodeServiceClient(srv.Client(), srv.URL), adminv1connect.NewFleetServiceClient(srv.Client(), srv.URL)
 }

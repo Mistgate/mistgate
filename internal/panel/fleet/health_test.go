@@ -473,7 +473,7 @@ func TestCountryCodeReachesTheAgent(t *testing.T) {
 	}
 	// A preset the owner picked is sent as it is.
 	yandex := &adminv1.DnsResolvers{Values: []string{"77.88.8.8", "77.88.8.1"}}
-	if _, err := (nodeService{e.f}).UpdateNode(e.ctx, connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: a.nodeID, DnsResolvers: yandex})); err != nil {
+	if _, err := (nodeService{e.f}).UpdateNode(asOwner(e.ctx), connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: a.nodeID, DnsResolvers: yandex})); err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.Join(c.desired().Settings.DnsResolvers, ","); got != "77.88.8.8,77.88.8.1" {

@@ -975,6 +975,20 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			}
 		}
 	}
+	if p.DNSResolvers != nil {
+		// The resolvers name the servers the agent's engines ask for every destination of its users: the owner's call,
+		// like the address. Sending the same list back (a form that saves all its fields) stays open.
+		cur, err := f.st.Node(ctx, m.NodeId)
+		switch {
+		case errors.Is(err, store.ErrNotFound): // answered by the update
+		case err != nil:
+			return nil, internalErr(f.log.Error, "update node", err)
+		case !slices.Equal(*p.DNSResolvers, cur.DNSResolvers):
+			if a, ok := auth.AdminFrom(ctx); !ok || a.Role != store.RoleOwner {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the owner can change the DNS resolvers of a node"))
+			}
+		}
+	}
 	live, err := f.liveRowsForNode(ctx, m.NodeId, true)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "read node live projection", err)
