@@ -5,12 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
-
-const nodeBundleSyncTimeout = 2 * time.Minute
 
 // NodeBundleSource fetches and verifies the latest signed node bundle from its release source. The current built
 // value is zero when there is no trusted local bundle.
@@ -19,9 +16,9 @@ type NodeBundleSource interface {
 	BundleStatus() (available bool, manifestSHA256 string)
 }
 
-// syncNodeBundle reserves the bundle directory against rollout and panel-update starts while a trusted GitHub
-// release is downloaded and atomically installed. Existing rollouts keep their pinned bundle until they finish.
-func (s *Service) syncNodeBundle(ctx context.Context) bool {
+// reserveNodeBundleSync reserves the bundle directory against rollout and panel-update starts while a trusted
+// GitHub release is downloaded and atomically installed. Existing rollouts keep their pinned bundle until they finish.
+func (s *Service) reserveNodeBundleSync(ctx context.Context) bool {
 	if s.cfg.NodeBundleSource == nil || s.cfg.Key == nil || s.dist == "" {
 		return false
 	}
@@ -45,6 +42,31 @@ func (s *Service) syncNodeBundle(ctx context.Context) bool {
 	}
 	s.bundleSyncing = true
 	s.mu.Unlock()
+	return true
+}
+
+// syncNodeBundle is the synchronous form used by tests and callers that need to wait for the result.
+func (s *Service) syncNodeBundle(ctx context.Context) bool {
+	if !s.reserveNodeBundleSync(ctx) {
+		return false
+	}
+	return s.runNodeBundleSync(ctx)
+}
+
+// startNodeBundleSync reserves synchronously so rollout starts see the refusal before the worker leaves the loop,
+// then runs network and disk work outside the update loop.
+func (s *Service) startNodeBundleSync(ctx context.Context) {
+	if !s.reserveNodeBundleSync(ctx) {
+		return
+	}
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.runNodeBundleSync(ctx)
+	}()
+}
+
+func (s *Service) runNodeBundleSync(ctx context.Context) bool {
 	defer func() {
 		s.mu.Lock()
 		s.bundleSyncing = false
@@ -56,7 +78,7 @@ func (s *Service) syncNodeBundle(ctx context.Context) bool {
 	if b := s.current(); b != nil && b.trusted {
 		currentBuilt = b.manifest.Built
 	}
-	syncCtx, cancel := context.WithTimeout(ctx, nodeBundleSyncTimeout)
+	syncCtx, cancel := context.WithTimeout(ctx, s.downloadTimeoutOrDefault(ctx))
 	defer cancel()
 	changed, err := s.cfg.NodeBundleSource.Sync(syncCtx, currentBuilt)
 	if err != nil {

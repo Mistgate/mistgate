@@ -536,7 +536,7 @@ func (a Access) SetUsersDisabled(ctx context.Context, ids []string, disabled boo
 
 // SetUserStatus stores a recomputed status.
 func (a Access) SetUserStatus(ctx context.Context, id, status string) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET status = ? WHERE id = ?`, status, id)
+	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET status = CASE WHEN disabled = 1 THEN 'disabled' ELSE ? END WHERE id = ?`, status, id)
 	return err
 }
 
@@ -550,7 +550,7 @@ func (a Access) ResetUserPeriod(ctx context.Context, id string, oldPeriodStart, 
 
 // ResetUserTraffic clears current usage and stores a recomputed status without changing period_start.
 func (a Access) ResetUserTraffic(ctx context.Context, id, status string) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET used_bytes = 0, status = ? WHERE id = ?`, status, id)
+	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET used_bytes = 0, status = CASE WHEN disabled = 1 THEN 'disabled' ELSE ? END WHERE id = ?`, status, id)
 	return err
 }
 

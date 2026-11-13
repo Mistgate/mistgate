@@ -314,7 +314,7 @@ func (s *Service) Run(ctx context.Context) {
 	s.mu.Unlock()
 	s.recover(ctx)
 	s.recoverOs(ctx)
-	s.syncNodeBundle(ctx)
+	s.startNodeBundleSync(ctx)
 	s.processScheduledNodeUpdates(ctx)
 	if s.cfg.PanelUpdater != nil {
 		s.wg.Add(1)
@@ -356,7 +356,7 @@ func (s *Service) Run(ctx context.Context) {
 			s.rescanIfChanged()
 			s.processScheduledNodeUpdates(ctx)
 		case <-bundlePoll.C:
-			s.syncNodeBundle(ctx)
+			s.startNodeBundleSync(ctx)
 			s.processScheduledNodeUpdates(ctx)
 		case <-prune.C:
 			s.pruneOld(ctx)

@@ -23,8 +23,9 @@ import (
 )
 
 const (
-	githubBundleMaxMetadata = release.MaxManifestBytes
-	githubBundleMaxSig      = ed25519.SignatureSize
+	githubBundleMaxMetadata   = release.MaxManifestBytes
+	githubBundleMaxSig        = ed25519.SignatureSize
+	nodeBundleMetadataTimeout = 20 * time.Second
 )
 
 var ErrGitHubNodeBundleMissing = errors.New("the selected GitHub release has no signed node bundle")
@@ -74,7 +75,9 @@ func NewGitHubNodeBundleSource(cfg GitHubNodeBundleConfig) *GitHubNodeBundleSour
 		distDir = filepath.Join(cfg.DataDir, "dist")
 	}
 	if cfg.HTTPClient == nil {
-		cfg.HTTPClient = &http.Client{Timeout: 2 * time.Minute, CheckRedirect: githubReleaseRedirect}
+		// Request contexts bound metadata and downloads separately; a client timeout here would cap the
+		// owner-configurable download budget for large signed bundles.
+		cfg.HTTPClient = &http.Client{CheckRedirect: githubReleaseRedirect}
 	}
 	return &GitHubNodeBundleSource{
 		distDir: distDir, key: append(ed25519.PublicKey(nil), cfg.Key...),
@@ -101,6 +104,11 @@ func (u *GitHubNodeBundleSource) BundleStatus() (bool, string) {
 // Sync fetches the selected release's signed package when its build is newer than the trusted local package. It returns
 // true only after the complete package has been verified and atomically installed.
 func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (bool, error) {
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultUpdateDownloadTimeout)
+		defer cancel()
+	}
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.available = false
@@ -112,13 +120,15 @@ func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (
 		return false, errors.New("node bundle source has no data directory")
 	}
 
-	list, newETag, notModified, err := fetchGitHubReleaseList(ctx, u.client, u.apiURL, "Mistgate-node-bundle-updater", u.releasesETag)
+	metadataCtx, cancelMetadata := context.WithTimeout(ctx, nodeBundleMetadataTimeout)
+	defer cancelMetadata()
+	list, newETag, notModified, err := fetchGitHubReleaseList(metadataCtx, u.client, u.apiURL, "Mistgate-node-bundle-updater", u.releasesETag)
 	if err != nil {
 		return false, err
 	}
 	if notModified {
 		if len(u.releases) == 0 {
-			list, newETag, notModified, err = fetchGitHubReleaseList(ctx, u.client, u.apiURL, "Mistgate-node-bundle-updater", "")
+			list, newETag, notModified, err = fetchGitHubReleaseList(metadataCtx, u.client, u.apiURL, "Mistgate-node-bundle-updater", "")
 			if err != nil {
 				return false, err
 			}
@@ -146,11 +156,11 @@ func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (
 	if !hasManifest || !hasSignature {
 		return false, ErrGitHubNodeBundleMissing
 	}
-	manifestBytes, err := downloadGitHubAsset(ctx, u.client, r.TagName, manifestAsset, githubBundleMaxMetadata)
+	manifestBytes, err := downloadGitHubAsset(metadataCtx, u.client, r.TagName, manifestAsset, githubBundleMaxMetadata)
 	if err != nil {
 		return false, fmt.Errorf("download node bundle manifest: %w", err)
 	}
-	signature, err := downloadGitHubAsset(ctx, u.client, r.TagName, signatureAsset, githubBundleMaxSig)
+	signature, err := downloadGitHubAsset(metadataCtx, u.client, r.TagName, signatureAsset, githubBundleMaxSig)
 	if err != nil {
 		return false, fmt.Errorf("download node bundle signature: %w", err)
 	}

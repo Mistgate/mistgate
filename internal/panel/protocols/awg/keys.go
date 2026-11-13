@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"unicode"
 )
 
 // X25519 key pair in the WireGuard form: 32 bytes, base64 (standard alphabet), private key clamped.
@@ -27,8 +28,8 @@ func genKeyPair() (priv, pub string, err error) {
 
 // publicKeyOf derives the public key from a base64 private key.
 func publicKeyOf(priv string) (string, error) {
-	b, err := base64.StdEncoding.DecodeString(priv)
-	if err != nil || len(b) != 32 {
+	b, ok := decodeStdBase64(priv)
+	if !ok || len(b) != 32 {
 		return "", fmt.Errorf("a private key must be 32 bytes in base64")
 	}
 	k, err := ecdh.X25519().NewPrivateKey(b)
@@ -39,8 +40,21 @@ func publicKeyOf(priv string) (string, error) {
 }
 
 func validKey(s string) bool {
+	b, ok := decodeStdBase64(s)
+	return ok && len(b) == 32
+}
+
+func decodeStdBase64(s string) ([]byte, bool) {
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			return nil, false
+		}
+	}
 	b, err := base64.StdEncoding.DecodeString(s)
-	return err == nil && len(b) == 32
+	if err != nil || base64.StdEncoding.EncodeToString(b) != s {
+		return nil, false
+	}
+	return b, true
 }
 
 func randomKey() (string, error) {

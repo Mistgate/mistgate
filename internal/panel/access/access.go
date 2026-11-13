@@ -207,21 +207,33 @@ func (s *Service) Sweep(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.refresh(ctx, states)
+	changed, err := s.refresh(ctx, states)
+	if changed > 0 || err != nil {
+		s.notify.StateChanged()
+	}
+	return changed, err
 }
 
 // Recompute refreshes the status of the given users; the fleet calls it after it added their usage, so a
 // quota overrun takes effect within one stats interval. Changed statuses notify the nodes.
 func (s *Service) Recompute(ctx context.Context, userIDs []string) error {
+	changed, refreshed, err := s.recompute(ctx, userIDs)
+	if refreshed && (changed > 0 || err != nil) {
+		s.notify.StateChanged()
+	}
+	return err
+}
+
+func (s *Service) recompute(ctx context.Context, userIDs []string) (int, bool, error) {
 	if len(userIDs) == 0 {
-		return nil
+		return 0, false, nil
 	}
 	states, err := s.st.Access().UserStates(ctx, userIDs)
 	if err != nil {
-		return err
+		return 0, false, err
 	}
-	_, err = s.refresh(ctx, states)
-	return err
+	changed, err := s.refresh(ctx, states)
+	return changed, true, err
 }
 
 func (s *Service) refresh(ctx context.Context, states []store.AccessUserState) (int, error) {
@@ -245,15 +257,11 @@ func (s *Service) refresh(ctx context.Context, states []store.AccessUserState) (
 			continue
 		}
 		if err != nil {
-			s.notify.StateChanged()
 			return changed, err
 		}
 		if status != u.Status {
 			changed++
 		}
-	}
-	if changed > 0 {
-		s.notify.StateChanged()
 	}
 	return changed, nil
 }

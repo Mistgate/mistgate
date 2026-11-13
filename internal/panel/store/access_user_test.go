@@ -153,3 +153,43 @@ func TestAdminTrafficResetDoesNotDependOnStalePeriodStart(t *testing.T) {
 			periodStart, usedBytes, status, currentPeriod.Unix())
 	}
 }
+
+func TestAccessStatusWritesCannotReenableDisabledUser(t *testing.T) {
+	ctx := context.Background()
+	st, err := Open(ctx, filepath.Join(t.TempDir(), "store.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	groupID, userID := NewID("grp_"), NewID("usr_")
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: groupID, Name: "alice", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Access().CreateUser(ctx, AccessUser{
+		ID: userID, Name: "alice", GroupID: groupID, Status: "active", AppHapp: true, AppAmnezia: true,
+		AllNodes: true, QuotaReset: "month", PeriodStart: now, DeviceLimit: 5,
+		SubTokenHash: []byte("alice-token-hash"), SubTokenEnc: []byte("sealed"), CreatedAt: now,
+	}, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	a := st.Access()
+	if err := a.SetUsersDisabled(ctx, []string{userID}, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.ResetUserTraffic(ctx, userID, "active"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetUserStatus(ctx, userID, "active"); err != nil {
+		t.Fatal(err)
+	}
+	var disabled int
+	var status string
+	if err := st.R.QueryRowContext(ctx, `SELECT disabled, status FROM user WHERE id = ?`, userID).Scan(&disabled, &status); err != nil {
+		t.Fatal(err)
+	}
+	if disabled != 1 || status != "disabled" {
+		t.Fatalf("stale status writes left disabled=%d status=%q; want disabled=1 status=disabled", disabled, status)
+	}
+}

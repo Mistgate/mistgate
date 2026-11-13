@@ -1,7 +1,6 @@
 package awg
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/netip"
@@ -196,7 +195,7 @@ func validate(s Settings) []protocols.FieldError {
 
 	// 7. 3.1 only: key, padding, timers
 	if o.HeaderProtectionKey != "" { // checked on 2.0 too: a stored key must at least be a key
-		if b, err := base64.StdEncoding.DecodeString(o.HeaderProtectionKey); err != nil || len(b) != hpkBytes {
+		if b, ok := decodeStdBase64(o.HeaderProtectionKey); !ok || len(b) != hpkBytes {
 			add("/obfuscation/header_protection_key", "invalid", "must be 32 bytes in base64")
 		}
 	}

@@ -145,6 +145,55 @@ func TestGitHubNodeBundleSourceDownloadsAndVerifiesRelease(t *testing.T) {
 	}
 }
 
+func TestGitHubNodeBundleMetadataHasShortBudgetAndAssetsUseCallerBudget(t *testing.T) {
+	_, priv, err := release.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{
+		"mistgate-node-linux-amd64": []byte("signed linux amd64 agent"),
+		"mistgate-node-linux-arm64": []byte("signed linux arm64 agent"),
+	}
+	apiBody, assets := signedNodeRelease(t, priv, "v0.2.0", 1_900_000_000, 2_000_000_000, files)
+	var metadataBudget, binaryBudget time.Duration
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		deadline, ok := r.Context().Deadline()
+		if !ok {
+			return nil, errors.New("bundle request has no deadline")
+		}
+		remaining := time.Until(deadline)
+		name := filepath.Base(r.URL.Path)
+		if r.URL.Host == "api.github.com" || name == release.ManifestName || name == release.SignatureName {
+			metadataBudget = remaining
+		} else if r.URL.Host == "github.com" {
+			binaryBudget = remaining
+		}
+		if r.URL.Host == "api.github.com" {
+			return githubResponse(http.StatusOK, apiBody), nil
+		}
+		if r.URL.Host == "github.com" {
+			body, ok := assets[name]
+			if !ok {
+				return githubResponse(http.StatusNotFound, nil), nil
+			}
+			return githubResponse(http.StatusOK, body), nil
+		}
+		return nil, errors.New("unexpected host " + r.URL.Host)
+	})}
+	source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{
+		DataDir: t.TempDir(), Key: priv.Public().(ed25519.PublicKey), HTTPClient: client,
+		Now: func() time.Time { return time.Unix(1_800_000_000, 0) },
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+	defer cancel()
+	if changed, err := source.Sync(ctx, 0); err != nil || !changed {
+		t.Fatalf("bundle sync = %v, %v", changed, err)
+	}
+	if metadataBudget <= 0 || metadataBudget > nodeBundleMetadataTimeout || binaryBudget <= nodeBundleMetadataTimeout {
+		t.Fatalf("request budgets: metadata=%s binary=%s; want metadata <= %s and binary > %s", metadataBudget, binaryBudget, nodeBundleMetadataTimeout, nodeBundleMetadataTimeout)
+	}
+}
+
 func TestGitHubNodeBundleSourceFollowsChannelWithoutDowngrading(t *testing.T) {
 	_, priv, err := release.GenerateKey()
 	if err != nil {

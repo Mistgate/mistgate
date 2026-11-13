@@ -775,8 +775,7 @@ func (s *Service) ExtendUsers(ctx context.Context, req *connect.Request[adminv1.
 }
 
 // ResetUserTraffic zeroes used_bytes of the current period. The period start (so the next reset) and the traffic
-// history stay; the status is recomputed, which lifts LIMITED, and the nodes hear about it through Recompute-style
-// notification when a status changed.
+// history stay; the status is recomputed from current data, which lifts LIMITED, and the nodes are notified after a reset.
 func (s *Service) ResetUserTraffic(ctx context.Context, req *connect.Request[adminv1.ResetUserTrafficRequest]) (*connect.Response[adminv1.ResetUserTrafficResponse], error) {
 	m := req.Msg
 	if err := checkIDs(m.UserIds); err != nil {
@@ -803,7 +802,7 @@ func (s *Service) ResetUserTraffic(ctx context.Context, req *connect.Request[adm
 		return nil, err
 	}
 	defer reservation.finish()
-	changed := false
+	reset := false
 	ids := make([]string, 0, len(us))
 	for _, u := range us {
 		status := ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, 0, now)
@@ -812,13 +811,17 @@ func (s *Service) ResetUserTraffic(ctx context.Context, req *connect.Request[adm
 				return nil, s.internal("reset traffic", err)
 			}
 			reservation.markTouched(1)
+			reset = true
 		}
-		changed = changed || status != u.Status
 		ids = append(ids, u.ID)
 		s.audit(ctx, actor(ctx), "user_reset_traffic", map[string]any{"user": u.ID, "was_bytes": u.UsedBytes})
 	}
-	if changed {
+	changed, refreshed, err := s.recompute(ctx, ids)
+	if reset || changed > 0 || refreshed && err != nil {
 		s.notify.StateChanged()
+	}
+	if err != nil {
+		return nil, s.internal("recompute", err)
 	}
 	users, err := s.loadUsers(ctx, ids...)
 	if err != nil {

@@ -396,6 +396,40 @@ func TestResetUserTraffic(t *testing.T) {
 	wantCode(t, err, connect.CodeInvalidArgument)
 }
 
+func TestResetUserTrafficRecomputesAfterSweepInterleaving(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	u := e.user("quota", f.group, func(m *adminv1.CreateUserRequest) { m.QuotaBytes = 1000 }).User
+	must(struct{}{}, e.st.Access().AddUsage(e.ctx, u.Id, 1500)) // Stored status is still active in this snapshot.
+	e.sql(`CREATE TRIGGER reset_traffic_sweep_race BEFORE UPDATE OF used_bytes ON user
+		WHEN OLD.id = '` + u.Id + `' AND OLD.used_bytes > 0 AND NEW.used_bytes = 0
+		BEGIN UPDATE user SET status = 'limited' WHERE id = OLD.id; END`)
+	e.resetNotify()
+
+	got := must(e.s.ResetUserTraffic(e.ctx, req(&adminv1.ResetUserTrafficRequest{UserIds: []string{u.Id}}))).Msg.Users[0]
+	if got.Status != adminv1.UserStatus_USER_STATUS_ACTIVE || got.UsedBytes != 0 {
+		t.Fatalf("after sweep/reset interleaving: status %v used %d", got.Status, got.UsedBytes)
+	}
+	if !f.desiredCreds()[u.Id] || e.notify.n.Load() != 1 {
+		t.Fatalf("reset did not refresh node access exactly once: allowed=%v notifications=%d", f.desiredCreds()[u.Id], e.notify.n.Load())
+	}
+}
+
+func TestResetUserTrafficDoesNotReenableConcurrentDisable(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	u := e.user("quota", f.group, func(m *adminv1.CreateUserRequest) { m.QuotaBytes = 1000 }).User
+	must(struct{}{}, e.st.Access().AddUsage(e.ctx, u.Id, 1500))
+	e.sql(`CREATE TRIGGER reset_traffic_disable_race BEFORE UPDATE OF used_bytes ON user
+		WHEN OLD.id = '` + u.Id + `' AND OLD.disabled = 0 AND OLD.used_bytes > 0 AND NEW.used_bytes = 0
+		BEGIN UPDATE user SET disabled = 1, status = 'disabled' WHERE id = OLD.id; END`)
+
+	got := must(e.s.ResetUserTraffic(e.ctx, req(&adminv1.ResetUserTrafficRequest{UserIds: []string{u.Id}}))).Msg.Users[0]
+	if got.Status != adminv1.UserStatus_USER_STATUS_DISABLED || got.UsedBytes != 0 {
+		t.Fatalf("after concurrent disable/reset: status %v used %d", got.Status, got.UsedBytes)
+	}
+}
+
 func TestSweepFailureNotifiesAfterPartialStatusChanges(t *testing.T) {
 	f := newFixture(t)
 	e := f.e

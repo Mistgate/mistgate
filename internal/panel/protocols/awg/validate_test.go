@@ -149,6 +149,16 @@ func TestValidatorRejects(t *testing.T) {
 
 		{"key length", "/obfuscation/header_protection_key", "invalid", func(s *Settings) { s.Obfuscation.HeaderProtectionKey = "AAAA" }, nil},
 		{"key not base64", "/obfuscation/header_protection_key", "invalid", func(s *Settings) { s.Obfuscation.HeaderProtectionKey = strings.Repeat("!", 44) }, nil},
+		{"key with newline", "/obfuscation/header_protection_key", "invalid", func(s *Settings) {
+			key := key32(0x40)
+			s.Obfuscation.HeaderProtectionKey = key[:12] + "\n" + key[12:]
+		}, nil},
+		{"key with noncanonical padding bits", "/obfuscation/header_protection_key", "invalid", func(s *Settings) {
+			key := key32(0x40)
+			alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+			padBits := strings.IndexByte(alphabet, key[len(key)-2])
+			s.Obfuscation.HeaderProtectionKey = key[:len(key)-2] + string(alphabet[padBits|1]) + key[len(key)-1:]
+		}, nil},
 		{"padding reversed", "/obfuscation/content_padding_addition", "invalid", func(s *Settings) { s.Obfuscation.ContentPaddingAddition = "10-2" }, nil},
 		{"timer above uint16", "/obfuscation/rekey_timeout", "invalid", func(s *Settings) { s.Obfuscation.RekeyTimeout = "3-65536" }, nil},
 		{"rekey not below reject", "/obfuscation/rekey_after_time", "invalid", func(s *Settings) { s.Obfuscation.RekeyAfterTime = "100-160" }, nil},

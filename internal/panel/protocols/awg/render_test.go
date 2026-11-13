@@ -86,6 +86,44 @@ func TestConfDetails(t *testing.T) {
 	}
 }
 
+func TestRenderedKeysRequireCanonicalBase64(t *testing.T) {
+	mutators := map[string]func(*protocols.RenderInput){
+		"private key newline": func(in *protocols.RenderInput) {
+			var secret peerSecret
+			if err := json.Unmarshal(in.Peer, &secret); err != nil {
+				t.Fatal(err)
+			}
+			key := secret.Priv
+			secret.Priv = key[:12] + "\n" + key[12:]
+			in.Peer, _ = json.Marshal(secret)
+		},
+		"preshared key newline": func(in *protocols.RenderInput) {
+			var secret peerSecret
+			if err := json.Unmarshal(in.Peer, &secret); err != nil {
+				t.Fatal(err)
+			}
+			key := secret.PSK
+			secret.PSK = key[:12] + "\n" + key[12:]
+			in.Peer, _ = json.Marshal(secret)
+		},
+		"server public key newline": func(in *protocols.RenderInput) {
+			key := key32(0xc0)
+			in.InboundPublic = raw(t, struct {
+				PublicKey string `json:"public_key"`
+			}{key[:12] + "\n" + key[12:]})
+		},
+	}
+	for name, mutate := range mutators {
+		t.Run(name, func(t *testing.T) {
+			in := renderInput(t, fixture31(), plugin.FormatAWGConf)
+			mutate(&in)
+			if _, ok := New().Render(in); ok {
+				t.Fatal("render accepted a raw key containing a newline")
+			}
+		})
+	}
+}
+
 func TestPickDNS(t *testing.T) {
 	cases := []struct {
 		in       []string
