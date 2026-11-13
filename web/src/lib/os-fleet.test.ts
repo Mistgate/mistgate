@@ -88,9 +88,8 @@ describe("the order and the stages", () => {
     expect(planStages([row("de1", 1)], 3).map((s) => s.rows.length)).toEqual([1]);
   });
 
-  it("offers a batch the way the agent rollout does, never above 5 and never more than are left", () => {
-    expect(defaultBatchSize(3)).toBe(1);
-    expect(defaultBatchSize(8)).toBe(2);
+  it("starts with one node at a time whatever the fleet, and lets the owner go up to 5 but never past what is left", () => {
+    expect(defaultBatchSize()).toBe(1);
     expect(maxBatchSize(2)).toBe(1);
     expect(maxBatchSize(4)).toBe(3);
     expect(maxBatchSize(20)).toBe(5);

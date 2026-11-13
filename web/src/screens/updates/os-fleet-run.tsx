@@ -154,10 +154,10 @@ function StoppedBanner({ run, step, owner, actions }: { run: OsRun; step: OsStep
       action={
         owner && (
           <>
-            <Button variant="secondary" size="sm" disabled={actions.busy || retried} onClick={() => void actions.resume(run.id, false)}>
+            <Button variant={retried ? "secondary" : "primary"} size="sm" disabled={actions.busy || retried} onClick={() => void actions.resume(run.id, false)}>
               {t("osf.btn.retry")}
             </Button>
-            <Button variant="primary" size="sm" disabled={actions.busy} onClick={() => void actions.resume(run.id, true)}>
+            <Button variant={retried ? "primary" : "secondary"} size="sm" disabled={actions.busy} onClick={() => void actions.resume(run.id, true)}>
               {t("osf.btn.skip")}
             </Button>
             <Button variant="ghost" size="sm" disabled={actions.busy} onClick={() => void actions.close(run.id)}>

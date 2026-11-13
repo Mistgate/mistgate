@@ -17,6 +17,8 @@ export const en = {
   // ---- the window before the run
   "osf.dlg.title": "Update {n} node|Update {n} nodes",
   "osf.dlg.lead": "One run for all of them. The node with the fewest people online goes first, alone, as a test; the rest follow in batches, and each batch starts only after the previous one passed its checks.",
+  "osf.h.what": "What to install",
+  "osf.h.reboot": "Reboot",
   "osf.dlg.what": "What to do",
   "osf.scope.security": "Security updates",
   "osf.scope.security.hint": "Only the security updates. Ordinary packages wait for later.",
@@ -148,6 +150,8 @@ export const ru: Record<keyof typeof en, string> = {
 
   "osf.dlg.title": "Обновить {n} ноду|Обновить {n} ноды|Обновить {n} нод",
   "osf.dlg.lead": "Один общий запуск. Первой идёт нода, где меньше всего людей онлайн, — одна, как проба; остальные идут пачками, и каждая пачка стартует только после того, как предыдущая прошла проверки.",
+  "osf.h.what": "Что ставить",
+  "osf.h.reboot": "Перезагрузка",
   "osf.dlg.what": "Что сделать",
   "osf.scope.security": "Обновления безопасности",
   "osf.scope.security.hint": "Только обновления безопасности. Обычные пакеты подождут.",
@@ -275,6 +279,8 @@ export const zh: Record<keyof typeof en, string> = {
 
   "osf.dlg.title": "更新 {n} 个节点",
   "osf.dlg.lead": "一次运行覆盖所有节点。在线人数最少的节点先单独更新，作为试探；其余节点分批进行，每一批都要等上一批通过检查后才开始。",
+  "osf.h.what": "安装内容",
+  "osf.h.reboot": "重启",
   "osf.dlg.what": "要做什么",
   "osf.scope.security": "安全更新",
   "osf.scope.security.hint": "只安装安全更新，普通软件包留到以后。",
@@ -402,6 +408,8 @@ export const fa: Record<keyof typeof en, string> = {
 
   "osf.dlg.title": "به‌روزرسانی {n} نود",
   "osf.dlg.lead": "یک اجرای مشترک برای همه. نودی که کمترین کاربر آنلاین را دارد اول و تنها، به‌عنوان آزمایش، می‌رود؛ بقیه دسته‌دسته دنبالش می‌آیند و هر دسته فقط وقتی شروع می‌شود که دستهٔ قبلی بررسی‌هایش را گذرانده باشد.",
+  "osf.h.what": "چه چیزی نصب شود",
+  "osf.h.reboot": "راه‌اندازی مجدد",
   "osf.dlg.what": "چه کاری انجام شود",
   "osf.scope.security": "به‌روزرسانی‌های امنیتی",
   "osf.scope.security.hint": "فقط به‌روزرسانی‌های امنیتی. بسته‌های معمولی برای بعد می‌مانند.",
@@ -529,6 +537,8 @@ export const tr: Record<keyof typeof en, string> = {
 
   "osf.dlg.title": "{n} düğümü güncelle",
   "osf.dlg.lead": "Hepsi için tek bir çalıştırma. Çevrimiçi kişi sayısı en az olan düğüm, deneme olarak, önce ve tek başına gider; diğerleri gruplar hâlinde izler ve her grup yalnızca bir önceki grup kontrolleri geçtikten sonra başlar.",
+  "osf.h.what": "Ne kurulsun",
+  "osf.h.reboot": "Yeniden başlatma",
   "osf.dlg.what": "Ne yapılsın",
   "osf.scope.security": "Güvenlik güncellemeleri",
   "osf.scope.security.hint": "Yalnızca güvenlik güncellemeleri. Sıradan paketler sonraya kalır.",

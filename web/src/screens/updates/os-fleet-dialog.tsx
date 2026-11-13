@@ -9,7 +9,7 @@ import { useT, type T } from "@/i18n";
 import { canaryFirst, defaultBatchSize, defaultScope, maxBatchSize, planStages, rebootOf, scopeBlock, scopeMode, type OsScope } from "@/lib/os-fleet";
 import { blockText, type OsActions } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
-import { Choice, Fact } from "./os-confirm";
+import { Choice, ChoiceBlock, Fact } from "./os-confirm";
 
 // The window before an OS update of several nodes: what will be done, the order (the canary named), how many at a time, who is
 // online on each node, and which of the ticked nodes are left out for now and why. The call asks for a fresh step-up like the
@@ -37,7 +37,7 @@ export function OsFleetDialog({ rows, actions, onClose, onStarted, initialScope 
   const [pick, setPick] = useState<number | null>(null);
   const eligible = rows.filter((r) => scopeBlock(r, scope) === "");
   const left = rows.filter((r) => scopeBlock(r, scope) !== "");
-  const batch = Math.min(pick ?? defaultBatchSize(eligible.length), maxBatchSize(eligible.length));
+  const batch = Math.min(pick ?? defaultBatchSize(), maxBatchSize(eligible.length));
   const stages = planStages(eligible, batch);
   const canary = stages[0]?.rows[0];
   const people = eligible.reduce((sum, r) => sum + (r.online ?? 0), 0);
@@ -80,17 +80,21 @@ export function OsFleetDialog({ rows, actions, onClose, onStarted, initialScope 
         </>
       }
     >
-      <RadioGroup value={scope} onValueChange={(v) => setScope(v as OsScope)} aria-label={t("osf.dlg.what")} className="flex flex-col gap-2">
-        {scopes.map((s) => (
-          <Choice key={s} value={s} label={t(`osf.scope.${s}`)} hint={t(`osf.scope.${s}.hint`)} aside={t("osf.scope.fits", { n: fits(s), total: rows.length })} />
-        ))}
-      </RadioGroup>
+      <ChoiceBlock id="osf-what" title={t("osf.h.what")}>
+        <RadioGroup value={scope} onValueChange={(v) => setScope(v as OsScope)} aria-label={t("osf.dlg.what")} className="flex flex-col gap-2">
+          {scopes.map((s) => (
+            <Choice key={s} value={s} label={t(`osf.scope.${s}`)} hint={t(`osf.scope.${s}.hint`)} aside={t("osf.scope.fits", { n: fits(s), total: rows.length })} />
+          ))}
+        </RadioGroup>
+      </ChoiceBlock>
 
       {!rebootOnly && (
-        <RadioGroup value={reboot} onValueChange={(v) => setReboot(v as typeof reboot)} aria-label={t("os.dlg.after")} className="flex flex-col gap-2">
-          <Choice value="if_required" label={t("os.dlg.reboot.ifRequired")} hint={t("os.dlg.reboot.ifRequired.hint")} />
-          <Choice value="never" label={t("os.dlg.reboot.never")} hint={t("os.dlg.reboot.never.hint")} />
-        </RadioGroup>
+        <ChoiceBlock id="osf-reboot" title={t("osf.h.reboot")}>
+          <RadioGroup value={reboot} onValueChange={(v) => setReboot(v as typeof reboot)} aria-label={t("os.dlg.after")} className="flex flex-col gap-2">
+            <Choice value="if_required" label={t("os.dlg.reboot.ifRequired")} hint={t("os.dlg.reboot.ifRequired.hint")} />
+            <Choice value="never" label={t("os.dlg.reboot.never")} hint={t("os.dlg.reboot.never.hint")} />
+          </RadioGroup>
+        </ChoiceBlock>
       )}
 
       {eligible.length === 0 ? (

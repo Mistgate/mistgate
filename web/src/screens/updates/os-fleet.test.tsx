@@ -152,6 +152,29 @@ describe("the window before the run", () => {
     expect(d).toContain("Fits 3 of 4");
   });
 
+  it("puts a small heading over each group of choices, so they do not run into each other", async () => {
+    await open("fi1", "de1", "nl1");
+    const heads = [...dialog()!.querySelectorAll("h3")].map((h) => h.textContent);
+    expect(heads).toContain("What to install");
+    expect(heads).toContain("Reboot");
+    expect(heads.indexOf("What to install")).toBeLessThan(heads.indexOf("Reboot"));
+    // a reboot-only run has no reboot choice, so no such group
+    await click(radio("Only a reboot"));
+    expect([...dialog()!.querySelectorAll("h3")].map((h) => h.textContent)).not.toContain("Reboot");
+  });
+
+  it("takes one node at a time by default, even for a big fleet, and sends more only when the owner picks it", async () => {
+    const many = ["a1", "a2", "a3", "a4", "a5", "a6"].map((n, i) => node(n, i));
+    await mount(<OsSection />, data(many));
+    await click(button("Select all with something to install (6)"));
+    await click(buttonStarting("Update "));
+    const picked = () => [...dialog()!.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === "1")!;
+    expect(picked().getAttribute("aria-checked")).toBe("true");
+    expect(dialog()!.textContent).toContain("A bigger batch finishes sooner, but more people lose their connection at the same time.");
+    await click(buttonStarting("Start on 6 nodes", dialog()!));
+    expect(updates.startOsRollout).toHaveBeenCalledWith(expect.objectContaining({ batchSize: 1 }));
+  });
+
   it("starts one run for the nodes that can go, the canary first, after a fresh step-up", async () => {
     await open("fi1", "de1", "nl1", "msk1");
     await click(buttonStarting("Start on 3 nodes", dialog()!));
@@ -293,6 +316,9 @@ describe("the queue of a run", () => {
     expect(banner.textContent).toContain("de1: updates are installed, but the server was not rebooted.");
     expect(banner.textContent).toContain("GRUB");
     expect(banner.textContent).toContain("Retry tries this node once more");
+    // the accent is on Retry: it is the first thing to try
+    expect(button("Retry", banner)!.className).toContain("bg-accent");
+    expect(button("Skip and continue", banner)!.className).not.toContain("bg-accent");
     await click(button("Retry", banner));
     expect(updates.resumeOsRollout).toHaveBeenLastCalledWith({ rolloutId: "osr_1", skipFailed: false });
     await click(button("Skip and continue", banner));
@@ -309,6 +335,9 @@ describe("the queue of a run", () => {
     expect(disabled(button("Retry", banner))).toBe(true);
     expect(banner.textContent).toContain("already retried once");
     expect(disabled(button("Skip and continue", banner))).toBeFalsy();
+    // and the accent moves to the one that is left
+    expect(button("Skip and continue", banner)!.className).toContain("bg-accent");
+    expect(button("Retry", banner)!.className).not.toContain("bg-accent");
   });
 
   it("says a cancel that waits for a running job, with no buttons", async () => {
@@ -407,6 +436,7 @@ describe("All packages for one node", () => {
     await click(button("Install updates…"));
     expect(pick("Security updates").getAttribute("aria-checked")).toBe("true");
     expect(win().textContent).toContain("2 updates are waiting. Ordinary packages are left for later.");
+    expect([...win().querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["What to install", "Reboot"]);
     await click(pick("All packages"));
     expect(win().textContent).toContain("Install all updates on de1");
     expect(win().textContent).toContain("12 updates will be installed, security and ordinary");

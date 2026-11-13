@@ -45,8 +45,8 @@ export function defaultScope(rows: readonly OsRow[]): OsScope {
 export const canaryFirst = <R extends Pick<OsRow, "online" | "name">>(rows: readonly R[]): R[] =>
   [...rows].sort((a, b) => (a.online ?? 0) - (b.online ?? 0) || (a.name ?? "").localeCompare(b.name ?? ""));
 
-/** Nodes after the canary that go together when the owner has no wish: the panel's default for an agent rollout. */
-export const defaultBatchSize = (n: number) => Math.min(5, n < 5 ? 1 : 2);
+/** Nodes after the canary that go together when the owner has no wish: always one (a reboot cuts people off); 2 to 5 are the owner's choice. */
+export const defaultBatchSize = () => 1;
 
 /** The most that makes sense after the canary: all the rest, but never above the server's 5. */
 export const maxBatchSize = (n: number) => Math.max(1, Math.min(5, n - 1));

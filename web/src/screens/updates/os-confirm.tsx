@@ -26,6 +26,18 @@ export function Fact({ icon, children }: { icon: IconName; children: ReactNode }
   );
 }
 
+/** A group of choices under a small heading, in the style of "Order" and "Left out for now": two groups in a row no longer run into each other. */
+export function ChoiceBlock({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-2">
+      <h3 id={id} className="text-[11px] font-bold tracking-wide text-muted uppercase">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
 /** One of a few choices with its words under it (`aside`: a quiet line after them); the long labels wrap instead of squeezing a segmented control. */
 export function Choice({ value, label, hint, aside }: { value: string; label: string; hint: string; aside?: string }) {
   return (
@@ -140,16 +152,20 @@ export function OsConfirmDialog({ row, mode, actions, onClose, initialPkgs }: { 
       </ul>
 
       {choosePkgs && (
-        <RadioGroup value={pkgs} onValueChange={(v) => setPkgs(v as typeof pkgs)} aria-label={t("osf.one.what")} className="flex flex-col gap-2">
-          <Choice value="security" label={t("osf.scope.security")} hint={t.n("osf.one.security.hint", security)} />
-          <Choice value="all" label={t("osf.scope.all")} hint={t.n("osf.one.all.hint", pending)} />
-        </RadioGroup>
+        <ChoiceBlock id="osf-one-what" title={t("osf.h.what")}>
+          <RadioGroup value={pkgs} onValueChange={(v) => setPkgs(v as typeof pkgs)} aria-label={t("osf.one.what")} className="flex flex-col gap-2">
+            <Choice value="security" label={t("osf.scope.security")} hint={t.n("osf.one.security.hint", security)} />
+            <Choice value="all" label={t("osf.scope.all")} hint={t.n("osf.one.all.hint", pending)} />
+          </RadioGroup>
+        </ChoiceBlock>
       )}
       {install && (
-        <RadioGroup value={reboot} onValueChange={(v) => setReboot(v as typeof reboot)} aria-label={t("os.dlg.after")} className="flex flex-col gap-2">
-          <Choice value="if_required" label={t("os.dlg.reboot.ifRequired")} hint={t("os.dlg.reboot.ifRequired.hint")} />
-          <Choice value="never" label={t("os.dlg.reboot.never")} hint={t("os.dlg.reboot.never.hint")} />
-        </RadioGroup>
+        <ChoiceBlock id="osf-one-reboot" title={t("osf.h.reboot")}>
+          <RadioGroup value={reboot} onValueChange={(v) => setReboot(v as typeof reboot)} aria-label={t("os.dlg.after")} className="flex flex-col gap-2">
+            <Choice value="if_required" label={t("os.dlg.reboot.ifRequired")} hint={t("os.dlg.reboot.ifRequired.hint")} />
+            <Choice value="never" label={t("os.dlg.reboot.never")} hint={t("os.dlg.reboot.never.hint")} />
+          </RadioGroup>
+        </ChoiceBlock>
       )}
 
     </Modal>

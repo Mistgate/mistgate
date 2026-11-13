@@ -11,7 +11,7 @@ export function Callout({ kind, alert, action, className, children }: { kind: "w
         <StatusGlyph kind={kind} />
       </span>
       <Body className="min-w-0 flex-1 basis-48 text-xs leading-snug text-pretty text-fg">{children}</Body>
-      {action && <div className="flex flex-none flex-wrap gap-2 max-sm:ms-[22px]">{action}</div>}
+      {action && <div className="flex flex-wrap gap-2 sm:flex-none max-sm:ms-[22px] max-sm:min-w-0 max-sm:max-w-[calc(100%-22px)]">{action}</div>}
     </div>
   );
 }
