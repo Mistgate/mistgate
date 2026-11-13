@@ -13,6 +13,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"path"
 	"strings"
 )
 
@@ -81,6 +82,9 @@ type Step struct {
 	Files []FileOp
 	Dir   string
 	Check func(out string) error
+	// Prep runs before the command, with the source directory ({src} replaced): the Debian recipe makes the module source
+	// right here (FixCompat) before the compiler sees it. An error fails the step.
+	Prep func(src string, w io.Writer) error
 	// Build marks the step that compiles the module: its failure is module_build_failed. An apt step is one too when its
 	// output shows the DKMS build of the module failing.
 	Build bool
@@ -160,7 +164,10 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 				}
 				return nil
 			}},
-			{Desc: "build the module against the installed headers", Cmd: []string{"make", "-C", "{src}/src", "KERNELDIR=/lib/modules/" + e.Kernel + "/build", fmt.Sprintf("-j%d", cpus)}, Build: true},
+			{Desc: "build the module against the installed headers", Cmd: []string{"make", "-C", "{src}/src", "KERNELDIR=/lib/modules/" + e.Kernel + "/build", fmt.Sprintf("-j%d", cpus)}, Build: true,
+				Prep: func(src string, w io.Writer) error {
+					return CompatErr(FixCompat(RealSys(), []string{path.Join(src, "src")}, false, w))
+				}},
 			{Desc: "install the module for the running kernel", Cmd: []string{"install", "-D", "-m", "0644", "{src}/src/amneziawg.ko", "/lib/modules/" + e.Kernel + "/updates/amneziawg.ko"}},
 			{Desc: "update the module dependency index", Cmd: []string{"depmod", "-a", e.Kernel}},
 		}

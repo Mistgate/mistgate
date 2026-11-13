@@ -247,6 +247,7 @@ mistgate edge setup-link --file FILE
 | `run` | 在前台运行 Agent。 |
 | `cleanup-net` | 移除 Agent 的隧道接口、WARP 路由和 nftables 表。 |
 | `awg prepare-kernel` | 安装 AmneziaWG 内核模块。 |
+| `awg fix-source` | 修复在部分内核上无法构建的模块源码。 |
 | `host enable-security-updates` | 开启自动安全更新（Debian 和 Ubuntu）。 |
 | `version` | 显示版本、构建时间和发布密钥指纹。 |
 
@@ -333,6 +334,17 @@ mistgate-node awg prepare-kernel --yes    # 执行命令
 | `--timeout` | `45m` | 本次运行的最长时限。 |
 
 它会使用 apt 安装软件包（非交互式；如其他包管理器持有锁，最多等待 30 分钟）。支持 Debian 和 Ubuntu；不支持容器；必须关闭 Secure Boot 并使用 systemd。参见 [AmneziaWG](../guide/amneziawg.md)。
+
+### mistgate-node awg fix-source
+
+当 AmneziaWG 模块源码是已知会在部分内核上导致构建失败的文件时，对其进行修复。仅限 Linux，以 root 身份运行。
+
+```sh
+mistgate-node awg fix-source --check    # 只报告，不做修改
+mistgate-node awg fix-source            # 修复
+```
+
+它检查 `/usr/src/amneziawg-*/compat/compat.h`。已知有问题的文件只有在结果恰好是预期文件时才会被替换（通过临时文件和重命名）；正常的文件报告为 `ok`；其他任何文件保持原样，并附上其 sha256 的前 12 个字符。如果有文件仍需修复或不被认识，退出码为 1，否则为 0。更新任务和 `awg prepare-kernel` 会自行完成这一步；参见[内核更新在构建 AmneziaWG 模块时失败](../operations/troubleshooting.md#内核更新在构建-amneziawg-模块时失败)。
 
 ### mistgate-node host enable-security-updates
 

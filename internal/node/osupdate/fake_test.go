@@ -40,6 +40,8 @@ type fakeMachine struct {
 	modinfo map[string]bool
 	// curCtx is the context of the command being run (a handler can look at it).
 	curCtx context.Context
+	// failWriteFile makes Host.WriteFile fail (the module source cannot be repaired).
+	failWriteFile bool
 	// onSleep runs at every Sleep of the job (to cancel it or change the machine mid-way).
 	onSleep func()
 }
@@ -188,6 +190,13 @@ func (m *fakeMachine) host() Host {
 				return []byte(s), nil
 			}
 			return nil, errors.New("not found")
+		},
+		WriteFile: func(p, body string) error {
+			if m.failWriteFile {
+				return errors.New("read-only file system")
+			}
+			m.files[p] = body
+			return nil
 		},
 		Size: func(p string) (int64, bool) {
 			if n, ok := m.sizes[p]; ok {

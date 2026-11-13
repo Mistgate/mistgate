@@ -247,6 +247,7 @@ Prints `mistgate <version>`, then `built <time>` when the binary was built with 
 | `run` | Runs the agent in the foreground. |
 | `cleanup-net` | Removes the agent's tunnel interfaces, WARP routes and nftables tables. |
 | `awg prepare-kernel` | Installs the AmneziaWG kernel module. |
+| `awg fix-source` | Repairs a module source that does not build on some kernels. |
 | `host enable-security-updates` | Turns on automatic security updates (Debian and Ubuntu). |
 | `version` | Prints the version, the build time and the release key fingerprint. |
 
@@ -333,6 +334,17 @@ mistgate-node awg prepare-kernel --yes    # runs it
 | `--timeout` | `45m` | Hard limit of the run. |
 
 It installs packages with apt (non-interactive, waiting up to 30 minutes for another package manager's lock). Supported: Debian and Ubuntu, not a container, without Secure Boot, with systemd. See [AmneziaWG](../guide/amneziawg.md).
+
+### mistgate-node awg fix-source
+
+Repairs the AmneziaWG module's source when it is a file known to break the build on some kernels. Linux only, as root.
+
+```sh
+mistgate-node awg fix-source --check    # reports, changes nothing
+mistgate-node awg fix-source            # repairs
+```
+
+It looks at `/usr/src/amneziawg-*/compat/compat.h`. A known-bad file is replaced (through a temporary file and a rename) only when the result is exactly the expected file; a good file is reported as `ok`; any other file is left as it is and reported with the first 12 characters of its sha256. The exit code is 1 when a file still needs the repair or is not known, else 0. The update job and `awg prepare-kernel` do this themselves; see [a kernel update fails in the module build](../operations/troubleshooting.md#a-kernel-update-fails-in-the-amneziawg-module-build).
 
 ### mistgate-node host enable-security-updates
 

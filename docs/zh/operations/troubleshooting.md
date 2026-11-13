@@ -192,6 +192,33 @@ timedatectl
 
 参见 [AmneziaWG](../guide/amneziawg.md)。
 
+## 内核更新在构建 AmneziaWG 模块时失败
+
+**显示方式**
+
+- apt 或 dpkg 输出 `Bad return status for module build on kernel: ...`，内核或头文件软件包停在半配置状态（`dpkg --audit` 会列出）；此后 apt 拒绝安装其他软件包。
+- 系统更新任务以 `awg_module_build_failed` 结束。
+
+**原因**
+
+模块源码（Amnezia PPA 的 `amneziawg-dkms` 1.0.0；Debian 方案构建的是同一个文件）按内核版本号来选择调用两个内核函数的方式。部分发行版内核（Ubuntu 7.0.0-38）在较旧的版本号下带有其中一项改动，于是模块无法编译。
+
+**Mistgate 的做法**
+
+在构建模块之前，以及构建失败之后，更新任务（和 `awg prepare-kernel`）会检查 `/usr/src/amneziawg-*/compat/compat.h`。只有当该文件恰好是已知有问题的两个文件之一（PPA 的文件，或手动删掉第一条宏定义的同一文件）时，才会把这些行替换为按内核函数的真实签名来选择的写法，确认结果恰好是预期的文件，让 dpkg 完成配置，并把失败的步骤再执行一次。其他任何文件都保持原样，失败原因会写明 `the module source is not one Mistgate knows (sha256 ...)` 以及哈希的前 12 个字符。
+
+**处理方法**
+
+- 先查看，再修复，然后让 dpkg 完成：
+
+  ```sh
+  mistgate-node awg fix-source --check
+  mistgate-node awg fix-source
+  dpkg --configure -a
+  ```
+
+- 对于 Mistgate 不认识的文件，不会做任何修改。请更新 `amneziawg-dkms`（修复后的软件包会替换该文件），或自行修改文件，最后执行 `dpkg --configure -a`。
+
 ## WARP 无法运行
 
 **显示方式**

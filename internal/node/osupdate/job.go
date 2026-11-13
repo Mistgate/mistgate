@@ -103,6 +103,8 @@ type run struct {
 	awgNeeded bool
 	container string
 	distro    string
+	// unknownSource is the start of the sha256 of a module source Mistgate does not know (found by fixSource), "" = none.
+	unknownSource string
 	// release lets go of the dpkg lock held for the reboot.
 	release func()
 }
@@ -406,10 +408,18 @@ func (r *run) repairIfNeeded(ctx context.Context) *Failure {
 		return nil
 	}
 	r.phase(PhaseRepairing)
-	out, err := r.cmdKeep(ctx, append(append([]string{"dpkg"}, dpkgConfOpts...), "--configure", "-a")...)
-	if err == nil {
-		out2, err2 := r.cmd(ctx, "apt-get", "-o", aptLockOption, "check")
-		out, err = out+out2, err2
+	r.fixSource() // the configure below builds the module: a known-bad source is repaired before it does
+	configure := func() (string, error) {
+		out, err := r.cmdKeep(ctx, append(append([]string{"dpkg"}, dpkgConfOpts...), "--configure", "-a")...)
+		if err == nil {
+			out2, err2 := r.cmd(ctx, "apt-get", "-o", aptLockOption, "check")
+			out, err = out+out2, err2
+		}
+		return out, err
+	}
+	out, err := configure()
+	if err != nil && ownDKMSFailure(out) && r.fixSource() {
+		out, err = configure() // repaired just now: once more
 	}
 	if err != nil && ownDKMSFailure(out) {
 		return r.buildFailed(ctx, out, "")
@@ -428,6 +438,23 @@ func (r *run) repairIfNeeded(ctx context.Context) *Failure {
 		return f
 	}
 	return nil
+}
+
+// fixSource repairs the module's source (compat.h) when it is a file Mistgate knows to break the build on some kernels, and
+// says whether it changed one. What it found goes to the journal and the status file (awg_source); a file it does not know is
+// left as it is and remembered for the reason of a failed build.
+func (r *run) fixSource() bool {
+	sys := awgprep.Sys{ReadFile: r.host.ReadFile, WriteFile: r.host.WriteFile}
+	rs := awgprep.FixCompat(sys, r.host.Glob("/usr/src/amneziawg-*"), false, r.out)
+	if sha := awgprep.CompatUnknownSHA(rs); sha != "" {
+		r.unknownSource = sha
+		_ = r.write(func(s *Status) { s.AwgSource = "unknown:" + sha })
+	}
+	if awgprep.CompatChanged(rs) {
+		_ = r.write(func(s *Status) { s.AwgSource = "patched" })
+		return true
+	}
+	return false
 }
 
 // buildFailed ends a job whose AmneziaWG module does not build (its own DKMS build failed). The job removes nothing (the module
@@ -455,6 +482,9 @@ func (r *run) buildFailed(ctx context.Context, out, hint string) *Failure {
 	}
 	f.Detail = fmt.Sprintf("the AmneziaWG module does not build for %s; nothing was removed and nothing more was installed, the loaded module serves "+
 		"until the next boot; fix the build (its make.log is under /var/lib/dkms/amneziawg) before any reboot", what)
+	if r.unknownSource != "" {
+		f.Detail += "; " + awgprep.UnknownSourceNote(r.unknownSource)
+	}
 	if r.j.Spec.Reboot != RebootNever {
 		_ = r.write(func(s *Status) { s.Reboot, s.HeldReason = RebootHeld, CodeAwgBuildFailed })
 	}
@@ -488,6 +518,7 @@ func (r *run) refresh(ctx context.Context) *Failure {
 func (r *run) install(ctx context.Context) *Failure {
 	spec := r.j.Spec
 	r.phase(PhaseInstalling)
+	r.fixSource() // a new kernel's postinst builds the module: a known-bad source is repaired before it does
 	if sim, err := r.query(ctx, append([]string{"apt-get"}, aptSimulationArgs...)...); err == nil {
 		_, _, notable := parseSimulation(sim)
 		if kernelPending(notable) {
@@ -518,7 +549,9 @@ func (r *run) install(ctx context.Context) *Failure {
 		out, err = r.cmdKeep(ctx, append(args, "--with-new-pkgs", "upgrade")...)
 	}
 	if err != nil {
-		return r.installFailed(ctx, out)
+		if f := r.installFailed(ctx, out); f != nil {
+			return f
+		}
 	}
 	if after, _, derr := r.dpkgTable(ctx); derr == nil {
 		_ = r.write(func(s *Status) { s.Upgraded = countChanged(r.table, after) })
@@ -532,7 +565,11 @@ func (r *run) installFailed(ctx context.Context, out string) *Failure {
 	case awgprep.IsAptLockOutput(out):
 		return fail(CodeAptLock, "another package manager prevented access to the package lock")
 	case ownDKMSFailure(out):
-		// The new kernel's postinst ran the module's build and it failed: the job stops here.
+		// The new kernel's postinst ran the module's build and it failed. A source Mistgate knows to be bad is repaired and dpkg
+		// finishes once more (a nil here: the job goes on); otherwise, or when that fails too, the job stops here.
+		if r.fixSource() {
+			return r.repairIfNeeded(ctx)
+		}
 		return r.buildFailed(ctx, out, "")
 	}
 	// unattended-upgrade writes the output of dpkg to its own log, not to this job's: when it fails, look at dpkg itself. Whatever
@@ -682,7 +719,18 @@ func (r *run) awgModule(ctx context.Context) *Failure {
 	if dkmsOK() {
 		return nil
 	}
+	r.fixSource()
 	out, err := r.cmdKeep(ctx, "dkms", "autoinstall", "-k", k)
+	if err != nil && ownDKMSFailure(out) && r.fixSource() {
+		// Repaired just now: finish dpkg (the failed build left the package half configured), then the build once more.
+		if f := r.repairIfNeeded(ctx); f != nil {
+			return f
+		}
+		if dkmsOK() {
+			return nil
+		}
+		out, err = r.cmdKeep(ctx, "dkms", "autoinstall", "-k", k)
+	}
 	if err != nil && ownDKMSFailure(out) {
 		return r.buildFailed(ctx, out, k)
 	}

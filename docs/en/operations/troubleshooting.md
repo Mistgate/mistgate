@@ -192,6 +192,33 @@ If authenticator codes for the admin keep failing, check the clock of the panel 
 
 See [AmneziaWG](../guide/amneziawg.md).
 
+## A kernel update fails in the AmneziaWG module build
+
+**How it shows**
+
+- apt or dpkg prints `Bad return status for module build on kernel: ...`, and a kernel or headers package stays half configured (`dpkg --audit` lists it); apt then refuses other installs.
+- An OS update job ends with `awg_module_build_failed`.
+
+**Why**
+
+The module's source (`amneziawg-dkms` 1.0.0 from the Amnezia PPA; the Debian recipe builds the same file) calls two kernel functions in a way it chooses by the kernel's version number. Some distribution kernels (Ubuntu 7.0.0-38) carry one of the two changes under an older number, so the module does not compile.
+
+**What Mistgate does**
+
+Before it builds the module, and again when a build fails, the update job (and `awg prepare-kernel`) looks at `/usr/src/amneziawg-*/compat/compat.h`. If the file is exactly one of the two files known to be bad (the PPA's, or the same file with its first macro line deleted by hand), it replaces those lines with ones that look at the real signature of the kernel's function, checks that the result is exactly the expected file, finishes dpkg and tries the step once more. Any other file is left as it is, and the failure says `the module source is not one Mistgate knows (sha256 ...)` with the first 12 characters of its hash.
+
+**What to do**
+
+- Look, then repair, then let dpkg finish:
+
+  ```sh
+  mistgate-node awg fix-source --check
+  mistgate-node awg fix-source
+  dpkg --configure -a
+  ```
+
+- For a file Mistgate does not know, nothing is changed. Update `amneziawg-dkms` (a fixed package replaces the file), or edit the file yourself and finish with `dpkg --configure -a`.
+
 ## WARP does not work
 
 **How it shows**

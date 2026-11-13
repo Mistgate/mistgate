@@ -46,6 +46,10 @@ type Runner func(ctx context.Context, w io.Writer, dir string, cmd ...string) (s
 type Sys struct {
 	WriteFile  func(path, body string) error
 	RemoveFile func(path string) error
+	// ReadFile reads a file (the module source's compat.h). Nil = unavailable.
+	ReadFile func(path string) ([]byte, error)
+	// SourceDirs lists the DKMS module source trees (/usr/src/amneziawg-*). Nil = none.
+	SourceDirs func() []string
 	Exists     func(path string) bool
 	// Probe asks the kernel for the genetlink family: version and maxattr, or an error when it is not loaded.
 	Probe func() (genlVersion uint32, maxAttr uint32, err error)
@@ -53,6 +57,16 @@ type Sys struct {
 	AptBusy func() bool
 	// Sleep waits d or until ctx ends. Nil = the real clock.
 	Sleep func(ctx context.Context, d time.Duration)
+}
+
+// configureAll finishes an interrupted dpkg run the way the OS job does: it keeps every configuration file as it is.
+var configureAll = []string{"dpkg", "--force-confdef", "--force-confold", "--configure", "-a"}
+
+func (s Sys) sourceDirs() []string {
+	if s.SourceDirs == nil {
+		return nil
+	}
+	return s.SourceDirs()
 }
 
 func (s Sys) sleep(ctx context.Context, d time.Duration) {
@@ -143,11 +157,33 @@ func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner,
 				}
 			}
 		}
-		var out string
+		if s.Prep != nil {
+			if err := s.Prep(src, w); err != nil {
+				return &Failure{
+					Code:   CodeStepFailed,
+					Detail: fmt.Sprintf("step %d of %d failed: %s (%v)", i+1, len(steps), s.Desc, err),
+					Long:   fmt.Sprintf("step %d (%s) failed before it started: %v (nothing is rolled back; fix the cause and run the command again)", i+1, s.Desc, err),
+				}
+			}
+		}
+		var out, unknownSource string
 		if len(cmd) > 0 {
 			fmt.Fprintf(w, "  $ %s\n", strings.Join(cmd, " "))
 			var err error
 			out, err = run(ctx, w, s.Dir, cmd...)
+			if err != nil && ctxFailure(ctx, limit) == nil && (s.Build || dkmsBuildFailed(out)) && OwnDKMSFailure(out) {
+				// The module's own DKMS build failed. A source Mistgate knows to be bad is repaired and the step goes once more;
+				// only when it fails again does the removal below apply.
+				rs := FixCompat(sys, sys.sourceDirs(), false, w)
+				if CompatChanged(rs) {
+					fmt.Fprintf(w, "\nthe module source was repaired: finishing dpkg, then step %d once more\n  $ %s\n", i+1, strings.Join(configureAll, " "))
+					_, _ = run(ctx, w, "", configureAll...)
+					fmt.Fprintf(w, "  $ %s\n", strings.Join(cmd, " "))
+					out, err = run(ctx, w, s.Dir, cmd...)
+				} else {
+					unknownSource = CompatUnknownSHA(rs)
+				}
+			}
 			if err != nil {
 				if f := ctxFailure(ctx, limit); f != nil {
 					return f
@@ -161,6 +197,11 @@ func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner,
 					f.Detail = fmt.Sprintf("step %d of %d: another package manager (apt, dpkg, unattended-upgrades) prevented access to the package lock", i+1, len(steps))
 				case s.Build || dkmsBuildFailed(out):
 					f = buildFailure(ctx, w, run, s, i+1, cmd, out)
+					if unknownSource != "" {
+						// first: the status file keeps only the start of the sentence
+						f.Detail = UnknownSourceNote(unknownSource) + "; " + f.Detail
+						f.Long += "; " + UnknownSourceNote(unknownSource)
+					}
 				}
 				return f
 			}

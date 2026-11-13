@@ -84,9 +84,11 @@ func RealSys() Sys {
 			}
 			return err
 		},
-		Exists:  func(p string) bool { _, err := os.Stat(p); return err == nil },
-		Probe:   probeModule,
-		AptBusy: aptBusy,
+		ReadFile:   os.ReadFile,
+		SourceDirs: RealSourceDirs,
+		Exists:     func(p string) bool { _, err := os.Stat(p); return err == nil },
+		Probe:      probeModule,
+		AptBusy:    aptBusy,
 	}
 }
 

@@ -15,6 +15,8 @@ import (
 // builds a fake, so no test touches the host it runs on.
 type Host struct {
 	ReadFile func(path string) ([]byte, error)
+	// WriteFile replaces a file atomically (the module source's compat.h is repaired through it).
+	WriteFile func(path, body string) error
 	// Size is the size of a file, ok = false when there is none.
 	Size func(path string) (int64, bool)
 	// Glob lists the paths that match a pattern.
@@ -34,7 +36,8 @@ type Host struct {
 // RealHost is the live machine. The lock probe needs root (it opens the lock files for writing).
 func RealHost() Host {
 	return Host{
-		ReadFile: os.ReadFile,
+		ReadFile:  os.ReadFile,
+		WriteFile: awgprep.RealSys().WriteFile,
 		Size: func(p string) (int64, bool) {
 			info, err := os.Stat(p)
 			if err != nil {
@@ -66,6 +69,9 @@ func (h Host) defaults() Host {
 	real := RealHost()
 	if h.ReadFile == nil {
 		h.ReadFile = real.ReadFile
+	}
+	if h.WriteFile == nil {
+		h.WriteFile = real.WriteFile
 	}
 	if h.Size == nil {
 		h.Size = real.Size

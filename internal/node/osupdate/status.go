@@ -49,7 +49,10 @@ type Status struct {
 	KernelNow     string   `json:"kernel_now,omitempty"`
 	BootID        string   `json:"boot_id,omitempty"` // the boot the job started on
 	AwgRequired   bool     `json:"awg_required,omitempty"`
-	Reported      bool     `json:"reported,omitempty"`
+	// AwgSource says what the job found in the module's source: "patched" (it repaired a known-bad compat.h) or
+	// "unknown:<12 hex of its sha256>" (a file Mistgate does not know, left as it was). Empty = nothing to say.
+	AwgSource string `json:"awg_source,omitempty"`
+	Reported  bool   `json:"reported,omitempty"`
 }
 
 // ReadStatus returns the status at path; ok is false when there is none (never ran, or unreadable garbage).
