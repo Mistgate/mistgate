@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -64,36 +65,43 @@ type parsedCred struct {
 	hash [32]byte
 }
 
-// buildIndex validates creds (nothing is touched on error), then reuses the states of credentials that
-// already exist in old and updates their mutable fields. users hands out the person buckets of the inbound's
-// credentials (nil: no person limits).
-func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ratelimit.Registry) (*index, error) {
+// buildIndex skips malformed credentials and later duplicate ids or tokens, then reuses the states of credentials
+// already in old and updates their mutable fields. users hands out the person buckets of the inbound's credentials.
+func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ratelimit.Registry) (*index, []error) {
+	creds = append([]plugin.UserCred(nil), creds...)
+	sort.SliceStable(creds, func(i, j int) bool { return creds[i].CredID < creds[j].CredID })
 	parsed := make([]parsedCred, 0, len(creds))
 	seenID := make(map[string]struct{}, len(creds))
 	seenHash := make(map[[32]byte]string, len(creds))
+	var skipped []error
 	for _, c := range creds {
 		if c.CredID == "" {
-			return nil, fmt.Errorf("credential without id")
+			skipped = append(skipped, fmt.Errorf("credential without id"))
+			continue
 		}
+		if _, dup := seenID[c.CredID]; dup {
+			skipped = append(skipped, fmt.Errorf("duplicate credential id %s", c.CredID))
+			continue
+		}
+		seenID[c.CredID] = struct{}{}
 		var d struct {
 			AuthSHA256 string `json:"auth_sha256"`
 		}
 		if err := json.Unmarshal(c.Data, &d); err != nil {
-			return nil, fmt.Errorf("credential %s: data: %w", c.CredID, err)
+			skipped = append(skipped, fmt.Errorf("credential %s: data: %w", c.CredID, err))
+			continue
 		}
 		raw, err := hex.DecodeString(d.AuthSHA256)
 		if err != nil || len(raw) != sha256.Size {
-			return nil, fmt.Errorf("credential %s: auth_sha256 must be 64 hex chars", c.CredID)
+			skipped = append(skipped, fmt.Errorf("credential %s: auth_sha256 must be 64 hex chars", c.CredID))
+			continue
 		}
 		var h [32]byte
 		copy(h[:], raw)
-		if _, dup := seenID[c.CredID]; dup {
-			return nil, fmt.Errorf("duplicate credential id %s", c.CredID)
-		}
 		if other, dup := seenHash[h]; dup {
-			return nil, fmt.Errorf("credentials %s and %s share one token", other, c.CredID)
+			skipped = append(skipped, fmt.Errorf("credentials %s and %s share one token", other, c.CredID))
+			continue
 		}
-		seenID[c.CredID] = struct{}{}
 		seenHash[h] = c.CredID
 		parsed = append(parsed, parsedCred{c, h})
 	}
@@ -135,7 +143,7 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ra
 		ix.byHash[p.hash] = cs
 		ix.byID[p.c.CredID] = cs
 	}
-	return ix, nil
+	return ix, skipped
 }
 
 // ---- hot path: hysteria core callbacks, all on *inbound ----

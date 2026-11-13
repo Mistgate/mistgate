@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,11 +39,19 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 		res.Status = pb.ApplyStatus_APPLY_STATUS_APPLIED
 		res.StateHash = a.observedHash(cur)
 		res.Inbounds = a.cachedResults(cur)
+		res.Status = applyStatus(res.Inbounds)
+		if cur.partial {
+			res.Status = pb.ApplyStatus_APPLY_STATUS_PARTIAL
+		}
 		res.Relays = a.relay.results
 		return done()
 	}
 
 	next, err := merge(cur, ds, a.knows)
+	var partial *partialStateError
+	if err != nil && errors.As(err, &partial) {
+		err = nil
+	}
 	switch {
 	case errors.Is(err, errBaseMismatch):
 		a.log.Info("delta on the wrong base", "base", ds.BaseRevision, "applied", cur.revision)
@@ -55,6 +64,10 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 		res.StateHash = a.observedHash(cur)
 		return done()
 	}
+	if partial != nil {
+		a.reportStateIssues(partial.issues)
+	}
+	a.clearChangedApplyMarkers(ds, next)
 	if ds.Settings != nil {
 		a.settings.Store(ds.Settings)
 		if ds.Settings.GetOsStatus() {
@@ -72,6 +85,9 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	a.setModel(next)
 	a.persistModel(next, false)
 	res.Status = applyStatus(results)
+	if partial != nil || next.partial {
+		res.Status = pb.ApplyStatus_APPLY_STATUS_PARTIAL
+	}
 	res.Inbounds = results
 	res.Relays = a.relay.results
 	res.StateHash = a.observedHash(next)
@@ -145,14 +161,25 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	a.syncRelays(ctx, next)
 	nextTCP := withRelayClaims(tcpPortClaims(next), a.relay.claims)
 	claimedTCP := mergeTCPPortClaims(withRelayClaims(tcpPortClaims(prev), prevRelayClaims), nextTCP)
+	var removedFailures []*pb.InboundResult
 	for _, id := range prev.ids() {
 		old := prev.inbounds[id]
-		if n := next.inbounds[id]; n != nil && n.spec.Protocol == old.spec.Protocol {
+		n := next.inbounds[id]
+		if n != nil && n.parseErr == "" && n.applyErr == "" && n.spec.Protocol == old.spec.Protocol {
 			continue
 		}
 		if e := a.engines[old.spec.Protocol]; e != nil {
-			if err := e.Remove(ctx, id); err != nil {
-				a.log.Warn("remove inbound", "inbound", id, "err", err)
+			if err := a.removeEngine(ctx, old.spec.Protocol, e, id); err != nil {
+				if isEnginePanic(err) {
+					if n != nil {
+						n.applyErr = err.Error()
+					} else {
+						removedFailures = append(removedFailures, &pb.InboundResult{InboundId: id, State: pb.InboundRunState_INBOUND_RUN_STATE_FAILED, Error: err.Error()})
+						a.event(pb.Severity_SEVERITY_ERROR, "engine_failed", id, map[string]string{"error": err.Error()})
+					}
+				} else {
+					a.log.Warn("remove inbound", "inbound", id, "err", err)
+				}
 			}
 		}
 		delete(a.held, id)
@@ -171,6 +198,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	hops := a.syncHops(ctx, next, results, active)
 	a.syncInboundPorts(ctx, next, active, hops)
 	a.noteCerts(results)
+	results = append(results, removedFailures...)
 	var failed []string
 	for _, r := range results {
 		if r.Error != "" {
@@ -185,7 +213,7 @@ func tcpPortClaims(next *model) map[uint16]string {
 	claimed := make(map[uint16]string)
 	for _, id := range next.ids() {
 		spec := next.inbounds[id].spec
-		if spec.Enabled && spec.Listen.Network == "tcp" {
+		if next.inbounds[id].parseErr == "" && next.inbounds[id].applyErr == "" && spec.Enabled && spec.Listen.Network == "tcp" {
 			if _, exists := claimed[spec.Listen.Port]; !exists { // ids are sorted; keep the same lower-id winner as hop checks
 				claimed[spec.Listen.Port] = id
 			}
@@ -224,7 +252,7 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 	// the cache: a running one is stopped, there is never a silent direct exit.
 	why, blocked := a.blocked[spec.ID]
 	blocked = blocked && spec.Enabled
-	if !blocked && h != nil && !force && h.spec == sh && h.creds == ch && h.res.Error == "" {
+	if !blocked && in.parseErr == "" && in.applyErr == "" && h != nil && !force && h.spec == sh && h.creds == ch && h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
 		res := proto.Clone(h.res).(*pb.InboundResult)
 		a.refreshState(res)
 		return res
@@ -232,18 +260,27 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 
 	var rep engine.ApplyReport
 	var err error
-	if blocked {
+	if a.crashSkips[spec.ID] {
+		delete(a.crashSkips, spec.ID)
+		err = errors.New("skipped after a crash while applying it")
+	} else if in.applyErr != "" {
+		err = errors.New(in.applyErr)
+	} else if in.parseErr != "" {
+		err = errors.New(in.parseErr)
+	} else if blocked {
 		err = a.blockedFail(ctx, spec, why)
 	} else {
-		rep, err = eng.Apply(ctx, spec, creds)
+		rep, err = a.applyEngine(ctx, spec, creds, eng)
 	}
 	res := &pb.InboundResult{InboundId: spec.ID, SpecHash: sh}
-	wasFailing := h != nil && h.res.Error != ""
+	wasFailing := h != nil && h.res.State == pb.InboundRunState_INBOUND_RUN_STATE_FAILED
 	if err != nil {
 		res.State = pb.InboundRunState_INBOUND_RUN_STATE_FAILED
 		res.Error = err.Error()
-		if h == nil || h.res.Error != res.Error {
-			a.log.Error("inbound failed", "inbound", spec.ID, "err", err)
+		if h == nil || h.res.Error != res.Error || h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
+			if !isEnginePanic(err) {
+				a.log.Error("inbound failed", "inbound", spec.ID, "err", err)
+			}
 			if isBackendUnavailable(err) { // agent.proto "AWG AND WARP": awg_backend_unavailable {reason}
 				a.event(pb.Severity_SEVERITY_ERROR, "awg_backend_unavailable", spec.ID, map[string]string{"reason": res.Error})
 			} else {
@@ -256,6 +293,9 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 		}
 		res.CredCount = uint32(rep.CredCount)
 		res.Restarted = rep.Restarted
+		if w := append(append([]string(nil), in.credWarn...), rep.Warnings...); len(w) != 0 {
+			res.Error = fmt.Sprintf("%d credential%s skipped: %s", len(w), plural(len(w)), strings.Join(w, "; "))
+		}
 		res.CertPinSha256 = rep.Cert.PinSHA256
 		if !rep.Cert.NotAfter.IsZero() {
 			res.CertNotAfterUnix = rep.Cert.NotAfter.Unix()
@@ -295,6 +335,145 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 	return res
 }
 
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+type enginePanicError struct{ reason string }
+
+func (e *enginePanicError) Error() string { return e.reason }
+
+func enginePanicReason(v any) string {
+	var detail string
+	switch p := v.(type) {
+	case string:
+		detail = p
+	case error:
+		detail = p.Error()
+	default:
+		detail = fmt.Sprintf("%T", p)
+	}
+	detail = strings.TrimSpace(detail)
+	if detail == "" {
+		detail = fmt.Sprintf("%T", v)
+	}
+	if len(detail) > 160 {
+		detail = detail[:160]
+	}
+	return "engine panic: " + detail
+}
+
+func isEnginePanic(err error) bool {
+	var target *enginePanicError
+	return errors.As(err, &target)
+}
+
+func (a *Agent) applyEngine(ctx context.Context, spec plugin.InboundSpec, creds []plugin.UserCred, eng engine.Engine) (rep engine.ApplyReport, err error) {
+	prior := a.beginApplyMarker(spec.ID, statehash.Spec(spec))
+	defer func() {
+		if v := recover(); v != nil {
+			err = &enginePanicError{reason: enginePanicReason(v)}
+			a.log.Error("engine panic", "protocol", spec.Protocol, "inbound", spec.ID, "operation", "apply", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
+		}
+		if err == nil || !prior {
+			a.finishApplyMarker(spec.ID)
+		}
+	}()
+	// This catches synchronous engine panics only; panics in goroutines started by an engine are out of scope.
+	return eng.Apply(ctx, spec, creds)
+}
+
+func (a *Agent) removeEngine(ctx context.Context, protocol string, eng engine.Engine, id string) (err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			err = &enginePanicError{reason: enginePanicReason(v)}
+			a.log.Error("engine panic", "protocol", protocol, "inbound", id, "operation", "remove", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
+		}
+	}()
+	return eng.Remove(ctx, id)
+}
+
+func (a *Agent) loadApplyMarkers() {
+	if a.applyMarkersLoaded {
+		return
+	}
+	markers, err := loadApplyMarkers(a.cfg.StateDir)
+	if err != nil {
+		a.log.Warn("apply crash marker ignored", "err", err)
+		markers = map[string]string{}
+		_ = saveApplyMarkers(a.cfg.StateDir, markers)
+	}
+	a.applyMarkers, a.applyMarkersLoaded = markers, true
+	a.crashSkips = make(map[string]bool, len(markers))
+	for id := range markers {
+		a.crashSkips[id] = true
+	}
+}
+
+func (a *Agent) beginApplyMarker(id, specHash string) bool {
+	a.loadApplyMarkers()
+	prior := a.applyMarkers[id] == specHash
+	a.applyMarkers[id] = specHash
+	if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
+		a.log.Error("write apply crash marker", "inbound", id, "err", err)
+	}
+	return prior
+}
+
+func (a *Agent) finishApplyMarker(id string) {
+	a.loadApplyMarkers()
+	delete(a.applyMarkers, id)
+	if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
+		a.log.Warn("clear apply crash marker", "inbound", id, "err", err)
+	}
+}
+
+func (a *Agent) clearChangedApplyMarkers(ds *pb.DesiredState, next *model) {
+	a.loadApplyMarkers()
+	removed := make(map[string]bool, len(ds.RemovedInboundIds))
+	for _, id := range ds.RemovedInboundIds {
+		removed[id] = true
+	}
+	sentSpecs := make(map[string]string, len(ds.Inbounds))
+	for _, is := range ds.Inbounds {
+		if is != nil && is.InboundId != "" && is.Spec != nil {
+			if in := next.inbounds[is.InboundId]; in != nil {
+				sentSpecs[is.InboundId] = statehash.Spec(in.spec)
+			}
+		}
+	}
+	changed := false
+	for id, hash := range a.applyMarkers {
+		if newHash, sent := sentSpecs[id]; sent && newHash == hash {
+			continue
+		}
+		if _, sent := sentSpecs[id]; !sent && ds.BaseRevision != 0 && !removed[id] {
+			continue
+		}
+		delete(a.applyMarkers, id)
+		delete(a.crashSkips, id)
+		changed = true
+	}
+	if changed {
+		if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
+			a.log.Warn("clear changed apply crash marker", "err", err)
+		}
+	}
+}
+
+func (a *Agent) reportStateIssues(issues []stateIssue) {
+	for _, issue := range issues {
+		if issue.kind == "inbound" {
+			continue // applyInbound reports the failed inbound with its parse reason.
+		}
+		a.log.Warn("desired state item skipped", "kind", issue.kind, "id", issue.id, "reason", issue.reason)
+		a.event(pb.Severity_SEVERITY_ERROR, "desired_state_item_skipped", issue.id, map[string]string{"kind": issue.kind, "error": issue.reason})
+	}
+}
+
 // refreshState takes the live run state from the engine's health, which can change after Apply.
 func (a *Agent) refreshState(res *pb.InboundResult) {
 	for _, p := range a.protocols {
@@ -303,7 +482,7 @@ func (a *Agent) refreshState(res *pb.InboundResult) {
 				continue
 			}
 			res.State = pb.InboundRunState(hh.State)
-			if hh.State == plugin.RunFailed && res.Error == "" {
+			if hh.State == plugin.RunFailed && hh.Detail != "" {
 				res.Error = hh.Detail
 			}
 			// the certificate may have been issued (ACME) or renewed after the engine answered Apply; a result that
@@ -544,7 +723,7 @@ func (a *Agent) observedHash(m *model) string {
 		}
 	}
 	for id, in := range m.inbounds {
-		if !in.spec.Enabled && !have[id] {
+		if in.parseErr == "" && in.applyErr == "" && !in.spec.Enabled && !have[id] {
 			all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 		}
 	}
@@ -576,6 +755,9 @@ func (m *model) hash() string {
 	all := make([]statehash.Inbound, 0, len(m.inbounds))
 	for _, id := range m.ids() {
 		in := m.inbounds[id]
+		if in.parseErr != "" {
+			continue
+		}
 		all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 	}
 	return statehash.StateRelays(all, m.warp, m.relays)

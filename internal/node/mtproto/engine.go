@@ -182,37 +182,45 @@ type parsedCred struct {
 	key  [mp.KeyLen]byte
 }
 
-func parseCreds(creds []plugin.UserCred) ([]parsedCred, error) {
+func parseCreds(creds []plugin.UserCred) ([]parsedCred, []error) {
+	creds = append([]plugin.UserCred(nil), creds...)
+	sort.SliceStable(creds, func(i, j int) bool { return creds[i].CredID < creds[j].CredID })
 	out := make([]parsedCred, 0, len(creds))
 	seen := make(map[string]struct{}, len(creds))
 	seenKey := make(map[[mp.KeyLen]byte]string, len(creds))
+	var skipped []error
 	for _, c := range creds {
 		if c.CredID == "" {
-			return nil, errors.New("credential without id")
+			skipped = append(skipped, errors.New("credential without id"))
+			continue
 		}
 		if _, dup := seen[c.CredID]; dup {
-			return nil, fmt.Errorf("duplicate credential id %s", c.CredID)
+			skipped = append(skipped, fmt.Errorf("duplicate credential id %s", c.CredID))
+			continue
 		}
 		seen[c.CredID] = struct{}{}
 		var d struct {
 			Key string `json:"key"`
 		}
 		if err := json.Unmarshal(c.Data, &d); err != nil {
-			return nil, fmt.Errorf("credential %s: data: %w", c.CredID, err)
+			skipped = append(skipped, fmt.Errorf("credential %s: data: %w", c.CredID, err))
+			continue
 		}
 		raw, err := hex.DecodeString(d.Key)
 		if err != nil || len(raw) != mp.KeyLen {
-			return nil, fmt.Errorf("credential %s: key must be %d hex characters", c.CredID, 2*mp.KeyLen)
+			skipped = append(skipped, fmt.Errorf("credential %s: key must be %d hex characters", c.CredID, 2*mp.KeyLen))
+			continue
 		}
 		var key [mp.KeyLen]byte
 		copy(key[:], raw)
 		if other, dup := seenKey[key]; dup {
-			return nil, fmt.Errorf("credentials %s and %s share one key", other, c.CredID)
+			skipped = append(skipped, fmt.Errorf("credentials %s and %s share one key", other, c.CredID))
+			continue
 		}
 		seenKey[key] = c.CredID
 		out = append(out, parsedCred{cred: c, key: key})
 	}
-	return out, nil
+	return out, skipped
 }
 
 // credState holds one credential's counters. It is shared by the indexes that contain it and by the sessions opened
@@ -307,9 +315,15 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 	if err != nil {
 		return engine.ApplyReport{}, fmt.Errorf("mtproto inbound %q: %w", spec.ID, err)
 	}
-	parsed, err := parseCreds(creds)
-	if err != nil {
-		return engine.ApplyReport{}, fmt.Errorf("mtproto inbound %q: %w", spec.ID, err)
+	parsed, skipped := parseCreds(creds)
+	validCreds := make([]plugin.UserCred, 0, len(parsed))
+	for _, p := range parsed {
+		validCreds = append(validCreds, p.cred)
+	}
+	creds = validCreds
+	warnings := make([]string, len(skipped))
+	for i, err := range skipped {
+		warnings[i] = err.Error()
 	}
 	mpCreds := make([]mp.Credential, len(parsed))
 	for i, p := range parsed {
@@ -336,7 +350,7 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 		}
 		in.idx.Store(&credIndex{current: map[string]*credState{}})
 		e.inbounds[spec.ID] = in
-		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, nil
+		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Warnings: warnings}, nil
 	}
 
 	if old != nil && old.specHash == sh && old.settled() {
@@ -349,7 +363,7 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 			return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("mtproto inbound %q credentials: %w", spec.ID, err)
 		}
 		old.creds = cloneCreds(creds)
-		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, nil
+		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Warnings: warnings}, nil
 	}
 
 	restarted, restarts := false, uint32(0)
@@ -374,7 +388,7 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("mtproto inbound %q: %w", spec.ID, err)
 	}
 	in.setState(plugin.RunRunning, "")
-	return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Restarted: restarted}, nil
+	return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Restarted: restarted, Warnings: warnings}, nil
 }
 
 func (e *Engine) Remove(ctx context.Context, inboundID string) error {

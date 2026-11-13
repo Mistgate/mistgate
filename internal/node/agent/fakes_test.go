@@ -30,6 +30,7 @@ type fakeEngine struct {
 	kicked    [][]string
 	kickRet   int
 	applyErr  map[string]error
+	warnings  map[string][]string
 	closed    bool
 	unhealthy map[string]bool // inbounds whose Health says FAILED
 	lateCert  bool            // like ACME: Apply reports no certificate, Health reports leaf once there is one
@@ -48,7 +49,7 @@ type fakeInbound struct {
 }
 
 func newFakeEngine(proto string) *fakeEngine {
-	return &fakeEngine{proto: proto, in: map[string]*fakeInbound{}, applies: map[string]int{}, applyErr: map[string]error{}, upEach: 10, downEach: 5}
+	return &fakeEngine{proto: proto, in: map[string]*fakeInbound{}, applies: map[string]int{}, applyErr: map[string]error{}, warnings: map[string][]string{}, upEach: 10, downEach: 5}
 }
 
 func (e *fakeEngine) factory() engine.Factory {
@@ -75,7 +76,7 @@ func (e *fakeEngine) Apply(_ context.Context, spec plugin.InboundSpec, creds []p
 	if e.lateCert {
 		cert = engine.CertInfo{}
 	}
-	return engine.ApplyReport{SpecHash: statehash.Spec(spec), CredCount: len(creds), Restarted: restarted, Cert: cert}, nil
+	return engine.ApplyReport{SpecHash: statehash.Spec(spec), CredCount: len(creds), Restarted: restarted, Cert: cert, Warnings: append([]string(nil), e.warnings[spec.ID]...)}, nil
 }
 
 func (e *fakeEngine) Remove(_ context.Context, id string) error {

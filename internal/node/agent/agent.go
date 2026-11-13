@@ -214,8 +214,11 @@ type Agent struct {
 	hopsSet bool
 	// warm: the persisted state was restored (or there was none), so an inbound that starts now was asked for, not
 	// brought back by this process starting (the reason of engine_started). upMarker is the update marker of a new build.
-	warm     bool
-	upMarker *update.Marker
+	warm               bool
+	upMarker           *update.Marker
+	applyMarkers       map[string]string // last process did not return from Apply for these inbound specs
+	applyMarkersLoaded bool
+	crashSkips         map[string]bool // one startup replay skip per marker, consumed by restore or first desired apply
 	// exitProbe reads how the previous run ended from systemd and the journals (nil = the real host; tests replace it).
 	exitProbe exitProbe
 	hopRej    map[string]string // inbound id -> why its hop range was refused (F12), rebuilt by every syncHops
@@ -591,9 +594,15 @@ func (a *Agent) Run(ctx context.Context) error {
 func (a *Agent) restore(ctx context.Context) {
 	// If the agent restarts before an unsaved apply reaches disk, this restores the older state. On reconnect, a Hello
 	// state-hash mismatch makes the panel send a full correction.
+	a.loadApplyMarkers()
 	m, err := loadState(a.cfg.StateDir, a.knows)
 	if err != nil {
-		a.log.Warn("persisted state ignored", "err", err)
+		var partial *partialStateError
+		if errors.As(err, &partial) {
+			a.log.Warn("persisted state has invalid items", "err", err)
+		} else {
+			a.log.Warn("persisted state ignored", "err", err)
+		}
 	}
 	if m.revision == 0 && len(m.inbounds) == 0 {
 		return

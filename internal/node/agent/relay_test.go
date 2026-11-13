@@ -514,7 +514,7 @@ func TestRelayListMergeSemantics(t *testing.T) {
 		t.Error("the model hash is not the shared one")
 	}
 
-	// What cannot be represented rejects the message and changes nothing.
+	// What cannot be represented is skipped while the rest of the desired state is accepted.
 	for name, bad := range map[string]*pb.RelayForwards{
 		"no id":        relays(relay("", "tcp", 8443, "203.0.113.7", 443)),
 		"nil item":     {Items: []*pb.RelayForward{nil}},
@@ -522,8 +522,17 @@ func TestRelayListMergeSemantics(t *testing.T) {
 		"port too big": relays(relay("rly_a", "tcp", 70000, "203.0.113.7", 443)),
 		"to_port big":  relays(relay("rly_a", "tcp", 8443, "203.0.113.7", 65536)),
 	} {
-		if _, err := merge(full, &pb.DesiredState{Revision: 2, BaseRevision: 1, Relays: bad}, known); !errors.Is(err, errRejected) {
-			t.Errorf("%s: err = %v, want a rejection", name, err)
+		next, err := merge(full, &pb.DesiredState{Revision: 2, BaseRevision: 1, Relays: bad}, known)
+		var partial *partialStateError
+		want := 0
+		if name == "repeated id" {
+			want = 1 // deterministic first item wins; the duplicate later item is skipped.
+		}
+		if !errors.As(err, &partial) || next == nil || len(next.relays) != want || len(full.relays) != 2 {
+			t.Errorf("%s: result = %+v, err = %v; want %d accepted replacement item(s) and partial status", name, next, err, want)
+		}
+		if name == "repeated id" && next != nil && len(next.relays) == 1 && (next.relays[0].Network != "tcp" || next.relays[0].Port != 8443) {
+			t.Errorf("repeated id kept %+v, want the first item", next.relays[0])
 		}
 	}
 }

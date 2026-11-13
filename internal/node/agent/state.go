@@ -20,6 +20,8 @@ import (
 type model struct {
 	revision uint64
 	inbounds map[string]*inbound
+	partial  bool
+	issues   []stateIssue
 	settings *pb.NodeSettings
 	// warp is the node-level WARP configuration; nil = this node has no WARP, Enabled=false = paused. It is replaced
 	// as a whole and never mutated once stored (agent.proto "AWG AND WARP").
@@ -29,8 +31,21 @@ type model struct {
 }
 
 type inbound struct {
-	spec  plugin.InboundSpec
-	creds map[string]plugin.UserCred
+	spec     plugin.InboundSpec
+	creds    map[string]plugin.UserCred
+	parseErr string
+	credWarn []string // credentials of the last message that were skipped; the inbound runs with the rest
+	applyErr string
+}
+
+type stateIssue struct {
+	kind, id, reason string
+}
+
+type partialStateError struct{ issues []stateIssue }
+
+func (e *partialStateError) Error() string {
+	return fmt.Sprintf("desired state contains %d invalid item(s)", len(e.issues))
 }
 
 var (
@@ -45,9 +60,9 @@ func rejectf(format string, a ...any) error {
 func newModel() *model { return &model{inbounds: map[string]*inbound{}} }
 
 func (m *model) clone() *model {
-	c := &model{revision: m.revision, settings: m.settings, warp: m.warp, relays: m.relays, inbounds: make(map[string]*inbound, len(m.inbounds))}
+	c := &model{revision: m.revision, partial: m.partial, issues: append([]stateIssue(nil), m.issues...), settings: m.settings, warp: m.warp, relays: m.relays, inbounds: make(map[string]*inbound, len(m.inbounds))}
 	for id, in := range m.inbounds {
-		ci := &inbound{spec: in.spec, creds: make(map[string]plugin.UserCred, len(in.creds))}
+		ci := &inbound{spec: in.spec, creds: make(map[string]plugin.UserCred, len(in.creds)), parseErr: in.parseErr, applyErr: in.applyErr, credWarn: in.credWarn}
 		for k, v := range in.creds {
 			ci.creds[k] = v
 		}
@@ -56,8 +71,9 @@ func (m *model) clone() *model {
 	return c
 }
 
-// merge applies a DesiredState on top of cur and returns the new model; cur is never modified, so a
-// rejected message changes nothing. known says whether a protocol has an engine on this node.
+// merge applies a DesiredState on top of cur and returns the new model; cur is never modified. Invalid
+// items are recorded on the result so the caller can apply the valid remainder and report PARTIAL.
+// known says whether a protocol has an engine on this node.
 func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*model, error) {
 	var next *model
 	switch {
@@ -68,6 +84,7 @@ func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*
 	default:
 		next = cur.clone()
 	}
+	var issues []stateIssue
 	next.revision = ds.Revision
 	if ds.Settings != nil {
 		next.settings = ds.Settings
@@ -75,24 +92,35 @@ func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*
 		next.settings = cur.settings
 	}
 	full := ds.BaseRevision == 0
+	if ds.Warp != nil {
+		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool { return issue.kind != "warp" })
+	}
+	if ds.Relays != nil {
+		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool { return issue.kind != "relay" })
+	}
+	for _, id := range ds.RemovedInboundIds {
+		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool { return issue.id != id || issue.kind == "warp" || issue.kind == "relay" })
+	}
 	// WARP: presence replaces the whole configuration (a delta too), absence in a delta keeps it, absence in a full
 	// state means this node has no WARP (next started empty above).
 	if ds.Warp != nil {
 		w, err := warpFromPB(ds.Warp)
 		if err != nil {
-			return nil, err
+			issues = append(issues, stateIssue{kind: "warp", reason: err.Error()})
+		} else {
+			next.warp = w
 		}
-		next.warp = w
 	} else if full {
 		next.warp = nil
 	}
 	// Relay forwards: the same rule. Presence (an empty list too) replaces the list, absence in a delta keeps it.
 	if ds.Relays != nil {
-		rs, err := relaysFromPB(ds.Relays)
-		if err != nil {
-			return nil, err
-		}
+		next.relays = nil
+		rs, rejected := relaysFromPB(ds.Relays)
 		next.relays = rs
+		for _, err := range rejected {
+			issues = append(issues, stateIssue{kind: "relay", reason: err.Error()})
+		}
 	} else if full {
 		next.relays = nil
 	}
@@ -102,28 +130,52 @@ func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*
 	seen := map[string]bool{}
 	for _, is := range ds.Inbounds {
 		if is == nil || is.InboundId == "" {
-			return nil, rejectf("inbound without id")
+			issues = append(issues, stateIssue{kind: "inbound_item", reason: "inbound without id"})
+			continue
 		}
+		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool {
+			return issue.id != is.InboundId || (issue.kind != "inbound" && issue.kind != "inbound_item")
+		})
 		if seen[is.InboundId] {
-			return nil, rejectf("inbound %s listed twice", is.InboundId)
+			issues = append(issues, stateIssue{kind: "inbound_item", id: is.InboundId, reason: fmt.Sprintf("inbound %s listed twice", is.InboundId)})
+			continue
 		}
 		seen[is.InboundId] = true
 		in := next.inbounds[is.InboundId]
+		if is.Spec == nil && in == nil {
+			in = &inbound{spec: plugin.InboundSpec{ID: is.InboundId}, creds: map[string]plugin.UserCred{}, parseErr: fmt.Sprintf("inbound %s: new inbound without spec", is.InboundId)}
+			next.inbounds[is.InboundId] = in
+			issues = append(issues, stateIssue{kind: "inbound", id: is.InboundId, reason: in.parseErr})
+			continue
+		}
+		if in == nil {
+			in = &inbound{spec: plugin.InboundSpec{ID: is.InboundId}, creds: map[string]plugin.UserCred{}}
+			next.inbounds[is.InboundId] = in
+		}
+		in.applyErr = ""
 		if is.Spec != nil {
+			in.parseErr = ""
 			spec, err := specFromPB(is.InboundId, is.Spec)
 			if err != nil {
-				return nil, err
+				in.spec = plugin.InboundSpec{ID: is.InboundId}
+				in.creds = map[string]plugin.UserCred{}
+				in.parseErr = err.Error()
+				issues = append(issues, stateIssue{kind: "inbound", id: is.InboundId, reason: in.parseErr})
+				continue
 			}
 			if !known(spec.Protocol) {
-				return nil, rejectf("inbound %s: no engine for protocol %q", is.InboundId, spec.Protocol)
-			}
-			if in == nil {
-				in = &inbound{creds: map[string]plugin.UserCred{}}
-				next.inbounds[is.InboundId] = in
+				in.spec = plugin.InboundSpec{ID: is.InboundId}
+				in.creds = map[string]plugin.UserCred{}
+				in.parseErr = fmt.Sprintf("inbound %s: no engine for protocol %q", is.InboundId, spec.Protocol)
+				issues = append(issues, stateIssue{kind: "inbound", id: is.InboundId, reason: in.parseErr})
+				continue
 			}
 			in.spec = spec
-		} else if in == nil {
-			return nil, rejectf("inbound %s: new inbound without spec", is.InboundId)
+		} else if in.parseErr != "" && in.spec.Protocol == "" {
+			issues = append(issues, stateIssue{kind: "inbound", id: is.InboundId, reason: in.parseErr})
+			continue
+		} else {
+			in.parseErr = ""
 		}
 		if is.CredsReplace || full {
 			in.creds = make(map[string]plugin.UserCred, len(is.Creds))
@@ -131,15 +183,49 @@ func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*
 		for _, id := range is.RemovedCredIds {
 			delete(in.creds, id)
 		}
+		credSeen := map[string]bool{}
+		var credErrors []string
 		for _, c := range is.Creds {
+			if c != nil && c.CredId != "" && credSeen[c.CredId] {
+				msg := fmt.Sprintf("inbound %s: duplicate credential id %s", is.InboundId, c.CredId)
+				credErrors = append(credErrors, msg)
+				issues = append(issues, stateIssue{kind: "inbound", id: is.InboundId, reason: msg})
+				continue
+			}
 			uc, err := credFromPB(c)
 			if err != nil {
-				return nil, rejectf("inbound %s: %v", is.InboundId, err)
+				msg := fmt.Sprintf("inbound %s: %v", is.InboundId, err)
+				credErrors = append(credErrors, msg)
+				issues = append(issues, stateIssue{kind: "inbound", id: is.InboundId, reason: msg})
+				continue
 			}
+			credSeen[uc.CredID] = true
 			in.creds[uc.CredID] = uc
 		}
+		in.credWarn = credErrors
+	}
+	next.issues = append(next.issues, issues...)
+	next.partial = len(next.issues) != 0
+	for _, in := range next.inbounds {
+		if in.parseErr != "" {
+			next.partial = true
+			break
+		}
+	}
+	if len(issues) != 0 {
+		return next, &partialStateError{issues: issues}
 	}
 	return next, nil
+}
+
+func filterStateIssues(issues []stateIssue, keep func(stateIssue) bool) []stateIssue {
+	out := issues[:0]
+	for _, issue := range issues {
+		if keep(issue) {
+			out = append(out, issue)
+		}
+	}
+	return out
 }
 
 func specFromPB(id string, s *pb.InboundSpec) (plugin.InboundSpec, error) {
@@ -255,6 +341,9 @@ func (m *model) snapshot() *pb.DesiredState {
 	ds := &pb.DesiredState{Revision: m.revision, Settings: m.settings, StateHash: m.hash(), Warp: warpToPB(m.warp), Relays: relaysToPB(m.relays)}
 	for _, id := range m.ids() {
 		in := m.inbounds[id]
+		if in.parseErr != "" {
+			continue
+		}
 		is := &pb.InboundState{InboundId: id, Spec: specToPB(in.spec), CredsReplace: true}
 		for _, c := range in.sortedCreds() {
 			is.Creds = append(is.Creds, credToPB(c))
@@ -296,7 +385,49 @@ func loadState(dir string, known func(string) bool) (*model, error) {
 	ds.Inbounds = kept
 	m, err := merge(newModel(), &ds, known)
 	if err != nil {
+		var partial *partialStateError
+		if errors.As(err, &partial) {
+			return m, fmt.Errorf("%s: %w", fileState, err)
+		}
 		return newModel(), fmt.Errorf("%s: %w", fileState, err)
 	}
 	return m, nil
+}
+
+func loadApplyMarkers(dir string) (map[string]string, error) {
+	b, err := os.ReadFile(filepath.Join(dir, fileApplyMark))
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var file struct {
+		Inbounds map[string]string `json:"inbounds"`
+	}
+	if err := json.Unmarshal(b, &file); err != nil {
+		return nil, err
+	}
+	if file.Inbounds == nil {
+		file.Inbounds = map[string]string{}
+	}
+	return file.Inbounds, nil
+}
+
+func saveApplyMarkers(dir string, markers map[string]string) error {
+	path := filepath.Join(dir, fileApplyMark)
+	if len(markers) == 0 {
+		err := os.Remove(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	b, err := json.Marshal(struct {
+		Inbounds map[string]string `json:"inbounds"`
+	}{Inbounds: markers})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o600)
 }

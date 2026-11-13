@@ -38,11 +38,12 @@ const apiVersion = 1
 // Files in the state directory (directory 0700, files 0600). The key and the leaf certificate live in ONE
 // file so that a renewal (a new key every time) is a single atomic rename.
 const (
-	fileIdentity   = "identity.pem"       // EC PRIVATE KEY + CERTIFICATE
-	filePendingKey = "enroll-pending.pem" // private key kept only for a retried, interrupted enrollment
-	fileCA         = "ca.pem"             // the panel CA; from enrollment on it is the only trust anchor
-	fileMeta       = "agent.json"         // panel address, agent SNI, node id
-	fileState      = "state.json"         // last applied desired state
+	fileIdentity   = "identity.pem"           // EC PRIVATE KEY + CERTIFICATE
+	filePendingKey = "enroll-pending.pem"     // private key kept only for a retried, interrupted enrollment
+	fileCA         = "ca.pem"                 // the panel CA; from enrollment on it is the only trust anchor
+	fileMeta       = "agent.json"             // panel address, agent SNI, node id
+	fileState      = "state.json"             // last applied desired state
+	fileApplyMark  = "applying-inbounds.json" // inbounds whose apply did not return before the last process exit
 )
 
 // renewBefore is how long before expiry the agent renews (day 20 of 30).

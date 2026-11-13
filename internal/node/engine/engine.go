@@ -80,6 +80,7 @@ type ApplyReport struct {
 	CredCount int
 	Restarted bool
 	Cert      CertInfo // what the inbound serves; zero if the protocol has no TLS
+	Warnings  []string // non-fatal credential errors; the accepted credentials were applied
 }
 
 type CertInfo struct {

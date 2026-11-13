@@ -772,6 +772,41 @@ func TestApplyUsersOnlyKeepsAndRemovesSessions(t *testing.T) {
 	}
 }
 
+func TestApplySkipsBadCredentialAndStillRevokesOthers(t *testing.T) {
+	f := newRuntimeFixture(t, false)
+	spec := f.spec("node-a", "xhttp")
+	kept := testCredential("alice", "66ad4540-b58c-4ad2-9926-ea63445a9b57")
+	revoked := testCredential("revoked", "66ad4540-b58c-4ad2-9926-ea63445a9b59")
+	if _, err := f.engine.Apply(context.Background(), spec, []plugin.UserCred{kept, revoked}); err != nil {
+		t.Fatal(err)
+	}
+	bad := testCredential("broken", "not-a-uuid")
+	report, err := f.engine.Apply(context.Background(), spec, []plugin.UserCred{kept, bad})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CredCount != 1 || len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "broken") {
+		t.Fatalf("apply report = %+v", report)
+	}
+	observed := f.engine.Observed()
+	if len(observed) != 1 || len(observed[0].Creds) != 1 || observed[0].Creds[0].CredID != kept.CredID {
+		t.Fatalf("observed credentials = %+v", observed)
+	}
+
+	duplicate := testCredential("z", stringID(kept))
+	report, err = f.engine.Apply(context.Background(), spec, []plugin.UserCred{duplicate, kept})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CredCount != 1 || len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "alice and z share one UUID") {
+		t.Fatalf("duplicate UUID report = %+v", report)
+	}
+	observed = f.engine.Observed()
+	if len(observed) != 1 || len(observed[0].Creds) != 1 || observed[0].Creds[0].CredID != kept.CredID {
+		t.Fatalf("duplicate UUID winner = %+v; want %s", observed, kept.CredID)
+	}
+}
+
 func (c *xrayClient) tryDial(target string) (net.Conn, error) {
 	conn, err := net.DialTimeout("tcp", c.socks, time.Second)
 	if err != nil {

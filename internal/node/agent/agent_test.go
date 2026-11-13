@@ -463,13 +463,13 @@ func TestDesiredStateFullDeltaAndHash(t *testing.T) {
 	case <-time.After(150 * time.Millisecond):
 	}
 
-	// 7. rejected: unknown protocol. Nothing changes.
+	// 7. an unknown protocol fails only its own inbound; the message is still applied partially.
 	bad := inb("inb_2", 0, 0, cred("crd_q"))
 	bad.Spec.Protocol = "nosuch"
 	h.panel.push(&pb.DesiredState{Revision: 12, BaseRevision: 11, Inbounds: []*pb.InboundState{bad}})
 	r = h.panel.nextApply()
-	if r.Status != pb.ApplyStatus_APPLY_STATUS_REJECTED || r.Error == "" || h.eng.has("inb_2") {
-		t.Fatalf("reject: %v", r)
+	if r.Status != pb.ApplyStatus_APPLY_STATUS_PARTIAL || len(r.Inbounds) != 2 || r.Inbounds[1].InboundId != "inb_2" || r.Inbounds[1].State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED || h.eng.has("inb_2") {
+		t.Fatalf("partial parse failure: %v", r)
 	}
 
 	// 8. a full state without inb_1 removes it

@@ -68,32 +68,41 @@ type credState struct {
 	expiryTimer stoppable
 }
 
-// users hands out the person buckets of the inbound's credentials (nil: no person limits).
-func buildIndex(inboundID string, old *credentialIndex, creds []plugin.UserCred, now func() time.Time, after afterFunc, users *ratelimit.Registry) (*credentialIndex, error) {
+// users hands out the person buckets of the inbound's credentials (nil: no person limits). Malformed credentials and
+// later duplicate ids or UUIDs are skipped so a single entry cannot freeze updates to the rest of the inbound.
+func buildIndex(inboundID string, old *credentialIndex, creds []plugin.UserCred, now func() time.Time, after afterFunc, users *ratelimit.Registry) (*credentialIndex, []error) {
+	creds = append([]plugin.UserCred(nil), creds...)
+	sort.SliceStable(creds, func(i, j int) bool { return creds[i].CredID < creds[j].CredID })
 	parsed := make([]parsedCredential, 0, len(creds))
 	seenID := make(map[string]struct{}, len(creds))
 	seenUUID := make(map[xuuid.UUID]string, len(creds))
+	var skipped []error
 	for _, c := range creds {
 		if c.CredID == "" {
-			return nil, errors.New("credential without id")
+			skipped = append(skipped, errors.New("credential without id"))
+			continue
 		}
+		if _, dup := seenID[c.CredID]; dup {
+			skipped = append(skipped, fmt.Errorf("duplicate credential id %s", c.CredID))
+			continue
+		}
+		seenID[c.CredID] = struct{}{}
 		var data struct {
 			ID string `json:"id"`
 		}
 		if err := json.Unmarshal(c.Data, &data); err != nil {
-			return nil, fmt.Errorf("credential %s: data: %w", c.CredID, err)
+			skipped = append(skipped, fmt.Errorf("credential %s: data: %w", c.CredID, err))
+			continue
 		}
 		u, err := parseUUID(data.ID)
 		if err != nil {
-			return nil, fmt.Errorf("credential %s: data.id must be a UUID", c.CredID)
-		}
-		if _, dup := seenID[c.CredID]; dup {
-			return nil, fmt.Errorf("duplicate credential id %s", c.CredID)
+			skipped = append(skipped, fmt.Errorf("credential %s: data.id must be a UUID", c.CredID))
+			continue
 		}
 		if other, dup := seenUUID[u]; dup {
-			return nil, fmt.Errorf("credentials %s and %s share one UUID", other, c.CredID)
+			skipped = append(skipped, fmt.Errorf("credentials %s and %s share one UUID", other, c.CredID))
+			continue
 		}
-		seenID[c.CredID] = struct{}{}
 		seenUUID[u] = c.CredID
 		c.Data = append([]byte(nil), c.Data...)
 		parsed = append(parsed, parsedCredential{cred: c, uuid: u})
@@ -119,7 +128,7 @@ func buildIndex(inboundID string, old *credentialIndex, creds []plugin.UserCred,
 		cs.person.Store(shared[cs.id])
 		ix.byID[cs.id] = cs
 	}
-	return ix, nil
+	return ix, skipped
 }
 
 func parseUUID(text string) (xuuid.UUID, error) {

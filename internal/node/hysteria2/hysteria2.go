@@ -203,15 +203,30 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	if old != nil {
 		oldIdx = old.idx.Load()
 	}
-	ix, err := buildIndex(spec.ID, oldIdx, creds, e.users)
-	if err != nil {
-		return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("hysteria2 inbound %q: %w", spec.ID, err)
+	ix, skipped := buildIndex(spec.ID, oldIdx, creds, e.users)
+	accepted := make(map[string]bool, len(ix.byID))
+	for id := range ix.byID {
+		accepted[id] = true
+	}
+	kept := creds[:0]
+	for _, cred := range creds {
+		if accepted[cred.CredID] {
+			kept = append(kept, cred)
+			delete(accepted, cred.CredID)
+		}
+	}
+	creds = kept
+	warnings := make([]string, len(skipped))
+	for i, err := range skipped {
+		warnings[i] = err.Error()
 	}
 
 	// Same spec, and either serving or deliberately stopped: a users-only change. Swap the index.
 	if old != nil && old.specHash == sh && old.torrentVersion == e.torrentVersion && old.settled() {
 		e.swapIndex(old, oldIdx, ix, creds)
-		return e.report(old, len(creds), false), nil
+		report := e.report(old, len(creds), false)
+		report.Warnings = warnings
+		return report, nil
 	}
 
 	// New inbound, changed spec, or a retry of one that failed: (re)build it.
@@ -236,7 +251,9 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 
 	if !spec.Enabled {
 		in.setState(plugin.RunStopped, "disabled")
-		return e.report(in, len(creds), restarted), nil
+		report := e.report(in, len(creds), restarted)
+		report.Warnings = warnings
+		return report, nil
 	}
 	if err := in.start(ctx); err != nil {
 		e.log.Error("hysteria2 inbound failed to start", "inbound", spec.ID, "err", err)
@@ -244,7 +261,9 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 		in.setState(plugin.RunFailed, err.Error())
 		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("hysteria2 inbound %q: %w", spec.ID, err)
 	}
-	return e.report(in, len(creds), restarted), nil
+	report := e.report(in, len(creds), restarted)
+	report.Warnings = warnings
+	return report, nil
 }
 
 func (e *eng) report(in *inbound, n int, restarted bool) engine.ApplyReport {

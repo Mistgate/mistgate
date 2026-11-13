@@ -252,26 +252,29 @@ func withRelayClaims(claims, relay map[uint16]string) map[uint16]string {
 	return claims
 }
 
-// relaysFromPB turns the wire list into the model's: sorted by id. A list that cannot be represented (an empty or repeated
-// id, a port beyond 65535) rejects the whole message, like a malformed inbound; whether a forward may be installed is
-// decided later, per forward.
-func relaysFromPB(l *pb.RelayForwards) ([]plugin.RelayForward, error) {
+// relaysFromPB turns the wire list into the model's sorted list and skips entries that cannot be represented.
+func relaysFromPB(l *pb.RelayForwards) ([]plugin.RelayForward, []error) {
 	out := make([]plugin.RelayForward, 0, len(l.Items))
 	seen := map[string]bool{}
+	var rejected []error
 	for _, f := range l.Items {
-		switch {
-		case f == nil || f.RelayId == "":
-			return nil, rejectf("relay without id")
-		case seen[f.RelayId]:
-			return nil, rejectf("relay %s listed twice", f.RelayId)
-		case f.Port > 65535 || f.ToPort > 65535:
-			return nil, rejectf("relay %s: port out of range", f.RelayId)
+		if f == nil || f.RelayId == "" {
+			rejected = append(rejected, rejectf("relay without id"))
+			continue
+		}
+		if seen[f.RelayId] {
+			rejected = append(rejected, rejectf("relay %s listed twice", f.RelayId))
+			continue
+		}
+		if f.Port > 65535 || f.ToPort > 65535 {
+			rejected = append(rejected, rejectf("relay %s: port out of range", f.RelayId))
+			continue
 		}
 		seen[f.RelayId] = true
 		out = append(out, plugin.RelayForward{ID: f.RelayId, Network: f.Network, Port: uint16(f.Port), ToHost: f.ToHost, ToPort: uint16(f.ToPort)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, nil
+	return out, rejected
 }
 
 // relaysToPB is the persisted form: nil when there are no forwards, so a state without any is what it was before them.

@@ -20,6 +20,7 @@ import (
 	"net/netip"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -275,6 +276,39 @@ func TestEngineLifecycle(t *testing.T) {
 	}
 	if certs.released.Load() == 0 {
 		t.Fatal("the certificate claim was not released")
+	}
+}
+
+func TestApplySkipsBadCredentialAndStillRevokesOthers(t *testing.T) {
+	a, revoked := credential("a", key(1)), credential("revoked", key(2))
+	env := engine.Env{Certs: &fakeCerts{acme: testCert(t, ownDomain), self: testCert(t, ownDomain)}}
+	f := newFixture(t, env, `{"domains":["de1.example.com"]}`, a, revoked)
+
+	bad := credential("broken", key(3))
+	bad.Data = json.RawMessage(`{`)
+	report, err := f.e.Apply(context.Background(), f.spec, []plugin.UserCred{a, bad})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CredCount != 1 || len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "broken") {
+		t.Fatalf("apply report = %+v", report)
+	}
+	observed := f.e.Observed()
+	if len(observed) != 1 || len(observed[0].Creds) != 1 || observed[0].Creds[0].CredID != a.CredID {
+		t.Fatalf("observed credentials = %+v", observed)
+	}
+
+	duplicate := credential("z", key(1))
+	report, err = f.e.Apply(context.Background(), f.spec, []plugin.UserCred{duplicate, a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CredCount != 1 || len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "a and z share one key") {
+		t.Fatalf("duplicate key report = %+v", report)
+	}
+	observed = f.e.Observed()
+	if len(observed) != 1 || len(observed[0].Creds) != 1 || observed[0].Creds[0].CredID != a.CredID {
+		t.Fatalf("duplicate key winner = %+v; want %s", observed, a.CredID)
 	}
 }
 

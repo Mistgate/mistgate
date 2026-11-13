@@ -131,52 +131,85 @@ func (w *wantPeer) update() awgcfg.Peer {
 	return p
 }
 
-// parsePeers turns credentials into peers and refuses the whole set when one is unusable or two collide: a
-// duplicate public key or allowed ip would silently move traffic between users.
-func parsePeers(cfg nodeConfig, creds []plugin.UserCred) (map[[32]byte]*wantPeer, error) {
+// parsePeers turns credentials into peers, skipping malformed entries and later duplicate keys or addresses.
+func parsePeers(cfg nodeConfig, creds []plugin.UserCred) (map[[32]byte]*wantPeer, []error) {
+	creds = append([]plugin.UserCred(nil), creds...)
+	sort.SliceStable(creds, func(i, j int) bool { return creds[i].CredID < creds[j].CredID })
 	out := make(map[[32]byte]*wantPeer, len(creds))
 	ips := map[netip.Prefix]string{}
+	seenID := make(map[string]bool, len(creds))
+	var skipped []error
 	for _, c := range creds {
+		if c.CredID == "" {
+			skipped = append(skipped, errors.New("credential without id"))
+			continue
+		}
+		if seenID[c.CredID] {
+			skipped = append(skipped, fmt.Errorf("duplicate credential id %s", c.CredID))
+			continue
+		}
+		seenID[c.CredID] = true
 		var j credJSON
 		if err := json.Unmarshal(c.Data, &j); err != nil {
-			return nil, fmt.Errorf("credential %s: data: %w", c.CredID, err)
+			skipped = append(skipped, fmt.Errorf("credential %s: data: %w", c.CredID, err))
+			continue
 		}
 		pub, ok := awgcfg.DecodeKey(j.PublicKey)
 		if !ok {
-			return nil, fmt.Errorf("credential %s: public_key must be base64 of 32 bytes", c.CredID)
+			skipped = append(skipped, fmt.Errorf("credential %s: public_key must be base64 of 32 bytes", c.CredID))
+			continue
 		}
 		w := &wantPeer{credID: c.CredID, userID: c.UserID, pub: pub}
 		if j.PSK != "" {
 			k, ok := awgcfg.DecodeKey(j.PSK)
 			if !ok {
-				return nil, fmt.Errorf("credential %s: psk must be base64 of 32 bytes", c.CredID)
+				skipped = append(skipped, fmt.Errorf("credential %s: psk must be base64 of 32 bytes", c.CredID))
+				continue
 			}
 			w.psk = &k
 		}
 		if len(j.AllowedIPs) == 0 {
-			return nil, fmt.Errorf("credential %s: allowed_ips is empty", c.CredID)
+			skipped = append(skipped, fmt.Errorf("credential %s: allowed_ips is empty", c.CredID))
+			continue
 		}
+		localIPs := make(map[netip.Prefix]struct{}, len(j.AllowedIPs))
+		var credErr error
 		for _, s := range j.AllowedIPs {
 			p, err := netip.ParsePrefix(s)
 			if err != nil || p.Masked() != p || p.Bits() != p.Addr().BitLen() {
-				return nil, fmt.Errorf("credential %s: allowed ip %q must be a single address (/32 or /128)", c.CredID, s)
+				credErr = fmt.Errorf("credential %s: allowed ip %q must be a single address (/32 or /128)", c.CredID, s)
+				break
 			}
 			if err := inSubnet(cfg.tunnel, p.Addr()); err != nil {
-				return nil, fmt.Errorf("credential %s: allowed ip %s: %w", c.CredID, p, err)
+				credErr = fmt.Errorf("credential %s: allowed ip %s: %w", c.CredID, p, err)
+				break
+			}
+			if _, dup := localIPs[p]; dup {
+				credErr = fmt.Errorf("credential %s repeats allowed address %s", c.CredID, p)
+				break
 			}
 			if other, dup := ips[p]; dup {
-				return nil, fmt.Errorf("credentials %s and %s share the address %s", other, c.CredID, p)
+				credErr = fmt.Errorf("credentials %s and %s share the address %s", other, c.CredID, p)
+				break
 			}
-			ips[p] = c.CredID
+			localIPs[p] = struct{}{}
 			w.allowed = append(w.allowed, p)
 		}
-		sort.Slice(w.allowed, func(i, j int) bool { return w.allowed[i].Addr().Less(w.allowed[j].Addr()) })
+		if credErr != nil {
+			skipped = append(skipped, credErr)
+			continue
+		}
 		if prev, dup := out[pub]; dup {
-			return nil, fmt.Errorf("credentials %s and %s share a public key", prev.credID, c.CredID)
+			skipped = append(skipped, fmt.Errorf("credentials %s and %s share a public key", prev.credID, c.CredID))
+			continue
+		}
+		sort.Slice(w.allowed, func(i, j int) bool { return w.allowed[i].Addr().Less(w.allowed[j].Addr()) })
+		for p := range localIPs {
+			ips[p] = c.CredID
 		}
 		out[pub] = w
 	}
-	return out, nil
+	return out, skipped
 }
 
 // inSubnet: a peer address must be inside the client subnet and not the node's own address.

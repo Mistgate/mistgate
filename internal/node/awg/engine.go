@@ -276,9 +276,22 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 	if cfg.version == awgcfg.Version31 && !e.backend.Is31() {
 		return e.fail(old, spec, sh, creds, fmt.Errorf("%s: %s cannot run AWG 3.1 (RandomTrailers/DisableCookies missing): needs amneziawg module v3.1.20260812 or newer, no silent fallback", ReasonModuleTooOld, e.backend.Version()))
 	}
-	peers, err := parsePeers(cfg, creds)
-	if err != nil {
-		return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("awg inbound %q: %w", spec.ID, err)
+	peers, skipped := parsePeers(cfg, creds)
+	accepted := make(map[string]bool, len(peers))
+	for _, peer := range peers {
+		accepted[peer.credID] = true
+	}
+	kept := creds[:0]
+	for _, cred := range creds {
+		if accepted[cred.CredID] {
+			kept = append(kept, cred)
+			delete(accepted, cred.CredID)
+		}
+	}
+	creds = kept
+	warnings := make([]string, len(skipped))
+	for i, err := range skipped {
+		warnings[i] = err.Error()
 	}
 	if other := e.byIface[cfg.name]; other != "" && other != spec.ID {
 		return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("awg inbound %q: udp port %d is already served by inbound %q", spec.ID, cfg.port, other)
@@ -292,16 +305,16 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 			e.log.Warn("awg peer removal could not be confirmed; rebuilding the interface", "inbound", spec.ID, "err", err)
 			if rebuildErr := e.rebuildLive(ctx, old, spec, sh, creds, cfg, peers); rebuildErr != nil {
 				e.log.Error("awg interface rebuild failed", "inbound", spec.ID, "err", rebuildErr)
-				return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("awg inbound %q: rebuild after failed live update: %w", spec.ID, rebuildErr)
+				return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Warnings: warnings}, fmt.Errorf("awg inbound %q: rebuild after failed live update: %w", spec.ID, rebuildErr)
 			}
 			restarted = true
 		} else if err != nil {
 			e.log.Error("awg live update failed", "inbound", spec.ID, "err", err)
-			return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("awg inbound %q: %w", spec.ID, err)
+			return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Warnings: warnings}, fmt.Errorf("awg inbound %q: %w", spec.ID, err)
 		}
 		old.spec, old.specHash, old.creds, old.cfg = spec, sh, creds, cfg
 		old.warnedMissing = false
-		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Restarted: restarted}, nil
+		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Restarted: restarted, Warnings: warnings}, nil
 	}
 
 	// New inbound, changed identity, or a retry of one that failed or lost its interface: (re)build it.
@@ -323,10 +336,10 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 		e.log.Error("awg inbound failed to start", "inbound", spec.ID, "err", err)
 		e.destroy(ctx, in)
 		in.state, in.detail, in.since = plugin.RunFailed, err.Error(), e.now()
-		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("awg inbound %q: %w", spec.ID, err)
+		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Warnings: warnings}, fmt.Errorf("awg inbound %q: %w", spec.ID, err)
 	}
 	in.state, in.detail, in.since = plugin.RunRunning, "", e.now()
-	return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Restarted: restarted}, nil
+	return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Restarted: restarted, Warnings: warnings}, nil
 }
 
 // fail records a failed inbound (keeping nothing running for it) and returns the error.

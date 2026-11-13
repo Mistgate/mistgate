@@ -993,11 +993,15 @@ func TestRejectsMalformedL3(t *testing.T) {
 		ds := fullState(2, awgInb("inb_a", 51842, "10.66.4", "direct", awgCred("c1")))
 		mut(ds)
 		r := mustApply(t, x.panel, ds)
-		if r.Status != pb.ApplyStatus_APPLY_STATUS_REJECTED {
+		if r.Status != pb.ApplyStatus_APPLY_STATUS_PARTIAL {
 			t.Errorf("%s: status %v", name, r.Status)
 		}
-		if r.StateHash != expectedHash(t, good) {
-			t.Errorf("%s: a rejected message changed the state", name)
+		if strings.HasPrefix(name, "warp ") {
+			if r.StateHash != expectedHash(t, good) || r.Inbounds[0].State != pb.InboundRunState_INBOUND_RUN_STATE_RUNNING {
+				t.Errorf("%s: bad WARP item affected the valid inbound/state: %v", name, r)
+			}
+		} else if r.StateHash == expectedHash(t, good) || r.Inbounds[0].State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED || r.Inbounds[0].Error == "" {
+			t.Errorf("%s: bad tunnel should fail only its inbound: %v", name, r)
 		}
 	}
 	if x.warp.lastSpec() != nil {

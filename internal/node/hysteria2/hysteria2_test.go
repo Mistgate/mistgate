@@ -1107,25 +1107,26 @@ func TestApplyValidationAndLifecycle(t *testing.T) {
 	}
 	r.e.Remove(ctx, r.spec.ID)
 
-	// Bad credentials are rejected as a whole and change nothing.
+	// Bad credentials are skipped individually while the inbound keeps running.
 	for name, c := range map[string]plugin.UserCred{
 		"no data":    {CredID: "crd_x"},
 		"short hash": {CredID: "crd_x", Data: json.RawMessage(`{"auth_sha256":"abcd"}`)},
 		"not hex":    {CredID: "crd_x", Data: json.RawMessage(`{"auth_sha256":"` + strings.Repeat("zz", 32) + `"}`)},
 		"no id":      func() plugin.UserCred { c := cred("x"); c.CredID = ""; return c }(),
 	} {
-		if _, err := r.e.Apply(ctx, r.spec, []plugin.UserCred{c}); err == nil {
-			t.Errorf("credential %s must be rejected", name)
+		report, err := r.e.Apply(ctx, r.spec, []plugin.UserCred{c})
+		if err != nil || report.CredCount != 0 || len(report.Warnings) != 1 {
+			t.Errorf("credential %s: report=%+v err=%v; want it skipped with a warning", name, report, err)
 		}
 	}
 	dup := cred("d")
 	dup2 := cred("d")
 	dup2.CredID = "crd_d2"
-	if _, err := r.e.Apply(ctx, r.spec, []plugin.UserCred{dup, dup2}); err == nil {
-		t.Error("two credentials with one token must be rejected")
+	if report, err := r.e.Apply(ctx, r.spec, []plugin.UserCred{dup, dup2}); err != nil || report.CredCount != 1 || len(report.Warnings) != 1 {
+		t.Errorf("duplicate token: report=%+v err=%v; want first credential applied and later one skipped", report, err)
 	}
-	if _, err := r.e.Apply(ctx, r.spec, []plugin.UserCred{dup, dup}); err == nil {
-		t.Error("duplicate credential id must be rejected")
+	if report, err := r.e.Apply(ctx, r.spec, []plugin.UserCred{dup, dup}); err != nil || report.CredCount != 1 || len(report.Warnings) != 1 {
+		t.Errorf("duplicate credential id: report=%+v err=%v; want one credential applied and duplicate skipped", report, err)
 	}
 	r.e.Remove(ctx, r.spec.ID)
 
@@ -1181,6 +1182,40 @@ func TestApplyValidationAndLifecycle(t *testing.T) {
 	}
 	if _, err := r.e.Apply(ctx, r.spec, nil); err == nil {
 		t.Fatal("Apply after Close must fail")
+	}
+}
+
+func TestApplySkipsBadCredentialAndStillRevokesOthers(t *testing.T) {
+	r := newRig(t, "")
+	kept, revoked := cred("a"), cred("revoked")
+	r.apply(kept, revoked)
+
+	bad := cred("broken")
+	bad.Data = json.RawMessage(`{`)
+	report, err := r.e.Apply(context.Background(), r.spec, []plugin.UserCred{kept, bad})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CredCount != 1 || len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "broken") {
+		t.Fatalf("apply report = %+v", report)
+	}
+	observed := r.e.Observed()
+	if len(observed) != 1 || len(observed[0].Creds) != 1 || observed[0].Creds[0].CredID != kept.CredID {
+		t.Fatalf("observed credentials = %+v", observed)
+	}
+
+	duplicate := cred("z")
+	duplicate.Data = append([]byte(nil), kept.Data...)
+	report, err = r.e.Apply(context.Background(), r.spec, []plugin.UserCred{duplicate, kept})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CredCount != 1 || len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "crd_a and crd_z share one token") {
+		t.Fatalf("duplicate token report = %+v", report)
+	}
+	observed = r.e.Observed()
+	if len(observed) != 1 || len(observed[0].Creds) != 1 || observed[0].Creds[0].CredID != kept.CredID {
+		t.Fatalf("duplicate token winner = %+v; want %s", observed, kept.CredID)
 	}
 }
 

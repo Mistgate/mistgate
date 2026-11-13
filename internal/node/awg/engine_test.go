@@ -184,12 +184,15 @@ func TestIdentityChangeRecreatesButMTUDoesNot(t *testing.T) {
 
 	addr := spec(t, "inb1", 51842, nil)
 	addr.Tunnel.AddrV4 = netip.MustParsePrefix("10.66.8.1/22")
-	if _, err := e.Apply(context.Background(), addr, []plugin.UserCred{a}); err == nil {
-		t.Fatal("a peer outside the new subnet must be refused") // a is 10.66.4.5, the new subnet is 10.66.8.0/22
+	rep, err := e.Apply(context.Background(), addr, []plugin.UserCred{a})
+	if err != nil || rep.CredCount != 0 || len(rep.Warnings) != 1 || !strings.Contains(rep.Warnings[0], "outside the client subnet") {
+		t.Fatalf("peer outside the new subnet should be skipped: report=%+v err=%v", rep, err) // a is 10.66.4.5; the new subnet is 10.66.8.0/22
 	}
-	if h := e.Health()[0]; h.State != plugin.RunRunning {
-		t.Errorf("a refused Apply must leave the running inbound alone: %+v", h)
+	if h := e.Health()[0]; h.State != plugin.RunRunning || fb.hasPeer(p1, 0x0a) {
+		t.Errorf("the inbound should run with the invalid peer removed: health=%+v", h)
 	}
+	mustApply(t, e, s, a) // restore the base settings for the port-change assertion below
+	fb.take()
 
 	// a port change moves the interface
 	mustApply(t, e, spec(t, "inb1", 51843, nil), a)
@@ -552,26 +555,28 @@ func TestRefusedInputLeavesEverythingAlone(t *testing.T) {
 	fb.take()
 	ctx := context.Background()
 
+	badCred := func(c plugin.UserCred) plugin.UserCred { c.CredID = "broken"; return c }
 	bad := map[string][]plugin.UserCred{
-		"not json":          {{CredID: "x", Data: []byte("{")}},
-		"bad public key":    {credData(good, func(j *credJSON) { j.PublicKey = "AAAA" })},
-		"bad psk":           {credData(good, func(j *credJSON) { j.PSK = "AAAA" })},
-		"no address":        {credData(good, func(j *credJSON) { j.AllowedIPs = nil })},
-		"wide prefix":       {credData(good, func(j *credJSON) { j.AllowedIPs = []string{"10.66.4.0/24"} })},
-		"default route":     {credData(good, func(j *credJSON) { j.AllowedIPs = []string{"0.0.0.0/0"} })},
-		"outside subnet":    {credData(good, func(j *credJSON) { j.AllowedIPs = []string{"192.0.2.5/32"} })},
-		"the node itself":   {credData(good, func(j *credJSON) { j.AllowedIPs = []string{"10.66.4.1/32"} })},
-		"v6 without tunnel": {credData(good, func(j *credJSON) { j.AllowedIPs = []string{"2001:db8::5/128"} })},
+		"not json":          {good, {CredID: "broken", Data: []byte("{")}},
+		"bad public key":    {good, badCred(credData(good, func(j *credJSON) { j.PublicKey = "AAAA" }))},
+		"bad psk":           {good, badCred(credData(good, func(j *credJSON) { j.PSK = "AAAA" }))},
+		"no address":        {good, badCred(credData(good, func(j *credJSON) { j.AllowedIPs = nil }))},
+		"wide prefix":       {good, badCred(credData(good, func(j *credJSON) { j.AllowedIPs = []string{"10.66.4.0/24"} }))},
+		"default route":     {good, badCred(credData(good, func(j *credJSON) { j.AllowedIPs = []string{"0.0.0.0/0"} }))},
+		"outside subnet":    {good, badCred(credData(good, func(j *credJSON) { j.AllowedIPs = []string{"192.0.2.5/32"} }))},
+		"the node itself":   {good, badCred(credData(good, func(j *credJSON) { j.AllowedIPs = []string{"10.66.4.1/32"} }))},
+		"v6 without tunnel": {good, badCred(credData(good, func(j *credJSON) { j.AllowedIPs = []string{"2001:db8::5/128"} }))},
 		"same key twice":    {good, credData(cred("b", 0x0a, 6), func(*credJSON) {})},
 		"same address":      {good, cred("b", 0x0b, 5)},
 	}
 	for name, creds := range bad {
-		if _, err := e.Apply(ctx, s, creds); err == nil {
-			t.Errorf("%s: accepted", name)
+		rep, err := e.Apply(ctx, s, creds)
+		if err != nil || rep.CredCount != 1 || len(rep.Warnings) != 1 {
+			t.Errorf("%s: report=%+v err=%v; want one accepted peer and one warning", name, rep, err)
 		}
 	}
-	if got := fb.take(); len(got) != 0 {
-		t.Errorf("refused input touched the device: %v", got)
+	if got := fb.take(); len(got) != 0 || !fb.hasPeer(p1, 0x0a) {
+		t.Errorf("valid peer changed while bad credentials were skipped: calls=%v", got)
 	}
 
 	badSpec := map[string]func(*plugin.InboundSpec){
@@ -837,9 +842,9 @@ func TestConcurrentUseIsRaceFree(t *testing.T) {
 
 func TestParsePeersAcceptsWhatThePanelSends(t *testing.T) {
 	cfg := nodeConfig{tunnel: spec(t, "x", 1, nil).Tunnel}
-	got, err := parsePeers(cfg, []plugin.UserCred{cred("a", 0x0a, 5)})
-	if err != nil {
-		t.Fatal(err)
+	got, skipped := parsePeers(cfg, []plugin.UserCred{cred("a", 0x0a, 5)})
+	if len(skipped) != 0 {
+		t.Fatal(skipped)
 	}
 	w := got[pk(0x0a)]
 	if w == nil || w.credID != "a" || len(w.allowed) != 2 || w.psk == nil || *w.psk != pk(0x0a+100) {
@@ -849,5 +854,50 @@ func TestParsePeersAcceptsWhatThePanelSends(t *testing.T) {
 	var c credJSON
 	if err := json.Unmarshal(cred("a", 1, 5).Data, &c); err != nil || c.PublicKey == "" {
 		t.Fatal(err)
+	}
+}
+
+func TestApplySkipsMalformedCredentialAndStillRevokesOthers(t *testing.T) {
+	e, fb, _ := newTestEngine(t)
+	sp := spec(t, "inb1", 51842, nil)
+	a, revoked := cred("a", 0x0a, 5), cred("revoked", 0x0b, 6)
+	mustApply(t, e, sp, a, revoked)
+	fb.take()
+
+	bad := plugin.UserCred{CredID: "broken", Data: json.RawMessage(`{`)}
+	report, err := e.Apply(context.Background(), sp, []plugin.UserCred{a, bad})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CredCount != 1 || len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "broken") {
+		t.Fatalf("apply report = %+v", report)
+	}
+	if !fb.hasPeer(p1, 0x0a) || fb.hasPeer(p1, 0x0b) {
+		t.Fatal("valid peer was not kept or revoked peer remained")
+	}
+	if got := fb.take(); !slices.Equal(got, []string{"peers:" + p1 + ":-0b"}) {
+		t.Fatalf("peer removal was not applied: %v", got)
+	}
+}
+
+func TestParsePeersKeepsLowestIDWhenAddressesDuplicate(t *testing.T) {
+	cfg := nodeConfig{tunnel: spec(t, "x", 1, nil).Tunnel}
+	got, skipped := parsePeers(cfg, []plugin.UserCred{cred("b", 0x0b, 5), cred("a", 0x0a, 5)})
+	if len(got) != 1 || got[pk(0x0a)] == nil || got[pk(0x0b)] != nil {
+		t.Fatalf("peers = %+v", got)
+	}
+	if len(skipped) != 1 || !strings.Contains(skipped[0].Error(), "credentials a and b share the address") {
+		t.Fatalf("skipped = %v", skipped)
+	}
+}
+
+func TestParsePeersKeepsLowestIDWhenKeysDuplicate(t *testing.T) {
+	cfg := nodeConfig{tunnel: spec(t, "x", 1, nil).Tunnel}
+	got, skipped := parsePeers(cfg, []plugin.UserCred{cred("b", 0x0a, 6), cred("a", 0x0a, 5)})
+	if len(got) != 1 || got[pk(0x0a)] == nil || got[pk(0x0a)].credID != "a" {
+		t.Fatalf("peers = %+v", got)
+	}
+	if len(skipped) != 1 || !strings.Contains(skipped[0].Error(), "credentials a and b share a public key") {
+		t.Fatalf("skipped = %v", skipped)
 	}
 }

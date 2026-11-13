@@ -193,9 +193,22 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	if old != nil {
 		oldIdx = old.idx.Load()
 	}
-	ix, err := buildIndex(spec.ID, oldIdx, creds, e.now, e.after, e.users)
-	if err != nil {
-		return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("vless inbound %q: %w", spec.ID, err)
+	ix, skipped := buildIndex(spec.ID, oldIdx, creds, e.now, e.after, e.users)
+	accepted := make(map[string]bool, len(ix.byID))
+	for id := range ix.byID {
+		accepted[id] = true
+	}
+	kept := creds[:0]
+	for _, cred := range creds {
+		if accepted[cred.CredID] {
+			kept = append(kept, cred)
+			delete(accepted, cred.CredID)
+		}
+	}
+	creds = kept
+	warnings := make([]string, len(skipped))
+	for i, err := range skipped {
+		warnings[i] = err.Error()
 	}
 
 	if old != nil && old.specHash == sh && old.settled() {
@@ -207,7 +220,9 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 		old.creds = creds
 		old.idx.Store(ix)
 		e.retireMissing(oldIdx, ix)
-		return e.report(old, len(creds), false), nil
+		report := e.report(old, len(creds), false)
+		report.Warnings = warnings
+		return report, nil
 	}
 
 	in := &inbound{
@@ -232,14 +247,18 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	e.inbounds[spec.ID] = in
 	if !spec.Enabled {
 		in.setState(plugin.RunStopped, "disabled")
-		return e.report(in, len(creds), restarted), nil
+		report := e.report(in, len(creds), restarted)
+		report.Warnings = warnings
+		return report, nil
 	}
 	if err := in.start(ctx); err != nil {
 		in.setState(plugin.RunFailed, err.Error())
 		e.log.Error("vless inbound failed to start", "inbound", spec.ID, "err", err)
 		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("vless inbound %q: %w", spec.ID, err)
 	}
-	return e.report(in, len(creds), restarted), nil
+	report := e.report(in, len(creds), restarted)
+	report.Warnings = warnings
+	return report, nil
 }
 
 func (in *inbound) start(ctx context.Context) error {
