@@ -170,6 +170,7 @@ type Agent struct {
 	updateRootCAs           *x509.CertPool                                          // test seam for loopback source-fetch servers
 	updateDialContext       func(context.Context, string, string) (net.Conn, error) // test seam; production uses a bounded dialer
 	linkPlain               bool                                                    // test seam: dial the link as an older agent that does not seal
+	linkLegacy              atomic.Bool                                             // the last v2 link handshake failed after the proof: the next dial signs as v1
 	offset                  atomic.Int64                                            // seconds: panel clock minus local clock, measured at Hello
 	skewed                  atomic.Bool
 	cur                     atomic.Pointer[session]

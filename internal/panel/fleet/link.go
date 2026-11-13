@@ -211,18 +211,33 @@ func LinkChallenge(audience string) (nonce, frame []byte, err error) {
 
 // linkAccept checks the agent's LinkAuth frame against the challenge nonce and, when the node proves its certificate,
 // returns the LinkAccept frame signed with the panel CA, and the session's seal keys when the agent asked for sealing
-// (agentlink.WantsSeal; nil = a plain session with an older agent). One database read (the node's certificates).
+// (agentlink.WantsSeal; nil = a plain session with an older agent). One database read (the node's certificates and its
+// seal mark); the first sealed session of a node adds one write.
+//
+// The signature is v2 (AgentDigestV2, covers the agent's nonce, so the request to seal cannot be changed on the way) or
+// v1 (AgentDigest, does not). A v2 proof must ask for sealing. A v1 proof that asks for it opens a sealed session, which
+// nobody in the middle can use; one that does not is a plain session, and only a node that never sealed gets one: a v1
+// proof can be forwarded with the marker taken out, so once a node has sealed, an unsealed session as that node is refused.
 func (f *Fleet) linkAccept(ctx context.Context, nodeID, audience string, nonce, authFrame []byte) (peerCert, []byte, []byte, bool) {
 	var auth agentv1.LinkAuth
 	if !validLinkNodeID(nodeID) || proto.Unmarshal(authFrame, &auth) != nil || auth.NodeId != nodeID || len(auth.Nonce) != 32 {
 		return peerCert{}, nil, nil, false
 	}
-	pc, pub, ok := f.verifyLinkAuth(ctx, nodeID, agentlink.AgentDigest(nodeID, audience, nonce), auth.Signature)
+	pc, pub, v2, sealed, ok := f.verifyLinkAuth(ctx, nodeID, agentlink.AgentDigestV2(nodeID, audience, nonce, auth.Nonce), agentlink.AgentDigest(nodeID, audience, nonce), auth.Signature)
 	if !ok {
 		return peerCert{}, nil, nil, false
 	}
+	seal := agentlink.WantsSeal(auth.Nonce)
+	if v2 && !seal {
+		return peerCert{}, nil, nil, false
+	}
+	if !seal && sealed {
+		f.log.Warn("link session without sealing refused: the node sealed before", "code", "link_downgrade_refused", "node", nodeID)
+		f.event(ctx, 2, "link_downgrade_refused", nodeID, nil)
+		return peerCert{}, nil, nil, false
+	}
 	digest, keys := agentlink.PanelDigest(nodeID, audience, nonce, auth.Nonce), []byte(nil)
-	if agentlink.WantsSeal(auth.Nonce) {
+	if seal {
 		var err error
 		if keys, err = agentlink.SealKeys(f.ca.key, pub, nodeID, audience, nonce, auth.Nonce); err != nil {
 			return peerCert{}, nil, nil, false
@@ -236,6 +251,11 @@ func (f *Fleet) linkAccept(ctx context.Context, nodeID, audience string, nonce, 
 	frame, err := proto.Marshal(&agentv1.LinkAccept{Signature: sig})
 	if err != nil {
 		return peerCert{}, nil, nil, false
+	}
+	if seal && !sealed {
+		if err := f.st.MarkNodeLinkSealed(ctx, nodeID); err != nil {
+			f.log.Warn("link seal mark not saved", "code", "link_seal_mark_failed", "node", nodeID, "err", err)
+		}
 	}
 	return pc, frame, keys, true
 }
@@ -288,12 +308,12 @@ func validLinkNodeID(id string) bool {
 	return true
 }
 
-// verifyLinkAuth returns the certificate that signed digest and its key.
-func (f *Fleet) verifyLinkAuth(ctx context.Context, nodeID string, digest, signature []byte) (peerCert, *ecdsa.PublicKey, bool) {
+// verifyLinkAuth returns the certificate that signed digestV2 (v2 = true) or digestV1, its key and the node's seal mark.
+func (f *Fleet) verifyLinkAuth(ctx context.Context, nodeID string, digestV2, digestV1, signature []byte) (peerCert, *ecdsa.PublicKey, bool, bool, bool) {
 	now := f.now().UTC()
-	certs, err := f.st.LinkCertificates(ctx, nodeID, now)
+	certs, sealed, err := f.st.LinkCertificates(ctx, nodeID, now)
 	if err != nil {
-		return peerCert{}, nil, false
+		return peerCert{}, nil, false, false, false
 	}
 	for _, row := range certs {
 		block, _ := pem.Decode([]byte(row.PEM))
@@ -307,13 +327,18 @@ func (f *Fleet) verifyLinkAuth(ctx context.Context, nodeID string, digest, signa
 		if _, err := cert.Verify(x509.VerifyOptions{Roots: f.ca.pool, CurrentTime: now, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
 			continue
 		}
-		pub, ok := cert.PublicKey.(*ecdsa.PublicKey)
-		if !ok || pub.Curve != elliptic.P256() || !agentlink.Verify(pub, digest, signature) {
+		pub, isKey := cert.PublicKey.(*ecdsa.PublicKey)
+		if !isKey || pub.Curve != elliptic.P256() {
 			continue
 		}
-		return peerCert{serial: row.Serial, notAfter: cert.NotAfter}, pub, true
+		if agentlink.Verify(pub, digestV2, signature) {
+			return peerCert{serial: row.Serial, notAfter: cert.NotAfter}, pub, true, sealed, true
+		}
+		if agentlink.Verify(pub, digestV1, signature) {
+			return peerCert{serial: row.Serial, notAfter: cert.NotAfter}, pub, false, sealed, true
+		}
 	}
-	return peerCert{}, nil, false
+	return peerCert{}, nil, false, false, false
 }
 
 func linkCertNamesNode(cert *x509.Certificate, nodeID string) bool {

@@ -365,6 +365,7 @@ func TestAgentEstablishedLinkDropReconnectsWithoutMTLS(t *testing.T) {
 	t.Cleanup(linkServer.Close)
 	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(linkServer.URL, "https") + linkPrefix
 	h.a.linkHTTPClient = linkServer.Client()
+	h.a.linkPlain = true // this fake panel answers the plain accept: it does not seal
 	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 20*time.Millisecond
 	h.start()
 
@@ -458,6 +459,7 @@ func newHoldLinkServer(t *testing.T, h *harness, fail int) *holdLinkServer {
 	t.Cleanup(func() { close(s.stop) })
 	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(s.srv.URL, "https") + "/" + strings.Repeat("h", 24) + "/"
 	h.a.linkHTTPClient = s.srv.Client()
+	h.a.linkPlain = true // this fake panel answers the plain accept: it does not seal
 	return s
 }
 
@@ -883,6 +885,7 @@ func TestAgentSwitchesToAdvertisedLinkWithoutBackoff(t *testing.T) {
 	t.Cleanup(linkServer.Close)
 	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(linkServer.URL, "https") + linkPrefix
 	h.a.linkHTTPClient = linkServer.Client()
+	h.a.linkPlain = true // this fake panel answers the plain accept: it does not seal
 	h.a.backoffMin, h.a.backoffMax = 5*time.Second, 5*time.Second
 	h.start()
 	h.waitConnected() // the mTLS HelloAck advertises link support

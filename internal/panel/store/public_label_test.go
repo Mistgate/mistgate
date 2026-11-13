@@ -30,7 +30,7 @@ func TestNodePublicLabel(t *testing.T) {
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_old', 'de1', 'de1.example.com', 'active', 1)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.UpTo(ctx, 129); err != nil {
+	if _, err := provider.Up(ctx); err != nil {
 		t.Fatalf("apply the label: %v", err)
 	}
 	if n, err := st.Node(ctx, "nod_old"); err != nil || n.PublicLabel != "" {

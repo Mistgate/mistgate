@@ -163,6 +163,9 @@ message Node {
   // The owner's short text for people, shown next to this server in the Mistgate app ("" = none). Up to 40 characters. The node's
   // name is never shown to them.
   string public_label = 37;
+  // The node has opened an encrypted link session at least once, so the panel no longer accepts an unencrypted one from it
+  // (re-enrolling the node clears this). False for a node that never used the link or only with an agent too old to encrypt.
+  bool link_sealed = 38;
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",

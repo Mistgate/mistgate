@@ -1050,6 +1050,10 @@ func TestEdgeLinkSupersededSocket(t *testing.T) {
 		}
 	})
 
+	// The raw client speaks plain frames, as an agent that cannot seal: the node's seal mark (set by the real agent) would refuse it.
+	if _, err := r.st.W.ExecContext(context.Background(), `UPDATE node SET link_sealed = 0 WHERE id = ?`, r.nodeID); err != nil {
+		t.Fatal(err)
+	}
 	c := r.dialRaw(r.agentKey())
 	c.hello("inst-raw")
 	if got := r.session(); got != 2 {

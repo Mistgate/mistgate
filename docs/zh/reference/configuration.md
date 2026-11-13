@@ -115,7 +115,7 @@ setup 在各种模式下生成的值：
 | `enroll --resume-key` | none | off | 将新密钥保存在 `enroll-pending.pem` 中，直到注册成功；重试时继续使用该密钥。SSH 安装会使用此项。 |
 | `enroll --force` | none | off | 替换已有身份。 |
 | `enroll`, `install`, `run --state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | Agent 状态目录。三个命令都使用同一目录。 |
-| `run --link-url` | `MISTGATE_LINK_URL` | empty | 已签名 WebSocket 链接的可选基础地址，格式为 `wss://host/<secret-prefix>`。面板声明支持时，Agent 会使用此链接；否则使用 mTLS。每个面板都会提供并声明此链接；只有设置了此值的 Agent 才会使用。如果无法建立链接，Agent 会回退到 mTLS，并在 10 分钟后再次尝试该链接。除非配置此值，否则现有节点会继续使用 mTLS。安装命令不会设置此项。 |
+| `run --link-url` | `MISTGATE_LINK_URL` | empty | 已签名 WebSocket 链接的可选基础地址，格式为 `wss://host/<secret-prefix>`。面板声明支持时，Agent 会使用此链接；否则使用 mTLS。每个面板都会提供并声明此链接；只有设置了此值的 Agent 才会使用。如果无法建立链接，Agent 会回退到 mTLS，并在 10 分钟后再次尝试该链接。除非配置此值，否则现有节点会继续使用 mTLS。安装命令不会设置此项。 链接会话是加密的，且 Agent 会对加密请求本身签名，因此途中无法将其关闭。节点一旦打开过加密的链接会话，面板就不再接受它的未加密会话（事件日志会出现 `link_downgrade_refused`）；若 Agent 被回滚到不支持加密的版本，重新注册该节点即可解除。 |
 | `install --bin` | none | `/usr/local/bin/mistgate-node` | 二进制文件的存放位置；当前运行的可执行文件位于其他位置时会复制到此处。Agent 会获得对此目录的写入权限（用于自更新）。 |
 | `install --no-start` | none | off | 写入并启用单元，但不启动它。 |
 | `run --log-level` | `MISTGATE_LOG_LEVEL` | `info` | 可选值为 `debug`、`info`、`warn` 或 `error`。 |

@@ -314,7 +314,10 @@ type Node struct {
 	Notes string `protobuf:"bytes,36,opt,name=notes,proto3" json:"notes,omitempty"`
 	// The owner's short text for people, shown next to this server in the Mistgate app ("" = none). Up to 40 characters. The node's
 	// name is never shown to them.
-	PublicLabel   string `protobuf:"bytes,37,opt,name=public_label,json=publicLabel,proto3" json:"public_label,omitempty"`
+	PublicLabel string `protobuf:"bytes,37,opt,name=public_label,json=publicLabel,proto3" json:"public_label,omitempty"`
+	// The node has opened an encrypted link session at least once, so the panel no longer accepts an unencrypted one from it
+	// (re-enrolling the node clears this). False for a node that never used the link or only with an agent too old to encrypt.
+	LinkSealed    bool `protobuf:"varint,38,opt,name=link_sealed,json=linkSealed,proto3" json:"link_sealed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -606,6 +609,13 @@ func (x *Node) GetPublicLabel() string {
 		return x.PublicLabel
 	}
 	return ""
+}
+
+func (x *Node) GetLinkSealed() bool {
+	if x != nil {
+		return x.LinkSealed
+	}
+	return false
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",
@@ -6498,7 +6508,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xe6\v\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\x87\f\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -6542,7 +6552,9 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x19user_rate_limit_supported\x18\" \x01(\bR\x16userRateLimitSupported\x12/\n" +
 	"\x04ipv6\x18# \x01(\v2\x1b.mistgate.admin.v1.NodeIpv6R\x04ipv6\x12\x14\n" +
 	"\x05notes\x18$ \x01(\tR\x05notes\x12!\n" +
-	"\fpublic_label\x18% \x01(\tR\vpublicLabel\"\x8d\x02\n" +
+	"\fpublic_label\x18% \x01(\tR\vpublicLabel\x12\x1f\n" +
+	"\vlink_sealed\x18& \x01(\bR\n" +
+	"linkSealed\"\x8d\x02\n" +
 	"\bNodeIpv6\x12\x14\n" +
 	"\x05entry\x18\x01 \x01(\tR\x05entry\x12'\n" +
 	"\x0fentry_supported\x18\x02 \x01(\bR\x0eentrySupported\x12-\n" +

@@ -120,19 +120,38 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 	if !ok || key.Curve != elliptic.P256() {
 		return refuse(errors.New("node link key is invalid"))
 	}
-	nodeNonce, err := agentlink.SealNonce() // asks the panel to seal the session
+	// The agent asks the panel to seal the session (the marker in its nonce) and signs that nonce too (v2). Only after a
+	// handshake that failed once the proof was sent does the next dial sign as an agent of the older panels did (v1, still
+	// asking to seal): a panel that cannot read v2 hangs up, and the old proof is the one it knows. A v2 dial takes a sealed
+	// answer only.
+	legacy := a.linkLegacy.Swap(false) && !a.linkPlain
+	nodeNonce, err := agentlink.SealNonce()
 	if a.linkPlain {
 		_, err = rand.Read(nodeNonce)
 	}
 	if err != nil {
 		return refuse(errors.New("node link nonce generation failed"))
 	}
-	signature, err := agentlink.Sign(key, agentlink.AgentDigest(a.meta.NodeID, challenge.Audience, challenge.Nonce))
+	digest := agentlink.AgentDigestV2(a.meta.NodeID, challenge.Audience, challenge.Nonce, nodeNonce)
+	if legacy || a.linkPlain {
+		digest = agentlink.AgentDigest(a.meta.NodeID, challenge.Audience, challenge.Nonce)
+	}
+	signature, err := agentlink.Sign(key, digest)
 	if err != nil {
 		return refuse(errors.New("node link signature failed"))
 	}
 	if err := agentlink.WriteFrame(hctx, ws, &pb.LinkAuth{NodeId: a.meta.NodeID, Nonce: nodeNonce, Signature: signature}); err != nil {
 		return refuse(errors.New("panel link authentication failed"))
+	}
+	refuse = func(reason error) (*websocketAgentTransport, func(), error) {
+		if !legacy && !a.linkPlain {
+			a.linkLegacy.Store(true)
+		}
+		_ = ws.Close(websocket.StatusPolicyViolation, "")
+		if cleanup != nil {
+			cleanup()
+		}
+		return nil, nil, reason
 	}
 	typ, frame, err = agentlink.ReadFrame(hctx, ws)
 	if err != nil || typ != websocket.MessageBinary {
@@ -149,13 +168,13 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 	if !ok {
 		return refuse(errors.New("panel link authentication failed"))
 	}
-	var keys []byte // nil: an older panel, which signs the plain digest and does not seal
+	var keys []byte // nil: an older panel, which signs the plain digest and does not seal (never after a v2 proof)
 	switch {
 	case agentlink.Verify(caKey, agentlink.SealedPanelDigest(a.meta.NodeID, challenge.Audience, challenge.Nonce, nodeNonce), accepted.Signature):
 		if keys, err = agentlink.SealKeys(key, caKey, a.meta.NodeID, challenge.Audience, challenge.Nonce, nodeNonce); err != nil {
 			return refuse(errors.New("panel link authentication failed"))
 		}
-	case agentlink.Verify(caKey, agentlink.PanelDigest(a.meta.NodeID, challenge.Audience, challenge.Nonce, nodeNonce), accepted.Signature):
+	case (legacy || a.linkPlain) && agentlink.Verify(caKey, agentlink.PanelDigest(a.meta.NodeID, challenge.Audience, challenge.Nonce, nodeNonce), accepted.Signature):
 	default:
 		return refuse(errors.New("panel link authentication failed"))
 	}
