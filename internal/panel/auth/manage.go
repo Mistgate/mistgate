@@ -166,8 +166,14 @@ func (s *Service) RemovePasskey(ctx context.Context, req *connect.Request[adminv
 		s.log.Error("delete passkey", "err", err)
 		return nil, errInternal(err)
 	}
+	// A removed passkey is what the owner does after losing a device: sessions it opened must not outlive it.
+	ended, err := s.st.DeleteOtherSessions(ctx, admin.ID, currentHash(req))
+	if err != nil {
+		s.log.Error("end other sessions", "code", "passkey_remove_end_sessions_failed", "err", err)
+		return nil, errInternal(err)
+	}
 	ip := s.clientIP(req)
-	s.audit(ctx, admin.ID, "passkey_remove", "ok", ip, map[string]any{"passkey": req.Msg.Id})
+	s.audit(ctx, admin.ID, "passkey_remove", "ok", ip, map[string]any{"passkey": req.Msg.Id, "sessions_ended": ended})
 	s.emit(Event{Kind: EventPasskeyRemoved, AdminID: admin.ID, Method: "passkey", IP: ip.String()})
 	return connect.NewResponse(&adminv1.RemovePasskeyResponse{}), nil
 }
