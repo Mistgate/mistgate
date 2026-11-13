@@ -383,6 +383,7 @@ type Startup struct {
 
 func (u *Updater) Startup() Startup {
 	var st Startup
+	u.syncPrevRecord()
 	if m, err := readMarker(u.path(FileRolledBack)); m != nil || err != nil { // the unit guard restored .prev
 		if m == nil {
 			m = &Marker{}
@@ -852,6 +853,44 @@ func (u *Updater) stagePrev() ([]byte, error) {
 	return jsonMarshal(prevRecord{SHA256: hex.EncodeToString(h.Sum(nil)), Built: u.cfg.Built})
 }
 
+// syncPrevRecord runs first at every start, before the panel can send a command. A .prev with no record was left by an
+// agent that did not write records (the update that installed this one): the file is taken as it is, its hash recorded
+// once, its Built unknown (0, which verifyPrev does not compare). Whoever can write the executable's directory before
+// the agent starts owns the node anyway; the panel cannot. A record whose .prev is gone (the unit guard moved it back
+// over the executable) is removed.
+func (u *Updater) syncPrevRecord() {
+	fi, err := os.Stat(u.prev())
+	if err != nil || !fi.Mode().IsRegular() {
+		_ = os.Remove(u.path(FilePrev))
+		return
+	}
+	if _, err := os.Stat(u.path(FilePrev)); err == nil {
+		return
+	}
+	sum, err := fileSHA256(u.prev())
+	if err != nil {
+		u.log.Warn("cannot record the previous build", "code", "update_prev_record_failed", "err", err)
+		return
+	}
+	rec, _ := jsonMarshal(prevRecord{SHA256: sum})
+	if err := writeAtomic(u.path(FilePrev), rec, 0o600); err != nil {
+		u.log.Warn("cannot record the previous build", "code", "update_prev_record_failed", "err", err)
+	}
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 // swapPrev makes the staged copy the rollback target together with its record. restore puts the older target back.
 func (u *Updater) swapPrev(rec []byte) (restore func(), err error) {
 	oldRec, _ := os.ReadFile(u.path(FilePrev))
@@ -897,7 +936,7 @@ func (u *Updater) verifyPrev() error {
 	if _, err := io.Copy(h, f); err != nil {
 		return err
 	}
-	if hex.EncodeToString(h.Sum(nil)) != rec.SHA256 || rec.Built > u.cfg.Built {
+	if hex.EncodeToString(h.Sum(nil)) != rec.SHA256 || (rec.Built != 0 && rec.Built > u.cfg.Built) {
 		return errors.New("the previous build does not match its record")
 	}
 	return nil

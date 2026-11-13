@@ -94,3 +94,67 @@ func TestFailedUpdateKeepsOlderRollbackTarget(t *testing.T) {
 		t.Fatal("staging files left behind")
 	}
 }
+
+// A .prev left by an agent that wrote no record is adopted once at start: afterwards the rollback works, and a .prev
+// swapped after that is refused.
+func TestStartupAdoptsAPrevWithoutARecord(t *testing.T) {
+	e := newEnv(t)
+	if err := os.WriteFile(e.exe+".prev", []byte("the build of the old agent"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	u := e.updater(nil)
+	u.Startup()
+	if !exists(filepath.Join(e.state, FilePrev)) {
+		t.Fatal("no record after the start")
+	}
+	if r, fin := u.Rollback(context.Background(), &pb.RollbackAgent{RequestId: "rb"}); !r.Ok || fin == nil {
+		t.Fatalf("rollback of an adopted .prev: %v", r)
+	}
+	if string(readFile(t, e.exe)) != "the build of the old agent" || exists(filepath.Join(e.state, FilePrev)) {
+		t.Fatal("the adopted build was not restored or its record stayed")
+	}
+
+	e = newEnv(t)
+	_ = os.WriteFile(e.exe+".prev", []byte("the build of the old agent"), 0o755)
+	u = e.updater(nil)
+	u.Startup()
+	_ = os.WriteFile(e.exe+".prev", []byte("NOT A RELEASE"), 0o755) // after the record was written
+	if r, _ := u.Rollback(context.Background(), &pb.RollbackAgent{RequestId: "rb"}); r.Ok || r.Error != "no_previous" {
+		t.Fatalf("rollback of a swapped .prev: %v", r)
+	}
+}
+
+// A start leaves an existing record alone, and drops one whose .prev is gone (the unit guard restored it).
+func TestStartupKeepsOrDropsThePrevRecord(t *testing.T) {
+	e := newEnv(t)
+	writePrev(t, e, "recorded build")
+	recPath := filepath.Join(e.state, FilePrev)
+	before := readFile(t, recPath)
+	_ = os.WriteFile(e.exe+".prev", []byte("changed after the record"), 0o755)
+	e.updater(nil).Startup()
+	if string(readFile(t, recPath)) != string(before) {
+		t.Fatal("the start rewrote an existing record")
+	}
+	_ = os.Remove(e.exe + ".prev")
+	e.updater(nil).Startup()
+	if exists(recPath) {
+		t.Fatal("a record without a .prev stayed")
+	}
+}
+
+// The in-process crash-loop rollback consumes .prev and its record.
+func TestRollbackNowConsumesThePrevRecord(t *testing.T) {
+	e := newEnv(t)
+	writePrev(t, e, "the previous build")
+	m := &Marker{FromVersion: "a", ToVersion: "b", FromBuilt: ownBuilt, ToBuilt: newBuilt}
+	b, _ := jsonMarshal(m)
+	_ = os.WriteFile(filepath.Join(e.state, FilePending), b, 0o600)
+	u := e.updater(func(c *Config) { c.Built = newBuilt })
+	u.Startup()
+	if _, err := u.RollbackNow(ReasonCrashLoop); err != nil {
+		t.Fatal(err)
+	}
+	if string(readFile(t, e.exe)) != "the previous build" || exists(filepath.Join(e.state, FilePrev)) {
+		t.Fatal("the previous build was not restored or its record stayed")
+	}
+}
