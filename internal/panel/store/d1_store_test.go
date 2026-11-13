@@ -1635,7 +1635,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatalf("SubscriptionFetchAt = %d, want the touch of the second device %d", fetched, now.Add(2*time.Hour).Unix())
 		}
 	})
-	t.Run("LinkDeviceBlockAndEviction", func(t *testing.T) {
+	t.Run("LinkDeviceBlockAndIdle", func(t *testing.T) {
 		st := openD1Store(t)
 		createGroup(t, st, "grp_link_limit", nil)
 		createUser(t, st, "usr_link_limit", "Link limit", "grp_link_limit")
@@ -1664,20 +1664,20 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if _, err := ensure("c"); !errors.As(err, &limit) || limit.Mode != LinkModeEnforce {
 			t.Fatalf("a third device at the limit: %v", err)
 		}
-		// A device silent for 31 days gives its place: the guard of the batch checks the victim and the count.
+		// A device silent for 31 days is idle and stops filling a place, but it is kept: the third device is born next to it.
 		if _, err := st.W.ExecContext(ctx, `UPDATE device SET last_seen_at = ? WHERE id = 'dev_ll_a'`, now.Add(-31*24*time.Hour).Unix()); err != nil {
 			t.Fatal(err)
 		}
 		c, err := ensure("c")
-		if err != nil || c.Device.ID != "dev_ll_c" || c.Replaced != "dev_ll_a" || len(c.Added) != 1 {
-			t.Fatalf("a third device with a silent one = %+v, %v", c, err)
+		if err != nil || c.Device.ID != "dev_ll_c" || c.Replaced != "" || !c.Born || len(c.Added) != 1 {
+			t.Fatalf("a third device with an idle one = %+v, %v", c, err)
 		}
 		var live, replaced, liveCreds int
 		st.R.QueryRowContext(ctx, `SELECT count(*) FROM device WHERE user_id = ? AND revoked_at IS NULL`, userID).Scan(&live)
 		st.R.QueryRowContext(ctx, `SELECT count(*) FROM event WHERE code = 'device_replaced' AND user_id = ?`, userID).Scan(&replaced)
 		st.R.QueryRowContext(ctx, `SELECT count(*) FROM device_credential WHERE device_id = 'dev_ll_a' AND revoked_at IS NULL`).Scan(&liveCreds)
-		if live != 2 || replaced != 1 || liveCreds != 0 {
-			t.Fatalf("live %d, device_replaced events %d, live credentials of the replaced device %d; want 2, 1, 0", live, replaced, liveCreds)
+		if live != 3 || replaced != 0 || liveCreds != 1 {
+			t.Fatalf("live %d, device_replaced events %d, live credentials of the idle device %d; want 3, 0, 1", live, replaced, liveCreds)
 		}
 
 		// The block: the device is revoked, its HWID is not born again, the snapshot says so, and the unblock lets it back.
@@ -1705,11 +1705,14 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		}
 
 		// STRICT revokes the shared devices in the batch that stores the mode; a revoked row older than the cutoff is pruned.
+		if _, err := st.Access().RevokeDevice(ctx, "dev_ll_a", now); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := st.W.ExecContext(ctx, `UPDATE device SET revoked_at = 5 WHERE id = 'dev_ll_a'`); err != nil {
 			t.Fatal(err)
 		}
 		if n, err := st.PruneRevokedDevices(ctx, now.Add(-time.Hour), 10); err != nil || n != 1 {
-			t.Fatalf("PruneRevokedDevices = %d, %v; want the replaced device", n, err)
+			t.Fatalf("PruneRevokedDevices = %d, %v; want the revoked device", n, err)
 		}
 		if n, err := st.SaveSubscriptionSettings(ctx, nil, LinkModeStrict, now); err != nil || n != 0 {
 			t.Fatalf("SaveSubscriptionSettings = %d, %v", n, err)

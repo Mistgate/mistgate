@@ -719,8 +719,8 @@ async function run() {
         wasmFailure,
       ]), "invalid WebAuthn RP settings must fail before first-run settings are stored");
       // The VPS oracle shares this database; its own start writes the subscription-rules markers (subsettings.MigrateM3, MigrateSingbox)
-      // and the link device limit mode (subsettings.MigrateLinkDeviceLimit).
-      const settingsAfterFailure = await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting WHERE k NOT IN ('sub_rules_m3', 'sub_rules_singbox', 'link_device_limit')").first("n");
+      // and the link device limit mode (subsettings.MigrateLinkDeviceLimit); a migration writes the idle-device default itself.
+      const settingsAfterFailure = await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting WHERE k NOT IN ('sub_rules_m3', 'sub_rules_singbox', 'link_device_limit', 'device_idle_after_days')").first("n");
       assert.equal(Number(settingsAfterFailure), 0, "failed first init leaves no settings behind");
 
       // A setup token hash from the deployer (SETUP_TOKEN_SHA256): the panel offers it, logs only its expiry, and never
@@ -737,7 +737,7 @@ async function run() {
         hashPanel.init({ ...initOptions, setupTokenSHA256: deployerHash.toUpperCase() }),
         wasmFailure,
       ]), /setupTokenSHA256/, "an uppercase or malformed hash is refused");
-      assert.equal(Number(await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting WHERE k NOT IN ('sub_rules_m3', 'sub_rules_singbox', 'link_device_limit')").first("n")), 0,
+      assert.equal(Number(await globalThis.__d1.prepare("SELECT count(*) AS n FROM setting WHERE k NOT IN ('sub_rules_m3', 'sub_rules_singbox', 'link_device_limit', 'device_idle_after_days')").first("n")), 0,
         "a refused hash leaves no settings behind");
       let mark = logs.length;
       await Promise.race([hashPanel.init({ ...initOptions, setupTokenSHA256: deployerHash }), wasmFailure]);
@@ -770,7 +770,7 @@ async function run() {
       }
       logs.length = 0;
       for (const table of ["setup_token", "auth_ceremony"]) await globalThis.__d1.prepare(`DELETE FROM ${table}`).run();
-      await globalThis.__d1.prepare("DELETE FROM setting WHERE k NOT IN ('sub_rules_m3', 'sub_rules_singbox', 'link_device_limit')").run();
+      await globalThis.__d1.prepare("DELETE FROM setting WHERE k NOT IN ('sub_rules_m3', 'sub_rules_singbox', 'link_device_limit', 'device_idle_after_days')").run();
 
       // Without SETUP_TOKEN_SHA256 the panel mints no token and prints no link (a link in the Worker's log would let anyone who
       // can read that log create the owner); it says how to set the secret.
