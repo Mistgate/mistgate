@@ -29,16 +29,18 @@ type Props<V extends string> = {
   variant?: keyof typeof looks;
   "aria-label": string;
   className?: string;
+  /** Long labels wrap onto two lines instead of pushing the control wider than its box (a phone). */
+  wrap?: boolean;
 };
 
-export function Segmented<V extends string>({ value, onValueChange, options, variant = "inset", className, ...rest }: Props<V>) {
+export function Segmented<V extends string>({ value, onValueChange, options, variant = "inset", className, wrap, ...rest }: Props<V>) {
   const look = looks[variant];
   const index = Math.max(0, options.findIndex((o) => o.value === value));
   return (
     <RadioGroup
       value={value}
       onValueChange={(v) => onValueChange(v as V)}
-      className={cx("box-border", look.track, className)}
+      className={cx("box-border", look.track, wrap && "h-auto min-h-9", className)}
       {...rest}
     >
       {variant === "thumb" && (
@@ -53,7 +55,7 @@ export function Segmented<V extends string>({ value, onValueChange, options, var
           key={o.value}
           value={o.value}
           title={o.title}
-          className={cx("inline-flex cursor-pointer items-center justify-center whitespace-nowrap", look.item)}
+          className={cx("inline-flex cursor-pointer items-center justify-center", wrap ? "py-1 text-center leading-tight" : "whitespace-nowrap", look.item)}
         >
           {o.label}
         </Radio.Root>

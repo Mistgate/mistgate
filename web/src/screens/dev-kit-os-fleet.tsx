@@ -13,7 +13,7 @@ import { OsFleetRun } from "@/screens/updates/os-fleet-run";
 import { OsSection } from "@/screens/updates/os";
 
 // Development only, /dev-kit?only=os-fleet: the OS update of several nodes on made-up data. The table with ticks and the bar above
-// it; the window before the run (?dialog=fleet|fleet-all|fleet-reboot|fleet-none, ?dialog=single-security|single-all|cancel opens
+// it; the window before the run (?dialog=fleet|fleet-5|fleet-all|fleet-reboot|fleet-none, ?dialog=single-security|single-all|cancel opens
 // the window of one node and the cancel window); the queue in each state (under way with a node waiting for the package lock,
 // rebooting and checking, paused by the owner, stopped by a failed node, the same after a retry, cancelling, finished); the
 // names of the security packages and the package lock. ?lang=ru|fa|zh|tr and ?theme come from the dev kit itself.
@@ -38,6 +38,8 @@ const busy = { updateBlock: "rollout_active", rebootBlock: "rollout_active" };
 const held = <T,>(f: (o: Record<string, unknown>) => T) => f(busy);
 
 const idle = answer([nl1(), de1(), fi1(), sg1(), msk1()]);
+// five nodes that can all go (the biggest window the dev kit shows)
+const five = answer([nl1(), de1(), fi1(), sg1({ updateBlock: "", state: OsUpdateState.UPDATES, status: { ...base, pending: 6, security: 2 } }), msk1({ supported: true, updateCapable: true, updateBlock: "", rebootBlock: "", state: OsUpdateState.UPDATES, onlineUsers: 1, status: { ...base, pending: 4, security: 1 } })]);
 
 const noGate = { mode: "security" };
 const passedNl1 = step("nod_nl1", "nl1", { state: OsStepState.PASSED, stage: 0, kernelFrom: "6.8.0-147-generic", kernelTo: "6.8.0-150-generic", sentUnix: now - 1300, rebootUnix: now - 1000, backUnix: now - 800, finishedUnix: now - 600, params: { upgraded: "7", reboot: "done", kernel: "6.8.0-150-generic", mode: "security" } });
@@ -179,6 +181,7 @@ function DialogBlock({ auto }: { auto: string | null }) {
     <>
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => setOpen("fleet")}>Fleet window: security</Button>
+        <Button onClick={() => setOpen("fleet-5")}>Five nodes</Button>
         <Button onClick={() => setOpen("fleet-all")}>All packages</Button>
         <Button onClick={() => setOpen("fleet-reboot")}>Only a reboot</Button>
         <Button onClick={() => setOpen("fleet-none")}>Nothing can go</Button>
@@ -186,7 +189,7 @@ function DialogBlock({ auto }: { auto: string | null }) {
         <Button onClick={() => setOpen("single-all")}>One node: all packages</Button>
         <Button onClick={() => setOpen("single-ordinary")}>One node: only ordinary packages</Button>
       </div>
-      {open?.startsWith("fleet") && <OsFleetDialog rows={open === "fleet-none" ? pick(["nod_msk1"]) : pick(ticked)} actions={actions} initialScope={scope} onClose={close} />}
+      {open?.startsWith("fleet") && <OsFleetDialog rows={open === "fleet-none" ? pick(["nod_msk1"]) : open === "fleet-5" ? rowsOf(five, ticked) : pick(ticked)} actions={actions} initialScope={scope} onClose={close} />}
       {open === "single-security" && <OsConfirmDialog row={nodeRow} mode="install" actions={actions} onClose={close} />}
       {open === "single-all" && <OsConfirmDialog row={nodeRow} mode="install" actions={actions} initialPkgs="all" onClose={close} />}
       {open === "single-ordinary" && <OsConfirmDialog row={onlyOrdinary} mode="install" actions={actions} onClose={close} />}

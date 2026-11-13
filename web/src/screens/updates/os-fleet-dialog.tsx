@@ -1,32 +1,64 @@
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
+import { Segmented } from "@/components/ui/segmented";
 import { useT, type T } from "@/i18n";
+import { cx } from "@/lib/cx";
 import { canaryFirst, defaultBatchSize, defaultScope, maxBatchSize, planStages, rebootOf, scopeBlock, scopeMode, type OsScope } from "@/lib/os-fleet";
 import { blockText, type OsActions } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
-import { Choice, ChoiceBlock, Fact } from "./os-confirm";
+import { Fact, Heading, RebootRow } from "./os-confirm";
 
-// The window before an OS update of several nodes: what will be done, the order (the canary named), how many at a time, who is
-// online on each node, and which of the ticked nodes are left out for now and why. The call asks for a fresh step-up like the
-// one for a single node (OsActions.startFleet). Only the nodes that can go now are sent: a node left out here would be skipped
-// by the panel anyway, and the canary must be one that will really run.
+// The window before an OS update of several nodes, kept short: what to do (one switch and one line of words), whether to reboot
+// (one row), the order as a chain of nodes with the batch size beside it, the nodes left out (one folded line) and a few facts.
+// The call asks for a fresh step-up like the one for a single node (OsActions.startFleet). Only the nodes that can go now are
+// sent: a node left out here would be skipped by the panel anyway, and the canary must be one that will really run.
 
 const scopes: OsScope[] = ["security", "all", "reboot"];
 
-/** "5 online" / "nobody online". */
-const onlineText = (t: T, n: number) => (n > 0 ? t("osf.online", { n }) : t("osf.online.none"));
-
-function NodeChip({ row, t }: { row: OsRow; t: T }) {
+/** One node of the chain: its name, "canary" on the first, and how many people are online on it, small. */
+function Node({ row, canary, why, t }: { row: OsRow; canary: boolean; why: string; t: T }) {
+  const n = row.online ?? 0;
   return (
-    <li className="flex min-h-7 items-center gap-2 rounded-ctl border border-line bg-surface-2 px-2.5 py-1 text-xs">
+    <li title={canary ? why : undefined} className={cx("flex min-h-7 items-center gap-1.5 rounded-ctl border bg-surface-2 px-2 py-0.5 text-xs", canary ? "border-accent-line" : "border-line")}>
       <b className="font-mono">{row.name}</b>
-      <span className="text-muted">{onlineText(t, row.online ?? 0)}</span>
+      {canary && <span className="text-[10px] font-semibold text-accent-text">({t("up.ro.canary")})</span>}
+      <span aria-hidden className="flex items-center gap-0.5 text-[10px] text-muted">
+        <Icon name="people" size={10} />
+        {n}
+      </span>
+      <span className="sr-only">{n > 0 ? t("osf.online", { n }) : t("osf.online.none")}</span>
     </li>
+  );
+}
+
+/** "Left out 2: sg1, msk1", folded; its reasons open with a click (open at once when no node can go and the reasons are the whole story). */
+function Left({ rows, scope, openAtOnce, t }: { rows: OsRow[]; scope: OsScope; openAtOnce: boolean; t: T }) {
+  const [touched, setTouched] = useState<boolean | null>(null);
+  const open = touched ?? openAtOnce;
+  return (
+    <section className="flex flex-col gap-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setTouched(!open)}
+        className="-mx-1 flex min-h-7 items-center gap-1.5 rounded-ctl px-1 text-start text-xs font-semibold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+      >
+        <Icon name="chevronRight" size={12} className={cx("flex-none transition-transform duration-200 rtl:-scale-x-100", open && "rotate-90 rtl:rotate-90")} />
+        <span className="min-w-0 truncate">{t("osf.skip.sum", { n: rows.length, names: rows.map((r) => r.name).join(", ") })}</span>
+      </button>
+      {open && (
+        <ul className="flex flex-col gap-1 ps-4">
+          {rows.map((r) => (
+            <li key={r.id} className="text-xs leading-snug text-pretty text-muted">
+              <b className="font-mono text-fg">{r.name}</b> · {blockText(t, scopeBlock(r, scope))}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -37,13 +69,14 @@ export function OsFleetDialog({ rows, actions, onClose, onStarted, initialScope 
   const [pick, setPick] = useState<number | null>(null);
   const eligible = rows.filter((r) => scopeBlock(r, scope) === "");
   const left = rows.filter((r) => scopeBlock(r, scope) !== "");
-  const batch = Math.min(pick ?? defaultBatchSize(), maxBatchSize(eligible.length));
+  const maxBatch = maxBatchSize(eligible.length);
+  const batch = Math.min(pick ?? defaultBatchSize(), maxBatch);
   const stages = planStages(eligible, batch);
   const canary = stages[0]?.rows[0];
   const people = eligible.reduce((sum, r) => sum + (r.online ?? 0), 0);
   const reboots = scope === "reboot" || reboot === "if_required";
   const rebootOnly = scope === "reboot";
-  const fits = (s: OsScope) => rows.filter((r) => scopeBlock(r, s) === "").length;
+  const fits = rows.filter((r) => scopeBlock(r, scope) === "").length;
 
   const go = () =>
     void actions
@@ -80,106 +113,72 @@ export function OsFleetDialog({ rows, actions, onClose, onStarted, initialScope 
         </>
       }
     >
-      <ChoiceBlock id="osf-what" title={t("osf.h.what")}>
-        <RadioGroup value={scope} onValueChange={(v) => setScope(v as OsScope)} aria-label={t("osf.dlg.what")} className="flex flex-col gap-2">
-          {scopes.map((s) => (
-            <Choice key={s} value={s} label={t(`osf.scope.${s}`)} hint={t(`osf.scope.${s}.hint`)} aside={t("osf.scope.fits", { n: fits(s), total: rows.length })} />
-          ))}
-        </RadioGroup>
-      </ChoiceBlock>
+      <div className="flex flex-col gap-3">
+        <section aria-labelledby="osf-what" className="flex flex-col gap-1.5">
+          <Heading id="osf-what">{t("osf.h.what")}</Heading>
+          <Segmented
+            variant="thumb"
+            wrap
+            aria-label={t("osf.dlg.what")}
+            value={scope}
+            onValueChange={setScope}
+            options={scopes.map((s) => ({ value: s, label: t(`osf.seg.${s}`) }))}
+          />
+          <p className="text-xs leading-snug text-pretty text-muted">
+            {t(`osf.scope.${scope}.hint`)} <b className="font-semibold text-fg">· {t("osf.scope.fits", { n: fits, total: rows.length })}</b>
+          </p>
+        </section>
 
-      {!rebootOnly && (
-        <ChoiceBlock id="osf-reboot" title={t("osf.h.reboot")}>
-          <RadioGroup value={reboot} onValueChange={(v) => setReboot(v as typeof reboot)} aria-label={t("os.dlg.after")} className="flex flex-col gap-2">
-            <Choice value="if_required" label={t("os.dlg.reboot.ifRequired")} hint={t("os.dlg.reboot.ifRequired.hint")} />
-            <Choice value="never" label={t("os.dlg.reboot.never")} hint={t("os.dlg.reboot.never.hint")} />
-          </RadioGroup>
-        </ChoiceBlock>
-      )}
+        {!rebootOnly && <RebootRow on={reboot === "if_required"} onChange={(on) => setReboot(on ? "if_required" : "never")} />}
 
-      {eligible.length === 0 ? (
-        <Notice tone="quiet">{t("osf.skip.none")}</Notice>
-      ) : (
-        <section aria-labelledby="osf-order" className="flex flex-col gap-2.5">
-          <h3 id="osf-order" className="text-[11px] font-bold tracking-wide text-muted uppercase">
-            {t("osf.order.title")}
-          </h3>
-          <ol className="flex flex-col">
-            {stages.map((st) => (
-              <li key={st.stage} className="grid gap-x-3 gap-y-1.5 border-t border-line py-2.5 first:border-t-0 first:pt-0 sm:grid-cols-[132px_minmax(0,1fr)]">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <b className="text-[13px]">{st.stage === 0 ? t("up.ro.canary") : t("up.ro.batch", { n: st.stage })}</b>
-                  <span className="text-[11px] leading-snug text-muted">{st.stage === 0 ? t("osf.order.canaryWhy", { node: canary?.name ?? "" }) : t.n("up.ro.batch.what", st.rows.length)}</span>
+        {eligible.length === 0 ? (
+          <Notice tone="quiet">{t("osf.skip.none")}</Notice>
+        ) : (
+          <section aria-labelledby="osf-order" className="flex flex-col gap-1.5">
+            <div className="flex min-h-7 items-center justify-between gap-3">
+              <Heading id="osf-order">{t("osf.order.title")}</Heading>
+              {maxBatch > 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted">{t("osf.batch.per")}</span>
+                  <Segmented
+                    aria-label={t("osf.batch.aria")}
+                    value={String(batch)}
+                    onValueChange={(v) => setPick(Number(v))}
+                    options={Array.from({ length: maxBatch }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+                  />
                 </div>
-                <ul className="flex flex-wrap content-start gap-1.5">
-                  {st.rows.map((r) => (
-                    <NodeChip key={r.id} row={r} t={t} />
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ol>
-
-          {eligible.length > 2 && (
-            <div className="flex flex-col gap-1.5 rounded-field border border-line bg-surface-2 p-3">
-              <span id="osf-batch" className="text-[13px] font-bold">
-                {t("osf.batch.title")}
-              </span>
-              <RadioGroup value={String(batch)} onValueChange={(v) => setPick(Number(v))} aria-labelledby="osf-batch" className="flex flex-wrap gap-1.5">
-                {Array.from({ length: maxBatchSize(eligible.length) }, (_, i) => i + 1).map((n) => (
-                  <Radio.Root
-                    key={n}
-                    value={String(n)}
-                    aria-label={t("osf.batch.aria") + " " + n}
-                    className="grid size-9 cursor-pointer place-items-center rounded-ctl border border-line bg-surface text-sm font-bold transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft data-checked:text-accent-text"
-                  >
-                    {n}
-                  </Radio.Root>
-                ))}
-              </RadioGroup>
-              <span className="text-xs leading-snug text-pretty text-muted">{t("osf.batch.hint")}</span>
+              )}
             </div>
-          )}
-        </section>
-      )}
+            <ol className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
+              {stages.map((st, i) => (
+                <li key={st.stage} className="flex items-center gap-1">
+                  {i > 0 && <Icon name="chevronRight" size={12} className="flex-none text-faint rtl:-scale-x-100" aria-hidden />}
+                  <ul className={cx("flex flex-wrap items-center gap-1", st.rows.length > 1 && "rounded-field border border-dashed border-line p-1")}>
+                    {st.rows.map((r) => (
+                      <Node key={r.id} row={r} canary={st.stage === 0} why={t("osf.order.canaryWhy", { node: r.name ?? "" })} t={t} />
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+            {batch > 1 && <p className="text-[11px] leading-snug text-pretty text-muted">{t("osf.batch.hint")}</p>}
+          </section>
+        )}
 
-      {left.length > 0 && eligible.length > 0 && (
-        <section aria-labelledby="osf-left" className="flex flex-col gap-1.5">
-          <h3 id="osf-left" className="text-[11px] font-bold tracking-wide text-muted uppercase">
-            {t("osf.skip.title")}
-          </h3>
-          <ul className="flex flex-col gap-1">
-            {left.map((r) => (
-              <li key={r.id} className="flex items-start gap-2 text-xs leading-snug text-pretty text-muted">
-                <Icon name="minus" size={12} className="mt-0.5 flex-none" aria-hidden />
-                <span>
-                  <b className="font-mono text-fg">{r.name}</b> · {blockText(t, scopeBlock(r, scope))}
-                </span>
-              </li>
-            ))}
+        {left.length > 0 && <Left rows={left} scope={scope} openAtOnce={eligible.length === 0} t={t} />}
+
+        {eligible.length > 0 && (
+          <ul className="flex flex-col gap-1.5">
+            <Fact icon="people" small>
+              <b className="font-semibold text-fg">{t.n("osf.online.total", people)}</b>
+              {people > 0 && reboots && ` ${t("os.dlg.online.drop")}`}
+            </Fact>
+            <Fact icon="pulse" small>
+              {t("os.dlg.fact.profiles")} {t("osf.dlg.cut")}
+            </Fact>
           </ul>
-        </section>
-      )}
-      {left.length > 0 && eligible.length === 0 && (
-        <ul className="flex flex-col gap-1">
-          {left.map((r) => (
-            <li key={r.id} className="text-xs leading-snug text-pretty text-muted">
-              <b className="font-mono text-fg">{r.name}</b> · {blockText(t, scopeBlock(r, scope))}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {eligible.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          <Fact icon="people">
-            {t.n("osf.online.total", people)}
-            {people > 0 && reboots && <span className="block text-xs text-muted">{t("os.dlg.online.drop")}</span>}
-          </Fact>
-          <Fact icon="pulse">{t("os.dlg.fact.profiles")}</Fact>
-          <Fact icon="clock">{t("osf.dlg.cut")}</Fact>
-        </ul>
-      )}
+        )}
+      </div>
     </Modal>
   );
 }

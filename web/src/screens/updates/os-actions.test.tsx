@@ -171,8 +171,10 @@ describe("the window before an update", () => {
     expect(s).toContain("5 people are online on de1 now");
     expect(s).toContain("disconnected for about two minutes");
     expect(s).toContain("Old kernels stay installed.");
-    expect(s).toContain("Reboot if required (recommended)");
-    expect(s).toContain("Do not reboot");
+    // the reboot is one row with a switch, on by default, and a short line that follows it
+    expect(s).toContain("Reboot if required");
+    expect(s).toContain("Only if the updates need it; the node checks it is safe.");
+    expect(d.querySelector("[role=switch]")?.getAttribute("aria-checked")).toBe("true");
     expect(s).not.toMatch(/anyway/i);
   });
 
@@ -200,8 +202,9 @@ describe("the window before an update", () => {
   it("starts it without a reboot when that is chosen, and hides the warning about people when nobody reboots", async () => {
     await mount(actions(data([node()])));
     await click(button("Install updates…"));
-    const never = [...dialog()!.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent?.includes("Do not reboot"))!;
-    await click(never);
+    await click(dialog()!.querySelector("[role=switch]"));
+    expect(dialog()!.querySelector("[role=switch]")?.getAttribute("aria-checked")).toBe("false");
+    expect(dialog()!.textContent).toContain("Updates go in, servers keep running; reboot later.");
     expect(dialog()!.textContent).not.toContain("disconnected for about two minutes");
     await click(button("Install updates", dialog()!));
     expect(updates.startOsRollout).toHaveBeenCalledWith({ nodeIds: ["nod_de1"], mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.NEVER });

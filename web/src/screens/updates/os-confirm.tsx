@@ -1,10 +1,10 @@
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
+import { Segmented } from "@/components/ui/segmented";
+import { Switch } from "@/components/ui/switch";
 import { OsRebootPolicy, OsRolloutMode } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { minutesText } from "@/lib/format";
@@ -17,45 +17,38 @@ import type { OsRow } from "@/lib/os-updates";
 
 export type OsDialogMode = "install" | "reboot";
 
-export function Fact({ icon, children }: { icon: IconName; children: ReactNode }) {
+export function Fact({ icon, children, small }: { icon: IconName; children: ReactNode; /** A quiet 12px line, for the facts under the choices of the compact windows. */ small?: boolean }) {
   return (
-    <li className="flex items-start gap-2.5 text-[13px] leading-snug">
-      <Icon name={icon} size={15} className="mt-0.5 flex-none text-muted" aria-hidden />
+    <li className={small ? "flex items-start gap-2 text-xs leading-snug text-muted" : "flex items-start gap-2.5 text-[13px] leading-snug"}>
+      <Icon name={icon} size={small ? 13 : 15} className="mt-0.5 flex-none text-muted" aria-hidden />
       <span className="text-pretty">{children}</span>
     </li>
   );
 }
 
-/** A group of choices under a small heading, in the style of "Order" and "Left out for now": two groups in a row no longer run into each other. */
-export function ChoiceBlock({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+/** A small heading over a group of controls, in the style of the other compact windows ("Order"). */
+export function Heading({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-2">
-      <h3 id={id} className="text-[11px] font-bold tracking-wide text-muted uppercase">
-        {title}
-      </h3>
+    <h3 id={id} className="text-[11px] font-bold tracking-wide text-muted uppercase">
       {children}
-    </section>
+    </h3>
   );
 }
 
-/** One of a few choices with its words under it (`aside`: a quiet line after them); the long labels wrap instead of squeezing a segmented control. */
-export function Choice({ value, label, hint, aside }: { value: string; label: string; hint: string; aside?: string }) {
+/** "Reboot if required" as one row: its words, a one-line hint that follows the switch, and the switch. */
+export function RebootRow({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const t = useT();
+  const id = useId();
   return (
-    <Radio.Root
-      value={value}
-      className="flex cursor-pointer items-start gap-2.5 rounded-field border border-line bg-surface-2 p-3 text-start transition-colors duration-200 data-checked:border-accent-line data-checked:bg-surface"
-    >
-      <span aria-hidden className="mt-0.5 grid size-4 flex-none place-items-center rounded-full border border-line bg-surface">
-        <Radio.Indicator className="size-2 rounded-full bg-accent" />
-      </span>
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-          <span className="text-[13px] font-bold">{label}</span>
-          {aside && <span className="text-[11px] font-semibold text-muted">{aside}</span>}
+    <div className="flex items-center gap-3 rounded-field border border-line bg-surface-2 px-3 py-2">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span id={id} className="text-[13px] font-bold">
+          {t("osf.reboot.label")}
         </span>
-        <span className="text-xs leading-snug text-pretty text-muted">{hint}</span>
-      </span>
-    </Radio.Root>
+        <span className="text-[11px] leading-snug text-pretty text-muted">{t(on ? "osf.reboot.on" : "osf.reboot.off")}</span>
+      </div>
+      <Switch checked={on} onCheckedChange={onChange} aria-labelledby={id} />
+    </div>
   );
 }
 
@@ -127,12 +120,30 @@ export function OsConfirmDialog({ row, mode, actions, onClose, initialPkgs }: { 
       {willReboot && s?.awgModuleNext === "missing" && <Notice>{t("os.dlg.warn.awgMissing")}</Notice>}
       {install && s?.apt === "half_configured" && <Notice>{t("os.dlg.warn.half", { names: s.halfConfigured.slice(0, 3).join(", ") })}</Notice>}
       {install && (s?.held.length ?? 0) > 0 && <Notice tone="quiet">{t("os.dlg.warn.held", { names: s?.held.slice(0, 3).join(", ") ?? "" })}</Notice>}
-      <ul className="flex flex-col gap-2">
+      {choosePkgs && (
+        <section aria-labelledby="osf-one-what" className="flex flex-col gap-1.5">
+          <Heading id="osf-one-what">{t("osf.h.what")}</Heading>
+          <Segmented
+            variant="thumb"
+            wrap
+            aria-label={t("osf.one.what")}
+            value={pkgs}
+            onValueChange={setPkgs}
+            options={[
+              { value: "security", label: t("osf.seg.security") },
+              { value: "all", label: t("osf.seg.all") },
+            ]}
+          />
+          <p className="text-xs leading-snug text-pretty text-muted">{pkgs === "all" ? t.n("osf.one.all.hint", pending) : t.n("osf.one.security.hint", security)}</p>
+        </section>
+      )}
+      {install && <RebootRow on={reboot === "if_required"} onChange={(on) => setReboot(on ? "if_required" : "never")} />}
+      <ul className="flex flex-col gap-1.5">
         {!install && <Fact icon="shield">{t("os.dlg.reboot.lead")}</Fact>}
         {install && (
           <Fact icon="shield">
             {all ? t.n("osf.one.all.fact", pending) : t.n("os.dlg.security", security)}
-            {!all && others > 0 && <span className="block text-xs text-muted">{t.n("os.dlg.others", others)}</span>}
+            {!all && others > 0 && <span className="text-muted"> · {t.n("os.dlg.others", others)}</span>}
           </Fact>
         )}
         {newKernel && <Fact icon="cpu">{t("os.dlg.kernel", { from: s?.kernelRunning ?? "", to: s?.kernelNewest ?? "" })}</Fact>}
@@ -144,30 +155,14 @@ export function OsConfirmDialog({ row, mode, actions, onClose, initialPkgs }: { 
         {install && (
           <Fact icon="people">
             {online > 0 ? t.n("os.dlg.online", online, { node: name }) : t("os.dlg.online.none", { node: name })}
-            {online > 0 && willReboot && <span className="block text-xs text-muted">{t("os.dlg.online.drop")}</span>}
+            {online > 0 && willReboot && <span className="text-muted"> {t("os.dlg.online.drop")}</span>}
           </Fact>
         )}
-        {install && <Fact icon="disk">{t("os.dlg.fact.kernels")}</Fact>}
-        <Fact icon="pulse">{t("os.dlg.fact.profiles")}</Fact>
       </ul>
-
-      {choosePkgs && (
-        <ChoiceBlock id="osf-one-what" title={t("osf.h.what")}>
-          <RadioGroup value={pkgs} onValueChange={(v) => setPkgs(v as typeof pkgs)} aria-label={t("osf.one.what")} className="flex flex-col gap-2">
-            <Choice value="security" label={t("osf.scope.security")} hint={t.n("osf.one.security.hint", security)} />
-            <Choice value="all" label={t("osf.scope.all")} hint={t.n("osf.one.all.hint", pending)} />
-          </RadioGroup>
-        </ChoiceBlock>
-      )}
-      {install && (
-        <ChoiceBlock id="osf-one-reboot" title={t("osf.h.reboot")}>
-          <RadioGroup value={reboot} onValueChange={(v) => setReboot(v as typeof reboot)} aria-label={t("os.dlg.after")} className="flex flex-col gap-2">
-            <Choice value="if_required" label={t("os.dlg.reboot.ifRequired")} hint={t("os.dlg.reboot.ifRequired.hint")} />
-            <Choice value="never" label={t("os.dlg.reboot.never")} hint={t("os.dlg.reboot.never.hint")} />
-          </RadioGroup>
-        </ChoiceBlock>
-      )}
-
+      <p className="text-[11px] leading-snug text-pretty text-muted">
+        {install && `${t("os.dlg.fact.kernels")} `}
+        {t("os.dlg.fact.profiles")}
+      </p>
     </Modal>
   );
 }

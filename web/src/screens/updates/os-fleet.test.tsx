@@ -95,6 +95,7 @@ const tick = (name: string) => host!.querySelector<HTMLInputElement>(`input[type
 const ticked = () => [...new Set([...host!.querySelectorAll<HTMLInputElement>("input[type=checkbox][aria-label^='Select ']")].filter((i) => i.checked && !i.getAttribute("aria-label")!.startsWith("Select all")).map((i) => i.getAttribute("aria-label")!.slice(7)))];
 const dialog = () => document.querySelector<HTMLElement>("[data-shot=os-fleet-confirm]");
 const radio = (label: string) => [...dialog()!.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent?.includes(label))!;
+const rebootSwitch = () => dialog()!.querySelector<HTMLElement>("[role=switch]");
 
 describe("ticking nodes in the table", () => {
   it("gives the owner a tick on every node and one button that ticks all that have something to install", async () => {
@@ -138,29 +139,42 @@ describe("the window before the run", () => {
     await open("fi1", "de1", "nl1", "msk1");
     const d = dialog()!.textContent!;
     expect(d).toContain("Update 3 nodes");
-    expect(d).toContain("nl1 goes first: the fewest people are online there.");
-    expect(d).toContain("nobody online");
-    expect(d).toContain("3 online");
-    expect(d).toContain("5 online");
+    expect(d).toContain("The quietest node goes first, the rest follow after its checks.");
+    // the chain: the canary named first, the people online on each node, small
+    const chain = [...dialog()!.querySelectorAll("ol > li")].map((li) => li.textContent);
+    expect(chain[0]).toContain("nl1");
+    expect(chain[0]).toContain("(Canary)");
+    expect(chain[0]).toContain("nobody online");
+    expect(chain[1]).toContain("de1");
+    expect(chain[1]).toContain("3 online");
+    expect(chain[2]).toContain("fi1");
+    expect(chain[2]).toContain("5 online");
+    expect(dialog()!.querySelector("li[title='nl1 goes first: the fewest people are online there.']")).not.toBeNull();
     expect(d).toContain("8 people are online on these nodes now.");
-    expect(d).toContain("Left out for now");
-    expect(d).toContain("msk1");
-    expect(d).toContain("The node agent is too old to run updates");
-    // the first kind is chosen, and the reboot as recommended
-    expect(radio("Security updates").getAttribute("aria-checked")).toBe("true");
-    expect(radio("Reboot if required").getAttribute("aria-checked")).toBe("true");
+    // the node left out is one folded line; its reason opens with a click
+    const fold = [...dialog()!.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.startsWith("Left out 1: msk1"))!;
+    expect(fold.getAttribute("aria-expanded")).toBe("false");
+    expect(d).not.toContain("The node agent is too old to run updates");
+    await click(fold);
+    expect(fold.getAttribute("aria-expanded")).toBe("true");
+    expect(dialog()!.textContent).toContain("The node agent is too old to run updates");
+    // the first kind is chosen, one line says what it does and how many it fits, and the reboot is on
+    expect(radio("Security").getAttribute("aria-checked")).toBe("true");
+    expect(d).toContain("Only security updates; ordinary packages wait.");
     expect(d).toContain("Fits 3 of 4");
+    expect(rebootSwitch()?.getAttribute("aria-checked")).toBe("true");
   });
 
   it("puts a small heading over each group of choices, so they do not run into each other", async () => {
     await open("fi1", "de1", "nl1");
     const heads = [...dialog()!.querySelectorAll("h3")].map((h) => h.textContent);
-    expect(heads).toContain("What to install");
-    expect(heads).toContain("Reboot");
-    expect(heads.indexOf("What to install")).toBeLessThan(heads.indexOf("Reboot"));
-    // a reboot-only run has no reboot choice, so no such group
-    await click(radio("Only a reboot"));
-    expect([...dialog()!.querySelectorAll("h3")].map((h) => h.textContent)).not.toContain("Reboot");
+    expect(heads).toEqual(["What to install", "Order"]);
+    // the choices are one switch row and one segmented control, each named for a screen reader
+    expect(dialog()!.querySelector("[role=radiogroup][aria-label='What to do']")).not.toBeNull();
+    expect(rebootSwitch()?.getAttribute("aria-labelledby")).toBeTruthy();
+    // a reboot-only run has no reboot choice
+    await click(radio("Reboot only"));
+    expect(rebootSwitch()).toBeNull();
   });
 
   it("takes one node at a time by default, even for a big fleet, and sends more only when the owner picks it", async () => {
@@ -168,9 +182,14 @@ describe("the window before the run", () => {
     await mount(<OsSection />, data(many));
     await click(button("Select all with something to install (6)"));
     await click(buttonStarting("Update "));
-    const picked = () => [...dialog()!.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === "1")!;
-    expect(picked().getAttribute("aria-checked")).toBe("true");
-    expect(dialog()!.textContent).toContain("A bigger batch finishes sooner, but more people lose their connection at the same time.");
+    const picked = (n: string) => [...dialog()!.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === n)!;
+    expect(picked("1").getAttribute("aria-checked")).toBe("true");
+    // the batch switch offers 1 to 5 (six nodes: the canary and five more); the warning appears only above 1
+    expect([...dialog()!.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label='Nodes per batch'] [role=radio]")].map((r) => r.textContent)).toEqual(["1", "2", "3", "4", "5"]);
+    expect(dialog()!.textContent).not.toContain("more people lose connection at once");
+    await click(picked("2"));
+    expect(dialog()!.textContent).toContain("Bigger batches finish sooner, but more people lose connection at once.");
+    await click(picked("1"));
     await click(buttonStarting("Start on 6 nodes", dialog()!));
     expect(updates.startOsRollout).toHaveBeenCalledWith(expect.objectContaining({ batchSize: 1 }));
   });
@@ -189,11 +208,13 @@ describe("the window before the run", () => {
   it("takes the ordinary packages in with All packages, and sends the mode, the reboot choice and the batch size", async () => {
     await open("fi1", "de1", "nl1", "sg1");
     expect(dialog()!.textContent).toContain("Update 3 nodes");
-    expect(dialog()!.textContent).toContain("sg1");
+    expect(dialog()!.textContent).toContain("Left out 1: sg1");
+    await click([...dialog()!.querySelectorAll<HTMLButtonElement>("button")].find((x) => x.textContent?.startsWith("Left out")));
     expect(dialog()!.textContent).toContain("There are no security updates to install");
     await click(radio("All packages"));
     expect(dialog()!.textContent).toContain("Update 4 nodes");
-    await click(radio("Do not reboot"));
+    await click(rebootSwitch());
+    expect(rebootSwitch()?.getAttribute("aria-checked")).toBe("false");
     // four nodes: the canary and three more, in batches of 1 to 3
     const batch = [...dialog()!.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === "2")!;
     await click(batch);
@@ -208,8 +229,8 @@ describe("the window before the run", () => {
 
   it("makes a reboot-only run the red button, with no reboot choice", async () => {
     await open("fi1", "de1");
-    await click(radio("Only a reboot"));
-    expect(dialog()!.querySelector("[aria-label='After installing']")).toBeNull();
+    await click(radio("Reboot only"));
+    expect(rebootSwitch()).toBeNull();
     const go = buttonStarting("Reboot 2 nodes", dialog()!)!;
     expect(go.className).toContain("bg-danger-soft");
     await click(go);
@@ -434,10 +455,12 @@ describe("All packages for one node", () => {
     const d = one({ security: 2, pending: 12 });
     await mount(actions(d), d);
     await click(button("Install updates…"));
-    expect(pick("Security updates").getAttribute("aria-checked")).toBe("true");
+    expect(pick("Security").getAttribute("aria-checked")).toBe("true");
     expect(win().textContent).toContain("2 updates are waiting. Ordinary packages are left for later.");
-    expect([...win().querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["What to install", "Reboot"]);
+    expect([...win().querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["What to install"]);
+    expect(win().querySelector("[role=switch]")?.getAttribute("aria-checked")).toBe("true");
     await click(pick("All packages"));
+    expect(win().textContent).toContain("12 updates, security and ordinary.");
     expect(win().textContent).toContain("Install all updates on de1");
     expect(win().textContent).toContain("12 updates will be installed, security and ordinary");
     await click(button("Install updates", win()));
