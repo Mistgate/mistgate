@@ -453,7 +453,7 @@ func (e *env) apply(c *call, tool, confirm string, run func(c *call, pl Plan) (d
 		if errors.As(runErr, &retry) && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(c.ctx.Err(), context.DeadlineExceeded) {
 			msg := retry.response()
 			if ferr := e.cfg.Plans.ReleaseApply(fctx, started.ID, previousStatus); ferr != nil {
-				e.cfg.Log.Error("mcp: release apply", "err", ferr)
+				e.cfg.Log.Error("mcp: release apply", "code", "mcp_plan_release_failed", "err", ferr)
 				e.audit(c, "mcp_apply", map[string]any{"plan_id": started.ID, "tool": tool, "result": "busy", "reason_code": retry.code}, "fail")
 				return nil, errors.New("busy (" + retry.code + "): the plan could not be released; check its status before retrying")
 			}
