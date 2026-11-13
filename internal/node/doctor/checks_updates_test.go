@@ -236,3 +236,40 @@ func TestSecurityUpdatesJobStates(t *testing.T) {
 		}
 	})
 }
+
+func TestSecurityUpdatesWarnsAboutAutoRebootOnTheKernelModule(t *testing.T) {
+	const apt = "apt-config shell R Unattended-Upgrade::Automatic-Reboot/b"
+	kernel := AwgBackend{Mode: "auto", Name: "kernel", Version: "1.0", Available: true}
+	userspace := AwgBackend{Mode: "auto", Name: "userspace", Version: "1.0", Available: true}
+	with := func(b AwgBackend) func(*Env) {
+		return func(e *Env) { e.AwgBackend = func() AwgBackend { return b } }
+	}
+	cases := []struct {
+		name       string
+		reboot     string
+		backend    AwgBackend
+		inbound    bool
+		wantStatus Status
+		wantCode   string
+	}{
+		{"auto reboot on the kernel module", "R='true'\n", kernel, true, Warn, CodeSecurityUpdatesAutoReboot},
+		{"auto reboot off", "R='false'\n", kernel, true, OK, CodeSecurityUpdatesOn},
+		{"auto reboot on userspace", "R='true'\n", userspace, true, OK, CodeSecurityUpdatesOn},
+		{"auto reboot without an AmneziaWG inbound", "R='true'\n", kernel, false, OK, CodeSecurityUpdatesOn},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFake(t)
+			securityUpdatesFixture(f)
+			f.cmd(apt, c.reboot, nil)
+			opts := []func(*Env){with(c.backend)}
+			if c.inbound {
+				opts = append(opts, withInbounds(awgIn("running")))
+			}
+			r := run(t, f.doctor(opts...), CheckSecurityUpdates)
+			if r.Status != c.wantStatus || r.Code != c.wantCode || r.FixID != "" {
+				t.Fatalf("result = %+v, want %s %s", r, c.wantStatus, c.wantCode)
+			}
+		})
+	}
+}

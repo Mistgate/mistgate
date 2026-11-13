@@ -33,6 +33,8 @@ type fakeMachine struct {
 	installed      []string
 	kernelFail     bool
 	kernelSortFail bool
+	// grubOmit lists kernels the generated /boot/grub/grub.cfg does not name (a menu that was never updated).
+	grubOmit map[string]bool
 	// lockErr makes HoldAptLock fail; locks counts the locks taken and unlocks the ones let go.
 	lockErr        error
 	locks, unlocks int
@@ -183,11 +185,25 @@ func (m *fakeMachine) run(ctx context.Context, w io.Writer, _ string, cmd ...str
 	return out, err
 }
 
+// grubCfg is the menu of GRUB: one entry for the running kernel and each installed one, unless the test left it out.
+func (m *fakeMachine) grubCfg() string {
+	var b strings.Builder
+	for _, k := range append(slices.Clone(m.installed), strings.TrimSpace(m.files["/proc/sys/kernel/osrelease"])) {
+		if !m.grubOmit[k] {
+			b.WriteString("menuentry 'Ubuntu, with Linux " + k + "' {\n\tlinux\t/boot/vmlinuz-" + k + " root=/dev/sda1 ro quiet\n\tinitrd\t/boot/initrd.img-" + k + "\n}\n")
+		}
+	}
+	return b.String()
+}
+
 func (m *fakeMachine) host() Host {
 	return Host{
 		ReadFile: func(p string) ([]byte, error) {
 			if s, ok := m.files[p]; ok {
 				return []byte(s), nil
+			}
+			if _, ok := m.sizes[p]; ok && p == "/boot/grub/grub.cfg" {
+				return []byte(m.grubCfg()), nil
 			}
 			return nil, errors.New("not found")
 		},

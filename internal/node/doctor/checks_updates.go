@@ -40,6 +40,8 @@ type securityUpdatesSnapshot struct {
 	timers    []aptTimerState
 	status    awgprep.Status
 	hasStatus bool
+	// autoRebootAwg: unattended-upgrades may reboot the host by itself (Automatic-Reboot) while AmneziaWG runs on the kernel module.
+	autoRebootAwg bool
 	// The transient unit of the job as systemd sees it (LoadState, ActiveState); "" when systemctl did not say. A unit
 	// that does not exist is LoadState "not-found" with ActiveState "inactive".
 	loadState   string
@@ -102,6 +104,13 @@ func inspectSecurityUpdates(ctx context.Context, e *Env) securityUpdatesSnapshot
 	enabled, _ := e.Run(ctx, "systemctl", append([]string{"is-enabled"}, aptDailyTimers...)...)
 	active, _ := e.Run(ctx, "systemctl", append([]string{"is-active"}, aptDailyTimers...)...)
 	s.timers = parseAptTimerStates(string(enabled), string(active))
+	// Only a node on the AmneziaWG kernel module cares: unattended-upgrades reboots without the agent's checks (osupdate's reboot guard).
+	if awgInboundCount(e) > 0 && e.AwgBackend != nil {
+		if b := e.AwgBackend(); b.Available && b.Name == "kernel" {
+			out, _ := e.Run(ctx, secupdates.AptConfigCommand, "shell", "R", "Unattended-Upgrade::Automatic-Reboot/b")
+			s.autoRebootAwg = strings.Contains(strings.NewReplacer("'", "", `"`, "").Replace(string(out)), "R=true")
+		}
+	}
 	return s
 }
 
@@ -144,6 +153,10 @@ func checkSecurityUpdatesResult(s securityUpdatesSnapshot) Result {
 		return Result{Status: Warn, Code: CodeSecurityUpdatesOff,
 			Detail: "automatic updates are off: " + strings.Join(off, ", "),
 			Params: p("off", strings.Join(off, ", ")), FixID: fix}
+	}
+	if s.autoRebootAwg {
+		return Result{Status: Warn, Code: CodeSecurityUpdatesAutoReboot,
+			Detail: "unattended-upgrades may reboot this node by itself (Automatic-Reboot) into a kernel without the AmneziaWG module; this reboot is outside the agent's guard, turn Automatic-Reboot off"}
 	}
 	return Result{Status: OK, Code: CodeSecurityUpdatesOn, Detail: "automatic security updates are on"}
 }

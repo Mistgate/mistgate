@@ -62,10 +62,28 @@ type osStatusV struct {
 	AutoUpdates    string   `json:"auto_updates,omitempty"`
 	AutoReboot     bool     `json:"auto_reboot"`
 	AwgModuleNext  string   `json:"awg_module_next,omitempty"`
-	Container      string   `json:"container,omitempty"`
-	BootIDHash     string   `json:"boot_id_hash,omitempty"`
-	Job            *osJobV  `json:"job,omitempty"`
-	Error          string   `json:"error,omitempty"`
+	// Kernels is the per-kernel table (newest first, at most 8); RebootBlockers are the job codes a reboot would be refused with
+	// right now. Both are absent from an agent that predates them.
+	Kernels        []osKernelV `json:"kernels,omitempty"`
+	AwgSource      string      `json:"awg_source,omitempty"`
+	RebootBlockers []string    `json:"reboot_blockers,omitempty"`
+	Container      string      `json:"container,omitempty"`
+	BootIDHash     string      `json:"boot_id_hash,omitempty"`
+	Job            *osJobV     `json:"job,omitempty"`
+	Error          string      `json:"error,omitempty"`
+}
+
+type osKernelV struct {
+	Version   string `json:"version"`
+	Running   bool   `json:"running"`
+	NextBoot  bool   `json:"next_boot"`
+	Candidate bool   `json:"candidate"`
+	Image     bool   `json:"image"`
+	Initrd    bool   `json:"initrd"`
+	GrubEntry bool   `json:"grub_entry"`
+	Headers   string `json:"headers"`
+	Module    string `json:"module,omitempty"`
+	Packages  string `json:"packages"`
 }
 
 type osNodeV struct {
@@ -171,6 +189,15 @@ func osStatusView(s *agentv1.OsStatus) *osStatusV {
 		if mcpOSPackage.MatchString(name) {
 			v.HalfConfigured = append(v.HalfConfigured, noAddr(clean(name, 64)))
 		}
+	}
+	for _, k := range s.GetKernels() {
+		v.Kernels = append(v.Kernels, osKernelV{Version: noAddr(clean(k.GetVersion(), 128)), Running: k.GetRunning(), NextBoot: k.GetNextBoot(),
+			Candidate: k.GetCandidate(), Image: k.GetImage(), Initrd: k.GetInitrd(), GrubEntry: k.GetGrubEntry(), Headers: clean(k.GetHeaders(), 16),
+			Module: clean(k.GetModule(), 16), Packages: clean(k.GetPackages(), 24)})
+	}
+	v.AwgSource = clean(s.GetAwgSource(), 32)
+	for _, code := range s.GetRebootBlockers() {
+		v.RebootBlockers = append(v.RebootBlockers, clean(code, 32))
 	}
 	if j := s.GetJob(); j != nil {
 		v.Job = &osJobV{ID: clean(j.GetJobId(), 80), Action: clean(j.GetAction(), 24), Mode: clean(j.GetMode(), 16),

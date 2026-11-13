@@ -6,6 +6,7 @@ import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { osRows, osSystem, useOsUpdates, type OsRow } from "@/lib/os-updates";
 import { OsNodeActions } from "@/screens/updates/os-actions";
+import { OsKernels } from "@/screens/updates/os-kernels";
 import { Panel } from "@/screens/users/ui";
 
 // Node -> Server: the node's operating system (what the Updates page shows in its Server operating system table) and the
@@ -60,6 +61,7 @@ export function OsCard({ nodeId }: { nodeId: string }) {
     <Panel title={t("os.card.title")} icon="cpu" tone="mint">
       <p className="-mt-1 text-xs leading-normal text-pretty text-muted">{t("os.card.body")}</p>
       <OsFacts row={row} />
+      <OsKernels row={row} />
       <div className="border-t border-line pt-3 empty:hidden">
         <OsNodeActions row={row} />
       </div>

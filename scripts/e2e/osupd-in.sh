@@ -63,7 +63,11 @@ chmod 0755 /usr/local/bin/systemd-detect-virt
 # GRUB: the job refuses to reboot unless GRUB starts its first entry. The sandbox has a grub.cfg, GRUB_DEFAULT=0 and a grub-editenv
 # stand-in that prints the content of /var/lib/mgtest-grubenv (nothing while the file is absent).
 mkdir -p /boot/grub
-echo "# grub.cfg of the sandbox" > /boot/grub/grub.cfg
+# The menu names the kernels of /boot and the fake one the scenarios install (boot_entry_missing looks for vmlinuz-<newest>).
+{
+  echo "# grub.cfg of the sandbox"
+  for f in /boot/vmlinuz-* /boot/vmlinuz-9.9.9-mgfake; do echo "menuentry 'sandbox' { linux ${f#/boot} root=/dev/sda1 ro }"; done
+} > /boot/grub/grub.cfg
 : > /boot/grub/grubenv
 printf 'GRUB_DEFAULT=0\nGRUB_TIMEOUT=5\n' > /etc/default/grub
 rm -f /etc/default/grub.d/*.cfg 2> /dev/null
@@ -278,6 +282,12 @@ rm -f "$ST"
 job --action reboot --reboot always
 check "7e: a next_entry in grub-editenv is refused" test "$(cat /tmp/job.rc)/$(field code)" = 1/boot_default_custom
 rm -f /var/lib/mgtest-grubenv
+cp /boot/grub/grub.cfg /boot/grub/grub.cfg.keep
+echo "# a menu that was never updated: no entry for the newest kernel" > /boot/grub/grub.cfg
+rm -f "$ST"
+job --action reboot --reboot always
+check "7e: a menu without the newest kernel's entry is refused (boot_entry_missing)" test "$(cat /tmp/job.rc)/$(field code)" = 1/boot_entry_missing
+mv /boot/grub/grub.cfg.keep /boot/grub/grub.cfg
 mv /boot/grub/grub.cfg /boot/grub/grub.cfg.away
 rm -f "$ST"
 job --action reboot --reboot always

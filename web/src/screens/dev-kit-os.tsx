@@ -55,6 +55,28 @@ const warnings = node({
   status: { ...waiting, pending: 31, security: 9, autoReboot: true, awgModuleNext: "missing", apt: "half_configured", halfConfigured: ["libssl3", "openssh-server"], held: ["linux-generic"] },
 });
 
+const kern = (version: string, over: Record<string, unknown> = {}) => ({
+  version, running: false, nextBoot: false, candidate: true, image: true, initrd: true, grubEntry: true, headers: "present", module: "built", packages: "ok", ...over,
+});
+// a node whose agent sends the kernel table: all in order, and the shape of the incident (no initrd, no GRUB entry, no module build, headers half configured)
+const kernelsClean = node({
+  state: OsUpdateState.REBOOT_REQUIRED,
+  status: { ...waiting, kernels: [kern("6.8.0-150-generic", { nextBoot: true }), kern("6.8.0-147-generic", { running: true }), kern("6.8.0-145-generic", { candidate: false })], awgSource: "ok" },
+});
+const kernelsBlocked = node({
+  nodeId: "nod_nl1", name: "nl1", state: OsUpdateState.REBOOT_REQUIRED,
+  status: {
+    ...waiting,
+    kernels: [
+      kern("6.8.0-150-generic", { nextBoot: true, initrd: false, grubEntry: false, headers: "missing", module: "missing", packages: "half_configured" }),
+      kern("6.8.0-147-generic", { running: true }),
+      kern("6.8.0-145-generic", { candidate: false, module: "unknown" }),
+    ],
+    rebootBlockers: ["initramfs_missing", "boot_entry_missing", "awg_module_missing", "dpkg_interrupted"],
+  },
+  rebootBlock: "",
+});
+
 const scenes = {
   available: answer([de1Waiting]),
   running: answer(
@@ -104,6 +126,8 @@ const scenes = {
       { status: OsRolloutStatus.PAUSED, pauseKey: "not_back", pauseParams: { node: "fi1" } },
     ),
   ),
+  kernelsClean: answer([kernelsClean]),
+  kernelsBlocked: answer([kernelsBlocked, { ...kernelsClean, nodeId: "nod_de1", name: "de1" }]),
   oldAgent: answer([node({ nodeId: "nod_msk1", name: "msk1", supported: false, state: OsUpdateState.UNSUPPORTED, status: undefined, updateCapable: false, updateBlock: "agent_old", rebootBlock: "agent_old" })]),
   offline: answer([node({ nodeId: "nod_se1", name: "se1", connected: false, state: OsUpdateState.OFFLINE, status: undefined, updateBlock: "offline", rebootBlock: "offline" })]),
   done: answer(
@@ -229,6 +253,12 @@ export function OsKit() {
       </Shot>
       <Shot id="os-refused" title="nl1: the node refused, nothing happened on the server (no Close, no alert)" data={scenes.refused}>
         <Both data={scenes.refused} />
+      </Shot>
+      <Shot id="os-kernels-clean" title="de1: the kernel table, all in order (Next boot: ready; open it with the title)" data={scenes.kernelsClean}>
+        <Both data={scenes.kernelsClean} />
+      </Shot>
+      <Shot id="os-kernels-blocked" title="nl1: the next kernel has no initrd and no GRUB entry: a reboot would be refused, Reboot is off with the reason" data={scenes.kernelsBlocked}>
+        <Both data={scenes.kernelsBlocked} />
       </Shot>
       <Shot id="os-oldagent" title="msk1: the agent is too old to run updates" data={scenes.oldAgent}>
         <Both data={scenes.oldAgent} />

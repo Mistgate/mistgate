@@ -384,7 +384,8 @@ package mistgate.agent.v1;
 //     image or initramfs of one of those kernels is missing or cut short (initramfs_missing); /boot is nearly full while the
 //     kernel changes (boot_full); GRUB may not start its first entry: no /boot/grub/grub.cfg, GRUB_DEFAULT other than 0 in
 //     /etc/default/grub or /etc/default/grub.d/*.cfg, a saved_entry or next_entry in grub-editenv, or grub-editenv unreadable
-//     (boot_default_custom). The checks look at the kernels of the next boot also when none is new. After the checks pass the
+//     (boot_default_custom); /boot/grub/grub.cfg does not name vmlinuz-<kernel> for the newest kernel (boot_entry_missing). The checks
+//     look at the kernels of the next boot also when none is new. After the checks pass the
 //     dpkg lock (an open file description lock) is held until the reboot. "reboot always" skips only the "is a reboot needed" test.
 //   - THE MODULE'S PACKAGES are never removed by the job, and it installs no package for the module (not the kernel headers
 //     either). When the module's own DKMS build fails (dpkg's repair, the install, or dkms autoinstall for the new kernel), the
@@ -396,7 +397,7 @@ package mistgate.agent.v1;
 //     checking | rebooting; reboot done | not_required | held | not_asked; code (failed) unsupported_os | no_systemd |
 //     bad_request | busy | disk_full | apt_lock | dpkg_broken | security_source_failed | refresh_failed | install_failed |
 //     auto_reboot_conflict | dpkg_interrupted | awg_module_missing | awg_module_build_failed | kernel_unknown | kernel_older |
-//     boot_full | initramfs_missing | boot_default_custom | too_soon | reboot_limit | reboot_failed | timeout | interrupted |
+//     boot_full | initramfs_missing | boot_entry_missing | boot_default_custom | too_soon | reboot_limit | reboot_failed | timeout | interrupted |
 //     cancelled | launch_failed, and after a
 //     reboot kernel_not_switched | awg_module_not_loaded | inbound_failed (the job did reboot the host; reboot = done).
 //     reason is one fixed English sentence (package names are checked against ^[a-z0-9][a-z0-9.+-]{0,63}$, addresses are
@@ -748,6 +749,28 @@ message OsStatus {
   string boot_id_hash = 20; // first 16 hex characters of SHA-256(boot_id), never the raw boot id
   OsJob job = 21; // the running OS job, or the last one not yet reported; unset when there is none
   string error = 22; // not_apt | no_systemd | read_failed
+  // The kernel table: at most 8 installed kernels, newest first. Empty from an agent that predates it, in a container, and when
+  // no kernel can be told: the panel then shows "update the agent" or nothing.
+  repeated OsKernel kernels = 23;
+  // State of the AmneziaWG module source: ok | patched | needs_patch | unknown:<12 hex> | empty (no DKMS source, or not read yet).
+  string awg_source = 24;
+  // The job codes ("OS UPDATES") the reboot check would refuse with right now: initramfs_missing, boot_entry_missing,
+  // awg_module_missing, dpkg_interrupted, kernel_older, boot_default_custom. A preview of the reader; the job decides.
+  repeated string reboot_blockers = 25;
+}
+
+// One installed kernel as the reader sees it (OsStatus.kernels). Only reads, never a root write.
+message OsKernel {
+  string version = 1; // the release, as uname -r prints it
+  bool running = 2;
+  bool next_boot = 3; // what GRUB starts by default: the highest installed version
+  bool candidate = 4; // on the fallback path from the next boot down to the running kernel; the reboot check covers these
+  bool image = 5; // /boot/vmlinuz-<version> exists and is not empty
+  bool initrd = 6; // /boot/initrd.img-<version> is at least 1 MiB
+  bool grub_entry = 7; // /boot/grub/grub.cfg names vmlinuz-<version>
+  string headers = 8; // present | missing (/usr/src/linux-headers-<version>)
+  string module = 9; // built | missing | unknown | empty (AmneziaWG module not in use); unknown: a plain build the sandbox cannot see
+  string packages = 10; // ok | half_configured (dpkg state of this kernel's linux-* packages)
 }
 
 // The running OS job, or the last one the panel has not been told about yet (OsStatus.job). Strings are the vocabulary of

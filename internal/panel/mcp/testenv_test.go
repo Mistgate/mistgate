@@ -507,7 +507,11 @@ func newWorld() *world {
 	osStatus := &agentv1.OsStatus{MeasuredUnix: 1700000000, DistroId: "ubuntu", DistroVersion: "24.04", Pending: 3, Security: 1,
 		Notable: []string{"openssl 3.0.0 3.0.1 s", "203.0.113.77 1 2 -", "linux-image-generic 5.15.0.125.123 5.15.0.126.125 s"}, KernelRunning: "6.8.0-1-generic", KernelNewest: "6.8.0-2-generic",
 		RebootRequired: true, RebootReasons: []string{"kernel", "linux-image-6.8.0-2-generic"}, Held: []string{"linux-image-6.8.0-2-generic", "203.0.113.77"},
-		Apt: "ok", ListsUnix: 1699990000, DpkgUnix: 1699980000, AutoUpdates: "on", BootIdHash: "0123456789abcdef"}
+		Apt: "ok", ListsUnix: 1699990000, DpkgUnix: 1699980000, AutoUpdates: "on", BootIdHash: "0123456789abcdef",
+		Kernels: []*agentv1.OsKernel{
+			{Version: "6.8.0-2-generic", NextBoot: true, Candidate: true, Image: true, GrubEntry: true, Headers: "present", Module: "missing", Packages: "half_configured"},
+			{Version: "6.8.0-1-generic", Running: true, Candidate: true, Image: true, Initrd: true, GrubEntry: true, Headers: "present", Module: "built", Packages: "ok"}},
+		AwgSource: "ok", RebootBlockers: []string{"initramfs_missing", "awg_module_missing"}}
 	w.osUpdates = &adminv1.GetOsUpdatesResponse{NowUnix: 1700000000, ScheduleTimezoneOffsetMinutes: 180, PanelHost: proto.Clone(osStatus).(*agentv1.OsStatus), Nodes: []*adminv1.NodeOs{
 		{NodeId: nodeA, Name: "de1", Connected: true, Supported: true, UpdateCapable: true, OnlineUsers: 3, State: adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES, Status: proto.Clone(osStatus).(*agentv1.OsStatus)},
 		{NodeId: nodeB, Name: "nl1", Connected: false, Supported: true, UpdateCapable: true, UpdateBlock: "offline", RebootBlock: "offline", State: adminv1.OsUpdateState_OS_UPDATE_STATE_OFFLINE},

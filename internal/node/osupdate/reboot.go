@@ -152,6 +152,10 @@ func (r *run) rebootChecks(ctx context.Context, ki kernelInfo, switched bool) *F
 		if len(noBoot) > 0 {
 			add(CodeInitramfsMissing, "the boot files of kernel %s are missing or incomplete", strings.Join(firstN(noBoot, 3), ", "))
 		}
+		// No grub.cfg at all is boot_default_custom's to say (the boot loader may not be GRUB); here the file exists and lacks the entry.
+		if r.host.exists("/boot/grub/grub.cfg") && !grubNames(r.host.text("/boot/grub/grub.cfg"), ki.Newest) {
+			add(CodeBootEntryMissing, "/boot/grub/grub.cfg has no menu entry for kernel %s, which the next boot starts", ki.Newest)
+		}
 		if free, ok := r.host.FreeMB("/boot"); switched && ok && free < minBootFreeMB {
 			add(CodeBootFull, "/boot has only %d MB free", free)
 		}

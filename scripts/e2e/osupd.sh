@@ -29,7 +29,7 @@
 # AmneziaWG alone; a failure of AmneziaWG's own build stops the job (failed/awg_module_build_failed, also with reboot never) in the
 # repair, with its package still there and nothing installed after; a loaded module without a flag holds the reboot; a kernel that
 # linux-version cannot tell (kernel_unknown) holds it; a GRUB default that is not entry 0, a next_entry or no grub.cfg hold it
-# (boot_default_custom); the second reboot of a panel job within the hour is refused (reboot_limit) and a manual one is not; an
+# (boot_default_custom), and so does a menu without an entry for the newest kernel (boot_entry_missing); the second reboot of a panel job within the hour is refused (reboot_limit) and a manual one is not; an
 # unsupported system and a second job are refused; bad requests are refused by the command line.
 # WHAT IT DOES NOT: the real reboot and the return (Go tests with a fake host cover them), AmneziaWG itself (the module is
 # "loaded" by a directory under /sys/module of the sandbox), the linux-version of the distribution (a stand-in is used), DEBIAN

@@ -106,6 +106,7 @@ const samples: Record<string, Record<string, string>> = {
   "security_updates.enable_failed": { reason: "the background task was interrupted before it finished" },
   "security_updates.not_apt": {},
   "security_updates.no_systemd": {},
+  "security_updates.auto_reboot": {},
   "skip.unsupported": { reason: "not a Linux host" },
   "skip.timeout": {},
   "skip.internal": {},

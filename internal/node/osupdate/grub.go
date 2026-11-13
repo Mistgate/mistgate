@@ -6,32 +6,38 @@ import (
 	"strings"
 )
 
-// grubProblem says why the next boot may not start "the newest kernel", or "" when it will. The job checks the newest kernel and
-// the ones below it down to the running one; that is only worth anything when GRUB starts the first menu entry. It refuses when:
+// grubProblem says why the next boot may not start "the newest kernel", or "" when it will; see grubDefaultProblem.
+func (r *run) grubProblem(ctx context.Context) string {
+	return grubDefaultProblem(r.host.exists, r.host.Glob, r.host.text, func() (string, error) { return r.query(ctx, "grub-editenv", "list") })
+}
+
+// grubDefaultProblem is the check behind grubProblem and the reader's reboot preview, over the files and the one command they read.
+// The job checks the newest kernel and the ones below it down to the running one; that is only worth anything when GRUB starts the
+// first menu entry. It refuses when:
 //   - there is no /boot/grub/grub.cfg (another boot loader, or a GRUB whose configuration is somewhere else);
 //   - GRUB_DEFAULT is set in /etc/default/grub or /etc/default/grub.d/*.cfg to anything but 0 ("saved", an entry number or name);
 //   - grub-editenv shows a saved_entry or a next_entry (a one-shot or remembered choice), or cannot be read.
-func (r *run) grubProblem(ctx context.Context) string {
-	if !r.host.exists("/boot/grub/grub.cfg") {
+func grubDefaultProblem(exists func(string) bool, glob func(string) []string, text func(string) string, editenv func() (string, error)) string {
+	if !exists("/boot/grub/grub.cfg") {
 		return "there is no /boot/grub/grub.cfg: the boot loader is not GRUB or its configuration is elsewhere, so the kernel of the next boot is not known"
 	}
 	files := []string{"/etc/default/grub"}
-	extra := r.host.Glob("/etc/default/grub.d/*.cfg")
+	extra := glob("/etc/default/grub.d/*.cfg")
 	sort.Strings(extra)
 	files = append(files, extra...)
 	def := ""
 	for _, f := range files {
-		if v, ok := grubDefaultIn(r.host.text(f)); ok {
+		if v, ok := grubDefaultIn(text(f)); ok {
 			def = v // grub-mkconfig sources the files in this order; the last assignment wins
 		}
 	}
 	if def != "" && def != "0" {
 		return "GRUB_DEFAULT is set to something other than 0, so GRUB may not start the newest kernel"
 	}
-	if !r.host.exists("/boot/grub/grubenv") {
+	if !exists("/boot/grub/grubenv") {
 		return "" // no environment block: nothing is saved, and grub-editenv would only fail to open it
 	}
-	out, err := r.query(ctx, "grub-editenv", "list")
+	out, err := editenv()
 	if err != nil {
 		return "grub-editenv could not be read, so a saved or next boot entry cannot be ruled out"
 	}

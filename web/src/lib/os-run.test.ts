@@ -203,7 +203,7 @@ describe("every sentence has its words in every language", () => {
   const jobCodes = [
     "unsupported_os", "no_systemd", "bad_request", "busy", "disk_full", "apt_lock", "dpkg_broken", "security_source_failed", "refresh_failed", "install_failed", "auto_reboot_conflict", "dpkg_interrupted",
     "awg_module_missing", "boot_full", "initramfs_missing", "reboot_failed", "timeout", "interrupted", "cancelled", "launch_failed", "kernel_not_switched", "awg_module_not_loaded", "inbound_failed",
-    "kernel_unknown", "kernel_older", "awg_module_build_failed", "too_soon", "boot_default_custom", "reboot_limit", "unknown",
+    "kernel_unknown", "kernel_older", "awg_module_build_failed", "too_soon", "boot_default_custom", "boot_entry_missing", "reboot_limit", "unknown",
   ];
   const stepKeys = [
     "offline", "unsupported", "panel_host", "busy", "up_to_date", "not_required", "cancelled", "agent_refused", "job_failed", "reboot_held", "no_answer", "not_back", "kernel_not_switched", "state_not_applied",

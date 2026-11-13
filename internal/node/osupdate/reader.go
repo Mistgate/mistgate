@@ -131,8 +131,9 @@ func (r *Reader) Read(ctx context.Context) (*agentv1.OsStatus, error) {
 	}
 	s.Container = r.containerKind(ctx)
 	if s.Container == "" {
-		if newest, err := r.newestKernel(ctx); err == nil {
-			s.KernelNewest = newest
+		if ki, sorted, err := r.installedKernels(ctx, s.KernelRunning); err == nil {
+			s.KernelNewest = ki.Newest
+			r.kernelTable(ctx, s, statusRows, sorted, ki)
 		}
 	}
 
@@ -162,6 +163,7 @@ func (r *Reader) Read(ctx context.Context) (*agentv1.OsStatus, error) {
 	}
 	r.autoUpdates(ctx, s)
 	r.awgModule(s, statusRows)
+	// TODO(A1, the module source fix): s.AwgSource (ok | patched | needs_patch | unknown:<12 hex>) is filled once awgprep can tell it; until then it stays empty.
 	return s, simErr
 }
 
@@ -217,28 +219,41 @@ func (r *Reader) packageStatuses(ctx context.Context) (string, error) {
 	return string(out), err
 }
 
-func (r *Reader) newestKernel(ctx context.Context) (string, error) {
+// installedKernels lists the installed kernels, highest first, and tells the one the next boot starts (kernelCandidates, as the job
+// does). The list is empty when linux-version lists none.
+func (r *Reader) installedKernels(ctx context.Context, running string) (kernelInfo, []string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	list, err := r.Run(ctx, "linux-version", "list")
 	if err != nil {
-		return "", err
+		return kernelInfo{}, nil, err
 	}
-	versions := strings.Fields(string(list))
-	if len(versions) == 0 {
-		return "", nil
-	}
-	args := append([]string{"sort", "--reverse"}, versions...)
-	sorted, err := r.Run(ctx, "linux-version", args...)
-	if err != nil {
-		return "", err
-	}
-	for _, v := range strings.Fields(string(sorted)) {
+	var installed []string
+	for _, v := range strings.Fields(string(list)) {
 		if safeKernelVersion(v) {
-			return v, nil
+			installed = append(installed, v)
 		}
 	}
-	return "", errors.New("linux-version returned no kernel version")
+	if len(installed) == 0 {
+		return kernelInfo{}, nil, nil
+	}
+	args := append([]string{"sort", "--reverse"}, kernelsToSort(installed, running)...)
+	out, err := r.Run(ctx, "linux-version", args...)
+	if err != nil {
+		return kernelInfo{}, nil, err
+	}
+	sorted := strings.Fields(string(out))
+	ki := kernelCandidates(sorted, installed, running)
+	if ki.Newest == "" {
+		return kernelInfo{}, nil, errors.New("linux-version returned no kernel version")
+	}
+	var highestFirst []string
+	for _, v := range sorted {
+		if contains(installed, v) {
+			highestFirst = append(highestFirst, v)
+		}
+	}
+	return ki, highestFirst, nil
 }
 
 func safeKernelVersion(s string) bool {

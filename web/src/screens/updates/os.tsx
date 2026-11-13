@@ -8,6 +8,7 @@ import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
 import { osPill, osRows, osSummary, osSystem, useOsUpdates, type OsRow } from "@/lib/os-updates";
 import { OsNodeActions, OsRowMenu } from "./os-actions";
+import { OsKernels } from "./os-kernels";
 
 // Updates -> Server operating system: the packages and the kernel of the panel's own server and of every node, as the
 // servers read them from disk. A node's row ends in the ⋯ menu that installs its security updates, reboots it or checks for
@@ -158,6 +159,10 @@ export function OsSection() {
                 <div className="col-span-full empty:hidden">
                   <OsNodeActions row={row} compact />
                 </div>
+                {/* a reboot the kernel table says would be refused: shown open, only then */}
+                <div className="col-span-full empty:hidden">
+                  <OsKernels row={row} onlyBlocked />
+                </div>
               </div>
             ))}
           </div>
@@ -178,6 +183,9 @@ export function OsSection() {
                 <State row={row} />
                 <div className="empty:hidden">
                   <OsNodeActions row={row} compact />
+                </div>
+                <div className="empty:hidden">
+                  <OsKernels row={row} onlyBlocked />
                 </div>
               </div>
             ))}

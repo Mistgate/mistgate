@@ -96,9 +96,55 @@ func validOsStatus(s *agentv1.OsStatus, now time.Time) bool {
 		}
 	}
 	s.Notable = slices.DeleteFunc(s.Notable, func(notable string) bool { return !validNotable(notable) })
+	// The kernel table and its companions are optional: one that does not check out is dropped, the rest is kept.
+	if !validOsKernels(s.Kernels) || !validOsBlockers(s.RebootBlockers) {
+		s.Kernels, s.RebootBlockers = nil, nil
+	}
+	if !osAwgSource.MatchString(s.AwgSource) {
+		s.AwgSource = ""
+	}
 	// A job that does not check out is dropped on its own, like a bad notable entry: the rest of the snapshot is stored.
 	if s.Job != nil && !validOsJob(s.Job, now) {
 		s.Job = nil
+	}
+	return true
+}
+
+var osAwgSource = regexp.MustCompile("^(|ok|patched|needs_patch|unknown:[0-9a-f]{12})$")
+
+// validOsKernels bounds the kernel table: at most 8 rows, each a safe version once, the words of agent.proto OsKernel, at most one
+// running and one next-boot row.
+func validOsKernels(ks []*agentv1.OsKernel) bool {
+	if len(ks) > 8 {
+		return false
+	}
+	seen := map[string]bool{}
+	running, next := 0, 0
+	for _, k := range ks {
+		if k == nil || !osKernelText.MatchString(k.Version) || !safeOSValue(k.Version) || seen[k.Version] ||
+			!oneOf(k.Headers, "present", "missing") || !oneOf(k.Module, "", "built", "missing", "unknown") || !oneOf(k.Packages, "ok", "half_configured") {
+			return false
+		}
+		seen[k.Version] = true
+		if k.Running {
+			running++
+		}
+		if k.NextBoot {
+			next++
+		}
+	}
+	return running <= 1 && next <= 1
+}
+
+// validOsBlockers: the codes of the reader's reboot preview, each once.
+func validOsBlockers(codes []string) bool {
+	if len(codes) > len(osupdate.RebootBlockers) {
+		return false
+	}
+	for i, c := range codes {
+		if !slices.Contains(osupdate.RebootBlockers, c) || slices.Contains(codes[:i], c) {
+			return false
+		}
 	}
 	return true
 }

@@ -346,6 +346,7 @@ The node decides whether a reboot is safe, and the panel has no way around its a
 | `busy` | Another job is running on the server: wait for it to finish. |
 | `too_soon` | The server restarted less than 10 minutes ago, so it was not rebooted again. |
 | `reboot_limit` | The panel already rebooted this server within the last hour or three times today, so it will not do it again yet. |
+| `boot_entry_missing` | `/boot/grub/grub.cfg` has no menu entry for the newest kernel, so a reboot would not start it and the node was not rebooted: run `update-grub` on the server or reboot from your provider’s panel. |
 | `boot_default_custom` | The boot menu (GRUB) is set to a chosen or saved entry, not the newest kernel, so the node was not rebooted: set GRUB_DEFAULT=0 or reboot from your provider’s panel. |
 | `awg_module_missing` | The AmneziaWG module is not built for the new kernel, so the node was not rebooted: build the module first. |
 | `awg_module_build_failed` | The AmneziaWG module failed to build for the new kernel; the node was not rebooted and the loaded module keeps working: fix the build first. |
@@ -380,6 +381,20 @@ The node decides whether a reboot is safe, and the panel has no way around its a
 
 The panel keeps the whole state in its database, so a panel restart in the middle loses nothing: it finds the job by its id and goes on. The node's events `os_update_started`, `os_update_done`, `os_update_failed` and `os_reboot_started` and the panel's `os_step_passed` and `os_step_failed` are on the node's **History** tab; the audit log has `os_rollout_start`, `os_rollout_cancel` and `os_refresh`.
 
+### The kernel table
+
+The node's Operating system card (Node → Server) lists the installed kernels, newest first, at most 8. One row is one kernel, with five small marks that say whether it can be started:
+
+- **Boot**: the kernel image is in `/boot` and its initramfs is at least 1 MiB.
+- **GRUB**: `/boot/grub/grub.cfg` names the kernel.
+- **Headers**: `/usr/src/linux-headers-<kernel>` is there.
+- **Module**: the AmneziaWG module is built for it. Grey when AmneziaWG does not use the kernel module, or when the agent cannot see the build (a plain build on Debian).
+- **Packages**: the kernel's `linux-*` packages are fully configured.
+
+The line under the title reads "Next boot: ready", or "A reboot would be refused: …" with the first reason (`initramfs_missing`, `boot_entry_missing`, `awg_module_missing`, `dpkg_interrupted`, `kernel_older` or `boot_default_custom`, the same codes as the reboot job below). In the Updates table the block appears, open, only for such a node. While a reboot would be refused, **Reboot…** is off with the same reason. The agent reads these files in its own sandbox and changes nothing; the reboot job checks again as root and decides, so the table is a preview, not a promise. An agent from before this version shows "Update the agent to see the kernel table".
+
+The Security updates check in Health also warns when `unattended-upgrades` has `Automatic-Reboot` on while AmneziaWG runs on the kernel module: that reboot is outside the agent's guard and can land on a kernel without the module. Turn `Automatic-Reboot` off.
+
 ### Running by hand on a node
 
 The panel starts this same job for one node (see [Update one server's system](#update-one-servers-system)). The node can also run one itself, and the owner can start it on one server over SSH (as root; Debian 12 or 13, Ubuntu 22.04, 24.04 or 26.04 with systemd):
@@ -407,6 +422,7 @@ Before it reboots, the command checks and refuses, rebooting nothing and ending 
 - the AmneziaWG module is loaded (or `--awg-required` is given) and is not built for every kernel the boot menu can end up on: the newest installed one and each lower one that is not older than the running kernel (`awg_module_missing`);
 - the image or initramfs of one of those kernels is missing or cut short (`initramfs_missing`), or, when the kernel changes, `/boot` has under 50 MB free (`boot_full`);
 - GRUB may not start its first entry: there is no `/boot/grub/grub.cfg`, `GRUB_DEFAULT` is set to anything but `0` in `/etc/default/grub` or `/etc/default/grub.d/*.cfg`, `grub-editenv list` shows a `saved_entry` or a `next_entry`, or `grub-editenv` cannot be read (`boot_default_custom`);
+- `/boot/grub/grub.cfg` exists but does not name `vmlinuz-<kernel>` for the newest installed kernel (`boot_entry_missing`);
 - the host booted less than 10 minutes ago (`too_soon`): a node is not rebooted in a loop;
 - for a job sent by the panel (an id that starts with `osj_`): the node was rebooted by such a job less than an hour ago or three times in the last 24 hours, or the reboot history, kept next to `os-update.json`, is unreadable or ahead of the clock (`reboot_limit`). Commands started by hand are not limited.
 

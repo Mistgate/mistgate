@@ -631,38 +631,15 @@ func (r *run) bootKernel(ctx context.Context) (kernelInfo, *Failure) {
 		return unknown("no installed kernel")
 	}
 	running := r.host.KernelRunning()
-	all := append([]string(nil), versions...)
-	if safeKernelVersion(running) && !contains(versions, running) {
-		all = append(all, running)
-	}
-	newest := ""
-	sorted, err := r.query(cctx, append([]string{"linux-version", "sort", "--reverse"}, all...)...)
+	sorted, err := r.query(cctx, append([]string{"linux-version", "sort", "--reverse"}, kernelsToSort(versions, running)...)...)
 	if err != nil {
 		return unknown("linux-version sort failed")
 	}
-	// The sorted list is highest first. The first installed version in it is what GRUB starts; when the running kernel (not
-	// among the installed ones) comes before it, the next boot goes down to an older kernel.
-	newIdx, runIdx := -1, -1
-	fields := strings.Fields(sorted)
-	for i, v := range fields {
-		if newIdx < 0 && contains(versions, v) {
-			newIdx = i
-			newest = v
-		}
-		if runIdx < 0 && v == running {
-			runIdx = i
-		}
-	}
-	if newIdx < 0 {
+	ki := kernelCandidates(strings.Fields(sorted), versions, running)
+	if ki.Newest == "" {
 		return unknown("linux-version returned nothing usable")
 	}
-	var cands []string
-	for i, v := range fields {
-		if contains(versions, v) && (runIdx < 0 || i <= runIdx) {
-			cands = append(cands, v)
-		}
-	}
-	return kernelInfo{Newest: newest, Older: runIdx >= 0 && runIdx < newIdx, Candidates: cands}, nil
+	return ki, nil
 }
 
 func contains(list []string, s string) bool {

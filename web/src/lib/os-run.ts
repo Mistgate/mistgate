@@ -8,6 +8,7 @@ import { en, type MessageKey } from "@/i18n/en";
 import { updates } from "./api";
 import { errorText } from "./errors";
 import { minutesText } from "./format";
+import { kernelBlock, kernelWhyKey, parseKernelBlock } from "./os-kernels";
 import { osUpdatesQuery, type OsRow, type OsRun, type OsStepRow } from "./os-updates";
 import { plain } from "./plain";
 
@@ -166,7 +167,7 @@ export function stepPill(step: Pick<OsStepRow, "state">): { kind: StatusKind; ke
 // What the buttons may do
 
 export type OsAction = "install" | "reboot" | "refresh";
-type Blocks = Pick<OsRow, "updateBlock" | "rebootBlock" | "rollout" | "step">;
+type Blocks = Pick<OsRow, "updateBlock" | "rebootBlock" | "rollout" | "step"> & Partial<Pick<OsRow, "status">>;
 
 /** Why an action is not available now ("" = it is): the server's word for the node, and any run that is not closed yet. */
 export function blockOf(row: Blocks, action: OsAction): string {
@@ -174,11 +175,15 @@ export function blockOf(row: Blocks, action: OsAction): string {
     // refreshing only reads: a busy, offline or old node stops it, a run on another node does not
     return ["offline", "agent_old", "unsupported", "panel_host", "node_busy"].includes(row.updateBlock) ? row.updateBlock : row.step && stepOpen(row.step) ? "rollout_active" : "";
   }
-  return (action === "reboot" ? row.rebootBlock : row.updateBlock) || (rolloutBlocksOthers(row.rollout) ? "rollout_active" : "");
+  // a reboot the node's own kernel table says would be refused is off too, with that reason (the node refuses it all the same)
+  const own = action === "reboot" ? row.rebootBlock || kernelBlock(row.status) : row.updateBlock;
+  return own || (rolloutBlocksOthers(row.rollout) ? "rollout_active" : "");
 }
 
 /** The words for a block key ("os.block.<key>"); a key from a newer panel reads as sent. */
 export function blockText(t: T, key: string): string {
+  const kernel = parseKernelBlock(key);
+  if (kernel) return t("up.os.kern.refused", { why: t(kernelWhyKey(kernel.code), { kernel: kernel.kernel }) });
   const k = `os.block.${key}`;
   return hasKey(k) ? t(k) : key;
 }

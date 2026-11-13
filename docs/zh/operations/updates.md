@@ -346,6 +346,7 @@ journalctl -u mistgate -n 50
 | `busy` | 服务器上已有其他任务在运行：请等待其结束。 |
 | `too_soon` | 服务器 10 分钟内刚重启过，因此没有再次重启。 |
 | `reboot_limit` | 面板在最近一小时内或今天已三次重启过此服务器，因此暂不再重启。 |
+| `boot_entry_missing` | `/boot/grub/grub.cfg` 中没有最新内核的菜单条目，重启不会启动它，因此节点没有重启：请在服务器上运行 `update-grub`，或在服务商面板中重启。 |
 | `boot_default_custom` | 启动菜单（GRUB）被设为指定或已保存的条目，而不是最新内核，因此节点没有重启：请设置 GRUB_DEFAULT=0，或在服务商面板中重启。 |
 | `awg_module_missing` | AmneziaWG 模块尚未为新内核构建，因此节点没有重启：请先构建模块。 |
 | `awg_module_build_failed` | AmneziaWG 模块无法为新内核构建；节点没有重启，已加载的模块继续工作：请先修复构建。 |
@@ -380,6 +381,20 @@ journalctl -u mistgate -n 50
 
 面板把全部状态保存在数据库中，所以更新途中重启面板不会丢失任何东西：它会按 id 找到任务并继续。节点事件 `os_update_started`、`os_update_done`、`os_update_failed`、`os_reboot_started` 以及面板的 `os_step_passed`、`os_step_failed` 显示在节点的**历史**标签页；审计日志记录 `os_rollout_start`、`os_rollout_cancel` 和 `os_refresh`。
 
+### 内核表
+
+节点的“操作系统”卡片（节点 → 服务器）按从新到旧列出已安装的内核，最多 8 个。每行是一个内核，带五个小标记，说明它能否启动：
+
+- **启动**：内核映像在 `/boot` 中，且 initramfs 不小于 1 MiB。
+- **GRUB**：`/boot/grub/grub.cfg` 列出了该内核。
+- **头文件**：存在 `/usr/src/linux-headers-<内核>`。
+- **模块**：已为它构建 AmneziaWG 模块。AmneziaWG 不使用内核模块，或 Agent 看不到构建结果（Debian 上的普通构建）时为灰色。
+- **软件包**：该内核的 `linux-*` 软件包已完全配置。
+
+标题下的一行显示“下次启动：就绪”，或“重启会被拒绝：…”并给出第一个原因（`initramfs_missing`、`boot_entry_missing`、`awg_module_missing`、`dpkg_interrupted`、`kernel_older` 或 `boot_default_custom`，与下文重启任务的代码相同）。在“更新”表格中，只有这样的节点才会显示该区块，并且是展开的。只要重启会被拒绝，**重启…** 就会关闭并显示同样的原因。Agent 在自己的沙箱中读取这些文件，不做任何修改；重启任务会以 root 身份重新检查并作出决定，所以这张表是预览，而不是保证。早于此版本的 Agent 会显示“请更新 Agent 以查看内核表”。
+
+“健康”中的“安全更新”检查还会在 `unattended-upgrades` 开启了 `Automatic-Reboot`、而 AmneziaWG 运行在内核模块上时发出警告：这种重启不受 Agent 保护检查的约束，可能落到没有该模块的内核上。请关闭 `Automatic-Reboot`。
+
 ### 在节点上手动运行
 
 面板会为单个节点启动同一个任务（参见[更新单个服务器的系统](#更新单个服务器的系统)）。节点自己也可以执行这个任务，所有者可以通过 SSH 在单台服务器上启动它（以 root 运行；Debian 12 或 13，Ubuntu 22.04、24.04 或 26.04，需带 systemd）：
@@ -407,6 +422,7 @@ systemd-run --unit=mistgate-os-update --collect --property=KillMode=mixed --prop
 - AmneziaWG 模块已加载（或给出了 `--awg-required`），而尚未为启动菜单可能进入的每个内核构建：已安装的最新内核，以及每个不比正在运行的内核更旧的较低内核（`awg_module_missing`）；
 - 这些内核之一的映像或 initramfs 缺失或不完整（`initramfs_missing`），或内核变更时 `/boot` 可用空间不足 50 MB（`boot_full`）；
 - GRUB 可能不会启动第一项：没有 `/boot/grub/grub.cfg`，`/etc/default/grub` 或 `/etc/default/grub.d/*.cfg` 中的 `GRUB_DEFAULT` 不是 `0`，`grub-editenv list` 显示 `saved_entry` 或 `next_entry`，或 `grub-editenv` 无法读取（`boot_default_custom`）；
+- `/boot/grub/grub.cfg` 存在，但没有为最新已安装的内核列出 `vmlinuz-<内核>`（`boot_entry_missing`）；
 - 服务器启动不足 10 分钟（`too_soon`）：节点不会被循环重启；
 - 对面板发送的任务（标识以 `osj_` 开头）：该节点不足一小时前已被此类任务重启过，或 24 小时内已重启三次，或 `os-update.json` 旁边的重启历史无法读取或比时钟更超前（`reboot_limit`）。手动启动的命令不受此限制。
 

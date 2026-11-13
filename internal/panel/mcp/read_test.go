@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"unicode"
@@ -101,6 +102,14 @@ func TestOsUpdatesStatusIsStoredOnlyAndScrubsUntrustedText(t *testing.T) {
 	v := decode[OsUpdatesV](t, out)
 	if len(v.Nodes) != 1 || v.Nodes[0].NodeID != nodeA || v.Nodes[0].Name != "de1" || v.Nodes[0].Status == nil {
 		t.Fatalf("selected OS status = %+v", v)
+	}
+	st := v.Nodes[0].Status
+	if len(st.Kernels) != 2 || st.Kernels[0].Version != "6.8.0-2-generic" || !st.Kernels[0].NextBoot || st.Kernels[0].Initrd || st.Kernels[0].Module != "missing" ||
+		st.Kernels[0].Packages != "half_configured" || !st.Kernels[1].Running || st.AwgSource != "ok" {
+		t.Fatalf("the kernel table did not reach the tool result: %+v", st)
+	}
+	if !slices.Equal(st.RebootBlockers, []string{"initramfs_missing", "awg_module_missing"}) {
+		t.Fatalf("reboot blockers = %v", st.RebootBlockers)
 	}
 	e.w.mu.Lock()
 	calls := e.w.osUpdatesCalls

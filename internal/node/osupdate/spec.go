@@ -57,6 +57,8 @@ const (
 	CodeAwgBuildFailed = "awg_module_build_failed"
 	// CodeBootDefaultCustom: what GRUB starts is not "the newest kernel": a custom default, a saved or next entry, or not GRUB.
 	CodeBootDefaultCustom = "boot_default_custom"
+	// CodeBootEntryMissing: /boot/grub/grub.cfg does not name the image of the kernel the next boot starts.
+	CodeBootEntryMissing = "boot_entry_missing"
 	// CodeRebootLimit: the node reboots at most once an hour and three times a day for jobs of the panel.
 	CodeRebootLimit = "reboot_limit"
 	// CodeTooSoon: the host booted less than MinUptime ago; a second reboot so soon is not done.
@@ -67,7 +69,10 @@ const (
 var Codes = []string{CodeUnsupportedOS, CodeNoSystemd, CodeBadRequest, CodeBusy, CodeDiskFull, CodeAptLock, CodeDpkgBroken, CodeSecuritySource,
 	CodeRefreshFailed, CodeInstallFailed, CodeAutoReboot, CodeDpkgInterrupted, CodeAwgModuleMissing, CodeBootFull, CodeInitramfsMissing,
 	CodeRebootFailed, CodeTimeout, CodeInterrupted, CodeCancelled, CodeLaunchFailed, CodeKernelNotSwitched, CodeAwgNotLoaded, CodeInboundFailed,
-	CodeKernelUnknown, CodeKernelOlder, CodeAwgBuildFailed, CodeTooSoon, CodeBootDefaultCustom, CodeRebootLimit}
+	CodeKernelUnknown, CodeKernelOlder, CodeAwgBuildFailed, CodeTooSoon, CodeBootDefaultCustom, CodeBootEntryMissing, CodeRebootLimit}
+
+// RebootBlockers are the codes of Codes that the reader's reboot preview (OsStatus.reboot_blockers) can carry.
+var RebootBlockers = []string{CodeInitramfsMissing, CodeBootEntryMissing, CodeAwgModuleMissing, CodeDpkgInterrupted, CodeKernelOlder, CodeBootDefaultCustom}
 
 // Phases lists the phases of a running job.
 var Phases = []string{PhasePreflight, PhaseWaitingLock, PhaseRepairing, PhaseRefreshing, PhaseInstalling, PhaseAwgModule, PhaseChecking, PhaseRebooting}
