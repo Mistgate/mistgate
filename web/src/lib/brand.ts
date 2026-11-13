@@ -46,9 +46,11 @@ export function sanitizeLogo(source: string): string | null {
   if (root.localName !== "svg" || doc.querySelector("parsererror")) return null;
 
   const walk = (el: Element) => {
-    for (const child of Array.from(el.children)) {
-      if (!allowedTags.has(child.localName.toLowerCase())) child.remove();
-      else walk(child);
+    for (const child of Array.from(el.childNodes)) {
+      // Only elements stay: a comment that is inert in XML turns into markup once the string is parsed as HTML.
+      if (child.nodeType !== Node.ELEMENT_NODE) child.remove();
+      else if (!allowedTags.has((child as Element).localName.toLowerCase())) child.remove();
+      else walk(child as Element);
     }
     for (const attr of Array.from(el.attributes)) {
       const name = attr.name.toLowerCase();

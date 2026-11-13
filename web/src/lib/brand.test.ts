@@ -30,6 +30,19 @@ describe("sanitizeLogo", () => {
     expect(out).toContain('fill="url(#g)"');
   });
 
+  it("drops comments, text and processing instructions, which an HTML parser would read differently", () => {
+    const out = sanitizeLogo(svg("<!--><img src=x onerror=alert(1)>--><g>text<!-- c --><path d=\"M0 0h1\"/></g><?pi data?>"))!;
+    expect(out).not.toContain("<!--");
+    expect(out).not.toContain("-->");
+    expect(out).not.toContain("<img");
+    expect(out).not.toContain("onerror");
+    expect(out).not.toContain("text");
+    expect(out).toContain("<path");
+    const host = document.createElement("div");
+    host.innerHTML = out;
+    expect(host.querySelector("img")).toBeNull();
+  });
+
   it("rejects things that are not a usable SVG", () => {
     expect(sanitizeLogo("<div>not svg</div>")).toBeNull();
     expect(sanitizeLogo("<svg><path></svg>")).toBeNull();
