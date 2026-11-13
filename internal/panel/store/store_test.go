@@ -180,6 +180,12 @@ func TestSetupTokenSingleUse(t *testing.T) {
 	if got.SignCount != 7 || got.Flags != 0x5d {
 		t.Errorf("touch not stored: %+v", got)
 	}
+	if err := s.TouchPasskey(ctx, []byte("cred-1"), 5, 0x5d, now); err != nil { // finished after a later sign-in
+		t.Fatal(err)
+	}
+	if got, _ = s.PasskeyByCredentialID(ctx, []byte("cred-1")); got.SignCount != 7 {
+		t.Errorf("an older counter lowered sign_count to %d", got.SignCount)
+	}
 }
 
 func TestSessions(t *testing.T) {

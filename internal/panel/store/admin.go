@@ -350,10 +350,11 @@ func (s *Store) PasskeysByAdmin(ctx context.Context, adminID string) ([]Passkey,
 }
 
 // TouchPasskey records a successful sign-in: new signature counter, flags (backup
-// state may change) and last-used time.
+// state may change) and last-used time. The counter never goes down: two sign-ins that finish out of order must not
+// leave the older count behind (it is what a cloned authenticator is caught by).
 func (s *Store) TouchPasskey(ctx context.Context, credID []byte, signCount uint32, flags byte, now time.Time) error {
 	_, err := s.W.ExecContext(ctx,
-		`UPDATE passkey SET sign_count = ?, flags = ?, last_used_at = ? WHERE credential_id = ?`,
+		`UPDATE passkey SET sign_count = max(sign_count, ?), flags = ?, last_used_at = ? WHERE credential_id = ?`,
 		int64(signCount), int64(flags), unix(now), credID)
 	return err
 }
