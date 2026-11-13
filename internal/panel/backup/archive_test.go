@@ -555,3 +555,37 @@ func makeTraversalArchive(t *testing.T, identity *age.HybridIdentity) []byte {
 	}
 	return output.Bytes()
 }
+
+// A passphrase restore refuses an archive whose header asks for more scrypt work than the cap, and takes one at the cap.
+func TestPassphraseRestoreCapsTheScryptWorkFactor(t *testing.T) {
+	const passphrase = "correct horse battery staple"
+	defer func(v int) { maxScryptWorkFactor = v }(maxScryptWorkFactor)
+	maxScryptWorkFactor = 10
+	for _, tc := range []struct {
+		logN int
+		ok   bool
+	}{{10, true}, {11, false}} {
+		recipient, err := age.NewScryptRecipient(passphrase)
+		if err != nil {
+			t.Fatal(err)
+		}
+		recipient.SetWorkFactor(tc.logN)
+		var enc bytes.Buffer
+		w, err := age.Encrypt(&enc, recipient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte("x"))
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		identity, err := passphraseIdentity(passphrase)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = age.Decrypt(bytes.NewReader(enc.Bytes()), identity)
+		if (err == nil) != tc.ok {
+			t.Errorf("logN %d: err = %v, want ok=%v", tc.logN, err, tc.ok)
+		}
+	}
+}

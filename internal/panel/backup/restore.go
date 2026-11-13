@@ -445,7 +445,7 @@ func restoreIdentities(msg *adminv1.PrepareRestoreRequest) ([]age.Identity, erro
 	}
 	passphrase := msg.Passphrase
 	msg.Passphrase = ""
-	identity, err := age.NewScryptIdentity(passphrase)
+	identity, err := passphraseIdentity(passphrase)
 	passphraseBytes := []byte(passphrase)
 	clear(passphraseBytes)
 	if err != nil {

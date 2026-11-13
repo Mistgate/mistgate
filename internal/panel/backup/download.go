@@ -30,6 +30,21 @@ const (
 	scryptWorkFactor   = 18 // logN 18: approximately one second on a modern machine, matching age's reasonable default.
 )
 
+// maxScryptWorkFactor is the highest logN a passphrase restore will work out. An archive says in its own header how hard
+// its key is to derive (age allows up to 22: about 4 GiB of memory); the panel writes 18 and age's tool 18, so 20 (1 GiB)
+// leaves room and refuses an archive built to exhaust the machine. A var so a test can lower it.
+var maxScryptWorkFactor = 20
+
+// passphraseIdentity is the age identity of a restore passphrase, with the work factor capped.
+func passphraseIdentity(passphrase string) (*age.ScryptIdentity, error) {
+	identity, err := age.NewScryptIdentity(passphrase)
+	if err != nil {
+		return nil, err
+	}
+	identity.SetMaxWorkFactor(maxScryptWorkFactor)
+	return identity, nil
+}
+
 // DownloadHandler is mounted beside the Connect admin services under the same session and cross-origin protection.
 func (s *Service) DownloadHandler() (string, http.Handler) {
 	return downloadPath, http.HandlerFunc(s.download)

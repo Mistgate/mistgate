@@ -136,7 +136,7 @@ func runRestore(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		identity, err := age.NewScryptIdentity(passphrase)
+		identity, err := passphraseIdentity(passphrase)
 		if err != nil {
 			return errors.New("backup: cannot create passphrase identity")
 		}
