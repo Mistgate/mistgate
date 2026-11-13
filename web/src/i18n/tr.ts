@@ -250,6 +250,8 @@ const core: CoreMessages = {
   "err.preset_is_default": "Bu varsayılan ön ayar. Önce başka birini varsayılan yap.",
   "err.preset_builtin": "Yerleşik ön ayar silinemez.",
   "field.port.out_of_range": "Port 1 ile 65535 arasında olmalı",
+  "field.obfuscation.jc.handshake_budget": "Jc, boş olmayan I1–I5 paketleri ve bir el sıkışma paketi toplamı 128'i aşmamalı.",
+  "field.obfuscation.header_protection_key.rt_range_requires_hpk": "Rastgele kuyruklar açıkken tek değerden geniş her H1–H4 aralığı bir başlık koruma anahtarı gerektirir.",
   "field.hop.from.invalid": "Port, atlama aralığının dışında olmalı",
   "field.hop.from.out_of_range": "Aralık 1024 ile 65535 arasında başlamalı, SSH ve diğer bilinen portlara denk gelmemeli",
   "field.hop.to.too_wide": "Aralıkta en fazla 20.000 port olabilir",

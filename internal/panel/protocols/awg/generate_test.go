@@ -27,6 +27,9 @@ func TestGeneratedObfuscationIsAlwaysValid(t *testing.T) {
 					if e := validate(s); len(e) > 0 {
 						t.Fatalf("%s %s mtu %d seed %d: %+v\n%+v", version, p.ID, mtu, seed, e, o)
 					}
+					if o.Jc+nonEmptySignaturePackets(o.I())+1 > maxJc {
+						t.Fatalf("%s %s mtu %d seed %d exceeds the handshake packet budget: %+v", version, p.ID, mtu, seed, o)
+					}
 					if o.Jmax >= mtu {
 						t.Fatalf("jmax %d not below mtu %d", o.Jmax, mtu)
 					}
@@ -39,7 +42,7 @@ func TestGeneratedObfuscationIsAlwaysValid(t *testing.T) {
 					if version == Version31 && (o.HeaderProtectionKey == "" || !o.RandomTrailers || o.S1 != o.S2 || o.S2 != o.S3 || o.S3 != o.S4) {
 						t.Fatalf("3.1 shape: %+v", o)
 					}
-					if version == Version20 && (o.HeaderProtectionKey != "" || o.RandomTrailers || o.ContentPaddingAddition != "" || o.PersistentKeepalive != "25" || plainHeaders(o)) {
+					if version == Version20 && (o.HeaderProtectionKey != "" || o.RandomTrailers || o.ContentPaddingAddition != "" || o.PersistentKeepalive != "25" || plainHeaders(o) || o.S4 == 16) {
 						t.Fatalf("2.0 carries 3.x keys or plain headers: %+v", o)
 					}
 					for _, w := range warnings(s) {
@@ -126,6 +129,9 @@ func TestGenerateKeepsTheDataPacketWithinThePath(t *testing.T) {
 				o, err := GenerateObfuscationSeeded(version, "stun", mtu, seed, "")
 				if err != nil {
 					t.Fatal(err)
+				}
+				if version == Version20 && o.S4 == 16 {
+					t.Fatalf("2.0 mtu %d seed %d generated S4=16", mtu, seed)
 				}
 				s := fixture31()
 				s.Version, s.MTU, s.Obfuscation = version, mtu, o

@@ -159,6 +159,9 @@ func generate(version, preset string, mtu int, domain string, rng *mrand.Rand, k
 		return Obfuscation{}, err
 	}
 	o := sig
+	// Keep the junk count within amneziawg-go's handshake packet budget even if the preset
+	// chain or the generated Jc range changes later.
+	jc = min(jc, maxJc-nonEmptySignaturePackets(sig.I())-1)
 	o.Jc, o.Jmin, o.Jmax = jc, jmin, jmax
 
 	var seed [16]byte
@@ -198,9 +201,9 @@ func generate(version, preset string, mtu int, domain string, rng *mrand.Rand, k
 
 	// 2.0: S1, S2 in [15,150], S3 in [8,55], S4 in [4,27] (less when the MTU leaves no room); the four packet
 	// sizes must differ.
-	hr := maxS4(mtu)
 	for {
-		o.S1, o.S2, o.S3, o.S4 = between(15, 150), between(15, 150), between(8, 55), between(min(4, hr), min(27, hr))
+		o.S1, o.S2, o.S3 = between(15, 150), between(15, 150), between(8, 55)
+		o.S4 = randomS4(rng, mtu)
 		if a, b, c, d := 148+o.S1, 92+o.S2, 64+o.S3, 32+o.S4; a != b && a != c && a != d && b != c && b != d && c != d {
 			break
 		}
@@ -230,6 +233,20 @@ func generate(version, preset string, mtu int, domain string, rng *mrand.Rand, k
 	o.H1, o.H2, o.H3, o.H4 = hs[0], hs[1], hs[2], hs[3]
 	o.PersistentKeepalive = "25"
 	return o, nil
+}
+
+// randomS4 draws uniformly from the old MTU-bounded range, except for 16. In 2.0 that value
+// can make a padded data packet a multiple of 16 bytes, which looks like plain WireGuard.
+func randomS4(rng *mrand.Rand, mtu int) int {
+	lo, hi := min(4, maxS4(mtu)), min(27, maxS4(mtu))
+	if lo <= 16 && hi >= 16 {
+		v := lo + rng.IntN(hi-lo)
+		if v >= 16 {
+			v++
+		}
+		return v
+	}
+	return lo + rng.IntN(hi-lo+1)
 }
 
 func sortInts(a []int) {

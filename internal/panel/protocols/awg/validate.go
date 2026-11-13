@@ -117,6 +117,8 @@ func validate(s Settings) []protocols.FieldError {
 	// 3. junk packets
 	if o.Jc < 0 || o.Jc > maxJc {
 		add("/obfuscation/jc", "out_of_range", "Jc must be 0-128")
+	} else if nonEmptySignaturePackets(o.I())+1 > maxJc-o.Jc {
+		add("/obfuscation/jc", "handshake_budget", fmt.Sprintf("Jc (%d) plus %d non-empty signature packets and one handshake packet must not exceed %d", o.Jc, nonEmptySignaturePackets(o.I()), maxJc))
 	}
 	if o.Jmin < 0 || o.Jmin > maxJunk {
 		add("/obfuscation/jmin", "out_of_range", "Jmin must be 0-1280")
@@ -154,6 +156,7 @@ func validate(s Settings) []protocols.FieldError {
 
 	// 5. header types: four non-overlapping ranges; "off" is exactly 1,2,3,4 and all four are always sent
 	var hr [4]rng
+	wideHeaders := false
 	hOK := true
 	for i, hv := range o.H() {
 		r, err := parseRange(hv, maxUint32)
@@ -163,6 +166,10 @@ func validate(s Settings) []protocols.FieldError {
 			continue
 		}
 		hr[i] = r
+		wideHeaders = wideHeaders || r.lo < r.hi
+	}
+	if s.Version == Version31 && o.RandomTrailers && !hpk && wideHeaders {
+		add("/obfuscation/header_protection_key", "rt_range_requires_hpk", "RandomTrailers with an H1-H4 range wider than one value requires a header protection key")
 	}
 	if hOK {
 		for i := 0; i < 4; i++ {
@@ -259,6 +266,16 @@ func Warnings(raw json.RawMessage) []Warning {
 // plainHeaders reports H1..H4 = 1, 2, 3, 4: the message types of plain WireGuard.
 func plainHeaders(o Obfuscation) bool { return o.H() == [4]string{"1", "2", "3", "4"} }
 
+func nonEmptySignaturePackets(packets [5]string) int {
+	n := 0
+	for _, packet := range packets {
+		if packet != "" {
+			n++
+		}
+	}
+	return n
+}
+
 // headerWeakness finds the H values that give the profile away when headers are sent in the clear (no header
 // protection key): the pointer of the first offender per kind. Valid settings only.
 func headerWeakness(o Obfuscation) (small, lt5 string) {
@@ -309,6 +326,9 @@ func warnings(s Settings) []Warning {
 	}
 	if o.Jc > jcWarnAbove {
 		add("/obfuscation/jc", "jc_high")
+	}
+	if s.Version == Version20 && o.S4 == 16 {
+		add("/obfuscation/s4", "s4_16_v20")
 	}
 	if o.Jmax >= s.MTU {
 		add("/obfuscation/jmax", "jmax_ge_mtu") // fragmentation

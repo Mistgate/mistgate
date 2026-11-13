@@ -385,13 +385,17 @@ func TestPerDeviceClientsAndMinClients(t *testing.T) {
 		return m
 	}
 	m31 := min(fixture31())
-	for app, v := range map[string]string{"AmneziaVPN": "5.0.1.5", "AmneziaWG Android": "v3.1.20260814", "AmneziaWG Windows": "3.1.0", "AmneziaWG Apple": "v3.1.3", "Mihomo": "v1.19.30"} {
+	for app, v := range map[string]string{
+		"AmneziaVPN": "5.0.1.5", "AmneziaWG Android": "v3.1.20260814", "AmneziaWG Windows": "3.1.0", "AmneziaWG Apple": "v3.1.3",
+		"WG Tunnel": "5.6.0", "FlClash": "0.8.97", "Throne": "1.4.0", "ZedSecure": "3.1.8", "Keenetic": "5.2 alpha 11",
+		"GL.iNet": "2.0 only", "Hiddify": "2.0 only", "Mihomo": "v1.19.30",
+	} {
 		if m31[app] != v {
 			t.Errorf("3.1 %s = %q, want %q", app, m31[app], v)
 		}
 	}
 	m20 := min(fixture20())
-	if m20["AmneziaVPN"] != "4.8.12.9" || m20["Mihomo"] != "v1.19.14" || m20["AmneziaWG"] == "" {
+	if m20["AmneziaVPN"] != "4.8.12.9" || m20["Mihomo"] != "v1.19.14" || m20["AmneziaWG"] == "" || m20["Keenetic stable"] != "5.1" || m20["GL.iNet firmware"] != "4.9" || m20["Hiddify"] != "2.0 only" {
 		t.Errorf("2.0: %v", m20)
 	}
 	// the returned slice is a copy: a caller cannot edit the table

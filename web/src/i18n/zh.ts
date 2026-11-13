@@ -252,6 +252,8 @@ const core: CoreMessages = {
   "err.preset_builtin": "内置预设无法删除。",
 
   "field.port.out_of_range": "端口范围为 1–65535",
+  "field.obfuscation.jc.handshake_budget": "Jc、非空的 I1–I5 特征包和一个握手包的总数不得超过 128。",
+  "field.obfuscation.header_protection_key.rt_range_requires_hpk": "启用随机尾部时，任何宽于单个值的 H1–H4 范围都需要头部保护密钥。",
   "field.hop.from.invalid": "端口必须在跳跃范围之外",
   "field.hop.from.out_of_range": "范围起点须在 1024–65535 之间，且避开 SSH 和其他常用端口",
   "field.hop.to.too_wide": "范围最多包含 20,000 个端口",

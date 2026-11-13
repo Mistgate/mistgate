@@ -47,6 +47,9 @@ func TestValidPositive(t *testing.T) {
 	v30.Obfuscation.RandomTrailers, v30.Obfuscation.HeaderProtectionKey = false, ""
 	v30.Obfuscation.S1, v30.Obfuscation.S2, v30.Obfuscation.S3, v30.Obfuscation.S4 = 31, 47, 23, 17
 	v30.Obfuscation.H1, v30.Obfuscation.H2, v30.Obfuscation.H3, v30.Obfuscation.H4 = Range{Lo: 10, Hi: 20}, Range{Lo: 30, Hi: 40}, Range{Lo: 50, Hi: 60}, Range{Lo: 70, Hi: 80}
+	singleRangeNoHPK := full31()
+	singleRangeNoHPK.Obfuscation.HeaderProtectionKey = ""
+	singleRangeNoHPK.Obfuscation.H1 = Range{Lo: 10, Hi: 10}
 	min12 := full31()
 	min12.Obfuscation.S1, min12.Obfuscation.S2, min12.Obfuscation.S3, min12.Obfuscation.S4 = 12, 12, 12, 12
 	amnezia := full31() // Amnezia 5.0.x defaults: S=12, CPA 10-100, DNS-style I1
@@ -62,7 +65,7 @@ func TestValidPositive(t *testing.T) {
 	extremes.Obfuscation.S1, extremes.Obfuscation.S2, extremes.Obfuscation.S3, extremes.Obfuscation.S4 = 150, 150, 64, 64
 	extremes.Obfuscation.RandomTrailers = false
 
-	for name, s := range map[string]Settings{"3.1 full": full31(), "3.0 style": v30, "2.0": v20, "S=12 + HPK": min12,
+	for name, s := range map[string]Settings{"3.1 full": full31(), "3.0 style": v30, "3.1 single H range without HPK": singleRangeNoHPK, "2.0": v20, "S=12 + HPK": min12,
 		"amnezia 5.0 defaults": amnezia, "no obfuscation 3.1": plain, "no obfuscation 2.0": plain20, "limits": extremes} {
 		if r := Validate(s, Options{MTU: 1280}); !r.OK() {
 			t.Errorf("%s: unexpected errors: %v", name, r.Errors)
@@ -91,6 +94,7 @@ func TestValidateRules(t *testing.T) {
 		{"2.0 has no rekey", func(s *Settings) { s.Version = Version20 }, "/obfuscation/rekey_after_time", "not_in_version"},
 		{"2.0 has no disable cookies", func(s *Settings) { s.Version = Version20; s.Obfuscation.DisableCookies = true }, "/obfuscation/disable_cookies", "not_in_version"},
 		{"jc high", func(s *Settings) { s.Obfuscation.Jc = 129 }, "/obfuscation/jc", "range"},
+		{"handshake packet budget", func(s *Settings) { s.Obfuscation.Jc = 127 }, "/obfuscation/jc", "handshake_budget"},
 		{"jc negative", func(s *Settings) { s.Obfuscation.Jc = -1 }, "/obfuscation/jc", "range"},
 		{"jmin > jmax", func(s *Settings) { s.Obfuscation.Jmin, s.Obfuscation.Jmax = 60, 50 }, "/obfuscation/jmin", "jmin_gt_jmax"},
 		{"jmax high", func(s *Settings) { s.Obfuscation.Jmax = 1281 }, "/obfuscation/jmax", "range"},
@@ -108,6 +112,10 @@ func TestValidateRules(t *testing.T) {
 			s.Obfuscation.H1, s.Obfuscation.H2 = Range{Lo: 300, Hi: 400}, Range{Lo: 350, Hi: 450}
 		}, "/obfuscation/h2", "h_overlap"},
 		{"h equal", func(s *Settings) { s.Obfuscation.H4 = s.Obfuscation.H1 }, "/obfuscation/h4", "h_overlap"},
+		{"random trailers with ranged headers need hpk", func(s *Settings) {
+			s.Obfuscation.HeaderProtectionKey = ""
+			s.Obfuscation.H1 = Range{Lo: 10, Hi: 20}
+		}, "/obfuscation/header_protection_key", "rt_range_requires_hpk"},
 		{"hpk length", func(s *Settings) {
 			s.Obfuscation.HeaderProtectionKey = base64.StdEncoding.EncodeToString(make([]byte, 16))
 		}, "/obfuscation/header_protection_key", "hpk"},
@@ -169,6 +177,13 @@ func TestWarnings(t *testing.T) {
 				t.Errorf("mtu %d: missing warning %s in %v", mtu, w, r.Warnings)
 			}
 		}
+	}
+	v20 := Settings{Version: Version20, Obfuscation: Obfuscation{
+		S4: 16, H1: Range{Lo: 1, Hi: 1}, H2: Range{Lo: 2, Hi: 2}, H3: Range{Lo: 3, Hi: 3}, H4: Range{Lo: 4, Hi: 4},
+	}}
+	r := Validate(v20, Options{})
+	if !r.OK() || !has(r.Warnings, "/obfuscation/s4", "s4_16_v20") {
+		t.Errorf("2.0 S4=16 should warn without failing: errors=%v warnings=%v", r.Errors, r.Warnings)
 	}
 }
 

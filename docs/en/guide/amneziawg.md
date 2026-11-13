@@ -25,10 +25,12 @@ The editor shows the **Oldest client that works** for the chosen version. An old
 
 | Version | Oldest client |
 |:--|:--|
-| 3.1 | AmneziaVPN 5.0.1.5, AmneziaWG Android v3.1.20260814, AmneziaWG Windows 3.1.0, AmneziaWG Apple v3.1.3, Mihomo v1.19.30 |
-| 2.0 | AmneziaVPN 4.8.12.9, AmneziaWG 2.0.0, Mihomo v1.19.14 |
+| 3.1 | AmneziaVPN 5.0.1.5, AmneziaWG Android v3.1.20260814, AmneziaWG Windows 3.1.0, AmneziaWG Apple v3.1.3, Mihomo v1.19.30, WG Tunnel 5.6.0, FlClash 0.8.97, Throne 1.4.0, ZedSecure 3.1.8, Keenetic 5.2 alpha 11, GL.iNet (2.0 only), Hiddify (2.0 only) |
+| 2.0 | AmneziaVPN 4.8.12.9, AmneziaWG 2.0.0, Mihomo v1.19.14, Keenetic stable 5.1, GL.iNet firmware 4.9, Hiddify (2.0 only) |
 
 The same list is shown next to every config a person gets.
+
+This list follows a community compatibility matrix dated 2026-11-05 and will age. Throne 1.3.x strips padding; ZedSecure versions before 3.1.8 do not understand the header protection key. Stable Keenetic 5.1 and GL.iNet firmware 4.9 support only 2.0; Keenetic 3.1 support starts at 5.2 alpha 11. Hiddify does not read the header protection key or content padding, so use 2.0. sing-box-extended fails when ContentPaddingAddition is above 16.
 
 ## The profile editor
 
@@ -77,10 +79,10 @@ Critical settings must match on the node and in every client; changing them make
 
 | Setting | Range | Critical | What it does |
 |:--|:--|:--|:--|
-| **Junk packets (Jc)** | 0–128 | no | Sent by the client before each handshake; 4–12 is usual. |
+| **Junk packets (Jc)** | 0–128 | no | Sent by the client before each handshake; 4–12 is usual. Jc + non-empty I1–I5 packets + one handshake packet must be at most 128. |
 | **Junk size, min (Jmin)** / **max (Jmax)** | 0–1280 bytes | no | Keep Jmax below the MTU. |
 | **Init padding (S1)**, **Response padding (S2)** | 0–150 bytes | yes | Bytes added to the handshake messages. |
-| **Cookie padding (S3)**, **Data padding (S4)** | 0–64 bytes | yes | S4 is added to every data packet: keep it small. |
+| **Cookie padding (S3)**, **Data padding (S4)** | 0–64 bytes | yes | S4 is added to every data packet: keep it small. In 2.0, avoid 16: it can make the packet length a multiple of 16 and look like plain WireGuard. |
 | **Init header (H1)** … **Data header (H4)** | a number or a range lo-hi | yes | Message type values. 1, 2, 3, 4 are plain WireGuard. The four ranges must not overlap. |
 | **Signature packet 1 (I1)** … **(I5)** | up to 3500 characters each | no | Tags b, r, rc, rd, t. Filled by the look; typing here makes the look **Custom**. I1 is here, I2–I5 are under **Advanced**. |
 
@@ -90,13 +92,13 @@ Critical settings must match on the node and in every client; changing them make
 |:--|:--|:--|
 | **Signature seed** | no | Not a secret. With the device id it makes the per-device packets reproducible; a new seed changes them the next time a config is shown. |
 | **Header protection key** | yes | 3.1 only. The same 32 bytes on the node and in every client. Stored encrypted. |
-| **Random trailers** | yes | 3.1 only. Must match on both sides. |
+| **Random trailers** | yes | 3.1 only. Must match on both sides. Unequal S1–S4 is a warning. Without a header protection key, use single H1–H4 values; wider ranges can lose packets. |
 | **Turn off cookie replies** | no | 3.1 only, node side. On removes the protection against handshake floods. |
 | **Extra padding** | no | 3.1 only. A range of random bytes added to data packets. |
 | **Rekey after**, **Rekey timeout**, **Reject after**, **Keepalive timeout**, **Handshake attempts** | no | 3.1 only. Timers, a number or a range. |
 | **Persistent keepalive** | no | Written into the client; keep it under 30 s, the UDP timeout of many NATs. 2.0 takes one number; Mihomo uses the first one. |
 
-While you edit, the editor warns about legal but risky values: too many junk packets, Jmax not below the MTU, S4 that does not fit 1500 at this MTU (with the MTU that would fit), H values of plain WireGuard, a narrow H range, cookie replies turned off, a keepalive longer than a NAT timeout, a look on an unusual port.
+While you edit, the editor warns about legal but risky values: too many junk packets, Jmax not below the MTU, S4 that does not fit 1500 at this MTU (with the MTU that would fit), S4 = 16 in 2.0, H values of plain WireGuard, a narrow H range, cookie replies turned off, a keepalive longer than a NAT timeout, a look on an unusual port.
 
 ## Client networks and addresses
 

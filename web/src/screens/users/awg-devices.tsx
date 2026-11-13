@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import type { DeviceConfig } from "@/gen/mistgate/admin/v1/device_pb";
 import type { ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
 import { devices as devicesApi, users } from "@/lib/api";
-import { downloadText, guessPlatform, platforms } from "@/lib/awg";
+import { downloadText, guessPlatform, minClientLabel, platforms } from "@/lib/awg";
 import { codedError } from "@/lib/coded-error";
 import { errorText } from "@/lib/errors";
 import { useTx, type Tx } from "./t";
@@ -270,7 +270,7 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
           <div className="flex flex-wrap gap-1.5">
             {cfg.minClients.map((c) => (
               <Chip key={c.app} mono>
-                {c.app} {c.minVersion}+
+                {minClientLabel(c.app, c.minVersion, t("awg.clients.only20"))}
               </Chip>
             ))}
           </div>

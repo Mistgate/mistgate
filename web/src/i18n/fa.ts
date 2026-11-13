@@ -249,6 +249,8 @@ const core: CoreMessages = {
   "err.preset_is_default": "این پیش‌تنظیم پیش‌فرض است. اول یکی دیگر را پیش‌فرض کن.",
   "err.preset_builtin": "پیش‌تنظیم داخلی را نمی‌شود حذف کرد.",
   "field.port.out_of_range": "پورت از 1 تا 65535 است",
+  "field.obfuscation.jc.handshake_budget": "مجموع Jc، بسته‌های غیرخالی I1–I5 و یک بستهٔ دست‌دهی نباید از ۱۲۸ بیشتر شود.",
+  "field.obfuscation.header_protection_key.rt_range_requires_hpk": "با دنباله‌های تصادفی، هر بازهٔ H1–H4 بزرگ‌تر از یک مقدار به کلید محافظت از سرآیند نیاز دارد.",
   "field.hop.from.invalid": "پورت باید خارج از بازهٔ پرش باشد",
   "field.hop.from.out_of_range": "شروع بازه بین 1024 و 65535 است، دور از SSH و پورت‌های شناخته‌شدهٔ دیگر",
   "field.hop.to.too_wide": "بازه حداکثر 20,000 پورت دارد",

@@ -137,6 +137,7 @@ describe("names and choices a friend can read", () => {
     expect(versionsFor("ios", all)).toEqual([{ client: "amnezia", app: "AmneziaVPN", min: "5.0.1.5" }]);
     expect(versionsFor("android", all).map((m) => `${m.app} ${m.min}`)).toEqual(["AmneziaVPN 5.0.1.5", "AmneziaWG 3.1.20260814"]);
     expect(plain(t.needApp(versionsFor("android", all)))).toBe("Нужна AmneziaVPN 5.0.1.5 или новее — или AmneziaWG 3.1.20260814 и новее");
+    expect(plain(t.needApp([{ app: "Hiddify", min: "2.0 only" }]))).toBe("Нужна Hiddify (только AWG 2.0)");
   });
 });
 

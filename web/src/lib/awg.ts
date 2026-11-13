@@ -12,14 +12,29 @@ export const minClients: Record<AwgVersion, { app: string; min: string }[]> = {
     { app: "AmneziaWG Android", min: "v3.1.20260814" },
     { app: "AmneziaWG Windows", min: "3.1.0" },
     { app: "AmneziaWG Apple", min: "v3.1.3" },
+    { app: "WG Tunnel", min: "5.6.0" },
+    { app: "FlClash", min: "0.8.97" },
+    { app: "Throne", min: "1.4.0" },
+    { app: "ZedSecure", min: "3.1.8" },
+    { app: "Keenetic", min: "5.2 alpha 11" },
+    { app: "GL.iNet", min: "2.0 only" },
+    { app: "Hiddify", min: "2.0 only" },
     { app: "Mihomo", min: "v1.19.30" },
   ],
   "2.0": [
     { app: "AmneziaVPN", min: "4.8.12.9" },
     { app: "AmneziaWG", min: "2.0.0" },
+    { app: "Keenetic stable", min: "5.1" },
+    { app: "GL.iNet firmware", min: "4.9" },
+    { app: "Hiddify", min: "2.0 only" },
     { app: "Mihomo", min: "v1.19.14" },
   ],
 };
+
+/** A protocol limitation, not a client-version threshold. */
+export function minClientLabel(app: string, min: string, only20 = "2.0 only"): string {
+  return min === "2.0 only" ? `${app} · ${only20}` : `${app} ${min}+`;
+}
 
 export const asVersion = (v: unknown): AwgVersion => (v === "2.0" ? "2.0" : "3.1");
 

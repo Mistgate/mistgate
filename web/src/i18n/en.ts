@@ -265,6 +265,8 @@ const core = {
 
   // A profile field the server refused: "field.<path>.<code>" of its FieldError; a pair without an entry shows the server’s text.
   "field.port.out_of_range": "The port is 1 to 65535",
+  "field.obfuscation.jc.handshake_budget": "Jc plus the non-empty I1–I5 packets and one handshake packet must not exceed 128.",
+  "field.obfuscation.header_protection_key.rt_range_requires_hpk": "With random trailers, any H1–H4 range wider than one value needs a header protection key.",
   "field.hop.from.invalid": "The port must be outside the hopping range",
   "field.hop.from.out_of_range": "The range starts between 1024 and 65535, clear of SSH and other well-known ports",
   "field.hop.to.too_wide": "The range holds at most 20,000 ports",

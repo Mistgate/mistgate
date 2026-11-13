@@ -256,6 +256,8 @@ const core: CoreMessages = {
   "err.preset_builtin": "Встроенный пресет нельзя удалить.",
 
   "field.port.out_of_range": "Порт — от 1 до 65535",
+  "field.obfuscation.jc.handshake_budget": "Сумма Jc, непустых пакетов I1–I5 и одного пакета рукопожатия не должна превышать 128.",
+  "field.obfuscation.header_protection_key.rt_range_requires_hpk": "При случайных хвостах любой диапазон H1–H4 шире одного значения требует ключ защиты заголовков.",
   "field.hop.from.invalid": "Порт должен быть вне диапазона прыжков",
   "field.hop.from.out_of_range": "Начало диапазона — от 1024 до 65535, чтобы не задеть SSH и служебные порты",
   "field.hop.to.too_wide": "В диапазоне не больше 20 000 портов",

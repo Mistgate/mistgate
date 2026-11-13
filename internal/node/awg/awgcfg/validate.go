@@ -105,6 +105,9 @@ func Validate(s Settings, opt Options) Result {
 	} else if o.Jc > warnJc {
 		warn(obf+"jc", "jc_high", "more than %d junk packets per handshake is a visible pattern and costs bandwidth", warnJc)
 	}
+	if o.Jc >= 0 && o.Jc <= maxJc && nonEmptySignaturePackets(o.I())+1 > maxJc-o.Jc {
+		bad(obf+"jc", "handshake_budget", "Jc (%d) plus %d non-empty signature packets and one handshake packet must not exceed %d", o.Jc, nonEmptySignaturePackets(o.I()), maxJc)
+	}
 	if o.Jmin < 0 || o.Jmin > maxJunk {
 		bad(obf+"jmin", "range", "must be 0..%d", maxJunk)
 	}
@@ -160,6 +163,7 @@ func Validate(s Settings, opt Options) Result {
 	// 5. H1..H4: all four are always sent; 1,2,3,4 means "off".
 	hv := o.H()
 	hOK := true
+	wideHeaders := false
 	for i, h := range hv {
 		ptr := fmt.Sprintf("%sh%d", obf, i+1)
 		switch {
@@ -173,6 +177,12 @@ func Validate(s Settings, opt Options) Result {
 			bad(ptr, "h_order", "lo %d is greater than hi %d", h.Lo, h.Hi)
 			hOK = false
 		}
+		if !h.bad && h.Lo < h.Hi {
+			wideHeaders = true
+		}
+	}
+	if s.Version == Version31 && o.RandomTrailers && o.HeaderProtectionKey == "" && wideHeaders {
+		bad(obf+"header_protection_key", "rt_range_requires_hpk", "random_trailers with an H1-H4 range wider than one value requires a header protection key")
 	}
 	if hOK {
 		for i := 0; i < 4; i++ {
@@ -218,7 +228,20 @@ func Validate(s Settings, opt Options) Result {
 	if is31 && o.DisableCookies {
 		warn(obf+"disable_cookies", "disable_cookies", "no protection from handshake floods with spoofed addresses")
 	}
+	if s.Version == Version20 && o.S4 == 16 {
+		warn(obf+"s4", "s4_16_v20", "s4 is 16; padded data packets may look like plain WireGuard")
+	}
 	return r
+}
+
+func nonEmptySignaturePackets(packets [5]string) int {
+	n := 0
+	for _, packet := range packets {
+		if packet != "" {
+			n++
+		}
+	}
+	return n
 }
 
 func checkU16Range(ptr string, v Range, bad func(ptr, code, msg string, a ...any)) {

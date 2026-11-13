@@ -11,7 +11,7 @@ import { Notice } from "@/components/ui/notice";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import { awg as awgApi } from "@/lib/api";
-import { asVersion, changedCount, minClients, versions, type AwgVersion, type ConfImport } from "@/lib/awg";
+import { asVersion, changedCount, minClientLabel, minClients, versions, type AwgVersion, type ConfImport } from "@/lib/awg";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useTx, type Tx } from "@/screens/users/t";
@@ -291,7 +291,7 @@ export function AwgPanel({ settings, onChange, advice }: { settings: Settings; o
           <div className="flex flex-wrap gap-1.5">
             {minClients[version].map((c) => (
               <Chip key={c.app} mono>
-                {c.app} {c.min}+
+                {minClientLabel(c.app, c.min, t("awg.clients.only20"))}
               </Chip>
             ))}
           </div>

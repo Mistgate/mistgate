@@ -60,6 +60,15 @@ func TestValidatorAcceptsTheMatrix(t *testing.T) {
 			s.Obfuscation.I2 = "<b 0xc0ffee><rc 12><rd 4><t><r 100>"
 			s.Obfuscation.I5 = "<r 1>"
 		},
+		"handshake packet budget at the limit": func(s *Settings) {
+			s.Obfuscation.Jc = 126
+			s.Obfuscation.I1, s.Obfuscation.I2, s.Obfuscation.I3, s.Obfuscation.I4, s.Obfuscation.I5 = "<r 1>", "", "", "", ""
+		},
+		"random trailers with a one-value range and no key": func(s *Settings) {
+			o := &s.Obfuscation
+			o.HeaderProtectionKey = ""
+			o.H1, o.H2, o.H3, o.H4 = "100-100", "300", "500-500", "700"
+		},
 		"IPv4 only":                 func(s *Settings) { s.Subnet6 = "" },
 		"warp exit":                 func(s *Settings) { s.Egress = "warp" },
 		"a single keepalive number": func(s *Settings) { s.Obfuscation.PersistentKeepalive = "25" },
@@ -101,6 +110,7 @@ func TestValidatorRejects(t *testing.T) {
 
 		{"jc", "/obfuscation/jc", "out_of_range", func(s *Settings) { s.Obfuscation.Jc = 129 }, nil},
 		{"jc negative", "/obfuscation/jc", "out_of_range", func(s *Settings) { s.Obfuscation.Jc = -1 }, nil},
+		{"handshake packet budget", "/obfuscation/jc", "handshake_budget", func(s *Settings) { s.Obfuscation.Jc = 127 }, nil},
 		{"jmin above jmax", "/obfuscation/jmax", "invalid", func(s *Settings) { s.Obfuscation.Jmin, s.Obfuscation.Jmax = 60, 50 }, nil},
 		{"jmax", "/obfuscation/jmax", "out_of_range", func(s *Settings) { s.Obfuscation.Jmax = 1281 }, nil},
 		{"jmin", "/obfuscation/jmin", "out_of_range", func(s *Settings) { s.Obfuscation.Jmin = 1281 }, nil},
@@ -119,6 +129,11 @@ func TestValidatorRejects(t *testing.T) {
 		{"h not a number", "/obfuscation/h1", "invalid", func(s *Settings) { s.Obfuscation.H1 = "a-b" }, nil},
 		{"h above uint32", "/obfuscation/h4", "invalid", func(s *Settings) { s.Obfuscation.H4 = "4294967296" }, nil},
 		{"h negative", "/obfuscation/h1", "invalid", func(s *Settings) { s.Obfuscation.H1 = "-5" }, nil},
+		{"random trailers with wide headers need key", "/obfuscation/header_protection_key", "rt_range_requires_hpk", func(s *Settings) {
+			o := &s.Obfuscation
+			o.HeaderProtectionKey = ""
+			o.H1, o.H2, o.H3, o.H4 = "100-200", "300-400", "500-600", "700-800"
+		}, nil},
 
 		{"i counter tag", "/obfuscation/i1", "invalid", func(s *Settings) { s.Obfuscation.I1 = "<c><r 10>" }, nil},
 		{"i empty hex", "/obfuscation/i2", "invalid", func(s *Settings) { s.Obfuscation.I2 = "<b 0x>" }, nil},
@@ -187,6 +202,14 @@ func TestWarnings(t *testing.T) {
 	}
 	if w := codes(clean31()); len(w) != 0 {
 		t.Errorf("clean fixture has warnings: %v", w)
+	}
+	v20 := fixture20()
+	v20.Obfuscation.S4 = 16
+	if e := validate(v20); len(e) != 0 {
+		t.Fatalf("2.0 S4=16 remains valid: %v", e)
+	}
+	if w := codes(v20); !w["s4_16_v20"] {
+		t.Errorf("2.0 S4=16 warning missing: %v", w)
 	}
 	s := clean31()
 	s.Obfuscation.Jc, s.MTU, s.Obfuscation.Jmax, s.Obfuscation.DisableCookies = 20, 1200, 1250, true

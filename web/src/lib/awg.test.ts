@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedCount, guessPlatform, leaves, minClients, parseAwgConf, randomKey32, randomPort } from "./awg";
+import { changedCount, guessPlatform, leaves, minClientLabel, minClients, parseAwgConf, randomKey32, randomPort } from "./awg";
 import { codedError } from "./coded-error";
 import { errorCode } from "./errors";
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -117,6 +117,12 @@ describe("tables", () => {
   it("3.1 asks for the newer clients", () => {
     expect(minClients["3.1"].find((c) => c.app === "AmneziaVPN")?.min).toBe("5.0.1.5");
     expect(minClients["2.0"].find((c) => c.app === "AmneziaVPN")?.min).toBe("4.8.12.9");
+    expect(minClients["3.1"].map(({ app, min }) => [app, min])).toEqual(expect.arrayContaining([
+      ["WG Tunnel", "5.6.0"], ["FlClash", "0.8.97"], ["Throne", "1.4.0"], ["ZedSecure", "3.1.8"],
+      ["Keenetic", "5.2 alpha 11"], ["GL.iNet", "2.0 only"], ["Hiddify", "2.0 only"],
+    ]));
+    expect(minClientLabel("GL.iNet", "2.0 only")).toBe("GL.iNet · 2.0 only");
+    expect(minClientLabel("WG Tunnel", "5.6.0")).toBe("WG Tunnel 5.6.0+");
   });
   it("guesses the platform of the browser", () => {
     expect(guessPlatform("Mozilla/5.0 (iPhone; CPU iPhone OS 17_4)")).toBe("ios");
