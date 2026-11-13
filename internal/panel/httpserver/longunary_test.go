@@ -11,7 +11,16 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
+
+// signedIn is what RequireSession does in front of the router for a session call.
+func signedIn(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(auth.WithAdmin(r.Context(), store.Admin{ID: "adm_alice"})))
+	})
+}
 
 // A long unary admin call (the TSPU probe test) answers after the listener's write timeout; any other unary call is cut at it.
 func TestLongUnaryCallOutlivesTheWriteTimeout(t *testing.T) {
@@ -23,7 +32,7 @@ func TestLongUnaryCallOutlivesTheWriteTimeout(t *testing.T) {
 		{Path: "/mistgate.admin.v1.TspuProbeService/", Handler: slow},
 		{Path: "/mistgate.admin.v1.HealthService/", Handler: slow},
 	}
-	ts := httptest.NewUnstartedServer(router)
+	ts := httptest.NewUnstartedServer(signedIn(router))
 	ts.EnableHTTP2 = true
 	ts.Config.WriteTimeout = 150 * time.Millisecond
 	ts.StartTLS()
@@ -54,7 +63,7 @@ func TestLongUnaryRequestBodyKeepsTheReadTimeout(t *testing.T) {
 		_, err := io.ReadAll(r.Body)
 		readErrors <- err
 	})}}
-	ts := httptest.NewUnstartedServer(router)
+	ts := httptest.NewUnstartedServer(signedIn(router))
 	ts.Config.ReadTimeout = 150 * time.Millisecond
 	ts.Config.WriteTimeout = time.Second
 	ts.Start()

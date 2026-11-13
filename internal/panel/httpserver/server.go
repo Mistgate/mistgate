@@ -219,10 +219,14 @@ type apiRouter []AdminHandler
 func (a apiRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, h := range a {
 		if strings.HasPrefix(r.URL.Path, h.Path) {
-			if isStream(r) {
-				liftDeadlines(w)
-			} else if longUnary[r.URL.Path] {
-				liftWriteDeadline(w)
+			// Only a signed-in caller gets the deadlines lifted: the public procedures reach this router without a
+			// session, and a stream content type there must not let a slow client hold the connection open.
+			if _, ok := auth.AdminFrom(r.Context()); ok {
+				if isStream(r) {
+					liftDeadlines(w)
+				} else if longUnary[r.URL.Path] {
+					liftWriteDeadline(w)
+				}
 			}
 			h.Handler.ServeHTTP(w, r)
 			return
