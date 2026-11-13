@@ -102,7 +102,7 @@ export type NodeOs = Message<"mistgate.admin.v1.NodeOs"> & {
    * three times in 24 hours (reboot_limit); the panel counts the reboots of its own OS rollouts. The SPA turns the Reboot action
    * off until then. A reboot_only StartOsRollout before that time is refused with os_blocked: reason=reboot_wait.
    *
-   * @generated from field: int64 reboot_possible_unix = 12;
+   * @generated from field: int64 reboot_possible_unix = 12 [jstype = JS_NUMBER];
    */
   rebootPossibleUnix: bigint;
 };
