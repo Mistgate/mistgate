@@ -204,6 +204,13 @@ func (s *Store) ConsumeRecoveryToken(ctx context.Context, hash []byte, now time.
 	return len(results[0].Rows) == 1, nil
 }
 
+// ReleaseRecoveryToken gives back a token ConsumeRecoveryToken spent at usedAt, for a reset that failed after it: the
+// person who holds the link has not got a new login yet. It touches only a token spent at exactly that time.
+func (s *Store) ReleaseRecoveryToken(ctx context.Context, hash []byte, usedAt time.Time) error {
+	_, err := s.W.ExecContext(ctx, `UPDATE recovery_token SET used_at = NULL WHERE hash = ? AND used_at = ?`, hash, unix(usedAt))
+	return err
+}
+
 func (s *Store) createFirstAdmin(ctx context.Context, tokenHash []byte, now time.Time, a Admin, insertCred Stmt) error {
 	_, err := s.batch(ctx,
 		guard(`EXISTS (SELECT 1 FROM setup_token WHERE hash = ? AND used_at IS NULL AND expires_at > ?)

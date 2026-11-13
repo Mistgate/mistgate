@@ -111,6 +111,10 @@ func (s *Service) recoverLoginHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := ResetLogin(r.Context(), s.st, s.vault, resetInput, now)
 	if err != nil {
+		// The token was spent for a reset that did not happen: give it back, the link still has to work.
+		if rerr := s.st.ReleaseRecoveryToken(context.WithoutCancel(r.Context()), tokenHash, now); rerr != nil {
+			s.log.Error("release recovery token", "code", "recovery_token_release_failed", "err", rerr)
+		}
 		var target *ResetTargetError
 		if errors.As(err, &target) {
 			writeRecoveryError(w, http.StatusBadRequest, "invalid_argument", target.Error())
