@@ -35,6 +35,9 @@ func (e *testEnv) osCancels() []*adminv1.CancelOsRolloutRequest {
 
 func TestOsRolloutStartNeedsApprovalAndRunsThePinnedNode(t *testing.T) {
 	e := newTestEnv(t)
+	e.w.mu.Lock()
+	e.w.osUpdates.Nodes[0].Status.SecurityStuck = []string{"libfoo1"}
+	e.w.mu.Unlock()
 	_, secret := e.token(ProfileAdmin)
 	s := e.session(secret)
 	args := map[string]any{"node_ids": []any{nodeA}, "mode": "security", "reboot": "if_required"}
@@ -44,8 +47,12 @@ func TestOsRolloutStartNeedsApprovalAndRunsThePinnedNode(t *testing.T) {
 		t.Fatalf("plan: %+v", p)
 	}
 	var keys []string
+	stuckFact := false
 	for _, f := range p.Facts {
 		keys = append(keys, f.Key)
+		if f.Key == "security_stuck" {
+			stuckFact = f.Untrusted && f.Value == "libfoo1"
+		}
 		if f.Key == "node" && (!f.Untrusted || f.Value != "de1") {
 			t.Errorf("the node name is data: %+v", f)
 		}
@@ -54,6 +61,9 @@ func TestOsRolloutStartNeedsApprovalAndRunsThePinnedNode(t *testing.T) {
 		if !strings.Contains(strings.Join(keys, ","), want) {
 			t.Errorf("plan facts %v lack %q", keys, want)
 		}
+	}
+	if !stuckFact {
+		t.Errorf("plan did not list node-supplied security_stuck names as untrusted: %+v", p.Facts)
 	}
 
 	// before the owner decides, the apply is refused and nothing runs

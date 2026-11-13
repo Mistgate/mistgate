@@ -107,6 +107,12 @@ func TestOsUpdatesStatusIsStoredOnlyAndScrubsUntrustedText(t *testing.T) {
 		t.Fatalf("the time a reboot becomes possible did not reach the tool result: %+v", v.Nodes[0])
 	}
 	st := v.Nodes[0].Status
+	if !slices.Equal(st.SecurityPending, []string{"libfoo1", "libbar-common:amd64"}) || !slices.Equal(st.SecurityStuck, []string{"libfoo1"}) {
+		t.Fatalf("security package names were not safely projected: pending=%q stuck=%q", st.SecurityPending, st.SecurityStuck)
+	}
+	if st.AptLockHolder != "apt-get" || st.AptLockSinceUnix != 1699999000 {
+		t.Fatalf("apt lock owner was not projected: holder=%q since=%d", st.AptLockHolder, st.AptLockSinceUnix)
+	}
 	if len(st.Kernels) != 2 || st.Kernels[0].Version != "6.8.0-2-generic" || !st.Kernels[0].NextBoot || st.Kernels[0].Initrd || st.Kernels[0].Module != "missing" ||
 		st.Kernels[0].Packages != "half_configured" || !st.Kernels[1].Running || st.AwgSource != "ok" {
 		t.Fatalf("the kernel table did not reach the tool result: %+v", st)

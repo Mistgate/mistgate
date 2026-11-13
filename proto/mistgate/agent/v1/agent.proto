@@ -768,6 +768,14 @@ message OsStatus {
   // The job codes ("OS UPDATES") the reboot check would refuse with right now: initramfs_missing, boot_entry_missing,
   // awg_module_missing, dpkg_interrupted, kernel_older, boot_default_custom. A preview of the reader; the job decides.
   repeated string reboot_blockers = 25;
+  // Security-origin upgrades from the local apt simulation, at most 32; package names are node-supplied and validated.
+  repeated string security_pending = 26;
+  // Security packages pending for more than 48 hours while automatic updates are enabled, at most 32.
+  repeated string security_stuck = 27;
+  // Validated /proc/<pid>/comm for the process holding a matched apt lock, empty when unreadable or invalid.
+  string apt_lock_holder = 28;
+  // Unix start time of the process holding the matched apt lock, zero when unavailable.
+  int64 apt_lock_since_unix = 29 [jstype = JS_NUMBER];
 }
 
 // One installed kernel as the reader sees it (OsStatus.kernels). Only reads, never a root write.
@@ -803,6 +811,12 @@ message OsJob {
   repeated string sources_failed = 14;
   string kernel_from = 15;
   string kernel_to = 16;
+  // The apt lock wait refusal's process and configured wait, set with code=apt_lock.
+  string apt_lock_holder = 17;
+  uint32 apt_lock_minutes = 18;
+  // A non-fatal result note; security_leftover_failed means security updates remain pending after unattended-upgrade.
+  string note_code = 19;
+  string note = 20;
 }
 
 message ConnectRequest {

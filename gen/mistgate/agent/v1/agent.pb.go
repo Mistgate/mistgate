@@ -725,8 +725,16 @@ type OsStatus struct {
 	// The job codes ("OS UPDATES") the reboot check would refuse with right now: initramfs_missing, boot_entry_missing,
 	// awg_module_missing, dpkg_interrupted, kernel_older, boot_default_custom. A preview of the reader; the job decides.
 	RebootBlockers []string `protobuf:"bytes,25,rep,name=reboot_blockers,json=rebootBlockers,proto3" json:"reboot_blockers,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Security-origin upgrades from the local apt simulation, at most 32; package names are node-supplied and validated.
+	SecurityPending []string `protobuf:"bytes,26,rep,name=security_pending,json=securityPending,proto3" json:"security_pending,omitempty"`
+	// Security packages pending for more than 48 hours while automatic updates are enabled, at most 32.
+	SecurityStuck []string `protobuf:"bytes,27,rep,name=security_stuck,json=securityStuck,proto3" json:"security_stuck,omitempty"`
+	// Validated /proc/<pid>/comm for the process holding a matched apt lock, empty when unreadable or invalid.
+	AptLockHolder string `protobuf:"bytes,28,opt,name=apt_lock_holder,json=aptLockHolder,proto3" json:"apt_lock_holder,omitempty"`
+	// Unix start time of the process holding the matched apt lock, zero when unavailable.
+	AptLockSinceUnix int64 `protobuf:"varint,29,opt,name=apt_lock_since_unix,json=aptLockSinceUnix,proto3" json:"apt_lock_since_unix,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *OsStatus) Reset() {
@@ -934,6 +942,34 @@ func (x *OsStatus) GetRebootBlockers() []string {
 	return nil
 }
 
+func (x *OsStatus) GetSecurityPending() []string {
+	if x != nil {
+		return x.SecurityPending
+	}
+	return nil
+}
+
+func (x *OsStatus) GetSecurityStuck() []string {
+	if x != nil {
+		return x.SecurityStuck
+	}
+	return nil
+}
+
+func (x *OsStatus) GetAptLockHolder() string {
+	if x != nil {
+		return x.AptLockHolder
+	}
+	return ""
+}
+
+func (x *OsStatus) GetAptLockSinceUnix() int64 {
+	if x != nil {
+		return x.AptLockSinceUnix
+	}
+	return 0
+}
+
 // One installed kernel as the reader sees it (OsStatus.kernels). Only reads, never a root write.
 type OsKernel struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1071,6 +1107,12 @@ type OsJob struct {
 	SourcesFailed []string               `protobuf:"bytes,14,rep,name=sources_failed,json=sourcesFailed,proto3" json:"sources_failed,omitempty"`
 	KernelFrom    string                 `protobuf:"bytes,15,opt,name=kernel_from,json=kernelFrom,proto3" json:"kernel_from,omitempty"`
 	KernelTo      string                 `protobuf:"bytes,16,opt,name=kernel_to,json=kernelTo,proto3" json:"kernel_to,omitempty"`
+	// The apt lock wait refusal's process and configured wait, set with code=apt_lock.
+	AptLockHolder  string `protobuf:"bytes,17,opt,name=apt_lock_holder,json=aptLockHolder,proto3" json:"apt_lock_holder,omitempty"`
+	AptLockMinutes uint32 `protobuf:"varint,18,opt,name=apt_lock_minutes,json=aptLockMinutes,proto3" json:"apt_lock_minutes,omitempty"`
+	// A non-fatal result note; security_leftover_failed means security updates remain pending after unattended-upgrade.
+	NoteCode      string `protobuf:"bytes,19,opt,name=note_code,json=noteCode,proto3" json:"note_code,omitempty"`
+	Note          string `protobuf:"bytes,20,opt,name=note,proto3" json:"note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1213,6 +1255,34 @@ func (x *OsJob) GetKernelFrom() string {
 func (x *OsJob) GetKernelTo() string {
 	if x != nil {
 		return x.KernelTo
+	}
+	return ""
+}
+
+func (x *OsJob) GetAptLockHolder() string {
+	if x != nil {
+		return x.AptLockHolder
+	}
+	return ""
+}
+
+func (x *OsJob) GetAptLockMinutes() uint32 {
+	if x != nil {
+		return x.AptLockMinutes
+	}
+	return 0
+}
+
+func (x *OsJob) GetNoteCode() string {
+	if x != nil {
+		return x.NoteCode
+	}
+	return ""
+}
+
+func (x *OsJob) GetNote() string {
+	if x != nil {
+		return x.Note
 	}
 	return ""
 }
@@ -8375,7 +8445,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\rRenewResponse\x12'\n" +
 	"\x0fcertificate_pem\x18\x01 \x01(\tR\x0ecertificatePem\x12$\n" +
 	"\x0enot_after_unix\x18\x02 \x01(\x03R\fnotAfterUnix\x12(\n" +
-	"\x10renew_after_unix\x18\x03 \x01(\x03R\x0erenewAfterUnix\"\xe3\x06\n" +
+	"\x10renew_after_unix\x18\x03 \x01(\x03R\x0erenewAfterUnix\"\x90\b\n" +
 	"\bOsStatus\x12'\n" +
 	"\rmeasured_unix\x18\x01 \x01(\x03B\x020\x02R\fmeasuredUnix\x12\x1b\n" +
 	"\tdistro_id\x18\x02 \x01(\tR\bdistroId\x12%\n" +
@@ -8406,7 +8476,11 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\akernels\x18\x17 \x03(\v2\x1b.mistgate.agent.v1.OsKernelR\akernels\x12\x1d\n" +
 	"\n" +
 	"awg_source\x18\x18 \x01(\tR\tawgSource\x12'\n" +
-	"\x0freboot_blockers\x18\x19 \x03(\tR\x0erebootBlockers\"\x94\x02\n" +
+	"\x0freboot_blockers\x18\x19 \x03(\tR\x0erebootBlockers\x12)\n" +
+	"\x10security_pending\x18\x1a \x03(\tR\x0fsecurityPending\x12%\n" +
+	"\x0esecurity_stuck\x18\x1b \x03(\tR\rsecurityStuck\x12&\n" +
+	"\x0fapt_lock_holder\x18\x1c \x01(\tR\raptLockHolder\x121\n" +
+	"\x13apt_lock_since_unix\x18\x1d \x01(\x03B\x020\x02R\x10aptLockSinceUnix\"\x94\x02\n" +
 	"\bOsKernel\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
 	"\arunning\x18\x02 \x01(\bR\arunning\x12\x1b\n" +
@@ -8419,7 +8493,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\aheaders\x18\b \x01(\tR\aheaders\x12\x16\n" +
 	"\x06module\x18\t \x01(\tR\x06module\x12\x1a\n" +
 	"\bpackages\x18\n" +
-	" \x01(\tR\bpackages\"\xd3\x03\n" +
+	" \x01(\tR\bpackages\"\xd6\x04\n" +
 	"\x05OsJob\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12\x12\n" +
@@ -8439,7 +8513,11 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x0esources_failed\x18\x0e \x03(\tR\rsourcesFailed\x12\x1f\n" +
 	"\vkernel_from\x18\x0f \x01(\tR\n" +
 	"kernelFrom\x12\x1b\n" +
-	"\tkernel_to\x18\x10 \x01(\tR\bkernelTo\"\x9a\x06\n" +
+	"\tkernel_to\x18\x10 \x01(\tR\bkernelTo\x12&\n" +
+	"\x0fapt_lock_holder\x18\x11 \x01(\tR\raptLockHolder\x12(\n" +
+	"\x10apt_lock_minutes\x18\x12 \x01(\rR\x0eaptLockMinutes\x12\x1b\n" +
+	"\tnote_code\x18\x13 \x01(\tR\bnoteCode\x12\x12\n" +
+	"\x04note\x18\x14 \x01(\tR\x04note\"\x9a\x06\n" +
 	"\x0eConnectRequest\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\x04R\x03seq\x120\n" +
 	"\x05hello\x18\n" +

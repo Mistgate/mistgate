@@ -272,14 +272,66 @@ func TestLockNeverFreeFailsBeforeAnyApt(t *testing.T) {
 	m.busy = func() bool { return true }
 	p := statusPath(t)
 	err := m.job(Spec{Action: ActionUpgrade, Mode: ModeSecurity, Reboot: RebootIfRequired}, p).Do(context.Background())
-	if asFailure(t, err).Code != CodeAptLock {
+	f := asFailure(t, err)
+	if f.Code != CodeAptLock || f.AptLockHolder != "apt-get" || f.AptLockMinutes != 15 {
 		t.Fatalf("err = %v", err)
 	}
 	if m.ran("apt-get -o") || m.ran("unattended-upgrade") {
 		t.Fatalf("apt ran with the lock held: %v", m.calls)
 	}
-	if st := mustStatus(t, p); st.State != StateFailed || st.Code != CodeAptLock {
+	if st := mustStatus(t, p); st.State != StateFailed || st.Code != CodeAptLock || st.AptLockHolder != "apt-get" || st.AptLockMinutes != 15 {
 		t.Fatalf("status = %+v", st)
+	}
+}
+
+func TestSecurityModeInstallsOnlySecuritySimulationLeftovers(t *testing.T) {
+	m := newMachine(t)
+	simulation := commandKey(append([]string{"apt-get"}, aptSimulationArgs...)...)
+	leftover := "Inst libfoo1 [1] (2 Ubuntu:24.04/noble-security [amd64])\n" +
+		"Inst libbar-common [1] (2 Ubuntu:24.04/noble-updates [amd64])\n"
+	m.on(simulation, func() (string, error) {
+		if m.ran("unattended-upgrade") {
+			return leftover, nil
+		}
+		return "", nil
+	})
+	m.ok(commandKey("apt-mark", "showauto"), "libfoo1\n")
+	m.ok(commandKey("apt-mark", "auto", "libfoo1"), "")
+	install := commandKey("apt-get", "-y", "-o", aptLockOption, "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
+		"--no-remove", "install", "libfoo1")
+	m.ok(install, "")
+	p := statusPath(t)
+	if err := m.job(Spec{Action: ActionUpgrade, Mode: ModeSecurity, Reboot: RebootNever}, p).Do(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(m.calls, install) || !slices.Contains(m.calls, "apt-mark auto libfoo1") || slices.Contains(m.calls, "apt-get -y -o "+aptLockOption+" -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --no-remove install libbar-common") {
+		t.Fatalf("leftover install did not target only the simulated security package and restore its automatic mark: %v", m.calls)
+	}
+	if st := mustStatus(t, p); st.State != StateDone || st.NoteCode != "" {
+		t.Fatalf("successful leftover install status = %+v", st)
+	}
+}
+
+func TestSecurityLeftoverFailureIsANonFatalResultNote(t *testing.T) {
+	m := newMachine(t)
+	simulation := commandKey(append([]string{"apt-get"}, aptSimulationArgs...)...)
+	m.on(simulation, func() (string, error) {
+		if m.ran("unattended-upgrade") {
+			return "Inst libfoo1 [1] (2 Ubuntu:24.04/noble-security [amd64])\n", nil
+		}
+		return "", nil
+	})
+	m.ok(commandKey("apt-mark", "showauto"), "")
+	install := commandKey("apt-get", "-y", "-o", aptLockOption, "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
+		"--no-remove", "install", "libfoo1")
+	m.fail(install, "E: package could not be unpacked\n")
+	p := statusPath(t)
+	if err := m.job(Spec{Action: ActionUpgrade, Mode: ModeSecurity, Reboot: RebootNever}, p).Do(context.Background()); err != nil {
+		t.Fatalf("a failed leftover install failed the job: %v", err)
+	}
+	st := mustStatus(t, p)
+	if st.State != StateDone || st.NoteCode != NoteSecurityLeftoverFailed || st.Note == "" {
+		t.Fatalf("leftover failure result = %+v", st)
 	}
 }
 

@@ -429,6 +429,9 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	if reader == nil {
 		reader = osupdate.NewReader()
 	}
+	if reader.StateDir == "" {
+		reader.StateDir = cfg.StateDir
+	}
 	reader.Now = a.now
 	a.osUpdateMonitor = osupdate.NewMonitor(reader)
 	if siteErr != nil {

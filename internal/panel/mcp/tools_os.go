@@ -161,6 +161,15 @@ var osRolloutStart = changeSpec[osRolloutStartArgs]{
 			facts = append(facts,
 				Fact{Key: "pending", Value: strconv.FormatUint(uint64(s.GetPending()), 10)},
 				Fact{Key: "security", Value: strconv.FormatUint(uint64(s.GetSecurity()), 10)})
+			var stuck []string
+			for _, name := range s.GetSecurityStuck() {
+				if mcpOSPendingPackage.MatchString(name) {
+					stuck = append(stuck, noAddr(clean(name, 96)))
+				}
+			}
+			if len(stuck) > 0 {
+				facts = append(facts, Fact{Key: "security_stuck", Value: strings.Join(stuck, ", "), Untrusted: true})
+			}
 		}
 		if s.GetKernelRunning() != "" {
 			kernel := noAddr(clean(s.GetKernelRunning(), 128))

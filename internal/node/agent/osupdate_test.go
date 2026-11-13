@@ -274,6 +274,32 @@ func TestOsUpdateEndsAreEventsReportedOnce(t *testing.T) {
 	}
 }
 
+func TestOsUpdateResultsCarryAptLockAndLeftoverNotes(t *testing.T) {
+	n := newOsNode()
+	h := newOsAgent(t, n, nil)
+	h.waitConnected()
+	askOs(h, &pb.UpdateOs{Action: "upgrade", Mode: "security", Reboot: "never", JobId: "osj_lock"})
+	now := time.Now().Unix()
+	writeOsStatus(t, n.path, osupdate.Status{JobID: "osj_lock", Action: "upgrade", Mode: "security", RebootPolicy: "never", State: osupdate.StateFailed,
+		Started: now - 20, Updated: now, Finished: now, Code: osupdate.CodeAptLock, Reason: "another package manager held the dpkg lock",
+		AptLockHolder: "apt-get", AptLockMinutes: 15})
+	eventually(t, func() bool { return h.panel.hasEvent("os_update_failed") }, "the apt-lock refusal event")
+	failed := h.panel.event("os_update_failed")
+	if failed.Params["code"] != osupdate.CodeAptLock || failed.Params["holder"] != "apt-get" || failed.Params["minutes"] != "15" {
+		t.Fatalf("apt lock refusal params = %+v", failed.Params)
+	}
+
+	askOs(h, &pb.UpdateOs{Action: "refresh", Reboot: "never", JobId: "osj_leftover"})
+	now = time.Now().Unix()
+	writeOsStatus(t, n.path, osupdate.Status{JobID: "osj_leftover", Action: "refresh", RebootPolicy: "never", State: osupdate.StateDone,
+		Started: now - 10, Updated: now, Finished: now, NoteCode: osupdate.NoteSecurityLeftoverFailed, Note: "Some security updates remain pending; check the node and retry."})
+	eventually(t, func() bool { return h.panel.hasEvent("os_update_done") }, "the non-fatal security leftover note")
+	done := h.panel.event("os_update_done")
+	if done.Params["note_code"] != osupdate.NoteSecurityLeftoverFailed || done.Params["note"] == "" {
+		t.Fatalf("done event did not carry the leftover note: %+v", done.Params)
+	}
+}
+
 // A job that ended while the agent was down (or an agent restarted mid-job) is reported when the agent is back; a job that
 // rebooted the host is reported on the kernel the host came back with.
 func TestOsUpdateReportsAnEndThatHappenedWhileTheAgentWasDown(t *testing.T) {

@@ -321,6 +321,8 @@ How it is read:
 - It works on Debian and Ubuntu with systemd. Other systems, and nodes whose agent is older than this feature, show **Not available** with the reason.
 - The panel's own server is read only when the panel runs as root; otherwise the row says to check it by hand.
 
+The status lists up to 32 pending security package names and marks names that have remained pending for more than two days while automatic updates are enabled. After `unattended-upgrade`, the node retries security packages it still sees in its own simulation, including any required new dependencies, and reports a failed retry without failing the job. When apt holds its lock, the status names the holder process and shows when it started.
+
 From this layer the panel installs security updates on one node and reboots it: see [Update one server's system](#update-one-servers-system). Ordinary updates (all the other packages), several nodes at once and the panel's own server are not done from here yet: update those over SSH or by the command under [Running by hand on a node](#running-by-hand-on-a-node). Ordinary updates that wait do not change a server's state. The Cloudflare edition does not have this layer. The MCP tool `os_updates_status` returns the same stored readings and the last OS update; it never contacts a node.
 
 ### Update one server's system

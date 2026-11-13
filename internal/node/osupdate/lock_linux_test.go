@@ -4,8 +4,10 @@ package osupdate
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/sys/unix"
@@ -22,6 +24,52 @@ func tryOFD(t *testing.T, path string) error {
 	defer f.Close()
 	lk := unix.Flock_t{Type: unix.F_WRLCK}
 	return unix.FcntlFlock(f.Fd(), unix.F_OFD_SETLK, &lk)
+}
+
+func TestReaderParsesAndValidatesAptLockHolder(t *testing.T) {
+	for _, tc := range []struct {
+		name, comm, wantHolder string
+	}{
+		{"valid process", "apt-get", "apt-get"},
+		{"invalid process name", "apt;get", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			lock := filepath.Join(root, "var", "lib", "dpkg", "lock")
+			if err := os.MkdirAll(filepath.Dir(lock), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(lock, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Stat(lock)
+			if err != nil {
+				t.Fatal(err)
+			}
+			key, ok := deviceInode(info)
+			if !ok {
+				t.Fatal("could not read lock device and inode")
+			}
+			const pid = 4312
+			writeRoot(t, root, "/proc/locks", fmt.Sprintf("1: POSIX ADVISORY WRITE %d %s 0 EOF\n", pid, key))
+			writeRoot(t, root, fmt.Sprintf("/proc/%d/comm", pid), tc.comm+"\n")
+			statFields := make([]string, 20) // fields 3 through 22
+			statFields[0], statFields[19] = "S", "450"
+			writeRoot(t, root, fmt.Sprintf("/proc/%d/stat", pid), fmt.Sprintf("%d (apt-get) %s\n", pid, strings.Join(statFields, " ")))
+			writeRoot(t, root, "/proc/stat", "cpu 1 2 3\nbtime 1800000000\n")
+			reader := &Reader{Root: root}
+			locked, holder, since := reader.aptLockStatus()
+			if !locked || holder != tc.wantHolder {
+				t.Fatalf("lock = %v, holder = %q, want locked and holder %q", locked, holder, tc.wantHolder)
+			}
+			if tc.wantHolder != "" && since != 1800000004 {
+				t.Fatalf("lock process start time = %d, want 1800000004", since)
+			}
+			if tc.wantHolder == "" && since != 0 {
+				t.Fatalf("invalid holder yielded a start time: %d", since)
+			}
+		})
+	}
 }
 
 func TestHeldLockSurvivesAnotherOpenAndCloseOfTheSameFile(t *testing.T) {

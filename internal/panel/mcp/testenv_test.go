@@ -511,6 +511,7 @@ func newWorld() *world {
 		nodeStatuses: map[string]adminv1.NodeStatus{nodeA: adminv1.NodeStatus_NODE_STATUS_ONLINE, nodeB: adminv1.NodeStatus_NODE_STATUS_DOWN},
 		rolloutStat:  adminv1.RolloutStatus_ROLLOUT_STATUS_DONE, bundleStat: adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED, scheduleTimezoneOffset: 180, downloadTimeoutSeconds: 1800, scheduledUnix: 1700009000}
 	osStatus := &agentv1.OsStatus{MeasuredUnix: 1700000000, DistroId: "ubuntu", DistroVersion: "24.04", Pending: 3, Security: 1,
+		SecurityPending: []string{"libfoo1", "libbar-common:amd64", "libbar-common;evil"}, SecurityStuck: []string{"libfoo1", "libbar-common;evil"}, AptLockHolder: "apt-get", AptLockSinceUnix: 1699999000,
 		Notable: []string{"openssl 3.0.0 3.0.1 s", "203.0.113.77 1 2 -", "linux-image-generic 5.15.0.125.123 5.15.0.126.125 s"}, KernelRunning: "6.8.0-1-generic", KernelNewest: "6.8.0-2-generic",
 		RebootRequired: true, RebootReasons: []string{"kernel", "linux-image-6.8.0-2-generic"}, Held: []string{"linux-image-6.8.0-2-generic", "203.0.113.77"},
 		Apt: "ok", ListsUnix: 1699990000, DpkgUnix: 1699980000, AutoUpdates: "on", BootIdHash: "0123456789abcdef",

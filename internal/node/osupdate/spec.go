@@ -65,6 +65,9 @@ const (
 	CodeTooSoon = "too_soon"
 )
 
+// NoteSecurityLeftoverFailed is a non-fatal result note: unattended-upgrade completed, but its named security leftovers did not install.
+const NoteSecurityLeftoverFailed = "security_leftover_failed"
+
 // Codes lists every code a job or a refusal can carry; the panel checks an incoming job against it.
 var Codes = []string{CodeUnsupportedOS, CodeNoSystemd, CodeBadRequest, CodeBusy, CodeDiskFull, CodeAptLock, CodeDpkgBroken, CodeSecuritySource,
 	CodeRefreshFailed, CodeInstallFailed, CodeAutoReboot, CodeDpkgInterrupted, CodeAwgModuleMissing, CodeBootFull, CodeInitramfsMissing,

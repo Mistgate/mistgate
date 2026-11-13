@@ -35,20 +35,24 @@ type Status struct {
 	Updated      int64  `json:"updated"` // the last heartbeat
 	Finished     int64  `json:"finished,omitempty"`
 	// Back is when the agent first saw the host on a new boot (a job that rebooted it).
-	Back          int64    `json:"back,omitempty"`
-	Code          string   `json:"code,omitempty"`
-	Reason        string   `json:"reason,omitempty"` // one fixed English sentence, never package-manager output
-	Package       string   `json:"package,omitempty"`
-	Reasons       []string `json:"reasons,omitempty"` // every code that blocked the reboot
-	Upgraded      uint32   `json:"upgraded,omitempty"`
-	Reboot        string   `json:"reboot,omitempty"`
-	HeldReason    string   `json:"held_reason,omitempty"`
-	SourcesFailed []string `json:"sources_failed,omitempty"`
-	KernelFrom    string   `json:"kernel_from,omitempty"`
-	KernelTo      string   `json:"kernel_to,omitempty"`
-	KernelNow     string   `json:"kernel_now,omitempty"`
-	BootID        string   `json:"boot_id,omitempty"` // the boot the job started on
-	AwgRequired   bool     `json:"awg_required,omitempty"`
+	Back           int64    `json:"back,omitempty"`
+	Code           string   `json:"code,omitempty"`
+	Reason         string   `json:"reason,omitempty"` // one fixed English sentence, never package-manager output
+	NoteCode       string   `json:"note_code,omitempty"`
+	Note           string   `json:"note,omitempty"`
+	Package        string   `json:"package,omitempty"`
+	AptLockHolder  string   `json:"apt_lock_holder,omitempty"`
+	AptLockMinutes uint32   `json:"apt_lock_minutes,omitempty"`
+	Reasons        []string `json:"reasons,omitempty"` // every code that blocked the reboot
+	Upgraded       uint32   `json:"upgraded,omitempty"`
+	Reboot         string   `json:"reboot,omitempty"`
+	HeldReason     string   `json:"held_reason,omitempty"`
+	SourcesFailed  []string `json:"sources_failed,omitempty"`
+	KernelFrom     string   `json:"kernel_from,omitempty"`
+	KernelTo       string   `json:"kernel_to,omitempty"`
+	KernelNow      string   `json:"kernel_now,omitempty"`
+	BootID         string   `json:"boot_id,omitempty"` // the boot the job started on
+	AwgRequired    bool     `json:"awg_required,omitempty"`
 	// AwgSource says what the job found in the module's source: "patched" (it repaired a known-bad compat.h) or
 	// "unknown:<12 hex of its sha256>" (a file Mistgate does not know, left as it was). Empty = nothing to say.
 	AwgSource string `json:"awg_source,omitempty"`
@@ -115,7 +119,8 @@ func (s Status) Proto() *agentv1.OsJob {
 	return &agentv1.OsJob{
 		JobId: s.JobID, Action: s.Action, Mode: s.Mode, State: s.State, Phase: s.Phase,
 		StartedUnix: s.Started, UpdatedUnix: s.Updated, FinishedUnix: s.Finished,
-		Code: s.Code, Reason: s.Reason, Upgraded: s.Upgraded, Reboot: s.Reboot, HeldReason: s.HeldReason,
+		Code: s.Code, Reason: s.Reason, NoteCode: s.NoteCode, Note: s.Note, Upgraded: s.Upgraded, Reboot: s.Reboot, HeldReason: s.HeldReason,
+		AptLockHolder: s.AptLockHolder, AptLockMinutes: s.AptLockMinutes,
 		SourcesFailed: append([]string(nil), s.SourcesFailed...), KernelFrom: s.KernelFrom, KernelTo: s.KernelTo,
 	}
 }

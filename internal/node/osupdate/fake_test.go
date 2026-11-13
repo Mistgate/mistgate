@@ -73,6 +73,7 @@ func newMachine(t *testing.T) *fakeMachine {
 	for cmd, out := range map[string]string{
 		commandKey("apt-config", "shell", "R", "Unattended-Upgrade::Automatic-Reboot/b"): "R='false'\n",
 		commandKey("dpkg-query", "-W", "-f=${Status}", "unattended-upgrades"):            "install ok installed",
+		commandKey("apt-mark", "showauto"):                                               "",
 		commandKey("apt-get", "-o", aptLockOption, "update"):                             "Hit:1 http://archive.example.net/ubuntu resolute InRelease\nReading package lists...\n",
 		commandKey("apt-get", "-o", aptLockOption, "check"):                              "",
 		commandKey("unattended-upgrade", "-v"):                                           "Packages that will be upgraded: libc6\n",
@@ -81,6 +82,13 @@ func newMachine(t *testing.T) *fakeMachine {
 	} {
 		m.ok(cmd, out)
 	}
+	simulation := commandKey(append([]string{"apt-get"}, aptSimulationArgs...)...)
+	m.on(simulation, func() (string, error) {
+		if m.ran("unattended-upgrade") {
+			return "", nil
+		}
+		return "Inst libc6 [2.40-1] (2.40-2 Ubuntu:26.04/resolute-security [amd64])\n", nil
+	})
 	m.ok(allUpgrade, "")
 	return m
 }
@@ -244,6 +252,7 @@ func (m *fakeMachine) host() Host {
 		AptBusy: func() bool {
 			return m.busy != nil && m.busy()
 		},
+		AptLockInfo: func() (string, int64) { return "apt-get", m.clock.Unix() },
 		HoldAptLock: func() (func(), error) {
 			if m.lockErr != nil {
 				return nil, m.lockErr

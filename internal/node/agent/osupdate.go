@@ -140,7 +140,8 @@ func (a *Agent) osJobFingerprint() string {
 	if !ok {
 		return ""
 	}
-	return strings.Join([]string{st.JobID, st.State, st.Phase, st.Code, st.Reboot, strconv.FormatUint(uint64(st.Upgraded), 10)}, "|")
+	return strings.Join([]string{st.JobID, st.State, st.Phase, st.Code, st.NoteCode, st.AptLockHolder,
+		strconv.FormatUint(uint64(st.AptLockMinutes), 10), st.Reboot, strconv.FormatUint(uint64(st.Upgraded), 10)}, "|")
 }
 
 // osUpdateEnded raises the event of a finished job, reads the host again and has the doctor look again.
@@ -152,6 +153,9 @@ func (a *Agent) osUpdateEnded(ctx context.Context, st osupdate.Status) {
 	params := map[string]string{"job_id": st.JobID}
 	if st.State == osupdate.StateDone {
 		params["upgraded"], params["reboot"], params["kernel"] = strconv.FormatUint(uint64(st.Upgraded), 10), st.Reboot, kernel
+		if st.NoteCode != "" {
+			params["note_code"], params["note"] = st.NoteCode, st.Note
+		}
 		if st.HeldReason != "" {
 			params["held_reason"] = st.HeldReason
 		}
@@ -159,6 +163,10 @@ func (a *Agent) osUpdateEnded(ctx context.Context, st osupdate.Status) {
 		a.event(pb.Severity_SEVERITY_INFO, "os_update_done", "", params)
 	} else {
 		params["code"], params["reason"], params["package"] = st.Code, st.Reason, st.Package
+		if st.Code == osupdate.CodeAptLock {
+			params["holder"] = st.AptLockHolder
+			params["minutes"] = strconv.FormatUint(uint64(st.AptLockMinutes), 10)
+		}
 		if st.Reboot != "" {
 			params["reboot"] = st.Reboot
 		}

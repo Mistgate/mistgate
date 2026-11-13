@@ -25,6 +25,8 @@ type Host struct {
 	FreeMB func(path string) (int64, bool)
 	// AptBusy says whether dpkg, apt or unattended-upgrades hold a lock.
 	AptBusy func() bool
+	// AptLockInfo returns the validated process name holding an apt lock, when readable.
+	AptLockInfo func() (string, int64)
 	// HoldAptLock takes the dpkg frontend lock and keeps it until release is called (or the process ends), so that no other
 	// package manager starts between the last check before a reboot and the reboot. An error means somebody holds it.
 	HoldAptLock func() (release func(), err error)
@@ -49,6 +51,10 @@ func RealHost() Host {
 		FreeMB: freeMB,
 		AptBusy: func() bool {
 			return awgprep.RealSys().AptBusy() || awgprep.FileLocked("/var/run/unattended-upgrades.lock")
+		},
+		AptLockInfo: func() (string, int64) {
+			_, holder, since := (&Reader{}).aptLockStatus()
+			return holder, since
 		},
 		HoldAptLock: holdAptLock,
 		Sleep:       sleepCtx,
@@ -84,6 +90,9 @@ func (h Host) defaults() Host {
 	}
 	if h.AptBusy == nil {
 		h.AptBusy = real.AptBusy
+	}
+	if h.AptLockInfo == nil {
+		h.AptLockInfo = real.AptLockInfo
 	}
 	if h.HoldAptLock == nil {
 		h.HoldAptLock = real.HoldAptLock

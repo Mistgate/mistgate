@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ func TestGetOsUpdatesUsesStoredNodeSnapshots(t *testing.T) {
 	old := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1"}, online: 1})
 	now := e.clk.Now()
 	status := &agentv1.OsStatus{MeasuredUnix: now.Unix(), DistroId: "ubuntu", DistroVersion: "24.04", Pending: 2, Security: 1,
+		SecurityPending: []string{"libfoo1"}, SecurityStuck: []string{"libfoo1"}, AptLockHolder: "apt-get", AptLockSinceUnix: now.Add(-time.Minute).Unix(),
 		Notable: []string{"openssl 3.0.0 3.0.1 s"}, Apt: "ok", AutoUpdates: "on", BootIdHash: "0123456789abcdef"}
 	body, err := protojson.Marshal(status)
 	if err != nil {
@@ -44,6 +46,10 @@ func TestGetOsUpdatesUsesStoredNodeSnapshots(t *testing.T) {
 	got := byID[capable]
 	if got == nil || !got.GetConnected() || !got.GetSupported() || got.GetState() != adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES || got.GetOnlineUsers() != 2 || got.GetStatus().GetPending() != 2 {
 		t.Fatalf("capable node = %+v", got)
+	}
+	if !slices.Equal(got.GetStatus().GetSecurityPending(), []string{"libfoo1"}) || !slices.Equal(got.GetStatus().GetSecurityStuck(), []string{"libfoo1"}) ||
+		got.GetStatus().GetAptLockHolder() != "apt-get" || got.GetStatus().GetAptLockSinceUnix() != now.Add(-time.Minute).Unix() {
+		t.Fatalf("new node OS fields did not reach the admin response: %+v", got.GetStatus())
 	}
 	if got.GetOnPanelServer() {
 		t.Fatal("node was marked as the panel host without a panel snapshot")

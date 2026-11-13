@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +31,8 @@ const (
 	FullReadInterval    = 6 * time.Hour
 	aptReadTimeout      = 30 * time.Second
 	maxPackages         = 16
+	maxSecurityPending  = 32
+	securityStuckAfter  = 48 * time.Hour
 	maxOutput           = 4 << 20
 )
 
@@ -46,9 +50,10 @@ type Runner func(context.Context, string, ...string) ([]byte, error)
 
 // Reader inspects the host. Root is a test-only filesystem root; commands should be replaced when it is set.
 type Reader struct {
-	Root string
-	Run  Runner
-	Now  func() time.Time
+	Root     string
+	StateDir string
+	Run      Runner
+	Now      func() time.Time
 }
 
 func NewReader() *Reader { return &Reader{Run: runCommand, Now: time.Now} }
@@ -121,7 +126,8 @@ func (r *Reader) Read(ctx context.Context) (*agentv1.OsStatus, error) {
 		s.Held, s.HalfConfigured = parsePackageStatuses(statusRows)
 	}
 
-	locked := r.aptLocked()
+	locked, lockHolder, lockSince := r.aptLockStatus()
+	s.AptLockHolder, s.AptLockSinceUnix = lockHolder, lockSince
 	if locked {
 		s.Apt = "locked"
 	} else if len(s.HalfConfigured) > 0 {
@@ -150,10 +156,14 @@ func (r *Reader) Read(ctx context.Context) (*agentv1.OsStatus, error) {
 
 	s.RebootRequired, s.RebootReasons = r.rebootRequired(s)
 	var simErr error
+	var securityPending []string
+	var securityFirstSeen map[string]int64
 	if !locked && s.Apt != "no_lists" && s.Apt != "unknown" {
 		out, err := r.simulate(ctx)
 		if err == nil {
-			s.Pending, s.Security, s.Notable = parseSimulation(string(out))
+			s.Pending, s.Security, s.Notable, securityPending = parseSimulationDetails(string(out))
+			s.SecurityPending = firstPackageNames(securityPending, maxSecurityPending)
+			securityFirstSeen = r.rememberSecurityPending(securityPending, s.MeasuredUnix)
 		} else {
 			// The status still goes out, with the counts left empty, so the panel shows that the read failed instead of
 			// an old state. The returned error carries the reason for the agent's log.
@@ -164,6 +174,14 @@ func (r *Reader) Read(ctx context.Context) (*agentv1.OsStatus, error) {
 		}
 	}
 	r.autoUpdates(ctx, s)
+	if s.AutoUpdates == "on" {
+		for _, name := range securityPending {
+			if first := securityFirstSeen[name]; first > 0 && s.MeasuredUnix-first > int64(securityStuckAfter/time.Second) {
+				s.SecurityStuck = append(s.SecurityStuck, name)
+			}
+		}
+		s.SecurityStuck = firstPackageNames(s.SecurityStuck, maxSecurityPending)
+	}
 	r.awgModule(s, statusRows)
 	s.AwgSource = r.awgSource()
 	return s, simErr
@@ -342,9 +360,16 @@ func (r *Reader) containerKind(ctx context.Context) string {
 }
 
 func (r *Reader) aptLocked() bool {
+	locked, _, _ := r.aptLockStatus()
+	return locked
+}
+
+// aptLockStatus matches the apt lock inode first, then reads the process named by that exact /proc/locks row. A lock with
+// an unknown or invalid owner still counts as locked; the optional metadata is simply left empty.
+func (r *Reader) aptLockStatus() (bool, string, int64) {
 	locks, err := r.readFile("/proc/locks")
 	if err != nil {
-		return false
+		return false, "", 0
 	}
 	wanted := map[string]bool{}
 	for _, p := range []string{"/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock", "/var/lib/apt/lists/lock"} {
@@ -354,14 +379,85 @@ func (r *Reader) aptLocked() bool {
 			}
 		}
 	}
+	matched := false
 	for _, line := range strings.Split(string(locks), "\n") {
-		for _, field := range strings.Fields(line) {
+		fields := strings.Fields(line)
+		inodeAt := -1
+		for i, field := range fields {
 			if wanted[field] {
-				return true
+				inodeAt = i
+				break
 			}
 		}
+		if inodeAt < 0 {
+			continue
+		}
+		matched = true
+		// A leading "->" marks a blocked waiter, not the process that owns the lock.
+		if len(fields) < 2 || fields[1] == "->" || inodeAt == 0 {
+			continue
+		}
+		pid, err := strconv.Atoi(fields[inodeAt-1])
+		if err != nil || pid <= 0 {
+			continue
+		}
+		comm, err := r.readFile(fmt.Sprintf("/proc/%d/comm", pid))
+		if err != nil {
+			continue
+		}
+		holder := strings.TrimSpace(string(comm))
+		if !validAptLockHolder(holder) {
+			continue
+		}
+		stat, statErr := r.readFile(fmt.Sprintf("/proc/%d/stat", pid))
+		procStat, procStatErr := r.readFile("/proc/stat")
+		if statErr != nil || procStatErr != nil {
+			return true, holder, 0
+		}
+		return true, holder, processStartUnix(string(stat), string(procStat))
 	}
-	return false
+	return matched, "", 0
+}
+
+func validAptLockHolder(s string) bool {
+	if len(s) == 0 || len(s) > 15 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || strings.ContainsRune("._-", c)) {
+			return false
+		}
+	}
+	return true
+}
+
+// processStartUnix converts /proc/<pid>/stat's starttime (field 22, in USER_HZ ticks) to Unix seconds using /proc/stat's
+// boot time. Linux exposes USER_HZ as 100 for this proc field on supported Debian and Ubuntu hosts.
+func processStartUnix(stat, procStat string) int64 {
+	end := strings.LastIndexByte(stat, ')') // comm may itself contain spaces or ')' characters
+	if end < 0 || end+1 >= len(stat) {
+		return 0
+	}
+	fields := strings.Fields(stat[end+1:])
+	if len(fields) <= 19 {
+		return 0
+	}
+	ticks, err := strconv.ParseInt(fields[19], 10, 64)
+	if err != nil || ticks < 0 {
+		return 0
+	}
+	var boot int64
+	for _, line := range strings.Split(procStat, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "btime" {
+			boot, err = strconv.ParseInt(fields[1], 10, 64)
+			if err == nil && boot > 0 {
+				return boot + ticks/100
+			}
+			return 0
+		}
+	}
+	return 0
 }
 
 // deviceInode uses reflection because syscall.Stat_t has different definitions across the build targets.
@@ -528,6 +624,12 @@ func parsePackageStatuses(out string) (held, half []string) {
 }
 
 func parseSimulation(out string) (pending, security uint32, notable []string) {
+	pending, security, notable, _ = parseSimulationDetails(out)
+	return pending, security, notable
+}
+
+func parseSimulationDetails(out string) (pending, security uint32, notable, securityPending []string) {
+	securityNames := map[string]bool{}
 	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "Inst ") {
@@ -537,6 +639,7 @@ func parseSimulation(out string) (pending, security uint32, notable []string) {
 		if !ok {
 			continue
 		}
+		securityPackage := pkg
 		pkg, ok = normalizePackageName(pkg)
 		if !ok {
 			continue
@@ -544,6 +647,9 @@ func parseSimulation(out string) (pending, security uint32, notable []string) {
 		pending++
 		if isSecurityOrigin(origin) {
 			security++
+			if validSecurityPackageName(securityPackage) {
+				securityNames[securityPackage] = true
+			}
 		}
 		if notablePackage(pkg) && len(notable) < maxPackages {
 			suffix := "-"
@@ -553,7 +659,93 @@ func parseSimulation(out string) (pending, security uint32, notable []string) {
 			notable = append(notable, strings.Join([]string{pkg, safeVersion(old), safeVersion(next), suffix}, " "))
 		}
 	}
-	return pending, security, notable
+	for name := range securityNames {
+		securityPending = append(securityPending, name)
+	}
+	sort.Strings(securityPending)
+	return pending, security, notable, securityPending
+}
+
+func parseSecurityPending(out string) []string {
+	_, _, _, names := parseSimulationDetails(out)
+	return names
+}
+
+func validSecurityPackageName(s string) bool {
+	name, arch, hasArch := strings.Cut(s, ":")
+	if len(name) < 2 || len(name) > 63 || !((name[0] >= 'a' && name[0] <= 'z') || (name[0] >= '0' && name[0] <= '9')) {
+		return false
+	}
+	for _, c := range name {
+		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || strings.ContainsRune("+.-", c)) {
+			return false
+		}
+	}
+	if !hasArch {
+		return true
+	}
+	if len(arch) == 0 || len(arch) > 32 {
+		return false
+	}
+	for _, c := range arch {
+		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+type osPendingState struct {
+	FirstSeen map[string]int64 `json:"first_seen_unix"`
+}
+
+func (r *Reader) rememberSecurityPending(names []string, now int64) map[string]int64 {
+	firstSeen := map[string]int64{}
+	if r.StateDir == "" {
+		return firstSeen
+	}
+	path := filepath.Join(r.StateDir, "os-pending.json")
+	if data, err := os.ReadFile(path); err == nil {
+		var state osPendingState
+		if json.Unmarshal(data, &state) == nil {
+			for name, first := range state.FirstSeen {
+				if validSecurityPackageName(name) && first > 0 && first <= now {
+					firstSeen[name] = first
+				}
+			}
+		}
+	}
+	current := make(map[string]int64, len(names))
+	for _, name := range names {
+		if !validSecurityPackageName(name) {
+			continue
+		}
+		first := firstSeen[name]
+		if first == 0 {
+			first = now
+		}
+		current[name] = first
+	}
+	_ = writeJSONFile(path, osPendingState{FirstSeen: current})
+	return current
+}
+
+func firstPackageNames(names []string, limit int) []string {
+	if len(names) == 0 {
+		return []string{}
+	}
+	out := append([]string(nil), names...)
+	sort.Strings(out)
+	unique := out[:0]
+	for _, name := range out {
+		if len(unique) == 0 || unique[len(unique)-1] != name {
+			unique = append(unique, name)
+		}
+	}
+	if len(unique) > limit {
+		unique = unique[:limit]
+	}
+	return unique
 }
 
 func parseInst(line string) (pkg, old, next, origin string, ok bool) {

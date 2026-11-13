@@ -2,6 +2,7 @@ package osupdate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,6 +35,110 @@ func TestParseSimulationKeepsInstLinesWithBrokenPackageTail(t *testing.T) {
 	if p, _, _ := parseSimulation("Inst systemd [1] (2 Ubuntu:22.04/jammy-security [amd64]) trailing words"); p != 0 {
 		t.Fatalf("a line with unknown text after the parenthesis counted as pending (%d)", p)
 	}
+}
+
+func TestSecurityPendingNamesAreValidatedAndCapped(t *testing.T) {
+	var lines []string
+	for i := 0; i < 33; i++ {
+		lines = append(lines, fmt.Sprintf("Inst libfoo1:arch%02d [1] (2 Ubuntu:24.04/noble-security [amd64])", i))
+	}
+	lines = append(lines,
+		"Inst libbar-common;evil [1] (2 Ubuntu:24.04/noble-security [amd64])",
+		"Inst libbar-common [1] (2 Ubuntu:24.04/noble-updates [amd64])")
+	r := securityTestReader(t, func() time.Time { return time.Unix(1_800_000_000, 0) }, strings.Join(lines, "\n"))
+	status, err := r.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.GetSecurityPending()) != maxSecurityPending || status.GetSecurityPending()[0] != "libfoo1:arch00" || status.GetSecurityPending()[31] != "libfoo1:arch31" {
+		t.Fatalf("security_pending = %q, want the first 32 validated names", status.GetSecurityPending())
+	}
+	if status.GetSecurity() != 33 || slices.Contains(status.GetSecurityPending(), "libbar-common") || slices.Contains(status.GetSecurityPending(), "libbar-common;evil") {
+		t.Fatalf("security count or names included a non-security or invalid name: %+v", status)
+	}
+}
+
+func TestSecurityStuckAppearsAfterTwoDaysOfAutomaticUpdates(t *testing.T) {
+	current := time.Unix(1_800_000_000, 0)
+	r := securityTestReader(t, func() time.Time { return current }, "Inst libfoo1 [1] (2 Ubuntu:24.04/noble-security [amd64])")
+	read := func(want bool) {
+		t.Helper()
+		status, err := r.Read(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := slices.Contains(status.GetSecurityStuck(), "libfoo1")
+		if got != want || status.GetAutoUpdates() != "on" {
+			t.Fatalf("security_stuck=%q auto_updates=%q, want stuck=%v and automatic updates on", status.GetSecurityStuck(), status.GetAutoUpdates(), want)
+		}
+	}
+	read(false)
+	current = current.Add(48 * time.Hour)
+	read(false)
+	current = current.Add(time.Second)
+	read(true)
+}
+
+func TestSecurityPendingStatePrunesAndToleratesCorruptFile(t *testing.T) {
+	stateDir := t.TempDir()
+	r := &Reader{StateDir: stateDir}
+	first := time.Unix(1_800_000_000, 0).Unix()
+	r.rememberSecurityPending([]string{"libfoo1", "libbar-common"}, first)
+	current := r.rememberSecurityPending([]string{"libfoo1"}, first+10)
+	if len(current) != 1 || current["libfoo1"] != first {
+		t.Fatalf("first-seen after pruning = %v", current)
+	}
+	path := filepath.Join(stateDir, "os-pending.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored osPendingState
+	if err := json.Unmarshal(data, &stored); err != nil || len(stored.FirstSeen) != 1 || stored.FirstSeen["libfoo1"] != first {
+		t.Fatalf("pruned state file = %s, err=%v", data, err)
+	}
+	if err := os.WriteFile(path, []byte("{corrupt"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	current = r.rememberSecurityPending([]string{"libbar-common"}, first+20)
+	if len(current) != 1 || current["libbar-common"] != first+20 {
+		t.Fatalf("first-seen after corrupt file = %v", current)
+	}
+	data, err = os.ReadFile(path)
+	if err != nil || !json.Valid(data) {
+		t.Fatalf("corrupt state was not replaced atomically with valid JSON: %s, err=%v", data, err)
+	}
+}
+
+func securityTestReader(t *testing.T, now func() time.Time, simulation string) *Reader {
+	t.Helper()
+	root, stateDir := t.TempDir(), t.TempDir()
+	writeRoot(t, root, "/etc/os-release", "ID=ubuntu\nVERSION_ID=24.04\n")
+	writeRoot(t, root, "/proc/locks", "")
+	writeRoot(t, root, "/var/lib/dpkg/status", "fixture")
+	writeRoot(t, root, "/var/lib/apt/lists/example_InRelease", "fixture")
+	return &Reader{Root: root, StateDir: stateDir, Now: now, Run: func(_ context.Context, name string, args ...string) ([]byte, error) {
+		switch name {
+		case "apt-get":
+			return []byte(simulation), nil
+		case "dpkg-query":
+			if slices.Contains(args, "unattended-upgrades") {
+				return []byte("install ok installed"), nil
+			}
+			return []byte("ii \tlibfoo1\t1\n"), nil
+		case "apt-config":
+			return []byte("L='1'; U='1'; R='false';\n"), nil
+		case "systemctl":
+			if args[0] == "is-enabled" {
+				return []byte("enabled\nenabled\n"), nil
+			}
+			return []byte("active\nactive\n"), nil
+		case "linux-version":
+			return nil, fmt.Errorf("no kernel fixture")
+		default:
+			return nil, nil
+		}
+	}}
 }
 
 type fakeInfo struct{ sys any }

@@ -52,6 +52,8 @@ var (
 // status file, the event and the UI carry, never package-manager output); Package is the package at fault, when one is.
 type Failure struct {
 	Code, Detail, Package string
+	AptLockHolder         string
+	AptLockMinutes        uint32
 	// Reasons are all codes that blocked a reboot, the first being Code.
 	Reasons []string
 }
@@ -183,6 +185,7 @@ func (j Job) Do(ctx context.Context) error {
 		}
 		_ = r.write(func(s *Status) {
 			s.State, s.Code, s.Reason, s.Package, s.Reasons, s.Finished = StateFailed, f.Code, f.Detail, f.Package, f.Reasons, r.host.Now().Unix()
+			s.AptLockHolder, s.AptLockMinutes = f.AptLockHolder, f.AptLockMinutes
 		})
 		return f
 	}
@@ -385,7 +388,10 @@ func (r *run) waitLock(ctx context.Context, maxWait time.Duration, setPhase bool
 	if f := ctxFailure(ctx); f != nil {
 		return f
 	}
-	return fail(CodeAptLock, "another package manager held the dpkg lock for more than %d minutes", max(int(maxWait/time.Minute), 1))
+	f := fail(CodeAptLock, "another package manager held the dpkg lock for more than %d minutes", max(int(maxWait/time.Minute), 1))
+	f.AptLockHolder, _ = r.host.AptLockInfo()
+	f.AptLockMinutes = uint32(max(int(maxWait/time.Minute), 1))
+	return f
 }
 
 // dpkgTable reads "status<TAB>package<TAB>version" of every package: the versions (installed ones only) and the packages
@@ -553,10 +559,66 @@ func (r *run) install(ctx context.Context) *Failure {
 			return f
 		}
 	}
+	if spec.Mode == ModeSecurity {
+		r.installSecurityLeftovers(ctx)
+	}
 	if after, _, derr := r.dpkgTable(ctx); derr == nil {
 		_ = r.write(func(s *Status) { s.Upgraded = countChanged(r.table, after) })
 	}
 	return nil
+}
+
+// installSecurityLeftovers retries only the security-origin packages left by unattended-upgrade. The names are derived from
+// the node's apt simulation, never from a request. apt-get install admits their new dependencies; automatic marks on explicit
+// targets are restored afterward so an originally automatic package does not become manual.
+func (r *run) installSecurityLeftovers(ctx context.Context) {
+	sim, err := r.query(ctx, append([]string{"apt-get"}, aptSimulationArgs...)...)
+	if err != nil {
+		r.securityLeftoverNote()
+		return
+	}
+	names := parseSecurityPending(sim)
+	if len(names) == 0 {
+		return
+	}
+	autoOut, err := r.query(ctx, "apt-mark", "showauto")
+	if err != nil {
+		r.securityLeftoverNote()
+		return
+	}
+	auto := map[string]bool{}
+	for _, name := range strings.Fields(autoOut) {
+		if validSecurityPackageName(name) {
+			auto[name] = true
+		}
+	}
+	args := []string{"apt-get", "-y", "-o", aptLockOption}
+	for _, option := range dpkgConfOpts {
+		args = append(args, "-o", "Dpkg::Options::="+option)
+	}
+	args = append(args, "--no-remove", "install")
+	args = append(args, names...)
+	_, installErr := r.cmdKeep(ctx, args...)
+	var restoreErr error
+	var restore []string
+	for _, name := range names {
+		if auto[name] {
+			restore = append(restore, name)
+		}
+	}
+	if len(restore) > 0 {
+		_, restoreErr = r.cmdKeep(ctx, append([]string{"apt-mark", "auto"}, restore...)...)
+	}
+	if installErr != nil || restoreErr != nil {
+		r.securityLeftoverNote()
+	}
+}
+
+func (r *run) securityLeftoverNote() {
+	_ = r.write(func(s *Status) {
+		s.NoteCode = NoteSecurityLeftoverFailed
+		s.Note = "Some security updates remain pending; check the node and retry."
+	})
 }
 
 // installFailed classifies a failed install.
