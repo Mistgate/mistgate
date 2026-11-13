@@ -143,14 +143,18 @@ describe("the window before the run", () => {
     // the chain: the canary named first, the people online on each node, small
     const chain = [...dialog()!.querySelectorAll("ol > li")].map((li) => li.textContent);
     expect(chain[0]).toContain("nl1");
-    expect(chain[0]).toContain("(Canary)");
+    expect(chain[0]).toContain("Canary");
+    expect(chain[1]).not.toContain("Canary");
     expect(chain[0]).toContain("nobody online");
     expect(chain[1]).toContain("de1");
     expect(chain[1]).toContain("3 online");
     expect(chain[2]).toContain("fi1");
     expect(chain[2]).toContain("5 online");
     expect(dialog()!.querySelector("li[title='nl1 goes first: the fewest people are online there.']")).not.toBeNull();
-    expect(d).toContain("8 people are online on these nodes now.");
+    // two quiet lines at the bottom, and no text about pausing or cancelling here
+    expect(d).toContain("Online on these nodes: 8 — disconnected for about two minutes");
+    expect(d).toContain("After the update the panel checks the profiles; on a failure the run stops");
+    expect(d).not.toContain("never cut short");
     // the node left out is one folded line; its reason opens with a click
     const fold = [...dialog()!.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.startsWith("Left out 1: msk1"))!;
     expect(fold.getAttribute("aria-expanded")).toBe("false");
@@ -160,8 +164,9 @@ describe("the window before the run", () => {
     expect(dialog()!.textContent).toContain("The node agent is too old to run updates");
     // the first kind is chosen, one line says what it does and how many it fits, and the reboot is on
     expect(radio("Security").getAttribute("aria-checked")).toBe("true");
-    expect(d).toContain("Only security updates; ordinary packages wait.");
+    expect(d).toContain("Only security updates.");
     expect(d).toContain("Fits 3 of 4");
+    expect(d).not.toContain("· Fits");
     expect(rebootSwitch()?.getAttribute("aria-checked")).toBe("true");
   });
 
@@ -287,11 +292,14 @@ describe("the queue of a run", () => {
     const c = card().textContent!;
     expect(c).toContain("Can retry in 11 min");
     expect(c).toContain("another package manager holds the lock");
-    expect(c).toContain("unattended-upgr has been installing packages on the node for 14 min");
+    expect(c).toContain("next in 11 min");
+    // who holds the lock is said once, on the node's own row, not again in the card
+    expect(c).not.toContain("unattended-upgr");
+    expect(host!.textContent!.match(/unattended-upgr has been installing/g)).toHaveLength(2);
     expect(card().querySelector("[class*=text-danger]")).toBeNull();
     expect(card().querySelector("[role=alert]")).toBeNull();
-    // the row of the node says it too, in one line, without a moving bar
-    expect(host!.textContent).toContain("Can retry in 11 min");
+    // the row of the node does not say it again, and has no moving bar
+    expect(host!.textContent!.match(/Can retry in 11 min/g)).toHaveLength(1);
     expect(host!.querySelector("[role=progressbar][aria-label='The update is in progress']")).toBeNull();
   });
 
@@ -317,10 +325,11 @@ describe("the queue of a run", () => {
     expect(updates.cancelOsRollout).toHaveBeenCalledWith({ rolloutId: "osr_1" });
   });
 
-  it("says a pause by the owner in a quiet notice and offers Continue", async () => {
+  it("shows a pause by the owner by its pill and Continue, with no sentence repeating them", async () => {
     await mount(<OsSection />, all(rollout([passed("nl1"), step("de1", OsStepState.PENDING, 1)], { status: OsRolloutStatus.PAUSED, pauseKey: "owner" })));
-    expect(card().textContent).toContain("Paused. Nothing new starts until you continue.");
+    expect(card().textContent).toContain("Paused");
     expect(card().querySelector("[role=alert]")).toBeNull();
+    expect(card().querySelector("[role=status]")).toBeNull();
     await click(button("Continue", card()));
     expect(updates.resumeOsRollout).toHaveBeenCalledWith({ rolloutId: "osr_1", skipFailed: false });
   });
@@ -336,7 +345,8 @@ describe("the queue of a run", () => {
     const banner = card().querySelector<HTMLElement>("[role=alert]")!;
     expect(banner.textContent).toContain("de1: updates are installed, but the server was not rebooted.");
     expect(banner.textContent).toContain("GRUB");
-    expect(banner.textContent).toContain("Retry tries this node once more");
+    // the buttons say what they do: no sentence explaining them
+    expect(banner.textContent).not.toContain("Retry tries this node once more");
     // the accent is on Retry: it is the first thing to try
     expect(button("Retry", banner)!.className).toContain("bg-accent");
     expect(button("Skip and continue", banner)!.className).not.toContain("bg-accent");
@@ -456,11 +466,9 @@ describe("All packages for one node", () => {
     await mount(actions(d), d);
     await click(button("Install updates…"));
     expect(pick("Security").getAttribute("aria-checked")).toBe("true");
-    expect(win().textContent).toContain("2 updates are waiting. Ordinary packages are left for later.");
     expect([...win().querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["What to install"]);
     expect(win().querySelector("[role=switch]")?.getAttribute("aria-checked")).toBe("true");
     await click(pick("All packages"));
-    expect(win().textContent).toContain("12 updates, security and ordinary.");
     expect(win().textContent).toContain("Install all updates on de1");
     expect(win().textContent).toContain("12 updates will be installed, security and ordinary");
     await click(button("Install updates", win()));

@@ -12,7 +12,7 @@ import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { isFleetRun, lockRefusedText, stepChip, waitText, waitingRetry } from "@/lib/os-fleet";
 import { blockKeys, blockOf, blockText, elapsedText, gateWaitText, gateWindowText, osRunOf, pauseCode, pauseText, phaseText, resultLine, stepPill, stepReason, stepSince, useOsActions, type OsNodeRun } from "@/lib/os-run";
-import type { Os, OsRow } from "@/lib/os-updates";
+import type { OsRow } from "@/lib/os-updates";
 import { useIsOwner, vantageNote } from "@/lib/updates";
 import { OsConfirmDialog, type OsDialogMode } from "./os-confirm";
 
@@ -33,8 +33,8 @@ export function useNowSec(active: boolean, everyMs = 15_000) {
   return now;
 }
 
-/** A node waiting for its stage, or for another try after a refusal that only said "not now" ("can retry in 12 min"): a calm block, no bar that never ends. */
-function Queued({ step, now, status, fleet }: { step: Extract<OsNodeRun, { kind: "running" }>["step"]; now: number; status?: Os; fleet: boolean }) {
+/** A node waiting for another try after a refusal that only said "not now" ("can retry in 12 min"): a calm block, no bar that never ends. */
+function Queued({ step, now }: { step: Extract<OsNodeRun, { kind: "running" }>["step"]; now: number }) {
   const t = useT();
   const chip = stepChip(t, step, now);
   return (
@@ -42,19 +42,18 @@ function Queued({ step, now, status, fleet }: { step: Extract<OsNodeRun, { kind:
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]">
         <StatusDot kind={chip.kind} />
         <b>{chip.label}</b>
-        {fleet && <span className="text-[11px] text-muted">{step.stage === 0 ? t("up.ro.canary") : t("up.ro.batch", { n: step.stage })}</span>}
       </div>
-      {waitingRetry(step) && !fleet && <p className="ps-4 text-xs leading-snug text-pretty text-muted">{waitText(t, step, status, now, false)}</p>}
+      <p className="ps-4 text-xs leading-snug text-pretty text-muted">{waitText(t, step, now)}</p>
     </div>
   );
 }
 
 /** The step under way: what the node is doing, for how long, and a bar that has no end because nobody knows it. */
-function Progress({ run, now, compact, status }: { run: Extract<OsNodeRun, { kind: "running" }>; now: number; compact: boolean; status?: Os }) {
+function Progress({ run, now, compact }: { run: Extract<OsNodeRun, { kind: "running" }>; now: number; compact: boolean }) {
   const t = useT();
   const { step, rollout } = run;
-  // a node that only waits its turn in a run of several: a line, no bar that never ends; the queue card above the table has the rest
-  if (step.state === OsStepState.PENDING && (isFleetRun(rollout) || waitingRetry(step))) return <Queued step={step} now={now} status={status} fleet={isFleetRun(rollout)} />;
+  // a node that waits after a refusal that only said "not now": a calm block, no bar that never ends
+  if (step.state === OsStepState.PENDING && waitingRetry(step)) return <Queued step={step} now={now} />;
   const since = stepSince(step, rollout);
   // the check after the job: which profiles have not passed yet, and how long it has waited of the most it will
   const gating = step.state === OsStepState.GATING;
@@ -215,7 +214,9 @@ export function OsNodeActions({ row, compact = false }: { row: OsRow; compact?: 
   const now = useNowSec(!!running);
   if (!row.nodeId) return null;
   const run = osRunOf(row);
-  if ((!owner || compact) && run.kind === "idle") return null;
+  // a node that waits in a run of several (its turn, or another try) is in the queue card above the table: its row says nothing more
+  const queued = run.kind === "running" && isFleetRun(run.rollout) && run.step.state === OsStepState.PENDING;
+  if ((!owner || compact) && (run.kind === "idle" || queued)) return null;
 
   const name = row.name ?? "";
   const size = compact ? "sm" : "md";
@@ -226,7 +227,7 @@ export function OsNodeActions({ row, compact = false }: { row: OsRow; compact?: 
 
   return (
     <div data-shot="os-node-actions" className="flex min-w-0 flex-col gap-2.5">
-      {run.kind === "running" && <Progress run={run} now={now} compact={compact} status={row.status} />}
+      {run.kind === "running" && !queued && <Progress run={run} now={now} compact={compact} />}
       {run.kind === "running" && owner && run.step.state === OsStepState.PENDING && !isFleetRun(run.rollout) && (
         <div>
           <Button variant="ghost" size={size} disabled={off} onClick={() => void actions.close(run.rollout.id)}>

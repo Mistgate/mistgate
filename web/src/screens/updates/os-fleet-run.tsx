@@ -49,13 +49,13 @@ function Chip({ step, nowSec, t }: { step: OsStepRow; nowSec: number; t: T }) {
 
 /** The line under a stage for a node that waits, failed or was left alone: the reason, calm for a wait and a skip. */
 function note(t: T, s: OsStepRow, status: Os | undefined, nowSec: number): { text: string; kind: StatusKind } | null {
-  if (waitingRetry(s)) return { text: waitText(t, s, status, nowSec), kind: "off" };
-  if (s.state !== OsStepState.FAILED && s.state !== OsStepState.SKIPPED) return null;
-  if (keyTail(s.errorKey) === "cancelled") return null;
+  if (waitingRetry(s)) return { text: waitText(t, s, nowSec), kind: "off" };
+  // a skipped node says why on its own row below, and the node that stopped the run in the banner: not said a third time here
+  if (s.state !== OsStepState.FAILED || keyTail(s.errorKey) === "cancelled") return null;
   const r = stepReason(t, s.errorKey, s.params);
   const lock = lockRefusedText(t, status, s.params.code ?? "");
   const text = [r.title, lock || r.detail].filter(Boolean).join(" ");
-  return text ? { text, kind: s.state === OsStepState.FAILED ? "bad" : "off" } : null;
+  return text ? { text, kind: "bad" } : null;
 }
 
 function Stages({ run, statusOf, nowSec, skipNoteOf }: { run: OsRun; statusOf: (nodeId: string) => Os | undefined; nowSec: number; /** The node the banner above already explains. */ skipNoteOf?: string }) {
@@ -69,12 +69,11 @@ function Stages({ run, statusOf, nowSec, skipNoteOf }: { run: OsRun; statusOf: (
         const why = st.steps.filter((s) => s.nodeId !== skipNoteOf).map((s) => ({ s, n: note(t, s, statusOf(s.nodeId), nowSec) })).filter((x) => x.n);
         return (
           <li key={st.stage} className="grid gap-x-4 gap-y-1.5 border-t border-line py-3 first:border-t-0 first:pt-1 sm:grid-cols-[150px_minmax(0,1fr)]">
-            <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex min-h-7 min-w-0 flex-col justify-center self-start">
               <b className={cx("flex items-center gap-1.5 text-[13px]", st.stage === current && "text-accent-text")}>
                 {st.stage === 0 ? t("up.ro.canary") : t("up.ro.batch", { n: st.stage })}
                 {st.stage === current && <span className="size-1.5 rounded-full bg-accent" aria-hidden />}
               </b>
-              <span className="text-[11px] leading-snug text-muted">{stageWhat(t, st.stage, st.steps.length)}</span>
             </div>
             <div className="flex min-w-0 flex-col gap-2">
               <ul className="flex flex-wrap gap-1.5">
@@ -102,8 +101,6 @@ function Stages({ run, statusOf, nowSec, skipNoteOf }: { run: OsRun; statusOf: (
     </ol>
   );
 }
-
-const stageWhat = (t: T, stage: number, n: number) => (stage === 0 ? t("osf.stage.canary") : t.n("up.ro.batch.what", n));
 
 /** One segment per node in the colour of its state, and the count of each kind under it. */
 function Bar({ run, nowSec }: { run: OsRun; nowSec: number }) {
@@ -171,7 +168,7 @@ function StoppedBanner({ run, step, owner, actions }: { run: OsRun; step: OsStep
         <b>{pauseText(t, run.pauseKey, step.nodeName, pause)}</b>
         {reason.title && !same && <span>{reason.title}</span>}
         {reason.detail && <span>{reason.detail}</span>}
-        <span className="text-muted">{t(retried ? "osf.stop.retried" : "osf.stop.hint")}</span>
+        {retried && <span className="text-muted">{t("osf.stop.retried")}</span>}
       </div>
     </Callout>
   );
@@ -257,7 +254,6 @@ export function OsFleetRun({ run, owner, actions, statusOf, nowSec, askingCancel
         )}
       </div>
       <Bar run={run} nowSec={nowSec} />
-      {phase === "paused" && <Notice tone="quiet">{t("osf.paused.text")}</Notice>}
       {phase === "cancelling" && <Notice tone="quiet">{t("osf.cancelling.text")}</Notice>}
       {culprit && <StoppedBanner run={run} step={culprit} owner={owner} actions={actions} />}
       {open && (

@@ -170,7 +170,8 @@ describe("the window before an update", () => {
     expect(s).toContain("already needs a reboot to start kernel 6.8.0-150-generic");
     expect(s).toContain("5 people are online on de1 now");
     expect(s).toContain("disconnected for about two minutes");
-    expect(s).toContain("Old kernels stay installed.");
+    // one quiet line about the check after the update (the old-kernels sentence is gone: nothing is removed anyway)
+    expect(s).toContain("After the update the panel checks the profiles; on a failure the run stops");
     // the reboot is one row with a switch, on by default, and a short line that follows it
     expect(s).toContain("Reboot if required");
     expect(s).toContain("Only if the updates need it; the node checks it is safe.");

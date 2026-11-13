@@ -168,18 +168,16 @@ describe("the state of a node as a chip", () => {
     expect(stepChip(t, step({ state: OsStepState.SKIPPED, errorKey: "try_later" }), NOW)).toEqual({ kind: "off", label: "Not now" });
   });
 
-  it("explains a wait with its reason, its time and the holder of the lock", () => {
+  it("explains a wait with its reason and its time; the holder of the lock is said on the node's own row", () => {
     const s = step({ phase: "waiting_retry", retryAfterUnix: NOW + 600, params: { retry_code: "apt_lock" } });
-    const holder = status({ apt: "locked", aptLockHolder: "unattended-upgr", aptLockSinceUnix: NOW - 14 * 60 });
-    const line = waitText(t, s, holder, NOW);
+    const line = waitText(t, s, NOW);
     expect(line).toContain("another package manager holds the lock");
     expect(line).toContain("next in 10 min");
-    expect(line).toContain("unattended-upgr has been installing packages on the node for 14 min");
-    // another reason, nothing known of the lock
-    expect(waitText(t, { ...s, params: { retry_code: "too_soon" } }, undefined, NOW)).toContain("rebooted only a few minutes ago");
+    expect(line).not.toContain("unattended-upgr");
+    expect(waitText(t, { ...s, params: { retry_code: "too_soon" } }, NOW)).toContain("rebooted only a few minutes ago");
     // a code nobody knows reads as "another job is running"
-    expect(waitText(t, { ...s, params: { retry_code: "whatever" } }, undefined, NOW)).toContain("another job is running");
-    expect(waitText(t, { ...s, retryAfterUnix: NOW - 1 }, undefined, NOW)).toContain("trying again");
+    expect(waitText(t, { ...s, params: { retry_code: "whatever" } }, NOW)).toContain("another job is running");
+    expect(waitText(t, { ...s, retryAfterUnix: NOW - 1 }, NOW)).toContain("trying again");
   });
 });
 

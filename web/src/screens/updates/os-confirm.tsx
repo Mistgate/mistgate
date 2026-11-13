@@ -1,15 +1,14 @@
-import { useId, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Icon, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
-import { Switch } from "@/components/ui/switch";
 import { OsRebootPolicy, OsRolloutMode } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { minutesText } from "@/lib/format";
 import { minutesUntil, type OsActions } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
+import { SwitchRow } from "@/screens/users/ui";
 
 // The window before an OS update of one node: what will happen (packages, kernel, who is online), the one choice
 // (reboot if required, or not), what to watch for, then the button. A reboot the node itself finds unsafe is refused by the
@@ -17,13 +16,9 @@ import type { OsRow } from "@/lib/os-updates";
 
 export type OsDialogMode = "install" | "reboot";
 
-export function Fact({ icon, children, small }: { icon: IconName; children: ReactNode; /** A quiet 12px line, for the facts under the choices of the compact windows. */ small?: boolean }) {
-  return (
-    <li className={small ? "flex items-start gap-2 text-xs leading-snug text-muted" : "flex items-start gap-2.5 text-[13px] leading-snug"}>
-      <Icon name={icon} size={small ? 13 : 15} className="mt-0.5 flex-none text-muted" aria-hidden />
-      <span className="text-pretty">{children}</span>
-    </li>
-  );
+/** One fact of a window, a plain line: no icon, so every text of the window starts on the same vertical. */
+export function Fact({ children }: { children: ReactNode }) {
+  return <li className="text-[13px] leading-snug text-pretty">{children}</li>;
 }
 
 /** A small heading over a group of controls, in the style of the other compact windows ("Order"). */
@@ -35,19 +30,13 @@ export function Heading({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
-/** "Reboot if required" as one row: its words, a one-line hint that follows the switch, and the switch. */
+/** "Reboot if required" as the app's own settings row (SwitchRow): its words, a one-line hint that follows the switch, and the switch. */
 export function RebootRow({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   const t = useT();
-  const id = useId();
+  // in a box of its own so the row's divider (it has one between rows of a list) does not draw above it
   return (
-    <div className="flex items-center gap-3 rounded-field border border-line bg-surface-2 px-3 py-2">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span id={id} className="text-[13px] font-bold">
-          {t("osf.reboot.label")}
-        </span>
-        <span className="text-[11px] leading-snug text-pretty text-muted">{t(on ? "osf.reboot.on" : "osf.reboot.off")}</span>
-      </div>
-      <Switch checked={on} onCheckedChange={onChange} aria-labelledby={id} />
+    <div>
+      <SwitchRow label={t("osf.reboot.label")} hint={t(on ? "osf.reboot.on" : "osf.reboot.off")} checked={on} onCheckedChange={onChange} className="min-h-0! py-0.5" />
     </div>
   );
 }
@@ -134,35 +123,31 @@ export function OsConfirmDialog({ row, mode, actions, onClose, initialPkgs }: { 
               { value: "all", label: t("osf.seg.all") },
             ]}
           />
-          <p className="text-xs leading-snug text-pretty text-muted">{pkgs === "all" ? t.n("osf.one.all.hint", pending) : t.n("osf.one.security.hint", security)}</p>
         </section>
       )}
       {install && <RebootRow on={reboot === "if_required"} onChange={(on) => setReboot(on ? "if_required" : "never")} />}
       <ul className="flex flex-col gap-1.5">
-        {!install && <Fact icon="shield">{t("os.dlg.reboot.lead")}</Fact>}
+        {!install && <Fact>{t("os.dlg.reboot.lead")}</Fact>}
         {install && (
-          <Fact icon="shield">
+          <Fact>
             {all ? t.n("osf.one.all.fact", pending) : t.n("os.dlg.security", security)}
             {!all && others > 0 && <span className="text-muted"> · {t.n("os.dlg.others", others)}</span>}
           </Fact>
         )}
-        {newKernel && <Fact icon="cpu">{t("os.dlg.kernel", { from: s?.kernelRunning ?? "", to: s?.kernelNewest ?? "" })}</Fact>}
+        {newKernel && <Fact>{t("os.dlg.kernel", { from: s?.kernelRunning ?? "", to: s?.kernelNewest ?? "" })}</Fact>}
         {s?.rebootRequired ? (
-          <Fact icon="refresh">{due}</Fact>
+          <Fact>{due}</Fact>
         ) : (
-          !install && <Fact icon="refresh">{t("os.dlg.reboot.notNeeded")}</Fact>
+          !install && <Fact>{t("os.dlg.reboot.notNeeded")}</Fact>
         )}
         {install && (
-          <Fact icon="people">
+          <Fact>
             {online > 0 ? t.n("os.dlg.online", online, { node: name }) : t("os.dlg.online.none", { node: name })}
             {online > 0 && willReboot && <span className="text-muted"> {t("os.dlg.online.drop")}</span>}
           </Fact>
         )}
       </ul>
-      <p className="text-[11px] leading-snug text-pretty text-muted">
-        {install && `${t("os.dlg.fact.kernels")} `}
-        {t("os.dlg.fact.profiles")}
-      </p>
+      <p className="text-xs leading-snug text-pretty text-muted">{t("osf.fact.profiles")}</p>
     </Modal>
   );
 }

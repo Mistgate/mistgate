@@ -176,13 +176,11 @@ export function stepChip(t: T, s: OsStepRow, nowSec: number): { kind: StatusKind
   }
 }
 
-/** Why a waiting node waits, in a sentence; the holder of the package lock is named when the node's status has it. */
-export function waitText(t: T, s: OsStepRow, status: Os | undefined, nowSec: number, withLock = true): string {
+/** Why a waiting node waits, in a sentence (who holds the package lock is said on the node's own row). */
+export function waitText(t: T, s: OsStepRow, nowSec: number): string {
   const code = waitReasons.includes(s.params.retry_code ?? "") ? s.params.retry_code! : "busy";
   const reason = t(`osf.wait.${code}` as MessageKey);
-  const lock = withLock && code === "apt_lock" ? lockNowText(t, status, nowSec) : "";
-  const line = s.retryAfterUnix > nowSec ? t("osf.wait.line", { reason, time: minutesText(t, minutesUntil(s.retryAfterUnix, nowSec)) }) : t("osf.wait.line.now", { reason });
-  return lock ? `${line} ${lock}` : line;
+  return s.retryAfterUnix > nowSec ? t("osf.wait.line", { reason, time: minutesText(t, minutesUntil(s.retryAfterUnix, nowSec)) }) : t("osf.wait.line.now", { reason });
 }
 
 // ---------------------------------------------------------------------------------------------------
