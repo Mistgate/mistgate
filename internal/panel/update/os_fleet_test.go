@@ -207,6 +207,13 @@ func TestOsFleetFailurePausesResumeRetriesOnceAndSkipFailedContinues(t *testing.
 	if _, err := e.s.resumeOs(e.ctx, ro.ID, false); err != nil {
 		t.Fatalf("resume retry: %v", err)
 	}
+	resp, err := (rpc{s: e.s}).GetOsUpdates(e.ctx, connect.NewRequest(&adminv1.GetOsUpdatesRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := resp.Msg.GetRollout().GetSteps()[0]; got.GetRetryCount() != 1 || got.GetParams()[osRetryCount] != "1" {
+		t.Fatalf("typed retry count = %d, params = %v; want 1 in both", got.GetRetryCount(), got.GetParams())
+	}
 	e.osTick()
 	retried := e.wantOsStep(first, store.OsStepSent, "")
 	if retried.Params[osRetryCount] != "1" || retried.JobID == failed.JobID {

@@ -108,6 +108,12 @@ func osRolloutMsg(ro store.OsRolloutRow, steps []store.OsStepRow) *adminv1.OsRol
 	for _, x := range steps {
 		st := &adminv1.OsStep{NodeId: x.NodeID, NodeName: x.NodeName, State: osStepStateProto(x.State), JobId: x.JobID, Phase: x.Phase,
 			KernelFrom: x.KernelFrom, KernelTo: x.KernelTo, ErrorKey: x.ErrorKey, Params: x.Params, Stage: int32(x.Stage)}
+		if retryCount, err := strconv.ParseUint(x.Params[osRetryCount], 10, 32); err == nil {
+			st.RetryCount = uint32(retryCount)
+		}
+		if slices.Contains(osRetryLater, x.Params[osRetryCode]) {
+			st.RetryCode = x.Params[osRetryCode]
+		}
 		if retryAt, err := strconv.ParseInt(x.Params[osRetryAfter], 10, 64); err == nil && retryAt > 0 {
 			st.RetryAfterUnix = retryAt
 		}

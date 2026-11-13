@@ -6,6 +6,7 @@ import (
 	"math"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,25 +29,26 @@ var mcpOSPendingPackage = regexp.MustCompile("^[a-z0-9][a-z0-9.+-]{1,62}(:[a-z0-
 var mcpOSLockHolder = regexp.MustCompile("^[A-Za-z0-9._-]{1,15}$")
 
 type osJobV struct {
-	ID          string `json:"id,omitempty"`
-	Action      string `json:"action,omitempty"`
-	Mode        string `json:"mode,omitempty"`
-	State       string `json:"state,omitempty"`
-	Phase       string `json:"phase,omitempty"`
-	Started     int64  `json:"started_unix,omitempty"`
-	Updated     int64  `json:"updated_unix,omitempty"`
-	Finished    int64  `json:"finished_unix,omitempty"`
-	Code        string `json:"code,omitempty"`
-	Reason      string `json:"reason,omitempty"`
-	NoteCode    string `json:"note_code,omitempty"`
-	Note        string `json:"note,omitempty"`
-	LockHolder  string `json:"apt_lock_holder,omitempty"`
-	LockMinutes uint32 `json:"apt_lock_minutes,omitempty"`
-	Upgraded    uint32 `json:"upgraded,omitempty"`
-	Reboot      string `json:"reboot,omitempty"`
-	HeldReason  string `json:"held_reason,omitempty"`
-	KernelFrom  string `json:"kernel_from,omitempty"`
-	KernelTo    string `json:"kernel_to,omitempty"`
+	ID            string `json:"id,omitempty"`
+	Action        string `json:"action,omitempty"`
+	Mode          string `json:"mode,omitempty"`
+	State         string `json:"state,omitempty"`
+	Phase         string `json:"phase,omitempty"`
+	Started       int64  `json:"started_unix,omitempty"`
+	Updated       int64  `json:"updated_unix,omitempty"`
+	Finished      int64  `json:"finished_unix,omitempty"`
+	Code          string `json:"code,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	NoteCode      string `json:"note_code,omitempty"`
+	Note          string `json:"note,omitempty"`
+	NoteUntrusted bool   `json:"note_untrusted,omitempty"`
+	LockHolder    string `json:"apt_lock_holder,omitempty"`
+	LockMinutes   uint32 `json:"apt_lock_minutes,omitempty"`
+	Upgraded      uint32 `json:"upgraded,omitempty"`
+	Reboot        string `json:"reboot,omitempty"`
+	HeldReason    string `json:"held_reason,omitempty"`
+	KernelFrom    string `json:"kernel_from,omitempty"`
+	KernelTo      string `json:"kernel_to,omitempty"`
 }
 
 type osStatusV struct {
@@ -102,33 +104,42 @@ type osNodeV struct {
 	Connected   bool       `json:"connected"`
 	Supported   bool       `json:"supported"`
 	OnlineUsers uint32     `json:"online_users"`
+	Inbounds    uint32     `json:"inbounds"`
 	OnPanel     bool       `json:"on_panel_server"`
 	State       string     `json:"state"`
 	Status      *osStatusV `json:"status,omitempty"`
 	// UpdateCapable is whether the agent can run an OS job; UpdateBlock and RebootBlock say why the panel would refuse one now
 	// (the keys of the admin's os.block.*), empty when it would not.
-	UpdateCapable bool   `json:"update_capable"`
-	UpdateBlock   string `json:"update_block,omitempty"`
-	RebootBlock   string `json:"reboot_block,omitempty"`
+	UpdateCapable  bool   `json:"update_capable"`
+	UpdateBlock    string `json:"update_block,omitempty"`
+	UpdateBlockAll string `json:"update_block_all,omitempty"`
+	RebootBlock    string `json:"reboot_block,omitempty"`
 	// RebootPossible is the Unix time from which a reboot is possible again (RebootBlock is reboot_wait until then), absent when now.
 	RebootPossible int64 `json:"reboot_possible_unix,omitempty"`
 }
 
 type osStepV struct {
-	NodeID     string `json:"node_id"`
-	Name       string `json:"name"`
-	State      string `json:"state"`
-	JobID      string `json:"job_id,omitempty"`
-	Phase      string `json:"phase,omitempty"`
-	KernelFrom string `json:"kernel_from,omitempty"`
-	KernelTo   string `json:"kernel_to,omitempty"`
-	Sent       int64  `json:"sent_unix,omitempty"`
-	Finished   int64  `json:"finished_unix,omitempty"`
-	Error      string `json:"error,omitempty"`
-	Code       string `json:"code,omitempty"`
-	Package    string `json:"package,omitempty"`
-	Upgraded   string `json:"upgraded,omitempty"`
-	Reboot     string `json:"reboot,omitempty"`
+	NodeID         string `json:"node_id"`
+	Name           string `json:"name"`
+	State          string `json:"state"`
+	JobID          string `json:"job_id,omitempty"`
+	Phase          string `json:"phase,omitempty"`
+	KernelFrom     string `json:"kernel_from,omitempty"`
+	KernelTo       string `json:"kernel_to,omitempty"`
+	Sent           int64  `json:"sent_unix,omitempty"`
+	Finished       int64  `json:"finished_unix,omitempty"`
+	Error          string `json:"error,omitempty"`
+	Code           string `json:"code,omitempty"`
+	Package        string `json:"package,omitempty"`
+	Upgraded       string `json:"upgraded,omitempty"`
+	Reboot         string `json:"reboot,omitempty"`
+	AptLockHolder  string `json:"apt_lock_holder,omitempty"`
+	AptLockMinutes uint32 `json:"apt_lock_minutes,omitempty"`
+	NoteCode       string `json:"note_code,omitempty"`
+	Note           string `json:"note,omitempty"`
+	NoteUntrusted  bool   `json:"note_untrusted,omitempty"`
+	RetryCount     uint32 `json:"retry_count,omitempty"`
+	RetryCode      string `json:"retry_code,omitempty"`
 }
 
 // osRolloutV is the active OS rollout, else the last one. Names and packages are untrusted input.
@@ -239,7 +250,7 @@ func osStatusView(s *agentv1.OsStatus) *osStatusV {
 		v.Job = &osJobV{ID: clean(j.GetJobId(), 80), Action: clean(j.GetAction(), 24), Mode: clean(j.GetMode(), 16),
 			State: clean(j.GetState(), 24), Phase: clean(j.GetPhase(), 32), Started: j.GetStartedUnix(), Updated: j.GetUpdatedUnix(),
 			Finished: j.GetFinishedUnix(), Code: clean(j.GetCode(), 48), Reason: noAddr(clean(j.GetReason(), 160)),
-			NoteCode: noteCode, Note: noAddr(clean(j.GetNote(), 160)),
+			NoteCode: noteCode, Note: noAddr(clean(j.GetNote(), 160)), NoteUntrusted: j.GetNote() != "",
 			LockHolder: lockHolder, LockMinutes: j.GetAptLockMinutes(),
 			Upgraded: j.GetUpgraded(), Reboot: clean(j.GetReboot(), 24), HeldReason: clean(j.GetHeldReason(), 32),
 			KernelFrom: noAddr(clean(j.GetKernelFrom(), 128)), KernelTo: noAddr(clean(j.GetKernelTo(), 128))}
@@ -252,19 +263,31 @@ func osUpdatesView(r *adminv1.GetOsUpdatesResponse) *OsUpdatesV {
 		ScheduleTimezone: r.GetScheduleTimezoneOffsetMinutes()}
 	for _, n := range r.GetNodes() {
 		v.Nodes = append(v.Nodes, osNodeV{NodeID: clean(n.GetNodeId(), 80), Name: nm(n.GetName()), Connected: n.GetConnected(),
-			Supported: n.GetSupported(), OnlineUsers: n.GetOnlineUsers(), OnPanel: n.GetOnPanelServer(),
+			Supported: n.GetSupported(), OnlineUsers: n.GetOnlineUsers(), Inbounds: n.GetInbounds(), OnPanel: n.GetOnPanelServer(),
 			State: enumName("OS_UPDATE_STATE_", n.GetState().String()), Status: osStatusView(n.GetStatus()),
-			UpdateCapable: n.GetUpdateCapable(), UpdateBlock: clean(n.GetUpdateBlock(), 24), RebootBlock: clean(n.GetRebootBlock(), 24), RebootPossible: n.GetRebootPossibleUnix()})
+			UpdateCapable: n.GetUpdateCapable(), UpdateBlock: clean(n.GetUpdateBlock(), 24), UpdateBlockAll: clean(n.GetUpdateBlockAll(), 24),
+			RebootBlock: clean(n.GetRebootBlock(), 24), RebootPossible: n.GetRebootPossibleUnix()})
 	}
 	if ro := r.GetRollout(); ro != nil {
 		rv := &osRolloutV{ID: clean(ro.GetId(), 60), Status: enumName("OS_ROLLOUT_STATUS_", ro.GetStatus().String()), Mode: enumName("OS_ROLLOUT_MODE_", ro.GetMode().String()),
 			Reboot: enumName("OS_REBOOT_POLICY_", ro.GetReboot().String()), PauseKey: clean(ro.GetPauseKey(), 32), Created: ro.GetCreatedUnix(), Finished: ro.GetFinishedUnix(), Steps: []osStepV{}}
 		for _, st := range ro.GetSteps() {
 			p := st.GetParams()
+			note := noAddr(clean(p["note"], 160))
+			lockMinutes, _ := strconv.ParseUint(p["apt_lock_minutes"], 10, 32)
+			lockHolder := ""
+			if mcpOSLockHolder.MatchString(p["apt_lock_holder"]) {
+				lockHolder = p["apt_lock_holder"]
+			}
+			noteCode := ""
+			if p["note_code"] == "security_leftover_failed" {
+				noteCode = p["note_code"]
+			}
 			rv.Steps = append(rv.Steps, osStepV{NodeID: clean(st.GetNodeId(), 80), Name: nm(st.GetNodeName()), State: enumName("OS_STEP_STATE_", st.GetState().String()),
 				JobID: clean(st.GetJobId(), 60), Phase: clean(st.GetPhase(), 24), KernelFrom: noAddr(clean(st.GetKernelFrom(), 128)), KernelTo: noAddr(clean(st.GetKernelTo(), 128)),
 				Sent: st.GetSentUnix(), Finished: st.GetFinishedUnix(), Error: clean(st.GetErrorKey(), 32), Code: clean(p["code"], 32), Package: noAddr(clean(p["package"], 64)),
-				Upgraded: clean(p["upgraded"], 8), Reboot: clean(p["reboot"], 16)})
+				Upgraded: clean(p["upgraded"], 8), Reboot: clean(p["reboot"], 16), AptLockHolder: lockHolder, AptLockMinutes: uint32(lockMinutes),
+				NoteCode: noteCode, Note: note, NoteUntrusted: p["note"] != "", RetryCount: st.GetRetryCount(), RetryCode: clean(st.GetRetryCode(), 32)})
 		}
 		v.Rollout = rv
 	}

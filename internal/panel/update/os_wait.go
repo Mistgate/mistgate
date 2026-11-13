@@ -136,20 +136,25 @@ func (p *osPass) osNothingChanged(v osJobView) (string, bool) {
 
 // waitTryLater returns a self-closing refusal to PENDING. The initial wait time and next retry time are stored in the existing
 // step row, so the two-hour ceiling survives a panel restart.
-func (p *osPass) waitTryLater(x *store.OsStepRow, code string, retryAt time.Time) {
+func (p *osPass) waitTryLater(x *store.OsStepRow, code string, retryAt time.Time, extra ...map[string]string) {
 	code = osCode(code)
 	if !slices.Contains(osRetryLater, code) {
 		p.finishAndPause(x, osErrAgentRefused, map[string]string{"code": code}, pauseStepFailed)
 		return
 	}
+	params := map[string]string{}
+	for _, values := range extra {
+		params = mergeParams(params, values)
+	}
 	if p.cancelRequested() { // the answer came after the owner's cancel: the step must not go back to the queue
-		p.finish(x, store.OsStepSkipped, errCancelled, nil)
+		p.finish(x, store.OsStepSkipped, errCancelled, params)
 		return
 	}
 	started := retryStart(x, p.now)
 	deadline := started.Add(osRetryLimit)
 	if !p.now.Before(deadline) {
-		p.finish(x, store.OsStepSkipped, osErrTryLater, map[string]string{"code": code})
+		params["code"] = code
+		p.finish(x, store.OsStepSkipped, osErrTryLater, params)
 		return
 	}
 	if retryAt.IsZero() || !retryAt.After(p.now) {
@@ -161,6 +166,7 @@ func (p *osPass) waitTryLater(x *store.OsStepRow, code string, retryAt time.Time
 	updated := *x
 	updated.State, updated.Phase, updated.PhaseAt = store.OsStepPending, osWaitPhase, started
 	updated.ErrorKey = ""
+	updated.Params = mergeParams(updated.Params, params)
 	updated.Params = mergeParams(updated.Params, map[string]string{
 		osRetryAfter: strconv.FormatInt(retryAt.Unix(), 10),
 		osRetryCode:  code,

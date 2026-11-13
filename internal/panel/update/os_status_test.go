@@ -13,12 +13,13 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func TestGetOsUpdatesUsesStoredNodeSnapshots(t *testing.T) {
 	e := newEnv(t)
-	capable := e.addNode("de1", nodeOpts{caps: []string{osupdate.Capability}, online: 2})
+	capable := e.addNode("de1", nodeOpts{caps: []string{osupdate.Capability}, online: 2, inbounds: 2})
 	old := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1"}, online: 1})
 	now := e.clk.Now()
 	status := &agentv1.OsStatus{MeasuredUnix: now.Unix(), DistroId: "ubuntu", DistroVersion: "24.04", Pending: 2, Security: 1,
@@ -44,7 +45,7 @@ func TestGetOsUpdatesUsesStoredNodeSnapshots(t *testing.T) {
 		byID[node.GetNodeId()] = node
 	}
 	got := byID[capable]
-	if got == nil || !got.GetConnected() || !got.GetSupported() || got.GetState() != adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES || got.GetOnlineUsers() != 2 || got.GetStatus().GetPending() != 2 {
+	if got == nil || !got.GetConnected() || !got.GetSupported() || got.GetState() != adminv1.OsUpdateState_OS_UPDATE_STATE_UPDATES || got.GetOnlineUsers() != 2 || got.GetInbounds() != 2 || got.GetStatus().GetPending() != 2 {
 		t.Fatalf("capable node = %+v", got)
 	}
 	if !slices.Equal(got.GetStatus().GetSecurityPending(), []string{"libfoo1"}) || !slices.Equal(got.GetStatus().GetSecurityStuck(), []string{"libfoo1"}) ||
@@ -60,6 +61,45 @@ func TestGetOsUpdatesUsesStoredNodeSnapshots(t *testing.T) {
 	}
 	if resp.Msg.GetPanelHost() != nil {
 		t.Fatalf("unexpected panel-host snapshot: %+v", resp.Msg.GetPanelHost())
+	}
+}
+
+func TestOsUpdateBlocksAreModeAware(t *testing.T) {
+	e := newEnv(t)
+	id := e.osNode("de1")
+	e.osStatus(id, func(s *agentv1.OsStatus) { s.Pending, s.Security, s.RebootRequired = 3, 0, false })
+
+	resp, err := (rpc{s: e.s}).GetOsUpdates(e.ctx, connect.NewRequest(&adminv1.GetOsUpdatesRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var node *adminv1.NodeOs
+	for _, n := range resp.Msg.GetNodes() {
+		if n.GetNodeId() == id {
+			node = n
+			break
+		}
+	}
+	if node == nil || node.GetUpdateBlock() != blockNothingToDo || node.GetUpdateBlockAll() != "" {
+		t.Fatalf("ordinary-only node blocks = security %q, all %q; want nothing_to_do and clear", node.GetUpdateBlock(), node.GetUpdateBlockAll())
+	}
+	if _, err := e.s.startOs(e.ctx, []string{id}, store.OsModeSecurity, store.OsRebootNever); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), blockNothingToDo) {
+		t.Fatalf("security rollout with only ordinary updates = %v, want nothing_to_do", err)
+	}
+	if _, err := e.s.startOs(e.ctx, []string{id}, store.OsModeAll, store.OsRebootNever); err != nil {
+		t.Fatalf("all-mode rollout with ordinary updates = %v", err)
+	}
+}
+
+func TestBusyNodeStartRefusesWithNodeBusyReason(t *testing.T) {
+	e := newEnv(t)
+	id := e.osNode("de1")
+	e.osStatus(id, func(s *agentv1.OsStatus) {
+		s.Security = 1
+		s.Job = &agentv1.OsJob{State: osupdate.StateRunning}
+	})
+	if _, err := e.s.startOs(e.ctx, []string{id}, store.OsModeSecurity, store.OsRebootNever); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "os_blocked: reason=node_busy") {
+		t.Fatalf("busy-node start error = %v, want os_blocked: reason=node_busy", err)
 	}
 }
 

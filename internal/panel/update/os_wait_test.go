@@ -202,6 +202,14 @@ func TestOsLaunchWaitsUntilARebootIsPossible(t *testing.T) {
 	if got.Phase != osWaitPhase || got.Params[osRetryCode] != osupdate.CodeTooSoon || got.Params[osRetryAfter] != strconv.FormatInt(wantAt, 10) {
 		t.Fatalf("retry params %+v, want time %d", got.Params, wantAt)
 	}
+	resp, err := (rpc{s: e.s}).GetOsUpdates(e.ctx, connect.NewRequest(&adminv1.GetOsUpdatesRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := resp.Msg.GetRollout().GetSteps()[0]
+	if step.GetRetryCode() != osupdate.CodeTooSoon || step.GetParams()[osRetryCode] != osupdate.CodeTooSoon || step.GetRetryCount() != 0 {
+		t.Fatalf("typed retry details = code %q count %d params %v", step.GetRetryCode(), step.GetRetryCount(), step.GetParams())
+	}
 	e.wantOsRollout(store.RolloutRunning, "")
 	if len(e.fl.osJobs()) != 0 {
 		t.Fatal("a reboot was sent to a node that would refuse it")

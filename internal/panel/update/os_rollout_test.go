@@ -263,6 +263,58 @@ func TestOsRolloutWithoutRebootGoesThroughTheGate(t *testing.T) {
 	e.wantOsRollout(store.RolloutDone, "")
 }
 
+func TestOsRolloutStepKeepsNodeJobDetailsAfterStatusDisappears(t *testing.T) {
+	e := newEnv(t)
+	id := e.osNode("de1")
+	e.hl.set(id, 1, 0, 0)
+	e.startOs(id, store.OsModeSecurity, store.OsRebootNever)
+	e.osTick()
+	x := e.osStep(id)
+	e.osJob(id, &agentv1.OsJob{JobId: x.JobID, Action: "upgrade", Mode: "security", State: "done", Upgraded: 2, Reboot: "not_asked",
+		AptLockHolder: "apt-get", AptLockMinutes: 17, NoteCode: osupdate.NoteSecurityLeftoverFailed,
+		Note: "Some security updates remain pending; check the node and retry."})
+	e.osEvent(id, "os_update_done", map[string]string{"job_id": x.JobID, "upgraded": "2", "reboot": "not_asked"})
+	e.osTick()
+	e.wantOsStep(id, store.OsStepGating, "")
+
+	// The job has disappeared from the node's live snapshot before the gate closes.
+	e.osStatus(id, nil)
+	e.hl.set(id, 1, 1, 0)
+	e.osTick()
+	got := e.wantOsStep(id, store.OsStepPassed, "")
+	if got.Params["apt_lock_holder"] != "apt-get" || got.Params["apt_lock_minutes"] != "17" ||
+		got.Params["note_code"] != osupdate.NoteSecurityLeftoverFailed || got.Params["note"] != "Some security updates remain pending; check the node and retry." {
+		t.Fatalf("finished step lost node job details: %+v", got.Params)
+	}
+}
+
+func TestOsRolloutRetryableRefusalKeepsNodeDetailsWhenItExpires(t *testing.T) {
+	e := newEnv(t)
+	id := e.osNode("nl1")
+	e.startOs(id, store.OsModeSecurity, store.OsRebootNever)
+	e.osTick()
+	x := e.osStep(id)
+	e.osJob(id, &agentv1.OsJob{JobId: x.JobID, Action: "upgrade", Mode: "security", State: "failed", Code: osupdate.CodeAptLock,
+		AptLockHolder: "apt-get", AptLockMinutes: 12, NoteCode: osupdate.NoteSecurityLeftoverFailed,
+		Note: "Some security updates remain pending; check the node and retry."})
+	e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeAptLock, "holder": "apt-get", "minutes": "12"})
+	e.osTick()
+	waiting := e.wantOsStep(id, store.OsStepPending, "")
+	if waiting.Params["apt_lock_holder"] != "apt-get" || waiting.Params["apt_lock_minutes"] != "12" ||
+		waiting.Params["note_code"] != osupdate.NoteSecurityLeftoverFailed || waiting.Params["note"] == "" {
+		t.Fatalf("waiting step lost node refusal details: %+v", waiting.Params)
+	}
+
+	e.osStatus(id, nil)
+	e.clk.Advance(osRetryLimit)
+	e.osTick()
+	finished := e.wantOsStep(id, store.OsStepSkipped, osErrTryLater)
+	if finished.Params["apt_lock_holder"] != "apt-get" || finished.Params["apt_lock_minutes"] != "12" ||
+		finished.Params["note_code"] != osupdate.NoteSecurityLeftoverFailed || finished.Params["note"] == "" {
+		t.Fatalf("expired refusal step lost node details: %+v", finished.Params)
+	}
+}
+
 func TestOsRolloutRebootOnly(t *testing.T) {
 	e := newEnv(t)
 	id := e.osNode("de1")

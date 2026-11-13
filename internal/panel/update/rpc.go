@@ -266,11 +266,17 @@ func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsU
 		if err != nil {
 			return nil, s.internal("read node facts", err)
 		}
+		inbounds, err := s.st.FleetInbounds(ctx, node.ID, true)
+		if err != nil {
+			return nil, s.internal("read node inbounds", err)
+		}
 		// Containers on one kernel share the boot id, so a match alone only means "same kernel": see onPanelServer.
 		osn := s.osNodeOf(node, row.Connected, status, host, facts.Hostname, resp.NowUnix, reboots[node.ID])
 		resp.Nodes = append(resp.Nodes, &adminv1.NodeOs{NodeId: node.ID, Name: node.Name, Connected: row.Connected,
 			Supported: osn.supported, OnlineUsers: online, OnPanelServer: osn.onPanel, State: osUpdateState(capable, row.Connected, status, resp.NowUnix), Status: status,
-			UpdateCapable: osn.updateCap, UpdateBlock: osBlock(g, osn, false), RebootBlock: osBlock(g, osn, true), RebootPossibleUnix: unixOrZero(osn.rebootAt)})
+			UpdateCapable: osn.updateCap, UpdateBlock: osBlockForMode(g, osn, store.OsModeSecurity),
+			UpdateBlockAll: osBlockForMode(g, osn, store.OsModeAll), RebootBlock: osBlock(g, osn, true),
+			RebootPossibleUnix: unixOrZero(osn.rebootAt), Inbounds: uint32(len(inbounds))})
 	}
 	return connect.NewResponse(resp), nil
 }

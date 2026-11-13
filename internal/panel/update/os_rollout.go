@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -899,6 +900,9 @@ func (p *osPass) send(x *store.OsStepRow, n store.NodeRow, status *agentv1.OsSta
 	updated.Params = mergeParams(x.Params, map[string]string{"boot_hash": status.GetBootIdHash()})
 	delete(updated.Params, osRetryAfter) // osRetrySince stays: the two-hour wait is one budget across resends
 	delete(updated.Params, osRetryCode)
+	for _, key := range []string{"code", "package", "upgraded", "reboot", "held_reason", "kernel", "apt_lock_holder", "apt_lock_minutes", "note_code", "note"} {
+		delete(updated.Params, key)
+	}
 	if !p.save(&updated) {
 		return
 	}
@@ -1051,6 +1055,8 @@ func osCode(c string) string {
 // osJobView is what the panel knows about one job from the node: the snapshot's job and the events raised for it.
 type osJobView struct {
 	state, phase, code, reason, pkg, reboot, heldReason, kernelTo, kernel, upgraded string
+	aptLockHolder, noteCode, note                                                   string
+	aptLockMinutes                                                                  uint32
 	// reasons are all the codes that blocked a reboot, comma separated (the event of a failed job carries them, the snapshot does not).
 	reasons   string
 	rebooting bool
@@ -1065,7 +1071,8 @@ func (p *osPass) job(x *store.OsStepRow, status *agentv1.OsStatus) osJobView {
 	var v osJobView
 	if j := status.GetJob(); j != nil && j.GetJobId() == x.JobID {
 		v = osJobView{state: j.GetState(), phase: j.GetPhase(), code: j.GetCode(), reason: j.GetReason(), reboot: j.GetReboot(), heldReason: j.GetHeldReason(),
-			kernelTo: j.GetKernelTo(), upgraded: strconv.FormatUint(uint64(j.GetUpgraded()), 10), rebooting: j.GetPhase() == osupdate.PhaseRebooting, snapshot: true}
+			kernelTo: j.GetKernelTo(), upgraded: strconv.FormatUint(uint64(j.GetUpgraded()), 10), rebooting: j.GetPhase() == osupdate.PhaseRebooting, snapshot: true,
+			aptLockHolder: j.GetAptLockHolder(), aptLockMinutes: j.GetAptLockMinutes(), noteCode: j.GetNoteCode(), note: j.GetNote()}
 	}
 	events, err := p.s.st.OsJobEvents(p.ctx, x.NodeID, x.JobID, x.SentAt.Add(-10*time.Minute))
 	if err != nil {
@@ -1084,11 +1091,25 @@ func (p *osPass) job(x *store.OsStepRow, status *agentv1.OsStatus) osJobView {
 				v.state = osupdate.StateRunning
 			}
 		case "os_update_done":
+			if v.noteCode == "" {
+				v.noteCode = e.Params["note_code"]
+			}
+			if v.note == "" {
+				v.note = e.Params["note"]
+			}
 			if !ended {
 				v.state, ended = osupdate.StateDone, true
 				v.upgraded, v.reboot, v.kernel, v.heldReason = e.Params["upgraded"], e.Params["reboot"], e.Params["kernel"], e.Params["held_reason"]
 			}
 		case "os_update_failed":
+			if v.aptLockHolder == "" {
+				v.aptLockHolder = e.Params["holder"]
+			}
+			if v.aptLockMinutes == 0 {
+				if n, err := strconv.ParseUint(e.Params["minutes"], 10, 32); err == nil {
+					v.aptLockMinutes = uint32(n)
+				}
+			}
 			if v.reasons == "" {
 				v.reasons = e.Params["reasons"]
 			}
@@ -1122,7 +1143,47 @@ func jobParams(v osJobView) map[string]string {
 	if v.kernel != "" && osKernelName.MatchString(v.kernel) {
 		out["kernel"] = v.kernel
 	}
+	if osAptLockHolder.MatchString(v.aptLockHolder) {
+		out["apt_lock_holder"] = v.aptLockHolder
+	}
+	if v.aptLockMinutes > 0 {
+		out["apt_lock_minutes"] = strconv.FormatUint(uint64(v.aptLockMinutes), 10)
+	}
+	if v.noteCode == osupdate.NoteSecurityLeftoverFailed {
+		out["note_code"] = v.noteCode
+	}
+	if note := osNodeNote(v.note); note != "" {
+		out["note"] = note
+	}
 	return out
+}
+
+var (
+	osAptLockHolder = regexp.MustCompile("^[A-Za-z0-9._-]{1,15}$")
+	osIPv4Text      = regexp.MustCompile(`(?:[0-9]{1,3}[.]){3}[0-9]{1,3}`)
+	osIPv6Text      = regexp.MustCompile(`(?i)(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{1,4}|(?:[0-9a-f]{1,4}:){1,7}:(?:[0-9a-f]{1,4})?|::[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*`)
+)
+
+// osNodeNote applies the status projection's text bounds, whitespace cleanup and address redaction before the value is durable.
+func osNodeNote(note string) string {
+	note = strings.Map(func(r rune) rune {
+		if unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Co, r) {
+			return -1
+		}
+		if unicode.IsControl(r) || unicode.IsSpace(r) {
+			return ' '
+		}
+		return r
+	}, note)
+	note = strings.Join(strings.Fields(note), " ")
+	note = osIPv4Text.ReplaceAllString(note, "[addr]")
+	note = osIPv6Text.ReplaceAllStringFunc(note, func(m string) string {
+		if strings.Contains(m, "::") || strings.ContainsAny(strings.ToLower(m), "abcdef") || strings.Count(m, ":") >= 5 {
+			return "[addr]"
+		}
+		return m
+	})
+	return truncateRunes(note, 160)
 }
 
 // applyJob moves a step along with what the job says. It is idempotent: the same view twice changes nothing the second time.
@@ -1148,7 +1209,7 @@ func (p *osPass) applyJob(x *store.OsStepRow, v osJobView) {
 	case osupdate.StateDone:
 		extra := jobParams(v)
 		if code, ok := p.osNothingChanged(v); ok && v.reboot == osupdate.RebootHeld {
-			p.waitTryLater(x, code, p.retryNotBefore(x.NodeID, code))
+			p.waitTryLater(x, code, p.retryNotBefore(x.NodeID, code), extra)
 			return
 		}
 		if v.reboot == osupdate.RebootHeld { // a node that finished with a reboot held
@@ -1167,7 +1228,7 @@ func (p *osPass) applyJob(x *store.OsStepRow, v osJobView) {
 	case osupdate.StateFailed:
 		extra := jobParams(v)
 		if code, ok := p.osNothingChanged(v); ok {
-			p.waitTryLater(x, code, p.retryNotBefore(x.NodeID, code))
+			p.waitTryLater(x, code, p.retryNotBefore(x.NodeID, code), extra)
 			return
 		}
 		switch {

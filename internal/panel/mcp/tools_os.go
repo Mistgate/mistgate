@@ -18,8 +18,6 @@ import (
 	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 )
 
-const mcpOsRetryCount = "retry_count"
-
 // OS updates of nodes (UpdateService.StartOsRollout / PauseOsRollout / ResumeOsRollout / CancelOsRollout): plans and applies
 // need the owner's approval and a fresh step-up. The node's reboot checks are never overridden.
 
@@ -98,13 +96,14 @@ func osModeOf(mode, reboot string) (adminv1.OsRolloutMode, adminv1.OsRebootPolic
 
 // osBlockFor is why the node cannot take the job now, "" when it can (the panel's own answer, GetOsUpdates).
 func osBlockFor(n *adminv1.NodeOs, mode string) string {
-	if mode == "reboot_only" {
+	switch mode {
+	case "reboot_only":
 		return n.GetRebootBlock()
+	case "all":
+		return n.GetUpdateBlockAll()
+	default:
+		return n.GetUpdateBlock()
 	}
-	if mode == "all" && n.GetUpdateBlock() == "nothing_to_do" && n.GetStatus() != nil && n.GetStatus().GetPending() > 0 {
-		return ""
-	}
-	return n.GetUpdateBlock()
 }
 
 type osRolloutPlanNode struct {
@@ -127,18 +126,14 @@ func (c *call) osRolloutSnapshot(ids []string) (*adminv1.GetOsUpdatesResponse, *
 	for _, n := range osUpdates.GetNodes() {
 		osByID[n.GetNodeId()] = n
 	}
-	updateByID := make(map[string]*adminv1.NodeUpdate, len(updates.GetNodes()))
-	for _, n := range updates.GetNodes() {
-		updateByID[n.GetNodeId()] = n
-	}
 	var candidates []*adminv1.NodeUpdate
 	for _, id := range ids {
 		n := osByID[id]
-		u := updateByID[id]
-		if n == nil || u == nil {
+		if n == nil {
 			return nil, nil, nil, errors.New("node_id is not an active node of this panel")
 		}
-		candidates = append(candidates, u)
+		candidates = append(candidates, &adminv1.NodeUpdate{NodeId: n.GetNodeId(), Name: n.GetName(),
+			OnlineUsers: n.GetOnlineUsers(), Inbounds: n.GetInbounds()})
 	}
 	panelupdate.SortRolloutCandidates(candidates)
 	ordered := make([]*osRolloutPlanNode, 0, len(candidates))
@@ -158,7 +153,7 @@ func osStartGlobalBlock(osUpdates *adminv1.GetOsUpdatesResponse, agentUpdates *a
 	}
 	// the panel states a global blocker through the nodes' own block fields as well
 	for _, n := range osUpdates.GetNodes() {
-		for _, b := range []string{n.GetUpdateBlock(), n.GetRebootBlock()} {
+		for _, b := range []string{n.GetUpdateBlock(), n.GetUpdateBlockAll(), n.GetRebootBlock()} {
 			if b == "rollout_active" || b == "agent_rollout" || b == "panel_busy" {
 				return b
 			}
@@ -176,9 +171,6 @@ func osSkipNow(n *adminv1.NodeOs, mode, reboot string) string {
 		}
 	}
 	block := osBlockFor(n, mode)
-	if mode == "all" && block == "nothing_to_do" && n.GetStatus() != nil && n.GetStatus().GetPending() > 0 {
-		block = ""
-	}
 	switch block {
 	case "offline", "agent_old", "unsupported", "panel_host", "no_status", "nothing_to_do", "awg_build":
 		return block
@@ -311,7 +303,7 @@ var osRolloutStart = changeSpec[osRolloutStartArgs]{
 		adminv1connect.UpdateServiceStartOsRolloutProcedure),
 	desc: "Start an OS rollout on one to twenty nodes: mode security installs security packages, all installs ordinary and security packages, " +
 		"or reboot_only changes no packages. The canary runs first, then each batch waits for the previous batch's health gate; batch_size is one to five (default 1). " +
-		"Nodes with a reboot blocker are skipped; busy nodes wait up to two hours. People on a rebooting node disconnect for about two minutes. " +
+		"Nodes with a reboot blocker are skipped; a busy single-node selection is refused with os_blocked: reason=node_busy, while busy nodes in multi-node rollouts wait up to two hours. People on a rebooting node disconnect for about two minutes. " +
 		"The node's reboot checks are never overridden. Needs the owner's approval in the admin panel.",
 	plan: func(c *call, a osRolloutStartArgs) (*planned, error) {
 		ids, err := uniqueIDs("node_ids", a.NodeIDs, false)
@@ -340,6 +332,9 @@ var osRolloutStart = changeSpec[osRolloutStartArgs]{
 				return nil, retry
 			}
 			return nil, errors.New("another rollout is active: " + why)
+		}
+		if len(ordered) == 1 && osBlockFor(ordered[0].os, a.Mode) == "node_busy" {
+			return nil, errors.New("os_blocked: reason=node_busy")
 		}
 		facts, summary := osStartPlanFacts(ordered, a.Mode, a.Reboot, batch)
 		ids = ids[:0]
@@ -540,7 +535,7 @@ var (
 			decided, failed := osRolloutProgress(ro)
 			if !a.SkipFailed {
 				for _, step := range ro.GetSteps() {
-					if step.GetState() == adminv1.OsStepState_OS_STEP_STATE_FAILED && step.GetParams()[mcpOsRetryCount] != "" && step.GetParams()[mcpOsRetryCount] != "0" {
+					if step.GetState() == adminv1.OsStepState_OS_STEP_STATE_FAILED && step.GetRetryCount() > 0 {
 						return nil, errors.New("a failed step was already retried; set skip_failed to continue past it")
 					}
 				}

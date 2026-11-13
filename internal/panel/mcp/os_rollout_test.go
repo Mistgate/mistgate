@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 )
 
 // os_rollout_start and os_rollout_cancel: the owner approves, the apply runs exactly what the plan pinned, and nothing runs before.
@@ -127,10 +128,43 @@ func TestOsRolloutStartRefusedAtThePlan(t *testing.T) {
 	}
 }
 
+func TestOsRolloutStartBusyNodeIsRefusedAtPlanButListedForMultiNode(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	e.w.mu.Lock()
+	e.w.osUpdates.Nodes[0].UpdateBlock = "node_busy"
+	e.w.mu.Unlock()
+	args := map[string]any{"node_ids": []any{nodeA}, "mode": "security", "reboot": "never"}
+	if got := mustFail(t, s, "os_rollout_start_plan", args); !strings.Contains(got, "os_blocked: reason=node_busy") {
+		t.Fatalf("single busy node plan error = %q, want os_blocked: reason=node_busy", got)
+	}
+
+	args["node_ids"] = []any{nodeA, nodeB}
+	p := planOf(t, s, "os_rollout_start", args)
+	listedBusy := false
+	for _, fact := range p.Facts {
+		if fact.Key == "update_block" && fact.Value == "node_busy" {
+			listedBusy = true
+		}
+	}
+	if !listedBusy {
+		t.Fatalf("multi-node plan did not list the busy node's wait reason: %+v", p.Facts)
+	}
+}
+
 func TestOsRolloutStartPlansMultipleNodesAndAllMode(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileAdmin)
 	s := e.session(secret)
+	e.w.mu.Lock()
+	e.w.osUpdates.Nodes[0].OnlineUsers, e.w.osUpdates.Nodes[0].Inbounds = 2, 4
+	e.w.osUpdates.Nodes[1].OnlineUsers, e.w.osUpdates.Nodes[1].Inbounds = 2, 1
+	e.w.updateNodes = []*adminv1.NodeUpdate{
+		{NodeId: nodeA, Name: "de1", OnlineUsers: 0, Inbounds: 0},
+		{NodeId: nodeB, Name: "nl1", OnlineUsers: 50, Inbounds: 50},
+	}
+	e.w.mu.Unlock()
 	p := planOf(t, s, "os_rollout_start", map[string]any{"node_ids": []any{nodeA, nodeB}, "mode": "security", "reboot": "never"})
 	if !strings.Contains(p.Summary, "2 nodes") {
 		t.Fatalf("two-node plan: %+v", p)
@@ -144,10 +178,30 @@ func TestOsRolloutStartPlansMultipleNodesAndAllMode(t *testing.T) {
 	if !skippedOffline {
 		t.Fatalf("plan did not identify the currently offline node: %+v", p.Facts)
 	}
+	ordered := false
+	for _, f := range p.Facts {
+		if f.Key == "order" && f.Value == "nl1 -> de1" && f.Untrusted {
+			ordered = true
+		}
+	}
+	if !ordered {
+		t.Fatalf("plan did not use OS row online/inbound counts for canary order: %+v", p.Facts)
+	}
 
+	e.w.mu.Lock()
+	e.w.osUpdates.Nodes[0].Status.Pending = 3
+	e.w.osUpdates.Nodes[0].Status.Security = 0
+	e.w.osUpdates.Nodes[0].UpdateBlock = "nothing_to_do"
+	e.w.osUpdates.Nodes[0].UpdateBlockAll = ""
+	e.w.mu.Unlock()
 	all := planOf(t, s, "os_rollout_start", map[string]any{"node_ids": []any{nodeA}, "mode": "all", "reboot": "never", "batch_size": 3})
 	if !strings.Contains(all.Summary, "3 pending packages") {
 		t.Fatalf("mode all summary lacks the pending count: %q", all.Summary)
+	}
+	for _, f := range all.Facts {
+		if f.Key == "update_block" && f.Value == "nothing_to_do" {
+			t.Fatalf("all-mode plan used the security-mode blocker: %+v", all.Facts)
+		}
 	}
 	e.plans.decide(all.PlanID, true)
 	applyOf(t, s, "os_rollout_start", all.ConfirmToken)
@@ -242,6 +296,24 @@ func TestOsRolloutRetryClassificationIsNarrow(t *testing.T) {
 	}
 	if retry := retryOsRolloutStart(connect.NewError(connect.CodeFailedPrecondition, errors.New("os_blocked: reason=node_busy"))); retry != nil {
 		t.Errorf("node busy classified as retryable: %v", retry)
+	}
+}
+
+func TestOsUpdatesViewMarksNodeNotesUntrustedAndExposesTypedRetryFields(t *testing.T) {
+	resp := &adminv1.GetOsUpdatesResponse{
+		Nodes: []*adminv1.NodeOs{{Status: &agentv1.OsStatus{Job: &agentv1.OsJob{NoteCode: "security_leftover_failed", Note: "node supplied note"}}}},
+		Rollout: &adminv1.OsRollout{Steps: []*adminv1.OsStep{{Params: map[string]string{
+			"apt_lock_holder": "apt-get", "apt_lock_minutes": "17", "note_code": "security_leftover_failed", "note": "node supplied note",
+		}, RetryCount: 1, RetryCode: "apt_lock"}}},
+	}
+	got := osUpdatesView(resp)
+	if job := got.Nodes[0].Status.Job; job.Note != "node supplied note" || !job.NoteUntrusted {
+		t.Fatalf("live note view = %+v", job)
+	}
+	step := got.Rollout.Steps[0]
+	if step.AptLockHolder != "apt-get" || step.AptLockMinutes != 17 || step.NoteCode != "security_leftover_failed" ||
+		step.Note != "node supplied note" || !step.NoteUntrusted || step.RetryCount != 1 || step.RetryCode != "apt_lock" {
+		t.Fatalf("step view = %+v", step)
 	}
 }
 
@@ -344,7 +416,7 @@ func TestOsRolloutPauseResumeToolsNeedApprovalAndKeepOptions(t *testing.T) {
 	}
 
 	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_PAUSED,
-		Steps: step(adminv1.OsStepState_OS_STEP_STATE_FAILED, map[string]string{mcpOsRetryCount: "1"})})
+		Steps: []*adminv1.OsStep{{NodeId: nodeA, NodeName: "de1", State: adminv1.OsStepState_OS_STEP_STATE_FAILED, RetryCount: 1}}})
 	skip := planOf(t, s, "os_rollout_resume", map[string]any{"rollout_id": "osr_1", "skip_failed": true})
 	e.plans.decide(skip.PlanID, true)
 	applyOf(t, s, "os_rollout_resume", skip.ConfirmToken)

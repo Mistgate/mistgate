@@ -644,7 +644,7 @@ type NodeOs struct {
 	Status        *v1.OsStatus           `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
 	// The agent lists "os-update/1": it can run an OS job. False for an agent that only reads (update the agent).
 	UpdateCapable bool `protobuf:"varint,9,opt,name=update_capable,json=updateCapable,proto3" json:"update_capable,omitempty"`
-	// Why StartOsRollout would be refused for this node right now, "" when it would not. One of: offline, agent_old,
+	// Why a security-mode StartOsRollout would be refused for this node right now, "" when it would not. One of: offline, agent_old,
 	// unsupported, panel_host, node_busy (a job is running on the node, or a refresh of its package lists was just asked for), no_status (nothing read yet), nothing_to_do
 	// (nothing to install: use a reboot), rollout_active (an OS rollout is running or paused: a paused one holds only the next OS update), agent_rollout (a node-agent
 	// rollout is active), panel_busy (the panel itself is being updated or a bundle is being installed), awg_build (the
@@ -657,8 +657,12 @@ type NodeOs struct {
 	// three times in 24 hours (reboot_limit); the panel counts the reboots of its own OS rollouts. The SPA turns the Reboot action
 	// off until then. A reboot_only StartOsRollout before that time is refused with os_blocked: reason=reboot_wait.
 	RebootPossibleUnix int64 `protobuf:"varint,12,opt,name=reboot_possible_unix,json=rebootPossibleUnix,proto3" json:"reboot_possible_unix,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// The same package-update blocker for mode ALL. update_block stays the security-mode field for old clients.
+	UpdateBlockAll string `protobuf:"bytes,13,opt,name=update_block_all,json=updateBlockAll,proto3" json:"update_block_all,omitempty"`
+	// Number of enabled inbounds, used with online_users and name for the reproducible canary order.
+	Inbounds      uint32 `protobuf:"varint,14,opt,name=inbounds,proto3" json:"inbounds,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NodeOs) Reset() {
@@ -775,6 +779,20 @@ func (x *NodeOs) GetRebootPossibleUnix() int64 {
 	return 0
 }
 
+func (x *NodeOs) GetUpdateBlockAll() string {
+	if x != nil {
+		return x.UpdateBlockAll
+	}
+	return ""
+}
+
+func (x *NodeOs) GetInbounds() uint32 {
+	if x != nil {
+		return x.Inbounds
+	}
+	return 0
+}
+
 type GetOsUpdatesResponse struct {
 	state                         protoimpl.MessageState `protogen:"open.v1"`
 	NowUnix                       int64                  `protobuf:"varint,1,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
@@ -887,8 +905,11 @@ type OsStep struct {
 	Stage int32 `protobuf:"varint,15,opt,name=stage,proto3" json:"stage,omitempty"`
 	// If state is PENDING and phase is "waiting_retry", the node may be tried again at this Unix time; zero means now.
 	RetryAfterUnix int64 `protobuf:"varint,16,opt,name=retry_after_unix,json=retryAfterUnix,proto3" json:"retry_after_unix,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Typed retry details; params keeps retry_count and retry_code for older clients.
+	RetryCount    uint32 `protobuf:"varint,17,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
+	RetryCode     string `protobuf:"bytes,18,opt,name=retry_code,json=retryCode,proto3" json:"retry_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *OsStep) Reset() {
@@ -1031,6 +1052,20 @@ func (x *OsStep) GetRetryAfterUnix() int64 {
 		return x.RetryAfterUnix
 	}
 	return 0
+}
+
+func (x *OsStep) GetRetryCount() uint32 {
+	if x != nil {
+		return x.RetryCount
+	}
+	return 0
+}
+
+func (x *OsStep) GetRetryCode() string {
+	if x != nil {
+		return x.RetryCode
+	}
+	return ""
 }
 
 type OsRollout struct {
@@ -4312,7 +4347,7 @@ var File_mistgate_admin_v1_update_proto protoreflect.FileDescriptor
 const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\n" +
 	"\x1emistgate/admin/v1/update.proto\x12\x11mistgate.admin.v1\x1a\x1dmistgate/agent/v1/agent.proto\"\x15\n" +
-	"\x13GetOsUpdatesRequest\"\xcc\x03\n" +
+	"\x13GetOsUpdatesRequest\"\x92\x04\n" +
 	"\x06NodeOs\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
@@ -4326,14 +4361,16 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\fupdate_block\x18\n" +
 	" \x01(\tR\vupdateBlock\x12!\n" +
 	"\freboot_block\x18\v \x01(\tR\vrebootBlock\x124\n" +
-	"\x14reboot_possible_unix\x18\f \x01(\x03B\x020\x02R\x12rebootPossibleUnix\"\xa3\x02\n" +
+	"\x14reboot_possible_unix\x18\f \x01(\x03B\x020\x02R\x12rebootPossibleUnix\x12(\n" +
+	"\x10update_block_all\x18\r \x01(\tR\x0eupdateBlockAll\x12\x1a\n" +
+	"\binbounds\x18\x0e \x01(\rR\binbounds\"\xa3\x02\n" +
 	"\x14GetOsUpdatesResponse\x12\x1d\n" +
 	"\bnow_unix\x18\x01 \x01(\x03B\x020\x02R\anowUnix\x12/\n" +
 	"\x05nodes\x18\x02 \x03(\v2\x19.mistgate.admin.v1.NodeOsR\x05nodes\x12:\n" +
 	"\n" +
 	"panel_host\x18\x03 \x01(\v2\x1b.mistgate.agent.v1.OsStatusR\tpanelHost\x12G\n" +
 	" schedule_timezone_offset_minutes\x18\x04 \x01(\x05R\x1dscheduleTimezoneOffsetMinutes\x126\n" +
-	"\arollout\x18\x05 \x01(\v2\x1c.mistgate.admin.v1.OsRolloutR\arollout\"\xed\x04\n" +
+	"\arollout\x18\x05 \x01(\v2\x1c.mistgate.admin.v1.OsRolloutR\arollout\"\xad\x05\n" +
 	"\x06OsStep\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x124\n" +
@@ -4354,7 +4391,11 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\terror_key\x18\r \x01(\tR\berrorKey\x12=\n" +
 	"\x06params\x18\x0e \x03(\v2%.mistgate.admin.v1.OsStep.ParamsEntryR\x06params\x12\x14\n" +
 	"\x05stage\x18\x0f \x01(\x05R\x05stage\x12,\n" +
-	"\x10retry_after_unix\x18\x10 \x01(\x03B\x020\x02R\x0eretryAfterUnix\x1a9\n" +
+	"\x10retry_after_unix\x18\x10 \x01(\x03B\x020\x02R\x0eretryAfterUnix\x12\x1f\n" +
+	"\vretry_count\x18\x11 \x01(\rR\n" +
+	"retryCount\x12\x1d\n" +
+	"\n" +
+	"retry_code\x18\x12 \x01(\tR\tretryCode\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x97\x04\n" +
