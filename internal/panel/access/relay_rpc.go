@@ -96,6 +96,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 			out.ExitPort = uint32(spec.Listen.Port)
 		}
 	}
+	fillRelayMode(out, l)
 	return out
 }
 

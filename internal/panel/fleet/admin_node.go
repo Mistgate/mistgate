@@ -264,6 +264,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	out.TorrentBlockerSupported = store.CapabilityPresent(caps, capTorrentGuard)
 	out.ClientIpv6Supported = store.CapabilityPresent(caps, capClientIPv6)
 	out.UserRateLimitSupported = store.CapabilityPresent(caps, capUserRateLimit)
+	out.BridgePort = uint32(n.BridgePort) // the reason and the profile that holds 443 are the controller's (not computed yet)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	out.Ipv6 = ipv6Msg(n, d6)
 	if live.Connected {

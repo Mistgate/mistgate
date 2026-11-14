@@ -4,8 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -199,5 +201,32 @@ func TestReverseWayWithoutWhatItNeedsIsPlain(t *testing.T) {
 	x.f.StateChanged()
 	if d = c.next(m); d.BridgeServe == nil || d.BridgeServe.Path != "" || len(d.Relays.Items) != 1 {
 		t.Fatalf("a failed server: %v", d)
+	}
+}
+
+// The admin's node card shows the port of the bridge the node's site takes (0 = 443 on the node's own site); the reason and the
+// profile that holds 443 are not computed yet and the control channel through an entry is a later step.
+func TestNodeMessageCarriesTheBridgePort(t *testing.T) {
+	x := newRelayEnv(t)
+	port := func() map[string]*adminv1.Node {
+		resp, err := nodeService{x.f}.ListNodes(x.ctx, connect.NewRequest(&adminv1.ListNodesRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]*adminv1.Node{}
+		for _, n := range resp.Msg.Nodes {
+			out[n.Id] = n
+		}
+		return out
+	}
+	if n := port()[x.entry.nodeID]; n.BridgePort != 0 || n.BridgePortReason != "" || n.BridgePortProfileId != "" || n.LinkViaNodeId != "" {
+		t.Fatalf("a node without a bridge: %+v", n)
+	}
+	x.givePath(8443)
+	if n := port()[x.entry.nodeID]; n.BridgePort != 8443 || n.BridgePortReason != "" || n.BridgePortProfileId != "" || n.LinkViaNodeId != "" {
+		t.Fatalf("a node with a bridge on 8443: %+v", n)
+	}
+	if n := port()[x.exit.nodeID]; n.BridgePort != 0 {
+		t.Fatalf("the other node: %+v", n)
 	}
 }

@@ -125,8 +125,9 @@ message Relay {
   // test). When and how the last leg check went is check.leg.
   uint32 direct_streak = 31;
   // Why the reverse way is not possible for this relay now: "entry_agent_old" (the entry's agent lacks "relay-reverse/1"),
-  // "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). Computed, not stored; not the
-  // same as agent_supported, which is only about the entry and "relay-forward/1".
+  // "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). When several hold, the first of
+  // udp, entry_agent_old, exit_agent_old is given (an agent update does not help a UDP server). An agent that has not connected
+  // yet counts as old. Computed, not stored; not the same as agent_supported, which is only about the entry and "relay-forward/1".
   string reverse_blocked = 32;
   // The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
   RelayBridge bridge = 33;

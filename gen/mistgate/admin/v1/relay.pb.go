@@ -79,8 +79,9 @@ type Relay struct {
 	// test). When and how the last leg check went is check.leg.
 	DirectStreak uint32 `protobuf:"varint,31,opt,name=direct_streak,json=directStreak,proto3" json:"direct_streak,omitempty"`
 	// Why the reverse way is not possible for this relay now: "entry_agent_old" (the entry's agent lacks "relay-reverse/1"),
-	// "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). Computed, not stored; not the
-	// same as agent_supported, which is only about the entry and "relay-forward/1".
+	// "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). When several hold, the first of
+	// udp, entry_agent_old, exit_agent_old is given (an agent update does not help a UDP server). An agent that has not connected
+	// yet counts as old. Computed, not stored; not the same as agent_supported, which is only about the entry and "relay-forward/1".
 	ReverseBlocked string `protobuf:"bytes,32,opt,name=reverse_blocked,json=reverseBlocked,proto3" json:"reverse_blocked,omitempty"`
 	// The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
 	Bridge        *RelayBridge `protobuf:"bytes,33,opt,name=bridge,proto3" json:"bridge,omitempty"`

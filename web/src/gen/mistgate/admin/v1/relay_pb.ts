@@ -216,8 +216,9 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
 
   /**
    * Why the reverse way is not possible for this relay now: "entry_agent_old" (the entry's agent lacks "relay-reverse/1"),
-   * "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). Computed, not stored; not the
-   * same as agent_supported, which is only about the entry and "relay-forward/1".
+   * "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). When several hold, the first of
+   * udp, entry_agent_old, exit_agent_old is given (an agent update does not help a UDP server). An agent that has not connected
+   * yet counts as old. Computed, not stored; not the same as agent_supported, which is only about the entry and "relay-forward/1".
    *
    * @generated from field: string reverse_blocked = 32;
    */
