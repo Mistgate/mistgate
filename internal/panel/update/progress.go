@@ -5,6 +5,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 type progressExpectation struct {
@@ -36,7 +37,14 @@ var progressPhaseOrder = map[string]int{
 // RecordProgress persists the latest valid frame on the rollout step. This is deliberately a database operation:
 // the edge edition receives frames in one isolate and serves GetUpdates from another.
 func (s *Service) RecordProgress(ctx context.Context, nodeID string, p *agentv1.UpdateProgress) error {
-	if p == nil || nodeID == "" || p.RequestId == "" {
+	if p == nil || nodeID == "" {
+		return nil
+	}
+	p.RequestId = store.Clip(p.RequestId, 128)
+	p.Phase = store.Clip(p.Phase, 32)
+	p.Error = store.Clip(p.Error, 256)
+	p.Source = store.Clip(p.Source, 32)
+	if p.RequestId == "" {
 		return nil
 	}
 	if !progressPhases[p.Phase] || (p.BytesTotal > 0 && p.BytesDownloaded > p.BytesTotal) {

@@ -386,11 +386,4 @@ update/schedule.go	update: mark missed node update schedules	1
 update/schedule.go	update: remove obsolete node update schedule	1
 update/schedule.go	update: start scheduled node update	1
 update/update.go	update: prune rollouts	1
-warp/service.go	<"warp: " + what>	1
-warp/service.go	warp: audit	1
-warp/service.go	warp: cloudflare call failed	1
-warp/service.go	warp: delete device at cloudflare failed	1
-warp/service.go	warp: open secrets (wrong master key?); deleting the local account only	1
-warp/service.go	warp: read params	1
-warp/service.go	warp: record attention	1
 warp/views.go	warp: open secrets (wrong master key?)	1

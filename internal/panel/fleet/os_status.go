@@ -10,6 +10,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -28,6 +29,7 @@ var (
 func (f *Fleet) recordOsStatus(ctx context.Context, nodeID string, status *agentv1.OsStatus, at time.Time) {
 	// validOsStatus drops bad entries in place, and the frame it came from is not ours to change.
 	status = proto.Clone(status).(*agentv1.OsStatus)
+	clipOsStatusText(status)
 	if !validOsStatus(status, at) {
 		f.log.Warn("OS status rejected", "code", "os_status_invalid", "node", nodeID)
 		return
@@ -42,6 +44,62 @@ func (f *Fleet) recordOsStatus(ctx context.Context, nodeID string, status *agent
 		return
 	}
 	f.osChanged(nodeID)
+}
+
+func clipOsStatusText(s *agentv1.OsStatus) {
+	if s == nil {
+		return
+	}
+	s.DistroId = store.Clip(s.DistroId, 64)
+	s.DistroVersion = store.Clip(s.DistroVersion, 64)
+	s.KernelRunning = store.Clip(s.KernelRunning, 128)
+	s.KernelNewest = store.Clip(s.KernelNewest, 128)
+	s.Apt = store.Clip(s.Apt, 32)
+	s.AutoUpdates = store.Clip(s.AutoUpdates, 32)
+	s.AwgModuleNext = store.Clip(s.AwgModuleNext, 32)
+	s.Container = store.Clip(s.Container, 48)
+	s.BootIdHash = store.Clip(s.BootIdHash, 32)
+	s.Error = store.Clip(s.Error, 32)
+	s.AwgSource = store.Clip(s.AwgSource, 32)
+	s.AptLockHolder = store.Clip(s.AptLockHolder, 128)
+	clipOSList(s.Notable, 256)
+	clipOSList(s.RebootReasons, 64)
+	clipOSList(s.Held, 64)
+	clipOSList(s.HalfConfigured, 64)
+	clipOSList(s.RebootBlockers, 64)
+	clipOSList(s.SecurityPending, 64)
+	clipOSList(s.SecurityStuck, 64)
+	for _, k := range s.Kernels {
+		if k != nil {
+			k.Version = store.Clip(k.Version, 128)
+			k.Headers = store.Clip(k.Headers, 32)
+			k.Module = store.Clip(k.Module, 32)
+			k.Packages = store.Clip(k.Packages, 32)
+		}
+	}
+	if j := s.Job; j != nil {
+		j.JobId = store.Clip(j.JobId, 64)
+		j.Action = store.Clip(j.Action, 32)
+		j.Mode = store.Clip(j.Mode, 32)
+		j.State = store.Clip(j.State, 32)
+		j.Phase = store.Clip(j.Phase, 32)
+		j.Code = store.Clip(j.Code, 64)
+		j.Reason = store.Clip(j.Reason, 256)
+		j.Reboot = store.Clip(j.Reboot, 32)
+		j.HeldReason = store.Clip(j.HeldReason, 64)
+		j.KernelFrom = store.Clip(j.KernelFrom, 128)
+		j.KernelTo = store.Clip(j.KernelTo, 128)
+		j.AptLockHolder = store.Clip(j.AptLockHolder, 128)
+		j.NoteCode = store.Clip(j.NoteCode, 64)
+		j.Note = store.Clip(j.Note, 256)
+		clipOSList(j.SourcesFailed, 128)
+	}
+}
+
+func clipOSList(values []string, limit int) {
+	for i := range values {
+		values[i] = store.Clip(values[i], limit)
+	}
 }
 
 // osJobEventCode: the events an agent raises about an OS job (agent.proto "OS UPDATES").
@@ -63,7 +121,8 @@ func validOsStatus(s *agentv1.OsStatus, now time.Time) bool {
 	if s == nil || s.MeasuredUnix <= 0 || time.Unix(s.MeasuredUnix, 0).After(now.Add(5*time.Minute)) || time.Unix(s.MeasuredUnix, 0).Before(now.Add(-7*24*time.Hour)) {
 		return false
 	}
-	if s.Pending > 100000 || s.Security > s.Pending || len(s.Notable) > 16 || len(s.RebootReasons) > 16 || len(s.Held) > 16 || len(s.HalfConfigured) > 16 {
+	if s.Pending > 100000 || s.Security > s.Pending || len(s.Notable) > 16 || len(s.RebootReasons) > 16 || len(s.Held) > 16 ||
+		len(s.HalfConfigured) > 16 || len(s.SecurityPending) > 32 || len(s.SecurityStuck) > 32 {
 		return false
 	}
 	// Both may be empty: Debian testing and sid have no VERSION_ID, and a failed os-release read leaves both empty. Such a

@@ -384,6 +384,8 @@ func (s *Store) RecordStepProgress(ctx context.Context, nodeID, requestID, phase
 	if nodeID == "" || requestID == "" || phase == "" {
 		return false, nil
 	}
+	requestID, phase = Clip(requestID, 128), Clip(phase, 32)
+	progressError, source = Clip(progressError, 256), Clip(source, 32)
 	res, err := s.W.ExecContext(ctx, `UPDATE update_step SET
 		progress_phase = ?, progress_rank = ?,
 		progress_downloaded = CASE WHEN progress_downloaded > ? THEN progress_downloaded ELSE ? END,

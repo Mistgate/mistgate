@@ -3,6 +3,7 @@ package update
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -74,7 +75,7 @@ func TestRecordProgressRejectsStaleAndRegressingFrames(t *testing.T) {
 		t.Fatalf("progress total changed to %d, want 100", got)
 	}
 	if err := e.s.RecordProgress(e.ctx, "nod_a", &agentv1.UpdateProgress{
-		RequestId: "req_current", Phase: "failed", UpdatedUnix: now.Add(5 * time.Second).Unix(), Error: "download_failed", Source: "github",
+		RequestId: "req_current", Phase: "failed", UpdatedUnix: now.Add(5 * time.Second).Unix(), Error: strings.Repeat("x", 4096), Source: "github",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +86,8 @@ func TestRecordProgressRejectsStaleAndRegressingFrames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(steps) != 1 || steps[0].ProgressPhase != "failed" || steps[0].ProgressDownloaded != 40 || steps[0].ProgressTotal != 100 || steps[0].ProgressSource != "github" {
+	if len(steps) != 1 || steps[0].ProgressPhase != "failed" || steps[0].ProgressDownloaded != 40 || steps[0].ProgressTotal != 100 ||
+		steps[0].ProgressSource != "github" || len(steps[0].ProgressError) != 256 {
 		t.Fatalf("persisted progress = %+v", steps)
 	}
 

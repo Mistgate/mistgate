@@ -21,6 +21,7 @@ import (
 	"connectrpc.com/connect"
 	"golang.org/x/crypto/curve25519"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
@@ -212,7 +213,7 @@ func (s *Service) open(a store.WarpAccountRow) (secrets, error) {
 func fail(code connect.Code, key string) error { return connect.NewError(code, errors.New(key)) }
 
 func (s *Service) internal(what string, err error) error {
-	s.log.Error("warp: "+what, "err", err)
+	s.log.Error("warp: "+what, "code", "warp_internal_error", "err", err)
 	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 }
 
@@ -220,7 +221,7 @@ func (s *Service) internal(what string, err error) error {
 // HTTP status travels as "code: status=N" (the web errorVars format) so the owner sees what Cloudflare answered.
 func (s *Service) cloudflareErr(nodeID, what string, err error) error {
 	st := apiStatus(err)
-	s.log.Warn("warp: cloudflare call failed", "node", nodeID, "call", what, "status", st, "err", err)
+	s.log.Warn("warp: cloudflare call failed", "code", "warp_cloudflare_call_failed", "node", nodeID, "call", what, "status", st, "err", err)
 	switch {
 	case st == http.StatusTooManyRequests:
 		return fail(connect.CodeResourceExhausted, fmt.Sprintf("cloudflare_rate_limited: status=%d", st)) // import a wgcf profile instead
@@ -241,7 +242,7 @@ func revoked(status int) bool {
 func (s *Service) audit(ctx context.Context, actor, action string, params map[string]string) {
 	b, _ := json.Marshal(params)
 	if err := s.st.Audit(ctx, s.now(), store.AuditEntry{Actor: actor, Action: action, Params: string(b), Result: "ok"}); err != nil {
-		s.log.Warn("warp: audit", "action", action, "err", err)
+		s.log.Warn("warp: audit", "code", "warp_audit_failed", "action", action, "err", err)
 	}
 }
 
@@ -276,7 +277,7 @@ func (s *Service) liveNode(ctx context.Context, nodeID string) (store.NodeLiveRo
 func (s *Service) params(ctx context.Context) Params {
 	raw, err := s.st.Setting(ctx, SettingKey)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		s.log.Warn("warp: read params", "err", err)
+		s.log.Warn("warp: read params", "code", "warp_params_read_failed", "err", err)
 	}
 	return parseParams(raw)
 }
@@ -358,7 +359,7 @@ func (s *Service) forget(nodeID string, p Params, x secrets) bool {
 		return false
 	}
 	if err := c.Delete(ctx, p, x.RegID, x.Token); err != nil {
-		s.log.Warn("warp: delete device at cloudflare failed", "node", nodeID, "status", apiStatus(err), "err", err)
+		s.log.Warn("warp: delete device at cloudflare failed", "code", "warp_cloudflare_device_delete_failed", "node", nodeID, "status", apiStatus(err), "err", err)
 		return false
 	}
 	return true
@@ -632,7 +633,7 @@ func (s *Service) refreshLocked(ctx context.Context, nodeID, actor string) (stor
 	if err != nil {
 		if revoked(apiStatus(err)) {
 			if aerr := s.st.SetWarpAttention(ctx, nodeID, "revoked", s.now()); aerr != nil {
-				s.log.Warn("warp: record attention", "node", nodeID, "err", aerr)
+				s.log.Warn("warp: record attention", "code", "warp_attention_record_failed", "node", nodeID, "err", aerr)
 			}
 		}
 		return store.WarpAccountRow{}, s.cloudflareErr(nodeID, "refresh", err)
@@ -673,7 +674,7 @@ func (s *Service) delete(ctx context.Context, nodeID, confirmName string) (remot
 	}
 	x, err := s.open(a)
 	if err != nil {
-		s.log.Error("warp: open secrets (wrong master key?); deleting the local account only", "node", nodeID, "err", err)
+		s.log.Error("warp: open secrets (wrong master key?); deleting the local account only", "code", "warp_secret_open_failed", "node", nodeID, "err", err)
 	}
 	remote := s.forget(nodeID, s.params(ctx), x)
 	if err := s.st.DeleteWarpAccount(ctx, nodeID); err != nil {
@@ -783,7 +784,22 @@ func specOf(a store.WarpAccountRow, privateKey string) *plugin.WarpSpec {
 // StoreHealth keeps the last WarpHealth a node reported (StatsBatch.warp), for GetWarp and the node badge. A node
 // without an account is ignored.
 func (s *Service) StoreHealth(ctx context.Context, nodeID string, h *agentv1.WarpHealth) error {
-	b, err := protojson.Marshal(h)
+	if h == nil {
+		return nil
+	}
+	health := proto.Clone(h).(*agentv1.WarpHealth)
+	health.Backend = store.Clip(health.Backend, 32)
+	health.Endpoint = store.Clip(health.Endpoint, 64)
+	health.WarpFlag = store.Clip(health.WarpFlag, 16)
+	health.Colo = store.Clip(health.Colo, 16)
+	health.LastError = store.Clip(health.LastError, 128)
+	if health.ProbeCloudflare != nil {
+		health.ProbeCloudflare.FailureCode = store.Clip(health.ProbeCloudflare.FailureCode, 64)
+	}
+	if health.ProbeOther != nil {
+		health.ProbeOther.FailureCode = store.Clip(health.ProbeOther.FailureCode, 64)
+	}
+	b, err := protojson.Marshal(health)
 	if err != nil {
 		return err
 	}

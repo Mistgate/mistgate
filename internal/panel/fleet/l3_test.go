@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/netip"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // The L3 additions of the fleet (agent.proto "AWG AND WARP"): the capability gates, the
@@ -560,6 +562,36 @@ func TestAwgAndWarpHealthIntakeIsStoredAndThrottled(t *testing.T) {
 	}
 	if resp.Msg.Node.AwgBackend != "auto" || resp.Msg.Node.Warp == nil || resp.Msg.Node.Warp.State != adminv1.WarpState_WARP_STATE_NOT_CONFIGURED {
 		t.Errorf("node view: backend=%q warp=%v", resp.Msg.Node.AwgBackend, resp.Msg.Node.Warp)
+	}
+}
+
+func TestNodeHealthTextIsClippedBeforeItIsStored(t *testing.T) {
+	x, a := newL3Env(t)
+	c, _, _ := connectCaps(a, "health-text", "awg/1", "warp/1")
+	now := x.clock.now().Unix()
+	long := strings.Repeat("x", 4096)
+	warp := &agentv1.WarpHealth{State: agentv1.WarpState_WARP_STATE_DOWN, Backend: long, Endpoint: long,
+		WarpFlag: long, Colo: long, LastError: long, ProbeCloudflare: &agentv1.WarpProbeResult{FailureCode: long},
+		ProbeOther: &agentv1.WarpProbeResult{FailureCode: long}}
+	frame := awgBatch(1, now, "inb_awg", 1, warp)
+	frame.GetStats().Health[0].Awg.Backend = long
+	frame.GetStats().Health[0].Awg.BackendVersion = long
+	c.send(1, frame)
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
+	var awg agentv1.AwgHealth
+	if err := protojson.Unmarshal([]byte(x.inboundRow("inb_awg").AwgHealthJSON), &awg); err != nil {
+		t.Fatal(err)
+	}
+	if len(awg.Backend) != 32 || len(awg.BackendVersion) != 128 {
+		t.Fatalf("stored AWG text lengths = %d, %d", len(awg.Backend), len(awg.BackendVersion))
+	}
+	got := x.wm.lastHealth()
+	if got == nil || len(got.Backend) != 32 || len(got.Endpoint) != 64 || len(got.WarpFlag) != 16 || len(got.Colo) != 16 ||
+		len(got.LastError) != 128 || len(got.GetProbeCloudflare().FailureCode) != 64 || len(got.GetProbeOther().FailureCode) != 64 {
+		t.Fatalf("stored WARP text was not clipped: %+v", got)
+	}
+	if len(warp.Backend) != len(long) || len(frame.GetStats().Health[0].Awg.BackendVersion) != len(long) {
+		t.Fatal("intake mutated the node's frame while clipping")
 	}
 }
 

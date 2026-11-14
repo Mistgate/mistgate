@@ -3,12 +3,14 @@ package fleet
 import (
 	"net/netip"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -57,6 +59,35 @@ func TestOsStatusValidationBoundsUntrustedFieldsAndRejectsAddresses(t *testing.T
 				t.Fatalf("invalid status was accepted: %+v", candidate)
 			}
 		})
+	}
+}
+
+func TestOsStatusTextIsClippedAtIntake(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("de1")
+	now := time.Now().UTC().Truncate(time.Second)
+	status := osStatusFixture(now)
+	status.DistroId = strings.Repeat("u", 100)
+	status.DistroVersion = strings.Repeat("2", 100)
+	status.KernelRunning = strings.Repeat("6", 200)
+	status.AptLockHolder = strings.Repeat("p", 512)
+	status.Job = &agentv1.OsJob{JobId: "osj_ab12", Action: "upgrade", Mode: "security", State: "failed", Phase: "rebooting",
+		StartedUnix: now.Unix(), UpdatedUnix: now.Unix(), Code: "apt_lock", Reason: strings.Repeat("a", 1024),
+		Reboot: "held", HeldReason: "apt_lock", NoteCode: strings.Repeat("n", 256), Note: strings.Repeat("x", 1024)}
+	e.f.recordOsStatus(e.ctx, a.nodeID, status, now)
+	var raw string
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT status_json FROM node_os_status WHERE node_id = ?`, a.nodeID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var got agentv1.OsStatus
+	if err := protojson.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.DistroId) != 64 || len(got.DistroVersion) != 64 || len(got.KernelRunning) != 128 || len(got.AptLockHolder) != 128 ||
+		got.Job == nil || len(got.Job.Reason) != 256 || len(got.Job.NoteCode) != 64 || len(got.Job.Note) != 256 {
+		t.Fatalf("stored OS status text lengths: distro=%d version=%d kernel=%d lock_holder=%d job_reason=%d note_code=%d note=%d",
+			len(got.DistroId), len(got.DistroVersion), len(got.KernelRunning), len(got.AptLockHolder), len(got.GetJob().GetReason()),
+			len(got.GetJob().GetNoteCode()), len(got.GetJob().GetNote()))
 	}
 }
 

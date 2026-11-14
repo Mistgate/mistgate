@@ -17,6 +17,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 const sessionStateVersion = 1
@@ -1074,7 +1075,7 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	}
 	var in []store.InboundApplied
 	for _, ir := range r.Inbounds {
-		ia := store.InboundApplied{ID: ir.InboundId, State: runState(ir.State), Error: clip(ir.Error, 512), SpecHash: clip(ir.SpecHash, 128)}
+		ia := store.InboundApplied{ID: store.Clip(ir.InboundId, 64), State: runState(ir.State), Error: store.Clip(ir.Error, 512), SpecHash: store.Clip(ir.SpecHash, 128)}
 		if ir.CertPinSha256 != "" {
 			if pin, ok := protocols.NormalizePin(ir.CertPinSha256); ok {
 				ia.CertPin = pin
@@ -1455,11 +1456,11 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 			state.L3.AWG = map[string]l3HealthMemo{}
 		}
 		m := state.L3.AWG[h.InboundId]
-		if !m.due(l3ReportHash(h.Awg), now, false) {
+		if !m.due(l3ReportHash(awg), now, false) {
 			continue
 		}
 		state.L3.AWG[h.InboundId] = m
-		b, err := protojson.Marshal(h.Awg)
+		b, err := protojson.Marshal(awg)
 		if err != nil {
 			continue
 		}
@@ -1471,12 +1472,14 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 	if st.Warp == nil || w == nil {
 		return
 	}
-	report, warpKey := l3ReportHash(st.Warp), warpChangeKey(st.Warp)
+	warp := proto.Clone(st.Warp).(*agentv1.WarpHealth)
+	clipWarpHealth(warp)
+	report, warpKey := l3ReportHash(warp), warpChangeKey(warp)
 	warpMemo := state.L3.Warp
 	if warpMemo.due(report, now, !state.L3.Warp.At.IsZero() && state.L3.WarpChangeKey != warpKey) {
 		state.L3.Warp = warpMemo
 		state.L3.WarpChangeKey = warpKey
-		if err := w.StoreHealth(ctx, nodeID, st.Warp); err != nil {
+		if err := w.StoreHealth(ctx, nodeID, warp); err != nil {
 			c.f.log.Warn("store warp health", "code", "store_failed", "node", nodeID, "err", err)
 		}
 	}
@@ -1497,6 +1500,9 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 // ApplyResult was sent and renewed later, so the apply-time value alone stays empty. Only a well-formed pin is taken
 // (it ends up in subscriptions of self-signed inbounds). An expiry beyond maxCertLife is not believed (the health
 // check would never warn), so that value stays unchanged.
+		awg := proto.Clone(h.Awg).(*agentv1.AwgHealth)
+		awg.Backend = store.Clip(awg.Backend, 32)
+		awg.BackendVersion = store.Clip(awg.BackendVersion, 128)
 func certStats(st *agentv1.StatsBatch, now time.Time) []store.FleetInboundCert {
 	var certs []store.FleetInboundCert
 	for i, h := range st.Health {
@@ -1517,3 +1523,20 @@ func certStats(st *agentv1.StatsBatch, now time.Time) []store.FleetInboundCert {
 	}
 	return certs
 }
+func clipWarpHealth(h *agentv1.WarpHealth) {
+	if h == nil {
+		return
+	}
+	h.Backend = store.Clip(h.Backend, 32)
+	h.Endpoint = store.Clip(h.Endpoint, 64)
+	h.WarpFlag = store.Clip(h.WarpFlag, 16)
+	h.Colo = store.Clip(h.Colo, 16)
+	h.LastError = store.Clip(h.LastError, 128)
+	if h.ProbeCloudflare != nil {
+		h.ProbeCloudflare.FailureCode = store.Clip(h.ProbeCloudflare.FailureCode, 64)
+	}
+	if h.ProbeOther != nil {
+		h.ProbeOther.FailureCode = store.Clip(h.ProbeOther.FailureCode, 64)
+	}
+}
+
