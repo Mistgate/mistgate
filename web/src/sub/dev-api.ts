@@ -46,22 +46,26 @@ PersistentKeepalive = 25
 `;
 
 // the names the server gives servers, keys and files (access/names.go): the country, "mistgate-de.conf"
-const cfg = (node: string, cc: string, stale = false) =>
+// `via` is the country of an entry node: the key of the path through it (the same node id, a name that ends "· via RU", its own file)
+const cfg = (node: string, cc: string, stale = false, via = "") =>
   awgConfig({
     node_id: `nod_${node}`,
+    ...(via ? { via_node_id: "nod_msk1", via_country: via } : {}),
     // the server names keys in the instance's language; the sample follows the page's, so each page shows its own
-    label: new Intl.DisplayNames([document.documentElement.lang || "ru"], { type: "region" }).of(cc) ?? cc,
+    label: (new Intl.DisplayNames([document.documentElement.lang || "ru"], { type: "region" }).of(cc) ?? cc) + (via ? ` · via ${via}` : ""),
     country_code: cc,
     version: "3.1",
-    conf: conf(node),
+    conf: conf(via ? "msk1" : node),
     vpn_key: `vpn://${"AAAAAQAAAGh4nO".repeat(10)}`,
-    filename: `mistgate-${cc.toLowerCase()}.conf`,
+    filename: `mistgate-${cc.toLowerCase()}${via ? `-via-${via.toLowerCase()}` : ""}.conf`,
     stale,
     warnings: ["amnezia_desktop_mtu"],
     min_clients: [{ client: "amnezia", app: "AmneziaVPN", min: "5.0.1.5" }, { client: "amnezia", app: "AmneziaWG Android", min: "v3.1.20260814" }],
   });
 
-const nodes = () => [cfg("de1", "DE"), cfg("fi1", "FI")];
+// the "awg-relay" case: the path through the entry in Russia comes right after the direct config of its server
+const viaRu = () => new URLSearchParams(location.search).get("case") === "awg-relay";
+const nodes = () => (viaRu() ? [cfg("de1", "DE"), cfg("de1", "DE", false, "RU"), cfg("fi1", "FI")] : [cfg("de1", "DE"), cfg("fi1", "FI")]);
 const perPlatform = new Map<string, number>();
 
 /** The dev server's password form accepts abcd-2345; three wrong tries in a row get the "try later" answer. */

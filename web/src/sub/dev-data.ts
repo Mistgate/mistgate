@@ -408,6 +408,19 @@ cases["dns-link"] = { ...dnsBoth, access: { happ: true, amnezia: false }, amnezi
 // the owner offers nothing for the link apps: the note about the link apps stays, the keys keep their choice per server
 cases["dns-both-off"] = { ...dnsBoth, dns: linkDns([]) };
 
+// an AmneziaWG server that also comes through the entry in Russia: its key stays direct, the Mihomo apps get the twin "· через RU"
+// (a link, Mihomo only), and a key through the entry is another config of the same server (open the key with &open=d3, pick the
+// second country; dev-api.ts answers it for this case)
+const de1Awg: ServerEntry = {
+  ...de1,
+  app_names: ["DE · AmneziaWG", "DE · AmneziaWG · через RU"],
+  connections: [
+    { way: "key", exit: "direct", app_name: "", profile_id: "p31" },
+    { way: "link", exit: "direct", app_name: "DE · AmneziaWG · через RU", profile_id: "", mihomo_only: true, relay: true, via: "RU" },
+  ],
+};
+cases["awg-relay"] = { ...dnsBoth, servers: [de1Awg, nl1], dns: linkDns(offered) };
+
 // the Telegram proxy: one card per tg://proxy link, the twins of a server's link (its IPv6 entry, a relay in RU) marked
 const tgUrl = (host: string, port = 443) => `tg://proxy?server=${host}&port=${port}&secret=ee0123456789abcdef0123456789abcdef7777772e676f6f676c652e636f6d`;
 const tgFra = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", ipv6: false, relay: false, via: "", url: tgUrl("de1.example.com") };

@@ -118,7 +118,7 @@ function Mock({ role, children }: { role: Role; children: ReactNode }) {
       c.setQueryData(candidatesQuery(n.id).queryKey, {
         agentSupported: true,
         entryCountry: { verdict: "ok", dark: [], atUnix: now },
-        candidates: nodes.filter((o) => o.id !== n.id).flatMap((o) => inboundsOf(o.name, o.protocols).map((i) => ({ inboundId: i.id, nodeId: o.id, nodeName: o.name, profileId: i.profileId, profileName: i.profileName, protocol: i.protocol, network: net(i.protocol), port: i.port, unsupported: i.protocol === "awg" ? "awg" : "", hop: false, relayId: "", country: { verdict: "blocked", dark: ["MTS"], atUnix: now }, reach: { verdict: "reach", source: "tspu_row", atUnix: now } }))),
+        candidates: nodes.filter((o) => o.id !== n.id).flatMap((o) => inboundsOf(o.name, o.protocols).map((i) => ({ inboundId: i.id, nodeId: o.id, nodeName: o.name, profileId: i.profileId, profileName: i.profileName, protocol: i.protocol, network: net(i.protocol), port: i.port, unsupported: "", hop: false, relayId: "", country: { verdict: "blocked", dark: ["MTS"], atUnix: now }, reach: { verdict: "reach", source: "tspu_row", atUnix: now } }))),
       } as never);
     }
     return c;

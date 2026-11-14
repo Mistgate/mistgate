@@ -294,7 +294,7 @@ if (data.locked) {
     modal.sync(open, open ? (st.dns.open ? dnsModal(ctx()) : deviceModal(ctx())) : []);
   };
 
-  // `vite -c vite.sub.config.ts` only: &way=key picks the key way of the first-visit steps, &sheet=pick|link|key opens the "add a device" sheet, &menu=<device id> a row's menu, &open=<device id> its details, &ask=remove:<id>|rotate:<id> its question
+  // `vite -c vite.sub.config.ts` only: &way=key picks the key way of the first-visit steps, &sheet=pick|link|key opens the "add a device" sheet, &menu=<device id> a row's menu, &open=<device id> its details, &key=<device id>[&country=<n>] its key sheet, &ask=remove:<id>|rotate:<id> its question
   if (import.meta.env.DEV) {
     const sheet = devQuery.get("sheet");
     if (sheet === "pick" || sheet === "link" || sheet === "key") {
@@ -304,6 +304,12 @@ if (data.locked) {
     st.amz.menu = devQuery.get("menu");
     st.details = devQuery.get("open");
     if (devQuery.get("way") === "key") st.way = "key";
+    // &key=<device id> opens the key of a device, &country=<n> on the n-th config of its list (0 = the first)
+    const key = devQuery.get("key");
+    if (key) {
+      st.amz.node[key] = Number(devQuery.get("country")) || 0;
+      actions.amz.show(key);
+    }
     const [kind, id] = (devQuery.get("ask") ?? "").split(":");
     if ((kind === "remove" || kind === "rotate") && id) st.amz.confirm = { id, kind };
   }
