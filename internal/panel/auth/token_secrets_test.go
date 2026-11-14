@@ -62,6 +62,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.ListNodeServerKeysResponse.keys":                   "public SSH keys from a server's authorized_keys file; private keys are never read or returned",
 		"mistgate.admin.v1.AddNodeServerKeyResponse.key":                      "the public key just added to a server",
 		"mistgate.admin.v1.NodeServerKey.panel_key":                           "a bool marking the panel's public SSH key",
+		"mistgate.admin.v1.Node.link_sealed":                                  "a bool: the node has used an encrypted link session, not a key",
 		"mistgate.admin.v1.Device.enrol_link_stale":                           "a bool: the person's link changed after the device enrolled; no hash is returned",
 		"mistgate.ops.v1.RetentionItem.key":                                   "the name of a retention setting (journal_days ...), not a key",
 	}
