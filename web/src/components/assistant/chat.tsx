@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { halo } from "@/components/fx/halo";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
@@ -350,6 +350,11 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   const [scrolled, setScrolled] = useState(false);
   const context = initialContext !== undefined ? initialContext : pageContext;
   const pick = usePick({ provider, model: providerLabel });
+  // what the message box offers to finish: the questions asked in this conversation (newest first), then the examples
+  const suggestions = useMemo(
+    () => [...chat.messages.filter((m) => m.role === ChatRole.USER && !looksSecret(m.text)).map((m) => m.text).reverse(), ...EXAMPLES.map((k) => t(k))],
+    [chat.messages, t],
+  );
 
   // the list follows the answer as it grows: new messages, text, tool lines, plan cards
   const tail = chat.messages[chat.messages.length - 1];
@@ -450,11 +455,14 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
             </Button>
           </div>
         )}
-        <Composer text={text} onText={setText} onSubmit={() => submit()} running={chat.running} onStop={() => void chat.stop()} context={context} attached={attach} onAttach={setAttach} pick={pick} owner={owner} onNavigate={() => window.innerWidth < 768 && onClose()} pickerOpen={pickerOpen} />
+        <Composer text={text} onText={setText} onSubmit={() => submit()} running={chat.running} onStop={() => void chat.stop()} context={context} attached={attach} onAttach={setAttach} pick={pick} owner={owner} onNavigate={() => window.innerWidth < 768 && onClose()} pickerOpen={pickerOpen} suggestions={suggestions} />
       </footer>
     </section>
   );
 }
+
+/** Example questions: the first three are the buttons of an empty chat, all of them are what the message box offers to finish. */
+const EXAMPLES = ["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3", "ai.chat.ex4", "ai.chat.ex5", "ai.chat.ex6", "ai.chat.ex7", "ai.chat.ex8"] as const;
 
 function Hello({ onPick }: { onPick: (q: string) => void }) {
   const t = useT();
@@ -465,7 +473,7 @@ function Hello({ onPick }: { onPick: (q: string) => void }) {
       </span>
       <p className="max-w-[300px] text-[13.5px] leading-relaxed text-pretty text-muted">{t("ai.chat.hello")}</p>
       <div className="flex flex-wrap justify-center gap-2">
-        {(["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3"] as const).map((k) => (
+        {EXAMPLES.slice(0, 3).map((k) => (
           <button key={k} type="button" onClick={() => onPick(t(k))} className="max-w-full rounded-full bg-surface-2 px-3.5 py-2 text-[12.5px] transition-colors hover:bg-accent-soft">
             {t(k)}
           </button>

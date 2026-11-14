@@ -1,14 +1,16 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icons";
 import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
 import { looksSecret, type Context } from "@/lib/assistant";
 import { AgentPicker, type Pick } from "./agent-picker";
+import { Ghost, suggest } from "./ghost";
 
 /**
  * The message box: the page the message goes with as a chip on top, the text (grows to about six lines, then scrolls softly),
  * and under it "+" (attach the page again), the agent picker and the send button, which is the stop button while a turn runs.
- * Enter sends, Shift+Enter breaks the line.
+ * Enter sends, Shift+Enter breaks the line. A question started like an earlier one (`suggestions`) is finished in a dim colour;
+ * Tab, or → at the end, takes it.
  */
 export function Composer({
   text,
@@ -23,6 +25,7 @@ export function Composer({
   owner,
   onNavigate,
   pickerOpen,
+  suggestions,
 }: {
   text: string;
   onText: (v: string) => void;
@@ -36,9 +39,22 @@ export function Composer({
   owner: boolean;
   onNavigate?: () => void;
   pickerOpen?: boolean;
+  suggestions?: readonly string[];
 }) {
   const t = useT();
   const area = useRef<HTMLTextAreaElement>(null);
+  const mirror = useRef<HTMLDivElement>(null);
+  // the suggestion just taken, while its letters land: the box's own text is hidden under them for that moment
+  const [taken, setTaken] = useState<{ base: string; rest: string } | null>(null);
+  const landing = taken && taken.base + taken.rest === text ? taken : null;
+  const rest = landing || running ? "" : suggest(text, suggestions ?? []);
+  const ghost = landing ?? (rest ? { base: text, rest } : null);
+  const accept = () => {
+    if (!rest) return;
+    setTaken({ base: text, rest });
+    onText(text + rest);
+    area.current?.focus();
+  };
 
   // grow with the text up to six lines; past that the box scrolls with a soft fade at the edge that has more
   useLayoutEffect(() => {
@@ -46,11 +62,13 @@ export function Composer({
     if (!el) return;
     el.style.height = "auto";
     el.dataset.empty = text ? "0" : "1";
+    el.dataset.ghost = ghost?.rest ? "1" : "0";
     const max = 6 * 20;
-    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
+    // the suggestion may wrap onto a line the typed text has not reached
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, mirror.current?.scrollHeight ?? 0), max)}px`;
     el.dataset.top = el.scrollTop > 1 ? "1" : "0";
     el.dataset.bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1 ? "1" : "0";
-  }, [text]);
+  }, [text, ghost?.rest]);
 
   return (
     <div className="flex flex-col gap-1.5 rounded-[18px] border border-line bg-canvas px-3 pt-2.5 pb-2 transition-colors focus-within:border-accent-line">
@@ -65,26 +83,42 @@ export function Composer({
           </span>
         </div>
       )}
-      <textarea
-        ref={area}
-        aria-label={t("ai.chat.ph")}
-        placeholder={t("ai.chat.ph")}
-        value={text}
-        rows={1}
-        onChange={(e) => onText(e.target.value)}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          el.dataset.top = el.scrollTop > 1 ? "1" : "0";
-          el.dataset.bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1 ? "1" : "0";
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            onSubmit();
-          }
-        }}
-        className="scroll-soft block min-h-5 w-full resize-none bg-transparent px-1 text-[13.5px] leading-5 outline-none placeholder:text-muted"
-      />
+      <div className="relative">
+        {ghost && (
+          <Ghost
+            base={ghost.base}
+            rest={ghost.rest}
+            accepted={!!landing}
+            onAccept={accept}
+            onDone={() => setTaken(null)}
+            label={t("ai.chat.accept")}
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 px-1 text-[13.5px] leading-5 break-words whitespace-pre-wrap"
+          />
+        )}
+        <textarea
+          ref={area}
+          aria-label={t("ai.chat.ph")}
+          placeholder={t("ai.chat.ph")}
+          value={text}
+          rows={1}
+          onChange={(e) => onText(e.target.value)}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            el.dataset.top = el.scrollTop > 1 ? "1" : "0";
+            el.dataset.bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1 ? "1" : "0";
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              onSubmit();
+            } else if (rest && (e.key === "Tab" || e.key === "ArrowRight") && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && e.currentTarget.selectionStart === text.length) {
+              e.preventDefault();
+              accept();
+            }
+          }}
+          className={`scroll-soft block min-h-5 w-full resize-none bg-transparent px-1 text-[13.5px] leading-5 outline-none placeholder:text-muted ${landing ? "[-webkit-text-fill-color:transparent]" : ""}`}
+        />
+      </div>
       {looksSecret(text) && (
         <p role="status" className="flex items-start gap-1.5 px-1 text-[11.5px] leading-snug text-warn-text">
           <Icon name="lock" size={11} className="mt-0.5 flex-none" />
