@@ -456,6 +456,22 @@ func TestRelayCreateWaitsForTheOwnerThenChecksAndSwitchesOn(t *testing.T) {
 	}
 }
 
+func TestAWGRelayPlanExplainsPerEntryKeysAndDisguisePort(t *testing.T) {
+	e := newTestEnv(t)
+	e.w.relay.cands = append(e.w.relay.cands, &adminv1.RelayCandidate{
+		InboundId: "inb_awg", NodeId: nodeA, NodeName: "de1", ProfileId: "prf_awg", ProfileName: "AWG",
+		Protocol: "awg", Network: "udp", Port: 51820,
+	})
+	_, secret := e.token(ProfileAdmin)
+	p := planOf(t, e.session(secret), "relay", map[string]any{"action": "create", "node": "nl1", "inbound_id": "inb_awg"})
+	if fact := factOf(t, p, "entry_port"); !strings.Contains(fact.Value, "profile's disguise port") {
+		t.Errorf("entry_port = %+v, want disguise-port selection", fact)
+	}
+	if fact := factOf(t, p, "awg_path_keys"); fact.Value != "People allowed to use both nodes get their own AmneziaWG relay key. AmneziaVPN users must download and import the new config; apps using a subscription link get it on refresh." {
+		t.Errorf("awg_path_keys = %+v", fact)
+	}
+}
+
 func TestRelayCreatePlanWarnsWhenEntryAndExitShareACountry(t *testing.T) {
 	for _, tc := range []struct {
 		name, exit, entry string

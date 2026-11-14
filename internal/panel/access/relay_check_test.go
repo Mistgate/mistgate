@@ -330,11 +330,20 @@ func TestSwitchingOnWithoutAFreshCheckIsRefusedWithTheRealGate(t *testing.T) {
 	}
 }
 
-func TestCreateRelayRefusesAServerARelayCannotPassOn(t *testing.T) {
-	f := newRelayFix(t)
-	awg := f.awgProfile("awg-files", "")
-	srv := f.inbound(awg.Id, "nod_de1")
-	wantMsg(t, errOf2(f.create(srv.Id, "nod_fi1", 0)), "failed_precondition: relay_unsupported: reason=awg")
+func TestCreateRelayAcceptsAWG(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "192.0.2.10", "active")
+	e.node("nod_msk1", "msk1", "198.51.100.20", "active")
+	e.sql(`UPDATE node SET agent_caps = 'relay-forward/1' WHERE id = 'nod_msk1'`)
+	profile := e.awgProfile("awg-files", `{"port":1194,"obfuscation":{"preset":"quic"}}`)
+	srv := e.inbound(profile.Id, "nod_de1")
+	r, err := e.s.CreateRelay(e.ctx, req(&adminv1.CreateRelayRequest{InboundId: srv.Id, ViaNodeId: "nod_msk1"}))
+	if err != nil {
+		t.Fatalf("CreateRelay for AWG: %v", err)
+	}
+	if r.Msg.Relay.Protocol != "awg" || r.Msg.Relay.Port != 443 || r.Msg.Relay.ExitPort != 1194 {
+		t.Fatalf("AWG relay did not prefer the free QUIC disguise port: %+v", r.Msg.Relay)
+	}
 }
 
 func TestRelayUnsupportedReasons(t *testing.T) {
@@ -347,7 +356,7 @@ func TestRelayUnsupportedReasons(t *testing.T) {
 		{"vless behind a CDN", "vless", `{"cdn":{"host":"cdn.example.org","port":443}}`, "cdn", plugin.TLSAcmeDomain},
 		{"vless with an empty CDN host", "vless", `{"cdn":{"host":""}}`, "", plugin.TLSAcmeDomain},
 		{"certificate on an IP", "hysteria2", `{}`, "acme_ip", plugin.TLSAcmeIP},
-		{"awg", "awg", `{}`, "awg", 0},
+		{"awg", "awg", `{}`, "", 0},
 	} {
 		spec := plugin.InboundSpec{Settings: []byte(tc.settings), TLS: plugin.TLS{Mode: tc.tls}}
 		if got := relayUnsupported(tc.protocol, spec); got != tc.want {
@@ -397,7 +406,7 @@ func TestListRelayCandidates(t *testing.T) {
 	if got[f.server.Id].RelayId != r.Id || got[f.server.Id].Network != "udp" || got[f.server.Id].Port != 443 || got[f.server.Id].NodeName != "de1" || got[f.server.Id].Unsupported != "" {
 		t.Errorf("the server that has a relay: %+v", got[f.server.Id])
 	}
-	for id, want := range map[string]string{awg.Id: "awg", cdn.Id: "cdn", vless.Id: "", hy.Id: ""} {
+	for id, want := range map[string]string{awg.Id: "", cdn.Id: "cdn", vless.Id: "", hy.Id: ""} {
 		if got[id] == nil || got[id].Unsupported != want {
 			t.Errorf("%s: %+v, want unsupported %q", id, got[id], want)
 		}
@@ -436,7 +445,7 @@ func TestListRelayCandidates(t *testing.T) {
 	if resp.EntryCountry.Verdict != "ok" || resp.EntryCountry.AtUnix != 95 {
 		t.Errorf("entry: %+v", resp.EntryCountry)
 	}
-	if first := resp.Candidates[0]; first.InboundId != hy.Id {
+	if first := resp.Candidates[0]; first.NodeId != "nod_fr1" {
 		t.Errorf("the exit that is dark for some networks goes first: %+v", first)
 	}
 

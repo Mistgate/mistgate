@@ -1842,6 +1842,8 @@ type deviceConnV struct {
 	InboundID    string      `json:"inbound_id"`
 	Profile      string      `json:"profile"`
 	Protocol     string      `json:"protocol"`
+	ViaCountry   string      `json:"via_country,omitempty"` // the key of a path through an entry node of this country; empty on the direct path
+	ViaNodeID    string      `json:"via_node_id,omitempty"`
 	Connects     uint32      `json:"connects"`
 	Rejects      uint32      `json:"rejects"`
 	Drops        uint32      `json:"drops"`
@@ -1933,6 +1935,7 @@ func userConnectionView(r *adminv1.GetUserConnectionResponse, nodes []*adminv1.N
 	for _, d := range r.GetRows() {
 		dv := deviceConnV{DeviceID: clean(d.GetDeviceId(), 80), NodeID: clean(d.GetNodeId(), 80), NodeName: nm(d.GetNodeName()),
 			InboundID: clean(d.GetInboundId(), 80), Profile: nm(d.GetProfileName()), Protocol: clean(d.GetProtocol(), 40),
+			ViaCountry: clean(d.GetViaCountry(), 8), ViaNodeID: clean(d.GetViaNodeId(), 80),
 			Connects: d.GetConnects(), Rejects: d.GetRejects(), Drops: d.GetDrops(), Stalls: d.GetStalls(), OnlineS: d.GetOnlineS(),
 			LastHourUnix: d.GetLastHourUnix(), Platform: clean(d.GetPlatform(), 40), Client: clean(d.GetClient(), 80), Kind: clean(d.GetKind(), 40),
 			Hours: []linkHourV{}, ClientCloses: d.GetClientCloses(), Freezes: d.GetFreezes(), Quiet: d.GetQuiet(),

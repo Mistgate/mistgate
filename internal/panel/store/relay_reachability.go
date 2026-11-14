@@ -80,7 +80,7 @@ func NewRelayReachability(in RelayReachabilityInput) RelayReachability {
 }
 
 func RelayTargetInbound(protocol string, cdn bool) bool {
-	return strings.ToLower(strings.TrimSpace(protocol)) != "awg" && !cdn
+	return !cdn
 }
 
 func RelayPathNetwork(protocol string) string {

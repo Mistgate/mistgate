@@ -141,7 +141,9 @@ type LinkDeviceResult struct {
 	Device       AccessDevice
 	Creds        []AccessCred
 	Added        []AccessCred
-	FullProfiles []string // EnsureLinkAWGCreds: the profiles whose client network has no free address
+	FullProfiles []string      // EnsureLinkAWGCreds: the profiles whose client network has no free address
+	FullPaths    []AWGPathFull // EnsureLinkAWGCreds: relay keys skipped because the profile network is full
+	FailedPaths  []AWGPathFailure
 	// Replaced is kept for compatibility and is always empty; idle devices are retained.
 	Replaced string
 	// Born: the device is new (not found, not taken over from the shared one).
@@ -335,7 +337,9 @@ func (a Access) ensureLinkDevice(ctx context.Context, dev AccessDevice, limit in
 		}
 		have := make(map[string]bool, len(b.creds))
 		for _, c := range b.creds {
-			have[c.Protocol] = true
+			if c.Path == "" {
+				have[c.Protocol] = true
+			}
 		}
 		if b.enrol {
 			have = make(map[string]bool)

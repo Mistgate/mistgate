@@ -225,12 +225,9 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 }
 
 // relayUnsupported says why a server cannot be passed on by an entry, "" when it can: people reach a CDN server through the CDN,
-// not the exit's address; a certificate on the exit's IP address would not fit the entry's; the AmneziaWG key goes through a
-// relay only by a later step.
+// not the exit's address; a certificate on the exit's IP address would not fit the entry's.
 func relayUnsupported(protocol string, spec plugin.InboundSpec) string {
 	switch {
-	case protocol == "awg":
-		return "awg"
 	case spec.TLS.Mode == plugin.TLSAcmeIP:
 		return "acme_ip"
 	case protocols.ServerCDN(spec):

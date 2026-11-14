@@ -1282,7 +1282,7 @@ func (s *Service) inboundNoWayInWarning(ctx context.Context, f store.AccessInbou
 		}
 	}
 
-	// a code the admin words: "awg" (AmneziaWG cannot be relayed yet), "acme_ip" (a certificate for the node's IP), or no relay
+	// a code the admin words: "acme_ip" (a certificate for the node's IP), "cdn", or no usable relay
 	reason := unsupported
 	if reason == "" {
 		reason = "no_usable_relay"

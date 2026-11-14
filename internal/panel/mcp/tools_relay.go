@@ -61,7 +61,7 @@ func relayTools() []toolDef {
 		readTool("relay_candidates", ProfileReadonly,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.RelayServiceListRelayCandidatesProcedure),
 			"The servers of other nodes that an entry node could relay, with what the panel knows about reaching them. node is the entry (id or exact name). "+
-				"Per server: its inbound_id (what relay_plan create takes), exit node, profile, protocol, network and port; unsupported (empty: it can be relayed; else cdn, acme_ip, awg or build_failed); "+
+				"Per server: its inbound_id (what relay_plan create takes), exit node, profile, protocol, network and port; unsupported (empty: it can be relayed; else cdn, acme_ip or build_failed); "+
 				"hop (the server has a hop range, a relay passes one port); relay_id (this entry already relays it); "+
 				"exit_country_check (how people inside the country see the exit: verdict ok, partial, blocked, listed or no_data, and the dark networks); "+
 				"entry_reaches_exit (does the entry itself reach the exit: reach, partial, blocked or no_data, from the TSPU probe when it ran from that entry). "+
@@ -274,6 +274,9 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 		return nil, errors.New("the entry node's agent is too old to forward: update it first")
 	}
 	port := "chosen by the panel: the exit's port " + strconv.Itoa(int(cand.GetPort())) + " when it is free on the entry, else a free one"
+	if cand.GetProtocol() == "awg" {
+		port = "chosen by the panel: the profile's disguise port when it is free and supported, else the exit's port " + strconv.Itoa(int(cand.GetPort())) + " when free, else another free one"
+	}
 	if a.Port != 0 {
 		port = strconv.Itoa(int(a.Port))
 	}
@@ -289,6 +292,9 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 	}
 	if cand.GetHop() {
 		facts = append(facts, Fact{Key: "warning", Value: "the server has a hop range; the relay passes its one port only"})
+	}
+	if cand.GetProtocol() == "awg" {
+		facts = append(facts, Fact{Key: "awg_path_keys", Value: "People allowed to use both nodes get their own AmneziaWG relay key. AmneziaVPN users must download and import the new config; apps using a subscription link get it on refresh."})
 	}
 	for _, exit := range nodes {
 		if exit.GetId() == cand.GetNodeId() && entry.GetCountryCode() != "" && exit.GetCountryCode() != "" && strings.EqualFold(entry.GetCountryCode(), exit.GetCountryCode()) {

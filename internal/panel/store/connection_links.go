@@ -213,7 +213,9 @@ type NodeLinkReadRow struct {
 // UserLinksByHour reads one person's rows and optional hour buckets, with device metadata from the same query.
 func (s *Store) UserLinksByHour(ctx context.Context, userID string, since time.Time, byHour bool) ([]UserLink, error) {
 	query := `WITH base AS (
-			SELECT dc.device_id, l.node_id, n.name AS node_name, l.inbound_id, p.name AS profile_name, p.protocol,
+			SELECT dc.device_id, dc.path AS path_key,
+				CASE WHEN dc.path LIKE 'relay:%' THEN substr(dc.path, 7) ELSE '' END AS via_node_id,
+				COALESCE(via.country_code, '') AS via_country, l.node_id, n.name AS node_name, l.inbound_id, p.name AS profile_name, p.protocol,
 				COALESCE(d.platform, '') AS platform, COALESCE(d.client, '') AS client, COALESCE(d.kind, '') AS kind,
 				l.hour_start, SUM(l.connects) AS connects, SUM(l.rejects) AS rejects, SUM(l.drops) AS drops,
 				SUM(l.stalls) AS stalls, SUM(l.online_s) AS online_s,
@@ -225,64 +227,66 @@ func (s *Store) UserLinksByHour(ctx context.Context, userID string, since time.T
 			FROM link_hour l
 			JOIN device_credential dc ON dc.id = l.cred_id
 			LEFT JOIN device d ON d.id = dc.device_id
+			LEFT JOIN node via ON via.id = CASE WHEN dc.path LIKE 'relay:%' THEN substr(dc.path, 7) ELSE '' END
 			JOIN node n ON n.id = l.node_id
 			JOIN inbound i ON i.id = l.inbound_id
 			JOIN profile p ON p.id = i.profile_id
 			WHERE l.user_id = ? AND l.user_id <> '' AND l.hour_start >= ? AND l.cred_id <> ''
-			GROUP BY dc.device_id, l.node_id, n.name, l.inbound_id, p.name, p.protocol, d.platform, d.client, d.kind, l.hour_start
+			GROUP BY dc.device_id, dc.path, via.country_code, l.node_id, n.name, l.inbound_id, p.name, p.protocol,
+				d.platform, d.client, d.kind, l.hour_start
 		), totals AS (
-			SELECT device_id, node_id, node_name, inbound_id, profile_name, protocol, platform, client, kind,
+			SELECT device_id, path_key, via_node_id, via_country, node_id, node_name, inbound_id, profile_name, protocol, platform, client, kind,
 				SUM(connects) AS connects, SUM(rejects) AS rejects, SUM(drops) AS drops, SUM(stalls) AS stalls,
 				SUM(online_s) AS online_s, SUM(client_closes) AS client_closes, SUM(freezes) AS freezes, SUM(quiet) AS quiet,
 				SUM(accepted) AS accepted, SUM(hellos_foreign) AS hellos_foreign, SUM(rtt_ms_sum) AS rtt_ms_sum,
 				SUM(rtt_samples) AS rtt_samples, SUM(pkts_sent) AS pkts_sent, SUM(pkts_lost) AS pkts_lost, MAX(hour_start) AS last_hour,
 				` + reasonSums + `, MAX(variant) AS variant, MAX(awg_backend) AS awg_backend
-			FROM base GROUP BY device_id, node_id, inbound_id
+			FROM base GROUP BY device_id, path_key, via_node_id, via_country, node_id, node_name, inbound_id, profile_name, protocol, platform, client, kind
 			HAVING SUM(connects) + SUM(rejects) + SUM(drops) + SUM(stalls) + SUM(online_s) + SUM(client_closes) + SUM(freezes) +
 				SUM(quiet) + SUM(accepted) + SUM(hellos_foreign) + SUM(rtt_samples) + SUM(pkts_sent) + SUM(pkts_lost) +
 				` + reasonHaving + ` > 0
 		), hours AS (
-			SELECT device_id, node_id, inbound_id, hour_start, SUM(connects) AS connects, SUM(rejects) AS rejects,
+			SELECT device_id, path_key, via_node_id, via_country, node_id, inbound_id, hour_start, SUM(connects) AS connects, SUM(rejects) AS rejects,
 				SUM(drops) AS drops, SUM(stalls) AS stalls, SUM(online_s) AS online_s,
 				SUM(client_closes) AS client_closes, SUM(freezes) AS freezes, SUM(quiet) AS quiet,
 				SUM(accepted) AS accepted, SUM(hellos_foreign) AS hellos_foreign, SUM(rtt_ms_sum) AS rtt_ms_sum,
 				SUM(rtt_samples) AS rtt_samples, SUM(pkts_sent) AS pkts_sent, SUM(pkts_lost) AS pkts_lost, ` + reasonSums + `
-			FROM base WHERE ? = 1 GROUP BY device_id, node_id, inbound_id, hour_start
+			FROM base WHERE ? = 1 GROUP BY device_id, path_key, via_node_id, via_country, node_id, inbound_id, hour_start
 			HAVING SUM(connects) + SUM(rejects) + SUM(drops) + SUM(stalls) + SUM(online_s) + SUM(client_closes) + SUM(freezes) +
 				SUM(quiet) + SUM(accepted) + SUM(hellos_foreign) + SUM(rtt_samples) + SUM(pkts_sent) + SUM(pkts_lost) +
 				` + reasonHaving + ` > 0
 		)
-		SELECT 0 AS row_type, device_id, node_id, node_name, inbound_id, profile_name, protocol, platform, client, kind,
+		SELECT 0 AS row_type, device_id, path_key, via_node_id, via_country, node_id, node_name, inbound_id, profile_name, protocol, platform, client, kind,
 			connects, rejects, drops, stalls, online_s, client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms_sum, rtt_samples,
 			pkts_sent, pkts_lost, last_hour, 0 AS hour_start, ` + reasonList + `, variant, awg_backend
 		FROM totals
 		UNION ALL
-		SELECT 1, b.device_id, b.node_id, b.node_name, b.inbound_id, b.profile_name, b.protocol, b.platform, b.client, b.kind,
+		SELECT 1, b.device_id, b.path_key, b.via_node_id, b.via_country, b.node_id, b.node_name, b.inbound_id, b.profile_name, b.protocol, b.platform, b.client, b.kind,
 			h.connects, h.rejects, h.drops, h.stalls, h.online_s, h.client_closes, h.freezes, h.quiet, h.accepted, h.hellos_foreign,
 			h.rtt_ms_sum, h.rtt_samples, h.pkts_sent, h.pkts_lost, 0, h.hour_start, ` + reasonListH + `, '', ''
-		FROM hours h JOIN base b USING (device_id, node_id, inbound_id, hour_start)
-		GROUP BY h.device_id, h.node_id, h.inbound_id, h.hour_start
-		ORDER BY device_id, node_name, profile_name, inbound_id, row_type, hour_start`
+		FROM hours h JOIN base b USING (device_id, path_key, node_id, inbound_id, hour_start)
+		GROUP BY h.device_id, h.path_key, h.node_id, h.inbound_id, h.hour_start
+		ORDER BY device_id, path_key, node_name, profile_name, inbound_id, row_type, hour_start`
 	rows, err := s.R.QueryContext(ctx, query, userID, linkHourOf(since), int64(boolInt(byHour)))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	type key struct{ device, node, inbound string }
+	type key struct{ device, path, node, inbound string }
 	indices := map[key]int{}
 	var out []UserLink
 	for rows.Next() {
 		var kind int
 		var r UserLink
 		var last, hour int64
-		dest := []any{&kind, &r.DeviceID, &r.NodeID, &r.NodeName, &r.InboundID, &r.ProfileName, &r.Protocol, &r.Platform,
+		dest := []any{&kind, &r.DeviceID, &r.PathKey, &r.ViaNodeID, &r.ViaCountry, &r.NodeID, &r.NodeName, &r.InboundID, &r.ProfileName, &r.Protocol, &r.Platform,
 			&r.Client, &r.Kind, &r.Connects, &r.Rejects, &r.Drops, &r.Stalls, &r.OnlineS, &r.ClientCloses, &r.Freezes, &r.Quiet,
 			&r.Accepted, &r.HellosForeign, &r.RttMSSum, &r.RttSamples, &r.PktsSent, &r.PktsLost, &last, &hour}
 		dest = append(append(dest, r.LinkReasons.dest()...), &r.Variant, &r.AwgBackend)
 		if err := rows.Scan(dest...); err != nil {
 			return nil, err
 		}
-		k := key{r.DeviceID, r.NodeID, r.InboundID}
+		k := key{r.DeviceID, r.PathKey, r.NodeID, r.InboundID}
 		i, ok := indices[k]
 		if !ok {
 			r.LastHour = fromUnix(last)

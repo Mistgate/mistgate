@@ -395,7 +395,7 @@ func TestAccessSameCountryEntryIsSkippedAndInlandEntryStaysFirst(t *testing.T) {
 	}
 }
 
-func TestAccessRelayTargetSkipsAWGAndCDNInbounds(t *testing.T) {
+func TestAccessRelayTargetSkipsOnlyCDNInbounds(t *testing.T) {
 	type inboundSpec struct {
 		profile string
 		proto   string
@@ -408,9 +408,9 @@ func TestAccessRelayTargetSkipsAWGAndCDNInbounds(t *testing.T) {
 		wantID   string
 		wantNext bool
 	}{
-		{name: "awg only", inbounds: []inboundSpec{{"prf_awg", "awg", 51820, false}}},
+		{name: "awg only", inbounds: []inboundSpec{{"prf_awg", "awg", 51820, false}}, wantID: "inb_de1_awg_51820", wantNext: true},
 		{name: "cdn only", inbounds: []inboundSpec{{"prf_vless", "vless", 443, true}}},
-		{name: "awg before vless", inbounds: []inboundSpec{{"prf_awg", "awg", 51820, false}, {"prf_vless", "vless", 8443, false}}, wantID: "inb_de1_vless_8443", wantNext: true},
+		{name: "awg before vless", inbounds: []inboundSpec{{"prf_awg", "awg", 51820, false}, {"prf_vless", "vless", 8443, false}}, wantID: "inb_de1_awg_51820", wantNext: true},
 		{name: "cdn before vless", inbounds: []inboundSpec{{"prf_vless", "vless", 443, true}, {"prf_vless", "vless", 8443, false}}, wantID: "inb_de1_vless_8443", wantNext: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -516,7 +516,7 @@ func TestAccessRelayNeedsAWayForThePerson(t *testing.T) {
 				f.in.Users[0].AllNodes, f.in.Users[1].AllNodes = false, false
 			}},
 			{name: "entry off in the group", proto: "vless", profile: "prf_vless", mod: func(f *fxb, _ *accRelay) { f.in.Groups[0].DisabledNodes = []string{"nod_nl1"} }},
-			{name: "awg is no relay target", proto: "awg", profile: "prf_awg"},
+			{name: "awg is relay target", proto: "awg", profile: "prf_awg", healthy: true},
 		} {
 			t.Run(fmt.Sprintf("direct=%v/%s", direct, tc.name), func(t *testing.T) {
 				f := newFx().node("de1", "DE", "online").node("nl1", "NL", "online").group("group", tc.profile)

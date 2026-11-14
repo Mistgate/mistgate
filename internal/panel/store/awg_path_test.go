@@ -7,6 +7,8 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -111,6 +113,9 @@ func TestAWGPathCredentialsDoNotChangeDeviceViews(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// The scope carries the relay keys of the device on purpose (the configs through an entry need them): they are the one
+		// thing that must differ, and nothing else in the scope may.
+		got.DeviceScope.PathCreds = nil
 		return got
 	}
 
@@ -122,6 +127,9 @@ func TestAWGPathCredentialsDoNotChangeDeviceViews(t *testing.T) {
 	insertAWGPathCred(t, s, "crd_alice_path", "dev_alice", "usr_alice", profileID, "relay:nod_msk1", directIdx+2, linkNow)
 	insertAWGPathCred(t, s, "crd_bob_path", link.Device.ID, "usr_alice", profileID, "relay:nod_msk1", linkIdx+2, linkNow)
 	after := readViews()
+	if scope, err := s.Access().AWGDeviceScope(ctx, "dev_alice"); err != nil || len(scope.PathCreds) != 1 || scope.PathCreds[0].ID != "crd_alice_path" || scope.PathCreds[0].Path != "relay:nod_msk1" {
+		t.Fatalf("the device scope must carry the device's own relay key: %+v, %v", scope.PathCreds, err)
+	}
 	if !reflect.DeepEqual(before, after) {
 		t.Fatalf("path credentials changed device views:\nbefore: %+v\nafter:  %+v", before, after)
 	}
@@ -130,8 +138,9 @@ func TestAWGPathCredentialsDoNotChangeDeviceViews(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if data.Device.ID != link.Device.ID || len(data.DeviceCreds) != 1 || data.DeviceCreds[0].ID != "crd_bob_awg" || data.AWG[0].ID != "dev_alice" {
-		t.Fatalf("link snapshot must hold the direct key only, next to the direct AWG device list: device=%+v creds=%+v awg=%+v", data.Device, data.DeviceCreds, data.AWG)
+	if data.Device.ID != link.Device.ID || len(data.DeviceCreds) != 2 || data.DeviceCreds[0].ID != "crd_bob_awg" ||
+		data.DeviceCreds[0].Path != "" || data.DeviceCreds[1].ID != "crd_bob_path" || data.DeviceCreds[1].Path != "relay:nod_msk1" || data.AWG[0].ID != "dev_alice" {
+		t.Fatalf("link snapshot did not retain both credential paths next to the direct AWG device list: device=%+v creds=%+v awg=%+v", data.Device, data.DeviceCreds, data.AWG)
 	}
 	// The create paths see the direct key too: a path key neither hides it nor counts for it.
 	again, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_alice", "bob", nil), 5, linkNow, []AWGImplicitWant{{
@@ -141,8 +150,107 @@ func TestAWGPathCredentialsDoNotChangeDeviceViews(t *testing.T) {
 			return AccessCred{}, "", errors.New("a key is already there: nothing to issue")
 		},
 	}})
-	if err != nil || len(again.Added) != 0 || len(again.Creds) != 1 || again.Creds[0].ID != "crd_bob_awg" {
+	if err != nil || len(again.Added) != 0 || len(again.Creds) != 2 || again.Creds[0].ID != "crd_bob_awg" {
 		t.Fatalf("EnsureLinkAWGCreds with a path key next to the direct one = %+v, %v", again, err)
+	}
+}
+
+func TestEnsureKeyPathCredRequiresRelayAndIsIdempotent(t *testing.T) {
+	ctx := context.Background()
+	s, profileID, deviceID, _ := awgPathFixture(t)
+	path := "relay:nod_msk1"
+	issue := func(idx int) (AccessCred, string, error) {
+		return AccessCred{ID: NewID("crd_path_"), Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_path", nil
+	}
+	if _, _, err := s.Access().EnsureKeyPathCred(ctx, deviceID, profileID, path, 32, linkNow, issue); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("path issue without a relay = %v, want ErrNotFound", err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND path = ? AND revoked_at IS NULL`, deviceID, path); got != 0 {
+		t.Fatalf("path credential without a relay = %d, want 0", got)
+	}
+	execT(t, s, `INSERT INTO node (id, name, address, country_code, state, created_at, agent_caps) VALUES ('nod_msk1', 'msk1', '198.51.100.20', 'ZZ', 'active', 1, 'relay-forward/1')`)
+	if err := s.CreateRelay(ctx, Relay{ID: "rly_msk1", InboundID: "inb_de1", ViaNodeID: "nod_msk1", Network: "udp", Port: 8443}, linkNow); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls atomic.Int32
+	issue = func(idx int) (AccessCred, string, error) {
+		id := NewID("crd_path_")
+		calls.Add(1)
+		return AccessCred{ID: id, Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_path", nil
+	}
+	var wg sync.WaitGroup
+	creds := make([]AccessCred, 2)
+	created := make([]bool, 2)
+	errs := make([]error, 2)
+	for i := range creds {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			creds[i], created[i], errs[i] = s.Access().EnsureKeyPathCred(ctx, deviceID, profileID, path, 32, linkNow, issue)
+		}(i)
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("parallel path issue %d: %v", i, err)
+		}
+	}
+	if creds[0].ID == "" || creds[0].ID != creds[1].ID || creds[0].Path != path || created[0] == created[1] {
+		t.Fatalf("parallel results = %+v/%v and %+v/%v; want one stored key", creds[0], created[0], creds[1], created[1])
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND profile_id = ? AND path = ? AND revoked_at IS NULL`, deviceID, profileID, path); got != 1 {
+		t.Fatalf("live path credentials = %d, want one", got)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id = ? AND released_at = 0`, creds[0].ID); got != 1 {
+		t.Fatalf("path peer allocation = %d, want one", got)
+	}
+}
+
+func TestEnsureLinkAWGSkipsAPathWithoutItsRelay(t *testing.T) {
+	ctx := context.Background()
+	s, profileID, _, _ := awgPathFixture(t)
+	direct := AWGImplicitWant{ProfileID: profileID, MaxIdx: 32, Issue: func(int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_bob_awg", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_bob_awg", nil
+	}}
+	path := AWGImplicitWant{ProfileID: profileID, Path: "relay:nod_msk1", MaxIdx: 32, Issue: func(int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_bob_path", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_bob_path", nil
+	}}
+	result, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_alice", "bob", nil), 5, linkNow, []AWGImplicitWant{direct, path})
+	if err != nil || len(result.Added) != 1 || result.Added[0].Path != "" || len(result.Creds) != 1 || result.Creds[0].Path != "" {
+		t.Fatalf("link AWG issue without a relay = %+v, %v; want the direct key only", result, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND path = ? AND revoked_at IS NULL`, result.Device.ID, path.Path); got != 0 {
+		t.Fatalf("path key without its relay = %d, want 0", got)
+	}
+}
+
+func TestEnsureLinkAWGPathIssueFailureKeepsTheDirectCredential(t *testing.T) {
+	ctx := context.Background()
+	s, profileID, _, _ := awgPathFixture(t)
+	setLinkMode(t, s, LinkModeEnforce)
+	execT(t, s, `INSERT INTO node (id, name, address, country_code, state, created_at, agent_caps)
+		VALUES ('nod_msk1', 'msk1', '198.51.100.20', 'ZZ', 'active', 1, 'relay-forward/1')`)
+	if err := s.CreateRelay(ctx, Relay{ID: "rly_msk1", InboundID: "inb_de1", ViaNodeID: "nod_msk1", Network: "udp", Port: 8443}, linkNow); err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_alice", "bob", nil), 5, linkNow, []AWGImplicitWant{
+		{ProfileID: profileID, MaxIdx: 32, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_bob_awg", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_bob_awg", nil
+		}},
+		{ProfileID: profileID, Path: "relay:nod_msk1", MaxIdx: 32, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{}, "", errors.New("temporary key generation failure")
+		}},
+	})
+	if err != nil || len(result.Added) != 1 || result.Added[0].Path != "" || len(result.Creds) != 1 || len(result.FailedPaths) != 1 ||
+		result.FailedPaths[0].ProfileID != profileID || result.FailedPaths[0].Path != "relay:nod_msk1" || result.FailedPaths[0].Err == nil {
+		t.Fatalf("link AWG result after a path issue failure = %+v, %v", result, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND profile_id = ? AND path = '' AND revoked_at IS NULL`, result.Device.ID, profileID); got != 1 {
+		t.Fatalf("direct key after path issue failure = %d, want one", got)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND profile_id = ? AND path = 'relay:nod_msk1' AND revoked_at IS NULL`, result.Device.ID, profileID); got != 0 {
+		t.Fatalf("path key after issue failure = %d, want none", got)
 	}
 }
 

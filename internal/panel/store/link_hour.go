@@ -275,6 +275,7 @@ func (s *Store) NodeLinkSums(ctx context.Context, nodeID string, since time.Time
 // hour with a counter.
 type UserLink struct {
 	DeviceID, NodeID, NodeName, InboundID, ProfileName, Protocol string
+	PathKey, ViaNodeID, ViaCountry                               string
 	Platform, Client, Kind                                       string
 	Connects, Rejects, Drops, Stalls, OnlineS                    uint64
 	ClientCloses, Freezes, Quiet, Accepted, HellosForeign        uint64

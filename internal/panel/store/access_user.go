@@ -101,6 +101,7 @@ type AccessDevice struct {
 type AccessCred struct {
 	ID, DeviceID, UserID, Protocol string
 	ProfileID                      string
+	Path                           string // "" is the direct key; "relay:<node id>" is a relay key
 	SecretEnc                      []byte // vault, AAD = ID
 	DataJSON                       string
 	ConfigEpoch                    int64
@@ -155,9 +156,9 @@ func nullableClientDeviceHash(hash []byte) any {
 func accInsertCredStmts(creds []AccessCred) []Stmt {
 	stmts := make([]Stmt, 0, len(creds))
 	for _, c := range creds {
-		stmts = append(stmts, Stmt{Query: `INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, secret_enc, data_json, config_epoch, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			Args: []any{c.ID, c.DeviceID, c.UserID, c.Protocol, accNullStr(c.ProfileID), c.SecretEnc, c.DataJSON, c.ConfigEpoch, unix(c.CreatedAt)}})
+		stmts = append(stmts, Stmt{Query: `INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, path, secret_enc, data_json, config_epoch, created_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			Args: []any{c.ID, c.DeviceID, c.UserID, c.Protocol, accNullStr(c.ProfileID), c.Path, c.SecretEnc, c.DataJSON, c.ConfigEpoch, unix(c.CreatedAt)}})
 	}
 	return stmts
 }
@@ -828,11 +829,9 @@ func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	return d, nil
 }
 
-// linkDeviceCredsSQLAt reads one live link device of a user and its live direct credentials: ?1 is the user, ?2 the device's
+// linkDeviceCredsSQLAt reads one live link device of a user and all its live credentials: ?1 is the user, ?2 the device's
 // hwid_hash, NULL for the shared device (IS compares NULL too, so one statement serves both). Its aliases are unique so
-// the query can also be the trailing SELECT of a Returning batch. The path credentials (relay keys) are left out: the
-// callers key a credential by protocol and profile, so a path key would stand in for the direct one. Whoever starts to
-// issue them gives AccessCred a path and keys by it.
+// the query can also be the trailing SELECT of a Returning batch. Callers distinguish keys by their path.
 func linkDeviceCredsSQLAt(now time.Time) string {
 	idle, since := deviceIdleSQL("d", now)
 	return `
@@ -842,11 +841,12 @@ func linkDeviceCredsSQLAt(now time.Time) string {
 		coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at,
 		d.created_at AS device_created_at, ` + idle + ` AS idle, ` + since + ` AS idle_since_unix,
 		coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol,
-		coalesce(c.profile_id, '') AS profile_id, coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json,
+		coalesce(c.profile_id, '') AS profile_id, coalesce(c.path, '') AS credential_path,
+		coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json,
 		coalesce(c.config_epoch, 0) AS config_epoch, coalesce(c.created_at, 0) AS credential_created_at
-	FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.path = ''
+	FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
 	WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND d.hwid_hash IS ?2 AND d.kind = 'link'
-	ORDER BY c.protocol, c.profile_id, c.id`
+	ORDER BY c.protocol, c.profile_id, c.path, c.id`
 }
 
 // hwidArg is the ?2 of linkDeviceCredsSQL: NULL, not an empty blob, for the shared device.
@@ -906,11 +906,11 @@ func scanLinkDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) 
 	var device AccessDevice
 	var shared bool
 	var first, last, deviceCreated, idle, idleSince, configEpoch, credCreated int64
-	var id, protocol, profile, data string
+	var id, protocol, profile, path, data string
 	var secret []byte
 	if err := row.Scan(&device.ID, &device.UserID, &device.Platform, &device.Model, &device.OSVersion, &device.Client, &shared,
 		&device.KeyHash, &device.EnrolTokenHash,
-		&first, &last, &deviceCreated, &idle, &idleSince, &id, &protocol, &profile, &secret, &data, &configEpoch, &credCreated); err != nil {
+		&first, &last, &deviceCreated, &idle, &idleSince, &id, &protocol, &profile, &path, &secret, &data, &configEpoch, &credCreated); err != nil {
 		return AccessDevice{}, AccessCred{}, false, err
 	}
 	device.Kind, device.Implicit = DeviceKindLink, shared
@@ -922,7 +922,7 @@ func scanLinkDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) 
 	if id == "" {
 		return device, AccessCred{}, false, nil
 	}
-	cred := AccessCred{ID: id, DeviceID: device.ID, UserID: device.UserID, Protocol: protocol, ProfileID: profile,
+	cred := AccessCred{ID: id, DeviceID: device.ID, UserID: device.UserID, Protocol: protocol, ProfileID: profile, Path: path,
 		SecretEnc: secret, DataJSON: data, ConfigEpoch: configEpoch, CreatedAt: fromUnix(credCreated)}
 	return device, cred, true, nil
 }

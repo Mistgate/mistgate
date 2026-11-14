@@ -162,6 +162,9 @@ type Service struct {
 	credMu sync.Mutex
 	creds  map[string]store.ProbeCredRow // inbound id -> credential (cache of the table)
 
+	awgProbeMu    sync.Mutex
+	awgProbeLocks map[string]chan struct{} // one client probe at a time for each inbound's shared probe credential
+
 	snapMu sync.Mutex
 	snap   *snapshot
 

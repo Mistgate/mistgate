@@ -112,9 +112,35 @@ func classify(err error) (code, detail string) {
 	return "timeout", detail
 }
 
+func (s *Service) lockAWGProbe(ctx context.Context, inboundID string) (func(), bool) {
+	s.awgProbeMu.Lock()
+	if s.awgProbeLocks == nil {
+		s.awgProbeLocks = make(map[string]chan struct{})
+	}
+	gate := s.awgProbeLocks[inboundID]
+	if gate == nil {
+		gate = make(chan struct{}, 1)
+		s.awgProbeLocks[inboundID] = gate
+	}
+	s.awgProbeMu.Unlock()
+	select {
+	case gate <- struct{}{}:
+		return func() { <-gate }, true
+	case <-ctx.Done():
+		return nil, false
+	}
+}
+
 // attempt is one try: dial, probe, close. skipped reports a configuration the dialer has no client for (nothing
 // is recorded then).
 func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped bool) {
+	if t.in.Protocol == "awg" {
+		unlock, ok := s.lockAWGProbe(ctx, t.in.ID)
+		if !ok {
+			return Result{}, true
+		}
+		defer unlock()
+	}
 	cred, secret, err := s.probeCredSecret(ctx, t)
 	if err != nil {
 		s.log.Warn("health: probe credential unreadable", "inbound", t.in.ID, "err", err)

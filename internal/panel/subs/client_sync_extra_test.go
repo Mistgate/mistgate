@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -230,6 +231,48 @@ func TestSyncVLESSPaths(t *testing.T) {
 	}
 	if b.etg == withFI.etg {
 		t.Error("the ETag did not follow the relay's country")
+	}
+}
+
+func TestSyncAWGRelayPathCarriesItsOwnKeyAndTunnelAddress(t *testing.T) {
+	e := newSyncEnv(t, nil)
+	if _, err := e.st.W.Exec(`UPDATE node SET name = 'de1', address = '192.0.2.10', country_code = 'DE' WHERE id = 'nod_1'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, agent_caps, created_at)
+		VALUES ('nod_msk1', 'msk1', '198.51.100.20', 'ZZ', 'active', 'relay-forward/1', 2)`); err != nil {
+		t.Fatal(err)
+	}
+	inbound := e.inboundOf(e.awg)
+	if _, err := e.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
+		VALUES ('rly_awg_msk1', ?, 'nod_msk1', 'udp', 8443, 1, 'active', ?, 1, 1)`, inbound,
+		`{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		t.Fatal(err)
+	}
+	_, token := e.person("alice", nil)
+	device := e.enrolDevice(token, hwidA)
+	body := e.mustSync(device.Key)
+	paths := body.paths("awg")
+	if len(paths) != 2 || paths[0].Via != "direct" || paths[1].Via != "relay" || paths[1].ViaCountry != "ZZ" {
+		t.Fatalf("AWG direct/relay paths = %+v\n%s", paths, body.raw)
+	}
+	endpoint := func(path syncPath) map[string]any {
+		t.Helper()
+		value, ok := path.Settings["endpoint"].(map[string]any)
+		if !ok {
+			t.Fatalf("AWG endpoint is missing: %v", path.Settings)
+		}
+		return value
+	}
+	directEndpoint, relayEndpoint := endpoint(paths[0]), endpoint(paths[1])
+	if directEndpoint["host"] != "192.0.2.10" || relayEndpoint["host"] != "198.51.100.20" || relayEndpoint["port"] != float64(8443) ||
+		paths[0].Settings["private_key"] == "" || paths[0].Settings["private_key"] == paths[1].Settings["private_key"] ||
+		paths[0].Settings["address_v4"] == "" || paths[0].Settings["address_v4"] == paths[1].Settings["address_v4"] ||
+		!reflect.DeepEqual(paths[0].Settings["params"], paths[1].Settings["params"]) || paths[0].Settings["mtu"] != paths[1].Settings["mtu"] {
+		t.Errorf("direct and relay AWG settings = %+v / %+v", paths[0].Settings, paths[1].Settings)
+	}
+	if again := e.mustSync(device.Key); again.raw != body.raw || e.count(`SELECT count(*) FROM device_credential WHERE device_id = ? AND protocol = 'awg' AND revoked_at IS NULL`, device.DeviceID) != 2 {
+		t.Errorf("a second sync changed the path keys or response: %s", again.raw)
 	}
 }
 

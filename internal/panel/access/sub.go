@@ -286,12 +286,12 @@ func (s *Service) PreviewSubscription(ctx context.Context, userID string) (SubVi
 	return v, link, nil
 }
 
-// credKey names a credential in the secrets map: a per-device protocol holds one credential per profile.
-func credKey(protocol, profileID string) string {
+// credKey names a credential in the secrets map: AWG credentials are distinct for each profile and connection path.
+func credKey(protocol, profileID, path string) string {
 	if profileID == "" {
 		return protocol
 	}
-	return protocol + "/" + profileID
+	return protocol + "/" + profileID + "/" + path
 }
 
 func subscriptionProtocolRank(protocol string) int {
@@ -445,6 +445,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 
 	rd := requestDevice{dev: data.Device, creds: data.DeviceCreds, hash: hash}
 	g, full := data.Group, data.Inbounds
+	relaysOf := s.subRelays(data.Relays, full, g, u)
 	if touch && opt.EnrolledDevice != nil {
 		// The client API's device, known by its key: the one place where the credentials of an enrolled device are issued.
 		// The basic path below refuses such a device by design, so it is never reached from here.
@@ -453,7 +454,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			return v, nil
 		}
 		wasIdle := rd.dev.Idle && len(rd.dev.Protocols) > 0
-		rd, err = s.ensureClientAPICreds(ctx, u, g, full, opt, rd)
+		rd, err = s.ensureClientAPICreds(ctx, u, g, full, relaysOf, opt, rd)
 		if err != nil {
 			if refusal, _ := s.refusalOf(u, err); refusal != "" {
 				v.Refusal = refusal
@@ -492,7 +493,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			}
 			changed = changed || dropped > 0
 		} else if v.Refusal == "" && opt.Format == plugin.FormatMihomo {
-			rd, v.Refusal = s.ensureMihomoAWG(ctx, u, g, full, opt.Device, rd, data)
+			rd, v.Refusal = s.ensureMihomoAWG(ctx, u, g, full, relaysOf, opt.Device, rd, data)
 			changed = rd.added
 		}
 		if v.Refusal != "" {
@@ -521,7 +522,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if err != nil {
 			return SubView{}, err
 		}
-		secrets[credKey(c.Protocol, c.ProfileID)] = string(pt)
+		secrets[credKey(c.Protocol, c.ProfileID, c.Path)] = string(pt)
 	}
 	var telegramSecret string // the secret of the person's Telegram key; "" without one
 	if u.AppTelegram && data.TelegramCred.ID != "" {
@@ -555,7 +556,6 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			capacityMbps[f.Node.ID] = f.Node.BandwidthMbps
 		}
 	}
-	relaysOf := s.subRelays(data.Relays, full, g, u)
 	for _, rs := range relaysOf { // a twin's load is the larger of its entry's and its exit's
 		for _, l := range rs {
 			networkNodeIDs = append(networkNodeIDs, l.ViaNodeID)
@@ -613,7 +613,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		key := f.Profile.Protocol
 		if protocols.IsPerDevice(proto) {
-			key = credKey(key, f.Profile.ID)
+			key = credKey(key, f.Profile.ID, "")
 		}
 		secret := secrets[key]
 		if telegram {
@@ -707,6 +707,13 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 				twin.Mark, twin.PathKey = ViaMark(l.ViaNodeCountry), "relay:"+l.ViaNodeID
 				twin.LoadPercent = maxPercent(srv.LoadPercent, networkUsage[l.ViaNodeID].LoadPercent)
 				tin := twinInput(in, f, spec, l)
+				if f.Profile.Protocol == awg.ID {
+					pathSecret := secrets[credKey(awg.ID, f.Profile.ID, twin.PathKey)]
+					if pathSecret == "" {
+						continue
+					}
+					tin.Secret, tin.Peer, tin.NodeAddr = pathSecret, json.RawMessage(pathSecret), l.ViaNodeAddress
+				}
 				if opt.Name != nil {
 					tin.DisplayName = opt.Name(twin)
 				}
@@ -996,14 +1003,14 @@ func (s *Service) placeholderSecrets(u store.AccessUser, protocolsHeld []string,
 // announced, in one guarded store batch that re-checks the device's key and the link it was enrolled under; unlike basic link
 // fetches this path is tied to the key that authorised the request. When the snapshot of the request shows nothing missing the
 // store is not called at all (nothing would be written, and the snapshot is as fresh as any basic fetch's).
-func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, opt SubOptions, rd requestDevice) (requestDevice, error) {
+func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, relays map[string][]store.RelayLink, opt SubOptions, rd requestDevice) (requestDevice, error) {
 	dev := *opt.EnrolledDevice
 	dev.UserID, dev.HWIDHash = u.ID, slices.Clone(rd.hash)
 	if dev.ID == "" || len(dev.KeyHash) == 0 {
 		return rd, store.ErrNotFound
 	}
 	// AmneziaWG does not follow the owner's link switch (opt.NoLinkAWG): the app asks for it with its caps and gets it while it may.
-	want := s.awgWants(u, g, full, dev.ID, func(version string) bool { return protocols.HasCapability(opt.Capabilities, "awg", version) })
+	want := s.awgWants(u, g, full, relays, dev.ID, func(version string) bool { return protocols.HasCapability(opt.Capabilities, "awg", version) })
 	if s.enrolledDeviceComplete(u, dev, rd, want) {
 		return rd, nil
 	}
@@ -1015,6 +1022,12 @@ func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, 
 	}
 	for _, profileID := range result.FullProfiles {
 		s.log.Warn("access: AWG profile network is full for a client API device", "code", "client_api_awg_network_full", "profile", profileID, "err", store.ErrAccessSubnetFull)
+	}
+	for _, full := range result.FullPaths {
+		s.log.Warn("access: AWG relay key network is full for a client API device", "code", "awg_path_network_full", "profile", full.ProfileID, "path", full.Path, "err", store.ErrAccessSubnetFull)
+	}
+	for _, failed := range result.FailedPaths {
+		s.log.Warn("access: cannot issue an AWG relay key for a client API device", "code", "awg_path_credential_issue_failed", "profile", failed.ProfileID, "path", failed.Path, "err", failed.Err)
 	}
 	if len(result.Added) > 0 {
 		s.notify.StateChanged()
@@ -1035,16 +1048,18 @@ func (s *Service) enrolledDeviceComplete(u store.AccessUser, dev store.AccessDev
 	have := map[string]bool{}
 	profiles := map[string]bool{}
 	for _, c := range rd.creds {
-		have[c.Protocol] = true
+		if c.Path == "" {
+			have[c.Protocol] = true
+		}
 		if c.ProfileID != "" {
-			profiles[c.ProfileID] = true
+			profiles[c.ProfileID+"\x00"+c.Path] = true
 		}
 	}
 	if len(s.missingProtocols(u.AppHapp, u.AppAmnezia, u.AppTelegram, have)) != 0 {
 		return false
 	}
 	for _, w := range want {
-		if !profiles[w.ProfileID] {
+		if !profiles[w.ProfileID+"\x00"+w.Path] {
 			return false
 		}
 	}
@@ -1054,32 +1069,52 @@ func (s *Service) enrolledDeviceComplete(u store.AccessUser, dev store.AccessDev
 // awgWants lists the AmneziaWG profiles the user can use, each with the way to issue its credential to deviceID. keep, when set,
 // decides by the version of a profile whether the device is to get it. A profile whose secrets cannot be opened or whose network
 // is invalid is logged and left out; the subscription itself must not fail for it.
-func (s *Service) awgWants(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, deviceID string, keep func(version string) bool) []store.AWGImplicitWant {
+func (s *Service) awgWants(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, relays map[string][]store.RelayLink, deviceID string, keep func(version string) bool) []store.AWGImplicitWant {
 	proto, ok := s.reg.Get(awg.ID)
 	if !ok {
 		return nil
 	}
 	var want []store.AWGImplicitWant
 	seen := map[string]bool{}
+	skipped := map[string]bool{} // profiles that are left out: logged once, not once for each of their inbounds
 	for _, f := range full {
-		if f.Profile.Protocol != awg.ID || seen[f.Profile.ID] || !s.usable(f, g, u) {
+		if f.Profile.Protocol != awg.ID || skipped[f.Profile.ID] || !s.usable(f, g, u) {
 			continue
 		}
-		seen[f.Profile.ID] = true
 		merged, err := s.mergedSettings(f.Profile)
 		if err != nil {
 			s.log.Error("access: cannot open profile secrets", "code", "awg_profile_settings_open_failed", "profile", f.Profile.ID, "err", err)
+			skipped[f.Profile.ID] = true
 			continue
 		}
 		if keep != nil && !keep(awgVersion(merged)) {
+			skipped[f.Profile.ID] = true
 			continue
 		}
 		maxIdx, err := awg.MaxPeerIndex(merged)
 		if err != nil {
 			s.log.Error("access: bad AWG network", "code", "awg_profile_network_invalid", "profile", f.Profile.ID, "err", err)
+			skipped[f.Profile.ID] = true
 			continue
 		}
-		want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, MaxIdx: maxIdx, Issue: s.awgIssuer(proto, u.ID, deviceID, f.Profile.ID, merged)})
+		issue := s.awgIssuer(proto, u.ID, deviceID, f.Profile.ID, merged)
+		if key := f.Profile.ID + "\x00"; !seen[key] {
+			want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, MaxIdx: maxIdx, Issue: issue})
+			seen[key] = true
+		}
+		spec, err := s.buildSpec(f, merged)
+		if err != nil || relayUnsupported(awg.ID, spec) != "" {
+			continue
+		}
+		for _, l := range relays[f.Inbound.ID] {
+			path := "relay:" + l.ViaNodeID
+			key := f.Profile.ID + "\x00" + path
+			if seen[key] {
+				continue
+			}
+			want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, Path: path, MaxIdx: maxIdx, Issue: issue})
+			seen[key] = true
+		}
 	}
 	return want
 }
@@ -1099,7 +1134,7 @@ func (s *Service) awgMinClients(settings string) []protocols.ClientReq {
 // proxy is skipped; the subscription itself must not fail for it, nor for the ceiling of devices in TRACK (the shared device
 // then). The device may be born here (a person with only the AmneziaVPN access has no link credential to be born with): it
 // is refused like in ensureLinkCreds, and refusal says so.
-func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, hint DeviceHint, rd requestDevice, data store.SubscriptionData) (requestDevice, string) {
+func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, relays map[string][]store.RelayLink, hint DeviceHint, rd requestDevice, data store.SubscriptionData) (requestDevice, string) {
 	if _, ok := s.reg.Get(awg.ID); !ok {
 		return rd, ""
 	}
@@ -1109,7 +1144,7 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 	if template.ID == "" {
 		template.ID = store.NewID("dev_")
 	}
-	want := s.awgWants(u, g, full, template.ID, nil)
+	want := s.awgWants(u, g, full, relays, template.ID, nil)
 	if len(want) == 0 {
 		return rd, ""
 	}
@@ -1125,13 +1160,19 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 		} else if fallback {
 			// No device of its own for this HWID: the shared device holds the proxies, as for an app without a HWID.
 			hint.HWID = ""
-			return s.ensureMihomoAWG(ctx, u, g, full, hint, requestDevice{added: rd.added}, data)
+			return s.ensureMihomoAWG(ctx, u, g, full, relays, hint, requestDevice{added: rd.added}, data)
 		}
 		s.log.Warn("access: cannot issue AWG credentials for a Mihomo subscription", "code", "mihomo_awg_credential_issue_failed", "user", u.ID, "err", err)
 		return rd, ""
 	}
 	for _, profileID := range result.FullProfiles {
 		s.log.Warn("access: AWG profile network is full for a Mihomo subscription", "code", "mihomo_awg_network_full", "user", u.ID, "profile", profileID, "err", store.ErrAccessSubnetFull)
+	}
+	for _, full := range result.FullPaths {
+		s.log.Warn("access: AWG relay key network is full for a Mihomo subscription", "code", "awg_path_network_full", "user", u.ID, "profile", full.ProfileID, "path", full.Path, "err", store.ErrAccessSubnetFull)
+	}
+	for _, failed := range result.FailedPaths {
+		s.log.Warn("access: cannot issue an AWG relay key for a Mihomo subscription", "code", "awg_path_credential_issue_failed", "user", u.ID, "profile", failed.ProfileID, "path", failed.Path, "err", failed.Err)
 	}
 	if result.Device.ID == "" {
 		return rd, ""

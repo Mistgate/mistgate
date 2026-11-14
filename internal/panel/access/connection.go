@@ -62,6 +62,7 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 		hasLinks2 := connectiondiag.SupportsHysteria2Links2(r.Protocol, links2ByNode[r.NodeID])
 		msg := &adminv1.DeviceConnection{
 			DeviceId: r.DeviceID, NodeId: r.NodeID, NodeName: r.NodeName, InboundId: r.InboundID, ProfileName: r.ProfileName,
+			ViaCountry: r.ViaCountry, ViaNodeId: r.ViaNodeID,
 			Protocol: r.Protocol, Connects: clamp32(r.Connects), Rejects: clamp32(r.Rejects), Drops: clamp32(r.Drops),
 			Stalls: clamp32(r.Stalls), OnlineS: r.OnlineS, LastHourUnix: r.LastHour.Unix(), Platform: r.Platform,
 			Client: r.Client, Kind: store.DeviceKindName(r.Kind), Hours: userLinkHours(r.Hours, hasLinks2),

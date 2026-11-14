@@ -1,11 +1,13 @@
 package access
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -24,6 +26,7 @@ import (
 // DeviceConfig is the config of a device on one node.
 type DeviceConfig struct {
 	InboundID, NodeID, NodeName, CountryCode string
+	ViaCountry, ViaNodeID                    string
 	Server                                   string // the public name of the node ("Germany 2"): the user page shows this, never NodeName
 	ProfileName, AWGVersion                  string // "3.1" | "2.0"
 	Conf                                     string // WireGuard-style .conf (AmneziaVPN and AmneziaWG import it)
@@ -158,6 +161,11 @@ type deviceScope struct {
 	proto   protocols.Protocol
 	merged  json.RawMessage
 	ins     []store.AccessInboundFull
+	// relays and pathCreds come with the scope (loadDevice) so that rendering the configs through an entry costs no read of
+	// its own; relaysKnown is false for a scope that was put together by hand (AddAWGDevice), which reads the relays itself.
+	relays      []store.RelayLink
+	relaysKnown bool
+	pathCreds   map[string]store.AccessCred // by path; renderDeviceConfigs adds what it issues
 }
 
 // loadDevice finds a live AWG device and what goes with it. owner != "" restricts it to that user's devices; any
@@ -169,7 +177,11 @@ func (s *Service) loadDevice(ctx context.Context, owner, deviceID string) (*devi
 	} else if err != nil {
 		return nil, s.internal("get device", err)
 	}
-	sc := &deviceScope{user: loaded.User, group: loaded.Group, dev: loaded.Device, profile: loaded.Profile}
+	sc := &deviceScope{user: loaded.User, group: loaded.Group, dev: loaded.Device, profile: loaded.Profile,
+		relays: loaded.Relays, relaysKnown: true, pathCreds: map[string]store.AccessCred{}}
+	for _, c := range loaded.PathCreds {
+		sc.pathCreds[c.Path] = c
+	}
 	if sc.proto, err = s.awgPlugin(); err != nil {
 		return nil, err
 	}
@@ -363,6 +375,7 @@ func (s *Service) RotateDevice(ctx context.Context, by, owner, deviceID string) 
 		return store.AccessAWGDevice{}, nil, s.internal("rotate device", err)
 	}
 	s.notify.StateChanged()
+	sc.pathCreds = map[string]store.AccessCred{} // the rotation revoked the keys of the paths: the next render issues new ones
 	s.audit(ctx, by, "device_rotate", map[string]any{"user": sc.user.ID, "device": deviceID, "profile": sc.profile.ID})
 	if sc.dev, err = a.AWGDevice(ctx, deviceID); err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("get device", err)
@@ -449,6 +462,14 @@ func (s *Service) RevokeOwnDevice(ctx context.Context, by, owner, deviceID strin
 	return nil
 }
 
+// viaLabel is what a config through an entry node adds to the server's name: the entry's country, never its node name.
+func viaLabel(country string) string {
+	if cc := strings.ToUpper(strings.TrimSpace(country)); cc != "" {
+		return " · via " + cc
+	}
+	return " · via entry"
+}
+
 // renderDeviceConfigs renders the .conf and the vpn:// key of the device for each usable inbound of its profile.
 // markEpoch records the profile's current epoch on the credential (the user now holds current configs); recordDNS records
 // the DNS each config carries (the key now holds it), what "stale DNS" is measured against.
@@ -458,6 +479,15 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		return nil, s.internal("open device key", err)
 	}
 	nodeDNS := s.newNodeDNS(ctx, sc.user.ID)
+	relayLinks := sc.relays
+	if !sc.relaysKnown {
+		var err error
+		if relayLinks, err = s.st.RelayLinks(ctx, store.RelayFilter{}); err != nil {
+			return nil, s.internal("read relays for device configs", err)
+		}
+	}
+	relaysOf := s.subRelays(relayLinks, sc.ins, sc.group, sc.user)
+	maxIdx, maxIdxErr := awg.MaxPeerIndex(sc.merged)
 	version := awgVersion(sc.merged)
 	var reqs []protocols.ClientReq
 	for _, r := range protocols.MinClientsOf(sc.proto, sc.merged) {
@@ -472,6 +502,11 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	title, brand, lang := s.keyNaming(ctx)
 	public, names, files := keyNames(title, brand, lang, nodes)
 	var out []DeviceConfig
+	pathAdded := false
+	fileUsed := map[string]bool{}
+	for _, name := range files {
+		fileUsed[name] = true
+	}
 	held := map[string]string{} // node id -> the resolver pair the config of that node carries
 	for i, f := range sc.ins {
 		spec, err := s.buildSpec(f, sc.merged)
@@ -513,6 +548,70 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			ConfFilename: files[i], Stale: sc.dev.Stale(),
 			MinClients: reqs, Warnings: warnings,
 		})
+		if maxIdxErr != nil {
+			continue
+		}
+		if relayUnsupported(awg.ID, spec) != "" {
+			continue
+		}
+		for _, relay := range relaysOf[f.Inbound.ID] {
+			path := "relay:" + relay.ViaNodeID
+			cred, have := sc.pathCreds[path]
+			if !have {
+				var created bool
+				var err error
+				cred, created, err = s.st.Access().EnsureKeyPathCred(ctx, sc.dev.ID, sc.profile.ID, path, maxIdx, s.now(),
+					s.awgIssuer(sc.proto, sc.user.ID, sc.dev.ID, sc.profile.ID, sc.merged))
+				if errors.Is(err, store.ErrAccessSubnetFull) {
+					s.log.Warn("access: AWG relay key network is full for a static device", "code", "awg_path_network_full", "user", sc.user.ID,
+						"device", sc.dev.ID, "profile", sc.profile.ID, "path", path, "err", err)
+					continue
+				}
+				if errors.Is(err, store.ErrNotFound) {
+					continue // the device or relay ceased to be eligible while its configs were being rendered
+				}
+				if err != nil {
+					s.log.Warn("access: cannot issue an AWG relay key for a static device", "code", "awg_path_credential_issue_failed", "user", sc.user.ID,
+						"device", sc.dev.ID, "profile", sc.profile.ID, "path", path, "err", err)
+					continue
+				}
+				if sc.pathCreds == nil {
+					sc.pathCreds = map[string]store.AccessCred{}
+				}
+				sc.pathCreds[path] = cred
+				pathAdded = pathAdded || created
+			}
+			pathSecret, err := s.vault.Open(cred.SecretEnc, cred.ID)
+			if err != nil {
+				s.log.Error("access: cannot open an AWG relay key for a static device", "code", "awg_path_credential_open_failed", "device", sc.dev.ID, "path", path, "err", err)
+				continue
+			}
+			viaMark := viaLabel(relay.ViaNodeCountry)
+			pathInput := twinInput(in, f, spec, relay)
+			pathInput.Secret, pathInput.Peer, pathInput.NodeAddr = string(pathSecret), pathSecret, relay.ViaNodeAddress
+			pathInput.DisplayName = names[i] + viaMark
+			pathInput.Format = plugin.FormatAWGConf
+			pathConf, confOK := sc.proto.Render(pathInput)
+			pathInput.Format = plugin.FormatAmneziaVPN
+			pathKey, keyOK := sc.proto.Render(pathInput)
+			if !confOK || !keyOK {
+				s.log.Error("access: cannot render an AWG relay config", "code", "awg_path_config_render_failed", "inbound", f.Inbound.ID, "device", sc.dev.ID, "via", relay.ViaNodeID)
+				continue
+			}
+			// The file is named by the entry's country, never by its node name; a second entry of that country gets a number.
+			base := strings.TrimSuffix(files[i], ".conf") + "-via-" + cmp.Or(slug(relay.ViaNodeCountry), "entry")
+			filename := base + ".conf"
+			for k := 2; fileUsed[filename]; k++ {
+				filename = base + "-" + strconv.Itoa(k) + ".conf"
+			}
+			fileUsed[filename] = true
+			out = append(out, DeviceConfig{
+				InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode,
+				ViaCountry: relay.ViaNodeCountry, ViaNodeID: relay.ViaNodeID, Server: public[i] + viaMark,
+				ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(pathConf.Data), VPNKey: string(pathKey.Data),
+				ConfFilename: filename, Stale: sc.dev.Stale(), MinClients: reqs, Warnings: warnings,
+			})
+		}
 	}
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
@@ -529,6 +628,9 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		if err := s.st.Access().RecordDeviceConfig(ctx, sc.dev.CredID, epoch, sig); err != nil {
 			return nil, s.internal("record the device config", err)
 		}
+	}
+	if pathAdded {
+		s.notify.StateChanged()
 	}
 	return out, nil
 }

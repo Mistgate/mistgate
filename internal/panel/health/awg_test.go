@@ -3,6 +3,7 @@
 package health
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -415,5 +416,78 @@ func TestAWGProbeRoundsDoNotLeakDevices(t *testing.T) {
 	}
 	if after := settled(); after > base+4 { // a leaking device is dozens of goroutines each
 		t.Fatalf("goroutines: %d before %d rounds, %d after", base, rounds, after)
+	}
+}
+
+type resultTunnel struct{}
+
+func (resultTunnel) DialContext(context.Context, string, string) (net.Conn, error) { return nil, nil }
+func (resultTunnel) Close() error                                                  { return nil }
+func (resultTunnel) ProbeResult() Result {
+	return Result{Status: adminv1.CheckStatus_CHECK_STATUS_OK}
+}
+
+func TestAWGAttemptsForOneInboundDoNotOverlap(t *testing.T) {
+	r := newAWGRig(t)
+	id := r.deploy("awg", "", true)
+	sn, err := r.s.snapshot(r.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := sn.targets[id]
+	firstEntered := make(chan struct{})
+	secondEntered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var calls, active, peak atomic.Int32
+	r.s.cfg.Dialers["awg"] = func(ctx context.Context, _ Target, _ DialOptions) (Tunnel, error) {
+		call := calls.Add(1)
+		if call == 1 {
+			close(firstEntered)
+		} else {
+			secondEntered <- struct{}{}
+		}
+		current := active.Add(1)
+		for old := peak.Load(); current > old && !peak.CompareAndSwap(old, current); old = peak.Load() {
+		}
+		select {
+		case <-release:
+		case <-ctx.Done():
+		}
+		active.Add(-1)
+		return resultTunnel{}, nil
+	}
+	type outcome struct {
+		status  adminv1.CheckStatus
+		skipped bool
+	}
+	firstDone, secondDone := make(chan outcome, 1), make(chan outcome, 1)
+	go func() {
+		res, skipped := r.s.attempt(r.ctx, target)
+		firstDone <- outcome{res.Status, skipped}
+	}()
+	<-firstEntered
+	go func() {
+		res, skipped := r.s.attempt(r.ctx, target)
+		secondDone <- outcome{res.Status, skipped}
+	}()
+	select {
+	case <-secondEntered:
+		close(release)
+		t.Fatal("the second AWG dial started while the first attempt still owned the probe key")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	for name, done := range map[string]<-chan outcome{"first": firstDone, "second": secondDone} {
+		select {
+		case got := <-done:
+			if got.skipped || got.status != adminv1.CheckStatus_CHECK_STATUS_OK {
+				t.Errorf("%s attempt = %+v", name, got)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s AWG attempt did not finish", name)
+		}
+	}
+	if calls.Load() != 2 || peak.Load() != 1 {
+		t.Fatalf("AWG dial calls=%d, peak overlap=%d; want two calls with no overlap", calls.Load(), peak.Load())
 	}
 }

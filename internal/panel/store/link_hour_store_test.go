@@ -15,8 +15,8 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	base := time.Date(2026, 10, 23, 12, 20, 0, 0, time.UTC)
 	hour := base.Unix() / 3600 * 3600
 	for _, q := range []string{
-		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_lh_a', 'de1', '203.0.113.10', 'active', 1)`,
-		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_lh_b', 'nl1', '203.0.113.11', 'active', 1)`,
+		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_lh_a', 'de1', '192.0.2.10', 'active', 1)`,
+		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_lh_b', 'nl1', '192.0.2.11', 'active', 1)`,
 	} {
 		if _, err := st.W.ExecContext(ctx, q); err != nil {
 			t.Fatal(err)
@@ -219,8 +219,20 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	}
 
 	// the person: per device, node and inbound; node name, then profile name; the other person's key is not here
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, country_code, state, created_at)
+		VALUES ('nod_msk1', 'msk1', '198.51.100.20', 'ZZ', 'retired', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, path, secret_enc, data_json, created_at)
+		VALUES ('crd_lh_awg_path', 'dev_usr_lh', 'usr_lh', 'awg', 'prf_lh_awg', 'relay:nod_msk1', ?, '{}', ?)`, []byte{1}, base.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, connects)
+		VALUES ('nod_lh_a', ?, 'inb_lh_awg', 'crd_lh_awg_path', 'usr_lh', 1)`, hour); err != nil {
+		t.Fatal(err)
+	}
 	links, err := st.UserLinks(ctx, "usr_lh", base)
-	if err != nil || len(links) != 2 {
+	if err != nil || len(links) != 3 {
 		t.Fatalf("UserLinks = %+v, %v", links, err)
 	}
 	if want := (UserLink{DeviceID: "dev_usr_lh", NodeID: "nod_lh_a", NodeName: "de1", InboundID: "inb_lh_hy2", ProfileName: "Fast", Protocol: "hysteria2",
@@ -234,11 +246,18 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 		Connects: 4, Rejects: 2, Stalls: 1, OnlineS: 100, LastHour: time.Unix(hour+3600, 0)}); !sameLink(links[1], want) {
 		t.Errorf("second row = %+v, want %+v", links[1], want)
 	}
+	if want := (UserLink{DeviceID: "dev_usr_lh", PathKey: "relay:nod_msk1", ViaNodeID: "nod_msk1", ViaCountry: "ZZ",
+		NodeID: "nod_lh_a", NodeName: "de1", InboundID: "inb_lh_awg", ProfileName: "Home AWG", Protocol: "awg",
+		Platform: "android", Client: "Happ/3.4.2", Kind: "link", Connects: 1, LastHour: time.Unix(hour, 0)}); !sameLink(links[2], want) {
+		t.Errorf("relay path row = %+v, want %+v", links[2], want)
+	}
 	links, err = st.UserLinksByHour(ctx, "usr_lh", base, true)
-	if err != nil || len(links) != 2 || len(links[0].Hours) != 1 || links[0].Hours[0] != (LinkHourSums{HourStart: hour, Connects: 3, Drops: 1,
+	if err != nil || len(links) != 3 || len(links[0].Hours) != 1 || links[0].Hours[0] != (LinkHourSums{HourStart: hour, Connects: 3, Drops: 1,
 		ClientCloses: 2, Freezes: 3, Quiet: 4, RttMSSum: 1500, RttSamples: 3, PktsSent: 500, PktsLost: 5}) ||
 		len(links[1].Hours) != 2 || links[1].Hours[0] != (LinkHourSums{HourStart: hour, Connects: 4, Stalls: 1, OnlineS: 100}) ||
-		links[1].Hours[1] != (LinkHourSums{HourStart: hour + 3600, Rejects: 2}) {
+		links[1].Hours[1] != (LinkHourSums{HourStart: hour + 3600, Rejects: 2}) ||
+		links[2].PathKey != "relay:nod_msk1" || links[2].ViaNodeID != "nod_msk1" || links[2].ViaCountry != "ZZ" ||
+		len(links[2].Hours) != 1 || links[2].Hours[0] != (LinkHourSums{HourStart: hour, Connects: 1}) {
 		t.Errorf("user by_hour = %+v, %v", links, err)
 	}
 	if links, err = st.UserLinks(ctx, "usr_lh_other", base); err != nil || len(links) != 2 || links[0].Rejects != 7 || links[1].NodeID != "nod_lh_b" || links[1].Connects != 9 {
@@ -252,8 +271,8 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	if n, err := st.PruneLinkHours(ctx, base); err != nil || n != 1 {
 		t.Errorf("pruned %d, %v, want the one row of three hours earlier", n, err)
 	}
-	if n, err := st.PruneLinkHours(ctx, base.Add(time.Hour)); err != nil || n != 6 {
-		t.Errorf("pruned %d, %v, want the six rows of the first hour", n, err)
+	if n, err := st.PruneLinkHours(ctx, base.Add(time.Hour)); err != nil || n != 7 {
+		t.Errorf("pruned %d, %v, want the seven rows of the first hour", n, err)
 	}
 	if err := st.R.QueryRowContext(ctx, `SELECT COUNT(*) FROM link_hour`).Scan(&rows); err != nil || rows != 2 {
 		t.Errorf("rows after the retention %d, %v, want 2", rows, err)
@@ -292,6 +311,7 @@ func sumsByID(t *testing.T, st *Store, ctx context.Context, nodeID string, since
 
 func sameLink(a, b UserLink) bool {
 	return a.DeviceID == b.DeviceID && a.NodeID == b.NodeID && a.NodeName == b.NodeName && a.InboundID == b.InboundID &&
+		a.PathKey == b.PathKey && a.ViaNodeID == b.ViaNodeID && a.ViaCountry == b.ViaCountry &&
 		a.ProfileName == b.ProfileName && a.Protocol == b.Protocol && a.Platform == b.Platform && a.Client == b.Client && a.Kind == b.Kind &&
 		a.Connects == b.Connects && a.Rejects == b.Rejects && a.Drops == b.Drops && a.Stalls == b.Stalls && a.OnlineS == b.OnlineS &&
 		a.ClientCloses == b.ClientCloses && a.Freezes == b.Freezes && a.Quiet == b.Quiet && a.Accepted == b.Accepted && a.HellosForeign == b.HellosForeign &&

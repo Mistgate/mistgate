@@ -233,8 +233,7 @@ func TestNoTwinForAPersonWhoseNodesLeaveTheEntryOut(t *testing.T) {
 	}
 }
 
-// A server that cannot go through a relay never gets a twin, whatever the rows say (CreateRelay refuses it, but the rule is also
-// kept where the view is built): an AmneziaWG key has no twin in any format.
+// A relay row without its path credential never gets an AmneziaWG twin; direct access stays available in every format.
 func TestNoTwinForAnAmneziaWGServer(t *testing.T) {
 	f := newTwinFix(t)
 	awg := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: "awg", Name: "awg31"}))).Msg.Profile

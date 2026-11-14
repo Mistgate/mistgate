@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"slices"
@@ -11,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/protocols/awg/mimicry"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -162,11 +164,30 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	}
 	network := spec.Listen.Network
 	port := uint16(m.Port)
+	var naturalPort uint16
+	if f.Profile.Protocol == "awg" {
+		var settings struct {
+			Obfuscation struct {
+				Preset string `json:"preset"`
+			} `json:"obfuscation"`
+		}
+		if json.Unmarshal(merged, &settings) == nil {
+			for _, candidate := range mimicry.NaturalPorts(settings.Obfuscation.Preset) {
+				p := uint16(candidate)
+				if relayPortOK(uint32(p)) && clashOf(plugin.Listen{Network: network, Port: p}, others) == nil {
+					naturalPort = p
+					break
+				}
+			}
+		}
+	}
 	switch {
 	case port != 0:
 		if err := portRefusal(f.Profile.Protocol, entry.Name, plugin.Listen{Network: network, Port: port}, others, nil, s.now()); err != nil {
 			return nil, err
 		}
+	case naturalPort != 0:
+		port = naturalPort
 	case relayPortOK(uint32(spec.Listen.Port)) && clashOf(plugin.Listen{Network: network, Port: spec.Listen.Port}, others) == nil:
 		port = spec.Listen.Port // the same port as on the exit, when it is free here
 	default:

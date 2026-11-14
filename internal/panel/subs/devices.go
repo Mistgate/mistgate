@@ -154,10 +154,12 @@ func amneziaData(v access.SubView, link string, selfService, preview bool, now t
 func online(last, now time.Time) bool { return !last.IsZero() && now.Sub(last) < awgOnlineWindow }
 
 type configJSON struct {
-	NodeID string `json:"node_id"`
+	NodeID    string `json:"node_id"`
+	ViaNodeID string `json:"via_node_id,omitempty"`
 	// Label is the public name of the server, the same as servers[].label ("Germany · Frankfurt", "Germany 2", "Server").
 	Label       string          `json:"label"`
 	CountryCode string          `json:"country_code"`
+	ViaCountry  string          `json:"via_country,omitempty"`
 	Version     string          `json:"version"`
 	Conf        string          `json:"conf"`    // the .conf text (AmneziaVPN and the AmneziaWG apps import it; one QR)
 	VPNKey      string          `json:"vpn_key"` // vpn:// for AmneziaVPN
@@ -192,7 +194,8 @@ func configsOf(cfgs []access.DeviceConfig) []configJSON {
 	out := make([]configJSON, 0, len(cfgs))
 	for _, c := range cfgs {
 		out = append(out, configJSON{
-			NodeID: c.NodeID, Label: c.Server, CountryCode: c.CountryCode, Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
+			NodeID: c.NodeID, ViaNodeID: c.ViaNodeID, Label: c.Server, CountryCode: c.CountryCode, ViaCountry: c.ViaCountry,
+			Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
 			Filename: c.ConfFilename, Stale: c.Stale, Warnings: nonNil(c.Warnings), MinClients: minClientsJSON(c.MinClients),
 		})
 	}

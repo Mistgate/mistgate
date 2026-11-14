@@ -93,7 +93,7 @@ func TestUpdateInboundDirectInSubscriptionsNoWayInWarningCases(t *testing.T) {
 	awg := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: "awg", Name: "awg"}))).Msg.Profile
 	awgIn := f.inbound(awg.Id, "nod_nl1")
 	got := warning(turnOff(awgIn.Id))
-	if got == nil || got.Params["reason"] != "awg" || got.Params["profile"] != "awg" || got.Params["node"] != "nl1" {
+	if got == nil || got.Params["reason"] != "no_usable_relay" || got.Params["profile"] != "awg" || got.Params["node"] != "nl1" {
 		t.Errorf("AmneziaWG warning = %+v", got)
 	}
 }

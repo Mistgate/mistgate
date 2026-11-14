@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -238,12 +239,132 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 	return resultUserID, nil
 }
 
+// EnsureKeyPathCred gives a static AWG device one peer for a relay entry of its profile. The direct key must still be live,
+// and the relay is checked in the guarded insert so a concurrent delete cannot leave a new orphan path key behind.
+func (a Access) EnsureKeyPathCred(ctx context.Context, deviceID, profileID, path string, maxIdx int, now time.Time, issue AWGIssue) (AccessCred, bool, error) {
+	if deviceID == "" || profileID == "" || !strings.HasPrefix(path, "relay:") || strings.TrimPrefix(path, "relay:") == "" || issue == nil {
+		return AccessCred{}, false, errors.New("store: invalid AWG path credential request")
+	}
+	cutoff := unix(now.Add(-awgQuarantine))
+	var result AccessCred
+	created := false
+	_, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+		result, created = AccessCred{}, false
+		var existing []AccessCred
+		var device awgPathDeviceState
+		var taken []awgTakenIndex
+		r := reads{}
+		r.add(appendRows(&existing, scanAWGPathCred), awgPathCredsSQL+` AND c.profile_id = ? AND c.path = ?`, deviceID, profileID, path)
+		r.add(oneRow(&device, scanAWGPathDeviceState), `SELECT coalesce(d.user_id, '') AS user_id, coalesce(p.critical_epoch, 0) AS epoch,
+			CASE WHEN d.id IS NOT NULL
+				AND EXISTS (SELECT 1 FROM device_credential c JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
+					WHERE c.device_id = d.id AND c.protocol = 'awg' AND c.profile_id = p.id AND c.path = '' AND c.revoked_at IS NULL)
+				AND EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
+					WHERE i.profile_id = p.id AND 'relay:' || r.via_node_id = ?3)
+				THEN 1 ELSE 0 END AS eligible
+			FROM (SELECT 1) AS anchor
+			LEFT JOIN device d ON d.id = ?2 AND d.kind = 'key' AND d.revoked_at IS NULL
+			LEFT JOIN profile p ON p.id = ?1`, profileID, deviceID, path)
+		r.add(appendRows(&taken, scanAWGTakenIndex), `SELECT ?1 AS profile_id, taken.idx FROM (`+awgTakenSQL+`) taken`, profileID, cutoff)
+		if err := r.run(ctx, a.s); err != nil {
+			return nil, accMapErr(err)
+		}
+		if device.Eligible == 0 || device.UserID == "" {
+			return nil, ErrNotFound
+		}
+		if len(existing) > 0 {
+			result = existing[0]
+			return nil, nil
+		}
+		occupied := make(map[int]bool, len(taken))
+		for _, row := range taken {
+			occupied[row.Index] = true
+		}
+		idx := nextAWGIndex(occupied, maxIdx)
+		if idx == 0 {
+			return nil, ErrAccessSubnetFull
+		}
+		cred, publicKey, err := issue(idx)
+		if err != nil {
+			return nil, accMapErr(err)
+		}
+		cred.DeviceID, cred.UserID, cred.ProfileID, cred.Path, cred.ConfigEpoch, cred.CreatedAt = deviceID, device.UserID, profileID, path, device.Epoch, now
+		guardSQL := `EXISTS (SELECT 1 FROM device d
+			JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.profile_id = ?1 AND c.path = '' AND c.revoked_at IS NULL
+			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
+			WHERE d.id = ?2 AND d.user_id = ?4 AND d.kind = 'key' AND d.revoked_at IS NULL)
+			AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?5)
+			AND EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
+				WHERE i.profile_id = ?1 AND 'relay:' || r.via_node_id = ?6)
+			AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?2 AND profile_id = ?1 AND path = ?6 AND revoked_at IS NULL)
+			AND ?3 NOT IN (
+				SELECT idx FROM awg_peer WHERE profile_id = ?1 AND (released_at = 0 OR released_at > ?7)
+				UNION SELECT c.awg_idx FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id
+					WHERE i.profile_id = ?1 AND c.awg_idx > 0
+			)`
+		stmts := []Stmt{
+			guard(guardSQL, profileID, deviceID, int64(idx), device.UserID, device.Epoch, path, cutoff),
+			awgPurgeExpiredStmt(profileID, cutoff),
+		}
+		stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
+		stmts = append(stmts, awgInsertPeerStmt(cred.ID, profileID, idx, publicKey, now))
+		result, created = cred, true
+		return stmts, nil
+	})
+	if err != nil {
+		return AccessCred{}, false, accMapErr(err)
+	}
+	return result, created, nil
+}
+
+// awgPathCredsSQL reads the live relay keys of a device (the first ?); a caller narrows it with AND.
+const awgPathCredsSQL = `SELECT c.id, c.device_id, c.user_id, c.protocol, coalesce(c.profile_id, ''), c.path,
+	c.secret_enc, coalesce(c.data_json, ''), c.config_epoch, c.created_at
+	FROM device_credential c WHERE c.device_id = ? AND c.protocol = 'awg' AND c.path <> '' AND c.revoked_at IS NULL`
+
+type awgPathDeviceState struct {
+	UserID   string
+	Epoch    int64
+	Eligible int64
+}
+
+func scanAWGPathDeviceState(r rowScanner) (awgPathDeviceState, error) {
+	var value awgPathDeviceState
+	err := r.Scan(&value.UserID, &value.Epoch, &value.Eligible)
+	return value, err
+}
+
+func scanAWGPathCred(r rowScanner) (AccessCred, error) {
+	var value AccessCred
+	var createdAt int64
+	err := r.Scan(&value.ID, &value.DeviceID, &value.UserID, &value.Protocol, &value.ProfileID, &value.Path,
+		&value.SecretEnc, &value.DataJSON, &value.ConfigEpoch, &createdAt)
+	value.CreatedAt = fromUnix(createdAt)
+	return value, err
+}
+
 // AWGImplicitWant asks for an AWG credential of one profile on the request's link device.
 type AWGImplicitWant struct {
 	ProfileID string
+	Path      string // "" is direct; relay keys use "relay:<entry node id>"
 	MaxIdx    int
 	Issue     AWGIssue
 }
+
+// AWGPathFull names a skipped relay credential whose profile has no free peer address.
+type AWGPathFull struct {
+	ProfileID string
+	Path      string
+}
+
+// AWGPathFailure records a relay key that could not be issued without failing the direct credentials in the same request.
+type AWGPathFailure struct {
+	ProfileID string
+	Path      string
+	Err       error
+}
+
+func awgWantKey(profileID, path string) string { return profileID + "\x00" + path }
 
 type accessProfileEpoch struct {
 	ID    string
@@ -264,6 +385,19 @@ type awgTakenIndex struct {
 func scanAWGTakenIndex(r rowScanner) (awgTakenIndex, error) {
 	var value awgTakenIndex
 	err := r.Scan(&value.ProfileID, &value.Index)
+	return value, err
+}
+
+type awgPathRelay struct {
+	Key    string
+	Exists bool
+}
+
+func scanAWGPathRelay(r rowScanner) (awgPathRelay, error) {
+	var value awgPathRelay
+	var profileID, path string
+	err := r.Scan(&profileID, &path, &value.Exists)
+	value.Key = awgWantKey(profileID, path)
 	return value, err
 }
 
@@ -326,6 +460,7 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		var st linkDeviceState
 		var profileEpochs []accessProfileEpoch
 		var taken []awgTakenIndex
+		var pathRelays []awgPathRelay
 		var linkCurrent int // enrolled: 1 while the device was enrolled under the user's current link
 		r := reads{}
 		st.add(&r, userID, dev.HWIDHash, now)
@@ -335,6 +470,35 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		r.add(appendRows(&profileEpochs, scanAccessProfileEpoch), `SELECT id, critical_epoch FROM profile WHERE id IN (SELECT value FROM json_each(?))`, accJSON(profileIDs))
 		for _, profileID := range profileIDs {
 			r.add(appendRows(&taken, scanAWGTakenIndex), `SELECT ?1 AS profile_id, taken.idx FROM (`+awgTakenSQL+`) taken`, profileID, cutoff)
+		}
+		type pathWant struct {
+			ProfileID string `json:"profile_id"`
+			Path      string `json:"path"`
+		}
+		var pathWants []pathWant
+		seenPaths := map[string]bool{}
+		for _, w := range want {
+			if w.Path == "" {
+				continue
+			}
+			key := awgWantKey(w.ProfileID, w.Path)
+			if seenPaths[key] {
+				continue
+			}
+			seenPaths[key] = true
+			pathWants = append(pathWants, pathWant{ProfileID: w.ProfileID, Path: w.Path})
+		}
+		if len(pathWants) > 0 {
+			encoded, err := json.Marshal(pathWants)
+			if err != nil {
+				return nil, err
+			}
+			r.add(appendRows(&pathRelays, scanAWGPathRelay), `SELECT json_extract(wanted.value, '$.profile_id') AS profile_id,
+				json_extract(wanted.value, '$.path') AS path,
+				EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
+					WHERE i.profile_id = json_extract(wanted.value, '$.profile_id')
+					AND 'relay:' || r.via_node_id = json_extract(wanted.value, '$.path')) AS relay_exists
+				FROM json_each(?) AS wanted`, string(encoded))
 		}
 		if err := r.run(ctx, a.s); err != nil {
 			return nil, accMapErr(err)
@@ -352,6 +516,10 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		}
 		for _, row := range taken {
 			occupied[row.ProfileID][row.Index] = true
+		}
+		pathExists := make(map[string]bool, len(pathRelays))
+		for _, row := range pathRelays {
+			pathExists[row.Key] = row.Exists
 		}
 		own := linkDeviceSnapshotOf(st.own)
 		result.Device, result.Creds = own.Device, own.Creds
@@ -375,9 +543,11 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		have := map[string]bool{}
 		haveProtocol := map[string]bool{}
 		for _, cred := range b.creds {
-			haveProtocol[cred.Protocol] = true
+			if cred.Path == "" {
+				haveProtocol[cred.Protocol] = true
+			}
 			if cred.ProfileID != "" {
-				have[cred.ProfileID] = true
+				have[awgWantKey(cred.ProfileID, cred.Path)] = true
 			}
 		}
 		var added []AccessCred
@@ -389,12 +559,19 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		}
 		var issues []awgBatchIssue
 		for _, w := range want {
-			if w.ProfileID == "" || have[w.ProfileID] {
+			if w.ProfileID == "" || have[awgWantKey(w.ProfileID, w.Path)] {
+				continue
+			}
+			if w.Path != "" && !pathExists[awgWantKey(w.ProfileID, w.Path)] {
 				continue
 			}
 			idx := nextAWGIndex(occupied[w.ProfileID], w.MaxIdx)
 			if idx == 0 {
-				result.FullProfiles = append(result.FullProfiles, w.ProfileID)
+				if w.Path == "" {
+					result.FullProfiles = append(result.FullProfiles, w.ProfileID)
+				} else {
+					result.FullPaths = append(result.FullPaths, AWGPathFull{ProfileID: w.ProfileID, Path: w.Path})
+				}
 				continue
 			}
 			epoch, ok := epochs[w.ProfileID]
@@ -403,12 +580,16 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 			}
 			cred, publicKey, err := w.Issue(idx)
 			if err != nil {
+				if w.Path != "" {
+					result.FailedPaths = append(result.FailedPaths, AWGPathFailure{ProfileID: w.ProfileID, Path: w.Path, Err: err})
+					continue
+				}
 				return nil, accMapErr(err)
 			}
-			cred.DeviceID, cred.UserID, cred.ProfileID, cred.ConfigEpoch, cred.CreatedAt = deviceID, userID, w.ProfileID, epoch, now
+			cred.DeviceID, cred.UserID, cred.ProfileID, cred.Path, cred.ConfigEpoch, cred.CreatedAt = deviceID, userID, w.ProfileID, w.Path, epoch, now
 			issues = append(issues, awgBatchIssue{profileID: w.ProfileID, idx: idx, epoch: epoch, cred: cred, publicKey: publicKey})
 			occupied[w.ProfileID][idx] = true
-			have[w.ProfileID] = true
+			have[awgWantKey(w.ProfileID, w.Path)] = true
 		}
 		if len(issues) == 0 && len(added) == 0 && (b.exists || b.born) {
 			return nil, nil // nothing to add, and no device is born empty; an adoption still happens
@@ -427,13 +608,18 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		for _, issue := range issues {
 			deviceGuard := `EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL AND key_hash IS NULL)`
 			args := []any{issue.profileID, cutoff, int64(issue.idx), deviceID, userID, issue.epoch, hwidArg(dev.HWIDHash)}
+			pathArg := "?8"
 			if enrolled {
 				deviceGuard = `EXISTS (SELECT 1 FROM device WHERE id = ?4 AND user_id = ?5 AND hwid_hash IS ?7 AND kind = 'link' AND revoked_at IS NULL AND blocked_at IS NULL AND key_hash = ?8 AND enrol_token_hash = (SELECT sub_token_hash FROM user WHERE id = ?5))`
 				args = append(args, dev.KeyHash)
+				pathArg = "?9"
 			}
+			args = append(args, issue.cred.Path)
 			stmts = append(stmts, guard(deviceGuard+`
 				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
-				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND path = '' AND revoked_at IS NULL)
+				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND path = `+pathArg+` AND revoked_at IS NULL)
+				AND (`+pathArg+` = '' OR EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
+					WHERE i.profile_id = ?1 AND 'relay:' || r.via_node_id = `+pathArg+`))
 				AND ?3 NOT IN (`+awgTakenSQL+`)`, args...))
 			stmts = append(stmts, awgPurgeExpiredStmt(issue.profileID, cutoff))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{issue.cred})...)
@@ -552,6 +738,10 @@ type AccessAWGDeviceScope struct {
 	Group    AccessGroup
 	Profile  AccessProfile
 	Inbounds []AccessInboundFull
+	// Relays are the relays that are on, and PathCreds the live relay keys of the device (path <> ''), read in the same batch:
+	// the configs through an entry need both, and a call of their own would cost the edge another round trip.
+	Relays    []RelayLink
+	PathCreds []AccessCred
 }
 
 // Stale reports whether the profile changed in a way that breaks the config the device last received.
@@ -656,6 +846,8 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 	groupProfileIDs := []string{}
 	groupDisabledNodeIDs := []string{}
 	var inbounds []AccessInboundFull
+	var relays []RelayLink
+	var pathCreds []AccessCred
 	r := reads{}
 	r.add(oneRow(&device, scanAWGDeviceProfile), `SELECT d.id AS device_id, d.user_id AS device_user_id, d.platform, d.model, d.os_version,
 			coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at AS device_created_at,
@@ -682,13 +874,16 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 				SELECT c.profile_id FROM device_credential c WHERE c.device_id = ? AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 			)
 			ORDER BY i.created_at, i.rowid`, deviceID)
+	r.add(appendRows(&relays, scanRelayLink), relayEnabledQuery)
+	r.add(appendRows(&pathCreds, scanAWGPathCred), awgPathCredsSQL, deviceID)
 	if err := r.run(ctx, a.s); err != nil {
 		return AccessAWGDeviceScope{}, err
 	}
 	user.NodeIDs = userNodeIDs
 	group.ProfileIDs = groupProfileIDs
 	group.DisabledNodeIDs = groupDisabledNodeIDs
-	return AccessAWGDeviceScope{Device: device.Device, User: user, Group: group, Profile: device.Profile, Inbounds: inbounds}, nil
+	return AccessAWGDeviceScope{Device: device.Device, User: user, Group: group, Profile: device.Profile, Inbounds: inbounds,
+		Relays: relays, PathCreds: pathCreds}, nil
 }
 
 // RecordDeviceConfig records what the credential's device received: the profile epoch of the config (never lowered; nil
