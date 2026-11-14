@@ -227,9 +227,9 @@ func TestNoIPv6TwinWithoutAUsableEntry(t *testing.T) {
 	}
 }
 
-// The static AmneziaWG keys keep the address they were issued with, whatever the entry says; only the Mihomo proxy of AmneziaWG,
-// which refreshes with the subscription, goes to the IPv6 address too.
-func TestIPv6EntryLeavesAmneziaWGKeysAlone(t *testing.T) {
+// A link device that gets an AmneziaWG IPv6 twin uses a separate key and tunnel address; static configs keep their direct endpoint
+// because this page does not render an IPv6 twin for them.
+func TestIPv6EntryUsesSeparateAmneziaWGKeyForMihomo(t *testing.T) {
 	f := newRelayFix(t)
 	f.entry("nod_de1", entryAddr)
 	awg := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: "awg", Name: "awg31"}))).Msg.Profile
@@ -239,9 +239,13 @@ func TestIPv6EntryLeavesAmneziaWGKeysAlone(t *testing.T) {
 
 	// the Mihomo subscription: the proxy and its IPv6 twin, in the same order as the servers
 	m := must(f.s.SubscriptionWith(f.ctx, token, SubOptions{Format: plugin.FormatMihomo, NoPageData: true}))
-	if len(m.Lines) != 2 || !strings.Contains(m.Lines[0], "de1.example.com") || strings.Contains(m.Lines[0], entryAddr) ||
+	if len(m.Lines) != 2 || len(m.Servers) != 2 || !strings.Contains(m.Lines[0], "de1.example.com") || strings.Contains(m.Lines[0], entryAddr) ||
 		!strings.Contains(m.Lines[1], `server: "`+entryAddr+`"`) || m.Servers[1].Mark != MarkIPv6 {
 		t.Fatalf("Mihomo AmneziaWG proxies:\n%s", strings.Join(m.Lines, "\n"))
+	}
+	if m.Servers[0].PathKey != "direct" || m.Servers[1].PathKey != "ipv6" ||
+		awgPrivateKey(t, m.Lines[0]) == awgPrivateKey(t, m.Lines[1]) || awgTunnelAddress(t, m.Lines[0]) == awgTunnelAddress(t, m.Lines[1]) {
+		t.Fatalf("Mihomo direct and IPv6 paths must have different private keys and tunnel addresses:\n%s", strings.Join(m.Lines, "\n"))
 	}
 	// the key (.conf and vpn://) of the device: the node's own address
 	d := must(f.s.CreateAwgDevice(f.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: u.Id, ProfileId: awg.Id, Platform: "ios", Label: "phone"}))).Msg

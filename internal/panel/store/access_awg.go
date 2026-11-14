@@ -259,8 +259,7 @@ func (a Access) EnsureKeyPathCred(ctx context.Context, deviceID, profileID, path
 			CASE WHEN d.id IS NOT NULL
 				AND EXISTS (SELECT 1 FROM device_credential c JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 					WHERE c.device_id = d.id AND c.protocol = 'awg' AND c.profile_id = p.id AND c.path = '' AND c.revoked_at IS NULL)
-				AND EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
-					WHERE i.profile_id = p.id AND 'relay:' || r.via_node_id = ?3)
+				AND `+awgPathExistsSQL("p.id", "?3")+`
 				THEN 1 ELSE 0 END AS eligible
 			FROM (SELECT 1) AS anchor
 			LEFT JOIN device d ON d.id = ?2 AND d.kind = 'key' AND d.revoked_at IS NULL
@@ -294,10 +293,9 @@ func (a Access) EnsureKeyPathCred(ctx context.Context, deviceID, profileID, path
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			WHERE d.id = ?2 AND d.user_id = ?4 AND d.kind = 'key' AND d.revoked_at IS NULL)
 			AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?5)
-			AND EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
-				WHERE i.profile_id = ?1 AND 'relay:' || r.via_node_id = ?6)
+			AND ` + awgPathExistsSQL("?1", "?6") + `
 			AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?2 AND profile_id = ?1 AND path = ?6 AND revoked_at IS NULL)
-			AND ?3 NOT IN (
+			AND CAST(?3 AS INTEGER) NOT IN (
 				SELECT idx FROM awg_peer WHERE profile_id = ?1 AND (released_at = 0 OR released_at > ?7)
 				UNION SELECT c.awg_idx FROM health_probe_cred c JOIN inbound i ON i.id = c.inbound_id
 					WHERE i.profile_id = ?1 AND c.awg_idx > 0
@@ -346,12 +344,12 @@ func scanAWGPathCred(r rowScanner) (AccessCred, error) {
 // AWGImplicitWant asks for an AWG credential of one profile on the request's link device.
 type AWGImplicitWant struct {
 	ProfileID string
-	Path      string // "" is direct; relay keys use "relay:<entry node id>"
+	Path      string // "" is direct; extra paths are "ipv6" or "relay:<entry node id>"
 	MaxIdx    int
 	Issue     AWGIssue
 }
 
-// AWGPathFull names a skipped relay credential whose profile has no free peer address.
+// AWGPathFull names a skipped path credential whose profile has no free peer address.
 type AWGPathFull struct {
 	ProfileID string
 	Path      string
@@ -365,6 +363,19 @@ type AWGPathFailure struct {
 }
 
 func awgWantKey(profileID, path string) string { return profileID + "\x00" + path }
+
+// awgPathExistsSQL checks the kind of extra AWG path while its credential is issued. An IPv6 path needs a live inbound whose
+// configured entry is on; a relay path needs the matching relay row.
+func awgPathExistsSQL(profileExpr, pathExpr string) string {
+	return `((` + pathExpr + ` = 'ipv6' AND EXISTS (
+		SELECT 1 FROM inbound i JOIN node n ON n.id = i.node_id
+		WHERE i.profile_id = ` + profileExpr + ` AND i.enabled = 1 AND i.state IN ('pending', 'active')
+		AND n.state = 'active' AND n.ipv6_entry <> ''
+	)) OR (` + pathExpr + ` GLOB 'relay:*' AND EXISTS (
+		SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
+		WHERE i.profile_id = ` + profileExpr + ` AND 'relay:' || r.via_node_id = ` + pathExpr + `
+	)))`
+}
 
 type accessProfileEpoch struct {
 	ID    string
@@ -495,9 +506,7 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 			}
 			r.add(appendRows(&pathRelays, scanAWGPathRelay), `SELECT json_extract(wanted.value, '$.profile_id') AS profile_id,
 				json_extract(wanted.value, '$.path') AS path,
-				EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
-					WHERE i.profile_id = json_extract(wanted.value, '$.profile_id')
-					AND 'relay:' || r.via_node_id = json_extract(wanted.value, '$.path')) AS relay_exists
+				`+awgPathExistsSQL(`json_extract(wanted.value, '$.profile_id')`, `json_extract(wanted.value, '$.path')`)+` AS path_exists
 				FROM json_each(?) AS wanted`, string(encoded))
 		}
 		if err := r.run(ctx, a.s); err != nil {
@@ -618,9 +627,8 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 			stmts = append(stmts, guard(deviceGuard+`
 				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
 				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND path = `+pathArg+` AND revoked_at IS NULL)
-				AND (`+pathArg+` = '' OR EXISTS (SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
-					WHERE i.profile_id = ?1 AND 'relay:' || r.via_node_id = `+pathArg+`))
-				AND ?3 NOT IN (`+awgTakenSQL+`)`, args...))
+				AND (`+pathArg+` = '' OR `+awgPathExistsSQL("?1", pathArg)+`)
+				AND CAST(?3 AS INTEGER) NOT IN (`+awgTakenSQL+`)`, args...))
 			stmts = append(stmts, awgPurgeExpiredStmt(issue.profileID, cutoff))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{issue.cred})...)
 			stmts = append(stmts, awgInsertPeerStmt(issue.cred.ID, issue.profileID, issue.idx, issue.publicKey, now))
@@ -738,7 +746,7 @@ type AccessAWGDeviceScope struct {
 	Group    AccessGroup
 	Profile  AccessProfile
 	Inbounds []AccessInboundFull
-	// Relays are the relays that are on, and PathCreds the live relay keys of the device (path <> ''), read in the same batch:
+	// Relays are the relays that are on, and PathCreds the live extra-path keys of the device (path <> ''), read in the same batch:
 	// the configs through an entry need both, and a call of their own would cost the edge another round trip.
 	Relays    []RelayLink
 	PathCreds []AccessCred
@@ -980,19 +988,19 @@ func (a Access) AWGDevicesPerProfile(ctx context.Context, groupID, userID string
 	return out, rows.Err()
 }
 
-const awgOrphanPathCredWhere = `c.protocol = 'awg' AND c.profile_id IS NOT NULL AND c.path <> '' AND c.revoked_at IS NULL
-	AND NOT EXISTS (
-		SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
-		WHERE i.profile_id = c.profile_id AND 'relay:' || r.via_node_id = c.path
-	)`
+// An orphan is a live path key whose path no longer exists: the exact negation of awgPathExistsSQL, the rule that issues the key,
+// so the sweep cannot revoke a key that the subscription would still give out.
+var awgOrphanPathCredWhere = `c.protocol = 'awg' AND c.profile_id IS NOT NULL AND c.path <> '' AND c.revoked_at IS NULL
+	AND NOT ` + awgPathExistsSQL("c.profile_id", "c.path")
 
 // awgOrphanPathCredFrom names the partial index of the live path keys: the planner has no statistics to choose it over the
 // protocol index, and the sweep runs on every retention pass, so it must read no row while no path key exists.
 const awgOrphanPathCredFrom = `device_credential c INDEXED BY device_credential_path`
 
-const awgOrphanPathCredIDs = `SELECT c.id FROM ` + awgOrphanPathCredFrom + ` WHERE ` + awgOrphanPathCredWhere
+var awgOrphanPathCredIDs = `SELECT c.id FROM ` + awgOrphanPathCredFrom + ` WHERE ` + awgOrphanPathCredWhere
 
-// RevokeOrphanPathCreds quarantines path peers whose profile no longer has a relay through the entry node.
+// RevokeOrphanPathCreds quarantines path peers whose path is gone: the relay through the entry node was deleted, or no inbound of
+// the profile has an IPv6 entry any more.
 func (s *Store) RevokeOrphanPathCreds(ctx context.Context, now time.Time) (int64, error) {
 	var results []StmtResult
 	var err error
@@ -1005,7 +1013,7 @@ func (s *Store) RevokeOrphanPathCreds(ctx context.Context, now time.Time) (int64
 			return nil, nil
 		}
 		return []Stmt{
-			guard(`(SELECT count(*) FROM `+awgOrphanPathCredFrom+` WHERE `+awgOrphanPathCredWhere+`) = ?`, count),
+			guard(`(SELECT count(*) FROM `+awgOrphanPathCredFrom+` WHERE `+awgOrphanPathCredWhere+`) = CAST(? AS INTEGER)`, count),
 			{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN (` + awgOrphanPathCredIDs + `)`, Args: []any{unix(now)}},
 			{Query: `UPDATE device_credential SET revoked_at = ? WHERE revoked_at IS NULL AND id IN (` + awgOrphanPathCredIDs + `)`, Args: []any{unix(now)}},
 		}, nil

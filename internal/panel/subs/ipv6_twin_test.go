@@ -74,7 +74,7 @@ func TestIPv6TwinAndRelayTwinInEveryFormat(t *testing.T) {
 	}
 }
 
-func TestMihomoAmneziaWGProxyGetsIPv6Twin(t *testing.T) {
+func TestMihomoAmneziaWGIPv6TwinGetsItsOwnKey(t *testing.T) {
 	m := newM3Rig(t)
 	if _, err := m.st.W.Exec(`UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_1'`); err != nil {
 		t.Fatal(err)
@@ -95,8 +95,8 @@ func TestMihomoAmneziaWGProxyGetsIPv6Twin(t *testing.T) {
 	if len(awg) != 2 || awg[0]["server"] != "de1.example.com" || awg[1]["server"] != "2001:db8::5" || !strings.Contains(awg[1]["name"].(string), "IPv6") {
 		t.Fatalf("AmneziaWG proxies = %+v, want the main server and its IPv6 twin", awg)
 	}
-	if awg[0]["private-key"] != awg[1]["private-key"] || awg[0]["ip"] != awg[1]["ip"] {
-		t.Errorf("the IPv6 twin changed the device key or tunnel address: %v / %v", awg[0], awg[1])
+	if awg[0]["private-key"] == awg[1]["private-key"] || awg[0]["ip"] == awg[1]["ip"] {
+		t.Errorf("direct and IPv6 proxies need different private keys and tunnel addresses: %v / %v", awg[0], awg[1])
 	}
 	got := maskMihomoGenerated(maskMihomoCredentials(rec.Body.String(), p.Proxies))
 	goldenFile(t, "ipv6_awg_mihomo.yaml", got)

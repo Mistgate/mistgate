@@ -690,12 +690,25 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 				twin := srv
 				twin.Mark, twin.PathKey = MarkIPv6, "ipv6"
 				tin := ipv6Input(in, addr)
-				if opt.Name != nil {
-					tin.DisplayName = opt.Name(twin)
+				renderTwin := true
+				if f.Profile.Protocol == awg.ID {
+					// The same server at two endpoints with one key would have its peer endpoint jump between them, so the twin has a
+					// key of its own; without one (no free address) there is no twin and the direct server is untouched.
+					pathSecret := secrets[credKey(awg.ID, f.Profile.ID, twin.PathKey)]
+					if pathSecret == "" {
+						renderTwin = false
+					} else {
+						tin.Secret, tin.Peer = pathSecret, json.RawMessage(pathSecret)
+					}
 				}
-				if tf, ok := proto.Render(tin); ok {
-					twin.URI = string(tf.Data)
-					emit(twin, &SubConn{Way: "link", Exit: srv.Exit, IPv6: true})
+				if renderTwin {
+					if opt.Name != nil {
+						tin.DisplayName = opt.Name(twin)
+					}
+					if tf, ok := proto.Render(tin); ok {
+						twin.URI = string(tf.Data)
+						emit(twin, &SubConn{Way: "link", Exit: srv.Exit, IPv6: true})
+					}
 				}
 			}
 			// The twins of the server, right after it: the same server through each relay of it that is usable for the person.
@@ -1024,10 +1037,10 @@ func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, 
 		s.log.Warn("access: AWG profile network is full for a client API device", "code", "client_api_awg_network_full", "profile", profileID, "err", store.ErrAccessSubnetFull)
 	}
 	for _, full := range result.FullPaths {
-		s.log.Warn("access: AWG relay key network is full for a client API device", "code", "awg_path_network_full", "profile", full.ProfileID, "path", full.Path, "err", store.ErrAccessSubnetFull)
+		s.log.Warn("access: AWG path key network is full for a client API device", "code", "awg_path_network_full", "profile", full.ProfileID, "path", full.Path, "err", store.ErrAccessSubnetFull)
 	}
 	for _, failed := range result.FailedPaths {
-		s.log.Warn("access: cannot issue an AWG relay key for a client API device", "code", "awg_path_credential_issue_failed", "profile", failed.ProfileID, "path", failed.Path, "err", failed.Err)
+		s.log.Warn("access: cannot issue an AWG path key for a client API device", "code", "awg_path_credential_issue_failed", "profile", failed.ProfileID, "path", failed.Path, "err", failed.Err)
 	}
 	if len(result.Added) > 0 {
 		s.notify.StateChanged()
@@ -1106,6 +1119,13 @@ func (s *Service) awgWants(u store.AccessUser, g store.AccessGroup, full []store
 		if err != nil || relayUnsupported(awg.ID, spec) != "" {
 			continue
 		}
+		if ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "" {
+			key := f.Profile.ID + "\x00ipv6"
+			if !seen[key] {
+				want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, Path: "ipv6", MaxIdx: maxIdx, Issue: issue})
+				seen[key] = true
+			}
+		}
 		for _, l := range relays[f.Inbound.ID] {
 			path := "relay:" + l.ViaNodeID
 			key := f.Profile.ID + "\x00" + path
@@ -1169,10 +1189,10 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 		s.log.Warn("access: AWG profile network is full for a Mihomo subscription", "code", "mihomo_awg_network_full", "user", u.ID, "profile", profileID, "err", store.ErrAccessSubnetFull)
 	}
 	for _, full := range result.FullPaths {
-		s.log.Warn("access: AWG relay key network is full for a Mihomo subscription", "code", "awg_path_network_full", "user", u.ID, "profile", full.ProfileID, "path", full.Path, "err", store.ErrAccessSubnetFull)
+		s.log.Warn("access: AWG path key network is full for a Mihomo subscription", "code", "awg_path_network_full", "user", u.ID, "profile", full.ProfileID, "path", full.Path, "err", store.ErrAccessSubnetFull)
 	}
 	for _, failed := range result.FailedPaths {
-		s.log.Warn("access: cannot issue an AWG relay key for a Mihomo subscription", "code", "awg_path_credential_issue_failed", "user", u.ID, "profile", failed.ProfileID, "path", failed.Path, "err", failed.Err)
+		s.log.Warn("access: cannot issue an AWG path key for a Mihomo subscription", "code", "awg_path_credential_issue_failed", "user", u.ID, "profile", failed.ProfileID, "path", failed.Path, "err", failed.Err)
 	}
 	if result.Device.ID == "" {
 		return rd, ""

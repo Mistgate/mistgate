@@ -225,6 +225,56 @@ func TestEnsureLinkAWGSkipsAPathWithoutItsRelay(t *testing.T) {
 	}
 }
 
+func TestEnsureLinkAWGIssuesIPv6PathOnlyWhileEntryIsOn(t *testing.T) {
+	ctx := context.Background()
+	s, profileID, _, _ := awgPathFixture(t)
+	direct := AWGImplicitWant{ProfileID: profileID, MaxIdx: 32, Issue: func(int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_bob_awg", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_bob_awg", nil
+	}}
+	ipv6 := AWGImplicitWant{ProfileID: profileID, Path: "ipv6", MaxIdx: 32, Issue: func(int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_bob_ipv6", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_bob_ipv6", nil
+	}}
+	dev := linkDevice("usr_alice", "bob", nil)
+	result, err := s.Access().EnsureLinkAWGCreds(ctx, dev, 5, linkNow, []AWGImplicitWant{direct, ipv6})
+	if err != nil || len(result.Added) != 1 || result.Added[0].Path != "" || len(result.Creds) != 1 {
+		t.Fatalf("link AWG issue with the entry off = %+v, %v; want the direct key only", result, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND profile_id = ? AND path = 'ipv6' AND revoked_at IS NULL`, result.Device.ID, profileID); got != 0 {
+		t.Fatalf("IPv6 path key with the entry off = %d, want 0", got)
+	}
+	execT(t, s, `UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_de1'`)
+	result, err = s.Access().EnsureLinkAWGCreds(ctx, dev, 5, linkNow, []AWGImplicitWant{direct, ipv6})
+	if err != nil || len(result.Added) != 1 || result.Added[0].Path != "ipv6" || len(result.Creds) != 2 {
+		t.Fatalf("link AWG issue with the entry on = %+v, %v; want one IPv6 path key next to direct", result, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND profile_id = ? AND path = 'ipv6' AND revoked_at IS NULL`, result.Device.ID, profileID); got != 1 {
+		t.Fatalf("IPv6 path keys with the entry on = %d, want 1", got)
+	}
+}
+
+func TestEnsureLinkAWGIPv6PathNetworkFullKeepsDirect(t *testing.T) {
+	ctx := context.Background()
+	s, profileID, _, _ := awgPathFixture(t)
+	execT(t, s, `UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_de1'`)
+	result, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_alice", "bob", nil), 5, linkNow, []AWGImplicitWant{
+		{ProfileID: profileID, MaxIdx: 3, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_bob_awg", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_bob_awg", nil
+		}},
+		{ProfileID: profileID, Path: "ipv6", MaxIdx: 3, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_bob_ipv6", Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_bob_ipv6", nil
+		}},
+	})
+	if err != nil || len(result.Added) != 1 || result.Added[0].Path != "" || len(result.Creds) != 1 || len(result.FullPaths) != 1 || result.FullPaths[0].Path != "ipv6" {
+		t.Fatalf("link AWG issue with only the direct index free = %+v, %v; want direct and a skipped IPv6 path", result, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND profile_id = ? AND path = '' AND revoked_at IS NULL`, result.Device.ID, profileID); got != 1 {
+		t.Fatalf("direct credential after path pool exhaustion = %d, want 1", got)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND profile_id = ? AND path = 'ipv6' AND revoked_at IS NULL`, result.Device.ID, profileID); got != 0 {
+		t.Fatalf("IPv6 path credential after pool exhaustion = %d, want 0", got)
+	}
+}
+
 func TestEnsureLinkAWGPathIssueFailureKeepsTheDirectCredential(t *testing.T) {
 	ctx := context.Background()
 	s, profileID, _, _ := awgPathFixture(t)
@@ -279,6 +329,7 @@ func TestRotateAWGDeviceRevokesPathCredentials(t *testing.T) {
 	ctx := context.Background()
 	s, profileID, deviceID, directIdx := awgPathFixture(t)
 	insertAWGPathCred(t, s, "crd_alice_path", deviceID, "usr_alice", profileID, "relay:nod_msk1", directIdx+1, linkNow.Add(-time.Hour))
+	insertAWGPathCred(t, s, "crd_alice_ipv6", deviceID, "usr_alice", profileID, "ipv6", directIdx+2, linkNow.Add(-time.Hour))
 	now := linkNow.Add(time.Hour)
 	userID, err := s.Access().RotateAWGDevice(ctx, deviceID, now, func(int) (AccessCred, string, error) {
 		return AccessCred{ID: "crd_alice_rotated", Protocol: "awg", SecretEnc: []byte{2}, DataJSON: `{}`}, "pub_alice_rotated", nil
@@ -286,17 +337,17 @@ func TestRotateAWGDeviceRevokesPathCredentials(t *testing.T) {
 	if err != nil || userID != "usr_alice" {
 		t.Fatalf("RotateAWGDevice = %q, %v", userID, err)
 	}
-	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = 'crd_alice_path' AND revoked_at = ?`, now.Unix()); got != 1 {
-		t.Fatalf("path credential revoked at rotation = %d, want 1", got)
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE id IN ('crd_alice_path', 'crd_alice_ipv6') AND revoked_at = ?`, now.Unix()); got != 2 {
+		t.Fatalf("path credentials revoked at rotation = %d, want 2", got)
 	}
-	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id = 'crd_alice_path' AND released_at = ?`, now.Unix()); got != 1 {
-		t.Fatalf("path peer quarantined at rotation = %d, want 1", got)
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id IN ('crd_alice_path', 'crd_alice_ipv6') AND released_at = ?`, now.Unix()); got != 2 {
+		t.Fatalf("path peers quarantined at rotation = %d, want 2", got)
 	}
 	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = 'crd_alice_rotated' AND path = '' AND revoked_at IS NULL`); got != 1 {
 		t.Fatalf("replacement direct credential = %d, want 1", got)
 	}
-	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id = 'crd_alice_path' AND released_at > 0`); got != 1 {
-		t.Fatalf("path address was not left in quarantine: %d", got)
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id IN ('crd_alice_path', 'crd_alice_ipv6') AND released_at > 0`); got != 2 {
+		t.Fatalf("path addresses were not left in quarantine: %d", got)
 	}
 }
 
@@ -304,15 +355,40 @@ func TestRevokeDeviceIncludesAWGPathCredentials(t *testing.T) {
 	ctx := context.Background()
 	s, profileID, deviceID, directIdx := awgPathFixture(t)
 	insertAWGPathCred(t, s, "crd_alice_path", deviceID, "usr_alice", profileID, "relay:nod_msk1", directIdx+1, linkNow)
+	insertAWGPathCred(t, s, "crd_alice_ipv6", deviceID, "usr_alice", profileID, "ipv6", directIdx+2, linkNow)
 	now := linkNow.Add(time.Hour)
 	if userID, err := s.Access().RevokeDevice(ctx, deviceID, now); err != nil || userID != "usr_alice" {
 		t.Fatalf("RevokeDevice = %q, %v", userID, err)
 	}
-	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND revoked_at = ?`, deviceID, now.Unix()); got != 2 {
-		t.Fatalf("device credentials revoked = %d, want direct and path", got)
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE device_id = ? AND revoked_at = ?`, deviceID, now.Unix()); got != 3 {
+		t.Fatalf("device credentials revoked = %d, want direct and both paths", got)
 	}
-	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id IN ('crd_dev_alice', 'crd_alice_path') AND released_at = ?`, now.Unix()); got != 2 {
-		t.Fatalf("device peer addresses quarantined = %d, want 2", got)
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id IN ('crd_dev_alice', 'crd_alice_path', 'crd_alice_ipv6') AND released_at = ?`, now.Unix()); got != 3 {
+		t.Fatalf("device peer addresses quarantined = %d, want 3", got)
+	}
+}
+
+func TestRevokeOrphanIPv6PathCredsFollowsConfiguredEntry(t *testing.T) {
+	ctx := context.Background()
+	s, profileID, deviceID, directIdx := awgPathFixture(t)
+	insertAWGPathCred(t, s, "crd_alice_ipv6", deviceID, "usr_alice", profileID, "ipv6", directIdx+1, linkNow)
+	now := linkNow.Add(time.Hour)
+	execT(t, s, `UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_de1'`)
+	if n, err := s.RevokeOrphanPathCreds(ctx, now); err != nil || n != 0 {
+		t.Fatalf("sweep with IPv6 entry on = %d, %v; want no revocation", n, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = 'crd_alice_ipv6' AND revoked_at IS NULL`); got != 1 {
+		t.Fatalf("IPv6 key with entry on is live = %d, want 1", got)
+	}
+	execT(t, s, `UPDATE node SET ipv6_entry = '' WHERE id = 'nod_de1'`)
+	if n, err := s.RevokeOrphanPathCreds(ctx, now); err != nil || n != 1 {
+		t.Fatalf("sweep with IPv6 entry off = %d, %v; want one revocation", n, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM device_credential WHERE id = 'crd_alice_ipv6' AND revoked_at = ?`, now.Unix()); got != 1 {
+		t.Fatalf("IPv6 key after entry off = %d, want revoked", got)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id = 'crd_alice_ipv6' AND released_at = ?`, now.Unix()); got != 1 {
+		t.Fatalf("IPv6 peer after entry off = %d, want quarantined", got)
 	}
 }
 

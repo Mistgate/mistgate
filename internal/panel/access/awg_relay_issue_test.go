@@ -1,11 +1,16 @@
 package access
 
 import (
+	"bytes"
+	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -14,12 +19,22 @@ import (
 // twin only with the key of its own entry; one key on two paths breaks the tunnel (the lab of the relay plan).
 
 var awgPrivateKeyLine = regexp.MustCompile(`private-key: "([^"]+)"`)
+var awgTunnelAddressLine = regexp.MustCompile(`(?m)^\s*ip: "?([^"\r\n]+)"?`)
 
 func awgPrivateKey(t *testing.T, uri string) string {
 	t.Helper()
 	m := awgPrivateKeyLine.FindStringSubmatch(uri)
 	if m == nil {
 		t.Fatalf("no private key in the AmneziaWG proxy:\n%s", uri)
+	}
+	return m[1]
+}
+
+func awgTunnelAddress(t *testing.T, uri string) string {
+	t.Helper()
+	m := awgTunnelAddressLine.FindStringSubmatch(uri)
+	if m == nil {
+		t.Fatalf("no tunnel address in the AmneziaWG proxy:\n%s", uri)
 	}
 	return m[1]
 }
@@ -98,6 +113,124 @@ func TestAWGRelayServersEachGetTheirOwnKey(t *testing.T) {
 	}
 	if n := f.count(`SELECT count(*) FROM device_credential WHERE user_id = ? AND protocol = 'awg' AND revoked_at IS NULL`, alice.Id); n != 3 {
 		t.Errorf("credentials after the second fetch = %d, want three", n)
+	}
+}
+
+func TestAWGDirectIPv6AndRelayPathsUseDistinctPeersOnOneDevice(t *testing.T) {
+	f, _, group := awgRelayFix(t)
+	f.entry("nod_de1", entryAddr)
+	f.sql(`UPDATE relay SET enabled = 0 WHERE via_node_id = 'nod_nl1'`)
+	alice := f.user("alice", group, func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 1 }).User
+
+	v := f.mihomoAWG(f.tokenOf(alice.Id))
+	wantPaths := []string{"direct", "ipv6", "relay:nod_fi1"}
+	wantHosts := []string{"de1.example.com", entryAddr, "fi1.example.com"}
+	if len(v.Servers) != len(wantPaths) {
+		t.Fatalf("servers = %+v, want direct, IPv6 and relay paths", v.Servers)
+	}
+	keys, addresses := map[string]bool{}, map[string]bool{}
+	for i, server := range v.Servers {
+		if server.PathKey != wantPaths[i] || !strings.Contains(server.URI, `server: "`+wantHosts[i]+`"`) {
+			t.Errorf("server %d = %+v; want path %q at %q", i, server, wantPaths[i], wantHosts[i])
+		}
+		key, address := awgPrivateKey(t, server.URI), awgTunnelAddress(t, server.URI)
+		if keys[key] {
+			t.Errorf("server %d reuses another path's private key", i)
+		}
+		if addresses[address] {
+			t.Errorf("server %d reuses another path's tunnel address %q", i, address)
+		}
+		keys[key], addresses[address] = true, true
+	}
+	if got := f.count(`SELECT count(*) FROM device_credential WHERE user_id = ? AND protocol = 'awg' AND revoked_at IS NULL`, alice.Id); got != 3 {
+		t.Errorf("AWG credentials = %d, want three on the device", got)
+	}
+	if got := f.count(`SELECT count(*) FROM device WHERE user_id = ? AND kind = 'link' AND revoked_at IS NULL`, alice.Id); got != 1 {
+		t.Errorf("live link devices = %d, want one device-limit slot", got)
+	}
+}
+
+// A person who has the "· IPv6" twin today with the direct key keeps the twin after the update, now with a key of its own on
+// the next fetch; turning the entry off hides the twin at once and the sweep takes the key, and it comes back with a new key.
+func TestAWGIPv6TwinKeyFollowsTheEntry(t *testing.T) {
+	f, _, group := awgRelayFix(t)
+	f.sql(`UPDATE relay SET enabled = 0`)
+	alice := f.user("alice", group, nil).User
+	token := f.tokenOf(alice.Id)
+	ipv6Keys := func(live bool) int {
+		q := `SELECT count(*) FROM device_credential WHERE user_id = ? AND path = 'ipv6'`
+		if live {
+			q += ` AND revoked_at IS NULL`
+		}
+		return f.count(q, alice.Id)
+	}
+
+	v := f.mihomoAWG(token)
+	if len(v.Servers) != 1 || ipv6Keys(false) != 0 {
+		t.Fatalf("entry off: servers %+v, IPv6 keys %d; want the direct server and no key", v.Servers, ipv6Keys(false))
+	}
+	direct := awgPrivateKey(t, v.Servers[0].URI)
+
+	f.entry("nod_de1", entryAddr)
+	v = f.mihomoAWG(token)
+	if len(v.Servers) != 2 || v.Servers[1].PathKey != "ipv6" || awgPrivateKey(t, v.Servers[0].URI) != direct {
+		t.Fatalf("entry on: servers %+v; want the same direct key and an IPv6 twin", v.Servers)
+	}
+	first := awgPrivateKey(t, v.Servers[1].URI)
+	if first == direct || ipv6Keys(true) != 1 {
+		t.Fatalf("IPv6 key equals the direct key (%v) or %d live keys", first == direct, ipv6Keys(true))
+	}
+
+	f.entry("nod_de1", "")
+	if v = f.mihomoAWG(token); len(v.Servers) != 1 || v.Servers[0].PathKey != "direct" {
+		t.Fatalf("entry off again: servers %+v; want the direct one", v.Servers)
+	}
+	if ipv6Keys(true) != 1 {
+		t.Fatal("the key must wait for the sweep, not vanish with the twin")
+	}
+	if n, err := f.st.RevokeOrphanPathCreds(f.ctx, time.Now()); err != nil || n != 1 || ipv6Keys(true) != 0 {
+		t.Fatalf("sweep with the entry off = %d, %v; live IPv6 keys %d", n, err, ipv6Keys(true))
+	}
+	f.entry("nod_de1", entryAddr)
+	v = f.mihomoAWG(token)
+	if len(v.Servers) != 2 || awgPrivateKey(t, v.Servers[1].URI) == first || awgPrivateKey(t, v.Servers[1].URI) == direct {
+		t.Fatalf("entry back on: servers %+v; want a twin with a fresh key", v.Servers)
+	}
+}
+
+// The profile network is full: the direct server stays, there is no IPv6 twin and the log says why.
+func TestAWGIPv6TwinNetworkFullKeepsTheDirectServer(t *testing.T) {
+	f := newTwinFix(t)
+	f.entry("nod_de1", entryAddr)
+	p := f.awgProfile("tiny", `{"subnet4":"10.77.0.0/24","subnet6":""}`)
+	f.inbound(p.Id, "nod_de1")
+	g := f.group("g", p.Id)
+	var fillers []string
+	for i := range 3 {
+		fillers = append(fillers, f.user(fmt.Sprintf("filler%d", i), g, func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 100 }).User.Id)
+	}
+	alice := f.user("alice", g, nil).User
+	const maxIdx = 254 // the peers 2..254 of a /24; one address is left for the direct key
+	for i := range maxIdx - 2 {
+		if _, err := f.st.Access().AddAWGDevice(f.ctx, store.AWGDeviceAdd{Device: store.AccessDevice{ID: fmt.Sprintf("dev_fill%d", i), UserID: fillers[i/90]},
+			ProfileID: p.Id, MaxIdx: maxIdx, Limit: 100}, f.clock, func(idx int) (store.AccessCred, string, error) {
+			return store.AccessCred{ID: fmt.Sprintf("crd_fill%d", idx), Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, fmt.Sprintf("pub%d", idx), nil
+		}); err != nil {
+			t.Fatalf("fill %d: %v", i, err)
+		}
+	}
+	var logged bytes.Buffer
+	f.s.log = slog.New(slog.NewTextHandler(&logged, nil))
+
+	v := f.mihomoAWG(f.tokenOf(alice.Id))
+	if len(v.Servers) != 1 || v.Servers[0].PathKey != "direct" || v.Servers[0].Mark != "" {
+		t.Fatalf("servers = %+v, want only the direct one", v.Servers)
+	}
+	if n := f.count(`SELECT count(*) FROM device_credential WHERE user_id = ? AND protocol = 'awg' AND path = '' AND revoked_at IS NULL`, alice.Id); n != 1 {
+		t.Errorf("direct keys = %d, want one", n)
+	}
+	if !strings.Contains(logged.String(), "awg_path_network_full") {
+		t.Errorf("no coded log line for the full network: %s", logged.String())
 	}
 }
 
