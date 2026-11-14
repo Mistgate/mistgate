@@ -19,7 +19,7 @@ func (s *Service) countryRelayReachability(ctx context.Context, sn *snapshot, no
 	in := store.RelayReachabilityInput{NowUnix: now.Unix(), HealthIntervalS: uint32(s.interval(ctx).Seconds())}
 	groups, err := s.st.Access().Groups(ctx)
 	if err != nil {
-		s.log.Warn("health: country relay groups", "err", err)
+		s.log.Warn("health: country relay groups", "code", "country_relay_read_failed", "err", err)
 		return store.RelayReachability{}, false
 	}
 	for _, g := range groups {
@@ -27,13 +27,13 @@ func (s *Service) countryRelayReachability(ctx context.Context, sn *snapshot, no
 	}
 	users, err := s.st.Access().RelayReachabilityUsers(ctx)
 	if err != nil {
-		s.log.Warn("health: country relay users", "err", err)
+		s.log.Warn("health: country relay users", "code", "country_relay_read_failed", "err", err)
 		return store.RelayReachability{}, false
 	}
 	in.Users = users
 	inbounds, err := s.st.Access().InboundsFull(ctx, "")
 	if err != nil {
-		s.log.Warn("health: country relay inbounds", "err", err)
+		s.log.Warn("health: country relay inbounds", "code", "country_relay_read_failed", "err", err)
 		return store.RelayReachability{}, false
 	}
 	for _, full := range inbounds {
