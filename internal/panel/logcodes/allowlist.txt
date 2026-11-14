@@ -185,13 +185,6 @@ fleet/decoy.go	sync node decoy site	1
 fleet/enroll.go	enroll	1
 fleet/enroll.go	renew	1
 fleet/enroll.go	renew refused	1
-fleet/fleet.go	close remote node link	1
-fleet/fleet.go	poke connected remote nodes	1
-fleet/fleet.go	read live nodes	2
-fleet/fleet.go	read live nodes for remote fan-out	1
-fleet/fleet.go	read online devices	1
-fleet/fleet.go	sweep	1
-fleet/fleet.go	sweep live nodes	1
 fleet/ipv6_check.go	IPv6 check through Globalping	1
 fleet/ipv6_check.go	list inbounds for the IPv6 check	1
 fleet/ipv6_check.go	list nodes for the IPv6 check	1
@@ -229,8 +222,6 @@ fleet/relay.go	relay: the server's spec does not build, the forward is left out	
 fleet/relay_check.go	relay check: list nodes	1
 fleet/relay_check.go	relay check: the server's spec does not build	1
 fleet/relay_check.go	store relay check	1
-fleet/statsguard.go	connection counters over the row limit, the rest dropped	1
-fleet/statsguard.go	node journal over the row limit, the rest dropped	1
 fleet/tls.go	certificate lookup failed	1
 fleet/tls.go	certificate recheck failed	1
 fleet/update.go	record last update	1

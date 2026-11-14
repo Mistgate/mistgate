@@ -223,7 +223,7 @@ const (
 func (f *Fleet) guardJournal(st *agentv1.StatsBatch) []store.FleetJournal {
 	entries := st.GetJournal()
 	if len(entries) > maxJournalEntries && f.log != nil {
-		f.log.Warn("node journal over the row limit, the rest dropped", "rows", len(entries), "limit", maxJournalEntries)
+		f.log.Warn("node journal over the row limit, the rest dropped", "code", "node_journal_over_row_limit", "rows", len(entries), "limit", maxJournalEntries)
 	}
 	if len(entries) > maxJournalEntries {
 		entries = entries[:maxJournalEntries]
@@ -265,7 +265,7 @@ func (f *Fleet) guardJournal(st *agentv1.StatsBatch) []store.FleetJournal {
 func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
 	rows := st.Links
 	if len(rows) > maxStatsDeltas {
-		f.log.Warn("connection counters over the row limit, the rest dropped", "rows", len(rows), "limit", maxStatsDeltas)
+		f.log.Warn("connection counters over the row limit, the rest dropped", "code", "connection_counters_over_row_limit", "rows", len(rows), "limit", maxStatsDeltas)
 		rows = rows[:maxStatsDeltas]
 	}
 	out := make([]store.FleetLink, 0, len(rows))

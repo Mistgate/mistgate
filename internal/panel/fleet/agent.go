@@ -130,7 +130,7 @@ func (s *session) runDesiredPreparation(ctx context.Context) (Transition, error)
 	event.At = s.f.now()
 	tr, err := s.stepCore(ctx, event)
 	if prepareErr != nil && ctx.Err() == nil {
-		s.f.log.Warn("prepare desired state", "node", s.nodeID, "err", prepareErr)
+		s.f.log.Warn("prepare desired state", "code", "prepare_desired_state_failed", "node", s.nodeID, "err", prepareErr)
 	}
 	return tr, err
 }
@@ -149,7 +149,7 @@ func (s *session) startDesiredPreparation() {
 // background preparation would otherwise end it as a bare "stream closed").
 func (s *session) endOnError(err error) {
 	if s.ctx.Err() == nil {
-		s.f.log.Error("session step", "node", s.nodeID, "err", err)
+		s.f.log.Error("session step", "code", "session_step_failed", "node", s.nodeID, "err", err)
 	}
 	var ce *connect.Error
 	switch {
@@ -228,7 +228,7 @@ func (f *Fleet) runSharedEffect(ctx context.Context, nodeID string, effect Sessi
 	case EffectRecordAnswer:
 		if u := f.updates(); u != nil {
 			if err := u.RecordAnswer(ctx, nodeID, effect.RequestID, effect.Result); err != nil {
-				f.log.Warn("record update answer", "node", nodeID, "err", err)
+				f.log.Warn("record update answer", "code", "update_answer_store_failed", "node", nodeID, "err", err)
 			}
 		}
 	}
@@ -466,14 +466,14 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			// the end is written to the store (NodeDisconnected) before the waiters are released: bound it
 			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Second)
 			if _, err := s.stepCore(dctx, SessionEvent{Kind: EventDisconnected, At: f.now()}); err != nil {
-				f.log.Warn("disconnect session core", "node", id, "err", err)
+				f.log.Warn("disconnect session core", "code", "session_disconnect_failed", "node", id, "err", err)
 			}
 			dcancel()
 		}
 		close(s.done)
 	}()
 	if helloErr != nil {
-		f.log.Error("hello response", "node", id, "err", helloErr)
+		f.log.Error("hello response", "code", "hello_response_failed", "node", id, "err", helloErr)
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 	s.dispatchCoreEffects(sctx, tr.Effects)

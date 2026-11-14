@@ -331,7 +331,7 @@ func (f *Fleet) runPokeConnected() {
 		// column; switch to a `ConnectedNodeIDs` query if that read becomes limiting.
 		rows, err := f.Live(ctx)
 		if err != nil {
-			f.log.Warn("read live nodes for remote fan-out", "err", err)
+			f.log.Warn("read live nodes for remote fan-out", "code", "remote_fanout_live_read_failed", "err", err)
 		} else {
 			nodeIDs := make([]string, 0, len(rows))
 			for _, row := range rows {
@@ -340,7 +340,7 @@ func (f *Fleet) runPokeConnected() {
 				}
 			}
 			if err := f.cfg.Remote.Poke(ctx, nodeIDs); err != nil {
-				f.log.Warn("poke connected remote nodes", "err", err)
+				f.log.Warn("poke connected remote nodes", "code", "remote_node_poke_failed", "err", err)
 			}
 		}
 		cancel()
@@ -396,7 +396,7 @@ func (f *Fleet) Online(ctx context.Context) []OnlineSession {
 	var out []OnlineSession
 	rows, err := f.liveView(ctx)
 	if err != nil {
-		f.log.Warn("read live nodes", "err", err)
+		f.log.Warn("read live nodes", "code", "live_nodes_read_failed", "err", err)
 		return nil
 	}
 	for _, row := range rows {
@@ -417,7 +417,7 @@ func (f *Fleet) OnlineUsers() map[string]string {
 	newest := map[string]int64{}
 	rows, err := f.Live(context.Background())
 	if err != nil {
-		f.log.Warn("read live nodes", "err", err)
+		f.log.Warn("read live nodes", "code", "live_nodes_read_failed", "err", err)
 		return out
 	}
 	for _, row := range rows {
@@ -443,7 +443,7 @@ func (f *Fleet) OnlineDevices() map[string][]string {
 	out := map[string][]string{}
 	pairs, err := f.st.OnlineDevices(context.Background(), f.now().UTC())
 	if err != nil {
-		f.log.Warn("read online devices", "err", err)
+		f.log.Warn("read online devices", "code", "online_devices_read_failed", "err", err)
 		return out
 	}
 	for _, p := range pairs {
@@ -471,7 +471,7 @@ func (f *Fleet) session(nodeID string) *session {
 func (f *Fleet) drop(ctx context.Context, nodeID, reason string) {
 	if f.cfg.Remote != nil {
 		if err := f.cfg.Remote.Close(ctx, nodeID, reason); err != nil {
-			f.log.Warn("close remote node link", "node", nodeID, "err", err)
+			f.log.Warn("close remote node link", "code", "remote_node_close_failed", "node", nodeID, "err", err)
 		}
 		return
 	}
@@ -511,12 +511,12 @@ func (f *Fleet) Sweep(ctx context.Context) { f.sweep(ctx) }
 func (f *Fleet) sweep(ctx context.Context) {
 	nodes, err := f.st.Nodes(ctx, false)
 	if err != nil {
-		f.log.Warn("sweep", "err", err)
+		f.log.Warn("sweep", "code", "node_sweep_failed", "err", err)
 		return
 	}
 	liveRows, err := f.Live(ctx)
 	if err != nil {
-		f.log.Warn("sweep live nodes", "err", err)
+		f.log.Warn("sweep live nodes", "code", "live_nodes_sweep_read_failed", "err", err)
 		return
 	}
 	liveByID := liveRowsByID(liveRows)
