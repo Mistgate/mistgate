@@ -21,6 +21,7 @@ import { EventsTab } from "@/screens/node/events";
 import { AuditPage } from "@/screens/settings-pages/audit";
 import { UpdateDownloadSourcesCard, UpdateDownloadTimeoutCard } from "@/screens/settings-pages/system";
 import { UpdatesScreen } from "@/screens/updates";
+import { ChannelDialog } from "@/screens/updates/channel";
 import { UsersScreen } from "@/screens/users/list";
 import { groupsQuery } from "@/screens/users/rpc";
 
@@ -368,6 +369,23 @@ export const panelOffer = page({
     upNode({ nodeId: "nod_nl1", name: "nl1", address: "nl1.example.com", lastUpdate: lastOk(V_OLD, V_NEW, 4 * H) }),
   ],
 });
+// the panel follows Testing, the root-owned policy file says stable (or cannot be read): a state of the panel card with the command
+const policyOffer = (errorKey: string) =>
+  page({
+    updateChannel: "testing",
+    panel: {
+      version: "v0.1.24",
+      built: B_NEW,
+      hasReleaseKey: true,
+      releaseKeyFingerprint: "abcd1234abcd1234",
+      update: { version: "v0.1.25-testing.1", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.1.25-testing.1", publishedUnix: NOW - H, checkedUnix: NOW - 300, available: true, supported: true, installable: false, installing: false, errorKey, built: NOW - H, sha256: "" },
+    },
+    nodes: [
+      upNode({ nodeId: "nod_de1", name: "de1", lastUpdate: lastOk(V_OLD, V_NEW, 5 * H) }),
+      upNode({ nodeId: "nod_fi1", name: "fi1", address: "fi1.example.com", lastUpdate: lastOk(V_OLD, V_NEW, 5 * H) }),
+      upNode({ nodeId: "nod_nl1", name: "nl1", address: "nl1.example.com", lastUpdate: lastOk(V_OLD, V_NEW, 4 * H) }),
+    ],
+  });
 const untrusted = page({
   bundle: { ...bundle, status: BundleStatus.UNTRUSTED, errorKey: "updates.bundle.err.file_mismatch", params: { file: "mistgate-node-linux-amd64" } },
   nodes: [upNode({ state: NodeUpdateState.OUTDATED, version: V_OLD, built: B_OLD }), upNode({ nodeId: "nod_fi1", name: "fi1", state: NodeUpdateState.OFFLINE, version: V_OLD, built: B_OLD, address: "fi1.example.com" })],
@@ -491,6 +509,15 @@ export function UpdatesKit() {
       </Shot>
       <Shot id="updates-notes-panel" title="Updates: what's new in the panel card, a signed release is out" seed={[[updatesQuery.queryKey, panelOfferNotes]]}>
         <UpdatesScreen />
+      </Shot>
+      <Shot id="updates-panel-channel-not-allowed" title="Updates: the panel follows Testing, the root policy file allows stable" seed={[[updatesQuery.queryKey, policyOffer("channel_not_allowed")]]}>
+        <UpdatesScreen />
+      </Shot>
+      <Shot id="updates-panel-channel-invalid" title="Updates: the root policy file cannot be used" seed={[[updatesQuery.queryKey, policyOffer("channel_config_invalid")]]}>
+        <UpdatesScreen />
+      </Shot>
+      <Shot id="updates-channel-dialog" title={`Updates: the channel window (${new URLSearchParams(location.search).get("dialog") === "channel" ? "open" : "?dialog=channel opens it"})`}>
+        <ChannelDialog open={new URLSearchParams(location.search).get("dialog") === "channel"} onOpenChange={() => {}} current="testing" running={{ version: "v0.1.24", channel: "testing" }} onPick={async () => true} />
       </Shot>
       <Shot id="updates-untrusted" title="Updates: the bundle failed the check (its details open by themselves)" seed={[[updatesQuery.queryKey, untrusted]]}>
         <UpdatesScreen />
