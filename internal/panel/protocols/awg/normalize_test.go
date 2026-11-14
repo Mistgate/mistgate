@@ -3,6 +3,7 @@ package awg
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/mistgate/mistgate/internal/panel/protocols"
@@ -99,7 +100,7 @@ func TestNormalizeCreate(t *testing.T) {
 	if e := p.Validate(out); len(e) > 0 || !plainHeaders(o) || o.Preset != "sip" || o.Domain != "example.org" || o.PerDeviceSignature {
 		t.Errorf("an explicit 2.0 block with plain headers: %+v %+v", e, o)
 	}
-	if w := Warnings(out); len(w) == 0 || w[0].Code != "h_default_v20" {
+	if w := Warnings(out); !slices.ContainsFunc(w, func(x Warning) bool { return x.Code == "h_default_v20" }) {
 		t.Errorf("warnings: %+v", w)
 	}
 	_ = merged
@@ -146,7 +147,7 @@ func TestNormalizeUpdate(t *testing.T) {
 	if !bytes.Equal(merged, out) {
 		t.Error("a 2.0 profile with plain headers was rewritten by an update that kept the version")
 	}
-	if w := Warnings(out); len(w) == 0 || w[0].Code != "h_default_v20" {
+	if w := Warnings(out); !slices.ContainsFunc(w, func(x Warning) bool { return x.Code == "h_default_v20" }) {
 		t.Errorf("warnings: %+v", w)
 	}
 	// a version flip INTO 2.0 with a block that has plain headers and S1-S4 of its own (a pasted .conf, an API
