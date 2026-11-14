@@ -93,6 +93,17 @@ describe("the servers", () => {
     expect(normalize({ servers: [{ id: "a", label: "x", connections: [{ way: "link", mihomo_only: true }, { way: "link" }] }] }).servers.map((s) => s.connections.map((c) => c.mihomo_only === true))).toEqual([[true, false]]);
   });
 
+  it("an AmneziaWG server through a relay: the key stays direct, its twin is a Mihomo-only link 'через RU', and the card does not say the whole server is Mihomo-only", () => {
+    const byName = (el: HTMLElement, n: string) => cards(el).find((x) => text(x.querySelector(".srv-name")).startsWith(n))!;
+    const de = byName(page("awg-relay"), "Германия");
+    expect([...de.querySelectorAll(".chips .chip")].map(text)).toEqual(["по ссылке", "ключ", "через RU"]);
+    expect(text(de.querySelector(".srv-app"))).toContain("DE · AmneziaWG · через RU");
+    expect(text(de.querySelector(".srv-mihomo"))).toBe("Часть подключений — только в kl!ck и других Mihomo-приложениях");
+    // the same twin on a server with no key is Mihomo-only altogether
+    const linkOnly = page("awg-relay", undefined, (d) => (d.servers[0]!.connections = d.servers[0]!.connections.filter((c) => c.way === "link")));
+    expect(text(byName(linkOnly, "Германия").querySelector(".srv-mihomo"))).toBe("Только в kl!ck и других Mihomo-приложениях");
+  });
+
   it("a twin through a relay node reads as 'через RU' on its server's card, with its name in the apps; the fields survive reading the data", () => {
     const byName = (el: HTMLElement, n: string) => cards(el).find((x) => text(x.querySelector(".srv-name")).startsWith(n))!;
     const ru = page("relay");

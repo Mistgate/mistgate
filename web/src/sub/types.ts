@@ -122,6 +122,9 @@ export type AmneziaData = {
 /** One config of a device on one node, as the endpoints answer. */
 export type AwgConfig = {
   node_id: string;
+  /** A config through an entry node (a relay): that node's id and country code ("" for the direct config, which shares node_id). */
+  via_node_id: string;
+  via_country: string;
   /** The server as the page names it ("Germany · Frankfurt", "Server"), never the panel's node name. It is also what the connection is called in the app. */
   label: string;
   country_code: string;

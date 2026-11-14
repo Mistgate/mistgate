@@ -246,7 +246,8 @@ function keySheet(c: AmzCtx, x: AwgDevice, mode: "shown" | "created" | "renew"):
   };
   const fileOnly = cfg.warnings.includes("amnezia_desktop_mtu") && note("warn", "warn", t.desktopFileOnly);
   // the old connection in the app is called by the country (the mockup: "Germany"), as the new keys are named
-  const oldConn = countryName(cfg.country_code, s.lang) || cfg.label;
+  // (a key through an entry is a connection of its own, named as the page names it: "Germany · via RU")
+  const oldConn = cfg.via_node_id ? cfg.label : countryName(cfg.country_code, s.lang) || cfg.label;
   const [pasteStep, deleteStep] = t.renewSteps(app, oldConn);
 
   const body: Kid[] = [];
@@ -304,6 +305,8 @@ function keySheet(c: AmzCtx, x: AwgDevice, mode: "shown" | "created" | "renew"):
           h("div", { class: "seg pills only-w", role: "radiogroup", "aria-labelledby": `k-c-${x.id}` }, ...labels.map((l, k) => h("button", { class: i === k ? "on" : "", type: "button", role: "radio", "aria-checked": i === k, "data-k": `amz-node-${x.id}-${k}`, on: { click: () => a.amz.node(x.id, k) } }, l))),
           h("p", { class: "hint only-w" }, t.countryH),
         ),
+      // the key through an entry is another server in the app: said once, where it is picked
+      cfg.via_node_id && note("", "info", t.viaKeyNote(t.chipVia(cfg.via_country), app)),
       ...body,
       h("div", { class: "div" }),
       h(

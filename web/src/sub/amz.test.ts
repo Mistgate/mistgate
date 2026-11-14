@@ -606,6 +606,30 @@ describe("the key dialog", () => {
     expect(text(w.querySelector(".fld > .hint.only-w"))).toBe("Каждая страна — отдельное подключение. Добавьте одну; перестанет работать — добавьте другую.");
   });
 
+  it("a key through an entry shares the node of the direct one: it is named as the app names it, says once that it is a new server, and is the connection to delete when renewed", () => {
+    const via = awgConfig({ node_id: "de1", via_node_id: "nod_msk1", via_country: "ru", label: "Германия · Франкфурт · via RU", country_code: "DE", version: "3.1", conf: "[Interface]\nPrivateKey = y\n", vpn_key: "vpn://via", filename: "mistgate-de-via-ru.conf" });
+    expect([via.via_node_id, via.via_country]).toEqual(["nod_msk1", "RU"]);
+    expect([cfg("de1").via_node_id, cfg("de1").via_country]).toEqual(["", ""]);
+    expect(awgConfig({ node_id: "de1", via_country: "RU" }).via_country).toBe(""); // a country with no entry means nothing
+    expect(nodeLabels([cfg("de1"), via])).toEqual(["🇩🇪 Германия · Франкфурт", "🇩🇪 Германия · Франкфурт · via RU"]);
+    const open = (mode: "open" | "renew", pick: number) => {
+      const d = data("return");
+      const s = { lang: "ru" as const, amz: newAmzState("android", "p31", "android") };
+      s.amz[mode] = "d3";
+      s.amz.configs.d3 = [cfg("de1"), via];
+      s.amz.node.d3 = pick;
+      const box = document.createElement("div");
+      box.append(...(addModal({ d, s, a: actions(), t }) as Node[]));
+      return box;
+    };
+    expect(open("open", 0).querySelector(".cfg > .note")).toBeNull();
+    const note = open("open", 1).querySelectorAll(".cfg > .note");
+    expect([...note].map(text)).toEqual(["Это отдельный ключ для пути через RU: импортируйте его в AmneziaVPN как новый сервер."]);
+    expect(open("open", 1).querySelector(".pick .t")?.textContent).toBe("🇩🇪 Германия · Франкфурт · via RU");
+    expect(text(open("renew", 1).querySelector(".steps-box li:last-child"))).toContain("«Германия · Франкфурт · via RU»");
+    expect(text(open("renew", 0).querySelector(".steps-box li:last-child"))).toContain("«Германия»");
+  });
+
   it("the new key of a stale device: what to add, and which old connection goes (by country, never by the panel's node)", () => {
     const b = modal("android", "d3", "renew", () => {}, "stale");
     expect(text(b.querySelector("h3"))).toBe("Новый ключ для «Pixel 7»");
