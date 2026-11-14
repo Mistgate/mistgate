@@ -389,12 +389,19 @@ func installLatestPanelUpdate(ctx context.Context, cfg PanelUpdateConfig, system
 	if err != nil {
 		return fmt.Errorf("panel-update-helper: %w", err)
 	}
-	// The helper does not read the panel's update_channel: it looks on the channel of the release the panel confirmed
-	// (v1.2.3-dev.1 -> dev), so a panel on Testing or Development updates to what it offered, not to the newest stable.
-	// The channel only widens which signed releases are looked at; the version and digest must still match the request.
-	if channel, ok := release.ChannelOf(want.Version); ok {
-		updater.cfg.Channel = func() release.Channel { return channel }
+	allowedChannel, err := readRootAllowedPanelUpdateChannel(cfg.AllowedChannelFile)
+	if err != nil {
+		return fmt.Errorf("panel-update-helper: %w", err)
 	}
+	requestedChannel, _ := release.ParseChannel(want.Channel) // takePanelUpdateRequest validated it.
+	if requestedChannel != allowedChannel {
+		return fmt.Errorf("panel-update-helper: %w (to allow %s, run: %s)",
+			panelUpdateChannelNotAllowedError(requestedChannel, allowedChannel), requestedChannel, panelUpdateChannelCommand(requestedChannel))
+	}
+	// The request may confirm one channel, but it cannot choose the helper's search range: that always comes from the
+	// root-owned policy file. The signed manifest, exact version and digest checks still narrow the candidate further.
+	updater.cfg.Channel = func() release.Channel { return allowedChannel }
+	cfg.Channel = updater.cfg.Channel
 	checkCtx, cancelCheck := context.WithTimeout(ctx, panelUpdateCheckTimeout)
 	status, rel, err := updater.fetchStatus(checkCtx)
 	cancelCheck()

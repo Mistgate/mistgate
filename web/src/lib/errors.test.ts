@@ -26,6 +26,14 @@ describe("the panel's refusal codes", () => {
     expect(errorVars("device_limit: 5/5").detail).toBe("5/5"); // the older "code: detail" keeps its detail
   });
 
+  it("word a channel the root update policy does not allow, with a command built from the channel word only", () => {
+    const cmd = "sudo sh -c 'install -d -o root -g root -m 0755 /etc/mistgate && tmp=$(mktemp /etc/mistgate/.panel-update-channel.XXXXXX) && printf \"%s\\n\" testing > \"$tmp\" && chmod 0644 \"$tmp\" && mv -f \"$tmp\" /etc/mistgate/panel-update-channel'";
+    expect(say("panel_update_channel_not_allowed: allowed=stable&channel=testing", Code.FailedPrecondition)).toBe(`The update helper installs only from stable, but this panel follows testing. To allow testing, run on the server: ${cmd}`);
+    expect(say("panel_update_channel_not_allowed: allowed=stable&channel=testing", Code.FailedPrecondition, "ru")).toContain(cmd);
+    expect(say("panel_update_channel_not_allowed: allowed=stable&channel=%3B+rm+-rf", Code.FailedPrecondition)).not.toContain("rm -rf"); // an unknown word reads as stable
+    expect(say("panel_update_channel_config_invalid: x+must+be+owned+by+root", Code.FailedPrecondition)).toContain("/etc/mistgate/panel-update-channel");
+  });
+
   it("word the relay refusals: a port a relay holds, a server that cannot be relayed, a check that is missing, old or failed", () => {
     expect(say("port_taken: free=8444&node=msk1&port=8443&profile=relay+to+de1", Code.AlreadyExists, "ru")).toBe("Порт 8443 на msk1 уже занят ретрансляцией.");
     expect(say("port_taken: node=msk1&port=8443&profile=relay", Code.AlreadyExists)).toBe("Port 8443 on msk1 is already taken by a relay.");

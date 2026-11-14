@@ -13,7 +13,7 @@ import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { bundleErrorText, heroOf, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
 import { Command } from "./nodes";
-import { asChannel } from "@/lib/channels";
+import { asChannel, panelChannelCommand } from "@/lib/channels";
 import { ChannelChip, ChannelDialog, channelName } from "./channel";
 import { WhatsNew } from "./notes";
 import { PanelUpdateWindow } from "./update-dialog";
@@ -193,6 +193,8 @@ export function panelUpdate(t: ReturnType<typeof useT>, data: Updates, edge: boo
     unsigned: t("up.panel.unsigned", { version: update?.version ?? "" }),
     expired: t("up.panel.expired", { version: update?.version ?? "" }),
     no_key: t("up.panel.noKeyUpdate"),
+    channel_not_allowed: t("up.panel.channelNotAllowed", { channel: asChannel(data.updateChannel) }),
+    channel_config_invalid: t("up.panel.channelConfigInvalid"),
     install_failed: t("up.panel.installFailed"),
   };
   const label = update?.installing
@@ -215,6 +217,23 @@ export function panelUpdate(t: ReturnType<typeof useT>, data: Updates, edge: boo
           ? "off"
           : "ok";
   return { p, update, label, kind };
+}
+
+/**
+ * The root update helper follows its own channel file, and it names another channel than the one selected (or cannot be
+ * read): shown as a state of the card, once, with the command that fixes it, instead of an error at every check.
+ */
+function ChannelPolicy({ data, owner }: { data: Updates; owner: boolean }) {
+  const t = useT();
+  const key = data.panel?.update?.errorKey;
+  if (!owner || (key !== "channel_not_allowed" && key !== "channel_config_invalid")) return null;
+  const channel = asChannel(data.updateChannel);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs leading-normal text-pretty text-muted">{t(key === "channel_not_allowed" ? "up.panel.channelHint" : "up.panel.channelConfigHint", { channel })}</p>
+      <Command value={panelChannelCommand(channel)} />
+    </div>
+  );
 }
 
 /** The steps for a panel that cannot update itself from here (no systemd service). */
@@ -312,6 +331,7 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
           {owner && !off && <PanelUpdateWindow open={win} onOpenChange={setWin} data={data} actions={actions} />}
         </div>
         {edition.edge ? <EdgeDeploy version={update?.version} /> : off ? <EditionNotice feature="panel_update" /> : <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
+        {!off && <ChannelPolicy data={data} owner={owner} />}
       </div>
       {!update?.supported && !off && (
         <div className="border-t border-line pt-3">
@@ -365,6 +385,7 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
         <p className="text-xs leading-snug text-pretty text-muted">{t("up.ch.ahead", { version: running.version, channel: channelName(t, channel) })}</p>
       )}
       {edition.edge ? <EdgeDeploy version={update?.version} /> : <EditionNotice feature="panel_update" />}
+      {!off && <ChannelPolicy data={data} owner={owner} />}
       <WhatsNew notes={data.panelNotes} />
       {owner && (
         <ChannelDialog open={win === "channel"} onOpenChange={(o) => setWin(o ? "channel" : "")} current={channel} running={running} onPick={actions.setChannel} />

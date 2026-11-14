@@ -353,7 +353,8 @@ func (r rpc) InstallPanelUpdate(ctx context.Context, req *connect.Request[adminv
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPanelUnsupported), errors.Is(err, ErrNoPanelRelease), errors.Is(err, ErrNoPanelUpdate), errors.Is(err, ErrPanelAssetMissing),
-			errors.Is(err, ErrPanelUnsigned), errors.Is(err, ErrPanelExpired), errors.Is(err, ErrPanelNoKey), errors.Is(err, ErrPanelChanged):
+			errors.Is(err, ErrPanelUnsigned), errors.Is(err, ErrPanelExpired), errors.Is(err, ErrPanelNoKey), errors.Is(err, ErrPanelChanged),
+			errors.Is(err, ErrPanelUpdateChannelNotAllowed), errors.Is(err, ErrPanelUpdateChannelConfig):
 			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 		default:
 			return nil, connect.NewError(connect.CodeUnavailable, err)

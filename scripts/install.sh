@@ -8,6 +8,7 @@ readonly PANEL_SIGNATURE_CONTEXT="mistgate panel manifest v1"
 readonly PANEL_SSHSIG_NAMESPACE="mistgate-panel-manifest-v1"
 readonly DEFAULT_DATA_DIR="/var/lib/mistgate"
 readonly UNIT_FILE="/etc/systemd/system/mistgate.service"
+readonly PANEL_UPDATE_CHANNEL_FILE="/etc/mistgate/panel-update-channel"
 
 public_url=""
 public_host=""
@@ -33,6 +34,7 @@ test_ssh_public_key=""
 test_arch=""
 test_os=""
 test_bin_dir="/usr/local/bin"
+test_etc_dir=""
 test_skip_systemd=0
 test_skip_port_check=0
 
@@ -70,6 +72,27 @@ USAGE
 fail() {
   printf 'mistgate installer: %s\n' "$1" >&2
   exit 1
+}
+
+write_panel_update_channel_policy() {
+  local channel_dir channel_tmp
+  channel_dir=${panel_update_channel_file%/*}
+  install -d -m 0755 -- "$channel_dir"
+  # Keep an existing root policy. The installer is for a fresh panel; changing an existing allowed channel is a
+  # separate root action and must not be inferred from the panel's writable settings database.
+  if [[ -e "$panel_update_channel_file" || -L "$panel_update_channel_file" ]]; then
+    return 0
+  fi
+  channel_tmp=$(mktemp "$channel_dir/.panel-update-channel.XXXXXX") || fail "could not create the root update channel policy"
+  printf '%s\n' "$channel" > "$channel_tmp"
+  chmod 0644 -- "$channel_tmp"
+  if ! ln -- "$channel_tmp" "$panel_update_channel_file"; then
+    if [[ ! -e "$panel_update_channel_file" && ! -L "$panel_update_channel_file" ]]; then
+      rm -f -- "$channel_tmp"
+      fail "could not install the root update channel policy"
+    fi
+  fi
+  rm -f -- "$channel_tmp"
 }
 
 need_value() {
@@ -330,11 +353,12 @@ if [[ "${MISTGATE_INSTALL_TEST:-}" == "1" ]]; then
   test_arch=${MISTGATE_INSTALL_TEST_ARCH:-}
   test_os=${MISTGATE_INSTALL_TEST_OS:-}
   test_bin_dir=${MISTGATE_INSTALL_TEST_BIN_DIR:-/usr/local/bin}
+  test_etc_dir=${MISTGATE_INSTALL_TEST_ETC_DIR:-${test_bin_dir%/}/etc}
   test_skip_systemd=${MISTGATE_INSTALL_SKIP_SYSTEMD:-0}
   test_skip_port_check=${MISTGATE_INSTALL_SKIP_PORT_CHECK:-0}
 else
   for name in MISTGATE_INSTALL_BASE_URL MISTGATE_INSTALL_TEST_KEY MISTGATE_INSTALL_TEST_ARCH \
-    MISTGATE_INSTALL_TEST_SSH_PUBLIC_KEY_BASE64 MISTGATE_INSTALL_TEST_OS MISTGATE_INSTALL_TEST_BIN_DIR MISTGATE_INSTALL_SKIP_SYSTEMD \
+    MISTGATE_INSTALL_TEST_SSH_PUBLIC_KEY_BASE64 MISTGATE_INSTALL_TEST_OS MISTGATE_INSTALL_TEST_BIN_DIR MISTGATE_INSTALL_TEST_ETC_DIR MISTGATE_INSTALL_SKIP_SYSTEMD \
     MISTGATE_INSTALL_SKIP_PORT_CHECK; do
     [[ -z "${!name:-}" ]] || fail "$name is only available when MISTGATE_INSTALL_TEST=1"
   done
@@ -429,7 +453,7 @@ if [[ "$test_skip_systemd" != "1" ]]; then
   [[ -d /run/systemd/system ]] || fail "systemd is required"
   command -v systemctl >/dev/null 2>&1 || fail "systemctl is required"
 fi
-for tool in curl sha256sum base64 awk grep install mktemp sed wc tr date sort tail cut; do
+for tool in curl sha256sum base64 awk grep install mktemp ln sed wc tr date sort tail cut; do
   command -v "$tool" >/dev/null 2>&1 || fail "required command not found: $tool"
 done
 if [[ "$test_skip_port_check" != "1" ]]; then
@@ -461,9 +485,11 @@ fi
 if [[ "$test_mode" == "1" ]]; then
   base_url=${test_base_url:-$RELEASES_URL}
   install_bin_dir=$test_bin_dir
+  panel_update_channel_file="${test_etc_dir%/}/mistgate/panel-update-channel"
 else
   base_url=$RELEASES_URL
   install_bin_dir=/usr/local/bin
+  panel_update_channel_file=$PANEL_UPDATE_CHANNEL_FILE
 fi
 if [[ -n "$version" ]]; then
   release_path="$base_url/releases/download/$version"
@@ -657,7 +683,8 @@ if [[ "$dry_run" == "1" ]]; then
   exit 0
 fi
 
-printf '4. Install the verified panel binary.\n'
+printf '4. Install the root-owned panel update channel and verified binary.\n'
+write_panel_update_channel_policy
 if [[ "$test_mode" == "1" ]]; then
   mkdir -p -- "$install_bin_dir"
 fi

@@ -1,6 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { T } from "@/i18n";
 import { editionFeatures, type EditionFeature } from "@/i18n/edition";
+import { asChannel, panelChannelCommand } from "./channels";
 import { lossyVars } from "./port-check";
 
 /**
@@ -63,6 +64,9 @@ export const errorCodes = [
   "os_blocked",
   "os_cancel_inflight",
   "node_updating",
+  // the root update helper follows /etc/mistgate/panel-update-channel (InstallPanelUpdate, FailedPrecondition): "channel=<selected>&allowed=<policy>"
+  "panel_update_channel_not_allowed",
+  "panel_update_channel_config_invalid",
 ] as const;
 
 /**
@@ -111,6 +115,11 @@ function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
   if (!errorCodes.includes(code)) return undefined;
   const vars = errorVars(c.rawMessage);
+  // the command is built here from the validated channel word, never taken from the message
+  if (code === "panel_update_channel_not_allowed") {
+    const channel = asChannel(vars.channel);
+    return t("err.panel_update_channel_not_allowed", { ...vars, channel, allowed: asChannel(vars.allowed), command: panelChannelCommand(channel) });
+  }
   // a relay holds the port: the panel names it "relay" or "relay to <exit>", not a profile
   if (code === "port_taken" && /^relay($| )/.test(vars.profile ?? "")) return t("err.port_taken_relay", vars);
   const filled =

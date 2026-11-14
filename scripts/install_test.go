@@ -396,6 +396,27 @@ func TestInstallerSkipsSystemdInTestMode(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(binDir, "mistgate")); err != nil {
 		t.Fatalf("installed test panel is missing: %v", err)
 	}
+	channelFile := filepath.Join(binDir, "etc", "mistgate", "panel-update-channel")
+	if got, err := os.ReadFile(channelFile); err != nil || string(got) != "stable\n" {
+		t.Fatalf("default allowed channel file = %q, %v; want stable", got, err)
+	}
+	if info, err := os.Stat(channelFile); err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("allowed channel file mode = %v, %v; want 0644", info, err)
+	}
+
+	devBase := t.TempDir()
+	devBinDir := filepath.Join(devBase, "bin")
+	devDataDir := filepath.Join(devBase, "data")
+	devArgs := []string{"--public-url", "https://panel.example.com", "--version", installerTestVersion,
+		"--data-dir", devDataDir, "--yes", "--channel", "dev"}
+	output, err = runInstaller(t, bash, server.URL, release.publicKey, release.sshPublicKey, filepath.ToSlash(devBinDir), "x86_64", devArgs...)
+	if err != nil {
+		t.Fatalf("dev installer failed: %v\n%s", err, output)
+	}
+	devChannelFile := filepath.Join(devBinDir, "etc", "mistgate", "panel-update-channel")
+	if got, err := os.ReadFile(devChannelFile); err != nil || string(got) != "dev\n" {
+		t.Fatalf("selected allowed channel file = %q, %v; want dev", got, err)
+	}
 }
 
 func TestInstallerRestoresAnEncryptedBackupBeforeTheFirstStart(t *testing.T) {
@@ -646,7 +667,7 @@ func runInstallerWithPath(t *testing.T, bash, baseURL, key, sshPublicKey, binDir
 func installerPathWithoutSignatureTools(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	for _, name := range []string{"curl", "sha256sum", "base64", "awk", "grep", "install", "mktemp", "sed", "wc", "tr", "date", "sort", "tail", "cut", "uname", "rm"} {
+	for _, name := range []string{"curl", "sha256sum", "base64", "awk", "grep", "install", "mktemp", "ln", "sed", "wc", "tr", "date", "sort", "tail", "cut", "uname", "rm"} {
 		path, err := exec.LookPath(name)
 		if err != nil {
 			t.Fatalf("required installer command %s: %v", name, err)
@@ -673,6 +694,7 @@ func installerTestEnv(baseURL, key, sshPublicKey, binDir, arch, skipSystemd, ski
 		"MISTGATE_INSTALL_TEST_ARCH="+arch,
 		"MISTGATE_INSTALL_TEST_OS=Linux",
 		"MISTGATE_INSTALL_TEST_BIN_DIR="+binDir,
+		"MISTGATE_INSTALL_TEST_ETC_DIR="+filepath.Join(binDir, "etc"),
 		"MISTGATE_INSTALL_SKIP_SYSTEMD="+skipSystemd,
 		"MISTGATE_INSTALL_SKIP_PORT_CHECK="+skipPortCheck,
 	)

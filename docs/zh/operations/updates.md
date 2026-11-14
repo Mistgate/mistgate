@@ -243,7 +243,9 @@ chmod +x /root/mistgate-node.new && mv /root/mistgate-node.new /root/mistgate-no
 
 仅当发布版本包含 `panel-manifest.json` 和 `panel-manifest.sig`、签名通过编译进此面板的发布密钥验证（`release.pub` 不计入：面板服务用户可以写入该文件）、清单未过期且构建时间晚于当前面板时，才可以安装面板发布版本。发布版本按构建时间而不是版本字符串排序：如果面板是从标签之后的提交构建的（例如 `v0.1.6-3-gabc1234`），则不会将 `v0.1.6` 视为更新，因此也不会向已执行相应数据库迁移的面板提供降级版本。没有此类清单的发布版本会显示「没有使用此面板的发布密钥签名，无法安装」；清单过期的发布版本会显示为已过期，直到重新签名。卡片会显示发布版本构建日期和适用于此服务器的二进制 SHA-256。**更新面板**会提交该版本和 SHA-256；如果此时最新的已签名发布版本已不同，面板会拒绝更新。
 
-面板以 root 身份运行并由 systemd 管理时，可以自动安装更新。使用非特权服务用户（例如 `mistgate`）运行的面板可以使用下面固定的 root 辅助程序；HTTP 面板本身仍以非特权用户运行。无论哪种情况，所有者都必须重新验证，并且必须先完成当前节点滚动更新。面板会将已确认的版本和 SHA-256 写入 `<data-dir>/panel-update.request`，然后启动辅助程序（root 面板使用临时 systemd 单元 `mistgate-panel-update-<time>.service`，其他面板使用 `mistgate-panel-update.service`）。请求只能缩小辅助程序可以安装的范围。辅助程序会使用编译进已安装二进制的密钥自行验证发布版本的面板清单，确认清单中的版本和 SHA-256 与已确认内容完全相同且构建时间更新，下载二进制并检查大小、SHA-256 和 ELF 架构。只有全部检查通过后，辅助程序才会停止面板、备份数据目录、替换二进制并重新启动面板。
+面板以 root 身份运行并由 systemd 管理时，可以自动安装更新。使用非特权服务用户（例如 `mistgate`）运行的面板可以使用下面固定的 root 辅助程序；HTTP 面板本身仍以非特权用户运行。无论哪种情况，所有者都必须重新验证，并且必须先完成当前节点滚动更新。面板会将所选渠道、已确认的版本和 SHA-256 写入 `<data-dir>/panel-update.request`，然后启动辅助程序（root 面板使用临时 systemd 单元 `mistgate-panel-update-<time>.service`，其他面板使用 `mistgate-panel-update.service`）。请求只能缩小辅助程序可以安装的范围。辅助程序会使用编译进已安装二进制的密钥自行验证发布版本的面板清单，确认清单中的版本和 SHA-256 与已确认内容完全相同且构建时间更新，下载二进制并检查大小、SHA-256 和 ELF 架构。只有全部检查通过后，辅助程序才会停止面板、备份数据目录、替换二进制并重新启动面板。
+
+辅助程序允许的发布渠道来自 root 所有的 `/etc/mistgate/panel-update-channel` 文件。全新安装仅在策略文件不存在时，才会根据安装器的 `--channel` 创建该文件（默认 `stable`）。如果文件不存在，辅助程序按 `stable` 处理，因此现有稳定版安装无需迁移。更新页面把渠道选择保存在面板数据库中；重新验证保护该设置，但不会让 `mistgate` 进程有权写入 root 策略文件。面板会把所选渠道、已确认版本和 SHA-256 写入 `panel-update.request`。如果所选渠道与允许渠道不同，更新页面只会在面板卡片上以状态的形式说明一次，并附上用于修改允许渠道的 root 命令（没有“更新”按钮，也不会反复报错），辅助程序自身也会以 `panel_update_channel_not_allowed` 拒绝。该文件必须是 root 所有、组和其他用户不可写的普通文件，内容为一个词（`stable`、`testing` 或 `dev`），且位于 root 所有、其他用户不可写的目录中；其他情况（包括符号链接）都会以 `panel_update_channel_config_invalid` 拒绝，页面会显示替换该文件的命令。当前使用 Testing 或 Development 的安装不会被静默切换：在所有者运行该命令之前，它们的更新会等待，而现有稳定版安装无需任何操作即可继续更新。
 
 新面板必须在 systemd 未重启它的情况下持续运行 45 秒（设置为 `Restart=on-failure` 时，几秒后的崩溃只会显示为重启）。否则，辅助程序会停止新面板、恢复旧二进制和数据备份（包括原始文件所有权），再启动旧面板。更新成功后，旧二进制会保留为 `<binary>.prev`；数据快照会保存在数据目录旁边，路径为 `<data-dir>.panel-update-backup.tar.gz`。如果辅助程序在未替换面板的情况下退出（检查或下载失败），更新页面会在几秒内显示更新未完成；随后可以重新开始滚动更新或其他更新。`journalctl -u 'mistgate-panel-update*'` 会说明原因。
 
@@ -252,6 +254,12 @@ chmod +x /root/mistgate-node.new && mv /root/mistgate-node.new /root/mistgate-no
 ### 为非 root 面板服务启用更新
 
 对于使用 `User=mistgate` 的 systemd 面板单元，请安装由 root 所有的辅助单元及其受限 PolicyKit 规则。该规则只允许此账户启动 `mistgate-panel-update.service`；不会授予通用 systemd 控制权限或 root shell。面板单元可以保留 `NoNewPrivileges=yes`。辅助单元只会更新标准目录结构：二进制 `/usr/local/bin/mistgate`、数据目录 `/var/lib/mistgate` 和服务 `mistgate.service`。如果非 root 面板安装在其他位置，选择**更新面板**时会显示包含这些路径的错误；请手动更新。
+
+如需明确允许其他渠道，请以 root 身份运行面板显示的命令。以下命令将允许渠道设为 Development：
+
+```sh
+sudo sh -c 'install -d -o root -g root -m 0755 /etc/mistgate && tmp=$(mktemp /etc/mistgate/.panel-update-channel.XXXXXX) && printf "%s\n" dev > "$tmp" && chmod 0644 "$tmp" && mv -f "$tmp" /etc/mistgate/panel-update-channel'
+```
 
 ```sh
 install -o root -g root -m 0644 deploy/systemd/mistgate-panel-update.service /etc/systemd/system/mistgate-panel-update.service

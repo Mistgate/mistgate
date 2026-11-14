@@ -172,7 +172,8 @@ func newPanelUpdater(t *testing.T, f *panelFixture, rec *recorder, mutate func(*
 	dataDir := t.TempDir()
 	cfg := PanelUpdateConfig{
 		CurrentBuilt: panelOwnBuilt, Key: panelTestPub, DataDir: dataDir, ServiceUnit: "mistgate.service",
-		Executable: filepath.Join(dataDir, "mistgate"), Enabled: true, OS: "linux", Arch: "amd64", HTTPClient: client,
+		Executable: filepath.Join(dataDir, "mistgate"), AllowedChannelFile: filepath.Join(dataDir, "missing-panel-update-channel"),
+		Enabled: true, OS: "linux", Arch: "amd64", HTTPClient: client,
 		Runner: rec.run, Now: func() time.Time { return panelTestNow }, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 	if mutate != nil {
@@ -223,7 +224,7 @@ func TestPanelUpdaterOffersSignedReleaseAndSchedulesTheHelper(t *testing.T) {
 		containsArg(l[0], "--sha256") || !containsArg(l[0], "--property=TimeoutStartSec=30min") {
 		t.Fatalf("unexpected launch command: %#v", l)
 	}
-	if r := readRequest(t, dataDir); r.Version != "v1.2.0" || r.SHA256 != f.digest() {
+	if r := readRequest(t, dataDir); r.Version != "v1.2.0" || r.SHA256 != f.digest() || r.Channel != "stable" {
 		t.Fatalf("request = %+v", r)
 	}
 	if !updater.Status().Installing {
@@ -251,7 +252,7 @@ func TestPanelUpdaterRequestsFixedRootHelperForNonRootService(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dataDir, "panel-update.new")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unprivileged panel staged a binary for the root helper: %v", err)
 	}
-	if r := readRequest(t, dataDir); r.Version != "v1.2.0" {
+	if r := readRequest(t, dataDir); r.Version != "v1.2.0" || r.Channel != "stable" {
 		t.Fatalf("request = %+v", r)
 	}
 	if !updater.Status().Installing {
@@ -740,13 +741,42 @@ func helperEnv(t *testing.T) (dataDir, target string) {
 func helperConfig(t *testing.T, f *panelFixture, dataDir, target string) PanelUpdateConfig {
 	client, _ := f.client(t)
 	return PanelUpdateConfig{CurrentBuilt: panelOwnBuilt, Key: panelTestPub, DataDir: dataDir, ServiceUnit: "mistgate.service", Executable: target,
-		OS: "linux", Arch: "amd64", HTTPClient: client, Now: func() time.Time { return panelTestNow }, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+		AllowedChannelFile: filepath.Join(dataDir, "missing-panel-update-channel"),
+		OS:                 "linux", Arch: "amd64", HTTPClient: client, Now: func() time.Time { return panelTestNow }, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+}
+
+func rootOwnedChannelFileForTest(t *testing.T, channel string) string {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skip("root-owned channel policy is Linux-only")
+	}
+	path := filepath.Join(t.TempDir(), "panel-update-channel")
+	if err := os.WriteFile(path, []byte(channel+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, gid, ok := panelDataOwner(info)
+	if !ok {
+		t.Skip("file ownership is not available")
+	}
+	if uid != 0 {
+		if err := os.Chown(path, 0, gid); err != nil {
+			t.Skipf("cannot create a root-owned channel policy: %v", err)
+		}
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestRootHelperInstallsTheConfirmedSignedRelease(t *testing.T) {
 	f := newPanelFixture()
 	dataDir, target := helperEnv(t)
-	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: "v1.2.0", SHA256: f.digest()}); err != nil {
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: "v1.2.0", SHA256: f.digest(), Channel: "stable"}); err != nil {
 		t.Fatal(err)
 	}
 	var calls [][]string
@@ -777,11 +807,12 @@ func TestRootHelperInstallsTheConfirmedReleaseOfItsChannel(t *testing.T) {
 	dev.tag, dev.built = "v1.2.1-dev.1", panelTestBuilt+100
 	dev.binary = append(minimalELF(elf.EM_X86_64), 1)
 	dataDir, target := helperEnv(t)
-	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: dev.tag, SHA256: dev.digest()}); err != nil {
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: dev.tag, SHA256: dev.digest(), Channel: "dev"}); err != nil {
 		t.Fatal(err)
 	}
 	cfg := helperConfig(t, stable, dataDir, target)
 	cfg.HTTPClient, _ = panelFixturesClient(t, stable, dev)
+	cfg.AllowedChannelFile = rootOwnedChannelFileForTest(t, "dev")
 	var calls [][]string
 	if err := installLatestPanelUpdate(context.Background(), cfg, systemctlRecorder(&calls, nil)); err != nil {
 		t.Fatal(err)
@@ -791,16 +822,129 @@ func TestRootHelperInstallsTheConfirmedReleaseOfItsChannel(t *testing.T) {
 	}
 	// A stable request still installs the stable release when a newer dev build exists beside it.
 	dataDir, target = helperEnv(t)
-	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: stable.tag, SHA256: stable.digest()}); err != nil {
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: stable.tag, SHA256: stable.digest(), Channel: "stable"}); err != nil {
 		t.Fatal(err)
 	}
 	cfg = helperConfig(t, stable, dataDir, target)
 	cfg.HTTPClient, _ = panelFixturesClient(t, stable, dev)
+	cfg.AllowedChannelFile = rootOwnedChannelFileForTest(t, "stable")
 	if err := installLatestPanelUpdate(context.Background(), cfg, systemctlRecorder(&calls, nil)); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, stable.binary) {
 		t.Fatalf("installed binary = %x, %v; want the stable build", got, err)
+	}
+}
+
+func TestRootHelperRefusesDevRequestWhenAllowedChannelDefaultsToStable(t *testing.T) {
+	dev := newPanelFixture()
+	dev.tag, dev.built = "v1.2.1-dev.1", panelTestBuilt+100
+	dataDir, target := helperEnv(t)
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: dev.tag, SHA256: dev.digest(), Channel: "dev"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := helperConfig(t, dev, dataDir, target)
+	cfg.AllowedChannelFile = filepath.Join(t.TempDir(), "missing-panel-update-channel")
+	var calls [][]string
+	err := installLatestPanelUpdate(context.Background(), cfg, systemctlRecorder(&calls, nil))
+	if !errors.Is(err, ErrPanelUpdateChannelNotAllowed) || !strings.Contains(err.Error(), "panel_update_channel_not_allowed") ||
+		!strings.Contains(err.Error(), "channel=dev&allowed=stable") ||
+		!strings.Contains(err.Error(), `sudo sh -c 'install -d -o root -g root -m 0755 /etc/mistgate && tmp=$(mktemp /etc/mistgate/.panel-update-channel.XXXXXX) && printf "%s\n" dev > "$tmp" && chmod 0644 "$tmp" && mv -f "$tmp" /etc/mistgate/panel-update-channel'`) {
+		t.Fatalf("channel refusal = %v", err)
+	}
+	if len(calls) != 0 {
+		t.Fatalf("systemctl ran: %#v", calls)
+	}
+	if got, _ := os.ReadFile(target); string(got) != "previous" {
+		t.Fatalf("installed binary changed: %q", got)
+	}
+}
+
+func TestMissingRootPanelUpdateChannelDefaultsToStable(t *testing.T) {
+	channel, err := readRootAllowedPanelUpdateChannel(filepath.Join(t.TempDir(), "missing-panel-update-channel"))
+	if err != nil || channel != release.ChannelStable {
+		t.Fatalf("missing root channel policy = %q, %v; want stable", channel, err)
+	}
+}
+
+func TestPanelUpdaterRefusesAChannelTheRootPolicyDoesNotAllowBeforeScheduling(t *testing.T) {
+	f := newPanelFixture()
+	rec := &recorder{}
+	updater, counts, dataDir := newPanelUpdater(t, f, rec, func(c *PanelUpdateConfig) {
+		c.Channel = func() release.Channel { return release.ChannelDev }
+		c.AllowedChannelFile = filepath.Join(t.TempDir(), "missing-panel-update-channel")
+	})
+	err := updater.Install(context.Background(), f.tag, f.digest())
+	if !errors.Is(err, ErrPanelUpdateChannelNotAllowed) || err.Error() != "panel_update_channel_not_allowed: channel=dev&allowed=stable" {
+		t.Fatalf("panel channel refusal = %v", err)
+	}
+	if counts["api"] != 0 || len(rec.launched()) != 0 {
+		t.Fatalf("channel refusal checked GitHub or launched the helper: counts=%v launched=%v", counts, rec.launched())
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, panelUpdateRequestName)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("wrote request despite channel refusal: %v", err)
+	}
+}
+
+// A panel whose selected channel the root policy does not allow shows that as a state of the card (not installable, a
+// stable key), every time and without a log line; a stable panel on a missing policy is unaffected.
+func TestPanelUpdaterShowsAChannelPolicyMismatchAsAStateNotALogLine(t *testing.T) {
+	f := newPanelFixture()
+	var logs strings.Builder
+	updater, _, _ := newPanelUpdater(t, f, &recorder{}, func(c *PanelUpdateConfig) {
+		c.Channel = func() release.Channel { return release.ChannelTesting }
+		c.AllowedChannelFile = filepath.Join(t.TempDir(), "missing-panel-update-channel")
+		c.Log = slog.New(slog.NewTextHandler(&logs, nil))
+	})
+	for i := 0; i < 3; i++ {
+		updater.Invalidate()
+		s := updater.Check(context.Background())
+		if !s.Available || s.Installable || s.ErrorKey != "channel_not_allowed" {
+			t.Fatalf("check %d status = %+v", i, s)
+		}
+	}
+	if logs.Len() != 0 {
+		t.Fatalf("a channel policy mismatch was logged: %s", logs.String())
+	}
+	if s := updater.Status(); s.Installable || s.ErrorKey != "channel_not_allowed" {
+		t.Fatalf("status = %+v", s)
+	}
+
+	stable, _, _ := newPanelUpdater(t, f, &recorder{}, nil)
+	if s := stable.Check(context.Background()); !s.Available || !s.Installable || s.ErrorKey != "" {
+		t.Fatalf("stable panel on a missing policy = %+v", s)
+	}
+}
+
+func TestRootHelperRefusesAChannelOtherThanTheAllowedOne(t *testing.T) {
+	stable := newPanelFixture()
+	dataDir, target := helperEnv(t)
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: stable.tag, SHA256: stable.digest(), Channel: "stable"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := helperConfig(t, stable, dataDir, target)
+	cfg.AllowedChannelFile = rootOwnedChannelFileForTest(t, "dev")
+	var calls [][]string
+	if err := installLatestPanelUpdate(context.Background(), cfg, systemctlRecorder(&calls, nil)); !errors.Is(err, ErrPanelUpdateChannelNotAllowed) || len(calls) != 0 {
+		t.Fatalf("stable request with dev allowed: err=%v calls=%v", err, calls)
+	}
+}
+
+func TestRootHelperRefusesAnUnsafeChannelPolicyFile(t *testing.T) {
+	f := newPanelFixture()
+	dataDir, target := helperEnv(t)
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: f.tag, SHA256: f.digest(), Channel: "stable"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := helperConfig(t, f, dataDir, target)
+	path := rootOwnedChannelFileForTest(t, "stable")
+	if err := os.WriteFile(path, []byte("latest\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg.AllowedChannelFile = path
+	var calls [][]string
+	if err := installLatestPanelUpdate(context.Background(), cfg, systemctlRecorder(&calls, nil)); !errors.Is(err, ErrPanelUpdateChannelConfig) || len(calls) != 0 {
+		t.Fatalf("garbage policy: err=%v calls=%v", err, calls)
 	}
 }
 
@@ -816,7 +960,7 @@ func TestRootHelperRefusesBeforeStoppingThePanel(t *testing.T) {
 	}{
 		"tampered asset":      {mutate: func(f *panelFixture) { f.served = append([]byte("x"), f.binary[1:]...) }, want: "SHA-256"},
 		"no request":          {request: &panelUpdateRequest{}, want: "no confirmed panel update request"},
-		"another release":     {request: &panelUpdateRequest{Version: "v1.1.0", SHA256: strings.Repeat("a", 64)}, want: ErrPanelChanged.Error()},
+		"another release":     {request: &panelUpdateRequest{Version: "v1.1.0", SHA256: strings.Repeat("a", 64), Channel: "stable"}, want: ErrPanelChanged.Error()},
 		"unsigned release":    {mutate: func(f *panelFixture) { f.unsigned = true }, want: ErrPanelUnsigned.Error()},
 		"foreign signature":   {mutate: func(f *panelFixture) { f.signer = other }, want: ErrPanelUnsigned.Error()},
 		"not newer":           {cfg: func(c *PanelUpdateConfig) { c.CurrentBuilt = panelTestBuilt }, want: ErrNoPanelUpdate.Error()},
@@ -828,7 +972,7 @@ func TestRootHelperRefusesBeforeStoppingThePanel(t *testing.T) {
 				tc.mutate(f)
 			}
 			dataDir, target := helperEnv(t)
-			req := panelUpdateRequest{Version: "v1.2.0", SHA256: f.digest()}
+			req := panelUpdateRequest{Version: "v1.2.0", SHA256: f.digest(), Channel: "stable"}
 			if tc.request != nil {
 				req = *tc.request
 			}
@@ -858,7 +1002,15 @@ func TestRootHelperRefusesBeforeStoppingThePanel(t *testing.T) {
 
 func TestPanelUpdateRequestIsValidated(t *testing.T) {
 	dir := t.TempDir()
-	for _, body := range []string{`{"version":"v1.2.0","sha256":"short"}`, `{"version":"latest","sha256":"` + strings.Repeat("a", 64) + `"}`, `not json`} {
+	validDigest := strings.Repeat("a", 64)
+	for _, body := range []string{
+		`{"version":"v1.2.0","sha256":"short","channel":"stable"}`,
+		`{"version":"latest","sha256":"` + validDigest + `","channel":"stable"}`,
+		`{"version":"v1.2.0","sha256":"` + validDigest + `","channel":"nightly"}`,
+		`{"version":"v1.2.0","sha256":"` + validDigest + `","channel":"stable","force":true}`,
+		`{"version":"v1.2.0","sha256":"` + validDigest + `","channel":"stable"}{"force":true}`,
+		`not json`,
+	} {
 		if err := os.WriteFile(filepath.Join(dir, panelUpdateRequestName), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
