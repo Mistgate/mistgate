@@ -19,6 +19,8 @@ The owner sets it up in **AI → Assistant**:
 
 A round button appears at the bottom corner of every page for the admins it is open to; **Ctrl+J** (**⌘J** on a Mac) opens and closes the chat too.
 
+The message box finishes a question you have started. When what you type begins like one of your earlier questions (from any conversation) or like one of the examples, the rest appears dim after the cursor, with a **Tab** key. Press **Tab**, or **→** at the end of the line, to take it. Only the end of a one-line question is offered, and nothing is sent until you send it.
+
 ## Providers and where your data goes
 
 | Provider | Address the panel calls | Models | Where the data goes |

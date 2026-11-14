@@ -188,6 +188,8 @@ In the user card, under **Devices** → **AmneziaVPN keys**, **Add device** open
 
 Opening a config marks the device as having the current one: an **outdated** badge (after a critical change of the profile, or a new port or address of a node) goes away once the person has imported the new config.
 
+A device also gets a separate key for each entry that passes the server on through a [relay](relays.md#amneziawg-through-a-relay). Its config is another item of the **Node** list ("de1 · via RU"); import it into AmneziaVPN as a new server. It takes no place in the device limit. **Replace key** and **Delete** cover these keys too.
+
 > **Warning:** a config holds the device's private key. Send it only to its owner, and never paste it into a shared chat.
 
 ## vpn:// keys and .conf files
@@ -210,4 +212,4 @@ On a phone: open AmneziaVPN, tap "+", paste the key (or scan the QR code), tap "
 
 ## AmneziaWG through the subscription
 
-Apps on the mihomo core can carry AmneziaWG too. When a person has AmneziaVPN switched on and their app gets the Mihomo format, the subscription includes their AmneziaWG servers. A Mihomo app has no device identity, so all Mihomo apps of one person share one key per profile, made at the first fetch, and they count as the one subscription device in the limit. When the node has an [IPv6 entry](nodes.md#ipv6-entry), the Mihomo subscription also carries an IPv6 proxy of each AmneziaWG server, listed right after it; the file and the key stay as they are. See [Subscriptions](subscriptions.md).
+Apps on the mihomo core can carry AmneziaWG too. When a person has AmneziaVPN switched on and their app gets the Mihomo format, the subscription includes their AmneziaWG servers. A Mihomo app has no device identity, so all Mihomo apps of one person share one key per profile, made at the first fetch, and they count as the one subscription device in the limit. When the node has an [IPv6 entry](nodes.md#ipv6-entry), the Mihomo subscription also carries an IPv6 proxy of each AmneziaWG server, listed right after it. It has a key and a tunnel address of its own: with one key on both servers the node's record of the peer's address jumps between them, and apps that held both at once lost packets. People get the new key when their app refreshes the subscription. When a [relay](relays.md#amneziawg-through-a-relay) passes the server on, the server through the entry has a key of its own too. See [Subscriptions](subscriptions.md).

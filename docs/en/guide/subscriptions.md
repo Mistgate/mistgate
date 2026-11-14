@@ -118,6 +118,8 @@ Turn it off when people use AmneziaWG in AmneziaVPN anyway: in a Mihomo app it o
 - AmneziaVPN keys, the person's page and the other formats do not change. The Mistgate app (not released publicly yet) is not one of the apps on the link here: it gets AmneziaWG on its own and keeps it whatever this switch says (its own switch is the row **Mistgate app** on the person's card), and its keys are not counted in the confirmation;
 - a person whose only servers are AmneziaWG gets the placeholder entry in a Mihomo app: see [When no server fits the app](#when-no-server-fits-the-app).
 
+Through a [relay](relays.md#amneziawg-through-a-relay), a Mihomo app gets a twin of the AmneziaWG server (` · via RU`) with its own key, and the Mistgate app gets it at its next sync. The link lists still carry no AmneziaWG.
+
 Turned back on, the apps get new keys at their next refresh. While it is off, **Apps & formats** strikes AmneziaWG out on the Mihomo card and links to the switch.
 
 ## Device limit for apps on the link

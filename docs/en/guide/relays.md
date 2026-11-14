@@ -45,7 +45,7 @@ Accounting stays on the exit: traffic, quotas, speed limits, devices and [torren
 1. Update the entry node's agent if **Updates** says so: older agents cannot forward ("Update the node agent to add relays"). The server's firewall must allow forwarded traffic; if it drops it (`FORWARD` policy `DROP`, as UFW and Docker set by default) the relay stays down and the card says so.
 2. Open the node people cannot reach: **Nodes** → that node → **Ways in** → **Add a way in…**. When the node is dark, the dialog starts: "From Russia, de1 does not open on MTS. Give those people another way in — the node and its keys stay the same."
 3. Choose **Through another node**: "People connect to a node their network sees; it passes their traffic to de1 unchanged." The best choice is hinted ("Good fit: msk1, seen from MTS"). The other choice is the [IPv6 entry](nodes.md#ipv6-entry); it is greyed out, with the reason, when the node cannot take one.
-4. Pick the entry (**Through which node**). **Good fits: seen from MTS** come first, then **Other nodes**; each shows its country code, whether people see it and, where the TSPU probe runs from it, whether it reaches de1. A node that already passes servers of de1 says "Already passes on 2 servers of de1".
+4. Pick the entry (**Through which node**). **Good fits: seen from MTS** come first, then **Other nodes**; each shows its country code, whether people see it and, where the TSPU probe runs from it, whether it reaches de1. A node that already passes servers of de1 says "Already passes on 2 servers of de1". An entry in the same country as the exit gains people nothing, because their route to it does not change: it is never in **Good fits**, it carries the hint "Same country as the exit", and you can still pick it.
 5. Tick the servers to relay. Each has a port on the entry (**auto** is the exit's port if free, else a free one). A server that cannot be relayed is grey with the reason.
 6. **Check and turn on** runs both checks and switches the relay on. **Only check** runs the leg and adds the relay switched off; turn it on with **Turn on** in its row within 15 minutes, or check again (switching on needs a leg check that passed less than 15 minutes ago). The dialog shows the progress and the result per server; **Back** returns to the choice of the node.
 7. The row shows *Works, checked 3 min ago*, or *Not turned on* with the stage: `leg` (the entry cannot reach the exit's server: a block, a route, the exit's firewall), `path` (the port on the entry is not reachable from outside: the entry's firewall or hoster, or `FORWARD` dropped). **Check now** repeats the checks; **Turn off** and **Remove** stop the forward on the entry.
@@ -76,6 +76,20 @@ For each relay that works, a person gets a **twin** of the exit's server right a
 - **What people see:** a second server to pick when the first does not connect. Nothing changes for the servers they already use.
 - **MTProto:** a relay passes an [MTProto](mtproto.md) server on as well. The twin is not in the subscription: it is one more link in the person's **Telegram proxy** block, marked **via RU**, with the same key and the same name in the handshake as the exit's.
 
+## AmneziaWG through a relay
+
+A relay passes an [AmneziaWG](amneziawg.md) server on like any other: the entry forwards its UDP port and the exit holds the tunnel. The one difference is the key. The exit remembers one address for each key, so a key used on two paths at once would make the exit jump between them and lose packets. So everyone who is allowed both the exit's server and the entry node gets a **separate key and tunnel address for the path through the entry**; the direct server keeps its own key.
+
+- **Apps on the subscription link** (Mihomo apps, the Mistgate app): the server through the entry, `🇩🇪 DE · AmneziaWG · via RU`, appears right after the direct one at the next refresh of the subscription. The app gets its key then; nobody has to do anything.
+- **AmneziaVPN keys:** the path through the entry is a separate config. It is in the device's card (**Show key**, the **Node** list: "de1 · via RU") and on the person's subscription page. It has to be imported into AmneziaVPN as a new server; the direct config stays as it was.
+- **Devices:** a key through an entry takes no place in the device limit.
+- **Port:** by default the entry first tries the port that suits the profile's look (443 for QUIC) when the entry can use it, then the exit's port, then any free one. After the port of a relay changes, download the AmneziaVPN config again.
+- **Removing:** when the last relay of a server through an entry is removed, the keys of that path are revoked by themselves.
+- **What the exit sees:** these people come from the entry's address.
+- **History:** in a person's connection history, the rows of such a key carry the chip "via RU".
+
+An AmneziaWG server is not in link lists (URI): that format cannot carry it.
+
 ## What it cannot pass on
 
 | Server | Why | What to do |
@@ -83,9 +97,8 @@ For each relay that works, a person gets a **twin** of the exit's server right a
 | VLESS behind a CDN | People connect to the CDN, not to the node. | Nothing: it does not need a relay. |
 | A server whose Let's Encrypt certificate is issued for the node's IP address | Apps would reject that address on the entry. | Use a certificate for a name, or a self-signed one with a pin. |
 | A server with a port-hopping range | A relay passes one port. | The twin uses that one port: port hopping does not work through a relay. |
-| AmneziaWG | Its twin is a separate key and is not built yet. | Later. |
 
-A relay works over **IPv4** only: the entry's forward uses IPv4 on both sides.
+A relay works over **IPv4** only: the entry's forward uses IPv4 on both sides. If the entry's name has an `AAAA` record and an app picks the IPv6 address, it does not connect. Keep only an `A` record for that name, or give the node its address instead of the name.
 
 ## With MCP
 

@@ -188,6 +188,8 @@ mistgate-node awg prepare-kernel --verify-only   # 检查已存在的模块
 
 打开配置后，系统会将该设备标记为已有当前配置：更改协议配置的关键设置，或更改节点的端口或地址后，设备会显示**已过时**标记；用户导入新配置后，该标记会消失。
 
+设备还会为每个经[中转](relays.md#amneziawg-经中转)转发该服务器的入口得到一个单独的密钥。它的配置是**节点**列表中的另一项（「de1 · 经 RU」）；请把它作为新服务器导入 AmneziaVPN。它不占用设备上限中的名额。**更换密钥**和**删除**对这些密钥同样生效。
+
 > **警告：** 配置包含设备的私钥。只能发送给设备所有者，切勿粘贴到共享聊天中。
 
 ## `vpn://` 密钥和 `.conf` 文件
@@ -210,4 +212,4 @@ mistgate-node awg prepare-kernel --verify-only   # 检查已存在的模块
 
 ## 通过订阅使用 AmneziaWG
 
-基于 mihomo 内核的应用也可以使用 AmneziaWG。用户启用了 AmneziaVPN，且其应用获取 Mihomo 格式时，订阅中会包含其 AmneziaWG 服务器。Mihomo 应用没有设备身份，因此同一用户的所有 Mihomo 应用会共用每个协议配置的一个密钥；密钥会在首次获取时生成，并在设备上限中计为一个订阅设备。节点有 [IPv6 入口](nodes.md#ipv6-入口)时，Mihomo 订阅还会为每个 AmneziaWG 服务器附上一个 IPv6 代理，紧跟在它后面；文件和密钥保持不变。请参阅[订阅](subscriptions.md)。
+基于 mihomo 内核的应用也可以使用 AmneziaWG。用户启用了 AmneziaVPN，且其应用获取 Mihomo 格式时，订阅中会包含其 AmneziaWG 服务器。Mihomo 应用没有设备身份，因此同一用户的所有 Mihomo 应用会共用每个协议配置的一个密钥；密钥会在首次获取时生成，并在设备上限中计为一个订阅设备。节点有 [IPv6 入口](nodes.md#ipv6-入口)时，Mihomo 订阅还会为每个 AmneziaWG 服务器附上一个 IPv6 代理，紧跟在它后面。它有自己的密钥和隧道地址：两个服务器共用一个密钥时，节点记录的对端地址会在两者之间跳变，同时保留两个服务器的应用会丢包。用户在应用刷新订阅时得到新密钥。经[中转](relays.md#amneziawg-经中转)转发该服务器时，经入口的服务器也有自己的密钥。请参阅[订阅](subscriptions.md)。
