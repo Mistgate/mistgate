@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -155,7 +156,7 @@ func TestSeverityFloorAndSilentResolutions(t *testing.T) {
 		t.Fatalf("info USER_CONNECTION was sent: total messages %d, before %d", got, before)
 	}
 	e.svc.mu.Lock()
-	queued := e.svc.open["user_connection//"]
+	_, queued := e.svc.open["user_connection//"]
 	e.svc.mu.Unlock()
 	if queued {
 		t.Fatal("info USER_CONNECTION was recorded as announced")
@@ -171,6 +172,40 @@ func TestSeverityFloorAndSilentResolutions(t *testing.T) {
 		a.Resolution, a.ResolvedAt = res, e.clk.now()
 		e.svc.AlertTransition(a, true)
 		e.quiet(before, 120*time.Millisecond)
+	}
+}
+
+func TestAwgPrepareFailureIsToldOncePerTransitionAndOpenStateIsBounded(t *testing.T) {
+	e := newEnv(t)
+	e.addNode("de1", "de1")
+	e.svc.AwgPrepareFailed("de1", "apt_lock", 10)
+	e.svc.AwgPrepareFailed("de1", "apt_lock", 10) // the same transition again
+	e.svc.AwgPrepareFailed("de1", "apt_lock", 20) // a later build failed the same way
+	e.svc.AwgPrepareFailed("de1", "step_failed", 20)
+	e.svc.mu.Lock()
+	queued := len(e.svc.pending)
+	e.svc.mu.Unlock()
+	if queued != 3 {
+		t.Fatalf("queued %d prepare alerts, want one per transition (3)", queued)
+	}
+
+	e.clk.advance(openAlertTTL + time.Second)
+	e.svc.AwgPrepareFailed("de1", "apt_lock", 10)
+	e.svc.mu.Lock()
+	queued = len(e.svc.pending)
+	e.svc.mu.Unlock()
+	if queued != 4 {
+		t.Fatalf("after the TTL queued %d prepare alerts, want 4", queued)
+	}
+
+	for i := 0; i < maxOpenAlerts+1; i++ {
+		e.svc.openOnce("alert/" + strconv.Itoa(i))
+	}
+	e.svc.mu.Lock()
+	open := len(e.svc.open)
+	e.svc.mu.Unlock()
+	if open > maxOpenAlerts {
+		t.Fatalf("open alert map has %d entries, cap %d", open, maxOpenAlerts)
 	}
 }
 

@@ -37,12 +37,14 @@ const (
 	notifiedRel   = "telegram.notified.release"
 	notifiedAgent = "telegram.notified.agents"
 
-	linkCodeTTL = 10 * time.Minute
-	maxPending  = 200
-	minSeverity = 2 // warning and up; info-level alerts are never sent
-	maxMessage  = 3500
-	ipSeenFor   = 30 * 24 * time.Hour
-	edgePollMax = 25 // seconds; leave time in the cron job for processing and offset persistence
+	linkCodeTTL   = 10 * time.Minute
+	maxPending    = 200
+	minSeverity   = 2 // warning and up; info-level alerts are never sent
+	maxMessage    = 3500
+	ipSeenFor     = 30 * 24 * time.Hour
+	edgePollMax   = 25 // seconds; leave time in the cron job for processing and offset persistence
+	openAlertTTL  = 30 * 24 * time.Hour
+	maxOpenAlerts = 4096
 
 	nodeNameTimeout = 5 * time.Second // the node-name read of an alert message (D1 on the edge)
 )
@@ -98,7 +100,7 @@ type Service struct {
 	mu         sync.Mutex
 	pending    []item
 	announcing map[string]struct{}  // watcher notices queued or being delivered
-	open       map[string]bool      // health alerts announced as open and not yet resolved
+	open       map[string]time.Time // health alerts announced as open and not yet resolved
 	seenIP     map[string]time.Time // admin id + address -> last sign-in seen from it
 	lastTest   map[string]time.Time // admin id -> last test message
 	botErr     string               // how the last conversation with Telegram went ("" = fine)
@@ -169,7 +171,7 @@ func New(cfg Config) (*Service, error) {
 	}
 	return &Service{
 		st: cfg.Store, vault: cfg.Vault, api: &apiClient{base: strings.TrimRight(cfg.APIBase, "/"), hc: cfg.HTTPClient}, cfg: cfg, log: cfg.Log, now: cfg.Now,
-		announcing: map[string]struct{}{}, open: map[string]bool{}, seenIP: map[string]time.Time{}, lastTest: map[string]time.Time{},
+		announcing: map[string]struct{}{}, open: map[string]time.Time{}, seenIP: map[string]time.Time{}, lastTest: map[string]time.Time{},
 		notify: make(chan struct{}, 1), wake: make(chan struct{}, 1),
 	}, nil
 }
@@ -207,13 +209,13 @@ func (s *Service) tokenAndBotID(ctx context.Context) (vault.Redacted, int64, boo
 	b, err := s.st.TelegramBot(ctx)
 	if err != nil {
 		if !errors.Is(err, store.ErrNotFound) && ctx.Err() == nil {
-			s.log.Warn("telegram: read bot", "err", err)
+			s.log.Warn("telegram: read bot", "code", "telegram_bot_read_failed", "err", err)
 		}
 		return "", 0, false
 	}
 	pt, err := s.vault.Open(b.Token, tokenRecordID)
 	if err != nil {
-		s.log.Error("telegram: the stored bot token cannot be opened", "err", err)
+		s.log.Error("telegram: the stored bot token cannot be opened", "code", "telegram_token_open_failed", "err", err)
 		return "", 0, false
 	}
 	return vault.Redacted(pt), b.BotID, true
@@ -322,7 +324,7 @@ func (s *Service) pollLoop(ctx context.Context) {
 		}
 		if len(ups) > 0 {
 			if err := s.st.SetSettings(ctx, map[string]string{offsetKey: strconv.FormatInt(offset, 10)}); err != nil && ctx.Err() == nil {
-				s.log.Warn("telegram: save offset", "err", err)
+				s.log.Warn("telegram: save offset", "code", "telegram_offset_store_failed", "err", err)
 			}
 		}
 	}
@@ -345,7 +347,7 @@ func (s *Service) PollPendingLinkCode(ctx context.Context) error {
 	}
 	defer func() {
 		if err := s.st.ReleaseLease(ctx, "telegram-poll", holder); err != nil && ctx.Err() == nil {
-			s.log.Warn("telegram: release poll lease", "err", err)
+			s.log.Warn("telegram: release poll lease", "code", "telegram_lease_release_failed", "err", err)
 		}
 	}()
 
@@ -431,7 +433,7 @@ func (s *Service) handleMessage(ctx context.Context, tok vault.Redacted, m tgMes
 			l, brand := s.panel(ctx)
 			if err := s.st.BindTelegramChat(ctx, adminID, m.Chat.ID, s.now()); err != nil {
 				if !errors.Is(err, store.ErrNotFound) {
-					s.log.Warn("telegram: bind chat", "err", err)
+					s.log.Warn("telegram: bind chat", "code", "telegram_chat_bind_failed", "err", err)
 				}
 				return
 			}
@@ -486,7 +488,7 @@ func (s *Service) takeCode(ctx context.Context, code string) (adminID string, ok
 	adminID, err := s.st.TakeTelegramLinkCode(ctx, codeHash(code), s.now())
 	if err != nil {
 		if !errors.Is(err, store.ErrNotFound) && ctx.Err() == nil {
-			s.log.Warn("telegram: consume link code", "err", err)
+			s.log.Warn("telegram: consume link code", "code", "telegram_link_consume_failed", "err", err)
 		}
 		return "", false
 	}
@@ -549,7 +551,7 @@ func (s *Service) enqueueNotice(key, version string, it item) {
 func (s *Service) noticeDelivered(ctx context.Context, it item) {
 	if id := it.noticeID(); id != "" {
 		if err := s.st.SetSettings(context.WithoutCancel(ctx), map[string]string{it.noticeKey: it.noticeVersion}); err != nil {
-			s.log.Warn("telegram: remember announced version", "err", err)
+			s.log.Warn("telegram: remember announced version", "code", "telegram_notice_store_failed", "err", err)
 		}
 		s.mu.Lock()
 		delete(s.announcing, id)
@@ -585,13 +587,16 @@ func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 	if !s.cfg.Edge { // on the edge the alert row and the health-eval lease decide; a per-isolate map would drop a re-open
 		key := a.Kind + "/" + a.NodeID + "/" + a.Subject
 		s.mu.Lock()
+		now := s.now()
+		s.pruneOpenLocked(now)
 		if resolved {
 			delete(s.open, key)
-		} else if s.open[key] {
+		} else if _, exists := s.open[key]; exists {
 			s.mu.Unlock()
 			return
 		} else {
-			s.open[key] = true
+			s.open[key] = now
+			s.pruneOpenLocked(now)
 		}
 		s.mu.Unlock()
 	}
@@ -623,11 +628,7 @@ func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 // BackupFailed announces a failed backup once; the next one that works resolves it. The scheduler retries with a growing
 // wait, and every retry that fails again would otherwise be a message.
 func (s *Service) BackupFailed(code string) {
-	s.mu.Lock()
-	again := s.open["backup"]
-	s.open["backup"] = true
-	s.mu.Unlock()
-	if again {
+	if s.openOnce("backup") {
 		return
 	}
 	adminURL := s.cfg.AdminURL
@@ -637,7 +638,8 @@ func (s *Service) BackupFailed(code string) {
 // BackupOK resolves a failure that was announced.
 func (s *Service) BackupOK() {
 	s.mu.Lock()
-	was := s.open["backup"]
+	s.pruneOpenLocked(s.now())
+	_, was := s.open["backup"]
 	delete(s.open, "backup")
 	s.mu.Unlock()
 	if was {
@@ -672,19 +674,48 @@ func (s *Service) ClientLogs(n ClientLogsNews) {
 	s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return clientLogsText(l, n, adminURL) }})
 }
 
-// AwgPrepareFailed announces a failed build of the AmneziaWG kernel module on a node (the same failure is told once).
+// AwgPrepareFailed announces a failed build of the AmneziaWG kernel module on a node. at is the panel's time of the
+// running-to-failed transition, which the fleet reports once per requested build: the same transition is told once, and a
+// new build that fails again (even with the same code) is told again.
 func (s *Service) AwgPrepareFailed(nodeID, code string, at int64) {
-	key := "awgprep/" + nodeID + "/" + strconv.FormatInt(at, 10)
-	s.mu.Lock()
-	again := s.open[key]
-	s.open[key] = true
-	s.mu.Unlock()
-	if again {
+	key := "awgprep/" + nodeID + "/" + code + "/" + strconv.FormatInt(at, 10)
+	if s.openOnce(key) {
 		return
 	}
 	node := s.nodeName(context.Background(), nodeID)
 	adminURL := s.cfg.AdminURL
 	s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return awgPrepareFailedText(l, node, code, adminURL) }})
+}
+
+func (s *Service) openOnce(key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	s.pruneOpenLocked(now)
+	if _, exists := s.open[key]; exists {
+		return true
+	}
+	s.open[key] = now
+	s.pruneOpenLocked(now)
+	return false
+}
+
+func (s *Service) pruneOpenLocked(now time.Time) {
+	for key, openedAt := range s.open {
+		if now.Sub(openedAt) >= openAlertTTL {
+			delete(s.open, key)
+		}
+	}
+	for len(s.open) > maxOpenAlerts {
+		oldestKey := ""
+		var oldest time.Time
+		for key, openedAt := range s.open {
+			if oldestKey == "" || openedAt.Before(oldest) {
+				oldestKey, oldest = key, openedAt
+			}
+		}
+		delete(s.open, oldestKey)
+	}
 }
 
 // ---- release and agent watcher
@@ -818,7 +849,7 @@ func (s *Service) flush(ctx context.Context) {
 	}
 	links, err := s.st.TelegramLinks(ctx)
 	if err != nil {
-		s.log.Warn("telegram: read links", "err", err)
+		s.log.Warn("telegram: read links", "code", "telegram_links_read_failed", "err", err)
 		var retained map[string]struct{}
 		if ctx.Err() != nil {
 			retained = s.requeueUndelivered(items, nil, nil)
@@ -1010,17 +1041,17 @@ retry:
 		switch {
 		case ae != nil && ae.Status == http.StatusTooManyRequests:
 			d := retryAfterWait(ae.RetryAfter)
-			s.log.Warn("telegram: rate limited", "retry_in", d.String())
+			s.log.Warn("telegram: rate limited", "code", "telegram_rate_limited", "retry_in", d.String())
 			if !s.sleepPlain(ctx, d) {
 				return deliveryCanceled
 			}
 			continue
 		case ae != nil && ae.Status == http.StatusUnauthorized:
 			s.setBotErr("unauthorized")
-			s.log.Warn("telegram: the bot token is refused")
+			s.log.Warn("telegram: the bot token is refused", "code", "telegram_unauthorized")
 			return deliveryRefused
 		case ae != nil && !ae.Transport && ae.Status >= 400 && ae.Status < 500:
-			s.log.Warn("telegram: message refused", "status", ae.Status, "desc", clip(ae.Desc, 80)) // a blocked bot, a deleted chat
+			s.log.Warn("telegram: message refused", "code", "telegram_message_refused", "status", ae.Status, "desc", clip(ae.Desc, 80)) // a blocked bot, a deleted chat
 			return deliveryRefused
 		default:
 			s.setBotErr("unreachable")
@@ -1036,7 +1067,7 @@ retry:
 			attempt++
 		}
 	}
-	s.log.Warn("telegram: message dropped after retries")
+	s.log.Warn("telegram: message dropped after retries", "code", "telegram_message_dropped")
 	return deliveryGaveUp
 }
 
@@ -1051,6 +1082,6 @@ func (s *Service) auditAs(ctx context.Context, actor, action string, params map[
 		return
 	}
 	if err := s.st.Audit(ctx, s.now(), store.AuditEntry{Actor: actor, Action: action, Params: string(b), Result: "ok", Source: source}); err != nil {
-		s.log.Warn("telegram: audit", "action", action, "err", err)
+		s.log.Warn("telegram: audit", "code", "telegram_audit_failed", "action", action, "err", err)
 	}
 }

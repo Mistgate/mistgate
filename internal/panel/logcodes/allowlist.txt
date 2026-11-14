@@ -179,14 +179,6 @@ dns/dns.go	dns: cannot parse preset	1
 fleet/admin_node.go	agent failed to restart inbounds	1
 fleet/admin_node.go	audit	1
 fleet/admin_node.go	restart event	1
-fleet/agent.go	disconnect session core	1
-fleet/agent.go	hello response	1
-fleet/agent.go	prepare desired state	1
-fleet/agent.go	record update answer	1
-fleet/agent.go	session step	1
-fleet/awgprep.go	agent failed to prepare the awg kernel module	1
-fleet/awgprep.go	record awg prepare	1
-fleet/awgprep.go	restore awg prepare state	1
 fleet/bandwidth.go	audit	1
 fleet/bandwidth.go	store the measured bandwidth	1
 fleet/decoy.go	sync node decoy site	1
@@ -362,19 +354,6 @@ telegram/rpc.go	telegram: save bot	1
 telegram/rpc.go	telegram: status	1
 telegram/rpc.go	telegram: switch alerts	1
 telegram/rpc.go	telegram: unlink	1
-telegram/service.go	telegram: audit	1
-telegram/service.go	telegram: bind chat	1
-telegram/service.go	telegram: consume link code	1
-telegram/service.go	telegram: message dropped after retries	1
-telegram/service.go	telegram: message refused	1
-telegram/service.go	telegram: rate limited	1
-telegram/service.go	telegram: read bot	1
-telegram/service.go	telegram: read links	1
-telegram/service.go	telegram: release poll lease	1
-telegram/service.go	telegram: remember announced version	1
-telegram/service.go	telegram: save offset	1
-telegram/service.go	telegram: the bot token is refused	1
-telegram/service.go	telegram: the stored bot token cannot be opened	1
 update/bundle.go	update: bundle file unreadable	1
 update/bundle_auto.go	update: check active rollout before GitHub bundle sync	1
 update/bundle_auto.go	update: downloaded GitHub node bundle did not pass local verification	1

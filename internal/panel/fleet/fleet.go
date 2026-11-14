@@ -87,8 +87,8 @@ type Config struct {
 	// OnUsage is called after a stats batch added usage to these users (new used_bytes are committed), e.g.
 	// access.Service.Recompute, so a quota overrun takes effect within one stats interval.
 	OnUsage func(ctx context.Context, userIDs []string)
-	// OnAwgPrepareFailed is called when a node reports that the build of its AmneziaWG kernel module failed (the Telegram
-	// alerts hang on it). at is the time the node gave; a replay of the same report carries the same value. Must not block.
+	// OnAwgPrepareFailed is called once when a panel-requested AmneziaWG build transitions from running to failed. at is
+	// the panel time. Must not block.
 	OnAwgPrepareFailed func(nodeID, code string, at int64)
 	// GlobalpingTCP6 asks Globalping for a TCP ping of port on an IPv6 address from probes around the world, and says how many
 	// probes answered and how many of them connected. It is the last resort of CheckIPv6, when no node can send over IPv6. Nil, or an

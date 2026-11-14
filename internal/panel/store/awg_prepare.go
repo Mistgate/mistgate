@@ -69,12 +69,18 @@ func (s *Store) AwgPrepareStarted(ctx context.Context, nodeID string, since int6
 }
 
 // AwgPrepareFinish records the end of a build. When it succeeded and the admin still wants the module (Want) the node's
-// awg_backend becomes "kernel" in the same transaction (switched = true): this is the only place the panel switches a node
-// to the kernel module by itself, and only after the node said the module is built, loaded and verified. A failure
-// changes nothing but the record.
-func (s *Store) AwgPrepareFinish(ctx context.Context, nodeID string, ok bool, at int64, code, reason string) (switched bool, err error) {
+// awg_backend becomes "kernel" in the same transaction (switched = true). failedTransition is true only when a requested
+// running build moves to failed; callers use it for the owner notification.
+func (s *Store) AwgPrepareFinish(ctx context.Context, nodeID string, ok bool, at int64, code, reason string) (bool, error) {
+	switched, _, err := s.AwgPrepareFinishTransition(ctx, nodeID, ok, at, code, reason)
+	return switched, err
+}
+
+// AwgPrepareFinishTransition also reports the requested running-to-failed transition for alert delivery.
+func (s *Store) AwgPrepareFinishTransition(ctx context.Context, nodeID string, ok bool, at int64, code, reason string) (switched, failedTransition bool, err error) {
 	err = s.awgPrepareTx(ctx, nodeID, func(cur AwgPrepareRow, backend string) (AwgPrepareRow, string) {
 		switched = ok && cur.Want && backend != "kernel"
+		failedTransition = !ok && cur.State == AwgPrepareRunning && cur.Want
 		next := AwgPrepareRow{State: AwgPrepareDone, Since: at}
 		if !ok {
 			next = AwgPrepareRow{State: AwgPrepareFailed, Since: at, Code: code, Reason: reason}
@@ -85,7 +91,7 @@ func (s *Store) AwgPrepareFinish(ctx context.Context, nodeID string, ok bool, at
 		}
 		return next, ""
 	})
-	return switched, err
+	return switched, failedTransition, err
 }
 
 // awgPrepareTx retries fn against the exact JSON and backend values it read, so a concurrent AWG state change cannot

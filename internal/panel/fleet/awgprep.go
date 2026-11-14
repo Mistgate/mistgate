@@ -98,7 +98,7 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 	now := f.now().UTC().Unix()
 	restore := func() {
 		if err := f.st.SetAwgPrepare(ctx, n.ID, prev); err != nil {
-			f.log.Warn("restore awg prepare state", "node", n.ID, "err", err)
+			f.log.Warn("restore awg prepare state", "code", "awg_prepare_restore_failed", "node", n.ID, "err", err)
 		}
 	}
 	if confirm { // the wish is recorded BEFORE the node is asked: a "done" cannot overtake it
@@ -116,7 +116,7 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 			PrepareAwgKernel: &agentv1.PrepareAwgKernel{RequestId: reqID, DryRun: !confirm}}}
 	}, &live)
 	if err == nil && !res.Ok {
-		f.log.Warn("agent failed to prepare the awg kernel module", "node", n.ID, "error", res.Error)
+		f.log.Warn("agent failed to prepare the awg kernel module", "code", "awg_prepare_command_failed", "node", n.ID, "error", clip(res.Error, 200))
 		err = connect.NewError(connect.CodeInternal, errors.New("the agent could not prepare: "+clip(res.Error, 200)))
 	}
 	var outcome adminv1.PrepareAwgOutcome
@@ -138,7 +138,7 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 		restore() // nothing was started (ready, or it cannot be done here): the wish is not kept
 	case running && prev.State != store.AwgPrepareRunning:
 		if err := f.st.AwgPrepareStarted(ctx, n.ID, now); err != nil { // the dry run found one the panel did not know
-			f.log.Warn("record awg prepare", "node", n.ID, "err", err)
+			f.log.Warn("record awg prepare", "code", "awg_prepare_record_failed", "node", n.ID, "err", err)
 		}
 	}
 	if confirm && outcome == adminv1.PrepareAwgOutcome_PREPARE_AWG_OUTCOME_STARTED {
@@ -162,15 +162,16 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 // onAwgPrepareEvent keeps the record of a build in step with what the node reports. Replays are harmless: a start keeps its
 // time, an end after the end changes nothing the second time (the switch only happens while the wish stands).
 func (f *Fleet) onAwgPrepareEvent(ctx context.Context, nodeID string, row store.EventRow) {
-	at := row.Time.Unix()
+	at := f.now().Unix()
 	var err error
 	switch row.Code {
 	case evPrepStarted:
 		err = f.st.AwgPrepareStarted(ctx, nodeID, at)
 	case evPrepDone, evPrepFailed:
-		var switched bool
-		switched, err = f.st.AwgPrepareFinish(ctx, nodeID, row.Code == evPrepDone, at, clip(row.Params["code"], 32), clip(row.Params["reason"], 200))
-		if err == nil && row.Code == evPrepFailed && f.cfg.OnAwgPrepareFailed != nil {
+		var switched, failedTransition bool
+		switched, failedTransition, err = f.st.AwgPrepareFinishTransition(ctx, nodeID, row.Code == evPrepDone, at,
+			clip(row.Params["code"], 32), clip(row.Params["reason"], 200))
+		if err == nil && failedTransition && f.cfg.OnAwgPrepareFailed != nil {
 			f.cfg.OnAwgPrepareFailed(nodeID, clip(row.Params["code"], 32), at)
 		}
 		if err == nil && switched {
@@ -181,6 +182,6 @@ func (f *Fleet) onAwgPrepareEvent(ctx context.Context, nodeID string, row store.
 		return
 	}
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		f.log.Warn("record awg prepare event", "node", nodeID, "code", row.Code, "err", err)
+		f.log.Warn("record awg prepare event", "code", "awg_prepare_event_failed", "node", nodeID, "event_code", row.Code, "err", err)
 	}
 }
