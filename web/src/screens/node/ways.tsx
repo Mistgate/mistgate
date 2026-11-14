@@ -647,11 +647,13 @@ function NewWayDialog({ data, w, start, onClose, onIpv6 }: { data: Data; w: Ways
   const own = hintOf(w.country);
   const cut = isCut(own) && own!.dark.length > 0;
   const darkText = own?.dark.join(", ") ?? "";
+  const sameAsExit = (cc: string) => !!node.countryCode && cc === node.countryCode;
   const picks: Pick[] = nodes
     .filter((n) => n.id !== node.id && n.status !== NodeStatus.RETIRED)
     .map((n) => {
       const hint = hintOf(fleet?.byNode.get(n.id));
-      const fit = cut && !!hint && (hint.verdict === "ok" || hint.verdict === "partial") && !own!.dark.some((d) => hint.dark.includes(d));
+      // an entry in the exit's own country is no good fit: the people's route to it would not change; it stays pickable
+      const fit = cut && !!hint && (hint.verdict === "ok" || hint.verdict === "partial") && !own!.dark.some((d) => hint.dark.includes(d)) && !sameAsExit(n.countryCode);
       return { node: n, hint, fit, already: relays.filter((r) => r.exitNodeId === node.id && r.viaNodeId === n.id).length };
     })
     // good fits first; among them a node inside the people's country (their route to it stays at home), then one every network sees
@@ -731,7 +733,8 @@ function NewWayDialog({ data, w, start, onClose, onIpv6 }: { data: Data; w: Ways
   const pickCard = (p: Pick) => {
     const seen = (cut ? seenHint(t, p.node.name, own, p.hint) : null) ?? countryHint(t, w.cc, p.hint);
     const r = p.fit ? reachOf(p.node.id) : undefined;
-    const hints = [seen, r ? reachHint(t, p.node.name, node.name, r) : null].filter((h): h is Hint => !!h);
+    const same: Hint | null = sameAsExit(p.node.countryCode) ? { tone: "off", text: t("relay.hint.sameCountry") } : null;
+    const hints = [seen, r ? reachHint(t, p.node.name, node.name, r) : null, same].filter((h): h is Hint => !!h);
     return (
       <button
         key={p.node.id}

@@ -19,6 +19,9 @@ export type Stage = Plain<RelayStage>;
 export type CountryHint = Plain<RelayCountryHint>;
 export type ReachHint = Plain<RelayReachHint>;
 
+/** The label of a path through an entry: "via RU", or "via a relay" for an entry with no country. */
+export const viaLabel = (t: T, cc: string) => (cc ? t("relay.via", { cc }) : t("relay.viaAny"));
+
 /** The relays with this node at either end, oldest first. Under ["relays"], so a change refreshes every node page. */
 export const relaysQuery = (nodeId: string) =>
   queryOptions({
@@ -172,9 +175,10 @@ export type CandidateNode = { nodeId: string; nodeName: string; servers: Candida
 
 /**
  * The candidates by exit node, in the panel's order (the ones that can be relayed first, the cut exits among them first):
- * the suggested nodes (cut, with a server that can be relayed), then the others.
+ * the suggested nodes (cut, with a server that can be relayed), then the others. An exit in the entry's own country is never
+ * suggested (`sameCountry`): the people's route to it would not change.
  */
-export function groupCandidates(list: Candidate[]): { suggested: CandidateNode[]; others: CandidateNode[] } {
+export function groupCandidates(list: Candidate[], sameCountry: (nodeId: string) => boolean = () => false): { suggested: CandidateNode[]; others: CandidateNode[] } {
   const byNode = new Map<string, CandidateNode>();
   for (const c of list) {
     const g = byNode.get(c.nodeId) ?? { nodeId: c.nodeId, nodeName: c.nodeName, servers: [], suggested: false };
@@ -186,7 +190,7 @@ export function groupCandidates(list: Candidate[]): { suggested: CandidateNode[]
   const rank = (c: Candidate) => (c.unsupported ? 2 : c.relayId ? 1 : 0);
   for (const g of all) {
     g.servers.sort((a, b) => rank(a) - rank(b));
-    g.suggested = g.servers.some((c) => !c.unsupported && isCut(c.country));
+    g.suggested = !sameCountry(g.nodeId) && g.servers.some((c) => !c.unsupported && isCut(c.country));
   }
   return { suggested: all.filter((g) => g.suggested), others: all.filter((g) => !g.suggested) };
 }

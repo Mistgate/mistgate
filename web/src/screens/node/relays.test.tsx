@@ -7,7 +7,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
 import { relaysQuery, type RelayMsg } from "@/lib/relay";
-import { AddRelayDialog, RelayRows, useRelayRuns } from "./relays";
+import { AddRelayDialog, ChangeRelayPort, RelayRows, useRelayRuns } from "./relays";
 
 const listRelays = vi.fn();
 const listRelayCandidates = vi.fn();
@@ -24,7 +24,7 @@ vi.mock("@/lib/api", () => ({
     updateRelay: (...a: unknown[]) => updateRelay(...a),
     deleteRelay: (...a: unknown[]) => deleteRelay(...a),
   },
-  nodes: { listNodes: () => Promise.resolve({ nodes: [{ id: "nod_de1", countryCode: "DE" }, { id: "nod_fi1", countryCode: "FI" }, { id: "nod_msk1", countryCode: "RU" }] }) },
+  nodes: { listNodes: () => Promise.resolve({ nodes: [{ id: "nod_de1", countryCode: "DE" }, { id: "nod_fi1", countryCode: "FI" }, { id: "nod_msk1", countryCode: "RU" }, { id: "nod_ru2", countryCode: "RU" }] }) },
   countryReach: { getCountryReachability: () => Promise.resolve({ settings: { country: "RU" } }) },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { updateIntervalHours: 12 }, effectiveTitle: "", serverSamples: [] }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role: 1 } }) },
@@ -319,5 +319,55 @@ describe("the exit's side and the panel's watch", () => {
     expect(row.textContent).not.toContain("Through the forward");
     expect(rowOf("Once").dataset.state).toBe("on"); // one bad round is not an outage yet
     expect(rowOf("Once").textContent).toContain("nothing comes through msk1 from outside");
+  });
+});
+
+describe("AmneziaWG through a relay", () => {
+  const awgDe = cand({ inboundId: "inb_awg", profileId: "prf_awg", profileName: "AWG 3.1", protocol: "awg", network: "udp", port: 51820 });
+  // an exit in the entry's own country (RU, as msk1): cut from RU, but the route would not change
+  const awgRu = cand({ inboundId: "inb_awg_ru", nodeId: "nod_ru2", nodeName: "ru2", profileId: "prf_awg", profileName: "AWG 3.1", protocol: "awg", network: "udp", port: 51820 });
+  const open = async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    listRelayCandidates.mockResolvedValue({ ...candidates, candidates: [awgDe, awgRu] });
+    await mount(<AddRelayDialog open onOpenChange={() => {}} entry={msk1} />);
+    await settle();
+  };
+
+  it("an AmneziaWG server can be picked, and picking it says once what people get", async () => {
+    await open();
+    const row = [...dialog().querySelectorAll<HTMLElement>("[data-testid=relay-candidate]")].find((s) => s.textContent?.includes("AWG 3.1") && s.closest("[data-testid=relay-candidate-node]")?.textContent?.includes("de1"))!;
+    expect(row.dataset.off).toBeUndefined();
+    expect(row.querySelector("input")?.disabled).toBe(false);
+    expect(row.textContent).not.toContain("later");
+    expect(dialog().textContent).not.toContain(en["relay.dlg.awgNote"]);
+    await tick("Relay AWG 3.1 of de1");
+    expect(dialog().textContent).toContain(en["relay.dlg.awgNote"]);
+    expect(dialog().textContent?.split(en["relay.dlg.awgNote"]).length).toBe(2);
+    await tick("Relay AWG 3.1 of de1");
+    expect(dialog().textContent).not.toContain(en["relay.dlg.awgNote"]);
+  });
+
+  it("an exit in the entry's own country is not suggested, stays pickable and says why", async () => {
+    await open();
+    const groups = [...dialog().querySelectorAll("section h3")].map((h) => h.textContent);
+    expect(groups).toEqual(["Suggested: unreachable from part of RU", "Other nodes"]);
+    const nodes = [...dialog().querySelectorAll<HTMLElement>("[data-testid=relay-candidate-node]")];
+    const [suggested, others] = ["de1", "ru2"].map((n) => nodes.find((x) => x.textContent?.includes(n))!);
+    expect(suggested!.closest("section")?.querySelector("h3")?.textContent).toBe("Suggested: unreachable from part of RU");
+    expect(others!.closest("section")?.querySelector("h3")?.textContent).toBe("Other nodes");
+    expect(others!.textContent).toContain("Same country as msk1");
+    expect(others!.querySelector("input")?.disabled).toBe(false);
+    expect(suggested!.textContent).not.toContain("Same country");
+  });
+
+  it("changing the port of an AmneziaWG relay warns that AmneziaVPN configs through the entry need downloading again", async () => {
+    const awg = relay({ id: "rly_awg", profileName: "AWG 3.1", protocol: "awg", network: "udp", port: 51820, exitPort: 51820 }) as unknown as RelayMsg;
+    await mount(<ChangeRelayPort r={awg} onClose={() => {}} />);
+    expect(dialog().textContent).toContain(en["relay.dlg.portAwg"]);
+    await act(async () => root!.unmount());
+    root = null;
+    host?.remove();
+    await mount(<ChangeRelayPort r={on as unknown as RelayMsg} onClose={() => {}} />);
+    expect(dialog().textContent).not.toContain(en["relay.dlg.portAwg"]);
   });
 });

@@ -36,6 +36,7 @@ import {
   stageReason,
   statePill,
   unverifiable,
+  viaLabel,
   type Candidate,
   type CandidateNode,
   type CountryHint,
@@ -61,9 +62,6 @@ export function useCountryOf(): (id: string) => string {
   const by = new Map((q.data?.nodes ?? []).map((n) => [n.id, n.countryCode]));
   return (id) => by.get(id) ?? "";
 }
-
-/** The label of a twin in the subscriptions: "via RU", or "via a relay" for an entry with no country. */
-const viaLabel = (t: T, cc: string) => (cc ? t("relay.via", { cc }) : t("relay.viaAny"));
 
 export const ccChip = (cc: string) => (
   <span className="flex h-[22px] min-w-[30px] flex-none items-center justify-center rounded-[7px] bg-surface-2 px-[7px] font-mono text-[11px] font-bold text-muted">{cc || "—"}</span>
@@ -438,7 +436,9 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   const [working, setWorking] = useState(false);
   const candidates = (cands.data?.candidates ?? []).filter((c) => !exitId || c.nodeId === exitId);
   const ready = !!cands.data?.agentSupported && candidates.length > 0;
-  const groups = groupCandidates(candidates);
+  // an exit in the entry's own country gains the people nothing: it is not suggested, and says why
+  const sameCountry = (nodeId: string) => !!entry.cc && ccOf(nodeId) === entry.cc;
+  const groups = groupCandidates(candidates, sameCountry);
   const chosen = candidates.filter((c) => c.inboundId in picked);
 
   const reset = () => {
@@ -565,6 +565,7 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
     <>
       {groups.suggested.length > 0 && candidateGroup(exitId ? "" : t("relay.dlg.suggested", { cc }), groups.suggested, cands.data.entryCountry)}
       {groups.others.length > 0 && candidateGroup(groups.suggested.length > 0 ? t("relay.dlg.others") : "", groups.others, cands.data.entryCountry)}
+      {chosen.some((c) => c.protocol === "awg") && <Notice tone="quiet">{t("relay.dlg.awgNote")}</Notice>}
       <p className="text-xs leading-snug text-muted">{t("relay.dlg.portHint", { entry: entry.name })}</p>
     </>
   );
@@ -577,7 +578,8 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
         {title && <h3 className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{title}</h3>}
         {nodes.map((g) => {
           const first = g.servers[0]!;
-          const hints = [countryHint(t, cc, first.country), reachHint(t, entry.name, g.nodeName, first.reach), seenHint(t, entry.name, first.country, entryCountry)].filter((h): h is Hint => !!h);
+          const same: Hint | null = sameCountry(g.nodeId) ? { tone: "off", text: t("relay.hint.sameCountryEntry", { entry: entry.name }) } : null;
+          const hints = [countryHint(t, cc, first.country), reachHint(t, entry.name, g.nodeName, first.reach), seenHint(t, entry.name, first.country, entryCountry), same].filter((h): h is Hint => !!h);
           return (
             <div key={g.nodeId} data-testid="relay-candidate-node" className="flex flex-col overflow-hidden rounded-card border border-line">
               <div className="flex flex-col gap-1.5 bg-surface-2/60 px-3.5 py-2.5">
@@ -608,7 +610,7 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
     const off = !!c.unsupported || !!c.relayId;
     const on = c.inboundId in picked;
     const why = c.unsupported
-      ? (["cdn", "acme_ip", "awg", "build_failed"] as const).includes(c.unsupported as "cdn")
+      ? (["cdn", "acme_ip", "build_failed"] as const).includes(c.unsupported as "cdn")
         ? t(`relay.unsupported.${c.unsupported as "cdn"}`)
         : c.unsupported
       : c.relayId
@@ -781,6 +783,7 @@ export function ChangeRelayPort({ r, onClose }: { r: RelayMsg; onClose: () => vo
       }
     >
       <TextField label={t("wg.port.label")} mono inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} />
+      {r.protocol === "awg" && <Notice tone="quiet">{t("relay.dlg.portAwg")}</Notice>}
       {error != null && (
         <Notice tone="danger" className="items-start">
           {errorText(error, t)}

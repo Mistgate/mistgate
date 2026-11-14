@@ -25,7 +25,6 @@ import { useInboundRefresh } from "./inbound-check";
 type In = Plain<Inbound>;
 
 const reasonKeys: Record<string, MessageKey> = {
-  awg: "ways.subs.reason.awg",
   acme_ip: "ways.subs.reason.acme_ip",
   no_usable_relay: "ways.subs.reason.no_usable_relay",
 };

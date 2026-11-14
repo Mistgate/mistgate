@@ -125,7 +125,7 @@ describe("relay rules", () => {
   const server = (over: Partial<GServer> = {}): GServer => ({ inboundId: "hy2", name: "HY2", protocol: "hysteria2", net: "udp", port: 443, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works", ...over });
   it("refuses what the relay dialog refuses", () => {
     expect(relayRefusal("be", "be", server(), [])).toBe("same_node");
-    expect(relayRefusal("msk1", "be", server({ noRelay: "awg" }), [])).toBe("awg");
+    expect(relayRefusal("msk1", "be", server({ noRelay: "cdn" }), [])).toBe("cdn");
     expect(relayRefusal("msk1", "be", server(), [relay({})])).toBe("exists");
     expect(relayRefusal("ru2", "be", server(), [relay({})])).toBeUndefined();
   });
@@ -215,14 +215,14 @@ describe("the calm states (ADR 0016 follow-up)", () => {
     expect(nodeOf(graph({ entry: "on" })).v6?.state).toBe("on");
   });
 
-  it("refusals come with the reason the row shows: cdn, awg, off, exists, the same node", () => {
+  it("refusals come with the reason the row shows: cdn, off, exists, the same node; an AmneziaWG server can be relayed", () => {
     const server = (over: Partial<GServer> = {}): GServer => ({ inboundId: "x", name: "X", protocol: "vless", net: "tcp", port: 1, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works", ...over });
     expect(relayRefusal("a", "b", server({ noRelay: "cdn" }), [])).toBe("cdn");
     expect(relayRefusal("a", "b", server({ noRelay: "off" }), [])).toBe("off");
     expect(relayRefusal("a", "b", server({ noRelay: "net" }), [])).toBe("net");
     const g = graph({ inbounds: [inbound("awg", "awg", 1), inbound("cdn", "vless", 2, { cdn: true }), inbound("hy", "hysteria2", 3)] });
     const servers = (g.cards.find((c) => c.kind === "node") as { servers: GServer[] }).servers;
-    expect(Object.fromEntries(servers.map((s) => [s.inboundId, s.noRelay]))).toEqual({ awg: "awg", cdn: "cdn", hy: undefined });
+    expect(Object.fromEntries(servers.map((s) => [s.inboundId, s.noRelay]))).toEqual({ awg: undefined, cdn: "cdn", hy: undefined });
   });
 });
 
@@ -276,7 +276,7 @@ describe("reconnectRule: what grabbing a wire's end does", () => {
     { inboundId: "hy2", name: "HY2", protocol: "hysteria2", net: "udp", port: 443, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works" },
     { inboundId: "hy3", name: "HY3", protocol: "hysteria2", net: "udp", port: 444, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works" },
     { inboundId: "vless", name: "VLESS", protocol: "vless", net: "tcp", port: 8443, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works" },
-    { inboundId: "awg", name: "AWG", protocol: "awg", net: "udp", port: 1, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works", noRelay: "awg" },
+    { inboundId: "awg", name: "AWG", protocol: "awg", net: "udp", port: 1, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works" },
     { inboundId: "cdn", name: "CDN", protocol: "vless", net: "tcp", port: 2, egress: "direct", listed: true, cdn: true, on: true, failed: false, way: "works", noRelay: "cdn" },
   ];
   const r1 = relay({});
@@ -292,9 +292,9 @@ describe("reconnectRule: what grabbing a wire's end does", () => {
     const wire = { ...rWire, relay: relay({ id: "r9", inboundId: "hy2" }) } as never;
     expect(reconnectRule(wire, "to", onServer("hy3"), { ...ctx, relays: [relay({ id: "r9", inboundId: "hy2" })] })).toMatchObject({ ok: true, action: { type: "moveRelay", inboundId: "hy3" } });
   });
-  it("refuses another network, AWG, a CDN server, a server this entry already relays, and moving the entry end", () => {
+  it("refuses another network, a server this entry already relays, and moving the entry end", () => {
     expect(reconnectRule(rWire, "to", onServer("vless"), ctx)).toEqual({ ok: false, reason: "network" });
-    expect(reconnectRule(rWire, "to", onServer("awg"), ctx)).toEqual({ ok: false, reason: "awg" });
+    expect(reconnectRule(rWire, "to", onServer("awg"), ctx)).toMatchObject({ ok: true, action: { type: "moveRelay", inboundId: "awg" } }); // AmneziaWG is UDP and relayable now
     expect(reconnectRule(rWire, "to", onServer("hy3"), ctx)).toEqual({ ok: false, reason: "exists" });
     expect(reconnectRule(rWire, "to", { card: "internet", port: "exit" }, ctx)).toEqual({ ok: false, reason: "target" });
     expect(reconnectRule(rWire, "from", onServer("hy3"), ctx)).toEqual({ ok: false, reason: "relayEntry" });

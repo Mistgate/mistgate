@@ -219,6 +219,29 @@ describe("the line of a node dark on part of the country", () => {
 });
 
 describe("the New way in dialog", () => {
+  it("an entry in the exit's own country is no good fit: it goes under Other nodes with its reason, and can still be picked", async () => {
+    // de2 is seen from every network, as msk1 is, but it sits in Germany like de1: the people's route to de1 would not change
+    nodes.push({ id: "nod_de2", name: "de2", countryCode: "DE", status: NodeStatus.ONLINE });
+    countryChecks = [...countryChecks, country("nod_de2", CountryVerdict.OK)];
+    try {
+      search = { tab: "ways", add: "1" };
+      await mount(de1());
+      await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.startsWith("Through another node")));
+      await settle();
+      expect([...dialog().querySelectorAll("section h3")].map((h) => h.textContent)).toEqual(["Good fits: seen from MTS", "Other nodes"]);
+      const entries = [...dialog().querySelectorAll<HTMLElement>("[data-testid=way-entry]")];
+      expect(entries.map((e) => e.querySelector(".font-extrabold")?.textContent)).toEqual(["msk1", "de2", "fi1"]);
+      expect(entries[0]!.textContent).not.toContain("Same country");
+      expect(entries[1]!.textContent).toContain("Same country as the exit");
+      expect(entries[1]!.closest("section")?.querySelector("h3")?.textContent).toBe("Other nodes");
+      await click(entries[1]);
+      await settle();
+      expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_de2" }, expect.anything());
+    } finally {
+      nodes.pop();
+    }
+  });
+
   it("offers the node people see where de1 is dark, then only de1's servers through it, and makes the relay through that entry", async () => {
     search = { tab: "ways", add: "1" };
     await mount(de1());

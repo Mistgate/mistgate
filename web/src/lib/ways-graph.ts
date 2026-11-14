@@ -52,7 +52,7 @@ export type GServer = {
   /** The way people have to it (see ServerWay); the chip on its row. */
   way: ServerWay;
   /** Why an entry cannot forward it; undefined when it can (the server decides finally: an ACME-IP certificate…). */
-  noRelay?: "cdn" | "awg" | "net" | "off";
+  noRelay?: "cdn" | "net" | "off";
 };
 
 export type GCard =
@@ -160,7 +160,7 @@ export function serverOf(i: GraphInput["inbounds"][number]): GServer {
     on,
     failed: i.state === InboundState.FAILED,
     way: "unknown",
-    noRelay: i.cdn ? "cdn" : i.protocol === "awg" ? "awg" : !net ? "net" : !on ? "off" : undefined,
+    noRelay: i.cdn ? "cdn" : !net ? "net" : !on ? "off" : undefined,
   };
 }
 

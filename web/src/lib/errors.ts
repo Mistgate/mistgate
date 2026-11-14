@@ -94,7 +94,7 @@ function editionVars(t: T, vars: Record<string, string>): Record<string, string>
 /** The words of a relay refusal's values: why a server cannot be relayed, which stage of the check failed. */
 function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
   const reason = vars.reason ?? "";
-  const worded = ["cdn", "acme_ip", "awg", "build_failed"].includes(reason);
+  const worded = ["cdn", "acme_ip", "build_failed"].includes(reason);
   return {
     ...vars,
     reason: worded ? t(`relay.unsupported.${reason as "cdn"}`) : reason,

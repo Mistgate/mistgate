@@ -193,7 +193,7 @@ export function WaysGraph({
                 />
               </label>
             )}
-            {s.noRelay === "cdn" || s.noRelay === "awg" ? <p className="text-[11.5px] leading-snug text-muted">{t(s.noRelay === "cdn" ? "wg.noRelay.cdn" : "wg.noRelay.awg")}</p> : null}
+            {s.noRelay === "cdn" ? <p className="text-[11.5px] leading-snug text-muted">{t("wg.noRelay.cdn")}</p> : null}
           </div>
         )}
       </Pop>
