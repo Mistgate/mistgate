@@ -70,7 +70,7 @@ Critical settings must match on the node and in every client; changing them make
 | Setting | Range and default | Critical | What it does |
 |:--|:--|:--|:--|
 | **UDP port** | 1–65535; a new profile gets a random one in 10000–60000 (never 51820, 51821 or 55424) | yes | The node listens here. **Random port** draws another. |
-| **MTU** | 1200–1420, default 1280 | no | Tunnel MTU on the node and in the `.conf`. MTU + S4 + 80 must fit in 1500. |
+| **MTU** | 1200–1420, default 1280 | no | Tunnel MTU on the node and in the `.conf`. MTU + S4 + 80 must fit in 1500. Below 1280 the editor warns: client configs route IPv6 (`::/0`) through the tunnel, and IPv6 needs at least 1280. |
 | **Exit** | **Direct** or **WARP** | no | See [WARP](warp.md). |
 | **Client network (IPv4)** | a private /16–/24 network | yes | The node is .1, each device gets one address. Cannot change once the profile is on a node or has devices. |
 | **Client network (IPv6)** | a /64 from fc00::/7, or empty | yes | Empty means no IPv6 inside the tunnel. Fixed like the IPv4 network. |
@@ -98,7 +98,7 @@ Critical settings must match on the node and in every client; changing them make
 | **Rekey after**, **Rekey timeout**, **Reject after**, **Keepalive timeout**, **Handshake attempts** | no | 3.1 only. Timers, a number or a range. |
 | **Persistent keepalive** | no | Written into the client; keep it under 30 s, the UDP timeout of many NATs. 2.0 takes one number; Mihomo uses the first one. |
 
-While you edit, the editor warns about legal but risky values: too many junk packets, Jmax not below the MTU, S4 that does not fit 1500 at this MTU (with the MTU that would fit), S4 = 16 in 2.0, H values of plain WireGuard, a narrow H range, cookie replies turned off, a keepalive longer than a NAT timeout, a look on an unusual port.
+While you edit, the editor warns about legal but risky values: too many junk packets, Jmax not below the MTU, S4 that does not fit 1500 at this MTU (with the MTU that would fit), an MTU below the 1280 minimum of IPv6, S4 = 16 in 2.0, H values of plain WireGuard, a narrow H range, cookie replies turned off, a keepalive longer than a NAT timeout, a look on an unusual port.
 
 ## Client networks and addresses
 

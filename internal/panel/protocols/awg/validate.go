@@ -341,6 +341,10 @@ func warnings(s Settings) []Warning {
 	if s.MTU > defaultMTU {
 		add("/mtu", "mtu_above_1280") // desktop AmneziaVPN overwrites the MTU of a vpn:// key anyway
 	}
+	if s.MTU < defaultMTU {
+		// Client AllowedIPs always keep ::/0, even when the node gives the client no IPv6 tunnel address.
+		add("/mtu", "mtu_ipv6_min", "mtu", strconv.Itoa(s.MTU), "minimum", strconv.Itoa(defaultMTU))
+	}
 	if o.S4 > maxS4(s.MTU) {
 		add("/mtu", "mtu_headroom", "suggested_mtu", strconv.Itoa(suggestedMTU(o.S4)), "s4", strconv.Itoa(o.S4))
 	}

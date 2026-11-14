@@ -252,9 +252,10 @@ func TestAWGPreviewAdviceAndScore(t *testing.T) {
 		settings, code string
 		params         map[string]string
 	}{
-		"mtu":       {`{"mtu":1420}`, "mtu_headroom", map[string]string{"suggested_mtu": "", "s4": ""}},
-		"keepalive": {`{"obfuscation":{"persistent_keepalive":"25-40"}}`, "keepalive_over_nat", map[string]string{"max": "40"}},
-		"2.0":       {`{"version":"2.0","obfuscation":{"preset":"stun","h1":"1","h2":"2","h3":"3","h4":"4","random_trailers":false,"content_padding_addition":"","rekey_after_time":"","rekey_timeout":"","reject_after_time":"","keepalive_timeout":"","max_handshake_attempts":"","persistent_keepalive":"25"}}`, "h_default_v20", nil},
+		"mtu":              {`{"mtu":1420}`, "mtu_headroom", map[string]string{"suggested_mtu": "", "s4": ""}},
+		"IPv6 minimum MTU": {`{"mtu":1279,"subnet6":""}`, "mtu_ipv6_min", map[string]string{"mtu": "1279", "minimum": "1280"}},
+		"keepalive":        {`{"obfuscation":{"persistent_keepalive":"25-40"}}`, "keepalive_over_nat", map[string]string{"max": "40"}},
+		"2.0":              {`{"version":"2.0","obfuscation":{"preset":"stun","h1":"1","h2":"2","h3":"3","h4":"4","random_trailers":false,"content_padding_addition":"","rekey_after_time":"","rekey_timeout":"","reject_after_time":"","keepalive_timeout":"","max_handshake_attempts":"","persistent_keepalive":"25"}}`, "h_default_v20", nil},
 	} {
 		p := must(e.s.PreviewProfile(e.ctx, req(&adminv1.PreviewProfileRequest{Protocol: "awg", SettingsJson: c.settings}))).Msg
 		var got *adminv1.FieldError

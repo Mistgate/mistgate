@@ -38,6 +38,7 @@ var warningText = map[string]string{
 	"no_flood_protection": "cookies are off: nothing slows a handshake flood",
 	"trailers_unequal_s":  "random trailers work best with S1-S4 equal",
 	"mtu_above_1280":      "AmneziaVPN on a desktop overwrites the MTU of a vpn:// key",
+	"mtu_ipv6_min":        "client configs route IPv6 through the tunnel, but this MTU is below IPv6's 1280-byte minimum",
 	"mtu_headroom":        "MTU + S4 + 80 does not fit 1500: data packets fragment on a standard path",
 	"h_default_v20":       "H1-H4 = 1, 2, 3, 4 are the headers of plain WireGuard: the main fingerprint without header protection",
 	"h_small_range":       "an H range narrower than 1000 values is easy to guess",

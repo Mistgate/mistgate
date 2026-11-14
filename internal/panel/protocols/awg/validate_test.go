@@ -276,6 +276,8 @@ func TestWarningMatrix(t *testing.T) {
 			func(s *Settings) { s.Obfuscation.Preset = "ssdp" }, func(s *Settings) { s.Port = 1900 }},
 		{"mtu with no room for S4", "mtu_headroom", "/mtu", map[string]string{"suggested_mtu": "1396", "s4": "24"}, clean31,
 			func(s *Settings) { s.MTU = 1420 }, func(s *Settings) { s.MTU = 1396 }},
+		{"IPv6 default route below its minimum MTU", "mtu_ipv6_min", "/mtu", map[string]string{"mtu": "1279", "minimum": "1280"}, clean31,
+			func(s *Settings) { s.MTU, s.Subnet6 = 1279, "" }, func(s *Settings) { s.MTU = 1280 }},
 		{"keepalive over the NAT timeout", "keepalive_over_nat", "/obfuscation/persistent_keepalive", map[string]string{"max": "35"}, clean31,
 			func(s *Settings) { s.Obfuscation.PersistentKeepalive = "25-35" }, func(s *Settings) { s.Obfuscation.PersistentKeepalive = "25-30" }},
 		{"a single keepalive over it", "keepalive_over_nat", "/obfuscation/persistent_keepalive", map[string]string{"max": "31"}, fixture20,

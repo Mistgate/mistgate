@@ -180,7 +180,7 @@ describe("AwgPanel score and remarks", () => {
     expect(el.querySelectorAll('[role="status"]')).toHaveLength(2);
   });
   it("every code of the server has a text in both languages", async () => {
-    const warn = ["jc_high", "jmax_ge_mtu", "no_flood_protection", "trailers_unequal_s", "mtu_above_1280", "mtu_headroom", "h_default_v20", "h_small_range", "h_lt5", "preset_port", "keepalive_over_nat"];
+    const warn = ["jc_high", "jmax_ge_mtu", "no_flood_protection", "trailers_unequal_s", "mtu_above_1280", "mtu_headroom", "mtu_ipv6_min", "h_default_v20", "h_small_range", "h_lt5", "preset_port", "keepalive_over_nat"];
     const items = ["h_default_v20", "h_lt5", "h_small_range", "jc_zero", "junk_narrow", "s_zero", "jc_high", "jmax_ge_mtu", "no_random_trailers", "trailers_unequal_s", "no_data_padding", "timers_default", "no_cps", "cps_frozen", "preset_port", "port_default", "keepalive_over_nat", "mtu_headroom", "per_device_signature"];
     const tiers = ["header_protection", "ranges", "cps", "headers", "wireguard"];
     const keys = [...warn.map((c) => `awg.warn.${c}`), ...items.map((c) => `awg.score.${c}`), ...tiers.map((c) => `awg.score.tier.${c}`)];
