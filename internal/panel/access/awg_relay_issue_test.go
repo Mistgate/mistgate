@@ -69,15 +69,17 @@ func TestAWGRelayServersEachGetTheirOwnKey(t *testing.T) {
 	if len(v.Servers) != 3 {
 		t.Fatalf("servers = %d, want the direct one and a twin through each entry", len(v.Servers))
 	}
+	// The direct server comes first; the two relays were made in the same second, so their order follows their random ids.
 	wantPaths := []string{"direct", "relay:nod_fi1", "relay:nod_nl1"}
-	wantHosts := []string{"de1.example.com", "fi1.example.com", "nl1.example.com"}
-	wantPorts := []string{"", "port: 8443", "port: 9443"}
+	want := map[string][2]string{"direct": {"de1.example.com", ""}, "relay:nod_fi1": {"fi1.example.com", "port: 8443"}, "relay:nod_nl1": {"nl1.example.com", "port: 9443"}}
 	keys := map[string]bool{}
 	var direct string
 	for i, srv := range v.Servers {
-		if srv.PathKey != wantPaths[i] || !strings.Contains(srv.URI, `server: "`+wantHosts[i]+`"`) || !strings.Contains(srv.URI, wantPorts[i]) {
-			t.Errorf("server %d = %q through %q:\n%s", i, srv.PathKey, wantHosts[i], srv.URI)
+		w, ok := want[srv.PathKey]
+		if !ok || (i == 0) != (srv.PathKey == "direct") || !strings.Contains(srv.URI, `server: "`+w[0]+`"`) || !strings.Contains(srv.URI, w[1]) {
+			t.Errorf("server %d = %q, want %q:\n%s", i, srv.PathKey, w[0], srv.URI)
 		}
+		delete(want, srv.PathKey)
 		key := awgPrivateKey(t, srv.URI)
 		if keys[key] {
 			t.Errorf("server %d (%s) shares its private key with another path", i, srv.PathKey)
