@@ -118,8 +118,8 @@ func TestDeviceCredentialIPv6PathMigrationPreservesRelayKeys(t *testing.T) {
 			VALUES (?, ?, ?, ?, 1)`, c.id, profile, c.idx, "pub_"+c.id)
 	}
 
-	if _, err := p.UpTo(ctx, 138); err != nil {
-		t.Fatalf("up to 138: %v", err)
+	if _, err := p.UpTo(ctx, 137); err != nil {
+		t.Fatalf("up to 137: %v", err)
 	}
 	indexesIntact := func(when string) {
 		t.Helper()
