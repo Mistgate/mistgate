@@ -130,6 +130,43 @@ func (s *Service) conversation(ctx context.Context, adminID, id string) (*adminv
 	return summary, segment, nil
 }
 
+// RecentQuestions returns what the admin typed lately across their conversations (not a task's or a follow-up's turns): short
+// one-line texts, newest first, each once.
+func (s *Service) RecentQuestions(ctx context.Context, _ *connect.Request[adminv1.RecentQuestionsRequest]) (*connect.Response[adminv1.RecentQuestionsResponse], error) {
+	admin, err := adminFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.st.R.QueryContext(ctx, `SELECT m.id,m.body_enc FROM assistant_message m JOIN assistant_conversation c ON c.id=m.conversation_id AND c.admin_id=m.admin_id WHERE m.admin_id=? AND m.role='user' AND c.task_id='' ORDER BY m.created_at DESC,m.id DESC LIMIT 200`, admin.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	seen := map[string]bool{}
+	out := []string{}
+	for rows.Next() && len(out) < 50 {
+		var id string
+		var sealed []byte
+		if err = rows.Scan(&id, &sealed); err != nil {
+			return nil, err
+		}
+		var body messageBody
+		if openJSON(s.vault, sealed, MessageAAD(id), &body) != nil || body.FollowUp != nil {
+			continue
+		}
+		q := strings.TrimSpace(body.Text)
+		if q == "" || len(q) > 300 || strings.ContainsAny(q, "\r\n") || seen[strings.ToLower(q)] {
+			continue
+		}
+		seen[strings.ToLower(q)] = true
+		out = append(out, q)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.RecentQuestionsResponse{Questions: out}), nil
+}
+
 func (s *Service) ListConversations(ctx context.Context, req *connect.Request[adminv1.ListConversationsRequest]) (*connect.Response[adminv1.ListConversationsResponse], error) {
 	admin, err := adminFrom(ctx)
 	if err != nil {

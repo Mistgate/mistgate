@@ -11,7 +11,7 @@ import { navKey, sections, type SectionId } from "@/components/nav";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { assistant } from "@/lib/api";
-import { accessQuery, assistantErrorKey, conversationsQuery, followUpPoll, looksSecret, providerName, type Context, type FollowUp, type LiveMsg, type LiveTool, type Msg, type Note, type Plan, type Tool } from "@/lib/assistant";
+import { accessQuery, assistantErrorKey, conversationsQuery, followUpPoll, looksSecret, providerName, recentQuestionsQuery, type Context, type FollowUp, type LiveMsg, type LiveTool, type Msg, type Note, type Plan, type Tool } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
@@ -350,10 +350,11 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   const [scrolled, setScrolled] = useState(false);
   const context = initialContext !== undefined ? initialContext : pageContext;
   const pick = usePick({ provider, model: providerLabel });
-  // what the message box offers to finish: the questions asked in this conversation (newest first), then the examples
+  // what the message box offers to finish: the questions asked in this conversation (newest first), in the others, then the examples
+  const recent = useQuery(recentQuestionsQuery).data;
   const suggestions = useMemo(
-    () => [...chat.messages.filter((m) => m.role === ChatRole.USER && !looksSecret(m.text)).map((m) => m.text).reverse(), ...EXAMPLES.map((k) => t(k))],
-    [chat.messages, t],
+    () => [...chat.messages.filter((m) => m.role === ChatRole.USER).map((m) => m.text).reverse(), ...(recent ?? []), ...EXAMPLES.map((k) => t(k))].filter((q) => !looksSecret(q)),
+    [chat.messages, recent, t],
   );
 
   // the list follows the answer as it grows: new messages, text, tool lines, plan cards

@@ -54,6 +54,9 @@ const (
 	// AssistantServiceListConversationsProcedure is the fully-qualified name of the AssistantService's
 	// ListConversations RPC.
 	AssistantServiceListConversationsProcedure = "/mistgate.admin.v1.AssistantService/ListConversations"
+	// AssistantServiceRecentQuestionsProcedure is the fully-qualified name of the AssistantService's
+	// RecentQuestions RPC.
+	AssistantServiceRecentQuestionsProcedure = "/mistgate.admin.v1.AssistantService/RecentQuestions"
 	// AssistantServiceGetConversationProcedure is the fully-qualified name of the AssistantService's
 	// GetConversation RPC.
 	AssistantServiceGetConversationProcedure = "/mistgate.admin.v1.AssistantService/GetConversation"
@@ -106,6 +109,8 @@ type AssistantServiceClient interface {
 	ListProviderModels(context.Context, *connect.Request[v1.ListProviderModelsRequest]) (*connect.Response[v1.ListProviderModelsResponse], error)
 	// The admin's own conversations, newest first.
 	ListConversations(context.Context, *connect.Request[v1.ListConversationsRequest]) (*connect.Response[v1.ListConversationsResponse], error)
+	// What the admin asked lately, across their conversations: the message box offers to finish a question started like one.
+	RecentQuestions(context.Context, *connect.Request[v1.RecentQuestionsRequest]) (*connect.Response[v1.RecentQuestionsResponse], error)
 	GetConversation(context.Context, *connect.Request[v1.GetConversationRequest]) (*connect.Response[v1.GetConversationResponse], error)
 	DeleteConversation(context.Context, *connect.Request[v1.DeleteConversationRequest]) (*connect.Response[v1.DeleteConversationResponse], error)
 	// The admin's own; with all_admins (owner, fresh step-up) everyone's.
@@ -180,6 +185,12 @@ func NewAssistantServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+AssistantServiceListConversationsProcedure,
 			connect.WithSchema(assistantServiceMethods.ByName("ListConversations")),
+			connect.WithClientOptions(opts...),
+		),
+		recentQuestions: connect.NewClient[v1.RecentQuestionsRequest, v1.RecentQuestionsResponse](
+			httpClient,
+			baseURL+AssistantServiceRecentQuestionsProcedure,
+			connect.WithSchema(assistantServiceMethods.ByName("RecentQuestions")),
 			connect.WithClientOptions(opts...),
 		),
 		getConversation: connect.NewClient[v1.GetConversationRequest, v1.GetConversationResponse](
@@ -266,6 +277,7 @@ type assistantServiceClient struct {
 	removeProviderKey       *connect.Client[v1.RemoveProviderKeyRequest, v1.RemoveProviderKeyResponse]
 	listProviderModels      *connect.Client[v1.ListProviderModelsRequest, v1.ListProviderModelsResponse]
 	listConversations       *connect.Client[v1.ListConversationsRequest, v1.ListConversationsResponse]
+	recentQuestions         *connect.Client[v1.RecentQuestionsRequest, v1.RecentQuestionsResponse]
 	getConversation         *connect.Client[v1.GetConversationRequest, v1.GetConversationResponse]
 	deleteConversation      *connect.Client[v1.DeleteConversationRequest, v1.DeleteConversationResponse]
 	deleteAllConversations  *connect.Client[v1.DeleteAllConversationsRequest, v1.DeleteAllConversationsResponse]
@@ -313,6 +325,11 @@ func (c *assistantServiceClient) ListProviderModels(ctx context.Context, req *co
 // ListConversations calls mistgate.admin.v1.AssistantService.ListConversations.
 func (c *assistantServiceClient) ListConversations(ctx context.Context, req *connect.Request[v1.ListConversationsRequest]) (*connect.Response[v1.ListConversationsResponse], error) {
 	return c.listConversations.CallUnary(ctx, req)
+}
+
+// RecentQuestions calls mistgate.admin.v1.AssistantService.RecentQuestions.
+func (c *assistantServiceClient) RecentQuestions(ctx context.Context, req *connect.Request[v1.RecentQuestionsRequest]) (*connect.Response[v1.RecentQuestionsResponse], error) {
+	return c.recentQuestions.CallUnary(ctx, req)
 }
 
 // GetConversation calls mistgate.admin.v1.AssistantService.GetConversation.
@@ -390,6 +407,8 @@ type AssistantServiceHandler interface {
 	ListProviderModels(context.Context, *connect.Request[v1.ListProviderModelsRequest]) (*connect.Response[v1.ListProviderModelsResponse], error)
 	// The admin's own conversations, newest first.
 	ListConversations(context.Context, *connect.Request[v1.ListConversationsRequest]) (*connect.Response[v1.ListConversationsResponse], error)
+	// What the admin asked lately, across their conversations: the message box offers to finish a question started like one.
+	RecentQuestions(context.Context, *connect.Request[v1.RecentQuestionsRequest]) (*connect.Response[v1.RecentQuestionsResponse], error)
 	GetConversation(context.Context, *connect.Request[v1.GetConversationRequest]) (*connect.Response[v1.GetConversationResponse], error)
 	DeleteConversation(context.Context, *connect.Request[v1.DeleteConversationRequest]) (*connect.Response[v1.DeleteConversationResponse], error)
 	// The admin's own; with all_admins (owner, fresh step-up) everyone's.
@@ -460,6 +479,12 @@ func NewAssistantServiceHandler(svc AssistantServiceHandler, opts ...connect.Han
 		AssistantServiceListConversationsProcedure,
 		svc.ListConversations,
 		connect.WithSchema(assistantServiceMethods.ByName("ListConversations")),
+		connect.WithHandlerOptions(opts...),
+	)
+	assistantServiceRecentQuestionsHandler := connect.NewUnaryHandler(
+		AssistantServiceRecentQuestionsProcedure,
+		svc.RecentQuestions,
+		connect.WithSchema(assistantServiceMethods.ByName("RecentQuestions")),
 		connect.WithHandlerOptions(opts...),
 	)
 	assistantServiceGetConversationHandler := connect.NewUnaryHandler(
@@ -550,6 +575,8 @@ func NewAssistantServiceHandler(svc AssistantServiceHandler, opts ...connect.Han
 			assistantServiceListProviderModelsHandler.ServeHTTP(w, r)
 		case AssistantServiceListConversationsProcedure:
 			assistantServiceListConversationsHandler.ServeHTTP(w, r)
+		case AssistantServiceRecentQuestionsProcedure:
+			assistantServiceRecentQuestionsHandler.ServeHTTP(w, r)
 		case AssistantServiceGetConversationProcedure:
 			assistantServiceGetConversationHandler.ServeHTTP(w, r)
 		case AssistantServiceDeleteConversationProcedure:
@@ -609,6 +636,10 @@ func (UnimplementedAssistantServiceHandler) ListProviderModels(context.Context, 
 
 func (UnimplementedAssistantServiceHandler) ListConversations(context.Context, *connect.Request[v1.ListConversationsRequest]) (*connect.Response[v1.ListConversationsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.AssistantService.ListConversations is not implemented"))
+}
+
+func (UnimplementedAssistantServiceHandler) RecentQuestions(context.Context, *connect.Request[v1.RecentQuestionsRequest]) (*connect.Response[v1.RecentQuestionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.AssistantService.RecentQuestions is not implemented"))
 }
 
 func (UnimplementedAssistantServiceHandler) GetConversation(context.Context, *connect.Request[v1.GetConversationRequest]) (*connect.Response[v1.GetConversationResponse], error) {

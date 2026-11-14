@@ -49,6 +49,13 @@ export const conversationsQuery = (query: string) =>
     queryFn: async ({ signal }) => plain(await assistant.listConversations({ query, limit: 50 }, { signal })).conversations,
   });
 
+/** What the admin asked lately, in any conversation: the message box offers to finish a question started like one. */
+export const recentQuestionsQuery = queryOptions({
+  queryKey: ["assistant", "recent-questions"],
+  queryFn: async ({ signal }) => (await assistant.recentQuestions({}, { signal })).questions,
+  staleTime: 60_000,
+});
+
 export const conversationQuery = (id: string) =>
   queryOptions({
     queryKey: ["assistant", "conversation", id],

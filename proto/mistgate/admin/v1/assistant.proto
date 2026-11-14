@@ -58,6 +58,8 @@ service AssistantService {
 
   // The admin's own conversations, newest first.
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  // What the admin asked lately, across their conversations: the message box offers to finish a question started like one.
+  rpc RecentQuestions(RecentQuestionsRequest) returns (RecentQuestionsResponse);
   rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
   rpc DeleteConversation(DeleteConversationRequest) returns (DeleteConversationResponse);
   // The admin's own; with all_admins (owner, fresh step-up) everyone's.
@@ -435,6 +437,13 @@ message ListConversationsRequest {
 message ListConversationsResponse {
   repeated ConversationSummary conversations = 1;
   string next_page_token = 2;
+}
+
+message RecentQuestionsRequest {}
+
+message RecentQuestionsResponse {
+  // The admin's own one-line questions, newest first, without repeats; at most 50. Not those of scheduled tasks and follow-ups.
+  repeated string questions = 1;
 }
 
 message GetConversationRequest {
