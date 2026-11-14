@@ -113,7 +113,7 @@ func relayModeStoreProof(t *testing.T, st *Store) {
 	l = mustRelay(t, st, "rly_a")
 	got, ok := l.Bridge()
 	if !ok || got != report || l.DirectStreak() != 2 {
-		t.Fatalf("bridge report %+v (%v), streak %d", got, ok, l.DirectStreak())
+		t.Fatalf("bridge report %+v (%v), streak %d, check_json %s", got, ok, l.DirectStreak(), l.CheckJSON)
 	}
 	if c, ok := l.Check(); !ok || c.At != now.Unix()+1 || c.Monitor == nil || !c.Monitor.OK || !c.Verified() {
 		t.Fatalf("the check lost a member next to the bridge report: %+v", c)

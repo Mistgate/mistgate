@@ -51,8 +51,9 @@ type RelayBridgeCheck struct {
 // relayModeCheck is the members of check_json the reverse way adds. Each has its own writer, like the other members, so one
 // writer never overwrites another's.
 type relayModeCheck struct {
-	Bridge       *RelayBridgeCheck `json:"bridge"`
-	DirectStreak uint32            `json:"direct_streak"`
+	Bridge *RelayBridgeCheck `json:"bridge"`
+	// A float: D1 binds every JS number as a real, so a count written there may come back as 2.0.
+	DirectStreak float64 `json:"direct_streak"`
 }
 
 func (r Relay) modeCheck() relayModeCheck {
@@ -73,7 +74,7 @@ func (r Relay) Bridge() (RelayBridgeCheck, bool) {
 }
 
 // DirectStreak is how many checks of the direct leg passed in a row while the relay stands in the reverse way (0 to 3).
-func (r Relay) DirectStreak() uint32 { return min(r.modeCheck().DirectStreak, 3) }
+func (r Relay) DirectStreak() uint32 { return uint32(max(0, min(r.modeCheck().DirectStreak, 3))) }
 
 // SetRelayBridge stores the bridge report of a relay in check_json.bridge; nil removes it. ErrNotFound when the relay is gone.
 func (s *Store) SetRelayBridge(ctx context.Context, id string, b *RelayBridgeCheck) error {
@@ -93,7 +94,7 @@ func (s *Store) SetRelayDirectStreak(ctx context.Context, id string, streak uint
 	if streak == 0 {
 		return s.relayCheckMember(ctx, `UPDATE relay SET check_json = json_remove(COALESCE(check_json, '{}'), '$.direct_streak') WHERE id = ?`, id)
 	}
-	return s.relayCheckMember(ctx, `UPDATE relay SET check_json = json_set(COALESCE(check_json, '{}'), '$.direct_streak', ?) WHERE id = ?`, int64(min(streak, 3)), id)
+	return s.relayCheckMember(ctx, `UPDATE relay SET check_json = json_set(COALESCE(check_json, '{}'), '$.direct_streak', CAST(? AS INTEGER)) WHERE id = ?`, int64(min(streak, 3)), id)
 }
 
 func (s *Store) relayCheckMember(ctx context.Context, query string, args ...any) error {
