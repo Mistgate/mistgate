@@ -212,7 +212,7 @@ describe("panel self-update", () => {
 
   it("shows a channel the root update policy does not allow as a state with the command, and no install button", async () => {
     await mount(page({ updateChannel: "testing", panel: { ...page().panel, update: { version: "v0.3.0-testing.1", url: "", publishedUnix: 2000, checkedUnix: 1000, built: 0, sha256: "", available: true, supported: true, installable: false, installing: false, errorKey: "channel_not_allowed" } } }));
-    expect(text()).toContain("The root update policy does not allow testing: the panel cannot install from it");
+    expect(text()).toContain("Channel testing not allowed");
     expect(text()).toContain("/etc/mistgate/panel-update-channel");
     expect(text()).toContain('printf "%s\\n" testing');
     expect(button("Update panel")).toBeUndefined();

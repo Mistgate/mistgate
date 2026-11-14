@@ -122,7 +122,7 @@ export function ChannelDialog({
         <Notice tone="quiet">{t("up.ch.stays", { version: running.version, channel: t(nameKey[choice]) })}</Notice>
       )}
       {early && !stays && <Notice tone="warn">{t("up.ch.early", { channel: t(nameKey[choice]) })}</Notice>}
-      <Notice tone="quiet">{t("up.ch.policy")}</Notice>
+      <p className="text-xs leading-normal text-pretty text-muted">{t("up.ch.policy")}</p>
     </Modal>
   );
 }
