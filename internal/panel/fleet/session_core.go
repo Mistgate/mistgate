@@ -1326,6 +1326,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		ds.Inbounds = fullInbounds(want)
 		ds.Warp = warpProto(want.warp)
 		ds.Relays = relaysProto(want.relays)
+		ds.BridgeServe, ds.BridgeDials = bridgeServeProto(want.bridgeServe), bridgeDialsProto(want.bridgeDials)
 	} else {
 		ds.BaseRevision = state.SentRevision
 		ds.Inbounds, ds.RemovedInboundIds = diffState(digest, want)
@@ -1334,6 +1335,12 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		}
 		if digest.Relays != relaysHash(want.relays) {
 			ds.Relays = relayProtoAlways(want.relays) // presence replaces the list; the empty wrapper clears it
+		}
+		if digest.Serve != serveHash(want.bridgeServe) {
+			ds.BridgeServe = bridgeServeAlways(want.bridgeServe) // presence replaces the setting; the empty message stops the bridge
+		}
+		if digest.Dials != dialsHash(want.bridgeDials) {
+			ds.BridgeDials = bridgeDialsAlways(want.bridgeDials) // the empty wrapper clears the list
 		}
 	}
 	_, raw, err := marshalSentDigest(want, rev)

@@ -62,6 +62,48 @@ type RelayForward struct {
 	Port    uint16
 	ToHost  string
 	ToPort  uint16
+	// Mode is "" (and "dnat": the same plain forward) or "reverse"; ExitNodeID names the exit whose bridge carries a reverse forward.
+	// Both are empty for an agent without CapRelayReverse (the omitempty keeps the JSON the panel digests of a plain forward as it was).
+	Mode       string `json:"Mode,omitempty"`
+	ExitNodeID string `json:"ExitNodeID,omitempty"`
+}
+
+// CapRelayReverse is the Hello capability of an agent that can run the bridge of a reverse relay (RelayForward.mode,
+// DesiredState.bridge_serve and bridge_dials, ApplyResult.bridges, StatsBatch.bridges; agent.proto "REVERSE RELAY"). The panel
+// sends those fields only to a stream that listed it; a pair of agents needs it at both ends for a reverse relay.
+const CapRelayReverse = "relay-reverse/1"
+
+// BridgeServe is the entry side of the bridge (agent.v1.BridgeServe): where the exits call and which of them are accepted.
+type BridgeServe struct {
+	Port        uint16 // the TCP port of the entry's site; 0 = 443 of the node's own site
+	Path        string
+	ExitNodeIDs []string
+	PanelVia    bool
+}
+
+// IsZero: nothing is served (an empty BridgeServe on the wire stops the bridge; it hashes like an absent one).
+func (b BridgeServe) IsZero() bool {
+	return b.Port == 0 && b.Path == "" && len(b.ExitNodeIDs) == 0 && !b.PanelVia
+}
+
+// BridgeDial is one entry an exit calls (agent.v1.BridgeDial).
+type BridgeDial struct {
+	EntryNodeID string
+	Host        string // an IP literal or a name
+	Port        uint16
+	SNI         string // empty = no SNI, verification by the pin only
+	PinSHA256   string // lowercase hex of the DER leaf certificate; empty = system roots for SNI
+	Path        string
+	Pool        uint32 // TLS connections to keep; 0 = the agent's default
+	Targets     []BridgeTarget
+	PanelVia    bool
+}
+
+// BridgeTarget is where the exit passes the connections of one relay: its own server, by network and port (agent.v1.BridgeTarget).
+type BridgeTarget struct {
+	RelayID string
+	Network string
+	Port    uint16
 }
 
 // Listen is what the HOST layer needs. The engine binds Port only; the agent installs the hop DNAT.

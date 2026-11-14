@@ -95,7 +95,11 @@ type nodeState struct {
 	// relays are the ports the node forwards to servers on other nodes, sorted by id; only for an agent that lists
 	// "relay-forward/1", and only switched-on relays whose server is usable (relayForwards).
 	relays []plugin.RelayForward
-	hash   string // statehash.StateRelays of the whole
+	// bridgeServe and bridgeDials are the bridge of the reverse relays (agent.proto "REVERSE RELAY"), only for an agent that lists
+	// "relay-reverse/1": the entry's serve setting (nil = none) and the entries an exit calls (sorted by entry id).
+	bridgeServe *plugin.BridgeServe
+	bridgeDials []plugin.BridgeDial
+	hash        string // statehash.StateBridge of the whole
 	// withheld are the inbounds the agent cannot take (an awg inbound for an agent without "awg/1"); the node page says why.
 	withheld []string
 }
@@ -108,6 +112,8 @@ type sentDigest struct {
 	Warp     string                 `json:"w,omitempty"`  // hash of the WarpSpec, "" = none
 	WarpOff  bool                   `json:"wo,omitempty"` // a WarpSpec with Enabled=false (RestartWarp's pause)
 	Relays   string                 `json:"rl,omitempty"` // relaysHash of the forwards, "" = none
+	Serve    string                 `json:"bs,omitempty"` // serveHash of the bridge's serve setting, "" = none
+	Dials    string                 `json:"bd,omitempty"` // dialsHash of the entries the node calls, "" = none
 }
 
 type sentInbound struct {
@@ -157,12 +163,15 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 			}
 		}
 		if slices.Contains(caps, plugin.CapRelayForward) {
-			if st.relays, err = f.relayForwards(ctx, n); err != nil {
+			if st.relays, err = f.relayForwards(ctx, n, caps); err != nil {
 				return nil, err
 			}
 		}
+		if st.bridgeServe, st.bridgeDials, err = f.bridgeDesired(ctx, n, caps); err != nil {
+			return nil, err
+		}
 	}
-	st.hash = statehash.StateRelays(st.list(), st.warp, st.relays)
+	st.hash = statehash.StateBridge(st.list(), st.warp, st.relays, st.bridgeServe, st.bridgeDials)
 	return st, nil
 }
 
@@ -291,6 +300,7 @@ func sentDigestFor(s *nodeState, revision uint64) *sentDigest {
 	digest := &sentDigest{
 		Revision: revision, Hash: s.hash, In: make(map[string]sentInbound, len(s.in)),
 		Warp: warpHash(s.warp), WarpOff: s.warp != nil && !s.warp.Enabled, Relays: relaysHash(s.relays),
+		Serve: serveHash(s.bridgeServe), Dials: dialsHash(s.bridgeDials),
 	}
 	for id, inbound := range s.in {
 		sent := sentInbound{Spec: inbound.specHash}
@@ -433,7 +443,8 @@ func relaysProto(rs []plugin.RelayForward) *agentv1.RelayForwards {
 func relayProtoAlways(rs []plugin.RelayForward) *agentv1.RelayForwards {
 	out := &agentv1.RelayForwards{Items: make([]*agentv1.RelayForward, 0, len(rs))}
 	for _, r := range rs {
-		out.Items = append(out.Items, &agentv1.RelayForward{RelayId: r.ID, Network: r.Network, Port: uint32(r.Port), ToHost: r.ToHost, ToPort: uint32(r.ToPort)})
+		out.Items = append(out.Items, &agentv1.RelayForward{RelayId: r.ID, Network: r.Network, Port: uint32(r.Port), ToHost: r.ToHost, ToPort: uint32(r.ToPort),
+			Mode: r.Mode, ExitNodeId: r.ExitNodeID})
 	}
 	return out
 }
