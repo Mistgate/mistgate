@@ -236,13 +236,20 @@ type accessCtx struct {
 
 func (a *accessCtx) userGiven(u *accUser, x *accInbound) bool {
 	g := a.groupsByID[u.GroupID]
-	if g == nil || !x.Enabled || x.State == "disabled" || !(x.Direct || x.CDN) {
+	if g == nil || !x.Enabled || x.State == "disabled" {
 		return false
 	}
 	if !slices.Contains(g.ProfileIDs, x.ProfileID) || slices.Contains(g.DisabledNodes, x.NodeID) {
 		return false
 	}
-	return u.AllNodes || slices.Contains(u.NodeIDs, x.NodeID)
+	if !userCanUseNode(u, x.NodeID) {
+		return false
+	}
+	return x.Direct || x.CDN || a.userHasHealthyRelay(u, g, x)
+}
+
+func userCanUseNode(u *accUser, nodeID string) bool {
+	return u.AllNodes || slices.Contains(u.NodeIDs, nodeID)
 }
 
 func pct(ok, tried int) *int {
@@ -294,6 +301,17 @@ func buildAccess(in *accessInput) *AccessReportV {
 		u := &in.Users[i]
 		a.usersByGroup[u.GroupID] = append(a.usersByGroup[u.GroupID], u)
 	}
+	for i := range in.Nodes {
+		n := &in.Nodes[i]
+		d := b.diagnose(n)
+		for j := range d.Classes {
+			if a.firstRelayableInbound(n.ID, d.Classes[j]) == "" {
+				d.Classes[j].Next = slices.DeleteFunc(d.Classes[j].Next, func(next nextStepV) bool { return next.Kind == "add_relay" })
+			}
+		}
+		a.diags[n.ID] = &d
+	}
+	a.ways = b.wayStates(a.diags)
 	for i := range in.Inbounds {
 		x := &in.Inbounds[i]
 		for j := range in.Users {
@@ -302,12 +320,6 @@ func buildAccess(in *accessInput) *AccessReportV {
 			}
 		}
 	}
-	for i := range in.Nodes {
-		n := &in.Nodes[i]
-		d := b.diagnose(n)
-		a.diags[n.ID] = &d
-	}
-	a.ways = b.wayStates(a.diags)
 
 	v := &AccessReportV{NowUnix: in.NowUnix, SinceUnix: in.SinceUnix, Hours: in.Hours, Limits: accessLimits, Matrix: []accessCellV{}, Country: []accessCountryNodeV{},
 		BlockDiagnosis: []blockNodeV{}, Findings: []accessFindingV{}, Recommendations: []accessRecV{}, UsersRead: len(in.Users), UsersTotal: in.UsersTotal,
@@ -695,8 +707,13 @@ func (a *accessCtx) findings() []accessFindingV {
 					sev = "warning"
 				}
 				vs := summarizeVantages(cc.Vantages)
+				detail := map[string]string{"verdict": cc.Verdict, "confidence": cc.Confidence, "country": cc.Country, "dark": strings.Join(cleanAll(vs.darkOps, 40, 8), ",")}
+				if a.nodeReachedThroughRelays(nid) {
+					sev = "info"
+					detail["why"] = "reached_through_relays"
+				}
 				add(accessFindingV{Code: "node_blocked_in_country", Severity: sev, Node: nm(n.Name), Evidence: []string{"check:" + nid}, Affected: aff,
-					Detail: map[string]string{"verdict": cc.Verdict, "confidence": cc.Confidence, "country": cc.Country, "dark": strings.Join(cleanAll(vs.darkOps, 40, 8), ",")}})
+					Detail: detail})
 			}
 		}
 		for _, c := range d.Classes {
@@ -842,7 +859,7 @@ func (a *accessCtx) findings() []accessFindingV {
 		var ev []string
 		for _, id := range ways {
 			x := a.inboundByID(id)
-			st := a.effectiveWay(x)
+			st := a.effectiveWay(x, g)
 			switch st {
 			case stateFailing, stateBroken:
 				failN++
@@ -888,7 +905,18 @@ func (a *accessCtx) findings() []accessFindingV {
 }
 
 func (a *accessCtx) groupGives(g *accGroup, x *accInbound) bool {
-	return x.Enabled && x.State != "disabled" && (x.Direct || x.CDN) && slices.Contains(g.ProfileIDs, x.ProfileID) && !slices.Contains(g.DisabledNodes, x.NodeID)
+	if !x.Enabled || x.State == "disabled" || !slices.Contains(g.ProfileIDs, x.ProfileID) || slices.Contains(g.DisabledNodes, x.NodeID) {
+		return false
+	}
+	if x.Direct || x.CDN {
+		return true
+	}
+	for _, u := range a.usersByGroup[g.ID] {
+		if userCanUseNode(u, x.NodeID) && a.userHasHealthyRelay(u, g, x) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *accessCtx) vant(nodeID string) []accVantage {
@@ -930,22 +958,73 @@ func relayProblem(r accRelay) string {
 	return ""
 }
 
-func relayHealthy(r accRelay) bool {
-	return r.Enabled && r.State == "active" && relayProblem(r) == ""
+func (a *accessCtx) relayHealthy(r accRelay) bool {
+	return r.Enabled && r.State == "active" && r.Checked && r.CheckOK && relayProblem(r) == "" && a.relayMonitorFresh(r)
 }
 
-// effectiveWay is the state of an inbound once a healthy relay in front of it is counted: a relay whose entry node is not itself
-// failing makes a blocked server reachable.
-func (a *accessCtx) effectiveWay(x *accInbound) string {
+func (a *accessCtx) relayMonitorFresh(r accRelay) bool {
+	if r.MonitorAtUnix <= 0 || a.in.NowUnix < r.MonitorAtUnix {
+		return false
+	}
+	interval := a.in.HealthIntervalS
+	if interval == 0 {
+		interval = 300
+	}
+	// Match the health evaluator's relay-monitor window: two rounds plus one minute.
+	maxAge := int64(interval)*2 + 60
+	return a.in.NowUnix-r.MonitorAtUnix <= maxAge
+}
+
+func (a *accessCtx) relayEntryUsable(entryID string) bool {
+	d := a.diags[entryID]
+	return d != nil && !hasHardClass(d)
+}
+
+func (a *accessCtx) userHasHealthyRelay(u *accUser, g *accGroup, x *accInbound) bool {
+	if !relayTargetInbound(x) {
+		return false
+	}
+	for _, r := range a.in.Relays {
+		if r.InboundID != x.ID || r.ExitID != x.NodeID || !a.relayHealthy(r) || !a.relayEntryUsable(r.EntryID) ||
+			slices.Contains(g.DisabledNodes, r.EntryID) || !userCanUseNode(u, r.EntryID) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func (a *accessCtx) nodeReachedThroughRelays(nodeID string) bool {
+	served := false
+	for _, x := range a.inboundsOf(nodeID) {
+		users := a.given[x.ID]
+		if len(users) == 0 {
+			continue
+		}
+		served = true
+		if way := a.ways[x.ID]; x.Direct && (way == nil || way.State != stateFailing && way.State != stateBroken) {
+			return false // people still reach the server directly (or nobody knows it does not work): the block is not made up for
+		}
+		for _, u := range users {
+			g := a.groupsByID[u.GroupID]
+			if g == nil || !a.userHasHealthyRelay(u, g, x) {
+				return false
+			}
+		}
+	}
+	return served
+}
+
+// effectiveWay is the state of an inbound for a group once a healthy relay in front of it is counted: a relay whose entry node
+// is not itself failing, and that one of the group's people may use, makes a blocked server reachable.
+func (a *accessCtx) effectiveWay(x *accInbound, g *accGroup) string {
 	st := a.ways[x.ID].State
 	if st != stateFailing && st != stateBroken {
 		return st
 	}
-	for _, r := range a.in.Relays {
-		if r.InboundID == x.ID && relayHealthy(r) {
-			if w := a.diags[r.EntryID]; w != nil && !hasHardClass(w) {
-				return stateWorking
-			}
+	for _, u := range a.usersByGroup[g.ID] {
+		if a.userHasHealthyRelay(u, g, x) {
+			return stateWorking
 		}
 	}
 	return st
@@ -965,10 +1044,8 @@ func hasHardClass(d *blockNodeV) bool {
 
 func (a *accessCtx) hasHealthyRelayFor(nodeID string) bool {
 	for _, r := range a.in.Relays {
-		if r.ExitID == nodeID && relayHealthy(r) {
-			if w := a.diags[r.EntryID]; w != nil && !hasHardClass(w) {
-				return true
-			}
+		if r.ExitID == nodeID && a.relayHealthy(r) && a.relayEntryUsable(r.EntryID) {
+			return true
 		}
 	}
 	return false
@@ -996,6 +1073,9 @@ func (a *accessCtx) entryFor(exit *accNode, c blockClassV) []string {
 	for i := range a.in.Nodes {
 		n := &a.in.Nodes[i]
 		if n.ID == exit.ID || n.Status != "online" {
+			continue
+		}
+		if n.Country != "" && exit.Country != "" && strings.EqualFold(n.Country, exit.Country) {
 			continue
 		}
 		cc := a.in.Countries[n.ID]
@@ -1037,6 +1117,19 @@ func (a *accessCtx) entryFor(exit *accNode, c blockClassV) []string {
 		out = append(out, nm(c.name))
 	}
 	return out
+}
+
+func relayTargetInbound(x *accInbound) bool {
+	return x != nil && normProtocol(x.Protocol) != "awg" && !x.CDN
+}
+
+func (a *accessCtx) firstRelayableInbound(nodeID string, c blockClassV) string {
+	for _, x := range a.inboundsOf(nodeID) {
+		if x.Enabled && x.State != "disabled" && classScopeMatch(c, x) && relayTargetInbound(x) {
+			return x.ID
+		}
+	}
+	return ""
 }
 
 func (a *accessCtx) anyCDNWorks() bool {
@@ -1081,6 +1174,7 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 			if len(scoped) > 0 {
 				firstIn = scoped[0]
 			}
+			relayIn := a.firstRelayableInbound(nid, c)
 			switch c.Class {
 			case clsIPBlocked, clsWhitelist, clsOperator, clsRegional:
 				if c.Confidence == confLow && c.Class == clsIPBlocked {
@@ -1094,12 +1188,10 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 					continue
 				}
 				entries := a.entryFor(n, c)
-				if len(entries) > 0 {
+				if relayIn != "" && len(entries) > 0 {
 					r := base("add_relay")
 					r.Target["entry_node"] = strings.Join(entries, ",")
-					if firstIn != "" {
-						r.Target["inbound_id"] = firstIn
-					}
+					r.Target["inbound_id"] = relayIn
 					r.PlanTool = "relay_plan"
 					r.Effect = "People of the dark networks reach the entry and the entry passes their traffic to this node's server; the servers they use today do not change."
 					if c.Class == clsWhitelist {

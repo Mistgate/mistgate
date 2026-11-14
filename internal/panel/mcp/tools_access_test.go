@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -17,7 +18,7 @@ import (
 type fxb struct{ in *accessInput }
 
 func newFx() *fxb {
-	in := &accessInput{Hours: 24, NowUnix: 1700000000, SinceUnix: 1700000000 - 86400, Profiles: map[string]accProfile{}, Totals: map[string]accTotals{},
+	in := &accessInput{Hours: 24, NowUnix: 1700000000, SinceUnix: 1700000000 - 86400, HealthIntervalS: 300, Profiles: map[string]accProfile{}, Totals: map[string]accTotals{},
 		Countries: map[string]*accCountry{}, Klick: map[string]*accKlick{}, UDPLossNodes: map[string]bool{}}
 	f := &fxb{in: in}
 	in.Profiles["prf_vless"] = accProfile{ID: "prf_vless", Name: "Web", Protocol: "vless", Summary: "TCP 8443 · REALITY · Vision"}
@@ -338,7 +339,8 @@ func TestAccessWorkingRelayIsAWay(t *testing.T) {
 			c.Vantages = []accVantage{vant("MTS", "home", "dark", false), vant("Beeline", "mobile", "dark", false)}
 		})
 		f.cc("de1", "ok", func(c *accCountry) { c.Vantages = []accVantage{vant("MTS", "home", "reach", true)} })
-		f.in.Relays = []accRelay{{ID: "rel_1", EntryID: "nod_de1", ExitID: "nod_be", InboundID: v, State: "active", Enabled: true, ExitLive: true, AgentSupported: true, Checked: true, CheckOK: relayOK}}
+		f.in.Relays = []accRelay{{ID: "rel_1", EntryID: "nod_de1", ExitID: "nod_be", InboundID: v, State: "active", Enabled: true, ExitLive: true, AgentSupported: true,
+			Checked: true, CheckOK: relayOK, MonitorAtUnix: f.in.NowUnix}}
 		return buildAccess(f.in)
 	}
 	r := build(true)
@@ -354,6 +356,207 @@ func TestAccessWorkingRelayIsAWay(t *testing.T) {
 	}
 	if accFinding(r, "group_without_working_way", "") == nil {
 		t.Fatal("a failed relay is no way")
+	}
+}
+
+func TestAccessSameCountryEntryIsSkippedAndInlandEntryStaysFirst(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		exitCountry string
+		nodes       [][2]string // name, country
+		want        string
+	}{
+		// ams1 sorts before msk1, so only the inland preference puts msk1 first; nl1 shares the exit's country and is out
+		{"same country skipped, inland first", "DE", [][2]string{{"nl1", "de"}, {"ams1", "NL"}, {"msk1", "RU"}}, "msk1,ams1"},
+		// nodes without a country are not "the same country" as an exit without one
+		{"empty countries are not equal", "", [][2]string{{"nl1", ""}, {"ams1", "NL"}}, "ams1,nl1"},
+		{"exit without a country keeps entries", "", [][2]string{{"nl1", "DE"}}, "nl1"},
+		{"entry without a country is kept", "DE", [][2]string{{"nl1", ""}}, "nl1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFx().node("de1", tc.exitCountry, "online")
+			for _, n := range tc.nodes {
+				f.node(n[0], n[1], "online")
+			}
+			f.group("group", "prf_vless").users("group", 2, 1699990000)
+			f.inbound("de1", "prf_vless", "vless", 443)
+			f.cc("de1", "blocked", func(c *accCountry) {
+				c.TSPU = ports(443, "blocked")
+				c.Vantages = []accVantage{vant("MTS", "home", "dark", false)}
+			})
+			for _, n := range tc.nodes {
+				f.cc(n[0], "ok", nil)
+			}
+			got := rec(buildAccess(f.in), "add_relay")
+			if got == nil || got.Target["entry_node"] != tc.want {
+				t.Fatalf("add_relay entries: %+v, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAccessRelayTargetSkipsAWGAndCDNInbounds(t *testing.T) {
+	type inboundSpec struct {
+		profile string
+		proto   string
+		port    uint32
+		cdn     bool
+	}
+	for _, tc := range []struct {
+		name     string
+		inbounds []inboundSpec
+		wantID   string
+		wantNext bool
+	}{
+		{name: "awg only", inbounds: []inboundSpec{{"prf_awg", "awg", 51820, false}}},
+		{name: "cdn only", inbounds: []inboundSpec{{"prf_vless", "vless", 443, true}}},
+		{name: "awg before vless", inbounds: []inboundSpec{{"prf_awg", "awg", 51820, false}, {"prf_vless", "vless", 8443, false}}, wantID: "inb_de1_vless_8443", wantNext: true},
+		{name: "cdn before vless", inbounds: []inboundSpec{{"prf_vless", "vless", 443, true}, {"prf_vless", "vless", 8443, false}}, wantID: "inb_de1_vless_8443", wantNext: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFx().node("de1", "DE", "online").node("msk1", "RU", "online")
+			for _, spec := range tc.inbounds {
+				f.inbound("de1", spec.profile, spec.proto, spec.port)
+				f.in.Inbounds[len(f.in.Inbounds)-1].CDN = spec.cdn
+			}
+			f.cc("de1", "blocked", func(c *accCountry) {
+				c.TSPU = ports(443, "blocked")
+				c.Vantages = []accVantage{vant("MTS", "home", "dark", false)}
+			})
+			f.cc("msk1", "ok", nil)
+			r := buildAccess(f.in)
+			got := rec(r, "add_relay")
+			if tc.wantID == "" {
+				if got != nil {
+					t.Fatalf("unexpected add_relay: %+v", got)
+				}
+			} else if got == nil || got.Target["inbound_id"] != tc.wantID {
+				t.Fatalf("add_relay target: %+v", got)
+			}
+			c := classOf(r, "de1", clsIPBlocked)
+			hasNext := false
+			if c != nil {
+				for _, next := range c.Next {
+					hasNext = hasNext || next.Kind == "add_relay"
+				}
+			}
+			if hasNext != tc.wantNext {
+				t.Fatalf("block_diagnosis add_relay next = %v, want %v", hasNext, tc.wantNext)
+			}
+		})
+	}
+}
+
+func TestAccessRelayOnlyServerUsesHealthyRelay(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		withRelay    bool
+		monitorAge   int64
+		monitorFails uint32
+		wantSeverity string
+		wantGroupErr bool
+	}{
+		{name: "fresh relay", withRelay: true, monitorFails: 1, wantSeverity: "info"},
+		{name: "no relay", wantSeverity: "error", wantGroupErr: true},
+		{name: "relay failed twice", withRelay: true, monitorFails: 2, wantSeverity: "error", wantGroupErr: true},
+		{name: "stale monitor", withRelay: true, monitorAge: 661, wantSeverity: "error", wantGroupErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFx().node("de1", "DE", "online").node("nl1", "NL", "online").group("group", "prf_vless")
+			inboundID := f.inbound("de1", "prf_vless", "vless", 443)
+			f.in.Inbounds[0].Direct = false
+			f.in.Users = []accUser{
+				{ID: "alice", GroupID: "group", NodeIDs: []string{"nod_de1", "nod_nl1"}, LastSeen: f.in.NowUnix},
+				{ID: "bob", GroupID: "group", NodeIDs: []string{"nod_de1", "nod_nl1"}, LastSeen: f.in.NowUnix},
+			}
+			f.in.UsersTotal = len(f.in.Users)
+			f.cc("de1", "blocked", func(c *accCountry) {
+				c.TSPU = ports(443, "blocked")
+				c.Vantages = []accVantage{vant("MTS", "home", "dark", false)}
+			})
+			f.cc("nl1", "ok", nil)
+			if tc.withRelay {
+				f.in.Relays = []accRelay{{ID: "relay", EntryID: "nod_nl1", ExitID: "nod_de1", InboundID: inboundID, ProfileID: "prf_vless",
+					State: "active", Enabled: true, ExitLive: true, AgentSupported: true, Checked: true, CheckOK: true,
+					MonitorAtUnix: f.in.NowUnix - tc.monitorAge, MonitorFails: tc.monitorFails}}
+			}
+			r := buildAccess(f.in)
+			if got := accFinding(r, "group_without_working_way", ""); (got != nil) != tc.wantGroupErr {
+				t.Fatalf("group_without_working_way = %+v, want error %v", got, tc.wantGroupErr)
+			}
+			blocked := accFinding(r, "node_blocked_in_country", "de1")
+			if blocked == nil || blocked.Severity != tc.wantSeverity {
+				t.Fatalf("node_blocked_in_country: %+v", blocked)
+			}
+			if tc.wantSeverity == "info" && blocked.Detail["why"] != "reached_through_relays" {
+				t.Fatalf("relay detail: %+v", blocked.Detail)
+			}
+		})
+	}
+}
+
+// TestAccessRelayNeedsAWayForThePerson: a relay row that is enabled and checked is still no way when it is stale, off, unchecked,
+// carries a server it cannot, or ends at an entry the group's people are not given.
+func TestAccessRelayNeedsAWayForThePerson(t *testing.T) {
+	for _, direct := range []bool{false, true} {
+		for _, tc := range []struct {
+			name    string
+			proto   string
+			profile string
+			mod     func(*fxb, *accRelay)
+			healthy bool
+		}{
+			{name: "healthy", proto: "vless", profile: "prf_vless", healthy: true},
+			{name: "relay off", proto: "vless", profile: "prf_vless", mod: func(_ *fxb, r *accRelay) { r.Enabled = false }},
+			{name: "never checked", proto: "vless", profile: "prf_vless", mod: func(_ *fxb, r *accRelay) { r.Checked, r.CheckOK = false, false }},
+			{name: "never monitored", proto: "vless", profile: "prf_vless", mod: func(_ *fxb, r *accRelay) { r.MonitorAtUnix = 0 }},
+			{name: "monitor from the future", proto: "vless", profile: "prf_vless", mod: func(f *fxb, r *accRelay) { r.MonitorAtUnix = f.in.NowUnix + 60 }},
+			{name: "entry not given to the people", proto: "vless", profile: "prf_vless", mod: func(f *fxb, _ *accRelay) {
+				f.in.Users[0].NodeIDs, f.in.Users[1].NodeIDs = []string{"nod_de1"}, []string{"nod_de1"}
+				f.in.Users[0].AllNodes, f.in.Users[1].AllNodes = false, false
+			}},
+			{name: "entry off in the group", proto: "vless", profile: "prf_vless", mod: func(f *fxb, _ *accRelay) { f.in.Groups[0].DisabledNodes = []string{"nod_nl1"} }},
+			{name: "awg is no relay target", proto: "awg", profile: "prf_awg"},
+		} {
+			t.Run(fmt.Sprintf("direct=%v/%s", direct, tc.name), func(t *testing.T) {
+				f := newFx().node("de1", "DE", "online").node("nl1", "NL", "online").group("group", tc.profile)
+				inboundID := f.inbound("de1", tc.profile, tc.proto, 443)
+				f.in.Inbounds[0].Direct = direct
+				f.in.Users = []accUser{
+					{ID: "alice", GroupID: "group", AllNodes: true, LastSeen: f.in.NowUnix},
+					{ID: "bob", GroupID: "group", AllNodes: true, LastSeen: f.in.NowUnix},
+				}
+				f.in.UsersTotal = len(f.in.Users)
+				f.cc("de1", "blocked", func(c *accCountry) {
+					c.TSPU = ports(443, "blocked")
+					c.Vantages = []accVantage{vant("MTS", "home", "dark", false)}
+				})
+				f.cc("nl1", "ok", nil)
+				rel := accRelay{ID: "relay", EntryID: "nod_nl1", ExitID: "nod_de1", InboundID: inboundID, ProfileID: tc.profile, State: "active", Enabled: true,
+					ExitLive: true, AgentSupported: true, Checked: true, CheckOK: true, MonitorAtUnix: f.in.NowUnix}
+				if tc.mod != nil {
+					tc.mod(f, &rel)
+				}
+				f.in.Relays = []accRelay{rel}
+				r := buildAccess(f.in)
+				blocked := accFinding(r, "node_blocked_in_country", "de1")
+				if blocked == nil {
+					t.Fatal("no node_blocked_in_country")
+				}
+				if tc.healthy {
+					if accFinding(r, "group_without_working_way", "") != nil || blocked.Severity != "info" || blocked.Detail["why"] != "reached_through_relays" {
+						t.Fatalf("a healthy relay is a way: %+v", r.Findings)
+					}
+					return
+				}
+				if accFinding(r, "group_without_working_way", "") == nil {
+					t.Fatalf("no way, yet no group_without_working_way: %+v", r.Findings)
+				}
+				if blocked.Severity != "error" || blocked.Detail["why"] != "" {
+					t.Fatalf("blocked node was lowered: %+v", blocked)
+				}
+			})
+		}
 	}
 }
 
@@ -439,6 +642,7 @@ func TestBlockWhitelistVersusIPBlocked(t *testing.T) {
 	mob := []accVantage{vant("MTS", "mobile", "dark", false), vant("Tele2", "mobile", "dark", false)}
 	// mobile dark, fixed lines reach: whitelist
 	f := newFx().node("be", "BE", "online")
+	f.inbound("be", "prf_vless", "vless", 443)
 	f.cc("be", "partial", func(c *accCountry) { c.Vantages = append(slices.Clone(mob), vant("Rostelecom", "home", "reach", true)) })
 	r := buildAccess(f.in)
 	c := classOf(r, "be", clsWhitelist)

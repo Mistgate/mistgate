@@ -283,6 +283,7 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 	if r, err := c.cl.Health.GetChecks(c.ctx, connect.NewRequest(&adminv1.GetChecksRequest{})); err != nil {
 		miss("checks")
 	} else {
+		in.HealthIntervalS = r.Msg.GetIntervalS()
 		for _, id := range r.Msg.GetUdpLoss().GetNodeIds() {
 			in.UDPLossNodes[id] = true
 		}
@@ -308,7 +309,7 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 		for _, x := range r.Msg.GetRelays() {
 			ar := accRelay{ID: clean(x.GetId(), 80), EntryID: clean(x.GetViaNodeId(), 80), ExitID: clean(x.GetExitNodeId(), 80), InboundID: clean(x.GetInboundId(), 80),
 				ProfileID: clean(x.GetProfileId(), 80), State: inboundStateName(x.GetState()), Enabled: x.GetEnabled(), ExitLive: x.GetExitLive(), AgentSupported: x.GetAgentSupported(),
-				MonitorFails: x.GetMonitor().GetFailStreak()}
+				MonitorAtUnix: x.GetMonitor().GetAtUnix(), MonitorFails: x.GetMonitor().GetFailStreak()}
 			if ck := x.GetCheck(); ck != nil && ck.GetAtUnix() != 0 {
 				ar.Checked, ar.CheckOK = true, ck.GetOk()
 			}

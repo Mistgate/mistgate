@@ -456,6 +456,37 @@ func TestRelayCreateWaitsForTheOwnerThenChecksAndSwitchesOn(t *testing.T) {
 	}
 }
 
+func TestRelayCreatePlanWarnsWhenEntryAndExitShareACountry(t *testing.T) {
+	for _, tc := range []struct {
+		name, exit, entry string
+		warns             bool
+	}{
+		{"same country, any case", "DE", "de", true},
+		{"other country", "DE", "NL", false},
+		{"no exit country", "", "NL", false},
+		{"no countries at all", "", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newTestEnv(t)
+			e.w.nodePatches[nodeA] = &adminv1.UpdateNodeRequest{CountryCode: &tc.exit}
+			e.w.nodePatches[nodeB] = &adminv1.UpdateNodeRequest{CountryCode: &tc.entry}
+			_, secret := e.token(ProfileAdmin)
+			s := e.session(secret)
+
+			p := planOf(t, s, "relay", map[string]any{"action": "create", "node": "nl1", "inbound_id": "inb_3"})
+			warned := false
+			for _, f := range p.Facts {
+				if f.Key == "warning" && f.Value == "entry and exit are in the same country" {
+					warned = true
+				}
+			}
+			if warned != tc.warns {
+				t.Fatalf("same-country warning = %v, want %v: %+v", warned, tc.warns, p.Facts)
+			}
+		})
+	}
+}
+
 func TestRelayCreateThatFailsAChecksStaysOff(t *testing.T) {
 	for _, tc := range []struct {
 		name            string

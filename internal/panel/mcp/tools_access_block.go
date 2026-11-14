@@ -178,6 +178,7 @@ type accRelay struct {
 	ID, EntryID, ExitID, InboundID, ProfileID, State string
 	Enabled, ExitLive, AgentSupported                bool
 	Checked, CheckOK                                 bool
+	MonitorAtUnix                                    int64
 	MonitorFails                                     uint32
 }
 
@@ -188,6 +189,7 @@ type accLoss struct {
 
 type accessInput struct {
 	NowUnix, SinceUnix int64
+	HealthIntervalS    uint32
 	Hours              int
 	Country, Group     string // filters (upper-case country, group id)
 	Node, Protocol     string // filters (node id, normalised protocol)

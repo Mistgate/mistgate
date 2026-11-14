@@ -244,10 +244,15 @@ func countryText(c *adminv1.RelayCountryHint) string {
 }
 
 func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
-	id, name, err := c.nodeRef(a.Node)
+	nodes, err := c.listNodes()
 	if err != nil {
 		return nil, err
 	}
+	entry, err := resolveNode(nodes, a.Node)
+	if err != nil {
+		return nil, err
+	}
+	id, name := entry.GetId(), entry.GetName()
 	r, err := c.cl.Relay.ListRelayCandidates(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.ListRelayCandidatesRequest{ViaNodeId: id}))
 	if err != nil {
 		return nil, apiError(err)
@@ -284,6 +289,12 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 	}
 	if cand.GetHop() {
 		facts = append(facts, Fact{Key: "warning", Value: "the server has a hop range; the relay passes its one port only"})
+	}
+	for _, exit := range nodes {
+		if exit.GetId() == cand.GetNodeId() && entry.GetCountryCode() != "" && exit.GetCountryCode() != "" && strings.EqualFold(entry.GetCountryCode(), exit.GetCountryCode()) {
+			facts = append(facts, Fact{Key: "warning", Value: "entry and exit are in the same country"})
+			break
+		}
 	}
 	facts = append(facts,
 		Fact{Key: "checks", Value: "after it is made the entry tries the exit's server (leg), then the relay is switched on and a third node reaches the exit through the entry (path); a failed stage switches it off, while an unverifiable stage leaves it enabled and unverified"},

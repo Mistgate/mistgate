@@ -643,15 +643,22 @@ func (w *world) ListNodes(context.Context, *connect.Request[adminv1.ListNodesReq
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	nameA, nameB := "de1", "nl1"
+	countryA, countryB := "", ""
 	if p := w.nodePatches[nodeA]; p != nil && p.Name != nil {
 		nameA = *p.Name
+	}
+	if p := w.nodePatches[nodeA]; p != nil && p.CountryCode != nil {
+		countryA = *p.CountryCode
 	}
 	if p := w.nodePatches[nodeB]; p != nil && p.Name != nil {
 		nameB = *p.Name
 	}
+	if p := w.nodePatches[nodeB]; p != nil && p.CountryCode != nil {
+		countryB = *p.CountryCode
+	}
 	return connect.NewResponse(&adminv1.ListNodesResponse{Nodes: []*adminv1.Node{
-		{Id: nodeA, Name: nameA, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true},
-		{Id: nodeB, Name: nameB, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true},
+		{Id: nodeA, Name: nameA, CountryCode: countryA, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true},
+		{Id: nodeB, Name: nameB, CountryCode: countryB, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true},
 	}}), nil
 }
 
