@@ -487,6 +487,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 	}
 	f.scheduleDecoySync(id)
 
+	var frameBucket agentFrameBucket
 	for {
 		select {
 		case <-sctx.Done():
@@ -516,7 +517,26 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 			if !ok {
 				return endErr()
 			}
-			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: f.now(), Frame: m})
+			now := f.now()
+			if !frameBucket.allow(now) {
+				if m.Seq != 0 {
+					// A reliable frame is never skipped: the ack of a later one would cover it and the batch would be lost.
+					// The agent reconnects and replays from the last ack.
+					f.log.Warn("agent reliable frames exceeded the per-session rate, session closed", "code", "agent_frames_rate_limited",
+						"node", id, "seq", m.Seq)
+					return connect.NewError(connect.CodeResourceExhausted, errors.New("agent exceeded the session frame rate"))
+				}
+				closeSession, report := frameBucket.drop(now)
+				if report {
+					f.log.Warn("agent frames exceeded the per-session rate and were dropped", "code", "agent_frames_rate_limited",
+						"node", id, "dropped", frameBucket.totalDrops, "closing", closeSession)
+				}
+				if closeSession {
+					return connect.NewError(connect.CodeResourceExhausted, errors.New("agent exceeded the session frame rate"))
+				}
+				continue
+			}
+			tr, err := s.stepCore(sctx, SessionEvent{Kind: EventAgentFrame, At: now, Frame: m})
 			if err != nil {
 				return errOrCause(sctx)
 			}
