@@ -89,6 +89,8 @@ message Relay {
   uint64 bytes = 23;
   uint64 packets = 24;
   int64 counted_unix = 25;
+  // Traffic through the forward now, bits per second, from the last two counter readings; 0 when there is one reading or none. Until agents count the way back it is the direction towards the exit only.
+  uint64 bps = 26;
 }
 
 // A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
@@ -195,7 +197,18 @@ message RelayCandidate {
   string relay_id = 11;
   RelayCountryHint country = 12;
   RelayReachHint reach = 13;
+  // Who would get the new server if this relay were made. Absent when it cannot be relayed.
+  RelayAudience audience = 14;
 }
+
+// The people a relay through this entry would serve.
+message RelayAudience {
+  // People who are given the exit's server and are allowed the entry node.
+  uint32 people = 1;
+  // Their AmneziaVPN keys of this profile (static configs): each has to import the new config once. 0 for other protocols.
+  uint32 static_awg_devices = 2;
+}
+
 
 message ListRelayCandidatesRequest {
   string via_node_id = 1;

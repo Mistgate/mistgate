@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/relay.proto.
  */
 export const file_mistgate_admin_v1_relay: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEiwQQKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjaxIwCgdtb25pdG9yGBYgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlNb25pdG9yEg0KBWJ5dGVzGBcgASgEEg8KB3BhY2tldHMYGCABKAQSFAoMY291bnRlZF91bml4GBkgASgDInIKDFJlbGF5TW9uaXRvchIPCgdhdF91bml4GAEgASgDEgoKAm9rGAIgASgIEg0KBXN0YWdlGAMgASgJEgwKBGNvZGUYBCABKAkSEwoLcmVzcG9uc2VfbXMYBSABKA0SEwoLZmFpbF9zdHJlYWsYBiABKA0ijwEKClJlbGF5U3RhZ2USDgoGc3RhdHVzGAEgASgJEgwKBGNvZGUYAiABKAkSEQoJc2VuZGVyX2lkGAMgASgJEhMKC3NlbmRlcl9uYW1lGAQgASgJEg8KB3ZlcmRpY3QYBSABKAkSDAoEc2VudBgGIAEoDRILCgNnb3QYByABKA0SDwoHYXRfdW5peBgIIAEoAyLOAQoKUmVsYXlDaGVjaxIPCgdhdF91bml4GAEgASgDEg8KB25ldHdvcmsYAiABKAkSDAoEcG9ydBgDIAEoDRIKCgJ0bxgEIAEoCRIqCgNsZWcYBSABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlEisKBHBhdGgYBiABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlEgoKAm9rGAcgASgIEg0KBXN0YWdlGAggASgJEhAKCHZlcmlmaWVkGAkgASgIIh8KEUNoZWNrUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJIj0KEkNoZWNrUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IkIKEFJlbGF5Q291bnRyeUhpbnQSDwoHdmVyZGljdBgBIAEoCRIMCgRkYXJrGAIgAygJEg8KB2F0X3VuaXgYAyABKAMiQgoOUmVsYXlSZWFjaEhpbnQSDwoHdmVyZGljdBgBIAEoCRIOCgZzb3VyY2UYAiABKAkSDwoHYXRfdW5peBgDIAEoAyK/AgoOUmVsYXlDYW5kaWRhdGUSEgoKaW5ib3VuZF9pZBgBIAEoCRIPCgdub2RlX2lkGAIgASgJEhEKCW5vZGVfbmFtZRgDIAEoCRISCgpwcm9maWxlX2lkGAQgASgJEhQKDHByb2ZpbGVfbmFtZRgFIAEoCRIQCghwcm90b2NvbBgGIAEoCRIPCgduZXR3b3JrGAcgASgJEgwKBHBvcnQYCCABKA0SEwoLdW5zdXBwb3J0ZWQYCSABKAkSCwoDaG9wGAogASgIEhAKCHJlbGF5X2lkGAsgASgJEjQKB2NvdW50cnkYDCABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNvdW50cnlIaW50EjAKBXJlYWNoGA0gASgLMiEubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlSZWFjaEhpbnQiMQoaTGlzdFJlbGF5Q2FuZGlkYXRlc1JlcXVlc3QSEwoLdmlhX25vZGVfaWQYASABKAkiqQEKG0xpc3RSZWxheUNhbmRpZGF0ZXNSZXNwb25zZRI1CgpjYW5kaWRhdGVzGAEgAygLMiEubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDYW5kaWRhdGUSFwoPYWdlbnRfc3VwcG9ydGVkGAIgASgIEjoKDWVudHJ5X2NvdW50cnkYAyABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNvdW50cnlIaW50IiQKEUxpc3RSZWxheXNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiPgoSTGlzdFJlbGF5c1Jlc3BvbnNlEigKBnJlbGF5cxgBIAMoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IksKEkNyZWF0ZVJlbGF5UmVxdWVzdBISCgppbmJvdW5kX2lkGAEgASgJEhMKC3ZpYV9ub2RlX2lkGAIgASgJEgwKBHBvcnQYAyABKA0iPgoTQ3JlYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Il4KElVwZGF0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCRIUCgdlbmFibGVkGAIgASgISACIAQESEQoEcG9ydBgDIAEoDUgBiAEBQgoKCF9lbmFibGVkQgcKBV9wb3J0Ij4KE1VwZGF0ZVJlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSIgChJEZWxldGVSZWxheVJlcXVlc3QSCgoCaWQYASABKAkiFQoTRGVsZXRlUmVsYXlSZXNwb25zZTLUBAoMUmVsYXlTZXJ2aWNlElkKCkxpc3RSZWxheXMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXNwb25zZRJcCgtDcmVhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVzcG9uc2USXAoLVXBkYXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlc3BvbnNlElwKC0RlbGV0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXNwb25zZRJZCgpDaGVja1JlbGF5EiQubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tSZWxheVJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JlbGF5UmVzcG9uc2USdAoTTGlzdFJlbGF5Q2FuZGlkYXRlcxItLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheUNhbmRpZGF0ZXNSZXF1ZXN0Gi4ubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5Q2FuZGlkYXRlc1Jlc3BvbnNlQsUBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCClJlbGF5UHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEizgQKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjaxIwCgdtb25pdG9yGBYgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlNb25pdG9yEg0KBWJ5dGVzGBcgASgEEg8KB3BhY2tldHMYGCABKAQSFAoMY291bnRlZF91bml4GBkgASgDEgsKA2JwcxgaIAEoBCJyCgxSZWxheU1vbml0b3ISDwoHYXRfdW5peBgBIAEoAxIKCgJvaxgCIAEoCBINCgVzdGFnZRgDIAEoCRIMCgRjb2RlGAQgASgJEhMKC3Jlc3BvbnNlX21zGAUgASgNEhMKC2ZhaWxfc3RyZWFrGAYgASgNIo8BCgpSZWxheVN0YWdlEg4KBnN0YXR1cxgBIAEoCRIMCgRjb2RlGAIgASgJEhEKCXNlbmRlcl9pZBgDIAEoCRITCgtzZW5kZXJfbmFtZRgEIAEoCRIPCgd2ZXJkaWN0GAUgASgJEgwKBHNlbnQYBiABKA0SCwoDZ290GAcgASgNEg8KB2F0X3VuaXgYCCABKAMizgEKClJlbGF5Q2hlY2sSDwoHYXRfdW5peBgBIAEoAxIPCgduZXR3b3JrGAIgASgJEgwKBHBvcnQYAyABKA0SCgoCdG8YBCABKAkSKgoDbGVnGAUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRIrCgRwYXRoGAYgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRIKCgJvaxgHIAEoCBINCgVzdGFnZRgIIAEoCRIQCgh2ZXJpZmllZBgJIAEoCCIfChFDaGVja1JlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCSI9ChJDaGVja1JlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSJCChBSZWxheUNvdW50cnlIaW50Eg8KB3ZlcmRpY3QYASABKAkSDAoEZGFyaxgCIAMoCRIPCgdhdF91bml4GAMgASgDIkIKDlJlbGF5UmVhY2hIaW50Eg8KB3ZlcmRpY3QYASABKAkSDgoGc291cmNlGAIgASgJEg8KB2F0X3VuaXgYAyABKAMi8wIKDlJlbGF5Q2FuZGlkYXRlEhIKCmluYm91bmRfaWQYASABKAkSDwoHbm9kZV9pZBgCIAEoCRIRCglub2RlX25hbWUYAyABKAkSEgoKcHJvZmlsZV9pZBgEIAEoCRIUCgxwcm9maWxlX25hbWUYBSABKAkSEAoIcHJvdG9jb2wYBiABKAkSDwoHbmV0d29yaxgHIAEoCRIMCgRwb3J0GAggASgNEhMKC3Vuc3VwcG9ydGVkGAkgASgJEgsKA2hvcBgKIAEoCBIQCghyZWxheV9pZBgLIAEoCRI0Cgdjb3VudHJ5GAwgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDb3VudHJ5SGludBIwCgVyZWFjaBgNIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5UmVhY2hIaW50EjIKCGF1ZGllbmNlGA4gASgLMiAubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlBdWRpZW5jZSI7Cg1SZWxheUF1ZGllbmNlEg4KBnBlb3BsZRgBIAEoDRIaChJzdGF0aWNfYXdnX2RldmljZXMYAiABKA0iMQoaTGlzdFJlbGF5Q2FuZGlkYXRlc1JlcXVlc3QSEwoLdmlhX25vZGVfaWQYASABKAkiqQEKG0xpc3RSZWxheUNhbmRpZGF0ZXNSZXNwb25zZRI1CgpjYW5kaWRhdGVzGAEgAygLMiEubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDYW5kaWRhdGUSFwoPYWdlbnRfc3VwcG9ydGVkGAIgASgIEjoKDWVudHJ5X2NvdW50cnkYAyABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNvdW50cnlIaW50IiQKEUxpc3RSZWxheXNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiPgoSTGlzdFJlbGF5c1Jlc3BvbnNlEigKBnJlbGF5cxgBIAMoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IksKEkNyZWF0ZVJlbGF5UmVxdWVzdBISCgppbmJvdW5kX2lkGAEgASgJEhMKC3ZpYV9ub2RlX2lkGAIgASgJEgwKBHBvcnQYAyABKA0iPgoTQ3JlYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Il4KElVwZGF0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCRIUCgdlbmFibGVkGAIgASgISACIAQESEQoEcG9ydBgDIAEoDUgBiAEBQgoKCF9lbmFibGVkQgcKBV9wb3J0Ij4KE1VwZGF0ZVJlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSIgChJEZWxldGVSZWxheVJlcXVlc3QSCgoCaWQYASABKAkiFQoTRGVsZXRlUmVsYXlSZXNwb25zZTLUBAoMUmVsYXlTZXJ2aWNlElkKCkxpc3RSZWxheXMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXNwb25zZRJcCgtDcmVhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVzcG9uc2USXAoLVXBkYXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlc3BvbnNlElwKC0RlbGV0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXNwb25zZRJZCgpDaGVja1JlbGF5EiQubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tSZWxheVJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JlbGF5UmVzcG9uc2USdAoTTGlzdFJlbGF5Q2FuZGlkYXRlcxItLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheUNhbmRpZGF0ZXNSZXF1ZXN0Gi4ubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5Q2FuZGlkYXRlc1Jlc3BvbnNlQsUBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCClJlbGF5UHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.Relay
@@ -167,6 +167,13 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
    * @generated from field: int64 counted_unix = 25;
    */
   countedUnix: bigint;
+
+  /**
+   * Traffic through the forward now, bits per second, from the last two counter readings; 0 when there is one reading or none. Until agents count the way back it is the direction towards the exit only.
+   *
+   * @generated from field: uint64 bps = 26;
+   */
+  bps: bigint;
 };
 
 /**
@@ -547,6 +554,13 @@ export type RelayCandidate = Message<"mistgate.admin.v1.RelayCandidate"> & {
    * @generated from field: mistgate.admin.v1.RelayReachHint reach = 13;
    */
   reach?: RelayReachHint | undefined;
+
+  /**
+   * Who would get the new server if this relay were made. Absent when it cannot be relayed.
+   *
+   * @generated from field: mistgate.admin.v1.RelayAudience audience = 14;
+   */
+  audience?: RelayAudience | undefined;
 };
 
 /**
@@ -555,6 +569,34 @@ export type RelayCandidate = Message<"mistgate.admin.v1.RelayCandidate"> & {
  */
 export const RelayCandidateSchema: GenMessage<RelayCandidate> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_relay, 8);
+
+/**
+ * The people a relay through this entry would serve.
+ *
+ * @generated from message mistgate.admin.v1.RelayAudience
+ */
+export type RelayAudience = Message<"mistgate.admin.v1.RelayAudience"> & {
+  /**
+   * People who are given the exit's server and are allowed the entry node.
+   *
+   * @generated from field: uint32 people = 1;
+   */
+  people: number;
+
+  /**
+   * Their AmneziaVPN keys of this profile (static configs): each has to import the new config once. 0 for other protocols.
+   *
+   * @generated from field: uint32 static_awg_devices = 2;
+   */
+  staticAwgDevices: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayAudience.
+ * Use `create(RelayAudienceSchema)` to create a new message.
+ */
+export const RelayAudienceSchema: GenMessage<RelayAudience> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 9);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelayCandidatesRequest
@@ -571,7 +613,7 @@ export type ListRelayCandidatesRequest = Message<"mistgate.admin.v1.ListRelayCan
  * Use `create(ListRelayCandidatesRequestSchema)` to create a new message.
  */
 export const ListRelayCandidatesRequestSchema: GenMessage<ListRelayCandidatesRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 9);
+  messageDesc(file_mistgate_admin_v1_relay, 10);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelayCandidatesResponse
@@ -604,7 +646,7 @@ export type ListRelayCandidatesResponse = Message<"mistgate.admin.v1.ListRelayCa
  * Use `create(ListRelayCandidatesResponseSchema)` to create a new message.
  */
 export const ListRelayCandidatesResponseSchema: GenMessage<ListRelayCandidatesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 10);
+  messageDesc(file_mistgate_admin_v1_relay, 11);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysRequest
@@ -621,7 +663,7 @@ export type ListRelaysRequest = Message<"mistgate.admin.v1.ListRelaysRequest"> &
  * Use `create(ListRelaysRequestSchema)` to create a new message.
  */
 export const ListRelaysRequestSchema: GenMessage<ListRelaysRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 11);
+  messageDesc(file_mistgate_admin_v1_relay, 12);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysResponse
@@ -638,7 +680,7 @@ export type ListRelaysResponse = Message<"mistgate.admin.v1.ListRelaysResponse">
  * Use `create(ListRelaysResponseSchema)` to create a new message.
  */
 export const ListRelaysResponseSchema: GenMessage<ListRelaysResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 12);
+  messageDesc(file_mistgate_admin_v1_relay, 13);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayRequest
@@ -667,7 +709,7 @@ export type CreateRelayRequest = Message<"mistgate.admin.v1.CreateRelayRequest">
  * Use `create(CreateRelayRequestSchema)` to create a new message.
  */
 export const CreateRelayRequestSchema: GenMessage<CreateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 13);
+  messageDesc(file_mistgate_admin_v1_relay, 14);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayResponse
@@ -684,7 +726,7 @@ export type CreateRelayResponse = Message<"mistgate.admin.v1.CreateRelayResponse
  * Use `create(CreateRelayResponseSchema)` to create a new message.
  */
 export const CreateRelayResponseSchema: GenMessage<CreateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 14);
+  messageDesc(file_mistgate_admin_v1_relay, 15);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayRequest
@@ -711,7 +753,7 @@ export type UpdateRelayRequest = Message<"mistgate.admin.v1.UpdateRelayRequest">
  * Use `create(UpdateRelayRequestSchema)` to create a new message.
  */
 export const UpdateRelayRequestSchema: GenMessage<UpdateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 15);
+  messageDesc(file_mistgate_admin_v1_relay, 16);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayResponse
@@ -728,7 +770,7 @@ export type UpdateRelayResponse = Message<"mistgate.admin.v1.UpdateRelayResponse
  * Use `create(UpdateRelayResponseSchema)` to create a new message.
  */
 export const UpdateRelayResponseSchema: GenMessage<UpdateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 16);
+  messageDesc(file_mistgate_admin_v1_relay, 17);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayRequest
@@ -745,7 +787,7 @@ export type DeleteRelayRequest = Message<"mistgate.admin.v1.DeleteRelayRequest">
  * Use `create(DeleteRelayRequestSchema)` to create a new message.
  */
 export const DeleteRelayRequestSchema: GenMessage<DeleteRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 17);
+  messageDesc(file_mistgate_admin_v1_relay, 18);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayResponse
@@ -758,7 +800,7 @@ export type DeleteRelayResponse = Message<"mistgate.admin.v1.DeleteRelayResponse
  * Use `create(DeleteRelayResponseSchema)` to create a new message.
  */
 export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 18);
+  messageDesc(file_mistgate_admin_v1_relay, 19);
 
 /**
  * Relays: a port of one node (the entry) that passes the encrypted traffic of a server on another node (the exit) on,

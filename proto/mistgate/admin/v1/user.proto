@@ -116,6 +116,10 @@ message DeviceConnection {
   uint32 responses_unmatched = 28;
   // Which of these five this row's protocol, transport, AWG backend or agent does not count: their zero means nothing.
   repeated string unsupported = 29;
+  // The connections of this row went through a relay: the entry node's country ("RU") and id. Empty: the direct path.
+  string via_country = 30;
+  // See via_country.
+  string via_node_id = 31;
 }
 
 message GetUserConnectionResponse {

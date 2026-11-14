@@ -462,7 +462,11 @@ type DeviceConfig struct {
 	// Stable codes the UI localises: amnezia_desktop_mtu, dns_no_split, dns_fallback, ...
 	Warnings []string `protobuf:"bytes,11,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	// File name for "Download .conf", already safe ("de1-31.conf"); never derived from raw user input.
-	ConfFilename  string `protobuf:"bytes,12,opt,name=conf_filename,json=confFilename,proto3" json:"conf_filename,omitempty"`
+	ConfFilename string `protobuf:"bytes,12,opt,name=conf_filename,json=confFilename,proto3" json:"conf_filename,omitempty"`
+	// The config goes through a relay: the entry node's country ("RU") and id. Empty: the direct config.
+	ViaCountry string `protobuf:"bytes,13,opt,name=via_country,json=viaCountry,proto3" json:"via_country,omitempty"`
+	// See via_country.
+	ViaNodeId     string `protobuf:"bytes,14,opt,name=via_node_id,json=viaNodeId,proto3" json:"via_node_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -581,6 +585,20 @@ func (x *DeviceConfig) GetConfFilename() string {
 	return ""
 }
 
+func (x *DeviceConfig) GetViaCountry() string {
+	if x != nil {
+		return x.ViaCountry
+	}
+	return ""
+}
+
+func (x *DeviceConfig) GetViaNodeId() string {
+	if x != nil {
+		return x.ViaNodeId
+	}
+	return ""
+}
+
 type ClientRequirement struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "AmneziaVPN", "AmneziaWG Android", "Mihomo".
@@ -664,7 +682,7 @@ const file_mistgate_admin_v1_device_proto_rawDesc = "" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\"I\n" +
 	"\x14RenameDeviceResponse\x121\n" +
-	"\x06device\x18\x01 \x01(\v2\x19.mistgate.admin.v1.DeviceR\x06device\"\x95\x03\n" +
+	"\x06device\x18\x01 \x01(\v2\x19.mistgate.admin.v1.DeviceR\x06device\"\xd6\x03\n" +
 	"\fDeviceConfig\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x17\n" +
@@ -681,7 +699,10 @@ const file_mistgate_admin_v1_device_proto_rawDesc = "" +
 	" \x03(\v2$.mistgate.admin.v1.ClientRequirementR\n" +
 	"minClients\x12\x1a\n" +
 	"\bwarnings\x18\v \x03(\tR\bwarnings\x12#\n" +
-	"\rconf_filename\x18\f \x01(\tR\fconfFilename\"F\n" +
+	"\rconf_filename\x18\f \x01(\tR\fconfFilename\x12\x1f\n" +
+	"\vvia_country\x18\r \x01(\tR\n" +
+	"viaCountry\x12\x1e\n" +
+	"\vvia_node_id\x18\x0e \x01(\tR\tviaNodeId\"F\n" +
 	"\x11ClientRequirement\x12\x10\n" +
 	"\x03app\x18\x01 \x01(\tR\x03app\x12\x1f\n" +
 	"\vmin_version\x18\x02 \x01(\tR\n" +

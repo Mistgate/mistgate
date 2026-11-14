@@ -484,7 +484,11 @@ type DeviceConnection struct {
 	Responses          uint32 `protobuf:"varint,27,opt,name=responses,proto3" json:"responses,omitempty"`
 	ResponsesUnmatched uint32 `protobuf:"varint,28,opt,name=responses_unmatched,json=responsesUnmatched,proto3" json:"responses_unmatched,omitempty"`
 	// Which of these five this row's protocol, transport, AWG backend or agent does not count: their zero means nothing.
-	Unsupported   []string `protobuf:"bytes,29,rep,name=unsupported,proto3" json:"unsupported,omitempty"`
+	Unsupported []string `protobuf:"bytes,29,rep,name=unsupported,proto3" json:"unsupported,omitempty"`
+	// The connections of this row went through a relay: the entry node's country ("RU") and id. Empty: the direct path.
+	ViaCountry string `protobuf:"bytes,30,opt,name=via_country,json=viaCountry,proto3" json:"via_country,omitempty"`
+	// See via_country.
+	ViaNodeId     string `protobuf:"bytes,31,opt,name=via_node_id,json=viaNodeId,proto3" json:"via_node_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -720,6 +724,20 @@ func (x *DeviceConnection) GetUnsupported() []string {
 		return x.Unsupported
 	}
 	return nil
+}
+
+func (x *DeviceConnection) GetViaCountry() string {
+	if x != nil {
+		return x.ViaCountry
+	}
+	return ""
+}
+
+func (x *DeviceConnection) GetViaNodeId() string {
+	if x != nil {
+		return x.ViaNodeId
+	}
+	return ""
 }
 
 type GetUserConnectionResponse struct {
@@ -3973,7 +3991,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x18GetUserConnectionRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05hours\x18\x02 \x01(\rR\x05hours\x12\x17\n" +
-	"\aby_hour\x18\x03 \x01(\bR\x06byHour\"\x96\a\n" +
+	"\aby_hour\x18\x03 \x01(\bR\x06byHour\"\xd7\a\n" +
 	"\x10DeviceConnection\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
@@ -4007,7 +4025,10 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\vinitiations\x18\x1a \x01(\rR\vinitiations\x12\x1c\n" +
 	"\tresponses\x18\x1b \x01(\rR\tresponses\x12/\n" +
 	"\x13responses_unmatched\x18\x1c \x01(\rR\x12responsesUnmatched\x12 \n" +
-	"\vunsupported\x18\x1d \x03(\tR\vunsupported\"\x8c\x02\n" +
+	"\vunsupported\x18\x1d \x03(\tR\vunsupported\x12\x1f\n" +
+	"\vvia_country\x18\x1e \x01(\tR\n" +
+	"viaCountry\x12\x1e\n" +
+	"\vvia_node_id\x18\x1f \x01(\tR\tviaNodeId\"\x8c\x02\n" +
 	"\x19GetUserConnectionResponse\x12!\n" +
 	"\n" +
 	"since_unix\x18\x01 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +

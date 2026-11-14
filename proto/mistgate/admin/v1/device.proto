@@ -96,6 +96,10 @@ message DeviceConfig {
   repeated string warnings = 11;
   // File name for "Download .conf", already safe ("de1-31.conf"); never derived from raw user input.
   string conf_filename = 12;
+  // The config goes through a relay: the entry node's country ("RU") and id. Empty: the direct config.
+  string via_country = 13;
+  // See via_country.
+  string via_node_id = 14;
 }
 
 message ClientRequirement {
