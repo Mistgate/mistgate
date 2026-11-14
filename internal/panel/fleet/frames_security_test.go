@@ -24,13 +24,14 @@ func TestAgentFrameLimitClosesPersistentlyFloodingSession(t *testing.T) {
 }
 
 // A reliable frame over the rate is never skipped (the ack of a later one would cover it): the session ends and the agent
-// replays from the last ack.
+// replays from the last ack. The frames carry a code only the panel may write, so each costs the panel almost nothing and
+// the test does not depend on how fast the database is.
 func TestAgentFrameLimitNeverSkipsAReliableFrame(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("de1")
 	c, _, _ := connectFull(a, "frame-reliable")
 	for seq := uint64(1); seq <= agentFrameBurst+8; seq++ {
-		frame := &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{Code: "frame_probe", TimeUnix: time.Now().Unix()}}}
+		frame := &agentv1.ConnectRequest{Seq: seq, Message: &agentv1.ConnectRequest_Event{Event: &agentv1.Event{Code: "node_down", TimeUnix: time.Now().Unix()}}}
 		if err := c.st.Send(frame); err != nil {
 			break
 		}
