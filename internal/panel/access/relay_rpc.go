@@ -43,14 +43,15 @@ func (s *Service) RelayHandler() (string, http.Handler) {
 }
 
 // relayUsable is the rule for a person's entry of a server: the relay is switched on and its stages passed or were marked
-// unverifiable (a failed check is not usable; a relay still being checked has no path result yet), and the entry's agent holds
-// the forward (State "active": one that failed to install is not offered), the exit's server is usable for the person (usable:
-// group, node, app) and live, and the entry node is live, enabled for the group, and one of the person's nodes. The twin servers
-// of the subscription follow it (subRelays); the entry node's own forward follows only the part that is not about a person
-// (store.RelayLink.Live).
+// unverifiable, the entry's agent holds the forward, and the person can receive the exit's server through that entry. The twin
+// servers of the subscription follow it (subRelays); candidate audiences reuse the recipient part before a relay exists.
 func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return relayPathUsable(l) && s.usable(exit, g, u) &&
-		!slices.Contains(g.DisabledNodeIDs, l.ViaNodeID) &&
+	return relayPathUsable(l) && s.relayRecipientUsable(l, exit, g, u)
+}
+
+// relayRecipientUsable is the subscriber part shared by an existing relay and a candidate with no relay state yet.
+func (s *Service) relayRecipientUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
+	return s.usable(exit, g, u) && !slices.Contains(g.DisabledNodeIDs, l.ViaNodeID) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, l.ViaNodeID))
 }
 
@@ -83,6 +84,9 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 		}
 		if counters := check.Counters; counters != nil {
 			out.Bytes, out.Packets, out.CountedUnix = counters.Bytes, counters.Packets, counters.CountedUnix
+			if l.Enabled { // a switched-off forward carries nothing, whatever its last reading said
+				out.Bps = counters.BPS(s.now())
+			}
 		}
 	}
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {

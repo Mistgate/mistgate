@@ -47,7 +47,7 @@ var transactionShape1 = map[string]string{
 	"debug_capture.go:PruneDebugCaptures":            "The old captures' lines and the captures themselves are deleted in one fixed batch.",
 	"client_debug.go:PruneClientDebug":               "The old and orphaned requests' lines, the rows themselves and the lines left without a row are deleted in one fixed batch.",
 	"relay.go:RelaysApplied":                         "The reported forwards of one entry update their rows (switched-on relays of that node only) in one fixed batch.",
-	"relay_check.go:SetRelayCounters":                "Updates each enabled relay owned by the reporting entry in one fixed batch.",
+	"relay_check.go:SetRelayCounters":                "Stores the current and previous readings plus each day's increments for enabled relays owned by the reporting entry in one fixed batch.",
 	"provision.go:FinishCancelledNodeProvisionJob":   "The cancellation event and guarded state transition run in one fixed batch.",
 	"provision.go:RequeueNodeProvisionJobs":          "Set-based event inserts and state updates requeue interrupted jobs in one fixed batch.",
 	"provision.go:createNodeProvisionJob":            "The job insert and optional queued event run in one fixed batch.",

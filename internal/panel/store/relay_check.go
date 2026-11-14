@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"time"
 )
 
 // The latest check of a relay lives in relay.check_json (migration 00085); there is no history. The fleet module makes the
@@ -48,11 +50,47 @@ type RelayMonitorCheck struct {
 	AutoCheckTargetKey string `json:"auto_check_target_key,omitempty"`
 }
 
-// RelayCounters is one snapshot of the named nft counter for a forward.
+// RelayCounters is one snapshot of the named nft counter for a forward. Until the agent counts return traffic, its rate and
+// day total describe only bytes sent toward the exit.
 type RelayCounters struct {
-	Bytes       uint64 `json:"bytes"`
-	Packets     uint64 `json:"packets"`
-	CountedUnix int64  `json:"counted_unix"`
+	Bytes           uint64 `json:"bytes"`
+	Packets         uint64 `json:"packets"`
+	CountedUnix     int64  `json:"counted_unix"`
+	PrevBytes       uint64 `json:"prev_bytes,omitempty"`
+	PrevCountedUnix int64  `json:"prev_counted_unix,omitempty"`
+	TodayBytes      uint64 `json:"today_bytes,omitempty"`
+	TodayDay        int64  `json:"today_day,omitempty"`
+}
+
+const (
+	relayCounterFreshWindow = 15 * time.Minute
+	maxRelayCounterBPS      = uint64(1_000_000_000_000) // A jump above 1 Tb/s is not a useful rate sample.
+)
+
+// BPS returns the forward rate when both readings are recent and ordered. A lower current counter is a reset, whose new value
+// is the increment; zero or stale intervals do not produce a rate.
+func (c RelayCounters) BPS(now time.Time) uint64 {
+	if c.PrevCountedUnix <= 0 || c.CountedUnix <= c.PrevCountedUnix || now.Unix() < c.CountedUnix || now.Unix() < c.PrevCountedUnix {
+		return 0
+	}
+	interval := c.CountedUnix - c.PrevCountedUnix
+	if interval > int64(relayCounterFreshWindow/time.Second) || now.Unix()-c.CountedUnix > int64(relayCounterFreshWindow/time.Second) ||
+		now.Unix()-c.PrevCountedUnix > int64(relayCounterFreshWindow/time.Second) {
+		return 0
+	}
+	delta := c.Bytes
+	if c.Bytes >= c.PrevBytes {
+		delta = c.Bytes - c.PrevBytes
+	}
+	maxBytes := maxRelayCounterBPS / 8 * uint64(interval)
+	if delta > maxBytes {
+		return 0
+	}
+	bps := delta * 8 / uint64(interval)
+	if bps > maxRelayCounterBPS {
+		return 0
+	}
+	return bps
 }
 
 // RelayCounterUpdate is one counter snapshot reported by the entry node.
@@ -161,20 +199,67 @@ func (s *Store) SetRelayMonitorCheck(ctx context.Context, id string, m RelayMoni
 func (s *Store) SetRelayCounters(ctx context.Context, nodeID string, updates []RelayCounterUpdate) error {
 	stmts := make([]Stmt, 0, len(updates))
 	for _, update := range updates {
-		if update.RelayID == "" {
+		if update.RelayID == "" || update.CountedUnix <= 0 {
 			continue
 		}
-		b, err := json.Marshal(update.RelayCounters)
+		b, err := json.Marshal(struct {
+			Bytes       uint64 `json:"bytes"`
+			Packets     uint64 `json:"packets"`
+			CountedUnix int64  `json:"counted_unix"`
+		}{Bytes: update.Bytes, Packets: update.Packets, CountedUnix: update.CountedUnix})
 		if err != nil {
 			return err
 		}
-		stmts = append(stmts, Stmt{Query: `UPDATE relay SET check_json = json_set(COALESCE(check_json, '{}'), '$.counters', json(?))
-			WHERE id = ? AND via_node_id = ? AND network = ? AND port = ? AND enabled = 1`,
-			Args: []any{string(b), update.RelayID, nodeID, update.Network, update.Port}})
+		// The day is cast in SQL: a bound number may reach D1 as a REAL, and the JSON member must stay an integer.
+		day := time.Unix(update.CountedUnix, 0).UTC()
+		dayStart := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC).Unix()
+		stmts = append(stmts, Stmt{Query: `UPDATE relay SET check_json = json_set(COALESCE(check_json, '{}'), '$.counters',
+			json_set(json(?1),
+				'$.prev_bytes', json_extract(check_json, '$.counters.bytes'),
+				'$.prev_counted_unix', json_extract(check_json, '$.counters.counted_unix'),
+				'$.today_bytes', CASE
+					WHEN json_extract(check_json, '$.counters.today_day') = ?2 THEN
+						COALESCE(json_extract(check_json, '$.counters.today_bytes'), 0) + CASE
+							WHEN json_type(check_json, '$.counters.counted_unix') IS NULL THEN json_extract(?1, '$.bytes')
+							WHEN json_extract(?1, '$.bytes') < json_extract(check_json, '$.counters.bytes') THEN json_extract(?1, '$.bytes')
+							ELSE json_extract(?1, '$.bytes') - json_extract(check_json, '$.counters.bytes') END
+					ELSE CASE
+						WHEN json_type(check_json, '$.counters.counted_unix') IS NULL THEN json_extract(?1, '$.bytes')
+						WHEN json_extract(?1, '$.bytes') < json_extract(check_json, '$.counters.bytes') THEN json_extract(?1, '$.bytes')
+						ELSE json_extract(?1, '$.bytes') - json_extract(check_json, '$.counters.bytes') END
+				END,
+				'$.today_day', CAST(?2 AS INTEGER)))
+			WHERE id = ?3 AND via_node_id = ?4 AND network = ?5 AND port = ?6 AND enabled = 1
+				AND (json_type(check_json, '$.counters.counted_unix') IS NULL OR
+					json_extract(check_json, '$.counters.counted_unix') < json_extract(?1, '$.counted_unix'))`,
+			Args: []any{string(b), dayStart, update.RelayID, nodeID, update.Network, update.Port}})
 	}
 	if len(stmts) == 0 {
 		return nil
 	}
 	_, err := s.batch(ctx, stmts...)
 	return err
+}
+
+// RelayTodayBytesByNode sums the persisted daily forward increments of each entry's relays for one UTC day boundary. A relay
+// deleted during the day takes its share with it: the day total lives in the relay row.
+func (s *Store) RelayTodayBytesByNode(ctx context.Context, dayStart int64) (map[string]uint64, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT via_node_id, SUM(json_extract(check_json, '$.counters.today_bytes')) FROM relay
+		WHERE json_extract(check_json, '$.counters.today_day') = ? GROUP BY via_node_id`, dayStart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]uint64{}
+	for rows.Next() {
+		var nodeID string
+		var sum sql.NullInt64
+		if err := rows.Scan(&nodeID, &sum); err != nil {
+			return nil, err
+		}
+		if sum.Valid && sum.Int64 > 0 {
+			out[nodeID] = uint64(sum.Int64)
+		}
+	}
+	return out, rows.Err()
 }

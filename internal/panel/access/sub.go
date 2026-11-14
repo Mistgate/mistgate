@@ -350,13 +350,9 @@ func compareSubscriptionInbounds(a, b store.AccessInboundFull) int {
 func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, opt SubOptions) (SubView, error) {
 	a := s.st.Access()
 	now := s.now()
-	// Not the stored status: expiry and quota are exact at this instant even before the sweep ran.
-	ps, reset := AdvancePeriod(u.QuotaReset, u.PeriodStart, now)
-	if reset {
-		u.UsedBytes, u.PeriodStart = 0, ps
-	}
+	u, status := currentSubscriptionUser(u, now)
 	v := SubView{
-		UserID: u.ID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now),
+		UserID: u.ID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: status,
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
 		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia, AppTelegram: u.AppTelegram,
 	}
@@ -758,6 +754,15 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	s.nodeDNSData(ctx, &v, n, awgDevs)
 	return v, nil
+}
+
+// currentSubscriptionUser applies a due quota reset before deriving status, as a subscription fetch does even before the sweep.
+func currentSubscriptionUser(u store.AccessUser, now time.Time) (store.AccessUser, string) {
+	periodStart, reset := AdvancePeriod(u.QuotaReset, u.PeriodStart, now)
+	if reset {
+		u.UsedBytes, u.PeriodStart = 0, periodStart
+	}
+	return u, ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now)
 }
 
 // ipv6Egress says whether a client of this exit node gets IPv6 out of it. Only what the panel knows for sure counts, and what it does

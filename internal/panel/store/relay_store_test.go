@@ -313,7 +313,9 @@ func relayStoreProof(t *testing.T, st *Store) {
 		t.Fatal(err)
 	}
 	got, ok = mustRelay(t, st, "rly_a").Check()
-	if !ok || got.Counters == nil || *got.Counters != counters || got.Monitor == nil || *got.Monitor != monitor || got.Leg != chk.Leg || got.Path != chk.Path {
+	if !ok || got.Counters == nil || got.Counters.Bytes != counters.Bytes || got.Counters.Packets != counters.Packets ||
+		got.Counters.CountedUnix != counters.CountedUnix || got.Counters.TodayBytes != counters.Bytes ||
+		got.Monitor == nil || *got.Monitor != monitor || got.Leg != chk.Leg || got.Path != chk.Path {
 		t.Fatalf("counter writer changed another check_json member: %+v", got)
 	}
 

@@ -282,6 +282,14 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, s.internal("list nodes", err)
 	}
+	fullInbounds, err := a.InboundsFull(ctx, "")
+	if err != nil {
+		return nil, s.internal("list inbounds", err)
+	}
+	inboundsByNode := make(map[string][]store.AccessInboundFull)
+	for _, f := range fullInbounds {
+		inboundsByNode[f.Node.ID] = append(inboundsByNode[f.Node.ID], f)
+	}
 	links, err := s.st.RelayLinks(ctx, store.RelayFilter{ViaNodeID: entry.ID})
 	if err != nil {
 		return nil, s.internal("list relays", err)
@@ -293,15 +301,12 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 
 	var out []*adminv1.RelayCandidate
 	var exits []string
+	candidateInbounds := map[string]store.AccessInboundFull{}
 	for _, n := range nodes {
 		if n.ID == entry.ID || n.State != "active" {
 			continue
 		}
-		full, err := a.InboundsFull(ctx, n.ID)
-		if err != nil {
-			return nil, s.internal("list inbounds", err)
-		}
-		for _, f := range full {
+		for _, f := range inboundsByNode[n.ID] {
 			if !store.InboundLive(f.Inbound.Enabled, f.Inbound.State, f.Node.State) {
 				continue
 			}
@@ -316,9 +321,77 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 				c.Unsupported = relayUnsupported(f.Profile.Protocol, spec)
 			}
 			out = append(out, c)
+			candidateInbounds[f.Inbound.ID] = f
 			if !slices.Contains(exits, n.ID) {
 				exits = append(exits, n.ID)
 			}
+		}
+	}
+	if len(out) > 0 {
+		nodeSet := map[string]bool{entry.ID: true}
+		awgProfiles := map[string]bool{}
+		for _, c := range out {
+			nodeSet[c.NodeId] = true
+			if c.Protocol == "awg" {
+				awgProfiles[c.ProfileId] = true
+			}
+		}
+		nodeIDs := make([]string, 0, len(nodeSet))
+		for id := range nodeSet {
+			nodeIDs = append(nodeIDs, id)
+		}
+		groups, err := a.Groups(ctx)
+		if err != nil {
+			return nil, s.internal("list relay audience groups", err)
+		}
+		groupOf := make(map[string]store.AccessGroup, len(groups))
+		for _, g := range groups {
+			groupOf[g.ID] = g
+		}
+		users, err := a.RelayAudienceUsers(ctx, nodeIDs)
+		if err != nil {
+			return nil, s.internal("list relay audience people", err)
+		}
+		profileIDs := make([]string, 0, len(awgProfiles))
+		for id := range awgProfiles {
+			profileIDs = append(profileIDs, id)
+		}
+		keyCounts, err := a.RelayStaticAWGDeviceCounts(ctx, profileIDs)
+		if err != nil {
+			return nil, s.internal("list relay audience keys", err)
+		}
+		now := s.now()
+		var active []store.AccessUser // disabled, expired and over-quota people get no twin, as in their subscription
+		for _, u := range users {
+			if _, status := currentSubscriptionUser(u, now); status == StatusActive {
+				active = append(active, u)
+			}
+		}
+		for _, c := range out {
+			f, ok := candidateInbounds[c.InboundId]
+			if !ok {
+				continue
+			}
+			audience := &adminv1.RelayAudience{}
+			for _, u := range active {
+				g, ok := groupOf[u.GroupID]
+				if !ok || !s.relayRecipientUsable(store.RelayLink{ViaNodeID: entry.ID}, f, g, u) {
+					continue
+				}
+				if audience.People < ^uint32(0) {
+					audience.People++
+				}
+				if c.Protocol == "awg" {
+					count := keyCounts[u.ID][c.ProfileId]
+					left := uint64(^uint32(0) - audience.StaticAwgDevices)
+					if count > left {
+						audience.StaticAwgDevices = ^uint32(0)
+					} else {
+						audience.StaticAwgDevices += uint32(count)
+					}
+				}
+			}
+			c.Audience = audience
 		}
 	}
 

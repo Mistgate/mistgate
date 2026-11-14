@@ -2497,6 +2497,10 @@ func TestD1RelaysStorage(t *testing.T) {
 	relayStoreProof(t, openD1Store(t))
 }
 
+func TestD1RelayCountersStorage(t *testing.T) {
+	relayCounterStoreProof(t, openD1Store(t))
+}
+
 func TestD1RelayRace(t *testing.T) {
 	relayRaceProof(t, openD1Store(t))
 }
@@ -2663,4 +2667,8 @@ func TestD1ClientCompatDevices(t *testing.T) {
 	if len(got) != 1 || got[0].ID != "dev_vless" || got[0].Client != "Happ/3.4.2" || got[0].Platform != "android" || got[0].Shared || got[0].LastSeenAt.IsZero() {
 		t.Fatalf("devices = %+v", got)
 	}
+}
+
+func TestD1RelayAudienceStorage(t *testing.T) {
+	relayAudienceProof(t, openD1Store(t))
 }

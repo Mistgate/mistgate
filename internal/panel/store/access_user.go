@@ -226,6 +226,82 @@ func (a Access) UsersByIDs(ctx context.Context, ids []string) ([]AccessUser, err
 	return a.collectUsers(ctx, rows)
 }
 
+// RelayAudienceUsers reads the subscription access fields for every person once. NodeIDs is limited to the candidate exits and
+// entry, so callers can apply the same node-selection rule as subscriptions without a query per candidate.
+func (a Access) RelayAudienceUsers(ctx context.Context, nodeIDs []string) ([]AccessUser, error) {
+	rows, err := a.s.R.QueryContext(ctx, `SELECT u.id, u.group_id, u.disabled, u.status, u.app_happ, u.app_amnezia, u.app_telegram,
+		u.all_nodes, u.quota_bytes, u.quota_reset, u.period_start, u.used_bytes, u.expires_at
+		FROM user u`)
+	if err != nil {
+		return nil, err
+	}
+	var out []AccessUser
+	idx := map[string]int{}
+	for rows.Next() {
+		var u AccessUser
+		var disabled, happ, amnezia, telegram, all int
+		var quota, period, used int64
+		var expires sql.NullInt64
+		if err := rows.Scan(&u.ID, &u.GroupID, &disabled, &u.Status, &happ, &amnezia, &telegram, &all,
+			&quota, &u.QuotaReset, &period, &used, &expires); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		u.Disabled, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AllNodes = disabled != 0, happ != 0, amnezia != 0, telegram != 0, all != 0
+		u.QuotaBytes, u.UsedBytes, u.PeriodStart, u.ExpiresAt = uint64(quota), uint64(used), fromUnix(period), accTimeIfNonzero(expires)
+		idx[u.ID] = len(out)
+		out = append(out, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(out) == 0 || len(nodeIDs) == 0 {
+		return out, err
+	}
+	nrows, err := a.s.R.QueryContext(ctx, `SELECT user_id, node_id FROM user_node
+		WHERE node_id IN (SELECT value FROM json_each(?)) ORDER BY node_id`, accJSON(nodeIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer nrows.Close()
+	for nrows.Next() {
+		var userID, nodeID string
+		if err := nrows.Scan(&userID, &nodeID); err != nil {
+			return nil, err
+		}
+		if i, ok := idx[userID]; ok {
+			out[i].NodeIDs = append(out[i].NodeIDs, nodeID)
+		}
+	}
+	return out, nrows.Err()
+}
+
+// RelayStaticAWGDeviceCounts counts live static AmneziaVPN keys by person and profile for the candidate AWG profiles.
+func (a Access) RelayStaticAWGDeviceCounts(ctx context.Context, profileIDs []string) (map[string]map[string]uint64, error) {
+	out := map[string]map[string]uint64{}
+	if len(profileIDs) == 0 {
+		return out, nil
+	}
+	rows, err := a.s.R.QueryContext(ctx, `SELECT c.user_id, c.profile_id, count(*) FROM device_credential c
+		JOIN device d ON d.id = c.device_id AND d.user_id = c.user_id AND d.kind = 'key' AND d.revoked_at IS NULL
+		WHERE c.protocol = 'awg' AND c.path = '' AND c.revoked_at IS NULL AND c.profile_id IN (SELECT value FROM json_each(?))
+		GROUP BY c.user_id, c.profile_id`, accJSON(profileIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID, profileID string
+		var count uint64
+		if err := rows.Scan(&userID, &profileID, &count); err != nil {
+			return nil, err
+		}
+		if out[userID] == nil {
+			out[userID] = map[string]uint64{}
+		}
+		out[userID][profileID] = count
+	}
+	return out, rows.Err()
+}
+
 // UserByTokenHash finds the user of a subscription token hash (sha256), or ErrNotFound.
 func (a Access) UserByTokenHash(ctx context.Context, hash []byte) (AccessUser, error) {
 	var user AccessUser

@@ -251,12 +251,12 @@ func pct(used, total uint64) float32 {
 
 // nodeMsg builds the Node message. protos, todayBytes, enabled and live are looked up by the caller once per
 // request.
-func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary, d6 store.IPv6Doctor) *adminv1.Node {
+func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes, relayTodayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary, d6 store.IPv6Doctor) *adminv1.Node {
 	view := decodeLiveView(live)
 	st := f.statusOfLive(ctx, n, live, enabled, now, health)
 	out := &adminv1.Node{
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address, Notes: n.Notes, PublicLabel: n.PublicLabel, LinkSealed: n.LinkSealed,
-		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
+		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, RelayTodayBytes: relayTodayBytes, AgentVersion: n.AgentVersion,
 		LastSeenUnix: fleetUnix(live.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
 		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6,
 	}
@@ -366,6 +366,10 @@ func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1
 	if err != nil {
 		return nil, internalErr(f.log.Error, "traffic today", err)
 	}
+	relayToday, err := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
+	if err != nil {
+		return nil, internalErr(f.log.Error, "relay traffic today", err)
+	}
 	enabled, err := f.st.FleetEnabledInbounds(ctx)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node inbounds", err)
@@ -380,7 +384,7 @@ func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1
 	d6 := f.ipv6Doctors(ctx)
 	resp := &adminv1.ListNodesResponse{ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}
 	for _, n := range nodes {
-		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID], d6[n.ID]))
+		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID], d6[n.ID]))
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -415,6 +419,10 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	today, err := f.todayBytesByNode(ctx, now)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "traffic today", err)
+	}
+	relayToday, err := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
+	if err != nil {
+		return nil, internalErr(f.log.Error, "relay traffic today", err)
 	}
 	facts, err := f.st.NodeFacts(ctx, n.ID)
 	if err != nil {
@@ -461,7 +469,7 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	}
 	view := decodeLiveView(live)
 	panelBundle, _ := f.panelDecoyBundle()
-	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))
+	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], relayToday[n.ID], enabled, now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))
 	if n.State == "pending" {
 		if exp, err := f.st.PendingEnrollmentExpiry(ctx, n.ID, now); err == nil {
 			resp.EnrollmentExpiresUnix = fleetUnix(exp)
@@ -674,7 +682,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
 	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
-		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}, store.IPv6Doctor{}), // pending: no checks yet
+		Node:           f.nodeMsg(ctx, n, nil, 0, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}, store.IPv6Doctor{}), // pending: no checks yet
 		InstallCommand: install,
 		CaFingerprint:  "sha256:" + f.ca.fingerprint,
 		ExpiresUnix:    now.Add(ttl).Unix(),
@@ -1013,9 +1021,10 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	now := f.now().UTC()
 	protos, _ := f.st.FleetNodeProtocols(ctx)
 	today, _ := f.todayBytesByNode(ctx, now)
+	relayToday, _ := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	panelBundle, _ := f.panelDecoyBundle()
-	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))}), nil
+	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))}), nil
 }
 
 // nodeUpdateAudit is the audit record of an UpdateNode: the names of the fields the request carried and, for the

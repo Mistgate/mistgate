@@ -118,6 +118,39 @@ func TestListRelaysIncludesMonitorAndCounters(t *testing.T) {
 	}
 }
 
+func TestListRelaysCalculatesBPS(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.invalid", "active")
+	e.node("nod_msk1", "msk1", "msk1.example.invalid", "active")
+	e.sql(`UPDATE node SET agent_caps = 'relay-forward/1' WHERE id = 'nod_msk1'`)
+	p := e.profile("de1", "")
+	in := e.inbound(p.Id, "nod_de1")
+	r := must(e.s.CreateRelay(e.ctx, req(&adminv1.CreateRelayRequest{InboundId: in.Id, ViaNodeId: "nod_msk1"}))).Msg.Relay
+	e.sql(`UPDATE relay SET enabled = 1 WHERE id = ?`, r.Id)
+	set := func(bytes uint64, at int64) {
+		t.Helper()
+		if err := e.st.SetRelayCounters(e.ctx, "nod_msk1", []store.RelayCounterUpdate{{RelayID: r.Id, Network: "udp", Port: 443,
+			RelayCounters: store.RelayCounters{Bytes: bytes, CountedUnix: at}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	set(100, e.clock.Unix()-20)
+	set(200, e.clock.Unix()-10)
+	got := must(e.s.ListRelays(e.ctx, req(&adminv1.ListRelaysRequest{}))).Msg.Relays[0]
+	if got.Bytes != 200 || got.Bps != 80 {
+		t.Fatalf("two readings: bytes=%d bps=%d, want 200 and 80", got.Bytes, got.Bps)
+	}
+	set(30, e.clock.Unix())
+	got = must(e.s.ListRelays(e.ctx, req(&adminv1.ListRelaysRequest{}))).Msg.Relays[0]
+	if got.Bytes != 30 || got.Bps != 24 {
+		t.Fatalf("reset reading: bytes=%d bps=%d, want 30 and 24", got.Bytes, got.Bps)
+	}
+	e.sql(`UPDATE relay SET enabled = 0 WHERE id = ?`, r.Id)
+	if got = must(e.s.ListRelays(e.ctx, req(&adminv1.ListRelaysRequest{}))).Msg.Relays[0]; got.Bps != 0 {
+		t.Fatalf("switched-off relay reports %d bit/s", got.Bps)
+	}
+}
+
 func errOf2(_ *adminv1.Relay, err error) error { return err }
 
 // The port rules run both ways: a relay cannot take a port a profile or a relay of the entry holds (hop range included),

@@ -443,3 +443,59 @@ func TestListRelayCandidates(t *testing.T) {
 	_, err := f.s.ListRelayCandidates(f.ctx, req(&adminv1.ListRelayCandidatesRequest{ViaNodeId: "nod_nope"}))
 	wantCode(t, err, connect.CodeNotFound)
 }
+
+func TestListRelayCandidateAudience(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.invalid", "active")
+	e.node("nod_nl1", "nl1", "nl1.example.invalid", "active")
+	e.node("nod_msk1", "msk1", "msk1.example.invalid", "active")
+	e.sql(`UPDATE node SET agent_caps = 'relay-forward/1' WHERE id = 'nod_msk1'`)
+	de1 := e.awgProfile("de1", "")
+	nl1 := e.awgProfile("nl1", "")
+	de1Inbound := e.inbound(de1.Id, "nod_de1")
+	e.inbound(nl1.Id, "nod_nl1")
+	group := e.group("de1", de1.Id, nl1.Id)
+	allNodes := func(m *adminv1.CreateUserRequest) { m.Nodes = &adminv1.NodeSelection{All: true} }
+	alice := e.userBare("alice", group, amnOnly(allNodes)).User
+	bob := e.userBare("bob", group, amnOnly(allNodes)).User
+	aliceKey := must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: alice.Id, ProfileId: de1.Id, Platform: "ios"}))).Msg.Device
+	must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: alice.Id, ProfileId: nl1.Id, Platform: "ios"})))
+	must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: bob.Id, ProfileId: de1.Id, Platform: "ios"})))
+	revokedKey := must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: alice.Id, ProfileId: de1.Id, Platform: "ios"}))).Msg.Device
+	e.sql(`UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND profile_id = ? AND path = ''`, e.clock.Unix(), revokedKey.Id, de1.Id)
+	e.sql(`INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, path, secret_enc, data_json, created_at)
+		VALUES ('crd_alice_path', ?, ?, 'awg', ?, 'relay:nod_msk1', x'01', '{}', ?)`, aliceKey.Id, alice.Id, de1.Id, e.clock.Unix())
+	e.sql(`INSERT INTO device (id, user_id, kind, first_seen_at, last_seen_at, created_at, platform, model)
+		VALUES ('dev_alice_link', ?, 'link', ?, ?, ?, 'ios', 'ios')`, alice.Id, e.clock.Unix(), e.clock.Unix(), e.clock.Unix())
+	e.sql(`INSERT INTO device_credential (id, device_id, user_id, protocol, profile_id, path, secret_enc, data_json, created_at)
+		VALUES ('crd_alice_link', 'dev_alice_link', ?, 'awg', ?, '', x'01', '{}', ?)`, alice.Id, de1.Id, e.clock.Unix())
+	e.sql(`UPDATE user SET disabled = 1, status = 'disabled' WHERE id = ?`, bob.Id)
+
+	list := func() *adminv1.RelayCandidate {
+		t.Helper()
+		resp := must(e.s.ListRelayCandidates(e.ctx, req(&adminv1.ListRelayCandidatesRequest{ViaNodeId: "nod_msk1"}))).Msg
+		for _, c := range resp.Candidates {
+			if c.InboundId == de1Inbound.Id {
+				return c
+			}
+		}
+		t.Fatalf("candidate %s is absent", de1Inbound.Id)
+		return nil
+	}
+	got := list()
+	if got.Audience == nil || got.Audience.People != 1 || got.Audience.StaticAwgDevices != 1 {
+		t.Fatalf("disabled bob and non-static keys changed audience: %+v", got.Audience)
+	}
+	e.sql(`UPDATE user SET disabled = 0, status = 'active' WHERE id = ?`, bob.Id)
+	got = list()
+	if got.Audience.People != 2 || got.Audience.StaticAwgDevices != 2 {
+		t.Fatalf("live static keys of this profile were not counted: %+v", got.Audience)
+	}
+	e.sql(`UPDATE user SET disabled = 1, status = 'disabled' WHERE id = ?`, bob.Id)
+	e.sql(`UPDATE user SET all_nodes = 0 WHERE id = ?`, alice.Id)
+	e.sql(`INSERT INTO user_node (user_id, node_id) VALUES (?, 'nod_de1'), (?, 'nod_nl1')`, alice.Id, alice.Id)
+	got = list()
+	if got.Audience.People != 0 || got.Audience.StaticAwgDevices != 0 {
+		t.Fatalf("person without the entry node was counted: %+v", got.Audience)
+	}
+}

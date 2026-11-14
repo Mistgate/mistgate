@@ -175,10 +175,11 @@ func (f *Fleet) ipv6EntryReply(ctx context.Context, nodeID, code string, chk *st
 	now := f.now().UTC()
 	protos, _ := f.st.FleetNodeProtocols(ctx)
 	today, _ := f.todayBytesByNode(ctx, now)
+	relayToday, _ := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	panelBundle, _ := f.panelDecoyBundle()
 	out := &adminv1.UpdateIpv6EntryResponse{ErrorCode: code,
-		Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))}
+		Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))}
 	if chk != nil {
 		out.Check = ipv6CheckMsg(*chk)
 	}
