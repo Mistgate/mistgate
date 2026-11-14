@@ -94,6 +94,8 @@ The node does not probe a target for this kind (there is nothing external to pro
 
 Choose **Another site** to have the node pass visitors on to a real site you name. The target is the site your node impersonates. A bad choice makes the node easy to tell from the real site, or makes every handshake fail.
 
+A target that points at this inbound itself (`localhost`, `127.0.0.1`, `[::1]` or the node's own address, with the inbound's own port) would send every handshake back to the node, so it is refused; so are `0.0.0.0` and `::`. A site next to the node on another port, such as `127.0.0.1:8443`, works. Choose **This node's site** when visitors should see the node's decoy site.
+
 - It must speak **TLS 1.3** and offer the post-quantum key exchange **X25519MLKEM768**. Most large modern sites do. You can ask a site with OpenSSL 3.5 or newer: `openssl s_client -connect www.example.org:443 -tls1_3 -groups X25519MLKEM768`.
 - Prefer a site in **the same network (ASN)** as the node, or at least in the same country and close to it: it matches the address the visitor connects to and keeps the handshake fast.
 - Choose a site that stays up and that nobody blocks where your people live. The node connects to it for every visitor.

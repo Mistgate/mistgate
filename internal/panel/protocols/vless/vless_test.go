@@ -165,6 +165,15 @@ func TestValidate(t *testing.T) {
 		{name: "target port zero", mutate: func(s *Settings) { s.Reality.Target = "www.example.org:0" }, want: "/reality/target"},
 		{name: "target port high", mutate: func(s *Settings) { s.Reality.Target = "www.example.org:65536" }, want: "/reality/target"},
 		{name: "target ipv6", mutate: func(s *Settings) { s.Reality.Target = "[2001:db8::1]:443" }},
+		{name: "target loopback on another port", mutate: func(s *Settings) { s.Port = 28443; s.Reality.Target = "127.0.0.1:8443" }},
+		{name: "target localhost on another port", mutate: func(s *Settings) { s.Port = 28443; s.Reality.Target = "localhost:8443" }},
+		{name: "target IPv6 loopback on another port", mutate: func(s *Settings) { s.Port = 28443; s.Reality.Target = "[::1]:8443" }},
+		{name: "target loopback on inbound port", mutate: func(s *Settings) { s.Port = 443; s.Reality.Target = "127.0.0.1:443" }, want: "/reality/target", message: "same_port"},
+		{name: "target localhost on inbound port", mutate: func(s *Settings) { s.Port = 443; s.Reality.Target = "localhost:443" }, want: "/reality/target", message: "same_port"},
+		{name: "target IPv6 loopback on inbound port", mutate: func(s *Settings) { s.Port = 443; s.Reality.Target = "[::1]:443" }, want: "/reality/target", message: "same_port"},
+		{name: "target unspecified IPv4", mutate: func(s *Settings) { s.Port = 28443; s.Reality.Target = "0.0.0.0:443" }, want: "/reality/target", message: "unspecified"},
+		{name: "target unspecified IPv6", mutate: func(s *Settings) { s.Port = 28443; s.Reality.Target = "[::]:443" }, want: "/reality/target", message: "unspecified"},
+		{name: "target unspecified on inbound port", mutate: func(s *Settings) { s.Port = 443; s.Reality.Target = "[::]:443" }, want: "/reality/target", message: "same_port"},
 		{name: "target name defaults server names", mutate: func(s *Settings) { s.Reality.ServerNames = nil }},
 		{name: "server names nine", mutate: func(s *Settings) {
 			s.Reality.ServerNames = []string{"a.example", "b.example", "c.example", "d.example", "e.example", "f.example", "g.example", "h.example", "i.example"}
@@ -300,6 +309,50 @@ func TestEmptyServerNamesFollowTheTarget(t *testing.T) {
 		if len(node.Reality.ServerNames) != 1 || node.Reality.ServerNames[0] != host {
 			t.Errorf("%s: server names = %v", target, node.Reality.ServerNames)
 		}
+	}
+}
+
+func TestBuildInboundRejectsItsOwnREALITYTarget(t *testing.T) {
+	for _, tc := range []struct {
+		name, target, nodeAddress string
+		wantErr                   string
+	}{
+		{"same domain and port", "node-a.example.com:443", "Node-A.Example.com.", "same_node"},
+		{"same IPv6 address and port", "[2001:db8::1]:443", "2001:db8::1", "same_node"},
+		{"same host on another port", "node-a.example.com:8443", "node-a.example.com", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			settings := validSettings(t, func(s *Settings) {
+				s.Reality.Target = tc.target
+				s.Reality.ServerNames = []string{"node-a.example.com"}
+			})
+			_, err := New().BuildInbound(protocols.InboundInput{
+				Profile: protocols.ProfileView{Settings: settings}, Node: protocols.NodeView{Address: tc.nodeAddress}, PluginState: bytes32(),
+			})
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("BuildInbound: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("BuildInbound error = %v, want %q", err, tc.wantErr)
+			}
+		})
+	}
+
+	self := validSettings(t, func(s *Settings) {
+		s.Reality.TargetKind, s.Reality.Target, s.Reality.ServerNames = targetSelf, "", nil
+	})
+	spec, err := New().BuildInbound(protocols.InboundInput{
+		Profile: protocols.ProfileView{Settings: self}, Node: protocols.NodeView{Address: "node-a.example.com"}, PluginState: bytes32(),
+	})
+	if err != nil {
+		t.Fatalf("self target: %v", err)
+	}
+	var node NodeSettings
+	if err := json.Unmarshal(spec.Settings, &node); err != nil || node.Reality.Target != "self" {
+		t.Fatalf("self target = %q, err %v", node.Reality.Target, err)
 	}
 }
 

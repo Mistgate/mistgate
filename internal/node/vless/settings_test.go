@@ -27,6 +27,38 @@ func settingsSpec(transport, security string) plugin.InboundSpec {
 	}
 }
 
+func TestParseSpecRealityTargetLoop(t *testing.T) {
+	for _, tc := range []struct {
+		name, target string
+		listenPort   uint16
+		wantErr      bool
+	}{
+		{"loopback on listen port", "127.0.0.1:443", 443, true},
+		{"localhost on listen port", "localhost:443", 443, true},
+		{"IPv6 loopback on listen port", "[::1]:443", 443, true},
+		{"unspecified IPv4 on listen port", "0.0.0.0:443", 443, true},
+		{"unspecified IPv6 on listen port", "[::]:443", 443, true},
+		{"loopback on another port", "127.0.0.1:8443", 28443, false},
+		{"localhost on another port", "localhost:8443", 28443, false},
+		{"IPv6 loopback on another port", "[::1]:8443", 28443, false},
+		{"unspecified on another port", "0.0.0.0:8443", 28443, false},
+		{"external site on the listen port", "de1.example.com:443", 443, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := settingsSpec("tcp", "reality")
+			spec.Listen.Port = tc.listenPort
+			spec.Settings = json.RawMessage(strings.Replace(string(spec.Settings), `"de1.example.com:443"`, `"`+tc.target+`"`, 1))
+			_, err := parseSpec(spec)
+			if tc.wantErr != (err != nil) {
+				t.Fatalf("parseSpec error = %v, want error %v", err, tc.wantErr)
+			}
+			if err != nil && !strings.Contains(err.Error(), "own listen port") {
+				t.Fatalf("parseSpec error = %v, want the loop reason", err)
+			}
+		})
+	}
+}
+
 func TestTLSCoreConfigUsesUnixWithoutReality(t *testing.T) {
 	for _, transport := range []string{"xhttp", "ws"} {
 		t.Run(transport, func(t *testing.T) {
