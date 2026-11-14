@@ -210,6 +210,18 @@ const activeAlerts: Alert[] = [
     params: { node: "nl1", country: "RU", verdict: "blocked", confidence: "conflict", sources: "globalping,tspu,cheburcheck,bsbord", networks: darkNets.join(", "), ports: "" },
     firstSeenUnix: NOW - 23 * 60,
   }),
+  // blocked from the country, yet everybody given its servers gets there through working relays: quiet info, no Telegram
+  alert({
+    id: "a11",
+    severity: AlertSeverity.INFO,
+    kind: AlertKind.COUNTRY_BLOCKED,
+    nodeId: "nod_de1",
+    nodeName: "de1",
+    titleKey: "health.alert.country_blocked.title",
+    whyKey: "health.alert.country_blocked.why.reached_through_relays",
+    params: { node: "de1", country: "RU", verdict: "blocked", confidence: "eyeball", sources: "globalping,bsbord", networks: "MTS, Rostelecom", ports: "", why: "reached_through_relays" },
+    firstSeenUnix: NOW - 3 * 60 * 60,
+  }),
   alert({
     id: "a1",
     severity: AlertSeverity.CRITICAL,
