@@ -26,7 +26,9 @@ entries=(
   # of which stays within its own limit below; this entry is their sum.
   # 48 MiB with the client compatibility catalogue (46.94 MiB measured): its admin service and the devices query are code of
   # the admin Worker, which keeps 1.5 MiB under its own limit; this entry still ships nowhere.
-  "mistgate-edge:48"
+  # 49 MiB with relay keys for AmneziaWG devices (48.02 MiB measured): a key per relay path, the relay twin in subscriptions,
+  # the audience and traffic of a relay are code of the public and admin Workers, each within its own limit below.
+  "mistgate-edge:49"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.
