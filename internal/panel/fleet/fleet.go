@@ -556,3 +556,12 @@ func (f *Fleet) event(ctx context.Context, sev int, code, nodeID string, params 
 		f.log.Warn("write event", "code", code, "err", err)
 	}
 }
+
+func (f *Fleet) allowStatsRejectEvent(ctx context.Context, nodeID string) bool {
+	d, err := f.cfg.Limiter.Take(ctx, securitylimit.Bucket{Name: "fleet-stats-reject-event", Burst: 1, Refill: rejectEventEvery}, nodeID)
+	if err != nil {
+		f.log.Warn("stats rejection event limiter failed", "code", "stats_reject_limiter_failed", "node", nodeID, "err", err)
+		return false
+	}
+	return d.Allowed
+}

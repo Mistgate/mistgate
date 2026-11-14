@@ -39,9 +39,12 @@ func newFleetBatchFixture(t *testing.T, s *Store, prefix string) fleetBatchFixtu
 	if err := s.Access().CreateGroup(ctx, AccessGroup{ID: groupID, Name: prefix, CreatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.W.ExecContext(ctx, `INSERT INTO user_group_profile (group_id, profile_id) VALUES (?, ?)`, groupID, profileID); err != nil {
+		t.Fatal(err)
+	}
 	userID := "usr_" + prefix
-	if _, err := s.W.ExecContext(ctx, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, prefix, groupID, now.Unix(), []byte(prefix+"-sub"), []byte{1}, now.Unix()); err != nil {
+	if _, err := s.W.ExecContext(ctx, `INSERT INTO user (id, name, group_id, all_nodes, period_start, sub_token_hash, sub_token_enc, created_at)
+		VALUES (?, ?, ?, 1, ?, ?, ?, ?)`, userID, prefix, groupID, now.Unix(), []byte(prefix+"-sub"), []byte{1}, now.Unix()); err != nil {
 		t.Fatal(err)
 	}
 	deviceID := "dev_" + prefix

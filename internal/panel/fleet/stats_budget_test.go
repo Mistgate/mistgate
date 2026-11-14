@@ -57,6 +57,7 @@ func TestStatsBudgetAcceptsThirtyMinuteOutboxReplayAfterReconnect(t *testing.T) 
 	ids := e.fixture(state.NodeID)
 	const perBatch = 100_000_000
 	reconnect := now.Add(30 * time.Minute)
+	e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Unix(), state.NodeID)
 	state = stepHello(t, core, ctx, state, reconnect, hello("instance-stats-replay", 0, "").GetHello()).State
 	for i := 0; i < 180; i++ {
 		intervalEnd := now.Add(time.Duration(i+1) * 10 * time.Second)
@@ -72,6 +73,7 @@ func TestStatsBudgetIsSharedAcrossReconnects(t *testing.T) {
 	e, core, ctx, initial, now := coreFixture(t, "stats-reconnect-budget")
 	ids := e.fixture(initial.NodeID)
 	core.f.cfg.MaxNodeBytesPerSec = 100
+	e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Add(-statsBudgetCap).Unix(), initial.NodeID)
 	state := stepHello(t, core, ctx, initial, now, hello("instance-stats-reconnect", 0, "").GetHello()).State
 	perHour := uint64(100 * time.Hour.Seconds())
 	drain := int(statsBudgetCap / time.Hour)
@@ -99,6 +101,7 @@ func TestStatsBudgetRefillsAtOneSecondPerSecondAndClampsClaims(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "stats-claim-clamp")
 	ids := e.fixture(state.NodeID)
 	core.f.cfg.MaxNodeBytesPerSec = 100
+	e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Add(-statsBudgetCap).Unix(), state.NodeID)
 	state = stepHello(t, core, ctx, state, now, hello("instance-stats-clamp", 0, "").GetHello()).State
 	perHour := uint64(100 * time.Hour.Seconds())
 	drain := int(statsBudgetCap / time.Hour)
@@ -122,6 +125,7 @@ func TestStatsBudgetDuplicateDoesNotSpendAndStoreRefusalDoesNotSpend(t *testing.
 		e, core, ctx, state, now := coreFixture(t, "stats-duplicate-budget")
 		ids := e.fixture(state.NodeID)
 		core.f.cfg.MaxNodeBytesPerSec = 100
+		e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Add(-statsBudgetCap).Unix(), state.NodeID)
 		state = stepHello(t, core, ctx, state, now, hello("instance-stats-duplicate", 0, "").GetHello()).State
 		perHour := uint64(100 * time.Hour.Seconds())
 		state = ingestTestStats(t, e, core, ctx, state, now, now, 1, time.Hour, ids.i1, perHour)
@@ -143,6 +147,7 @@ func TestStatsBudgetDuplicateDoesNotSpendAndStoreRefusalDoesNotSpend(t *testing.
 		e, core, ctx, state, now := coreFixture(t, "stats-refusal-budget")
 		ids := e.fixture(state.NodeID)
 		core.f.cfg.MaxNodeBytesPerSec = 100
+		e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Add(-statsBudgetCap).Unix(), state.NodeID)
 		state = stepHello(t, core, ctx, state, now, hello("instance-stats-refusal", 0, "").GetHello()).State
 		e.exec(`CREATE TRIGGER reject_budget_stats BEFORE INSERT ON traffic_bucket WHEN NEW.user_id = 'usr_alice' BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
 		perHour := uint64(100 * time.Hour.Seconds())
@@ -164,7 +169,7 @@ func TestStatsBudgetStateSurvivesCloudflareLinkReconnect(t *testing.T) {
 	r.helloed(1, "instance-stats-budget-reconnect")
 	r.frame(testStatsFrame(1, r.now, 10*time.Second, ids.i1, 1_000))
 	spent := r.decoded()
-	if spent.StatsBudgetLeftNanos != int64(statsBudgetCap-10*time.Second) || !spent.StatsBudgetAt.Equal(r.now) {
+	if spent.StatsBudgetLeftNanos != int64(statsBudgetInitial-10*time.Second) || !spent.StatsBudgetAt.Equal(r.now) {
 		t.Fatalf("state after accepted batch = left %s at %s", time.Duration(spent.StatsBudgetLeftNanos), spent.StatsBudgetAt)
 	}
 	closed := r.call(LinkIn{Kind: LinkClosed, At: r.now.Add(time.Second)})
@@ -234,6 +239,7 @@ func TestStatsBudgetAcceptsAFullOutboxWhoseBatchesRunALittleLong(t *testing.T) {
 	ids := e.fixture(state.NodeID)
 	core.f.cfg.MaxNodeBytesPerSec = 1000
 	reconnect := now.Add(8 * time.Hour)
+	e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Unix(), state.NodeID)
 	state = stepHello(t, core, ctx, state, reconnect, hello("instance-stats-outbox", 0, "").GetHello()).State
 	end := reconnect.Add(-7 * time.Hour)
 	var want int64
@@ -308,5 +314,57 @@ func TestStatsBudgetMarkOnlyMovesForward(t *testing.T) {
 	bucket = refillStatsBudget(bucket, at.Add(10*time.Second))
 	if bucket.left != time.Minute+10*time.Second {
 		t.Fatalf("ten seconds refilled %s", bucket.left-time.Minute)
+	}
+}
+
+// The panel was down for an hour with the node's batches queuing: the first hello after it credits the hour plus one
+// minute, so the whole hour of 10-second batches is booked.
+func TestStatsBudgetAfterAnHourOfPanelDowntimeAcceptsTheQueuedHour(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "stats-restart-hour")
+	ids := e.fixture(state.NodeID)
+	core.f.cfg.MaxNodeBytesPerSec = 100
+	e.exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Unix(), state.NodeID)
+	reconnect := now.Add(time.Hour)
+	state = stepHello(t, core, ctx, state, reconnect, hello("instance-stats-restart", 0, "").GetHello()).State
+	const perBatch = 1000 // 100 bytes/s over ten seconds: exactly what the guard allows
+	for i := 0; i < 360; i++ {
+		intervalEnd := now.Add(time.Duration(i+1) * 10 * time.Second)
+		state = ingestTestStats(t, e, core, ctx, state, reconnect, intervalEnd, uint64(i+1), 10*time.Second, ids.i1, perBatch)
+	}
+	if got, want := usedBytes(e), int64(360*perBatch); got != want {
+		t.Fatalf("the queued hour accounted %d bytes, want all %d", got, want)
+	}
+}
+
+// A node the panel has never heard from gets one minute of credit, not seven hours: a claim of an hour of traffic is
+// refused.
+func TestStatsBudgetOfANeverSeenNodeIsOneMinute(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "stats-fresh-node")
+	ids := e.fixture(state.NodeID)
+	core.f.cfg.MaxNodeBytesPerSec = 100
+	state = stepHello(t, core, ctx, state, now, hello("instance-stats-fresh", 0, "").GetHello()).State
+	if got := time.Duration(state.StatsBudgetLeftNanos); got != statsBudgetInitial {
+		t.Fatalf("a fresh node starts with %s of stats credit, want %s", got, statsBudgetInitial)
+	}
+	state = ingestTestStats(t, e, core, ctx, state, now, now, 1, time.Hour, ids.i1, 100*3600)
+	if got := usedBytes(e); got != 0 {
+		t.Fatalf("a fresh node booked %d bytes for an hour it claimed", got)
+	}
+	// The refused claim used the minute up; a normal batch ten seconds later is credited by the time that passed.
+	later := now.Add(10 * time.Second)
+	ingestTestStats(t, e, core, ctx, state, later, later, 2, 10*time.Second, ids.i1, 1000)
+	if got := usedBytes(e); got != 1000 {
+		t.Fatalf("a normal batch booked %d bytes, want 1000", got)
+	}
+}
+
+// Credit carried in the session state (the edge keeps it between sockets) is not thrown away by a hello that finds less
+// elapsed panel time, and a hello never adds more than the time that really passed.
+func TestStatsBudgetHelloKeepsLargerCarriedCredit(t *testing.T) {
+	_, core, ctx, state, now := coreFixture(t, "stats-carried")
+	state.StatsBudgetLeftNanos, state.StatsBudgetAt = int64(3*time.Hour), now
+	state = stepHello(t, core, ctx, state, now.Add(time.Minute), hello("instance-stats-carried", 0, "").GetHello()).State
+	if got, want := time.Duration(state.StatsBudgetLeftNanos), 3*time.Hour+time.Minute; got != want {
+		t.Fatalf("carried credit after hello = %s, want %s", got, want)
 	}
 }

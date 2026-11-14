@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/bits"
 	"sort"
 	"time"
 )
@@ -52,10 +53,68 @@ type FleetStatsIn struct {
 	Host *HostSample
 	// Live builds the session projection inside each guarded attempt. It must not mutate captured state.
 	Live func(refs map[string]FleetCredRef) FleetLive
+	// Span is the interval the node was credited for this batch; with it a credential's speed limit caps its delta
+	// (speedCeiling). 0 = no cap, for callers that do not know it.
+	Span time.Duration
 }
 
 // FleetCredRef is what a credential id resolves to (credentials are soft-deleted, so revoked ones resolve).
-type FleetCredRef struct{ UserID, DeviceID, Protocol string }
+type FleetCredRef struct {
+	UserID, DeviceID, Protocol string
+	// OnNode: the credential's user belongs on this node by group, profile and node selection, or had traffic accepted
+	// from it in the last nodeUserWindow. A disabled user, a revoked device or a switched-off inbound still count, so the
+	// last batch a node sends after such a change is still booked. Zero when a ref is built without a lookup (tests).
+	OnNode bool
+	// RateBps is the strictest speed limit of the credential (its device's or its person's), 0 = unlimited.
+	RateBps uint64
+}
+
+// nodeUserWindow is how long a user stays "on a node" after the last traffic the panel accepted from it there. It covers
+// the longest outbox a node replays (about six hours) with a wide margin, so a person moved off a node still has the
+// tail of their traffic booked.
+const nodeUserWindow = 48 * time.Hour
+
+// speedCeilingFactor and speedCeilingSlack give a credential's speed limit room: the node's shaper allows bursts and the
+// agent's interval floats, so the cap is factor x limit x interval plus slack, and a delta above it is counted at the cap.
+const (
+	speedCeilingFactor = 2
+	speedCeilingSlack  = 16 << 20
+)
+
+// speedCeiling is the most bytes (up and down together) a credential with this speed limit may be credited in span.
+// 0 = no cap.
+func speedCeiling(rateBps uint64, span time.Duration) uint64 {
+	if rateBps == 0 || span <= 0 {
+		return 0
+	}
+	ceiling := float64(rateBps)/8*span.Seconds()*speedCeilingFactor + speedCeilingSlack
+	if ceiling >= 1<<62 {
+		return 0 // beyond anything a node can carry: the node's own guard is the cap
+	}
+	return uint64(ceiling)
+}
+
+// strictestLimit is the smaller non-zero of the person's and the device's speed limit, 0 when neither is set.
+func strictestLimit(person, device uint64) uint64 {
+	if person == 0 || (device != 0 && device < person) {
+		return device
+	}
+	return person
+}
+
+// capDelta lowers up and down together so that their sum is at most ceiling, keeping their proportion.
+func capDelta(up, down, ceiling uint64) (uint64, uint64, bool) {
+	if ceiling == 0 || satAdd(up, down) <= ceiling {
+		return up, down, false
+	}
+	total := satAdd(up, down)
+	hi, lo := bits.Mul64(up, ceiling)
+	if hi >= total { // cannot happen while up <= total, kept so Div64 never panics
+		return ceiling, 0, true
+	}
+	newUp, _ := bits.Div64(hi, lo, total)
+	return newUp, ceiling - newUp, true
+}
 
 // FleetStatsOut is the outcome of IngestStats.
 type FleetStatsOut struct {
@@ -63,6 +122,8 @@ type FleetStatsOut struct {
 	Refs       map[string]FleetCredRef // every credential of the batch that resolved
 	InboundIDs []string                // live inbounds currently assigned to this node
 	Skipped    int                     // deltas and link rows dropped: unknown credential, or inbound not on this node
+	OffNode    int                     // deltas dropped: the credential resolves but its user does not belong on this node
+	Clamped    int                     // deltas counted at their credential's speed-limit ceiling instead of the reported size
 	Probe      int                     // deltas and link rows of the health probe system credential, ignored on purpose (not an anomaly)
 	Users      []string                // users whose used_bytes grew (for the access module's status recompute)
 }
@@ -187,13 +248,22 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			for _, row := range rows {
 				var id string
 				var ref FleetCredRef
-				if err := batchRow(row).Scan(&id, &ref.UserID, &ref.DeviceID, &ref.Protocol); err != nil {
+				var personBps, deviceBps int64
+				if err := batchRow(row).Scan(&id, &ref.UserID, &ref.DeviceID, &ref.Protocol, &personBps, &deviceBps, &ref.OnNode); err != nil {
 					return err
 				}
+				ref.RateBps = strictestLimit(uint64(max(personBps, 0)), uint64(max(deviceBps, 0)))
 				creds[id] = ref
 			}
 			return nil
-		}, `SELECT id, user_id, device_id, protocol FROM device_credential WHERE id IN (SELECT value FROM json_each(?))`, jsonStrings(credIDs))
+		}, `SELECT c.id, c.user_id, c.device_id, c.protocol, u.speed_limit_bps, u.device_speed_limit_bps,
+				(EXISTS (SELECT 1 FROM inbound i
+					JOIN profile p ON p.id = i.profile_id AND p.protocol = c.protocol AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
+					JOIN user_group_profile gp ON gp.profile_id = p.id AND gp.group_id = u.group_id
+					WHERE i.node_id = ?1 AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = ?1)))
+				OR EXISTS (SELECT 1 FROM traffic_bucket t WHERE t.user_id = c.user_id AND t.node_id = ?1 AND t.protocol = c.protocol AND t.hour_start >= ?2)) AS on_node
+			FROM device_credential c JOIN user u ON u.id = c.user_id
+			WHERE c.id IN (SELECT value FROM json_each(?3))`, in.NodeID, unix(in.Now)-int64(nodeUserWindow/time.Second), jsonStrings(credIDs))
 		r.add(func(rows [][]any) error {
 			for _, row := range rows {
 				var id string
@@ -251,7 +321,16 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				out.Skipped++
 				continue
 			}
+			// A node books traffic of its own users only. An inbound deleted since is not checked (its tail is booked as before).
+			if _, live := liveInboundIDs[d.InboundID]; live && !ref.OnNode {
+				out.OffNode++
+				continue
+			}
 			up, down := min(d.Up, maxDelta), min(d.Down, maxDelta)
+			var clamped bool
+			if up, down, clamped = capDelta(up, down, speedCeiling(ref.RateBps, in.Span)); clamped {
+				out.Clamped++
+			}
 			k := bucketKey{ref.UserID, ref.Protocol}
 			if perBucket[k] == nil {
 				perBucket[k] = &fleetStatsSums{}
@@ -726,12 +805,14 @@ func (s *Store) IngestEventBounded(ctx context.Context, nodeID, instance string,
 	}
 	results, err := s.batch(ctx, stmts...)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	if len(results[0].Rows) == 0 {
-		return false, ErrNotFound
+		return false, false, ErrNotFound
 	}
-	return len(results[len(results)-1].Rows) == 0, nil
+	dup = len(results[len(results)-1].Rows) == 0
+	overLimit = len(results[1].Rows) == 0 && !dup // not stored and not a repeat: the budget refused it
+	return dup, overLimit, nil
 }
 
 func agentEventInsertStmt(args []any, used, nodeID, instance string, seq uint64, usedArgs []any) Stmt {
@@ -749,6 +830,9 @@ type fleetExecer interface {
 }
 
 func insertEvent(ctx context.Context, ex fleetExecer, e EventRow) error {
+	if e.ReceivedAt.IsZero() {
+		e.ReceivedAt = e.Time
+	}
 	_, err := ex.ExecContext(ctx, `
 		INSERT OR IGNORE INTO event (ts, received_at, severity, code, source, node_id, user_id, device_id, inbound_id, params_json, src_instance, src_seq)
 		VALUES (?, ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?, ?)`, eventInsertArgs(e)...)
@@ -772,6 +856,3 @@ func eventInsertArgs(e EventRow) []any {
 	}
 	return []any{unix(e.Time), unix(receivedAt), e.Severity, e.Code, e.Source, e.NodeID, e.UserID, e.DeviceID, e.InboundID, params, inst, seq}
 }
-	if e.ReceivedAt.IsZero() {
-		e.ReceivedAt = e.Time
-	}

@@ -563,11 +563,11 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 	if _, _, err := st.NodeHello(ctx, node.ID, 1, HelloInfo{AgentVersion: "test", Instance: "d1-instance"}, now); err != nil {
 		t.Fatalf("NodeHello() before stats = %v", err)
 	}
-	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_d1_stats", Name: "d1-stats", CreatedAt: now}); err != nil {
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_d1_stats", Name: "d1-stats", ProfileIDs: []string{"prf_d1_stats"}, CreatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.W.ExecContext(ctx, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at)
-		VALUES ('usr_d1_stats', 'd1-stats-user', 'grp_d1_stats', ?, ?, ?, ?)`, now.Unix(), []byte("d1-stats-sub"), []byte{1}, now.Unix()); err != nil {
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO user (id, name, group_id, all_nodes, period_start, sub_token_hash, sub_token_enc, created_at)
+		VALUES ('usr_d1_stats', 'd1-stats-user', 'grp_d1_stats', 1, ?, ?, ?, ?)`, now.Unix(), []byte("d1-stats-sub"), []byte{1}, now.Unix()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO device (id, user_id, hwid_hash, first_seen_at, last_seen_at, created_at)

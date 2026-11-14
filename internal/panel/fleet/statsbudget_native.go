@@ -11,7 +11,7 @@ func (f *Fleet) lockStatsBudget(state *SessionState, now time.Time) statsBudgetL
 	}
 	entry := f.statsBudgets[state.NodeID]
 	if entry == nil {
-		entry = &statsBudgetEntry{}
+		entry = &statsBudgetEntry{bucket: statsBudgetFromState(state, now)}
 		f.statsBudgets[state.NodeID] = entry
 	}
 	f.statsBudgetMapMu.Unlock()

@@ -338,6 +338,21 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.state.Version = sessionStateVersion
 	tr.state.InstanceID = h.InstanceId
 	tr.state.HelloDeadline = time.Time{}
+	// The stats credit a node starts with: one minute plus the panel time since the node last reached the panel, so a
+	// restart or an outage of the panel does not cost the node the batches it queued meanwhile (stats are committed
+	// together with node.last_seen_at). A never-seen node gets the minute only. A bucket carried over from the previous
+	// socket (the edge keeps it in the session's stored state) is kept when it holds more: reconnecting never adds credit.
+	statsBucket := statsBudgetBucket{left: statsBudgetInitial, at: event.At}
+	if !prev.LastSeenAt.IsZero() {
+		statsBucket.at = prev.LastSeenAt
+	}
+	statsBucket = refillStatsBudget(statsBucket, event.At)
+	if !tr.state.StatsBudgetAt.IsZero() {
+		if carried := statsBudgetFromState(tr.state, event.At); carried.left > statsBucket.left {
+			statsBucket = carried
+		}
+	}
+	setStatsBudgetState(tr.state, statsBucket)
 	tr.state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
 	tr.state.LastSeenAt = event.At
 	tr.state.LivenessDeadline = event.At.Add(time.Duration(tr.state.LivenessNanos))
@@ -544,7 +559,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	projectionTooLarge := false
 	in := store.FleetStatsIn{NodeID: tr.state.NodeID, Instance: tr.state.InstanceID, Session: tr.state.OwnerGeneration,
 		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic, Links: g.links, Networks: g.networks, PersonNetworks: g.personNetworks,
-		NetworksDBSHA256: g.networksDBSHA256, Journal: g.journal, JournalSecrets: c.f.cfg.JournalSecrets}
+		NetworksDBSHA256: g.networksDBSHA256, Journal: g.journal, JournalSecrets: c.f.cfg.JournalSecrets, Span: g.creditedSpan}
 	in.Live = func(refs map[string]store.FleetCredRef) store.FleetLive {
 		live, _, tooLarge := buildFleetLive(projectionState, st, g.traffic, now, refs)
 		projectionTooLarge = projectionTooLarge || tooLarge
@@ -596,6 +611,9 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	if !out.Duplicate {
 		budget.spend(g.creditedSpan)
 		c.l3Stats(ctx, tr.state, st, out.InboundIDs, now)
+		if out.OffNode > 0 || out.Clamped > 0 {
+			c.statsAdjusted(ctx, tr.state, out.OffNode, out.Clamped, now)
+		}
 		if out.Skipped > 0 {
 			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "code", "stats_entries_dropped", "node", tr.state.NodeID, "count", out.Skipped)
 		}
@@ -839,12 +857,29 @@ func clampLiveFloat(value, minValue, maxValue float64) float64 {
 }
 
 func (c *SessionCore) rejectStats(ctx context.Context, state *SessionState, g guardedStats, now time.Time) {
-	c.f.log.Warn("stats batch failed the sanity check, traffic dropped", "code", "stats_sanity_rejected", "node", state.NodeID, "deltas", g.rejected, "reason", g.reason)
 	if !state.LastReject.IsZero() && now.Sub(state.LastReject) < rejectEventEvery {
 		return
 	}
 	state.LastReject = now
-	c.f.event(ctx, 3, "stats_rejected", state.NodeID, map[string]string{"reason": g.reason, "deltas": fmt.Sprint(g.rejected)})
+	c.f.log.Warn("stats batch failed the sanity check, traffic dropped", "code", "stats_sanity_rejected", "node", state.NodeID, "deltas", g.rejected, "reason", g.reason)
+	if c.f.allowStatsRejectEvent(ctx, state.NodeID) {
+		c.f.event(ctx, 3, "stats_rejected", state.NodeID, map[string]string{"reason": g.reason, "deltas": fmt.Sprint(g.rejected)})
+	}
+}
+
+// statsAdjusted reports what the store left out of an accepted batch: traffic of users that do not belong on the node
+// (dropped) and deltas above their credential's speed-limit ceiling (counted at the ceiling). Once a minute per node: a
+// person who was just disabled is still known to the node, so an ordinary change never gets here.
+func (c *SessionCore) statsAdjusted(ctx context.Context, state *SessionState, offNode, clamped int, now time.Time) {
+	if !state.LastReject.IsZero() && now.Sub(state.LastReject) < rejectEventEvery {
+		return
+	}
+	state.LastReject = now
+	c.f.log.Warn("stats traffic outside the node's users dropped or capped at the speed limit", "code", "stats_credential_adjusted",
+		"node", state.NodeID, "off_node", offNode, "capped", clamped)
+	if offNode > 0 && c.f.allowStatsRejectEvent(ctx, state.NodeID) {
+		c.f.event(ctx, 3, "stats_rejected", state.NodeID, map[string]string{"reason": "credential_not_on_node", "deltas": fmt.Sprint(offNode)})
+	}
 }
 
 func markCoreAck(tr *coreTransition, seq uint64, now time.Time) {
@@ -956,6 +991,10 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 		c.dropAgentEvent(tr, seq, now)
 		return
 	}
+	if store.IsPanelEventCode(ev.Code) {
+		c.dropAgentEvent(tr, seq, now)
+		return
+	}
 	t := time.Unix(ev.TimeUnix, 0).UTC()
 	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) || ev.Code == "update_committed" || osJobEventCode(ev.Code) {
 		// update_committed and the events of an OS job: the panel compares them with when it sent the command, so a node clock
@@ -991,10 +1030,6 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 		}
 		for _, k := range []string{"protocol", "torrent_protocol"} {
 			if v := ev.Params[k]; v != "" {
-	if store.IsPanelEventCode(ev.Code) {
-		c.dropAgentEvent(tr, seq, now)
-		return
-	}
 				row.Params[k] = store.Clip(v, 256)
 			}
 		}
@@ -1019,6 +1054,10 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 	if err != nil {
 		c.f.log.Error("ingest event", "code", "event_ingest_failed", "node", tr.state.NodeID, "err", err)
 		tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
+		return
+	}
+	if overLimit {
+		c.dropAgentEvent(tr, seq, now)
 		return
 	}
 	if !dup && row.Code == "update_committed" {
@@ -1054,10 +1093,6 @@ func (c *SessionCore) warpAttention(ctx context.Context, tr *coreTransition, rea
 	}
 	if err := w.NeedsAttention(ctx, tr.state.NodeID, reason); err != nil {
 		c.f.log.Warn("record warp attention", "code", "warp_attention_failed", "node", tr.state.NodeID, "err", err)
-		return
-	}
-	if overLimit {
-		c.dropAgentEvent(tr, seq, now)
 		return
 	}
 	if reason == warpReasonLadder {
@@ -1463,6 +1498,9 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 		if state.L3.AWG == nil {
 			state.L3.AWG = map[string]l3HealthMemo{}
 		}
+		awg := proto.Clone(h.Awg).(*agentv1.AwgHealth)
+		awg.Backend = store.Clip(awg.Backend, 32)
+		awg.BackendVersion = store.Clip(awg.BackendVersion, 128)
 		m := state.L3.AWG[h.InboundId]
 		if !m.due(l3ReportHash(awg), now, false) {
 			continue
@@ -1504,13 +1542,27 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 	state.L3.WarpUp = up
 }
 
+func clipWarpHealth(h *agentv1.WarpHealth) {
+	if h == nil {
+		return
+	}
+	h.Backend = store.Clip(h.Backend, 32)
+	h.Endpoint = store.Clip(h.Endpoint, 64)
+	h.WarpFlag = store.Clip(h.WarpFlag, 16)
+	h.Colo = store.Clip(h.Colo, 16)
+	h.LastError = store.Clip(h.LastError, 128)
+	if h.ProbeCloudflare != nil {
+		h.ProbeCloudflare.FailureCode = store.Clip(h.ProbeCloudflare.FailureCode, 64)
+	}
+	if h.ProbeOther != nil {
+		h.ProbeOther.FailureCode = store.Clip(h.ProbeOther.FailureCode, 64)
+	}
+}
+
 // certStats builds the inbound certificates to commit with this stats batch. An ACME certificate is issued after the
 // ApplyResult was sent and renewed later, so the apply-time value alone stays empty. Only a well-formed pin is taken
 // (it ends up in subscriptions of self-signed inbounds). An expiry beyond maxCertLife is not believed (the health
 // check would never warn), so that value stays unchanged.
-		awg := proto.Clone(h.Awg).(*agentv1.AwgHealth)
-		awg.Backend = store.Clip(awg.Backend, 32)
-		awg.BackendVersion = store.Clip(awg.BackendVersion, 128)
 func certStats(st *agentv1.StatsBatch, now time.Time) []store.FleetInboundCert {
 	var certs []store.FleetInboundCert
 	for i, h := range st.Health {
@@ -1531,20 +1583,3 @@ func certStats(st *agentv1.StatsBatch, now time.Time) []store.FleetInboundCert {
 	}
 	return certs
 }
-func clipWarpHealth(h *agentv1.WarpHealth) {
-	if h == nil {
-		return
-	}
-	h.Backend = store.Clip(h.Backend, 32)
-	h.Endpoint = store.Clip(h.Endpoint, 64)
-	h.WarpFlag = store.Clip(h.WarpFlag, 16)
-	h.Colo = store.Clip(h.Colo, 16)
-	h.LastError = store.Clip(h.LastError, 128)
-	if h.ProbeCloudflare != nil {
-		h.ProbeCloudflare.FailureCode = store.Clip(h.ProbeCloudflare.FailureCode, 64)
-	}
-	if h.ProbeOther != nil {
-		h.ProbeOther.FailureCode = store.Clip(h.ProbeOther.FailureCode, 64)
-	}
-}
-

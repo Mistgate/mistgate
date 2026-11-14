@@ -11,6 +11,10 @@ import (
 // dropped as "over the limit".
 const statsBudgetCap = 7 * time.Hour
 
+// statsBudgetInitial is the credit of a node the panel has not heard from yet. A node that was seen before starts with this
+// plus the panel time since it was last seen (SessionCore.hello), up to statsBudgetCap, so a replay after an outage fits.
+const statsBudgetInitial = time.Minute
+
 // retireStatsBudget is what a node may still report between its retirement and the end of its session: one normal
 // interval, once, for the whole window.
 const retireStatsBudget = 10 * time.Second
@@ -33,9 +37,8 @@ type statsBudgetLease struct {
 
 // sessionStatsBudgetLease keeps the bucket in the session's own state. The Cloudflare edition has no Fleet memory
 // that outlives a request, so its bucket always lives there; on a server it is the bucket of a retiring node, whose
-// entry in the Fleet's map is already forgotten (a new one would start full) and whose state was given
-// retireStatsBudget when the retirement was sent. Every accepted batch spends from it: a lease that could not be
-// spent let a retiring node claim an interval with every frame.
+// entry in the Fleet's map is already forgotten and whose state was given retireStatsBudget when retirement was sent.
+// Every accepted batch spends from it: a lease that could not be spent let a retiring node claim an interval with every frame.
 func sessionStatsBudgetLease(state *SessionState, now time.Time) statsBudgetLease {
 	bucket := statsBudgetFromState(state, now)
 	setStatsBudgetState(state, bucket)
@@ -51,7 +54,7 @@ func sessionStatsBudgetLease(state *SessionState, now time.Time) statsBudgetLeas
 
 func refillStatsBudget(bucket statsBudgetBucket, now time.Time) statsBudgetBucket {
 	if bucket.at.IsZero() {
-		return statsBudgetBucket{left: statsBudgetCap, at: now}
+		return statsBudgetBucket{left: statsBudgetInitial, at: now}
 	}
 	bucket.left = min(max(bucket.left, time.Duration(0)), statsBudgetCap)
 	if elapsed := now.Sub(bucket.at); elapsed > 0 {
