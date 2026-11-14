@@ -5,6 +5,7 @@ import type { T } from "@/i18n";
 import { nodes, users } from "./api";
 import type { Fmt } from "./format";
 import { plain, type Plain } from "./plain";
+import { viaLabel } from "./relay";
 
 // What the nodes count of connection attempts (agent.proto LinkCounters, design/connection-diagnostics.md): the Connection
 // block of the person's card and a line under every profile on the node's Profiles tab. Counts only, never an address.
@@ -98,6 +99,11 @@ function qualityParts(t: T, x: Quality): Part[] {
   if (x.rttSamples > 0) parts.push({ text: t("conn.rtt", { ms: x.rttMs }) });
   if (x.pktsSent >= 1000) parts.push({ text: t("conn.loss", { pct: (x.lossPermille / 10).toFixed(1) }), warn: x.lossPermille >= 50 });
   return parts;
+}
+
+/** The path of a row that went through a relay: "via RU" (or "via a relay" for an entry with no country); "" for the direct path. */
+export function connVia(t: T, x: Pick<DeviceConn, "viaNodeId" | "viaCountry">): string {
+  return x.viaNodeId || x.viaCountry ? viaLabel(t, x.viaCountry) : "";
 }
 
 /**

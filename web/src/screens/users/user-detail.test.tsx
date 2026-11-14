@@ -238,6 +238,22 @@ describe("the user card", () => {
     expect(text()).not.toContain("Access ended, but the person keeps trying");
   });
 
+  it("a row through a relay says 'via RU' beside its node, apart from the direct row of the same key; the direct row is unchanged", async () => {
+    const row = (over: object) => ({ deviceId: "dev_k", nodeId: "nod_1", nodeName: "de1", inboundId: "inb_awg", profileName: "AWG 3.1", protocol: "awg", connects: 4, rejects: 0, drops: 0, stalls: 0, onlineS: 0n, lastHourUnix: NOW - 3600, viaCountry: "", viaNodeId: "", ...over });
+    getUserConnection.mockResolvedValue({
+      sinceUnix: NOW - 86_400, nowUnix: NOW, nodesWithoutCounters: [],
+      rows: [row({}), row({ connects: 9, viaCountry: "RU", viaNodeId: "nod_msk1" })],
+    });
+    await mount();
+    const rows = [...document.querySelectorAll("[data-testid=conn-row]")];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.querySelector("[data-testid=conn-via]")).toBeNull();
+    expect(rows[0]!.textContent).toContain("4 connections");
+    expect(rows[1]!.querySelector("[data-testid=conn-via]")?.textContent).toBe("via RU");
+    expect(rows[1]!.textContent).toContain("de1 · AWG 3.1");
+    expect(rows[1]!.textContent).toContain("9 connections");
+  });
+
   it("adds what the nodes counted per device and profile to the Connection block, trouble in the warning colour", async () => {
     getUserConnection.mockResolvedValue({
       sinceUnix: NOW - 86_400, nowUnix: NOW, nodesWithoutCounters: [],

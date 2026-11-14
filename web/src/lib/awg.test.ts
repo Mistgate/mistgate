@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedCount, guessPlatform, leaves, minClientLabel, minClients, parseAwgConf, randomKey32, randomPort } from "./awg";
+import { changedCount, configKey, guessPlatform, leaves, minClientLabel, minClients, parseAwgConf, randomKey32, randomPort } from "./awg";
 import { codedError } from "./coded-error";
 import { errorCode } from "./errors";
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -143,5 +143,13 @@ describe("coded errors", () => {
     expect(codedError(new ConnectError("device_limit: 5/5", Code.FailedPrecondition), t, "awg.err")).toBe("limit 5/5");
     expect(codedError(new ConnectError("brand_new_code", Code.FailedPrecondition), t, "awg.err")).toBe("brand_new_code");
     expect(codedError(new ConnectError("x", Code.Internal), t, "awg.err")).toBe("err.generic");
+  });
+});
+
+describe("configKey", () => {
+  it("tells the config through an entry from the direct one of the same node", () => {
+    expect(configKey({ nodeId: "nod_de1", viaNodeId: "" })).toBe("nod_de1");
+    expect(configKey({ nodeId: "nod_de1", viaNodeId: "nod_msk1" })).toBe("nod_de1|nod_msk1");
+    expect(configKey({ nodeId: "nod_de1", viaNodeId: "nod_msk1" })).not.toBe(configKey({ nodeId: "nod_de1", viaNodeId: "" }));
   });
 });

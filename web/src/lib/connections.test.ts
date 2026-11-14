@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fill, pickForm, type T } from "@/i18n";
 import { en } from "@/i18n/en";
-import { deviceConnParts, inboundConnParts, type DeviceConn, type InboundConn } from "./connections";
+import { connVia, deviceConnParts, inboundConnParts, type DeviceConn, type InboundConn } from "./connections";
 import { makeFmt } from "./format";
 
 const t = Object.assign((key: string, vars?: Record<string, string | number>) => fill((en as Record<string, string>)[key]!, vars), {
@@ -23,7 +23,17 @@ const noReasons = { tcpStalls: 0, tcpStalls16k: 0, initiations: 0, responses: 0,
 const device = (over: Partial<DeviceConn>): DeviceConn => ({
   deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "P", protocol: "awg", connects: 0, rejects: 0, drops: 0, stalls: 0,
   onlineS: 0, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [], clientCloses: 0, freezes: 0, quiet: 0, rttMs: 0, lossPermille: 0,
-  rttSamples: 0, pktsSent: 0, ...noReasons, ...over,
+  rttSamples: 0, pktsSent: 0, viaCountry: "", viaNodeId: "", ...noReasons, ...over,
+});
+
+describe("the path of a row", () => {
+  it("names the entry's country for a row through a relay, and says nothing for the direct one", () => {
+    expect(connVia(t, device({}))).toBe("");
+    expect(connVia(t, device({ viaNodeId: "nod_msk1", viaCountry: "RU" }))).toBe("via RU");
+    expect(connVia(t, device({ viaNodeId: "nod_msk1" }))).toBe("via a relay");
+    // the counts of the row are the same facts, with or without the path
+    expect(deviceConnParts(t, fmt, device({ connects: 3, viaNodeId: "nod_msk1", viaCountry: "RU" })).map((p) => p.text)).toEqual(["3 connections"]);
+  });
 });
 
 describe("why handshakes fail (links/3)", () => {
@@ -74,7 +84,7 @@ describe("why handshakes fail (links/3)", () => {
 
 describe("connection counters in words", () => {
   it("names a device's counts, trouble flagged", () => {
-    const parts = deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2", connects: 1, rejects: 2, drops: 0, stalls: 3, onlineS: 120, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [], clientCloses: 0, freezes: 0, quiet: 0, rttMs: 0, lossPermille: 0, rttSamples: 0, pktsSent: 0, ...noReasons });
+    const parts = deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2", connects: 1, rejects: 2, drops: 0, stalls: 3, onlineS: 120, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [], clientCloses: 0, freezes: 0, quiet: 0, rttMs: 0, lossPermille: 0, rttSamples: 0, pktsSent: 0, viaCountry: "", viaNodeId: "", ...noReasons });
     expect(parts).toEqual([
       { text: "1 connection" },
       { text: "key refused: 2", warn: true },
@@ -107,7 +117,7 @@ describe("connection counters in words", () => {
     ]);
     expect(deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2",
       connects: 5, rejects: 0, drops: 4, stalls: 0, onlineS: 0, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [],
-      clientCloses: 0, freezes: 0, quiet: 4, rttMs: 40, lossPermille: 3, rttSamples: 2, pktsSent: 300, ...noReasons })).toEqual([
+      clientCloses: 0, freezes: 0, quiet: 4, rttMs: 40, lossPermille: 3, rttSamples: 2, pktsSent: 300, viaCountry: "", viaNodeId: "", ...noReasons })).toEqual([
       { text: "5 connections" },
       { text: "dropped at once: 4", warn: false },
       { text: "RTT 40 ms" },

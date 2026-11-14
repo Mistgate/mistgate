@@ -36,7 +36,13 @@ export function minClientLabel(app: string, min: string, only20 = "2.0 only"): s
   return min === "2.0 only" ? `${app} · ${only20}` : `${app} ${min}+`;
 }
 
-export const asVersion = (v: unknown): AwgVersion => (v === "2.0" ? "2.0" : "3.1");
+/**
+ * What picks one config of a device: the node and the entry it goes through. A config through an entry has the SAME node id
+ * as the direct one, so the node alone does not tell them apart.
+ */
+export const configKey = (c: { nodeId: string; viaNodeId: string }) => (c.viaNodeId ? `${c.nodeId}|${c.viaNodeId}` : c.nodeId);
+
+export const asVersion =(v: unknown): AwgVersion => (v === "2.0" ? "2.0" : "3.1");
 
 /** Platforms the "add a device" dialogs offer (device.proto: CreateAwgDeviceRequest.platform). */
 export const platforms = ["ios", "android", "windows", "macos", "linux", "other"] as const;

@@ -20,7 +20,7 @@ import { TextField } from "@/components/ui/text-field";
 import { Infinite, Stepper } from "@/components/ui/stepper";
 import { useToast } from "@/components/ui/toast";
 import { dns, users } from "@/lib/api";
-import { deviceConnParts, userConnectionQuery, type Part, type UserConnection } from "@/lib/connections";
+import { connVia, deviceConnParts, userConnectionQuery, type Part, type UserConnection } from "@/lib/connections";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { clampPage } from "@/lib/paging";
@@ -502,10 +502,15 @@ function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserCo
       {conn.rows.length > 0 && (
         <ul className="flex flex-col divide-y divide-line">
           {conn.rows.slice((page - 1) * connPageSize, page * connPageSize).map((r) => (
-            <li key={`${r.deviceId}/${r.inboundId}`} data-testid="conn-row" className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
+            <li key={`${r.deviceId}/${r.inboundId}/${r.viaNodeId}`} data-testid="conn-row" className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[13px]">
                 <b className="font-bold">{name(r.deviceId)}</b>
                 <span className="text-muted">{t("conn.where", { node: r.nodeName || r.nodeId, profile: r.profileName })}</span>
+                {connVia(t, r) && (
+                  <span data-testid="conn-via" data-tone="lavender" className="tone-chip inline-flex h-[18px] items-center self-center px-1.5 text-[11px] font-bold whitespace-nowrap">
+                    {connVia(t, r)}
+                  </span>
+                )}
                 {r.lastHourUnix > 0 && <span className="ms-auto font-mono text-[11px] text-muted">{t("conn.last", { ago: fmt.ago(r.lastHourUnix) })}</span>}
               </div>
               <PartsLine parts={deviceConnParts(t, fmt, r)} />

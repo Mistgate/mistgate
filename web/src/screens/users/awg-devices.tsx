@@ -11,9 +11,10 @@ import { useToast } from "@/components/ui/toast";
 import type { DeviceConfig } from "@/gen/mistgate/admin/v1/device_pb";
 import type { ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
 import { devices as devicesApi, users } from "@/lib/api";
-import { downloadText, guessPlatform, minClientLabel, platforms } from "@/lib/awg";
+import { configKey, downloadText, guessPlatform, minClientLabel, platforms } from "@/lib/awg";
 import { codedError } from "@/lib/coded-error";
 import { errorText } from "@/lib/errors";
+import { viaLabel } from "@/lib/relay";
 import { useTx, type Tx } from "./t";
 import { ConfirmModal } from "./ui";
 
@@ -178,7 +179,8 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
   }, [device.id, initial]);
 
   const configs = data.state === "ready" ? data.configs : [];
-  const cfg = configs.find((c) => c.nodeId === node) ?? configs[0];
+  // a config through an entry has the node id of the direct one: the pick is the node and the entry together
+  const cfg = configs.find((c) => configKey(c) === node) ?? configs[0];
 
   async function copy(text: string) {
     try {
@@ -218,7 +220,10 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
   if (data.state === "error") return <Notice tone="danger">{deviceError(data.error, t)}</Notice>;
   if (!cfg) return <Notice>{t("awg.cfg.none")}</Notice>;
 
-  const nodeOptions = configs.map((c) => ({ value: c.nodeId, label: c.nodeName }));
+  // the path through an entry sits right under the direct config of its node, named "de1 · via RU"
+  const via = cfg.viaNodeId ? viaLabel(t, cfg.viaCountry) : "";
+  const nameOf = (c: DeviceConfig) => (c.viaNodeId ? `${c.nodeName} · ${viaLabel(t, c.viaCountry)}` : c.nodeName);
+  const nodeOptions = configs.map((c) => ({ value: configKey(c), label: nameOf(c), icon: c.countryCode ? <Flag code={c.countryCode} /> : undefined }));
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex flex-wrap gap-1.5">
@@ -226,6 +231,7 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
         <Chip>{t("awg.cfg.keyInside")}</Chip>
       </div>
       {cfg.stale && <Notice>{t("awg.cfg.stale")}</Notice>}
+      {via && <Notice tone="quiet">{t("awg.cfg.viaNote", { via })}</Notice>}
 
       <div className="flex flex-col items-center gap-4 md:flex-row md:items-start">
         <div className="flex flex-none flex-col items-center gap-2">
@@ -240,12 +246,12 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
           {nodeOptions.length > 1 ? (
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("awg.cfg.node")}</span>
-              <Select aria-label={t("awg.cfg.node")} value={cfg.nodeId} onValueChange={(v) => { setNode(v); setQrFailed(false); }} options={nodeOptions} />
+              <Select aria-label={t("awg.cfg.node")} value={configKey(cfg)} onValueChange={(v) => { setNode(v); setQrFailed(false); }} options={nodeOptions} />
             </div>
           ) : (
             <span className="flex items-center gap-2 text-[13px] font-bold">
               {cfg.countryCode && <Flag code={cfg.countryCode} />}
-              {cfg.nodeName}
+              {nameOf(cfg)}
             </span>
           )}
           <Button variant="primary" size="md" full onClick={() => downloadText(cfg.confFilename || "awg.conf", cfg.conf)}>
