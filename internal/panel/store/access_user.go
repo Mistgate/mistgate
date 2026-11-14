@@ -752,9 +752,11 @@ func scanAccessDevice(r rowScanner) (AccessDevice, error) {
 	return d, nil
 }
 
-// linkDeviceCredsSQLAt reads one live link device of a user and all its live credentials: ?1 is the user, ?2 the device's
+// linkDeviceCredsSQLAt reads one live link device of a user and its live direct credentials: ?1 is the user, ?2 the device's
 // hwid_hash, NULL for the shared device (IS compares NULL too, so one statement serves both). Its aliases are unique so
-// the query can also be the trailing SELECT of a Returning batch.
+// the query can also be the trailing SELECT of a Returning batch. The path credentials (relay keys) are left out: the
+// callers key a credential by protocol and profile, so a path key would stand in for the direct one. Whoever starts to
+// issue them gives AccessCred a path and keys by it.
 func linkDeviceCredsSQLAt(now time.Time) string {
 	idle, since := deviceIdleSQL("d", now)
 	return `
@@ -766,7 +768,7 @@ func linkDeviceCredsSQLAt(now time.Time) string {
 		coalesce(c.id, '') AS credential_id, coalesce(c.protocol, '') AS protocol,
 		coalesce(c.profile_id, '') AS profile_id, coalesce(c.secret_enc, X'') AS secret_enc, coalesce(c.data_json, '') AS data_json,
 		coalesce(c.config_epoch, 0) AS config_epoch, coalesce(c.created_at, 0) AS credential_created_at
-	FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL
+	FROM device d LEFT JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.path = ''
 	WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND d.hwid_hash IS ?2 AND d.kind = 'link'
 	ORDER BY c.protocol, c.profile_id, c.id`
 }
@@ -875,7 +877,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	r.add(appendRows(&awgDevices, scanAWGDevice), `SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
 			p.id AS profile_id, p.name AS profile_name, p.settings_json AS profile_settings_json, c.id AS credential_id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig
 			FROM device d
-			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
+			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			JOIN profile p ON p.id = c.profile_id
 			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.user_id = ? ORDER BY d.created_at, d.id`, userID)

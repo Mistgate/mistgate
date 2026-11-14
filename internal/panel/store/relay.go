@@ -254,6 +254,8 @@ func (s *Store) DeleteRelay(ctx context.Context, id string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	// The relay is gone whatever happens next: a failed cleanup is repeated by the retention sweep, which logs it.
+	_, _ = s.RevokeOrphanPathCreds(ctx, time.Now().UTC())
 	return nil
 }
 

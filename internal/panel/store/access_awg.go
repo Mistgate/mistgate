@@ -180,7 +180,7 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 		var idx int
 		err := a.s.R.QueryRowContext(ctx,
 			`SELECT d.user_id, c.id, c.profile_id, ap.idx FROM device d
-				 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
+				 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 				 JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 				 WHERE d.id = ? AND d.revoked_at IS NULL AND d.kind = 'key' ORDER BY c.created_at, c.id LIMIT 1`, deviceID).
 			Scan(&userID, &oldCred, &profileID, &idx)
@@ -209,14 +209,14 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 		// is not checked against awgTakenSQL, which also lists this device's own quarantined peers of earlier rotations.
 		guardSQL := `EXISTS (
 			SELECT 1 FROM device d
-			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
+			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			WHERE d.id = ? AND d.user_id = ? AND d.revoked_at IS NULL AND d.kind = 'key'
 			AND c.id = ? AND c.profile_id = ? AND ap.idx = ?
 			AND NOT EXISTS (
 				SELECT 1 FROM device_credential c2
 				JOIN awg_peer ap2 ON ap2.credential_id = c2.id AND ap2.released_at = 0
-				WHERE c2.device_id = d.id AND c2.revoked_at IS NULL AND c2.profile_id IS NOT NULL
+				WHERE c2.device_id = d.id AND c2.revoked_at IS NULL AND c2.profile_id IS NOT NULL AND c2.path = ''
 				AND (c2.created_at < c.created_at OR (c2.created_at = c.created_at AND c2.id < c.id))
 			)
 		) AND EXISTS (SELECT 1 FROM profile WHERE id = ? AND critical_epoch = ?)`
@@ -224,6 +224,9 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 			guard(guardSQL, deviceID, userID, oldCred, profileID, int64(idx), profileID, epoch),
 			{Query: `UPDATE device_credential SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL`, Args: []any{unix(now), oldCred}},
 			{Query: `UPDATE awg_peer SET released_at = ? WHERE credential_id = ? AND released_at = 0`, Args: []any{unix(now), oldCred}},
+			{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN
+				(SELECT id FROM device_credential WHERE device_id = ? AND protocol = 'awg' AND path <> '' AND revoked_at IS NULL)`, Args: []any{unix(now), deviceID}},
+			{Query: `UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND protocol = 'awg' AND path <> '' AND revoked_at IS NULL`, Args: []any{unix(now), deviceID}},
 		}
 		stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
 		stmts = append(stmts, awgInsertPeerStmt(cred.ID, profileID, idx, publicKey, now))
@@ -417,7 +420,7 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 		for _, cred := range added {
 			cred.DeviceID, cred.UserID, cred.CreatedAt = deviceID, userID, now
 			result.Added = append(result.Added, cred)
-			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?1 AND protocol = ?2 AND coalesce(profile_id, '') = ?3 AND revoked_at IS NULL)`,
+			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?1 AND protocol = ?2 AND coalesce(profile_id, '') = ?3 AND path = '' AND revoked_at IS NULL)`,
 				deviceID, cred.Protocol, cred.ProfileID))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
 		}
@@ -430,7 +433,7 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 			}
 			stmts = append(stmts, guard(deviceGuard+`
 				AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
-				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND revoked_at IS NULL)
+				AND NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?4 AND profile_id = ?1 AND path = '' AND revoked_at IS NULL)
 				AND ?3 NOT IN (`+awgTakenSQL+`)`, args...))
 			stmts = append(stmts, awgPurgeExpiredStmt(issue.profileID, cutoff))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{issue.cred})...)
@@ -461,7 +464,7 @@ func (a Access) ensureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 func (a Access) CountLinkAWGKeys(ctx context.Context) (int, error) {
 	var count int
 	err := a.s.R.QueryRowContext(ctx, `SELECT count(*) FROM device d
-		JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.revoked_at IS NULL
+		JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.path = '' AND c.revoked_at IS NULL
 		JOIN awg_peer p ON p.credential_id = c.id AND p.released_at = 0
 		WHERE d.kind = 'link' AND d.key_hash IS NULL AND d.revoked_at IS NULL`).Scan(&count)
 	return count, err
@@ -607,7 +610,7 @@ func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]Access
 		`SELECT d.id, d.user_id, d.platform, d.model, d.os_version, d.first_seen_at, d.last_seen_at, d.created_at,
 		   p.id, p.name, p.settings_json, c.id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, c.dns_sig
 		 FROM device d
-		 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
+		 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 		 JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 		 JOIN profile p ON p.id = c.profile_id
 		 WHERE d.revoked_at IS NULL AND d.kind = 'key' AND `+where+` ORDER BY d.created_at, d.id`, arg)
@@ -662,7 +665,7 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 			p.id AS profile_id, p.protocol AS profile_protocol, p.name AS profile_name, p.settings_json AS profile_settings_json,
 			p.secrets_enc AS profile_secrets_enc, p.version AS profile_version, p.created_at AS profile_created_at, p.updated_at AS profile_updated_at
 			FROM device d
-			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
+			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 			JOIN profile p ON p.id = c.profile_id
 			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.id = ?`, deviceID)
@@ -676,7 +679,7 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 	r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' AND i.profile_id = (
-				SELECT c.profile_id FROM device_credential c WHERE c.device_id = ? AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
+				SELECT c.profile_id FROM device_credential c WHERE c.device_id = ? AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 			)
 			ORDER BY i.created_at, i.rowid`, deviceID)
 	if err := r.run(ctx, a.s); err != nil {
@@ -739,7 +742,7 @@ func (a Access) ProfileLiveAWG(ctx context.Context, profileID string, limit int)
 		`SELECT u.name FROM device_credential c
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.kind = 'key'
 		 JOIN user u ON u.id = c.user_id
-		 WHERE c.profile_id = ? AND c.revoked_at IS NULL ORDER BY u.name, c.id`, profileID)
+		 WHERE c.profile_id = ? AND c.path = '' AND c.revoked_at IS NULL ORDER BY u.name, c.id`, profileID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -764,7 +767,7 @@ func (a Access) AWGDevicesPerProfile(ctx context.Context, groupID, userID string
 		`SELECT c.profile_id, count(*) FROM device_credential c
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.kind = 'key'
 		 JOIN user u ON u.id = c.user_id
-		 WHERE c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND (? = '' OR u.group_id = ?) AND (? = '' OR u.id = ?)
+		 WHERE c.path = '' AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND (? = '' OR u.group_id = ?) AND (? = '' OR u.id = ?)
 		 GROUP BY c.profile_id`, groupID, groupID, userID, userID)
 	if err != nil {
 		return nil, err
@@ -780,6 +783,45 @@ func (a Access) AWGDevicesPerProfile(ctx context.Context, groupID, userID string
 		out[pid] = n
 	}
 	return out, rows.Err()
+}
+
+const awgOrphanPathCredWhere = `c.protocol = 'awg' AND c.profile_id IS NOT NULL AND c.path <> '' AND c.revoked_at IS NULL
+	AND NOT EXISTS (
+		SELECT 1 FROM relay r JOIN inbound i ON i.id = r.inbound_id
+		WHERE i.profile_id = c.profile_id AND 'relay:' || r.via_node_id = c.path
+	)`
+
+// awgOrphanPathCredFrom names the partial index of the live path keys: the planner has no statistics to choose it over the
+// protocol index, and the sweep runs on every retention pass, so it must read no row while no path key exists.
+const awgOrphanPathCredFrom = `device_credential c INDEXED BY device_credential_path`
+
+const awgOrphanPathCredIDs = `SELECT c.id FROM ` + awgOrphanPathCredFrom + ` WHERE ` + awgOrphanPathCredWhere
+
+// RevokeOrphanPathCreds quarantines path peers whose profile no longer has a relay through the entry node.
+func (s *Store) RevokeOrphanPathCreds(ctx context.Context, now time.Time) (int64, error) {
+	var results []StmtResult
+	var err error
+	results, err = s.retryGuarded(ctx, func() ([]Stmt, error) {
+		var count int64
+		if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM `+awgOrphanPathCredFrom+` WHERE `+awgOrphanPathCredWhere).Scan(&count); err != nil {
+			return nil, err
+		}
+		if count == 0 {
+			return nil, nil
+		}
+		return []Stmt{
+			guard(`(SELECT count(*) FROM `+awgOrphanPathCredFrom+` WHERE `+awgOrphanPathCredWhere+`) = ?`, count),
+			{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN (` + awgOrphanPathCredIDs + `)`, Args: []any{unix(now)}},
+			{Query: `UPDATE device_credential SET revoked_at = ? WHERE revoked_at IS NULL AND id IN (` + awgOrphanPathCredIDs + `)`, Args: []any{unix(now)}},
+		}, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if len(results) != 3 {
+		return 0, nil
+	}
+	return results[2].RowsAffected, nil
 }
 
 // ProfileHasPeers reports whether the profile ever handed out a tunnel address (live or in quarantine): its client

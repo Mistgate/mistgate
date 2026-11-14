@@ -356,7 +356,7 @@ func (a Access) ensureLinkDevice(ctx context.Context, dev AccessDevice, limit in
 		for i, cred := range added {
 			cred.DeviceID, cred.UserID, cred.CreatedAt = b.deviceID, dev.UserID, now
 			result.Added[i] = cred
-			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?1 AND protocol = ?2 AND coalesce(profile_id, '') = ?3 AND revoked_at IS NULL)`,
+			stmts = append(stmts, guard(`NOT EXISTS (SELECT 1 FROM device_credential WHERE device_id = ?1 AND protocol = ?2 AND coalesce(profile_id, '') = ?3 AND path = '' AND revoked_at IS NULL)`,
 				b.deviceID, cred.Protocol, cred.ProfileID))
 			stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
 		}

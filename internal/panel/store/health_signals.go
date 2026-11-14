@@ -226,7 +226,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 		       c.config_epoch AS config_epoch, p.critical_epoch AS critical_epoch
 		FROM device d
 		JOIN user u ON u.id = d.user_id
-		JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL
+		JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 		JOIN profile p ON p.id = c.profile_id
 		JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 		WHERE d.revoked_at IS NULL AND d.kind = 'key'`)

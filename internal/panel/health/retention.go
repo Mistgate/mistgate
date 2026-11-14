@@ -97,6 +97,11 @@ func (s *Service) sweep(ctx context.Context) {
 	} else if n > 0 {
 		s.log.Info("health: pruned revoked devices", "count", n)
 	}
+	if n, err := s.st.RevokeOrphanPathCreds(ctx, now); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: revoke orphan AWG paths", "code", "revoke_orphan_awg_paths_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: revoked orphan AWG paths", "count", n)
+	}
 	// the in-memory map of the last fixes only matters for five minutes
 	s.fixMu.Lock()
 	for k, at := range s.recentFix {
