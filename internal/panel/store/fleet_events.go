@@ -13,7 +13,7 @@ import (
 // the inbound is gone) are filled by Events only.
 type EventRow struct {
 	ID                                                      int64
-	Time                                                    time.Time
+	Time, ReceivedAt                                        time.Time
 	Severity                                                int    // 1 info, 2 warning, 3 error
 	Code, Source                                            string // source: agent | panel | admin
 	NodeID, NodeName, UserID, UserName, DeviceID, InboundID string
@@ -21,6 +21,25 @@ type EventRow struct {
 	Params                                                  map[string]string
 	SrcInstance                                             string // agent events: dedup
 	SrcSeq                                                  uint64
+}
+
+// IsPanelEventCode reports codes reserved for panel-authored event rows. The source field is always set by the panel at
+// ingestion, so an agent must not be able to make its event look like one of these transitions. A code both sides raise
+// (stats_dropped: the agent's outbox overflowed, the panel refused a batch) is not reserved.
+func IsPanelEventCode(code string) bool {
+	_, ok := panelEventCodes[code]
+	return ok
+}
+
+var panelEventCodes = map[string]struct{}{
+	"node_retired": {}, "node_recovered": {}, "node_blip": {}, "agent_restarted": {}, "node_enrolled": {}, "node_down": {},
+	"awg_kernel_switched": {}, "bandwidth_upload_missing": {}, "bandwidth_measured": {},
+	"stats_stale": {}, "stats_rejected": {}, "apply_rejected": {}, "state_drift": {}, "node_event_daily_limit": {},
+	"port_lossy": {}, "path_lossy": {}, "panel_path_lossy": {}, "user_change_limit": {}, "device_limit_reached": {},
+	"traffic_stopped": {}, "traffic_resumed": {}, "check_failing": {}, "check_recovered": {},
+	"update_step_passed": {}, "update_step_failed": {}, "update_step_rolled_back": {}, "update_download_source": {},
+	"os_step_passed": {}, "os_step_failed": {}, "client_logs_declined": {}, "client_logs_received": {},
+	"subscription_shared_suspect": {},
 }
 
 const deviceLimitEventWindow = time.Hour
@@ -183,7 +202,7 @@ func (s *Store) LastNodeEventCode(ctx context.Context, nodeID string, codes ...s
 	if len(codes) == 0 {
 		return "", nil
 	}
-	q := `SELECT code FROM event WHERE node_id = ? AND code IN (?` + repeatComma(len(codes)-1) + `) ORDER BY id DESC LIMIT 1`
+	q := `SELECT code FROM event WHERE node_id = ? AND source = 'panel' AND code IN (?` + repeatComma(len(codes)-1) + `) ORDER BY id DESC LIMIT 1`
 	args := []any{nodeID}
 	for _, c := range codes {
 		args = append(args, c)

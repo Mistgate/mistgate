@@ -107,7 +107,7 @@ var transactionShape2 = map[string]string{
 	"node_decoy.go:SetNodesDecoyMode":                "Each requested node has a live-state guard and mode update in the same atomic batch.",
 	"fleet_node.go:NodeDisconnected":                 "The matching live session guards last-seen/disconnect time and row deletion in one fixed batch.",
 	"fleet_node.go:RetireNode":                       "A node-state guard precedes retirement, certificate/token changes, provisioning cancellation, and retained-key and relay deletion.",
-	"fleet_stats.go:IngestEvent":                     "One batch conditionally inserts the event and advances the node sequence, distinguishing duplicates from missing nodes.",
+	"fleet_stats.go:IngestEventBounded":              "One batch conditionally inserts an agent event under the daily budget of its class, records the class marker once per day, and advances the node sequence.",
 	"fleet_stats.go:IngestStats":                     "Credential and node lookups run in one read batch; an eleven-statement guarded write batch (with connection counters and the node journal) also updates the session-matched live projection.",
 	"health.go:InsertProbeCredIdx":                   "A guarded batch retries when the inbound credential or candidate peer allocation changed.",
 	"mcpplan.go:BeginApply":                          "A status and hash compare-and-swap lets only one apply proceed.",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -655,13 +656,65 @@ func (s *Store) SkipSeq(ctx context.Context, nodeID, instance string, seq uint64
 	return err
 }
 
-// IngestEvent stores one reliable agent Event and node.last_seq in one atomic batch. dup reports that the
-// seq was already committed.
+// Agent events stored per node and UTC day, one budget per class, so a flood of one class cannot hide another: an
+// honest agent sends an info event per engine start, apply and restart (a link that flaps every minute makes about 1,500
+// a day), warnings and errors only when something is wrong, and a torrent_attempt (a warning) at most once per inbound and
+// person every five minutes, which is why that code has a budget of its own. Over the budget a new event is dropped (and
+// acked) and one panel marker "node_event_daily_limit" with the class in its params is written for that node, class and day.
+const (
+	eventClassInfo    = "info"
+	eventClassWarning = "warning"
+	eventClassError   = "error"
+	eventClassTorrent = "torrent"
+)
+
+var agentEventDailyLimits = map[string]int{eventClassInfo: 2000, eventClassWarning: 1000, eventClassError: 1000, eventClassTorrent: 1000}
+
+// eventClassSQL is the class of a row of the event table, the same rule as agentEventClass.
+const eventClassSQL = `CASE WHEN code = 'torrent_attempt' THEN 'torrent' WHEN severity = 1 THEN 'info' WHEN severity = 2 THEN 'warning' ELSE 'error' END`
+
+func agentEventClass(e EventRow) string {
+	switch {
+	case e.Code == "torrent_attempt":
+		return eventClassTorrent
+	case e.Severity == 1:
+		return eventClassInfo
+	case e.Severity == 2:
+		return eventClassWarning
+	default:
+		return eventClassError
+	}
+}
+
+// IngestEvent stores one reliable agent Event and node.last_seq in one atomic batch. dup reports that the seq was already
+// committed.
 func (s *Store) IngestEvent(ctx context.Context, nodeID, instance string, seq uint64, now time.Time, e EventRow) (dup bool, err error) {
-	e.NodeID, e.Source, e.SrcInstance, e.SrcSeq = nodeID, "agent", instance, seq
+	dup, _, err = s.IngestEventBounded(ctx, nodeID, instance, seq, now, e)
+	return dup, err
+}
+
+// IngestEventBounded is IngestEvent under the daily budget of the event's class; overLimit reports that the row was
+// dropped for it (node.last_seq still moves, so the node is acked).
+func (s *Store) IngestEventBounded(ctx context.Context, nodeID, instance string, seq uint64, now time.Time, e EventRow) (dup, overLimit bool, err error) {
+	now = now.UTC()
+	dayStart := now.Truncate(24 * time.Hour).Unix()
+	dayEnd := now.Truncate(24 * time.Hour).Add(24 * time.Hour).Unix()
+	e.NodeID, e.Source, e.SrcInstance, e.SrcSeq, e.ReceivedAt = nodeID, "agent", instance, seq, now
+	class := agentEventClass(e)
+	limit := agentEventDailyLimits[class]
+	// Rows of this class that the node's agent has had stored today.
+	used := `(SELECT count(*) FROM event WHERE source = 'agent' AND node_id = ? AND received_at >= ? AND received_at < ? AND ` + eventClassSQL + ` = ?)`
 	stmts := []Stmt{
 		{Query: `SELECT id FROM node WHERE id = ?`, Args: []any{nodeID}, Returning: true},
-		eventInsertStmt(eventInsertArgs(e), nodeID, instance, seq),
+		agentEventInsertStmt(eventInsertArgs(e), used, nodeID, instance, seq, []any{nodeID, dayStart, dayEnd, class, limit}),
+		// The marker is looked up first (one index probe), so the count runs only until the day's marker exists.
+		{Query: `INSERT OR IGNORE INTO event (ts, received_at, severity, code, source, node_id, params_json)
+			SELECT ?, ?, 2, 'node_event_daily_limit', 'panel', ?, ?
+			WHERE NOT EXISTS (SELECT 1 FROM event WHERE source = 'panel' AND code = 'node_event_daily_limit' AND node_id = ?
+				AND received_at / 86400 = ? AND json_extract(params_json, '$.level') = ?)
+			AND ` + used + ` >= ?`,
+			Args: []any{unix(now), unix(now), nodeID, `{"level":"` + class + `","limit":"` + fmt.Sprint(limit) + `"}`,
+				nodeID, dayStart / 86400, class, nodeID, dayStart, dayEnd, class, limit}},
 	}
 	if seq == 0 {
 		stmts = append(stmts, Stmt{Query: `UPDATE node SET last_seen_at = max(last_seen_at, ?) WHERE id = ? RETURNING id`,
@@ -681,11 +734,14 @@ func (s *Store) IngestEvent(ctx context.Context, nodeID, instance string, seq ui
 	return len(results[len(results)-1].Rows) == 0, nil
 }
 
-func eventInsertStmt(args []any, nodeID, instance string, seq uint64) Stmt {
+func agentEventInsertStmt(args []any, used, nodeID, instance string, seq uint64, usedArgs []any) Stmt {
 	args = append(args, nodeID, int64(seq), instance, int64(seq))
-	return Stmt{Query: `INSERT OR IGNORE INTO event (ts, severity, code, source, node_id, user_id, device_id, inbound_id, params_json, src_instance, src_seq)
-		SELECT ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?, ?
-		WHERE EXISTS (SELECT 1 FROM node WHERE id = ? AND (? = 0 OR agent_instance_id <> ? OR last_seq < ?))`, Args: args}
+	args = append(args, usedArgs...)
+	return Stmt{Query: `INSERT OR IGNORE INTO event (ts, received_at, severity, code, source, node_id, user_id, device_id, inbound_id, params_json, src_instance, src_seq)
+		SELECT ?, ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?, ?
+		WHERE EXISTS (SELECT 1 FROM node WHERE id = ? AND (? = 0 OR agent_instance_id <> ? OR last_seq < ?))
+		AND ` + used + ` < ?
+		RETURNING id`, Args: args, Returning: true}
 }
 
 type fleetExecer interface {
@@ -694,8 +750,8 @@ type fleetExecer interface {
 
 func insertEvent(ctx context.Context, ex fleetExecer, e EventRow) error {
 	_, err := ex.ExecContext(ctx, `
-		INSERT OR IGNORE INTO event (ts, severity, code, source, node_id, user_id, device_id, inbound_id, params_json, src_instance, src_seq)
-		VALUES (?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?, ?)`, eventInsertArgs(e)...)
+		INSERT OR IGNORE INTO event (ts, received_at, severity, code, source, node_id, user_id, device_id, inbound_id, params_json, src_instance, src_seq)
+		VALUES (?, ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?, ?)`, eventInsertArgs(e)...)
 	return err
 }
 
@@ -710,5 +766,12 @@ func eventInsertArgs(e EventRow) []any {
 	if e.SrcSeq != 0 {
 		seq, inst = int64(e.SrcSeq), e.SrcInstance
 	}
-	return []any{unix(e.Time), e.Severity, e.Code, e.Source, e.NodeID, e.UserID, e.DeviceID, e.InboundID, params, inst, seq}
+	receivedAt := e.ReceivedAt
+	if receivedAt.IsZero() {
+		receivedAt = e.Time
+	}
+	return []any{unix(e.Time), unix(receivedAt), e.Severity, e.Code, e.Source, e.NodeID, e.UserID, e.DeviceID, e.InboundID, params, inst, seq}
 }
+	if e.ReceivedAt.IsZero() {
+		e.ReceivedAt = e.Time
+	}

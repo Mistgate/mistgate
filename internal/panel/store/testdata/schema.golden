@@ -229,6 +229,12 @@
   },
   {
     "type": "index",
+    "name": "event_agent_received",
+    "tbl_name": "event",
+    "sql": "CREATE INDEX event_agent_received ON event (node_id, received_at) WHERE source = 'agent' AND node_id IS NOT NULL"
+  },
+  {
+    "type": "index",
     "name": "event_device_limit",
     "tbl_name": "event",
     "sql": "CREATE INDEX event_device_limit ON event (ts) WHERE code = 'device_limit_reached'"
@@ -238,6 +244,12 @@
     "name": "event_node",
     "tbl_name": "event",
     "sql": "CREATE INDEX event_node ON event (node_id, id DESC) WHERE node_id IS NOT NULL"
+  },
+  {
+    "type": "index",
+    "name": "event_node_daily_limit",
+    "tbl_name": "event",
+    "sql": "CREATE UNIQUE INDEX event_node_daily_limit ON event (node_id, received_at / 86400, json_extract(params_json, '$.level')) WHERE source = 'panel' AND code = 'node_event_daily_limit' AND node_id IS NOT NULL"
   },
   {
     "type": "index",
@@ -783,7 +795,7 @@
     "type": "table",
     "name": "event",
     "tbl_name": "event",
-    "sql": "CREATE TABLE event ( id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, severity INTEGER NOT NULL CHECK (severity BETWEEN 1 AND 3), -- 1 info, 2 warning, 3 error code TEXT NOT NULL, source TEXT NOT NULL CHECK (source IN ('agent', 'panel', 'admin')), node_id TEXT, user_id TEXT, device_id TEXT, inbound_id TEXT, params_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(params_json)), -- agent events: belt-and-braces dedup on top of node.last_seq src_instance TEXT, src_seq INTEGER ) STRICT"
+    "sql": "CREATE TABLE event ( id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, severity INTEGER NOT NULL CHECK (severity BETWEEN 1 AND 3), -- 1 info, 2 warning, 3 error code TEXT NOT NULL, source TEXT NOT NULL CHECK (source IN ('agent', 'panel', 'admin')), node_id TEXT, user_id TEXT, device_id TEXT, inbound_id TEXT, params_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(params_json)), -- agent events: belt-and-braces dedup on top of node.last_seq src_instance TEXT, src_seq INTEGER , received_at INTEGER NOT NULL DEFAULT 0) STRICT"
   },
   {
     "type": "table",

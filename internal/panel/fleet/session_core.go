@@ -991,6 +991,10 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 		}
 		for _, k := range []string{"protocol", "torrent_protocol"} {
 			if v := ev.Params[k]; v != "" {
+	if store.IsPanelEventCode(ev.Code) {
+		c.dropAgentEvent(tr, seq, now)
+		return
+	}
 				row.Params[k] = store.Clip(v, 256)
 			}
 		}
@@ -1011,7 +1015,7 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 			row.Params[store.Clip(k, 64)] = store.Clip(v, 256)
 		}
 	}
-	dup, err := c.f.st.IngestEvent(ctx, tr.state.NodeID, tr.state.InstanceID, seq, now, row)
+	dup, overLimit, err := c.f.st.IngestEventBounded(ctx, tr.state.NodeID, tr.state.InstanceID, seq, now, row)
 	if err != nil {
 		c.f.log.Error("ingest event", "code", "event_ingest_failed", "node", tr.state.NodeID, "err", err)
 		tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
@@ -1050,6 +1054,10 @@ func (c *SessionCore) warpAttention(ctx context.Context, tr *coreTransition, rea
 	}
 	if err := w.NeedsAttention(ctx, tr.state.NodeID, reason); err != nil {
 		c.f.log.Warn("record warp attention", "code", "warp_attention_failed", "node", tr.state.NodeID, "err", err)
+		return
+	}
+	if overLimit {
+		c.dropAgentEvent(tr, seq, now)
 		return
 	}
 	if reason == warpReasonLadder {
