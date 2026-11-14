@@ -173,6 +173,11 @@ message RelayStage {
   // "apply_timeout" (the entry did not install the forward), "switched_off" (someone switched the relay off while it was
   // waited for). Skipped: "unverifiable" (the server has no name to attribute the TLS identity to this node), "off" (the relay
   // is not switched on, so there is no forward to reach), "leg_failed".
+  // reverse_reach adds: "exit_offline", "unsupported" (skipped: the exit's agent has no tcpcheck/1), "entry_site_unavailable"
+  // (skipped: the entry has no site of its own on TCP 443 to probe, or the connection was refused there: nothing listens, which
+  // says nothing about whether the exit reaches the entry); a connection that gets no answer ("timeout") is the exit not reaching
+  // the entry. reverse_speed adds: "busy" (skipped: a speed test already runs on one of the nodes, or the daily limit is reached),
+  // "unsupported" (skipped), "entry_offline", "unreachable".
   string code = 2;
   // The node that sent the probe (its id), or "panel".
   string sender_id = 3;
@@ -183,6 +188,14 @@ message RelayStage {
   uint32 sent = 6;
   uint32 got = 7;
   int64 at_unix = 8;
+  // reverse_speed only (the other stages leave these 0): the megabytes asked for (8 to 32), the megabits a second, the bytes the
+  // entry got, the connect and first-byte times and the duration of the flow in milliseconds.
+  uint32 mb = 9;
+  double mbit_s = 10;
+  uint64 bytes = 11;
+  uint32 connect_ms = 12;
+  uint32 first_byte_ms = 13;
+  uint32 duration_ms = 14;
 }
 
 // What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
@@ -207,12 +220,21 @@ message RelayCheck {
   RelayStage bridge = 10;
   // Reverse way only: the exit reached the entry's bridge endpoint (a TLS probe from the exit that sees the entry's own site,
   // and a data stream the exit opens to the entry). Run by CheckRelay when the leg did not pass and the way may be reverse,
-  // and the stage the gate of "reverse" and "auto" reads. Absent when it did not run. Codes: those of leg, "bridge_unreachable".
+  // and the stage the gate of "reverse" and "auto" reads. Absent when it did not run. Codes: see RelayStage.code.
+  // The result stays in the check of a later run that does not repeat the stage (its at_unix says how old it is).
   RelayStage reverse_reach = 11;
+  // The proof by speed (reverse way only), never run by itself: the exit sends an 8 MB flow to the entry (the existing path
+  // speed test, the exit the one that connects). Only CheckRelayRequest.reverse_speed starts it. Absent when it did not run.
+  RelayStage reverse_speed = 12;
 }
 
 message CheckRelayRequest {
   string id = 1;
+  // Also run reverse_reach when the leg passes (it runs by itself after a failed leg).
+  bool reverse_reach = 2;
+  // Also send the 8 MB flow of reverse_speed (it implies reverse_reach). Moves bulk traffic between two nodes: the speed test
+  // limits (one test per node at a time, a few a day) hold.
+  bool reverse_speed = 3;
 }
 
 message CheckRelayResponse {
