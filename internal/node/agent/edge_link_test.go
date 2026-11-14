@@ -345,12 +345,16 @@ func (r *edgeRig) seed() {
 		}
 	}
 	exec(`UPDATE node SET bandwidth_mbps = 100 WHERE id = ?`, r.nodeID) // no automatic bandwidth test
+	// A node the panel last heard of hours ago starts with that time as stats credit (a session without it has one minute): the
+	// 20 ms batches of these tests, each claiming at least a second, would spend a minute within a second or two.
+	exec(`UPDATE node SET last_seen_at = ? WHERE id = ?`, now.Add(-6*time.Hour).Unix(), r.nodeID)
 	if r.o.liveness != 0 {
 		exec(`UPDATE node SET liveness_timeout_s = ? WHERE id = ?`, r.o.liveness, r.nodeID)
 	}
 	unix := now.Unix()
 	exec(`INSERT INTO user_group (id, name, created_at) VALUES ('grp_edge', 'g1', ?)`, unix)
 	exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_edge', 'fake', 'p1', '{}', 1, ?, ?)`, unix, unix)
+	exec(`INSERT INTO user_group_profile (group_id, profile_id) VALUES ('grp_edge', 'prf_edge')`) // the group reaches the node: the panel books stats only for the node's users
 	exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, created_at, updated_at) VALUES ('inb_edge', 'prf_edge', ?, 1, ?, ?)`, r.nodeID, unix, unix)
 	h := sha256.Sum256([]byte("alice"))
 	exec(`INSERT INTO user (id, name, group_id, disabled, status, app_happ, app_amnezia, all_nodes, quota_bytes, period_start,
@@ -1162,7 +1166,7 @@ func TestEdgeLinkFramesBeforeThePeersCloseAreStepped(t *testing.T) {
 // 6. A failed step closes the socket 1011 and writes nothing; frames queued behind it are dropped; after the reconnect every
 // stats batch is counted exactly once, also the one whose step failed after its database write committed.
 func TestEdgeLinkFailedStepCountsEveryBatchOnce(t *testing.T) {
-	// The panel starts with a full six-hour bucket, so this test can keep exercising its original 20 ms batches.
+	// seed() gives the node a six-hour stats bucket (last seen hours ago), so this test can keep exercising its original 20 ms batches.
 	r := newEdgeRig(t, edgeOpts{statsEvery: 20 * time.Millisecond})
 	ag := r.start(nil)
 	eventually(t, func() bool { return ag.eng.has("inb_edge") && r.session() == 1 }, "connected")
