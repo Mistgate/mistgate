@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // The block classifier of block_diagnosis and access_report. It is a pure function of stored facts (accessInput): every class
@@ -272,14 +274,9 @@ func normProtocol(p string) string {
 	return p
 }
 
-func isUDPProto(p string) bool { p = normProtocol(p); return p == "hysteria2" || p == "awg" }
+func isUDPProto(p string) bool { return store.RelayPathNetwork(normProtocol(p)) == "udp" }
 
-func netOf(p string) string {
-	if isUDPProto(p) {
-		return "udp"
-	}
-	return "tcp"
-}
+func netOf(p string) string { return store.RelayPathNetwork(normProtocol(p)) }
 
 func u32(n uint32) string { return strconv.FormatUint(uint64(n), 10) }
 

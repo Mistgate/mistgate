@@ -141,6 +141,8 @@ VPN 应用 [kl!ck](https://github.com/vbu00/klick)（Windows、macOS）带有一
 - **全国性来源。** 对告警而言，完整结论会降为 `partial`，除非有全国性来源自己给出它：Globalping、公共 cheburcheck 或 TSPU 探测。局部来源只看到几个网络或地区，即你自己的 cheburcheck 探测点和 bsbord（比如只选克里米亚）。它们单独或一起，都只会触发部分告警。页面上，仅 bsbord 选克里米亚时仍可能显示 `blocked`；被压住的只有告警。
 - **文本。** 告警及其 Telegram 消息会写明发现封锁的来源（`globalping`、`tspu`、`cheburcheck`、`cheburcheck_own`、`bsbord`）、置信度、无应答的网络（外部来源按网络命名，如 `MTS (Crimea, bsbord)`）以及 TSPU 探测看到被封锁的端口。标题为「节点从俄罗斯无法连接」。正文说明什么被切断（「TCP 被阻断」，Globalping 看到时还有「ICMP 仍可通过」；或「ICMP 和 TCP 都无法通过」），然后是「发现方：…」，`conflict` 时还有「各来源的结果不一致，此处显示较差的一项。」打开时一条消息，关闭时一条消息。
 
+- **通过中继。** 如果发给用户的节点上的每个服务器前都有正常的[中继](../guide/relays.md)（按用户的分组和节点权限计算；已停用的用户不算），而直连服务器本身被封，告警为**提示**级别（`why=reached_through_relays`：*用户通过中继到达这个节点*），不会发送到 Telegram。没有给任何人发服务器的节点，或有一个服务器没有正常中继的节点，仍为警告。已打开的告警就地更改，不会再产生第二条。中继连续两轮“客户端视角”检测失败时，告警升回警告，并像新告警一样发出通知（每条告警一次）；中继恢复正常后，它无消息地降为提示。[助手](../reference/mcp.md)的 `access_report` 工具使用同一规则。
+
 **部分：一个网络连不上节点而其他网络可以。** 同一类告警，主题为 `partial`，级别为警告。
 
 - **观察。** 每条记录给它的每个网络、单元或探测点一次观察，记在键 `来源|网络` 之下：`globalping|AS8359`、`cheburcheck|probe:17`、`bsbord|mts|krym|off`、`tspu|<探测节点>`。键不跨来源：cheburcheck 的可达不会清除 bsbord 的无应答，反之亦然，因为越过设备的 SYN 说明不了 SIM 卡收到了什么。

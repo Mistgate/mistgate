@@ -578,7 +578,14 @@ func (s *Service) finishNotices(items []item, retained map[string]struct{}) {
 // nothing; one the admin muted ends and re-opens quietly.
 func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 	if a.Severity < minSeverity {
-		return
+		// An alert announced and then lowered to info ends as announced: it is told once more, so that its "open" is not left
+		// forgotten (and a later one is not taken for it). One that never was announced stays silent.
+		s.mu.Lock()
+		_, announced := s.open[a.Kind+"/"+a.NodeID+"/"+a.Subject]
+		s.mu.Unlock()
+		if !resolved || s.cfg.Edge || !announced {
+			return
+		}
 	}
 	// a scheduled task's alerts go to Telegram only when the owner asked for it on the task
 	if (a.Kind == "scheduled_check" || a.Kind == "scheduled_task_failing") && a.Params["telegram"] != "1" {

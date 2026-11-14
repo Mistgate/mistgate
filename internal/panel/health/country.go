@@ -1101,6 +1101,17 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 	if !liveOn && !tspu.On && len(external) == 0 {
 		return
 	}
+	now := s.now()
+	// Read only when a node has a full alert to judge, and once for all of them.
+	var relayReach store.RelayReachability
+	var relayReachOK, relayReachRead bool
+	relayReachability := func() (store.RelayReachability, bool) {
+		if !relayReachRead {
+			relayReachRead = true
+			relayReach, relayReachOK = s.countryRelayReachability(ctx, sn, now)
+		}
+		return relayReach, relayReachOK
+	}
 	hold := func() {
 		for k := range activeAlerts {
 			if k.kind == kCountryBlocked {
@@ -1193,7 +1204,6 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 	}
 
 	ages6 := countryRoundMaxAges(cc.Interval, rows6)
-	now := s.now()
 	for _, n := range sn.nodes {
 		var ipv6Word string // what the IPv6 rounds say of a node that has no IPv6 alert of its own: a parameter of its IPv4 alert
 		entry := ipv6On && ipv6Entry(n)
@@ -1226,7 +1236,7 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 				}
 			}
 		}
-		s.countryNodeConds(n, live[n.ID].Connected, signals, activeAlerts, d, add, countryFamilyAlerts{family: familyV4, ipv6: ipv6Word})
+		s.countryNodeConds(n, live[n.ID].Connected, signals, activeAlerts, d, add, relayReachability, countryFamilyAlerts{family: familyV4, ipv6: ipv6Word})
 		if ipv6On {
 			// An IPv6 alert exists only for a node whose IPv6 entry is on: the people on it depend on it. Without
 			// the entry the keys are let go, as those of a source that is off.
@@ -1239,7 +1249,7 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 					signals6 = append(signals6, countryGlobalpingSignal(r, age6))
 				}
 			}
-			s.countryNodeConds(n, live[n.ID].Connected, signals6, activeAlerts, d, add, countryFamilyAlerts{family: familyV6, off: !entry, hold: v6Failed})
+			s.countryNodeConds(n, live[n.ID].Connected, signals6, activeAlerts, d, add, relayReachability, countryFamilyAlerts{family: familyV6, off: !entry, hold: v6Failed})
 		}
 	}
 }
@@ -1291,7 +1301,8 @@ func (f countryFamilyAlerts) subject(v4 string) string {
 
 // countryNodeConds is the COUNTRY_BLOCKED logic of one node and one address family over the signals of that family (see
 // addCountryConds). Nothing of it depends on the family but the keys, the signals and the parameters.
-func (s *Service) countryNodeConds(n store.NodeRow, connected bool, signals []countryAlertSignal, activeAlerts map[key]store.HealthAlert, d *derived, add func(cond), f countryFamilyAlerts) {
+func (s *Service) countryNodeConds(n store.NodeRow, connected bool, signals []countryAlertSignal, activeAlerts map[key]store.HealthAlert, d *derived, add func(cond),
+	relayReachability func() (store.RelayReachability, bool), f countryFamilyAlerts) {
 	full, partial := f.subjects()
 	k := key{kCountryBlocked, n.ID, full}
 	partialKey := key{kCountryBlocked, n.ID, partial}
@@ -1307,7 +1318,15 @@ func (s *Service) countryNodeConds(n store.NodeRow, connected bool, signals []co
 	counted := countryCountedEvents(events)
 	seen := counted[:min(len(counted), countryAlertRounds)]
 	if len(seen) == countryAlertRounds && seen[0].bad() && seen[1].bad() {
-		add(f.decorate(countryCond(n, seen[0])))
+		c := countryCond(n, seen[0])
+		if rr, ok := relayReachability(); ok {
+			if rr.NodeReachedThroughRelays(n.ID, countryBlockedDirectPaths(rr.Input.Inbounds, n.ID, c.params["verdict"])) {
+				c = countryRelayCond(c)
+			}
+		} else if activeAlerts[k].Params["why"] == "reached_through_relays" {
+			c = countryRelayCond(c) // the access state could not be read: do not flip an alert on a failed read
+		}
+		add(f.decorate(c))
 		d.superseded[partialKey] = true
 		return
 	}

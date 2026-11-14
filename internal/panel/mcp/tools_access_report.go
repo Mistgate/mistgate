@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // access_report rules: the matrix of protocol by node, the country and operator view, the findings and the recommendations.
@@ -232,20 +234,11 @@ type accessCtx struct {
 	ways         map[string]*wayV
 	cells        map[string]*accessCellV
 	inScope      map[string]bool // node ids in scope
+	reachability store.RelayReachability
 }
 
 func (a *accessCtx) userGiven(u *accUser, x *accInbound) bool {
-	g := a.groupsByID[u.GroupID]
-	if g == nil || !x.Enabled || x.State == "disabled" {
-		return false
-	}
-	if !slices.Contains(g.ProfileIDs, x.ProfileID) || slices.Contains(g.DisabledNodes, x.NodeID) {
-		return false
-	}
-	if !userCanUseNode(u, x.NodeID) {
-		return false
-	}
-	return x.Direct || x.CDN || a.userHasHealthyRelay(u, g, x)
+	return a.reachability.UserGiven(u.ID, x.ID)
 }
 
 func userCanUseNode(u *accUser, nodeID string) bool {
@@ -312,6 +305,7 @@ func buildAccess(in *accessInput) *AccessReportV {
 		a.diags[n.ID] = &d
 	}
 	a.ways = b.wayStates(a.diags)
+	a.reachability = a.relayReachability()
 	for i := range in.Inbounds {
 		x := &in.Inbounds[i]
 		for j := range in.Users {
@@ -959,20 +953,7 @@ func relayProblem(r accRelay) string {
 }
 
 func (a *accessCtx) relayHealthy(r accRelay) bool {
-	return r.Enabled && r.State == "active" && r.Checked && r.CheckOK && relayProblem(r) == "" && a.relayMonitorFresh(r)
-}
-
-func (a *accessCtx) relayMonitorFresh(r accRelay) bool {
-	if r.MonitorAtUnix <= 0 || a.in.NowUnix < r.MonitorAtUnix {
-		return false
-	}
-	interval := a.in.HealthIntervalS
-	if interval == 0 {
-		interval = 300
-	}
-	// Match the health evaluator's relay-monitor window: two rounds plus one minute.
-	maxAge := int64(interval)*2 + 60
-	return a.in.NowUnix-r.MonitorAtUnix <= maxAge
+	return a.reachability.RelayHealthy(r.ID)
 }
 
 func (a *accessCtx) relayEntryUsable(entryID string) bool {
@@ -981,38 +962,33 @@ func (a *accessCtx) relayEntryUsable(entryID string) bool {
 }
 
 func (a *accessCtx) userHasHealthyRelay(u *accUser, g *accGroup, x *accInbound) bool {
-	if !relayTargetInbound(x) {
-		return false
-	}
-	for _, r := range a.in.Relays {
-		if r.InboundID != x.ID || r.ExitID != x.NodeID || !a.relayHealthy(r) || !a.relayEntryUsable(r.EntryID) ||
-			slices.Contains(g.DisabledNodes, r.EntryID) || !userCanUseNode(u, r.EntryID) {
-			continue
-		}
-		return true
-	}
-	return false
+	return a.reachability.UserHasHealthyRelay(u.ID, x.ID)
 }
 
 func (a *accessCtx) nodeReachedThroughRelays(nodeID string) bool {
-	served := false
-	for _, x := range a.inboundsOf(nodeID) {
-		users := a.given[x.ID]
-		if len(users) == 0 {
-			continue
-		}
-		served = true
-		if way := a.ways[x.ID]; x.Direct && (way == nil || way.State != stateFailing && way.State != stateBroken) {
-			return false // people still reach the server directly (or nobody knows it does not work): the block is not made up for
-		}
-		for _, u := range users {
-			g := a.groupsByID[u.GroupID]
-			if g == nil || !a.userHasHealthyRelay(u, g, x) {
-				return false
-			}
-		}
+	return a.reachability.NodeReachedThroughRelays(nodeID, nil)
+}
+
+func (a *accessCtx) relayReachability() store.RelayReachability {
+	in := store.RelayReachabilityInput{NowUnix: a.in.NowUnix, HealthIntervalS: a.in.HealthIntervalS}
+	for _, g := range a.in.Groups {
+		in.Groups = append(in.Groups, store.RelayReachabilityGroup{ID: g.ID, ProfileIDs: g.ProfileIDs, DisabledNodeIDs: g.DisabledNodes})
 	}
-	return served
+	for _, u := range a.in.Users {
+		in.Users = append(in.Users, store.RelayReachabilityUser{ID: u.ID, GroupID: u.GroupID, AllNodes: u.AllNodes, NodeIDs: u.NodeIDs})
+	}
+	for _, x := range a.in.Inbounds {
+		way := a.ways[x.ID]
+		blocked := way != nil && (way.State == stateFailing || way.State == stateBroken)
+		in.Inbounds = append(in.Inbounds, store.RelayReachabilityInbound{ID: x.ID, NodeID: x.NodeID, ProfileID: x.ProfileID,
+			Protocol: normProtocol(x.Protocol), State: x.State, Enabled: x.Enabled, Direct: x.Direct, CDN: x.CDN, DirectBlocked: blocked})
+	}
+	for _, r := range a.in.Relays {
+		in.Relays = append(in.Relays, store.RelayReachabilityRelay{ID: r.ID, InboundID: r.InboundID, EntryID: r.EntryID, ExitID: r.ExitID, State: r.State,
+			Enabled: r.Enabled, ExitLive: r.ExitLive, AgentSupported: r.AgentSupported, Checked: r.Checked, CheckOK: r.CheckOK,
+			MonitorAtUnix: r.MonitorAtUnix, MonitorFails: r.MonitorFails, EntryUsable: a.relayEntryUsable(r.EntryID)})
+	}
+	return store.NewRelayReachability(in)
 }
 
 // effectiveWay is the state of an inbound for a group once a healthy relay in front of it is counted: a relay whose entry node
@@ -1120,7 +1096,7 @@ func (a *accessCtx) entryFor(exit *accNode, c blockClassV) []string {
 }
 
 func relayTargetInbound(x *accInbound) bool {
-	return x != nil && normProtocol(x.Protocol) != "awg" && !x.CDN
+	return x != nil && store.RelayTargetInbound(normProtocol(x.Protocol), x.CDN)
 }
 
 func (a *accessCtx) firstRelayableInbound(nodeID string, c blockClassV) string {

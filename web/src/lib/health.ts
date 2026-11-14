@@ -151,12 +151,15 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
     // in Persian each name is an isolate of its own, so the list keeps the right-to-left order of the sentence around it
     const isolate = (s: string) => (dirOf(fmt.lang) === "rtl" ? `⁨${s}⁩` : s);
     params.probes = listOf(fmt.locale, (dark.length ? dark : sources.filter((s) => s && s !== "tspu")).map((s) => isolate(sourceName(t, s))));
+    // people reach the node through relays (info): that sentence is the alert's own, whoever saw the block
     const own =
-      sources.includes("tspu") && !sources.includes("globalping")
-        ? "health.alert.country_blocked.why.tspu"
-        : a.params.confidence === "conflict"
-          ? `health.alert.country_blocked.why.conflict.${a.params.verdict ?? ""}`
-          : "";
+      a.params.why === "reached_through_relays"
+        ? ""
+        : sources.includes("tspu") && !sources.includes("globalping")
+          ? "health.alert.country_blocked.why.tspu"
+          : a.params.confidence === "conflict"
+            ? `health.alert.country_blocked.why.conflict.${a.params.verdict ?? ""}`
+            : "";
     if (own && hasKey(own)) return t(own, params);
   }
   if (a.kind === AlertKind.PORT_LOSSY) {

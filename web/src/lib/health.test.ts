@@ -546,6 +546,7 @@ describe("the server's vocabulary is covered", () => {
     "health.alert.country_blocked.why.tspu",
     "health.alert.country_blocked.why.conflict.tcp_blocked",
     "health.alert.country_blocked.why.conflict.blocked",
+    "health.alert.country_blocked.why.reached_through_relays",
     "health.alert.country_blocked.title.partial",
     "health.alert.country_blocked.why.partial",
     "hl.res.accepted",
@@ -1216,6 +1217,17 @@ describe("reachability from a country", () => {
     // both sources that agree keep Globalping's words: its probes saw it
     const agree = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.tcp_blocked", params: { ...params, confidence: "eyeball", verdict: "tcp_blocked" } });
     expect(alertWhy(tPlural, fmt, agree)).toMatch(/^Probes inside Russia \(Beeline, Rostelecom\) reach the node’s address/);
+  });
+
+  it("words a country_blocked alert that people get around through relays by its own sentence, whoever saw the block", () => {
+    const base = { kind: AlertKind.COUNTRY_BLOCKED, severity: AlertSeverity.INFO, whyKey: "health.alert.country_blocked.why.reached_through_relays" };
+    const params = { node: "de1", country: "RU", why: "reached_through_relays", verdict: "tcp_blocked", networks: "", ports: "443" };
+    for (const extra of [{ sources: "globalping" }, { sources: "tspu" }, { sources: "globalping,tspu", confidence: "conflict" }] as Record<string, string>[]) {
+      const a = alert({ ...base, params: { ...params, ...extra } });
+      expect(alertWhy(tPlural, fmt, a)).toMatch(/^People reach this node through relays: every server of it they are given has a healthy relay, so the block in Russia/);
+      expect(alertWhy(tRuPlural, fmtRu, a)).toMatch(/^До ноды доходят через реле:/);
+      expect(alertWhy(tZhPlural, fmtZh, a)).toMatch(/^用户通过中继到达这个节点/);
+    }
   });
 });
 

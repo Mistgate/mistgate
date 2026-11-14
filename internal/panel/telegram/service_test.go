@@ -161,6 +161,18 @@ func TestSeverityFloorAndSilentResolutions(t *testing.T) {
 	if queued {
 		t.Fatal("info USER_CONNECTION was recorded as announced")
 	}
+	countryAlert := alert("country_blocked", "nod_1", 1)
+	countryAlert.Params = map[string]string{"why": "reached_through_relays"}
+	e.svc.AlertTransition(countryAlert, false)
+	if got := e.tg.total(); got != before {
+		t.Fatalf("info COUNTRY_BLOCKED was sent: total messages %d, before %d", got, before)
+	}
+	e.svc.mu.Lock()
+	_, queued = e.svc.open["country_blocked/nod_1/"]
+	e.svc.mu.Unlock()
+	if queued {
+		t.Fatal("info COUNTRY_BLOCKED was recorded as announced")
+	}
 
 	e.svc.AlertTransition(alert("doctor_warn", "nod_1", 1), false)
 	for i, res := range []string{"superseded", "accepted", "node_retired"} {
@@ -173,6 +185,39 @@ func TestSeverityFloorAndSilentResolutions(t *testing.T) {
 		e.svc.AlertTransition(a, true)
 		e.quiet(before, 120*time.Millisecond)
 	}
+}
+
+// An alert that was announced and then lowered to info (a country block the relays make up for) says it ended and is forgotten,
+// so that a block that comes later is announced again; one that never was announced ends in silence.
+func TestAnnouncedAlertLoweredToInfoIsToldEndedAndForgotten(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.addNode("nod_1", "n1")
+	e.setBot()
+	e.link(owner, 777)
+	e.run()
+
+	quiet := alert("country_blocked", "nod_1", 1)
+	quiet.Params = map[string]string{"why": "reached_through_relays"}
+	quiet.Resolution, quiet.ResolvedAt = "cleared", e.clk.now()
+	e.svc.AlertTransition(quiet, true) // never announced
+	e.quiet(e.tg.total(), 120*time.Millisecond)
+
+	e.svc.AlertTransition(alert("country_blocked", "nod_1", 2), false)
+	waitFor(t, "the open message", func() bool { return e.tg.total() >= 1 })
+	e.svc.AlertTransition(alert("country_blocked", "nod_1", 2), false) // the same alert risen again in place: told once
+	e.quiet(1, 120*time.Millisecond)
+
+	e.svc.AlertTransition(quiet, true) // ended while lowered
+	waitFor(t, "the end message", func() bool { return e.tg.total() >= 2 })
+	e.svc.mu.Lock()
+	_, kept := e.svc.open["country_blocked/nod_1/"]
+	e.svc.mu.Unlock()
+	if kept {
+		t.Fatal("the lowered alert stayed recorded as announced")
+	}
+	e.svc.AlertTransition(alert("country_blocked", "nod_1", 2), false)
+	waitFor(t, "a new block is announced", func() bool { return e.tg.total() >= 3 })
 }
 
 func TestAwgPrepareFailureIsToldOncePerTransitionAndOpenStateIsBounded(t *testing.T) {

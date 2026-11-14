@@ -374,6 +374,9 @@ export const en = {
     "Probes inside {country} ({networks}) reach the node’s address, but TCP to {ports} does not connect: the connection requests are dropped on the way. Two checks in a row saw it. It closes after two clean checks.",
   "health.alert.country_blocked.why.blocked":
     "Probes inside {country} ({networks}) cannot reach the node at all: no answer to ping, no TCP connection. Two checks in a row saw it. It closes after two clean checks.",
+  // info: every server of the node that people are given has a healthy relay (the block is still there)
+  "health.alert.country_blocked.why.reached_through_relays":
+    "People reach this node through relays: every server of it they are given has a healthy relay, so the block in {country} does not cut them off. It turns into a warning if a relay stops working, and closes after two clean checks.",
   // the TSPU probe alone (sources "tspu"): no Globalping networks, only TCP, a data-center view; and live sources that disagree:
   // {probes} are the sources of the networks that get nothing ("cheburcheck, Globalping and bsbord"), the other checks see a way through
   "health.alert.country_blocked.why.tspu":
@@ -985,6 +988,8 @@ export const ru: typeof en = {
     "Зонды внутри {country} ({networks}) достают до адреса ноды, но TCP на {ports} не соединяется: запросы на соединение режут по дороге. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
   "health.alert.country_blocked.why.blocked":
     "Зонды внутри {country} ({networks}) совсем не достают до ноды: нет ответа ни на ping, ни по TCP. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+  "health.alert.country_blocked.why.reached_through_relays":
+    "До ноды доходят через реле: у каждого её сервера, который выдают людям, есть здоровое реле, так что блокировка в {country} их не отрезает. Алерт станет предупреждением, если реле перестанет работать, и закроется после двух чистых проверок.",
   "health.alert.country_blocked.why.tspu":
     "Твоя нода-зонд внутри {country} видит, что TCP на {ports} обрывается на коробке фильтрации (ТСПУ) по пути. Это взгляд из датацентра: в домашних сетях может быть иначе. Так показали два запуска подряд. Алерт закроется после двух чистых проверок.",
   "health.alert.country_blocked.why.conflict.tcp_blocked":
@@ -1554,6 +1559,7 @@ export const zh: typeof en = {
     "位于 {networks} 的家庭或移动网络探测点收不到这个节点的任何响应，但能到达你的其他节点；{country}境内的其他网络可以访问它。连续两次检测都是如此。这些网络重新能访问节点后，告警会关闭。",
   "health.alert.country_blocked.why.tcp_blocked": "{country}境内的探测点（{networks}）能到达节点地址，但 TCP {ports} 连不上：连接请求在途中被丢弃。连续两次检测都是如此。连续两次正常后，告警会关闭。",
   "health.alert.country_blocked.why.blocked": "{country}境内的探测点（{networks}）完全无法到达节点：ping 和 TCP 都没有响应。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+  "health.alert.country_blocked.why.reached_through_relays": "用户通过中继到达这个节点：发给用户的每个服务器都有正常的中继，所以{country}的封锁不会让他们断线。中继一旦失效，告警会升为警告；连续两次正常后会关闭。",
   "health.alert.country_blocked.why.tspu":
     "你在{country}境内的探测节点发现，到 TCP {ports} 的连接在途中的过滤设备（TSPU）处被切断。这是数据中心视角，家庭网络的情况可能不同。连续两次运行都是如此。连续两次正常后，告警会关闭。",
   "health.alert.country_blocked.why.conflict.tcp_blocked":
@@ -2087,6 +2093,7 @@ export const fa: typeof en = {
   "health.alert.country_blocked.why.partial": "نقطه‌های سنجش خانگی و موبایلی در {networks} از این نود جوابی نمی‌گیرند، در حالی که به نودهای دیگرت می‌رسند؛ از شبکه‌های دیگر {country} نود در دسترس است. دو بررسی پشت‌سرهم همین را نشان دادند. وقتی این شبکه‌ها دوباره به نود برسند، هشدار بسته می‌شود.",
   "health.alert.country_blocked.why.tcp_blocked": "نقطه‌های سنجش داخل {country} ({networks}) به آدرس نود می‌رسند، اما TCP به {ports} وصل نمی‌شود: درخواست‌های اتصال در مسیر دور ریخته می‌شوند. دو بررسی پشت‌سرهم همین را نشان دادند. بعد از دو بررسی تمیز بسته می‌شود.",
   "health.alert.country_blocked.why.blocked": "نقطه‌های سنجش داخل {country} ({networks}) اصلاً به نود نمی‌رسند: نه جواب ping هست، نه اتصال TCP. دو بررسی پشت‌سرهم همین را نشان دادند. بعد از دو بررسی تمیز بسته می‌شود.",
+  "health.alert.country_blocked.why.reached_through_relays": "کاربران از راه رله‌ها به این نود می‌رسند: هر سروری از آن که به کاربران داده می‌شود رلهٔ سالم دارد، پس مسدودی در {country} آن‌ها را قطع نمی‌کند. اگر رله از کار بیفتد این هشدار به هشدار عادی تبدیل می‌شود و بعد از دو بررسی تمیز بسته می‌شود.",
   "health.alert.country_blocked.why.tspu": "نود سنجش تو داخل {country} می‌بیند TCP به {ports} در جعبهٔ فیلترینگ (TSPU) سر راه قطع می‌شود. این دید از دیتاسنتر است: در شبکه‌های خانگی ممکن است فرق کند. دو اجرای پشت‌سرهم همین را نشان دادند. بعد از دو بررسی تمیز بسته می‌شود.",
   "health.alert.country_blocked.why.conflict.tcp_blocked": "منبع‌ها با هم نمی‌خوانند: نقطه‌های سنجش {probes} داخل {country} ({networks}) می‌بینند TCP به {ports} قطع شده، اما بررسی‌های دیگر در آنجا نود را طور دیگری می‌بینند. نتیجهٔ بدتر نمایش داده شده است. دو بررسی پشت‌سرهم همین را نشان دادند. بعد از دو بررسی تمیز بسته می‌شود.",
   "health.alert.country_blocked.why.conflict.blocked": "منبع‌ها با هم نمی‌خوانند: نقطه‌های سنجش {probes} داخل {country} ({networks}) اصلاً به نود نمی‌رسند، نه جواب ping هست و نه اتصال TCP، اما بررسی‌های دیگر در آنجا طور دیگری می‌بینند. نتیجهٔ بدتر نمایش داده شده است. دو بررسی پشت‌سرهم همین را نشان دادند. بعد از دو بررسی تمیز بسته می‌شود.",
@@ -2611,6 +2618,7 @@ export const tr: typeof en = {
   "health.alert.country_blocked.why.partial": "{networks} ağlarındaki ev ve mobil ölçüm noktaları bu düğümden yanıt alamıyor, oysa diğer düğümlerine ulaşabiliyor; {country} içindeki diğer ağlar ise ona ulaşabiliyor. Üst üste iki kontrol bunu gördü. Bu ağlar düğüme yeniden ulaşınca uyarı kapanır.",
   "health.alert.country_blocked.why.tcp_blocked": "{country} içindeki ölçüm noktaları ({networks}) düğümün adresine ulaşıyor ama {ports} portlarına TCP bağlantısı kurulamıyor: bağlantı istekleri yolda düşürülüyor. Üst üste iki kontrol bunu gördü. İki temiz kontrolden sonra kapanır.",
   "health.alert.country_blocked.why.blocked": "{country} içindeki ölçüm noktaları ({networks}) düğüme hiç ulaşamıyor: ping'e yanıt yok, TCP bağlantısı da yok. Üst üste iki kontrol bunu gördü. İki temiz kontrolden sonra kapanır.",
+  "health.alert.country_blocked.why.reached_through_relays": "İnsanlar bu düğüme röleler üzerinden ulaşıyor: onlara verilen her sunucunun sağlam bir rölesi var, bu yüzden {country} içindeki engel onları kesmiyor. Bir röle çalışmayı bırakırsa uyarıya dönüşür, iki temiz kontrolden sonra kapanır.",
   "health.alert.country_blocked.why.tspu": "{country} içindeki ölçüm düğümün, yolundaki filtreleme cihazında (TSPU) {ports} portlarına TCP'nin kesildiğini görüyor. Bu bir veri merkezi bakışı: ev ağlarında durum farklı olabilir. Üst üste iki çalıştırma bunu gördü. İki temiz kontrolden sonra kapanır.",
   "health.alert.country_blocked.why.conflict.tcp_blocked": "Kaynaklar çelişiyor: {country} içindeki {probes} ölçüm noktaları ({networks}) {ports} portlarına TCP'nin kesildiğini görüyor; oradaki diğer kontroller ise düğümü farklı görüyor. Daha kötü sonuç gösteriliyor. Üst üste iki kontrol bunu gördü. İki temiz kontrolden sonra kapanır.",
   "health.alert.country_blocked.why.conflict.blocked": "Kaynaklar çelişiyor: {country} içindeki {probes} ölçüm noktaları ({networks}) düğüme hiç ulaşamıyor, ping'e yanıt yok, TCP bağlantısı da yok; oradaki diğer kontroller ise onu farklı görüyor. Daha kötü sonuç gösteriliyor. Üst üste iki kontrol bunu gördü. İki temiz kontrolden sonra kapanır.",

@@ -1035,6 +1035,12 @@ func (s *Service) reconcile(ctx context.Context, now time.Time, d *derived, acti
 				if err := s.st.TouchAlert(ctx, na, now); err != nil {
 					return err
 				}
+				if a.Severity < sevWarning && na.Severity >= sevWarning {
+					// An alert that rises out of info is news, as one that opens: the mute ended with the rise (TouchAlert).
+					up := a
+					up.Severity, up.WhyKey, up.Params, up.MutedUntil = na.Severity, na.WhyKey, na.Params, time.Time{}
+					s.transition(up, false)
+				}
 			}
 			continue
 		}
