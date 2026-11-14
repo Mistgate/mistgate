@@ -62,8 +62,8 @@ type Config struct {
 	AfterResponse AfterResponseRunner
 	// CheckPorts runs the fleet UDP delivery check; nil disables save-time checks.
 	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
-	// CheckRelay runs the fleet's check of a relay (fleet.CheckRelay): the stages it names (store.RelayStageLeg, RelayStagePath;
-	// none = both), the result stored in the relay and returned. nil: relays cannot be checked, so none is switched on.
+	// CheckRelay runs the fleet's check of a relay (fleet.CheckRelay): the stages it names (store.RelayStageLeg, RelayStagePath,
+	// RelayStageReverseReach, RelayStageReverseSpeed; none = leg and path), the result stored in the relay and returned. nil: relays cannot be checked, so none is switched on.
 	CheckRelay func(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
 	// Limiter is the shared backend for token user-change budgets and their refusal-event gate.
 	Limiter securitylimit.Limiter

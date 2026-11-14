@@ -64,7 +64,8 @@ func relayTools() []toolDef {
 				"Per server: its inbound_id (what relay_plan create takes), exit node, profile, protocol, network and port; unsupported (empty: it can be relayed; else cdn, acme_ip or build_failed); "+
 				"hop (the server has a hop range, a relay passes one port); relay_id (this entry already relays it); "+
 				"exit_country_check (how people inside the country see the exit: verdict ok, partial, blocked, listed or no_data, and the dark networks); "+
-				"entry_reaches_exit (does the entry itself reach the exit: reach, partial, blocked or no_data, from the TSPU probe when it ran from that entry). "+
+				"entry_reaches_exit (does the entry itself reach the exit: reach, partial, blocked or no_data, from the TSPU probe when it ran from that entry); "+
+				"exit_reaches_entry (does the exit reach the entry's own HTTPS site on TCP 443, the way a reverse relay needs: reach, partial, blocked or no_data, from the last relay check of that pair in a day). "+
 				"entry_country_check is the same view of the entry itself: a relay helps only where people can see the entry. no_data means unknown, not fine. Never an address. Stored data only.",
 			func(c *call, in relayCandidatesArg) (any, error) {
 				id, name, err := c.nodeRef(in.Node)
@@ -79,14 +80,14 @@ func relayTools() []toolDef {
 			}),
 
 		readToolWithin(applyTimeout, "relay_check", ProfileAdmin, procs(adminv1connect.RelayServiceCheckRelayProcedure),
-			"Check one relay now and store the result: the leg (the entry node tries the exit's server) and, when the relay is switched on, the path (a third node reaches the exit through the entry's port). "+
+			"Check one relay now and store the result: the leg (the entry node tries the exit's server), reverse_reach (the exit node tries the entry's own HTTPS site on TCP 443: it runs by itself when the leg fails, reverse_reach=true runs it anyway) and, when the relay is switched on, the path (a third node reaches the exit through the entry's port). "+
 				"It only sends test packets between the owner's nodes: it changes no switch and nothing on any host. It can take up to a minute. "+
 				"Switching a relay on needs a leg check made less than 15 minutes earlier that passed or was skipped as unverifiable; this is that check. Returns the relay with its new last_check.",
 			func(c *call, in relayCheckArg) (any, error) {
 				if err := validID("relay_id", in.RelayID); err != nil {
 					return nil, err
 				}
-				r, err := c.cl.Relay.CheckRelay(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.CheckRelayRequest{Id: in.RelayID}))
+				r, err := c.cl.Relay.CheckRelay(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.CheckRelayRequest{Id: in.RelayID, ReverseReach: in.ReverseReach}))
 				if err != nil {
 					return nil, apiError(err)
 				}
@@ -109,7 +110,8 @@ type relayCandidatesArg struct {
 }
 
 type relayCheckArg struct {
-	RelayID string `json:"relay_id" jsonschema:"a relay id from relays_list"`
+	RelayID      string `json:"relay_id" jsonschema:"a relay id from relays_list"`
+	ReverseReach bool   `json:"reverse_reach,omitempty" jsonschema:"also test whether the exit reaches the entry's site when the direct leg passes"`
 }
 
 const (
@@ -334,7 +336,11 @@ func relayCheckText(r *adminv1.Relay) string {
 		}
 		return t
 	}
-	return fmtTime(ck.GetAtUnix()) + ": " + stage("leg", ck.GetLeg()) + ", " + stage("path", ck.GetPath())
+	text := fmtTime(ck.GetAtUnix()) + ": " + stage("leg", ck.GetLeg()) + ", " + stage("path", ck.GetPath())
+	if ck.GetReverseReach().GetStatus() != "" { // the exit's own probe of the entry's site; only when it ran
+		text += ", " + stage("reverse_reach", ck.GetReverseReach()) + " at " + fmtTime(ck.GetReverseReach().GetAtUnix())
+	}
+	return text
 }
 
 func (c *call) relayChangePlan(a relayArgs) (*planned, error) {

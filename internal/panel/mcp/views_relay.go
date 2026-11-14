@@ -13,24 +13,32 @@ import (
 // the first colon, because the detail after it may name an address.
 
 type relayStageV struct {
-	Status  string `json:"status,omitempty"` // ok, fail, skipped; empty: did not run
-	Code    string `json:"code,omitempty"`
-	Sender  string `json:"sender,omitempty"` // the node that sent the probe, or "panel"
-	Verdict string `json:"verdict,omitempty"`
-	Sent    uint32 `json:"sent,omitempty"`
-	Got     uint32 `json:"got,omitempty"`
-	AtUnix  int64  `json:"at_unix,omitempty"`
+	Status      string  `json:"status,omitempty"` // ok, fail, skipped; empty: did not run
+	Code        string  `json:"code,omitempty"`
+	Sender      string  `json:"sender,omitempty"` // the node that sent the probe, or "panel"
+	Verdict     string  `json:"verdict,omitempty"`
+	Sent        uint32  `json:"sent,omitempty"`
+	Got         uint32  `json:"got,omitempty"`
+	AtUnix      int64   `json:"at_unix,omitempty"`
+	MB          uint32  `json:"mb,omitempty"`
+	MbitS       float64 `json:"mbit_s,omitempty"`
+	Bytes       uint64  `json:"bytes,omitempty"`
+	ConnectMS   uint32  `json:"connect_ms,omitempty"`
+	FirstByteMS uint32  `json:"first_byte_ms,omitempty"`
+	DurationMS  uint32  `json:"duration_ms,omitempty"`
 }
 
 type relayCheckV struct {
-	AtUnix   int64        `json:"at_unix"`
-	Network  string       `json:"network"`
-	Port     uint32       `json:"port"`
-	OK       bool         `json:"ok"`
-	Stage    string       `json:"failed_stage,omitempty"` // leg or path
-	Verified bool         `json:"verified"`               // both stages ran and passed: it works from outside
-	Leg      *relayStageV `json:"leg,omitempty"`
-	Path     *relayStageV `json:"path,omitempty"`
+	AtUnix       int64        `json:"at_unix"`
+	Network      string       `json:"network"`
+	Port         uint32       `json:"port"`
+	OK           bool         `json:"ok"`
+	Stage        string       `json:"failed_stage,omitempty"` // leg or path
+	Verified     bool         `json:"verified"`               // both stages ran and passed: it works from outside
+	Leg          *relayStageV `json:"leg,omitempty"`
+	Path         *relayStageV `json:"path,omitempty"`
+	ReverseReach *relayStageV `json:"reverse_reach,omitempty"`
+	ReverseSpeed *relayStageV `json:"reverse_speed,omitempty"`
 }
 
 type relayV struct {
@@ -61,7 +69,8 @@ func relayStageView(s *adminv1.RelayStage) *relayStageV {
 		return nil
 	}
 	return &relayStageV{Status: clean(s.GetStatus(), 12), Code: clean(s.GetCode(), 40), Sender: nm(s.GetSenderName()),
-		Verdict: clean(s.GetVerdict(), 12), Sent: s.GetSent(), Got: s.GetGot(), AtUnix: s.GetAtUnix()}
+		Verdict: clean(s.GetVerdict(), 12), Sent: s.GetSent(), Got: s.GetGot(), AtUnix: s.GetAtUnix(), MB: s.GetMb(), MbitS: s.GetMbitS(),
+		Bytes: s.GetBytes(), ConnectMS: s.GetConnectMs(), FirstByteMS: s.GetFirstByteMs(), DurationMS: s.GetDurationMs()}
 }
 
 func relayView(r *adminv1.Relay) relayV {
@@ -77,7 +86,8 @@ func relayView(r *adminv1.Relay) relayV {
 	}
 	if c := r.GetCheck(); c != nil && c.GetAtUnix() != 0 {
 		v.Check = &relayCheckV{AtUnix: c.GetAtUnix(), Network: clean(c.GetNetwork(), 8), Port: c.GetPort(), OK: c.GetOk(),
-			Stage: clean(c.GetStage(), 8), Verified: c.GetVerified(), Leg: relayStageView(c.GetLeg()), Path: relayStageView(c.GetPath())}
+			Stage: clean(c.GetStage(), 8), Verified: c.GetVerified(), Leg: relayStageView(c.GetLeg()), Path: relayStageView(c.GetPath()),
+			ReverseReach: relayStageView(c.GetReverseReach()), ReverseSpeed: relayStageView(c.GetReverseSpeed())}
 	}
 	return v
 }
@@ -152,6 +162,7 @@ type relayCandidateV struct {
 	RelayID     string         `json:"relay_id,omitempty"`    // this entry already relays it
 	Country     *relayCountryV `json:"exit_country_check,omitempty"`
 	Reach       *relayReachV   `json:"entry_reaches_exit,omitempty"`
+	ExitReaches *relayReachV   `json:"exit_reaches_entry,omitempty"`
 }
 
 // RelayCandidatesV is the relay_candidates result.
@@ -201,6 +212,9 @@ func relayCandidatesView(entryID, entryName string, r *adminv1.ListRelayCandidat
 		}
 		if x := c.GetReach(); x != nil {
 			row.Reach = &relayReachV{Verdict: clean(x.GetVerdict(), 12), Source: clean(x.GetSource(), 20), AtUnix: x.GetAtUnix()}
+		}
+		if x := c.GetExitReachesEntry(); x != nil {
+			row.ExitReaches = &relayReachV{Verdict: clean(x.GetVerdict(), 12), Source: clean(x.GetSource(), 20), AtUnix: x.GetAtUnix()}
 		}
 		v.Candidates = append(v.Candidates, row)
 	}

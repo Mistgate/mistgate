@@ -208,7 +208,7 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 	if s.cfg.CheckRelay == nil {
 		return nil, coded(connect.CodeFailedPrecondition, "check_unavailable")
 	}
-	c, err := s.cfg.CheckRelay(ctx, link.ID)
+	c, err := s.cfg.CheckRelay(ctx, link.ID, requestedRelayStages(req.Msg)...)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, notFound("relay")
@@ -216,7 +216,9 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 		return nil, s.internal("check relay", err)
 	}
 	s.audit(ctx, actor(ctx), "relay.check", map[string]any{"relay": link.ID, "via": link.ViaNodeName, "exit": link.ExitNodeName,
-		"ok": c.OK, "verified": c.Verified(), "stage": c.Stage, "leg": c.Leg.Status, "leg_code": c.Leg.Code, "path": c.Path.Status, "path_code": c.Path.Code})
+		"ok": c.OK, "verified": c.Verified(), "stage": c.Stage, "leg": c.Leg.Status, "leg_code": c.Leg.Code, "path": c.Path.Status, "path_code": c.Path.Code,
+		"reverse_reach": c.ReverseReach.Status, "reverse_reach_code": c.ReverseReach.Code, "reverse_speed": c.ReverseSpeed.Status,
+		"reverse_speed_code": c.ReverseSpeed.Code})
 	next, err := s.st.RelayLink(ctx, link.ID)
 	if err != nil {
 		return nil, s.internal("read relay", err)
@@ -239,10 +241,18 @@ func relayUnsupported(protocol string, spec plugin.InboundSpec) string {
 func relayCheckMsg(c store.RelayCheck, nameOf func(string) string) *adminv1.RelayCheck {
 	stage := func(s store.RelayStage) *adminv1.RelayStage {
 		return &adminv1.RelayStage{Status: s.Status, Code: s.Code, SenderId: s.Sender, SenderName: nameOf(s.Sender),
-			Verdict: s.Verdict, Sent: s.Sent, Got: s.Got, AtUnix: s.At}
+			Verdict: s.Verdict, Sent: s.Sent, Got: s.Got, AtUnix: s.At, Mb: s.MB, MbitS: s.MbitS, Bytes: s.Bytes,
+			ConnectMs: s.ConnectMS, FirstByteMs: s.FirstByteMS, DurationMs: s.DurationMS}
 	}
-	return &adminv1.RelayCheck{AtUnix: c.At, Network: c.Network, Port: uint32(c.Port), To: c.To, Leg: stage(c.Leg), Path: stage(c.Path),
+	msg := &adminv1.RelayCheck{AtUnix: c.At, Network: c.Network, Port: uint32(c.Port), To: c.To, Leg: stage(c.Leg), Path: stage(c.Path),
 		Ok: c.OK, Stage: c.Stage, Verified: c.Verified()}
+	if c.ReverseReach != (store.RelayStage{}) { // absent when it did not run
+		msg.ReverseReach = stage(c.ReverseReach)
+	}
+	if c.ReverseSpeed != (store.RelayStage{}) {
+		msg.ReverseSpeed = stage(c.ReverseSpeed)
+	}
+	return msg
 }
 
 // relayCheckOf is the message of the relay's latest check (nil before the first), naming the sending nodes.
@@ -405,6 +415,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 	}
 	for _, c := range out {
 		c.Country = hint(c.NodeId)
+		c.ExitReachesEntry = exitReachHint(links, c.NodeId, s.now())
 		if c.Reach = reach[c.NodeId]; c.Reach == nil {
 			c.Reach = &adminv1.RelayReachHint{Verdict: "no_data"}
 		}

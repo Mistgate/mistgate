@@ -138,16 +138,22 @@ func relayCounterStoreProof(t *testing.T, st *Store) {
 		t.Fatalf("prior day total still visible = %d, want 0", got)
 	}
 
-	check := RelayCheck{At: stamp(day2, 120), Network: "udp", Port: 443, To: "de1.example.invalid:443",
-		Leg: RelayStage{Status: "ok"}, Path: RelayStage{Status: "ok"}}
+	checkAt := stamp(day2, 120)
+	check := RelayCheck{At: checkAt, Network: "udp", Port: 443, To: "de1.example.invalid:443",
+		Leg: RelayStage{Status: "ok"}, Path: RelayStage{Status: "ok"},
+		ReverseReach: RelayStage{Status: "ok", Sender: "nod_b1_de1", At: checkAt},
+		ReverseSpeed: RelayStage{Status: "ok", Sender: "nod_b1_de1", At: checkAt, MB: 8, MbitS: 91.2, Bytes: 8 << 20,
+			ConnectMS: 12, FirstByteMS: 31, DurationMS: 730}}
 	check.Settle()
 	u := f.updates[0]
 	u.RelayCounters = RelayCounters{Bytes: 20, Packets: 2, CountedUnix: stamp(day2, 120)}
+	monitor := RelayMonitorCheck{AtUnix: checkAt, OK: true, Stage: "ok", ResponseMS: 18}
 	var wg sync.WaitGroup
-	errs := make(chan error, 2)
-	wg.Add(2)
+	errs := make(chan error, 3)
+	wg.Add(3)
 	go func() { defer wg.Done(); errs <- st.SetRelayCounters(ctx, f.entryID, []RelayCounterUpdate{u}) }()
 	go func() { defer wg.Done(); errs <- st.SetRelayCheck(ctx, u.RelayID, check) }()
+	go func() { defer wg.Done(); errs <- st.SetRelayMonitorCheck(ctx, u.RelayID, monitor) }()
 	wg.Wait()
 	close(errs)
 	for err := range errs {
@@ -160,8 +166,19 @@ func relayCounterStoreProof(t *testing.T, st *Store) {
 		t.Fatal(err)
 	}
 	gotCheck, ok := link.Check()
-	if !ok || gotCheck.Leg.Status != "ok" || gotCheck.Counters == nil || gotCheck.Counters.Bytes != 20 || gotCheck.Counters.TodayBytes != 10 {
+	if !ok || gotCheck.Leg.Status != "ok" || gotCheck.ReverseReach != check.ReverseReach || gotCheck.ReverseSpeed != check.ReverseSpeed ||
+		gotCheck.Monitor == nil || *gotCheck.Monitor != monitor || gotCheck.Counters == nil || gotCheck.Counters.Bytes != 20 || gotCheck.Counters.TodayBytes != 10 {
 		t.Fatalf("concurrent check/counter writes lost a member: %+v", gotCheck)
+	}
+	var atType, portType, mbType, bytesType, todayDayType string
+	if err := st.R.QueryRowContext(ctx, `SELECT json_type(check_json, '$.at'), json_type(check_json, '$.port'),
+		json_type(check_json, '$.reverse_speed.mb'), json_type(check_json, '$.reverse_speed.bytes'),
+		json_type(check_json, '$.counters.today_day') FROM relay WHERE id = ?`, u.RelayID).
+		Scan(&atType, &portType, &mbType, &bytesType, &todayDayType); err != nil {
+		t.Fatal(err)
+	}
+	if atType != "integer" || portType != "integer" || mbType != "integer" || bytesType != "integer" || todayDayType != "integer" {
+		t.Fatalf("JSON number types = at %q port %q speed mb %q bytes %q counter day %q, want integer", atType, portType, mbType, bytesType, todayDayType)
 	}
 
 	// A snapshot repeated with the same time (a retried report) is not counted twice, and a deleted relay takes its share.

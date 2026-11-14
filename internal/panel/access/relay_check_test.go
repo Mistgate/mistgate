@@ -21,12 +21,14 @@ import (
 // fakeChecker answers CheckRelay as the fleet does: stages that run take the configured answer, the others keep the last
 // check of the same target; the result is stored in the relay.
 type fakeChecker struct {
-	f     *relayFix
-	mu    sync.Mutex
-	leg   store.RelayStage
-	path  store.RelayStage
-	err   error
-	calls [][]string
+	f    *relayFix
+	mu   sync.Mutex
+	leg  store.RelayStage
+	path store.RelayStage
+	// reverse and speed are what the reverse stages answer when they are asked for.
+	reverse, speed store.RelayStage
+	err            error
+	calls          [][]string
 	// provenAtPath is what the relay's Proven said when the path was asked for, in the order of the asks.
 	provenAtPath []bool
 }
@@ -58,6 +60,14 @@ func (c *fakeChecker) check(ctx context.Context, id string, stages ...string) (s
 	if runPath {
 		out.Path = c.path
 		out.Path.At = now
+	}
+	if slices.Contains(stages, store.RelayStageReverseReach) {
+		out.ReverseReach = c.reverse
+		out.ReverseReach.At = now
+	}
+	if slices.Contains(stages, store.RelayStageReverseSpeed) {
+		out.ReverseSpeed = c.speed
+		out.ReverseSpeed.At = now
 	}
 	out.Settle()
 	return out, c.f.st.SetRelayCheck(ctx, id, out)
@@ -165,6 +175,62 @@ func TestCheckRelayRPCStoresAndAuditsAndSwitchesNothing(t *testing.T) {
 	chk = must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id}))).Msg.Relay.Check
 	if chk.Ok || chk.Stage != "leg" || chk.Leg.Code != "timeout" {
 		t.Fatalf("failed check = %+v", chk)
+	}
+}
+
+func TestCheckRelayRPCAsksForTheReverseStagesOnlyWhenToldTo(t *testing.T) {
+	f, c, r := newCheckedFix(t)
+	c.reverse = store.RelayStage{Status: "ok", Sender: "nod_de1", Verdict: "ours"}
+	c.speed = store.RelayStage{Status: "ok", Sender: "nod_de1", MB: 8, MbitS: 91.5, Bytes: 8 << 20, ConnectMS: 12, FirstByteMS: 30, DurationMS: 700}
+
+	chk := must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id}))).Msg.Relay.Check
+	if chk.ReverseReach != nil || chk.ReverseSpeed != nil || len(c.calls[0]) != 0 {
+		t.Fatalf("a plain check ran or showed a reverse stage: %+v, asked for %v", chk, c.calls[0])
+	}
+	chk = must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id, ReverseReach: true}))).Msg.Relay.Check
+	if !slices.Equal(c.calls[1], []string{"leg", "path", "reverse_reach"}) || chk.ReverseReach.GetStatus() != "ok" || chk.ReverseReach.SenderName != "de1" ||
+		chk.ReverseReach.Verdict != "ours" || chk.ReverseSpeed != nil {
+		t.Fatalf("reverse reach asked for: %v, %+v", c.calls[1], chk)
+	}
+	chk = must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id, ReverseSpeed: true}))).Msg.Relay.Check
+	sp := chk.ReverseSpeed
+	if !slices.Equal(c.calls[2], []string{"leg", "path", "reverse_reach", "reverse_speed"}) || chk.ReverseReach.GetStatus() != "ok" ||
+		sp.GetStatus() != "ok" || sp.Mb != 8 || sp.MbitS != 91.5 || sp.Bytes != 8<<20 || sp.ConnectMs != 12 || sp.FirstByteMs != 30 || sp.DurationMs != 700 {
+		t.Fatalf("speed proof asked for: %v, %+v", c.calls[2], chk)
+	}
+	rows := f.audited("relay.check")
+	if len(rows) != 3 || !strings.Contains(rows[0].Params, `"reverse_speed":"ok"`) || strings.Contains(rows[2].Params, `"reverse_reach":"ok"`) {
+		t.Fatalf("audit: %+v", rows)
+	}
+}
+
+func TestListRelayCandidatesShowsWhatTheExitsProbeFound(t *testing.T) {
+	f, c, r := newCheckedFix(t)
+	other := f.inbound(f.vlessProfile("reality").Id, "nod_de1") // a second server of the same exit, no relay
+	list := func() map[string]*adminv1.RelayCandidate {
+		out := map[string]*adminv1.RelayCandidate{}
+		for _, cand := range must(f.s.ListRelayCandidates(f.ctx, req(&adminv1.ListRelayCandidatesRequest{ViaNodeId: "nod_fi1"}))).Msg.Candidates {
+			out[cand.InboundId] = cand
+		}
+		return out
+	}
+	if h := list()[other.Id].ExitReachesEntry; h == nil || h.Verdict != "no_data" || h.Source != "" || h.AtUnix != 0 {
+		t.Fatalf("before any check: %+v", h)
+	}
+	c.leg = store.RelayStage{Status: "fail", Code: "timeout", Sender: "nod_fi1", Verdict: "timeout"}
+	c.reverse = store.RelayStage{Status: "ok", Sender: "nod_de1", Verdict: "ours"}
+	must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id, ReverseReach: true})))
+	// the finding is about the pair (this entry, this exit), so every server of the exit shows it
+	for _, id := range []string{f.server.Id, other.Id} {
+		h := list()[id].ExitReachesEntry
+		if h == nil || h.Verdict != "reach" || h.Source != "exit_probe" || h.AtUnix != f.clock.Unix() {
+			t.Errorf("%s: exit_reaches_entry = %+v", id, h)
+		}
+	}
+	c.reverse = store.RelayStage{Status: "fail", Code: "timeout", Sender: "nod_de1", Verdict: "timeout"}
+	must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id, ReverseReach: true})))
+	if h := list()[other.Id].ExitReachesEntry; h.Verdict != "blocked" {
+		t.Errorf("after a timeout: %+v", h)
 	}
 }
 

@@ -30,6 +30,8 @@ type relayFixture struct {
 	order            []string
 	creates          []*adminv1.CreateRelayRequest
 	updates          []*adminv1.UpdateRelayRequest
+	checks           []*adminv1.CheckRelayRequest
+	reverseReach     *adminv1.RelayStage // what the check answers as reverse_reach
 }
 
 func newRelayFixture() relayFixture {
@@ -117,6 +119,7 @@ func (w *world) CheckRelay(_ context.Context, r *connect.Request[adminv1.CheckRe
 		return nil, relayCoded(connect.CodeNotFound, "relay not found")
 	}
 	f.log("check")
+	f.checks = append(f.checks, r.Msg)
 	leg := &adminv1.RelayStage{Status: "ok", SenderName: x.GetViaNodeName(), AtUnix: 1790842000}
 	if f.legFail != "" {
 		leg = &adminv1.RelayStage{Status: "fail", Code: f.legFail, SenderName: x.GetViaNodeName(), AtUnix: 1790842000}
@@ -131,7 +134,7 @@ func (w *world) CheckRelay(_ context.Context, r *connect.Request[adminv1.CheckRe
 			path = &adminv1.RelayStage{Status: "ok", SenderName: "panel", AtUnix: 1790842000}
 		}
 	}
-	x.Check = &adminv1.RelayCheck{AtUnix: 1790842000, Network: x.GetNetwork(), Port: x.GetPort(), To: canaryAddr + ":443", Leg: leg, Path: path,
+	x.Check = &adminv1.RelayCheck{AtUnix: 1790842000, Network: x.GetNetwork(), Port: x.GetPort(), To: canaryAddr + ":443", Leg: leg, Path: path, ReverseReach: f.reverseReach,
 		Ok:       (leg.Status == "ok" || (leg.Status == "skipped" && leg.GetCode() == "unverifiable")) && path.Status != "fail",
 		Verified: leg.Status == "ok" && path.Status == "ok"}
 	return connect.NewResponse(&adminv1.CheckRelayResponse{Relay: x}), nil
@@ -217,9 +220,16 @@ func (w *world) DeleteRelay(_ context.Context, r *connect.Request[adminv1.Delete
 // ---------------------------------------------------------------------------------------------------------------------
 
 type relayStageResult struct {
-	Status string `json:"status"`
-	Code   string `json:"code"`
-	Sender string `json:"sender"`
+	Status      string  `json:"status"`
+	Code        string  `json:"code"`
+	Sender      string  `json:"sender"`
+	AtUnix      int64   `json:"at_unix"`
+	MB          uint32  `json:"mb"`
+	MbitS       float64 `json:"mbit_s"`
+	Bytes       uint64  `json:"bytes"`
+	ConnectMS   uint32  `json:"connect_ms"`
+	FirstByteMS uint32  `json:"first_byte_ms"`
+	DurationMS  uint32  `json:"duration_ms"`
 }
 
 type relayResult struct {
@@ -233,11 +243,13 @@ type relayResult struct {
 	State         string `json:"state"`
 	LastErrorCode string `json:"last_error_code"`
 	Check         *struct {
-		OK       bool              `json:"ok"`
-		Verified bool              `json:"verified"`
-		Stage    string            `json:"failed_stage"`
-		Leg      *relayStageResult `json:"leg"`
-		Path     *relayStageResult `json:"path"`
+		OK           bool              `json:"ok"`
+		Verified     bool              `json:"verified"`
+		Stage        string            `json:"failed_stage"`
+		Leg          *relayStageResult `json:"leg"`
+		Path         *relayStageResult `json:"path"`
+		ReverseReach *relayStageResult `json:"reverse_reach"`
+		ReverseSpeed *relayStageResult `json:"reverse_speed"`
 	} `json:"last_check"`
 }
 
@@ -384,6 +396,50 @@ func TestRelayCheckIsAnAdminReadWithoutAPlan(t *testing.T) {
 	}
 	if got := mustFail(t, s, "relay_check", map[string]any{"relay_id": "rly_missing"}); !strings.Contains(got, "not_found") {
 		t.Errorf("unknown relay: %q", got)
+	}
+}
+
+func TestRelayCheckShowsTheReverseStagesAndAsksForThemOnlyWhenToldTo(t *testing.T) {
+	e := newTestEnv(t)
+	e.w.relay.legFail = "timeout"
+	e.w.relay.reverseReach = &adminv1.RelayStage{Status: "ok", SenderName: "de1", Verdict: "ours", AtUnix: 1790842001}
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	out := mustOK(t, s, "relay_check", map[string]any{"relay_id": "rly_2"})
+	noCanary(t, "relay_check", out)
+	r := decode[relayResult](t, out)
+	if r.Check == nil || r.Check.ReverseReach == nil || r.Check.ReverseReach.Status != "ok" || r.Check.ReverseReach.Sender != "de1" ||
+		r.Check.ReverseReach.AtUnix != 1790842001 || r.Check.ReverseSpeed != nil {
+		t.Fatalf("relay_check reverse stages = %+v", r.Check)
+	}
+	mustOK(t, s, "relay_check", map[string]any{"relay_id": "rly_2", "reverse_reach": true})
+	f := &e.w.relay
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.checks) != 2 || f.checks[0].GetReverseReach() || f.checks[0].GetReverseSpeed() || !f.checks[1].GetReverseReach() || f.checks[1].GetReverseSpeed() {
+		t.Fatalf("check requests = %+v; want the speed proof never asked for through MCP (path_speed has its own plan)", f.checks)
+	}
+}
+
+func TestRelayCandidatesShowWhetherTheExitReachesTheEntry(t *testing.T) {
+	e := newTestEnv(t)
+	e.w.relay.cands[0].ExitReachesEntry = &adminv1.RelayReachHint{Verdict: "reach", Source: "exit_probe", AtUnix: 1790842001}
+	_, secret := e.token(ProfileReadonly)
+	out := mustOK(t, e.session(secret), "relay_candidates", map[string]any{"node": "nl1"})
+	noCanary(t, "relay_candidates", out)
+	got := decode[struct {
+		Candidates []struct {
+			InboundID   string `json:"inbound_id"`
+			ExitReaches *struct {
+				Verdict string `json:"verdict"`
+				Source  string `json:"source"`
+				AtUnix  int64  `json:"at_unix"`
+			} `json:"exit_reaches_entry"`
+		} `json:"candidates"`
+	}](t, out)
+	if len(got.Candidates) < 2 || got.Candidates[0].ExitReaches == nil || got.Candidates[0].ExitReaches.Verdict != "reach" ||
+		got.Candidates[0].ExitReaches.Source != "exit_probe" || got.Candidates[0].ExitReaches.AtUnix != 1790842001 || got.Candidates[1].ExitReaches != nil {
+		t.Fatalf("candidates = %+v", got.Candidates)
 	}
 }
 

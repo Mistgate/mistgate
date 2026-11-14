@@ -12,20 +12,28 @@ import (
 
 // The stages of a check, as RelayCheck.Stage names them.
 const (
-	RelayStageLeg  = "leg"  // the entry node to the exit's server
-	RelayStagePath = "path" // a third node to the entry's forwarded port, counted at the exit
+	RelayStageLeg          = "leg"           // the entry node to the exit's server
+	RelayStagePath         = "path"          // a third node to the entry's forwarded port, counted at the exit
+	RelayStageReverseReach = "reverse_reach" // the exit node to the entry's HTTPS site
+	RelayStageReverseSpeed = "reverse_speed" // an explicit speed test from the exit node to the entry
 )
 
 // RelayStage is one stage of a check. Status is "ok", "fail", "skipped" or "" (did not run); Code says why a stage failed or
 // was skipped (the words of relay.proto RelayStage.code); Sender is the node id that sent the probe, or "panel".
 type RelayStage struct {
-	Status  string `json:"status,omitempty"`
-	Code    string `json:"code,omitempty"`
-	Sender  string `json:"sender,omitempty"`
-	Verdict string `json:"verdict,omitempty"`
-	Sent    uint32 `json:"sent,omitempty"`
-	Got     uint32 `json:"got,omitempty"`
-	At      int64  `json:"at,omitempty"`
+	Status      string  `json:"status,omitempty"`
+	Code        string  `json:"code,omitempty"`
+	Sender      string  `json:"sender,omitempty"`
+	Verdict     string  `json:"verdict,omitempty"`
+	Sent        uint32  `json:"sent,omitempty"`
+	Got         uint32  `json:"got,omitempty"`
+	At          int64   `json:"at,omitempty"`
+	MB          uint32  `json:"mb,omitempty"`
+	MbitS       float64 `json:"mbit_s,omitempty"`
+	Bytes       uint64  `json:"bytes,omitempty"`
+	ConnectMS   uint32  `json:"connect_ms,omitempty"`
+	FirstByteMS uint32  `json:"first_byte_ms,omitempty"`
+	DurationMS  uint32  `json:"duration_ms,omitempty"`
 }
 
 // Unverifiable says the stage was skipped because it could not attribute a TLS identity to the server.
@@ -104,16 +112,18 @@ type RelayCounterUpdate struct {
 // RelayCheck is what the last check of a relay found. Port and To are what it was made for: a relay moved to another port or
 // pointed at another address is not covered by it.
 type RelayCheck struct {
-	At       int64              `json:"at,omitempty"`
-	Network  string             `json:"network,omitempty"`
-	Port     uint16             `json:"port,omitempty"`
-	To       string             `json:"to,omitempty"` // the exit's address:port
-	Leg      RelayStage         `json:"leg"`
-	Path     RelayStage         `json:"path"`
-	OK       bool               `json:"ok"`              // the leg ran and no stage that ran failed
-	Stage    string             `json:"stage,omitempty"` // the first stage that failed
-	Monitor  *RelayMonitorCheck `json:"monitor,omitempty"`
-	Counters *RelayCounters     `json:"counters,omitempty"`
+	At           int64              `json:"at,omitempty"`
+	Network      string             `json:"network,omitempty"`
+	Port         uint16             `json:"port,omitempty"`
+	To           string             `json:"to,omitempty"` // the exit's address:port
+	Leg          RelayStage         `json:"leg"`
+	Path         RelayStage         `json:"path"`
+	ReverseReach RelayStage         `json:"reverse_reach,omitzero"`
+	ReverseSpeed RelayStage         `json:"reverse_speed,omitzero"`
+	OK           bool               `json:"ok"`              // the leg ran and no stage that ran failed
+	Stage        string             `json:"stage,omitempty"` // the first direct stage that failed
+	Monitor      *RelayMonitorCheck `json:"monitor,omitempty"`
+	Counters     *RelayCounters     `json:"counters,omitempty"`
 }
 
 // Settle recomputes OK and Stage from the two stages. An unverifiable leg is not a failure: its owner may choose to enable the
@@ -166,9 +176,11 @@ func (s *Store) SetRelayCheck(ctx context.Context, id string, c RelayCheck) erro
 	if err != nil {
 		return err
 	}
+	// D1 can bind a number as REAL. Cast the root timestamp and port so json_set writes integers into the check document.
 	res, err := s.W.ExecContext(ctx, `UPDATE relay SET check_json = json_patch(
-		json_remove(COALESCE(check_json, '{}'), '$.at', '$.network', '$.port', '$.to', '$.leg', '$.path', '$.ok', '$.stage'), ?)
-		WHERE id = ?`, string(b), id)
+		json_remove(COALESCE(check_json, '{}'), '$.at', '$.network', '$.port', '$.to', '$.leg', '$.path', '$.reverse_reach', '$.reverse_speed', '$.ok', '$.stage'),
+		json_set(json(?), '$.at', CAST(? AS INTEGER), '$.port', CAST(? AS INTEGER)))
+		WHERE id = ?`, string(b), c.At, c.Port, id)
 	if err != nil {
 		return err
 	}

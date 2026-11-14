@@ -25,23 +25,25 @@ import (
 //     server and UDP is counted at the exit, after it went through the entry's DNAT. The panel itself sends only when no
 //     third node can.
 //
-// The whole check holds the exit's port-check gate (acquirePortCheck): the exit has one UDP counter table, and a relay check and
-// a port check must not arm it at once. The result goes into the relay (check_json) and comes back; it is the caller's to act on
-// (the gate that switches a relay on is in the access module).
+// The whole check holds both nodes' port-check gates (acquirePortCheck): the exit has one UDP counter table, and the reverse
+// probe targets the entry. A relay check and a port check must not measure either node at once. The result goes into the relay
+// (check_json) and comes back; it is the caller's to act on (the gate that switches a relay on is in the access module).
 //
-// stages names what to run (store.RelayStageLeg, store.RelayStagePath; none = both). A stage that does not run keeps what the
-// last check said, when that check was made for the same target (the leg does not depend on the entry's port).
+// stages names what to run (store.RelayStageLeg, RelayStagePath, RelayStageReverseReach or RelayStageReverseSpeed; none = leg
+// and path). A reverse reach check also runs after a failed leg. The speed proof only runs when named.
 func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error) {
 	runLeg, runPath := len(stages) == 0 || slices.Contains(stages, store.RelayStageLeg), len(stages) == 0 || slices.Contains(stages, store.RelayStagePath)
+	requestReverseReach := slices.Contains(stages, store.RelayStageReverseReach)
+	runReverseSpeed := slices.Contains(stages, store.RelayStageReverseSpeed)
 	link, err := f.st.RelayLink(ctx, relayID)
 	if err != nil {
 		return store.RelayCheck{}, err
 	}
-	lock, _, _, err := f.acquirePortCheck(ctx, link.ExitNodeID)
+	release, err := f.acquireRelayPortChecks(ctx, link.ViaNodeID, link.ExitNodeID)
 	if err != nil {
 		return store.RelayCheck{}, err
 	}
-	defer func() { <-lock.gate }()
+	defer release()
 	// what the owner did while this check waited for the exit's gate counts
 	if link, err = f.st.RelayLink(ctx, relayID); err != nil {
 		return store.RelayCheck{}, err
@@ -70,6 +72,11 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 			check.Leg = prev.Leg
 		}
 	}
+	if prev, ok := link.Check(); ok {
+		// the reverse stages answer a question of the entry's site, not of this run's target: one that does not run keeps what the
+		// last check found, and its own at_unix says how old that is
+		check.ReverseReach, check.ReverseSpeed = prev.ReverseReach, prev.ReverseSpeed
+	}
 	rc := relayRun{f: f, link: link, entry: entry, exit: exit, spec: spec, row: row, now: now}
 	if specErr == nil {
 		liveRows, err := f.Live(ctx)
@@ -97,6 +104,31 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 			}
 		default:
 			check.Path = rc.path(ctx)
+		}
+	}
+	runReverseReach := requestReverseReach || runLeg && check.Leg.Status == "fail"
+	if runReverseReach || runReverseSpeed {
+		if rc.live == nil {
+			liveRows, err := f.Live(ctx)
+			if err != nil {
+				f.log.Warn("relay reverse check: read live nodes", "code", "store_failed", "relay", link.ID, "err", err)
+				if runReverseReach {
+					check.ReverseReach = rc.stage("fail", "failed", "")
+				}
+				if runReverseSpeed {
+					check.ReverseSpeed = rc.stage("fail", "failed", "")
+				}
+			} else {
+				rc.live = liveRowsByID(liveRows)
+			}
+		}
+		if rc.live != nil {
+			if runReverseReach {
+				check.ReverseReach = rc.reverseReach(ctx)
+			}
+			if runReverseSpeed {
+				check.ReverseSpeed = rc.reverseSpeed(ctx)
+			}
 		}
 	}
 	check.Settle()
