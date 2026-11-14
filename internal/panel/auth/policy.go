@@ -334,6 +334,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.AssistantServiceRemoveProviderKeyProcedure:       levelOwner,
 	adminv1connect.AssistantServiceListProviderModelsProcedure:      levelOwner,
 	adminv1connect.AssistantServiceListConversationsProcedure:       levelRead,
+	adminv1connect.AssistantServiceRecentQuestionsProcedure:         levelRead,
 	adminv1connect.AssistantServiceGetConversationProcedure:         levelRead,
 	adminv1connect.AssistantServiceDeleteConversationProcedure:      levelRead,
 	adminv1connect.AssistantServiceDeleteAllConversationsProcedure:  levelRead,
