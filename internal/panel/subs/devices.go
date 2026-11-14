@@ -37,7 +37,7 @@ import (
 //
 // Answers carry `Cache-Control: no-store`. The keys are never embedded in the page: they leave only through these calls,
 // on demand. Every call goes through http.CrossOriginProtection (a browser page of another origin cannot post), counts
-// against a per-token hourly budget of its own, and is refused when the admin switched self-service off.
+// against a per-token-and-network hourly budget of its own, with a larger per-token ceiling, and is refused when the admin switched self-service off.
 
 // Devices is what the endpoints call; *access.Service implements it. A Source that does not leaves the endpoints off.
 type Devices interface {
@@ -257,7 +257,7 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 		}
 	}
 	// The keys leave only for a user who can use them; removing a device and renaming one never hurt.
-	if !h.admitWrite(r.Context(), w, token, v, rest == "" || action == "configs" || action == "rotate") {
+	if !h.admitWrite(r.Context(), w, token, client, v, rest == "" || action == "configs" || action == "rotate") {
 		return
 	}
 
@@ -354,7 +354,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 			jsonError(w, http.StatusForbidden, off, "")
 			return access.SubView{}, nil, false
 		}
-		if retry := h.writeWait(ctx, token); retry > 0 {
+		if retry := h.writeWait(ctx, token, client); retry > 0 {
 			if !h.confirmCachedToken(ctx, w, r, token, client) {
 				return access.SubView{}, nil, false
 			}
@@ -410,50 +410,70 @@ func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter,
 }
 
 // admitWrite is the end of the shared start: the user's status (needActive: the call needs a user who can use the
-// servers, 409 user_inactive otherwise) and the hourly budget of writes of the token (429), counted for the devices and
-// the DNS together. It answers and returns false when the call ends there.
-func (h *handler) admitWrite(ctx context.Context, w http.ResponseWriter, token string, v access.SubView, needActive bool) bool {
+// servers, 409 user_inactive otherwise) and the hourly budget of writes for the token and client network (429), counted
+// for the devices and the DNS together. It answers and returns false when the call ends there.
+func (h *handler) admitWrite(ctx context.Context, w http.ResponseWriter, token, client string, v access.SubView, needActive bool) bool {
 	if needActive && v.Status != access.StatusActive {
 		jsonError(w, http.StatusConflict, "user_inactive", v.Status)
 		return false
 	}
-	if retry := h.writeAdmit(ctx, token); retry > 0 {
+	if retry := h.writeAdmit(ctx, token, client); retry > 0 {
 		tooManyWrites(w, retry)
 		return false
 	}
 	return true
 }
 
-func (h *handler) writeWait(ctx context.Context, token string) time.Duration {
+func (h *handler) writeWait(ctx context.Context, token, client string) time.Duration {
 	if h.cfg.MaxWritesPerHour < 0 {
 		return 0
 	}
-	d, err := h.cfg.Limiter.Peek(ctx, h.writeWindow(), "t:"+token)
-	if err != nil {
-		return time.Hour
-	}
-	if !d.Allowed {
-		return d.RetryAfter
+	for _, counter := range h.writeCounters(token, client) {
+		d, err := h.cfg.Limiter.Peek(ctx, counter.window, counter.key)
+		if err != nil {
+			return time.Hour
+		}
+		if !d.Allowed {
+			return d.RetryAfter
+		}
 	}
 	return 0
 }
 
-func (h *handler) writeAdmit(ctx context.Context, token string) time.Duration {
+func (h *handler) writeAdmit(ctx context.Context, token, client string) time.Duration {
 	if h.cfg.MaxWritesPerHour < 0 {
 		return 0
 	}
-	d, err := h.cfg.Limiter.Record(ctx, h.writeWindow(), "t:"+token)
-	if err != nil {
-		return time.Hour
-	}
-	if !d.Allowed {
-		return d.RetryAfter
+	for _, counter := range h.writeCounters(token, client) {
+		d, err := h.cfg.Limiter.Record(ctx, counter.window, counter.key)
+		if err != nil {
+			return time.Hour
+		}
+		if !d.Allowed {
+			return d.RetryAfter
+		}
 	}
 	return 0
 }
 
-func (h *handler) writeWindow() securitylimit.Window {
-	return securitylimit.Window{Name: "subscription-writes", Limit: h.cfg.MaxWritesPerHour, Span: time.Hour}
+type writeCounter struct {
+	window securitylimit.Window
+	key    string
+}
+
+func (h *handler) writeCounters(token, client string) []writeCounter {
+	counters := make([]writeCounter, 0, 2)
+	if client != "" {
+		counters = append(counters, writeCounter{
+			window: securitylimit.Window{Name: "subscription-writes-client", Limit: h.cfg.MaxWritesPerHour, Span: time.Hour},
+			key:    tokenClientLimitKey(token, client),
+		})
+	}
+	counters = append(counters, writeCounter{
+		window: securitylimit.Window{Name: "subscription-writes", Limit: maxWritesPerTokenHour, Span: time.Hour},
+		key:    "t:" + token,
+	})
+	return counters
 }
 
 func tooManyWrites(w http.ResponseWriter, retry time.Duration) {

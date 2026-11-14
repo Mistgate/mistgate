@@ -814,8 +814,11 @@ func TestEnrolBudgets(t *testing.T) {
 		if rec.Code != 429 || rec.Header().Get("Retry-After") == "" {
 			t.Fatalf("third write = %d %q", rec.Code, rec.Body.String())
 		}
-		if got := e.limiter.count("subscription-writes"); got != 3 {
-			t.Errorf("writes recorded %d times, want 3", got)
+		if got := e.limiter.count("subscription-writes-client"); got != 3 {
+			t.Errorf("client-network writes recorded %d times, want 3", got)
+		}
+		if got := e.limiter.count("subscription-writes"); got != 2 {
+			t.Errorf("per-token writes recorded %d times, want two allowed writes", got)
 		}
 	})
 }

@@ -2,6 +2,7 @@ package subs_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -226,16 +227,17 @@ func TestWrongPasswordsAreCountedPerTokenAndLimited(t *testing.T) {
 			t.Fatal("a wrong password got a cookie")
 		}
 	}
-	// locked: even the right password waits
+	// This network is locked, even when the password is right.
 	rec := g.unlock(t, tok, pw)
 	if rec.Code != 429 || rec.Header().Get("Retry-After") == "" || decodeAnswer(t, rec).Error != "locked" {
 		t.Fatalf("lockout: %d %v %s", rec.Code, rec.Header(), rec.Body.String())
 	}
-	g.ip = "203.0.113.50" // another network, same token: the token's count still holds
-	if rec := g.unlock(t, tok, pw); rec.Code != 429 {
-		t.Fatalf("another network could pass the token's lockout: %d", rec.Code)
+	g.ip = "198.51.100.8" // another network, same token
+	if rec := g.unlock(t, tok, pw); rec.Code != 200 {
+		t.Fatalf("another network was caught by the first network's lockout: %d %s", rec.Code, rec.Body.String())
 	}
 	g.now = g.now.Add(10*time.Minute + time.Second)
+	g.ip = "198.51.100.7"
 	if rec := g.unlock(t, tok, pw); rec.Code != 200 {
 		t.Fatalf("after the window: %d %s", rec.Code, rec.Body.String())
 	}
@@ -276,19 +278,42 @@ func TestCookieOfAPlainHTTPInstanceIsNotSecure(t *testing.T) {
 	}
 }
 
-func TestWrongPasswordsAreCountedPerClientNetworkToo(t *testing.T) {
+func TestWrongPasswordBudgetsArePerTokenAndClientNetwork(t *testing.T) {
 	g := newGate(t, nil)
 	uidA, a := g.newUser("alice", nil)
-	_, b := g.newUser("bob", nil)
-	for i := 0; i < 5; i++ { // one client network guessing at two links
-		g.unlock(t, []string{a, b}[i%2], "aaaa-bbbb")
+	uidB, b := g.newUser("bob", nil)
+	for i := 0; i < 5; i++ {
+		if rec := g.unlock(t, a, "aaaa-bbbb"); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("wrong password %d: %d %s", i+1, rec.Code, rec.Body.String())
+		}
 	}
 	if rec := g.unlock(t, a, g.password(uidA)); rec.Code != 429 {
-		t.Fatalf("the client network is not limited across tokens: %d", rec.Code)
+		t.Fatalf("network X was not locked for this token: %d", rec.Code)
 	}
 	g.ip = "203.0.113.50"
 	if rec := g.unlock(t, a, g.password(uidA)); rec.Code != 200 {
-		t.Fatalf("another network was caught by someone else's guesses: %d", rec.Code)
+		t.Fatalf("network Y was caught by network X's guesses: %d %s", rec.Code, rec.Body.String())
+	}
+	g.ip = "198.51.100.7"
+	if rec := g.unlock(t, b, g.password(uidB)); rec.Code != 200 {
+		t.Fatalf("network X's guesses for alice limited bob's token: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUnlockTokenCeilingAcrossClientNetworks(t *testing.T) {
+	g := newGate(t, nil)
+	_, tok := g.newUser("alice", nil)
+	for network := 1; network <= 10; network++ {
+		g.ip = fmt.Sprintf("203.0.113.%d", network)
+		for i := 0; i < 5; i++ {
+			if rec := g.unlock(t, tok, "aaaa-bbbb"); rec.Code != http.StatusUnauthorized {
+				t.Fatalf("network %d wrong password %d: %d %s", network, i+1, rec.Code, rec.Body.String())
+			}
+		}
+	}
+	g.ip = "203.0.113.11"
+	if rec := g.unlock(t, tok, "aaaa-bbbb"); rec.Code != http.StatusTooManyRequests || decodeAnswer(t, rec).Error != "locked" {
+		t.Fatalf("per-token password ceiling: %d %s", rec.Code, rec.Body.String())
 	}
 }
 

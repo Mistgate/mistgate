@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -41,10 +43,14 @@ func (fakeDevs) RevokeOwnDevice(context.Context, string, string, string) error {
 // cost one per request. An unknown token still gets the decoy first, whatever else is wrong with the request.
 func TestRefusedCallsDoNotBuildTheView(t *testing.T) {
 	src := &fakeSrc{valid: map[string]access.SubView{tokA: {UserName: "alice", Status: access.StatusActive}}}
-	h := Handler(fakeDevs{src}, decoyHandler, Config{MaxWritesPerHour: 2, MinInterval: -1, MaxPerHour: -1})
+	h := Handler(fakeDevs{src}, decoyHandler, Config{
+		MaxWritesPerHour: 2, MinInterval: -1, MaxPerHour: -1,
+		ClientIP: func(req *http.Request) netip.Addr { a, _ := netip.ParseAddr(req.Header.Get("X-Test-IP")); return a },
+	})
 	post := func(token string, hdr ...string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest("POST", "/"+token+"/devices/dev_abcde/rename", strings.NewReader(`{"label":"x"}`))
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Test-IP", "198.51.100.7")
 		for i := 0; i+1 < len(hdr); i += 2 {
 			req.Header.Set(hdr[i], hdr[i+1])
 		}
@@ -81,7 +87,10 @@ func TestRefusedCallsDoNotBuildTheView(t *testing.T) {
 func TestWriteBudgetIsSharedByHandlers(t *testing.T) {
 	src := &fakeSrc{valid: map[string]access.SubView{tokA: {UserName: "alice", Status: access.StatusActive}}}
 	limiter := securitylimit.NewMemory(nil, 0)
-	config := Config{Limiter: limiter, MaxWritesPerHour: 1, MinInterval: -1, MaxPerHour: -1}
+	config := Config{
+		Limiter: limiter, MaxWritesPerHour: 1, MinInterval: -1, MaxPerHour: -1,
+		ClientIP: func(*http.Request) netip.Addr { return netip.MustParseAddr("198.51.100.7") },
+	}
 	first := Handler(fakeDevs{src}, decoyHandler, config)
 	second := Handler(fakeDevs{src}, decoyHandler, config)
 	post := func(h http.Handler) *httptest.ResponseRecorder {
@@ -96,5 +105,48 @@ func TestWriteBudgetIsSharedByHandlers(t *testing.T) {
 	}
 	if rec := post(second); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("second handler did not see the exhausted budget: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestWriteBudgetIsPerTokenAndClientNetworkWithTokenCeiling(t *testing.T) {
+	src := &fakeSrc{valid: map[string]access.SubView{
+		tokA: {UserName: "alice", Status: access.StatusActive},
+		tokB: {UserName: "bob", Status: access.StatusActive},
+	}}
+	h := Handler(fakeDevs{src}, decoyHandler, Config{
+		MaxWritesPerHour: 2, MinInterval: -1, MaxPerHour: -1,
+		ClientIP: func(req *http.Request) netip.Addr { a, _ := netip.ParseAddr(req.Header.Get("X-Test-IP")); return a },
+	})
+	post := func(token, ip string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/"+token+"/devices/dev_abcde/rename", strings.NewReader("{"))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Test-IP", ip)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	const networkX = "198.51.100.20"
+	for i := 0; i < 2; i++ {
+		if rec := post(tokA, networkX); rec.Code != http.StatusBadRequest {
+			t.Fatalf("malformed write %d from network X: %d %s", i+1, rec.Code, rec.Body)
+		}
+	}
+	if rec := post(tokA, networkX); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("network X over its write budget: %d %s", rec.Code, rec.Body)
+	}
+	if rec := post(tokA, "198.51.100.21"); rec.Code != http.StatusBadRequest {
+		t.Fatalf("network Y was limited by network X: %d %s", rec.Code, rec.Body)
+	}
+
+	for network := 1; network <= 50; network++ {
+		ip := "203.0.113." + strconv.Itoa(network)
+		for i := 0; i < 2; i++ {
+			if rec := post(tokB, ip); rec.Code != http.StatusBadRequest {
+				t.Fatalf("network %d write %d: %d %s", network, i+1, rec.Code, rec.Body)
+			}
+		}
+	}
+	if rec := post(tokB, "203.0.113.51"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("per-token write ceiling: %d %s", rec.Code, rec.Body)
 	}
 }

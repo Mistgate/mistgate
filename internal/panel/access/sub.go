@@ -237,24 +237,30 @@ func (s *Service) Subscription(ctx context.Context, token string) (SubView, erro
 
 // CheckSubscriptionToken checks whether a cached subscription token still exists, without building its view.
 func (s *Service) CheckSubscriptionToken(ctx context.Context, token string) error {
-	found, err := s.st.Access().HasUserWithTokenHash(ctx, hashToken(token))
+	k := tokenKey(token)
+	found, err := s.st.Access().HasUserWithTokenHash(ctx, k[:])
 	if err != nil {
 		return err
 	}
 	if !found {
+		s.tokens.remove(k)
 		return ErrUnknownToken
 	}
+	s.tokens.add(k)
 	return nil
 }
 
 // SubscriptionWith is Subscription with a client format (see SubOptions).
 func (s *Service) SubscriptionWith(ctx context.Context, token string, opt SubOptions) (SubView, error) {
-	u, err := s.st.Access().UserByTokenHash(ctx, hashToken(token))
+	k := tokenKey(token)
+	u, err := s.st.Access().UserByTokenHash(ctx, k[:])
 	if errors.Is(err, store.ErrNotFound) {
+		s.tokens.remove(k)
 		return SubView{}, ErrUnknownToken
 	} else if err != nil {
 		return SubView{}, err
 	}
+	s.tokens.add(k)
 	return s.subView(ctx, u, !opt.NoTouch, opt)
 }
 

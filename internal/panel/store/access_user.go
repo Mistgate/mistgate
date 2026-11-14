@@ -253,6 +253,28 @@ func (a Access) HasUserWithTokenHash(ctx context.Context, hash []byte) (bool, er
 	return err == nil, err
 }
 
+// SubTokenHashes returns the subscription token hashes (sha256) of every user.
+func (a Access) SubTokenHashes(ctx context.Context) ([][32]byte, error) {
+	rows, err := a.s.R.QueryContext(ctx, `SELECT sub_token_hash FROM user`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out [][32]byte
+	for rows.Next() {
+		var b []byte
+		if err := rows.Scan(&b); err != nil {
+			return nil, err
+		}
+		var h [32]byte
+		if len(b) == len(h) {
+			copy(h[:], b)
+			out = append(out, h)
+		}
+	}
+	return out, rows.Err()
+}
+
 // collectUsers drains rows and attaches the explicit node lists.
 func (a Access) collectUsers(ctx context.Context, rows *sql.Rows) ([]AccessUser, error) {
 	var out []AccessUser

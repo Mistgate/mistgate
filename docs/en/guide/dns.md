@@ -147,7 +147,7 @@ A preset you set on a user or a group goes before the default of the list: the p
 
 At the top of **Servers** the person sees a card named by their apps: **DNS in Happ and other apps that use the link** (the app is the one the page recommends on that device). It shows what applies and **Change**, which opens the same list as the DNS of a server; the default is listed first under its name. The apps get the new DNS with their next subscription update, within the refresh interval (12 hours by default); the page says so. A person who also uses AmneziaVPN keys reads one line under the card: the keys are not affected, their DNS is on each server's card.
 
-The pick is written to the audit log as `page_link_dns_choice`: the person's name and the preset, never the link or an address. It counts against the limit shared by all actions on the page: 20 changes an hour per link. Turning **DNS choice on the page** off hides the card and keeps the picks made.
+The pick is written to the audit log as `page_link_dns_choice`: the person's name and the preset, never the link or an address. It counts against the limit shared by all actions on the page: 20 changes an hour per client network, up to 100 per link in total. Turning **DNS choice on the page** off hides the card and keeps the picks made.
 
 ## DNS per server
 
@@ -184,7 +184,7 @@ The node's block says so: "Happ, the Mihomo apps, Xray JSON and sing-box have on
 ### What the person does and what you see
 
 - On their page the row is called **Key DNS**, with a key icon, and it is shown only to a person who uses AmneziaVPN keys (the app is on for them, or they hold a key), on a server that carries keys. A person who uses only the apps on the link does not see it.
-- The person picks a preset for each server. The choice is written to the audit log as `page_dns_choice`: the person's name, the node's name and the preset, never the link or an address. It counts against the limit shared by all actions on the page: 20 changes an hour per link.
+- The person picks a preset for each server. The choice is written to the audit log as `page_dns_choice`: the person's name, the node's name and the preset, never the link or an address. It counts against the limit shared by all actions on the page: 20 changes an hour per client network, up to 100 per link in total.
 - On the user card, **DNS picked on the page** lists the person's pick for the apps on the link and their choices per node (read only). **Reset** removes all of them (the owner and helpers may); it is written to the audit log as `user_dns_choices_reset`. See [Users and groups](users-and-groups.md).
 - Turning the switch off does not reset the choices already made: they keep working until you reset them on the user card.
 

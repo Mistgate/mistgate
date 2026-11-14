@@ -6,19 +6,21 @@
 // of its local server check (probe.go) and a client enrols its device by the link (clientenrol.go). Unknown tokens get the decoy, so the endpoint cannot be told from any other path of the site.
 //
 // Abuse protection, all in memory and bounded, none of it logging a token or an address:
-//   - Per-client-network miss and cold-miss windows limit database work from unknown links. Cold valid links do not
-//     spend their network's cold-miss allowance during a lockout.
+//   - Per-client-network miss limit: a network that guesses too many unknown links is blocked for a while. A blocked network
+//     still gets every link the process knows to exist (TokenIndex), and a small budget of database checks for the rest.
 //   - per token: fetches within MinInterval are answered from a cache of the rendered response (no
-//     database work), and more than MaxPerHour fetches an hour get a 429;
+//     database work), with hourly limits per token and client network and a larger per-token ceiling;
 //   - link sharing: distinct client networks (/24, /48) seen per token per day are counted (never stored
 //     as addresses), and above SharedNets one subscription_shared_suspect event is written for that day;
-//   - self-service writes (add, configs, rotate, revoke, rename a device, pick a DNS): a separate per-token counter,
-//     MaxWritesPerHour an hour, so that the fetch budget above is not shared with them.
+//   - self-service writes (add, configs, rotate, revoke, rename a device, pick a DNS): a separate per-token-and-network
+//     counter and a larger per-token ceiling, so that the fetch budget above is not shared with them.
 package subs
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"hash/maphash"
 	"io/fs"
@@ -55,6 +57,15 @@ type TokenChecker interface {
 }
 
 var _ TokenChecker = (*access.Service)(nil)
+
+// TokenIndex lets a Source say that a token is one it knows exists, from memory, without a database call. For a request from
+// a network blocked for guessing it is what tells a real link the process has not served yet from a guess: a token the
+// index knows is served normally, and only the others spend the network's small budget of database checks (takeColdLookup).
+type TokenIndex interface {
+	KnownSubscriptionToken(ctx context.Context, token string) bool
+}
+
+var _ TokenIndex = (*access.Service)(nil)
 
 // FormatSource is a Source that can also render a client format (the Mihomo profile needs the proxies of the Mihomo
 // format); *access.Service implements it. A Source without it serves the Mihomo rule the base64 list.
@@ -137,11 +148,11 @@ type Config struct {
 	MissWindow  time.Duration // default 1 minute
 	BlockFor    time.Duration // default 15 minutes
 	MinInterval time.Duration // cache lifetime of a token's data; default 10 seconds
-	MaxPerHour  int           // fetches per token per hour; default 60
+	MaxPerHour  int           // fetches per token and client network per hour; default 60; token ceiling is 600
 	SharedNets  int           // distinct client networks per token per day before the event; default 8
 	MaxKeys     int           // clients and tokens tracked per table (memory bound); default securitylimit.DefaultMaxKeysPerName
-	// MaxWritesPerHour is the self-service writes (device add, configs, rotate, revoke, rename, pick a DNS) per token an hour;
-	// default 20, negative = no limit. Separate from MaxPerHour.
+	// MaxWritesPerHour is the self-service writes (device add, configs, rotate, revoke, rename, pick a DNS) per token and client
+	// network an hour; default 20, with a 100 per-token ceiling. Negative disables both. Separate from MaxPerHour.
 	MaxWritesPerHour int
 	// MaxEnrolsPerHour is the client API enrolments (POST <link>/client/enrol) per link an hour, on top of the writes above;
 	// default enrolPerHour, negative = no limit (tests).
@@ -152,8 +163,8 @@ type Config struct {
 	// page never asks for a password. With a key, the page and its self-service calls are gated while the
 	// settings say so (subsettings.PagePassword); the subscription itself never is.
 	PageKey []byte
-	// UnlockTries is how many password entries one token, and one client network, get within UnlockWindow before
-	// the answer is "try later"; defaults 5 and 10 minutes, UnlockTries negative = no limit.
+	// UnlockTries is how many password entries one token and client network get within UnlockWindow before the answer is
+	// "try later"; defaults 5 and 10 minutes, with a 50 per-token ceiling. UnlockTries negative disables both.
 	UnlockTries  int
 	UnlockWindow time.Duration
 }
@@ -221,6 +232,15 @@ const (
 	announceMax = 200
 
 	tokenMin, tokenMax = 20, 64 // the issued tokens are 43 characters; anything outside is not ours
+
+	maxFetchesPerTokenHour = 600
+	maxWritesPerTokenHour  = 100
+	maxUnlocksPerToken     = 50
+
+	// The database checks a blocked network may spend on a token nothing vouches for (takeColdLookup): 30 at once, then one
+	// every two seconds, so at most 60 in any minute.
+	coldTokenLookupBurst  = 30
+	coldTokenLookupRefill = 2 * time.Second
 )
 
 // tokenState is what is remembered about one valid token. Nothing in it is an address.
@@ -230,9 +250,6 @@ type tokenState struct {
 
 	cached map[viewKey]cachedView // the data of the last fetch per view format and device, reused for MinInterval
 	expire *time.Timer            // empties cached MinInterval after the last fetch (see remember)
-
-	winStart time.Time // start of the current hour; hits counts the fetches in it
-	hits     int
 
 	day      int64               // unix day of nets
 	nets     map[uint64]struct{} // keyed hashes of the networks seen today, capped
@@ -333,15 +350,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.decoy.ServeHTTP(w, r)
 			return
 		}
-		if _, known := h.tokens.Get(token); !known {
+		if _, known := h.tokens.Get(token); !known && !h.indexed(r.Context(), token) {
+			// Neither served by this process nor known to its index: a stranger's guess or a link the index has not seen yet.
+			// Both get the decoy, except for the few lookups the network's budget allows, which find the second kind.
 			checker, ok := h.src.(TokenChecker)
-			if !ok || !h.allowColdTokenCheck(r.Context(), client) {
+			if !ok || !h.takeColdLookup(r.Context(), client) {
 				h.decoy.ServeHTTP(w, r)
 				return
 			}
 			err := checker.CheckSubscriptionToken(r.Context(), token)
 			if errors.Is(err, access.ErrUnknownToken) {
-				h.recordColdMiss(r.Context(), client)
 				h.decoy.ServeHTTP(w, r)
 				return
 			}
@@ -400,7 +418,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	st, known := h.tokens.Get(token)
 	admitted := false
 	if known {
-		res, retry, suspect := st.admit(h, ip, now, key, app)
+		res, retry, suspect := st.admit(r.Context(), h, token, client, ip, now, key, app)
 		if retry > 0 {
 			tooMany(w, retry)
 			return
@@ -449,7 +467,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !admitted {
 		st = h.tokens.GetOrCreate(token, func() *tokenState { return &tokenState{} })
-		if _, retry, suspect := st.admit(h, ip, now, key, app); retry > 0 {
+		if _, retry, suspect := st.admit(r.Context(), h, token, client, ip, now, key, app); retry > 0 {
 			tooMany(w, retry)
 			return
 		} else if suspect != "" {
@@ -818,37 +836,68 @@ func (h *handler) missWindow() securitylimit.Window {
 	}
 }
 
-// allowColdTokenCheck peeks before the database call so valid cold links do not spend the unknown-token allowance.
-func (h *handler) allowColdTokenCheck(ctx context.Context, client string) bool {
-	d, err := h.cfg.Limiter.Peek(ctx, h.coldMissWindow(), "c:"+client)
+// indexed reports whether the Source knows the token exists without a database call (see TokenIndex).
+func (h *handler) indexed(ctx context.Context, token string) bool {
+	ix, ok := h.src.(TokenIndex)
+	return ok && ix.KnownSubscriptionToken(ctx, token)
+}
+
+// takeColdLookup spends one of the network's database checks for a token nothing vouches for: coldTokenLookupBurst at once,
+// then one every coldTokenLookupRefill, however many tokens the network sends. A known token never needs one (the index,
+// or this process serving it before); an unknown one is turned away at the decoy as before, so the answer does not tell
+// the two apart. It fails closed: a limiter that cannot answer spends nothing and the request gets the decoy.
+func (h *handler) takeColdLookup(ctx context.Context, client string) bool {
+	d, err := h.cfg.Limiter.Take(ctx, securitylimit.Bucket{
+		Name: "subscription-cold-lookup", Burst: coldTokenLookupBurst, Refill: coldTokenLookupRefill,
+	}, "c:"+client)
 	return err == nil && d.Allowed
 }
 
-func (h *handler) recordColdMiss(ctx context.Context, client string) {
-	if _, err := h.cfg.Limiter.Record(ctx, h.coldMissWindow(), "c:"+client); err != nil && h.cfg.Log != nil {
-		h.cfg.Log.Warn("subscription cold-miss limit unavailable", "code", "subscription_cold_miss_record_failed")
-	}
+func tokenClientLimitKey(token, client string) string {
+	sum := sha256.Sum256([]byte("token-client\x00" + token + "\x00" + client))
+	return "tc:" + hex.EncodeToString(sum[:])
 }
 
-func (h *handler) coldMissWindow() securitylimit.Window {
-	return securitylimit.Window{Name: "subscription-cold-miss", Limit: h.cfg.MissLimit, Span: h.cfg.BlockFor}
+func (h *handler) fetchAdmit(ctx context.Context, token, client string) time.Duration {
+	if h.cfg.MaxPerHour < 0 {
+		return 0
+	}
+	if client != "" {
+		d, err := h.cfg.Limiter.Record(ctx, h.fetchClientWindow(), tokenClientLimitKey(token, client))
+		if err != nil {
+			return time.Hour
+		}
+		if !d.Allowed {
+			return d.RetryAfter
+		}
+	}
+	d, err := h.cfg.Limiter.Record(ctx, h.fetchTokenWindow(), "t:"+token)
+	if err != nil {
+		return time.Hour
+	}
+	if !d.Allowed {
+		return d.RetryAfter
+	}
+	return 0
+}
+
+func (h *handler) fetchClientWindow() securitylimit.Window {
+	return securitylimit.Window{Name: "subscription-fetch-client", Limit: h.cfg.MaxPerHour, Span: time.Hour}
+}
+
+func (h *handler) fetchTokenWindow() securitylimit.Window {
+	return securitylimit.Window{Name: "subscription-fetch-token", Limit: maxFetchesPerTokenHour, Span: time.Hour}
 }
 
 // admit counts one fetch of the token: against the hourly cap (retry > 0: refused), towards the day's
 // distinct networks (suspect is the user name, non-empty once per day when the threshold is crossed), and
 // returns the cached response when it is younger than MinInterval.
-func (st *tokenState) admit(h *handler, ip netip.Addr, now time.Time, key viewKey, app bool) (res *access.SubView, retry time.Duration, suspect string) {
+func (st *tokenState) admit(ctx context.Context, h *handler, token, client string, ip netip.Addr, now time.Time, key viewKey, app bool) (res *access.SubView, retry time.Duration, suspect string) {
+	if retry = h.fetchAdmit(ctx, token, client); retry > 0 {
+		return nil, retry, ""
+	}
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if h.cfg.MaxPerHour > 0 {
-		if now.Sub(st.winStart) >= time.Hour {
-			st.winStart, st.hits = now, 0
-		}
-		if st.hits >= h.cfg.MaxPerHour {
-			return nil, st.winStart.Add(time.Hour).Sub(now), ""
-		}
-		st.hits++
-	}
 	if h.cfg.SharedNets > 0 && ip.IsValid() {
 		if day := now.UTC().Unix() / 86400; day != st.day {
 			st.day, st.nets, st.reported = day, nil, false

@@ -25,8 +25,8 @@ import (
 //
 //	POST <link>/unlock {"password"}   200 and the cookie | 401 wrong_password (+left) | 429 locked (+retry_after)
 //
-// Entries are counted per token and per client network (UnlockTries within UnlockWindow); the moment either runs out is
-// one audit row, without the token and without an address.
+// Entries are counted per token and client network (UnlockTries within UnlockWindow), with a 50-entry per-token ceiling;
+// the moment either runs out is one audit row, without the token and without an address.
 
 // cookieName is the cookie that remembers an unlocked page; it is scoped to the path of the link, so it goes nowhere
 // else on the site.
@@ -52,11 +52,23 @@ func (h *handler) unlocked(r *http.Request, token string) bool {
 	return err == nil && pagepass.CheckCookie(h.cfg.PageKey, token, c.Value)
 }
 
-// tryKeys are the counters an entry for token from client is counted against.
-func tryKeys(token, client string) []struct{ scope, key string } {
-	keys := []struct{ scope, key string }{{"token", "t:" + token}}
+type unlockCounter struct {
+	scope  string
+	key    string
+	window securitylimit.Window
+}
+
+// unlockCounters keeps the token-wide backstop separate from one client's password budget for this token.
+func (h *handler) unlockCounters(token, client string) []unlockCounter {
+	keys := []unlockCounter{{
+		scope: "token", key: "t:" + token,
+		window: securitylimit.Window{Name: "page-password", Limit: maxUnlocksPerToken, Span: h.cfg.UnlockWindow},
+	}}
 	if client != "" {
-		keys = append(keys, struct{ scope, key string }{"client", "c:" + client})
+		keys = append(keys, unlockCounter{
+			scope: "client", key: tokenClientLimitKey(token, client),
+			window: securitylimit.Window{Name: "page-password-client", Limit: h.cfg.UnlockTries, Span: h.cfg.UnlockWindow},
+		})
 	}
 	return keys
 }
@@ -69,14 +81,13 @@ func lockedAnswer(w http.ResponseWriter, retry time.Duration) {
 
 func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, client string, now time.Time) {
 	ctx := r.Context()
-	window := securitylimit.Window{Name: "page-password", Limit: h.cfg.UnlockTries, Span: h.cfg.UnlockWindow}
 	retryOnFailure := h.cfg.UnlockWindow
 	if retryOnFailure <= 0 {
 		retryOnFailure = time.Minute
 	}
 	if h.cfg.UnlockTries > 0 { // a counter that already ran out answers before any database work
-		for _, k := range tryKeys(token, client) {
-			decision, err := h.cfg.Limiter.Peek(ctx, window, k.key)
+		for _, k := range h.unlockCounters(token, client) {
+			decision, err := h.cfg.Limiter.Peek(ctx, k.window, k.key)
 			if err != nil {
 				lockedAnswer(w, retryOnFailure)
 				return
@@ -108,8 +119,8 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 	}
 	left := h.cfg.UnlockTries
 	if left > 0 {
-		for _, k := range tryKeys(token, client) {
-			decision, err := h.cfg.Limiter.Record(ctx, window, k.key)
+		for _, k := range h.unlockCounters(token, client) {
+			decision, err := h.cfg.Limiter.Record(ctx, k.window, k.key)
 			if err != nil {
 				lockedAnswer(w, retryOnFailure)
 				return
@@ -134,7 +145,7 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "wrong_password", "left": left})
 		return
 	}
-	if err := h.cfg.Limiter.Reset(ctx, window, "t:"+token); err != nil {
+	if err := h.cfg.Limiter.Reset(ctx, securitylimit.Window{Name: "page-password", Limit: maxUnlocksPerToken, Span: h.cfg.UnlockWindow}, "t:"+token); err != nil {
 		lockedAnswer(w, retryOnFailure)
 		return
 	}

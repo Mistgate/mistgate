@@ -51,8 +51,9 @@ func (r *rig) handler(mut func(*subs.Config)) (http.Handler, *subsettings.Cache)
 	cache := subsettings.NewCache(r.st, nil)
 	cfg := subs.Config{
 		Title: "Fallback", BaseURL: "https://sub.example.com/k3xq8", Settings: cache, BrandTTL: -1, // no brand cache: a rename is seen at once
-		Brand: func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, r.st) },
-		Dist:  pageDist,
+		Brand:    func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, r.st) },
+		Dist:     pageDist,
+		ClientIP: func(*http.Request) netip.Addr { return netip.MustParseAddr("198.51.100.7") },
 	}
 	if mut != nil {
 		mut(&cfg)

@@ -111,14 +111,14 @@ A way the person cannot use stays on the sheet as a quiet card with the reason: 
 
 ## Self-service devices
 
-With **Devices on the page** on (the default), a person manages their own devices: the apps on the link can be renamed and removed (see [My devices](#my-devices)), and the AmneziaVPN keys as follows. All changes together are limited to 20 an hour per link; past that the page says in how many minutes to try again.
+With **Devices on the page** on (the default), a person manages their own devices: the apps on the link can be renamed and removed (see [My devices](#my-devices)), and the AmneziaVPN keys as follows. All changes together are limited to 20 an hour per client network and 100 an hour per link in total; past that the page says in how many minutes to try again.
 
 - **Add a device** asks first how the device will connect (see [My devices](#my-devices)); the **With a key** way is the form: "Connection option" (the main one is named by the countries of its nodes; a WARP profile is "Spare exit (if some site won't open)"; a 2.0 profile is "For old AmneziaVPN versions (before 5.0.1.5)"), "What kind of device", and "Name (optional)". The key opens at once.
 - For each device: **Show key** as the main action, and the **⋯** menu with **Rename**, **Replace key** (the old one stops working at once) and **Remove** (the VPN on it stops at once). Remove and Replace ask first, in the row.
 - The key window: **Country** (one connection per node; "Each country is a separate connection"), **Copy key**, **Download file**, the steps and a QR code. A server is named as on the **Channel utilization** card and in the person's app: by its country and location, never by the node's name in the panel; a node with neither is "Server", and a repeated name gets a number ("Germany 2"). The key's connection in AmneziaVPN carries the same name after the subscription title ("Mistgate · Germany 2").
 - When an old key stops working (a critical change of the profile, a new port or address of a node), the device says "new key needed", and **Get a new key** walks the person through replacing it.
 
-Limits: only an active person can add a device, show a key or replace one; the device limit applies ("All slots are used. Remove a device you no longer use, or message us"); and one link may make 20 such requests an hour, showing a key included. With the option off, the page lists the keys and says "Keys come from the admin — message us if you need a new one."
+Limits: only an active person can add a device, show a key or replace one; the device limit applies ("All slots are used. Remove a device you no longer use, or message us"); and one client network may make 20 such requests an hour, with a total ceiling of 100 per link. Showing a key counts too. With the option off, the page lists the keys and says "Keys come from the admin — message us if you need a new one."
 
 A person whose subscription is not active still sees their AmneziaVPN keys, and can rename and remove them; adding new ones is not possible.
 
@@ -146,7 +146,7 @@ For each of the person's servers the page gets:
 ### Choosing and applying
 
 - The choice for the apps on the link is written to the audit log as `page_link_dns_choice`: the person's name and the preset. A choice for the keys of a server is made for one server at a time and written as `page_dns_choice`: the person's name, the node's name and the preset. Neither has the link or an address.
-- It counts against the same limit as the other actions on the page: 20 changes an hour per link.
+- It counts against the same limit as the other actions on the page: 20 changes an hour per client network, up to 100 an hour per link overall.
 - Where it works differs by format:
   - **AmneziaVPN and AmneziaWG keys** (`.conf`, `vpn://`, QR code): the DNS is written inside the key, so the person has to press **Get a new key** again. The key itself does not change; the device is marked "new key needed" with the reason DNS until they do. The mark follows what the key holds against what applies to the person on that server now, whatever changed it: their pick or going back to the default, the owner changing the offered presets or the default, a preset edited or deleted. The key counts as received only when the person's own device fetches it: an admin opening the key in the panel does not clear the mark. A key made before this was tracked gets no mark until the person fetches it once.
   - **The AmneziaWG proxies of a Mihomo profile** (Clash Verge Rev, FlClash and the like): the choice applies at the next subscription update.

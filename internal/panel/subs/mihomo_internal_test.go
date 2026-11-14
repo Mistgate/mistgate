@@ -382,7 +382,7 @@ func TestWriteAdmitConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if h.writeAdmit(context.Background(), tokA) == 0 {
+			if h.writeAdmit(context.Background(), tokA, "198.51.100.10") == 0 {
 				admitted.Add(1)
 			}
 		}()
@@ -399,21 +399,21 @@ func TestWriteAdmit(t *testing.T) {
 	limiter := securitylimit.NewMemory(func() time.Time { return now }, 0)
 	h := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: limiter, MaxWritesPerHour: 3, Now: func() time.Time { return now }}).(*handler)
 	for i := 0; i < 3; i++ {
-		if retry := h.writeAdmit(context.Background(), tokA); retry != 0 {
+		if retry := h.writeAdmit(context.Background(), tokA, "198.51.100.10"); retry != 0 {
 			t.Fatalf("write %d refused", i)
 		}
 	}
 	now = now.Add(10 * time.Minute)
-	if retry := h.writeWait(context.Background(), tokA); retry <= 0 || retry > 51*time.Minute {
+	if retry := h.writeWait(context.Background(), tokA, "198.51.100.10"); retry <= 0 || retry > 51*time.Minute {
 		t.Errorf("retry = %v", retry)
 	}
 	now = now.Add(51 * time.Minute)
-	if retry := h.writeAdmit(context.Background(), tokA); retry != 0 {
+	if retry := h.writeAdmit(context.Background(), tokA, "198.51.100.10"); retry != 0 {
 		t.Error("a new hour must restart the budget")
 	}
 	free := Handler(&fakeSrc{valid: map[string]access.SubView{}}, decoyHandler, Config{Limiter: securitylimit.NewMemory(nil, 0), MaxWritesPerHour: -1}).(*handler)
 	for i := 0; i < 1000; i++ {
-		if retry := free.writeAdmit(context.Background(), tokA); retry != 0 {
+		if retry := free.writeAdmit(context.Background(), tokA, ""); retry != 0 {
 			t.Fatal("unlimited refused")
 		}
 	}

@@ -92,7 +92,7 @@ func (h *handler) serveEnrol(w http.ResponseWriter, r *http.Request, token, clie
 		jsonError(w, http.StatusServiceUnavailable, "not_configured", "")
 		return
 	}
-	if retry := h.writeAdmit(ctx, token); retry > 0 {
+	if retry := h.writeAdmit(ctx, token, client); retry > 0 {
 		tooManyWrites(w, retry)
 		return
 	}

@@ -83,6 +83,7 @@ type Service struct {
 	limiter       securitylimit.Limiter
 	now           func() time.Time
 	afterResponse AfterResponseRunner
+	tokens        tokenIndex // the subscription tokens known to exist (token_index.go)
 
 	touching                  sync.Map // device id -> struct{}: a last_seen_at write is in flight (sub.go)
 	limited                   sync.Map // "lim:<user id>" -> time.Time: when the limit event of the user was last queued (sub.go)

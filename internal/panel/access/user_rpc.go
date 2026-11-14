@@ -292,6 +292,7 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	case err != nil:
 		return nil, s.internal("create user", err)
 	}
+	s.tokens.add([32]byte(hash))
 	s.notify.StateChanged()
 	s.audit(ctx, actor(ctx), "user_create", map[string]any{"user": id, "name": name})
 	created, err := s.loadUsers(ctx, id)
@@ -978,6 +979,8 @@ func (s *Service) GetSubscriptionLink(ctx context.Context, req *connect.Request[
 		if err := a.SetSubToken(ctx, u.ID, hash, s.vault.Seal([]byte(tok), u.ID)); err != nil {
 			return nil, s.internal("rotate token", err)
 		}
+		s.tokens.remove([32]byte(u.SubTokenHash))
+		s.tokens.add([32]byte(hash))
 		s.audit(ctx, actor(ctx), "user_link_rotate", map[string]any{"user": u.ID, "name": u.Name})
 		token = tok
 	} else {

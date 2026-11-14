@@ -110,7 +110,7 @@ How the public listener decides, in this order: a TLS connection with the secret
 
 The admin is the single-page app plus the Connect API under `<admin>/api/`, the MCP server at `<admin>/mcp` and the server-rendered install manager of SSH installs at `<admin>/nodes/install`. The API sits behind the session check: a session cookie (`__Host-sid`, Secure, HttpOnly, SameSite=Strict) or an API token in the `Authorization: Bearer` header. Admin responses carry a strict Content-Security-Policy, `X-Frame-Options: DENY`, `no-store`, `noindex`, and HSTS over TLS; state-changing requests from other origins are refused.
 
-Each client (an IPv4 address or an IPv6 /64) has a request budget per side: public, admin and agent. Over the budget it gets a 429 in the style of the decoy. The subscription endpoint has its own limits on top: a network that tries 20 unknown tokens within a minute gets only the decoy for 15 minutes, one token may be fetched 60 times an hour, and one link used from more than 8 networks in a day raises a "link shared" event.
+Each client (an IPv4 address or an IPv6 /64) has a request budget per side: public, admin and agent. Over the budget it gets a 429 in the style of the decoy. The subscription endpoint has its own limits on top: a client network that tries 20 unknown tokens within a minute is blocked for 15 minutes, and its unknown tokens cost at most 30 database lookups at once and one every two seconds after that, while links the panel knows to exist are still served. A token can be fetched 60 times an hour from each network and 600 times an hour in total. Self-service writes allow 20 per network and 100 per token per hour. One link used from more than 8 networks in a day raises a "link shared" event.
 
 ## Storage
 

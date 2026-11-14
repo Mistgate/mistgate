@@ -257,12 +257,10 @@ func (h *handler) staleKey(w http.ResponseWriter, r *http.Request, route string,
 // clientRetryAfter is the seconds a client waits before it repeats a request that was answered 503 retry.
 const clientRetryAfter = "5"
 
-// clientAPIMiss is the decoy for a stranger, counted as a miss the way an unknown token is (in the cold-check window when the
+// clientAPIMiss is the decoy for a stranger, counted as a miss the way an unknown token is (not counted again when the
 // network is locked out already).
 func (h *handler) clientAPIMiss(w http.ResponseWriter, r *http.Request, client string, locked bool) {
-	if locked {
-		h.recordColdMiss(r.Context(), client)
-	} else {
+	if !locked { // nothing gates on more misses of a network that is blocked already
 		h.miss(r.Context(), client)
 	}
 	h.decoy.ServeHTTP(w, r)
