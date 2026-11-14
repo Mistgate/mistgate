@@ -119,7 +119,7 @@ var transactionShape2 = map[string]string{
 	"provision.go:CompleteNodeProvisionJob":          "A running-state guard precedes the completion, access, and event writes.",
 	"provision.go:RequestCancelNodeProvisionJob":     "A state diagnostic and queued/running compare-and-swap keep cancellation events atomic.",
 	"provision.go:updateNodeProvisionJobFromState":   "The expected-state UPDATE is a compare-and-swap; its optional event shares the batch.",
-	"relay.go:CreateRelay":                           "A guard on a server and an entry that are two enrolled nodes precedes the insert; the unique keys refuse a duplicate or a taken port.",
+	"relay.go:CreateRelay":                           "A guard on a server and an entry that are two enrolled nodes precedes the insert (which also stores the owner's mode); the unique keys refuse a duplicate or a taken port.",
 	"telegram.go:BindTelegramChat":                   "SQL checks the admin while replacing both unique link owners.",
 	"telegram.go:SetTelegramBot":                     "SQL drops links and pending link codes only when the stored bot differs, with the bot upsert in one batch.",
 	"token.go:CreateAPIToken":                        "The insert guard enforces the live-token cap and unique active name in SQL.",

@@ -2497,6 +2497,10 @@ func TestD1RelaysStorage(t *testing.T) {
 	relayStoreProof(t, openD1Store(t))
 }
 
+func TestD1RelayModeStorage(t *testing.T) {
+	relayModeStoreProof(t, openD1Store(t))
+}
+
 func TestD1RelayCountersStorage(t *testing.T) {
 	relayCounterStoreProof(t, openD1Store(t))
 }
