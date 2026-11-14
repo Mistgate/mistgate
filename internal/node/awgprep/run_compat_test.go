@@ -140,7 +140,7 @@ func TestRunDebianRepairsTheCloneBeforeMake(t *testing.T) {
 		t.Fatal(err)
 	}
 	var atMake string
-	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "abcdef0123456789\n"}}
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "\n"}}
 	run := func(ctx context.Context, w io.Writer, dir string, cmd ...string) (string, error) {
 		if cmd[0] == "make" {
 			b, _ := os.ReadFile(file)

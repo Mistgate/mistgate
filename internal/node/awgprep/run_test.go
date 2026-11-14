@@ -86,7 +86,7 @@ func ubuntuPlanFor(t *testing.T, kernel string) []Step {
 }
 
 func TestRunRunsThePlanThenVerifies(t *testing.T) {
-	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "abcdef0123456789\n"}}
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "\n"}}
 	var wrote string
 	var buf bytes.Buffer
 	var seen [][2]int
@@ -110,9 +110,10 @@ func TestRunRunsThePlanThenVerifies(t *testing.T) {
 	}
 }
 
-// A moved tag stops the build before anything is compiled or installed.
+// A moved tag stops the build before anything is compiled or installed. The whole commit is compared: one that only
+// starts like the pinned commit is another commit.
 func TestRunStopsOnAMovedTag(t *testing.T) {
-	r := &recRun{out: map[string]string{"git -C": "deadbeef00000000\n"}}
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit[:39] + "f\n"}}
 	var wrote string
 	err := Run(context.Background(), io.Discard, debianPlan(t), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
 	if err == nil || !strings.Contains(err.Error(), "tag moved") || codeOf(t, err) != CodeSourceMoved {
@@ -252,7 +253,7 @@ func TestRunUndoesAModuleThatDoesNotBuild(t *testing.T) {
 }
 
 func TestRunADebianBuildThatFailsIsABuildFailure(t *testing.T) {
-	r := &recRun{fail: "make -C", out: map[string]string{"git -C": pinnedModuleCommit + "abcdef0123456789\n"}}
+	r := &recRun{fail: "make -C", out: map[string]string{"git -C": pinnedModuleCommit + "\n"}}
 	var wrote string
 	err := Run(context.Background(), io.Discard, debianPlan(t), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
 	if codeOf(t, err) != CodeBuildFailed || !strings.Contains(err.Error(), "nothing else is rolled back") {
@@ -349,7 +350,7 @@ func jobFor(t *testing.T, env Env, r *recRun, wrote *string) (Job, string) {
 var okEnv = Env{OSRelease: osr("debian", ""), Kernel: "6.1.0-18-amd64", CPUs: 1, Systemd: true}
 
 func TestJobWritesAStatusFromRunningToDone(t *testing.T) {
-	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "00\n"}}
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "\n"}}
 	var wrote string
 	job, path := jobFor(t, okEnv, r, &wrote)
 	var states []string
@@ -377,7 +378,7 @@ func TestJobWritesAStatusFromRunningToDone(t *testing.T) {
 }
 
 func TestPrepareJobStopsWhenTheSharedModuleLockIsHeld(t *testing.T) {
-	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "00\n"}}
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "\n"}}
 	var wrote string
 	job, path := jobFor(t, okEnv, r, &wrote)
 	job.Sys.TryBuilderLock = func() (func(), bool, error) { return nil, false, nil }
@@ -456,7 +457,7 @@ func TestJobOnAContainerAndOnAnotherDistro(t *testing.T) {
 }
 
 func TestJobWaitsForAForeignAptLockBeforeTheFirstCommand(t *testing.T) {
-	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "00\n"}}
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "\n"}}
 	var wrote string
 	job, _ := jobFor(t, okEnv, r, &wrote)
 	busy := 2
@@ -478,7 +479,7 @@ func TestJobWaitsForAForeignAptLockBeforeTheFirstCommand(t *testing.T) {
 }
 
 func TestJobWaitsForAptLockLongerThanTheOldFiveMinuteLimit(t *testing.T) {
-	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "00\n"}}
+	r := &recRun{out: map[string]string{"git -C": pinnedModuleCommit + "\n"}}
 	var wrote string
 	job, _ := jobFor(t, okEnv, r, &wrote)
 	var checks int

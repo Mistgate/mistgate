@@ -21,7 +21,7 @@ const (
 	// pinnedModuleTag and pinnedModuleCommit are the release of amneziawg-linux-kernel-module the Debian source build
 	// checks out. The commit is verified after the clone: a moved tag is not trusted.
 	pinnedModuleTag    = "v3.1.20260906"
-	pinnedModuleCommit = "4569c4c"
+	pinnedModuleCommit = "4569c4c67f3a57414969260cafbbd04694fbaae0"
 	moduleRepo         = "https://github.com/amnezia-vpn/amneziawg-linux-kernel-module"
 	modulesLoadFile    = "/etc/modules-load.d/amneziawg.conf"
 )
@@ -170,7 +170,7 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 			{Desc: "install the build tools and the headers of the running kernel", Cmd: aptInstall("git", "make", "gcc", headers)},
 			{Desc: "fetch the pinned source " + pinnedModuleTag, Cmd: []string{"git", "clone", "--depth", "1", "--branch", pinnedModuleTag, moduleRepo, "{src}"}},
 			{Desc: "check the commit of the clone", Cmd: []string{"git", "-C", "{src}", "rev-parse", "HEAD"}, Check: func(out string) error {
-				if !strings.HasPrefix(strings.TrimSpace(out), pinnedModuleCommit) {
+				if strings.TrimSpace(out) != pinnedModuleCommit {
 					return &Failure{Code: CodeSourceMoved, Detail: fmt.Sprintf("the clone is at %q, the pinned commit is %s: the tag moved, nothing was built", strings.TrimSpace(out), pinnedModuleCommit)}
 				}
 				return nil
