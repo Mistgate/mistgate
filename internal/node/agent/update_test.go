@@ -510,9 +510,16 @@ func TestRollbackAgentOverTheWire(t *testing.T) {
 	}
 	f.noExec(50 * time.Millisecond)
 
+	// A .prev with no record is adopted by the agent's next start (the old agent that left it wrote none).
+	h.stop()
+	h.drainHellos()
 	if err := os.WriteFile(f.exe+".prev", oldBin, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	h.eng = newFakeEngine("fake")
+	h.a = h.newAgent()
+	h.start()
+	h.nextHello()
 	h.panel.send(rb)
 	if r := h.panel.nextCmd(); !r.Ok || r.RequestId != "rb-1" {
 		t.Fatalf("result = %v", r)
