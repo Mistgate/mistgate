@@ -152,18 +152,29 @@ func TestDescriptionRules(t *testing.T) {
 // placeholders; never a scheme that runs or embeds content.
 func TestAddLinkTemplateRules(t *testing.T) {
 	for tmpl, ok := range map[string]bool{
-		"":                 true,
-		"happ://add/{url}": true,
+		"":                          true,
+		"happ://add/{url}":          true,
+		"MyClient+v2.X://add/{url}": true,
 		"myclient://add?url={url_enc}&name={name_enc}": true,
 		"my-client+v2.x://import/{url_enc}":            true,
 		"https://example.com/import?u={url_enc}":       true,
+		"x://add/{url}":                                false, // a one-letter scheme reads as a Windows drive
 		"javascript:alert(1)":                          false,
 		"JavaScript://x/{url}":                         false,
 		"data:text/html,{url}":                         false,
 		"vbscript:x":                                   false,
 		"file:///{url}":                                false,
+		"blob:https://example.org/{url}":               false,
+		"about:blank":                                  false,
 		"{url}":                                        false,
-		"x://add/{url}":                                false, // a one-letter scheme reads as a Windows drive
+		" myclient://add/{url}":                        false,
+		"myclient://add/\t{url}":                       false,
+		"myclient://add/\n{url}":                       false,
+		"myclient://add/\u00a0{url}":                   false,
+		"1client://add/{url}":                          false,
+		"my%63lient://add/{url}":                       false,
+		"java%73cript:alert(1)":                        false,
+		"javascript%3Aalert(1)":                        false,
 		"myclient://add?u={token}":                     false,
 		"myclient://add/{url":                          false,
 		"myclient://add {url}":                         false,
