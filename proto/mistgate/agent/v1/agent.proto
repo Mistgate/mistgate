@@ -479,7 +479,8 @@ package mistgate.agent.v1;
 //     target listed for it (relay_id -> the network and port of the exit's own server on this node), never to anything else.
 //   - The list and the setting are part of the persisted state: a restarted agent holds the bridge without the panel.
 //   - BridgeState (ApplyResult.bridges, StatsBatch.bridges): one row per bridge the agent holds, by peer node id, newest wins:
-//     the live connections, since when, the round trip of its ping, the last error and the totals.
+//     the live connections, since when, the round trip of its ping, the last error and the totals; an entry that runs its own
+//     bridge site (BridgeServe.port != 0) also reports that site's certificate pin (site_cert_pin_sha256), which the exits need.
 //   - Hello.link_via_node_id: an agent that cannot reach the panel directly and calls it through an entry's bridge says which
 //     entry (the control channel through the entry is a later step; the field is only carried until then).
 //
@@ -1445,6 +1446,13 @@ message BridgeState {
   uint64 streams = 6;
   uint64 bytes_in = 7;
   uint64 bytes_out = 8;
+  // ENTRY side only: SHA-256 of the DER leaf certificate (lowercase hex) of the site listener the agent runs ITSELF for the
+  // bridge (BridgeServe.port != 0), as it serves now (the same pin the exit puts in BridgeDial.pin_sha256). Empty when the bridge
+  // arrives on the site of an inbound (BridgeServe.port = 0: take cert_pin_sha256 of that inbound), when the listener is not up,
+  // and on every exit-side row. The agent's own site has no name a CA could vouch for, so the pin is the only way the exit can
+  // know it reached the right entry. Every row of the entry carries the same value (one site serves all its exits); a renewed
+  // certificate shows up here in the next StatsBatch, so the panel re-reads it there and sends the exits the new pin.
+  string site_cert_pin_sha256 = 9;
 }
 
 message RelayResult {

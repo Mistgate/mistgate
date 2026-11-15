@@ -4067,11 +4067,18 @@ type BridgeState struct {
 	Error string `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
 	// Streams (people's connections) the bridge has carried since the agent started, and the bytes of them: bytes_in
 	// towards the people, bytes_out towards the exit's server.
-	Streams       uint64 `protobuf:"varint,6,opt,name=streams,proto3" json:"streams,omitempty"`
-	BytesIn       uint64 `protobuf:"varint,7,opt,name=bytes_in,json=bytesIn,proto3" json:"bytes_in,omitempty"`
-	BytesOut      uint64 `protobuf:"varint,8,opt,name=bytes_out,json=bytesOut,proto3" json:"bytes_out,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Streams  uint64 `protobuf:"varint,6,opt,name=streams,proto3" json:"streams,omitempty"`
+	BytesIn  uint64 `protobuf:"varint,7,opt,name=bytes_in,json=bytesIn,proto3" json:"bytes_in,omitempty"`
+	BytesOut uint64 `protobuf:"varint,8,opt,name=bytes_out,json=bytesOut,proto3" json:"bytes_out,omitempty"`
+	// ENTRY side only: SHA-256 of the DER leaf certificate (lowercase hex) of the site listener the agent runs ITSELF for the
+	// bridge (BridgeServe.port != 0), as it serves now (the same pin the exit puts in BridgeDial.pin_sha256). Empty when the bridge
+	// arrives on the site of an inbound (BridgeServe.port = 0: take cert_pin_sha256 of that inbound), when the listener is not up,
+	// and on every exit-side row. The agent's own site has no name a CA could vouch for, so the pin is the only way the exit can
+	// know it reached the right entry. Every row of the entry carries the same value (one site serves all its exits); a renewed
+	// certificate shows up here in the next StatsBatch, so the panel re-reads it there and sends the exits the new pin.
+	SiteCertPinSha256 string `protobuf:"bytes,9,opt,name=site_cert_pin_sha256,json=siteCertPinSha256,proto3" json:"site_cert_pin_sha256,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *BridgeState) Reset() {
@@ -4158,6 +4165,13 @@ func (x *BridgeState) GetBytesOut() uint64 {
 		return x.BytesOut
 	}
 	return 0
+}
+
+func (x *BridgeState) GetSiteCertPinSha256() string {
+	if x != nil {
+		return x.SiteCertPinSha256
+	}
+	return ""
 }
 
 type RelayResult struct {
@@ -9281,7 +9295,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\vduration_ms\x18\x06 \x01(\rR\n" +
 	"durationMs\x126\n" +
 	"\x06relays\x18\a \x03(\v2\x1e.mistgate.agent.v1.RelayResultR\x06relays\x128\n" +
-	"\abridges\x18\b \x03(\v2\x1e.mistgate.agent.v1.BridgeStateR\abridges\"\xe3\x01\n" +
+	"\abridges\x18\b \x03(\v2\x1e.mistgate.agent.v1.BridgeStateR\abridges\"\x94\x02\n" +
 	"\vBridgeState\x12 \n" +
 	"\fpeer_node_id\x18\x01 \x01(\tR\n" +
 	"peerNodeId\x12\x14\n" +
@@ -9292,7 +9306,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x05error\x18\x05 \x01(\tR\x05error\x12\x18\n" +
 	"\astreams\x18\x06 \x01(\x04R\astreams\x12\x19\n" +
 	"\bbytes_in\x18\a \x01(\x04R\abytesIn\x12\x1b\n" +
-	"\tbytes_out\x18\b \x01(\x04R\bbytesOut\"c\n" +
+	"\tbytes_out\x18\b \x01(\x04R\bbytesOut\x12/\n" +
+	"\x14site_cert_pin_sha256\x18\t \x01(\tR\x11siteCertPinSha256\"c\n" +
 	"\vRelayResult\x12\x19\n" +
 	"\brelay_id\x18\x01 \x01(\tR\arelayId\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x14\n" +
