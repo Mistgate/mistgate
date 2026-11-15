@@ -17,6 +17,7 @@ const updateGroup = vi.fn();
 const navigate = vi.fn();
 let params: Record<string, string> = {};
 let search: Record<string, string> = {};
+let profileProtocol = "hysteria2";
 
 // the plugin's schema with the domain field (the trimmed fixture has none)
 const schema = JSON.stringify({ ...JSON.parse(hy2), properties: { ...JSON.parse(hy2).properties, sni: { type: "string", title: "SNI", "x-group": "basics", "x-order": 30, "x-critical": true } } });
@@ -30,6 +31,7 @@ const awgSchema = JSON.stringify({
     subnet6: { type: "string", title: "Client network (IPv6)", "x-group": "basics", "x-order": 60 },
   },
 });
+const mtprotoSchema = JSON.stringify({ type: "object", properties: { port: { type: "integer", title: "Port", "x-group": "basics", "x-order": 10, "x-critical": true } } });
 const vlessDefaults = JSON.stringify({ port: 443, transport: "xhttp", security: "reality", reality: { target_kind: "self", target: "", server_names: [], short_ids: [], fingerprint: "chrome" }, xhttp: { path: "", host: "", mode: "auto", x_padding_bytes: "100-1000" }, egress: "direct" });
 const awgDefaults = JSON.stringify({ version: "3.1", port: 10819, mtu: 1280, subnet4: "10.66.4.0/22", subnet6: "fd66:66:0:1::/64", obfuscation: { preset: "dns" } });
 
@@ -47,6 +49,7 @@ vi.mock("@/lib/api", async (orig) => ({
     listProtocols: () => Promise.resolve({ protocols: [
       { id: "hysteria2", displayName: "Hysteria2", settingsSchemaJson: schema, defaultSettingsJson: defaults, apps: [App.HAPP] },
       { id: "awg", displayName: "AmneziaWG", settingsSchemaJson: awgSchema, defaultSettingsJson: awgDefaults, apps: [App.AMNEZIA] },
+      { id: "mtproto", displayName: "MTProto", settingsSchemaJson: mtprotoSchema, defaultSettingsJson: JSON.stringify({ port: 443 }), apps: [App.TELEGRAM] },
       { id: "vless", displayName: "VLESS", settingsSchemaJson: vless, defaultSettingsJson: vlessDefaults, apps: [App.HAPP] },
     ] }),
     listProfiles: () => Promise.resolve({ profiles: [{ id: "p_old", name: "hy2 · 443", protocol: "hysteria2" }] }),
@@ -54,7 +57,7 @@ vi.mock("@/lib/api", async (orig) => ({
       Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Subscription link · URI list", formats: formatsOf(r) }),
     getProfile: () =>
       Promise.resolve({
-        profile: { id: "p_old", name: "hy2 · 443", protocol: "hysteria2", version: 1, nodeCount: 2, userCount: 12, summary: "", warnings: [] },
+        profile: { id: "p_old", name: "hy2 · 443", protocol: profileProtocol, version: 1, nodeCount: 2, userCount: 12, summary: "", warnings: [] },
         settingsJson: defaults,
         inbounds: [],
       }),
@@ -107,6 +110,7 @@ let host: HTMLDivElement | null = null;
 beforeEach(() => {
   params = {};
   search = {};
+  profileProtocol = "hysteria2";
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -300,6 +304,22 @@ describe("critical changes of a Hysteria2 profile", () => {
     expect(dialog).toContain("This server stops working for 12 users until their app refreshes the subscription (up to 6 h).");
     expect(dialog).toContain("Ask them to refresh the subscription by hand, or make a copy of the profile on a new port");
     expect(dialog).toContain("The profile restarts on 2 nodes.");
+  });
+});
+
+describe("critical changes of an MTProto profile", () => {
+  it("say the Telegram link stops working until the person adds the new one: no subscription refresh to wait for", async () => {
+    params = { id: "p_old" };
+    profileProtocol = "mtproto";
+    updateProfile.mockResolvedValue({ impact: { inboundsRestarted: 1, usersOnline: 0, devicesNeedReissue: 0, criticalFields: ["/port"], affectedUserNames: ["anna", "boris"] } });
+    await mount();
+    await type(document.querySelector<HTMLInputElement>("input[aria-label='TCP port']")!, "8443");
+    await click(button("Save"));
+    await settle();
+    const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!.textContent!;
+    expect(dialog).toContain("The Telegram link stops working for 12 people until they add the new one from their page.");
+    expect(dialog).toContain("Send them the new link");
+    expect(dialog).not.toContain("subscription");
   });
 });
 

@@ -643,7 +643,8 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
 /**
  * "Apply critical changes?" with what they really do. A key-based profile (AmneziaWG) names the keys that stop working. A
  * profile the subscription carries (Hysteria2) breaks for everyone who has it until their app refreshes the subscription,
- * so it says that, with the two ways around it; otherwise the people online reconnect.
+ * so it says that, with the two ways around it; a Telegram link (MTProto) refreshes by nothing, so people are sent the new
+ * one; otherwise the people online reconnect.
  */
 function ImpactModal({
   impact,
@@ -663,17 +664,22 @@ function ImpactModal({
   t: Tx;
 }) {
   const i = impact?.impact;
-  const bySub = wayOf(protocol.id, [{ id: protocol.id, apps: protocol.apps }]) === "sub";
+  // Telegram links do not ride the subscription: nothing refreshes them, the person is sent the new one
+  const byTg = telegramOnly(protocol.apps);
+  const bySub = !byTg && wayOf(protocol.id, [{ id: protocol.id, apps: protocol.apps }]) === "sub";
   const subs = useQuery({ ...settingsQuery, enabled: open && bySub });
   const hours = subs.data?.settings.updateIntervalHours || 12;
-  const broken = !!i && bySub && i.criticalFields.length > 0;
+  const broken = !!i && (bySub || byTg) && i.criticalFields.length > 0;
+  const people = Math.max(userCount, i?.affectedUserNames.length ?? 0);
   const head: ReactNode = !i
     ? ""
     : i.devicesNeedReissue > 0
       ? t.n("profiles.crit.headDevices", i.devicesNeedReissue)
       : broken
         ? i.inboundsRestarted > 0
-          ? t.n("profiles.crit.headSub", Math.max(userCount, i.affectedUserNames.length), { h: hours })
+          ? byTg
+            ? t.n("profiles.crit.headTg", people)
+            : t.n("profiles.crit.headSub", people, { h: hours })
           : t("profiles.crit.headNowhere")
         : i.usersOnline > 0
           ? t.n("profiles.crit.headOnline", i.usersOnline)
@@ -690,7 +696,7 @@ function ImpactModal({
         <>
           <Notice title={head} className="items-start">
             {t("profiles.crit.body", { fields: impact!.fields.join(", ") })} {i.inboundsRestarted > 0 && t.n("profiles.crit.inbounds", i.inboundsRestarted)}
-            {broken && i.inboundsRestarted > 0 && <span className="mt-1 block">{t("profiles.crit.subAdvice")}</span>}
+            {broken && i.inboundsRestarted > 0 && <span className="mt-1 block">{t(byTg ? "profiles.crit.tgAdvice" : "profiles.crit.subAdvice")}</span>}
           </Notice>
           {i.affectedUserNames.length > 0 && (
             <div className="flex max-h-56 flex-col overflow-y-auto">
