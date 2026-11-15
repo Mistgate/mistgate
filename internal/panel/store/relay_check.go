@@ -34,6 +34,8 @@ type RelayStage struct {
 	ConnectMS   uint32  `json:"connect_ms,omitempty"`
 	FirstByteMS uint32  `json:"first_byte_ms,omitempty"`
 	DurationMS  uint32  `json:"duration_ms,omitempty"`
+	// Port is the TCP port of the bridge endpoint a reverse_reach probe was made for (0 for every other stage).
+	Port uint16 `json:"port,omitempty"`
 }
 
 // Unverifiable says the stage was skipped because it could not attribute a TLS identity to the server.
@@ -112,18 +114,22 @@ type RelayCounterUpdate struct {
 // RelayCheck is what the last check of a relay found. Port and To are what it was made for: a relay moved to another port or
 // pointed at another address is not covered by it.
 type RelayCheck struct {
-	At           int64              `json:"at,omitempty"`
-	Network      string             `json:"network,omitempty"`
-	Port         uint16             `json:"port,omitempty"`
-	To           string             `json:"to,omitempty"` // the exit's address:port
-	Leg          RelayStage         `json:"leg"`
-	Path         RelayStage         `json:"path"`
-	ReverseReach RelayStage         `json:"reverse_reach,omitzero"`
-	ReverseSpeed RelayStage         `json:"reverse_speed,omitzero"`
-	OK           bool               `json:"ok"`              // the leg ran and no stage that ran failed
-	Stage        string             `json:"stage,omitempty"` // the first direct stage that failed
-	Monitor      *RelayMonitorCheck `json:"monitor,omitempty"`
-	Counters     *RelayCounters     `json:"counters,omitempty"`
+	At           int64      `json:"at,omitempty"`
+	Network      string     `json:"network,omitempty"`
+	Port         uint16     `json:"port,omitempty"`
+	To           string     `json:"to,omitempty"` // the exit's address:port
+	Leg          RelayStage `json:"leg"`
+	Path         RelayStage `json:"path"`
+	ReverseReach RelayStage `json:"reverse_reach,omitzero"`
+	ReverseSpeed RelayStage `json:"reverse_speed,omitzero"`
+	// DirectSpeed is the panel's own 8 MB proof of the direct way before a reverse relay returns to DNAT.
+	DirectSpeed RelayStage `json:"direct_speed,omitzero"`
+	// Bridge is derived from the agents' reports (Relay.BridgeStage) by whoever shows or uses the check; it is never stored.
+	Bridge   RelayStage         `json:"-"`
+	OK       bool               `json:"ok"`              // the leg ran and no stage that ran failed
+	Stage    string             `json:"stage,omitempty"` // the first direct stage that failed
+	Monitor  *RelayMonitorCheck `json:"monitor,omitempty"`
+	Counters *RelayCounters     `json:"counters,omitempty"`
 }
 
 // Settle recomputes OK and Stage from the two stages. An unverifiable leg is not a failure: its owner may choose to enable the
@@ -148,7 +154,8 @@ func (c RelayCheck) CanUse() bool { return c.Leg.Acceptable() && c.Path.Acceptab
 // Check reads the relay's latest check; the second result is false when there is none.
 func (r Relay) Check() (RelayCheck, bool) {
 	var c RelayCheck
-	if json.Unmarshal([]byte(r.CheckJSON), &c) != nil || (c.At == 0 && c.Monitor == nil && c.Counters == nil) {
+	if json.Unmarshal([]byte(r.CheckJSON), &c) != nil || (c.At == 0 && c.Monitor == nil && c.Counters == nil &&
+		c.Leg.At == 0 && c.Path.At == 0 && c.ReverseReach.At == 0 && c.ReverseSpeed.At == 0 && c.DirectSpeed.At == 0) {
 		return RelayCheck{}, false
 	}
 	return c, true
@@ -178,7 +185,7 @@ func (s *Store) SetRelayCheck(ctx context.Context, id string, c RelayCheck) erro
 	}
 	// D1 can bind a number as REAL. Cast the root timestamp and port so json_set writes integers into the check document.
 	res, err := s.W.ExecContext(ctx, `UPDATE relay SET check_json = json_patch(
-		json_remove(COALESCE(check_json, '{}'), '$.at', '$.network', '$.port', '$.to', '$.leg', '$.path', '$.reverse_reach', '$.reverse_speed', '$.ok', '$.stage'),
+		json_remove(COALESCE(check_json, '{}'), '$.at', '$.network', '$.port', '$.to', '$.leg', '$.path', '$.reverse_reach', '$.reverse_speed', '$.direct_speed', '$.ok', '$.stage'),
 		json_set(json(?), '$.at', CAST(? AS INTEGER), '$.port', CAST(? AS INTEGER)))
 		WHERE id = ?`, string(b), c.At, c.Port, id)
 	if err != nil {

@@ -118,6 +118,67 @@ func relayModeStoreProof(t *testing.T, st *Store) {
 	if c, ok := l.Check(); !ok || c.At != now.Unix()+1 || c.Monitor == nil || !c.Monitor.OK || !c.Verified() {
 		t.Fatalf("the check lost a member next to the bridge report: %+v", c)
 	}
+	entrySide := RelayBridgeSideCheck{Connected: true, Conns: 1, SinceUnix: now.Unix() - 30, AtUnix: now.Unix()}
+	exitSide := RelayBridgeSideCheck{Connected: true, Conns: 2, RTTMS: 43, SinceUnix: now.Unix() - 30, AtUnix: now.Unix()}
+	if err := st.SetRelayBridgeSide(ctx, "rly_a", "entry", &entrySide); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayBridgeSide(ctx, "rly_a", "exit", &exitSide); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayDirectState(ctx, "rly_a", 2, now.Unix()-30); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayCheck(ctx, "rly_a", RelayCheck{At: now.Unix() + 2, Network: "tcp", Port: 8443,
+		To: "192.0.2.10:443", Leg: RelayStage{Status: "ok"}, Path: RelayStage{Status: "ok"}, ReverseReach: RelayStage{Status: "ok", At: now.Unix()},
+		DirectSpeed: RelayStage{Status: "ok", MB: 8, At: now.Unix()}, OK: true}); err != nil {
+		t.Fatal(err)
+	}
+	l = mustRelay(t, st, "rly_a")
+	got, ok = l.Bridge()
+	if !ok || got.Entry == nil || *got.Entry != entrySide || got.Exit == nil || *got.Exit != exitSide || got.Conns != exitSide.Conns {
+		t.Fatalf("the two bridge report paths did not merge: %+v; check_json=%s", got, l.CheckJSON)
+	}
+	if c, ok := l.Check(); !ok || c.DirectSpeed.MB != 8 || c.Monitor == nil || !c.Monitor.OK || l.DirectStreak() != 2 || l.DirectStreakAt() != now.Unix()-30 {
+		t.Fatalf("the check writer lost relay-owned members: check=%+v streak=%d at=%d", c, l.DirectStreak(), l.DirectStreakAt())
+	}
+	// the bridge stage is derived from the exit's report, never stored
+	for _, tc := range []struct {
+		name         string
+		at           time.Time
+		report       RelayBridgeSideCheck
+		status, code string
+		stageAt      int64
+	}{
+		{"holding", now, exitSide, "ok", "", now.Unix()},
+		{"warming", now, RelayBridgeSideCheck{Connected: true, Conns: 1, SinceUnix: now.Unix() - 3, AtUnix: now.Unix()}, "skipped", "warming", now.Unix()},
+		{"an error of the agent", now, RelayBridgeSideCheck{Connected: true, Conns: 1, SinceUnix: now.Unix() - 60, Error: "pin_mismatch", AtUnix: now.Unix()}, "fail", "pin_mismatch", now.Unix()},
+		{"no connection", now, RelayBridgeSideCheck{AtUnix: now.Unix()}, "fail", "disconnected", now.Unix()},
+		{"silent for 91 seconds", now.Add(91 * time.Second), exitSide, "fail", "stale", now.Unix() + 91},
+		{"a report from the future", now.Add(-time.Minute), exitSide, "fail", "stale", now.Unix() - 60},
+	} {
+		if err := st.SetRelayBridgeSide(ctx, "rly_a", "exit", &tc.report); err != nil {
+			t.Fatal(err)
+		}
+		if got := mustRelay(t, st, "rly_a").BridgeStage(tc.at); got.Status != tc.status || got.Code != tc.code || got.At != tc.stageAt {
+			t.Fatalf("bridge stage %s = %+v, want %s/%s at %d", tc.name, got, tc.status, tc.code, tc.stageAt)
+		}
+	}
+	// the pool the panel asks for and the people the entry reports live next to the sides, and neither erases the other
+	entrySide.Clients = 150
+	if err := st.SetRelayBridgeSide(ctx, "rly_a", "entry", &entrySide); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayBridgePool(ctx, "rly_a", 4, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayBridgeSide(ctx, "rly_a", "exit", &exitSide); err != nil {
+		t.Fatal(err)
+	}
+	got, ok = mustRelay(t, st, "rly_a").Bridge()
+	if !ok || got.Pool != 4 || got.PoolAt != now.Unix() || got.Entry == nil || got.Entry.Clients != 150 || got.Exit == nil || got.Exit.Conns != 2 {
+		t.Fatalf("pool and people did not survive the side reports: %+v", got)
+	}
 	if err := st.SetRelayDirectStreak(ctx, "rly_a", 9); err != nil {
 		t.Fatal(err)
 	}
