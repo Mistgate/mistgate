@@ -269,6 +269,9 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const toast = useToast();
   const refresh = useInboundRefresh(nodeId);
   const isAwg = inbound.protocol === "awg";
+  // VLESS has a name of its own to set only where it has a certificate: the node's own site behind REALITY, or TLS (the
+  // server resolved one, or the admin set one, or it could not for want of a domain); REALITY with another site has none
+  const named = inbound.protocol !== "vless" || !!inbound.tlsServerName || !!inbound.tlsServerNameOverride || (!!inbound.lastError && inboundErrorKind(inbound.lastError) === "cert");
   const was = { port: inbound.port ? String(inbound.port) : "", sni: inbound.tlsServerName, enabled: inbound.state !== InboundState.DISABLED };
   const [port, setPort] = useState(was.port);
   const [sni, setSni] = useState(was.sni);
@@ -365,7 +368,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
             onAnyway={() => save.mutate(true)}
           />
         )}
-        {!isAwg && inbound.protocol !== "vless" && (
+        {!isAwg && named && (
           <TextField
             id={sniId}
             label={t("node.profiles.tlsOverride")}

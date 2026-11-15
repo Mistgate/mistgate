@@ -768,3 +768,38 @@ describe("a port that loses UDP packets", () => {
     expect(adds()).toHaveLength(2);
   });
 });
+
+describe("the domain of a VLESS server", () => {
+  const vless = { id: "inb_v", profileId: "prf_v", profileName: "vl", protocol: "vless", state: InboundState.ACTIVE, port: 443, tlsServerName: "", certNotAfterUnix: 0, certPinSha256: "", lastError: "" };
+  const domain = () => input("Domain (SNI)");
+  const edit = async (inbound: object) => {
+    updateInbound.mockResolvedValue({ inbound: {}, warnings: [], freePort: 0 });
+    await mount(data({ inbounds: [inbound] }));
+    await click(button("Edit"));
+    await settle();
+  };
+
+  it("is in the edit window when the server has a name for it (the node's own site, TLS), and is sent as tlsServerNameOverride", async () => {
+    await edit({ ...vless, tlsServerName: "de1.example.com" });
+    expect(domain()?.value).toBe("de1.example.com");
+    await type(domain(), "vpn.example.com");
+    await checked();
+    await click(document.querySelector("[role=dialog] button[type=submit]"));
+    await settle();
+    expect(updateInbound.mock.calls.filter(([r]) => !(r as { validateOnly?: boolean }).validateOnly).at(-1)?.[0]).toMatchObject({ inboundId: "inb_v", tlsServerNameOverride: "vpn.example.com" });
+  });
+
+  it("is there to fix a certificate that could not be made, and to clear a name that was set", async () => {
+    await edit({ ...vless, state: InboundState.FAILED, lastError: "cannot build inbound: a host name is required for a Let's Encrypt certificate" });
+    expect(domain()).toBeDefined();
+    act(() => root?.unmount());
+    host?.remove();
+    await edit({ ...vless, tlsServerNameOverride: "old.example.com" });
+    expect(domain()).toBeDefined();
+  });
+
+  it("is not there for REALITY with another site, which has no certificate name", async () => {
+    await edit(vless);
+    expect(domain()).toBeUndefined();
+  });
+});
