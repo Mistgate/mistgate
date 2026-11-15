@@ -14,6 +14,7 @@ package agent
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/hex"
@@ -41,6 +42,7 @@ import (
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/awgprep"
+	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
@@ -241,6 +243,12 @@ type Agent struct {
 	torrentGuardActive  bool
 	hostFirewallErr     string       // Last reported host-firewall sync failure; worker-owned.
 	relay               relayRuntime // relay forwards (relay.go); worker-owned
+	bridgeEntry         *nodebridge.Entry
+	bridgeDialer        *nodebridge.Dialer
+	bridgeSite          *bridgeSiteServer
+	bridgeServeError    string
+	bridgeInfo          atomic.Pointer[bridgeInfo] // what the stats goroutine may read of the worker-owned bridge state
+	bridgeCertSequence  atomic.Uint64
 
 	// Timing knobs; tests shorten them.
 	statsEvery   time.Duration // 0 = NodeSettings.stats_interval_s
@@ -445,6 +453,17 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		a.log.Warn("persisted decoy site ignored", "code", "decoy_state_invalid", "err", siteErr)
 	}
 	a.id.Store(id)
+	a.bridgeEntry = nodebridge.NewEntry()
+	a.bridgeEntry.SetLogger(a.log.With("source", "bridge"))
+	a.bridgeDialer = nodebridge.NewDialer(func() nodebridge.DialIdentity {
+		current := a.id.Load()
+		if current == nil || len(current.cert.Certificate) == 0 {
+			return nodebridge.DialIdentity{}
+		}
+		key, _ := current.cert.PrivateKey.(*ecdsa.PrivateKey)
+		return nodebridge.DialIdentity{NodeID: a.meta.NodeID, CertificateDER: append([]byte(nil), current.cert.Certificate[0]...), PrivateKey: key}
+	})
+	a.bridgeDialer.SetClock(a.now)
 	a.settings.Store(&pb.NodeSettings{})
 
 	userLimits := ratelimit.NewRegistry() // one per agent: a person's hysteria2 and vless credentials share their bucket
@@ -493,10 +512,13 @@ func (a *Agent) egress(name string) (engine.Egress, error) {
 }
 
 func (a *Agent) masquerade(inboundID string) http.Handler {
+	var site http.Handler
 	if a.cfg.Masquerade != nil {
-		return a.cfg.Masquerade(inboundID)
+		site = a.cfg.Masquerade(inboundID)
+	} else {
+		site = a.decoySite.Handler()
 	}
-	return a.decoySite.Handler()
+	return a.bridgeEntry.Handler(site)
 }
 
 // now is the agent clock corrected by the offset measured at Hello.
@@ -534,6 +556,15 @@ func (a *Agent) knows(protocol string) bool { _, ok := a.engines[protocol]; retu
 func (a *Agent) closeEngines() {
 	a.closeOnce.Do(func() {
 		a.debug.shutdown()
+		if a.bridgeEntry != nil {
+			a.bridgeEntry.Close()
+		}
+		if a.bridgeDialer != nil {
+			a.bridgeDialer.Close()
+		}
+		if a.bridgeSite != nil {
+			a.bridgeSite.Close()
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		for _, p := range a.protocols {
@@ -622,7 +653,7 @@ func (a *Agent) restore(ctx context.Context) {
 		a.configureNetworks(m.settings)
 	}
 	a.startAwgKmod(ctx, m)
-	if m.revision == 0 && len(m.inbounds) == 0 {
+	if m.revision == 0 && len(m.inbounds) == 0 && len(m.relays) == 0 && m.bridgeServe == nil && len(m.bridgeDials) == 0 {
 		return
 	}
 	a.syncOwnedIPv6(ctx) // the addresses come back with the agent, without the panel

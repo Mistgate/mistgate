@@ -44,6 +44,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 			res.Status = pb.ApplyStatus_APPLY_STATUS_PARTIAL
 		}
 		res.Relays = a.relay.results
+		res.Bridges = a.bridgeResults()
 		return done()
 	}
 
@@ -91,6 +92,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	}
 	res.Inbounds = results
 	res.Relays = a.relay.results
+	res.Bridges = a.bridgeResults()
 	res.StateHash = a.observedHash(next)
 	if ds.BaseRevision == 0 { // deltas are frequent; only a full apply is an event worth reporting
 		added, removed, changed, users := diffModels(cur, next)
@@ -157,6 +159,13 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	a.engineSettings(ctx, next)
 	a.syncWarp(ctx, next)
 	a.syncTunnels(ctx, next)
+	reverseClaims := a.reverseRelayTCPClaims(next)
+	if len(reverseClaims) > 0 || (next.bridgeServe != nil && next.bridgeServe.Port != 0) {
+		preRelayClaims := withRelayClaims(tcpPortClaims(next), reverseClaims)
+		preRelayClaims = mergeTCPPortClaims(withRelayClaims(tcpPortClaims(prev), prevRelayClaims), preRelayClaims)
+		a.syncTCPClaims(ctx, preRelayClaims)
+	}
+	a.syncBridgeServe(ctx, next)
 	// The forwards come before the engines too: a TCP port a forward holds is a claim like an inbound's, so a decoy site
 	// gives it up while the forward is installed and keeps it when the forward failed.
 	a.syncRelays(ctx, next)
@@ -197,7 +206,9 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	a.syncTorrentGuardApplied(ctx, next, results)
 	active := successfullyAppliedEnabledInbounds(results)
 	hops := a.syncHops(ctx, next, results, active)
-	a.syncInboundPorts(ctx, next, active, hops)
+	firewallReady := a.syncInboundPorts(ctx, next, active, hops)
+	a.startReverseRelays(firewallReady)
+	a.syncBridgeDials(ctx, next, results)
 	a.noteCerts(results)
 	results = append(results, removedFailures...)
 	var failed []string
@@ -207,6 +218,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 		}
 	}
 	a.failedApply.Store(&failed)
+	a.publishBridgeInfo()
 	return results
 }
 
@@ -218,6 +230,11 @@ func tcpPortClaims(next *model) map[uint16]string {
 			if _, exists := claimed[spec.Listen.Port]; !exists { // ids are sorted; keep the same lower-id winner as hop checks
 				claimed[spec.Listen.Port] = id
 			}
+		}
+	}
+	if next.bridgeServe != nil && next.bridgeServe.Port != 0 {
+		if _, exists := claimed[next.bridgeServe.Port]; !exists {
+			claimed[next.bridgeServe.Port] = "bridge-site"
 		}
 	}
 	return claimed
@@ -556,7 +573,7 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 // syncInboundPorts mirrors only enabled listeners whose engine apply succeeded. UDP hop ranges are included only after
 // their exact nft redirect was accepted and installed. A failure is a node-level warning, not an inbound error: the
 // listener runs, and the host firewall may well be open by the owner's own rules.
-func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[string]bool, hops []hostctl.Hop) {
+func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[string]bool, hops []hostctl.Hop) bool {
 	byHop := make(map[string]hostctl.Hop, len(hops))
 	for _, h := range hops {
 		byHop[h.InboundID] = h
@@ -587,6 +604,17 @@ func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[st
 			tcpSet[s.Listen.Port] = struct{}{}
 		}
 	}
+	if a.bridgeSite != nil {
+		if port := a.bridgeSite.Port(); port != 0 {
+			tcpSet[port] = struct{}{}
+		}
+	}
+	for port := range a.relay.listenerPorts {
+		tcpSet[port] = struct{}{}
+	}
+	for _, listener := range a.relay.pending {
+		tcpSet[listener.Port] = struct{}{}
+	}
 	udp := make([]hostctl.UDPInboundPort, 0, len(udpSet))
 	for port := range udpSet {
 		udp = append(udp, port)
@@ -610,9 +638,11 @@ func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[st
 	}
 	if err := errors.Join(errs...); err != nil {
 		a.markHostFirewallSyncFailure(err, udp, tcp)
+		return false
 	} else {
 		a.clearHostFirewallSyncFailure()
 	}
+	return true
 }
 
 // markHostFirewallSyncFailure reports one warning per distinct failure; the same failure on later reconciles is quiet.
@@ -728,7 +758,7 @@ func (a *Agent) observedHash(m *model) string {
 			all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 		}
 	}
-	return statehash.StateRelays(all, m.warp, m.relays)
+	return statehash.StateBridge(all, m.warp, m.relays, m.bridgeServe, m.bridgeDials)
 }
 
 func withExpired(held []plugin.UserCred, in *inbound, now time.Time) []plugin.UserCred {
@@ -761,5 +791,5 @@ func (m *model) hash() string {
 		}
 		all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 	}
-	return statehash.StateRelays(all, m.warp, m.relays)
+	return statehash.StateBridge(all, m.warp, m.relays, m.bridgeServe, m.bridgeDials)
 }
