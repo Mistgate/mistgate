@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -93,6 +94,26 @@ func TestRelayDownAlertStreakAndRecovery(t *testing.T) {
 	}
 	if len(transitions) != 2 || !transitions[1].Resolved {
 		t.Fatalf("recovery transition = %+v", transitions)
+	}
+}
+
+func TestReverseRelayDownAlertUsesBridgeStage(t *testing.T) {
+	e, _, id := newRelayMonitorEnv(t)
+	now := e.clock.Now()
+	e.exec(`UPDATE relay SET network = 'tcp' WHERE id = ?`, id)
+	if err := e.st.SetRelayActiveMode(e.ctx, id, store.RelayModeReverse, "leg_failed", now); err != nil {
+		t.Fatal(err)
+	}
+	check := store.RelayCheck{At: now.Unix(), Network: "tcp", Port: 8443, Leg: store.RelayStage{Status: "fail"},
+		Path: store.RelayStage{Status: "fail", Code: "timeout"}}
+	if err := e.st.SetRelayCheck(e.ctx, id, check); err != nil {
+		t.Fatal(err)
+	}
+	setRelayMonitor(t, e, id, false, 2, "bridge")
+	e.evaluate()
+	alert := e.active()["relay_down/fi1/"+id]
+	if alert.WhyKey != "health.alert.relay_down.why.bridge" || alert.Params["stage"] != "bridge" {
+		t.Fatalf("reverse relay alert = %+v, want bridge stage", alert)
 	}
 }
 
@@ -205,6 +226,44 @@ func TestRelayAutomaticDiagnosisRepeatLimit(t *testing.T) {
 	run()
 	if count() != 2 {
 		t.Fatalf("diagnosis did not become due at the limit: %d calls", count())
+	}
+}
+
+// A failed round of a relay that can use the bridge is diagnosed with the exit's probe of the entry's bridge endpoint in the same
+// pass: the controller needs it fresh to move the relay (a flow that froze leaves the leg alive, so the probe would not run by itself),
+// and the next diagnosis is half an hour away. A relay that cannot (UDP, an agent that is too old, the owner's dnat) gets the pair it
+// always got.
+func TestRelayDiagnosisAsksForReverseReachWhereTheBridgeIsPossible(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		network string
+		caps    string
+		mode    string
+		want    []string
+	}{
+		{"tcp, both agents, auto", "tcp", "relay-forward/1 relay-reverse/1", store.RelayModeAuto, []string{store.RelayStageLeg, store.RelayStagePath, store.RelayStageReverseReach}},
+		{"udp", "udp", "relay-forward/1 relay-reverse/1", store.RelayModeAuto, nil},
+		{"an agent without the capability", "tcp", "relay-forward/1", store.RelayModeAuto, nil},
+		{"the owner's dnat", "tcp", "relay-forward/1 relay-reverse/1", store.RelayModeDNAT, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e, _, id := newRelayMonitorEnv(t, func(c *Config) {
+				c.Dialers = map[string]Dialer{"hysteria2": func(context.Context, Target, DialOptions) (Tunnel, error) {
+					return nil, errors.New("probe dial failed")
+				}}
+			})
+			e.exec(`UPDATE relay SET network = ?, mode = ? WHERE id = ?`, tc.network, tc.mode, id)
+			e.exec(`UPDATE node SET agent_caps = ? WHERE id IN (SELECT via_node_id FROM relay WHERE id = ?)`, tc.caps, id)
+			e.exec(`UPDATE node SET agent_caps = ? WHERE id IN (SELECT node_id FROM inbound WHERE id IN (SELECT inbound_id FROM relay WHERE id = ?))`, "relay-reverse/1 tcpcheck/1", id)
+			if _, ok := e.s.roundRelay(e.ctx, relayTargetID(id)); !ok {
+				t.Fatal("relay client-eye round was skipped")
+			}
+			e.fl.mu.Lock()
+			defer e.fl.mu.Unlock()
+			if len(e.fl.relayStages) != 1 || !slices.Equal(e.fl.relayStages[0], tc.want) {
+				t.Fatalf("stages asked for = %v, want one call with %v", e.fl.relayStages, tc.want)
+			}
+		})
 	}
 }
 

@@ -14,9 +14,6 @@ access/node_dns.go	access: cannot read a dns preset	1
 access/node_dns.go	access: cannot read the subscription DNS state	1
 access/profile_rpc.go	access: retained server key unreadable, making a new one	1
 access/profile_rpc.go	access: server key of the removed inbound is unreadable, not kept	1
-access/relay_check.go	access: path check of a relay	1
-access/relay_check.go	access: store a relay check	2
-access/relay_check.go	access: switch a failed relay off	1
 access/twin_rpc.go	access: twin rollback: inbound not removed	1
 access/twin_rpc.go	access: twin rollback: profile not removed	1
 app/assistant_wiring.go	assistant MCP tools are off	1
@@ -273,9 +270,6 @@ health/port_recheck.go	health: select periodic UDP port check	2
 health/probe.go	health: probe credential unreadable	1
 health/relay_hints.go	relay hints: country checks	1
 health/relay_hints.go	relay hints: tspu rows	1
-health/relay_round.go	health: diagnose relay	1
-health/relay_round.go	health: reserve relay diagnosis	1
-health/relay_round.go	health: store relay monitor	1
 health/targets.go	health: no probe credential	1
 httpserver/decoy.go	close decoy directory root	1
 httpserver/decoy.go	open decoy directory	1
