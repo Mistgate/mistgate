@@ -495,6 +495,20 @@ describe("the profiles list by protocol", () => {
     expect(t).not.toContain("ignored.example.com");
   });
 
+  it("names the port by the network of the protocol (MTProto and VLESS are tcp, Hysteria2 and AmneziaWG udp) and matches the checks of that network", async () => {
+    const mt = { ...hy, id: "inb_3", profileId: "prf_3", profileName: "tg", protocol: "mtproto", port: 8443 };
+    const vl = { ...hy, id: "inb_4", profileId: "prf_4", profileName: "vl", protocol: "vless", port: 443 };
+    await mount(data({ inbounds: [hy, awg, mt, vl], portChecks: [{ port: 8443, verdict: 4, sent: 300, got: 189 }], tcpChecks: [] }));
+    const t = text();
+    expect(t).toContain("tcp/8443");
+    expect(t).toContain("tcp/443");
+    expect(t).toContain("udp/443");
+    expect(t).toContain("udp/51820");
+    expect(t).not.toContain("udp/8443");
+    // the UDP check on 8443 is not MTProto's: no verdict on its row
+    expect(t).not.toContain("189");
+  });
+
   it("puts what the node counted of connection attempts under each profile, and says so when there were none", async () => {
     getNodeConnections.mockResolvedValue({
       supported: true, sinceUnix: 0n, nowUnix: 0n,
@@ -551,6 +565,14 @@ describe("a profile that did not start", () => {
     expect(text()).toContain("Failed to start");
     expect(text()).toContain("Port udp/8443 is taken by another program (xray)");
     expect(text()).toContain("listen udp :8443: bind: address already in use");
+  });
+
+  it("names the port of a failed MTProto profile with tcp, not udp", async () => {
+    const tg = { ...failed, protocol: "mtproto", profileName: "tg", lastError: "listen tcp :8443: bind: address already in use" };
+    await mount(data({ inbounds: [tg] }));
+    await settle();
+    expect(text()).toContain("Port tcp/8443 is taken by another program");
+    expect(text()).not.toContain("Port udp/8443");
   });
 
   it("changes the port from the row: the edit opens on a port that is free on the node", async () => {

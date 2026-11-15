@@ -167,7 +167,7 @@ export function StateBanner({ data, tab, onTab, onRestart }: { data: Plain<GetNo
               </Button>
             }
           >
-            {inboundErrorText(t, error, { port: first?.port, process: first ? holders[first.id] : undefined })}
+            {inboundErrorText(t, error, { port: first?.port, protocol: first?.protocol, process: first ? holders[first.id] : undefined })}
           </Banner>
         );
       }

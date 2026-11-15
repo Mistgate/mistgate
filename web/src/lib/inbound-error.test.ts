@@ -31,4 +31,13 @@ describe("why a profile did not start, in words", () => {
     expect(inboundErrorText(t, "needs a DNS name")).toContain("нужен домен с A-записью");
     expect(inboundErrorText(t, "x")).toBe("Профиль не запустился");
   });
+
+  it("names the port by the network of the protocol, else by the text's own, and guesses udp last", () => {
+    const e = "listen tcp :8443: bind: address already in use";
+    expect(inboundErrorText(t, e, { port: 8443, protocol: "mtproto" })).toBe("Порт tcp/8443 занят другой программой");
+    expect(inboundErrorText(t, "address already in use", { port: 443, protocol: "vless" })).toBe("Порт tcp/443 занят другой программой");
+    expect(inboundErrorText(t, "address already in use", { port: 443, protocol: "hysteria2" })).toBe("Порт udp/443 занят другой программой");
+    expect(inboundErrorText(t, e, { port: 8443 })).toBe("Порт tcp/8443 занят другой программой");
+    expect(inboundErrorText(t, "address already in use", { port: 443 })).toBe("Порт udp/443 занят другой программой");
+  });
 });

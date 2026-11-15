@@ -1,5 +1,6 @@
 import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
+import { networkOf } from "./ways-graph";
 
 // Why a profile did not start on a node, in words: the agent (or the panel, for a profile that cannot be built) leaves an
 // English last_error such as "listen udp :8443: bind: address already in use". This sorts it into a class with a sentence;
@@ -38,13 +39,15 @@ const sentence: Record<InboundErrorKind, MessageKey> = {
 
 /**
  * The sentence for a profile's last_error. `port` is the profile's port on the node (else the one the text names),
- * `process` what holds it when the node's doctor knows ("caddy").
+ * `process` what holds it when the node's doctor knows ("caddy"), `protocol` the profile's, whose network ("tcp" or "udp")
+ * the port is named with; without one the text's own "listen tcp" decides, and "udp" is the last guess.
  */
-export function inboundErrorText(t: T, error: string, ctx: { port?: number; process?: string } = {}): string {
+export function inboundErrorText(t: T, error: string, ctx: { port?: number; process?: string; protocol?: string } = {}): string {
   const kind = inboundErrorKind(error);
   const port = ctx.port || inboundErrorPort(error);
   if (kind === "port" && port) {
-    const vars = { port: `udp/${port}`, process: ctx.process ?? "" };
+    const net = (ctx.protocol && networkOf(ctx.protocol)) || (/listen (tcp|udp)/i.exec(error)?.[1]?.toLowerCase() ?? "udp");
+    const vars = { port: `${net}/${port}`, process: ctx.process ?? "" };
     return t(ctx.process ? "node.inbound.err.portProcess" : "node.inbound.err.port", vars);
   }
   return t(sentence[kind]);

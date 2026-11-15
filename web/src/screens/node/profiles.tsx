@@ -27,6 +27,7 @@ import { agentLinked } from "@/lib/node-status";
 import { protocolName } from "@/lib/series";
 import { useNow } from "@/lib/time";
 import { useIsOwner } from "@/lib/updates";
+import { networkOf } from "@/lib/ways-graph";
 import { profileListQuery } from "@/screens/users/rpc";
 import { PartsLine } from "@/screens/users/user-detail";
 import { AddInbound } from "./add-inbound";
@@ -65,7 +66,7 @@ function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
  * every row line up. Anything that is not AmneziaWG reads as TLS.
  */
 function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number, dot?: Cell["dot"]): Cell[] {
-  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${i.protocol === "vless" ? "tcp" : "udp"}/${i.port}` : "", mono: true, dot };
+  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${networkOf(i.protocol) ?? "udp"}/${i.port}` : "", mono: true, dot };
   const egress: Cell = { label: t("node.profiles.egress"), value: i.egress ? t(i.egress === "warp" ? "node.profiles.egress.warp" : "node.profiles.egress.direct") : "" };
   if (i.protocol === "awg") {
     const a = i.awg;
@@ -107,11 +108,11 @@ export function usePortHolders(nodeId: string, enabled = true): Record<string, s
 }
 
 /** Why a profile did not start, in words, with the agent's own text under it. Also on the profile page ("Where it runs"). */
-export function InboundErrorNote({ inbound, process }: { inbound: Pick<Plain<Inbound>, "lastError" | "port">; process?: string }) {
+export function InboundErrorNote({ inbound, process }: { inbound: Pick<Plain<Inbound>, "lastError" | "port" | "protocol">; process?: string }) {
   const t = useT();
   return (
     <div className="flex flex-col gap-0.5 rounded-field border border-[color-mix(in_oklch,var(--danger)_45%,var(--border))] bg-danger-soft px-3 py-2">
-      <p className="text-[13px] leading-snug font-semibold text-danger-text">{inboundErrorText(t, inbound.lastError, { port: inbound.port, process })}</p>
+      <p className="text-[13px] leading-snug font-semibold text-danger-text">{inboundErrorText(t, inbound.lastError, { port: inbound.port, protocol: inbound.protocol, process })}</p>
       <p className="font-mono text-[11px] leading-snug break-words text-muted">{inbound.lastError}</p>
     </div>
   );
@@ -174,7 +175,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
       {data.inbounds.map((i) => {
         const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
         // the last port check of this profile's port: a dot that leads to it in the ways in
-        const tcp = i.protocol === "vless";
+        const tcp = networkOf(i.protocol) === "tcp";
         const checked = tcp ? data.tcpChecks?.find((c) => c.port === i.port && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
         const cs = cells(t, fmt, i, now, checked && (tcp ? tcpPill(t, checked.verdict) : verdictPill(t, checked as never)));
         const kind = i.lastError ? inboundErrorKind(i.lastError) : null;
