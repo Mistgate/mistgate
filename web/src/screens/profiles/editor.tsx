@@ -224,7 +224,7 @@ function NewEditor({
 /** What a form on screen was drawn from: one saved version of a profile. */
 type Saved = { key: string; info: ProtocolInfo; profile: ProfileSummary; inbounds: Inbound[]; initial: { name: string; settingsJson: string } };
 
-function EditProfile({ id }: { id: string }) {
+export function EditProfile({ id }: { id: string }) {
   const t = useTx();
   const go = useGo();
   const qc = useQueryClient();
@@ -685,7 +685,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
  * so it says that, with the two ways around it; a Telegram link (MTProto) refreshes by nothing, so people are sent the new
  * one; otherwise the people online reconnect.
  */
-function ImpactModal({
+export function ImpactModal({
   impact,
   userCount,
   protocol,
