@@ -72,8 +72,9 @@ type Relay struct {
 	// When active_mode last changed; 0 = it never has.
 	ModeChangedUnix int64 `protobuf:"varint,29,opt,name=mode_changed_unix,json=modeChangedUnix,proto3" json:"mode_changed_unix,omitempty"`
 	// Why the relay is in the way it is: "" (dnat, no change so far), "leg_failed" (reverse after the direct leg failed),
-	// "direct_back" (dnat again, the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported" (the bridge is not
-	// possible: the agents), "udp" (a UDP server: dnat only for now).
+	// "direct_back" (dnat again: the leg held three checks an hour apart and an 8 MB flow of its own), "bridge_failed" (dnat again:
+	// the bridge or the path through it failed while the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported"
+	// (the bridge is not possible: the agents), "udp" (a UDP server: dnat only for now).
 	ModeReason string `protobuf:"bytes,30,opt,name=mode_reason,json=modeReason,proto3" json:"mode_reason,omitempty"`
 	// In the reverse way: consecutive good checks of the direct leg, 0 to 3 (the panel goes back to DNAT after 3 and a speed
 	// test). When and how the last leg check went is check.leg.
@@ -362,7 +363,17 @@ type RelayBridge struct {
 	// Since when the bridge has been connected (the present run); 0 = not connected.
 	SinceUnix int64 `protobuf:"varint,4,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
 	// The last error an agent reported for the bridge, a short fixed word; empty = none.
-	Error         string `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	Error string `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	// People using the bridge right now (the entry counts their connections that are being carried; waiting pairs are not people).
+	Clients uint32 `protobuf:"varint,6,opt,name=clients,proto3" json:"clients,omitempty"`
+	// The TLS connections the panel asked the exit to hold (2, or 4 when the relay is busy or the bridge is near its limit).
+	Pool uint32 `protobuf:"varint,7,opt,name=pool,proto3" json:"pool,omitempty"`
+	// The most people the pool carries at once: pool times (250 HTTP/2 streams of a connection minus those of the waiting pairs)
+	// divided by 2 streams a person, about 120 a connection. 0 when pool is.
+	Capacity uint32 `protobuf:"varint,8,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	// clients is at least 80 % of capacity. Only a hint for the screen: no alert, no message to the owner. At the limit the panel
+	// raises the pool to 4 itself; at pool 4 the way to more room is a second entry.
+	NearFull      bool `protobuf:"varint,9,opt,name=near_full,json=nearFull,proto3" json:"near_full,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -430,6 +441,34 @@ func (x *RelayBridge) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *RelayBridge) GetClients() uint32 {
+	if x != nil {
+		return x.Clients
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetPool() uint32 {
+	if x != nil {
+		return x.Pool
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetCapacity() uint32 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetNearFull() bool {
+	if x != nil {
+		return x.NearFull
+	}
+	return false
 }
 
 // A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
@@ -551,12 +590,16 @@ type RelayStage struct {
 	AtUnix int64  `protobuf:"varint,8,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
 	// reverse_speed only (the other stages leave these 0): the megabytes asked for (8 to 32), the megabits a second, the bytes the
 	// entry got, the connect and first-byte times and the duration of the flow in milliseconds.
-	Mb            uint32  `protobuf:"varint,9,opt,name=mb,proto3" json:"mb,omitempty"`
-	MbitS         float64 `protobuf:"fixed64,10,opt,name=mbit_s,json=mbitS,proto3" json:"mbit_s,omitempty"`
-	Bytes         uint64  `protobuf:"varint,11,opt,name=bytes,proto3" json:"bytes,omitempty"`
-	ConnectMs     uint32  `protobuf:"varint,12,opt,name=connect_ms,json=connectMs,proto3" json:"connect_ms,omitempty"`
-	FirstByteMs   uint32  `protobuf:"varint,13,opt,name=first_byte_ms,json=firstByteMs,proto3" json:"first_byte_ms,omitempty"`
-	DurationMs    uint32  `protobuf:"varint,14,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Mb          uint32  `protobuf:"varint,9,opt,name=mb,proto3" json:"mb,omitempty"`
+	MbitS       float64 `protobuf:"fixed64,10,opt,name=mbit_s,json=mbitS,proto3" json:"mbit_s,omitempty"`
+	Bytes       uint64  `protobuf:"varint,11,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	ConnectMs   uint32  `protobuf:"varint,12,opt,name=connect_ms,json=connectMs,proto3" json:"connect_ms,omitempty"`
+	FirstByteMs uint32  `protobuf:"varint,13,opt,name=first_byte_ms,json=firstByteMs,proto3" json:"first_byte_ms,omitempty"`
+	DurationMs  uint32  `protobuf:"varint,14,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	// reverse_reach only: the TCP port of the entry's bridge endpoint the exit probed (443 on the entry's own site or the port of
+	// the separate bridge site, Node.bridge_port); 0 for the other stages and for results from before the field. A probe made for
+	// another port than the endpoint now is stale, whatever its at_unix says.
+	Port          uint32 `protobuf:"varint,15,opt,name=port,proto3" json:"port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -689,6 +732,13 @@ func (x *RelayStage) GetDurationMs() uint32 {
 	return 0
 }
 
+func (x *RelayStage) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
 // What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
 // packets counted (UDP) or the server's identity proven (TCP) at the exit.
 type RelayCheck struct {
@@ -717,7 +767,12 @@ type RelayCheck struct {
 	ReverseReach *RelayStage `protobuf:"bytes,11,opt,name=reverse_reach,json=reverseReach,proto3" json:"reverse_reach,omitempty"`
 	// The proof by speed (reverse way only), never run by itself: the exit sends an 8 MB flow to the entry (the existing path
 	// speed test, the exit the one that connects). Only CheckRelayRequest.reverse_speed starts it. Absent when it did not run.
-	ReverseSpeed  *RelayStage `protobuf:"bytes,12,opt,name=reverse_speed,json=reverseSpeed,proto3" json:"reverse_speed,omitempty"`
+	ReverseSpeed *RelayStage `protobuf:"bytes,12,opt,name=reverse_speed,json=reverseSpeed,proto3" json:"reverse_speed,omitempty"`
+	// The proof by speed of the DIRECT way, which the panel starts itself, never the owner: before it moves a reverse relay back to
+	// DNAT, the entry opens one flow to the exit's node and takes 8 MB (the existing path speed test, the entry the one that
+	// connects), which catches a flow that freezes after the first 16 KB. Run at most once an hour and inside the daily speed test
+	// limits (a limit reached is skipped, "busy"). Absent when it never ran. Codes as reverse_speed.
+	DirectSpeed   *RelayStage `protobuf:"bytes,13,opt,name=direct_speed,json=directSpeed,proto3" json:"direct_speed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -832,6 +887,13 @@ func (x *RelayCheck) GetReverseReach() *RelayStage {
 func (x *RelayCheck) GetReverseSpeed() *RelayStage {
 	if x != nil {
 		return x.ReverseSpeed
+	}
+	return nil
+}
+
+func (x *RelayCheck) GetDirectSpeed() *RelayStage {
+	if x != nil {
+		return x.DirectSpeed
 	}
 	return nil
 }
@@ -1096,8 +1158,12 @@ type RelayCandidate struct {
 	// Does the exit reach this entry's bridge endpoint (the way a reverse relay needs)? Known only when a check of the exit towards
 	// the entry ran. Same verdicts as reach; source "exit_probe" when it came from one, "" with no_data.
 	ExitReachesEntry *RelayReachHint `protobuf:"bytes,15,opt,name=exit_reaches_entry,json=exitReachesEntry,proto3" json:"exit_reaches_entry,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Why a reverse relay of this server through this entry is not possible, as Relay.reverse_blocked: "entry_agent_old",
+	// "exit_agent_old", "udp" or "" (possible). Computed from the two agents' capabilities and the server's network, so the dialog can
+	// say it before the relay exists; it beats exit_reaches_entry (a UDP server can show "reach" and still has no bridge).
+	ReverseBlocked string `protobuf:"bytes,16,opt,name=reverse_blocked,json=reverseBlocked,proto3" json:"reverse_blocked,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RelayCandidate) Reset() {
@@ -1233,6 +1299,13 @@ func (x *RelayCandidate) GetExitReachesEntry() *RelayReachHint {
 		return x.ExitReachesEntry
 	}
 	return nil
+}
+
+func (x *RelayCandidate) GetReverseBlocked() string {
+	if x != nil {
+		return x.ReverseBlocked
+	}
+	return ""
 }
 
 // The people a relay through this entry would serve.
@@ -1837,14 +1910,18 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"modeReason\x12#\n" +
 	"\rdirect_streak\x18\x1f \x01(\rR\fdirectStreak\x12'\n" +
 	"\x0freverse_blocked\x18  \x01(\tR\x0ereverseBlocked\x126\n" +
-	"\x06bridge\x18! \x01(\v2\x1e.mistgate.admin.v1.RelayBridgeR\x06bridge\"\x8d\x01\n" +
+	"\x06bridge\x18! \x01(\v2\x1e.mistgate.admin.v1.RelayBridgeR\x06bridge\"\xf4\x01\n" +
 	"\vRelayBridge\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12\x14\n" +
 	"\x05conns\x18\x02 \x01(\rR\x05conns\x12\x15\n" +
 	"\x06rtt_ms\x18\x03 \x01(\rR\x05rttMs\x12\x1d\n" +
 	"\n" +
 	"since_unix\x18\x04 \x01(\x03R\tsinceUnix\x12\x14\n" +
-	"\x05error\x18\x05 \x01(\tR\x05error\"\xa3\x01\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\x12\x18\n" +
+	"\aclients\x18\x06 \x01(\rR\aclients\x12\x12\n" +
+	"\x04pool\x18\a \x01(\rR\x04pool\x12\x1a\n" +
+	"\bcapacity\x18\b \x01(\rR\bcapacity\x12\x1b\n" +
+	"\tnear_full\x18\t \x01(\bR\bnearFull\"\xa3\x01\n" +
 	"\fRelayMonitor\x12\x17\n" +
 	"\aat_unix\x18\x01 \x01(\x03R\x06atUnix\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x14\n" +
@@ -1853,7 +1930,7 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\vresponse_ms\x18\x05 \x01(\rR\n" +
 	"responseMs\x12\x1f\n" +
 	"\vfail_streak\x18\x06 \x01(\rR\n" +
-	"failStreak\"\xf0\x02\n" +
+	"failStreak\"\x84\x03\n" +
 	"\n" +
 	"RelayStage\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x12\n" +
@@ -1873,7 +1950,8 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"connect_ms\x18\f \x01(\rR\tconnectMs\x12\"\n" +
 	"\rfirst_byte_ms\x18\r \x01(\rR\vfirstByteMs\x12\x1f\n" +
 	"\vduration_ms\x18\x0e \x01(\rR\n" +
-	"durationMs\"\xc8\x03\n" +
+	"durationMs\x12\x12\n" +
+	"\x04port\x18\x0f \x01(\rR\x04port\"\x8a\x04\n" +
 	"\n" +
 	"RelayCheck\x12\x17\n" +
 	"\aat_unix\x18\x01 \x01(\x03R\x06atUnix\x12\x18\n" +
@@ -1888,7 +1966,8 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x06bridge\x18\n" +
 	" \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\x06bridge\x12B\n" +
 	"\rreverse_reach\x18\v \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\freverseReach\x12B\n" +
-	"\rreverse_speed\x18\f \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\freverseSpeed\"m\n" +
+	"\rreverse_speed\x18\f \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\freverseSpeed\x12@\n" +
+	"\fdirect_speed\x18\r \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\vdirectSpeed\"m\n" +
 	"\x11CheckRelayRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rreverse_reach\x18\x02 \x01(\bR\freverseReach\x12#\n" +
@@ -1902,7 +1981,7 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x0eRelayReachHint\x12\x18\n" +
 	"\averdict\x18\x01 \x01(\tR\averdict\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x12\x17\n" +
-	"\aat_unix\x18\x03 \x01(\x03R\x06atUnix\"\xc7\x04\n" +
+	"\aat_unix\x18\x03 \x01(\x03R\x06atUnix\"\xf0\x04\n" +
 	"\x0eRelayCandidate\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x17\n" +
@@ -1921,7 +2000,8 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\acountry\x18\f \x01(\v2#.mistgate.admin.v1.RelayCountryHintR\acountry\x127\n" +
 	"\x05reach\x18\r \x01(\v2!.mistgate.admin.v1.RelayReachHintR\x05reach\x12<\n" +
 	"\baudience\x18\x0e \x01(\v2 .mistgate.admin.v1.RelayAudienceR\baudience\x12O\n" +
-	"\x12exit_reaches_entry\x18\x0f \x01(\v2!.mistgate.admin.v1.RelayReachHintR\x10exitReachesEntry\"U\n" +
+	"\x12exit_reaches_entry\x18\x0f \x01(\v2!.mistgate.admin.v1.RelayReachHintR\x10exitReachesEntry\x12'\n" +
+	"\x0freverse_blocked\x18\x10 \x01(\tR\x0ereverseBlocked\"U\n" +
 	"\rRelayAudience\x12\x16\n" +
 	"\x06people\x18\x01 \x01(\rR\x06people\x12,\n" +
 	"\x12static_awg_devices\x18\x02 \x01(\rR\x10staticAwgDevices\"<\n" +
@@ -2018,33 +2098,34 @@ var file_mistgate_admin_v1_relay_proto_depIdxs = []int32{
 	3,  // 6: mistgate.admin.v1.RelayCheck.bridge:type_name -> mistgate.admin.v1.RelayStage
 	3,  // 7: mistgate.admin.v1.RelayCheck.reverse_reach:type_name -> mistgate.admin.v1.RelayStage
 	3,  // 8: mistgate.admin.v1.RelayCheck.reverse_speed:type_name -> mistgate.admin.v1.RelayStage
-	0,  // 9: mistgate.admin.v1.CheckRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
-	7,  // 10: mistgate.admin.v1.RelayCandidate.country:type_name -> mistgate.admin.v1.RelayCountryHint
-	8,  // 11: mistgate.admin.v1.RelayCandidate.reach:type_name -> mistgate.admin.v1.RelayReachHint
-	10, // 12: mistgate.admin.v1.RelayCandidate.audience:type_name -> mistgate.admin.v1.RelayAudience
-	8,  // 13: mistgate.admin.v1.RelayCandidate.exit_reaches_entry:type_name -> mistgate.admin.v1.RelayReachHint
-	9,  // 14: mistgate.admin.v1.ListRelayCandidatesResponse.candidates:type_name -> mistgate.admin.v1.RelayCandidate
-	7,  // 15: mistgate.admin.v1.ListRelayCandidatesResponse.entry_country:type_name -> mistgate.admin.v1.RelayCountryHint
-	0,  // 16: mistgate.admin.v1.ListRelaysResponse.relays:type_name -> mistgate.admin.v1.Relay
-	0,  // 17: mistgate.admin.v1.CreateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
-	0,  // 18: mistgate.admin.v1.UpdateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
-	13, // 19: mistgate.admin.v1.RelayService.ListRelays:input_type -> mistgate.admin.v1.ListRelaysRequest
-	15, // 20: mistgate.admin.v1.RelayService.CreateRelay:input_type -> mistgate.admin.v1.CreateRelayRequest
-	17, // 21: mistgate.admin.v1.RelayService.UpdateRelay:input_type -> mistgate.admin.v1.UpdateRelayRequest
-	19, // 22: mistgate.admin.v1.RelayService.DeleteRelay:input_type -> mistgate.admin.v1.DeleteRelayRequest
-	5,  // 23: mistgate.admin.v1.RelayService.CheckRelay:input_type -> mistgate.admin.v1.CheckRelayRequest
-	11, // 24: mistgate.admin.v1.RelayService.ListRelayCandidates:input_type -> mistgate.admin.v1.ListRelayCandidatesRequest
-	14, // 25: mistgate.admin.v1.RelayService.ListRelays:output_type -> mistgate.admin.v1.ListRelaysResponse
-	16, // 26: mistgate.admin.v1.RelayService.CreateRelay:output_type -> mistgate.admin.v1.CreateRelayResponse
-	18, // 27: mistgate.admin.v1.RelayService.UpdateRelay:output_type -> mistgate.admin.v1.UpdateRelayResponse
-	20, // 28: mistgate.admin.v1.RelayService.DeleteRelay:output_type -> mistgate.admin.v1.DeleteRelayResponse
-	6,  // 29: mistgate.admin.v1.RelayService.CheckRelay:output_type -> mistgate.admin.v1.CheckRelayResponse
-	12, // 30: mistgate.admin.v1.RelayService.ListRelayCandidates:output_type -> mistgate.admin.v1.ListRelayCandidatesResponse
-	25, // [25:31] is the sub-list for method output_type
-	19, // [19:25] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	3,  // 9: mistgate.admin.v1.RelayCheck.direct_speed:type_name -> mistgate.admin.v1.RelayStage
+	0,  // 10: mistgate.admin.v1.CheckRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
+	7,  // 11: mistgate.admin.v1.RelayCandidate.country:type_name -> mistgate.admin.v1.RelayCountryHint
+	8,  // 12: mistgate.admin.v1.RelayCandidate.reach:type_name -> mistgate.admin.v1.RelayReachHint
+	10, // 13: mistgate.admin.v1.RelayCandidate.audience:type_name -> mistgate.admin.v1.RelayAudience
+	8,  // 14: mistgate.admin.v1.RelayCandidate.exit_reaches_entry:type_name -> mistgate.admin.v1.RelayReachHint
+	9,  // 15: mistgate.admin.v1.ListRelayCandidatesResponse.candidates:type_name -> mistgate.admin.v1.RelayCandidate
+	7,  // 16: mistgate.admin.v1.ListRelayCandidatesResponse.entry_country:type_name -> mistgate.admin.v1.RelayCountryHint
+	0,  // 17: mistgate.admin.v1.ListRelaysResponse.relays:type_name -> mistgate.admin.v1.Relay
+	0,  // 18: mistgate.admin.v1.CreateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
+	0,  // 19: mistgate.admin.v1.UpdateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
+	13, // 20: mistgate.admin.v1.RelayService.ListRelays:input_type -> mistgate.admin.v1.ListRelaysRequest
+	15, // 21: mistgate.admin.v1.RelayService.CreateRelay:input_type -> mistgate.admin.v1.CreateRelayRequest
+	17, // 22: mistgate.admin.v1.RelayService.UpdateRelay:input_type -> mistgate.admin.v1.UpdateRelayRequest
+	19, // 23: mistgate.admin.v1.RelayService.DeleteRelay:input_type -> mistgate.admin.v1.DeleteRelayRequest
+	5,  // 24: mistgate.admin.v1.RelayService.CheckRelay:input_type -> mistgate.admin.v1.CheckRelayRequest
+	11, // 25: mistgate.admin.v1.RelayService.ListRelayCandidates:input_type -> mistgate.admin.v1.ListRelayCandidatesRequest
+	14, // 26: mistgate.admin.v1.RelayService.ListRelays:output_type -> mistgate.admin.v1.ListRelaysResponse
+	16, // 27: mistgate.admin.v1.RelayService.CreateRelay:output_type -> mistgate.admin.v1.CreateRelayResponse
+	18, // 28: mistgate.admin.v1.RelayService.UpdateRelay:output_type -> mistgate.admin.v1.UpdateRelayResponse
+	20, // 29: mistgate.admin.v1.RelayService.DeleteRelay:output_type -> mistgate.admin.v1.DeleteRelayResponse
+	6,  // 30: mistgate.admin.v1.RelayService.CheckRelay:output_type -> mistgate.admin.v1.CheckRelayResponse
+	12, // 31: mistgate.admin.v1.RelayService.ListRelayCandidates:output_type -> mistgate.admin.v1.ListRelayCandidatesResponse
+	26, // [26:32] is the sub-list for method output_type
+	20, // [20:26] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_relay_proto_init() }

@@ -1453,6 +1453,9 @@ message BridgeState {
   // know it reached the right entry. Every row of the entry carries the same value (one site serves all its exits); a renewed
   // certificate shows up here in the next StatsBatch, so the panel re-reads it there and sends the exits the new pin.
   string site_cert_pin_sha256 = 9;
+  // ENTRY side only: the people's connections the bridge carries RIGHT NOW (streams is a total since the start and cannot say
+  // this): those that were handed a pair and have not ended, not the waiting pairs. 0 on the exit's rows.
+  uint32 clients_now = 10;
 }
 
 message RelayResult {

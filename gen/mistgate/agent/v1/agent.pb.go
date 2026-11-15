@@ -2474,7 +2474,6 @@ func (x *PersonNetwork) GetConnects() uint32 {
 //   - attrs keeps only these keys: inbound, protocol, profile, port, state, reason, code, backend, mode, version, kernel,
 //     iface, check, fix, count, err, error; at most 8, each value cleaned the same way and at most 160 characters.
 //   - inbound_id is the record's "inbound" attribute when it names an inbound.
-//
 // Records with the same level, source, message, inbound_id and attrs["code"] in one batch interval are one entry with a
 // count and the first and last time; after 64 kinds the rest are counted in one entry of source "agent" and message
 // "journal_overflow" (count = records left out). The panel cleans addresses again and replaces the node's own secret names.
@@ -4077,8 +4076,11 @@ type BridgeState struct {
 	// know it reached the right entry. Every row of the entry carries the same value (one site serves all its exits); a renewed
 	// certificate shows up here in the next StatsBatch, so the panel re-reads it there and sends the exits the new pin.
 	SiteCertPinSha256 string `protobuf:"bytes,9,opt,name=site_cert_pin_sha256,json=siteCertPinSha256,proto3" json:"site_cert_pin_sha256,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// ENTRY side only: the people's connections the bridge carries RIGHT NOW (streams is a total since the start and cannot say
+	// this): those that were handed a pair and have not ended, not the waiting pairs. 0 on the exit's rows.
+	ClientsNow    uint32 `protobuf:"varint,10,opt,name=clients_now,json=clientsNow,proto3" json:"clients_now,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BridgeState) Reset() {
@@ -4172,6 +4174,13 @@ func (x *BridgeState) GetSiteCertPinSha256() string {
 		return x.SiteCertPinSha256
 	}
 	return ""
+}
+
+func (x *BridgeState) GetClientsNow() uint32 {
+	if x != nil {
+		return x.ClientsNow
+	}
+	return 0
 }
 
 type RelayResult struct {
@@ -9295,7 +9304,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\vduration_ms\x18\x06 \x01(\rR\n" +
 	"durationMs\x126\n" +
 	"\x06relays\x18\a \x03(\v2\x1e.mistgate.agent.v1.RelayResultR\x06relays\x128\n" +
-	"\abridges\x18\b \x03(\v2\x1e.mistgate.agent.v1.BridgeStateR\abridges\"\x94\x02\n" +
+	"\abridges\x18\b \x03(\v2\x1e.mistgate.agent.v1.BridgeStateR\abridges\"\xb5\x02\n" +
 	"\vBridgeState\x12 \n" +
 	"\fpeer_node_id\x18\x01 \x01(\tR\n" +
 	"peerNodeId\x12\x14\n" +
@@ -9307,7 +9316,10 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\astreams\x18\x06 \x01(\x04R\astreams\x12\x19\n" +
 	"\bbytes_in\x18\a \x01(\x04R\abytesIn\x12\x1b\n" +
 	"\tbytes_out\x18\b \x01(\x04R\bbytesOut\x12/\n" +
-	"\x14site_cert_pin_sha256\x18\t \x01(\tR\x11siteCertPinSha256\"c\n" +
+	"\x14site_cert_pin_sha256\x18\t \x01(\tR\x11siteCertPinSha256\x12\x1f\n" +
+	"\vclients_now\x18\n" +
+	" \x01(\rR\n" +
+	"clientsNow\"c\n" +
 	"\vRelayResult\x12\x19\n" +
 	"\brelay_id\x18\x01 \x01(\tR\arelayId\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x14\n" +

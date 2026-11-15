@@ -118,8 +118,9 @@ message Relay {
   // When active_mode last changed; 0 = it never has.
   int64 mode_changed_unix = 29;
   // Why the relay is in the way it is: "" (dnat, no change so far), "leg_failed" (reverse after the direct leg failed),
-  // "direct_back" (dnat again, the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported" (the bridge is not
-  // possible: the agents), "udp" (a UDP server: dnat only for now).
+  // "direct_back" (dnat again: the leg held three checks an hour apart and an 8 MB flow of its own), "bridge_failed" (dnat again:
+  // the bridge or the path through it failed while the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported"
+  // (the bridge is not possible: the agents), "udp" (a UDP server: dnat only for now).
   string mode_reason = 30;
   // In the reverse way: consecutive good checks of the direct leg, 0 to 3 (the panel goes back to DNAT after 3 and a speed
   // test). When and how the last leg check went is check.leg.
@@ -145,6 +146,16 @@ message RelayBridge {
   int64 since_unix = 4;
   // The last error an agent reported for the bridge, a short fixed word; empty = none.
   string error = 5;
+  // People using the bridge right now (the entry counts their connections that are being carried; waiting pairs are not people).
+  uint32 clients = 6;
+  // The TLS connections the panel asked the exit to hold (2, or 4 when the relay is busy or the bridge is near its limit).
+  uint32 pool = 7;
+  // The most people the pool carries at once: pool times (250 HTTP/2 streams of a connection minus those of the waiting pairs)
+  // divided by 2 streams a person, about 120 a connection. 0 when pool is.
+  uint32 capacity = 8;
+  // clients is at least 80 % of capacity. Only a hint for the screen: no alert, no message to the owner. At the limit the panel
+  // raises the pool to 4 itself; at pool 4 the way to more room is a second entry.
+  bool near_full = 9;
 }
 
 // A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
@@ -196,6 +207,10 @@ message RelayStage {
   uint32 connect_ms = 12;
   uint32 first_byte_ms = 13;
   uint32 duration_ms = 14;
+  // reverse_reach only: the TCP port of the entry's bridge endpoint the exit probed (443 on the entry's own site or the port of
+  // the separate bridge site, Node.bridge_port); 0 for the other stages and for results from before the field. A probe made for
+  // another port than the endpoint now is stale, whatever its at_unix says.
+  uint32 port = 15;
 }
 
 // What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
@@ -226,6 +241,11 @@ message RelayCheck {
   // The proof by speed (reverse way only), never run by itself: the exit sends an 8 MB flow to the entry (the existing path
   // speed test, the exit the one that connects). Only CheckRelayRequest.reverse_speed starts it. Absent when it did not run.
   RelayStage reverse_speed = 12;
+  // The proof by speed of the DIRECT way, which the panel starts itself, never the owner: before it moves a reverse relay back to
+  // DNAT, the entry opens one flow to the exit's node and takes 8 MB (the existing path speed test, the entry the one that
+  // connects), which catches a flow that freezes after the first 16 KB. Run at most once an hour and inside the daily speed test
+  // limits (a limit reached is skipped, "busy"). Absent when it never ran. Codes as reverse_speed.
+  RelayStage direct_speed = 13;
 }
 
 message CheckRelayRequest {
@@ -285,6 +305,10 @@ message RelayCandidate {
   // Does the exit reach this entry's bridge endpoint (the way a reverse relay needs)? Known only when a check of the exit towards
   // the entry ran. Same verdicts as reach; source "exit_probe" when it came from one, "" with no_data.
   RelayReachHint exit_reaches_entry = 15;
+  // Why a reverse relay of this server through this entry is not possible, as Relay.reverse_blocked: "entry_agent_old",
+  // "exit_agent_old", "udp" or "" (possible). Computed from the two agents' capabilities and the server's network, so the dialog can
+  // say it before the relay exists; it beats exit_reaches_entry (a UDP server can show "reach" and still has no bridge).
+  string reverse_blocked = 16;
 }
 
 // The people a relay through this entry would serve.

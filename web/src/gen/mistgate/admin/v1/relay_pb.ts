@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/relay.proto.
  */
 export const file_mistgate_admin_v1_relay: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEigQYKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjaxIwCgdtb25pdG9yGBYgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlNb25pdG9yEg0KBWJ5dGVzGBcgASgEEg8KB3BhY2tldHMYGCABKAQSFAoMY291bnRlZF91bml4GBkgASgDEgsKA2JwcxgaIAEoBBIMCgRtb2RlGBsgASgJEhMKC2FjdGl2ZV9tb2RlGBwgASgJEhkKEW1vZGVfY2hhbmdlZF91bml4GB0gASgDEhMKC21vZGVfcmVhc29uGB4gASgJEhUKDWRpcmVjdF9zdHJlYWsYHyABKA0SFwoPcmV2ZXJzZV9ibG9ja2VkGCAgASgJEi4KBmJyaWRnZRghIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5QnJpZGdlImIKC1JlbGF5QnJpZGdlEhEKCWNvbm5lY3RlZBgBIAEoCBINCgVjb25ucxgCIAEoDRIOCgZydHRfbXMYAyABKA0SEgoKc2luY2VfdW5peBgEIAEoAxINCgVlcnJvchgFIAEoCSJyCgxSZWxheU1vbml0b3ISDwoHYXRfdW5peBgBIAEoAxIKCgJvaxgCIAEoCBINCgVzdGFnZRgDIAEoCRIMCgRjb2RlGAQgASgJEhMKC3Jlc3BvbnNlX21zGAUgASgNEhMKC2ZhaWxfc3RyZWFrGAYgASgNIvoBCgpSZWxheVN0YWdlEg4KBnN0YXR1cxgBIAEoCRIMCgRjb2RlGAIgASgJEhEKCXNlbmRlcl9pZBgDIAEoCRITCgtzZW5kZXJfbmFtZRgEIAEoCRIPCgd2ZXJkaWN0GAUgASgJEgwKBHNlbnQYBiABKA0SCwoDZ290GAcgASgNEg8KB2F0X3VuaXgYCCABKAMSCgoCbWIYCSABKA0SDgoGbWJpdF9zGAogASgBEg0KBWJ5dGVzGAsgASgEEhIKCmNvbm5lY3RfbXMYDCABKA0SFQoNZmlyc3RfYnl0ZV9tcxgNIAEoDRITCgtkdXJhdGlvbl9tcxgOIAEoDSLpAgoKUmVsYXlDaGVjaxIPCgdhdF91bml4GAEgASgDEg8KB25ldHdvcmsYAiABKAkSDAoEcG9ydBgDIAEoDRIKCgJ0bxgEIAEoCRIqCgNsZWcYBSABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlEisKBHBhdGgYBiABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlEgoKAm9rGAcgASgIEg0KBXN0YWdlGAggASgJEhAKCHZlcmlmaWVkGAkgASgIEi0KBmJyaWRnZRgKIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USNAoNcmV2ZXJzZV9yZWFjaBgLIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USNAoNcmV2ZXJzZV9zcGVlZBgMIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2UiTQoRQ2hlY2tSZWxheVJlcXVlc3QSCgoCaWQYASABKAkSFQoNcmV2ZXJzZV9yZWFjaBgCIAEoCBIVCg1yZXZlcnNlX3NwZWVkGAMgASgIIj0KEkNoZWNrUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IkIKEFJlbGF5Q291bnRyeUhpbnQSDwoHdmVyZGljdBgBIAEoCRIMCgRkYXJrGAIgAygJEg8KB2F0X3VuaXgYAyABKAMiQgoOUmVsYXlSZWFjaEhpbnQSDwoHdmVyZGljdBgBIAEoCRIOCgZzb3VyY2UYAiABKAkSDwoHYXRfdW5peBgDIAEoAyKyAwoOUmVsYXlDYW5kaWRhdGUSEgoKaW5ib3VuZF9pZBgBIAEoCRIPCgdub2RlX2lkGAIgASgJEhEKCW5vZGVfbmFtZRgDIAEoCRISCgpwcm9maWxlX2lkGAQgASgJEhQKDHByb2ZpbGVfbmFtZRgFIAEoCRIQCghwcm90b2NvbBgGIAEoCRIPCgduZXR3b3JrGAcgASgJEgwKBHBvcnQYCCABKA0SEwoLdW5zdXBwb3J0ZWQYCSABKAkSCwoDaG9wGAogASgIEhAKCHJlbGF5X2lkGAsgASgJEjQKB2NvdW50cnkYDCABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNvdW50cnlIaW50EjAKBXJlYWNoGA0gASgLMiEubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlSZWFjaEhpbnQSMgoIYXVkaWVuY2UYDiABKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUF1ZGllbmNlEj0KEmV4aXRfcmVhY2hlc19lbnRyeRgPIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5UmVhY2hIaW50IjsKDVJlbGF5QXVkaWVuY2USDgoGcGVvcGxlGAEgASgNEhoKEnN0YXRpY19hd2dfZGV2aWNlcxgCIAEoDSIxChpMaXN0UmVsYXlDYW5kaWRhdGVzUmVxdWVzdBITCgt2aWFfbm9kZV9pZBgBIAEoCSKpAQobTGlzdFJlbGF5Q2FuZGlkYXRlc1Jlc3BvbnNlEjUKCmNhbmRpZGF0ZXMYASADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNhbmRpZGF0ZRIXCg9hZ2VudF9zdXBwb3J0ZWQYAiABKAgSOgoNZW50cnlfY291bnRyeRgDIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Q291bnRyeUhpbnQiJAoRTGlzdFJlbGF5c1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSI+ChJMaXN0UmVsYXlzUmVzcG9uc2USKAoGcmVsYXlzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiWQoSQ3JlYXRlUmVsYXlSZXF1ZXN0EhIKCmluYm91bmRfaWQYASABKAkSEwoLdmlhX25vZGVfaWQYAiABKAkSDAoEcG9ydBgDIAEoDRIMCgRtb2RlGAQgASgJIj4KE0NyZWF0ZVJlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSJ6ChJVcGRhdGVSZWxheVJlcXVlc3QSCgoCaWQYASABKAkSFAoHZW5hYmxlZBgCIAEoCEgAiAEBEhEKBHBvcnQYAyABKA1IAYgBARIRCgRtb2RlGAQgASgJSAKIAQFCCgoIX2VuYWJsZWRCBwoFX3BvcnRCBwoFX21vZGUiPgoTVXBkYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IiAKEkRlbGV0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCSIVChNEZWxldGVSZWxheVJlc3BvbnNlMtQECgxSZWxheVNlcnZpY2USWQoKTGlzdFJlbGF5cxIkLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5c1Jlc3BvbnNlElwKC0NyZWF0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlUmVsYXlSZXNwb25zZRJcCgtVcGRhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVJlbGF5UmVzcG9uc2USXAoLRGVsZXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5EZWxldGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5EZWxldGVSZWxheVJlc3BvbnNlElkKCkNoZWNrUmVsYXkSJC5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JlbGF5UmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUmVsYXlSZXNwb25zZRJ0ChNMaXN0UmVsYXlDYW5kaWRhdGVzEi0ubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5Q2FuZGlkYXRlc1JlcXVlc3QaLi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlDYW5kaWRhdGVzUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIKUmVsYXlQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEigQYKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjaxIwCgdtb25pdG9yGBYgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlNb25pdG9yEg0KBWJ5dGVzGBcgASgEEg8KB3BhY2tldHMYGCABKAQSFAoMY291bnRlZF91bml4GBkgASgDEgsKA2JwcxgaIAEoBBIMCgRtb2RlGBsgASgJEhMKC2FjdGl2ZV9tb2RlGBwgASgJEhkKEW1vZGVfY2hhbmdlZF91bml4GB0gASgDEhMKC21vZGVfcmVhc29uGB4gASgJEhUKDWRpcmVjdF9zdHJlYWsYHyABKA0SFwoPcmV2ZXJzZV9ibG9ja2VkGCAgASgJEi4KBmJyaWRnZRghIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5QnJpZGdlIqYBCgtSZWxheUJyaWRnZRIRCgljb25uZWN0ZWQYASABKAgSDQoFY29ubnMYAiABKA0SDgoGcnR0X21zGAMgASgNEhIKCnNpbmNlX3VuaXgYBCABKAMSDQoFZXJyb3IYBSABKAkSDwoHY2xpZW50cxgGIAEoDRIMCgRwb29sGAcgASgNEhAKCGNhcGFjaXR5GAggASgNEhEKCW5lYXJfZnVsbBgJIAEoCCJyCgxSZWxheU1vbml0b3ISDwoHYXRfdW5peBgBIAEoAxIKCgJvaxgCIAEoCBINCgVzdGFnZRgDIAEoCRIMCgRjb2RlGAQgASgJEhMKC3Jlc3BvbnNlX21zGAUgASgNEhMKC2ZhaWxfc3RyZWFrGAYgASgNIogCCgpSZWxheVN0YWdlEg4KBnN0YXR1cxgBIAEoCRIMCgRjb2RlGAIgASgJEhEKCXNlbmRlcl9pZBgDIAEoCRITCgtzZW5kZXJfbmFtZRgEIAEoCRIPCgd2ZXJkaWN0GAUgASgJEgwKBHNlbnQYBiABKA0SCwoDZ290GAcgASgNEg8KB2F0X3VuaXgYCCABKAMSCgoCbWIYCSABKA0SDgoGbWJpdF9zGAogASgBEg0KBWJ5dGVzGAsgASgEEhIKCmNvbm5lY3RfbXMYDCABKA0SFQoNZmlyc3RfYnl0ZV9tcxgNIAEoDRITCgtkdXJhdGlvbl9tcxgOIAEoDRIMCgRwb3J0GA8gASgNIp4DCgpSZWxheUNoZWNrEg8KB2F0X3VuaXgYASABKAMSDwoHbmV0d29yaxgCIAEoCRIMCgRwb3J0GAMgASgNEgoKAnRvGAQgASgJEioKA2xlZxgFIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USKwoEcGF0aBgGIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USCgoCb2sYByABKAgSDQoFc3RhZ2UYCCABKAkSEAoIdmVyaWZpZWQYCSABKAgSLQoGYnJpZGdlGAogASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRI0Cg1yZXZlcnNlX3JlYWNoGAsgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRI0Cg1yZXZlcnNlX3NwZWVkGAwgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRIzCgxkaXJlY3Rfc3BlZWQYDSABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlIk0KEUNoZWNrUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJEhUKDXJldmVyc2VfcmVhY2gYAiABKAgSFQoNcmV2ZXJzZV9zcGVlZBgDIAEoCCI9ChJDaGVja1JlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSJCChBSZWxheUNvdW50cnlIaW50Eg8KB3ZlcmRpY3QYASABKAkSDAoEZGFyaxgCIAMoCRIPCgdhdF91bml4GAMgASgDIkIKDlJlbGF5UmVhY2hIaW50Eg8KB3ZlcmRpY3QYASABKAkSDgoGc291cmNlGAIgASgJEg8KB2F0X3VuaXgYAyABKAMiywMKDlJlbGF5Q2FuZGlkYXRlEhIKCmluYm91bmRfaWQYASABKAkSDwoHbm9kZV9pZBgCIAEoCRIRCglub2RlX25hbWUYAyABKAkSEgoKcHJvZmlsZV9pZBgEIAEoCRIUCgxwcm9maWxlX25hbWUYBSABKAkSEAoIcHJvdG9jb2wYBiABKAkSDwoHbmV0d29yaxgHIAEoCRIMCgRwb3J0GAggASgNEhMKC3Vuc3VwcG9ydGVkGAkgASgJEgsKA2hvcBgKIAEoCBIQCghyZWxheV9pZBgLIAEoCRI0Cgdjb3VudHJ5GAwgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDb3VudHJ5SGludBIwCgVyZWFjaBgNIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5UmVhY2hIaW50EjIKCGF1ZGllbmNlGA4gASgLMiAubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlBdWRpZW5jZRI9ChJleGl0X3JlYWNoZXNfZW50cnkYDyABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVJlYWNoSGludBIXCg9yZXZlcnNlX2Jsb2NrZWQYECABKAkiOwoNUmVsYXlBdWRpZW5jZRIOCgZwZW9wbGUYASABKA0SGgoSc3RhdGljX2F3Z19kZXZpY2VzGAIgASgNIjEKGkxpc3RSZWxheUNhbmRpZGF0ZXNSZXF1ZXN0EhMKC3ZpYV9ub2RlX2lkGAEgASgJIqkBChtMaXN0UmVsYXlDYW5kaWRhdGVzUmVzcG9uc2USNQoKY2FuZGlkYXRlcxgBIAMoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Q2FuZGlkYXRlEhcKD2FnZW50X3N1cHBvcnRlZBgCIAEoCBI6Cg1lbnRyeV9jb3VudHJ5GAMgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDb3VudHJ5SGludCIkChFMaXN0UmVsYXlzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIj4KEkxpc3RSZWxheXNSZXNwb25zZRIoCgZyZWxheXMYASADKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSJZChJDcmVhdGVSZWxheVJlcXVlc3QSEgoKaW5ib3VuZF9pZBgBIAEoCRITCgt2aWFfbm9kZV9pZBgCIAEoCRIMCgRwb3J0GAMgASgNEgwKBG1vZGUYBCABKAkiPgoTQ3JlYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5InoKElVwZGF0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCRIUCgdlbmFibGVkGAIgASgISACIAQESEQoEcG9ydBgDIAEoDUgBiAEBEhEKBG1vZGUYBCABKAlIAogBAUIKCghfZW5hYmxlZEIHCgVfcG9ydEIHCgVfbW9kZSI+ChNVcGRhdGVSZWxheVJlc3BvbnNlEicKBXJlbGF5GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiIAoSRGVsZXRlUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJIhUKE0RlbGV0ZVJlbGF5UmVzcG9uc2Uy1AQKDFJlbGF5U2VydmljZRJZCgpMaXN0UmVsYXlzEiQubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5c1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlzUmVzcG9uc2USXAoLQ3JlYXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVSZWxheVJlc3BvbnNlElwKC1VwZGF0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlUmVsYXlSZXNwb25zZRJcCgtEZWxldGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZVJlbGF5UmVzcG9uc2USWQoKQ2hlY2tSZWxheRIkLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUmVsYXlSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tSZWxheVJlc3BvbnNlEnQKE0xpc3RSZWxheUNhbmRpZGF0ZXMSLS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlDYW5kaWRhdGVzUmVxdWVzdBouLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheUNhbmRpZGF0ZXNSZXNwb25zZULFAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgpSZWxheVByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.Relay
@@ -199,8 +199,9 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
 
   /**
    * Why the relay is in the way it is: "" (dnat, no change so far), "leg_failed" (reverse after the direct leg failed),
-   * "direct_back" (dnat again, the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported" (the bridge is not
-   * possible: the agents), "udp" (a UDP server: dnat only for now).
+   * "direct_back" (dnat again: the leg held three checks an hour apart and an 8 MB flow of its own), "bridge_failed" (dnat again:
+   * the bridge or the path through it failed while the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported"
+   * (the bridge is not possible: the agents), "udp" (a UDP server: dnat only for now).
    *
    * @generated from field: string mode_reason = 30;
    */
@@ -279,6 +280,36 @@ export type RelayBridge = Message<"mistgate.admin.v1.RelayBridge"> & {
    * @generated from field: string error = 5;
    */
   error: string;
+
+  /**
+   * People using the bridge right now (the entry counts their connections that are being carried; waiting pairs are not people).
+   *
+   * @generated from field: uint32 clients = 6;
+   */
+  clients: number;
+
+  /**
+   * The TLS connections the panel asked the exit to hold (2, or 4 when the relay is busy or the bridge is near its limit).
+   *
+   * @generated from field: uint32 pool = 7;
+   */
+  pool: number;
+
+  /**
+   * The most people the pool carries at once: pool times (250 HTTP/2 streams of a connection minus those of the waiting pairs)
+   * divided by 2 streams a person, about 120 a connection. 0 when pool is.
+   *
+   * @generated from field: uint32 capacity = 8;
+   */
+  capacity: number;
+
+  /**
+   * clients is at least 80 % of capacity. Only a hint for the screen: no alert, no message to the owner. At the limit the panel
+   * raises the pool to 4 itself; at pool 4 the way to more room is a second entry.
+   *
+   * @generated from field: bool near_full = 9;
+   */
+  nearFull: boolean;
 };
 
 /**
@@ -440,6 +471,15 @@ export type RelayStage = Message<"mistgate.admin.v1.RelayStage"> & {
    * @generated from field: uint32 duration_ms = 14;
    */
   durationMs: number;
+
+  /**
+   * reverse_reach only: the TCP port of the entry's bridge endpoint the exit probed (443 on the entry's own site or the port of
+   * the separate bridge site, Node.bridge_port); 0 for the other stages and for results from before the field. A probe made for
+   * another port than the endpoint now is stale, whatever its at_unix says.
+   *
+   * @generated from field: uint32 port = 15;
+   */
+  port: number;
 };
 
 /**
@@ -535,6 +575,16 @@ export type RelayCheck = Message<"mistgate.admin.v1.RelayCheck"> & {
    * @generated from field: mistgate.admin.v1.RelayStage reverse_speed = 12;
    */
   reverseSpeed?: RelayStage | undefined;
+
+  /**
+   * The proof by speed of the DIRECT way, which the panel starts itself, never the owner: before it moves a reverse relay back to
+   * DNAT, the entry opens one flow to the exit's node and takes 8 MB (the existing path speed test, the entry the one that
+   * connects), which catches a flow that freezes after the first 16 KB. Run at most once an hour and inside the daily speed test
+   * limits (a limit reached is skipped, "busy"). Absent when it never ran. Codes as reverse_speed.
+   *
+   * @generated from field: mistgate.admin.v1.RelayStage direct_speed = 13;
+   */
+  directSpeed?: RelayStage | undefined;
 };
 
 /**
@@ -753,6 +803,15 @@ export type RelayCandidate = Message<"mistgate.admin.v1.RelayCandidate"> & {
    * @generated from field: mistgate.admin.v1.RelayReachHint exit_reaches_entry = 15;
    */
   exitReachesEntry?: RelayReachHint | undefined;
+
+  /**
+   * Why a reverse relay of this server through this entry is not possible, as Relay.reverse_blocked: "entry_agent_old",
+   * "exit_agent_old", "udp" or "" (possible). Computed from the two agents' capabilities and the server's network, so the dialog can
+   * say it before the relay exists; it beats exit_reaches_entry (a UDP server can show "reach" and still has no bridge).
+   *
+   * @generated from field: string reverse_blocked = 16;
+   */
+  reverseBlocked: string;
 };
 
 /**
@@ -1013,10 +1072,10 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * unchanged (agent.proto "RELAY FORWARDS" and "REVERSE RELAY"). People whose network blocks the exit reach it through the
  * entry; the entry sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay
  * on the exit.
- *
+ * 
  * Everything here is owner-only over /api (a helper and an API token get PERMISSION_DENIED). Through MCP a token may
  * read relays and run a check, and a change is a plan the owner approves in the admin. Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
- *
+ * 
  * TWO WAYS TO PASS ON (Relay.mode is the owner's choice, Relay.active_mode is what stands now):
  *   "dnat": the entry opens the connection to the exit's address itself (the kernel rewrites the destination). Cheap, the
  *     default for every existing relay; it needs the entry to reach the exit directly ("the leg").
@@ -1026,7 +1085,7 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  *     subscriptions, are the same in both ways.
  *   mode "auto" (the default) lets the panel choose: DNAT while the leg works, reverse when it does not and the pair can do it,
  *   back to DNAT when the leg is alive again (reason in Relay.mode_reason); "dnat" and "reverse" pin the way.
- *
+ * 
  * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a check less than 15
  * minutes ago that fits the way the relay would go:
  *   - dnat: the leg check (the entry node to the exit's server) must pass or be skipped as "unverifiable".
@@ -1043,9 +1102,9 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
  * failed, on an enrolled node) and the entry's agent lists "relay-forward/1" (a reverse relay also "relay-reverse/1", as does the
  * exit's agent).
- *
+ * 
  * A relay goes when its server is deleted, and when either node is retired.
- *
+ * 
  * ERRORS. NOT_FOUND: the relay, the server or the node. INVALID_ARGUMENT: a port that is neither 443 nor 1024-65535,
  * "same_node" (the entry holds the server itself), a mode that is not "auto", "dnat" or "reverse". ALREADY_EXISTS: "relay_exists"
  * (the entry already forwards this server), "port_taken" (a profile or a relay of the entry holds that network and port, hop
