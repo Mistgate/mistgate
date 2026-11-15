@@ -47,9 +47,20 @@ func TestPublicLabelOfANode(t *testing.T) {
 	if err := update(ptr(forty)); err != nil || get() != forty {
 		t.Fatalf("40 characters: %v %q", err, get())
 	}
+	// The non-joiner of a Persian word and the joiner of an emoji family are text, not controls.
+	for _, ok := range []string{"می\u200cخواهم", "\U0001F468\u200d\U0001F469\u200d\U0001F467"} {
+		if err := update(ptr(ok)); err != nil || get() != ok {
+			t.Fatalf("%q: %v %q", ok, err, get())
+		}
+	}
+	if err := update(ptr(forty)); err != nil {
+		t.Fatal(err)
+	}
 	for name, bad := range map[string]string{
 		"41 characters": strings.Repeat("я", 41), "newline": "a\nb", "tab": "a\tb", "NUL": "a\x00b", "DEL": "a\x7fb", "C1 control": "a\u0085b",
 		"line separator": "a\u2028b", "paragraph separator": "a\u2029b", "invalid UTF-8": "a\xffb",
+		"right-to-left override": "a\u202eb", "left-to-right isolate": "a\u2066b", "zero-width space": "a\u200bb",
+		"byte-order mark": "a\ufeffb", "tag character": "a\U000e0067b",
 	} {
 		if err := update(ptr(bad)); code(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
