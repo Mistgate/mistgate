@@ -16,6 +16,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
@@ -178,6 +179,7 @@ type Agent struct {
 	cur                     atomic.Pointer[session]
 	cancel                  context.CancelCauseFunc
 	runCtx                  context.Context                                  // agent lifetime; link-only update downloads must outlive their panel session
+	sessionEpoch            atomic.Uint64                                    // advances after each authenticated HelloAck
 	offsetAt                atomic.Pointer[time.Time]                        // when offset was measured, with its monotonic reading; nil = never
 	elapsed                 func(since time.Time) (wall, mono time.Duration) // test seam: wall and monotonic time since offsetAt
 
@@ -268,9 +270,19 @@ type Agent struct {
 	heldFlush    time.Duration // 0 = heldFlushWait: how long the end of a held session waits for each of its flush and drain
 	resetAfter   time.Duration // 0 = 1 min: a session that lived this long resets the reconnect delay
 
-	linkPingEvery   time.Duration // 0 = NodeSettings.keepalive_interval_s (20 s): how often the link is pinged
-	linkPingTimeout time.Duration // 0 = NodeSettings.keepalive_timeout_s (45 s): how long a pong may take
-	updateLinkIdle  time.Duration // test seam; 0 = the updater's common no-data timeout
+	linkPingEvery          time.Duration                                           // 0 = NodeSettings.keepalive_interval_s (20 s): how often the link is pinged
+	linkPingTimeout        time.Duration                                           // 0 = NodeSettings.keepalive_timeout_s (45 s): how long a pong may take
+	updateLinkIdle         time.Duration                                           // test seam; 0 = the updater's common no-data timeout
+	bridgeFallbackAfter    time.Duration                                           // 0 = 60 s without an authenticated panel session
+	bridgeFallbackAttempts int                                                     // 0 = three consecutive direct failures
+	bridgeProbeEvery       time.Duration                                           // 0 = 10 min between direct-path probes while on a bridge
+	bridgeProbeTimeout     time.Duration                                           // 0 = dial timeout
+	bridgeWait             func(context.Context, time.Duration) bool               // deterministic seam for fallback/probe timing tests
+	directDialContext      func(context.Context, string, string) (net.Conn, error) // test seam for direct control-path failures
+	sessionFn              func(context.Context) error                             // test seam: the direct control session
+	bridgedFn              func(context.Context, string) error                     // test seam: the control session through an entry's bridge
+	panelEntryFn           func() string                                           // test seam: the entry whose bridge is up
+	probeFn                func(context.Context) error                             // test seam: one probe of the direct path
 
 	busy atomic.Int32 // operations started by a session that ending it would cut short (goBusy)
 
@@ -720,15 +732,77 @@ func (a *Agent) stateNeedsPersist() bool {
 // ---------------------------------------------------------------------------------------------------
 // Connection loop
 
+// panelPath is the connect loop's memory of how the panel is reached: directly (mTLS or the link), or through the bridge of an entry
+// node (reverse relay, plan section 6). The loop owns it; the probe goroutine of a bridge session uses it only while that session
+// runs, and the loop reads it again after the goroutine is gone.
+type panelPath struct {
+	failures int       // direct attempts in a row that gave no healthy session
+	since    time.Time // the end of the last established session; the start of the loop before the first one
+	onBridge bool      // sessions run through a bridge until two direct probes pass in a row (or the bridge goes away)
+	probeAt  time.Time // on a bridge: when the direct path is probed next, kept across the bridge sessions of one stay
+	passed   int       // on a bridge: direct probes that passed in a row
+	flaps    int       // returns to the direct path that failed in a row; each doubles the probe interval
+	trial    bool      // the running direct session is a return from a bridge: if it is not healthy, straight back
+}
+
+const (
+	bridgeProbesToReturn = 2
+	bridgeMaxProbeGap    = time.Hour
+)
+
 func (a *Agent) connectLoop(ctx context.Context) {
 	delay := a.backoffMin
+	path := &panelPath{since: time.Now()}
 	for ctx.Err() == nil {
+		via := a.choosePanelPath(path)
 		started := time.Now()
-		err := a.session(ctx)
+		epoch := a.sessionEpoch.Load()
+		var err error
+		switch {
+		case via != "":
+			err = a.bridgeSession(ctx, via, path)
+		case a.sessionFn != nil:
+			err = a.sessionFn(ctx)
+		default:
+			err = a.session(ctx)
+		}
 		if ctx.Err() != nil {
 			return
 		}
-		lived := time.Since(started)
+		endedAt := time.Now()
+		lived := endedAt.Sub(started)
+		established := a.sessionEpoch.Load() != epoch
+		// A session that authenticated but died within a couple of minutes is not a working path: a filter that lets the handshake
+		// through and freezes the flow after a few KiB gives exactly this. Counting it as a success would hold the agent on a
+		// direct path that never stays up.
+		healthy := established && lived >= a.healthyAfter()
+		if errors.Is(err, errReturnDirect) {
+			a.log.Info("the panel is reachable directly again; leaving the bridge", "code", "agent_panel_direct_back", "via", via)
+			path.onBridge, path.failures, path.since, path.trial = false, 0, endedAt, true
+			delay = a.backoffMin
+			continue
+		}
+		switch {
+		case via != "":
+			if !established {
+				// The bridge carried no session either. The direct path gets its turn, and the backoff below keeps growing:
+				// a panel that is down for both must not be hammered at the minimum delay.
+				path.onBridge, path.failures, path.since = false, 0, endedAt
+			}
+		case errors.Is(err, errSwitchTransport):
+			// A mTLS session that only found out the panel offers the link: no verdict on the path.
+		case healthy:
+			path.failures, path.since, path.flaps, path.trial = 0, endedAt, 0, false
+		case established:
+			path.since = endedAt
+			path.failures++
+			a.returnFailed(path)
+		case errors.Is(err, errLinkNotEstablished) && !a.linkOnly():
+			// The link failed and mTLS follows at once: not a failure of the direct path yet.
+		default:
+			path.failures++
+			a.returnFailed(path)
+		}
 		if lived >= a.backoffResetAfter() {
 			delay = a.backoffMin // also when the loop goes on below without a wait: a long session ended
 		}
@@ -741,11 +815,263 @@ func (a *Agent) connectLoop(ctx context.Context) {
 			a.log.Warn("agent link failed; falling back to mTLS", "code", "agent_link_fallback", "err", err)
 			continue
 		}
+		due := false
+		if via == "" && !path.onBridge {
+			due = a.bridgeFallbackDue(path.failures, path.since, endedAt)
+			if due && a.panelBridgeEntry() != "" {
+				continue
+			}
+		}
 		var wait time.Duration
 		wait, delay = backoffStep(delay, lived, a.backoffMin, a.backoffMax)
+		if via == "" && !path.onBridge {
+			if !due {
+				wait = min(wait, max(time.Duration(0), path.since.Add(a.bridgeFallbackDelay()).Sub(endedAt)))
+			} else if a.hasPanelBridgeDesired() {
+				wait = min(wait, time.Second)
+			}
+		}
 		a.log.Warn("panel connection lost", "code", "panel_connection_lost", "err", err, "lived", lived.Round(time.Second), "retry_in", wait.Round(10*time.Millisecond))
 		sleepCtx(ctx, wait)
 	}
+}
+
+// returnFailed is called when a direct session did not hold: if it was a return from a bridge, the agent goes straight back to the
+// bridge it left (it is still up, or the loop would be on the direct path anyway), and the next return waits twice as long.
+func (a *Agent) returnFailed(p *panelPath) {
+	if !p.trial {
+		return
+	}
+	p.trial = false
+	p.flaps++
+	p.failures = max(p.failures, a.bridgeFallbackFailureLimit())
+}
+
+// choosePanelPath returns the entry node whose bridge the next session goes through, or "" for the direct path.
+func (a *Agent) choosePanelPath(p *panelPath) string {
+	now := time.Now()
+	if p.onBridge {
+		if via := a.panelBridgeEntry(); via != "" { // the bridge may have changed hands: any entry that is up will do
+			return via
+		}
+		// Every bridge is gone: direct again, the counters start afresh.
+		p.onBridge, p.failures, p.since = false, 0, now
+		return ""
+	}
+	if !a.bridgeFallbackDue(p.failures, p.since, now) {
+		return ""
+	}
+	via := a.panelBridgeEntry()
+	if via == "" {
+		return ""
+	}
+	p.onBridge, p.passed = true, 0
+	p.probeAt = now.Add(a.bridgeProbeDelay(p.flaps))
+	a.log.Warn("the panel is not reachable directly; the control session goes through the bridge of an entry node",
+		"code", "agent_panel_via_bridge", "via", via, "failures", p.failures)
+	return via
+}
+
+func (a *Agent) bridgeFallbackDue(directFailures int, noSessionSince, now time.Time) bool {
+	return directFailures >= a.bridgeFallbackFailureLimit() || !now.Before(noSessionSince.Add(a.bridgeFallbackDelay()))
+}
+
+func (a *Agent) bridgeFallbackDelay() time.Duration {
+	if a.bridgeFallbackAfter > 0 {
+		return a.bridgeFallbackAfter
+	}
+	return time.Minute
+}
+
+func (a *Agent) bridgeFallbackFailureLimit() int {
+	if a.bridgeFallbackAttempts > 0 {
+		return a.bridgeFallbackAttempts
+	}
+	return 3
+}
+
+// healthyAfter is how long an authenticated session must live to count as proof that the path works.
+func (a *Agent) healthyAfter() time.Duration { return 2 * a.backoffResetAfter() }
+
+func (a *Agent) bridgeProbeInterval() time.Duration {
+	if a.bridgeProbeEvery > 0 {
+		return a.bridgeProbeEvery
+	}
+	return 10 * time.Minute
+}
+
+// bridgeProbeDelay is the gap to the next direct probe: ten minutes, doubled for every failed return in a row (up to an hour), and
+// spread by +-20% so that the exits that went to a bridge together do not probe together. An explicit test interval is exact.
+func (a *Agent) bridgeProbeDelay(flaps int) time.Duration {
+	base := a.bridgeProbeInterval()
+	d := min(base<<min(flaps, 3), max(base, bridgeMaxProbeGap))
+	if a.bridgeProbeEvery > 0 {
+		return d
+	}
+	return jitter(d)
+}
+
+func (a *Agent) bridgeProbeDeadline() time.Duration {
+	if a.bridgeProbeTimeout > 0 {
+		return a.bridgeProbeTimeout
+	}
+	return dialTimeout(a.settings.Load())
+}
+
+func (a *Agent) waitBridgeProbe(ctx context.Context, d time.Duration) bool {
+	if a.bridgeWait != nil {
+		return a.bridgeWait(ctx, d)
+	}
+	sleepCtx(ctx, d)
+	return ctx.Err() == nil
+}
+
+func (a *Agent) hasPanelBridgeDesired() bool {
+	m := a.snapshotModel()
+	if m == nil {
+		return false
+	}
+	for _, dial := range m.bridgeDials {
+		if dial.PanelVia {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Agent) panelBridgeEntry() string {
+	if a.panelEntryFn != nil {
+		return a.panelEntryFn()
+	}
+	if a.bridgeDialer == nil {
+		return ""
+	}
+	m := a.snapshotModel()
+	if m == nil {
+		return ""
+	}
+	states := make(map[string]nodebridge.DialState)
+	for _, state := range a.bridgeDialer.States() {
+		states[state.PeerNodeID] = state
+	}
+	entries := make([]string, 0, len(m.bridgeDials))
+	for _, dial := range m.bridgeDials {
+		if dial.PanelVia {
+			entries = append(entries, dial.EntryNodeID)
+		}
+	}
+	sort.Strings(entries)
+	for _, id := range entries {
+		if state := states[id]; state.Conns > 0 {
+			return id
+		}
+	}
+	return ""
+}
+
+// bridgeSession runs one control session through the bridge of entryNodeID and, while it runs, probes the direct path on the
+// schedule kept in p (so a reconnect through the bridge does not restart the ten minutes). Two probes in a row that pass end the
+// session with errReturnDirect.
+func (a *Agent) bridgeSession(ctx context.Context, entryNodeID string, p *panelPath) error {
+	sctx, cancel := context.WithCancel(ctx)
+	var recovered atomic.Bool
+	probeDone := make(chan struct{})
+	go func() {
+		defer close(probeDone)
+		for {
+			if d := time.Until(p.probeAt); d > 0 && !a.waitBridgeProbe(sctx, d) {
+				return
+			}
+			if sctx.Err() != nil {
+				return
+			}
+			probeCtx, stop := context.WithTimeout(sctx, a.bridgeProbeDeadline())
+			err := a.probeDirectPanel(probeCtx)
+			stop()
+			p.probeAt = time.Now().Add(a.bridgeProbeDelay(p.flaps))
+			if err != nil {
+				p.passed = 0
+				continue
+			}
+			p.passed++
+			if p.passed >= bridgeProbesToReturn {
+				recovered.Store(true)
+				cancel()
+				return
+			}
+		}
+	}()
+	err := a.sessionViaBridge(sctx, entryNodeID)
+	cancel()
+	<-probeDone
+	if recovered.Load() {
+		return errReturnDirect
+	}
+	return err
+}
+
+func (a *Agent) sessionViaBridge(ctx context.Context, entryNodeID string) error {
+	if a.bridgedFn != nil {
+		return a.bridgedFn(ctx, entryNodeID)
+	}
+	if a.linkOnly() {
+		return a.linkSessionVia(ctx, entryNodeID)
+	}
+	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
+		err := a.linkSessionVia(ctx, entryNodeID)
+		if !errors.Is(err, errLinkNotEstablished) || ctx.Err() != nil {
+			return err
+		}
+		hold := a.linkHoldFor
+		if hold == 0 {
+			hold = defaultLinkHold
+		}
+		retry := a.now().Add(hold)
+		a.linkRetryAt.Store(&retry)
+	}
+	return a.mtlsSessionVia(ctx, entryNodeID)
+}
+
+func (a *Agent) probeDirectPanel(ctx context.Context) error {
+	if a.probeFn != nil {
+		return a.probeFn(ctx)
+	}
+	if a.linkOnly() || (a.cfg.LinkURL != "" && a.linkAdvertised.Load() && a.linkWait() <= 0) {
+		stream, cleanup, err := a.dialLink(ctx)
+		if err != nil {
+			return err
+		}
+		_ = stream.Close()
+		if cleanup != nil {
+			cleanup()
+		}
+		return nil
+	}
+	host, _, err := net.SplitHostPort(a.meta.Panel)
+	if err != nil || host == "" {
+		return errors.New("panel address unavailable")
+	}
+	address, config := a.meta.Panel, a.mtlsConfig()
+	dialer := (&net.Dialer{Timeout: a.bridgeProbeDeadline(), KeepAlive: 30 * time.Second}).DialContext
+	if a.directDialContext != nil {
+		dialer = a.directDialContext
+	}
+	conn, err := dialer(ctx, "tcp", address)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+	tlsConn := tls.Client(conn, config)
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		return err
+	}
+	if !a.linkOnly() && tlsConn.ConnectionState().NegotiatedProtocol != "h2" {
+		return errors.New("panel did not negotiate h2")
+	}
+	return nil
 }
 
 func (a *Agent) backoffResetAfter() time.Duration {
@@ -757,6 +1083,7 @@ func (a *Agent) backoffResetAfter() time.Duration {
 
 var errSwitchTransport = errors.New("switch to advertised agent link")
 var errLinkNotEstablished = errors.New("agent link session did not establish")
+var errReturnDirect = errors.New("two direct path probes succeeded")
 
 // backoffStep implements "1 s -> 60 s, factor 2, +-20% jitter, reset once a stream has lived 60 s".
 // delay is the nominal delay for this wait; it returns the jittered wait and the nominal delay for the next.
@@ -963,22 +1290,37 @@ func (a *Agent) session(ctx context.Context) error {
 }
 
 func (a *Agent) mtlsSession(ctx context.Context) error {
+	return a.mtlsSessionVia(ctx, "")
+}
+
+func (a *Agent) mtlsSessionVia(ctx context.Context, viaNodeID string) error {
 	st := a.settings.Load()
 	client := newHTTPClient(a.mtlsConfig(), dialTimeout(st), &http.HTTP2Config{
 		SendPingTimeout: secs(st.KeepaliveIntervalS, 20*time.Second),
 		PingTimeout:     secs(st.KeepaliveTimeoutS, 45*time.Second),
 	})
 	defer client.CloseIdleConnections()
+	if transport, ok := client.Transport.(*http.Transport); ok {
+		if viaNodeID != "" {
+			transport.DialContext = a.panelBridgeDial(viaNodeID)
+		} else if a.directDialContext != nil {
+			transport.DialContext = a.directDialContext
+		}
+	}
 
 	sctx, cancel := context.WithCancel(ctx)
 	stream := agentv1connect.NewAgentServiceClient(client, "https://"+a.meta.Panel,
 		connect.WithReadMaxBytes(64<<20)).Connect(sctx)
-	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream})
+	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream}, viaNodeID)
 }
 
 func (a *Agent) linkSession(ctx context.Context) error {
+	return a.linkSessionVia(ctx, "")
+}
+
+func (a *Agent) linkSessionVia(ctx context.Context, viaNodeID string) error {
 	sctx, cancel := context.WithCancel(ctx)
-	stream, cleanup, err := a.dialLink(sctx)
+	stream, cleanup, err := a.dialLinkVia(sctx, viaNodeID)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("%w: %w", errLinkNotEstablished, err)
@@ -989,7 +1331,7 @@ func (a *Agent) linkSession(ctx context.Context) error {
 	st := a.settings.Load()
 	dead := make(chan error, 1)
 	go stream.keepalive(durOr(a.linkPingEvery, secs(st.KeepaliveIntervalS, 20*time.Second)), durOr(a.linkPingTimeout, secs(st.KeepaliveTimeoutS, 45*time.Second)), cancel, dead)
-	err = a.runSession(cancel, stream)
+	err = a.runSession(cancel, stream, viaNodeID)
 	select {
 	case kerr := <-dead:
 		err = kerr
@@ -1004,14 +1346,14 @@ func (a *Agent) linkSession(ctx context.Context) error {
 	return err
 }
 
-func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) error {
+func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, viaNodeID string) error {
 	defer stream.Close()
 	defer cancel()
 	ctx := stream.Context()
 	// Closing the transport on cancellation wakes a blocked receive for both HTTP/2 and WebSocket sessions.
 	go func() { <-ctx.Done(); _ = stream.Close() }()
 
-	if err := stream.Send(a.hello(ctx)); err != nil {
+	if err := stream.Send(a.helloVia(ctx, viaNodeID)); err != nil {
 		if errors.Is(err, io.EOF) { // the real error is on the response side
 			if _, rerr := stream.Receive(); rerr != nil {
 				err = rerr
@@ -1040,6 +1382,7 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	if ack == nil {
 		return errors.New("first panel message is not HelloAck")
 	}
+	a.sessionEpoch.Add(1)
 	if link, ok := stream.(*websocketAgentTransport); ok {
 		link.established = true
 	}
@@ -1105,6 +1448,10 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 }
 
 func (a *Agent) hello(ctx context.Context) *pb.ConnectRequest {
+	return a.helloVia(ctx, "")
+}
+
+func (a *Agent) helloVia(ctx context.Context, viaNodeID string) *pb.ConnectRequest {
 	next, first := a.out.hello()
 	m := a.snapshotModel()
 	var rev uint64
@@ -1115,7 +1462,7 @@ func (a *Agent) hello(ctx context.Context) *pb.ConnectRequest {
 	h := &pb.Hello{
 		NodeId: a.meta.NodeID, AgentVersion: a.cfg.Version, ApiVersion: apiVersion, InstanceId: a.instanceID,
 		NextSeq: next, FirstUnackedSeq: first, AppliedRevision: rev, AppliedStateHash: hash,
-		Capabilities: a.capabilities(), Built: a.cfg.Built,
+		Capabilities: a.capabilities(), Built: a.cfg.Built, LinkViaNodeId: viaNodeID,
 		NetworksDbSha256: a.nets.LoadedSHA(),
 	}
 	h.DecoyMode, h.DecoySha256 = a.decoySite.State()
@@ -1135,6 +1482,15 @@ func (a *Agent) hello(ctx context.Context) *pb.ConnectRequest {
 		h.Facts.BootUnix = f.Boot.Unix()
 	}
 	return &pb.ConnectRequest{Message: &pb.ConnectRequest_Hello{Hello: h}}
+}
+
+func (a *Agent) panelBridgeDial(entryNodeID string) func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, _ string) (net.Conn, error) {
+		if network != "tcp" || a.bridgeDialer == nil {
+			return nil, errors.New("panel bridge unavailable")
+		}
+		return a.bridgeDialer.DialPanel(ctx, entryNodeID)
+	}
 }
 
 func (a *Agent) onHelloAck(ack *pb.HelloAck) {

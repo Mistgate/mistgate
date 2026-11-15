@@ -42,7 +42,14 @@ func (a *Agent) syncBridgeServe(ctx context.Context, next *model) {
 		return
 	}
 	serve := next.bridgeServe
-	if err := a.bridgeEntry.SetServe(nodebridge.ServeConfig{EntryNodeID: a.meta.NodeID, Path: serve.Path, ExitNodeIDs: serve.ExitNodeIDs, Roots: id.ca, Now: a.now}); err != nil {
+	panelAddress := ""
+	panelVia := serve.PanelVia
+	if panelVia {
+		panelAddress = a.bridgePanelAddress()
+		panelVia = panelAddress != ""
+	}
+	if err := a.bridgeEntry.SetServe(nodebridge.ServeConfig{EntryNodeID: a.meta.NodeID, Path: serve.Path, ExitNodeIDs: serve.ExitNodeIDs,
+		PanelVia: panelVia, PanelAddress: panelAddress, Roots: id.ca, Now: a.now}); err != nil {
 		a.clearBridgeServe()
 		a.bridgeServeError = "bad_config"
 		return
@@ -85,6 +92,30 @@ func (a *Agent) syncBridgeServe(ctx context.Context, next *model) {
 		a.bridgeServeError = code
 	}
 	a.bridgeSite.SetRelease(release)
+}
+
+// bridgePanelAddress is the entry agent's own panel endpoint. It is never read from a bridge request or the exit's desired targets.
+func (a *Agent) bridgePanelAddress() string {
+	if a.meta.Panel != "" {
+		host, port, err := net.SplitHostPort(a.meta.Panel)
+		if err == nil && host != "" && port != "" {
+			return a.meta.Panel
+		}
+		return ""
+	}
+	link := a.cfg.LinkURL
+	if link == "" {
+		link = a.meta.Link
+	}
+	u, err := parseLinkBase(link)
+	if err != nil || u.Hostname() == "" {
+		return ""
+	}
+	port := u.Port()
+	if port == "" {
+		port = "443"
+	}
+	return net.JoinHostPort(u.Hostname(), port)
 }
 
 func (a *Agent) clearBridgeServe() {
