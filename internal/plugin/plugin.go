@@ -91,8 +91,8 @@ type BridgeDial struct {
 	EntryNodeID string
 	Host        string // an IP literal or a name
 	Port        uint16
-	SNI         string // empty = no SNI, verification by the pin only
-	PinSHA256   string // lowercase hex of the DER leaf certificate; empty = system roots for SNI
+	SNI         string // optional server name sent as SNI; one of SNI or PinSHA256 is required
+	PinSHA256   string // lowercase hex SHA-256 of the leaf certificate's DER
 	Path        string
 	Pool        uint32 // TLS connections to keep; 0 = the agent's default
 	Targets     []BridgeTarget
