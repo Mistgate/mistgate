@@ -313,3 +313,22 @@ func TestDoctorReportCopiesRelayCounters(t *testing.T) {
 		t.Fatalf("stored relay counters = %+v, check ok=%v", check.Counters, ok)
 	}
 }
+
+// The entry's listener of a relay in the reverse way counts bytes only: its doctor result has no "packets", and the counters of
+// such a relay (the rate that chooses the bridge's pool, the traffic on the relay's row) never reached the panel.
+func TestDoctorReportCopiesTheCountersOfAReverseListenerWithoutPackets(t *testing.T) {
+	e, _, id := newRelayMonitorEnv(t)
+	report := &agentv1.DoctorReport{Results: []*agentv1.DoctorResult{{
+		Id: "relay", Status: agentv1.DoctorStatus_DOCTOR_STATUS_OK,
+		Params: map[string]string{"relay": id, "network": "udp", "port": "8443", "bytes": "65536", "bytes_back": "9000"},
+	}}}
+	e.s.DoctorReport(e.ctx, "fi1", report)
+	link, err := e.st.RelayLink(e.ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check, ok := link.Check()
+	if !ok || check.Counters == nil || check.Counters.Bytes != 65536 || check.Counters.Packets != 0 {
+		t.Fatalf("stored relay counters = %+v, check ok=%v", check.Counters, ok)
+	}
+}
