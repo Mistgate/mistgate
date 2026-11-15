@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -26,7 +27,10 @@ const (
 	githubBundleMaxMetadata   = release.MaxManifestBytes
 	githubBundleMaxSig        = ed25519.SignatureSize
 	nodeBundleMetadataTimeout = 20 * time.Second
+	nodeBundleTempStaleAge    = 24 * time.Hour
 )
+
+const nodeBundleTempPrefix = ".mistgate-node-bundle-"
 
 var ErrGitHubNodeBundleMissing = errors.New("the selected GitHub release has no signed node bundle")
 
@@ -101,6 +105,31 @@ func (u *GitHubNodeBundleSource) BundleStatus() (bool, string) {
 	return u.available, u.manifestSHA256
 }
 
+// Prepare restores an interrupted bundle swap and removes old staging directories before the panel reads dist/.
+func (u *GitHubNodeBundleSource) Prepare() error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.prepareLocked()
+}
+
+// prepareLocked holds u.mu so it cannot remove a staging directory used by Sync.
+func (u *GitHubNodeBundleSource) prepareLocked() error {
+	if u.distDir == "" || filepath.Clean(u.distDir) == "." {
+		return nil
+	}
+	parent := filepath.Dir(u.distDir)
+	if err := os.MkdirAll(parent, 0o700); err != nil {
+		return fmt.Errorf("create node bundle directory: %w", err)
+	}
+	if err := recoverBundleDirectory(u.distDir, u.key, u.now()); err != nil {
+		return fmt.Errorf("recover node bundle directory: %w", err)
+	}
+	if err := removeStaleNodeBundleDirs(parent, time.Now()); err != nil {
+		return fmt.Errorf("remove stale node bundle directories: %w", err)
+	}
+	return nil
+}
+
 // Sync fetches the selected release's signed package when its build is newer than the trusted local package. It returns
 // true only after the complete package has been verified and atomically installed.
 func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (bool, error) {
@@ -113,11 +142,14 @@ func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (
 	defer u.mu.Unlock()
 	u.available = false
 	u.manifestSHA256 = ""
-	if len(u.key) != ed25519.PublicKeySize {
-		return false, errors.New("node bundle source has no valid release key")
-	}
 	if u.distDir == "" || filepath.Clean(u.distDir) == "." {
 		return false, errors.New("node bundle source has no data directory")
+	}
+	if err := u.prepareLocked(); err != nil {
+		return false, err
+	}
+	if len(u.key) != ed25519.PublicKeySize {
+		return false, errors.New("node bundle source has no valid release key")
 	}
 
 	metadataCtx, cancelMetadata := context.WithTimeout(ctx, nodeBundleMetadataTimeout)
@@ -211,9 +243,6 @@ func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (
 		if err := validateGitHubBundleAsset(asset, r.TagName, githubBundleMaxMetadata); err != nil {
 			return false, err
 		}
-	}
-	if err := os.MkdirAll(filepath.Dir(u.distDir), 0o700); err != nil {
-		return false, fmt.Errorf("create node bundle directory: %w", err)
 	}
 	stage, err := os.MkdirTemp(filepath.Dir(u.distDir), ".mistgate-node-bundle-*")
 	if err != nil {
@@ -430,6 +459,146 @@ func replaceBundleDirectory(dest, stage string) error {
 	}
 	if hadPrevious {
 		_ = os.RemoveAll(backup)
+	}
+	return nil
+}
+
+type nodeBundleCandidate struct {
+	path     string
+	manifest *release.Manifest
+	modTime  time.Time
+	previous bool
+}
+
+func recoverBundleDirectory(dest string, key ed25519.PublicKey, now time.Time) error {
+	info, err := os.Lstat(dest)
+	if err == nil {
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("existing node bundle path is not a regular directory")
+		}
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	parent := filepath.Dir(dest)
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return err
+	}
+	var candidates []nodeBundleCandidate
+	for _, entry := range entries {
+		name := entry.Name()
+		previous := strings.HasSuffix(name, ".previous")
+		base := strings.TrimSuffix(name, ".previous")
+		if !strings.HasPrefix(base, nodeBundleTempPrefix) || len(base) == len(nodeBundleTempPrefix) {
+			continue
+		}
+		path := filepath.Join(parent, name)
+		info, err := os.Lstat(path)
+		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		manifest, ok := verifyNodeBundleDirectory(path, key, now)
+		if !ok {
+			continue
+		}
+		candidates = append(candidates, nodeBundleCandidate{path: path, manifest: manifest, modTime: info.ModTime(), previous: previous})
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		a, b := candidates[i], candidates[j]
+		if a.manifest.Built != b.manifest.Built {
+			return a.manifest.Built > b.manifest.Built
+		}
+		if a.manifest.Expires != b.manifest.Expires {
+			return a.manifest.Expires > b.manifest.Expires
+		}
+		if a.previous != b.previous {
+			return !a.previous
+		}
+		return a.modTime.After(b.modTime)
+	})
+	return os.Rename(candidates[0].path, dest)
+}
+
+func verifyNodeBundleDirectory(dir string, key ed25519.PublicKey, now time.Time) (*release.Manifest, bool) {
+	if len(key) != ed25519.PublicKeySize {
+		return nil, false
+	}
+	manifestBytes, err := readRegularNodeBundleFile(filepath.Join(dir, release.ManifestName))
+	if err != nil {
+		return nil, false
+	}
+	signature, err := readRegularNodeBundleFile(filepath.Join(dir, release.SignatureName))
+	if err != nil {
+		return nil, false
+	}
+	manifest, err := release.Verify(key, manifestBytes, signature)
+	if err != nil {
+		return nil, false
+	}
+	if err := manifest.Check(now, 0); err != nil && !errors.Is(err, release.ErrUpToDate) {
+		return nil, false
+	}
+	for _, file := range manifest.Files {
+		path := filepath.Join(dir, file.Name)
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			return nil, false
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, false
+		}
+		verifyErr := release.VerifyFile(file, f)
+		closeErr := f.Close()
+		if verifyErr != nil || closeErr != nil {
+			return nil, false
+		}
+	}
+	return manifest, true
+}
+
+func readRegularNodeBundleFile(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("node bundle file is not regular")
+	}
+	return os.ReadFile(path)
+}
+
+func removeStaleNodeBundleDirs(parent string, now time.Time) error {
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		base := strings.TrimSuffix(name, ".previous")
+		if !strings.HasPrefix(base, nodeBundleTempPrefix) || len(base) == len(nodeBundleTempPrefix) {
+			continue
+		}
+		path := filepath.Join(parent, name)
+		info, err := os.Lstat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.ModTime().After(now) || now.Sub(info.ModTime()) < nodeBundleTempStaleAge {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
 	}
 	return nil
 }

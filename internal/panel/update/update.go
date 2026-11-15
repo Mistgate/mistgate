@@ -261,6 +261,13 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 			return "unknown"
 		}
 	}
+	// An interrupted bundle swap is finished before dist/ is first read. A directory that cannot be recovered must not
+	// keep the panel down: the next sync tries again and reports the same error.
+	if preparer, ok := cfg.NodeBundleSource.(interface{ Prepare() error }); ok {
+		if err := preparer.Prepare(); err != nil {
+			cfg.Log.Warn("update: prepare node bundle directory", "code", "node_bundle_prepare_failed", "err", err)
+		}
+	}
 	cfg.Timing.defaults()
 	s := &Service{st: st, fl: fl, hl: hl, cfg: cfg, log: cfg.Log, now: cfg.Now,
 		hashes: map[string]hashEntry{}, runCtx: context.Background(),
