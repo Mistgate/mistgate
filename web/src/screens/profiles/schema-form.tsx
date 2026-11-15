@@ -10,6 +10,7 @@ import { cx } from "@/lib/cx";
 import { useTx, type Tx } from "@/screens/users/t";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { errorsOf, getAt, isChanged, listIssues, makeSecret, MASK, setAt, type Field, type Group, type Settings } from "./schema";
+import { problemText } from "./problem-text";
 
 /** What a schema group is about: basics sand, the disguise sage, the rest of the protocol's knobs sky. */
 const groupMarks: Record<string, { icon: IconName; tone: Tone }> = {
@@ -192,7 +193,7 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
           <span id={errId} className="flex flex-col">
             {shown.map((p, i) => (
               <span key={i} role="alert" className="text-[11px] leading-snug text-danger-text">
-                {(p.code && t.opt(`field${p.pointer.replaceAll("/", ".")}.${p.code}`)) || p.message}
+                {problemText(t, protocol, p) || p.message}
               </span>
             ))}
           </span>

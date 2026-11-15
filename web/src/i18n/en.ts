@@ -311,6 +311,7 @@ const core = {
   "field.egress.invalid_enum": "Direct or WARP",
   "field.reality.fingerprint.invalid_enum": "Chrome, Firefox, Safari, iOS, Edge or random",
   "field.reality.target_kind.invalid_enum": "This node’s site or another site",
+  "field.hysteria2.tls_mode.unsupported": "A Let’s Encrypt certificate for an IP address is not available yet: use a domain or self-signed",
 };
 
 export type CoreMessages = typeof core;

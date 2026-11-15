@@ -125,6 +125,14 @@ describe("SchemaForm", () => {
     expect(el.textContent).not.toContain("the port must be outside the hop range");
     expect(el.textContent).toContain("something new");
   });
+
+  it("words the same path and code by the protocol: Hysteria2's certificate on an IP is not VLESS's REALITY", () => {
+    const settings = parseSettings('{"tls_mode":"acme_ip"}');
+    const problems = [{ pointer: "/tls_mode", code: "unsupported", message: "IP certificates are not available yet" }];
+    const hy = mount(<SchemaForm protocol="hysteria2" groups={parseSchema(hy2)} settings={settings} base={settings} problems={problems} onChange={() => {}} />);
+    expect(hy.textContent).toContain(en["field.hysteria2.tls_mode.unsupported"]);
+    expect(hy.textContent).not.toContain(en["field.tls_mode.unsupported"]);
+  });
 });
 
 describe("string list (VLESS server names)", () => {
