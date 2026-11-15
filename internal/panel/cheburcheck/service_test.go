@@ -391,6 +391,77 @@ func Test429BackoffDoublesAndStoresNoRow(t *testing.T) {
 	}
 }
 
+// A site that answers 403 to every request (a guard against automated clients): the pause between calls doubles up to an
+// hour, one warning marks the change of state and then one per hold at the ceiling, and a good answer starts over.
+func Test403HoldDoublesToAnHourWarnsRarelyAndResets(t *testing.T) {
+	e := newEnv(t, 0)
+	failures := []fakeReply{}
+	for i := 0; i < 8; i++ {
+		failures = append(failures, fakeReply{status: http.StatusForbidden})
+	}
+	e.fake.checkResponses = failures // the ninth check and later are answered
+	e.enablePublic()
+	for i := 0; i < 9; i++ {
+		e.addNode("de"+strconv.Itoa(i), "203.0.113."+strconv.Itoa(10+i))
+	}
+	wantHold := []int{2, 4, 8, 16, 32, 60, 60, 60}
+	wantNext := []string{"4", "8", "16", "32", "60", "60", "60", "60"}
+	for i, minutes := range wantHold {
+		before := len(e.fake.snapshot())
+		if err := e.svc.Tick(context.Background()); err != nil {
+			t.Fatalf("failure %d: %v", i+1, err)
+		}
+		if len(e.fake.snapshot()) == before {
+			t.Fatalf("failure %d: no request was sent", i+1)
+		}
+		kv, err := e.st.SettingValues(context.Background(), []string{settingStatus, settingHoldUntil, settingBackoff})
+		if err != nil || kv[settingStatus] != "unreachable" || kv[settingBackoff] != wantNext[i] {
+			t.Fatalf("failure %d state = %v, %v", i+1, kv, err)
+		}
+		hold, _ := strconv.ParseInt(kv[settingHoldUntil], 10, 64)
+		if want := e.time().Add(time.Duration(minutes) * time.Minute).Unix(); hold != want {
+			t.Fatalf("failure %d: hold until %d, want %d minutes from now", i+1, hold, minutes)
+		}
+		e.advance(time.Duration(minutes)*time.Minute - time.Second)
+		before = len(e.fake.snapshot())
+		if err := e.svc.Tick(context.Background()); err != nil || len(e.fake.snapshot()) != before {
+			t.Fatalf("failure %d: a call was made during the hold (err %v)", i+1, err)
+		}
+		e.advance(time.Second)
+	}
+	// Warned for the change of state (1st) and for each hold at the ceiling (6th, 7th, 8th); the doubling steps stay quiet.
+	warns := strings.Count(e.logs.String(), `level=WARN msg="cheburcheck: request failed"`)
+	if warns != 4 || strings.Count(e.logs.String(), "code=cheburcheck_request_failed") != 8 {
+		t.Fatalf("warnings = %d, want 4 of 8 failures; log: %s", warns, e.logs.String())
+	}
+	if err := e.svc.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	kv, err := e.st.SettingValues(context.Background(), []string{settingStatus, settingHoldUntil, settingBackoff})
+	if err != nil || kv[settingStatus] != "" || kv[settingHoldUntil] != "" || kv[settingBackoff] != strconv.Itoa(defaultBackoffMin) {
+		t.Fatalf("state after a good answer = %v, %v", kv, err)
+	}
+}
+
+// The Test button asks the status endpoint at once, whatever hold the loop keeps.
+func TestManualTestIgnoresTheFailureHold(t *testing.T) {
+	e := newEnv(t, 0)
+	e.fake.checkResponses = []fakeReply{{status: http.StatusForbidden}}
+	e.enablePublic()
+	e.addNode("de1", "203.0.113.10")
+	if err := e.svc.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	kv, err := e.st.SettingValues(context.Background(), []string{settingHoldUntil})
+	if err != nil || kv[settingHoldUntil] == "" {
+		t.Fatalf("no hold after a 403: %v, %v", kv, err)
+	}
+	resp, err := (rpc{e.svc}).TestCheburcheck(testOwner(), connect.NewRequest(&adminv1.TestCheburcheckRequest{}))
+	if err != nil || !resp.Msg.Reachable {
+		t.Fatalf("manual test during the hold = %v, %v", resp, err)
+	}
+}
+
 func Test400IsIPProbesOffAndHeld(t *testing.T) {
 	e := newEnv(t, 0)
 	e.fake.probeResponses = []fakeReply{{status: http.StatusBadRequest}}
@@ -699,6 +770,13 @@ func TestMissingCheckIDStoresUnknownAndAdvances(t *testing.T) {
 	}
 	assertReason(t, rows[0], "no_id")
 	e.advance(30 * time.Second)
+	if err := e.svc.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if checks, _ := e.fake.counts(); checks != 1 {
+		t.Fatalf("a failure is held for %v, but 30 seconds later the site was called again", rateHoldStart)
+	}
+	e.advance(rateHoldStart)
 	if err := e.svc.Tick(context.Background()); err != nil {
 		t.Fatal(err)
 	}

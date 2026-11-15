@@ -15,7 +15,7 @@ func (s *Service) Run(ctx context.Context) {
 	defer t.Stop()
 	for {
 		if err := s.Tick(ctx); err != nil && ctx.Err() == nil {
-			s.log.Warn("cheburcheck: tick", "err", err)
+			s.log.Warn("cheburcheck: tick", "code", "cheburcheck_tick_failed", "err", err)
 		}
 		select {
 		case <-ctx.Done():

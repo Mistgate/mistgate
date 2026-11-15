@@ -141,16 +141,6 @@ bsbord/service.go	bsbord: store probe results	1
 bsbord/service.go	bsbord: store skipped targets	1
 bsbord/service.go	bsbord: the stored key cannot be opened; it is ignored	1
 bsbord/service.go	bsbord: verify request state	1
-cheburcheck/run_native.go	cheburcheck: tick	1
-cheburcheck/service.go	cheburcheck: audit	2
-cheburcheck/service.go	cheburcheck: delete rows	1
-cheburcheck/service.go	cheburcheck: disconnect	1
-cheburcheck/service.go	cheburcheck: read latest rows	1
-cheburcheck/service.go	cheburcheck: read settings	2
-cheburcheck/service.go	cheburcheck: request failed	1
-cheburcheck/service.go	cheburcheck: save failure state	1
-cheburcheck/service.go	cheburcheck: save settings	1
-cheburcheck/service.go	cheburcheck: stored token cannot be opened; it is ignored	1
 clientprobe/service.go	clientprobe: audit	1
 clientprobe/service.go	clientprobe: disconnect	1
 clientprobe/service.go	clientprobe: forget the reports	1

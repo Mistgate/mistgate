@@ -55,6 +55,7 @@ const (
 	callSpacing     = 30 * time.Second
 	rateHoldStart   = 2 * time.Minute
 	rateHoldMax     = 30 * time.Minute
+	failHoldMax     = time.Hour // ceiling of the hold after repeated failures that are not a rate limit (403, 5xx, network)
 	probesOffHold   = 6 * time.Hour
 	testEvery       = 10 * time.Second
 	testTimeout     = 15 * time.Second
@@ -197,7 +198,7 @@ func parseSettings(kv map[string]string) settings {
 	if n, err := strconv.ParseInt(kv[settingHoldUntil], 10, 64); err == nil && n > 0 {
 		st.holdUntil = time.Unix(n, 0)
 	}
-	if n, err := strconv.Atoi(kv[settingBackoff]); err == nil && n >= 2 && n <= 30 {
+	if n, err := strconv.Atoi(kv[settingBackoff]); err == nil && n >= 2 && n <= int(failHoldMax/time.Minute) {
 		st.backoffMin = n
 	}
 	return st
@@ -238,7 +239,7 @@ func (s *Service) latest(ctx context.Context, state State) (State, error) {
 func (s *Service) State(ctx context.Context) State {
 	st, err := s.load(ctx)
 	if err != nil {
-		s.log.Warn("cheburcheck: read settings", "err", err)
+		s.log.Warn("cheburcheck: read settings", "code", "cheburcheck_read_settings_failed", "err", err)
 		return State{}
 	}
 	return s.sourceState(st)
@@ -267,12 +268,12 @@ func unixOrZero(t time.Time) int64 {
 func (s *Service) current(ctx context.Context) (*adminv1.CheburcheckSettings, error) {
 	st, err := s.load(ctx)
 	if err != nil {
-		s.log.Error("cheburcheck: read settings", "err", err)
+		s.log.Error("cheburcheck: read settings", "code", "cheburcheck_read_settings_failed", "err", err)
 		return nil, errInternal
 	}
 	state, err := s.latest(ctx, s.sourceState(st))
 	if err != nil {
-		s.log.Error("cheburcheck: read latest rows", "err", err)
+		s.log.Error("cheburcheck: read latest rows", "code", "cheburcheck_read_rows_failed", "err", err)
 		return nil, errInternal
 	}
 	return protoSettings(st, state), nil
@@ -284,7 +285,7 @@ func (s *Service) token(st settings) vault.Redacted {
 	}
 	b, err := s.cfg.Vault.Open(st.sealed, tokenAAD)
 	if err != nil {
-		s.log.Warn("cheburcheck: stored token cannot be opened; it is ignored")
+		s.log.Warn("cheburcheck: stored token cannot be opened; it is ignored", "code", "cheburcheck_token_unreadable")
 		return ""
 	}
 	return vault.Redacted(b)
@@ -538,43 +539,62 @@ func (s *Service) storeUnknown(ctx context.Context, gen uint64, st settings, d d
 	return err
 }
 
+// holdStep is the hold for this failure and the step stored for the next one: the stored step (2 minutes at first) is
+// clamped to [rateHoldStart, ceiling] and doubled up to the ceiling. A stored result without a failure resets it.
+func holdStep(backoffMin int, ceiling time.Duration) (delay time.Duration, next int) {
+	delay = min(max(time.Duration(backoffMin)*time.Minute, rateHoldStart), ceiling)
+	return delay, int(min(delay*2, ceiling) / time.Minute)
+}
+
 func (s *Service) handleFailure(ctx context.Context, gen uint64, st settings, source, phase string, err error) error {
 	var ae *apiError
 	api := errors.As(err, &ae)
 	values := map[string]string{}
+	var delay, ceiling time.Duration // the hold taken and the most it can grow to; the repeats of one status log quietly below the ceiling
 	switch {
 	case api && ae.Status == http.StatusTooManyRequests:
-		delay := time.Duration(st.backoffMin) * time.Minute
-		if delay < rateHoldStart {
-			delay = rateHoldStart
-		}
-		if delay > rateHoldMax {
-			delay = rateHoldMax
-		}
-		next := min(int(delay/time.Minute)*2, int(rateHoldMax/time.Minute))
+		var next int
+		ceiling = rateHoldMax
+		delay, next = holdStep(st.backoffMin, ceiling)
 		values[settingStatus] = "rate_limited"
 		values[settingHoldUntil] = strconv.FormatInt(s.now().Add(delay).Unix(), 10)
 		values[settingBackoff] = strconv.Itoa(next)
 	case api && ae.Status == http.StatusBadRequest && phase == "probe":
+		delay, ceiling = probesOffHold, probesOffHold
 		values[settingStatus] = "ip_probes_off"
-		values[settingHoldUntil] = strconv.FormatInt(s.now().Add(probesOffHold).Unix(), 10)
+		values[settingHoldUntil] = strconv.FormatInt(s.now().Add(delay).Unix(), 10)
 		values[settingBackoff] = strconv.Itoa(int(rateHoldStart / time.Minute))
 	case api && ae.Status == http.StatusNotFound && source == SourceOwn && phase == "probe":
 		values[settingStatus] = "token_unknown"
 		values[settingTokenUnknown] = "1"
 	default:
+		// 403 (the site refuses automated requests), 5xx, a dead network: the same site call would fail again at once,
+		// so the pause doubles with every failure in a row, like the rate limit's, up to an hour.
+		var next int
+		ceiling = failHoldMax
+		delay, next = holdStep(st.backoffMin, ceiling)
 		values[settingStatus] = "unreachable"
+		values[settingHoldUntil] = strconv.FormatInt(s.now().Add(delay).Unix(), 10)
+		values[settingBackoff] = strconv.Itoa(next)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if gen != s.gen {
+	if gen != s.gen || ctx.Err() != nil {
 		return nil
 	}
 	if err := s.cfg.Store.SetSettings(ctx, values); err != nil {
-		s.log.Warn("cheburcheck: save failure state", "status", values[settingStatus], "err", err)
+		s.log.Warn("cheburcheck: save failure state", "code", "cheburcheck_save_state_failed", "status", values[settingStatus], "err", err)
 		return err
 	}
-	s.log.Warn("cheburcheck: request failed", "status", values[settingStatus], "err", err)
+	// A change of state is a warning; the same state again is a debug line until the pause has grown to its ceiling,
+	// then one warning per hold, so a site that stays shut costs one line an hour instead of one a minute.
+	if st.status == values[settingStatus] && delay > 0 && delay < ceiling {
+		s.log.Debug("cheburcheck: request failed again", "code", "cheburcheck_request_failed", "status", values[settingStatus],
+			"hold_min", int(delay/time.Minute), "err", err)
+		return nil
+	}
+	s.log.Warn("cheburcheck: request failed", "code", "cheburcheck_request_failed", "status", values[settingStatus],
+		"hold_min", int(delay/time.Minute), "err", err)
 	return nil
 }
 
@@ -710,13 +730,13 @@ func (r rpc) UpdateCheburcheck(ctx context.Context, req *connect.Request[adminv1
 	if len(values) > 0 {
 		s.stop()
 		if err := s.cfg.Store.SetSettings(ctx, values); err != nil {
-			s.log.Error("cheburcheck: save settings", "err", err)
+			s.log.Error("cheburcheck: save settings", "code", "cheburcheck_save_settings_failed", "err", err)
 			return nil, errInternal
 		}
 	}
 	params := `{"token_changed":` + strconv.FormatBool(tokenChanged) + `}`
 	if err := s.cfg.Store.Audit(ctx, s.now(), store.AuditEntry{Actor: admin.ID, Action: "cheburcheck_update", Params: params, Result: "ok"}); err != nil {
-		s.log.Warn("cheburcheck: audit", "err", err)
+		s.log.Warn("cheburcheck: audit", "code", "cheburcheck_audit_failed", "err", err)
 	}
 	s.changed(ctx)
 	current, err := s.current(ctx)
@@ -746,15 +766,15 @@ func (r rpc) DisconnectCheburcheck(ctx context.Context, _ *connect.Request[admin
 	values := map[string]string{settingEnabled: "0", settingPublic: "1", settingToken: "", settingHoldUntil: "", settingBackoff: strconv.Itoa(defaultBackoffMin),
 		settingStatus: "", settingTokenUnknown: "0"}
 	if err := s.cfg.Store.SetSettings(ctx, values); err != nil {
-		s.log.Error("cheburcheck: disconnect", "err", err)
+		s.log.Error("cheburcheck: disconnect", "code", "cheburcheck_disconnect_failed", "err", err)
 		return nil, errInternal
 	}
 	if err := s.cfg.Store.DeleteExtChecks(ctx, SourcePublic, SourceOwn); err != nil {
-		s.log.Error("cheburcheck: delete rows", "err", err)
+		s.log.Error("cheburcheck: delete rows", "code", "cheburcheck_delete_rows_failed", "err", err)
 		return nil, errInternal
 	}
 	if err := s.cfg.Store.Audit(ctx, s.now(), store.AuditEntry{Actor: admin.ID, Action: "cheburcheck_disconnect", Result: "ok"}); err != nil {
-		s.log.Warn("cheburcheck: audit", "err", err)
+		s.log.Warn("cheburcheck: audit", "code", "cheburcheck_audit_failed", "err", err)
 	}
 	s.changed(ctx)
 	current, err := s.current(ctx)
