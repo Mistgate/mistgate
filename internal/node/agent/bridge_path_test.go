@@ -2,14 +2,22 @@ package agent
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The connect loop's choice between the direct path to the panel and the bridge of an entry node, driven by scripted sessions
@@ -317,6 +325,72 @@ func TestPanelProbeDelayIsJitteredAndDoublesPerFailedReturn(t *testing.T) {
 			if d < want*8/10 || d > want*12/10 {
 				t.Fatalf("after %d failed returns the delay is %s, want about %s", flaps, d, want)
 			}
+		}
+	}
+}
+
+// The bridge dies under the control session: the agent does not stay on it, and the direct path takes over as soon as it works.
+func TestPanelSessionSurvivesTheBridgeFallingAndTheDirectPathReturning(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	entry := nodebridge.NewEntry()
+	bridgeServerCert, pin := issueBridgeSiteCertificate(t, h.panel)
+	if err := entry.SetServe(nodebridge.ServeConfig{EntryNodeID: "nod_msk1", Path: "/private-bridge-path", ExitNodeIDs: []string{h.a.meta.NodeID},
+		PanelVia: true, PanelAddress: h.panel.addr(), Roots: h.a.id.Load().ca}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewUnstartedServer(entry.Handler(http.NotFoundHandler()))
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{bridgeServerCert}, MinVersion: tls.VersionTLS13}
+	server.Config.TLSConfig = server.TLS
+	if err := nodebridge.ConfigureSiteHTTP2(server.Config); err != nil {
+		t.Fatal(err)
+	}
+	server.StartTLS()
+	t.Cleanup(func() {
+		entry.Close()
+		server.Close()
+	})
+	_, portText, err := net.SplitHostPort(server.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.ParseUint(portText, 10, 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proofIdentity := issueBridgePeerIdentity(t, h.panel, h.a.meta.NodeID)
+	dial := plugin.BridgeDial{EntryNodeID: "nod_msk1", Host: "127.0.0.1", Port: uint16(port), SNI: "msk1.example.com", PinSHA256: pin,
+		Path: "/private-bridge-path", Pool: 2, PanelVia: true, Targets: []plugin.BridgeTarget{{RelayID: "rly_a", Network: "tcp", Port: 4443}}}
+	dialer := nodebridge.NewDialer(func() nodebridge.DialIdentity { return proofIdentity })
+	h.a.bridgeDialer.Close()
+	h.a.bridgeDialer = dialer
+	dialer.Sync(context.Background(), []nodebridge.DialSpec{{Dial: dial}})
+	t.Cleanup(dialer.Close)
+	waitPanelBridgeConns(t, dialer, dial.EntryNodeID)
+
+	m := newModel()
+	m.bridgeDials = []plugin.BridgeDial{dial}
+	h.a.setModel(m)
+	var directReady atomic.Bool
+	h.a.directDialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		if !directReady.Load() {
+			return nil, errors.New("direct panel path unavailable")
+		}
+		return (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, network, address)
+	}
+	h.a.bridgeFallbackAfter, h.a.bridgeFallbackAttempts = time.Hour, 3
+	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 40*time.Millisecond
+	h.a.bridgeWait = func(ctx context.Context, _ time.Duration) bool { <-ctx.Done(); return false } // no probe in this test
+
+	h.start()
+	if first := receivePanelHello(t, h.panel.hellos); first.LinkViaNodeId != "nod_msk1" {
+		t.Fatalf("first Hello.link_via_node_id = %q, want nod_msk1", first.LinkViaNodeId)
+	}
+	entry.Close() // the entry's bridge dies under the session
+	directReady.Store(true)
+	for {
+		hello := receivePanelHello(t, h.panel.hellos)
+		if hello.LinkViaNodeId == "" {
+			return // the agent is back on the direct path
 		}
 	}
 }
