@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -26,8 +25,6 @@ const updateHTTPUserAgent = "Mistgate-Update/1"
 
 // githubReleaseBase is fixed in production and may be replaced with -X only for loopback e2e builds.
 var githubReleaseBase = "https://github.com/Mistgate/mistgate/releases/download/"
-
-var cloudflareR2Host = regexp.MustCompile(`^[0-9a-f]{32}(\.eu|\.fedramp)?\.r2\.cloudflarestorage\.com$`)
 
 var errLinkStalled = errors.New("link download stalled")
 
@@ -53,8 +50,6 @@ func (s *updSource) Fetchers(m *release.Manifest, f release.File) []update.Fetch
 			if release.ValidChannelTag(m.Version) {
 				fetchers = append(fetchers, s.githubFetcher(m, f))
 			}
-		case "cloudflare":
-			fetchers = append(fetchers, s.cloudflareFetcher(f, s.request.GetCloudflareUrl()))
 		case "peer":
 			// Peer fields are reserved on the wire; stage 3a implements the receiver.
 		default:
@@ -108,26 +103,6 @@ func (s *updSource) githubFetcher(m *release.Manifest, f release.File) update.Fe
 			},
 		})
 	}}
-}
-
-func (s *updSource) cloudflareFetcher(f release.File, rawURL string) update.Fetcher {
-	return update.Fetcher{Kind: "cloudflare", Fetch: func(ctx context.Context, offset uint64, w io.Writer) (uint64, error) {
-		if !validCloudflareURL(rawURL) {
-			return 0, update.PermanentSourceFailure("refused", errors.New("cloudflare source URL refused"))
-		}
-		return s.fetchRangedHTTP(ctx, rawURL, offset, uint64(f.Size), w, rangedHTTPPolicy{})
-	}}
-}
-
-func validCloudflareURL(raw string) bool {
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" {
-		return false
-	}
-	if port := u.Port(); port != "" && port != "443" {
-		return false
-	}
-	return cloudflareR2Host.MatchString(strings.ToLower(u.Hostname()))
 }
 
 type rangedHTTPPolicy struct {

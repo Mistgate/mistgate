@@ -27,8 +27,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"log/slog"
-
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/update"
 	"github.com/mistgate/mistgate/internal/release"
@@ -613,103 +611,14 @@ func TestGitHubSourceFailureFallsBackToPanel(t *testing.T) {
 	}
 }
 
-func TestCloudflareValidR2RangeAndNoRedirect(t *testing.T) {
-	host := strings.Repeat("a", 32) + ".r2.cloudflarestorage.com"
-	if !validCloudflareURL("https://" + host + ":443/bundle?sig=test") {
-		t.Fatal("port 443 should be accepted for a valid R2 host")
-	}
-	content := []byte("0123456789abcdef")
-	var requests atomic.Int32
-	var rangeHeader, authHeader, cookieHeader string
-	srv, roots := newR2TLSServer(t, host, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
-		rangeHeader, authHeader, cookieHeader = r.Header.Get("Range"), r.Header.Get("Authorization"), r.Header.Get("Cookie")
-		w.Header().Set("Content-Range", "bytes 5-15/16")
-		w.Header().Set("Content-Length", "11")
-		w.WriteHeader(http.StatusPartialContent)
-		_, _ = w.Write(content[5:])
-	}))
-	a := &Agent{updateRootCAs: roots, updateDialContext: loopbackDial(srv)}
-	rawURL := "https://" + host + "/bundle?X-Amz-Credential=presign-test"
-	s := updSource{a: a, request: &pb.UpdateAgent{Sources: []string{"cloudflare"}, CloudflareUrl: rawURL}}
-	fetcher := s.Fetchers(&release.Manifest{Version: "v1.2.3"}, release.File{Name: "agent.bin", Size: int64(len(content))})[0]
-	var got bytes.Buffer
-	total, err := fetcher.Fetch(context.Background(), 5, &got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if total != uint64(len(content)) || !bytes.Equal(got.Bytes(), content[5:]) || requests.Load() != 1 {
-		t.Errorf("cloudflare fetch total=%d bytes=%q requests=%d", total, got.Bytes(), requests.Load())
-	}
-	if rangeHeader != "bytes=5-" || authHeader != "" || cookieHeader != "" {
-		t.Errorf("cloudflare request headers range=%q authorization=%q cookie=%q", rangeHeader, authHeader, cookieHeader)
-	}
-}
-
-func TestCloudflareRejectsInvalidURLsBeforeDial(t *testing.T) {
-	host := strings.Repeat("b", 32) + ".r2.cloudflarestorage.com"
-	var dials atomic.Int32
-	a := &Agent{updateDialContext: func(context.Context, string, string) (net.Conn, error) {
-		dials.Add(1)
-		return nil, errors.New("unexpected dial")
-	}}
-	badURLs := []string{
-		"https://other.invalid/bundle",
-		"https://" + strings.Repeat("a", 31) + ".r2.cloudflarestorage.com/bundle",
-		"http://" + host + "/bundle",
-		"https://" + host + ":444/bundle",
-		"https://alice@" + host + "/bundle",
-		"https://127.0.0.1/bundle",
-	}
-	for _, rawURL := range badURLs {
-		s := updSource{a: a, request: &pb.UpdateAgent{Sources: []string{"cloudflare"}, CloudflareUrl: rawURL}}
-		fetcher := s.Fetchers(&release.Manifest{Version: "v1.2.3"}, release.File{Name: "agent.bin", Size: 1})[0]
-		_, err := fetcher.Fetch(context.Background(), 0, io.Discard)
-		if !errors.Is(err, update.ErrPermanent) || strings.Contains(err.Error(), rawURL) {
-			t.Errorf("invalid URL was not refused safely: %v", err)
-		}
-	}
-	if dials.Load() != 0 {
-		t.Errorf("invalid URLs caused %d dials", dials.Load())
-	}
-}
-
-func TestCloudflareRedirectIsNotFollowed(t *testing.T) {
-	host := strings.Repeat("c", 32) + ".eu.r2.cloudflarestorage.com"
-	var requests atomic.Int32
-	srv, roots := newR2TLSServer(t, host, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
-		http.Redirect(w, r, "/redirect-target", http.StatusFound)
-	}))
-	a := &Agent{updateRootCAs: roots, updateDialContext: loopbackDial(srv)}
-	s := updSource{a: a, request: &pb.UpdateAgent{Sources: []string{"cloudflare"}, CloudflareUrl: "https://" + host + "/bundle?sig=presign-test"}}
-	fetcher := s.Fetchers(&release.Manifest{Version: "v1.2.3"}, release.File{Name: "agent.bin", Size: 1})[0]
-	_, err := fetcher.Fetch(context.Background(), 0, io.Discard)
-	if !errors.Is(err, update.ErrPermanent) || requests.Load() != 1 || strings.Contains(err.Error(), host) {
-		t.Errorf("redirect = %v, requests=%d", err, requests.Load())
-	}
-}
-
-func TestCloudflareURLNeverReachesResultsOrLogs(t *testing.T) {
-	host := strings.Repeat("d", 32) + ".fedramp.r2.cloudflarestorage.com"
-	var logs lockedLogBuffer
-	logger := slog.New(slog.NewTextHandler(&logs, nil))
-	srv, roots := newR2TLSServer(t, host, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.NotFound(w, nil)
-	}))
-	a, f, _ := newLinkUpdateAgent(t, http.NotFoundHandler(), func(c *update.Config) { c.Log = logger })
-	a.updateRootCAs = roots
-	a.updateDialContext = loopbackDial(srv)
-	content := []byte("new signed binary")
-	manifest, signature := f.manifest(content, newBuilt)
-	secretURL := "https://" + host + "/bundle?X-Amz-Credential=presign-test-secret"
-	req := &pb.UpdateAgent{RequestId: "cloudflare-redaction", Manifest: manifest, Signature: signature, Sources: []string{"cloudflare"}, CloudflareUrl: secretURL}
-	res, finish := a.upd.Apply(context.Background(), req, &updSource{a: a, request: req})
-	if finish != nil || res.Ok || res.Error != "download_failed" || res.Params["sources_failed"] != "cloudflare:http_404" {
-		t.Fatalf("Apply = %+v, finish %v", res, finish != nil)
-	}
-	combined := res.Detail + " " + res.Params["sources_used"] + " " + res.Params["sources_failed"] + " " + logs.String()
-	if strings.Contains(combined, secretURL) || strings.Contains(combined, "presign-test-secret") || strings.Contains(combined, host) {
-		t.Errorf("Cloudflare URL data appeared in update output: %s", combined)
+func TestCloudflareURLIsIgnoredLikeAnAbsentField(t *testing.T) {
+	manifest := &release.Manifest{Version: "v1.2.3"}
+	file := release.File{Name: "agent.bin", Size: 1}
+	withURL := updSource{request: &pb.UpdateAgent{Sources: []string{"cloudflare"}, CloudflareUrl: "https://example.org/bundle"}}
+	withoutURL := updSource{request: &pb.UpdateAgent{Sources: []string{"cloudflare"}}}
+	withFetchers := withURL.Fetchers(manifest, file)
+	withoutFetchers := withoutURL.Fetchers(manifest, file)
+	if len(withFetchers) != len(withoutFetchers) || len(withFetchers) != 0 {
+		t.Fatalf("cloudflare source fetchers with field=%d without field=%d; both should be ignored", len(withFetchers), len(withoutFetchers))
 	}
 }
