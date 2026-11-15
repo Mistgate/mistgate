@@ -168,9 +168,14 @@ func (l RelayLink) Proven() bool {
 	return ok && c.Verified()
 }
 
-// Usable says every stage either passed or was unverifiable. The caller checks whether the owner enabled the relay.
+// Usable says every stage either passed or was unverifiable. The caller checks whether the owner enabled the relay. A relay in the
+// reverse way stands on the bridge BECAUSE its direct leg fails (or freezes): the leg is then no part of what makes it usable, the
+// path through the bridge is. Without this the relay is taken out of every subscription at the moment it begins to work.
 func (l RelayLink) Usable() bool {
 	c, ok := l.Check()
+	if ok && l.Reverse() {
+		return c.Path.Acceptable()
+	}
 	return ok && c.CanUse()
 }
 

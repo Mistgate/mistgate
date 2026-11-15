@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -208,5 +209,35 @@ func TestEvaluateRelayModeCountsDirectChecksAtThirtyMinuteIntervals(t *testing.T
 				t.Fatalf("direct streak = %d, want %d", got.DirectStreak, tc.streak)
 			}
 		})
+	}
+}
+
+// A relay in the reverse way stands on the bridge because its direct leg fails or freezes: what makes it usable (the subscriptions
+// offer it, the people's apps list it) is the path through the bridge, and the failed leg is not a reason to take it away.
+func TestRelayLinkInTheReverseWayIsUsableOnItsPathAlone(t *testing.T) {
+	link := func(active, leg, path string) RelayLink {
+		b, err := json.Marshal(RelayCheck{At: 1, Leg: RelayStage{Status: leg, At: 1}, Path: RelayStage{Status: path, At: 1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return RelayLink{Relay: Relay{CheckJSON: string(b), ActiveMode: active}}
+	}
+	for _, tc := range []struct {
+		name              string
+		active, leg, path string
+		want              bool
+	}{
+		{"direct way, both pass", RelayModeDNAT, "ok", "ok", true},
+		{"direct way, the leg fails", RelayModeDNAT, "fail", "skipped", false},
+		{"reverse way, the leg fails and the path through the bridge passes", RelayModeReverse, "fail", "ok", true},
+		{"reverse way, the path through the bridge fails", RelayModeReverse, "fail", "fail", false},
+		{"reverse way, no path stage yet (the switch has just happened)", RelayModeReverse, "fail", "skipped", false},
+	} {
+		if got := link(tc.active, tc.leg, tc.path).Usable(); got != tc.want {
+			t.Errorf("%s: Usable() = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+	if (RelayLink{Relay: Relay{ActiveMode: RelayModeReverse}}).Usable() {
+		t.Error("a relay with no check at all is usable")
 	}
 }
