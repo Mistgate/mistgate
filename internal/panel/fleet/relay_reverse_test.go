@@ -483,3 +483,38 @@ func TestCheckRelayReverseReachOfABridgeSiteOnAPortOfItsOwnIsAProbeTheAgentTakes
 		t.Fatalf("reverse reach = %+v", got.ReverseReach)
 	}
 }
+
+// The leg probe a reverse relay gets every half hour runs the leg alone. The path that shows the bridge carries people stays in the
+// check it comes from (it said "ok" for this target a minute ago, and its at_unix says so); a check without it made the relay
+// unusable, so the apps lost it, until the next full check.
+func TestCheckRelayLegOnlyKeepsThePathOfTheSameTarget(t *testing.T) {
+	x := newReverseCheckEnv(t, true, true)
+	x.tcpRelay(true)
+	now := time.Now().Unix()
+	path := store.RelayStage{Status: "ok", Sender: x.exit.nodeID, Verdict: "ours", At: now - 60}
+	if err := x.st.SetRelayCheck(x.ctx, "rly_t", store.RelayCheck{At: now - 60, Network: "tcp", Port: 7443, To: reverseExitAddress + ":8443",
+		Leg: store.RelayStage{Status: "fail", Code: "timeout", At: now - 60}, Path: path}); err != nil {
+		t.Fatal(err)
+	}
+	// a failed leg also asks whether the exit reaches the entry (the second probe)
+	run := func() store.RelayCheck {
+		resultCh := x.start("rly_t", store.RelayStageLeg)
+		leg := waitTCPProbe(x.ec)
+		replyPortCommand(x.ec, leg.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "t8443": "timeout"}})
+		reverse := waitTCPProbe(x.xc)
+		replyPortCommand(x.xc, reverse.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "t443": "ours"}})
+		return result(t, resultCh)
+	}
+	got := run()
+	if got.Leg.Status != "fail" || got.Path != path {
+		t.Fatalf("leg-only check: leg %+v, path %+v, want the old path %+v", got.Leg, got.Path, path)
+	}
+	// another target (the exit's server moved): the old path says nothing about it
+	if err := x.st.SetRelayCheck(x.ctx, "rly_t", store.RelayCheck{At: now - 30, Network: "tcp", Port: 7443, To: reverseExitAddress + ":9999",
+		Leg: store.RelayStage{Status: "fail", Code: "timeout", At: now - 30}, Path: path}); err != nil {
+		t.Fatal(err)
+	}
+	if got = run(); got.Path.Status != "" {
+		t.Fatalf("the path of another target was kept: %+v", got.Path)
+	}
+}

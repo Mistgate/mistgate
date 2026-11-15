@@ -70,9 +70,16 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 	if specErr == nil {
 		check.To = net.JoinHostPort(exit.Address, strconv.Itoa(int(spec.Listen.Port)))
 	}
-	if !runLeg {
+	if !runLeg || !runPath {
+		// a stage that does not run keeps what the last check of the same target found (its own at_unix says how old that is): the
+		// leg probe of a reverse relay, made every half hour, must not take away the path that shows the bridge carries people
 		if prev, ok := link.Check(); ok && prev.Network == check.Network && prev.To == check.To && check.To != "" {
-			check.Leg = prev.Leg
+			if !runLeg {
+				check.Leg = prev.Leg
+			}
+			if !runPath && prev.Port == check.Port {
+				check.Path = prev.Path
+			}
 		}
 	}
 	if prev, ok := link.Check(); ok {
