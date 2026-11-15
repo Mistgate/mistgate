@@ -207,9 +207,11 @@ func TestUpdateLinkFetchRetriesStalledDownload(t *testing.T) {
 			http.Error(w, "too many requests", http.StatusInternalServerError)
 		}
 	}))
-	a.updateLinkIdle = 50 * time.Millisecond
+	// The timer covers a fresh TLS handshake and the response head of the resumed request, so it must be far
+	// longer than a loaded -race runner needs for that; the stalled first request still ends within it.
+	a.updateLinkIdle = 400 * time.Millisecond
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	result, finish := applyLinkUpdate(ctx, a, f, linkDownloadToken, content)
 	if result == nil || !result.Ok || finish == nil {
@@ -399,8 +401,15 @@ func TestUpdateLinkFetchDiscardsPrefixWhenRangeGets200(t *testing.T) {
 }
 
 func TestUpdateLinkSlowRange200PrefixKeepsIdleTimerAlive(t *testing.T) {
-	content := bytes.Repeat([]byte("x"), 64)
-	cut := 8
+	// What the test proves: discarding the ignored prefix alone takes longer than the idle timer (cut*pause >
+	// idle), yet it must not fire because every byte resets it. The gap between bytes is a tenth of the timer,
+	// so a scheduling stall under -race has to exceed 360 ms before it can fake a stalled download.
+	const (
+		idle  = 400 * time.Millisecond
+		pause = 40 * time.Millisecond
+		cut   = 12
+	)
+	content := bytes.Repeat([]byte("x"), 20)
 	var calls atomic.Int32
 	a, f, _ := newLinkUpdateAgent(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch calls.Add(1) {
@@ -422,13 +431,13 @@ func TestUpdateLinkSlowRange200PrefixKeepsIdleTimerAlive(t *testing.T) {
 				if flusher != nil {
 					flusher.Flush()
 				}
-				time.Sleep(15 * time.Millisecond)
+				time.Sleep(pause)
 			}
 		default:
 			t.Errorf("unexpected request %d", calls.Load())
 		}
-	}), func(c *update.Config) { c.IdleTimeout = 50 * time.Millisecond })
-	a.updateLinkIdle = 50 * time.Millisecond
+	}), func(c *update.Config) { c.IdleTimeout = idle })
+	a.updateLinkIdle = idle
 
 	result, finish := applyLinkUpdate(context.Background(), a, f, linkDownloadToken, content)
 	if result == nil || !result.Ok || finish == nil {
