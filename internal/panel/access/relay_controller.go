@@ -81,7 +81,17 @@ func (s *Service) controlRelayOnce(ctx context.Context, l store.RelayLink, entry
 			in.MonitorFailAt = c.Monitor.AtUnix
 		}
 	}
+	// The exit dials the entry only while the panel wants the bridge (BridgeWanted), and that comes from the stages this run just read
+	// (a failed leg or a frozen flow, with the exit reaching the entry), which nothing else turns into desired state: the nodes are
+	// told when it changes, or the exit would never hold the bridge the controller then waits for.
+	wanted := l.BridgeWanted(now, port)
+	previous, loaded := s.bridgeWanted.Swap(l.ID, wanted)
+	wantChanged := loaded && previous.(bool) != wanted || !loaded && wanted
 	decision := store.EvaluateRelayMode(in)
+	// a change of the way tells the nodes by itself (applyRelayMode)
+	if wantChanged && notify && decision.ActiveMode == l.ActiveMode && decision.ModeReason == l.ModeReason {
+		s.notify.StateChanged()
+	}
 	if decision.DirectStreak != l.DirectStreak() || decision.DirectStreakAt != l.DirectStreakAt() {
 		if err := s.st.SetRelayDirectState(ctx, l.ID, decision.DirectStreak, decision.DirectStreakAt); err != nil && !errors.Is(err, store.ErrNotFound) {
 			s.log.Warn("store relay direct streak", "code", "relay_direct_streak_failed", "relay", l.ID, "err", err)

@@ -333,3 +333,30 @@ func TestAutoRelayRefusalIsTheLegsWithTheBridgeBeside(t *testing.T) {
 		t.Fatal("a refused relay was switched on")
 	}
 }
+
+// The exit dials the entry only while the panel wants the bridge, and what makes it want it (a failed leg with the exit reaching the
+// entry, found by a check or a round) is no event of its own: the controller, which reads those stages after every round, tells the
+// nodes when the want appears or goes, once, so that the exit gets its BridgeDial before the controller waits for the bridge.
+func TestControllerTellsTheNodesWhenTheBridgeBecomesWanted(t *testing.T) {
+	x := newReverseControlFix(t, store.RelayModeDNAT)
+	x.monitor(true, 0)
+	x.check(x.stage("ok", 0), store.RelayStage{}, x.stage("ok", 0), store.RelayStage{})
+	x.s.ControlRelay(x.ctx, x.id)
+	base := x.notify.n.Load()
+
+	x.check(x.stage("fail", 0), x.stage("ok", 0), store.RelayStage{}, store.RelayStage{})
+	x.s.ControlRelay(x.ctx, x.id)
+	if got := x.notify.n.Load(); got != base+1 {
+		t.Fatalf("the leg failed and the exit reaches the entry: StateChanged calls %d -> %d, want one more", base, got)
+	}
+	x.s.ControlRelay(x.ctx, x.id)
+	if got := x.notify.n.Load(); got != base+1 {
+		t.Fatalf("an unchanged want told the nodes again: %d -> %d", base+1, got)
+	}
+
+	x.check(x.stage("ok", 0), x.stage("ok", 0), x.stage("ok", 0), store.RelayStage{})
+	x.s.ControlRelay(x.ctx, x.id)
+	if got := x.notify.n.Load(); got != base+2 {
+		t.Fatalf("the leg is alive again: StateChanged calls %d -> %d, want one more (the exit stops dialing)", base+1, got)
+	}
+}

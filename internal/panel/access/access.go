@@ -103,7 +103,11 @@ type Service struct {
 	// controlling holds the relays the mode controller is deciding now: a second call for the same relay (the next report, the next
 	// round) is dropped, not queued, because it would decide from the same state, and the proof it may run takes a minute.
 	controlling sync.Map
-	relayGate   func(context.Context, store.RelayLink) error
+	// bridgeWanted is, per relay, whether the last decision of the controller wanted the exit to hold the bridge
+	// (RelayLink.BridgeWanted). The exit's dials are part of its desired state and a stored check stage does not rebuild it, so a
+	// change is told to the nodes.
+	bridgeWanted sync.Map
+	relayGate    func(context.Context, store.RelayLink) error
 	// relaySettleFn follows the switch on (relaySettle); relayWait and relayPoll are how long it waits for the entry's report
 	// and how often it looks; relayHints is the source of the candidates' hints (SetRelayHints).
 	relaySettleFn func(context.Context, store.RelayLink) error
