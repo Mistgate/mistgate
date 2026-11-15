@@ -130,13 +130,14 @@ type dialRun struct {
 }
 
 type Dialer struct {
-	mu       sync.Mutex
-	identity func() DialIdentity
-	runs     map[string]*dialRun
-	states   map[string]DialState
-	timing   dialTiming
-	clock    func() time.Time
-	closed   bool
+	mu          sync.Mutex
+	identity    func() DialIdentity
+	runs        map[string]*dialRun
+	states      map[string]DialState
+	timing      dialTiming
+	clock       func() time.Time
+	panelActive bool
+	closed      bool
 }
 
 func NewDialer(identity func() DialIdentity) *Dialer {
@@ -261,7 +262,7 @@ func makeDialTargets(targets []plugin.BridgeTarget, targetErrors map[string]stri
 
 func sameDial(a, b plugin.BridgeDial) bool {
 	return a.EntryNodeID == b.EntryNodeID && a.Host == b.Host && a.Port == b.Port &&
-		a.SNI == b.SNI && a.PinSHA256 == b.PinSHA256 && a.Path == b.Path
+		a.SNI == b.SNI && a.PinSHA256 == b.PinSHA256 && a.Path == b.Path && a.PanelVia == b.PanelVia
 }
 
 func normalizeDial(d plugin.BridgeDial) (plugin.BridgeDial, string) {
@@ -715,7 +716,7 @@ func (p *pairWorkers) run1(elastic bool) {
 			cancel()
 			return
 		}
-		responses, code, err := d.openPair(requestCtx, cancel, run, cc, p.proof, pairID)
+		responses, code, err := d.openPair(requestCtx, cancel, run.dial, cc, p.proof, pairID, "")
 		if err != nil || code != "" {
 			tracker.endRequest(id)
 			cancel()
@@ -764,12 +765,12 @@ func (p *pairWorkers) run1(elastic bool) {
 	}
 }
 
-func (d *Dialer) openPair(ctx context.Context, cancel context.CancelFunc, run *dialRun, cc *http2.ClientConn, proof Proof, pairID string) (*pairResponses, string, error) {
+func (d *Dialer) openPair(ctx context.Context, cancel context.CancelFunc, dial plugin.BridgeDial, cc *http2.ClientConn, proof Proof, pairID, kind string) (*pairResponses, string, error) {
 	reader, writer := io.Pipe()
 	u := url.URL{
 		Scheme: "https",
-		Host:   net.JoinHostPort(strings.Trim(run.dial.Host, "[]"), strconv.Itoa(int(run.dial.Port))),
-		Path:   run.dial.Path,
+		Host:   net.JoinHostPort(strings.Trim(dial.Host, "[]"), strconv.Itoa(int(dial.Port))),
+		Path:   dial.Path,
 	}
 	downReq, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), reader)
 	if err != nil {
@@ -788,6 +789,9 @@ func (d *Dialer) openPair(ctx context.Context, cancel context.CancelFunc, run *d
 	for _, request := range []*http.Request{downReq, upReq} {
 		request.Header.Set(ProtocolHeader, protocolVersion)
 		request.Header.Set(PairIDHeader, pairID)
+		if kind != "" {
+			request.Header.Set(StreamKindHeader, kind)
+		}
 		proof.setHeaders(request.Header)
 	}
 	downReq.Header.Set(StreamHeader, string(pairDown))
@@ -852,9 +856,11 @@ func (d *Dialer) openPair(ctx context.Context, cancel context.CancelFunc, run *d
 		return nil, "", errors.New("bad bridge response")
 	}
 	relayID := responses.down.Header.Get(RelayIDHeader)
-	if !relayIDPattern.MatchString(relayID) || responses.up.Header.Get(RelayIDHeader) != relayID ||
+	if (kind == StreamKindPanel && (relayID != "" || responses.up.Header.Get(RelayIDHeader) != "")) ||
+		(kind != StreamKindPanel && (!relayIDPattern.MatchString(relayID) || responses.up.Header.Get(RelayIDHeader) != relayID)) ||
 		responses.down.Header.Get(ProtocolHeader) != protocolVersion || responses.up.Header.Get(ProtocolHeader) != protocolVersion ||
-		responses.down.Header.Get(StreamHeader) != string(pairDown) || responses.up.Header.Get(StreamHeader) != string(pairUp) {
+		responses.down.Header.Get(StreamHeader) != string(pairDown) || responses.up.Header.Get(StreamHeader) != string(pairUp) ||
+		responses.down.Header.Get(StreamKindHeader) != kind || responses.up.Header.Get(StreamKindHeader) != kind {
 		closePairResponses(responses)
 		cancel()
 		return nil, "", errors.New("bad bridge response")

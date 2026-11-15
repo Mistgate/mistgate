@@ -88,7 +88,7 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 		if l.ViaNodeID == n.ID && l.BridgeServed() && bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) &&
 			bridgeNodeIDPattern.MatchString(n.ID) && bridgeNodeIDPattern.MatchString(l.ExitNodeID) {
 			exits[l.ExitNodeID] = true
-			serve.Port, serve.Path = n.BridgePort, n.BridgePath
+			serve.Port, serve.Path, serve.PanelVia = n.BridgePort, n.BridgePath, true
 		}
 		if l.ExitNodeID != n.ID || !l.Enabled {
 			continue
@@ -124,7 +124,7 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 		}
 		d := dials[entry.ID]
 		if d == nil {
-			d = &plugin.BridgeDial{EntryNodeID: entry.ID, Host: entry.Address, Port: entry.BridgeEndpointPort(), Path: entry.BridgePath}
+			d = &plugin.BridgeDial{EntryNodeID: entry.ID, Host: entry.Address, Port: entry.BridgeEndpointPort(), Path: entry.BridgePath, PanelVia: true}
 			if entry.BridgePort != 0 {
 				d.PinSHA256 = l.BridgeSitePin(entry.BridgePort, now)
 			} else if target, ok := f.bridgeTLSName(ctx, entry); ok {

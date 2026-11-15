@@ -25,7 +25,9 @@ import (
 const (
 	MaxStreamsPerExit       = 4096
 	MaxStreamsPerEntry      = 8192
-	MaxConnectionsPerExit   = 2 * MaxPoolSize
+	MaxPeopleConnsPerExit   = 2 * MaxPoolSize // the pool plus the connections that serve out their time
+	MaxPanelConnsPerExit    = 2               // the control link's own TLS connection, plus the one a replacing link opens while the old one dies
+	MaxConnectionsPerExit   = MaxPeopleConnsPerExit + MaxPanelConnsPerExit
 	AcceptQueueSize         = 1024 // a burst of people arrives faster than the listener hands them out
 	PendingStreamsPerExit   = 256
 	MaxPendingClients       = 4096
@@ -34,8 +36,14 @@ const (
 	BridgeStreamIdleTimeout = 2 * time.Minute
 	BridgeRequestIdle       = 30 * time.Second
 	BridgePairTimeout       = 5 * time.Second
+	BridgePanelDialTimeout  = BridgeTargetDialTimeout
 	BridgeProgressTimeout   = 30 * time.Second
-	maxBridgeListeners      = 64
+	// The control link's byte budget: a bucket that holds ControlBudgetBytes and refills at ControlBudgetPerSecond. A busy exit's
+	// session carries a few KiB per second for days, so a total per stream would cut it every hour or two; the bucket only stops an
+	// exit that pumps data at the panel (2 Mbit/s sustained, a 64 MiB burst).
+	ControlBudgetBytes     = uint64(64 << 20)
+	ControlBudgetPerSecond = uint64(256 << 10)
+	maxBridgeListeners     = 64
 )
 
 var (
@@ -49,8 +57,11 @@ type ServeConfig struct {
 	EntryNodeID string
 	Path        string
 	ExitNodeIDs []string
-	Roots       *x509.CertPool
-	Now         func() time.Time
+	PanelVia    bool
+	// PanelAddress is supplied only by the entry agent from its own enrollment configuration.
+	PanelAddress string
+	Roots        *x509.CertPool
+	Now          func() time.Time
 }
 
 type RelayListener struct {
@@ -80,6 +91,7 @@ type RelayCounters struct {
 
 type entryConn struct {
 	active int
+	panel  bool // carries the control link, never people: a connection keeps the class of its first request
 }
 
 type cachedProof struct {
@@ -96,6 +108,7 @@ type entryPeer struct {
 	connections  map[[32]byte]entryConn
 	pairs        map[pairKey]*bridgePair
 	active       uint64
+	panelPair    *bridgePair
 	clientActive uint64
 	streams      uint64
 	bytesIn      uint64
@@ -132,6 +145,9 @@ type bridgePair struct {
 	err       string
 	conn      net.Conn
 	relayID   string
+	kind      string
+	budget    uint64    // control link only: bytes left in the bucket
+	budgetAt  time.Time // control link only: when the bucket was last refilled
 	pairTimer *time.Timer
 	idleTimer *time.Timer
 	progress  *time.Timer
@@ -212,6 +228,7 @@ type entryTiming struct {
 	pendingJitter  time.Duration
 	progress       time.Duration
 	streamIdle     time.Duration
+	panelDial      time.Duration
 	acceptRetryMin time.Duration
 	acceptRetryMax time.Duration
 }
@@ -223,6 +240,7 @@ func defaultEntryTiming() entryTiming {
 		pendingJitter:  BridgeRequestIdle / 5,
 		progress:       BridgeProgressTimeout,
 		streamIdle:     BridgeStreamIdleTimeout,
+		panelDial:      BridgePanelDialTimeout,
 		acceptRetryMin: 5 * time.Millisecond,
 		acceptRetryMax: time.Second,
 	}
@@ -342,6 +360,10 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 	if !nodeIDPattern.MatchString(cfg.EntryNodeID) || !validBridgePath(cfg.Path) || cfg.Roots == nil || len(cfg.ExitNodeIDs) == 0 {
 		return errors.New("bad_config")
 	}
+	// An address that is no host:port only costs the control link: the people's bridge must not go down with it.
+	if !cfg.PanelVia || !validPanelAddress(cfg.PanelAddress) {
+		cfg.PanelVia, cfg.PanelAddress = false, ""
+	}
 	ids := append([]string(nil), cfg.ExitNodeIDs...)
 	sort.Strings(ids)
 	allowed := ids[:0]
@@ -365,10 +387,14 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 	}
 	old := e.serve
 	identityChanged := old.EntryNodeID != cfg.EntryNodeID || old.Path != cfg.Path || old.Roots != cfg.Roots
+	panelChanged := old.PanelVia != cfg.PanelVia || old.PanelAddress != cfg.PanelAddress
 	removed := make([]string, 0)
+	var controlPairs []*bridgePair
 	for id := range e.peers {
 		if identityChanged || !slicesContains(cfg.ExitNodeIDs, id) {
 			removed = append(removed, id)
+		} else if panelChanged && e.peers[id].panelPair != nil {
+			controlPairs = append(controlPairs, e.peers[id].panelPair)
 		}
 	}
 	if !sameServe(old, cfg) {
@@ -380,6 +406,9 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 	}
 	e.serve = cfg
 	e.mu.Unlock()
+	for _, pair := range controlPairs {
+		e.finishPair(pair, "closed", true)
+	}
 	e.listenerMu.Lock()
 	for _, listener := range e.listeners {
 		if identityChanged || !slicesContains(cfg.ExitNodeIDs, listener.config.ExitNodeID) {
@@ -395,7 +424,8 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 }
 
 func sameServe(a, b ServeConfig) bool {
-	if a.EntryNodeID != b.EntryNodeID || a.Path != b.Path || a.Roots != b.Roots || len(a.ExitNodeIDs) != len(b.ExitNodeIDs) {
+	if a.EntryNodeID != b.EntryNodeID || a.Path != b.Path || a.Roots != b.Roots || a.PanelVia != b.PanelVia ||
+		a.PanelAddress != b.PanelAddress || len(a.ExitNodeIDs) != len(b.ExitNodeIDs) {
 		return false
 	}
 	for i := range a.ExitNodeIDs {
@@ -404,6 +434,15 @@ func sameServe(a, b ServeConfig) bool {
 		}
 	}
 	return true
+}
+
+func validPanelAddress(address string) bool {
+	host, portText, err := net.SplitHostPort(address)
+	if err != nil || host == "" || strings.TrimSpace(address) != address || strings.ContainsAny(host, " \t\r\n") {
+		return false
+	}
+	port, err := strconv.Atoi(portText)
+	return err == nil && port > 0 && port <= 65535
 }
 
 func validBridgePath(path string) bool {
@@ -418,9 +457,11 @@ func (e *Entry) Handler(site http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cfg := e.serveSnapshot()
 		role := pairRole(r.Header.Get(StreamHeader))
+		kind := r.Header.Get(StreamKindHeader)
 		pairID := r.Header.Get(PairIDHeader)
 		if cfg.Path == "" || r.URL.RawQuery != "" || r.URL.Fragment != "" ||
 			!sameSecretPath(r.URL.Path, cfg.Path) || r.Method != http.MethodPost || r.Header.Get(ProtocolHeader) != protocolVersion ||
+			(kind != "" && kind != StreamKindPanel) ||
 			(role != pairDown && role != pairUp) || !pairIDPattern.MatchString(pairID) ||
 			(role == pairUp && (r.ContentLength > 0 || len(r.TransferEncoding) > 0)) {
 			site.ServeHTTP(w, r)
@@ -446,34 +487,49 @@ func (e *Entry) Handler(site http.Handler) http.Handler {
 			site.ServeHTTP(w, r)
 			return
 		}
+		if kind == StreamKindPanel {
+			if !cfg.PanelVia {
+				e.writeBridgeError(w, exitID, kind, "panel_via_disabled")
+				return
+			}
+			// The exit does not choose where the entry connects: the destination is the entry's own panel address from its
+			// enrollment, and a request that names one (or a relay) is refused rather than ignored.
+			_, targetNamed := r.Header[http.CanonicalHeaderKey(TargetHeader)]
+			_, relayNamed := r.Header[http.CanonicalHeaderKey(RelayIDHeader)]
+			if targetNamed || relayNamed {
+				e.writeBridgeError(w, exitID, kind, "target_not_allowed")
+				return
+			}
+		}
 		markBridgeConnection(r.Context())
 		peer := e.peer(exitID)
 		if peer == nil {
-			e.writeBridgeError(w, exitID, "closed")
+			e.writeBridgeError(w, exitID, kind, "closed")
 			return
 		}
 		if err := clearSiteDeadlines(w); err != nil {
-			e.setPeerError(exitID, "timeout_unsupported")
-			e.writeBridgeError(w, exitID, "timeout_unsupported")
+			e.writeBridgeError(w, exitID, kind, "timeout_unsupported")
 			return
 		}
 		key := sha256.Sum256(exporter)
-		if code := e.acquireHalf(peer, key, now); code != "" {
-			e.setPeerError(exitID, code)
-			e.writeBridgeError(w, exitID, code)
+		if code := e.acquireHalf(peer, key, now, kind); code != "" {
+			e.writeBridgeError(w, exitID, kind, code)
 			return
 		}
-		pair, paired, code := e.joinPair(peer, pairKey{connection: key, id: pairID}, role)
+		pair, paired, code := e.joinPair(peer, pairKey{connection: key, id: pairID}, role, kind)
 		if code != "" {
 			e.releaseHalf(peer, key)
-			e.setPeerError(exitID, code)
-			e.writeBridgeError(w, exitID, code)
+			e.writeBridgeError(w, exitID, kind, code)
 			return
 		}
 		defer e.releaseHalf(peer, key)
-		if paired && !e.offerPair(pair) {
-			e.setPeerError(exitID, "queue_full")
-			e.finishPair(pair, "queue_full", true)
+		if paired {
+			if kind == StreamKindPanel {
+				e.attachPanelPair(pair, cfg.PanelAddress)
+			} else if !e.offerPair(pair) {
+				e.setPeerError(exitID, "queue_full")
+				e.finishPair(pair, "queue_full", true)
+			}
 		}
 		e.servePairHalf(w, r, pair, role)
 	})
@@ -561,18 +617,39 @@ func (e *Entry) peer(id string) *entryPeer {
 	return p
 }
 
-func (e *Entry) acquireHalf(p *entryPeer, key [32]byte, now time.Time) string {
+// acquireHalf admits one request half on a connection. The control link and the people have their own connection budgets, so
+// neither can crowd the other out: a connection keeps the class of its first request and a request of the other class on it
+// is refused.
+func (e *Entry) acquireHalf(p *entryPeer, key [32]byte, now time.Time, kind string) string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.closed.Load() {
 		return "closed"
 	}
+	panel := kind == StreamKindPanel
 	c, ok := p.connections[key]
-	if !ok && len(p.connections) >= MaxConnectionsPerExit {
-		return "connection_limit"
+	if ok && c.panel != panel {
+		return "stream_kind_mismatch"
 	}
-	if !ok && p.since.IsZero() {
-		p.since = now
+	if !ok {
+		people, control := 0, 0
+		for _, other := range p.connections {
+			if other.panel {
+				control++
+			} else {
+				people++
+			}
+		}
+		if panel && control >= MaxPanelConnsPerExit {
+			return "control_limit"
+		}
+		if !panel && people >= MaxPeopleConnsPerExit {
+			return "connection_limit"
+		}
+		if !panel && p.since.IsZero() {
+			p.since = now
+		}
+		c.panel = panel
 	}
 	c.active++
 	p.connections[key] = c
@@ -593,7 +670,13 @@ func (e *Entry) releaseHalf(p *entryPeer, key [32]byte) {
 	e.mu.Unlock()
 }
 
-func (e *Entry) joinPair(peer *entryPeer, key pairKey, role pairRole) (*bridgePair, bool, string) {
+func (e *Entry) joinPair(peer *entryPeer, key pairKey, role pairRole, kind string) (*bridgePair, bool, string) {
+	var replaced *bridgePair
+	defer func() { // after every return below has unlocked
+		if replaced != nil {
+			e.finishPair(replaced, "closed", true)
+		}
+	}()
 	e.mu.Lock()
 	if e.closed.Load() {
 		e.mu.Unlock()
@@ -601,31 +684,45 @@ func (e *Entry) joinPair(peer *entryPeer, key pairKey, role pairRole) (*bridgePa
 	}
 	pair := peer.pairs[key]
 	if pair == nil {
+		if kind == StreamKindPanel && peer.panelPair != nil && !pairDone(peer.panelPair) {
+			// One control link per exit, the newest wins: an exit that restarted must not wait for the entry to notice that
+			// its old link is gone.
+			replaced = peer.panelPair
+		}
 		ctx, cancel := context.WithCancel(context.Background())
 		pair = &bridgePair{
 			peer: peer, key: key, ctx: ctx, cancel: cancel, ready: make(chan struct{}),
 			attached: make(chan struct{}), done: make(chan struct{}), halves: map[pairRole]bool{},
-			completed: map[pairRole]bool{},
+			completed: map[pairRole]bool{}, kind: kind,
 		}
 		peer.pairs[key] = pair
+		if kind == StreamKindPanel {
+			peer.panelPair = pair
+		}
 		pair.pairTimer = time.AfterFunc(e.timing.pairWait, func() { e.finishPair(pair, "pair_timeout", true) })
 	}
-	if pair.finished || pair.halves[role] {
+	if pair.finished || pair.halves[role] || pair.kind != kind {
 		e.mu.Unlock()
+		if pair.kind != kind {
+			return pair, false, "stream_kind_mismatch"
+		}
 		return pair, false, "duplicate_pair"
 	}
 	pair.halves[role] = true
 	paired := pair.halves[pairDown] && pair.halves[pairUp] && !pair.paired
-	if paired && (peer.active >= MaxStreamsPerExit || e.totalStreams >= MaxStreamsPerEntry) {
+	// The control link is not a person: it takes no slot of the stream limits and the limits cannot refuse it.
+	if paired && kind != StreamKindPanel && (peer.active >= MaxStreamsPerExit || e.totalStreams >= MaxStreamsPerEntry) {
 		e.mu.Unlock()
 		e.finishPair(pair, "stream_limit", true)
 		return pair, false, "stream_limit"
 	}
 	if paired {
 		pair.paired = true
-		pair.active = true
-		peer.active++
-		e.totalStreams++
+		if kind != StreamKindPanel {
+			pair.active = true
+			peer.active++
+			e.totalStreams++
+		}
 		if pair.pairTimer != nil {
 			pair.pairTimer.Stop()
 			pair.pairTimer = nil
@@ -634,6 +731,27 @@ func (e *Entry) joinPair(peer *entryPeer, key pairKey, role pairRole) (*bridgePa
 	}
 	e.mu.Unlock()
 	return pair, paired, ""
+}
+
+func (e *Entry) attachPanelPair(pair *bridgePair, address string) {
+	ctx, cancel := context.WithTimeout(pair.ctx, e.timing.panelDial)
+	conn, err := (&net.Dialer{Timeout: e.timing.panelDial, KeepAlive: BridgeKeepAlive}).DialContext(ctx, "tcp", address)
+	cancel()
+	if err != nil {
+		e.finishPair(pair, "panel_connect", true)
+		return
+	}
+	idle := newIdleConn(conn, e.timing.streamIdle)
+	e.mu.Lock()
+	if pair.finished || pair.conn != nil {
+		e.mu.Unlock()
+		_ = idle.Close()
+		return
+	}
+	pair.conn = idle
+	pair.budget, pair.budgetAt = ControlBudgetBytes, time.Now()
+	close(pair.attached)
+	e.mu.Unlock()
 }
 
 func (e *Entry) offerPair(pair *bridgePair) bool {
@@ -690,7 +808,11 @@ func (e *Entry) servePairHalf(w http.ResponseWriter, r *http.Request, pair *brid
 	}
 	w.Header().Set(ProtocolHeader, protocolVersion)
 	w.Header().Set(StreamHeader, string(role))
-	w.Header().Set(RelayIDHeader, relayID)
+	if pair.kind == StreamKindPanel {
+		w.Header().Set(StreamKindHeader, StreamKindPanel)
+	} else {
+		w.Header().Set(RelayIDHeader, relayID)
+	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
@@ -737,6 +859,9 @@ func (e *Entry) copyDown(pair *bridgePair, dst net.Conn, src io.Reader) error {
 	for {
 		n, readErr := src.Read(buf)
 		if n > 0 {
+			if !e.reservePairBytes(pair, uint64(n)) {
+				return errors.New("control_byte_limit")
+			}
 			e.startProgress(pair)
 			if err := writeFull(dst, buf[:n]); err != nil {
 				return err
@@ -758,6 +883,9 @@ func (e *Entry) copyUp(pair *bridgePair, src net.Conn, w http.ResponseWriter, fl
 	for {
 		n, readErr := src.Read(buf)
 		if n > 0 {
+			if !e.reservePairBytes(pair, uint64(n)) {
+				return errors.New("control_byte_limit")
+			}
 			written, err := w.Write(buf[:n])
 			flusher.Flush()
 			if err != nil {
@@ -775,6 +903,28 @@ func (e *Entry) copyUp(pair *bridgePair, src net.Conn, w http.ResponseWriter, fl
 			return readErr
 		}
 	}
+}
+
+// reservePairBytes takes n bytes from the control link's bucket; an empty bucket ends the link. People's streams have no
+// bucket (their pairs have no budgetAt).
+func (e *Entry) reservePairBytes(pair *bridgePair, n uint64) bool {
+	if pair.kind != StreamKindPanel {
+		return true
+	}
+	e.mu.Lock()
+	now := time.Now()
+	if elapsed := now.Sub(pair.budgetAt); elapsed > 0 {
+		pair.budget = min(ControlBudgetBytes, pair.budget+uint64(elapsed.Seconds()*float64(ControlBudgetPerSecond)))
+		pair.budgetAt = now
+	}
+	if pair.finished || n > pair.budget {
+		e.mu.Unlock()
+		e.finishPair(pair, "control_byte_limit", true)
+		return false
+	}
+	pair.budget -= n
+	e.mu.Unlock()
+	return true
 }
 
 func (e *Entry) startProgress(pair *bridgePair) {
@@ -813,13 +963,18 @@ func (e *Entry) progressExpired(pair *bridgePair, generation uint64) {
 }
 
 func (e *Entry) addBytes(pair *bridgePair, toPeople, toExit uint64) {
+	if pair.kind == StreamKindPanel {
+		return // the control link's bytes are not people's traffic: not in the bridge counters, not in the relay's
+	}
 	e.mu.Lock()
 	pair.peer.bytesIn += toPeople
 	pair.peer.bytesOut += toExit
-	counter := e.relayCounters[pair.relayID]
-	counter.Bytes += toExit
-	counter.BytesBack += toPeople
-	e.relayCounters[pair.relayID] = counter
+	if pair.relayID != "" {
+		counter := e.relayCounters[pair.relayID]
+		counter.Bytes += toExit
+		counter.BytesBack += toPeople
+		e.relayCounters[pair.relayID] = counter
+	}
 	e.mu.Unlock()
 }
 
@@ -853,6 +1008,9 @@ func (e *Entry) finishPairWhen(pair *bridgePair, code string, reset, unlessTaken
 		pair.progress = nil
 	}
 	delete(pair.peer.pairs, pair.key)
+	if pair.peer.panelPair == pair {
+		pair.peer.panelPair = nil
+	}
 	if pair.active {
 		pair.active = false
 		if pair.peer.active > 0 {
@@ -883,12 +1041,16 @@ func (e *Entry) writePairError(w http.ResponseWriter, pair *bridgePair) {
 	if code == "" {
 		code = "closed"
 	}
-	e.writeBridgeError(w, pair.peerID(), code)
+	e.writeBridgeError(w, pair.peerID(), pair.kind, code)
 }
 
-func (e *Entry) writeBridgeError(w http.ResponseWriter, exitID, code string) {
+func (e *Entry) writeBridgeError(w http.ResponseWriter, exitID, kind, code string) {
 	if code != "request_idle" {
-		e.setPeerError(exitID, code)
+		if kind == StreamKindPanel {
+			e.noteControlError(exitID, code)
+		} else {
+			e.setPeerError(exitID, code)
+		}
 	}
 	w.Header().Set(ErrorHeader, code)
 	status := http.StatusServiceUnavailable
@@ -896,8 +1058,37 @@ func (e *Entry) writeBridgeError(w http.ResponseWriter, exitID, code string) {
 		status = http.StatusGatewayTimeout
 	} else if code == "pair_timeout" {
 		status = http.StatusRequestTimeout
+	} else if code == "panel_via_disabled" || code == "target_not_allowed" || code == "control_limit" || code == "stream_kind_mismatch" {
+		status = http.StatusForbidden
+	} else if code == "control_byte_limit" {
+		status = http.StatusRequestEntityTooLarge
+	} else if code == "panel_connect" {
+		status = http.StatusBadGateway
 	}
 	w.WriteHeader(status)
+}
+
+// noteControlError logs a refused control link (throttled like the people's errors) but leaves the exit's error alone: that field is
+// what the panel reads as "the bridge is unhealthy", and a panel that the entry cannot reach is not a broken bridge.
+func (e *Entry) noteControlError(exitID, code string) {
+	if exitID == "" || code == "" {
+		return
+	}
+	e.mu.Lock()
+	now := time.Now()
+	if cfgNow := e.serve.Now; cfgNow != nil {
+		now = cfgNow()
+	}
+	last := e.logged["panel:"+code]
+	shouldLog := last.IsZero() || now.Sub(last) >= time.Minute
+	if shouldLog {
+		e.logged["panel:"+code] = now
+	}
+	logger := e.log
+	e.mu.Unlock()
+	if shouldLog && logger != nil {
+		logger.Warn("reverse relay bridge refused a control link", "code", code)
+	}
 }
 
 func (e *Entry) setPeerError(exitID, code string) {
@@ -1256,11 +1447,17 @@ func (e *Entry) States() []PeerState {
 	for id, peer := range e.peers {
 		clients := uint32(0)
 		for _, pair := range peer.pairs {
-			if pair.conn != nil && !pair.finished {
+			if pair.kind != StreamKindPanel && pair.conn != nil && !pair.finished {
 				clients++
 			}
 		}
-		out = append(out, PeerState{PeerNodeID: id, Conns: uint32(len(peer.connections)), Since: peer.since,
+		conns := uint32(0) // the control link's connection is not part of the pool the panel reads
+		for _, c := range peer.connections {
+			if !c.panel {
+				conns++
+			}
+		}
+		out = append(out, PeerState{PeerNodeID: id, Conns: conns, Since: peer.since,
 			Streams: peer.streams, BytesIn: peer.bytesIn, BytesOut: peer.bytesOut, Error: peer.lastError, Clients: clients})
 	}
 	e.mu.RUnlock()

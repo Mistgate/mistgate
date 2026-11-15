@@ -38,6 +38,7 @@ const maxCertLife = 11 * 365 * 24 * time.Hour
 type SessionState struct {
 	Version         uint8     `json:"v"`
 	NodeID          string    `json:"n,omitempty"`
+	LinkViaNodeID   string    `json:"lv,omitempty"`
 	OwnerGeneration uint64    `json:"o,omitempty"`
 	InstanceID      string    `json:"i,omitempty"`
 	AgentCaps       []string  `json:"ac,omitempty"`
@@ -337,6 +338,10 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	}
 	tr.state.Version = sessionStateVersion
 	tr.state.InstanceID = h.InstanceId
+	tr.state.LinkViaNodeID = ""
+	if bridgeNodeIDPattern.MatchString(h.LinkViaNodeId) && h.LinkViaNodeId != tr.state.NodeID {
+		tr.state.LinkViaNodeID = h.LinkViaNodeId
+	}
 	tr.state.HelloDeadline = time.Time{}
 	// The stats credit a node starts with: one minute plus the panel time since the node last reached the panel, so a
 	// restart or an outage of the panel does not cost the node the batches it queued meanwhile (stats are committed
@@ -636,6 +641,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 type liveJSONView struct {
 	IntervalEndUnix   int64             `json:"interval_end_unix"`
 	MetricsAtUnix     int64             `json:"metrics_at_unix"`
+	LinkViaNodeID     string            `json:"link_via_node_id,omitempty"`
 	Metrics           *liveJSONMetrics  `json:"metrics,omitempty"`
 	Health            []liveJSONHealth  `json:"health"`
 	RunningInboundIDs []string          `json:"running_inbound_ids,omitempty"`
@@ -724,6 +730,7 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 	const maxRate = uint64(1 << 50)
 	view := liveJSONView{
 		IntervalEndUnix:   end,
+		LinkViaNodeID:     state.LinkViaNodeID,
 		Health:            make([]liveJSONHealth, 0, min(len(st.Health), 64)),
 		RunningInboundIDs: make([]string, 0, min(len(st.Health), maxLiveRunningInbounds)),
 		Online:            make([]liveJSONOnline, 0, min(len(st.Sessions), 2000)),

@@ -119,7 +119,7 @@ func assertAgentBridgeValid(t *testing.T, ds *agentv1.DesiredState, roots *x509.
 	if ds.BridgeServe != nil && (ds.BridgeServe.Path != "" || len(ds.BridgeServe.ExitNodeIds) != 0) {
 		entry := nodebridge.NewEntry()
 		if err := entry.SetServe(nodebridge.ServeConfig{EntryNodeID: "nod_msk1", Path: ds.BridgeServe.Path,
-			ExitNodeIDs: ds.BridgeServe.ExitNodeIds, Roots: roots}); err != nil {
+			ExitNodeIDs: ds.BridgeServe.ExitNodeIds, PanelVia: ds.BridgeServe.PanelVia, PanelAddress: "192.0.2.53:443", Roots: roots}); err != nil {
 			t.Fatalf("the node's BridgeServe validator rejected panel state %v: %v", ds.BridgeServe, err)
 		}
 	}
@@ -190,12 +190,12 @@ func TestReversePairIsSentTheBridge(t *testing.T) {
 	// The entry: the forward carries the way and the exit, the serve setting says where the exit calls and whom it accepts.
 	wantRelays := &agentv1.RelayForwards{Items: []*agentv1.RelayForward{{RelayId: "rly_a", Network: "tcp", Port: 7443, ToHost: "exit.example.com", ToPort: 4443,
 		Mode: "reverse", ExitNodeId: x.exit.nodeID}}}
-	wantServe := &agentv1.BridgeServe{Port: 8443, Path: bridgePath, ExitNodeIds: []string{x.exit.nodeID}}
+	wantServe := &agentv1.BridgeServe{Port: 8443, Path: bridgePath, ExitNodeIds: []string{x.exit.nodeID}, PanelVia: true}
 	if !proto.Equal(ds.Relays, wantRelays) || !proto.Equal(ds.BridgeServe, wantServe) || ds.BridgeDials != nil {
 		t.Fatalf("the entry: relays %v serve %v dials %v", ds.Relays, ds.BridgeServe, ds.BridgeDials)
 	}
 	if want := statehash.StateBridge(nil, nil, []plugin.RelayForward{{ID: "rly_a", Network: "tcp", Port: 7443, ToHost: "exit.example.com", ToPort: 4443, Mode: "reverse", ExitNodeID: x.exit.nodeID}},
-		&plugin.BridgeServe{Port: 8443, Path: bridgePath, ExitNodeIDs: []string{x.exit.nodeID}}, nil); ds.StateHash != want || m.hash() != want {
+		&plugin.BridgeServe{Port: 8443, Path: bridgePath, ExitNodeIDs: []string{x.exit.nodeID}, PanelVia: true}, nil); ds.StateHash != want || m.hash() != want {
 		t.Fatalf("the entry's hash %s, want %s", ds.StateHash, want)
 	}
 
@@ -215,7 +215,7 @@ func TestReversePairIsSentTheBridge(t *testing.T) {
 	}
 	x.f.StateChanged()
 	d := ec.next(em)
-	wantDials := &agentv1.BridgeDials{Items: []*agentv1.BridgeDial{{EntryNodeId: x.entry.nodeID, Host: "entry.example.com", Port: 8443, Path: bridgePath, Pool: 2,
+	wantDials := &agentv1.BridgeDials{Items: []*agentv1.BridgeDial{{EntryNodeId: x.entry.nodeID, Host: "entry.example.com", Port: 8443, Path: bridgePath, Pool: 2, PanelVia: true,
 		PinSha256: bridgePin, Targets: []*agentv1.BridgeTarget{{RelayId: "rly_a", Network: "tcp", Port: 4443}}}}}
 	if !proto.Equal(d.BridgeDials, wantDials) || d.BridgeServe != nil || d.Relays != nil || len(d.Inbounds) != 0 {
 		t.Fatalf("the exit's delta: %v", d)
@@ -491,5 +491,18 @@ func TestNodeMessageCarriesTheBridgePort(t *testing.T) {
 	}
 	if n := port()[x.exit.nodeID]; n.BridgePort != 0 {
 		t.Fatalf("the other node: %+v", n)
+	}
+}
+
+func TestNodeMessageCarriesTheLivePanelBridgeEntry(t *testing.T) {
+	x := newRelayEnv(t)
+	node, err := x.st.Node(x.ctx, x.exit.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := store.NodeLiveRow{NodeID: node.ID, Connected: true, LiveJSON: `{"link_via_node_id":"` + x.entry.nodeID + `"}`}
+	got := x.f.nodeMsg(x.ctx, node, nil, 0, 0, map[string]string{}, x.f.now(), live, nil, store.NodeHealthSummary{}, store.IPv6Doctor{})
+	if got.LinkViaNodeId != x.entry.nodeID {
+		t.Fatalf("node link_via_node_id = %q, want %q", got.LinkViaNodeId, x.entry.nodeID)
 	}
 }

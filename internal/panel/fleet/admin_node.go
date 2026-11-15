@@ -270,6 +270,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	out.Ipv6 = ipv6Msg(n, d6)
 	if live.Connected {
+		out.LinkViaNodeId = view.LinkViaNodeID
 		out.Online = protocolCounts(onlineByProtocolView(view))
 		if m := view.Metrics; m != nil {
 			out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, float32(m.CPUPct), pct(m.RAMUsedBytes, m.RAMTotalBytes), m.UptimeS
