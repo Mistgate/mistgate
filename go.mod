@@ -223,4 +223,4 @@ replace github.com/xtls/reality => ./third_party/reality
 
 // Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus one commit that makes Vision's TrafficState fields
 // atomic, from the public fork github.com/Mistgate/Xray-core (its README says what and why). Pin a commit of the fork, not a branch.
-replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261115162919-706a6dec6f12
+replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261115163343-9699c0aacb48
