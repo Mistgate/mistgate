@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { InboundState, NodeStatus, type Inbound } from "@/gen/mistgate/admin/v1/common_pb";
+import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
@@ -26,6 +27,7 @@ import { portNotes, withNotes } from "@/lib/port-check";
 import { agentLinked } from "@/lib/node-status";
 import { protocolName } from "@/lib/series";
 import { useNow } from "@/lib/time";
+import { meQuery } from "@/lib/session";
 import { useIsOwner } from "@/lib/updates";
 import { networkOf } from "@/lib/ways-graph";
 import { profileListQuery } from "@/screens/users/rpc";
@@ -126,6 +128,8 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
   const fmt = useFmt();
   const now = Math.floor(useNow(60_000) / 1000);
   // addProfile: the profile page sent us here to add that profile: the dialog opens with it chosen
+  const owner = useIsOwner(); // policy.go: a server on a node (CreateInbound, UpdateInbound, DeleteInbound) is the owner's
+  const canRestart = useQuery(meQuery).data?.admin?.role === Role.HELPER || owner; // RestartInbounds is the helper's too
   const [adding, setAddingOpen] = useState(Boolean(addProfile));
   const setAdding = (open: boolean) => {
     setAddingOpen(open);
@@ -142,21 +146,20 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
   const conn = useQuery({ ...nodeConnectionsQuery(node.id), enabled: data.inbounds.length > 0 && node.status !== NodeStatus.RETIRED }).data;
   const connOf = new Map((conn?.inbounds ?? []).map((x) => [x.inboundId, x]));
   // relays are the owner's (RelayService): removing a server says which relays go with it
-  const owner = useIsOwner();
 
-  const add = (
+  const add = owner ? (
     <Button variant="primary" size="md" onClick={() => setAdding(true)}>
       <Icon name="plus" size={14} />
       {t("node.profiles.add")}
     </Button>
-  );
+  ) : undefined;
 
   return (
     <div className="flex flex-col gap-2">
       {data.inbounds.length === 0 ? (
         <div className="rounded-card-lg border border-dashed border-line">
           <EmptyState title={t("node.profiles.none", { name: node.name })} action={add}>
-            {t("node.profiles.noneBody")}
+            {t(owner ? "node.profiles.noneBody" : "node.profiles.ownerOnly")}
           </EmptyState>
         </div>
       ) : (
@@ -164,11 +167,9 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
           {conn && !conn.supported && linked && <p data-testid="conn-unsupported" className="text-xs leading-normal text-pretty text-muted">{t("conn.node.unsupported")}</p>}
           <div className="flex items-center gap-2 pb-1">
             <span className="flex-1 text-xs text-muted">{t.n("node.profiles.count", data.inbounds.length)}</span>
-            <Button variant="primary" size="md" onClick={() => setAdding(true)}>
-              <Icon name="plus" size={14} />
-              {t("node.profiles.add")}
-            </Button>
+            {add}
           </div>
+          {!owner && <Notice tone="quiet">{t("node.profiles.ownerOnly")}</Notice>}
         </>
       )}
 
@@ -179,8 +180,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
         const checked = tcp ? data.tcpChecks?.find((c) => c.port === i.port && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
         const cs = cells(t, fmt, i, now, checked && (tcp ? tcpPill(t, checked.verdict) : verdictPill(t, checked as never)));
         const kind = i.lastError ? inboundErrorKind(i.lastError) : null;
-        const fix: ReactNode =
-          kind === "port" ? (
+        const fix: ReactNode = !owner ? null : kind === "port" ? (
             <Button variant="primary" size="sm" onClick={() => setEditing({ inbound: i, focus: "port" })}>
               {t("node.profiles.changePort")}
             </Button>
@@ -238,23 +238,27 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
             {i.lastError && <InboundErrorNote inbound={i} process={holders[i.id]} />}
             <div className="flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
               {fix}
-              <Button variant="secondary" size="sm" onClick={() => setEditing({ inbound: i })}>
-                {t("common.edit")}
-              </Button>
-              {linked && i.state !== InboundState.DISABLED && (
+              {owner && (
+                <Button variant="secondary" size="sm" onClick={() => setEditing({ inbound: i })}>
+                  {t("common.edit")}
+                </Button>
+              )}
+              {canRestart && linked && i.state !== InboundState.DISABLED && (
                 <Button variant="secondary" size="sm" onClick={() => setRestarting(i)}>
                   {t("node.profiles.restart")}
                 </Button>
               )}
-              <Button variant="ghostDanger" size="sm" className="ms-auto" onClick={() => setRemoving(i)}>
-                {t("node.profiles.remove")}
-              </Button>
+              {owner && (
+                <Button variant="ghostDanger" size="sm" className="ms-auto" onClick={() => setRemoving(i)}>
+                  {t("node.profiles.remove")}
+                </Button>
+              )}
             </div>
           </Fresh>
         );
       })}
 
-      <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />
+      {owner && <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />}
       {editing && (
         <EditInbound key={editing.inbound.id} inbound={editing.inbound} focus={editing.focus} nodeId={node.id} nodeAddress={node.address} onClose={() => setEditing(null)} />
       )}

@@ -423,6 +423,7 @@ export const en = {
 
   "node.profiles.count": "{n} profile on this node|{n} profiles on this node",
   "node.profiles.add": "Add profile",
+  "node.profiles.ownerOnly": "Only the owner can add, change or remove profiles on a node.",
   "node.profiles.none": "No profiles on {name} yet — users will not get it",
   "node.profiles.noneBody": "A profile is a protocol setup. Put one here, and the users whose group has it get this node in their subscription.",
   "node.profiles.port": "Port",
@@ -1681,6 +1682,7 @@ export const ru: typeof en = {
 
   "node.profiles.count": "{n} профиль на ноде|{n} профиля на ноде|{n} профилей на ноде",
   "node.profiles.add": "Добавить профиль",
+  "node.profiles.ownerOnly": "Добавлять, менять и убирать профили на ноде может только владелец.",
   "node.profiles.none": "На {name} ещё нет профилей — пользователи её не получат",
   "node.profiles.noneBody": "Профиль — это настройки протокола. Поставь его сюда — и пользователи из групп с этим профилем получат эту ноду в подписке.",
   "node.profiles.port": "Порт",
@@ -2931,6 +2933,7 @@ export const zh: typeof en = {
 
   "node.profiles.count": "此节点上有 {n} 个协议配置",
   "node.profiles.add": "添加协议配置",
+  "node.profiles.ownerOnly": "仅所有者可以在节点上添加、更改或移除协议配置。",
   "node.profiles.none": "{name} 上还没有协议配置，用户无法使用该节点",
   "node.profiles.noneBody": "协议配置是一套协议设置。部署一个到这里，所在分组包含它的用户就会在订阅中获得此节点。",
   "node.profiles.port": "端口",
@@ -4166,6 +4169,7 @@ export const fa: typeof en = {
   "node.f.engines": "موتورها",
   "node.profiles.count": "{n} پروفایل روی این نود",
   "node.profiles.add": "افزودن پروفایل",
+  "node.profiles.ownerOnly": "فقط مالک می‌تواند پروفایل‌های یک نود را اضافه، تغییر یا حذف کند.",
   "node.profiles.none": "روی {name} هنوز پروفایلی نیست — کاربران آن را نمی‌گیرند",
   "node.profiles.noneBody": "پروفایل یعنی تنظیمات یک پروتکل. یکی را اینجا بگذار تا کاربرانی که گروهشان آن را دارد، این نود را در اشتراکشان بگیرند.",
   "node.profiles.port": "پورت",
@@ -5389,6 +5393,7 @@ export const tr: typeof en = {
   "node.f.engines": "Motorlar",
   "node.profiles.count": "Bu düğümde {n} profil",
   "node.profiles.add": "Profil ekle",
+  "node.profiles.ownerOnly": "Bir düğümdeki profilleri yalnızca sahip ekleyebilir, değiştirebilir veya kaldırabilir.",
   "node.profiles.none": "{name} düğümünde henüz profil yok: kullanıcılar bu düğümü almaz",
   "node.profiles.noneBody": "Profil, bir protokolün ayarlarıdır. Buraya bir tane dağıt; grubunda bu profil olan kullanıcılar bu düğümü aboneliklerinde alır.",
   "node.profiles.port": "Port",

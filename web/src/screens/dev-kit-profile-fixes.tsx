@@ -164,6 +164,11 @@ export function ProfileFixesKit() {
           <ProfilesTab data={tab([inbound({}), failedTg, vlessOk, vlessSite])} />
         </Mock>
       </Demo>
+      <Demo shot="profile-fixes-node-tab-helper" title="Profile fixes: the node's Profiles tab for a helper — rows readable, only “Restart” (the helper's), one quiet line instead of the owner's buttons">
+        <Mock fill={[...as(Role.HELPER), ...fill]}>
+          <ProfilesTab data={tab([inbound({}), failedTg, vlessOk])} />
+        </Mock>
+      </Demo>
     </div>
   );
 }

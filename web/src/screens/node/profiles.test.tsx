@@ -10,6 +10,7 @@ import { DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { PrepareAwgOutcome } from "@/gen/mistgate/admin/v1/node_pb";
 import { ProfilesTab } from "./profiles";
 
+let role = 1; // Role.OWNER
 const getNodeConnections = vi.fn();
 const listProfiles = vi.fn();
 const createInbound = vi.fn();
@@ -40,7 +41,7 @@ vi.mock("@/lib/api", () => ({
   },
   groups: { listGroups: (...a: unknown[]) => listGroups(...a), updateGroup: (...a: unknown[]) => updateGroup(...a) },
   health: { getDoctor: (...a: unknown[]) => getDoctor(...a) },
-  auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role: 1 } }) },
+  auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   fleet: {},
   users: {},
   assetUrl: (p: string) => p,
@@ -62,6 +63,7 @@ beforeAll(() => {
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
+  role = 1;
   updateNode.mockResolvedValue({});
   createInbound.mockResolvedValue({});
   updateInbound.mockResolvedValue({});
@@ -104,6 +106,7 @@ async function mount(d: never, props: { addProfile?: string; onAddClosed?: () =>
       </QueryClientProvider>,
     ),
   );
+  await settle(); // the signed-in admin's role arrives: the actions are the owner's
 }
 const settle = async () => {
   for (let i = 0; i < 4; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
@@ -801,5 +804,44 @@ describe("the domain of a VLESS server", () => {
   it("is not there for REALITY with another site, which has no certificate name", async () => {
     await edit(vless);
     expect(domain()).toBeUndefined();
+  });
+});
+
+describe("who may change the servers on a node", () => {
+  const hy = { id: "inb_1", profileId: "prf_1", profileName: "test", protocol: "hysteria2", state: InboundState.ACTIVE, port: 443, tlsServerName: "example.com", certNotAfterUnix: 0, certPinSha256: "", lastError: "" };
+  const failed = { ...hy, id: "inb_2", state: InboundState.FAILED, lastError: "listen udp :443: bind: address already in use" };
+  const labels = () => [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
+
+  it("the owner has every action", async () => {
+    await mount(data({ inbounds: [hy, failed] }));
+    expect(labels()).toEqual(expect.arrayContaining(["Add profile", "Edit", "Restart", "Remove", "Change port"]));
+    expect(text()).not.toContain("Only the owner can add");
+  });
+
+  it("a helper reads the rows and may only restart: RestartInbounds is theirs, the rest is the owner's; one line says so", async () => {
+    role = 2; // Role.HELPER
+    await mount(data({ inbounds: [hy, failed] }));
+    await settle();
+    expect(labels()).toContain("Restart");
+    for (const gone of ["Add profile", "Edit", "Remove", "Change port"]) expect(labels()).not.toContain(gone);
+    expect(text().split("Only the owner can add, change or remove profiles on a node.").length - 1).toBe(1);
+    expect(text()).toContain("Port udp/443 is taken by another program");
+  });
+
+  it("an observer has no action at all", async () => {
+    role = 3; // Role.READONLY
+    await mount(data({ inbounds: [hy] }));
+    await settle();
+    expect(labels()).toEqual([]);
+    expect(text()).toContain("Only the owner can add");
+  });
+
+  it("with no server on the node a non-owner gets the reason instead of 'Add profile', and the dialog does not open for the profile page's request", async () => {
+    role = 2;
+    await mount(data(), { addProfile: "prf_1" });
+    await settle();
+    expect(labels()).not.toContain("Add profile");
+    expect(text()).toContain("Only the owner can add, change or remove profiles on a node.");
+    expect(document.querySelector("[role=dialog]")).toBeNull();
   });
 });
