@@ -23,12 +23,17 @@ const (
 // this version), then the entry's agent, then the exit's. An agent that has not connected has no capabilities on record and counts
 // as old.
 func reverseBlocked(l store.RelayLink) string {
+	return reverseBlockedOf(l.Network, l.ViaNodeCaps, l.ExitNodeCaps)
+}
+
+// reverseBlockedOf is the same for a server not yet relayed: its network and the capabilities of the two agents.
+func reverseBlockedOf(network string, entryCaps, exitCaps []string) string {
 	switch {
-	case l.Network != "tcp":
+	case network != "tcp":
 		return reverseBlockedUDP
-	case !slices.Contains(l.ViaNodeCaps, plugin.CapRelayReverse):
+	case !slices.Contains(entryCaps, plugin.CapRelayReverse):
 		return reverseBlockedEntryOld
-	case !slices.Contains(l.ExitNodeCaps, plugin.CapRelayReverse):
+	case !slices.Contains(exitCaps, plugin.CapRelayReverse):
 		return reverseBlockedExitOld
 	}
 	return ""
@@ -44,5 +49,14 @@ func fillRelayMode(out *adminv1.Relay, l store.RelayLink) {
 	out.ReverseBlocked = reverseBlocked(l)
 	if b, ok := l.Bridge(); ok {
 		out.Bridge = &adminv1.RelayBridge{Connected: b.Connected, Conns: b.Conns, RttMs: b.RTTMS, SinceUnix: b.SinceUnix, Error: b.Error}
+		// How full the bridge is: the people the entry carries now, the connections the exit was asked to hold (2, or 4), what
+		// that pool carries at most and whether the bridge is nearly full. Of the pair, not of this relay: every relay of the
+		// entry and the exit shows the same (the entry's report is per exit).
+		out.Bridge.Pool = max(b.Pool, store.BridgePoolMin)
+		out.Bridge.Capacity = store.BridgeCapacity(out.Bridge.Pool)
+		if b.Entry != nil {
+			out.Bridge.Clients = b.Entry.Clients
+		}
+		out.Bridge.NearFull = store.BridgeNearFull(out.Bridge.Clients, out.Bridge.Pool)
 	}
 }

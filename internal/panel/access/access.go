@@ -99,8 +99,11 @@ type Service struct {
 
 	// relayMu makes "check the entry's ports, then write the relay" one step in this process (relay_rpc.go); the unique keys
 	// of the relay table keep several panels apart. relayGate decides whether a relay may be switched on.
-	relayMu   sync.Mutex
-	relayGate func(context.Context, store.RelayLink) error
+	relayMu sync.Mutex
+	// controlling holds the relays the mode controller is deciding now: a second call for the same relay (the next report, the next
+	// round) is dropped, not queued, because it would decide from the same state, and the proof it may run takes a minute.
+	controlling sync.Map
+	relayGate   func(context.Context, store.RelayLink) error
 	// relaySettleFn follows the switch on (relaySettle); relayWait and relayPoll are how long it waits for the entry's report
 	// and how often it looks; relayHints is the source of the candidates' hints (SetRelayHints).
 	relaySettleFn func(context.Context, store.RelayLink) error

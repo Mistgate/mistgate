@@ -713,6 +713,10 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 				l: plugin.Listen{Network: r.Network, Port: r.Port}})
 		}
 	}
+	if n, err := s.st.Node(ctx, nodeID); err == nil && n.BridgePort != 0 {
+		listens = append(listens, nodeListen{profile: "reverse relay bridge", protocol: "bridge", enabled: true,
+			l: plugin.Listen{Network: "tcp", Port: n.BridgePort}})
+	}
 	return listens, profiles, nil
 }
 

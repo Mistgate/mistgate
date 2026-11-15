@@ -27,11 +27,12 @@ func requestedRelayStages(m *adminv1.CheckRelayRequest) []string {
 // exitReachHintAge): the exit's TLS probe of the entry's own site on TCP 443. "no_data" when none ran, or the stage could not
 // say (the exit's agent too old, no site on the entry, a refused connection: nothing listens there, the exit may still reach the
 // host).
-func exitReachHint(links []store.RelayLink, exitID string, now time.Time) *adminv1.RelayReachHint {
+func exitReachHint(links []store.RelayLink, exitID string, endpointPort uint16, now time.Time) *adminv1.RelayReachHint {
 	var newest store.RelayStage
 	for _, l := range links {
 		c, ok := l.Check()
-		if !ok || l.ExitNodeID != exitID || c.ReverseReach.At <= newest.At {
+		if !ok || l.ExitNodeID != exitID || c.ReverseReach.At <= newest.At || c.ReverseReach.Port != 0 && c.ReverseReach.Port != endpointPort ||
+			c.ReverseReach.Port == 0 && endpointPort != 443 {
 			continue
 		}
 		newest = c.ReverseReach
