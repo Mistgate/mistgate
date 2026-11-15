@@ -309,7 +309,7 @@ export default function DevKit() {
   if (which === "halo") return <HaloKit />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit }[which];
+  const only = { "profile-fixes": ProfileFixesKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit }[which];
   if (only) {
     const Kit = only;
     return (
