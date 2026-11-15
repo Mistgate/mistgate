@@ -19,6 +19,8 @@ let params: Record<string, string> = {};
 let search: Record<string, string> = {};
 let profileProtocol = "hysteria2";
 let role = Role.OWNER;
+let savedElsewhere = false; // the profile was saved from another window: version 2, port 8443
+let qc: QueryClient;
 
 // the plugin's schema with the domain field (the trimmed fixture has none)
 const schema = JSON.stringify({ ...JSON.parse(hy2), properties: { ...JSON.parse(hy2).properties, sni: { type: "string", title: "SNI", "x-group": "basics", "x-order": 30, "x-critical": true } } });
@@ -58,8 +60,8 @@ vi.mock("@/lib/api", async (orig) => ({
       Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Subscription link · URI list", formats: formatsOf(r) }),
     getProfile: () =>
       Promise.resolve({
-        profile: { id: "p_old", name: "hy2 · 443", protocol: profileProtocol, version: 1, nodeCount: 2, userCount: 12, summary: "", warnings: [] },
-        settingsJson: defaults,
+        profile: { id: "p_old", name: "hy2 · 443", protocol: profileProtocol, version: savedElsewhere ? 2 : 1, nodeCount: 2, userCount: 12, summary: "", warnings: [] },
+        settingsJson: savedElsewhere ? defaults.replace('"port":443', '"port":8443') : defaults,
         inbounds: [],
       }),
     createProfile: (...a: unknown[]) => createProfile(...a),
@@ -113,6 +115,7 @@ beforeEach(() => {
   search = {};
   profileProtocol = "hysteria2";
   role = Role.OWNER;
+  savedElsewhere = false;
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -125,7 +128,7 @@ async function mount() {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
@@ -180,6 +183,50 @@ describe("who may change a profile", () => {
     expect(text()).toContain("Only the owner can change profiles.");
     expect(text()).not.toContain("Hysteria2");
     expect(button("Back to profiles")).toBeDefined();
+  });
+});
+
+describe("a profile saved in another window while this one is being edited", () => {
+  it("keeps what was typed, says the profile changed, and takes the saved one only on Reload", async () => {
+    params = { id: "p_old" };
+    await mount();
+    await type(portField(), "9443");
+    savedElsewhere = true;
+    await act(async () => void (await qc.invalidateQueries({ queryKey: ["profiles"] })));
+    await settle();
+    expect(portField().value).toBe("9443");
+    expect(text()).toContain("This profile was changed somewhere else");
+    await click(button("Reload"));
+    await settle();
+    expect(portField().value).toBe("8443");
+    expect(text()).not.toContain("This profile was changed somewhere else");
+  });
+
+  it("does not hold back its own save: the form takes the version this window saved", async () => {
+    params = { id: "p_old" };
+    updateProfile.mockImplementation(() => {
+      savedElsewhere = true; // the server now holds version 2 with the typed port
+      return Promise.resolve({});
+    });
+    await mount();
+    await type(portField(), "8443");
+    await click(button("Save"));
+    await settle();
+    await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim() === "Apply changes"));
+    await settle();
+    expect(updateProfile).toHaveBeenCalled();
+    expect(text()).not.toContain("This profile was changed somewhere else");
+    expect(button("Save")).toBeUndefined(); // no changes left: the save bar is gone
+    expect(portField().value).toBe("8443");
+  });
+
+  it("shows the saved profile at once when nothing was typed", async () => {
+    params = { id: "p_old" };
+    await mount();
+    savedElsewhere = true;
+    await act(async () => void (await qc.invalidateQueries({ queryKey: ["profiles"] })));
+    await settle();
+    expect(portField().value).toBe("8443");
   });
 });
 

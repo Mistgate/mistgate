@@ -221,14 +221,31 @@ function NewEditor({
   );
 }
 
+/** What a form on screen was drawn from: one saved version of a profile. */
+type Saved = { key: string; info: ProtocolInfo; profile: ProfileSummary; inbounds: Inbound[]; initial: { name: string; settingsJson: string } };
+
 function EditProfile({ id }: { id: string }) {
   const t = useTx();
   const go = useGo();
+  const qc = useQueryClient();
   const protocols = useQuery(protocolsQuery);
   const q = useQuery({
     queryKey: ["profiles", "detail", id],
     queryFn: ({ signal }) => profiles.getProfile({ profileId: id }, { signal }),
   });
+  // The form starts from what the server holds and is redrawn when the saved version (or name) changes, but not under
+  // someone who is typing: a version saved in another window waits behind "Reload" while the open form holds changes.
+  const [edits, setEdits] = useState(0);
+  const [shown, setShown] = useState<Saved | undefined>();
+  const profile = q.data?.profile;
+  const info = profile && protocols.data?.find((p) => p.id === profile.protocol);
+  const live: Saved | undefined = q.data && profile && info ? { key: `${profile.id}:${profile.version}:${profile.name}`, info, profile, inbounds: q.data.inbounds, initial: { name: profile.name, settingsJson: q.data.settingsJson } } : undefined;
+  if (live && (!shown || (shown.key !== live.key && (edits === 0 || shown.profile.id !== live.profile.id)))) setShown(live);
+  const reload = () => {
+    setEdits(0);
+    if (live) setShown(live);
+    void qc.invalidateQueries({ queryKey: ["profiles"] });
+  };
   if (q.isPending || protocols.isPending) return <Pending />;
   if (q.isError) {
     if (isCode(q.error, Code.NotFound)) {
@@ -248,19 +265,9 @@ function EditProfile({ id }: { id: string }) {
     return <QueryError error={q.error} onRetry={() => void q.refetch()} />;
   }
   if (protocols.isError) return <QueryError error={protocols.error} onRetry={() => void protocols.refetch()} />;
-  const profile = q.data.profile!;
-  const info = protocols.data.find((p) => p.id === profile.protocol);
-  if (!info) return <EmptyState title={t("profiles.notFound")}>{profile.protocol}</EmptyState>;
-  // remounted when the saved version (or name) changes, so the form always starts from what the server holds
-  return (
-    <Editor
-      key={`${profile.id}:${profile.version}:${profile.name}`}
-      info={info}
-      profile={profile}
-      inbounds={q.data.inbounds}
-      initial={{ name: profile.name, settingsJson: q.data.settingsJson }}
-    />
-  );
+  if (!info) return <EmptyState title={t("profiles.notFound")}>{q.data.profile!.protocol}</EmptyState>;
+  const on = shown ?? live!;
+  return <Editor key={on.key} info={on.info} profile={on.profile} inbounds={on.inbounds} initial={on.initial} behind={!!live && live.key !== on.key} onEdits={setEdits} onReload={reload} />;
 }
 
 type EditorProps = {
@@ -279,9 +286,13 @@ type EditorProps = {
   /** New profile: whether the form holds something now, and that the profile is made (leaving then asks nothing). */
   onDirty?: (dirty: boolean) => void;
   onCreated?: () => void;
+  /** Saved profile: how many changes the form holds, and that another version was saved meanwhile (Reload takes it). */
+  onEdits?: (count: number) => void;
+  behind?: boolean;
+  onReload?: () => void;
 };
 
-function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, onDraft, onChangeProtocol, onBack, onDirty, onCreated }: EditorProps) {
+function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, onDraft, onChangeProtocol, onBack, onDirty, onCreated, onEdits, behind, onReload }: EditorProps) {
   const t = useTx();
   const toast = useToast();
   const go = useGo();
@@ -333,6 +344,9 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
   useEffect(() => {
     onDirty?.(dirty);
   }, [onDirty, dirty]);
+  useEffect(() => {
+    onEdits?.(count);
+  }, [onEdits, count]);
   const latest = useRef({ settings, typed, dirty, onDraft });
   useEffect(() => {
     latest.current = { settings, typed, dirty, onDraft };
@@ -426,6 +440,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
       }
       await profiles.updateProfile(request);
       setImpactOpen(false);
+      onEdits?.(0); // saved: the form takes the new version when it arrives
       await qc.invalidateQueries({ queryKey: ["profiles"] });
       toast(profile.nodeCount > 0 ? t.n("profiles.savedRollout", profile.nodeCount) : t("profiles.saved"));
     } catch (e) {
@@ -534,10 +549,10 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
 
       {view && <Notice tone="quiet">{t("profiles.ownerOnly")}</Notice>}
 
-      {notice === "stale" && (
+      {(notice === "stale" || behind) && (
         <Notice tone="danger">
           {t("profiles.stale")}
-          <Button className="ms-3" size="sm" onClick={() => void qc.invalidateQueries({ queryKey: ["profiles"] })}>
+          <Button className="ms-3" size="sm" onClick={onReload ?? (() => void qc.invalidateQueries({ queryKey: ["profiles"] }))}>
             {t("profiles.reload")}
           </Button>
         </Notice>
