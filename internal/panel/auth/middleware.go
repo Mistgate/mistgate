@@ -83,6 +83,15 @@ func AdminFrom(ctx context.Context) (store.Admin, bool) {
 	return a, ok
 }
 
+// ActorID returns the stable identifier to store in an audit row.
+func ActorID(ctx context.Context) string {
+	a, ok := AdminFrom(ctx)
+	if !ok {
+		return "anonymous"
+	}
+	return a.ID
+}
+
 // ActorLabel names the caller of an admin RPC for an event the admin reads ("who pressed it"): the admin's display
 // name, else the id (an API token is "token:<id>"), "" when the call has no admin.
 func ActorLabel(ctx context.Context) string {

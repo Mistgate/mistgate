@@ -23,3 +23,13 @@ func TestActorLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestActorID(t *testing.T) {
+	ctx := context.WithValue(context.Background(), adminKey{}, store.Admin{ID: "adm_alice", DisplayName: "alice"})
+	if got := ActorID(ctx); got != "adm_alice" {
+		t.Fatalf("ActorID = %q, want stable admin id", got)
+	}
+	if got := ActorID(context.Background()); got != "anonymous" {
+		t.Fatalf("ActorID without an admin = %q, want anonymous", got)
+	}
+}

@@ -224,12 +224,49 @@ func assertDownloadAudit(t *testing.T, s *Service, filename string, size int64, 
 		if fields["filename"] != filename || fields["encryption"] != encryption || fields["completed"] != true || fields["size_bytes"] != float64(size) || row.Result != "ok" {
 			t.Errorf("download audit fields = %v", fields)
 		}
+		if row.Actor != "owner" {
+			t.Errorf("download audit actor = %q, want stable id owner", row.Actor)
+		}
 		if passphrase != "" && strings.Contains(row.Params, passphrase) {
 			t.Error("audit event contains the passphrase")
 		}
 		return
 	}
 	t.Fatal("backup.download audit event was not recorded")
+}
+
+func TestBackupAuditWritersStoreStableActorIDs(t *testing.T) {
+	s, _, _ := newTestService(t)
+	ctx := auth.WithAdmin(context.Background(), store.Admin{ID: "adm_alice", DisplayName: "alice", Role: store.RoleOwner})
+	if _, err := s.st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES (?, ?, ?, ?, ?)`,
+		"adm_alice", "alice", store.RoleOwner, []byte("alice-handle"), time.Now().Unix()); err != nil {
+		t.Fatal(err)
+	}
+	s.auditDownload(ctx, map[string]any{"filename": "backup"}, true)
+	s.audit(ctx, "backup.test", map[string]string{})
+	if err := s.auditEvent(ctx, "backup.test_restore", map[string]string{}); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := s.st.ListAudit(ctx, "", 0, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"backup.download": false, "backup.test": false, "backup.test_restore": false}
+	for _, row := range rows {
+		if _, ok := want[row.Action]; !ok {
+			continue
+		}
+		if row.Actor != "adm_alice" || row.ActorName != "alice" {
+			t.Errorf("%s actor = %q (%q), want stable id and resolved name", row.Action, row.Actor, row.ActorName)
+		}
+		want[row.Action] = true
+	}
+	for action, found := range want {
+		if !found {
+			t.Errorf("missing audit event %s", action)
+		}
+	}
 }
 
 type cancelAfterFirstWrite struct {

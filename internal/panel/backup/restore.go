@@ -923,5 +923,5 @@ func (s *Service) auditEvent(ctx context.Context, action string, params any) err
 	if ip.IsValid() {
 		ipText = ip.String()
 	}
-	return s.st.Audit(ctx, time.Now(), store.AuditEntry{Actor: auth.ActorLabel(ctx), Action: action, Params: string(encoded), Result: "ok", IP: ipText})
+	return s.st.Audit(ctx, time.Now(), store.AuditEntry{Actor: auth.ActorID(ctx), Action: action, Params: string(encoded), Result: "ok", IP: ipText})
 }

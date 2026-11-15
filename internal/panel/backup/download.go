@@ -314,7 +314,7 @@ func (s *Service) auditDownload(ctx context.Context, fields map[string]any, comp
 		ipText = ip.String()
 	}
 	if err := s.st.Audit(ctx, time.Now(), store.AuditEntry{
-		Actor: auth.ActorLabel(ctx), Action: "backup.download", Params: string(params), Result: result, IP: ipText,
+		Actor: auth.ActorID(ctx), Action: "backup.download", Params: string(params), Result: result, IP: ipText,
 	}); err != nil {
 		s.log.Warn("write backup download audit event failed", "code", "audit_unavailable")
 	}
