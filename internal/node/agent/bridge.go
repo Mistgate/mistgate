@@ -247,6 +247,7 @@ func (a *Agent) bridgeResults() []*pb.BridgeState {
 			out := entry(state.PeerNodeID)
 			out.Conns += state.Conns
 			out.Streams += state.Streams
+			out.ClientsNow += state.Clients
 			out.BytesIn += state.BytesIn
 			out.BytesOut += state.BytesOut
 			if !state.Since.IsZero() && (out.SinceUnix == 0 || state.Since.Unix() < out.SinceUnix) {

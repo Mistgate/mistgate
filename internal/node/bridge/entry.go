@@ -68,6 +68,9 @@ type PeerState struct {
 	BytesIn    uint64
 	BytesOut   uint64
 	Error      string
+	// Clients is how many people the bridge carries now: pairs a person's connection was handed to and that have not ended.
+	// Streams only counts up, and the waiting pairs are not people.
+	Clients uint32
 }
 
 type RelayCounters struct {
@@ -1251,8 +1254,14 @@ func (e *Entry) States() []PeerState {
 		out = append(out, state)
 	}
 	for id, peer := range e.peers {
+		clients := uint32(0)
+		for _, pair := range peer.pairs {
+			if pair.conn != nil && !pair.finished {
+				clients++
+			}
+		}
 		out = append(out, PeerState{PeerNodeID: id, Conns: uint32(len(peer.connections)), Since: peer.since,
-			Streams: peer.streams, BytesIn: peer.bytesIn, BytesOut: peer.bytesOut, Error: peer.lastError})
+			Streams: peer.streams, BytesIn: peer.bytesIn, BytesOut: peer.bytesOut, Error: peer.lastError, Clients: clients})
 	}
 	e.mu.RUnlock()
 	sort.Slice(out, func(i, j int) bool { return out[i].PeerNodeID < out[j].PeerNodeID })

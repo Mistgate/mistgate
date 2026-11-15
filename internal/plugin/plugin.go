@@ -73,6 +73,16 @@ type RelayForward struct {
 // sends those fields only to a stream that listed it; a pair of agents needs it at both ends for a reverse relay.
 const CapRelayReverse = "relay-reverse/1"
 
+// BridgeHTTP2Streams is MAX_CONCURRENT_STREAMS of the bridge's site (the Go server's 250; it is part of the site's look, so it is
+// not raised), BridgePendingPairs the waiting pairs an exit keeps open on each connection (2 streams each), and BridgePeoplePerConn
+// what is left for people, 2 streams a person: the most people one TLS connection of the bridge carries. A burst may take more
+// waiting pairs for a moment; the figure is the steady one.
+const (
+	BridgeHTTP2Streams  = 250
+	BridgePendingPairs  = 4
+	BridgePeoplePerConn = (BridgeHTTP2Streams - 2*BridgePendingPairs) / 2
+)
+
 // BridgeServe is the entry side of the bridge (agent.v1.BridgeServe): where the exits call and which of them are accepted.
 type BridgeServe struct {
 	Port        uint16 // the TCP port of the entry's site; 0 = 443 of the node's own site

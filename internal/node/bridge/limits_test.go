@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 func TestBridgeEntryResourceLimits(t *testing.T) {
@@ -94,4 +96,19 @@ func TestBridgeEntryResourceLimits(t *testing.T) {
 
 func testPair(id string) *bridgePair {
 	return &bridgePair{key: pairKey{id: id}, done: make(chan struct{})}
+}
+
+// The panel tells the owner how many people a bridge carries from plugin.BridgePeoplePerConn; it has to follow the agent's own
+// waiting-pair count, or the figure on the screen is a different bridge's.
+func TestPanelCapacityFigureFollowsTheWaitingPairs(t *testing.T) {
+	if plugin.BridgePendingPairs != PendingWorkersPerConn {
+		t.Fatalf("plugin.BridgePendingPairs = %d, the dialer keeps %d waiting pairs a connection", plugin.BridgePendingPairs, PendingWorkersPerConn)
+	}
+	want := (plugin.BridgeHTTP2Streams - 2*PendingWorkersPerConn) / 2
+	if plugin.BridgePeoplePerConn != want {
+		t.Fatalf("people a connection carries = %d, want %d", plugin.BridgePeoplePerConn, want)
+	}
+	if want != 121 {
+		t.Fatalf("the figure moved to %d: the screens and the notes say about 120 people a connection", want)
+	}
 }

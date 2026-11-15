@@ -629,3 +629,45 @@ func isTCPReset(err error) bool {
 	message := strings.ToLower(fmt.Sprint(err))
 	return strings.Contains(message, "connection reset") || strings.Contains(message, "forcibly closed by the remote host")
 }
+
+// The entry says how many people it carries RIGHT NOW (PeerState.Clients), which Streams (a total since the start) cannot: two
+// sessions open make 2, and a session that ends takes one off while the waiting pairs the exit keeps open never count.
+func TestEntryCountsPeopleCarriedNow(t *testing.T) {
+	pki := newTestPKI(t)
+	target := startEchoTarget(t, pki.serverCert)
+	entry, dialer, _, relayPort := newBridgeFixture(t, target.port, pki)
+	waitFor(t, 10*time.Second, func() bool {
+		states := dialer.States()
+		return len(states) == 1 && states[0].Conns == 2
+	}, "dialer did not connect both TLS pool connections")
+	clients := func() uint32 {
+		for _, s := range entry.States() {
+			if s.PeerNodeID == "nod_de1" {
+				return s.Clients
+			}
+		}
+		return 0
+	}
+	if got := clients(); got != 0 {
+		t.Fatalf("clients with nobody connected = %d (the waiting pairs are not people)", got)
+	}
+	open := func() *tls.Conn {
+		raw, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(int(relayPort))), 3*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := tls.Client(raw, &tls.Config{RootCAs: pki.roots, ServerName: "msk1.example", MinVersion: tls.VersionTLS13})
+		if err := c.Handshake(); err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	a, b := open(), open()
+	defer b.Close()
+	waitFor(t, 5*time.Second, func() bool { return clients() == 2 }, "two people were not counted: "+fmt.Sprint(entry.States()))
+	a.Close()
+	waitFor(t, 10*time.Second, func() bool { return clients() == 1 }, "a person who left was still counted: "+fmt.Sprint(entry.States()))
+	if streams := entry.States()[0].Streams; streams < 2 {
+		t.Fatalf("streams = %d, the total since the start must not fall with the people who leave", streams)
+	}
+}
