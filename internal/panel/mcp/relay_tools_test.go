@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -233,10 +234,19 @@ type relayStageResult struct {
 }
 
 type relayResult struct {
-	ID            string `json:"id"`
-	Protocol      string `json:"protocol"`
-	EntryNode     string `json:"entry_node"`
-	ExitNode      string `json:"exit_node"`
+	ID             string `json:"id"`
+	Protocol       string `json:"protocol"`
+	EntryNode      string `json:"entry_node"`
+	ExitNode       string `json:"exit_node"`
+	Mode           string `json:"mode"`
+	ActiveMode     string `json:"active_mode"`
+	ModeReason     string `json:"mode_reason"`
+	ReverseBlocked string `json:"reverse_blocked"`
+	Bridge         *struct {
+		Connected bool   `json:"connected"`
+		Conns     uint32 `json:"conns"`
+		RTTMS     uint32 `json:"rtt_ms"`
+	} `json:"bridge"`
 	Port          uint32 `json:"port"`
 	ExitPort      uint32 `json:"exit_port"`
 	Enabled       bool   `json:"enabled"`
@@ -250,6 +260,7 @@ type relayResult struct {
 		Path         *relayStageResult `json:"path"`
 		ReverseReach *relayStageResult `json:"reverse_reach"`
 		ReverseSpeed *relayStageResult `json:"reverse_speed"`
+		Bridge       *relayStageResult `json:"bridge"`
 	} `json:"last_check"`
 }
 
@@ -338,6 +349,71 @@ func TestRelayReadsNameNoAddress(t *testing.T) {
 	if calls := relayCalls(e); len(calls) != 0 {
 		t.Errorf("reads changed or checked something: %v", calls)
 	}
+}
+
+func TestRelayListShowsModeBridgeAndBridgeStage(t *testing.T) {
+	e := newTestEnv(t)
+	r := e.w.relay.find("rly_1")
+	r.Mode, r.ActiveMode, r.ModeReason = "auto", "reverse", "leg_failed"
+	r.Bridge = &adminv1.RelayBridge{Connected: true, Conns: 2, RttMs: 34}
+	r.Check.Bridge = &adminv1.RelayStage{Status: "ok", SenderName: "de1", AtUnix: 1790842000}
+	_, secret := e.token(ProfileReadonly)
+	out := mustOK(t, e.session(secret), "relays_list", map[string]any{})
+	rv := decode[struct {
+		Relays []relayResult `json:"relays"`
+	}](t, out).Relays[0]
+	if rv.Mode != "auto" || rv.ActiveMode != "reverse" || rv.ModeReason != "leg_failed" || rv.Bridge == nil ||
+		!rv.Bridge.Connected || rv.Bridge.Conns != 2 || rv.Bridge.RTTMS != 34 || rv.Check == nil || rv.Check.Bridge == nil || rv.Check.Bridge.Status != "ok" {
+		t.Fatalf("relay view omitted reverse state: %+v", rv)
+	}
+}
+
+func TestRelayListShowsBridgeStageBeforeTheFirstFullCheck(t *testing.T) {
+	r := &adminv1.Relay{Check: &adminv1.RelayCheck{Bridge: &adminv1.RelayStage{Status: "fail", Code: "disconnected", AtUnix: 1790842000}}}
+	v := relayView(r)
+	if v.Check == nil || v.Check.Bridge == nil || v.Check.Bridge.Status != "fail" || v.Check.Bridge.Code != "disconnected" {
+		t.Fatalf("stage-only bridge check was hidden: %+v", v)
+	}
+	if text := relayCheckText(r); !strings.Contains(text, "bridge fail (disconnected)") {
+		t.Fatalf("stage-only bridge check text = %q", text)
+	}
+}
+
+func TestRelayPlanReportsReverseModeFacts(t *testing.T) {
+	t.Run("stale exit reach hint", func(t *testing.T) {
+		e := newTestEnv(t)
+		e.w.relay.cands[1].ExitReachesEntry = &adminv1.RelayReachHint{Verdict: "reach", Source: "exit_probe", AtUnix: time.Now().Add(-16 * time.Minute).Unix()}
+		_, secret := e.token(ProfileAdmin)
+		p := planOf(t, e.session(secret), "relay", map[string]any{"action": "create", "node": "nl1", "inbound_id": "inb_3", "mode": "reverse"})
+		if factOf(t, p, "mode").Value != "reverse" || !strings.HasPrefix(factOf(t, p, "reverse_reach").Value, "stale") {
+			t.Fatalf("reverse create facts: %+v", p.Facts)
+		}
+	})
+	t.Run("UDP cannot use the bridge", func(t *testing.T) {
+		e := newTestEnv(t)
+		e.w.relay.cands[3].ReverseBlocked = "udp" // the panel's word for it, from the candidate list
+		_, secret := e.token(ProfileAdmin)
+		p := planOf(t, e.session(secret), "relay", map[string]any{"action": "create", "node": "nl1", "inbound_id": "inb_5", "mode": "reverse"})
+		if factOf(t, p, "mode").Value != "reverse" || !strings.Contains(factOf(t, p, "reverse_bridge").Value, "UDP cannot use the bridge") {
+			t.Fatalf("UDP reverse facts: %+v", p.Facts)
+		}
+	})
+	t.Run("an old agent and stale stage", func(t *testing.T) {
+		e := newTestEnv(t)
+		r := e.w.relay.find("rly_2")
+		r.ReverseBlocked = "entry_agent_old"
+		r.Check = &adminv1.RelayCheck{ReverseReach: &adminv1.RelayStage{Status: "ok", AtUnix: time.Now().Add(-16 * time.Minute).Unix()}}
+		_, secret := e.token(ProfileAdmin)
+		p := planOf(t, e.session(secret), "relay", map[string]any{"action": "enable", "relay_id": "rly_2", "mode": "reverse"})
+		if !strings.Contains(factOf(t, p, "reverse_bridge").Value, "entry's agent is too old") {
+			t.Fatalf("reverse enable facts: %+v", p.Facts)
+		}
+		for _, f := range p.Facts {
+			if f.Key == "reverse_reach" {
+				t.Fatalf("a bridge that cannot be had was given a reach: %+v", p.Facts)
+			}
+		}
+	})
 }
 
 func TestRelayListPagesContinueWithoutDroppingRelays(t *testing.T) {

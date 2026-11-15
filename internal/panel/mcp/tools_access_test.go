@@ -359,6 +359,29 @@ func TestAccessWorkingRelayIsAWay(t *testing.T) {
 	}
 }
 
+func TestAccessWorkingReverseRelayIsAWay(t *testing.T) {
+	f := newFx().node("be", "BE", "online").node("de1", "DE", "online").group("kids", "prf_vless").users("kids", 2, 1699990000)
+	v := f.inbound("be", "prf_vless", "vless", 443)
+	f.cc("be", "blocked", func(c *accCountry) {
+		c.TSPU = ports(443, "blocked")
+		c.Vantages = []accVantage{vant("MTS", "home", "dark", false)}
+	})
+	f.cc("de1", "ok", func(c *accCountry) { c.Vantages = []accVantage{vant("MTS", "home", "reach", true)} })
+	f.in.Relays = []accRelay{{ID: "rly_reverse", EntryID: "nod_de1", ExitID: "nod_be", InboundID: v, State: "active", Enabled: true,
+		ExitLive: true, AgentSupported: true, Mode: "auto", ActiveMode: "reverse", ReverseSupported: true,
+		BridgeOK: true, BridgeAtUnix: f.in.NowUnix, PathOK: true, MonitorAtUnix: f.in.NowUnix}}
+	r := buildAccess(f.in)
+	if accFinding(r, "group_without_working_way", "") != nil || accFinding(r, "relay_down", "") != nil || rec(r, "add_relay") != nil {
+		t.Fatalf("a healthy reverse relay was not treated as a way: findings=%+v recommendations=%+v", r.Findings, r.Recommendations)
+	}
+	f.in.Relays[0].BridgeOK = false
+	f.in.Relays[0].MonitorFails = 2
+	r = buildAccess(f.in)
+	if accFinding(r, "group_without_working_way", "") == nil || accFinding(r, "relay_down", "") == nil {
+		t.Fatalf("a reverse relay with a down bridge remained healthy: findings=%+v", r.Findings)
+	}
+}
+
 func TestAccessSameCountryEntryIsSkippedAndInlandEntryStaysFirst(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
