@@ -207,7 +207,7 @@ Neden böyle göründüğü:
 Başka bir web sunucusunun bu ana bilgisayarda 443 portuna sahip olması gerekiyorsa Mistgate onun arkasında çalışabilir:
 
 - Herkese açık dinleyiciyi loopback üzerinde TLS olmadan çalıştırın (`--listen 127.0.0.1:8080`, `--acme-domain` ve `--tls-cert` yok) ve `panel.example.com` için TLS'yi proxy'nin sonlandırmasına, Host başlığını ve yolu değiştirmeden iletmesine izin verin.
-- Hız sınırlarının, oturumların ve denetim günlüğünün gerçek istemci adresini `X-Forwarded-For` ya da `Forwarded` başlığından görmesi için `--trusted-proxy 127.0.0.1` ekleyin.
+- Hız sınırlarının, oturumların ve denetim günlüğünün gerçek istemci adresini `X-Forwarded-For` başlığından görmesi için `--trusted-proxy 127.0.0.1` ekleyin. Vekil bu başlığı kendisi ayarlamalı veya üzerine yazmalıdır, böylece istemci kendi adresini veremez; yalnızca `Forwarded` yazan bir vekil desteklenmez.
 - Düğüm ajanları TLS'yi panelin kendisinden ister. Onlara kendi dinleyicilerini verin ve adresini kurulum komutlarına koyun: `--agent-listen :8443 --agent-addr panel.example.com:8443`. Proxy o porta dokunmamalıdır.
 
 Ajan portu o zaman yalnızca gizli TLS adına yanıt veren ayrı bir porttur; paylaşılan 443 portunda ise kamuflaj sitesinin arkasına saklanır. Mümkünse yukarıdaki düz kurulumu tercih edin.

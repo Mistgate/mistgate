@@ -2,7 +2,6 @@ package auth
 
 import (
 	"bytes"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -45,7 +44,6 @@ func hdr(kv ...string) http.Header {
 func TestClientIP(t *testing.T) {
 	proxies, _ := ParseProxies([]string{"10.0.0.0/8", "127.0.0.1", "fd00::/8"})
 	tr := NewProxyTrust(proxies)
-	tr.log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	none := NewProxyTrust(nil)
 	for _, tc := range []struct {
 		name  string
@@ -65,14 +63,9 @@ func TestClientIP(t *testing.T) {
 		{"garbage in the chain: fall back to the peer", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5, unknown"), "10.0.0.1"},
 		{"empty header value", tr, "10.0.0.1:1", hdr("X-Forwarded-For", ""), "10.0.0.1"},
 		{"XFF with port and IPv4-mapped", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "[::ffff:203.0.113.5]:4711"), "203.0.113.5"},
-		{"Forwarded", tr, "10.0.0.1:1", hdr("Forwarded", `for=203.0.113.5;proto=https;by=10.0.0.1`), "203.0.113.5"},
-		{"Forwarded, quoted IPv6 with port, chain", tr, "10.0.0.1:1", hdr("Forwarded", `for=1.2.3.4, for="[2001:db8::7]:4711";proto=https, For=10.0.0.3`), "2001:db8::7"},
-		{"Forwarded obfuscated node", tr, "10.0.0.1:1", hdr("Forwarded", `for=_hidden`), "10.0.0.1"},
-		{"Forwarded element without for", tr, "10.0.0.1:1", hdr("Forwarded", `proto=https`), "10.0.0.1"},
+		{"Forwarded alone is ignored", tr, "10.0.0.1:1", hdr("Forwarded", `for=203.0.113.5;proto=https`), "10.0.0.1"},
 		{"both headers agree", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.5"), "203.0.113.5"},
-		{"both headers disagree: XFF wins", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.99"), "203.0.113.5"},
-		{"unparseable Forwarded does not hide XFF", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=unknown"), "203.0.113.5"},
-		{"Forwarded element without for does not hide XFF", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "proto=https"), "203.0.113.5"},
+		{"Forwarded cannot override XFF", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.99"), "203.0.113.5"},
 		{"IPv6 proxy", tr, "[fd00::1]:443", hdr("X-Forwarded-For", "2001:db8::9"), "2001:db8::9"},
 		{"IPv4-mapped peer", tr, "[::ffff:10.0.0.1]:443", hdr("X-Forwarded-For", "203.0.113.5"), "203.0.113.5"},
 		{"unparseable peer", tr, "garbage", hdr("X-Forwarded-For", "203.0.113.5"), ""},
@@ -98,22 +91,6 @@ func TestUntrustedForwardedHeaderWarningIsLoggedOnce(t *testing.T) {
 		}
 	}
 	if count := strings.Count(output.String(), "no trusted proxy is configured"); count != 1 {
-		t.Fatalf("warning count = %d, want one: %q", count, output.String())
-	}
-}
-
-func TestForwardedDisagreementWarningIsLoggedOnce(t *testing.T) {
-	forwardedDisagreementWarning.Store(false)
-	var output bytes.Buffer
-	trust := NewProxyTrust([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")})
-	trust.log = slog.New(slog.NewTextHandler(&output, nil))
-	for _, forwarded := range []string{"for=203.0.113.99", "for=unknown"} {
-		got := trust.ClientIP("10.0.0.1:1234", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", forwarded))
-		if got.String() != "203.0.113.5" {
-			t.Fatalf("X-Forwarded-For was not used: %v", got)
-		}
-	}
-	if count := strings.Count(output.String(), "trusted proxy headers disagree"); count != 1 {
 		t.Fatalf("warning count = %d, want one: %q", count, output.String())
 	}
 }
