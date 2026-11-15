@@ -14,16 +14,16 @@ func TestBridgeEntryResourceLimits(t *testing.T) {
 	peer := e.peer("nod_de1")
 	now := time.Now()
 
-	if MaxConnectionsPerExit < 2*MaxPoolSize {
-		t.Fatalf("exit connection limit = %d, want at least twice max pool %d", MaxConnectionsPerExit, MaxPoolSize)
+	if MaxPeopleConnsPerExit < 2*MaxPoolSize {
+		t.Fatalf("people connection limit = %d, want the pool and its draining connections (%d)", MaxPeopleConnsPerExit, 2*MaxPoolSize)
 	}
-	for i := 0; i < MaxConnectionsPerExit; i++ {
+	for i := 0; i < MaxPeopleConnsPerExit; i++ {
 		key := [32]byte{byte(i + 1)}
-		if code := e.acquireHalf(peer, key, now); code != "" {
+		if code := e.acquireHalf(peer, key, now, ""); code != "" {
 			t.Fatalf("connection %d: %s", i, code)
 		}
 	}
-	if code := e.acquireHalf(peer, [32]byte{MaxConnectionsPerExit + 1}, now); code != "connection_limit" {
+	if code := e.acquireHalf(peer, [32]byte{MaxConnectionsPerExit + 1}, now, ""); code != "connection_limit" {
 		t.Fatalf("connection limit error = %q", code)
 	}
 	for key := range peer.connections {
@@ -31,22 +31,22 @@ func TestBridgeEntryResourceLimits(t *testing.T) {
 	}
 
 	peer.active = MaxStreamsPerExit
-	_, _, code := e.joinPair(peer, pairKey{id: "limit-exit"}, pairDown)
+	_, _, code := e.joinPair(peer, pairKey{id: "limit-exit"}, pairDown, "")
 	if code != "" {
 		t.Fatalf("first half rejected before pair completion: %q", code)
 	}
-	_, _, code = e.joinPair(peer, pairKey{id: "limit-exit"}, pairUp)
+	_, _, code = e.joinPair(peer, pairKey{id: "limit-exit"}, pairUp, "")
 	if code != "stream_limit" {
 		t.Fatalf("per-exit stream limit error = %q", code)
 	}
 	peer.active = 0
 
 	e.totalStreams = MaxStreamsPerEntry
-	_, _, code = e.joinPair(peer, pairKey{id: "limit-entry"}, pairDown)
+	_, _, code = e.joinPair(peer, pairKey{id: "limit-entry"}, pairDown, "")
 	if code != "" {
 		t.Fatalf("entry limit first half = %q", code)
 	}
-	_, _, code = e.joinPair(peer, pairKey{id: "limit-entry"}, pairUp)
+	_, _, code = e.joinPair(peer, pairKey{id: "limit-entry"}, pairUp, "")
 	if code != "stream_limit" {
 		t.Fatalf("per-entry stream limit error = %q", code)
 	}
@@ -111,4 +111,94 @@ func TestPanelCapacityFigureFollowsTheWaitingPairs(t *testing.T) {
 	if want != 121 {
 		t.Fatalf("the figure moved to %d: the screens and the notes say about 120 people a connection", want)
 	}
+}
+
+// The control link and the people have separate connection budgets, and neither can use up the other's.
+func TestControlLinkAndPeopleKeepSeparateConnectionBudgets(t *testing.T) {
+	e := NewEntry()
+	defer e.Close()
+	peer := e.peer("nod_de1")
+	now := time.Now()
+
+	// People fill their whole budget: the control link still gets in, and only up to its own.
+	for i := 0; i < MaxPeopleConnsPerExit; i++ {
+		if code := e.acquireHalf(peer, [32]byte{1, byte(i)}, now, ""); code != "" {
+			t.Fatalf("people connection %d: %s", i, code)
+		}
+	}
+	if code := e.acquireHalf(peer, [32]byte{2, 0}, now, ""); code != "connection_limit" {
+		t.Fatalf("the people's limit = %q", code)
+	}
+	for i := 0; i < MaxPanelConnsPerExit; i++ {
+		if code := e.acquireHalf(peer, [32]byte{3, byte(i)}, now, StreamKindPanel); code != "" {
+			t.Fatalf("control connection %d is refused although people hold %d connections: %s", i, MaxPeopleConnsPerExit, code)
+		}
+	}
+	if code := e.acquireHalf(peer, [32]byte{3, 99}, now, StreamKindPanel); code != "control_limit" {
+		t.Fatalf("the control link's limit = %q", code)
+	}
+	if got := peerConns(e, "nod_de1"); got != MaxPeopleConnsPerExit {
+		t.Fatalf("the pool the panel reads counts %d connections, want the people's %d without the control link's", got, MaxPeopleConnsPerExit)
+	}
+
+	// The other way round: a control link in place does not take a person's connection.
+	e.releaseHalf(peer, [32]byte{1, 0})
+	if code := e.acquireHalf(peer, [32]byte{4, 0}, now, ""); code != "" {
+		t.Fatalf("a person's connection is refused while the control link is up: %s", code)
+	}
+
+	// A connection keeps the class of its first request.
+	if code := e.acquireHalf(peer, [32]byte{3, 0}, now, ""); code != "stream_kind_mismatch" {
+		t.Fatalf("a person's request on the control link's connection = %q", code)
+	}
+	if code := e.acquireHalf(peer, [32]byte{4, 0}, now, StreamKindPanel); code != "stream_kind_mismatch" {
+		t.Fatalf("a control request on a person's connection = %q", code)
+	}
+}
+
+// People can fill every stream slot of an exit and of the entry; the control link needs none and is not refused. And the
+// other way: it takes none from them.
+func TestControlLinkTakesNoStreamSlot(t *testing.T) {
+	e := NewEntry()
+	defer e.Close()
+	peer := e.peer("nod_de1")
+	peer.active = MaxStreamsPerExit
+	e.totalStreams = MaxStreamsPerEntry
+
+	key := pairKey{id: "control-link-slot"}
+	if _, _, code := e.joinPair(peer, key, pairDown, StreamKindPanel); code != "" {
+		t.Fatalf("first half: %q", code)
+	}
+	pair, paired, code := e.joinPair(peer, key, pairUp, StreamKindPanel)
+	if code != "" || !paired {
+		t.Fatalf("control link with every stream slot taken: paired %t, code %q", paired, code)
+	}
+	if peer.active != MaxStreamsPerExit || e.totalStreams != MaxStreamsPerEntry {
+		t.Fatalf("the control link took a stream slot: exit %d, entry %d", peer.active, e.totalStreams)
+	}
+	e.finishPair(pair, "closed", true)
+	if peer.active != MaxStreamsPerExit || e.totalStreams != MaxStreamsPerEntry {
+		t.Fatalf("ending the control link gave back a slot it never took: exit %d, entry %d", peer.active, e.totalStreams)
+	}
+
+	peer.active, e.totalStreams = MaxStreamsPerExit-1, MaxStreamsPerEntry-1
+	ctl := pairKey{id: "control-link-first"}
+	e.joinPair(peer, ctl, pairDown, StreamKindPanel)
+	e.joinPair(peer, ctl, pairUp, StreamKindPanel)
+	person := pairKey{id: "person-after-control"}
+	if _, _, code := e.joinPair(peer, person, pairDown, ""); code != "" {
+		t.Fatal(code)
+	}
+	if _, paired, code := e.joinPair(peer, person, pairUp, ""); code != "" || !paired {
+		t.Fatalf("a person is refused the last slot because a control link exists: paired %t, code %q", paired, code)
+	}
+}
+
+func peerConns(e *Entry, id string) int {
+	for _, s := range e.States() {
+		if s.PeerNodeID == id {
+			return int(s.Conns)
+		}
+	}
+	return -1
 }

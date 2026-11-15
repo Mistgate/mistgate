@@ -21,7 +21,10 @@ const (
 	ErrorHeader       = "X-Mistgate-Bridge-Error"
 	ProtocolHeader    = "X-Mistgate-Bridge-Version"
 	StreamHeader      = "X-Mistgate-Bridge-Stream"
+	StreamKindHeader  = "X-Mistgate-Bridge-Kind"
+	TargetHeader      = "X-Mistgate-Bridge-Target"
 	PairIDHeader      = "X-Mistgate-Bridge-Pair-ID"
+	StreamKindPanel   = "panel"
 	protocolVersion   = "2"
 
 	maxCertificateDER = 12 << 10
