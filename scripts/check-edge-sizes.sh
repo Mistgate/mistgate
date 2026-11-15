@@ -30,9 +30,13 @@ entries=(
   # the audience and traffic of a relay are code of the public and admin Workers, each within its own limit below.
   "mistgate-edge:49"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
-  "mistgate-edge-public:28"
+  # 29 MiB with the reverse relay (28.03 MiB measured): the agent contract grew by the bridge messages, and every Worker that
+  # builds an agent's desired state or reads its reports carries the generated code; nothing of the bridge itself runs here.
+  "mistgate-edge-public:29"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.
-  "mistgate-edge-link:30"
+  # 31 MiB with the reverse relay (30.08 MiB measured): the bridge part of the desired state and of the agents' reports is this
+  # Worker's own job.
+  "mistgate-edge-link:31"
   # Scheduled work: wireCore, so Telegram, updates and WARP are in it for the work that will move here. Measured 25.1 MiB;
   # 28.1 MiB in November 2026 with the two-sender UDP port check (fleet, in wireCore: the periodic port recheck runs here).
   "mistgate-edge-jobs:31"
