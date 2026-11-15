@@ -231,6 +231,8 @@ Upstream on Windows: xray's readv there is a blocking WSARecv (`common/buf/readv
 1. Xray version: stable v26.3.27, bumped deliberately (not v26.9.x pre-releases). — owner: yes (2026-10-09)
    Moved to v26.11.9 on 2026-11 (compat plan stage C3): the REALITY library is vendored in `third_party/reality` with a switch that keeps
    accepting classical (non-post-quantum) ClientHellos, so no client notices; the node turns it on for every inbound.
+   Xray itself comes through a `replace` to the public fork `github.com/Mistgate/Xray-core` (upstream plus one commit: Vision's
+   `TrafficState` fields atomic, a data race upstream declined to fix), so `internal/node/vless` runs under `-race` in CI.
 2. REALITY target: no default; required; the node probe checks TLS 1.3 and MLKEM; no shared-CDN sites (can be abused as
    a forwarder). — owner: yes (2026-10-09)
 3. CDN host: profile-level `cdn.host`, one origin node per CDN profile in v1; per-inbound later. — owner: yes (2026-10-09)

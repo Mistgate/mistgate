@@ -4,7 +4,7 @@
 # CI's, an edge script not run), so this follows the workflow, not memory.
 #
 #   scripts/ci-local.sh            every job except race (slow)
-#   scripts/ci-local.sh --race     with the race job (fleet and agent under -race, 20-35 min)
+#   scripts/ci-local.sh --race     with the race job (fleet, agent and vless under -race, 20-35 min)
 #   scripts/ci-local.sh go web     only the named jobs: go web edge buf docs watcher edge-worker race
 #
 # On Windows run it from Git Bash; the edge jobs call PowerShell (pwsh if present, else Windows PowerShell). shellcheck
@@ -71,7 +71,7 @@ for job in "${jobs[@]}"; do
     edge-worker)
       step "edge worker typecheck+test" bash -c 'cd edge/worker && pnpm install --frozen-lockfile >/dev/null && pnpm typecheck && pnpm test' ;;
     race)
-      step "race (fleet, agent)" go test -race -count=1 -timeout 50m ./internal/panel/fleet/ ./internal/node/agent/ ;;
+      step "race (fleet, agent, vless)" go test -race -count=1 -timeout 50m ./internal/panel/fleet/ ./internal/node/agent/ ./internal/node/vless/ ;;
     *) results+=("FAIL  unknown job $job") ;;
   esac
 done

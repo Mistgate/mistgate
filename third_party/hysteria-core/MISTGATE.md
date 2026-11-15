@@ -39,3 +39,9 @@ hook (`internal/node/hysteria2/sniffing.go`) answers done at once for an IP-lite
 To move to a new upstream version: copy the new `core/v2` module from the Go module cache over this directory, apply the
 hunks above again (they are small and marked by `ConnEventLogger`, `LostPackets` and `ConnContext`), update the version here and in `go.mod`'s
 `require`, and run `go build ./...` and the Hysteria2 engine tests (`go test ./internal/node/hysteria2/`).
+
+## Published fork
+
+The same tree is published as branch `mistgate` of `github.com/Mistgate/hysteria` (its `core/` directory), one commit on top of the upstream
+version named above, for anyone who wants the patch without Mistgate. Mistgate itself builds from this directory, not from the
+fork. When this copy moves to a new upstream version or its patch changes, push the same tree to that branch in the same change.

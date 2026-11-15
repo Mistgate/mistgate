@@ -75,3 +75,9 @@ Mihomo (1.8.2) and older Xray would be turned away by it. Mistgate builds the pr
 3. `go mod tidy`, `go build ./...`, `go test -p 1 ./internal/node/vless/ ./internal/vendorcheck/`, then the old-client matrix of
    the m3 e2e.
 4. Check `LICENSE`/`LICENSE-Go` and the licences of the library's new dependencies (no GPL in the node binary).
+
+## Published fork
+
+The same tree is published as branch `mistgate` of `github.com/Mistgate/REALITY` (the repository root), one commit on top of the upstream
+version named above, for anyone who wants the patch without Mistgate. Mistgate itself builds from this directory, not from the
+fork. When this copy moves to a new upstream version or its patch changes, push the same tree to that branch in the same change.

@@ -220,3 +220,7 @@ replace github.com/apernet/hysteria/core/v2 => ./third_party/hysteria-core
 
 // REALITY that still takes the ClientHellos Xray 26.3.27 took (third_party/reality/MISTGATE.md).
 replace github.com/xtls/reality => ./third_party/reality
+
+// Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus one commit that makes Vision's TrafficState fields
+// atomic, from the public fork github.com/Mistgate/Xray-core (its README says what and why). Pin a commit of the fork, not a branch.
+replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261115162919-706a6dec6f12
