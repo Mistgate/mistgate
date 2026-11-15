@@ -43,7 +43,7 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow, caps []strin
 			continue
 		}
 		fwd := plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: exit.Address, ToPort: spec.Listen.Port}
-		if n.BridgePath != "" && reverseCarried(l, n.ID, caps) { // the entry listens itself and passes people on through the exit's bridge (bridge.go)
+		if bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) && reverseCarried(l, n.ID, caps) { // A bad endpoint cannot be carried as a reverse forward.
 			fwd.Mode, fwd.ExitNodeID = store.RelayModeReverse, l.ExitNodeID
 		}
 		out = append(out, fwd)

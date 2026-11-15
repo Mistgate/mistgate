@@ -51,15 +51,26 @@ func (p fakeProto) DefaultSettings() (json.RawMessage, error) {
 func (p fakeProto) Validate(json.RawMessage) []protocols.FieldError { return nil }
 func (p fakeProto) Summary(json.RawMessage) string                  { return p.id }
 func (p fakeProto) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, error) {
-	var s struct{ Port int }
+	var s struct {
+		Port     int    `json:"port"`
+		Security string `json:"security"`
+	}
 	if err := json.Unmarshal(in.Profile.Settings, &s); err != nil {
 		return plugin.InboundSpec{}, err
 	}
 	if in.PortOverride != 0 {
 		s.Port = int(in.PortOverride)
 	}
-	return plugin.InboundSpec{Listen: plugin.Listen{Network: "udp", Port: uint16(s.Port)},
-		TLS: plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: in.Node.Address}, Egress: "direct", Settings: in.Profile.Settings}, nil
+	network := "udp"
+	if p.id == "vless" {
+		network = "tcp"
+	}
+	tlsMode := plugin.TLSSelfSigned
+	if p.id == "vless" && s.Security == "tls" {
+		tlsMode = plugin.TLSAcmeDomain
+	}
+	return plugin.InboundSpec{Listen: plugin.Listen{Network: network, Port: uint16(s.Port)},
+		TLS: plugin.TLS{Mode: tlsMode, ServerName: in.Node.Address}, Egress: "direct", Settings: in.Profile.Settings}, nil
 }
 func (p fakeProto) IssueCredential(protocols.IssueInput) (protocols.Issued, error) {
 	return protocols.Issued{}, nil
@@ -244,6 +255,9 @@ type conn struct {
 	st   *connect.BidiStreamForClient[agentv1.ConnectRequest, agentv1.ConnectResponse]
 	in   chan *agentv1.ConnectResponse
 	errc chan error
+	// bridges is what the agent reports of its bridges in every result it sends; an agent reports its complete snapshot each
+	// time, so a result without them says "none".
+	bridges []*agentv1.BridgeState
 }
 
 func (a *agent) open() *conn {

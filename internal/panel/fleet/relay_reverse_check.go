@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/tcpcheck"
 )
 
 // acquireRelayPortChecks takes both ends in node order so checks for relays that share an entry or an exit cannot deadlock.
@@ -28,8 +29,14 @@ func (f *Fleet) acquireRelayPortChecks(ctx context.Context, nodeIDs ...string) (
 	}, nil
 }
 
-// reverseReach asks the exit's tcpcheck/1 agent whether the entry's own HTTPS site answers on 443.
+// reverseReach asks the exit's tcpcheck/1 agent whether the selected bridge endpoint answers with the entry's TLS identity.
 func (r relayRun) reverseReach(ctx context.Context) store.RelayStage {
+	stage := r.reverseReachAt(ctx)
+	stage.Port = r.entry.BridgeEndpointPort() // the probe says something about this port and no other
+	return stage
+}
+
+func (r relayRun) reverseReachAt(ctx context.Context) store.RelayStage {
 	target, ok, err := r.reverseSiteTarget(ctx)
 	if err != nil {
 		r.f.log.Warn("relay reverse reach: read entry site", "code", "store_failed", "relay", r.link.ID, "err", err)
@@ -54,6 +61,13 @@ func (r relayRun) reverseReach(ctx context.Context) store.RelayStage {
 }
 
 func (r relayRun) reverseSiteTarget(ctx context.Context) (tcpTarget, bool, error) {
+	if r.entry.BridgePort != 0 {
+		pin := r.link.BridgeSitePin(r.entry.BridgePort, r.now)
+		if pin == "" {
+			return tcpTarget{}, false, nil
+		}
+		return tcpTarget{Port: r.entry.BridgePort, Role: tcpRoleSite, Kind: tcpcheck.KindTLS, Pin: pin}, true, nil
+	}
 	specs, pins, err := r.f.tcpSpecsOf(ctx, r.entry)
 	if err != nil {
 		return tcpTarget{}, false, err

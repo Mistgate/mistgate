@@ -29,12 +29,15 @@ import (
 // probe targets the entry. A relay check and a port check must not measure either node at once. The result goes into the relay
 // (check_json) and comes back; it is the caller's to act on (the gate that switches a relay on is in the access module).
 //
-// stages names what to run (store.RelayStageLeg, RelayStagePath, RelayStageReverseReach or RelayStageReverseSpeed; none = leg
-// and path). A reverse reach check also runs after a failed leg. The speed proof only runs when named.
+// stages names what to run (store.RelayStageLeg, RelayStagePath, RelayStageReverseReach, RelayStageReverseSpeed or
+// RelayStageDirectSpeed; none = leg and path). A reverse reach check also runs after a failed leg. The two speed proofs only run
+// when named: reverse_speed at the owner's request, direct_speed at the mode controller's (it is what lets a reverse relay go back
+// to the direct way). The result carries the bridge stage of a relay in the reverse way, derived from the exit's report.
 func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error) {
 	runLeg, runPath := len(stages) == 0 || slices.Contains(stages, store.RelayStageLeg), len(stages) == 0 || slices.Contains(stages, store.RelayStagePath)
 	requestReverseReach := slices.Contains(stages, store.RelayStageReverseReach)
 	runReverseSpeed := slices.Contains(stages, store.RelayStageReverseSpeed)
+	runDirectSpeed := slices.Contains(stages, store.RelayStageDirectSpeed)
 	link, err := f.st.RelayLink(ctx, relayID)
 	if err != nil {
 		return store.RelayCheck{}, err
@@ -75,7 +78,11 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 	if prev, ok := link.Check(); ok {
 		// the reverse stages answer a question of the entry's site, not of this run's target: one that does not run keeps what the
 		// last check found, and its own at_unix says how old that is
-		check.ReverseReach, check.ReverseSpeed = prev.ReverseReach, prev.ReverseSpeed
+		check.ReverseReach, check.ReverseSpeed, check.DirectSpeed = prev.ReverseReach, prev.ReverseSpeed, prev.DirectSpeed
+		if check.ReverseReach.Port != 0 && check.ReverseReach.Port != entry.BridgeEndpointPort() ||
+			check.ReverseReach.Port == 0 && check.ReverseReach.At > 0 && entry.BridgeEndpointPort() != 443 {
+			check.ReverseReach = store.RelayStage{} // a probe of the endpoint the entry had before says nothing about this one
+		}
 	}
 	rc := relayRun{f: f, link: link, entry: entry, exit: exit, spec: spec, row: row, now: now}
 	if specErr == nil {
@@ -130,6 +137,21 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 				check.ReverseSpeed = rc.reverseSpeed(ctx)
 			}
 		}
+	}
+	if runDirectSpeed {
+		if rc.live == nil {
+			if liveRows, err := f.Live(ctx); err == nil {
+				rc.live = liveRowsByID(liveRows)
+			}
+		}
+		if rc.live != nil {
+			check.DirectSpeed = rc.directSpeed(ctx)
+		} else {
+			check.DirectSpeed = rc.stage("fail", "failed", "")
+		}
+	}
+	if link.Reverse() {
+		check.Bridge = link.BridgeStage(now) // what the exit's agent says, not stored with the check
 	}
 	check.Settle()
 	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)

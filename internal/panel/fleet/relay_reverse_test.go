@@ -250,6 +250,89 @@ func TestCheckRelayReverseSpeedSkipsWhenEitherNodeIsBusy(t *testing.T) {
 	idle(t, 75*time.Millisecond, x.ec, x.xc)
 }
 
+// The proof the controller asks for before a reverse relay goes back to DNAT: the ENTRY connects to the exit's node and takes 8 MB
+// (the exit sends: that is the way people's downloads go), and it runs as the panel's own, not the owner's.
+func TestCheckRelayDirectSpeedIsTheEntryConnectingToTheExit(t *testing.T) {
+	x := newReverseCheckEnv(t, true, true)
+	x.tcpRelay(false)
+	resultCh := x.start("rly_t", store.RelayStageDirectSpeed)
+	serve := waitSpeed(x.xc, 1)
+	if serve.Count != relayDirectSpeedMB || serve.Df {
+		t.Fatalf("direct speed serve = %+v (the exit serves 8 MB, and the sender is the exit: not the entry's direction up)", serve)
+	}
+	replyPortCommand(x.xc, serve.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"port": "40202"}})
+	run := waitSpeed(x.ec, 2)
+	if run.Host != reverseExitAddress || len(run.Ports) != 1 || run.Ports[0] != 40202 || run.Count != relayDirectSpeedMB || run.Df {
+		t.Fatalf("direct speed run = %+v (the entry connects to the exit's address, never the other way)", run)
+	}
+	replyPortCommand(x.ec, run.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{
+		"mbit_s": "64.5", "bytes": strconv.FormatUint(uint64(relayDirectSpeedMB)<<20, 10), "connect_ms": "21", "first_byte_ms": "48", "duration_ms": "1040"}})
+	stop := waitSpeed(x.xc, 3)
+	replyPortCommand(x.xc, stop.RequestId, &agentv1.CommandResult{Ok: true})
+
+	got := result(t, resultCh)
+	stage := got.DirectSpeed
+	if stage.Status != "ok" || stage.Sender != x.entry.nodeID || stage.MB != relayDirectSpeedMB || stage.Bytes != uint64(relayDirectSpeedMB)<<20 || stage.MbitS != 64.5 {
+		t.Fatalf("direct speed stage = %+v", stage)
+	}
+	if got.Leg.Status != "" || got.ReverseSpeed.Status != "" {
+		t.Fatalf("the proof ran other stages: leg %+v reverse speed %+v", got.Leg, got.ReverseSpeed)
+	}
+	rows, err := x.st.PathSpeeds(x.ctx, time.Unix(0, 0), x.entry.nodeID, 0)
+	if err != nil || len(rows) != 1 || rows[0].FromID != x.entry.nodeID || rows[0].Direction != "down" {
+		t.Fatalf("direct speed history = %+v, %v", rows, err)
+	}
+	// it is kept with the check, and a later run of other stages does not lose it
+	again := x.start("rly_t", store.RelayStageLeg)
+	tcpRun(x.ec, "ours", 8443)
+	if kept := result(t, again).DirectSpeed; kept.Status != "ok" || kept.At != stage.At {
+		t.Fatalf("a later check lost the proof: %+v", kept)
+	}
+}
+
+// A limit reached, or a busy node, is "skipped busy" and sends the agents nothing; the daily limit of speed tests holds for the
+// panel's own proofs, so the controller cannot use up what the owner has.
+func TestCheckRelayDirectSpeedRespectsTheDailyLimit(t *testing.T) {
+	x := newReverseCheckEnv(t, true, true)
+	x.tcpRelay(false)
+	for i := 0; i < speedNodeDayMax; i++ {
+		if err := x.st.AddPathSpeedStart(x.ctx, "system", x.entry.nodeID, x.exit.nodeID, time.Now().Add(-time.Duration(i+1)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := result(t, x.start("rly_t", store.RelayStageDirectSpeed))
+	if got.DirectSpeed.Status != "skipped" || got.DirectSpeed.Code != "busy" {
+		t.Fatalf("direct speed over the daily limit = %+v", got.DirectSpeed)
+	}
+	idle(t, 75*time.Millisecond, x.ec, x.xc)
+}
+
+// A reverse_reach probe says which port it was made for; a later check that does not repeat it keeps it only while the entry's
+// endpoint is still that port (the first version probed 443 and wrote no port).
+func TestCheckRelayDropsAReverseProbeOfAnEndpointTheEntryNoLongerHas(t *testing.T) {
+	x := newReverseCheckEnv(t, true, true)
+	x.tcpRelay(false)
+	now := time.Now().Unix()
+	if err := x.st.SetRelayCheck(x.ctx, "rly_t", store.RelayCheck{At: now, Network: "tcp", Port: 7443,
+		ReverseReach: store.RelayStage{Status: "ok", At: now}}); err != nil { // no port: 443
+		t.Fatal(err)
+	}
+	run := func() store.RelayCheck {
+		resultCh := x.start("rly_t", store.RelayStageLeg)
+		tcpRun(x.ec, "ours", 8443)
+		return result(t, resultCh)
+	}
+	if got := run(); got.ReverseReach.Status != "ok" {
+		t.Fatalf("the probe of 443 was dropped while the entry's endpoint is 443: %+v", got.ReverseReach)
+	}
+	if err := x.st.SetNodeBridgePort(x.ctx, x.entry.nodeID, 8443); err != nil {
+		t.Fatal(err)
+	}
+	if got := run(); got.ReverseReach.Status != "" {
+		t.Fatalf("the probe of 443 survived the endpoint moving to 8443: %+v", got.ReverseReach)
+	}
+}
+
 func TestAcquireRelayPortChecksSortsAndDeduplicatesNodeIDs(t *testing.T) {
 	f := &Fleet{}
 	release, err := f.acquireRelayPortChecks(context.Background(), "de1", "de1", "msk1")
