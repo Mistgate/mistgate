@@ -1,7 +1,10 @@
 package update
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -168,6 +171,84 @@ func TestScheduledNodeUpdateSurvivesRestartAndRunsOnlyForSelectedNode(t *testing
 	}
 	if got, err := e.st.NodeUpdateSchedules(e.ctx); err != nil || len(got) != 0 {
 		t.Fatalf("started schedule was not consumed: %+v, %v", got, err)
+	}
+}
+
+func TestScheduledNodeUpdateIsCancelledWhenCreatorLosesAuthority(t *testing.T) {
+	for _, tc := range []struct {
+		name, reason, query string
+	}{
+		{name: "removed", reason: "creator_missing", query: `DELETE FROM admin WHERE id = ?`},
+		{name: "demoted", reason: "creator_role_changed", query: `UPDATE admin SET role = ? WHERE id = ?`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.defaultBundle()
+			id := e.addNode("de1", nodeOpts{})
+			b := e.s.current()
+			local := scheduleLocalAfter(e, 2*time.Minute, defaultScheduleTimezoneOffsetMin)
+			if _, err := e.s.scheduleNodeUpdate(e.ctx, id, local, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); err != nil {
+				t.Fatal(err)
+			}
+			e.clk.Advance(3 * time.Minute)
+			if tc.name == "demoted" {
+				if _, err := e.st.W.ExecContext(e.ctx, tc.query, store.RoleHelper, "adm_test"); err != nil {
+					t.Fatal(err)
+				}
+			} else if _, err := e.st.W.ExecContext(e.ctx, tc.query, "adm_test"); err != nil {
+				t.Fatal(err)
+			}
+
+			var logs bytes.Buffer
+			e.s.log = slog.New(slog.NewTextHandler(&logs, nil))
+			e.s.processScheduledNodeUpdates(e.ctx)
+			if schedules, err := e.st.NodeUpdateSchedules(e.ctx); err != nil || len(schedules) != 0 {
+				t.Fatalf("unauthorized schedule remains: %+v, %v", schedules, err)
+			}
+			if _, err := e.st.ActiveRollout(e.ctx); !errors.Is(err, store.ErrNotFound) {
+				t.Fatalf("unauthorized rollout started: %v", err)
+			}
+			rows, err := e.st.ListAudit(e.ctx, "", 0, 20)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range rows {
+				if row.Action != "node_update_schedule_cancel" {
+					continue
+				}
+				if row.Actor != "adm_test" || !strings.Contains(row.Params, `"reason":"`+tc.reason+`"`) {
+					t.Fatalf("schedule cancellation audit = %+v", row)
+				}
+				if !strings.Contains(logs.String(), "code=scheduled_creator_unavailable") {
+					t.Fatalf("schedule cancellation notice missing: %q", logs.String())
+				}
+				return
+			}
+			t.Fatal("schedule cancellation audit row missing")
+		})
+	}
+}
+
+func TestScheduledNodeUpdateAcceptsLiveOwnerTokenCreator(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	now := e.clk.Now()
+	token := store.APIToken{ID: "tok_alice", Name: "alice", Profile: store.ProfileAdmin, RatePerMin: 60,
+		CreatedBy: "adm_test", CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+	if err := e.st.CreateAPIToken(e.ctx, token, make([]byte, 32)); err != nil {
+		t.Fatal(err)
+	}
+	e.s.cfg.Actor = func(context.Context) string { return "mcp:" + token.ID }
+	id := e.addNode("de1", nodeOpts{})
+	b := e.s.current()
+	local := scheduleLocalAfter(e, 2*time.Minute, defaultScheduleTimezoneOffsetMin)
+	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, local, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); err != nil {
+		t.Fatal(err)
+	}
+	e.clk.Advance(3 * time.Minute)
+	e.s.processScheduledNodeUpdates(e.ctx)
+	if _, err := e.st.ActiveRollout(e.ctx); err != nil {
+		t.Fatalf("live owner-token schedule did not start: %v", err)
 	}
 }
 

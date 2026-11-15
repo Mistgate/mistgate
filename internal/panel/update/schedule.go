@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/tasks/spec"
 )
@@ -174,6 +177,72 @@ func updatableWhenOfflineForCap(n nodeView, updateCap string) bool {
 	return n.row.State == "active" && slices.Contains(n.row.AgentCaps, updateCap)
 }
 
+func (s *Service) scheduledActorReason(ctx context.Context, actor string) (string, error) {
+	const procedure = adminv1connect.UpdateServiceStartRolloutProcedure
+	requiredRole := auth.ProcedureRole(procedure)
+	if actor == "" {
+		return "creator_missing", nil
+	}
+	prefix, id, tokenActor := strings.Cut(actor, ":")
+	if tokenActor && (prefix == "token" || prefix == "mcp") {
+		if id == "" {
+			return "creator_missing", nil
+		}
+		tok, err := s.st.GetAPIToken(ctx, id)
+		if errors.Is(err, store.ErrNotFound) {
+			return "creator_missing", nil
+		}
+		if err != nil {
+			return "", err
+		}
+		if tok.Revoked() {
+			return "creator_revoked", nil
+		}
+		if tok.Expired(s.now()) {
+			return "creator_expired", nil
+		}
+		if auth.TokenProfileRole(tok.Profile) != auth.TokenProcedureRole(procedure) {
+			return "creator_role_changed", nil
+		}
+		admin, err := s.st.Admin(ctx, tok.CreatedBy)
+		if errors.Is(err, store.ErrNotFound) {
+			return "creator_missing", nil
+		}
+		if err != nil {
+			return "", err
+		}
+		if admin.Role != requiredRole {
+			return "creator_role_changed", nil
+		}
+		return "", nil
+	}
+	admin, err := s.st.Admin(ctx, actor)
+	if errors.Is(err, store.ErrNotFound) {
+		return "creator_missing", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if admin.Role != requiredRole {
+		return "creator_role_changed", nil
+	}
+	return "", nil
+}
+
+func (s *Service) cancelScheduledNodeUpdate(ctx context.Context, schedule store.NodeUpdateScheduleRow, reason string) {
+	deleted, err := s.st.DeleteNodeUpdateScheduleIfMatches(ctx, schedule)
+	if err != nil {
+		s.log.Warn("update: cancel scheduled node update", "code", "scheduled_cancel_failed", "node", schedule.NodeID, "err", err)
+		return
+	}
+	if !deleted {
+		return
+	}
+	params := map[string]string{"node_id": schedule.NodeID, "version": schedule.ToVersion, "reason": reason}
+	s.auditAs(ctx, schedule.CreatedBy, "node_update_schedule_cancel", params)
+	s.log.Warn("update: scheduled node update cancelled", "code", "scheduled_creator_unavailable", "node", schedule.NodeID, "reason", reason)
+}
+
 func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 	now := s.now()
 	if s.cfg.Key == nil {
@@ -249,14 +318,19 @@ func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 			}
 			continue
 		}
+		reason, err := s.scheduledActorReason(ctx, schedule.CreatedBy)
+		if err != nil {
+			s.log.Warn("update: check scheduled update creator", "code", "scheduled_creator_check_failed", "node", schedule.NodeID, "err", err)
+			continue
+		}
+		if reason != "" {
+			s.cancelScheduledNodeUpdate(ctx, schedule, reason)
+			continue
+		}
 		if !node.connected || (!s.cfg.Edge && !s.fl.HasSession(schedule.NodeID)) || !updatable(node.state) {
 			continue
 		}
-		actor := schedule.CreatedBy
-		if actor == "" {
-			actor = "system:schedule"
-		}
-		ro, err := s.startWithActorAndSchedule(ctx, []string{schedule.NodeID}, 0, actor, nil, &schedule)
+		ro, err := s.startWithActorAndSchedule(ctx, []string{schedule.NodeID}, 0, schedule.CreatedBy, nil, &schedule)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition || ctx.Err() != nil {
 				return
