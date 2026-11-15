@@ -5,7 +5,6 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 const MaxAuthorityBytes = 8 * 1024
@@ -74,17 +73,12 @@ func ParseAuthority(value string) (Authority, error) {
 		if !ok || strings.Contains(portText, ":") {
 			return Authority{}, ErrInvalidAuthority
 		}
-		if host == "" || strings.ContainsAny(host, "[]/\\@?#") {
+		if !validHostName(host) {
 			return Authority{}, ErrInvalidAuthority
 		}
 		if address, err := netip.ParseAddr(host); err == nil && address.Is6() {
 			// IPv6 literals in CONNECT authorities must be bracketed.
 			return Authority{}, ErrInvalidAuthority
-		}
-		for _, r := range host {
-			if unicode.IsSpace(r) || unicode.IsControl(r) {
-				return Authority{}, ErrInvalidAuthority
-			}
 		}
 	}
 
@@ -101,6 +95,27 @@ func ParseAuthority(value string) (Authority, error) {
 		return Authority{}, ErrInvalidAuthority
 	}
 	return Authority{Kind: AuthorityHostPort, Host: host, Port: uint16(port)}, nil
+}
+
+// maxHostNameBytes is the longest DNS name (253 octets) with room for a final dot.
+const maxHostNameBytes = 255
+
+// validHostName accepts what the official server's HTTP parser accepts in the
+// host part of an authority: ASCII unreserved characters, sub-delimiters and
+// '%'. Non-ASCII names (IDN) are expected in punycode; userinfo, brackets,
+// slashes, whitespace and control bytes are refused.
+func validHostName(host string) bool {
+	if host == "" || len(host) > maxHostNameBytes {
+		return false
+	}
+	for i := 0; i < len(host); i++ {
+		c := host[i]
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
+			strings.IndexByte("-._~!$&'()*+,;=%", c) >= 0) {
+			return false
+		}
+	}
+	return true
 }
 
 func isPseudoHost(host string) bool {

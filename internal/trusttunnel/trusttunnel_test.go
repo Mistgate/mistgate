@@ -331,7 +331,7 @@ func TestDeepLinkRoundTrip(t *testing.T) {
 			Username:     "sample-user",
 			Password:     "sample-secret",
 			Name:         "sample endpoint",
-			DNSUpstreams: []netip.Addr{netip.MustParseAddr("192.0.2.53")},
+			DNSUpstreams: []string{"192.0.2.53"},
 		},
 		{
 			Hostname:  "example.com",
@@ -420,7 +420,7 @@ func TestDeepLinkRequiredTagsAndUnsupportedTags(t *testing.T) {
 }
 
 func TestDeepLinkRejectsOversizedAndMalformedValues(t *testing.T) {
-	if _, err := DecodeDeepLink(strings.Repeat("x", MaxDeepLinkBytes+1)); !errors.Is(err, ErrDeepLinkTooLong) {
+	if _, err := DecodeDeepLink(strings.Repeat("x", MaxDeepLinkDecodeBytes+1)); !errors.Is(err, ErrDeepLinkTooLong) {
 		t.Fatalf("oversized link error = %v", err)
 	}
 	if _, err := DecodeDeepLink(DeepLinkPrefix + "AAAA"); err == nil {
@@ -473,17 +473,28 @@ func FuzzUDPDecode(f *testing.F) {
 	server, _ := EncodeUDPServerFrame(frame)
 	short := []byte{0, 0, 0, 3, 1, 2, 3}
 	large := []byte{0xff, 0xff, 0xff, 0xff}
-	f.Add([]byte{})
-	f.Add(client)
-	f.Add(server)
-	f.Add(short)
-	f.Add(large)
-	f.Fuzz(func(t *testing.T, input []byte) {
+	f.Add([]byte{}, uint16(0))
+	f.Add(client, uint16(5))
+	f.Add(server, uint16(41))
+	f.Add(short, uint16(2))
+	f.Add(large, uint16(1))
+	f.Add(append(append([]byte(nil), short...), client...), uint16(9))
+	f.Add(handClient(40, 5, []byte{1, 2, 3}), uint16(38))
+	f.Add(handClient(37+2, 2, []byte{0xff, 0xfe}), uint16(40))
+	f.Fuzz(func(t *testing.T, input []byte, split uint16) {
 		for _, direction := range []UDPDirection{UDPClientToServer, UDPServerToClient} {
 			decoder := NewUDPDecoder(direction)
-			_, _ = decoder.Feed(input)
+			whole, _ := decoder.Feed(input)
 			if len(decoder.buffer) > maxUDPFrameWireSize {
 				t.Fatalf("retained %d bytes", len(decoder.buffer))
+			}
+			// The frames must not depend on how the stream is cut into chunks.
+			cut := int(split) % (len(input) + 1)
+			chunked := NewUDPDecoder(direction)
+			first, _ := chunked.Feed(input[:cut])
+			second, _ := chunked.Feed(input[cut:])
+			if got := append(first, second...); !reflect.DeepEqual(got, whole) {
+				t.Fatalf("direction %d, cut %d: %d frames in chunks, %d at once", direction, cut, len(got), len(whole))
 			}
 		}
 	})
@@ -530,14 +541,21 @@ func FuzzDeepLinkRoundtrip(f *testing.F) {
 	seedLink, _ := EncodeDeepLink(seed)
 	f.Add([]byte(seedLink), "example.com", "192.0.2.10:443", "sample-user", "sample-secret", "", false)
 	f.Add([]byte(DeepLinkPrefix+"AAAA"), "example.com", "[2001:db8::10]:443", "sample-user", "sample-secret", "sample endpoint", true)
-	f.Add([]byte(DeepLinkPrefix+strings.Repeat("A", MaxDeepLinkBytes)), "example.com", "192.0.2.10:443", "sample-user", "sample-secret", "", false)
+	f.Add([]byte(officialClientLink), "example.com", "192.0.2.10:443", "sample-user", "sample-secret", "", false)
+	f.Add([]byte(allTagsLink), "example.com", "192.0.2.10:443", "sample-user", "sample-secret", "", false)
+	f.Add([]byte("tt://?AAECDh1odHRwczovL2V4YW1wbGUuY29tL3N1Yj90PWFiYw"), "example.com", "192.0.2.10:443", "sample-user", "sample-secret", "", false)
+	f.Add([]byte(DeepLinkPrefix+strings.Repeat("A", MaxDeepLinkDecodeBytes)), "example.com", "192.0.2.10:443", "sample-user", "sample-secret", "", false)
 	f.Fuzz(func(t *testing.T, raw []byte, hostname, address, username, password, name string, hasIPv6 bool) {
-		if decoded, err := DecodeDeepLink(string(raw)); err == nil && len(decoded.Addresses) == 1 {
+		if decoded, err := DecodeDeepLink(string(raw)); err == nil {
 			reencoded, encodeErr := EncodeDeepLink(decoded)
 			if encodeErr == nil {
 				again, decodeErr := DecodeDeepLink(reencoded)
 				if decodeErr != nil {
 					t.Fatalf("decode canonical link: %v", decodeErr)
+				}
+				// A subscription-only link carries no has_ipv6 or protocol.
+				if decoded.Hostname == "" && decoded.Username == "" && decoded.Password == "" && len(decoded.Addresses) == 0 {
+					decoded.HasIPv6, decoded.HTTP3 = true, false
 				}
 				if !reflect.DeepEqual(again, decoded) {
 					t.Fatalf("decoded link changed after re-encoding: %#v != %#v", again, decoded)

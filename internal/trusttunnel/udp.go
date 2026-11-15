@@ -9,16 +9,24 @@ import (
 )
 
 const (
-	MaxUDPAppNameBytes    = 255
-	MaxUDPClientPayload   = 65434
+	MaxUDPAppNameBytes = 255
+	// MaxUDPClientPayload is the payload limit of a client frame with an empty
+	// app name; a name of L bytes lowers it to MaxUDPClientPayload - 2*L (the
+	// official server drops a frame whose Length exceeds 65471 - L).
+	MaxUDPClientPayload = 65434
+	// MaxUDPServerPayload is the largest payload the encoder produces for the
+	// client (65536 - 20 - 8, the official server's UDP read buffer).
 	MaxUDPServerPayload   = 65508
 	maxUDPClientFrameSize = 65471
 	minUDPClientFrameSize = 37
 	minUDPServerFrameSize = 36
 	// udpAppNameLengthOffset is where the one-byte name length sits in a client frame body: after both addresses and ports.
 	udpAppNameLengthOffset = 36
-	maxUDPServerFrameSize  = minUDPServerFrameSize + MaxUDPServerPayload
-	maxUDPFrameWireSize    = 4 + maxUDPServerFrameSize
+	// The decoder of server frames is as lenient as the official client's: it
+	// takes a payload up to 65535 - 8, a little more than the server ever sends.
+	maxUDPServerDecodePayload = 65527
+	maxUDPServerFrameSize     = minUDPServerFrameSize + maxUDPServerDecodePayload
+	maxUDPFrameWireSize       = 4 + maxUDPServerFrameSize
 )
 
 // UDPDirection selects which side's frame layout a UDPDecoder accepts.
@@ -114,14 +122,23 @@ func paddedIP(address netip.Addr) ([16]byte, error) {
 	if address.Is4() {
 		ip := address.As4()
 		copy(result[12:], ip[:])
-		return result, nil
-	}
-	if !address.Is6() || address.Zone() != "" {
+	} else if address.Is6() && address.Zone() == "" {
+		result = address.As16()
+	} else {
 		return result, ErrInvalidUDPFrame
 	}
-	return address.As16(), nil
+	// The wire has no type bit: twelve leading zero bytes mean IPv4, except the
+	// exact ::1. An address the reader would misread (IPv4 0.0.0.1, or IPv6
+	// "::" and "::a.b.c.d") cannot be sent.
+	if decodedIP(result[:]) != address {
+		return result, ErrInvalidUDPFrame
+	}
+	return result, nil
 }
 
+// decodedIP reads the 16-byte address field the way the official client does:
+// twelve leading zero bytes mean IPv4, except for the exact ::1 (the official
+// server has no such exception and reads ::1 as 0.0.0.1).
 func decodedIP(encoded []byte) netip.Addr {
 	firstTwelveZero := true
 	for _, b := range encoded[:12] {
@@ -145,7 +162,12 @@ func decodedIP(encoded []byte) netip.Addr {
 // UDPDecoder incrementally reads length-prefixed _udp2 frames. Feed accepts
 // arbitrary chunk boundaries, returns every complete valid frame, and reports
 // the first dropped-frame error while continuing at the next frame boundary.
-// Its retained buffer is bounded by the largest frame admitted by the protocol.
+// A frame the official reader would drop is dropped here too, with the same
+// number of bytes skipped, so both stay in step with the stream. Its retained
+// buffer is bounded by the largest frame admitted by the protocol.
+//
+// Each returned Payload is a copy that the caller owns; the decoder reuses its
+// internal buffer. A UDPDecoder is not safe for concurrent use.
 type UDPDecoder struct {
 	direction        UDPDirection
 	buffer           []byte
