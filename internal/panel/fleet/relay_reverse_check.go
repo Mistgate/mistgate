@@ -29,6 +29,10 @@ func (f *Fleet) acquireRelayPortChecks(ctx context.Context, nodeIDs ...string) (
 	}, nil
 }
 
+// bridgeSiteName is the name the self-signed certificate of the agent's own bridge site carries (internal/node/agent/bridge.go
+// bridgeSiteCertName); a probe or a dial that has the site's pin does not depend on it.
+const bridgeSiteName = "localhost"
+
 // reverseReach asks the exit's tcpcheck/1 agent whether the selected bridge endpoint answers with the entry's TLS identity.
 func (r relayRun) reverseReach(ctx context.Context) store.RelayStage {
 	stage := r.reverseReachAt(ctx)
@@ -66,7 +70,9 @@ func (r relayRun) reverseSiteTarget(ctx context.Context) (tcpTarget, bool, error
 		if pin == "" {
 			return tcpTarget{}, false, nil
 		}
-		return tcpTarget{Port: r.entry.BridgePort, Role: tcpRoleSite, Kind: tcpcheck.KindTLS, Pin: pin}, true, nil
+		// The probe of a TLS site always names a server (tcpcheck.Validate refuses a probe without one, which made every probe of a
+		// bridge site on a port of its own fail as "failed"); the site is told by its pin, the name is only what the handshake says.
+		return tcpTarget{Port: r.entry.BridgePort, Role: tcpRoleSite, Kind: tcpcheck.KindTLS, SNI: bridgeSiteName, Pin: pin}, true, nil
 	}
 	specs, pins, err := r.f.tcpSpecsOf(ctx, r.entry)
 	if err != nil {

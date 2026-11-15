@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	mtprotoProto "github.com/mistgate/mistgate/internal/panel/protocols/mtproto"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/tcpcheck"
 )
 
 const (
@@ -449,5 +451,35 @@ func TestCheckRelayKeepsTheReverseStagesOfAnEarlierRun(t *testing.T) {
 	}
 	if check, ok := stored.Check(); !ok || check.ReverseReach != was {
 		t.Fatalf("stored = %+v", check.ReverseReach)
+	}
+}
+
+// A bridge site on a port of its own is probed by its pin, and the probe still has to name a server: the agent refuses a TLS target
+// without one (tcpcheck.Validate), and the check of every such endpoint then failed as "failed" and the relay could never be
+// switched on.
+func TestCheckRelayReverseReachOfABridgeSiteOnAPortOfItsOwnIsAProbeTheAgentTakes(t *testing.T) {
+	x := newReverseCheckEnv(t, false, true)
+	x.tcpRelay(false)
+	if err := x.st.SetNodeBridgePort(x.ctx, x.entry.nodeID, 8443); err != nil {
+		t.Fatal(err)
+	}
+	pin := strings.Repeat("ab", 32)
+	if err := x.st.SetRelayBridgeSide(x.ctx, "rly_t", "entry", &store.RelayBridgeSideCheck{AtUnix: time.Now().Unix(), SitePin: pin, SitePort: 8443}); err != nil {
+		t.Fatal(err)
+	}
+	resultCh := x.start("rly_t")
+	leg := waitTCPProbe(x.ec)
+	replyPortCommand(x.ec, leg.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "t8443": "timeout"}})
+	reverse := waitTCPProbe(x.xc)
+	if len(reverse.Targets) != 1 || reverse.Targets[0].Port != 8443 || reverse.Targets[0].PinSha256 != pin {
+		t.Fatalf("probe of the bridge site = %+v", reverse)
+	}
+	target := reverse.Targets[0]
+	if err := tcpcheck.Validate(reverse.Host, []tcpcheck.Target{{Port: uint16(target.Port), Kind: target.Kind, SNI: target.Sni, PinSHA256: target.PinSha256}}); err != nil {
+		t.Fatalf("the exit's agent would refuse the probe of the bridge site: %v (target %+v)", err, target)
+	}
+	replyPortCommand(x.xc, reverse.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "t8443": "ours"}})
+	if got := result(t, resultCh); got.ReverseReach.Status != "ok" || got.ReverseReach.Port != 8443 {
+		t.Fatalf("reverse reach = %+v", got.ReverseReach)
 	}
 }
