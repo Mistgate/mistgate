@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Tip } from "@/components/ui/tooltip";
 import { cx } from "@/lib/cx";
 import { useMove } from "@/lib/paging";
+import { useIsOwner } from "@/lib/updates";
 import { AppLink, useGo } from "@/screens/users/nav";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
@@ -39,6 +40,7 @@ const subgrid = "@min-[760px]:col-span-full @min-[760px]:grid @min-[760px]:grid-
 export function ProfilesScreen() {
   const t = useTx();
   const go = useGo();
+  const owner = useIsOwner(); // policy.go: only the owner makes, changes and deletes profiles; the rest read them
   const move = useMove();
   const navigate = useNavigate();
   const search = validateProfilesSearch(useSearch({ strict: false }) as Record<string, unknown>);
@@ -58,10 +60,12 @@ export function ProfilesScreen() {
         <span className="text-xs text-muted">{t("profiles.sub")}</span>
       </div>
       {/* looking at one protocol, a new profile is most likely one more of it: its form opens at once (with "Change") */}
-      <Button variant="primary" onClick={() => navigate({ to: "/profiles/new", search: protocol ? { protocol } : {} } as never)}>
-        <Icon name="plus" size={14} />
-        {t("profiles.create")}
-      </Button>
+      {owner && (
+        <Button variant="primary" onClick={() => navigate({ to: "/profiles/new", search: protocol ? { protocol } : {} } as never)}>
+          <Icon name="plus" size={14} />
+          {t("profiles.create")}
+        </Button>
+      )}
     </div>
   );
   const page = (body: ReactNode) => (
@@ -80,12 +84,14 @@ export function ProfilesScreen() {
         <EmptyState
           title={t("profiles.none.title")}
           action={
-            <Button variant="primary" size="lg" onClick={() => go("/profiles/new")}>
-              {t("profiles.new")}
-            </Button>
+            owner ? (
+              <Button variant="primary" size="lg" onClick={() => go("/profiles/new")}>
+                {t("profiles.new")}
+              </Button>
+            ) : undefined
           }
         >
-          {t("profiles.none.body")}
+          {t(owner ? "profiles.none.body" : "profiles.ownerOnly")}
         </EmptyState>
       </Card>,
     );

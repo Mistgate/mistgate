@@ -18,6 +18,7 @@ const navigate = vi.fn();
 let params: Record<string, string> = {};
 let search: Record<string, string> = {};
 let profileProtocol = "hysteria2";
+let role = Role.OWNER;
 
 // the plugin's schema with the domain field (the trimmed fixture has none)
 const schema = JSON.stringify({ ...JSON.parse(hy2), properties: { ...JSON.parse(hy2).properties, sni: { type: "string", title: "SNI", "x-group": "basics", "x-order": 30, "x-critical": true } } });
@@ -86,7 +87,7 @@ vi.mock("@/lib/api", async (orig) => ({
   },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { updateIntervalHours: 6, apps: [{ kind: App.HAPP, name: "Happ" }, { kind: App.AMNEZIA, name: "AmneziaVPN" }] }, effectiveTitle: "" }) },
   dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
-  auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role: Role.OWNER } }) },
+  auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   awgApi: { listMimicryPresets: () => Promise.resolve({ presets: [], domains: [] }) },
 }));
 vi.mock("@tanstack/react-router", () => ({
@@ -111,6 +112,7 @@ beforeEach(() => {
   params = {};
   search = {};
   profileProtocol = "hysteria2";
+  role = Role.OWNER;
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -150,6 +152,36 @@ const type = (el: HTMLInputElement, value: string) =>
 const nameField = () => document.querySelector<HTMLInputElement>("input[placeholder='E.g. Main · 443']")!;
 const portField = () => document.querySelector<HTMLInputElement>("input[aria-label='Port']")!;
 const pressed = (label: string) => button(label)?.getAttribute("aria-pressed");
+
+describe("who may change a profile", () => {
+  it("the owner has the save bar after a change and the delete section", async () => {
+    params = { id: "p_old" };
+    await mount();
+    expect(text()).toContain("Delete profile");
+    expect(text()).not.toContain("Only the owner can change profiles.");
+    await type(portField(), "9443");
+    expect(button("Save")).toBeDefined();
+  });
+
+  it.each([Role.HELPER, Role.READONLY])("role %i reads the form: no Save, no Delete, the fields are out of reach, and the page says why", async (r) => {
+    role = r;
+    params = { id: "p_old" };
+    await mount();
+    expect(text()).toContain("Only the owner can change profiles.");
+    expect(button("Save")).toBeUndefined();
+    expect(text()).not.toContain("Delete profile");
+    expect(portField().closest("[inert]")).not.toBeNull();
+    expect(portField().value).toBe("443"); // still readable
+  });
+
+  it("a new profile is the owner's: the others get the reason and the way back, not the choice of a protocol", async () => {
+    role = Role.HELPER;
+    await mount();
+    expect(text()).toContain("Only the owner can change profiles.");
+    expect(text()).not.toContain("Hysteria2");
+    expect(button("Back to profiles")).toBeDefined();
+  });
+});
 
 describe("a new profile", () => {
   // the form is step 2 of a new profile: its protocol is in the URL (step 1 is new-profile.test.tsx)

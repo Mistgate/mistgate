@@ -2,11 +2,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { ProfilesScreen } from "./list";
 import { validateProfilesSearch } from "./search";
 
+let role = Role.OWNER;
 const all = [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON];
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
@@ -31,6 +33,7 @@ vi.mock("@/lib/api", async (orig) => ({
         ],
       }),
   },
+  auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   groups: { listGroups: () => Promise.resolve({ groups: [{ id: "g", name: "Family", profileIds: ["p_run", "p_nowhere", "p_tg"], userCount: 5, dnsPresetId: "", happNodes: 2, amneziaNodes: 0 }] }) },
 }));
 
@@ -61,6 +64,7 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
   search = {};
+  role = Role.OWNER;
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -90,6 +94,21 @@ const cells = (name: string) => [...row(name).querySelectorAll<HTMLElement>("[ta
 const radio = (start: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent!.startsWith(start))!;
 
 describe("the profiles list", () => {
+  it("offers a new profile to the owner only: the helper and the observer read the list", async () => {
+    await mount();
+    expect(document.body.textContent).toContain("New profile");
+    act(() => root?.unmount());
+    host?.remove();
+    for (const r of [Role.HELPER, Role.READONLY]) {
+      role = r;
+      await mount();
+      expect(names()).toEqual(["nowhere", "runs", "lonely", "tg"]);
+      expect(document.body.textContent).not.toContain("New profile");
+      act(() => root?.unmount());
+      host?.remove();
+    }
+  });
+
   it("is one row per profile in the protocols' order, the name being the row's link", async () => {
     await mount();
     expect(names()).toEqual(["nowhere", "runs", "lonely", "tg"]);

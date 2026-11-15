@@ -26,6 +26,7 @@ import { avatarIndex } from "@/screens/users/format";
 import { ConfirmModal, Panel, useDebounced } from "@/screens/users/ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { reloadPage, useStaleVersion } from "@/lib/stale";
+import { useIsOwner } from "@/lib/updates";
 import { allFields, changedFields, getAt, makeSecret, parseSchema, parseSettings, setAt, withGeneratedSecrets, type Field, type Settings } from "./schema";
 import { AfterCreate, autoName, useAfterCreate } from "./after-create";
 import { AwgPanel, awgHidden, handTyped } from "./awg-panel";
@@ -73,6 +74,7 @@ function NewProfile() {
   const t = useTx();
   const go = useGo();
   const navigate = useNavigate();
+  const owner = useIsOwner();
   const protocols = useQuery(protocolsQuery);
   // "?node=<id>": made from that node's page; the profile goes on it and the editor returns there
   const { node = "", protocol = "" } = useSearch({ strict: false }) as { node?: string; protocol?: string };
@@ -94,6 +96,20 @@ function NewProfile() {
     enableBeforeUnload: () => held.current && !done.current,
     withResolver: true,
   });
+  // policy.go: making a profile is the owner's; the others have nothing to do on this page
+  if (!owner)
+    return (
+      <EmptyState
+        title={t("profiles.new")}
+        action={
+          <Button variant="secondary" size="lg" onClick={() => go("/profiles")}>
+            {t("profiles.back")}
+          </Button>
+        }
+      >
+        {t("profiles.ownerOnly")}
+      </EmptyState>
+    );
   if (protocols.isPending) return <Pending />;
   if (protocols.isError) return <QueryError error={protocols.error} onRetry={() => void protocols.refetch()} />;
   const list = [...protocols.data].sort((a, b) => byProtocol(a.id, b.id));
@@ -272,6 +288,9 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
   const navigate = useNavigate();
   const qc = useQueryClient();
   const isNew = !profile;
+  // policy.go: only the owner changes or deletes a profile; the helper and the observer read it (the page is a view)
+  const owner = useIsOwner();
+  const view = !isNew && !owner;
 
   const groups = useMemo(() => parseSchema(info.settingsSchemaJson), [info.settingsSchemaJson]);
   const fields = useMemo(() => allFields(groups), [groups]);
@@ -513,6 +532,8 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
         </div>
       </div>
 
+      {view && <Notice tone="quiet">{t("profiles.ownerOnly")}</Notice>}
+
       {notice === "stale" && (
         <Notice tone="danger">
           {t("profiles.stale")}
@@ -546,29 +567,32 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
 
       <div className="grid items-start gap-3.5 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-3.5">
-          <Card lg className="flex flex-col gap-3 p-4">
-            <ChoiceStrip info={info} t={t} onChange={onChangeProtocol} bare={!!profile} />
-            <div aria-hidden className="h-px bg-line" />
-            <TextField
-              icon="tag"
-              tone="lavender"
-              label={t("profiles.name")}
-              hint={t("profiles.nameHint")}
-              error={nameError && !name.trim() ? t("profiles.nameRequired") : undefined}
-              value={name}
-              onChange={(e) => {
-                setTyped(e.target.value);
-                setNameError(false);
-              }}
-              placeholder={t("profiles.namePh")}
-              autoComplete="off"
-              maxLength={64}
-            />
-          </Card>
-          {isNew && <AfterCreate a={after} info={info} settings={settings} />}
-          {isAwg && <AwgPanel settings={settings} onChange={edit} advice={preview.data && preview.data.errors.length === 0 ? { warnings: preview.data.warnings, score: preview.data.obfuscationScore } : undefined} />}
-          <SchemaForm protocol={info.id} groups={groups} settings={settings} base={base} problems={problems} onChange={isAwg ? (n) => edit(handTyped(settings, n)) : isVless ? (n) => edit(vlessEdited(settings, n)) : edit} hidden={hidden} offers={isVless ? vlessOffers : undefined} readOnly={readOnly} extra={extra} />
-          {profile && <DeleteSection profile={profile} inbounds={inbounds} />}
+          {/* inert: a reader sees every value and cannot change one (the controls are of several kinds, not all of them disable) */}
+          <div inert={view} className={cx("flex flex-col gap-3.5", view && "opacity-80")}>
+            <Card lg className="flex flex-col gap-3 p-4">
+              <ChoiceStrip info={info} t={t} onChange={onChangeProtocol} bare={!!profile} />
+              <div aria-hidden className="h-px bg-line" />
+              <TextField
+                icon="tag"
+                tone="lavender"
+                label={t("profiles.name")}
+                hint={t("profiles.nameHint")}
+                error={nameError && !name.trim() ? t("profiles.nameRequired") : undefined}
+                value={name}
+                onChange={(e) => {
+                  setTyped(e.target.value);
+                  setNameError(false);
+                }}
+                placeholder={t("profiles.namePh")}
+                autoComplete="off"
+                maxLength={64}
+              />
+            </Card>
+            {isNew && <AfterCreate a={after} info={info} settings={settings} />}
+            {isAwg && <AwgPanel settings={settings} onChange={edit} advice={preview.data && preview.data.errors.length === 0 ? { warnings: preview.data.warnings, score: preview.data.obfuscationScore } : undefined} />}
+            <SchemaForm protocol={info.id} groups={groups} settings={settings} base={base} problems={problems} onChange={isAwg ? (n) => edit(handTyped(settings, n)) : isVless ? (n) => edit(vlessEdited(settings, n)) : edit} hidden={hidden} offers={isVless ? vlessOffers : undefined} readOnly={readOnly} extra={extra} />
+          </div>
+          {profile && !view && <DeleteSection profile={profile} inbounds={inbounds} />}
         </div>
 
         <Panel
@@ -599,7 +623,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
         </Panel>
       </div>
 
-      {(count > 0 || isNew) && (
+      {(count > 0 || isNew) && !view && (
         <div className="screen-enter sticky bottom-[84px] z-[3] flex flex-wrap items-center gap-2 rounded-card border border-accent-line bg-surface py-2 pe-2 ps-4 md:bottom-4">
           <span className="min-w-[140px] flex-1 text-[13px] font-bold">{count > 0 ? t("profiles.dirty", { n: count }) : info.displayName}</span>
           {count > 0 && (
