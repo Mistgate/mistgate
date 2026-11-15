@@ -59,7 +59,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 		res.StateHash = a.observedHash(cur)
 		return done()
 	case err != nil:
-		a.log.Warn("desired state rejected", "revision", ds.Revision, "err", err)
+		a.log.Warn("desired state rejected", "code", "desired_state_rejected", "revision", ds.Revision, "err", err)
 		res.Status, res.Error = pb.ApplyStatus_APPLY_STATUS_REJECTED, err.Error()
 		res.StateHash = a.observedHash(cur)
 		return done()
@@ -79,7 +79,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	if ds.StateHash != "" && ds.StateHash != next.hash() {
 		// Not fatal: the authoritative comparison is the observed hash below, but this tells us whether the
 		// merge itself diverged from the panel's idea of the state.
-		a.log.Warn("merged state hash differs from the panel's", "revision", ds.Revision, "base", ds.BaseRevision)
+		a.log.Warn("merged state hash differs from the panel's", "code", "state_hash_mismatch", "revision", ds.Revision, "base", ds.BaseRevision)
 	}
 
 	results := a.reconcile(ctx, next, nil)
@@ -179,7 +179,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 						a.event(pb.Severity_SEVERITY_ERROR, "engine_failed", id, map[string]string{"error": err.Error()})
 					}
 				} else {
-					a.log.Warn("remove inbound", "inbound", id, "err", err)
+					a.log.Warn("remove inbound", "code", "inbound_remove_failed", "inbound", id, "err", err)
 				}
 			}
 		}
@@ -280,7 +280,7 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 		res.State, res.Error = pb.InboundRunState_INBOUND_RUN_STATE_FAILED, err.Error()
 		if h == nil || h.res.Error != res.Error || h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
 			if !isEnginePanic(err) {
-				a.log.Error("inbound failed", "inbound", spec.ID, "err", err)
+				a.log.Error("inbound failed", "code", "inbound_apply_failed", "inbound", spec.ID, "err", err)
 			}
 			if isBackendUnavailable(err) { // agent.proto "AWG AND WARP": awg_backend_unavailable {reason}
 				a.event(pb.Severity_SEVERITY_ERROR, "awg_backend_unavailable", spec.ID, map[string]string{"reason": res.Error})
@@ -377,7 +377,7 @@ func (a *Agent) applyEngine(ctx context.Context, spec plugin.InboundSpec, creds 
 	defer func() {
 		if v := recover(); v != nil {
 			err = &enginePanicError{reason: enginePanicReason(v)}
-			a.log.Error("engine panic", "protocol", spec.Protocol, "inbound", spec.ID, "operation", "apply", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
+			a.log.Error("engine panic", "code", "engine_apply_panic", "protocol", spec.Protocol, "inbound", spec.ID, "operation", "apply", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
 		}
 		if err == nil || !prior {
 			a.finishApplyMarker(spec.ID)
@@ -391,7 +391,7 @@ func (a *Agent) removeEngine(ctx context.Context, protocol string, eng engine.En
 	defer func() {
 		if v := recover(); v != nil {
 			err = &enginePanicError{reason: enginePanicReason(v)}
-			a.log.Error("engine panic", "protocol", protocol, "inbound", id, "operation", "remove", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
+			a.log.Error("engine panic", "code", "engine_remove_panic", "protocol", protocol, "inbound", id, "operation", "remove", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
 		}
 	}()
 	return eng.Remove(ctx, id)
@@ -403,7 +403,7 @@ func (a *Agent) loadApplyMarkers() {
 	}
 	markers, err := loadApplyMarkers(a.cfg.StateDir)
 	if err != nil {
-		a.log.Warn("apply crash marker ignored", "err", err)
+		a.log.Warn("apply crash marker ignored", "code", "apply_crash_marker_read_failed", "err", err)
 		markers = map[string]string{}
 		_ = saveApplyMarkers(a.cfg.StateDir, markers)
 	}
@@ -419,7 +419,7 @@ func (a *Agent) beginApplyMarker(id, specHash string) bool {
 	prior := a.applyMarkers[id] == specHash
 	a.applyMarkers[id] = specHash
 	if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
-		a.log.Error("write apply crash marker", "inbound", id, "err", err)
+		a.log.Error("write apply crash marker", "code", "apply_crash_marker_write_failed", "inbound", id, "err", err)
 	}
 	return prior
 }
@@ -428,7 +428,7 @@ func (a *Agent) finishApplyMarker(id string) {
 	a.loadApplyMarkers()
 	delete(a.applyMarkers, id)
 	if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
-		a.log.Warn("clear apply crash marker", "inbound", id, "err", err)
+		a.log.Warn("clear apply crash marker", "code", "apply_crash_marker_clear_failed", "inbound", id, "err", err)
 	}
 }
 
@@ -460,7 +460,7 @@ func (a *Agent) clearChangedApplyMarkers(ds *pb.DesiredState, next *model) {
 	}
 	if changed {
 		if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
-			a.log.Warn("clear changed apply crash marker", "err", err)
+			a.log.Warn("clear changed apply crash marker", "code", "apply_crash_marker_clear_failed", "err", err)
 		}
 	}
 }
@@ -470,7 +470,7 @@ func (a *Agent) reportStateIssues(issues []stateIssue) {
 		if issue.kind == "inbound" {
 			continue // applyInbound reports the failed inbound with its parse reason.
 		}
-		a.log.Warn("desired state item skipped", "kind", issue.kind, "id", issue.id, "reason", issue.reason)
+		a.log.Warn("desired state item skipped", "code", "desired_item_skipped", "kind", issue.kind, "id", issue.id, "reason", issue.reason)
 		a.event(pb.Severity_SEVERITY_ERROR, "desired_state_item_skipped", issue.id, map[string]string{"kind": issue.kind, "error": issue.reason})
 	}
 }
@@ -527,7 +527,7 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 	}
 	for id, msg := range rej {
 		if a.hopRej[id] != msg {
-			a.log.Error("port hop rejected", "inbound", id, "reason", msg)
+			a.log.Error("port hop rejected", "code", "port_hop_rejected", "inbound", id, "reason", msg)
 			a.event(pb.Severity_SEVERITY_ERROR, "hop_rejected", id, map[string]string{"error": msg})
 		}
 	}
@@ -538,7 +538,7 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 	}
 	if err := a.host.SetPortHops(ctx, hops); err != nil {
 		a.hopsSet = false
-		a.log.Error("port hopping not installed", "err", err)
+		a.log.Error("port hopping not installed", "code", "port_hop_sync_failed", "err", err)
 		for _, r := range results {
 			for _, h := range hops {
 				if h.InboundID == r.InboundId && r.Error == "" {
@@ -621,7 +621,7 @@ func (a *Agent) markHostFirewallSyncFailure(err error, udp []hostctl.UDPInboundP
 	errMsg := err.Error()
 	if a.hostFirewallErr != errMsg {
 		a.hostFirewallErr = errMsg
-		a.log.Warn("host firewall inbound rules were not fully reconciled", "err", err)
+		a.log.Warn("host firewall inbound rules were not fully reconciled", "code", "host_firewall_sync_failed", "err", err)
 		list := make([]string, len(udp))
 		for i, p := range udp {
 			if p.Port != 0 {

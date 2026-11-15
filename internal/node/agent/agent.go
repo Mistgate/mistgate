@@ -442,7 +442,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	reader.Now = a.now
 	a.osUpdateMonitor = osupdate.NewMonitor(reader)
 	if siteErr != nil {
-		a.log.Warn("persisted decoy site ignored", "err", siteErr)
+		a.log.Warn("persisted decoy site ignored", "code", "decoy_state_invalid", "err", siteErr)
 	}
 	a.id.Store(id)
 	a.settings.Store(&pb.NodeSettings{})
@@ -538,7 +538,7 @@ func (a *Agent) closeEngines() {
 		defer cancel()
 		for _, p := range a.protocols {
 			if err := a.engines[p].Close(ctx); err != nil {
-				a.log.Warn("engine close", "protocol", p, "err", err)
+				a.log.Warn("engine close", "code", "engine_close_failed", "protocol", p, "err", err)
 			}
 		}
 	})
@@ -560,11 +560,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.announceStart(ctx)
 	if cleaner, ok := a.host.(hostctl.UDPCountCleaner); ok {
 		if err := cleaner.CleanupUDPCount(ctx); err != nil {
-			a.log.Warn("stale UDP check table not removed", "err", err)
+			a.log.Warn("stale UDP check table not removed", "code", "udp_check_cleanup_failed", "err", err)
 		}
 	}
 	if err := a.host.ApplyBaseline(ctx); err != nil {
-		a.log.Warn("host baseline not fully applied", "err", err)
+		a.log.Warn("host baseline not fully applied", "code", "host_baseline_failed", "err", err)
 	}
 	a.restore(ctx)
 	a.warm = true
@@ -612,9 +612,9 @@ func (a *Agent) restore(ctx context.Context) {
 	if err != nil {
 		var partial *partialStateError
 		if errors.As(err, &partial) {
-			a.log.Warn("persisted state has invalid items", "err", err)
+			a.log.Warn("persisted state has invalid items", "code", "persisted_state_partial", "err", err)
 		} else {
-			a.log.Warn("persisted state ignored", "err", err)
+			a.log.Warn("persisted state ignored", "code", "persisted_state_invalid", "err", err)
 		}
 	}
 	if m.settings != nil {
@@ -671,7 +671,7 @@ func (a *Agent) persistModel(m *model, retryOnly bool) {
 
 	if err != nil {
 		if !wasUnsaved {
-			a.log.Error("could not persist the applied state", "err", err)
+			a.log.Error("could not persist the applied state", "code", "persisted_state_write_failed", "err", err)
 		}
 		return
 	}
@@ -707,12 +707,12 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		if errors.Is(err, errLinkNotEstablished) && !a.linkOnly() {
 			// session() has noted the failure, so the next session is mTLS until the hold period is over: no backoff
 			// wait, and none of the growth it would add to the delay of later real failures.
-			a.log.Warn("agent link failed; falling back to mTLS", "err", err)
+			a.log.Warn("agent link failed; falling back to mTLS", "code", "agent_link_fallback", "err", err)
 			continue
 		}
 		var wait time.Duration
 		wait, delay = backoffStep(delay, lived, a.backoffMin, a.backoffMax)
-		a.log.Warn("panel connection lost", "err", err, "lived", lived.Round(time.Second), "retry_in", wait.Round(10*time.Millisecond))
+		a.log.Warn("panel connection lost", "code", "panel_connection_lost", "err", err, "lived", lived.Round(time.Second), "retry_in", wait.Round(10*time.Millisecond))
 		sleepCtx(ctx, wait)
 	}
 }
@@ -1133,7 +1133,7 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 	a.upd.AckOutcome(a.helloOutcome.Swap(nil)) // the panel has this outcome now; stop repeating it
 	if math.Abs(float64(off)) > 30 {
 		if a.skewed.CompareAndSwap(false, true) {
-			a.log.Warn("clock differs from the panel", "offset_s", off)
+			a.log.Warn("clock differs from the panel", "code", "clock_offset", "offset_s", off)
 			a.event(pb.Severity_SEVERITY_WARNING, "clock_skew", "", map[string]string{"offset_s": strconv.FormatInt(off, 10)})
 		}
 	} else {
@@ -1199,9 +1199,9 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 	case *pb.ConnectResponse_Renew:
 		a.onRenewReply(m.Renew)
 	case *pb.ConnectResponse_HelloAck:
-		a.log.Warn("unexpected second HelloAck ignored")
+		a.log.Warn("unexpected second HelloAck ignored", "code", "unexpected_hello_ack")
 	default:
-		a.log.Warn("unknown panel message ignored")
+		a.log.Warn("unknown panel message ignored", "code", "unknown_panel_message")
 	}
 }
 
@@ -1482,7 +1482,7 @@ func (a *Agent) handle(ctx context.Context, j job) {
 	case j.sweep:
 		if forwardFix, ok := a.host.(hostctl.ForwardExceptionReassertor); ok {
 			if err := forwardFix.ReassertForwardExceptions(ctx); err != nil {
-				a.log.Warn("doctor forwarding exceptions could not be reasserted", "err", err)
+				a.log.Warn("doctor forwarding exceptions could not be reasserted", "code", "doctor_forwarding_sync_failed", "err", err)
 			}
 		}
 		a.syncOwnedIPv6(ctx)
@@ -1571,7 +1571,7 @@ func (a *Agent) restartInbound(ctx context.Context, r *pb.RestartInbound) *pb.Co
 // revoked the certificate, so a half-retired node that keeps trying would only loop. Failures are
 // reported in the CommandResult.
 func (a *Agent) retire(ctx context.Context, j job) {
-	a.log.Warn("retire requested by the panel")
+	a.log.Warn("retire requested by the panel", "code", "retire_requested")
 	a.busy.Add(1) // the answer and the drain below are on the session: it is not to be ended meanwhile
 	defer a.busy.Add(-1)
 	a.closeEngines()
@@ -1595,7 +1595,7 @@ func (a *Agent) retire(ctx context.Context, j job) {
 		j.s.drain(3 * time.Second)
 	}
 	if err := wipeState(a.cfg.StateDir); err != nil {
-		a.log.Error("could not delete the state directory", "err", err)
+		a.log.Error("could not delete the state directory", "code", "state_directory_delete_failed", "err", err)
 	}
 	a.cancel(ErrRetired)
 }

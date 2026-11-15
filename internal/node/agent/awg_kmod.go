@@ -65,7 +65,7 @@ func (a *Agent) reapplyAwgAfterKmod(ctx context.Context) {
 	if r, ok := a.engines[awg.Protocol].(AwgModuleReprober); ok {
 		moved, err := r.ReprobeKernel(ctx)
 		if err != nil {
-			a.log.Warn("AmneziaWG engine re-probe after module sync failed", "err", err)
+			a.log.Warn("AmneziaWG engine re-probe after module sync failed", "code", "awg_reprobe_failed", "err", err)
 		}
 		if !moved {
 			return

@@ -170,7 +170,7 @@ func (a *Agent) recordCrash(now time.Time) int {
 		b.WriteByte('\n')
 	}
 	if err := writeFileAtomic(p, []byte(b.String()), 0o600); err != nil {
-		a.log.Warn("could not keep the crash log", "err", err)
+		a.log.Warn("could not keep the crash log", "code", "crash_log_write_failed", "err", err)
 	}
 	return len(keep)
 }
@@ -179,6 +179,6 @@ func (a *Agent) recordCrash(now time.Time) int {
 func (a *Agent) markCleanExit() {
 	body := strconv.FormatInt(a.now().Unix(), 10) + " " + a.cfg.Version + "\n"
 	if err := writeFileAtomic(filepath.Join(a.cfg.StateDir, fileCleanExit), []byte(body), 0o600); err != nil {
-		a.log.Warn("could not mark the clean exit", "err", err)
+		a.log.Warn("could not mark the clean exit", "code", "clean_exit_marker_failed", "err", err)
 	}
 }

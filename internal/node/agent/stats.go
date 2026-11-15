@@ -94,7 +94,7 @@ func (a *Agent) collectLoop(ctx context.Context) {
 		a.push(&pb.ConnectRequest{Message: &pb.ConnectRequest_Stats{Stats: a.buildBatch(ctx, last, end)}})
 		last = end
 		if n := a.out.takeDropped(); n > 0 {
-			a.log.Warn("unacked statistics dropped", "batches", n)
+			a.log.Warn("unacked statistics dropped", "code", "stats_unacked_dropped", "batches", n)
 			a.event(pb.Severity_SEVERITY_WARNING, "stats_dropped", "", map[string]string{"batches": strconv.FormatUint(uint64(n), 10)})
 		}
 	}
@@ -112,7 +112,7 @@ func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsB
 		e := a.engines[p]
 		c, err := e.Collect(ctx)
 		if err != nil {
-			a.log.Warn("collect failed", "protocol", p, "err", err)
+			a.log.Warn("collect failed", "code", "stats_collect_failed", "protocol", p, "err", err)
 		}
 		links = append(links, c.Links...)
 		for _, t := range c.Traffic {
