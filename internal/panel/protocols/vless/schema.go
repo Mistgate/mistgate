@@ -47,7 +47,7 @@ const settingsSchema = `{
       "type": "object", "title": "CDN", "x-group": "tls", "x-order": 30,
       "properties": {
         "host": {"type": "string", "default": "", "title": "CDN host", "description": "The host clients connect to. The client Host and SNI use this value.", "x-order": 10, "x-critical": true},
-        "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 443, "title": "CDN port", "x-order": 20}
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 443, "title": "CDN port", "x-order": 20, "x-critical": true}
       }
     },
     "reality": {
