@@ -153,7 +153,7 @@ pid_is() { # pid file $1 names a live process whose command line is "... mistgat
 	read -r pi_p <"$1" || return 1
 	case ${pi_p} in ""|*[!0-9]*) return 1 ;; esac
 	[ -r "/proc/${pi_p}/cmdline" ] || return 1
-	pi_c=$(tr '\000' ' ' <"/proc/${pi_p}/cmdline")
+	pi_c=$(tr '\000' ' ' <"/proc/${pi_p}/cmdline" 2>/dev/null) || return 1
 	case ${pi_c} in *"mistgate-probe $2 "*) PIDOF=${pi_p}; return 0 ;; esac
 	return 1
 }

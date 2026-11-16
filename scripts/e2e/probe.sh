@@ -509,8 +509,8 @@ say "points: $GOT"
 check "de1 (SYNs dropped), nl1 (RST after the ClientHello), de2 (freeze after 16 KB), de3 (open): tcp_timeout, tls_reset, freeze, reach" \
   '[ "$GOT" = "de1=dark tcp_timeout nl1=dark tls_reset de2=dark freeze de3=reach" ]'
 check "the point names operator, city and probe, and holds no address" '
-  v=$(api HealthService/GetChecks "$(jq -nc --arg id "${NODE_ID[de3]}" "{nodeId:\$id}")" | jq -r "[.countryChecks[]?.vantages[]? | select(.source == \"probes\")][0].network")
-  echo "network: $v"; [ "$v" = "AS64496 · Exampleville · probe alice" ]'
+  v=$(api HealthService/GetChecks "$(jq -nc --arg id "${NODE_ID[de3]}" "{nodeId:\$id}")" | jq -r "[.countryChecks[]?.vantages[]? | select(.source == \"probes\")][0] | (.network + \" | \" + (.probeName // \"\"))")
+  echo "network | probe: $v"; [ "$v" = "AS64496 · Exampleville | alice" ]'
 check "the panel counts the probe's checks of the day" '[ "$(probe_json | jq -r ".checksDay // 0")" -gt 0 ]'
 
 # a reference that opens: nothing filters on the way, so "reach" proves nothing (no_filter); the dark points stay
