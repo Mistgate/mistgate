@@ -707,6 +707,7 @@ message CountryVantage {
   uint32 dpi_hop = 9;
   bool icmp_ok = 10;
   bool tcp_ok = 11;
+  string why = 12;
 }
 
 // One source's newest fresh verdict, including unknown when that source ran without a usable result.

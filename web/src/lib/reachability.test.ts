@@ -88,7 +88,7 @@ describe("the source lines", () => {
 describe("a network that reaches none of the nodes", () => {
   type Vantage = CountryCheck["vantages"][number];
   const v = (source: string, key: string, state: string, over: Partial<Vantage> = {}): Vantage => ({
-    source, key, network: key, region: "", asn: "", kind: "", state, atUnix: now, dpiHop: 0, icmpOk: false, tcpOk: false, ...over,
+    source, key, network: key, region: "", asn: "", kind: "", state, atUnix: now, dpiHop: 0, icmpOk: false, tcpOk: false, why: "", ...over,
   });
   const crimea = (state: string) => v("bsbord", "mts|krym|off", state, { network: "MTS", region: "КРЫМ" });
   const node = (...vantages: Vantage[]) => ({ vantages }) as CountryCheck;

@@ -3380,6 +3380,7 @@ type CountryVantage struct {
 	DpiHop        uint32 `protobuf:"varint,9,opt,name=dpi_hop,json=dpiHop,proto3" json:"dpi_hop,omitempty"`
 	IcmpOk        bool   `protobuf:"varint,10,opt,name=icmp_ok,json=icmpOk,proto3" json:"icmp_ok,omitempty"`
 	TcpOk         bool   `protobuf:"varint,11,opt,name=tcp_ok,json=tcpOk,proto3" json:"tcp_ok,omitempty"`
+	Why           string `protobuf:"bytes,12,opt,name=why,proto3" json:"why,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3489,6 +3490,13 @@ func (x *CountryVantage) GetTcpOk() bool {
 		return x.TcpOk
 	}
 	return false
+}
+
+func (x *CountryVantage) GetWhy() string {
+	if x != nil {
+		return x.Why
+	}
+	return ""
 }
 
 // One source's newest fresh verdict, including unknown when that source ran without a usable result.
@@ -3845,7 +3853,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x19\n" +
 	"\bcheck_id\x18\x02 \x01(\tR\acheckId\"S\n" +
 	"\x1aUnacceptDoctorItemResponse\x125\n" +
-	"\x06doctor\x18\x01 \x01(\v2\x1d.mistgate.admin.v1.NodeDoctorR\x06doctor\"\x8e\x02\n" +
+	"\x06doctor\x18\x01 \x01(\v2\x1d.mistgate.admin.v1.NodeDoctorR\x06doctor\"\xa0\x02\n" +
 	"\x0eCountryVantage\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x18\n" +
@@ -3858,7 +3866,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\adpi_hop\x18\t \x01(\rR\x06dpiHop\x12\x17\n" +
 	"\aicmp_ok\x18\n" +
 	" \x01(\bR\x06icmpOk\x12\x15\n" +
-	"\x06tcp_ok\x18\v \x01(\bR\x05tcpOk\"\xb3\x01\n" +
+	"\x06tcp_ok\x18\v \x01(\bR\x05tcpOk\x12\x10\n" +
+	"\x03why\x18\f \x01(\tR\x03why\"\xb3\x01\n" +
 	"\rSourceVerdict\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12;\n" +
 	"\averdict\x18\x02 \x01(\x0e2!.mistgate.admin.v1.CountryVerdictR\averdict\x12\x18\n" +
