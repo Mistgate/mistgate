@@ -337,7 +337,7 @@ func (s *Service) scheduledTurn(ctx context.Context, admin store.Admin, tokenID,
 		}
 		for _, raw := range response.Transcript {
 			history = append(history, raw)
-			res.transcript = append(res.transcript, raw)
+			res.transcript = append(res.transcript, storedTranscript(raw))
 		}
 		if response.Text != "" {
 			text.WriteString(paragraphBreak(text.String(), response.Text) + response.Text)
@@ -416,7 +416,7 @@ func (s *Service) scheduledTool(ctx context.Context, session mcp.AssistantSessio
 		return toolOutput{err: true, text: "tool call limit reached; no tool was run"}
 	}
 	*used++
-	ui := &adminv1.ToolCall{Id: cleanContextText(tc.id, 100), Tool: cleanContextText(tc.name, 100), ArgsJson: clipped(safeToolArgs(tc.input), 1200), Done: true}
+	ui := &adminv1.ToolCall{Id: cleanContextText(tc.id, 100), Tool: cleanContextText(tc.name, 100), ArgsJson: clipped(safeToolArgs(compactBulkyArgs(tc.name, tc.input)), 1200), Done: true}
 	var execution toolExecution
 	if tool.local {
 		execution = s.executeLocalTool(ctx, admin, conversationID, tc.name, input)
