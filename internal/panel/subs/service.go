@@ -36,7 +36,7 @@ type Service struct {
 	brand    func(ctx context.Context) (instance.Settings, error)
 	dns      DefaultPresets // nil = no DNS module: default_dns_preset_id stays empty
 	log      *slog.Logger
-	notify   StateNotifier // told when a switch to STRICT revoked devices; nil = nobody to tell
+	notify   StateNotifier    // told when a switch to STRICT revoked devices; nil = nobody to tell
 	preview  ProfilePreviewer // the views of the Mihomo template preview; nil = the preview is not available
 }
 

@@ -84,7 +84,9 @@ func proxyNode(line string) (*yaml.Node, string, bool) {
 }
 
 // uniqueName makes a proxy name safe: not one of the core's adapter names and not taken yet (subsettings.CoreNames).
-func uniqueName(name string, taken map[string]bool) string { return subsettings.UniqueName(name, taken) }
+func uniqueName(name string, taken map[string]bool) string {
+	return subsettings.UniqueName(name, taken)
+}
 
 // groupName is the name of the select group: the subscription title without what would break a rule line
 // ("MATCH,<group>" is split at commas) or the "#group" fragment of a nameserver (split at "&" and "=").
