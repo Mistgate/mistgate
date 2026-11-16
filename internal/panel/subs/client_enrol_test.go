@@ -26,7 +26,6 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
-	"github.com/mistgate/mistgate/internal/panel/protocols/trusttunnel"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
@@ -132,13 +131,7 @@ func newEnrolEnvWith(t *testing.T, mut func(*subs.Config, *store.Store)) *enrolE
 
 func trustTunnelRegistry(t *testing.T) *protocols.Registry {
 	t.Helper()
-	plugins := builtin.Registry().List()
-	plugins = append(plugins, trusttunnel.New())
-	r, err := protocols.NewRegistry(plugins...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return r
+	return builtin.Registry() // TrustTunnel is a built-in of the VPS edition
 }
 
 func newEnrolEnvWithRegistry(t *testing.T, registry *protocols.Registry, mut func(*subs.Config, *store.Store)) *enrolEnv {

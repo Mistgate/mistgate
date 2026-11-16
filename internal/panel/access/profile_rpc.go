@@ -858,6 +858,20 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 		}
 		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_paused", Params: params})
 	}
+	// TrustTunnel serves the node's own site on its TCP port, so a Hysteria2 site there is closed and nothing else changes: the
+	// same pause as under VLESS, told apart by its code because the admin's sentence for hy2_decoy_paused names VLESS.
+	appendTakenWarning := func(port int, hy2, trustTunnel string) {
+		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_site_taken", Params: map[string]string{
+			"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "trusttunnel": trustTunnel}})
+	}
+	if spec.Protocol == "trusttunnel" && spec.Listen.Network == "tcp" {
+		for _, other := range others {
+			if other.enabled && other.protocol == "hysteria2" && hy2TCPPort(other.spec) == int(spec.Listen.Port) {
+				appendTakenWarning(int(spec.Listen.Port), other.profile, profileName)
+				break
+			}
+		}
+	}
 	if spec.Protocol == "vless" && spec.Listen.Network == "tcp" {
 		for _, other := range others {
 			if !other.enabled || other.protocol != "hysteria2" || hy2TCPPort(other.spec) != int(spec.Listen.Port) {
@@ -870,11 +884,17 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 		port := hy2TCPPort(spec)
 		if port > 0 {
 			for _, other := range others {
-				if !other.enabled || other.protocol != "vless" || other.l.Network != "tcp" || int(other.l.Port) != port {
+				if !other.enabled || other.l.Network != "tcp" || int(other.l.Port) != port {
 					continue
 				}
-				appendDecoyWarning(port, profileName, other.profile, other.spec, spec)
-				break
+				if other.protocol == "vless" {
+					appendDecoyWarning(port, profileName, other.profile, other.spec, spec)
+					break
+				}
+				if other.protocol == "trusttunnel" {
+					appendTakenWarning(port, profileName, other.profile)
+					break
+				}
 			}
 		}
 	}

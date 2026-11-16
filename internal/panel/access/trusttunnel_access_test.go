@@ -18,13 +18,7 @@ import (
 
 func registerTrustTunnelForTest(t *testing.T, e *env) {
 	t.Helper()
-	plugins := builtin.Registry().List()
-	plugins = append(plugins, trusttunnel.New())
-	r, err := protocols.NewRegistry(plugins...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.s.reg = r
+	e.s.reg = builtin.Registry() // TrustTunnel is a built-in of the VPS edition
 }
 
 func TestTrustTunnelCreateInboundDomainErrorAndSNI(t *testing.T) {

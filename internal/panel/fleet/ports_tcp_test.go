@@ -126,6 +126,16 @@ func TestTCPTargets(t *testing.T) {
 			specs: []tcpSpec{{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
 				Settings: json.RawMessage(`{"domains":["node-a.example.com"],"fallback":"decoy"}`)}}},
 		},
+		"a TrustTunnel port is probed as a site, with ALPN on 443, and closes a Hysteria2 site there": {
+			specs: []tcpSpec{hy2Spec("a", plugin.TLSAcmeDomain, "node-a.example.com", ""),
+				{Profile: "TrustTunnel", Spec: plugin.InboundSpec{ID: "tt", Protocol: "trusttunnel", Listen: plugin.Listen{Network: "tcp", Port: 443},
+					TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "node-a.example.com"}, Settings: json.RawMessage(`{"h3":true}`)}}},
+			pins: map[string]string{"tt": pin},
+			want: []tcpTarget{
+				{Port: 80, Role: "acme", Kind: "http_mark"},
+				{Port: 443, Role: "site", ALPN: true, Profile: "TrustTunnel", Kind: "tls", SNI: "node-a.example.com", Pin: pin},
+			},
+		},
 		"a UDP inbound of another protocol is not a TCP port": {
 			specs: []tcpSpec{{Profile: "awg", Spec: plugin.InboundSpec{ID: "w", Protocol: "awg", Listen: plugin.Listen{Network: "udp", Port: 51820}}}},
 		},
