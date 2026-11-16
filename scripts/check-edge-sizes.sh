@@ -32,7 +32,11 @@ entries=(
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.
-  "mistgate-edge-link:30"
+  # 31 MiB in November 2026 (30.003 MiB measured, 2.9 KiB over 30): nothing of own probes runs here (the service, its
+  # proto package and its health code are VPS-only and are not linked), but the fields a probe point adds to the shared
+  # CountryVantage message (why, probe name, port) are part of adminv1, which wireCore links into every Worker, and the
+  # previous steps had left this entry 5 KiB of room. The message cannot move: the admin reads it from the same package.
+  "mistgate-edge-link:31"
   # Scheduled work: wireCore, so Telegram, updates and WARP are in it for the work that will move here. Measured 25.1 MiB;
   # 28.1 MiB in November 2026 with the two-sender UDP port check (fleet, in wireCore: the periodic port recheck runs here).
   "mistgate-edge-jobs:31"
