@@ -2593,7 +2593,7 @@ export const UserService: GenService<{
   },
   /**
    * Makes the person's TrustTunnel key if they have none. TrustTunnel has to be on and the person active. The key is kind KEY
-   * and counts against their device limit; at the limit this fails with device_limit.
+   * and counts against their device limit; at the limit this fails with device_limit ("device_limit: used/limit", as for an AmneziaVPN key).
    *
    * @generated from rpc mistgate.admin.v1.UserService.IssueTrustTunnelKey
    */

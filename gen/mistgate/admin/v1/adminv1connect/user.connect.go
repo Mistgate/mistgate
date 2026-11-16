@@ -129,7 +129,7 @@ type UserServiceClient interface {
 	// Links are returned only when TrustTunnel is on, the person is active, a key exists and a usable inbound runs.
 	GetTrustTunnelLinks(context.Context, *connect.Request[v1.GetTrustTunnelLinksRequest]) (*connect.Response[v1.GetTrustTunnelLinksResponse], error)
 	// Makes the person's TrustTunnel key if they have none. TrustTunnel has to be on and the person active. The key is kind KEY
-	// and counts against their device limit; at the limit this fails with device_limit.
+	// and counts against their device limit; at the limit this fails with device_limit ("device_limit: used/limit", as for an AmneziaVPN key).
 	IssueTrustTunnelKey(context.Context, *connect.Request[v1.IssueTrustTunnelKeyRequest]) (*connect.Response[v1.IssueTrustTunnelKeyResponse], error)
 	// Revokes the TrustTunnel key and frees its device-limit slot; nodes drop the credential with the next desired state.
 	// TrustTunnel stays on.
@@ -429,7 +429,7 @@ type UserServiceHandler interface {
 	// Links are returned only when TrustTunnel is on, the person is active, a key exists and a usable inbound runs.
 	GetTrustTunnelLinks(context.Context, *connect.Request[v1.GetTrustTunnelLinksRequest]) (*connect.Response[v1.GetTrustTunnelLinksResponse], error)
 	// Makes the person's TrustTunnel key if they have none. TrustTunnel has to be on and the person active. The key is kind KEY
-	// and counts against their device limit; at the limit this fails with device_limit.
+	// and counts against their device limit; at the limit this fails with device_limit ("device_limit: used/limit", as for an AmneziaVPN key).
 	IssueTrustTunnelKey(context.Context, *connect.Request[v1.IssueTrustTunnelKeyRequest]) (*connect.Response[v1.IssueTrustTunnelKeyResponse], error)
 	// Revokes the TrustTunnel key and frees its device-limit slot; nodes drop the credential with the next desired state.
 	// TrustTunnel stays on.

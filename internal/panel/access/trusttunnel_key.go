@@ -80,8 +80,8 @@ func (s *Service) issueTrustTunnelKey(ctx context.Context, by string, u store.Ac
 		return false, notFound("user")
 	case err != nil:
 		var limit *store.AccessLimitError
-		if errors.As(err, &limit) {
-			return false, failed("device_limit_reached")
+		if errors.As(err, &limit) { // the code the admin words itself, as for an AmneziaVPN key: "device_limit: 5/5: names"
+			return false, failed("device_limit: %d/%d%s", limit.Used, limit.Limit, s.limitDevices(ctx, u.ID))
 		}
 		return false, s.internal("issue TrustTunnel key", err)
 	}

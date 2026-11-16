@@ -314,8 +314,8 @@ func TestTrustTunnelKeyIssueAtLimitReturnsDeviceLimit(t *testing.T) {
 	if _, err := r.e.s.Subscription(r.e.ctx, r.token); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.e.s.issueTrustTunnelKey(r.e.ctx, "admin", r.user()); err == nil || !strings.Contains(err.Error(), "device_limit_reached") {
-		t.Fatalf("issue at the device limit = %v, want device_limit_reached", err)
+	if _, err := r.e.s.issueTrustTunnelKey(r.e.ctx, "admin", r.user()); err == nil || !strings.HasPrefix(err.Error(), "failed_precondition: device_limit: 1/1") {
+		t.Fatalf("issue at the device limit = %v, want device_limit: 1/1", err)
 	}
 	if _, _, err := r.e.st.Access().TrustTunnelKey(r.e.ctx, r.userID); err != store.ErrNotFound {
 		t.Fatalf("limit refusal left a key: %v", err)

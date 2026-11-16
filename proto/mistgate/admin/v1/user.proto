@@ -66,7 +66,7 @@ service UserService {
   // Links are returned only when TrustTunnel is on, the person is active, a key exists and a usable inbound runs.
   rpc GetTrustTunnelLinks(GetTrustTunnelLinksRequest) returns (GetTrustTunnelLinksResponse);
   // Makes the person's TrustTunnel key if they have none. TrustTunnel has to be on and the person active. The key is kind KEY
-  // and counts against their device limit; at the limit this fails with device_limit.
+  // and counts against their device limit; at the limit this fails with device_limit ("device_limit: used/limit", as for an AmneziaVPN key).
   rpc IssueTrustTunnelKey(IssueTrustTunnelKeyRequest) returns (IssueTrustTunnelKeyResponse);
   // Revokes the TrustTunnel key and frees its device-limit slot; nodes drop the credential with the next desired state.
   // TrustTunnel stays on.
