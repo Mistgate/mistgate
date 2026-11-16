@@ -278,10 +278,11 @@ func TestRoleOffAndTunnelReplaced(t *testing.T) {
 	r := newRig(t, false)
 	first := r.panel(t, r.ca.server(t, tunnelSNI))
 	r.waitTunnel(t, true)
+	// The new dial carries the subscription name as SNI too: it must replace the tunnel, never be forwarded through it.
 	r.panel(t, r.ca.server(t, tunnelSNI))
 	_ = first.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if _, err := io.Copy(io.Discard, first); err != nil && !isTimeout(err) {
-		t.Logf("first tunnel ended: %v", err)
+	if _, err := io.Copy(io.Discard, first); isTimeout(err) {
+		t.Fatal("the first tunnel stayed up: the second dial was not taken as the tunnel")
 	}
 	r.waitTunnel(t, true)
 	r.host.Configure(Config{})
