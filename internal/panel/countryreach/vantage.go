@@ -22,6 +22,8 @@ type Vantage struct {
 	ASN       string `json:"asn,omitempty"`
 	Kind      string `json:"kind,omitempty"`
 	State     string `json:"state"`
+	At        int64  `json:"at,omitempty"`
+	Why       string `json:"why,omitempty"`
 	DPIHop    int    `json:"dpi_hop,omitempty"`
 	TargetHop int    `json:"target_hop,omitempty"`
 	ICMPOK    bool   `json:"icmp_ok,omitempty"`

@@ -807,19 +807,36 @@ func externalSourcePath(source string) bool {
 	return source == countryreach.SourceCheburcheck || source == countryreach.SourceCheburcheckOwn
 }
 
-func externalSourceEyeball(source string) bool {
+func externalSourceEyeball(source string, kinds ...string) bool {
 	switch source {
 	case countryreach.SourceCheburcheck, countryreach.SourceCheburcheckOwn, countryreach.SourceBsbord,
 		countryreach.SourceBsbordTunnel, countryreach.SourceBsbordGeo:
 		return true
+	case countryreach.SourceProbes:
+		return len(kinds) > 0 && (kinds[0] == countryreach.VantageKindHome || kinds[0] == countryreach.VantageKindMobile)
 	default:
 		return false
 	}
 }
 
+func externalVantagesEyeball(source string, vantages []countryreach.Vantage) bool {
+	if source != countryreach.SourceProbes {
+		return externalSourceEyeball(source)
+	}
+	for _, vantage := range vantages {
+		if externalSourceEyeball(source, vantage.Kind) {
+			return true
+		}
+	}
+	return false
+}
+
 func countryVantageProto(source string, at time.Time, v countryreach.Vantage) *adminv1.CountryVantage {
+	if v.At != 0 {
+		at = time.Unix(v.At, 0).UTC()
+	}
 	return &adminv1.CountryVantage{Source: source, Key: v.Key, Network: v.Network, Region: v.Region, Asn: v.ASN, Kind: v.Kind, State: v.State,
-		AtUnix: at.Unix(), DpiHop: uint32(max(v.DPIHop, 0)), IcmpOk: v.ICMPOK, TcpOk: v.TCPOK}
+		AtUnix: at.Unix(), DpiHop: uint32(max(v.DPIHop, 0)), IcmpOk: v.ICMPOK, TcpOk: v.TCPOK, Why: v.Why}
 }
 
 func globalpingVantages(detail countryDetail) []countryreach.Vantage {
@@ -1035,13 +1052,20 @@ func (s *Service) countryChecks(ctx context.Context, nodeID string) ([]*adminv1.
 			}
 			var detail countryreach.ExtDetail
 			_ = json.Unmarshal([]byte(r.DetailJSON), &detail)
-			live = append(live, countryreach.Live{Source: r.Source, Verdict: r.Verdict, Reason: detail.Reason, Eyeball: externalSourceEyeball(r.Source),
-				Path: externalSourcePath(r.Source), At: r.At})
-			for _, v := range detail.Vantages {
-				m.Vantages = append(m.Vantages, countryVantageProto(r.Source, r.At, v))
+			verdict, reason, sourceAt := r.Verdict, detail.Reason, r.At
+			if r.Source == countryreach.SourceProbes {
+				detail, verdict, reason, sourceAt = currentProbeDetail(r, state.MaxAge, now)
+				if len(detail.Vantages) == 0 {
+					continue
+				}
 			}
-			if r.At.After(at) {
-				at = r.At
+			live = append(live, countryreach.Live{Source: r.Source, Verdict: verdict, Reason: reason, Eyeball: externalVantagesEyeball(r.Source, detail.Vantages),
+				Path: externalSourcePath(r.Source), At: sourceAt})
+			for _, v := range detail.Vantages {
+				m.Vantages = append(m.Vantages, countryVantageProto(r.Source, sourceAt, v))
+			}
+			if sourceAt.After(at) {
+				at = sourceAt
 			}
 		}
 		var b *store.BlocklistCheck
@@ -1200,7 +1224,7 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 		}
 	}
 	for _, r := range externalRows {
-		signals = append(signals, countryExternalSignal(r, externalBySource[r.Source]))
+		signals = append(signals, countryExternalSignalFor(r, externalBySource[r.Source], cc.Country, now))
 	}
 
 	ages6 := countryRoundMaxAges(cc.Interval, rows6)
@@ -1408,15 +1432,29 @@ func countryTSPUSignal(r tspuRound, maxAge time.Duration, name string) countryAl
 }
 
 func countryExternalSignal(r store.ExtCheck, maxAge time.Duration) countryAlertSignal {
+	return countryExternalSignalFor(r, maxAge, countryreach.TSPUCountry, time.Now())
+}
+
+// countryExternalSignalFor is countryExternalSignal for the country the owner chose. Only the own probes look from the chosen
+// country; the other external sources are Russian by construction and keep the constant they always had.
+func countryExternalSignalFor(r store.ExtCheck, maxAge time.Duration, country string, now time.Time) countryAlertSignal {
 	var detail countryreach.ExtDetail
 	_ = json.Unmarshal([]byte(r.DetailJSON), &detail)
+	verdict, reason := r.Verdict, detail.Reason
+	signalCountry := countryreach.TSPUCountry
+	if r.Source == countryreach.SourceProbes {
+		detail, verdict, reason, _ = currentProbeDetail(r, maxAge, now)
+		if country != "" {
+			signalCountry = country
+		}
+	}
 	vantages := make([]countryAlertVantage, 0, len(detail.Vantages))
 	for _, v := range detail.Vantages {
-		vantages = append(vantages, countryAlertVantage{vantage: v, eyeball: externalSourceEyeball(r.Source)})
+		vantages = append(vantages, countryAlertVantage{vantage: v, eyeball: externalSourceEyeball(r.Source, v.Kind)})
 	}
-	return countryAlertSignal{nodeID: r.NodeID, source: r.Source, verdict: r.Verdict, reason: detail.Reason,
-		country: countryreach.TSPUCountry, at: r.At, maxAge: maxAge, interval: maxAge / 3,
-		eyeball: externalSourceEyeball(r.Source), path: externalSourcePath(r.Source), vantages: vantages}
+	return countryAlertSignal{nodeID: r.NodeID, source: r.Source, verdict: verdict, reason: reason,
+		country: signalCountry, at: r.At, maxAge: maxAge, interval: maxAge / 3,
+		eyeball: externalVantagesEyeball(r.Source, detail.Vantages), path: externalSourcePath(r.Source), vantages: vantages}
 }
 
 func blockedTSPUPorts(ports []countryreach.TSPUPort) []uint16 {
@@ -1546,10 +1584,26 @@ type countryObservation struct {
 // partial and that same vantage reached another fleet node. A full block, whitelist unit, or source outage is not a D/R.
 func countryObservations(events []countryEvent, signals []countryAlertSignal) map[string][]countryObservation {
 	observations := map[string][]countryObservation{}
-	for _, event := range events {
+	// A row of the own probes keeps the points of the probes that did not report this time, so one measurement sits in several
+	// rows. It counts once, in the oldest row that has it: the row it was made for.
+	probeOwner := map[string]int{}
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].signal.source != countryreach.SourceProbes {
+			continue
+		}
+		for _, item := range events[i].signal.vantages {
+			if m := probeMeasurement(events[i].signal, item.vantage); probeOwner[m] == 0 {
+				probeOwner[m] = i + 1
+			}
+		}
+	}
+	for i, event := range events {
 		byKey := map[string]countryObservation{}
 		for _, item := range event.signal.vantages {
 			v := item.vantage
+			if event.signal.source == countryreach.SourceProbes && probeOwner[probeMeasurement(event.signal, v)] != i+1 {
+				continue
+			}
 			if v.State == countryreach.VantageStateWhitelist || v.State == countryreach.VantageStateUncertain ||
 				(event.signal.source == countryreach.SourceGlobalping && !item.eyeball) {
 				continue
@@ -1605,7 +1659,8 @@ func countryVantageReachedAnother(signal countryAlertSignal, item countryAlertVa
 		}
 		delta := signal.at.Sub(other.at)
 		switch signal.source {
-		case countryreach.SourceTSPU, countryreach.SourceBsbord, countryreach.SourceBsbordTunnel, countryreach.SourceBsbordGeo:
+		case countryreach.SourceTSPU, countryreach.SourceBsbord, countryreach.SourceBsbordTunnel, countryreach.SourceBsbordGeo,
+			countryreach.SourceProbes:
 			if delta != 0 {
 				continue
 			}
@@ -1701,7 +1756,8 @@ func countryPartialCond(n store.NodeRow, events []countryEvent, signals []countr
 		latest := seen[0]
 		networks = append(networks, countryVantageName(latest.source, latest.vantage))
 		sources[latest.source] = true
-		if latest.source != countryreach.SourceTSPU {
+		if latest.source != countryreach.SourceTSPU &&
+			(latest.source != countryreach.SourceProbes || externalSourceEyeball(latest.source, latest.vantage.Kind)) {
 			confidence = countryreach.ConfidenceEyeball
 		}
 	}

@@ -42,6 +42,7 @@ const (
 	SourceBsbord         = "bsbord"
 	SourceBsbordTunnel   = "bsbord_tunnel"
 	SourceBsbordGeo      = "bsbord_geo"
+	SourceProbes         = "probes"
 )
 
 // Live is the newest row from one source. Path means it can show the path past the TSPU, but cannot prove that the node
@@ -113,8 +114,10 @@ func sourceRank(source string) int {
 		return 6
 	case SourceLists:
 		return 7
-	default:
+	case SourceProbes:
 		return 8
+	default:
+		return 9
 	}
 }
 
