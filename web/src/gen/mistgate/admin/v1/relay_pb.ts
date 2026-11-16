@@ -1072,10 +1072,10 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * unchanged (agent.proto "RELAY FORWARDS" and "REVERSE RELAY"). People whose network blocks the exit reach it through the
  * entry; the entry sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay
  * on the exit.
- * 
+ *
  * Everything here is owner-only over /api (a helper and an API token get PERMISSION_DENIED). Through MCP a token may
  * read relays and run a check, and a change is a plan the owner approves in the admin. Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
- * 
+ *
  * TWO WAYS TO PASS ON (Relay.mode is the owner's choice, Relay.active_mode is what stands now):
  *   "dnat": the entry opens the connection to the exit's address itself (the kernel rewrites the destination). Cheap, the
  *     default for every existing relay; it needs the entry to reach the exit directly ("the leg").
@@ -1085,7 +1085,7 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  *     subscriptions, are the same in both ways.
  *   mode "auto" (the default) lets the panel choose: DNAT while the leg works, reverse when it does not and the pair can do it,
  *   back to DNAT when the leg is alive again (reason in Relay.mode_reason); "dnat" and "reverse" pin the way.
- * 
+ *
  * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a check less than 15
  * minutes ago that fits the way the relay would go:
  *   - dnat: the leg check (the entry node to the exit's server) must pass or be skipped as "unverifiable".
@@ -1102,9 +1102,9 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
  * failed, on an enrolled node) and the entry's agent lists "relay-forward/1" (a reverse relay also "relay-reverse/1", as does the
  * exit's agent).
- * 
+ *
  * A relay goes when its server is deleted, and when either node is retired.
- * 
+ *
  * ERRORS. NOT_FOUND: the relay, the server or the node. INVALID_ARGUMENT: a port that is neither 443 nor 1024-65535,
  * "same_node" (the entry holds the server itself), a mode that is not "auto", "dnat" or "reverse". ALREADY_EXISTS: "relay_exists"
  * (the entry already forwards this server), "port_taken" (a profile or a relay of the entry holds that network and port, hop

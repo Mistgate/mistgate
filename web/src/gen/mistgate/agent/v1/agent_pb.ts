@@ -1294,7 +1294,7 @@ export const JournalEntrySchema: GenMessage<JournalEntry> = /*@__PURE__*/
  * never reaches the node" from "the node refuses the key", "it connects and drops at once" and "it works". Counters, never
  * addresses: the client's address is not sent (Session.remote_ip is reserved), and no row says when a single connection
  * happened. The engines count on connection and handshake events only, never per data chunk.
- * 
+ *
  * cred_id "" is the inbound itself: what cannot be put on a credential (an unknown key, the handshake totals). The event
  * counters (connects, rejects, drops, stalls, unknown_keys) leave in the next batch; the volume counters (online_s, hellos,
  * handshakes) are added up and leave in the first batch after a 10-minute boundary of UTC (:00, :10, ...). A restart of the
@@ -3232,7 +3232,7 @@ export const PrepareAwgKernelSchema: GenMessage<PrepareAwgKernel> = /*@__PURE__*
  * listed "os-update/1". Answered with exactly one CommandResult (ok = true unless the job could not be started: error
  * "failed: <short>"); params.state is started (job_id) | running (job_id of the one going) | finished (job_id repeats the
  * last job, which is over: result, code, reason) | unsupported (code, reason).
- * 
+ *
  * Every field is an enumeration or an opaque id. The panel never sends a package name, a path or a command line, and the
  * node checks every value again: an unknown action, mode or reboot value, or a combination below that is not allowed,
  * is answered unsupported / code bad_request and nothing is run. What runs is decided on the node (see "OS UPDATES").

@@ -2474,6 +2474,7 @@ func (x *PersonNetwork) GetConnects() uint32 {
 //   - attrs keeps only these keys: inbound, protocol, profile, port, state, reason, code, backend, mode, version, kernel,
 //     iface, check, fix, count, err, error; at most 8, each value cleaned the same way and at most 160 characters.
 //   - inbound_id is the record's "inbound" attribute when it names an inbound.
+//
 // Records with the same level, source, message, inbound_id and attrs["code"] in one batch interval are one entry with a
 // count and the first and last time; after 64 kinds the rest are counted in one entry of source "agent" and message
 // "journal_overflow" (count = records left out). The panel cleans addresses again and replaces the node's own secret names.
