@@ -9,9 +9,11 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/plugin"
+	ttwire "github.com/mistgate/mistgate/internal/trusttunnel"
 )
 
 const (
@@ -234,5 +236,130 @@ func TestMistgatePathGoldensAndCapabilityGate(t *testing.T) {
 	otherFormat.Format = plugin.FormatURIList
 	if _, ok := New().Render(otherFormat); ok {
 		t.Fatal("Render() emitted a path for another client format")
+	}
+}
+
+func TestOfficialTrustTunnelDeepLinks(t *testing.T) {
+	base := protocols.RenderInput{
+		Format: plugin.FormatTTLink,
+		Inbound: protocols.InboundView{
+			Node: protocols.NodeView{Address: "de1.example.com"}, Port: 443,
+			TLSServerName: "de1.example.com", TLSMode: plugin.TLSAcmeDomain,
+		},
+		Secret: testUsername + ":" + testPassword, DNS: []string{"192.0.2.53", "2001:db8::53", "192.0.2.54", "192.0.2.55"}, NoIPv6Egress: true,
+		DisplayName: "de1",
+	}
+	check := func(name string, input protocols.RenderInput, want ttwire.DeepLink, golden string) {
+		t.Helper()
+		fragment, ok := New().Render(input)
+		if !ok || fragment.Format != plugin.FormatTTLink {
+			t.Fatalf("%s: Render() = %+v, %v", name, fragment, ok)
+		}
+		if string(fragment.Data) != golden {
+			t.Fatalf("%s: tt:// = %s, want %s", name, fragment.Data, golden)
+		}
+		got, err := ttwire.DecodeDeepLink(string(fragment.Data))
+		if err != nil {
+			t.Fatalf("%s: DecodeDeepLink: %v", name, err)
+		}
+		if got.Hostname != want.Hostname || len(got.Addresses) != len(want.Addresses) || got.HasIPv6 != want.HasIPv6 ||
+			got.Username != want.Username || got.Password != want.Password || got.Name != want.Name ||
+			len(got.DNSUpstreams) != len(want.DNSUpstreams) || got.CustomSNI != "" || got.SkipVerification ||
+			len(got.Certificate) != 0 || got.HTTP3 || got.AntiDPI || got.ClientRandomPrefix != "" ||
+			got.ClientRandomAuthKey != "" || got.SubscriptionURL != "" {
+			t.Fatalf("%s: decoded fields = %+v, want %+v", name, got, want)
+		}
+		for i := range want.Addresses {
+			if got.Addresses[i] != want.Addresses[i] {
+				t.Errorf("%s: address[%d] = %q, want %q", name, i, got.Addresses[i], want.Addresses[i])
+			}
+		}
+		for i := range want.DNSUpstreams {
+			if got.DNSUpstreams[i] != want.DNSUpstreams[i] {
+				t.Errorf("%s: dns_upstreams[%d] = %q, want %q", name, i, got.DNSUpstreams[i], want.DNSUpstreams[i])
+			}
+		}
+	}
+	check("direct ipv6 off with DNS", base, ttwire.DeepLink{
+		Hostname: "de1.example.com", Addresses: []string{"de1.example.com:443"}, HasIPv6: false,
+		Username: testUsername, Password: testPassword, Name: "de1", DNSUpstreams: []string{"192.0.2.53", "192.0.2.54"},
+	}, "tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDANkZTENFgoxOTIuMC4yLjUzCjE5Mi4wLjIuNTQ")
+
+	withoutDNS := base
+	withoutDNS.NoIPv6Egress, withoutDNS.DNS = false, nil
+	check("direct ipv6 on without DNS", withoutDNS, ttwire.DeepLink{
+		Hostname: "de1.example.com", Addresses: []string{"de1.example.com:443"}, HasIPv6: true,
+		Username: testUsername, Password: testPassword, Name: "de1",
+	}, "tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEBCQEBDANkZTE")
+
+	relay := base
+	relay.Inbound.Node.Address, relay.Inbound.Port, relay.Inbound.TCPOnly = "192.0.2.22", 8443, true
+	relay.DisplayName = "de1 via nl1"
+	check("relay twin", relay, ttwire.DeepLink{
+		Hostname: "de1.example.com", Addresses: []string{"192.0.2.22:8443"}, HasIPv6: false,
+		Username: testUsername, Password: testPassword, Name: "de1 via nl1", DNSUpstreams: []string{"192.0.2.53", "192.0.2.54"},
+	}, "tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3Ag8xOTIuMC4yLjIyOjg0NDMEAQAJAQEMC2RlMSB2aWEgbmwxDRYKMTkyLjAuMi41MwoxOTIuMC4yLjU0")
+
+	selfSigned := base
+	selfSigned.Inbound.TLSMode = plugin.TLSSelfSigned
+	fragment, ok := New().Render(selfSigned)
+	if ok || fragment.Data != nil || fragment.Note != plugin.NoteSelfSigned {
+		t.Fatalf("self-signed inbound = %+v, %v; want no link with self-signed note", fragment, ok)
+	}
+
+	masked := base
+	masked.MaskSecrets = true
+	fragment, ok = New().Render(masked)
+	if !ok {
+		t.Fatal("masked TrustTunnel link did not render")
+	}
+	decoded, err := ttwire.DecodeDeepLink(string(fragment.Data))
+	if err != nil || decoded.Username != protocols.MaskedSecret || decoded.Password != protocols.MaskedSecret {
+		t.Fatalf("masked link decoded as %+v, %v", decoded, err)
+	}
+}
+
+func TestOfficialTrustTunnelLinkNames(t *testing.T) {
+	in := protocols.RenderInput{
+		Format: plugin.FormatTTLink,
+		Inbound: protocols.InboundView{
+			Node: protocols.NodeView{Address: "de1.example.com"}, Port: 443,
+			TLSServerName: "de1.example.com", TLSMode: plugin.TLSAcmeDomain,
+		},
+		Secret: testUsername + ":" + testPassword,
+	}
+	render := func(name string) ttwire.DeepLink {
+		t.Helper()
+		in := in
+		in.DisplayName = name
+		fragment, ok := New().Render(in)
+		if !ok {
+			t.Fatalf("name %q did not render", name)
+		}
+		got, err := ttwire.DecodeDeepLink(string(fragment.Data))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := render("🇩🇪 Frankfurt · TrustTunnel"); got.Name != "🇩🇪 Frankfurt · TrustTunnel" {
+		t.Fatalf("a flag and a middle dot came back as %q", got.Name)
+	}
+	long := render(strings.Repeat("é", 5000))
+	if len(long.Name) == 0 || len(long.Name) > maxLinkName || !utf8.ValidString(long.Name) {
+		t.Fatalf("a long name came back as %d bytes, valid=%v", len(long.Name), utf8.ValidString(long.Name))
+	}
+
+	for name, mutate := range map[string]func(*protocols.RenderInput){
+		"hostname with a space": func(in *protocols.RenderInput) { in.Inbound.TLSServerName = "de1 example.com" },
+		"address with a slash":  func(in *protocols.RenderInput) { in.Inbound.Node.Address = "de1.example.com/x" },
+		"password with a colon": func(in *protocols.RenderInput) { in.Secret = testUsername + ":" + testPassword + ":x" },
+		"no port":               func(in *protocols.RenderInput) { in.Inbound.Port = 0 },
+	} {
+		bad := in
+		mutate(&bad)
+		if fragment, ok := New().Render(bad); ok || len(fragment.Data) != 0 {
+			t.Errorf("%s rendered %q", name, fragment.Data)
+		}
 	}
 }

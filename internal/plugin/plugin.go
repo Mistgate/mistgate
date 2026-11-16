@@ -169,12 +169,13 @@ type EngineHealth struct {
 type ClientID string
 
 const (
-	ClientHapp     ClientID = "happ"     // user toggle "Happ"
-	ClientAmnezia  ClientID = "amnezia"  // user toggle "Amnezia"
-	ClientTelegram ClientID = "telegram" // user toggle "Telegram": MTProto proxy links
-	ClientMistgate ClientID = "mistgate" // the first-party app, enrolled by its client API key
-	ClientMihomo   ClientID = "mihomo"
-	ClientSingbox  ClientID = "singbox" // the official sing-box apps (SFA, SFI, SFM); no user toggle of their own
+	ClientHapp        ClientID = "happ"        // user toggle "Happ"
+	ClientAmnezia     ClientID = "amnezia"     // user toggle "Amnezia"
+	ClientTelegram    ClientID = "telegram"    // user toggle "Telegram": MTProto proxy links
+	ClientTrustTunnel ClientID = "trusttunnel" // user toggle "TrustTunnel": official-app tt:// links
+	ClientMistgate    ClientID = "mistgate"    // the first-party app, enrolled by its client API key
+	ClientMihomo      ClientID = "mihomo"
+	ClientSingbox     ClientID = "singbox" // the official sing-box apps (SFA, SFI, SFM); no user toggle of their own
 )
 
 // ClientFormat is a subscription wire format.
@@ -191,6 +192,8 @@ const (
 	// FormatTelegramLink is one tg://proxy link. It is no subscription format: no subscription carries it, the person's
 	// own list of Telegram links does (access.SubView.Telegram).
 	FormatTelegramLink ClientFormat = "tg-link"
+	// FormatTTLink is one official-app tt:// key. It is not a subscription format; a person receives it in their key block.
+	FormatTTLink ClientFormat = "tt-link"
 )
 
 // ClientSupport says which client can consume a protocol, in which formats.

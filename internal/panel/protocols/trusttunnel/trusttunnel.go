@@ -50,7 +50,10 @@ func (*Protocol) Experimental() bool        { return true }
 func (*Protocol) SettingsSchema() []byte    { return []byte(settingsSchema) }
 func (*Protocol) Doctor() []protocols.Check { return nil }
 func (*Protocol) Clients() []plugin.ClientSupport {
-	return []plugin.ClientSupport{{Client: plugin.ClientMistgate, Formats: []plugin.ClientFormat{plugin.FormatMistgate}}}
+	return []plugin.ClientSupport{
+		{Client: plugin.ClientMistgate, Formats: []plugin.ClientFormat{plugin.FormatMistgate}},
+		{Client: plugin.ClientTrustTunnel, Formats: []plugin.ClientFormat{plugin.FormatTTLink}},
+	}
 }
 
 var _ protocols.Protocol = (*Protocol)(nil)
@@ -254,6 +257,9 @@ func encodeNodeCredential(username, password string) (json.RawMessage, error) {
 }
 
 func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
+	if in.Format == plugin.FormatTTLink {
+		return renderTTLink(in)
+	}
 	if in.Format != plugin.FormatMistgate {
 		return plugin.Fragment{}, false
 	}
