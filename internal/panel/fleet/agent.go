@@ -575,7 +575,7 @@ func sessionCloseError(close *SessionClose) error {
 
 // helloInfo takes what the node says about itself. Every string is bounded: they are stored and shown in the UI.
 func helloInfo(h *agentv1.Hello) store.HelloInfo {
-	info := store.HelloInfo{AgentVersion: clip(h.AgentVersion, 64), APIVersion: h.ApiVersion, Instance: h.InstanceId,
+	info := store.HelloInfo{AgentVersion: clipText(h.AgentVersion, 64), APIVersion: h.ApiVersion, Instance: h.InstanceId,
 		Built: h.Built, Caps: capabilities(h), LastUpdateJSON: lastUpdateJSON(h.LastUpdate)}
 	if slices.Contains(info.Caps, capNetworks) {
 		info.NetworksDBSHA256 = validNetworksDigest(h.NetworksDbSha256)
@@ -598,14 +598,14 @@ func helloInfo(h *agentv1.Hello) store.HelloInfo {
 		if ft.BootUnix > 0 {
 			info.BootAt = time.Unix(ft.BootUnix, 0).UTC()
 		}
-		info.Facts = store.NodeFactsRow{Hostname: clip(ft.Hostname, 128), OS: clip(ft.Os, 128), Kernel: clip(ft.Kernel, 128), Arch: clip(ft.Arch, 32),
-			CPUCount: ft.CpuCount, RAMTotal: min(ft.RamTotalBytes, 1<<62), DiskTotal: min(ft.DiskTotalBytes, 1<<62), Virt: clip(ft.Virt, 64), HasIPv6: ft.HasIpv6}
+		info.Facts = store.NodeFactsRow{Hostname: clipText(ft.Hostname, 128), OS: clipText(ft.Os, 128), Kernel: clipText(ft.Kernel, 128), Arch: clipText(ft.Arch, 32),
+			CPUCount: ft.CpuCount, RAMTotal: min(ft.RamTotalBytes, 1<<62), DiskTotal: min(ft.DiskTotalBytes, 1<<62), Virt: clipText(ft.Virt, 64), HasIPv6: ft.HasIpv6}
 	}
 	for i, e := range h.Engines {
 		if i == maxEngines {
 			break
 		}
-		info.Facts.Engines = append(info.Facts.Engines, store.EngineRow{Protocol: clip(e.Protocol, 64), Version: clip(e.Version, 64)})
+		info.Facts.Engines = append(info.Facts.Engines, store.EngineRow{Protocol: clipText(e.Protocol, 64), Version: clipText(e.Version, 64)})
 	}
 	return info
 }
@@ -653,6 +653,10 @@ func bucketHour(end, now time.Time) (hour int64, stale bool) {
 }
 
 func clip(s string, n int) string { return store.Clip(s, n) }
+
+// clipText is clip for text an admin reads as a name or a version (host facts, engines, update results): direction
+// and invisible-space characters go first.
+func clipText(s string, n int) string { return store.Clip(store.CleanDisplayText(s, n), n) }
 
 func runState(s agentv1.InboundRunState) string {
 	switch s {

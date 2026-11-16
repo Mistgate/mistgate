@@ -13,17 +13,16 @@ jobs:
     # the job past 50 min in November 2026. The tests now open a copy of a database migrated once per binary
     # (internal/panel/store/storetest): fleet takes 137 s under -race on a workstation (was 1790 s), agent 150 s. The limit
     # keeps a wide margin for hosted runners, which are about 1.7 times slower; a package that needs more is a finding.
-    # internal/node/vless is left out: the one race it still reports is inside xray-core (Vision's TrafficState, proxy.go
-    # reader at 255/384 against XtlsFilterTls at 629, shared by both copy directions and still unsynchronised in v26.11.9;
-    # TestXrayClientTrafficCountersAndObserved/tcp trips it, the rest of the package is clean). The XHTTP races and the checkptr
-    # reports of earlier cores are gone. Recheck after an xray-core bump with go test -race -count=1 ./internal/node/vless/
+    # internal/node/vless is in: the one race it used to report, in xray-core's Vision TrafficState (shared by both copy
+    # directions), is fixed in our fork of xray-core that go.mod's replace points to (github.com/Mistgate/Xray-core; upstream
+    # declined the fix). The XHTTP races and the checkptr reports of earlier cores are gone too.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
-      - run: go test -race -count=1 -timeout 50m ./internal/panel/fleet/ ./internal/node/agent/
+      - run: go test -race -count=1 -timeout 50m ./internal/panel/fleet/ ./internal/node/agent/ ./internal/node/vless/
   edge-store:
     runs-on: ubuntu-24.04
     steps:

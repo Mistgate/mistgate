@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -331,7 +332,7 @@ func checkPlaceholders(what, s string, known map[string]bool) error {
 }
 
 func noControl(s string) bool {
-	return !strings.ContainsFunc(s, func(r rune) bool { return r < 0x20 || r == 0x7f })
+	return !strings.ContainsFunc(s, unicode.IsControl)
 }
 
 // httpsURL checks an optional link: empty, or an absolute https URL without spaces or control characters (the user
@@ -429,7 +430,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 			return invalid("%s.description: control characters are not allowed", w)
 		}
 		if t := a.AddLinkTemplate; t != "" {
-			if len(t) > maxTemplate || !noControl(t) || strings.ContainsAny(t, " \t") {
+			if len(t) > maxTemplate || !noControl(t) || strings.ContainsFunc(t, unicode.IsSpace) {
 				return invalid("%s.add_link_template: not a valid link template", w)
 			}
 			if err := checkPlaceholders(w+".add_link_template", t, addKnown); err != nil {

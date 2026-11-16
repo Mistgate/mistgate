@@ -548,7 +548,7 @@ func (s *Service) audit(ctx context.Context, action string, params any) {
 		ipText = ip.String()
 	}
 	if err := s.st.Audit(ctx, time.Now(), store.AuditEntry{
-		Actor: auth.ActorLabel(ctx), Action: action, Params: string(encoded),
+		Actor: auth.ActorID(ctx), Action: action, Params: string(encoded),
 		Result: "ok", IP: ipText,
 	}); err != nil {
 		s.log.Warn("write backup audit event failed", "code", "audit_unavailable")

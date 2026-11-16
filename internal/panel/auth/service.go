@@ -63,7 +63,7 @@ type Config struct {
 	Origins []string // allowed browser origins, e.g. "https://k7q2x9.example.com"
 	// Vault seals the TOTP secrets at rest. Without it password sign-in is unavailable.
 	Vault *vault.Vault
-	// TrustedProxies are the reverse proxies whose X-Forwarded-For / Forwarded headers are
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For header is
 	// believed when working out the client address (rate limit, audit log, sessions).
 	TrustedProxies []netip.Prefix
 	// TurnstileURL is the Cloudflare siteverify endpoint; empty means SiteverifyURL. Tests point it at a fake.
@@ -155,7 +155,6 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 		cfg.Limiter = securitylimit.NewMemory(nil, 0)
 	}
 	trust := NewProxyTrust(cfg.TrustedProxies)
-	trust.log = log
 	s := &Service{
 		sourceURL:  cfg.SourceURL,
 		tsURL:      cfg.TurnstileURL,

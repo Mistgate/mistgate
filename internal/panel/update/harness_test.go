@@ -395,6 +395,10 @@ func newEnv(t *testing.T) *env {
 	}
 	e := &env{t: t, ctx: ctx, st: st, fl: newFakeFleet(), hl: newFakeHealth(), dir: t.TempDir(), pub: pub, priv: priv,
 		clk: &clock{t: time.Unix(1_791_100_000, 0)}, built: map[string]int64{}}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES (?, ?, ?, ?, ?)`,
+		"adm_test", "alice", store.RoleOwner, []byte("admin-handle"), e.clk.Now().Unix()); err != nil {
+		t.Fatal(err)
+	}
 	e.stepUp = func(context.Context) error { return nil }
 	e.s = e.newService(pub)
 	return e

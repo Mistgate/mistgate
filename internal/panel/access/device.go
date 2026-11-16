@@ -53,8 +53,8 @@ func cleanDeviceInput(platform, label string, needPlatform bool) (string, string
 		}
 	}
 	label = strings.TrimSpace(label)
-	if utf8.RuneCountInString(label) > 40 || strings.ContainsFunc(label, func(r rune) bool { return r < 0x20 || r == 0x7f || r == 0x2028 || r == 0x2029 }) {
-		return "", "", invalid("label must be at most 40 characters without control characters")
+	if utf8.RuneCountInString(label) > 40 || strings.ContainsFunc(label, store.UnsafeDisplayRune) {
+		return "", "", invalid("label must be at most 40 characters without control or format characters")
 	}
 	return platform, label, nil
 }

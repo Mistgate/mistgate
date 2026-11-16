@@ -2,8 +2,8 @@ package access
 
 import (
 	"strings"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // DeviceHint is what a subscription request says about its device: the X-HWID, X-Device-OS, X-Ver-OS and X-Device-Model
@@ -83,25 +83,9 @@ func platformOf(s string) string {
 	return "other"
 }
 
-// cleanHeader drops control characters, trims and cuts to max runes.
+// cleanHeader removes control and format characters before storing device metadata.
 func cleanHeader(s string, max int) string {
-	if s == "" {
-		return ""
-	}
-	if !utf8.ValidString(s) {
-		s = strings.ToValidUTF8(s, "")
-	}
-	s = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || r == 0x2028 || r == 0x2029 {
-			return -1
-		}
-		return r
-	}, s)
-	s = strings.TrimSpace(s)
-	if utf8.RuneCountInString(s) > max {
-		s = string([]rune(s)[:max])
-	}
-	return s
+	return store.CleanDisplayText(s, max)
 }
 
 // clientOf is the app of a User-Agent: its first token, name and version only ("Happ/3.4.2"; Happ 6 sends

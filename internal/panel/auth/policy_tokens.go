@@ -344,3 +344,6 @@ func profileRole(profile string) string {
 	}
 	return store.RoleReadonly
 }
+
+// TokenProfileRole returns the role represented by a token profile.
+func TokenProfileRole(profile string) string { return profileRole(profile) }

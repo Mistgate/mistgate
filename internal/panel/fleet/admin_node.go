@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
@@ -70,11 +69,10 @@ const (
 )
 
 // validPublicLabel: the owner's text for people (the Mistgate app shows it). At most maxNodeLabel characters, valid UTF-8, and no
-// control character of any kind (the line and paragraph separators included), so that it is one plain line wherever it is shown.
+// control character of any kind (the line and paragraph separators included) and no direction or invisible-space character
+// (store.UnsafeDisplayRune), so that it is one plain line wherever it is shown. The joiner and non-joiner stay.
 func validPublicLabel(s string) bool {
-	return utf8.ValidString(s) && utf8.RuneCountInString(s) <= maxNodeLabel && !strings.ContainsFunc(s, func(r rune) bool {
-		return unicode.IsControl(r) || r == 0x2028 || r == 0x2029
-	})
+	return utf8.ValidString(s) && utf8.RuneCountInString(s) <= maxNodeLabel && !strings.ContainsFunc(s, store.UnsafeDisplayRune)
 }
 
 // validText: at most max characters (runes, like the admin's form fields count them), valid UTF-8, no control characters.

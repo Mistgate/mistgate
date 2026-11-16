@@ -88,6 +88,235 @@ func newTestGitHubNodeBundleSourceAt(t *testing.T, pub []byte, apiBody []byte, a
 	return u, dataDir
 }
 
+func writeTestNodeBundleDir(t *testing.T, dir string, priv ed25519.PrivateKey, version string, built int64, files map[string][]byte) {
+	t.Helper()
+	writeTestNodeBundleDirWithExpiry(t, dir, priv, version, built, built+1000, files)
+}
+
+func writeTestNodeBundleDirWithExpiry(t *testing.T, dir string, priv ed25519.PrivateKey, version string, built, expires int64, files map[string][]byte) {
+	t.Helper()
+	_, assets := signedNodeRelease(t, priv, version, built, expires, files)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range assets {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestGitHubNodeBundleSourceRecoversInterruptedSwap(t *testing.T) {
+	_, priv, err := release.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := priv.Public().(ed25519.PublicKey)
+	files := map[string][]byte{
+		"mistgate-node-linux-amd64": []byte("amd64"),
+		"mistgate-node-linux-arm64": []byte("arm64"),
+	}
+
+	t.Run("before first rename", func(t *testing.T) {
+		dataDir := t.TempDir()
+		dist := filepath.Join(dataDir, "dist")
+		writeTestNodeBundleDir(t, dist, priv, "v0.1.0", 10, files)
+		stage, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeTestNodeBundleDir(t, stage, priv, "v0.2.0", 20, files)
+		stale := time.Now().Add(-nodeBundleTempStaleAge - time.Minute)
+		if err := os.Chtimes(stage, stale, stale); err != nil {
+			t.Fatal(err)
+		}
+
+		source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{DataDir: dataDir, Key: pub, Now: func() time.Time { return time.Unix(30, 0) }})
+		if err := source.Prepare(); err != nil {
+			t.Fatal(err)
+		}
+		assertBundleVersion(t, dist, "v0.1.0")
+		if _, err := os.Stat(stage); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("stale stage remains: %v", err)
+		}
+	})
+
+	t.Run("between renames prefers complete new bundle", func(t *testing.T) {
+		dataDir := t.TempDir()
+		dist := filepath.Join(dataDir, "dist")
+		writeTestNodeBundleDir(t, dist, priv, "v0.1.0", 10, files)
+		stage, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeTestNodeBundleDir(t, stage, priv, "v0.2.0", 20, files)
+		backup := stage + ".previous"
+		if err := os.Rename(dist, backup); err != nil {
+			t.Fatal(err)
+		}
+
+		source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{DataDir: dataDir, Key: pub, Now: func() time.Time { return time.Unix(30, 0) }})
+		if err := source.Prepare(); err != nil {
+			t.Fatal(err)
+		}
+		assertBundleVersion(t, dist, "v0.2.0")
+		if _, err := os.Stat(backup); err != nil {
+			t.Fatalf("recent previous bundle should remain until it is stale: %v", err)
+		}
+	})
+
+	t.Run("between renames restores complete previous bundle", func(t *testing.T) {
+		dataDir := t.TempDir()
+		stage, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(stage, release.ManifestName), []byte("incomplete"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		backup := stage + ".previous"
+		writeTestNodeBundleDir(t, backup, priv, "v0.1.0", 10, files)
+
+		source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{DataDir: dataDir, Key: pub, Now: func() time.Time { return time.Unix(30, 0) }})
+		if err := source.Prepare(); err != nil {
+			t.Fatal(err)
+		}
+		assertBundleVersion(t, filepath.Join(dataDir, "dist"), "v0.1.0")
+	})
+
+	t.Run("after second rename keeps dist and ages out previous bundle", func(t *testing.T) {
+		dataDir := t.TempDir()
+		dist := filepath.Join(dataDir, "dist")
+		writeTestNodeBundleDir(t, dist, priv, "v0.2.0", 20, files)
+		backup := filepath.Join(dataDir, nodeBundleTempPrefix+"swap.previous")
+		writeTestNodeBundleDir(t, backup, priv, "v0.1.0", 10, files)
+
+		source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{DataDir: dataDir, Key: pub, Now: func() time.Time { return time.Unix(30, 0) }})
+		if err := source.Prepare(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(backup); err != nil {
+			t.Fatalf("recent previous bundle should remain until it is stale: %v", err)
+		}
+		stale := time.Now().Add(-nodeBundleTempStaleAge - time.Minute)
+		if err := os.Chtimes(backup, stale, stale); err != nil {
+			t.Fatal(err)
+		}
+		if err := source.Prepare(); err != nil {
+			t.Fatal(err)
+		}
+		assertBundleVersion(t, dist, "v0.2.0")
+		if _, err := os.Stat(backup); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("stale previous bundle remains: %v", err)
+		}
+	})
+
+	t.Run("expired new bundle restores the usable previous bundle", func(t *testing.T) {
+		dataDir := t.TempDir()
+		stage, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeTestNodeBundleDirWithExpiry(t, stage, priv, "v0.2.0", 20, 25, files)
+		backup := stage + ".previous"
+		writeTestNodeBundleDirWithExpiry(t, backup, priv, "v0.1.0", 10, 100, files)
+
+		source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{DataDir: dataDir, Key: pub, Now: func() time.Time { return time.Unix(30, 0) }})
+		if err := source.Prepare(); err != nil {
+			t.Fatal(err)
+		}
+		assertBundleVersion(t, filepath.Join(dataDir, "dist"), "v0.1.0")
+	})
+}
+
+func TestNewRecoversNodeBundleBeforeItsInitialScan(t *testing.T) {
+	e := newEnv(t)
+	e.clk.mu.Lock()
+	e.clk.t = time.Unix(20, 0)
+	e.clk.mu.Unlock()
+	dataDir := e.dir
+	stage, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{
+		"mistgate-node-linux-amd64": []byte("amd64"),
+		"mistgate-node-linux-arm64": []byte("arm64"),
+	}
+	writeTestNodeBundleDir(t, stage, e.priv, "v0.2.0", 20, files)
+	backup := stage + ".previous"
+	writeTestNodeBundleDir(t, backup, e.priv, "v0.1.0", 10, files)
+	stale, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-nodeBundleTempStaleAge - time.Minute)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{DataDir: dataDir, Key: e.pub, Now: e.clk.Now})
+	cfg := e.s.cfg
+	cfg.NodeBundleSource = source
+	service, err := New(e.st, e.fl, e.hl, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current := service.current(); current == nil || !current.trusted || current.manifest.Version != "v0.2.0" {
+		t.Fatalf("initial bundle after interrupted swap = %+v, want the recovered signed bundle", current)
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("stale bundle directory remains after service start: %v", err)
+	}
+}
+
+func assertBundleVersion(t *testing.T, dir, want string) {
+	t.Helper()
+	manifestBytes, err := os.ReadFile(filepath.Join(dir, release.ManifestName))
+	if err != nil {
+		t.Fatalf("read bundle manifest: %v", err)
+	}
+	manifest, err := release.Parse(manifestBytes)
+	if err != nil || manifest.Version != want {
+		t.Fatalf("bundle version = %+v, %v; want %s", manifest, err, want)
+	}
+}
+
+func TestGitHubNodeBundleSyncCleansOnlyStaleStagingDirectories(t *testing.T) {
+	_, priv, err := release.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	stale, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := os.MkdirTemp(dataDir, nodeBundleTempPrefix+"*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-nodeBundleTempStaleAge - time.Minute)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+	source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{
+		DataDir: dataDir, Key: priv.Public().(ed25519.PublicKey), APIURL: "https://example.org/releases",
+		HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("offline")
+		})},
+	})
+	if _, err := source.Sync(context.Background(), 0); err == nil {
+		t.Fatal("sync unexpectedly succeeded")
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("stale stage remains after sync start: %v", err)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Fatalf("recent stage was removed: %v", err)
+	}
+}
+
 func TestGitHubNodeBundleSourceDownloadsAndVerifiesRelease(t *testing.T) {
 	_, priv, err := release.GenerateKey()
 	if err != nil {

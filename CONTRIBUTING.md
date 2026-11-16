@@ -104,6 +104,21 @@ Edit `proto/**/*.proto` first, then run `make gen` (`go tool buf lint` and `go t
 remote, so it needs internet) and commit the regenerated `gen/` and `web/src/gen/` with your change. Never edit
 generated files by hand. Changes to the agent protocol are additive: old agents must keep working.
 
+## Patched cores
+
+Three protocol cores are built with a patch, each through a `replace` in `go.mod` whose comment says what and why:
+
+- `third_party/reality` and `third_party/hysteria-core` are copies of the upstream module in the repository (small trees), each
+  with a `MISTGATE.md`: the version it copies, the changes, how to move it to a new upstream version. They are also published as
+  branches `mistgate` of `github.com/Mistgate/REALITY` and `github.com/Mistgate/hysteria`; Mistgate builds from the copy.
+- Xray-core is not copied: it is 8 MB in about 1200 files, which would bury every diff and every search. Mistgate builds from
+  the public fork `github.com/Mistgate/Xray-core` (branch `mistgate`: upstream plus one commit), pinned by commit in the
+  `replace`. The fork's README says what changed and how to move it to a new upstream version.
+
+`internal/vendorcheck` fails when a copy no longer matches the version `go.mod` requires, or when the Xray-core `replace` names a
+base other than the required version. After any bump of one of these cores, run `go test ./internal/vendorcheck/` and, for Xray,
+`go test -race ./internal/node/vless/` (the Vision race the fork fixes is what kept that package out of CI's race job).
+
 ## Conventions
 
 - Code comments and identifiers are in English.

@@ -184,8 +184,8 @@ func lastUpdateJSON(l *agentv1.LastUpdate) string {
 	default:
 		return ""
 	}
-	b, err := json.Marshal(store.LastUpdateRow{Outcome: outcome, FromVersion: clip(l.FromVersion, 64), FromBuilt: l.FromBuilt,
-		ToVersion: clip(l.ToVersion, 64), ToBuilt: l.ToBuilt, Reason: clip(l.Reason, 128), AtUnix: l.AtUnix})
+	b, err := json.Marshal(store.LastUpdateRow{Outcome: outcome, FromVersion: clipText(l.FromVersion, 64), FromBuilt: l.FromBuilt,
+		ToVersion: clipText(l.ToVersion, 64), ToBuilt: l.ToBuilt, Reason: clipText(l.Reason, 128), AtUnix: l.AtUnix})
 	if err != nil {
 		return ""
 	}
@@ -201,8 +201,8 @@ func (f *Fleet) recordCommit(ctx context.Context, nodeID string, row store.Event
 		return
 	}
 	fromBuilt, _ := strconv.ParseInt(row.Params["from_built"], 10, 64)
-	err := f.st.SetLastUpdateIfNewer(ctx, nodeID, store.LastUpdateRow{Outcome: "ok", FromVersion: clip(row.Params["from_version"], 64), FromBuilt: fromBuilt,
-		ToVersion: clip(row.Params["to_version"], 64), ToBuilt: toBuilt, AtUnix: row.Time.Unix()})
+	err := f.st.SetLastUpdateIfNewer(ctx, nodeID, store.LastUpdateRow{Outcome: "ok", FromVersion: clipText(row.Params["from_version"], 64), FromBuilt: fromBuilt,
+		ToVersion: clipText(row.Params["to_version"], 64), ToBuilt: toBuilt, AtUnix: row.Time.Unix()})
 	if err != nil {
 		f.log.Warn("record last update", "node", nodeID, "err", err)
 	}
