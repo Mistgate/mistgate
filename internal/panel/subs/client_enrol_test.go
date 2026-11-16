@@ -24,7 +24,9 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	"github.com/mistgate/mistgate/internal/panel/protocols/trusttunnel"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
@@ -125,6 +127,21 @@ func newEnrolEnv(t *testing.T, mut func(*subs.Config)) *enrolEnv {
 
 // newEnrolEnvWith is newEnrolEnv for a change of the config that needs the store (the DNS module is built over it).
 func newEnrolEnvWith(t *testing.T, mut func(*subs.Config, *store.Store)) *enrolEnv {
+	return newEnrolEnvWithRegistry(t, builtin.Registry(), mut)
+}
+
+func trustTunnelRegistry(t *testing.T) *protocols.Registry {
+	t.Helper()
+	plugins := builtin.Registry().List()
+	plugins = append(plugins, trusttunnel.New())
+	r, err := protocols.NewRegistry(plugins...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func newEnrolEnvWithRegistry(t *testing.T, registry *protocols.Registry, mut func(*subs.Config, *store.Store)) *enrolEnv {
 	t.Helper()
 	ctx := context.Background()
 	logs := &lockedBuffer{}
@@ -140,7 +157,7 @@ func newEnrolEnvWith(t *testing.T, mut func(*subs.Config, *store.Store)) *enrolE
 	t.Cleanup(func() { st.Close() })
 	v, _ := vault.New(make([]byte, vault.KeySize))
 	state := &stateCounter{}
-	svc, err := access.New(st, v, builtin.Registry(), state, nil, access.Config{SubscriptionBaseURL: "https://sub.example.com/k3xq8", Log: log})
+	svc, err := access.New(st, v, registry, state, nil, access.Config{SubscriptionBaseURL: "https://sub.example.com/k3xq8", Log: log})
 	if err != nil {
 		t.Fatal(err)
 	}

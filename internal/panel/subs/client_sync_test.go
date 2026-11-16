@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +22,8 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
+	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 )
@@ -50,8 +54,12 @@ func newSyncEnv(t *testing.T, mut func(*subs.Config)) *syncEnv {
 
 // newSyncEnvWith is newSyncEnv for a configuration that needs the store.
 func newSyncEnvWith(t *testing.T, mut func(*subs.Config, *store.Store)) *syncEnv {
+	return newSyncEnvWithRegistry(t, builtin.Registry(), mut)
+}
+
+func newSyncEnvWithRegistry(t *testing.T, registry *protocols.Registry, mut func(*subs.Config, *store.Store)) *syncEnv {
 	t.Helper()
-	e := newEnrolEnvWith(t, func(c *subs.Config, st *store.Store) {
+	e := newEnrolEnvWithRegistry(t, registry, func(c *subs.Config, st *store.Store) {
 		c.Routing = subs.HappRouting(dns.New(st))
 		if mut != nil {
 			mut(c, st)
@@ -719,6 +727,71 @@ func TestSyncAWGWithTheLinkSwitchOffStillFollowsThePersonAndTheCaps(t *testing.T
 	e.setApps(uid, &adminv1.AppToggles{Happ: true, Amnezia: true, Mistgate: new(false)})
 	if b := e.mustSync(a.Key); len(b.paths("awg")) != 0 || b.Reason != "app_disabled" {
 		t.Fatalf("the app off for the person: %s", b.raw)
+	}
+}
+
+func TestTrustTunnelCredentialRequiresMistgateCapability(t *testing.T) {
+	e := newSyncEnvWithRegistry(t, trustTunnelRegistry(t), nil)
+	p := must(e.svc.CreateProfile(e.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "trusttunnel", Name: "TrustTunnel", SettingsJson: `{"port":8443,"h3":true,"tls_mode":"acme_domain","egress":"direct"}`,
+	}))).Msg.Profile
+	must(e.svc.CreateInbound(e.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: p.Id, NodeId: "nod_1"})))
+	g := must(e.svc.CreateGroup(e.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{
+		Name: "with TrustTunnel", ProfileIds: []string{e.profile, e.awg, p.Id},
+	}))).Msg.Group
+	e.group2 = g.Id
+	_, tok := e.person("alice", nil)
+
+	plain := fetch(e.h, "/"+tok, happUA, "X-HWID", hwidB)
+	if plain.Code != 200 {
+		t.Fatalf("plain subscription = %d %s", plain.Code, plain.Body.String())
+	}
+	if body := decode(e.t, plain.Body.String()); strings.Contains(body, "trusttunnel") || strings.Contains(body, "tt://") {
+		t.Fatalf("plain subscription rendered TrustTunnel: %s", body)
+	}
+	if n := e.count(`SELECT count(*) FROM device_credential WHERE protocol = 'trusttunnel' AND revoked_at IS NULL`); n != 0 {
+		t.Fatalf("plain link fetch issued %d TrustTunnel credentials", n)
+	}
+
+	a := e.enrolDevice(tok, hwidA)
+	if n := e.count(`SELECT count(*) FROM device_credential WHERE protocol = 'trusttunnel' AND revoked_at IS NULL`); n != 0 {
+		t.Fatalf("enrol issued %d TrustTunnel credentials before sync capabilities", n)
+	}
+	if got := e.mustSync(a.Key, "X-Mistgate-Caps", "v=1"); len(got.paths("trusttunnel")) != 0 {
+		t.Fatalf("sync without TrustTunnel capability included a path: %s", got.raw)
+	}
+	if n := e.count(`SELECT count(*) FROM device_credential WHERE protocol = 'trusttunnel' AND revoked_at IS NULL`); n != 0 {
+		t.Fatalf("sync without TrustTunnel capability issued %d credentials", n)
+	}
+
+	got := e.mustSync(a.Key, "X-Mistgate-Caps", "v=1; trusttunnel=1")
+	paths := got.paths("trusttunnel")
+	if len(paths) != 1 {
+		t.Fatalf("TrustTunnel-capable sync paths = %+v; body %s", paths, got.raw)
+	}
+	if paths[0].Settings["transport"] != "auto" || paths[0].Settings["sni"] != "de1.example.com" || paths[0].Settings["tls"] != "ca" || paths[0].Settings["server"] != "de1.example.com" || paths[0].Settings["port"] != float64(8443) {
+		t.Fatalf("TrustTunnel app path = %+v", paths[0])
+	}
+	path := paths[0]
+	path.ID = "pth_test"
+	path.Settings["username"] = "ualice2345672345"
+	path.Settings["password"] = "aB234567cD234567eF234567gH234567"
+	pathJSON, err := json.Marshal(map[string]any{
+		"id": path.ID, "protocol": path.Protocol, "label": path.Label, "via": path.Via,
+		"ipv6": path.IPv6, "ipv6_egress": path.IPv6Egress, "settings": path.Settings,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath, err := os.ReadFile(filepath.Join("testdata", "trusttunnel_sync_direct_auto.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(pathJSON) != strings.TrimSpace(string(wantPath)) {
+		t.Fatalf("TrustTunnel sync path JSON = %s, want %s", pathJSON, wantPath)
+	}
+	if n := e.count(`SELECT count(*) FROM device_credential WHERE protocol = 'trusttunnel' AND revoked_at IS NULL`); n != 1 {
+		t.Fatalf("capable sync issued %d TrustTunnel credentials, want 1", n)
 	}
 }
 
