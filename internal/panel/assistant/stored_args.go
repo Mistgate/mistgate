@@ -8,24 +8,43 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
-// A site the model writes for node_decoy_plan is a few tens of kilobytes of file text. The plan card lists the files and
-// their sizes, so neither the dialog's saved history nor the tool line in the chat keeps the contents: they hold the size and
+// A site the model writes for node_decoy_plan is a few tens of kilobytes of file text, and a Mihomo template for
+// subscription_mihomo_template_set_plan is up to 64 KiB. The plan card lists the files and their sizes (the template's name, groups,
+// size and hosts), so neither the dialog's saved history nor the tool line in the chat keeps the contents: they hold the size and
 // a short hash of each in their place. The turn itself still has the whole call, so the model can go on with it.
 
-const bulkyTool = "node_decoy_plan"
+const (
+	bulkyTool    = "node_decoy_plan"
+	templateTool = "subscription_mihomo_template_set_plan"
+)
+
+// compactToolArgs cuts the bulk out of the arguments of one call by its tool; it reports whether it changed anything.
+func compactToolArgs(tool string, args map[string]any) bool {
+	switch tool {
+	case bulkyTool:
+		return compactDecoyArgs(args)
+	case templateTool:
+		if s, ok := args["yaml"].(string); ok {
+			args["yaml"] = omitted(s)
+			return true
+		}
+	}
+	return false
+}
 
 // compactBulkyArgs returns the arguments of a tool call with the contents of its files cut out; other calls pass unchanged.
 func compactBulkyArgs(tool string, input []byte) []byte {
-	if tool != bulkyTool {
+	if tool != bulkyTool && tool != templateTool {
 		return input
 	}
 	var args map[string]any
 	if json.Unmarshal(input, &args) != nil {
 		return input
 	}
-	if !compactDecoyArgs(args) {
+	if !compactToolArgs(tool, args) {
 		return input
 	}
 	out, err := json.Marshal(args)
@@ -58,10 +77,11 @@ func omitted(s string) string {
 	return fmt.Sprintf("[omitted from history: %d bytes, sha256 %s]", len(s), hex.EncodeToString(sum[:6]))
 }
 
-// storedTranscript is a model message as the saved history keeps it: the calls of node_decoy_plan in it are compacted. The
+// storedTranscript is a model message as the saved history keeps it: the calls of node_decoy_plan and
+// subscription_mihomo_template_set_plan in it are compacted. The
 // message is in the provider's own shape (Anthropic content blocks or OpenAI tool_calls), so every object is looked at.
 func storedTranscript(raw json.RawMessage) json.RawMessage {
-	if !bytes.Contains(raw, []byte(bulkyTool)) {
+	if !bytes.Contains(raw, []byte(bulkyTool)) && !bytes.Contains(raw, []byte(templateTool)) {
 		return raw
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -88,12 +108,12 @@ func compactTranscript(v any) (changed bool) {
 			changed = compactTranscript(item) || changed
 		}
 	case map[string]any:
-		if v["name"] == bulkyTool {
+		if tool, _ := v["name"].(string); tool == bulkyTool || tool == templateTool {
 			if input, ok := v["input"].(map[string]any); ok { // Anthropic tool_use
-				changed = compactDecoyArgs(input) || changed
+				changed = compactToolArgs(tool, input) || changed
 			}
 			if arguments, ok := v["arguments"].(string); ok { // OpenAI function call: the arguments are a JSON string
-				compact := string(compactBulkyArgs(bulkyTool, []byte(arguments)))
+				compact := string(compactBulkyArgs(tool, []byte(arguments)))
 				v["arguments"], changed = compact, changed || compact != arguments
 			}
 		}
@@ -102,4 +122,28 @@ func compactTranscript(v any) (changed bool) {
 		}
 	}
 	return changed
+}
+
+// templateReadTool is the read of a template's text, in windows of about 24 KiB: what the model reads is its own to use in the turn, but
+// the saved history keeps the size and the hash, not the text.
+const templateReadTool = "subscription_mihomo_template_get"
+
+// toolResultMessages are the messages of one round of tool results: live is what the turn goes on with, stored what the saved history
+// keeps (the text of a template read cut out). They are the same when no call of the round read a template.
+func toolResultMessages(adapter adapter, calls []modelToolCall, outputs []toolOutput) (live, stored []jsonRaw) {
+	live = adapter.ToolResults(calls, outputs)
+	var compact []toolOutput
+	for i, call := range calls {
+		if call.name != templateReadTool || i >= len(outputs) || outputs[i].err {
+			continue
+		}
+		if compact == nil {
+			compact = slices.Clone(outputs)
+		}
+		compact[i].text = omitted(outputs[i].text)
+	}
+	if compact == nil {
+		return live, live
+	}
+	return live, adapter.ToolResults(calls, compact)
 }

@@ -367,10 +367,9 @@ func (s *Service) scheduledTurn(ctx context.Context, admin store.Admin, tokenID,
 			output := s.scheduledTool(turnCtx, session, admin, tokenID, conversationID, tc, byName, &used, finalRound, &res)
 			outputs = append(outputs, output)
 		}
-		for _, raw := range adapter.ToolResults(response.Tools, outputs) {
-			history = append(history, raw)
-			res.transcript = append(res.transcript, raw)
-		}
+		live, stored := toolResultMessages(adapter, response.Tools, outputs)
+		history = append(history, live...)
+		res.transcript = append(res.transcript, stored...)
 		if res.verdict != nil || finalRound {
 			break
 		}

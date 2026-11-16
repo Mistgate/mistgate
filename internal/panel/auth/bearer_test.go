@@ -958,6 +958,7 @@ func TestTokenAllowList(t *testing.T) {
 	wantProfileGrants["subscription_texts_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
 	wantProfileGrants["subscription_link_limits_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
 	wantProfileGrants["subscription_page_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
+	wantProfileGrants["subscription_mihomo_template_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
 	wantProfileGrants["dns_settings_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
 	wantProfileGrants["dns_preset_create"] = []string{adminv1connect.DnsServiceCreateDnsPresetProcedure}
 	wantProfileGrants["dns_preset_update"] = []string{adminv1connect.DnsServiceUpdateDnsPresetProcedure}

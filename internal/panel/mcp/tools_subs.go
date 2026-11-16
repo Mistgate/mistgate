@@ -34,7 +34,8 @@ func subscriptionTools() []toolDef {
 			"The subscription page every user sees: its apps per platform in display order (name, kind, download link, add-link template, description, "+
 				"recommended), ordered User-Agent serving rules, page options and Happ ping settings, instance DNS default and link-app DNS offer, "+
 				"link device-limit mode and device_idle_after_days (0 disables idling; otherwise 7 to 365), AmneziaWG-in-link and automatic-server-selection switches, server-name template, title, announcement, support link and refresh interval, "+
-				"and the owner's own response headers of a successful subscription answer (name, value, base64, the formats and groups each goes to) with the names that are reserved. "+
+				"and the owner's own response headers of a successful subscription answer (name, value, base64, the formats and groups each goes to) with the names that are reserved, "+
+				"and the owner's own Mihomo YAML templates without their text (name, group ids, bytes, a short hash and the number and codes of their warnings: read one with subscription_mihomo_template_get). "+
 				"Also the current shared link-user and link AmneziaWG-key counts. No user's link or key. Links show query strings and long path "+
 				"segments as [redacted]; give a field to subscription_app_upsert_plan only when you change an app.",
 			func(c *call, _ noArgs) (any, error) {
@@ -46,6 +47,7 @@ func subscriptionTools() []toolDef {
 			})},
 		change(subsAppUpsert), change(subsAppRemove),
 		change(subsRulesSet), change(subsTextsSet), change(subsLinkLimitsSet), change(subsPageSet),
+		[]toolDef{mihomoTemplateGet}, change(mihomoTemplateSet),
 		change(dnsSettingsSet),
 	)
 }
@@ -83,6 +85,7 @@ type SubsSettingsV struct {
 	HappPingOnOpen      bool                  `json:"happ_ping_on_open"`
 	ResponseHeaders     []responseHeaderV     `json:"response_headers"`
 	ReservedHeaders     []string              `json:"reserved_header_names"` // may not be an own header's name; "X-Hwid-*" is a prefix
+	MihomoTemplates     []mihomoTemplateV     `json:"mihomo_templates"`      // the owner's own Mihomo YAML templates, without their text
 }
 
 // responseHeaderV is one own response header: the first of two entries of one name that apply wins.
@@ -122,7 +125,7 @@ func subsSettingsView(r *adminv1.GetSubscriptionSettingsResponse) *SubsSettingsV
 		Apps: map[string][]subsAppV{}, Rules: []serveRuleV{}, DefaultDNSPresetID: clean(s.GetDefaultDnsPresetId(), 60),
 		LinkDeviceLimit: linkModeWord(s), DeviceIdleAfterDays: s.GetDeviceIdleAfterDays(), LinkAWG: subsettings.LinkAWG(s), LinkAutoSelect: subsettings.LinkAutoSelect(s), SharedLinkUsers: r.GetSharedLinkUsers(),
 		LinkAWGKeys: r.GetLinkAwgKeys(), HappPing: happPingWord(s.GetHappPing()), HappPingOnOpen: s.GetHappPingOnOpen(),
-		ResponseHeaders: []responseHeaderV{}, ReservedHeaders: r.GetReservedHeaderNames(),
+		ResponseHeaders: []responseHeaderV{}, ReservedHeaders: r.GetReservedHeaderNames(), MihomoTemplates: mihomoTemplateViews(s),
 	}
 	for _, e := range s.GetResponseHeaders() {
 		hv := responseHeaderV{Name: clean(e.GetName(), 64), Value: clean(e.GetValue(), 1000), Base64: e.GetBase64(), Formats: []string{}, Only: e.GetOnlyGroups(), Groups: cleanIDs(e.GetGroupIds())}
