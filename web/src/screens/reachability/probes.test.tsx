@@ -14,6 +14,7 @@ const create = vi.fn();
 const revoke = vi.fn();
 const confirmNetwork = vi.fn();
 const checkNow = vi.fn();
+const updateCommand = vi.fn();
 const disconnect = vi.fn();
 const getChecks = vi.fn();
 let me: Record<string, unknown> = {};
@@ -25,6 +26,7 @@ vi.mock("@/lib/api", () => ({
     revoke: (...a: unknown[]) => revoke(...a),
     confirmNetwork: (...a: unknown[]) => confirmNetwork(...a),
     checkNow: (...a: unknown[]) => checkNow(...a),
+    updateCommand: (...a: unknown[]) => updateCommand(...a),
     disconnect: (...a: unknown[]) => disconnect(...a),
   },
   health: { getChecks: (...a: unknown[]) => getChecks(...a) },
@@ -41,37 +43,42 @@ const NOW = Math.floor(Date.now() / 1000);
 const min = 60;
 const settings = (over: object = {}) => ({ enabled: true, intervalMin: 60, fallbackUrl: "", ...over });
 const probe = (over: object = {}) => ({
-  id: "prb_0123456789abcdef01234567", name: "dacha", city: "Springfield", kind: "home", state: "active", asn: 64496, operator: "ExampleNet", pinnedOperator: "ExampleNet",
-  version: "0a1b2c3d4e5f", lastSeenUnix: NOW - 4 * min, lastResultUnix: NOW - 12 * min, checksDay: 24, tokenExpiresUnix: 0, ...over,
+  id: "prb_0123456789abcdef01234567", name: "kitchen", city: "Springfield", kind: "home", state: "active", asn: 64496, operator: "ExampleNet", pinnedOperator: "ExampleNet",
+  version: "0a1b2c3d4e5f", lastSeenUnix: NOW - 4 * min, lastResultUnix: NOW - 12 * min, checksDay: 24, tokenExpiresUnix: 0, reference: "filtered", ...over,
 });
 const office = probe({ id: "prb_89abcdef0123456789abcdef", name: "office", city: "Shelbyville", kind: "dc", operator: "Demo Telecom", pinnedOperator: "Demo Telecom", asn: 64497 });
 const waiting = probe({ id: "prb_aaaaaaaaaaaaaaaaaaaaaaaa", state: "pending", operator: "", pinnedOperator: "", asn: 0, version: "", lastSeenUnix: 0, lastResultUnix: 0, checksDay: 0, tokenExpiresUnix: NOW + 22 * 3600 });
 const COMMAND = "opkg update && cd /tmp && sh mgp.sh install 'https://panel.example.com/mgp-q2w3e4r5t6y7u8i9o0p1a2s3d4' 'mgp_q2w3e4r5t6y7u8i9o0p1a2s3d4f5g6h7j8k9l0z1x2c3v4b5'";
+const SERVER_COMMAND = "f=$(mktemp) && sudo sh \"$f\" install 'https://panel.example.com/mgp-q2w3e4r5t6y7u8i9o0p1a2s3d4' 'mgp_q2w3e4r5t6y7u8i9o0p1a2s3d4f5g6h7j8k9l0z1x2c3v4b5'";
+const UPDATE = "cd /tmp && echo '0a1b2c3d4e5f  mgp.sh' | sha256sum -c - && sh mgp.sh upgrade";
+const SERVER_UPDATE = "f=$(mktemp) && echo \"0a1b2c3d4e5f  $f\" | sha256sum -c - && sudo sh \"$f\" upgrade";
+const VERSION = "0a1b2c3d4e5f";
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 let qc: QueryClient;
 beforeEach(() => {
   me = { admin: { id: "adm_1", role: 1 }, edition: "vps", unavailable: [] };
-  get.mockResolvedValue({ settings: settings(), probes: [] });
+  get.mockResolvedValue({ settings: settings(), probes: [], scriptVersion: VERSION });
   getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: [] });
   update.mockResolvedValue({});
   revoke.mockResolvedValue({});
   disconnect.mockResolvedValue({});
   confirmNetwork.mockResolvedValue({});
   checkNow.mockResolvedValue({});
-  create.mockResolvedValue({ probe: waiting, token: "mgp_secret", command: COMMAND, scriptSha256: "0a1b2c3d4e5f".padEnd(64, "0") });
+  create.mockResolvedValue({ probe: waiting, token: "mgp_secret", command: COMMAND, serverCommand: SERVER_COMMAND, scriptSha256: VERSION.padEnd(64, "0") });
+  updateCommand.mockResolvedValue({ command: UPDATE, serverCommand: SERVER_UPDATE, scriptVersion: VERSION });
 });
 afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
   act(() => setLang("en"));
-  for (const m of [get, update, create, revoke, confirmNetwork, checkNow, disconnect, getChecks]) m.mockReset();
+  for (const m of [get, update, create, revoke, confirmNetwork, checkNow, disconnect, getChecks, updateCommand]) m.mockReset();
 });
 
-async function mount(data: { settings?: object; probes?: object[] } = {}, before: (qc: QueryClient) => void = () => {}) {
-  get.mockResolvedValue({ settings: data.settings ?? settings(), probes: data.probes ?? [] });
+async function mount(data: { settings?: object; probes?: object[]; scriptVersion?: string } = {}, before: (qc: QueryClient) => void = () => {}) {
+  get.mockResolvedValue({ settings: data.settings ?? settings(), probes: data.probes ?? [], scriptVersion: data.scriptVersion ?? VERSION });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -144,9 +151,9 @@ describe("the Own probes card: its state line", () => {
     expect(rows().map((r) => r.dataset.look)).toEqual(["online", "online", "revoked"]);
     // no actions on a revoked probe
     expect(buttons(row("old"))).toEqual([]);
-    expect(row("dacha").textContent).toContain("ExampleNet · Springfield");
-    expect(row("dacha").textContent).toContain("in touch 4 min ago");
-    expect(row("dacha").textContent).toContain("24 checks in 24 h");
+    expect(row("kitchen").textContent).toContain("ExampleNet · Springfield");
+    expect(row("kitchen").textContent).toContain("in touch 4 min ago");
+    expect(row("kitchen").textContent).toContain("24 checks in 24 h");
     expect(row("office").textContent).toContain("Data centre");
   });
 
@@ -154,13 +161,13 @@ describe("the Own probes card: its state line", () => {
     await mount({ probes: [probe({ lastSeenUnix: NOW - 7 * 3600 })] });
     expect(state()?.dataset.state).toBe("offline");
     expect(state()?.textContent).toBe("No contact · no probe has asked the panel for 7 h");
-    expect(row("dacha").textContent).toContain("Not heard from for 7 h");
+    expect(row("kitchen").textContent).toContain("Not heard from for 7 h");
   });
 
   it("holds a probe whose network changed for the owner: its words, its Confirm button, and it does not count as working", async () => {
     await mount({ probes: [probe({ state: "network_changed", operator: "Sample Mobile", asn: 64498 })] });
     expect(state()?.dataset.state).toBe("netChanged");
-    const r = row("dacha");
+    const r = row("kitchen");
     expect(r.dataset.look).toBe("netChanged");
     expect(r.textContent).toContain("Network changed");
     expect(r.textContent).toContain("It now asks the panel from Sample Mobile; before that it was ExampleNet.");
@@ -168,32 +175,51 @@ describe("the Own probes card: its state line", () => {
     expect(confirmNetwork).toHaveBeenCalledWith({ id: "prb_0123456789abcdef01234567" });
   });
 
-  it("says that a probe sees no filtering on its path, from the points of the checks, and why that is the right state outside the country", async () => {
-    getChecks.mockResolvedValue({
-      nowUnix: NOW, intervalS: 300, columns: [], rows: [],
-      countryChecks: [{ nodeId: "nod_1", vantages: [{ source: "probes", key: "probe:prb_0123456789abcdef01234567", state: "uncertain", why: "no_filter" }] }],
-    });
-    await mount({ probes: [probe()] });
-    expect(row("dacha").dataset.look).toBe("noFilter");
-    expect(row("dacha").textContent).toContain("No filtering on its path");
-    expect(row("dacha").textContent).toContain("A probe outside the country does not see blocks");
+  it("says that a probe sees no filtering on its path from what the probe itself reports, before any point is in the checks, and why that is the right state outside the country", async () => {
+    getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: [] });
+    await mount({ probes: [probe({ reference: "open" })] });
+    expect(row("kitchen").dataset.look).toBe("noFilter");
+    expect(row("kitchen").textContent).toContain("No filtering on its path");
+    expect(row("kitchen").textContent).toContain("A probe outside the country does not see blocks");
     expect(state()?.textContent).toBe("1 of 1 working · last check 12 min ago · 1 probe sees no filtering");
+    // the card does not read the checks for it any more
+    expect(getChecks).not.toHaveBeenCalled();
+  });
+
+  it("is an ordinary working probe while its reference is blocked or no round has finished; one that could not try it says its points prove nothing", async () => {
+    await mount({ probes: [probe({ reference: "filtered" }), probe({ ...office, reference: "" }), probe({ id: "prb_b", name: "balcony", reference: "unavailable" })] });
+    expect(rows().map((r) => r.dataset.look)).toEqual(["online", "online", "online"]);
+    expect(row("kitchen").textContent).not.toContain("reference address");
+    expect(row("office").textContent).not.toContain("reference address");
+    expect(row("balcony").textContent).toContain("The reference address could not be tried");
+    expect(row("balcony").textContent).toContain("ref=off");
   });
 
   it("marks a probe Outdated when the panel's script is newer, and only that probe", async () => {
-    await mount({ probes: [probe({ version: "111111111111" }), probe({ ...office, version: "0a1b2c3d4e5f" })] }, (c) => c.setQueryData(["ownProbe", "script"], "0a1b2c3d4e5f"));
-    expect(row("dacha").querySelector("[data-testid=probe-outdated]")?.textContent).toBe("Outdated");
+    await mount({ probes: [probe({ version: "111111111111" }), probe({ ...office, version: VERSION })] });
+    expect(row("kitchen").querySelector("[data-testid=probe-outdated]")?.textContent).toBe("Outdated");
     expect(row("office").querySelector("[data-testid=probe-outdated]")).toBeNull();
     expect(document.querySelectorAll("[data-testid=probe-outdated]")).toHaveLength(1);
   });
 
-  it("does not mark a probe that waits for its command or one that is revoked: they have no script yet", async () => {
-    await mount({ probes: [waiting, probe({ id: "prb_dead", name: "old", state: "revoked", version: "111111111111" })] }, (c) => c.setQueryData(["ownProbe", "script"], "0a1b2c3d4e5f"));
+  it("marks it after a reload as well: the panel's list says the version, no command was made in this session", async () => {
+    await mount({ probes: [probe({ version: "111111111111" })] });
+    expect(create).not.toHaveBeenCalled();
+    expect(document.querySelectorAll("[data-testid=probe-outdated]")).toHaveLength(1);
+    // the panel's script changes under the open page: the next list says the new version and the pill follows
+    get.mockResolvedValue({ settings: settings(), probes: [probe({ version: VERSION })], scriptVersion: VERSION });
+    await act(async () => void (await qc.invalidateQueries({ queryKey: ["ownProbe"] })));
+    for (let i = 0; i < 3; i++) await settle();
     expect(document.querySelector("[data-testid=probe-outdated]")).toBeNull();
   });
 
-  it("does not guess: with no newer script known, nobody is Outdated", async () => {
-    await mount({ probes: [probe({ version: "111111111111" })] });
+  it("does not mark a probe that waits for its command or one that is revoked: they have no script yet", async () => {
+    await mount({ probes: [waiting, probe({ id: "prb_dead", name: "old", state: "revoked", version: "111111111111" })] });
+    expect(document.querySelector("[data-testid=probe-outdated]")).toBeNull();
+  });
+
+  it("does not guess: with no script version in the list, nobody is Outdated", async () => {
+    await mount({ probes: [probe({ version: "111111111111" })], scriptVersion: "" });
     expect(document.querySelector("[data-testid=probe-outdated]")).toBeNull();
   });
 });
@@ -203,21 +229,21 @@ describe("the Own probes card: what it asks and says before it acts", () => {
     await mount({ probes: [probe()] });
     await click(button("Check now"));
     expect(checkNow).toHaveBeenCalledWith({ id: "prb_0123456789abcdef01234567" });
-    expect(row("dacha").textContent).toContain("The probe picks it up within 15 minutes.");
+    expect(row("kitchen").textContent).toContain("The probe picks it up within 15 minutes.");
   });
 
   it("asks before it revokes, says it cannot be undone, and revokes only on the second click", async () => {
     await mount({ probes: [probe()] });
-    await click(button("Revoke", row("dacha")));
+    await click(button("Revoke", row("kitchen")));
     expect(revoke).not.toHaveBeenCalled();
-    expect(dialog()?.textContent).toContain("Revoke the probe “dacha”?");
+    expect(dialog()?.textContent).toContain("Revoke the probe “kitchen”?");
     expect(dialog()?.textContent).toContain("This cannot be undone");
     // how to take the script off the device is in the window
     expect(dialog()?.textContent).toContain("sh /opt/sbin/mistgate-probe uninstall");
     await click(button("Cancel", dialog()!));
     expect(dialog()).toBeNull();
     expect(revoke).not.toHaveBeenCalled();
-    await click(button("Revoke", row("dacha")));
+    await click(button("Revoke", row("kitchen")));
     await click(button("Revoke", dialog()!));
     expect(revoke).toHaveBeenCalledWith({ id: "prb_0123456789abcdef01234567" });
   });
@@ -265,7 +291,7 @@ describe("the Add window and its one-time command", () => {
   async function fillAndCreate() {
     await click(button("Add a probe"));
     const inputs = dialog()!.querySelectorAll("input");
-    await type(inputs[0]!, "dacha");
+    await type(inputs[0]!, "kitchen");
     await type(inputs[1]!, "Springfield");
     await click(button("Create the command", dialog()!));
   }
@@ -285,12 +311,14 @@ describe("the Add window and its one-time command", () => {
   it("shows the command big, one-time for 24 hours, the three steps, what the provider sees and the docs link; and says it cannot be shown again", async () => {
     await mount();
     await fillAndCreate();
-    expect(create).toHaveBeenCalledWith({ name: "dacha", city: "Springfield", kind: "home" });
+    expect(create).toHaveBeenCalledWith({ name: "kitchen", city: "Springfield", kind: "home" });
     const d = dialog()!;
     expect(d.querySelector("[data-testid=probe-command]")?.textContent).toBe(COMMAND);
     expect(d.textContent).toContain("One-time command, valid for 24 hours.");
     expect(d.textContent).toContain("it cannot be shown again");
     expect([...d.querySelectorAll("ol > li")].map((li) => li.querySelector("span.text-sm")?.textContent)).toEqual(["Open SSH on the router", "Paste the command and press Enter", "Wait for “connected” here"]);
+    expect(d.textContent).not.toContain("cut everything");
+    expect(d.textContent).not.toContain("cd /tmp”");
     expect(buttons(d)).toContain("Copy the command");
     expect(buttons(d)).toContain("Did not copy it? Create a new one");
     expect(d.querySelector("[data-testid=probe-see]")?.textContent).toContain("What this person's provider sees");
@@ -298,6 +326,37 @@ describe("the Add window and its one-time command", () => {
     expect(d.querySelector("a[href='https://mistgate.app/operations/probes/']")?.getAttribute("target")).toBe("_blank");
     // the token travels inside the command only: the window has no other copy of it
     expect(d.textContent).not.toContain("mgp_secret");
+  });
+
+  it("shows the command of the system the probe is for, a router first for a home probe, and the server's one on the other side of the switch", async () => {
+    await mount();
+    await fillAndCreate();
+    const d = () => dialog()!;
+    const shown = () => d().querySelector("[data-testid=probe-command]")?.textContent;
+    const choice = (label: string) => [...d().querySelectorAll("[role=radio],button")].find((b) => b.textContent?.trim() === label);
+    expect(shown()).toBe(COMMAND);
+    expect(d().textContent).toContain("Open SSH on the router");
+    expect(d().textContent).toContain("For a Keenetic router with Entware");
+    await click(choice("Server (VPS)"));
+    expect(shown()).toBe(SERVER_COMMAND);
+    expect(shown()).not.toContain("opkg");
+    expect(d().textContent).toContain("Open SSH on the server");
+    expect(d().textContent).toContain("Run it as a user with sudo");
+    await click(choice("Keenetic (Entware)"));
+    expect(shown()).toBe(COMMAND);
+  });
+
+  it("opens on the server's command for a data centre probe", async () => {
+    await mount();
+    create.mockResolvedValueOnce({ probe: { ...waiting, kind: "dc" }, token: "mgp_secret", command: COMMAND, serverCommand: SERVER_COMMAND, scriptSha256: VERSION.padEnd(64, "0") });
+    await click(button("Add a probe"));
+    const inputs = dialog()!.querySelectorAll("input");
+    await type(inputs[0]!, "office");
+    await type(inputs[1]!, "Shelbyville");
+    await click([...dialog()!.querySelectorAll("[role=radio],button")].find((b) => b.textContent?.trim() === "Data centre"));
+    await click(button("Create the command", dialog()!));
+    expect(create).toHaveBeenCalledWith({ name: "office", city: "Shelbyville", kind: "dc" });
+    expect(dialog()?.querySelector("[data-testid=probe-command]")?.textContent).toBe(SERVER_COMMAND);
   });
 
   it("keeps the command in the window and nowhere else: closed, it is gone from the page, the query cache, the mutation cache and both storages", async () => {
@@ -330,11 +389,11 @@ describe("the Add window and its one-time command", () => {
   it("makes the same probe again with a new command when it was not copied: the waiting one is revoked first", async () => {
     await mount();
     await fillAndCreate();
-    create.mockResolvedValueOnce({ probe: { ...waiting, id: "prb_bbbbbbbbbbbbbbbbbbbbbbbb" }, token: "mgp_second", command: COMMAND.replace("mgp_q2w3", "mgp_n3w2"), scriptSha256: "0a1b2c3d4e5f".padEnd(64, "0") });
+    create.mockResolvedValueOnce({ probe: { ...waiting, id: "prb_bbbbbbbbbbbbbbbbbbbbbbbb" }, token: "mgp_second", command: COMMAND.replace("mgp_q2w3", "mgp_n3w2"), serverCommand: SERVER_COMMAND, scriptSha256: VERSION.padEnd(64, "0") });
     await click(button("Did not copy it? Create a new one", dialog()!));
     expect(revoke).toHaveBeenCalledWith({ id: "prb_aaaaaaaaaaaaaaaaaaaaaaaa" });
     expect(create).toHaveBeenCalledTimes(2);
-    expect(create).toHaveBeenLastCalledWith({ name: "dacha", city: "Springfield", kind: "home" });
+    expect(create).toHaveBeenLastCalledWith({ name: "kitchen", city: "Springfield", kind: "home" });
     expect(dialog()?.querySelector("[data-testid=probe-command]")?.textContent).toContain("mgp_n3w2");
   });
 
@@ -342,7 +401,7 @@ describe("the Add window and its one-time command", () => {
     await mount();
     await fillAndCreate();
     expect(dialog()?.textContent).toContain("Waiting for the probe to reach the panel for the first time.");
-    get.mockResolvedValue({ settings: settings(), probes: [probe({ id: "prb_aaaaaaaaaaaaaaaaaaaaaaaa" })] });
+    get.mockResolvedValue({ settings: settings(), probes: [probe({ id: "prb_aaaaaaaaaaaaaaaaaaaaaaaa" })], scriptVersion: VERSION });
     await act(async () => void (await qc.invalidateQueries({ queryKey: ["ownProbe"] })));
     for (let i = 0; i < 3; i++) await settle();
     expect(dialog()?.textContent).toContain("ConnectedExampleNet · Springfield. The first check starts on its own.");
@@ -359,17 +418,35 @@ describe("the Add window and its one-time command", () => {
 });
 
 describe("the update command", () => {
-  it("is for the system the probe stands on: a router by default for a home probe, a server for a data centre one; the panel's address comes from the probe's own configuration", async () => {
+  const command = () => dialog()?.querySelector("[data-testid=update-command]")?.textContent ?? "";
+  const choice = (label: string) => [...dialog()!.querySelectorAll("[role=radio],button")].find((b) => b.textContent?.trim() === label);
+
+  it("is the panel's: asked of it when the window opens, for the system the probe stands on (a router for a home probe, a server for a data centre one), and made nowhere else", async () => {
     await mount({ probes: [probe(), office] });
-    await click(button("Update command", row("dacha")));
-    const command = () => dialog()?.querySelector("[data-testid=update-command]")?.textContent ?? "";
-    expect(command()).toContain("/opt/etc/mistgate-probe/conf");
-    expect(command()).toContain("sh mgp.sh upgrade");
+    expect(updateCommand).not.toHaveBeenCalled();
+    await click(button("Update command", row("kitchen")));
+    expect(updateCommand).toHaveBeenCalledTimes(1);
+    expect(command()).toBe(UPDATE);
     expect(command()).not.toContain("mgp_");
+    // nothing of the old self-made line: no reading of the probe's configuration, no download that skips the hash
+    expect(command()).not.toContain("sed -n");
+    expect(command()).not.toContain("/conf");
+    await click(choice("Server (VPS)"));
+    expect(command()).toBe(SERVER_UPDATE);
     await click(button("Close", dialog()!));
     await click(button("Update command", row("office")));
-    expect(command()).toContain("/etc/mistgate-probe/conf");
-    expect(command()).not.toContain("/opt/");
+    expect(command()).toBe(SERVER_UPDATE);
+  });
+
+  it("says why when the panel cannot build it, and tries again on a click", async () => {
+    const { ConnectError, Code } = await import("@connectrpc/connect");
+    updateCommand.mockRejectedValueOnce(new ConnectError("public HTTPS URL is required to build an install command", Code.FailedPrecondition));
+    await mount({ probes: [probe()] });
+    await click(button("Update command", row("kitchen")));
+    expect(command()).toBe("");
+    expect(dialog()?.textContent).toContain("The command needs the panel's public HTTPS address. Set it in Settings first.");
+    await click(button("Try again", dialog()!));
+    expect(command()).toBe(UPDATE);
   });
 });
 
@@ -378,9 +455,9 @@ describe("in the other languages", () => {
     setLang("ru");
     await mount({ probes: [probe(), office] });
     expect(state()?.textContent).toBe("Работает 2 из 2 · последняя проверка 12 мин назад");
-    expect(row("dacha").textContent).toContain("Дом");
-    expect(row("dacha").textContent).toContain("на связи 4 мин назад");
-    expect(buttons(row("dacha"))).toEqual(["Проверить сейчас", "Команда обновления", "Отозвать"]);
+    expect(row("kitchen").textContent).toContain("Дом");
+    expect(row("kitchen").textContent).toContain("на связи 4 мин назад");
+    expect(buttons(row("kitchen"))).toEqual(["Проверить сейчас", "Команда обновления", "Отозвать"]);
     expect(en["pr.title"]).toBe("Own probes");
   });
 });

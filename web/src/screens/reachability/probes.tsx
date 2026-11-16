@@ -17,13 +17,13 @@ import { useFmt } from "@/lib/format";
 import {
   hostOf,
   isOutdated,
+  ownProbeErrorText,
   ownProbeQuery,
   probeKinds,
   probeLook,
   sortProbes,
   uninstallCommand,
-  updateCommand,
-  useLatestScript,
+  updateCommandQuery,
   type Issued,
   type OwnProbeRow,
   type ProbeHost,
@@ -50,10 +50,9 @@ const lookPill: Record<ProbeLook, { kind: StatusKind; word: MessageKey }> = {
 
 const kindWord = (t: T, kind: string) => (kind === "home" || kind === "mobile" || kind === "dc" ? t(`pr.kind.${kind}`) : kind);
 
-/** The probes: a row each, the ones that want a look first. `now` and `unfiltered` come from the card, which reads the checks. */
-export function ProbeList({ probes, now, unfiltered, actions }: { probes: readonly OwnProbeRow[]; now: number; unfiltered: ReadonlySet<string>; actions: Actions }) {
+/** The probes: a row each, the ones that want a look first. `scriptVersion` is the panel's script as the list names it; `now` comes from the card. */
+export function ProbeList({ probes, now, scriptVersion, actions }: { probes: readonly OwnProbeRow[]; now: number; scriptVersion: string; actions: Actions }) {
   const t = useT();
-  const latest = useLatestScript();
   const [revoking, setRevoking] = useState<OwnProbeRow | null>(null);
   const [updating, setUpdating] = useState<OwnProbeRow | null>(null);
   // the probe that was just asked to check: its row says when it will
@@ -61,13 +60,13 @@ export function ProbeList({ probes, now, unfiltered, actions }: { probes: readon
   return (
     <>
       <ul aria-label={t("pr.block.probes")} className="flex flex-col divide-y divide-line rounded-field border border-line bg-canvas">
-        {sortProbes(probes, now, unfiltered).map((p) => (
+        {sortProbes(probes, now).map((p) => (
           <ProbeRow
             key={p.id}
             p={p}
             now={now}
-            look={probeLook(p, now, unfiltered)}
-            outdated={isOutdated(p, latest)}
+            look={probeLook(p, now)}
+            outdated={isOutdated(p, scriptVersion)}
             asked={asked === p.id}
             busy={actions.checkNow.isPending || actions.confirmNetwork.isPending}
             onCheck={() => actions.checkNow.mutate(p.id, { onSuccess: () => setAsked(p.id) })}
@@ -152,6 +151,7 @@ function ProbeRow(p: {
       {look === "pending" && <p className="text-xs leading-snug text-pretty text-muted">{[t("pr.expires", { time: fmt.stamp(probe.tokenExpiresUnix) }), t("pr.pending.note")].join(" ")}</p>}
       {look === "expired" && <p className="text-xs leading-snug text-muted">{t("pr.expired")}</p>}
       {look === "noFilter" && <p className="text-xs leading-snug text-pretty text-muted">{t("pr.noFilter.note")}</p>}
+      {live && look !== "noFilter" && probe.reference === "unavailable" && <p className="text-xs leading-snug text-pretty text-muted">{t("pr.refUnavailable.note")}</p>}
       {look !== "revoked" && (
         <div className="flex flex-wrap items-center gap-2">
           {live && (
@@ -209,11 +209,37 @@ export function RevokeModal({ probe, busy, onClose, onConfirm }: { probe: OwnPro
   );
 }
 
-/** The command that updates a probe already standing, for the system it is on (a router is the default for a home or a mobile probe). */
+/** The host switch of the windows that show a command: a Keenetic (Entware) or a server. A home or mobile probe is a router by default. */
+function HostSwitch({ value, onChange }: { value: ProbeHost; onChange: (h: ProbeHost) => void }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("pr.update.on")}</span>
+      <Segmented
+        aria-label={t("pr.update.on")}
+        variant="inset"
+        className="w-full [&>*]:flex-1"
+        wrap
+        value={value}
+        onValueChange={onChange}
+        options={[
+          { value: "keenetic", label: t("pr.update.keenetic") },
+          { value: "server", label: t("pr.update.server") },
+        ]}
+      />
+    </div>
+  );
+}
+
+/**
+ * The command that updates a probe already standing, for the system it is on. The panel builds it (the script's hash is checked in
+ * it, as in the install command), so the window only shows what it is given.
+ */
 export function UpdateModal({ probe, onClose }: { probe: OwnProbeRow; onClose: () => void }) {
   const t = useT();
   const [host, setHost] = useState<ProbeHost>(hostOf(probe.kind));
-  const command = updateCommand(host);
+  const q = useQuery(updateCommandQuery);
+  const command = q.data ? (host === "server" ? q.data.serverCommand : q.data.command) : "";
   return (
     <Modal
       open
@@ -227,27 +253,30 @@ export function UpdateModal({ probe, onClose }: { probe: OwnProbeRow; onClose: (
         </Button>
       }
     >
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("pr.update.on")}</span>
-        <Segmented
-          aria-label={t("pr.update.on")}
-          variant="inset"
-          className="w-full [&>*]:flex-1"
-          wrap
-          value={host}
-          onValueChange={setHost}
-          options={[
-            { value: "keenetic", label: t("pr.update.keenetic") },
-            { value: "server", label: t("pr.update.server") },
-          ]}
-        />
-      </div>
-      <div className="flex flex-col gap-2.5">
-        <pre tabIndex={0} dir="ltr" data-testid="update-command" className={commandCls}>
-          {command}
-        </pre>
-        <CopyButton value={command} label={t("pr.cmd.copy")} variant="primary" size="md" full />
-      </div>
+      <HostSwitch value={host} onChange={setHost} />
+      {q.isError ? (
+        <Callout
+          kind="warn"
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void q.refetch()}>
+              {t("common.retry")}
+            </Button>
+          }
+        >
+          {ownProbeErrorText(q.error, t)}
+        </Callout>
+      ) : command ? (
+        <div className="flex flex-col gap-2.5">
+          <pre tabIndex={0} dir="ltr" data-testid="update-command" className={commandCls}>
+            {command}
+          </pre>
+          <CopyButton value={command} label={t("pr.cmd.copy")} variant="primary" size="md" full />
+        </div>
+      ) : (
+        <p role="status" className="text-xs text-muted">
+          {t("common.loading")}
+        </p>
+      )}
     </Modal>
   );
 }
@@ -345,6 +374,8 @@ export function AddProbeModal({ actions, onClose, preset }: { actions: Actions; 
 function CommandSteps({ issued, busy, onAgain }: { issued: Issued; busy: boolean; onAgain: () => void }) {
   const t = useT();
   const pre = useRef<HTMLPreElement>(null);
+  const [host, setHost] = useState<ProbeHost>(hostOf(issued.probe.kind));
+  const command = host === "server" ? issued.serverCommand : issued.command;
   const live = useQuery({ ...ownProbeQuery, refetchInterval: 3_000 });
   const seen = live.data?.probes.find((p) => p.id === issued.probe.id);
   const connected = !!seen && seen.state !== "pending" && seen.lastSeenUnix > 0;
@@ -364,18 +395,18 @@ function CommandSteps({ issued, busy, onAgain }: { issued: Issued; busy: boolean
     <div className="flex flex-col gap-4">
       <Callout kind="warn">{t("pr.cmd.noRepeat")}</Callout>
       <ol className="flex flex-col gap-4">
-        <Step n={1} title={t("pr.cmd.step1")}>
-          <p className="text-xs leading-snug text-pretty text-muted">{t("pr.cmd.step1.hint")}</p>
+        <Step n={1} title={t(host === "server" ? "pr.cmd.step1.server" : "pr.cmd.step1")}>
+          <HostSwitch value={host} onChange={setHost} />
+          <p className="text-xs leading-snug text-pretty text-muted">{t(host === "server" ? "pr.cmd.step1.hint.server" : "pr.cmd.step1.hint")}</p>
         </Step>
         <Step n={2} title={t("pr.cmd.step2")}>
           <pre ref={pre} tabIndex={0} dir="ltr" data-testid="probe-command" className={commandCls}>
-            {issued.command}
+            {command}
           </pre>
-          <CopyButton value={issued.command} label={t("pr.cmd.copy")} variant="primary" size="md" full onFail={select} />
+          <CopyButton value={command} label={t("pr.cmd.copy")} variant="primary" size="md" full onFail={select} />
           <p className="text-xs leading-snug text-pretty text-muted">
-            <b className="font-bold text-fg">{t("pr.cmd.note")}</b> {t("pr.cmd.for")}
+            <b className="font-bold text-fg">{t("pr.cmd.note")}</b> {t(host === "server" ? "pr.cmd.for.server" : "pr.cmd.for")}
           </p>
-          {issued.probe.kind === "dc" && <p className="text-xs leading-snug text-pretty text-muted">{t("pr.cmd.forServer")}</p>}
           <button
             type="button"
             disabled={busy}

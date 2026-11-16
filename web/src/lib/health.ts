@@ -141,8 +141,7 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.COUNTRY_BLOCKED) {
     // "RU" and "443, 8443" as the sentence needs them: "from Russia", "ports 443 and 8443"
     params.country = countryIn(t, a.params.country ?? "");
-    // the points of own probes are named "Operator · City · probe name" by the panel
-    params.networks = networksShort(t, probeNamesIn(t, a.params.networks ?? ""));
+    params.networks = networksShort(t, a.params.networks ?? "");
     const ports = (a.params.ports ?? "").split(",").map((p) => p.trim()).filter(Boolean);
     params.ports = ports.length ? t.n("cr.alert.ports", ports.length, { ports: listOf(fmt.locale, ports) }) : "";
     // the TSPU probe alone, and sources that disagree, have their own keys
@@ -578,18 +577,17 @@ export function probeWhy(t: T, why: string): string {
   return why && hasKey(key) ? t(key) : t("pr.why.unknown");
 }
 
-/**
- * The name of a point of an own probe as the panel writes it, "Operator · City · probe name": the English word is the panel's,
- * the admin says it in its own language ("Operator · City — probe “name”"). A text of another shape stays as it is.
- */
-export function probePointName(t: T, network: string): string {
-  const m = /^(.*) · probe (.+)$/s.exec(network);
-  return m ? t("pr.vantage", { where: m[1]!, name: m[2]! }) : network;
+/** Why a point of an own probe is dark or unsure, with the port of the target it comes from: "TLS is reset (443)". */
+export function probeReason(t: T, v: Pick<Vantage, "why" | "port">): string {
+  const why = probeWhy(t, v.why);
+  return v.why && v.port > 0 ? `${why} (${v.port})` : why;
 }
 
-/** The same inside the networks of an alert ("Operator · City · probe name (AS64496, City)"): each such name is turned the same way. */
-export const probeNamesIn = (t: T, networks: string) =>
-  networks.replace(/ · probe ([^,(]+?)(?= \(|,|$)/g, (_, name: string) => t("pr.vantage", { where: "", name }));
+/** The name of a point of an own probe, in the admin's words: "Operator · City — probe “name”"; a point with no probe name (none sent) is its network. */
+export function probePointName(t: T, v: Pick<Vantage, "network" | "key" | "probeName">): string {
+  const where = v.network || v.key || "?";
+  return v.probeName ? t("pr.vantage", { where, name: v.probeName }) : where;
+}
 
 /** A row with a Globalping round (it has probes, or a reason why it has none); a row of the TSPU probe or the lists alone has neither. */
 export const isLive = (c: Pick<CountryCheck, "probes" | "reason">) => c.probes.length > 0 || c.reason !== "";
@@ -740,7 +738,7 @@ function breakdownNets(t: T, vs: readonly Vantage[], locale: string): BreakdownN
     // an own probe is named after itself (its name has the city in it) and says why its point is dark or unsure instead of its source
     const net =
       v.source === "probes"
-        ? { name: probePointName(t, v.network || v.key || "?"), tag: [v.asn ? `AS${v.asn}` : "", kind, v.state === "reach" ? "" : probeWhy(t, v.why)].filter(Boolean).join(" · ") }
+        ? { name: probePointName(t, v), tag: [v.asn ? `AS${v.asn}` : "", kind, v.state === "reach" ? "" : probeReason(t, v)].filter(Boolean).join(" · ") }
         : { name: v.network || v.key || "?", tag: [v.asn ? `AS${v.asn}` : "", v.region, kind, sourceName(t, v.source)].filter(Boolean).join(" · ") };
     const k = `${net.name}|${net.tag}`;
     const seen = lines.get(k);
@@ -795,8 +793,8 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
   const partial = c.verdict === CountryVerdict.PARTIAL;
   const darkAll = c.vantages.filter((v) => v.state === "dark");
   const darkNamed = partial ? darkAll : [];
-  // the points of own probes carry the panel's English "probe" in their names: turned into the admin's words
-  const named = (v: Vantage) => (v.source === "probes" ? { ...v, network: probePointName(t, v.network) } : v);
+  // the points of own probes are named after their probe, in the admin's words
+  const named = (v: Vantage) => (v.source === "probes" ? { ...v, network: probePointName(t, v) } : v);
   const dark = darkNamed.length ? t("cr.tip.dark", { networks: [...new Set(darkNamed.map((v) => vantageName(named(v))))].join(t("cr.tip.sep")) }) : "";
   const darkNames = [...new Set(darkNamed.map((v) => named(v).network).filter(Boolean))].join(", ");
   const of = (state: string) => breakdownNets(t, c.vantages.filter((v) => v.state === state), fmt.locale);
@@ -805,8 +803,8 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
     .map((v): OwnPoint => ({
       key: v.key,
       kind: v.state === "reach" ? "ok" : v.state === "dark" ? "dark" : "unsure",
-      name: probePointName(t, v.network || v.key || "?"),
-      what: v.state === "reach" ? t("pr.ok") : probeWhy(t, v.why),
+      name: probePointName(t, v),
+      what: v.state === "reach" ? t("pr.ok") : probeReason(t, v),
       at: fmt.ago(v.atUnix),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, fmt.locale));

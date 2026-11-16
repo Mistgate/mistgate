@@ -77,7 +77,6 @@ import {
   probeDefaultInterval,
   probeIntervals,
   probesState,
-  unfilteredProbes,
   useOwnProbeActions,
   validFallback,
   type OwnProbes,
@@ -1642,18 +1641,15 @@ function ProbesBody({ data, act }: { data: OwnProbes; act: ReturnType<typeof use
   const s = data.settings!;
   const [adding, setAdding] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  // a probe that sees no filtering is known by its points in the checks: the probe itself does not say it
-  const checks = useQuery({ ...checksQuery(), enabled: s.enabled }).data?.countryChecks;
-  const unfiltered = useMemo(() => unfilteredProbes(checks ?? []), [checks]);
   const now = Math.floor(useNow() / 1000);
-  const state = probesState(s, data.probes, now, unfiltered);
+  const state = probesState(s, data.probes, now);
   const live = data.probes.filter((p) => p.state !== "revoked");
 
   return (
     <>
       <Block flush>
         <ProbesStateLine state={state} now={now} />
-        {s.enabled && data.probes.length > 0 && <ProbeList probes={data.probes} now={now} unfiltered={unfiltered} actions={act} />}
+        {s.enabled && data.probes.length > 0 && <ProbeList probes={data.probes} now={now} scriptVersion={data.scriptVersion} actions={act} />}
       </Block>
       {s.enabled && (
         <Block title={t("pr.block.checks")}>

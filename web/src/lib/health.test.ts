@@ -826,6 +826,8 @@ describe("reachability from a country", () => {
     icmpOk: state === "reach",
     tcpOk: state === "reach",
     why: "",
+    probeName: "",
+    port: 0,
     ...over,
   });
   const gpDark = (network: string, asn: string, region: string) => vantage("globalping", network, "dark", { key: `AS${asn}`, asn, region });

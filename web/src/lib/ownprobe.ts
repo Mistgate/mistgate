@@ -1,4 +1,4 @@
-import { queryOptions, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { useToast } from "@/components/ui/toast";
 import type { OwnProbeServiceGetResponse } from "@/gen/mistgate/ownprobe/v1/own_probe_pb";
@@ -6,13 +6,14 @@ import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { ownProbe } from "./api";
 import { sourceErrorText } from "./globalping";
-import type { CountryCheck } from "./health";
 import { plain, type Plain } from "./plain";
 
 // The "Own probes" card of the Reachability sources (own_probe.proto): routers and servers the owner controls inside a country
 // check the nodes from their own networks. Every call is the owner's (API tokens and the MCP have none); creating, revoking,
-// switching and disconnecting need a step-up, "check now" and "confirm network" do not. The one-time install command comes with
-// Create and never again. The words are in i18n/probes.ts ("pr."); nothing here knows an address of a device.
+// switching and disconnecting need a step-up, "check now" and "confirm network" do not. The one-time install commands (for a router
+// and for a server) come with Create and never again; the update commands (no token in them) come from the panel on request. Every
+// command is built by the panel, with the hash of its script checked in it: nothing here makes one. The words are in i18n/probes.ts
+// ("pr."); nothing here knows an address of a device.
 
 export type OwnProbes = Plain<OwnProbeServiceGetResponse>;
 export type OwnProbeSettings = NonNullable<OwnProbes["settings"]>;
@@ -35,30 +36,27 @@ export type ProbeKind = (typeof probeKinds)[number];
 /** A probe that was last heard longer ago than this is "not heard from" (it asks every 12-18 minutes, the script at most hourly). */
 export const offlineAfterSec = 3600;
 
-/** The panel's script as the probes report it (the first 12 hex of its sha256), of the newest command made in this session. */
-const scriptQuery = { queryKey: ["ownProbe", "script"] as const };
-export const useLatestScript = () => useQuery<string>({ ...scriptQuery, queryFn: skipToken, staleTime: Infinity }).data;
+/** The probe runs another script than the panel hands out now (`scriptVersion` of the list: the first 12 hex of its sha256, as a probe reports it). */
+export const isOutdated = (p: Pick<OwnProbeRow, "version" | "state">, scriptVersion: string | undefined) =>
+  !!scriptVersion && !!p.version && p.state !== "pending" && p.state !== "revoked" && p.version !== scriptVersion.slice(0, 12);
 
-/** The probe is older than the script the panel hands out, as far as this session knows it. */
-export const isOutdated = (p: Pick<OwnProbeRow, "version" | "state">, latest: string | undefined) =>
-  !!latest && !!p.version && p.state !== "pending" && p.state !== "revoked" && p.version !== latest.slice(0, 12);
-
-/** The ids of probes that see no filtering on their path (the point says "no_filter"): the checks carry it, the probe does not. */
-export function unfilteredProbes(checks: readonly CountryCheck[]): Set<string> {
-  const ids = new Set<string>();
-  for (const c of checks) for (const v of c.vantages ?? []) if (v.source === "probes" && v.why === "no_filter") ids.add(v.key.replace(/^probe:/, ""));
-  return ids;
-}
+/** The commands that update a probe that stands: for a router (Entware) and for a server. Made by the panel, with no token in them. */
+export const updateCommandQuery = queryOptions({
+  queryKey: ["ownProbe", "updateCommand"],
+  queryFn: async ({ signal }) => plain(await ownProbe.updateCommand({}, { signal })),
+  staleTime: 60_000,
+});
 
 export type ProbeLook = "pending" | "expired" | "online" | "offline" | "netChanged" | "noFilter" | "revoked";
 
 /** What a probe is now. A pending one is waiting for its command; an active one is on, or silent for too long; the rest as the server says. */
-export function probeLook(p: OwnProbeRow, now: number, unfiltered: ReadonlySet<string>): ProbeLook {
+export function probeLook(p: OwnProbeRow, now: number): ProbeLook {
   if (p.state === "revoked") return "revoked";
   if (p.state === "pending") return p.tokenExpiresUnix > 0 && p.tokenExpiresUnix < now ? "expired" : "pending";
   if (p.state === "network_changed") return "netChanged";
   if (p.lastSeenUnix < now - offlineAfterSec) return "offline";
-  return unfiltered.has(p.id) ? "noFilter" : "online";
+  // the probe says it itself, after its first round: its reference address opens, so its network filters nothing
+  return p.reference === "open" ? "noFilter" : "online";
 }
 
 export type ProbesState =
@@ -73,11 +71,11 @@ export type ProbesState =
  * The state line: off; on with no probe (a revoked one does not count); only probes waiting for their command; the ones that
  * ought to work are silent; a network change waits for the owner; else "N of M" with the newest result.
  */
-export function probesState(s: Pick<OwnProbeSettings, "enabled">, probes: readonly OwnProbeRow[], now: number, unfiltered: ReadonlySet<string>): ProbesState {
+export function probesState(s: Pick<OwnProbeSettings, "enabled">, probes: readonly OwnProbeRow[], now: number): ProbesState {
   if (!s.enabled) return { kind: "off" };
   const live = probes.filter((p) => p.state !== "revoked");
   if (live.length === 0) return { kind: "none" };
-  const looks = live.map((p) => probeLook(p, now, unfiltered));
+  const looks = live.map((p) => probeLook(p, now));
   const works = looks.filter((l) => l === "online" || l === "noFilter").length;
   const changed = looks.filter((l) => l === "netChanged").length;
   if (works === 0 && changed > 0) return { kind: "netChanged" };
@@ -94,25 +92,16 @@ export function probesState(s: Pick<OwnProbeSettings, "enabled">, probes: readon
 }
 
 /** The probes in the order of the list: the ones to look at first (a changed network, no contact), then the working, then the rest. */
-export function sortProbes(probes: readonly OwnProbeRow[], now: number, unfiltered: ReadonlySet<string>): OwnProbeRow[] {
+export function sortProbes(probes: readonly OwnProbeRow[], now: number): OwnProbeRow[] {
   const rank: Record<ProbeLook, number> = { netChanged: 0, offline: 1, expired: 2, pending: 3, online: 4, noFilter: 5, revoked: 6 };
-  return [...probes].sort((a, b) => rank[probeLook(a, now, unfiltered)] - rank[probeLook(b, now, unfiltered)] || a.name.localeCompare(b.name));
+  return [...probes].sort((a, b) => rank[probeLook(a, now)] - rank[probeLook(b, now)] || a.name.localeCompare(b.name));
 }
 
-export const probeConfPath = { keenetic: "/opt/etc/mistgate-probe/conf", server: "/etc/mistgate-probe/conf" } as const;
 export const probeBinPath = { keenetic: "/opt/sbin/mistgate-probe", server: "/usr/local/sbin/mistgate-probe" } as const;
-export type ProbeHost = keyof typeof probeConfPath;
+export type ProbeHost = keyof typeof probeBinPath;
 
 /** The system a kind of probe usually stands on: a router at home or on the mobile network, a server in a data centre. */
 export const hostOf = (kind: string): ProbeHost => (kind === "dc" ? "server" : "keenetic");
-
-/**
- * The command that updates a probe already installed. The panel's address is in the probe's own configuration (its `url=` line),
- * so the command needs nothing secret: it downloads the current script and runs its `upgrade`. It cannot pin the script's hash
- * the way the install command does: the panel's answer does not carry the hash of the script it serves now (see the report).
- */
-export const updateCommand = (host: ProbeHost) =>
-  `cd /tmp && curl -fsS --proto '=https' -o mgp.sh "$(sed -n 's/^url=//p' ${probeConfPath[host]})/probe.sh" && sh mgp.sh upgrade`;
 
 export const uninstallCommand = (host: ProbeHost) => `sh ${probeBinPath[host]} uninstall`;
 
@@ -138,8 +127,8 @@ export function validFallback(v: string): boolean {
   }
 }
 
-/** What the window that makes a probe keeps while it is open, and only then: the install command and who it is for. */
-export type Issued = { probe: OwnProbeRow; command: string };
+/** What the window that makes a probe keeps while it is open, and only then: who it is for and its one-time install command, for a router and for a server. */
+export type Issued = { probe: OwnProbeRow; command: string; serverCommand: string };
 
 export function useOwnProbeActions() {
   const t = useT();
@@ -195,15 +184,14 @@ export function useOwnProbeActions() {
   });
 
   /**
-   * Makes a probe and returns its install command. Not a mutation on purpose: a mutation keeps its result in the cache for
-   * minutes, and the command is shown once. The caller holds it as long as its window is open and no longer; the token inside is
-   * dropped here, the command carries it.
+   * Makes a probe and returns its install commands. Not a mutation on purpose: a mutation keeps its result in the cache for
+   * minutes, and the commands are shown once. The caller holds them as long as its window is open and no longer; the token inside is
+   * dropped here, the commands carry it.
    */
   async function create(req: { name: string; city: string; kind: ProbeKind }): Promise<Issued> {
     const res = await guard(() => ownProbe.create(req));
     fresh();
-    qc.setQueryData(scriptQuery.queryKey, res.scriptSha256.slice(0, 12));
-    return { probe: plain(res.probe!), command: res.command };
+    return { probe: plain(res.probe!), command: res.command, serverCommand: res.serverCommand };
   }
 
   /** "I did not copy it": the probe that waits for its command is revoked and the same one is made again, with a new command. */

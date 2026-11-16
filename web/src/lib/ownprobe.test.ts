@@ -3,7 +3,7 @@ import { AlertKind, AlertSeverity, CountryVerdict } from "@/gen/mistgate/admin/v
 import { dictionaries, fill, langs, pickForm, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { makeFmt } from "./format";
-import { alertWhy, countryLook, probeNamesIn, probePointName, probeWhy, type Alert, type CountryCheck } from "./health";
+import { alertWhy, countryLook, probeReason, probeWhy, type Alert, type CountryCheck } from "./health";
 import {
   hostOf,
   isOutdated,
@@ -11,8 +11,6 @@ import {
   probesState,
   sortProbes,
   uninstallCommand,
-  unfilteredProbes,
-  updateCommand,
   validFallback,
   type OwnProbeRow,
 } from "./ownprobe";
@@ -29,44 +27,34 @@ const fmt = makeFmt("en", t);
 const NOW = 1_760_500_000;
 const min = 60;
 const probe = (over: Partial<OwnProbeRow> = {}): OwnProbeRow => ({
-  id: "prb_0123456789abcdef01234567", name: "dacha", city: "Springfield", kind: "home", state: "active", asn: 64496, operator: "ExampleNet", pinnedOperator: "ExampleNet",
-  version: "0a1b2c3d4e5f", lastSeenUnix: NOW - 4 * min, lastResultUnix: NOW - 12 * min, checksDay: 24, tokenExpiresUnix: 0, ...over,
+  id: "prb_0123456789abcdef01234567", name: "kitchen", city: "Springfield", kind: "home", state: "active", asn: 64496, operator: "ExampleNet", pinnedOperator: "ExampleNet",
+  version: "0a1b2c3d4e5f", lastSeenUnix: NOW - 4 * min, lastResultUnix: NOW - 12 * min, checksDay: 24, tokenExpiresUnix: 0, reference: "filtered", ...over,
 });
-const none = new Set<string>();
 
 describe("what a probe is now", () => {
   it("is waiting for its command until it is heard from, and expired once the command's day is over", () => {
-    expect(probeLook(probe({ state: "pending", tokenExpiresUnix: NOW + 3600 }), NOW, none)).toBe("pending");
-    expect(probeLook(probe({ state: "pending", tokenExpiresUnix: NOW - 1 }), NOW, none)).toBe("expired");
-    expect(probeLook(probe({ state: "pending", tokenExpiresUnix: 0 }), NOW, none)).toBe("pending");
+    expect(probeLook(probe({ state: "pending", tokenExpiresUnix: NOW + 3600 }), NOW)).toBe("pending");
+    expect(probeLook(probe({ state: "pending", tokenExpiresUnix: NOW - 1 }), NOW)).toBe("expired");
+    expect(probeLook(probe({ state: "pending", tokenExpiresUnix: 0 }), NOW)).toBe("pending");
   });
 
   it("is working while it is heard from within the hour, and silent after", () => {
-    expect(probeLook(probe(), NOW, none)).toBe("online");
-    expect(probeLook(probe({ lastSeenUnix: NOW - 3599 }), NOW, none)).toBe("online");
-    expect(probeLook(probe({ lastSeenUnix: NOW - 3601 }), NOW, none)).toBe("offline");
+    expect(probeLook(probe(), NOW)).toBe("online");
+    expect(probeLook(probe({ lastSeenUnix: NOW - 3599 }), NOW)).toBe("online");
+    expect(probeLook(probe({ lastSeenUnix: NOW - 3601 }), NOW)).toBe("offline");
   });
 
-  it("says no filtering when its points say it, but only while it works", () => {
-    const id = "prb_0123456789abcdef01234567";
-    expect(probeLook(probe(), NOW, new Set([id]))).toBe("noFilter");
-    expect(probeLook(probe({ lastSeenUnix: NOW - 7200 }), NOW, new Set([id]))).toBe("offline");
-    expect(probeLook(probe(), NOW, new Set(["prb_other"]))).toBe("online");
+  it("says no filtering when the probe itself says its reference opens, but only while it works", () => {
+    expect(probeLook(probe({ reference: "open" }), NOW)).toBe("noFilter");
+    expect(probeLook(probe({ reference: "open", lastSeenUnix: NOW - 7200 }), NOW)).toBe("offline");
+    // every other answer of the reference leaves it an ordinary working probe: a filter, no round yet, a reference that was not tried
+    for (const reference of ["filtered", "", "unavailable"]) expect(probeLook(probe({ reference }), NOW), reference).toBe("online");
   });
 
   it("holds a changed network and a revoked probe as the panel says, whatever the clock", () => {
-    expect(probeLook(probe({ state: "network_changed" }), NOW, none)).toBe("netChanged");
-    expect(probeLook(probe({ state: "network_changed", lastSeenUnix: 1 }), NOW, none)).toBe("netChanged");
-    expect(probeLook(probe({ state: "revoked", lastSeenUnix: 1 }), NOW, none)).toBe("revoked");
-  });
-
-  it("finds the probes that see no filtering in the points of the checks, by their ids, and only those with that reason", () => {
-    const check = (vantages: object[]) => ({ vantages }) as unknown as CountryCheck;
-    const ids = unfilteredProbes([
-      check([{ source: "probes", key: "probe:prb_a", why: "no_filter" }, { source: "probes", key: "probe:prb_b", why: "tls_reset" }, { source: "globalping", key: "probe:prb_c", why: "no_filter" }]),
-      check([{ source: "probes", key: "probe:prb_d", why: "no_filter" }]),
-    ]);
-    expect([...ids].sort()).toEqual(["prb_a", "prb_d"]);
+    expect(probeLook(probe({ state: "network_changed" }), NOW)).toBe("netChanged");
+    expect(probeLook(probe({ state: "network_changed", lastSeenUnix: 1 }), NOW)).toBe("netChanged");
+    expect(probeLook(probe({ state: "revoked", lastSeenUnix: 1 }), NOW)).toBe("revoked");
   });
 });
 
@@ -81,21 +69,20 @@ describe("the state of the card", () => {
     ["a network to confirm and nothing else working", { enabled: true }, [probe({ state: "network_changed" })], "netChanged"],
     ["working", { enabled: true }, [probe()], "works"],
   ] as const)("%s", (_, settings, probes, kind) => {
-    expect(probesState(settings, probes, NOW, none).kind).toBe(kind);
+    expect(probesState(settings, probes, NOW).kind).toBe(kind);
   });
 
   it("counts N of M over the probes that are not revoked, with the newest result, the changed networks and the unfiltered ones", () => {
     const s = probesState(
       { enabled: true },
-      [probe(), probe({ id: "prb_b", lastResultUnix: NOW - 3 * min }), probe({ id: "prb_c", state: "network_changed" }), probe({ id: "prb_d", state: "revoked" })],
+      [probe(), probe({ id: "prb_b", lastResultUnix: NOW - 3 * min, reference: "open" }), probe({ id: "prb_c", state: "network_changed" }), probe({ id: "prb_d", state: "revoked" })],
       NOW,
-      new Set(["prb_b"]),
     );
     expect(s).toEqual({ kind: "works", n: 2, m: 3, lastAt: NOW - 3 * min, changed: 1, unfiltered: 1 });
   });
 
   it("names how long the silence is, by the newest sign of life", () => {
-    const s = probesState({ enabled: true }, [probe({ lastSeenUnix: NOW - 5 * 3600 }), probe({ id: "prb_b", lastSeenUnix: NOW - 9 * 3600 })], NOW, none);
+    const s = probesState({ enabled: true }, [probe({ lastSeenUnix: NOW - 5 * 3600 }), probe({ id: "prb_b", lastSeenUnix: NOW - 9 * 3600 })], NOW);
     expect(s).toEqual({ kind: "offline", since: NOW - 5 * 3600 });
   });
 
@@ -110,7 +97,6 @@ describe("the state of the card", () => {
         probe({ id: "prb_ok2", name: "a-ok" }),
       ],
       NOW,
-      none,
     ).map((p) => p.id);
     expect(order).toEqual(["prb_net", "prb_off", "prb_wait", "prb_ok2", "prb_ok", "prb_dead"]);
   });
@@ -123,6 +109,7 @@ describe("a probe is Outdated", () => {
     // the whole hash of Create is as good as its first twelve
     expect(isOutdated(probe({ version: "0a1b2c3d4e5f" }), "0a1b2c3d4e5f".padEnd(64, "0"))).toBe(false);
     expect(isOutdated(probe({ version: "111111111111" }), undefined)).toBe(false);
+    expect(isOutdated(probe({ version: "111111111111" }), "")).toBe(false);
     expect(isOutdated(probe({ version: "" }), "0a1b2c3d4e5f")).toBe(false);
     expect(isOutdated(probe({ state: "pending", version: "111111111111" }), "0a1b2c3d4e5f")).toBe(false);
     expect(isOutdated(probe({ state: "revoked", version: "111111111111" }), "0a1b2c3d4e5f")).toBe(false);
@@ -130,10 +117,7 @@ describe("a probe is Outdated", () => {
 });
 
 describe("the commands for the device", () => {
-  it("update from the probe's own configuration: nothing secret in it, the system's own paths", () => {
-    expect(updateCommand("keenetic")).toBe(`cd /tmp && curl -fsS --proto '=https' -o mgp.sh "$(sed -n 's/^url=//p' /opt/etc/mistgate-probe/conf)/probe.sh" && sh mgp.sh upgrade`);
-    expect(updateCommand("server")).toContain("/etc/mistgate-probe/conf");
-    expect(updateCommand("server")).not.toContain("/opt/");
+  it("to remove a probe are the system's own paths; the install and update commands are the panel's, never made here", () => {
     expect(uninstallCommand("keenetic")).toBe("sh /opt/sbin/mistgate-probe uninstall");
     expect(uninstallCommand("server")).toBe("sh /usr/local/sbin/mistgate-probe uninstall");
   });
@@ -178,7 +162,7 @@ describe("the reasons of a point", () => {
 });
 
 describe("the points of the probes in a node's verdict", () => {
-  const point = (over: object) => ({ source: "probes", key: "probe:prb_a", network: "ExampleNet · Springfield · probe dacha", region: "Springfield", asn: "64496", kind: "home", state: "dark", atUnix: NOW - 5 * min, dpiHop: 0, icmpOk: false, tcpOk: true, why: "tls_reset", ...over });
+  const point = (over: object) => ({ source: "probes", key: "probe:prb_a", network: "ExampleNet · Springfield", probeName: "kitchen", port: 443, region: "Springfield", asn: "64496", kind: "home", state: "dark", atUnix: NOW - 5 * min, dpiHop: 0, icmpOk: false, tcpOk: true, why: "tls_reset", ...over });
   const check = (vantages: object[], over: object = {}) =>
     ({
       nodeId: "nod_1", country: "RU", verdict: CountryVerdict.PARTIAL, atUnix: NOW - 5 * min, probes: [], reason: "", eyeball: true, confidence: "eyeball", listedBy: [], cdnProvider: "", cdnRegion: "",
@@ -187,22 +171,36 @@ describe("the points of the probes in a node's verdict", () => {
     }) as unknown as CountryCheck;
   const looks = (lang: (typeof langs)[number], c: CountryCheck) => countryLook(tOf(lang), makeFmt(lang, tOf(lang)), c);
 
-  it("name the probe the way the owner reads it, without an address: operator, city, the probe, what it saw and when", () => {
+  it("name the probe the way the owner reads it, without an address: operator, city, the probe from its own field, what it saw on which port and when", () => {
     const look = countryLook(t, { ...fmt, ago: () => "5 min ago" }, check([point({})]));
-    expect(look.ownPoints).toEqual([{ key: "probe:prb_a", kind: "dark", name: "ExampleNet · Springfield — probe “dacha”", what: "TLS is reset", at: "5 min ago" }]);
+    expect(look.ownPoints).toEqual([{ key: "probe:prb_a", kind: "dark", name: "ExampleNet · Springfield — probe “kitchen”", what: "TLS is reset (443)", at: "5 min ago" }]);
     // the cell's note and the tooltip's line say it in the admin's words as well
-    expect(look.note).toBe("ExampleNet · Springfield — probe “dacha”");
-    expect(look.dark).not.toContain(" · probe ");
-    // the dark point is in the breakdown too, with the reason in place of its source
-    expect(look.breakdown?.dark).toEqual([{ name: "ExampleNet · Springfield — probe “dacha”", tag: "AS64496 · home · TLS is reset" }]);
+    expect(look.note).toBe("ExampleNet · Springfield — probe “kitchen”");
+    // the dark point is in the breakdown too, with the reason and its port in place of its source
+    expect(look.breakdown?.dark).toEqual([{ name: "ExampleNet · Springfield — probe “kitchen”", tag: "AS64496 · home · TLS is reset (443)" }]);
+  });
+
+  it("take the name from the field, never from the network's text: a network that has the word in it stays as it is", () => {
+    const odd = point({ network: "Probe Telecom · Springfield · probe x", probeName: "kitchen" });
+    expect(looks("en", check([odd])).ownPoints[0]!.name).toBe("Probe Telecom · Springfield · probe x — probe “kitchen”");
+    expect(looks("en", check([point({ probeName: "" })])).ownPoints[0]!.name).toBe("ExampleNet · Springfield");
+  });
+
+  it("say the port of the reason only for a reason, and only when the panel names one", () => {
+    expect(probeReason(t, { why: "tls_reset", port: 8443 })).toBe("TLS is reset (8443)");
+    expect(probeReason(t, { why: "tcp_timeout", port: 0 })).toBe("no answer: the connection times out");
+    expect(probeReason(t, { why: "", port: 443 })).toBe("no clear answer");
+    expect(probeReason(tOf("ru"), { why: "tls_reset", port: 443 })).toBe("TLS обрывается (443)");
+    const open = looks("en", check([point({ state: "uncertain", why: "no_filter", port: 0 })], { verdict: CountryVerdict.OK })).ownPoints[0]!;
+    expect(open.what).toBe("no filtering on its path, so “reachable” proves nothing");
   });
 
   it("say what a point that reaches the node says, and a point that proves nothing says why", () => {
     const ok = looks("en", check([point({ state: "reach", why: "" })], { verdict: CountryVerdict.OK })).ownPoints[0]!;
     expect([ok.kind, ok.what]).toEqual(["ok", "reaches the node"]);
-    const open = looks("en", check([point({ state: "uncertain", why: "no_filter" })], { verdict: CountryVerdict.OK })).ownPoints[0]!;
+    const open = looks("en", check([point({ state: "uncertain", why: "no_filter", port: 0 })], { verdict: CountryVerdict.OK })).ownPoints[0]!;
     expect([open.kind, open.what]).toEqual(["unsure", "no filtering on its path, so “reachable” proves nothing"]);
-    const noControl = looks("en", check([point({ state: "uncertain", why: "no_control" })], { verdict: CountryVerdict.UNKNOWN })).ownPoints[0]!;
+    const noControl = looks("en", check([point({ state: "uncertain", why: "no_control", port: 0 })], { verdict: CountryVerdict.UNKNOWN })).ownPoints[0]!;
     expect(noControl.what).toBe("its own network is down: nothing proved");
   });
 
@@ -215,22 +213,10 @@ describe("the points of the probes in a node's verdict", () => {
   it("read in every language with the probe's name in guillemets or quotes, and never the panel's English word", () => {
     for (const lang of langs) {
       const look = looks(lang, check([point({})]));
-      expect(look.ownPoints[0]!.name, lang).toContain("dacha");
+      expect(look.ownPoints[0]!.name, lang).toContain("kitchen");
       expect(look.ownPoints[0]!.name, lang).not.toContain(" · probe ");
     }
-    expect(looks("ru", check([point({})])).ownPoints[0]!.name).toBe("ExampleNet · Springfield — зонд «dacha»");
-  });
-
-  it("leave a name of another shape as the panel wrote it", () => {
-    expect(probePointName(t, "ExampleNet")).toBe("ExampleNet");
-    expect(probePointName(t, "ExampleNet · Springfield · probe office")).toBe("ExampleNet · Springfield — probe “office”");
-  });
-
-  it("turn every such name inside the networks of an alert", () => {
-    expect(probeNamesIn(t, "ExampleNet · Springfield · probe dacha (AS64496, Springfield), Demo Telecom · Shelbyville · probe office")).toBe(
-      "ExampleNet · Springfield — probe “dacha” (AS64496, Springfield), Demo Telecom · Shelbyville — probe “office”",
-    );
-    expect(probeNamesIn(t, "MTS (AS8359, Moscow), Tele2")).toBe("MTS (AS8359, Moscow), Tele2");
+    expect(looks("ru", check([point({})])).ownPoints[0]!.name).toBe("ExampleNet · Springfield — зонд «kitchen»");
   });
 });
 
@@ -239,19 +225,19 @@ describe("the alert of a block that only own probes saw", () => {
     ({
       id: "alt_1", severity: AlertSeverity.WARNING, kind: AlertKind.COUNTRY_BLOCKED, nodeId: "nod_1", nodeName: "de1", subject: "partial", titleKey: "health.alert.country_blocked.title",
       whyKey: "health.alert.country_blocked.why.partial", firstSeenUnix: 1, openedUnix: 1, lastSeenUnix: 1, resolvedAtUnix: 0, resolution: "", mutedUntilUnix: 0, actions: [],
-      params: { country: "RU", verdict: "partial", sources: "probes", networks: "ExampleNet · Springfield · probe dacha" }, ...over,
+      params: { country: "RU", verdict: "partial", sources: "probes", networks: "ExampleNet · Springfield · “kitchen” (AS64496, Springfield, probes)" }, ...over,
     }) as Alert;
 
   it("says that it is a hint from one narrow point, with the probe named, in every language", () => {
     for (const lang of langs) {
       const tt = tOf(lang);
       const why = alertWhy(tt, makeFmt(lang, tt), alert());
-      expect(why, lang).toContain("dacha");
+      expect(why, lang).toContain("“kitchen”");
       expect(why, lang).not.toContain("{");
       expect(why, lang).not.toBe(alertWhy(tt, makeFmt(lang, tt), alert({ params: { country: "RU", verdict: "partial", sources: "globalping", networks: "MTS" } })));
     }
     expect(alertWhy(t, fmt, alert())).toBe(
-      "Your own probe on ExampleNet · Springfield — probe “dacha” gets no answer from this node. It is one narrow point, so this is a hint, not proof: the other networks of Russia were not looked at. Two checks in a row saw it. It closes once the probe reaches the node again.",
+      "Your own probe on ExampleNet · Springfield · “kitchen” (AS64496, Springfield, probes) gets no answer from this node. It is one narrow point, so this is a hint, not proof: the other networks of Russia were not looked at. Two checks in a row saw it. It closes once the probe reaches the node again.",
     );
   });
 

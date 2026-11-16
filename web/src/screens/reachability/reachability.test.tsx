@@ -504,8 +504,8 @@ describe("the Reachability page with the sources off", () => {
 
 describe("the points of own probes, for everyone who reads the page", () => {
   const probes = [
-    vantage("probes", "probe:prb_a", "reach", { network: "ExampleNet · Springfield · probe dacha", asn: "64496", kind: "home", why: "" }),
-    vantage("probes", "probe:prb_b", "uncertain", { network: "Demo Telecom · Shelbyville · probe office", asn: "64497", kind: "dc", why: "no_filter" }),
+    vantage("probes", "probe:prb_a", "reach", { network: "ExampleNet · Springfield", probeName: "kitchen", asn: "64496", kind: "home", why: "" }),
+    vantage("probes", "probe:prb_b", "uncertain", { network: "Demo Telecom · Shelbyville", probeName: "office", asn: "64497", kind: "dc", why: "no_filter" }),
   ];
 
   it("gives a helper the lines of the probes under a node, and no card, no button: the sources and the probes are the owner's", async () => {
@@ -516,7 +516,7 @@ describe("the points of own probes, for everyone who reads the page", () => {
     const points = [...row("de1").querySelectorAll("[data-testid=own-points] li")].map((li) => li.textContent);
     expect(points).toEqual([
       "?Demo Telecom · Shelbyville — probe “office” no filtering on its path, so “reachable” proves nothing · 4 min ago",
-      "✓ExampleNet · Springfield — probe “dacha” reaches the node · 4 min ago",
+      "✓ExampleNet · Springfield — probe “kitchen” reaches the node · 4 min ago",
     ]);
     expect(line("de1", "probes").getAttribute("data-on")).toBe("true");
     expect(document.querySelectorAll("#sources h3")).toHaveLength(0);
@@ -531,10 +531,10 @@ describe("the points of own probes, for everyone who reads the page", () => {
     getHistory.mockResolvedValue(history(["globalping", "probes"]));
     getChecks.mockResolvedValue({
       nowUnix: NOW, intervalS: 300, columns: [], rows: [],
-      countryChecks: [check("nod_de1", CountryVerdict.PARTIAL, { sources: ["probes"], vantages: [vantage("probes", "probe:prb_a", "dark", { network: "ExampleNet · Springfield · probe dacha", asn: "64496", kind: "home", why: "tls_reset" })] })],
+      countryChecks: [check("nod_de1", CountryVerdict.PARTIAL, { sources: ["probes"], vantages: [vantage("probes", "probe:prb_a", "dark", { network: "ExampleNet · Springfield", probeName: "kitchen", port: 443, asn: "64496", kind: "home", why: "tls_reset" })] })],
     });
     await mount();
-    expect(words(row("de1").querySelector("[data-testid=partial-breakdown]"))).toContain("ExampleNet · Springfield — probe “dacha” AS64496 · home · TLS is reset");
+    expect(words(row("de1").querySelector("[data-testid=partial-breakdown]"))).toContain("ExampleNet · Springfield — probe “kitchen” AS64496 · home · TLS is reset (443)");
     expect(row("de1").querySelector("[data-testid=own-points]")).toBeNull();
   });
 });
