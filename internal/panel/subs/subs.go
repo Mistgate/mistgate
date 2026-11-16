@@ -42,6 +42,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -484,7 +485,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // come from the cache), so the header is set apart from it.
 func (h *handler) notSupported(w http.ResponseWriter, r *http.Request, hint access.DeviceHint, app bool) {
 	if app && hint.HWID == "" && firstHeader(r, "X-Hwid") != "" {
-		w.Header().Set("X-Hwid-Not-Supported", "true")
+		w.Header().Set(subhdr.XHwidNotSupported, "true")
 	}
 }
 
@@ -649,10 +650,10 @@ var happPing = map[adminv1.HappPing]string{adminv1.HappPing_HAPP_PING_TCP: "tcp"
 func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, format plugin.ClientFormat) {
 	ctx := r.Context()
 	hd := w.Header()
-	hd["Cache-Control"] = headerCacheNoStore[:1:1]
-	hd["X-Content-Type-Options"] = headerNoSniff[:1:1]
-	hd.Set("Profile-Title", b64(h.title(set, b)))
-	hd.Set("Subscription-Userinfo", userinfo(v))
+	hd[subhdr.CacheControl] = headerCacheNoStore[:1:1]
+	hd[subhdr.XContentTypeOptions] = headerNoSniff[:1:1]
+	hd.Set(subhdr.ProfileTitle, b64(h.title(set, b)))
+	hd.Set(subhdr.SubscriptionUserinfo, userinfo(v))
 	hours := int(set.GetUpdateIntervalHours())
 	if hours == 0 {
 		hours = subsettings.DefaultUpdateHours
@@ -660,56 +661,70 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	if v.Status != access.StatusActive || v.Refusal != "" {
 		hours = updateHoursNoAccess
 	}
-	hd.Set("Profile-Update-Interval", strconv.Itoa(hours))
-	hd.Set("Profile-Web-Page-Url", h.link(r, token))
+	hd.Set(subhdr.ProfileUpdateInterval, strconv.Itoa(hours))
+	hd.Set(subhdr.ProfileWebPageURL, h.link(r, token))
 	ann := set.GetAnnouncement()
 	if note := h.appNote(v, b.Language, format); note != "" {
 		ann = note // the reason the app stopped working is the announcement that matters now
 	}
 	if a := cutAnnounce(ann, announceMax); a != "" {
-		hd.Set("Announce", b64(a))
+		hd.Set(subhdr.Announce, b64(a))
 	}
 	if u := set.GetSupportUrl(); u != "" {
-		hd.Set("Support-Url", u)
+		hd.Set(subhdr.SupportURL, u)
 	}
 	if h.probeOn(ctx) {
 		// kl!ck sends the reports of its local server check only to a panel that says it takes them, and of what version.
-		hd.Set("Probe-Report", strconv.Itoa(clientprobe.Version))
+		hd.Set(subhdr.ProbeReport, strconv.Itoa(clientprobe.Version))
 	}
 	if clientCapsPresent(r) && h.cfg.Settings != nil && h.cfg.Settings.ClientAPIEnabled(ctx) {
 		// This is written only by the app response writers; the public HTML page has its own writer above.
-		hd.Set("Mistgate-Client-Api", "1")
+		hd.Set(subhdr.MistgateClientAPI, "1")
 	}
 	if v.Refusal != "" {
 		// The headers of Remnawave, 3x-ui and v2RayTun, so the apps that read them say the same: the HWID check is on, and
 		// the limit is reached or the app has no device ID to give. A blocked device gets neither: the limit is not why,
 		// and an app that reads the flag would tell the person to free a place; the announcement says what happened.
-		hd.Set("X-Hwid-Active", "true")
+		hd.Set(subhdr.XHwidActive, "true")
 		switch v.Refusal {
 		case access.RefusalNoDeviceID:
-			hd.Set("X-Hwid-Not-Supported", "true")
+			hd.Set(subhdr.XHwidNotSupported, "true")
 		case access.RefusalDeviceLimit:
-			hd.Set("X-Hwid-Max-Devices-Reached", "true")
+			hd.Set(subhdr.XHwidMaxDevicesReached, "true")
 		}
-		hd.Set("X-Hwid-Limit", strconv.Itoa(v.DeviceLimit))
+		hd.Set(subhdr.XHwidLimit, strconv.Itoa(v.DeviceLimit))
 	}
 	if ping, ok := happPing[set.GetHappPing()]; ok && isHapp(r.UserAgent()) {
 		// The headers the old Remnawave setups sent Happ: how to ping the servers, show the delay in ms, and whether to ping
 		// when the app opens. Only Happ reads them, and only when the owner chose something other than the app's default.
-		hd.Set("Ping-Type", ping)
-		hd.Set("Ping-Result", "time")
+		hd.Set(subhdr.PingType, ping)
+		hd.Set(subhdr.PingResult, "time")
 		onOpen := "0"
 		if set.GetHappPingOnOpen() {
 			onOpen = "1"
 		}
-		hd.Set("Subscription-Ping-Onopen-Enabled", onOpen)
+		hd.Set(subhdr.SubscriptionPingOnopenEnabled, onOpen)
 	}
 	if format == plugin.FormatURIList && h.cfg.Routing != nil && v.Status == access.StatusActive && v.UserID != "" && isHapp(r.UserAgent()) {
 		if val, err := h.cfg.Routing.HappRouting(ctx, v.UserID); err != nil {
 			h.cfg.Log.Warn("happ routing header skipped", "code", "subscription_happ_routing_unavailable", "err", err) // no user id, no token in the log
 		} else if val != "" {
-			hd.Set("Routing", val)
+			hd.Set(subhdr.Routing, val)
 		}
+	}
+	if v.Status == access.StatusActive && v.Refusal == "" {
+		// The owner's own headers go with an answer that serves the person, never with a refusal or a note that says why there are no
+		// servers.
+		setOwnHeaders(hd, subsettings.ResponseHeadersFor(set, v.GroupID, formatOf(format)))
+	}
+}
+
+// setOwnHeaders puts the owner's headers into the answer under the name the owner wrote (a header name is case-insensitive and the
+// apps that read these may want their own spelling). It is the one place that names a header by data, not by a subhdr constant:
+// the settings do not take a name of subhdr.Reserved, which is every name the code of this package sets.
+func setOwnHeaders(dst http.Header, list []subsettings.SentHeader) {
+	for _, e := range list {
+		dst[e.Name] = []string{e.Value}
 	}
 }
 
@@ -751,16 +766,16 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 func (h *handler) writeDocument(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, contentType []string, body []byte, format plugin.ClientFormat) {
 	h.headers(w, r, token, v, set, b, format)
 	hd := w.Header()
-	hd["Content-Type"] = contentType[:1:1]
-	hd.Set("Content-Disposition", "attachment; filename*=UTF-8''"+pctEncode(h.title(set, b)))
-	if _, ok := hd["Vary"]; ok {
-		hd.Add("Vary", "Accept-Encoding")
+	hd[subhdr.ContentType] = contentType[:1:1]
+	hd.Set(subhdr.ContentDisposition, "attachment; filename*=UTF-8''"+pctEncode(h.title(set, b)))
+	if _, ok := hd[subhdr.Vary]; ok {
+		hd.Add(subhdr.Vary, "Accept-Encoding")
 	} else {
-		hd["Vary"] = headerVaryAcceptEncoding[:1:1]
+		hd[subhdr.Vary] = headerVaryAcceptEncoding[:1:1]
 	}
 	if acceptsGzip(r) {
 		body = gzipped(body)
-		hd["Content-Encoding"] = headerContentEncodingGzip[:1:1]
+		hd[subhdr.ContentEncoding] = headerContentEncodingGzip[:1:1]
 	}
 	w.Write(body)
 }
@@ -769,7 +784,7 @@ func (h *handler) writeDocument(w http.ResponseWriter, r *http.Request, token st
 func (h *handler) writeList(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
 	h.headers(w, r, token, v, set, b, plugin.FormatURIList)
-	w.Header()["Content-Type"] = headerContentTypePlainText[:1:1]
+	w.Header()[subhdr.ContentType] = headerContentTypePlainText[:1:1]
 	w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(h.lines(v, set, b, isHapp(r.UserAgent())), "\n")))))
 }
 
@@ -806,7 +821,7 @@ func tooMany(w http.ResponseWriter, retry time.Duration) {
 	if secs < 1 {
 		secs = 1
 	}
-	w.Header().Set("Retry-After", strconv.Itoa(secs))
+	w.Header().Set(subhdr.RetryAfter, strconv.Itoa(secs))
 	http.Error(w, "too many requests", http.StatusTooManyRequests)
 }
 

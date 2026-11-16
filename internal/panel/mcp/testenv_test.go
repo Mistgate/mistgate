@@ -34,6 +34,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/tasks/v1/tasksv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -1470,7 +1471,7 @@ func (w *world) ListClients(context.Context, *connect.Request[adminv1.ListClient
 func (w *world) GetSubscriptionSettings(context.Context, *connect.Request[adminv1.GetSubscriptionSettingsRequest]) (*connect.Response[adminv1.GetSubscriptionSettingsResponse], error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return connect.NewResponse(&adminv1.GetSubscriptionSettingsResponse{Settings: proto.Clone(w.subs).(*adminv1.SubscriptionSettings), EffectiveTitle: "Example VPN", SharedLinkUsers: 5, LinkAwgKeys: 7}), nil
+	return connect.NewResponse(&adminv1.GetSubscriptionSettingsResponse{Settings: proto.Clone(w.subs).(*adminv1.SubscriptionSettings), EffectiveTitle: "Example VPN", SharedLinkUsers: 5, LinkAwgKeys: 7, ReservedHeaderNames: subhdr.ReservedNames()}), nil
 }
 
 // UpdateSubscriptionSettings is the real save's check and store: what the MCP layer sends must pass the admin's validation.

@@ -447,6 +447,9 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 			}
 		}
 	}
+	if err := validateResponseHeaders(s.ResponseHeaders); err != nil {
+		return err
+	}
 	if o := s.UserPage; o == nil {
 		return invalid("user_page missing")
 	}
@@ -484,6 +487,7 @@ func Normalize(s *adminv1.SubscriptionSettings) {
 			r.UaContains = strings.TrimSpace(r.UaContains)
 		}
 	}
+	normalizeResponseHeaders(s.ResponseHeaders)
 }
 
 var (
@@ -545,6 +549,7 @@ func Parse(value string) (*adminv1.SubscriptionSettings, error) {
 		s.UserPage = &adminv1.UserPageOptions{}
 	}
 	s.DefaultDnsPresetId, s.LinkDns = "", nil
+	s.ResponseHeaders = keepValidHeaders(s.ResponseHeaders)
 	return s, nil
 }
 

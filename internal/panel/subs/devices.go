@@ -21,6 +21,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -480,7 +481,7 @@ func (h *handler) writeCounters(token, client string) []writeCounter {
 }
 
 func tooManyWrites(w http.ResponseWriter, retry time.Duration) {
-	w.Header().Set("Retry-After", strconv.Itoa(int((retry+time.Second-1)/time.Second)))
+	w.Header().Set(subhdr.RetryAfter, strconv.Itoa(int((retry+time.Second-1)/time.Second)))
 	jsonError(w, http.StatusTooManyRequests, "too_many_requests", "")
 }
 
@@ -603,10 +604,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 		status, b = http.StatusInternalServerError, []byte(`{"error":"internal"}`)
 	}
 	hd := w.Header()
-	hd["Content-Type"] = headerContentTypeJSON[:1:1]
-	hd["Cache-Control"] = headerCacheNoStore[:1:1]
-	hd["X-Content-Type-Options"] = headerNoSniff[:1:1]
-	hd["Referrer-Policy"] = headerNoReferrer[:1:1]
+	hd[subhdr.ContentType] = headerContentTypeJSON[:1:1]
+	hd[subhdr.CacheControl] = headerCacheNoStore[:1:1]
+	hd[subhdr.XContentTypeOptions] = headerNoSniff[:1:1]
+	hd[subhdr.ReferrerPolicy] = headerNoReferrer[:1:1]
 	w.WriteHeader(status)
 	w.Write(b)
 }

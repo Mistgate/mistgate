@@ -45,6 +45,9 @@ const (
 	// SubscriptionServiceTestUserAgentProcedure is the fully-qualified name of the
 	// SubscriptionService's TestUserAgent RPC.
 	SubscriptionServiceTestUserAgentProcedure = "/mistgate.admin.v1.SubscriptionService/TestUserAgent"
+	// SubscriptionServicePreviewResponseHeadersProcedure is the fully-qualified name of the
+	// SubscriptionService's PreviewResponseHeaders RPC.
+	SubscriptionServicePreviewResponseHeadersProcedure = "/mistgate.admin.v1.SubscriptionService/PreviewResponseHeaders"
 )
 
 // SubscriptionServiceClient is a client for the mistgate.admin.v1.SubscriptionService service.
@@ -55,6 +58,9 @@ type SubscriptionServiceClient interface {
 	ListClients(context.Context, *connect.Request[v1.ListClientsRequest]) (*connect.Response[v1.ListClientsResponse], error)
 	// "Serving rules" tab: which rule and format a sample User-Agent gets.
 	TestUserAgent(context.Context, *connect.Request[v1.TestUserAgentRequest]) (*connect.Response[v1.TestUserAgentResponse], error)
+	// "Response headers" tab: the headers of the list (the editor's draft, checked like a save) one person gets with one
+	// User-Agent. INVALID_ARGUMENT for a list that a save would refuse; NOT_FOUND for an unknown person.
+	PreviewResponseHeaders(context.Context, *connect.Request[v1.PreviewResponseHeadersRequest]) (*connect.Response[v1.PreviewResponseHeadersResponse], error)
 }
 
 // NewSubscriptionServiceClient constructs a client for the mistgate.admin.v1.SubscriptionService
@@ -92,6 +98,12 @@ func NewSubscriptionServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(subscriptionServiceMethods.ByName("TestUserAgent")),
 			connect.WithClientOptions(opts...),
 		),
+		previewResponseHeaders: connect.NewClient[v1.PreviewResponseHeadersRequest, v1.PreviewResponseHeadersResponse](
+			httpClient,
+			baseURL+SubscriptionServicePreviewResponseHeadersProcedure,
+			connect.WithSchema(subscriptionServiceMethods.ByName("PreviewResponseHeaders")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -101,6 +113,7 @@ type subscriptionServiceClient struct {
 	updateSubscriptionSettings *connect.Client[v1.UpdateSubscriptionSettingsRequest, v1.UpdateSubscriptionSettingsResponse]
 	listClients                *connect.Client[v1.ListClientsRequest, v1.ListClientsResponse]
 	testUserAgent              *connect.Client[v1.TestUserAgentRequest, v1.TestUserAgentResponse]
+	previewResponseHeaders     *connect.Client[v1.PreviewResponseHeadersRequest, v1.PreviewResponseHeadersResponse]
 }
 
 // GetSubscriptionSettings calls mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings.
@@ -124,6 +137,11 @@ func (c *subscriptionServiceClient) TestUserAgent(ctx context.Context, req *conn
 	return c.testUserAgent.CallUnary(ctx, req)
 }
 
+// PreviewResponseHeaders calls mistgate.admin.v1.SubscriptionService.PreviewResponseHeaders.
+func (c *subscriptionServiceClient) PreviewResponseHeaders(ctx context.Context, req *connect.Request[v1.PreviewResponseHeadersRequest]) (*connect.Response[v1.PreviewResponseHeadersResponse], error) {
+	return c.previewResponseHeaders.CallUnary(ctx, req)
+}
+
 // SubscriptionServiceHandler is an implementation of the mistgate.admin.v1.SubscriptionService
 // service.
 type SubscriptionServiceHandler interface {
@@ -133,6 +151,9 @@ type SubscriptionServiceHandler interface {
 	ListClients(context.Context, *connect.Request[v1.ListClientsRequest]) (*connect.Response[v1.ListClientsResponse], error)
 	// "Serving rules" tab: which rule and format a sample User-Agent gets.
 	TestUserAgent(context.Context, *connect.Request[v1.TestUserAgentRequest]) (*connect.Response[v1.TestUserAgentResponse], error)
+	// "Response headers" tab: the headers of the list (the editor's draft, checked like a save) one person gets with one
+	// User-Agent. INVALID_ARGUMENT for a list that a save would refuse; NOT_FOUND for an unknown person.
+	PreviewResponseHeaders(context.Context, *connect.Request[v1.PreviewResponseHeadersRequest]) (*connect.Response[v1.PreviewResponseHeadersResponse], error)
 }
 
 // NewSubscriptionServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -166,6 +187,12 @@ func NewSubscriptionServiceHandler(svc SubscriptionServiceHandler, opts ...conne
 		connect.WithSchema(subscriptionServiceMethods.ByName("TestUserAgent")),
 		connect.WithHandlerOptions(opts...),
 	)
+	subscriptionServicePreviewResponseHeadersHandler := connect.NewUnaryHandler(
+		SubscriptionServicePreviewResponseHeadersProcedure,
+		svc.PreviewResponseHeaders,
+		connect.WithSchema(subscriptionServiceMethods.ByName("PreviewResponseHeaders")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.SubscriptionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SubscriptionServiceGetSubscriptionSettingsProcedure:
@@ -176,6 +203,8 @@ func NewSubscriptionServiceHandler(svc SubscriptionServiceHandler, opts ...conne
 			subscriptionServiceListClientsHandler.ServeHTTP(w, r)
 		case SubscriptionServiceTestUserAgentProcedure:
 			subscriptionServiceTestUserAgentHandler.ServeHTTP(w, r)
+		case SubscriptionServicePreviewResponseHeadersProcedure:
+			subscriptionServicePreviewResponseHeadersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -199,4 +228,8 @@ func (UnimplementedSubscriptionServiceHandler) ListClients(context.Context, *con
 
 func (UnimplementedSubscriptionServiceHandler) TestUserAgent(context.Context, *connect.Request[v1.TestUserAgentRequest]) (*connect.Response[v1.TestUserAgentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.SubscriptionService.TestUserAgent is not implemented"))
+}
+
+func (UnimplementedSubscriptionServiceHandler) PreviewResponseHeaders(context.Context, *connect.Request[v1.PreviewResponseHeadersRequest]) (*connect.Response[v1.PreviewResponseHeadersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.SubscriptionService.PreviewResponseHeaders is not implemented"))
 }

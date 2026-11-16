@@ -23,6 +23,7 @@ var ErrUnknownToken = errors.New("access: unknown subscription token")
 // SubView is what the public subscription endpoint needs about one token.
 type SubView struct {
 	UserID           string
+	GroupID          string // the person's group; the owner's own response headers can be limited to groups
 	UserName         string
 	SubscriptionName string
 	Status           string // active | disabled | expired | limited
@@ -352,7 +353,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	now := s.now()
 	u, status := currentSubscriptionUser(u, now)
 	v := SubView{
-		UserID: u.ID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: status,
+		UserID: u.ID, GroupID: u.GroupID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: status,
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
 		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia, AppTelegram: u.AppTelegram,
 	}
@@ -774,6 +775,12 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	s.nodeDNSData(ctx, &v, n, awgDevs)
 	return v, nil
+}
+
+// SubscriptionStatus is the status a subscription fetch would derive for the person now (a due quota reset applied first).
+func SubscriptionStatus(u store.AccessUser, now time.Time) string {
+	_, status := currentSubscriptionUser(u, now)
+	return status
 }
 
 // currentSubscriptionUser applies a due quota reset before deriving status, as a subscription fetch does even before the sweep.
