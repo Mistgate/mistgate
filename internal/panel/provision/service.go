@@ -59,6 +59,8 @@ type SubHostAPI interface {
 	PrepareInstall(ctx context.Context, sshHost, domain string, skipDNS bool) (tunnelSNI string, err error)
 	ActivateInstalled(ctx context.Context, nodeID, domain, tunnelSNI string) error // off → on
 	DeactivateInstalled(ctx context.Context, nodeID string) error                  // on → off, only for that node alone
+	// TunnelDownReason is why the panel's tunnel to nodeID is down: "", "unreachable" or "not_recognised".
+	TunnelDownReason(nodeID string) string
 }
 
 // BinarySource returns a node binary from the currently trusted release, its size and the sha256 (hex) in the signed

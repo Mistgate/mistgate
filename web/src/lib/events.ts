@@ -48,6 +48,7 @@ const textKeys: Record<string, MessageKey> = {
   host_firewall_sync_failed: "event.host_firewall_sync_failed",
   host_firewall_sync_recovered: "event.host_firewall_sync_recovered",
   sub_host_tunnel_down: "event.sub_host_tunnel_down",
+  sub_host_tunnel_not_recognised: "event.sub_host_tunnel_not_recognised",
   sub_host_tunnel_up: "event.sub_host_tunnel_up",
   user_created: "event.user_created",
   user_over_quota: "event.user_over_quota",

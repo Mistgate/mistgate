@@ -617,6 +617,10 @@ func errorLabel(code string) string {
 		return "Агент установлен, но не подключился к панели вовремя."
 	case "subscription_host_tunnel_down":
 		return "Агент установлен, но панель не смогла открыть туннель к ноде. Проверьте, что с сервера панели доступен TCP 443 ноды и что поддомен указывает на ноду."
+	case "subscription_host_clock_skew":
+		return "Часы сервера и панели расходятся больше чем на полторы минуты, и нода не узнает туннель панели. Включите синхронизацию времени на обоих (timedatectl set-ntp true) и повторите установку."
+	case "subscription_host_not_recognised":
+		return "Агент установлен, нода ответила панели, но не узнала её. Проверьте время на панели и на ноде и повторите установку."
 	case "ssh_connection_failed", "ssh_connection_canceled":
 		return "SSH-подключение прервано. Проверьте сервер и повторите установку."
 	case "ssh_connection_refused", "ssh_connection_unavailable":

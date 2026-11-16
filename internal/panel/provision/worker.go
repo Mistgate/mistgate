@@ -434,6 +434,13 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		if !s.mayContinue(ctx, &job) {
 			return
 		}
+		// The node accepts the panel's tunnel only within hosttunnel.MarkWindow of its own clock: a server whose clock is
+		// off would install fine and then never let the panel in.
+		if skew, ok := s.remoteClockSkew(ctx, conn); ok && skew > maxInstallClockSkew {
+			s.cfg.Log.Warn("subscription host install: clocks differ", "code", "sub_host_clock_skew", "job_id", job.ID, "skew_seconds", int64(skew.Seconds()))
+			s.failJob(ctx, job, "subscription_host_clock_skew")
+			return
+		}
 		if err := s.cfg.SubHost.ActivateInstalled(ctx, job.NodeID, secret.SubHostDomain, secret.SubHostTunnelSNI); err != nil {
 			if ctx.Err() == nil {
 				s.cfg.Log.Warn("subscription host not activated", "code", "sub_host_activation_failed", "job_id", job.ID, "err", err)
@@ -472,6 +479,9 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		if ctx.Err() == nil {
 			if errors.Is(err, store.ErrNodeRetired) {
 				s.failJob(ctx, job, "node_retired")
+			} else if host && s.cfg.SubHost.TunnelDownReason(job.NodeID) == "not_recognised" {
+				// The node answered the panel's tunnel as its site: it did not accept the panel's mark.
+				s.failJob(ctx, job, "subscription_host_not_recognised")
 			} else if host {
 				// The host's agent reaches the panel only inside the tunnel the panel dials: the fault is on that path.
 				s.failJob(ctx, job, "subscription_host_tunnel_down")
@@ -484,6 +494,27 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	if s.finishJob(ctx, job, secret, panelFingerprint) {
 		job.Phase = "completed"
 	}
+}
+
+// maxInstallClockSkew is how far a subscription host's clock may be from the panel's at install: under the node's
+// two-minute window for the tunnel's mark, with room for drift.
+const maxInstallClockSkew = 90 * time.Second
+
+// remoteClockSkew is how far the server's clock is from the panel's. ok is false when the server did not answer with a
+// number; the tunnel wait catches a bad clock then. The output is never logged.
+func (s *Service) remoteClockSkew(ctx context.Context, conn *Connection) (time.Duration, bool) {
+	t0 := s.cfg.Now()
+	out, err := runSSHCapture(ctx, conn, "date -u +%s", nil, 10*time.Second, 32)
+	t1 := s.cfg.Now()
+	if err != nil {
+		return 0, false
+	}
+	remote, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	mid := t0.Add(t1.Sub(t0) / 2)
+	return time.Unix(remote, 0).Sub(mid).Abs(), true
 }
 
 func (s *Service) watchWorkerCancellation(ctx context.Context, jobID string, stop <-chan struct{}, cancel context.CancelFunc) {

@@ -45,28 +45,52 @@ func selfSigned(t *testing.T, name string) (tls.Certificate, *x509.CertPool) {
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key, Leaf: leaf}, pool
 }
 
-func TestPeekHelloThenHandshake(t *testing.T) {
-	cert, pool := selfSigned(t, "sub.example.com")
-	client, server := net.Pipe()
+// dialChrome runs Dial on one end of a pipe; the other end peeks the hello and serves TLS 1.3 with h2, as the node does.
+func dialChrome(t *testing.T, secret string, at time.Time) (hello Hello, alpn []string) {
+	t.Helper()
+	cert, _ := selfSigned(t, "sub.example.com")
+	panelCert, _ := selfSigned(t, "panel")
+	// Over TCP, not net.Pipe: the server writes its session ticket while the client writes, which needs a buffer.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer client.Close()
+	server, err := ln.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
 	done := make(chan error, 1)
 	go func() {
-		tc := tls.Client(client, &tls.Config{ServerName: "sub.example.com", RootCAs: pool, NextProtos: []string{TunnelALPN("s"), "h2"}})
-		if err := tc.Handshake(); err != nil {
+		tc, err := Dial(context.Background(), client, DialConfig{
+			ServerName: "sub.example.com", Secret: secret, Certificate: panelCert,
+			VerifyNode: func([][]byte) error { return nil }, Now: func() time.Time { return at },
+		})
+		if err != nil {
 			done <- err
 			return
 		}
-		_, err := tc.Write([]byte("ping"))
+		_, err = tc.Write([]byte("ping"))
 		done <- err
 	}()
 	hello, replay, err := PeekHello(server, 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hello.ServerName != "sub.example.com" || !hello.Offers(TunnelALPN("s")) || hello.Offers(TunnelALPN("other")) {
-		t.Fatalf("hello = %+v", hello)
-	}
-	ts := tls.Server(replay, &tls.Config{Certificates: []tls.Certificate{cert}})
+	ts := tls.Server(replay, &tls.Config{
+		Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS13, NextProtos: []string{"h2"},
+		ClientAuth: tls.RequireAnyClientCert,
+		GetConfigForClient: func(h *tls.ClientHelloInfo) (*tls.Config, error) {
+			alpn = append([]string(nil), h.SupportedProtos...)
+			return nil, nil
+		},
+	})
 	if err := ts.Handshake(); err != nil {
 		t.Fatalf("handshake after replay: %v", err)
 	}
@@ -76,6 +100,81 @@ func TestPeekHelloThenHandshake(t *testing.T) {
 	}
 	if err := <-done; err != nil {
 		t.Fatal(err)
+	}
+	return hello, alpn
+}
+
+func TestDialLooksLikeChromeAndCarriesTheMark(t *testing.T) {
+	at := time.Unix(1_800_000_000, 0)
+	hello, alpn := dialChrome(t, "s", at)
+	if hello.ServerName != "sub.example.com" {
+		t.Fatalf("server name %q", hello.ServerName)
+	}
+	if len(alpn) != 2 || alpn[0] != "h2" || alpn[1] != "http/1.1" {
+		t.Fatalf("alpn %q", alpn)
+	}
+	if bytes.Contains(hello.raw, []byte("mg-")) {
+		t.Fatal("the hello carries the old ALPN mark")
+	}
+	if _, got, ok := hello.Mark("s"); !ok || !got.Equal(at) {
+		t.Fatalf("mark = %v, %v", got, ok)
+	}
+	if _, _, ok := hello.Mark("other"); ok {
+		t.Fatal("the mark opened with another secret")
+	}
+	// The mark is bound to the whole hello: a byte changed anywhere outside the session id breaks it.
+	for _, i := range []int{4, helloRandom, helloRandom + 31, helloSIDEnd, len(hello.raw) / 2, len(hello.raw) - 1} {
+		h := Hello{raw: append([]byte(nil), hello.raw...)}
+		h.raw[i] ^= 1
+		if _, _, ok := h.Mark("s"); ok {
+			t.Fatalf("the mark survived a change at byte %d", i)
+		}
+	}
+}
+
+func TestPlainHelloHasNoMark(t *testing.T) {
+	cert, pool := selfSigned(t, "sub.example.com")
+	client, server := net.Pipe()
+	defer client.Close()
+	go func() {
+		tc := tls.Client(client, &tls.Config{ServerName: "sub.example.com", RootCAs: pool})
+		if tc.Handshake() == nil {
+			_, _ = tc.Write([]byte("ping"))
+		}
+	}()
+	hello, replay, err := PeekHello(server, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := hello.Mark(""); ok || hello.raw == nil {
+		t.Fatalf("raw %d bytes, mark %v", len(hello.raw), ok)
+	}
+	ts := tls.Server(replay, &tls.Config{Certificates: []tls.Certificate{cert}})
+	if err := ts.Handshake(); err != nil {
+		t.Fatalf("handshake after replay: %v", err)
+	}
+}
+
+func TestReplayFresh(t *testing.T) {
+	var r Replay
+	now := time.Unix(1_800_000_000, 0)
+	a, b := [32]byte{1}, [32]byte{2}
+	if !r.Fresh(a, now, now) {
+		t.Fatal("first use refused")
+	}
+	if r.Fresh(a, now, now.Add(time.Second)) {
+		t.Fatal("replay accepted")
+	}
+	if r.Fresh(b, now.Add(-3*time.Minute), now) || r.Fresh(b, now.Add(3*time.Minute), now) {
+		t.Fatal("a mark out of the window accepted")
+	}
+	if !r.Fresh(b, now.Add(-MarkWindow), now) {
+		t.Fatal("a mark at the edge of the window refused")
+	}
+	later := now.Add(2*MarkWindow + time.Second)
+	r.Fresh([32]byte{3}, later, later)
+	if _, ok := r.seen[a]; ok {
+		t.Fatal("an expired mark is still remembered")
 	}
 }
 
@@ -88,7 +187,7 @@ func TestPeekHelloGarbageIsReplayed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hello.ServerName != "" || len(hello.ALPN) != 0 {
+	if hello.ServerName != "" || hello.raw != nil {
 		t.Fatalf("hello = %+v", hello)
 	}
 	got := make([]byte, len(msg))

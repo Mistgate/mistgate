@@ -328,11 +328,21 @@ func TestTunnelEvents(t *testing.T) {
 	if got := events(); len(got) != 1 || got[0] != "sub_host_tunnel_down" {
 		t.Fatalf("down: %v", got)
 	}
-	e.svc.setUp(tn, true)
+	e.svc.setUp(tn, true, "")
 	e.svc.checkTunnels(e.ctx)
 	e.svc.checkTunnels(e.ctx)
 	if got := events(); len(got) != 2 || got[0] != "sub_host_tunnel_up" {
 		t.Fatalf("up: %v", got)
+	}
+	// A node that answers as its site is reported apart from one that cannot be reached.
+	e.svc.setUp(tn, false, reasonNotRecognised)
+	if got := e.svc.TunnelDownReason("nod_x"); got != reasonNotRecognised {
+		t.Fatalf("reason %q", got)
+	}
+	e.now = e.now.Add(31 * time.Second)
+	e.svc.checkTunnels(e.ctx)
+	if got := events(); len(got) != 3 || got[0] != "sub_host_tunnel_not_recognised" {
+		t.Fatalf("not recognised: %v", got)
 	}
 }
 

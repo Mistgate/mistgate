@@ -39,6 +39,9 @@ message SubscriptionHostTunnel {
   bool up = 2;
   // When it last went up or down.
   int64 since_unix = 3 [jstype = JS_NUMBER];
+  // Why it is down: "" (up or unknown) | unreachable | not_recognised (the node answered without accepting the panel's
+  // mark: clocks apart, an older agent, or another tunnel secret).
+  string down_reason = 4;
 }
 
 // An online node still connected through the subscription host while it is being turned off.

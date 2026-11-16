@@ -47,6 +47,8 @@ The panel switches at run time, without a restart. Its agents receive the new li
 
 While the host is on, the card shows the domain, the node, the tunnel's state (*tunnel up* or *tunnel down*, and since when) and the CAA record. The panel records the events `sub_host_tunnel_down` when a tunnel stays down and `sub_host_tunnel_up` when it is back.
 
+The panel's tunnel looks like Chrome opening the subdomain; the node recognises it by a mark that carries the panel's clock and accepts it only within two minutes of its own. If the node answers but does not recognise the panel, the card says so instead of *tunnel down* and the panel records `sub_host_tunnel_not_recognised`: check that time synchronisation is on for both the panel and the node (`timedatectl set-ntp true`) and that the node's agent is up to date. An SSH install of a host checks the server's clock against the panel's before it turns the host on.
+
 ## CAA record
 
 The card shows a CAA record that lets only this panel's certificate account issue certificates for the domain. Publish it in your DNS. The line under it says whether DNS has it: *Published in DNS*, *Not in DNS yet*, *Appears once the panel has its certificate account*, or *Could not check DNS for it*.

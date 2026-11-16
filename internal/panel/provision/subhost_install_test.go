@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -32,6 +33,13 @@ type fakeSubHost struct {
 	state       string
 	activated   []string // node ids
 	deactivated []string
+	downReason  string
+}
+
+func (f *fakeSubHost) TunnelDownReason(string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.downReason
 }
 
 func (f *fakeSubHost) State() string {
@@ -77,8 +85,10 @@ type hostNode struct {
 	pending      string
 	csrs         int
 	finish       struct{ command, stdin string }
-	finishFails  int  // the next finishes that fail (an interrupted session)
-	installFails bool // `mistgate-node install` fails
+	finishFails  int    // the next finishes that fail (an interrupted session)
+	installFails bool   // `mistgate-node install` fails
+	neverOnline  bool   // the agent installs but never connects (the panel's tunnel does not come up)
+	clock        string // the answer to `date -u +%s`; "" fails the command
 	onCSR        func()
 	order        []string
 }
@@ -128,6 +138,15 @@ func (n *hostNode) execute(command string, channel ssh.Channel) ([]byte, error) 
 		return nil, err
 	case command == "/root/mistgate-node install" && n.installFails:
 		return nil, errors.New("systemd refused")
+	case command == "/root/mistgate-node install" && n.neverOnline:
+		return nil, nil
+	case command == "date -u +%s":
+		n.installNode.mu.Lock()
+		defer n.installNode.mu.Unlock()
+		if n.clock == "" {
+			return nil, errors.New("no date")
+		}
+		return []byte(n.clock + "\n"), nil
 	}
 	return n.installNode.execute(command, channel)
 }
@@ -273,6 +292,42 @@ func TestSubscriptionHostDeactivatedWhenTheInstallFailsAfterActivation(t *testin
 	activated, deactivated, state := sub.calls()
 	if !slices.Equal(activated, []string{e2eSessionNodeID}) || !slices.Equal(deactivated, []string{e2eSessionNodeID}) || state != "" {
 		t.Fatalf("activated %v deactivated %v state %q", activated, deactivated, state)
+	}
+}
+
+// A server whose clock is off by more than maxInstallClockSkew fails before the role turns on: the node would refuse the
+// panel's tunnel.
+func TestSubscriptionHostClockSkewFailsBeforeActivation(t *testing.T) {
+	manager := &e2eNodeManager{}
+	sub := &fakeSubHost{}
+	node := newHostNode(t, manager)
+	node.clock = strconv.FormatInt(drainT0.Add(5*time.Minute).Unix(), 10)
+	st, svc := subHostService(t, node, manager, sub)
+	drainOnce(t, svc)
+
+	if job := jobState(t, st, subHostJob); job.State != "failed" || job.ErrorCode != "subscription_host_clock_skew" {
+		t.Fatalf("job = %q %q", job.State, job.ErrorCode)
+	}
+	if activated, _, _ := sub.calls(); len(activated) != 0 {
+		t.Fatalf("activated %v with a skewed clock", activated)
+	}
+}
+
+// A node that answered the panel's tunnel as its site is reported as such, not as an unreachable 443.
+func TestSubscriptionHostNotRecognised(t *testing.T) {
+	manager := &e2eNodeManager{}
+	sub := &fakeSubHost{downReason: "not_recognised"}
+	node := newHostNode(t, manager)
+	node.clock = strconv.FormatInt(drainT0.Add(30*time.Second).Unix(), 10)
+	node.neverOnline = true
+	st, svc := subHostService(t, node, manager, sub)
+	drainOnce(t, svc)
+
+	if job := jobState(t, st, subHostJob); job.State != "failed" || job.ErrorCode != "subscription_host_not_recognised" {
+		t.Fatalf("job = %q %q", job.State, job.ErrorCode)
+	}
+	if activated, deactivated, _ := sub.calls(); len(activated) != 1 || len(deactivated) != 1 {
+		t.Fatalf("activated %v deactivated %v", activated, deactivated)
 	}
 }
 

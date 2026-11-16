@@ -164,10 +164,15 @@ function SubHostCard({ host }: { host: SubscriptionHost }) {
     const tun = host.tunnels.find((x) => x.nodeId === id);
     if (!tun) return null;
     const ago = tun.sinceUnix ? fmt.ago(Number(tun.sinceUnix)) : "";
+    const state = tun.up
+      ? "set.domains.subHost.tunnelUp"
+      : tun.downReason === "not_recognised"
+        ? "set.domains.subHost.tunnelNotRecognised"
+        : "set.domains.subHost.tunnelDown";
     return (
       <li key={id} className="flex items-center justify-between gap-2 text-[13px]">
         <span className="font-semibold">{nameOf(id)}</span>
-        <span className={tun.up ? "text-ok-text" : "text-danger-text"}>{t(tun.up ? "set.domains.subHost.tunnelUp" : "set.domains.subHost.tunnelDown", { ago })}</span>
+        <span className={tun.up ? "text-ok-text" : "text-danger-text"}>{t(state, { ago })}</span>
       </li>
     );
   };

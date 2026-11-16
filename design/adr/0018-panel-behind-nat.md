@@ -16,14 +16,19 @@ second panel and without putting any secret on a machine that is easier to seize
 node then serves that subdomain on its port 443; everything else on the node stays as it was.
 
 **The panel dials out.** The panel opens a TLS connection to the host's 443 with the subscription subdomain as SNI and
-an ALPN protocol derived from a tunnel secret (a random name kept only in the panel's settings and the host's routing
-table, never shown to an agent or an API caller); the host tells the tunnel from subscription clients by that ALPN
-value alone. A secret SNI was tried first and failed in the field: the home panel's ISP path cut TLS whose SNI did not
-resolve in DNS, while the same SNI worked on the node itself; the subdomain always resolves. Both ends prove themselves
-with fleet-CA certificates: the node presents its ClientAuth node certificate, the panel a ServerAuth certificate naming
-the tunnel secret (sent encrypted under TLS 1.3). Over that one connection runs HTTP/2 (`golang.org/x/net/http2`, already
-a dependency), so many subscription fetches and agent links share it. yamux was rejected: a new dependency for what
-HTTP/2 already does.
+Chrome's ClientHello (uTLS `HelloChrome_Auto`, ALPN `h2, http/1.1`), and marks it with a tunnel secret (a random name
+kept only in the panel's settings and the host's routing table, never shown to an agent or an API caller). The mark is
+the hello's 32-byte session id: the panel's clock sealed with AES-256-GCM under a key derived (HKDF-SHA256) from the
+secret and the hello's client random, authenticated together with the whole hello. The host accepts a mark within two
+minutes of its own clock and only once; a stale, replayed or foreign mark is treated as no mark, so a prober that
+replays the panel's hello gets what a browser gets. The first version marked the tunnel with an ALPN protocol derived
+from the secret: a constant, non-browser value next to Go's fingerprint, distinguishable on the wire and replayable to
+get the node's fleet certificate. A secret SNI was tried before that and failed in the field: the home panel's ISP path
+cut TLS whose SNI did not resolve in DNS, while the same SNI worked on the node itself; the subdomain always resolves.
+Both ends prove themselves with fleet-CA certificates: the node presents its ClientAuth node certificate, the panel a
+ServerAuth certificate naming the tunnel secret (sent encrypted under TLS 1.3). Over that one connection runs HTTP/2
+(`golang.org/x/net/http2`, already a dependency), so many subscription fetches and agent links share it. yamux was
+rejected: a new dependency for what HTTP/2 already does.
 
 **The host forwards raw TLS and stores nothing.** For the subscription subdomain the host splices the client's TLS
 bytes into a tunnel stream; TLS terminates in the panel, which holds the certificate and its key. The node never sees a
@@ -63,9 +68,12 @@ long-lived outbound sockets.
 - A home panel needs no public address, no port forwarding and no dynamic DNS; the fleet stays reachable as long as the
   host node is.
 - The host is a single point for subscriptions and agent links; a tunnel down for a while records `sub_host_tunnel_down`
-  and its recovery `sub_host_tunnel_up`, and the owner can move the host to another node.
+  (or `sub_host_tunnel_not_recognised` when the node answered as its site: clocks apart, an older agent) and its
+  recovery `sub_host_tunnel_up`, and the owner can move the host to another node. An SSH install of a host compares the
+  server's clock with the panel's first and refuses a difference over 90 seconds.
 - Seizing the host yields no subscriptions, tokens or keys: only TLS traffic it cannot decrypt and the tunnel secret.
-- The tunnel's ALPN value is visible on the wire and unlike any browser's; a network that blocks unknown ALPN values
-  would block the tunnel, and with it every subscription and agent link (the subdomain then shows the node's own site).
+- The tunnel still differs from a browser in ways the mark cannot hide: one long-lived connection from the panel's
+  address to the node; the node's first flight in the tunnel's handshake (fleet certificate and a certificate request)
+  differs in size from the panel's answer to a subscription client; and the Chrome profile ages with the uTLS version.
 - Nodes whose agent lacks the link capabilities block enabling (`sub_host_nodes_lack_link`) until they are updated.
 - MCP and API tokens can read the state; every change is an approved plan with a fresh owner step-up.

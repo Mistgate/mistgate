@@ -428,11 +428,13 @@ func TestTunnelLinkSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tc := tls.Client(raw, &tls.Config{ServerName: "sub.example.com", InsecureSkipVerify: true, NextProtos: []string{hosttunnel.TunnelALPN(tunnelSNI)},
-		Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}})
-	t.Cleanup(func() { _ = tc.Close() })
+	t.Cleanup(func() { _ = raw.Close() })
 	go func() {
-		if tc.Handshake() != nil {
+		tc, err := hosttunnel.Dial(t.Context(), raw, hosttunnel.DialConfig{
+			ServerName: "sub.example.com", Secret: tunnelSNI, VerifyNode: func([][]byte) error { return nil },
+			Certificate: tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key},
+		})
+		if err != nil {
 			return
 		}
 		(&http2.Server{}).ServeConn(tc, &http2.ServeConnOpts{Handler: hosttunnel.ServerHandler(func(kind string, c net.Conn) bool {

@@ -1,8 +1,9 @@
 // Package subhost is the node side of the subscription host (issue #48). A panel at home behind NAT dials the host
-// node's TCP 443 with a secret SNI; this package takes that connection over as an HTTP/2 tunnel (the node is the client)
-// and forwards the raw TLS of the subscription names, which arrive on the same port, into the panel through it. Every
-// other connection on 443 goes on to the node's own site unchanged. The agent's own link to the panel can also run
-// inside the tunnel (DialPanel).
+// node's TCP 443 with a Chrome-like ClientHello whose session id carries a mark sealed with the tunnel secret; this
+// package takes that connection over as an HTTP/2 tunnel (the node is the client) and forwards the raw TLS of the
+// subscription names, which arrive on the same port, into the panel through it. Every other connection on 443, a hello
+// whose mark is stale or replayed included, goes on to the node's own site unchanged. The agent's own link to the panel
+// can also run inside the tunnel (DialPanel).
 package subhost
 
 import (
@@ -82,6 +83,10 @@ type Host struct {
 
 	mu  sync.Mutex
 	tun *tunnel
+
+	now        func() time.Time
+	replay     hosttunnel.Replay
+	skewLogged atomic.Int64 // unix seconds of the last clock-skew warning
 }
 
 // New returns a Host with the role off.
@@ -90,7 +95,7 @@ func New(id Identity, log *slog.Logger) *Host {
 		log = slog.New(slog.DiscardHandler)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	h := &Host{id: id, log: log, ctx: ctx, cancel: cancel}
+	h := &Host{id: id, log: log, ctx: ctx, cancel: cancel, now: time.Now}
 	h.cfg.Store(&config{})
 	return h
 }
@@ -166,8 +171,8 @@ func ProxyListener(ln net.Listener) net.Listener {
 
 func usePolicy(proxyproto.ConnPolicyOptions) (proxyproto.Policy, error) { return proxyproto.USE, nil }
 
-// WrapSite wraps the listener of a site on publicPort (engine.Env.SiteListener). On 443 it routes by SNI: the tunnel's
-// own SNI to the tunnel, the subscription names to the panel while the tunnel is up, everything else to the site. On
+// WrapSite wraps the listener of a site on publicPort (engine.Env.SiteListener). On 443 it routes by ClientHello: the
+// panel's fresh mark to the tunnel, the subscription names to the panel while the tunnel is up, everything else to the site. On
 // other ports it only strips the PROXY header of a proxied site.
 func (h *Host) WrapSite(ln net.Listener, publicPort uint16, proxied bool) net.Listener {
 	if publicPort != 443 {
@@ -266,11 +271,18 @@ func (l *siteListener) handle(c net.Conn) {
 	if err != nil {
 		return // PeekHello closed it
 	}
-	switch {
-	case hello.Offers(hosttunnel.TunnelALPN(cfg.sni)):
-		l.h.acceptTunnel(replay, cfg.sni)
-		return
-	case cfg.names[strings.ToLower(hello.ServerName)]:
+	if id, at, ok := hello.Mark(cfg.sni); ok {
+		now := l.h.now()
+		if l.h.replay.Fresh(id, at, now) {
+			l.h.acceptTunnel(replay, cfg.sni)
+			return
+		}
+		if d := now.Sub(at).Abs(); d > hosttunnel.MarkWindow {
+			l.h.warnSkew(d, now)
+		}
+	}
+	// A refused mark is treated as no mark: what a prober replaying the panel's hello sees is what a browser sees.
+	if cfg.names[strings.ToLower(hello.ServerName)] {
 		if t := l.h.current(); t != nil {
 			l.h.forward(replay, t)
 			return
@@ -279,14 +291,22 @@ func (l *siteListener) handle(c net.Conn) {
 	l.toSite(replay)
 }
 
+// warnSkew logs, at most once a minute, that a valid mark came with a clock too far from this node's.
+func (h *Host) warnSkew(d time.Duration, now time.Time) {
+	last := h.skewLogged.Load()
+	if now.Unix()-last < 60 || !h.skewLogged.CompareAndSwap(last, now.Unix()) {
+		return
+	}
+	h.log.Warn("subscription host tunnel refused: the panel's clock and this server's differ", "code", "sub_host_clock_skew", "skew_seconds", int64(d.Seconds()))
+}
+
 // acceptTunnel takes the panel's connection over: the node is the TLS server and the HTTP/2 client. Only a certificate
 // of the panel's CA for ServerAuth that names the tunnel secret is accepted: node certificates are ClientAuth with a URI
 // SAN only, so another node cannot pose as the panel.
 func (h *Host) acceptTunnel(c net.Conn, sni string) {
-	proto := hosttunnel.TunnelALPN(sni)
 	conf := &tls.Config{
 		MinVersion: tls.VersionTLS13,
-		NextProtos: []string{proto},
+		NextProtos: []string{"h2"},
 		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 			if cert := h.id.Cert(); cert != nil {
 				return cert, nil
@@ -302,7 +322,7 @@ func (h *Host) acceptTunnel(c net.Conn, sni string) {
 	ctx, cancel := context.WithTimeout(h.ctx, handshakeTimeout)
 	err := tc.HandshakeContext(ctx)
 	cancel()
-	if err == nil && tc.ConnectionState().NegotiatedProtocol != proto {
+	if err == nil && tc.ConnectionState().NegotiatedProtocol != "h2" {
 		err = errors.New("no tunnel protocol")
 	}
 	if err != nil {

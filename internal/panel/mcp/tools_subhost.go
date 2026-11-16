@@ -20,9 +20,10 @@ import (
 // inside the panel; no tool reads or returns it.
 
 type subHostTunnelView struct {
-	NodeID    string `json:"node_id"`
-	Up        bool   `json:"up"`
-	SinceUnix int64  `json:"since_unix,omitempty"`
+	NodeID     string `json:"node_id"`
+	Up         bool   `json:"up"`
+	SinceUnix  int64  `json:"since_unix,omitempty"`
+	DownReason string `json:"down_reason,omitempty"`
 }
 
 type subHostNodeView struct {
@@ -61,7 +62,7 @@ func subHostViewOf(h *adminv1.SubscriptionHost) subHostView {
 	v := subHostView{State: subHostState(h.GetState()), Domain: clean(h.GetDomain(), 253), NodeID: clean(h.GetNodeId(), 64),
 		NextNodeID: clean(h.GetNextNodeId(), 64), PublicURL: clean(h.GetPublicUrl(), 300), CAARecord: clean(h.GetCaaRecord(), 300), CAAStatus: clean(h.GetCaaStatus(), 64)}
 	for _, t := range h.GetTunnels() {
-		v.Tunnels = append(v.Tunnels, subHostTunnelView{NodeID: clean(t.GetNodeId(), 64), Up: t.GetUp(), SinceUnix: t.GetSinceUnix()})
+		v.Tunnels = append(v.Tunnels, subHostTunnelView{NodeID: clean(t.GetNodeId(), 64), Up: t.GetUp(), SinceUnix: t.GetSinceUnix(), DownReason: clean(t.GetDownReason(), 32)})
 	}
 	for _, p := range h.GetPending() {
 		v.Pending = append(v.Pending, subHostNodeView{NodeID: clean(p.GetNodeId(), 64), Name: nm(p.GetName()), Via: clean(p.GetVia(), 300)})
@@ -75,7 +76,8 @@ func subHostViewOf(h *adminv1.SubscriptionHost) subHostView {
 func subscriptionHostTools() []toolDef {
 	get := readTool("subscription_host_get", ProfileAdmin, procs(adminv1connect.SubscriptionHostServiceGetSubscriptionHostProcedure),
 		"The subscription host: whether the panel's public address is a subdomain served by a node (state off, on, moving or leaving), "+
-			"the domain, the serving node and the next one during a move, tunnel health, nodes still connected through it while leaving, "+
+			"the domain, the serving node and the next one during a move, tunnel health (a down tunnel's down_reason is unreachable, "+
+			"or not_recognised when the node answered as its site: clocks on the panel and node apart, an older agent), nodes still connected through it while leaving, "+
 			"the CAA record to publish, and nodes whose agent cannot follow the panel to a new link address.",
 		func(c *call, _ noArgs) (any, error) {
 			h, err := c.subHost()

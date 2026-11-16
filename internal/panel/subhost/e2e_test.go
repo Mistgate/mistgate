@@ -49,6 +49,7 @@ type e2e struct {
 	fl    *fleet.Fleet
 	mu    sync.Mutex
 	addrs map[string]string // node address -> the loopback listener standing for its TCP 443
+	now   func() time.Time  // the panel's clock; nil = time.Now
 }
 
 func newE2E(t *testing.T) *e2e {
@@ -151,7 +152,7 @@ func (e *e2e) panel() *e2ePanel {
 	t := e.t
 	t.Helper()
 	svc := New(Config{Store: e.st, Fleet: onlineFleet{e.fl}, Addr: pubaddr.New("https://old.example"), StepUp: func(context.Context) error { return nil },
-		LinkPrefix: "/lnk/", Resolver: fakeResolver{}, Dial: e.dial,
+		LinkPrefix: "/lnk/", Resolver: fakeResolver{}, Dial: e.dial, Now: e.now,
 		CAA: func(context.Context, string) ([]string, bool, error) { return nil, false, nil }})
 	ctx, cancel := context.WithCancel(e.ctx)
 	done := make(chan struct{})
@@ -280,4 +281,45 @@ func TestSubscriptionThroughHost(t *testing.T) {
 	waitFor(t, 5*time.Second, func() bool { return !a.host.TunnelUp() }, "the panel to drop the tunnel to a")
 	wantSite(t, a, e2eDomain)
 	wantPanel(t, b)
+}
+
+// The panel tells a node that answered as its site (here: the panel's clock 5 minutes ahead, so the node refuses the
+// mark) from one it cannot reach.
+func TestTunnelDownReason(t *testing.T) {
+	reason := func(p *e2ePanel) string {
+		v := p.svc.tunnelViews()
+		if len(v) != 1 || v[0].GetUp() {
+			return ""
+		}
+		return v[0].GetDownReason()
+	}
+	for _, tc := range []struct {
+		name, want string
+		setup      func(e *e2e, n *e2eNode)
+	}{
+		{"clock", reasonNotRecognised, func(e *e2e, _ *e2eNode) { e.now = func() time.Time { return time.Now().Add(5 * time.Minute) } }},
+		{"unreachable", reasonUnreachable, func(e *e2e, n *e2eNode) { e.addrs["203.0.113.1"] = "127.0.0.1:1" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newE2E(t)
+			a := e.node("a", "203.0.113.1")
+			tc.setup(e, a)
+			p := e.panel()
+			if _, err := (rpc{p.svc}).SetSubscriptionHost(e.ctx, connect.NewRequest(&adminv1.SetSubscriptionHostRequest{NodeId: a.id, Domain: e2eDomain, SkipDnsCheck: true})); err != nil {
+				t.Fatal(err)
+			}
+			st, err := loadState(e.ctx, e.st)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a.host.Configure(nodehost.Config{TunnelSNI: st.SNI, Names: []string{e2eDomain}})
+			waitFor(t, 5*time.Second, func() bool { return reason(p) == tc.want }, "down reason "+tc.want)
+			if a.host.TunnelUp() {
+				t.Fatal("tunnel up")
+			}
+			if got := p.svc.TunnelDownReason(a.id); got != tc.want {
+				t.Fatalf("TunnelDownReason = %q", got)
+			}
+		})
+	}
 }

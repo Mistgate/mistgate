@@ -1,19 +1,18 @@
 // Package hosttunnel is the wire layer of the subscription host (issue #48). The panel, which may sit behind NAT, dials a
-// TLS connection to the host node's TCP 443 with the subscription name as SNI and a secret ALPN protocol (TunnelALPN), and
+// TLS connection to the host node's TCP 443 with the subscription name as SNI and a ClientHello that imitates Chrome, and
 // speaks HTTP/2 over it as the server; the node is the HTTP/2 client and opens one stream per forwarded connection: the
 // raw TLS of a subscription client (KindTLS) or the node's own agent link (KindLink). Each stream is a POST to StreamPath
 // whose request body carries node→panel bytes and whose response body carries panel→node bytes.
 //
-// The secret rides in ALPN, not in the SNI: censoring networks drop TLS whose SNI does not resolve in DNS, and the
-// subscription name always does.
+// The node tells the panel's hello from a browser's by a mark sealed in its session id with the tunnel secret (SealMark):
+// the SNI must resolve in DNS (censoring networks drop TLS whose SNI does not), and a constant extension or a
+// non-browser fingerprint would mark the connection to anyone watching.
 package hosttunnel
 
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -46,13 +45,6 @@ const (
 	// PingTimeout is how long the node waits for the answer to that ping before it drops the tunnel.
 	PingTimeout = 10 * time.Second
 )
-
-// TunnelALPN is the ALPN protocol that marks the panel's tunnel connection to a host whose tunnel secret is secret (the
-// node tells it from the subscription clients by this alone). A hash keeps it within ALPN's 255 bytes whatever the secret.
-func TunnelALPN(secret string) string {
-	sum := sha256.Sum256([]byte("mistgate host tunnel\x00" + secret))
-	return "mg-" + hex.EncodeToString(sum[:12])
-}
 
 // maxHello bounds what PeekHello buffers while it looks for a ClientHello.
 const maxHello = 16 << 10
@@ -91,21 +83,12 @@ func (r *recordingConn) Write(p []byte) (int, error) { return len(p), nil }
 // Hello is what PeekHello reads of a ClientHello.
 type Hello struct {
 	ServerName string
-	ALPN       []string
+	// raw is the ClientHello handshake message when it came in one TLS record, else nil.
+	raw []byte
 }
 
-// Offers says whether the ClientHello offered the ALPN protocol proto.
-func (h Hello) Offers(proto string) bool {
-	for _, p := range h.ALPN {
-		if p == proto {
-			return true
-		}
-	}
-	return false
-}
-
-// PeekHello reads the ClientHello of c within timeout and returns its server name and ALPN protocols, and a connection
-// that replays the bytes read so far before the rest of c. Bytes that are not a ClientHello give a zero Hello and a replay
+// PeekHello reads the ClientHello of c within timeout and returns what it says, and a connection that replays the bytes
+// read so far before the rest of c. Bytes that are not a ClientHello give a zero Hello and a replay
 // of them (err == nil): the caller passes such a connection on to its site. err != nil only when reading c failed; c is
 // closed then.
 func PeekHello(c net.Conn, timeout time.Duration) (hello Hello, replay net.Conn, err error) {
@@ -117,13 +100,16 @@ func PeekHello(c net.Conn, timeout time.Duration) (hello Hello, replay net.Conn,
 	seen := false
 	srv := tls.Server(rec, &tls.Config{GetConfigForClient: func(h *tls.ClientHelloInfo) (*tls.Config, error) {
 		seen = true
-		hello = Hello{ServerName: h.ServerName, ALPN: append([]string(nil), h.SupportedProtos...)}
+		hello = Hello{ServerName: h.ServerName}
 		return nil, errHelloSeen
 	}})
 	_ = srv.Handshake()
 	if rec.sockErr != nil && !seen {
 		_ = c.Close()
 		return Hello{}, nil, rec.sockErr
+	}
+	if seen {
+		hello.raw = helloMessage(rec.buf.Bytes())
 	}
 	if err := c.SetReadDeadline(time.Time{}); err != nil {
 		_ = c.Close()

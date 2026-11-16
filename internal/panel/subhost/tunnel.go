@@ -4,8 +4,6 @@ package subhost
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"math/rand/v2"
 	"net"
@@ -33,8 +31,17 @@ type tunnel struct {
 	cancel      context.CancelFunc
 	up          bool
 	since       time.Time // when it last went up or down (or started)
-	downSent    bool      // sub_host_tunnel_down was recorded for the current outage
+	reason      string    // why it is down: "" (up or not tried yet), reasonUnreachable or reasonNotRecognised
+	downSent    bool      // the down event was recorded for the current outage
 }
+
+// Why a tunnel is down (SubscriptionHostTunnel.down_reason).
+const (
+	reasonUnreachable = "unreachable"
+	// reasonNotRecognised: the node answered with a certificate that is not its own, i.e. as its site: it did not accept
+	// the panel's mark (clocks apart, an older agent, another tunnel secret).
+	reasonNotRecognised = "not_recognised"
+)
 
 // reconcile runs one dialer per wanted node (id -> tunnel SNI) and stops the others. Dialers start only once Run runs.
 func (s *Service) reconcile(want map[string]string) {
@@ -94,13 +101,12 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 
-// checkTunnels records sub_host_tunnel_down for a tunnel down for tunnelDownAfter straight, and sub_host_tunnel_up when one
-// comes back after that.
+// checkTunnels records sub_host_tunnel_down (or sub_host_tunnel_not_recognised) for a tunnel down for tunnelDownAfter
+// straight, and sub_host_tunnel_up when one comes back after that.
 func (s *Service) checkTunnels(ctx context.Context) {
 	now := s.cfg.Now()
 	type ev struct {
-		node string
-		up   bool
+		node, code string
 	}
 	var evs []ev
 	s.tmu.Lock()
@@ -108,17 +114,21 @@ func (s *Service) checkTunnels(ctx context.Context) {
 		switch {
 		case !t.up && !t.downSent && now.Sub(t.since) >= tunnelDownAfter:
 			t.downSent = true
-			evs = append(evs, ev{t.nodeID, false})
+			code := "sub_host_tunnel_down"
+			if t.reason == reasonNotRecognised {
+				code = "sub_host_tunnel_not_recognised"
+			}
+			evs = append(evs, ev{t.nodeID, code})
 		case t.up && t.downSent:
 			t.downSent = false
-			evs = append(evs, ev{t.nodeID, true})
+			evs = append(evs, ev{t.nodeID, "sub_host_tunnel_up"})
 		}
 	}
 	s.tmu.Unlock()
 	for _, e := range evs {
-		row := store.EventRow{Time: now, Severity: 2, Code: "sub_host_tunnel_down", Source: "panel", NodeID: e.node}
-		if e.up {
-			row.Severity, row.Code = 1, "sub_host_tunnel_up"
+		row := store.EventRow{Time: now, Severity: 2, Code: e.code, Source: "panel", NodeID: e.node}
+		if e.code == "sub_host_tunnel_up" {
+			row.Severity = 1
 		}
 		if err := s.cfg.Store.InsertEvent(ctx, row); err != nil {
 			s.cfg.Log.Warn("subscription host: record tunnel event", "code", "sub_host_event_failed", "err", err)
@@ -126,12 +136,23 @@ func (s *Service) checkTunnels(ctx context.Context) {
 	}
 }
 
-func (s *Service) setUp(t *tunnel, up bool) {
+func (s *Service) setUp(t *tunnel, up bool, reason string) {
 	s.tmu.Lock()
 	defer s.tmu.Unlock()
 	if t.up != up {
 		t.up, t.since = up, s.cfg.Now()
 	}
+	t.reason = reason
+}
+
+// TunnelDownReason is why the tunnel of nodeID is down: "" when it is up or unknown.
+func (s *Service) TunnelDownReason(nodeID string) string {
+	s.tmu.Lock()
+	defer s.tmu.Unlock()
+	if t, ok := s.tunnels[nodeID]; ok && !t.up {
+		return t.reason
+	}
+	return ""
 }
 
 func (s *Service) tunnelViews() []*adminv1.SubscriptionHostTunnel {
@@ -139,7 +160,7 @@ func (s *Service) tunnelViews() []*adminv1.SubscriptionHostTunnel {
 	defer s.tmu.Unlock()
 	out := make([]*adminv1.SubscriptionHostTunnel, 0, len(s.tunnels))
 	for _, t := range s.tunnels {
-		out = append(out, &adminv1.SubscriptionHostTunnel{NodeId: t.nodeID, Up: t.up, SinceUnix: t.since.Unix()})
+		out = append(out, &adminv1.SubscriptionHostTunnel{NodeId: t.nodeID, Up: t.up, SinceUnix: t.since.Unix(), DownReason: t.reason})
 	}
 	return out
 }
@@ -148,10 +169,18 @@ func (s *Service) dialLoop(ctx context.Context, t *tunnel) {
 	backoff := backoffMin
 	for ctx.Err() == nil {
 		start := s.cfg.Now()
-		if err := s.serveTunnel(ctx, t); err != nil && ctx.Err() == nil {
+		err := s.serveTunnel(ctx, t)
+		if err != nil && ctx.Err() == nil {
 			s.cfg.Log.Debug("subscription host: tunnel", "node_id", t.nodeID, "err", err)
 		}
-		s.setUp(t, false)
+		switch {
+		case err == nil:
+			s.setUp(t, false, "")
+		case errors.Is(err, hosttunnel.ErrNotRecognised):
+			s.setUp(t, false, reasonNotRecognised)
+		default:
+			s.setUp(t, false, reasonUnreachable)
+		}
 		if s.cfg.Now().Sub(start) >= aliveReset {
 			backoff = backoffMin
 		}
@@ -165,9 +194,9 @@ func (s *Service) dialLoop(ctx context.Context, t *tunnel) {
 	}
 }
 
-// serveTunnel dials the node with the subscription name as SNI and the tunnel's secret ALPN protocol, proves the panel
-// with a certificate of the fleet CA for the tunnel secret, checks the node's own certificate, and serves the node's
-// streams over HTTP/2 until the connection ends.
+// serveTunnel dials the node with the subscription name as SNI and Chrome's ClientHello carrying the mark of the tunnel
+// secret, proves the panel with a certificate of the fleet CA for the tunnel secret, checks the node's own certificate,
+// and serves the node's streams over HTTP/2 until the connection ends.
 func (s *Service) serveTunnel(ctx context.Context, t *tunnel) error {
 	s.tmu.Lock()
 	domain := s.cur.Domain
@@ -187,27 +216,16 @@ func (s *Service) serveTunnel(ctx context.Context, t *tunnel) error {
 	stop := context.AfterFunc(ctx, func() { _ = raw.Close() })
 	defer stop()
 	nodeID := t.nodeID
-	proto := hosttunnel.TunnelALPN(t.sni)
-	tc := tls.Client(raw, &tls.Config{
-		ServerName: domain, NextProtos: []string{proto}, MinVersion: tls.VersionTLS13,
-		InsecureSkipVerify: true, // the chain and the node identity are checked below, against the fleet CA
-		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-			return s.cfg.Fleet.VerifyNodeCertificate(nodeID, rawCerts)
-		},
-		Certificates: []tls.Certificate{cert},
-	})
 	hsCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	err = tc.HandshakeContext(hsCtx)
+	tc, err := hosttunnel.Dial(hsCtx, raw, hosttunnel.DialConfig{
+		ServerName: domain, Secret: t.sni, Certificate: cert, Now: s.cfg.Now,
+		VerifyNode: func(rawCerts [][]byte) error { return s.cfg.Fleet.VerifyNodeCertificate(nodeID, rawCerts) },
+	})
 	cancel()
 	if err != nil {
-		_ = raw.Close()
 		return err
 	}
-	if tc.ConnectionState().NegotiatedProtocol != proto {
-		_ = tc.Close()
-		return errors.New("node did not accept the tunnel protocol")
-	}
-	s.setUp(t, true)
+	s.setUp(t, true, "")
 	srv := &http2.Server{MaxConcurrentStreams: hosttunnel.MaxStreams, ReadIdleTimeout: hosttunnel.ReadIdle, PingTimeout: hosttunnel.PingTimeout}
 	srv.ServeConn(tc, &http2.ServeConnOpts{Context: ctx, Handler: hosttunnel.ServerHandler(s.accept(nodeID))})
 	return nil

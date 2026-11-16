@@ -82,7 +82,10 @@ type SubscriptionHostTunnel struct {
 	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	Up     bool                   `protobuf:"varint,2,opt,name=up,proto3" json:"up,omitempty"`
 	// When it last went up or down.
-	SinceUnix     int64 `protobuf:"varint,3,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
+	SinceUnix int64 `protobuf:"varint,3,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
+	// Why it is down: "" (up or unknown) | unreachable | not_recognised (the node answered without accepting the panel's
+	// mark: clocks apart, an older agent, or another tunnel secret).
+	DownReason    string `protobuf:"bytes,4,opt,name=down_reason,json=downReason,proto3" json:"down_reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -136,6 +139,13 @@ func (x *SubscriptionHostTunnel) GetSinceUnix() int64 {
 		return x.SinceUnix
 	}
 	return 0
+}
+
+func (x *SubscriptionHostTunnel) GetDownReason() string {
+	if x != nil {
+		return x.DownReason
+	}
+	return ""
 }
 
 // An online node still connected through the subscription host while it is being turned off.
@@ -1018,12 +1028,14 @@ var File_mistgate_admin_v1_subscription_host_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_host_proto_rawDesc = "" +
 	"\n" +
-	")mistgate/admin/v1/subscription_host.proto\x12\x11mistgate.admin.v1\"d\n" +
+	")mistgate/admin/v1/subscription_host.proto\x12\x11mistgate.admin.v1\"\x85\x01\n" +
 	"\x16SubscriptionHostTunnel\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x0e\n" +
 	"\x02up\x18\x02 \x01(\bR\x02up\x12!\n" +
 	"\n" +
-	"since_unix\x18\x03 \x01(\x03B\x020\x02R\tsinceUnix\"\\\n" +
+	"since_unix\x18\x03 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1f\n" +
+	"\vdown_reason\x18\x04 \x01(\tR\n" +
+	"downReason\"\\\n" +
 	"\x1bSubscriptionHostPendingNode\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +

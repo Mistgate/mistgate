@@ -73,6 +73,8 @@ const codeText: Record<string, MessageKey> = {
   host_firewall_configuration_failed: "node.ssh.error.firewall",
   node_not_connected: "node.ssh.error.notConnected",
   subscription_host_tunnel_down: "node.ssh.error.hostTunnel",
+  subscription_host_clock_skew: "node.ssh.error.hostClock",
+  subscription_host_not_recognised: "node.ssh.error.hostNotRecognised",
   systemd_install_failed: "node.ssh.error.systemd",
   agent_install_failed: "node.ssh.error.systemd",
   // an own private key, and the panel key the install puts on the server (provision/private_key.go, server_keys.go)

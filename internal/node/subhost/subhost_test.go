@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -117,17 +118,63 @@ func newRig(t *testing.T, proxied bool) *rig {
 	return &rig{ca: ca, host: h, addr: ln.Addr().String(), site: site, subCert: ca.server(t, subName)}
 }
 
+// panelConn is a test panel's tunnel connection: what it wrote to the node, and done closed once the tunnel ended.
+type panelConn struct {
+	net.Conn
+	mu   sync.Mutex
+	sent []byte
+	done chan struct{}
+}
+
+func (p *panelConn) Write(b []byte) (int, error) {
+	p.mu.Lock()
+	p.sent = append(p.sent, b...)
+	p.mu.Unlock()
+	return p.Conn.Write(b)
+}
+
+// firstRecord is the first TLS record the panel sent: its ClientHello.
+func (p *panelConn) firstRecord(t *testing.T) []byte {
+	t.Helper()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.sent) < 5 {
+		t.Fatal("the panel sent no record")
+	}
+	return append([]byte(nil), p.sent[:5+int(p.sent[3])<<8|int(p.sent[4])]...)
+}
+
+// ended says whether the tunnel ended within d.
+func (p *panelConn) ended(d time.Duration) bool {
+	select {
+	case <-p.done:
+		return true
+	case <-time.After(d):
+		return false
+	}
+}
+
 // panel dials the tunnel with cert and serves it: every tls stream is answered with "hello <peer>\n" over TLS for subName.
-func (r *rig) panel(t *testing.T, cert *tls.Certificate) net.Conn {
+func (r *rig) panel(t *testing.T, cert *tls.Certificate) *panelConn {
+	return r.panelAs(t, cert, tunnelSNI, nil)
+}
+
+// panelAs is panel with the tunnel secret and the clock of the mark.
+func (r *rig) panelAs(t *testing.T, cert *tls.Certificate, secret string, now func() time.Time) *panelConn {
 	t.Helper()
 	raw, err := net.Dial("tcp", r.addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tc := tls.Client(raw, &tls.Config{ServerName: subName, InsecureSkipVerify: true, NextProtos: []string{hosttunnel.TunnelALPN(tunnelSNI)}, Certificates: []tls.Certificate{*cert}})
-	t.Cleanup(func() { _ = tc.Close() })
+	p := &panelConn{Conn: raw, done: make(chan struct{})}
+	t.Cleanup(func() { _ = raw.Close() })
 	go func() {
-		if tc.Handshake() != nil {
+		defer close(p.done)
+		tc, err := hosttunnel.Dial(t.Context(), p, hosttunnel.DialConfig{
+			ServerName: subName, Secret: secret, Certificate: *cert, Now: now,
+			VerifyNode: func([][]byte) error { return nil },
+		})
+		if err != nil {
 			return
 		}
 		(&http2.Server{}).ServeConn(tc, &http2.ServeConnOpts{Handler: hosttunnel.ServerHandler(func(kind string, c net.Conn) bool {
@@ -143,7 +190,7 @@ func (r *rig) panel(t *testing.T, cert *tls.Certificate) net.Conn {
 			return true
 		})})
 	}()
-	return tc
+	return p
 }
 
 func (r *rig) waitTunnel(t *testing.T, want bool) {
@@ -229,10 +276,8 @@ func TestSubscriptionNameWithoutTunnelGoesToSite(t *testing.T) {
 
 func TestNodeCertificateCannotOpenTunnel(t *testing.T) {
 	r := newRig(t, false)
-	tc := r.panel(t, r.ca.node(t, "nl1"))
-	_ = tc.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if _, err := tc.Read(make([]byte, 1)); err == nil {
-		t.Fatal("the node read bytes from a tunnel with a node certificate")
+	if !r.panel(t, r.ca.node(t, "nl1")).ended(5 * time.Second) {
+		t.Fatal("a tunnel with a node certificate stayed open")
 	}
 	if r.host.TunnelUp() {
 		t.Fatal("tunnel up with a node certificate")
@@ -280,8 +325,7 @@ func TestRoleOffAndTunnelReplaced(t *testing.T) {
 	r.waitTunnel(t, true)
 	// The new dial carries the subscription name as SNI too: it must replace the tunnel, never be forwarded through it.
 	r.panel(t, r.ca.server(t, tunnelSNI))
-	_ = first.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if _, err := io.Copy(io.Discard, first); isTimeout(err) {
+	if !first.ended(5 * time.Second) {
 		t.Fatal("the first tunnel stayed up: the second dial was not taken as the tunnel")
 	}
 	r.waitTunnel(t, true)
@@ -292,9 +336,55 @@ func TestRoleOffAndTunnelReplaced(t *testing.T) {
 	}
 }
 
-func isTimeout(err error) bool {
-	ne, ok := err.(net.Error)
-	return ok && ne.Timeout()
+// A recorded hello of the panel opens no second tunnel: the node treats it as any connection for the subscription name,
+// and the live tunnel stays.
+func TestReplayedHelloOpensNoTunnel(t *testing.T) {
+	r := newRig(t, false)
+	first := r.panel(t, r.ca.server(t, tunnelSNI))
+	r.waitTunnel(t, true)
+	c, err := net.Dial("tcp", r.addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.Write(first.firstRecord(t)); err != nil {
+		t.Fatal(err)
+	}
+	if first.ended(500 * time.Millisecond) {
+		t.Fatal("the replayed hello replaced the tunnel")
+	}
+	c2, err := net.Dial("tcp", r.addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := r.clientLine(t, c2, subName), "hello tls "+c2.LocalAddr().String(); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// A mark from a clock out of the window, or sealed with another secret, is no mark: the connection goes to the site.
+func TestStaleOrForeignMarkGoesToSite(t *testing.T) {
+	r := newRig(t, false)
+	for name, dial := range map[string]func() *panelConn{
+		"skew": func() *panelConn {
+			return r.panelAs(t, r.ca.server(t, tunnelSNI), tunnelSNI, func() time.Time { return time.Now().Add(5 * time.Minute) })
+		},
+		"secret": func() *panelConn { return r.panelAs(t, r.ca.server(t, tunnelSNI), "t-other.example.com", nil) },
+	} {
+		p := dial()
+		select {
+		case c := <-r.site:
+			_ = c.Close()
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: the connection never reached the site", name)
+		}
+		if !p.ended(5 * time.Second) {
+			t.Fatalf("%s: the dial did not end", name)
+		}
+		if r.host.TunnelUp() {
+			t.Fatalf("%s: tunnel up", name)
+		}
+	}
 }
 
 func TestOtherPortUntouched(t *testing.T) {
