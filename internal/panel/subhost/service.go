@@ -249,19 +249,7 @@ func (s *Service) realityForeign443(ctx context.Context, nodeID string) (bool, e
 		if in.Protocol != vless.ID {
 			continue
 		}
-		var cfg vless.Settings
-		if json.Unmarshal([]byte(in.Settings), &cfg) != nil || cfg.Security != "reality" {
-			continue
-		}
-		port := int(in.PortOverride)
-		if port == 0 {
-			port = cfg.Port
-		}
-		kind := cfg.Reality.TargetKind
-		if kind == "" && strings.TrimSpace(cfg.Reality.Target) != "" {
-			kind = "site"
-		}
-		if port == 443 && kind != "" && kind != "self" {
+		if port, foreign := vless.ForeignRealitySite([]byte(in.Settings), int(in.PortOverride)); foreign && port == 443 {
 			return true, nil
 		}
 	}

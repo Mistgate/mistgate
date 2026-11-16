@@ -958,3 +958,22 @@ func nodeName(node protocols.NodeView, fallback string) string {
 	}
 	return fallback
 }
+
+// ForeignRealitySite says whether settings are REALITY whose target is another site, on TCP port (0 = the port of the
+// settings). It reads both forms of the settings: the profile document (target_kind) and the spec built for the node,
+// where the node's own site is the target "self". Such an inbound hands its whole port to that site's camouflage:
+// nothing else of the node, the subscription host's subdomain included, can be told apart on it.
+func ForeignRealitySite(settings []byte, port int) (onPort int, foreign bool) {
+	var cfg Settings
+	if json.Unmarshal(settings, &cfg) != nil || cfg.Security != "reality" {
+		return 0, false
+	}
+	if port == 0 {
+		port = cfg.Port
+	}
+	kind, target := cfg.Reality.TargetKind, strings.TrimSpace(cfg.Reality.Target)
+	if kind == "" && target != "" && target != targetSelf {
+		kind = targetSite
+	}
+	return port, kind != "" && kind != targetSelf
+}

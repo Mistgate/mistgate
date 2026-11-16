@@ -44,6 +44,7 @@ esac`,
 		"firewall-cmd": `case "$1" in
 --get-active-zones) printf 'public\n  interfaces: eth0\n' ;;
 esac`,
+		"nft": `:`, // present: nothing is installed
 	})
 	has := func(c string) bool {
 		for _, got := range calls {
@@ -74,6 +75,36 @@ esac`,
 		if !has("firewall-cmd --zone=public --add-port="+rule) || !has("firewall-cmd --zone=public --add-port="+rule+" --permanent") {
 			t.Errorf("firewalld %s not added at runtime and permanently: %q", rule, calls)
 		}
+	}
+}
+
+// A server without nft gets the nftables package through apt, after an index update when the first try fails; a host
+// that has it is left alone (the test above sees no apt-get call).
+func TestFirewallScriptInstallsMissingNftables(t *testing.T) {
+	for _, p := range []string{"/usr/bin/nft", "/bin/nft"} { // the PATH runScript gives the script
+		if _, err := os.Stat(p); err == nil {
+			t.Skip("this machine has nft where the script looks: nothing would be installed")
+		}
+	}
+	_, calls := runScript(t, remoteFirewallPreparationScript, []string{"22"}, map[string]string{
+		// the first install fails (a fresh image has no package index), the one after `update` puts nft in place
+		"apt-get": `d="$(dirname "$0")"
+case "$*" in
+*update*) : > "$d/updated" ;;
+*install*nftables*) [ -f "$d/updated" ] || exit 100; printf '#!/bin/sh\n' > "$d/nft"; chmod +x "$d/nft" ;;
+esac`,
+	})
+	var installs, updates int
+	for _, c := range calls {
+		if strings.HasPrefix(c, "apt-get ") && strings.Contains(c, "install -y --no-install-recommends nftables") {
+			installs++
+		}
+		if strings.HasPrefix(c, "apt-get ") && strings.HasSuffix(c, " update") {
+			updates++
+		}
+	}
+	if installs != 2 || updates != 1 {
+		t.Fatalf("installs = %d, updates = %d: %q", installs, updates, calls)
 	}
 }
 

@@ -57,6 +57,9 @@ printf 'existing_node_id=%s\n' "$node_id"
 // (hostctl.Cleanup); a rule the owner already had is left alone and untagged. The SSH rule is never tagged: removing
 // it could lock the owner out. firewalld: each port goes in at runtime and permanently, without --reload, which would
 // drop runtime-only rules such as fail2ban bans and Docker chains.
+//
+// nftables: the agent keeps its own tables through `nft` (SSH guard, port hopping, WARP and AmneziaWG NAT). Minimal
+// cloud images ship without it (Debian 13), so it is installed here with apt when missing; exit 20 = that failed.
 const remoteFirewallPreparationScript = `set -eu
 ssh_port="${1:-}"
 case "$ssh_port" in
@@ -83,7 +86,20 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
     done
   done
 fi
+
+if ! command -v nft >/dev/null 2>&1; then
+  command -v apt-get >/dev/null 2>&1 || exit 20
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get -o DPkg::Lock::Timeout=60 install -y --no-install-recommends nftables >/dev/null 2>&1 || {
+    apt-get -o DPkg::Lock::Timeout=60 update >/dev/null 2>&1 || exit 20
+    apt-get -o DPkg::Lock::Timeout=60 install -y --no-install-recommends nftables >/dev/null 2>&1 || exit 20
+  }
+  command -v nft >/dev/null 2>&1 || exit 20
+fi
 `
+
+// errNftablesInstall is prepareHostFirewall's failure to put nftables on the host.
+var errNftablesInstall = errors.New("provision: nftables could not be installed")
 
 type preflightFailure string
 
@@ -358,7 +374,11 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	}
 	if err := prepareHostFirewall(ctx, conn, job.SSHPort); err != nil {
 		if ctx.Err() == nil {
-			s.failJob(ctx, job, "host_firewall_configuration_failed")
+			if errors.Is(err, errNftablesInstall) {
+				s.failJob(ctx, job, "nftables_install_failed")
+			} else {
+				s.failJob(ctx, job, "host_firewall_configuration_failed")
+			}
 		}
 		return
 	}
@@ -472,6 +492,9 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		if ctx.Err() == nil {
 			if errors.Is(err, store.ErrNodeRetired) {
 				s.failJob(ctx, job, "node_retired")
+			} else if host {
+				// The host's agent reaches the panel only inside the tunnel the panel dials: the fault is on that path.
+				s.failJob(ctx, job, "subscription_host_tunnel_down")
 			} else {
 				s.failJob(ctx, job, "node_not_connected")
 			}
@@ -677,7 +700,16 @@ func prepareHostFirewall(ctx context.Context, conn *Connection, sshPort uint16) 
 	if sshPort == 0 {
 		return errors.New("provision: invalid SSH port for firewall preparation")
 	}
-	return runSSH(ctx, conn, "sh -s -- "+strconv.Itoa(int(sshPort)), strings.NewReader(remoteFirewallPreparationScript), 30*time.Second)
+	_, exit, err := runSSHCaptureWithExit(ctx, conn, "sh -s -- "+strconv.Itoa(int(sshPort)), strings.NewReader(remoteFirewallPreparationScript), 6*time.Minute, 0, true)
+	switch {
+	case err != nil:
+		return err
+	case exit == 20:
+		return errNftablesInstall
+	case exit != 0:
+		return errors.New("provision: remote command failed")
+	}
+	return nil
 }
 
 func parsePreflightOutput(output []byte) (*remotePreflight, error) {

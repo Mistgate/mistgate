@@ -76,6 +76,7 @@ export const errorCodes = [
   "sub_host_return_url_required",
   "sub_host_nodes_pending",
   "sub_host_same_node",
+  "sub_host_reality_foreign",
 ] as const;
 
 /**

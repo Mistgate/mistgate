@@ -80,6 +80,7 @@ mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAA… mistgate-panel'
 
 1. **检查。** 读取操作系统、架构、内核、CPU、内存、`/root` 中的可用磁盘空间，并检查 systemd 是否存在、服务器是否已有 Mistgate 节点身份，以及服务器是否能通过 TCP 连接到面板的 Agent 地址（测试时间为 5 秒）。
 2. **主机防火墙。** 只会更改已启用的防火墙；未启用的防火墙会保持关闭。UFW 会添加 SSH 端口、80/tcp、443/tcp 和 443/udp，并使用注释 `mistgate-node-provision-v1`；如果相同规则已存在，则跳过对应端口。firewalld 会在所有活动区域中添加 SSH 端口、80/tcp、443/tcp 和 443/udp，同时应用于运行时和永久配置；不会通过重新加载防火墙来删除仅存在于运行时的规则。
+   如果服务器上没有 `nft` 命令（一些精简镜像如此，例如 Debian 13 云镜像），这一步还会通过 apt 安装 `nftables` 软件包：Agent 通过它维护自己的规则。
 3. **Agent。** 根据服务器架构，从可信包流式传输 Agent 到 `/root/mistgate-node`，检查文件大小和 SHA-256 值，并将其设为可执行文件。
 4. **注册。** 使用有效期为一小时的一次性令牌运行 `mistgate-node enroll`。令牌通过标准输入传递（`--token-stdin`），绝不会出现在命令行中。`--resume-key` 会将待处理的密钥保留在磁盘上，便于在中断后使用同一密钥重试注册。
 5. **服务。** 运行 `mistgate-node install`，写入加固过的 systemd 服务单元并启动 Agent，具体与手动安装相同：见[添加节点](add-node.md)中的「服务器上会发生什么」。

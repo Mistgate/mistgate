@@ -40,6 +40,12 @@ func (f *Fleet) SessionVia(nodeID string) string {
 	return ""
 }
 
+// IsSubscriptionHost says whether the node carries the subscription subdomain now (or is about to, during a move).
+func (f *Fleet) IsSubscriptionHost(nodeID string) bool {
+	r := f.panelRouting()
+	return r.IsHost != nil && r.IsHost(nodeID)
+}
+
 // tunnelCert is a cached client certificate of the panel for one tunnel SNI.
 type tunnelCert struct {
 	cert    tls.Certificate
