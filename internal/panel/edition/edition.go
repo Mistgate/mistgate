@@ -38,7 +38,7 @@ const Code = "unavailable_in_edition"
 
 // edgeUnavailable is the source of truth for the edge. internal/panel/app keeps a test that every deferred edge job
 // maps onto ids here and every id here has a job.
-var edgeUnavailable = []string{Backups, MCP, Assistant, HealthChecks, AgentLogs, PanelUpdate, DecoyOwn, TSPUProbe, OSUpdates, OwnProbes}
+var edgeUnavailable = []string{Backups, MCP, Assistant, HealthChecks, AgentLogs, PanelUpdate, DecoyOwn, TSPUProbe, OSUpdates, OwnProbes, TrustTunnel}
 
 // Unavailable is the feature ids the edition lacks: none on the VPS. The result is a copy.
 func Unavailable(isEdge bool) []string {
