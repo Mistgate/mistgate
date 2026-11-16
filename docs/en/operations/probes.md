@@ -39,7 +39,7 @@ The panel needs its public HTTPS address (**Settings**): the command is built fr
 2. The window shows **one command**, once. It is valid for 24 hours and cannot be shown again; if you did not copy it, make a new one (the waiting probe is revoked and a new one made). Switch between **Keenetic (Entware)** and **Server (VPS)**: they are two commands.
 3. Open SSH on the device, paste the command and press Enter. The window waits for **Connected**.
 
-The command downloads the script from your panel, **checks its sha256** against the one the panel computed, and only then runs it with the one-time token. On a Keenetic it first installs `curl`, `ca-bundle` and `coreutils-sha256sum`; on a server the script goes to a private temporary file and runs through `sudo` (as root, drop the `sudo`). Running it again is safe: an already registered probe is refreshed.
+The command downloads the script from your panel, **checks its sha256** against the one the panel computed, and only then runs it with the one-time token. On a Keenetic it first installs those of `curl`, `ca-bundle` and `coreutils-sha256sum` that are missing (a package already there is left alone); on a server the script goes to a private temporary file and runs through `sudo` (as root, drop the `sudo`). Running it again is safe: an already registered probe is refreshed.
 
 The script registers itself with the token (the token is sent in the request body, never in a command line), keeps its secret in a file closed to other users, and starts. On a Keenetic it becomes `/opt/etc/init.d/S99mistgate-probe`, so it starts with Entware; on a server it is a systemd service `mistgate-probe`.
 
