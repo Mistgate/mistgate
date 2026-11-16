@@ -71,7 +71,7 @@ The panel on the right, **What the client sees**, shows what a client would get 
 
 An existing profile's page starts with **Where it runs**: one line that says whether the profile works ("Working: 2 nodes, 1 group, 14 users") or what is missing, with the button that fixes it, then three columns:
 
-- **Nodes**: each node with the port and the state of the profile there, and the agent's error when it failed. **Put on nodes** adds more.
+- **Nodes**: each node with the port and the state of the profile there, and the agent's error when it failed. **Put on nodes** adds more. The tick button in the card's header (**Choose nodes to take the profile off**) puts a box on every row: tick the nodes, press **Take off N nodes** and confirm. The nodes lose the profile in one step, and the people connected through it on them lose the connection.
 - **Groups**: the groups that carry it; **Edit** opens a group, **Add to a group** adds it to one more.
 - **Users**: how many people get it, per group. Only active users whose app switch allows the protocol are counted.
 
@@ -189,7 +189,7 @@ Save your changes first: the copy is made from the saved profile. People of thos
 
 ## Deleting a profile
 
-**Danger zone** → **Delete profile** removes the profile for good, and groups lose it. A profile that is still on a node cannot be deleted: the window names the nodes. Remove it from those nodes first (node → **Profiles** → **Remove**).
+**Danger zone** → **Delete profile** removes the profile for good, and groups lose it. For a profile that is on nodes the window lists them with a box each, all ticked. With all of them ticked the red button reads **Take off all nodes and delete**: type the profile name and the panel takes the profile off every node and deletes it in one step. Untick some nodes and the button takes the profile off only the ticked ones and keeps the profile; the window stays with the nodes that are left. People connected through the profile on those nodes lose the connection, and relays through them go too; this cannot be undone. A node that is not connected does not hold anything up: it drops the profile as soon as it connects. If the profile got another node while the window was open, nothing is changed and the window names that node. Groups lose a deleted profile. Removing it from a single node is still on the node's **Profiles** tab (**Remove**).
 
 ## Who can do what
 

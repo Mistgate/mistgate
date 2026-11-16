@@ -220,7 +220,7 @@ func main() {
 | `SubscriptionService.UpdateSubscriptionSettings`（用户页面的一个应用） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 
-以下操作对所有令牌都不可用：删除用户、获取订阅链接、Telegram 代理和 TrustTunnel 的密钥和链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
+以下操作对所有令牌都不可用：删除用户、获取订阅链接、Telegram 代理和 TrustTunnel 的密钥和链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；一次从多个节点移除协议配置（可同时删除，`ProfileService.RemoveProfileFromNodes`）；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
 
 ## 需要所有者批准的变更
 

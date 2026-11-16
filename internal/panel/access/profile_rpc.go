@@ -604,19 +604,115 @@ func (s *Service) DeleteProfile(ctx context.Context, req *connect.Request[adminv
 		if err != nil {
 			return nil, s.internal("profile inbounds", err)
 		}
-		var nodes []string // a retired node keeps its inbounds, so it is named too
-		for _, in := range ins {
-			if n, err := a.Node(ctx, in.NodeID); err == nil {
-				nodes = append(nodes, n.Name)
-			}
-		}
-		slices.Sort(nodes)
-		return nil, coded(connect.CodeFailedPrecondition, "profile_deployed", "nodes", strings.Join(nodes, ", "))
+		return nil, s.profileDeployed(ctx, ins)
 	case err != nil:
 		return nil, s.internal("delete profile", err)
 	}
 	s.audit(ctx, actor(ctx), "profile_delete", map[string]any{"profile": req.Msg.ProfileId, "name": gone.Name, "protocol": gone.Protocol})
 	return connect.NewResponse(&adminv1.DeleteProfileResponse{}), nil
+}
+
+// profileDeployed is the refusal "the profile is still on these nodes": FAILED_PRECONDITION profile_deployed, naming them.
+func (s *Service) profileDeployed(ctx context.Context, ins []store.AccessInbound) error {
+	var nodes []string // a retired node keeps its inbounds, so it is named too
+	for _, in := range ins {
+		if n, err := s.st.Access().Node(ctx, in.NodeID); err == nil {
+			nodes = append(nodes, n.Name)
+		}
+	}
+	slices.Sort(nodes)
+	return coded(connect.CodeFailedPrecondition, "profile_deployed", "nodes", strings.Join(nodes, ", "))
+}
+
+// RemoveProfileFromNodes takes the profile off the listed nodes in one transaction and, with delete_profile, deletes it in
+// the same one. There is no per-node step to fail half way: the nodes learn the new desired state from the panel, so one that
+// is offline drops the profile when it connects again (a retired node has nothing to tell).
+func (s *Service) RemoveProfileFromNodes(ctx context.Context, req *connect.Request[adminv1.RemoveProfileFromNodesRequest]) (*connect.Response[adminv1.RemoveProfileFromNodesResponse], error) {
+	m := req.Msg
+	a := s.st.Access()
+	if len(m.NodeIds) == 0 {
+		return nil, invalid("node_ids is empty")
+	}
+	prof, err := a.Profile(ctx, m.ProfileId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, notFound("profile")
+	} else if err != nil {
+		return nil, s.internal("get profile", err)
+	}
+	if m.DeleteProfile && m.ConfirmName != prof.Name {
+		return nil, invalid("confirm_name does not match the profile name")
+	}
+	ins, err := a.InboundsOfProfile(ctx, prof.ID) // for the vault AAD of the kept keys, the relays, the events and the audit row
+	if err != nil {
+		return nil, s.internal("profile inbounds", err)
+	}
+	inboundOf := map[string]string{} // node id -> inbound id
+	var relays []store.RelayLink     // they go with the inbounds (foreign key)
+	for _, in := range ins {
+		if !slices.Contains(m.NodeIds, in.NodeID) {
+			continue
+		}
+		inboundOf[in.NodeID] = in.ID
+		links, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: in.ID})
+		if err != nil {
+			return nil, s.internal("list relays", err)
+		}
+		relays = append(relays, links...)
+	}
+	retain := func(enc []byte, profileID, nodeID string) ([]byte, error) {
+		state, err := s.vault.Open(enc, inboundOf[nodeID])
+		if err != nil {
+			s.log.Warn("access: server key of the removed inbound is unreadable, not kept", "code", "awg_server_key_unreadable", "inbound", inboundOf[nodeID], "err", err)
+			return nil, nil
+		}
+		return s.vault.Seal(state, store.RetainedKeyAAD(profileID, nodeID)), nil
+	}
+	removed, err := a.RemoveProfileInbounds(ctx, prof.ID, m.NodeIds, m.DeleteProfile, s.now(), retain)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, notFound("profile")
+	case errors.Is(err, store.ErrAccessInUse):
+		var left []store.AccessInbound
+		for _, in := range ins {
+			if !slices.Contains(m.NodeIds, in.NodeID) {
+				left = append(left, in)
+			}
+		}
+		if len(left) == 0 { // the profile got a new node after the list was read
+			if left, err = a.InboundsOfProfile(ctx, prof.ID); err != nil {
+				return nil, s.internal("profile inbounds", err)
+			}
+		}
+		return nil, s.profileDeployed(ctx, left)
+	case errors.Is(err, store.ErrConflict):
+		return nil, coded(connect.CodeAborted, "stale_version") // its nodes kept changing: the page is out of date
+	case err != nil:
+		return nil, s.internal("remove profile from nodes", err)
+	}
+	resp := &adminv1.RemoveProfileFromNodesResponse{Removed: uint32(len(removed)), ProfileDeleted: m.DeleteProfile}
+	var names []string
+	for _, in := range removed {
+		node, _ := a.Node(ctx, in.NodeID) // a retired node keeps its row and its name
+		names = append(names, node.Name)
+		s.nodeEvent(ctx, "profile_removed", in.NodeID, in.ID, prof)
+	}
+	slices.Sort(names)
+	gone := relays[:0]
+	for _, l := range relays {
+		if slices.ContainsFunc(removed, func(in store.AccessInbound) bool { return in.ID == l.InboundID }) {
+			gone = append(gone, l)
+		}
+	}
+	resp.RelaysRemoved = uint32(len(gone))
+	s.auditRelaysGone(ctx, gone, "inbound_removed")
+	if len(removed) > 0 {
+		s.audit(ctx, actor(ctx), "inbounds_remove", map[string]any{"profile": prof.Name, "count": len(removed), "nodes": nameList(names)})
+	}
+	if m.DeleteProfile {
+		s.audit(ctx, actor(ctx), "profile_delete", map[string]any{"profile": prof.ID, "name": prof.Name, "protocol": prof.Protocol, "nodes": len(removed)})
+	}
+	s.notify.StateChanged()
+	return connect.NewResponse(resp), nil
 }
 
 // ---- inbounds ----

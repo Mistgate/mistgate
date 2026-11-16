@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 )
@@ -114,12 +115,8 @@ func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVers
 // behind as an empty shell.
 func (a Access) DeleteProfile(ctx context.Context, id string, now time.Time) error {
 	_, err := a.s.batch(ctx,
-		guard(`EXISTS (SELECT 1 FROM profile WHERE id = ?)
-			AND NOT EXISTS (SELECT 1 FROM inbound WHERE profile_id = ?)`, id, id),
-		Stmt{Query: `UPDATE device SET revoked_at = ? WHERE revoked_at IS NULL AND kind = 'key' AND id IN
-		   (SELECT device_id FROM device_credential WHERE profile_id = ?)`, Args: []any{unix(now), id}},
-		Stmt{Query: `DELETE FROM profile WHERE id = ?`, Args: []any{id}},
-	)
+		append([]Stmt{guard(`EXISTS (SELECT 1 FROM profile WHERE id = ?)
+			AND NOT EXISTS (SELECT 1 FROM inbound WHERE profile_id = ?)`, id, id)}, deleteProfileStmts(id, now)...)...)
 	if errors.Is(err, errGuard) {
 		var inbounds int
 		if readErr := a.s.R.QueryRowContext(ctx, `SELECT count(*) FROM inbound WHERE profile_id = ?`, id).Scan(&inbounds); readErr != nil {
@@ -131,6 +128,15 @@ func (a Access) DeleteProfile(ctx context.Context, id string, now time.Time) err
 		return ErrNotFound
 	}
 	return err
+}
+
+// deleteProfileStmts are the writes that remove a profile whose inbounds are already gone (or go in the same batch).
+func deleteProfileStmts(id string, now time.Time) []Stmt {
+	return []Stmt{
+		{Query: `UPDATE device SET revoked_at = ? WHERE revoked_at IS NULL AND kind = 'key' AND id IN
+		   (SELECT device_id FROM device_credential WHERE profile_id = ?)`, Args: []any{unix(now), id}},
+		{Query: `DELETE FROM profile WHERE id = ?`, Args: []any{id}},
+	}
 }
 
 // AccessBrief is a user id and name.
@@ -376,6 +382,79 @@ func (a Access) DeleteInbound(ctx context.Context, id string, now time.Time, ret
 		return nil
 	}
 	return ErrConflict
+}
+
+// RemoveProfileInbounds removes the inbounds of a profile on the given nodes in one transaction and returns them; a node
+// that does not carry the profile is skipped. With deleteProfile the profile goes in the same transaction (its inbounds
+// must all be among the removed ones, else ErrAccessInUse and nothing changes). Without it retain parks the server key of
+// a per-device (AWG) inbound for the pair, as DeleteInbound does. ErrNotFound: no such profile; ErrConflict: the inbounds
+// of the profile kept changing while this ran.
+func (a Access) RemoveProfileInbounds(ctx context.Context, profileID string, nodeIDs []string, deleteProfile bool, now time.Time,
+	retain func(stateEnc []byte, profileID, nodeID string) ([]byte, error)) ([]AccessInbound, error) {
+	for range 8 { // the guards pin what was read; a change in between starts over
+		var protocol string
+		if err := a.s.W.QueryRowContext(ctx, `SELECT protocol FROM profile WHERE id = ?`, profileID).Scan(&protocol); errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		} else if err != nil {
+			return nil, err
+		}
+		all, err := a.InboundsOfProfile(ctx, profileID)
+		if err != nil {
+			return nil, err
+		}
+		var victims []AccessInbound
+		for _, in := range all {
+			if slices.Contains(nodeIDs, in.NodeID) {
+				victims = append(victims, in)
+			}
+		}
+		if deleteProfile && len(victims) != len(all) {
+			return nil, ErrAccessInUse
+		}
+		stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM profile WHERE id = ? AND protocol = ?)
+			AND (SELECT count(*) FROM inbound WHERE profile_id = ?) = ?`, profileID, protocol, profileID, len(all))}
+		for _, in := range victims {
+			var enc []byte
+			var public string
+			if err := a.s.W.QueryRowContext(ctx, `SELECT plugin_state_enc, plugin_public_json FROM inbound WHERE id = ?`, in.ID).Scan(&enc, &public); errors.Is(err, sql.ErrNoRows) {
+				stmts = nil // gone since the list was read
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if retain != nil && !deleteProfile && len(enc) > 0 {
+				stmts = append(stmts, guard(`EXISTS (SELECT 1 FROM inbound WHERE id = ? AND plugin_state_enc IS ? AND plugin_public_json = ?)`, in.ID, enc, public))
+				kept, err := retain(enc, profileID, in.NodeID)
+				if err != nil {
+					return nil, err
+				}
+				if len(kept) > 0 {
+					stmts = append(stmts, Stmt{Query: `INSERT OR REPLACE INTO awg_retained_key (profile_id, node_id, state_enc, public_json, created_at)
+						 SELECT ?1, ?2, ?3, ?4, ?5 WHERE EXISTS (SELECT 1 FROM node WHERE id = ?2 AND state <> 'retired')`,
+						Args: []any{profileID, in.NodeID, kept, accPublicJSON(public), unix(now)}})
+				}
+			}
+			stmts = append(stmts,
+				Stmt{Query: `INSERT OR REPLACE INTO node_inbound_stats_tombstone (node_id, inbound_id, protocol) VALUES (?, ?, ?)`, Args: []any{in.NodeID, in.ID, protocol}},
+				Stmt{Query: `DELETE FROM inbound WHERE id = ?`, Args: []any{in.ID}})
+		}
+		if stmts == nil {
+			continue
+		}
+		if deleteProfile {
+			stmts = append(stmts, deleteProfileStmts(profileID, now)...)
+		}
+		if len(victims) == 0 && !deleteProfile {
+			return nil, nil // nothing to do: a repeated call
+		}
+		if _, err := a.s.batch(ctx, stmts...); errors.Is(err, errGuard) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		return victims, nil
+	}
+	return nil, ErrConflict
 }
 
 // AccessInboundFull is an inbound with its profile and node.

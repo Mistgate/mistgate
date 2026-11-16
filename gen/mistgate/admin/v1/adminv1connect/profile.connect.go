@@ -63,6 +63,9 @@ const (
 	// ProfileServiceDeleteInboundProcedure is the fully-qualified name of the ProfileService's
 	// DeleteInbound RPC.
 	ProfileServiceDeleteInboundProcedure = "/mistgate.admin.v1.ProfileService/DeleteInbound"
+	// ProfileServiceRemoveProfileFromNodesProcedure is the fully-qualified name of the ProfileService's
+	// RemoveProfileFromNodes RPC.
+	ProfileServiceRemoveProfileFromNodesProcedure = "/mistgate.admin.v1.ProfileService/RemoveProfileFromNodes"
 	// ProfileServiceTwinProfileProcedure is the fully-qualified name of the ProfileService's
 	// TwinProfile RPC.
 	ProfileServiceTwinProfileProcedure = "/mistgate.admin.v1.ProfileService/TwinProfile"
@@ -92,6 +95,12 @@ type ProfileServiceClient interface {
 	UpdateInbound(context.Context, *connect.Request[v1.UpdateInboundRequest]) (*connect.Response[v1.UpdateInboundResponse], error)
 	// Remove the profile from the node; its users lose this endpoint.
 	DeleteInbound(context.Context, *connect.Request[v1.DeleteInboundRequest]) (*connect.Response[v1.DeleteInboundResponse], error)
+	// Remove the profile from several nodes at once, optionally deleting the profile in the same step. One transaction on the
+	// panel: the inbounds are gone together or not at all, and a node that is offline drops the profile when it connects
+	// again (the desired state is read from the panel). A node of the list that does not carry the profile is skipped, so a
+	// repeated call is harmless. With delete_profile the list must cover every node the profile is on, else FAILED_PRECONDITION
+	// "profile_deployed" names those left and nothing changes. Owner only.
+	RemoveProfileFromNodes(context.Context, *connect.Request[v1.RemoveProfileFromNodesRequest]) (*connect.Response[v1.RemoveProfileFromNodesResponse], error)
 	// "The same server with and without WARP": a twin of a profile whose exit is flipped (direct <-> WARP). Same
 	// protocol and settings, the name with " · WARP" added or removed, a port that is free on every node, fresh secrets
 	// (and, for AmneziaWG, its own client network), no port hopping. It goes on the nodes and into the groups the
@@ -171,6 +180,12 @@ func NewProfileServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(profileServiceMethods.ByName("DeleteInbound")),
 			connect.WithClientOptions(opts...),
 		),
+		removeProfileFromNodes: connect.NewClient[v1.RemoveProfileFromNodesRequest, v1.RemoveProfileFromNodesResponse](
+			httpClient,
+			baseURL+ProfileServiceRemoveProfileFromNodesProcedure,
+			connect.WithSchema(profileServiceMethods.ByName("RemoveProfileFromNodes")),
+			connect.WithClientOptions(opts...),
+		),
 		twinProfile: connect.NewClient[v1.TwinProfileRequest, v1.TwinProfileResponse](
 			httpClient,
 			baseURL+ProfileServiceTwinProfileProcedure,
@@ -182,17 +197,18 @@ func NewProfileServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // profileServiceClient implements ProfileServiceClient.
 type profileServiceClient struct {
-	listProtocols  *connect.Client[v1.ListProtocolsRequest, v1.ListProtocolsResponse]
-	listProfiles   *connect.Client[v1.ListProfilesRequest, v1.ListProfilesResponse]
-	getProfile     *connect.Client[v1.GetProfileRequest, v1.GetProfileResponse]
-	createProfile  *connect.Client[v1.CreateProfileRequest, v1.CreateProfileResponse]
-	updateProfile  *connect.Client[v1.UpdateProfileRequest, v1.UpdateProfileResponse]
-	previewProfile *connect.Client[v1.PreviewProfileRequest, v1.PreviewProfileResponse]
-	deleteProfile  *connect.Client[v1.DeleteProfileRequest, v1.DeleteProfileResponse]
-	createInbound  *connect.Client[v1.CreateInboundRequest, v1.CreateInboundResponse]
-	updateInbound  *connect.Client[v1.UpdateInboundRequest, v1.UpdateInboundResponse]
-	deleteInbound  *connect.Client[v1.DeleteInboundRequest, v1.DeleteInboundResponse]
-	twinProfile    *connect.Client[v1.TwinProfileRequest, v1.TwinProfileResponse]
+	listProtocols          *connect.Client[v1.ListProtocolsRequest, v1.ListProtocolsResponse]
+	listProfiles           *connect.Client[v1.ListProfilesRequest, v1.ListProfilesResponse]
+	getProfile             *connect.Client[v1.GetProfileRequest, v1.GetProfileResponse]
+	createProfile          *connect.Client[v1.CreateProfileRequest, v1.CreateProfileResponse]
+	updateProfile          *connect.Client[v1.UpdateProfileRequest, v1.UpdateProfileResponse]
+	previewProfile         *connect.Client[v1.PreviewProfileRequest, v1.PreviewProfileResponse]
+	deleteProfile          *connect.Client[v1.DeleteProfileRequest, v1.DeleteProfileResponse]
+	createInbound          *connect.Client[v1.CreateInboundRequest, v1.CreateInboundResponse]
+	updateInbound          *connect.Client[v1.UpdateInboundRequest, v1.UpdateInboundResponse]
+	deleteInbound          *connect.Client[v1.DeleteInboundRequest, v1.DeleteInboundResponse]
+	removeProfileFromNodes *connect.Client[v1.RemoveProfileFromNodesRequest, v1.RemoveProfileFromNodesResponse]
+	twinProfile            *connect.Client[v1.TwinProfileRequest, v1.TwinProfileResponse]
 }
 
 // ListProtocols calls mistgate.admin.v1.ProfileService.ListProtocols.
@@ -245,6 +261,11 @@ func (c *profileServiceClient) DeleteInbound(ctx context.Context, req *connect.R
 	return c.deleteInbound.CallUnary(ctx, req)
 }
 
+// RemoveProfileFromNodes calls mistgate.admin.v1.ProfileService.RemoveProfileFromNodes.
+func (c *profileServiceClient) RemoveProfileFromNodes(ctx context.Context, req *connect.Request[v1.RemoveProfileFromNodesRequest]) (*connect.Response[v1.RemoveProfileFromNodesResponse], error) {
+	return c.removeProfileFromNodes.CallUnary(ctx, req)
+}
+
 // TwinProfile calls mistgate.admin.v1.ProfileService.TwinProfile.
 func (c *profileServiceClient) TwinProfile(ctx context.Context, req *connect.Request[v1.TwinProfileRequest]) (*connect.Response[v1.TwinProfileResponse], error) {
 	return c.twinProfile.CallUnary(ctx, req)
@@ -274,6 +295,12 @@ type ProfileServiceHandler interface {
 	UpdateInbound(context.Context, *connect.Request[v1.UpdateInboundRequest]) (*connect.Response[v1.UpdateInboundResponse], error)
 	// Remove the profile from the node; its users lose this endpoint.
 	DeleteInbound(context.Context, *connect.Request[v1.DeleteInboundRequest]) (*connect.Response[v1.DeleteInboundResponse], error)
+	// Remove the profile from several nodes at once, optionally deleting the profile in the same step. One transaction on the
+	// panel: the inbounds are gone together or not at all, and a node that is offline drops the profile when it connects
+	// again (the desired state is read from the panel). A node of the list that does not carry the profile is skipped, so a
+	// repeated call is harmless. With delete_profile the list must cover every node the profile is on, else FAILED_PRECONDITION
+	// "profile_deployed" names those left and nothing changes. Owner only.
+	RemoveProfileFromNodes(context.Context, *connect.Request[v1.RemoveProfileFromNodesRequest]) (*connect.Response[v1.RemoveProfileFromNodesResponse], error)
 	// "The same server with and without WARP": a twin of a profile whose exit is flipped (direct <-> WARP). Same
 	// protocol and settings, the name with " · WARP" added or removed, a port that is free on every node, fresh secrets
 	// (and, for AmneziaWG, its own client network), no port hopping. It goes on the nodes and into the groups the
@@ -349,6 +376,12 @@ func NewProfileServiceHandler(svc ProfileServiceHandler, opts ...connect.Handler
 		connect.WithSchema(profileServiceMethods.ByName("DeleteInbound")),
 		connect.WithHandlerOptions(opts...),
 	)
+	profileServiceRemoveProfileFromNodesHandler := connect.NewUnaryHandler(
+		ProfileServiceRemoveProfileFromNodesProcedure,
+		svc.RemoveProfileFromNodes,
+		connect.WithSchema(profileServiceMethods.ByName("RemoveProfileFromNodes")),
+		connect.WithHandlerOptions(opts...),
+	)
 	profileServiceTwinProfileHandler := connect.NewUnaryHandler(
 		ProfileServiceTwinProfileProcedure,
 		svc.TwinProfile,
@@ -377,6 +410,8 @@ func NewProfileServiceHandler(svc ProfileServiceHandler, opts ...connect.Handler
 			profileServiceUpdateInboundHandler.ServeHTTP(w, r)
 		case ProfileServiceDeleteInboundProcedure:
 			profileServiceDeleteInboundHandler.ServeHTTP(w, r)
+		case ProfileServiceRemoveProfileFromNodesProcedure:
+			profileServiceRemoveProfileFromNodesHandler.ServeHTTP(w, r)
 		case ProfileServiceTwinProfileProcedure:
 			profileServiceTwinProfileHandler.ServeHTTP(w, r)
 		default:
@@ -426,6 +461,10 @@ func (UnimplementedProfileServiceHandler) UpdateInbound(context.Context, *connec
 
 func (UnimplementedProfileServiceHandler) DeleteInbound(context.Context, *connect.Request[v1.DeleteInboundRequest]) (*connect.Response[v1.DeleteInboundResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProfileService.DeleteInbound is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) RemoveProfileFromNodes(context.Context, *connect.Request[v1.RemoveProfileFromNodesRequest]) (*connect.Response[v1.RemoveProfileFromNodesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProfileService.RemoveProfileFromNodes is not implemented"))
 }
 
 func (UnimplementedProfileServiceHandler) TwinProfile(context.Context, *connect.Request[v1.TwinProfileRequest]) (*connect.Response[v1.TwinProfileResponse], error) {
