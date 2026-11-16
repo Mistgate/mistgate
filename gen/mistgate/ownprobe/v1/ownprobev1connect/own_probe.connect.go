@@ -39,6 +39,9 @@ const (
 	OwnProbeServiceUpdateProcedure = "/mistgate.ownprobe.v1.OwnProbeService/Update"
 	// OwnProbeServiceCreateProcedure is the fully-qualified name of the OwnProbeService's Create RPC.
 	OwnProbeServiceCreateProcedure = "/mistgate.ownprobe.v1.OwnProbeService/Create"
+	// OwnProbeServiceUpdateCommandProcedure is the fully-qualified name of the OwnProbeService's
+	// UpdateCommand RPC.
+	OwnProbeServiceUpdateCommandProcedure = "/mistgate.ownprobe.v1.OwnProbeService/UpdateCommand"
 	// OwnProbeServiceRevokeProcedure is the fully-qualified name of the OwnProbeService's Revoke RPC.
 	OwnProbeServiceRevokeProcedure = "/mistgate.ownprobe.v1.OwnProbeService/Revoke"
 	// OwnProbeServiceConfirmNetworkProcedure is the fully-qualified name of the OwnProbeService's
@@ -57,6 +60,7 @@ type OwnProbeServiceClient interface {
 	Get(context.Context, *connect.Request[v1.OwnProbeServiceGetRequest]) (*connect.Response[v1.OwnProbeServiceGetResponse], error)
 	Update(context.Context, *connect.Request[v1.OwnProbeServiceUpdateRequest]) (*connect.Response[v1.OwnProbeServiceUpdateResponse], error)
 	Create(context.Context, *connect.Request[v1.OwnProbeServiceCreateRequest]) (*connect.Response[v1.OwnProbeServiceCreateResponse], error)
+	UpdateCommand(context.Context, *connect.Request[v1.OwnProbeServiceUpdateCommandRequest]) (*connect.Response[v1.OwnProbeServiceUpdateCommandResponse], error)
 	Revoke(context.Context, *connect.Request[v1.OwnProbeServiceRevokeRequest]) (*connect.Response[v1.OwnProbeServiceRevokeResponse], error)
 	ConfirmNetwork(context.Context, *connect.Request[v1.OwnProbeServiceConfirmNetworkRequest]) (*connect.Response[v1.OwnProbeServiceConfirmNetworkResponse], error)
 	CheckNow(context.Context, *connect.Request[v1.OwnProbeServiceCheckNowRequest]) (*connect.Response[v1.OwnProbeServiceCheckNowResponse], error)
@@ -92,6 +96,12 @@ func NewOwnProbeServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(ownProbeServiceMethods.ByName("Create")),
 			connect.WithClientOptions(opts...),
 		),
+		updateCommand: connect.NewClient[v1.OwnProbeServiceUpdateCommandRequest, v1.OwnProbeServiceUpdateCommandResponse](
+			httpClient,
+			baseURL+OwnProbeServiceUpdateCommandProcedure,
+			connect.WithSchema(ownProbeServiceMethods.ByName("UpdateCommand")),
+			connect.WithClientOptions(opts...),
+		),
 		revoke: connect.NewClient[v1.OwnProbeServiceRevokeRequest, v1.OwnProbeServiceRevokeResponse](
 			httpClient,
 			baseURL+OwnProbeServiceRevokeProcedure,
@@ -124,6 +134,7 @@ type ownProbeServiceClient struct {
 	get            *connect.Client[v1.OwnProbeServiceGetRequest, v1.OwnProbeServiceGetResponse]
 	update         *connect.Client[v1.OwnProbeServiceUpdateRequest, v1.OwnProbeServiceUpdateResponse]
 	create         *connect.Client[v1.OwnProbeServiceCreateRequest, v1.OwnProbeServiceCreateResponse]
+	updateCommand  *connect.Client[v1.OwnProbeServiceUpdateCommandRequest, v1.OwnProbeServiceUpdateCommandResponse]
 	revoke         *connect.Client[v1.OwnProbeServiceRevokeRequest, v1.OwnProbeServiceRevokeResponse]
 	confirmNetwork *connect.Client[v1.OwnProbeServiceConfirmNetworkRequest, v1.OwnProbeServiceConfirmNetworkResponse]
 	checkNow       *connect.Client[v1.OwnProbeServiceCheckNowRequest, v1.OwnProbeServiceCheckNowResponse]
@@ -143,6 +154,11 @@ func (c *ownProbeServiceClient) Update(ctx context.Context, req *connect.Request
 // Create calls mistgate.ownprobe.v1.OwnProbeService.Create.
 func (c *ownProbeServiceClient) Create(ctx context.Context, req *connect.Request[v1.OwnProbeServiceCreateRequest]) (*connect.Response[v1.OwnProbeServiceCreateResponse], error) {
 	return c.create.CallUnary(ctx, req)
+}
+
+// UpdateCommand calls mistgate.ownprobe.v1.OwnProbeService.UpdateCommand.
+func (c *ownProbeServiceClient) UpdateCommand(ctx context.Context, req *connect.Request[v1.OwnProbeServiceUpdateCommandRequest]) (*connect.Response[v1.OwnProbeServiceUpdateCommandResponse], error) {
+	return c.updateCommand.CallUnary(ctx, req)
 }
 
 // Revoke calls mistgate.ownprobe.v1.OwnProbeService.Revoke.
@@ -170,6 +186,7 @@ type OwnProbeServiceHandler interface {
 	Get(context.Context, *connect.Request[v1.OwnProbeServiceGetRequest]) (*connect.Response[v1.OwnProbeServiceGetResponse], error)
 	Update(context.Context, *connect.Request[v1.OwnProbeServiceUpdateRequest]) (*connect.Response[v1.OwnProbeServiceUpdateResponse], error)
 	Create(context.Context, *connect.Request[v1.OwnProbeServiceCreateRequest]) (*connect.Response[v1.OwnProbeServiceCreateResponse], error)
+	UpdateCommand(context.Context, *connect.Request[v1.OwnProbeServiceUpdateCommandRequest]) (*connect.Response[v1.OwnProbeServiceUpdateCommandResponse], error)
 	Revoke(context.Context, *connect.Request[v1.OwnProbeServiceRevokeRequest]) (*connect.Response[v1.OwnProbeServiceRevokeResponse], error)
 	ConfirmNetwork(context.Context, *connect.Request[v1.OwnProbeServiceConfirmNetworkRequest]) (*connect.Response[v1.OwnProbeServiceConfirmNetworkResponse], error)
 	CheckNow(context.Context, *connect.Request[v1.OwnProbeServiceCheckNowRequest]) (*connect.Response[v1.OwnProbeServiceCheckNowResponse], error)
@@ -199,6 +216,12 @@ func NewOwnProbeServiceHandler(svc OwnProbeServiceHandler, opts ...connect.Handl
 		OwnProbeServiceCreateProcedure,
 		svc.Create,
 		connect.WithSchema(ownProbeServiceMethods.ByName("Create")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ownProbeServiceUpdateCommandHandler := connect.NewUnaryHandler(
+		OwnProbeServiceUpdateCommandProcedure,
+		svc.UpdateCommand,
+		connect.WithSchema(ownProbeServiceMethods.ByName("UpdateCommand")),
 		connect.WithHandlerOptions(opts...),
 	)
 	ownProbeServiceRevokeHandler := connect.NewUnaryHandler(
@@ -233,6 +256,8 @@ func NewOwnProbeServiceHandler(svc OwnProbeServiceHandler, opts ...connect.Handl
 			ownProbeServiceUpdateHandler.ServeHTTP(w, r)
 		case OwnProbeServiceCreateProcedure:
 			ownProbeServiceCreateHandler.ServeHTTP(w, r)
+		case OwnProbeServiceUpdateCommandProcedure:
+			ownProbeServiceUpdateCommandHandler.ServeHTTP(w, r)
 		case OwnProbeServiceRevokeProcedure:
 			ownProbeServiceRevokeHandler.ServeHTTP(w, r)
 		case OwnProbeServiceConfirmNetworkProcedure:
@@ -260,6 +285,10 @@ func (UnimplementedOwnProbeServiceHandler) Update(context.Context, *connect.Requ
 
 func (UnimplementedOwnProbeServiceHandler) Create(context.Context, *connect.Request[v1.OwnProbeServiceCreateRequest]) (*connect.Response[v1.OwnProbeServiceCreateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ownprobe.v1.OwnProbeService.Create is not implemented"))
+}
+
+func (UnimplementedOwnProbeServiceHandler) UpdateCommand(context.Context, *connect.Request[v1.OwnProbeServiceUpdateCommandRequest]) (*connect.Response[v1.OwnProbeServiceUpdateCommandResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ownprobe.v1.OwnProbeService.UpdateCommand is not implemented"))
 }
 
 func (UnimplementedOwnProbeServiceHandler) Revoke(context.Context, *connect.Request[v1.OwnProbeServiceRevokeRequest]) (*connect.Response[v1.OwnProbeServiceRevokeResponse], error) {

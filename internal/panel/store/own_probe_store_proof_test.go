@@ -4,10 +4,19 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 )
+
+func parseTargetsForTest(raw string) []any {
+	var job struct {
+		Targets []any `json:"targets"`
+	}
+	_ = json.Unmarshal([]byte(raw), &job)
+	return job.Targets
+}
 
 func ownProbeStoreProof(t *testing.T, st *Store) {
 	t.Helper()
@@ -54,16 +63,42 @@ func ownProbeStoreProof(t *testing.T, st *Store) {
 	if err := st.SetOwnProbeJob(ctx, created.ID, "0123456789abcdef", `{"targets":[]}`, now.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.CompleteOwnProbeJob(ctx, created.ID, "0123456789abcdef", "abcdef012345", now.Add(3*time.Minute), time.Hour, 2); err != nil {
+	if err := st.CompleteOwnProbeJob(ctx, created.ID, "0123456789abcdef", "abcdef012345", "open", now.Add(3*time.Minute), time.Hour, 2); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.CompleteOwnProbeJob(ctx, created.ID, "0123456789abcdef", "abcdef012345", now.Add(4*time.Minute), time.Hour, 2); !errors.Is(err, ErrNotFound) {
+	if err := st.CompleteOwnProbeJob(ctx, created.ID, "0123456789abcdef", "abcdef012345", "open", now.Add(4*time.Minute), time.Hour, 2); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("job replay = %v, want ErrNotFound", err)
 	}
-	if got, err := st.OwnProbe(ctx, created.ID); err != nil || got.ChecksDay != 2 || got.JobID != "" {
+	if got, err := st.OwnProbe(ctx, created.ID); err != nil || got.ChecksDay != 2 || got.JobID != "" || OwnProbeRef(got) != "open" {
 		t.Fatalf("completed job row = %+v, %v", got, err)
 	}
+	// the reference result outlives the things that drop a job (check now, the switch off, the next job being issued) and is
+	// replaced by the next round
 	if err := st.DueOwnProbe(ctx, created.ID, now.Add(5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.OwnProbe(ctx, created.ID); OwnProbeRef(got) != "open" {
+		t.Fatalf("check now dropped the reference result: %q", got.JobJSON)
+	}
+	if err := st.ClearOwnProbeJobs(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.OwnProbe(ctx, created.ID); OwnProbeRef(got) != "open" {
+		t.Fatalf("clearing the jobs dropped the reference result: %q", got.JobJSON)
+	}
+	if err := st.SetOwnProbeJob(ctx, created.ID, "fedcba9876543210", `{"targets":[{"node_id":"nod_1"}]}`, now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.OwnProbe(ctx, created.ID); OwnProbeRef(got) != "open" || len(parseTargetsForTest(got.JobJSON)) != 1 {
+		t.Fatalf("a new job lost the reference result or its targets: %q", got.JobJSON)
+	}
+	if err := st.CompleteOwnProbeJob(ctx, created.ID, "fedcba9876543210", "abcdef012345", "blocked", now.Add(6*time.Minute), time.Hour, 1); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.OwnProbe(ctx, created.ID); OwnProbeRef(got) != "blocked" || got.JobJSON != `{"ref":"blocked"}` {
+		t.Fatalf("the round after did not replace it: %q", got.JobJSON)
+	}
+	if err := st.DueOwnProbe(ctx, created.ID, now.Add(7*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.RevokeOwnProbe(ctx, created.ID); err != nil {
@@ -72,7 +107,7 @@ func ownProbeStoreProof(t *testing.T, st *Store) {
 	if _, err := st.OwnProbeBySecretHash(ctx, secretHash[:]); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("revoked secret lookup = %v, want ErrNotFound", err)
 	}
-	if got, err := st.OwnProbe(ctx, created.ID); err != nil || got.State != "revoked" || got.SecretHash != nil || got.JobID != "" {
+	if got, err := st.OwnProbe(ctx, created.ID); err != nil || got.State != "revoked" || OwnProbeRef(got) != "" || got.SecretHash != nil || got.JobID != "" {
 		t.Fatalf("revoked probe = %+v, %v", got, err)
 	}
 

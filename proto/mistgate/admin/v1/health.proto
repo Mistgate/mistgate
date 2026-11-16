@@ -708,6 +708,9 @@ message CountryVantage {
   bool icmp_ok = 10;
   bool tcp_ok = 11;
   string why = 12;
+  // Own probes only: the name the owner gave the probe, and the port of the node's target the reason (why) comes from.
+  string probe_name = 13;
+  uint32 port = 14;
 }
 
 // One source's newest fresh verdict, including unknown when that source ran without a usable result.

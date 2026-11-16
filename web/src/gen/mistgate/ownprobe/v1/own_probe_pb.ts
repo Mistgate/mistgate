@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/ownprobe/v1/own_probe.proto.
  */
 export const file_mistgate_ownprobe_v1_own_probe: GenFile = /*@__PURE__*/
-  fileDesc("CiRtaXN0Z2F0ZS9vd25wcm9iZS92MS9vd25fcHJvYmUucHJvdG8SFG1pc3RnYXRlLm93bnByb2JlLnYxIk8KEE93blByb2JlU2V0dGluZ3MSDwoHZW5hYmxlZBgBIAEoCBIUCgxpbnRlcnZhbF9taW4YAiABKA0SFAoMZmFsbGJhY2tfdXJsGAMgASgJIoYCCghPd25Qcm9iZRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBGNpdHkYAyABKAkSDAoEa2luZBgEIAEoCRINCgVzdGF0ZRgFIAEoCRILCgNhc24YBiABKA0SEAoIb3BlcmF0b3IYByABKAkSFwoPcGlubmVkX29wZXJhdG9yGAggASgJEg8KB3ZlcnNpb24YCSABKAkSGgoObGFzdF9zZWVuX3VuaXgYCiABKANCAjACEhwKEGxhc3RfcmVzdWx0X3VuaXgYCyABKANCAjACEhIKCmNoZWNrc19kYXkYDCABKA0SHgoSdG9rZW5fZXhwaXJlc191bml4GA0gASgDQgIwAiIbChlPd25Qcm9iZVNlcnZpY2VHZXRSZXF1ZXN0IoYBChpPd25Qcm9iZVNlcnZpY2VHZXRSZXNwb25zZRI4CghzZXR0aW5ncxgBIAEoCzImLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2V0dGluZ3MSLgoGcHJvYmVzGAIgAygLMh4ubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmUiWAocT3duUHJvYmVTZXJ2aWNlVXBkYXRlUmVxdWVzdBI4CghzZXR0aW5ncxgBIAEoCzImLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2V0dGluZ3MiWQodT3duUHJvYmVTZXJ2aWNlVXBkYXRlUmVzcG9uc2USOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNldHRpbmdzIkgKHE93blByb2JlU2VydmljZUNyZWF0ZVJlcXVlc3QSDAoEbmFtZRgBIAEoCRIMCgRjaXR5GAIgASgJEgwKBGtpbmQYAyABKAkihQEKHU93blByb2JlU2VydmljZUNyZWF0ZVJlc3BvbnNlEi0KBXByb2JlGAEgASgLMh4ubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmUSDQoFdG9rZW4YAiABKAkSDwoHY29tbWFuZBgDIAEoCRIVCg1zY3JpcHRfc2hhMjU2GAQgASgJIioKHE93blByb2JlU2VydmljZVJldm9rZVJlcXVlc3QSCgoCaWQYASABKAkiTgodT3duUHJvYmVTZXJ2aWNlUmV2b2tlUmVzcG9uc2USLQoFcHJvYmUYASABKAsyHi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZSIyCiRPd25Qcm9iZVNlcnZpY2VDb25maXJtTmV0d29ya1JlcXVlc3QSCgoCaWQYASABKAkiVgolT3duUHJvYmVTZXJ2aWNlQ29uZmlybU5ldHdvcmtSZXNwb25zZRItCgVwcm9iZRgBIAEoCzIeLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlIiwKHk93blByb2JlU2VydmljZUNoZWNrTm93UmVxdWVzdBIKCgJpZBgBIAEoCSJQCh9Pd25Qcm9iZVNlcnZpY2VDaGVja05vd1Jlc3BvbnNlEi0KBXByb2JlGAEgASgLMh4ubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmUiIgogT3duUHJvYmVTZXJ2aWNlRGlzY29ubmVjdFJlcXVlc3QiXQohT3duUHJvYmVTZXJ2aWNlRGlzY29ubmVjdFJlc3BvbnNlEjgKCHNldHRpbmdzGAEgASgLMiYubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXR0aW5nczLYBgoPT3duUHJvYmVTZXJ2aWNlEmgKA0dldBIvLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2VydmljZUdldFJlcXVlc3QaMC5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VHZXRSZXNwb25zZRJxCgZVcGRhdGUSMi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VVcGRhdGVSZXF1ZXN0GjMubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlVXBkYXRlUmVzcG9uc2UScQoGQ3JlYXRlEjIubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlQ3JlYXRlUmVxdWVzdBozLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2VydmljZUNyZWF0ZVJlc3BvbnNlEnEKBlJldm9rZRIyLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2VydmljZVJldm9rZVJlcXVlc3QaMy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VSZXZva2VSZXNwb25zZRKJAQoOQ29uZmlybU5ldHdvcmsSOi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VDb25maXJtTmV0d29ya1JlcXVlc3QaOy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VDb25maXJtTmV0d29ya1Jlc3BvbnNlEncKCENoZWNrTm93EjQubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlQ2hlY2tOb3dSZXF1ZXN0GjUubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlQ2hlY2tOb3dSZXNwb25zZRJ9CgpEaXNjb25uZWN0EjYubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlRGlzY29ubmVjdFJlcXVlc3QaNy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VEaXNjb25uZWN0UmVzcG9uc2VC3QEKGGNvbS5taXN0Z2F0ZS5vd25wcm9iZS52MUINT3duUHJvYmVQcm90b1ABWkBnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9vd25wcm9iZS92MTtvd25wcm9iZXYxogIDTU9YqgIUTWlzdGdhdGUuT3ducHJvYmUuVjHKAhRNaXN0Z2F0ZVxPd25wcm9iZVxWMeICIE1pc3RnYXRlXE93bnByb2JlXFYxXEdQQk1ldGFkYXRh6gIWTWlzdGdhdGU6Ok93bnByb2JlOjpWMWIGcHJvdG8z");
+  fileDesc("CiRtaXN0Z2F0ZS9vd25wcm9iZS92MS9vd25fcHJvYmUucHJvdG8SFG1pc3RnYXRlLm93bnByb2JlLnYxIk8KEE93blByb2JlU2V0dGluZ3MSDwoHZW5hYmxlZBgBIAEoCBIUCgxpbnRlcnZhbF9taW4YAiABKA0SFAoMZmFsbGJhY2tfdXJsGAMgASgJIpkCCghPd25Qcm9iZRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBGNpdHkYAyABKAkSDAoEa2luZBgEIAEoCRINCgVzdGF0ZRgFIAEoCRILCgNhc24YBiABKA0SEAoIb3BlcmF0b3IYByABKAkSFwoPcGlubmVkX29wZXJhdG9yGAggASgJEg8KB3ZlcnNpb24YCSABKAkSGgoObGFzdF9zZWVuX3VuaXgYCiABKANCAjACEhwKEGxhc3RfcmVzdWx0X3VuaXgYCyABKANCAjACEhIKCmNoZWNrc19kYXkYDCABKA0SHgoSdG9rZW5fZXhwaXJlc191bml4GA0gASgDQgIwAhIRCglyZWZlcmVuY2UYDiABKAkiGwoZT3duUHJvYmVTZXJ2aWNlR2V0UmVxdWVzdCKeAQoaT3duUHJvYmVTZXJ2aWNlR2V0UmVzcG9uc2USOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNldHRpbmdzEi4KBnByb2JlcxgCIAMoCzIeLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlEhYKDnNjcmlwdF92ZXJzaW9uGAMgASgJIlgKHE93blByb2JlU2VydmljZVVwZGF0ZVJlcXVlc3QSOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNldHRpbmdzIlkKHU93blByb2JlU2VydmljZVVwZGF0ZVJlc3BvbnNlEjgKCHNldHRpbmdzGAEgASgLMiYubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXR0aW5ncyJIChxPd25Qcm9iZVNlcnZpY2VDcmVhdGVSZXF1ZXN0EgwKBG5hbWUYASABKAkSDAoEY2l0eRgCIAEoCRIMCgRraW5kGAMgASgJIp0BCh1Pd25Qcm9iZVNlcnZpY2VDcmVhdGVSZXNwb25zZRItCgVwcm9iZRgBIAEoCzIeLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlEg0KBXRva2VuGAIgASgJEg8KB2NvbW1hbmQYAyABKAkSFQoNc2NyaXB0X3NoYTI1NhgEIAEoCRIWCg5zZXJ2ZXJfY29tbWFuZBgFIAEoCSIlCiNPd25Qcm9iZVNlcnZpY2VVcGRhdGVDb21tYW5kUmVxdWVzdCJnCiRPd25Qcm9iZVNlcnZpY2VVcGRhdGVDb21tYW5kUmVzcG9uc2USDwoHY29tbWFuZBgBIAEoCRIWCg5zZXJ2ZXJfY29tbWFuZBgCIAEoCRIWCg5zY3JpcHRfdmVyc2lvbhgDIAEoCSIqChxPd25Qcm9iZVNlcnZpY2VSZXZva2VSZXF1ZXN0EgoKAmlkGAEgASgJIk4KHU93blByb2JlU2VydmljZVJldm9rZVJlc3BvbnNlEi0KBXByb2JlGAEgASgLMh4ubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmUiMgokT3duUHJvYmVTZXJ2aWNlQ29uZmlybU5ldHdvcmtSZXF1ZXN0EgoKAmlkGAEgASgJIlYKJU93blByb2JlU2VydmljZUNvbmZpcm1OZXR3b3JrUmVzcG9uc2USLQoFcHJvYmUYASABKAsyHi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZSIsCh5Pd25Qcm9iZVNlcnZpY2VDaGVja05vd1JlcXVlc3QSCgoCaWQYASABKAkiUAofT3duUHJvYmVTZXJ2aWNlQ2hlY2tOb3dSZXNwb25zZRItCgVwcm9iZRgBIAEoCzIeLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlIiIKIE93blByb2JlU2VydmljZURpc2Nvbm5lY3RSZXF1ZXN0Il0KIU93blByb2JlU2VydmljZURpc2Nvbm5lY3RSZXNwb25zZRI4CghzZXR0aW5ncxgBIAEoCzImLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2V0dGluZ3My4QcKD093blByb2JlU2VydmljZRJoCgNHZXQSLy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VHZXRSZXF1ZXN0GjAubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlR2V0UmVzcG9uc2UScQoGVXBkYXRlEjIubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlVXBkYXRlUmVxdWVzdBozLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2VydmljZVVwZGF0ZVJlc3BvbnNlEnEKBkNyZWF0ZRIyLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2VydmljZUNyZWF0ZVJlcXVlc3QaMy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VDcmVhdGVSZXNwb25zZRKGAQoNVXBkYXRlQ29tbWFuZBI5Lm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2VydmljZVVwZGF0ZUNvbW1hbmRSZXF1ZXN0GjoubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlVXBkYXRlQ29tbWFuZFJlc3BvbnNlEnEKBlJldm9rZRIyLm1pc3RnYXRlLm93bnByb2JlLnYxLk93blByb2JlU2VydmljZVJldm9rZVJlcXVlc3QaMy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VSZXZva2VSZXNwb25zZRKJAQoOQ29uZmlybU5ldHdvcmsSOi5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VDb25maXJtTmV0d29ya1JlcXVlc3QaOy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VDb25maXJtTmV0d29ya1Jlc3BvbnNlEncKCENoZWNrTm93EjQubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlQ2hlY2tOb3dSZXF1ZXN0GjUubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlQ2hlY2tOb3dSZXNwb25zZRJ9CgpEaXNjb25uZWN0EjYubWlzdGdhdGUub3ducHJvYmUudjEuT3duUHJvYmVTZXJ2aWNlRGlzY29ubmVjdFJlcXVlc3QaNy5taXN0Z2F0ZS5vd25wcm9iZS52MS5Pd25Qcm9iZVNlcnZpY2VEaXNjb25uZWN0UmVzcG9uc2VC3QEKGGNvbS5taXN0Z2F0ZS5vd25wcm9iZS52MUINT3duUHJvYmVQcm90b1ABWkBnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9vd25wcm9iZS92MTtvd25wcm9iZXYxogIDTU9YqgIUTWlzdGdhdGUuT3ducHJvYmUuVjHKAhRNaXN0Z2F0ZVxPd25wcm9iZVxWMeICIE1pc3RnYXRlXE93bnByb2JlXFYxXEdQQk1ldGFkYXRh6gIWTWlzdGdhdGU6Ok93bnByb2JlOjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeSettings
@@ -107,6 +107,15 @@ export type OwnProbe = Message<"mistgate.ownprobe.v1.OwnProbe"> & {
    * @generated from field: int64 token_expires_unix = 13 [jstype = JS_NUMBER];
    */
   tokenExpiresUnix: bigint;
+
+  /**
+   * What the probe's last finished round said of the reference address that a filter blocks: "" (no round yet), "filtered" (the
+   * reference was blocked: the probe's network filters), "open" (it opened: nothing is filtered on the path, so "reachable"
+   * proves nothing) or "unavailable" (the probe could not try it: its network is down or it has the reference switched off).
+   *
+   * @generated from field: string reference = 14;
+   */
+  reference: string;
 };
 
 /**
@@ -142,6 +151,14 @@ export type OwnProbeServiceGetResponse = Message<"mistgate.ownprobe.v1.OwnProbeS
    * @generated from field: repeated mistgate.ownprobe.v1.OwnProbe probes = 2;
    */
   probes: OwnProbe[];
+
+  /**
+   * The version of the script this panel hands out now (the first 12 characters of its sha256): the same value a probe reports
+   * in OwnProbe.version, so a probe whose version differs is out of date.
+   *
+   * @generated from field: string script_version = 3;
+   */
+  scriptVersion: string;
 };
 
 /**
@@ -231,6 +248,8 @@ export type OwnProbeServiceCreateResponse = Message<"mistgate.ownprobe.v1.OwnPro
   token: string;
 
   /**
+   * The command for a router with Entware (a Keenetic): it installs the packages first.
+   *
    * @generated from field: string command = 3;
    */
   command: string;
@@ -239,6 +258,13 @@ export type OwnProbeServiceCreateResponse = Message<"mistgate.ownprobe.v1.OwnPro
    * @generated from field: string script_sha256 = 4;
    */
   scriptSha256: string;
+
+  /**
+   * The command for a server (systemd): the same download and hash check, no packages, the script run through sudo.
+   *
+   * @generated from field: string server_command = 5;
+   */
+  serverCommand: string;
 };
 
 /**
@@ -247,6 +273,49 @@ export type OwnProbeServiceCreateResponse = Message<"mistgate.ownprobe.v1.OwnPro
  */
 export const OwnProbeServiceCreateResponseSchema: GenMessage<OwnProbeServiceCreateResponse> = /*@__PURE__*/
   messageDesc(file_mistgate_ownprobe_v1_own_probe, 7);
+
+/**
+ * @generated from message mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandRequest
+ */
+export type OwnProbeServiceUpdateCommandRequest = Message<"mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandRequest.
+ * Use `create(OwnProbeServiceUpdateCommandRequestSchema)` to create a new message.
+ */
+export const OwnProbeServiceUpdateCommandRequestSchema: GenMessage<OwnProbeServiceUpdateCommandRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 8);
+
+/**
+ * The commands that update a probe already standing, built like the install ones (download, sha256 check, then `upgrade`), with
+ * no token in them. Empty while the panel has no public HTTPS address (the call then fails).
+ *
+ * @generated from message mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandResponse
+ */
+export type OwnProbeServiceUpdateCommandResponse = Message<"mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandResponse"> & {
+  /**
+   * @generated from field: string command = 1;
+   */
+  command: string;
+
+  /**
+   * @generated from field: string server_command = 2;
+   */
+  serverCommand: string;
+
+  /**
+   * @generated from field: string script_version = 3;
+   */
+  scriptVersion: string;
+};
+
+/**
+ * Describes the message mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandResponse.
+ * Use `create(OwnProbeServiceUpdateCommandResponseSchema)` to create a new message.
+ */
+export const OwnProbeServiceUpdateCommandResponseSchema: GenMessage<OwnProbeServiceUpdateCommandResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 9);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceRevokeRequest
@@ -263,7 +332,7 @@ export type OwnProbeServiceRevokeRequest = Message<"mistgate.ownprobe.v1.OwnProb
  * Use `create(OwnProbeServiceRevokeRequestSchema)` to create a new message.
  */
 export const OwnProbeServiceRevokeRequestSchema: GenMessage<OwnProbeServiceRevokeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 8);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 10);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceRevokeResponse
@@ -280,7 +349,7 @@ export type OwnProbeServiceRevokeResponse = Message<"mistgate.ownprobe.v1.OwnPro
  * Use `create(OwnProbeServiceRevokeResponseSchema)` to create a new message.
  */
 export const OwnProbeServiceRevokeResponseSchema: GenMessage<OwnProbeServiceRevokeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 9);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 11);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkRequest
@@ -297,7 +366,7 @@ export type OwnProbeServiceConfirmNetworkRequest = Message<"mistgate.ownprobe.v1
  * Use `create(OwnProbeServiceConfirmNetworkRequestSchema)` to create a new message.
  */
 export const OwnProbeServiceConfirmNetworkRequestSchema: GenMessage<OwnProbeServiceConfirmNetworkRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 10);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 12);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkResponse
@@ -314,7 +383,7 @@ export type OwnProbeServiceConfirmNetworkResponse = Message<"mistgate.ownprobe.v
  * Use `create(OwnProbeServiceConfirmNetworkResponseSchema)` to create a new message.
  */
 export const OwnProbeServiceConfirmNetworkResponseSchema: GenMessage<OwnProbeServiceConfirmNetworkResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 11);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 13);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceCheckNowRequest
@@ -331,7 +400,7 @@ export type OwnProbeServiceCheckNowRequest = Message<"mistgate.ownprobe.v1.OwnPr
  * Use `create(OwnProbeServiceCheckNowRequestSchema)` to create a new message.
  */
 export const OwnProbeServiceCheckNowRequestSchema: GenMessage<OwnProbeServiceCheckNowRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 12);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 14);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceCheckNowResponse
@@ -348,7 +417,7 @@ export type OwnProbeServiceCheckNowResponse = Message<"mistgate.ownprobe.v1.OwnP
  * Use `create(OwnProbeServiceCheckNowResponseSchema)` to create a new message.
  */
 export const OwnProbeServiceCheckNowResponseSchema: GenMessage<OwnProbeServiceCheckNowResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 13);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 15);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceDisconnectRequest
@@ -361,7 +430,7 @@ export type OwnProbeServiceDisconnectRequest = Message<"mistgate.ownprobe.v1.Own
  * Use `create(OwnProbeServiceDisconnectRequestSchema)` to create a new message.
  */
 export const OwnProbeServiceDisconnectRequestSchema: GenMessage<OwnProbeServiceDisconnectRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 14);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 16);
 
 /**
  * @generated from message mistgate.ownprobe.v1.OwnProbeServiceDisconnectResponse
@@ -378,7 +447,7 @@ export type OwnProbeServiceDisconnectResponse = Message<"mistgate.ownprobe.v1.Ow
  * Use `create(OwnProbeServiceDisconnectResponseSchema)` to create a new message.
  */
 export const OwnProbeServiceDisconnectResponseSchema: GenMessage<OwnProbeServiceDisconnectResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_ownprobe_v1_own_probe, 15);
+  messageDesc(file_mistgate_ownprobe_v1_own_probe, 17);
 
 /**
  * Owner-managed probes that measure the fleet from a network the owner controls.
@@ -409,6 +478,14 @@ export const OwnProbeService: GenService<{
     methodKind: "unary";
     input: typeof OwnProbeServiceCreateRequestSchema;
     output: typeof OwnProbeServiceCreateResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.ownprobe.v1.OwnProbeService.UpdateCommand
+   */
+  updateCommand: {
+    methodKind: "unary";
+    input: typeof OwnProbeServiceUpdateCommandRequestSchema;
+    output: typeof OwnProbeServiceUpdateCommandResponseSchema;
   },
   /**
    * @generated from rpc mistgate.ownprobe.v1.OwnProbeService.Revoke

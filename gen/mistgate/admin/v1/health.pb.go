@@ -3375,12 +3375,15 @@ type CountryVantage struct {
 	Asn     string                 `protobuf:"bytes,5,opt,name=asn,proto3" json:"asn,omitempty"`
 	Kind    string                 `protobuf:"bytes,6,opt,name=kind,proto3" json:"kind,omitempty"`
 	// reach, dark, whitelist or uncertain.
-	State         string `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"`
-	AtUnix        int64  `protobuf:"varint,8,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
-	DpiHop        uint32 `protobuf:"varint,9,opt,name=dpi_hop,json=dpiHop,proto3" json:"dpi_hop,omitempty"`
-	IcmpOk        bool   `protobuf:"varint,10,opt,name=icmp_ok,json=icmpOk,proto3" json:"icmp_ok,omitempty"`
-	TcpOk         bool   `protobuf:"varint,11,opt,name=tcp_ok,json=tcpOk,proto3" json:"tcp_ok,omitempty"`
-	Why           string `protobuf:"bytes,12,opt,name=why,proto3" json:"why,omitempty"`
+	State  string `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"`
+	AtUnix int64  `protobuf:"varint,8,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	DpiHop uint32 `protobuf:"varint,9,opt,name=dpi_hop,json=dpiHop,proto3" json:"dpi_hop,omitempty"`
+	IcmpOk bool   `protobuf:"varint,10,opt,name=icmp_ok,json=icmpOk,proto3" json:"icmp_ok,omitempty"`
+	TcpOk  bool   `protobuf:"varint,11,opt,name=tcp_ok,json=tcpOk,proto3" json:"tcp_ok,omitempty"`
+	Why    string `protobuf:"bytes,12,opt,name=why,proto3" json:"why,omitempty"`
+	// Own probes only: the name the owner gave the probe, and the port of the node's target the reason (why) comes from.
+	ProbeName     string `protobuf:"bytes,13,opt,name=probe_name,json=probeName,proto3" json:"probe_name,omitempty"`
+	Port          uint32 `protobuf:"varint,14,opt,name=port,proto3" json:"port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3497,6 +3500,20 @@ func (x *CountryVantage) GetWhy() string {
 		return x.Why
 	}
 	return ""
+}
+
+func (x *CountryVantage) GetProbeName() string {
+	if x != nil {
+		return x.ProbeName
+	}
+	return ""
+}
+
+func (x *CountryVantage) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
 }
 
 // One source's newest fresh verdict, including unknown when that source ran without a usable result.
@@ -3853,7 +3870,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x19\n" +
 	"\bcheck_id\x18\x02 \x01(\tR\acheckId\"S\n" +
 	"\x1aUnacceptDoctorItemResponse\x125\n" +
-	"\x06doctor\x18\x01 \x01(\v2\x1d.mistgate.admin.v1.NodeDoctorR\x06doctor\"\xa0\x02\n" +
+	"\x06doctor\x18\x01 \x01(\v2\x1d.mistgate.admin.v1.NodeDoctorR\x06doctor\"\xd3\x02\n" +
 	"\x0eCountryVantage\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x18\n" +
@@ -3867,7 +3884,10 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\aicmp_ok\x18\n" +
 	" \x01(\bR\x06icmpOk\x12\x15\n" +
 	"\x06tcp_ok\x18\v \x01(\bR\x05tcpOk\x12\x10\n" +
-	"\x03why\x18\f \x01(\tR\x03why\"\xb3\x01\n" +
+	"\x03why\x18\f \x01(\tR\x03why\x12\x1d\n" +
+	"\n" +
+	"probe_name\x18\r \x01(\tR\tprobeName\x12\x12\n" +
+	"\x04port\x18\x0e \x01(\rR\x04port\"\xb3\x01\n" +
 	"\rSourceVerdict\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12;\n" +
 	"\averdict\x18\x02 \x01(\x0e2!.mistgate.admin.v1.CountryVerdictR\averdict\x12\x18\n" +

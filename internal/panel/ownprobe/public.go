@@ -249,7 +249,7 @@ func (s *Service) applyReport(ctx context.Context, id string, report SyncReport)
 	if err := s.foldReport(ctx, current, report, targets, now, interval); err != nil {
 		return false, err
 	}
-	if err := s.cfg.Store.CompleteOwnProbeJob(ctx, current.ID, report.JobID, report.Version, now, interval, len(report.Results)); err != nil {
+	if err := s.cfg.Store.CompleteOwnProbeJob(ctx, current.ID, report.JobID, report.Version, report.Reference, now, interval, len(report.Results)); err != nil {
 		return false, err
 	}
 	return true, nil

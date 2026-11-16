@@ -78,6 +78,7 @@ func extCheck(nodeID string, vantages []countryreach.Vantage, at time.Time) (sto
 func judgeProbe(probe store.OwnProbe, results []targetResult, reference string, now time.Time) countryreach.Vantage {
 	var sawReach, sawDark, tcpOK, tlsOK bool
 	var darkWhy, otherWhy string
+	var darkPort, otherPort uint16 // the port of the target the reason comes from
 	for _, item := range results {
 		state, reason := targetVerdict(item.target, item.result)
 		tcpOK = tcpOK || item.result.TCP == "ok"
@@ -85,22 +86,27 @@ func judgeProbe(probe store.OwnProbe, results []targetResult, reference string, 
 		sawReach = sawReach || state == countryreach.VantageStateReach
 		switch {
 		case state == countryreach.VantageStateDark && !sawDark:
-			sawDark, darkWhy = true, reason
+			sawDark, darkWhy, darkPort = true, reason, item.target.Port
 		case state == countryreach.VantageStateUncertain && otherWhy == "":
-			otherWhy = reason
+			otherWhy, otherPort = reason, item.target.Port
 		}
 	}
-	state, why := countryreach.VantageStateUncertain, otherWhy
+	state, why, port := countryreach.VantageStateUncertain, otherWhy, otherPort
 	switch {
 	case sawReach:
-		state, why = countryreach.VantageStateReach, ""
+		state, why, port = countryreach.VantageStateReach, "", 0
 	case sawDark:
-		state, why = countryreach.VantageStateDark, darkWhy
+		state, why, port = countryreach.VantageStateDark, darkWhy, darkPort
 	}
 	if reference == "open" && state == countryreach.VantageStateReach {
 		state, why = countryreach.VantageStateUncertain, "no_filter"
 	}
-	return makeVantage(probe, state, why, tcpOK, tlsOK, now)
+	if why == "" || why == "no_filter" { // a port belongs to a reason that is about one target
+		port = 0
+	}
+	v := makeVantage(probe, state, why, tcpOK, tlsOK, now)
+	v.Port = port
+	return v
 }
 
 // targetVerdict reads one result of one target. A TCP connect alone proves nothing about TLS, so a target of kind tcp only
@@ -125,7 +131,8 @@ func targetVerdict(target Target, result SyncResult) (string, string) {
 	return countryreach.VantageStateUncertain, ""
 }
 
-// makeVantage names the point the way the owner reads it: operator, city and the probe's name; no address is in it.
+// makeVantage names the point the way the owner reads it: operator and city, and the probe's name as a field of its own; no address
+// is in it.
 func makeVantage(probe store.OwnProbe, state, why string, tcpOK, tlsOK bool, at time.Time) countryreach.Vantage {
 	network := strings.TrimSpace(probe.Operator)
 	if network == "" {
@@ -134,12 +141,9 @@ func makeVantage(probe store.OwnProbe, state, why string, tcpOK, tlsOK bool, at 
 	if probe.City != "" {
 		network += " · " + probe.City
 	}
-	if probe.Name != "" {
-		network += " · probe " + probe.Name
-	}
 	return countryreach.Vantage{Key: "probe:" + probe.ID, Network: network, Region: probe.City,
 		ASN: strconv.FormatUint(uint64(probe.ASN), 10), Kind: probe.Kind, State: state, At: at.Unix(), Why: why,
-		TCPOK: tcpOK, TLS: tlsOK}
+		TCPOK: tcpOK, TLS: tlsOK, ProbeName: probe.Name}
 }
 
 func (s *Service) activeProbeIDs(ctx context.Context) (map[string]bool, error) {

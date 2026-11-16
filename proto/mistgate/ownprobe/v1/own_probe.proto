@@ -12,6 +12,7 @@ service OwnProbeService {
   rpc Get(OwnProbeServiceGetRequest) returns (OwnProbeServiceGetResponse);
   rpc Update(OwnProbeServiceUpdateRequest) returns (OwnProbeServiceUpdateResponse);
   rpc Create(OwnProbeServiceCreateRequest) returns (OwnProbeServiceCreateResponse);
+  rpc UpdateCommand(OwnProbeServiceUpdateCommandRequest) returns (OwnProbeServiceUpdateCommandResponse);
   rpc Revoke(OwnProbeServiceRevokeRequest) returns (OwnProbeServiceRevokeResponse);
   rpc ConfirmNetwork(OwnProbeServiceConfirmNetworkRequest) returns (OwnProbeServiceConfirmNetworkResponse);
   rpc CheckNow(OwnProbeServiceCheckNowRequest) returns (OwnProbeServiceCheckNowResponse);
@@ -38,12 +39,19 @@ message OwnProbe {
   int64 last_result_unix = 11 [jstype = JS_NUMBER];
   uint32 checks_day = 12;
   int64 token_expires_unix = 13 [jstype = JS_NUMBER];
+  // What the probe's last finished round said of the reference address that a filter blocks: "" (no round yet), "filtered" (the
+  // reference was blocked: the probe's network filters), "open" (it opened: nothing is filtered on the path, so "reachable"
+  // proves nothing) or "unavailable" (the probe could not try it: its network is down or it has the reference switched off).
+  string reference = 14;
 }
 
 message OwnProbeServiceGetRequest {}
 message OwnProbeServiceGetResponse {
   OwnProbeSettings settings = 1;
   repeated OwnProbe probes = 2;
+  // The version of the script this panel hands out now (the first 12 characters of its sha256): the same value a probe reports
+  // in OwnProbe.version, so a probe whose version differs is out of date.
+  string script_version = 3;
 }
 
 message OwnProbeServiceUpdateRequest { OwnProbeSettings settings = 1; }
@@ -59,8 +67,20 @@ message OwnProbeServiceCreateResponse {
   OwnProbe probe = 1;
   // Shown once. The database stores only its hash.
   string token = 2;
+  // The command for a router with Entware (a Keenetic): it installs the packages first.
   string command = 3;
   string script_sha256 = 4;
+  // The command for a server (systemd): the same download and hash check, no packages, the script run through sudo.
+  string server_command = 5;
+}
+
+message OwnProbeServiceUpdateCommandRequest {}
+// The commands that update a probe already standing, built like the install ones (download, sha256 check, then `upgrade`), with
+// no token in them. Empty while the panel has no public HTTPS address (the call then fails).
+message OwnProbeServiceUpdateCommandResponse {
+  string command = 1;
+  string server_command = 2;
+  string script_version = 3;
 }
 
 message OwnProbeServiceRevokeRequest { string id = 1; }

@@ -836,7 +836,7 @@ func countryVantageProto(source string, at time.Time, v countryreach.Vantage) *a
 		at = time.Unix(v.At, 0).UTC()
 	}
 	return &adminv1.CountryVantage{Source: source, Key: v.Key, Network: v.Network, Region: v.Region, Asn: v.ASN, Kind: v.Kind, State: v.State,
-		AtUnix: at.Unix(), DpiHop: uint32(max(v.DPIHop, 0)), IcmpOk: v.ICMPOK, TcpOk: v.TCPOK, Why: v.Why}
+		AtUnix: at.Unix(), DpiHop: uint32(max(v.DPIHop, 0)), IcmpOk: v.ICMPOK, TcpOk: v.TCPOK, Why: v.Why, ProbeName: v.ProbeName, Port: uint32(v.Port)}
 }
 
 func globalpingVantages(detail countryDetail) []countryreach.Vantage {
@@ -1715,6 +1715,9 @@ func countryVantageName(source string, v countryreach.Vantage) string {
 	}
 	if v.Region != "" {
 		details = append(details, v.Region)
+	}
+	if v.ProbeName != "" { // an own probe's name rides in quotes after its network: the alert text names no language
+		name += " · “" + v.ProbeName + "”"
 	}
 	if source != countryreach.SourceGlobalping {
 		details = append(details, source)

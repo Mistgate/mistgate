@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -165,9 +166,28 @@ func (s *Store) RevokeOwnProbe(ctx context.Context, id string) error {
 	return err
 }
 
+// job_json holds the outstanding target list ({"targets": [...]}) and, between jobs, what the last finished round said of the
+// reference address ({"ref": "..."}; see OwnProbeRef). The statements that drop a job keep the "ref" key, so "check now" and a
+// switch-off do not make the probe forget it; a network change, a confirmation and a revocation drop it with the job.
+const keepRef = `CASE WHEN json_extract(job_json, '$.ref') IS NULL THEN '{}' ELSE json_object('ref', json_extract(job_json, '$.ref')) END`
+
+// OwnProbeRef is the reference result of a probe's last finished round as the row keeps it: "blocked", "open", "fail" or ""
+// (no round yet).
+func OwnProbeRef(p OwnProbe) string {
+	var job struct {
+		Ref string `json:"ref"`
+	}
+	if json.Unmarshal([]byte(p.JobJSON), &job) != nil {
+		return ""
+	}
+	return job.Ref
+}
+
 // SetOwnProbeJob replaces the outstanding target list. Addresses are trusted only because this list was built by the panel.
 func (s *Store) SetOwnProbeJob(ctx context.Context, id, jobID, jobJSON string, due time.Time) error {
-	res, err := s.W.ExecContext(ctx, `UPDATE own_probe SET job_id = ?, job_json = ?, job_due = ? WHERE id = ? AND state = 'active'`,
+	res, err := s.W.ExecContext(ctx, `UPDATE own_probe SET job_id = ?1, job_due = ?3,
+		job_json = CASE WHEN json_extract(job_json, '$.ref') IS NULL THEN ?2 ELSE json_set(?2, '$.ref', json_extract(job_json, '$.ref')) END
+		WHERE id = ?4 AND state = 'active'`,
 		jobID, jobJSON, unix(due), id)
 	if err != nil {
 		return err
@@ -180,15 +200,16 @@ func (s *Store) SetOwnProbeJob(ctx context.Context, id, jobID, jobJSON string, d
 }
 
 // CompleteOwnProbeJob consumes one matching outstanding job and updates its counters. A replay or an older job cannot change
-// the row. checks_day_at is the UTC day bucket's midnight.
-func (s *Store) CompleteOwnProbeJob(ctx context.Context, id, jobID, version string, now time.Time, interval time.Duration, count int) error {
+// the row. checks_day_at is the UTC day bucket's midnight. reference is what the round said of the reference address
+// ("blocked", "open" or "fail"), kept until the next round.
+func (s *Store) CompleteOwnProbeJob(ctx context.Context, id, jobID, version, reference string, now time.Time, interval time.Duration, count int) error {
 	day := now.UTC().Truncate(24 * time.Hour)
 	due := now.Add(interval)
 	res, err := s.W.ExecContext(ctx, `UPDATE own_probe SET last_result = ?, version = ?, checks_day =
 		CASE WHEN checks_day_at < ? THEN MIN(600, ?) ELSE MIN(600, checks_day + ?) END,
-		checks_day_at = ?, job_id = '', job_json = '{}', job_due = ?
+		checks_day_at = ?, job_id = '', job_json = CASE WHEN ? = '' THEN '{}' ELSE json_object('ref', ?) END, job_due = ?
 		WHERE id = ? AND state = 'active' AND job_id = ?`,
-		unix(now), version, unix(day), count, count, unix(day), unix(due), id, jobID)
+		unix(now), version, unix(day), count, count, unix(day), reference, reference, unix(due), id, jobID)
 	if err != nil {
 		return err
 	}
@@ -201,7 +222,7 @@ func (s *Store) CompleteOwnProbeJob(ctx context.Context, id, jobID, version stri
 
 // DueOwnProbe marks an active probe for a check at the next sync.
 func (s *Store) DueOwnProbe(ctx context.Context, id string, now time.Time) error {
-	res, err := s.W.ExecContext(ctx, `UPDATE own_probe SET job_due = ?, job_id = '', job_json = '{}' WHERE id = ? AND state = 'active'`, unix(now), id)
+	res, err := s.W.ExecContext(ctx, `UPDATE own_probe SET job_due = ?, job_id = '', job_json = `+keepRef+` WHERE id = ? AND state = 'active'`, unix(now), id)
 	if err != nil {
 		return err
 	}
@@ -214,6 +235,6 @@ func (s *Store) DueOwnProbe(ctx context.Context, id string, now time.Time) error
 
 // ClearOwnProbeJobs removes queued work while preserving enrollment and counters.
 func (s *Store) ClearOwnProbeJobs(ctx context.Context) error {
-	_, err := s.W.ExecContext(ctx, `UPDATE own_probe SET job_id = '', job_json = '{}', job_due = 0 WHERE state = 'active'`)
+	_, err := s.W.ExecContext(ctx, `UPDATE own_probe SET job_id = '', job_json = `+keepRef+`, job_due = 0 WHERE state = 'active'`)
 	return err
 }

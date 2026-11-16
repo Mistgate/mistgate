@@ -202,18 +202,73 @@ func safeLabel(value string, maxLen int) bool {
 	return true
 }
 
-// BuildInstallCommand returns the one-time router command. The random token alphabet is restricted, and URLs are validated
-// before shell quoting, so settings cannot turn the line into additional commands.
-func BuildInstallCommand(publicURL, prefix, token, scriptHash string) (string, error) {
+// curlFetch is how every command downloads the script: fail on an HTTP error, bounded in time, no redirects followed.
+const curlFetch = "curl -fsS --connect-timeout 15 -m 120"
+
+// commandBase checks the three inputs every command shares and returns the panel's probe address (public URL and prefix; the
+// script adds /probe.sh, /enroll, /sync). URLs are validated before they are quoted, so settings cannot turn a line into more
+// commands.
+func commandBase(publicURL, prefix, scriptHash string) (string, error) {
 	u, err := url.Parse(publicURL)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
-		!validProbePrefix(prefix) || !validProbeToken(token) || !lowerHex(scriptHash, 64) {
+		!validProbePrefix(prefix) || !lowerHex(scriptHash, 64) {
+		return "", errors.New("invalid probe command input")
+	}
+	return strings.TrimRight(u.String(), "/") + strings.TrimSuffix(prefix, "/"), nil
+}
+
+func shellQuote(v string) string { return "'" + strings.ReplaceAll(v, "'", `'\''`) + "'" }
+
+// routerCommand downloads the script to /tmp of a Keenetic's Entware, checks its sha256 and runs it with verb (arguments already
+// quoted): the one line of the install and of the update, so the hash of what runs is checked the same way in both.
+func routerCommand(base, scriptHash, verb string) string {
+	return "cd /tmp && " + curlFetch + " -o mgp.sh " + shellQuote(base+"/probe.sh") +
+		" && echo " + shellQuote(scriptHash+"  mgp.sh") + " | sha256sum -c - && sh mgp.sh " + verb
+}
+
+// serverCommand is the same for a server (systemd): the script goes to a file of mktemp, readable by nobody else, so nobody can
+// put another script in its place between the check and the sudo that runs it.
+func serverCommand(base, scriptHash, verb string) string {
+	return "f=$(mktemp) && " + curlFetch + ` -o "$f" ` + shellQuote(base+"/probe.sh") +
+		` && echo "` + scriptHash + `  $f" | sha256sum -c - && sudo sh "$f" ` + verb
+}
+
+// BuildInstallCommand returns the one-time command for a router with Entware (Keenetic): the packages, the download, the hash
+// check and the install with the token. The random token alphabet is restricted, and URLs are validated before shell quoting.
+func BuildInstallCommand(publicURL, prefix, token, scriptHash string) (string, error) {
+	base, err := commandBase(publicURL, prefix, scriptHash)
+	if err != nil || !validProbeToken(token) {
 		return "", errors.New("invalid install command input")
 	}
-	base := strings.TrimRight(u.String(), "/") + strings.TrimSuffix(prefix, "/") // the script adds /probe.sh, /enroll, /sync
-	quote := func(v string) string { return "'" + strings.ReplaceAll(v, "'", "'\\''") + "'" }
-	return "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh " + quote(base+"/probe.sh") +
-		" && echo " + quote(scriptHash+"  mgp.sh") + " | sha256sum -c - && sh mgp.sh install " + quote(base) + " " + quote(token), nil
+	return "opkg update && opkg install curl ca-bundle coreutils-sha256sum && " + routerCommand(base, scriptHash, "install "+shellQuote(base)+" "+shellQuote(token)), nil
+}
+
+// BuildServerInstallCommand is the one-time command for a server: no opkg, the script through sudo.
+func BuildServerInstallCommand(publicURL, prefix, token, scriptHash string) (string, error) {
+	base, err := commandBase(publicURL, prefix, scriptHash)
+	if err != nil || !validProbeToken(token) {
+		return "", errors.New("invalid install command input")
+	}
+	return serverCommand(base, scriptHash, "install "+shellQuote(base)+" "+shellQuote(token)), nil
+}
+
+// BuildUpdateCommand updates a probe already standing on a router: the same download and hash check as the install, then
+// `upgrade`. It carries no token: the probe keeps the panel's address and its own secret in its configuration.
+func BuildUpdateCommand(publicURL, prefix, scriptHash string) (string, error) {
+	base, err := commandBase(publicURL, prefix, scriptHash)
+	if err != nil {
+		return "", errors.New("invalid update command input")
+	}
+	return routerCommand(base, scriptHash, "upgrade"), nil
+}
+
+// BuildServerUpdateCommand is BuildUpdateCommand for a server.
+func BuildServerUpdateCommand(publicURL, prefix, scriptHash string) (string, error) {
+	base, err := commandBase(publicURL, prefix, scriptHash)
+	if err != nil {
+		return "", errors.New("invalid update command input")
+	}
+	return serverCommand(base, scriptHash, "upgrade"), nil
 }
 
 func validProbePrefix(prefix string) bool {

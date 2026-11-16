@@ -32,7 +32,7 @@ func (r rpc) Get(ctx context.Context, _ *connect.Request[ownprobev1.OwnProbeServ
 	if err != nil {
 		return nil, s.internal("list own probes", "own_probe_get_failed", err)
 	}
-	out := &ownprobev1.OwnProbeServiceGetResponse{Settings: settingsMessage(settings)}
+	out := &ownprobev1.OwnProbeServiceGetResponse{Settings: settingsMessage(settings), ScriptVersion: ScriptVersion()}
 	for _, row := range rows {
 		out.Probes = append(out.Probes, probeMessage(row))
 	}
@@ -104,12 +104,35 @@ func (r rpc) Create(ctx context.Context, req *connect.Request[ownprobev1.OwnProb
 	if err != nil {
 		return nil, fail(connect.CodeFailedPrecondition, "public HTTPS URL is required to build an install command")
 	}
+	serverCommand, err := BuildServerInstallCommand(s.cfg.PublicURL, s.cfg.ProbePrefix, token, ScriptHash())
+	if err != nil {
+		return nil, fail(connect.CodeFailedPrecondition, "public HTTPS URL is required to build an install command")
+	}
 	if err := s.cfg.Store.CreateOwnProbe(ctx, row); err != nil {
 		return nil, s.internal("create own probe", "own_probe_create_failed", err)
 	}
 	s.audit(ctx, admin, "own_probe.create", map[string]any{"probe": row.ID, "name": row.Name, "kind": row.Kind})
 	s.changed(ctx)
-	return connect.NewResponse(&ownprobev1.OwnProbeServiceCreateResponse{Probe: probeMessage(row), Token: token, Command: command, ScriptSha256: ScriptHash()}), nil
+	return connect.NewResponse(&ownprobev1.OwnProbeServiceCreateResponse{Probe: probeMessage(row), Token: token, Command: command, ScriptSha256: ScriptHash(), ServerCommand: serverCommand}), nil
+}
+
+// UpdateCommand gives the commands that update a probe that stands already, for a router and for a server. They are the install
+// commands without the token (the script downloaded, its sha256 checked, then `upgrade`), the same for every probe, so nothing
+// secret leaves with them beyond the panel's probe address that the install command carried too.
+func (r rpc) UpdateCommand(ctx context.Context, _ *connect.Request[ownprobev1.OwnProbeServiceUpdateCommandRequest]) (*connect.Response[ownprobev1.OwnProbeServiceUpdateCommandResponse], error) {
+	s := r.s
+	if _, err := owner(ctx); err != nil {
+		return nil, err
+	}
+	command, err := BuildUpdateCommand(s.cfg.PublicURL, s.cfg.ProbePrefix, ScriptHash())
+	if err != nil {
+		return nil, fail(connect.CodeFailedPrecondition, "public HTTPS URL is required to build an install command")
+	}
+	serverCommand, err := BuildServerUpdateCommand(s.cfg.PublicURL, s.cfg.ProbePrefix, ScriptHash())
+	if err != nil {
+		return nil, fail(connect.CodeFailedPrecondition, "public HTTPS URL is required to build an install command")
+	}
+	return connect.NewResponse(&ownprobev1.OwnProbeServiceUpdateCommandResponse{Command: command, ServerCommand: serverCommand, ScriptVersion: ScriptVersion()}), nil
 }
 
 func (r rpc) Revoke(ctx context.Context, req *connect.Request[ownprobev1.OwnProbeServiceRevokeRequest]) (*connect.Response[ownprobev1.OwnProbeServiceRevokeResponse], error) {
@@ -226,10 +249,24 @@ func settingsMessage(s Settings) *ownprobev1.OwnProbeSettings {
 	return &ownprobev1.OwnProbeSettings{Enabled: s.Enabled, IntervalMin: s.IntervalMin, FallbackUrl: s.FallbackURL}
 }
 
+// referenceWord is what the interface is told of a round's reference result: the probe's own words (blocked, open, fail) say
+// what the probe tried, these say what it means for the owner.
+func referenceWord(ref string) string {
+	switch ref {
+	case "blocked":
+		return "filtered"
+	case "open":
+		return "open"
+	case "fail":
+		return "unavailable"
+	}
+	return ""
+}
+
 // probeMessage carries no hash, token or address: the row has none of the last, and the first two never leave the store.
 func probeMessage(p store.OwnProbe) *ownprobev1.OwnProbe {
 	out := &ownprobev1.OwnProbe{Id: p.ID, Name: p.Name, City: p.City, Kind: p.Kind, State: p.State, Asn: p.ASN, Operator: p.Operator,
-		PinnedOperator: p.PinnedOperator, Version: p.Version, ChecksDay: uint32(max(p.ChecksDay, 0))}
+		PinnedOperator: p.PinnedOperator, Version: p.Version, ChecksDay: uint32(max(p.ChecksDay, 0)), Reference: referenceWord(store.OwnProbeRef(p))}
 	if !p.LastSeen.IsZero() {
 		out.LastSeenUnix = p.LastSeen.Unix()
 	}

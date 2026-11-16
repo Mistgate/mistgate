@@ -122,3 +122,24 @@ func TestCountryVantageProtoCarriesTheReasonAndTheTimeOfThePoint(t *testing.T) {
 		t.Fatalf("other source = %+v", got)
 	}
 }
+
+// The name the owner gave a probe and the port its reason comes from travel in fields of their own, so the admin does not have to
+// take them out of a string; the name of the point in an alert names the probe without a word of any language.
+func TestCountryVantageProtoCarriesTheProbeNameAndThePort(t *testing.T) {
+	row := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
+	v := countryreach.Vantage{Key: "probe:prb_x", Network: "ExampleNet · Springfield", Region: "Springfield", ASN: "64496", Kind: "home", State: "dark",
+		Why: "tls_reset", ProbeName: "office", Port: 443}
+	got := countryVantageProto("probes", row, v)
+	if got.ProbeName != "office" || got.Port != 443 || got.Kind != "home" || got.Network != "ExampleNet · Springfield" || got.Why != "tls_reset" {
+		t.Fatalf("proto = %+v", got)
+	}
+	if other := countryVantageProto("bsbord", row, countryreach.Vantage{Key: "k", State: "dark"}); other.ProbeName != "" || other.Port != 0 {
+		t.Fatalf("another source = %+v", other)
+	}
+	if name := countryVantageName("probes", v); name != "ExampleNet · Springfield · “office” (AS64496, Springfield, probes)" {
+		t.Fatalf("alert name = %q", name)
+	}
+	if name := countryVantageName("cheburcheck", countryreach.Vantage{Key: "k", Network: "Tele", ASN: "8359", Region: "Moscow"}); name != "Tele (AS8359, Moscow, cheburcheck)" {
+		t.Fatalf("a point of another source = %q", name)
+	}
+}

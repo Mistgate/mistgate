@@ -16,6 +16,7 @@ func TestOwnProbeProceduresAreOwnerOnlyAndClosedToTokens(t *testing.T) {
 		OwnProbeGetProcedure:            ownprobev1connect.OwnProbeServiceGetProcedure,
 		OwnProbeUpdateProcedure:         ownprobev1connect.OwnProbeServiceUpdateProcedure,
 		OwnProbeCreateProcedure:         ownprobev1connect.OwnProbeServiceCreateProcedure,
+		OwnProbeUpdateCommandProcedure:  ownprobev1connect.OwnProbeServiceUpdateCommandProcedure,
 		OwnProbeRevokeProcedure:         ownprobev1connect.OwnProbeServiceRevokeProcedure,
 		OwnProbeConfirmNetworkProcedure: ownprobev1connect.OwnProbeServiceConfirmNetworkProcedure,
 		OwnProbeCheckNowProcedure:       ownprobev1connect.OwnProbeServiceCheckNowProcedure,
@@ -48,7 +49,7 @@ func TestOwnProbeProceduresOverTheWire(t *testing.T) {
 	_, ro := e.mkToken("ro", store.ProfileReadonly, 600)
 	_, op := e.mkToken("op", store.ProfileOperator, 600)
 	_, ad := e.mkToken("ad", store.ProfileAdmin, 600)
-	for _, path := range []string{OwnProbeGetProcedure, OwnProbeUpdateProcedure, OwnProbeCreateProcedure, OwnProbeRevokeProcedure,
+	for _, path := range []string{OwnProbeGetProcedure, OwnProbeUpdateProcedure, OwnProbeCreateProcedure, OwnProbeUpdateCommandProcedure, OwnProbeRevokeProcedure,
 		OwnProbeConfirmNetworkProcedure, OwnProbeCheckNowProcedure, OwnProbeDisconnectProcedure} {
 		for _, secret := range []string{ro, op, ad} {
 			if got := e.code(path, secret); got != 403 {

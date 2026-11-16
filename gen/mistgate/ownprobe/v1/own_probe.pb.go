@@ -96,8 +96,12 @@ type OwnProbe struct {
 	LastResultUnix   int64                  `protobuf:"varint,11,opt,name=last_result_unix,json=lastResultUnix,proto3" json:"last_result_unix,omitempty"`
 	ChecksDay        uint32                 `protobuf:"varint,12,opt,name=checks_day,json=checksDay,proto3" json:"checks_day,omitempty"`
 	TokenExpiresUnix int64                  `protobuf:"varint,13,opt,name=token_expires_unix,json=tokenExpiresUnix,proto3" json:"token_expires_unix,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// What the probe's last finished round said of the reference address that a filter blocks: "" (no round yet), "filtered" (the
+	// reference was blocked: the probe's network filters), "open" (it opened: nothing is filtered on the path, so "reachable"
+	// proves nothing) or "unavailable" (the probe could not try it: its network is down or it has the reference switched off).
+	Reference     string `protobuf:"bytes,14,opt,name=reference,proto3" json:"reference,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *OwnProbe) Reset() {
@@ -221,6 +225,13 @@ func (x *OwnProbe) GetTokenExpiresUnix() int64 {
 	return 0
 }
 
+func (x *OwnProbe) GetReference() string {
+	if x != nil {
+		return x.Reference
+	}
+	return ""
+}
+
 type OwnProbeServiceGetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -258,9 +269,12 @@ func (*OwnProbeServiceGetRequest) Descriptor() ([]byte, []int) {
 }
 
 type OwnProbeServiceGetResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Settings      *OwnProbeSettings      `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
-	Probes        []*OwnProbe            `protobuf:"bytes,2,rep,name=probes,proto3" json:"probes,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Settings *OwnProbeSettings      `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	Probes   []*OwnProbe            `protobuf:"bytes,2,rep,name=probes,proto3" json:"probes,omitempty"`
+	// The version of the script this panel hands out now (the first 12 characters of its sha256): the same value a probe reports
+	// in OwnProbe.version, so a probe whose version differs is out of date.
+	ScriptVersion string `protobuf:"bytes,3,opt,name=script_version,json=scriptVersion,proto3" json:"script_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -307,6 +321,13 @@ func (x *OwnProbeServiceGetResponse) GetProbes() []*OwnProbe {
 		return x.Probes
 	}
 	return nil
+}
+
+func (x *OwnProbeServiceGetResponse) GetScriptVersion() string {
+	if x != nil {
+		return x.ScriptVersion
+	}
+	return ""
 }
 
 type OwnProbeServiceUpdateRequest struct {
@@ -462,9 +483,12 @@ type OwnProbeServiceCreateResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Probe *OwnProbe              `protobuf:"bytes,1,opt,name=probe,proto3" json:"probe,omitempty"`
 	// Shown once. The database stores only its hash.
-	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
-	Command       string `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
-	ScriptSha256  string `protobuf:"bytes,4,opt,name=script_sha256,json=scriptSha256,proto3" json:"script_sha256,omitempty"`
+	Token string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	// The command for a router with Entware (a Keenetic): it installs the packages first.
+	Command      string `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
+	ScriptSha256 string `protobuf:"bytes,4,opt,name=script_sha256,json=scriptSha256,proto3" json:"script_sha256,omitempty"`
+	// The command for a server (systemd): the same download and hash check, no packages, the script run through sudo.
+	ServerCommand string `protobuf:"bytes,5,opt,name=server_command,json=serverCommand,proto3" json:"server_command,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -527,6 +551,111 @@ func (x *OwnProbeServiceCreateResponse) GetScriptSha256() string {
 	return ""
 }
 
+func (x *OwnProbeServiceCreateResponse) GetServerCommand() string {
+	if x != nil {
+		return x.ServerCommand
+	}
+	return ""
+}
+
+type OwnProbeServiceUpdateCommandRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OwnProbeServiceUpdateCommandRequest) Reset() {
+	*x = OwnProbeServiceUpdateCommandRequest{}
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OwnProbeServiceUpdateCommandRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OwnProbeServiceUpdateCommandRequest) ProtoMessage() {}
+
+func (x *OwnProbeServiceUpdateCommandRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OwnProbeServiceUpdateCommandRequest.ProtoReflect.Descriptor instead.
+func (*OwnProbeServiceUpdateCommandRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{8}
+}
+
+// The commands that update a probe already standing, built like the install ones (download, sha256 check, then `upgrade`), with
+// no token in them. Empty while the panel has no public HTTPS address (the call then fails).
+type OwnProbeServiceUpdateCommandResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Command       string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	ServerCommand string                 `protobuf:"bytes,2,opt,name=server_command,json=serverCommand,proto3" json:"server_command,omitempty"`
+	ScriptVersion string                 `protobuf:"bytes,3,opt,name=script_version,json=scriptVersion,proto3" json:"script_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OwnProbeServiceUpdateCommandResponse) Reset() {
+	*x = OwnProbeServiceUpdateCommandResponse{}
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OwnProbeServiceUpdateCommandResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OwnProbeServiceUpdateCommandResponse) ProtoMessage() {}
+
+func (x *OwnProbeServiceUpdateCommandResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OwnProbeServiceUpdateCommandResponse.ProtoReflect.Descriptor instead.
+func (*OwnProbeServiceUpdateCommandResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *OwnProbeServiceUpdateCommandResponse) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *OwnProbeServiceUpdateCommandResponse) GetServerCommand() string {
+	if x != nil {
+		return x.ServerCommand
+	}
+	return ""
+}
+
+func (x *OwnProbeServiceUpdateCommandResponse) GetScriptVersion() string {
+	if x != nil {
+		return x.ScriptVersion
+	}
+	return ""
+}
+
 type OwnProbeServiceRevokeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -536,7 +665,7 @@ type OwnProbeServiceRevokeRequest struct {
 
 func (x *OwnProbeServiceRevokeRequest) Reset() {
 	*x = OwnProbeServiceRevokeRequest{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[8]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +677,7 @@ func (x *OwnProbeServiceRevokeRequest) String() string {
 func (*OwnProbeServiceRevokeRequest) ProtoMessage() {}
 
 func (x *OwnProbeServiceRevokeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[8]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +690,7 @@ func (x *OwnProbeServiceRevokeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OwnProbeServiceRevokeRequest.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceRevokeRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *OwnProbeServiceRevokeRequest) GetId() string {
@@ -580,7 +709,7 @@ type OwnProbeServiceRevokeResponse struct {
 
 func (x *OwnProbeServiceRevokeResponse) Reset() {
 	*x = OwnProbeServiceRevokeResponse{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[9]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -592,7 +721,7 @@ func (x *OwnProbeServiceRevokeResponse) String() string {
 func (*OwnProbeServiceRevokeResponse) ProtoMessage() {}
 
 func (x *OwnProbeServiceRevokeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[9]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -605,7 +734,7 @@ func (x *OwnProbeServiceRevokeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OwnProbeServiceRevokeResponse.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceRevokeResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *OwnProbeServiceRevokeResponse) GetProbe() *OwnProbe {
@@ -624,7 +753,7 @@ type OwnProbeServiceConfirmNetworkRequest struct {
 
 func (x *OwnProbeServiceConfirmNetworkRequest) Reset() {
 	*x = OwnProbeServiceConfirmNetworkRequest{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[10]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +765,7 @@ func (x *OwnProbeServiceConfirmNetworkRequest) String() string {
 func (*OwnProbeServiceConfirmNetworkRequest) ProtoMessage() {}
 
 func (x *OwnProbeServiceConfirmNetworkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[10]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +778,7 @@ func (x *OwnProbeServiceConfirmNetworkRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use OwnProbeServiceConfirmNetworkRequest.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceConfirmNetworkRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *OwnProbeServiceConfirmNetworkRequest) GetId() string {
@@ -668,7 +797,7 @@ type OwnProbeServiceConfirmNetworkResponse struct {
 
 func (x *OwnProbeServiceConfirmNetworkResponse) Reset() {
 	*x = OwnProbeServiceConfirmNetworkResponse{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[11]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -680,7 +809,7 @@ func (x *OwnProbeServiceConfirmNetworkResponse) String() string {
 func (*OwnProbeServiceConfirmNetworkResponse) ProtoMessage() {}
 
 func (x *OwnProbeServiceConfirmNetworkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[11]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -693,7 +822,7 @@ func (x *OwnProbeServiceConfirmNetworkResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use OwnProbeServiceConfirmNetworkResponse.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceConfirmNetworkResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *OwnProbeServiceConfirmNetworkResponse) GetProbe() *OwnProbe {
@@ -712,7 +841,7 @@ type OwnProbeServiceCheckNowRequest struct {
 
 func (x *OwnProbeServiceCheckNowRequest) Reset() {
 	*x = OwnProbeServiceCheckNowRequest{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[12]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -724,7 +853,7 @@ func (x *OwnProbeServiceCheckNowRequest) String() string {
 func (*OwnProbeServiceCheckNowRequest) ProtoMessage() {}
 
 func (x *OwnProbeServiceCheckNowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[12]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -737,7 +866,7 @@ func (x *OwnProbeServiceCheckNowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OwnProbeServiceCheckNowRequest.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceCheckNowRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *OwnProbeServiceCheckNowRequest) GetId() string {
@@ -756,7 +885,7 @@ type OwnProbeServiceCheckNowResponse struct {
 
 func (x *OwnProbeServiceCheckNowResponse) Reset() {
 	*x = OwnProbeServiceCheckNowResponse{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[13]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -768,7 +897,7 @@ func (x *OwnProbeServiceCheckNowResponse) String() string {
 func (*OwnProbeServiceCheckNowResponse) ProtoMessage() {}
 
 func (x *OwnProbeServiceCheckNowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[13]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -781,7 +910,7 @@ func (x *OwnProbeServiceCheckNowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OwnProbeServiceCheckNowResponse.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceCheckNowResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *OwnProbeServiceCheckNowResponse) GetProbe() *OwnProbe {
@@ -799,7 +928,7 @@ type OwnProbeServiceDisconnectRequest struct {
 
 func (x *OwnProbeServiceDisconnectRequest) Reset() {
 	*x = OwnProbeServiceDisconnectRequest{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[14]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -811,7 +940,7 @@ func (x *OwnProbeServiceDisconnectRequest) String() string {
 func (*OwnProbeServiceDisconnectRequest) ProtoMessage() {}
 
 func (x *OwnProbeServiceDisconnectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[14]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -824,7 +953,7 @@ func (x *OwnProbeServiceDisconnectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OwnProbeServiceDisconnectRequest.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceDisconnectRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{16}
 }
 
 type OwnProbeServiceDisconnectResponse struct {
@@ -836,7 +965,7 @@ type OwnProbeServiceDisconnectResponse struct {
 
 func (x *OwnProbeServiceDisconnectResponse) Reset() {
 	*x = OwnProbeServiceDisconnectResponse{}
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[15]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +977,7 @@ func (x *OwnProbeServiceDisconnectResponse) String() string {
 func (*OwnProbeServiceDisconnectResponse) ProtoMessage() {}
 
 func (x *OwnProbeServiceDisconnectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[15]
+	mi := &file_mistgate_ownprobe_v1_own_probe_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +990,7 @@ func (x *OwnProbeServiceDisconnectResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use OwnProbeServiceDisconnectResponse.ProtoReflect.Descriptor instead.
 func (*OwnProbeServiceDisconnectResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *OwnProbeServiceDisconnectResponse) GetSettings() *OwnProbeSettings {
@@ -879,7 +1008,7 @@ const file_mistgate_ownprobe_v1_own_probe_proto_rawDesc = "" +
 	"\x10OwnProbeSettings\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12!\n" +
 	"\finterval_min\x18\x02 \x01(\rR\vintervalMin\x12!\n" +
-	"\ffallback_url\x18\x03 \x01(\tR\vfallbackUrl\"\x86\x03\n" +
+	"\ffallback_url\x18\x03 \x01(\tR\vfallbackUrl\"\xa4\x03\n" +
 	"\bOwnProbe\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -895,11 +1024,13 @@ const file_mistgate_ownprobe_v1_own_probe_proto_rawDesc = "" +
 	"\x10last_result_unix\x18\v \x01(\x03B\x020\x02R\x0elastResultUnix\x12\x1d\n" +
 	"\n" +
 	"checks_day\x18\f \x01(\rR\tchecksDay\x120\n" +
-	"\x12token_expires_unix\x18\r \x01(\x03B\x020\x02R\x10tokenExpiresUnix\"\x1b\n" +
-	"\x19OwnProbeServiceGetRequest\"\x98\x01\n" +
+	"\x12token_expires_unix\x18\r \x01(\x03B\x020\x02R\x10tokenExpiresUnix\x12\x1c\n" +
+	"\treference\x18\x0e \x01(\tR\treference\"\x1b\n" +
+	"\x19OwnProbeServiceGetRequest\"\xbf\x01\n" +
 	"\x1aOwnProbeServiceGetResponse\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.mistgate.ownprobe.v1.OwnProbeSettingsR\bsettings\x126\n" +
-	"\x06probes\x18\x02 \x03(\v2\x1e.mistgate.ownprobe.v1.OwnProbeR\x06probes\"b\n" +
+	"\x06probes\x18\x02 \x03(\v2\x1e.mistgate.ownprobe.v1.OwnProbeR\x06probes\x12%\n" +
+	"\x0escript_version\x18\x03 \x01(\tR\rscriptVersion\"b\n" +
 	"\x1cOwnProbeServiceUpdateRequest\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.mistgate.ownprobe.v1.OwnProbeSettingsR\bsettings\"c\n" +
 	"\x1dOwnProbeServiceUpdateResponse\x12B\n" +
@@ -907,12 +1038,18 @@ const file_mistgate_ownprobe_v1_own_probe_proto_rawDesc = "" +
 	"\x1cOwnProbeServiceCreateRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04city\x18\x02 \x01(\tR\x04city\x12\x12\n" +
-	"\x04kind\x18\x03 \x01(\tR\x04kind\"\xaa\x01\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\"\xd1\x01\n" +
 	"\x1dOwnProbeServiceCreateResponse\x124\n" +
 	"\x05probe\x18\x01 \x01(\v2\x1e.mistgate.ownprobe.v1.OwnProbeR\x05probe\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x12\x18\n" +
 	"\acommand\x18\x03 \x01(\tR\acommand\x12#\n" +
-	"\rscript_sha256\x18\x04 \x01(\tR\fscriptSha256\".\n" +
+	"\rscript_sha256\x18\x04 \x01(\tR\fscriptSha256\x12%\n" +
+	"\x0eserver_command\x18\x05 \x01(\tR\rserverCommand\"%\n" +
+	"#OwnProbeServiceUpdateCommandRequest\"\x8e\x01\n" +
+	"$OwnProbeServiceUpdateCommandResponse\x12\x18\n" +
+	"\acommand\x18\x01 \x01(\tR\acommand\x12%\n" +
+	"\x0eserver_command\x18\x02 \x01(\tR\rserverCommand\x12%\n" +
+	"\x0escript_version\x18\x03 \x01(\tR\rscriptVersion\".\n" +
 	"\x1cOwnProbeServiceRevokeRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"U\n" +
 	"\x1dOwnProbeServiceRevokeResponse\x124\n" +
@@ -927,11 +1064,12 @@ const file_mistgate_ownprobe_v1_own_probe_proto_rawDesc = "" +
 	"\x05probe\x18\x01 \x01(\v2\x1e.mistgate.ownprobe.v1.OwnProbeR\x05probe\"\"\n" +
 	" OwnProbeServiceDisconnectRequest\"g\n" +
 	"!OwnProbeServiceDisconnectResponse\x12B\n" +
-	"\bsettings\x18\x01 \x01(\v2&.mistgate.ownprobe.v1.OwnProbeSettingsR\bsettings2\xd8\x06\n" +
+	"\bsettings\x18\x01 \x01(\v2&.mistgate.ownprobe.v1.OwnProbeSettingsR\bsettings2\xe1\a\n" +
 	"\x0fOwnProbeService\x12h\n" +
 	"\x03Get\x12/.mistgate.ownprobe.v1.OwnProbeServiceGetRequest\x1a0.mistgate.ownprobe.v1.OwnProbeServiceGetResponse\x12q\n" +
 	"\x06Update\x122.mistgate.ownprobe.v1.OwnProbeServiceUpdateRequest\x1a3.mistgate.ownprobe.v1.OwnProbeServiceUpdateResponse\x12q\n" +
-	"\x06Create\x122.mistgate.ownprobe.v1.OwnProbeServiceCreateRequest\x1a3.mistgate.ownprobe.v1.OwnProbeServiceCreateResponse\x12q\n" +
+	"\x06Create\x122.mistgate.ownprobe.v1.OwnProbeServiceCreateRequest\x1a3.mistgate.ownprobe.v1.OwnProbeServiceCreateResponse\x12\x86\x01\n" +
+	"\rUpdateCommand\x129.mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandRequest\x1a:.mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandResponse\x12q\n" +
 	"\x06Revoke\x122.mistgate.ownprobe.v1.OwnProbeServiceRevokeRequest\x1a3.mistgate.ownprobe.v1.OwnProbeServiceRevokeResponse\x12\x89\x01\n" +
 	"\x0eConfirmNetwork\x12:.mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkRequest\x1a;.mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkResponse\x12w\n" +
 	"\bCheckNow\x124.mistgate.ownprobe.v1.OwnProbeServiceCheckNowRequest\x1a5.mistgate.ownprobe.v1.OwnProbeServiceCheckNowResponse\x12}\n" +
@@ -951,7 +1089,7 @@ func file_mistgate_ownprobe_v1_own_probe_proto_rawDescGZIP() []byte {
 	return file_mistgate_ownprobe_v1_own_probe_proto_rawDescData
 }
 
-var file_mistgate_ownprobe_v1_own_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_mistgate_ownprobe_v1_own_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_mistgate_ownprobe_v1_own_probe_proto_goTypes = []any{
 	(*OwnProbeSettings)(nil),                      // 0: mistgate.ownprobe.v1.OwnProbeSettings
 	(*OwnProbe)(nil),                              // 1: mistgate.ownprobe.v1.OwnProbe
@@ -961,14 +1099,16 @@ var file_mistgate_ownprobe_v1_own_probe_proto_goTypes = []any{
 	(*OwnProbeServiceUpdateResponse)(nil),         // 5: mistgate.ownprobe.v1.OwnProbeServiceUpdateResponse
 	(*OwnProbeServiceCreateRequest)(nil),          // 6: mistgate.ownprobe.v1.OwnProbeServiceCreateRequest
 	(*OwnProbeServiceCreateResponse)(nil),         // 7: mistgate.ownprobe.v1.OwnProbeServiceCreateResponse
-	(*OwnProbeServiceRevokeRequest)(nil),          // 8: mistgate.ownprobe.v1.OwnProbeServiceRevokeRequest
-	(*OwnProbeServiceRevokeResponse)(nil),         // 9: mistgate.ownprobe.v1.OwnProbeServiceRevokeResponse
-	(*OwnProbeServiceConfirmNetworkRequest)(nil),  // 10: mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkRequest
-	(*OwnProbeServiceConfirmNetworkResponse)(nil), // 11: mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkResponse
-	(*OwnProbeServiceCheckNowRequest)(nil),        // 12: mistgate.ownprobe.v1.OwnProbeServiceCheckNowRequest
-	(*OwnProbeServiceCheckNowResponse)(nil),       // 13: mistgate.ownprobe.v1.OwnProbeServiceCheckNowResponse
-	(*OwnProbeServiceDisconnectRequest)(nil),      // 14: mistgate.ownprobe.v1.OwnProbeServiceDisconnectRequest
-	(*OwnProbeServiceDisconnectResponse)(nil),     // 15: mistgate.ownprobe.v1.OwnProbeServiceDisconnectResponse
+	(*OwnProbeServiceUpdateCommandRequest)(nil),   // 8: mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandRequest
+	(*OwnProbeServiceUpdateCommandResponse)(nil),  // 9: mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandResponse
+	(*OwnProbeServiceRevokeRequest)(nil),          // 10: mistgate.ownprobe.v1.OwnProbeServiceRevokeRequest
+	(*OwnProbeServiceRevokeResponse)(nil),         // 11: mistgate.ownprobe.v1.OwnProbeServiceRevokeResponse
+	(*OwnProbeServiceConfirmNetworkRequest)(nil),  // 12: mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkRequest
+	(*OwnProbeServiceConfirmNetworkResponse)(nil), // 13: mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkResponse
+	(*OwnProbeServiceCheckNowRequest)(nil),        // 14: mistgate.ownprobe.v1.OwnProbeServiceCheckNowRequest
+	(*OwnProbeServiceCheckNowResponse)(nil),       // 15: mistgate.ownprobe.v1.OwnProbeServiceCheckNowResponse
+	(*OwnProbeServiceDisconnectRequest)(nil),      // 16: mistgate.ownprobe.v1.OwnProbeServiceDisconnectRequest
+	(*OwnProbeServiceDisconnectResponse)(nil),     // 17: mistgate.ownprobe.v1.OwnProbeServiceDisconnectResponse
 }
 var file_mistgate_ownprobe_v1_own_probe_proto_depIdxs = []int32{
 	0,  // 0: mistgate.ownprobe.v1.OwnProbeServiceGetResponse.settings:type_name -> mistgate.ownprobe.v1.OwnProbeSettings
@@ -983,19 +1123,21 @@ var file_mistgate_ownprobe_v1_own_probe_proto_depIdxs = []int32{
 	2,  // 9: mistgate.ownprobe.v1.OwnProbeService.Get:input_type -> mistgate.ownprobe.v1.OwnProbeServiceGetRequest
 	4,  // 10: mistgate.ownprobe.v1.OwnProbeService.Update:input_type -> mistgate.ownprobe.v1.OwnProbeServiceUpdateRequest
 	6,  // 11: mistgate.ownprobe.v1.OwnProbeService.Create:input_type -> mistgate.ownprobe.v1.OwnProbeServiceCreateRequest
-	8,  // 12: mistgate.ownprobe.v1.OwnProbeService.Revoke:input_type -> mistgate.ownprobe.v1.OwnProbeServiceRevokeRequest
-	10, // 13: mistgate.ownprobe.v1.OwnProbeService.ConfirmNetwork:input_type -> mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkRequest
-	12, // 14: mistgate.ownprobe.v1.OwnProbeService.CheckNow:input_type -> mistgate.ownprobe.v1.OwnProbeServiceCheckNowRequest
-	14, // 15: mistgate.ownprobe.v1.OwnProbeService.Disconnect:input_type -> mistgate.ownprobe.v1.OwnProbeServiceDisconnectRequest
-	3,  // 16: mistgate.ownprobe.v1.OwnProbeService.Get:output_type -> mistgate.ownprobe.v1.OwnProbeServiceGetResponse
-	5,  // 17: mistgate.ownprobe.v1.OwnProbeService.Update:output_type -> mistgate.ownprobe.v1.OwnProbeServiceUpdateResponse
-	7,  // 18: mistgate.ownprobe.v1.OwnProbeService.Create:output_type -> mistgate.ownprobe.v1.OwnProbeServiceCreateResponse
-	9,  // 19: mistgate.ownprobe.v1.OwnProbeService.Revoke:output_type -> mistgate.ownprobe.v1.OwnProbeServiceRevokeResponse
-	11, // 20: mistgate.ownprobe.v1.OwnProbeService.ConfirmNetwork:output_type -> mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkResponse
-	13, // 21: mistgate.ownprobe.v1.OwnProbeService.CheckNow:output_type -> mistgate.ownprobe.v1.OwnProbeServiceCheckNowResponse
-	15, // 22: mistgate.ownprobe.v1.OwnProbeService.Disconnect:output_type -> mistgate.ownprobe.v1.OwnProbeServiceDisconnectResponse
-	16, // [16:23] is the sub-list for method output_type
-	9,  // [9:16] is the sub-list for method input_type
+	8,  // 12: mistgate.ownprobe.v1.OwnProbeService.UpdateCommand:input_type -> mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandRequest
+	10, // 13: mistgate.ownprobe.v1.OwnProbeService.Revoke:input_type -> mistgate.ownprobe.v1.OwnProbeServiceRevokeRequest
+	12, // 14: mistgate.ownprobe.v1.OwnProbeService.ConfirmNetwork:input_type -> mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkRequest
+	14, // 15: mistgate.ownprobe.v1.OwnProbeService.CheckNow:input_type -> mistgate.ownprobe.v1.OwnProbeServiceCheckNowRequest
+	16, // 16: mistgate.ownprobe.v1.OwnProbeService.Disconnect:input_type -> mistgate.ownprobe.v1.OwnProbeServiceDisconnectRequest
+	3,  // 17: mistgate.ownprobe.v1.OwnProbeService.Get:output_type -> mistgate.ownprobe.v1.OwnProbeServiceGetResponse
+	5,  // 18: mistgate.ownprobe.v1.OwnProbeService.Update:output_type -> mistgate.ownprobe.v1.OwnProbeServiceUpdateResponse
+	7,  // 19: mistgate.ownprobe.v1.OwnProbeService.Create:output_type -> mistgate.ownprobe.v1.OwnProbeServiceCreateResponse
+	9,  // 20: mistgate.ownprobe.v1.OwnProbeService.UpdateCommand:output_type -> mistgate.ownprobe.v1.OwnProbeServiceUpdateCommandResponse
+	11, // 21: mistgate.ownprobe.v1.OwnProbeService.Revoke:output_type -> mistgate.ownprobe.v1.OwnProbeServiceRevokeResponse
+	13, // 22: mistgate.ownprobe.v1.OwnProbeService.ConfirmNetwork:output_type -> mistgate.ownprobe.v1.OwnProbeServiceConfirmNetworkResponse
+	15, // 23: mistgate.ownprobe.v1.OwnProbeService.CheckNow:output_type -> mistgate.ownprobe.v1.OwnProbeServiceCheckNowResponse
+	17, // 24: mistgate.ownprobe.v1.OwnProbeService.Disconnect:output_type -> mistgate.ownprobe.v1.OwnProbeServiceDisconnectResponse
+	17, // [17:25] is the sub-list for method output_type
+	9,  // [9:17] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -1012,7 +1154,7 @@ func file_mistgate_ownprobe_v1_own_probe_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_ownprobe_v1_own_probe_proto_rawDesc), len(file_mistgate_ownprobe_v1_own_probe_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
