@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/apernet/hysteria/extras/v2/correctnet"
-	"github.com/mistgate/mistgate/internal/node/bridge"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"golang.org/x/crypto/acme"
 )
 
@@ -51,7 +51,7 @@ func startTCPMasq(port int, getCert func(*tls.ClientHelloInfo) (*tls.Certificate
 		MaxHeaderBytes:    16 << 10,
 		ErrorLog:          log.New(io.Discard, "", 0),
 	}
-	if err := bridge.ConfigureSiteHTTP2(srv); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(srv); err != nil {
 		_ = ln.Close()
 		return nil, fmt.Errorf("configure HTTPS site: %w", err)
 	}

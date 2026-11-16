@@ -17,6 +17,7 @@ import (
 	"time"
 
 	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -341,7 +342,7 @@ func TestPanelSessionSurvivesTheBridgeFallingAndTheDirectPathReturning(t *testin
 	server := httptest.NewUnstartedServer(entry.Handler(http.NotFoundHandler()))
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{bridgeServerCert}, MinVersion: tls.VersionTLS13}
 	server.Config.TLSConfig = server.TLS
-	if err := nodebridge.ConfigureSiteHTTP2(server.Config); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()

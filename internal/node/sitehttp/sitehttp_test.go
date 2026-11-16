@@ -173,7 +173,8 @@ func TestLimiterSourcesWithoutAnAddressShareOneKeyAndOnlyTheTotalLimitApplies(t 
 	}
 }
 
-// reference is how the bridge's site wires the same server; the fingerprint test pins the two to one SETTINGS.
+// reference is the plain Go server with only the connection window raised (the bridge's first site wired it so); the
+// fingerprint test pins ConfigureSiteHTTP2 to its SETTINGS.
 func reference(server *http.Server) error {
 	return http2.ConfigureServer(server, &http2.Server{MaxUploadBufferPerConnection: 16 << 20})
 }
@@ -255,7 +256,7 @@ func handshakeFrames(t *testing.T, configure func(*http.Server) error) serverFra
 }
 
 // TestSettingsMatchTheBridgeSite pins the fingerprint: the SETTINGS and the connection WINDOW_UPDATE a site sends are the
-// ones of the bridge's http2.ConfigureServer call, field for field, and not just numbers we believe are equal.
+// ones of a plain http2.ConfigureServer call, field for field, and not just numbers we believe are equal.
 func TestSettingsMatchTheBridgeSite(t *testing.T) {
 	want := handshakeFrames(t, reference)
 	got := handshakeFrames(t, ConfigureSiteHTTP2)

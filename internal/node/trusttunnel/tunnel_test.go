@@ -3,12 +3,10 @@ package trusttunnel
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"io"
 	"net"
 	"net/http"
-	"reflect"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
@@ -18,8 +16,8 @@ import (
 
 	"github.com/mistgate/mistgate/internal/node/egress"
 	nodeengine "github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/sitehttp/sitehttptest"
 	"github.com/mistgate/mistgate/internal/plugin"
-	"golang.org/x/net/http2"
 )
 
 // shortTimings makes every timeout of the site and the tunnel tiny except the tunnel's own idle time, so that a tunnel that
@@ -555,75 +553,13 @@ func TestNothingLeaksWhenTunnelsEndTheHardWay(t *testing.T) {
 }
 
 // The listener of a tunnel port sends the SETTINGS and window of any other site of the node (bridge, Hysteria2's decoy,
-// the VLESS site): a probe that reads them learns nothing.
+// the VLESS site): a probe that reads them learns nothing. The other sites check themselves against the same reference.
 func TestListenerFingerprintMatchesTheNodesOtherSites(t *testing.T) {
 	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
 	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
-	certificate, err := testCertificate()
+	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The site as Hysteria2's TCP decoy and the VLESS site build it.
-	site := &http.Server{
-		Handler:           http.NotFoundHandler(),
-		TLSConfig:         &tls.Config{Certificates: []tls.Certificate{*certificate}, NextProtos: []string{"h2", "http/1.1"}},
-		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second,
-		IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10,
-	}
-	if err := http2.ConfigureServer(site, &http2.Server{MaxUploadBufferPerConnection: 16 << 20}); err != nil {
-		t.Fatal(err)
-	}
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	go site.Serve(tls.NewListener(ln, site.TLSConfig))
-	t.Cleanup(func() { _ = site.Close() })
-
-	got, want := serverPreface(t, h.addr), serverPreface(t, ln.Addr().String())
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("tunnel port frames differ from the site's:\n got  %+v\n want %+v", got, want)
-	}
-}
-
-type prefaceFrames struct {
-	Settings []http2.Setting
-	Windows  []uint32
-}
-
-func serverPreface(t *testing.T, addr string) prefaceFrames {
-	t.Helper()
-	raw, err := net.Dial("tcp", addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer raw.Close()
-	conn := tls.Client(raw, &tls.Config{InsecureSkipVerify: true, ServerName: "example.com", NextProtos: []string{"h2"}})
-	if err := conn.Handshake(); err != nil {
-		t.Fatal(err)
-	}
-	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
-	if _, err := io.WriteString(conn, http2.ClientPreface); err != nil {
-		t.Fatal(err)
-	}
-	framer := http2.NewFramer(conn, conn)
-	if err := framer.WriteSettings(); err != nil {
-		t.Fatal(err)
-	}
-	var got prefaceFrames
-	for len(got.Settings) == 0 || len(got.Windows) == 0 {
-		frame, err := framer.ReadFrame()
-		if err != nil {
-			t.Fatalf("reading the server's first frames: %v", err)
-		}
-		switch f := frame.(type) {
-		case *http2.SettingsFrame:
-			if !f.IsAck() {
-				_ = f.ForeachSetting(func(s http2.Setting) error { got.Settings = append(got.Settings, s); return nil })
-			}
-		case *http2.WindowUpdateFrame:
-			got.Windows = append(got.Windows, f.Increment)
-		}
-	}
-	return got
+	sitehttptest.Check(t, "TrustTunnel", conn)
 }

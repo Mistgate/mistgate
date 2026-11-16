@@ -25,6 +25,7 @@ import (
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/http2"
 
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -664,7 +665,7 @@ func TestReview11_DERPinEmptySNIAndTrustedRoots(t *testing.T) {
 			return nil, nil
 		}}
 	server.Config.TLSConfig = server.TLS
-	if err := ConfigureSiteHTTP2(server.Config); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()
@@ -714,7 +715,7 @@ func TestReview13_StandardHTTP2SettingsExceptConnectionWindow(t *testing.T) {
 	server := httptest.NewUnstartedServer(http.NotFoundHandler())
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{pki.serverCert}, MinVersion: tls.VersionTLS13}
 	server.Config.TLSConfig = server.TLS
-	if err := ConfigureSiteHTTP2(server.Config); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()
@@ -785,7 +786,7 @@ func TestReview14_ProofCannotCrossTLSConnections(t *testing.T) {
 	})))
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{pki.serverCert}, MinVersion: tls.VersionTLS13}
 	server.Config.TLSConfig = server.TLS
-	if err := ConfigureSiteHTTP2(server.Config); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()
@@ -900,7 +901,7 @@ func TestReview11_TLS12SiteSupport(t *testing.T) {
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "tls12") }))
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{pki.serverCert}, MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12}
 	server.Config.TLSConfig = server.TLS
-	if err := ConfigureSiteHTTP2(server.Config); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()
@@ -913,70 +914,6 @@ func TestReview11_TLS12SiteSupport(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-}
-
-type fakeSiteConn struct {
-	net.Conn
-	addr   net.Addr
-	closed atomic.Bool
-}
-
-func (c *fakeSiteConn) RemoteAddr() net.Addr { return c.addr }
-func (c *fakeSiteConn) Close() error         { c.closed.Store(true); return nil }
-
-func fakeSource(ip string) *fakeSiteConn {
-	return &fakeSiteConn{addr: &net.TCPAddr{IP: net.ParseIP(ip), Port: 40000}}
-}
-
-func TestSiteLimiterEvictsTheBusiestSourceAndSparesProvenConnections(t *testing.T) {
-	l := &siteConnectionLimiter{anonymous: map[net.Conn]siteConn{}}
-	closeAll := func(victims []net.Conn) {
-		for _, v := range victims {
-			_ = v.Close()
-		}
-	}
-	var scanner []*fakeSiteConn
-	for i := 0; i < 3*siteMaxAnonymousPerSource; i++ {
-		c := fakeSource("198.51.100.7")
-		scanner = append(scanner, c)
-		closeAll(l.add(c))
-	}
-	live := 0
-	for _, c := range scanner {
-		if !c.closed.Load() {
-			live++
-		}
-	}
-	if live != siteMaxAnonymousPerSource {
-		t.Fatalf("one source holds %d anonymous connections, want at most %d", live, siteMaxAnonymousPerSource)
-	}
-
-	// Four more sources fill the whole set; a fifth source still gets in, at the cost of the busiest source's oldest.
-	for i := 0; len(l.anonymous) < siteMaxAnonymousConnections; i++ {
-		closeAll(l.add(fakeSource(fmt.Sprintf("203.0.113.%d", 1+i%4))))
-	}
-	exit := fakeSource("192.0.2.1")
-	victims := l.add(exit)
-	if len(victims) != 1 || len(l.anonymous) != siteMaxAnonymousConnections {
-		t.Fatalf("a connection at the limit evicted %d, set size %d", len(victims), len(l.anonymous))
-	}
-	if exit.closed.Load() {
-		t.Fatal("the new connection was refused")
-	}
-	if source := victims[0].(*fakeSiteConn).addr.(*net.TCPAddr).IP.String(); source != "198.51.100.7" {
-		t.Fatalf("evicted a connection of %s, want the busiest source", source)
-	}
-	// The exit proves itself: it leaves the set, and no later flood can evict it.
-	l.remove(exit)
-	for i := 0; i < 500; i++ {
-		closeAll(l.add(fakeSource(fmt.Sprintf("100.64.%d.%d", i/200, i%200+1))))
-	}
-	if exit.closed.Load() {
-		t.Fatal("a proven connection was evicted by anonymous traffic")
-	}
-	if len(l.anonymous) > siteMaxAnonymousConnections {
-		t.Fatalf("anonymous set grew to %d", len(l.anonymous))
-	}
 }
 
 func TestSiteScannersCannotLockOutTheBridge(t *testing.T) {
@@ -1143,7 +1080,7 @@ func TestBridgeProofNeedsExtendedMasterSecretOnTLS12(t *testing.T) {
 	}))
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{pki.serverCert}, MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12}
 	server.Config.TLSConfig = server.TLS
-	if err := ConfigureSiteHTTP2(server.Config); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()

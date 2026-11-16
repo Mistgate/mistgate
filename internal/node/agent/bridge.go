@@ -19,6 +19,7 @@ import (
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -400,7 +401,7 @@ func (s *bridgeSiteServer) Sync(port uint16, getCertificate func(*tls.ClientHell
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second,
 		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10,
 		ErrorLog: log.New(io.Discard, "", 0)}
-	if err := nodebridge.ConfigureSiteHTTP2(server); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server); err != nil {
 		_ = ln.Close()
 		return err
 	}

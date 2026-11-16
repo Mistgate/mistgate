@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -317,7 +318,7 @@ func newBridgeFixtureConfigured(t *testing.T, targetPort uint16, pki testPKI, st
 	server.Config.TLSConfig = server.TLS
 	server.Config.ReadTimeout = streamTimeout
 	server.Config.WriteTimeout = streamTimeout
-	if err := ConfigureSiteHTTP2(server.Config); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()

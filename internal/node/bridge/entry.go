@@ -20,6 +20,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 )
 
 const (
@@ -501,7 +503,7 @@ func (e *Entry) Handler(site http.Handler) http.Handler {
 				return
 			}
 		}
-		markBridgeConnection(r.Context())
+		sitehttp.MarkAuthenticated(r.Context())
 		peer := e.peer(exitID)
 		if peer == nil {
 			e.writeBridgeError(w, exitID, kind, "closed")
