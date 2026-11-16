@@ -391,13 +391,24 @@ func testSpec(port uint16) plugin.InboundSpec {
 
 func reservePort(t *testing.T) uint16 {
 	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
+	// The h3 inbound binds the same number on UDP, and a number free on TCP may be taken or reserved there (Windows keeps
+	// excluded UDP ranges), so the port is one that both protocols give out.
+	for range 50 {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		port := listener.Addr().(*net.TCPAddr).Port
+		udp, err := net.ListenPacket("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+		_ = listener.Close()
+		if err != nil {
+			continue
+		}
+		_ = udp.Close()
+		return uint16(port)
 	}
-	port := uint16(listener.Addr().(*net.TCPAddr).Port)
-	_ = listener.Close()
-	return port
+	t.Fatal("no port free on both TCP and UDP")
+	return 0
 }
 
 type testHTTP2Client struct {
