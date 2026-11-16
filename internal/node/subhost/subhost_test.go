@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -118,12 +119,14 @@ func newRig(t *testing.T, proxied bool) *rig {
 	return &rig{ca: ca, host: h, addr: ln.Addr().String(), site: site, subCert: ca.server(t, subName)}
 }
 
-// panelConn is a test panel's tunnel connection: what it wrote to the node, and done closed once the tunnel ended.
+// panelConn is a test panel's tunnel connection: what it wrote to the node, the streams the node opened in it, and done
+// closed once the tunnel ended.
 type panelConn struct {
 	net.Conn
-	mu   sync.Mutex
-	sent []byte
-	done chan struct{}
+	mu      sync.Mutex
+	sent    []byte
+	streams atomic.Int32
+	done    chan struct{}
 }
 
 func (p *panelConn) Write(b []byte) (int, error) {
@@ -141,7 +144,7 @@ func (p *panelConn) firstRecord(t *testing.T) []byte {
 	if len(p.sent) < 5 {
 		t.Fatal("the panel sent no record")
 	}
-	return append([]byte(nil), p.sent[:5+int(p.sent[3])<<8|int(p.sent[4])]...)
+	return append([]byte(nil), p.sent[:5+(int(p.sent[3])<<8|int(p.sent[4]))]...)
 }
 
 // ended says whether the tunnel ended within d.
@@ -178,6 +181,7 @@ func (r *rig) panelAs(t *testing.T, cert *tls.Certificate, secret string, now fu
 			return
 		}
 		(&http2.Server{}).ServeConn(tc, &http2.ServeConnOpts{Handler: hosttunnel.ServerHandler(func(kind string, c net.Conn) bool {
+			p.streams.Add(1)
 			go func() {
 				defer c.Close()
 				s := tls.Server(c, &tls.Config{Certificates: []tls.Certificate{*r.subCert}})
@@ -336,21 +340,40 @@ func TestRoleOffAndTunnelReplaced(t *testing.T) {
 	}
 }
 
-// A recorded hello of the panel opens no second tunnel: the node treats it as any connection for the subscription name,
-// and the live tunnel stays.
+// A recorded hello of the panel opens no second tunnel: the node treats it as any connection for the subscription name
+// (forwarded into the live tunnel), and the live tunnel stays.
 func TestReplayedHelloOpensNoTunnel(t *testing.T) {
 	r := newRig(t, false)
 	first := r.panel(t, r.ca.server(t, tunnelSNI))
 	r.waitTunnel(t, true)
+	hello := first.firstRecord(t)
+	// The recorded bytes are a whole hello with a valid mark: only the replay cache can refuse them.
+	a, b := net.Pipe()
+	defer a.Close()
+	go func() { _, _ = a.Write(hello) }()
+	peeked, _, err := hosttunnel.PeekHello(b, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := peeked.Mark(tunnelSNI); !ok {
+		t.Fatal("the recorded hello carries no valid mark")
+	}
 	c, err := net.Dial("tcp", r.addr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	if _, err := c.Write(first.firstRecord(t)); err != nil {
+	if _, err := c.Write(hello); err != nil {
 		t.Fatal(err)
 	}
-	if first.ended(500 * time.Millisecond) {
+	deadline := time.Now().Add(5 * time.Second)
+	for first.streams.Load() != 1 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the replay was not forwarded into the tunnel: %d streams", first.streams.Load())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if first.ended(300 * time.Millisecond) {
 		t.Fatal("the replayed hello replaced the tunnel")
 	}
 	c2, err := net.Dial("tcp", r.addr)

@@ -25,6 +25,7 @@ type fakeSubHost struct {
 	domain, node, next  string
 	publicURL           string
 	dnsMismatch         bool
+	downReason          string // of the serving node's tunnel; "" = up
 	set, moves, disable []string
 }
 
@@ -35,7 +36,7 @@ func (f *fakeSubHost) view() *adminv1.SubscriptionHost {
 	}
 	h := &adminv1.SubscriptionHost{State: st, Domain: f.domain, NodeId: f.node, NextNodeId: f.next, PublicUrl: f.publicURL}
 	if f.node != "" {
-		h.Tunnels = []*adminv1.SubscriptionHostTunnel{{NodeId: f.node, Up: true}}
+		h.Tunnels = []*adminv1.SubscriptionHostTunnel{{NodeId: f.node, Up: f.downReason == "", DownReason: f.downReason}}
 	}
 	return h
 }
@@ -167,6 +168,13 @@ func TestSubscriptionHostPlansWaitForTheOwner(t *testing.T) {
 		t.Fatalf("disable apply: %+v %v", a, e.w.subhost.disable)
 	}
 	noSubHostSNI(t, "get after", mustOK(t, s, "subscription_host_get", map[string]any{}))
+	// A node that answered the panel's tunnel as its site is told apart from an unreachable one.
+	e.w.subhost.mu.Lock()
+	e.w.subhost.state, e.w.subhost.node, e.w.subhost.downReason = adminv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_ON, "de1", "not_recognised"
+	e.w.subhost.mu.Unlock()
+	if out := mustOK(t, s, "subscription_host_get", map[string]any{}); !strings.Contains(out, `"down_reason":"not_recognised"`) {
+		t.Fatalf("get: %s", out)
+	}
 	for _, p := range e.plans.byID {
 		noSubHostSNI(t, p.Tool, p.ParamsJSON+p.FactsJSON+p.Summary+p.Result)
 	}

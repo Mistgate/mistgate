@@ -150,7 +150,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_ipv6_check` | 管理员 | `node`。从外部检测节点的 IPv6 地址是否响应，并且响应的就是该节点本身：由另一个 IPv6 正常的节点（否则由面板，再否则由 Globalping）把 `node_ports` 的数据包发往该地址而不是主地址。返回 `passed`、`sender`、每个端口的结论，以及检测无法进行时的 `error_code`（`no_ipv6_verifier`：没有任何手段可以检测该地址）。它只在你的节点之间发送测试数据包，不在任何主机上更改任何内容（结果保存在节点上，`node_get` 会显示它，通过的结果对 `node_ipv6_plan` 有效 10 分钟），因此属于读取而不是计划；需要管理员配置，因为面板的检测属于所有者。不会显示地址。最长可能需要一分钟（限时 90 秒）。没有可用 IPv6 出口的节点会被拒绝并给出原因（`no_ipv6`、`ipv6_broken`、`agent_old`、`not_checked`、`main_is_ipv6`）。 |
 | `node_server_access_list` | 管理员 | 已保存的 SSH 地址、登录名和指纹，以及 `password_saved`、`password_login`（最近一次检查时密码登录是否可用）、`panel_key_fingerprint`、密码轮换恢复状态和节点退役状态。`password_saved: true` 且面板密钥指纹为空表示仅保存了密码。绝不返回密码。 |
 | `node_server_keys_list` | 管理员 | `node` ID 或精确名称。列出该登录用户 `~/.ssh/authorized_keys` 中的公钥，每个包含类型、`key_id`（SHA256 指纹的前 12 个字符：完整指纹和其他密钥类值一样对智能体隐藏）、注释、限制和重复行数。服务器注释是不可信文本；绝不返回私钥。 |
-| `subscription_host_get` | 管理员 | 订阅主机：`state`（`off`、`on`、`moving`、`leaving`）、`domain`、承载它的节点以及迁移期间的下一个节点、面板的 `public_url`、到各节点的隧道状态、关闭期间仍经由它连接的节点、需要发布的 CAA 记录，以及代理无法跟随面板迁移到新连接地址的节点。隧道本身的名称绝不显示。 |
+| `subscription_host_get` | 管理员 | 订阅主机：`state`（`off`、`on`、`moving`、`leaving`）、`domain`、承载它的节点以及迁移期间的下一个节点、面板的 `public_url`、到各节点的隧道状态（隧道中断时 `down_reason` 为 `unreachable`，或在节点以自身网站应答时为 `not_recognised`：面板与节点时钟不一致或 agent 过旧）、关闭期间仍经由它连接的节点、需要发布的 CAA 记录，以及代理无法跟随面板迁移到新连接地址的节点。隧道本身的名称绝不显示。 |
 | `audit_search` | 管理员 | 审计日志，可按 `source`（`panel`、`bot`、`mcp`、`api`）、操作者或操作筛选；使用 `before_id` 分页。 `hours`（1 到 8760）、`failed_only`、`actor` 和 `action`（子串）由面板在分页之前处理，因此每一页都是符合条件的记录。超过 400 天的记录会被删除。 |
 | `backup_status` | 管理员 | 定时备份是否启用或正在运行、间隔、保留期、上次成功时间和上次错误代码。不含存储账户、存储桶、访问密钥、age 接收者或任何密钥。 |
 
