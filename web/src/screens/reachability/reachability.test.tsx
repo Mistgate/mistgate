@@ -25,6 +25,7 @@ vi.mock("@/lib/api", () => ({
   blocklist: { getBlocklist: () => Promise.resolve({ settings: { enabled: true, available: true, checkedUnix: 0, listsUnix: 0 } }) },
   tspuProbe: { getTspuProbe: () => Promise.resolve({ settings: { enabled: true, available: true, unavailableReason: "", probeNodeId: "nod_probe1", intervalMin: 120, nodes: [] } }) },
   clientProbe: { getClientProbe: () => Promise.resolve({ settings: { enabled: false, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 }) },
+  ownProbe: { get: () => Promise.resolve({ settings: { enabled: false, intervalMin: 60, fallbackUrl: "" }, probes: [] }) },
   cheburcheck: {
     getCheburcheck: () =>
       Promise.resolve({ settings: { enabled: true, publicEnabled: true, hasToken: false, intervalMin: 180, ownIntervalMin: 60, status: "", holdUntilUnix: 0, lastRunUnix: 0, lastVerdict: "", unavailable: "", tokenUnknown: false } }),
@@ -224,10 +225,10 @@ describe("the Reachability page with every source on", () => {
     expect(events[1]?.textContent).toContain("lasted 16 h");
   });
 
-  it("ends with the six sources for the owner, the first one that is on open, and leads to its parts from the header", async () => {
+  it("ends with the seven sources for the owner, the first one that is on open, and leads to its parts from the header", async () => {
     await mount();
     expect(document.querySelector("#sources h2")?.textContent).toBe("Sources");
-    expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
+    expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
     expect([...document.querySelectorAll("#sources [role=tabpanel]:not([hidden]) h3")].map((h) => h.textContent)).toEqual(["Globalping"]);
     const nav = document.querySelector("nav[aria-label='On this page']");
     expect([...nav!.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
@@ -469,7 +470,7 @@ describe("the Reachability page with the sources off", () => {
     expect(document.querySelector("[data-kind]")).toBeNull();
     expect(rows()).toHaveLength(0);
     expect(document.querySelectorAll("[data-testid=reach-event]")).toHaveLength(2);
-    expect(document.querySelectorAll("#sources h3")).toHaveLength(6);
+    expect(document.querySelectorAll("#sources h3")).toHaveLength(7);
   });
 
   it("dims a source that is off and leaves its lanes empty, while the others draw", async () => {
@@ -498,6 +499,43 @@ describe("the Reachability page with the sources off", () => {
     expect(text()).toContain("Only the owner sees and changes the sources.");
     // the country of the subtitle comes from the history, which every role reads
     expect(text()).toContain("Whether the nodes open from Russia");
+  });
+});
+
+describe("the points of own probes, for everyone who reads the page", () => {
+  const probes = [
+    vantage("probes", "probe:prb_a", "reach", { network: "ExampleNet · Springfield · probe dacha", asn: "64496", kind: "home", why: "" }),
+    vantage("probes", "probe:prb_b", "uncertain", { network: "Demo Telecom · Shelbyville · probe office", asn: "64497", kind: "dc", why: "no_filter" }),
+  ];
+
+  it("gives a helper the lines of the probes under a node, and no card, no button: the sources and the probes are the owner's", async () => {
+    role = Role.HELPER;
+    getHistory.mockResolvedValue(history(["globalping", "probes"]));
+    getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: [check("nod_de1", OK, { sources: ["globalping", "probes"], vantages: probes })] });
+    await mount();
+    const points = [...row("de1").querySelectorAll("[data-testid=own-points] li")].map((li) => li.textContent);
+    expect(points).toEqual([
+      "?Demo Telecom · Shelbyville — probe “office” no filtering on its path, so “reachable” proves nothing · 4 min ago",
+      "✓ExampleNet · Springfield — probe “dacha” reaches the node · 4 min ago",
+    ]);
+    expect(line("de1", "probes").getAttribute("data-on")).toBe("true");
+    expect(document.querySelectorAll("#sources h3")).toHaveLength(0);
+    expect(text()).toContain("Only the owner sees and changes the sources.");
+    const labels = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
+    for (const word of ["Revoke", "Add a probe", "Check now", "Update command", "Confirm network", "Disconnect"]) expect(labels).not.toContain(word);
+    // nobody sees an address: the lines hold the operator, the city and the name
+    expect(text()).not.toMatch(/\d+\.\d+\.\d+\.\d+/);
+  });
+
+  it("puts a dark point in the breakdown of the node, with the reason, and not twice", async () => {
+    getHistory.mockResolvedValue(history(["globalping", "probes"]));
+    getChecks.mockResolvedValue({
+      nowUnix: NOW, intervalS: 300, columns: [], rows: [],
+      countryChecks: [check("nod_de1", CountryVerdict.PARTIAL, { sources: ["probes"], vantages: [vantage("probes", "probe:prb_a", "dark", { network: "ExampleNet · Springfield · probe dacha", asn: "64496", kind: "home", why: "tls_reset" })] })],
+    });
+    await mount();
+    expect(words(row("de1").querySelector("[data-testid=partial-breakdown]"))).toContain("ExampleNet · Springfield — probe “dacha” AS64496 · home · TLS is reset");
+    expect(row("de1").querySelector("[data-testid=own-points]")).toBeNull();
   });
 });
 

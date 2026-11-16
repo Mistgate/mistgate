@@ -15,12 +15,15 @@ export function CopyButton({
   size = "sm",
   variant = "secondary",
   full,
+  onFail,
 }: {
   value: string;
   label?: string;
   size?: "sm" | "md" | "lg";
   variant?: ButtonVariant;
   full?: boolean;
+  /** The browser refused: the caller can select the text for the person to copy by hand. */
+  onFail?: () => void;
 }) {
   const t = useT();
   const toast = useToast();
@@ -32,6 +35,7 @@ export function CopyButton({
       setDone(true);
       setTimeout(() => setDone(false), 2000);
     } catch {
+      onFail?.();
       toast(t("common.copyFailed"));
     }
   }

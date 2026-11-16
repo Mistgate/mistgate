@@ -34,6 +34,7 @@ const testBsbord = vi.fn();
 const listBsbordUnits = vi.fn();
 const previewBsbord = vi.fn();
 const disconnectBsbord = vi.fn();
+const getOwnProbe = vi.fn();
 vi.mock("@/lib/api", () => ({
   cheburcheck: {
     getCheburcheck: (...a: unknown[]) => getCheburcheck(...a),
@@ -49,6 +50,7 @@ vi.mock("@/lib/api", () => ({
     previewBsbord: (...a: unknown[]) => previewBsbord(...a),
     disconnectBsbord: (...a: unknown[]) => disconnectBsbord(...a),
   },
+  ownProbe: { get: (...a: unknown[]) => getOwnProbe(...a) },
   clientProbe: {
     getClientProbe: (...a: unknown[]) => getClientProbe(...a),
     updateClientProbe: (...a: unknown[]) => updateClientProbe(...a),
@@ -99,6 +101,7 @@ beforeEach(() => {
   getBlocklist.mockResolvedValue({ settings: lists() });
   getTspuProbe.mockResolvedValue({ settings: tspu() });
   getClientProbe.mockResolvedValue({ settings: { enabled: false, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 });
+  getOwnProbe.mockResolvedValue({ settings: { enabled: false, intervalMin: 60, fallbackUrl: "" }, probes: [] });
   getCheburcheck.mockResolvedValue({ settings: chebur() });
   getBsbord.mockResolvedValue({ settings: bsb() });
   listBsbordUnits.mockResolvedValue({ units: [], nUnits: 0, nProbeable: 0 });
@@ -180,15 +183,15 @@ describe("the sources", () => {
     expect(tab("Globalping")?.getAttribute("aria-selected")).toBe("true");
   });
 
-  it("list the six in one place, each with what it is, where it looks from and its state in a word; the first one that is on opens", async () => {
+  it("list the seven in one place, each with what it is, where it looks from and its state in a word; the first one that is on opens", async () => {
     getBlocklist.mockResolvedValue({ settings: lists({ enabled: true, checkedUnix: Math.floor(Date.now() / 1000) - 2 * 3600 }) });
     getTspuProbe.mockResolvedValue({ settings: tspu({ enabled: true }) });
     getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, hasToken: true, status: "token_unknown", tokenUnknown: true }) });
     await mount(settings());
-    expect(tabs().map((x) => x.querySelector("span + span")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
+    expect(tabs().map((x) => x.querySelector("span + span")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
     expect(document.querySelector("[role=tablist]")?.getAttribute("aria-label")).toBe("Sources");
     expect(shown()).toEqual(["Block lists"]);
-    expect(tabs().map((x) => x.getAttribute("aria-selected"))).toEqual(["false", "true", "false", "false", "false", "false"]);
+    expect(tabs().map((x) => x.getAttribute("aria-selected"))).toEqual(["false", "true", "false", "false", "false", "false", "false"]);
     // the row says what the source's own state line says, in a word and a few more
     // (the pill's glyph comes first: – off, × error, ~ waiting; a tick is drawn, not written)
     expect(tab("Globalping")?.textContent).toBe("GlobalpingOffFree · volunteer probesany country");
@@ -225,15 +228,15 @@ describe("the sources", () => {
 
   it("walk the list with the arrows, Home and End as one Tab stop; Enter and Space are the row's own click", async () => {
     await mount(settings());
-    expect(tabs().map((x) => x.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
+    expect(tabs().map((x) => x.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
     act(() => tabs()[0]!.focus());
     const steps: [string, string][] = [
       ["ArrowDown", "Block lists"],
       ["ArrowRight", "TSPU probe"],
       ["ArrowUp", "Block lists"],
-      ["End", "kl!ck users"],
+      ["End", "Own probes"],
       ["ArrowDown", "Globalping"],
-      ["ArrowLeft", "kl!ck users"],
+      ["ArrowLeft", "Own probes"],
       ["Home", "Globalping"],
       ["ArrowDown", "Block lists"],
     ];
@@ -246,7 +249,7 @@ describe("the sources", () => {
     expect(shown()).toEqual(["Globalping"]);
     await click(document.activeElement);
     expect(shown()).toEqual(["Block lists"]);
-    expect(tabs().map((x) => x.tabIndex)).toEqual([-1, 0, -1, -1, -1, -1]);
+    expect(tabs().map((x) => x.tabIndex)).toEqual([-1, 0, -1, -1, -1, -1, -1]);
   });
 
   it("on a phone take turns: a tap opens the source and its way back, which returns to the row left", async () => {
@@ -427,7 +430,7 @@ describe("the block-list card", () => {
 
   it("comes after the Globalping card, off by default: nothing downloaded, nothing to test, the privacy line", async () => {
     await mount(settings());
-    expect([...document.querySelectorAll("[role=tabpanel] h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
+    expect([...document.querySelectorAll("[role=tabpanel] h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
     expect(listsState()?.dataset.state).toBe("off");
     expect(listsState()?.textContent).toBe("Off · Nothing is downloaded.");
     expect(listsSwitch()?.getAttribute("aria-checked")).toBe("false");

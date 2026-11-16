@@ -211,7 +211,7 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
 }
 
 /** One numbered step of the install. */
-function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: ReactNode }) {
+export function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: ReactNode }) {
   return (
     <li className="flex gap-3">
       <span

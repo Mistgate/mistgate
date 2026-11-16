@@ -55,6 +55,7 @@ import {
 } from "@/lib/cheburcheck";
 import { clientProbeQuery, clientProbeState, groupText, nodeKind, troubleText, useClientProbeActions, type ClientProbe, type ClientProbeNode } from "@/lib/clientprobe";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { minutesText, useFmt, type Fmt } from "@/lib/format";
 import {
   cardState,
@@ -71,7 +72,19 @@ import {
   type TestOutcome,
 } from "@/lib/globalping";
 import { checksQuery, countryReason, hasKey, tspuPortsText } from "@/lib/health";
+import {
+  ownProbeQuery,
+  probeDefaultInterval,
+  probeIntervals,
+  probesState,
+  unfilteredProbes,
+  useOwnProbeActions,
+  validFallback,
+  type OwnProbes,
+  type ProbesState,
+} from "@/lib/ownprobe";
 import { nodesQuery } from "@/lib/queries";
+import { useNow } from "@/lib/time";
 import {
   isNotAFailure,
   probeNodeOptions,
@@ -88,6 +101,7 @@ import {
   type TspuTest,
 } from "@/lib/tspu";
 import { CountryMark } from "@/screens/health/country";
+import { AddProbeModal, ProbeList } from "./probes";
 import { isSourceId, sourceIds, type SourceId } from "./search";
 
 type Actions = ReturnType<typeof useGlobalpingActions>;
@@ -104,6 +118,7 @@ const meta: Record<SourceId, { icon: IconName; title: MessageKey; what: MessageK
   cheburcheck: { icon: "pulse", title: "cc.title", what: "src.what.cheburcheck", ruOnly: true, Card: CheburcheckCard },
   bsbord: { icon: "phone", title: "bb.title", what: "src.what.bsbord", ruOnly: true, Card: BsbordCard },
   klick: { icon: "people", title: "kc.title", what: "src.what.klick", ruOnly: false, Card: KlickCard },
+  probes: { icon: "pin", title: "pr.title", what: "src.what.probes", ruOnly: false, Card: ProbesCard },
 };
 
 /** What a source's state line says. The line reports it up, so the row of the list and the open source never disagree. */
@@ -123,6 +138,7 @@ export function SourceCards() {
   const navigate = useNavigate();
   const asked = (useSearch({ strict: false }) as { source?: unknown }).source;
   const chosen = isSourceId(asked) ? asked : undefined;
+  const edge = useEdition().off("own_probes");
 
   // the first source that is on, once every one has answered; then it stays, so switching it off does not move the page
   const on = [
@@ -132,9 +148,11 @@ export function SourceCards() {
     useQuery({ ...cheburcheckQuery, select: (s) => s.enabled }),
     useQuery({ ...bsbordQuery, select: (s) => s.enabled }),
     useQuery({ ...clientProbeQuery, select: (p) => !!p.settings?.enabled }),
+    // the Cloudflare edition has no own probes: nothing is asked there, and a query that is not asked does not hold the page back
+    useQuery({ ...ownProbeQuery, enabled: !edge, select: (p) => !!p.settings?.enabled }),
   ];
   const [first, setFirst] = useState<SourceId | null>(null);
-  if (first === null && on.every((q) => !q.isPending)) setFirst(sourceIds.find((_, i) => on[i]!.data) ?? "globalping");
+  if (first === null && on.every((q) => !q.isPending || q.fetchStatus === "idle")) setFirst(sourceIds.find((_, i) => on[i]!.data) ?? "globalping");
   const open = chosen ?? first;
 
   const [looks, setLooks] = useState<Partial<Record<SourceId, Look>>>({});
@@ -633,12 +651,12 @@ function SettingRow({ label, hint, top, width, children }: { label: string; hint
 const everyText = (t: T, m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} ${t("unit.h")}` : minutesText(t, m));
 
 /** Minutes between rounds or runs. Globalping may space its rounds out further when the hourly limit needs it. */
-function IntervalField({ current, options, onPick, label }: { current: number; options: readonly number[]; onPick: (minutes: number) => void; label?: string }) {
+function IntervalField({ current, options, onPick, label, hint }: { current: number; options: readonly number[]; onPick: (minutes: number) => void; label?: string; hint?: string }) {
   const t = useT();
   const minutes = options.includes(current) ? options : [...options, current].sort((a, b) => a - b);
   const name = label ?? t("cr.interval");
   return (
-    <SettingRow label={name} width="w-[200px]">
+    <SettingRow label={name} hint={hint} width="w-[200px]">
       <Select
         compact
         aria-label={name}
@@ -1576,5 +1594,162 @@ function GroupLine({ label, groups }: { label: string; groups: ClientProbeNode["
     <p className="text-xs leading-normal text-pretty text-muted">
       <b className="font-semibold text-fg">{label}:</b> {groups.map((g) => groupText(t, g.name, g.tally!)).join("; ")}
     </p>
+  );
+}
+
+/**
+ * Own probes: routers and servers the owner (or a friend) runs inside a country, which check the nodes from their own networks.
+ * Off by default. Owner only; the Cloudflare edition has none. The probes' list, the window that makes one and the revoke are in
+ * probes.tsx; this card has the switch, the state line, the settings and Disconnect.
+ */
+export function ProbesCard() {
+  const t = useT();
+  const edge = useEdition().off("own_probes");
+  const q = useQuery({ ...ownProbeQuery, enabled: !edge });
+  const act = useOwnProbeActions();
+  const s = q.data?.settings;
+  return (
+    <Detail
+      id="probes"
+      sub={t("pr.sub")}
+      control={
+        s &&
+        !edge && (
+          <Switch checked={s.enabled} disabled={act.update.isPending || act.disconnect.isPending} onCheckedChange={(on) => act.update.mutate({ enabled: on })} aria-label={t("pr.switch")} />
+        )
+      }
+    >
+      {edge ? (
+        <>
+          <Block flush>
+            <StateLine state="unavailable" kind="off" word={t("cr.state.unavailable")} detail={t("pr.state.edition")} />
+          </Block>
+          <Privacy>{t("pr.privacy")}</Privacy>
+        </>
+      ) : (
+        <>
+          <Loading q={q} />
+          {/* switched off and on again, the card starts over, as the other cards do */}
+          {q.data && <ProbesBody key={String(q.data.settings?.enabled)} data={q.data} act={act} />}
+        </>
+      )}
+    </Detail>
+  );
+}
+
+function ProbesBody({ data, act }: { data: OwnProbes; act: ReturnType<typeof useOwnProbeActions> }) {
+  const t = useT();
+  const s = data.settings!;
+  const [adding, setAdding] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  // a probe that sees no filtering is known by its points in the checks: the probe itself does not say it
+  const checks = useQuery({ ...checksQuery(), enabled: s.enabled }).data?.countryChecks;
+  const unfiltered = useMemo(() => unfilteredProbes(checks ?? []), [checks]);
+  const now = Math.floor(useNow() / 1000);
+  const state = probesState(s, data.probes, now, unfiltered);
+  const live = data.probes.filter((p) => p.state !== "revoked");
+
+  return (
+    <>
+      <Block flush>
+        <ProbesStateLine state={state} now={now} />
+        {s.enabled && data.probes.length > 0 && <ProbeList probes={data.probes} now={now} unfiltered={unfiltered} actions={act} />}
+      </Block>
+      {s.enabled && (
+        <Block title={t("pr.block.checks")}>
+          <IntervalField current={s.intervalMin || probeDefaultInterval} options={probeIntervals} hint={t("pr.interval.hint")} onPick={(m) => act.update.mutate({ intervalMin: m })} />
+          <FallbackField current={s.fallbackUrl} busy={act.update.isPending} onSave={(v, done) => act.update.mutate({ fallbackUrl: v }, { onSuccess: done })} />
+        </Block>
+      )}
+      <Privacy>{t("pr.privacy")}</Privacy>
+      {s.enabled && (
+        <ActionBar>
+          <Button variant={live.length === 0 ? "primary" : "secondary"} size="md" onClick={() => setAdding(true)}>
+            <Icon name="plus" size={14} aria-hidden />
+            {t("pr.add")}
+          </Button>
+          <Disconnect onClick={() => setDisconnecting(true)} />
+        </ActionBar>
+      )}
+      {adding && <AddProbeModal actions={act} onClose={() => setAdding(false)} />}
+      {disconnecting && (
+        <ConfirmDisconnect
+          title={t("pr.disconnect.title")}
+          body={t("pr.disconnect.body")}
+          busy={act.disconnect.isPending}
+          onClose={() => setDisconnecting(false)}
+          onConfirm={() => act.disconnect.mutate(undefined, { onSuccess: () => setDisconnecting(false) })}
+        />
+      )}
+    </>
+  );
+}
+
+/** The state of the probes: off, none yet, waiting for a command, silent, a network to confirm, or "N of M" with the newest check. */
+function ProbesStateLine({ state, now }: { state: ProbesState; now: number }) {
+  const t = useT();
+  const fmt = useFmt();
+  const [kind, word, detail] = ((): [StatusKind, string, string] => {
+    switch (state.kind) {
+      case "off":
+        return ["off", t("cr.state.off"), t("pr.state.off.detail")];
+      case "none":
+        return ["blip", t("cr.state.on"), t("pr.state.none")];
+      case "pending":
+        return ["blip", t("pr.state.pending"), t("pr.state.pending.detail")];
+      case "offline":
+        return ["bad", t("pr.state.offlineAll"), t("pr.state.offlineAll.detail", { age: fmt.duration(now - state.since) })];
+      case "netChanged":
+        return ["warn", t("pr.state.netChanged"), t("pr.state.netChanged.detail")];
+      case "works": {
+        const parts = [
+          state.lastAt > 0 ? t("pr.state.last", { ago: fmt.ago(state.lastAt) }) : t("pr.state.firstCheck"),
+          state.changed ? t.n("pr.state.changed", state.changed) : "",
+          state.unfiltered ? t.n("pr.state.unfiltered", state.unfiltered) : "",
+        ];
+        return ["ok", t("pr.state.works", { n: state.n, m: state.m }), parts.filter(Boolean).join(" · ")];
+      }
+    }
+  })();
+  return <StateLine state={state.kind} kind={kind} word={word} detail={detail} />;
+}
+
+/** The spare address of the panel: empty, or an https:// URL; saved with its own button, as the settings that are text are. */
+function FallbackField({ current, busy, onSave }: { current: string; busy: boolean; onSave: (value: string, done: () => void) => void }) {
+  const t = useT();
+  const [value, setValue] = useState(current);
+  const [tried, setTried] = useState(false);
+  const bad = !validFallback(value);
+  const changed = value.trim() !== current;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    setTried(true);
+    if (busy || bad || !changed) return;
+    onSave(value.trim(), () => setTried(false));
+  };
+  return (
+    <SettingRow label={t("pr.fallback")} top width="basis-full @min-[540px]:w-full">
+      <form onSubmit={submit} noValidate className="flex flex-wrap items-start gap-2">
+        <TextField
+          aria-label={t("pr.fallback")}
+          hint={t("pr.fallback.hint")}
+          error={tried && bad ? t("pr.err.fallback") : undefined}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="https://panel.example.com"
+          mono
+          className="min-w-[260px] flex-1"
+        />
+        <span className="mt-1 flex gap-2">
+          <Button type="submit" variant="secondary" size="md" disabled={busy || !changed}>
+            {t("pr.fallback.save")}
+          </Button>
+        </span>
+      </form>
+    </SettingRow>
   );
 }
