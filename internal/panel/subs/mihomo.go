@@ -3,6 +3,7 @@ package subs
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -30,6 +31,7 @@ type mihomoProfile struct {
 	names      []string // the server name of each line, parallel to lines ("" or missing = keep the plugin's own)
 	preset     *dns.Preset
 	autoSelect bool
+	note       bool // lines hold the one entry that says why there are no servers: the profile is the built-in one, never a template
 	log        *slog.Logger
 }
 
@@ -96,12 +98,10 @@ func groupName(title string, taken map[string]bool) string {
 	return uniqueName(strings.Join(strings.Fields(title), " "), taken)
 }
 
-// build writes the profile. Lines that do not parse as one proxy are skipped (and logged without their text: it holds
-// a device secret).
-func (p mihomoProfile) build() ([]byte, error) {
-	proxies := seqNode()
-	taken := map[string]bool{}
-	var names []string
+// servers are the proxies of the lines with the names they want (the name of the server, else the one the plugin gave it). A line
+// that does not parse is skipped.
+func (p mihomoProfile) servers() []subsettings.MihomoServer {
+	var out []subsettings.MihomoServer
 	for i, line := range p.lines {
 		m, own, ok := proxyNode(line)
 		if !ok {
@@ -114,9 +114,59 @@ func (p mihomoProfile) build() ([]byte, error) {
 		if i < len(p.names) && p.names[i] != "" {
 			name = p.names[i]
 		}
-		name = uniqueName(name, taken)
-		subsettings.SetProxyName(m, name)
-		proxies.Content = append(proxies.Content, m)
+		out = append(out, subsettings.MihomoServer{Node: m, Name: name})
+	}
+	return out
+}
+
+// render is the profile of one person: the template of their group around their servers, else the built-in profile. The built-in one
+// is what a person gets when there is no template (tplText ""), when they get a note instead of servers (the note must be seen: a
+// template's groups would hide it), when none of their servers can be used, and when the template does not build (a stored text that
+// this version cannot read: a log line with the template's name, never its text). tplName is for that line only.
+func (p mihomoProfile) render(tplName, tplText string) (body []byte, templated bool, err error) {
+	if tplText != "" && !p.note {
+		switch body, err := p.buildFromTemplate(tplText); {
+		case err == nil:
+			return body, true, nil
+		case errors.Is(err, subsettings.ErrNoServers):
+		default:
+			if p.log != nil {
+				p.log.Warn("mihomo profile: a template could not be used, the built-in profile is sent", "code", "mihomo_template_unusable", "template", tplName)
+			}
+		}
+	}
+	body, err = p.build()
+	return body, false, err
+}
+
+// buildFromTemplate puts the servers of the person into a template (subsettings.ApplyMihomoTemplate). The dns section the template
+// lacks is the resolvers of the person's preset with respect-rules on: no group name is known here for a "#group" fragment, and the
+// split, ad and country rules of the preset (and the policy and providers they need) are the built-in profile's, not a template's.
+func (p mihomoProfile) buildFromTemplate(text string) ([]byte, error) {
+	opt := subsettings.MihomoOptions{AutoSelect: p.autoSelect}
+	if p.preset != nil {
+		if d, err := p.preset.MihomoDNS(""); err != nil {
+			if p.log != nil {
+				p.log.Warn("mihomo profile: the dns section was left out", "code", "mihomo_dns_render_failed", "err", err)
+			}
+		} else {
+			d.Policy = nil
+			opt.DNS = dnsNode(d, true)
+		}
+	}
+	return subsettings.ApplyMihomoTemplate(text, p.servers(), opt)
+}
+
+// build writes the profile. Lines that do not parse as one proxy are skipped (and logged without their text: it holds
+// a device secret).
+func (p mihomoProfile) build() ([]byte, error) {
+	proxies := seqNode()
+	taken := map[string]bool{}
+	var names []string
+	for _, s := range p.servers() {
+		name := uniqueName(s.Name, taken)
+		subsettings.SetProxyName(s.Node, name)
+		proxies.Content = append(proxies.Content, s.Node)
 		names = append(names, name)
 	}
 	group := groupName(p.title, taken)
@@ -150,7 +200,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 				p.log.Warn("mihomo profile: the dns section was left out", "code", "mihomo_dns_render_failed", "err", err)
 			}
 		} else {
-			root.set("dns", dnsNode(d))
+			root.set("dns", dnsNode(d, false))
 			direct = d.Direct
 			providers = d.Providers
 			block = d.Block
@@ -195,7 +245,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 
 // dnsNode is the dns section: fake-ip so that rules see names, IPv6 answers off (the profile's tunnel and the
 // resolvers are IPv4), the servers of the preset (dns.MihomoDNS says why each is where it is).
-func dnsNode(d dns.MihomoDNS) *yaml.Node {
+func dnsNode(d dns.MihomoDNS, respectRules bool) *yaml.Node {
 	m := newMap()
 	m.set("enable", boolNode(true)).set("ipv6", boolNode(false))
 	m.set("enhanced-mode", strNode("fake-ip")).set("fake-ip-range", strNode("198.18.0.1/16"))
@@ -211,6 +261,9 @@ func dnsNode(d dns.MihomoDNS) *yaml.Node {
 		m.set("nameserver-policy", pol.n)
 	}
 	m.set("proxy-server-nameserver", quotedSeq(d.ProxyServerNameserver))
+	if respectRules { // the resolvers' own traffic follows the rules (it needs proxy-server-nameserver, which is always there)
+		m.set("respect-rules", boolNode(true))
+	}
 	return m.n
 }
 

@@ -1,0 +1,41 @@
+# PC: its own dns, a provider and a static proxy next to the servers of the person.
+mixed-port: 7890
+mode: rule
+
+proxy-providers:
+  office:
+    type: http
+    url: https://example.com/office.yaml
+    interval: 3600
+    path: ./providers/office.yaml
+
+proxies:
+  - name: office-socks
+    type: socks5
+    server: office.example.com
+    port: 1080
+
+proxy-groups:
+  - name: Servers
+    type: select
+    include-all-proxies: true
+  - name: Work
+    type: select
+    use: [office]
+    proxies: [office-socks, DIRECT]
+  - name: Nobody
+    type: url-test
+    include-all-proxies: true
+    filter: "no-such-server"
+
+dns:
+  enable: true
+  ipv6: false
+  nameserver:
+    - 9.9.9.9
+  default-nameserver:
+    - 9.9.9.9
+
+rules:
+  - DOMAIN-SUFFIX,corp.example.com,Work
+  - MATCH,Servers

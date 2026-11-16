@@ -744,22 +744,33 @@ func clientCapsPresent(r *http.Request) bool {
 	return false
 }
 
-// writeMihomo answers with the Mihomo YAML profile: the proxies of the view (named like the base64 list names its
-// servers, never with the load percentage: see remarks), one select group, the dns section of the user's effective preset. gzip when the client accepts it.
+// mihomoProfileOf is what the Mihomo profile of a view is built from: the proxies of the view (named like the base64 list names its
+// servers, never with the load percentage: see remarks), or the one entry that says why there are none. The preset is the caller's.
+func mihomoProfileOf(v access.SubView, set *adminv1.SubscriptionSettings, title, lang string, now time.Time, log *slog.Logger) mihomoProfile {
+	p := mihomoProfile{title: title, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), log: log}
+	if note := stateNote(v, lang, now); note != "" {
+		p.lines, p.names, p.note = []string{placeholderProxy}, []string{note}, true
+	} else if !subsettings.LinkAWG(set) && len(v.Lines) == 0 && len(v.AWGProfiles) > 0 {
+		p.lines, p.names, p.note = []string{placeholderProxy}, []string{noServersNote(lang)}, true
+	} else if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {
+		p.names = remarks(v.Servers, set.GetServerNameTemplate(), lang)
+	}
+	return p
+}
+
+// writeMihomo answers with the Mihomo YAML profile: the template of the person's group around their servers (see
+// subsettings.MihomoTemplateFor), else the built-in profile: the servers, one select group and the dns section of the user's
+// effective preset. A person who gets a note instead of servers, or has none, gets the built-in profile. gzip when the client accepts it.
 func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	ctx := r.Context()
 	b := h.brand(ctx)
-	title := h.title(set, b)
-	p := mihomoProfile{title: title, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), log: h.cfg.Log}
-	if note := stateNote(v, b.Language, h.cfg.Now()); note != "" {
-		p.lines, p.names = []string{placeholderProxy}, []string{note}
-	} else if !subsettings.LinkAWG(set) && len(v.Lines) == 0 && len(v.AWGProfiles) > 0 {
-		p.lines, p.names = []string{placeholderProxy}, []string{noServersNote(b.Language)}
-	} else if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {
-		p.names = remarks(v.Servers, set.GetServerNameTemplate(), b.Language)
-	}
+	p := mihomoProfileOf(v, set, h.title(set, b), b.Language, h.cfg.Now(), h.cfg.Log)
 	p.preset = h.linkPreset(ctx, v)
-	body, err := p.build()
+	var tplName, tplText string
+	if t := subsettings.MihomoTemplateFor(set, v.GroupID); t != nil {
+		tplName, tplText = t.Name, t.Yaml
+	}
+	body, _, err := p.render(tplName, tplText)
 	if err != nil {
 		h.cfg.Log.Error("mihomo profile", "code", "subscription_mihomo_render_failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

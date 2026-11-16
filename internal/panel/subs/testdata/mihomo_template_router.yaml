@@ -1,0 +1,38 @@
+# Router: transparent proxy for the LAN. The panel puts the servers in `proxies` and adds `Auto`.
+mixed-port: 7890
+redir-port: 7892
+tproxy-port: 7893
+allow-lan: true
+bind-address: "*"
+mode: rule
+log-level: warning
+external-controller: 127.0.0.1:9090
+
+x-check: &check
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+
+proxy-groups:
+  - name: Proxy
+    type: select
+    include-all-proxies: true
+    proxies: [Auto, DIRECT] # the panel's Auto group
+  - name: Fast
+    <<: *check
+    type: url-test
+    include-all-proxies: true
+    filter: "(?i)de|nl"
+
+rule-providers:
+  ads:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://example.com/ads.mrs
+    interval: 86400
+
+rules:
+  - RULE-SET,ads,REJECT
+  - DOMAIN-SUFFIX,example.com,DIRECT
+  - GEOIP,LAN,DIRECT,no-resolve
+  - MATCH,Proxy
