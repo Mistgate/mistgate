@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -20,6 +21,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -96,7 +98,7 @@ func (s *Service) GetSubscriptionSettings(ctx context.Context, _ *connect.Reques
 	if err := s.fillDNS(ctx, set); err != nil {
 		return nil, s.internal("default dns preset", err)
 	}
-	resp := &adminv1.GetSubscriptionSettingsResponse{Settings: set, EffectiveTitle: s.effectiveTitle(ctx, set)}
+	resp := &adminv1.GetSubscriptionSettingsResponse{Settings: set, EffectiveTitle: s.effectiveTitle(ctx, set), ReservedHeaderNames: subhdr.ReservedNames()}
 	shared, err := s.st.Access().SharedLinkUsers(ctx)
 	if err != nil {
 		return nil, s.internal("shared link users", err)
@@ -214,7 +216,13 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 			return nil, s.internal("set default dns preset", err)
 		}
 	}
-	set, revoked, err := s.settings.UpdateRevoking(ctx, req.Msg.Settings)
+	next, err := s.headerGroups(ctx, req.Msg.Settings)
+	if errors.Is(err, subsettings.ErrInvalid) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	} else if err != nil {
+		return nil, s.internal("response header groups", err)
+	}
+	set, revoked, err := s.settings.UpdateRevoking(ctx, next)
 	if errors.Is(err, subsettings.ErrInvalid) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	} else if err != nil {
@@ -228,7 +236,7 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	}
 	// The audit row says that the settings changed and how big they are, never their texts.
 	params, _ := json.Marshal(map[string]any{
-		"apps": len(set.Apps), "rules": len(set.Rules), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
+		"apps": len(set.Apps), "rules": len(set.Rules), "response_headers": len(set.ResponseHeaders), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
 		"link_awg": subsettings.LinkAWG(set), "link_auto_select": subsettings.LinkAutoSelect(set), "shared_revoked": revoked,
 	})
 	entry := store.AuditEntry{Actor: admin.ID, Action: "subscription_settings_update", Result: "ok", Params: string(params)}
@@ -239,6 +247,87 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 		s.log.Warn("audit", "code", "subscription_audit_write_failed", "action", entry.Action, "err", err)
 	}
 	return connect.NewResponse(&adminv1.UpdateSubscriptionSettingsResponse{Settings: set}), nil
+}
+
+// headerGroups checks the groups the own response headers are limited to. A group that does not exist is refused, unless the
+// stored settings already name it: it was deleted since, and drops out of the list here, so that a save from another tab of the
+// admin does not fail over it (the person of a deleted group cannot exist, so the entry never applied to anyone). It returns the
+// settings to store (a copy when anything changed).
+func (s *Service) headerGroups(ctx context.Context, set *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, error) {
+	used := false
+	for _, e := range set.GetResponseHeaders() {
+		used = used || len(e.GetGroupIds()) > 0
+	}
+	if !used {
+		return set, nil
+	}
+	groups, err := s.st.Access().Groups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	live := make(map[string]bool, len(groups))
+	for _, g := range groups {
+		live[g.ID] = true
+	}
+	stored, err := subsettings.Load(ctx, s.st)
+	if err != nil {
+		return nil, err
+	}
+	had := map[string]bool{}
+	for _, e := range stored.GetResponseHeaders() {
+		for _, id := range e.GroupIds {
+			had[id] = true
+		}
+	}
+	out := proto.Clone(set).(*adminv1.SubscriptionSettings)
+	for i, e := range out.ResponseHeaders {
+		e.GroupIds = slices.DeleteFunc(e.GroupIds, func(id string) bool { return !live[id] && had[id] })
+		for _, id := range e.GroupIds {
+			if !live[id] {
+				return nil, fmt.Errorf("%w: response_headers[%d].group_ids: no such group", subsettings.ErrInvalid, i)
+			}
+		}
+	}
+	return out, nil
+}
+
+// PreviewResponseHeaders says which of the own headers of the list one person's answer carries for a User-Agent: the answer
+// format that User-Agent is served by the saved rules, the person's group and whether their subscription serves them at all.
+func (s *Service) PreviewResponseHeaders(ctx context.Context, req *connect.Request[adminv1.PreviewResponseHeadersRequest]) (*connect.Response[adminv1.PreviewResponseHeadersResponse], error) {
+	m := req.Msg
+	if len(m.UserAgent) > 1024 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("user agent is too long"))
+	}
+	list, err := subsettings.CheckResponseHeaders(m.Headers)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	u, err := s.st.Access().User(ctx, m.UserId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such person"))
+	} else if err != nil {
+		return nil, s.internal("preview user", err)
+	}
+	_, format, _ := Choose(s.settings.Get(ctx), m.UserAgent)
+	resp := &adminv1.PreviewResponseHeadersResponse{Format: format}
+	if g, err := s.st.Access().Group(ctx, u.GroupID); err == nil {
+		resp.GroupName = g.Name
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, s.internal("preview group", err)
+	}
+	switch {
+	case format == adminv1.SubFormat_SUB_FORMAT_USER_PAGE:
+		resp.NotServed = "page"
+	case format == adminv1.SubFormat_SUB_FORMAT_DECOY:
+		resp.NotServed = "decoy"
+	case access.SubscriptionStatus(u, time.Now()) != access.StatusActive:
+		resp.NotServed = "no_access"
+	default:
+		for _, h := range subsettings.ResponseHeadersFor(&adminv1.SubscriptionSettings{ResponseHeaders: list}, u.GroupID, format) {
+			resp.Headers = append(resp.Headers, &adminv1.SentHeader{Name: h.Name, Value: h.Value, Base64: h.Base64})
+		}
+	}
+	return connect.NewResponse(resp), nil
 }
 
 // clientNames are the display names of the client ids the plugins refer to.

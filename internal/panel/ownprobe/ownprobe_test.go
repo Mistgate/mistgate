@@ -1072,7 +1072,7 @@ func TestBuildInstallCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh 'https://panel.example.test/aaaaaaaaaaaaaaaaaaaaaaaa/probe.sh'" +
+	want := "i(){ opkg install \"$1\" || { opkg update; opkg install \"$1\"; }; }; command -v curl >/dev/null || i curl; command -v sha256sum >/dev/null || i coreutils-sha256sum; [ -s /opt/etc/ssl/certs/ca-certificates.crt ] || i ca-bundle; cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh 'https://panel.example.test/aaaaaaaaaaaaaaaaaaaaaaaa/probe.sh'" +
 		" && echo '" + hash + "  mgp.sh' | sha256sum -c - && sh mgp.sh install 'https://panel.example.test/aaaaaaaaaaaaaaaaaaaaaaaa' '" + token + "'"
 	if command != want {
 		t.Fatalf("command:\n got %s\nwant %s", command, want)

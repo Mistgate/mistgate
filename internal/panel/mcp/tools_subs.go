@@ -33,7 +33,8 @@ func subscriptionTools() []toolDef {
 		[]toolDef{readTool("subscription_settings_get", ProfileReadonly, procs(adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure),
 			"The subscription page every user sees: its apps per platform in display order (name, kind, download link, add-link template, description, "+
 				"recommended), ordered User-Agent serving rules, page options and Happ ping settings, instance DNS default and link-app DNS offer, "+
-				"link device-limit mode and device_idle_after_days (0 disables idling; otherwise 7 to 365), AmneziaWG-in-link and automatic-server-selection switches, server-name template, title, announcement, support link and refresh interval. "+
+				"link device-limit mode and device_idle_after_days (0 disables idling; otherwise 7 to 365), AmneziaWG-in-link and automatic-server-selection switches, server-name template, title, announcement, support link and refresh interval, "+
+				"and the owner's own response headers of a successful subscription answer (name, value, base64, the formats and groups each goes to) with the names that are reserved. "+
 				"Also the current shared link-user and link AmneziaWG-key counts. No user's link or key. Links show query strings and long path "+
 				"segments as [redacted]; give a field to subscription_app_upsert_plan only when you change an app.",
 			func(c *call, _ noArgs) (any, error) {
@@ -80,6 +81,18 @@ type SubsSettingsV struct {
 	LinkAWGKeys         uint32                `json:"link_awg_keys"`
 	HappPing            string                `json:"happ_ping"`
 	HappPingOnOpen      bool                  `json:"happ_ping_on_open"`
+	ResponseHeaders     []responseHeaderV     `json:"response_headers"`
+	ReservedHeaders     []string              `json:"reserved_header_names"` // may not be an own header's name; "X-Hwid-*" is a prefix
+}
+
+// responseHeaderV is one own response header: the first of two entries of one name that apply wins.
+type responseHeaderV struct {
+	Name    string   `json:"name"`
+	Value   string   `json:"value"`
+	Base64  bool     `json:"base64"`
+	Formats []string `json:"formats"`     // empty = every format
+	Only    bool     `json:"only_groups"` // false = every group
+	Groups  []string `json:"group_ids"`   // with only_groups; none listed = nobody
 }
 
 type serveRuleV struct {
@@ -109,6 +122,14 @@ func subsSettingsView(r *adminv1.GetSubscriptionSettingsResponse) *SubsSettingsV
 		Apps: map[string][]subsAppV{}, Rules: []serveRuleV{}, DefaultDNSPresetID: clean(s.GetDefaultDnsPresetId(), 60),
 		LinkDeviceLimit: linkModeWord(s), DeviceIdleAfterDays: s.GetDeviceIdleAfterDays(), LinkAWG: subsettings.LinkAWG(s), LinkAutoSelect: subsettings.LinkAutoSelect(s), SharedLinkUsers: r.GetSharedLinkUsers(),
 		LinkAWGKeys: r.GetLinkAwgKeys(), HappPing: happPingWord(s.GetHappPing()), HappPingOnOpen: s.GetHappPingOnOpen(),
+		ResponseHeaders: []responseHeaderV{}, ReservedHeaders: r.GetReservedHeaderNames(),
+	}
+	for _, e := range s.GetResponseHeaders() {
+		hv := responseHeaderV{Name: clean(e.GetName(), 64), Value: clean(e.GetValue(), 1000), Base64: e.GetBase64(), Formats: []string{}, Only: e.GetOnlyGroups(), Groups: cleanIDs(e.GetGroupIds())}
+		for _, f := range e.GetFormats() {
+			hv.Formats = append(hv.Formats, subFormatWord(f))
+		}
+		v.ResponseHeaders = append(v.ResponseHeaders, hv)
 	}
 	if link := s.GetLinkDns(); link != nil {
 		v.LinkDNS.PresetIDs = cleanIDs(link.GetPresetIds())

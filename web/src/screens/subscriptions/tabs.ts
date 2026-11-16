@@ -1,4 +1,4 @@
-export const subsTabs = ["formats", "rules", "clients", "texts", "page", "dns"] as const;
+export const subsTabs = ["formats", "rules", "clients", "texts", "headers", "page", "dns"] as const;
 export type SubsTab = (typeof subsTabs)[number];
 
 /**

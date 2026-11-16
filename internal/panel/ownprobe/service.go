@@ -235,12 +235,14 @@ func serverCommand(base, scriptHash, verb string) string {
 
 // BuildInstallCommand returns the one-time command for a router with Entware (Keenetic): the packages, the download, the hash
 // check and the install with the token. The random token alphabet is restricted, and URLs are validated before shell quoting.
+// Only a missing package is installed: "opkg install curl" on a router that has curl upgrades the program without its library
+// and breaks it, and "opkg update" fails as a whole when one stale custom feed does, so it runs only when an install needs it.
 func BuildInstallCommand(publicURL, prefix, token, scriptHash string) (string, error) {
 	base, err := commandBase(publicURL, prefix, scriptHash)
 	if err != nil || !validProbeToken(token) {
 		return "", errors.New("invalid install command input")
 	}
-	return "opkg update && opkg install curl ca-bundle coreutils-sha256sum && " + routerCommand(base, scriptHash, "install "+shellQuote(base)+" "+shellQuote(token)), nil
+	return "i(){ opkg install \"$1\" || { opkg update; opkg install \"$1\"; }; }; command -v curl >/dev/null || i curl; command -v sha256sum >/dev/null || i coreutils-sha256sum; [ -s /opt/etc/ssl/certs/ca-certificates.crt ] || i ca-bundle; " + routerCommand(base, scriptHash, "install "+shellQuote(base)+" "+shellQuote(token)), nil
 }
 
 // BuildServerInstallCommand is the one-time command for a server: no opkg, the script through sudo.

@@ -20,6 +20,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 )
 
 const (
@@ -195,11 +196,11 @@ func (h *handler) serveClientSync(w http.ResponseWriter, r *http.Request, dev st
 	}
 	sum := sha256.Sum256(canonical)
 	etag := `"` + hex.EncodeToString(sum[:]) + `"`
-	w.Header().Set("ETag", etag)
-	w.Header()["Cache-Control"] = headerCacheNoStore[:1:1]
-	w.Header()["Content-Type"] = headerContentTypeJSON[:1:1]
-	w.Header()["X-Content-Type-Options"] = headerNoSniff[:1:1]
-	w.Header()["Referrer-Policy"] = headerNoReferrer[:1:1]
+	w.Header().Set(subhdr.ETag, etag)
+	w.Header()[subhdr.CacheControl] = headerCacheNoStore[:1:1]
+	w.Header()[subhdr.ContentType] = headerContentTypeJSON[:1:1]
+	w.Header()[subhdr.XContentTypeOptions] = headerNoSniff[:1:1]
+	w.Header()[subhdr.ReferrerPolicy] = headerNoReferrer[:1:1]
 	if ifNoneMatch(r.Header.Values("If-None-Match"), etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -249,7 +250,7 @@ func (h *handler) staleKey(w http.ResponseWriter, r *http.Request, route string,
 		jsonError(w, http.StatusUnauthorized, "link_changed", "")
 	default:
 		h.cfg.Log.Warn("client API request asked to retry", "code", "client_api_retry", "route", route, "err", cause)
-		w.Header().Set("Retry-After", clientRetryAfter)
+		w.Header().Set(subhdr.RetryAfter, clientRetryAfter)
 		jsonError(w, http.StatusServiceUnavailable, "retry", "")
 	}
 }

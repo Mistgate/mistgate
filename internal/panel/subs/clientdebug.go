@@ -14,6 +14,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 )
 
 // The logs a person's app sends for support: POST <base>/debug and POST <base>/debug/decline (the client API's routes, with sync and
@@ -194,7 +195,7 @@ func (h *handler) serveClientDebug(w http.ResponseWriter, r *http.Request, dev s
 // clientDebugRetryLater is 503 retry: the panel is busy with other deliveries; the body of this one was not read, or was read and
 // not kept.
 func (h *handler) clientDebugRetryLater(w http.ResponseWriter) {
-	w.Header().Set("Retry-After", strconv.Itoa(int(clientDebugBackoff/time.Second)))
+	w.Header().Set(subhdr.RetryAfter, strconv.Itoa(int(clientDebugBackoff/time.Second)))
 	jsonError(w, http.StatusServiceUnavailable, "retry", "")
 }
 
@@ -266,7 +267,7 @@ func (h *handler) clientDebugFailed(w http.ResponseWriter, err error) {
 		tooManyWrites(w, refusal.RetryAfter)
 		return
 	case refusal.RetryAfter > 0:
-		w.Header().Set("Retry-After", strconv.Itoa(int((refusal.RetryAfter+time.Second-1)/time.Second)))
+		w.Header().Set(subhdr.RetryAfter, strconv.Itoa(int((refusal.RetryAfter+time.Second-1)/time.Second)))
 	}
 	jsonError(w, refusal.Status, refusal.Code, refusal.Message)
 }

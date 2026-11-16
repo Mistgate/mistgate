@@ -10,12 +10,14 @@ import { ClientApiCard } from "@/screens/subscriptions/client-api";
 import { ClientsTab } from "@/screens/subscriptions/clients";
 import { FormatsTab } from "@/screens/subscriptions/formats";
 import { DeviceIdleCard } from "@/screens/subscriptions/device-idle";
+import { HeadersTab } from "@/screens/subscriptions/headers";
 import { LinkAutoCard } from "@/screens/subscriptions/link-auto";
 import { LinkAwgCard, LinkAwgOffDialog } from "@/screens/subscriptions/link-awg";
 import type { Settings } from "@/screens/subscriptions/model";
-import { clientsQuery, settingsQuery } from "@/screens/subscriptions/queries";
+import { clientsQuery, pickerUsersQuery, settingsQuery } from "@/screens/subscriptions/queries";
 import { TextsTab } from "@/screens/subscriptions/texts";
-import { protocolsQuery } from "@/screens/users/rpc";
+import { groupsQuery, protocolsQuery } from "@/screens/users/rpc";
+import { subscriptions } from "@/lib/api";
 
 // Development only (the dev kit): Subscriptions on made-up settings. /dev-kit?only=subs: "Names & texts" with how Happ
 // pings the servers; &state=awg-on|awg-off|awg-ask: the switch "AmneziaWG in apps on the link" on the tab "Who gets
@@ -24,6 +26,9 @@ import { protocolsQuery } from "@/screens/users/rpc";
 // as a helper sees it (read only). &state=clients|clients-empty|clients-readonly|clients-rules: the tab "App versions" with
 // devices of every state and of every class of what the nodes saw (data-shot subs-clients, and subs-clients-classic with the chip "Old-style" chosen: the OK device there is the table's mistake), with no device that gets REALITY servers, as a helper sees it (the table of minimum versions only
 // read), and with that table unfolded for the owner (one row changed from the built-in one, one of their own).
+// &state=headers-empty|headers|headers-error: the tab "Response headers" with no header, with the flclashx-* headers of FlClashX
+// (the preview answers as the panel would: the format of the User-Agent, the person's group) and with the four mistakes the form
+// points out (data-shot subs-headers-empty, subs-headers, subs-headers-error).
 
 const settings = {
   title: "",
@@ -42,6 +47,61 @@ const settings = {
   happPing: HappPing.TCP,
   happPingOnOpen: true,
 } as unknown as Settings;
+
+// The names the panel keeps, as GetSubscriptionSettingsResponse.reserved_header_names lists them (subhdr.ReservedNames).
+const reservedNames = "Accept-*|Access-Control-*|Age|Allow|Alt-Svc|Alt-Used|Announce|Authorization|Cache-Control|Cache-Status|CF-*|Clear-Site-Data|Connection|Content-*|Cookie|Cookie2|Cross-Origin-*|Date|Early-Data|ETag|Expect|Expires|Forwarded|From|Host|If-*|Keep-Alive|Last-Modified|Link|Location|Max-Forwards|Mistgate-*|NEL|Origin|Origin-Agent-Cluster|Permissions-Policy|Ping-*|Pragma|Probe-Report|Profile-*|Proxy-*|Range|Referrer-Policy|Refresh|Report-To|Reporting-Endpoints|Retry-After|Routing|Sec-*|Server|Server-Timing|Service-Worker-Allowed|Set-Cookie|Set-Cookie2|Strict-Transport-Security|Subscription-*|Support-Url|TE|Timing-Allow-Origin|Trailer|Transfer-Encoding|Upgrade|Upgrade-Insecure-Requests|User-Agent|Vary|Via|Warning|WWW-Authenticate|X-Accel-Buffering|X-Accel-Redirect|X-Content-Type-Options|X-Envoy-*|X-Forwarded-*|X-Frame-Options|X-Hwid-*|X-Powered-By|X-Real-Ip|X-Request-Id|X-Robots-Tag|X-Xss-Protection".split("|");
+const hdr = (name: string, value: string, o: Partial<{ base64: boolean; formats: SubFormat[]; onlyGroups: boolean; groupIds: string[] }> = {}) => ({ name, value, base64: false, formats: [], onlyGroups: false, groupIds: [], ...o });
+const hdrGroups = [
+  { id: "grp_mobile", name: "MOBILE" },
+  { id: "grp_home", name: "HOME" },
+  { id: "grp_vip", name: "VIP" },
+];
+const hdrUsers = [
+  { id: "usr_alice", name: "alice" },
+  { id: "usr_bob", name: "bob" },
+];
+const hdrPairs = [
+  hdr("flclashx-servicename", "Мой VPN", { base64: true }),
+  hdr("flclashx-special", "providermode, noglobal", { formats: [SubFormat.MIHOMO_YAML], onlyGroups: true, groupIds: ["grp_mobile"] }),
+  hdr("flclashx-settings", "autostart, closeconnections", { formats: [SubFormat.MIHOMO_YAML] }),
+  hdr("flclashx-widgets", "currentOutbound,announcement,proxyGroups", { formats: [SubFormat.MIHOMO_YAML], onlyGroups: true, groupIds: ["grp_mobile", "grp_vip"] }),
+];
+// the four mistakes of the form: a name the panel keeps, a name that is no token, text that needs base64, a group list left empty
+const hdrMistakes = [
+  hdr("Content-Type", "text/plain"),
+  hdr("flclashx view", "dark"),
+  hdr("flclashx-servicename", "Мой VPN"),
+  hdr("flclashx-special", "providermode", { onlyGroups: true }),
+];
+const hdrOf = (state: string) => (state === "headers-empty" ? [] : state === "headers-error" ? hdrMistakes : hdrPairs);
+
+/** The tab "Response headers" on its own cache; the panel's preview is answered here by the same rule (format of the User-Agent, group of the person). */
+function HeadersShot({ state }: { state: string }) {
+  const [qc] = useState(() => {
+    const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    c.setQueryData(groupsQuery.queryKey, hdrGroups as never);
+    c.setQueryData(pickerUsersQuery.queryKey, hdrUsers);
+    (subscriptions as unknown as Record<string, unknown>).previewResponseHeaders = async ({ userId, userAgent, headers }: { userId: string; userAgent: string; headers: typeof hdrPairs }) => {
+      const ua = userAgent.toLowerCase();
+      const format = ua.includes("mozilla") ? SubFormat.USER_PAGE : ua.includes("mihomo") || ua.includes("clash") ? SubFormat.MIHOMO_YAML : ua.includes("sing-box") ? SubFormat.SINGBOX_JSON : ua.includes("v2ray") ? SubFormat.XRAY_JSON : SubFormat.BASE64_URIS;
+      const group = userId === "usr_alice" ? "grp_mobile" : "grp_home";
+      const sent = headers
+        .filter((h) => (h.formats.length === 0 || h.formats.includes(format)) && (!h.onlyGroups || h.groupIds.includes(group)))
+        .map((h) => ({ name: h.name, base64: h.base64, value: h.base64 ? `base64:${btoa(String.fromCharCode(...new TextEncoder().encode(h.value)))}` : h.value }));
+      return { format, headers: format === SubFormat.USER_PAGE ? [] : sent, notServed: format === SubFormat.USER_PAGE ? "page" : "", groupName: hdrGroups.find((g) => g.id === group)!.name };
+    };
+    return c;
+  });
+  const data = { settings: { ...settings, responseHeaders: hdrOf(state) } as unknown as Settings, reservedHeaderNames: reservedNames };
+  return (
+    <QueryClientProvider client={qc}>
+      <div data-shot={`subs-${state}`} className="flex flex-col gap-3">
+        <SectionLabel>{state === "headers-empty" ? "Subscriptions → Response headers: none yet" : state === "headers-error" ? "Subscriptions → Response headers: a name the panel keeps, a name that is no header name, text that needs base64, no group chosen" : "Subscriptions → Response headers: the flclashx-* headers of FlClashX, with the preview of what one person gets"}</SectionLabel>
+        <HeadersTab data={data} />
+      </div>
+    </QueryClientProvider>
+  );
+}
 
 const clients = [
   { id: "happ", name: "Happ", protocols: ["hysteria2", "vless"], formats: [SubFormat.BASE64_URIS, SubFormat.XRAY_JSON] },
@@ -177,7 +237,7 @@ export function SubsKit() {
       : [];
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
-    c.setQueryData(settingsQuery.queryKey, { settings: shown, effectiveTitle: "Mistgate", samples, sampleGroup: state === "many" ? "Default" : "", namesLanguage: "", sharedLinkUsers: 0, linkAwgKeys: 14 });
+    c.setQueryData(settingsQuery.queryKey, { settings: shown, reservedHeaderNames: [] as string[], effectiveTitle: "Mistgate", samples, sampleGroup: state === "many" ? "Default" : "", namesLanguage: "", sharedLinkUsers: 0, linkAwgKeys: 14 });
     c.setQueryData(clientsQuery.queryKey, clients as never);
     c.setQueryData(protocolsQuery.queryKey, protocols as never);
     return c;
@@ -194,6 +254,7 @@ export function SubsKit() {
             <ClientApiShot enabled owner empty label="Subscriptions → Who gets what: the Mistgate app, on, nobody has connected yet" />
           </div>
         )}
+        {state.startsWith("headers") && <HeadersShot state={state} />}
         {state === "clients" && (
           <>
             <ClientsShot owner shot="subs-clients" label="Subscriptions → App versions: devices of every state with what the nodes saw (a device new-style in fact but below the minimum by the table, one that is old-style in fact, a mixed one, one nobody measured), the owner" />
@@ -211,7 +272,7 @@ export function SubsKit() {
             <DeviceIdleCard settings={{ ...shown, deviceIdleAfterDays: 0 } as Settings} />
           </div>
         )}
-        {!awg && state !== "client-api" && state !== "idle" && !state.startsWith("clients") && (
+        {!awg && state !== "client-api" && state !== "idle" && !state.startsWith("clients") && !state.startsWith("headers") && (
           <div data-shot="subs-texts" className="flex flex-col gap-3">
             <SectionLabel>Subscriptions → Names &amp; texts: ping in Happ</SectionLabel>
             <TextsTab data={{ settings, effectiveTitle: "Mistgate", samples, sampleGroup: state === "many" ? "Default" : "" } as never} />

@@ -473,7 +473,7 @@ probe_json() { own Get | jq -c --arg id "$PROBE_ID" '.probes[] | select(.id == $
 probe_state() { probe_json | jq -r .state; }
 check "the panel's command carries the sha256 of the script it serves" \
   '[ "$SCRIPT_SHA" = "$(sha256sum "$ROOT/internal/panel/ownprobe/mistgate-probe.sh" | cut -d" " -f1)" ]'
-case $COMMAND in "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh "*) ;; *) die "the install command has another shape" ;; esac
+case $COMMAND in "i(){ opkg install \"\$1\" || { opkg update; opkg install \"\$1\"; }; }; command -v curl >/dev/null || i curl; command -v sha256sum >/dev/null || i coreutils-sha256sum; [ -s /opt/etc/ssl/certs/ca-certificates.crt ] || i ca-bundle; cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh "*) ;; *) die "the install command has another shape" ;; esac
 INSTALL_OUT=$(inhome "${STAND_SH[@]}" -c "${COMMAND/cd \/tmp/cd $WORK/dl}" 2>&1) || { printf '%s\n' "$INSTALL_OUT" >&2; die "the install command failed"; }
 printf '%s\n' "$INSTALL_OUT"
 check "install by the issued command prints OK with the id the panel gave" 'case $INSTALL_OUT in *"OK: probe $PROBE_ID registered and running"*) true ;; *) false ;; esac'

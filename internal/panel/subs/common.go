@@ -11,6 +11,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/instance"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/web"
 )
@@ -148,16 +149,16 @@ func (c *common) writeData(w http.ResponseWriter, r *http.Request, d pageData, a
 		return
 	}
 	hd := w.Header()
-	hd["Content-Type"] = headerContentTypeHTML[:1:1]
-	hd["Cache-Control"] = headerCacheNoStore[:1:1]
-	hd["X-Content-Type-Options"] = headerNoSniff[:1:1]
-	hd["Referrer-Policy"] = headerNoReferrer[:1:1]
-	hd["X-Robots-Tag"] = headerRobotsNoIndex[:1:1]
-	hd.Set("Content-Security-Policy", c.page.csp(ancestors))
+	hd[subhdr.ContentType] = headerContentTypeHTML[:1:1]
+	hd[subhdr.CacheControl] = headerCacheNoStore[:1:1]
+	hd[subhdr.XContentTypeOptions] = headerNoSniff[:1:1]
+	hd[subhdr.ReferrerPolicy] = headerNoReferrer[:1:1]
+	hd[subhdr.XRobotsTag] = headerRobotsNoIndex[:1:1]
+	hd.Set(subhdr.ContentSecurityPolicy, c.page.csp(ancestors))
 	if ancestors == "'self'" {
-		hd["X-Frame-Options"] = headerFrameSameOrigin[:1:1] // replaces the admin's DENY
+		hd[subhdr.XFrameOptions] = headerFrameSameOrigin[:1:1] // replaces the admin's DENY
 	} else {
-		hd["X-Frame-Options"] = headerFrameDeny[:1:1]
+		hd[subhdr.XFrameOptions] = headerFrameDeny[:1:1]
 	}
 	w.Write(html)
 }

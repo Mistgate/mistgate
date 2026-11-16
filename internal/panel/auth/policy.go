@@ -149,6 +149,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure: levelWrite,
 	adminv1connect.SubscriptionServiceListClientsProcedure:                levelRead,
 	adminv1connect.SubscriptionServiceTestUserAgentProcedure:              levelRead,
+	adminv1connect.SubscriptionServicePreviewResponseHeadersProcedure:     levelRead,
 
 	// HealthService: reads for every role; mute, "check now" and "run doctor" are day-to-day work; a fix
 	// changes host configuration or drops sessions, so the owner (restart_inbound may later be relaxed

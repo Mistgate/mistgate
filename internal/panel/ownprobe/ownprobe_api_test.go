@@ -37,7 +37,7 @@ func TestCommandBuilders(t *testing.T) {
 		"server update":  func() (string, error) { return BuildServerUpdateCommand(apiURL, apiPrefix, hash) },
 	}
 	want := map[string]string{
-		"router install": "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh '" + base + "/probe.sh'" +
+		"router install": "i(){ opkg install \"$1\" || { opkg update; opkg install \"$1\"; }; }; command -v curl >/dev/null || i curl; command -v sha256sum >/dev/null || i coreutils-sha256sum; [ -s /opt/etc/ssl/certs/ca-certificates.crt ] || i ca-bundle; cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh '" + base + "/probe.sh'" +
 			" && echo '" + hash + "  mgp.sh' | sha256sum -c - && sh mgp.sh install '" + base + "' '" + token + "'",
 		"server install": `f=$(mktemp) && curl -fsS --connect-timeout 15 -m 120 -o "$f" '` + base + `/probe.sh'` +
 			` && echo "` + hash + `  $f" | sha256sum -c - && sudo sh "$f" install '` + base + "' '" + token + "'",

@@ -22,7 +22,7 @@ import { LinkAwgCard } from "./link-awg";
 import { Lead } from "./ui";
 
 // Client User-Agents to try: the chip label and what it fills in.
-const samples = [
+export const samples = [
   ["Happ", "Happ/3.2.1 (iPhone; iOS 18.0)"],
   ["AmneziaVPN", "AmneziaVPN/4.8.2 Android"],
   ["Mihomo", "mihomo/1.18.9"],
