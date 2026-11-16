@@ -10,6 +10,7 @@ import (
 const Links2Capability = "links/2"
 const Links3Capability = "links/3"
 const VLESSUnknownKeysCapability = "vless-unknown-keys/1"
+const TrustTunnelCapability = "trusttunnel/1"
 
 // VLESSHelloKexCapability marks agents that count the key exchange of the ClientHellos of REALITY connections per key
 // (agent.proto LinkCounters hello_pq, hello_classic, hello_unknown).
@@ -24,6 +25,9 @@ var (
 	KeyLink3Fields = []string{"tcp_stalls", "tcp_stalls_16k", "initiations", "responses", "responses_unmatched"}
 	unsupported    = map[string][]string{
 		"awg": append([]string{"rejects", "drops", "hellos", "handshakes"}, link2Fields...),
+		// The TrustTunnel engine counts connects and unknown_keys, and with trusttunnel/1 auth_failed (a known username refused,
+		// for a wrong password or an ended term); every other counter is not reported, and its zero means nothing.
+		"trusttunnel": append([]string{"rejects", "drops", "stalls", "hellos", "handshakes", "keys_stalled", "keys_tried"}, link2Fields...),
 		// VLESS sessions supply online_s; vless-unknown-keys/1 agents additionally report unknown_keys per inbound, and links/3
 		// agents hellos, hellos_foreign and connects (see vlessSupported).
 		"vless": {"connects", "rejects", "drops", "stalls", "unknown_keys", "hellos", "handshakes", "keys_stalled", "keys_tried",
@@ -89,7 +93,13 @@ func UnsupportedCountersFor(protocol string, agentCaps []string, v Variant) []st
 		}
 	}
 	for _, f := range Link3Fields {
-		if !links3 || !link3Supported(protocol, f, v) {
+		supported := links3 && link3Supported(protocol, f, v)
+		// TrustTunnel's inbound-only auth_failed counter is part of its protocol capability contract, not the
+		// generic links/3 bundle. Its node capability gates both the inbound and this counter.
+		if protocol == "trusttunnel" && f == "auth_failed" && slices.Contains(agentCaps, TrustTunnelCapability) {
+			supported = true
+		}
+		if !supported {
 			out = append(out, f)
 		}
 	}
@@ -154,5 +164,5 @@ func SupportsHysteria2Links2(protocol string, supportsLinks2 bool) bool {
 
 // UnsupportedDescription is the common note used by MCP descriptions and tests.
 func UnsupportedDescription() string {
-	return "unsupported names counters the current protocol, its transport, the AWG backend or the agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: unknown_keys is supported with vless-unknown-keys/1, hellos, hellos_foreign and over REALITY TCP connects with links/3, and every other connection counter except online_s is unsupported; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms, loss_permille, rtt_samples and pkts_sent; links/3 reasons only where the engine sees them: Hysteria2 hs_unfinished and the tls_* alerts, VLESS REALITY reality_fallback, auth_failed and hs_unfinished, VLESS tls hs_unfinished and the tls_* alerts, VLESS tcp_stalls over REALITY TCP or a direct TLS front, AWG initiations, responses and responses_unmatched on the userspace backend only (the kernel backend cannot tell them apart))."
+	return "unsupported names counters the current protocol, its transport, the AWG backend or the agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: unknown_keys is supported with vless-unknown-keys/1, hellos, hellos_foreign and over REALITY TCP connects with links/3, and every other connection counter except online_s is unsupported; TrustTunnel: only connects and the inbound-only unknown_keys, and with trusttunnel/1 the inbound-only auth_failed, are reported; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms, loss_permille, rtt_samples and pkts_sent; links/3 reasons only where the engine sees them: Hysteria2 hs_unfinished and the tls_* alerts, VLESS REALITY reality_fallback, auth_failed and hs_unfinished, VLESS tls hs_unfinished and the tls_* alerts, VLESS tcp_stalls over REALITY TCP or a direct TLS front, AWG initiations, responses and responses_unmatched on the userspace backend only (the kernel backend cannot tell them apart))."
 }

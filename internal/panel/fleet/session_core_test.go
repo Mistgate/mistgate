@@ -654,6 +654,32 @@ func TestNodeLiveConnectedFollowsHelloAndClose(t *testing.T) {
 	}
 }
 
+func TestHelloLinkViaNodeAppearsInLiveProjection(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-live-bridge-link")
+	frame := hello("instance-live-bridge-link", 0, "")
+	frame.GetHello().LinkViaNodeId = "nod_msk1"
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventHello, At: now, Frame: frame}); err != nil {
+		t.Fatal(err)
+	}
+	if state.LinkViaNodeID != "nod_msk1" {
+		t.Fatalf("session link_via_node_id = %q, want nod_msk1", state.LinkViaNodeID)
+	}
+	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix()}
+	if _, err := core.Step(ctx, &state, SessionEvent{Kind: EventAgentFrame, At: now, Frame: &agentv1.ConnectRequest{
+		Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: stats},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("NodeLive = %+v, %v", rows, err)
+	}
+	view := decodeLiveView(rows[0])
+	if view.LinkViaNodeID != "nod_msk1" {
+		t.Fatalf("live projection link_via_node_id = %q, want nod_msk1", view.LinkViaNodeID)
+	}
+}
+
 func fireAlarmsThrough(t *testing.T, ctx context.Context, core *SessionCore, tr testTransition, target time.Time) testTransition {
 	t.Helper()
 	for i := 0; i < 10_000 && tr.Close == nil && tr.NextAlarm != nil && !tr.NextAlarm.After(target); i++ {

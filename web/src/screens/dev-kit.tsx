@@ -72,6 +72,8 @@ import { AiKit } from "./dev-kit-ai";
 import { FxKit } from "./dev-kit-fx";
 import { GraphKit } from "./dev-kit-graph";
 import { AwgRelayKit } from "./dev-kit-awg-relay";
+import { TrustTunnelKit } from "./dev-kit-trusttunnel";
+import { BridgeKit } from "./dev-kit-bridge";
 
 // Development only (see router.tsx): every primitive in one place, to look at in both themes and at
 // 390 and 1280 px. Plain English on purpose: this page never ships.
@@ -304,13 +306,13 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes: one kit alone, for its screenshots;
+  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "halo") return <HaloKit />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { "profile-fixes": ProfileFixesKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit }[which];
+  const only = { "profile-fixes": ProfileFixesKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit }[which];
   if (only) {
     const Kit = only;
     return (

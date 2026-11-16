@@ -44,6 +44,9 @@ describe("the panel's refusal codes", () => {
     expect(say("relay_check_stale", Code.FailedPrecondition)).toBe(en["err.relay_check_stale"]);
     expect(say("relay_check_failed: code=timeout&stage=path", Code.FailedPrecondition, "ru")).toBe("Ретрансляция не прошла проверку (снаружи через вход). Почему — на странице ноды входа.");
     expect(say("relay_check_failed: code=refused&stage=leg", Code.FailedPrecondition)).toBe("The relay did not pass its check (from the entry to the exit). The entry node’s page says why.");
+    // a bridge for a server whose path cannot be proven: said plainly, not as a failed check
+    expect(say("relay_check_failed: code=unverifiable&stage=path", Code.FailedPrecondition)).toBe(en["err.relay_bridge_unverifiable"]);
+    expect(say("relay_check_failed: code=unverifiable&stage=path", Code.FailedPrecondition, "ru")).toBe("Для этого сервера мост недоступен: его путь нельзя проверить.");
     expect(say("relay_exists: exit=de1&node=msk1", Code.AlreadyExists, "ru")).toBe("msk1 уже ретранслирует этот сервер de1.");
     expect(say("agent_old: node=msk1", Code.FailedPrecondition)).toBe("The agent of msk1 is too old for relays. Update it on the Updates page.");
     expect(say("same_node: node=de1", Code.InvalidArgument, "ru")).toBe("Сервер стоит на самой de1: ретранслировать можно только сервер другой ноды.");

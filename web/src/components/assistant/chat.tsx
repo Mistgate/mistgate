@@ -463,7 +463,7 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
 }
 
 /** Example questions: the first three are the buttons of an empty chat, all of them are what the message box offers to finish. */
-const EXAMPLES = ["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3", "ai.chat.ex4", "ai.chat.ex5", "ai.chat.ex6", "ai.chat.ex7", "ai.chat.ex8"] as const;
+const EXAMPLES = ["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3", "ai.chat.ex4", "ai.chat.ex5", "ai.chat.ex6", "ai.chat.ex7", "ai.chat.ex8", "ai.chat.ex9"] as const;
 
 function Hello({ onPick }: { onPick: (q: string) => void }) {
   const t = useT();

@@ -42,12 +42,14 @@ type SubView struct {
 	// Telegram are the person's tg://proxy links, one per MTProto inbound they may use and the node's IPv6 and relay twins of it.
 	// They belong to no subscription: they are never in Lines, Servers or a node's Conns, because an app of the link would
 	// list a tg:// line as a server. Only the user page and GetTelegramLinks read them.
-	Telegram    []SubServer
+	Telegram []SubServer
+	// TrustTunnel are the key-owned links for the official app. They never enter Lines, Servers or a node's Conns.
+	TrustTunnel []SubServer
 	QuotaReset  string // none | day | week | month | rolling_month
 	NextReset   time.Time
 	DeviceLimit int
-	// DevicesUsed counts the devices that count against DeviceLimit (live credentials, the Telegram key not among them); Devices
-	// lists all of them, the Telegram key too.
+	// DevicesUsed counts live devices against DeviceLimit (including AmneziaVPN and TrustTunnel keys, excluding the Telegram key);
+	// Devices lists all of them.
 	DevicesUsed int
 	DevicesIdle int
 	Devices     []SubDevice
@@ -56,10 +58,10 @@ type SubView struct {
 	AWGProfiles []SubAWGProfile
 	// AccessHapp / AccessAmnezia: the user's app toggle AND a usable deployed inbound whose protocol that app
 	// can consume (the user page shows only what works).
-	AccessHapp, AccessAmnezia, AccessTelegram bool
+	AccessHapp, AccessAmnezia, AccessTelegram, AccessTrustTunnel bool
 	// AppAmnezia is the user's AmneziaVPN toggle alone (AccessAmnezia also needs a live inbound and an active user): a person
 	// whose subscription ended still sees the keys they hold and can remove them.
-	AppAmnezia, AppTelegram bool
+	AppAmnezia, AppTelegram, AppTrustTunnel bool
 	// AppMistgateOff is the person's Mistgate app switch, off: a client API sync of one of their devices carries no servers.
 	AppMistgateOff bool
 	// Nodes are the servers of the person, one per node, in subscription order: the ones a link carries and the ones a key
@@ -128,6 +130,7 @@ type SubConn struct {
 // SubServer is one Lines entry with the facts the remark (server name) is built from.
 type SubServer struct {
 	URI         string // the same string as the matching Lines entry (a proxy for the Mihomo format)
+	Note        string // stable reason a TrustTunnel server was skipped, empty for a rendered link
 	Protocol    string // plugin id
 	ProfileID   string
 	NodeID      string // internal grouping key; never emitted as user-facing text
@@ -170,7 +173,7 @@ func ViaMark(entryCountry string) string {
 type SubDevice struct {
 	ID, Platform, Model string
 	// Kind is "link" (an app that reports a device ID), "shared" (the common place of the apps that report none), "key" (an
-	// AmneziaVPN key) or "telegram" (the Telegram proxy key). The person can remove and rename the first and the third.
+	// AmneziaVPN or TrustTunnel key) or "telegram" (the Telegram proxy key). The person can remove and rename link/key devices.
 	Kind string
 	// OSVersion and Client are what the app last said about itself (X-Ver-OS, the first token of its User-Agent); "" if nothing.
 	OSVersion, Client string
@@ -220,6 +223,8 @@ type SubOptions struct {
 	// NoPageData: the view is for an app, so it leaves out what only the user page shows (the DNS of each node, the
 	// presets they name, the keys that hold an older DNS) and does not read it.
 	NoPageData bool
+	// IncludeTrustTunnel renders the person's key links for the public user page and admin key RPC only.
+	IncludeTrustTunnel bool
 	// IncludeEffectiveDNS lets the writer of a profile (Mihomo, Xray JSON, sing-box) reuse the effective preset read with node DNS.
 	IncludeEffectiveDNS bool
 	// EnrolledDevice selects the device already authenticated by its client API key. It may receive missing credentials through
@@ -275,7 +280,7 @@ func (s *Service) PreviewSubscription(ctx context.Context, userID string) (SubVi
 	} else if err != nil {
 		return SubView{}, "", err
 	}
-	v, err := s.subView(ctx, u, false, SubOptions{})
+	v, err := s.subView(ctx, u, false, SubOptions{IncludeTrustTunnel: true})
 	if err != nil {
 		return SubView{}, "", err
 	}
@@ -355,7 +360,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	v := SubView{
 		UserID: u.ID, GroupID: u.GroupID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: status,
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
-		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia, AppTelegram: u.AppTelegram,
+		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia, AppTelegram: u.AppTelegram, AppTrustTunnel: u.AppTrustTunnel,
 	}
 	var hash []byte // the request's device: its HWID, hashed with the user; nil = the shared device
 	if opt.Device.HWID != "" {
@@ -390,15 +395,17 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	for _, d := range devs {
 		kind := subDeviceKind(d)
 		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: kind, OSVersion: d.OSVersion, Client: d.Client,
-			LastSeen: d.LastSeenAt, Online: (d.Kind == store.DeviceKindLink || kind == "telegram") && len(data.OnlineDevices[d.ID]) > 0}
+			LastSeen: d.LastSeenAt, Online: (d.Kind == store.DeviceKindLink || kind == "telegram" || kind == "trusttunnel") && len(data.OnlineDevices[d.ID]) > 0}
 		for _, pid := range d.Protocols {
 			if p, ok := s.reg.Get(pid); ok {
-				if happ, amnezia, telegram, _ := clientApps(p); happ {
+				if happ, amnezia, telegram, trustTunnel, _ := clientApps(p); happ {
 					sd.App = "happ"
 				} else if amnezia {
 					sd.App = "amnezia"
 				} else if telegram {
 					sd.App = "telegram"
+				} else if trustTunnel {
+					sd.App = "trusttunnel"
 				}
 				break
 			}
@@ -413,7 +420,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		v.Devices = append(v.Devices, sd)
 	}
-	v.DevicesUsed, v.DevicesIdle, v.LinkMode = data.LimitCount(), data.IdleCount(), data.LinkMode // the Telegram key is listed but fills no place
+	v.DevicesUsed, v.DevicesIdle, v.LinkMode = data.LimitCount(), data.IdleCount(), data.LinkMode // TrustTunnel keys count; the Telegram key does not
 	if v.Status != StatusActive {
 		// The app keeps fetching after access ended: the touch is what lets health notice that the person is trying.
 		if touch && opt.EnrolledDevice != nil {
@@ -446,7 +453,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 
 	rd := requestDevice{dev: data.Device, creds: data.DeviceCreds, hash: hash}
 	g, full := data.Group, data.Inbounds
-	relaysOf := s.subRelays(data.Relays, full, g, u)
+	format := opt.Format
+	if format == "" {
+		format = plugin.FormatURIList
+	}
+	relaysOf := s.subRelays(data.Relays, full, g, u, format)
 	if touch && opt.EnrolledDevice != nil {
 		// The client API's device, known by its key: the one place where the credentials of an enrolled device are issued.
 		// The basic path below refuses such a device by design, so it is never reached from here.
@@ -541,20 +552,24 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 	}
 
-	format := opt.Format
-	if format == "" {
-		format = plugin.FormatURIList
-	}
 	v.Format = format
 	var networkNodeIDs []string
 	capacityMbps := map[string]int{}
 	for _, f := range full {
-		if !s.usable(f, g, u) {
+		if !s.usableForFormat(f, g, u, format) {
 			continue
 		}
 		if _, exists := s.reg.Get(f.Profile.Protocol); exists {
 			networkNodeIDs = append(networkNodeIDs, f.Node.ID)
 			capacityMbps[f.Node.ID] = f.Node.BandwidthMbps
+		}
+	}
+	if u.AppTrustTunnel {
+		for _, f := range full {
+			if s.usableForFormat(f, g, u, plugin.FormatTTLink) {
+				v.AccessTrustTunnel = true
+				break
+			}
 		}
 	}
 	for _, rs := range relaysOf { // a twin's load is the larger of its entry's and its exit's
@@ -587,11 +602,11 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		return &v.Nodes[i]
 	}
 	for _, f := range full {
-		if !s.usable(f, g, u) {
+		if !s.usableForFormat(f, g, u, format) {
 			continue
 		}
 		proto, _ := s.reg.Get(f.Profile.Protocol)
-		happ, amnezia, telegram, _ := clientApps(proto)
+		happ, amnezia, telegram, _, _ := clientApps(proto)
 		v.AccessHapp = v.AccessHapp || happ && u.AppHapp
 		v.AccessAmnezia = v.AccessAmnezia || amnezia && u.AppAmnezia
 		v.AccessTelegram = v.AccessTelegram || telegram && u.AppTelegram
@@ -755,6 +770,16 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			}
 		}
 	}
+	if opt.IncludeTrustTunnel && u.AppTrustTunnel && data.TrustTunnelCred.ID != "" {
+		pt, err := s.vault.Open(data.TrustTunnelCred.SecretEnc, data.TrustTunnelCred.ID)
+		if err != nil {
+			return SubView{}, err
+		}
+		v.TrustTunnel, err = s.trustTunnelServers(ctx, u, g, full, data.Relays, string(pt), opt)
+		if err != nil {
+			return SubView{}, err
+		}
+	}
 	for i := range v.Nodes {
 		v.Nodes[i].Online = liveByNode[v.Nodes[i].ID].Connected
 	}
@@ -809,11 +834,11 @@ func ipv6Egress(n store.AccessNode, exit string) bool {
 
 // subRelays are the relays that give the person a twin server, by the exit's inbound: the ones relayUsable accepts, in the
 // order of the relays. The caller drops the ones the protocol cannot carry (relayUnsupported).
-func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) map[string][]store.RelayLink {
+func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) map[string][]store.RelayLink {
 	var out map[string][]store.RelayLink
 	for _, l := range relays {
 		i := slices.IndexFunc(full, func(f store.AccessInboundFull) bool { return f.Inbound.ID == l.InboundID })
-		if i < 0 || l.ViaNodeAddress == "" || !s.relayUsable(l, full[i], g, u) {
+		if i < 0 || l.ViaNodeAddress == "" || !s.relayUsableFor(l, full[i], g, u, format) {
 			continue
 		}
 		if out == nil {
@@ -852,6 +877,7 @@ func ipv6Input(in protocols.RenderInput, addr string) protocols.RenderInput {
 func twinInput(in protocols.RenderInput, f store.AccessInboundFull, spec plugin.InboundSpec, l store.RelayLink) protocols.RenderInput {
 	spec.Listen.Port, spec.Listen.HopFrom, spec.Listen.HopTo = l.Port, 0, 0
 	in.Inbound = inboundView(protocols.NodeView{ID: f.Node.ID, Name: f.Node.Name, Address: l.ViaNodeAddress, CountryCode: f.Node.CountryCode}, spec, f.Inbound.CertPinSHA256)
+	in.Inbound.TCPOnly = true
 	return in
 }
 
@@ -877,6 +903,8 @@ func subDeviceKind(d store.AccessDevice) string {
 	switch {
 	case d.Kind == store.DeviceKindKey && slices.Contains(d.Protocols, store.TelegramProtocol):
 		return "telegram"
+	case d.Kind == store.DeviceKindKey && slices.Contains(d.Protocols, store.TrustTunnelProtocol):
+		return "trusttunnel"
 	case d.Kind == store.DeviceKindKey:
 		return "key"
 	case d.Implicit:
@@ -1031,11 +1059,12 @@ func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, 
 	}
 	// AmneziaWG does not follow the owner's link switch (opt.NoLinkAWG): the app asks for it with its caps and gets it while it may.
 	want := s.awgWants(u, g, full, relays, dev.ID, func(version string) bool { return protocols.HasCapability(opt.Capabilities, "awg", version) })
-	if s.enrolledDeviceComplete(u, dev, rd, want) {
+	if s.enrolledDeviceComplete(u, dev, rd, want, opt.Capabilities, !u.AppMistgateOff) {
 		return rd, nil
 	}
 	result, err := s.st.Access().EnsureEnrolledLinkDevice(ctx, dev, s.now(), func(deviceID string, have map[string]bool) ([]store.AccessCred, error) {
-		return s.newCreds(u.ID, deviceID, u.AppHapp, u.AppAmnezia, u.AppTelegram, have)
+		return s.newEnrolledClientCreds(u.ID, deviceID, u.AppHapp, u.AppAmnezia, u.AppTelegram, have,
+			opt.Capabilities, !u.AppMistgateOff)
 	}, want, u.DeviceLimit)
 	if err != nil {
 		return rd, err
@@ -1061,7 +1090,8 @@ func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, 
 // enrolledDeviceComplete reports whether the snapshot of the request already shows the enrolled device as the live holder of the
 // key and of the link it was enrolled under, with a credential of every link protocol its apps allow and of every wanted AWG
 // profile: then there is nothing to issue.
-func (s *Service) enrolledDeviceComplete(u store.AccessUser, dev store.AccessDevice, rd requestDevice, want []store.AWGImplicitWant) bool {
+func (s *Service) enrolledDeviceComplete(u store.AccessUser, dev store.AccessDevice, rd requestDevice, want []store.AWGImplicitWant,
+	caps []string, mistgateEnabled bool) bool {
 	if rd.dev.ID != dev.ID || !bytes.Equal(rd.dev.KeyHash, dev.KeyHash) || len(rd.dev.EnrolTokenHash) == 0 || !bytes.Equal(rd.dev.EnrolTokenHash, u.SubTokenHash) {
 		return false
 	}
@@ -1078,12 +1108,22 @@ func (s *Service) enrolledDeviceComplete(u store.AccessUser, dev store.AccessDev
 	if len(s.missingProtocols(u.AppHapp, u.AppAmnezia, u.AppTelegram, have)) != 0 {
 		return false
 	}
+	if s.mistgateTrustTunnelWanted(caps, mistgateEnabled) && !have["trusttunnel"] {
+		return false
+	}
 	for _, w := range want {
 		if !profiles[w.ProfileID+"\x00"+w.Path] {
 			return false
 		}
 	}
 	return true
+}
+
+func (s *Service) mistgateTrustTunnelWanted(caps []string, enabled bool) bool {
+	if !enabled || !protocols.HasCapability(caps, "trusttunnel", "1") {
+		return false
+	}
+	return s.mistgateConsumes("trusttunnel")
 }
 
 // awgWants lists the AmneziaWG profiles the user can use, each with the way to issue its credential to deviceID. keep, when set,
@@ -1253,11 +1293,23 @@ func (s *Service) SetTouchHookForTest(hook func(started bool)) { s.touchHookForT
 // usable is the subscription half of the effective-access rule: the user's group holds the profile, the
 // node is selected and live, the inbound is on and not failed, and an enabled app consumes the protocol.
 func (s *Service) usable(f store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return liveInbound(f) &&
-		slices.Contains(g.ProfileIDs, f.Profile.ID) &&
-		!slices.Contains(g.DisabledNodeIDs, f.Node.ID) &&
-		(u.AllNodes || slices.Contains(u.NodeIDs, f.Node.ID)) &&
-		s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram)
+	return s.usableForFormat(f, g, u, plugin.FormatURIList)
+}
+
+// usableForFormat is usable for a subscription of the given format: the Mistgate app's format also carries the protocols that
+// only that app consumes (while the person's Mistgate switch is on); every other format leaves them out.
+func (s *Service) usableForFormat(f store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
+	if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) ||
+		slices.Contains(g.DisabledNodeIDs, f.Node.ID) || !(u.AllNodes || slices.Contains(u.NodeIDs, f.Node.ID)) {
+		return false
+	}
+	if format == plugin.FormatTTLink {
+		return u.AppTrustTunnel && s.allowed(f.Profile.Protocol, false, false, false, true)
+	}
+	if s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram, false) {
+		return true
+	}
+	return format == plugin.FormatMistgate && !u.AppMistgateOff && s.mistgateConsumes(f.Profile.Protocol)
 }
 
 // liveInbound: the inbound is on and not failed, on an enrolled node (the part of usable that is not about the user).
@@ -1267,17 +1319,22 @@ func liveInbound(f store.AccessInboundFull) bool {
 
 // accessOf is what the user's page offers by app (User.access_happ / access_amnezia): SubView's AccessHapp and
 // AccessAmnezia, without the status.
-func (s *Service) accessOf(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull) (happ, amnezia, telegram bool) {
+func (s *Service) accessOf(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull) (happ, amnezia, telegram, trustTunnel bool) {
 	for _, f := range full {
-		if !s.usable(f, g, u) {
+		linkUsable := s.usable(f, g, u)
+		ttUsable := s.usableForFormat(f, g, u, plugin.FormatTTLink)
+		if !linkUsable && !ttUsable {
 			continue
 		}
 		if p, ok := s.reg.Get(f.Profile.Protocol); ok {
-			h, a, t, _ := clientApps(p)
-			happ = happ || h && u.AppHapp
-			amnezia = amnezia || a && u.AppAmnezia
-			telegram = telegram || t && u.AppTelegram
+			h, a, t, tt, _ := clientApps(p)
+			if linkUsable {
+				happ = happ || h && u.AppHapp
+				amnezia = amnezia || a && u.AppAmnezia
+				telegram = telegram || t && u.AppTelegram
+			}
+			trustTunnel = trustTunnel || ttUsable && tt && u.AppTrustTunnel
 		}
 	}
-	return happ, amnezia, telegram
+	return happ, amnezia, telegram, trustTunnel
 }

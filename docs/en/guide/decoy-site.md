@@ -34,7 +34,14 @@ The panel stores each bundle by its SHA-256 and sends a node only its own bundle
 
 A node whose agent is too old (it predates this feature) keeps the built-in page, and the panel shows "agent too old": update the node, then choose its site. The edge edition does not store Own bundles, so Own is unavailable there. Every change is recorded in the audit log.
 
-An AI agent connected over [MCP](../reference/mcp.md) can set a node's site with `node_decoy_plan` and `node_decoy_apply`; the owner approves each change. The agent prompt in [AI agents](../getting-started/ai-agents.md) tells it never to repeat the subject or look of the sites made for other nodes.
+An AI agent connected over [MCP](../reference/mcp.md) can set a node's site with `node_decoy_plan` and `node_decoy_apply`; the owner approves each change. An own site goes in one of two ways, and exactly one of them is given:
+
+- **`bundle_base64`**: a ZIP or TAR archive, as above.
+- **`files`**: a list of text files, `{path, content}`, and for a small image or icon `{path, content_base64}`. This is for an agent that cannot make an archive, such as a model with no file tools. The panel packs the list itself into the same canonical archive (paths sorted, fixed times and modes), so the same files always have the same SHA-256 and a node that already has the site is not sent it again. The archive then goes through exactly the checks of an upload; only a few are made first: at most 64 files, a path of at most 200 bytes, no two paths that differ only in case (`Index.html` next to `index.html`), `index.html` at the top, 2 MiB in all.
+
+The plan lists every file with its size, the total and the SHA-256 of the bundle; it never shows the contents, and they reach neither the audit log nor the saved chat history. The agent prompt in [AI agents](../getting-started/ai-agents.md) tells it never to repeat the subject or look of the sites made for other nodes.
+
+The built-in [assistant](assistant.md) can make the site itself: ask it in the chat ("make a decoy site for the node alpha"). It writes a few small pages and a style sheet, and shows a **Proposed change** card with the list of files; you approve it as any other change. A model's answer is length-capped, so a site made this way stays small, about 20 KB in all, which is enough for the three to five pages described below.
 
 ## What a good decoy looks like
 

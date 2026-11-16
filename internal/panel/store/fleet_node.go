@@ -65,6 +65,11 @@ type NodeRow struct {
 	PublicLabel string
 	// LinkSealed is set once the node opened a sealed link session (migration 00134); a plain one is refused after that.
 	LinkSealed bool
+	// BridgePort is the TCP port of the node's site that the bridge of a reverse relay arrives at when the node is an entry; 0 = 443
+	// on the node's own site. BridgePath is the random path of the bridge ("" until the first reverse relay of the entry; migration
+	// 00141). It is the panel's: it goes to the two agents of a pair and nowhere else.
+	BridgePort uint16
+	BridgePath string
 }
 
 const nodeCols = `id, name, address, country_code, location, provider, notes, dns_resolvers,
@@ -72,7 +77,7 @@ const nodeCols = `id, name, address, country_code, location, provider, notes, dn
 	boot_at, last_seen_at, last_connected_at, last_disconnected_at, agent_instance_id, last_seq,
 	desired_revision, desired_hash, applied_revision, applied_hash, created_at, retired_at,
 	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps, client_ipv6,
-	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash, ipv6_entry, ipv6_json, networks_db_sha256, public_label, link_sealed`
+	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash, ipv6_entry, ipv6_json, networks_db_sha256, public_label, link_sealed, bridge_port, bridge_path`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -82,14 +87,14 @@ func scanNode(r rowScanner) (NodeRow, error) {
 	var serial sql.NullString
 	var boot, seen, conn, disc, created int64
 	var retired sql.NullInt64
-	var lastSeq, desRev, appRev int64
+	var lastSeq, desRev, appRev, bridgePort int64
 	var caps string
 	err := r.Scan(&n.ID, &n.Name, &n.Address, &n.CountryCode, &n.Location, &n.Provider, &n.Notes, &dns,
 		&n.LivenessTimeoutS, &n.ApplyTimeoutS, &n.DialTimeoutS, &n.State, &serial, &n.AgentVersion, &n.APIVersion,
 		&boot, &seen, &conn, &disc, &n.AgentInstanceID, &lastSeq,
 		&desRev, &n.DesiredHash, &appRev, &n.AppliedHash, &created, &retired,
 		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps, &n.ClientIPv6,
-		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash, &n.IPv6Entry, &n.IPv6JSON, &n.NetworksDBSHA256, &n.PublicLabel, &n.LinkSealed)
+		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash, &n.IPv6Entry, &n.IPv6JSON, &n.NetworksDBSHA256, &n.PublicLabel, &n.LinkSealed, &bridgePort, &n.BridgePath)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeRow{}, ErrNotFound
 	}
@@ -103,6 +108,7 @@ func scanNode(r rowScanner) (NodeRow, error) {
 	n.CreatedAt = fleetTime(created)
 	n.RetiredAt = fleetTime(retired.Int64)
 	n.AgentCaps = strings.Fields(caps)
+	n.BridgePort = uint16(bridgePort)
 	return n, nil
 }
 

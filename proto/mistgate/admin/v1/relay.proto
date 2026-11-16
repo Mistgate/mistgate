@@ -5,31 +5,50 @@ package mistgate.admin.v1;
 import "mistgate/admin/v1/common.proto";
 
 // Relays: a port of one node (the entry) that passes the encrypted traffic of a server on another node (the exit) on,
-// unchanged (agent.proto "RELAY FORWARDS"). People whose network blocks the exit reach it through the entry; the entry
-// sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay on the exit.
+// unchanged (agent.proto "RELAY FORWARDS" and "REVERSE RELAY"). People whose network blocks the exit reach it through the
+// entry; the entry sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay
+// on the exit.
 //
 // Everything here is owner-only over /api (a helper and an API token get PERMISSION_DENIED). Through MCP a token may
 // read relays and run a check, and a change is a plan the owner approves in the admin. Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
 //
-// A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a leg check less than
-// 15 minutes ago for the relay's present target (the exit's address and server port). The leg must pass or be skipped as
-// "unverifiable"; otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked", "relay_check_stale" or
-// "relay_check_failed". Switching on installs the forward and checks the path from outside through the entry (so does
-// moving a relay that is on to another port). A failed path switches the relay off and UpdateRelay answers
-// "relay_check_failed" (stage, code); an unverifiable path leaves it on and unverified. A relay is offered to users after
-// both stages pass or are explicitly unverifiable. "verified" is true only when both stages pass.
+// TWO WAYS TO PASS ON (Relay.mode is the owner's choice, Relay.active_mode is what stands now):
+//   "dnat": the entry opens the connection to the exit's address itself (the kernel rewrites the destination). Cheap, the
+//     default for every existing relay; it needs the entry to reach the exit directly ("the leg").
+//   "reverse": for a network that cuts a connection started towards the exit but lets the exit's own connection through, the
+//     EXIT calls the entry and holds a few TLS connections (the bridge); the entry passes people's connections to the exit
+//     through them. TCP servers only; both agents list "relay-reverse/1". The entry's address and port, and so the people's
+//     subscriptions, are the same in both ways.
+//   mode "auto" (the default) lets the panel choose: DNAT while the leg works, reverse when it does not and the pair can do it,
+//   back to DNAT when the leg is alive again (reason in Relay.mode_reason); "dnat" and "reverse" pin the way.
+//
+// A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a check less than 15
+// minutes ago that fits the way the relay would go:
+//   - dnat: the leg check (the entry node to the exit's server) must pass or be skipped as "unverifiable".
+//   - reverse: both agents list "relay-reverse/1", the server is TCP, and the stage "reverse_reach" (the exit reaches the entry's
+//     bridge endpoint) must pass for the present endpoint; the leg is not required.
+//   - auto: CheckRelay tries both. The relay is switched on in dnat when the leg passed, else in reverse when reverse_reach passed
+//     and the pair can do it (mode_reason "leg_failed"), else it is refused.
+// Otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked", "relay_check_stale" or "relay_check_failed".
+// Switching on installs the forward (in reverse: the bridge, and waits until the exit reports it is connected, stage "bridge") and
+// checks the path from outside through the entry (so does moving a relay that is on to another port). A failed bridge or path
+// switches the relay off and UpdateRelay answers "relay_check_failed" (stage, code); an unverifiable path leaves it on and
+// unverified. A relay is offered to users after both stages pass or are explicitly unverifiable. "verified" is true only when
+// both stages pass.
 // The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
-// failed, on an enrolled node) and the entry's agent lists "relay-forward/1".
+// failed, on an enrolled node) and the entry's agent lists "relay-forward/1" (a reverse relay also "relay-reverse/1", as does the
+// exit's agent).
 //
 // A relay goes when its server is deleted, and when either node is retired.
 //
 // ERRORS. NOT_FOUND: the relay, the server or the node. INVALID_ARGUMENT: a port that is neither 443 nor 1024-65535,
-// "same_node" (the entry holds the server itself). ALREADY_EXISTS: "relay_exists" (the entry already forwards this server),
-// "port_taken" (a profile or a relay of the entry holds that network and port, hop ranges included; the message carries a
-// free port), "hop_taken". FAILED_PRECONDITION: "node_retired", "agent_old" (the entry's agent lacks "relay-forward/1"),
-// "relay_unchecked" (no check yet), "relay_check_stale" (older than 15 minutes, or the target changed since),
-// "relay_check_failed" (stage and code say where), "relay_unsupported" (reason: "cdn", "acme_ip" or "awg": a server the
-// entry cannot pass on), "no_clean_port" (the entry has no free port to offer).
+// "same_node" (the entry holds the server itself), a mode that is not "auto", "dnat" or "reverse". ALREADY_EXISTS: "relay_exists"
+// (the entry already forwards this server), "port_taken" (a profile or a relay of the entry holds that network and port, hop
+// ranges included; the message carries a free port), "hop_taken". FAILED_PRECONDITION: "node_retired", "agent_old" (the entry's
+// agent lacks "relay-forward/1"), "reverse_unavailable" (mode "reverse" but the pair cannot do it; reason: "entry_agent_old",
+// "exit_agent_old" or "udp"), "relay_unchecked" (no check yet), "relay_check_stale" (older than 15 minutes, or the target
+// changed since), "relay_check_failed" (stage and code say where), "relay_unsupported" (reason: "cdn", "acme_ip" or "awg": a
+// server the entry cannot pass on), "no_clean_port" (the entry has no free port to offer).
 service RelayService {
   // The relays, oldest first. node_id, when set, keeps those that have this node at either end.
   rpc ListRelays(ListRelaysRequest) returns (ListRelaysResponse);
@@ -91,6 +110,52 @@ message Relay {
   int64 counted_unix = 25;
   // Traffic through the forward now, bits per second, from the last two counter readings; 0 when there is one reading or none. Until agents count the way back it is the direction towards the exit only.
   uint64 bps = 26;
+  // The owner's choice of the way: "auto" (the default), "dnat" or "reverse". Every relay that existed before the reverse mode is
+  // "auto"; it stays a DNAT relay until an agent pair that can do the reverse mode needs it.
+  string mode = 27;
+  // The way that stands now: "dnat" or "reverse". Only the panel changes it.
+  string active_mode = 28;
+  // When active_mode last changed; 0 = it never has.
+  int64 mode_changed_unix = 29;
+  // Why the relay is in the way it is: "" (dnat, no change so far), "leg_failed" (reverse after the direct leg failed),
+  // "direct_back" (dnat again: the leg held three checks an hour apart and an 8 MB flow of its own), "bridge_failed" (dnat again:
+  // the bridge or the path through it failed while the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported"
+  // (the bridge is not possible: the agents), "udp" (a UDP server: dnat only for now).
+  string mode_reason = 30;
+  // In the reverse way: consecutive good checks of the direct leg, 0 to 3 (the panel goes back to DNAT after 3 and a speed
+  // test). When and how the last leg check went is check.leg.
+  uint32 direct_streak = 31;
+  // Why the reverse way is not possible for this relay now: "entry_agent_old" (the entry's agent lacks "relay-reverse/1"),
+  // "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). When several hold, the first of
+  // udp, entry_agent_old, exit_agent_old is given (an agent update does not help a UDP server). An agent that has not connected
+  // yet counts as old. Computed, not stored; not the same as agent_supported, which is only about the entry and "relay-forward/1".
+  string reverse_blocked = 32;
+  // The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
+  RelayBridge bridge = 33;
+}
+
+// The bridge of a reverse relay (agent.proto BridgeState), as the panel last had it from the two agents.
+message RelayBridge {
+  // The exit has at least one live connection to the entry's bridge.
+  bool connected = 1;
+  // Live TLS connections.
+  uint32 conns = 2;
+  // Round trip of the bridge's ping, milliseconds; 0 = none yet.
+  uint32 rtt_ms = 3;
+  // Since when the bridge has been connected (the present run); 0 = not connected.
+  int64 since_unix = 4;
+  // The last error an agent reported for the bridge, a short fixed word; empty = none.
+  string error = 5;
+  // People using the bridge right now (the entry counts their connections that are being carried; waiting pairs are not people).
+  uint32 clients = 6;
+  // The TLS connections the panel asked the exit to hold (2, or 4 when the relay is busy or the bridge is near its limit).
+  uint32 pool = 7;
+  // The most people the pool carries at once: pool times (250 HTTP/2 streams of a connection minus those of the waiting pairs)
+  // divided by 2 streams a person, about 120 a connection. 0 when pool is.
+  uint32 capacity = 8;
+  // clients is at least 80 % of capacity. Only a hint for the screen: no alert, no message to the owner. At the limit the panel
+  // raises the pool to 4 itself; at pool 4 the way to more room is a second entry.
+  bool near_full = 9;
 }
 
 // A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
@@ -119,6 +184,11 @@ message RelayStage {
   // "apply_timeout" (the entry did not install the forward), "switched_off" (someone switched the relay off while it was
   // waited for). Skipped: "unverifiable" (the server has no name to attribute the TLS identity to this node), "off" (the relay
   // is not switched on, so there is no forward to reach), "leg_failed".
+  // reverse_reach adds: "exit_offline", "unsupported" (skipped: the exit's agent has no tcpcheck/1), "entry_site_unavailable"
+  // (skipped: the entry has no site of its own on TCP 443 to probe, or the connection was refused there: nothing listens, which
+  // says nothing about whether the exit reaches the entry); a connection that gets no answer ("timeout") is the exit not reaching
+  // the entry. reverse_speed adds: "busy" (skipped: a speed test already runs on one of the nodes, or the daily limit is reached),
+  // "unsupported" (skipped), "entry_offline", "unreachable".
   string code = 2;
   // The node that sent the probe (its id), or "panel".
   string sender_id = 3;
@@ -129,6 +199,18 @@ message RelayStage {
   uint32 sent = 6;
   uint32 got = 7;
   int64 at_unix = 8;
+  // reverse_speed only (the other stages leave these 0): the megabytes asked for (8 to 32), the megabits a second, the bytes the
+  // entry got, the connect and first-byte times and the duration of the flow in milliseconds.
+  uint32 mb = 9;
+  double mbit_s = 10;
+  uint64 bytes = 11;
+  uint32 connect_ms = 12;
+  uint32 first_byte_ms = 13;
+  uint32 duration_ms = 14;
+  // reverse_reach only: the TCP port of the entry's bridge endpoint the exit probed (443 on the entry's own site or the port of
+  // the separate bridge site, Node.bridge_port); 0 for the other stages and for results from before the field. A probe made for
+  // another port than the endpoint now is stale, whatever its at_unix says.
+  uint32 port = 15;
 }
 
 // What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
@@ -144,14 +226,35 @@ message RelayCheck {
   RelayStage path = 6;
   // No stage that ran failed, and the leg passed or was skipped as unverifiable.
   bool ok = 7;
-  // The first stage that failed: "leg", "path", or "".
+  // The first stage that failed: "leg", "reverse_reach", "bridge", "path", or "".
   string stage = 8;
   // Both stages ran and passed: the relay works from outside.
   bool verified = 9;
+  // Reverse way only: the exit reports the bridge is connected (a live connection for at least 10 seconds); the stage that
+  // follows a switch-on in reverse, before path. Absent on a check of a DNAT relay.
+  RelayStage bridge = 10;
+  // Reverse way only: the exit reached the entry's bridge endpoint (a TLS probe from the exit that sees the entry's own site,
+  // and a data stream the exit opens to the entry). Run by CheckRelay when the leg did not pass and the way may be reverse,
+  // and the stage the gate of "reverse" and "auto" reads. Absent when it did not run. Codes: see RelayStage.code.
+  // The result stays in the check of a later run that does not repeat the stage (its at_unix says how old it is).
+  RelayStage reverse_reach = 11;
+  // The proof by speed (reverse way only), never run by itself: the exit sends an 8 MB flow to the entry (the existing path
+  // speed test, the exit the one that connects). Only CheckRelayRequest.reverse_speed starts it. Absent when it did not run.
+  RelayStage reverse_speed = 12;
+  // The proof by speed of the DIRECT way, which the panel starts itself, never the owner: before it moves a reverse relay back to
+  // DNAT, the entry opens one flow to the exit's node and takes 8 MB (the existing path speed test, the entry the one that
+  // connects), which catches a flow that freezes after the first 16 KB. Run at most once an hour and inside the daily speed test
+  // limits (a limit reached is skipped, "busy"). Absent when it never ran. Codes as reverse_speed.
+  RelayStage direct_speed = 13;
 }
 
 message CheckRelayRequest {
   string id = 1;
+  // Also run reverse_reach when the leg passes (it runs by itself after a failed leg).
+  bool reverse_reach = 2;
+  // Also send the 8 MB flow of reverse_speed (it implies reverse_reach). Moves bulk traffic between two nodes: the speed test
+  // limits (one test per node at a time, a few a day) hold.
+  bool reverse_speed = 3;
 }
 
 message CheckRelayResponse {
@@ -199,6 +302,13 @@ message RelayCandidate {
   RelayReachHint reach = 13;
   // Who would get the new server if this relay were made. Absent when it cannot be relayed.
   RelayAudience audience = 14;
+  // Does the exit reach this entry's bridge endpoint (the way a reverse relay needs)? Known only when a check of the exit towards
+  // the entry ran. Same verdicts as reach; source "exit_probe" when it came from one, "" with no_data.
+  RelayReachHint exit_reaches_entry = 15;
+  // Why a reverse relay of this server through this entry is not possible, as Relay.reverse_blocked: "entry_agent_old",
+  // "exit_agent_old", "udp" or "" (possible). Computed from the two agents' capabilities and the server's network, so the dialog can
+  // say it before the relay exists; it beats exit_reaches_entry (a UDP server can show "reach" and still has no bridge).
+  string reverse_blocked = 16;
 }
 
 // The people a relay through this entry would serve.
@@ -236,6 +346,8 @@ message CreateRelayRequest {
   string inbound_id = 1;
   string via_node_id = 2;
   uint32 port = 3;
+  // "auto", "dnat" or "reverse"; empty = "auto".
+  string mode = 4;
 }
 
 message CreateRelayResponse {
@@ -246,6 +358,8 @@ message UpdateRelayRequest {
   string id = 1;
   optional bool enabled = 2;
   optional uint32 port = 3;
+  // "auto", "dnat" or "reverse"; unset = unchanged.
+  optional string mode = 4;
 }
 
 message UpdateRelayResponse {

@@ -446,10 +446,12 @@ func TestKmodBootBudgetCancelsBuild(t *testing.T) {
 	h := newKmodTestHost(t)
 	h.blockBuild = true
 	cfg := h.config(t, KmodBoot, "")
-	cfg.Budget = 15 * time.Millisecond
+	// The budget has to outlast the checks before the build even on a loaded machine: with 15 ms it ran out on the first
+	// dpkg-query of a busy CI runner and the build never started.
+	cfg.Budget = 300 * time.Millisecond
 	started := time.Now()
 	err := RunKmodSync(context.Background(), cfg)
-	if err == nil || time.Since(started) > time.Second || countKmodCommand(h, "dkms", "autoinstall") != 1 {
+	if err == nil || time.Since(started) > 5*time.Second || countKmodCommand(h, "dkms", "autoinstall") != 1 {
 		t.Fatalf("budget result err=%v elapsed=%s commands=%v", err, time.Since(started), h.commands)
 	}
 }

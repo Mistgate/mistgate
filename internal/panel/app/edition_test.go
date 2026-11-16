@@ -38,7 +38,7 @@ func TestEdgeDeferredJobsMatchUnavailableFeatures(t *testing.T) {
 		}
 	}
 	listed := edition.Unavailable(true)
-	noJob := []string{edition.DecoyOwn, edition.OwnProbes}
+	noJob := []string{edition.DecoyOwn, edition.OwnProbes, edition.TrustTunnel}
 	for _, id := range listed {
 		if !covered[id] && !slices.Contains(noJob, id) {
 			t.Errorf("unavailable id %q has no deferred job behind it", id)
@@ -49,7 +49,7 @@ func TestEdgeDeferredJobsMatchUnavailableFeatures(t *testing.T) {
 			t.Errorf("deferred job maps to %q, which Me does not list as unavailable", id)
 		}
 	}
-	if len(listed) != len(covered)+len(noJob) || !slices.Contains(listed, edition.DecoyOwn) || !slices.Contains(listed, edition.OwnProbes) {
+	if len(listed) != len(covered)+len(noJob) || !slices.Contains(listed, edition.DecoyOwn) || !slices.Contains(listed, edition.OwnProbes) || !slices.Contains(listed, edition.TrustTunnel) {
 		t.Errorf("unavailable ids %v, ids behind jobs %v plus %v", listed, slices.Sorted(maps.Keys(covered)), noJob)
 	}
 }

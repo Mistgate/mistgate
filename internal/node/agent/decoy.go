@@ -26,7 +26,7 @@ func (a *Agent) setDecoy(s *session, cmd *pb.SetDecoy) {
 			result.Error = "bad_params"
 		} else {
 			result.Error = "failed"
-			a.log.Warn("decoy site update failed")
+			a.log.Warn("decoy site update failed", "code", "decoy_site_update_failed")
 		}
 		s.send(&pb.ConnectRequest{Message: &pb.ConnectRequest_CommandResult{CommandResult: result}})
 		return

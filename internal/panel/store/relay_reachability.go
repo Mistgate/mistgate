@@ -34,9 +34,11 @@ type RelayReachabilityUser struct {
 
 type RelayReachabilityRelay struct {
 	ID, InboundID, EntryID, ExitID, State string
+	Mode, ActiveMode                      string
 	Enabled, ExitLive, AgentSupported     bool
-	Checked, CheckOK, EntryUsable         bool
-	MonitorAtUnix                         int64
+	ReverseSupported, Checked, CheckOK    bool
+	EntryUsable, BridgeOK, PathOK         bool
+	BridgeAtUnix, MonitorAtUnix           int64
 	MonitorFails                          uint32
 }
 
@@ -167,8 +169,15 @@ func (r RelayReachability) NodeReachedThroughRelays(nodeID string, directBlocked
 }
 
 func relayReachabilityHealthy(r RelayReachabilityRelay, nowUnix int64, interval uint32) bool {
-	if !r.Enabled || r.State != "active" || !r.AgentSupported || !r.ExitLive || !r.Checked || !r.CheckOK || r.MonitorFails >= 2 ||
+	if !r.Enabled || r.State != "active" || !r.AgentSupported || !r.ExitLive || r.MonitorFails >= 2 ||
 		r.MonitorAtUnix <= 0 || r.MonitorAtUnix > nowUnix {
+		return false
+	}
+	if r.ActiveMode == RelayModeReverse {
+		if !r.ReverseSupported || !r.BridgeOK || !r.PathOK || r.BridgeAtUnix <= 0 || r.BridgeAtUnix > nowUnix || nowUnix-r.BridgeAtUnix > 90 {
+			return false
+		}
+	} else if !r.Checked || !r.CheckOK {
 		return false
 	}
 	if interval == 0 {

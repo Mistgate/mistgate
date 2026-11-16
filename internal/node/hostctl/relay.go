@@ -108,31 +108,48 @@ func ValidateForward(f Forward, accepted []Forward, g ForwardGuard) error {
 	if err := f.check(); err != nil {
 		return err
 	}
-	if len(accepted) >= MaxForwards {
-		return fmt.Errorf("forward %s: a node takes at most %d forwards", f.ID, MaxForwards)
-	}
-	for _, o := range accepted {
-		if o.Network == f.Network && o.Port == f.Port {
-			return fmt.Errorf("forward %s: %s port %d is already forwarded by %s", f.ID, f.Network, f.Port, o.ID)
-		}
-	}
-	for _, p := range g.SSHPorts {
-		if p == f.Port {
-			return fmt.Errorf("forward %s: port %d is the sshd port of this node", f.ID, f.Port)
-		}
-	}
-	for _, p := range g.Ports {
-		if p.Network == f.Network && p.Port == f.Port {
-			return fmt.Errorf("forward %s: %s port %d is used by an inbound of this node", f.ID, f.Network, f.Port)
-		}
-	}
-	for _, h := range g.Hops {
-		if h.Network == f.Network && f.Port >= h.From && f.Port <= h.To {
-			return fmt.Errorf("forward %s: %s port %d is inside the hop range %d-%d of inbound %s", f.ID, f.Network, f.Port, h.From, h.To, h.InboundID)
-		}
+	if err := ValidateForwardPort(f.ID, f.Network, f.Port, accepted, g); err != nil {
+		return err
 	}
 	if g.IsSelf != nil && g.IsSelf(f.ToIP.Unmap()) {
 		return fmt.Errorf("forward %s: %s is an address of this node", f.ID, f.ToIP)
+	}
+	return nil
+}
+
+// ValidateForwardPort checks ownership and conflicts for a relay listener without resolving or validating a DNAT target.
+// Reverse relays use this same port policy but never install a host forward.
+func ValidateForwardPort(id, network string, port uint16, accepted []Forward, g ForwardGuard) error {
+	switch {
+	case !idRe.MatchString(id):
+		return fmt.Errorf("forward %q: bad id", id)
+	case network != "tcp" && network != "udp":
+		return fmt.Errorf("forward %s: network %q", id, network)
+	case port != 443 && port < MinForwardPort:
+		return fmt.Errorf("forward %s: port %d is below %d (well-known ports, sshd 22 and ACME 80 stay out of reach; 443 is the one exception)", id, port, MinForwardPort)
+	}
+	if len(accepted) >= MaxForwards {
+		return fmt.Errorf("forward %s: a node takes at most %d forwards", id, MaxForwards)
+	}
+	for _, o := range accepted {
+		if o.Network == network && o.Port == port {
+			return fmt.Errorf("forward %s: %s port %d is already forwarded by %s", id, network, port, o.ID)
+		}
+	}
+	for _, p := range g.SSHPorts {
+		if p == port {
+			return fmt.Errorf("forward %s: port %d is the sshd port of this node", id, port)
+		}
+	}
+	for _, p := range g.Ports {
+		if p.Network == network && p.Port == port {
+			return fmt.Errorf("forward %s: %s port %d is used by an inbound of this node", id, network, port)
+		}
+	}
+	for _, h := range g.Hops {
+		if h.Network == network && port >= h.From && port <= h.To {
+			return fmt.Errorf("forward %s: %s port %d is inside the hop range %d-%d of inbound %s", id, network, port, h.From, h.To, h.InboundID)
+		}
 	}
 	return nil
 }
@@ -172,6 +189,7 @@ func RenderRelays(fs []Forward, local []netip.Addr) (string, error) {
 	fmt.Fprintf(&b, "\tset local4 {\n\t\ttype ipv4_addr\n\t\telements = { %s }\n\t}\n", strings.Join(addrs, ", "))
 	for _, f := range sorted {
 		fmt.Fprintf(&b, "\tcounter %s_%d {\n\t}\n", f.Network, f.Port)
+		fmt.Fprintf(&b, "\tcounter %s_%d_back {\n\t}\n", f.Network, f.Port)
 	}
 	b.WriteString("\tchain pre {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n")
 	for _, f := range sorted {
@@ -186,6 +204,7 @@ func RenderRelays(fs []Forward, local []netip.Addr) (string, error) {
 	b.WriteString("\t}\n\tchain pass {\n\t\ttype filter hook forward priority filter; policy accept;\n")
 	for _, f := range sorted {
 		fmt.Fprintf(&b, "\t\tmeta nfproto ipv4 ct status dnat ct original proto-dst %d ip daddr %s %s dport %d counter name %s_%d accept\n", f.Port, f.ToIP, f.Network, f.ToPort, f.Network, f.Port)
+		fmt.Fprintf(&b, "\t\tmeta nfproto ipv4 ct status dnat ct original proto-dst %d ip saddr %s %s sport %d counter name %s_%d_back accept\n", f.Port, f.ToIP, f.Network, f.ToPort, f.Network, f.Port)
 	}
 	b.WriteString("\t}\n}\n")
 	return b.String(), nil

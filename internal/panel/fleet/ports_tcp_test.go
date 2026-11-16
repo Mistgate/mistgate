@@ -55,7 +55,7 @@ func TestTCPTargets(t *testing.T) {
 			specs: []tcpSpec{vlessSpec("b", 8443, realityOther, plugin.TLS{}), hy2Spec("a", plugin.TLSAcmeDomain, "node-a.example.com", "")},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 443, Role: "site", ALPN: true, Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com"},
+				{Port: 443, Role: "site", ALPN: true, Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
 				{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "www.example.org"},
 			},
 		},
@@ -63,7 +63,7 @@ func TestTCPTargets(t *testing.T) {
 			specs: []tcpSpec{hy2Spec("a", plugin.TLSAcmeDomain, "node-a.example.com", `{"masquerade":{"tcp_port":8443}}`)},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 8443, Role: "site", Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com"},
+				{Port: 8443, Role: "site", Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
 			},
 		},
 		"a site that is switched off is not probed": {
@@ -83,8 +83,8 @@ func TestTCPTargets(t *testing.T) {
 			},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-b", Kind: "tls", SNI: "node-a.example.com"},
-				{Port: 8443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "node-a.example.com"},
+				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-b", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
+				{Port: 8443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
 			},
 		},
 		"TLS fronts use their server name and only ACME on 443 gets ALPN": {
@@ -95,8 +95,8 @@ func TestTCPTargets(t *testing.T) {
 			},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-a", Kind: "tls", SNI: "origin.example.com"},
-				{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "origin.example.com"},
+				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-a", Kind: "tls", SNI: "origin.example.com", PublicCert: true},
+				{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "origin.example.com", PublicCert: true},
 				{Port: 9443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "origin.example.com"},
 			},
 		},
@@ -125,6 +125,16 @@ func TestTCPTargets(t *testing.T) {
 		"MTProto own-site fallback without an SNI is not probed": {
 			specs: []tcpSpec{{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
 				Settings: json.RawMessage(`{"domains":["node-a.example.com"],"fallback":"decoy"}`)}}},
+		},
+		"a TrustTunnel port is probed as a site, with ALPN on 443, and closes a Hysteria2 site there": {
+			specs: []tcpSpec{hy2Spec("a", plugin.TLSAcmeDomain, "node-a.example.com", ""),
+				{Profile: "TrustTunnel", Spec: plugin.InboundSpec{ID: "tt", Protocol: "trusttunnel", Listen: plugin.Listen{Network: "tcp", Port: 443},
+					TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "node-a.example.com"}, Settings: json.RawMessage(`{"h3":true}`)}}},
+			pins: map[string]string{"tt": pin},
+			want: []tcpTarget{
+				{Port: 80, Role: "acme", Kind: "http_mark"},
+				{Port: 443, Role: "site", ALPN: true, Profile: "TrustTunnel", Kind: "tls", SNI: "node-a.example.com", Pin: pin},
+			},
 		},
 		"a UDP inbound of another protocol is not a TCP port": {
 			specs: []tcpSpec{{Profile: "awg", Spec: plugin.InboundSpec{ID: "w", Protocol: "awg", Listen: plugin.Listen{Network: "udp", Port: 51820}}}},

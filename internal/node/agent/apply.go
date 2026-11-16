@@ -44,6 +44,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 			res.Status = pb.ApplyStatus_APPLY_STATUS_PARTIAL
 		}
 		res.Relays = a.relay.results
+		res.Bridges = a.bridgeResults()
 		return done()
 	}
 
@@ -59,7 +60,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 		res.StateHash = a.observedHash(cur)
 		return done()
 	case err != nil:
-		a.log.Warn("desired state rejected", "revision", ds.Revision, "err", err)
+		a.log.Warn("desired state rejected", "code", "desired_state_rejected", "revision", ds.Revision, "err", err)
 		res.Status, res.Error = pb.ApplyStatus_APPLY_STATUS_REJECTED, err.Error()
 		res.StateHash = a.observedHash(cur)
 		return done()
@@ -79,7 +80,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	if ds.StateHash != "" && ds.StateHash != next.hash() {
 		// Not fatal: the authoritative comparison is the observed hash below, but this tells us whether the
 		// merge itself diverged from the panel's idea of the state.
-		a.log.Warn("merged state hash differs from the panel's", "revision", ds.Revision, "base", ds.BaseRevision)
+		a.log.Warn("merged state hash differs from the panel's", "code", "state_hash_mismatch", "revision", ds.Revision, "base", ds.BaseRevision)
 	}
 
 	results := a.reconcile(ctx, next, nil)
@@ -91,6 +92,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	}
 	res.Inbounds = results
 	res.Relays = a.relay.results
+	res.Bridges = a.bridgeResults()
 	res.StateHash = a.observedHash(next)
 	if ds.BaseRevision == 0 { // deltas are frequent; only a full apply is an event worth reporting
 		added, removed, changed, users := diffModels(cur, next)
@@ -157,6 +159,13 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	a.engineSettings(ctx, next)
 	a.syncWarp(ctx, next)
 	a.syncTunnels(ctx, next)
+	reverseClaims := a.reverseRelayTCPClaims(next)
+	if len(reverseClaims) > 0 || (next.bridgeServe != nil && next.bridgeServe.Port != 0) {
+		preRelayClaims := withRelayClaims(tcpPortClaims(next), reverseClaims)
+		preRelayClaims = mergeTCPPortClaims(withRelayClaims(tcpPortClaims(prev), prevRelayClaims), preRelayClaims)
+		a.syncTCPClaims(ctx, preRelayClaims)
+	}
+	a.syncBridgeServe(ctx, next)
 	// The forwards come before the engines too: a TCP port a forward holds is a claim like an inbound's, so a decoy site
 	// gives it up while the forward is installed and keeps it when the forward failed.
 	a.syncRelays(ctx, next)
@@ -179,7 +188,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 						a.event(pb.Severity_SEVERITY_ERROR, "engine_failed", id, map[string]string{"error": err.Error()})
 					}
 				} else {
-					a.log.Warn("remove inbound", "inbound", id, "err", err)
+					a.log.Warn("remove inbound", "code", "inbound_remove_failed", "inbound", id, "err", err)
 				}
 			}
 		}
@@ -197,7 +206,9 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	a.syncTorrentGuardApplied(ctx, next, results)
 	active := successfullyAppliedEnabledInbounds(results)
 	hops := a.syncHops(ctx, next, results, active)
-	a.syncInboundPorts(ctx, next, active, hops)
+	firewallReady := a.syncInboundPorts(ctx, next, active, hops)
+	a.startReverseRelays(firewallReady)
+	a.syncBridgeDials(ctx, next, results)
 	a.noteCerts(results)
 	results = append(results, removedFailures...)
 	var failed []string
@@ -207,6 +218,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 		}
 	}
 	a.failedApply.Store(&failed)
+	a.publishBridgeInfo()
 	return results
 }
 
@@ -218,6 +230,11 @@ func tcpPortClaims(next *model) map[uint16]string {
 			if _, exists := claimed[spec.Listen.Port]; !exists { // ids are sorted; keep the same lower-id winner as hop checks
 				claimed[spec.Listen.Port] = id
 			}
+		}
+	}
+	if next.bridgeServe != nil && next.bridgeServe.Port != 0 {
+		if _, exists := claimed[next.bridgeServe.Port]; !exists {
+			claimed[next.bridgeServe.Port] = "bridge-site"
 		}
 	}
 	return claimed
@@ -280,7 +297,7 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 		res.State, res.Error = pb.InboundRunState_INBOUND_RUN_STATE_FAILED, err.Error()
 		if h == nil || h.res.Error != res.Error || h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
 			if !isEnginePanic(err) {
-				a.log.Error("inbound failed", "inbound", spec.ID, "err", err)
+				a.log.Error("inbound failed", "code", "inbound_apply_failed", "inbound", spec.ID, "err", err)
 			}
 			if isBackendUnavailable(err) { // agent.proto "AWG AND WARP": awg_backend_unavailable {reason}
 				a.event(pb.Severity_SEVERITY_ERROR, "awg_backend_unavailable", spec.ID, map[string]string{"reason": res.Error})
@@ -377,7 +394,7 @@ func (a *Agent) applyEngine(ctx context.Context, spec plugin.InboundSpec, creds 
 	defer func() {
 		if v := recover(); v != nil {
 			err = &enginePanicError{reason: enginePanicReason(v)}
-			a.log.Error("engine panic", "protocol", spec.Protocol, "inbound", spec.ID, "operation", "apply", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
+			a.log.Error("engine panic", "code", "engine_apply_panic", "protocol", spec.Protocol, "inbound", spec.ID, "operation", "apply", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
 		}
 		if err == nil || !prior {
 			a.finishApplyMarker(spec.ID)
@@ -391,7 +408,7 @@ func (a *Agent) removeEngine(ctx context.Context, protocol string, eng engine.En
 	defer func() {
 		if v := recover(); v != nil {
 			err = &enginePanicError{reason: enginePanicReason(v)}
-			a.log.Error("engine panic", "protocol", protocol, "inbound", id, "operation", "remove", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
+			a.log.Error("engine panic", "code", "engine_remove_panic", "protocol", protocol, "inbound", id, "operation", "remove", "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
 		}
 	}()
 	return eng.Remove(ctx, id)
@@ -403,7 +420,7 @@ func (a *Agent) loadApplyMarkers() {
 	}
 	markers, err := loadApplyMarkers(a.cfg.StateDir)
 	if err != nil {
-		a.log.Warn("apply crash marker ignored", "err", err)
+		a.log.Warn("apply crash marker ignored", "code", "apply_crash_marker_read_failed", "err", err)
 		markers = map[string]string{}
 		_ = saveApplyMarkers(a.cfg.StateDir, markers)
 	}
@@ -419,7 +436,7 @@ func (a *Agent) beginApplyMarker(id, specHash string) bool {
 	prior := a.applyMarkers[id] == specHash
 	a.applyMarkers[id] = specHash
 	if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
-		a.log.Error("write apply crash marker", "inbound", id, "err", err)
+		a.log.Error("write apply crash marker", "code", "apply_crash_marker_write_failed", "inbound", id, "err", err)
 	}
 	return prior
 }
@@ -428,7 +445,7 @@ func (a *Agent) finishApplyMarker(id string) {
 	a.loadApplyMarkers()
 	delete(a.applyMarkers, id)
 	if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
-		a.log.Warn("clear apply crash marker", "inbound", id, "err", err)
+		a.log.Warn("clear apply crash marker", "code", "apply_crash_marker_clear_failed", "inbound", id, "err", err)
 	}
 }
 
@@ -460,7 +477,7 @@ func (a *Agent) clearChangedApplyMarkers(ds *pb.DesiredState, next *model) {
 	}
 	if changed {
 		if err := saveApplyMarkers(a.cfg.StateDir, a.applyMarkers); err != nil {
-			a.log.Warn("clear changed apply crash marker", "err", err)
+			a.log.Warn("clear changed apply crash marker", "code", "apply_crash_marker_clear_failed", "err", err)
 		}
 	}
 }
@@ -470,7 +487,7 @@ func (a *Agent) reportStateIssues(issues []stateIssue) {
 		if issue.kind == "inbound" {
 			continue // applyInbound reports the failed inbound with its parse reason.
 		}
-		a.log.Warn("desired state item skipped", "kind", issue.kind, "id", issue.id, "reason", issue.reason)
+		a.log.Warn("desired state item skipped", "code", "desired_item_skipped", "kind", issue.kind, "id", issue.id, "reason", issue.reason)
 		a.event(pb.Severity_SEVERITY_ERROR, "desired_state_item_skipped", issue.id, map[string]string{"kind": issue.kind, "error": issue.reason})
 	}
 }
@@ -527,7 +544,7 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 	}
 	for id, msg := range rej {
 		if a.hopRej[id] != msg {
-			a.log.Error("port hop rejected", "inbound", id, "reason", msg)
+			a.log.Error("port hop rejected", "code", "port_hop_rejected", "inbound", id, "reason", msg)
 			a.event(pb.Severity_SEVERITY_ERROR, "hop_rejected", id, map[string]string{"error": msg})
 		}
 	}
@@ -538,7 +555,7 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 	}
 	if err := a.host.SetPortHops(ctx, hops); err != nil {
 		a.hopsSet = false
-		a.log.Error("port hopping not installed", "err", err)
+		a.log.Error("port hopping not installed", "code", "port_hop_sync_failed", "err", err)
 		for _, r := range results {
 			for _, h := range hops {
 				if h.InboundID == r.InboundId && r.Error == "" {
@@ -556,7 +573,7 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 // syncInboundPorts mirrors only enabled listeners whose engine apply succeeded. UDP hop ranges are included only after
 // their exact nft redirect was accepted and installed. A failure is a node-level warning, not an inbound error: the
 // listener runs, and the host firewall may well be open by the owner's own rules.
-func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[string]bool, hops []hostctl.Hop) {
+func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[string]bool, hops []hostctl.Hop) bool {
 	byHop := make(map[string]hostctl.Hop, len(hops))
 	for _, h := range hops {
 		byHop[h.InboundID] = h
@@ -586,6 +603,29 @@ func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[st
 			}
 			tcpSet[s.Listen.Port] = struct{}{}
 		}
+		for _, side := range plugin.SideListens(s) {
+			switch side.Network {
+			case "udp":
+				if side.Port != 0 {
+					udpSet[hostctl.UDPInboundPort{Port: side.Port}] = struct{}{}
+				}
+			case "tcp":
+				if side.Port != 0 {
+					tcpSet[side.Port] = struct{}{}
+				}
+			}
+		}
+	}
+	if a.bridgeSite != nil {
+		if port := a.bridgeSite.Port(); port != 0 {
+			tcpSet[port] = struct{}{}
+		}
+	}
+	for port := range a.relay.listenerPorts {
+		tcpSet[port] = struct{}{}
+	}
+	for _, listener := range a.relay.pending {
+		tcpSet[listener.Port] = struct{}{}
 	}
 	udp := make([]hostctl.UDPInboundPort, 0, len(udpSet))
 	for port := range udpSet {
@@ -610,9 +650,11 @@ func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[st
 	}
 	if err := errors.Join(errs...); err != nil {
 		a.markHostFirewallSyncFailure(err, udp, tcp)
+		return false
 	} else {
 		a.clearHostFirewallSyncFailure()
 	}
+	return true
 }
 
 // markHostFirewallSyncFailure reports one warning per distinct failure; the same failure on later reconciles is quiet.
@@ -621,7 +663,7 @@ func (a *Agent) markHostFirewallSyncFailure(err error, udp []hostctl.UDPInboundP
 	errMsg := err.Error()
 	if a.hostFirewallErr != errMsg {
 		a.hostFirewallErr = errMsg
-		a.log.Warn("host firewall inbound rules were not fully reconciled", "err", err)
+		a.log.Warn("host firewall inbound rules were not fully reconciled", "code", "host_firewall_sync_failed", "err", err)
 		list := make([]string, len(udp))
 		for i, p := range udp {
 			if p.Port != 0 {
@@ -728,7 +770,7 @@ func (a *Agent) observedHash(m *model) string {
 			all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 		}
 	}
-	return statehash.StateRelays(all, m.warp, m.relays)
+	return statehash.StateBridge(all, m.warp, m.relays, m.bridgeServe, m.bridgeDials)
 }
 
 func withExpired(held []plugin.UserCred, in *inbound, now time.Time) []plugin.UserCred {
@@ -761,5 +803,5 @@ func (m *model) hash() string {
 		}
 		all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 	}
-	return statehash.StateRelays(all, m.warp, m.relays)
+	return statehash.StateBridge(all, m.warp, m.relays, m.bridgeServe, m.bridgeDials)
 }

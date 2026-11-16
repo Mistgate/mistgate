@@ -37,7 +37,7 @@ func (s *Service) ClientSubscription(ctx context.Context, dev store.AccessDevice
 		// The person's Mistgate app is switched off, as an app of theirs can be: with no app allowed nothing is usable, so the device
 		// is served no server and nothing is issued to it. What it holds is kept (the nodes stop taking it, see store.DesiredCreds)
 		// and works again when the switch is on. The status and the plan are the person's own and are still told.
-		u.AppHapp, u.AppAmnezia, u.AppTelegram = false, false, false
+		u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AppTrustTunnel = false, false, false, false
 	}
 	v, err := s.subView(ctx, u, true, SubOptions{Format: plugin.FormatMistgate, Device: hint, EnrolledDevice: &dev, Capabilities: caps,
 		NoPageData: true, IncludeEffectiveDNS: true})

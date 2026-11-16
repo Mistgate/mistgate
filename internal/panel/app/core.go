@@ -133,7 +133,8 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 
 // accessConfig is the access service's configuration, the same in every role.
 func (b base) accessConfig(fl *fleet.Fleet, stepUp func(context.Context) error) access.Config {
-	return access.Config{SubscriptionBaseURL: b.subBase, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts, CheckRelay: fl.CheckRelay, Limiter: b.limiter}
+	return access.Config{SubscriptionBaseURL: b.subBase, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts,
+		CheckRelay: fl.CheckRelay, Limiter: b.limiter}
 }
 
 // usageRecompute is fleet.Config.OnUsage: a quota overrun takes effect right after the stats batch that crossed it.
@@ -270,6 +271,7 @@ func wireCore(c Config) (*core, error) {
 		return nil, err
 	}
 	k.acc = acc
+	fl.SetRelayControl(acc.ControlRelay)
 	// Globalping, an integration of its own: off until the owner switches it on. The country check of the health module
 	// measures through it and does nothing while it is off. The country it looks from is the shared one of countryreach.
 	// Its history is read by the health module, which knows which sources are on: late binding to hl.
@@ -330,8 +332,9 @@ func wireCore(c Config) (*core, error) {
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
 	hcfg := health.Config{Edge: edge, Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem, CheckPortsUDP: fl.CheckPortsAsSystemUDP,
-		Country: k.gp.Country,
-		Lists:   k.bl.Active,
+		ControlRelay: acc.ControlRelay,
+		Country:      k.gp.Country,
+		Lists:        k.bl.Active,
 		// One read for both external sources: the evaluator asks on every pass, also while both are off.
 		External: func(ctx context.Context) []health.ExternalState {
 			kv, err := st.SettingValues(ctx, append(cheburcheck.StateKeys(), bsbord.StateKeys()...))

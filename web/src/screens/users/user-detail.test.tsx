@@ -490,8 +490,8 @@ describe("the Mistgate app among the apps of a person", () => {
     expect(sw().getAttribute("aria-checked")).toBe("true"); // a person without the field is the default: on
     expect(row().getAttribute("data-state")).toBe("on");
     expect(row().querySelector("a")).toBeNull(); // no pill while the panel has it on
-    // the other three rows are its neighbours in the same block, and it comes last
-    expect(row().parentElement!.querySelectorAll(":scope > label [role=switch]")).toHaveLength(3);
+    // the other four rows (link, AmneziaVPN, Telegram, TrustTunnel) are its neighbours in the same block, and it comes last
+    expect(row().parentElement!.querySelectorAll(":scope > label [role=switch]")).toHaveLength(4);
     expect(row().parentElement!.lastElementChild).toBe(row());
   });
 

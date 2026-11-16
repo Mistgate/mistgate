@@ -109,16 +109,22 @@ func changeTools() []toolDef {
 
 type nodeDecoyArgs struct {
 	ReasonField
-	Node         string `json:"node" jsonschema:"node id or exact name"`
-	Mode         string `json:"mode" jsonschema:"builtin, panel or own"`
-	BundleBase64 string `json:"bundle_base64,omitempty" jsonschema:"base64 ZIP or TAR static site up to 2 MiB; required for own, omitted otherwise"`
+	Node         string         `json:"node" jsonschema:"node id or exact name"`
+	Mode         string         `json:"mode" jsonschema:"builtin, panel or own"`
+	BundleBase64 string         `json:"bundle_base64,omitempty" jsonschema:"base64 ZIP or TAR static site up to 2 MiB; for own, give this or files, omitted otherwise"`
+	Files        []decoyFileArg `json:"files,omitempty" jsonschema:"the own site as a list of files, when you cannot make an archive: at most 64 files and 2 MiB, one must be index.html at the top; give this or bundle_base64, omitted for other modes"`
 }
 
 var nodeDecoy = changeSpec[nodeDecoyArgs]{
 	name: "node_decoy", min: ProfileAdmin, danger: true, maxArgs: maxUploadArgsJSON,
 	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure,
 		adminv1connect.NodeServiceSetNodeDecoyModeProcedure),
-	desc: "Choose builtin, the panel's decoy site, or upload an own static site for one node. When generating an own site, never repeat the subject or look of sites already made for other nodes.",
+	desc: "Choose builtin, the panel's decoy site, or an own static site for one node. " +
+		"For own, give the site as files (a list of {path, content} text files, or content_base64 for a small image: use this when you cannot make an archive) or as bundle_base64 (a ZIP or TAR), one of the two. " +
+		"The site is small, static and self-contained: plain HTML and one style sheet, 3 to 5 pages with index.html at the top and a 404.html in the same style, every link a path from the root, " +
+		"no external scripts, fonts, images, analytics, embeds or links to other sites, no forms, nothing that names a VPN, a proxy or this panel. " +
+		"A model's answer is length-capped, so keep the files under about 20 KB in total (the limit is 2 MiB) and send them in one call. " +
+		"When generating an own site, never repeat the subject or look of sites already made for other nodes.",
 	plan: func(c *call, a nodeDecoyArgs) (*planned, error) {
 		id, name, err := c.nodeRef(a.Node)
 		if err != nil {
@@ -135,12 +141,12 @@ var nodeDecoy = changeSpec[nodeDecoyArgs]{
 		var bundle *decoy.Bundle
 		switch a.Mode {
 		case decoy.ModeBuiltin:
-			if a.BundleBase64 != "" {
-				return nil, errors.New("bundle_base64 is only allowed with own mode")
+			if a.BundleBase64 != "" || len(a.Files) > 0 {
+				return nil, errors.New("bundle_base64 and files are only allowed with own mode")
 			}
 		case decoy.ModePanel:
-			if a.BundleBase64 != "" {
-				return nil, errors.New("bundle_base64 is only allowed with own mode")
+			if a.BundleBase64 != "" || len(a.Files) > 0 {
+				return nil, errors.New("bundle_base64 and files are only allowed with own mode")
 			}
 			if !node.GetDecoyPanelAvailable() {
 				return nil, errors.New("panel decoy site is unavailable")
@@ -149,33 +155,34 @@ var nodeDecoy = changeSpec[nodeDecoyArgs]{
 			if !node.GetDecoyOwnAvailable() {
 				return nil, errors.New("own decoy sites are unavailable in this edition")
 			}
-			if a.BundleBase64 == "" {
-				return nil, errors.New("bundle_base64 is required for own mode")
+			var archive []byte
+			if bundle, archive, err = a.ownBundle(); err != nil {
+				return nil, err
 			}
-			archive, err := base64.StdEncoding.Strict().DecodeString(a.BundleBase64)
-			if err != nil {
-				return nil, errors.New("bundle_base64 must encode a ZIP or TAR archive")
-			}
-			bundle, err = decoy.ParseArchive(archive)
-			if err != nil {
-				return nil, errors.New(decoy.ClientMessage(err))
-			}
+			// what is stored and applied is the archive, whichever way the site came
+			a.BundleBase64, a.Files = base64.StdEncoding.EncodeToString(archive), nil
 		default:
 			return nil, errors.New("mode must be builtin, panel or own")
 		}
 		facts := []Fact{{Key: "node", Value: nm(name), Untrusted: true}, {Key: "mode", Value: a.Mode}}
+		summary := "Change the decoy site for one node. The owner must approve this change before it is applied."
 		if bundle != nil {
 			var size int
 			files := bundle.Files()
 			for _, f := range files {
 				size += len(f.Content)
 			}
-			facts = append(facts, Fact{Key: "bundle", Value: bundle.Hash()},
+			listing, err := decoyFileFacts(bundle)
+			if err != nil {
+				return nil, err
+			}
+			facts = append(facts, Fact{Key: "bundle", Value: spacedHash(bundle.Hash())},
 				Fact{Key: "files", Value: fmt.Sprint(len(files))}, Fact{Key: "bytes", Value: fmt.Sprint(size)})
+			facts = append(facts, listing...)
+			summary = fmt.Sprintf("Change the decoy site for one node to an own static site of %d files, %d bytes. The owner must approve this change before it is applied.", len(files), size)
 		}
 		a.Node = id
-		return &planned{Summary: "Change the decoy site for one node. The owner must approve this change before it is applied.",
-			Facts: facts, Danger: []string{dangerFleet}, Params: a}, nil
+		return &planned{Summary: summary, Facts: facts, Danger: []string{dangerFleet}, Params: a}, nil
 	},
 	apply: func(c *call, a nodeDecoyArgs, _ Plan) (done, error) {
 		var archive []byte

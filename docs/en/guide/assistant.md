@@ -52,6 +52,10 @@ Ask "who cannot connect, and what do we fix?", or press **Work out what does not
 
 It answers with a short picture per protocol, node and group, then three to five ranked recommendations, each tied to its evidence and offered as one plan (a relay through an entry people reach, a move to port 443, a different protocol for a group, a CDN profile, the IPv6 entry, taking a blocked server out of subscriptions). The rules are fixed, so the same facts give the same answer; where a signal is missing it says so and names the check that would tell (for example `path_probe` over UDP from a node in the country). VLESS keeps no attempt counter, so its failures show only through the country view and kl!ck.
 
+## Make a decoy site for a node
+
+Ask "make a decoy site for the node alpha". The assistant picks a subject and a look that the sites of your other nodes do not use, writes a few small pages and a style sheet and sends them as a list of files to `node_decoy_plan` (mode `own`). The **Proposed change** card lists the files with their sizes and the SHA-256 of the site, never the text; **Approve and apply** puts the site on the node. Its answer is length-capped, so the site stays small, about 20 KB in all; for a bigger one upload an archive on the node's **Server** tab. The text of the files is not kept in the saved conversation: ask for a new site rather than for a change to the last one. See [Your own decoy site](decoy-site.md).
+
 ## Memory
 
 - **Notes.** The assistant saves what it should remember ("Remembered: …" in the chat, with **Forget**). **AI → Memory** lists them: add, edit and delete any, or **Forget everything**. Every note goes into every conversation; at most 100 notes of 400 characters.

@@ -89,14 +89,52 @@ func StateWarp(in []Inbound, warp *plugin.WarpSpec) string { return StateRelays(
 
 // Relay is the hash line of one forward: "relay" + "\x1f" + join("\x1f", id, network, port, to_host, to_port).
 // It has six fields, so it can never be mistaken for an inbound line (three) or the warp line (two).
+//
+// A reverse-relay forward (a mode other than "" and "dnat", or an exit_node_id) adds two fields, mode and exit_node_id, so the
+// line of a plain forward is what it was before the bridge existed; a mode of "dnat" counts as "".
 func Relay(r plugin.RelayForward) string {
-	return strings.Join([]string{"relay", r.ID, r.Network, u(uint64(r.Port)), r.ToHost, u(uint64(r.ToPort))}, us)
+	line := []string{"relay", r.ID, r.Network, u(uint64(r.Port)), r.ToHost, u(uint64(r.ToPort))}
+	mode := r.Mode
+	if mode == "dnat" {
+		mode = ""
+	}
+	if mode != "" || r.ExitNodeID != "" {
+		line = append(line, mode, r.ExitNodeID)
+	}
+	return strings.Join(line, us)
+}
+
+// BridgeServe is the hash line of the entry side of the bridge: "bridge_serve" + "" + join("", port, path,
+// join(",", sorted exit_node_ids), panel_via).
+func BridgeServe(b plugin.BridgeServe) string {
+	ids := append([]string(nil), b.ExitNodeIDs...)
+	sort.Strings(ids)
+	return strings.Join([]string{"bridge_serve", u(uint64(b.Port)), b.Path, strings.Join(ids, ","), b2s(b.PanelVia)}, us)
+}
+
+// BridgeDial is the hash line of one entry an exit calls: "bridge_dial" + "" + join("", entry_node_id, host, port, sni,
+// pin_sha256, path, pool, panel_via, join(",", targets as relay_id:network:port, sorted)).
+func BridgeDial(d plugin.BridgeDial) string {
+	targets := make([]string, len(d.Targets))
+	for i, t := range d.Targets {
+		targets[i] = t.RelayID + ":" + t.Network + ":" + u(uint64(t.Port))
+	}
+	sort.Strings(targets)
+	return strings.Join([]string{"bridge_dial", d.EntryNodeID, d.Host, u(uint64(d.Port)), d.SNI, d.PinSHA256, d.Path, u(uint64(d.Pool)),
+		b2s(d.PanelVia), strings.Join(targets, ",")}, us)
 }
 
 // StateRelays is StateWarp plus the forwarded ports: one Relay line each, sorted among themselves, after the warp line.
 // An empty list adds nothing, so the result is StateWarp(in, warp) byte for byte, and a delta that clears the list and a
 // full state without one hash alike.
 func StateRelays(in []Inbound, warp *plugin.WarpSpec, relays []plugin.RelayForward) string {
+	return StateBridge(in, warp, relays, nil, nil)
+}
+
+// StateBridge is StateRelays plus the bridge of the reverse relays: the bridge_serve line (only when serve is set and not empty),
+// then one bridge_dial line per dial, sorted among themselves, after the relay lines. A nil or empty serve and no dials add
+// nothing, so the result is StateRelays(in, warp, relays) byte for byte.
+func StateBridge(in []Inbound, warp *plugin.WarpSpec, relays []plugin.RelayForward, serve *plugin.BridgeServe, dials []plugin.BridgeDial) string {
 	lines := make([]string, len(in))
 	for i, x := range in {
 		lines[i] = x.Spec.ID + us + Spec(x.Spec) + us + Creds(x.Creds)
@@ -111,5 +149,14 @@ func StateRelays(in []Inbound, warp *plugin.WarpSpec, relays []plugin.RelayForwa
 	}
 	sort.Strings(rl)
 	lines = append(lines, rl...)
+	if serve != nil && !serve.IsZero() {
+		lines = append(lines, BridgeServe(*serve))
+	}
+	dl := make([]string, len(dials))
+	for i, d := range dials {
+		dl[i] = BridgeDial(d)
+	}
+	sort.Strings(dl)
+	lines = append(lines, dl...)
 	return hexSum(strings.Join(lines, "\n"))
 }

@@ -48,13 +48,14 @@ type tcpSpec struct {
 
 // tcpTarget is one TCP port to probe and what to say about it.
 type tcpTarget struct {
-	Port    uint16
-	Role    string // acme | site | vless
-	ALPN    bool   // the listener answers TLS-ALPN-01
-	Profile string
-	Kind    string // tcpcheck.KindHTTPMark | tcpcheck.KindTLS
-	SNI     string
-	Pin     string // lower-case hex sha256 of the leaf the node reported, "" = none
+	Port       uint16
+	Role       string // acme | site | vless
+	ALPN       bool   // the listener answers TLS-ALPN-01
+	Profile    string
+	Kind       string // tcpcheck.KindHTTPMark | tcpcheck.KindTLS
+	SNI        string
+	Pin        string // lower-case hex sha256 of the leaf the node reported, "" = none
+	PublicCert bool   // an ACME certificate; a name without a pin can be checked by the node's system roots
 }
 
 // tcpTargets lists the ports to probe on a node from its enabled inbounds, 80 first and then by port, at most
@@ -65,6 +66,7 @@ type tcpTarget struct {
 //     the site there, and the VLESS row says what answers.
 //   - a VLESS TCP port (role vless): REALITY with another site is probed with the target's name (a valid chain proves our
 //     REALITY forwarded the hello to that site), "self" and TLS with the node's own name.
+//   - a TrustTunnel TCP port (role site): its HTTPS site answers the node's own name; a Hysteria2 site on the same port is closed.
 //   - an MTProto TCP port (role mtproto): only its own-site Fake TLS fallback, whose decoy answers with the node's site and
 //     certificate; a Fake TLS fallback to another site cannot prove that the port belongs to this node.
 func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
@@ -77,8 +79,8 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 		if s.Spec.TLS.Mode == plugin.TLSAcmeDomain || s.Spec.TLS.Mode == plugin.TLSAcmeIP {
 			acme = true
 		}
-		if s.Spec.Protocol == "vless" && s.Spec.Listen.Network == "tcp" {
-			vlessPorts[s.Spec.Listen.Port] = true
+		if (s.Spec.Protocol == "vless" || s.Spec.Protocol == "trusttunnel") && s.Spec.Listen.Network == "tcp" {
+			vlessPorts[s.Spec.Listen.Port] = true // the node closes a Hysteria2 site on a TCP port another inbound holds
 		}
 	}
 
@@ -101,11 +103,17 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 		switch {
 		case spec.Protocol == "vless" && spec.Listen.Network == "tcp":
 			sni, ownName := vlessProbeName(spec)
-			t := tcpTarget{Port: spec.Listen.Port, Role: tcpRoleVLESS, Profile: s.Profile, Kind: tcpcheck.KindTLS, SNI: sni, Pin: pin}
+			t := tcpTarget{Port: spec.Listen.Port, Role: tcpRoleVLESS, Profile: s.Profile, Kind: tcpcheck.KindTLS, SNI: sni, Pin: pin,
+				PublicCert: hasPublicCertificate(spec.TLS)}
 			if ownName {
 				t.ALPN = alpn(t.Port, spec.TLS)
 			}
 			add(t)
+		case spec.Protocol == "trusttunnel" && spec.Listen.Network == "tcp":
+			// An HTTPS site of its own: the TLS handshake with the node's name proves the port reaches this node (TLS-ALPN-01
+			// is answered on 443 with an ACME certificate, as for a Hysteria2 site).
+			add(tcpTarget{Port: spec.Listen.Port, Role: tcpRoleSite, ALPN: alpn(spec.Listen.Port, spec.TLS), Profile: s.Profile,
+				Kind: tcpcheck.KindTLS, SNI: spec.TLS.ServerName, Pin: pin})
 		case spec.Protocol == "mtproto" && spec.Listen.Network == "tcp":
 			var settings struct {
 				Fallback string `json:"fallback"`
@@ -117,14 +125,14 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 				continue
 			}
 			add(tcpTarget{Port: spec.Listen.Port, Role: tcpRoleMTProto, Profile: s.Profile, Kind: tcpcheck.KindTLS,
-				SNI: spec.TLS.ServerName, Pin: pin})
+				SNI: spec.TLS.ServerName, Pin: pin, PublicCert: hasPublicCertificate(spec.TLS)})
 		case spec.Protocol == "hysteria2":
 			port := uint16(hy2SitePort(spec))
 			if port == 0 || vlessPorts[port] {
 				continue
 			}
 			add(tcpTarget{Port: port, Role: tcpRoleSite, ALPN: alpn(port, spec.TLS), Profile: s.Profile, Kind: tcpcheck.KindTLS,
-				SNI: spec.TLS.ServerName, Pin: pin})
+				SNI: spec.TLS.ServerName, Pin: pin, PublicCert: hasPublicCertificate(spec.TLS)})
 		}
 	}
 
@@ -142,6 +150,10 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 		out = out[:tcpcheck.MaxTargets]
 	}
 	return out
+}
+
+func hasPublicCertificate(tls plugin.TLS) bool {
+	return tls.Mode == plugin.TLSAcmeDomain || tls.Mode == plugin.TLSAcmeIP
 }
 
 // vlessProbeName is the TLS name to send to a VLESS listener, and whether it is the node's own name ("self" REALITY or a

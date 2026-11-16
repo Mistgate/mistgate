@@ -84,6 +84,7 @@ A server that a format cannot carry is left out of that format without a word, a
 
 - sing-box has no XHTTP transport and cannot check a self-signed certificate by its fingerprint. Gecko is carried by Mihomo only.
 - AmneziaWG reaches an app only through Mihomo YAML or an AmneziaVPN key. The first can be turned off: [AmneziaWG in apps on the link](#amneziawg-in-apps-on-the-link).
+- TrustTunnel is in no format: the official apps take a `tt://` link from the person's page ([TrustTunnel](trusttunnel.md)).
 - MTProto is in no format. A `tg://proxy` line would be a broken server in every VPN app, so the Telegram links come only from the person's page and the admin ([MTProto](mtproto.md)).
 - A WARP copy is the node's exit; nothing changes on the client, so it follows the profile it copies.
 - A person for whom a format has no server at all gets a placeholder entry: see [When no server fits the app](#when-no-server-fits-the-app).

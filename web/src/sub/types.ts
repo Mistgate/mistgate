@@ -13,6 +13,9 @@ export type AppEntry = { platform: Platform; kind: Kind; name: string; download_
 /** The mode of the device limit for the apps on the link: counted only, refused over the limit, or also refused without a device ID. */
 export type LinkMode = "track" | "enforce" | "strict";
 
+/** One tt:// link of the page: the server as the page names it (country, place), its marks, and the link itself ("" with a note). */
+export type TrustTunnelLink = { label: string; country_code: string; place: string; has_ipv6: boolean; relay: boolean; via: string; note: string; url: string };
+
 export type Device = {
   id: string;
   platform: string;
@@ -22,8 +25,8 @@ export type Device = {
   last_seen_unix: number;
   online: boolean;
   /** "link": an app that reports a device ID; "shared": the one place of the apps that report none; "key": an AmneziaVPN key;
-   * "telegram": the Telegram proxy key. */
-  kind: "link" | "shared" | "key" | "telegram";
+   * "telegram": the Telegram proxy key; "trusttunnel": the TrustTunnel key (the owner issues and revokes it). */
+  kind: "link" | "shared" | "key" | "telegram" | "trusttunnel";
   /** The person may remove or rename it on this page (never the shared place, never in the admin's preview). */
   can_remove: boolean;
   can_rename: boolean;
@@ -167,9 +170,14 @@ export type MgData = {
   support_url: string;
   options: { show_announcement: boolean; show_support: boolean; show_qr: boolean };
   apps: AppEntry[];
-  access: { happ: boolean; amnezia: boolean; telegram?: boolean };
+  access: { happ: boolean; amnezia: boolean; telegram?: boolean; trust_tunnel?: boolean };
   /** The tg://proxy links of the person, when Telegram is on; null when it is off. */
   telegram?: { links: { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string }[] } | null;
+  /**
+   * The tt:// links of the person for the official TrustTunnel apps, when it is on; null when it is off. A server whose certificate
+   * is self-signed is a row with a `note` ("self_signed") and no url.
+   */
+  trust_tunnel?: { links: TrustTunnelLink[] } | null;
   devices: Device[];
   /** Where a device of the link is removed and renamed (POST <it>/<id>/revoke, /rename); "" in the admin's preview and with self-service off. */
   devices_endpoint: string;

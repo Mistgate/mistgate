@@ -407,6 +407,27 @@ func TestDebugBufferIsBoundedByRecordsAndBytes(t *testing.T) {
 	}
 }
 
+// The debug capture is the other way a node's text reaches the panel: a credential header in it goes too.
+func TestDebugRecordsDropCredentialHeaders(t *testing.T) {
+	d := newDebugState(nil, time.Now)
+	d.start("req_a", slog.LevelDebug, nil, time.Hour, func(string) {})
+	defer d.shutdown()
+	d.add(slog.LevelDebug, logRecord{
+		at: time.Now(), source: "agent", msg: "CONNECT refused, Proxy-Authorization: Basic YWxpY2U6c2VjcmV0cGFzc3dvcmQ=",
+		attrs: map[string]string{"err": `header "Authorization": "Bearer abc.def-ghi_jkl"`, "code": "x"},
+	})
+	if len(d.cur.recs) != 1 {
+		t.Fatalf("records = %d", len(d.cur.recs))
+	}
+	r := d.cur.recs[0]
+	text := r.msg + " " + r.attrs["err"]
+	for _, secret := range []string{"YWxpY2U6c2VjcmV0cGFzc3dvcmQ=", "abc.def-ghi_jkl", "Basic", "Bearer"} {
+		if strings.Contains(text, secret) {
+			t.Errorf("%q survived the capture's scrub: %q", secret, text)
+		}
+	}
+}
+
 func TestDebugRecordsAreScrubbedOnTheNode(t *testing.T) {
 	d := newDebugState(nil, time.Now)
 	d.start("req_s", slog.LevelDebug, nil, time.Hour, func(string) {})

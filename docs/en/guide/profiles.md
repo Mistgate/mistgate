@@ -17,7 +17,7 @@ A person gets a server when all of these hold: the profile is in their group, it
 
 ## Protocols are plugins
 
-Each protocol is a plugin of the panel: today Hysteria2, VLESS, AmneziaWG and MTProto, which is marked as experimental. A plugin brings its settings as a schema, and the editor draws the form from it. That is why every protocol's form looks alike:
+Each protocol is a plugin of the panel: today Hysteria2, VLESS, AmneziaWG, MTProto and TrustTunnel; the last two are marked as experimental. A plugin brings its settings as a schema, and the editor draws the form from it. That is why every protocol's form looks alike:
 
 - fields are grouped into **Basics**, **Obfuscation** and **Advanced**; a group header counts what you changed ("2 changed") and what is wrong ("1 error");
 - numbers carry their unit (Mbit/s, s, bytes);
@@ -40,6 +40,7 @@ Not every subscription format can carry every profile: sing-box has no XHTTP, on
 - A yellow chip marks a real loss: "not in sing-box: XHTTP". Formats that lose the profile for the same reason share one chip: "not in Link list, Xray JSON, sing-box: Gecko". Hover or focus a chip for the full sentence.
 - AmneziaWG is not a loss, it is how it works: the line ends "Mihomo · AmneziaVPN keys", with no chip.
 - MTProto is in no subscription format and is not a loss either: its `tg://` links come from the person's page, and the preview under **What the client sees** shows the link ("Telegram · tg://proxy link"). See [MTProto](mtproto.md).
+- TrustTunnel is in no subscription format either: its `tt://` links come from the person's page, and the Mistgate app gets its path directly. See [TrustTunnel](trusttunnel.md).
 - A Hysteria2 port-hopping range is not a loss either. The link list and Xray JSON write it as one port, so their names carry a dotted underline and a tip: "The port range is written as one port."
 - In the editor the line follows your settings as you type, and it is hidden while the draft has errors. On the user card, next to a subscription profile that some format leaves out, only the yellow chip shows.
 
@@ -56,7 +57,7 @@ The reasons are stable codes. The panel's API and [MCP](../reference/mcp.md) ret
 
 ## Creating a profile
 
-1. **New profile** has two steps. First choose the protocol: a card for each (**Hysteria2**, **VLESS**, **AmneziaWG**, **MTProto**; the experimental one says so). Then the form opens, starting from the plugin's defaults, with every secret already generated. The settings of the protocol you chose are on its page, for example [MTProto](mtproto.md).
+1. **New profile** has two steps. First choose the protocol: a card for each (**Hysteria2**, **VLESS**, **AmneziaWG**, **MTProto**, **TrustTunnel**; the experimental ones say so). Then the form opens, starting from the plugin's defaults, with every secret already generated. The settings of the protocol you chose are on its page, for example [MTProto](mtproto.md).
 2. **Name**. Until you type one, it follows the port: "Hysteria2 · 443". Up to 64 characters, shown in the panel's lists and, through `{profile}` of the name template, in the server names people see (see [Subscriptions](subscriptions.md)).
 3. Change the settings you need. The panel checks them as you type; a field with a problem is marked, and the preview waits until it is fixed.
 4. **Right after it is created** decides what happens on the click:

@@ -171,6 +171,7 @@ type InboundView struct {
 	Node           NodeView
 	Port           uint16
 	HopFrom, HopTo uint16
+	TCPOnly        bool   // relay twin: the forward carries TCP only, even if the direct inbound also serves HTTP/3
 	TLSServerName  string // effective SNI
 	TLSMode        plugin.TLSMode
 	CertPinSHA256  string // reported by the node after apply; empty until then

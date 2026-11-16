@@ -435,6 +435,7 @@ type world struct {
 	warpRestarts        []*adminv1.RestartWarpRequest
 	warpRegistrations   []*adminv1.RegisterWarpRequest
 	nodeDecoyReqs       []*adminv1.SetNodeDecoyModeRequest
+	noOwnDecoy          bool // the node's edition does not store own decoy bundles
 	relay               relayFixture
 
 	// awgStatus makes a node report one AmneziaWG inbound with this state (nil = the node serves none); awgFallback adds the
@@ -723,7 +724,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 		Node: &adminv1.Node{
 			AwgBackend: awgMode,
 			Id:         r.Msg.GetNodeId(), Name: name, Address: canaryAddr, CountryCode: country, Location: location, Provider: provider, Status: w.nodeStatuses[r.Msg.GetNodeId()],
-			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: true,
+			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: !w.noOwnDecoy,
 			Ipv6: w.ipv6Of(r.Msg.GetNodeId()),
 		},
 		Metrics:  w.metricsOf(r.Msg.GetNodeId()),

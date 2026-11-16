@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package mistgate.trusttunnel.v1;
+
+// The tt:// keys of the official TrustTunnel apps. A separate package from mistgate.admin.v1 on purpose, like mistgate.ops.v1 and
+// mistgate.ownprobe.v1: the Cloudflare edition's Workers link every admin message, and TrustTunnel is not offered there (the plugin
+// is not registered in that build, and the service is a stub that refuses with unavailable_in_edition: feature=trusttunnel).
+// The procedures are the admin's write level, closed to API tokens and the MCP: a tt:// link carries the key's secret
+// (internal/panel/auth policy_trusttunnel.go; a test compares its names with the generated ones).
+service TrustTunnelService {
+  // The official TrustTunnel apps' tt:// links for one person. A read: it makes no device or key and records no fetch.
+  // Links are returned only when TrustTunnel is on, the person is active, a key exists and a usable inbound runs.
+  rpc GetTrustTunnelLinks(GetTrustTunnelLinksRequest) returns (GetTrustTunnelLinksResponse);
+  // Makes the person's TrustTunnel key if they have none. TrustTunnel has to be on and the person active. The key is kind KEY
+  // and counts against their device limit; at the limit this fails with device_limit ("device_limit: used/limit", as for an AmneziaVPN key).
+  rpc IssueTrustTunnelKey(IssueTrustTunnelKeyRequest) returns (IssueTrustTunnelKeyResponse);
+  // Revokes the TrustTunnel key and frees its device-limit slot; nodes drop the credential with the next desired state.
+  // TrustTunnel stays on.
+  rpc RevokeTrustTunnelKey(RevokeTrustTunnelKeyRequest) returns (RevokeTrustTunnelKeyResponse);
+}
+
+message GetTrustTunnelLinksRequest {
+  string user_id = 1;
+}
+
+// One tt:// key link. The URL contains a secret and must be handled like a password. A skipped link has an empty url and a
+// stable note code (for example self_signed).
+message TrustTunnelLink {
+  string node_id = 1;
+  string node_name = 2;
+  string profile_id = 3;
+  string profile_name = 4;
+  string url = 5;
+  bool has_ipv6 = 6;
+  bool relay = 7;
+  string via = 8;
+  string note = 9;
+}
+
+message GetTrustTunnelLinksResponse {
+  repeated TrustTunnelLink links = 1;
+  bool has_key = 2;
+  string key_device_id = 3;
+  int64 key_issued_unix = 4 [jstype = JS_NUMBER];
+}
+
+message IssueTrustTunnelKeyRequest {
+  string user_id = 1;
+}
+
+message IssueTrustTunnelKeyResponse {
+  GetTrustTunnelLinksResponse trust_tunnel = 1;
+}
+
+message RevokeTrustTunnelKeyRequest {
+  string user_id = 1;
+}
+
+message RevokeTrustTunnelKeyResponse {
+  GetTrustTunnelLinksResponse trust_tunnel = 1;
+}
