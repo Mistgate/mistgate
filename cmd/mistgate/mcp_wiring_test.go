@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -164,7 +165,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 45 || b != 91 || c != 176 {
+	if a, b, c := count(ro), count(op), count(ad); a != 46 || b != 94 || c != 179 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -461,6 +462,36 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Errorf("after the refused apply: %d %s", code, body)
 	}
 
+	// -- an own Mihomo template: the operator plans it, the owner's card names it without the text, the real save checks and stores
+	// it, the readonly token reads it in windows, and no audit row holds the text.
+	const tplMarker = "# marker-template-text-4471"
+	tplText := "mixed-port: 7890\n" + tplMarker + "\nproxy-groups:\n  - name: Proxy\n    type: select\n    include-all-proxies: true\nrules:\n  - MATCH,Proxy\n"
+	tp := decodeJSON[mcp.PlanOut](t, ok(op2, "subscription_mihomo_template_set_plan", map[string]any{"name": "ROUTER", "yaml": tplText, "group_ids": []string{groupID}}))
+	if !tp.NeedsApproval || len(tp.Danger) != 1 || tp.Danger[0] != "user_page" {
+		t.Fatalf("subscription_mihomo_template_set_plan: %+v", tp)
+	}
+	if code, body := rpc("owner", "", "ApprovalService", "ListApprovals", `{}`); code != 200 || !strings.Contains(body, "ROUTER") || strings.Contains(body, "marker-template-text") {
+		t.Errorf("the owner's card for the template: %d %s", code, body)
+	}
+	if out, isErr := tool(op2, "subscription_mihomo_template_set_plan", map[string]any{"name": "ROUTER", "yaml": tplText + "# [redacted]\n"}); !isErr || !strings.Contains(out, "template_has_redaction_markers") {
+		t.Errorf("a text with a marker of the scrubber: %v %s", isErr, out)
+	}
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+tp.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	if ap := decodeJSON[mcp.ApplyOut](t, ok(op2, "subscription_mihomo_template_set_apply", map[string]any{"confirm_token": tp.ConfirmToken})); ap.Status != "applied" {
+		t.Errorf("subscription_mihomo_template_set_apply: %+v", ap)
+	}
+	if code, body := rpc("owner", "", "SubscriptionService", "GetSubscriptionSettings", `{}`); code != 200 || !strings.Contains(body, "marker-template-text") {
+		t.Errorf("the template was not saved: %d %s", code, body)
+	}
+	if out := ok(ro, "subscription_settings_get", map[string]any{}); !strings.Contains(out, `"mihomo_templates":[{"name":"ROUTER"`) || strings.Contains(out, "marker-template-text") {
+		t.Errorf("the list of templates: %s", out)
+	}
+	if out := ok(ro, "subscription_mihomo_template_get", map[string]any{"name": "router"}); !strings.Contains(out, "marker-template-text") || !strings.Contains(out, `"bytes":`+strconv.Itoa(len(tplText))) {
+		t.Errorf("the read of the template: %s", out)
+	}
+
 	// -- the audit trail: the plan, the apply and the module's own rows carry the token as mcp:<id>
 	rows, err := st.ListAudit(ctx, "", 0, 200)
 	if err != nil {
@@ -471,6 +502,9 @@ func TestMCPEndToEnd(t *testing.T) {
 		seen[r.Source+"/"+r.Action+"/"+r.Actor] = true
 		if strings.Contains(r.Params, "cf_") || strings.Contains(r.Params, opSecret) || strings.Contains(r.Params, op2Secret) {
 			t.Errorf("audit row %s carries a secret: %s", r.Action, r.Params)
+		}
+		if strings.Contains(r.Params, "marker-template-text") {
+			t.Errorf("audit row %s carries the text of a template: %s", r.Action, r.Params)
 		}
 	}
 	for _, want := range []string{"mcp/mcp_plan/mcp:" + opID, "mcp/mcp_apply/mcp:" + opID, "mcp/mcp_apply/mcp:" + adID, "panel/approval_approve/adm_owner",
@@ -525,7 +559,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 45 {
+	if n := count(ps); n != 46 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {

@@ -1208,6 +1208,7 @@ type SubscriptionPreviewV struct {
 	Serve     *serveV       `json:"serve,omitempty"`
 	Profiles  []profileRefV `json:"profiles,omitempty"`
 	Nodes     []nodeAccessV `json:"nodes,omitempty"`
+	Mihomo    *mihomoUseV   `json:"mihomo_yaml,omitempty"`
 	Note      string        `json:"note"`
 	Truncated bool          `json:"truncated,omitempty"`
 }

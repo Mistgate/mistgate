@@ -3,7 +3,7 @@ title: Subscriptions
 description: "One link per person for every app: which format each app gets and how the panel decides, how servers are named, what the apps show, and the settings of the subscription."
 ---
 
-Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has seven tabs: **Apps & formats**, **Who gets what**, **App versions**, **Names & texts**, **Response headers**, **User page** and **DNS**.
+Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has eight tabs: **Apps & formats**, **Who gets what**, **App versions**, **Names & texts**, **Response headers**, **Mihomo templates**, **User page** and **DNS**.
 
 ![One link per person: a new user, their subscription link and their own page on a phone](../../images/video/link-poster-en.webp)
 
@@ -283,6 +283,112 @@ A header goes with an answer that serves the person, and only with that. A refus
 
 Changes wait for **Save**; **Discard** drops them. They apply at the next fetch, within a minute, without a restart. The Cloudflare edition serves them the same way.
 
+## Mihomo templates
+
+By default the Mihomo YAML is the panel's own profile: your servers, one group to pick from, an `Auto` group and the DNS of the person's preset. The **Mihomo templates** tab lets you write your own profile for chosen groups: your proxy groups, rules and rule lists, with the person's servers put in. One template can go to several groups (the router and the PC of the same family get different ones), and a group named by no template gets the panel's own profile. A person is in one group, so they get one template.
+
+The tab lists the templates (name, groups, size, a mark for errors and warnings). **Add template**, **Duplicate** (for a second device, start from a copy of the first) and **Delete** work on the list; a template has a **Name**, its **Groups** (a group already in another template is shown as taken) and the YAML text, which you type, paste or load with **Load .yaml**. Nothing is saved before **Save**. A change reaches people with their next fetch (in the Cloudflare edition, within a minute).
+
+### What the panel changes
+
+The panel touches three keys of the root and leaves the rest as you wrote it, with comments, anchors, `<<` and the order of the keys:
+
+| Key | What the panel does |
+|:--|:--|
+| `proxies` | Puts the person's servers **first**, before the proxies you wrote. A missing key (or `null`) is created. |
+| `proxy-groups` | Adds the group `Auto` at the end while **Automatic server choice** is on and the template has no group of that name, even for a person with one server, so that your groups can refer to it. It is a `url-test` over the person's servers (not over your own `proxies`). |
+| `dns` | Only when the template has none: the resolvers of the person's DNS preset, with `respect-rules: true`. Nothing else of the preset is added (see below). |
+
+Everything else is yours: `rules`, `rule-providers`, `proxy-providers`, `tun`, the ports. The rules of the person's DNS preset (blocked ads, the split, countries) are **not** added to a template, because the order of the rules and the `MATCH` are yours; write them in the template if you need them. When the template has its own `dns`, the person's DNS preset and their pick on the page do not apply to the Mihomo apps (the other apps keep them).
+
+The panel names the person's servers by the [server name template](#names-texts). If one of those names is one that a proxy or group of the template already has, or a name of the Mihomo core (`DIRECT`, `REJECT`, `REJECT-DROP`, `PASS`, `COMPATIBLE`, `GLOBAL`), the server gets ` ·` added to its name. The names in your template are never changed, and none of them may be a core name.
+
+### Getting the servers into your groups
+
+Do not write a server's name in a group: the servers differ from person to person, and a name a person does not have makes Mihomo refuse the whole file. The save refuses it too. Ask Mihomo for the servers instead:
+
+- `include-all-proxies: true` takes the person's servers and the proxies of your template;
+- `filter` and `exclude-filter` (regular expressions) narrow them by name, for example `filter: "Germany"`;
+- `include-all: true` also takes the groups of your `proxy-providers`;
+- the group `Auto` is the person's servers by speed.
+
+A template for the group `ROUTER`, written with made-up names:
+
+```yaml
+# ROUTER: a transparent proxy for the home network
+mixed-port: 7890
+redir-port: 7892
+allow-lan: true
+mode: rule
+
+proxy-groups:
+  - name: Proxy
+    type: select
+    include-all-proxies: true
+    proxies: [Auto, DIRECT]   # Auto is the group the panel adds
+  - name: Germany
+    type: url-test
+    include-all-proxies: true
+    filter: "Germany"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+
+rule-providers:
+  ads:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://rules.example.com/ads.mrs
+    interval: 86400
+
+rules:
+  - RULE-SET,ads,REJECT
+  - DOMAIN-SUFFIX,example.com,DIRECT
+  - GEOIP,LAN,DIRECT,no-resolve
+  - DOMAIN-SUFFIX,example.org,Germany
+  - MATCH,Proxy
+```
+
+A person in `ROUTER` gets this text with their servers at the top of `proxies`, `Auto` at the end of `proxy-groups` and a `dns` section, and nothing else changed.
+
+### What a save checks
+
+The limits: 20 templates, 64 KiB each and 256 KiB in all; a name of 1 to 60 characters (the same name in another letter case counts as the same); at most 100 groups in one template; a group in one template only. A group you delete drops out of its template at the next save.
+
+The save refuses a template, with the line in the message, when:
+
+- the text is not valid UTF-8 or YAML, holds a second document (`---`), a key given twice, or aliases that expand far beyond the text;
+- the root is not a mapping or has `<<`, or `proxies` or `proxy-groups` is not a plain list (an alias there would let the panel change the anchor too);
+- a proxy has no `name`, a group has no `name` or `type`, names repeat, or one is a core name;
+- a group refers in its `proxies` to a name that is no proxy or group of the template, no core name and not `Auto` (while the panel adds that group), or in `use` to a provider you did not define;
+- the panel cannot build a profile from it with two sample servers.
+
+Other findings do not stop a save and show in the preview as **Worth a look**: no group takes the person's servers (add `include-all-proxies` or refer to `Auto`); the template has its own `dns`; the person's DNS preset has ad, split or country rules that the template does not get; the template has its own `Auto`, so the panel adds none; a rule sends to a name that is nothing in the template; no group is chosen. The panel does not check the rest of Mihomo's keys: run the file in Mihomo for that.
+
+### Preview
+
+**Preview** builds the profile of one person from the text on the screen, saved or not: pick a person (any person, not only one of the chosen groups) and read the YAML their link would give. The servers show only name, type, address and port, never a key or a password; nothing is saved and no device is created. It also says which template that person gets today and why, for example that they are in a group no template names, so they get the panel's own profile.
+
+### Who gets the template
+
+The template goes only into the **Mihomo YAML** answer of a link, to people whose subscription is on. A person whose subscription is off, expired or over the quota gets the panel's own profile with the note that says so, and so does a person none of whose servers can be put in a Mihomo profile (for example, only AmneziaWG servers while **AmneziaWG in apps on the link** is off): an empty `url-test` would break the file. The other formats (link list, Xray JSON, sing-box JSON) do not use templates. kl!ck reads only the `proxies` of the profile and keeps its own groups, rules and DNS: the proxies of your template show up in its list, its `proxy-providers` do not.
+
+### Addresses in a template
+
+The panel never opens an address from a template, and a save does not check that a list or a provider answers. The apps of your people do: each app downloads the `rule-providers` and `proxy-providers` itself. The host sees the person's IP address and the time of the request, and a `proxy-providers` source can add servers you do not control. Use hosts you trust.
+
+Everything in a template is seen by every person of its groups, and by every admin, read-only ones too: the comments, and any token in the URL of a list. Keep secrets out of it. An agent that reads a template over [MCP](../reference/mcp.md) gets it with query strings and long path segments cut, and cannot write such a text back; the owner's approval card for a change lists the hosts the template's addresses name.
+
+### Keep it compact
+
+The panel reads and writes the template again for every fetch. A template of 14 KB costs about 6 ms of processor time in the Cloudflare edition, one of 64 KiB about 27 ms. Put the rules in `rule-providers` instead of thousands of lines of `rules`.
+
+### If you had one file with a block per device
+
+The panel has no markers that cut one file by group. Make a template for each group: copy the file, delete the blocks of the other devices in each copy and give each copy to its group (**Duplicate** makes the copy). One group, one template: renaming a group breaks nothing.
+
+A panel rolled back to a version without templates drops them from the settings at its next save of these settings: keep the texts elsewhere before you roll back.
+
 ## When a subscription does not work
 
 When a person is disabled, past their term or over their quota, the apps do not get an empty list. They get one entry, named after the reason, that never connects, and the announcement is replaced by the same reason, in the panel's default language:
@@ -381,4 +487,4 @@ Rules are saved as soon as you add, move or remove one. On **Names & texts**, **
 
 ## Who can do what
 
-Every admin can read these settings and try a User-Agent. The owner and helpers change them. The DNS tab is described in [DNS](dns.md).
+Every admin can read these settings, including the Mihomo templates, and try a User-Agent or a template preview. The owner and helpers change them. The DNS tab is described in [DNS](dns.md).

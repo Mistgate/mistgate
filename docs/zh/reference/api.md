@@ -217,7 +217,8 @@ func main() {
 | `ProvisioningService.ListNodeServerAccess`（连接元数据，不含密码） | 否 | 否 | 是 |
 | `ProvisioningService.GetSSHFingerprint` | 否 | 否 | 仅在 MCP 服务器制定 `node_install` 计划时可用 |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
-| `SubscriptionService.UpdateSubscriptionSettings`（用户页面的一个应用） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
+| `SubscriptionService.UpdateSubscriptionSettings`（共享设置：用户页面的应用、文本、自定义响应头、自有 Mihomo 模板） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
+| `SubscriptionService.PreviewMihomoTemplate` | 否 | 否 | 否（管理面板的预览；智能体用 `subscription_mihomo_template_get` 读取模板，并在 `subscription_preview` 中查看某人得到哪个模板） |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 
 以下操作对所有令牌都不可用：删除用户、获取订阅链接、Telegram 代理和 TrustTunnel 的密钥和链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。

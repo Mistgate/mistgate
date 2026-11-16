@@ -700,10 +700,9 @@ func (s *Service) runTurn(ctx context.Context, admin store.Admin, in turnInput, 
 				}
 			}
 		}
-		for _, raw := range current.adapter.ToolResults(response.Tools, outputs) {
-			history = append(history, raw)
-			turnTranscript = append(turnTranscript, raw)
-		}
+		live, stored := toolResultMessages(current.adapter, response.Tools, outputs)
+		history = append(history, live...)
+		turnTranscript = append(turnTranscript, stored...)
 		if terminalError != "" || end == "limit" {
 			break
 		}

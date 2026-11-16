@@ -351,8 +351,9 @@ func readTools() []toolDef {
 			}),
 
 		readTool("subscription_preview", ProfileReadonly,
-			procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.SubscriptionServiceListClientsProcedure, adminv1connect.SubscriptionServiceTestUserAgentProcedure),
-			"What a user's subscription would look like to a client: which format a client (a client id, or a User-Agent) is served and which profiles and nodes the user's access gives. "+
+			procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.SubscriptionServiceListClientsProcedure, adminv1connect.SubscriptionServiceTestUserAgentProcedure, adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure),
+			"What a user's subscription would look like to a client: which format a client (a client id, or a User-Agent) is served and which profiles and nodes the user's access gives, "+
+				"and mihomo_yaml: the name of the own Mihomo template the user gets in the Mihomo YAML answer (empty for the panel's own profile, with the reason: no_template_for_group, no_access or no_servers). "+
 				"It is not the rendered subscription and carries no link: the link is a credential and is never shown.",
 			func(c *call, in subPreviewArg) (any, error) { return c.subscriptionPreview(in) }),
 
@@ -833,6 +834,11 @@ func (c *call) subscriptionPreview(in subPreviewArg) (any, error) {
 			v.Nodes = append(v.Nodes, n)
 		}
 	}
+	set, _, err := c.subsSettings()
+	if err != nil {
+		return nil, err
+	}
+	v.Mihomo = mihomoUseOf(set, u.GetUser(), len(v.Nodes))
 	ua := in.Client
 	known := false
 	for _, ci := range cl.Msg.GetClients() {
