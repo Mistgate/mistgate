@@ -67,6 +67,9 @@
 # directory only.
 # --censor runs the isolated real-measurement censorship lab and asserts block_diagnosis/access_report; --mcp-fleet brings
 # up the throwaway dev fleet, sweeps every MCP read tool with the no-secrets scan, then tears it down.
+# --bridge [options] runs the reverse-relay ("bridge") lab alone (scripts/e2e/bridge.sh, which takes the rest of the arguments:
+# --only, --quick, --long-return, --keep): a real panel, four real agents, real Xray clients and a filter that cuts the direct
+# way towards the exits by direction, one scenario per rule of the reverse-relay plan, checked on a matrix of protocols.
 #
 # ISOLATION. A node agent owns things that exist once per host: TCP 443 (masquerade), the nft table
 # mistgate_node, /etc/sysctl.d/90-mistgate.conf and the journald drop-in. So the whole run happens in a private
@@ -76,6 +79,11 @@
 # disturb the run, and nothing the agent installs can outlive it.
 
 set -Eeuo pipefail
+
+if [ "${1:-}" = --bridge ]; then
+  shift
+  exec bash "$(cd "$(dirname "$0")" && pwd)/e2e/bridge.sh" "$@"
+fi
 
 # --old-node <abs path>: run the whole scenario with that mistgate-node binary (built from an older commit) in
 # place of the one built from this tree. The panel is always the new one; the health steps then expect an agent
