@@ -2493,6 +2493,31 @@ func TestD1ExtChecksStorage(t *testing.T) {
 	extCheckStoreProof(t, openD1Store(t))
 }
 
+func TestD1OwnProbeStorage(t *testing.T) {
+	ownProbeStoreProof(t, openD1Store(t))
+}
+
+func TestD1OwnProbeEnrollUsesOneStatement(t *testing.T) {
+	binding := js.Global().Get("__d1")
+	st := openD1Store(t)
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	now := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
+	tokenHash, secretHash := sha256.Sum256([]byte("mgp_test_d1_token")), sha256.Sum256([]byte("mgps_test_d1_secret"))
+	if err := st.CreateOwnProbe(ctx, OwnProbe{ID: "prb_d1_count", Name: "probe-de1", City: "de1", Kind: "home",
+		TokenHash: tokenHash[:], TokenExpires: now.Add(time.Hour), CreatedAt: now, CreatedBy: "adm_test"}); err != nil {
+		t.Fatal(err)
+	}
+	calls := countD1Queries(t, binding, "EnrollOwnProbe", func() {
+		if _, err := st.EnrollOwnProbe(ctx, tokenHash[:], secretHash[:], 64512, "ExampleNet", "ExampleNet", "abcdef012345", now); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if calls.queries != 1 || calls.batches != 0 {
+		t.Fatalf("EnrollOwnProbe used %d sequential D1 calls and %d batches, want one UPDATE RETURNING", calls.queries, calls.batches)
+	}
+}
+
 func TestD1RelaysStorage(t *testing.T) {
 	relayStoreProof(t, openD1Store(t))
 }
