@@ -72,6 +72,15 @@ const (
 	// UserServiceRevokeTelegramKeyProcedure is the fully-qualified name of the UserService's
 	// RevokeTelegramKey RPC.
 	UserServiceRevokeTelegramKeyProcedure = "/mistgate.admin.v1.UserService/RevokeTelegramKey"
+	// UserServiceGetTrustTunnelLinksProcedure is the fully-qualified name of the UserService's
+	// GetTrustTunnelLinks RPC.
+	UserServiceGetTrustTunnelLinksProcedure = "/mistgate.admin.v1.UserService/GetTrustTunnelLinks"
+	// UserServiceIssueTrustTunnelKeyProcedure is the fully-qualified name of the UserService's
+	// IssueTrustTunnelKey RPC.
+	UserServiceIssueTrustTunnelKeyProcedure = "/mistgate.admin.v1.UserService/IssueTrustTunnelKey"
+	// UserServiceRevokeTrustTunnelKeyProcedure is the fully-qualified name of the UserService's
+	// RevokeTrustTunnelKey RPC.
+	UserServiceRevokeTrustTunnelKeyProcedure = "/mistgate.admin.v1.UserService/RevokeTrustTunnelKey"
 	// UserServiceGetUserConnectionProcedure is the fully-qualified name of the UserService's
 	// GetUserConnection RPC.
 	UserServiceGetUserConnectionProcedure = "/mistgate.admin.v1.UserService/GetUserConnection"
@@ -116,6 +125,15 @@ type UserServiceClient interface {
 	// Revokes the key and frees its place among the devices; the nodes drop the secret with the next desired state. Telegram
 	// stays on. Turning Telegram off or removing the key device (RevokeDevice) does the same.
 	RevokeTelegramKey(context.Context, *connect.Request[v1.RevokeTelegramKeyRequest]) (*connect.Response[v1.RevokeTelegramKeyResponse], error)
+	// The official TrustTunnel apps' tt:// links for one person. A read: it makes no device or key and records no fetch.
+	// Links are returned only when TrustTunnel is on, the person is active, a key exists and a usable inbound runs.
+	GetTrustTunnelLinks(context.Context, *connect.Request[v1.GetTrustTunnelLinksRequest]) (*connect.Response[v1.GetTrustTunnelLinksResponse], error)
+	// Makes the person's TrustTunnel key if they have none. TrustTunnel has to be on and the person active. The key is kind KEY
+	// and counts against their device limit; at the limit this fails with device_limit.
+	IssueTrustTunnelKey(context.Context, *connect.Request[v1.IssueTrustTunnelKeyRequest]) (*connect.Response[v1.IssueTrustTunnelKeyResponse], error)
+	// Revokes the TrustTunnel key and frees its device-limit slot; nodes drop the credential with the next desired state.
+	// TrustTunnel stays on.
+	RevokeTrustTunnelKey(context.Context, *connect.Request[v1.RevokeTrustTunnelKeyRequest]) (*connect.Response[v1.RevokeTrustTunnelKeyResponse], error)
 	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
 	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
 	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -223,6 +241,24 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("RevokeTelegramKey")),
 			connect.WithClientOptions(opts...),
 		),
+		getTrustTunnelLinks: connect.NewClient[v1.GetTrustTunnelLinksRequest, v1.GetTrustTunnelLinksResponse](
+			httpClient,
+			baseURL+UserServiceGetTrustTunnelLinksProcedure,
+			connect.WithSchema(userServiceMethods.ByName("GetTrustTunnelLinks")),
+			connect.WithClientOptions(opts...),
+		),
+		issueTrustTunnelKey: connect.NewClient[v1.IssueTrustTunnelKeyRequest, v1.IssueTrustTunnelKeyResponse](
+			httpClient,
+			baseURL+UserServiceIssueTrustTunnelKeyProcedure,
+			connect.WithSchema(userServiceMethods.ByName("IssueTrustTunnelKey")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeTrustTunnelKey: connect.NewClient[v1.RevokeTrustTunnelKeyRequest, v1.RevokeTrustTunnelKeyResponse](
+			httpClient,
+			baseURL+UserServiceRevokeTrustTunnelKeyProcedure,
+			connect.WithSchema(userServiceMethods.ByName("RevokeTrustTunnelKey")),
+			connect.WithClientOptions(opts...),
+		),
 		getUserConnection: connect.NewClient[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse](
 			httpClient,
 			baseURL+UserServiceGetUserConnectionProcedure,
@@ -234,22 +270,25 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // userServiceClient implements UserServiceClient.
 type userServiceClient struct {
-	listUsers           *connect.Client[v1.ListUsersRequest, v1.ListUsersResponse]
-	getUser             *connect.Client[v1.GetUserRequest, v1.GetUserResponse]
-	createUser          *connect.Client[v1.CreateUserRequest, v1.CreateUserResponse]
-	updateUser          *connect.Client[v1.UpdateUserRequest, v1.UpdateUserResponse]
-	setUsersEnabled     *connect.Client[v1.SetUsersEnabledRequest, v1.SetUsersEnabledResponse]
-	extendUsers         *connect.Client[v1.ExtendUsersRequest, v1.ExtendUsersResponse]
-	resetUserTraffic    *connect.Client[v1.ResetUserTrafficRequest, v1.ResetUserTrafficResponse]
-	revokeDevice        *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
-	unblockDevice       *connect.Client[v1.UnblockDeviceRequest, v1.UnblockDeviceResponse]
-	deleteUsers         *connect.Client[v1.DeleteUsersRequest, v1.DeleteUsersResponse]
-	getSubscriptionLink *connect.Client[v1.GetSubscriptionLinkRequest, v1.GetSubscriptionLinkResponse]
-	getTelegramLinks    *connect.Client[v1.GetTelegramLinksRequest, v1.GetTelegramLinksResponse]
-	issueTelegramKey    *connect.Client[v1.IssueTelegramKeyRequest, v1.IssueTelegramKeyResponse]
-	rotateTelegramKey   *connect.Client[v1.RotateTelegramKeyRequest, v1.RotateTelegramKeyResponse]
-	revokeTelegramKey   *connect.Client[v1.RevokeTelegramKeyRequest, v1.RevokeTelegramKeyResponse]
-	getUserConnection   *connect.Client[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse]
+	listUsers            *connect.Client[v1.ListUsersRequest, v1.ListUsersResponse]
+	getUser              *connect.Client[v1.GetUserRequest, v1.GetUserResponse]
+	createUser           *connect.Client[v1.CreateUserRequest, v1.CreateUserResponse]
+	updateUser           *connect.Client[v1.UpdateUserRequest, v1.UpdateUserResponse]
+	setUsersEnabled      *connect.Client[v1.SetUsersEnabledRequest, v1.SetUsersEnabledResponse]
+	extendUsers          *connect.Client[v1.ExtendUsersRequest, v1.ExtendUsersResponse]
+	resetUserTraffic     *connect.Client[v1.ResetUserTrafficRequest, v1.ResetUserTrafficResponse]
+	revokeDevice         *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	unblockDevice        *connect.Client[v1.UnblockDeviceRequest, v1.UnblockDeviceResponse]
+	deleteUsers          *connect.Client[v1.DeleteUsersRequest, v1.DeleteUsersResponse]
+	getSubscriptionLink  *connect.Client[v1.GetSubscriptionLinkRequest, v1.GetSubscriptionLinkResponse]
+	getTelegramLinks     *connect.Client[v1.GetTelegramLinksRequest, v1.GetTelegramLinksResponse]
+	issueTelegramKey     *connect.Client[v1.IssueTelegramKeyRequest, v1.IssueTelegramKeyResponse]
+	rotateTelegramKey    *connect.Client[v1.RotateTelegramKeyRequest, v1.RotateTelegramKeyResponse]
+	revokeTelegramKey    *connect.Client[v1.RevokeTelegramKeyRequest, v1.RevokeTelegramKeyResponse]
+	getTrustTunnelLinks  *connect.Client[v1.GetTrustTunnelLinksRequest, v1.GetTrustTunnelLinksResponse]
+	issueTrustTunnelKey  *connect.Client[v1.IssueTrustTunnelKeyRequest, v1.IssueTrustTunnelKeyResponse]
+	revokeTrustTunnelKey *connect.Client[v1.RevokeTrustTunnelKeyRequest, v1.RevokeTrustTunnelKeyResponse]
+	getUserConnection    *connect.Client[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse]
 }
 
 // ListUsers calls mistgate.admin.v1.UserService.ListUsers.
@@ -327,6 +366,21 @@ func (c *userServiceClient) RevokeTelegramKey(ctx context.Context, req *connect.
 	return c.revokeTelegramKey.CallUnary(ctx, req)
 }
 
+// GetTrustTunnelLinks calls mistgate.admin.v1.UserService.GetTrustTunnelLinks.
+func (c *userServiceClient) GetTrustTunnelLinks(ctx context.Context, req *connect.Request[v1.GetTrustTunnelLinksRequest]) (*connect.Response[v1.GetTrustTunnelLinksResponse], error) {
+	return c.getTrustTunnelLinks.CallUnary(ctx, req)
+}
+
+// IssueTrustTunnelKey calls mistgate.admin.v1.UserService.IssueTrustTunnelKey.
+func (c *userServiceClient) IssueTrustTunnelKey(ctx context.Context, req *connect.Request[v1.IssueTrustTunnelKeyRequest]) (*connect.Response[v1.IssueTrustTunnelKeyResponse], error) {
+	return c.issueTrustTunnelKey.CallUnary(ctx, req)
+}
+
+// RevokeTrustTunnelKey calls mistgate.admin.v1.UserService.RevokeTrustTunnelKey.
+func (c *userServiceClient) RevokeTrustTunnelKey(ctx context.Context, req *connect.Request[v1.RevokeTrustTunnelKeyRequest]) (*connect.Response[v1.RevokeTrustTunnelKeyResponse], error) {
+	return c.revokeTrustTunnelKey.CallUnary(ctx, req)
+}
+
 // GetUserConnection calls mistgate.admin.v1.UserService.GetUserConnection.
 func (c *userServiceClient) GetUserConnection(ctx context.Context, req *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {
 	return c.getUserConnection.CallUnary(ctx, req)
@@ -371,6 +425,15 @@ type UserServiceHandler interface {
 	// Revokes the key and frees its place among the devices; the nodes drop the secret with the next desired state. Telegram
 	// stays on. Turning Telegram off or removing the key device (RevokeDevice) does the same.
 	RevokeTelegramKey(context.Context, *connect.Request[v1.RevokeTelegramKeyRequest]) (*connect.Response[v1.RevokeTelegramKeyResponse], error)
+	// The official TrustTunnel apps' tt:// links for one person. A read: it makes no device or key and records no fetch.
+	// Links are returned only when TrustTunnel is on, the person is active, a key exists and a usable inbound runs.
+	GetTrustTunnelLinks(context.Context, *connect.Request[v1.GetTrustTunnelLinksRequest]) (*connect.Response[v1.GetTrustTunnelLinksResponse], error)
+	// Makes the person's TrustTunnel key if they have none. TrustTunnel has to be on and the person active. The key is kind KEY
+	// and counts against their device limit; at the limit this fails with device_limit.
+	IssueTrustTunnelKey(context.Context, *connect.Request[v1.IssueTrustTunnelKeyRequest]) (*connect.Response[v1.IssueTrustTunnelKeyResponse], error)
+	// Revokes the TrustTunnel key and frees its device-limit slot; nodes drop the credential with the next desired state.
+	// TrustTunnel stays on.
+	RevokeTrustTunnelKey(context.Context, *connect.Request[v1.RevokeTrustTunnelKeyRequest]) (*connect.Response[v1.RevokeTrustTunnelKeyResponse], error)
 	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
 	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
 	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -474,6 +537,24 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("RevokeTelegramKey")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceGetTrustTunnelLinksHandler := connect.NewUnaryHandler(
+		UserServiceGetTrustTunnelLinksProcedure,
+		svc.GetTrustTunnelLinks,
+		connect.WithSchema(userServiceMethods.ByName("GetTrustTunnelLinks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceIssueTrustTunnelKeyHandler := connect.NewUnaryHandler(
+		UserServiceIssueTrustTunnelKeyProcedure,
+		svc.IssueTrustTunnelKey,
+		connect.WithSchema(userServiceMethods.ByName("IssueTrustTunnelKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceRevokeTrustTunnelKeyHandler := connect.NewUnaryHandler(
+		UserServiceRevokeTrustTunnelKeyProcedure,
+		svc.RevokeTrustTunnelKey,
+		connect.WithSchema(userServiceMethods.ByName("RevokeTrustTunnelKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	userServiceGetUserConnectionHandler := connect.NewUnaryHandler(
 		UserServiceGetUserConnectionProcedure,
 		svc.GetUserConnection,
@@ -512,6 +593,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceRotateTelegramKeyHandler.ServeHTTP(w, r)
 		case UserServiceRevokeTelegramKeyProcedure:
 			userServiceRevokeTelegramKeyHandler.ServeHTTP(w, r)
+		case UserServiceGetTrustTunnelLinksProcedure:
+			userServiceGetTrustTunnelLinksHandler.ServeHTTP(w, r)
+		case UserServiceIssueTrustTunnelKeyProcedure:
+			userServiceIssueTrustTunnelKeyHandler.ServeHTTP(w, r)
+		case UserServiceRevokeTrustTunnelKeyProcedure:
+			userServiceRevokeTrustTunnelKeyHandler.ServeHTTP(w, r)
 		case UserServiceGetUserConnectionProcedure:
 			userServiceGetUserConnectionHandler.ServeHTTP(w, r)
 		default:
@@ -581,6 +668,18 @@ func (UnimplementedUserServiceHandler) RotateTelegramKey(context.Context, *conne
 
 func (UnimplementedUserServiceHandler) RevokeTelegramKey(context.Context, *connect.Request[v1.RevokeTelegramKeyRequest]) (*connect.Response[v1.RevokeTelegramKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.RevokeTelegramKey is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetTrustTunnelLinks(context.Context, *connect.Request[v1.GetTrustTunnelLinksRequest]) (*connect.Response[v1.GetTrustTunnelLinksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.GetTrustTunnelLinks is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) IssueTrustTunnelKey(context.Context, *connect.Request[v1.IssueTrustTunnelKeyRequest]) (*connect.Response[v1.IssueTrustTunnelKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.IssueTrustTunnelKey is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) RevokeTrustTunnelKey(context.Context, *connect.Request[v1.RevokeTrustTunnelKeyRequest]) (*connect.Response[v1.RevokeTrustTunnelKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.RevokeTrustTunnelKey is not implemented"))
 }
 
 func (UnimplementedUserServiceHandler) GetUserConnection(context.Context, *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {

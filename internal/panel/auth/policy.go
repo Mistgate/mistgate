@@ -309,22 +309,25 @@ var procedureLevels = map[string]level{
 	adminv1connect.TelegramServiceSetTelegramAlertsProcedure: levelRead,
 	adminv1connect.TelegramServiceSendTelegramTestProcedure:  levelRead,
 
-	adminv1connect.UserServiceListUsersProcedure:           levelRead,
-	adminv1connect.UserServiceGetUserProcedure:             levelRead,
-	adminv1connect.UserServiceGetUserConnectionProcedure:   levelRead, // counts only, no address
-	adminv1connect.UserServiceCreateUserProcedure:          levelWrite,
-	adminv1connect.UserServiceUpdateUserProcedure:          levelWrite,
-	adminv1connect.UserServiceSetUsersEnabledProcedure:     levelWrite,
-	adminv1connect.UserServiceExtendUsersProcedure:         levelWrite,
-	adminv1connect.UserServiceResetUserTrafficProcedure:    levelWrite,
-	adminv1connect.UserServiceRevokeDeviceProcedure:        levelWrite,
-	adminv1connect.UserServiceUnblockDeviceProcedure:       levelWrite,
-	adminv1connect.UserServiceDeleteUsersProcedure:         levelWrite,
-	adminv1connect.UserServiceGetSubscriptionLinkProcedure: levelWrite, // the link is the user's credential
-	adminv1connect.UserServiceGetTelegramLinksProcedure:    levelWrite, // a tg:// link carries the proxy secret
-	adminv1connect.UserServiceIssueTelegramKeyProcedure:    levelWrite, // like the AmneziaVPN key calls: the key is a user credential
-	adminv1connect.UserServiceRotateTelegramKeyProcedure:   levelWrite,
-	adminv1connect.UserServiceRevokeTelegramKeyProcedure:   levelWrite,
+	adminv1connect.UserServiceListUsersProcedure:            levelRead,
+	adminv1connect.UserServiceGetUserProcedure:              levelRead,
+	adminv1connect.UserServiceGetUserConnectionProcedure:    levelRead, // counts only, no address
+	adminv1connect.UserServiceCreateUserProcedure:           levelWrite,
+	adminv1connect.UserServiceUpdateUserProcedure:           levelWrite,
+	adminv1connect.UserServiceSetUsersEnabledProcedure:      levelWrite,
+	adminv1connect.UserServiceExtendUsersProcedure:          levelWrite,
+	adminv1connect.UserServiceResetUserTrafficProcedure:     levelWrite,
+	adminv1connect.UserServiceRevokeDeviceProcedure:         levelWrite,
+	adminv1connect.UserServiceUnblockDeviceProcedure:        levelWrite,
+	adminv1connect.UserServiceDeleteUsersProcedure:          levelWrite,
+	adminv1connect.UserServiceGetSubscriptionLinkProcedure:  levelWrite, // the link is the user's credential
+	adminv1connect.UserServiceGetTelegramLinksProcedure:     levelWrite, // a tg:// link carries the proxy secret
+	adminv1connect.UserServiceIssueTelegramKeyProcedure:     levelWrite, // like the AmneziaVPN key calls: the key is a user credential
+	adminv1connect.UserServiceRotateTelegramKeyProcedure:    levelWrite,
+	adminv1connect.UserServiceRevokeTelegramKeyProcedure:    levelWrite,
+	adminv1connect.UserServiceGetTrustTunnelLinksProcedure:  levelWrite, // a tt:// link carries the key secret
+	adminv1connect.UserServiceIssueTrustTunnelKeyProcedure:  levelWrite,
+	adminv1connect.UserServiceRevokeTrustTunnelKeyProcedure: levelWrite,
 
 	// AssistantService is a signed-in UI surface only; token access is deliberately absent from policy_tokens.go.
 	adminv1connect.AssistantServiceGetAssistantAccessProcedure:      levelRead,

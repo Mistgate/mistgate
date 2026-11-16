@@ -35,11 +35,16 @@ func (s *Service) protocol(id string) (protocols.Protocol, error) {
 // isTelegram: the protocol is for Telegram clients (MTProto). Its credential is the person's own key, not a link device's,
 // and what it renders is never a line of a subscription.
 func isTelegram(p protocols.Protocol) bool {
-	_, _, telegram, _ := clientApps(p)
+	_, _, telegram, _, _ := clientApps(p)
 	return telegram
 }
 
-func clientApps(p protocols.Protocol) (happ, amnezia, telegram bool, apps []adminv1.App) {
+func isTrustTunnel(p protocols.Protocol) bool {
+	_, _, _, trustTunnel, _ := clientApps(p)
+	return trustTunnel
+}
+
+func clientApps(p protocols.Protocol) (happ, amnezia, telegram, trustTunnel bool, apps []adminv1.App) {
 	for _, c := range p.Clients() {
 		switch c.Client {
 		case plugin.ClientHapp:
@@ -48,6 +53,8 @@ func clientApps(p protocols.Protocol) (happ, amnezia, telegram bool, apps []admi
 			amnezia = true
 		case plugin.ClientTelegram:
 			telegram = true
+		case plugin.ClientTrustTunnel:
+			trustTunnel = true
 		}
 	}
 	if happ {
@@ -58,6 +65,9 @@ func clientApps(p protocols.Protocol) (happ, amnezia, telegram bool, apps []admi
 	}
 	if telegram {
 		apps = append(apps, adminv1.App_APP_TELEGRAM)
+	}
+	if trustTunnel {
+		apps = append(apps, adminv1.App_APP_TRUST_TUNNEL)
 	}
 	return
 }
@@ -74,7 +84,7 @@ func (s *Service) ListProtocols(ctx context.Context, _ *connect.Request[adminv1.
 		if err != nil {
 			return nil, s.internal("mask defaults", err)
 		}
-		_, _, _, apps := clientApps(p)
+		_, _, _, _, apps := clientApps(p)
 		resp.Protocols = append(resp.Protocols, &adminv1.ProtocolInfo{
 			Id: p.ID(), DisplayName: p.DisplayName(), SettingsSchemaJson: string(p.SettingsSchema()),
 			DefaultSettingsJson: string(masked), Apps: apps, Experimental: protocols.IsExperimental(p),
@@ -96,8 +106,8 @@ func (s *Service) profileSummary(ctx context.Context, p store.AccessProfile, inb
 }
 
 func (s *Service) summaryOf(ctx context.Context, p store.AccessProfile, proto protocols.Protocol, merged json.RawMessage, inbounds []store.AccessInbound) (*adminv1.ProfileSummary, error) {
-	happ, amnezia, telegram, _ := clientApps(proto)
-	users, err := s.st.Access().ProfileUsers(ctx, p.ID, happ, amnezia, telegram)
+	happ, amnezia, telegram, trustTunnel, _ := clientApps(proto)
+	users, err := s.st.Access().ProfileUsers(ctx, p.ID, happ, amnezia, telegram, trustTunnel)
 	if err != nil {
 		return nil, s.internal("profile users", err)
 	}
@@ -289,8 +299,8 @@ func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, prot
 	if len(restartedNodes) == 0 {
 		return impact, nil
 	}
-	happ, amnezia, telegram, _ := clientApps(proto)
-	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia, telegram)
+	happ, amnezia, telegram, trustTunnel, _ := clientApps(proto)
+	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia, telegram, trustTunnel)
 	if err != nil {
 		return nil, s.internal("profile users", err)
 	}

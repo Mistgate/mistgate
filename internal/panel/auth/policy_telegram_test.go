@@ -39,3 +39,26 @@ func TestTelegramServicePolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestTrustTunnelKeyPolicy(t *testing.T) {
+	for name, path := range map[string]string{
+		"GetTrustTunnelLinks":  adminv1connect.UserServiceGetTrustTunnelLinksProcedure,
+		"IssueTrustTunnelKey":  adminv1connect.UserServiceIssueTrustTunnelKeyProcedure,
+		"RevokeTrustTunnelKey": adminv1connect.UserServiceRevokeTrustTunnelKeyProcedure,
+	} {
+		if got := levelOf(path); got != levelWrite {
+			t.Errorf("%s level = %v, want write", name, got)
+		}
+		for role, want := range map[string]bool{store.RoleOwner: true, store.RoleHelper: true, store.RoleReadonly: false} {
+			if got := roleAllows(role, levelOf(path)); got != want {
+				t.Errorf("%s as %s: allowed = %v, want %v", name, role, got, want)
+			}
+		}
+		if NeedsStepUp(path) {
+			t.Errorf("%s unexpectedly needs step-up", name)
+		}
+		if _, allowed := TokenAccess(path); allowed {
+			t.Errorf("%s must stay closed to API tokens and MCP", name)
+		}
+	}
+}
