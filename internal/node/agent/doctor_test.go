@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -409,6 +410,36 @@ func TestDoctorInboundsDescribeTheAppliedState(t *testing.T) {
 	}
 }
 
+// The doctor is told about the UDP socket that TrustTunnel's HTTP/3 adds to the TCP listener, and only while h3 is on.
+func TestDoctorInboundsCarryTheSideListenOfTrustTunnelHTTP3(t *testing.T) {
+	h := newHarness(t, harnessOpts{extra: map[string]engine.Factory{"trusttunnel": newFakeEngine("trusttunnel").factory()}})
+	h.waitConnected()
+	state := inb("tt1", 0, 0, cred("c1"))
+	state.Spec.Protocol = "trusttunnel"
+	state.Spec.Listen = &pb.Listen{Network: "tcp", Port: 8443}
+	state.Spec.Tls = &pb.Tls{Mode: pb.TlsMode_TLS_MODE_ACME_DOMAIN, ServerName: "example.com"}
+	state.Spec.SettingsJson = `{"h3":true}`
+	h.panel.push(fullState(1, state))
+	h.panel.nextApply()
+	got := h.a.doctorInbounds()
+	if len(got) != 1 || got[0].Network != "tcp" || got[0].Port != 8443 || got[0].TLSPort != 8443 ||
+		!reflect.DeepEqual(got[0].SideListens, []doctor.InboundListen{{Network: "udp", Port: 8443}}) {
+		t.Fatalf("doctor inbound with h3 = %+v, want the UDP side listen and the certificate port", got)
+	}
+
+	off := inb("tt1", 0, 0, cred("c1"))
+	off.Spec.Protocol = "trusttunnel"
+	off.Spec.Listen = &pb.Listen{Network: "tcp", Port: 8443}
+	off.Spec.Tls = state.Spec.Tls
+	off.Spec.SettingsJson = `{"h3":false}`
+	off.Spec.SpecVersion = 2
+	h.panel.push(fullState(2, off))
+	h.panel.nextApply()
+	if got := h.a.doctorInbounds(); len(got) != 1 || len(got[0].SideListens) != 0 {
+		t.Fatalf("doctor inbound without h3 = %+v, want no side listen", got)
+	}
+}
+
 // An ACME certificate that arrives (or renews) after the last apply is judged by the live value the engine reports, for the
 // inbounds whose certificate the doctor cannot read itself (design/vless.md section 7.3).
 func TestDoctorInboundsTakeTheLiveCertificateExpiry(t *testing.T) {
@@ -453,6 +484,18 @@ func TestTLSPortOf(t *testing.T) {
 		{mk("vless", `{"security":"reality","reality":{"target":"self"}}`, plugin.TLSAcmeDomain), 0},
 		{mk("vless", `{"security":"reality","reality":{"target":"www.example.org:443"}}`, 0), 0},
 		{mk("vless", `not json`, plugin.TLSAcmeDomain), 0},
+		// TrustTunnel: its TCP port serves the certificate, with or without HTTP/3 beside it
+		{func() plugin.InboundSpec {
+			sp := mk("trusttunnel", `{"h3":true}`, plugin.TLSAcmeDomain)
+			sp.Listen = plugin.Listen{Network: "tcp", Port: 8443}
+			return sp
+		}(), 8443},
+		{func() plugin.InboundSpec {
+			sp := mk("trusttunnel", `{}`, plugin.TLSSelfSigned)
+			sp.Listen = plugin.Listen{Network: "tcp", Port: 443}
+			return sp
+		}(), 443},
+		{mk("trusttunnel", `{}`, 0), 0},
 	} {
 		if got := tlsPortOf(tc.spec); got != tc.want {
 			t.Errorf("%s %s mode %d: %d, want %d", tc.spec.Protocol, tc.spec.Settings, tc.spec.TLS.Mode, got, tc.want)

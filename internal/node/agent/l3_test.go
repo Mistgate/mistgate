@@ -582,6 +582,10 @@ func TestTunnelPublishedPortsTable(t *testing.T) {
 		{"udp on port 22 is not ssh", []*inbound{spec("de1", "hysteria2", "udp", 22, true, `{"masquerade":{"tcp_port":0}}`)}, nil, []hostctl.PublishedPort{pp("udp", 22)}},
 		{"awg port claimed by another udp inbound", []*inbound{spec("alice", "awg", "udp", 51842, true, ``), spec("de1", "hysteria2", "udp", 51842, true, `{"masquerade":{"tcp_port":0}}`)}, nil, []hostctl.PublishedPort{}},
 		{"awg itself", []*inbound{spec("alice", "awg", "udp", 51842, true, ``)}, nil, []hostctl.PublishedPort{}},
+		{"trusttunnel h2 only", []*inbound{spec("tt1", "trusttunnel", "tcp", 8443, true, `{"h3":false}`)}, nil, []hostctl.PublishedPort{pp("tcp", 8443)}},
+		{"trusttunnel with h3 publishes the udp socket too", []*inbound{spec("tt1", "trusttunnel", "tcp", 8443, true, `{"h3":true}`)}, nil, []hostctl.PublishedPort{pp("tcp", 8443), pp("udp", 8443)}},
+		{"trusttunnel h3 on an awg udp port", []*inbound{spec("alice", "awg", "udp", 8443, true, ``), spec("tt1", "trusttunnel", "tcp", 8443, true, `{"h3":true}`)}, nil, []hostctl.PublishedPort{pp("tcp", 8443)}},
+		{"disabled trusttunnel with h3", []*inbound{spec("tt1", "trusttunnel", "tcp", 8443, false, `{"h3":true}`)}, nil, []hostctl.PublishedPort{}},
 	} {
 		m := &model{inbounds: map[string]*inbound{}}
 		for _, in := range tc.in {

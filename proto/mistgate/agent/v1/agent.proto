@@ -312,7 +312,7 @@ package mistgate.agent.v1;
 //     it listed the string (an old agent would reject the unknown protocol and the whole state with it), and
 //     answers the admin calls that need them with FAILED_PRECONDITION ("agent too old"). A new agent with an old
 //     panel simply never receives them, and its new health fields are ignored.
-//     "trusttunnel/1" gates TrustTunnel inbounds; the current engine serves TCP HTTP/2.
+//     "trusttunnel/1" gates TrustTunnel inbounds and TCP HTTP/2; "trusttunnel-h3/1" gates h3:true on the same UDP port.
 //   - DesiredState.warp. Presence replaces the WHOLE WARP configuration, in a delta too; absence in a delta means
 //     "unchanged"; absence in a full state (base_revision = 0) means "this node has no WARP". Because a delta
 //     cannot say "remove", the panel sends a full state when an account is deleted. enabled = false with a

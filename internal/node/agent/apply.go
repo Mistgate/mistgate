@@ -586,6 +586,18 @@ func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[st
 			}
 			tcpSet[s.Listen.Port] = struct{}{}
 		}
+		for _, side := range plugin.SideListens(s) {
+			switch side.Network {
+			case "udp":
+				if side.Port != 0 {
+					udpSet[hostctl.UDPInboundPort{Port: side.Port}] = struct{}{}
+				}
+			case "tcp":
+				if side.Port != 0 {
+					tcpSet[side.Port] = struct{}{}
+				}
+			}
+		}
 	}
 	udp := make([]hostctl.UDPInboundPort, 0, len(udpSet))
 	for port := range udpSet {

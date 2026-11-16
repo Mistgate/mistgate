@@ -31,6 +31,17 @@ func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesAdvertiseTrustTunnelHTTP3OnlyWithEngine(t *testing.T) {
+	without := (&Agent{engines: map[string]engine.Engine{}}).capabilities()
+	if slices.Contains(without, capTrustTunnel) || slices.Contains(without, capTrustTunnelH3) {
+		t.Fatalf("TrustTunnel capabilities without engine = %v", without)
+	}
+	with := (&Agent{engines: map[string]engine.Engine{"trusttunnel": newFakeEngine("trusttunnel")}}).capabilities()
+	if !slices.Contains(with, capTrustTunnel) || !slices.Contains(with, capTrustTunnelH3) {
+		t.Fatalf("TrustTunnel capabilities = %v, want %s and %s", with, capTrustTunnel, capTrustTunnelH3)
+	}
+}
+
 func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {
 	a := &Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}
 	caps := a.capabilities()
