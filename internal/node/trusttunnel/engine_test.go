@@ -1249,3 +1249,36 @@ func writeUDPFrame(t *testing.T, writer *io.PipeWriter, frame wire.UDPFrame) {
 func mustAddrPort(value string) netip.AddrPort {
 	return netip.MustParseAddrPort(value)
 }
+
+// A credential that Apply keeps is shared with the handlers that are authenticating against it: Apply writes nothing but
+// its atomics (run under -race: a rewrite of the user name or the hash is a data race).
+func TestApplyOfTheSameCredentialsWhileConnectsAreInFlight(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+	client := newHTTP2Client(t, h.addr)
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if got := statusOf(t, client, "_check", authValue(t, alice)); got.StatusCode != http.StatusOK {
+				t.Errorf("_check during Apply = %d", got.StatusCode)
+				return
+			}
+		}
+	}()
+	for range 40 {
+		if _, err := h.e.Apply(context.Background(), h.spec, []plugin.UserCred{alice.cred}); err != nil {
+			t.Error(err)
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	close(stop)
+	<-done
+}

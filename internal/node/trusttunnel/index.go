@@ -125,7 +125,7 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ra
 				udpFlows: make(map[*udpFlow]struct{}),
 			}
 		}
-		cs.inboundID, cs.id, cs.username, cs.passHash = inboundID, cred.CredID, value.username, value.hash
+		// A kept credential is live: handlers read its fields, so nothing but its atomics is written here.
 		cs.removed.Store(false)
 		var validUntil int64
 		if !cred.ValidUntil.IsZero() {
