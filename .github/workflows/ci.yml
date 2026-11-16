@@ -59,8 +59,16 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile && pnpm build # the panel embeds web/dist
       - run: go vet ./...
+      # The own-probe script (internal/panel/ownprobe/mistgate-probe.sh) is tested under busybox ash, the shell of the routers it
+      # runs on, and under dash. busybox-static is the distribution package; MGP_REQUIRE_BUSYBOX turns a missing busybox into a failure.
+      - name: busybox for the probe script tests
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends busybox-static
       - run: go test ./...
+        env:
+          MGP_REQUIRE_BUSYBOX: "1"
       - run: shellcheck scripts/install.sh
+      - run: shellcheck -s sh -o all internal/panel/ownprobe/mistgate-probe.sh
+      - run: shellcheck internal/panel/ownprobe/testdata/fakecurl.sh
       # Debian trixie exercises the OpenSSL fallback, including releases without panel-manifest.sshsig.
       - name: Installer tests (Debian trixie OpenSSL fallback)
         env:

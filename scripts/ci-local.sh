@@ -49,7 +49,11 @@ for job in "${jobs[@]}"; do
       step "web build (embedded)" bash -c 'cd web && pnpm install --frozen-lockfile >/dev/null && pnpm build'
       step "go vet" go vet ./...
       step "go test" go test ./...
-      if command -v shellcheck >/dev/null 2>&1; then step "shellcheck install.sh" shellcheck scripts/install.sh; fi
+      if command -v shellcheck >/dev/null 2>&1; then
+        step "shellcheck install.sh" shellcheck scripts/install.sh
+        step "shellcheck probe script" shellcheck -s sh -o all internal/panel/ownprobe/mistgate-probe.sh
+        step "shellcheck probe fakes" shellcheck internal/panel/ownprobe/testdata/fakecurl.sh
+      fi
       step "go test scripts" go test -count=1 ./scripts
       step "go build" go build ./... ;;
     web)
