@@ -365,6 +365,8 @@ tt_dev_env() {
       echo "TT_SYNC_ALICE=$WORK/tt-sync-alice.json   # the answer of GET <base>/sync for the first person; path = .servers[].paths[] with protocol trusttunnel"
       echo "TT_SYNC_BOB=$WORK/tt-sync-bob.json"
       echo "TT_ALICE_SUBSCRIPTION=$TT_A_URL   # POST <it>/client/enrol, then GET <base>/sync with the device key"
+      echo "TT_ALICE_USER_ID=$TT_A_ID   # for UserService/SetUsersEnabled (needs owner.env of --tt-dev)"
+      echo "TT_BOB_USER_ID=$TT_B_ID"
     } >"$WORK/tt-dev.env" )
 }
 
@@ -374,7 +376,15 @@ tt_hold() {
   say "work directory: $WORK (kept); everything below is in the network namespace ${MG_E2E_NS:-of this run}: enter it with  ip netns exec ${MG_E2E_NS:-<ns>} bash"
   say "the node: 127.0.0.1:$TT_PORT, TCP (HTTP/2) and UDP (HTTP/3), server name $TT_SNI, certificate pin sha256 $TT_PIN, certificate $WORK/tt-node.pem (self-signed), client file $WORK/tt-client-alice.toml"
   say "the first person's sync answer, with the TrustTunnel path (user name and password): $WORK/tt-sync-alice.json; the second person's: $WORK/tt-sync-bob.json"
-  say "the settings of both: $WORK/tt-dev.env; the admin API is $ADMIN (owner session: owner.env is not made here; use --hold of the base scenario for the MCP)"
+  # the owner's session and authenticator secret of this throwaway panel, as --hold of the base scenario writes them: a developer
+  # of a client can switch a person off while a connection is open (owner.env, mode 0600, removed when the run ends)
+  ( umask 077
+    printf 'MG_ADMIN_URL=%s/
+MG_OWNER_COOKIE=%s
+MG_TOTP_SECRET=%s
+MG_NETNS=%s
+'       "$ADMIN" "${COOKIE#__Host-sid=}" "$TOTP_SECRET" "${MG_E2E_NS:-}" >"$WORK/owner.env" )
+  say "the settings of both: $WORK/tt-dev.env; the admin API is $ADMIN, the owner session of this panel in $WORK/owner.env (0600). To switch a person off while a connection is open: POST <admin>/api/mistgate.admin.v1.UserService/SetUsersEnabled {"userIds":[TT_ALICE_USER_ID],"enabled":false} with the owner cookie and a fresh authenticator code of MG_TOTP_SECRET (a step-up, as the stand does in E5)"
   trap 'exit 0' INT TERM
   FINISHED=1
   while :; do sleep 3600 & wait $!; done
@@ -585,9 +595,11 @@ tt_e9_e11() {
   rss1=$(vmrss_mb "$NODE_PID")
   note "agent RSS: $rss0 MB before the gigabytes, $rss1 MB after"
   if awk -v a="$rss0" -v b="$rss1" 'BEGIN{exit !(b <= a * 1.10 + 8)}'; then tt_ok E9c "agent RSS $rss0 -> $rss1 MB after 2 GiB (within 10% plus 8 MB)"; else tt_no E9c "agent RSS $rss0 -> $rss1 MB"; fi
-  local n
+  local n t10=$SECONDS
   n=$(seq 100 | xargs -P100 -I{} nsenter -t "$tta_PID" -n -- curl -s -m 60 -o /dev/null -w '%{http_code}\n' --socks5-hostname 127.0.0.1:1080 "http://$WHOAMI/e10-{}" | grep -c '^200$')
-  [ "$n" = 100 ] && tt_ok E10a "100 parallel fetches through one client: 100 x 200" || tt_no E10a "100 parallel fetches: $n x 200"
+  # the fake internet's listen backlog is 512 (m3.sh whoami.py): with the default of 5 the rest of the 100 waited for SYN retries
+  # (1, 3, 7 s) and the check passed on those delays; it must now finish in a few seconds
+  [ "$n" = 100 ] && tt_ok E10a "100 parallel fetches through one client: 100 x 200 in $((SECONDS - t10)) s" || tt_no E10a "100 parallel fetches: $n x 200 in $((SECONDS - t10)) s"
   sleep 15
   th1=$(tt_node_threads)
   if [ "$th1" -le $((th0 + 8)) ]; then tt_ok E10b "agent threads $th0 -> $th1 and RSS $(vmrss_mb "$NODE_PID") MB after the 100 (goroutines are not readable from outside: threads and RSS stand in)"; else tt_no E10b "agent threads $th0 -> $th1"; fi

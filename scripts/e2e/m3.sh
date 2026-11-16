@@ -89,6 +89,9 @@ class H(http.server.BaseHTTPRequestHandler):
 class S(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    # socketserver's default backlog is 5: with dozens of parallel requests through a tunnel the rest wait for a SYN retry
+    # (1, 3, 7, 15 s), which looks like a hang after a successful CONNECT
+    request_queue_size = 512
 
 S((host, port), H).serve_forever()
 PY
