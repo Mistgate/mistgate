@@ -135,6 +135,9 @@ function known(c: ConnectError, t: T): string | undefined {
   // a relay holds the port: the panel names it "relay" or "relay to <exit>", not a profile
   if (code === "port_taken" && /^relay($| )/.test(vars.profile ?? "")) return t("err.port_taken_relay", vars);
   if (code === "device_limit") return t("err.device_limit", deviceLimitVars(vars));
+  // the bridge needs a path the panel can prove from a third node; a server whose path cannot be checked (an MTProto server with the site
+  // fallback) never passes that proof, so the refusal says so instead of "the relay did not pass its check"
+  if (code === "relay_check_failed" && vars.stage === "path" && vars.code === "unverifiable") return t("err.relay_bridge_unverifiable", vars);
   const filled =
     code === "port_lossy"
       ? lossyVars(t, vars)

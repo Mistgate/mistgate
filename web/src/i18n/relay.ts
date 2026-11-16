@@ -193,6 +193,7 @@ export const en = {
   "relay.way.blockedWord.entry_agent_old": "the agent of the entry is too old",
   "relay.way.blockedWord.exit_agent_old": "the agent of the exit is too old",
   "err.reverse_unavailable": "A bridge is not possible for this relay: {reason}.",
+  "err.relay_bridge_unverifiable": "A bridge is not available for this server: its path cannot be checked.",
   "relay.stageName.reverse_reach": "from the exit to the entry, for a bridge",
   "relay.stageName.bridge": "the bridge",
 
@@ -448,6 +449,7 @@ export const ru: typeof en = {
   "relay.way.blockedWord.entry_agent_old": "агент входа слишком старый",
   "relay.way.blockedWord.exit_agent_old": "агент выхода слишком старый",
   "err.reverse_unavailable": "Для этой ретрансляции мост невозможен: {reason}.",
+  "err.relay_bridge_unverifiable": "Для этого сервера мост недоступен: его путь нельзя проверить.",
   "relay.stageName.reverse_reach": "от выхода до входа, для моста",
   "relay.stageName.bridge": "мост",
 
@@ -699,6 +701,7 @@ export const zh: typeof en = {
   "relay.way.blockedWord.entry_agent_old": "入口的 Agent 版本过旧",
   "relay.way.blockedWord.exit_agent_old": "出口的 Agent 版本过旧",
   "err.reverse_unavailable": "此中转无法使用桥接：{reason}。",
+  "err.relay_bridge_unverifiable": "此服务器无法使用桥接：无法检测其路径。",
   "relay.stageName.reverse_reach": "从出口到入口（为桥接）",
   "relay.stageName.bridge": "桥接",
 
@@ -945,6 +948,7 @@ export const fa: typeof en = {
   "relay.way.blockedWord.entry_agent_old": "ایجنت ورودی خیلی قدیمی است",
   "relay.way.blockedWord.exit_agent_old": "ایجنت خروجی خیلی قدیمی است",
   "err.reverse_unavailable": "برای این رله پل ممکن نیست: {reason}.",
+  "err.relay_bridge_unverifiable": "پل برای این سرور در دسترس نیست: مسیر آن قابل بررسی نیست.",
   "relay.stageName.reverse_reach": "از خروجی تا ورودی، برای پل",
   "relay.stageName.bridge": "پل",
 
@@ -1191,6 +1195,7 @@ export const tr: typeof en = {
   "relay.way.blockedWord.entry_agent_old": "girişin ajanı çok eski",
   "relay.way.blockedWord.exit_agent_old": "çıkışın ajanı çok eski",
   "err.reverse_unavailable": "Bu aktarıcı için köprü mümkün değil: {reason}.",
+  "err.relay_bridge_unverifiable": "Bu sunucu için köprü kullanılamıyor: yolu doğrulanamıyor.",
   "relay.stageName.reverse_reach": "çıkıştan girişe, köprü için",
   "relay.stageName.bridge": "köprü",
 
