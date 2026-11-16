@@ -18,6 +18,10 @@ service SubscriptionService {
   // "Response headers" tab: the headers of the list (the editor's draft, checked like a save) one person gets with one
   // User-Agent. INVALID_ARGUMENT for a list that a save would refuse; NOT_FOUND for an unknown person.
   rpc PreviewResponseHeaders(PreviewResponseHeadersRequest) returns (PreviewResponseHeadersResponse);
+  // "Mihomo templates" tab: the profile one person would get from the editor's draft of a template, as the Mihomo answer builds it
+  // (nothing is written: no device, no credential), and what the owner should look at. INVALID_ARGUMENT for a text that a save
+  // would refuse; NOT_FOUND for an unknown person.
+  rpc PreviewMihomoTemplate(PreviewMihomoTemplateRequest) returns (PreviewMihomoTemplateResponse);
 }
 
 message SubscriptionSettings {
@@ -297,4 +301,33 @@ message PreviewResponseHeadersResponse {
   string not_served = 3;
   // The person's group, for the preview's caption.
   string group_name = 4;
+}
+
+message PreviewMihomoTemplateRequest {
+  string user_id = 1;
+  // The text of the draft, checked as a save checks it (and against the saved switch of automatic selection).
+  string yaml = 2;
+  // The groups the draft is for; none: the warning "unused". The person need not be in one of them.
+  repeated string group_ids = 3;
+}
+
+// One finding that does not stop a save (SubscriptionService words them by code). code is one of: no_server_group (no group takes the
+// servers of the person: include-all-proxies, or Auto), own_dns (the person's DNS preset is not applied to this template),
+// preset_rules_skipped (the preset has ad, split or country rules that a template does not get), own_auto (the template has its own
+// Auto, so the panel adds none), unknown_rule_target (arg: the last field of a rule that names no proxy or group), unused (no group).
+message MihomoWarning {
+  string code = 1;
+  string arg = 2;
+}
+
+message PreviewMihomoTemplateResponse {
+  // The profile: the servers of the person with their name, type, address and port only (no credential), around the template. When
+  // not_served is set, the profile the person gets instead (the panel's own).
+  string yaml = 1;
+  repeated MihomoWarning warnings = 2;
+  // The person's group, for the preview's caption.
+  string group_name = 3;
+  // Why the person does not get the template: "no_access" (their subscription is off, expired or over its quota: the answer is a note)
+  // or "no_servers" (none of their servers can be in a Mihomo profile). "" = the template.
+  string not_served = 4;
 }

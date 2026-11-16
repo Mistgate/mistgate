@@ -633,15 +633,20 @@ func (h *handler) appNote(v access.SubView, lang string, format plugin.ClientFor
 // linkPreset is the DNS preset the document of a link carries (Mihomo, Xray JSON, sing-box): the one read with the view, else the
 // preset of the user's link apps; nil when there is none (no DNS module, or it failed: the document has no dns section).
 func (h *handler) linkPreset(ctx context.Context, v access.SubView) *dns.Preset {
+	return linkPresetOf(ctx, v, h.cfg.DNS, h.cfg.Log)
+}
+
+// linkPresetOf is linkPreset for whoever has the DNS module (e may be nil).
+func linkPresetOf(ctx context.Context, v access.SubView, e Effective, log *slog.Logger) *dns.Preset {
 	if v.EffectiveDNS != nil {
 		return v.EffectiveDNS
 	}
-	if h.cfg.DNS == nil || v.UserID == "" {
+	if e == nil || v.UserID == "" {
 		return nil
 	}
-	pre, err := h.cfg.DNS.LinkEffective(ctx, v.UserID)
+	pre, err := e.LinkEffective(ctx, v.UserID)
 	if err != nil {
-		h.cfg.Log.Warn("profile: no dns section", "code", "subscription_dns_unavailable", "err", err)
+		log.Warn("profile: no dns section", "code", "subscription_dns_unavailable", "err", err)
 		return nil
 	}
 	return &pre

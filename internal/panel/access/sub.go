@@ -292,6 +292,20 @@ func (s *Service) PreviewSubscription(ctx context.Context, userID string) (SubVi
 	return v, link, nil
 }
 
+// PreviewSubscriptionWith is the view of a user for the admin's preview of a profile (opt.Format says which): looked up by id
+// (ErrUnknownToken when there is none), and it writes nothing, whatever opt says: no device, no credential, no mark that the
+// subscription was fetched. A server the person has no credentials for yet is shown with a throwaway secret.
+func (s *Service) PreviewSubscriptionWith(ctx context.Context, userID string, opt SubOptions) (SubView, error) {
+	u, err := s.st.Access().User(ctx, userID)
+	if errors.Is(err, store.ErrNotFound) {
+		return SubView{}, ErrUnknownToken
+	} else if err != nil {
+		return SubView{}, err
+	}
+	opt.NoTouch, opt.NoPageData = true, true
+	return s.subView(ctx, u, false, opt)
+}
+
 // credKey names a credential in the secrets map: AWG credentials are distinct for each profile and connection path.
 func credKey(protocol, profileID, path string) string {
 	if profileID == "" {

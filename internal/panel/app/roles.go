@@ -224,6 +224,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	cfg := k.baseHTTP()
 	subSvc := subs.NewService(k.st, parts.cache, k.reg, parts.brand, parts.dns, k.log)
 	subSvc.NotifyWith(k.fl) // a switch to STRICT revokes the shared devices
+	subSvc.PreviewWith(k.acc) // the preview of a Mihomo template reads the person's view, writes nothing
 	// The kl!ck reports: the owner's switch (it rides with the subscription settings, hence their cache) and the counts.
 	probe := clientprobe.New(clientprobe.Config{Store: k.st, StepUp: k.authSvc.RequireStepUp, Invalidate: parts.cache.Invalidate, Log: k.log, Now: k.c.Clock})
 	clientAPI := clientapi.New(clientapi.Config{Store: k.st, StepUp: k.authSvc.RequireStepUp, Invalidate: parts.cache.Invalidate, Log: k.log, Now: k.c.Clock})

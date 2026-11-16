@@ -48,6 +48,9 @@ const (
 	// SubscriptionServicePreviewResponseHeadersProcedure is the fully-qualified name of the
 	// SubscriptionService's PreviewResponseHeaders RPC.
 	SubscriptionServicePreviewResponseHeadersProcedure = "/mistgate.admin.v1.SubscriptionService/PreviewResponseHeaders"
+	// SubscriptionServicePreviewMihomoTemplateProcedure is the fully-qualified name of the
+	// SubscriptionService's PreviewMihomoTemplate RPC.
+	SubscriptionServicePreviewMihomoTemplateProcedure = "/mistgate.admin.v1.SubscriptionService/PreviewMihomoTemplate"
 )
 
 // SubscriptionServiceClient is a client for the mistgate.admin.v1.SubscriptionService service.
@@ -61,6 +64,10 @@ type SubscriptionServiceClient interface {
 	// "Response headers" tab: the headers of the list (the editor's draft, checked like a save) one person gets with one
 	// User-Agent. INVALID_ARGUMENT for a list that a save would refuse; NOT_FOUND for an unknown person.
 	PreviewResponseHeaders(context.Context, *connect.Request[v1.PreviewResponseHeadersRequest]) (*connect.Response[v1.PreviewResponseHeadersResponse], error)
+	// "Mihomo templates" tab: the profile one person would get from the editor's draft of a template, as the Mihomo answer builds it
+	// (nothing is written: no device, no credential), and what the owner should look at. INVALID_ARGUMENT for a text that a save
+	// would refuse; NOT_FOUND for an unknown person.
+	PreviewMihomoTemplate(context.Context, *connect.Request[v1.PreviewMihomoTemplateRequest]) (*connect.Response[v1.PreviewMihomoTemplateResponse], error)
 }
 
 // NewSubscriptionServiceClient constructs a client for the mistgate.admin.v1.SubscriptionService
@@ -104,6 +111,12 @@ func NewSubscriptionServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(subscriptionServiceMethods.ByName("PreviewResponseHeaders")),
 			connect.WithClientOptions(opts...),
 		),
+		previewMihomoTemplate: connect.NewClient[v1.PreviewMihomoTemplateRequest, v1.PreviewMihomoTemplateResponse](
+			httpClient,
+			baseURL+SubscriptionServicePreviewMihomoTemplateProcedure,
+			connect.WithSchema(subscriptionServiceMethods.ByName("PreviewMihomoTemplate")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -114,6 +127,7 @@ type subscriptionServiceClient struct {
 	listClients                *connect.Client[v1.ListClientsRequest, v1.ListClientsResponse]
 	testUserAgent              *connect.Client[v1.TestUserAgentRequest, v1.TestUserAgentResponse]
 	previewResponseHeaders     *connect.Client[v1.PreviewResponseHeadersRequest, v1.PreviewResponseHeadersResponse]
+	previewMihomoTemplate      *connect.Client[v1.PreviewMihomoTemplateRequest, v1.PreviewMihomoTemplateResponse]
 }
 
 // GetSubscriptionSettings calls mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings.
@@ -142,6 +156,11 @@ func (c *subscriptionServiceClient) PreviewResponseHeaders(ctx context.Context, 
 	return c.previewResponseHeaders.CallUnary(ctx, req)
 }
 
+// PreviewMihomoTemplate calls mistgate.admin.v1.SubscriptionService.PreviewMihomoTemplate.
+func (c *subscriptionServiceClient) PreviewMihomoTemplate(ctx context.Context, req *connect.Request[v1.PreviewMihomoTemplateRequest]) (*connect.Response[v1.PreviewMihomoTemplateResponse], error) {
+	return c.previewMihomoTemplate.CallUnary(ctx, req)
+}
+
 // SubscriptionServiceHandler is an implementation of the mistgate.admin.v1.SubscriptionService
 // service.
 type SubscriptionServiceHandler interface {
@@ -154,6 +173,10 @@ type SubscriptionServiceHandler interface {
 	// "Response headers" tab: the headers of the list (the editor's draft, checked like a save) one person gets with one
 	// User-Agent. INVALID_ARGUMENT for a list that a save would refuse; NOT_FOUND for an unknown person.
 	PreviewResponseHeaders(context.Context, *connect.Request[v1.PreviewResponseHeadersRequest]) (*connect.Response[v1.PreviewResponseHeadersResponse], error)
+	// "Mihomo templates" tab: the profile one person would get from the editor's draft of a template, as the Mihomo answer builds it
+	// (nothing is written: no device, no credential), and what the owner should look at. INVALID_ARGUMENT for a text that a save
+	// would refuse; NOT_FOUND for an unknown person.
+	PreviewMihomoTemplate(context.Context, *connect.Request[v1.PreviewMihomoTemplateRequest]) (*connect.Response[v1.PreviewMihomoTemplateResponse], error)
 }
 
 // NewSubscriptionServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -193,6 +216,12 @@ func NewSubscriptionServiceHandler(svc SubscriptionServiceHandler, opts ...conne
 		connect.WithSchema(subscriptionServiceMethods.ByName("PreviewResponseHeaders")),
 		connect.WithHandlerOptions(opts...),
 	)
+	subscriptionServicePreviewMihomoTemplateHandler := connect.NewUnaryHandler(
+		SubscriptionServicePreviewMihomoTemplateProcedure,
+		svc.PreviewMihomoTemplate,
+		connect.WithSchema(subscriptionServiceMethods.ByName("PreviewMihomoTemplate")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.SubscriptionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SubscriptionServiceGetSubscriptionSettingsProcedure:
@@ -205,6 +234,8 @@ func NewSubscriptionServiceHandler(svc SubscriptionServiceHandler, opts ...conne
 			subscriptionServiceTestUserAgentHandler.ServeHTTP(w, r)
 		case SubscriptionServicePreviewResponseHeadersProcedure:
 			subscriptionServicePreviewResponseHeadersHandler.ServeHTTP(w, r)
+		case SubscriptionServicePreviewMihomoTemplateProcedure:
+			subscriptionServicePreviewMihomoTemplateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -232,4 +263,8 @@ func (UnimplementedSubscriptionServiceHandler) TestUserAgent(context.Context, *c
 
 func (UnimplementedSubscriptionServiceHandler) PreviewResponseHeaders(context.Context, *connect.Request[v1.PreviewResponseHeadersRequest]) (*connect.Response[v1.PreviewResponseHeadersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.SubscriptionService.PreviewResponseHeaders is not implemented"))
+}
+
+func (UnimplementedSubscriptionServiceHandler) PreviewMihomoTemplate(context.Context, *connect.Request[v1.PreviewMihomoTemplateRequest]) (*connect.Response[v1.PreviewMihomoTemplateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.SubscriptionService.PreviewMihomoTemplate is not implemented"))
 }

@@ -168,6 +168,12 @@ type Previewer interface {
 	PreviewSubscription(ctx context.Context, userID string) (access.SubView, string, error)
 }
 
+// ProfilePreviewer supplies a user's view for the admin's preview of a Mihomo profile (it writes nothing); *access.Service
+// implements it.
+type ProfilePreviewer interface {
+	PreviewSubscriptionWith(ctx context.Context, userID string, opt access.SubOptions) (access.SubView, error)
+}
+
 // PreviewHandler returns the admin preview of the user page: what the user with this id would see, framed by
 // the admin UI (frame-ancestors 'self'). The caller checks the admin session; the handler never sees a token.
 func PreviewHandler(src Previewer, cfg Config) func(w http.ResponseWriter, r *http.Request, userID string) {

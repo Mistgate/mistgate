@@ -37,6 +37,7 @@ type Service struct {
 	dns      DefaultPresets // nil = no DNS module: default_dns_preset_id stays empty
 	log      *slog.Logger
 	notify   StateNotifier // told when a switch to STRICT revoked devices; nil = nobody to tell
+	preview  ProfilePreviewer // the views of the Mihomo template preview; nil = the preview is not available
 }
 
 // StateNotifier is told that credentials left the database and the nodes must hear about it; the fleet implements it.
@@ -44,6 +45,9 @@ type StateNotifier interface{ StateChanged() }
 
 // NotifyWith sets who hears about devices that a switch of the device limit to STRICT revoked.
 func (s *Service) NotifyWith(n StateNotifier) { s.notify = n }
+
+// PreviewWith sets where the views of the Mihomo template preview come from (the access module).
+func (s *Service) PreviewWith(p ProfilePreviewer) { s.preview = p }
 
 // NewService builds the service; settings is the cache the public handler reads too, brand the loader of the
 // instance brand (for effective_title).
