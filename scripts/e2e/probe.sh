@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # The own probes of the country check, end to end: the real panel binary, the real probe script (internal/panel/ownprobe/
-# mistgate-probe.sh, installed with the command the panel prints), real curl, busybox ash when it is installed (dash if not),
+# mistgate-probe.sh, installed with the command the panel prints), real curl, busybox ash when it is installed (dash if not, or as asked by --shell),
 # real node agents with real Xray, and a "TSPU" router made of nft, all in network namespaces.
 #
-#   MSYS_NO_PATHCONV=1 wsl -d Ubuntu -u root -- bash scripts/e2e/probe.sh [--keep] [--term-test] [--stop-after STAGE] [--hold]
+#   MSYS_NO_PATHCONV=1 wsl -d Ubuntu -u root -- bash scripts/e2e/probe.sh [--keep] [--term-test] [--stop-after STAGE] [--hold] [--shell dash|busybox]
 #
 # Needs: go, curl, jq, python3, openssl, nft, ip, mount, mountpoint, unshare, setsid, ss, nsenter, sed. Runs as root, but
 # ONLY inside a private network and mount namespace (`unshare -n -m`): the host's interfaces, routes, nft tables and Docker
@@ -38,17 +38,19 @@ set -Eeuo pipefail
 SELF=$(readlink -f "$0")
 ROOT=$(cd "$(dirname "$SELF")/../.." && pwd)
 ARGS=("$@")
-KEEP="" TERM_TEST="" STOP_AFTER="" HOLD=""
+KEEP="" TERM_TEST="" STOP_AFTER="" HOLD="" SHELL_WANT=""
 while [ $# -gt 0 ]; do
   case $1 in
     --keep) KEEP=1 ;;
     --term-test) TERM_TEST=1 ;;
     --stop-after) STOP_AFTER=${2:?--stop-after needs a stage}; shift ;;
     --hold) HOLD=1 ;;
+    --shell) SHELL_WANT=${2:?--shell needs dash or busybox}; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
   shift
 done
+case $SHELL_WANT in ""|dash|busybox) ;; *) echo "--shell is dash or busybox" >&2; exit 2 ;; esac
 
 if [ "$(uname -s)" != Linux ] || [ "$(id -u)" != 0 ]; then
   if ! command -v wsl.exe >/dev/null 2>&1; then
@@ -69,7 +71,7 @@ if [ "${MG_PROBE_INNER:-}" != 1 ]; then
   if [ -n "$TERM_TEST" ]; then
     # The cleanup after SIGTERM: the whole lab runs and is held, SIGTERM goes to it, and nothing may be left of it.
     mark=$(mktemp /tmp/mg-probe-term.XXXXXX)
-    MG_PROBE_WORKFILE=$mark bash "$SELF" --hold --stop-after install &
+    MG_PROBE_WORKFILE=$mark bash "$SELF" ${SHELL_WANT:+--shell "$SHELL_WANT"} --hold --stop-after install &
     pid=$!
     for ((i = 0; i < 1500; i++)); do
       [ -s "$mark" ] && [ -e "$(cat "$mark")/held" ] && break
@@ -403,12 +405,30 @@ sleep 7 # the list of targets of the health module is reused for 5 s: the probe 
 # ---------------------------------------------------------------- the home: a stand-in router with the probe's tools
 STAGE=home
 if id nobody >/dev/null 2>&1; then DROP=1; else DROP=""; fi
-if command -v busybox >/dev/null && busybox ash -c 'exit 0' 2>/dev/null; then STAND_SH=("$(command -v busybox)" ash) SH_NAME="busybox ash"
-else STAND_SH=("$(command -v dash || command -v sh)") SH_NAME=$(basename "${STAND_SH[0]}"); fi
+BUSYBOX=$(command -v busybox || true)
+if [ "$SHELL_WANT" = busybox ] && { [ -z "$BUSYBOX" ] || ! "$BUSYBOX" ash -c 'exit 0'; }; then die "--shell busybox: no busybox with ash"; fi
+if [ "$SHELL_WANT" != dash ] && [ -n "$BUSYBOX" ] && "$BUSYBOX" ash -c 'exit 0' 2>/dev/null; then SH_NAME="busybox ash"
+else SH_NAME=dash; BUSYBOX=""; fi
 say "the probe script runs under: $SH_NAME (worker as nobody: ${DROP:-no})"
 mkdir -p "$HOME_ROOT/bin" "$HOME_ROOT/opt/sbin" "$HOME_ROOT/opt/etc/init.d" "$HOME_ROOT/tmp" "$WORK/dl"
 chmod -R 755 "$HOME_ROOT"
-ln -s "${STAND_SH[0]}" "$HOME_ROOT/bin/sh"
+if [ -n "$BUSYBOX" ]; then
+  # This busybox runs its own applets whatever the PATH says (FEATURE_SH_STANDALONE), so the shifted date and the logger of this
+  # lab, which are files in its bin, would never run. The sh of the lab runs a script file under ash with them as functions (a
+  # function is looked up before an applet); sh -c and sh -n are plain ash.
+  cat >"$HOME_ROOT/bin/sh" <<EOT
+#!/bin/sh
+case \${1:-} in -* | "") exec '$BUSYBOX' ash "\$@" ;; esac
+exec '$BUSYBOX' ash -c 'date() { case \${1:-} in +%s) o=0; [ ! -f "\$MG_CLOCK_OFFSET" ] || read -r o <"\$MG_CLOCK_OFFSET"; echo \$((\$(command date +%s) + o)) ;; *) command date "\$@" ;; esac; }
+logger() { echo "\$*" >>"\$MG_PROBE_WORK/home-logger.log"; }
+. "\$0"' "\$@"
+EOT
+  chmod 755 "$HOME_ROOT/bin/sh"
+  STAND_SH=("$HOME_ROOT/bin/sh")
+else
+  STAND_SH=("$(command -v dash || command -v sh)")
+  ln -s "${STAND_SH[0]}" "$HOME_ROOT/bin/sh"
+fi
 cat >"$HOME_ROOT/bin/opkg" <<'EOT'
 #!/bin/sh
 echo "opkg $*" >>"$MG_PROBE_WORK/opkg.log"
@@ -453,7 +473,7 @@ probe_json() { own Get | jq -c --arg id "$PROBE_ID" '.probes[] | select(.id == $
 probe_state() { probe_json | jq -r .state; }
 check "the panel's command carries the sha256 of the script it serves" \
   '[ "$SCRIPT_SHA" = "$(sha256sum "$ROOT/internal/panel/ownprobe/mistgate-probe.sh" | cut -d" " -f1)" ]'
-case $COMMAND in "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsSo mgp.sh "*) ;; *) die "the install command has another shape" ;; esac
+case $COMMAND in "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh "*) ;; *) die "the install command has another shape" ;; esac
 INSTALL_OUT=$(inhome "${STAND_SH[@]}" -c "${COMMAND/cd \/tmp/cd $WORK/dl}" 2>&1) || { printf '%s\n' "$INSTALL_OUT" >&2; die "the install command failed"; }
 printf '%s\n' "$INSTALL_OUT"
 check "install by the issued command prints OK with the id the panel gave" 'case $INSTALL_OUT in *"OK: probe $PROBE_ID registered and running"*) true ;; *) false ;; esac'
@@ -509,6 +529,62 @@ RO_OUT=$(inhome unshare -m bash -c 'mount --make-rprivate / && mount -o remount,
   "${STAND_SH[@]}" "$PROBE_BIN" run 2>&1) || true
 say "read-only root: $RO_OUT"
 check "a cycle on a read-only root works" 'case $RO_OUT in "run: http 200, executed 1"*) true ;; *) false ;; esac'
+
+# ---------------------------------------------------------------- what the probe costs a router
+STAGE=footprint
+tree_of() { # the pid and all its descendants
+  ps -e -o pid= -o ppid= | awk -v root="$1" '{ par[$1] = $2; id[++n] = $1 } END { seen[root] = 1; do { ch = 0; for (i = 1; i <= n; i++) if (!(id[i] in seen) && (par[id[i]] in seen)) { seen[id[i]] = 1; ch = 1 } } while (ch); for (p in seen) print p }'
+}
+use_of() { # <pid>: "processes RSS-kB PSS-kB CPU-ticks voluntary-context-switches" of the pid and its descendants
+  local p c=0 rss=0 pss=0 cpu=0 vol=0 r s t v
+  for p in $(tree_of "$1"); do
+    [ -r "/proc/$p/status" ] || continue
+    r=$(awk '/^VmRSS:/ { print $2 }' "/proc/$p/status" 2>/dev/null) || r=0
+    s=$(awk '/^Pss:/ { print $2 }' "/proc/$p/smaps_rollup" 2>/dev/null) || s=0
+    t=$(awk '{ s = $0; sub(/^.*\) /, "", s); split(s, f, " "); print f[12] + f[13] }' "/proc/$p/stat" 2>/dev/null) || t=0
+    v=$(awk '/^voluntary_ctxt_switches:/ { print $2 }' "/proc/$p/status" 2>/dev/null) || v=0
+    c=$((c + 1)); rss=$((rss + ${r:-0})); pss=$((pss + ${s:-0})); cpu=$((cpu + ${t:-0})); vol=$((vol + ${v:-0}))
+  done
+  echo "$c $rss $pss $cpu $vol"
+}
+home_if=$(ip -n mgprobe-home -o -4 addr show | awk '$4 ~ /^10\.78\.13\.2\// { print $2; exit }')
+if_bytes() { ip netns exec mgprobe-home cat "/sys/class/net/$home_if/statistics/rx_bytes" "/sys/class/net/$home_if/statistics/tx_bytes" | awk '{ s += $1 } END { print s }'; }
+listeners() { ip netns exec mgprobe-home ss -H -ltunwx 2>/dev/null | wc -l; }
+# idle: the supervisor, the worker and its one sleep; 30 s in which nothing may wake up
+SUP=$(cat "$STATE/supervisor.pid")
+U0=$(use_of "$SUP"); sleep 30; U1=$(use_of "$SUP")
+read -r IC IR IP_ ICPU0 IV0 <<<"$U0"; read -r IC1 IR1 IP1 ICPU1 IV1 <<<"$U1"
+say "MEASURE idle ($SH_NAME): $IC1 processes, RSS ${IR1} kB, PSS ${IP1} kB, CPU $((ICPU1 - ICPU0)) ticks and $((IV1 - IV0)) wake-ups in 30 s"
+check "idle: the same $IC processes, no CPU, no wake-up between two syncs (one sleep until the next)" '[ "$IC" = "$IC1" ] && [ "$ICPU1" = "$ICPU0" ] && [ "$IV1" = "$IV0" ]'
+check "idle: three processes (supervisor, worker, sleep; dash with util-linux su keeps a fourth, the su) and the worker at nice 10" '
+  [ "$IC1" -le "$([ "$SH_NAME" = dash ] && echo 4 || echo 3)" ] && w=$(cat "$STATE/worker.pid") && [ "$(ps -o ni= -p "$w" | tr -d " ")" = 10 ]'
+# a cycle: peak memory and processes, CPU time, bytes on the wire, sockets that listen, files written
+touch "$WORK/stamp"; sleep 1
+B0=$(if_bytes); L_MAX=$(listeners)
+check_now
+advance_clock
+( TIMEFORMAT='%3U %3S'; time probe_run run ) >"$WORK/cycle.out" 2>&1 &
+CP=$!
+PEAK_N=0 PEAK_RSS=0 PEAK_PSS=0
+while kill -0 "$CP" 2>/dev/null; do
+  read -r n r p _ <<<"$(use_of "$CP")"
+  [ "$n" -le "$PEAK_N" ] || PEAK_N=$n
+  [ "$r" -le "$PEAK_RSS" ] || PEAK_RSS=$r
+  [ "$p" -le "$PEAK_PSS" ] || PEAK_PSS=$p
+  l=$(listeners); [ "$l" -le "$L_MAX" ] || L_MAX=$l
+  sleep 0.2
+done
+wait "$CP" || true
+B1=$(if_bytes)
+read -r CPU_U CPU_S <<<"$(tail -n 1 "$WORK/cycle.out")"
+CPU_MS=$(awk -v u="$CPU_U" -v s="$CPU_S" 'BEGIN { printf "%d", (u + s) * 1000 }')
+say "MEASURE cycle ($SH_NAME): $(head -n 1 "$WORK/cycle.out"); peak $PEAK_N processes, RSS ${PEAK_RSS} kB, PSS ${PEAK_PSS} kB; CPU ${CPU_MS} ms; $((B1 - B0)) bytes on the wire; listening sockets seen: $L_MAX"
+say "MEASURE per day at 60 min: CPU $((CPU_MS * 24 / 1000)).$((CPU_MS * 24 / 100 % 10)) s of 86400 s, traffic $(( (B1 - B0) * 24 / 1024 )) KiB"
+check "the cycle opens no listening socket (tcp, udp, raw, unix) in the home network" '[ "$L_MAX" = 0 ]'
+check "the cycle writes no file outside its state directory" '
+  w=$(find "$HOME_ROOT" -newer "$WORK/stamp" ! -path "$HOME_ROOT/tmp" ! -path "$HOME_ROOT/tmp/*" | head -n 5); [ -z "$w" ] || { echo "$w"; false; }'
+check "the cycle's peak: at most 12 MB of PSS (RSS counts the shared pages of curl and libc again for every process)" '[ "$PEAK_PSS" -le 12288 ]'
+check "the cycle's CPU: under 0.1 percent of a day at 60 minutes between cycles" '[ $((CPU_MS * 24)) -lt 86400 ]'
 
 # ---------------------------------------------------------------- the network changes
 STAGE=network
