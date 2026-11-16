@@ -56,7 +56,7 @@ func requiredCap(s plugin.InboundSpec) string {
 		return capMTProto
 	}
 	if s.Protocol == "trusttunnel" {
-		if trustTunnelH3(s) {
+		if plugin.TrustTunnelH3(s) {
 			return capTrustTunnelH3
 		}
 		return capTrustTunnel
@@ -71,13 +71,6 @@ func requiredCap(s plugin.InboundSpec) string {
 		return capVLESS
 	}
 	return ""
-}
-
-func trustTunnelH3(s plugin.InboundSpec) bool {
-	var settings struct {
-		H3 bool `json:"h3"`
-	}
-	return json.Unmarshal(s.Settings, &settings) == nil && settings.H3
 }
 
 func vlessTLS(s plugin.InboundSpec) bool {

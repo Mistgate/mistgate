@@ -413,9 +413,9 @@ func insertAdmin(t *testing.T, st *store.Store, role string) store.Admin {
 func TestEveryProcedureHasAPolicy(t *testing.T) {
 	registered := map[string]bool{}
 	// mistgate.probe.v1 (ProbeService), mistgate.ops.v1 (OpsService, policy_ops.go) and mistgate.tasks.v1 (TasksService,
-	// policy_tasks.go) are the VPS edition's own service packages, kept out of the Cloudflare Workers; their procedures need a
+	// policy_tasks.go) and mistgate.trusttunnel.v1 (TrustTunnelService, policy_trusttunnel.go) are the VPS edition's own service packages, kept out of the Cloudflare Workers; their procedures need a
 	// level too.
-	for _, pkg := range []protoreflect.FullName{"mistgate.admin.v1", "mistgate.probe.v1", "mistgate.ops.v1", "mistgate.tasks.v1"} {
+	for _, pkg := range []protoreflect.FullName{"mistgate.admin.v1", "mistgate.probe.v1", "mistgate.ops.v1", "mistgate.tasks.v1", "mistgate.trusttunnel.v1"} {
 		protoregistry.GlobalFiles.RangeFilesByPackage(pkg, func(fd protoreflect.FileDescriptor) bool {
 			for i := 0; i < fd.Services().Len(); i++ {
 				svc := fd.Services().Get(i)

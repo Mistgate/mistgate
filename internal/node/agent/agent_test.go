@@ -32,6 +32,10 @@ func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
 }
 
 func TestCapabilitiesAdvertiseTrustTunnelHTTP3OnlyWithEngine(t *testing.T) {
+	// The panel (internal/panel/fleet desired.go) asks for these exact strings; its test pins the same literals.
+	if capTrustTunnel != "trusttunnel/1" || capTrustTunnelH3 != "trusttunnel-h3/1" {
+		t.Fatalf("capabilities are %q and %q", capTrustTunnel, capTrustTunnelH3)
+	}
 	without := (&Agent{engines: map[string]engine.Engine{}}).capabilities()
 	if slices.Contains(without, capTrustTunnel) || slices.Contains(without, capTrustTunnelH3) {
 		t.Fatalf("TrustTunnel capabilities without engine = %v", without)

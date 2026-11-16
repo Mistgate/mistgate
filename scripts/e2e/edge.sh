@@ -99,9 +99,7 @@ edge_build() {
   mkdir -p "$w/dist"
   WASM_BYTES=0 WASM_GZ=0
   for role in $EDGE_ROLES; do
-    role_tags=nethttpomithttp2
-    if [[ "$role" == "link" ]]; then role_tags="$role_tags,edge_link"; fi
-    GOOS=js GOARCH=wasm go build -tags "$role_tags" -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/ -X $TG_PKG.defaultAPIBase=http://127.0.0.1:$TG_PORT" \
+    GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/ -X $TG_PKG.defaultAPIBase=http://127.0.0.1:$TG_PORT" \
       -o "$w/dist/$role.wasm" "./cmd/mistgate-edge-$role"
     n=$(stat -c %s "$w/dist/$role.wasm")
     WASM_BYTES=$((WASM_BYTES + n)) WASM_GZ=$((WASM_GZ + $(gzip -9 -c "$w/dist/$role.wasm" | wc -c)))

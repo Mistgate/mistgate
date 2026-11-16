@@ -13,21 +13,10 @@ import (
 // edgeRebuild builds the edge bundle; a test seam (goBuildEdge in production), like releaseRebuild.
 var edgeRebuild = goBuildEdge
 
-// edgeBuildTags are the build tags of every role wasm file. nethttpomithttp2 leaves out net/http's HTTP/2 (about 0.8 MB): a
+// edgeBuildTags are the build tags of the role wasm files. nethttpomithttp2 leaves out net/http's HTTP/2 (about 0.8 MB): a
 // Worker never speaks HTTP/2 itself, Go's js/wasm transport hands every request to fetch. CI's size step and
 // scripts/build-edge.ps1 use the same tag.
 const edgeBuildTags = "nethttpomithttp2"
-
-// edgeRoleTags are the build tags of one role's wasm: edgeBuildTags, and for the link Worker edge_link, which leaves the
-// TrustTunnel key code (issuing, links, the wire encoder) out of the Worker that only answers agents. The same rule is in
-// scripts/check-edge-sizes.sh, build-edge.ps1, test-edge-roles.ps1 and e2e/edge.sh (TestEdgeLinkTagIsEverywhere keeps them
-// in step): a release that built the role another way would ship a different Worker than the one CI measured.
-func edgeRoleTags(role string) string {
-	if role == release.RoleLink {
-		return edgeBuildTags + ",edge_link"
-	}
-	return edgeBuildTags
-}
 
 // edgeWasmRoles are the roles that carry a Go panel, in the bundle's order; each is cmd/mistgate-edge-<role>. FRONT has none.
 // (cmd/mistgate-edge, the build with every role, is for the Node tests and the e2e run, not for a release.)
@@ -72,7 +61,7 @@ func goBuildEdge(src, version string, built int64, key, out string) error {
 		return err
 	}
 	for _, role := range edgeWasmRoles {
-		if _, err := run(src, env, "go", "build", "-tags", edgeRoleTags(role), "-trimpath", "-buildvcs=false", "-ldflags", releaseLdflags(version, built, key),
+		if _, err := run(src, env, "go", "build", "-tags", edgeBuildTags, "-trimpath", "-buildvcs=false", "-ldflags", releaseLdflags(version, built, key),
 			"-o", filepath.Join(scripts, role+".wasm"), "./cmd/mistgate-edge-"+role); err != nil {
 			return err
 		}

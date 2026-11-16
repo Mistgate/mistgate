@@ -28,6 +28,9 @@ const (
 	DecoyOwn     = "decoy_own"
 	TSPUProbe    = "tspu_probe"
 	OSUpdates    = "os_updates"
+	// TrustTunnel is not in the edge edition's first version (no plugin, no keys). It is deliberately not in edgeUnavailable:
+	// no deferred job stands behind it, and the admin has no sentence for it before the TrustTunnel screens (T7) exist.
+	TrustTunnel = "trusttunnel"
 )
 
 // Code is the refusal code of Refuse; the admin has a sentence for it ("err.unavailable_in_edition").

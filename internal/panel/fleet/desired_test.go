@@ -47,6 +47,11 @@ func TestRequiredProtocolCapability(t *testing.T) {
 }
 
 func TestTrustTunnelInboundIsWithheldWithoutCapability(t *testing.T) {
+	// The agent's own constants (internal/node/agent l3.go) are pinned to the same literals in its test: the two halves meet
+	// only in these strings.
+	if capTrustTunnel != "trusttunnel/1" || capTrustTunnelH3 != "trusttunnel-h3/1" {
+		t.Fatalf("capabilities are %q and %q", capTrustTunnel, capTrustTunnelH3)
+	}
 	tt := plugin.InboundSpec{ID: "inb_tt", Protocol: "trusttunnel", Enabled: true,
 		Listen: plugin.Listen{Network: "tcp", Port: 443}, Settings: []byte(`{"h3":false}`)}
 	e := newEnv(t)

@@ -1,4 +1,4 @@
-//go:build !edge_link
+//go:build !js
 
 package access
 

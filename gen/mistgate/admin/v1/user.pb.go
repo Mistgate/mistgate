@@ -3993,404 +3993,6 @@ func (x *RevokeTelegramKeyResponse) GetProxy() *GetTelegramLinksResponse {
 	return nil
 }
 
-type GetTrustTunnelLinksRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetTrustTunnelLinksRequest) Reset() {
-	*x = GetTrustTunnelLinksRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[46]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetTrustTunnelLinksRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetTrustTunnelLinksRequest) ProtoMessage() {}
-
-func (x *GetTrustTunnelLinksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[46]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetTrustTunnelLinksRequest.ProtoReflect.Descriptor instead.
-func (*GetTrustTunnelLinksRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{46}
-}
-
-func (x *GetTrustTunnelLinksRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-// One tt:// key link. The URL contains a secret and must be handled like a password. A skipped link has an empty url and a
-// stable note code (for example self_signed).
-type TrustTunnelLink struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	NodeName      string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
-	ProfileId     string                 `protobuf:"bytes,3,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
-	ProfileName   string                 `protobuf:"bytes,4,opt,name=profile_name,json=profileName,proto3" json:"profile_name,omitempty"`
-	Url           string                 `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
-	HasIpv6       bool                   `protobuf:"varint,6,opt,name=has_ipv6,json=hasIpv6,proto3" json:"has_ipv6,omitempty"`
-	Relay         bool                   `protobuf:"varint,7,opt,name=relay,proto3" json:"relay,omitempty"`
-	Via           string                 `protobuf:"bytes,8,opt,name=via,proto3" json:"via,omitempty"`
-	Note          string                 `protobuf:"bytes,9,opt,name=note,proto3" json:"note,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TrustTunnelLink) Reset() {
-	*x = TrustTunnelLink{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[47]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TrustTunnelLink) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TrustTunnelLink) ProtoMessage() {}
-
-func (x *TrustTunnelLink) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[47]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TrustTunnelLink.ProtoReflect.Descriptor instead.
-func (*TrustTunnelLink) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{47}
-}
-
-func (x *TrustTunnelLink) GetNodeId() string {
-	if x != nil {
-		return x.NodeId
-	}
-	return ""
-}
-
-func (x *TrustTunnelLink) GetNodeName() string {
-	if x != nil {
-		return x.NodeName
-	}
-	return ""
-}
-
-func (x *TrustTunnelLink) GetProfileId() string {
-	if x != nil {
-		return x.ProfileId
-	}
-	return ""
-}
-
-func (x *TrustTunnelLink) GetProfileName() string {
-	if x != nil {
-		return x.ProfileName
-	}
-	return ""
-}
-
-func (x *TrustTunnelLink) GetUrl() string {
-	if x != nil {
-		return x.Url
-	}
-	return ""
-}
-
-func (x *TrustTunnelLink) GetHasIpv6() bool {
-	if x != nil {
-		return x.HasIpv6
-	}
-	return false
-}
-
-func (x *TrustTunnelLink) GetRelay() bool {
-	if x != nil {
-		return x.Relay
-	}
-	return false
-}
-
-func (x *TrustTunnelLink) GetVia() string {
-	if x != nil {
-		return x.Via
-	}
-	return ""
-}
-
-func (x *TrustTunnelLink) GetNote() string {
-	if x != nil {
-		return x.Note
-	}
-	return ""
-}
-
-type GetTrustTunnelLinksResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Links         []*TrustTunnelLink     `protobuf:"bytes,1,rep,name=links,proto3" json:"links,omitempty"`
-	HasKey        bool                   `protobuf:"varint,2,opt,name=has_key,json=hasKey,proto3" json:"has_key,omitempty"`
-	KeyDeviceId   string                 `protobuf:"bytes,3,opt,name=key_device_id,json=keyDeviceId,proto3" json:"key_device_id,omitempty"`
-	KeyIssuedUnix int64                  `protobuf:"varint,4,opt,name=key_issued_unix,json=keyIssuedUnix,proto3" json:"key_issued_unix,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetTrustTunnelLinksResponse) Reset() {
-	*x = GetTrustTunnelLinksResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[48]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetTrustTunnelLinksResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetTrustTunnelLinksResponse) ProtoMessage() {}
-
-func (x *GetTrustTunnelLinksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[48]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetTrustTunnelLinksResponse.ProtoReflect.Descriptor instead.
-func (*GetTrustTunnelLinksResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{48}
-}
-
-func (x *GetTrustTunnelLinksResponse) GetLinks() []*TrustTunnelLink {
-	if x != nil {
-		return x.Links
-	}
-	return nil
-}
-
-func (x *GetTrustTunnelLinksResponse) GetHasKey() bool {
-	if x != nil {
-		return x.HasKey
-	}
-	return false
-}
-
-func (x *GetTrustTunnelLinksResponse) GetKeyDeviceId() string {
-	if x != nil {
-		return x.KeyDeviceId
-	}
-	return ""
-}
-
-func (x *GetTrustTunnelLinksResponse) GetKeyIssuedUnix() int64 {
-	if x != nil {
-		return x.KeyIssuedUnix
-	}
-	return 0
-}
-
-type IssueTrustTunnelKeyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *IssueTrustTunnelKeyRequest) Reset() {
-	*x = IssueTrustTunnelKeyRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[49]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *IssueTrustTunnelKeyRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*IssueTrustTunnelKeyRequest) ProtoMessage() {}
-
-func (x *IssueTrustTunnelKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[49]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use IssueTrustTunnelKeyRequest.ProtoReflect.Descriptor instead.
-func (*IssueTrustTunnelKeyRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{49}
-}
-
-func (x *IssueTrustTunnelKeyRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-type IssueTrustTunnelKeyResponse struct {
-	state         protoimpl.MessageState       `protogen:"open.v1"`
-	TrustTunnel   *GetTrustTunnelLinksResponse `protobuf:"bytes,1,opt,name=trust_tunnel,json=trustTunnel,proto3" json:"trust_tunnel,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *IssueTrustTunnelKeyResponse) Reset() {
-	*x = IssueTrustTunnelKeyResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[50]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *IssueTrustTunnelKeyResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*IssueTrustTunnelKeyResponse) ProtoMessage() {}
-
-func (x *IssueTrustTunnelKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[50]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use IssueTrustTunnelKeyResponse.ProtoReflect.Descriptor instead.
-func (*IssueTrustTunnelKeyResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{50}
-}
-
-func (x *IssueTrustTunnelKeyResponse) GetTrustTunnel() *GetTrustTunnelLinksResponse {
-	if x != nil {
-		return x.TrustTunnel
-	}
-	return nil
-}
-
-type RevokeTrustTunnelKeyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeTrustTunnelKeyRequest) Reset() {
-	*x = RevokeTrustTunnelKeyRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[51]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeTrustTunnelKeyRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeTrustTunnelKeyRequest) ProtoMessage() {}
-
-func (x *RevokeTrustTunnelKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[51]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeTrustTunnelKeyRequest.ProtoReflect.Descriptor instead.
-func (*RevokeTrustTunnelKeyRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{51}
-}
-
-func (x *RevokeTrustTunnelKeyRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-type RevokeTrustTunnelKeyResponse struct {
-	state         protoimpl.MessageState       `protogen:"open.v1"`
-	TrustTunnel   *GetTrustTunnelLinksResponse `protobuf:"bytes,1,opt,name=trust_tunnel,json=trustTunnel,proto3" json:"trust_tunnel,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeTrustTunnelKeyResponse) Reset() {
-	*x = RevokeTrustTunnelKeyResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[52]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeTrustTunnelKeyResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeTrustTunnelKeyResponse) ProtoMessage() {}
-
-func (x *RevokeTrustTunnelKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[52]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeTrustTunnelKeyResponse.ProtoReflect.Descriptor instead.
-func (*RevokeTrustTunnelKeyResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{52}
-}
-
-func (x *RevokeTrustTunnelKeyResponse) GetTrustTunnel() *GetTrustTunnelLinksResponse {
-	if x != nil {
-		return x.TrustTunnel
-	}
-	return nil
-}
-
 var File_mistgate_admin_v1_user_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_user_proto_rawDesc = "" +
@@ -4720,33 +4322,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x18RevokeTelegramKeyRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"^\n" +
 	"\x19RevokeTelegramKeyResponse\x12A\n" +
-	"\x05proxy\x18\x01 \x01(\v2+.mistgate.admin.v1.GetTelegramLinksResponseR\x05proxy\"5\n" +
-	"\x1aGetTrustTunnelLinksRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xf2\x01\n" +
-	"\x0fTrustTunnelLink\x12\x17\n" +
-	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
-	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1d\n" +
-	"\n" +
-	"profile_id\x18\x03 \x01(\tR\tprofileId\x12!\n" +
-	"\fprofile_name\x18\x04 \x01(\tR\vprofileName\x12\x10\n" +
-	"\x03url\x18\x05 \x01(\tR\x03url\x12\x19\n" +
-	"\bhas_ipv6\x18\x06 \x01(\bR\ahasIpv6\x12\x14\n" +
-	"\x05relay\x18\a \x01(\bR\x05relay\x12\x10\n" +
-	"\x03via\x18\b \x01(\tR\x03via\x12\x12\n" +
-	"\x04note\x18\t \x01(\tR\x04note\"\xc0\x01\n" +
-	"\x1bGetTrustTunnelLinksResponse\x128\n" +
-	"\x05links\x18\x01 \x03(\v2\".mistgate.admin.v1.TrustTunnelLinkR\x05links\x12\x17\n" +
-	"\ahas_key\x18\x02 \x01(\bR\x06hasKey\x12\"\n" +
-	"\rkey_device_id\x18\x03 \x01(\tR\vkeyDeviceId\x12*\n" +
-	"\x0fkey_issued_unix\x18\x04 \x01(\x03B\x020\x02R\rkeyIssuedUnix\"5\n" +
-	"\x1aIssueTrustTunnelKeyRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"p\n" +
-	"\x1bIssueTrustTunnelKeyResponse\x12Q\n" +
-	"\ftrust_tunnel\x18\x01 \x01(\v2..mistgate.admin.v1.GetTrustTunnelLinksResponseR\vtrustTunnel\"6\n" +
-	"\x1bRevokeTrustTunnelKeyRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"q\n" +
-	"\x1cRevokeTrustTunnelKeyResponse\x12Q\n" +
-	"\ftrust_tunnel\x18\x01 \x01(\v2..mistgate.admin.v1.GetTrustTunnelLinksResponseR\vtrustTunnel*\x8d\x01\n" +
+	"\x05proxy\x18\x01 \x01(\v2+.mistgate.admin.v1.GetTelegramLinksResponseR\x05proxy*\x8d\x01\n" +
 	"\n" +
 	"UserStatus\x12\x1b\n" +
 	"\x17USER_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
@@ -4790,7 +4366,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x10DEVICE_KIND_LINK\x10\x01\x12\x1b\n" +
 	"\x17DEVICE_KIND_LINK_SHARED\x10\x02\x12\x13\n" +
 	"\x0fDEVICE_KIND_KEY\x10\x03\x12\x1c\n" +
-	"\x18DEVICE_KIND_TELEGRAM_KEY\x10\x042\xca\x0f\n" +
+	"\x18DEVICE_KIND_TELEGRAM_KEY\x10\x042\xe5\f\n" +
 	"\vUserService\x12V\n" +
 	"\tListUsers\x12#.mistgate.admin.v1.ListUsersRequest\x1a$.mistgate.admin.v1.ListUsersResponse\x12P\n" +
 	"\aGetUser\x12!.mistgate.admin.v1.GetUserRequest\x1a\".mistgate.admin.v1.GetUserResponse\x12Y\n" +
@@ -4808,10 +4384,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x10GetTelegramLinks\x12*.mistgate.admin.v1.GetTelegramLinksRequest\x1a+.mistgate.admin.v1.GetTelegramLinksResponse\x12k\n" +
 	"\x10IssueTelegramKey\x12*.mistgate.admin.v1.IssueTelegramKeyRequest\x1a+.mistgate.admin.v1.IssueTelegramKeyResponse\x12n\n" +
 	"\x11RotateTelegramKey\x12+.mistgate.admin.v1.RotateTelegramKeyRequest\x1a,.mistgate.admin.v1.RotateTelegramKeyResponse\x12n\n" +
-	"\x11RevokeTelegramKey\x12+.mistgate.admin.v1.RevokeTelegramKeyRequest\x1a,.mistgate.admin.v1.RevokeTelegramKeyResponse\x12t\n" +
-	"\x13GetTrustTunnelLinks\x12-.mistgate.admin.v1.GetTrustTunnelLinksRequest\x1a..mistgate.admin.v1.GetTrustTunnelLinksResponse\x12t\n" +
-	"\x13IssueTrustTunnelKey\x12-.mistgate.admin.v1.IssueTrustTunnelKeyRequest\x1a..mistgate.admin.v1.IssueTrustTunnelKeyResponse\x12w\n" +
-	"\x14RevokeTrustTunnelKey\x12..mistgate.admin.v1.RevokeTrustTunnelKeyRequest\x1a/.mistgate.admin.v1.RevokeTrustTunnelKeyResponse\x12n\n" +
+	"\x11RevokeTelegramKey\x12+.mistgate.admin.v1.RevokeTelegramKeyRequest\x1a,.mistgate.admin.v1.RevokeTelegramKeyResponse\x12n\n" +
 	"\x11GetUserConnection\x12+.mistgate.admin.v1.GetUserConnectionRequest\x1a,.mistgate.admin.v1.GetUserConnectionResponseB\xc4\x01\n" +
 	"\x15com.mistgate.admin.v1B\tUserProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
@@ -4828,79 +4401,72 @@ func file_mistgate_admin_v1_user_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
+var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_mistgate_admin_v1_user_proto_goTypes = []any{
-	(UserStatus)(0),                      // 0: mistgate.admin.v1.UserStatus
-	(QuotaReset)(0),                      // 1: mistgate.admin.v1.QuotaReset
-	(UserFilter)(0),                      // 2: mistgate.admin.v1.UserFilter
-	(UserSort)(0),                        // 3: mistgate.admin.v1.UserSort
-	(DnsSource)(0),                       // 4: mistgate.admin.v1.DnsSource
-	(DeviceKind)(0),                      // 5: mistgate.admin.v1.DeviceKind
-	(*GetUserConnectionRequest)(nil),     // 6: mistgate.admin.v1.GetUserConnectionRequest
-	(*DeviceConnection)(nil),             // 7: mistgate.admin.v1.DeviceConnection
-	(*GetUserConnectionResponse)(nil),    // 8: mistgate.admin.v1.GetUserConnectionResponse
-	(*AppToggles)(nil),                   // 9: mistgate.admin.v1.AppToggles
-	(*NodeSelection)(nil),                // 10: mistgate.admin.v1.NodeSelection
-	(*User)(nil),                         // 11: mistgate.admin.v1.User
-	(*ListUsersRequest)(nil),             // 12: mistgate.admin.v1.ListUsersRequest
-	(*UserCounts)(nil),                   // 13: mistgate.admin.v1.UserCounts
-	(*ListUsersResponse)(nil),            // 14: mistgate.admin.v1.ListUsersResponse
-	(*GetUserRequest)(nil),               // 15: mistgate.admin.v1.GetUserRequest
-	(*Device)(nil),                       // 16: mistgate.admin.v1.Device
-	(*DayTraffic)(nil),                   // 17: mistgate.admin.v1.DayTraffic
-	(*NodeTraffic)(nil),                  // 18: mistgate.admin.v1.NodeTraffic
-	(*NodeAccess)(nil),                   // 19: mistgate.admin.v1.NodeAccess
-	(*ProfileRef)(nil),                   // 20: mistgate.admin.v1.ProfileRef
-	(*GetUserResponse)(nil),              // 21: mistgate.admin.v1.GetUserResponse
-	(*BlockedDevice)(nil),                // 22: mistgate.admin.v1.BlockedDevice
-	(*CreateUserRequest)(nil),            // 23: mistgate.admin.v1.CreateUserRequest
-	(*CreateUserResponse)(nil),           // 24: mistgate.admin.v1.CreateUserResponse
-	(*UpdateUserRequest)(nil),            // 25: mistgate.admin.v1.UpdateUserRequest
-	(*UpdateUserResponse)(nil),           // 26: mistgate.admin.v1.UpdateUserResponse
-	(*AccessImpact)(nil),                 // 27: mistgate.admin.v1.AccessImpact
-	(*ImpactProfile)(nil),                // 28: mistgate.admin.v1.ImpactProfile
-	(*SetUsersEnabledRequest)(nil),       // 29: mistgate.admin.v1.SetUsersEnabledRequest
-	(*SetUsersEnabledResponse)(nil),      // 30: mistgate.admin.v1.SetUsersEnabledResponse
-	(*ExtendUsersRequest)(nil),           // 31: mistgate.admin.v1.ExtendUsersRequest
-	(*ExtendUsersResponse)(nil),          // 32: mistgate.admin.v1.ExtendUsersResponse
-	(*ResetUserTrafficRequest)(nil),      // 33: mistgate.admin.v1.ResetUserTrafficRequest
-	(*ResetUserTrafficResponse)(nil),     // 34: mistgate.admin.v1.ResetUserTrafficResponse
-	(*RevokeDeviceRequest)(nil),          // 35: mistgate.admin.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),         // 36: mistgate.admin.v1.RevokeDeviceResponse
-	(*UnblockDeviceRequest)(nil),         // 37: mistgate.admin.v1.UnblockDeviceRequest
-	(*UnblockDeviceResponse)(nil),        // 38: mistgate.admin.v1.UnblockDeviceResponse
-	(*DeleteUsersRequest)(nil),           // 39: mistgate.admin.v1.DeleteUsersRequest
-	(*DeleteUsersResponse)(nil),          // 40: mistgate.admin.v1.DeleteUsersResponse
-	(*GetSubscriptionLinkRequest)(nil),   // 41: mistgate.admin.v1.GetSubscriptionLinkRequest
-	(*GetSubscriptionLinkResponse)(nil),  // 42: mistgate.admin.v1.GetSubscriptionLinkResponse
-	(*GetTelegramLinksRequest)(nil),      // 43: mistgate.admin.v1.GetTelegramLinksRequest
-	(*TelegramProxyLink)(nil),            // 44: mistgate.admin.v1.TelegramProxyLink
-	(*GetTelegramLinksResponse)(nil),     // 45: mistgate.admin.v1.GetTelegramLinksResponse
-	(*IssueTelegramKeyRequest)(nil),      // 46: mistgate.admin.v1.IssueTelegramKeyRequest
-	(*IssueTelegramKeyResponse)(nil),     // 47: mistgate.admin.v1.IssueTelegramKeyResponse
-	(*RotateTelegramKeyRequest)(nil),     // 48: mistgate.admin.v1.RotateTelegramKeyRequest
-	(*RotateTelegramKeyResponse)(nil),    // 49: mistgate.admin.v1.RotateTelegramKeyResponse
-	(*RevokeTelegramKeyRequest)(nil),     // 50: mistgate.admin.v1.RevokeTelegramKeyRequest
-	(*RevokeTelegramKeyResponse)(nil),    // 51: mistgate.admin.v1.RevokeTelegramKeyResponse
-	(*GetTrustTunnelLinksRequest)(nil),   // 52: mistgate.admin.v1.GetTrustTunnelLinksRequest
-	(*TrustTunnelLink)(nil),              // 53: mistgate.admin.v1.TrustTunnelLink
-	(*GetTrustTunnelLinksResponse)(nil),  // 54: mistgate.admin.v1.GetTrustTunnelLinksResponse
-	(*IssueTrustTunnelKeyRequest)(nil),   // 55: mistgate.admin.v1.IssueTrustTunnelKeyRequest
-	(*IssueTrustTunnelKeyResponse)(nil),  // 56: mistgate.admin.v1.IssueTrustTunnelKeyResponse
-	(*RevokeTrustTunnelKeyRequest)(nil),  // 57: mistgate.admin.v1.RevokeTrustTunnelKeyRequest
-	(*RevokeTrustTunnelKeyResponse)(nil), // 58: mistgate.admin.v1.RevokeTrustTunnelKeyResponse
-	(*LinkHour)(nil),                     // 59: mistgate.admin.v1.LinkHour
-	(*HelloKexDevice)(nil),               // 60: mistgate.admin.v1.HelloKexDevice
-	(App)(0),                             // 61: mistgate.admin.v1.App
-	(*ProfileFormat)(nil),                // 62: mistgate.admin.v1.ProfileFormat
+	(UserStatus)(0),                     // 0: mistgate.admin.v1.UserStatus
+	(QuotaReset)(0),                     // 1: mistgate.admin.v1.QuotaReset
+	(UserFilter)(0),                     // 2: mistgate.admin.v1.UserFilter
+	(UserSort)(0),                       // 3: mistgate.admin.v1.UserSort
+	(DnsSource)(0),                      // 4: mistgate.admin.v1.DnsSource
+	(DeviceKind)(0),                     // 5: mistgate.admin.v1.DeviceKind
+	(*GetUserConnectionRequest)(nil),    // 6: mistgate.admin.v1.GetUserConnectionRequest
+	(*DeviceConnection)(nil),            // 7: mistgate.admin.v1.DeviceConnection
+	(*GetUserConnectionResponse)(nil),   // 8: mistgate.admin.v1.GetUserConnectionResponse
+	(*AppToggles)(nil),                  // 9: mistgate.admin.v1.AppToggles
+	(*NodeSelection)(nil),               // 10: mistgate.admin.v1.NodeSelection
+	(*User)(nil),                        // 11: mistgate.admin.v1.User
+	(*ListUsersRequest)(nil),            // 12: mistgate.admin.v1.ListUsersRequest
+	(*UserCounts)(nil),                  // 13: mistgate.admin.v1.UserCounts
+	(*ListUsersResponse)(nil),           // 14: mistgate.admin.v1.ListUsersResponse
+	(*GetUserRequest)(nil),              // 15: mistgate.admin.v1.GetUserRequest
+	(*Device)(nil),                      // 16: mistgate.admin.v1.Device
+	(*DayTraffic)(nil),                  // 17: mistgate.admin.v1.DayTraffic
+	(*NodeTraffic)(nil),                 // 18: mistgate.admin.v1.NodeTraffic
+	(*NodeAccess)(nil),                  // 19: mistgate.admin.v1.NodeAccess
+	(*ProfileRef)(nil),                  // 20: mistgate.admin.v1.ProfileRef
+	(*GetUserResponse)(nil),             // 21: mistgate.admin.v1.GetUserResponse
+	(*BlockedDevice)(nil),               // 22: mistgate.admin.v1.BlockedDevice
+	(*CreateUserRequest)(nil),           // 23: mistgate.admin.v1.CreateUserRequest
+	(*CreateUserResponse)(nil),          // 24: mistgate.admin.v1.CreateUserResponse
+	(*UpdateUserRequest)(nil),           // 25: mistgate.admin.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),          // 26: mistgate.admin.v1.UpdateUserResponse
+	(*AccessImpact)(nil),                // 27: mistgate.admin.v1.AccessImpact
+	(*ImpactProfile)(nil),               // 28: mistgate.admin.v1.ImpactProfile
+	(*SetUsersEnabledRequest)(nil),      // 29: mistgate.admin.v1.SetUsersEnabledRequest
+	(*SetUsersEnabledResponse)(nil),     // 30: mistgate.admin.v1.SetUsersEnabledResponse
+	(*ExtendUsersRequest)(nil),          // 31: mistgate.admin.v1.ExtendUsersRequest
+	(*ExtendUsersResponse)(nil),         // 32: mistgate.admin.v1.ExtendUsersResponse
+	(*ResetUserTrafficRequest)(nil),     // 33: mistgate.admin.v1.ResetUserTrafficRequest
+	(*ResetUserTrafficResponse)(nil),    // 34: mistgate.admin.v1.ResetUserTrafficResponse
+	(*RevokeDeviceRequest)(nil),         // 35: mistgate.admin.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),        // 36: mistgate.admin.v1.RevokeDeviceResponse
+	(*UnblockDeviceRequest)(nil),        // 37: mistgate.admin.v1.UnblockDeviceRequest
+	(*UnblockDeviceResponse)(nil),       // 38: mistgate.admin.v1.UnblockDeviceResponse
+	(*DeleteUsersRequest)(nil),          // 39: mistgate.admin.v1.DeleteUsersRequest
+	(*DeleteUsersResponse)(nil),         // 40: mistgate.admin.v1.DeleteUsersResponse
+	(*GetSubscriptionLinkRequest)(nil),  // 41: mistgate.admin.v1.GetSubscriptionLinkRequest
+	(*GetSubscriptionLinkResponse)(nil), // 42: mistgate.admin.v1.GetSubscriptionLinkResponse
+	(*GetTelegramLinksRequest)(nil),     // 43: mistgate.admin.v1.GetTelegramLinksRequest
+	(*TelegramProxyLink)(nil),           // 44: mistgate.admin.v1.TelegramProxyLink
+	(*GetTelegramLinksResponse)(nil),    // 45: mistgate.admin.v1.GetTelegramLinksResponse
+	(*IssueTelegramKeyRequest)(nil),     // 46: mistgate.admin.v1.IssueTelegramKeyRequest
+	(*IssueTelegramKeyResponse)(nil),    // 47: mistgate.admin.v1.IssueTelegramKeyResponse
+	(*RotateTelegramKeyRequest)(nil),    // 48: mistgate.admin.v1.RotateTelegramKeyRequest
+	(*RotateTelegramKeyResponse)(nil),   // 49: mistgate.admin.v1.RotateTelegramKeyResponse
+	(*RevokeTelegramKeyRequest)(nil),    // 50: mistgate.admin.v1.RevokeTelegramKeyRequest
+	(*RevokeTelegramKeyResponse)(nil),   // 51: mistgate.admin.v1.RevokeTelegramKeyResponse
+	(*LinkHour)(nil),                    // 52: mistgate.admin.v1.LinkHour
+	(*HelloKexDevice)(nil),              // 53: mistgate.admin.v1.HelloKexDevice
+	(App)(0),                            // 54: mistgate.admin.v1.App
+	(*ProfileFormat)(nil),               // 55: mistgate.admin.v1.ProfileFormat
 }
 var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
-	59, // 0: mistgate.admin.v1.DeviceConnection.hours:type_name -> mistgate.admin.v1.LinkHour
+	52, // 0: mistgate.admin.v1.DeviceConnection.hours:type_name -> mistgate.admin.v1.LinkHour
 	7,  // 1: mistgate.admin.v1.GetUserConnectionResponse.rows:type_name -> mistgate.admin.v1.DeviceConnection
-	60, // 2: mistgate.admin.v1.GetUserConnectionResponse.hello_kex:type_name -> mistgate.admin.v1.HelloKexDevice
+	53, // 2: mistgate.admin.v1.GetUserConnectionResponse.hello_kex:type_name -> mistgate.admin.v1.HelloKexDevice
 	0,  // 3: mistgate.admin.v1.User.status:type_name -> mistgate.admin.v1.UserStatus
 	9,  // 4: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
-	61, // 5: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
+	54, // 5: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
 	1,  // 6: mistgate.admin.v1.User.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
 	10, // 7: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
 	4,  // 8: mistgate.admin.v1.User.dns_source:type_name -> mistgate.admin.v1.DnsSource
@@ -4909,7 +4475,7 @@ var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
 	11, // 11: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
 	13, // 12: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
 	5,  // 13: mistgate.admin.v1.Device.kind:type_name -> mistgate.admin.v1.DeviceKind
-	62, // 14: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
+	55, // 14: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
 	11, // 15: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
 	16, // 16: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
 	17, // 17: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
@@ -4937,52 +4503,43 @@ var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
 	45, // 39: mistgate.admin.v1.IssueTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
 	45, // 40: mistgate.admin.v1.RotateTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
 	45, // 41: mistgate.admin.v1.RevokeTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
-	53, // 42: mistgate.admin.v1.GetTrustTunnelLinksResponse.links:type_name -> mistgate.admin.v1.TrustTunnelLink
-	54, // 43: mistgate.admin.v1.IssueTrustTunnelKeyResponse.trust_tunnel:type_name -> mistgate.admin.v1.GetTrustTunnelLinksResponse
-	54, // 44: mistgate.admin.v1.RevokeTrustTunnelKeyResponse.trust_tunnel:type_name -> mistgate.admin.v1.GetTrustTunnelLinksResponse
-	12, // 45: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
-	15, // 46: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
-	23, // 47: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
-	25, // 48: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
-	29, // 49: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
-	31, // 50: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
-	33, // 51: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
-	35, // 52: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
-	37, // 53: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
-	39, // 54: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
-	41, // 55: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
-	43, // 56: mistgate.admin.v1.UserService.GetTelegramLinks:input_type -> mistgate.admin.v1.GetTelegramLinksRequest
-	46, // 57: mistgate.admin.v1.UserService.IssueTelegramKey:input_type -> mistgate.admin.v1.IssueTelegramKeyRequest
-	48, // 58: mistgate.admin.v1.UserService.RotateTelegramKey:input_type -> mistgate.admin.v1.RotateTelegramKeyRequest
-	50, // 59: mistgate.admin.v1.UserService.RevokeTelegramKey:input_type -> mistgate.admin.v1.RevokeTelegramKeyRequest
-	52, // 60: mistgate.admin.v1.UserService.GetTrustTunnelLinks:input_type -> mistgate.admin.v1.GetTrustTunnelLinksRequest
-	55, // 61: mistgate.admin.v1.UserService.IssueTrustTunnelKey:input_type -> mistgate.admin.v1.IssueTrustTunnelKeyRequest
-	57, // 62: mistgate.admin.v1.UserService.RevokeTrustTunnelKey:input_type -> mistgate.admin.v1.RevokeTrustTunnelKeyRequest
-	6,  // 63: mistgate.admin.v1.UserService.GetUserConnection:input_type -> mistgate.admin.v1.GetUserConnectionRequest
-	14, // 64: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
-	21, // 65: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
-	24, // 66: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
-	26, // 67: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
-	30, // 68: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
-	32, // 69: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
-	34, // 70: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
-	36, // 71: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
-	38, // 72: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
-	40, // 73: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
-	42, // 74: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
-	45, // 75: mistgate.admin.v1.UserService.GetTelegramLinks:output_type -> mistgate.admin.v1.GetTelegramLinksResponse
-	47, // 76: mistgate.admin.v1.UserService.IssueTelegramKey:output_type -> mistgate.admin.v1.IssueTelegramKeyResponse
-	49, // 77: mistgate.admin.v1.UserService.RotateTelegramKey:output_type -> mistgate.admin.v1.RotateTelegramKeyResponse
-	51, // 78: mistgate.admin.v1.UserService.RevokeTelegramKey:output_type -> mistgate.admin.v1.RevokeTelegramKeyResponse
-	54, // 79: mistgate.admin.v1.UserService.GetTrustTunnelLinks:output_type -> mistgate.admin.v1.GetTrustTunnelLinksResponse
-	56, // 80: mistgate.admin.v1.UserService.IssueTrustTunnelKey:output_type -> mistgate.admin.v1.IssueTrustTunnelKeyResponse
-	58, // 81: mistgate.admin.v1.UserService.RevokeTrustTunnelKey:output_type -> mistgate.admin.v1.RevokeTrustTunnelKeyResponse
-	8,  // 82: mistgate.admin.v1.UserService.GetUserConnection:output_type -> mistgate.admin.v1.GetUserConnectionResponse
-	64, // [64:83] is the sub-list for method output_type
-	45, // [45:64] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	12, // 42: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
+	15, // 43: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
+	23, // 44: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
+	25, // 45: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
+	29, // 46: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
+	31, // 47: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
+	33, // 48: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
+	35, // 49: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
+	37, // 50: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
+	39, // 51: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
+	41, // 52: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
+	43, // 53: mistgate.admin.v1.UserService.GetTelegramLinks:input_type -> mistgate.admin.v1.GetTelegramLinksRequest
+	46, // 54: mistgate.admin.v1.UserService.IssueTelegramKey:input_type -> mistgate.admin.v1.IssueTelegramKeyRequest
+	48, // 55: mistgate.admin.v1.UserService.RotateTelegramKey:input_type -> mistgate.admin.v1.RotateTelegramKeyRequest
+	50, // 56: mistgate.admin.v1.UserService.RevokeTelegramKey:input_type -> mistgate.admin.v1.RevokeTelegramKeyRequest
+	6,  // 57: mistgate.admin.v1.UserService.GetUserConnection:input_type -> mistgate.admin.v1.GetUserConnectionRequest
+	14, // 58: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
+	21, // 59: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
+	24, // 60: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
+	26, // 61: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
+	30, // 62: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
+	32, // 63: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
+	34, // 64: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
+	36, // 65: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
+	38, // 66: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
+	40, // 67: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
+	42, // 68: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
+	45, // 69: mistgate.admin.v1.UserService.GetTelegramLinks:output_type -> mistgate.admin.v1.GetTelegramLinksResponse
+	47, // 70: mistgate.admin.v1.UserService.IssueTelegramKey:output_type -> mistgate.admin.v1.IssueTelegramKeyResponse
+	49, // 71: mistgate.admin.v1.UserService.RotateTelegramKey:output_type -> mistgate.admin.v1.RotateTelegramKeyResponse
+	51, // 72: mistgate.admin.v1.UserService.RevokeTelegramKey:output_type -> mistgate.admin.v1.RevokeTelegramKeyResponse
+	8,  // 73: mistgate.admin.v1.UserService.GetUserConnection:output_type -> mistgate.admin.v1.GetUserConnectionResponse
+	58, // [58:74] is the sub-list for method output_type
+	42, // [42:58] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_user_proto_init() }
@@ -5000,7 +4557,7 @@ func file_mistgate_admin_v1_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_user_proto_rawDesc), len(file_mistgate_admin_v1_user_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   53,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

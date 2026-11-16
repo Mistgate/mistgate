@@ -8,6 +8,7 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	trusttunnelv1 "github.com/mistgate/mistgate/gen/mistgate/trusttunnel/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	ttwire "github.com/mistgate/mistgate/internal/trusttunnel"
@@ -139,19 +140,19 @@ func TestTrustTunnelKeyAuditContainsNoCredentialOrLink(t *testing.T) {
 
 func TestTrustTunnelKeyRPCLifecycle(t *testing.T) {
 	r := newTrustTunnelKeyRig(t, 5, "acme_domain")
-	s := r.e.s
-	got, err := s.GetTrustTunnelLinks(r.e.ctx, req(&adminv1.GetTrustTunnelLinksRequest{UserId: r.userID}))
+	s := trustTunnelRPC{r.e.s}
+	got, err := s.GetTrustTunnelLinks(r.e.ctx, req(&trusttunnelv1.GetTrustTunnelLinksRequest{UserId: r.userID}))
 	if err != nil || got.Msg.HasKey || len(got.Msg.Links) != 0 {
 		t.Fatalf("initial GetTrustTunnelLinks = %+v, %v", got, err)
 	}
-	issued, err := s.IssueTrustTunnelKey(r.e.ctx, req(&adminv1.IssueTrustTunnelKeyRequest{UserId: r.userID}))
+	issued, err := s.IssueTrustTunnelKey(r.e.ctx, req(&trusttunnelv1.IssueTrustTunnelKeyRequest{UserId: r.userID}))
 	if err != nil || issued.Msg.TrustTunnel == nil || !issued.Msg.TrustTunnel.HasKey || len(issued.Msg.TrustTunnel.Links) != 1 || issued.Msg.TrustTunnel.Links[0].Url == "" {
 		t.Fatalf("IssueTrustTunnelKey = %+v, %v", issued, err)
 	}
 	if decoded, err := ttwire.DecodeDeepLink(issued.Msg.TrustTunnel.Links[0].Url); err != nil || decoded.Hostname != "de1.example.com" {
 		t.Fatalf("issued RPC URL = %+v, %v", decoded, err)
 	}
-	revoked, err := s.RevokeTrustTunnelKey(r.e.ctx, req(&adminv1.RevokeTrustTunnelKeyRequest{UserId: r.userID}))
+	revoked, err := s.RevokeTrustTunnelKey(r.e.ctx, req(&trusttunnelv1.RevokeTrustTunnelKeyRequest{UserId: r.userID}))
 	if err != nil || revoked.Msg.TrustTunnel == nil || revoked.Msg.TrustTunnel.HasKey || len(revoked.Msg.TrustTunnel.Links) != 0 {
 		t.Fatalf("RevokeTrustTunnelKey = %+v, %v", revoked, err)
 	}
@@ -399,7 +400,7 @@ func TestTrustTunnelKeyFollowsThePersonOnTheNodes(t *testing.T) {
 	if got := onNode(); got != 0 {
 		t.Fatalf("credentials on the node of a disabled person = %d, want 0", got)
 	}
-	if links := must(e.s.GetTrustTunnelLinks(e.ctx, req(&adminv1.GetTrustTunnelLinksRequest{UserId: r.userID}))).Msg; !links.HasKey || len(links.Links) != 0 {
+	if links := must(trustTunnelRPC{e.s}.GetTrustTunnelLinks(e.ctx, req(&trusttunnelv1.GetTrustTunnelLinksRequest{UserId: r.userID}))).Msg; !links.HasKey || len(links.Links) != 0 {
 		t.Fatalf("links of a disabled person = %+v, want the key kept and no link", links)
 	}
 	must(e.s.SetUsersEnabled(e.ctx, req(&adminv1.SetUsersEnabledRequest{UserIds: []string{r.userID}, Enabled: true})))

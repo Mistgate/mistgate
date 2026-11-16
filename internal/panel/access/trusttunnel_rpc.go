@@ -1,16 +1,28 @@
-//go:build !edge_link
+//go:build !js
 
 package access
 
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 
 	"connectrpc.com/connect"
-	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	trusttunnelv1 "github.com/mistgate/mistgate/gen/mistgate/trusttunnel/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/trusttunnel/v1/trusttunnelv1connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
+
+// The TrustTunnel key RPCs are a service of their own (proto/mistgate/trusttunnel/v1), so the Cloudflare edition, which does not
+// offer TrustTunnel, links neither the messages nor this code (trusttunnel_js.go).
+
+// TrustTunnelHandler returns the Connect path and handler of TrustTunnelService.
+func (s *Service) TrustTunnelHandler() (string, http.Handler) {
+	return trusttunnelv1connect.NewTrustTunnelServiceHandler(trustTunnelRPC{s}, handlerOpts...)
+}
+
+type trustTunnelRPC struct{ s *Service }
 
 // userForTrustTunnel resolves the owner-selected person for one of the key RPCs.
 func (s *Service) userForTrustTunnel(ctx context.Context, id string) (store.AccessUser, error) {
@@ -27,9 +39,9 @@ func (s *Service) userForTrustTunnel(ctx context.Context, id string) (store.Acce
 	return u, nil
 }
 
-func trustTunnelLinksProto(result TrustTunnelKeyLinks) *adminv1.GetTrustTunnelLinksResponse {
-	resp := &adminv1.GetTrustTunnelLinksResponse{
-		Links: make([]*adminv1.TrustTunnelLink, 0, len(result.Links)), HasKey: result.HasKey, KeyDeviceId: result.DeviceID,
+func trustTunnelLinksProto(result TrustTunnelKeyLinks) *trusttunnelv1.GetTrustTunnelLinksResponse {
+	resp := &trusttunnelv1.GetTrustTunnelLinksResponse{
+		Links: make([]*trusttunnelv1.TrustTunnelLink, 0, len(result.Links)), HasKey: result.HasKey, KeyDeviceId: result.DeviceID,
 	}
 	if !result.IssuedAt.IsZero() {
 		resp.KeyIssuedUnix = result.IssuedAt.Unix()
@@ -38,7 +50,7 @@ func trustTunnelLinksProto(result TrustTunnelKeyLinks) *adminv1.GetTrustTunnelLi
 		if srv.URI == "" && srv.Note == "" {
 			continue
 		}
-		link := &adminv1.TrustTunnelLink{
+		link := &trusttunnelv1.TrustTunnelLink{
 			NodeId: srv.NodeID, NodeName: srv.Node, ProfileId: srv.ProfileID, ProfileName: srv.Profile,
 			Url: srv.URI, HasIpv6: srv.IPv6Egress, Note: srv.Note,
 		}
@@ -51,7 +63,8 @@ func trustTunnelLinksProto(result TrustTunnelKeyLinks) *adminv1.GetTrustTunnelLi
 }
 
 // GetTrustTunnelLinks returns the user's key links. A read only: it makes no device and emits no fetch event.
-func (s *Service) GetTrustTunnelLinks(ctx context.Context, req *connect.Request[adminv1.GetTrustTunnelLinksRequest]) (*connect.Response[adminv1.GetTrustTunnelLinksResponse], error) {
+func (r trustTunnelRPC) GetTrustTunnelLinks(ctx context.Context, req *connect.Request[trusttunnelv1.GetTrustTunnelLinksRequest]) (*connect.Response[trusttunnelv1.GetTrustTunnelLinksResponse], error) {
+	s := r.s
 	u, err := s.userForTrustTunnel(ctx, req.Msg.UserId)
 	if err != nil {
 		return nil, err
@@ -64,7 +77,8 @@ func (s *Service) GetTrustTunnelLinks(ctx context.Context, req *connect.Request[
 }
 
 // IssueTrustTunnelKey makes the one counted key for an active person whose TrustTunnel switch is on.
-func (s *Service) IssueTrustTunnelKey(ctx context.Context, req *connect.Request[adminv1.IssueTrustTunnelKeyRequest]) (*connect.Response[adminv1.IssueTrustTunnelKeyResponse], error) {
+func (r trustTunnelRPC) IssueTrustTunnelKey(ctx context.Context, req *connect.Request[trusttunnelv1.IssueTrustTunnelKeyRequest]) (*connect.Response[trusttunnelv1.IssueTrustTunnelKeyResponse], error) {
+	s := r.s
 	u, err := s.userForTrustTunnel(ctx, req.Msg.UserId)
 	if err != nil {
 		return nil, err
@@ -85,11 +99,12 @@ func (s *Service) IssueTrustTunnelKey(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminv1.IssueTrustTunnelKeyResponse{TrustTunnel: trustTunnelLinksProto(links)}), nil
+	return connect.NewResponse(&trusttunnelv1.IssueTrustTunnelKeyResponse{TrustTunnel: trustTunnelLinksProto(links)}), nil
 }
 
 // RevokeTrustTunnelKey removes the key credential from all desired node states and frees its device-limit slot.
-func (s *Service) RevokeTrustTunnelKey(ctx context.Context, req *connect.Request[adminv1.RevokeTrustTunnelKeyRequest]) (*connect.Response[adminv1.RevokeTrustTunnelKeyResponse], error) {
+func (r trustTunnelRPC) RevokeTrustTunnelKey(ctx context.Context, req *connect.Request[trusttunnelv1.RevokeTrustTunnelKeyRequest]) (*connect.Response[trusttunnelv1.RevokeTrustTunnelKeyResponse], error) {
+	s := r.s
 	u, err := s.userForTrustTunnel(ctx, req.Msg.UserId)
 	if err != nil {
 		return nil, err
@@ -105,5 +120,5 @@ func (s *Service) RevokeTrustTunnelKey(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminv1.RevokeTrustTunnelKeyResponse{TrustTunnel: trustTunnelLinksProto(links)}), nil
+	return connect.NewResponse(&trusttunnelv1.RevokeTrustTunnelKeyResponse{TrustTunnel: trustTunnelLinksProto(links)}), nil
 }

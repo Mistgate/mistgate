@@ -293,25 +293,6 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	return d
 }
 
-func pageTrustTunnelOf(v access.SubView, lang string) *pageTrustTunnel {
-	tt := &pageTrustTunnel{Links: []pageTrustTunnelLink{}}
-	labels := serverLabels(v, lang)
-	for _, srv := range v.TrustTunnel {
-		if srv.URI == "" && srv.Note == "" {
-			continue
-		}
-		link := pageTrustTunnelLink{
-			Label: labels[srv.NodeID] + markText(srv.Mark, lang), CountryCode: strings.ToUpper(strings.TrimSpace(srv.CountryCode)),
-			Place: place(srv.Location), HasIPv6: srv.IPv6Egress, Note: srv.Note, URL: srv.URI,
-		}
-		if cc, ok := strings.CutPrefix(srv.Mark, access.MarkVia); ok {
-			link.Relay, link.Via = true, cc
-		}
-		tt.Links = append(tt.Links, link)
-	}
-	return tt
-}
-
 // linkNodes counts the nodes the subscription link carries, for any app (two profiles on one node are one server).
 func linkNodes(v access.SubView) int {
 	n := 0

@@ -1,5 +1,3 @@
-//go:build !edge_link
-
 package trusttunnel
 
 import (

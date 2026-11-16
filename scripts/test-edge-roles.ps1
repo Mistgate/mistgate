@@ -21,9 +21,7 @@ try {
     Push-Location $repoRoot
     try {
         foreach ($role in "public", "link", "jobs", "admin", "provision") {
-            $roleTags = "nethttpomithttp2"
-            if ($role -eq "link") { $roleTags += ",edge_link" }
-            & go build "-tags=$roleTags" -o (Join-Path $resolvedTempDir "$role.wasm") "./cmd/mistgate-edge-$role"
+            & go build "-tags=nethttpomithttp2" -o (Join-Path $resolvedTempDir "$role.wasm") "./cmd/mistgate-edge-$role"
             if ($LASTEXITCODE -ne 0) {
                 exit $LASTEXITCODE
             }

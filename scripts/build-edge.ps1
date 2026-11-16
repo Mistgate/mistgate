@@ -35,9 +35,7 @@ try {
     Invoke-Native "go build (js/wasm)" { go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o $wasm ./cmd/mistgate-edge }
     # The split edition's Workers (edge/worker/src/roles/*.ts) import dist/<role>.wasm.
     foreach ($role in "public", "link", "jobs", "admin", "provision") {
-        $roleTags = "nethttpomithttp2"
-        if ($role -eq "link") { $roleTags += ",edge_link" }
-        Invoke-Native "go build $role (js/wasm)" { go build "-tags=$roleTags" -ldflags="-s -w" -trimpath -o (Join-Path $dist "$role.wasm") "./cmd/mistgate-edge-$role" }
+        Invoke-Native "go build $role (js/wasm)" { go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o (Join-Path $dist "$role.wasm") "./cmd/mistgate-edge-$role" }
     }
 } finally {
     $env:GOOS = $previousGoos
