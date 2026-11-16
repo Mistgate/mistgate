@@ -24,6 +24,7 @@ import { ProfileService } from "@/gen/mistgate/admin/v1/profile_pb";
 import { ProvisioningService } from "@/gen/mistgate/admin/v1/provisioning_pb";
 import { RelayService } from "@/gen/mistgate/admin/v1/relay_pb";
 import { SubscriptionService } from "@/gen/mistgate/admin/v1/subscription_pb";
+import { SubscriptionHostService } from "@/gen/mistgate/admin/v1/subscription_host_pb";
 import { TelegramService } from "@/gen/mistgate/admin/v1/telegram_pb";
 import { TspuProbeService } from "@/gen/mistgate/admin/v1/tspu_probe_pb";
 import { UpdateService } from "@/gen/mistgate/admin/v1/update_pb";
@@ -55,6 +56,8 @@ export const provisioning = createClient(ProvisioningService, transport);
 export const users = createClient(UserService, transport);
 export const groups = createClient(GroupService, transport);
 export const subscriptions = createClient(SubscriptionService, transport);
+// The panel's public address on a node subdomain (subscription_host.proto); the VPS edition only.
+export const subHost = createClient(SubscriptionHostService, transport);
 export const dns = createClient(DnsService, transport);
 export const health = createClient(HealthService, transport);
 export const updates = createClient(UpdateService, transport);

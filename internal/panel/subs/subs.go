@@ -97,7 +97,11 @@ type Config struct {
 	Title string
 	// BaseURL is the public subscription address up to and including the prefix ("https://sub.example.com/k3xq8");
 	// the user's link is BaseURL + "/" + token. Empty: derived from the request (Host, TLS), good enough for tests.
-	BaseURL string
+	// Called on every use: the public address can change while the panel runs. nil = empty.
+	BaseURL func() string
+	// OnBaseURL, if set, registers fn to be called with the new BaseURL whenever it changes: its origin is then trusted
+	// by the cross-origin protection too.
+	OnBaseURL func(fn func(baseURL string))
 
 	// Settings is the subscription settings cache (what the admin edits); nil = the built-in defaults.
 	Settings *subsettings.Cache
@@ -314,13 +318,29 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 		readers = 8
 	}
 	h.debugReaders = make(chan struct{}, readers)
-	if o := originOf(cfg.BaseURL); o != "" {
-		// Behind a proxy that rewrites Host the Origin of a browser is still the public address.
-		if err := h.cop.AddTrustedOrigin(o); err != nil {
-			cfg.Log.Warn("subscription base URL is not a usable origin", "code", "subscription_base_origin_invalid", "err", err)
-		}
+	h.trustOrigin(cfg.baseURL())
+	if cfg.OnBaseURL != nil {
+		cfg.OnBaseURL(h.trustOrigin)
 	}
 	return h
+}
+
+// baseURL is the current BaseURL; "" when unset.
+func (c Config) baseURL() string {
+	if c.BaseURL == nil {
+		return ""
+	}
+	return c.BaseURL()
+}
+
+// trustOrigin makes the cross-origin protection accept the origin of a subscription base URL.
+func (h *handler) trustOrigin(base string) {
+	if o := originOf(base); o != "" {
+		// Behind a proxy that rewrites Host the Origin of a browser is still the public address.
+		if err := h.cop.AddTrustedOrigin(o); err != nil {
+			h.cfg.Log.Warn("subscription base URL is not a usable origin", "code", "subscription_base_origin_invalid", "err", err)
+		}
+	}
 }
 
 // originOf is "scheme://host[:port]" of a base URL, "" when it has none.

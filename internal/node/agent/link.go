@@ -29,6 +29,8 @@ type websocketAgentTransport struct {
 	link        *agentlink.Link
 	closeOnce   sync.Once
 	established bool
+	// onEstablished runs once the HelloAck arrived over this link (a new link address is then committed: hostrole.go).
+	onEstablished func()
 }
 
 func (s *websocketAgentTransport) Context() context.Context { return s.ctx }
@@ -72,7 +74,12 @@ func parseLinkBase(raw string) (*url.URL, error) {
 }
 
 func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(), error) {
-	base, err := parseLinkBase(a.cfg.LinkURL)
+	return a.dialLinkBase(ctx, a.linkURL())
+}
+
+// dialLinkBase dials the link of the panel at the link base address raw (wss://host/<secret-prefix>/).
+func (a *Agent) dialLinkBase(ctx context.Context, raw string) (*websocketAgentTransport, func(), error) {
+	base, err := parseLinkBase(raw)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -84,10 +91,15 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 	endpoint.Scheme = "wss"
 
 	client, cleanup := a.newLinkHTTPClient()
+	return a.dialLinkAt(ctx, endpoint.String(), base.Host, client, cleanup)
+}
 
+// dialLinkAt runs the link handshake at endpoint: the panel's challenge must name audience. cleanup releases client and
+// is returned with the transport (it is run here on a failure).
+func (a *Agent) dialLinkAt(ctx context.Context, endpoint, audience string, client *http.Client, cleanup func()) (*websocketAgentTransport, func(), error) {
 	hctx, cancel := context.WithTimeout(ctx, linkHandshakeTimeout)
 	defer cancel()
-	ws, _, err := websocket.Dial(hctx, endpoint.String(), &websocket.DialOptions{HTTPClient: client})
+	ws, _, err := websocket.Dial(hctx, endpoint, &websocket.DialOptions{HTTPClient: client})
 	if err != nil {
 		if cleanup != nil {
 			cleanup()
@@ -112,7 +124,7 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 		return refuse(errors.New("panel link challenge rejected"))
 	}
 	var challenge pb.LinkChallenge
-	if proto.Unmarshal(frame, &challenge) != nil || len(challenge.Nonce) != 32 || challenge.Audience != base.Host {
+	if proto.Unmarshal(frame, &challenge) != nil || len(challenge.Nonce) != 32 || challenge.Audience != audience {
 		return refuse(errors.New("panel link challenge rejected"))
 	}
 	id := a.id.Load()

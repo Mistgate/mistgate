@@ -22,15 +22,19 @@ import (
 
 // instanceAPI implements InstanceService on top of package instance.
 type instanceAPI struct {
-	st                *store.Store
-	log               *slog.Logger
-	adminURL, subBase string // shown to the owner only
+	st       *store.Store
+	log      *slog.Logger
+	adminURL string        // shown to the owner only
+	subBase  func() string // shown to the owner only; nil = none
 }
 
 // forOwner adds the addresses an owner may see to an Instance.
 func (a *instanceAPI) forOwner(ctx context.Context, in *adminv1.Instance) *adminv1.Instance {
 	if admin, ok := auth.AdminFrom(ctx); ok && admin.Role == store.RoleOwner {
-		in.AdminUrl, in.SubscriptionBase = a.adminURL, a.subBase
+		in.AdminUrl = a.adminURL
+		if a.subBase != nil {
+			in.SubscriptionBase = a.subBase()
+		}
 	}
 	return in
 }

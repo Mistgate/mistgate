@@ -125,6 +125,7 @@ describe("words of an approval", () => {
     const tools = [
       "user_create", "user_update", "user_disable", "user_enable", "user_reset_traffic", "device_revoke", "alert_mute", "alert_close", "node_fix", "rollout_start", "rollout_pause", "rollout_resume",
       "rollout_cancel", "os_rollout_start", "os_rollout_cancel", "node_update_schedule", "node_update_schedule_cancel", "update_timezone", "node_rollback", "node_install", "node_server_password_rotate", "node_server_keys_add",
+      "subscription_host_set", "subscription_host_move", "subscription_host_disable",
     ];
     for (const tool of tools) {
       expect(toolTitle(t, tool), tool).not.toBe(tool);
@@ -139,6 +140,7 @@ describe("words of an approval", () => {
       "dns_preset", "used", "scheduled_at", "scheduled_version", "timezone", "existing_schedule", "from", "to",
       "pending", "security", "kernel", "people_online", "reboot_required", "warning", "batch_size", "canary_position", "agent_version", "key_type", "fingerprint", "comment", "already_present",
       "ssh", "username", "host_key", "host_key_algorithm", "panel_ssh_key", "address", "installation", "recovery",
+      "domain", "dns", "subscription_host", "public_url",
     ];
     for (const k of keys) {
       expect(factLabel(t, k), k).not.toBe(k);

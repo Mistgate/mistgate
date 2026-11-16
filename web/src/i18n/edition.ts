@@ -2,7 +2,7 @@
 // (internal/panel/edition); the admin says so in these words instead of showing a button that does nothing. English is the
 // source of truth: `ru` is type-checked against it. The admin speaks «ты». Never rename an id: the server sends them.
 /** The feature ids MeResponse.unavailable carries (internal/panel/edition). */
-export const editionFeatures = ["backups", "mcp", "assistant", "health_checks", "agent_updates", "agent_logs", "panel_update", "decoy_own", "tspu_probe", "os_updates", "own_probes"] as const;
+export const editionFeatures = ["backups", "mcp", "assistant", "health_checks", "agent_updates", "agent_logs", "panel_update", "decoy_own", "tspu_probe", "os_updates", "own_probes", "subscription_host"] as const;
 export type EditionFeature = (typeof editionFeatures)[number];
 
 export const en = {
@@ -18,6 +18,7 @@ export const en = {
   "edition.feature.tspu_probe": "TSPU probe of the country check",
   "edition.feature.os_updates": "Operating-system updates of the servers",
   "edition.feature.own_probes": "Own probes",
+  "edition.feature.subscription_host": "Subscription address on a node",
   "edition.feature.assistant": "The assistant",
   // what to do instead, where there is something
   "edition.hint.mcp": "Tokens you already have are listed and can be revoked; new ones cannot be created yet.",
@@ -35,6 +36,7 @@ export const ru: typeof en = {
   "edition.feature.tspu_probe": "ТСПУ-зонд проверки из страны",
   "edition.feature.os_updates": "Обновления операционной системы серверов",
   "edition.feature.own_probes": "Свои зонды",
+  "edition.feature.subscription_host": "Адрес подписки на ноде",
   "edition.feature.assistant": "Ассистент",
   "edition.hint.mcp": "Уже выданные токены видны и отзываются; новые пока создать нельзя.",
 };
@@ -52,6 +54,7 @@ export const zh: typeof en = {
   "edition.feature.tspu_probe": "国家可达性检测的 TSPU 探测",
   "edition.feature.os_updates": "服务器操作系统更新",
   "edition.feature.own_probes": "自有探测点",
+  "edition.feature.subscription_host": "节点上的订阅地址",
   "edition.feature.assistant": "助手",
   "edition.hint.mcp": "已有的令牌可以查看和吊销，暂时无法创建新令牌。",
 };
@@ -68,6 +71,7 @@ export const fa: typeof en = {
   "edition.feature.tspu_probe": "نقطهٔ سنجش TSPU در بررسی از داخل کشور",
   "edition.feature.os_updates": "به‌روزرسانی سیستم‌عامل سرورها",
   "edition.feature.own_probes": "نقاط سنجش خودت",
+  "edition.feature.subscription_host": "نشانی اشتراک روی نود",
   "edition.feature.assistant": "دستیار",
   "edition.hint.mcp": "توکن‌هایی که قبلاً صادر شده‌اند دیده و ابطال می‌شوند؛ ساختن توکن جدید هنوز ممکن نیست.",
 };
@@ -84,6 +88,7 @@ export const tr: typeof en = {
   "edition.feature.tspu_probe": "Ülke kontrolünün TSPU ölçüm noktası",
   "edition.feature.os_updates": "Sunucuların işletim sistemi güncellemeleri",
   "edition.feature.own_probes": "Kendi ölçüm noktaların",
+  "edition.feature.subscription_host": "Düğümde abonelik adresi",
   "edition.feature.assistant": "Asistan",
   "edition.hint.mcp": "Daha önce verilmiş token'lar listelenir ve iptal edilebilir; yenileri henüz oluşturulamaz.",
 };

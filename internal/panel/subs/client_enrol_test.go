@@ -140,7 +140,7 @@ func newEnrolEnvWith(t *testing.T, mut func(*subs.Config, *store.Store)) *enrolE
 	t.Cleanup(func() { st.Close() })
 	v, _ := vault.New(make([]byte, vault.KeySize))
 	state := &stateCounter{}
-	svc, err := access.New(st, v, builtin.Registry(), state, nil, access.Config{SubscriptionBaseURL: "https://sub.example.com/k3xq8", Log: log})
+	svc, err := access.New(st, v, builtin.Registry(), state, nil, access.Config{SubscriptionBaseURL: func() string { return "https://sub.example.com/k3xq8" }, Log: log})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +511,7 @@ func TestEnrolAnswersOnceWithAKeyOfItsOwn(t *testing.T) {
 
 // base must not come from a Host header: without a configured public address enrol is not available.
 func TestEnrolNeedsAConfiguredPublicAddress(t *testing.T) {
-	e := newEnrolEnv(t, func(c *subs.Config) { c.BaseURL = ""; c.Prefix = "/k3xq8" })
+	e := newEnrolEnv(t, func(c *subs.Config) { c.BaseURL = nil; c.Prefix = "/k3xq8" })
 	e.switchAPI(true)
 	_, tok := e.user("alice", nil)
 	req := httptest.NewRequest("POST", "/k3xq8/"+tok+"/client/enrol", strings.NewReader(enrolBody(hwidA)))

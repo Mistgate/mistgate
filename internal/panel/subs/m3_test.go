@@ -957,7 +957,10 @@ func TestSelfServiceRoutesAreOnlyForPOSTWithAToken(t *testing.T) {
 // Cross-origin browsers cannot post; same-origin ones and non-browser clients (curl) can.
 func TestSelfServiceCrossOrigin(t *testing.T) {
 	m := newM3Rig(t)
-	h, _ := m.handler(func(c *subs.Config) { c.BaseURL = "https://sub.example.com/k3xq8"; c.MaxWritesPerHour = -1 })
+	h, _ := m.handler(func(c *subs.Config) {
+		c.BaseURL = func() string { return "https://sub.example.com/k3xq8" }
+		c.MaxWritesPerHour = -1
+	})
 	_, tok := m.newUser("alice", func(c *adminv1.CreateUserRequest) { c.DeviceLimit = 50 })
 	c := call{h, t, tok}
 	for name, hdr := range map[string][]string{

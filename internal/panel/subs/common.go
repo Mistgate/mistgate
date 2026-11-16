@@ -91,8 +91,8 @@ func (c *common) title(set *adminv1.SubscriptionSettings, b instance.Settings) s
 
 // link is the subscription URL of a token.
 func (c *common) link(r *http.Request, token string) string {
-	if c.cfg.BaseURL != "" {
-		return strings.TrimRight(c.cfg.BaseURL, "/") + "/" + token
+	if base := c.cfg.baseURL(); base != "" {
+		return strings.TrimRight(base, "/") + "/" + token
 	}
 	scheme := "http"
 	if r.TLS != nil {

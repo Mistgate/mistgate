@@ -31,13 +31,34 @@ func cmdEnroll(args []string) int {
 	stateDir := fs.String("state-dir", envOr("MISTGATE_NODE_STATE_DIR", defaultStateDir), "state directory")
 	force := fs.Bool("force", false, "replace an existing identity")
 	resumeKey := fs.Bool("resume-key", false, "persist the pending key so an interrupted SSH enrollment can be retried safely")
+	offlineCSR := fs.Bool("offline-csr", false, "offline enrollment, step 1: keep a new key and print its CSR for the panel")
+	offlineFinish := fs.Bool("offline-finish", false, "offline enrollment, step 2: read the node certificate and the CA certificate (PEM) from stdin")
+	nodeID := fs.String("node-id", "", "with --offline-finish: the node id the panel gave")
+	tunnelSNI := fs.String("tunnel-sni", "", "with --offline-finish: the SNI of the panel's subscription-host tunnel")
+	tunnelName := fs.String("tunnel-name", "", "with --offline-finish: the subscription name this node forwards to the panel")
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), "usage: mistgate-node enroll (--panel <host:port> --sni <name> | --link-url <wss://host/prefix/>) --ca-sha256 <hex> (--token <token> | --token-stdin) [--state-dir dir]\n"+
+			"       mistgate-node enroll --offline-csr [--state-dir dir]\n"+
+			"       mistgate-node enroll --offline-finish --node-id <id> --ca-sha256 <hex> --link-url <wss://host/prefix/> --tunnel-sni <name> --tunnel-name <name> [--state-dir dir] < node-and-ca.pem\n"+
 			"The panel prints the --token form when you add a node. Use --token-stdin to keep the token out of process arguments.\n\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *offlineCSR || *offlineFinish {
+		explicit := map[string]bool{}
+		fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
+		if *offlineCSR && *offlineFinish || explicit["token"] || explicit["token-stdin"] || explicit["panel"] || explicit["sni"] {
+			fmt.Fprintln(os.Stderr, "enroll: --offline-csr and --offline-finish exclude each other and --token, --token-stdin, --panel and --sni")
+			return 2
+		}
+		if *offlineCSR {
+			return enrollOfflineCSR(*stateDir, *force)
+		}
+		return enrollOfflineFinish(os.Stdin, agent.OfflineEnrollConfig{
+			StateDir: *stateDir, NodeID: *nodeID, CASHA256: *pin, LinkURL: *linkURL, TunnelSNI: *tunnelSNI, TunnelName: *tunnelName, Force: *force,
+		})
 	}
 	resolvedToken, err := resolveEnrollmentToken(os.Stdin, *token, os.Getenv("MISTGATE_ENROLL_TOKEN"), *tokenStdin)
 	if err != nil {

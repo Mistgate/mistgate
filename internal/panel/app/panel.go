@@ -48,12 +48,12 @@ type InstanceConfig struct {
 
 // linkURL is the base of the signed agent link (and of link-only enrolment): wss:// + the public host + the secret
 // prefix. "" when the panel has no public URL or no link prefix.
-func linkURL(in InstanceConfig) string {
-	u, err := url.Parse(in.PublicURL)
-	if err != nil || u.Host == "" || in.LinkPrefix == "" {
+func linkURL(publicURL, linkPrefix string) string {
+	u, err := url.Parse(publicURL)
+	if err != nil || u.Host == "" || linkPrefix == "" {
 		return ""
 	}
-	return "wss://" + u.Host + in.LinkPrefix
+	return "wss://" + u.Host + linkPrefix
 }
 
 // provisionLinkURL is the link an SSH install enrols the node over. Edge agents are link-only (no mTLS endpoint to dial),
@@ -62,7 +62,7 @@ func provisionLinkURL(edge bool, in InstanceConfig) string {
 	if !edge {
 		return ""
 	}
-	return linkURL(in)
+	return linkURL(in.PublicURL, in.LinkPrefix)
 }
 
 // forwardProvision is the ProvisioningService mount: the marker that sends the call to the Provisioner when forwarding, else

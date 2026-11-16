@@ -899,6 +899,8 @@ message Hello {
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
   // "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
   // by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
+  // "host-tunnel/1" (NodeSettings.host_tunnel: the node can be the subscription host) and "panel-link/1"
+  // (NodeSettings.panel_link_url: the agent switches to a new panel link address on its own).
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
   // Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -1720,6 +1722,22 @@ message NodeSettings {
   // The panel explicitly asks a capable agent to read local apt/dpkg/kernel state and send OsStatus snapshots.
   // False is the default; old panels leave the agent silent and running no apt simulation.
   bool os_status = 15;
+  // This node is the subscription host (issue #48): on its TCP 443 it routes the TLS of forward_names into the panel over
+  // a tunnel the panel dials to it with tunnel_sni. Absent or an empty tunnel_sni = the role is off. Read only by agents
+  // with "host-tunnel/1".
+  HostTunnel host_tunnel = 16;
+  // The panel's link address the agent should use from now on (the base URL, as at enrollment). Empty = no change. The
+  // agent tries it, keeps the old address as fallback until a session on the new one succeeds, then saves it. Read only
+  // by agents with "panel-link/1".
+  string panel_link_url = 17;
+}
+
+// HostTunnel is the subscription-host role of a node (NodeSettings.host_tunnel).
+message HostTunnel {
+  // The secret SNI the panel's tunnel connection presents on the node's TCP 443. The panel's certificate names it.
+  string tunnel_sni = 1;
+  // Hostnames whose TLS connections on TCP 443 go into the panel through the tunnel.
+  repeated string forward_names = 2;
 }
 
 message DesiredState {

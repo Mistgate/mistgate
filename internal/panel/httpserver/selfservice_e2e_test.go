@@ -27,7 +27,7 @@ func TestSelfServiceThroughThePublicListener(t *testing.T) {
 	})
 	ctx := context.Background()
 	v, _ := vault.New(make([]byte, vault.KeySize))
-	svc, err := access.New(e.st, v, builtin.Registry(), nil, nil, access.Config{SubscriptionBaseURL: "https://sub.example.com" + strings.TrimSuffix(subPrefix, "/")})
+	svc, err := access.New(e.st, v, builtin.Registry(), nil, nil, access.Config{SubscriptionBaseURL: func() string { return "https://sub.example.com" + strings.TrimSuffix(subPrefix, "/") }})
 	if err != nil {
 		t.Fatal(err)
 	}

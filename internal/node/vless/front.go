@@ -27,6 +27,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/certs"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/nets"
+	"github.com/mistgate/mistgate/internal/node/subhost"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -48,8 +49,9 @@ type site struct {
 
 // startSite listens on a fresh internal socket and serves the site. It must be up before the REALITY listener starts: the
 // first thing that listener does is to measure the target's post-handshake records, and a target that does not answer
-// leaves empty lengths for the life of the process (design/vless.md section 7.5).
-func startSite(id string, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), h http.Handler) (*site, error) {
+// leaves empty lengths for the life of the process (design/vless.md section 7.5). wrap, when not nil, wraps the listener
+// before it is served (engine.Env.SiteListener).
+func startSite(id string, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), h http.Handler, wrap func(net.Listener) net.Listener) (*site, error) {
 	network, addr, cleanup, err := siteSocketFn(id)
 	if err != nil {
 		return nil, err
@@ -58,6 +60,9 @@ func startSite(id string, cert func(*tls.ClientHelloInfo) (*tls.Certificate, err
 	if err != nil {
 		cleanup()
 		return nil, fmt.Errorf("site listener: %w", err)
+	}
+	if wrap != nil {
+		ln = wrap(ln)
 	}
 	srv := &http.Server{
 		Handler: h,
@@ -358,7 +363,12 @@ func (in *inbound) startSelfSite(ctx context.Context) (*site, engine.Cert, error
 	if h == nil {
 		h = decoy.Handler()
 	}
-	s, err := startSite(in.spec.ID, certs.SiteCertificate(acmeCert, fallback), h)
+	// REALITY passes the visitor's address in a PROXY v2 header (Xver 2 in buildCoreConfig); the site strips it.
+	wrap := in.e.env.SiteWrap(in.spec.Listen.Port, true)
+	if wrap == nil {
+		wrap = subhost.ProxyListener
+	}
+	s, err := startSite(in.spec.ID, certs.SiteCertificate(acmeCert, fallback), h, wrap)
 	if err != nil {
 		return nil, engine.Cert{}, err
 	}

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -73,7 +74,7 @@ func (k *keyPair) get() *tls.Certificate {
 // the fleet's TLS config (mutual TLS) before any of that. It returns the autocert
 // manager too (nil without ACME) for the HTTP-01 / redirect listener.
 func (s *Server) publicTLS(o ServeOptions) (*tls.Config, *autocert.Manager, error) {
-	if o.TLSCert == "" && len(o.ACMEDomains) == 0 {
+	if o.TLSCert == "" && len(o.ACMEDomains) == 0 && s.cfg.PublicTunnel == nil {
 		return nil, nil, nil
 	}
 	cfg := &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"h2", "http/1.1"}}
@@ -86,28 +87,40 @@ func (s *Server) publicTLS(o ServeOptions) (*tls.Config, *autocert.Manager, erro
 	}
 	var mgr *autocert.Manager
 	acmeNames := map[string]bool{}
-	if len(o.ACMEDomains) > 0 {
-		for _, d := range o.ACMEDomains {
-			d = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(d), "."))
-			if d == "" || !strings.Contains(d, ".") || strings.ContainsAny(d, "*/: ") {
-				return nil, nil, fmt.Errorf("acme domain %q: need a plain host name like example.com", d)
-			}
-			acmeNames[d] = true
+	for _, d := range o.ACMEDomains {
+		d = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(d), "."))
+		if d == "" || !strings.Contains(d, ".") || strings.ContainsAny(d, "*/: ") {
+			return nil, nil, fmt.Errorf("acme domain %q: need a plain host name like example.com", d)
 		}
-		names := make([]string, 0, len(acmeNames))
-		for d := range acmeNames {
-			names = append(names, d)
+		acmeNames[d] = true
+	}
+	// isACMEName: one of the static ACME domains, or the extra host of the moment.
+	isACMEName := func(name string) bool {
+		if acmeNames[name] {
+			return true
 		}
+		if s.cfg.ExtraACMEHost == nil {
+			return false
+		}
+		extra := normSNI(s.cfg.ExtraACMEHost())
+		return extra != "" && name == extra
+	}
+	if len(o.ACMEDomains) > 0 || s.cfg.PublicTunnel != nil {
 		mgr = &autocert.Manager{
-			Prompt:     autocert.AcceptTOS,
-			HostPolicy: autocert.HostWhitelist(names...),
-			Cache:      autocert.DirCache(o.ACMEDir),
-			Email:      o.ACMEEmail,
+			Prompt: autocert.AcceptTOS,
+			HostPolicy: func(_ context.Context, host string) error {
+				if !isACMEName(normSNI(host)) {
+					return fmt.Errorf("acme: host %q not configured", host)
+				}
+				return nil
+			},
+			Cache: autocert.DirCache(o.ACMEDir),
+			Email: o.ACMEEmail,
 		}
 		cfg.NextProtos = append(cfg.NextProtos, acme.ALPNProto)
 	}
 	cfg.GetCertificate = func(h *tls.ClientHelloInfo) (*tls.Certificate, error) {
-		useACME := mgr != nil && (static == nil || acmeNames[normSNI(h.ServerName)] || wantsACMEChallenge(h))
+		useACME := mgr != nil && (static == nil || isACMEName(normSNI(h.ServerName)) || wantsACMEChallenge(h))
 		switch {
 		case useACME:
 			return mgr.GetCertificate(h)

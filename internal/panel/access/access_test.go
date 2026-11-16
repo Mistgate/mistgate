@@ -76,7 +76,7 @@ func newEnv(t *testing.T) *env {
 	}
 	e := &env{t: t, st: st, notify: &fakeNotify{}, online: fakeOnline{}, clock: ts("2026-09-30T12:00:00Z"), ctx: ctx}
 	limiter := securitylimit.NewMemory(func() time.Time { return e.clock }, 0)
-	s, err := New(st, v, builtin.Registry(), e.notify, e.online, Config{SubscriptionBaseURL: "https://sub.example.com/k3xq/", StepUp: func(context.Context) error { return nil }, Limiter: limiter})
+	s, err := New(st, v, builtin.Registry(), e.notify, e.online, Config{SubscriptionBaseURL: func() string { return "https://sub.example.com/k3xq/" }, StepUp: func(context.Context) error { return nil }, Limiter: limiter})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1201,7 +1201,7 @@ func TestSubscriptionSelfSignedNeedsPin(t *testing.T) {
 
 func TestSubscriptionLinkNeedsBase(t *testing.T) {
 	e := newEnv(t)
-	e.s.cfg.SubscriptionBaseURL = ""
+	e.s.cfg.SubscriptionBaseURL = nil
 	g := e.group("g")
 	_, err := e.s.CreateUser(e.ctx, req(&adminv1.CreateUserRequest{Name: "u", GroupId: g}))
 	wantMsg(t, err, "failed_precondition: sub_address_missing")

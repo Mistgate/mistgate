@@ -198,7 +198,7 @@ func newEnv(t *testing.T, mut ...func(*Config)) *env {
 		t.Fatal(err)
 	}
 	reg := builtin.Registry()
-	acc, err := access.New(st, v, reg, nil, nil, access.Config{SubscriptionBaseURL: "https://sub.example.com/k3xq/"})
+	acc, err := access.New(st, v, reg, nil, nil, access.Config{SubscriptionBaseURL: func() string { return "https://sub.example.com/k3xq/" }})
 	if err != nil {
 		t.Fatal(err)
 	}

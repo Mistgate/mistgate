@@ -372,8 +372,9 @@ type world struct {
 	adminv1connect.UnimplementedRelayServiceHandler
 	opsv1connect.UnimplementedOpsServiceHandler
 
-	loadHours     []uint32 // GetFleetLoad windows (tools_capacity_test.go)
-	withResources bool     // GetNode of nodeA carries the resource fields of a current agent
+	loadHours     []uint32    // GetFleetLoad windows (tools_capacity_test.go)
+	withResources bool        // GetNode of nodeA carries the resource fields of a current agent
+	subhost       fakeSubHost // SubscriptionHostService (tools_subhost_test.go)
 
 	rotateReq           []*adminv1.RotateNodeServerPasswordRequest
 	installReq          []*adminv1.StartNodeProvisionRequest
@@ -1983,6 +1984,7 @@ func (w *world) api(a *fakeAuth) http.Handler {
 		func() (string, http.Handler) { return probev1connect.NewProbeServiceHandler(w) },
 		func() (string, http.Handler) { return opsv1connect.NewOpsServiceHandler(w) },
 		func() (string, http.Handler) { return tasksv1connect.NewTasksServiceHandler(w.tasks) },
+		func() (string, http.Handler) { return adminv1connect.NewSubscriptionHostServiceHandler(&w.subhost) },
 	} {
 		p, hh := h()
 		mux.Handle(p, hh)

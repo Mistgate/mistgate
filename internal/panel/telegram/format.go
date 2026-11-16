@@ -901,6 +901,9 @@ var toolTitles = map[string]localizedText{
 	"node_server_key_remove":      {en: "Remove a node SSH key", ru: "Удалить SSH-ключ ноды", zh: "移除节点 SSH 密钥"},
 	"subscription_app_upsert":     {en: "Add or change an app on the user page", ru: "Добавить или изменить приложение на странице пользователя", zh: "添加或更改用户页面上的应用"},
 	"subscription_app_remove":     {en: "Remove an app from the user page", ru: "Убрать приложение со страницы пользователя", zh: "移除用户页面上的应用"},
+	"subscription_host_set":       {en: "Move the panel address onto a node subdomain", ru: "Перенести адрес панели на поддомен ноды", zh: "将面板地址迁移到节点子域名"},
+	"subscription_host_move":      {en: "Change the subscription host’s node", ru: "Сменить ноду хоста подписок", zh: "更换订阅主机的节点"},
+	"subscription_host_disable":   {en: "Turn the subscription host off", ru: "Отключить хост подписок", zh: "关闭订阅主机"},
 }
 
 // planWaitingText says an agent's plan waits for the owner. It never says what the plan contains beyond the tool's title:

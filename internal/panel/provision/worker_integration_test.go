@@ -388,6 +388,27 @@ type e2eNodeManager struct {
 	state           string
 	enrollmentToken string
 	connected       bool
+	enrollments     int      // CreateProvisionEnrollment calls
+	sessionCSRs     [][]byte // EnrollInSession calls, in order
+}
+
+const e2eSessionNodeID = "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+var (
+	e2eSessionCert = []byte("-----BEGIN CERTIFICATE-----\nbm9kZQ==\n-----END CERTIFICATE-----\n")
+	e2eSessionCA   = []byte("-----BEGIN CERTIFICATE-----\nY2E=\n-----END CERTIFICATE-----\n")
+)
+
+// EnrollInSession takes the current token once, like the fleet: a second use is refused.
+func (m *e2eNodeManager) EnrollInSession(_ context.Context, token string, csr []byte) (string, []byte, []byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if token == "" || token != m.enrollmentToken {
+		return "", nil, nil, errors.New("token refused")
+	}
+	m.enrollmentToken, m.state = "", "active"
+	m.sessionCSRs = append(m.sessionCSRs, append([]byte(nil), csr...))
+	return e2eSessionNodeID, e2eSessionCert, e2eSessionCA, nil
 }
 
 func TestWaitOnlineStopsWhenNodeIsRetired(t *testing.T) {
@@ -452,6 +473,7 @@ func (m *e2eNodeManager) CreateProvisionEnrollment(_ context.Context, _ NodeSpec
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.state, m.enrollmentToken = "pending", "one-time-enrollment-secret"
+	m.enrollments++
 	return m.enrollmentToken, strings.Repeat("a", 64), nil
 }
 

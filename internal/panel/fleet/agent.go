@@ -52,6 +52,7 @@ type session struct {
 	done       chan struct{} // closed when the Connect handler returns
 	out        chan *agentv1.ConnectResponse
 	alarmTimer *time.Timer
+	via        string // the Host a link session dialled; "" for mTLS
 
 	coreMu    sync.Mutex
 	core      *SessionCore
@@ -453,6 +454,9 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		done: make(chan struct{}), out: make(chan *agentv1.ConnectResponse, outQueue),
 		replies: map[string]chan *agentv1.ConnectRequest{},
 		logs:    map[string]*logSub{}, core: core, coreState: state, alarmTimer: alarmTimer}
+	if v, ok := stream.(interface{ via() string }); ok {
+		s.via = v.via()
+	}
 	s.coreMu.Lock()
 	if !f.register(s) {
 		s.coreMu.Unlock()
@@ -729,6 +733,12 @@ func settingsSig(s *agentv1.NodeSettings) string {
 	}
 	if s.GetOsStatus() {
 		sig += "|os-status=1"
+	}
+	if t := s.GetHostTunnel(); t != nil { // absent unless the node is the subscription host: other signatures stay as they were
+		sig += "|host-tunnel=" + t.GetTunnelSni() + "/" + strings.Join(t.GetForwardNames(), ",")
+	}
+	if s.PanelLinkUrl != "" {
+		sig += "|panel-link=" + s.PanelLinkUrl
 	}
 	return sig
 }

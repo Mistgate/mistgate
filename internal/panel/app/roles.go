@@ -94,6 +94,9 @@ func Build(c Config) (*Panel, error) {
 	}
 	cfg.AgentSNI, cfg.AgentTLS, cfg.AgentHandler = k.in.AgentSNI, k.fl.AgentTLSConfig, k.fl.AgentHandler()
 	cfg.AgentLinkPrefix, cfg.AgentLinkHandler = k.in.LinkPrefix, link
+	if k.sub != nil { // the subscription host: its tunnels feed the public handler, and its subdomain gets a certificate
+		cfg.PublicTunnel, cfg.ExtraACMEHost = k.sub.PublicListener(), k.sub.ACMEHost
+	}
 	return k.finish(cfg, prov, bkp, true)
 }
 
@@ -214,7 +217,7 @@ func (k *core) baseHTTP() httpserver.Config {
 		TrustedOrigins: k.in.RPOrigins,
 		Log:            k.log,
 		// Settings -> Domains shows the owner both addresses, read-only.
-		AdminURL: k.in.AdminURL(), SubscriptionBase: k.subBase,
+		AdminURL: k.in.AdminURL(), SubscriptionBase: k.subBaseURL,
 	}
 }
 
@@ -252,6 +255,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	}
 	cfg.AdminHandlers = append(cfg.AdminHandlers, probeAdminHandlers(k.fl)...)     // probes between nodes: the VPS only
 	cfg.AdminHandlers = append(cfg.AdminHandlers, ownProbeAdminHandlers(k.own)...) // the panel's own probes: the VPS only
+	cfg.AdminHandlers = append(cfg.AdminHandlers, subHostAdminHandlers(k.sub)...)  // the subscription host: the VPS only
 	// API tokens and the owner's approvals, then the MCP endpoint over the same admin API.
 	cfg.AdminHandlers = append(cfg.AdminHandlers, integrationHandlers(k.authSvc)...)
 	if path, handler := k.assistantHandler(); path != "" {
@@ -300,6 +304,17 @@ func (k *core) newProvision() (*nodeprovision.Service, error) {
 	provCfg := nodeprovision.Config{
 		StepUp: k.authSvc.RequireStepUp, Nodes: k.fl, Binaries: binaries, SSH: c.SSHClient,
 		PanelAddr: c.PanelAddr, LinkURL: provisionLinkURL(k.edge, k.in), AgentSNI: k.in.AgentSNI, Log: k.log,
+		LinkPrefix: k.in.LinkPrefix,
+	}
+	if sub := k.sub; sub != nil { // the VPS edition: the first subscription host installs over SSH, and while there is
+		// one a new node enrols over the link behind it (the panel may be reachable only through it)
+		provCfg.SubHost = sub
+		provCfg.EnrollLinkURL = func() string {
+			if sub.State() == "" {
+				return ""
+			}
+			return linkURL(k.addr.PublicURL(), k.in.LinkPrefix)
+		}
 	}
 	if c.ProvisionKick != nil {
 		provCfg.Kick = func() {

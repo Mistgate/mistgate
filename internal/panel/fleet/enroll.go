@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"net"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -92,20 +93,11 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 	default:
 		tokenHash = hashToken(m.EnrollmentToken)
 	}
-	pub, err := parseCSR(m.CsrDer)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	keyDER, err := x509.MarshalPKIXPublicKey(pub)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("bad CSR key"))
-	}
-	keyHash := sha256.Sum256(keyDER)
-
-	res, err := f.st.Enroll(ctx, tokenHash, keyHash[:], now, func(nodeID string) (store.CertRow, error) {
-		return f.ca.issueNode(nodeID, pub, now)
-	})
+	res, err := f.enrollNode(ctx, tokenHash, m.CsrDer, m.AgentVersion, now)
+	var bad *badCSRError
 	switch {
+	case errors.As(err, &bad):
+		return nil, connect.NewError(connect.CodeInvalidArgument, bad.error)
 	case errors.Is(err, store.ErrEnrollToken):
 		return nil, deny()
 	case errors.Is(err, store.ErrNodeRetired):
@@ -114,11 +106,6 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 		f.log.Error("enroll", "err", err)
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
-	if !res.Replay {
-		f.event(ctx, 1, "node_enrolled", res.NodeID, map[string]string{"agent_version": m.AgentVersion})
-		// Re-enrollment revoked the older certificates: a stream that still runs on one of them must go.
-		f.drop(ctx, res.NodeID, "node re-enrolled")
-	}
 	return connect.NewResponse(&agentv1.EnrollResponse{
 		NodeId:           res.NodeID,
 		CertificatePem:   res.Cert.PEM,
@@ -126,6 +113,32 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 		NotAfterUnix:     res.Cert.NotAfter.Unix(),
 		RenewAfterUnix:   res.Cert.NotAfter.Add(-renewBefore).Unix(),
 	}), nil
+}
+
+// enrollNode exchanges an enrolment token (by hash) and a CSR for a node certificate: what Enroll and EnrollInSession
+// share. A bad CSR is a *badCSRError; an unknown or used token is store.ErrEnrollToken; a retired node store.ErrNodeRetired.
+func (f *Fleet) enrollNode(ctx context.Context, tokenHash, csrDER []byte, agentVersion string, now time.Time) (store.EnrollResult, error) {
+	pub, err := parseCSR(csrDER)
+	if err != nil {
+		return store.EnrollResult{}, &badCSRError{err}
+	}
+	keyDER, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return store.EnrollResult{}, &badCSRError{errors.New("bad CSR key")}
+	}
+	keyHash := sha256.Sum256(keyDER)
+	res, err := f.st.Enroll(ctx, tokenHash, keyHash[:], now, func(nodeID string) (store.CertRow, error) {
+		return f.ca.issueNode(nodeID, pub, now)
+	})
+	if err != nil {
+		return res, err
+	}
+	if !res.Replay {
+		f.event(ctx, 1, "node_enrolled", res.NodeID, map[string]string{"agent_version": agentVersion})
+		// Re-enrollment revoked the older certificates: a stream that still runs on one of them must go.
+		f.drop(ctx, res.NodeID, "node re-enrolled")
+	}
+	return res, nil
 }
 
 // badCSRError marks a certificate request the panel refuses (the caller's fault, not an internal failure).

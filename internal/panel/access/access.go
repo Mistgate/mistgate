@@ -55,7 +55,8 @@ type AfterResponseRunner func(func())
 type Config struct {
 	// SubscriptionBaseURL is the public subscription address up to and including the secret prefix, e.g.
 	// "https://sub.example.com/k3xq8"; the user's token is appended after a slash.
-	SubscriptionBaseURL string
+	// Called on every use: the public address can change while the panel runs. nil = none.
+	SubscriptionBaseURL func() string
 	// StepUp is auth.Service.RequireStepUp. A nil callback denies destructive user deletion.
 	StepUp        func(context.Context) error
 	Log           *slog.Logger

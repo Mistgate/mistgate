@@ -267,7 +267,7 @@ func TestALockedOutEntryIsRefusedBeforeTheTokenIsLookedUp(t *testing.T) {
 // The cookie is Secure only when the instance's public URL is https: from an http page a browser would drop it, and
 // the page could never be unlocked.
 func TestCookieOfAPlainHTTPInstanceIsNotSecure(t *testing.T) {
-	g := newGate(t, func(c *subs.Config) { c.BaseURL = "http://sub.example.com/k3xq8" })
+	g := newGate(t, func(c *subs.Config) { c.BaseURL = func() string { return "http://sub.example.com/k3xq8" } })
 	uid, tok := g.newUser("alice", nil)
 	rec := g.unlock(t, tok, g.password(uid))
 	if rec.Code != 200 {
@@ -451,7 +451,7 @@ func TestNoKeyMeansNoGate(t *testing.T) { // a handler built without the panel's
 }
 
 func TestUnlockOnlyForPostCrossOriginAndKnownTokens(t *testing.T) {
-	g := newGate(t, func(c *subs.Config) { c.BaseURL = "https://sub.example.com/k3xq8" })
+	g := newGate(t, func(c *subs.Config) { c.BaseURL = func() string { return "https://sub.example.com/k3xq8" } })
 	uid, tok := g.newUser("alice", nil)
 	pw := g.password(uid)
 	if rec := fetch(g.h, "/"+tok+"/unlock", chrome); rec.Code != 404 {

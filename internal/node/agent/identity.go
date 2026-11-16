@@ -64,6 +64,54 @@ type Meta struct {
 	// Link is the wss://host/<secret-prefix>/ the agent enrolled through. Set = link-only: the agent never dials mTLS
 	// (Panel and SNI are empty), renews over its link session and lists no self-update.
 	Link string `json:"link,omitempty"`
+	// NextLink is a new link address the panel sent (NodeSettings.panel_link_url) or `set-panel` saved. The agent tries it
+	// in turn with its current one and makes it Link once a session over it succeeds.
+	NextLink string `json:"next_link,omitempty"`
+	// Tunnel is the subscription-host role (NodeSettings.host_tunnel); nil = off.
+	Tunnel *TunnelMeta `json:"tunnel,omitempty"`
+}
+
+// TunnelMeta is the subscription-host role of the node: the panel's tunnel arrives on TCP 443 with SNI, and the TLS of
+// Names goes through it into the panel.
+type TunnelMeta struct {
+	SNI   string   `json:"sni"`
+	Names []string `json:"names"`
+}
+
+// saveMeta writes agent.json.
+func saveMeta(dir string, m Meta) error {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(filepath.Join(dir, fileMeta), b, 0o600)
+}
+
+// SetPanelLink saves linkURL as the panel link address the agent tries next (Meta.NextLink); the running agent reads it
+// at its next start.
+func SetPanelLink(stateDir, linkURL string) error {
+	if _, err := parseLinkBase(linkURL); err != nil {
+		return fmt.Errorf("--link-url: %w", err)
+	}
+	if !IsEnrolled(stateDir) {
+		return errors.New("node is not enrolled")
+	}
+	raw, err := os.ReadFile(filepath.Join(stateDir, fileMeta))
+	if errors.Is(err, os.ErrNotExist) {
+		return errors.New("node is not enrolled")
+	} else if err != nil {
+		return err
+	}
+	var m Meta
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return fmt.Errorf("%s: %w", fileMeta, err)
+	}
+	if linkURL == m.Link {
+		m.NextLink = ""
+	} else {
+		m.NextLink = linkURL
+	}
+	return saveMeta(stateDir, m)
 }
 
 type identity struct {
@@ -194,27 +242,116 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 	}
 
 	meta := Meta{Panel: cfg.Panel, SNI: cfg.SNI, NodeID: m.NodeId, Link: cfg.LinkURL}
-	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
+	if err := storeEnrollment(cfg.StateDir, []byte(m.CaCertificatePem), meta, key, m.CertificatePem, cfg.ResumePendingKey); err != nil {
 		return Meta{}, err
 	}
-	_ = os.Chmod(cfg.StateDir, 0o700) // the directory may pre-exist with looser bits
-	metaJSON, _ := json.Marshal(meta)
-	for _, f := range []struct {
-		name string
-		data []byte
-	}{
-		{fileCA, []byte(m.CaCertificatePem)},
-		{fileMeta, metaJSON},
-		{fileIdentity, identityPEM(key, m.CertificatePem)}, // last: its presence means "enrolled"
-	} {
-		if err := writeFileAtomic(filepath.Join(cfg.StateDir, f.name), f.data, 0o600); err != nil {
-			return Meta{}, err
+	return meta, nil
+}
+
+// storeEnrollment writes the CA, agent.json and the identity, the identity last: its presence means "enrolled". Then the
+// pending key goes when removePending is set.
+func storeEnrollment(dir string, caPEM []byte, meta Meta, key *ecdsa.PrivateKey, certPEM string, removePending bool) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	_ = os.Chmod(dir, 0o700) // the directory may pre-exist with looser bits
+	if err := writeFileAtomic(filepath.Join(dir, fileCA), caPEM, 0o600); err != nil {
+		return err
+	}
+	if err := saveMeta(dir, meta); err != nil {
+		return err
+	}
+	if err := writeFileAtomic(filepath.Join(dir, fileIdentity), identityPEM(key, certPEM), 0o600); err != nil {
+		return err
+	}
+	if removePending {
+		if err := os.Remove(filepath.Join(dir, filePendingKey)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
 		}
 	}
-	if cfg.ResumePendingKey {
-		if err := os.Remove(filepath.Join(cfg.StateDir, filePendingKey)); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return Meta{}, err
+	return nil
+}
+
+// OfflineCSR starts an enrollment without a connection to the panel (a panel behind NAT that installs its subscription
+// host): it keeps a new key in enroll-pending.pem and returns the DER CSR to hand to the panel. An existing pending key
+// is reused, so running it again gives a CSR for the same key.
+func OfflineCSR(stateDir string, force bool) ([]byte, error) {
+	if stateDir == "" {
+		return nil, errors.New("state dir is required")
+	}
+	if !force && IsEnrolled(stateDir) {
+		return nil, errors.New("already enrolled; use --force to replace the identity")
+	}
+	_, csr, err := pendingKeyAndCSR(stateDir, false)
+	return csr, err
+}
+
+// OfflineEnrollConfig is the input of `enroll --offline-finish`.
+type OfflineEnrollConfig struct {
+	StateDir   string
+	NodeID     string
+	CASHA256   string // hex fingerprint of the panel CA certificate
+	LinkURL    string // wss://host/<secret-prefix>/
+	TunnelSNI  string
+	TunnelName string // the subscription name the node forwards
+	// PEM holds the node certificate, then the CA certificate (what the panel printed for this node).
+	PEM   []byte
+	Force bool
+}
+
+// EnrollOffline finishes an OfflineCSR enrollment with the certificate the panel issued for its CSR: the CA must have the
+// pinned fingerprint and the certificate must be for the pending key and chain to it. The node is then a link-only agent
+// with the subscription-host role.
+func EnrollOffline(cfg OfflineEnrollConfig) (Meta, error) {
+	pin, err := parsePin(cfg.CASHA256)
+	if err != nil {
+		return Meta{}, err
+	}
+	if _, err := parseLinkBase(cfg.LinkURL); err != nil {
+		return Meta{}, fmt.Errorf("--link-url: %w", err)
+	}
+	if cfg.StateDir == "" || cfg.NodeID == "" || cfg.TunnelSNI == "" || cfg.TunnelName == "" {
+		return Meta{}, errors.New("state dir, node id, tunnel SNI and tunnel name are required")
+	}
+	if !cfg.Force && IsEnrolled(cfg.StateDir) {
+		return Meta{}, errors.New("already enrolled; use --force to replace the identity")
+	}
+	key, err := readPendingKey(filepath.Join(cfg.StateDir, filePendingKey))
+	if errors.Is(err, os.ErrNotExist) {
+		return Meta{}, errors.New("no pending enrollment key: run `mistgate-node enroll --offline-csr` first")
+	} else if err != nil {
+		return Meta{}, err
+	}
+	var certPEM, caPEM []byte
+	for rest := cfg.PEM; certPEM == nil || caPEM == nil; {
+		var blk *pem.Block
+		if blk, rest = pem.Decode(rest); blk == nil {
+			return Meta{}, errors.New("expected the node certificate and then the CA certificate in PEM")
 		}
+		if blk.Type != "CERTIFICATE" {
+			continue
+		}
+		if certPEM == nil {
+			certPEM = pem.EncodeToMemory(blk)
+		} else {
+			caPEM = pem.EncodeToMemory(blk)
+		}
+	}
+	caCert, err := parseOneCert(caPEM)
+	if err != nil {
+		return Meta{}, fmt.Errorf("panel CA certificate: %w", err)
+	}
+	if sum := sha256.Sum256(caCert.Raw); subtle.ConstantTimeCompare(sum[:], pin[:]) != 1 {
+		return Meta{}, errors.New("the CA certificate does not match --ca-sha256")
+	}
+	pool := x509.NewCertPool()
+	pool.AddCert(caCert)
+	if _, err := checkLeaf(certPEM, key, pool); err != nil {
+		return Meta{}, fmt.Errorf("node certificate: %w", err)
+	}
+	meta := Meta{NodeID: cfg.NodeID, Link: cfg.LinkURL, Tunnel: &TunnelMeta{SNI: cfg.TunnelSNI, Names: []string{cfg.TunnelName}}}
+	if err := storeEnrollment(cfg.StateDir, caPEM, meta, key, string(certPEM), true); err != nil {
+		return Meta{}, err
 	}
 	return meta, nil
 }
@@ -303,15 +440,7 @@ func pendingKeyAndCSR(dir string, force bool) (*ecdsa.PrivateKey, []byte, error)
 	}
 	path := filepath.Join(dir, filePendingKey)
 	if !force {
-		if raw, err := os.ReadFile(path); err == nil {
-			block, _ := pem.Decode(raw)
-			if block == nil || block.Type != "EC PRIVATE KEY" {
-				return nil, nil, errors.New("pending enrollment key is invalid")
-			}
-			key, err := x509.ParseECPrivateKey(block.Bytes)
-			if err != nil {
-				return nil, nil, errors.New("pending enrollment key is invalid")
-			}
+		if key, err := readPendingKey(path); err == nil {
 			csr, err := csrForKey(key)
 			return key, csr, err
 		} else if !errors.Is(err, os.ErrNotExist) {
@@ -334,6 +463,23 @@ func pendingKeyAndCSR(dir string, force bool) (*ecdsa.PrivateKey, []byte, error)
 		return nil, nil, err
 	}
 	return key, csr, nil
+}
+
+// readPendingKey reads the key of an interrupted or offline enrollment.
+func readPendingKey(path string) (*ecdsa.PrivateKey, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(raw)
+	if block == nil || block.Type != "EC PRIVATE KEY" {
+		return nil, errors.New("pending enrollment key is invalid")
+	}
+	key, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		return nil, errors.New("pending enrollment key is invalid")
+	}
+	return key, nil
 }
 
 func parseOneCert(p []byte) (*x509.Certificate, error) {

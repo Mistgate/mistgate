@@ -915,8 +915,8 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 41 {
-		t.Errorf("%d procedures need approval, want 41: %v", len(approved), approved)
+	if len(approved) != 46 {
+		t.Errorf("%d procedures need approval, want 46: %v", len(approved), approved)
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)
@@ -962,6 +962,13 @@ func TestTokenAllowList(t *testing.T) {
 	wantProfileGrants["dns_preset_create"] = []string{adminv1connect.DnsServiceCreateDnsPresetProcedure}
 	wantProfileGrants["dns_preset_update"] = []string{adminv1connect.DnsServiceUpdateDnsPresetProcedure}
 	wantProfileGrants["dns_preset_delete"] = []string{adminv1connect.DnsServiceDeleteDnsPresetProcedure}
+	wantProfileGrants["subscription_host_set"] = []string{adminv1connect.SubscriptionHostServiceSetSubscriptionHostProcedure}
+	wantProfileGrants["subscription_host_move"] = []string{
+		adminv1connect.SubscriptionHostServiceStartSubscriptionHostMoveProcedure,
+		adminv1connect.SubscriptionHostServiceFinishSubscriptionHostChangeProcedure,
+		adminv1connect.SubscriptionHostServiceCancelSubscriptionHostChangeProcedure,
+	}
+	wantProfileGrants["subscription_host_disable"] = []string{adminv1connect.SubscriptionHostServiceDisableSubscriptionHostProcedure}
 	for tool, want := range wantProfileGrants {
 		if got := grantProcedures[tool]; !slices.Equal(got, want) {
 			t.Errorf("%s grant procedures = %v, want %v", tool, got, want)
@@ -1059,8 +1066,8 @@ func TestTokenAllowList(t *testing.T) {
 	}
 	// Step-up procedures include the protected handlers, credential reveal/rotation, password changes,
 	// authenticator enrollment, login captcha, and sensitive infrastructure operations.
-	if len(stepUpProcedures) != 74 {
-		t.Errorf("%d step-up procedures, want 74", len(stepUpProcedures))
+	if len(stepUpProcedures) != 79 {
+		t.Errorf("%d step-up procedures, want 79", len(stepUpProcedures))
 	}
 }
 

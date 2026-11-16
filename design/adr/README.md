@@ -22,5 +22,6 @@ new record that supersedes the old one, not by editing history.
 | [0015](0015-moving-target-transport.md) | A moving target: a dialect of its own for every server, rotated by the panel | Proposed |
 | [0016](0016-ways-graph.md) | The ways as a graph: a node's entries, relays and exits in a node editor | Proposed |
 | [0017](0017-agent-operable-fleet.md) | An agent-operable fleet: what agents read, run, decide and change, and how it is tested | Proposed |
+| [0018](0018-panel-behind-nat.md) | A panel behind NAT: one node is the subscription host | Accepted |
 
 The plan they serve: [`../cloudflare-edition/README.md`](../cloudflare-edition/README.md).

@@ -45,7 +45,7 @@ const evilLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" on
 
 func TestInstanceService(t *testing.T) {
 	e := newTestEnv(t, func(c *Config) {
-		c.AdminURL, c.SubscriptionBase = "https://admin.example.com/k7q2/", "https://example.com/s3cr3t"
+		c.AdminURL, c.SubscriptionBase = "https://admin.example.com/k7q2/", func() string { return "https://example.com/s3cr3t" }
 	})
 	ctx := context.Background()
 	base := e.admin.URL + "/"

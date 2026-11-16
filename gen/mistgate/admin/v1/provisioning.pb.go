@@ -243,8 +243,12 @@ type CheckSSHRequest struct {
 	// An owner's private key is used only for this check. It is never retained.
 	PrivateKey           string `protobuf:"bytes,7,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
 	PrivateKeyPassphrase string `protobuf:"bytes,8,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Non-empty: the check is for the install of the first subscription host serving this domain. The panel need not be
+	// reachable from the server (its address need not even be configured): the probe looks at <domain>:443 and a negative
+	// answer is reported, not refused.
+	SubscriptionHostDomain string `protobuf:"bytes,9,opt,name=subscription_host_domain,json=subscriptionHostDomain,proto3" json:"subscription_host_domain,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CheckSSHRequest) Reset() {
@@ -329,6 +333,13 @@ func (x *CheckSSHRequest) GetPrivateKey() string {
 func (x *CheckSSHRequest) GetPrivateKeyPassphrase() string {
 	if x != nil {
 		return x.PrivateKeyPassphrase
+	}
+	return ""
+}
+
+func (x *CheckSSHRequest) GetSubscriptionHostDomain() string {
+	if x != nil {
+		return x.SubscriptionHostDomain
 	}
 	return ""
 }
@@ -516,8 +527,13 @@ type StartNodeProvisionRequest struct {
 	// An owner's private key is used for this install only; the worker replaces it with the panel key for saved access.
 	PrivateKey           string `protobuf:"bytes,15,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
 	PrivateKeyPassphrase string `protobuf:"bytes,16,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Non-empty: install this server as the panel's first subscription host (issue #48), serving this domain. The node
+	// enrolls inside the SSH session (the panel may be unreachable from it) and the subscription host turns on with it.
+	SubscriptionHostDomain string `protobuf:"bytes,17,opt,name=subscription_host_domain,json=subscriptionHostDomain,proto3" json:"subscription_host_domain,omitempty"`
+	// With subscription_host_domain: do not require the domain to resolve to the SSH host yet.
+	SkipDnsCheck  bool `protobuf:"varint,18,opt,name=skip_dns_check,json=skipDnsCheck,proto3" json:"skip_dns_check,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartNodeProvisionRequest) Reset() {
@@ -660,6 +676,20 @@ func (x *StartNodeProvisionRequest) GetPrivateKeyPassphrase() string {
 		return x.PrivateKeyPassphrase
 	}
 	return ""
+}
+
+func (x *StartNodeProvisionRequest) GetSubscriptionHostDomain() string {
+	if x != nil {
+		return x.SubscriptionHostDomain
+	}
+	return ""
+}
+
+func (x *StartNodeProvisionRequest) GetSkipDnsCheck() bool {
+	if x != nil {
+		return x.SkipDnsCheck
+	}
+	return false
 }
 
 type RetryNodeProvisionRequest struct {
@@ -2445,7 +2475,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
 	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x1c\n" +
-	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\x8e\x02\n" +
+	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\xc8\x02\n" +
 	"\x0fCheckSSHRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
@@ -2455,7 +2485,8 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\ruse_panel_key\x18\x06 \x01(\bR\vusePanelKey\x12\x1f\n" +
 	"\vprivate_key\x18\a \x01(\tR\n" +
 	"privateKey\x124\n" +
-	"\x16private_key_passphrase\x18\b \x01(\tR\x14privateKeyPassphrase\"\xf1\x02\n" +
+	"\x16private_key_passphrase\x18\b \x01(\tR\x14privateKeyPassphrase\x128\n" +
+	"\x18subscription_host_domain\x18\t \x01(\tR\x16subscriptionHostDomain\"\xf1\x02\n" +
 	"\rNodePreflight\x12\"\n" +
 	"\fdistribution\x18\x01 \x01(\tR\fdistribution\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
@@ -2469,7 +2500,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x0fpanel_reachable\x18\n" +
 	" \x01(\bR\x0epanelReachable\"R\n" +
 	"\x10CheckSSHResponse\x12>\n" +
-	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xa4\x04\n" +
+	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\x84\x05\n" +
 	"\x19StartNodeProvisionRequest\x12'\n" +
 	"\x0fconfirm_install\x18\x01 \x01(\bR\x0econfirmInstall\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -2488,7 +2519,9 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x11install_panel_key\x18\x0e \x01(\bR\x0finstallPanelKey\x12\x1f\n" +
 	"\vprivate_key\x18\x0f \x01(\tR\n" +
 	"privateKey\x124\n" +
-	"\x16private_key_passphrase\x18\x10 \x01(\tR\x14privateKeyPassphrase\"\xc1\x02\n" +
+	"\x16private_key_passphrase\x18\x10 \x01(\tR\x14privateKeyPassphrase\x128\n" +
+	"\x18subscription_host_domain\x18\x11 \x01(\tR\x16subscriptionHostDomain\x12$\n" +
+	"\x0eskip_dns_check\x18\x12 \x01(\bR\fskipDnsCheck\"\xc1\x02\n" +
 	"\x19RetryNodeProvisionRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12'\n" +
 	"\x0fconfirm_install\x18\x02 \x01(\bR\x0econfirmInstall\x12\x1a\n" +

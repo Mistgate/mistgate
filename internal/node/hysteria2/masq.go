@@ -25,10 +25,15 @@ type tcpMasq struct {
 	ln  net.Listener // closed directly too: srv.Close misses a listener ServeTLS has not registered yet
 }
 
-func startTCPMasq(port int, getCert func(*tls.ClientHelloInfo) (*tls.Certificate, error), h http.Handler, quicPort uint16) (*tcpMasq, error) {
+// startTCPMasq listens on port and serves h over TLS there. wrap, when not nil, wraps the listener before it is served
+// (engine.Env.SiteListener).
+func startTCPMasq(port int, getCert func(*tls.ClientHelloInfo) (*tls.Certificate, error), h http.Handler, quicPort uint16, wrap func(net.Listener) net.Listener) (*tcpMasq, error) {
 	ln, err := correctnet.Listen("tcp", net.JoinHostPort(bindHost(), strconv.Itoa(port)))
 	if err != nil {
 		return nil, err
+	}
+	if wrap != nil {
+		ln = wrap(ln)
 	}
 	altSvc := fmt.Sprintf(`h3=":%d"; ma=2592000`, quicPort)
 	srv := &http.Server{

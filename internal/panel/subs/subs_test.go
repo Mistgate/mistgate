@@ -51,7 +51,7 @@ func newRigOnline(t *testing.T, prefix string, online access.OnlineSource) *rig 
 	}
 	t.Cleanup(func() { st.Close() })
 	v, _ := vault.New(make([]byte, vault.KeySize))
-	svc, err := access.New(st, v, builtin.Registry(), nil, online, access.Config{SubscriptionBaseURL: "https://sub.example.com" + prefix})
+	svc, err := access.New(st, v, builtin.Registry(), nil, online, access.Config{SubscriptionBaseURL: func() string { return "https://sub.example.com" + prefix }})
 	if err != nil {
 		t.Fatal(err)
 	}

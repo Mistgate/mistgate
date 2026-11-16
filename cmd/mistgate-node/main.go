@@ -13,7 +13,9 @@ const usage = `usage: mistgate-node <command> [flags]
 
 commands:
   enroll    exchange a one-time token for a node certificate (--panel and --sni, or --link-url; --ca-sha256, --token;
-            the panel shows this command when you add a node)
+            the panel shows this command when you add a node); --offline-csr and --offline-finish enroll the
+            subscription host of a panel the node cannot reach yet
+  set-panel save a new panel link address (--link-url); the agent switches to it once it works
   install   write a hardened systemd unit, enable and start it (root, Linux; -h for --state-dir, --bin, --no-start)
   run       run the agent in the foreground: what the systemd unit does, and the way to try it without systemd
   cleanup-net  remove the tunnel interfaces, the WARP routes and the nft tables of the agent (what the unit runs after every stop);
@@ -62,6 +64,8 @@ func dispatch(args []string) int {
 		return 0
 	case "enroll":
 		return cmdEnroll(args[1:])
+	case "set-panel":
+		return cmdSetPanel(args[1:])
 	case "install":
 		return cmdInstall(args[1:])
 	case "cleanup-net":

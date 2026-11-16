@@ -403,7 +403,7 @@ func (in *inbound) start(ctx context.Context) error {
 		} else {
 			// A busy TCP port must not take the VPN down: the inbound keeps serving QUIC, and the reason is in
 			// Health().Detail so the panel can show that the decoy is degraded.
-			m, err := startTCPMasq(cfg.tcpPort, cert.GetCertificate, masq, spec.Listen.Port)
+			m, err := startTCPMasq(cfg.tcpPort, cert.GetCertificate, masq, spec.Listen.Port, in.e.env.SiteWrap(uint16(cfg.tcpPort), false))
 			if err != nil {
 				detail = fmt.Sprintf("masq_tcp: %v", err)
 				in.e.log.Warn("hysteria2 tcp masquerade unavailable", "inbound", spec.ID, "port", cfg.tcpPort, "err", err)
@@ -481,7 +481,7 @@ func (e *eng) TCPClaims(_ context.Context, claimed map[uint16]string) {
 		if in.tcp != nil || e.tcpMasqOwner(in, in.cfg.tcpPort) != "" {
 			continue
 		}
-		m, err := startTCPMasq(in.cfg.tcpPort, in.cert.GetCertificate, in.masqHandler(), in.spec.Listen.Port)
+		m, err := startTCPMasq(in.cfg.tcpPort, in.cert.GetCertificate, in.masqHandler(), in.spec.Listen.Port, in.e.env.SiteWrap(uint16(in.cfg.tcpPort), false))
 		if err != nil {
 			detail := fmt.Sprintf("masq_tcp: %v", err)
 			in.mu.Lock()

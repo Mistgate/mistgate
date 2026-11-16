@@ -108,9 +108,17 @@ type Config struct {
 	// response (its own CSP with frame-ancestors 'self').
 	UserPagePreview func(w http.ResponseWriter, r *http.Request, userID string)
 
-	// AdminURL and SubscriptionBase are where the admin is reached and the base of the subscription links, as `mistgate
-	// setup` stored them: InstanceService shows them to the owner (Settings -> Domains), read-only.
-	AdminURL, SubscriptionBase string
+	// AdminURL is where the admin is reached, as `mistgate setup` stored it; SubscriptionBase, if set, gives the current base
+	// of the subscription links. InstanceService shows them to the owner (Settings -> Domains), read-only.
+	AdminURL         string
+	SubscriptionBase func() string
+
+	// ExtraACMEHost, if set, names one more host (besides ServeOptions.ACMEDomains) the public listener may get a Let's
+	// Encrypt certificate for; asked on every handshake, so it can change while the panel runs. "" = none.
+	ExtraACMEHost func() string
+	// PublicTunnel, if set, is a listener whose connections are served as the public listener's; its presence makes the
+	// public TLS config keep an ACME manager even without static ACME domains.
+	PublicTunnel net.Listener
 
 	// MCP, if set, builds the handler of the MCP endpoint from the in-process admin API: the services
 	// behind the session middleware, request paths without the "/api" prefix. The result is served at <admin>/mcp, and only
@@ -486,7 +494,8 @@ func (s *Server) allow(l *ratelimit.Limiter, w http.ResponseWriter, r *http.Requ
 func (s *Server) Public() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = s.withPublicContext(r) // auth.ClientIPFrom for the mounts and the agent endpoint
-		if s.agentRequest(r) {
+		viaTunnel := r.Context().Value(tunnelConnKey{}) != nil
+		if !viaTunnel && s.agentRequest(r) {
 			s.serveAgent(w, r) // its own limit
 			return
 		}
@@ -499,6 +508,12 @@ func (s *Server) Public() http.Handler {
 				liftDeadlines(w)
 			}
 			s.agentLink.ServeHTTP(w, r)
+			return
+		}
+		// The subscription host's tunnel carries the public side only: never the admin, whatever the host or path.
+		if viaTunnel && ((s.hostAdmin != nil && ctEqual(hostOnly(r.Host), s.cfg.AdminHost)) ||
+			(s.prefixAdmin != nil && hasSecretPrefix(r.URL.Path, s.cfg.AdminPrefix))) {
+			s.decoy.notFound(w, r)
 			return
 		}
 		if canonical && s.hostAdmin != nil && ctEqual(hostOnly(r.Host), s.cfg.AdminHost) {
@@ -529,6 +544,9 @@ func (s *Server) Public() http.Handler {
 		s.decoy.ServeHTTP(w, r)
 	})
 }
+
+// tunnelConnKey marks a request that came through the subscription host's tunnel (Config.PublicTunnel).
+type tunnelConnKey struct{}
 
 func (s *Server) agentLinkRequest(r *http.Request) bool {
 	if s.agentLink == nil || !hasSecretPrefix(r.URL.Path, s.cfg.AgentLinkPrefix) {
@@ -688,6 +706,7 @@ func (s *Server) Serve(ctx context.Context, o ServeOptions) error {
 		name string
 		srv  *http.Server
 		tls  bool
+		ln   net.Listener // already open (the tunnel); nil = listen on srv.Addr
 	}
 	mk := func(addr string, h http.Handler, tlsCfg *tls.Config) *http.Server {
 		return &http.Server{
@@ -709,27 +728,47 @@ func (s *Server) Serve(ctx context.Context, o ServeOptions) error {
 	if err != nil {
 		return err
 	}
-	ls := []listener{{"public", mk(o.Public, s.Public(), tlsCfg), tlsCfg != nil}}
+	// With only the tunnel asking for ACME, the main listener stays as configured: plain HTTP. tlsCfg is for the tunnel.
+	mainTLS := tlsCfg
+	if o.TLSCert == "" && len(o.ACMEDomains) == 0 {
+		mainTLS = nil
+	}
+	ls := []listener{{"public", mk(o.Public, s.Public(), mainTLS), mainTLS != nil, nil}}
 	if o.Admin != "" {
-		ls = append(ls, listener{"admin", mk(o.Admin, s.AdminListener(), nil), false})
+		ls = append(ls, listener{"admin", mk(o.Admin, s.AdminListener(), nil), false, nil})
 	}
 	if o.AgentListen != "" {
 		if !s.agentHooks() {
 			return errors.New("an agent listener needs the agent hooks (fleet) to be configured")
 		}
 		srv := mk(o.AgentListen, http.HandlerFunc(s.serveAgent), &tls.Config{MinVersion: tls.VersionTLS12, GetConfigForClient: s.agentConfig})
-		ls = append(ls, listener{"agent", srv, true})
+		ls = append(ls, listener{"agent", srv, true, nil})
 	}
 	if mgr != nil && o.ACMEHTTP != "" {
 		_, port, _ := net.SplitHostPort(o.Public)
-		ls = append(ls, listener{"acme-http", mk(o.ACMEHTTP, s.acmeHTTP(mgr, o.ACMEDomains, port), nil), false})
+		ls = append(ls, listener{"acme-http", mk(o.ACMEHTTP, s.acmeHTTP(mgr, o.ACMEDomains, port), nil), false, nil})
+	}
+	if s.cfg.PublicTunnel != nil {
+		// The connections the subscription host carries: the public handler over its own TLS (the tunnel always needs the
+		// ACME manager for the subdomain), marked so that they can never reach the admin. The agent SNI gets no mutual TLS
+		// there: the agent endpoint is not reachable through the tunnel even at the handshake.
+		tunnelTLS := tlsCfg.Clone()
+		tunnelTLS.GetConfigForClient = nil
+		srv := mk("", s.Public(), tunnelTLS)
+		srv.ConnContext = func(ctx context.Context, _ net.Conn) context.Context {
+			return context.WithValue(ctx, tunnelConnKey{}, true)
+		}
+		ls = append(ls, listener{"public-tunnel", srv, true, s.cfg.PublicTunnel})
 	}
 
 	errc := make(chan error, len(ls))
 	for _, l := range ls {
-		ln, err := net.Listen("tcp", l.srv.Addr)
-		if err != nil {
-			return err
+		ln := l.ln
+		if ln == nil {
+			var err error
+			if ln, err = net.Listen("tcp", l.srv.Addr); err != nil {
+				return err
+			}
 		}
 		s.cfg.Log.Info("listening", "listener", l.name, "addr", ln.Addr().String(), "tls", l.tls)
 		go func() {
