@@ -216,11 +216,11 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 			return nil, s.internal("set default dns preset", err)
 		}
 	}
-	next, err := s.headerGroups(ctx, req.Msg.Settings)
+	next, err := s.settingGroups(ctx, req.Msg.Settings)
 	if errors.Is(err, subsettings.ErrInvalid) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	} else if err != nil {
-		return nil, s.internal("response header groups", err)
+		return nil, s.internal("groups of the settings", err)
 	}
 	set, revoked, err := s.settings.UpdateRevoking(ctx, next)
 	if errors.Is(err, subsettings.ErrInvalid) {
@@ -236,7 +236,7 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	}
 	// The audit row says that the settings changed and how big they are, never their texts.
 	params, _ := json.Marshal(map[string]any{
-		"apps": len(set.Apps), "rules": len(set.Rules), "response_headers": len(set.ResponseHeaders), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
+		"apps": len(set.Apps), "rules": len(set.Rules), "response_headers": len(set.ResponseHeaders), "mihomo_templates": len(set.MihomoTemplates), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
 		"link_awg": subsettings.LinkAWG(set), "link_auto_select": subsettings.LinkAutoSelect(set), "shared_revoked": revoked,
 	})
 	entry := store.AuditEntry{Actor: admin.ID, Action: "subscription_settings_update", Result: "ok", Params: string(params)}
@@ -249,14 +249,17 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	return connect.NewResponse(&adminv1.UpdateSubscriptionSettingsResponse{Settings: set}), nil
 }
 
-// headerGroups checks the groups the own response headers are limited to. A group that does not exist is refused, unless the
-// stored settings already name it: it was deleted since, and drops out of the list here, so that a save from another tab of the
-// admin does not fail over it (the person of a deleted group cannot exist, so the entry never applied to anyone). It returns the
-// settings to store (a copy when anything changed).
-func (s *Service) headerGroups(ctx context.Context, set *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, error) {
+// settingGroups checks the groups the own response headers and the Mihomo templates name. A group that does not exist is refused,
+// unless the stored settings already name it in the same list: it was deleted since, and drops out of the list here, so that a save
+// from another tab of the admin does not fail over it (the person of a deleted group cannot exist, so the entry never applied to
+// anyone). It returns the settings to store (a copy when anything changed).
+func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, error) {
 	used := false
 	for _, e := range set.GetResponseHeaders() {
 		used = used || len(e.GetGroupIds()) > 0
+	}
+	for _, t := range set.GetMihomoTemplates() {
+		used = used || len(t.GetGroupIds()) > 0
 	}
 	if !used {
 		return set, nil
@@ -273,18 +276,31 @@ func (s *Service) headerGroups(ctx context.Context, set *adminv1.SubscriptionSet
 	if err != nil {
 		return nil, err
 	}
-	had := map[string]bool{}
+	hadHeader, hadTemplate := map[string]bool{}, map[string]bool{}
 	for _, e := range stored.GetResponseHeaders() {
 		for _, id := range e.GroupIds {
-			had[id] = true
+			hadHeader[id] = true
+		}
+	}
+	for _, t := range stored.GetMihomoTemplates() {
+		for _, id := range t.GroupIds {
+			hadTemplate[id] = true
 		}
 	}
 	out := proto.Clone(set).(*adminv1.SubscriptionSettings)
 	for i, e := range out.ResponseHeaders {
-		e.GroupIds = slices.DeleteFunc(e.GroupIds, func(id string) bool { return !live[id] && had[id] })
+		e.GroupIds = slices.DeleteFunc(e.GroupIds, func(id string) bool { return !live[id] && hadHeader[id] })
 		for _, id := range e.GroupIds {
 			if !live[id] {
 				return nil, fmt.Errorf("%w: response_headers[%d].group_ids: no such group", subsettings.ErrInvalid, i)
+			}
+		}
+	}
+	for i, t := range out.MihomoTemplates {
+		t.GroupIds = slices.DeleteFunc(t.GroupIds, func(id string) bool { return !live[id] && hadTemplate[id] })
+		for _, id := range t.GroupIds {
+			if !live[id] {
+				return nil, fmt.Errorf("%w: mihomo_templates[%d].group_ids: no such group", subsettings.ErrInvalid, i)
 			}
 		}
 	}

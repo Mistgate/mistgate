@@ -15,15 +15,13 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
 // The Mihomo YAML profile: the proxies the protocol plugins rendered, one select
 // group over all of them, the dns section of the user's effective preset and the rules that go with it. It is
 // assembled from yaml.v3 nodes only: names (node, profile, brand) are hostile input and a string template would let
 // one of them add a proxy or a rule. Some Mihomo-based apps take only `proxies:` and ignore the rest; others merge it.
-
-// reservedNames are the adapters of the core: a proxy or group with one of these names would be shadowed by it.
-var reservedNames = []string{"DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL"}
 
 // mihomoProfile is what the assembler needs about one user's subscription.
 type mihomoProfile struct {
@@ -83,27 +81,8 @@ func proxyNode(line string) (*yaml.Node, string, bool) {
 	return nil, "", false
 }
 
-// setName replaces the name of a proxy mapping (the key exists: proxyNode found it).
-func setName(m *yaml.Node, name string) {
-	for i := 0; i+1 < len(m.Content); i += 2 {
-		if m.Content[i].Value == "name" {
-			m.Content[i+1] = quoted(name)
-			return
-		}
-	}
-}
-
-// uniqueName makes a proxy name safe: not one of the core's adapter names and not taken yet.
-func uniqueName(name string, taken map[string]bool) string {
-	if name = strings.TrimSpace(name); name == "" {
-		name = "server"
-	}
-	for slices.Contains(reservedNames, strings.ToUpper(name)) || taken[name] {
-		name += " ·"
-	}
-	taken[name] = true
-	return name
-}
+// uniqueName makes a proxy name safe: not one of the core's adapter names and not taken yet (subsettings.CoreNames).
+func uniqueName(name string, taken map[string]bool) string { return subsettings.UniqueName(name, taken) }
 
 // groupName is the name of the select group: the subscription title without what would break a rule line
 // ("MATCH,<group>" is split at commas) or the "#group" fragment of a nameserver (split at "&" and "=").
@@ -136,7 +115,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 			name = p.names[i]
 		}
 		name = uniqueName(name, taken)
-		setName(m, name)
+		subsettings.SetProxyName(m, name)
 		proxies.Content = append(proxies.Content, m)
 		names = append(names, name)
 	}
@@ -147,12 +126,9 @@ func (p mihomoProfile) build() ([]byte, error) {
 	selectMembers := slices.Clone(names)
 	var autoGroup *yaml.Node
 	if p.autoSelect && len(names) > 1 {
-		auto := uniqueName("Auto", taken)
+		auto := uniqueName(subsettings.AutoName, taken)
 		selectMembers = append([]string{auto}, selectMembers...)
-		autoGroup = newMap().
-			set("name", quoted(auto)).set("type", strNode("url-test")).set("proxies", quotedSeq(names)).
-			set("url", quoted("https://www.gstatic.com/generate_204")).set("interval", intNode(300)).
-			set("tolerance", intNode(50)).set("lazy", boolNode(true)).set("timeout", intNode(5000)).n
+		autoGroup = subsettings.MihomoAutoGroup(auto, names)
 	}
 	members := append(selectMembers, "DIRECT")
 

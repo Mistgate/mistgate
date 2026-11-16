@@ -1,0 +1,548 @@
+{
+ "note": "Read by TestMihomoTemplateCases: what a save of one Mihomo template takes. lines are joined with newlines; auto_off is link_auto_select off; gen names a text the test builds (too big to write out); err is a part of the message.",
+ "cases": [
+  {
+   "name": "an author's router template with anchors, a merge key and a provider",
+   "ok": true,
+   "lines": [
+    "mixed-port: 7890",
+    "redir-port: 7892",
+    "allow-lan: true",
+    "mode: rule",
+    "log-level: warning",
+    "",
+    "x-check: &check",
+    "  url: https://www.gstatic.com/generate_204",
+    "  interval: 300",
+    "",
+    "proxy-providers:",
+    "  office:",
+    "    type: http",
+    "    url: https://example.com/office.yaml",
+    "    interval: 3600",
+    "",
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "    proxies: [Auto, DIRECT]",
+    "  - name: Fast",
+    "    <<: *check",
+    "    type: url-test",
+    "    include-all-proxies: true",
+    "  - name: Office",
+    "    type: select",
+    "    use: [office]",
+    "",
+    "rule-providers:",
+    "  ads:",
+    "    type: http",
+    "    behavior: domain",
+    "    format: mrs",
+    "    url: https://example.com/ads.mrs",
+    "    interval: 86400",
+    "",
+    "rules:",
+    "  - RULE-SET,ads,REJECT",
+    "  - DOMAIN-SUFFIX,example.com,Office",
+    "  - GEOIP,LAN,DIRECT,no-resolve",
+    "  - MATCH,Proxy"
+   ]
+  },
+  {
+   "name": "the smallest useful template",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true"
+   ]
+  },
+  {
+   "name": "no proxy-groups at all",
+   "ok": true,
+   "lines": [
+    "mixed-port: 7890"
+   ]
+  },
+  {
+   "name": "proxies and proxy-groups null",
+   "ok": true,
+   "lines": [
+    "proxies:",
+    "proxy-groups: ~"
+   ]
+  },
+  {
+   "name": "own proxies and a group over them",
+   "ok": true,
+   "lines": [
+    "proxies:",
+    "  - name: office",
+    "    type: socks5",
+    "    server: example.com",
+    "    port: 1080",
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    proxies: [office, DIRECT]"
+   ]
+  },
+  {
+   "name": "a group refers to another group",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "  - name: Outer",
+    "    type: select",
+    "    proxies: [Proxy, REJECT]"
+   ]
+  },
+  {
+   "name": "a name that is a number",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "  - name: 1",
+    "    type: select",
+    "    proxies: [Proxy]"
+   ]
+  },
+  {
+   "name": "own Auto group, switch on",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Auto",
+    "    type: url-test",
+    "    include-all-proxies: true",
+    "  - name: Proxy",
+    "    type: select",
+    "    proxies: [Auto]"
+   ]
+  },
+  {
+   "name": "own Auto group, switch off",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Auto",
+    "    type: url-test",
+    "    include-all-proxies: true",
+    "  - name: Proxy",
+    "    type: select",
+    "    proxies: [Auto]"
+   ],
+   "auto_off": true
+  },
+  {
+   "name": "Auto referred to, switch on",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    proxies: [Auto, DIRECT]"
+   ]
+  },
+  {
+   "name": "Auto referred to, switch off",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    proxies: [Auto, DIRECT]"
+   ],
+   "err": "Auto",
+   "auto_off": true
+  },
+  {
+   "name": "no text",
+   "ok": false,
+   "lines": [],
+   "err": "empty"
+  },
+  {
+   "name": "only a comment",
+   "ok": false,
+   "lines": [
+    "# nothing here"
+   ],
+   "err": "no YAML document"
+  },
+  {
+   "name": "a scalar at the root",
+   "ok": false,
+   "lines": [
+    "just text"
+   ],
+   "err": "root must be a mapping"
+  },
+  {
+   "name": "a list at the root",
+   "ok": false,
+   "lines": [
+    "- a",
+    "- b"
+   ],
+   "err": "root must be a mapping"
+  },
+  {
+   "name": "an explicit null document",
+   "ok": false,
+   "lines": [
+    "---",
+    "~"
+   ],
+   "err": "root must be a mapping"
+  },
+  {
+   "name": "two documents",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "---",
+    "mixed-port: 1"
+   ],
+   "err": "more than one"
+  },
+  {
+   "name": "two documents, the second broken",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "---",
+    "a: ["
+   ],
+   "err": "more than one"
+  },
+  {
+   "name": "a syntax error names its line",
+   "ok": false,
+   "lines": [
+    "mixed-port: 1",
+    "proxy-groups: ["
+   ],
+   "err": "line"
+  },
+  {
+   "name": "a tab for indentation",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "\t- name: a"
+   ],
+   "err": "line"
+  },
+  {
+   "name": "a key twice at the root",
+   "ok": false,
+   "lines": [
+    "mixed-port: 1",
+    "mixed-port: 2"
+   ],
+   "err": "already defined"
+  },
+  {
+   "name": "proxies twice at the root",
+   "ok": false,
+   "lines": [
+    "proxies: []",
+    "proxy-groups: []",
+    "proxies: []"
+   ],
+   "err": "already defined"
+  },
+  {
+   "name": "a key twice in a group",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    type: url-test"
+   ],
+   "err": "already defined"
+  },
+  {
+   "name": "an alias bomb",
+   "ok": false,
+   "err": "excessive aliasing",
+   "gen": "bomb"
+  },
+  {
+   "name": "an alias bomb in a key the panel does not read",
+   "ok": false,
+   "err": "excessive aliasing",
+   "gen": "bomb_x"
+  },
+  {
+   "name": "nesting too deep",
+   "ok": false,
+   "gen": "deep"
+  },
+  {
+   "name": "a merge key at the root",
+   "ok": false,
+   "lines": [
+    "base: &b",
+    "  mixed-port: 1",
+    "<<: *b"
+   ],
+   "err": "merge key"
+  },
+  {
+   "name": "proxies is an alias",
+   "ok": false,
+   "lines": [
+    "list: &p []",
+    "proxies: *p"
+   ],
+   "err": "alias"
+  },
+  {
+   "name": "proxy-groups is an alias",
+   "ok": false,
+   "lines": [
+    "list: &p []",
+    "proxy-groups: *p"
+   ],
+   "err": "alias"
+  },
+  {
+   "name": "proxies carries an anchor",
+   "ok": false,
+   "lines": [
+    "proxies: &p []"
+   ],
+   "err": "anchor"
+  },
+  {
+   "name": "proxy-groups carries an anchor",
+   "ok": false,
+   "lines": [
+    "proxy-groups: &g []"
+   ],
+   "err": "anchor"
+  },
+  {
+   "name": "proxies is a mapping",
+   "ok": false,
+   "lines": [
+    "proxies:",
+    "  a: 1"
+   ],
+   "err": "must be a list"
+  },
+  {
+   "name": "proxy-groups is a string",
+   "ok": false,
+   "lines": [
+    "proxy-groups: nothing"
+   ],
+   "err": "must be a list"
+  },
+  {
+   "name": "a proxy without a name",
+   "ok": false,
+   "lines": [
+    "proxies:",
+    "  - type: socks5"
+   ],
+   "err": "a name is required"
+  },
+  {
+   "name": "a proxy that is a string",
+   "ok": false,
+   "lines": [
+    "proxies:",
+    "  - office"
+   ],
+   "err": "line 2"
+  },
+  {
+   "name": "a group without a name",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - type: select"
+   ],
+   "err": "a name is required"
+  },
+  {
+   "name": "a group without a type",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy"
+   ],
+   "err": "a type is required"
+  },
+  {
+   "name": "a name twice among proxies and groups",
+   "ok": false,
+   "lines": [
+    "proxies:",
+    "  - name: Proxy",
+    "    type: socks5",
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select"
+   ],
+   "err": "used twice"
+  },
+  {
+   "name": "a group named DIRECT",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: DIRECT",
+    "    type: select"
+   ],
+   "err": "core"
+  },
+  {
+   "name": "a proxy named GLOBAL",
+   "ok": false,
+   "lines": [
+    "proxies:",
+    "  - name: GLOBAL",
+    "    type: socks5"
+   ],
+   "err": "core"
+  },
+  {
+   "name": "a group names a server of one person",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "  - name: Outer",
+    "    type: select",
+    "    proxies: [de1]"
+   ],
+   "err": "de1"
+  },
+  {
+   "name": "a group names a missing group",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    proxies: [Nope]"
+   ],
+   "err": "Nope"
+  },
+  {
+   "name": "a group uses a missing provider",
+   "ok": false,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    use: [office]"
+   ],
+   "err": "office"
+  },
+  {
+   "name": "a group uses a provider the template has",
+   "ok": true,
+   "lines": [
+    "proxy-providers:",
+    "  office:",
+    "    type: http",
+    "    url: https://example.com/o.yaml",
+    "    interval: 60",
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    use: [office]"
+   ]
+  },
+  {
+   "name": "proxy-providers is not a mapping",
+   "ok": false,
+   "lines": [
+    "proxy-providers: nothing",
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    use: [office]"
+   ],
+   "err": "proxy-providers"
+  },
+  {
+   "name": "an anchor inside a group is fine",
+   "ok": true,
+   "lines": [
+    "x: &g",
+    "  type: select",
+    "proxy-groups:",
+    "  - name: A",
+    "    <<: *g",
+    "  - name: B",
+    "    <<: *g"
+   ]
+  },
+  {
+   "name": "a rule whose target does not exist is only a warning",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "rules:",
+    "  - MATCH,Nowhere"
+   ]
+  },
+  {
+   "name": "a template with its own dns",
+   "ok": true,
+   "lines": [
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    "dns:",
+    "  enable: true",
+    "  nameserver: [1.1.1.1]"
+   ]
+  },
+  {
+   "name": "a template that is comments and plain keys",
+   "ok": true,
+   "lines": [
+    "# the router",
+    "log-level: info # quiet"
+   ]
+  },
+  {
+   "name": "a block scalar and flow style stay valid",
+   "ok": true,
+   "lines": [
+    "x-note: |",
+    "  line one",
+    "  line two",
+    "proxy-groups: [{name: Proxy, type: select, include-all-proxies: true}]"
+   ]
+  }
+ ]
+}

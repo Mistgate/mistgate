@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/subscription.proto.
  */
 export const file_mistgate_admin_v1_subscription: GenFile = /*@__PURE__*/
-  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9zdWJzY3JpcHRpb24ucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIu0FChRTdWJzY3JpcHRpb25TZXR0aW5ncxINCgV0aXRsZRgBIAEoCRIUCgxhbm5vdW5jZW1lbnQYAiABKAkSEwoLc3VwcG9ydF91cmwYAyABKAkSHQoVdXBkYXRlX2ludGVydmFsX2hvdXJzGAQgASgNEhwKFHNlcnZlcl9uYW1lX3RlbXBsYXRlGAUgASgJEiwKBGFwcHMYBiADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5QbGF0Zm9ybUFwcBI1Cgl1c2VyX3BhZ2UYByABKAsyIi5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyUGFnZU9wdGlvbnMSKwoFcnVsZXMYCCADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5TZXJ2ZVJ1bGUSHQoVZGVmYXVsdF9kbnNfcHJlc2V0X2lkGAkgASgJEkIKEWxpbmtfZGV2aWNlX2xpbWl0GAogASgOMiIubWlzdGdhdGUuYWRtaW4udjEuTGlua0RldmljZUxpbWl0SACIAQESMwoIbGlua19kbnMYCyABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5MaW5rRG5zT3B0aW9ucxIuCgloYXBwX3BpbmcYDCABKA4yGy5taXN0Z2F0ZS5hZG1pbi52MS5IYXBwUGluZxIZChFoYXBwX3Bpbmdfb25fb3BlbhgNIAEoCBIVCghsaW5rX2F3ZxgOIAEoCEgBiAEBEh0KEGxpbmtfYXV0b19zZWxlY3QYDyABKAhIAogBARIjChZkZXZpY2VfaWRsZV9hZnRlcl9kYXlzGBAgASgNSAOIAQESOwoQcmVzcG9uc2VfaGVhZGVycxgRIAMoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlc3BvbnNlSGVhZGVyQhQKEl9saW5rX2RldmljZV9saW1pdEILCglfbGlua19hd2dCEwoRX2xpbmtfYXV0b19zZWxlY3RCGQoXX2RldmljZV9pZGxlX2FmdGVyX2RheXMilAEKDlJlc3BvbnNlSGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkSDgoGYmFzZTY0GAMgASgIEi0KB2Zvcm1hdHMYBCADKA4yHC5taXN0Z2F0ZS5hZG1pbi52MS5TdWJGb3JtYXQSEwoLb25seV9ncm91cHMYBSABKAgSEQoJZ3JvdXBfaWRzGAYgAygJIj8KDkxpbmtEbnNPcHRpb25zEhIKCnByZXNldF9pZHMYASADKAkSGQoRZGVmYXVsdF9wcmVzZXRfaWQYAiABKAkiywEKC1BsYXRmb3JtQXBwEi0KCHBsYXRmb3JtGAEgASgOMhsubWlzdGdhdGUuYWRtaW4udjEuUGxhdGZvcm0SJAoEa2luZBgCIAEoDjIWLm1pc3RnYXRlLmFkbWluLnYxLkFwcBIMCgRuYW1lGAMgASgJEhQKDGRvd25sb2FkX3VybBgEIAEoCRIZChFhZGRfbGlua190ZW1wbGF0ZRgFIAEoCRITCgtkZXNjcmlwdGlvbhgGIAEoCRITCgtyZWNvbW1lbmRlZBgHIAEoCCKLAgoPVXNlclBhZ2VPcHRpb25zEhkKEXNob3dfYW5ub3VuY2VtZW50GAEgASgIEhQKDHNob3dfc3VwcG9ydBgCIAEoCBIPCgdzaG93X3FyGAMgASgIEiYKGWFsbG93X2RldmljZV9zZWxmX3NlcnZpY2UYBCABKAhIAIgBARIiChVyZXF1aXJlX3BhZ2VfcGFzc3dvcmQYBSABKAhIAYgBARIdChBhbGxvd19kbnNfY2hvaWNlGAYgASgISAKIAQFCHAoaX2FsbG93X2RldmljZV9zZWxmX3NlcnZpY2VCGAoWX3JlcXVpcmVfcGFnZV9wYXNzd29yZEITChFfYWxsb3dfZG5zX2Nob2ljZSJOCglTZXJ2ZVJ1bGUSEwoLdWFfY29udGFpbnMYASABKAkSLAoGZm9ybWF0GAIgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0IiAKHkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVxdWVzdCKtAgofR2V0U3Vic2NyaXB0aW9uU2V0dGluZ3NSZXNwb25zZRI5CghzZXR0aW5ncxgBIAEoCzInLm1pc3RnYXRlLmFkbWluLnYxLlN1YnNjcmlwdGlvblNldHRpbmdzEhcKD2VmZmVjdGl2ZV90aXRsZRgCIAEoCRI3Cg5zZXJ2ZXJfc2FtcGxlcxgDIAMoCzIfLm1pc3RnYXRlLmFkbWluLnYxLlNlcnZlclNhbXBsZRIUCgxzYW1wbGVfZ3JvdXAYBCABKAkSFgoObmFtZXNfbGFuZ3VhZ2UYBSABKAkSGQoRc2hhcmVkX2xpbmtfdXNlcnMYBiABKA0SFQoNbGlua19hd2dfa2V5cxgHIAEoDRIdChVyZXNlcnZlZF9oZWFkZXJfbmFtZXMYCCADKAkibwoMU2VydmVyU2FtcGxlEgwKBG5vZGUYASABKAkSFAoMY291bnRyeV9jb2RlGAIgASgJEg8KB3Byb2ZpbGUYAyABKAkSGQoMbG9hZF9wZXJjZW50GAQgASgNSACIAQFCDwoNX2xvYWRfcGVyY2VudCJeCiFVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1JlcXVlc3QSOQoIc2V0dGluZ3MYASABKAsyJy5taXN0Z2F0ZS5hZG1pbi52MS5TdWJzY3JpcHRpb25TZXR0aW5ncyJfCiJVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1Jlc3BvbnNlEjkKCHNldHRpbmdzGAEgASgLMicubWlzdGdhdGUuYWRtaW4udjEuU3Vic2NyaXB0aW9uU2V0dGluZ3MiaAoKQ2xpZW50SW5mbxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKCXByb3RvY29scxgDIAMoCRItCgdmb3JtYXRzGAQgAygOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0IhQKEkxpc3RDbGllbnRzUmVxdWVzdCJFChNMaXN0Q2xpZW50c1Jlc3BvbnNlEi4KB2NsaWVudHMYASADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRJbmZvIioKFFRlc3RVc2VyQWdlbnRSZXF1ZXN0EhIKCnVzZXJfYWdlbnQYASABKAkiagoVVGVzdFVzZXJBZ2VudFJlc3BvbnNlEhIKCnJ1bGVfaW5kZXgYASABKAUSLAoGZm9ybWF0GAIgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0Eg8KB2Jyb3dzZXIYAyABKAgieAodUHJldmlld1Jlc3BvbnNlSGVhZGVyc1JlcXVlc3QSDwoHdXNlcl9pZBgBIAEoCRISCgp1c2VyX2FnZW50GAIgASgJEjIKB2hlYWRlcnMYAyADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZXNwb25zZUhlYWRlciI5CgpTZW50SGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkSDgoGYmFzZTY0GAMgASgIIqYBCh5QcmV2aWV3UmVzcG9uc2VIZWFkZXJzUmVzcG9uc2USLAoGZm9ybWF0GAEgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0Ei4KB2hlYWRlcnMYAiADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5TZW50SGVhZGVyEhIKCm5vdF9zZXJ2ZWQYAyABKAkSEgoKZ3JvdXBfbmFtZRgEIAEoCSo4CghIYXBwUGluZxIZChVIQVBQX1BJTkdfVU5TUEVDSUZJRUQQABIRCg1IQVBQX1BJTkdfVENQEAEqjgEKD0xpbmtEZXZpY2VMaW1pdBIhCh1MSU5LX0RFVklDRV9MSU1JVF9VTlNQRUNJRklFRBAAEhsKF0xJTktfREVWSUNFX0xJTUlUX1RSQUNLEAESHQoZTElOS19ERVZJQ0VfTElNSVRfRU5GT1JDRRACEhwKGExJTktfREVWSUNFX0xJTUlUX1NUUklDVBADKooBCghQbGF0Zm9ybRIYChRQTEFURk9STV9VTlNQRUNJRklFRBAAEhAKDFBMQVRGT1JNX0lPUxABEhQKEFBMQVRGT1JNX0FORFJPSUQQAhIUChBQTEFURk9STV9XSU5ET1dTEAMSEgoOUExBVEZPUk1fTUFDT1MQBBISCg5QTEFURk9STV9MSU5VWBAFKsYBCglTdWJGb3JtYXQSGgoWU1VCX0ZPUk1BVF9VTlNQRUNJRklFRBAAEhoKFlNVQl9GT1JNQVRfQkFTRTY0X1VSSVMQARIYChRTVUJfRk9STUFUX1VTRVJfUEFHRRACEhQKEFNVQl9GT1JNQVRfREVDT1kQAxIaChZTVUJfRk9STUFUX01JSE9NT19ZQU1MEAQSGAoUU1VCX0ZPUk1BVF9YUkFZX0pTT04QBRIbChdTVUJfRk9STUFUX1NJTkdCT1hfSlNPThAGMuUEChNTdWJzY3JpcHRpb25TZXJ2aWNlEoABChdHZXRTdWJzY3JpcHRpb25TZXR0aW5ncxIxLm1pc3RnYXRlLmFkbWluLnYxLkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVxdWVzdBoyLm1pc3RnYXRlLmFkbWluLnYxLkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVzcG9uc2USiQEKGlVwZGF0ZVN1YnNjcmlwdGlvblNldHRpbmdzEjQubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlU3Vic2NyaXB0aW9uU2V0dGluZ3NSZXF1ZXN0GjUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlU3Vic2NyaXB0aW9uU2V0dGluZ3NSZXNwb25zZRJcCgtMaXN0Q2xpZW50cxIlLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RDbGllbnRzUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RDbGllbnRzUmVzcG9uc2USYgoNVGVzdFVzZXJBZ2VudBInLm1pc3RnYXRlLmFkbWluLnYxLlRlc3RVc2VyQWdlbnRSZXF1ZXN0GigubWlzdGdhdGUuYWRtaW4udjEuVGVzdFVzZXJBZ2VudFJlc3BvbnNlEn0KFlByZXZpZXdSZXNwb25zZUhlYWRlcnMSMC5taXN0Z2F0ZS5hZG1pbi52MS5QcmV2aWV3UmVzcG9uc2VIZWFkZXJzUmVxdWVzdBoxLm1pc3RnYXRlLmFkbWluLnYxLlByZXZpZXdSZXNwb25zZUhlYWRlcnNSZXNwb25zZULMAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQhFTdWJzY3JpcHRpb25Qcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
+  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9zdWJzY3JpcHRpb24ucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIqoGChRTdWJzY3JpcHRpb25TZXR0aW5ncxINCgV0aXRsZRgBIAEoCRIUCgxhbm5vdW5jZW1lbnQYAiABKAkSEwoLc3VwcG9ydF91cmwYAyABKAkSHQoVdXBkYXRlX2ludGVydmFsX2hvdXJzGAQgASgNEhwKFHNlcnZlcl9uYW1lX3RlbXBsYXRlGAUgASgJEiwKBGFwcHMYBiADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5QbGF0Zm9ybUFwcBI1Cgl1c2VyX3BhZ2UYByABKAsyIi5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyUGFnZU9wdGlvbnMSKwoFcnVsZXMYCCADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5TZXJ2ZVJ1bGUSHQoVZGVmYXVsdF9kbnNfcHJlc2V0X2lkGAkgASgJEkIKEWxpbmtfZGV2aWNlX2xpbWl0GAogASgOMiIubWlzdGdhdGUuYWRtaW4udjEuTGlua0RldmljZUxpbWl0SACIAQESMwoIbGlua19kbnMYCyABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5MaW5rRG5zT3B0aW9ucxIuCgloYXBwX3BpbmcYDCABKA4yGy5taXN0Z2F0ZS5hZG1pbi52MS5IYXBwUGluZxIZChFoYXBwX3Bpbmdfb25fb3BlbhgNIAEoCBIVCghsaW5rX2F3ZxgOIAEoCEgBiAEBEh0KEGxpbmtfYXV0b19zZWxlY3QYDyABKAhIAogBARIjChZkZXZpY2VfaWRsZV9hZnRlcl9kYXlzGBAgASgNSAOIAQESOwoQcmVzcG9uc2VfaGVhZGVycxgRIAMoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlc3BvbnNlSGVhZGVyEjsKEG1paG9tb190ZW1wbGF0ZXMYEiADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5NaWhvbW9UZW1wbGF0ZUIUChJfbGlua19kZXZpY2VfbGltaXRCCwoJX2xpbmtfYXdnQhMKEV9saW5rX2F1dG9fc2VsZWN0QhkKF19kZXZpY2VfaWRsZV9hZnRlcl9kYXlzIj8KDk1paG9tb1RlbXBsYXRlEgwKBG5hbWUYASABKAkSDAoEeWFtbBgCIAEoCRIRCglncm91cF9pZHMYAyADKAkilAEKDlJlc3BvbnNlSGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkSDgoGYmFzZTY0GAMgASgIEi0KB2Zvcm1hdHMYBCADKA4yHC5taXN0Z2F0ZS5hZG1pbi52MS5TdWJGb3JtYXQSEwoLb25seV9ncm91cHMYBSABKAgSEQoJZ3JvdXBfaWRzGAYgAygJIj8KDkxpbmtEbnNPcHRpb25zEhIKCnByZXNldF9pZHMYASADKAkSGQoRZGVmYXVsdF9wcmVzZXRfaWQYAiABKAkiywEKC1BsYXRmb3JtQXBwEi0KCHBsYXRmb3JtGAEgASgOMhsubWlzdGdhdGUuYWRtaW4udjEuUGxhdGZvcm0SJAoEa2luZBgCIAEoDjIWLm1pc3RnYXRlLmFkbWluLnYxLkFwcBIMCgRuYW1lGAMgASgJEhQKDGRvd25sb2FkX3VybBgEIAEoCRIZChFhZGRfbGlua190ZW1wbGF0ZRgFIAEoCRITCgtkZXNjcmlwdGlvbhgGIAEoCRITCgtyZWNvbW1lbmRlZBgHIAEoCCKLAgoPVXNlclBhZ2VPcHRpb25zEhkKEXNob3dfYW5ub3VuY2VtZW50GAEgASgIEhQKDHNob3dfc3VwcG9ydBgCIAEoCBIPCgdzaG93X3FyGAMgASgIEiYKGWFsbG93X2RldmljZV9zZWxmX3NlcnZpY2UYBCABKAhIAIgBARIiChVyZXF1aXJlX3BhZ2VfcGFzc3dvcmQYBSABKAhIAYgBARIdChBhbGxvd19kbnNfY2hvaWNlGAYgASgISAKIAQFCHAoaX2FsbG93X2RldmljZV9zZWxmX3NlcnZpY2VCGAoWX3JlcXVpcmVfcGFnZV9wYXNzd29yZEITChFfYWxsb3dfZG5zX2Nob2ljZSJOCglTZXJ2ZVJ1bGUSEwoLdWFfY29udGFpbnMYASABKAkSLAoGZm9ybWF0GAIgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0IiAKHkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVxdWVzdCKtAgofR2V0U3Vic2NyaXB0aW9uU2V0dGluZ3NSZXNwb25zZRI5CghzZXR0aW5ncxgBIAEoCzInLm1pc3RnYXRlLmFkbWluLnYxLlN1YnNjcmlwdGlvblNldHRpbmdzEhcKD2VmZmVjdGl2ZV90aXRsZRgCIAEoCRI3Cg5zZXJ2ZXJfc2FtcGxlcxgDIAMoCzIfLm1pc3RnYXRlLmFkbWluLnYxLlNlcnZlclNhbXBsZRIUCgxzYW1wbGVfZ3JvdXAYBCABKAkSFgoObmFtZXNfbGFuZ3VhZ2UYBSABKAkSGQoRc2hhcmVkX2xpbmtfdXNlcnMYBiABKA0SFQoNbGlua19hd2dfa2V5cxgHIAEoDRIdChVyZXNlcnZlZF9oZWFkZXJfbmFtZXMYCCADKAkibwoMU2VydmVyU2FtcGxlEgwKBG5vZGUYASABKAkSFAoMY291bnRyeV9jb2RlGAIgASgJEg8KB3Byb2ZpbGUYAyABKAkSGQoMbG9hZF9wZXJjZW50GAQgASgNSACIAQFCDwoNX2xvYWRfcGVyY2VudCJeCiFVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1JlcXVlc3QSOQoIc2V0dGluZ3MYASABKAsyJy5taXN0Z2F0ZS5hZG1pbi52MS5TdWJzY3JpcHRpb25TZXR0aW5ncyJfCiJVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1Jlc3BvbnNlEjkKCHNldHRpbmdzGAEgASgLMicubWlzdGdhdGUuYWRtaW4udjEuU3Vic2NyaXB0aW9uU2V0dGluZ3MiaAoKQ2xpZW50SW5mbxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKCXByb3RvY29scxgDIAMoCRItCgdmb3JtYXRzGAQgAygOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0IhQKEkxpc3RDbGllbnRzUmVxdWVzdCJFChNMaXN0Q2xpZW50c1Jlc3BvbnNlEi4KB2NsaWVudHMYASADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRJbmZvIioKFFRlc3RVc2VyQWdlbnRSZXF1ZXN0EhIKCnVzZXJfYWdlbnQYASABKAkiagoVVGVzdFVzZXJBZ2VudFJlc3BvbnNlEhIKCnJ1bGVfaW5kZXgYASABKAUSLAoGZm9ybWF0GAIgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0Eg8KB2Jyb3dzZXIYAyABKAgieAodUHJldmlld1Jlc3BvbnNlSGVhZGVyc1JlcXVlc3QSDwoHdXNlcl9pZBgBIAEoCRISCgp1c2VyX2FnZW50GAIgASgJEjIKB2hlYWRlcnMYAyADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZXNwb25zZUhlYWRlciI5CgpTZW50SGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkSDgoGYmFzZTY0GAMgASgIIqYBCh5QcmV2aWV3UmVzcG9uc2VIZWFkZXJzUmVzcG9uc2USLAoGZm9ybWF0GAEgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0Ei4KB2hlYWRlcnMYAiADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5TZW50SGVhZGVyEhIKCm5vdF9zZXJ2ZWQYAyABKAkSEgoKZ3JvdXBfbmFtZRgEIAEoCSo4CghIYXBwUGluZxIZChVIQVBQX1BJTkdfVU5TUEVDSUZJRUQQABIRCg1IQVBQX1BJTkdfVENQEAEqjgEKD0xpbmtEZXZpY2VMaW1pdBIhCh1MSU5LX0RFVklDRV9MSU1JVF9VTlNQRUNJRklFRBAAEhsKF0xJTktfREVWSUNFX0xJTUlUX1RSQUNLEAESHQoZTElOS19ERVZJQ0VfTElNSVRfRU5GT1JDRRACEhwKGExJTktfREVWSUNFX0xJTUlUX1NUUklDVBADKooBCghQbGF0Zm9ybRIYChRQTEFURk9STV9VTlNQRUNJRklFRBAAEhAKDFBMQVRGT1JNX0lPUxABEhQKEFBMQVRGT1JNX0FORFJPSUQQAhIUChBQTEFURk9STV9XSU5ET1dTEAMSEgoOUExBVEZPUk1fTUFDT1MQBBISCg5QTEFURk9STV9MSU5VWBAFKsYBCglTdWJGb3JtYXQSGgoWU1VCX0ZPUk1BVF9VTlNQRUNJRklFRBAAEhoKFlNVQl9GT1JNQVRfQkFTRTY0X1VSSVMQARIYChRTVUJfRk9STUFUX1VTRVJfUEFHRRACEhQKEFNVQl9GT1JNQVRfREVDT1kQAxIaChZTVUJfRk9STUFUX01JSE9NT19ZQU1MEAQSGAoUU1VCX0ZPUk1BVF9YUkFZX0pTT04QBRIbChdTVUJfRk9STUFUX1NJTkdCT1hfSlNPThAGMuUEChNTdWJzY3JpcHRpb25TZXJ2aWNlEoABChdHZXRTdWJzY3JpcHRpb25TZXR0aW5ncxIxLm1pc3RnYXRlLmFkbWluLnYxLkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVxdWVzdBoyLm1pc3RnYXRlLmFkbWluLnYxLkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVzcG9uc2USiQEKGlVwZGF0ZVN1YnNjcmlwdGlvblNldHRpbmdzEjQubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlU3Vic2NyaXB0aW9uU2V0dGluZ3NSZXF1ZXN0GjUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlU3Vic2NyaXB0aW9uU2V0dGluZ3NSZXNwb25zZRJcCgtMaXN0Q2xpZW50cxIlLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RDbGllbnRzUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RDbGllbnRzUmVzcG9uc2USYgoNVGVzdFVzZXJBZ2VudBInLm1pc3RnYXRlLmFkbWluLnYxLlRlc3RVc2VyQWdlbnRSZXF1ZXN0GigubWlzdGdhdGUuYWRtaW4udjEuVGVzdFVzZXJBZ2VudFJlc3BvbnNlEn0KFlByZXZpZXdSZXNwb25zZUhlYWRlcnMSMC5taXN0Z2F0ZS5hZG1pbi52MS5QcmV2aWV3UmVzcG9uc2VIZWFkZXJzUmVxdWVzdBoxLm1pc3RnYXRlLmFkbWluLnYxLlByZXZpZXdSZXNwb25zZUhlYWRlcnNSZXNwb25zZULMAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQhFTdWJzY3JpcHRpb25Qcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.SubscriptionSettings
@@ -144,6 +144,15 @@ export type SubscriptionSettings = Message<"mistgate.admin.v1.SubscriptionSettin
    * @generated from field: repeated mistgate.admin.v1.ResponseHeader response_headers = 17;
    */
   responseHeaders: ResponseHeader[];
+
+  /**
+   * The owner's own Mihomo YAML profiles, one for each of the groups they name; a person of a group that no template names gets the
+   * panel's own profile. The list is replaced as a whole. Checked on save (see MihomoTemplate); at most 20 templates, 64 KiB each and
+   * 256 KiB in all.
+   *
+   * @generated from field: repeated mistgate.admin.v1.MihomoTemplate mihomo_templates = 18;
+   */
+  mihomoTemplates: MihomoTemplate[];
 };
 
 /**
@@ -152,6 +161,51 @@ export type SubscriptionSettings = Message<"mistgate.admin.v1.SubscriptionSettin
  */
 export const SubscriptionSettingsSchema: GenMessage<SubscriptionSettings> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_subscription, 0);
+
+/**
+ * One Mihomo YAML profile of the owner. The panel puts the servers of the person at the start of its `proxies` and, while
+ * link_auto_select is on and the template has no group of that name, adds a url-test group `Auto` over them at the end of its
+ * `proxy-groups`; groups take the servers with `include-all-proxies` or `filter`. `dns` is added (resolvers of the person's preset,
+ * respect-rules on) only when the template has none. Everything else is left as written, comments included. The panel never
+ * fetches a URL of a template.
+ * 
+ * A save is refused (INVALID_ARGUMENT, the text names the line) unless the text is one valid YAML document that parses in full (no
+ * alias bomb, no repeated key), has a mapping at its root, `proxies` and `proxy-groups` that are lists (or absent) with named
+ * entries, groups that refer only to names of the template, the core and `Auto`, and `use` that names its `proxy-providers`; a
+ * group may be in one template only. Names are unique without regard to case.
+ *
+ * @generated from message mistgate.admin.v1.MihomoTemplate
+ */
+export type MihomoTemplate = Message<"mistgate.admin.v1.MihomoTemplate"> & {
+  /**
+   * 1 to 60 characters; how the editor and MCP call the template.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * The text, 1 byte to 64 KiB, UTF-8.
+   *
+   * @generated from field: string yaml = 2;
+   */
+  yaml: string;
+
+  /**
+   * The groups whose people get this template (at most 100). A group that is deleted later drops out of the list the next time the
+   * settings are saved; a template without groups serves nobody.
+   *
+   * @generated from field: repeated string group_ids = 3;
+   */
+  groupIds: string[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.MihomoTemplate.
+ * Use `create(MihomoTemplateSchema)` to create a new message.
+ */
+export const MihomoTemplateSchema: GenMessage<MihomoTemplate> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_subscription, 1);
 
 /**
  * One response header the owner adds to the subscription answer the apps fetch. The name is an HTTP token (RFC 9110) that is
@@ -205,7 +259,7 @@ export type ResponseHeader = Message<"mistgate.admin.v1.ResponseHeader"> & {
  * Use `create(ResponseHeaderSchema)` to create a new message.
  */
 export const ResponseHeaderSchema: GenMessage<ResponseHeader> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 1);
+  messageDesc(file_mistgate_admin_v1_subscription, 2);
 
 /**
  * What the owner offers for the link apps. A person's pick applies while it is offered; without one, their link apps get the
@@ -234,7 +288,7 @@ export type LinkDnsOptions = Message<"mistgate.admin.v1.LinkDnsOptions"> & {
  * Use `create(LinkDnsOptionsSchema)` to create a new message.
  */
 export const LinkDnsOptionsSchema: GenMessage<LinkDnsOptions> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 2);
+  messageDesc(file_mistgate_admin_v1_subscription, 3);
 
 /**
  * One app the user page recommends: e.g. iOS + APP_HAPP -> "Happ" (App Store link, happ://add/{url}),
@@ -294,7 +348,7 @@ export type PlatformApp = Message<"mistgate.admin.v1.PlatformApp"> & {
  * Use `create(PlatformAppSchema)` to create a new message.
  */
 export const PlatformAppSchema: GenMessage<PlatformApp> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 3);
+  messageDesc(file_mistgate_admin_v1_subscription, 4);
 
 /**
  * @generated from message mistgate.admin.v1.UserPageOptions
@@ -347,7 +401,7 @@ export type UserPageOptions = Message<"mistgate.admin.v1.UserPageOptions"> & {
  * Use `create(UserPageOptionsSchema)` to create a new message.
  */
 export const UserPageOptionsSchema: GenMessage<UserPageOptions> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 4);
+  messageDesc(file_mistgate_admin_v1_subscription, 5);
 
 /**
  * @generated from message mistgate.admin.v1.ServeRule
@@ -371,7 +425,7 @@ export type ServeRule = Message<"mistgate.admin.v1.ServeRule"> & {
  * Use `create(ServeRuleSchema)` to create a new message.
  */
 export const ServeRuleSchema: GenMessage<ServeRule> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 5);
+  messageDesc(file_mistgate_admin_v1_subscription, 6);
 
 /**
  * @generated from message mistgate.admin.v1.GetSubscriptionSettingsRequest
@@ -384,7 +438,7 @@ export type GetSubscriptionSettingsRequest = Message<"mistgate.admin.v1.GetSubsc
  * Use `create(GetSubscriptionSettingsRequestSchema)` to create a new message.
  */
 export const GetSubscriptionSettingsRequestSchema: GenMessage<GetSubscriptionSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 6);
+  messageDesc(file_mistgate_admin_v1_subscription, 7);
 
 /**
  * @generated from message mistgate.admin.v1.GetSubscriptionSettingsResponse
@@ -454,7 +508,7 @@ export type GetSubscriptionSettingsResponse = Message<"mistgate.admin.v1.GetSubs
  * Use `create(GetSubscriptionSettingsResponseSchema)` to create a new message.
  */
 export const GetSubscriptionSettingsResponseSchema: GenMessage<GetSubscriptionSettingsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 7);
+  messageDesc(file_mistgate_admin_v1_subscription, 8);
 
 /**
  * One server of the preview: what a server name is built from.
@@ -490,7 +544,7 @@ export type ServerSample = Message<"mistgate.admin.v1.ServerSample"> & {
  * Use `create(ServerSampleSchema)` to create a new message.
  */
 export const ServerSampleSchema: GenMessage<ServerSample> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 8);
+  messageDesc(file_mistgate_admin_v1_subscription, 9);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateSubscriptionSettingsRequest
@@ -509,7 +563,7 @@ export type UpdateSubscriptionSettingsRequest = Message<"mistgate.admin.v1.Updat
  * Use `create(UpdateSubscriptionSettingsRequestSchema)` to create a new message.
  */
 export const UpdateSubscriptionSettingsRequestSchema: GenMessage<UpdateSubscriptionSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 9);
+  messageDesc(file_mistgate_admin_v1_subscription, 10);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateSubscriptionSettingsResponse
@@ -526,7 +580,7 @@ export type UpdateSubscriptionSettingsResponse = Message<"mistgate.admin.v1.Upda
  * Use `create(UpdateSubscriptionSettingsResponseSchema)` to create a new message.
  */
 export const UpdateSubscriptionSettingsResponseSchema: GenMessage<UpdateSubscriptionSettingsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 10);
+  messageDesc(file_mistgate_admin_v1_subscription, 11);
 
 /**
  * @generated from message mistgate.admin.v1.ClientInfo
@@ -564,7 +618,7 @@ export type ClientInfo = Message<"mistgate.admin.v1.ClientInfo"> & {
  * Use `create(ClientInfoSchema)` to create a new message.
  */
 export const ClientInfoSchema: GenMessage<ClientInfo> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 11);
+  messageDesc(file_mistgate_admin_v1_subscription, 12);
 
 /**
  * @generated from message mistgate.admin.v1.ListClientsRequest
@@ -577,7 +631,7 @@ export type ListClientsRequest = Message<"mistgate.admin.v1.ListClientsRequest">
  * Use `create(ListClientsRequestSchema)` to create a new message.
  */
 export const ListClientsRequestSchema: GenMessage<ListClientsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 12);
+  messageDesc(file_mistgate_admin_v1_subscription, 13);
 
 /**
  * @generated from message mistgate.admin.v1.ListClientsResponse
@@ -594,7 +648,7 @@ export type ListClientsResponse = Message<"mistgate.admin.v1.ListClientsResponse
  * Use `create(ListClientsResponseSchema)` to create a new message.
  */
 export const ListClientsResponseSchema: GenMessage<ListClientsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 13);
+  messageDesc(file_mistgate_admin_v1_subscription, 14);
 
 /**
  * @generated from message mistgate.admin.v1.TestUserAgentRequest
@@ -611,7 +665,7 @@ export type TestUserAgentRequest = Message<"mistgate.admin.v1.TestUserAgentReque
  * Use `create(TestUserAgentRequestSchema)` to create a new message.
  */
 export const TestUserAgentRequestSchema: GenMessage<TestUserAgentRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 14);
+  messageDesc(file_mistgate_admin_v1_subscription, 15);
 
 /**
  * @generated from message mistgate.admin.v1.TestUserAgentResponse
@@ -642,7 +696,7 @@ export type TestUserAgentResponse = Message<"mistgate.admin.v1.TestUserAgentResp
  * Use `create(TestUserAgentResponseSchema)` to create a new message.
  */
 export const TestUserAgentResponseSchema: GenMessage<TestUserAgentResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 15);
+  messageDesc(file_mistgate_admin_v1_subscription, 16);
 
 /**
  * @generated from message mistgate.admin.v1.PreviewResponseHeadersRequest
@@ -671,7 +725,7 @@ export type PreviewResponseHeadersRequest = Message<"mistgate.admin.v1.PreviewRe
  * Use `create(PreviewResponseHeadersRequestSchema)` to create a new message.
  */
 export const PreviewResponseHeadersRequestSchema: GenMessage<PreviewResponseHeadersRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 16);
+  messageDesc(file_mistgate_admin_v1_subscription, 17);
 
 /**
  * One header as it goes out.
@@ -702,7 +756,7 @@ export type SentHeader = Message<"mistgate.admin.v1.SentHeader"> & {
  * Use `create(SentHeaderSchema)` to create a new message.
  */
 export const SentHeaderSchema: GenMessage<SentHeader> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 17);
+  messageDesc(file_mistgate_admin_v1_subscription, 18);
 
 /**
  * @generated from message mistgate.admin.v1.PreviewResponseHeadersResponse
@@ -745,7 +799,7 @@ export type PreviewResponseHeadersResponse = Message<"mistgate.admin.v1.PreviewR
  * Use `create(PreviewResponseHeadersResponseSchema)` to create a new message.
  */
 export const PreviewResponseHeadersResponseSchema: GenMessage<PreviewResponseHeadersResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 18);
+  messageDesc(file_mistgate_admin_v1_subscription, 19);
 
 /**
  * The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).

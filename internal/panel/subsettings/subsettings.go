@@ -450,6 +450,9 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	if err := validateResponseHeaders(s.ResponseHeaders); err != nil {
 		return err
 	}
+	if err := validateMihomoTemplates(s); err != nil {
+		return err
+	}
 	if o := s.UserPage; o == nil {
 		return invalid("user_page missing")
 	}
@@ -488,6 +491,7 @@ func Normalize(s *adminv1.SubscriptionSettings) {
 		}
 	}
 	normalizeResponseHeaders(s.ResponseHeaders)
+	normalizeMihomoTemplates(s.MihomoTemplates)
 }
 
 var (

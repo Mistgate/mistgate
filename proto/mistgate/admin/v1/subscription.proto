@@ -64,6 +64,30 @@ message SubscriptionSettings {
   // The owner's own response headers of a successful subscription answer (e.g. flclashx-servicename). In order: when two
   // entries of one name both apply, the first wins. Refusals (device limit, a blocked device, no access) carry none of them.
   repeated ResponseHeader response_headers = 17;
+  // The owner's own Mihomo YAML profiles, one for each of the groups they name; a person of a group that no template names gets the
+  // panel's own profile. The list is replaced as a whole. Checked on save (see MihomoTemplate); at most 20 templates, 64 KiB each and
+  // 256 KiB in all.
+  repeated MihomoTemplate mihomo_templates = 18;
+}
+
+// One Mihomo YAML profile of the owner. The panel puts the servers of the person at the start of its `proxies` and, while
+// link_auto_select is on and the template has no group of that name, adds a url-test group `Auto` over them at the end of its
+// `proxy-groups`; groups take the servers with `include-all-proxies` or `filter`. `dns` is added (resolvers of the person's preset,
+// respect-rules on) only when the template has none. Everything else is left as written, comments included. The panel never
+// fetches a URL of a template.
+//
+// A save is refused (INVALID_ARGUMENT, the text names the line) unless the text is one valid YAML document that parses in full (no
+// alias bomb, no repeated key), has a mapping at its root, `proxies` and `proxy-groups` that are lists (or absent) with named
+// entries, groups that refer only to names of the template, the core and `Auto`, and `use` that names its `proxy-providers`; a
+// group may be in one template only. Names are unique without regard to case.
+message MihomoTemplate {
+  // 1 to 60 characters; how the editor and MCP call the template.
+  string name = 1;
+  // The text, 1 byte to 64 KiB, UTF-8.
+  string yaml = 2;
+  // The groups whose people get this template (at most 100). A group that is deleted later drops out of the list the next time the
+  // settings are saved; a template without groups serves nobody.
+  repeated string group_ids = 3;
 }
 
 // One response header the owner adds to the subscription answer the apps fetch. The name is an HTTP token (RFC 9110) that is
