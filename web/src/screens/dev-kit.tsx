@@ -60,6 +60,7 @@ import { SSHKit } from "./dev-kit-ssh";
 import { OsKit, OsPageKit } from "./dev-kit-os";
 import { OsFleetKit } from "./dev-kit-os-fleet";
 import { ClientLogsKit } from "./dev-kit-clientlogs";
+import { ProbesKit } from "./dev-kit-probes";
 import { BulkKit, BulkPage } from "./dev-kit-bulk";
 import { UsersBulkKit, UsersBulkPage } from "./dev-kit-users-bulk";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
@@ -303,13 +304,13 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay: one kit alone, for its screenshots;
+  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "halo") return <HaloKit />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { "profile-fixes": ProfileFixesKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit }[which];
+  const only = { "profile-fixes": ProfileFixesKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit }[which];
   if (only) {
     const Kit = only;
     return (
