@@ -11,6 +11,7 @@ import { Infinite, Stepper } from "@/components/ui/stepper";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { users } from "@/lib/api";
+import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { nodesQuery } from "@/lib/queries";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
@@ -59,7 +60,7 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
   const [reset, setReset] = useState(QuotaReset.MONTH);
   const [termDays, setTermDays] = useState(30);
   const [devices, setDevices] = useState(5);
-  const [apps, setApps] = useState<{ happ: boolean; amnezia: boolean; telegram: boolean; mistgate: boolean } | null>(null); // null = what the group gives
+  const [apps, setApps] = useState<{ happ: boolean; amnezia: boolean; telegram: boolean; mistgate: boolean; trustTunnel: boolean } | null>(null); // null = what the group gives
   const [allNodes, setAllNodes] = useState(true);
   const [picked, setPicked] = useState<string[]>([]);
   const [editingGroup, setEditingGroup] = useState(false);
@@ -78,8 +79,11 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
   const inheritedDns = useInheritedDns(groupId);
   // The switches follow the group until one is flipped: a way the group gives nothing for starts off (with the reason
   // under it); a group that gives nothing at all leaves Happ on, and the red line above says why it is empty.
-  const auto = { happ: !group || group.happNodes > 0 || group.amneziaNodes === 0, amnezia: !!group && group.amneziaNodes > 0, telegram: false, mistgate: true };
-  const { happ, amnezia, telegram, mistgate } = apps ?? auto;
+  const auto = { happ: !group || group.happNodes > 0 || group.amneziaNodes === 0, amnezia: !!group && group.amneziaNodes > 0, telegram: false, mistgate: true, trustTunnel: false };
+  const { happ, amnezia, telegram, mistgate, trustTunnel } = apps ?? auto;
+  // not in the Cloudflare edition: no switch, so a new person is never refused for it there
+  const edition = useEdition();
+  const ttOff = edition.edge || edition.off("trusttunnel");
 
   const create = useMutation({
     mutationFn: () =>
@@ -90,7 +94,7 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
         quotaReset: reset,
         termDays,
         deviceLimit: devices,
-        apps: { happ, amnezia, telegram, mistgate },
+        apps: { happ, amnezia, telegram, mistgate, ...(trustTunnel && { trustTunnel }) },
         nodes: { all: allNodes, nodeIds: allNodes ? [] : picked.filter((id) => allIds.includes(id)) },
         dnsPresetId: dnsPreset,
         speedLimitBps: big(speed),
@@ -117,8 +121,8 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
     } else setAllNodes(true);
   };
   // at least one app stays on: the switch that would turn the last one off does nothing
-  const flipApp = (which: "happ" | "amnezia" | "telegram" | "mistgate", on: boolean) => {
-    const next = { happ, amnezia, telegram, mistgate, [which]: on };
+  const flipApp = (which: "happ" | "amnezia" | "telegram" | "mistgate" | "trustTunnel", on: boolean) => {
+    const next = { happ, amnezia, telegram, mistgate, trustTunnel, [which]: on };
     if (!next.happ && !next.amnezia) return;
     setApps(next);
   };
@@ -245,6 +249,7 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
         <SwitchRow label={linkApps} hint={offHint("happ") ?? t("users.happHint")} checked={happ} onCheckedChange={(on) => flipApp("happ", on)} className="min-h-12" />
         <SwitchRow label="AmneziaVPN" hint={offHint("amnezia") ?? t("users.awgHint")} checked={amnezia} onCheckedChange={(on) => flipApp("amnezia", on)} className="min-h-12" />
         <SwitchRow label={t("tgproxy.toggle")} hint={t("users.telegramHint")} checked={telegram} onCheckedChange={(on) => flipApp("telegram", on)} className="min-h-12" />
+        {!ttOff && <SwitchRow label={t("tt.toggle")} hint={t("users.trustTunnelHint")} checked={trustTunnel} onCheckedChange={(on) => flipApp("trustTunnel", on)} className="min-h-12" />}
         <MistgateAppRow checked={mistgate} linkOn={happ} onCheckedChange={(on) => flipApp("mistgate", on)} />
       </Box>
 
