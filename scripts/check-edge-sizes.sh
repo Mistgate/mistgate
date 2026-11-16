@@ -56,8 +56,10 @@ entries=(
   # past about 55 MiB the owner-only rare functions move to a Worker of their own. The debug capture's agent messages
   # (DebugCapture, DebugCaptureReport, SEVERITY_DEBUG) cost about 15 KB in every Worker, since each links the generated
   # agentv1 package; its RPCs are the VPS-only OpsService. The Agent update timeout/progress controls are owner-facing
-  # admin RPCs and UI state, so they stay here rather than adding another Worker boundary.
-  "mistgate-edge-admin:46"
+  # admin RPCs and UI state, so they stay here rather than adding another Worker boundary. 47 MiB with the owner's own
+  # subscription response headers (46.01 MiB measured, 9 KiB over 46): the settings RPC, its validation and the preview are
+  # admin RPCs, and the TrustTunnel and bridge settings merged just before had left 91 KiB of room.
+  "mistgate-edge-admin:47"
   # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB; 31.9 MiB in November 2026 with the panel's SSH key, the
   # authorized_keys management and the login by an own private key, which need that SSH client and so cannot live elsewhere.
   "mistgate-edge-provision:35"
