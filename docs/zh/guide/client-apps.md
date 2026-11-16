@@ -32,6 +32,10 @@ Mistgate 没有自有客户端。用户使用现有应用连接，面板会向�
 
 只有在用户开启 AmneziaVPN 连接方式（在用户卡片或分组中的**订阅中的应用**设置），且用户所在分组有部署到节点的 AmneziaWG 协议配置时，基于 mihomo 内核的应用才会收到 AmneziaWG 服务器。此类应用首次获取订阅时，会为它的设备发放 AmneziaWG 密钥。内核版本需要足够新：面板会在每个密钥旁标出 AmneziaWG 3.1 所需的 Mihomo 1.19.30 或更新版本，以及 2.0 所需的 1.19.14 或更新版本（参见[AmneziaWG](amneziawg.md)）。
 
+**TrustTunnel。** [TrustTunnel 协议配置](trusttunnel.md)由**官方 TrustTunnel 应用**（iOS、Android、Windows、macOS、Linux 和路由器；列表见 <https://github.com/TrustTunnel/TrustTunnel> 的 Clients 一节）和 Mistgate 应用读取。官方应用不读取订阅：用户每个服务器得到一条 `tt://` 链接或一个二维码，在应用中打开即可。链接来自用户页面的 **TrustTunnel** 区块和管理后台中该用户的卡片，不会来自订阅。`tt://` 链接始终是 HTTP/2，并且要求服务器带有公共证书。
+
+这些应用不在**订阅 → 用户页面**的应用列表中。用户只需开启 **TrustTunnel** 开关（[用户与分组](users-and-groups.md#trusttunnel)）。该协议是实验性的。
+
 ## 哪些应用会发送设备 ID
 
 [设备上限](subscriptions.md#订阅类应用的设备上限)按应用在 `X-HWID` 标头中发送的设备 ID 给应用计数。发送 ID 的应用有自己的名额和密钥；不发送的应用与其他同类应用共用一个名额。最后一列是面板拒绝设备时用户看到的内容（[应用会显示什么](subscriptions.md#设备被拒绝时应用会显示什么)）。

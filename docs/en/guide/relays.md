@@ -76,6 +76,8 @@ For each relay that works, a person gets a **twin** of the exit's server right a
 - **What people see:** a second server to pick when the first does not connect. Nothing changes for the servers they already use.
 - **MTProto:** a relay passes an [MTProto](mtproto.md) server on as well. The twin is not in the subscription: it is one more link in the person's **Telegram proxy** block, marked **via RU**, with the same key and the same name in the handshake as the exit's.
 
+- **TrustTunnel:** a relay passes a [TrustTunnel](trusttunnel.md) server on over HTTP/2 only: the twin is TCP only and goes to the Mistgate app, not into a `tt://` link.
+
 ## AmneziaWG through a relay
 
 A relay passes an [AmneziaWG](amneziawg.md) server on like any other: the entry forwards its UDP port and the exit holds the tunnel. The one difference is the key. The exit remembers one address for each key, so a key used on two paths at once would make the exit jump between them and lose packets. So everyone who is allowed both the exit's server and the entry node gets a **separate key and tunnel address for the path through the entry**; the direct server keeps its own key.
