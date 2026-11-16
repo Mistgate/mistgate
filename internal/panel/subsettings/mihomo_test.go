@@ -403,6 +403,31 @@ rules: [MATCH,Proxy]
 	}
 }
 
+// The comments that open the file are the first thing of the result, whatever the template starts with: the servers of the person
+// come after them (in the template's own `proxies` where it has one, else at the end), never above.
+func TestApplyKeepsTheOpeningCommentsFirst(t *testing.T) {
+	const groups = "proxy-groups:\n  - name: Proxy\n    type: select\n    include-all-proxies: true\n"
+	const static = "  - {name: office, type: socks5, server: example.com, port: 1080}\n"
+	for name, text := range map[string]string{
+		"no proxies":            "# Router, v3\n# for the family\n\nmixed-port: 7890\n" + groups,
+		"proxies first":         "# Router, v3\n# for the family\n\nproxies:\n" + static + groups,
+		"proxies first, no gap": "# Router, v3\n# for the family\nproxies:\n" + static + groups,
+		"empty proxies first":   "# Router, v3\n# for the family\n\nproxies: []\n" + groups,
+		"null proxies first":    "# Router, v3\n# for the family\n\nproxies:\n" + groups,
+		"proxies, then a note":  "# Router, v3\n# for the family\n\nproxies:\n  # the office\n" + static + groups,
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, b := apply(t, text, MihomoOptions{AutoSelect: true}, "de1")
+			if !strings.HasPrefix(out, "# Router, v3\n# for the family\n") {
+				t.Errorf("the opening comments are not first:\n%s", out)
+			}
+			if got := proxyNames(b); len(got) == 0 || got[0] != "de1" {
+				t.Errorf("the person's server is not first of proxies: %v", got)
+			}
+		})
+	}
+}
+
 func TestApplyRefusesWhatItCannotTouchSafely(t *testing.T) {
 	for name, text := range map[string]string{
 		"a merge key at the root":   "base: &b\n  mixed-port: 1\n<<: *b\n",

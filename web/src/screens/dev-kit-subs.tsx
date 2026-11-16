@@ -200,7 +200,7 @@ const mtTemplates = (state: string) =>
         { name: "Draft", yaml: state === "mihomo-error" ? mtDraft : mtBase, groupIds: [] },
       ];
 
-/** What the panel's preview answers for a text, in the shape of its rules (a made-up one: the line of a mistake, the six warnings, the servers first). */
+/** What the panel's preview answers for a text, in the shape of its rules (a made-up one: the line of a mistake, the six warnings, the servers after the comments that open the file). */
 function fakeMihomoPreview({ userId, yaml, groupIds }: { userId: string; yaml: string; groupIds: string[] }) {
   const lines = yaml.split("\n");
   const bad = lines.findIndex((l) => /^\s+[A-Za-z][\w-]*\s+[^\s:#-][^:]*$/.test(l) || /^[A-Za-z][\w-]*\s+[^\s:#][^:]*$/.test(l));
@@ -215,10 +215,14 @@ function fakeMihomoPreview({ userId, yaml, groupIds }: { userId: string; yaml: s
   if (groupIds.length === 0) warnings.push({ code: "unused", arg: "" });
   const servers = `proxies:\n  - {name: "DE de1 vless", type: vless, server: de1.example.com, port: 443}\n  - {name: "NL nl1 hysteria2", type: hysteria2, server: nl1.example.com, port: 8443}\n`;
   const auto = `  - name: Auto\n    type: url-test\n    proxies: ["DE de1 vless", "NL nl1 hysteria2"]\n    url: https://www.gstatic.com/generate_204\n    interval: 300\n`;
-  const at = lines.findIndex((l) => l.startsWith("rule-providers:") || l.startsWith("rules:"));
-  const body = lines.slice(0, at < 0 ? lines.length : at).join("\n").replace(/\n*$/, "\n") + (/include-all/.test(yaml) && !/name: Auto/.test(yaml) ? auto : "") + (at < 0 ? "" : "\n" + lines.slice(at).join("\n"));
+  // the comments at the top of the file stay the first thing of it: the person's servers come after them, as the panel puts them
+  const top = lines.findIndex((l) => !/^\s*(#.*)?$/.test(l));
+  const head = top < 0 ? lines : lines.slice(0, top);
+  const rest = top < 0 ? [] : lines.slice(top);
+  const at = rest.findIndex((l) => l.startsWith("rule-providers:") || l.startsWith("rules:"));
+  const body = rest.slice(0, at < 0 ? rest.length : at).join("\n").replace(/\n*$/, "\n") + (/include-all/.test(yaml) && !/name: Auto/.test(yaml) ? auto : "") + (at < 0 ? "" : "\n" + rest.slice(at).join("\n"));
   const dns = /^dns:/m.test(yaml) ? "" : "dns:\n  enable: true\n  respect-rules: true\n  nameserver: [https://dns.example.com/dns-query]\n";
-  return { yaml: servers + body + dns, warnings, groupName: mtGroups.find((g) => g.id === user.groupId)!.name, notServed: "" };
+  return { yaml: (head.length ? head.join("\n") + "\n" : "") + servers + body + dns, warnings, groupName: mtGroups.find((g) => g.id === user.groupId)!.name, notServed: "" };
 }
 
 /** The tab "Mihomo templates" on its own cache; the panel's preview is answered here by a stand-in (see fakeMihomoPreview). */
