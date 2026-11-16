@@ -16,8 +16,8 @@ func TestRelayModeSQLite(t *testing.T) {
 func TestRelayReverseMigrationUpDown(t *testing.T) {
 	ctx := context.Background()
 	s, p := openProvider(t)
-	if _, err := p.UpTo(ctx, 137); err != nil {
-		t.Fatalf("up to 137: %v", err)
+	if _, err := p.UpTo(ctx, 140); err != nil {
+		t.Fatalf("up to 140: %v", err)
 	}
 	for _, q := range []string{
 		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_de1', 'de1', '192.0.2.10', 'active', 1)`,
@@ -29,8 +29,8 @@ func TestRelayReverseMigrationUpDown(t *testing.T) {
 	} {
 		execT(t, s, q)
 	}
-	if _, err := p.UpTo(ctx, 138); err != nil {
-		t.Fatalf("up to 138: %v", err)
+	if _, err := p.UpTo(ctx, 141); err != nil {
+		t.Fatalf("up to 141: %v", err)
 	}
 	check := func(when string) {
 		t.Helper()
@@ -55,8 +55,8 @@ func TestRelayReverseMigrationUpDown(t *testing.T) {
 			t.Fatalf("%s was accepted", bad)
 		}
 	}
-	if _, err := p.DownTo(ctx, 137); err != nil {
-		t.Fatalf("down to 137: %v", err)
+	if _, err := p.DownTo(ctx, 140); err != nil {
+		t.Fatalf("down to 140: %v", err)
 	}
 	for _, column := range []string{"mode", "active_mode", "mode_changed_at", "mode_reason"} {
 		if countT(t, s, `SELECT count(*) FROM pragma_table_info('relay') WHERE name = ?`, column) != 0 {
@@ -71,7 +71,7 @@ func TestRelayReverseMigrationUpDown(t *testing.T) {
 	if countT(t, s, `SELECT count(*) FROM relay WHERE id = 'rly_old' AND enabled = 1 AND state = 'active'`) != 1 {
 		t.Fatal("the relay did not survive the down migration")
 	}
-	if _, err := p.UpTo(ctx, 138); err != nil {
+	if _, err := p.UpTo(ctx, 141); err != nil {
 		t.Fatalf("up again: %v", err)
 	}
 	check("after up again")

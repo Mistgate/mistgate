@@ -8,7 +8,7 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
-// The way a relay passes traffic on (migration 00138, relay.proto "TWO WAYS TO PASS ON"). Nothing here decides a way: the panel's
+// The way a relay passes traffic on (migration 00141, relay.proto "TWO WAYS TO PASS ON"). Nothing here decides a way: the panel's
 // controller (and the owner) write them, the desired state and the admin API read them.
 const (
 	RelayModeAuto    = "auto"    // the owner's choice only: the panel picks dnat or reverse

@@ -67,7 +67,7 @@ type NodeRow struct {
 	LinkSealed bool
 	// BridgePort is the TCP port of the node's site that the bridge of a reverse relay arrives at when the node is an entry; 0 = 443
 	// on the node's own site. BridgePath is the random path of the bridge ("" until the first reverse relay of the entry; migration
-	// 00138). It is the panel's: it goes to the two agents of a pair and nowhere else.
+	// 00141). It is the panel's: it goes to the two agents of a pair and nowhere else.
 	BridgePort uint16
 	BridgePath string
 }

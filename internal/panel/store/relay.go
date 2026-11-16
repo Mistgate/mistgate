@@ -32,7 +32,7 @@ type Relay struct {
 	AppliedAt              time.Time
 	CheckJSON              string
 	CreatedAt, UpdatedAt   time.Time
-	// The way the relay passes traffic on (migration 00138; the words of relay.proto Relay.mode and active_mode): Mode is the owner's
+	// The way the relay passes traffic on (migration 00141; the words of relay.proto Relay.mode and active_mode): Mode is the owner's
 	// choice ("auto", "dnat" or "reverse"), ActiveMode what stands now ("dnat" or "reverse"), ModeChangedAt when ActiveMode last
 	// changed (zero = never) and ModeReason why (relay.proto Relay.mode_reason).
 	Mode, ActiveMode, ModeReason string
