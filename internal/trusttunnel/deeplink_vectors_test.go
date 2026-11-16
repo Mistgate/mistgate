@@ -85,11 +85,11 @@ func TestDeepLinkDecodesEveryTag(t *testing.T) {
 }
 
 func TestDeepLinkEncoderMatchesHandWrittenBytes(t *testing.T) {
-	// 00 01 02 | 01 0f hostname | 05 05 alice | 06 06 s3cret | 02 0d 192.0.2.1:443 |
+	// 00 01 01 (version 1: no subscription_url, see EncodeDeepLink) | 01 0f hostname | 05 05 alice | 06 06 s3cret | 02 0d 192.0.2.1:443 |
 	// 04 01 00 (has_ipv6 explicit) | 09 01 01 (http2 explicit) | 0c 07 Example |
 	// 0d 0b 0a "192.0.2.53" (String[] of one entry)
-	const wantHex = "000102010f76706e2e6578616d706c652e636f6d0505616c6963650606733363726574020d3139322e302e322e313a3434330401000901010c074578616d706c650d0b0a3139322e302e322e3533"
-	const want = "tt://?AAECAQ92cG4uZXhhbXBsZS5jb20FBWFsaWNlBgZzM2NyZXQCDTE5Mi4wLjIuMTo0NDMEAQAJAQEMB0V4YW1wbGUNCwoxOTIuMC4yLjUz"
+	const wantHex = "000101010f76706e2e6578616d706c652e636f6d0505616c6963650606733363726574020d3139322e302e322e313a3434330401000901010c074578616d706c650d0b0a3139322e302e322e3533"
+	const want = "tt://?AAEBAQ92cG4uZXhhbXBsZS5jb20FBWFsaWNlBgZzM2NyZXQCDTE5Mi4wLjIuMTo0NDMEAQAJAQEMB0V4YW1wbGUNCwoxOTIuMC4yLjUz"
 	got, err := EncodeDeepLink(DeepLink{
 		Hostname:     "vpn.example.com",
 		Addresses:    []string{"192.0.2.1:443"},
@@ -465,5 +465,35 @@ func TestDeepLinkEncoderPolicy(t *testing.T) {
 		if value, found := findDeepLinkTag(payload, tag); !found || !bytes.Equal(value, []byte{1}) {
 			t.Fatalf("tag 0x%x = %x", tag, value)
 		}
+	}
+}
+
+// The stable official client (v1.1.12, found by the stand scripts/e2e/trusttunnel.sh: "Unsupported deep link version: 2 (max
+// supported: 1)") takes versions up to 1. A link without subscription_url is version 1; one with it must be 2, the version that
+// introduced the tag.
+func TestEncodedVersionIsOneUnlessThereIsASubscription(t *testing.T) {
+	version := func(link DeepLink) uint64 {
+		got, err := EncodeDeepLink(link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload, _ := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(got, DeepLinkPrefix))
+		raw, found := findDeepLinkTag(payload, deepLinkTagVersion)
+		if !found {
+			t.Fatal("no version tag")
+		}
+		v, _, err := ReadQUICVarint(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	plain := DeepLink{Hostname: "vpn.example.com", Addresses: []string{"192.0.2.1:443"}, Username: "alice", Password: "s3cret"}
+	if got := version(plain); got != 1 {
+		t.Errorf("a link without subscription_url is version %d, want 1", got)
+	}
+	plain.SubscriptionURL = "https://example.com/sub"
+	if got := version(plain); got != 2 {
+		t.Errorf("a link with subscription_url is version %d, want 2", got)
 	}
 }

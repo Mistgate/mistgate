@@ -383,7 +383,7 @@ func TestDeepLinkRequiredTagsAndUnsupportedTags(t *testing.T) {
 	if !found {
 		t.Fatal("version tag is absent")
 	}
-	if value, n, err := ReadQUICVarint(version); err != nil || n != len(version) || value != 2 {
+	if value, n, err := ReadQUICVarint(version); err != nil || n != len(version) || value != 1 { // version 1: the released official client rejects 2
 		t.Fatalf("version = %d, %d, %v", value, n, err)
 	}
 	protocol, found := findDeepLinkTag(payload, deepLinkTagUpstreamProtocol)

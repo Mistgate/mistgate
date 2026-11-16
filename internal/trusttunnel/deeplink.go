@@ -119,7 +119,7 @@ func ReadQUICVarint(data []byte) (value uint64, n int, err error) {
 	return value, size, nil
 }
 
-// EncodeDeepLink encodes a version-2 tt:// link. Tags are written in the order
+// EncodeDeepLink encodes a tt:// link: version 1, or 2 for one with a subscription_url (see the comment at the version tag). Tags are written in the order
 // of the official encoder. has_ipv6 and upstream_protocol are always explicit
 // (a Flutter client reads a missing has_ipv6 as false), except in a
 // subscription-only link, which carries only version and subscription_url.
@@ -173,7 +173,15 @@ func EncodeDeepLink(link DeepLink) (string, error) {
 		}
 	}
 
-	version, _ := AppendQUICVarint(nil, deepLinkVersion)
+	// DEEP_LINK.md says "encoders MUST emit version 2", but version 2 only adds subscription_url, and the released official client
+	// (trusttunnel_client and its setup_wizard, v1.1.12) rejects anything above 1 ("Unsupported deep link version: 2 (max supported:
+	// 1)", found by the stand of scripts/e2e/trusttunnel.sh). A link without subscription_url means the same in version 1, which
+	// every client accepts, new and old; only a subscription link has to be version 2.
+	emitVersion := uint64(1)
+	if subscription {
+		emitVersion = deepLinkVersion
+	}
+	version, _ := AppendQUICVarint(nil, emitVersion)
 	add(deepLinkTagVersion, version)
 	addString(deepLinkTagHostname, link.Hostname)
 	addString(deepLinkTagUsername, link.Username)

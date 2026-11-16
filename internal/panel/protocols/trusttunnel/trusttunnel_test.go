@@ -283,14 +283,14 @@ func TestOfficialTrustTunnelDeepLinks(t *testing.T) {
 	check("direct ipv6 off with DNS", base, ttwire.DeepLink{
 		Hostname: "de1.example.com", Addresses: []string{"de1.example.com:443"}, HasIPv6: false,
 		Username: testUsername, Password: testPassword, Name: "de1", DNSUpstreams: []string{"192.0.2.53", "192.0.2.54"},
-	}, "tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDANkZTENFgoxOTIuMC4yLjUzCjE5Mi4wLjIuNTQ")
+	}, "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDANkZTENFgoxOTIuMC4yLjUzCjE5Mi4wLjIuNTQ")
 
 	withoutDNS := base
 	withoutDNS.NoIPv6Egress, withoutDNS.DNS = false, nil
 	check("direct ipv6 on without DNS", withoutDNS, ttwire.DeepLink{
 		Hostname: "de1.example.com", Addresses: []string{"de1.example.com:443"}, HasIPv6: true,
 		Username: testUsername, Password: testPassword, Name: "de1",
-	}, "tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEBCQEBDANkZTE")
+	}, "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEBCQEBDANkZTE")
 
 	relay := base
 	relay.Inbound.Node.Address, relay.Inbound.Port, relay.Inbound.TCPOnly = "192.0.2.22", 8443, true
@@ -298,7 +298,7 @@ func TestOfficialTrustTunnelDeepLinks(t *testing.T) {
 	check("relay twin", relay, ttwire.DeepLink{
 		Hostname: "de1.example.com", Addresses: []string{"192.0.2.22:8443"}, HasIPv6: false,
 		Username: testUsername, Password: testPassword, Name: "de1 via nl1", DNSUpstreams: []string{"192.0.2.53", "192.0.2.54"},
-	}, "tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3Ag8xOTIuMC4yLjIyOjg0NDMEAQAJAQEMC2RlMSB2aWEgbmwxDRYKMTkyLjAuMi41MwoxOTIuMC4yLjU0")
+	}, "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3Ag8xOTIuMC4yLjIyOjg0NDMEAQAJAQEMC2RlMSB2aWEgbmwxDRYKMTkyLjAuMi41MwoxOTIuMC4yLjU0")
 
 	selfSigned := base
 	selfSigned.Inbound.TLSMode = plugin.TLSSelfSigned
