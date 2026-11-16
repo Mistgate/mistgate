@@ -479,6 +479,9 @@ func (testNodeManager) CreateProvisionEnrollment(context.Context, NodeSpec, stri
 func (testNodeManager) ProvisionNodeState(context.Context, string) (string, bool, error) {
 	return "pending", false, nil
 }
+func (testNodeManager) EnrollInSession(context.Context, string, []byte) (string, []byte, []byte, error) {
+	return "", nil, nil, errors.New("unused")
+}
 
 type testBinarySource struct{}
 

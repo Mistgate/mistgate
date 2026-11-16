@@ -20,6 +20,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
+	"github.com/mistgate/mistgate/internal/panel/protocols/vless"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -432,6 +433,9 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			}
 			if oldErr == nil && !specChanged(oldSpec, newSpec) {
 				continue
+			}
+			if err := s.hostRefusal(f.Node.ID, f.Node.Name, newSpec); err != nil {
+				return nil, err
 			}
 			others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
 			if err != nil {
@@ -877,6 +881,28 @@ func freePortFor(spec plugin.InboundSpec, others []nodeListen, checks map[uint16
 	return ports[0]
 }
 
+// hostRefusal is the coded refusal of an enabled inbound that would take TCP 443 of the subscription host away from the
+// node's own site (VLESS REALITY with another site as its target), or nil. In the node's spec the node's own site is the
+// target "self".
+func (s *Service) hostRefusal(nodeID, node string, spec plugin.InboundSpec) error {
+	if s.cfg.SubscriptionHost == nil || spec.Protocol != vless.ID || spec.Listen.Port != 443 || !s.cfg.SubscriptionHost(nodeID) {
+		return nil
+	}
+	var settings struct {
+		Security string `json:"security"`
+		Reality  struct {
+			Target string `json:"target"`
+		} `json:"reality"`
+	}
+	if json.Unmarshal(spec.Settings, &settings) != nil || settings.Security != "reality" {
+		return nil
+	}
+	if t := strings.TrimSpace(settings.Reality.Target); t != "" && t != "self" {
+		return coded(connect.CodeFailedPrecondition, "sub_host_reality_foreign", "node", node)
+	}
+	return nil
+}
+
 // portRefusal is the coded refusal of a listen that another profile of the node fights over, or nil: "hop_taken" when
 // the inbound's own hop range is what overlaps (no port fixes that), else "port_taken" with a free port to take instead.
 func portRefusal(spec plugin.InboundSpec, node string, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) error {
@@ -1250,6 +1276,9 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now()); err != nil {
 		return nil, err
 	}
+	if err := s.hostRefusal(f.Node.ID, f.Node.Name, spec); err != nil {
+		return nil, err
+	}
 	warnings, err := s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others)
 	if err != nil {
 		return nil, err
@@ -1352,6 +1381,9 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	if in.Enabled {
 		if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now()); err != nil {
+			return nil, err
+		}
+		if err := s.hostRefusal(f.Node.ID, f.Node.Name, spec); err != nil {
 			return nil, err
 		}
 		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others); err != nil {

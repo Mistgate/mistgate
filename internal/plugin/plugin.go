@@ -54,6 +54,12 @@ type WarpSpec struct {
 // The panel sends relays only to a stream that listed it.
 const CapRelayForward = "relay-forward/1"
 
+// CapHostTunnel is the Hello capability of an agent that can be the subscription host (NodeSettings.host_tunnel).
+const CapHostTunnel = "host-tunnel/1"
+
+// CapPanelLink is the Hello capability of an agent that follows NodeSettings.panel_link_url to a new panel link address.
+const CapPanelLink = "panel-link/1"
+
 // RelayForward is one forwarded port of the node (agent.v1.RelayForward): connections to Port go, unchanged, to ToHost:ToPort.
 // ToHost is an IPv4 literal or a name the agent resolves.
 type RelayForward struct {

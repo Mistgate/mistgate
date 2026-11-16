@@ -14,7 +14,7 @@ func TestSiteSpeaksHTTP2LikeEverySite(t *testing.T) {
 	cert := sitehttptest.Certificate(t)
 	port := freeTCPPort(t)
 	m, err := startTCPMasq(port, func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return &cert, nil },
-		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), 4443)
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), 4443, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

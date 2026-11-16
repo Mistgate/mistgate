@@ -88,7 +88,7 @@ func (h *handler) serveEnrol(w http.ResponseWriter, r *http.Request, token, clie
 		jsonError(w, http.StatusForbidden, "cross_origin", "")
 		return
 	}
-	if h.cfg.BaseURL == "" {
+	if h.cfg.baseURL() == "" {
 		jsonError(w, http.StatusServiceUnavailable, "not_configured", "")
 		return
 	}

@@ -1,7 +1,7 @@
 import { ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from "react";
 import { markFresh } from "@/components/fx/registry";
 import { Sweep } from "@/components/fx/sweep-react";
 import { authorizedKeysFile, PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
@@ -12,14 +12,16 @@ import { Banner, Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import type { NodePreflight } from "@/gen/mistgate/admin/v1/provisioning_pb";
+import { SubscriptionHostState } from "@/gen/mistgate/admin/v1/subscription_host_pb";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { provisioning } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
-import { errorText } from "@/lib/errors";
+import { errorCode, errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { subHostQuery } from "@/lib/queries";
 
 type Props = { onBack: () => void; onClose: () => void; onManual?: () => void };
 type Step = 0 | 1 | 2 | 3;
@@ -70,6 +72,9 @@ const codeText: Record<string, MessageKey> = {
   remote_outcome_unknown: "node.ssh.error.remoteOutcome",
   host_firewall_configuration_failed: "node.ssh.error.firewall",
   node_not_connected: "node.ssh.error.notConnected",
+  subscription_host_tunnel_down: "node.ssh.error.hostTunnel",
+  subscription_host_clock_skew: "node.ssh.error.hostClock",
+  subscription_host_not_recognised: "node.ssh.error.hostNotRecognised",
   systemd_install_failed: "node.ssh.error.systemd",
   agent_install_failed: "node.ssh.error.systemd",
   // an own private key, and the panel key the install puts on the server (provision/private_key.go, server_keys.go)
@@ -236,6 +241,12 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   const [confirmedInstall, setConfirmedInstall] = useState(false);
   const [preflight, setPreflight] = useState<NodePreflight | null>(null);
   const [jobId, setJobId] = useState("");
+  // the new node may carry the subscription address: offered while no node does (VPS edition only)
+  const hostable = !useEdition().off("subscription_host");
+  const subHostOff = useQuery({ ...subHostQuery, refetchInterval: false, enabled: hostable }).data?.state === SubscriptionHostState.OFF;
+  const [asSubHost, setAsSubHost] = useState(false);
+  const [subDomain, setSubDomain] = useState("");
+  const [dnsMismatch, setDnsMismatch] = useState(false);
   // the panel key is the default once it logs in to some node, else the password; the owner's own key never is
   const keyInUse = usePanelKeyInUse();
   const login = useSSHLogin(keyInUse ? "key" : "password");
@@ -344,6 +355,8 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
         fingerprint,
         ...login.request(),
         username: username.trim(),
+        // the first subscription host need not reach the panel: the check looks at its subdomain instead
+        ...(asSubHost && subHostOff ? { subscriptionHostDomain: subDomain.trim() } : {}),
       }));
       if (!response.preflight) throw new Error("preflight_missing");
       setPreflight(response.preflight);
@@ -359,9 +372,10 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     }
   }
 
-  async function startInstall(event: FormEvent) {
+  async function startInstall(event: FormEvent | MouseEvent, skipDnsCheck = false) {
     event.preventDefault();
     setFailure("");
+    setDnsMismatch(false);
     if (!confirmedInstall || !login.ready) {
       setFailure(t("node.ssh.confirmInstall"));
       return;
@@ -381,6 +395,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
         ...login.request(),
         sshUsername: username.trim(),
         ...login.install(),
+        ...(asSubHost && subHostOff ? { subscriptionHostDomain: subDomain.trim(), skipDnsCheck } : {}),
       }));
       if (!response.job?.id) throw new Error("provision_job_missing");
       login.clearSecrets(); // the job holds them now, sealed; a retry asks again
@@ -388,7 +403,10 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
       qc.setQueryData(["node-provision", response.job.id], response.job);
       setStep(3);
     } catch (error) {
-      if (!isStepUpCancelled(error)) fail(error);
+      if (!isStepUpCancelled(error)) {
+        fail(error);
+        if (errorCode(ConnectError.from(error).rawMessage) === "sub_host_dns_mismatch") setDnsMismatch(true);
+      }
     } finally {
       setPassword("");
       setBusy(null);
@@ -446,6 +464,11 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
       <Steps current={step} labels={labels} ariaLabel={t("node.ssh.steps")} />
       {failure && <Notice tone="danger">{failure}</Notice>}
       {failure === t("node.ssh.error.refused") && manualButton}
+      {dnsMismatch && step === 2 && (
+        <Button type="button" variant="outline" size="md" className={cx(footBtn, "self-start")} disabled={busy !== null} onClick={(event) => void startInstall(event, true)}>
+          {t("set.domains.subHost.continueAnyway")}
+        </Button>
+      )}
 
       {step === 0 && (
         <form onSubmit={(event) => void getFingerprint(event)} className="flex flex-col gap-4">
@@ -541,6 +564,27 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
             <TextField label={t("node.ssh.location")} value={location} onChange={(event) => setLocation(event.target.value)} maxLength={100} autoComplete="off" />
             <TextField label={t("node.ssh.provider")} value={provider} onChange={(event) => setProvider(event.target.value)} maxLength={100} autoComplete="off" />
           </div>
+          {hostable && subHostOff && (
+            <div className="flex flex-col gap-3">
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed text-fg">
+                <input type="checkbox" checked={asSubHost} onChange={(event) => setAsSubHost(event.target.checked)} className="mt-0.5 size-4 flex-none accent-accent" />
+                <span>{t("set.domains.subHost.installCheck")}</span>
+              </label>
+              {asSubHost && (
+                <TextField
+                  label={t("set.domains.subHost.domain")}
+                  value={subDomain}
+                  onChange={(event) => setSubDomain(event.target.value)}
+                  placeholder="sub.example.com"
+                  mono
+                  maxLength={253}
+                  autoComplete="off"
+                  hint={t("set.domains.subHost.installHint")}
+                  required
+                />
+              )}
+            </div>
+          )}
 
           {/* how the panel logs in: under a hairline, apart from the node's own details */}
           <div role="group" aria-labelledby="ssh-login-method" className="flex flex-col gap-3 border-t border-line pt-4">
@@ -603,7 +647,8 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
             <Fact label={t("node.ssh.memory")} value={fmt.bytes(Number(preflight.memoryBytes), 1024)} />
             <Fact label={t("node.ssh.disk")} value={fmt.bytes(Number(preflight.diskAvailableBytes), 1024)} />
             <Fact label={t("node.ssh.systemd")} value={preflight.systemd ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.systemd ? "good" : "bad"} />
-            <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : "bad"} />
+            {/* a subscription host behind a home panel cannot reach it yet: the panel dials the host after the install */}
+            <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : asSubHost && subHostOff ? undefined : "bad"} />
           </div>
           <p className="rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-muted">{t("node.ssh.firewallHint")}</p>
           {login.method === "password" && (

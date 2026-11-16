@@ -1,7 +1,7 @@
 import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
 import { OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { UserFilter } from "@/gen/mistgate/admin/v1/user_pb";
-import { fleet, nodes, users } from "./api";
+import { fleet, nodes, subHost, users } from "./api";
 import { plain } from "./plain";
 
 // Everything the screens read. The fleet changes under you, so every list polls every 10 s (agents report
@@ -22,6 +22,13 @@ export const nodesQuery = queryOptions({
   queryKey: ["nodes"],
   queryFn: async ({ signal }) => plain(await nodes.listNodes({}, { signal })),
   refetchInterval: pollMs,
+});
+
+/** The subscription host, polled every 5 s while a page shows it: tunnels and nodes on the move change on their own. */
+export const subHostQuery = queryOptions({
+  queryKey: ["subhost"],
+  queryFn: async ({ signal }) => (await subHost.getSubscriptionHost({}, { signal })).host ?? null,
+  refetchInterval: 5_000,
 });
 
 export const nodeQuery = (id: string) =>

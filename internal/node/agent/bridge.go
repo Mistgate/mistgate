@@ -104,7 +104,7 @@ func (a *Agent) bridgePanelAddress() string {
 		}
 		return ""
 	}
-	link := a.cfg.LinkURL
+	link := a.linkURL()
 	if link == "" {
 		link = a.meta.Link
 	}

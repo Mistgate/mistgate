@@ -619,7 +619,7 @@ export const en = {
   "health.fix.enable_security_updates.plan": "In the background: install unattended-upgrades from the server's own apt sources if it is missing, set the APT::Periodic switches to \"1\" in /etc/apt/apt.conf.d/99mistgate-security-updates if they are off, and enable and start the apt-daily timers on their usual schedule (updates install at the next daily run, not now). No reboot; Automatic-Reboot is not touched. Up to 20 minutes if another apt is running.",
 
   // ---- check errors (health.check.err.<code>)
-  "health.check.err.timeout": "No answer in time: the handshake or the first request did not complete (for Hysteria2 and AmneziaWG this usually means UDP does not arrive)",
+  "health.check.err.timeout": "No answer in time: the handshake or the first request did not complete (for Hysteria2 and AmneziaWG this usually means UDP does not arrive). The check runs from the panel's network: if that network blocks the port, clients elsewhere may still connect",
   "health.check.err.auth": "The node refused the panel’s check account",
   "health.check.err.tls": "Certificate or domain does not match",
   "health.check.err.refused": "Connection refused: nothing listens on the port",
@@ -1230,7 +1230,7 @@ export const ru: typeof en = {
   "health.fix.enable_security_updates.plan": "В фоне: поставить unattended-upgrades из источников apt самого сервера, если его нет; выставить переключатели APT::Periodic в \"1\" в /etc/apt/apt.conf.d/99mistgate-security-updates, если они выключены; включить и запустить таймеры apt-daily по обычному расписанию (обновления поставятся при следующем ежедневном запуске, не сейчас). Без перезагрузки; Automatic-Reboot не трогаем. До 20 минут, если работает другой apt.",
 
   // ---- check errors
-  "health.check.err.timeout": "Нет ответа вовремя: рукопожатие или первый запрос не завершились (у Hysteria2 и AmneziaWG обычно это значит, что не доходит UDP)",
+  "health.check.err.timeout": "Нет ответа вовремя: рукопожатие или первый запрос не завершились (у Hysteria2 и AmneziaWG обычно это значит, что не доходит UDP). Проверка идёт из сети панели: если этот порт режут в ней, у клиентов из других сетей всё может работать",
   "health.check.err.auth": "Нода отклонила проверочную учётку панели",
   "health.check.err.tls": "Сертификат или домен не совпадает",
   "health.check.err.refused": "Соединение отклонено: на порту никто не слушает",
@@ -1774,7 +1774,7 @@ export const zh: typeof en = {
   "health.fix.enable_security_updates.label": "开启安全更新",
   "health.fix.enable_security_updates.plan": "在后台执行：如未安装，则从服务器自己的 apt 源安装 unattended-upgrades；如已关闭，则在 /etc/apt/apt.conf.d/99mistgate-security-updates 中将 APT::Periodic 开关设为 \"1\"；启用并按原有计划启动 apt-daily 定时器（更新会在下一次每日运行时安装，而不是现在）。不会重启，不修改 Automatic-Reboot。若其他 apt 正在运行，最多需要 20 分钟。",
 
-  "health.check.err.timeout": "未在规定时间内应答：握手或首个请求没有完成（对 Hysteria2 和 AmneziaWG，这通常意味着 UDP 到不了）",
+  "health.check.err.timeout": "未在规定时间内应答：握手或首个请求没有完成（对 Hysteria2 和 AmneziaWG，这通常意味着 UDP 到不了）。检查是从面板所在网络发起的：如果该网络屏蔽了此端口，其他网络的客户端仍可能连得上",
   "health.check.err.auth": "节点拒绝了面板的检测账户",
   "health.check.err.tls": "证书或域名不匹配",
   "health.check.err.refused": "连接被拒绝：端口上没有程序在监听",
@@ -2299,7 +2299,7 @@ export const fa: typeof en = {
   "health.fix.allow_forwarding.plan": "{rules} قانون اضافه و {remove_rules} قانون قدیمیِ مخصوص Mistgate حذف می‌شود، در {chains} زنجیره با سیاست drop. این قانون‌ها فقط ترافیک جدید کلاینت‌های AWG (نه به سمت پل‌های کانتینر)، پاسخ اتصال‌هایی که کلاینت‌ها شروع کرده‌اند و {relays} فورواردِ رلهٔ فعلی را عبور می‌دهند؛ بقیهٔ ترافیک، از جمله اتصال‌های جدید به سمت کلاینت‌ها، زیر نظر فایروال میزبان می‌ماند.",
   "health.fix.enable_security_updates.label": "روشن کردن به‌روزرسانی‌های امنیتی",
   "health.fix.enable_security_updates.plan": "در پس‌زمینه: اگر unattended-upgrades نیست، از منبع‌های apt خود سرور نصب می‌شود؛ اگر کلیدهای APT::Periodic خاموش‌اند، در \u200E/etc/apt/apt.conf.d/99mistgate-security-updates روی «1» می‌روند؛ و تایمرهای apt-daily با زمان‌بندی معمولشان فعال و اجرا می‌شوند (به‌روزرسانی‌ها در اجرای روزانهٔ بعدی نصب می‌شوند، نه همین حالا). بدون راه‌اندازی دوباره؛ Automatic-Reboot دست نمی‌خورد. اگر apt دیگری در حال اجرا باشد، تا 20 دقیقه طول می‌کشد.",
-  "health.check.err.timeout": "جوابی به‌موقع نیامد: دست‌دهی یا اولین درخواست کامل نشد (برای Hysteria2 و AmneziaWG معمولاً یعنی UDP نمی‌رسد)",
+  "health.check.err.timeout": "جوابی به‌موقع نیامد: دست‌دهی یا اولین درخواست کامل نشد (برای Hysteria2 و AmneziaWG معمولاً یعنی UDP نمی‌رسد). بررسی از شبکهٔ پنل انجام می‌شود: اگر آن شبکه این پورت را ببندد، کلاینت‌ها از شبکه‌های دیگر شاید همچنان وصل شوند",
   "health.check.err.auth": "نود حساب بررسی پنل را رد کرد",
   "health.check.err.tls": "گواهی یا دامنه نمی‌خواند",
   "health.check.err.refused": "اتصال رد شد: روی پورت کسی گوش نمی‌دهد",
@@ -2824,7 +2824,7 @@ export const tr: typeof en = {
   "health.fix.allow_forwarding.plan": "DROP politikalı {chains} FORWARD zincirine {rules} kural ekle ve yalnızca Mistgate'e ait {remove_rules} eski kuralı kaldır. Kurallar yalnızca AWG istemcilerinden gelen yeni trafikle (konteyner köprülerine gidenlerle değil), istemcilerin başlattığı bağlantıların yanıtlarıyla ve {relays} güncel aktarıcı iletimiyle eşleşir; istemcilere doğru yeni bağlantılar dahil diğer trafik sunucunun güvenlik duvarının denetiminde kalır.",
   "health.fix.enable_security_updates.label": "Güvenlik güncellemelerini aç",
   "health.fix.enable_security_updates.plan": "Arka planda: unattended-upgrades yoksa sunucunun kendi apt kaynaklarından kur; kapalıysa /etc/apt/apt.conf.d/99mistgate-security-updates içindeki APT::Periodic anahtarlarını \"1\" yap; apt-daily zamanlayıcılarını her zamanki takvimiyle etkinleştirip başlat (güncellemeler şimdi değil, bir sonraki günlük çalışmada kurulur). Yeniden başlatma yok; Automatic-Reboot ayarına dokunulmaz. Başka bir apt çalışıyorsa 20 dakikaya kadar sürebilir.",
-  "health.check.err.timeout": "Zamanında yanıt yok: el sıkışma ya da ilk istek tamamlanmadı (Hysteria2 ve AmneziaWG için bu genelde UDP'nin ulaşmadığı anlamına gelir)",
+  "health.check.err.timeout": "Zamanında yanıt yok: el sıkışma ya da ilk istek tamamlanmadı (Hysteria2 ve AmneziaWG için bu genelde UDP'nin ulaşmadığı anlamına gelir). Kontrol panelin ağından yapılır: o ağ bu portu engelliyorsa başka ağlardaki istemciler yine de bağlanabilir",
   "health.check.err.auth": "Düğüm panelin kontrol hesabını reddetti",
   "health.check.err.tls": "Sertifika veya alan adı uyuşmuyor",
   "health.check.err.refused": "Bağlantı reddedildi: portu dinleyen yok",

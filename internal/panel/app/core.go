@@ -33,6 +33,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/pagepass"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	"github.com/mistgate/mistgate/internal/panel/pubaddr"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
@@ -88,7 +89,7 @@ type base struct {
 	edge    bool // the edge edition: the node link is set
 	limiter securitylimit.Limiter
 	reg     *protocols.Registry
-	subBase string // the subscription links start with this
+	addr    *pubaddr.Holder // the public URL, changeable while the panel runs
 }
 
 func newBase(c Config) (base, error) {
@@ -105,10 +106,17 @@ func newBase(c Config) (base, error) {
 	if b.limiter == nil {
 		b.limiter = securitylimit.NewMemory(c.Clock, 0)
 	}
-	if b.in.PublicURL != "" {
-		b.subBase = strings.TrimRight(b.in.PublicURL, "/") + strings.TrimRight(b.in.SubPrefix, "/")
-	}
+	b.addr = pubaddr.New(b.in.PublicURL)
 	return b, nil
+}
+
+// subBaseURL is the current base of the subscription links: the public URL + the subscription prefix; "" without a public URL.
+func (b base) subBaseURL() string {
+	pub := b.addr.PublicURL()
+	if pub == "" {
+		return ""
+	}
+	return strings.TrimRight(pub, "/") + strings.TrimRight(b.in.SubPrefix, "/")
 }
 
 // fleetConfig is the part of the fleet's configuration that every role that builds a fleet shares.
@@ -118,7 +126,7 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 		AgentSNI:             b.in.AgentSNI,
 		JournalSecrets:       []string{b.in.AgentSNI, agentSNIPrefix, b.in.AdminPrefix, b.in.SubPrefix, b.in.LinkPrefix, b.in.ProbePrefix},
 		LinkServed:           b.in.LinkPrefix != "",
-		LinkURL:              linkURL(b.in),
+		LinkURL:              func() string { return linkURL(b.addr.PublicURL(), b.in.LinkPrefix) },
 		Remote:               b.c.Remote,
 		AfterResponse:        b.c.AfterResponse,
 		Limiter:              b.limiter,
@@ -133,8 +141,8 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 
 // accessConfig is the access service's configuration, the same in every role.
 func (b base) accessConfig(fl *fleet.Fleet, stepUp func(context.Context) error) access.Config {
-	return access.Config{SubscriptionBaseURL: b.subBase, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts,
-		CheckRelay: fl.CheckRelay, Limiter: b.limiter}
+	return access.Config{SubscriptionBaseURL: b.subBaseURL, SubscriptionHost: fl.IsSubscriptionHost, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse,
+		CheckPorts: fl.CheckPorts, CheckRelay: fl.CheckRelay, Limiter: b.limiter}
 }
 
 // usageRecompute is fleet.Config.OnUsage: a quota overrun takes effect right after the stats batch that crossed it.
@@ -167,8 +175,9 @@ func (b base) newSubParts(migrate bool) subParts {
 	}
 	p.brand = func(ctx context.Context) (settings.Settings, error) { return settings.Load(ctx, b.st) }
 	p.cfg = subs.Config{
-		Title: b.c.Title, BaseURL: b.subBase, Settings: p.cache, Brand: p.brand,
-		Routing: subs.HappRouting(p.dns), Events: b.st, Log: b.log,
+		Title: b.c.Title, BaseURL: b.subBaseURL, Settings: p.cache, Brand: p.brand,
+		OnBaseURL: func(fn func(string)) { b.addr.Subscribe(func(string) { fn(b.subBaseURL()) }) },
+		Routing:   subs.HappRouting(p.dns), Events: b.st, Log: b.log,
 		Limiter: b.limiter, AfterResponse: b.c.AfterResponse, ProbeReports: b.st,
 		PageKey: b.vlt.Derive(pagepass.KeyLabel), // the page password of every user: computed from the token, nothing stored
 	}
@@ -200,6 +209,7 @@ type core struct {
 	bl                 *blocklist.Service
 	cp                 *countryprobe.Service
 	own                ownProbeService // nil on the Cloudflare edition (ownprobe_wiring_js.go)
+	sub                subHostService  // nil on the Cloudflare edition (subhost_wiring_js.go)
 	hl                 *health.Service
 	upd                *update.Service
 	wsv                *warp.Service
@@ -431,6 +441,7 @@ func wireCore(c Config) (*core, error) {
 	}
 	fl.SetWarp(warpForFleet{k.wsv})
 	k.own = newOwnProbes(k)
+	k.sub = newSubHost(k)
 	return k, nil
 }
 

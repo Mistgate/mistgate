@@ -44,9 +44,11 @@ type websocketSessionStream struct {
 	ctx   context.Context
 	ioCtx context.Context
 	link  *agentlink.Link
+	host  string // the Host the agent dialled
 }
 
 func (s websocketSessionStream) Context() context.Context { return s.ctx }
+func (s websocketSessionStream) via() string              { return s.host }
 
 func (s websocketSessionStream) Receive() (*agentv1.ConnectRequest, error) {
 	typ, b, err := s.link.Read(s.ioCtx)
@@ -185,7 +187,7 @@ func (f *Fleet) linkSocketHandler() http.Handler {
 		handshakeTimer.Stop()
 		cancelHandshake()
 
-		if err := (agentService{f}).runSession(ownerCtx, nodeID, pc, owner, websocketSessionStream{ctx: ownerCtx, ioCtx: r.Context(), link: agentlink.NewLink(ws, keys, false)}); err != nil {
+		if err := (agentService{f}).runSession(ownerCtx, nodeID, pc, owner, websocketSessionStream{ctx: ownerCtx, ioCtx: r.Context(), link: agentlink.NewLink(ws, keys, false), host: r.Host}); err != nil {
 			if isSuperseded(err) {
 				closeStatus = websocket.StatusCode(4000)
 			} else {

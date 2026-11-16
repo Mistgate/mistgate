@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// SubscriptionHostService puts the panel's public address on a subdomain served by one node: people's subscriptions and
+// the agents' link reach the panel through that node, which forwards them over a tunnel the panel dials. The panel itself
+// then needs no public address of its own. Every procedure is the owner's; the changing ones need a fresh step-up
+// (internal/panel/auth/policy_subhost.go). Refusals are coded ("err.<code>" in the admin UI, see web/src/lib/errors.ts):
+// sub_host_wrong_state, sub_host_domain_invalid, sub_host_node_unfit (reason=retired|offline|agent_too_old|
+// reality_foreign_target), sub_host_nodes_lack_link (nodes=<ids>), sub_host_dns_mismatch (found, expected),
+// sub_host_return_url_required, sub_host_nodes_pending (nodes=<ids>).
+service SubscriptionHostService {
+  rpc GetSubscriptionHost(GetSubscriptionHostRequest) returns (GetSubscriptionHostResponse);
+  // off -> on: the subdomain becomes the panel's public address.
+  rpc SetSubscriptionHost(SetSubscriptionHostRequest) returns (SetSubscriptionHostResponse);
+  // on -> moving: a second node gets ready to take over.
+  rpc StartSubscriptionHostMove(StartSubscriptionHostMoveRequest) returns (StartSubscriptionHostMoveResponse);
+  // moving -> on (the next node takes over), leaving -> off.
+  rpc FinishSubscriptionHostChange(FinishSubscriptionHostChangeRequest) returns (FinishSubscriptionHostChangeResponse);
+  // moving -> on (the move is dropped), leaving -> on.
+  rpc CancelSubscriptionHostChange(CancelSubscriptionHostChangeRequest) returns (CancelSubscriptionHostChangeResponse);
+  // on -> leaving: the panel goes back to public_url.
+  rpc DisableSubscriptionHost(DisableSubscriptionHostRequest) returns (DisableSubscriptionHostResponse);
+  // Read-only: whether the domain's DNS points at the node.
+  rpc CheckSubscriptionHostDomain(CheckSubscriptionHostDomainRequest) returns (CheckSubscriptionHostDomainResponse);
+}
+
+enum SubscriptionHostState {
+  SUBSCRIPTION_HOST_STATE_UNSPECIFIED = 0;
+  SUBSCRIPTION_HOST_STATE_OFF = 1;
+  SUBSCRIPTION_HOST_STATE_ON = 2;
+  SUBSCRIPTION_HOST_STATE_MOVING = 3;
+  SUBSCRIPTION_HOST_STATE_LEAVING = 4;
+}
+
+// The panel's tunnel to one node.
+message SubscriptionHostTunnel {
+  string node_id = 1;
+  bool up = 2;
+  // When it last went up or down.
+  int64 since_unix = 3 [jstype = JS_NUMBER];
+  // Why it is down: "" (up or unknown) | unreachable | not_recognised (the node answered without accepting the panel's
+  // mark: clocks apart, an older agent, or another tunnel secret).
+  string down_reason = 4;
+}
+
+// An online node still connected through the subscription host while it is being turned off.
+message SubscriptionHostPendingNode {
+  string node_id = 1;
+  string name = 2;
+  // The host the node dialled.
+  string via = 3;
+}
+
+message SubscriptionHostNodeRef {
+  string node_id = 1;
+  string name = 2;
+}
+
+message SubscriptionHost {
+  SubscriptionHostState state = 1;
+  string domain = 2;
+  string node_id = 3;
+  string next_node_id = 4;
+  // The panel's effective public address.
+  string public_url = 5;
+  repeated SubscriptionHostTunnel tunnels = 6;
+  repeated SubscriptionHostPendingNode pending = 7;
+  // The CAA record that limits certificates for the domain to this panel's ACME account, and whether DNS has it:
+  // account_pending | present | absent | unknown.
+  string caa_record = 8;
+  string caa_status = 9;
+  // Nodes whose agent cannot follow the panel to a new link address (no ws-link/1 or panel-link/1).
+  repeated SubscriptionHostNodeRef lacking_link = 10;
+}
+
+message GetSubscriptionHostRequest {}
+
+message GetSubscriptionHostResponse {
+  SubscriptionHost host = 1;
+}
+
+message SetSubscriptionHostRequest {
+  string node_id = 1;
+  string domain = 2;
+  bool skip_dns_check = 3;
+}
+
+message SetSubscriptionHostResponse {
+  SubscriptionHost host = 1;
+}
+
+message StartSubscriptionHostMoveRequest {
+  string node_id = 1;
+}
+
+message StartSubscriptionHostMoveResponse {
+  SubscriptionHost host = 1;
+}
+
+message FinishSubscriptionHostChangeRequest {
+  // Finish leaving even while nodes are still connected through the subscription host.
+  bool force = 1;
+}
+
+message FinishSubscriptionHostChangeResponse {
+  SubscriptionHost host = 1;
+}
+
+message CancelSubscriptionHostChangeRequest {}
+
+message CancelSubscriptionHostChangeResponse {
+  SubscriptionHost host = 1;
+}
+
+message DisableSubscriptionHostRequest {
+  // https://host[:port], or empty when no node but the host remains.
+  string public_url = 1;
+}
+
+message DisableSubscriptionHostResponse {
+  SubscriptionHost host = 1;
+}
+
+message CheckSubscriptionHostDomainRequest {
+  string node_id = 1;
+  string domain = 2;
+}
+
+message CheckSubscriptionHostDomainResponse {
+  bool matches = 1;
+  repeated string found = 2;
+  repeated string expected = 3;
+}

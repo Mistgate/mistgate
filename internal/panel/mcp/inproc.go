@@ -70,6 +70,7 @@ type clients struct {
 	Probe        probev1connect.ProbeServiceClient
 	Ops          opsv1connect.OpsServiceClient
 	Tasks        tasksv1connect.TasksServiceClient
+	SubHost      adminv1connect.SubscriptionHostServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -96,6 +97,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Backup:       adminv1connect.NewBackupServiceClient(hc, base),
 		Probe:        probev1connect.NewProbeServiceClient(hc, base),
 		Ops:          opsv1connect.NewOpsServiceClient(hc, base),
+		SubHost:      adminv1connect.NewSubscriptionHostServiceClient(hc, base),
 		Tasks:        tasksv1connect.NewTasksServiceClient(hc, base),
 	}
 }

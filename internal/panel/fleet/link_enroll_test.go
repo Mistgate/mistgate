@@ -40,7 +40,7 @@ func TestLinkEnrollRouteSharesEnrollOnBothEditions(t *testing.T) {
 			e := newCoreEnv(t)
 			if edition == "edge" {
 				e.f.cfg.Remote = &testRemote{}
-				e.f.cfg.LinkURL = "wss://de1.example.com" + linkTestPrefix + "/"
+				e.f.cfg.LinkURL = func() string { return "wss://de1.example.com" + linkTestPrefix + "/" }
 			}
 			cli := linkEnrollServer(t, e)
 			nodeID, token, _ := e.createEnrollment("node-a", "de1.example.com")
@@ -172,7 +172,7 @@ func TestCreateEnrollmentInstallCommands(t *testing.T) {
 	}
 
 	e.f.cfg.Remote = &testRemote{}
-	e.f.cfg.LinkURL = "wss://de1.example.com" + linkTestPrefix + "/"
+	e.f.cfg.LinkURL = func() string { return "wss://de1.example.com" + linkTestPrefix + "/" }
 	_, token, cmd = e.createEnrollment("node-b", "de2.example.com")
 	want = "chmod +x /root/mistgate-node && /root/mistgate-node enroll --link-url wss://de1.example.com" + linkTestPrefix + "/ --ca-sha256 " +
 		e.f.CAFingerprint() + " --token " + token + " && /root/mistgate-node install"
@@ -184,7 +184,7 @@ func TestCreateEnrollmentInstallCommands(t *testing.T) {
 	}
 
 	// On the edge the link address is what is required, not the mTLS address.
-	e.f.cfg.LinkURL = ""
+	e.f.cfg.LinkURL = nil
 	_, err := nodeService{e.f}.CreateEnrollment(e.ctx, connect.NewRequest(&adminv1.CreateEnrollmentRequest{Name: "node-c", Address: "de3.example.com"}))
 	if code(err) != connect.CodeFailedPrecondition {
 		t.Errorf("edge without a link address: %v", err)

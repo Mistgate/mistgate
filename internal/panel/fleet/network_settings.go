@@ -3,11 +3,13 @@ package fleet
 import (
 	"encoding/hex"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 type networkBundleInfo interface {
@@ -25,6 +27,13 @@ type networkTableReader interface {
 // so its settings and their signature stay what they were.
 func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 	s := nodeSettingsFor(n, caps, f.osStatusAllowed())
+	routing := f.panelRouting()
+	if t, ok := routing.Tunnels[n.ID]; ok && store.CapabilityPresent(caps, plugin.CapHostTunnel) {
+		s.HostTunnel = &agentv1.HostTunnel{TunnelSni: t.SNI, ForwardNames: slices.Clone(t.Names)}
+	}
+	if routing.LinkURL != "" && store.CapabilityPresent(caps, plugin.CapPanelLink) {
+		s.PanelLinkUrl = routing.LinkURL
+	}
 	if !store.CapabilityPresent(caps, capNetworks) {
 		return s
 	}

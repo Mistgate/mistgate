@@ -75,6 +75,9 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 			a.wakeOsStatusReader()
 		}
 		a.configureNetworks(ds.Settings)
+		if a.applyPanelRouting(ds.Settings) {
+			a.endForNewLink()
+		}
 	}
 	a.startAwgKmod(ctx, next)
 	if ds.StateHash != "" && ds.StateHash != next.hash() {
@@ -195,12 +198,17 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 		delete(a.held, id)
 	}
 	a.syncTCPClaims(ctx, claimedTCP)
+	if next != prev || len(force) > 0 {
+		// TCP 443 is free for an engine that wants it. A sweep of the same model starts no new listener: the site stays.
+		a.stopStandaloneSite()
+	}
 	now := a.now()
 	results := make([]*pb.InboundResult, 0, len(next.inbounds))
 	for _, id := range next.ids() {
 		results = append(results, a.applyInbound(ctx, next.inbounds[id], now, force[id]))
 	}
 	a.syncTCPClaims(ctx, nextTCP)
+	a.syncStandaloneSite() // the subscription host serves 443 itself when no engine took it
 	// NFQUEUE rules are installed before an AWG interface is created. Refresh its interface-index map now that
 	// the engines have applied, so packets use exact active interface identities from this point on.
 	a.syncTorrentGuardApplied(ctx, next, results)
@@ -640,6 +648,9 @@ func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[st
 		}
 		return udp[i].To < udp[j].To
 	})
+	if a.tunnelRole() { // the panel's tunnel and the subscription clients arrive on TCP 443
+		tcpSet[443] = struct{}{}
+	}
 	tcp := make([]uint16, 0, len(tcpSet))
 	for port := range tcpSet {
 		tcp = append(tcp, port)

@@ -29,6 +29,8 @@ type websocketAgentTransport struct {
 	link        *agentlink.Link
 	closeOnce   sync.Once
 	established bool
+	// onEstablished runs once the HelloAck arrived over this link (a new link address is then committed: hostrole.go).
+	onEstablished func()
 }
 
 func (s *websocketAgentTransport) Context() context.Context { return s.ctx }
@@ -75,8 +77,15 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 	return a.dialLinkVia(ctx, "")
 }
 
+// dialLinkVia dials the panel's link at its current address, through the panel bridge of entry node viaNodeID when set.
 func (a *Agent) dialLinkVia(ctx context.Context, viaNodeID string) (*websocketAgentTransport, func(), error) {
-	base, err := parseLinkBase(a.cfg.LinkURL)
+	return a.dialLinkBase(ctx, a.linkURL(), viaNodeID)
+}
+
+// dialLinkBase dials the link of the panel at the link base address raw (wss://host/<secret-prefix>/), through the panel
+// bridge of entry node viaNodeID when set.
+func (a *Agent) dialLinkBase(ctx context.Context, raw, viaNodeID string) (*websocketAgentTransport, func(), error) {
+	base, err := parseLinkBase(raw)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,16 +100,18 @@ func (a *Agent) dialLinkVia(ctx context.Context, viaNodeID string) (*websocketAg
 	var cleanup func()
 	if viaNodeID == "" {
 		client, cleanup = a.newLinkHTTPClient()
-	} else {
-		client, cleanup, err = a.newLinkHTTPClientVia(viaNodeID)
-		if err != nil {
-			return nil, nil, err
-		}
+	} else if client, cleanup, err = a.newLinkHTTPClientVia(viaNodeID); err != nil {
+		return nil, nil, err
 	}
+	return a.dialLinkAt(ctx, endpoint.String(), base.Host, client, cleanup)
+}
 
+// dialLinkAt runs the link handshake at endpoint: the panel's challenge must name audience. cleanup releases client and
+// is returned with the transport (it is run here on a failure).
+func (a *Agent) dialLinkAt(ctx context.Context, endpoint, audience string, client *http.Client, cleanup func()) (*websocketAgentTransport, func(), error) {
 	hctx, cancel := context.WithTimeout(ctx, linkHandshakeTimeout)
 	defer cancel()
-	ws, _, err := websocket.Dial(hctx, endpoint.String(), &websocket.DialOptions{HTTPClient: client})
+	ws, _, err := websocket.Dial(hctx, endpoint, &websocket.DialOptions{HTTPClient: client})
 	if err != nil {
 		if cleanup != nil {
 			cleanup()
@@ -125,7 +136,7 @@ func (a *Agent) dialLinkVia(ctx context.Context, viaNodeID string) (*websocketAg
 		return refuse(errors.New("panel link challenge rejected"))
 	}
 	var challenge pb.LinkChallenge
-	if proto.Unmarshal(frame, &challenge) != nil || len(challenge.Nonce) != 32 || challenge.Audience != base.Host {
+	if proto.Unmarshal(frame, &challenge) != nil || len(challenge.Nonce) != 32 || challenge.Audience != audience {
 		return refuse(errors.New("panel link challenge rejected"))
 	}
 	id := a.id.Load()

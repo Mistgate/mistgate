@@ -1,3 +1,4 @@
+import { ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
@@ -11,7 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { useToast } from "@/components/ui/toast";
 import { users } from "@/lib/api";
-import { errorText } from "@/lib/errors";
+import { errorCode, errorText } from "@/lib/errors";
 import { settingsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import type { UserN } from "./model";
 import { ConfirmModal } from "./ui";
@@ -159,7 +160,19 @@ function LinkBody({ target, initialUrl, initialPassword }: { target: LinkTarget;
     }
   }
 
-  if (fetched.isError && !initialUrl && !rotated) return <QueryError error={fetched.error} onRetry={() => void fetched.refetch()} />;
+  if (fetched.isError && !initialUrl && !rotated) {
+    // no public address yet: the way out is a subscription host, not a retry
+    if (errorCode(ConnectError.from(fetched.error).rawMessage) === "sub_address_missing")
+      return (
+        <Notice tone="warn">
+          {t("set.domains.subHost.linkMissing")}{" "}
+          <Link to="/settings/$section" params={{ section: "domains" }} className="font-bold whitespace-nowrap text-accent-text hover:underline">
+            {t("set.domains.subHost.linkMissingGo", { settings: t("nav.settings"), tab: t("settings.domains") })}
+          </Link>
+        </Notice>
+      );
+    return <QueryError error={fetched.error} onRetry={() => void fetched.refetch()} />;
+  }
   const keysOnly = target.amnezia && !target.happ;
   return (
     <>

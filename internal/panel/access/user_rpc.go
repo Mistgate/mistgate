@@ -179,7 +179,10 @@ func (s *Service) resolveNodes(ctx context.Context, sel *adminv1.NodeSelection) 
 }
 
 func (s *Service) subscriptionURL(token string) (string, error) {
-	base := strings.TrimRight(s.cfg.SubscriptionBaseURL, "/")
+	var base string
+	if s.cfg.SubscriptionBaseURL != nil {
+		base = strings.TrimRight(s.cfg.SubscriptionBaseURL(), "/")
+	}
 	if base == "" {
 		return "", coded(connect.CodeFailedPrecondition, "sub_address_missing")
 	}

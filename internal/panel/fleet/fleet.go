@@ -62,7 +62,8 @@ type Config struct {
 	PanelAddr string
 	// LinkURL is the base link-only agents are given (wss://host/<secret-prefix>/): the install command of an edge panel
 	// (Remote set) carries it instead of PanelAddr and the agent SNI. Empty = no link install command.
-	LinkURL string
+	// Called on every use: the public address can change while the panel runs. nil = empty.
+	LinkURL func() string
 	// JournalSecrets are this panel's secret SNI and path prefixes; the journal writer scrubs them from node-provided text.
 	JournalSecrets []string
 	// LinkServed reports whether the signed WebSocket agent link is mounted on the public listener.
@@ -135,6 +136,10 @@ type Fleet struct {
 	tlsMu  sync.Mutex
 	tlsCfg *tls.Config
 	tlsExp time.Time
+
+	routing     atomic.Pointer[PanelRouting] // SetPanelRouting (panelrouting.go); nil = none
+	tunnelMu    sync.Mutex
+	tunnelCerts map[string]tunnelCert // sni -> the panel's client certificate for the subscription-host tunnel
 
 	mu                     sync.Mutex
 	statsBudgetMapMu       sync.Mutex
@@ -606,4 +611,12 @@ func (f *Fleet) allowStatsRejectEvent(ctx context.Context, nodeID string) bool {
 		return false
 	}
 	return d.Allowed
+}
+
+// linkURL is the current LinkURL; "" when unset.
+func (c Config) linkURL() string {
+	if c.LinkURL == nil {
+		return ""
+	}
+	return c.LinkURL()
 }

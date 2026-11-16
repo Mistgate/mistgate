@@ -42,6 +42,7 @@ var edgeDeferred = map[string]string{
 	"assistant-retention": "assistant data is not written on the edge; assistant is VPS-only",
 	"scheduled-tasks":     "scheduled tasks run MCP tools and the assistant in process, which the edge does not serve",
 	"tspu-probe":          "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 15 minutes of wall time and 30 seconds of CPU; Get says it is unavailable and nothing runs",
+	"subscription-host":   "the tunnels to the subscription host stay open for hours; the edge has its own public address",
 }
 
 // edgeDeferredFeatures maps every deferred function above to the admin features it takes away: the ids Me reports in
@@ -56,6 +57,7 @@ var edgeDeferredFeatures = map[string][]string{
 	"assistant-retention": {edition.Assistant},
 	"scheduled-tasks":     {edition.Assistant},
 	"tspu-probe":          {edition.TSPUProbe},
+	"subscription-host":   {edition.SubscriptionHost},
 }
 
 // EdgeTick runs the scheduled work shared by the edge edition. Each pass gets a fresh timeout so one slow job does not

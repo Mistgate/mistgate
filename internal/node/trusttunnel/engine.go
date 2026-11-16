@@ -320,6 +320,10 @@ func (in *inbound) start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listen tcp %d: %w", in.spec.Listen.Port, err)
 	}
+	// A subscription host on this port takes its subdomain off this listener (internal/node/subhost), as from every site.
+	if wrap := in.e.env.SiteWrap(in.spec.Listen.Port, false); wrap != nil {
+		ln = wrap(ln)
+	}
 	in.ln = ln
 	in.srv = &http.Server{
 		Handler:           http.HandlerFunc(in.serveHTTP),

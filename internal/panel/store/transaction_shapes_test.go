@@ -70,6 +70,8 @@ var transactionShape1 = map[string]string{
 	"scheduled_task.go:DeleteScheduledTask":          "A task's runs and the task are deleted in one fixed batch.",
 	"scheduled_task.go:RecoverScheduledRuns":         "Runs left running are marked interrupted and every lease is given back in one fixed batch.",
 	"scheduled_task.go:PruneScheduledTaskRuns":       "Old and surplus runs and the matching messages and plan cards of task conversations are deleted in one fixed batch.",
+
+	"provision.go:KeepInterruptedNodeProvisionSecret": "One UPDATE guarded by the failed job_interrupted state stores the residual secret.",
 }
 
 var transactionShape2 = map[string]string{

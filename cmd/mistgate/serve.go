@@ -191,9 +191,10 @@ func runServe(args []string) error {
 	opts := httpserver.ServeOptions{
 		Public: *listen, Admin: *adminListen, AgentListen: *agentListen, TLSCert: *tlsCert, TLSKey: *tlsKey,
 		ACMEDomains: acmeDomains, ACMEEmail: *acmeEmail,
+		// Always set: the subscription host asks for a certificate of its subdomain even without --acme-domain.
+		ACMEDir: filepath.Join(*dataDir, "acme"),
 	}
 	if len(acmeDomains) > 0 {
-		opts.ACMEDir = filepath.Join(*dataDir, "acme")
 		opts.ACMEHTTP = *acmeHTTP
 	}
 	return p.run(ctx, opts)

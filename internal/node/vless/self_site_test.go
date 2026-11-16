@@ -376,7 +376,7 @@ func TestSiteRecordLengthsDoNotDependOnTheCertificate(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, selfMarker) })
 	sites := map[string]*site{}
 	for name, c := range certs {
-		s, err := startSite("lens-"+strconv.Itoa(len(sites)), func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return c, nil }, handler)
+		s, err := startSite("lens-"+strconv.Itoa(len(sites)), func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return c, nil }, handler, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -416,7 +416,7 @@ func TestSiteRecordLengthsDoNotDependOnTheCertificate(t *testing.T) {
 func TestRealityCannotMeasureASelfSignedSite(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, selfMarker) })
 	cert := selfSignedCert(t, selfName)
-	s, err := startSite("own-measure", func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return cert, nil }, handler)
+	s, err := startSite("own-measure", func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return cert, nil }, handler, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

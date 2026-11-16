@@ -56,6 +56,10 @@ message CheckSSHRequest {
   // An owner's private key is used only for this check. It is never retained.
   string private_key = 7;
   string private_key_passphrase = 8;
+  // Non-empty: the check is for the install of the first subscription host serving this domain. The panel need not be
+  // reachable from the server (its address need not even be configured): the probe looks at <domain>:443 and a negative
+  // answer is reported, not refused.
+  string subscription_host_domain = 9;
 }
 
 message NodePreflight {
@@ -97,6 +101,11 @@ message StartNodeProvisionRequest {
   // An owner's private key is used for this install only; the worker replaces it with the panel key for saved access.
   string private_key = 15;
   string private_key_passphrase = 16;
+  // Non-empty: install this server as the panel's first subscription host (issue #48), serving this domain. The node
+  // enrolls inside the SSH session (the panel may be unreachable from it) and the subscription host turns on with it.
+  string subscription_host_domain = 17;
+  // With subscription_host_domain: do not require the domain to resolve to the SSH host yet.
+  bool skip_dns_check = 18;
 }
 
 message RetryNodeProvisionRequest {

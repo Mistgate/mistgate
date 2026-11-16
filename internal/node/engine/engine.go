@@ -118,6 +118,21 @@ type Env struct {
 	UserLimits *ratelimit.Registry
 	// Nets resolves client addresses inside an engine and records only ASN-level connection events. Nil disables counting.
 	Nets *nets.Aggregator
+	// SiteListener wraps the listener of a node's own HTTPS site (the Hysteria2 TCP masquerade, a VLESS self site) before
+	// it is served. publicPort is the TCP port visitors reach the site on. proxied says a connection may open with a PROXY
+	// v2 header (the REALITY self site): the wrapper strips it and reports its source as RemoteAddr, on any port. On the
+	// subscription host it also routes the TLS of the subscription names on 443 into the panel's tunnel
+	// (internal/node/subhost). Nil: the listener is served as it is, and a proxied site strips the header itself.
+	SiteListener func(ln net.Listener, publicPort uint16, proxied bool) net.Listener
+}
+
+// SiteWrap is the wrapper of a site listener on publicPort (Env.SiteListener bound to its arguments), nil when the env
+// has none.
+func (e Env) SiteWrap(publicPort uint16, proxied bool) func(net.Listener) net.Listener {
+	if e.SiteListener == nil {
+		return nil
+	}
+	return func(ln net.Listener) net.Listener { return e.SiteListener(ln, publicPort, proxied) }
 }
 
 // Event is a small, protocol-neutral signal from an engine to the node agent.
