@@ -218,6 +218,30 @@ func (s *Service) newCreds(userID, deviceID string, happ, amnezia, telegram bool
 	return out, nil
 }
 
+// newEnrolledClientCreds adds the capability-gated Mistgate-only protocol credential to the link-app credentials. This method
+// is called only for a device already authenticated by its client API key; a basic subscription fetch never reaches it.
+func (s *Service) newEnrolledClientCreds(userID, deviceID string, happ, amnezia, telegram bool, have map[string]bool,
+	caps []string, mistgateEnabled bool) ([]store.AccessCred, error) {
+	out, err := s.newCreds(userID, deviceID, happ, amnezia, telegram, have)
+	if err != nil || !mistgateEnabled || !protocols.HasCapability(caps, "trusttunnel", "1") || have["trusttunnel"] {
+		return out, err
+	}
+	if !s.mistgateConsumes("trusttunnel") {
+		return out, nil
+	}
+	p, _ := s.reg.Get("trusttunnel")
+	issued, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+	if err != nil {
+		return nil, err
+	}
+	id := store.NewID("crd_")
+	out = append(out, store.AccessCred{
+		ID: id, DeviceID: deviceID, UserID: userID, Protocol: p.ID(),
+		SecretEnc: s.vault.Seal([]byte(issued.Secret), id), DataJSON: string(issued.NodeData), CreatedAt: s.now(),
+	})
+	return out, nil
+}
+
 func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.CreateUserRequest]) (*connect.Response[adminv1.CreateUserResponse], error) {
 	m := req.Msg
 	name, err := cleanName("user", m.Name)
@@ -504,7 +528,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			if !slices.Contains(na.NodeProtocols, f.Profile.Protocol) {
 				na.NodeProtocols = append(na.NodeProtocols, f.Profile.Protocol)
 			}
-			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
+			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && (s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram) || !u.AppMistgateOff && s.mistgateConsumes(f.Profile.Protocol)) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
 				na.Protocols = append(na.Protocols, f.Profile.Protocol)
 			}
 		}

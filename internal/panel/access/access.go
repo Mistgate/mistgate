@@ -381,6 +381,13 @@ func (s *Service) allowed(protocol string, happ, amnezia, telegram bool) bool {
 	return ok && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram)...)
 }
 
+// mistgateConsumes reports whether the first-party Mistgate app consumes the protocol (TrustTunnel is for that app alone). No
+// switch of a link app gives such a protocol; the person's Mistgate switch does, and only to a device that holds a key.
+func (s *Service) mistgateConsumes(protocol string) bool {
+	p, ok := s.reg.Get(protocol)
+	return ok && !protocols.IsPerDevice(p) && protocols.AllowedForApps(p, plugin.ClientMistgate)
+}
+
 func nodeView(n store.AccessNode) protocols.NodeView {
 	return protocols.NodeView{ID: n.ID, Name: n.Name, Address: n.Address, CountryCode: n.CountryCode}
 }
