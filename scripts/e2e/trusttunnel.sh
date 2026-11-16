@@ -481,7 +481,7 @@ tt_client_checks() {
   tt_e4_attempts
   tt_e4_counters
   tt_skip E12 "through a relay (DNAT): needs an entry node, a second agent with its own namespace and the relay stages of the panel; not built in this stand (the twin path is h2 only: B6 of the plan, covered by the sync tests)"
-  tt_skip E13 "through the bridge: the bridge is in another branch (feat/reverse-relay-lab)"
+  tt_skip E13 "through the bridge: not built in this stand; scripts/e2e/bridge.sh carries VLESS and MTProto, and the twin of a TrustTunnel server through the bridge is h2 only (the panel test TestTrustTunnelRelayInReverseModeGivesTheAppAnH2Path)"
 }
 
 # E5 and E6 need both people connected
