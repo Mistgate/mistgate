@@ -428,7 +428,7 @@ func TestTunnelLinkSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tc := tls.Client(raw, &tls.Config{ServerName: tunnelSNI, InsecureSkipVerify: true, NextProtos: []string{hosttunnel.ALPN},
+	tc := tls.Client(raw, &tls.Config{ServerName: "sub.example.com", InsecureSkipVerify: true, NextProtos: []string{hosttunnel.TunnelALPN(tunnelSNI)},
 		Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}})
 	t.Cleanup(func() { _ = tc.Close() })
 	go func() {

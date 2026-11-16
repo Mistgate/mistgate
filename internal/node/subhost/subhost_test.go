@@ -124,7 +124,7 @@ func (r *rig) panel(t *testing.T, cert *tls.Certificate) net.Conn {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tc := tls.Client(raw, &tls.Config{ServerName: tunnelSNI, InsecureSkipVerify: true, NextProtos: []string{"h2"}, Certificates: []tls.Certificate{*cert}})
+	tc := tls.Client(raw, &tls.Config{ServerName: subName, InsecureSkipVerify: true, NextProtos: []string{hosttunnel.TunnelALPN(tunnelSNI)}, Certificates: []tls.Certificate{*cert}})
 	t.Cleanup(func() { _ = tc.Close() })
 	go func() {
 		if tc.Handshake() != nil {

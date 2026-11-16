@@ -262,16 +262,15 @@ func (l *siteListener) handle(c net.Conn) {
 		l.toSite(c)
 		return
 	}
-	sni, replay, err := hosttunnel.PeekSNI(c, peekTimeout)
+	hello, replay, err := hosttunnel.PeekHello(c, peekTimeout)
 	if err != nil {
-		return // PeekSNI closed it
+		return // PeekHello closed it
 	}
-	name := strings.ToLower(sni)
 	switch {
-	case sni != "" && strings.EqualFold(sni, cfg.sni):
+	case hello.Offers(hosttunnel.TunnelALPN(cfg.sni)):
 		l.h.acceptTunnel(replay, cfg.sni)
 		return
-	case cfg.names[name]:
+	case cfg.names[strings.ToLower(hello.ServerName)]:
 		if t := l.h.current(); t != nil {
 			l.h.forward(replay, t)
 			return
@@ -281,12 +280,13 @@ func (l *siteListener) handle(c net.Conn) {
 }
 
 // acceptTunnel takes the panel's connection over: the node is the TLS server and the HTTP/2 client. Only a certificate
-// of the panel's CA for ServerAuth that names the tunnel SNI is accepted: node certificates are ClientAuth with a URI
+// of the panel's CA for ServerAuth that names the tunnel secret is accepted: node certificates are ClientAuth with a URI
 // SAN only, so another node cannot pose as the panel.
 func (h *Host) acceptTunnel(c net.Conn, sni string) {
+	proto := hosttunnel.TunnelALPN(sni)
 	conf := &tls.Config{
 		MinVersion: tls.VersionTLS13,
-		NextProtos: []string{hosttunnel.ALPN},
+		NextProtos: []string{proto},
 		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 			if cert := h.id.Cert(); cert != nil {
 				return cert, nil
@@ -302,8 +302,8 @@ func (h *Host) acceptTunnel(c net.Conn, sni string) {
 	ctx, cancel := context.WithTimeout(h.ctx, handshakeTimeout)
 	err := tc.HandshakeContext(ctx)
 	cancel()
-	if err == nil && tc.ConnectionState().NegotiatedProtocol != hosttunnel.ALPN {
-		err = errors.New("no h2")
+	if err == nil && tc.ConnectionState().NegotiatedProtocol != proto {
+		err = errors.New("no tunnel protocol")
 	}
 	if err != nil {
 		_ = tc.Close()

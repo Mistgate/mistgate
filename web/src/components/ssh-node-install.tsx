@@ -644,7 +644,8 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
             <Fact label={t("node.ssh.memory")} value={fmt.bytes(Number(preflight.memoryBytes), 1024)} />
             <Fact label={t("node.ssh.disk")} value={fmt.bytes(Number(preflight.diskAvailableBytes), 1024)} />
             <Fact label={t("node.ssh.systemd")} value={preflight.systemd ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.systemd ? "good" : "bad"} />
-            <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : "bad"} />
+            {/* a subscription host behind a home panel cannot reach it yet: the panel dials the host after the install */}
+            <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : asSubHost && subHostOff ? undefined : "bad"} />
           </div>
           <p className="rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-muted">{t("node.ssh.firewallHint")}</p>
           {login.method === "password" && (

@@ -165,9 +165,13 @@ func (s *Service) dialLoop(ctx context.Context, t *tunnel) {
 	}
 }
 
-// serveTunnel dials the node, proves the panel with a certificate of the fleet CA for the tunnel name, checks the node's own
-// certificate, and serves the node's streams over HTTP/2 until the connection ends.
+// serveTunnel dials the node with the subscription name as SNI and the tunnel's secret ALPN protocol, proves the panel
+// with a certificate of the fleet CA for the tunnel secret, checks the node's own certificate, and serves the node's
+// streams over HTTP/2 until the connection ends.
 func (s *Service) serveTunnel(ctx context.Context, t *tunnel) error {
+	s.tmu.Lock()
+	domain := s.cur.Domain
+	s.tmu.Unlock()
 	n, err := s.cfg.Store.Node(ctx, t.nodeID)
 	if err != nil {
 		return err
@@ -183,8 +187,9 @@ func (s *Service) serveTunnel(ctx context.Context, t *tunnel) error {
 	stop := context.AfterFunc(ctx, func() { _ = raw.Close() })
 	defer stop()
 	nodeID := t.nodeID
+	proto := hosttunnel.TunnelALPN(t.sni)
 	tc := tls.Client(raw, &tls.Config{
-		ServerName: t.sni, NextProtos: []string{hosttunnel.ALPN}, MinVersion: tls.VersionTLS13,
+		ServerName: domain, NextProtos: []string{proto}, MinVersion: tls.VersionTLS13,
 		InsecureSkipVerify: true, // the chain and the node identity are checked below, against the fleet CA
 		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 			return s.cfg.Fleet.VerifyNodeCertificate(nodeID, rawCerts)
@@ -198,9 +203,9 @@ func (s *Service) serveTunnel(ctx context.Context, t *tunnel) error {
 		_ = raw.Close()
 		return err
 	}
-	if tc.ConnectionState().NegotiatedProtocol != hosttunnel.ALPN {
+	if tc.ConnectionState().NegotiatedProtocol != proto {
 		_ = tc.Close()
-		return errors.New("node did not speak " + hosttunnel.ALPN)
+		return errors.New("node did not accept the tunnel protocol")
 	}
 	s.setUp(t, true)
 	srv := &http2.Server{MaxConcurrentStreams: hosttunnel.MaxStreams, ReadIdleTimeout: hosttunnel.ReadIdle, PingTimeout: hosttunnel.PingTimeout}

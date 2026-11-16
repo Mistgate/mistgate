@@ -44,13 +44,13 @@ func selfSigned(t *testing.T, name string) (tls.Certificate, *x509.CertPool) {
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key, Leaf: leaf}, pool
 }
 
-func TestPeekSNIThenHandshake(t *testing.T) {
+func TestPeekHelloThenHandshake(t *testing.T) {
 	cert, pool := selfSigned(t, "sub.example.com")
 	client, server := net.Pipe()
 	defer client.Close()
 	done := make(chan error, 1)
 	go func() {
-		tc := tls.Client(client, &tls.Config{ServerName: "sub.example.com", RootCAs: pool})
+		tc := tls.Client(client, &tls.Config{ServerName: "sub.example.com", RootCAs: pool, NextProtos: []string{TunnelALPN("s"), "h2"}})
 		if err := tc.Handshake(); err != nil {
 			done <- err
 			return
@@ -58,12 +58,12 @@ func TestPeekSNIThenHandshake(t *testing.T) {
 		_, err := tc.Write([]byte("ping"))
 		done <- err
 	}()
-	sni, replay, err := PeekSNI(server, 5*time.Second)
+	hello, replay, err := PeekHello(server, 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sni != "sub.example.com" {
-		t.Fatalf("sni = %q", sni)
+	if hello.ServerName != "sub.example.com" || !hello.Offers(TunnelALPN("s")) || hello.Offers(TunnelALPN("other")) {
+		t.Fatalf("hello = %+v", hello)
 	}
 	ts := tls.Server(replay, &tls.Config{Certificates: []tls.Certificate{cert}})
 	if err := ts.Handshake(); err != nil {
@@ -78,17 +78,17 @@ func TestPeekSNIThenHandshake(t *testing.T) {
 	}
 }
 
-func TestPeekSNIGarbageIsReplayed(t *testing.T) {
+func TestPeekHelloGarbageIsReplayed(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
 	msg := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 	go func() { _, _ = client.Write(msg) }()
-	sni, replay, err := PeekSNI(server, 5*time.Second)
+	hello, replay, err := PeekHello(server, 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sni != "" {
-		t.Fatalf("sni = %q", sni)
+	if hello.ServerName != "" || len(hello.ALPN) != 0 {
+		t.Fatalf("hello = %+v", hello)
 	}
 	got := make([]byte, len(msg))
 	if _, err := io.ReadFull(replay, got); err != nil {
@@ -99,10 +99,10 @@ func TestPeekSNIGarbageIsReplayed(t *testing.T) {
 	}
 }
 
-func TestPeekSNIReadErrorCloses(t *testing.T) {
+func TestPeekHelloReadErrorCloses(t *testing.T) {
 	client, server := net.Pipe()
 	_ = client.Close()
-	if _, _, err := PeekSNI(server, time.Second); err == nil {
+	if _, _, err := PeekHello(server, time.Second); err == nil {
 		t.Fatal("want a read error")
 	}
 }

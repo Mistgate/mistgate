@@ -1,14 +1,19 @@
 // Package hosttunnel is the wire layer of the subscription host (issue #48). The panel, which may sit behind NAT, dials a
-// TLS connection to the host node's TCP 443 with a secret SNI and speaks HTTP/2 over it as the server; the node is the
-// HTTP/2 client and opens one stream per forwarded connection: the raw TLS of a subscription client (KindTLS) or the
-// node's own agent link (KindLink). Each stream is a POST to StreamPath whose request body carries node→panel bytes and
-// whose response body carries panel→node bytes.
+// TLS connection to the host node's TCP 443 with the subscription name as SNI and a secret ALPN protocol (TunnelALPN), and
+// speaks HTTP/2 over it as the server; the node is the HTTP/2 client and opens one stream per forwarded connection: the
+// raw TLS of a subscription client (KindTLS) or the node's own agent link (KindLink). Each stream is a POST to StreamPath
+// whose request body carries node→panel bytes and whose response body carries panel→node bytes.
+//
+// The secret rides in ALPN, not in the SNI: censoring networks drop TLS whose SNI does not resolve in DNS, and the
+// subscription name always does.
 package hosttunnel
 
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -24,8 +29,6 @@ import (
 )
 
 const (
-	// ALPN is the protocol the tunnel's TLS negotiates.
-	ALPN = "h2"
 	// StreamPath is the request path of every tunnel stream.
 	StreamPath = "/s"
 	// HeaderKind says what a stream carries: KindTLS or KindLink.
@@ -44,7 +47,14 @@ const (
 	PingTimeout = 10 * time.Second
 )
 
-// maxHello bounds what PeekSNI buffers while it looks for a ClientHello.
+// TunnelALPN is the ALPN protocol that marks the panel's tunnel connection to a host whose tunnel secret is secret (the
+// node tells it from the subscription clients by this alone). A hash keeps it within ALPN's 255 bytes whatever the secret.
+func TunnelALPN(secret string) string {
+	sum := sha256.Sum256([]byte("mistgate host tunnel\x00" + secret))
+	return "mg-" + hex.EncodeToString(sum[:12])
+}
+
+// maxHello bounds what PeekHello buffers while it looks for a ClientHello.
 const maxHello = 16 << 10
 
 var (
@@ -78,29 +88,48 @@ func (r *recordingConn) Read(p []byte) (int, error) {
 
 func (r *recordingConn) Write(p []byte) (int, error) { return len(p), nil }
 
-// PeekSNI reads the ClientHello of c within timeout and returns its server name and a connection that replays the bytes
-// read so far before the rest of c. Bytes that are not a ClientHello give sni == "" and a replay of them (err == nil): the
-// caller passes such a connection on to its site. err != nil only when reading c failed; c is closed then.
-func PeekSNI(c net.Conn, timeout time.Duration) (sni string, replay net.Conn, err error) {
+// Hello is what PeekHello reads of a ClientHello.
+type Hello struct {
+	ServerName string
+	ALPN       []string
+}
+
+// Offers says whether the ClientHello offered the ALPN protocol proto.
+func (h Hello) Offers(proto string) bool {
+	for _, p := range h.ALPN {
+		if p == proto {
+			return true
+		}
+	}
+	return false
+}
+
+// PeekHello reads the ClientHello of c within timeout and returns its server name and ALPN protocols, and a connection
+// that replays the bytes read so far before the rest of c. Bytes that are not a ClientHello give a zero Hello and a replay
+// of them (err == nil): the caller passes such a connection on to its site. err != nil only when reading c failed; c is
+// closed then.
+func PeekHello(c net.Conn, timeout time.Duration) (hello Hello, replay net.Conn, err error) {
 	if err := c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 		_ = c.Close()
-		return "", nil, err
+		return Hello{}, nil, err
 	}
 	rec := &recordingConn{Conn: c}
+	seen := false
 	srv := tls.Server(rec, &tls.Config{GetConfigForClient: func(h *tls.ClientHelloInfo) (*tls.Config, error) {
-		sni = h.ServerName
+		seen = true
+		hello = Hello{ServerName: h.ServerName, ALPN: append([]string(nil), h.SupportedProtos...)}
 		return nil, errHelloSeen
 	}})
 	_ = srv.Handshake()
-	if rec.sockErr != nil && sni == "" {
+	if rec.sockErr != nil && !seen {
 		_ = c.Close()
-		return "", nil, rec.sockErr
+		return Hello{}, nil, rec.sockErr
 	}
 	if err := c.SetReadDeadline(time.Time{}); err != nil {
 		_ = c.Close()
-		return "", nil, err
+		return Hello{}, nil, err
 	}
-	return sni, &replayConn{Conn: c, head: rec.buf.Bytes()}, nil
+	return hello, &replayConn{Conn: c, head: rec.buf.Bytes()}, nil
 }
 
 // replayConn returns head before reading the connection.
