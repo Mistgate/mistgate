@@ -29,6 +29,7 @@ import { ExitTab } from "./exit";
 import { HistoryTab } from "./history";
 import { OverviewTab } from "./overview";
 import { ProfilesTab } from "./profiles";
+import { LinkViaLine } from "./relay-way";
 import { ServerTab } from "./server";
 import type { HistoryView, NodeSearch, NodeTab } from "./tabs";
 import { useWays, WaysTab } from "./ways";
@@ -238,6 +239,8 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
         </div>
       )}
 
+      {/* the agent reaches the panel through an entry's bridge (R4): a fallback path, and the way back is its own */}
+      {!retired && <LinkViaLine viaNodeId={node.linkViaNodeId} />}
       <StateBanner data={data} tab={tab} onTab={setTab} onRestart={() => setRestart(true)} />
 
       <Tabs

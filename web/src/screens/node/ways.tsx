@@ -26,6 +26,7 @@ import { nodeLoad } from "@/lib/node-load";
 import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import { useFresh } from "@/components/fx/fresh";
+import { activeOf } from "@/lib/relay-bridge";
 import { candidatesQuery, countryHint, isCut, reachHint, relaysQuery, seenHint, type CountryHint, type Hint } from "@/lib/relay";
 import { useNow } from "@/lib/time";
 import { ipv6Helps } from "@/lib/reachability";
@@ -206,6 +207,8 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
   const ccOf = useCountryOf();
   const look = lookOf(l, w);
   const seen = seenLine(t, l, w);
+  // how many of its servers go through the bridge now
+  const bridged = l.relays.filter((r) => r.enabled && activeOf(r) === "reverse").length;
   const title =
     l.kind === "direct" ? t("ways.direct") : l.kind === "cdn" ? t("ways.cdn") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : l.kind === "ipv6" ? t("ways.ipv6") : l.peer!.name;
   const where =
@@ -219,7 +222,7 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
         ? w.v6.entry || t(w.v6.entrySupported ? "ways.ipv6.lane.off" : "ways.ipv6.lane.na")
         : l.kind === "cdn"
           ? t.n("ways.servers", cdnOf(data).length)
-          : t.n("ways.servers", l.relays.length);
+          : [t.n("ways.servers", l.relays.length), bridged > 0 ? t("relay.way.lane", { n: bridged }) : ""].filter(Boolean).join(" · ");
   const mono = (l.kind === "direct" && data.inbounds.length > 0) || (l.kind === "ipv6" && !!w.v6.entry);
   // a lane broken on our side says so in words next to the ring's colour (how much of the country sees it is the line
   // below); the rest is said to a screen reader
@@ -563,7 +566,7 @@ function RelayDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }
         </Block>
       )}
       <Block flush={!forwardDrop} title={t("ways.block.servers")}>
-        <RelayRows list={lane.relays} side={via ? "exit" : "entry"} runs={runs} />
+        <RelayRows list={lane.relays} side={via ? "exit" : "entry"} runs={runs} readOnly={!w.owner} />
       </Block>
       {via && <SeenBlock w={w} name={peer.name} check={w.countryOf(peer.id)} />}
       <ActionBar>
