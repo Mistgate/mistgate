@@ -496,8 +496,15 @@ func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientF
 	if h.fsrc == nil {
 		return h.src.Subscription(ctx, token)
 	}
+	var name func(access.SubServer) string
+	if page {
+		settings, lang := h.settings(ctx), h.brand(ctx).Language
+		template := settings.GetServerNameTemplate()
+		name = func(server access.SubServer) string { return remarks([]access.SubServer{server}, template, lang)[0] }
+	}
 	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{
 		Format: format, Device: device, NoTouch: !touch, NoPageData: !page, NoLinkAWG: noLinkAWG,
+		IncludeTrustTunnel: page, Name: name,
 		IncludeEffectiveDNS: format != plugin.FormatURIList && h.cfg.DNS != nil,
 	})
 }
