@@ -29,6 +29,8 @@ import (
 const (
 	capAWG   = "awg/1"
 	capVLESS = "vless/1"
+	// capTrustTunnel marks the in-process TCP HTTP/2 TrustTunnel engine.
+	capTrustTunnel = "trusttunnel/1"
 	// capVLESSUnknownKeys marks agents that report VLESS unknown-user-ID attempts in links/1.
 	capVLESSUnknownKeys = "vless-unknown-keys/1"
 	// capVLESSHelloKex marks agents that count the key exchange the ClientHellos of REALITY connections offer, per key
@@ -181,6 +183,9 @@ func (a *Agent) capabilities() []string {
 		if a.cfg.Certs != nil { // the site needs the certificate source
 			caps = append(caps, capVLESSSelf, capVLESSTLS)
 		}
+	}
+	if _, ok := a.engines["trusttunnel"]; ok {
+		caps = append(caps, capTrustTunnel)
 	}
 	if a.appliesUserRateLimit() {
 		caps = append(caps, capUserRateLimit)
