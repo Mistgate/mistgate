@@ -16,24 +16,37 @@ import (
 	wire "github.com/mistgate/mistgate/internal/trusttunnel"
 )
 
+// The memory a credential can hold in _udp2 tunnels is bounded for the credential as a whole, not per stream: its
+// connections (at most maxCredentialConnections, one _udp2 stream each) share maxUDPFlows sockets with a udpReadBuffer
+// each, and udpAccountReplyBytes of queued replies. That is 4 MiB + 4 MiB, however many connections and streams it opens.
 const (
-	// maxUDPFlows is how many NAT flows one _udp2 stream keeps; the least recently active one makes room for a new one.
+	// maxUDPFlows is how many NAT flows all the _udp2 streams of one credential keep together; the least recently active
+	// one, on whichever stream, makes room for a new one.
 	maxUDPFlows = 256
 	// udpReadBuffer is the receive buffer of one flow. A datagram that fills it may have been cut, so it is dropped: real
 	// traffic stays far below it (a path MTU is 1500, a QUIC datagram 1350), and the 64 KiB a datagram can have in theory
 	// would cost 16 MiB per stream in buffers alone.
 	udpReadBuffer = 16 << 10
 	// The replies of one stream wait in a queue of at most udpReplyFrames frames and udpReplyBytes bytes for the client to
-	// take them. A client that does not read loses datagrams (UDP does that anyway) instead of holding the sockets' readers.
-	udpReplyFrames = 256
-	udpReplyBytes  = 1 << 20
-	dnsPort        = 53
+	// take them, and the queues of all the streams of a credential together hold at most udpAccountReplyBytes. A client
+	// that does not read loses datagrams (UDP does that anyway) instead of holding the sockets' readers.
+	udpReplyFrames       = 256
+	udpReplyBytes        = 1 << 20
+	udpAccountReplyBytes = 4 << 20
+	dnsPort              = 53
 )
 
 // serveUDP serves one _udp2 stream: datagrams of any number of client sources, each with its own egress socket (a NAT
 // keyed by the client's source address). A reply comes back as a frame from the address it came from to that source,
 // which is what the official client looks its flow up by.
+//
+// A connection carries one _udp2 stream per credential, as the official client opens it: a newer one replaces the older (a
+// client that reopens its stream while the old one is still being torn down, or whose old FIN arrives late over a lossy
+// path, must not be refused), and the older one is reset.
 func (in *inbound) serveUDP(w http.ResponseWriter, r *http.Request, stream *streamState) {
+	if previous := stream.conn.claimUDP(stream); previous != nil {
+		previous.abort()
+	}
 	w.WriteHeader(http.StatusOK)
 	if stream.flush() != nil {
 		return
@@ -122,7 +135,8 @@ func newUDPTunnel(in *inbound, stream *streamState) *udpTunnel {
 type udpFlow struct {
 	tunnel *udpTunnel
 	source netip.AddrPort
-	order  uint64
+	order  uint64 // among the flows of its stream
+	seq    uint64 // among the flows of its credential; guarded by credState.udpMu
 	conn   engine.EgressUDP
 
 	closed  atomic.Bool
@@ -148,20 +162,7 @@ func (tunnel *udpTunnel) flowFor(source, target netip.AddrPort) (*udpFlow, error
 		}
 		delete(tunnel.flows, source)
 	}
-	var victim *udpFlow
-	if len(tunnel.flows) >= maxUDPFlows {
-		for _, current := range tunnel.flows {
-			if victim == nil || current.last.Load() < victim.last.Load() ||
-				(current.last.Load() == victim.last.Load() && current.order < victim.order) {
-				victim = current
-			}
-		}
-		delete(tunnel.flows, victim.source)
-	}
 	tunnel.mu.Unlock()
-	if victim != nil {
-		victim.close()
-	}
 
 	conn, err := tunnel.in.out.UDP(target.String())
 	if err != nil {
@@ -182,6 +183,12 @@ func (tunnel *udpTunnel) flowFor(source, target netip.AddrPort) (*udpFlow, error
 	tunnel.flows[source] = flow
 	tunnel.readers.Add(1)
 	tunnel.mu.Unlock()
+	// The credential's other flows make room, on this stream or another one. A flow is counted from its birth, so the
+	// number of sockets is at most maxUDPFlows plus the flows being opened at this very moment.
+	for _, victim := range tunnel.stream.cred.trackUDPFlow(flow) {
+		victim.tunnel.remove(victim)
+		victim.close()
+	}
 	go flow.readLoop()
 	return flow, nil
 }
@@ -233,6 +240,7 @@ func (flow *udpFlow) close() {
 		flow.timer = nil
 	}
 	flow.mu.Unlock()
+	flow.tunnel.stream.cred.forgetUDPFlow(flow)
 	_ = flow.conn.Close()
 }
 
@@ -316,14 +324,17 @@ func (flow *udpFlow) answered(remote netip.AddrPort) {
 // datagram is dropped.
 func (tunnel *udpTunnel) enqueue(frame []byte, payload int) {
 	size := int64(len(frame))
-	if tunnel.queued.Add(size) > udpReplyBytes {
+	account := &tunnel.stream.cred.udpQueued
+	if tunnel.queued.Add(size) > udpReplyBytes || account.Add(size) > udpAccountReplyBytes {
 		tunnel.queued.Add(-size)
+		account.Add(-size)
 		return
 	}
 	select {
 	case tunnel.out <- udpOut{frame: frame, payload: payload}:
 	default:
 		tunnel.queued.Add(-size)
+		account.Add(-size)
 	}
 }
 
@@ -335,6 +346,7 @@ func (tunnel *udpTunnel) writeLoop(done chan<- struct{}) {
 	failed := false
 	for item := range tunnel.out {
 		tunnel.queued.Add(-int64(len(item.frame)))
+		stream.cred.udpQueued.Add(-int64(len(item.frame)))
 		if failed {
 			continue
 		}

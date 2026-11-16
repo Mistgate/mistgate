@@ -115,7 +115,7 @@ func TestSocketAndCleanupThatArriveAfterTheStreamEndedAreReleased(t *testing.T) 
 // The replies a client has not taken yet are bounded in count and in bytes, and queueing never waits.
 func TestReplyQueueIsBoundedInFramesAndInBytes(t *testing.T) {
 	in := &inbound{e: &eng{timing: defaultTimings}}
-	stream := &streamState{ctx: context.Background()}
+	stream := &streamState{ctx: context.Background(), cred: &credState{}}
 
 	small := newUDPTunnel(in, stream)
 	for range 5 * udpReplyFrames {
@@ -138,5 +138,47 @@ func TestReplyQueueIsBoundedInFramesAndInBytes(t *testing.T) {
 	}
 	if got := large.queued.Load(); got > udpReplyBytes {
 		t.Fatalf("queued bytes = %d, over the bound of %d", got, udpReplyBytes)
+	}
+}
+
+// The queued replies of all the streams of a credential together stay within one bound, so a credential cannot hold the
+// per-stream bound once for every connection it opens; the bytes come back as the writers take the frames.
+func TestReplyQueueBytesAreBoundedPerCredentialAcrossStreams(t *testing.T) {
+	in := &inbound{e: &eng{timing: defaultTimings}}
+	credential := &credState{}
+	const frame = 64 << 10
+	var tunnels []*udpTunnel
+	for range 16 { // as many streams as a credential has connections
+		tunnels = append(tunnels, newUDPTunnel(in, &streamState{ctx: context.Background(), cred: credential}))
+	}
+	for range 4 * udpAccountReplyBytes / frame {
+		for _, tunnel := range tunnels {
+			tunnel.enqueue(make([]byte, frame), frame)
+		}
+	}
+	if got := credential.udpQueued.Load(); got > udpAccountReplyBytes || got < udpAccountReplyBytes-frame {
+		t.Fatalf("queued bytes of the credential = %d, want the bound of %d", got, udpAccountReplyBytes)
+	}
+	var held int64
+	for _, tunnel := range tunnels {
+		held += tunnel.queued.Load()
+	}
+	if held != credential.udpQueued.Load() {
+		t.Fatalf("streams hold %d bytes, the credential counts %d", held, credential.udpQueued.Load())
+	}
+	// Another credential is not held back by this one.
+	other := newUDPTunnel(in, &streamState{ctx: context.Background(), cred: &credState{}})
+	other.enqueue(make([]byte, frame), frame)
+	if len(other.out) != 1 {
+		t.Fatal("a credential's full queues blocked another credential")
+	}
+	// A writer that takes a frame gives its bytes back to the credential.
+	before := credential.udpQueued.Load()
+	tunnels[0].stream.cred.udpQueued.Add(-frame)
+	tunnels[0].queued.Add(-frame)
+	<-tunnels[0].out
+	tunnels[0].enqueue(make([]byte, frame), frame)
+	if credential.udpQueued.Load() != before {
+		t.Fatalf("queued bytes after take and refill = %d, want %d", credential.udpQueued.Load(), before)
 	}
 }

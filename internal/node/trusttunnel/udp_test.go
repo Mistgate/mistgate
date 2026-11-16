@@ -391,3 +391,120 @@ func TestUDPKickClosesStreamAndSockets(t *testing.T) {
 		waitFor(t, time.Second, func() bool { return sockets.get(i).isClosed.Load() })
 	}
 }
+
+// A connection carries one _udp2 stream per credential. A second one replaces the first, which is reset and gives its
+// sockets back; the second works.
+func TestSecondUDP2OnAConnectionReplacesTheFirst(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	var sockets socketLog
+	h := newHarness(t, []plugin.UserCred{alice.cred}, sockets.egress(nil, nil), timings{})
+	client := newHTTP2Client(t, h.addr)
+
+	first, firstWriter := client.connect(t, "_udp2", authValue(t, alice), true)
+	writeUDPFrame(t, firstWriter, udpFrame("192.0.2.1", 1111, "192.0.2.10", 443, "first"))
+	if reply, err := readUDPFrame(first.Body); err != nil || string(reply.Payload) != "first" {
+		t.Fatalf("first stream echo = %+v, %v", reply, err)
+	}
+	second, secondWriter := client.connect(t, "_udp2", authValue(t, alice), true)
+	if second.StatusCode != 200 {
+		t.Fatalf("second _udp2 status = %d", second.StatusCode)
+	}
+	if n := authenticatedConnectionCount(h.in); n != 1 {
+		t.Fatalf("the two streams used %d connections, the test needs one", n)
+	}
+	if err, ended := streamErrorWithin(first.Body, time.Second); !ended || err == nil {
+		t.Fatalf("the replaced _udp2 stream ended = %v, err = %v; it must be reset within a second", ended, err)
+	}
+	waitFor(t, time.Second, func() bool { return sockets.get(0).isClosed.Load() })
+
+	writeUDPFrame(t, secondWriter, udpFrame("192.0.2.1", 2222, "192.0.2.10", 443, "second"))
+	if reply, err := readUDPFrame(second.Body); err != nil || string(reply.Payload) != "second" {
+		t.Fatalf("second stream echo = %+v, %v", reply, err)
+	}
+	// What the writer has taken off the queue is given back to the credential's bound.
+	credential := h.in.idx.Load().byID["alice"]
+	waitFor(t, time.Second, func() bool { return credential.udpQueued.Load() == 0 })
+	// It is the one stream of the credential on this connection now: a third replaces it in turn.
+	third, _ := client.connect(t, "_udp2", authValue(t, alice), true)
+	if err, ended := streamErrorWithin(second.Body, time.Second); !ended || err == nil {
+		t.Fatalf("the second stream survived a third: ended = %v, err = %v", ended, err)
+	}
+	_ = third.Body.Close()
+}
+
+// The sockets of all the _udp2 streams of a credential together stay at maxUDPFlows, however many connections carry
+// them; the least recently active ones close, on whichever stream. Another credential keeps its own.
+func TestUDPFlowsOfACredentialAreBoundedAcrossConnections(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	bob := makeCredential(t, "bob", "bob", "person-bob", 0, 0)
+	var sockets socketLog
+	h := newHarness(t, []plugin.UserCred{alice.cred, bob.cred}, sockets.egress(nil, nil), timings{})
+
+	_, bobBody, bobWriter := openUDP(t, h, bob)
+	go io.Copy(io.Discard, bobBody)
+	writeUDPFrame(t, bobWriter, udpFrame("192.0.2.2", 7000, "192.0.2.10", 443, "bob"))
+	waitFor(t, 5*time.Second, func() bool { return sockets.count() == 1 })
+	bobSocket := sockets.get(0)
+
+	const connections, perConnection = 3, 120 // 360 flows against a bound of 256
+	var writers []*io.PipeWriter
+	for c := 0; c < connections; c++ {
+		_, body, writer := openUDP(t, h, alice)
+		go io.Copy(io.Discard, body)
+		writers = append(writers, writer)
+		for i := 0; i < perConnection; i++ {
+			writeUDPFrame(t, writer, udpFrame("192.0.2.1", 1000+i, "192.0.2.10", 443, "x"))
+		}
+		waitFor(t, 5*time.Second, func() bool { return sockets.count() == 1+(c+1)*perConnection })
+		time.Sleep(5 * time.Millisecond) // the connections' flows are ordered by when they were last active
+	}
+	waitFor(t, 5*time.Second, func() bool {
+		open := 0
+		for i := 1; i < sockets.count(); i++ {
+			if !sockets.get(i).isClosed.Load() {
+				open++
+			}
+		}
+		return open == maxUDPFlows
+	})
+	if bobSocket.isClosed.Load() {
+		t.Fatal("another credential's flow was evicted")
+	}
+	// The newest flows are the ones that stayed.
+	for i := sockets.count() - 10; i < sockets.count(); i++ {
+		if sockets.get(i).isClosed.Load() {
+			t.Fatalf("socket %d of %d, among the newest, was closed", i, sockets.count())
+		}
+	}
+	credential := h.in.idx.Load().byID["alice"]
+	credential.udpMu.Lock()
+	counted := len(credential.udpFlows)
+	credential.udpMu.Unlock()
+	if counted != maxUDPFlows {
+		t.Fatalf("the credential counts %d flows, want %d", counted, maxUDPFlows)
+	}
+	for _, writer := range writers {
+		_ = writer.Close()
+	}
+	// Ending the streams gives every socket back.
+	waitFor(t, 5*time.Second, func() bool {
+		credential.udpMu.Lock()
+		defer credential.udpMu.Unlock()
+		return len(credential.udpFlows) == 0
+	})
+}
+
+// streamErrorWithin reads body to its end and returns what ended it, or reports that it did not end within d.
+func streamErrorWithin(body io.Reader, d time.Duration) (error, bool) {
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(io.Discard, body)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		return err, true
+	case <-time.After(d):
+		return nil, false
+	}
+}

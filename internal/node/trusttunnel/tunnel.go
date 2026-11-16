@@ -34,8 +34,9 @@ type connectionState struct {
 	expiring    bool
 	active      int
 	streams     map[*streamState]struct{}
-	credentials map[*credState]time.Time // credentials with a tunnel on this connection, and since when
-	banned      map[*credState]struct{}  // kicked: no further tunnel of these on this connection
+	credentials map[*credState]time.Time    // credentials with a tunnel on this connection, and since when
+	banned      map[*credState]struct{}     // kicked: no further tunnel of these on this connection
+	udp         map[*credState]*streamState // the _udp2 stream of each credential on this connection
 	idle        *time.Timer
 }
 
@@ -69,6 +70,7 @@ func (in *inbound) beginStream(r *http.Request, w http.ResponseWriter, conn net.
 		connection = &connectionState{
 			in: in, conn: conn, streams: make(map[*streamState]struct{}),
 			credentials: make(map[*credState]time.Time), banned: make(map[*credState]struct{}),
+			udp: make(map[*credState]*streamState),
 		}
 		in.conns[conn] = connection
 	}
@@ -121,6 +123,9 @@ func (in *inbound) finishStream(stream *streamState) {
 	connection := stream.conn
 	connection.mu.Lock()
 	delete(connection.streams, stream)
+	if connection.udp[stream.cred] == stream {
+		delete(connection.udp, stream.cred)
+	}
 	if connection.active > 0 {
 		connection.active--
 	}
@@ -180,6 +185,7 @@ func (connection *connectionState) shutdown() {
 	connection.streams = nil
 	connection.credentials = nil
 	connection.banned = nil
+	connection.udp = nil
 	connection.mu.Unlock()
 
 	for _, stream := range streams {
@@ -190,6 +196,19 @@ func (connection *connectionState) shutdown() {
 		delete(cs.connections, connection)
 		cs.mu.Unlock()
 	}
+}
+
+// claimUDP makes stream the _udp2 stream of its credential on this connection and returns the one it replaces, which the
+// caller ends. A closed connection claims nothing: its streams are being ended already.
+func (connection *connectionState) claimUDP(stream *streamState) *streamState {
+	connection.mu.Lock()
+	defer connection.mu.Unlock()
+	if connection.closed {
+		return nil
+	}
+	previous := connection.udp[stream.cred]
+	connection.udp[stream.cred] = stream
+	return previous
 }
 
 // detach ends every tunnel of one credential on this connection, at once, and refuses its further CONNECTs here. Other

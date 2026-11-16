@@ -40,6 +40,13 @@ type credState struct {
 	connections map[*connectionState]time.Time
 	streams     map[*streamState]struct{}
 	active      int
+
+	// The _udp2 memory of the credential is bounded as a whole, whatever the number of its connections and streams: at
+	// most maxUDPFlows egress sockets (each with a read buffer) and udpAccountReplyBytes of queued replies.
+	udpMu     sync.Mutex
+	udpFlows  map[*udpFlow]struct{}
+	udpSeq    uint64
+	udpQueued atomic.Int64
 }
 
 func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ratelimit.Registry) (*index, []plugin.UserCred, []string) {
@@ -115,6 +122,7 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ra
 			cs = &credState{
 				inboundID: inboundID, id: cred.CredID, username: value.username, passHash: value.hash,
 				connections: make(map[*connectionState]time.Time), streams: make(map[*streamState]struct{}),
+				udpFlows: make(map[*udpFlow]struct{}),
 			}
 		}
 		cs.inboundID, cs.id, cs.username, cs.passHash = inboundID, cred.CredID, value.username, value.hash
@@ -163,4 +171,36 @@ func (cs *credState) retire() {
 	for _, stream := range streams {
 		stream.abort()
 	}
+}
+
+// trackUDPFlow counts a new egress flow against the credential and returns the flows that must close to keep it within
+// maxUDPFlows: the least recently active ones, on any of the credential's streams. The caller closes them (not under a lock).
+func (cs *credState) trackUDPFlow(flow *udpFlow) []*udpFlow {
+	cs.udpMu.Lock()
+	defer cs.udpMu.Unlock()
+	if flow.closed.Load() { // closed before it was counted: forgetUDPFlow has nothing left to take out
+		return nil
+	}
+	var victims []*udpFlow
+	for len(cs.udpFlows) >= maxUDPFlows {
+		var oldest *udpFlow
+		for current := range cs.udpFlows {
+			if oldest == nil || current.last.Load() < oldest.last.Load() ||
+				(current.last.Load() == oldest.last.Load() && current.seq < oldest.seq) {
+				oldest = current
+			}
+		}
+		delete(cs.udpFlows, oldest)
+		victims = append(victims, oldest)
+	}
+	cs.udpSeq++
+	flow.seq = cs.udpSeq
+	cs.udpFlows[flow] = struct{}{}
+	return victims
+}
+
+func (cs *credState) forgetUDPFlow(flow *udpFlow) {
+	cs.udpMu.Lock()
+	delete(cs.udpFlows, flow)
+	cs.udpMu.Unlock()
 }
