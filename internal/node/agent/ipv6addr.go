@@ -61,7 +61,7 @@ func (a *Agent) syncOwnedIPv6(ctx context.Context) {
 		res, err = h.KeepOwnedIPv6(ctx)
 	}
 	if err != nil {
-		a.log.Warn("ipv6 addresses not fully synced", "err", err)
+		a.log.Warn("ipv6 addresses not fully synced", "code", "ipv6_sync_failed", "err", err)
 	}
 	var parts []string
 	states := make([]doctor.OwnedAddr, 0, len(res.States))

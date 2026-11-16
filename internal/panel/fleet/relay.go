@@ -15,9 +15,11 @@ import (
 
 // relayForwards lists the forwards of the entry node n, sorted by relay id. A relay is in it when it is switched on and
 // store.RelayLink.Live holds (the exit's server is on, not failed, on an enrolled node); the target is the exit node's
-// address and the server's own port (a hop range is not forwarded). A server whose spec does not build leaves the list: it
+// address and the server's own port (a hop range is not forwarded). A relay that stands in the reverse way, between two agents that
+// list "relay-reverse/1" and with a bridge path on the entry, carries its mode and the exit it is bridged to (reverseCarried); every other
+// one is the plain forward. A server whose spec does not build leaves the list: it
 // is reported on its own, and the forward would point nowhere.
-func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow) ([]plugin.RelayForward, error) {
+func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow, caps []string) ([]plugin.RelayForward, error) {
 	links, err := f.st.RelayLinks(ctx, store.RelayFilter{ViaNodeID: n.ID, EnabledOnly: true})
 	if err != nil || len(links) == 0 {
 		return nil, err
@@ -40,7 +42,11 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow) ([]plugin.Re
 			f.log.Warn("relay: the server's spec does not build, the forward is left out", "relay", l.ID, "inbound", l.InboundID, "err", err)
 			continue
 		}
-		out = append(out, plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: exit.Address, ToPort: spec.Listen.Port})
+		fwd := plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: exit.Address, ToPort: spec.Listen.Port}
+		if bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) && reverseCarried(l, n.ID, caps) { // A bad endpoint cannot be carried as a reverse forward.
+			fwd.Mode, fwd.ExitNodeID = store.RelayModeReverse, l.ExitNodeID
+		}
+		out = append(out, fwd)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil

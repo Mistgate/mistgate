@@ -68,30 +68,297 @@ func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 	return nil
 }
 
+// relayModeGate is the rule for switching a relay on in the mode asked for (relay.proto CheckRelay and the contract of the way):
+//
+//   - dnat: as always, the leg check of the last 15 minutes passed or could not be made.
+//   - reverse: both agents list "relay-reverse/1", the server is TCP, and a reverse_reach check, made now for the entry's bridge
+//     endpoint as it is now, passed. The leg is not asked for: the way exists because the direct leg may not work.
+//   - auto: the dnat gate when it passes. When it does not and the reverse way is possible, this runs the check itself (leg, and
+//     reverse_reach after a failed leg): a passing leg switches the relay on direct, a failed leg and a passing reverse_reach
+//     switch it on through the bridge. Otherwise the refusal is that of the leg, with the reverse_reach code beside it. A relay
+//     that cannot go through the bridge (UDP, an agent that is too old) is gated exactly as before the reverse way existed.
+func (s *Service) relayModeGate(ctx context.Context, l store.RelayLink, mode string) error {
+	switch mode {
+	case store.RelayModeDNAT:
+		return s.relayGate(ctx, l)
+	case store.RelayModeReverse:
+		return s.reverseRelayGate(ctx, l, mode)
+	case store.RelayModeAuto:
+		direct := s.relayGate(ctx, l)
+		if direct == nil || reverseBlocked(l) != "" || s.cfg.CheckRelay == nil {
+			return direct
+		}
+		_, restore, err := s.prepareBridgeSite(ctx, l, mode)
+		if err != nil {
+			return direct // the bridge cannot be probed: the answer is the direct gate's
+		}
+		check, err := s.cfg.CheckRelay(ctx, l.ID)
+		if err != nil {
+			restore()
+			return direct
+		}
+		entry, err := s.st.Node(ctx, l.ViaNodeID)
+		if err != nil {
+			restore()
+			return s.internal("get entry", err)
+		}
+		switch {
+		case check.Leg.Acceptable():
+			restore()
+			return nil
+		case check.Leg.Status == "fail" && check.ReverseReachOK(s.now(), entry.BridgeEndpointPort()):
+			return nil
+		}
+		restore()
+		if check.Leg.Status == "" {
+			return direct
+		}
+		return coded(connect.CodeFailedPrecondition, "relay_check_failed", "stage", store.RelayStageLeg, "code", check.Leg.Code,
+			"reverse_reach", cmp.Or(check.ReverseReach.Code, check.ReverseReach.Status, "unknown"))
+	default:
+		return invalid("mode must be auto, dnat or reverse")
+	}
+}
+
+func (s *Service) reverseRelayGate(ctx context.Context, l store.RelayLink, mode string) error {
+	if reason := reverseBlocked(l); reason != "" {
+		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", reason)
+	}
+	if s.cfg.CheckRelay == nil {
+		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", "reverse_reach_unknown")
+	}
+	entry, restore, err := s.prepareBridgeSite(ctx, l, mode)
+	if err != nil {
+		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", "reverse_reach_unknown")
+	}
+	check, err := s.cfg.CheckRelay(ctx, l.ID, store.RelayStageReverseReach)
+	if err != nil {
+		restore()
+		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", "reverse_reach_failed")
+	}
+	if !check.ReverseReachOK(s.now(), entry.BridgeEndpointPort()) {
+		restore()
+		reason := "reverse_reach_unknown"
+		switch {
+		case check.ReverseReach.At > 0 && !freshRelayStage(check.ReverseReach, s.now(), relayCheckTTL):
+			reason = "reverse_reach_stale"
+		case check.ReverseReach.Code != "":
+			reason = "reverse_reach_" + check.ReverseReach.Code
+		}
+		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", reason)
+	}
+	return nil
+}
+
+// prepareBridgeSite makes the entry's bridge endpoint (its path and port, chosen once) and, when that is a site of the bridge's own
+// (a port of its own, not the node's site on 443), has it served and its pin reported before the check that probes it. The entry
+// serves the site for the relays that may use the bridge (store.RelayLink.BridgeServed); a relay that is still dnat is made auto or
+// reverse first, and restore puts the mode back when the check refuses it.
+func (s *Service) prepareBridgeSite(ctx context.Context, l store.RelayLink, mode string) (store.NodeRow, func(), error) {
+	restore := func() {}
+	entry, err := s.ensureBridgeEndpoint(ctx, l.ViaNodeID, nil)
+	if err != nil {
+		return entry, restore, err
+	}
+	if entry.BridgePort == 0 {
+		return entry, restore, nil
+	}
+	if l.Mode == store.RelayModeDNAT && mode != store.RelayModeDNAT {
+		next, orig := mode, l.Mode
+		if err := s.st.UpdateRelay(ctx, l.ID, store.RelayPatch{Mode: &next}, s.now()); err != nil {
+			return entry, restore, err
+		}
+		s.notify.StateChanged()
+		restore = func() {
+			if err := s.st.UpdateRelay(context.WithoutCancel(ctx), l.ID, store.RelayPatch{Mode: &orig}, s.now()); err != nil && !errors.Is(err, store.ErrNotFound) {
+				s.log.Warn("put the relay mode back", "code", "relay_mode_restore_failed", "relay", l.ID, "err", err)
+			}
+			s.notify.StateChanged()
+		}
+	}
+	if err := s.awaitBridgeSite(ctx, l.ID, entry); err != nil {
+		restore()
+		return entry, func() {}, err
+	}
+	return entry, restore, nil
+}
+
+// awaitBridgeSite waits for the entry's agent to report the pin of its bridge site (a separate port; the node's site on 443 has
+// none to wait for): the exits verify it by that pin, and so does the probe.
+func (s *Service) awaitBridgeSite(ctx context.Context, relayID string, entry store.NodeRow) error {
+	if entry.BridgePort == 0 {
+		return nil
+	}
+	deadline := time.NewTimer(s.relayWait)
+	defer deadline.Stop()
+	tick := time.NewTicker(s.relayPoll)
+	defer tick.Stop()
+	for {
+		l, err := s.st.RelayLink(context.WithoutCancel(ctx), relayID)
+		if err != nil {
+			return err
+		}
+		if l.BridgeSitePin(entry.BridgePort, s.now()) != "" {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return errors.New("bridge site pin timeout")
+		case <-tick.C:
+		}
+	}
+}
+
+func freshRelayStage(stage store.RelayStage, now time.Time, ttl time.Duration) bool {
+	return stage.At > 0 && stage.At <= now.Unix() && now.Unix()-stage.At <= int64(ttl/time.Second)
+}
+
 // relaySettle runs after a relay was switched on: the entry installs the forward, then the path is checked from outside. When
 // the path fails the relay is switched off again; an unverifiable path leaves it on but unverified.
 func (s *Service) relaySettle(ctx context.Context, l store.RelayLink) error {
-	stage, code := store.RelayStagePath, s.awaitRelayForward(ctx, l.ID)
+	stage := store.RelayStagePath
+	if s.relayNeedsBridge(ctx, l) {
+		stage = store.RelayStageBridge
+		if code := s.awaitRelayBridge(ctx, l.ID); code != "" {
+			s.recordRelayBridgeFailure(ctx, l.ID, code)
+			return s.disableFailedRelay(ctx, l, stage, code)
+		}
+		s.controlRelay(ctx, l.ID, true, false) // the proof of this switch-on is the one below
+		current, err := s.st.RelayLink(context.WithoutCancel(ctx), l.ID)
+		if err != nil {
+			return s.internal("read relay after bridge", err)
+		}
+		if current.ActiveMode != store.RelayModeReverse && current.Mode == store.RelayModeAuto {
+			check, _ := current.Check()
+			if check.Leg.Status == "fail" && freshRelayStage(check.ReverseReach, s.now(), relayCheckTTL) && check.ReverseReach.Status == "ok" {
+				s.changeRelayMode(ctx, current, store.RelayModeReverse, "leg_failed")
+				current, err = s.st.RelayLink(context.WithoutCancel(ctx), l.ID)
+				if err != nil {
+					return s.internal("read relay after mode change", err)
+				}
+			}
+		}
+		if current.Mode == store.RelayModeReverse && current.ActiveMode != store.RelayModeReverse {
+			return s.disableFailedRelay(ctx, current, store.RelayStageBridge, "mode_not_ready")
+		}
+		l = current
+	}
+	code := s.awaitRelayForward(ctx, l.ID)
 	if code == "" {
-		code = s.relayPathCheck(ctx, l.ID)
-	} else {
-		s.recordRelayPathFailure(ctx, l.ID, code)
+		stage = store.RelayStagePath
+		code = s.relayPathCheckStrict(ctx, l.ID, l.ActiveMode == store.RelayModeReverse)
+	}
+	if code != "" {
+		if stage == store.RelayStagePath {
+			s.recordRelayPathFailure(ctx, l.ID, code)
+		} else {
+			s.recordRelayBridgeFailure(ctx, l.ID, code)
+		}
 	}
 	if code == "" {
 		return nil
 	}
+	return s.disableFailedRelay(ctx, l, stage, code)
+}
+
+func (s *Service) disableFailedRelay(ctx context.Context, l store.RelayLink, stage, code string) error {
 	bg := context.WithoutCancel(ctx)
 	off := false
 	s.relayMu.Lock()
 	err := s.st.UpdateRelay(bg, l.ID, store.RelayPatch{Enabled: &off}, s.now())
 	s.relayMu.Unlock()
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		s.log.Error("access: switch a failed relay off", "relay", l.ID, "err", err)
+		s.log.Error("access: switch a failed relay off", "code", "relay_disable_failed", "relay", l.ID, "err", err)
 	}
+	s.relayHome(bg, l.ID)
 	s.audit(bg, actor(ctx), "relay.update", map[string]any{"relay": l.ID, "via": l.ViaNodeName, "exit": l.ExitNodeName,
 		"enabled": false, "reason": "check_failed", "stage": stage, "code": code})
 	s.notify.StateChanged()
 	return coded(connect.CodeFailedPrecondition, "relay_check_failed", "stage", stage, "code", code)
+}
+
+// relayHome puts a relay that was switched off back in the plain way: a relay that is off has no way, and one that was on in the
+// reverse way and is switched on again must start from direct, as a new one does, and not carry the way it was in last.
+func (s *Service) relayHome(ctx context.Context, id string) {
+	if l, err := s.st.RelayLink(ctx, id); err == nil && l.ActiveMode != store.RelayModeDNAT {
+		if err := s.st.SetRelayActiveMode(ctx, id, store.RelayModeDNAT, "", s.now()); err != nil && !errors.Is(err, store.ErrNotFound) {
+			s.log.Warn("put a switched-off relay back in the plain way", "code", "relay_mode_store_failed", "relay", id, "err", err)
+		}
+	}
+}
+
+// relayNeedsBridge says switching this relay on goes through the bridge: the owner asked for it, it stands in it, or it is auto and
+// the direct leg failed while the exit reaches the entry's bridge endpoint (both lately, as the gate saw them).
+func (s *Service) relayNeedsBridge(ctx context.Context, l store.RelayLink) bool {
+	if l.Network != "tcp" {
+		return false
+	}
+	if l.ActiveMode == store.RelayModeReverse || l.Mode == store.RelayModeReverse {
+		return true
+	}
+	check, ok := l.Check()
+	if !ok || l.Mode != store.RelayModeAuto || !freshRelayStage(check.Leg, s.now(), relayCheckTTL) || check.Leg.Status != "fail" {
+		return false
+	}
+	entry, err := s.st.Node(ctx, l.ViaNodeID)
+	return err == nil && check.ReverseReachOK(s.now(), entry.BridgeEndpointPort())
+}
+
+// awaitRelayBridge waits for the exit's agent to report the bridge held for 10 seconds: "" when it does, else why not (an error
+// the agent reported, or that nothing came in time).
+func (s *Service) awaitRelayBridge(ctx context.Context, id string) string {
+	deadline := time.NewTimer(s.relayWait)
+	defer deadline.Stop()
+	tick := time.NewTicker(s.relayPoll)
+	defer tick.Stop()
+	for {
+		l, err := s.st.RelayLink(context.WithoutCancel(ctx), id)
+		if err != nil {
+			return "failed"
+		}
+		if !l.Enabled {
+			return "switched_off"
+		}
+		stage := l.BridgeStage(s.now())
+		switch {
+		case stage.Status == "ok":
+			return ""
+		case stage.Status == "fail" && stage.Code != "disconnected" && stage.Code != "stale":
+			return stage.Code
+		}
+		select {
+		case <-ctx.Done():
+			return "apply_timeout"
+		case <-deadline.C:
+			return "apply_timeout"
+		case <-tick.C:
+		}
+	}
+}
+
+// recordRelayBridgeFailure keeps why the bridge did not come up as the exit's own report (an error word), where the bridge stage
+// is read from; the relay is switched off after it, and its last check says so.
+func (s *Service) recordRelayBridgeFailure(ctx context.Context, id, code string) {
+	_ = s.st.SetRelayBridgeSide(context.WithoutCancel(ctx), id, "exit", &store.RelayBridgeSideCheck{Error: code, AtUnix: s.now().Unix()})
+}
+
+func (s *Service) changeRelayMode(ctx context.Context, l store.RelayLink, active, reason string) {
+	if l.ActiveMode == active && l.ModeReason == reason {
+		return
+	}
+	if err := s.st.SetRelayActiveMode(context.WithoutCancel(ctx), l.ID, active, reason, s.now()); err != nil {
+		s.log.Warn("store relay active mode", "code", "relay_mode_store_failed", "relay", l.ID, "err", err)
+		return
+	}
+	if l.ActiveMode != active {
+		s.notify.StateChanged()
+		if err := s.st.InsertEvent(context.WithoutCancel(ctx), store.EventRow{Time: s.now(), Severity: 1, Code: "relay_mode_changed", Source: "panel", NodeID: l.ViaNodeID,
+			Params: map[string]string{"relay": l.ID, "from": l.ActiveMode, "to": active, "reason": reason}}); err != nil {
+			s.log.Warn("record relay mode change", "code", "relay_mode_event_failed", "relay", l.ID, "err", err)
+		}
+	}
 }
 
 // awaitRelayForward waits for the entry's agent to report the forward: "" when it is active, else why not.
@@ -124,16 +391,22 @@ func (s *Service) awaitRelayForward(ctx context.Context, id string) string {
 
 // relayPathCheck runs the path stage through the fleet: "" when it passed or was unverifiable, else the failure code.
 func (s *Service) relayPathCheck(ctx context.Context, id string) string {
+	return s.relayPathCheckStrict(ctx, id, false)
+}
+
+func (s *Service) relayPathCheckStrict(ctx context.Context, id string, requireThirdNode bool) string {
 	if s.cfg.CheckRelay == nil {
 		return "failed"
 	}
 	c, err := s.cfg.CheckRelay(ctx, id, store.RelayStagePath)
 	switch {
 	case err != nil:
-		s.log.Warn("access: path check of a relay", "relay", id, "err", err)
+		s.log.Warn("access: path check of a relay", "code", "relay_path_check_failed", "relay", id, "err", err)
 		return "failed"
-	case c.Path.Acceptable():
+	case c.Path.Acceptable() && (!requireThirdNode || c.Path.Status == "ok" && c.Path.Sender != "panel"):
 		return ""
+	case requireThirdNode && c.Path.Status == "ok" && c.Path.Sender == "panel":
+		return "no_sender"
 	case c.Path.Status != "ok":
 		return cmp.Or(c.Path.Code, "failed")
 	}
@@ -156,7 +429,7 @@ func (s *Service) recordRelayPathFailure(ctx context.Context, id, code string) {
 	c.Path = store.RelayStage{Status: "fail", Code: code, At: c.At}
 	c.Settle()
 	if err := s.st.SetRelayCheck(bg, id, c); err != nil && !errors.Is(err, store.ErrNotFound) {
-		s.log.Warn("access: store a relay check", "relay", id, "err", err)
+		s.log.Warn("access: store a relay check", "code", "relay_check_store_failed", "relay", id, "err", err)
 	}
 }
 
@@ -173,7 +446,7 @@ func (s *Service) clearRelayPath(ctx context.Context, id string) {
 	c.Path = store.RelayStage{}
 	c.Settle()
 	if err := s.st.SetRelayCheck(ctx, id, c); err != nil && !errors.Is(err, store.ErrNotFound) {
-		s.log.Warn("access: store a relay check", "relay", id, "err", err)
+		s.log.Warn("access: store a relay check", "code", "relay_check_store_failed", "relay", id, "err", err)
 	}
 }
 
@@ -208,15 +481,24 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 	if s.cfg.CheckRelay == nil {
 		return nil, coded(connect.CodeFailedPrecondition, "check_unavailable")
 	}
-	c, err := s.cfg.CheckRelay(ctx, link.ID)
+	if link.BridgeServed() && reverseBlocked(link) == "" {
+		// the check of the exit towards the entry's bridge site needs the site up and its pin known
+		if entry, err := s.st.Node(ctx, link.ViaNodeID); err == nil && entry.BridgePort != 0 {
+			_ = s.awaitBridgeSite(ctx, link.ID, entry)
+		}
+	}
+	c, err := s.cfg.CheckRelay(ctx, link.ID, requestedRelayStages(req.Msg)...)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, notFound("relay")
 	case err != nil:
 		return nil, s.internal("check relay", err)
 	}
+	s.controlRelay(ctx, link.ID, true, true)
 	s.audit(ctx, actor(ctx), "relay.check", map[string]any{"relay": link.ID, "via": link.ViaNodeName, "exit": link.ExitNodeName,
-		"ok": c.OK, "verified": c.Verified(), "stage": c.Stage, "leg": c.Leg.Status, "leg_code": c.Leg.Code, "path": c.Path.Status, "path_code": c.Path.Code})
+		"ok": c.OK, "verified": c.Verified(), "stage": c.Stage, "leg": c.Leg.Status, "leg_code": c.Leg.Code, "path": c.Path.Status, "path_code": c.Path.Code,
+		"reverse_reach": c.ReverseReach.Status, "reverse_reach_code": c.ReverseReach.Code, "reverse_speed": c.ReverseSpeed.Status,
+		"reverse_speed_code": c.ReverseSpeed.Code})
 	next, err := s.st.RelayLink(ctx, link.ID)
 	if err != nil {
 		return nil, s.internal("read relay", err)
@@ -239,10 +521,24 @@ func relayUnsupported(protocol string, spec plugin.InboundSpec) string {
 func relayCheckMsg(c store.RelayCheck, nameOf func(string) string) *adminv1.RelayCheck {
 	stage := func(s store.RelayStage) *adminv1.RelayStage {
 		return &adminv1.RelayStage{Status: s.Status, Code: s.Code, SenderId: s.Sender, SenderName: nameOf(s.Sender),
-			Verdict: s.Verdict, Sent: s.Sent, Got: s.Got, AtUnix: s.At}
+			Verdict: s.Verdict, Sent: s.Sent, Got: s.Got, AtUnix: s.At, Mb: s.MB, MbitS: s.MbitS, Bytes: s.Bytes,
+			ConnectMs: s.ConnectMS, FirstByteMs: s.FirstByteMS, DurationMs: s.DurationMS, Port: uint32(s.Port)}
 	}
-	return &adminv1.RelayCheck{AtUnix: c.At, Network: c.Network, Port: uint32(c.Port), To: c.To, Leg: stage(c.Leg), Path: stage(c.Path),
+	msg := &adminv1.RelayCheck{AtUnix: c.At, Network: c.Network, Port: uint32(c.Port), To: c.To, Leg: stage(c.Leg), Path: stage(c.Path),
 		Ok: c.OK, Stage: c.Stage, Verified: c.Verified()}
+	if c.ReverseReach != (store.RelayStage{}) { // absent when it did not run
+		msg.ReverseReach = stage(c.ReverseReach)
+	}
+	if c.ReverseSpeed != (store.RelayStage{}) {
+		msg.ReverseSpeed = stage(c.ReverseSpeed)
+	}
+	if c.DirectSpeed != (store.RelayStage{}) {
+		msg.DirectSpeed = stage(c.DirectSpeed)
+	}
+	if c.Bridge != (store.RelayStage{}) {
+		msg.Bridge = stage(c.Bridge)
+	}
+	return msg
 }
 
 // relayCheckOf is the message of the relay's latest check (nil before the first), naming the sending nodes.
@@ -250,6 +546,9 @@ func (s *Service) relayCheckOf(ctx context.Context, l store.RelayLink) *adminv1.
 	c, ok := l.Check()
 	if !ok || c.At == 0 {
 		return nil
+	}
+	if _, reported := l.Bridge(); l.Reverse() || reported {
+		c.Bridge = l.BridgeStage(s.now()) // derived from the exit's report, shown while there is a bridge to speak of
 	}
 	names := map[string]string{}
 	return relayCheckMsg(c, func(id string) string {
@@ -291,6 +590,10 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, s.internal("list relays", err)
 	}
+	entryNode, err := s.st.Node(ctx, entry.ID)
+	if err != nil {
+		return nil, s.internal("get entry node", err)
+	}
 	relayOf := make(map[string]string, len(links)) // the exit's server -> this entry's relay
 	for _, l := range links {
 		relayOf[l.InboundID] = l.ID
@@ -317,6 +620,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 				c.Network, c.Port, c.Hop = spec.Listen.Network, uint32(spec.Listen.Port), spec.Listen.HopFrom != 0
 				c.Unsupported = relayUnsupported(f.Profile.Protocol, spec)
 			}
+			c.ReverseBlocked = reverseBlockedOf(c.Network, entry.AgentCaps, n.AgentCaps)
 			out = append(out, c)
 			candidateInbounds[f.Inbound.ID] = f
 			if !slices.Contains(exits, n.ID) {
@@ -405,6 +709,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 	}
 	for _, c := range out {
 		c.Country = hint(c.NodeId)
+		c.ExitReachesEntry = exitReachHint(links, c.NodeId, entryNode.BridgeEndpointPort(), s.now())
 		if c.Reach = reach[c.NodeId]; c.Reach == nil {
 			c.Reach = &adminv1.RelayReachHint{Verdict: "no_data"}
 		}

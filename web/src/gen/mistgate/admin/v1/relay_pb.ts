@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/relay.proto.
  */
 export const file_mistgate_admin_v1_relay: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEizgQKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjaxIwCgdtb25pdG9yGBYgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlNb25pdG9yEg0KBWJ5dGVzGBcgASgEEg8KB3BhY2tldHMYGCABKAQSFAoMY291bnRlZF91bml4GBkgASgDEgsKA2JwcxgaIAEoBCJyCgxSZWxheU1vbml0b3ISDwoHYXRfdW5peBgBIAEoAxIKCgJvaxgCIAEoCBINCgVzdGFnZRgDIAEoCRIMCgRjb2RlGAQgASgJEhMKC3Jlc3BvbnNlX21zGAUgASgNEhMKC2ZhaWxfc3RyZWFrGAYgASgNIo8BCgpSZWxheVN0YWdlEg4KBnN0YXR1cxgBIAEoCRIMCgRjb2RlGAIgASgJEhEKCXNlbmRlcl9pZBgDIAEoCRITCgtzZW5kZXJfbmFtZRgEIAEoCRIPCgd2ZXJkaWN0GAUgASgJEgwKBHNlbnQYBiABKA0SCwoDZ290GAcgASgNEg8KB2F0X3VuaXgYCCABKAMizgEKClJlbGF5Q2hlY2sSDwoHYXRfdW5peBgBIAEoAxIPCgduZXR3b3JrGAIgASgJEgwKBHBvcnQYAyABKA0SCgoCdG8YBCABKAkSKgoDbGVnGAUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRIrCgRwYXRoGAYgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRIKCgJvaxgHIAEoCBINCgVzdGFnZRgIIAEoCRIQCgh2ZXJpZmllZBgJIAEoCCIfChFDaGVja1JlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCSI9ChJDaGVja1JlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSJCChBSZWxheUNvdW50cnlIaW50Eg8KB3ZlcmRpY3QYASABKAkSDAoEZGFyaxgCIAMoCRIPCgdhdF91bml4GAMgASgDIkIKDlJlbGF5UmVhY2hIaW50Eg8KB3ZlcmRpY3QYASABKAkSDgoGc291cmNlGAIgASgJEg8KB2F0X3VuaXgYAyABKAMi8wIKDlJlbGF5Q2FuZGlkYXRlEhIKCmluYm91bmRfaWQYASABKAkSDwoHbm9kZV9pZBgCIAEoCRIRCglub2RlX25hbWUYAyABKAkSEgoKcHJvZmlsZV9pZBgEIAEoCRIUCgxwcm9maWxlX25hbWUYBSABKAkSEAoIcHJvdG9jb2wYBiABKAkSDwoHbmV0d29yaxgHIAEoCRIMCgRwb3J0GAggASgNEhMKC3Vuc3VwcG9ydGVkGAkgASgJEgsKA2hvcBgKIAEoCBIQCghyZWxheV9pZBgLIAEoCRI0Cgdjb3VudHJ5GAwgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDb3VudHJ5SGludBIwCgVyZWFjaBgNIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5UmVhY2hIaW50EjIKCGF1ZGllbmNlGA4gASgLMiAubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlBdWRpZW5jZSI7Cg1SZWxheUF1ZGllbmNlEg4KBnBlb3BsZRgBIAEoDRIaChJzdGF0aWNfYXdnX2RldmljZXMYAiABKA0iMQoaTGlzdFJlbGF5Q2FuZGlkYXRlc1JlcXVlc3QSEwoLdmlhX25vZGVfaWQYASABKAkiqQEKG0xpc3RSZWxheUNhbmRpZGF0ZXNSZXNwb25zZRI1CgpjYW5kaWRhdGVzGAEgAygLMiEubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDYW5kaWRhdGUSFwoPYWdlbnRfc3VwcG9ydGVkGAIgASgIEjoKDWVudHJ5X2NvdW50cnkYAyABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNvdW50cnlIaW50IiQKEUxpc3RSZWxheXNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiPgoSTGlzdFJlbGF5c1Jlc3BvbnNlEigKBnJlbGF5cxgBIAMoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IksKEkNyZWF0ZVJlbGF5UmVxdWVzdBISCgppbmJvdW5kX2lkGAEgASgJEhMKC3ZpYV9ub2RlX2lkGAIgASgJEgwKBHBvcnQYAyABKA0iPgoTQ3JlYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Il4KElVwZGF0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCRIUCgdlbmFibGVkGAIgASgISACIAQESEQoEcG9ydBgDIAEoDUgBiAEBQgoKCF9lbmFibGVkQgcKBV9wb3J0Ij4KE1VwZGF0ZVJlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSIgChJEZWxldGVSZWxheVJlcXVlc3QSCgoCaWQYASABKAkiFQoTRGVsZXRlUmVsYXlSZXNwb25zZTLUBAoMUmVsYXlTZXJ2aWNlElkKCkxpc3RSZWxheXMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXNwb25zZRJcCgtDcmVhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVzcG9uc2USXAoLVXBkYXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlc3BvbnNlElwKC0RlbGV0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXNwb25zZRJZCgpDaGVja1JlbGF5EiQubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tSZWxheVJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JlbGF5UmVzcG9uc2USdAoTTGlzdFJlbGF5Q2FuZGlkYXRlcxItLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheUNhbmRpZGF0ZXNSZXF1ZXN0Gi4ubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5Q2FuZGlkYXRlc1Jlc3BvbnNlQsUBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCClJlbGF5UHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEigQYKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjaxIwCgdtb25pdG9yGBYgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlNb25pdG9yEg0KBWJ5dGVzGBcgASgEEg8KB3BhY2tldHMYGCABKAQSFAoMY291bnRlZF91bml4GBkgASgDEgsKA2JwcxgaIAEoBBIMCgRtb2RlGBsgASgJEhMKC2FjdGl2ZV9tb2RlGBwgASgJEhkKEW1vZGVfY2hhbmdlZF91bml4GB0gASgDEhMKC21vZGVfcmVhc29uGB4gASgJEhUKDWRpcmVjdF9zdHJlYWsYHyABKA0SFwoPcmV2ZXJzZV9ibG9ja2VkGCAgASgJEi4KBmJyaWRnZRghIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5QnJpZGdlIqYBCgtSZWxheUJyaWRnZRIRCgljb25uZWN0ZWQYASABKAgSDQoFY29ubnMYAiABKA0SDgoGcnR0X21zGAMgASgNEhIKCnNpbmNlX3VuaXgYBCABKAMSDQoFZXJyb3IYBSABKAkSDwoHY2xpZW50cxgGIAEoDRIMCgRwb29sGAcgASgNEhAKCGNhcGFjaXR5GAggASgNEhEKCW5lYXJfZnVsbBgJIAEoCCJyCgxSZWxheU1vbml0b3ISDwoHYXRfdW5peBgBIAEoAxIKCgJvaxgCIAEoCBINCgVzdGFnZRgDIAEoCRIMCgRjb2RlGAQgASgJEhMKC3Jlc3BvbnNlX21zGAUgASgNEhMKC2ZhaWxfc3RyZWFrGAYgASgNIogCCgpSZWxheVN0YWdlEg4KBnN0YXR1cxgBIAEoCRIMCgRjb2RlGAIgASgJEhEKCXNlbmRlcl9pZBgDIAEoCRITCgtzZW5kZXJfbmFtZRgEIAEoCRIPCgd2ZXJkaWN0GAUgASgJEgwKBHNlbnQYBiABKA0SCwoDZ290GAcgASgNEg8KB2F0X3VuaXgYCCABKAMSCgoCbWIYCSABKA0SDgoGbWJpdF9zGAogASgBEg0KBWJ5dGVzGAsgASgEEhIKCmNvbm5lY3RfbXMYDCABKA0SFQoNZmlyc3RfYnl0ZV9tcxgNIAEoDRITCgtkdXJhdGlvbl9tcxgOIAEoDRIMCgRwb3J0GA8gASgNIp4DCgpSZWxheUNoZWNrEg8KB2F0X3VuaXgYASABKAMSDwoHbmV0d29yaxgCIAEoCRIMCgRwb3J0GAMgASgNEgoKAnRvGAQgASgJEioKA2xlZxgFIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USKwoEcGF0aBgGIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USCgoCb2sYByABKAgSDQoFc3RhZ2UYCCABKAkSEAoIdmVyaWZpZWQYCSABKAgSLQoGYnJpZGdlGAogASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRI0Cg1yZXZlcnNlX3JlYWNoGAsgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRI0Cg1yZXZlcnNlX3NwZWVkGAwgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlTdGFnZRIzCgxkaXJlY3Rfc3BlZWQYDSABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlIk0KEUNoZWNrUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJEhUKDXJldmVyc2VfcmVhY2gYAiABKAgSFQoNcmV2ZXJzZV9zcGVlZBgDIAEoCCI9ChJDaGVja1JlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSJCChBSZWxheUNvdW50cnlIaW50Eg8KB3ZlcmRpY3QYASABKAkSDAoEZGFyaxgCIAMoCRIPCgdhdF91bml4GAMgASgDIkIKDlJlbGF5UmVhY2hIaW50Eg8KB3ZlcmRpY3QYASABKAkSDgoGc291cmNlGAIgASgJEg8KB2F0X3VuaXgYAyABKAMiywMKDlJlbGF5Q2FuZGlkYXRlEhIKCmluYm91bmRfaWQYASABKAkSDwoHbm9kZV9pZBgCIAEoCRIRCglub2RlX25hbWUYAyABKAkSEgoKcHJvZmlsZV9pZBgEIAEoCRIUCgxwcm9maWxlX25hbWUYBSABKAkSEAoIcHJvdG9jb2wYBiABKAkSDwoHbmV0d29yaxgHIAEoCRIMCgRwb3J0GAggASgNEhMKC3Vuc3VwcG9ydGVkGAkgASgJEgsKA2hvcBgKIAEoCBIQCghyZWxheV9pZBgLIAEoCRI0Cgdjb3VudHJ5GAwgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDb3VudHJ5SGludBIwCgVyZWFjaBgNIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5UmVhY2hIaW50EjIKCGF1ZGllbmNlGA4gASgLMiAubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlBdWRpZW5jZRI9ChJleGl0X3JlYWNoZXNfZW50cnkYDyABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVJlYWNoSGludBIXCg9yZXZlcnNlX2Jsb2NrZWQYECABKAkiOwoNUmVsYXlBdWRpZW5jZRIOCgZwZW9wbGUYASABKA0SGgoSc3RhdGljX2F3Z19kZXZpY2VzGAIgASgNIjEKGkxpc3RSZWxheUNhbmRpZGF0ZXNSZXF1ZXN0EhMKC3ZpYV9ub2RlX2lkGAEgASgJIqkBChtMaXN0UmVsYXlDYW5kaWRhdGVzUmVzcG9uc2USNQoKY2FuZGlkYXRlcxgBIAMoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Q2FuZGlkYXRlEhcKD2FnZW50X3N1cHBvcnRlZBgCIAEoCBI6Cg1lbnRyeV9jb3VudHJ5GAMgASgLMiMubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDb3VudHJ5SGludCIkChFMaXN0UmVsYXlzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIj4KEkxpc3RSZWxheXNSZXNwb25zZRIoCgZyZWxheXMYASADKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSJZChJDcmVhdGVSZWxheVJlcXVlc3QSEgoKaW5ib3VuZF9pZBgBIAEoCRITCgt2aWFfbm9kZV9pZBgCIAEoCRIMCgRwb3J0GAMgASgNEgwKBG1vZGUYBCABKAkiPgoTQ3JlYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5InoKElVwZGF0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCRIUCgdlbmFibGVkGAIgASgISACIAQESEQoEcG9ydBgDIAEoDUgBiAEBEhEKBG1vZGUYBCABKAlIAogBAUIKCghfZW5hYmxlZEIHCgVfcG9ydEIHCgVfbW9kZSI+ChNVcGRhdGVSZWxheVJlc3BvbnNlEicKBXJlbGF5GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiIAoSRGVsZXRlUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJIhUKE0RlbGV0ZVJlbGF5UmVzcG9uc2Uy1AQKDFJlbGF5U2VydmljZRJZCgpMaXN0UmVsYXlzEiQubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5c1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlzUmVzcG9uc2USXAoLQ3JlYXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVSZWxheVJlc3BvbnNlElwKC1VwZGF0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlUmVsYXlSZXNwb25zZRJcCgtEZWxldGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZVJlbGF5UmVzcG9uc2USWQoKQ2hlY2tSZWxheRIkLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUmVsYXlSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tSZWxheVJlc3BvbnNlEnQKE0xpc3RSZWxheUNhbmRpZGF0ZXMSLS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlDYW5kaWRhdGVzUmVxdWVzdBouLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheUNhbmRpZGF0ZXNSZXNwb25zZULFAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgpSZWxheVByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.Relay
@@ -174,6 +174,63 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
    * @generated from field: uint64 bps = 26;
    */
   bps: bigint;
+
+  /**
+   * The owner's choice of the way: "auto" (the default), "dnat" or "reverse". Every relay that existed before the reverse mode is
+   * "auto"; it stays a DNAT relay until an agent pair that can do the reverse mode needs it.
+   *
+   * @generated from field: string mode = 27;
+   */
+  mode: string;
+
+  /**
+   * The way that stands now: "dnat" or "reverse". Only the panel changes it.
+   *
+   * @generated from field: string active_mode = 28;
+   */
+  activeMode: string;
+
+  /**
+   * When active_mode last changed; 0 = it never has.
+   *
+   * @generated from field: int64 mode_changed_unix = 29;
+   */
+  modeChangedUnix: bigint;
+
+  /**
+   * Why the relay is in the way it is: "" (dnat, no change so far), "leg_failed" (reverse after the direct leg failed),
+   * "direct_back" (dnat again: the leg held three checks an hour apart and an 8 MB flow of its own), "bridge_failed" (dnat again:
+   * the bridge or the path through it failed while the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported"
+   * (the bridge is not possible: the agents), "udp" (a UDP server: dnat only for now).
+   *
+   * @generated from field: string mode_reason = 30;
+   */
+  modeReason: string;
+
+  /**
+   * In the reverse way: consecutive good checks of the direct leg, 0 to 3 (the panel goes back to DNAT after 3 and a speed
+   * test). When and how the last leg check went is check.leg.
+   *
+   * @generated from field: uint32 direct_streak = 31;
+   */
+  directStreak: number;
+
+  /**
+   * Why the reverse way is not possible for this relay now: "entry_agent_old" (the entry's agent lacks "relay-reverse/1"),
+   * "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). When several hold, the first of
+   * udp, entry_agent_old, exit_agent_old is given (an agent update does not help a UDP server). An agent that has not connected
+   * yet counts as old. Computed, not stored; not the same as agent_supported, which is only about the entry and "relay-forward/1".
+   *
+   * @generated from field: string reverse_blocked = 32;
+   */
+  reverseBlocked: string;
+
+  /**
+   * The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
+   *
+   * @generated from field: mistgate.admin.v1.RelayBridge bridge = 33;
+   */
+  bridge?: RelayBridge | undefined;
 };
 
 /**
@@ -182,6 +239,85 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
  */
 export const RelaySchema: GenMessage<Relay> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_relay, 0);
+
+/**
+ * The bridge of a reverse relay (agent.proto BridgeState), as the panel last had it from the two agents.
+ *
+ * @generated from message mistgate.admin.v1.RelayBridge
+ */
+export type RelayBridge = Message<"mistgate.admin.v1.RelayBridge"> & {
+  /**
+   * The exit has at least one live connection to the entry's bridge.
+   *
+   * @generated from field: bool connected = 1;
+   */
+  connected: boolean;
+
+  /**
+   * Live TLS connections.
+   *
+   * @generated from field: uint32 conns = 2;
+   */
+  conns: number;
+
+  /**
+   * Round trip of the bridge's ping, milliseconds; 0 = none yet.
+   *
+   * @generated from field: uint32 rtt_ms = 3;
+   */
+  rttMs: number;
+
+  /**
+   * Since when the bridge has been connected (the present run); 0 = not connected.
+   *
+   * @generated from field: int64 since_unix = 4;
+   */
+  sinceUnix: bigint;
+
+  /**
+   * The last error an agent reported for the bridge, a short fixed word; empty = none.
+   *
+   * @generated from field: string error = 5;
+   */
+  error: string;
+
+  /**
+   * People using the bridge right now (the entry counts their connections that are being carried; waiting pairs are not people).
+   *
+   * @generated from field: uint32 clients = 6;
+   */
+  clients: number;
+
+  /**
+   * The TLS connections the panel asked the exit to hold (2, or 4 when the relay is busy or the bridge is near its limit).
+   *
+   * @generated from field: uint32 pool = 7;
+   */
+  pool: number;
+
+  /**
+   * The most people the pool carries at once: pool times (250 HTTP/2 streams of a connection minus those of the waiting pairs)
+   * divided by 2 streams a person, about 120 a connection. 0 when pool is.
+   *
+   * @generated from field: uint32 capacity = 8;
+   */
+  capacity: number;
+
+  /**
+   * clients is at least 80 % of capacity. Only a hint for the screen: no alert, no message to the owner. At the limit the panel
+   * raises the pool to 4 itself; at pool 4 the way to more room is a second entry.
+   *
+   * @generated from field: bool near_full = 9;
+   */
+  nearFull: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayBridge.
+ * Use `create(RelayBridgeSchema)` to create a new message.
+ */
+export const RelayBridgeSchema: GenMessage<RelayBridge> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 1);
 
 /**
  * A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
@@ -234,7 +370,7 @@ export type RelayMonitor = Message<"mistgate.admin.v1.RelayMonitor"> & {
  * Use `create(RelayMonitorSchema)` to create a new message.
  */
 export const RelayMonitorSchema: GenMessage<RelayMonitor> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 1);
+  messageDesc(file_mistgate_admin_v1_relay, 2);
 
 /**
  * One stage of a check.
@@ -257,6 +393,11 @@ export type RelayStage = Message<"mistgate.admin.v1.RelayStage"> & {
    * "apply_timeout" (the entry did not install the forward), "switched_off" (someone switched the relay off while it was
    * waited for). Skipped: "unverifiable" (the server has no name to attribute the TLS identity to this node), "off" (the relay
    * is not switched on, so there is no forward to reach), "leg_failed".
+   * reverse_reach adds: "exit_offline", "unsupported" (skipped: the exit's agent has no tcpcheck/1), "entry_site_unavailable"
+   * (skipped: the entry has no site of its own on TCP 443 to probe, or the connection was refused there: nothing listens, which
+   * says nothing about whether the exit reaches the entry); a connection that gets no answer ("timeout") is the exit not reaching
+   * the entry. reverse_speed adds: "busy" (skipped: a speed test already runs on one of the nodes, or the daily limit is reached),
+   * "unsupported" (skipped), "entry_offline", "unreachable".
    *
    * @generated from field: string code = 2;
    */
@@ -297,6 +438,48 @@ export type RelayStage = Message<"mistgate.admin.v1.RelayStage"> & {
    * @generated from field: int64 at_unix = 8;
    */
   atUnix: bigint;
+
+  /**
+   * reverse_speed only (the other stages leave these 0): the megabytes asked for (8 to 32), the megabits a second, the bytes the
+   * entry got, the connect and first-byte times and the duration of the flow in milliseconds.
+   *
+   * @generated from field: uint32 mb = 9;
+   */
+  mb: number;
+
+  /**
+   * @generated from field: double mbit_s = 10;
+   */
+  mbitS: number;
+
+  /**
+   * @generated from field: uint64 bytes = 11;
+   */
+  bytes: bigint;
+
+  /**
+   * @generated from field: uint32 connect_ms = 12;
+   */
+  connectMs: number;
+
+  /**
+   * @generated from field: uint32 first_byte_ms = 13;
+   */
+  firstByteMs: number;
+
+  /**
+   * @generated from field: uint32 duration_ms = 14;
+   */
+  durationMs: number;
+
+  /**
+   * reverse_reach only: the TCP port of the entry's bridge endpoint the exit probed (443 on the entry's own site or the port of
+   * the separate bridge site, Node.bridge_port); 0 for the other stages and for results from before the field. A probe made for
+   * another port than the endpoint now is stale, whatever its at_unix says.
+   *
+   * @generated from field: uint32 port = 15;
+   */
+  port: number;
 };
 
 /**
@@ -304,7 +487,7 @@ export type RelayStage = Message<"mistgate.admin.v1.RelayStage"> & {
  * Use `create(RelayStageSchema)` to create a new message.
  */
 export const RelayStageSchema: GenMessage<RelayStage> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 2);
+  messageDesc(file_mistgate_admin_v1_relay, 3);
 
 /**
  * What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
@@ -354,7 +537,7 @@ export type RelayCheck = Message<"mistgate.admin.v1.RelayCheck"> & {
   ok: boolean;
 
   /**
-   * The first stage that failed: "leg", "path", or "".
+   * The first stage that failed: "leg", "reverse_reach", "bridge", "path", or "".
    *
    * @generated from field: string stage = 8;
    */
@@ -366,6 +549,42 @@ export type RelayCheck = Message<"mistgate.admin.v1.RelayCheck"> & {
    * @generated from field: bool verified = 9;
    */
   verified: boolean;
+
+  /**
+   * Reverse way only: the exit reports the bridge is connected (a live connection for at least 10 seconds); the stage that
+   * follows a switch-on in reverse, before path. Absent on a check of a DNAT relay.
+   *
+   * @generated from field: mistgate.admin.v1.RelayStage bridge = 10;
+   */
+  bridge?: RelayStage | undefined;
+
+  /**
+   * Reverse way only: the exit reached the entry's bridge endpoint (a TLS probe from the exit that sees the entry's own site,
+   * and a data stream the exit opens to the entry). Run by CheckRelay when the leg did not pass and the way may be reverse,
+   * and the stage the gate of "reverse" and "auto" reads. Absent when it did not run. Codes: see RelayStage.code.
+   * The result stays in the check of a later run that does not repeat the stage (its at_unix says how old it is).
+   *
+   * @generated from field: mistgate.admin.v1.RelayStage reverse_reach = 11;
+   */
+  reverseReach?: RelayStage | undefined;
+
+  /**
+   * The proof by speed (reverse way only), never run by itself: the exit sends an 8 MB flow to the entry (the existing path
+   * speed test, the exit the one that connects). Only CheckRelayRequest.reverse_speed starts it. Absent when it did not run.
+   *
+   * @generated from field: mistgate.admin.v1.RelayStage reverse_speed = 12;
+   */
+  reverseSpeed?: RelayStage | undefined;
+
+  /**
+   * The proof by speed of the DIRECT way, which the panel starts itself, never the owner: before it moves a reverse relay back to
+   * DNAT, the entry opens one flow to the exit's node and takes 8 MB (the existing path speed test, the entry the one that
+   * connects), which catches a flow that freezes after the first 16 KB. Run at most once an hour and inside the daily speed test
+   * limits (a limit reached is skipped, "busy"). Absent when it never ran. Codes as reverse_speed.
+   *
+   * @generated from field: mistgate.admin.v1.RelayStage direct_speed = 13;
+   */
+  directSpeed?: RelayStage | undefined;
 };
 
 /**
@@ -373,7 +592,7 @@ export type RelayCheck = Message<"mistgate.admin.v1.RelayCheck"> & {
  * Use `create(RelayCheckSchema)` to create a new message.
  */
 export const RelayCheckSchema: GenMessage<RelayCheck> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 3);
+  messageDesc(file_mistgate_admin_v1_relay, 4);
 
 /**
  * @generated from message mistgate.admin.v1.CheckRelayRequest
@@ -383,6 +602,21 @@ export type CheckRelayRequest = Message<"mistgate.admin.v1.CheckRelayRequest"> &
    * @generated from field: string id = 1;
    */
   id: string;
+
+  /**
+   * Also run reverse_reach when the leg passes (it runs by itself after a failed leg).
+   *
+   * @generated from field: bool reverse_reach = 2;
+   */
+  reverseReach: boolean;
+
+  /**
+   * Also send the 8 MB flow of reverse_speed (it implies reverse_reach). Moves bulk traffic between two nodes: the speed test
+   * limits (one test per node at a time, a few a day) hold.
+   *
+   * @generated from field: bool reverse_speed = 3;
+   */
+  reverseSpeed: boolean;
 };
 
 /**
@@ -390,7 +624,7 @@ export type CheckRelayRequest = Message<"mistgate.admin.v1.CheckRelayRequest"> &
  * Use `create(CheckRelayRequestSchema)` to create a new message.
  */
 export const CheckRelayRequestSchema: GenMessage<CheckRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 4);
+  messageDesc(file_mistgate_admin_v1_relay, 5);
 
 /**
  * @generated from message mistgate.admin.v1.CheckRelayResponse
@@ -407,7 +641,7 @@ export type CheckRelayResponse = Message<"mistgate.admin.v1.CheckRelayResponse">
  * Use `create(CheckRelayResponseSchema)` to create a new message.
  */
 export const CheckRelayResponseSchema: GenMessage<CheckRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 5);
+  messageDesc(file_mistgate_admin_v1_relay, 6);
 
 /**
  * The panel's knowledge about the exit's country check, from the whole country-check machinery (Globalping, the TSPU
@@ -441,7 +675,7 @@ export type RelayCountryHint = Message<"mistgate.admin.v1.RelayCountryHint"> & {
  * Use `create(RelayCountryHintSchema)` to create a new message.
  */
 export const RelayCountryHintSchema: GenMessage<RelayCountryHint> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 6);
+  messageDesc(file_mistgate_admin_v1_relay, 7);
 
 /**
  * Does the entry reach the exit? Known only when the TSPU probe ran from this entry node.
@@ -475,7 +709,7 @@ export type RelayReachHint = Message<"mistgate.admin.v1.RelayReachHint"> & {
  * Use `create(RelayReachHintSchema)` to create a new message.
  */
 export const RelayReachHintSchema: GenMessage<RelayReachHint> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 7);
+  messageDesc(file_mistgate_admin_v1_relay, 8);
 
 /**
  * @generated from message mistgate.admin.v1.RelayCandidate
@@ -561,6 +795,23 @@ export type RelayCandidate = Message<"mistgate.admin.v1.RelayCandidate"> & {
    * @generated from field: mistgate.admin.v1.RelayAudience audience = 14;
    */
   audience?: RelayAudience | undefined;
+
+  /**
+   * Does the exit reach this entry's bridge endpoint (the way a reverse relay needs)? Known only when a check of the exit towards
+   * the entry ran. Same verdicts as reach; source "exit_probe" when it came from one, "" with no_data.
+   *
+   * @generated from field: mistgate.admin.v1.RelayReachHint exit_reaches_entry = 15;
+   */
+  exitReachesEntry?: RelayReachHint | undefined;
+
+  /**
+   * Why a reverse relay of this server through this entry is not possible, as Relay.reverse_blocked: "entry_agent_old",
+   * "exit_agent_old", "udp" or "" (possible). Computed from the two agents' capabilities and the server's network, so the dialog can
+   * say it before the relay exists; it beats exit_reaches_entry (a UDP server can show "reach" and still has no bridge).
+   *
+   * @generated from field: string reverse_blocked = 16;
+   */
+  reverseBlocked: string;
 };
 
 /**
@@ -568,7 +819,7 @@ export type RelayCandidate = Message<"mistgate.admin.v1.RelayCandidate"> & {
  * Use `create(RelayCandidateSchema)` to create a new message.
  */
 export const RelayCandidateSchema: GenMessage<RelayCandidate> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 8);
+  messageDesc(file_mistgate_admin_v1_relay, 9);
 
 /**
  * The people a relay through this entry would serve.
@@ -596,7 +847,7 @@ export type RelayAudience = Message<"mistgate.admin.v1.RelayAudience"> & {
  * Use `create(RelayAudienceSchema)` to create a new message.
  */
 export const RelayAudienceSchema: GenMessage<RelayAudience> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 9);
+  messageDesc(file_mistgate_admin_v1_relay, 10);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelayCandidatesRequest
@@ -613,7 +864,7 @@ export type ListRelayCandidatesRequest = Message<"mistgate.admin.v1.ListRelayCan
  * Use `create(ListRelayCandidatesRequestSchema)` to create a new message.
  */
 export const ListRelayCandidatesRequestSchema: GenMessage<ListRelayCandidatesRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 10);
+  messageDesc(file_mistgate_admin_v1_relay, 11);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelayCandidatesResponse
@@ -646,7 +897,7 @@ export type ListRelayCandidatesResponse = Message<"mistgate.admin.v1.ListRelayCa
  * Use `create(ListRelayCandidatesResponseSchema)` to create a new message.
  */
 export const ListRelayCandidatesResponseSchema: GenMessage<ListRelayCandidatesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 11);
+  messageDesc(file_mistgate_admin_v1_relay, 12);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysRequest
@@ -663,7 +914,7 @@ export type ListRelaysRequest = Message<"mistgate.admin.v1.ListRelaysRequest"> &
  * Use `create(ListRelaysRequestSchema)` to create a new message.
  */
 export const ListRelaysRequestSchema: GenMessage<ListRelaysRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 12);
+  messageDesc(file_mistgate_admin_v1_relay, 13);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysResponse
@@ -680,7 +931,7 @@ export type ListRelaysResponse = Message<"mistgate.admin.v1.ListRelaysResponse">
  * Use `create(ListRelaysResponseSchema)` to create a new message.
  */
 export const ListRelaysResponseSchema: GenMessage<ListRelaysResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 13);
+  messageDesc(file_mistgate_admin_v1_relay, 14);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayRequest
@@ -702,6 +953,13 @@ export type CreateRelayRequest = Message<"mistgate.admin.v1.CreateRelayRequest">
    * @generated from field: uint32 port = 3;
    */
   port: number;
+
+  /**
+   * "auto", "dnat" or "reverse"; empty = "auto".
+   *
+   * @generated from field: string mode = 4;
+   */
+  mode: string;
 };
 
 /**
@@ -709,7 +967,7 @@ export type CreateRelayRequest = Message<"mistgate.admin.v1.CreateRelayRequest">
  * Use `create(CreateRelayRequestSchema)` to create a new message.
  */
 export const CreateRelayRequestSchema: GenMessage<CreateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 14);
+  messageDesc(file_mistgate_admin_v1_relay, 15);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayResponse
@@ -726,7 +984,7 @@ export type CreateRelayResponse = Message<"mistgate.admin.v1.CreateRelayResponse
  * Use `create(CreateRelayResponseSchema)` to create a new message.
  */
 export const CreateRelayResponseSchema: GenMessage<CreateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 15);
+  messageDesc(file_mistgate_admin_v1_relay, 16);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayRequest
@@ -746,6 +1004,13 @@ export type UpdateRelayRequest = Message<"mistgate.admin.v1.UpdateRelayRequest">
    * @generated from field: optional uint32 port = 3;
    */
   port?: number | undefined;
+
+  /**
+   * "auto", "dnat" or "reverse"; unset = unchanged.
+   *
+   * @generated from field: optional string mode = 4;
+   */
+  mode?: string | undefined;
 };
 
 /**
@@ -753,7 +1018,7 @@ export type UpdateRelayRequest = Message<"mistgate.admin.v1.UpdateRelayRequest">
  * Use `create(UpdateRelayRequestSchema)` to create a new message.
  */
 export const UpdateRelayRequestSchema: GenMessage<UpdateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 16);
+  messageDesc(file_mistgate_admin_v1_relay, 17);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayResponse
@@ -770,7 +1035,7 @@ export type UpdateRelayResponse = Message<"mistgate.admin.v1.UpdateRelayResponse
  * Use `create(UpdateRelayResponseSchema)` to create a new message.
  */
 export const UpdateRelayResponseSchema: GenMessage<UpdateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 17);
+  messageDesc(file_mistgate_admin_v1_relay, 18);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayRequest
@@ -787,7 +1052,7 @@ export type DeleteRelayRequest = Message<"mistgate.admin.v1.DeleteRelayRequest">
  * Use `create(DeleteRelayRequestSchema)` to create a new message.
  */
 export const DeleteRelayRequestSchema: GenMessage<DeleteRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 18);
+  messageDesc(file_mistgate_admin_v1_relay, 19);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayResponse
@@ -800,35 +1065,54 @@ export type DeleteRelayResponse = Message<"mistgate.admin.v1.DeleteRelayResponse
  * Use `create(DeleteRelayResponseSchema)` to create a new message.
  */
 export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 19);
+  messageDesc(file_mistgate_admin_v1_relay, 20);
 
 /**
  * Relays: a port of one node (the entry) that passes the encrypted traffic of a server on another node (the exit) on,
- * unchanged (agent.proto "RELAY FORWARDS"). People whose network blocks the exit reach it through the entry; the entry
- * sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay on the exit.
- *
+ * unchanged (agent.proto "RELAY FORWARDS" and "REVERSE RELAY"). People whose network blocks the exit reach it through the
+ * entry; the entry sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay
+ * on the exit.
+ * 
  * Everything here is owner-only over /api (a helper and an API token get PERMISSION_DENIED). Through MCP a token may
  * read relays and run a check, and a change is a plan the owner approves in the admin. Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
- *
- * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a leg check less than
- * 15 minutes ago for the relay's present target (the exit's address and server port). The leg must pass or be skipped as
- * "unverifiable"; otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked", "relay_check_stale" or
- * "relay_check_failed". Switching on installs the forward and checks the path from outside through the entry (so does
- * moving a relay that is on to another port). A failed path switches the relay off and UpdateRelay answers
- * "relay_check_failed" (stage, code); an unverifiable path leaves it on and unverified. A relay is offered to users after
- * both stages pass or are explicitly unverifiable. "verified" is true only when both stages pass.
+ * 
+ * TWO WAYS TO PASS ON (Relay.mode is the owner's choice, Relay.active_mode is what stands now):
+ *   "dnat": the entry opens the connection to the exit's address itself (the kernel rewrites the destination). Cheap, the
+ *     default for every existing relay; it needs the entry to reach the exit directly ("the leg").
+ *   "reverse": for a network that cuts a connection started towards the exit but lets the exit's own connection through, the
+ *     EXIT calls the entry and holds a few TLS connections (the bridge); the entry passes people's connections to the exit
+ *     through them. TCP servers only; both agents list "relay-reverse/1". The entry's address and port, and so the people's
+ *     subscriptions, are the same in both ways.
+ *   mode "auto" (the default) lets the panel choose: DNAT while the leg works, reverse when it does not and the pair can do it,
+ *   back to DNAT when the leg is alive again (reason in Relay.mode_reason); "dnat" and "reverse" pin the way.
+ * 
+ * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a check less than 15
+ * minutes ago that fits the way the relay would go:
+ *   - dnat: the leg check (the entry node to the exit's server) must pass or be skipped as "unverifiable".
+ *   - reverse: both agents list "relay-reverse/1", the server is TCP, and the stage "reverse_reach" (the exit reaches the entry's
+ *     bridge endpoint) must pass for the present endpoint; the leg is not required.
+ *   - auto: CheckRelay tries both. The relay is switched on in dnat when the leg passed, else in reverse when reverse_reach passed
+ *     and the pair can do it (mode_reason "leg_failed"), else it is refused.
+ * Otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked", "relay_check_stale" or "relay_check_failed".
+ * Switching on installs the forward (in reverse: the bridge, and waits until the exit reports it is connected, stage "bridge") and
+ * checks the path from outside through the entry (so does moving a relay that is on to another port). A failed bridge or path
+ * switches the relay off and UpdateRelay answers "relay_check_failed" (stage, code); an unverifiable path leaves it on and
+ * unverified. A relay is offered to users after both stages pass or are explicitly unverifiable. "verified" is true only when
+ * both stages pass.
  * The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
- * failed, on an enrolled node) and the entry's agent lists "relay-forward/1".
- *
+ * failed, on an enrolled node) and the entry's agent lists "relay-forward/1" (a reverse relay also "relay-reverse/1", as does the
+ * exit's agent).
+ * 
  * A relay goes when its server is deleted, and when either node is retired.
- *
+ * 
  * ERRORS. NOT_FOUND: the relay, the server or the node. INVALID_ARGUMENT: a port that is neither 443 nor 1024-65535,
- * "same_node" (the entry holds the server itself). ALREADY_EXISTS: "relay_exists" (the entry already forwards this server),
- * "port_taken" (a profile or a relay of the entry holds that network and port, hop ranges included; the message carries a
- * free port), "hop_taken". FAILED_PRECONDITION: "node_retired", "agent_old" (the entry's agent lacks "relay-forward/1"),
- * "relay_unchecked" (no check yet), "relay_check_stale" (older than 15 minutes, or the target changed since),
- * "relay_check_failed" (stage and code say where), "relay_unsupported" (reason: "cdn", "acme_ip" or "awg": a server the
- * entry cannot pass on), "no_clean_port" (the entry has no free port to offer).
+ * "same_node" (the entry holds the server itself), a mode that is not "auto", "dnat" or "reverse". ALREADY_EXISTS: "relay_exists"
+ * (the entry already forwards this server), "port_taken" (a profile or a relay of the entry holds that network and port, hop
+ * ranges included; the message carries a free port), "hop_taken". FAILED_PRECONDITION: "node_retired", "agent_old" (the entry's
+ * agent lacks "relay-forward/1"), "reverse_unavailable" (mode "reverse" but the pair cannot do it; reason: "entry_agent_old",
+ * "exit_agent_old" or "udp"), "relay_unchecked" (no check yet), "relay_check_stale" (older than 15 minutes, or the target
+ * changed since), "relay_check_failed" (stage and code say where), "relay_unsupported" (reason: "cdn", "acme_ip" or "awg": a
+ * server the entry cannot pass on), "no_clean_port" (the entry has no free port to offer).
  *
  * @generated from service mistgate.admin.v1.RelayService
  */

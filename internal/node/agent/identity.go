@@ -425,7 +425,7 @@ func (a *Agent) renewLoop(ctx context.Context) {
 		wait := a.renewEvery
 		if until := time.Until(a.id.Load().notAfter()); until < renewBefore {
 			if err := a.renew(ctx); err != nil {
-				a.log.Warn("certificate renewal failed", "err", err, "expires_in", until.Round(time.Minute))
+				a.log.Warn("certificate renewal failed", "code", "certificate_renewal_failed", "err", err, "expires_in", until.Round(time.Minute))
 				if errors.Is(err, errNoSession) { // a link-only agent back from an outage: do not wait an hour for its session
 					wait = min(wait, a.renewNoSessionWait())
 				}

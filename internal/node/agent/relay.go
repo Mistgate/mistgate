@@ -9,6 +9,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -29,10 +30,13 @@ const (
 
 // relayRuntime is the worker-owned state of the forwards between reconciles.
 type relayRuntime struct {
-	results []*pb.RelayResult // of the last sync, by relay id; never mutated once stored
-	claims  map[uint16]string // TCP ports of the forwards installed now -> "relay:<id>" (decoy sites give these up)
-	hosts   map[string]relayLookup
-	logged  map[string]string // relay id -> the last failure logged, so one is logged once
+	results       []*pb.RelayResult // of the last sync, by relay id; never mutated once stored
+	claims        map[uint16]string // TCP ports of the forwards installed now -> "relay:<id>" (decoy sites give these up)
+	listeners     map[string]bridge.RelayListener
+	pending       []bridge.RelayListener // reverse listeners waiting for host INPUT rules
+	listenerPorts map[uint16]struct{}    // reverse TCP ports that need host INPUT firewall access
+	hosts         map[string]relayLookup
+	logged        map[string]string // relay id -> the last failure logged, so one is logged once
 
 	// Test seams; nil = the real thing.
 	lookup func(ctx context.Context, host string) (netip.Addr, error)
@@ -122,7 +126,28 @@ func (a *Agent) relayGuard(next *model) hostctl.ForwardGuard {
 			g.Hops = append(g.Hops, hostctl.Hop{InboundID: id, Network: l.Network, From: l.HopFrom, To: l.HopTo, Port: l.Port})
 		}
 	}
+	if next.bridgeServe != nil && next.bridgeServe.Port != 0 {
+		g.Ports = append(g.Ports, hostctl.NetPort{Network: "tcp", Port: next.bridgeServe.Port})
+	}
 	return g
+}
+
+// reverseRelayTCPClaims releases shared HTTPS masquerade ports before reverse listeners bind them.
+func (a *Agent) reverseRelayTCPClaims(next *model) map[uint16]string {
+	guard := a.relayGuard(next)
+	claims := make(map[uint16]string)
+	var accepted []hostctl.Forward
+	for _, relay := range next.relays {
+		if relay.Mode != "reverse" || relay.Network != "tcp" {
+			continue
+		}
+		if err := hostctl.ValidateForwardPort(relay.ID, relay.Network, relay.Port, accepted, guard); err != nil {
+			continue
+		}
+		accepted = append(accepted, hostctl.Forward{ID: relay.ID, Network: relay.Network, Port: relay.Port, ToPort: 1})
+		claims[relay.Port] = "relay:" + relay.ID
+	}
+	return claims
 }
 
 // syncRelays makes the host forward exactly what next lists and can be forwarded safely, and records the outcome per
@@ -132,16 +157,7 @@ func (a *Agent) relayGuard(next *model) hostctl.ForwardGuard {
 func (a *Agent) syncRelays(ctx context.Context, next *model) {
 	rt := &a.relay
 	rh, ok := a.host.(hostctl.RelayHost)
-	if !ok || !rh.RelaySupported() {
-		rt.results, rt.claims = nil, nil
-		for _, f := range next.relays {
-			rt.results = append(rt.results, &pb.RelayResult{RelayId: f.ID, Error: "unsupported_host"})
-		}
-		if len(next.relays) > 0 {
-			a.logRelayFailures(rt.results)
-		}
-		return
-	}
+	hostSupported := ok && rh.RelaySupported()
 
 	// Names that no forward uses any more are forgotten.
 	if rt.hosts == nil {
@@ -157,10 +173,33 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 
 	guard := a.relayGuard(next)
 	var accepted []hostctl.Forward
+	var acceptedPorts []hostctl.Forward
+	reverse := make(map[string]bridge.RelayListener)
 	results := make(map[string]*pb.RelayResult, len(next.relays))
 	for _, f := range next.relays { // sorted by id: on a clash the earlier id wins
 		r := &pb.RelayResult{RelayId: f.ID}
 		results[f.ID] = r
+		if f.Mode == "reverse" {
+			if f.Network != "tcp" || f.ExitNodeID == "" {
+				r.Error = "bad_reverse_config"
+				continue
+			}
+			if err := hostctl.ValidateForwardPort(f.ID, f.Network, f.Port, acceptedPorts, guard); err != nil {
+				r.Error = "refused: " + strings.TrimPrefix(err.Error(), "forward "+f.ID+": ")
+				continue
+			}
+			acceptedPorts = append(acceptedPorts, hostctl.Forward{ID: f.ID, Network: f.Network, Port: f.Port, ToPort: 1})
+			if a.bridgeServeError != "" || !a.bridgeServesExit(next.bridgeServe, f.ExitNodeID) {
+				r.Error = "bridge_unavailable"
+				continue
+			}
+			reverse[f.ID] = bridge.RelayListener{RelayID: f.ID, ExitNodeID: f.ExitNodeID, Port: f.Port}
+			continue // Reverse forwards never resolve or dial the panel's to_host/to_port.
+		}
+		if !hostSupported {
+			r.Error = "unsupported_host"
+			continue
+		}
 		ip, err := a.resolveRelay(lctx, f.ToHost)
 		if err != nil {
 			r.Error = "resolve: " + shortMsg(err)
@@ -168,23 +207,44 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 		}
 		r.ToIp = ip.String()
 		fw := hostctl.Forward{ID: f.ID, Network: f.Network, Port: f.Port, ToIP: ip, ToPort: f.ToPort}
-		if err := hostctl.ValidateForward(fw, accepted, guard); err != nil {
+		if err := hostctl.ValidateForward(fw, acceptedPorts, guard); err != nil {
 			r.Error = "refused: " + strings.TrimPrefix(err.Error(), "forward "+f.ID+": ")
 			continue
 		}
+		acceptedPorts = append(acceptedPorts, fw)
 		accepted = append(accepted, fw)
 	}
 
-	// The host gets the forwards that passed; when it cannot install them, all of those fail together.
-	failure := ""
-	if err := rh.SetRelays(ctx, accepted); err != nil {
-		failure = shortMsg(err)
-		if errors.Is(err, hostctl.ErrForwardDrop) {
-			failure = "forward_drop"
-			a.log.Warn("relay forwards not installed: a FORWARD chain drops forwarded packets", "detail", shortMsg(err))
+	// Keep unchanged reverse listeners while the host table is updated. A reverse-to-DNAT switch installs
+	// DNAT first; a DNAT-to-reverse switch starts its listener later, after INPUT rules are synchronized.
+	keep := make(map[string]bridge.RelayListener)
+	for id, old := range rt.listeners {
+		if want, ok := reverse[id]; ok && want == old {
+			keep[id] = old
 		}
 	}
-	rt.claims = nil
+	// The host gets the forwards that passed; when it cannot install them, all of those fail together.
+	failure := ""
+	if hostSupported {
+		if err := rh.SetRelays(ctx, accepted); err != nil {
+			failure = shortMsg(err)
+			if errors.Is(err, hostctl.ErrForwardDrop) {
+				failure = "forward_drop"
+				a.log.Warn("relay forwards not installed: a FORWARD chain drops forwarded packets", "code", "relay_forward_drop", "detail", shortMsg(err))
+			}
+		}
+	}
+	listenerErrors := map[string]error{}
+	activeListeners := keep
+	if a.bridgeEntry != nil && (failure == "" || !hostSupported) {
+		keepList := make([]bridge.RelayListener, 0, len(keep))
+		for _, l := range keep {
+			keepList = append(keepList, l)
+		}
+		a.bridgeEntry.SyncListeners(keepList)
+	}
+	rt.claims, rt.listenerPorts, rt.pending = nil, nil, nil
+	rt.listeners = activeListeners
 	for _, fw := range accepted {
 		r := results[fw.ID]
 		if failure != "" {
@@ -199,6 +259,48 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 			rt.claims[fw.Port] = "relay:" + fw.ID
 		}
 	}
+	for id, l := range activeListeners {
+		if r := results[id]; r != nil {
+			r.Ok = true
+		}
+		if rt.claims == nil {
+			rt.claims = map[uint16]string{}
+		}
+		rt.claims[l.Port] = "relay:" + id
+		if rt.listenerPorts == nil {
+			rt.listenerPorts = map[uint16]struct{}{}
+		}
+		rt.listenerPorts[l.Port] = struct{}{}
+	}
+	for id, l := range reverse {
+		if _, alreadyRunning := keep[id]; alreadyRunning {
+			continue
+		}
+		if failure != "" && hostSupported {
+			listenerErrors[id] = errors.New("relay_table")
+			continue
+		}
+		if a.bridgeEntry == nil {
+			listenerErrors[id] = errors.New("listener_failed")
+			continue
+		}
+		rt.pending = append(rt.pending, l)
+		if rt.listenerPorts == nil {
+			rt.listenerPorts = map[uint16]struct{}{}
+		}
+		rt.listenerPorts[l.Port] = struct{}{}
+		if rt.claims == nil {
+			rt.claims = map[uint16]string{}
+		}
+		rt.claims[l.Port] = "relay:" + id
+	}
+	for id := range reverse {
+		if r := results[id]; r != nil && !r.Ok && r.Error == "" {
+			if err := listenerErrors[id]; err != nil {
+				r.Error = err.Error()
+			}
+		}
+	}
 
 	out := make([]*pb.RelayResult, 0, len(results))
 	for _, f := range next.relays {
@@ -206,6 +308,56 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 	}
 	rt.results = out
 	a.logRelayFailures(out)
+}
+
+// startReverseRelays runs after INPUT firewall rules have been synchronized.
+func (a *Agent) startReverseRelays(firewallReady bool) {
+	rt := &a.relay
+	if len(rt.pending) == 0 {
+		return
+	}
+	if !firewallReady || a.bridgeEntry == nil {
+		for _, listener := range rt.pending {
+			for _, result := range rt.results {
+				if result.RelayId == listener.RelayID {
+					result.Ok = false
+					result.Error = "relay_table"
+				}
+			}
+		}
+		a.logRelayFailures(rt.results)
+		return
+	}
+	listeners := make([]bridge.RelayListener, 0, len(rt.listeners)+len(rt.pending))
+	for _, listener := range rt.listeners {
+		listeners = append(listeners, listener)
+	}
+	listeners = append(listeners, rt.pending...)
+	errs := a.bridgeEntry.SyncListeners(listeners)
+	for _, listener := range rt.pending {
+		if err := errs[listener.RelayID]; err != nil {
+			for _, result := range rt.results {
+				if result.RelayId == listener.RelayID {
+					result.Ok = false
+					result.Error = "listener_failed"
+				}
+			}
+			delete(rt.listeners, listener.RelayID)
+			delete(rt.listenerPorts, listener.Port)
+			delete(rt.claims, listener.Port)
+			continue
+		}
+		rt.listeners[listener.RelayID] = listener
+		for _, result := range rt.results {
+			if result.RelayId == listener.RelayID {
+				result.Ok = true
+				result.Error = ""
+				break
+			}
+		}
+	}
+	rt.pending = nil
+	a.logRelayFailures(rt.results)
 }
 
 // logRelayFailures logs each distinct failure of a forward once (the sweep repeats the sync every 30 s).
@@ -222,7 +374,7 @@ func (a *Agent) logRelayFailures(results []*pb.RelayResult) {
 			delete(rt.logged, r.RelayId)
 		case rt.logged[r.RelayId] != r.Error:
 			rt.logged[r.RelayId] = r.Error
-			a.log.Warn("relay forward failed", "relay", r.RelayId, "error", r.Error)
+			a.log.Warn("relay forward failed", "code", "relay_forward_failed", "relay", r.RelayId, "error", r.Error)
 		}
 	}
 	for id := range rt.logged {
@@ -270,8 +422,17 @@ func relaysFromPB(l *pb.RelayForwards) ([]plugin.RelayForward, []error) {
 			rejected = append(rejected, rejectf("relay %s: port out of range", f.RelayId))
 			continue
 		}
+		mode := f.Mode
+		if mode == "dnat" {
+			mode = ""
+		}
+		if (mode != "" && mode != "reverse") || (mode == "reverse" && (f.Network != "tcp" || f.ExitNodeId == "" || !bridgeNodeIDPattern.MatchString(f.ExitNodeId))) ||
+			(mode == "" && f.ExitNodeId != "") {
+			rejected = append(rejected, rejectf("relay %s: bad mode", f.RelayId))
+			continue
+		}
 		seen[f.RelayId] = true
-		out = append(out, plugin.RelayForward{ID: f.RelayId, Network: f.Network, Port: uint16(f.Port), ToHost: f.ToHost, ToPort: uint16(f.ToPort)})
+		out = append(out, plugin.RelayForward{ID: f.RelayId, Network: f.Network, Port: uint16(f.Port), ToHost: f.ToHost, ToPort: uint16(f.ToPort), Mode: mode, ExitNodeID: f.ExitNodeId})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, rejected
@@ -284,7 +445,11 @@ func relaysToPB(rs []plugin.RelayForward) *pb.RelayForwards {
 	}
 	l := &pb.RelayForwards{Items: make([]*pb.RelayForward, len(rs))}
 	for i, f := range rs {
-		l.Items[i] = &pb.RelayForward{RelayId: f.ID, Network: f.Network, Port: uint32(f.Port), ToHost: f.ToHost, ToPort: uint32(f.ToPort)}
+		mode := f.Mode
+		if mode == "dnat" {
+			mode = ""
+		}
+		l.Items[i] = &pb.RelayForward{RelayId: f.ID, Network: f.Network, Port: uint32(f.Port), ToHost: f.ToHost, ToPort: uint32(f.ToPort), Mode: mode, ExitNodeId: f.ExitNodeID}
 	}
 	return l
 }

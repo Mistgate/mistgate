@@ -169,6 +169,17 @@ message Node {
   // Bytes this node passed on as a relay entry since 00:00 (the same day boundary as traffic_today_bytes). Until agents count the
   // way back it is the direction towards the exits only.
   uint64 relay_today_bytes = 39 [jstype = JS_NUMBER];
+  // The TCP port of this node's site that the bridge of a reverse relay arrives at when the node is an entry; 0 = 443 on the
+  // node's own site (the usual case). The path of the bridge is not shown: it is the panel's, like the key of a link.
+  uint32 bridge_port = 40;
+  // Why the bridge is not on 443: "" (it is, or no reverse relay needs it), "reality_external_target" (a VLESS inbound holds 443
+  // with a foreign REALITY target, so the bridge has a port of its own) or "port_443_taken" (another server of the node holds 443).
+  string bridge_port_reason = 41;
+  // The profile whose inbound holds 443 in those two cases, for the "open the profile" button; empty otherwise.
+  string bridge_port_profile_id = 42;
+  // The entry node whose bridge the agent of this node runs its control channel through, because it cannot reach the panel
+  // directly; empty = a direct connection (Hello.link_via_node_id; live state, not stored).
+  string link_via_node_id = 43;
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",

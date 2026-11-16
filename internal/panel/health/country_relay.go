@@ -50,9 +50,17 @@ func (s *Service) countryRelayReachability(ctx context.Context, sn *snapshot, no
 		if hasCheck && check.Monitor != nil {
 			monitorAt, monitorFails = check.Monitor.AtUnix, check.Monitor.FailStreak
 		}
+		bridgeOK, bridgeAt, pathOK := false, int64(0), false
+		if link.Reverse() {
+			stage := link.BridgeStage(s.now()) // derived from the exit's report
+			bridgeOK, bridgeAt = stage.Status == "ok", stage.At
+			pathOK = hasCheck && check.Path.Acceptable() // proved, or not provable: as the direct way counts its check
+		}
 		in.Relays = append(in.Relays, store.RelayReachabilityRelay{ID: link.ID, InboundID: link.InboundID, EntryID: link.ViaNodeID,
 			ExitID: link.ExitNodeID, State: link.State, Enabled: link.Enabled, ExitLive: link.Live(),
-			AgentSupported: slices.Contains(link.ViaNodeCaps, "relay-forward/1"), Checked: hasCheck && check.At != 0,
+			Mode: link.Mode, ActiveMode: link.ActiveMode, AgentSupported: slices.Contains(link.ViaNodeCaps, "relay-forward/1"),
+			ReverseSupported: slices.Contains(link.ViaNodeCaps, "relay-reverse/1") && slices.Contains(link.ExitNodeCaps, "relay-reverse/1"),
+			BridgeOK:         bridgeOK, BridgeAtUnix: bridgeAt, PathOK: pathOK, Checked: hasCheck && check.At != 0,
 			CheckOK: hasCheck && check.At != 0 && check.OK, EntryUsable: link.ViaNodeState == "active",
 			MonitorAtUnix: monitorAt, MonitorFails: monitorFails})
 	}

@@ -997,7 +997,9 @@ func (a *accessCtx) relayReachability() store.RelayReachability {
 	}
 	for _, r := range a.in.Relays {
 		in.Relays = append(in.Relays, store.RelayReachabilityRelay{ID: r.ID, InboundID: r.InboundID, EntryID: r.EntryID, ExitID: r.ExitID, State: r.State,
-			Enabled: r.Enabled, ExitLive: r.ExitLive, AgentSupported: r.AgentSupported, Checked: r.Checked, CheckOK: r.CheckOK,
+			Mode: r.Mode, ActiveMode: r.ActiveMode, Enabled: r.Enabled, ExitLive: r.ExitLive, AgentSupported: r.AgentSupported,
+			ReverseSupported: r.ReverseSupported, BridgeOK: r.BridgeOK, BridgeAtUnix: r.BridgeAtUnix, PathOK: r.PathOK,
+			Checked: r.Checked, CheckOK: r.CheckOK,
 			MonitorAtUnix: r.MonitorAtUnix, MonitorFails: r.MonitorFails, EntryUsable: a.relayEntryUsable(r.EntryID)})
 	}
 	return store.NewRelayReachability(in)

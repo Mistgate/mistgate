@@ -63,7 +63,29 @@ type Relay struct {
 	Packets     uint64 `protobuf:"varint,24,opt,name=packets,proto3" json:"packets,omitempty"`
 	CountedUnix int64  `protobuf:"varint,25,opt,name=counted_unix,json=countedUnix,proto3" json:"counted_unix,omitempty"`
 	// Traffic through the forward now, bits per second, from the last two counter readings; 0 when there is one reading or none. Until agents count the way back it is the direction towards the exit only.
-	Bps           uint64 `protobuf:"varint,26,opt,name=bps,proto3" json:"bps,omitempty"`
+	Bps uint64 `protobuf:"varint,26,opt,name=bps,proto3" json:"bps,omitempty"`
+	// The owner's choice of the way: "auto" (the default), "dnat" or "reverse". Every relay that existed before the reverse mode is
+	// "auto"; it stays a DNAT relay until an agent pair that can do the reverse mode needs it.
+	Mode string `protobuf:"bytes,27,opt,name=mode,proto3" json:"mode,omitempty"`
+	// The way that stands now: "dnat" or "reverse". Only the panel changes it.
+	ActiveMode string `protobuf:"bytes,28,opt,name=active_mode,json=activeMode,proto3" json:"active_mode,omitempty"`
+	// When active_mode last changed; 0 = it never has.
+	ModeChangedUnix int64 `protobuf:"varint,29,opt,name=mode_changed_unix,json=modeChangedUnix,proto3" json:"mode_changed_unix,omitempty"`
+	// Why the relay is in the way it is: "" (dnat, no change so far), "leg_failed" (reverse after the direct leg failed),
+	// "direct_back" (dnat again: the leg held three checks an hour apart and an 8 MB flow of its own), "bridge_failed" (dnat again:
+	// the bridge or the path through it failed while the leg is alive), "owner" (the way was chosen by hand), "reverse_unsupported"
+	// (the bridge is not possible: the agents), "udp" (a UDP server: dnat only for now).
+	ModeReason string `protobuf:"bytes,30,opt,name=mode_reason,json=modeReason,proto3" json:"mode_reason,omitempty"`
+	// In the reverse way: consecutive good checks of the direct leg, 0 to 3 (the panel goes back to DNAT after 3 and a speed
+	// test). When and how the last leg check went is check.leg.
+	DirectStreak uint32 `protobuf:"varint,31,opt,name=direct_streak,json=directStreak,proto3" json:"direct_streak,omitempty"`
+	// Why the reverse way is not possible for this relay now: "entry_agent_old" (the entry's agent lacks "relay-reverse/1"),
+	// "exit_agent_old" (the exit's agent does), "udp" (the server is UDP), or "" (it is possible). When several hold, the first of
+	// udp, entry_agent_old, exit_agent_old is given (an agent update does not help a UDP server). An agent that has not connected
+	// yet counts as old. Computed, not stored; not the same as agent_supported, which is only about the entry and "relay-forward/1".
+	ReverseBlocked string `protobuf:"bytes,32,opt,name=reverse_blocked,json=reverseBlocked,proto3" json:"reverse_blocked,omitempty"`
+	// The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
+	Bridge        *RelayBridge `protobuf:"bytes,33,opt,name=bridge,proto3" json:"bridge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -280,6 +302,175 @@ func (x *Relay) GetBps() uint64 {
 	return 0
 }
 
+func (x *Relay) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+func (x *Relay) GetActiveMode() string {
+	if x != nil {
+		return x.ActiveMode
+	}
+	return ""
+}
+
+func (x *Relay) GetModeChangedUnix() int64 {
+	if x != nil {
+		return x.ModeChangedUnix
+	}
+	return 0
+}
+
+func (x *Relay) GetModeReason() string {
+	if x != nil {
+		return x.ModeReason
+	}
+	return ""
+}
+
+func (x *Relay) GetDirectStreak() uint32 {
+	if x != nil {
+		return x.DirectStreak
+	}
+	return 0
+}
+
+func (x *Relay) GetReverseBlocked() string {
+	if x != nil {
+		return x.ReverseBlocked
+	}
+	return ""
+}
+
+func (x *Relay) GetBridge() *RelayBridge {
+	if x != nil {
+		return x.Bridge
+	}
+	return nil
+}
+
+// The bridge of a reverse relay (agent.proto BridgeState), as the panel last had it from the two agents.
+type RelayBridge struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The exit has at least one live connection to the entry's bridge.
+	Connected bool `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
+	// Live TLS connections.
+	Conns uint32 `protobuf:"varint,2,opt,name=conns,proto3" json:"conns,omitempty"`
+	// Round trip of the bridge's ping, milliseconds; 0 = none yet.
+	RttMs uint32 `protobuf:"varint,3,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	// Since when the bridge has been connected (the present run); 0 = not connected.
+	SinceUnix int64 `protobuf:"varint,4,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
+	// The last error an agent reported for the bridge, a short fixed word; empty = none.
+	Error string `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	// People using the bridge right now (the entry counts their connections that are being carried; waiting pairs are not people).
+	Clients uint32 `protobuf:"varint,6,opt,name=clients,proto3" json:"clients,omitempty"`
+	// The TLS connections the panel asked the exit to hold (2, or 4 when the relay is busy or the bridge is near its limit).
+	Pool uint32 `protobuf:"varint,7,opt,name=pool,proto3" json:"pool,omitempty"`
+	// The most people the pool carries at once: pool times (250 HTTP/2 streams of a connection minus those of the waiting pairs)
+	// divided by 2 streams a person, about 120 a connection. 0 when pool is.
+	Capacity uint32 `protobuf:"varint,8,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	// clients is at least 80 % of capacity. Only a hint for the screen: no alert, no message to the owner. At the limit the panel
+	// raises the pool to 4 itself; at pool 4 the way to more room is a second entry.
+	NearFull      bool `protobuf:"varint,9,opt,name=near_full,json=nearFull,proto3" json:"near_full,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelayBridge) Reset() {
+	*x = RelayBridge{}
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelayBridge) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelayBridge) ProtoMessage() {}
+
+func (x *RelayBridge) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelayBridge.ProtoReflect.Descriptor instead.
+func (*RelayBridge) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RelayBridge) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+func (x *RelayBridge) GetConns() uint32 {
+	if x != nil {
+		return x.Conns
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetRttMs() uint32 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetSinceUnix() int64 {
+	if x != nil {
+		return x.SinceUnix
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *RelayBridge) GetClients() uint32 {
+	if x != nil {
+		return x.Clients
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetPool() uint32 {
+	if x != nil {
+		return x.Pool
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetCapacity() uint32 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+func (x *RelayBridge) GetNearFull() bool {
+	if x != nil {
+		return x.NearFull
+	}
+	return false
+}
+
 // A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
 // moves enough data (at least 64 KB) to see a transfer that stalls after the first kilobytes.
 type RelayMonitor struct {
@@ -300,7 +491,7 @@ type RelayMonitor struct {
 
 func (x *RelayMonitor) Reset() {
 	*x = RelayMonitor{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -312,7 +503,7 @@ func (x *RelayMonitor) String() string {
 func (*RelayMonitor) ProtoMessage() {}
 
 func (x *RelayMonitor) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -325,7 +516,7 @@ func (x *RelayMonitor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayMonitor.ProtoReflect.Descriptor instead.
 func (*RelayMonitor) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{1}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RelayMonitor) GetAtUnix() int64 {
@@ -382,6 +573,11 @@ type RelayStage struct {
 	// "apply_timeout" (the entry did not install the forward), "switched_off" (someone switched the relay off while it was
 	// waited for). Skipped: "unverifiable" (the server has no name to attribute the TLS identity to this node), "off" (the relay
 	// is not switched on, so there is no forward to reach), "leg_failed".
+	// reverse_reach adds: "exit_offline", "unsupported" (skipped: the exit's agent has no tcpcheck/1), "entry_site_unavailable"
+	// (skipped: the entry has no site of its own on TCP 443 to probe, or the connection was refused there: nothing listens, which
+	// says nothing about whether the exit reaches the entry); a connection that gets no answer ("timeout") is the exit not reaching
+	// the entry. reverse_speed adds: "busy" (skipped: a speed test already runs on one of the nodes, or the daily limit is reached),
+	// "unsupported" (skipped), "entry_offline", "unreachable".
 	Code string `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	// The node that sent the probe (its id), or "panel".
 	SenderId   string `protobuf:"bytes,3,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
@@ -389,16 +585,28 @@ type RelayStage struct {
 	// TCP: "ours", "other", "refused" or "timeout"; UDP: "ok", "lossy" or "broken".
 	Verdict string `protobuf:"bytes,5,opt,name=verdict,proto3" json:"verdict,omitempty"`
 	// UDP only: packets sent and counted by the exit.
-	Sent          uint32 `protobuf:"varint,6,opt,name=sent,proto3" json:"sent,omitempty"`
-	Got           uint32 `protobuf:"varint,7,opt,name=got,proto3" json:"got,omitempty"`
-	AtUnix        int64  `protobuf:"varint,8,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	Sent   uint32 `protobuf:"varint,6,opt,name=sent,proto3" json:"sent,omitempty"`
+	Got    uint32 `protobuf:"varint,7,opt,name=got,proto3" json:"got,omitempty"`
+	AtUnix int64  `protobuf:"varint,8,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	// reverse_speed only (the other stages leave these 0): the megabytes asked for (8 to 32), the megabits a second, the bytes the
+	// entry got, the connect and first-byte times and the duration of the flow in milliseconds.
+	Mb          uint32  `protobuf:"varint,9,opt,name=mb,proto3" json:"mb,omitempty"`
+	MbitS       float64 `protobuf:"fixed64,10,opt,name=mbit_s,json=mbitS,proto3" json:"mbit_s,omitempty"`
+	Bytes       uint64  `protobuf:"varint,11,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	ConnectMs   uint32  `protobuf:"varint,12,opt,name=connect_ms,json=connectMs,proto3" json:"connect_ms,omitempty"`
+	FirstByteMs uint32  `protobuf:"varint,13,opt,name=first_byte_ms,json=firstByteMs,proto3" json:"first_byte_ms,omitempty"`
+	DurationMs  uint32  `protobuf:"varint,14,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	// reverse_reach only: the TCP port of the entry's bridge endpoint the exit probed (443 on the entry's own site or the port of
+	// the separate bridge site, Node.bridge_port); 0 for the other stages and for results from before the field. A probe made for
+	// another port than the endpoint now is stale, whatever its at_unix says.
+	Port          uint32 `protobuf:"varint,15,opt,name=port,proto3" json:"port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RelayStage) Reset() {
 	*x = RelayStage{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -410,7 +618,7 @@ func (x *RelayStage) String() string {
 func (*RelayStage) ProtoMessage() {}
 
 func (x *RelayStage) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -423,7 +631,7 @@ func (x *RelayStage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayStage.ProtoReflect.Descriptor instead.
 func (*RelayStage) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{2}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RelayStage) GetStatus() string {
@@ -482,6 +690,55 @@ func (x *RelayStage) GetAtUnix() int64 {
 	return 0
 }
 
+func (x *RelayStage) GetMb() uint32 {
+	if x != nil {
+		return x.Mb
+	}
+	return 0
+}
+
+func (x *RelayStage) GetMbitS() float64 {
+	if x != nil {
+		return x.MbitS
+	}
+	return 0
+}
+
+func (x *RelayStage) GetBytes() uint64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+func (x *RelayStage) GetConnectMs() uint32 {
+	if x != nil {
+		return x.ConnectMs
+	}
+	return 0
+}
+
+func (x *RelayStage) GetFirstByteMs() uint32 {
+	if x != nil {
+		return x.FirstByteMs
+	}
+	return 0
+}
+
+func (x *RelayStage) GetDurationMs() uint32 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *RelayStage) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
 // What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
 // packets counted (UDP) or the server's identity proven (TCP) at the exit.
 type RelayCheck struct {
@@ -496,17 +753,33 @@ type RelayCheck struct {
 	Path *RelayStage `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`
 	// No stage that ran failed, and the leg passed or was skipped as unverifiable.
 	Ok bool `protobuf:"varint,7,opt,name=ok,proto3" json:"ok,omitempty"`
-	// The first stage that failed: "leg", "path", or "".
+	// The first stage that failed: "leg", "reverse_reach", "bridge", "path", or "".
 	Stage string `protobuf:"bytes,8,opt,name=stage,proto3" json:"stage,omitempty"`
 	// Both stages ran and passed: the relay works from outside.
-	Verified      bool `protobuf:"varint,9,opt,name=verified,proto3" json:"verified,omitempty"`
+	Verified bool `protobuf:"varint,9,opt,name=verified,proto3" json:"verified,omitempty"`
+	// Reverse way only: the exit reports the bridge is connected (a live connection for at least 10 seconds); the stage that
+	// follows a switch-on in reverse, before path. Absent on a check of a DNAT relay.
+	Bridge *RelayStage `protobuf:"bytes,10,opt,name=bridge,proto3" json:"bridge,omitempty"`
+	// Reverse way only: the exit reached the entry's bridge endpoint (a TLS probe from the exit that sees the entry's own site,
+	// and a data stream the exit opens to the entry). Run by CheckRelay when the leg did not pass and the way may be reverse,
+	// and the stage the gate of "reverse" and "auto" reads. Absent when it did not run. Codes: see RelayStage.code.
+	// The result stays in the check of a later run that does not repeat the stage (its at_unix says how old it is).
+	ReverseReach *RelayStage `protobuf:"bytes,11,opt,name=reverse_reach,json=reverseReach,proto3" json:"reverse_reach,omitempty"`
+	// The proof by speed (reverse way only), never run by itself: the exit sends an 8 MB flow to the entry (the existing path
+	// speed test, the exit the one that connects). Only CheckRelayRequest.reverse_speed starts it. Absent when it did not run.
+	ReverseSpeed *RelayStage `protobuf:"bytes,12,opt,name=reverse_speed,json=reverseSpeed,proto3" json:"reverse_speed,omitempty"`
+	// The proof by speed of the DIRECT way, which the panel starts itself, never the owner: before it moves a reverse relay back to
+	// DNAT, the entry opens one flow to the exit's node and takes 8 MB (the existing path speed test, the entry the one that
+	// connects), which catches a flow that freezes after the first 16 KB. Run at most once an hour and inside the daily speed test
+	// limits (a limit reached is skipped, "busy"). Absent when it never ran. Codes as reverse_speed.
+	DirectSpeed   *RelayStage `protobuf:"bytes,13,opt,name=direct_speed,json=directSpeed,proto3" json:"direct_speed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RelayCheck) Reset() {
 	*x = RelayCheck{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -518,7 +791,7 @@ func (x *RelayCheck) String() string {
 func (*RelayCheck) ProtoMessage() {}
 
 func (x *RelayCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -531,7 +804,7 @@ func (x *RelayCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayCheck.ProtoReflect.Descriptor instead.
 func (*RelayCheck) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RelayCheck) GetAtUnix() int64 {
@@ -597,16 +870,49 @@ func (x *RelayCheck) GetVerified() bool {
 	return false
 }
 
+func (x *RelayCheck) GetBridge() *RelayStage {
+	if x != nil {
+		return x.Bridge
+	}
+	return nil
+}
+
+func (x *RelayCheck) GetReverseReach() *RelayStage {
+	if x != nil {
+		return x.ReverseReach
+	}
+	return nil
+}
+
+func (x *RelayCheck) GetReverseSpeed() *RelayStage {
+	if x != nil {
+		return x.ReverseSpeed
+	}
+	return nil
+}
+
+func (x *RelayCheck) GetDirectSpeed() *RelayStage {
+	if x != nil {
+		return x.DirectSpeed
+	}
+	return nil
+}
+
 type CheckRelayRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Also run reverse_reach when the leg passes (it runs by itself after a failed leg).
+	ReverseReach bool `protobuf:"varint,2,opt,name=reverse_reach,json=reverseReach,proto3" json:"reverse_reach,omitempty"`
+	// Also send the 8 MB flow of reverse_speed (it implies reverse_reach). Moves bulk traffic between two nodes: the speed test
+	// limits (one test per node at a time, a few a day) hold.
+	ReverseSpeed  bool `protobuf:"varint,3,opt,name=reverse_speed,json=reverseSpeed,proto3" json:"reverse_speed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CheckRelayRequest) Reset() {
 	*x = CheckRelayRequest{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -618,7 +924,7 @@ func (x *CheckRelayRequest) String() string {
 func (*CheckRelayRequest) ProtoMessage() {}
 
 func (x *CheckRelayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -631,7 +937,7 @@ func (x *CheckRelayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckRelayRequest.ProtoReflect.Descriptor instead.
 func (*CheckRelayRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CheckRelayRequest) GetId() string {
@@ -639,6 +945,20 @@ func (x *CheckRelayRequest) GetId() string {
 		return x.Id
 	}
 	return ""
+}
+
+func (x *CheckRelayRequest) GetReverseReach() bool {
+	if x != nil {
+		return x.ReverseReach
+	}
+	return false
+}
+
+func (x *CheckRelayRequest) GetReverseSpeed() bool {
+	if x != nil {
+		return x.ReverseSpeed
+	}
+	return false
 }
 
 type CheckRelayResponse struct {
@@ -650,7 +970,7 @@ type CheckRelayResponse struct {
 
 func (x *CheckRelayResponse) Reset() {
 	*x = CheckRelayResponse{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -662,7 +982,7 @@ func (x *CheckRelayResponse) String() string {
 func (*CheckRelayResponse) ProtoMessage() {}
 
 func (x *CheckRelayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -675,7 +995,7 @@ func (x *CheckRelayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckRelayResponse.ProtoReflect.Descriptor instead.
 func (*CheckRelayResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CheckRelayResponse) GetRelay() *Relay {
@@ -700,7 +1020,7 @@ type RelayCountryHint struct {
 
 func (x *RelayCountryHint) Reset() {
 	*x = RelayCountryHint{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +1032,7 @@ func (x *RelayCountryHint) String() string {
 func (*RelayCountryHint) ProtoMessage() {}
 
 func (x *RelayCountryHint) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +1045,7 @@ func (x *RelayCountryHint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayCountryHint.ProtoReflect.Descriptor instead.
 func (*RelayCountryHint) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RelayCountryHint) GetVerdict() string {
@@ -764,7 +1084,7 @@ type RelayReachHint struct {
 
 func (x *RelayReachHint) Reset() {
 	*x = RelayReachHint{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -776,7 +1096,7 @@ func (x *RelayReachHint) String() string {
 func (*RelayReachHint) ProtoMessage() {}
 
 func (x *RelayReachHint) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -789,7 +1109,7 @@ func (x *RelayReachHint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayReachHint.ProtoReflect.Descriptor instead.
 func (*RelayReachHint) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RelayReachHint) GetVerdict() string {
@@ -834,14 +1154,21 @@ type RelayCandidate struct {
 	Country *RelayCountryHint `protobuf:"bytes,12,opt,name=country,proto3" json:"country,omitempty"`
 	Reach   *RelayReachHint   `protobuf:"bytes,13,opt,name=reach,proto3" json:"reach,omitempty"`
 	// Who would get the new server if this relay were made. Absent when it cannot be relayed.
-	Audience      *RelayAudience `protobuf:"bytes,14,opt,name=audience,proto3" json:"audience,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Audience *RelayAudience `protobuf:"bytes,14,opt,name=audience,proto3" json:"audience,omitempty"`
+	// Does the exit reach this entry's bridge endpoint (the way a reverse relay needs)? Known only when a check of the exit towards
+	// the entry ran. Same verdicts as reach; source "exit_probe" when it came from one, "" with no_data.
+	ExitReachesEntry *RelayReachHint `protobuf:"bytes,15,opt,name=exit_reaches_entry,json=exitReachesEntry,proto3" json:"exit_reaches_entry,omitempty"`
+	// Why a reverse relay of this server through this entry is not possible, as Relay.reverse_blocked: "entry_agent_old",
+	// "exit_agent_old", "udp" or "" (possible). Computed from the two agents' capabilities and the server's network, so the dialog can
+	// say it before the relay exists; it beats exit_reaches_entry (a UDP server can show "reach" and still has no bridge).
+	ReverseBlocked string `protobuf:"bytes,16,opt,name=reverse_blocked,json=reverseBlocked,proto3" json:"reverse_blocked,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RelayCandidate) Reset() {
 	*x = RelayCandidate{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -853,7 +1180,7 @@ func (x *RelayCandidate) String() string {
 func (*RelayCandidate) ProtoMessage() {}
 
 func (x *RelayCandidate) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -866,7 +1193,7 @@ func (x *RelayCandidate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayCandidate.ProtoReflect.Descriptor instead.
 func (*RelayCandidate) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RelayCandidate) GetInboundId() string {
@@ -967,6 +1294,20 @@ func (x *RelayCandidate) GetAudience() *RelayAudience {
 	return nil
 }
 
+func (x *RelayCandidate) GetExitReachesEntry() *RelayReachHint {
+	if x != nil {
+		return x.ExitReachesEntry
+	}
+	return nil
+}
+
+func (x *RelayCandidate) GetReverseBlocked() string {
+	if x != nil {
+		return x.ReverseBlocked
+	}
+	return ""
+}
+
 // The people a relay through this entry would serve.
 type RelayAudience struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -980,7 +1321,7 @@ type RelayAudience struct {
 
 func (x *RelayAudience) Reset() {
 	*x = RelayAudience{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -992,7 +1333,7 @@ func (x *RelayAudience) String() string {
 func (*RelayAudience) ProtoMessage() {}
 
 func (x *RelayAudience) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1005,7 +1346,7 @@ func (x *RelayAudience) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayAudience.ProtoReflect.Descriptor instead.
 func (*RelayAudience) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RelayAudience) GetPeople() uint32 {
@@ -1031,7 +1372,7 @@ type ListRelayCandidatesRequest struct {
 
 func (x *ListRelayCandidatesRequest) Reset() {
 	*x = ListRelayCandidatesRequest{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1043,7 +1384,7 @@ func (x *ListRelayCandidatesRequest) String() string {
 func (*ListRelayCandidatesRequest) ProtoMessage() {}
 
 func (x *ListRelayCandidatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1056,7 +1397,7 @@ func (x *ListRelayCandidatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRelayCandidatesRequest.ProtoReflect.Descriptor instead.
 func (*ListRelayCandidatesRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListRelayCandidatesRequest) GetViaNodeId() string {
@@ -1080,7 +1421,7 @@ type ListRelayCandidatesResponse struct {
 
 func (x *ListRelayCandidatesResponse) Reset() {
 	*x = ListRelayCandidatesResponse{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1092,7 +1433,7 @@ func (x *ListRelayCandidatesResponse) String() string {
 func (*ListRelayCandidatesResponse) ProtoMessage() {}
 
 func (x *ListRelayCandidatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1105,7 +1446,7 @@ func (x *ListRelayCandidatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRelayCandidatesResponse.ProtoReflect.Descriptor instead.
 func (*ListRelayCandidatesResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListRelayCandidatesResponse) GetCandidates() []*RelayCandidate {
@@ -1138,7 +1479,7 @@ type ListRelaysRequest struct {
 
 func (x *ListRelaysRequest) Reset() {
 	*x = ListRelaysRequest{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1150,7 +1491,7 @@ func (x *ListRelaysRequest) String() string {
 func (*ListRelaysRequest) ProtoMessage() {}
 
 func (x *ListRelaysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1163,7 +1504,7 @@ func (x *ListRelaysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRelaysRequest.ProtoReflect.Descriptor instead.
 func (*ListRelaysRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ListRelaysRequest) GetNodeId() string {
@@ -1182,7 +1523,7 @@ type ListRelaysResponse struct {
 
 func (x *ListRelaysResponse) Reset() {
 	*x = ListRelaysResponse{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1194,7 +1535,7 @@ func (x *ListRelaysResponse) String() string {
 func (*ListRelaysResponse) ProtoMessage() {}
 
 func (x *ListRelaysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1207,7 +1548,7 @@ func (x *ListRelaysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRelaysResponse.ProtoReflect.Descriptor instead.
 func (*ListRelaysResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListRelaysResponse) GetRelays() []*Relay {
@@ -1220,16 +1561,18 @@ func (x *ListRelaysResponse) GetRelays() []*Relay {
 type CreateRelayRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The exit's server (an inbound).
-	InboundId     string `protobuf:"bytes,1,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
-	ViaNodeId     string `protobuf:"bytes,2,opt,name=via_node_id,json=viaNodeId,proto3" json:"via_node_id,omitempty"`
-	Port          uint32 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	InboundId string `protobuf:"bytes,1,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
+	ViaNodeId string `protobuf:"bytes,2,opt,name=via_node_id,json=viaNodeId,proto3" json:"via_node_id,omitempty"`
+	Port      uint32 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	// "auto", "dnat" or "reverse"; empty = "auto".
+	Mode          string `protobuf:"bytes,4,opt,name=mode,proto3" json:"mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateRelayRequest) Reset() {
 	*x = CreateRelayRequest{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1241,7 +1584,7 @@ func (x *CreateRelayRequest) String() string {
 func (*CreateRelayRequest) ProtoMessage() {}
 
 func (x *CreateRelayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1254,7 +1597,7 @@ func (x *CreateRelayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRelayRequest.ProtoReflect.Descriptor instead.
 func (*CreateRelayRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CreateRelayRequest) GetInboundId() string {
@@ -1278,6 +1621,13 @@ func (x *CreateRelayRequest) GetPort() uint32 {
 	return 0
 }
 
+func (x *CreateRelayRequest) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
 type CreateRelayResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Relay         *Relay                 `protobuf:"bytes,1,opt,name=relay,proto3" json:"relay,omitempty"`
@@ -1287,7 +1637,7 @@ type CreateRelayResponse struct {
 
 func (x *CreateRelayResponse) Reset() {
 	*x = CreateRelayResponse{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1299,7 +1649,7 @@ func (x *CreateRelayResponse) String() string {
 func (*CreateRelayResponse) ProtoMessage() {}
 
 func (x *CreateRelayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1312,7 +1662,7 @@ func (x *CreateRelayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRelayResponse.ProtoReflect.Descriptor instead.
 func (*CreateRelayResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CreateRelayResponse) GetRelay() *Relay {
@@ -1323,17 +1673,19 @@ func (x *CreateRelayResponse) GetRelay() *Relay {
 }
 
 type UpdateRelayRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Enabled       *bool                  `protobuf:"varint,2,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
-	Port          *uint32                `protobuf:"varint,3,opt,name=port,proto3,oneof" json:"port,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Enabled *bool                  `protobuf:"varint,2,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	Port    *uint32                `protobuf:"varint,3,opt,name=port,proto3,oneof" json:"port,omitempty"`
+	// "auto", "dnat" or "reverse"; unset = unchanged.
+	Mode          *string `protobuf:"bytes,4,opt,name=mode,proto3,oneof" json:"mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateRelayRequest) Reset() {
 	*x = UpdateRelayRequest{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1345,7 +1697,7 @@ func (x *UpdateRelayRequest) String() string {
 func (*UpdateRelayRequest) ProtoMessage() {}
 
 func (x *UpdateRelayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1358,7 +1710,7 @@ func (x *UpdateRelayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRelayRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRelayRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *UpdateRelayRequest) GetId() string {
@@ -1382,6 +1734,13 @@ func (x *UpdateRelayRequest) GetPort() uint32 {
 	return 0
 }
 
+func (x *UpdateRelayRequest) GetMode() string {
+	if x != nil && x.Mode != nil {
+		return *x.Mode
+	}
+	return ""
+}
+
 type UpdateRelayResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Relay         *Relay                 `protobuf:"bytes,1,opt,name=relay,proto3" json:"relay,omitempty"`
@@ -1391,7 +1750,7 @@ type UpdateRelayResponse struct {
 
 func (x *UpdateRelayResponse) Reset() {
 	*x = UpdateRelayResponse{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1403,7 +1762,7 @@ func (x *UpdateRelayResponse) String() string {
 func (*UpdateRelayResponse) ProtoMessage() {}
 
 func (x *UpdateRelayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1416,7 +1775,7 @@ func (x *UpdateRelayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRelayResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRelayResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UpdateRelayResponse) GetRelay() *Relay {
@@ -1435,7 +1794,7 @@ type DeleteRelayRequest struct {
 
 func (x *DeleteRelayRequest) Reset() {
 	*x = DeleteRelayRequest{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1447,7 +1806,7 @@ func (x *DeleteRelayRequest) String() string {
 func (*DeleteRelayRequest) ProtoMessage() {}
 
 func (x *DeleteRelayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1460,7 +1819,7 @@ func (x *DeleteRelayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRelayRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRelayRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DeleteRelayRequest) GetId() string {
@@ -1478,7 +1837,7 @@ type DeleteRelayResponse struct {
 
 func (x *DeleteRelayResponse) Reset() {
 	*x = DeleteRelayResponse{}
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1490,7 +1849,7 @@ func (x *DeleteRelayResponse) String() string {
 func (*DeleteRelayResponse) ProtoMessage() {}
 
 func (x *DeleteRelayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_relay_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1503,14 +1862,14 @@ func (x *DeleteRelayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRelayResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRelayResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_admin_v1_relay_proto_rawDescGZIP(), []int{20}
 }
 
 var File_mistgate_admin_v1_relay_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/admin/v1/relay.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xd1\x06\n" +
+	"\x1dmistgate/admin/v1/relay.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xd9\b\n" +
 	"\x05Relay\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1542,7 +1901,27 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x05bytes\x18\x17 \x01(\x04R\x05bytes\x12\x18\n" +
 	"\apackets\x18\x18 \x01(\x04R\apackets\x12!\n" +
 	"\fcounted_unix\x18\x19 \x01(\x03R\vcountedUnix\x12\x10\n" +
-	"\x03bps\x18\x1a \x01(\x04R\x03bps\"\xa3\x01\n" +
+	"\x03bps\x18\x1a \x01(\x04R\x03bps\x12\x12\n" +
+	"\x04mode\x18\x1b \x01(\tR\x04mode\x12\x1f\n" +
+	"\vactive_mode\x18\x1c \x01(\tR\n" +
+	"activeMode\x12*\n" +
+	"\x11mode_changed_unix\x18\x1d \x01(\x03R\x0fmodeChangedUnix\x12\x1f\n" +
+	"\vmode_reason\x18\x1e \x01(\tR\n" +
+	"modeReason\x12#\n" +
+	"\rdirect_streak\x18\x1f \x01(\rR\fdirectStreak\x12'\n" +
+	"\x0freverse_blocked\x18  \x01(\tR\x0ereverseBlocked\x126\n" +
+	"\x06bridge\x18! \x01(\v2\x1e.mistgate.admin.v1.RelayBridgeR\x06bridge\"\xf4\x01\n" +
+	"\vRelayBridge\x12\x1c\n" +
+	"\tconnected\x18\x01 \x01(\bR\tconnected\x12\x14\n" +
+	"\x05conns\x18\x02 \x01(\rR\x05conns\x12\x15\n" +
+	"\x06rtt_ms\x18\x03 \x01(\rR\x05rttMs\x12\x1d\n" +
+	"\n" +
+	"since_unix\x18\x04 \x01(\x03R\tsinceUnix\x12\x14\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\x12\x18\n" +
+	"\aclients\x18\x06 \x01(\rR\aclients\x12\x12\n" +
+	"\x04pool\x18\a \x01(\rR\x04pool\x12\x1a\n" +
+	"\bcapacity\x18\b \x01(\rR\bcapacity\x12\x1b\n" +
+	"\tnear_full\x18\t \x01(\bR\bnearFull\"\xa3\x01\n" +
 	"\fRelayMonitor\x12\x17\n" +
 	"\aat_unix\x18\x01 \x01(\x03R\x06atUnix\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x14\n" +
@@ -1551,7 +1930,7 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\vresponse_ms\x18\x05 \x01(\rR\n" +
 	"responseMs\x12\x1f\n" +
 	"\vfail_streak\x18\x06 \x01(\rR\n" +
-	"failStreak\"\xcf\x01\n" +
+	"failStreak\"\x84\x03\n" +
 	"\n" +
 	"RelayStage\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x12\n" +
@@ -1562,7 +1941,17 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\averdict\x18\x05 \x01(\tR\averdict\x12\x12\n" +
 	"\x04sent\x18\x06 \x01(\rR\x04sent\x12\x10\n" +
 	"\x03got\x18\a \x01(\rR\x03got\x12\x17\n" +
-	"\aat_unix\x18\b \x01(\x03R\x06atUnix\"\x89\x02\n" +
+	"\aat_unix\x18\b \x01(\x03R\x06atUnix\x12\x0e\n" +
+	"\x02mb\x18\t \x01(\rR\x02mb\x12\x15\n" +
+	"\x06mbit_s\x18\n" +
+	" \x01(\x01R\x05mbitS\x12\x14\n" +
+	"\x05bytes\x18\v \x01(\x04R\x05bytes\x12\x1d\n" +
+	"\n" +
+	"connect_ms\x18\f \x01(\rR\tconnectMs\x12\"\n" +
+	"\rfirst_byte_ms\x18\r \x01(\rR\vfirstByteMs\x12\x1f\n" +
+	"\vduration_ms\x18\x0e \x01(\rR\n" +
+	"durationMs\x12\x12\n" +
+	"\x04port\x18\x0f \x01(\rR\x04port\"\x8a\x04\n" +
 	"\n" +
 	"RelayCheck\x12\x17\n" +
 	"\aat_unix\x18\x01 \x01(\x03R\x06atUnix\x12\x18\n" +
@@ -1573,9 +1962,16 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x04path\x18\x06 \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\x04path\x12\x0e\n" +
 	"\x02ok\x18\a \x01(\bR\x02ok\x12\x14\n" +
 	"\x05stage\x18\b \x01(\tR\x05stage\x12\x1a\n" +
-	"\bverified\x18\t \x01(\bR\bverified\"#\n" +
+	"\bverified\x18\t \x01(\bR\bverified\x125\n" +
+	"\x06bridge\x18\n" +
+	" \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\x06bridge\x12B\n" +
+	"\rreverse_reach\x18\v \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\freverseReach\x12B\n" +
+	"\rreverse_speed\x18\f \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\freverseSpeed\x12@\n" +
+	"\fdirect_speed\x18\r \x01(\v2\x1d.mistgate.admin.v1.RelayStageR\vdirectSpeed\"m\n" +
 	"\x11CheckRelayRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"D\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rreverse_reach\x18\x02 \x01(\bR\freverseReach\x12#\n" +
+	"\rreverse_speed\x18\x03 \x01(\bR\freverseSpeed\"D\n" +
 	"\x12CheckRelayResponse\x12.\n" +
 	"\x05relay\x18\x01 \x01(\v2\x18.mistgate.admin.v1.RelayR\x05relay\"Y\n" +
 	"\x10RelayCountryHint\x12\x18\n" +
@@ -1585,7 +1981,7 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x0eRelayReachHint\x12\x18\n" +
 	"\averdict\x18\x01 \x01(\tR\averdict\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x12\x17\n" +
-	"\aat_unix\x18\x03 \x01(\x03R\x06atUnix\"\xf6\x03\n" +
+	"\aat_unix\x18\x03 \x01(\x03R\x06atUnix\"\xf0\x04\n" +
 	"\x0eRelayCandidate\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x17\n" +
@@ -1603,7 +1999,9 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\brelay_id\x18\v \x01(\tR\arelayId\x12=\n" +
 	"\acountry\x18\f \x01(\v2#.mistgate.admin.v1.RelayCountryHintR\acountry\x127\n" +
 	"\x05reach\x18\r \x01(\v2!.mistgate.admin.v1.RelayReachHintR\x05reach\x12<\n" +
-	"\baudience\x18\x0e \x01(\v2 .mistgate.admin.v1.RelayAudienceR\baudience\"U\n" +
+	"\baudience\x18\x0e \x01(\v2 .mistgate.admin.v1.RelayAudienceR\baudience\x12O\n" +
+	"\x12exit_reaches_entry\x18\x0f \x01(\v2!.mistgate.admin.v1.RelayReachHintR\x10exitReachesEntry\x12'\n" +
+	"\x0freverse_blocked\x18\x10 \x01(\tR\x0ereverseBlocked\"U\n" +
 	"\rRelayAudience\x12\x16\n" +
 	"\x06people\x18\x01 \x01(\rR\x06people\x12,\n" +
 	"\x12static_awg_devices\x18\x02 \x01(\rR\x10staticAwgDevices\"<\n" +
@@ -1618,21 +2016,24 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x11ListRelaysRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"F\n" +
 	"\x12ListRelaysResponse\x120\n" +
-	"\x06relays\x18\x01 \x03(\v2\x18.mistgate.admin.v1.RelayR\x06relays\"g\n" +
+	"\x06relays\x18\x01 \x03(\v2\x18.mistgate.admin.v1.RelayR\x06relays\"{\n" +
 	"\x12CreateRelayRequest\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x1e\n" +
 	"\vvia_node_id\x18\x02 \x01(\tR\tviaNodeId\x12\x12\n" +
-	"\x04port\x18\x03 \x01(\rR\x04port\"E\n" +
+	"\x04port\x18\x03 \x01(\rR\x04port\x12\x12\n" +
+	"\x04mode\x18\x04 \x01(\tR\x04mode\"E\n" +
 	"\x13CreateRelayResponse\x12.\n" +
-	"\x05relay\x18\x01 \x01(\v2\x18.mistgate.admin.v1.RelayR\x05relay\"q\n" +
+	"\x05relay\x18\x01 \x01(\v2\x18.mistgate.admin.v1.RelayR\x05relay\"\x93\x01\n" +
 	"\x12UpdateRelayRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aenabled\x18\x02 \x01(\bH\x00R\aenabled\x88\x01\x01\x12\x17\n" +
-	"\x04port\x18\x03 \x01(\rH\x01R\x04port\x88\x01\x01B\n" +
+	"\x04port\x18\x03 \x01(\rH\x01R\x04port\x88\x01\x01\x12\x17\n" +
+	"\x04mode\x18\x04 \x01(\tH\x02R\x04mode\x88\x01\x01B\n" +
 	"\n" +
 	"\b_enabledB\a\n" +
-	"\x05_port\"E\n" +
+	"\x05_portB\a\n" +
+	"\x05_mode\"E\n" +
 	"\x13UpdateRelayResponse\x12.\n" +
 	"\x05relay\x18\x01 \x01(\v2\x18.mistgate.admin.v1.RelayR\x05relay\"$\n" +
 	"\x12DeleteRelayRequest\x12\x0e\n" +
@@ -1662,62 +2063,69 @@ func file_mistgate_admin_v1_relay_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_relay_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_relay_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_mistgate_admin_v1_relay_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_mistgate_admin_v1_relay_proto_goTypes = []any{
 	(*Relay)(nil),                       // 0: mistgate.admin.v1.Relay
-	(*RelayMonitor)(nil),                // 1: mistgate.admin.v1.RelayMonitor
-	(*RelayStage)(nil),                  // 2: mistgate.admin.v1.RelayStage
-	(*RelayCheck)(nil),                  // 3: mistgate.admin.v1.RelayCheck
-	(*CheckRelayRequest)(nil),           // 4: mistgate.admin.v1.CheckRelayRequest
-	(*CheckRelayResponse)(nil),          // 5: mistgate.admin.v1.CheckRelayResponse
-	(*RelayCountryHint)(nil),            // 6: mistgate.admin.v1.RelayCountryHint
-	(*RelayReachHint)(nil),              // 7: mistgate.admin.v1.RelayReachHint
-	(*RelayCandidate)(nil),              // 8: mistgate.admin.v1.RelayCandidate
-	(*RelayAudience)(nil),               // 9: mistgate.admin.v1.RelayAudience
-	(*ListRelayCandidatesRequest)(nil),  // 10: mistgate.admin.v1.ListRelayCandidatesRequest
-	(*ListRelayCandidatesResponse)(nil), // 11: mistgate.admin.v1.ListRelayCandidatesResponse
-	(*ListRelaysRequest)(nil),           // 12: mistgate.admin.v1.ListRelaysRequest
-	(*ListRelaysResponse)(nil),          // 13: mistgate.admin.v1.ListRelaysResponse
-	(*CreateRelayRequest)(nil),          // 14: mistgate.admin.v1.CreateRelayRequest
-	(*CreateRelayResponse)(nil),         // 15: mistgate.admin.v1.CreateRelayResponse
-	(*UpdateRelayRequest)(nil),          // 16: mistgate.admin.v1.UpdateRelayRequest
-	(*UpdateRelayResponse)(nil),         // 17: mistgate.admin.v1.UpdateRelayResponse
-	(*DeleteRelayRequest)(nil),          // 18: mistgate.admin.v1.DeleteRelayRequest
-	(*DeleteRelayResponse)(nil),         // 19: mistgate.admin.v1.DeleteRelayResponse
-	(InboundState)(0),                   // 20: mistgate.admin.v1.InboundState
+	(*RelayBridge)(nil),                 // 1: mistgate.admin.v1.RelayBridge
+	(*RelayMonitor)(nil),                // 2: mistgate.admin.v1.RelayMonitor
+	(*RelayStage)(nil),                  // 3: mistgate.admin.v1.RelayStage
+	(*RelayCheck)(nil),                  // 4: mistgate.admin.v1.RelayCheck
+	(*CheckRelayRequest)(nil),           // 5: mistgate.admin.v1.CheckRelayRequest
+	(*CheckRelayResponse)(nil),          // 6: mistgate.admin.v1.CheckRelayResponse
+	(*RelayCountryHint)(nil),            // 7: mistgate.admin.v1.RelayCountryHint
+	(*RelayReachHint)(nil),              // 8: mistgate.admin.v1.RelayReachHint
+	(*RelayCandidate)(nil),              // 9: mistgate.admin.v1.RelayCandidate
+	(*RelayAudience)(nil),               // 10: mistgate.admin.v1.RelayAudience
+	(*ListRelayCandidatesRequest)(nil),  // 11: mistgate.admin.v1.ListRelayCandidatesRequest
+	(*ListRelayCandidatesResponse)(nil), // 12: mistgate.admin.v1.ListRelayCandidatesResponse
+	(*ListRelaysRequest)(nil),           // 13: mistgate.admin.v1.ListRelaysRequest
+	(*ListRelaysResponse)(nil),          // 14: mistgate.admin.v1.ListRelaysResponse
+	(*CreateRelayRequest)(nil),          // 15: mistgate.admin.v1.CreateRelayRequest
+	(*CreateRelayResponse)(nil),         // 16: mistgate.admin.v1.CreateRelayResponse
+	(*UpdateRelayRequest)(nil),          // 17: mistgate.admin.v1.UpdateRelayRequest
+	(*UpdateRelayResponse)(nil),         // 18: mistgate.admin.v1.UpdateRelayResponse
+	(*DeleteRelayRequest)(nil),          // 19: mistgate.admin.v1.DeleteRelayRequest
+	(*DeleteRelayResponse)(nil),         // 20: mistgate.admin.v1.DeleteRelayResponse
+	(InboundState)(0),                   // 21: mistgate.admin.v1.InboundState
 }
 var file_mistgate_admin_v1_relay_proto_depIdxs = []int32{
-	20, // 0: mistgate.admin.v1.Relay.state:type_name -> mistgate.admin.v1.InboundState
-	3,  // 1: mistgate.admin.v1.Relay.check:type_name -> mistgate.admin.v1.RelayCheck
-	1,  // 2: mistgate.admin.v1.Relay.monitor:type_name -> mistgate.admin.v1.RelayMonitor
-	2,  // 3: mistgate.admin.v1.RelayCheck.leg:type_name -> mistgate.admin.v1.RelayStage
-	2,  // 4: mistgate.admin.v1.RelayCheck.path:type_name -> mistgate.admin.v1.RelayStage
-	0,  // 5: mistgate.admin.v1.CheckRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
-	6,  // 6: mistgate.admin.v1.RelayCandidate.country:type_name -> mistgate.admin.v1.RelayCountryHint
-	7,  // 7: mistgate.admin.v1.RelayCandidate.reach:type_name -> mistgate.admin.v1.RelayReachHint
-	9,  // 8: mistgate.admin.v1.RelayCandidate.audience:type_name -> mistgate.admin.v1.RelayAudience
-	8,  // 9: mistgate.admin.v1.ListRelayCandidatesResponse.candidates:type_name -> mistgate.admin.v1.RelayCandidate
-	6,  // 10: mistgate.admin.v1.ListRelayCandidatesResponse.entry_country:type_name -> mistgate.admin.v1.RelayCountryHint
-	0,  // 11: mistgate.admin.v1.ListRelaysResponse.relays:type_name -> mistgate.admin.v1.Relay
-	0,  // 12: mistgate.admin.v1.CreateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
-	0,  // 13: mistgate.admin.v1.UpdateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
-	12, // 14: mistgate.admin.v1.RelayService.ListRelays:input_type -> mistgate.admin.v1.ListRelaysRequest
-	14, // 15: mistgate.admin.v1.RelayService.CreateRelay:input_type -> mistgate.admin.v1.CreateRelayRequest
-	16, // 16: mistgate.admin.v1.RelayService.UpdateRelay:input_type -> mistgate.admin.v1.UpdateRelayRequest
-	18, // 17: mistgate.admin.v1.RelayService.DeleteRelay:input_type -> mistgate.admin.v1.DeleteRelayRequest
-	4,  // 18: mistgate.admin.v1.RelayService.CheckRelay:input_type -> mistgate.admin.v1.CheckRelayRequest
-	10, // 19: mistgate.admin.v1.RelayService.ListRelayCandidates:input_type -> mistgate.admin.v1.ListRelayCandidatesRequest
-	13, // 20: mistgate.admin.v1.RelayService.ListRelays:output_type -> mistgate.admin.v1.ListRelaysResponse
-	15, // 21: mistgate.admin.v1.RelayService.CreateRelay:output_type -> mistgate.admin.v1.CreateRelayResponse
-	17, // 22: mistgate.admin.v1.RelayService.UpdateRelay:output_type -> mistgate.admin.v1.UpdateRelayResponse
-	19, // 23: mistgate.admin.v1.RelayService.DeleteRelay:output_type -> mistgate.admin.v1.DeleteRelayResponse
-	5,  // 24: mistgate.admin.v1.RelayService.CheckRelay:output_type -> mistgate.admin.v1.CheckRelayResponse
-	11, // 25: mistgate.admin.v1.RelayService.ListRelayCandidates:output_type -> mistgate.admin.v1.ListRelayCandidatesResponse
-	20, // [20:26] is the sub-list for method output_type
-	14, // [14:20] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	21, // 0: mistgate.admin.v1.Relay.state:type_name -> mistgate.admin.v1.InboundState
+	4,  // 1: mistgate.admin.v1.Relay.check:type_name -> mistgate.admin.v1.RelayCheck
+	2,  // 2: mistgate.admin.v1.Relay.monitor:type_name -> mistgate.admin.v1.RelayMonitor
+	1,  // 3: mistgate.admin.v1.Relay.bridge:type_name -> mistgate.admin.v1.RelayBridge
+	3,  // 4: mistgate.admin.v1.RelayCheck.leg:type_name -> mistgate.admin.v1.RelayStage
+	3,  // 5: mistgate.admin.v1.RelayCheck.path:type_name -> mistgate.admin.v1.RelayStage
+	3,  // 6: mistgate.admin.v1.RelayCheck.bridge:type_name -> mistgate.admin.v1.RelayStage
+	3,  // 7: mistgate.admin.v1.RelayCheck.reverse_reach:type_name -> mistgate.admin.v1.RelayStage
+	3,  // 8: mistgate.admin.v1.RelayCheck.reverse_speed:type_name -> mistgate.admin.v1.RelayStage
+	3,  // 9: mistgate.admin.v1.RelayCheck.direct_speed:type_name -> mistgate.admin.v1.RelayStage
+	0,  // 10: mistgate.admin.v1.CheckRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
+	7,  // 11: mistgate.admin.v1.RelayCandidate.country:type_name -> mistgate.admin.v1.RelayCountryHint
+	8,  // 12: mistgate.admin.v1.RelayCandidate.reach:type_name -> mistgate.admin.v1.RelayReachHint
+	10, // 13: mistgate.admin.v1.RelayCandidate.audience:type_name -> mistgate.admin.v1.RelayAudience
+	8,  // 14: mistgate.admin.v1.RelayCandidate.exit_reaches_entry:type_name -> mistgate.admin.v1.RelayReachHint
+	9,  // 15: mistgate.admin.v1.ListRelayCandidatesResponse.candidates:type_name -> mistgate.admin.v1.RelayCandidate
+	7,  // 16: mistgate.admin.v1.ListRelayCandidatesResponse.entry_country:type_name -> mistgate.admin.v1.RelayCountryHint
+	0,  // 17: mistgate.admin.v1.ListRelaysResponse.relays:type_name -> mistgate.admin.v1.Relay
+	0,  // 18: mistgate.admin.v1.CreateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
+	0,  // 19: mistgate.admin.v1.UpdateRelayResponse.relay:type_name -> mistgate.admin.v1.Relay
+	13, // 20: mistgate.admin.v1.RelayService.ListRelays:input_type -> mistgate.admin.v1.ListRelaysRequest
+	15, // 21: mistgate.admin.v1.RelayService.CreateRelay:input_type -> mistgate.admin.v1.CreateRelayRequest
+	17, // 22: mistgate.admin.v1.RelayService.UpdateRelay:input_type -> mistgate.admin.v1.UpdateRelayRequest
+	19, // 23: mistgate.admin.v1.RelayService.DeleteRelay:input_type -> mistgate.admin.v1.DeleteRelayRequest
+	5,  // 24: mistgate.admin.v1.RelayService.CheckRelay:input_type -> mistgate.admin.v1.CheckRelayRequest
+	11, // 25: mistgate.admin.v1.RelayService.ListRelayCandidates:input_type -> mistgate.admin.v1.ListRelayCandidatesRequest
+	14, // 26: mistgate.admin.v1.RelayService.ListRelays:output_type -> mistgate.admin.v1.ListRelaysResponse
+	16, // 27: mistgate.admin.v1.RelayService.CreateRelay:output_type -> mistgate.admin.v1.CreateRelayResponse
+	18, // 28: mistgate.admin.v1.RelayService.UpdateRelay:output_type -> mistgate.admin.v1.UpdateRelayResponse
+	20, // 29: mistgate.admin.v1.RelayService.DeleteRelay:output_type -> mistgate.admin.v1.DeleteRelayResponse
+	6,  // 30: mistgate.admin.v1.RelayService.CheckRelay:output_type -> mistgate.admin.v1.CheckRelayResponse
+	12, // 31: mistgate.admin.v1.RelayService.ListRelayCandidates:output_type -> mistgate.admin.v1.ListRelayCandidatesResponse
+	26, // [26:32] is the sub-list for method output_type
+	20, // [20:26] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_relay_proto_init() }
@@ -1726,14 +2134,14 @@ func file_mistgate_admin_v1_relay_proto_init() {
 		return
 	}
 	file_mistgate_admin_v1_common_proto_init()
-	file_mistgate_admin_v1_relay_proto_msgTypes[16].OneofWrappers = []any{}
+	file_mistgate_admin_v1_relay_proto_msgTypes[17].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_relay_proto_rawDesc), len(file_mistgate_admin_v1_relay_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

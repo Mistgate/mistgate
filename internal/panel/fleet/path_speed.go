@@ -57,7 +57,12 @@ type speedJSON struct {
 // startSpeed admits a test between two nodes: it applies the limits, records the reservation and takes both nodes. The returned
 // function gives them back.
 func (f *Fleet) startSpeed(ctx context.Context, a, b string) (func(), error) {
-	actor := f.cfg.Actor(ctx)
+	return f.startSpeedAs(ctx, f.cfg.Actor(ctx), a, b)
+}
+
+// startSpeedAs is startSpeed for a caller that is not a signed-in admin (the relay controller asks as "system", so its tests
+// count against the panel's own share of the caller limit and not against whoever's request happened to run it).
+func (f *Fleet) startSpeedAs(ctx context.Context, actor, a, b string) (func(), error) {
 	now := f.now()
 	p := &f.probes
 	p.mu.Lock()

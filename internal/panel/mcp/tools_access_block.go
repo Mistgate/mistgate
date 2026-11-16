@@ -178,8 +178,11 @@ type accKlick struct {
 
 type accRelay struct {
 	ID, EntryID, ExitID, InboundID, ProfileID, State string
+	Mode, ActiveMode                                 string
 	Enabled, ExitLive, AgentSupported                bool
-	Checked, CheckOK                                 bool
+	ReverseSupported, Checked, CheckOK               bool
+	BridgeOK, PathOK                                 bool
+	BridgeAtUnix                                     int64
 	MonitorAtUnix                                    int64
 	MonitorFails                                     uint32
 }

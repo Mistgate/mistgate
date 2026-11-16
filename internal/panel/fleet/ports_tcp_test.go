@@ -55,7 +55,7 @@ func TestTCPTargets(t *testing.T) {
 			specs: []tcpSpec{vlessSpec("b", 8443, realityOther, plugin.TLS{}), hy2Spec("a", plugin.TLSAcmeDomain, "node-a.example.com", "")},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 443, Role: "site", ALPN: true, Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com"},
+				{Port: 443, Role: "site", ALPN: true, Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
 				{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "www.example.org"},
 			},
 		},
@@ -63,7 +63,7 @@ func TestTCPTargets(t *testing.T) {
 			specs: []tcpSpec{hy2Spec("a", plugin.TLSAcmeDomain, "node-a.example.com", `{"masquerade":{"tcp_port":8443}}`)},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 8443, Role: "site", Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com"},
+				{Port: 8443, Role: "site", Profile: "hy2-a", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
 			},
 		},
 		"a site that is switched off is not probed": {
@@ -83,8 +83,8 @@ func TestTCPTargets(t *testing.T) {
 			},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-b", Kind: "tls", SNI: "node-a.example.com"},
-				{Port: 8443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "node-a.example.com"},
+				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-b", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
+				{Port: 8443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
 			},
 		},
 		"TLS fronts use their server name and only ACME on 443 gets ALPN": {
@@ -95,8 +95,8 @@ func TestTCPTargets(t *testing.T) {
 			},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-a", Kind: "tls", SNI: "origin.example.com"},
-				{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "origin.example.com"},
+				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-a", Kind: "tls", SNI: "origin.example.com", PublicCert: true},
+				{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "origin.example.com", PublicCert: true},
 				{Port: 9443, Role: "vless", Profile: "vless-c", Kind: "tls", SNI: "origin.example.com"},
 			},
 		},

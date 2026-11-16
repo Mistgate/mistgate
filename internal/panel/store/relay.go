@@ -32,6 +32,11 @@ type Relay struct {
 	AppliedAt              time.Time
 	CheckJSON              string
 	CreatedAt, UpdatedAt   time.Time
+	// The way the relay passes traffic on (migration 00138; the words of relay.proto Relay.mode and active_mode): Mode is the owner's
+	// choice ("auto", "dnat" or "reverse"), ActiveMode what stands now ("dnat" or "reverse"), ModeChangedAt when ActiveMode last
+	// changed (zero = never) and ModeReason why (relay.proto Relay.mode_reason).
+	Mode, ActiveMode, ModeReason string
+	ModeChangedAt                time.Time
 }
 
 // RelayLink is a relay with what the panel knows of its two ends.
@@ -45,6 +50,8 @@ type RelayLink struct {
 	// The entry node.
 	ViaNodeName, ViaNodeState string
 	ViaNodeCaps               []string
+	// The capabilities the exit's agent listed (the reverse way needs them at both ends).
+	ExitNodeCaps []string
 	// What a person's subscription needs of the entry: where to connect, its country (the label of the twin) and its capacity.
 	ViaNodeAddress, ViaNodeCountry string
 	ViaNodeBandwidthMbps           int
@@ -71,13 +78,14 @@ type RelayFilter struct {
 
 // The columns of a relay whose names the joined tables share are aliased: a batched read (D1) answers by column name.
 const relayCols = `r.id AS relay_id, r.inbound_id, r.via_node_id, r.network, r.port, r.enabled AS relay_enabled, r.state AS relay_state,
-	r.last_error, r.to_ip, r.applied_at, r.check_json, r.created_at, r.updated_at`
+	r.last_error, r.to_ip, r.applied_at, r.check_json, r.created_at, r.updated_at,
+	r.mode, r.active_mode, r.mode_changed_at, r.mode_reason`
 
 const relayLinkQuery = `SELECT ` + relayCols + `,
 		x.id AS exit_node_id, x.name AS exit_node_name, x.state AS exit_node_state, i.enabled AS inbound_enabled, i.state AS inbound_state,
 		p.id AS profile_id, p.name AS profile_name, p.protocol, e.name AS via_node_name, e.state AS via_node_state,
 		e.agent_caps AS via_node_caps, e.address AS via_node_address, e.country_code AS via_node_country,
-		e.bandwidth_mbps AS via_node_bandwidth_mbps
+		e.bandwidth_mbps AS via_node_bandwidth_mbps, x.agent_caps AS exit_node_caps
 	FROM relay r
 	JOIN inbound i ON i.id = r.inbound_id
 	JOIN profile p ON p.id = i.profile_id
@@ -86,13 +94,14 @@ const relayLinkQuery = `SELECT ` + relayCols + `,
 
 func scanRelay(r rowScanner, extra ...any) (Relay, error) {
 	var v Relay
-	var port, applied, created, updated int64
+	var port, applied, created, updated, modeChanged int64
 	dest := append([]any{&v.ID, &v.InboundID, &v.ViaNodeID, &v.Network, &port, &v.Enabled, &v.State, &v.LastError, &v.ToIP, &applied,
-		&v.CheckJSON, &created, &updated}, extra...)
+		&v.CheckJSON, &created, &updated, &v.Mode, &v.ActiveMode, &modeChanged, &v.ModeReason}, extra...)
 	if err := r.Scan(dest...); err != nil {
 		return Relay{}, err
 	}
 	v.Port, v.AppliedAt, v.CreatedAt, v.UpdatedAt = uint16(port), fleetTime(applied), fromUnix(created), fromUnix(updated)
+	v.ModeChangedAt = fleetTime(modeChanged)
 	return v, nil
 }
 
@@ -154,15 +163,15 @@ func (s *Store) RelayLinks(ctx context.Context, f RelayFilter) ([]RelayLink, err
 // scanRelayLink scans a row of relayLinkQuery.
 func scanRelayLink(r rowScanner) (RelayLink, error) {
 	var l RelayLink
-	var caps string
+	var caps, exitCaps string
 	var address, country sql.NullString
 	var bandwidth sql.NullInt64
 	var err error
 	if l.Relay, err = scanRelay(r, &l.ExitNodeID, &l.ExitNodeName, &l.ExitNodeState, &l.ExitEnabled, &l.ExitState,
-		&l.ProfileID, &l.ProfileName, &l.Protocol, &l.ViaNodeName, &l.ViaNodeState, &caps, &address, &country, &bandwidth); err != nil {
+		&l.ProfileID, &l.ProfileName, &l.Protocol, &l.ViaNodeName, &l.ViaNodeState, &caps, &address, &country, &bandwidth, &exitCaps); err != nil {
 		return RelayLink{}, err
 	}
-	l.ViaNodeCaps = strings.Fields(caps)
+	l.ViaNodeCaps, l.ExitNodeCaps = strings.Fields(caps), strings.Fields(exitCaps)
 	l.ViaNodeAddress, l.ViaNodeCountry, l.ViaNodeBandwidthMbps = address.String, country.String, int(bandwidth.Int64)
 	return l, nil
 }
@@ -197,9 +206,9 @@ func (s *Store) CreateRelay(ctx context.Context, r Relay, now time.Time) error {
 	_, err := s.batch(ctx,
 		guard(`EXISTS (SELECT 1 FROM inbound i JOIN node x ON x.id = i.node_id JOIN node e ON e.id = ?2
 			WHERE i.id = ?1 AND x.state <> 'retired' AND e.state <> 'retired' AND x.id <> e.id)`, r.InboundID, r.ViaNodeID),
-		Stmt{Query: `INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, 0, 'pending', '{}', ?, ?)`,
-			Args: []any{r.ID, r.InboundID, r.ViaNodeID, r.Network, int64(r.Port), unix(now), unix(now)}},
+		Stmt{Query: `INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, mode, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, 0, 'pending', '{}', COALESCE(NULLIF(?, ''), 'auto'), ?, ?)`,
+			Args: []any{r.ID, r.InboundID, r.ViaNodeID, r.Network, int64(r.Port), r.Mode, unix(now), unix(now)}},
 	)
 	switch {
 	case errors.Is(err, errGuard):
@@ -216,6 +225,7 @@ func (s *Store) CreateRelay(ctx context.Context, r Relay, now time.Time) error {
 type RelayPatch struct {
 	Enabled *bool
 	Port    *uint16
+	Mode    *string // the owner's choice, one of the Relay* mode words; changes no state of the forward
 }
 
 // UpdateRelay applies the patch. A change of the switch or the port puts the relay back to pending (the agent has not
@@ -228,6 +238,9 @@ func (s *Store) UpdateRelay(ctx context.Context, id string, p RelayPatch, now ti
 	}
 	if p.Port != nil {
 		set, args = append(set, `port = ?`), append(args, int64(*p.Port))
+	}
+	if p.Mode != nil {
+		set, args = append(set, `mode = ?`), append(args, *p.Mode)
 	}
 	if p.Enabled != nil || p.Port != nil {
 		set = append(set, `state = 'pending'`, `last_error = ''`, `to_ip = ''`, `applied_at = 0`)

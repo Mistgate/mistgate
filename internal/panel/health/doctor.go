@@ -63,7 +63,11 @@ func (s *Service) DoctorReport(ctx context.Context, nodeID string, r *agentv1.Do
 		}
 		port, portErr := strconv.ParseUint(x.Params["port"], 10, 16)
 		bytes, byteErr := strconv.ParseUint(x.Params["bytes"], 10, 64)
-		packets, packetErr := strconv.ParseUint(x.Params["packets"], 10, 64)
+		// a relay in the reverse way is counted by the entry's listener (bytes and bytes_back): it has no packet count to give
+		packets, packetErr := uint64(0), error(nil)
+		if v, has := x.Params["packets"]; has {
+			packets, packetErr = strconv.ParseUint(v, 10, 64)
+		}
 		if portErr == nil && port > 0 && byteErr == nil && packetErr == nil {
 			countedUnix := now.Unix()
 			if x.MeasuredUnix > 0 && x.MeasuredUnix <= now.Add(5*time.Minute).Unix() {
