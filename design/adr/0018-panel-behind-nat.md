@@ -18,11 +18,12 @@ node then serves that subdomain on its port 443; everything else on the node sta
 **The panel dials out.** The panel opens a TLS connection to the host's 443 with the subscription subdomain as SNI and
 an ALPN protocol derived from a tunnel secret (a random name kept only in the panel's settings and the host's routing
 table, never shown to an agent or an API caller); the host tells the tunnel from subscription clients by that ALPN
-value alone. A secret SNI was tried first and failed in the field: networks in Russia drop TLS whose SNI does not
-resolve in DNS, and the subdomain always resolves. Both ends prove themselves with fleet-CA certificates: the node
-presents its ClientAuth node certificate, the panel a ServerAuth certificate naming the tunnel secret (sent encrypted
-under TLS 1.3). Over that one connection runs HTTP/2 (`golang.org/x/net/http2`, already a dependency), so many
-subscription fetches and agent links share it. yamux was rejected: a new dependency for what HTTP/2 already does.
+value alone. A secret SNI was tried first and failed in the field: the home panel's ISP path cut TLS whose SNI did not
+resolve in DNS, while the same SNI worked on the node itself; the subdomain always resolves. Both ends prove themselves
+with fleet-CA certificates: the node presents its ClientAuth node certificate, the panel a ServerAuth certificate naming
+the tunnel secret (sent encrypted under TLS 1.3). Over that one connection runs HTTP/2 (`golang.org/x/net/http2`, already
+a dependency), so many subscription fetches and agent links share it. yamux was rejected: a new dependency for what
+HTTP/2 already does.
 
 **The host forwards raw TLS and stores nothing.** For the subscription subdomain the host splices the client's TLS
 bytes into a tunnel stream; TLS terminates in the panel, which holds the certificate and its key. The node never sees a
@@ -65,6 +66,6 @@ long-lived outbound sockets.
   and its recovery `sub_host_tunnel_up`, and the owner can move the host to another node.
 - Seizing the host yields no subscriptions, tokens or keys: only TLS traffic it cannot decrypt and the tunnel secret.
 - The tunnel's ALPN value is visible on the wire and unlike any browser's; a network that blocks unknown ALPN values
-  would block the tunnel. The subdomain stays usable for subscriptions either way.
+  would block the tunnel, and with it every subscription and agent link (the subdomain then shows the node's own site).
 - Nodes whose agent lacks the link capabilities block enabling (`sub_host_nodes_lack_link`) until they are updated.
 - MCP and API tokens can read the state; every change is an approved plan with a fresh owner step-up.
