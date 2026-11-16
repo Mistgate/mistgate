@@ -22,8 +22,12 @@ import (
 // Hello.capabilities strings of the L3 additions (agent.proto "AWG AND WARP"). The panel puts an awg inbound or a
 // WarpSpec into the desired state of a stream ONLY when the stream listed the string.
 const (
-	capAWG   = "awg/1"
-	capVLESS = "vless/1"
+	capAWG         = "awg/1"
+	capVLESS       = "vless/1"
+	capTrustTunnel = "trusttunnel/1"
+	// capTrustTunnelH3: the agent also serves TrustTunnel over HTTP/3 (UDP beside the TCP port). An agent that lists only
+	// trusttunnel/1 has the HTTP/2 engine and rejects h3:true, so such an inbound is withheld from it.
+	capTrustTunnelH3 = "trusttunnel-h3/1"
 	// capVLESSSelf: an agent that can serve the node's own site behind REALITY (target "self"). An older vless/1 agent
 	// rejects that target, and self is the default of a new VLESS profile.
 	capVLESSSelf = "vless-self/1"
@@ -51,6 +55,12 @@ func requiredCap(s plugin.InboundSpec) string {
 	if s.Protocol == protocolMTProto {
 		return capMTProto
 	}
+	if s.Protocol == "trusttunnel" {
+		if trustTunnelH3(s) {
+			return capTrustTunnelH3
+		}
+		return capTrustTunnel
+	}
 	if s.Protocol == "vless" {
 		if vlessTLS(s) {
 			return capVLESSTLS
@@ -61,6 +71,13 @@ func requiredCap(s plugin.InboundSpec) string {
 		return capVLESS
 	}
 	return ""
+}
+
+func trustTunnelH3(s plugin.InboundSpec) bool {
+	var settings struct {
+		H3 bool `json:"h3"`
+	}
+	return json.Unmarshal(s.Settings, &settings) == nil && settings.H3
 }
 
 func vlessTLS(s plugin.InboundSpec) bool {
