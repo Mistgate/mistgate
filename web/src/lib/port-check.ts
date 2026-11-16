@@ -129,10 +129,15 @@ export function decoyNote(t: T, p: Record<string, string | undefined>): string {
   return [t(`node.check.decoy.${via}`, vars), port80].filter(Boolean).join(" ");
 }
 
+/** hy2_site_taken in words ({node, port, hy2, trusttunnel}): a TrustTunnel profile takes the TCP port of a Hysteria2 site, which gives way. */
+export function takenNote(t: T, p: Record<string, string | undefined>): string {
+  return t("node.check.taken", Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v ?? ""])));
+}
+
 /**
  * The sentences a saved inbound owes the admin about its port: the check could not run (port_unchecked), the port loses
  * packets and was saved anyway or did not change (port_lossy), or a VLESS profile took the Hysteria2 site's TCP port
- * (hy2_decoy_paused). Empty when there is nothing to say.
+ * (hy2_decoy_paused), or a TrustTunnel profile took it (hy2_site_taken). Empty when there is nothing to say.
  */
 export function portNotes(t: T, warnings: readonly Warning[] | undefined): string[] {
   const out: string[] = [];
@@ -140,6 +145,7 @@ export function portNotes(t: T, warnings: readonly Warning[] | undefined): strin
     if (w.code === "port_unchecked") out.push(t("ports.unchecked.saved", { port: w.params.port ?? "", node: w.params.node ?? "", why: reasonText(t, w.params.reason ?? "") }));
     if (w.code === "port_lossy") out.push(t("err.port_lossy", lossyVars(t, w.params)));
     if (w.code === "hy2_decoy_paused") out.push(decoyNote(t, w.params));
+    if (w.code === "hy2_site_taken") out.push(takenNote(t, w.params));
   }
   return out;
 }

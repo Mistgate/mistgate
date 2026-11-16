@@ -8,7 +8,7 @@ import { useT, type T } from "@/i18n";
 import { profiles as profilesApi } from "@/lib/api";
 import { errorCode, errorVars } from "@/lib/errors";
 import { plain, type Plain } from "@/lib/plain";
-import { decoyNote } from "@/lib/port-check";
+import { decoyNote, takenNote } from "@/lib/port-check";
 
 // The check before the click (CreateInbound / UpdateInbound with validate_only): asked again 300 ms after the last change
 // of the profile, the port or the domain, never written. The answer is either a coded refusal the dialog words next to the
@@ -129,10 +129,21 @@ export function WarpWarnings({ check, nodeId, nodeName, onLeave }: { check: Inbo
   );
 }
 
-/** "hy2_decoy_paused" of the check: a VLESS profile takes the TCP port of the Hysteria2 site on this node. Says so, does not stop. */
+/**
+ * "hy2_decoy_paused" of the check: a VLESS profile takes the TCP port of the Hysteria2 site on this node; "hy2_site_taken": a
+ * TrustTunnel profile does, and serves the node's own site there. Says so, does not stop.
+ */
 export function DecoyNotice({ check }: { check: InboundCheck }) {
   const t = useT();
   if (check.state !== "ok") return null;
+  const taken = check.warnings.find((x) => x.code === "hy2_site_taken");
+  if (taken) {
+    return (
+      <Notice className="items-start">
+        <span className="flex flex-col items-start gap-1.5">{takenNote(t, taken.params)}</span>
+      </Notice>
+    );
+  }
   const w = check.warnings.find((x) => x.code === "hy2_decoy_paused");
   if (!w) return null;
   return (

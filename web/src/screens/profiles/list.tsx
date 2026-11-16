@@ -18,7 +18,7 @@ import { AppLink, useGo } from "@/screens/users/nav";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
 import { dropsOf, dropWords, keysOnly, nameOf } from "./formats";
-import { byProtocol, lookOf, summaryParts, telegramOnly, viaWarp } from "./protocol-meta";
+import { byProtocol, lookOf, summaryParts, telegramOnly, trustTunnelOnly, viaWarp } from "./protocol-meta";
 import { Fresh } from "@/components/fx/fresh";
 import { useListEntrance } from "@/components/fx/page";
 import { facetIds, validateProfilesSearch, type FacetId } from "./search";
@@ -262,7 +262,8 @@ const Count = ({ icon, n, dim }: { icon: IconName; n: number; dim?: boolean }) =
  * tooltip. A part this list does not know stays a chip of its own words.
  */
 function factOf(part: string, protocol: string, t: Tx): { chip?: string; icon?: IconName; line: string } {
-  if (/^(UDP|TCP|XHTTP|WebSocket) \d+$/.test(part)) return { chip: part, line: part };
+  // TrustTunnel writes "TCP 443 + UDP 443" with HTTP/3 and "HTTP/2 + HTTP/3" beside it: both stay words, as the port does
+  if (/^(UDP|TCP|XHTTP|WebSocket) \d+( \+ UDP \d+)?$/.test(part) || /^HTTP\/[23]( \+ HTTP\/3)?$/.test(part)) return { chip: part, line: part };
   const hop = /^hop (\S+)$/.exec(part);
   if (hop) return { icon: "traffic", line: t("profiles.part.hop", { range: hop[1]! }) };
   if (part === "Salamander" || part === "Gecko") return { icon: "mask", line: t("profiles.fact.obfs", { v: part }) };
@@ -301,13 +302,21 @@ function Facts({ p, t }: { p: ProfileSummary; t: Tx }) {
   );
 }
 
-/** In how many formats the profile is, the ones that drop it as one amber mark; AmneziaWG's keys and Telegram's links by design. */
+/** In how many formats the profile is, the ones that drop it as one amber mark; AmneziaWG's keys, Telegram's and TrustTunnel's links by design. */
 function Formats({ p, protocol, t }: { p: ProfileSummary; protocol?: { apps: App[] }; t: Tx }) {
   if (protocol && telegramOnly(protocol.apps)) {
     return (
       <Cell lines={[{ icon: "plane", text: t("profiles.list.tgTip") }]}>
         <Icon name="plane" size={14} className="text-muted" />
         <span className="font-mono text-xs text-muted">tg://</span>
+      </Cell>
+    );
+  }
+  if (protocol && trustTunnelOnly(protocol.apps)) {
+    return (
+      <Cell lines={[{ icon: "tunnel", text: t("profiles.list.ttTip") }]}>
+        <Icon name="tunnel" size={14} className="text-muted" />
+        <span className="font-mono text-xs text-muted">tt://</span>
       </Cell>
     );
   }

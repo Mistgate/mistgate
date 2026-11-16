@@ -6,8 +6,9 @@ import type { IconName, Tone } from "@/components/ui/icons";
 
 /**
  * One icon and one pastel per protocol, a hue apart: Hysteria2 mint (fast), VLESS sky (looks like a web site), AmneziaWG
- * lavender (a key per device), MTProto rose (Telegram's plane). Sand stays out: next to the warnings' yellow it would read as
- * one. The order is the guide's advice: start with Hysteria2, add VLESS, then the keys, then Telegram.
+ * lavender (a key per device), MTProto rose (Telegram's plane), TrustTunnel sage (a tunnel mouth: HTTPS and the official apps). Sand
+ * stays out: next to the warnings' yellow it would read as one. The order is the guide's advice: start with Hysteria2, add VLESS,
+ * then the keys, then Telegram, then the newest.
  */
 // `badge`: the one honest word on its card in the New profile choice: where the guide says to start, and what is still new.
 type Look = { icon: IconName; tone: Tone; badge?: "start" | "experimental" };
@@ -16,6 +17,7 @@ const looks: Record<string, Look> = {
   vless: { icon: "globe", tone: "sky" },
   awg: { icon: "key", tone: "lavender" },
   mtproto: { icon: "plane", tone: "rose", badge: "experimental" },
+  trusttunnel: { icon: "tunnel", tone: "sage", badge: "experimental" },
 };
 const order = Object.keys(looks);
 
@@ -30,6 +32,12 @@ export function byProtocol(a: string, b: string): number {
 
 /** A protocol whose only app is Telegram (MTProto): its tg:// links reach people outside the subscription formats. */
 export const telegramOnly = (apps: readonly App[]) => apps.length > 0 && apps.every((a) => a === App.TELEGRAM);
+
+/** A protocol whose only app is the official TrustTunnel one: its tt:// keys (and the Mistgate app's own path) reach people outside the subscription formats. */
+export const trustTunnelOnly = (apps: readonly App[]) => apps.length > 0 && apps.every((a) => a === App.TRUST_TUNNEL);
+
+/** A protocol that reaches people by a link of its own, in none of the subscription formats: Telegram's tg:// or TrustTunnel's tt://. */
+export const ownLinkOnly = (apps: readonly App[]) => telegramOnly(apps) || trustTunnelOnly(apps);
 
 /**
  * The server's one-line summary as its parts: "UDP 443 · Salamander · Let's Encrypt · WARP" (MTProto writes "TCP 443 - Fake
