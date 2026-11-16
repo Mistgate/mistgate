@@ -15,6 +15,7 @@ import { tr as editionTr } from "./edition";
 import { tr as decoyTr } from "./decoy";
 import { tr as bulkTr } from "./bulk";
 import { tr as countryTr } from "./country";
+import { tr as probesTr } from "./probes";
 import { tr as connectionsTr } from "./connections";
 import { tr as journalTr } from "./journal";
 import { tr as relayTr } from "./relay";
@@ -299,4 +300,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "IP adresi için Let’s Encrypt sertifikası henüz yok: bir alan adı ya da kendi imzalı sertifikayı seç",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr };

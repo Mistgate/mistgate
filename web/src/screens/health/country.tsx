@@ -6,7 +6,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { countryIn, countryLook, type BreakdownNet, type CountryCheck, type CountryLook } from "@/lib/health";
+import { countryIn, countryLook, type BreakdownNet, type CountryCheck, type CountryLook, type OwnPoint } from "@/lib/health";
 
 // What one country makes of a node (GetChecksResponse.country_checks): what Globalping's probes inside it saw, what the TSPU
 // probe (one of the owner's nodes there) saw and what the block lists say of its address, as a column of the Health matrix, a
@@ -108,6 +108,12 @@ function CountryTip({ look, children }: { look: CountryLook; children: ReactElem
         </span>
       ))}
       {look.noProbe && <span className="font-medium text-muted">{look.noProbe}</span>}
+      {look.ownPoints.map((p) => (
+        <span key={p.key} className={cx("flex flex-col font-medium", p.kind === "dark" && "tone-warn tone-text", p.kind === "unsure" && "text-muted")}>
+          {p.name}
+          <span className="text-[11px] font-normal text-muted">{[p.what, p.at].join(" · ")}</span>
+        </span>
+      ))}
       {look.at && <span className="font-medium">{look.at}</span>}
       {look.gpNone && <span className="font-medium text-muted">{look.gpNone}</span>}
       {look.tspu && (
@@ -256,12 +262,46 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
     </div>
   );
   const tipped = look ? <CountryTip look={look}>{row}</CountryTip> : row;
-  if (!breakdown) return tipped;
+  if (!breakdown)
+    return (
+      <>
+        {tipped}
+        {look && look.ownPoints.length > 0 && <OwnPoints points={look.ownPoints} className="px-3" />}
+      </>
+    );
   return (
     <div className={cx("flex min-w-0 flex-col rounded-field", rowCls[kind])}>
       {tipped}
       <PartialBreakdown breakdown={breakdown} className="mx-3 border-t border-[color-mix(in_oklch,var(--c)_35%,var(--border))] pt-2.5 pb-3" />
     </div>
+  );
+}
+
+const pointMark = { ok: ["✓", "tone-ok tone-text"], dark: ["✕", "tone-bad tone-text"], unsure: ["?", "text-muted"] } as const;
+
+/**
+ * The points of the owner's own probes, a line each: the mark, "Operator · City — probe “dacha”", what it saw and when. Under a
+ * node's row where its verdict has no breakdown (a dark point is in the breakdown already). The name is the owner's own words and
+ * the operator; there is no address in it.
+ */
+export function OwnPoints({ points, className }: { points: readonly OwnPoint[]; className?: string }) {
+  const t = useT();
+  return (
+    <ul aria-label={t("pr.points.title")} data-testid="own-points" className={cx("flex min-w-0 flex-col gap-1 text-xs", className)}>
+      {points.map((p) => {
+        const [glyph, cls] = pointMark[p.kind];
+        return (
+          <li key={p.key} className="grid grid-cols-[14px_minmax(0,1fr)] items-baseline gap-x-1.5">
+            <span aria-hidden className={cx("text-center font-extrabold", cls)}>
+              {glyph}
+            </span>
+            <span className="min-w-0 break-words">
+              <span className="font-semibold">{p.name}</span> <span className="text-muted">{[p.what, p.at].join(" · ")}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

@@ -15,6 +15,7 @@ import { zh as editionZh } from "./edition";
 import { zh as decoyZh } from "./decoy";
 import { zh as bulkZh } from "./bulk";
 import { zh as countryZh } from "./country";
+import { zh as probesZh } from "./probes";
 import { zh as connectionsZh } from "./connections";
 import { zh as journalZh } from "./journal";
 import { zh as relayZh } from "./relay";
@@ -301,4 +302,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh };

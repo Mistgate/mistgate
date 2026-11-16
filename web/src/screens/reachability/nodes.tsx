@@ -12,7 +12,7 @@ import { useFmt, type Fmt } from "@/lib/format";
 import { countryIn, countryLook, ipv6Why, type CountryCheck } from "@/lib/health";
 import { ipv6Helps, ipv6State, laneNow, midnights, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
 import { entryOffered, type Ipv6Entry } from "@/lib/ways";
-import { CountryMark, CountryPill, PartialBreakdown } from "@/screens/health/country";
+import { CountryMark, CountryPill, OwnPoints, PartialBreakdown } from "@/screens/health/country";
 
 // The nodes of the Reachability page: a row per node with its verdict now (the pill of the Health column, with its tooltip), then
 // a line per source: its word for the node now and its week as a thin lane of verdicts. Globalping, the lists and the probe stay
@@ -31,6 +31,7 @@ const sourceKey: Record<ReachSource, MessageKey> = {
   cheburcheck: "rc.src.cheburcheck",
   cheburcheck_own: "rc.src.cheburcheck_own",
   bsbord: "rc.src.bsbord",
+  probes: "rc.src.probes",
 };
 
 /**
@@ -123,7 +124,7 @@ export function NodesTable({
                   <span className="w-5 flex-none font-mono text-[10px] font-bold text-muted">{n.countryCode}</span>
                   <span className="truncate font-mono text-[13px] font-bold">{n.name}</span>
                 </Link>
-                <div className="flex flex-none flex-col items-end gap-1.5 xl:items-start xl:self-start">
+                <div className="flex max-w-[68%] min-w-0 flex-col items-end gap-1.5 xl:max-w-none xl:items-start xl:self-start">
                   <CountryPill check={c} node={n.name} code={country} tag={c?.ipv6 ? "IPv4" : ""} />
                   {v6 === "data" && c?.ipv6 && <CountryPill check={c.ipv6} node={n.name} code={country} tag="IPv6" />}
                 </div>
@@ -181,6 +182,8 @@ function RowBreakdown({ check }: { check: CountryCheck | undefined }) {
   const t = useT();
   const fmt = useFmt();
   const look = check ? countryLook(t, fmt, check) : null;
+  // a dark point of an own probe is in the breakdown; otherwise the points have their own lines
+  if (look && !look.breakdown && look.ownPoints.length > 0) return <OwnPoints points={look.ownPoints} className="xl:col-span-3" />;
   if (!look?.breakdown) return null;
   return (
     <details data-testid="reach-breakdown" className="xl:col-span-3">

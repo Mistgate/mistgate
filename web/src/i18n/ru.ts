@@ -15,6 +15,7 @@ import { ru as editionRu } from "./edition";
 import { ru as decoyRu } from "./decoy";
 import { ru as bulkRu } from "./bulk";
 import { ru as countryRu } from "./country";
+import { ru as probesRu } from "./probes";
 import { ru as connectionsRu } from "./connections";
 import { ru as journalRu } from "./journal";
 import { ru as relayRu } from "./relay";
@@ -305,4 +306,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "Сертификат Let’s Encrypt на IP-адрес пока недоступен: возьми домен или самоподписанный",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu };

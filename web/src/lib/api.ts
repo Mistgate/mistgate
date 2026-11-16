@@ -30,6 +30,7 @@ import { UpdateService } from "@/gen/mistgate/admin/v1/update_pb";
 import { UserService } from "@/gen/mistgate/admin/v1/user_pb";
 import { WarpService } from "@/gen/mistgate/admin/v1/warp_pb";
 import { OpsService } from "@/gen/mistgate/ops/v1/ops_pb";
+import { OwnProbeService } from "@/gen/mistgate/ownprobe/v1/own_probe_pb";
 import { TasksService } from "@/gen/mistgate/tasks/v1/tasks_pb";
 import type { MessageKey } from "@/i18n/en";
 import { versionInterceptor } from "./stale";
@@ -70,6 +71,8 @@ export const blocklist = createClient(BlocklistService, transport);
 // TestTspuProbe runs for minutes: no call here sets a deadline (timeoutMs), and the transport has none of its own.
 export const tspuProbe = createClient(TspuProbeService, transport);
 export const clientProbe = createClient(ClientProbeService, transport);
+// The owner's own probes (routers and servers in a country that check the nodes); a package of its own, the edge edition has none.
+export const ownProbe = createClient(OwnProbeService, transport);
 // The owner's switch for the Mistgate desktop app's direct connection (client_api.proto); both editions.
 export const clientApi = createClient(ClientApiService, transport);
 // Which apps and versions send a post-quantum key share in the REALITY handshake, and the devices that do not (client_compat.proto).

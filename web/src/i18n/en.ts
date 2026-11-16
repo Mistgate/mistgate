@@ -17,6 +17,7 @@ import { en as editionEn } from "./edition";
 import { en as decoyEn } from "./decoy";
 import { en as bulkEn } from "./bulk";
 import { en as countryEn } from "./country";
+import { en as probesEn } from "./probes";
 import { en as connectionsEn } from "./connections";
 import { en as journalEn } from "./journal";
 import { en as relayEn } from "./relay";
@@ -316,7 +317,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;
