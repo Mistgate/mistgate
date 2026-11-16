@@ -169,6 +169,37 @@ func TestStreamMovesBytesBothWays(t *testing.T) {
 	}
 }
 
+// The panel's HTTP server closes its TLS connection on a stream after the tunnel died and the stream's handler returned:
+// the close-notify sets a write deadline, which must not reach the finished HTTP/2 response writer (it panics there).
+func TestDeadlineAfterTunnelDeathIsHarmless(t *testing.T) {
+	cert, _ := selfSigned(t, "sub.example.com")
+	accepted := make(chan net.Conn, 1)
+	a, b := net.Pipe()
+	served := make(chan struct{})
+	go func() {
+		(&http2.Server{}).ServeConn(a, &http2.ServeConnOpts{Handler: ServerHandler(func(_ string, c net.Conn) bool { accepted <- c; return true })})
+		close(served)
+	}()
+	cc, err := (&http2.Transport{}).NewClientConn(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := OpenStream(context.Background(), cc, "tunnel.example.com", KindTLS, netip.MustParseAddrPort("203.0.113.7:51234"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer node.Close()
+	panel := tls.Server(<-accepted, &tls.Config{Certificates: []tls.Certificate{cert}})
+	_ = a.Close() // the tunnel dies: every handler returns
+	_ = b.Close()
+	<-served
+	// The handler returns a moment after the connection is gone; from then on the response writer is finished.
+	for deadline := time.Now().Add(500 * time.Millisecond); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		_ = panel.SetWriteDeadline(time.Now().Add(time.Second))
+	}
+	_ = panel.Close()
+}
+
 // A read deadline that passed fails the pending read only: net/http does that to a hijacked connection (it aborts its
 // background read), and the stream must go on afterwards with no byte lost.
 func TestReadDeadlineCanBeReset(t *testing.T) {

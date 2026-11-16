@@ -175,6 +175,7 @@ type StreamConn struct {
 	rd       deadline
 
 	wmu       sync.Mutex
+	dmu       sync.Mutex // serialises SetWrite with the end of the stream: it must not run once the handler returned
 	closed    atomic.Bool
 	done      chan struct{}
 	closeOnce sync.Once
@@ -269,11 +270,13 @@ func (c *StreamConn) Close() error {
 func (c *StreamConn) waitWrites(unblock func()) {
 	if c.wmu.TryLock() {
 		c.wmu.Unlock()
-		return
+	} else {
+		unblock()
+		c.wmu.Lock()
+		c.wmu.Unlock() //nolint:staticcheck // an empty critical section: waits for the writer
 	}
-	unblock()
-	c.wmu.Lock()
-	c.wmu.Unlock() //nolint:staticcheck // an empty critical section: waits for the writer
+	c.dmu.Lock()
+	c.dmu.Unlock() //nolint:staticcheck // waits for a running SetWriteDeadline; none starts after Close
 }
 
 func (c *StreamConn) LocalAddr() net.Addr  { return c.local }
@@ -288,8 +291,12 @@ func (c *StreamConn) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
+// SetWriteDeadline does nothing once the connection is closed: the stream's response writer is gone then (net/http still
+// sets a deadline on a connection it closes, for the TLS close-notify).
 func (c *StreamConn) SetWriteDeadline(t time.Time) error {
-	if c.SetWrite == nil {
+	c.dmu.Lock()
+	defer c.dmu.Unlock()
+	if c.SetWrite == nil || c.closed.Load() {
 		return nil
 	}
 	return c.SetWrite(t)
