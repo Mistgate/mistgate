@@ -20,16 +20,21 @@ const traitIcons: Record<string, IconName[]> = {
   vless: ["lock", "cloud", "traffic"],
   awg: ["key", "mask", "traffic"],
   mtproto: ["plane", "link", "mask"],
+  trusttunnel: ["phone", "link", "globe"],
 };
 const appsOf: Record<string, string[]> = {
   hysteria2: ["Happ", "kl!ck", "Clash Verge Rev", "sing-box"],
   vless: ["Happ", "kl!ck", "v2rayNG", "Clash Verge Rev"],
   awg: ["AmneziaVPN", "AmneziaWG", "kl!ck"],
   mtproto: ["Telegram"],
+  trusttunnel: ["Mistgate", "TrustTunnel"],
 };
 // a protocol without its own list names the apps ProtocolInfo.apps declares
-const appNames: Partial<Record<App, string>> = { [App.HAPP]: "Happ", [App.AMNEZIA]: "AmneziaVPN", [App.TELEGRAM]: "Telegram" };
-const monograms: Record<string, string> = { Happ: "H", "kl!ck": "K", "Clash Verge Rev": "C", "sing-box": "S", v2rayNG: "V", AmneziaVPN: "A", AmneziaWG: "W", Telegram: "T" };
+const appNames: Partial<Record<App, string>> = { [App.HAPP]: "Happ", [App.AMNEZIA]: "AmneziaVPN", [App.TELEGRAM]: "Telegram", [App.TRUST_TUNNEL]: "TrustTunnel" };
+const monograms: Record<string, string> = { Happ: "H", "kl!ck": "K", "Clash Verge Rev": "C", "sing-box": "S", v2rayNG: "V", AmneziaVPN: "A", AmneziaWG: "W", Telegram: "T", Mistgate: "M", TrustTunnel: "TT" };
+
+/** An app's name in the card's tooltip: the brand as it is, or its own words where it needs them ("TrustTunnel (official apps)"). */
+const appLabel = (name: string, t: Tx) => t.opt(`profiles.pickApp.${name}`) ?? name;
 
 /** A protocol's card copy: one tagline, a few traits (icon and a word or two), the apps, and the fuller line for step 2. */
 export function copyOf(p: Proto, t: Tx) {
@@ -103,7 +108,8 @@ export function ProtocolPicker({
           e.preventDefault();
           onContinue(chosen.id);
         }}
-        className="grid gap-3 @min-[480px]:grid-cols-2 @min-[900px]:grid-cols-4"
+        // five protocols go three and two: five in a row are too narrow for a card's badge ("Experimental") and its apps
+        className={cx("grid gap-3 @min-[480px]:grid-cols-2", protocols.length > 4 ? "@min-[900px]:grid-cols-3" : "@min-[900px]:grid-cols-4")}
       >
         {protocols.map((p) => {
           const look = lookOf(p.id);
@@ -148,14 +154,14 @@ export function ProtocolPicker({
               <span className="mt-auto hidden pt-5 @min-[480px]:block">
                 <span className="flex min-h-7 items-center gap-2 border-t border-line pt-4">
                   {copy.apps.length > 0 && (
-                    <Tip label={copy.apps.join(" · ")}>
+                    <Tip label={copy.apps.map((a) => appLabel(a, t)).join(" · ")}>
                       <span className="flex items-center">
                         {copy.apps.map((a) => (
                           <span key={a} aria-hidden className="-ms-1.5 grid size-6 place-items-center rounded-full border-2 border-surface bg-surface-2 text-[11px] font-semibold text-muted group-data-checked:border-surface-2 group-data-checked:bg-surface first:ms-0">
                             {monograms[a] ?? a.slice(0, 1).toUpperCase()}
                           </span>
                         ))}
-                        <span className="sr-only">{copy.apps.join(", ")}</span>
+                        <span className="sr-only">{copy.apps.map((a) => appLabel(a, t)).join(", ")}</span>
                       </span>
                     </Tip>
                   )}

@@ -30,6 +30,8 @@ export const errorCodes = [
   "sni_needs_domain",
   "sni_invalid",
   "already_on_node",
+  // a person at the device limit (an AmneziaVPN or TrustTunnel key, the app switch that makes one): "device_limit: 3/3: alice-phone, laptop"
+  "device_limit",
   // the UDP delivery check (design/udp-port-check.md): a port that loses packets; a twin with no clean port on all nodes
   "port_lossy",
   "no_clean_port",
@@ -57,6 +59,8 @@ export const errorCodes = [
   "relay_unchecked",
   "relay_check_stale",
   "relay_check_failed",
+  // a bridge the pair cannot do (UpdateRelay / CreateRelay with mode "reverse"): "reverse_unavailable: reason=udp|entry_agent_old|exit_agent_old"
+  "reverse_unavailable",
   "check_unavailable",
   // a debug capture of a node (ops.proto StartDebugCapture): one at a time per node
   "debug_busy",
@@ -91,14 +95,22 @@ function editionVars(t: T, vars: Record<string, string>): Record<string, string>
   return { ...vars, feature: (editionFeatures as readonly string[]).includes(id) ? t(`edition.feature.${id as EditionFeature}`) : id };
 }
 
+/** "device_limit: 3/3: alice-phone, laptop": the places used and allowed, and the devices that hold them (": a, b", or nothing). */
+function deviceLimitVars(vars: Record<string, string>): Record<string, string> {
+  const m = /^(\d+)\/(\d+)(?::\s*(.*))?$/.exec(vars.detail ?? "");
+  return { ...vars, used: m?.[1] ?? "?", limit: m?.[2] ?? "?", names: m?.[3] ? `: ${m[3]}` : "" };
+}
+
 /** The words of a relay refusal's values: why a server cannot be relayed, which stage of the check failed. */
 function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
   const reason = vars.reason ?? "";
   const worded = ["cdn", "acme_ip", "build_failed"].includes(reason);
+  const bridge = ["udp", "entry_agent_old", "exit_agent_old"].includes(reason);
+  const stage = vars.stage === "path" || vars.stage === "reverse_reach" || vars.stage === "bridge" ? vars.stage : "leg";
   return {
     ...vars,
-    reason: worded ? t(`relay.unsupported.${reason as "cdn"}`) : reason,
-    stage: vars.stage === "path" ? t("relay.stageName.path") : t("relay.stageName.leg"),
+    reason: worded ? t(`relay.unsupported.${reason as "cdn"}`) : bridge ? t(`relay.way.blockedWord.${reason as "udp"}`) : reason,
+    stage: t(`relay.stageName.${stage}`),
   };
 }
 
@@ -122,6 +134,10 @@ function known(c: ConnectError, t: T): string | undefined {
   }
   // a relay holds the port: the panel names it "relay" or "relay to <exit>", not a profile
   if (code === "port_taken" && /^relay($| )/.test(vars.profile ?? "")) return t("err.port_taken_relay", vars);
+  if (code === "device_limit") return t("err.device_limit", deviceLimitVars(vars));
+  // the bridge needs a path the panel can prove from a third node; a server whose path cannot be checked (an MTProto server with the site
+  // fallback) never passes that proof, so the refusal says so instead of "the relay did not pass its check"
+  if (code === "relay_check_failed" && vars.stage === "path" && vars.code === "unverifiable") return t("err.relay_bridge_unverifiable", vars);
   const filled =
     code === "port_lossy"
       ? lossyVars(t, vars)
@@ -129,7 +145,7 @@ function known(c: ConnectError, t: T): string | undefined {
         ? editionVars(t, vars)
         : code.startsWith("decoy_bundle_")
           ? { path: "?", ...vars }
-          : code.startsWith("relay_")
+          : code.startsWith("relay_") || code === "reverse_unavailable"
             ? relayVars(t, vars)
             : code === "os_blocked"
               ? osVars(t, vars)

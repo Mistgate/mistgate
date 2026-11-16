@@ -59,7 +59,9 @@ func (s *Service) Desired(ctx context.Context, nodeID string) ([]NodeInbound, er
 	}
 	for _, r := range rows {
 		i, ok := at[r.InboundID]
-		if !ok || !s.allowed(r.Protocol, r.AppHapp, r.AppAmnezia, r.AppTelegram) {
+		// Official-app credentials follow their dedicated switch. Mistgate client API devices may also use the protocol;
+		// the store has already left those credentials out when the person switched Mistgate off.
+		if !ok || !s.allowed(r.Protocol, r.AppHapp, r.AppAmnezia, r.AppTelegram, r.AppTrustTunnel) && !(r.MistgateDevice && s.mistgateConsumes(r.Protocol)) {
 			continue
 		}
 		out[i].Creds = append(out[i].Creds, plugin.UserCred{

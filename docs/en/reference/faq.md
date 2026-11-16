@@ -19,12 +19,17 @@ Each person gets one subscription link, and each app gets the format it reads:
 - **Hysteria2 and VLESS**: a subscription app such as Happ (a list of URIs), or an app on the mihomo core, such as kl!ck, Clash Verge or FlClash (a Mihomo YAML profile). A browser that opens the link gets the person's page with instructions.
 - **AmneziaWG**: the AmneziaVPN app, with a key per device; kl!ck and the other apps on the mihomo core get it through the subscription.
 - **MTProto** (experimental): the Telegram app, with a `tg://proxy` link from the person's page; no subscription carries it.
+- **TrustTunnel** (experimental): the official TrustTunnel apps (all platforms and routers), with a `tt://` link or a QR code from the person's page; no subscription carries it. The Mistgate app takes it directly.
 
 A Hysteria2 profile with a self-signed certificate is verified with the official Hysteria2 client and with Mihomo; Happ is not verified with it yet. Xray JSON and sing-box JSON are served too; sing-box cannot carry a self-signed Hysteria2 certificate or XHTTP ([what works where](../guide/subscriptions.md#what-works-where)). See [Subscriptions](../guide/subscriptions.md) and [Client apps](../guide/client-apps.md): kl!ck is the app Mistgate recommends on Windows and macOS.
 
 ## Can Mistgate be a proxy for Telegram?
 
 Yes, as an experimental profile: [MTProto](../guide/mtproto.md). A node becomes a Telegram proxy with Fake TLS, and each person who has the **Telegram proxy** switch gets a key and `tg://proxy` links on their page. It serves the Telegram app only, not other apps, and the links are never put into a subscription. Telegram goes together with Happ or AmneziaVPN: a person cannot have the proxy alone.
+
+## What is TrustTunnel, and will it pass blocks better?
+
+[TrustTunnel](../guide/trusttunnel.md) is an experimental VPN over ordinary HTTPS with a real certificate, with official apps on every platform and for routers. It is not a way past blocks that VLESS or Hysteria2 cannot pass: over HTTP/2 a flow freezes after the first kilobytes under the "freeze after 16 KB" rule like any TCP flow (HTTP/3 over UDP passes it), and TLS inside TLS is visible to traffic analysis. Choose it for the official apps and routers, and check it on the networks that matter.
 
 ## Will the Telegram proxy work in Russia?
 

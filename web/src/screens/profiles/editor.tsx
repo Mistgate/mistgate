@@ -35,7 +35,8 @@ import { DeployDialog, type DeployProfile } from "./deploy";
 import { EgressNote } from "./egress-note";
 import { FormatsLine } from "./formats";
 import { ChoiceStrip, ProtocolPicker } from "./pick";
-import { byProtocol, lookOf, summaryParts, telegramOnly } from "./protocol-meta";
+import { byProtocol, lookOf, ownLinkOnly, summaryParts, telegramOnly, trustTunnelOnly } from "./protocol-meta";
+import { TrustTunnelLink } from "./tt-link";
 import { SchemaForm, type Problem } from "./schema-form";
 import { mtprotoHidden, mtprotoOn443 } from "./mtproto-form";
 import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
@@ -626,10 +627,12 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
               {preview.data ? preview.data.clientPreview.split("\n").map((line, i) => <ConfLine key={i} text={line} />) : <span className="text-muted">{t("profiles.previewBusy")}</span>}
             </div>
           )}
-          <span className="text-xs leading-normal text-pretty text-muted">{t("profiles.previewHint")}</span>
+          <span className="text-xs leading-normal text-pretty text-muted">{t(trustTunnelOnly(info.apps) ? "profiles.tt.previewHint" : "profiles.previewHint")}</span>
+          {/* the official TrustTunnel apps get a tt:// link of their own; the Mistgate app's path is above */}
+          {trustTunnelOnly(info.apps) && !preview.isError && (preview.data?.errors.length ?? 0) === 0 && <TrustTunnelLink settings={settings} />}
           {/* where the draft works, live: switching VLESS to XHTTP drops sing-box here (no formats while the draft has errors);
-              a Telegram-only protocol (MTProto) reaches people by tg:// links, in none of the formats by design */}
-          {!preview.isError && !telegramOnly(info.apps) && (preview.data?.formats.length ?? 0) > 0 && (
+              a protocol with a link of its own (MTProto's tg://, TrustTunnel's tt://) is in none of the formats by design */}
+          {!preview.isError && !ownLinkOnly(info.apps) && (preview.data?.formats.length ?? 0) > 0 && (
             <div className="flex flex-col gap-1 border-t border-line pt-3">
               <span className="text-[13px] font-bold">{t("profiles.fmt.title")}</span>
               <FormatsLine formats={preview.data!.formats} t={t} />
@@ -703,12 +706,13 @@ export function ImpactModal({
   t: Tx;
 }) {
   const i = impact?.impact;
-  // Telegram links do not ride the subscription: nothing refreshes them, the person is sent the new one
+  // Telegram and TrustTunnel links do not ride the subscription: nothing refreshes them, the person is sent the new one
   const byTg = telegramOnly(protocol.apps);
-  const bySub = !byTg && wayOf(protocol.id, [{ id: protocol.id, apps: protocol.apps }]) === "sub";
+  const byTt = trustTunnelOnly(protocol.apps);
+  const bySub = !byTg && !byTt && wayOf(protocol.id, [{ id: protocol.id, apps: protocol.apps }]) === "sub";
   const subs = useQuery({ ...settingsQuery, enabled: open && bySub });
   const hours = subs.data?.settings.updateIntervalHours || 12;
-  const broken = !!i && (bySub || byTg) && i.criticalFields.length > 0;
+  const broken = !!i && (bySub || byTg || byTt) && i.criticalFields.length > 0;
   const people = Math.max(userCount, i?.affectedUserNames.length ?? 0);
   const head: ReactNode = !i
     ? ""
@@ -718,7 +722,9 @@ export function ImpactModal({
         ? i.inboundsRestarted > 0
           ? byTg
             ? t.n("profiles.crit.headTg", people)
-            : t.n("profiles.crit.headSub", people, { h: hours })
+            : byTt
+              ? t.n("profiles.crit.headTt", people)
+              : t.n("profiles.crit.headSub", people, { h: hours })
           : t("profiles.crit.headNowhere")
         : i.usersOnline > 0
           ? t.n("profiles.crit.headOnline", i.usersOnline)
@@ -735,7 +741,7 @@ export function ImpactModal({
         <>
           <Notice title={head} className="items-start">
             {t("profiles.crit.body", { fields: impact!.fields.join(", ") })} {i.inboundsRestarted > 0 && t.n("profiles.crit.inbounds", i.inboundsRestarted)}
-            {broken && i.inboundsRestarted > 0 && <span className="mt-1 block">{t(byTg ? "profiles.crit.tgAdvice" : "profiles.crit.subAdvice")}</span>}
+            {broken && i.inboundsRestarted > 0 && <span className="mt-1 block">{t(byTg ? "profiles.crit.tgAdvice" : byTt ? "profiles.crit.ttAdvice" : "profiles.crit.subAdvice")}</span>}
           </Notice>
           {i.affectedUserNames.length > 0 && (
             <div className="flex max-h-56 flex-col overflow-y-auto">

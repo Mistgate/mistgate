@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -29,9 +30,9 @@ func relayTools() []toolDef {
 		readTool("relays_list", ProfileReadonly,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.RelayServiceListRelaysProcedure),
 			"The relays: each is a port on an entry node that passes one server of an exit node on, unchanged, for people whose network blocks the exit. "+
-				"Per relay: the entry and exit nodes, the exit's server (profile, protocol, network), the port on the entry and on the exit, whether it is switched on, "+
+				"Per relay: the entry and exit nodes, the exit's server (profile, protocol, network), the port on the entry and on the exit, whether it is switched on, the owner's mode, active mode and reason, the bridge status, "+
 				"what the entry's agent reported (state pending, active or failed, with the first word of its error), whether the exit's server is usable and the entry's agent can take the forward, "+
-				"and the last check: the leg (the entry reaches the exit) and the path (a third node reaches the exit through the entry), each ok, fail or skipped with its code, the node that sent the probe and, for UDP, the packets sent and counted. "+
+				"and the last check: the leg, reverse_reach, bridge and path stages, each ok, fail or skipped with its code, the node that sent the probe and, for UDP, the packets sent and counted. "+
 				"Every protocol and switch state is included. Optional node (id or exact name) keeps the relays that have it at either end. Pages are oldest first: limit defaults to 10 (at most 100), offset starts at 0; continue at next_offset until it is absent. "+
 				"Never an address of a node. Stored data only: it contacts no node.",
 			func(c *call, in relaysListArg) (any, error) {
@@ -64,7 +65,8 @@ func relayTools() []toolDef {
 				"Per server: its inbound_id (what relay_plan create takes), exit node, profile, protocol, network and port; unsupported (empty: it can be relayed; else cdn, acme_ip or build_failed); "+
 				"hop (the server has a hop range, a relay passes one port); relay_id (this entry already relays it); "+
 				"exit_country_check (how people inside the country see the exit: verdict ok, partial, blocked, listed or no_data, and the dark networks); "+
-				"entry_reaches_exit (does the entry itself reach the exit: reach, partial, blocked or no_data, from the TSPU probe when it ran from that entry). "+
+				"entry_reaches_exit (does the entry itself reach the exit: reach, partial, blocked or no_data, from the TSPU probe when it ran from that entry); "+
+				"exit_reaches_entry (does the exit reach the selected bridge endpoint, the way a reverse relay needs: reach, partial, blocked or no_data, from the last relay check of that pair in a day). "+
 				"entry_country_check is the same view of the entry itself: a relay helps only where people can see the entry. no_data means unknown, not fine. Never an address. Stored data only.",
 			func(c *call, in relayCandidatesArg) (any, error) {
 				id, name, err := c.nodeRef(in.Node)
@@ -79,14 +81,14 @@ func relayTools() []toolDef {
 			}),
 
 		readToolWithin(applyTimeout, "relay_check", ProfileAdmin, procs(adminv1connect.RelayServiceCheckRelayProcedure),
-			"Check one relay now and store the result: the leg (the entry node tries the exit's server) and, when the relay is switched on, the path (a third node reaches the exit through the entry's port). "+
+			"Check one relay now and store the result: the leg (the entry node tries the exit's server), reverse_reach (the exit node tries the selected bridge endpoint: it runs by itself when the leg fails, reverse_reach=true runs it anyway), and, when the relay is switched on, bridge and path stages. "+
 				"It only sends test packets between the owner's nodes: it changes no switch and nothing on any host. It can take up to a minute. "+
 				"Switching a relay on needs a leg check made less than 15 minutes earlier that passed or was skipped as unverifiable; this is that check. Returns the relay with its new last_check.",
 			func(c *call, in relayCheckArg) (any, error) {
 				if err := validID("relay_id", in.RelayID); err != nil {
 					return nil, err
 				}
-				r, err := c.cl.Relay.CheckRelay(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.CheckRelayRequest{Id: in.RelayID}))
+				r, err := c.cl.Relay.CheckRelay(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.CheckRelayRequest{Id: in.RelayID, ReverseReach: in.ReverseReach}))
 				if err != nil {
 					return nil, apiError(err)
 				}
@@ -109,7 +111,8 @@ type relayCandidatesArg struct {
 }
 
 type relayCheckArg struct {
-	RelayID string `json:"relay_id" jsonschema:"a relay id from relays_list"`
+	RelayID      string `json:"relay_id" jsonschema:"a relay id from relays_list"`
+	ReverseReach bool   `json:"reverse_reach,omitempty" jsonschema:"also test whether the exit reaches the entry's site when the direct leg passes"`
 }
 
 const (
@@ -123,6 +126,7 @@ const (
 type relayArgs struct {
 	ReasonField
 	Action    string `json:"action" jsonschema:"create, enable, disable, port or delete"`
+	Mode      string `json:"mode,omitempty" jsonschema:"auto, dnat or reverse; for create or enable, empty means auto or unchanged"`
 	RelayID   string `json:"relay_id,omitempty" jsonschema:"the relay (relays_list): for enable, disable, port and delete"`
 	Node      string `json:"node,omitempty" jsonschema:"the entry node, id or exact name: for create"`
 	InboundID string `json:"inbound_id,omitempty" jsonschema:"the exit's server, an inbound_id from relay_candidates: for create"`
@@ -160,17 +164,17 @@ var relayChange = changeSpec[relayArgs]{
 	apply: func(c *call, a relayArgs, _ Plan) (done, error) {
 		switch a.Action {
 		case relayCreate:
-			r, err := c.cl.Relay.CreateRelay(c.ctx, connect.NewRequest(&adminv1.CreateRelayRequest{InboundId: a.InboundID, ViaNodeId: a.Node, Port: a.Port}))
+			r, err := c.cl.Relay.CreateRelay(c.ctx, connect.NewRequest(&adminv1.CreateRelayRequest{InboundId: a.InboundID, ViaNodeId: a.Node, Port: a.Port, Mode: a.Mode}))
 			if err != nil {
 				return done{}, apiError(err)
 			}
 			id := r.Msg.GetRelay().GetId()
-			if err := c.relaySwitchOn(id, "Relay "+id+" was made but "); err != nil {
+			if err := c.relaySwitchOn(id, "Relay "+id+" was made but ", modeOrAuto(a.Mode)); err != nil {
 				return done{}, err
 			}
 			return doneWith("relay_created", "Relay "+id+" made and switched on: the path from outside was checked.", "relay", id), nil
 		case relayEnable:
-			if err := c.relaySwitchOn(a.RelayID, "Relay "); err != nil {
+			if err := c.relaySwitchOn(a.RelayID, "Relay ", a.Mode); err != nil {
 				return done{}, err
 			}
 			return doneWith("relay_enabled", "Relay switched on: the path from outside was checked.", "relay", a.RelayID), nil
@@ -201,14 +205,14 @@ func relayArgsShape(a relayArgs) error {
 	switch a.Action {
 	case relayCreate:
 		if !has(a.Node) || !has(a.InboundID) || has(a.RelayID) {
-			return errors.New("create takes node (the entry) and inbound_id (the exit's server), and optionally port")
+			return errors.New("create takes node (the entry), inbound_id (the exit's server), and optionally port and mode")
 		}
 		if err := validID("inbound_id", a.InboundID); err != nil {
 			return err
 		}
 	case relayEnable, relayDisable, relayDelete, relayPort:
 		if !has(a.RelayID) || has(a.Node) || has(a.InboundID) {
-			return errors.New(a.Action + " takes relay_id (and port for the port action) and nothing else")
+			return errors.New(a.Action + " takes relay_id (and mode for enable, port for port) and nothing else")
 		}
 		if err := validID("relay_id", a.RelayID); err != nil {
 			return err
@@ -216,8 +220,14 @@ func relayArgsShape(a relayArgs) error {
 		if (a.Action == relayPort) != (a.Port != 0) {
 			return errors.New("port is given for the port action and for no other")
 		}
+		if a.Action != relayEnable && a.Mode != "" {
+			return errors.New("mode is given for create or enable only")
+		}
 	default:
 		return errors.New("action must be create, enable, disable, port or delete")
+	}
+	if a.Mode != "" && a.Mode != "auto" && a.Mode != "dnat" && a.Mode != "reverse" {
+		return errors.New("mode must be auto, dnat or reverse")
 	}
 	if a.Port != 0 && !relayPortOK(a.Port) {
 		return errors.New("port must be 443 or between 1024 and 65535")
@@ -293,6 +303,14 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 	if cand.GetHop() {
 		facts = append(facts, Fact{Key: "warning", Value: "the server has a hop range; the relay passes its one port only"})
 	}
+	mode := modeOrAuto(a.Mode)
+	facts = append(facts, Fact{Key: "mode", Value: mode})
+	if rb := cand.GetReverseBlocked(); rb != "" {
+		facts = append(facts, Fact{Key: "reverse_bridge", Value: "unavailable: " + reverseBlockedText(rb)})
+	} else {
+		facts = append(facts, Fact{Key: "reverse_bridge", Value: "possible: both agents can run the bridge"},
+			Fact{Key: "reverse_reach", Value: relayReachFreshness(cand.GetExitReachesEntry(), time.Now())})
+	}
 	if cand.GetProtocol() == "awg" {
 		facts = append(facts, Fact{Key: "awg_path_keys", Value: "People allowed to use both nodes get their own AmneziaWG relay key. AmneziaVPN users must download and import the new config; apps using a subscription link get it on refresh."})
 	}
@@ -302,14 +320,60 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 			break
 		}
 	}
+	checks := "auto checks the entry-to-exit leg; for TCP, when that fails it also checks whether the exit reaches the entry. It enables direct when the leg passes, or through the bridge when reverse reach passes, then checks the path from a third node. A failed stage switches the relay off."
+	if mode == "dnat" {
+		checks = "dnat checks the entry-to-exit leg, then a third node reaches the exit through the entry (path). A failed stage switches the relay off."
+	} else if mode == "reverse" {
+		checks = "reverse requires both agents to support the bridge, a TCP server, and reverse reach passed within 15 minutes. After enabling, the panel waits for the bridge and checks the path from a third node. A failed stage switches the relay off."
+	}
 	facts = append(facts,
-		Fact{Key: "checks", Value: "after it is made the entry tries the exit's server (leg), then the relay is switched on and a third node reaches the exit through the entry (path); a failed stage switches it off, while an unverifiable stage leaves it enabled and unverified"},
+		Fact{Key: "checks", Value: checks},
 		Fact{Key: "effect", Value: relayEntryNote + " " + relayOnNote})
 	return &planned{
 		Summary: "Make a relay on one entry node for one server of an exit node, and switch it on if its checks pass or cannot verify it. The entry node gets one forwarding rule for its port. The owner has to approve it first.",
 		Facts:   facts, Danger: []string{dangerFleet},
-		Params: relayArgs{Action: relayCreate, Node: id, InboundID: a.InboundID, Port: a.Port},
+		Params: relayArgs{Action: relayCreate, Node: id, InboundID: a.InboundID, Port: a.Port, Mode: a.Mode},
 	}, nil
+}
+
+// reverseBlockedText says in words why a relay cannot go through the bridge (relay.proto reverse_blocked).
+func reverseBlockedText(reason string) string {
+	switch reason {
+	case "udp":
+		return "UDP cannot use the bridge; auto uses DNAT"
+	case "entry_agent_old":
+		return "the entry's agent is too old (no relay-reverse/1): update it"
+	case "exit_agent_old":
+		return "the exit's agent is too old (no relay-reverse/1): update it"
+	}
+	return clean(reason, 32)
+}
+
+func modeOrAuto(mode string) string {
+	if mode == "" {
+		return "auto"
+	}
+	return mode
+}
+
+func relayReachFreshness(h *adminv1.RelayReachHint, now time.Time) string {
+	if h == nil || h.GetAtUnix() == 0 || h.GetVerdict() == "no_data" {
+		return "unknown; reverse requires an exit-to-entry check passed within 15 minutes"
+	}
+	if now.Unix() < h.GetAtUnix() || now.Unix()-h.GetAtUnix() > int64(15*time.Minute/time.Second) {
+		return "stale; reverse requires an exit-to-entry check passed within 15 minutes"
+	}
+	return clean(h.GetVerdict(), 12) + " at " + fmtTime(h.GetAtUnix())
+}
+
+func relayStageFreshness(stage *adminv1.RelayStage, now time.Time) string {
+	if stage == nil || stage.GetAtUnix() == 0 || stage.GetStatus() == "" {
+		return "unknown; reverse needs a passing check from the exit within 15 minutes"
+	}
+	if now.Unix() < stage.GetAtUnix() || now.Unix()-stage.GetAtUnix() > int64(15*time.Minute/time.Second) {
+		return "stale; reverse needs a passing check from the exit within 15 minutes"
+	}
+	return clean(stage.GetStatus(), 12) + " " + clean(stage.GetCode(), 40) + " at " + fmtTime(stage.GetAtUnix())
 }
 
 func relayReachText(x *adminv1.RelayReachHint) string {
@@ -321,7 +385,7 @@ func relayReachText(x *adminv1.RelayReachHint) string {
 
 func relayCheckText(r *adminv1.Relay) string {
 	ck := r.GetCheck()
-	if ck == nil || ck.GetAtUnix() == 0 {
+	if ck == nil {
 		return "never checked"
 	}
 	stage := func(name string, s *adminv1.RelayStage) string {
@@ -334,7 +398,24 @@ func relayCheckText(r *adminv1.Relay) string {
 		}
 		return t
 	}
-	return fmtTime(ck.GetAtUnix()) + ": " + stage("leg", ck.GetLeg()) + ", " + stage("path", ck.GetPath())
+	var parts []string
+	if ck.GetAtUnix() > 0 {
+		parts = append(parts, fmtTime(ck.GetAtUnix())+": "+stage("leg", ck.GetLeg())+", "+stage("path", ck.GetPath()))
+	}
+	if ck.GetReverseReach().GetStatus() != "" { // the exit's own probe of the entry's site; only when it ran
+		parts = append(parts, stage("reverse_reach", ck.GetReverseReach())+" at "+fmtTime(ck.GetReverseReach().GetAtUnix()))
+	}
+	if ck.GetBridge().GetStatus() != "" {
+		parts = append(parts, stage("bridge", ck.GetBridge()))
+	}
+	if len(parts) == 0 {
+		return "never checked"
+	}
+	prefix := ""
+	if ck.GetAtUnix() == 0 {
+		prefix = "no full check yet: "
+	}
+	return prefix + strings.Join(parts, ", ")
 }
 
 func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
@@ -353,6 +434,7 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 	}
 	facts := []Fact{
 		{Key: "action", Value: a.Action},
+		{Key: "mode", Value: modeOrAuto(a.Mode)},
 		{Key: "entry", Value: nm(r.GetViaNodeName()), Untrusted: true},
 		{Key: "exit", Value: nm(r.GetExitNodeName()), Untrusted: true},
 		{Key: "server", Value: nm(r.GetProfileName()) + " (" + clean(r.GetProtocol(), 40) + ", " + clean(r.GetNetwork(), 8) + " " + strconv.Itoa(int(r.GetExitPort())) + ")", Untrusted: true},
@@ -370,6 +452,23 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 			return nil, errors.New("the entry node's agent is too old to forward: update it first")
 		case !r.GetExitLive():
 			return nil, errors.New("the exit's server is not usable now (switched off, failed or its node is not enrolled): fix that first")
+		}
+		requestedMode := a.Mode
+		if requestedMode == "" {
+			requestedMode = r.GetMode()
+		}
+		facts = append(facts, Fact{Key: "requested_mode", Value: modeOrAuto(requestedMode)})
+		if requestedMode == "reverse" || requestedMode == "auto" {
+			if r.GetReverseBlocked() != "" {
+				facts = append(facts, Fact{Key: "reverse_bridge", Value: "unavailable: " + reverseBlockedText(r.GetReverseBlocked())})
+			} else {
+				facts = append(facts, Fact{Key: "reverse_bridge", Value: "possible: both agents can run the bridge"})
+				if ck := r.GetCheck(); ck != nil {
+					facts = append(facts, Fact{Key: "reverse_reach", Value: relayStageFreshness(ck.GetReverseReach(), time.Now())})
+				} else {
+					facts = append(facts, Fact{Key: "reverse_reach", Value: "unknown; reverse needs a passing check from the exit within 15 minutes"})
+				}
+			}
 		}
 		summary = "Switch one relay on if its checks pass or are unverifiable: the entry tries the exit's server, then a third node reaches the exit through the entry. The owner has to approve it first."
 		effect = relayEntryNote + " " + relayOnNote
@@ -399,28 +498,45 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 		effect = relayOffNote
 	}
 	facts = append(facts, Fact{Key: "effect", Value: effect})
-	return &planned{Summary: summary, Facts: facts, Danger: []string{dangerFleet}, Params: a}, nil
+	params := a
+	if params.Action == relayEnable && params.Mode == "" {
+		params.Mode = r.GetMode()
+	}
+	return &planned{Summary: summary, Facts: facts, Danger: []string{dangerFleet}, Params: params}, nil
 }
 
 // relaySwitchOn checks the leg of a relay, then switches it on (the panel checks the path from outside and switches it off
 // again when that fails). A relay that does not end up on is a failure whose text starts with prefix and names the stage.
-func (c *call) relaySwitchOn(id, prefix string) error {
+func (c *call) relaySwitchOn(id, prefix, mode string) error {
 	chk, err := c.cl.Relay.CheckRelay(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.CheckRelayRequest{Id: id}))
 	if err != nil {
 		return apiError(err)
 	}
-	if leg := chk.Msg.GetRelay().GetCheck().GetLeg(); leg.GetStatus() != "ok" && !(leg.GetStatus() == "skipped" && leg.GetCode() == "unverifiable") {
-		return relayCheckFailure(prefix, "leg", leg.GetCode())
+	ck := chk.Msg.GetRelay().GetCheck()
+	legOK := ck.GetLeg().GetStatus() == "ok" || ck.GetLeg().GetStatus() == "skipped" && ck.GetLeg().GetCode() == "unverifiable"
+	if !legOK && mode != "reverse" {
+		if mode != "auto" || ck.GetReverseReach().GetStatus() != "ok" {
+			// the leg is what failed and its code is what the owner has always been told; the bridge was tried too, and the
+			// relay's last check has what it found
+			return relayCheckFailure(prefix, "leg", ck.GetLeg().GetCode())
+		}
 	}
 	on := true
-	if _, err := c.cl.Relay.UpdateRelay(c.ctx, connect.NewRequest(&adminv1.UpdateRelayRequest{Id: id, Enabled: &on})); err != nil {
+	update := &adminv1.UpdateRelayRequest{Id: id, Enabled: &on}
+	if mode != "" {
+		update.Mode = &mode
+	}
+	if _, err := c.cl.Relay.UpdateRelay(c.ctx, connect.NewRequest(update)); err != nil {
 		return relayRefusal(prefix, apiError(err))
 	}
 	return nil
 }
 
 func relayCheckFailure(prefix, stage, code string) error {
-	stage, code = clean(stage, 8), clean(code, 40)
+	stage, code = clean(stage, 32), clean(code, 40)
+	if code == "" {
+		code = "unknown"
+	}
 	return failure("relay_check_failed", prefix+"stays switched off: the "+stage+" check failed ("+code+"). The result is in the relay's last check; the owner can retry or delete it.",
 		"stage", stage, "code", code)
 }
@@ -433,6 +549,8 @@ func relayRefusal(prefix string, err error) error {
 		return relayCheckFailure(prefix, o.Params["stage"], o.Params["code"])
 	case "relay_unchecked", "relay_check_stale":
 		return failure(o.Code, prefix+"stays switched off: it needs a leg check made less than 15 minutes ago. Run relay_check and make a new plan.")
+	case "reverse_unavailable":
+		return failure(o.Code, prefix+"stays switched off: the reverse bridge is unavailable ("+clean(o.Params["reason"], 48)+"). Update the agents or choose auto/DNAT after checking the reverse path.", "reason", clean(o.Params["reason"], 48))
 	}
 	return err
 }

@@ -22,8 +22,12 @@ import (
 // Hello.capabilities strings of the L3 additions (agent.proto "AWG AND WARP"). The panel puts an awg inbound or a
 // WarpSpec into the desired state of a stream ONLY when the stream listed the string.
 const (
-	capAWG   = "awg/1"
-	capVLESS = "vless/1"
+	capAWG         = "awg/1"
+	capVLESS       = "vless/1"
+	capTrustTunnel = "trusttunnel/1"
+	// capTrustTunnelH3: the agent also serves TrustTunnel over HTTP/3 (UDP beside the TCP port). An agent that lists only
+	// trusttunnel/1 has the HTTP/2 engine and rejects h3:true, so such an inbound is withheld from it.
+	capTrustTunnelH3 = "trusttunnel-h3/1"
 	// capVLESSSelf: an agent that can serve the node's own site behind REALITY (target "self"). An older vless/1 agent
 	// rejects that target, and self is the default of a new VLESS profile.
 	capVLESSSelf = "vless-self/1"
@@ -50,6 +54,12 @@ func requiredCap(s plugin.InboundSpec) string {
 	}
 	if s.Protocol == protocolMTProto {
 		return capMTProto
+	}
+	if s.Protocol == "trusttunnel" {
+		if plugin.TrustTunnelH3(s) {
+			return capTrustTunnelH3
+		}
+		return capTrustTunnel
 	}
 	if s.Protocol == "vless" {
 		if vlessTLS(s) {
@@ -95,7 +105,11 @@ type nodeState struct {
 	// relays are the ports the node forwards to servers on other nodes, sorted by id; only for an agent that lists
 	// "relay-forward/1", and only switched-on relays whose server is usable (relayForwards).
 	relays []plugin.RelayForward
-	hash   string // statehash.StateRelays of the whole
+	// bridgeServe and bridgeDials are the bridge of the reverse relays (agent.proto "REVERSE RELAY"), only for an agent that lists
+	// "relay-reverse/1": the entry's serve setting (nil = none) and the entries an exit calls (sorted by entry id).
+	bridgeServe *plugin.BridgeServe
+	bridgeDials []plugin.BridgeDial
+	hash        string // statehash.StateBridge of the whole
 	// withheld are the inbounds the agent cannot take (an awg inbound for an agent without "awg/1"); the node page says why.
 	withheld []string
 }
@@ -108,6 +122,8 @@ type sentDigest struct {
 	Warp     string                 `json:"w,omitempty"`  // hash of the WarpSpec, "" = none
 	WarpOff  bool                   `json:"wo,omitempty"` // a WarpSpec with Enabled=false (RestartWarp's pause)
 	Relays   string                 `json:"rl,omitempty"` // relaysHash of the forwards, "" = none
+	Serve    string                 `json:"bs,omitempty"` // serveHash of the bridge's serve setting, "" = none
+	Dials    string                 `json:"bd,omitempty"` // dialsHash of the entries the node calls, "" = none
 }
 
 type sentInbound struct {
@@ -157,12 +173,15 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 			}
 		}
 		if slices.Contains(caps, plugin.CapRelayForward) {
-			if st.relays, err = f.relayForwards(ctx, n); err != nil {
+			if st.relays, err = f.relayForwards(ctx, n, caps); err != nil {
 				return nil, err
 			}
 		}
+		if st.bridgeServe, st.bridgeDials, err = f.bridgeDesired(ctx, n, caps); err != nil {
+			return nil, err
+		}
 	}
-	st.hash = statehash.StateRelays(st.list(), st.warp, st.relays)
+	st.hash = statehash.StateBridge(st.list(), st.warp, st.relays, st.bridgeServe, st.bridgeDials)
 	return st, nil
 }
 
@@ -291,6 +310,7 @@ func sentDigestFor(s *nodeState, revision uint64) *sentDigest {
 	digest := &sentDigest{
 		Revision: revision, Hash: s.hash, In: make(map[string]sentInbound, len(s.in)),
 		Warp: warpHash(s.warp), WarpOff: s.warp != nil && !s.warp.Enabled, Relays: relaysHash(s.relays),
+		Serve: serveHash(s.bridgeServe), Dials: dialsHash(s.bridgeDials),
 	}
 	for id, inbound := range s.in {
 		sent := sentInbound{Spec: inbound.specHash}
@@ -433,7 +453,8 @@ func relaysProto(rs []plugin.RelayForward) *agentv1.RelayForwards {
 func relayProtoAlways(rs []plugin.RelayForward) *agentv1.RelayForwards {
 	out := &agentv1.RelayForwards{Items: make([]*agentv1.RelayForward, 0, len(rs))}
 	for _, r := range rs {
-		out.Items = append(out.Items, &agentv1.RelayForward{RelayId: r.ID, Network: r.Network, Port: uint32(r.Port), ToHost: r.ToHost, ToPort: uint32(r.ToPort)})
+		out.Items = append(out.Items, &agentv1.RelayForward{RelayId: r.ID, Network: r.Network, Port: uint32(r.Port), ToHost: r.ToHost, ToPort: uint32(r.ToPort),
+			Mode: r.Mode, ExitNodeId: r.ExitNodeID})
 	}
 	return out
 }

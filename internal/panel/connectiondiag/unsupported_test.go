@@ -44,6 +44,33 @@ func TestVLESSUnknownKeysCapability(t *testing.T) {
 	}
 }
 
+func TestTrustTunnelCounters(t *testing.T) {
+	legacy := UnsupportedCountersForNode("trusttunnel", nil)
+	if !slices.Contains(legacy, "auth_failed") || slices.Contains(legacy, "unknown_keys") {
+		t.Fatalf("legacy TrustTunnel unsupported = %v, want auth_failed unsupported and unknown_keys supported", legacy)
+	}
+	current := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability})
+	if slices.Contains(current, "auth_failed") || slices.Contains(current, "unknown_keys") {
+		t.Fatalf("TrustTunnel with %s unsupported = %v", TrustTunnelCapability, current)
+	}
+	if len(current) != len(legacy)-1 {
+		t.Fatalf("TrustTunnel unsupported with capability = %v, want only auth_failed removed from %v", current, legacy)
+	}
+	for _, f := range []string{"rejects", "drops", "stalls", "hellos", "handshakes", "hs_unfinished", "tcp_stalls"} {
+		if !slices.Contains(current, f) {
+			t.Errorf("TrustTunnel does not report %s, yet it is not listed as unsupported: %v", f, current)
+		}
+	}
+	for _, f := range []string{"connects", "unknown_keys", "auth_failed"} {
+		if slices.Contains(current, f) {
+			t.Errorf("TrustTunnel reports %s, yet it is listed as unsupported: %v", f, current)
+		}
+	}
+	if !slices.Contains(UnsupportedCountersForNode("trusttunnel", []string{Links3Capability}), "auth_failed") {
+		t.Fatal("links/3 alone incorrectly made TrustTunnel auth_failed supported")
+	}
+}
+
 // links/3: each engine's reasons only where it sees them; an old agent, an unknown backend or an unknown transport is "not known".
 func TestLinks3Unsupported(t *testing.T) {
 	caps := []string{"links/1", "links/2", Links3Capability, VLESSUnknownKeysCapability}

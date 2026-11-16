@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"time"
 
@@ -37,23 +38,25 @@ func (s *Service) readPortChecks(ctx context.Context, nodeIDs ...string) (portCh
 	return out, nil
 }
 
-func freePortCandidates(protocol string, n int, listen plugin.Listen, others []nodeListen,
+func freePortCandidates(spec plugin.InboundSpec, n int, others []nodeListen,
 	checks map[uint16]store.PortCheck, now time.Time) []uint16 {
 	if n <= 0 {
 		return nil
 	}
 	limit := len(twinPreferred) + 64
-	candidates := freePorts(protocol, limit, func(port uint16) bool { return portAllowed(listen, port, others) })
+	candidates := freePorts(spec.Protocol, limit, func(port uint16) bool { return portAllowed(spec, port, others) })
+	udpListens := specUDPListens(spec)
 	var fresh, unchecked []uint16
 	for _, port := range candidates {
-		if listen.Network != "udp" {
+		if len(udpListens) == 0 {
 			unchecked = append(unchecked, port)
 			continue
 		}
-		if check, ok := checks[port]; ok && check.Bad(now) {
+		check, ok := checks[port]
+		if ok && check.Bad(now) {
 			continue
 		}
-		if check, ok := checks[port]; ok && check.Fresh(now) {
+		if ok && check.Fresh(now) {
 			fresh = append(fresh, port)
 			continue
 		}
@@ -113,23 +116,32 @@ func cachedPortLossy(checks map[uint16]store.PortCheck, port uint16, now time.Ti
 	return check, ok && check.Bad(now)
 }
 
-func cachedListenPortLossy(listen plugin.Listen, checks map[uint16]store.PortCheck, now time.Time) (store.PortCheck, bool) {
-	if listen.Network != "udp" {
-		return store.PortCheck{}, false
+func cachedSpecPortLossy(spec plugin.InboundSpec, checks map[uint16]store.PortCheck, now time.Time) (store.PortCheck, bool) {
+	for _, listen := range specUDPListens(spec) {
+		if check, ok := cachedPortLossy(checks, listen.Port, now); ok {
+			return check, true
+		}
 	}
-	return cachedPortLossy(checks, listen.Port, now)
+	return store.PortCheck{}, false
 }
 
-func (s *Service) checkPort(ctx context.Context, node store.AccessNode, protocol string, listen plugin.Listen,
+func (s *Service) checkPort(ctx context.Context, node store.AccessNode, spec plugin.InboundSpec,
 	others []nodeListen, checks map[uint16]store.PortCheck, allowLossy bool) (*adminv1.StatusReason, bool, error) {
-	if listen.Network != "udp" || s.cfg.CheckPorts == nil {
+	udpListens := specUDPListens(spec)
+	if len(udpListens) == 0 || s.cfg.CheckPorts == nil {
 		return nil, false, nil
 	}
+	listen := udpListens[0]
 	if cached, ok := checks[listen.Port]; ok && cached.Fresh(s.now()) {
 		return nil, false, nil
 	}
 
-	requested := []uint16{listen.Port}
+	requested := make([]uint16, 0, len(udpListens)+5)
+	for _, udp := range udpListens {
+		if !slices.Contains(requested, udp.Port) {
+			requested = append(requested, udp.Port)
+		}
+	}
 	if listen.Port != 443 {
 		requested = append(requested, 443)
 	}
@@ -137,7 +149,7 @@ func (s *Service) checkPort(ctx context.Context, node store.AccessNode, protocol
 	for _, port := range requested {
 		seen[port] = true
 	}
-	for _, candidate := range freePortCandidates(protocol, 3, listen, others, checks, s.now()) {
+	for _, candidate := range freePortCandidates(spec, 3, others, checks, s.now()) {
 		if !seen[candidate] {
 			requested = append(requested, candidate)
 			seen[candidate] = true
@@ -164,7 +176,7 @@ func (s *Service) checkPort(ctx context.Context, node store.AccessNode, protocol
 	if badPortVerdict(checked.Verdict) {
 		free := uint16(0)
 		for _, candidate := range requested {
-			if candidate == listen.Port || !portAllowed(listen, candidate, others) {
+			if candidate == listen.Port || !portAllowed(spec, candidate, others) {
 				continue
 			}
 			if row, ok := byPort[candidate]; ok && row.Verdict == "ok" {
@@ -173,7 +185,7 @@ func (s *Service) checkPort(ctx context.Context, node store.AccessNode, protocol
 			}
 		}
 		if free == 0 {
-			free = freePortFor(protocol, listen, others, checks, s.now())
+			free = freePortFor(spec, others, checks, s.now())
 		}
 		if !allowLossy {
 			return nil, false, portLossyRefusal(ctx, s, node.Name, checked, free)
@@ -186,13 +198,19 @@ func (s *Service) checkPort(ctx context.Context, node store.AccessNode, protocol
 	return nil, false, nil
 }
 
-func portAllowed(listen plugin.Listen, port uint16, others []nodeListen) bool {
+func portAllowed(spec plugin.InboundSpec, port uint16, others []nodeListen) bool {
+	listen := spec.Listen
 	if port == listen.Port || (listen.HopFrom != 0 && port >= listen.HopFrom && port <= listen.HopTo) {
 		return false
 	}
-	moved := listen
-	moved.Port = port
-	return clashOf(moved, others) == nil
+	moved := spec
+	moved.Listen.Port = port
+	for _, candidate := range inboundListens(moved) {
+		if clashOf(candidate, others) != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) auditLossyPort(ctx context.Context, node string, port uint16) {

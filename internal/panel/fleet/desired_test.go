@@ -32,6 +32,9 @@ func TestRequiredProtocolCapability(t *testing.T) {
 		{name: "VLESS TLS front", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"security":"tls"}`)}, want: capVLESSTLS},
 		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: capAWG},
 		{name: "MTProto", spec: plugin.InboundSpec{Protocol: "mtproto"}, want: capMTProto},
+		{name: "TrustTunnel", spec: plugin.InboundSpec{Protocol: "trusttunnel"}, want: capTrustTunnel},
+		{name: "TrustTunnel HTTP/2", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":false}`)}, want: capTrustTunnel},
+		{name: "TrustTunnel HTTP/3", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":true}`)}, want: capTrustTunnelH3},
 		{name: "Hysteria2", spec: plugin.InboundSpec{Protocol: "hysteria2"}},
 	}
 	for _, tt := range tests {
@@ -40,6 +43,66 @@ func TestRequiredProtocolCapability(t *testing.T) {
 				t.Errorf("requiredCap() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestTrustTunnelInboundIsWithheldWithoutCapability(t *testing.T) {
+	// The agent's own constants (internal/node/agent l3.go) are pinned to the same literals in its test: the two halves meet
+	// only in these strings.
+	if capTrustTunnel != "trusttunnel/1" || capTrustTunnelH3 != "trusttunnel-h3/1" {
+		t.Fatalf("capabilities are %q and %q", capTrustTunnel, capTrustTunnelH3)
+	}
+	tt := plugin.InboundSpec{ID: "inb_tt", Protocol: "trusttunnel", Enabled: true,
+		Listen: plugin.Listen{Network: "tcp", Port: 443}, Settings: []byte(`{"h3":false}`)}
+	e := newEnv(t)
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		return []statehash.Inbound{{Spec: tt}}, nil
+	}
+	node := store.NodeRow{ID: "nod_1", State: "active"}
+	for _, tc := range []struct {
+		name     string
+		caps     []string
+		held     bool
+		withheld bool
+	}{
+		{name: "agent without TrustTunnel", withheld: true},
+		{name: "agent with TrustTunnel", caps: []string{capTrustTunnel}, held: true},
+	} {
+		st, err := e.f.buildState(context.Background(), node, tc.caps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, held := st.in[tt.ID]
+		if held != tc.held || slices.Contains(st.withheld, tt.ID) != tc.withheld {
+			t.Errorf("%s: held=%v withheld=%v, want held=%v withheld=%v", tc.name, held, st.withheld, tc.held, tc.withheld)
+		}
+	}
+}
+
+// An agent with the HTTP/2 engine alone (trusttunnel/1) rejects h3:true: the panel keeps that inbound from it.
+func TestTrustTunnelHTTP3NeedsItsOwnCapability(t *testing.T) {
+	tt := plugin.InboundSpec{ID: "inb_tt3", Protocol: "trusttunnel", Enabled: true,
+		Listen: plugin.Listen{Network: "tcp", Port: 443}, Settings: []byte(`{"h3":true}`)}
+	e := newEnv(t)
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		return []statehash.Inbound{{Spec: tt}}, nil
+	}
+	node := store.NodeRow{ID: "nod_1", State: "active"}
+	for _, tc := range []struct {
+		name string
+		caps []string
+		held bool
+	}{
+		{name: "HTTP/2 engine only", caps: []string{capTrustTunnel}},
+		{name: "HTTP/2 and HTTP/3", caps: []string{capTrustTunnel, capTrustTunnelH3}, held: true},
+	} {
+		st, err := e.f.buildState(context.Background(), node, tc.caps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, held := st.in[tt.ID]; held != tc.held || slices.Contains(st.withheld, tt.ID) == tc.held {
+			t.Errorf("%s: held=%v withheld=%v, want held=%v", tc.name, held, st.withheld, tc.held)
+		}
 	}
 }
 

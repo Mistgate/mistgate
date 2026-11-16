@@ -79,7 +79,7 @@ func (a *Agent) announceStart(ctx context.Context) {
 	a.event(pb.Severity_SEVERITY_INFO, "agent_started", "", params)
 	if prev != a.cfg.Version {
 		if err := writeFileAtomic(p, []byte(a.cfg.Version+"\n"), 0o600); err != nil {
-			a.log.Warn("could not remember the started version", "err", err)
+			a.log.Warn("could not remember the started version", "code", "started_version_write_failed", "err", err)
 		}
 	}
 }

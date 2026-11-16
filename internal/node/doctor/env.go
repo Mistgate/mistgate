@@ -139,15 +139,16 @@ type OwnedAddr struct {
 
 // Inbound is one inbound as the doctor sees it.
 type Inbound struct {
-	ID       string
-	Protocol string
-	Network  string // "udp" | "tcp"
-	Port     int
-	HopFrom  int // 0 = no hop range
-	HopTo    int
-	Enabled  bool
-	Egress   string // "direct" | "warp"
-	TLSMode  string // "acme_domain" | "acme_ip" | "self_signed" | ""
+	ID          string
+	Protocol    string
+	Network     string // "udp" | "tcp"
+	Port        int
+	SideListens []InboundListen
+	HopFrom     int // 0 = no hop range
+	HopTo       int
+	Enabled     bool
+	Egress      string // "direct" | "warp"
+	TLSMode     string // "acme_domain" | "acme_ip" | "self_signed" | ""
 	// ServerName is the TLS server name (or IP for acme_ip).
 	ServerName string
 	State      string // "starting" | "running" | "failed" | "stopped"
@@ -162,6 +163,12 @@ type Inbound struct {
 	TLSPort int
 	// TLSDown is why the engine says that listener is not up ("masq_tcp: ... address already in use"), "" = up.
 	TLSDown string
+}
+
+// InboundListen is an auxiliary socket owned by the inbound, such as TrustTunnel's same-number UDP HTTP/3 listener.
+type InboundListen struct {
+	Network string
+	Port    int
 }
 
 // Sample is one stats-interval host sample kept by the agent (Ring).

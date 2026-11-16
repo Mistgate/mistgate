@@ -113,6 +113,16 @@ package mistgate.agent.v1;
 //   - DesiredState.relays non-empty: one more line per forward AFTER the warp line, sorted among themselves:
 //     "relay" + "" + join("", relay_id, network, port, to_host, to_port) (decimal integers). An absent list and an
 //     empty list hash alike (no lines), so the hash of a node without forwards is what it was before they existed.
+//   - REVERSE RELAY additions ("REVERSE RELAY" below), again only when present:
+//     - a forward with a mode other than "" / "dnat" or with an exit_node_id: its relay line gets two more fields,
+//       mode and exit_node_id (a mode of "dnat" counts as ""), so the line of a plain forward is what it was.
+//     - DesiredState.bridge_serve that is not empty: one line AFTER the relay lines: "bridge_serve" + "\x1f" +
+//       join("\x1f", port, path, join(",", sorted exit_node_ids), panel_via) (decimal integers, panel_via "1"/"0").
+//     - DesiredState.bridge_dials: one line per dial AFTER the bridge_serve line, sorted among themselves:
+//       "bridge_dial" + "\x1f" + join("\x1f", entry_node_id, host, port, sni, pin_sha256, path, pool, panel_via,
+//       join(",", sorted by relay_id: relay_id + ":" + network + ":" + port)).
+//     An absent message and an empty one (an empty BridgeServe, an empty BridgeDials) hash alike: no lines. The hash of a
+//     node without a bridge is byte for byte what it was before the bridge existed (golden test in internal/statehash).
 //
 // COMMANDS
 //   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel, UpdateOs, MeasureBandwidth, UdpCount, UdpSend, HttpMark and TcpProbe carry a request_id and get exactly one CommandResult. Removing a
@@ -312,6 +322,7 @@ package mistgate.agent.v1;
 //     it listed the string (an old agent would reject the unknown protocol and the whole state with it), and
 //     answers the admin calls that need them with FAILED_PRECONDITION ("agent too old"). A new agent with an old
 //     panel simply never receives them, and its new health fields are ignored.
+//     "trusttunnel/1" gates TrustTunnel inbounds and TCP HTTP/2; "trusttunnel-h3/1" gates h3:true on the same UDP port.
 //   - DesiredState.warp. Presence replaces the WHOLE WARP configuration, in a delta too; absence in a delta means
 //     "unchanged"; absence in a full state (base_revision = 0) means "this node has no WARP". Because a delta
 //     cannot say "remove", the panel sends a full state when an account is deleted. enabled = false with a
@@ -324,6 +335,8 @@ package mistgate.agent.v1;
 //   - Credential.data_json for awg is {"public_key":"<base64>","allowed_ips":["10.66.4.5/32","fd66:66:0:1::5/128"],
 //     "psk":"<base64>"} in that field order (the bytes are hashed). The client's private key never reaches a node.
 //   - Credential.data_json for vless is {"id":"<uuid>"}; the UUID reaches the node in clear (design decision 5).
+//   - Credential.data_json for trusttunnel is {"user":"<opaque username>","pass_sha256":"<64 hex chars>"}; the
+//     plaintext password never reaches the node.
 //   - Session for awg: connected_at_unix = the peer's last handshake. A peer is a session while its last handshake
 //     is younger than 190 s.
 //   - TrafficDelta for awg: bytes_up = the peer's received bytes (client -> internet), bytes_down = its
@@ -443,6 +456,36 @@ package mistgate.agent.v1;
 //   - A forwarded TCP port is claimed like an inbound's: the decoy site of a Hysteria2 inbound gives up that port while
 //     the forward is installed and takes it back when it is not.
 //   - The list is part of the persisted state: a restarted agent installs it without the panel.
+//
+// REVERSE RELAY (additive, protocol api_version stays 1)
+//   Some data centres filter by direction: a connection started from the entry's country towards the exit's address is cut
+//   (or freezes after a few kilobytes), while a TLS connection the exit itself opens to the entry's port 443 lives and carries
+//   a full stream. A relay in the reverse mode uses that: the EXIT calls the ENTRY and keeps a few TLS connections open, and the
+//   connections of people that arrive at the relay's port on the entry go to the exit through them. The panel picks the mode of
+//   a relay (RelayForward.mode); the people's subscriptions do not change (the same entry address and port).
+//   - CAPABILITY GATE. An agent lists "relay-reverse/1" when it can do this. The panel puts the fields of this section
+//     (RelayForward.mode and exit_node_id, DesiredState.bridge_serve, DesiredState.bridge_dials) into the desired state of a
+//     stream ONLY when it listed the string; ApplyResult.bridges and StatsBatch.bridges come only from such an agent. The
+//     entry and the exit are two agents: a reverse relay needs the string at both, otherwise it stays a plain forward.
+//   - RelayForward.mode. "" and "dnat": the forward of "RELAY FORWARDS" (the panel sends "" for it). "reverse": the entry does
+//     not install a DNAT rule for the port but listens on it itself (TCP only), takes a waiting request of the exit's bridge
+//     for every connection and passes the bytes on; exit_node_id says whose bridge. With no bridge or no waiting request the
+//     connection is closed at once. to_host and to_port stay as they were; they are not dialed in this mode.
+//   - DesiredState.bridge_serve (the ENTRY side). Where the exit's bridge arrives: the entry answers requests that carry a valid
+//     signature of one of exit_node_ids on `path` of its site (the site on TCP port `port`, 0 = 443 of the node's own site; a
+//     request without the signature gets the site's ordinary answer), and, when panel_via is set, also dials the panel's
+//     address for an exit whose control channel runs through the bridge. Presence replaces the whole setting, also in a delta
+//     (an empty BridgeServe stops it); absence in a delta = unchanged; absence in a full state = none.
+//   - DesiredState.bridge_dials (the EXIT side). The entries the exit calls. Presence (even an empty BridgeDials) replaces the
+//     whole list, also in a delta; absence in a delta = unchanged; absence in a full state = none; the wrapper exists so that
+//     a delta can say "none any more". The exit calls only the entries listed, and passes a request of an entry only to a
+//     target listed for it (relay_id -> the network and port of the exit's own server on this node), never to anything else.
+//   - The list and the setting are part of the persisted state: a restarted agent holds the bridge without the panel.
+//   - BridgeState (ApplyResult.bridges, StatsBatch.bridges): one row per bridge the agent holds, by peer node id, newest wins:
+//     the live connections, since when, the round trip of its ping, the last error and the totals; an entry that runs its own
+//     bridge site (BridgeServe.port != 0) also reports that site's certificate pin (site_cert_pin_sha256), which the exits need.
+//   - Hello.link_via_node_id: an agent that cannot reach the panel directly and calls it through an entry's bridge says which
+//     entry (the control channel through the entry is a later step; the field is only carried until then).
 //
 // BANDWIDTH TEST (additive, protocol api_version stays 1)
 //   The owner does not know a node's network capacity and a VPS's virtual NIC does not report the plan limit, so the
@@ -894,7 +937,7 @@ message Hello {
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
   // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "vless-hello-kex/1" (the LinkCounters fields hello_pq, hello_classic and hello_unknown), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
   // "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
@@ -913,6 +956,10 @@ message Hello {
   // SHA-256 of the ASN database file currently loaded by this agent; empty when no matching table is loaded.
   // Client addresses are never sent.
   string networks_db_sha256 = 16;
+  // The node id of the entry node whose reverse-relay bridge this session runs through ("REVERSE RELAY"): the agent could not
+  // reach the panel directly and calls it through the entry. Empty = a direct connection (also for an agent without
+  // "relay-reverse/1"). The panel keeps it in the live state of the node, not in the database.
+  string link_via_node_id = 17;
 }
 
 enum UpdateOutcome {
@@ -989,6 +1036,9 @@ message StatsBatch {
   // SHA-256 of the ASN database file currently loaded by this agent; empty when no matching table is loaded.
   // Client addresses are never sent.
   string networks_db_sha256 = 13;
+  // The reverse-relay bridges this agent holds now (agents with "relay-reverse/1"; see "REVERSE RELAY"). A full snapshot of
+  // them, newest batch wins (a coalescer keeps the last).
+  repeated BridgeState bridges = 14;
 }
 
 // Aggregated client-network counts for one inbound and ASN. Address data is never included.
@@ -1377,6 +1427,38 @@ message ApplyResult {
   // One per forward of the node's list, in relay_id order (see "RELAY FORWARDS"). Empty for an agent without
   // "relay-forward/1" and for a node without forwards.
   repeated RelayResult relays = 7;
+  // One per bridge the agent holds, in peer_node_id order (see "REVERSE RELAY"). Empty for an agent without "relay-reverse/1" and
+  // for a node without a bridge.
+  repeated BridgeState bridges = 8;
+}
+
+// One bridge of a reverse relay as its agent holds it: on the exit, the calls to one entry; on the entry, the exit that calls it.
+message BridgeState {
+  // The node on the other side of the bridge.
+  string peer_node_id = 1;
+  // Live TLS connections of the bridge now.
+  uint32 conns = 2;
+  // When the bridge first had a live connection in its present run (corrected agent time); 0 = never since the agent started.
+  int64 since_unix = 3;
+  // Round trip of the last ping over the bridge, milliseconds; 0 = none yet.
+  uint32 rtt_ms = 4;
+  // The last error of dialing or serving the bridge, a short fixed word (no address); empty when the last attempt was fine.
+  string error = 5;
+  // Streams (people's connections) the bridge has carried since the agent started, and the bytes of them: bytes_in
+  // towards the people, bytes_out towards the exit's server.
+  uint64 streams = 6;
+  uint64 bytes_in = 7;
+  uint64 bytes_out = 8;
+  // ENTRY side only: SHA-256 of the DER leaf certificate (lowercase hex) of the site listener the agent runs ITSELF for the
+  // bridge (BridgeServe.port != 0), as it serves now (the same pin the exit puts in BridgeDial.pin_sha256). Empty when the bridge
+  // arrives on the site of an inbound (BridgeServe.port = 0: take cert_pin_sha256 of that inbound), when the listener is not up,
+  // and on every exit-side row. The agent's own site has no name a CA could vouch for, so the pin is the only way the exit can
+  // know it reached the right entry. Every row of the entry carries the same value (one site serves all its exits); a renewed
+  // certificate shows up here in the next StatsBatch, so the panel re-reads it there and sends the exits the new pin.
+  string site_cert_pin_sha256 = 9;
+  // ENTRY side only: the people's connections the bridge carries RIGHT NOW (streams is a total since the start and cannot say
+  // this): those that were handed a pair and have not ended, not the waiting pairs. 0 on the exit's rows.
+  uint32 clients_now = 10;
 }
 
 message RelayResult {
@@ -1741,6 +1823,13 @@ message DesiredState {
   // whole list, also in a delta; absence in a delta = unchanged; absence in a full state = none. Sent only to agents
   // with "relay-forward/1".
   RelayForwards relays = 8;
+  // The entry side of the reverse relays this node serves (see "REVERSE RELAY"). Presence replaces the whole setting, also in
+  // a delta (an empty BridgeServe stops it); absence in a delta = unchanged; absence in a full state = none. Sent only to
+  // agents with "relay-reverse/1".
+  BridgeServe bridge_serve = 9;
+  // The entries this node calls as the exit of reverse relays. Presence (even an empty BridgeDials) replaces the whole list, also
+  // in a delta; absence in a delta = unchanged; absence in a full state = none. Sent only to agents with "relay-reverse/1".
+  BridgeDials bridge_dials = 10;
 }
 
 // A wrapper, so that a delta can tell an empty list from no list.
@@ -1758,6 +1847,59 @@ message RelayForward {
   // The exit: an IPv4 literal or a name (the agent resolves it, A records only).
   string to_host = 4;
   uint32 to_port = 5;
+  // "" | "dnat" | "reverse" (see "REVERSE RELAY"); "" and "dnat" are the same plain forward, the panel sends "". Sent only to an
+  // agent with "relay-reverse/1".
+  string mode = 6;
+  // mode "reverse": the exit node whose bridge carries the connections of this port. Empty otherwise.
+  string exit_node_id = 7;
+}
+
+// The entry side of the bridge (agent.proto "REVERSE RELAY").
+message BridgeServe {
+  // The TCP port of the entry's site the exit calls; 0 = 443 of the node's own site (the decoy site, the mask of a Hysteria2
+  // inbound or the "self" site of VLESS), any other port = a site listener of the agent's own.
+  uint32 port = 1;
+  // The path of the bridge on that site: random, assigned by the panel, [A-Za-z0-9_./-], starts with "/".
+  string path = 2;
+  // The exits whose bridge the entry accepts, by node id (their certificate has this CN). Any other caller gets the site.
+  repeated string exit_node_ids = 3;
+  // The entry also dials the panel's own address for a calling exit whose control channel runs through the bridge.
+  bool panel_via = 4;
+}
+
+// A wrapper, so that a delta can tell an empty list from no list.
+message BridgeDials {
+  repeated BridgeDial items = 1;
+}
+
+// One entry the exit calls (the EXIT side of the bridge).
+message BridgeDial {
+  string entry_node_id = 1;
+  // Where to call: an IP literal or a name, the port of the entry's site and the path of the bridge on it.
+  string host = 2;
+  uint32 port = 3;
+  // The name for TLS SNI; empty = no SNI (a bare IP).
+  string sni = 4;
+  // SHA-256 of the DER leaf certificate of the entry's site, lowercase hex. The agent verifies the entry by this pin when it is
+  // set, else by the system roots for sni; a dial with neither is refused (BridgeState.error "no_verification"), never made
+  // unverified.
+  string pin_sha256 = 5;
+  string path = 6;
+  // TLS connections to keep to this entry; 0 = the agent's default.
+  uint32 pool = 7;
+  // The relays of this entry the exit serves through the bridge: connections of those relays go to the exit's own servers
+  // listed here, and nowhere else.
+  repeated BridgeTarget targets = 8;
+  // The exit may also reach the panel through this bridge ("REVERSE RELAY", control channel through the entry).
+  bool panel_via = 9;
+}
+
+// relay_id of the relay that brings the connection; network and port of the exit's own server on this node (usually bound
+// to 127.0.0.1) it is passed to.
+message BridgeTarget {
+  string relay_id = 1;
+  string network = 2;
+  uint32 port = 3;
 }
 
 message WarpSpec {

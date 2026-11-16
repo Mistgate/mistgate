@@ -32,6 +32,10 @@ One subscription link serves every app. The panel picks the format by the app's 
 
 The AmneziaWG servers reach an app on the mihomo core only when the person has the AmneziaVPN way switched on (**Apps in the subscription** on the user card or the group) and the group has an AmneziaWG profile on a node. The first fetch by such an app gives its device the AmneziaWG keys. The core must be new enough: the panel lists Mihomo 1.19.30 or newer for AmneziaWG 3.1 and 1.19.14 for 2.0, next to every key ([AmneziaWG](amneziawg.md)).
 
+**TrustTunnel.** The [TrustTunnel profile](trusttunnel.md) is read by the **official TrustTunnel apps** (iOS, Android, Windows, macOS, Linux and routers; the list is in the Clients section of <https://github.com/TrustTunnel/TrustTunnel>) and by the Mistgate app. The official apps read no subscription: the person gets one `tt://` link per server, or a QR code, and opens it in the app. The links come from the **TrustTunnel** block of the person's page ([User page](user-page.md#telegram-proxy)) and of the person in the admin, never from a subscription. A `tt://` link is always HTTP/2, and it needs a server with a public certificate.
+
+The apps are not in the apps list of **Subscriptions → User page**. The person needs the switch **TrustTunnel** on ([Users and groups](users-and-groups.md#trusttunnel)). The protocol is experimental.
+
 ## Which apps send a device ID
 
 The [device limit](subscriptions.md#device-limit-for-apps-on-the-link) counts an app by the device ID it sends in the `X-HWID` header. An app with an ID gets a place and keys of its own; an app without one shares a place with the other such apps. The last column is what a person sees when the panel refuses the device ([what the app shows](subscriptions.md#what-the-app-shows-when-a-device-is-refused)).

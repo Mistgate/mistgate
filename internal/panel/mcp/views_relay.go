@@ -13,47 +13,75 @@ import (
 // the first colon, because the detail after it may name an address.
 
 type relayStageV struct {
-	Status  string `json:"status,omitempty"` // ok, fail, skipped; empty: did not run
-	Code    string `json:"code,omitempty"`
-	Sender  string `json:"sender,omitempty"` // the node that sent the probe, or "panel"
-	Verdict string `json:"verdict,omitempty"`
-	Sent    uint32 `json:"sent,omitempty"`
-	Got     uint32 `json:"got,omitempty"`
-	AtUnix  int64  `json:"at_unix,omitempty"`
+	Status      string  `json:"status,omitempty"` // ok, fail, skipped; empty: did not run
+	Code        string  `json:"code,omitempty"`
+	Sender      string  `json:"sender,omitempty"` // the node that sent the probe, or "panel"
+	Verdict     string  `json:"verdict,omitempty"`
+	Sent        uint32  `json:"sent,omitempty"`
+	Got         uint32  `json:"got,omitempty"`
+	AtUnix      int64   `json:"at_unix,omitempty"`
+	MB          uint32  `json:"mb,omitempty"`
+	MbitS       float64 `json:"mbit_s,omitempty"`
+	Bytes       uint64  `json:"bytes,omitempty"`
+	ConnectMS   uint32  `json:"connect_ms,omitempty"`
+	FirstByteMS uint32  `json:"first_byte_ms,omitempty"`
+	DurationMS  uint32  `json:"duration_ms,omitempty"`
 }
 
 type relayCheckV struct {
-	AtUnix   int64        `json:"at_unix"`
-	Network  string       `json:"network"`
-	Port     uint32       `json:"port"`
-	OK       bool         `json:"ok"`
-	Stage    string       `json:"failed_stage,omitempty"` // leg or path
-	Verified bool         `json:"verified"`               // both stages ran and passed: it works from outside
-	Leg      *relayStageV `json:"leg,omitempty"`
-	Path     *relayStageV `json:"path,omitempty"`
+	AtUnix       int64        `json:"at_unix"`
+	Network      string       `json:"network"`
+	Port         uint32       `json:"port"`
+	OK           bool         `json:"ok"`
+	Stage        string       `json:"failed_stage,omitempty"` // leg or path
+	Verified     bool         `json:"verified"`               // both stages ran and passed: it works from outside
+	Leg          *relayStageV `json:"leg,omitempty"`
+	Path         *relayStageV `json:"path,omitempty"`
+	ReverseReach *relayStageV `json:"reverse_reach,omitempty"`
+	ReverseSpeed *relayStageV `json:"reverse_speed,omitempty"`
+	Bridge       *relayStageV `json:"bridge,omitempty"`
+}
+
+type relayBridgeV struct {
+	Connected bool   `json:"connected"`
+	Conns     uint32 `json:"conns"`
+	RTTMS     uint32 `json:"rtt_ms,omitempty"`
+	SinceUnix int64  `json:"since_unix,omitempty"`
+	ErrorCode string `json:"error_code,omitempty"`
+	// How full the bridge is: the people it carries now, the connections the exit holds (2 or 4), what that pool carries at most,
+	// and whether it is at 80 % of that. A hint for the screen, never an alert.
+	Clients  uint32 `json:"clients"`
+	Pool     uint32 `json:"pool,omitempty"`
+	Capacity uint32 `json:"capacity,omitempty"`
+	NearFull bool   `json:"near_full,omitempty"`
 }
 
 type relayV struct {
-	ID             string       `json:"id"`
-	EntryNodeID    string       `json:"entry_node_id"`
-	EntryNode      string       `json:"entry_node"`
-	ExitNodeID     string       `json:"exit_node_id"`
-	ExitNode       string       `json:"exit_node"`
-	InboundID      string       `json:"inbound_id"`
-	ProfileID      string       `json:"profile_id"`
-	Profile        string       `json:"profile"`
-	Protocol       string       `json:"protocol"`
-	Network        string       `json:"network"`
-	Port           uint32       `json:"port"`      // on the entry
-	ExitPort       uint32       `json:"exit_port"` // of the server on the exit
-	Enabled        bool         `json:"enabled"`
-	State          string       `json:"state"` // what the entry's agent reported: pending, active, failed
-	LastErrorCode  string       `json:"last_error_code,omitempty"`
-	ExitLive       bool         `json:"exit_live"`       // the exit's server is usable now
-	AgentSupported bool         `json:"agent_supported"` // the entry's agent can take the forward
-	CreatedUnix    int64        `json:"created_unix"`
-	AppliedUnix    int64        `json:"applied_unix,omitempty"`
-	Check          *relayCheckV `json:"last_check,omitempty"`
+	ID             string        `json:"id"`
+	EntryNodeID    string        `json:"entry_node_id"`
+	EntryNode      string        `json:"entry_node"`
+	ExitNodeID     string        `json:"exit_node_id"`
+	ExitNode       string        `json:"exit_node"`
+	InboundID      string        `json:"inbound_id"`
+	ProfileID      string        `json:"profile_id"`
+	Profile        string        `json:"profile"`
+	Protocol       string        `json:"protocol"`
+	Network        string        `json:"network"`
+	Port           uint32        `json:"port"`      // on the entry
+	ExitPort       uint32        `json:"exit_port"` // of the server on the exit
+	Enabled        bool          `json:"enabled"`
+	State          string        `json:"state"` // what the entry's agent reported: pending, active, failed
+	LastErrorCode  string        `json:"last_error_code,omitempty"`
+	ExitLive       bool          `json:"exit_live"`       // the exit's server is usable now
+	AgentSupported bool          `json:"agent_supported"` // the entry's agent can take the forward
+	Mode           string        `json:"mode"`
+	ActiveMode     string        `json:"active_mode"`
+	ModeReason     string        `json:"mode_reason,omitempty"`
+	ReverseBlocked string        `json:"reverse_blocked,omitempty"`
+	Bridge         *relayBridgeV `json:"bridge,omitempty"`
+	CreatedUnix    int64         `json:"created_unix"`
+	AppliedUnix    int64         `json:"applied_unix,omitempty"`
+	Check          *relayCheckV  `json:"last_check,omitempty"`
 }
 
 func relayStageView(s *adminv1.RelayStage) *relayStageV {
@@ -61,7 +89,8 @@ func relayStageView(s *adminv1.RelayStage) *relayStageV {
 		return nil
 	}
 	return &relayStageV{Status: clean(s.GetStatus(), 12), Code: clean(s.GetCode(), 40), Sender: nm(s.GetSenderName()),
-		Verdict: clean(s.GetVerdict(), 12), Sent: s.GetSent(), Got: s.GetGot(), AtUnix: s.GetAtUnix()}
+		Verdict: clean(s.GetVerdict(), 12), Sent: s.GetSent(), Got: s.GetGot(), AtUnix: s.GetAtUnix(), MB: s.GetMb(), MbitS: s.GetMbitS(),
+		Bytes: s.GetBytes(), ConnectMS: s.GetConnectMs(), FirstByteMS: s.GetFirstByteMs(), DurationMS: s.GetDurationMs()}
 }
 
 func relayView(r *adminv1.Relay) relayV {
@@ -73,11 +102,17 @@ func relayView(r *adminv1.Relay) relayV {
 		State:         enumName("INBOUND_STATE_", r.GetState().String()),
 		ExitLive:      r.GetExitLive(),
 		LastErrorCode: errorCode(r.GetLastError()), AgentSupported: r.GetAgentSupported(),
-		CreatedUnix: r.GetCreatedUnix(), AppliedUnix: r.GetAppliedUnix(),
+		CreatedUnix: r.GetCreatedUnix(), AppliedUnix: r.GetAppliedUnix(), Mode: clean(r.GetMode(), 12),
+		ActiveMode: clean(r.GetActiveMode(), 12), ModeReason: clean(r.GetModeReason(), 32), ReverseBlocked: clean(r.GetReverseBlocked(), 32),
 	}
-	if c := r.GetCheck(); c != nil && c.GetAtUnix() != 0 {
+	if b := r.GetBridge(); b != nil {
+		v.Bridge = &relayBridgeV{Connected: b.GetConnected(), Conns: b.GetConns(), RTTMS: b.GetRttMs(), SinceUnix: b.GetSinceUnix(), ErrorCode: errorCode(b.GetError()),
+			Clients: b.GetClients(), Pool: b.GetPool(), Capacity: b.GetCapacity(), NearFull: b.GetNearFull()}
+	}
+	if c := r.GetCheck(); c != nil && (c.GetAtUnix() != 0 || c.GetBridge() != nil) {
 		v.Check = &relayCheckV{AtUnix: c.GetAtUnix(), Network: clean(c.GetNetwork(), 8), Port: c.GetPort(), OK: c.GetOk(),
-			Stage: clean(c.GetStage(), 8), Verified: c.GetVerified(), Leg: relayStageView(c.GetLeg()), Path: relayStageView(c.GetPath())}
+			Stage: clean(c.GetStage(), 8), Verified: c.GetVerified(), Leg: relayStageView(c.GetLeg()), Path: relayStageView(c.GetPath()),
+			ReverseReach: relayStageView(c.GetReverseReach()), ReverseSpeed: relayStageView(c.GetReverseSpeed()), Bridge: relayStageView(c.GetBridge())}
 	}
 	return v
 }
@@ -152,6 +187,10 @@ type relayCandidateV struct {
 	RelayID     string         `json:"relay_id,omitempty"`    // this entry already relays it
 	Country     *relayCountryV `json:"exit_country_check,omitempty"`
 	Reach       *relayReachV   `json:"entry_reaches_exit,omitempty"`
+	ExitReaches *relayReachV   `json:"exit_reaches_entry,omitempty"`
+	// ReverseBlocked is why a reverse relay of this server through this entry is not possible (udp, entry_agent_old,
+	// exit_agent_old); empty when it is. It beats exit_reaches_entry: a UDP server can show "reach" and still has no bridge.
+	ReverseBlocked string `json:"reverse_blocked,omitempty"`
 }
 
 // RelayCandidatesV is the relay_candidates result.
@@ -197,10 +236,13 @@ func relayCandidatesView(entryID, entryName string, r *adminv1.ListRelayCandidat
 			InboundID: clean(c.GetInboundId(), 80), ExitNodeID: clean(c.GetNodeId(), 80), ExitNode: nm(c.GetNodeName()),
 			ProfileID: clean(c.GetProfileId(), 80), Profile: nm(c.GetProfileName()), Protocol: clean(c.GetProtocol(), 40),
 			Network: clean(c.GetNetwork(), 8), ExitPort: c.GetPort(), Unsupported: clean(c.GetUnsupported(), 24), Hop: c.GetHop(),
-			RelayID: clean(c.GetRelayId(), 80), Country: relayCountryView(c.GetCountry()),
+			RelayID: clean(c.GetRelayId(), 80), Country: relayCountryView(c.GetCountry()), ReverseBlocked: clean(c.GetReverseBlocked(), 24),
 		}
 		if x := c.GetReach(); x != nil {
 			row.Reach = &relayReachV{Verdict: clean(x.GetVerdict(), 12), Source: clean(x.GetSource(), 20), AtUnix: x.GetAtUnix()}
+		}
+		if x := c.GetExitReachesEntry(); x != nil {
+			row.ExitReaches = &relayReachV{Verdict: clean(x.GetVerdict(), 12), Source: clean(x.GetSource(), 20), AtUnix: x.GetAtUnix()}
 		}
 		v.Candidates = append(v.Candidates, row)
 	}

@@ -85,6 +85,7 @@ Xray JSON 中的 `Auto` 配置包含所有服务器，并通过由 Xray observat
 - sing-box 没有 XHTTP 传输，也无法按指纹校验自签名证书。Gecko 仅 Mihomo 支持。
 - AmneziaWG 只能通过 Mihomo YAML 或 AmneziaVPN 密钥送达应用。前者可以关闭：参见[订阅类应用中的 AmneziaWG](#订阅类应用中的-amneziawg)。
 - MTProto 不在任何格式中。`tg://proxy` 行在每个 VPN 应用里都会被当成一台损坏的服务器，所以 Telegram 链接只来自用户的页面和管理后台（[MTProto](mtproto.md)）。
+- TrustTunnel 不在任何格式中：官方应用从用户的页面获取 `tt://` 链接（[TrustTunnel](trusttunnel.md)）。
 - WARP 副本是节点的出口，客户端上没有任何变化，因此它与所复制的协议配置表现一致。
 - 如果某个格式中一台服务器也没有，用户会收到一条占位记录：参见[没有适用于此应用的服务器时](#没有适用于此应用的服务器时)。
 

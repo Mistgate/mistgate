@@ -28,6 +28,9 @@ type model struct {
 	warp *plugin.WarpSpec
 	// relays are the forwarded ports of the node (agent.proto "RELAY FORWARDS"), sorted by id; nil = none. Replaced as a whole.
 	relays []plugin.RelayForward
+	// bridgeServe and bridgeDials are the persisted reverse-relay endpoints. Empty wrappers clear them in a delta.
+	bridgeServe *plugin.BridgeServe
+	bridgeDials []plugin.BridgeDial
 }
 
 type inbound struct {
@@ -60,7 +63,9 @@ func rejectf(format string, a ...any) error {
 func newModel() *model { return &model{inbounds: map[string]*inbound{}} }
 
 func (m *model) clone() *model {
-	c := &model{revision: m.revision, partial: m.partial, issues: append([]stateIssue(nil), m.issues...), settings: m.settings, warp: m.warp, relays: m.relays, inbounds: make(map[string]*inbound, len(m.inbounds))}
+	c := &model{revision: m.revision, partial: m.partial, issues: append([]stateIssue(nil), m.issues...), settings: m.settings, warp: m.warp,
+		relays: append([]plugin.RelayForward(nil), m.relays...), bridgeServe: cloneBridgeServe(m.bridgeServe), bridgeDials: cloneBridgeDials(m.bridgeDials),
+		inbounds: make(map[string]*inbound, len(m.inbounds))}
 	for id, in := range m.inbounds {
 		ci := &inbound{spec: in.spec, creds: make(map[string]plugin.UserCred, len(in.creds)), parseErr: in.parseErr, applyErr: in.applyErr, credWarn: in.credWarn}
 		for k, v := range in.creds {
@@ -98,6 +103,12 @@ func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*
 	if ds.Relays != nil {
 		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool { return issue.kind != "relay" })
 	}
+	if ds.BridgeServe != nil {
+		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool { return issue.kind != "bridge_serve" })
+	}
+	if ds.BridgeDials != nil {
+		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool { return issue.kind != "bridge_dial" })
+	}
 	for _, id := range ds.RemovedInboundIds {
 		next.issues = filterStateIssues(next.issues, func(issue stateIssue) bool { return issue.id != id || issue.kind == "warp" || issue.kind == "relay" })
 	}
@@ -123,6 +134,26 @@ func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*
 		}
 	} else if full {
 		next.relays = nil
+	}
+	if ds.BridgeServe != nil {
+		serve, err := bridgeServeFromPB(ds.BridgeServe)
+		if err != nil {
+			next.bridgeServe = nil
+			issues = append(issues, stateIssue{kind: "bridge_serve", reason: err.Error()})
+		} else {
+			next.bridgeServe = serve
+		}
+	} else if full {
+		next.bridgeServe = nil
+	}
+	if ds.BridgeDials != nil {
+		dials, rejected := bridgeDialsFromPB(ds.BridgeDials)
+		next.bridgeDials = dials
+		for _, err := range rejected {
+			issues = append(issues, stateIssue{kind: "bridge_dial", reason: err.Error()})
+		}
+	} else if full {
+		next.bridgeDials = nil
 	}
 	for _, id := range ds.RemovedInboundIds {
 		delete(next.inbounds, id)
@@ -338,7 +369,8 @@ func (m *model) ids() []string {
 
 // snapshot turns the model into a full DesiredState (the persisted form).
 func (m *model) snapshot() *pb.DesiredState {
-	ds := &pb.DesiredState{Revision: m.revision, Settings: m.settings, StateHash: m.hash(), Warp: warpToPB(m.warp), Relays: relaysToPB(m.relays)}
+	ds := &pb.DesiredState{Revision: m.revision, Settings: m.settings, StateHash: m.hash(), Warp: warpToPB(m.warp), Relays: relaysToPB(m.relays),
+		BridgeServe: bridgeServeToPB(m.bridgeServe), BridgeDials: bridgeDialsToPB(m.bridgeDials)}
 	for _, id := range m.ids() {
 		in := m.inbounds[id]
 		if in.parseErr != "" {

@@ -147,6 +147,11 @@ func serverLabels(v access.SubView, lang string) map[string]string {
 			out[t.NodeID] = label(t.CountryCode, t.Location)
 		}
 	}
+	for _, t := range v.TrustTunnel {
+		if _, named := out[t.NodeID]; !named {
+			out[t.NodeID] = label(t.CountryCode, t.Location)
+		}
+	}
 	return out
 }
 

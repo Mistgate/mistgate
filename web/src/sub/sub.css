@@ -48,6 +48,8 @@
   /* WARP: Cloudflare's orange */
   --tone-warp: light-dark(#9a3d00, #ffa45e);
   --tone-warp-bg: light-dark(#fdebdc, #3a2a1f);
+  --tone-sage: light-dark(#3d5520, #b0cc90);
+  --tone-sage-bg: light-dark(#e8f0dc, #2a3123);
   --tone-rose: light-dark(#67343e, #e6a6b0);
   --tone-rose-bg: light-dark(#f9e6e8, #362a2c);
   --backdrop: light-dark(rgb(22 22 26 / 0.36), rgb(0 0 0 / 0.62));
@@ -276,7 +278,7 @@ a { color: inherit; }
 .tile.s36 { width: 36px; height: 36px; border-radius: 11px; }
 .tile.sky { background: var(--tone-sky-bg); color: var(--tone-sky); } .tile.mint { background: var(--tone-mint-bg); color: var(--tone-mint); }
 .tile.lav { background: var(--tone-lav-bg); color: var(--tone-lav); } .tile.sand { background: var(--tone-sand-bg); color: var(--tone-sand); }
-.tile.rose { background: var(--tone-rose-bg); color: var(--tone-rose); } .tile.neu { background: var(--surface-2); color: var(--muted); }
+.tile.sage { background: var(--tone-sage-bg); color: var(--tone-sage); } .tile.rose { background: var(--tone-rose-bg); color: var(--tone-rose); } .tile.neu { background: var(--surface-2); color: var(--muted); }
 .tile.dash { background: none; box-shadow: inset 0 0 0 1.5px var(--faint); color: var(--muted); }
 .noapps { display: flex; flex-direction: column; gap: 14px; padding: 18px 16px 16px; border-radius: 16px; background: var(--surface-2); }
 .noapps .tile { background: var(--surface); }
@@ -654,3 +656,5 @@ a { color: inherit; }
 .tg-acts { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; flex: 1; min-width: 0; }
 .tg-acts .btn { width: 100%; }
 .tg-empty { padding: 16px; }
+/* TrustTunnel: the same cards; its tt:// link is long (a QR code of about 60 modules), so its code is larger to be read from a phone */
+.tt-qr { width: 176px; }

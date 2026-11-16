@@ -486,7 +486,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			return nil, s.internal("read relays for device configs", err)
 		}
 	}
-	relaysOf := s.subRelays(relayLinks, sc.ins, sc.group, sc.user)
+	relaysOf := s.subRelays(relayLinks, sc.ins, sc.group, sc.user, plugin.FormatURIList)
 	maxIdx, maxIdxErr := awg.MaxPeerIndex(sc.merged)
 	version := awgVersion(sc.merged)
 	var reqs []protocols.ClientReq

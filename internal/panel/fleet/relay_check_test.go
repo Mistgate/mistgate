@@ -193,7 +193,7 @@ func tcpRun(c *conn, verdict string, port uint16) *agentv1.TcpProbe {
 	return p
 }
 
-// idle fails if any of the connections is sent a port-check command within d.
+// idle fails if any of the connections is sent a probe or speed-test command within d.
 func idle(t *testing.T, d time.Duration, conns ...*conn) {
 	t.Helper()
 	deadline := time.After(d)
@@ -204,8 +204,8 @@ func idle(t *testing.T, d time.Duration, conns ...*conn) {
 			}
 			select {
 			case m := <-c.in:
-				if m.GetHttpMark() != nil || m.GetTcpProbe() != nil || m.GetUdpCount() != nil || m.GetUdpSend() != nil {
-					t.Fatalf("a port check command was sent: %+v", m)
+				if m.GetHttpMark() != nil || m.GetTcpProbe() != nil || m.GetUdpCount() != nil || m.GetUdpSend() != nil || m.GetSpeedTest() != nil {
+					t.Fatalf("a measurement command was sent: %+v", m)
 				}
 			default:
 			}

@@ -28,7 +28,11 @@ table inet mistgate_relay {
 	}
 	counter tcp_8443 {
 	}
+	counter tcp_8443_back {
+	}
 	counter udp_443 {
+	}
+	counter udp_443_back {
 	}
 	chain pre {
 		type nat hook prerouting priority dstnat; policy accept;
@@ -43,7 +47,9 @@ table inet mistgate_relay {
 	chain pass {
 		type filter hook forward priority filter; policy accept;
 		meta nfproto ipv4 ct status dnat ct original proto-dst 8443 ip daddr 192.0.2.10 tcp dport 443 counter name tcp_8443 accept
+		meta nfproto ipv4 ct status dnat ct original proto-dst 8443 ip saddr 192.0.2.10 tcp sport 443 counter name tcp_8443_back accept
 		meta nfproto ipv4 ct status dnat ct original proto-dst 443 ip daddr 198.51.100.20 udp dport 8443 counter name udp_443 accept
+		meta nfproto ipv4 ct status dnat ct original proto-dst 443 ip saddr 198.51.100.20 udp sport 8443 counter name udp_443_back accept
 	}
 }
 `

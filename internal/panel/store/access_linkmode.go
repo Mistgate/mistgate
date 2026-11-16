@@ -67,7 +67,7 @@ func hasHWIDDevice(devices []AccessDevice) bool {
 	return false
 }
 
-// LimitCount is how many of the person's devices fill the device limit: all of them but the Telegram key (accLimitDevice).
+// LimitCount is how many of the person's devices fill the device limit: all of them but the Telegram key.
 func (d SubscriptionData) LimitCount() int {
 	n := 0
 	for _, dev := range d.Devices {

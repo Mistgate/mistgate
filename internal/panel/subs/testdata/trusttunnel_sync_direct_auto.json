@@ -1,0 +1,1 @@
+{"id":"pth_test","ipv6":false,"ipv6_egress":false,"label":"TrustTunnel","protocol":"trusttunnel","settings":{"password":"aB234567cD234567eF234567gH234567","port":8443,"server":"de1.example.com","sni":"de1.example.com","tls":"ca","transport":"auto","username":"ualice2345672345"},"via":"direct"}

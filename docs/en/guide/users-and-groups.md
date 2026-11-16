@@ -14,7 +14,7 @@ A person gets a server when all of this holds:
 - the node is enabled for the person's group (a group can leave nodes out);
 - the profile is on a node the person may use (all nodes, or the ones picked for them);
 - that profile on the node is switched on and running or starting;
-- one of the person's app switches allows the protocol (the **Telegram proxy** switch is the one for MTProto).
+- one of the person's app switches allows the protocol (the **Telegram proxy** switch is the one for MTProto, and **TrustTunnel** the one for the official TrustTunnel apps).
 
 Any change to these is pushed to the nodes at once.
 
@@ -128,6 +128,7 @@ The heading shows the devices in use against the limit ("3 of 5"): amber when it
 - **Apps on the link**: a row for every app that sends a device ID. The row shows the name (the model, or the name you gave it) and a quiet line: "online" with the servers it is connected to ("de1, nl1"), or how long ago the app fetched the link. Hover the row for the system and the app with their versions ("iOS 18.1 · Happ 3.4.2"); the **⋯** menu also shows since when, the traffic of the device over all time and its fingerprint. One device on two servers at once is a sign that its config was copied to another device; the row says so on hover.
 - **Apps without a device ID**: one row for every app on the link that does not send one (Hiddify, v2rayNG and the like, or Happ with HWID switched off). They share one place. In the **Strict** mode there is no such place and these apps cannot connect.
 - **Telegram proxy**: the person's Telegram key, when they have one. It takes no place in the limit; removing it revokes the key, as **Revoke** does.
+- **TrustTunnel**: the person's `tt://` key, when they have one. It takes a place in the limit; **Revoke key** frees it.
 - **AmneziaVPN keys**: one row per device with its platform, profile and last connection; **Show key** and, in the menu, **Delete…**. **Add device** makes a new key. An **outdated** badge means the device needs its config again. See [AmneziaWG](amneziawg.md).
 - **Blocked (N)**: folded; see below.
 
@@ -148,6 +149,15 @@ The switch **Telegram proxy** gives the person the [MTProto](mtproto.md) servers
 - Turning it on makes the person's **Telegram key** at once, in the user form or on the card; turning it off revokes the key and its links. It cannot stand alone: at least one of the link apps and **AmneziaVPN** stays on.
 - The key is one secret for every MTProto server of the person. It appears among the devices as **Telegram proxy**, and it does **not** count against the device limit: it never takes a place and never fails for want of room.
 - The block **Telegram proxy** on the card shows the links (**Open in Telegram**, copy, a QR code) and has **Re-issue** and **Revoke**. Their effect is on [MTProto](mtproto.md#re-issue-and-revoke).
+- The links are not part of the subscription. The person finds them on their page ([User page](user-page.md#telegram-proxy)).
+
+### TrustTunnel
+
+The switch **TrustTunnel** gives the person the [TrustTunnel](trusttunnel.md) servers of their group, for the official TrustTunnel apps (experimental). The Mistgate app has its own switch and gets TrustTunnel servers directly.
+
+- Turning it on makes the person's key at once when the person is active; otherwise the card has **Issue key**. Turning it off revokes the key and its links. It cannot stand alone: at least one of the link apps and **AmneziaVPN** stays on.
+- The key is a device of kind key and **counts against the device limit**, like an AmneziaVPN key. At the limit **Issue key** is refused with the device-limit error; a disabled person gets no key. For a disabled or expired person the key is suspended and the links stop working until the access is back.
+- The block **TrustTunnel** on the card shows the links (a QR code, **Copy**) and has **Issue key** and **Revoke key**. A server with a self-signed certificate has no link.
 - The links are not part of the subscription. The person finds them on their page ([User page](user-page.md#telegram-proxy)).
 
 ### Subscription page
@@ -183,7 +193,7 @@ The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
 - **Group**: picking another group first asks the server what changes and shows it: "Alice loses: "AWG 3.1" (2 AmneziaVPN keys stop working)", "Gets: …". **Change group** confirms. An AmneziaVPN key belongs to one profile, so the keys of a lost profile stop working.
 - The group's profiles, in the two ways, each a link to its page.
 - **DNS**: the user's own preset, or empty for the group's or the default. The line under it says which applies and where it comes from.
-- The app switches, with **Telegram proxy**.
+- The app switches, with **Telegram proxy** and **TrustTunnel**.
 - **All nodes**, or per-node checkboxes. A node where nothing fits the person is greyed out; "Hysteria2 only" marks a node with one protocol. A node's name opens its **Profiles** tab, where its own port and domain are set.
 
 ### Danger zone
@@ -203,6 +213,7 @@ A device is one place in the limit.
 - All apps on the link that send no device ID share one place, **Apps without a device ID**.
 - Each AmneziaVPN key is one device.
 - The Telegram key is listed with the devices but is **not** one: it takes no place.
+- The TrustTunnel key is one device and takes a place, like an AmneziaVPN key.
 
 ### How a device appears
 

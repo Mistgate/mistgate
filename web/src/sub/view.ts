@@ -8,6 +8,7 @@ import { icon } from "./icons";
 import { fetchedUnix, fmtAgo, hero, isTelegram, safeUrl, stateText, type Hero } from "./logic";
 import { serversSection } from "./servers";
 import { telegramSection } from "./telegram";
+import { trustTunnelSection } from "./trusttunnel";
 import type { Actions, Ctx, State } from "./state";
 import { bar, dot } from "./ui";
 import type { Lang, MgData, Theme } from "./types";
@@ -134,7 +135,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
     const hasConnect = connectNeeded(d);
     if (stale) children.push(stale);
     if (s.returning) {
-      children.push(...servers, ...telegramSection(c), ...devices);
+      children.push(...servers, ...telegramSection(c), ...trustTunnelSection(c), ...devices);
     } else {
       if (hasConnect) {
         children.push(
@@ -142,7 +143,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
           h("div", { class: "cols" }, h("div", { class: "main" }, connectCard(c)), (qr || hasHelp) && h("aside", { class: "side only-w" }, qr, hasHelp && helpCard(c))),
         );
       }
-      children.push(...servers, ...telegramSection(c), ...devices);
+      children.push(...servers, ...telegramSection(c), ...trustTunnelSection(c), ...devices);
     }
     if (hasHelp) children.push(h("div", { class: s.returning ? "" : "only-m" }, helpCard(c)));
   }

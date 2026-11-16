@@ -264,6 +264,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	cfg.UserPagePreview = subs.PreviewHandler(k.acc, parts.cfg)
 	k.addOps(&cfg)
 	k.addTasks(&cfg)
+	k.addTrustTunnel(&cfg)
 	return cfg
 }
 

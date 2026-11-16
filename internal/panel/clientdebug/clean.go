@@ -36,7 +36,7 @@ var (
 	bearer      = regexp.MustCompile(`(?i)\b(bearer)(?:\s*:\s*|\s+)[^\s,;"]+`)
 	basicAuth   = regexp.MustCompile(`(?i)\b(authorization\s*[=:]\s*"?basic)\s+[^\s,;"]+`)
 	// vless%3A%2F%2F…: a share link that went through percent-encoding (a query string, a log of a URL)
-	encodedLink = regexp.MustCompile(`(?i)\b(?:vless|vmess|hysteria2|hysteria|hy2|ss|ssr|trojan|tuic|wireguard|awg|socks5?|https?)%3A%2F%2F\S+`)
+	encodedLink = regexp.MustCompile(`(?i)\b(?:vless|vmess|hysteria2|hysteria|hy2|ss|ssr|trojan|tuic|wireguard|awg|trusttunnel|tt|socks5?|https?)%3A%2F%2F\S+`)
 	// 32 hex digits without dashes: a UUID or a HWID
 	hex32 = regexp.MustCompile(`(?i)\b[0-9a-f]{32}\b`)
 )

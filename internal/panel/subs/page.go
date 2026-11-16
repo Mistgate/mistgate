@@ -92,21 +92,22 @@ func (p *pageTemplate) render(d pageData) ([]byte, error) {
 // ---- page data, version 1 ----
 
 type pageData struct {
-	V               int           `json:"v"`
-	Lang            string        `json:"lang"`
-	Brand           pageBrand     `json:"brand"`
-	Title           string        `json:"title"`
-	SubscriptionURL string        `json:"subscription_url"`
-	ServerCount     int           `json:"server_count"` // servers (nodes) the link carries ("all your servers (3) are already there")
-	ServerLoads     []pageServer  `json:"server_loads"` // kept for the old page; derived from Servers
-	User            pageUser      `json:"user"`
-	Announcement    string        `json:"announcement"`
-	SupportURL      string        `json:"support_url"`
-	Options         pageOptions   `json:"options"`
-	Apps            []pageApp     `json:"apps"`
-	Access          pageAccess    `json:"access"`
-	Telegram        *pageTelegram `json:"telegram"`
-	Devices         []pageDevice  `json:"devices"`
+	V               int              `json:"v"`
+	Lang            string           `json:"lang"`
+	Brand           pageBrand        `json:"brand"`
+	Title           string           `json:"title"`
+	SubscriptionURL string           `json:"subscription_url"`
+	ServerCount     int              `json:"server_count"` // servers (nodes) the link carries ("all your servers (3) are already there")
+	ServerLoads     []pageServer     `json:"server_loads"` // kept for the old page; derived from Servers
+	User            pageUser         `json:"user"`
+	Announcement    string           `json:"announcement"`
+	SupportURL      string           `json:"support_url"`
+	Options         pageOptions      `json:"options"`
+	Apps            []pageApp        `json:"apps"`
+	Access          pageAccess       `json:"access"`
+	Telegram        *pageTelegram    `json:"telegram"`
+	TrustTunnel     *pageTrustTunnel `json:"trust_tunnel"`
+	Devices         []pageDevice     `json:"devices"`
 	// DevicesEndpoint is where the page removes and renames the devices of its person: POST <it>/<device id>/revoke and
 	// /rename {"label"} (the calls the Amnezia section makes, now for every device the person may change; see pageDevice.CanRemove).
 	// "" in the admin's preview, which cannot write, and when the owner switched self-service off.
@@ -187,10 +188,27 @@ type pageTelegramLink struct {
 	URL   string `json:"url"`
 }
 
+// pageTrustTunnel is the official app's key links. A skipped self-signed inbound is included with a note and no URL.
+type pageTrustTunnel struct {
+	Links []pageTrustTunnelLink `json:"links"`
+}
+
+type pageTrustTunnelLink struct {
+	Label       string `json:"label"`
+	CountryCode string `json:"country_code"`
+	Place       string `json:"place"`
+	HasIPv6     bool   `json:"has_ipv6"`
+	Relay       bool   `json:"relay,omitempty"`
+	Via         string `json:"via,omitempty"`
+	Note        string `json:"note,omitempty"`
+	URL         string `json:"url"`
+}
+
 type pageAccess struct {
-	Happ     bool `json:"happ"`
-	Amnezia  bool `json:"amnezia"`
-	Telegram bool `json:"telegram"`
+	Happ        bool `json:"happ"`
+	Amnezia     bool `json:"amnezia"`
+	Telegram    bool `json:"telegram"`
+	TrustTunnel bool `json:"trust_tunnel"`
 }
 
 type pageDevice struct {
@@ -239,7 +257,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 		Announcement: set.GetAnnouncement(), SupportURL: set.GetSupportUrl(),
 		Options: pageOptions{ShowAnnouncement: opt.GetShowAnnouncement(), ShowSupport: opt.GetShowSupport(), ShowQR: opt.GetShowQr()},
 		Apps:    []pageApp{}, Devices: []pageDevice{},
-		Access: pageAccess{Happ: v.AccessHapp, Amnezia: v.AccessAmnezia, Telegram: v.AccessTelegram}, LinkDeviceLimit: store.LinkModeOf(v.LinkMode),
+		Access: pageAccess{Happ: v.AccessHapp, Amnezia: v.AccessAmnezia, Telegram: v.AccessTelegram, TrustTunnel: v.AccessTrustTunnel}, LinkDeviceLimit: store.LinkModeOf(v.LinkMode),
 	}
 	if d.User.QuotaReset == "" {
 		d.User.QuotaReset = access.ResetNone
@@ -258,13 +276,16 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 		d.DevicesEndpoint = link + "/devices"
 	}
 	for _, dv := range v.Devices {
-		own := d.DevicesEndpoint != "" && dv.Kind != "shared" && dv.Kind != "telegram" // the Telegram key is the owner's to issue and revoke
+		own := d.DevicesEndpoint != "" && dv.Kind != "shared" && dv.Kind != "telegram" && dv.Kind != "trusttunnel" // key devices are issued and revoked by the owner
 		d.Devices = append(d.Devices, pageDevice{ID: dv.ID, Platform: dv.Platform, Model: dv.Model, App: dv.App, LastSeenUnix: unixOrZero(dv.LastSeen), Online: dv.Online,
 			Kind: dv.Kind, CanRemove: own, CanRename: own, OSVersion: dv.OSVersion, Client: dv.Client})
 	}
 	d.Amnezia = amneziaData(v, link, subsettings.SelfService(set), preview, now)
 	if v.AppTelegram {
 		d.Telegram = pageTelegramOf(v, lang)
+	}
+	if v.AppTrustTunnel {
+		d.TrustTunnel = pageTrustTunnelOf(v, lang)
 	}
 	d.Servers = pageServers(v, set, lang)
 	d.ServerLoads = serverLoadsOf(d.Servers)

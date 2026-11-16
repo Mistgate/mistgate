@@ -61,7 +61,9 @@ type fakeFleet struct {
 	fixCalls   []fixCall
 	relayCheck func(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
 	relayCalls []string
-	online     map[string]int
+	// relayStages is the stages each of those calls named (none = the default pair).
+	relayStages [][]string
+	online      map[string]int
 }
 
 func (f *fakeFleet) OnlineByInbound(context.Context) map[string]int {
@@ -150,6 +152,7 @@ func (f *fakeFleet) ApplyFix(_ context.Context, node, fix string, dry bool, para
 func (f *fakeFleet) CheckRelay(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error) {
 	f.mu.Lock()
 	f.relayCalls = append(f.relayCalls, relayID)
+	f.relayStages = append(f.relayStages, stages)
 	check := f.relayCheck
 	f.mu.Unlock()
 	if check == nil {

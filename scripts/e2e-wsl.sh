@@ -33,6 +33,14 @@
 # subscription lists its inbound, a Hysteria2 client downloads through it). --edge runs the same on the Cloudflare edition.
 # Needs openssh-server installed (its system service stays masked); skipped by --m3-only and --old-node.
 #
+# --tt: the TrustTunnel stand (scripts/e2e/trusttunnel.sh): the official client, v1.1.12 from scripts/e2e/tt-fetch.sh, goes through a node
+# that serves TrustTunnel over HTTP/2 and HTTP/3, in network namespaces without a way to the internet; their reference endpoint
+# v1.1.0 is the oracle for the cases where our server and their client disagree. Checks E1-E20 of plans/trusttunnel-plan.md and a
+# table of PASS/FAIL/SKIP at the end. --tt-only runs it without the base steps (like --m3-only); with --hold the panel and the node
+# stay up with a test person, a device and its client configuration (the stand's tt-dev.env), for a developer of a client. --tt-dev
+# is that without the checks: the panel and the node with a TrustTunnel inbound (HTTP/2 and HTTP/3), two people, a device each, then it
+# waits for Ctrl-C and prints where everything is (work directory kept).
+#
 # The tunnel steps (AmneziaWG, WARP, Mihomo, VLESS, JSON; they are in scripts/e2e/m3.sh) are opt in: --m3, or --awg,
 # --warp, --mihomo, --vless, --json one by one, run after step 9 and before the retire; --m3-only runs them without the base and
 # self-update steps between. Clients and a fake internet sit in anonymous namespaces inside the run's namespace (`unshare -n`, a veth
@@ -69,6 +77,9 @@
 # prints, four fake nodes behind a "TSPU" made of nft; it asserts the points and their reasons, the network change, the revocation.
 # --censor runs the isolated real-measurement censorship lab and asserts block_diagnosis/access_report; --mcp-fleet brings
 # up the throwaway dev fleet, sweeps every MCP read tool with the no-secrets scan, then tears it down.
+# --bridge [options] runs the reverse-relay ("bridge") lab alone (scripts/e2e/bridge.sh, which takes the rest of the arguments:
+# --only, --quick, --long-return, --keep): a real panel, four real agents, real Xray clients and a filter that cuts the direct
+# way towards the exits by direction, one scenario per rule of the reverse-relay plan, checked on a matrix of protocols.
 #
 # ISOLATION. A node agent owns things that exist once per host: TCP 443 (masquerade), the nft table
 # mistgate_node, /etc/sysctl.d/90-mistgate.conf and the journald drop-in. So the whole run happens in a private
@@ -79,6 +90,11 @@
 
 set -Eeuo pipefail
 
+if [ "${1:-}" = --bridge ]; then
+  shift
+  exec bash "$(cd "$(dirname "$0")" && pwd)/e2e/bridge.sh" "$@"
+fi
+
 # --old-node <abs path>: run the whole scenario with that mistgate-node binary (built from an older commit) in
 # place of the one built from this tree. The panel is always the new one; the health steps then expect an agent
 # without the doctor (compatibility check). The path must be reachable from WSL (/mnt/...).
@@ -87,7 +103,7 @@ OLD_NODE=""
 # scenario and takes what it always took.
 # --decoy runs the decoy-site step alone (scripts/e2e/decoy.sh; --m3 includes it). --m3 is all four; --vless is independent of the others; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
 # and turns it on. --m3-only skips every base step after the node is up (development of the tunnel steps: ~5 minutes).
-M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_JSON="" M3_DECOY="" M3_ONLY="" EDGE="" SSH_ONLY="" CENSOR="" MCP_FLEET="" PROBES=""
+M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_JSON="" M3_DECOY="" M3_ONLY="" EDGE="" SSH_ONLY="" CENSOR="" MCP_FLEET="" PROBES="" TT="" TT_HOLD_DEV=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
@@ -101,6 +117,9 @@ while [ $# -gt 0 ]; do
     --json) M3_JSON=1 M3_VLESS=1 ;;
     --decoy) M3_DECOY=1 ;;
     --m3-only) M3_ONLY=1 ;;
+    --tt) TT=1 ;;
+    --tt-only) TT=1 M3_ONLY=1 ;;
+    --tt-dev) TT=1 M3_ONLY=1 TT_HOLD_DEV=1 KEEP=1 ;;
     --edge) EDGE=1 ;;
     --ssh-only) SSH_ONLY=1 ;;
     --censor) CENSOR=1 ;;
@@ -120,12 +139,12 @@ if [ -n "$CENSOR$MCP_FLEET$PROBES" ]; then
   exec bash "$SCRIPT_DIR/dev-fleet.sh" --mcp-e2e
 fi
 [ -z "$OLD_NODE" ] || [ -x "$OLD_NODE" ] || [ -f "$OLD_NODE" ] || { echo "--old-node: no such file: $OLD_NODE" >&2; exit 2; }
-[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$M3_JSON$M3_DECOY$OLD_NODE" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_JSON=1 M3_DECOY=1; }
+[ -z "$M3_ONLY" ] || [ -n "$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$M3_JSON$M3_DECOY$OLD_NODE$TT" ] || { M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_JSON=1 M3_DECOY=1; }
 M3_LIVE="$M3_AWG$M3_WARP$M3_MIHOMO$M3_VLESS$M3_JSON"
 # An old node cannot run what the tunnel steps add: the live steps would only fail, the compatibility step is what it needs.
 [ -z "$OLD_NODE" ] || M3_LIVE=""
 [ -z "$OLD_NODE" ] || M3_DECOY=""
-[ -z "$EDGE" ] || [ -z "$M3_LIVE$M3_DECOY$M3_ONLY$OLD_NODE" ] || { echo "--edge cannot be combined with the tunnel steps or --old-node" >&2; exit 2; }
+[ -z "$EDGE" ] || [ -z "$M3_LIVE$M3_DECOY$M3_ONLY$OLD_NODE$TT" ] || { echo "--edge cannot be combined with the tunnel steps or --old-node" >&2; exit 2; }
 [ -z "$SSH_ONLY" ] || [ -n "$EDGE" ] || { echo "--ssh-only goes with --edge (it skips the traffic steps 4-8 of the edge scenario; the VPS edition's SSH step needs the bundle of the base steps)" >&2; exit 2; }
 [ "$(id -u)" = 0 ] || { echo "run as root (wsl -d Ubuntu -u root)" >&2; exit 2; }
 for tool in go curl jq python3 openssl nft ip mount; do
@@ -141,6 +160,11 @@ if [ -n "$EDGE" ] || { [ -z "$M3_ONLY" ] && [ -z "$OLD_NODE" ]; }; then # the SS
   [ -x /usr/sbin/sshd ] || { echo "the SSH install steps need openssh-server (/usr/sbin/sshd): apt-get install openssh-server (the system service stays masked)" >&2; exit 2; }
   for tool in nsenter unshare ss ssh-keygen; do
     command -v "$tool" >/dev/null || { echo "missing tool for the SSH install steps: $tool" >&2; exit 2; }
+  done
+fi
+if [ -n "$TT" ]; then
+  for tool in nsenter unshare ss ping base64 setpriv prlimit nft openssl; do
+    command -v "$tool" >/dev/null || { echo "missing tool for --tt: $tool" >&2; exit 2; }
   done
 fi
 if [ -n "$M3_LIVE" ]; then
@@ -211,6 +235,8 @@ export GOTOOLCHAIN=${GOTOOLCHAIN:-auto} CGO_ENABLED=0 GOFLAGS=-buildvcs=false
 . "$REPO/scripts/e2e/m3.sh" # the tunnel steps (functions only; the calls are below)
 # shellcheck source=e2e/decoy.sh
 . "$REPO/scripts/e2e/decoy.sh" # the decoy site per node (functions only; the call is below)
+# shellcheck source=e2e/trusttunnel.sh
+. "$REPO/scripts/e2e/trusttunnel.sh" # the TrustTunnel stand (functions only; the call is below)
 # shellcheck source=e2e/sshnode.sh
 . "$REPO/scripts/e2e/sshnode.sh" # the SSH install on a real OpenSSH host (functions only; both editions call it)
 
@@ -294,6 +320,7 @@ cleanup() {
   if [ -n "$GH_PROGRESS_PID" ]; then stop_pid "$GH_PROGRESS_PID"; GH_PROGRESS_PID=""; fi
   for ((p = ${#PIDS[@]} - 1; p >= 0; p--)); do stop_pid "${PIDS[$p]}"; done
   ! declare -F edge_reap >/dev/null || edge_reap # workerd and the wrangler processes that outlived their parent
+  ! declare -F tt_reap >/dev/null || tt_reap # the TrustTunnel stand: its guard table and its world-readable directory
   sshn_reap # the agent an SSH install started on the test host, and its sshd sessions
   # Nothing to undo on the host: the nft table lives in the namespace and the agent's files on private tmpfs
   # mounts, both gone when the last process here exits.
@@ -729,6 +756,7 @@ fi
 cp "$WORK/rel/v1/mistgate-node-linux-$ARCH" "$BIN/mistgate-node"
 go build -trimpath -o "$BIN/h3get" ./scripts/e2e/h3get
 [ -z "$M3_LIVE" ] || m3_build
+[ -z "$TT" ] || tt_build
 NODE_BIN=$BIN/mistgate-node
 cp "$NODE_BIN" "$WORK/node-v1.bin"
 if [ -n "$OLD_NODE" ]; then
@@ -1496,6 +1524,9 @@ if [ -n "$M3_LIVE" ]; then
   [ -z "$M3_WARP" ] || m3_warp
   [ -z "$M3_JSON" ] || m3_json # after the WARP step: it uses the WARP twin and the VLESS inbounds the steps above left on the node
 fi
+
+# ================================================================ TrustTunnel stand (--tt), sources in scripts/e2e/trusttunnel.sh
+[ -z "$TT" ] || tt_main
 
 # ================================================================ 10. retire
 step "10. retire the node: the agent removes its nft table and files"

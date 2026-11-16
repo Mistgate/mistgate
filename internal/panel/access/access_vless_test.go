@@ -301,3 +301,49 @@ func TestDecoyPausedPort80FromStoredCheck(t *testing.T) {
 		})
 	}
 }
+
+// A TrustTunnel listener on the TCP port of a Hysteria2 site closes that site: the admin is told (hy2_site_taken, whose
+// sentence names TrustTunnel, where hy2_decoy_paused names VLESS), whichever of the two is being added.
+func TestHy2SiteTakenByTrustTunnel(t *testing.T) {
+	hy2 := plugin.InboundSpec{Protocol: "hysteria2", Listen: plugin.Listen{Network: "udp", Port: 443},
+		TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "de1.example.com"}, Settings: []byte(`{}`)}
+	tt := plugin.InboundSpec{Protocol: "trusttunnel", Listen: plugin.Listen{Network: "tcp", Port: 443},
+		TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "de1.example.com"}, Settings: []byte(`{}`)}
+	ttOn := func(port uint16) nodeListen {
+		s := tt
+		s.Listen.Port = port
+		return nodeListen{profile: "tt", protocol: "trusttunnel", enabled: true, l: s.Listen, spec: s}
+	}
+	hy2Other := nodeListen{profile: "hy2", protocol: "hysteria2", enabled: true, l: hy2.Listen, spec: hy2}
+	e := newEnv(t)
+	for name, tc := range map[string]struct {
+		add    plugin.InboundSpec
+		others []nodeListen
+		want   map[string]string // nil = no warning
+	}{
+		"trusttunnel added beside the site":  {tt, []nodeListen{hy2Other}, map[string]string{"node": "de1", "port": "443", "hy2": "hy2", "trusttunnel": "added"}},
+		"hysteria2 added beside trusttunnel": {hy2, []nodeListen{ttOn(443)}, map[string]string{"node": "de1", "port": "443", "hy2": "added", "trusttunnel": "tt"}},
+		"another port": {tt, []nodeListen{func() nodeListen {
+			n := hy2Other
+			n.spec.Settings = []byte(`{"masquerade":{"tcp_port":8443}}`)
+			return n
+		}()}, nil},
+		"hysteria2 beside trusttunnel on 8443": {hy2, []nodeListen{ttOn(8443)}, nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tc.add, tc.others)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == nil {
+				if len(got) != 0 {
+					t.Fatalf("warnings = %+v", got)
+				}
+				return
+			}
+			if len(got) != 1 || got[0].Code != "hy2_site_taken" || !reflect.DeepEqual(got[0].Params, tc.want) {
+				t.Fatalf("warnings = %+v, want hy2_site_taken %v", got, tc.want)
+			}
+		})
+	}
+}

@@ -38,11 +38,11 @@ func (a *Agent) measureBandwidth(s *session, r *pb.MeasureBandwidth) {
 	case s.ctx.Err() != nil:
 		return // nobody to tell
 	case errors.Is(err, speedtest.ErrUnreachable):
-		a.log.Warn("bandwidth test: no test server answered", "err", err)
+		a.log.Warn("bandwidth test: no test server answered", "code", "bandwidth_no_server", "err", err)
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "unreachable"}))
 		return
 	case err != nil:
-		a.log.Warn("bandwidth test failed", "err", err)
+		a.log.Warn("bandwidth test failed", "code", "bandwidth_test_failed", "err", err)
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "failed: " + clipText(err.Error(), 100)}))
 		return
 	}

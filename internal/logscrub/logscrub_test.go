@@ -75,6 +75,25 @@ func TestClip(t *testing.T) {
 	}
 }
 
+func TestCredentials(t *testing.T) {
+	for in, want := range map[string]string{
+		"Proxy-Authorization: Basic YWxpY2U6c2VjcmV0cGFzc3dvcmQ=":    "[REDACTED]",
+		"request failed: proxy-authorization=Basic YWxpY2U6c2VjcmV0": "request failed: [REDACTED]",
+		`header "Authorization": "Bearer abc.def-ghi_jkl"`:           `header "[REDACTED]"`,
+		"got Basic YWxpY2U6c2VjcmV0 from a client":                   "got [REDACTED] from a client",
+		"code=trusttunnel_start_failed err=listen tcp 443":           "code=trusttunnel_start_failed err=listen tcp 443",
+		"basic setup is done, authorization failed":                  "basic setup is done, authorization failed",
+		"short": "short",
+	} {
+		if got := Credentials(in); got != want {
+			t.Errorf("Credentials(%q) = %q, want %q", in, got, want)
+		}
+		if again := Credentials(Credentials(in)); again != Credentials(in) {
+			t.Errorf("Credentials is not idempotent on %q: %q", in, again)
+		}
+	}
+}
+
 // FuzzAddrs: an address put anywhere in text never survives (unless it is unspecified or loopback), and cleaning twice
 // changes nothing.
 func FuzzAddrs(f *testing.F) {
