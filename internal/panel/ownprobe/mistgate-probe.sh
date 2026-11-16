@@ -2,9 +2,8 @@
 # mistgate-probe: availability probe of a Mistgate panel; POSIX sh and curl (busybox ash, dash).
 #   sh mgp.sh install <base-url> <token> | upgrade       (the downloaded file; the panel prints the command)
 #   mistgate-probe uninstall | run | supervise | status | start | stop | restart
-# The panel can only make it run curl against targets of an answer whose every line matched a strict pattern (one bad
-# line cancels the answer). No self-update, no eval, no sourcing: the configuration is read as text. The limits below
-# are fixed here. MGP_ROOT (tests only; never set in a real install) puts every path under it and its bin first in PATH.
+# The panel can only make it run curl against targets of an answer whose every line matched a strict pattern. No
+# self-update, no eval, no sourcing; the limits below are fixed here. MGP_ROOT (tests only) puts every path under it.
 # shellcheck disable=SC2249,SC2312
 set -u
 umask 077
@@ -142,6 +141,13 @@ getn() { # file, default
 	GN=${gn_v}
 }
 setn() { printf '%s\n' "$2" >"$1"; }
+mem_low() { # MemAvailable under 16 MB
+	[ -r "${ROOT}/proc/meminfo" ] || return 1
+	while read -r ml_k ml_v _; do
+		if [ "${ml_k}" = 'MemAvailable:' ]; then [ "${ml_v}" -lt 16384 ]; return; fi
+	done <"${ROOT}/proc/meminfo"
+	return 1
+}
 pid_is() { # pid file $1 names a live process whose command line is "... mistgate-probe $2 ..."
 	[ -f "$1" ] || return 1
 	read -r pi_p <"$1" || return 1
@@ -459,6 +465,7 @@ cycle() {
 	cy_now=$(now)
 	getn "${S}/mute" 0
 	if [ "${GN}" -gt "${cy_now}" ]; then WAIT=$((GN - cy_now)); [ "${WAIT}" -le "${NEXT_MAX}" ] || WAIT=${NEXT_MAX}; return 0; fi
+	if mem_low; then WAIT=${NEXT_MIN}; log 'low memory: cycle skipped'; return 0; fi
 	sync_once
 	case ${HTTP} in
 		200) ;;
@@ -526,6 +533,8 @@ worker_term() {
 }
 cmd_worker() {
 	prepare
+	# the worker and its curls at the lowest priority, where renice and ionice exist (a failure is no error)
+	renice -n 10 -p "$$" >/dev/null 2>&1; ionice -c 3 -p "$$" >/dev/null 2>&1
 	printf '%s\n' "$$" >"${S}/worker.pid"
 	trap worker_term TERM INT HUP
 	cw_sup=${PPID}
@@ -534,7 +543,9 @@ cmd_worker() {
 		if locked; then cycle; unlock; else WAIT=60; fi
 		[ -d "/proc/${cw_sup}" ] || worker_term
 		rnd $((WAIT * 2 / 5 + 1))
+		cw_t=$(now)
 		nap $((WAIT - WAIT / 5 + RND))
+		[ $(($(now) - cw_t)) -ge 20 ] || exit 1 # no busy loop on a sleep that fails: the supervisor backs off
 	done
 }
 SUP_CHILD=''
@@ -557,7 +568,9 @@ cmd_supervise() {
 	chmod 700 "${S}" 2>/dev/null
 	printf '%s\n' "$$" >"${S}/supervisor.pid"
 	trap sup_term TERM INT HUP
+	sp_pause=10
 	while :; do
+		sp_t=$(now)
 		if can_drop; then
 			su -s /bin/sh -c "MGP_ROOT='${ROOT}' MGP_MODE='${MODE}' exec sh '${BIN}' worker" nobody </dev/null >/dev/null 2>&1 &
 		else
@@ -566,8 +579,10 @@ cmd_supervise() {
 		SUP_CHILD=$!
 		wait "${SUP_CHILD}"
 		SUP_CHILD=''
-		log 'worker ended; restarting in 10 s'
-		nap 10
+		[ $(($(now) - sp_t)) -lt 300 ] || sp_pause=10 # a worker that lived 5 minutes was fine: start over
+		log "worker ended; restarting in ${sp_pause} s"
+		nap "${sp_pause}"
+		[ "${sp_pause}" -ge 1800 ] || sp_pause=$((sp_pause * 2)) # quick deaths: 10, 20, 40 ... 2560 s
 	done
 }
 cmd_run() {
@@ -631,7 +646,7 @@ write_service() {
 			{
 				printf '#!/bin/sh\n# Mistgate probe: written by mistgate-probe install\nPATH=%s\nMGP_ROOT=%s\nMGP_MODE=%s\nexport PATH MGP_ROOT MGP_MODE\n' "'${PATH}'" "'${ROOT}'" "'${MODE}'"
 				# shellcheck disable=SC2016
-				printf 'case "${1:-}" in\n  start|stop|restart|status) exec sh %s "$1" ;;\n  *) echo "usage: $0 start|stop|restart|status"; exit 1 ;;\nesac\n' "${BIN}"
+				printf '[ -f %s ] || exit 0\ncase "${1:-}" in\n  start|stop|restart|status) exec sh %s "$1" ;;\n  *) echo "usage: $0 start|stop|restart|status"; exit 1 ;;\nesac\n' "${BIN}" "${BIN}"
 			} >"${INIT}.new"
 			chmod 755 "${INIT}.new"; mv "${INIT}.new" "${INIT}" ;;
 		systemd)
@@ -681,6 +696,9 @@ share_conf() { # the worker may be nobody: it reads the configuration through th
 	if chown "0:${sc_g}" "${CDIR}" "${CONF}" 2>/dev/null; then chmod 750 "${CDIR}"; chmod 640 "${CONF}"; fi
 }
 tools_ok() {
+	to_miss=''
+	for to_c in date sleep tr wc id mkdir cp mv rm chmod; do command -v "${to_c}" >/dev/null 2>&1 || to_miss="${to_miss} ${to_c}"; done
+	[ -z "${to_miss}" ] || die "missing commands:${to_miss}"
 	curl_mode || die 'curl is not installed (opkg install curl ca-bundle)'
 	command -v sha256sum >/dev/null 2>&1 || die 'sha256sum is not installed (opkg install coreutils-sha256sum)'
 	[ "${MODE}" != none ] || die 'unsupported system: needs Entware (/opt/etc/init.d) or systemd'

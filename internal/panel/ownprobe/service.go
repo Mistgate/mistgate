@@ -212,7 +212,7 @@ func BuildInstallCommand(publicURL, prefix, token, scriptHash string) (string, e
 	}
 	base := strings.TrimRight(u.String(), "/") + strings.TrimSuffix(prefix, "/") // the script adds /probe.sh, /enroll, /sync
 	quote := func(v string) string { return "'" + strings.ReplaceAll(v, "'", "'\\''") + "'" }
-	return "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsSo mgp.sh " + quote(base+"/probe.sh") +
+	return "opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && curl -fsS --connect-timeout 15 -m 120 -o mgp.sh " + quote(base+"/probe.sh") +
 		" && echo " + quote(scriptHash+"  mgp.sh") + " | sha256sum -c - && sh mgp.sh install " + quote(base) + " " + quote(token), nil
 }
 

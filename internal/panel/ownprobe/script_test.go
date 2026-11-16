@@ -118,7 +118,7 @@ func (l *lab) argvProblem(c fakeCall) string {
 		"%{http_code}": true,
 	}
 	var url string
-	sawProto, sawNoProxy := false, false
+	sawProto, sawNoProxy, maxTime, connectTime := false, false, 0, 0
 	for i := 0; i < len(a); i++ {
 		arg := a[i]
 		next := func() string {
@@ -138,8 +138,16 @@ func (l *lab) argvProblem(c fakeCall) string {
 		case "--noproxy":
 			sawNoProxy = next() == "*"
 		case "--connect-timeout", "-m", "--max-filesize", "--speed-limit", "--speed-time":
-			if v := next(); !digits.MatchString(v) {
+			v := next()
+			if !digits.MatchString(v) {
 				return arg + " " + v
+			}
+			n, _ := strconv.Atoi(v)
+			switch arg {
+			case "-m":
+				maxTime = n
+			case "--connect-timeout":
+				connectTime = n
 			}
 		case "--limit-rate":
 			if v := next(); !regexp.MustCompile(`^[0-9]{1,4}k$`).MatchString(v) {
@@ -191,6 +199,10 @@ func (l *lab) argvProblem(c fakeCall) string {
 	}
 	if !sawProto || !sawNoProxy || url == "" {
 		return "no --proto =https, --noproxy * or URL"
+	}
+	// no curl of the script can hang: every call has a hard limit on the whole transfer and one on the connection
+	if maxTime < 1 || maxTime > 30 || connectTime < 1 || connectTime > 10 {
+		return fmt.Sprintf("no hard time limit: -m %d --connect-timeout %d", maxTime, connectTime)
 	}
 	return ""
 }
@@ -650,7 +662,7 @@ func TestManyCyclesLeaveNothingBehind(t *testing.T) {
 while [ "$i" -lt "$1" ]; do
 	i=$((i + 1))
 	printf 'mgp 1\nnext 912\nstate active\njob %016x\nctl 192.0.2.1 443 control.example.test\nref 198.51.100.1 443\nt 1 203.0.113.12 443 tcp - -\nt 2 203.0.113.12 8443 tls target.example.test /\nt 3 203.0.113.21 443 fetch target.example.test /\nend\n' "$i" >"$FAKE_DIR/ans.default"
-	sh "$2" run >/dev/null || exit 1
+	$LAB_SH "$2" run >/dev/null || exit 1
 	read -r t <"$FAKE_DIR/clock"
 	echo $((t + 2000)) >"$FAKE_DIR/clock"
 	rm -rf "$FAKE_DIR/calls" "$FAKE_DIR"/body.* "$FAKE_DIR"/auth.*

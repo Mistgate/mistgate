@@ -119,17 +119,21 @@ func newLab(t testing.TB, sh shellSpec, opts labOptions) *lab {
 	}
 	bin := filepath.Join(root, "bin")
 	must(t, os.WriteFile(filepath.Join(bin, "curl"), fakeCurl, 0o755))
-	must(t, os.Symlink(sh.path, filepath.Join(bin, "sh")))
+	if sh.name == "busybox-ash" && !opts.realClock {
+		must(t, os.WriteFile(filepath.Join(bin, "sh"), []byte(busyboxSh(sh.path)), 0o755))
+	} else {
+		must(t, os.Symlink(sh.path, filepath.Join(bin, "sh")))
+	}
 	for _, tool := range []string{"opkg", "systemctl"} {
 		must(t, os.WriteFile(filepath.Join(bin, tool), []byte("#!/bin/sh\necho \"$0 $*\" >>\"$FAKE_DIR/tools.log\"\nexit 0\n"), 0o755))
 	}
 	must(t, os.WriteFile(filepath.Join(bin, "logger"), []byte("#!/bin/sh\necho \"$*\" >>\"$FAKE_DIR/logger.log\"\n"), 0o755))
 	if !opts.realClock {
 		must(t, os.WriteFile(filepath.Join(bin, "date"), []byte("#!/bin/sh\ncase ${1:-} in +%s) read -r t <\"$FAKE_DIR/clock\"; echo \"$t\" ;; *) exec /bin/date \"$@\" ;; esac\n"), 0o755))
-		must(t, os.WriteFile(filepath.Join(bin, "sleep"), []byte("#!/bin/sh\nread -r t <\"$FAKE_DIR/clock\"; echo $((t + $1)) >\"$FAKE_DIR/clock\"\n"), 0o755))
+		must(t, os.WriteFile(filepath.Join(bin, "sleep"), []byte("#!/bin/sh\n[ -z \"${FAKE_SLEEP_BROKEN:-}\" ] || exit 1\nread -r t <\"$FAKE_DIR/clock\"; echo $((t + $1)) >\"$FAKE_DIR/clock\"\n"), 0o755))
 	}
 	l.setClock(1_700_000_000)
-	l.env = []string{"MGP_ROOT=" + root, "FAKE_DIR=" + l.fake, "PATH=" + os.Getenv("PATH"), "HOME=" + root}
+	l.env = []string{"MGP_ROOT=" + root, "FAKE_DIR=" + l.fake, "PATH=" + os.Getenv("PATH"), "HOME=" + root, "LAB_SH=" + strings.Join(l.shellArgv(), " ")}
 	if opts.curlVersion != "" {
 		l.env = append(l.env, "FAKE_CURL_VERSION="+opts.curlVersion)
 	}
@@ -187,10 +191,31 @@ func (l *lab) setTarget(ip string, port int, line string) {
 	must(l.t, os.WriteFile(filepath.Join(l.fake, "t", fmt.Sprintf("%s_%d", ip, port)), []byte(line+"\n"), 0o644))
 }
 
+// busyboxSh is the "sh" of a busybox lab that has a fake clock. This busybox runs its own applets for date, sleep and logger whatever
+// the PATH says (it is built with FEATURE_SH_STANDALONE), so the fakes of the lab's bin would never run and the script would see
+// the real clock. Handed a script file, this sh runs it under ash with them as shell functions that read and move the lab's
+// clock and write its logger.log; a function is looked up before an applet. Anything else (sh -n, sh -c) is plain ash.
+func busyboxSh(busybox string) string {
+	const prologue = `date() { case ${1:-} in +%s) read -r fk_t <"$FAKE_DIR/clock"; echo "$fk_t" ;; *) command date "$@" ;; esac; }
+sleep() { [ -z "${FAKE_SLEEP_BROKEN:-}" ] || return 1; read -r fk_t <"$FAKE_DIR/clock"; echo $((fk_t + $1)) >"$FAKE_DIR/clock"; }
+logger() { echo "$*" >>"$FAKE_DIR/logger.log"; }
+. "$0"`
+	return "#!/bin/sh\ncase ${1:-} in -* | \"\") exec '" + busybox + "' ash \"$@\" ;; esac\nexec '" + busybox + "' ash -c '" + prologue + "' \"$@\"\n"
+}
+
+// shellArgv is the shell, and its leading arguments, that runs the lab's script.
+func (l *lab) shellArgv() []string {
+	if l.sh.name == "busybox-ash" && !l.opts.realClock {
+		return []string{filepath.Join(l.root, "bin", "sh")}
+	}
+	return l.sh.argv
+}
+
 func (l *lab) cmd(extraEnv []string, args ...string) *exec.Cmd {
-	argv := append(append([]string{}, l.sh.argv[1:]...), l.script)
+	sh := l.shellArgv()
+	argv := append(append([]string{}, sh[1:]...), l.script)
 	argv = append(argv, args...)
-	c := exec.Command(l.sh.argv[0], argv...)
+	c := exec.Command(sh[0], argv...)
 	c.Dir = l.root
 	c.Env = append(append([]string{}, l.env...), extraEnv...)
 	return c
