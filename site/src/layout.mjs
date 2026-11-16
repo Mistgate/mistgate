@@ -83,7 +83,7 @@ export const PAGE_SECTION = {
   "guide/profiles": "profiles", "guide/hysteria2": "profiles", "guide/amneziawg": "profiles",
   "guide/subscriptions": "subscriptions", "guide/client-apps": "subscriptions", "guide/user-page": "subscriptions", "guide/dns": "subscriptions",
   "operations/health": "health", "operations/troubleshooting": "health",
-  "operations/reachability": "reachability",
+  "operations/reachability": "reachability", "operations/probes": "reachability",
   "operations/updates": "updates", "operations/releases": "updates",
   "guide/assistant": "ai", "getting-started/ai-agents": "ai", "reference/api": "ai", "reference/mcp": "ai", "operations/telegram-alerts": "integrations",
   "getting-started/install-panel": "settings", "guide/decoy-site": "settings", "operations/backups": "settings", "operations/security": "settings", "operations/panel-watcher": "settings",
