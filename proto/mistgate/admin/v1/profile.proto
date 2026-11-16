@@ -46,6 +46,12 @@ service ProfileService {
   rpc UpdateInbound(UpdateInboundRequest) returns (UpdateInboundResponse);
   // Remove the profile from the node; its users lose this endpoint.
   rpc DeleteInbound(DeleteInboundRequest) returns (DeleteInboundResponse);
+  // Remove the profile from several nodes at once, optionally deleting the profile in the same step. One transaction on the
+  // panel: the inbounds are gone together or not at all, and a node that is offline drops the profile when it connects
+  // again (the desired state is read from the panel). A node of the list that does not carry the profile is skipped, so a
+  // repeated call is harmless. With delete_profile the list must cover every node the profile is on, else FAILED_PRECONDITION
+  // "profile_deployed" names those left and nothing changes. Owner only.
+  rpc RemoveProfileFromNodes(RemoveProfileFromNodesRequest) returns (RemoveProfileFromNodesResponse);
   // "The same server with and without WARP": a twin of a profile whose exit is flipped (direct <-> WARP). Same
   // protocol and settings, the name with " · WARP" added or removed, a port that is free on every node, fresh secrets
   // (and, for AmneziaWG, its own client network), no port hopping. It goes on the nodes and into the groups the
@@ -329,3 +335,22 @@ message DeleteInboundRequest {
 }
 
 message DeleteInboundResponse {}
+
+message RemoveProfileFromNodesRequest {
+  string profile_id = 1;
+  // The nodes to take the profile off; at least one.
+  repeated string node_ids = 2;
+  // Delete the profile too, when this call takes it off its last nodes. The groups lose it, as with DeleteProfile.
+  bool delete_profile = 3;
+  // With delete_profile: the profile name typed by the admin; must equal the current name.
+  string confirm_name = 4;
+}
+
+message RemoveProfileFromNodesResponse {
+  // How many inbounds were removed (nodes the profile was not on do not count).
+  uint32 removed = 1;
+  // The profile is gone.
+  bool profile_deleted = 2;
+  // Relay links through the removed inbounds that went with them.
+  uint32 relays_removed = 3;
+}

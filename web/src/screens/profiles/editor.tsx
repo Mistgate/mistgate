@@ -41,6 +41,7 @@ import { SchemaForm, type Problem } from "./schema-form";
 import { mtprotoHidden, mtprotoOn443 } from "./mtproto-form";
 import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
 import { markFresh } from "@/components/fx/registry";
+import { DeleteDeployedDialog } from "./take-off";
 import { WherePanel } from "./where";
 
 /**
@@ -760,22 +761,20 @@ export function ImpactModal({
   );
 }
 
-function DeleteSection({ profile, inbounds }: { profile: ProfileSummary; inbounds: Inbound[] }) {
+export function DeleteSection({ profile, inbounds }: { profile: ProfileSummary; inbounds: Inbound[] }) {
   const t = useTx();
   const toast = useToast();
   const go = useGo();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [deployed, setDeployed] = useState(false);
-  const nodeNames = [...new Set(inbounds.map((i) => i.nodeName))];
 
   async function remove() {
     try {
       await profiles.deleteProfile({ profileId: profile.id });
     } catch (e) {
-      // FAILED_PRECONDITION: still deployed. The explanation names the nodes; anything else is a toast.
-      if (isCode(e, Code.FailedPrecondition)) setDeployed(true);
-      else toast.error(errorText(e, t));
+      // FAILED_PRECONDITION: it got a node after the page was read. The window of a deployed profile takes it from here.
+      if (isCode(e, Code.FailedPrecondition)) await qc.invalidateQueries({ queryKey: ["profiles"] });
+      toast.error(errorText(e, t));
       throw e;
     }
     await qc.invalidateQueries({ queryKey: ["profiles"] });
@@ -790,27 +789,15 @@ function DeleteSection({ profile, inbounds }: { profile: ProfileSummary; inbound
           <span className="text-[13px] font-bold">{t("profiles.delete")}</span>
           <span className="text-[11px] leading-snug text-muted">{t("profiles.deleteHint")}</span>
         </div>
-        <Button
-          variant="danger"
-          onClick={() => {
-            setDeployed(false);
-            setOpen(true);
-          }}
-        >
+        <Button variant="danger" onClick={() => setOpen(true)}>
           {t("users.delete")}
         </Button>
       </div>
-      <ConfirmModal
-        open={open}
-        onOpenChange={setOpen}
-        title={t("profiles.deleteT", { name: profile.name })}
-        description={t("profiles.deleteBody")}
-        confirmLabel={t("users.delete")}
-        danger
-        onConfirm={remove}
-      >
-        {(deployed || nodeNames.length > 0) && <Notice tone={deployed ? "danger" : "warn"}>{t("profiles.deployed", { nodes: nodeNames.join(", ") || "—" })}</Notice>}
-      </ConfirmModal>
+      {inbounds.length > 0 ? (
+        <DeleteDeployedDialog open={open} onOpenChange={setOpen} profile={profile} inbounds={inbounds} />
+      ) : (
+        <ConfirmModal open={open} onOpenChange={setOpen} title={t("profiles.deleteT", { name: profile.name })} description={t("profiles.deleteBody")} confirmLabel={t("users.delete")} danger onConfirm={remove} />
+      )}
     </DangerZone>
   );
 }

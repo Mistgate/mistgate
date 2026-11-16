@@ -999,6 +999,7 @@ func TestTokenAllowList(t *testing.T) {
 		adminv1connect.NodeServicePrepareAwgKernelProcedure, // installs packages on the node: never through a token or MCP
 		adminv1connect.NodeServiceMeasureBandwidthProcedure, // makes the node push up to 1 GB: owner only, never through a token or MCP
 		adminv1connect.ProfileServiceTwinProfileProcedure,
+		adminv1connect.ProfileServiceRemoveProfileFromNodesProcedure,
 		adminv1connect.UpdateServiceRescanBundleProcedure,
 		adminv1connect.InstanceServiceGetInstanceProcedure,
 		adminv1connect.InstanceServiceUpdateInstanceProcedure,

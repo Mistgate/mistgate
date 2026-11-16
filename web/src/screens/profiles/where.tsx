@@ -16,15 +16,14 @@ import { groups as groupsApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { meQuery } from "@/lib/session";
-import { Flag } from "@/components/ui/flag";
 import { nodesQuery } from "@/lib/queries";
-import { InboundErrorNote, states } from "@/screens/node/profiles";
 import { groupTone } from "@/screens/users/format";
 import { GroupChip, GroupEditModal, NewGroupModal } from "@/screens/users/groups";
 import { groupsQuery } from "@/screens/users/rpc";
 import { useTx } from "@/screens/users/t";
 import { Panel } from "@/screens/users/ui";
 import { DeployDialog } from "./deploy";
+import { InboundRow, PickAll, TakeOffDialog, usePick } from "./take-off";
 import { TwinPanel, type Egress } from "./twin";
 
 type Verdict = "ok" | "none" | "noNode" | "noGroup" | "notRunning";
@@ -64,6 +63,9 @@ export function WherePanel({
   const canGroups = role === Role.OWNER || role === Role.HELPER;
   const canNodes = role === Role.OWNER; // policy.go: an inbound is infrastructure, a group is day-to-day
   const [pickNode, setPickNode] = useState(false);
+  const [choosing, setChoosing] = useState(false); // the nodes card in its choosing mode: boxes on the rows, "Take off" in the bar
+  const [asking, setAsking] = useState(false);
+  const pick = usePick(inbounds, false);
   const [pickGroup, setPickGroup] = useState(false);
   const [editId, setEditId] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -106,30 +108,47 @@ export function WherePanel({
           </StatusLine>
 
           <div className="grid gap-2.5 md:grid-cols-3">
-            <Column icon="server" tone="sky" title={t("where.nodes")} count={w.nodes} add={canNodes ? { label: t("where.addNode"), onClick: () => setPickNode(true) } : undefined}>
+            <Column
+              icon="server"
+              tone="sky"
+              title={t("where.nodes")}
+              count={w.nodes}
+              tools={
+                canNodes && inbounds.length > 0 ? (
+                  <IconButton
+                    variant="flat"
+                    aria-label={t("where.pick")}
+                    title={t("where.pick")}
+                    aria-pressed={choosing}
+                    className={choosing ? "text-accent-text" : undefined}
+                    onClick={() => {
+                      setChoosing(!choosing);
+                      pick.setAll(false);
+                    }}
+                  >
+                    <Icon name="check" size={15} />
+                  </IconButton>
+                ) : undefined
+              }
+              add={canNodes ? { label: t("where.addNode"), onClick: () => setPickNode(true) } : undefined}
+            >
+              {choosing && (
+                <li className="flex flex-col gap-1.5 pt-0.5 pb-2">
+                  <PickAll pick={pick} total={inbounds.length} className="whitespace-nowrap" />
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="danger" size="sm" className="min-w-0 flex-1" disabled={pick.on.length === 0} onClick={() => setAsking(true)}>
+                      {pick.on.length === 0 ? t("where.offNone") : t.n("where.offN", pick.on.length)}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setChoosing(false)}>
+                      {t("common.done")}
+                    </Button>
+                  </div>
+                </li>
+              )}
               {inbounds.length === 0 ? (
                 <Empty>{t("where.dash")}</Empty>
               ) : (
-                inbounds.map((i) => {
-                  const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
-                  const n = nodeOf.get(i.nodeId);
-                  return (
-                    <li key={i.id} className="flex flex-col gap-1.5 py-1.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {n?.countryCode && <Flag code={n.countryCode} size={14} />}
-                        <Link to="/nodes/$id" params={{ id: i.nodeId }} search={{ tab: "profiles" }} className="min-w-0 truncate text-[13px] font-bold text-accent-text hover:underline">
-                          {i.nodeName}
-                        </Link>
-                        {i.port > 0 && <span className="flex-none font-mono text-[11px] text-muted">:{i.port}</span>}
-                        {n?.location && <span className="hidden min-w-0 truncate text-xs text-muted sm:inline">{n.location}</span>}
-                        <span className="ms-auto flex-none">
-                          <StatusPill kind={s.kind} label={t(s.word)} sm />
-                        </span>
-                      </div>
-                      {i.lastError && <InboundErrorNote inbound={i} />}
-                    </li>
-                  );
-                })
+                inbounds.map((i) => <InboundRow key={i.id} inbound={i} node={nodeOf.get(i.nodeId)} pick={choosing ? { on: pick.has(i.id), toggle: () => pick.toggle(i.id) } : undefined} />)
               )}
             </Column>
 
@@ -192,6 +211,17 @@ export function WherePanel({
       )}
 
       <DeployDialog open={pickNode} onOpenChange={setPickNode} profile={{ id: profile.id, name: profile.name, protocol: profile.protocol, tlsMode: cert?.tlsMode, sni: cert?.sni }} inbounds={inbounds} />
+      <TakeOffDialog
+        open={asking}
+        onOpenChange={setAsking}
+        profile={profile}
+        chosen={inbounds.filter((i) => pick.has(i.id))}
+        nodeOf={nodeOf}
+        onDone={() => {
+          setChoosing(false);
+          pick.setAll(false);
+        }}
+      />
       <GroupPicker open={pickGroup} onOpenChange={setPickGroup} profile={profile} groups={groups} />
       <GroupEditModal group={groups.find((g) => g.id === editId)} open={editOpen} onOpenChange={setEditOpen} />
     </Panel>
@@ -213,17 +243,22 @@ function StatusLine({ kind, title, children, actions }: { kind: StatusKind; titl
 }
 
 /** One of the three: a small card with its mark, title, count and one quiet "+" in the header. */
-function Column({ icon, tone, title, count, add, children }: { icon: IconName; tone: Tone; title: string; count: number; add?: { label: string; onClick: () => void }; children: ReactNode }) {
+function Column({ icon, tone, title, count, add, tools, children }: { icon: IconName; tone: Tone; title: string; count: number; add?: { label: string; onClick: () => void }; tools?: ReactNode; children: ReactNode }) {
   return (
     <section className="flex min-w-0 flex-col rounded-field border border-line px-3 pt-2.5 pb-2">
       <div className="flex h-7 items-center gap-2">
         <IconChip icon={icon} tone={tone} size={22} />
         <h3 className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{title}</h3>
         <span className="font-mono text-xs font-bold text-fg">{count}</span>
-        {add && (
-          <IconButton variant="flat" aria-label={add.label} title={add.label} className="ms-auto" onClick={add.onClick}>
-            <Icon name="plus" size={15} />
-          </IconButton>
+        {(tools || add) && (
+          <span className="ms-auto flex items-center">
+            {tools}
+            {add && (
+              <IconButton variant="flat" aria-label={add.label} title={add.label} onClick={add.onClick}>
+                <Icon name="plus" size={15} />
+              </IconButton>
+            )}
+          </span>
         )}
       </div>
       <ul className="mt-1 flex flex-col divide-y divide-line">{children}</ul>

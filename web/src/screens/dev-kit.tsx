@@ -34,6 +34,7 @@ import { LinkModal } from "@/screens/users/link-modal";
 import { NodeDemos } from "@/screens/dev-kit-node";
 import { PortsKit } from "@/screens/dev-kit-ports";
 import { VlessKit } from "@/screens/dev-kit-vless";
+import { ProfileDeleteKit } from "@/screens/dev-kit-profile-delete";
 import { ProfileFixesKit } from "@/screens/dev-kit-profile-fixes";
 import { useT } from "@/i18n";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
@@ -306,13 +307,13 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge: one kit alone, for its screenshots;
+  // ?only=profile-delete|dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "halo") return <HaloKit />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { "profile-fixes": ProfileFixesKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit }[which];
+  const only = { "profile-fixes": ProfileFixesKit, "profile-delete": ProfileDeleteKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit }[which];
   if (only) {
     const Kit = only;
     return (

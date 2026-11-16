@@ -112,17 +112,18 @@ var procedureLevels = map[string]level{
 	adminv1connect.ProvisioningServiceRevealNodeServerPasswordProcedure: levelOwner, // credential reveal is owner-only and needs step-up
 	adminv1connect.ProvisioningServiceForgetNodeServerAccessProcedure:   levelOwner, // deletes a saved credential; needs step-up
 
-	adminv1connect.ProfileServiceListProtocolsProcedure:  levelRead,
-	adminv1connect.ProfileServiceListProfilesProcedure:   levelRead,
-	adminv1connect.ProfileServiceGetProfileProcedure:     levelRead, // secrets come back masked
-	adminv1connect.ProfileServicePreviewProfileProcedure: levelRead, // masked too
-	adminv1connect.ProfileServiceCreateProfileProcedure:  levelOwner,
-	adminv1connect.ProfileServiceUpdateProfileProcedure:  levelOwner,
-	adminv1connect.ProfileServiceDeleteProfileProcedure:  levelOwner,
-	adminv1connect.ProfileServiceCreateInboundProcedure:  levelOwner,
-	adminv1connect.ProfileServiceUpdateInboundProcedure:  levelOwner,
-	adminv1connect.ProfileServiceDeleteInboundProcedure:  levelOwner,
-	adminv1connect.ProfileServiceTwinProfileProcedure:    levelOwner, // CreateProfile + CreateInbound + UpdateGroup in one
+	adminv1connect.ProfileServiceListProtocolsProcedure:          levelRead,
+	adminv1connect.ProfileServiceListProfilesProcedure:           levelRead,
+	adminv1connect.ProfileServiceGetProfileProcedure:             levelRead, // secrets come back masked
+	adminv1connect.ProfileServicePreviewProfileProcedure:         levelRead, // masked too
+	adminv1connect.ProfileServiceCreateProfileProcedure:          levelOwner,
+	adminv1connect.ProfileServiceUpdateProfileProcedure:          levelOwner,
+	adminv1connect.ProfileServiceDeleteProfileProcedure:          levelOwner,
+	adminv1connect.ProfileServiceCreateInboundProcedure:          levelOwner,
+	adminv1connect.ProfileServiceUpdateInboundProcedure:          levelOwner,
+	adminv1connect.ProfileServiceDeleteInboundProcedure:          levelOwner,
+	adminv1connect.ProfileServiceRemoveProfileFromNodesProcedure: levelOwner, // DeleteInbound for a list, and DeleteProfile after it
+	adminv1connect.ProfileServiceTwinProfileProcedure:            levelOwner, // CreateProfile + CreateInbound + UpdateGroup in one
 
 	adminv1connect.GroupServiceListGroupsProcedure:  levelRead,
 	adminv1connect.GroupServiceCreateGroupProcedure: levelWrite,

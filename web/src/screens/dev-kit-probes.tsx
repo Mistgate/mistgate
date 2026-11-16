@@ -58,7 +58,7 @@ const base = "https://panel.example.com/mgp-kb3x2o7q5vwiz4nrp6sleu5hfa";
 const token = "mgp_kb3x2o7q5vwiz4nrp6sleu5hfa2o7q5vwiz4nrp6sleu5hf";
 const fetch = `curl -fsS --connect-timeout 15 -m 120`;
 // as ownprobe.BuildInstallCommand, BuildServerInstallCommand, BuildUpdateCommand and BuildServerUpdateCommand make them
-const routerInstall = `opkg update && opkg install curl ca-bundle coreutils-sha256sum && cd /tmp && ${fetch} -o mgp.sh '${base}/probe.sh' && echo '${sha}  mgp.sh' | sha256sum -c - && sh mgp.sh install '${base}' '${token}'`;
+const routerInstall = `i(){ opkg install "$1" || { opkg update; opkg install "$1"; }; }; command -v curl >/dev/null || i curl; command -v sha256sum >/dev/null || i coreutils-sha256sum; [ -s /opt/etc/ssl/certs/ca-certificates.crt ] || i ca-bundle; cd /tmp && ${fetch} -o mgp.sh '${base}/probe.sh' && echo '${sha}  mgp.sh' | sha256sum -c - && sh mgp.sh install '${base}' '${token}'`;
 const serverInstall = `f=$(mktemp) && ${fetch} -o "$f" '${base}/probe.sh' && echo "${sha}  $f" | sha256sum -c - && sudo sh "$f" install '${base}' '${token}'`;
 const routerUpdate = `cd /tmp && ${fetch} -o mgp.sh '${base}/probe.sh' && echo '${sha}  mgp.sh' | sha256sum -c - && sh mgp.sh upgrade`;
 const serverUpdate = `f=$(mktemp) && ${fetch} -o "$f" '${base}/probe.sh' && echo "${sha}  $f" | sha256sum -c - && sudo sh "$f" upgrade`;

@@ -88,6 +88,7 @@ var transactionShape2 = map[string]string{
 	"access_profile.go:UpdateProfile":                "A version guard precedes the profile and optional epoch and inbound bumps.",
 	"access_profile.go:DeleteProfile":                "A no-inbounds guard precedes device revocation and profile deletion.",
 	"access_profile.go:DeleteInbound":                "A snapshot guard protects retained-key insertion and inbound deletion after the callback runs.",
+	"access_profile.go:RemoveProfileInbounds":        "Guards pin the profile's inbound set and each kept key before the inbound deletions, retained keys and optional profile deletion run in one batch.",
 	"access_profile.go:UpdateGroupWithDisabledNodes": "A group guard precedes optional field, profile, and disabled-node updates.",
 	"access_profile.go:DeleteGroup":                  "A group and user guard or a group guard precedes its optional move and deletion.",
 	"admin.go:DeletePasskey":                         "SQL guards the delete against removing an admin's last sign-in method.",
