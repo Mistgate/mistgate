@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { SectionLabel } from "@/components/ui/bits";
@@ -12,6 +13,7 @@ import { FormatsTab } from "@/screens/subscriptions/formats";
 import { DeviceIdleCard } from "@/screens/subscriptions/device-idle";
 import { HeadersTab } from "@/screens/subscriptions/headers";
 import { LinkAutoCard } from "@/screens/subscriptions/link-auto";
+import { MihomoTab } from "@/screens/subscriptions/mihomo";
 import { LinkAwgCard, LinkAwgOffDialog } from "@/screens/subscriptions/link-awg";
 import type { Settings } from "@/screens/subscriptions/model";
 import { clientsQuery, pickerUsersQuery, settingsQuery } from "@/screens/subscriptions/queries";
@@ -29,6 +31,9 @@ import { subscriptions } from "@/lib/api";
 // &state=headers-empty|headers|headers-error: the tab "Response headers" with no header, with the flclashx-* headers of FlClashX
 // (the preview answers as the panel would: the format of the User-Agent, the person's group) and with the four mistakes the form
 // points out (data-shot subs-headers-empty, subs-headers, subs-headers-error).
+// &state=mihomo-empty|mihomo|mihomo-error|mihomo-warn|mihomo-builtin: the tab "Mihomo templates" with none, with three (the first
+// open, its preview for a person of its group), with a text the panel refuses (its line marked), with the warnings the panel
+// lists (data-shot subs-mihomo-*), and with the preview of a person whose group has no template (the panel's own profile).
 
 const settings = {
   title: "",
@@ -57,8 +62,8 @@ const hdrGroups = [
   { id: "grp_vip", name: "VIP" },
 ];
 const hdrUsers = [
-  { id: "usr_alice", name: "alice" },
-  { id: "usr_bob", name: "bob" },
+  { id: "usr_alice", name: "alice", groupId: "grp_mobile" },
+  { id: "usr_bob", name: "bob", groupId: "grp_home" },
 ];
 const hdrPairs = [
   hdr("flclashx-servicename", "Мой VPN", { base64: true }),
@@ -98,6 +103,147 @@ function HeadersShot({ state }: { state: string }) {
       <div data-shot={`subs-${state}`} className="flex flex-col gap-3">
         <SectionLabel>{state === "headers-empty" ? "Subscriptions → Response headers: none yet" : state === "headers-error" ? "Subscriptions → Response headers: a name the panel keeps, a name that is no header name, text that needs base64, no group chosen" : "Subscriptions → Response headers: the flclashx-* headers of FlClashX, with the preview of what one person gets"}</SectionLabel>
         <HeadersTab data={data} />
+      </div>
+    </QueryClientProvider>
+  );
+}
+
+// ---- the tab "Mihomo templates" ----
+const mtGroups = [
+  { id: "grp_router", name: "ROUTER" },
+  { id: "grp_pc", name: "PC" },
+  { id: "grp_mobile", name: "MOBILE" },
+];
+const mtUsers = [
+  { id: "usr_alice", name: "alice", groupId: "grp_router" },
+  { id: "usr_bob", name: "bob", groupId: "grp_pc" },
+  { id: "usr_carol", name: "carol", groupId: "grp_mobile" },
+];
+const mtRouter = `# Home routers: the router proxies the whole network.
+mixed-port: 7890
+redir-port: 7892
+tproxy-port: 7893
+allow-lan: true
+mode: rule
+log-level: warning
+
+proxy-groups:
+  - name: Proxy
+    type: select
+    include-all-proxies: true
+    proxies: [Auto, DIRECT]
+  - name: Streaming
+    type: select
+    include-all-proxies: true
+    filter: "(?i)nl1|de1"   # the servers whose name has nl1 or de1
+  - name: Direct
+    type: select
+    proxies: [DIRECT, Proxy]
+
+rule-providers:
+  ads:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://rules.example.com/ads.mrs
+    path: ./ruleset/ads.mrs
+    interval: 86400
+
+rules:
+  - RULE-SET,ads,REJECT
+  - GEOIP,PRIVATE,Direct,no-resolve
+  - DOMAIN-SUFFIX,example.com,Direct
+  - DOMAIN-KEYWORD,stream,Streaming
+  - MATCH,Proxy
+`;
+const mtPc = `# Desktop apps: its own DNS, everything through one group.
+mixed-port: 7890
+mode: rule
+dns:
+  enable: true
+  nameserver:
+    - https://dns.example.com/dns-query
+proxy-groups:
+  - name: Proxy
+    type: select
+    include-all-proxies: true
+    proxies: [Auto]
+rules:
+  - DOMAIN-SUFFIX,example.com,Direct
+  - MATCH,Proxy
+`;
+const mtDraft = `mixed-port: 7890
+mode rule
+proxy-groups:
+  - name: Proxy
+    type: select
+    include-all-proxies: true
+rules:
+  - MATCH,Proxy
+`;
+const mtBase = `mixed-port: 7890
+mode: rule
+proxy-groups:
+  - name: Proxy
+    type: select
+    include-all-proxies: true
+    proxies: [Auto, DIRECT]
+rules:
+  - MATCH,Proxy
+`;
+const mtTemplates = (state: string) =>
+  state === "mihomo-empty"
+    ? []
+    : [
+        { name: "Home routers", yaml: mtRouter, groupIds: ["grp_router"] },
+        { name: "Desktop", yaml: mtPc, groupIds: ["grp_pc"] },
+        { name: "Draft", yaml: state === "mihomo-error" ? mtDraft : mtBase, groupIds: [] },
+      ];
+
+/** What the panel's preview answers for a text, in the shape of its rules (a made-up one: the line of a mistake, the six warnings, the servers first). */
+function fakeMihomoPreview({ userId, yaml, groupIds }: { userId: string; yaml: string; groupIds: string[] }) {
+  const lines = yaml.split("\n");
+  const bad = lines.findIndex((l) => /^\s+[A-Za-z][\w-]*\s+[^\s:#-][^:]*$/.test(l) || /^[A-Za-z][\w-]*\s+[^\s:#][^:]*$/.test(l));
+  if (bad >= 0) throw new ConnectError(`line ${bad + 1}: could not find expected ':'`, Code.InvalidArgument);
+  const user = mtUsers.find((u) => u.id === userId)!;
+  const names = new Set(["DIRECT", "REJECT", "Auto", ...[...yaml.matchAll(/^\s+- name: (.+)$/gm)].map((m) => m[1]!.trim())]);
+  const warnings: { code: string; arg: string }[] = [];
+  if (!/include-all/.test(yaml) && !/\bAuto\b/.test(yaml)) warnings.push({ code: "no_server_group", arg: "" });
+  if (/^dns:/m.test(yaml)) warnings.push({ code: "own_dns", arg: "" });
+  for (const m of yaml.matchAll(/^\s+- (?:[A-Z-]+),[^,\n]*,([^,\n]+)/gm)) if (!names.has(m[1]!.trim())) warnings.push({ code: "unknown_rule_target", arg: m[1]!.trim() });
+  if (user.id === "usr_bob") warnings.push({ code: "preset_rules_skipped", arg: "" });
+  if (groupIds.length === 0) warnings.push({ code: "unused", arg: "" });
+  const servers = `proxies:\n  - {name: "DE de1 vless", type: vless, server: de1.example.com, port: 443}\n  - {name: "NL nl1 hysteria2", type: hysteria2, server: nl1.example.com, port: 8443}\n`;
+  const auto = `  - name: Auto\n    type: url-test\n    proxies: ["DE de1 vless", "NL nl1 hysteria2"]\n    url: https://www.gstatic.com/generate_204\n    interval: 300\n`;
+  const at = lines.findIndex((l) => l.startsWith("rule-providers:") || l.startsWith("rules:"));
+  const body = lines.slice(0, at < 0 ? lines.length : at).join("\n").replace(/\n*$/, "\n") + (/include-all/.test(yaml) && !/name: Auto/.test(yaml) ? auto : "") + (at < 0 ? "" : "\n" + lines.slice(at).join("\n"));
+  const dns = /^dns:/m.test(yaml) ? "" : "dns:\n  enable: true\n  respect-rules: true\n  nameserver: [https://dns.example.com/dns-query]\n";
+  return { yaml: servers + body + dns, warnings, groupName: mtGroups.find((g) => g.id === user.groupId)!.name, notServed: "" };
+}
+
+/** The tab "Mihomo templates" on its own cache; the panel's preview is answered here by a stand-in (see fakeMihomoPreview). */
+function MihomoShot({ state }: { state: string }) {
+  const [qc] = useState(() => {
+    const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    c.setQueryData(groupsQuery.queryKey, mtGroups as never);
+    c.setQueryData(pickerUsersQuery.queryKey, state === "mihomo-builtin" ? [mtUsers[2]!, mtUsers[0]!, mtUsers[1]!] : mtUsers);
+    c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role: Role.OWNER, displayName: "Owner" }, version: "dev" } as never);
+    (subscriptions as unknown as Record<string, unknown>).previewMihomoTemplate = async (r: Parameters<typeof fakeMihomoPreview>[0]) => fakeMihomoPreview(r);
+    return c;
+  });
+  const first = state === "mihomo-warn" ? 1 : state === "mihomo-error" || state === "mihomo-builtin" ? 2 : 0;
+  const label: Record<string, string> = {
+    "mihomo-empty": "Subscriptions → Mihomo templates: none yet",
+    mihomo: "Subscriptions → Mihomo templates: three templates, the first open, with its preview for a person of its group",
+    "mihomo-error": "Subscriptions → Mihomo templates: a text the panel refuses (its line is marked, the save is off)",
+    "mihomo-warn": "Subscriptions → Mihomo templates: what the panel says is worth a look (a save is not stopped)",
+    "mihomo-builtin": "Subscriptions → Mihomo templates: the preview for a person whose group has no template",
+  };
+  return (
+    <QueryClientProvider client={qc}>
+      <div data-shot={`subs-${state}`} className="flex flex-col gap-3">
+        <SectionLabel>{label[state]}</SectionLabel>
+        <MihomoTab data={{ settings: { ...settings, mihomoTemplates: mtTemplates(state) } as unknown as Settings }} initial={state === "mihomo-empty" ? null : first} />
       </div>
     </QueryClientProvider>
   );
@@ -255,6 +401,7 @@ export function SubsKit() {
           </div>
         )}
         {state.startsWith("headers") && <HeadersShot state={state} />}
+        {state.startsWith("mihomo") && <MihomoShot state={state} />}
         {state === "clients" && (
           <>
             <ClientsShot owner shot="subs-clients" label="Subscriptions → App versions: devices of every state with what the nodes saw (a device new-style in fact but below the minimum by the table, one that is old-style in fact, a mixed one, one nobody measured), the owner" />
@@ -272,7 +419,7 @@ export function SubsKit() {
             <DeviceIdleCard settings={{ ...shown, deviceIdleAfterDays: 0 } as Settings} />
           </div>
         )}
-        {!awg && state !== "client-api" && state !== "idle" && !state.startsWith("clients") && !state.startsWith("headers") && (
+        {!awg && state !== "client-api" && state !== "idle" && !state.startsWith("clients") && !state.startsWith("headers") && !state.startsWith("mihomo") && (
           <div data-shot="subs-texts" className="flex flex-col gap-3">
             <SectionLabel>Subscriptions → Names &amp; texts: ping in Happ</SectionLabel>
             <TextsTab data={{ settings, effectiveTitle: "Mistgate", samples, sampleGroup: state === "many" ? "Default" : "" } as never} />

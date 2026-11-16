@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icons";
 import { cx } from "@/lib/cx";
 import { useTx } from "@/screens/users/t";
 
@@ -45,4 +46,24 @@ export function SaveBar({ busy, canSave, onSave, onDiscard }: { busy: boolean; c
 /** The line under a tab's top that says what the tab is for (one or two sentences, muted, a readable width). */
 export function Lead({ children }: { children: ReactNode }) {
   return <p className="max-w-[680px] text-[13px] leading-normal text-muted">{children}</p>;
+}
+
+/** A pill the size of the filter chips that is pressed or not (`disabled`: a choice that is taken, `title` says by what). */
+export function ToggleChip({ on, onClick, disabled, title, children }: { on: boolean; onClick: () => void; disabled?: boolean; title?: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={disabled}
+      title={title}
+      onClick={onClick}
+      className={cx(
+        "flex h-[30px] max-w-full items-center gap-1.5 rounded-[15px] border px-3 text-xs font-bold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60",
+        on ? "border-accent-line bg-accent-soft text-fg" : "border-line bg-surface text-muted",
+      )}
+    >
+      {on && <Icon name="check" size={12} />}
+      {children}
+    </button>
+  );
 }

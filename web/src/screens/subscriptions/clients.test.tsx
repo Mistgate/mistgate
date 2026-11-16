@@ -543,7 +543,7 @@ describe("pure parts", () => {
   });
 
   it("has the tab to the right of 'Who gets what' and keeps a plain ?user in the URL", () => {
-    expect(subsTabs).toEqual(["formats", "rules", "clients", "texts", "headers", "page", "dns"]);
+    expect(subsTabs).toEqual(["formats", "rules", "clients", "texts", "headers", "mihomo", "page", "dns"]);
     expect(validateSubsSearch({ tab: "clients", user: "alice" })).toEqual({ tab: "clients", user: "alice" });
     expect(validateSubsSearch({ tab: "formats" })).toEqual({});
     expect(validateSubsSearch({ tab: "nope", user: "a b" })).toEqual({});

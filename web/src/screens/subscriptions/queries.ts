@@ -3,7 +3,7 @@ import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
 import { dns, subscriptions, users } from "@/lib/api";
 import { plain } from "@/lib/plain";
-import type { DnsData, ResponseHeader, Settings } from "./model";
+import { textKey, type DnsData, type ResponseHeader, type Settings } from "./model";
 
 // Query keys sit under "subs" / "dns". Settings change only when an admin saves, so there is no polling; a save
 // invalidates them. The user card reads the presets through the same key, so a change here shows there.
@@ -53,7 +53,7 @@ export const testAgentQuery = (userAgent: string) =>
 /** The user picker of the page preview: the first page of users, enough to see the page as somebody. */
 export const pickerUsersQuery = queryOptions({
   queryKey: ["users", "picker"],
-  queryFn: async ({ signal }) => plain((await users.listUsers({ pageSize: 50 }, { signal })).users).map((u) => ({ id: u.id, name: u.name })),
+  queryFn: async ({ signal }) => plain((await users.listUsers({ pageSize: 50 }, { signal })).users).map((u) => ({ id: u.id, name: u.name, groupId: u.groupId })),
   staleTime: 30_000,
 });
 
@@ -63,6 +63,19 @@ export const headerPreviewQuery = (userId: string, userAgent: string, headers: R
     queryKey: ["subs", "hdr-preview", userId, userAgent, headers],
     queryFn: async ({ signal }) => plain(await subscriptions.previewResponseHeaders({ userId, userAgent, headers }, { signal })),
     staleTime: 0,
+  });
+
+/**
+ * What the panel makes of a template text for one person (the profile and what to look at), asked of the text as the form holds it.
+ * A text the panel would refuse comes back as an error (InvalidArgument) that names the line. The key carries a short hash of the
+ * text, not the text; a save refreshes every one of these.
+ */
+export const mihomoPreviewQuery = (userId: string, yaml: string, groupIds: string[]) =>
+  queryOptions({
+    queryKey: ["subs", "mt-preview", userId, textKey(yaml), groupIds],
+    queryFn: async ({ signal }) => plain(await subscriptions.previewMihomoTemplate({ userId, yaml, groupIds }, { signal })),
+    staleTime: 60_000,
+    retry: false,
   });
 
 export const dnsPresetsQuery = queryOptions({

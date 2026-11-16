@@ -701,3 +701,67 @@ export function headerToSave(h: ResponseHeader, known: readonly string[] | null)
   const groupIds = !h.onlyGroups ? [] : known === null ? [...h.groupIds] : h.groupIds.filter((g) => known.includes(g));
   return { ...h, name: h.name.trim(), value: h.value.trim(), formats, groupIds };
 }
+
+// ---- the owner's own Mihomo templates ("Mihomo templates" tab) ----
+
+export type MihomoTemplate = Settings["mihomoTemplates"][number];
+/** What the panel enforces on save (internal/panel/subsettings/mihomo.go); the panel is the one that refuses, this only says why early. */
+export const templateLimit = { count: 20, name: 60, bytes: 64 << 10, total: 256 << 10 } as const;
+/** The largest file the editor takes from a drop or the file button; a template is far smaller, the panel says by how much. */
+export const templateFileMax = 1 << 20;
+
+export const templateBytes = (yaml: string): number => utf8.encode(yaml).length;
+/** Bytes as KiB with one decimal ("12.3"): the unit of the panel's limits. */
+export const kib = (bytes: number): string => (bytes / 1024).toFixed(1);
+
+/** A short key for a text (its length and a hash): what a query is told apart by, so that 64 KiB are not a key. */
+export function textKey(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) | 0;
+  return `${s.length}:${h >>> 0}`;
+}
+
+/** The text a new template starts with: one select group over every server of the person (and Auto while the panel adds it). */
+export const starterTemplate = (auto: boolean): string =>
+  [
+    "# The panel puts the person's servers at the start of `proxies` (the key may be missing).",
+    "# Groups take them with include-all-proxies or filter.",
+    "mixed-port: 7890",
+    "mode: rule",
+    "proxy-groups:",
+    "  - name: Proxy",
+    "    type: select",
+    "    include-all-proxies: true",
+    `    proxies: [${auto ? "Auto, " : ""}DIRECT]`,
+    "rules:",
+    "  - MATCH,Proxy",
+    "",
+  ].join("\n");
+
+/** What the form can say about a template before the panel does (the panel's save checks all of it again). */
+export function templateProblems(rows: readonly Pick<MihomoTemplate, "name" | "yaml">[], i: number): { name: HeaderProblem | null; text: HeaderProblem | null } {
+  const r = rows[i]!;
+  const name = r.name.trim();
+  const taken = rows.some((o, j) => j !== i && o.name.trim().toLowerCase() === name.toLowerCase());
+  const bytes = templateBytes(r.yaml);
+  return {
+    name: name === "" ? { key: "subs.mt.err.noName" } : [...name].length > templateLimit.name ? { key: "subs.mt.err.nameLong", vars: { max: templateLimit.name } } : taken ? { key: "subs.mt.err.nameTaken" } : null,
+    text: r.yaml.trim() === "" ? { key: "subs.mt.err.empty" } : bytes > templateLimit.bytes ? { key: "subs.mt.err.big", vars: { n: kib(bytes), max: templateLimit.bytes >> 10 } } : null,
+  };
+}
+
+/** What the panel's refusal of a template says: the words without the field's path, the line of the text it names, and which template (an index of the list sent). */
+export function templateRefusal(raw: string): { text: string; line?: number; index?: number } {
+  let s = raw.replace(/^invalid subscription settings:\s*/, "");
+  let index: number | undefined;
+  const m = /^mihomo_templates\[(\d+)\](?: \("(?:[^"\\]|\\.)*"\))?\.yaml:\s*/.exec(s);
+  if (m) {
+    index = Number(m[1]);
+    s = s.slice(m[0].length);
+  } else {
+    const f = /^mihomo_templates\[(\d+)\]\./.exec(s);
+    if (f) index = Number(f[1]);
+  }
+  const line = /(?:^|: )line (\d+):/.exec(s)?.[1];
+  return { text: s, ...(line && { line: Number(line) }), ...(index !== undefined && { index }) };
+}

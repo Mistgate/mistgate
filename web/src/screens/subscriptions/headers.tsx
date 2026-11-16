@@ -19,7 +19,7 @@ import { useDebounced } from "@/screens/users/ui";
 import { formatKey, headerFormats, headerLimit, headerNameProblem, headerSize, headerToSave, headerValueProblem, move, type HeaderProblem, type ResponseHeader, type Settings } from "./model";
 import { headerPreviewQuery, pickerUsersQuery, useSaveSettings } from "./queries";
 import { samples } from "./rules";
-import { inputCls, Lead, SaveBar } from "./ui";
+import { inputCls, Lead, SaveBar, ToggleChip } from "./ui";
 
 type Data = { settings: Settings; reservedHeaderNames: string[] };
 type Row = ResponseHeader & { k: number }; // k: the row's own key, so that a move keeps what is typed where it was
@@ -164,21 +164,6 @@ function HeadersForm({ settings, reserved }: { settings: Settings; reserved: str
 
       {dirty && <SaveBar busy={save.isPending} canSave={valid && known !== null} onSave={onSave} onDiscard={() => setRows(saved.map((h, k) => ({ ...h, k })))} />}
     </div>
-  );
-}
-
-/** A pill the size of the filter chips that is pressed or not. */
-function ToggleChip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cx("flex h-[30px] items-center gap-1.5 rounded-[15px] border px-3 text-xs font-bold transition-colors duration-200", on ? "border-accent-line bg-accent-soft text-fg" : "border-line bg-surface text-muted")}
-    >
-      {on && <Icon name="check" size={12} />}
-      {children}
-    </button>
   );
 }
 

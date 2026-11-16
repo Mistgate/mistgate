@@ -8,6 +8,7 @@ import { ClientsTab } from "./clients";
 import { DnsTab } from "./dns";
 import { FormatsTab } from "./formats";
 import { HeadersTab } from "./headers";
+import { MihomoTab } from "./mihomo";
 import { PageTab } from "./page";
 import { settingsQuery } from "./queries";
 import { RulesTab } from "./rules";
@@ -35,7 +36,7 @@ export function SubscriptionsScreen() {
       ) : id === "clients" ? (
         <ClientsTab userId={search.user} onClearUser={() => void navigate({ to: "/subscriptions", search: { tab: "clients" }, replace: true } as never)} />
       ) : (
-        body((d) => (id === "formats" ? <FormatsTab go={go} /> : id === "rules" ? <RulesTab settings={d.settings} /> : id === "texts" ? <TextsTab data={d} /> : id === "headers" ? <HeadersTab data={d} /> : <PageTab settings={d.settings} />))
+        body((d) => (id === "formats" ? <FormatsTab go={go} /> : id === "rules" ? <RulesTab settings={d.settings} /> : id === "texts" ? <TextsTab data={d} /> : id === "headers" ? <HeadersTab data={d} /> : id === "mihomo" ? <MihomoTab data={d} /> : <PageTab settings={d.settings} />))
       ),
   }));
 
