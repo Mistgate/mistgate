@@ -71,7 +71,6 @@ const codeText: Record<string, MessageKey> = {
   agent_bundle_unavailable: "node.ssh.error.bundle",
   remote_outcome_unknown: "node.ssh.error.remoteOutcome",
   host_firewall_configuration_failed: "node.ssh.error.firewall",
-  nftables_install_failed: "node.ssh.error.nftables",
   node_not_connected: "node.ssh.error.notConnected",
   subscription_host_tunnel_down: "node.ssh.error.hostTunnel",
   systemd_install_failed: "node.ssh.error.systemd",

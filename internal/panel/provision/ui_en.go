@@ -269,7 +269,6 @@ var pageEnglish = map[string]string{
 	"Панели не удалось безопасно продолжить это задание. Проверьте журналы панели.":     "The panel could not safely continue this job. Check the panel's logs.",
 	"Эта нода была выведена из эксплуатации и не может быть зарегистрирована повторно.": "This node was retired and cannot be registered again.",
 	"Не удалось настроить активный firewall на сервере. Проверьте права SSH-пользователя и правила UFW/firewalld, затем повторите установку. Firewall хостера настраивается отдельно.": "Could not set up the server's active firewall. Check the SSH user's rights and the UFW/firewalld rules, then retry. The hoster's firewall is set up separately.",
-	"На сервере нет nftables, и панели не удалось его установить. Установите пакет nftables (apt install nftables) и повторите установку.": "The server has no nftables and the panel could not install it. Install the nftables package (apt install nftables) and retry.",
 	"В доверенном наборе релиза не найден агент для этой архитектуры.":                                                                                                                 "The trusted release bundle has no agent for this architecture.",
 	"Не удалось передать агент на сервер.":                 "Could not transfer the agent to the server.",
 	"Не удалось безопасно зарегистрировать ноду в панели.": "Could not safely register the node in the panel.",

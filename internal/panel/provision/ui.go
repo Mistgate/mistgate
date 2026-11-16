@@ -631,8 +631,6 @@ func errorLabel(code string) string {
 		return "Эта нода была выведена из эксплуатации и не может быть зарегистрирована повторно."
 	case "host_firewall_configuration_failed":
 		return "Не удалось настроить активный firewall на сервере. Проверьте права SSH-пользователя и правила UFW/firewalld, затем повторите установку. Firewall хостера настраивается отдельно."
-	case "nftables_install_failed":
-		return "На сервере нет nftables, и панели не удалось его установить. Установите пакет nftables (apt install nftables) и повторите установку."
 	case "agent_bundle_unavailable":
 		return "В доверенном наборе релиза не найден агент для этой архитектуры."
 	case "agent_transfer_failed":
