@@ -41,6 +41,7 @@ const paths = {
   next: ["m9 6 6 6-6 6"],
   back: ["m15 6-6 6 6 6"],
   clock: [circle(12, 12, 9), "M12 7.5V12l3 2"],
+  tunnel: ["M4 20v-9a8 8 0 0 1 16 0v9", "M8.5 20v-8.5a3.5 3.5 0 0 1 7 0V20", "M2.5 20h19"],
   chat: ["M4.5 19.5V7a2.5 2.5 0 0 1 2.5-2.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5H8z"],
 } as const satisfies Record<string, readonly Shape[]>;
 
