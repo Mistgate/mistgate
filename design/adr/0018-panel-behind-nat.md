@@ -81,7 +81,8 @@ long-lived outbound sockets.
   observer that the node is a tunnel endpoint.
 - The tunnel secret is rotated only by moving the host to another node or turning it off and on again.
 - All subscription clients and agent links share the tunnel's 1024 streams: one client address (an IPv6 one by its
-  /64) takes at most 32, and the forwards leave 16 for the host's own agent link. Many addresses together can still
-  fill it.
+  /64) takes at most 32, and the forwards leave 16 for the host's own agent link. The other nodes' links arrive as
+  forwards like any client, so many addresses together (32 IPv4 addresses, or a routed /56) can still fill it and cut
+  subscriptions and those links until they let go.
 - Nodes whose agent lacks the link capabilities block enabling (`sub_host_nodes_lack_link`) until they are updated.
 - MCP and API tokens can read the state; every change is an approved plan with a fresh owner step-up.
