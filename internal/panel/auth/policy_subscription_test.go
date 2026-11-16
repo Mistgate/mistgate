@@ -52,3 +52,33 @@ func TestSubscriptionSettingsThroughTheOwnersApprovalOnly(t *testing.T) {
 		t.Errorf("an awaiting plan: %d", got)
 	}
 }
+
+// A save of the subscription settings under an approved plan says which tool's plan it is: the Mihomo templates are the owner's, and
+// only the plan of subscription_mihomo_template_set (which the owner approved) lets a token that is not the owner's change one.
+func TestApprovedPlanToolNamesTheToolOfTheGrant(t *testing.T) {
+	e := newTokenEnv(t)
+	op, opSecret := e.mkToken("op", store.ProfileOperator, 600)
+	update := adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure
+	mcp := func(planID string) context.Context {
+		return e.s.WithApprovedStepUp(WithChannel(context.Background(), ChannelMCP), planID)
+	}
+	approvedTool := func(ctx context.Context) string {
+		t.Helper()
+		e.call(update, opSecret, callOpts{ctx: ctx})
+		return e.seen.approved
+	}
+	if got := approvedTool(mcp(e.planFor(op, MihomoTemplateTool, true, "applying").ID)); got != MihomoTemplateTool {
+		t.Errorf("the template tool's approved plan: %q", got)
+	}
+	if got := approvedTool(mcp(e.planFor(op, "subscription_texts_set", true, "applying").ID)); got != "subscription_texts_set" {
+		t.Errorf("another tool's approved plan: %q", got)
+	}
+	// a plan nobody approved, and a call with no grant, name nothing (the call itself is refused before the handler)
+	e.seen.approved = "left over"
+	if got := approvedTool(mcp(e.planFor(op, MihomoTemplateTool, true, "awaiting").ID)); got != "left over" {
+		t.Errorf("an awaiting plan reached the handler: %q", got)
+	}
+	if got := ApprovedPlanTool(context.Background()); got != "" {
+		t.Errorf("no grant: %q", got)
+	}
+}

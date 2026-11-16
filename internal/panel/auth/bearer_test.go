@@ -40,6 +40,7 @@ type seen struct {
 	admin     store.Admin
 	principal Principal
 	stepUpErr error
+	approved  string // ApprovedPlanTool of the call
 	body      []byte
 }
 
@@ -57,6 +58,7 @@ func newTokenEnv(t *testing.T) *tokenEnv {
 		sn.admin, _ = AdminFrom(r.Context())
 		sn.principal = PrincipalFrom(r.Context())
 		sn.stepUpErr = s.RequireStepUp(r.Context())
+		sn.approved = ApprovedPlanTool(r.Context())
 		sn.body, _ = readAll(r)
 		// a module writing its own audit row with the request context: the source must follow the call
 		st.Audit(r.Context(), s.now(), store.AuditEntry{Actor: sn.admin.ID, Action: "module_row", Result: "ok"})

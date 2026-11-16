@@ -123,6 +123,25 @@ func HasApprovedUserChangePlan(ctx context.Context) bool {
 	return slices.Contains(userChangePlanProcedures[plan.Tool], procedure) || slices.Contains(grantProcedures[plan.Tool], procedure)
 }
 
+// MihomoTemplateTool is the MCP tool whose owner-approved plan may change the Mihomo templates of the subscription settings
+// through a token that is not the owner's (an operator token): the owner's approval of that plan is the owner's own decision.
+const MihomoTemplateTool = "subscription_mihomo_template_set"
+
+// ApprovedPlanTool is the MCP tool whose plan this call is applying, when the plan is one the owner approved and its tool may call
+// this procedure (the same test as the grant that let the call through); "" for any other call, a signed-in admin's included.
+func ApprovedPlanTool(ctx context.Context) string {
+	p := PrincipalFrom(ctx)
+	g, ok := ctx.Value(grantKey{}).(approvedGrant)
+	if !ok || g.s == nil || !p.Token || !g.s.grantAllows(ctx, p.TokenID, procedureFrom(ctx)) {
+		return ""
+	}
+	plan, err := g.s.st.GetMCPPlan(ctx, g.planID)
+	if err != nil {
+		return ""
+	}
+	return plan.Tool
+}
+
 // grantAllows reports whether the approved grant in ctx is valid for tokenID calling the procedure in ctx.
 func (s *Service) grantAllows(ctx context.Context, tokenID, procedure string) bool {
 	g, ok := ctx.Value(grantKey{}).(approvedGrant)

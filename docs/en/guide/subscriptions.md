@@ -287,6 +287,8 @@ Changes wait for **Save**; **Discard** drops them. They apply at the next fetch,
 
 By default the Mihomo YAML is the panel's own profile: your servers, one group to pick from, an `Auto` group and the DNS of the person's preset. The **Mihomo templates** tab lets you write your own profile for chosen groups: your proxy groups, rules and rule lists, with the person's servers put in. One template can go to several groups (the router and the PC of the same family get different ones), and a group named by no template gets the panel's own profile. A person is in one group, so they get one template.
 
+Only the owner changes templates. A template is the whole config its people get, with the `proxy-providers` and rules it names, which is more than the other settings of this section. A helper reads the templates and uses the preview, but a save of theirs that adds, deletes or changes a template (its name, text or groups) is refused with `mihomo_templates_owner_only`; the rest of the settings stay open to them. The same holds for a token: an agent changes a template only through the owner's approval of its plan.
+
 The tab lists the templates (name, groups, size, a mark for errors and warnings). **Add template**, **Duplicate** (for a second device, start from a copy of the first) and **Delete** work on the list; a template has a **Name**, its **Groups** (a group already in another template is shown as taken) and the YAML text, which you type, paste or load with **Load .yaml**. Nothing is saved before **Save**. A change reaches people with their next fetch (in the Cloudflare edition, within a minute).
 
 ### What the panel changes
@@ -487,4 +489,4 @@ Rules are saved as soon as you add, move or remove one. On **Names & texts**, **
 
 ## Who can do what
 
-Every admin can read these settings, including the Mihomo templates, and try a User-Agent or a template preview. The owner and helpers change them. The DNS tab is described in [DNS](dns.md).
+Every admin can read these settings, including the Mihomo templates, and try a User-Agent or a template preview. The owner and helpers change them, except the Mihomo templates, which only the owner changes. The DNS tab is described in [DNS](dns.md).

@@ -102,6 +102,8 @@ describe("the panel's refusal codes", () => {
     }
     expect(say("your role cannot do this", Code.PermissionDenied)).toBe(en["err.denied"]);
     expect(say("your role cannot do this", Code.PermissionDenied, "ru")).toBe(ru["err.denied"]);
+    expect(say("mihomo_templates_owner_only: only the owner can change the Mihomo templates", Code.PermissionDenied)).toBe(en["err.mihomo_templates_owner_only"]);
+    expect(say("mihomo_templates_owner_only: only the owner can change the Mihomo templates", Code.PermissionDenied, "ru")).toBe(ru["err.mihomo_templates_owner_only"]);
     expect(say("unknown denial", Code.PermissionDenied)).toBe(en["err.permissionDenied"]);
     expect(say("unknown denial", Code.PermissionDenied, "ru")).toBe(ru["err.permissionDenied"]);
   });

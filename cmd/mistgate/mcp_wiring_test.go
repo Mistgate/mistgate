@@ -462,8 +462,8 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Errorf("after the refused apply: %d %s", code, body)
 	}
 
-	// -- an own Mihomo template: the operator plans it, the owner's card names it without the text, the real save checks and stores
-	// it, the readonly token reads it in windows, and no audit row holds the text.
+	// -- an own Mihomo template: the operator plans it (a helper's role: only the owner's approval of this plan lets the save change a
+	// template), the owner's card names it without the text, the real save checks and stores it, the readonly token reads it in windows, and no audit row holds the text.
 	const tplMarker = "# marker-template-text-4471"
 	tplText := "mixed-port: 7890\n" + tplMarker + "\nproxy-groups:\n  - name: Proxy\n    type: select\n    include-all-proxies: true\nrules:\n  - MATCH,Proxy\n"
 	tp := decodeJSON[mcp.PlanOut](t, ok(op2, "subscription_mihomo_template_set_plan", map[string]any{"name": "ROUTER", "yaml": tplText, "group_ids": []string{groupID}}))
@@ -490,6 +490,19 @@ func TestMCPEndToEnd(t *testing.T) {
 	}
 	if out := ok(ro, "subscription_mihomo_template_get", map[string]any{"name": "router"}); !strings.Contains(out, "marker-template-text") || !strings.Contains(out, `"bytes":`+strconv.Itoa(len(tplText))) {
 		t.Errorf("the read of the template: %s", out)
+	}
+
+	// The templates are the owner's: the operator's other plans carry them as they are stored and apply without the owner's grant of this
+	// tool; the save over the API as a helper is refused in the subs tests (a token has no way to it but a plan).
+	tx := decodeJSON[mcp.PlanOut](t, ok(op2, "subscription_texts_set_plan", map[string]any{"announcement": "Maintenance tonight"}))
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+tx.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	if ap := decodeJSON[mcp.ApplyOut](t, ok(op2, "subscription_texts_set_apply", map[string]any{"confirm_token": tx.ConfirmToken})); ap.Status != "applied" {
+		t.Errorf("subscription_texts_set_apply with a template stored: %+v", ap)
+	}
+	if code, body := rpc("owner", "", "SubscriptionService", "GetSubscriptionSettings", `{}`); code != 200 || !strings.Contains(body, "Maintenance tonight") || !strings.Contains(body, "marker-template-text") {
+		t.Errorf("after the operator's text change: %d %s", code, body)
 	}
 
 	// -- the audit trail: the plan, the apply and the module's own rows carry the token as mcp:<id>

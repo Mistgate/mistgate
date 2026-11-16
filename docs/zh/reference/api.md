@@ -217,7 +217,7 @@ func main() {
 | `ProvisioningService.ListNodeServerAccess`（连接元数据，不含密码） | 否 | 否 | 是 |
 | `ProvisioningService.GetSSHFingerprint` | 否 | 否 | 仅在 MCP 服务器制定 `node_install` 计划时可用 |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
-| `SubscriptionService.UpdateSubscriptionSettings`（共享设置：用户页面的应用、文本、自定义响应头、自有 Mihomo 模板） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
+| `SubscriptionService.UpdateSubscriptionSettings`（共享设置：用户页面的应用、文本、自定义响应头、自有 Mihomo 模板；修改模板的保存只属于所有者：协作者会收到 `PERMISSION_DENIED` `mihomo_templates_owner_only`，令牌只能经所有者批准 `subscription_mihomo_template_set` 计划后修改） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
 | `SubscriptionService.PreviewMihomoTemplate` | 否 | 否 | 否（管理面板的预览；智能体用 `subscription_mihomo_template_get` 读取模板，并在 `subscription_preview` 中查看某人得到哪个模板） |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 

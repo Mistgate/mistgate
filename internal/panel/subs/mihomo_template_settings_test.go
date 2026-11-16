@@ -24,7 +24,7 @@ func mihomoTemplate(name string, groups ...string) *adminv1.MihomoTemplate {
 func TestMihomoTemplatesThroughTheSettingsAPI(t *testing.T) {
 	m := newM3Rig(t)
 	svc := headerService(m)
-	ctx := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates"})
+	ctx := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
 	temp := must(m.svc.CreateGroup(m.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "temp", ProfileIds: []string{m.profile}}))).Msg.Group.Id
 	save := func(list ...*adminv1.MihomoTemplate) (*adminv1.SubscriptionSettings, error) {
 		set := subsettings.Defaults()

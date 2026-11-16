@@ -289,7 +289,7 @@ var grantProcedures = map[string][]string{
 		adminv1connect.ProfileServiceDeleteInboundProcedure,
 		adminv1connect.GroupServiceUpdateGroupProcedure,
 	},
-	"subscription_mihomo_template_set": {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	MihomoTemplateTool: {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
 }
 
 // tokenProcedureRoles is narrower than the signed-in admin policy: the MCP projection for GetWarp omits its node

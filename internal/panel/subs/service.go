@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -193,6 +194,10 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	if !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
 	}
+	// Before anything is written, so a refused request changes nothing (the DNS offer below is saved first).
+	if err := s.ownerTemplates(ctx, admin, req.Msg.GetSettings()); err != nil {
+		return nil, err
+	}
 	// The document is checked before anything is written, so an invalid one leaves the DNS offer as it was. Then the DNS offer
 	// is written before the settings: a deleted preset or an invalid offer must not leave the settings saved (and shared devices
 	// revoked) after a refused request.
@@ -251,6 +256,64 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 		s.log.Warn("audit", "code", "subscription_audit_write_failed", "action", entry.Action, "err", err)
 	}
 	return connect.NewResponse(&adminv1.UpdateSubscriptionSettingsResponse{Settings: set}), nil
+}
+
+// errMihomoOwnerOnly is the refusal of a change of the Mihomo templates by anybody but the owner (an admin token acts as the owner;
+// so does the apply of an operator's plan of subscription_mihomo_template_set that the owner approved).
+// A template is the whole config its people get, with the providers and rules it names: more than the rest of the settings.
+var errMihomoOwnerOnly = connect.NewError(connect.CodePermissionDenied, errors.New("mihomo_templates_owner_only: only the owner can change the Mihomo templates"))
+
+// ownerTemplates refuses a save that changes the Mihomo templates when the caller is not the owner. The rest of the settings stay
+// open to a helper, which is how the form sends them: the whole document, the templates as it read them.
+func (s *Service) ownerTemplates(ctx context.Context, admin store.Admin, set *adminv1.SubscriptionSettings) error {
+	if admin.Role == store.RoleOwner || auth.ApprovedPlanTool(ctx) == auth.MihomoTemplateTool {
+		return nil
+	}
+	stored, err := subsettings.Load(ctx, s.st)
+	if err != nil {
+		return s.internal("settings for the owner check", err)
+	}
+	if !templatesDiffer(set.GetMihomoTemplates(), stored.GetMihomoTemplates(), nil) {
+		return nil
+	}
+	// A group that was deleted since may still stand in the stored list: a save drops it (settingGroups), so it is not a change.
+	groups, err := s.st.Access().Groups(ctx)
+	if err != nil {
+		return s.internal("groups for the owner check", err)
+	}
+	live := make(map[string]bool, len(groups))
+	for _, g := range groups {
+		live[g.ID] = true
+	}
+	if templatesDiffer(set.GetMihomoTemplates(), stored.GetMihomoTemplates(), func(id string) bool { return !live[id] }) {
+		return errMihomoOwnerOnly
+	}
+	return nil
+}
+
+// templatesDiffer says whether two lists give people different profiles: a template by name (as saved: trimmed, any case), its text
+// and its groups as a set (those that skip says to leave out). The order of the list is not compared: a group has one template at
+// most, so no order decides which one a person gets.
+func templatesDiffer(a, b []*adminv1.MihomoTemplate, skip func(id string) bool) bool {
+	if len(a) != len(b) {
+		return true
+	}
+	byName := make(map[string]*adminv1.MihomoTemplate, len(b))
+	for _, t := range b {
+		byName[strings.ToLower(strings.TrimSpace(t.GetName()))] = t
+	}
+	groups := func(t *adminv1.MihomoTemplate) []string {
+		ids := slices.DeleteFunc(slices.Clone(t.GetGroupIds()), func(id string) bool { return skip != nil && skip(id) })
+		slices.Sort(ids)
+		return slices.Compact(ids)
+	}
+	for _, t := range a {
+		o, ok := byName[strings.ToLower(strings.TrimSpace(t.GetName()))]
+		if !ok || o.GetYaml() != t.GetYaml() || !slices.Equal(groups(o), groups(t)) {
+			return true
+		}
+	}
+	return false
 }
 
 // settingGroups checks the groups the own response headers and the Mihomo templates name. A group that does not exist is refused,

@@ -180,7 +180,7 @@ function permissionDenied(c: ConnectError, t: T): string {
     case "your role cannot do this":
       return t("err.denied");
     default:
-      return t("err.permissionDenied");
+      return errorCode(c.rawMessage) === "mihomo_templates_owner_only" ? t("err.mihomo_templates_owner_only") : t("err.permissionDenied");
   }
 }
 
