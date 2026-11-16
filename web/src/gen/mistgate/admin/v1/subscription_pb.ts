@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/subscription.proto.
  */
 export const file_mistgate_admin_v1_subscription: GenFile = /*@__PURE__*/
-  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9zdWJzY3JpcHRpb24ucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIrAFChRTdWJzY3JpcHRpb25TZXR0aW5ncxINCgV0aXRsZRgBIAEoCRIUCgxhbm5vdW5jZW1lbnQYAiABKAkSEwoLc3VwcG9ydF91cmwYAyABKAkSHQoVdXBkYXRlX2ludGVydmFsX2hvdXJzGAQgASgNEhwKFHNlcnZlcl9uYW1lX3RlbXBsYXRlGAUgASgJEiwKBGFwcHMYBiADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5QbGF0Zm9ybUFwcBI1Cgl1c2VyX3BhZ2UYByABKAsyIi5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyUGFnZU9wdGlvbnMSKwoFcnVsZXMYCCADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5TZXJ2ZVJ1bGUSHQoVZGVmYXVsdF9kbnNfcHJlc2V0X2lkGAkgASgJEkIKEWxpbmtfZGV2aWNlX2xpbWl0GAogASgOMiIubWlzdGdhdGUuYWRtaW4udjEuTGlua0RldmljZUxpbWl0SACIAQESMwoIbGlua19kbnMYCyABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5MaW5rRG5zT3B0aW9ucxIuCgloYXBwX3BpbmcYDCABKA4yGy5taXN0Z2F0ZS5hZG1pbi52MS5IYXBwUGluZxIZChFoYXBwX3Bpbmdfb25fb3BlbhgNIAEoCBIVCghsaW5rX2F3ZxgOIAEoCEgBiAEBEh0KEGxpbmtfYXV0b19zZWxlY3QYDyABKAhIAogBARIjChZkZXZpY2VfaWRsZV9hZnRlcl9kYXlzGBAgASgNSAOIAQFCFAoSX2xpbmtfZGV2aWNlX2xpbWl0QgsKCV9saW5rX2F3Z0ITChFfbGlua19hdXRvX3NlbGVjdEIZChdfZGV2aWNlX2lkbGVfYWZ0ZXJfZGF5cyI/Cg5MaW5rRG5zT3B0aW9ucxISCgpwcmVzZXRfaWRzGAEgAygJEhkKEWRlZmF1bHRfcHJlc2V0X2lkGAIgASgJIssBCgtQbGF0Zm9ybUFwcBItCghwbGF0Zm9ybRgBIAEoDjIbLm1pc3RnYXRlLmFkbWluLnYxLlBsYXRmb3JtEiQKBGtpbmQYAiABKA4yFi5taXN0Z2F0ZS5hZG1pbi52MS5BcHASDAoEbmFtZRgDIAEoCRIUCgxkb3dubG9hZF91cmwYBCABKAkSGQoRYWRkX2xpbmtfdGVtcGxhdGUYBSABKAkSEwoLZGVzY3JpcHRpb24YBiABKAkSEwoLcmVjb21tZW5kZWQYByABKAgiiwIKD1VzZXJQYWdlT3B0aW9ucxIZChFzaG93X2Fubm91bmNlbWVudBgBIAEoCBIUCgxzaG93X3N1cHBvcnQYAiABKAgSDwoHc2hvd19xchgDIAEoCBImChlhbGxvd19kZXZpY2Vfc2VsZl9zZXJ2aWNlGAQgASgISACIAQESIgoVcmVxdWlyZV9wYWdlX3Bhc3N3b3JkGAUgASgISAGIAQESHQoQYWxsb3dfZG5zX2Nob2ljZRgGIAEoCEgCiAEBQhwKGl9hbGxvd19kZXZpY2Vfc2VsZl9zZXJ2aWNlQhgKFl9yZXF1aXJlX3BhZ2VfcGFzc3dvcmRCEwoRX2FsbG93X2Ruc19jaG9pY2UiTgoJU2VydmVSdWxlEhMKC3VhX2NvbnRhaW5zGAEgASgJEiwKBmZvcm1hdBgCIAEoDjIcLm1pc3RnYXRlLmFkbWluLnYxLlN1YkZvcm1hdCIgCh5HZXRTdWJzY3JpcHRpb25TZXR0aW5nc1JlcXVlc3QijgIKH0dldFN1YnNjcmlwdGlvblNldHRpbmdzUmVzcG9uc2USOQoIc2V0dGluZ3MYASABKAsyJy5taXN0Z2F0ZS5hZG1pbi52MS5TdWJzY3JpcHRpb25TZXR0aW5ncxIXCg9lZmZlY3RpdmVfdGl0bGUYAiABKAkSNwoOc2VydmVyX3NhbXBsZXMYAyADKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5TZXJ2ZXJTYW1wbGUSFAoMc2FtcGxlX2dyb3VwGAQgASgJEhYKDm5hbWVzX2xhbmd1YWdlGAUgASgJEhkKEXNoYXJlZF9saW5rX3VzZXJzGAYgASgNEhUKDWxpbmtfYXdnX2tleXMYByABKA0ibwoMU2VydmVyU2FtcGxlEgwKBG5vZGUYASABKAkSFAoMY291bnRyeV9jb2RlGAIgASgJEg8KB3Byb2ZpbGUYAyABKAkSGQoMbG9hZF9wZXJjZW50GAQgASgNSACIAQFCDwoNX2xvYWRfcGVyY2VudCJeCiFVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1JlcXVlc3QSOQoIc2V0dGluZ3MYASABKAsyJy5taXN0Z2F0ZS5hZG1pbi52MS5TdWJzY3JpcHRpb25TZXR0aW5ncyJfCiJVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1Jlc3BvbnNlEjkKCHNldHRpbmdzGAEgASgLMicubWlzdGdhdGUuYWRtaW4udjEuU3Vic2NyaXB0aW9uU2V0dGluZ3MiaAoKQ2xpZW50SW5mbxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKCXByb3RvY29scxgDIAMoCRItCgdmb3JtYXRzGAQgAygOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0IhQKEkxpc3RDbGllbnRzUmVxdWVzdCJFChNMaXN0Q2xpZW50c1Jlc3BvbnNlEi4KB2NsaWVudHMYASADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRJbmZvIioKFFRlc3RVc2VyQWdlbnRSZXF1ZXN0EhIKCnVzZXJfYWdlbnQYASABKAkiagoVVGVzdFVzZXJBZ2VudFJlc3BvbnNlEhIKCnJ1bGVfaW5kZXgYASABKAUSLAoGZm9ybWF0GAIgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0Eg8KB2Jyb3dzZXIYAyABKAgqOAoISGFwcFBpbmcSGQoVSEFQUF9QSU5HX1VOU1BFQ0lGSUVEEAASEQoNSEFQUF9QSU5HX1RDUBABKo4BCg9MaW5rRGV2aWNlTGltaXQSIQodTElOS19ERVZJQ0VfTElNSVRfVU5TUEVDSUZJRUQQABIbChdMSU5LX0RFVklDRV9MSU1JVF9UUkFDSxABEh0KGUxJTktfREVWSUNFX0xJTUlUX0VORk9SQ0UQAhIcChhMSU5LX0RFVklDRV9MSU1JVF9TVFJJQ1QQAyqKAQoIUGxhdGZvcm0SGAoUUExBVEZPUk1fVU5TUEVDSUZJRUQQABIQCgxQTEFURk9STV9JT1MQARIUChBQTEFURk9STV9BTkRST0lEEAISFAoQUExBVEZPUk1fV0lORE9XUxADEhIKDlBMQVRGT1JNX01BQ09TEAQSEgoOUExBVEZPUk1fTElOVVgQBSrGAQoJU3ViRm9ybWF0EhoKFlNVQl9GT1JNQVRfVU5TUEVDSUZJRUQQABIaChZTVUJfRk9STUFUX0JBU0U2NF9VUklTEAESGAoUU1VCX0ZPUk1BVF9VU0VSX1BBR0UQAhIUChBTVUJfRk9STUFUX0RFQ09ZEAMSGgoWU1VCX0ZPUk1BVF9NSUhPTU9fWUFNTBAEEhgKFFNVQl9GT1JNQVRfWFJBWV9KU09OEAUSGwoXU1VCX0ZPUk1BVF9TSU5HQk9YX0pTT04QBjLmAwoTU3Vic2NyaXB0aW9uU2VydmljZRKAAQoXR2V0U3Vic2NyaXB0aW9uU2V0dGluZ3MSMS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRTdWJzY3JpcHRpb25TZXR0aW5nc1JlcXVlc3QaMi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRTdWJzY3JpcHRpb25TZXR0aW5nc1Jlc3BvbnNlEokBChpVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5ncxI0Lm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVN1YnNjcmlwdGlvblNldHRpbmdzUmVxdWVzdBo1Lm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVN1YnNjcmlwdGlvblNldHRpbmdzUmVzcG9uc2USXAoLTGlzdENsaWVudHMSJS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Q2xpZW50c1JlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Q2xpZW50c1Jlc3BvbnNlEmIKDVRlc3RVc2VyQWdlbnQSJy5taXN0Z2F0ZS5hZG1pbi52MS5UZXN0VXNlckFnZW50UmVxdWVzdBooLm1pc3RnYXRlLmFkbWluLnYxLlRlc3RVc2VyQWdlbnRSZXNwb25zZULMAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQhFTdWJzY3JpcHRpb25Qcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
+  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9zdWJzY3JpcHRpb24ucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIu0FChRTdWJzY3JpcHRpb25TZXR0aW5ncxINCgV0aXRsZRgBIAEoCRIUCgxhbm5vdW5jZW1lbnQYAiABKAkSEwoLc3VwcG9ydF91cmwYAyABKAkSHQoVdXBkYXRlX2ludGVydmFsX2hvdXJzGAQgASgNEhwKFHNlcnZlcl9uYW1lX3RlbXBsYXRlGAUgASgJEiwKBGFwcHMYBiADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5QbGF0Zm9ybUFwcBI1Cgl1c2VyX3BhZ2UYByABKAsyIi5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyUGFnZU9wdGlvbnMSKwoFcnVsZXMYCCADKAsyHC5taXN0Z2F0ZS5hZG1pbi52MS5TZXJ2ZVJ1bGUSHQoVZGVmYXVsdF9kbnNfcHJlc2V0X2lkGAkgASgJEkIKEWxpbmtfZGV2aWNlX2xpbWl0GAogASgOMiIubWlzdGdhdGUuYWRtaW4udjEuTGlua0RldmljZUxpbWl0SACIAQESMwoIbGlua19kbnMYCyABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5MaW5rRG5zT3B0aW9ucxIuCgloYXBwX3BpbmcYDCABKA4yGy5taXN0Z2F0ZS5hZG1pbi52MS5IYXBwUGluZxIZChFoYXBwX3Bpbmdfb25fb3BlbhgNIAEoCBIVCghsaW5rX2F3ZxgOIAEoCEgBiAEBEh0KEGxpbmtfYXV0b19zZWxlY3QYDyABKAhIAogBARIjChZkZXZpY2VfaWRsZV9hZnRlcl9kYXlzGBAgASgNSAOIAQESOwoQcmVzcG9uc2VfaGVhZGVycxgRIAMoCzIhLm1pc3RnYXRlLmFkbWluLnYxLlJlc3BvbnNlSGVhZGVyQhQKEl9saW5rX2RldmljZV9saW1pdEILCglfbGlua19hd2dCEwoRX2xpbmtfYXV0b19zZWxlY3RCGQoXX2RldmljZV9pZGxlX2FmdGVyX2RheXMilAEKDlJlc3BvbnNlSGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkSDgoGYmFzZTY0GAMgASgIEi0KB2Zvcm1hdHMYBCADKA4yHC5taXN0Z2F0ZS5hZG1pbi52MS5TdWJGb3JtYXQSEwoLb25seV9ncm91cHMYBSABKAgSEQoJZ3JvdXBfaWRzGAYgAygJIj8KDkxpbmtEbnNPcHRpb25zEhIKCnByZXNldF9pZHMYASADKAkSGQoRZGVmYXVsdF9wcmVzZXRfaWQYAiABKAkiywEKC1BsYXRmb3JtQXBwEi0KCHBsYXRmb3JtGAEgASgOMhsubWlzdGdhdGUuYWRtaW4udjEuUGxhdGZvcm0SJAoEa2luZBgCIAEoDjIWLm1pc3RnYXRlLmFkbWluLnYxLkFwcBIMCgRuYW1lGAMgASgJEhQKDGRvd25sb2FkX3VybBgEIAEoCRIZChFhZGRfbGlua190ZW1wbGF0ZRgFIAEoCRITCgtkZXNjcmlwdGlvbhgGIAEoCRITCgtyZWNvbW1lbmRlZBgHIAEoCCKLAgoPVXNlclBhZ2VPcHRpb25zEhkKEXNob3dfYW5ub3VuY2VtZW50GAEgASgIEhQKDHNob3dfc3VwcG9ydBgCIAEoCBIPCgdzaG93X3FyGAMgASgIEiYKGWFsbG93X2RldmljZV9zZWxmX3NlcnZpY2UYBCABKAhIAIgBARIiChVyZXF1aXJlX3BhZ2VfcGFzc3dvcmQYBSABKAhIAYgBARIdChBhbGxvd19kbnNfY2hvaWNlGAYgASgISAKIAQFCHAoaX2FsbG93X2RldmljZV9zZWxmX3NlcnZpY2VCGAoWX3JlcXVpcmVfcGFnZV9wYXNzd29yZEITChFfYWxsb3dfZG5zX2Nob2ljZSJOCglTZXJ2ZVJ1bGUSEwoLdWFfY29udGFpbnMYASABKAkSLAoGZm9ybWF0GAIgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0IiAKHkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVxdWVzdCKtAgofR2V0U3Vic2NyaXB0aW9uU2V0dGluZ3NSZXNwb25zZRI5CghzZXR0aW5ncxgBIAEoCzInLm1pc3RnYXRlLmFkbWluLnYxLlN1YnNjcmlwdGlvblNldHRpbmdzEhcKD2VmZmVjdGl2ZV90aXRsZRgCIAEoCRI3Cg5zZXJ2ZXJfc2FtcGxlcxgDIAMoCzIfLm1pc3RnYXRlLmFkbWluLnYxLlNlcnZlclNhbXBsZRIUCgxzYW1wbGVfZ3JvdXAYBCABKAkSFgoObmFtZXNfbGFuZ3VhZ2UYBSABKAkSGQoRc2hhcmVkX2xpbmtfdXNlcnMYBiABKA0SFQoNbGlua19hd2dfa2V5cxgHIAEoDRIdChVyZXNlcnZlZF9oZWFkZXJfbmFtZXMYCCADKAkibwoMU2VydmVyU2FtcGxlEgwKBG5vZGUYASABKAkSFAoMY291bnRyeV9jb2RlGAIgASgJEg8KB3Byb2ZpbGUYAyABKAkSGQoMbG9hZF9wZXJjZW50GAQgASgNSACIAQFCDwoNX2xvYWRfcGVyY2VudCJeCiFVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1JlcXVlc3QSOQoIc2V0dGluZ3MYASABKAsyJy5taXN0Z2F0ZS5hZG1pbi52MS5TdWJzY3JpcHRpb25TZXR0aW5ncyJfCiJVcGRhdGVTdWJzY3JpcHRpb25TZXR0aW5nc1Jlc3BvbnNlEjkKCHNldHRpbmdzGAEgASgLMicubWlzdGdhdGUuYWRtaW4udjEuU3Vic2NyaXB0aW9uU2V0dGluZ3MiaAoKQ2xpZW50SW5mbxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKCXByb3RvY29scxgDIAMoCRItCgdmb3JtYXRzGAQgAygOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0IhQKEkxpc3RDbGllbnRzUmVxdWVzdCJFChNMaXN0Q2xpZW50c1Jlc3BvbnNlEi4KB2NsaWVudHMYASADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRJbmZvIioKFFRlc3RVc2VyQWdlbnRSZXF1ZXN0EhIKCnVzZXJfYWdlbnQYASABKAkiagoVVGVzdFVzZXJBZ2VudFJlc3BvbnNlEhIKCnJ1bGVfaW5kZXgYASABKAUSLAoGZm9ybWF0GAIgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0Eg8KB2Jyb3dzZXIYAyABKAgieAodUHJldmlld1Jlc3BvbnNlSGVhZGVyc1JlcXVlc3QSDwoHdXNlcl9pZBgBIAEoCRISCgp1c2VyX2FnZW50GAIgASgJEjIKB2hlYWRlcnMYAyADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZXNwb25zZUhlYWRlciI5CgpTZW50SGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkSDgoGYmFzZTY0GAMgASgIIqYBCh5QcmV2aWV3UmVzcG9uc2VIZWFkZXJzUmVzcG9uc2USLAoGZm9ybWF0GAEgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuU3ViRm9ybWF0Ei4KB2hlYWRlcnMYAiADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5TZW50SGVhZGVyEhIKCm5vdF9zZXJ2ZWQYAyABKAkSEgoKZ3JvdXBfbmFtZRgEIAEoCSo4CghIYXBwUGluZxIZChVIQVBQX1BJTkdfVU5TUEVDSUZJRUQQABIRCg1IQVBQX1BJTkdfVENQEAEqjgEKD0xpbmtEZXZpY2VMaW1pdBIhCh1MSU5LX0RFVklDRV9MSU1JVF9VTlNQRUNJRklFRBAAEhsKF0xJTktfREVWSUNFX0xJTUlUX1RSQUNLEAESHQoZTElOS19ERVZJQ0VfTElNSVRfRU5GT1JDRRACEhwKGExJTktfREVWSUNFX0xJTUlUX1NUUklDVBADKooBCghQbGF0Zm9ybRIYChRQTEFURk9STV9VTlNQRUNJRklFRBAAEhAKDFBMQVRGT1JNX0lPUxABEhQKEFBMQVRGT1JNX0FORFJPSUQQAhIUChBQTEFURk9STV9XSU5ET1dTEAMSEgoOUExBVEZPUk1fTUFDT1MQBBISCg5QTEFURk9STV9MSU5VWBAFKsYBCglTdWJGb3JtYXQSGgoWU1VCX0ZPUk1BVF9VTlNQRUNJRklFRBAAEhoKFlNVQl9GT1JNQVRfQkFTRTY0X1VSSVMQARIYChRTVUJfRk9STUFUX1VTRVJfUEFHRRACEhQKEFNVQl9GT1JNQVRfREVDT1kQAxIaChZTVUJfRk9STUFUX01JSE9NT19ZQU1MEAQSGAoUU1VCX0ZPUk1BVF9YUkFZX0pTT04QBRIbChdTVUJfRk9STUFUX1NJTkdCT1hfSlNPThAGMuUEChNTdWJzY3JpcHRpb25TZXJ2aWNlEoABChdHZXRTdWJzY3JpcHRpb25TZXR0aW5ncxIxLm1pc3RnYXRlLmFkbWluLnYxLkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVxdWVzdBoyLm1pc3RnYXRlLmFkbWluLnYxLkdldFN1YnNjcmlwdGlvblNldHRpbmdzUmVzcG9uc2USiQEKGlVwZGF0ZVN1YnNjcmlwdGlvblNldHRpbmdzEjQubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlU3Vic2NyaXB0aW9uU2V0dGluZ3NSZXF1ZXN0GjUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlU3Vic2NyaXB0aW9uU2V0dGluZ3NSZXNwb25zZRJcCgtMaXN0Q2xpZW50cxIlLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RDbGllbnRzUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RDbGllbnRzUmVzcG9uc2USYgoNVGVzdFVzZXJBZ2VudBInLm1pc3RnYXRlLmFkbWluLnYxLlRlc3RVc2VyQWdlbnRSZXF1ZXN0GigubWlzdGdhdGUuYWRtaW4udjEuVGVzdFVzZXJBZ2VudFJlc3BvbnNlEn0KFlByZXZpZXdSZXNwb25zZUhlYWRlcnMSMC5taXN0Z2F0ZS5hZG1pbi52MS5QcmV2aWV3UmVzcG9uc2VIZWFkZXJzUmVxdWVzdBoxLm1pc3RnYXRlLmFkbWluLnYxLlByZXZpZXdSZXNwb25zZUhlYWRlcnNSZXNwb25zZULMAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQhFTdWJzY3JpcHRpb25Qcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.SubscriptionSettings
@@ -136,6 +136,14 @@ export type SubscriptionSettings = Message<"mistgate.admin.v1.SubscriptionSettin
    * @generated from field: optional uint32 device_idle_after_days = 16;
    */
   deviceIdleAfterDays?: number | undefined;
+
+  /**
+   * The owner's own response headers of a successful subscription answer (e.g. flclashx-servicename). In order: when two
+   * entries of one name both apply, the first wins. Refusals (device limit, a blocked device, no access) carry none of them.
+   *
+   * @generated from field: repeated mistgate.admin.v1.ResponseHeader response_headers = 17;
+   */
+  responseHeaders: ResponseHeader[];
 };
 
 /**
@@ -144,6 +152,60 @@ export type SubscriptionSettings = Message<"mistgate.admin.v1.SubscriptionSettin
  */
 export const SubscriptionSettingsSchema: GenMessage<SubscriptionSettings> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_subscription, 0);
+
+/**
+ * One response header the owner adds to the subscription answer the apps fetch. The name is an HTTP token (RFC 9110) that is
+ * none of the panel's own headers (GetSubscriptionSettingsResponse.reserved_header_names); the value has no control
+ * characters; at most 20 entries, a name of at most 64 bytes, a value of at most 1000 bytes and 4096 bytes in all.
+ *
+ * @generated from message mistgate.admin.v1.ResponseHeader
+ */
+export type ResponseHeader = Message<"mistgate.admin.v1.ResponseHeader"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string value = 2;
+   */
+  value: string;
+
+  /**
+   * Send the value as "base64:" plus its base64, the way the panel sends the title (apps that read text headers decode it).
+   *
+   * @generated from field: bool base64 = 3;
+   */
+  base64: boolean;
+
+  /**
+   * The answer formats it goes with: SUB_FORMAT_BASE64_URIS, _MIHOMO_YAML, _XRAY_JSON or _SINGBOX_JSON. Empty = all of them.
+   *
+   * @generated from field: repeated mistgate.admin.v1.SubFormat formats = 4;
+   */
+  formats: SubFormat[];
+
+  /**
+   * false = every group; true = only the people of group_ids (none listed = nobody gets it).
+   *
+   * @generated from field: bool only_groups = 5;
+   */
+  onlyGroups: boolean;
+
+  /**
+   * Group ids, only with only_groups. A group that is deleted later drops out of the list the next time the settings are saved.
+   *
+   * @generated from field: repeated string group_ids = 6;
+   */
+  groupIds: string[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ResponseHeader.
+ * Use `create(ResponseHeaderSchema)` to create a new message.
+ */
+export const ResponseHeaderSchema: GenMessage<ResponseHeader> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_subscription, 1);
 
 /**
  * What the owner offers for the link apps. A person's pick applies while it is offered; without one, their link apps get the
@@ -172,7 +234,7 @@ export type LinkDnsOptions = Message<"mistgate.admin.v1.LinkDnsOptions"> & {
  * Use `create(LinkDnsOptionsSchema)` to create a new message.
  */
 export const LinkDnsOptionsSchema: GenMessage<LinkDnsOptions> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 1);
+  messageDesc(file_mistgate_admin_v1_subscription, 2);
 
 /**
  * One app the user page recommends: e.g. iOS + APP_HAPP -> "Happ" (App Store link, happ://add/{url}),
@@ -232,7 +294,7 @@ export type PlatformApp = Message<"mistgate.admin.v1.PlatformApp"> & {
  * Use `create(PlatformAppSchema)` to create a new message.
  */
 export const PlatformAppSchema: GenMessage<PlatformApp> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 2);
+  messageDesc(file_mistgate_admin_v1_subscription, 3);
 
 /**
  * @generated from message mistgate.admin.v1.UserPageOptions
@@ -285,7 +347,7 @@ export type UserPageOptions = Message<"mistgate.admin.v1.UserPageOptions"> & {
  * Use `create(UserPageOptionsSchema)` to create a new message.
  */
 export const UserPageOptionsSchema: GenMessage<UserPageOptions> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 3);
+  messageDesc(file_mistgate_admin_v1_subscription, 4);
 
 /**
  * @generated from message mistgate.admin.v1.ServeRule
@@ -309,7 +371,7 @@ export type ServeRule = Message<"mistgate.admin.v1.ServeRule"> & {
  * Use `create(ServeRuleSchema)` to create a new message.
  */
 export const ServeRuleSchema: GenMessage<ServeRule> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 4);
+  messageDesc(file_mistgate_admin_v1_subscription, 5);
 
 /**
  * @generated from message mistgate.admin.v1.GetSubscriptionSettingsRequest
@@ -322,7 +384,7 @@ export type GetSubscriptionSettingsRequest = Message<"mistgate.admin.v1.GetSubsc
  * Use `create(GetSubscriptionSettingsRequestSchema)` to create a new message.
  */
 export const GetSubscriptionSettingsRequestSchema: GenMessage<GetSubscriptionSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 5);
+  messageDesc(file_mistgate_admin_v1_subscription, 6);
 
 /**
  * @generated from message mistgate.admin.v1.GetSubscriptionSettingsResponse
@@ -377,6 +439,14 @@ export type GetSubscriptionSettingsResponse = Message<"mistgate.admin.v1.GetSubs
    * @generated from field: uint32 link_awg_keys = 7;
    */
   linkAwgKeys: number;
+
+  /**
+   * What an own response header may not be named, from the code that sets the headers: exact names, and prefixes written with a
+   * trailing "*" ("X-Hwid-*"). Compared without regard to case. The panel refuses such a name on save; the editor shows it first.
+   *
+   * @generated from field: repeated string reserved_header_names = 8;
+   */
+  reservedHeaderNames: string[];
 };
 
 /**
@@ -384,7 +454,7 @@ export type GetSubscriptionSettingsResponse = Message<"mistgate.admin.v1.GetSubs
  * Use `create(GetSubscriptionSettingsResponseSchema)` to create a new message.
  */
 export const GetSubscriptionSettingsResponseSchema: GenMessage<GetSubscriptionSettingsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 6);
+  messageDesc(file_mistgate_admin_v1_subscription, 7);
 
 /**
  * One server of the preview: what a server name is built from.
@@ -420,7 +490,7 @@ export type ServerSample = Message<"mistgate.admin.v1.ServerSample"> & {
  * Use `create(ServerSampleSchema)` to create a new message.
  */
 export const ServerSampleSchema: GenMessage<ServerSample> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 7);
+  messageDesc(file_mistgate_admin_v1_subscription, 8);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateSubscriptionSettingsRequest
@@ -439,7 +509,7 @@ export type UpdateSubscriptionSettingsRequest = Message<"mistgate.admin.v1.Updat
  * Use `create(UpdateSubscriptionSettingsRequestSchema)` to create a new message.
  */
 export const UpdateSubscriptionSettingsRequestSchema: GenMessage<UpdateSubscriptionSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 8);
+  messageDesc(file_mistgate_admin_v1_subscription, 9);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateSubscriptionSettingsResponse
@@ -456,7 +526,7 @@ export type UpdateSubscriptionSettingsResponse = Message<"mistgate.admin.v1.Upda
  * Use `create(UpdateSubscriptionSettingsResponseSchema)` to create a new message.
  */
 export const UpdateSubscriptionSettingsResponseSchema: GenMessage<UpdateSubscriptionSettingsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 9);
+  messageDesc(file_mistgate_admin_v1_subscription, 10);
 
 /**
  * @generated from message mistgate.admin.v1.ClientInfo
@@ -494,7 +564,7 @@ export type ClientInfo = Message<"mistgate.admin.v1.ClientInfo"> & {
  * Use `create(ClientInfoSchema)` to create a new message.
  */
 export const ClientInfoSchema: GenMessage<ClientInfo> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 10);
+  messageDesc(file_mistgate_admin_v1_subscription, 11);
 
 /**
  * @generated from message mistgate.admin.v1.ListClientsRequest
@@ -507,7 +577,7 @@ export type ListClientsRequest = Message<"mistgate.admin.v1.ListClientsRequest">
  * Use `create(ListClientsRequestSchema)` to create a new message.
  */
 export const ListClientsRequestSchema: GenMessage<ListClientsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 11);
+  messageDesc(file_mistgate_admin_v1_subscription, 12);
 
 /**
  * @generated from message mistgate.admin.v1.ListClientsResponse
@@ -524,7 +594,7 @@ export type ListClientsResponse = Message<"mistgate.admin.v1.ListClientsResponse
  * Use `create(ListClientsResponseSchema)` to create a new message.
  */
 export const ListClientsResponseSchema: GenMessage<ListClientsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 12);
+  messageDesc(file_mistgate_admin_v1_subscription, 13);
 
 /**
  * @generated from message mistgate.admin.v1.TestUserAgentRequest
@@ -541,7 +611,7 @@ export type TestUserAgentRequest = Message<"mistgate.admin.v1.TestUserAgentReque
  * Use `create(TestUserAgentRequestSchema)` to create a new message.
  */
 export const TestUserAgentRequestSchema: GenMessage<TestUserAgentRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 13);
+  messageDesc(file_mistgate_admin_v1_subscription, 14);
 
 /**
  * @generated from message mistgate.admin.v1.TestUserAgentResponse
@@ -572,7 +642,110 @@ export type TestUserAgentResponse = Message<"mistgate.admin.v1.TestUserAgentResp
  * Use `create(TestUserAgentResponseSchema)` to create a new message.
  */
 export const TestUserAgentResponseSchema: GenMessage<TestUserAgentResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_subscription, 14);
+  messageDesc(file_mistgate_admin_v1_subscription, 15);
+
+/**
+ * @generated from message mistgate.admin.v1.PreviewResponseHeadersRequest
+ */
+export type PreviewResponseHeadersRequest = Message<"mistgate.admin.v1.PreviewResponseHeadersRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string user_agent = 2;
+   */
+  userAgent: string;
+
+  /**
+   * The list to preview: the editor's draft, or the saved one.
+   *
+   * @generated from field: repeated mistgate.admin.v1.ResponseHeader headers = 3;
+   */
+  headers: ResponseHeader[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.PreviewResponseHeadersRequest.
+ * Use `create(PreviewResponseHeadersRequestSchema)` to create a new message.
+ */
+export const PreviewResponseHeadersRequestSchema: GenMessage<PreviewResponseHeadersRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_subscription, 16);
+
+/**
+ * One header as it goes out.
+ *
+ * @generated from message mistgate.admin.v1.SentHeader
+ */
+export type SentHeader = Message<"mistgate.admin.v1.SentHeader"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * As sent: with "base64:" and the encoded text when the entry asks for base64.
+   *
+   * @generated from field: string value = 2;
+   */
+  value: string;
+
+  /**
+   * @generated from field: bool base64 = 3;
+   */
+  base64: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.SentHeader.
+ * Use `create(SentHeaderSchema)` to create a new message.
+ */
+export const SentHeaderSchema: GenMessage<SentHeader> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_subscription, 17);
+
+/**
+ * @generated from message mistgate.admin.v1.PreviewResponseHeadersResponse
+ */
+export type PreviewResponseHeadersResponse = Message<"mistgate.admin.v1.PreviewResponseHeadersResponse"> & {
+  /**
+   * The answer format the User-Agent gets (SUB_FORMAT_USER_PAGE for a browser: the page, not a subscription).
+   *
+   * @generated from field: mistgate.admin.v1.SubFormat format = 1;
+   */
+  format: SubFormat;
+
+  /**
+   * The own headers that person's answer carries, in the order they are listed. Empty when the answer is not a subscription
+   * (see not_served) or no entry applies.
+   *
+   * @generated from field: repeated mistgate.admin.v1.SentHeader headers = 2;
+   */
+  headers: SentHeader[];
+
+  /**
+   * Why there are none by design: "page" (a browser gets the user page), "decoy" (the User-Agent is served as an unknown link),
+   * "no_access" (the person's subscription is off, expired or over its quota: the answer carries a note and no own headers).
+   * "" = the answer is a subscription.
+   *
+   * @generated from field: string not_served = 3;
+   */
+  notServed: string;
+
+  /**
+   * The person's group, for the preview's caption.
+   *
+   * @generated from field: string group_name = 4;
+   */
+  groupName: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.PreviewResponseHeadersResponse.
+ * Use `create(PreviewResponseHeadersResponseSchema)` to create a new message.
+ */
+export const PreviewResponseHeadersResponseSchema: GenMessage<PreviewResponseHeadersResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_subscription, 18);
 
 /**
  * The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).
@@ -782,6 +955,17 @@ export const SubscriptionService: GenService<{
     methodKind: "unary";
     input: typeof TestUserAgentRequestSchema;
     output: typeof TestUserAgentResponseSchema;
+  },
+  /**
+   * "Response headers" tab: the headers of the list (the editor's draft, checked like a save) one person gets with one
+   * User-Agent. INVALID_ARGUMENT for a list that a save would refuse; NOT_FOUND for an unknown person.
+   *
+   * @generated from rpc mistgate.admin.v1.SubscriptionService.PreviewResponseHeaders
+   */
+  previewResponseHeaders: {
+    methodKind: "unary";
+    input: typeof PreviewResponseHeadersRequestSchema;
+    output: typeof PreviewResponseHeadersResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_subscription, 0);
