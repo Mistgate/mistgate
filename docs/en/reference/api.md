@@ -217,7 +217,8 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `ProvisioningService.ListNodeServerAccess` (connection metadata, never a password) | no | no | yes |
 | `ProvisioningService.GetSSHFingerprint` | no | no | only while the MCP server makes a `node_install` plan |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | no | no | only through an approved MCP plan |
-| `SubscriptionService.UpdateSubscriptionSettings` (one app of the user page) | no | only through an approved MCP plan | only through an approved MCP plan |
+| `SubscriptionService.UpdateSubscriptionSettings` (the shared settings: an app of the user page, texts, own response headers, own Mihomo templates) | no | only through an approved MCP plan | only through an approved MCP plan |
+| `SubscriptionService.PreviewMihomoTemplate` | no | no | no (the admin's preview; an agent reads a template with `subscription_mihomo_template_get` and sees which one a person gets in `subscription_preview`) |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | no | no | only through an approved MCP plan |
 
 Closed to every token: deleting users, the subscription link, the Telegram proxy and TrustTunnel keys and links, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), creating groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
