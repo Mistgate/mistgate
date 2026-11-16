@@ -243,9 +243,9 @@ function SubHostCard({ host }: { host: SubscriptionHost }) {
         {error}
         <div className="flex flex-col gap-2 border-t border-line pt-3.5">
           <Labeled label={t("set.domains.subHost.moveTo")}>
-            <Select value={node} onValueChange={setNode} options={options([host.nodeId])} aria-label={t("set.domains.subHost.moveTo")} />
+            <Select value={node === host.nodeId ? "" : node} onValueChange={setNode} options={options([host.nodeId])} aria-label={t("set.domains.subHost.moveTo")} />
           </Labeled>
-          <Button variant="secondary" className="self-start" disabled={!node || busy} onClick={() => void run(() => subHost.startSubscriptionHostMove({ nodeId: node }))}>
+          <Button variant="secondary" className="self-start" disabled={!node || node === host.nodeId || busy} onClick={() => void run(() => subHost.startSubscriptionHostMove({ nodeId: node }))}>
             {t("set.domains.subHost.move")}
           </Button>
         </div>

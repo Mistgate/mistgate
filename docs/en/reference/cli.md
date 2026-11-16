@@ -275,9 +275,8 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 | `--force` | none | off | Replace an existing identity. |
 | `--resume-key` | none | off | Keep the new private key in `enroll-pending.pem` in the state directory until enrollment succeeds and use it again on the next try, so an interrupted enrollment can be retried: the panel answers a repeat with the same token and key within 10 minutes with the same certificate. With `--force` a new key is made. |
 | `--offline-csr` | none | off | Offline enrollment, step 1: keep a new key in `enroll-pending.pem` (or reuse the one there) and print its certificate request as one line, `csr=<base64 DER>`. |
-| `--offline-finish` | none | off | Offline enrollment, step 2: read the node certificate and then the panel's CA certificate (PEM) from stdin and store them with the pending key. |
+| `--offline-finish` | none | off | Offline enrollment, step 2: read from stdin the line `tunnel-sni=<name>` (the secret name of the panel's subscription host tunnel, kept out of the command line), then the node certificate and the panel's CA certificate (PEM), and store them with the pending key. |
 | `--node-id` | none | none | With `--offline-finish`: the node id the panel gave. |
-| `--tunnel-sni` | none | none | With `--offline-finish`: the secret name of the panel's subscription host tunnel. |
 | `--tunnel-name` | none | none | With `--offline-finish`: the subscription domain this node forwards to the panel. |
 
 `--panel`, `--sni`, `--ca-sha256` and a token (`--token`, `MISTGATE_ENROLL_TOKEN` or `--token-stdin`) are required; without them `enroll` exits with 2. A token works once, within the time the panel showed (an hour by default). The panel's [SSH install](../getting-started/ssh-install.md) runs the same `enroll` and `install` over SSH, with the token on stdin and `--token-stdin --resume-key`. On success it prints the node id and the next step:
@@ -287,12 +286,13 @@ enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
 
-The offline form enrolls the panel's first subscription host, which cannot reach a panel behind NAT yet. The panel's SSH install runs both steps itself: it reads the request of `--offline-csr`, issues the certificate, and passes it to `--offline-finish` on stdin. The node is then a link-only agent with the subscription host role. `--offline-csr` and `--offline-finish` cannot be combined with each other or with `--token`, `--token-stdin`, `--panel` or `--sni`; `--offline-finish` needs `--node-id`, `--ca-sha256`, `--link-url`, `--tunnel-sni` and `--tunnel-name`. The CA must have the `--ca-sha256` fingerprint and the certificate must belong to the pending key. Running `--offline-csr` again before the finish prints a request for the same key.
+The offline form enrolls the panel's first subscription host, which cannot reach a panel behind NAT yet. The panel's SSH install runs both steps itself: it reads the request of `--offline-csr`, issues the certificate, and passes the tunnel name and the certificates to `--offline-finish` on stdin. The node is then a link-only agent with the subscription host role. `--offline-csr` and `--offline-finish` cannot be combined with each other or with `--token`, `--token-stdin`, `--panel` or `--sni`; `--offline-finish` needs `--node-id`, `--ca-sha256`, `--link-url` and `--tunnel-name`, and stdin must start with the `tunnel-sni=` line. The CA must have the `--ca-sha256` fingerprint and the certificate must belong to the pending key. Running `--offline-csr` again before the finish prints a request for the same key.
 
 ```sh
 mistgate-node enroll --offline-csr
 mistgate-node enroll --offline-finish --node-id nod_… --ca-sha256 <fingerprint> \
-  --link-url wss://sub.example.com/<secret-prefix>/ --tunnel-sni <tunnel name> --tunnel-name sub.example.com < node-and-ca.pem
+  --link-url wss://sub.example.com/<secret-prefix>/ --tunnel-name sub.example.com < tunnel-and-pem
+# tunnel-and-pem: the line tunnel-sni=<tunnel name>, the node certificate, the CA certificate
 ```
 
 ### mistgate-node set-panel

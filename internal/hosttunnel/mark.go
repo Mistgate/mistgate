@@ -105,11 +105,12 @@ func helloMessage(buf []byte) []byte {
 // value is ready.
 type Replay struct {
 	mu   sync.Mutex
-	seen map[[32]byte]time.Time
+	seen map[[32]byte]time.Time // mark → the panel's time in it
 }
 
 // Fresh reports whether a mark made at `at` is within MarkWindow of now and was not seen before, and remembers it. Only
-// holders of the secret can make a mark, so the set needs no bound beyond the window.
+// holders of the secret can make a mark, so the set needs no bound beyond the window. A mark is forgotten once its own
+// time is out of the window on the wall clock (`at` carries no monotonic reading): a clock stepped back keeps it.
 func (r *Replay) Fresh(id [32]byte, at, now time.Time) bool {
 	if now.Sub(at).Abs() > MarkWindow {
 		return false
@@ -117,7 +118,7 @@ func (r *Replay) Fresh(id [32]byte, at, now time.Time) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for k, t := range r.seen {
-		if now.Sub(t) > 2*MarkWindow {
+		if now.Sub(t) > MarkWindow {
 			delete(r.seen, k)
 		}
 	}
@@ -127,6 +128,6 @@ func (r *Replay) Fresh(id [32]byte, at, now time.Time) bool {
 	if r.seen == nil {
 		r.seen = make(map[[32]byte]time.Time)
 	}
-	r.seen[id] = now
+	r.seen[id] = at
 	return true
 }

@@ -275,9 +275,8 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 | `--force` | none | off | 替换现有身份。 |
 | `--resume-key` | none | off | 在状态目录中将新私钥保存在 `enroll-pending.pem`，直到注册成功；下次尝试时继续使用该密钥，以便重试中断的注册：10 分钟内使用相同令牌和密钥重复请求时，面板会返回相同证书。与 `--force` 一起使用时会生成新密钥。 |
 | `--offline-csr` | none | off | 离线注册第 1 步：在 `enroll-pending.pem` 中保存新密钥（或复用已有密钥），并以一行 `csr=<base64 DER>` 输出其证书请求。 |
-| `--offline-finish` | none | off | 离线注册第 2 步：从 stdin 依次读取节点证书和面板 CA 证书（PEM），并与待用密钥一起保存。 |
+| `--offline-finish` | none | off | 离线注册第 2 步：从 stdin 依次读取一行 `tunnel-sni=<名称>`（面板订阅主机隧道的私密名称，不出现在命令行中）、节点证书和面板 CA 证书（PEM），并与待用密钥一起保存。 |
 | `--node-id` | none | none | 与 `--offline-finish` 一起使用：面板分配的节点 ID。 |
-| `--tunnel-sni` | none | none | 与 `--offline-finish` 一起使用：面板订阅主机隧道的私密名称。 |
 | `--tunnel-name` | none | none | 与 `--offline-finish` 一起使用：此节点转发给面板的订阅域名。 |
 
 必须提供 `--panel`、`--sni`、`--ca-sha256` 和令牌（`--token`、`MISTGATE_ENROLL_TOKEN` 或 `--token-stdin`）；缺少任一项时，`enroll` 都会以 2 退出。令牌只能使用一次，并且必须在面板显示的有效期内使用（默认一小时）。面板的 [SSH 安装](../getting-started/ssh-install.md)会通过 SSH 使用相同的 `enroll` 和 `install` 命令，令牌通过 stdin 传入，并带有 `--token-stdin --resume-key`。成功后会显示节点 ID 和下一步：
@@ -287,12 +286,13 @@ enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
 
-离线方式用于注册面板的第一个订阅主机，此时它还无法连到 NAT 后的面板。面板的 SSH 安装会自动完成这两步：读取 `--offline-csr` 输出的请求、签发证书，再通过 stdin 传给 `--offline-finish`。之后该节点成为只走连接通道、承担订阅主机角色的 Agent。`--offline-csr` 和 `--offline-finish` 不能相互组合，也不能与 `--token`、`--token-stdin`、`--panel` 或 `--sni` 一起使用；`--offline-finish` 需要 `--node-id`、`--ca-sha256`、`--link-url`、`--tunnel-sni` 和 `--tunnel-name`。CA 的指纹必须与 `--ca-sha256` 一致，证书必须属于待用密钥。在完成之前再次运行 `--offline-csr`，会为同一密钥输出请求。
+离线方式用于注册面板的第一个订阅主机，此时它还无法连到 NAT 后的面板。面板的 SSH 安装会自动完成这两步：读取 `--offline-csr` 输出的请求、签发证书，再通过 stdin 把隧道名称和证书传给 `--offline-finish`。之后该节点成为只走连接通道、承担订阅主机角色的 Agent。`--offline-csr` 和 `--offline-finish` 不能相互组合，也不能与 `--token`、`--token-stdin`、`--panel` 或 `--sni` 一起使用；`--offline-finish` 需要 `--node-id`、`--ca-sha256`、`--link-url` 和 `--tunnel-name`，并且 stdin 必须以 `tunnel-sni=` 行开头。CA 的指纹必须与 `--ca-sha256` 一致，证书必须属于待用密钥。在完成之前再次运行 `--offline-csr`，会为同一密钥输出请求。
 
 ```sh
 mistgate-node enroll --offline-csr
 mistgate-node enroll --offline-finish --node-id nod_… --ca-sha256 <fingerprint> \
-  --link-url wss://sub.example.com/<secret-prefix>/ --tunnel-sni <tunnel name> --tunnel-name sub.example.com < node-and-ca.pem
+  --link-url wss://sub.example.com/<secret-prefix>/ --tunnel-name sub.example.com < tunnel-and-pem
+# tunnel-and-pem：一行 tunnel-sni=<隧道名称>、节点证书、CA 证书
 ```
 
 ### mistgate-node set-panel

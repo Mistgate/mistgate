@@ -75,5 +75,13 @@ long-lived outbound sockets.
 - The tunnel still differs from a browser in ways the mark cannot hide: one long-lived connection from the panel's
   address to the node; the node's first flight in the tunnel's handshake (fleet certificate and a certificate request)
   differs in size from the panel's answer to a subscription client; and the Chrome profile ages with the uTLS version.
+- The replay cache lives in the agent's memory: a hello recorded within the two-minute window and replayed right after
+  the agent restarts (or by an on-path observer that drops the original) gets the node's tunnel handshake once. It
+  cannot complete it without the panel's key share and certificate, so it opens and replaces nothing; it only tells the
+  observer that the node is a tunnel endpoint.
+- The tunnel secret is rotated only by moving the host to another node or turning it off and on again.
+- All subscription clients and agent links share the tunnel's 1024 streams: one client address (an IPv6 one by its
+  /64) takes at most 32, and the forwards leave 16 for the host's own agent link. Many addresses together can still
+  fill it.
 - Nodes whose agent lacks the link capabilities block enabling (`sub_host_nodes_lack_link`) until they are updated.
 - MCP and API tokens can read the state; every change is an approved plan with a fresh owner step-up.

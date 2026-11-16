@@ -11,6 +11,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
@@ -422,5 +423,43 @@ func TestOtherPortUntouched(t *testing.T) {
 	}
 	if h.Wrapped443() != 0 {
 		t.Fatal("counted")
+	}
+}
+
+// One address (an IPv6 client by its /64) holds at most forwardsPerPeer forwards, and all of them together leave the
+// node's agent link its streams.
+func TestForwardLimits(t *testing.T) {
+	h := New(Identity{}, nil)
+	defer h.Close()
+	a := netip.MustParseAddr("198.51.100.7")
+	for i := range forwardsPerPeer {
+		if !h.admit(peerKey(a)) {
+			t.Fatalf("forward %d of one address refused", i+1)
+		}
+	}
+	if h.admit(peerKey(a)) {
+		t.Fatal("one address took more than forwardsPerPeer")
+	}
+	if !h.admit(peerKey(netip.MustParseAddr("198.51.100.8"))) {
+		t.Fatal("another address refused")
+	}
+	h.release(peerKey(a))
+	if !h.admit(peerKey(a)) {
+		t.Fatal("a released slot was not reused")
+	}
+	v6 := netip.MustParseAddr("2001:db8:1:2::1")
+	for range forwardsPerPeer {
+		h.admit(peerKey(v6))
+	}
+	if h.admit(peerKey(netip.MustParseAddr("2001:db8:1:2:ffff::9"))) {
+		t.Fatal("another address of the same /64 got its own slots")
+	}
+	for i := 0; h.forwards < maxForwards; i++ {
+		if !h.admit(netip.AddrFrom4([4]byte{10, byte(i >> 16), byte(i >> 8), byte(i)})) {
+			t.Fatalf("refused at %d forwards", h.forwards)
+		}
+	}
+	if h.admit(netip.MustParseAddr("203.0.113.1")) || maxForwards >= hosttunnel.MaxStreams {
+		t.Fatal("the forwards took the streams the agent link needs")
 	}
 }

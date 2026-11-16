@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -9,7 +10,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/agent"
 )
 
-// maxOfflinePEM bounds what --offline-finish reads from stdin: two certificates.
+// maxOfflinePEM bounds what --offline-finish reads from stdin: the tunnel line and two certificates.
 const maxOfflinePEM = 64 << 10
 
 // enrollOfflineCSR is `enroll --offline-csr`: the key stays in the state directory, the CSR goes to the panel.
@@ -23,10 +24,11 @@ func enrollOfflineCSR(stateDir string, force bool) int {
 	return 0
 }
 
-// enrollOfflineFinish is `enroll --offline-finish`: stdin holds the node certificate and then the CA certificate.
+// enrollOfflineFinish is `enroll --offline-finish`: stdin holds the line `tunnel-sni=<name>` (the tunnel secret, kept
+// out of the command line, sudo's log and /proc), then the node certificate and the CA certificate.
 func enrollOfflineFinish(in io.Reader, cfg agent.OfflineEnrollConfig) int {
-	if cfg.NodeID == "" || cfg.CASHA256 == "" || cfg.LinkURL == "" || cfg.TunnelSNI == "" || cfg.TunnelName == "" {
-		fmt.Fprintln(os.Stderr, "enroll: --offline-finish needs --node-id, --ca-sha256, --link-url, --tunnel-sni and --tunnel-name")
+	if cfg.NodeID == "" || cfg.CASHA256 == "" || cfg.LinkURL == "" || cfg.TunnelName == "" {
+		fmt.Fprintln(os.Stderr, "enroll: --offline-finish needs --node-id, --ca-sha256, --link-url and --tunnel-name")
 		return 2
 	}
 	b, err := io.ReadAll(io.LimitReader(in, maxOfflinePEM+1))
@@ -34,7 +36,13 @@ func enrollOfflineFinish(in io.Reader, cfg agent.OfflineEnrollConfig) int {
 		fmt.Fprintln(os.Stderr, "enroll: could not read the certificates from stdin")
 		return 2
 	}
-	cfg.PEM = b
+	line, rest, _ := bytes.Cut(b, []byte("\n"))
+	sni, ok := bytes.CutPrefix(bytes.TrimSpace(line), []byte("tunnel-sni="))
+	if !ok || len(sni) == 0 {
+		fmt.Fprintln(os.Stderr, "enroll: stdin must start with the line tunnel-sni=<name>")
+		return 2
+	}
+	cfg.TunnelSNI, cfg.PEM = string(sni), rest
 	meta, err := agent.EnrollOffline(cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "enroll:", err)

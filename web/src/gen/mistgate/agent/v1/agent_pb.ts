@@ -3457,7 +3457,9 @@ export const NodeSettingsSchema: GenMessage<NodeSettings> = /*@__PURE__*/
  */
 export type HostTunnel = Message<"mistgate.agent.v1.HostTunnel"> & {
   /**
-   * The secret SNI the panel's tunnel connection presents on the node's TCP 443. The panel's certificate names it.
+   * The tunnel secret (a random name under the subscription domain): it keys the mark in the session id of the panel's
+   * tunnel ClientHello, the panel's tunnel certificate names it, and the agent's in-tunnel link dials it. Never on the
+   * wire in clear: the tunnel's SNI is the subscription name.
    *
    * @generated from field: string tunnel_sni = 1;
    */

@@ -32,14 +32,13 @@ func cmdEnroll(args []string) int {
 	force := fs.Bool("force", false, "replace an existing identity")
 	resumeKey := fs.Bool("resume-key", false, "persist the pending key so an interrupted SSH enrollment can be retried safely")
 	offlineCSR := fs.Bool("offline-csr", false, "offline enrollment, step 1: keep a new key and print its CSR for the panel")
-	offlineFinish := fs.Bool("offline-finish", false, "offline enrollment, step 2: read the node certificate and the CA certificate (PEM) from stdin")
+	offlineFinish := fs.Bool("offline-finish", false, "offline enrollment, step 2: read the line tunnel-sni=<name>, then the node certificate and the CA certificate (PEM) from stdin")
 	nodeID := fs.String("node-id", "", "with --offline-finish: the node id the panel gave")
-	tunnelSNI := fs.String("tunnel-sni", "", "with --offline-finish: the SNI of the panel's subscription-host tunnel")
 	tunnelName := fs.String("tunnel-name", "", "with --offline-finish: the subscription name this node forwards to the panel")
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), "usage: mistgate-node enroll (--panel <host:port> --sni <name> | --link-url <wss://host/prefix/>) --ca-sha256 <hex> (--token <token> | --token-stdin) [--state-dir dir]\n"+
 			"       mistgate-node enroll --offline-csr [--state-dir dir]\n"+
-			"       mistgate-node enroll --offline-finish --node-id <id> --ca-sha256 <hex> --link-url <wss://host/prefix/> --tunnel-sni <name> --tunnel-name <name> [--state-dir dir] < node-and-ca.pem\n"+
+			"       mistgate-node enroll --offline-finish --node-id <id> --ca-sha256 <hex> --link-url <wss://host/prefix/> --tunnel-name <name> [--state-dir dir] < tunnel-and-pem\n"+
 			"The panel prints the --token form when you add a node. Use --token-stdin to keep the token out of process arguments.\n\n")
 		fs.PrintDefaults()
 	}
@@ -57,7 +56,7 @@ func cmdEnroll(args []string) int {
 			return enrollOfflineCSR(*stateDir, *force)
 		}
 		return enrollOfflineFinish(os.Stdin, agent.OfflineEnrollConfig{
-			StateDir: *stateDir, NodeID: *nodeID, CASHA256: *pin, LinkURL: *linkURL, TunnelSNI: *tunnelSNI, TunnelName: *tunnelName, Force: *force,
+			StateDir: *stateDir, NodeID: *nodeID, CASHA256: *pin, LinkURL: *linkURL, TunnelName: *tunnelName, Force: *force,
 		})
 	}
 	resolvedToken, err := resolveEnrollmentToken(os.Stdin, *token, os.Getenv("MISTGATE_ENROLL_TOKEN"), *tokenStdin)

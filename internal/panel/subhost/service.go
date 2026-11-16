@@ -274,7 +274,8 @@ func (s *Service) lackingLink(ctx context.Context) ([]*adminv1.SubscriptionHostN
 	return out, nil
 }
 
-// pending is every online node still connected through the subdomain or a tunnel name.
+// pending is every online node still connected through the subdomain. The host node's own session, inside the tunnel,
+// is not one: it can only leave once Finish closes the tunnel, and then takes the address it already holds.
 func (s *Service) pending(ctx context.Context, st state) ([]*adminv1.SubscriptionHostPendingNode, error) {
 	if st.Domain == "" {
 		return nil, nil
@@ -289,11 +290,7 @@ func (s *Service) pending(ctx context.Context, st state) ([]*adminv1.Subscriptio
 			continue
 		}
 		via := s.cfg.Fleet.SessionVia(n.ID)
-		h := hostOnly(via)
-		if h != "" && (h == st.Domain || h == st.SNI || h == st.NextSNI) {
-			if h != st.Domain {
-				via = "tunnel" // the host node's own session: the tunnel SNI is a secret and never leaves the panel
-			}
+		if hostOnly(via) == st.Domain {
 			out = append(out, &adminv1.SubscriptionHostPendingNode{NodeId: n.ID, Name: n.Name, Via: via})
 		}
 	}

@@ -314,7 +314,7 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	if !req.Msg.ConfirmInstall {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("confirm_install_required"))
 	}
-	domain := req.Msg.SubscriptionHostDomain
+	domain := strings.ToLower(strings.TrimSuffix(req.Msg.SubscriptionHostDomain, ".")) // as CheckSSH: the node's link address must be the panel's
 	if domain != "" {
 		// The first subscription host enrols inside the SSH session: the panel need not be reachable from it.
 		if s.cfg.SubHost == nil {

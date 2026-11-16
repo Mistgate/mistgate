@@ -933,7 +933,8 @@ func runEnrollment(ctx context.Context, conn *Connection, cfg Config, caFingerpr
 
 // runSessionEnrollment enrols the first subscription host without the node dialling the panel: the node keeps its key
 // in enroll-pending.pem and hands over a CSR (an interrupted job gets a CSR of the same key again), the panel issues the
-// certificate here, and the node stores it with the role. Neither the CSR line nor any remote output is logged.
+// certificate here, and the node stores it with the role. Neither the CSR line nor any remote output is logged; the
+// tunnel secret goes on stdin, never in the command line (sudo logs it, /proc shows it).
 func (s *Service) runSessionEnrollment(ctx context.Context, conn *Connection, job store.NodeProvisionJob, secret credentials) error {
 	output, err := runSSHCapture(ctx, conn, "/root/mistgate-node enroll --offline-csr", nil, 30*time.Second, 4<<10)
 	if err != nil {
@@ -952,10 +953,11 @@ func (s *Service) runSessionEnrollment(ctx context.Context, conn *Connection, jo
 	}
 	command := "/root/mistgate-node enroll --offline-finish --node-id " + shellQuote(nodeID) +
 		" --ca-sha256 " + shellQuote(secret.CAFingerprint) + " --link-url " + shellQuote(s.cfg.subHostLink(secret.SubHostDomain)) +
-		" --tunnel-sni " + shellQuote(secret.SubHostTunnelSNI) + " --tunnel-name " + shellQuote(secret.SubHostDomain)
-	pemIn := make([]byte, 0, len(certPEM)+len(caPEM))
-	pemIn = append(append(pemIn, certPEM...), caPEM...)
-	return runSSH(ctx, conn, command, bytes.NewReader(pemIn), 45*time.Second)
+		" --tunnel-name " + shellQuote(secret.SubHostDomain)
+	in := make([]byte, 0, len("tunnel-sni=\n")+len(secret.SubHostTunnelSNI)+len(certPEM)+len(caPEM))
+	in = append(append(append(append(in, "tunnel-sni="...), secret.SubHostTunnelSNI...), '\n'), certPEM...)
+	in = append(in, caPEM...)
+	return runSSH(ctx, conn, command, bytes.NewReader(in), 45*time.Second)
 }
 
 // parseOfflineCSR reads the `csr=<base64 DER>` line of `enroll --offline-csr`.

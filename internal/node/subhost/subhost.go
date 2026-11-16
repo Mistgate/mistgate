@@ -77,9 +77,12 @@ type Host struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	cfg      atomic.Pointer[config]
-	wrapped  atomic.Int32
-	forwards atomic.Int32
+	cfg     atomic.Pointer[config]
+	wrapped atomic.Int32
+
+	fmu      sync.Mutex
+	forwards int                // subscription clients carried into the panel now
+	perPeer  map[netip.Addr]int // of them, per client address
 
 	mu  sync.Mutex
 	tun *tunnel
@@ -387,12 +390,12 @@ func (h *Host) forward(c net.Conn, t *tunnel) {
 		_ = c.Close()
 		return
 	}
-	if h.forwards.Add(1) > hosttunnel.MaxStreams {
-		h.forwards.Add(-1)
+	key := peerKey(peer.Addr())
+	if !h.admit(key) {
 		_ = c.Close()
 		return
 	}
-	defer h.forwards.Add(-1)
+	defer h.release(key)
 	ctx, cancel := context.WithTimeout(h.ctx, openTimeout)
 	s, err := hosttunnel.OpenStream(ctx, t.cc, t.sni, hosttunnel.KindTLS, peer)
 	cancel()
@@ -407,6 +410,48 @@ func (h *Host) forward(c net.Conn, t *tunnel) {
 	_ = c.Close()
 	_ = s.Close()
 	<-done
+}
+
+// The forwards share the tunnel's streams with the node's own agent link: they leave it linkStreams of them, and one
+// address takes at most forwardsPerPeer, so a single client holding connections open cannot take the subscription and
+// every agent's link away.
+const (
+	linkStreams     = 16
+	maxForwards     = hosttunnel.MaxStreams - linkStreams
+	forwardsPerPeer = 32
+)
+
+func (h *Host) admit(a netip.Addr) bool {
+	h.fmu.Lock()
+	defer h.fmu.Unlock()
+	if h.forwards >= maxForwards || h.perPeer[a] >= forwardsPerPeer {
+		return false
+	}
+	if h.perPeer == nil {
+		h.perPeer = make(map[netip.Addr]int)
+	}
+	h.forwards++
+	h.perPeer[a]++
+	return true
+}
+
+func (h *Host) release(a netip.Addr) {
+	h.fmu.Lock()
+	defer h.fmu.Unlock()
+	h.forwards--
+	if h.perPeer[a]--; h.perPeer[a] <= 0 {
+		delete(h.perPeer, a)
+	}
+}
+
+// peerKey is the address a client is counted under: an IPv6 client by its /64, which one machine usually holds whole.
+func peerKey(a netip.Addr) netip.Addr {
+	if a.Is6() {
+		if p, err := a.Prefix(64); err == nil {
+			return p.Addr()
+		}
+	}
+	return a
 }
 
 func addrPort(a net.Addr) (netip.AddrPort, bool) {

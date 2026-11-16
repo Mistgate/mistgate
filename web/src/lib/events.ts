@@ -47,6 +47,7 @@ const textKeys: Record<string, MessageKey> = {
   torrent_guard_degraded: "event.torrent_guard_degraded",
   host_firewall_sync_failed: "event.host_firewall_sync_failed",
   host_firewall_sync_recovered: "event.host_firewall_sync_recovered",
+  sub_host_site_failed: "event.sub_host_site_failed",
   sub_host_tunnel_down: "event.sub_host_tunnel_down",
   sub_host_tunnel_not_recognised: "event.sub_host_tunnel_not_recognised",
   sub_host_tunnel_up: "event.sub_host_tunnel_up",

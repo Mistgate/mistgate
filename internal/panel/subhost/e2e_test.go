@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -80,9 +81,10 @@ func newE2E(t *testing.T) *e2e {
 
 // e2eNode is a host node: its TCP 443 (a loopback listener) wrapped by the real node subscription host, with a stub site.
 type e2eNode struct {
-	id   string
-	host *nodehost.Host
-	addr string
+	id     string
+	host   *nodehost.Host
+	addr   string
+	refuse atomic.Bool // the node trusts no CA: it accepts the mark, then refuses the panel's certificate
 }
 
 // node enrols a node in the fleet (as the SSH install does, inside a session) and starts its 443.
@@ -112,7 +114,13 @@ func (e *e2e) node(name, address string) *e2eNode {
 		t.Fatal(err)
 	}
 
-	h := nodehost.New(nodehost.Identity{Cert: func() *tls.Certificate { return cert }, CAPool: func() *x509.CertPool { return pool }}, nil)
+	n := &e2eNode{id: id}
+	h := nodehost.New(nodehost.Identity{Cert: func() *tls.Certificate { return cert }, CAPool: func() *x509.CertPool {
+		if n.refuse.Load() {
+			return x509.NewCertPool()
+		}
+		return pool
+	}}, nil)
 	t.Cleanup(h.Close)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -127,7 +135,8 @@ func (e *e2e) node(name, address string) *e2eNode {
 	e.mu.Lock()
 	e.addrs[address] = ln.Addr().String()
 	e.mu.Unlock()
-	return &e2eNode{id: id, host: h, addr: ln.Addr().String()}
+	n.host, n.addr = h, ln.Addr().String()
+	return n
 }
 
 func (e *e2e) dial(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -299,6 +308,8 @@ func TestTunnelDownReason(t *testing.T) {
 	}{
 		{"clock", reasonNotRecognised, func(e *e2e, _ *e2eNode) { e.now = func() time.Time { return time.Now().Add(5 * time.Minute) } }},
 		{"unreachable", reasonUnreachable, func(e *e2e, n *e2eNode) { e.addrs["203.0.113.1"] = "127.0.0.1:1" }},
+		// TLS 1.3 completes on the panel's side before the node refuses its certificate: the tunnel must not count as up.
+		{"panel refused", reasonUnreachable, func(_ *e2e, n *e2eNode) { n.refuse.Store(true) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newE2E(t)

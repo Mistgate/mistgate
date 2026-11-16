@@ -61,7 +61,8 @@ func (s *Service) PrepareInstall(ctx context.Context, sshHost, domain string, sk
 }
 
 // ActivateInstalled turns the role on for the node an install just enrolled, with the domain and tunnel SNI PrepareInstall
-// gave (off → on).
+// gave (off → on). Already on for the same node, domain and SNI it changes nothing: an install the panel died in, or one
+// whose undo was refused because another node exists, is retried without the owner turning the host off first.
 func (s *Service) ActivateInstalled(ctx context.Context, nodeID, domain, sni string) error {
 	domain, err := normDomain(domain)
 	if err != nil {
@@ -70,7 +71,12 @@ func (s *Service) ActivateInstalled(ctx context.Context, nodeID, domain, sni str
 	if !strings.HasSuffix(sni, "."+domain) {
 		return coded(connect.CodeInvalidArgument, "sub_host_tunnel_sni_invalid")
 	}
+	again := false
 	err = s.transition(ctx, func(st *state) error {
+		if st.State == stateOn && st.Node == nodeID && st.Domain == domain && st.SNI == sni {
+			again = true
+			return nil
+		}
 		if st.State != stateOff {
 			return wrongState()
 		}
@@ -85,7 +91,7 @@ func (s *Service) ActivateInstalled(ctx context.Context, nodeID, domain, sni str
 		*st = state{State: stateOn, Domain: domain, Node: nodeID, SNI: sni, PrevURL: prev, PublicURL: "https://" + domain}
 		return nil
 	})
-	if err != nil {
+	if err != nil || again {
 		return err
 	}
 	s.audit(ctx, "sub_host_set", map[string]string{"domain": domain, "node_id": nodeID, "via": "install"})

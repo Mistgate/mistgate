@@ -155,6 +155,9 @@ func nodeInstallPlanTool() toolDef {
 					}
 					if resolved.SubscriptionHostDomain != "" {
 						planned.Facts = append(planned.Facts, Fact{Key: "subscription_host", Value: resolved.SubscriptionHostDomain, Untrusted: true})
+						if resolved.SkipDNSCheck {
+							planned.Facts = append(planned.Facts, Fact{Key: "dns", Value: "check skipped: the domain may not point at this server"})
+						}
 					}
 					out, err := e.createPlan(c, base, params, reason, planned)
 					if err != nil {

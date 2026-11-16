@@ -23,7 +23,12 @@ const (
 	backoffMax = time.Minute
 	// aliveReset: a tunnel that stayed up this long starts the next backoff from the beginning.
 	aliveReset = time.Minute
+	// confirmUp: a tunnel counts as up once the node opens a stream in it or keeps it this long. TLS 1.3 completes on the
+	// panel's side before the node has judged the panel's certificate, so a refused panel would otherwise flicker up.
+	confirmUp = 3 * time.Second
 )
+
+var errTunnelUnused = errors.New("the node closed the tunnel before using it")
 
 // tunnel is the dialer of one host node.
 type tunnel struct {
@@ -225,9 +230,26 @@ func (s *Service) serveTunnel(ctx context.Context, t *tunnel) error {
 	if err != nil {
 		return err
 	}
-	s.setUp(t, true, "")
+	var once sync.Once
+	var confirmed bool
+	up := func() {
+		once.Do(func() {
+			confirmed = true
+			s.setUp(t, true, "")
+		})
+	}
+	timer := time.AfterFunc(confirmUp, up)
+	accept := s.accept(nodeID)
 	srv := &http2.Server{MaxConcurrentStreams: hosttunnel.MaxStreams, ReadIdleTimeout: hosttunnel.ReadIdle, PingTimeout: hosttunnel.PingTimeout}
-	srv.ServeConn(tc, &http2.ServeConnOpts{Context: ctx, Handler: hosttunnel.ServerHandler(s.accept(nodeID))})
+	srv.ServeConn(tc, &http2.ServeConnOpts{Context: ctx, Handler: hosttunnel.ServerHandler(func(kind string, c net.Conn) bool {
+		up()
+		return accept(kind, c)
+	})})
+	timer.Stop()
+	once.Do(func() {}) // a timer that fired just now has finished; one that did not never will
+	if !confirmed {
+		return errTunnelUnused
+	}
 	return nil
 }
 

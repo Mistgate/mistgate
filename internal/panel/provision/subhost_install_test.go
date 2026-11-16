@@ -206,12 +206,12 @@ func TestSubscriptionHostInstallEnrollsInTheSession(t *testing.T) {
 		t.Fatalf("enrolment steps %v, want csr then finish", node.order)
 	}
 	want := "/root/mistgate-node enroll --offline-finish --node-id '" + e2eSessionNodeID + "' --ca-sha256 '" + strings.Repeat("a", 64) +
-		"' --link-url 'wss://" + subHostDomain + subHostPrefix + "' --tunnel-sni '" + subHostSNI + "' --tunnel-name '" + subHostDomain + "'"
-	if node.finish.command != want {
-		t.Fatalf("finish command\n%q\nwant\n%q", node.finish.command, want)
+		"' --link-url 'wss://" + subHostDomain + subHostPrefix + "' --tunnel-name '" + subHostDomain + "'"
+	if node.finish.command != want || strings.Contains(node.finish.command, subHostSNI) {
+		t.Fatalf("finish command\n%q\nwant\n%q (the tunnel secret never in the command line)", node.finish.command, want)
 	}
-	if node.finish.stdin != string(e2eSessionCert)+string(e2eSessionCA) {
-		t.Fatalf("finish stdin %q, want the certificate then the CA", node.finish.stdin)
+	if node.finish.stdin != "tunnel-sni="+subHostSNI+"\n"+string(e2eSessionCert)+string(e2eSessionCA) {
+		t.Fatalf("finish stdin %q, want the tunnel line, the certificate, then the CA", node.finish.stdin)
 	}
 	if len(manager.sessionCSRs) != 1 || string(manager.sessionCSRs[0]) != "csr-of-key-A" {
 		t.Fatalf("CSRs given to the fleet: %q", manager.sessionCSRs)

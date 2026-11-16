@@ -6419,7 +6419,9 @@ func (x *NodeSettings) GetPanelLinkUrl() string {
 // HostTunnel is the subscription-host role of a node (NodeSettings.host_tunnel).
 type HostTunnel struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The secret SNI the panel's tunnel connection presents on the node's TCP 443. The panel's certificate names it.
+	// The tunnel secret (a random name under the subscription domain): it keys the mark in the session id of the panel's
+	// tunnel ClientHello, the panel's tunnel certificate names it, and the agent's in-tunnel link dials it. Never on the
+	// wire in clear: the tunnel's SNI is the subscription name.
 	TunnelSni string `protobuf:"bytes,1,opt,name=tunnel_sni,json=tunnelSni,proto3" json:"tunnel_sni,omitempty"`
 	// Hostnames whose TLS connections on TCP 443 go into the panel through the tunnel.
 	ForwardNames  []string `protobuf:"bytes,2,rep,name=forward_names,json=forwardNames,proto3" json:"forward_names,omitempty"`

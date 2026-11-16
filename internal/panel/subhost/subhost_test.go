@@ -363,9 +363,9 @@ func TestGetReportsCAA(t *testing.T) {
 	}
 }
 
-// The host node's own session comes in through its tunnel: while leaving, Get lists it as pending, but never with the
-// tunnel SNI it dialled.
-func TestPendingNeverShowsTheTunnelSNI(t *testing.T) {
+// The host node's own session comes in through its tunnel: while leaving, it is not pending (it moves only once Finish
+// closes the tunnel), so Finish without force succeeds once the other nodes have moved.
+func TestHostOwnSessionIsNotPending(t *testing.T) {
 	e := newEnv(t)
 	a := e.node("a", "203.0.113.1", allCaps, true)
 	b := e.node("b", "203.0.113.2", allCaps, true)
@@ -382,11 +382,38 @@ func TestPendingNeverShowsTheTunnelSNI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vias := map[string]string{}
-	for _, p := range g.Msg.Host.Pending {
-		vias[p.NodeId] = p.Via
+	if p := g.Msg.Host.Pending; len(p) != 1 || p[0].NodeId != b || p[0].Via != "sub.example.com:443" || strings.Contains(g.Msg.String(), sni) {
+		t.Fatalf("pending %v; only b, never the tunnel SNI", p)
 	}
-	if vias[a] != "tunnel" || vias[b] != "sub.example.com:443" || strings.Contains(g.Msg.String(), sni) {
-		t.Fatalf("pending %v; the response must not carry the tunnel SNI", vias)
+	e.fl.via[b] = "back.example:443"
+	if _, err := e.rpc.FinishSubscriptionHostChange(e.ctx, connect.NewRequest(&adminv1.FinishSubscriptionHostChangeRequest{})); err != nil {
+		t.Fatalf("finish with only the host in its tunnel: %v", err)
 	}
+	if st := e.state(); st != (state{PublicURL: "https://back.example"}) {
+		t.Fatalf("off: %+v", st)
+	}
+}
+
+// An install retried after the panel died in it, or after its undo was refused because another node exists, finds the
+// role already on for its node, domain and SNI and goes on; anything else stays refused.
+func TestActivateInstalledAgain(t *testing.T) {
+	e := newEnv(t)
+	a := e.node("a", "203.0.113.1", allCaps, true)
+	sni, err := e.svc.PrepareInstall(e.ctx, "203.0.113.1", "sub.example.com", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.ActivateInstalled(e.ctx, a, "sub.example.com", sni); err != nil {
+		t.Fatal(err)
+	}
+	b := e.node("b", "203.0.113.2", allCaps, true)
+	wantCode(t, e.svc.DeactivateInstalled(e.ctx, a), "sub_host_in_use")
+	if err := e.svc.ActivateInstalled(e.ctx, a, "Sub.Example.com.", sni); err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if st := e.state(); st.State != stateOn || st.Node != a || st.SNI != sni {
+		t.Fatalf("after retry: %+v", st)
+	}
+	wantCode(t, e.svc.ActivateInstalled(e.ctx, b, "sub.example.com", sni), "sub_host_wrong_state")
+	wantCode(t, e.svc.ActivateInstalled(e.ctx, a, "sub.example.com", "x.sub.example.com"), "sub_host_wrong_state")
 }
