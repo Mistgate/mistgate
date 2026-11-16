@@ -116,7 +116,7 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 	agentSNIPrefix, _, _ := strings.Cut(b.in.AgentSNI, ".")
 	return fleet.Config{
 		AgentSNI:             b.in.AgentSNI,
-		JournalSecrets:       []string{b.in.AgentSNI, agentSNIPrefix, b.in.AdminPrefix, b.in.SubPrefix, b.in.LinkPrefix},
+		JournalSecrets:       []string{b.in.AgentSNI, agentSNIPrefix, b.in.AdminPrefix, b.in.SubPrefix, b.in.LinkPrefix, b.in.ProbePrefix},
 		LinkServed:           b.in.LinkPrefix != "",
 		LinkURL:              linkURL(b.in),
 		Remote:               b.c.Remote,
@@ -198,6 +198,7 @@ type core struct {
 	bs                 *bsbord.Service
 	bl                 *blocklist.Service
 	cp                 *countryprobe.Service
+	own                ownProbeService // nil on the Cloudflare edition (ownprobe_wiring_js.go)
 	hl                 *health.Service
 	upd                *update.Service
 	wsv                *warp.Service
@@ -342,7 +343,8 @@ func wireCore(c Config) (*core, error) {
 			for _, s := range cheburcheck.StateFrom(kv).Sources() {
 				out = append(out, health.ExternalState(s))
 			}
-			return append(out, bsbord.StateFrom(kv))
+			out = append(out, bsbord.StateFrom(kv))
+			return append(out, ownProbeStates(ctx, k.own, log)...)
 		},
 		TSPU: func(ctx context.Context) health.TSPUState {
 			st := k.cp.State(ctx)
@@ -425,13 +427,14 @@ func wireCore(c Config) (*core, error) {
 		return nil, err
 	}
 	fl.SetWarp(warpForFleet{k.wsv})
+	k.own = newOwnProbes(k)
 	return k, nil
 }
 
 // panel is the Panel of the services the core holds; a role adds what it serves.
 func (k *core) panel() *Panel {
 	return &Panel{
-		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Cheburcheck: k.cc, Bsbord: k.bs, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
+		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, OwnProbes: k.own, Cheburcheck: k.cc, Bsbord: k.bs, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
 		provisionKick: k.c.ProvisionKick,
 	}
 }

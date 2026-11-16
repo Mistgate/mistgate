@@ -45,14 +45,16 @@ func TestInstanceSecrets(t *testing.T) {
 	genericRe := regexp.MustCompile(`^[a-z2-7]{16}\.com$`)
 	prefixRe := regexp.MustCompile(`^/[a-z2-7]{24}/$`)
 	linkPrefixRe := regexp.MustCompile(`^/[a-z2-7]{24}/$`)
+	probePrefixRe := regexp.MustCompile(`^/[a-z2-7]{24}/$`)
 	a, _ := newInstance(setupOpts{publicURL: "https://example.com"})
 	b, _ := newInstance(setupOpts{publicURL: "https://example.com"})
-	if !sniRe.MatchString(a.AgentSNI) || !prefixRe.MatchString(a.SubPrefix) || !linkPrefixRe.MatchString(a.LinkPrefix) ||
-		a.AgentSNI == b.AgentSNI || a.SubPrefix == b.SubPrefix || a.LinkPrefix == b.LinkPrefix || a.LinkPrefix == a.SubPrefix || a.SubPrefix == a.AdminPrefix {
+	if !sniRe.MatchString(a.AgentSNI) || !prefixRe.MatchString(a.SubPrefix) || !linkPrefixRe.MatchString(a.LinkPrefix) || !probePrefixRe.MatchString(a.ProbePrefix) ||
+		a.AgentSNI == b.AgentSNI || a.SubPrefix == b.SubPrefix || a.LinkPrefix == b.LinkPrefix || a.ProbePrefix == b.ProbePrefix ||
+		a.LinkPrefix == a.SubPrefix || a.ProbePrefix == a.SubPrefix || a.ProbePrefix == a.LinkPrefix || a.SubPrefix == a.AdminPrefix {
 		t.Fatalf("secrets: %+v / %+v", a, b)
 	}
 	in, err := newInstance(setupOpts{adminListen: "127.0.0.1:8081"})
-	if err != nil || !genericRe.MatchString(in.AgentSNI) || !prefixRe.MatchString(in.SubPrefix) || !linkPrefixRe.MatchString(in.LinkPrefix) {
+	if err != nil || !genericRe.MatchString(in.AgentSNI) || !prefixRe.MatchString(in.SubPrefix) || !linkPrefixRe.MatchString(in.LinkPrefix) || !probePrefixRe.MatchString(in.ProbePrefix) {
 		t.Fatalf("listener mode secrets: %+v %v", in, err)
 	}
 	ah, err := newInstance(setupOpts{adminHost: "K7Q2X9.Admin.Example.org", publicURL: "https://198.51.100.7"})
@@ -76,25 +78,25 @@ func TestInstanceSecrets(t *testing.T) {
 	}
 	defer st.Close()
 	first, err := loadInstance(ctx, st)
-	if err != nil || !sniRe.MatchString(first.AgentSNI) || !prefixRe.MatchString(first.SubPrefix) || !linkPrefixRe.MatchString(first.LinkPrefix) {
+	if err != nil || !sniRe.MatchString(first.AgentSNI) || !prefixRe.MatchString(first.SubPrefix) || !linkPrefixRe.MatchString(first.LinkPrefix) || !probePrefixRe.MatchString(first.ProbePrefix) {
 		t.Fatalf("load: %+v %v", first, err)
 	}
 	if out.Reset(); setup(ctx, dir, setupOpts{}, &out, time.Now()) != nil {
 		t.Fatal("second setup")
 	}
-	if again, _ := loadInstance(ctx, st); again.AgentSNI != first.AgentSNI || again.SubPrefix != first.SubPrefix || again.LinkPrefix != first.LinkPrefix {
+	if again, _ := loadInstance(ctx, st); again.AgentSNI != first.AgentSNI || again.SubPrefix != first.SubPrefix || again.LinkPrefix != first.LinkPrefix || again.ProbePrefix != first.ProbePrefix {
 		t.Error("secrets changed between runs")
 	}
 
 	// An installation from before these settings existed gets them once, then keeps them.
-	if _, err := st.W.ExecContext(ctx, `DELETE FROM setting WHERE k IN ('agent_sni', 'sub_prefix', 'link_prefix')`); err != nil {
+	if _, err := st.W.ExecContext(ctx, `DELETE FROM setting WHERE k IN ('agent_sni', 'sub_prefix', 'link_prefix', 'probe_prefix')`); err != nil {
 		t.Fatal(err)
 	}
 	legacy, err := loadInstance(ctx, st)
-	if err != nil || !sniRe.MatchString(legacy.AgentSNI) || !prefixRe.MatchString(legacy.SubPrefix) || !linkPrefixRe.MatchString(legacy.LinkPrefix) {
+	if err != nil || !sniRe.MatchString(legacy.AgentSNI) || !prefixRe.MatchString(legacy.SubPrefix) || !linkPrefixRe.MatchString(legacy.LinkPrefix) || !probePrefixRe.MatchString(legacy.ProbePrefix) {
 		t.Fatalf("legacy install: %+v %v", legacy, err)
 	}
-	if again, _ := loadInstance(ctx, st); again.AgentSNI != legacy.AgentSNI || again.SubPrefix != legacy.SubPrefix || again.LinkPrefix != legacy.LinkPrefix {
+	if again, _ := loadInstance(ctx, st); again.AgentSNI != legacy.AgentSNI || again.SubPrefix != legacy.SubPrefix || again.LinkPrefix != legacy.LinkPrefix || again.ProbePrefix != legacy.ProbePrefix {
 		t.Error("legacy secrets not stored")
 	}
 	if legacy.adminURL() != first.adminURL() {
@@ -103,7 +105,7 @@ func TestInstanceSecrets(t *testing.T) {
 
 	// --dev stores no instance settings but keeps the secrets in the same place.
 	dev := devInstance()
-	if err := ensureSecrets(ctx, st, &dev); err != nil || dev.AgentSNI != legacy.AgentSNI || dev.LinkPrefix != legacy.LinkPrefix {
+	if err := ensureSecrets(ctx, st, &dev); err != nil || dev.AgentSNI != legacy.AgentSNI || dev.LinkPrefix != legacy.LinkPrefix || dev.ProbePrefix != legacy.ProbePrefix {
 		t.Errorf("ensureSecrets: %+v %v", dev, err)
 	}
 }

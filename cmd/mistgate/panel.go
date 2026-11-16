@@ -62,6 +62,9 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 	if o.in.LinkPrefix == "" {
 		o.in.LinkPrefix = newSecretPrefix()
 	}
+	if o.in.ProbePrefix == "" {
+		o.in.ProbePrefix = newSecretPrefix()
+	}
 	var healthBlipWindow time.Duration
 	if d, err := time.ParseDuration(os.Getenv("MISTGATE_HEALTH_BLIP_WINDOW")); err == nil && d > 0 {
 		healthBlipWindow = d
@@ -71,7 +74,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 		Logger: log, Instance: app.InstanceConfig{
 			PublicURL: o.in.PublicURL, AdminHost: o.in.AdminHost, AdminPrefix: o.in.AdminPrefix,
 			AdminListen: o.in.AdminListen, RPID: o.in.RPID, RPOrigins: o.in.RPOrigins,
-			AgentSNI: o.in.AgentSNI, SubPrefix: o.in.SubPrefix, LinkPrefix: o.in.LinkPrefix,
+			AgentSNI: o.in.AgentSNI, SubPrefix: o.in.SubPrefix, LinkPrefix: o.in.LinkPrefix, ProbePrefix: o.in.ProbePrefix,
 		},
 		DecoyDir: o.decoyDir, PanelAddr: o.panelAddr, DataDir: o.dataDir,
 		UpdateService: o.updateService, Title: o.title, HealthBlipWindow: healthBlipWindow, Ops: o.ops,

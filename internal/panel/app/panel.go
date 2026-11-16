@@ -43,6 +43,7 @@ type InstanceConfig struct {
 	AgentSNI    string
 	SubPrefix   string
 	LinkPrefix  string // secret path prefix of the signed agent WebSocket link; empty = not served by this handler
+	ProbePrefix string // secret path prefix of the owner-managed probe endpoint
 }
 
 // linkURL is the base of the signed agent link (and of link-only enrolment): wss:// + the public host + the secret
@@ -160,13 +161,17 @@ type Config struct {
 
 // Panel is the assembled panel: its public HTTP handler, VPS listener adapter and services.
 type Panel struct {
-	Handler        http.Handler
-	Server         *httpserver.Server
-	Fleet          *fleet.Fleet
-	Access         *access.Service
-	Health         *health.Service
-	Blocklist      *blocklist.Service
-	CountryProbe   *countryprobe.Service
+	Handler      http.Handler
+	Server       *httpserver.Server
+	Fleet        *fleet.Fleet
+	Access       *access.Service
+	Health       *health.Service
+	Blocklist    *blocklist.Service
+	CountryProbe *countryprobe.Service
+	OwnProbes    interface {
+		Handler(...connect.HandlerOption) (string, http.Handler)
+		PublicHandler(string) http.Handler
+	}
 	Cheburcheck    *cheburcheck.Service
 	Bsbord         *bsbord.Service
 	Update         *update.Service

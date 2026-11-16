@@ -50,7 +50,7 @@ func (k *core) addOps(cfg *httpserver.Config) {
 	cfg.RPCStats = calls
 	svc := ops.New(ops.Config{
 		Store: k.st, Ring: oc.Ring, Level: oc.Level, DefaultLevel: oc.DefaultLevel, Format: oc.Format,
-		Secrets: []string{k.in.AgentSNI, agentSNIPrefix, k.in.AdminPrefix, k.in.SubPrefix, k.in.LinkPrefix},
+		Secrets: []string{k.in.AgentSNI, agentSNIPrefix, k.in.AdminPrefix, k.in.SubPrefix, k.in.LinkPrefix, k.in.ProbePrefix},
 		StepUp:  k.authSvc.RequireStepUp,
 		Fleet:   fleetH, Health: healthH, Relay: relayH,
 		Debug: k.fl,

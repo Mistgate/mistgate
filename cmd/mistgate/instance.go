@@ -31,6 +31,7 @@ type instance struct {
 	AgentSNI    string   // secret TLS server name that selects the agent endpoint, e.g. q3m8x2kd7w4ht9pa.example.com
 	SubPrefix   string   // secret path prefix of the public subscription endpoint, "/" + 24 chars + "/"
 	LinkPrefix  string   // secret path prefix of the signed agent WebSocket link
+	ProbePrefix string   // secret path prefix of the owner-managed probes
 }
 
 var errNotConfigured = errors.New("not configured: run `mistgate setup` first")
@@ -57,6 +58,7 @@ func newInstance(o setupOpts) (instance, error) {
 	}
 	in.SubPrefix = newSecretPrefix()
 	in.LinkPrefix = newSecretPrefix()
+	in.ProbePrefix = newSecretPrefix()
 
 	var pub *url.URL
 	if o.publicURL != "" {
@@ -178,6 +180,7 @@ func (in instance) settings() map[string]string {
 		"agent_sni":    in.AgentSNI,
 		"sub_prefix":   in.SubPrefix,
 		"link_prefix":  in.LinkPrefix,
+		"probe_prefix": in.ProbePrefix,
 	}
 }
 
@@ -233,6 +236,12 @@ func ensureSecrets(ctx context.Context, st *store.Store, in *instance) error {
 	if in.LinkPrefix, err = st.Setting(ctx, "link_prefix"); errors.Is(err, store.ErrNotFound) {
 		in.LinkPrefix = newSecretPrefix()
 		fill["link_prefix"] = in.LinkPrefix
+	} else if err != nil {
+		return err
+	}
+	if in.ProbePrefix, err = st.Setting(ctx, "probe_prefix"); errors.Is(err, store.ErrNotFound) {
+		in.ProbePrefix = newSecretPrefix()
+		fill["probe_prefix"] = in.ProbePrefix
 	} else if err != nil {
 		return err
 	}

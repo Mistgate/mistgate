@@ -89,6 +89,9 @@ func Build(c Config) (*Panel, error) {
 	}
 	cfg := k.adminConfig(parts, prov, bkp, c.ProvisionForward)
 	cfg.PublicMounts = map[string]http.Handler{k.in.SubPrefix: parts.mux(k.base, k.acc)}
+	if k.own != nil && k.in.ProbePrefix != "" {
+		cfg.PublicMounts[k.in.ProbePrefix] = k.own.PublicHandler(k.c.DecoyDir)
+	}
 	cfg.AgentSNI, cfg.AgentTLS, cfg.AgentHandler = k.in.AgentSNI, k.fl.AgentTLSConfig, k.fl.AgentHandler()
 	cfg.AgentLinkPrefix, cfg.AgentLinkHandler = k.in.LinkPrefix, link
 	return k.finish(cfg, prov, bkp, true)
@@ -109,7 +112,7 @@ func BuildAdmin(c Config) (*Panel, error) {
 		return nil, err
 	}
 	cfg := k.adminConfig(parts, prov, bkp, true)
-	cfg.ReservedPrefixes = []string{k.in.SubPrefix, k.in.LinkPrefix}
+	cfg.ReservedPrefixes = []string{k.in.SubPrefix, k.in.LinkPrefix, k.in.ProbePrefix}
 	return k.finish(cfg, prov, bkp, false)
 }
 
@@ -131,7 +134,7 @@ func BuildProvision(c Config) (*Panel, error) {
 	path, handler := forwardProvision(false, prov.Handler)
 	cfg.AdminHandlers = []httpserver.AdminHandler{{Path: path, Handler: handler}}
 	cfg.AdminPages = []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: forwardPage(false, prov.PageHandler())}}
-	cfg.ReservedPrefixes = []string{k.in.SubPrefix, k.in.LinkPrefix}
+	cfg.ReservedPrefixes = []string{k.in.SubPrefix, k.in.LinkPrefix, k.in.ProbePrefix}
 	return k.finish(cfg, prov, nil, false)
 }
 
@@ -148,7 +151,7 @@ func BuildLink(c Config) (*Panel, error) {
 	cfg := httpserver.Config{
 		DecoyDir: k.c.DecoyDir, Log: k.log,
 		AgentLinkPrefix: k.in.LinkPrefix, AgentLinkHandler: k.fl.LinkHandler(),
-		ReservedPrefixes: []string{k.in.MuxPrefix(), k.in.SubPrefix},
+		ReservedPrefixes: []string{k.in.MuxPrefix(), k.in.SubPrefix, k.in.ProbePrefix},
 	}
 	srv, err := httpserver.NewPublic(cfg, k.st)
 	if err != nil {
@@ -193,7 +196,7 @@ func BuildPublic(c Config) (*Panel, error) {
 	cfg := httpserver.Config{
 		DecoyDir: b.c.DecoyDir, Log: b.log,
 		PublicMounts:     map[string]http.Handler{b.in.SubPrefix: parts.mux(b, acc)},
-		ReservedPrefixes: []string{b.in.MuxPrefix(), b.in.LinkPrefix},
+		ReservedPrefixes: []string{b.in.MuxPrefix(), b.in.LinkPrefix, b.in.ProbePrefix},
 	}
 	srv, err := httpserver.NewPublic(cfg, b.st)
 	if err != nil {
@@ -247,7 +250,8 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 		path, handler := h()
 		cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
 	}
-	cfg.AdminHandlers = append(cfg.AdminHandlers, probeAdminHandlers(k.fl)...) // probes between nodes: the VPS only
+	cfg.AdminHandlers = append(cfg.AdminHandlers, probeAdminHandlers(k.fl)...)     // probes between nodes: the VPS only
+	cfg.AdminHandlers = append(cfg.AdminHandlers, ownProbeAdminHandlers(k.own)...) // the panel's own probes: the VPS only
 	// API tokens and the owner's approvals, then the MCP endpoint over the same admin API.
 	cfg.AdminHandlers = append(cfg.AdminHandlers, integrationHandlers(k.authSvc)...)
 	if path, handler := k.assistantHandler(); path != "" {

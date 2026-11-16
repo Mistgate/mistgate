@@ -117,6 +117,12 @@ func NewDecoy(dir string) http.Handler {
 	return http.HandlerFunc(newDecoy(dir, nil).notFound)
 }
 
+// NewTooMany returns the 429 of the decoy site (429.html of the decoy dir, else the built-in page, Retry-After in whole
+// seconds). A secret mount answers with it when a stranger has failed too often, so the limit looks like the one of the site.
+func NewTooMany(dir string) func(w http.ResponseWriter, r *http.Request, retry time.Duration) {
+	return newDecoy(dir, nil).tooMany
+}
+
 func newDecoy(dir string, log *slog.Logger) *decoy {
 	if dir == "" {
 		return &decoy{}
