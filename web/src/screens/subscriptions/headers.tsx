@@ -211,25 +211,11 @@ function HeaderRow({ row, n, total, problem, groups, groupsLoading, t, onChange,
   };
   const toggleGroup = (id: string) => onChange({ groupIds: row.groupIds.includes(id) ? row.groupIds.filter((x) => x !== id) : [...row.groupIds, id] });
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-3">
-      <div className="flex items-center gap-2.5">
-        <b className="min-w-0 flex-1 truncate text-[13px]">{t("subs.hdr.n", { n })}</b>
-        <span className="flex flex-none gap-0.5">
-          <IconButton aria-label={t("subs.hdr.up", { n })} variant="flat" disabled={n === 1} onClick={() => onMove(n - 2)}>
-            <Icon name="arrowUp" size={14} />
-          </IconButton>
-          <IconButton aria-label={t("subs.hdr.down", { n })} variant="flat" disabled={n === total} onClick={() => onMove(n)}>
-            <Icon name="arrowDown" size={14} />
-          </IconButton>
-          <IconButton aria-label={t("subs.hdr.remove", { n })} variant="flat" onClick={onRemove}>
-            <Icon name="trash" size={14} />
-          </IconButton>
-        </span>
-      </div>
-
-      <div className="grid gap-2.5 @min-[560px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface p-3">
+      {/* name | value | order and delete where the list is wide; name and the buttons, then the value, where it is narrow */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2 @min-[560px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto]">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <span className={eyebrow}>{t("subs.hdr.name")}</span>
+          <span className={cx(eyebrow, "flex min-h-6 items-center")}>{t("subs.hdr.name")}</span>
           <input
             aria-label={label(t("subs.hdr.name"))}
             aria-invalid={(row.name !== "" && !!problem.name) || undefined}
@@ -243,8 +229,14 @@ function HeaderRow({ row, n, total, problem, groups, groupsLoading, t, onChange,
           />
           {row.name !== "" && <Problem p={problem.name} t={t} />}
         </div>
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className={eyebrow}>{t("subs.hdr.value")}</span>
+        <div className="col-span-2 row-start-2 flex min-w-0 flex-col gap-1.5 @min-[560px]:col-span-1 @min-[560px]:col-start-2 @min-[560px]:row-start-1">
+          <div className="flex min-h-6 items-center justify-between gap-3">
+            <span className={eyebrow}>{t("subs.hdr.value")}</span>
+            <label title={t("subs.hdr.base64Hint")} className="flex cursor-pointer items-center gap-2 text-xs font-bold text-muted">
+              {t("subs.hdr.base64")}
+              <Switch checked={row.base64} onCheckedChange={(on) => onChange({ base64: on })} />
+            </label>
+          </div>
           <input
             aria-label={label(t("subs.hdr.value"))}
             aria-invalid={(row.value !== "" && !!problem.value) || undefined}
@@ -257,56 +249,62 @@ function HeaderRow({ row, n, total, problem, groups, groupsLoading, t, onChange,
           />
           {row.value !== "" && <Problem p={problem.value} t={t} />}
         </div>
-      </div>
-
-      <label className="flex min-h-9 cursor-pointer items-center gap-3">
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[13px] font-bold">{t("subs.hdr.base64")}</span>
-          <span className="text-[11px] leading-snug text-muted">{t("subs.hdr.base64Hint")}</span>
+        <span className="col-start-2 row-start-1 mt-[30px] flex h-10 flex-none items-center gap-0.5 @min-[560px]:col-start-3">
+          <IconButton aria-label={t("subs.hdr.up", { n })} variant="flat" disabled={n === 1} onClick={() => onMove(n - 2)}>
+            <Icon name="arrowUp" size={14} />
+          </IconButton>
+          <IconButton aria-label={t("subs.hdr.down", { n })} variant="flat" disabled={n === total} onClick={() => onMove(n)}>
+            <Icon name="arrowDown" size={14} />
+          </IconButton>
+          <IconButton aria-label={t("subs.hdr.remove", { n })} variant="flat" onClick={onRemove}>
+            <Icon name="trash" size={14} />
+          </IconButton>
         </span>
-        <Switch checked={row.base64} onCheckedChange={(on) => onChange({ base64: on })} />
-      </label>
-
-      <div className="flex flex-col gap-1.5">
-        <span className={eyebrow}>{t("subs.hdr.formats")}</span>
-        <div role="group" aria-label={label(t("subs.hdr.formats"))} className="flex flex-wrap gap-1.5">
-          <ToggleChip on={row.formats.length === 0} onClick={() => onChange({ formats: [] })}>
-            {t("subs.hdr.formatsAll")}
-          </ToggleChip>
-          {headerFormats.map((f) => (
-            <ToggleChip key={f} on={row.formats.includes(f)} onClick={() => toggleFormat(f)}>
-              {t(formatKey[f]!)}
-            </ToggleChip>
-          ))}
-        </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <span className={eyebrow}>{t("subs.hdr.groups")}</span>
-        <Segmented
-          variant="thumb"
-          aria-label={label(t("subs.hdr.groups"))}
-          value={row.onlyGroups ? "some" : "all"}
-          onValueChange={(v) => onChange({ onlyGroups: v === "some" })}
-          options={[
-            { value: "all", label: t("subs.hdr.groupsAll") },
-            { value: "some", label: t("subs.hdr.groupsSome") },
-          ]}
-          className="max-w-[360px]"
-        />
-        {row.onlyGroups &&
-          (groups.length === 0 ? (
-            <p className="text-xs text-muted">{groupsLoading ? t("common.loading") : t("subs.hdr.groupsNone")}</p>
-          ) : (
-            <div role="group" aria-label={label(t("subs.hdr.groups"))} className="flex flex-wrap gap-1.5">
-              {groups.map((g) => (
-                <ToggleChip key={g.id} on={row.groupIds.includes(g.id)} onClick={() => toggleGroup(g.id)}>
-                  {g.name}
-                </ToggleChip>
-              ))}
-            </div>
-          ))}
-        <Problem p={problem.groups} t={t} />
+      <div className="grid gap-2.5 @min-[560px]:grid-cols-[minmax(0,1fr)_minmax(0,15rem)]">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className={eyebrow}>{t("subs.hdr.formats")}</span>
+          <div role="group" aria-label={label(t("subs.hdr.formats"))} className="flex flex-wrap gap-1.5">
+            <ToggleChip on={row.formats.length === 0} onClick={() => onChange({ formats: [] })}>
+              {t("subs.hdr.formatsAll")}
+            </ToggleChip>
+            {headerFormats.map((f) => (
+              <ToggleChip key={f} on={row.formats.includes(f)} onClick={() => toggleFormat(f)}>
+                {t(formatKey[f]!)}
+              </ToggleChip>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className={eyebrow}>{t("subs.hdr.groups")}</span>
+          <Segmented
+            variant="thumb"
+            wrap
+            aria-label={label(t("subs.hdr.groups"))}
+            value={row.onlyGroups ? "some" : "all"}
+            onValueChange={(v) => onChange({ onlyGroups: v === "some" })}
+            options={[
+              { value: "all", label: t("subs.hdr.groupsAll") },
+              { value: "some", label: t("subs.hdr.groupsSome") },
+            ]}
+            className="max-w-[360px]"
+          />
+          {row.onlyGroups &&
+            (groups.length === 0 ? (
+              <p className="text-xs text-muted">{groupsLoading ? t("common.loading") : t("subs.hdr.groupsNone")}</p>
+            ) : (
+              <div role="group" aria-label={label(t("subs.hdr.groups"))} className="flex flex-wrap gap-1.5">
+                {groups.map((g) => (
+                  <ToggleChip key={g.id} on={row.groupIds.includes(g.id)} onClick={() => toggleGroup(g.id)}>
+                    {g.name}
+                  </ToggleChip>
+                ))}
+              </div>
+            ))}
+          <Problem p={problem.groups} t={t} />
+        </div>
       </div>
     </div>
   );
