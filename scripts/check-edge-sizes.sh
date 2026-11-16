@@ -58,7 +58,9 @@ for entry in "${entries[@]}"; do
   name="${entry%%:*}"
   limit=$(( ${entry##*:} * 1048576 ))
   wasm="$out/$name.wasm"
-  GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o "$wasm" "./cmd/$name"
+  tags=nethttpomithttp2
+  if [[ "$name" == "mistgate-edge-link" ]]; then tags="$tags,edge_link"; fi
+  GOOS=js GOARCH=wasm go build -tags "$tags" -ldflags="-s -w" -trimpath -o "$wasm" "./cmd/$name"
   bytes=$(stat -c%s "$wasm")
   printf '%-26s %9d bytes  %5.1f MiB  limit %9d  headroom %8d bytes (%d KiB)\n' \
     "$name" "$bytes" "$(echo "$bytes" | awk '{print $1/1048576}')" "$limit" $((limit - bytes)) $(( (limit - bytes) / 1024 ))
@@ -68,7 +70,7 @@ for entry in "${entries[@]}"; do
   fi
   # text/template looks methods up by name, which makes the linker keep every exported method of every type (7.9 MB of the
   # wasm). The install page is Go code (internal/panel/provision/ui_page.go) for that reason.
-  if GOOS=js GOARCH=wasm go list -deps "./cmd/$name" | grep -Ex 'text/template|html/template'; then
+  if GOOS=js GOARCH=wasm go list -tags "$tags" -deps "./cmd/$name" | grep -Ex 'text/template|html/template'; then
     echo "::error::cmd/$name imports a template engine; see the comment above this check"
     status=1
   fi

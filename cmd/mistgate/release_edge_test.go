@@ -297,3 +297,29 @@ func TestEdgeBundleRealBuildIsReproducible(t *testing.T) {
 		t.Error("no role carries the release key")
 	}
 }
+
+// Every script that builds a role's wasm gives the link role the edge_link tag, as the release does (edgeRoleTags).
+func TestEdgeLinkTagIsEverywhere(t *testing.T) {
+	for _, role := range edgeWasmRoles {
+		want := role == release.RoleLink
+		if got := strings.Contains(edgeRoleTags(role), "edge_link"); got != want {
+			t.Errorf("edgeRoleTags(%s) = %q, edge_link want %v", role, edgeRoleTags(role), want)
+		}
+		if !strings.Contains(edgeRoleTags(role), edgeBuildTags) {
+			t.Errorf("edgeRoleTags(%s) = %q lost %s", role, edgeRoleTags(role), edgeBuildTags)
+		}
+	}
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, script := range []string{"scripts/check-edge-sizes.sh", "scripts/build-edge.ps1", "scripts/test-edge-roles.ps1", "scripts/e2e/edge.sh"} {
+		b, err := os.ReadFile(filepath.Join(root, script))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), "edge_link") {
+			t.Errorf("%s does not build the link role with the edge_link tag", script)
+		}
+	}
+}
