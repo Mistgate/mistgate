@@ -91,13 +91,13 @@ func TestWorksWithOnlyBusyboxApplets(t *testing.T) {
 		l := newLab(t, sh, labOptions{noConf: true, notInstalled: true, realClock: true, scriptBytes: poorScript(t)})
 		applets := filepath.Join(l.root, "applets")
 		must(t, os.MkdirAll(applets, 0o755))
-		if out, err := exec.Command(bb, "--install", "-s", applets).CombinedOutput(); err != nil {
+		if out, err := combinedOutput(exec.Command(bb, "--install", "-s", applets)); err != nil {
 			t.Fatalf("busybox --install: %v %s", err, out)
 		}
-		t.Cleanup(func() { l.run("stop") })
+		t.Cleanup(func() { l.stopAndWait() })
 		token := "mgp_" + strings.Repeat("d", 52)
 		down := filepath.Join(l.root, "mgp.sh")
-		must(t, os.WriteFile(down, l.opts.scriptBytes, 0o755))
+		must(t, writeExe(down, l.opts.scriptBytes))
 		must(t, os.WriteFile(filepath.Join(l.fake, "enroll.resp"), []byte("mgp 1\nid "+labID+"\nsecret "+labSecret+"\nend\n"), 0o644))
 		// an applet that is missing is named, and nothing is installed
 		if sh.name == "dash" {
@@ -124,7 +124,7 @@ func TestWorksWithOnlyBusyboxApplets(t *testing.T) {
 			t.Errorf("the cycle made %d checks, want 5 (3 targets, the control, the reference)", n)
 		}
 		l.assertArgv()
-		if out, code := l.run("stop"); code != 0 {
+		if out, code := l.stopAndWait(); code != 0 {
 			t.Errorf("stop: %d %s", code, out)
 		}
 		if out, _ := l.run("run"); !strings.HasPrefix(out, "run: http 200") {
@@ -203,9 +203,9 @@ func TestSupervisorBacksOffWhenTheWorkerKeepsDying(t *testing.T) {
 		t.Parallel()
 		l := newLab(t, sh, labOptions{})
 		// a curl that does not run: the worker refuses to start ("curl is not installed") and the supervisor finds that out each time
-		must(t, os.WriteFile(filepath.Join(l.root, "bin", "curl"), []byte("#!/bin/sh\nexit 1\n"), 0o755))
+		must(t, writeExe(filepath.Join(l.root, "bin", "curl"), []byte("#!/bin/sh\nexit 1\n")))
 		c := l.cmd(nil, "supervise")
-		must(t, c.Start())
+		must(t, startCmd(c))
 		restarts := regexp.MustCompile(`restarting in ([0-9]+) s`)
 		var got []string
 		waitFor(t, "a dozen restarts", 60*time.Second, func() bool {
@@ -247,7 +247,7 @@ func TestWorkerDoesNotSpinWhenSleepFails(t *testing.T) {
 		c := l.cmd([]string{"FAKE_SLEEP_BROKEN=1"}, "worker")
 		cc := exec.CommandContext(ctx, c.Path, c.Args[1:]...)
 		cc.Dir, cc.Env = c.Dir, c.Env
-		err := cc.Run()
+		err := runCmd(cc)
 		ee, ok := err.(*exec.ExitError)
 		if !ok || ee.ExitCode() != 1 {
 			t.Fatalf("the worker should end with status 1 when sleep does not sleep: %v", err)
@@ -340,7 +340,7 @@ func TestIdleFootprint(t *testing.T) {
 	forShells(t, func(t *testing.T, sh shellSpec) {
 		t.Parallel()
 		l := newLab(t, sh, labOptions{realClock: true})
-		t.Cleanup(func() { l.run("stop") })
+		t.Cleanup(func() { l.stopAndWait() })
 		if out, code := l.run("start"); code != 0 {
 			t.Fatalf("start: %d %s", code, out)
 		}
@@ -401,7 +401,7 @@ func TestIdleFootprint(t *testing.T) {
 			t.Errorf("worker nice: %v", f)
 		}
 		if p, err := exec.LookPath("ionice"); err == nil {
-			if out, _ := exec.Command(p, "-p", strconv.Itoa(w)).CombinedOutput(); !strings.HasPrefix(string(out), "idle") {
+			if out, _ := combinedOutput(exec.Command(p, "-p", strconv.Itoa(w))); !strings.HasPrefix(string(out), "idle") {
 				t.Errorf("worker I/O class: %s", out)
 			}
 		}
@@ -415,17 +415,16 @@ func TestInitScriptIsHarmless(t *testing.T) {
 	forShells(t, func(t *testing.T, sh shellSpec) {
 		t.Parallel()
 		l := newLab(t, sh, labOptions{noConf: true, notInstalled: true, realClock: true})
-		t.Cleanup(func() { l.run("stop") })
+		t.Cleanup(func() { l.stopAndWait() })
 		token := "mgp_" + strings.Repeat("e", 52)
 		down := filepath.Join(l.root, "mgp.sh")
-		must(t, os.WriteFile(down, probeScript, 0o755))
+		must(t, writeExe(down, probeScript))
 		must(t, os.WriteFile(filepath.Join(l.fake, "enroll.resp"), []byte("mgp 1\nid "+labID+"\nsecret "+labSecret+"\nend\n"), 0o644))
 		if out, code := l.runAt(down, "install", labBase, token); code != 0 {
 			t.Fatalf("install: %d %s", code, out)
 		}
 		s99 := filepath.Join(l.root, "opt/etc/init.d/S99mistgate-probe")
-		l.run("stop")
-		waitFor(t, "the processes to end", 5*time.Second, func() bool { return !l.stateHas("supervisor.pid") && !l.stateHas("worker.pid") })
+		l.stopAndWait()
 		// the program is gone (a half-removed /opt): every verb is quiet and harmless
 		saved, err := os.ReadFile(l.script)
 		must(t, err)
@@ -442,15 +441,18 @@ func TestInitScriptIsHarmless(t *testing.T) {
 		}
 		// a reboot: /tmp is empty, the program is there again; start returns at once and the probe runs
 		must(t, os.RemoveAll(l.state))
-		must(t, os.WriteFile(l.script, saved, 0o755))
+		must(t, writeExe(l.script, saved))
 		begin := time.Now()
 		if out, code := l.shellScript(s99 + " start"); code != 0 || time.Since(begin) > 3*time.Second {
 			t.Errorf("init start after a reboot: %d %q in %v", code, out, time.Since(begin))
 		}
 		waitFor(t, "the probe after the reboot", 10*time.Second, func() bool { w := l.pidOf("worker.pid"); return w > 0 && procAlive(w) })
+		pids := l.probePids()
 		if out, _ := l.shellScript(s99 + " stop"); out != "" {
 			t.Errorf("init stop: %q", out)
 		}
-		waitFor(t, "the probe to stop", 10*time.Second, func() bool { return !l.stateHas("supervisor.pid") })
+		if !waitGone(pids) {
+			t.Error("the probe did not stop")
+		}
 	})
 }
