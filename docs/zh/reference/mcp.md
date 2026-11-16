@@ -188,7 +188,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `profile_update` | 管理员 | 计划：`profile_id`、可选 `name`、RFC 7386 JSON Merge Patch `settings_patch`（省略的敏感字段会保留原值；拒绝补丁中的 `null` 值）、`allow_lossy_port`；执行：仅 `confirm_token`。敏感字段遵循相同规则：省略、`"••••"` 或 `"$generate"` | 始终 |
 | `profile_deploy` | 管理员 | 计划：`profile_id`、`add_node_ids`、`remove_node_ids`、现有 `add_group_ids`、`remove_group_ids`，可选 `port_overrides` 和 `allow_lossy_port`；执行：仅 `confirm_token` | 始终 |
 | `node_fix` | 管理员 | `node`、诊断报告中的 `fix_id`；检查项列出参数时还需提供 `params` | 始终 |
-| `node_decoy` | 管理员 | `node`、`mode`（`builtin`、`panel`、`own`）、`bundle_base64`（最多 2 MiB 的 base64 ZIP 或 TAR；`own` 模式下必需） | 始终 |
+| `node_decoy` | 管理员 | `node`、`mode`（`builtin`、`panel`、`own`）、`own` 模式下 `bundle_base64`（最多 2 MiB 的 base64 ZIP 或 TAR）与 `files`（`{path, content}` 或 `{path, content_base64}` 列表：最多 64 个文件、路径不超过 200 个字符、总计 2 MiB、根目录有 `index.html`；计划列出文件及大小和 SHA-256，不显示内容）二选一，且只能给一个 | 始终 |
 | `node_update` | 管理员 | `node` 以及仅需更改的字段：`name`、`country_code`、`location`、`provider`、`notes`，以及各入站的 `direct_in_subscriptions` 开关。不接受地址和运行时设置 | 始终 |
 | `node_ipv6` | 管理员 | 计划：`node`、`action`（`enable` 或 `disable`）；应用：仅 `confirm_token`。开启或关闭节点的 [IPv6 入口](../guide/nodes.md#ipv6-入口)：在每个人的订阅里，节点的每个服务器旁多一个服务器「<节点> · IPv6」。`enable` 会先从外部检测该地址（参见 `node_ipv6_check`），只有通过才开启入口；无法接受入口的节点在计划阶段就会被拒绝并给出原因。计划会写明节点以及哪些协议配置的服务器会得到副本，绝不显示地址；该地址就是服务器用于出站 IPv6 的那个。 | 始终 |
 | `node_awg_backend` | 操作员 | 计划：`node`、`backend`（`auto`、`kernel` 或 `userspace`）；应用：仅 `confirm_token`。设置节点运行 AmneziaWG 的方式。计划会显示当前设置、现在运行的后端、节点是否处于[用户态回退](../guide/amneziawg.md#模块无法加载时)、在线设备数、重连提示（接口会重建，设备约 20 秒内重新连接），以及节点切到用户态时的内存估算（每台设备 26 KiB）。它不会构建内核模块。Agent 太旧、无法遵循该设置的节点会在应用时被拒绝。 | 始终 |
