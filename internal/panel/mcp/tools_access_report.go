@@ -41,6 +41,7 @@ type rejectSplitV struct {
 	AlertsRecv        uint32 `json:"alerts_recv,omitempty"`         // the app ended the handshake with an alert
 	RealityFallback   uint32 `json:"reality_fallback,omitempty"`    // sent to the REALITY target as not a client
 	RealityAuthFailed uint32 `json:"reality_auth_failed,omitempty"` // our name, wrong key or short id
+	AuthFailed        uint32 `json:"auth_failed,omitempty"`         // TrustTunnel: a known username refused, for a wrong password or an ended term
 	AnswersLost       uint32 `json:"answers_lost,omitempty"`        // AWG responses never confirmed
 	Unanswered        uint32 `json:"unanswered,omitempty"`          // AWG initiations the node did not answer
 }
@@ -218,7 +219,7 @@ func (v *AccessReportV) shrink() bool {
 
 var accessLimits = []string{
 	"VLESS keeps no failure counter per device, so success_pct is absent; with links/3 agents its server counts hellos, connects over REALITY TCP, REALITY refusals, unfinished handshakes and TCP stalls (reject_split, tcp_stalls, signals).",
-	"rejects are known keys refused for an ended term; unknown_keys are keys the node does not hold. Why a handshake failed (no reply, a TLS alert either way, a refused certificate, a failed REALITY authentication, AWG answers lost or not sent) is in reject_split for links/3 agents only where the engine sees it; unsupported names the rest, including every reason on older agents and the AWG handshake counts on the kernel backend.",
+	"rejects are known keys refused for an ended term; unknown_keys are keys the node does not hold. TrustTunnel auth_failed is inbound-only: a known username refused for a wrong password or an ended term. Why a handshake failed (no reply, a TLS alert either way, a refused certificate, a failed REALITY authentication, AWG answers lost or not sent) is in reject_split for links/3 agents only where the engine sees it; unsupported names the rest, including every reason on older agents and the AWG handshake counts on the kernel backend.",
 	"The country check judges TCP ports and addresses only: there is no UDP test, so UDP protocols are judged by in-country port checks, path loss and the counters.",
 	"kl!ck reports have no operator by protocol split: operators and server kinds are tallied apart. Counters know no country or operator of a person.",
 }
@@ -256,6 +257,12 @@ func pct(ok, tried int) *int {
 func transportOf(summary string) string {
 	s := strings.ToLower(summary)
 	var out []string
+	if strings.Contains(s, "http/2") {
+		out = append(out, "h2")
+	}
+	if strings.Contains(s, "http/3") {
+		out = append(out, "h3")
+	}
 	for _, k := range []string{"xhttp", "reality", "vision", "grpc", "ws", "hop", "salamander", "gecko", "cdn"} {
 		if strings.Contains(s, k) {
 			out = append(out, k)
@@ -407,7 +414,7 @@ func (a *accessCtx) cell(x *accInbound, devs map[string]*devAgg, rows []accRow) 
 	n := a.byID[x.NodeID]
 	p := in.Profiles[x.ProfileID]
 	c := &accessCellV{NodeID: x.NodeID, InboundID: x.ID, Profile: nm(p.Name), Protocol: normProtocol(x.Protocol), Transport: transportOf(p.Summary), Port: x.Port,
-		Network: netOf(x.Protocol), Egress: clean(x.Egress, 20), CDN: x.CDN, InSubs: x.Direct, State: x.State, AttemptsObservable: normProtocol(x.Protocol) != "vless"}
+		Network: networkOfInbound(x), Egress: clean(x.Egress, 20), CDN: x.CDN, InSubs: x.Direct, State: x.State, AttemptsObservable: normProtocol(x.Protocol) != "vless"}
 	if n != nil {
 		c.Node = nm(n.Name)
 	}
@@ -480,7 +487,12 @@ func (a *accessCtx) cell(x *accInbound, devs map[string]*devAgg, rows []accRow) 
 		split.StalledHandshake = max(c.Stalls, t.Stalls)
 	}
 	split.NoReply, split.CertRefused, split.AlertsSent = t.HsUnfinished, t.TLSCertRefused, t.TLSAlertsSent
-	split.AlertsRecv, split.RealityFallback, split.RealityAuthFailed = t.TLSAlertsRecv, t.RealityFallback, t.AuthFailed
+	split.AlertsRecv, split.RealityFallback = t.TLSAlertsRecv, t.RealityFallback
+	if c.Protocol == "trusttunnel" {
+		split.AuthFailed = t.AuthFailed
+	} else {
+		split.RealityAuthFailed = t.AuthFailed
+	}
 	split.AnswersLost, split.Unanswered = t.ResponsesUnmatched, t.Initiations-min(t.Initiations, t.Responses)
 	if split != (rejectSplitV{}) {
 		c.RejectSplit = &split
@@ -654,7 +666,7 @@ func classScopeMatch(c blockClassV, x *accInbound) bool {
 	case strings.HasPrefix(c.Scope, "port:"):
 		return c.port == x.Port && netOf(x.Protocol) == "tcp"
 	case c.protocol == "udp":
-		return isUDPProto(x.Protocol)
+		return hasUDPPath(x)
 	case c.protocol != "":
 		return normProtocol(x.Protocol) == c.protocol
 	}
@@ -776,7 +788,7 @@ func (a *accessCtx) findings() []accessFindingV {
 			ev = append(ev, "check:"+nid)
 		}
 		if lossy {
-			add(accessFindingV{Code: "udp_lossy_path", Severity: "warning", Node: nm(n.Name), Evidence: ev, Affected: a.affectedBy(a.idsOf(nid, func(x *accInbound) bool { return isUDPProto(x.Protocol) })...),
+			add(accessFindingV{Code: "udp_lossy_path", Severity: "warning", Node: nm(n.Name), Evidence: ev, Affected: a.affectedBy(a.idsOf(nid, func(x *accInbound) bool { return hasUDPPath(x) })...),
 				Detail: map[string]string{"next": "path_probe udp, node_trace"}})
 		}
 		// awg initiations without a reply
@@ -1266,7 +1278,7 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 				add(r)
 				for _, id := range scoped {
 					x := a.inboundByID(id)
-					if x == nil || !x.Direct || !isUDPProto(x.Protocol) || !a.usersHaveWorkingAlternate([]string{id}, func(other *accInbound) bool {
+					if x == nil || !x.Direct || !hasUDPPath(x) || !a.usersHaveWorkingAlternate([]string{id}, func(other *accInbound) bool {
 						return other.NodeID == nid && netOf(other.Protocol) == "tcp"
 					}) {
 						continue

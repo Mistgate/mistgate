@@ -74,6 +74,10 @@ func (t accTotals) reasonsUnknown(proto string) []string {
 		if !t.known("hs_unfinished") && !t.known("tcp_stalls") {
 			return []string{"VLESS handshake failures and TCP stalls are not known: an agent without links/3"}
 		}
+	case "trusttunnel":
+		if !t.known("auth_failed") {
+			return []string{"TrustTunnel authentication failures are not known: the node agent does not list trusttunnel/1"}
+		}
 	}
 	return nil
 }
@@ -118,6 +122,17 @@ func (b *blockCtx) addReasonClasses(n *accNode, tcpWorks bool, add func(blockCla
 				Unknown: []string{"probes fail the same way: if people connect fine, these are probes"},
 				Explain: "ClientHellos with this server's name fail REALITY authentication (" + u32(t.AuthFailed) + ", against " + u32(t.Connects) +
 					" connections): apps with another public key or short id, as after a key change that subscriptions did not get, or probes."})
+		}
+		if proto == "trusttunnel" && t.known("auth_failed") && t.AuthFailed >= minReasonCount && t.AuthFailed >= t.Connects {
+			conf, hard := confLow, false
+			if t.Connects == 0 {
+				conf, hard = confMedium, true
+			}
+			add(blockClassV{Class: clsBroken, Scope: scope, Confidence: conf, hard: hard, inbound: x.ID, port: x.Port, protocol: proto, Evidence: ev,
+				Detail:  map[string]string{"reason": "trusttunnel_auth_failed", "auth_failed": u32(t.AuthFailed), "connects": u32(t.Connects)},
+				Unknown: []string{"probes fail the same way: if devices connect fine, these attempts may be probes"},
+				Explain: "TrustTunnel received credentials for known usernames but refused them, for a wrong password or an ended term (" + u32(t.AuthFailed) +
+					" failures against " + u32(t.Connects) + " accepted connections): refresh the affected device's subscription or investigate probes."})
 		}
 		// REALITY answered, the client never finished: cut after the ClientHello
 		if proto == "vless" && !have(clsFingerprinted, "protocol:vless") {
