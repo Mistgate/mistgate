@@ -52,7 +52,7 @@ for job in "${jobs[@]}"; do
       if command -v shellcheck >/dev/null 2>&1; then
         step "shellcheck install.sh" shellcheck scripts/install.sh
         step "shellcheck probe script" shellcheck -s sh -o all internal/panel/ownprobe/mistgate-probe.sh
-        step "shellcheck probe fakes" shellcheck internal/panel/ownprobe/testdata/fakecurl.sh
+        step "shellcheck probe fakes" shellcheck internal/panel/ownprobe/testdata/fakecurl.sh scripts/e2e/probe.sh
       fi
       step "go test scripts" go test -count=1 ./scripts
       step "go build" go build ./... ;;

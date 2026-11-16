@@ -19,7 +19,7 @@ import (
 func newOwnProbes(k *core) ownProbeService {
 	hl, upd := k.hl, k.upd
 	return ownprobe.New(ownprobe.Config{Store: k.st, Limiter: k.limiter, StepUp: k.authSvc.RequireStepUp,
-		PublicURL: k.in.PublicURL, ProbePrefix: k.in.ProbePrefix, Now: k.c.Clock, Country: k.cr.Country,
+		PublicURL: k.in.PublicURL, ProbePrefix: k.in.ProbePrefix, Now: k.c.Clock, Country: k.cr.Country, SyncBurst: censorSimOwnProbeBurst(),
 		Targets: func(ctx context.Context) ([]ownprobe.Target, error) {
 			targets, err := hl.ProbeTargets(ctx)
 			out := make([]ownprobe.Target, len(targets))

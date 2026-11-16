@@ -68,7 +68,7 @@ jobs:
           MGP_REQUIRE_BUSYBOX: "1"
       - run: shellcheck scripts/install.sh
       - run: shellcheck -s sh -o all internal/panel/ownprobe/mistgate-probe.sh
-      - run: shellcheck internal/panel/ownprobe/testdata/fakecurl.sh
+      - run: shellcheck internal/panel/ownprobe/testdata/fakecurl.sh scripts/e2e/probe.sh
       # Debian trixie exercises the OpenSSL fallback, including releases without panel-manifest.sshsig.
       - name: Installer tests (Debian trixie OpenSSL fallback)
         env:

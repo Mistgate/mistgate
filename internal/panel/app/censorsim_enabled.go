@@ -10,3 +10,6 @@ func censorSimGlobalping() (string, time.Duration) {
 	return "http://198.51.100.100:9001", 5 * time.Millisecond
 }
 func censorSimBsbord() string { return "http://198.51.100.100:9002" }
+
+// scripts/e2e/probe.sh makes many reports in a few minutes; the production limit (3, then one per 5 minutes) would stall it.
+func censorSimOwnProbeBurst() int { return 100 }

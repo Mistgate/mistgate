@@ -49,12 +49,18 @@ func selfSigned(names []string) (tls.Certificate, []byte, error) {
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), nil
 }
 
+// pageKiB, when set by -page-kib, pads the page to that many KiB.
+var pageKiB int
+
 // serve answers every request on l with a small page until l is closed. TLS 1.3 only; CurvePreferences stays nil.
 func serve(l net.Listener, cert tls.Certificate) error {
 	srv := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_, _ = io.WriteString(w, "<!doctype html><title>Welcome</title><p>It works.</p>\n")
+			if pageKiB > 0 { // a long page: the own-probe lab reads the first 64 KiB of it
+				_, _ = io.WriteString(w, "<!-- "+strings.Repeat("x", pageKiB<<10)+" -->\n")
+			}
 		}),
 		TLSConfig: &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS13},
 		ErrorLog:  log.New(io.Discard, "", 0),
@@ -66,6 +72,7 @@ func main() {
 	listen := flag.String("listen", "127.0.0.1:0", "address to listen on")
 	names := flag.String("names", "www.example.com", "comma-separated host names the certificate is valid for")
 	certOut := flag.String("cert", "", "file to write the certificate to (PEM)")
+	flag.IntVar(&pageKiB, "page-kib", 0, "pad the page to this many KiB (0: the short page)")
 	flag.Parse()
 	cert, certPEM, err := selfSigned(strings.Split(*names, ","))
 	if err != nil {

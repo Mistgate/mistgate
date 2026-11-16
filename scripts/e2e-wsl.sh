@@ -65,6 +65,8 @@
 # path, an object reset (--edge --ssh-only skips the traffic steps 4-8, for work on the SSH steps), and the SSH installs through the Provisioner Worker (the agent streamed from a fake, signed GitHub
 # release; the Provisioner's script reloaded in the middle of an upload). It needs node 22 and pnpm, and builds into the work
 # directory only.
+# --probes runs the own-probe lab (scripts/e2e/probe.sh): the real panel, the real probe script installed with the command the panel
+# prints, four fake nodes behind a "TSPU" made of nft; it asserts the points and their reasons, the network change, the revocation.
 # --censor runs the isolated real-measurement censorship lab and asserts block_diagnosis/access_report; --mcp-fleet brings
 # up the throwaway dev fleet, sweeps every MCP read tool with the no-secrets scan, then tears it down.
 #
@@ -85,7 +87,7 @@ OLD_NODE=""
 # scenario and takes what it always took.
 # --decoy runs the decoy-site step alone (scripts/e2e/decoy.sh; --m3 includes it). --m3 is all four; --vless is independent of the others; --awg also runs the self-service calls of the user's page; --mihomo needs the AWG profiles of --awg
 # and turns it on. --m3-only skips every base step after the node is up (development of the tunnel steps: ~5 minutes).
-M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_JSON="" M3_DECOY="" M3_ONLY="" EDGE="" SSH_ONLY="" CENSOR="" MCP_FLEET=""
+M3_AWG="" M3_WARP="" M3_MIHOMO="" M3_VLESS="" M3_JSON="" M3_DECOY="" M3_ONLY="" EDGE="" SSH_ONLY="" CENSOR="" MCP_FLEET="" PROBES=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
@@ -103,16 +105,18 @@ while [ $# -gt 0 ]; do
     --ssh-only) SSH_ONLY=1 ;;
     --censor) CENSOR=1 ;;
     --mcp-fleet) MCP_FLEET=1 ;;
+    --probes) PROBES=1 ;;
     --old-node) OLD_NODE=${2:?--old-node needs a path}; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
   shift
 done
 set -- "${ARGS[@]}"
-[ -z "$CENSOR$MCP_FLEET" ] || [ "$#" = 1 ] || { echo "--censor and --mcp-fleet run alone" >&2; exit 2; }
-if [ -n "$CENSOR$MCP_FLEET" ]; then
+[ -z "$CENSOR$MCP_FLEET$PROBES" ] || [ "$#" = 1 ] || { echo "--censor, --probes and --mcp-fleet run alone (the own-probe lab takes its own flags: run scripts/e2e/probe.sh)" >&2; exit 2; }
+if [ -n "$CENSOR$MCP_FLEET$PROBES" ]; then
   SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
   if [ -n "$CENSOR" ]; then exec bash "$SCRIPT_DIR/e2e/censor.sh"; fi
+  if [ -n "$PROBES" ]; then exec bash "$SCRIPT_DIR/e2e/probe.sh"; fi
   exec bash "$SCRIPT_DIR/dev-fleet.sh" --mcp-e2e
 fi
 [ -z "$OLD_NODE" ] || [ -x "$OLD_NODE" ] || [ -f "$OLD_NODE" ] || { echo "--old-node: no such file: $OLD_NODE" >&2; exit 2; }

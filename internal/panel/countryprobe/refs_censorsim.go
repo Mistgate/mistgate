@@ -11,7 +11,8 @@ func censorSimReferences(country string) (References, bool) {
 		return References{}, false
 	}
 	return References{
-		Control: "198.51.100.10",
-		Blocked: []string{"198.51.100.66"},
+		Control:    "198.51.100.10",
+		ControlSNI: "www.example.com", // the own-probe lab (scripts/e2e/probe.sh) makes a TLS handshake with the control
+		Blocked:    []string{"198.51.100.66"},
 	}, true
 }
