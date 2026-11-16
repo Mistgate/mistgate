@@ -136,6 +136,30 @@ func TestJournalUsesTemplateScrubsAndLimitsAttributes(t *testing.T) {
 	}
 }
 
+// A TrustTunnel password must not reach the panel through an HTTP library's error text, whichever protocol's engine wrote it.
+func TestJournalDropsCredentialsFromMessagesAndAttributes(t *testing.T) {
+	const header = "Proxy-Authorization: Basic YWxpY2U6c2VjcmV0cGFzc3dvcmQ="
+	j := newJournal()
+	j.note(logRecord{
+		at: time.Unix(100, 0), level: pb.Severity_SEVERITY_WARNING, source: "agent",
+		msg:   "request refused: " + header,
+		attrs: map[string]string{"err": "got proxy-authorization=Basic YWxpY2U6c2VjcmV0cGFzc3dvcmQ= from 203.0.113.9:4000", "code": "x"},
+	})
+	rows := j.take(0)
+	if len(rows) != 1 {
+		t.Fatalf("journal rows = %+v", rows)
+	}
+	text := rows[0].Message + " " + rows[0].Attrs["err"]
+	for _, secret := range []string{"YWxpY2U6c2VjcmV0cGFzc3dvcmQ=", "Basic", "203.0.113.9"} {
+		if strings.Contains(text, secret) {
+			t.Errorf("%q reached the journal: %q", secret, text)
+		}
+	}
+	if rows[0].Attrs["code"] != "x" {
+		t.Errorf("the code attribute was lost: %v", rows[0].Attrs)
+	}
+}
+
 func TestJournalMessageClipIsByteBoundedAndUtf8Safe(t *testing.T) {
 	j := newJournal()
 	j.note(logRecord{

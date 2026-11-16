@@ -48,12 +48,21 @@ func (s *Service) RelayHandler() (string, http.Handler) {
 // unverifiable, the entry's agent holds the forward, and the person can receive the exit's server through that entry. The twin
 // servers of the subscription follow it (subRelays); candidate audiences reuse the recipient part before a relay exists.
 func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return relayPathUsable(l) && s.relayRecipientUsable(l, exit, g, u)
+	return s.relayUsableFor(l, exit, g, u, plugin.FormatURIList)
+}
+
+// relayUsableFor is relayUsable for a subscription of the given format (see usableForFormat).
+func (s *Service) relayUsableFor(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
+	return relayPathUsable(l) && s.relayRecipientUsableFor(l, exit, g, u, format)
 }
 
 // relayRecipientUsable is the subscriber part shared by an existing relay and a candidate with no relay state yet.
 func (s *Service) relayRecipientUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return s.usable(exit, g, u) && !slices.Contains(g.DisabledNodeIDs, l.ViaNodeID) &&
+	return s.relayRecipientUsableFor(l, exit, g, u, plugin.FormatURIList)
+}
+
+func (s *Service) relayRecipientUsableFor(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
+	return s.usableForFormat(exit, g, u, format) && !slices.Contains(g.DisabledNodeIDs, l.ViaNodeID) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, l.ViaNodeID))
 }
 
@@ -183,7 +192,7 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	}
 	switch {
 	case port != 0:
-		if err := portRefusal(f.Profile.Protocol, entry.Name, plugin.Listen{Network: network, Port: port}, others, nil, s.now()); err != nil {
+		if err := portRefusal(plugin.InboundSpec{Protocol: f.Profile.Protocol, Listen: plugin.Listen{Network: network, Port: port}}, entry.Name, others, nil, s.now()); err != nil {
 			return nil, err
 		}
 	case naturalPort != 0:
@@ -279,7 +288,7 @@ func (s *Service) UpdateRelay(ctx context.Context, req *connect.Request[adminv1.
 			if err != nil {
 				return err
 			}
-			if err := portRefusal(link.Protocol, link.ViaNodeName, plugin.Listen{Network: link.Network, Port: *patch.Port}, others, nil, s.now()); err != nil {
+			if err := portRefusal(plugin.InboundSpec{Protocol: link.Protocol, Listen: plugin.Listen{Network: link.Network, Port: *patch.Port}}, link.ViaNodeName, others, nil, s.now()); err != nil {
 				return err
 			}
 		}

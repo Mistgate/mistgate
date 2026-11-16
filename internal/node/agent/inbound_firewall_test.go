@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 func TestInboundUDPFirewallTracksOnlyRunningEnabledSpecs(t *testing.T) {
@@ -53,6 +55,40 @@ func TestInboundUDPFirewallTracksOnlyRunningEnabledSpecs(t *testing.T) {
 	}
 	if got := h2.host.udpPorts(); len(got) != 1 || !equalUDPPorts(got[0], []hostctl.UDPInboundPort{{Port: 443}}) {
 		t.Fatalf("firewall opened an uninstalled hop range: %+v", got)
+	}
+}
+
+func TestTrustTunnelFirewallIncludesUDPOnlyWhenH3IsEnabled(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		h3   bool
+		want []hostctl.UDPInboundPort
+	}{
+		{name: "h3 enabled", h3: true, want: []hostctl.UDPInboundPort{{Port: 8443}}},
+		{name: "h3 disabled"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, harnessOpts{noStart: true})
+			settings := `{"h3":false}`
+			if tc.h3 {
+				settings = `{"h3":true}`
+			}
+			m := &model{inbounds: map[string]*inbound{
+				"tt": {spec: plugin.InboundSpec{
+					ID: "tt", Protocol: "trusttunnel", Enabled: true,
+					Listen: plugin.Listen{Network: "tcp", Port: 8443}, Settings: []byte(settings),
+				}},
+			}}
+			h.a.syncInboundPorts(context.Background(), m, map[string]bool{"tt": true}, nil)
+			udpCalls := h.host.udpPorts()
+			if len(udpCalls) != 1 || !equalUDPPorts(udpCalls[0], tc.want) {
+				t.Fatalf("UDP firewall sets = %+v, want one set %+v", udpCalls, tc.want)
+			}
+			tcpCalls := h.host.tcpPorts()
+			if len(tcpCalls) != 1 || len(tcpCalls[0]) != 1 || tcpCalls[0][0] != 8443 {
+				t.Fatalf("TCP firewall sets = %+v, want [8443]", tcpCalls)
+			}
+		})
 	}
 }
 

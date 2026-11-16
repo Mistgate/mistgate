@@ -40,6 +40,7 @@ The API is defined in `proto/mistgate/admin/v1/`. Generated code is in the repos
 | `WarpService` | `warp.proto` | WARP accounts of nodes |
 | `AwgService` | `awg.proto` | Helpers of the AmneziaWG profile editor |
 | `BackupService` | `backup.proto` | Encrypted panel backups |
+| `TrustTunnelService` | `trusttunnel.proto` | A person's TrustTunnel key and `tt://` links (package `mistgate.trusttunnel.v1`; the admin's write level, closed to API tokens and MCP) |
 | `TelegramService` | `telegram.proto` | The Telegram bot and each admin's chat (owner and signed-in admins only; closed to API tokens and MCP) |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API tokens and the owner's approvals |
 | `CheburcheckService`, `BsbordService` | `cheburcheck.proto`, `bsbord.proto` | The cheburcheck and bsbord sources of the [country check](../operations/reachability.md): settings, status and test, and for bsbord the unit list and the price check (owner only; changing or disconnecting a source, and the price check, need a step-up; closed to API tokens and MCP) |
@@ -178,6 +179,17 @@ The [MTProto](../guide/mtproto.md) profiles and a person's Telegram key use thes
 
 All four calls are for the owner and helpers, and closed to API tokens, like the other calls that return a credential.
 
+## TrustTunnel
+
+The [TrustTunnel](../guide/trusttunnel.md) profiles and a person's key use `ProfileService`, `UserService` and a service of their own, `mistgate.trusttunnel.v1.TrustTunnelService`:
+
+- `ProtocolInfo.experimental` is true for TrustTunnel, as for MTProto.
+- `AppToggles.trust_tunnel`, in `CreateUser` and `UpdateUser`, is the person's TrustTunnel switch. Turning it on makes the person's key when the person is active, and turning it off revokes it. At least one of `happ` and `amnezia` must stay on.
+- `GetTrustTunnelLinks` reads a person's links: `has_key`, `key_device_id`, `key_issued_unix` and the `tt://` links, one per node and profile, with `ipv6`, `relay` and `via` marking twins. A link that cannot be made (a self-signed server) has an empty `url` and a `note`. It writes nothing.
+- `IssueTrustTunnelKey` makes the key when the person has none (the switch must be on and the person active; the key takes a place in the device limit, and at the limit the call fails with `device_limit`), and `RevokeTrustTunnelKey` revokes it and leaves the switch on. Each answers as `GetTrustTunnelLinks` does.
+
+A `tt://` link carries the person's secret, so all three calls are the admin's write level and closed to API tokens and MCP, like the other calls that return a credential. In the Cloudflare edition they answer `unavailable_in_edition`.
+
 ## Token profiles
 
 A profile acts as an admin role: **Read only** as read-only, **Operator** as helper, **Admin** as owner. On top of the role, a token may call only the procedures on a fixed allow-list (`internal/panel/auth/policy_tokens.go`); everything else is refused whatever the profile. Nothing on the list returns a credential.
@@ -208,7 +220,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `SubscriptionService.UpdateSubscriptionSettings` (one app of the user page) | no | only through an approved MCP plan | only through an approved MCP plan |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | no | no | only through an approved MCP plan |
 
-Closed to every token: deleting users, the subscription link, the Telegram proxy key and links, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), creating groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
+Closed to every token: deleting users, the subscription link, the Telegram proxy and TrustTunnel keys and links, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), creating groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
 
 ## Changes that need the owner
 

@@ -75,6 +75,8 @@ const paths = {
   video: "M3 6h12v12H3zM15 10l6-3v10l-6-3",
   // the paper plane of Telegram (the MTProto proxy)
   plane: "M21 3 3 10.5l5.5 2L10 20l3-5 5 4z",
+  // the mouth of a tunnel (TrustTunnel)
+  tunnel: "M4 20V11a8 8 0 0 1 16 0v9M8.5 20v-8.5a3.5 3.5 0 0 1 7 0V20M2.5 20h19",
   // WARP (Cloudflare's exit) and a pinned (self-signed) certificate
   cloud: "M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.2 9.1 4.5 4.5 0 0 0 7 18z",
   pin: "M9 3h6l-1 6 3 3H7l3-3-1-6zM12 12v9",

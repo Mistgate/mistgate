@@ -971,6 +971,41 @@ func TestUDPCheckPortListUsesEnabledPortsAndAnchorAndKeepsRequestedCandidates(t 
 	}
 }
 
+// A TrustTunnel inbound with HTTP/3 on has a UDP port beside its TCP one, and the UDP delivery check must count it.
+func TestUDPCheckPortsIncludeTheTrustTunnelHTTP3Port(t *testing.T) {
+	reg := builtin.Registry()
+	x := newEnvWithoutServer(t, reg)
+	access, err := accesssvc.New(x.st, x.v, reg, nil, nil, accesssvc.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.exec(`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_de1', 'de1', 'de1.example.com', 'active', 1)`)
+	for i, h3 := range []string{"false", "true"} {
+		profile, err := access.CreateProfile(x.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+			Protocol: "trusttunnel", Name: "tt" + h3, SettingsJson: `{"port":443,"h3":` + h3 + `,"sni":"","tls_mode":"acme_domain","egress":"direct"}`,
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = access.CreateInbound(x.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{
+			ProfileId: profile.Msg.Profile.Id, NodeId: "nod_de1", PortOverride: uint32(8443 + i),
+		})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	node, err := x.st.Node(x.ctx, "nod_de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbounds, err := x.st.FleetInbounds(x.ctx, node.ID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := x.f.udpCheckPorts(node, nil, inbounds); !reflect.DeepEqual(got, []uint16{8444, 443}) {
+		t.Fatalf("UDP check ports = %v, want only the HTTP/3 one (8444) and the anchor", got)
+	}
+}
+
 func TestUDPPortChecksUseBuiltNetworkAndPort(t *testing.T) {
 	x, node, inbounds := portSpecRows(t)
 	ports := x.f.udpCheckPorts(node, nil, inbounds)

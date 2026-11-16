@@ -19,12 +19,17 @@ Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和�
 - **Hysteria2 和 VLESS**：使用 Happ 等订阅类应用（获取 URI 列表），或使用基于 mihomo 内核的应用，例如 kl!ck、Clash Verge 或 FlClash（获取 Mihomo YAML 配置）。在浏览器中打开链接会进入该用户的页面，其中包含使用说明。
 - **AmneziaWG**：使用 AmneziaVPN 应用，每台设备单独使用密钥；kl!ck 和其他基于 mihomo 内核的应用通过订阅获取配置。
 - **MTProto**（实验性）：Telegram 应用，使用用户页面中的 `tg://proxy` 链接；没有任何订阅包含它。
+- **TrustTunnel**（实验性）：官方 TrustTunnel 应用（所有平台和路由器），使用用户页面中的 `tt://` 链接或二维码；没有任何订阅包含它。Mistgate 应用直接获取它。
 
 带有自签名证书的 Hysteria2 协议配置已使用官方 Hysteria2 客户端和 Mihomo 验证；尚未使用 Happ 验证。Xray JSON 和 sing-box JSON 格式也已提供；sing-box 不支持自签名的 Hysteria2 证书和 XHTTP（参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)）。参见[订阅](../guide/subscriptions.md)和[客户端应用](../guide/client-apps.md)：Mistgate 推荐在 Windows 和 macOS 上使用 kl!ck。
 
 ## Mistgate 可以作为 Telegram 的代理吗？
 
 可以，作为实验性的协议配置提供：[MTProto](../guide/mtproto.md)。节点会成为使用 Fake TLS 的 Telegram 代理，开启了 **Telegram 代理**开关的每位用户都会在自己的页面上获得一个密钥和 `tg://proxy` 链接。它只服务于 Telegram 应用，不服务于其他应用，链接也绝不会写入订阅。Telegram 须与 Happ 或 AmneziaVPN 一起使用：用户不能只有代理。
+
+## TrustTunnel 是什么，它能更好地通过封锁吗？
+
+[TrustTunnel](../guide/trusttunnel.md) 是运行在普通 HTTPS 之上、使用真实证书的实验性 VPN，各平台和路由器都有官方应用。它并不是绕过 VLESS 或 Hysteria2 通不过的封锁的办法：在 HTTP/2 上，数据流在最初几 KB 之后会在“16 KB 后冻结”规则下冻结，与任何 TCP 数据流一样（HTTP/3 走 UDP，可以通过），而且 TLS 套 TLS 能被流量分析看出来。选择它是为了官方应用和路由器，并请在重要的网络上验证。
 
 ## Telegram 代理在俄罗斯能用吗？
 

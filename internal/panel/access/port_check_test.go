@@ -338,7 +338,7 @@ func TestFreePortForTCPKeepsTCPAndUDPPortsSeparate(t *testing.T) {
 	}
 	checks := map[uint16]store.PortCheck{4443: {Port: 4443, Verdict: "broken", BadAt: now}}
 
-	if got := freePortFor("vless", listen, others, checks, now); got != 4443 {
+	if got := freePortFor(plugin.InboundSpec{Protocol: "vless", Listen: listen}, others, checks, now); got != 4443 {
 		t.Fatalf("free TCP port = %d, want UDP-only port 4443", got)
 	}
 }

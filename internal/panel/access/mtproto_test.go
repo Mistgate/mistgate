@@ -613,14 +613,14 @@ func TestMTProtoOnANodeWithoutADomain(t *testing.T) {
 	}
 }
 
-// The protocol list marks MTProto as experimental and nothing else.
+// The protocol list marks MTProto and TrustTunnel as experimental and nothing else.
 func TestProtocolListMarksMTProtoExperimental(t *testing.T) {
 	e := newEnv(t)
 	got := map[string]bool{}
 	for _, p := range must(e.s.ListProtocols(e.ctx, req(&adminv1.ListProtocolsRequest{}))).Msg.Protocols {
 		got[p.Id] = p.Experimental
 	}
-	if len(got) != 4 || !got["mtproto"] || got["hysteria2"] || got["vless"] || got["awg"] {
+	if len(got) != 5 || !got["mtproto"] || !got["trusttunnel"] || got["hysteria2"] || got["vless"] || got["awg"] {
 		t.Errorf("experimental by protocol: %v", got)
 	}
 }

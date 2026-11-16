@@ -65,6 +65,7 @@ type tcpTarget struct {
 //     the site there, and the VLESS row says what answers.
 //   - a VLESS TCP port (role vless): REALITY with another site is probed with the target's name (a valid chain proves our
 //     REALITY forwarded the hello to that site), "self" and TLS with the node's own name.
+//   - a TrustTunnel TCP port (role site): its HTTPS site answers the node's own name; a Hysteria2 site on the same port is closed.
 //   - an MTProto TCP port (role mtproto): only its own-site Fake TLS fallback, whose decoy answers with the node's site and
 //     certificate; a Fake TLS fallback to another site cannot prove that the port belongs to this node.
 func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
@@ -77,8 +78,8 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 		if s.Spec.TLS.Mode == plugin.TLSAcmeDomain || s.Spec.TLS.Mode == plugin.TLSAcmeIP {
 			acme = true
 		}
-		if s.Spec.Protocol == "vless" && s.Spec.Listen.Network == "tcp" {
-			vlessPorts[s.Spec.Listen.Port] = true
+		if (s.Spec.Protocol == "vless" || s.Spec.Protocol == "trusttunnel") && s.Spec.Listen.Network == "tcp" {
+			vlessPorts[s.Spec.Listen.Port] = true // the node closes a Hysteria2 site on a TCP port another inbound holds
 		}
 	}
 
@@ -106,6 +107,11 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 				t.ALPN = alpn(t.Port, spec.TLS)
 			}
 			add(t)
+		case spec.Protocol == "trusttunnel" && spec.Listen.Network == "tcp":
+			// An HTTPS site of its own: the TLS handshake with the node's name proves the port reaches this node (TLS-ALPN-01
+			// is answered on 443 with an ACME certificate, as for a Hysteria2 site).
+			add(tcpTarget{Port: spec.Listen.Port, Role: tcpRoleSite, ALPN: alpn(spec.Listen.Port, spec.TLS), Profile: s.Profile,
+				Kind: tcpcheck.KindTLS, SNI: spec.TLS.ServerName, Pin: pin})
 		case spec.Protocol == "mtproto" && spec.Listen.Network == "tcp":
 			var settings struct {
 				Fallback string `json:"fallback"`

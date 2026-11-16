@@ -29,6 +29,8 @@ const (
 	TSPUProbe    = "tspu_probe"
 	OSUpdates    = "os_updates"
 	OwnProbes    = "own_probes"
+	// TrustTunnel is the VPS edition's own protocol: the edge edition has no plugin and no keys for it.
+	TrustTunnel = "trusttunnel"
 )
 
 // Code is the refusal code of Refuse; the admin has a sentence for it ("err.unavailable_in_edition").

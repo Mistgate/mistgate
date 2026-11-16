@@ -520,10 +520,23 @@ func inboundPorts(ibs []Inbound) map[portKey]bool {
 	m := map[portKey]bool{}
 	for _, in := range ibs {
 		if in.Enabled {
-			m[portKey{in.Network, in.Port}] = true
+			for _, listen := range inboundListens(in) {
+				m[portKey{listen.Network, listen.Port}] = true
+			}
 		}
 	}
 	return m
+}
+
+func inboundListens(in Inbound) []InboundListen {
+	out := []InboundListen{{Network: in.Network, Port: in.Port}}
+	for _, side := range in.SideListens {
+		if side.Network == "" || side.Port <= 0 || (side.Network == in.Network && side.Port == in.Port) {
+			continue
+		}
+		out = append(out, side)
+	}
+	return out
 }
 
 // tcpPortIsOurs: a TCP listener of this agent holds the port. When the socket table cannot be read the answer
@@ -635,7 +648,9 @@ func portSpecs(ibs []Inbound) []portSpec {
 		if !in.Enabled {
 			continue
 		}
-		out = append(out, portSpec{in.Network, in.Port, in.Port})
+		for _, listen := range inboundListens(in) {
+			out = append(out, portSpec{listen.Network, listen.Port, listen.Port})
+		}
 		if in.HopFrom != 0 {
 			out = append(out, portSpec{in.Network, in.HopFrom, in.HopTo})
 		}
@@ -736,36 +751,42 @@ func checkPortConflicts(_ context.Context, e *Env) Result {
 	ls := listeners(e)
 
 	type hit struct {
-		in    Inbound
-		procs []string
+		in      Inbound
+		network string
+		port    int
+		procs   []string
 	}
 	var own, hop, tcp []hit
 	var recoverable []Inbound
 	for _, in := range enabled {
-		var holders, inRange []string
+		var inRange []string
 		free := true
-		for _, l := range ls {
-			if l.network != in.Network {
-				continue
-			}
-			// A running awg inbound on the kernel backend holds its UDP port with a kernel socket (inode 0, no owner process).
-			foreign := l.pid != e.SelfPID && !(l.pid == 0 && in.Protocol == "awg" && in.State == "running")
-			name := l.comm
-			if name == "" {
-				name = "unknown"
-			}
-			switch {
-			case l.port == in.Port:
-				free = false
-				if foreign {
-					holders = append(holders, fmt.Sprintf("%s(%d)", name, l.pid))
+		for _, listen := range inboundListens(in) {
+			var holders []string
+			mainListen := listen.Network == in.Network && listen.Port == in.Port
+			for _, l := range ls {
+				if l.network != listen.Network {
+					continue
 				}
-			case in.HopFrom != 0 && l.port >= in.HopFrom && l.port <= in.HopTo && foreign:
-				inRange = append(inRange, fmt.Sprintf("%s:%d", name, l.port))
+				// A running awg inbound on the kernel backend holds its UDP port with a kernel socket (inode 0, no owner process).
+				foreign := l.pid != e.SelfPID && !(l.pid == 0 && in.Protocol == "awg" && in.State == "running")
+				name := l.comm
+				if name == "" {
+					name = "unknown"
+				}
+				switch {
+				case l.port == listen.Port:
+					free = false
+					if foreign {
+						holders = append(holders, fmt.Sprintf("%s(%d)", name, l.pid))
+					}
+				case mainListen && in.HopFrom != 0 && l.port >= in.HopFrom && l.port <= in.HopTo && foreign:
+					inRange = append(inRange, fmt.Sprintf("%s:%d", name, l.port))
+				}
 			}
-		}
-		if len(holders) > 0 {
-			own = append(own, hit{in, uniq(sorted(holders))})
+			if len(holders) > 0 {
+				own = append(own, hit{in: in, network: listen.Network, port: listen.Port, procs: uniq(sorted(holders))})
+			}
 		}
 		if in.TLSPort > 0 { // the HTTPS listener (decoy and ACME) sits on a TCP port of its own
 			var th []string
@@ -775,11 +796,11 @@ func checkPortConflicts(_ context.Context, e *Env) Result {
 				}
 			}
 			if len(th) > 0 {
-				tcp = append(tcp, hit{in, uniq(sorted(th))})
+				tcp = append(tcp, hit{in: in, network: "tcp", port: in.TLSPort, procs: uniq(sorted(th))})
 			}
 		}
 		if len(inRange) > 0 {
-			hop = append(hop, hit{in, firstN(uniq(sorted(inRange)), maxNames)})
+			hop = append(hop, hit{in: in, procs: firstN(uniq(sorted(inRange)), maxNames)})
 		}
 		if in.State == "failed" && bindErrRe.MatchString(in.Error) && free {
 			recoverable = append(recoverable, in)
@@ -809,8 +830,8 @@ func checkPortConflicts(_ context.Context, e *Env) Result {
 	if len(own) > 0 {
 		h := own[0]
 		r.Status, r.Code = Fail, CodePortsHeld
-		r.Params = p("inbound_id", h.in.ID, "port", strconv.Itoa(h.in.Port), "network", h.in.Network, "process", strings.Join(h.procs, ","))
-		r.Detail = fmt.Sprintf("%s/%d of inbound %s is held by %s", h.in.Network, h.in.Port, h.in.ID, strings.Join(h.procs, ", "))
+		r.Params = p("inbound_id", h.in.ID, "port", strconv.Itoa(h.port), "network", h.network, "process", strings.Join(h.procs, ","))
+		r.Detail = fmt.Sprintf("%s/%d of inbound %s is held by %s", h.network, h.port, h.in.ID, strings.Join(h.procs, ", "))
 		r.FixID = "" // restarting cannot free a port a foreign process holds
 	}
 	return r

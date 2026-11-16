@@ -86,7 +86,7 @@ describe("the new user form", () => {
     expect(text()).toContain("Subscription (Happ) — 2 nodes");
     expect(text()).toContain("AmneziaVPN keys — no: no AmneziaWG of the group runs on an enabled node");
     // Happ on, AmneziaVPN off with the reason, Telegram off, the Mistgate app on, "all nodes" on
-    expect(switches()).toEqual(["true", "false", "false", "true", "true"]);
+    expect(switches()).toEqual(["true", "false", "false", "false", "true", "true"]); // link, AmneziaVPN, Telegram, TrustTunnel, Mistgate app, all nodes
     expect(text()).toContain("Off: no AmneziaWG of the group runs on a node");
     expect(text()).not.toContain("gets nothing yet");
 

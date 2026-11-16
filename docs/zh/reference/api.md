@@ -40,6 +40,7 @@ API 定义位于 `proto/mistgate/admin/v1/`。生成的代码也在仓库中：G
 | `WarpService` | `warp.proto` | 节点的 WARP 账户 |
 | `AwgService` | `awg.proto` | AmneziaWG 协议配置编辑器的辅助方法 |
 | `BackupService` | `backup.proto` | 面板加密备份 |
+| `TrustTunnelService` | `trusttunnel.proto` | 用户的 TrustTunnel 密钥和 `tt://` 链接（包 `mistgate.trusttunnel.v1`；管理员写入级别，对 API 令牌和 MCP 关闭） |
 | `TelegramService` | `telegram.proto` | Telegram 机器人和各管理员的聊天（仅所有者和已登录的管理员可用；API 令牌和 MCP 无法访问） |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API 令牌和所有者审批 |
 | `CheburcheckService`, `BsbordService` | `cheburcheck.proto`, `bsbord.proto` | [国家视角检测](../operations/reachability.md)的 cheburcheck 和 bsbord 来源：设置、状态和测试，bsbord 另有单元列表和价格查询（仅所有者；更改或断开来源以及价格查询需要再次验证；API 令牌和 MCP 无法访问） |
@@ -178,6 +179,17 @@ func main() {
 
 这四个调用面向所有者和协作者，并对 API 令牌关闭，与其他返回凭据的调用一样。
 
+## TrustTunnel
+
+[TrustTunnel](../guide/trusttunnel.md) 协议配置和用户的密钥使用 `ProfileService`、`UserService` 和独立的服务 `mistgate.trusttunnel.v1.TrustTunnelService`：
+
+- TrustTunnel 的 `ProtocolInfo.experimental` 为 true，与 MTProto 相同。
+- `CreateUser` 和 `UpdateUser` 中的 `AppToggles.trust_tunnel` 是用户的 TrustTunnel 开关。用户处于活动状态时，开启会生成用户的密钥，关闭会吊销它。`happ` 和 `amnezia` 中至少要保留一个开启。
+- `GetTrustTunnelLinks` 读取用户的链接：`has_key`、`key_device_id`、`key_issued_unix` 以及 `tt://` 链接，每个节点和协议配置一条，其中 `ipv6`、`relay` 和 `via` 标出副本。无法生成的链接（自签名服务器）`url` 为空并带有 `note`。它不写入任何内容。
+- `IssueTrustTunnelKey` 在用户没有密钥时生成密钥（开关必须开启且用户处于活动状态；密钥占用设备上限中的一个名额，达到上限时调用会以 `device_limit` 失败），`RevokeTrustTunnelKey` 吊销密钥并保持开关开启。两者的应答与 `GetTrustTunnelLinks` 相同。
+
+`tt://` 链接带有用户的密钥，所以这三个调用都是管理员写入级别，对 API 令牌和 MCP 关闭，与其他返回凭据的调用一样。在 Cloudflare 版本中它们返回 `unavailable_in_edition`。
+
 ## 令牌权限级别
 
 令牌权限级别对应管理后台角色：**只读**对应只读角色，**操作员**对应协作者，**管理员**对应所有者。除角色权限外，令牌还只能调用固定允许列表中的方法（`internal/panel/auth/policy_tokens.go`）；无论权限级别如何，其他方法都会被拒绝。允许列表中的方法均不会返回凭据。
@@ -208,7 +220,7 @@ func main() {
 | `SubscriptionService.UpdateSubscriptionSettings`（用户页面的一个应用） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 
-以下操作对所有令牌都不可用：删除用户、获取订阅链接、Telegram 代理密钥和链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
+以下操作对所有令牌都不可用：删除用户、获取订阅链接、Telegram 代理和 TrustTunnel 的密钥和链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
 
 ## 需要所有者批准的变更
 

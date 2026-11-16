@@ -93,6 +93,11 @@ func TestCleanerTable(t *testing.T) {
 
 		// share links that went through percent-encoding
 		{"vless in percent-encoding", "url vless%3A%2F%2F3f2b8c1e-aaaa-bbbb-cccc-123456789abc%40de1.example.com%3A443%3Fsid%3Dab12cd34 end", "url [link] end"},
+		{"TrustTunnel deep link", "tt://?v=2&hostname=de1.example.com&username=ualice2345672345&password=SecretTrustTunnelKey", "[link]"},
+		{"TrustTunnel link as the app writes it", "key tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDANkZTE end", "key [link] end"},
+		{"TrustTunnel link in capitals", "TT://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDU", "[link]"},
+		{"TrustTunnel link in capitals, percent-encoded", "Tt%3A%2F%2F%3FAAECAQ9kZTEuZXhhbXBsZS5jb20", "[link]"},
+		{"TrustTunnel in percent-encoding", "url tt%3A%2F%2F%3Fv%3D2%26username%3Dualice2345672345%26password%3DSecretTrustTunnelKey end", "url [link] end"},
 		{"hysteria2 in percent-encoding", "Hysteria2%3A%2F%2Fhunter2pass%40de1.example.com%3A443", "[link]"},
 		{"https in percent-encoding", "u=https%3A%2F%2Fsub.example.com%2Fabc", "u=[link]"},
 

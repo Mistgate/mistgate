@@ -175,7 +175,9 @@ function AddForm({
     : taken
       ? taken.hop
         ? t("node.check.port.hop", { port: taken.port!, node: node.name, profile: taken.profile!, hop: taken.hop })
-        : t("err.port_taken", taken)
+        : profile?.protocol === "trusttunnel"
+          ? t("where.portTakenTt", { port: taken.port!, node: node.name, profile: taken.profile! })
+          : t("err.port_taken", taken)
       : refused?.code === "port_in_hop"
         ? t("err.port_in_hop", refused.vars)
         : undefined;

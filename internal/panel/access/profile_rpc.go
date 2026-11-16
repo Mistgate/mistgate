@@ -35,11 +35,16 @@ func (s *Service) protocol(id string) (protocols.Protocol, error) {
 // isTelegram: the protocol is for Telegram clients (MTProto). Its credential is the person's own key, not a link device's,
 // and what it renders is never a line of a subscription.
 func isTelegram(p protocols.Protocol) bool {
-	_, _, telegram, _ := clientApps(p)
+	_, _, telegram, _, _ := clientApps(p)
 	return telegram
 }
 
-func clientApps(p protocols.Protocol) (happ, amnezia, telegram bool, apps []adminv1.App) {
+func isTrustTunnel(p protocols.Protocol) bool {
+	_, _, _, trustTunnel, _ := clientApps(p)
+	return trustTunnel
+}
+
+func clientApps(p protocols.Protocol) (happ, amnezia, telegram, trustTunnel bool, apps []adminv1.App) {
 	for _, c := range p.Clients() {
 		switch c.Client {
 		case plugin.ClientHapp:
@@ -48,6 +53,8 @@ func clientApps(p protocols.Protocol) (happ, amnezia, telegram bool, apps []admi
 			amnezia = true
 		case plugin.ClientTelegram:
 			telegram = true
+		case plugin.ClientTrustTunnel:
+			trustTunnel = true
 		}
 	}
 	if happ {
@@ -58,6 +65,9 @@ func clientApps(p protocols.Protocol) (happ, amnezia, telegram bool, apps []admi
 	}
 	if telegram {
 		apps = append(apps, adminv1.App_APP_TELEGRAM)
+	}
+	if trustTunnel {
+		apps = append(apps, adminv1.App_APP_TRUST_TUNNEL)
 	}
 	return
 }
@@ -74,7 +84,7 @@ func (s *Service) ListProtocols(ctx context.Context, _ *connect.Request[adminv1.
 		if err != nil {
 			return nil, s.internal("mask defaults", err)
 		}
-		_, _, _, apps := clientApps(p)
+		_, _, _, _, apps := clientApps(p)
 		resp.Protocols = append(resp.Protocols, &adminv1.ProtocolInfo{
 			Id: p.ID(), DisplayName: p.DisplayName(), SettingsSchemaJson: string(p.SettingsSchema()),
 			DefaultSettingsJson: string(masked), Apps: apps, Experimental: protocols.IsExperimental(p),
@@ -96,8 +106,8 @@ func (s *Service) profileSummary(ctx context.Context, p store.AccessProfile, inb
 }
 
 func (s *Service) summaryOf(ctx context.Context, p store.AccessProfile, proto protocols.Protocol, merged json.RawMessage, inbounds []store.AccessInbound) (*adminv1.ProfileSummary, error) {
-	happ, amnezia, telegram, _ := clientApps(proto)
-	users, err := s.st.Access().ProfileUsers(ctx, p.ID, happ, amnezia, telegram)
+	happ, amnezia, telegram, trustTunnel, _ := clientApps(proto)
+	users, err := s.st.Access().ProfileUsers(ctx, p.ID, happ, amnezia, telegram, trustTunnel)
 	if err != nil {
 		return nil, s.internal("profile users", err)
 	}
@@ -289,8 +299,8 @@ func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, prot
 	if len(restartedNodes) == 0 {
 		return impact, nil
 	}
-	happ, amnezia, telegram, _ := clientApps(proto)
-	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia, telegram)
+	happ, amnezia, telegram, trustTunnel, _ := clientApps(proto)
+	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia, telegram, trustTunnel)
 	if err != nil {
 		return nil, s.internal("profile users", err)
 	}
@@ -399,7 +409,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 	}
 	type changedInboundPort struct {
 		node        store.AccessNode
-		listen      plugin.Listen
+		spec        plugin.InboundSpec
 		others      []nodeListen
 		portChanged bool
 	}
@@ -428,7 +438,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 				return nil, err
 			}
 			changedPorts = append(changedPorts, changedInboundPort{
-				node: f.Node, listen: newSpec.Listen, others: others,
+				node: f.Node, spec: newSpec, others: others,
 				portChanged: oldErr != nil || oldSpec.Listen.Port != newSpec.Listen.Port,
 			})
 		}
@@ -437,7 +447,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		nodeIDs := make([]string, 0, len(changedPorts))
 		seen := make(map[string]bool, len(changedPorts))
 		for _, changed := range changedPorts {
-			if changed.listen.Network == "udp" && !seen[changed.node.ID] {
+			if specHasUDPListen(changed.spec) && !seen[changed.node.ID] {
 				seen[changed.node.ID] = true
 				nodeIDs = append(nodeIDs, changed.node.ID)
 			}
@@ -451,16 +461,16 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		}
 		for _, changed := range changedPorts {
 			checks := portChecks[changed.node.ID]
-			if err := portRefusal(p.Protocol, changed.node.Name, changed.listen, changed.others, checks, s.now()); err != nil {
+			if err := portRefusal(changed.spec, changed.node.Name, changed.others, checks, s.now()); err != nil {
 				return nil, err
 			}
-			if changed.listen.Network != "udp" {
+			if !specHasUDPListen(changed.spec) {
 				continue
 			}
 			if m.DryRun {
-				if bad, ok := cachedListenPortLossy(changed.listen, checks, s.now()); ok {
+				if bad, ok := cachedSpecPortLossy(changed.spec, checks, s.now()); ok {
 					if changed.portChanged && !m.AllowLossyPort {
-						free := freePortFor(p.Protocol, changed.listen, changed.others, checks, s.now())
+						free := freePortFor(changed.spec, changed.others, checks, s.now())
 						return nil, portLossyRefusal(ctx, s, changed.node.Name, bad, free)
 					}
 					portWarnings = append(portWarnings, s.portLossyWarning(ctx, changed.node.Name, bad))
@@ -468,7 +478,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 				continue
 			}
 			if changed.portChanged {
-				warning, override, err := s.checkPort(ctx, changed.node, p.Protocol, changed.listen, changed.others, checks, m.AllowLossyPort)
+				warning, override, err := s.checkPort(ctx, changed.node, changed.spec, changed.others, checks, m.AllowLossyPort)
 				if err != nil {
 					return nil, err
 				}
@@ -478,7 +488,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 				if override {
 					lossyOverrides = append(lossyOverrides, changed)
 				}
-			} else if bad, ok := cachedListenPortLossy(changed.listen, checks, s.now()); ok {
+			} else if bad, ok := cachedSpecPortLossy(changed.spec, checks, s.now()); ok {
 				portWarnings = append(portWarnings, s.portLossyWarning(ctx, changed.node.Name, bad))
 			}
 		}
@@ -504,7 +514,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		}
 		s.audit(ctx, actor(ctx), "profile_update", map[string]any{"profile": p.ID, "name": next.Name, "settings_changed": settingsChanged, "reissue": reissue})
 		for _, changed := range lossyOverrides {
-			s.auditLossyPort(ctx, changed.node.Name, changed.listen.Port)
+			s.auditLossyPort(ctx, changed.node.Name, changed.spec.Listen.Port)
 		}
 	}
 	sum, err := s.summaryOf(ctx, next, proto, newMerged, inbounds)
@@ -566,6 +576,8 @@ func (s *Service) PreviewProfile(ctx context.Context, req *connect.Request[admin
 		format, resp.ClientLabel = plugin.FormatAWGConf, "AmneziaVPN · .conf"
 	case isTelegram(proto): // no subscription carries it: the person gets the link from their own page
 		format, resp.ClientLabel = plugin.FormatTelegramLink, "Telegram · tg://proxy link"
+	case s.mistgateConsumes(proto.ID()): // only the Mistgate app takes it: its path settings, the credential masked
+		format, resp.ClientLabel = plugin.FormatMistgate, "Mistgate app · path settings"
 	}
 	if frag, ok := trialRender(proto, merged, node, in, spec, format, ""); ok {
 		resp.ClientPreview = string(frag.Data)
@@ -677,7 +689,34 @@ type nodeListen struct {
 	protocol string
 	enabled  bool
 	l        plugin.Listen
+	listens  []plugin.Listen
 	spec     plugin.InboundSpec
+}
+
+func inboundListens(spec plugin.InboundSpec) []plugin.Listen {
+	listens := []plugin.Listen{spec.Listen}
+	return append(listens, plugin.SideListens(spec)...)
+}
+
+func specHasUDPListen(spec plugin.InboundSpec) bool {
+	return len(specUDPListens(spec)) > 0
+}
+
+func specUDPListens(spec plugin.InboundSpec) []plugin.Listen {
+	var out []plugin.Listen
+	for _, listen := range inboundListens(spec) {
+		if listen.Network == "udp" {
+			out = append(out, listen)
+		}
+	}
+	return out
+}
+
+func (n nodeListen) allListens() []plugin.Listen {
+	if len(n.listens) > 0 {
+		return n.listens
+	}
+	return []plugin.Listen{n.l}
 }
 
 // nodeInbounds is what the checks need of a node's inbounds other than skip (the one being changed; a relay's id also
@@ -700,7 +739,7 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 			return nil, nil, s.internal("open profile secrets", err)
 		}
 		if os, err := s.buildSpec(o, merged); err == nil {
-			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen, spec: os})
+			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen, listens: inboundListens(os), spec: os})
 		}
 	}
 	forwards, err := s.st.RelayLinks(ctx, store.RelayFilter{ViaNodeID: nodeID})
@@ -719,8 +758,10 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 // clashOf is the first neighbour that fights l over a listener port (listenOverlap), or nil.
 func clashOf(l plugin.Listen, others []nodeListen) *nodeListen {
 	for i := range others {
-		if listenOverlap(l, others[i].l) {
-			return &others[i]
+		for _, other := range others[i].allListens() {
+			if listenOverlap(l, other) {
+				return &others[i]
+			}
 		}
 	}
 	return nil
@@ -728,8 +769,8 @@ func clashOf(l plugin.Listen, others []nodeListen) *nodeListen {
 
 // freePortFor is a port an inbound listening as l could take instead of l.Port, with its own hop range and, for UDP,
 // stored bad checks excluded; 0 when none is free.
-func freePortFor(protocol string, l plugin.Listen, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) uint16 {
-	ports := freePortCandidates(protocol, 1, l, others, checks, now)
+func freePortFor(spec plugin.InboundSpec, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) uint16 {
+	ports := freePortCandidates(spec, 1, others, checks, now)
 	if len(ports) == 0 {
 		return 0
 	}
@@ -738,7 +779,8 @@ func freePortFor(protocol string, l plugin.Listen, others []nodeListen, checks m
 
 // portRefusal is the coded refusal of a listen that another profile of the node fights over, or nil: "hop_taken" when
 // the inbound's own hop range is what overlaps (no port fixes that), else "port_taken" with a free port to take instead.
-func portRefusal(protocol, node string, l plugin.Listen, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) error {
+func portRefusal(spec plugin.InboundSpec, node string, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) error {
+	l := spec.Listen
 	if l.HopFrom != 0 {
 		// the range alone: its start stands in for the port, so that only the range is compared
 		if c := clashOf(plugin.Listen{Network: l.Network, Port: l.HopFrom, HopFrom: l.HopFrom, HopTo: l.HopTo}, others); c != nil {
@@ -746,12 +788,17 @@ func portRefusal(protocol, node string, l plugin.Listen, others []nodeListen, ch
 				"profile", c.profile, "node", node)
 		}
 	}
-	c := clashOf(l, others)
+	var c *nodeListen
+	for _, candidate := range inboundListens(spec) {
+		if c = clashOf(candidate, others); c != nil {
+			break
+		}
+	}
 	if c == nil {
 		return nil
 	}
 	kv := []string{"port", strconv.Itoa(int(l.Port)), "profile", c.profile, "node", node,
-		"free", strconv.Itoa(int(freePortFor(protocol, l, others, checks, now)))}
+		"free", strconv.Itoa(int(freePortFor(spec, others, checks, now)))}
 	if c.l.Port != l.Port {
 		kv = append(kv, "hop", fmt.Sprintf("%d-%d", c.l.HopFrom, c.l.HopTo)) // the port lies in that profile's hop range
 	}
@@ -811,6 +858,20 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 		}
 		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_paused", Params: params})
 	}
+	// TrustTunnel serves the node's own site on its TCP port, so a Hysteria2 site there is closed and nothing else changes: the
+	// same pause as under VLESS, told apart by its code because the admin's sentence for hy2_decoy_paused names VLESS.
+	appendTakenWarning := func(port int, hy2, trustTunnel string) {
+		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_site_taken", Params: map[string]string{
+			"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "trusttunnel": trustTunnel}})
+	}
+	if spec.Protocol == "trusttunnel" && spec.Listen.Network == "tcp" {
+		for _, other := range others {
+			if other.enabled && other.protocol == "hysteria2" && hy2TCPPort(other.spec) == int(spec.Listen.Port) {
+				appendTakenWarning(int(spec.Listen.Port), other.profile, profileName)
+				break
+			}
+		}
+	}
 	if spec.Protocol == "vless" && spec.Listen.Network == "tcp" {
 		for _, other := range others {
 			if !other.enabled || other.protocol != "hysteria2" || hy2TCPPort(other.spec) != int(spec.Listen.Port) {
@@ -823,11 +884,17 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 		port := hy2TCPPort(spec)
 		if port > 0 {
 			for _, other := range others {
-				if !other.enabled || other.protocol != "vless" || other.l.Network != "tcp" || int(other.l.Port) != port {
+				if !other.enabled || other.l.Network != "tcp" || int(other.l.Port) != port {
 					continue
 				}
-				appendDecoyWarning(port, profileName, other.profile, other.spec, spec)
-				break
+				if other.protocol == "vless" {
+					appendDecoyWarning(port, profileName, other.profile, other.spec, spec)
+					break
+				}
+				if other.protocol == "trusttunnel" {
+					appendTakenWarning(port, profileName, other.profile)
+					break
+				}
 			}
 		}
 	}
@@ -1074,13 +1141,13 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 		return nil, buildRefusal(err, f.Node.Name)
 	}
 	var portChecks portCheckCache
-	if spec.Listen.Network == "udp" {
+	if specHasUDPListen(spec) {
 		portChecks, err = s.readPortChecks(ctx, f.Node.ID)
 		if err != nil {
 			return nil, s.internal("read UDP port checks", err)
 		}
 	}
-	if err := portRefusal(proto.ID(), f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
+	if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now()); err != nil {
 		return nil, err
 	}
 	warnings, err := s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others)
@@ -1088,17 +1155,17 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 		return nil, err
 	}
 	if m.ValidateOnly {
-		if bad, ok := cachedListenPortLossy(spec.Listen, portChecks[f.Node.ID], s.now()); ok {
-			free := freePortFor(proto.ID(), spec.Listen, others, portChecks[f.Node.ID], s.now())
+		if bad, ok := cachedSpecPortLossy(spec, portChecks[f.Node.ID], s.now()); ok {
+			free := freePortFor(spec, others, portChecks[f.Node.ID], s.now())
 			if !m.AllowLossyPort {
 				return nil, portLossyRefusal(ctx, s, f.Node.Name, bad, free)
 			}
 			warnings = append(warnings, s.portLossyWarning(ctx, f.Node.Name, bad))
 		}
 		return connect.NewResponse(&adminv1.CreateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings,
-			FreePort: uint32(freePortFor(proto.ID(), spec.Listen, others, portChecks[f.Node.ID], s.now()))}), nil
+			FreePort: uint32(freePortFor(spec, others, portChecks[f.Node.ID], s.now()))}), nil
 	}
-	portWarning, lossyOverride, err := s.checkPort(ctx, f.Node, proto.ID(), spec.Listen, others, portChecks[f.Node.ID], m.AllowLossyPort)
+	portWarning, lossyOverride, err := s.checkPort(ctx, f.Node, spec, others, portChecks[f.Node.ID], m.AllowLossyPort)
 	if err != nil {
 		return nil, err
 	}
@@ -1177,14 +1244,14 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	var portWarning *adminv1.StatusReason
 	var lossyOverride bool
 	var portChecks portCheckCache
-	if spec.Listen.Network == "udp" && (m.ValidateOnly || in.Enabled) {
+	if specHasUDPListen(spec) && (m.ValidateOnly || in.Enabled) {
 		portChecks, err = s.readPortChecks(ctx, f.Node.ID)
 		if err != nil {
 			return nil, s.internal("read UDP port checks", err)
 		}
 	}
 	if in.Enabled {
-		if err := portRefusal(f.Profile.Protocol, f.Node.Name, spec.Listen, others, portChecks[f.Node.ID], s.now()); err != nil {
+		if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now()); err != nil {
 			return nil, err
 		}
 		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others); err != nil {
@@ -1202,28 +1269,28 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		portChanged := oldSpec.Listen.Port != spec.Listen.Port
 		switchedOn := !oldEnabled && in.Enabled
 		if m.ValidateOnly {
-			if bad, ok := cachedListenPortLossy(spec.Listen, portChecks[f.Node.ID], s.now()); ok {
-				free := freePortFor(f.Profile.Protocol, spec.Listen, others, portChecks[f.Node.ID], s.now())
+			if bad, ok := cachedSpecPortLossy(spec, portChecks[f.Node.ID], s.now()); ok {
+				free := freePortFor(spec, others, portChecks[f.Node.ID], s.now())
 				if (portChanged || switchedOn) && !m.AllowLossyPort {
 					return nil, portLossyRefusal(ctx, s, f.Node.Name, bad, free)
 				}
 				warnings = append(warnings, s.portLossyWarning(ctx, f.Node.Name, bad))
 			}
 		} else if portChanged || switchedOn {
-			portWarning, lossyOverride, err = s.checkPort(ctx, f.Node, f.Profile.Protocol, spec.Listen, others, portChecks[f.Node.ID], m.AllowLossyPort)
+			portWarning, lossyOverride, err = s.checkPort(ctx, f.Node, spec, others, portChecks[f.Node.ID], m.AllowLossyPort)
 			if err != nil {
 				return nil, err
 			}
 			if portWarning != nil {
 				warnings = append(warnings, portWarning)
 			}
-		} else if bad, ok := cachedListenPortLossy(spec.Listen, portChecks[f.Node.ID], s.now()); ok {
+		} else if bad, ok := cachedSpecPortLossy(spec, portChecks[f.Node.ID], s.now()); ok {
 			warnings = append(warnings, s.portLossyWarning(ctx, f.Node.Name, bad))
 		}
 	}
 	if m.ValidateOnly {
 		return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings,
-			FreePort: uint32(freePortFor(f.Profile.Protocol, spec.Listen, others, portChecks[f.Node.ID], s.now()))}), nil
+			FreePort: uint32(freePortFor(spec, others, portChecks[f.Node.ID], s.now()))}), nil
 	}
 	if specChangedByAdmin {
 		in.SpecVersion++
@@ -1276,7 +1343,7 @@ func (s *Service) inboundNoWayInWarning(ctx context.Context, f store.AccessInbou
 		group := store.AccessGroup{ProfileIDs: []string{f.Profile.ID}}
 		user := store.AccessUser{AllNodes: true, AppHapp: true, AppAmnezia: true, AppTelegram: true}
 		for _, link := range links {
-			if link.ViaNodeAddress != "" && s.relayUsable(link, f, group, user) {
+			if link.ViaNodeAddress != "" && s.relayUsableFor(link, f, group, user, plugin.FormatMistgate) {
 				return nil, nil
 			}
 		}

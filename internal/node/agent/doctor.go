@@ -150,6 +150,9 @@ func (a *Agent) doctorInbounds() []doctor.Inbound {
 			TLSMode: tlsModeName(sp.TLS.Mode), ServerName: sp.TLS.ServerName, State: "stopped", CertNotAfter: na[id],
 		}
 		in.TLSPort = tlsPortOf(sp)
+		for _, side := range plugin.SideListens(sp) {
+			in.SideListens = append(in.SideListens, doctor.InboundListen{Network: side.Network, Port: int(side.Port)})
+		}
 		if h, ok := health[id]; ok {
 			if h.CertNotAfter.After(in.CertNotAfter) { // an ACME leaf issued or renewed after the last apply
 				in.CertNotAfter = h.CertNotAfter
@@ -195,8 +198,9 @@ func runStateName(s plugin.RunState) string {
 
 // tlsPortOf is the TCP port whose served certificate the doctor can read, 0 = none. Hysteria2: its HTTPS masquerade
 // listener, settings.masquerade.tcp_port, 443 when absent, 0 = none (hysteria2/settings.go). VLESS with security tls: the
-// inbound's own port. VLESS with REALITY, whatever its target: nothing, because the certificate of a "self" site is behind
-// REALITY (a visitor of the port gets it, but the doctor's own handshake is not one of them), and before the first
+// inbound's own port. TrustTunnel: its own TCP port, where the site and the tunnel share one certificate (the QUIC listener
+// on the same number serves the same one). VLESS with REALITY, whatever its target: nothing, because the certificate of a
+// "self" site is behind REALITY (a visitor of the port gets it, but the doctor's own handshake is not one of them), and before the first
 // issuance that site shows a self-signed certificate that would read as a healthy 10-year one; the engine reports the
 // issued certificate instead (Inbound.CertNotAfter). The agent peeks into the engines' settings; an engine-provided
 // accessor replaces this when a third protocol has a TLS listener.
@@ -225,6 +229,8 @@ func tlsPortOf(sp plugin.InboundSpec) int {
 		if json.Unmarshal(sp.Settings, &j) != nil || j.Security != "tls" {
 			return 0
 		}
+		return int(sp.Listen.Port)
+	case "trusttunnel":
 		return int(sp.Listen.Port)
 	}
 	return 0
