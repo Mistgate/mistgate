@@ -3,7 +3,7 @@ title: Subscriptions
 description: "One link per person for every app: which format each app gets and how the panel decides, how servers are named, what the apps show, and the settings of the subscription."
 ---
 
-Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has six tabs: **Apps & formats**, **Who gets what**, **App versions**, **Names & texts**, **User page** and **DNS**.
+Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has seven tabs: **Apps & formats**, **Who gets what**, **App versions**, **Names & texts**, **Response headers**, **User page** and **DNS**.
 
 ![One link per person: a new user, their subscription link and their own page on a phone](../../images/video/link-poster-en.webp)
 
@@ -210,7 +210,7 @@ Every answer to an app carries, besides the servers, the headers subscription ap
 | `Routing` | The link list for Happ only: the person's DNS preset as a Happ routing profile. See [DNS](dns.md). The other formats carry their DNS inside, so they send no `Routing`. |
 | `Ping-Type`, `Ping-Result`, `Subscription-Ping-Onopen-Enabled` | Happ only, and only when **Ping in Happ** is not **App default**: how Happ pings the servers, the delay in ms, and whether it pings when it opens. See [Names & texts](#names-texts). |
 
-The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has a `select` group and, when enabled, an `Auto` group over the servers, plus a `dns:` section; Xray JSON has one config per server; sing-box JSON has one selector and, when enabled, an `Auto` URL test. Each takes the person's DNS preset in its own form.
+Headers of your own go after these: see [Response headers](#response-headers). The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has a `select` group and, when enabled, an `Auto` group over the servers, plus a `dns:` section; Xray JSON has one config per server; sing-box JSON has one selector and, when enabled, an `Auto` URL test. Each takes the person's DNS preset in its own form.
 
 ## Extra servers: over IPv6 and through a relay
 
@@ -257,6 +257,30 @@ In Happ, a node also ends its name with its current load: "🇩🇪 DE · Hyster
 |:--|:--|
 | **How to ping** | **App default** (the default) sends nothing, so Happ uses its own setting. **TCP** sends `Ping-Type: tcp` and `Ping-Result: time`: Happ opens a TCP connection to each server's port and shows the delay in ms. |
 | **Ping when the app opens** | With **TCP** only: Happ checks every server each time it starts (`Subscription-Ping-Onopen-Enabled: 1`; off sends `0`). |
+
+## Response headers
+
+The **Response headers** tab adds headers of your own to the subscription answer: the `flclashx-*` headers FlClashX reads for its service name, logo, view, widgets and settings, for example. The headers the panel sets itself are listed in [What the apps receive](#what-the-apps-receive).
+
+Each header is one row, with:
+
+| Field | What it does |
+|:--|:--|
+| **Name** | An HTTP header name: Latin letters, digits and the symbols `- _ . ! # $ % & ' * + ^ ~` (the characters RFC 9110 allows in a token), up to 64 characters. It goes out in the spelling you typed. |
+| **Value** | Up to 1000 bytes, with no line break or other control character. Only plain ASCII goes as it is. |
+| **Send as base64** | The panel sends `base64:` and the base64 of the value, the way it sends the title. Needed for any other text, such as «Мой VPN». |
+| **Formats** | **All formats**, or a choice of **Link list (base64)**, **Mihomo YAML**, **Xray JSON** and **sing-box JSON**: the format of the answer the app gets. |
+| **Groups** | **Every group**, or **Chosen groups**. A group that is deleted drops out of the row at the next save; a row with no group left goes to nobody. |
+
+The rows are in order: when two rows of one name apply to an answer, the first is sent. Up to 20 rows and 4096 bytes in all as sent (a proxy in front of the panel buffers the headers of an answer in 4 or 8 KiB).
+
+A header goes with an answer that serves the person, and only with that. A refusal ([device limit, a blocked device, an app with no device ID](#what-the-app-shows-when-a-device-is-refused)), the note a person without access gets, and the user page carry none of them: they stay as they are.
+
+**Names the panel keeps** are refused when you save, in any case: every header listed in [What the apps receive](#what-the-apps-receive) and in the refusal table, the families `X-Hwid-*`, `Profile-*`, `Subscription-*`, `Ping-*` and `Mistgate-*`, and the headers of the web server and the platform (`Content-*`, `Cache-Control`, `Set-Cookie`, `Location`, `Vary`, `ETag`, `Connection`, `Transfer-Encoding` and the other hop-by-hop headers, `Strict-Transport-Security`, `Access-Control-*`, `Sec-*` and so on). The tab shows the whole list. The panel's part of it comes from the code that sets the headers, and a test of that code fails when it sets a header that is not on the list, so a header the panel starts to send is kept from the same release.
+
+**What an app gets** shows what one person's answer to one User-Agent carries of the rows on the screen, saved or not: pick a person, type a User-Agent or take a sample. The headers are shown as they go out (a base64 row with its `base64:` text). For a browser, a rule that answers as an unknown link, and a person without access it says why there is nothing. The panel's own headers are not part of it.
+
+Changes wait for **Save**; **Discard** drops them. They apply at the next fetch, within a minute, without a restart. The Cloudflare edition serves them the same way.
 
 ## When a subscription does not work
 
@@ -346,7 +370,7 @@ A fresh panel recommends kl!ck on Windows and macOS (Happ second) and Happ on iO
 | **Devices on the page** | on | People add, re-key and remove their own AmneziaWG devices on their page, within their device limit. |
 | **DNS choice on the page** | off | People pick on their page one DNS for the apps on the link, from the presets listed under the switch (**DNS for the apps on the link**), and the DNS of the AmneziaWG keys of each server, from the presets the owner offers on each node. See [DNS](dns.md) and [User page](user-page.md). |
 
-Rules are saved as soon as you add, move or remove one. On **Names & texts** and **User page**, changes wait for **Save** in the bar at the bottom (**Discard** drops them). Either way they apply at the next fetch, without a restart.
+Rules are saved as soon as you add, move or remove one. On **Names & texts**, **Response headers** and **User page**, changes wait for **Save** in the bar at the bottom (**Discard** drops them). Either way they apply at the next fetch, without a restart.
 
 ## Protection of the links
 
