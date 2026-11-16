@@ -343,3 +343,29 @@ func TestBadPanelAddressOnlyDropsTheControlLinkNotTheBridge(t *testing.T) {
 		}
 	}
 }
+
+// The control session's HTTP/2 client treats a StreamError that its connection's read returns as one of its own stream errors and
+// reads again; the reset of the bridge's stream must therefore reach it as another error, or it spins on it.
+func TestPanelStreamConnHandsOutNoHTTP2StreamError(t *testing.T) {
+	reset := http2.StreamError{StreamID: 3, Code: http2.ErrCodeInternal}
+	pipeReader, pipeWriter := io.Pipe()
+	_ = pipeReader.CloseWithError(reset)
+	c := &panelStreamConn{read: io.NopCloser(&failingReader{err: reset}), write: pipeWriter}
+
+	_, readErr := c.Read(make([]byte, 8))
+	_, writeErr := c.Write([]byte("x"))
+	for name, err := range map[string]error{"read": readErr, "write": writeErr} {
+		if _, isStream := err.(http2.StreamError); isStream || !errors.Is(err, reset) {
+			t.Fatalf("%s error = %#v: want a wrapped error that still is the reset", name, err)
+		}
+	}
+
+	c.read = io.NopCloser(&failingReader{err: io.EOF})
+	if _, err := c.Read(make([]byte, 8)); err != io.EOF {
+		t.Fatalf("a clean end of the stream = %v, want io.EOF itself (TLS compares it)", err)
+	}
+}
+
+type failingReader struct{ err error }
+
+func (r *failingReader) Read([]byte) (int, error) { return 0, r.err }

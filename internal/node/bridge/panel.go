@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -120,7 +121,7 @@ func (c *panelStreamConn) Read(p []byte) (int, error) {
 	if err != nil && c.expired.Load() {
 		return n, os.ErrDeadlineExceeded
 	}
-	return n, err
+	return n, plainConnError(err)
 }
 
 func (c *panelStreamConn) Write(p []byte) (int, error) {
@@ -128,7 +129,19 @@ func (c *panelStreamConn) Write(p []byte) (int, error) {
 	if err != nil && c.expired.Load() {
 		return n, os.ErrDeadlineExceeded
 	}
-	return n, err
+	return n, plainConnError(err)
+}
+
+// plainConnError keeps an HTTP/2 error of the bridge's own streams from reaching the caller as it is. The control session runs an
+// HTTP/2 client of its own over this conn, and that client takes a StreamError returned by its connection's read for one of its own
+// stream errors (a type assertion, not errors.As): it logs it, skips it and reads again, and a conn whose error is final hands it
+// out again at once, so the client spun on the reset of the bridge's stream and never saw the control session end.
+func plainConnError(err error) error {
+	var stream http2.StreamError
+	if errors.As(err, &stream) {
+		return fmt.Errorf("panel bridge stream: %w", err)
+	}
+	return err
 }
 
 func (c *panelStreamConn) Close() error {
