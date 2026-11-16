@@ -1,4 +1,4 @@
-// Package trusttunnel serves the TCP HTTP/2 TrustTunnel transport in-process.
+// Package trusttunnel serves TrustTunnel over HTTP/2 and optionally HTTP/3 in-process.
 package trusttunnel
 
 import (
@@ -19,6 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/apernet/quic-go"
+	"github.com/apernet/quic-go/http3"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
@@ -37,8 +39,9 @@ var Factory engine.Factory = New
 var BindIP net.IP
 
 const (
-	codeStartFailed = "trusttunnel_start_failed"
-	codeServeFailed = "trusttunnel_serve_failed"
+	codeStartFailed   = "trusttunnel_start_failed"
+	codeServeFailed   = "trusttunnel_serve_failed"
+	codeH3ServeFailed = "trusttunnel_h3_serve_failed"
 )
 
 type timings struct {
@@ -120,11 +123,11 @@ func (e *eng) Version() string {
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, dep := range bi.Deps {
 			if dep.Path == "golang.org/x/net" && dep.Version != "" {
-				return "TrustTunnel h2, " + dep.Version
+				return "TrustTunnel h2/h3, " + dep.Version
 			}
 		}
 	}
-	return "TrustTunnel h2"
+	return "TrustTunnel h2/h3"
 }
 
 func (e *eng) Capabilities() engine.Capabilities {
@@ -138,16 +141,25 @@ type inbound struct {
 	creds    []plugin.UserCred // guarded by e.mu
 	idx      atomic.Pointer[index]
 
-	out       engine.Egress
-	cert      engine.Cert
-	certHeld  bool
-	ln        net.Listener
-	srv       *http.Server
-	serveDone chan struct{}
-	everServe bool
+	out         engine.Egress
+	cert        engine.Cert
+	certHeld    bool
+	ln          net.Listener
+	srv         *http.Server
+	serveDone   chan struct{}
+	everServe   bool
+	h3Ln        net.PacketConn
+	h3Transport *quic.Transport
+	h3Listener  *quic.EarlyListener
+	h3Server    *http3.Server
+	h3Retries   atomic.Uint64 // handshakes that had to prove their address first
+	h3ServeDone chan struct{}
+	everH3Serve bool
+	h3Enabled   bool
+	h3Anonymous *sitehttp.AnonymousLimiter
 
 	connMu sync.Mutex
-	conns  map[net.Conn]*connectionState
+	conns  map[any]*connectionState
 
 	unknownKeys atomic.Uint32
 
@@ -175,9 +187,6 @@ func parseSpec(spec plugin.InboundSpec) error {
 		if err := json.Unmarshal(spec.Settings, &settings); err != nil {
 			return errors.New("settings are invalid")
 		}
-	}
-	if settings.H3 {
-		return errors.New("HTTP/3 is not supported by this TrustTunnel engine yet")
 	}
 	return nil
 }
@@ -209,8 +218,9 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	}
 
 	in := &inbound{
-		e: e, spec: spec, specHash: hash, creds: accepted, conns: make(map[net.Conn]*connectionState),
-		state: plugin.RunStarting, since: e.now(), serveDone: make(chan struct{}),
+		e: e, spec: spec, specHash: hash, creds: accepted, conns: make(map[any]*connectionState),
+		h3Enabled: settingsH3(spec),
+		state:     plugin.RunStarting, since: e.now(), serveDone: make(chan struct{}),
 	}
 	in.idx.Store(next)
 	restarted := false
@@ -330,6 +340,12 @@ func (in *inbound) start(ctx context.Context) error {
 		_ = ln.Close()
 		return fmt.Errorf("configure HTTP/2: %w", err)
 	}
+	if in.h3Enabled {
+		if err := in.startH3(addr); err != nil {
+			_ = ln.Close()
+			return err
+		}
+	}
 	tlsListener := tls.NewListener(ln, in.srv.TLSConfig)
 	in.mu.Lock()
 	in.state, in.detail, in.since, in.everServe = plugin.RunRunning, "", in.e.now(), true
@@ -346,6 +362,9 @@ func (in *inbound) start(ctx context.Context) error {
 			in.mu.Unlock()
 		}
 	}()
+	if in.h3Enabled {
+		in.serveH3()
+	}
 	return nil
 }
 
@@ -356,6 +375,7 @@ func (in *inbound) connState(conn net.Conn, state http.ConnState) {
 }
 
 func (in *inbound) stop(releaseCert bool) {
+	in.stopH3()
 	if in.srv != nil {
 		_ = in.srv.Close()
 	}
@@ -363,7 +383,7 @@ func (in *inbound) stop(releaseCert bool) {
 		_ = in.ln.Close()
 	}
 	in.connMu.Lock()
-	conns := make([]net.Conn, 0, len(in.conns))
+	conns := make([]any, 0, len(in.conns))
 	for conn := range in.conns {
 		conns = append(conns, conn)
 	}
@@ -523,16 +543,28 @@ func (e *eng) Close(ctx context.Context) error {
 	}
 	e.mu.Unlock()
 	for _, in := range closing {
-		if !in.everServe {
+		if !in.everServe && !in.everH3Serve {
 			continue
 		}
-		select {
-		case <-in.serveDone:
-		case <-ctx.Done():
-			return ctx.Err()
+		for _, done := range []<-chan struct{}{in.serveDone, in.h3ServeDone} {
+			if done == nil {
+				continue
+			}
+			select {
+			case <-done:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
 	}
 	return nil
+}
+
+func settingsH3(spec plugin.InboundSpec) bool {
+	var settings struct {
+		H3 bool `json:"h3"`
+	}
+	return json.Unmarshal(spec.Settings, &settings) == nil && settings.H3
 }
 
 func (e *eng) sortedInbounds() []*inbound {

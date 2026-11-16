@@ -1,6 +1,7 @@
 package trusttunnel
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"reflect"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -152,48 +154,52 @@ func downCounter(h *testHarness, credID string) *credState { return h.in.idx.Loa
 
 // A client that stops reading must not pin its stream: a write stuck on its closed HTTP/2 window is cut by Kick.
 func TestKickFreesAStreamStuckOnAClientThatStoppedReading(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	backend := startTCPBackend(t, func(conn net.Conn) {
-		chunk := make([]byte, 32<<10)
-		for {
-			if _, err := conn.Write(chunk); err != nil {
-				return
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		backend := startTCPBackend(t, func(conn net.Conn) {
+			chunk := make([]byte, 32<<10)
+			for {
+				if _, err := conn.Write(chunk); err != nil {
+					return
+				}
 			}
+		})
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
+		client := v.client(t, h.addr)
+		response, _ := client.connect(t, "example.com:80", authValue(t, alice), true)
+		_ = response // never read: the client's window closes
+		cs := downCounter(h, "alice")
+		waitStuck(t, cs)
+		if affected, _ := h.e.Kick(context.Background(), []string{"alice"}); affected != 1 {
+			t.Fatalf("Kick affected %d, want 1", affected)
 		}
+		waitFor(t, time.Second, func() bool { return backendConnections(backend) == 0 })
+		waitFor(t, time.Second, func() bool { cs.mu.Lock(); defer cs.mu.Unlock(); return cs.active == 0 })
 	})
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
-	client := newHTTP2Client(t, h.addr)
-	response, _ := client.connect(t, "example.com:80", authValue(t, alice), true)
-	_ = response // never read: the client's window closes
-	cs := downCounter(h, "alice")
-	waitStuck(t, cs)
-	if affected, _ := h.e.Kick(context.Background(), []string{"alice"}); affected != 1 {
-		t.Fatalf("Kick affected %d, want 1", affected)
-	}
-	waitFor(t, time.Second, func() bool { return backendConnections(backend) == 0 })
-	waitFor(t, time.Second, func() bool { cs.mu.Lock(); defer cs.mu.Unlock(); return cs.active == 0 })
 }
 
 // And without a Kick the idle timer frees it: the soft end first, the reset when the soft end cannot get through.
 func TestIdleTimerFreesAStreamStuckOnAClientThatStoppedReading(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	backend := startTCPBackend(t, func(conn net.Conn) {
-		chunk := make([]byte, 32<<10)
-		for {
-			if _, err := conn.Write(chunk); err != nil {
-				return
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		backend := startTCPBackend(t, func(conn net.Conn) {
+			chunk := make([]byte, 32<<10)
+			for {
+				if _, err := conn.Write(chunk); err != nil {
+					return
+				}
 			}
-		}
+		})
+		ts := defaultTimings
+		ts.streamIdle, ts.eofGrace = 200*time.Millisecond, 100*time.Millisecond
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, ts)
+		client := v.client(t, h.addr)
+		response, _ := client.connect(t, "example.com:80", authValue(t, alice), true)
+		_ = response
+		cs := downCounter(h, "alice")
+		waitFor(t, 3*time.Second, func() bool { cs.mu.Lock(); defer cs.mu.Unlock(); return cs.active == 0 && cs.down.Load() > 0 })
+		waitFor(t, time.Second, func() bool { return backendConnections(backend) == 0 })
 	})
-	ts := defaultTimings
-	ts.streamIdle, ts.eofGrace = 200*time.Millisecond, 100*time.Millisecond
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, ts)
-	client := newHTTP2Client(t, h.addr)
-	response, _ := client.connect(t, "example.com:80", authValue(t, alice), true)
-	_ = response
-	cs := downCounter(h, "alice")
-	waitFor(t, 3*time.Second, func() bool { cs.mu.Lock(); defer cs.mu.Unlock(); return cs.active == 0 && cs.down.Load() > 0 })
-	waitFor(t, time.Second, func() bool { return backendConnections(backend) == 0 })
 }
 
 func backendConnections(backend *tcpBackend) int {
@@ -225,128 +231,136 @@ func waitStuck(t *testing.T, cs *credState) {
 
 // An upload the upstream does not take is held back by flow control: the server does not buffer it without bound.
 func TestUnreadUploadIsBoundedByFlowControl(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	hold := make(chan struct{})
-	backend := startTCPBackend(t, func(conn net.Conn) { <-hold })
-	t.Cleanup(func() { close(hold) })
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
-	client := newHTTP2Client(t, h.addr)
-	response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
-	var accepted atomic.Int64
-	go func() {
-		chunk := make([]byte, 64<<10)
-		for {
-			n, err := writer.Write(chunk)
-			accepted.Add(int64(n))
-			if err != nil {
-				return
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		hold := make(chan struct{})
+		backend := startTCPBackend(t, func(conn net.Conn) { <-hold })
+		t.Cleanup(func() { close(hold) })
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
+		client := v.client(t, h.addr)
+		response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
+		var accepted atomic.Int64
+		go func() {
+			chunk := make([]byte, 64<<10)
+			for {
+				n, err := writer.Write(chunk)
+				accepted.Add(int64(n))
+				if err != nil {
+					return
+				}
 			}
+		}()
+		stable, last := 0, int64(-1)
+		for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && stable < 6; time.Sleep(100 * time.Millisecond) {
+			if now := accepted.Load(); now == last && now > 0 {
+				stable++
+			} else {
+				stable = 0
+			}
+			last = accepted.Load()
 		}
-	}()
-	stable, last := 0, int64(-1)
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && stable < 6; time.Sleep(100 * time.Millisecond) {
-		if now := accepted.Load(); now == last && now > 0 {
-			stable++
-		} else {
-			stable = 0
+		if stable < 6 {
+			t.Fatalf("the client was never held back: %d bytes accepted and still going", accepted.Load())
 		}
-		last = accepted.Load()
-	}
-	if stable < 6 {
-		t.Fatalf("the client was never held back: %d bytes accepted and still going", accepted.Load())
-	}
-	// The stream window is 1 MiB; the upstream socket and the transport's own buffers add a few more.
-	if got := accepted.Load(); got > 12<<20 {
-		t.Fatalf("the server took %d bytes of a stalled upload, want a few MiB at most", got)
-	}
-	_ = writer.CloseWithError(errors.New("done"))
-	_ = response.Body.Close()
+		// The stream window is 1 MiB; the upstream socket and the transport's own buffers add a few more.
+		if got := accepted.Load(); got > 12<<20 {
+			t.Fatalf("the server took %d bytes of a stalled upload, want a few MiB at most", got)
+		}
+		_ = writer.CloseWithError(errors.New("done"))
+		_ = response.Body.Close()
+	})
 }
 
 // The upstream's EOF cannot half-close the response, so the stream ends after the grace instead of hanging for the idle time.
 func TestUpstreamCloseEndsTheResponseAfterTheGrace(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	backend := startTCPBackend(t, func(conn net.Conn) { _, _ = io.WriteString(conn, "bye") })
-	ts := defaultTimings
-	ts.eofGrace = 100 * time.Millisecond
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, ts)
-	client := newHTTP2Client(t, h.addr)
-	response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
-	start := time.Now()
-	got, err := io.ReadAll(response.Body)
-	if err != nil || string(got) != "bye" {
-		t.Fatalf("response = %q, %v", got, err)
-	}
-	if elapsed := time.Since(start); elapsed > 2*time.Second {
-		t.Fatalf("the response ended after %s, want about the grace", elapsed)
-	}
-	_ = writer.Close()
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		backend := startTCPBackend(t, func(conn net.Conn) { _, _ = io.WriteString(conn, "bye") })
+		ts := defaultTimings
+		ts.eofGrace = 100 * time.Millisecond
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, ts)
+		client := v.client(t, h.addr)
+		response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
+		start := time.Now()
+		got, err := io.ReadAll(response.Body)
+		if err != nil || string(got) != "bye" {
+			t.Fatalf("response = %q, %v", got, err)
+		}
+		if elapsed := time.Since(start); elapsed > 2*time.Second {
+			t.Fatalf("the response ended after %s, want about the grace", elapsed)
+		}
+		_ = writer.Close()
+	})
 }
 
 // While the client keeps sending after the upstream half-closed, the grace keeps being renewed and nothing is lost.
 func TestClientUploadContinuesAfterUpstreamHalfClose(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	received := make(chan string, 1)
-	backend := startTCPBackend(t, func(conn net.Conn) {
-		_, _ = io.WriteString(conn, "hello")
-		if half, ok := conn.(interface{ CloseWrite() error }); ok {
-			_ = half.CloseWrite()
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		received := make(chan string, 1)
+		backend := startTCPBackend(t, func(conn net.Conn) {
+			_, _ = io.WriteString(conn, "hello")
+			if half, ok := conn.(interface{ CloseWrite() error }); ok {
+				_ = half.CloseWrite()
+			}
+			all, _ := io.ReadAll(conn)
+			received <- string(all)
+		})
+		ts := defaultTimings
+		ts.eofGrace = 300 * time.Millisecond
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, ts)
+		client := v.client(t, h.addr)
+		response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
+		want := ""
+		for i := range 8 {
+			part := "chunk" + strconv.Itoa(i)
+			want += part
+			if _, err := io.WriteString(writer, part); err != nil {
+				t.Fatalf("upload stopped at %s: %v", part, err)
+			}
+			time.Sleep(100 * time.Millisecond) // longer in total than the grace
 		}
-		all, _ := io.ReadAll(conn)
-		received <- string(all)
+		_ = writer.Close()
+		_, _ = io.Copy(io.Discard, response.Body)
+		select {
+		case got := <-received:
+			if got != want {
+				t.Fatalf("upstream received %q, want %q", got, want)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("upstream never saw the end of the upload")
+		}
 	})
-	ts := defaultTimings
-	ts.eofGrace = 300 * time.Millisecond
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, ts)
-	client := newHTTP2Client(t, h.addr)
-	response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
-	want := ""
-	for i := range 8 {
-		part := "chunk" + strconv.Itoa(i)
-		want += part
-		if _, err := io.WriteString(writer, part); err != nil {
-			t.Fatalf("upload stopped at %s: %v", part, err)
-		}
-		time.Sleep(100 * time.Millisecond) // longer in total than the grace
-	}
-	_ = writer.Close()
-	_, _ = io.Copy(io.Discard, response.Body)
-	select {
-	case got := <-received:
-		if got != want {
-			t.Fatalf("upstream received %q, want %q", got, want)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("upstream never saw the end of the upload")
-	}
 }
 
 func TestDialErrorsMapToTheClientsWarnings(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	errs := map[string]error{
-		"blocked.example:80": egress.ErrBlocked,
-		"nov4.example:80":    egress.ErrNoIPv4,
-		"refused.example:80": &net.OpError{Op: "dial", Err: errors.New("connection refused")},
-		"dns.example:80":     &net.DNSError{Err: "no such host", Name: "dns.example"},
-		"other.example:80":   errors.New("something else"),
-	}
-	outbound := &testEgress{tcpDial: func(target string) (net.Conn, error) { return nil, errs[target] }}
-	h := newHarness(t, []plugin.UserCred{alice.cred}, outbound, timings{})
-	client := newHTTP2Client(t, h.addr)
-	want := map[string]string{
-		"blocked.example:80": "310 - Destination address is blocked",
-		"nov4.example:80":    "301 - Destination is unavailable",
-		"refused.example:80": "301 - Destination is unavailable",
-		"dns.example:80":     "301 - Destination is unavailable",
-		"other.example:80":   "300 - Connection failed for some reason",
-	}
-	for target, warning := range want {
-		response, _ := client.connect(t, target, authValue(t, alice), false)
-		_ = response.Body.Close()
-		if response.StatusCode != http.StatusBadGateway || response.Header.Get("X-Warning") != warning {
-			t.Fatalf("%s = %d %q, want 502 %q", target, response.StatusCode, response.Header.Get("X-Warning"), warning)
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		errs := map[string]error{
+			"blocked.example:80": egress.ErrBlocked,
+			"nov4.example:80":    egress.ErrNoIPv4,
+			"refused.example:80": &net.OpError{Op: "dial", Err: errors.New("connection refused")},
+			"dns.example:80":     &net.DNSError{Err: "no such host", Name: "dns.example"},
+			"other.example:80":   errors.New("something else"),
 		}
-	}
+		outbound := &testEgress{tcpDial: func(target string) (net.Conn, error) { return nil, errs[target] }}
+		h := v.harness(t, []plugin.UserCred{alice.cred}, outbound, timings{})
+		client := v.client(t, h.addr)
+		want := map[string]string{
+			"blocked.example:80": "310 - Destination address is blocked",
+			"nov4.example:80":    "301 - Destination is unavailable",
+			"refused.example:80": "301 - Destination is unavailable",
+			"dns.example:80":     "301 - Destination is unavailable",
+			"other.example:80":   "300 - Connection failed for some reason",
+		}
+		for target, warning := range want {
+			response, _ := client.connect(t, target, authValue(t, alice), false)
+			_ = response.Body.Close()
+			if response.StatusCode != http.StatusBadGateway || response.Header.Get("X-Warning") != warning {
+				t.Fatalf("%s = %d %q, want 502 %q", target, response.StatusCode, response.Header.Get("X-Warning"), warning)
+			}
+		}
+	})
 }
 
 type testClock struct{ now atomic.Pointer[time.Time] }
@@ -356,28 +370,30 @@ func (c *testClock) Now() time.Time  { return *c.now.Load() }
 
 // The engine honours ValidUntil itself (HardExpiry): a tunnel open when the term ends stops at its next data.
 func TestExpiryEndsAnOpenTunnelAndRefusesNewOnes(t *testing.T) {
-	base := time.Now()
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	alice.cred.ValidUntil = base.Add(time.Minute)
-	backend := echoBackend(t)
-	clock := &testClock{}
-	clock.set(base)
-	h := newHarnessEnv(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{},
-		func(env *nodeengine.Env) { env.Now = clock.Now })
-	if !h.e.Capabilities().HardExpiry {
-		t.Fatal("the engine enforces ValidUntil but does not say so")
-	}
-	client := newHTTP2Client(t, h.addr)
-	response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
-	exchange(t, writer, response.Body, "within the term")
-	clock.set(base.Add(2 * time.Minute))
-	_, _ = io.WriteString(writer, "after the term")
-	if !endsWithin(response.Body, time.Second) {
-		t.Fatal("the tunnel outlived the credential's term")
-	}
-	if got := statusOf(t, client, "example.com:80", authValue(t, alice)); got.StatusCode != http.StatusNotFound {
-		t.Fatalf("CONNECT after the term = %d, want the decoy's answer", got.StatusCode)
-	}
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		base := time.Now()
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		alice.cred.ValidUntil = base.Add(time.Minute)
+		backend := echoBackend(t)
+		clock := &testClock{}
+		clock.set(base)
+		h := v.harnessEnv(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{},
+			func(env *nodeengine.Env) { env.Now = clock.Now })
+		if !h.e.Capabilities().HardExpiry {
+			t.Fatal("the engine enforces ValidUntil but does not say so")
+		}
+		client := v.client(t, h.addr)
+		response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
+		exchange(t, writer, response.Body, "within the term")
+		clock.set(base.Add(2 * time.Minute))
+		_, _ = io.WriteString(writer, "after the term")
+		if !endsWithin(response.Body, time.Second) {
+			t.Fatal("the tunnel outlived the credential's term")
+		}
+		if got := statusOf(t, client, "example.com:80", authValue(t, alice)); got.StatusCode != http.StatusNotFound {
+			t.Fatalf("CONNECT after the term = %d, want the decoy's answer", got.StatusCode)
+		}
+	})
 }
 
 func TestApplyReportHealthAndRemove(t *testing.T) {
@@ -421,106 +437,121 @@ func TestApplyReportHealthAndRemove(t *testing.T) {
 // Nothing a tunnel owns outlives it: not on RST_STREAM, not on a dropped connection, not on a refused or timed-out dial, not
 // on a Kick or the engine's Close. Goroutines return to where they started and every socket is closed.
 func TestNothingLeaksWhenTunnelsEndTheHardWay(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	bob := makeCredential(t, "bob", "bob", "person-bob", 0, 0)
-	backend := echoBackend(t)
-	runtime.GC()
-	time.Sleep(50 * time.Millisecond)
-	baseline := runtime.NumGoroutine()
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		bob := makeCredential(t, "bob", "bob", "person-bob", 0, 0)
+		backend := echoBackend(t)
+		runtime.GC()
+		time.Sleep(50 * time.Millisecond)
+		baseline := runtime.NumGoroutine()
 
-	var slow atomic.Bool
-	outbound := &testEgress{udpEcho: true, tcpDial: func(target string) (net.Conn, error) {
-		switch target {
-		case "blocked.example:80":
-			return nil, egress.ErrBlocked
-		case "slow.example:80":
-			time.Sleep(60 * time.Millisecond) // finishes after the connect timeout
-			slow.Store(true)
-			return net.Dial("tcp", backend.listener.Addr().String())
-		}
-		return net.Dial("tcp", backend.listener.Addr().String())
-	}}
-	ts := defaultTimings
-	ts.connect = 20 * time.Millisecond
-	ts.udpFlowIdle = time.Hour
-	h := newHarness(t, []plugin.UserCred{alice.cred, bob.cred}, outbound, ts)
-
-	clients := []*testHTTP2Client{newHTTP2Client(t, h.addr), newHTTP2Client(t, h.addr), newHTTP2Client(t, h.addr)}
-	// RST_STREAM in the middle of a transfer.
-	for range 12 {
-		response, writer := clients[0].connect(t, "example.com:80", authValue(t, alice), true)
-		_, _ = writer.Write(make([]byte, 40<<10))
-		_ = writer.CloseWithError(errors.New("reset"))
-		_ = response.Body.Close()
-	}
-	// Refused and timed-out dials.
-	for range 6 {
-		_ = statusOf(t, clients[0], "blocked.example:80", authValue(t, alice))
-		_ = statusOf(t, clients[0], "slow.example:80", authValue(t, alice))
-	}
-	// UDP streams with live flows, ended by the client.
-	for i := range 4 {
-		response, writer := clients[1].connect(t, "_udp2", authValue(t, bob), true)
-		for j := range 5 {
-			writeUDPFrame(t, writer, udpFrame("192.0.2.1", 2000+j, "192.0.2.9", 443+i, "x"))
-		}
-		_ = writer.CloseWithError(errors.New("reset"))
-		_ = response.Body.Close()
-	}
-	// Open tunnels dropped with their connection.
-	var open []*io.PipeWriter
-	for range 5 {
-		response, writer := clients[2].connect(t, "example.com:80", authValue(t, bob), true)
-		exchange(t, writer, response.Body, "alive")
-		open = append(open, writer)
-	}
-	clients[2].kill()
-	// Open tunnels ended by Kick, and a UDP stream with it.
-	response, writer := clients[0].connect(t, "example.com:80", authValue(t, alice), true)
-	exchange(t, writer, response.Body, "alive")
-	udpResponse, udpWriter := clients[0].connect(t, "_udp2", authValue(t, alice), true)
-	writeUDPFrame(t, udpWriter, udpFrame("192.0.2.1", 3000, "192.0.2.9", 443, "x"))
-	_, _ = h.e.Kick(context.Background(), []string{"alice", "bob"})
-	for _, w := range append(open, writer, udpWriter) {
-		_ = w.CloseWithError(errors.New("reset"))
-	}
-	_ = response.Body.Close()
-	_ = udpResponse.Body.Close()
-	for _, c := range clients {
-		c.kill()
-		c.close()
-	}
-
-	waitFor(t, 3*time.Second, func() bool { return backendConnections(backend) == 0 })
-	outbound.mu.Lock()
-	sockets := append([]*testUDP(nil), outbound.udpSockets...)
-	outbound.mu.Unlock()
-	waitFor(t, 3*time.Second, func() bool {
-		for _, s := range sockets {
-			if !s.isClosed.Load() {
-				return false
+		var slow atomic.Bool
+		outbound := &testEgress{udpEcho: true, tcpDial: func(target string) (net.Conn, error) {
+			switch target {
+			case "blocked.example:80":
+				return nil, egress.ErrBlocked
+			case "slow.example:80":
+				time.Sleep(60 * time.Millisecond) // finishes after the connect timeout
+				slow.Store(true)
+				return net.Dial("tcp", backend.listener.Addr().String())
 			}
+			return net.Dial("tcp", backend.listener.Addr().String())
+		}}
+		ts := defaultTimings
+		ts.connect = 20 * time.Millisecond
+		ts.udpFlowIdle = time.Hour
+		h := v.harness(t, []plugin.UserCred{alice.cred, bob.cred}, outbound, ts)
+
+		clients := []tunnelClient{v.client(t, h.addr), v.client(t, h.addr), v.client(t, h.addr)}
+		// RST_STREAM in the middle of a transfer.
+		for range 12 {
+			response, writer := clients[0].connect(t, "example.com:80", authValue(t, alice), true)
+			_, _ = writer.Write(make([]byte, 40<<10))
+			_ = writer.CloseWithError(errors.New("reset"))
+			_ = response.Body.Close()
 		}
-		return true
-	})
-	for _, name := range []string{"alice", "bob"} {
-		cs := downCounter(h, name)
+		// Refused and timed-out dials.
+		for range 6 {
+			_ = statusOf(t, clients[0], "blocked.example:80", authValue(t, alice))
+			_ = statusOf(t, clients[0], "slow.example:80", authValue(t, alice))
+		}
+		// UDP streams with live flows, ended by the client.
+		for i := range 4 {
+			response, writer := clients[1].connect(t, "_udp2", authValue(t, bob), true)
+			for j := range 5 {
+				writeUDPFrame(t, writer, udpFrame("192.0.2.1", 2000+j, "192.0.2.9", 443+i, "x"))
+			}
+			_ = writer.CloseWithError(errors.New("reset"))
+			_ = response.Body.Close()
+		}
+		// Open tunnels dropped with their connection.
+		var open []*io.PipeWriter
+		var openBodies []io.Closer // an HTTP/3 client keeps a goroutine per response until its body is closed
+		for range 5 {
+			response, writer := clients[2].connect(t, "example.com:80", authValue(t, bob), true)
+			exchange(t, writer, response.Body, "alive")
+			open = append(open, writer)
+			openBodies = append(openBodies, response.Body)
+		}
+		clients[2].kill()
+		// Open tunnels ended by Kick, and a UDP stream with it.
+		response, writer := clients[0].connect(t, "example.com:80", authValue(t, alice), true)
+		exchange(t, writer, response.Body, "alive")
+		udpResponse, udpWriter := clients[0].connect(t, "_udp2", authValue(t, alice), true)
+		writeUDPFrame(t, udpWriter, udpFrame("192.0.2.1", 3000, "192.0.2.9", 443, "x"))
+		_, _ = h.e.Kick(context.Background(), []string{"alice", "bob"})
+		for _, w := range append(open, writer, udpWriter) {
+			_ = w.CloseWithError(errors.New("reset"))
+		}
+		_ = response.Body.Close()
+		_ = udpResponse.Body.Close()
+		for _, body := range openBodies {
+			_ = body.Close()
+		}
+		for _, c := range clients {
+			c.kill()
+			c.close()
+		}
+
+		waitFor(t, 3*time.Second, func() bool { return backendConnections(backend) == 0 })
+		outbound.mu.Lock()
+		sockets := append([]*testUDP(nil), outbound.udpSockets...)
+		outbound.mu.Unlock()
 		waitFor(t, 3*time.Second, func() bool {
-			cs.mu.Lock()
-			defer cs.mu.Unlock()
-			return cs.active == 0 && len(cs.streams) == 0 && len(cs.connections) == 0
+			for _, s := range sockets {
+				if !s.isClosed.Load() {
+					return false
+				}
+			}
+			return true
 		})
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := h.e.Close(ctx); err != nil {
-		t.Fatal(err)
-	}
-	http.DefaultTransport.(*http.Transport).CloseIdleConnections()
-	waitFor(t, 5*time.Second, func() bool { return runtime.NumGoroutine() <= baseline+2 })
-	if !slow.Load() {
-		t.Fatal("the slow dial never ran: the test did not exercise the late-dial path")
-	}
+		for _, name := range []string{"alice", "bob"} {
+			cs := downCounter(h, name)
+			waitFor(t, 3*time.Second, func() bool {
+				cs.mu.Lock()
+				defer cs.mu.Unlock()
+				return cs.active == 0 && len(cs.streams) == 0 && len(cs.connections) == 0
+			})
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := h.e.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+		http.DefaultTransport.(*http.Transport).CloseIdleConnections()
+		deadline := time.Now().Add(5 * time.Second)
+		for runtime.NumGoroutine() > baseline+2 && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if got := runtime.NumGoroutine(); got > baseline+2 {
+			var stacks bytes.Buffer
+			_ = pprof.Lookup("goroutine").WriteTo(&stacks, 1)
+			t.Fatalf("goroutines = %d, baseline %d:\n%s", got, baseline, stacks.String())
+		}
+		if !slow.Load() {
+			t.Fatal("the slow dial never ran: the test did not exercise the late-dial path")
+		}
+	})
 }
 
 // The listener of a tunnel port sends the SETTINGS and window of any other site of the node (bridge, Hysteria2's decoy,

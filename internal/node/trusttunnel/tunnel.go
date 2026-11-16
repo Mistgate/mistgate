@@ -16,18 +16,19 @@ import (
 
 const (
 	tunnelBufferSize = 32 << 10
-	// maxCredentialConnections is how many HTTP/2 connections one credential may hold at once. A connection counts for every
-	// credential that has a tunnel on it.
+	// maxCredentialConnections is how many HTTP/2 or HTTP/3 connections one credential may hold at once. A connection counts
+	// for every credential that has a tunnel on it.
 	maxCredentialConnections = 16
 )
 
 var tunnelBuffers = sync.Pool{New: func() any { return make([]byte, tunnelBufferSize) }}
 
-// connectionState is one authenticated HTTP/2 connection. Every CONNECT is authorized on its own, so a connection can carry
-// tunnels of several credentials; it lives as long as any installed credential still has a place on it.
+// connectionState is one authenticated HTTP/2 or HTTP/3 connection. Every CONNECT is authorized on its own, so a connection
+// can carry tunnels of several credentials; it lives as long as any installed credential still has a place on it.
 type connectionState struct {
-	in   *inbound
-	conn net.Conn
+	in        *inbound
+	key       any
+	closeConn func()
 
 	mu          sync.Mutex
 	closed      bool
@@ -48,37 +49,54 @@ type streamState struct {
 	cred *credState
 	body io.ReadCloser
 	w    http.ResponseWriter
+	out  io.Writer
 	rc   *http.ResponseController
 	ctx  context.Context
+	h3   bool
 
-	cancel context.CancelFunc
-	once   sync.Once
-	mu     sync.Mutex
-	up     net.Conn
-	clean  func()
-	done   bool // the handler is returning: the ResponseWriter is not to be used any more
-	reset  bool
+	cancel         context.CancelFunc
+	once           sync.Once
+	mu             sync.Mutex
+	up             net.Conn
+	clean          func()
+	done           bool // the handler is returning: the ResponseWriter is not to be used any more
+	reset          bool
+	rawH3          bool
+	abortTransport func()
+	closeTransport func()
 }
 
 func (in *inbound) beginStream(r *http.Request, w http.ResponseWriter, conn net.Conn, cs *credState) (*streamState, bool) {
 	if conn == nil {
 		return nil, false
 	}
+	return in.beginStreamOnConn(r, w, conn, func() { _ = conn.Close() }, w, cs)
+}
+
+func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key any, closeConn func(), out io.Writer, cs *credState) (*streamState, bool) {
+	if key == nil || r.Context().Err() != nil {
+		return nil, false
+	}
 	in.connMu.Lock()
-	connection := in.conns[conn]
+	if r.Context().Err() != nil {
+		in.connMu.Unlock()
+		return nil, false
+	}
+	connection := in.conns[key]
 	if connection == nil {
 		connection = &connectionState{
-			in: in, conn: conn, streams: make(map[*streamState]struct{}),
+			in: in, key: key, closeConn: closeConn, streams: make(map[*streamState]struct{}),
 			credentials: make(map[*credState]time.Time), banned: make(map[*credState]struct{}),
 			udp: make(map[*credState]*streamState),
 		}
-		in.conns[conn] = connection
+		in.conns[key] = connection
 	}
 	in.connMu.Unlock()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	stream := &streamState{
-		in: in, conn: connection, cred: cs, body: r.Body, w: w, rc: http.NewResponseController(w), ctx: ctx, cancel: cancel,
+		in: in, conn: connection, cred: cs, body: r.Body, w: w, out: out, rc: http.NewResponseController(w), ctx: ctx,
+		h3: r.ProtoMajor == 3, cancel: cancel,
 	}
 	connection.mu.Lock()
 	if _, banned := connection.banned[cs]; banned || connection.closed || connection.expiring {
@@ -138,7 +156,7 @@ func (in *inbound) finishStream(stream *streamState) {
 			}
 			connection.mu.Unlock()
 			if expire {
-				in.closeConnection(connection.conn)
+				in.closeConnection(connection.key)
 			}
 		})
 	}
@@ -152,15 +170,17 @@ func (in *inbound) finishStream(stream *streamState) {
 	stream.cred.mu.Unlock()
 }
 
-func (in *inbound) closeConnection(conn net.Conn) {
+func (in *inbound) closeConnection(key any) {
 	in.connMu.Lock()
-	connection := in.conns[conn]
-	delete(in.conns, conn)
+	connection := in.conns[key]
+	delete(in.conns, key)
 	in.connMu.Unlock()
 	if connection != nil {
 		connection.shutdown()
+		if connection.closeConn != nil {
+			connection.closeConn()
+		}
 	}
-	_ = conn.Close()
 }
 
 func (connection *connectionState) shutdown() {
@@ -251,7 +271,7 @@ func (connection *connectionState) detach(credential *credState) bool {
 		stream.abort()
 	}
 	if !keepConnection {
-		connection.in.closeConnection(connection.conn)
+		connection.in.closeConnection(connection.key)
 	}
 	return true
 }
@@ -302,16 +322,22 @@ func (stream *streamState) setCleanup(clean func()) {
 }
 
 // abort ends the stream by force, from any goroutine and any number of times: its sockets and reads are closed, and a write
-// stuck on a client that stopped reading is failed by resetting the HTTP/2 stream (closing the body does not free it).
+// stuck on a client that stopped reading is failed by resetting only this HTTP/2 or HTTP/3 stream.
 func (stream *streamState) abort() {
-	stream.free()
 	stream.mu.Lock()
 	if !stream.done && !stream.reset {
 		stream.reset = true
-		// A deadline in the past resets the stream at once; x/net does it before returning.
-		_ = stream.rc.SetWriteDeadline(time.Unix(1, 0))
+		if stream.abortTransport != nil {
+			stream.abortTransport()
+		} else if !stream.h3 {
+			// A deadline in the past resets an HTTP/2 stream at once; x/net does it before returning. An HTTP/3 stream whose
+			// response has not started is reset by the handler (endedBeforeResponse), never by a failed write: the library
+			// would still end it with a bare FIN, which the client takes for a protocol error of the whole connection.
+			_ = stream.rc.SetWriteDeadline(time.Unix(1, 0))
+		}
 	}
 	stream.mu.Unlock()
+	stream.free()
 }
 
 // release is the soft end, from the handler: the response finishes normally. It never touches the ResponseWriter, and after
@@ -319,8 +345,31 @@ func (stream *streamState) abort() {
 func (stream *streamState) release() {
 	stream.mu.Lock()
 	stream.done = true
+	closeTransport := stream.closeTransport
+	stream.closeTransport = nil
 	stream.mu.Unlock()
 	stream.free()
+	if closeTransport != nil {
+		closeTransport()
+	}
+}
+
+// endedBeforeResponse reports an HTTP/3 stream that was aborted while its response had not been taken over: the handler
+// must end it with http.ErrAbortHandler, which the library turns into RESET_STREAM and not into a bare FIN.
+func (stream *streamState) endedBeforeResponse() bool {
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	return stream.h3 && stream.reset && !stream.rawH3
+}
+
+func (stream *streamState) useHTTP3(out io.Writer, abort, closeTransport func()) {
+	stream.mu.Lock()
+	stream.out, stream.rawH3 = out, true
+	stream.abortTransport, stream.closeTransport = abort, closeTransport
+	if stream.reset && abort != nil {
+		abort()
+	}
+	stream.mu.Unlock()
 }
 
 func (stream *streamState) free() {
@@ -351,6 +400,9 @@ func (stream *streamState) clearDeadlines() error {
 }
 
 func (stream *streamState) flush() error {
+	if stream.rawH3 {
+		return nil
+	}
 	if err := stream.rc.Flush(); err == nil {
 		return nil
 	} else if !errors.Is(err, http.ErrNotSupported) {
@@ -376,6 +428,9 @@ func (in *inbound) serveTCP(w http.ResponseWriter, stream *streamState, authorit
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+	if err := stream.startHTTP3(); err != nil {
+		return
+	}
 	if err := stream.flush(); err != nil {
 		return
 	}
@@ -519,7 +574,7 @@ func copyDownload(stream *streamState, src net.Conn, activity chan<- struct{}) c
 				!ratelimit.WaitDown(stream.ctx, stream.cred.limit.Load(), stream.cred.person.Load(), uint64(n)) {
 				return copyResult{err: context.Canceled}
 			}
-			written, err := stream.w.Write(buffer[:n])
+			written, err := stream.out.Write(buffer[:n])
 			stream.cred.down.Add(uint64(written))
 			if written > 0 {
 				signalActivity(activity)

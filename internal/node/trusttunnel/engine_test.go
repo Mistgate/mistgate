@@ -1082,40 +1082,59 @@ func TestQuietTunnelOutlivesSiteWriteTimeout(t *testing.T) {
 }
 
 func TestAuthenticatedIdleConnectionClosesAfterInjectedTimeout(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	ts := defaultTimings
-	ts.connectionIdle = 25 * time.Millisecond
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, ts)
-	client := newHTTP2Client(t, h.addr)
-	response, _ := client.connect(t, "_check", authValue(t, alice), false)
-	_ = response.Body.Close()
-	waitFor(t, time.Second, func() bool { return authenticatedConnectionCount(h.in) == 0 })
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		ts := defaultTimings
+		ts.connectionIdle = 25 * time.Millisecond
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{}, ts)
+		client := v.client(t, h.addr)
+		response, _ := client.connect(t, "_check", authValue(t, alice), false)
+		_ = response.Body.Close()
+		waitFor(t, time.Second, func() bool { return authenticatedConnectionCount(h.in) == 0 })
+	})
+}
+
+// A connection whose last tunnel ended stays for the connection idle time, so the client's next request reuses it.
+func TestAuthenticatedIdleConnectionStaysUntilTheIdleTime(t *testing.T) {
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+		client := v.client(t, h.addr)
+		response, _ := client.connect(t, "_check", authValue(t, alice), false)
+		_ = response.Body.Close()
+		time.Sleep(300 * time.Millisecond)
+		if n := authenticatedConnectionCount(h.in); n != 1 {
+			t.Fatalf("authenticated connections after 300 ms of idle = %d, want the one still kept", n)
+		}
+	})
 }
 
 func TestTCPStreamIdleTimeoutClosesTheTunnel(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	peerReady := make(chan net.Conn, 1)
-	outbound := &testEgress{tcpDial: func(string) (net.Conn, error) {
-		server, client := net.Pipe()
-		peerReady <- client
-		return server, nil
-	}}
-	ts := defaultTimings
-	ts.streamIdle, ts.connectionIdle = 30*time.Millisecond, time.Second
-	h := newHarness(t, []plugin.UserCred{alice.cred}, outbound, ts)
-	client := newHTTP2Client(t, h.addr)
-	response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
-	_ = writer
-	peer := <-peerReady
-	defer peer.Close()
-	_ = peer.SetReadDeadline(time.Now().Add(time.Second))
-	if _, err := io.ReadAll(response.Body); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := peer.Read(make([]byte, 1)); err == nil {
-		t.Fatal("upstream socket stayed open after the stream idle timeout")
-	}
-	_ = response.Body.Close()
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		peerReady := make(chan net.Conn, 1)
+		outbound := &testEgress{tcpDial: func(string) (net.Conn, error) {
+			server, client := net.Pipe()
+			peerReady <- client
+			return server, nil
+		}}
+		ts := defaultTimings
+		ts.streamIdle, ts.connectionIdle = 30*time.Millisecond, time.Second
+		h := v.harness(t, []plugin.UserCred{alice.cred}, outbound, ts)
+		client := v.client(t, h.addr)
+		response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
+		_ = writer
+		peer := <-peerReady
+		defer peer.Close()
+		_ = peer.SetReadDeadline(time.Now().Add(time.Second))
+		if _, err := io.ReadAll(response.Body); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := peer.Read(make([]byte, 1)); err == nil {
+			t.Fatal("upstream socket stayed open after the stream idle timeout")
+		}
+		_ = response.Body.Close()
+	})
 }
 
 func TestSixteenConnectionCredentialLimit(t *testing.T) {
@@ -1170,19 +1189,21 @@ func TestRateLimitPersonBucketWithinTenPercent(t *testing.T) {
 }
 
 func TestResetStreamLeavesNoCopyGoroutine(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	backend := echoBackend(t)
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
-	client := newHTTP2Client(t, h.addr)
-	response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
-	baseline := runtime.NumGoroutine()
-	if _, err := writer.Write(make([]byte, 32<<10)); err != nil {
-		t.Fatal(err)
-	}
-	_ = writer.CloseWithError(errors.New("test stream reset"))
-	_ = response.Body.Close()
-	client.close()
-	waitFor(t, time.Second, func() bool { return runtime.NumGoroutine() <= baseline+1 })
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		backend := echoBackend(t)
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
+		client := v.client(t, h.addr)
+		response, writer := client.connect(t, "example.com:80", authValue(t, alice), true)
+		baseline := runtime.NumGoroutine()
+		if _, err := writer.Write(make([]byte, 32<<10)); err != nil {
+			t.Fatal(err)
+		}
+		_ = writer.CloseWithError(errors.New("test stream reset"))
+		_ = response.Body.Close()
+		client.close()
+		waitFor(t, time.Second, func() bool { return runtime.NumGoroutine() <= baseline+1 })
+	})
 }
 
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
@@ -1253,32 +1274,34 @@ func mustAddrPort(value string) netip.AddrPort {
 // A credential that Apply keeps is shared with the handlers that are authenticating against it: Apply writes nothing but
 // its atomics (run under -race: a rewrite of the user name or the hash is a data race).
 func TestApplyOfTheSameCredentialsWhileConnectsAreInFlight(t *testing.T) {
-	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
-	client := newHTTP2Client(t, h.addr)
-	stop := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-stop:
-				return
-			default:
+	forEachTransport(t, func(t *testing.T, v transportKind) {
+		alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+		h := v.harness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+		client := v.client(t, h.addr)
+		stop := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				if got := statusOf(t, client, "_check", authValue(t, alice)); got.StatusCode != http.StatusOK {
+					t.Errorf("_check during Apply = %d", got.StatusCode)
+					return
+				}
 			}
-			if got := statusOf(t, client, "_check", authValue(t, alice)); got.StatusCode != http.StatusOK {
-				t.Errorf("_check during Apply = %d", got.StatusCode)
-				return
+		}()
+		for range 40 {
+			if _, err := h.e.Apply(context.Background(), h.spec, []plugin.UserCred{alice.cred}); err != nil {
+				t.Error(err)
+				break
 			}
+			time.Sleep(time.Millisecond)
 		}
-	}()
-	for range 40 {
-		if _, err := h.e.Apply(context.Background(), h.spec, []plugin.UserCred{alice.cred}); err != nil {
-			t.Error(err)
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
-	close(stop)
-	<-done
+		close(stop)
+		<-done
+	})
 }

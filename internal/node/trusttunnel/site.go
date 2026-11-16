@@ -5,9 +5,12 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 
+	"github.com/apernet/quic-go"
+	"github.com/apernet/quic-go/http3"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/sitehttp"
@@ -22,7 +25,9 @@ var noUser [sha256.Size]byte
 var passwordDigest = func(password string) [sha256.Size]byte { return sha256.Sum256([]byte(password)) }
 
 func (in *inbound) serveHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.ProtoMajor != 2 || r.Method != http.MethodConnect {
+	isH2 := r.ProtoMajor == 2
+	isH3 := r.ProtoMajor == 3 && in.h3Enabled
+	if (!isH2 && !isH3) || r.Method != http.MethodConnect {
 		in.serveMasquerade(w, r)
 		return
 	}
@@ -51,13 +56,39 @@ func (in *inbound) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Every CONNECT is authorized on its own: one HTTP/2 connection can carry the tunnels of several credentials.
-	stream, ok := in.beginStream(r, w, sitehttp.Conn(r.Context()), cs)
+	var key any
+	var closeConn func()
+	if isH2 {
+		conn := sitehttp.Conn(r.Context())
+		key = conn
+		if conn != nil {
+			closeConn = func() { _ = conn.Close() }
+		}
+	} else {
+		conn := h3ConnFromContext(r.Context())
+		key = conn
+		if conn != nil {
+			closeConn = func() {
+				_ = conn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeNoError), "")
+			}
+		}
+	}
+	stream, ok := in.beginStreamOnConn(r, w, key, closeConn, w, cs)
 	if !ok {
 		in.serveMasquerade(w, r)
 		return
 	}
 	defer in.finishStream(stream)
-	sitehttp.MarkAuthenticated(r.Context())
+	defer func() {
+		if stream.endedBeforeResponse() {
+			panic(http.ErrAbortHandler)
+		}
+	}()
+	if isH3 {
+		in.h3Anonymous.MarkAuthenticated(key)
+	} else {
+		sitehttp.MarkAuthenticated(r.Context())
+	}
 	// The site's Read/WriteTimeout belong to its pages. They would end a tunnel (and its own connect timeout) after 30 s,
 	// so they go first, before anything is dialled.
 	if stream.clearDeadlines() != nil {
@@ -96,6 +127,9 @@ func (in *inbound) masquerade() http.Handler {
 
 // serveMasquerade answers as the site does. The credential header never reaches the site's handler.
 func (in *inbound) serveMasquerade(w http.ResponseWriter, r *http.Request) {
+	if in.h3Enabled && r.ProtoMajor < 3 {
+		w.Header().Set("Alt-Svc", fmt.Sprintf(`h3=":%d"; ma=2592000`, in.spec.Listen.Port))
+	}
 	request := r.Clone(r.Context())
 	request.Header = r.Header.Clone()
 	request.Header.Del("Proxy-Authorization")

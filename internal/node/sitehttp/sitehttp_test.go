@@ -33,19 +33,17 @@ func fakeSource(ip string) *fakeConn {
 	return &fakeConn{addr: &net.TCPAddr{IP: net.ParseIP(ip), Port: 40000}}
 }
 
-func closeAll(victims []net.Conn) {
-	for _, v := range victims {
-		_ = v.Close()
-	}
+func addFake(l *AnonymousLimiter, c *fakeConn) {
+	l.Add(c, c.RemoteAddr(), func() { _ = c.Close() })
 }
 
 func TestLimiterEvictsTheBusiestSourceAndSparesProvenConnections(t *testing.T) {
-	l := &connectionLimiter{anonymous: map[net.Conn]siteConn{}}
+	l := NewAnonymousLimiter()
 	var scanner []*fakeConn
 	for i := 0; i < 3*maxAnonymousPerSource; i++ {
 		c := fakeSource("198.51.100.7")
 		scanner = append(scanner, c)
-		closeAll(l.add(c))
+		addFake(l, c)
 	}
 	live := 0
 	for _, c := range scanner {
@@ -65,23 +63,29 @@ func TestLimiterEvictsTheBusiestSourceAndSparesProvenConnections(t *testing.T) {
 
 	// Four more sources fill the whole set; a fifth source still gets in, at the cost of the busiest source's oldest.
 	for i := 0; len(l.anonymous) < maxAnonymousConnections; i++ {
-		closeAll(l.add(fakeSource(fmt.Sprintf("203.0.113.%d", 1+i%4))))
+		addFake(l, fakeSource(fmt.Sprintf("203.0.113.%d", 1+i%4)))
 	}
 	client := fakeSource("192.0.2.1")
-	victims := l.add(client)
-	if len(victims) != 1 || len(l.anonymous) != maxAnonymousConnections {
-		t.Fatalf("a connection at the limit evicted %d, set size %d", len(victims), len(l.anonymous))
+	addFake(l, client)
+	if len(l.anonymous) != maxAnonymousConnections {
+		t.Fatalf("a connection at the limit left set size %d", len(l.anonymous))
 	}
 	if client.closed.Load() {
 		t.Fatal("the new connection was refused")
 	}
-	if source := victims[0].(*fakeConn).addr.(*net.TCPAddr).IP.String(); source != "198.51.100.7" {
-		t.Fatalf("evicted a connection of %s, want the busiest source", source)
+	var closedScanner int
+	for _, c := range scanner {
+		if c.closed.Load() {
+			closedScanner++
+		}
+	}
+	if closedScanner != len(scanner)-maxAnonymousPerSource+1 || !scanner[len(scanner)-maxAnonymousPerSource].closed.Load() || scanner[len(scanner)-maxAnonymousPerSource+1].closed.Load() {
+		t.Fatalf("total-limit eviction closed %d scanner connections, want its oldest remaining connection", closedScanner)
 	}
 	// The client proves itself: it leaves the set, and no later flood can evict it.
-	l.remove(client)
+	l.MarkAuthenticated(client)
 	for i := 0; i < 500; i++ {
-		closeAll(l.add(fakeSource(fmt.Sprintf("100.64.%d.%d", i/200, i%200+1))))
+		addFake(l, fakeSource(fmt.Sprintf("100.64.%d.%d", i/200, i%200+1)))
 	}
 	if client.closed.Load() {
 		t.Fatal("a proven connection was evicted by anonymous traffic")
@@ -92,12 +96,12 @@ func TestLimiterEvictsTheBusiestSourceAndSparesProvenConnections(t *testing.T) {
 }
 
 func TestLimiterGroupsIPv6ByItsSlash64AndIPv4MappedWithIPv4(t *testing.T) {
-	l := &connectionLimiter{anonymous: map[net.Conn]siteConn{}}
+	l := NewAnonymousLimiter()
 	var conns []*fakeConn
 	for i := 0; i < maxAnonymousPerSource+3; i++ {
 		c := fakeSource(fmt.Sprintf("2001:db8:1:2:%x::1", i+1)) // one /64, a different address each time
 		conns = append(conns, c)
-		closeAll(l.add(c))
+		addFake(l, c)
 	}
 	live := 0
 	for _, c := range conns {
@@ -108,18 +112,54 @@ func TestLimiterGroupsIPv6ByItsSlash64AndIPv4MappedWithIPv4(t *testing.T) {
 	if live != maxAnonymousPerSource {
 		t.Fatalf("a /64 holds %d anonymous connections, want %d", live, maxAnonymousPerSource)
 	}
-	if connSource(fakeSource("::ffff:192.0.2.9")) != connSource(fakeSource("192.0.2.9")) {
+	if connSource(fakeSource("::ffff:192.0.2.9").RemoteAddr()) != connSource(fakeSource("192.0.2.9").RemoteAddr()) {
 		t.Fatal("an IPv4-mapped address is a different source than its IPv4 address")
 	}
 }
 
+func TestLimiterGroupsUDPConnectionsByIPv4AndIPv6Slash64(t *testing.T) {
+	l := NewAnonymousLimiter()
+	var ipv6 []*fakeConn
+	for i := 0; i < maxAnonymousPerSource+3; i++ {
+		c := &fakeConn{addr: &net.UDPAddr{IP: net.ParseIP(fmt.Sprintf("2001:db8:1:2:%x::1", i+1)), Port: 40000 + i}}
+		ipv6 = append(ipv6, c)
+		addFake(l, c)
+	}
+	live := 0
+	for _, c := range ipv6 {
+		if !c.closed.Load() {
+			live++
+		}
+	}
+	if live != maxAnonymousPerSource {
+		t.Fatalf("UDP connections from one IPv6 /64 alive = %d, want %d", live, maxAnonymousPerSource)
+	}
+
+	l = NewAnonymousLimiter()
+	var ipv4 []*fakeConn
+	for i := 0; i < maxAnonymousPerSource+2; i++ {
+		c := &fakeConn{addr: &net.UDPAddr{IP: net.ParseIP("192.0.2.7"), Port: 41000 + i}}
+		ipv4 = append(ipv4, c)
+		addFake(l, c)
+	}
+	live = 0
+	for _, c := range ipv4 {
+		if !c.closed.Load() {
+			live++
+		}
+	}
+	if live != maxAnonymousPerSource {
+		t.Fatalf("UDP connections from one IPv4 address alive = %d, want %d", live, maxAnonymousPerSource)
+	}
+}
+
 func TestLimiterSourcesWithoutAnAddressShareOneKeyAndOnlyTheTotalLimitApplies(t *testing.T) {
-	l := &connectionLimiter{anonymous: map[net.Conn]siteConn{}}
+	l := NewAnonymousLimiter()
 	var conns []*fakeConn
 	for i := 0; i < maxAnonymousConnections+5; i++ {
 		c := &fakeConn{addr: &net.UnixAddr{Name: "x", Net: "unix"}}
 		conns = append(conns, c)
-		closeAll(l.add(c))
+		addFake(l, c)
 	}
 	live := 0
 	for _, c := range conns {
@@ -275,5 +315,35 @@ func TestConnAndMarkAuthenticatedThroughARealServer(t *testing.T) {
 func TestNilServerIsAnError(t *testing.T) {
 	if err := ConfigureSiteHTTP2(nil); err == nil {
 		t.Fatal("ConfigureSiteHTTP2(nil) returned no error")
+	}
+}
+
+func TestLimiterIsCrowdedFromHalfFullAndNotForProvenConnections(t *testing.T) {
+	l := NewAnonymousLimiter()
+	if l.Crowded() {
+		t.Fatal("an empty set is crowded")
+	}
+	var conns []*fakeConn
+	for i := 0; i < maxAnonymousConnections/2; i++ {
+		c := fakeSource(fmt.Sprintf("203.0.113.%d", 1+i)) // a source of its own each, so only the total counts
+		conns = append(conns, c)
+		if i < maxAnonymousConnections/2-1 && l.Crowded() {
+			t.Fatalf("%d connections already count as crowded", i)
+		}
+		addFake(l, c)
+	}
+	if !l.Crowded() {
+		t.Fatalf("%d anonymous connections do not count as crowded", maxAnonymousConnections/2)
+	}
+	l.MarkAuthenticated(conns[0])
+	if l.Crowded() {
+		t.Fatal("a connection that proved itself still counts towards the crowd")
+	}
+}
+
+// The limits are the site's contract (32 anonymous connections, 8 from one source), not a figure a test can follow.
+func TestAnonymousLimitsAreThoseOfTheSite(t *testing.T) {
+	if maxAnonymousConnections != 32 || maxAnonymousPerSource != 8 {
+		t.Fatalf("limits = %d total, %d per source, want 32 and 8", maxAnonymousConnections, maxAnonymousPerSource)
 	}
 }

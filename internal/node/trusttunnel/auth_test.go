@@ -48,7 +48,7 @@ func endsWithin(body io.Reader, d time.Duration) bool {
 	}
 }
 
-func statusOf(t *testing.T, client *testHTTP2Client, authority, auth string) *http.Response {
+func statusOf(t *testing.T, client tunnelClient, authority, auth string) *http.Response {
 	t.Helper()
 	response, _ := client.connect(t, authority, auth, false)
 	_, _ = io.Copy(io.Discard, response.Body)

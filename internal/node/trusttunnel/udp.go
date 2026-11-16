@@ -48,6 +48,9 @@ func (in *inbound) serveUDP(w http.ResponseWriter, r *http.Request, stream *stre
 		previous.abort()
 	}
 	w.WriteHeader(http.StatusOK)
+	if err := stream.startHTTP3(); err != nil {
+		return
+	}
 	if stream.flush() != nil {
 		return
 	}
@@ -350,7 +353,7 @@ func (tunnel *udpTunnel) writeLoop(done chan<- struct{}) {
 		if failed {
 			continue
 		}
-		n, err := stream.w.Write(item.frame)
+		n, err := stream.out.Write(item.frame)
 		if err == nil && n != len(item.frame) {
 			err = io.ErrShortWrite
 		}

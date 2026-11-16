@@ -1,8 +1,6 @@
-// Package sitehttp holds the HTTP/2 settings and the anonymous-connection limit that every HTTPS site of a node shares.
-// The settings are part of what a scanner can measure, so all sites must answer alike: change them here, never in one
-// caller. The code is the bridge's site limiter (internal/node/bridge/site.go) moved into a package of its own, with the
-// same numbers and the same eviction rule, so that a TrustTunnel port and a bridge port cannot be told apart by their
-// SETTINGS or by how they behave under a flood.
+// Package sitehttp holds the HTTP/2 settings and the anonymous-connection limit shared by HTTPS listeners. The settings
+// are part of what a scanner can measure, so all HTTP/2 sites must answer alike: change them here, never in one caller.
+// The reusable limiter applies the same source grouping and eviction rule to TCP and QUIC connections.
 package sitehttp
 
 import (
@@ -42,7 +40,7 @@ func ConfigureSiteHTTP2(server *http.Server) error {
 	}
 	previous := server.ConnState
 	previousContext := server.ConnContext
-	limiter := &connectionLimiter{anonymous: map[net.Conn]siteConn{}}
+	limiter := NewAnonymousLimiter()
 	server.ConnContext = func(ctx context.Context, conn net.Conn) context.Context {
 		if previousContext != nil {
 			ctx = previousContext(ctx, conn)
@@ -52,11 +50,9 @@ func ConfigureSiteHTTP2(server *http.Server) error {
 	server.ConnState = func(conn net.Conn, state http.ConnState) {
 		switch state {
 		case http.StateNew:
-			for _, victim := range limiter.add(conn) {
-				_ = victim.Close()
-			}
+			limiter.Add(conn, conn.RemoteAddr(), func() { _ = conn.Close() })
 		case http.StateClosed, http.StateHijacked:
-			limiter.remove(conn)
+			limiter.Remove(conn)
 		}
 		if previous != nil {
 			previous(conn, state)
@@ -66,7 +62,7 @@ func ConfigureSiteHTTP2(server *http.Server) error {
 }
 
 type connRef struct {
-	limiter *connectionLimiter
+	limiter *AnonymousLimiter
 	conn    net.Conn
 }
 
@@ -83,47 +79,97 @@ func MarkAuthenticated(ctx context.Context) net.Conn {
 	if !ok {
 		return nil
 	}
-	ref.limiter.remove(ref.conn)
+	ref.limiter.MarkAuthenticated(ref.conn)
 	return ref.conn
 }
 
 type siteConn struct {
 	seq    uint64
 	source string
+	close  func()
 }
 
-type connectionLimiter struct {
+// AnonymousLimiter bounds connections that have not yet authenticated. Keys must be comparable and stable for the life of
+// a connection. An authenticated key is removed from the set permanently until Remove is called when the connection ends.
+// Add closes evicted connections after releasing the limiter lock.
+type AnonymousLimiter struct {
 	mu        sync.Mutex
 	seq       uint64
-	anonymous map[net.Conn]siteConn
+	anonymous map[any]siteConn
+	proven    map[any]struct{}
 }
 
-// add records a new anonymous connection and returns the connections to close to stay within the limits.
-func (l *connectionLimiter) add(conn net.Conn) []net.Conn {
-	source := connSource(conn)
+// NewAnonymousLimiter creates an empty limiter with the site-wide limits and eviction order.
+func NewAnonymousLimiter() *AnonymousLimiter {
+	return &AnonymousLimiter{anonymous: map[any]siteConn{}, proven: map[any]struct{}{}}
+}
+
+// Add records a new anonymous connection. It closes the oldest connection of the busiest source when the total limit is
+// full, and closes a source's oldest connection when that source exceeds its own limit.
+func (l *AnonymousLimiter) Add(key any, addr net.Addr, closeConn func()) {
+	if key == nil {
+		return
+	}
+	if closeConn == nil {
+		closeConn = func() {}
+	}
+	source := connSource(addr)
 	l.mu.Lock()
-	defer l.mu.Unlock()
-	var victims []net.Conn
+	if _, ok := l.proven[key]; ok {
+		l.mu.Unlock()
+		return
+	}
+	if _, ok := l.anonymous[key]; ok {
+		l.mu.Unlock()
+		return
+	}
+	var victims []func()
 	if source != "" {
 		for l.count(source) >= maxAnonymousPerSource {
-			victims = append(victims, l.evictOldest(source))
+			if closeVictim := l.evictOldest(source); closeVictim != nil {
+				victims = append(victims, closeVictim)
+			}
 		}
 	}
 	for len(l.anonymous) >= maxAnonymousConnections {
-		victims = append(victims, l.evictOldest(l.busiestSource()))
+		if closeVictim := l.evictOldest(l.busiestSource()); closeVictim != nil {
+			victims = append(victims, closeVictim)
+		}
 	}
 	l.seq++
-	l.anonymous[conn] = siteConn{seq: l.seq, source: source}
-	return victims
+	l.anonymous[key] = siteConn{seq: l.seq, source: source, close: closeConn}
+	l.mu.Unlock()
+	for _, closeVictim := range victims {
+		closeVictim()
+	}
 }
 
-func (l *connectionLimiter) remove(conn net.Conn) {
+// Crowded reports that the anonymous set is at least half full: the site is being scanned or flooded.
+func (l *AnonymousLimiter) Crowded() bool {
 	l.mu.Lock()
-	delete(l.anonymous, conn)
+	defer l.mu.Unlock()
+	return len(l.anonymous) >= maxAnonymousConnections/2
+}
+
+// MarkAuthenticated removes key from the anonymous set and keeps it out until Remove observes the connection closing.
+func (l *AnonymousLimiter) MarkAuthenticated(key any) {
+	l.mu.Lock()
+	if _, tracked := l.anonymous[key]; tracked {
+		delete(l.anonymous, key)
+		l.proven[key] = struct{}{}
+	}
 	l.mu.Unlock()
 }
 
-func (l *connectionLimiter) count(source string) int {
+// Remove forgets a connection after it closes.
+func (l *AnonymousLimiter) Remove(key any) {
+	l.mu.Lock()
+	delete(l.anonymous, key)
+	delete(l.proven, key)
+	l.mu.Unlock()
+}
+
+func (l *AnonymousLimiter) count(source string) int {
 	n := 0
 	for _, c := range l.anonymous {
 		if c.source == source {
@@ -134,7 +180,7 @@ func (l *connectionLimiter) count(source string) int {
 }
 
 // busiestSource is the source with the most anonymous connections; the one with the oldest connection wins a tie.
-func (l *connectionLimiter) busiestSource() string {
+func (l *AnonymousLimiter) busiestSource() string {
 	counts := map[string]int{}
 	oldest := map[string]uint64{}
 	for _, c := range l.anonymous {
@@ -152,26 +198,40 @@ func (l *connectionLimiter) busiestSource() string {
 	return best
 }
 
-func (l *connectionLimiter) evictOldest(source string) net.Conn {
-	var victim net.Conn
+func (l *AnonymousLimiter) evictOldest(source string) func() {
+	var victim any
 	var oldest uint64
 	for conn, c := range l.anonymous {
 		if c.source == source && (victim == nil || c.seq < oldest) {
 			victim, oldest = conn, c.seq
 		}
 	}
+	if victim == nil {
+		return nil
+	}
+	closeConn := l.anonymous[victim].close
 	delete(l.anonymous, victim)
-	return victim
+	return closeConn
 }
 
 // connSource names where a connection comes from: the address (an IPv6 one by its /64), "" for anything else.
-func connSource(conn net.Conn) string {
-	addr, ok := conn.RemoteAddr().(*net.TCPAddr)
-	if !ok || addr == nil || addr.IP == nil {
+func connSource(addr net.Addr) string {
+	var ip net.IP
+	switch addr := addr.(type) {
+	case *net.TCPAddr:
+		if addr != nil {
+			ip = addr.IP
+		}
+	case *net.UDPAddr:
+		if addr != nil {
+			ip = addr.IP
+		}
+	}
+	if ip == nil {
 		return ""
 	}
-	if ip4 := addr.IP.To4(); ip4 != nil {
+	if ip4 := ip.To4(); ip4 != nil {
 		return ip4.String()
 	}
-	return addr.IP.Mask(net.CIDRMask(64, 128)).String()
+	return ip.Mask(net.CIDRMask(64, 128)).String()
 }
