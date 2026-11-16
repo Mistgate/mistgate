@@ -172,6 +172,7 @@ const (
 	ClientHapp     ClientID = "happ"     // user toggle "Happ"
 	ClientAmnezia  ClientID = "amnezia"  // user toggle "Amnezia"
 	ClientTelegram ClientID = "telegram" // user toggle "Telegram": MTProto proxy links
+	ClientMistgate ClientID = "mistgate" // the first-party app, enrolled by its client API key
 	ClientMihomo   ClientID = "mihomo"
 	ClientSingbox  ClientID = "singbox" // the official sing-box apps (SFA, SFI, SFM); no user toggle of their own
 )
