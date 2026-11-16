@@ -51,15 +51,26 @@ func (p fakeProto) DefaultSettings() (json.RawMessage, error) {
 func (p fakeProto) Validate(json.RawMessage) []protocols.FieldError { return nil }
 func (p fakeProto) Summary(json.RawMessage) string                  { return p.id }
 func (p fakeProto) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, error) {
-	var s struct{ Port int }
+	var s struct {
+		Port     int    `json:"port"`
+		Security string `json:"security"`
+	}
 	if err := json.Unmarshal(in.Profile.Settings, &s); err != nil {
 		return plugin.InboundSpec{}, err
 	}
 	if in.PortOverride != 0 {
 		s.Port = int(in.PortOverride)
 	}
-	return plugin.InboundSpec{Listen: plugin.Listen{Network: "udp", Port: uint16(s.Port)},
-		TLS: plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: in.Node.Address}, Egress: "direct", Settings: in.Profile.Settings}, nil
+	network := "udp"
+	if p.id == "vless" {
+		network = "tcp"
+	}
+	tlsMode := plugin.TLSSelfSigned
+	if p.id == "vless" && s.Security == "tls" {
+		tlsMode = plugin.TLSAcmeDomain
+	}
+	return plugin.InboundSpec{Listen: plugin.Listen{Network: network, Port: uint16(s.Port)},
+		TLS: plugin.TLS{Mode: tlsMode, ServerName: in.Node.Address}, Egress: "direct", Settings: in.Profile.Settings}, nil
 }
 func (p fakeProto) IssueCredential(protocols.IssueInput) (protocols.Issued, error) {
 	return protocols.Issued{}, nil
@@ -244,6 +255,9 @@ type conn struct {
 	st   *connect.BidiStreamForClient[agentv1.ConnectRequest, agentv1.ConnectResponse]
 	in   chan *agentv1.ConnectResponse
 	errc chan error
+	// bridges is what the agent reports of its bridges in every result it sends; an agent reports its complete snapshot each
+	// time, so a result without them says "none".
+	bridges []*agentv1.BridgeState
 }
 
 func (a *agent) open() *conn {
@@ -345,6 +359,10 @@ type model struct {
 	warp *plugin.WarpSpec // the node-level WARP configuration the agent holds
 	// relays are the forwards the agent holds (DesiredState.relays)
 	relays []plugin.RelayForward
+	// bridgeServe and bridgeDials are the bridge of the reverse relays (DesiredState.bridge_serve and bridge_dials); an agent holds
+	// no serve setting as nil, and an empty list as none.
+	bridgeServe *plugin.BridgeServe
+	bridgeDials []plugin.BridgeDial
 }
 
 type modelInbound struct {
@@ -390,7 +408,7 @@ func credFromProto(c *agentv1.Credential) plugin.UserCred {
 // apply returns false for a delta whose base revision is not the model's (BASE_MISMATCH).
 func (m *model) apply(ds *agentv1.DesiredState) bool {
 	if ds.BaseRevision == 0 {
-		m.in, m.warp, m.relays = map[string]*modelInbound{}, nil, nil // a full state: anything not listed is gone, WARP and forwards included
+		m.in, m.warp, m.relays, m.bridgeServe, m.bridgeDials = map[string]*modelInbound{}, nil, nil, nil, nil // a full state: anything not listed is gone, WARP, forwards and the bridge included
 	} else if ds.BaseRevision != m.rev {
 		return false
 	}
@@ -425,7 +443,21 @@ func (m *model) apply(ds *agentv1.DesiredState) bool {
 	if ds.Relays != nil { // present replaces the whole list (an empty wrapper clears it); absent in a delta keeps it
 		m.relays = nil
 		for _, r := range ds.Relays.Items {
-			m.relays = append(m.relays, plugin.RelayForward{ID: r.RelayId, Network: r.Network, Port: uint16(r.Port), ToHost: r.ToHost, ToPort: uint16(r.ToPort)})
+			m.relays = append(m.relays, plugin.RelayForward{ID: r.RelayId, Network: r.Network, Port: uint16(r.Port), ToHost: r.ToHost, ToPort: uint16(r.ToPort),
+				Mode: r.Mode, ExitNodeID: r.ExitNodeId})
+		}
+	}
+	if ds.BridgeServe != nil { // present replaces the setting (an empty message stops the bridge); absent in a delta keeps it
+		m.bridgeServe = &plugin.BridgeServe{Port: uint16(ds.BridgeServe.Port), Path: ds.BridgeServe.Path, ExitNodeIDs: ds.BridgeServe.ExitNodeIds, PanelVia: ds.BridgeServe.PanelVia}
+	}
+	if ds.BridgeDials != nil { // present replaces the whole list (an empty wrapper clears it); absent in a delta keeps it
+		m.bridgeDials = nil
+		for _, d := range ds.BridgeDials.Items {
+			dial := plugin.BridgeDial{EntryNodeID: d.EntryNodeId, Host: d.Host, Port: uint16(d.Port), SNI: d.Sni, PinSHA256: d.PinSha256, Path: d.Path, Pool: d.Pool, PanelVia: d.PanelVia}
+			for _, t := range d.Targets {
+				dial.Targets = append(dial.Targets, plugin.BridgeTarget{RelayID: t.RelayId, Network: t.Network, Port: uint16(t.Port)})
+			}
+			m.bridgeDials = append(m.bridgeDials, dial)
 		}
 	}
 	m.rev = ds.Revision
@@ -441,7 +473,7 @@ func (m *model) hash() string {
 		}
 		in = append(in, si)
 	}
-	return statehash.StateRelays(in, m.warp, m.relays)
+	return statehash.StateBridge(in, m.warp, m.relays, m.bridgeServe, m.bridgeDials)
 }
 
 func (m *model) credIDs(inbound string) []string {

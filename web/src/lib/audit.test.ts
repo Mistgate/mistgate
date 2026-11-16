@@ -83,6 +83,8 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["inbound_update", { inbound: "inb_1", profile: "hy2 · 443", node: "de1", port: 8443, enabled: true }],
   ["inbound_update", { inbound: "inb_1", profile: "hy2 · 443", node: "de1", port: 443, enabled: false }],
   ["inbound_remove", { inbound: "inb_1", profile: "hy2 · 443", node: "de1" }],
+  ["inbounds_remove", { profile: "hy2 · 443", count: 3, nodes: "de1, nl1, fi1" }],
+  ["inbounds_remove", { profile: "hy2 · 443", count: 1, nodes: "de1" }],
   ["preset_create", { preset: "dns_1", name: "Дом" }],
   ["preset_update", { preset: "dns_1", name: "Дом" }],
   ["preset_delete", { preset: "dns_1", name: "Дом" }],

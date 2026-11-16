@@ -565,13 +565,15 @@ function StatusMark({ u, group, t }: { u: User; group?: Group; t: Tx }) {
  * like the subscription page's. Each chip names itself on hover; a screen reader gets the whole wording once.
  */
 function AppIcons({ u, t }: { u: User; t: Tx }) {
-  const { link, keys } = viaOf(u);
-  if (!link && !keys) return null;
-  const full = t(link && keys ? "users.appsBoth" : link ? "users.appsHapp" : "users.appsAwg");
+  const { link, keys, trustTunnel } = viaOf(u);
+  if (!link && !keys && !trustTunnel) return null;
+  const base = link || keys ? t(link && keys ? "users.appsBoth" : link ? "users.appsHapp" : "users.appsAwg") : "";
+  const full = [base, trustTunnel && "TrustTunnel"].filter(Boolean).join(" + ");
   return (
     <span role="img" aria-label={full} className="flex flex-none items-center gap-1">
       {link && <ViaChip tone="sky" icon="link" label={t("users.appsHapp")} />}
       {keys && <ViaChip tone="mint" icon="key" label={t("users.appsAwg")} />}
+      {trustTunnel && <ViaChip tone="sage" icon="tunnel" label="TrustTunnel" />}
     </span>
   );
 }

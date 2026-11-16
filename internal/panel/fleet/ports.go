@@ -17,6 +17,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/udpcheck"
 )
 
@@ -495,12 +496,18 @@ func (f *Fleet) udpCheckPorts(node store.NodeRow, requested []uint16, inbounds [
 	built := make([]udpCheckInbound, 0, len(inbounds))
 	for _, inbound := range inbounds {
 		spec, err := f.buildSpec(node, inbound)
-		if err != nil || spec.Listen.Network != "udp" {
+		if err != nil {
 			continue
 		}
-		settings := udpPortSettings{Port: spec.Listen.Port}
-		settings.Hop.From, settings.Hop.To = spec.Listen.HopFrom, spec.Listen.HopTo
-		built = append(built, udpCheckInbound{enabled: inbound.Enabled, settings: settings})
+		// The UDP listener of the inbound, and the UDP side port of a TCP one (TrustTunnel's HTTP/3 beside its TCP port).
+		for _, listen := range append([]plugin.Listen{spec.Listen}, plugin.SideListens(spec)...) {
+			if listen.Network != "udp" {
+				continue
+			}
+			settings := udpPortSettings{Port: listen.Port}
+			settings.Hop.From, settings.Hop.To = listen.HopFrom, listen.HopTo
+			built = append(built, udpCheckInbound{enabled: inbound.Enabled, settings: settings})
+		}
 	}
 	return udpCheckPortList(requested, built)
 }

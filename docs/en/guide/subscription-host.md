@@ -13,6 +13,7 @@ This is the VPS edition only. The Cloudflare edition already has a public addres
 
 - **The host's port 443 belongs to the node's own site.** Use one of these:
   - a Hysteria2 profile, whose site is on TCP 443;
+  - a TrustTunnel profile on TCP 443;
   - a VLESS REALITY profile whose target is the node itself (the node's own site, with PROXY protocol);
   - a free 443, where the agent runs its own site.
 

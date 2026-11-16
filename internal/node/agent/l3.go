@@ -29,6 +29,10 @@ import (
 const (
 	capAWG   = "awg/1"
 	capVLESS = "vless/1"
+	// capTrustTunnel marks the in-process TCP HTTP/2 TrustTunnel engine.
+	capTrustTunnel = "trusttunnel/1"
+	// capTrustTunnelH3 says this engine can accept TrustTunnel HTTP/3 on UDP at the TCP listener's port.
+	capTrustTunnelH3 = "trusttunnel-h3/1"
 	// capVLESSUnknownKeys marks agents that report VLESS unknown-user-ID attempts in links/1.
 	capVLESSUnknownKeys = "vless-unknown-keys/1"
 	// capVLESSHelloKex marks agents that count the key exchange the ClientHellos of REALITY connections offer, per key
@@ -183,6 +187,9 @@ func (a *Agent) capabilities() []string {
 			caps = append(caps, capVLESSSelf, capVLESSTLS)
 		}
 	}
+	if _, ok := a.engines["trusttunnel"]; ok {
+		caps = append(caps, capTrustTunnel, capTrustTunnelH3)
+	}
 	if a.appliesUserRateLimit() {
 		caps = append(caps, capUserRateLimit)
 	}
@@ -191,6 +198,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if rh, ok := a.host.(hostctl.RelayHost); ok && rh.RelaySupported() {
 		caps = append(caps, plugin.CapRelayForward)
+	}
+	if a.bridgeEntry != nil {
+		caps = append(caps, plugin.CapRelayReverse)
 	}
 	if hostctl.TorrentGuardSupported() {
 		caps = append(caps, capTorrentGuard)
@@ -334,6 +344,12 @@ func tunnelPublishedPorts(next *model, sshPorts []uint16) []hostctl.PublishedPor
 			continue
 		}
 		seen[hostctl.PublishedPort{Network: listen.Network, Port: uint32(listen.Port)}] = true
+		for _, side := range plugin.SideListens(spec) { // TrustTunnel's HTTP/3 socket, when h3 is on
+			if side.Port != 0 && (side.Network == "tcp" || side.Network == "udp") &&
+				!(side.Network == "tcp" && ssh[side.Port]) && !(side.Network == "udp" && awgUDP[side.Port]) {
+				seen[hostctl.PublishedPort{Network: side.Network, Port: uint32(side.Port)}] = true
+			}
+		}
 		if spec.Protocol == "hysteria2" {
 			var settings struct {
 				Masquerade struct {

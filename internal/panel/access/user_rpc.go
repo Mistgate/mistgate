@@ -121,7 +121,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		var via []adminv1.App
 		for _, pid := range viaProtos[u.ID] {
 			if p, ok := s.reg.Get(pid); ok {
-				_, _, _, apps := clientApps(p)
+				_, _, _, _, apps := clientApps(p)
 				for _, app := range apps {
 					if !slices.Contains(via, app) {
 						via = append(via, app)
@@ -138,7 +138,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		deviceCounts := devs[u.ID]
 		out[i] = &adminv1.User{
 			Id: u.ID, Name: u.Name, SubscriptionName: u.SubscriptionName, GroupId: u.GroupID, GroupName: u.GroupName, Status: statusProto[u.Status],
-			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia, Telegram: u.AppTelegram, Mistgate: new(!u.AppMistgateOff)}, Via: via,
+			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia, Telegram: u.AppTelegram, Mistgate: new(!u.AppMistgateOff), TrustTunnel: new(u.AppTrustTunnel)}, Via: via,
 			DevicesUsed: uint32(deviceCounts.Used), DevicesIdle: uint32(deviceCounts.Idle), DeviceLimit: uint32(u.DeviceLimit),
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
 			ExpiresUnix: unixOrZero(u.ExpiresAt), LastSeenUnix: unixOrZero(u.LastSeenAt), Online: isOnline,
@@ -148,7 +148,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
 		out[i].EffectiveDnsPresetId, out[i].EffectiveDnsPresetName, out[i].DnsSource = effID, effName, dns.Source(src).Proto()
 		out[i].GroupColor = groups[u.GroupID].Color
-		out[i].AccessHapp, out[i].AccessAmnezia, out[i].AccessTelegram = s.accessOf(u, groups[u.GroupID], full)
+		out[i].AccessHapp, out[i].AccessAmnezia, out[i].AccessTelegram, _ = s.accessOf(u, groups[u.GroupID], full)
 		_, out[i].TelegramIssued = telegramKeys[u.ID]
 		if isOnline {
 			out[i].CurrentNodeId, out[i].CurrentNodeName = cur, nodeName[cur]
@@ -195,8 +195,8 @@ func (s *Service) subscriptionURL(token string) (string, error) {
 func (s *Service) missingProtocols(happ, amnezia, telegram bool, have map[string]bool) []protocols.Protocol {
 	var out []protocols.Protocol
 	for _, p := range s.reg.List() {
-		// A per-device protocol (AWG) is issued on request, and the Telegram key is the person's own: neither goes to a link device.
-		if !have[p.ID()] && !protocols.IsPerDevice(p) && !isTelegram(p) && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram)...) {
+		// A per-device protocol (AWG) is issued on request, and Telegram/TrustTunnel keys belong to the person: none go to a link device.
+		if !have[p.ID()] && !protocols.IsPerDevice(p) && !isTelegram(p) && !isTrustTunnel(p) && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram, false)...) {
 			out = append(out, p)
 		}
 	}
@@ -218,6 +218,30 @@ func (s *Service) newCreds(userID, deviceID string, happ, amnezia, telegram bool
 			SecretEnc: s.vault.Seal([]byte(iss.Secret), id), DataJSON: string(iss.NodeData), CreatedAt: now,
 		})
 	}
+	return out, nil
+}
+
+// newEnrolledClientCreds adds the capability-gated Mistgate-only protocol credential to the link-app credentials. This method
+// is called only for a device already authenticated by its client API key; a basic subscription fetch never reaches it.
+func (s *Service) newEnrolledClientCreds(userID, deviceID string, happ, amnezia, telegram bool, have map[string]bool,
+	caps []string, mistgateEnabled bool) ([]store.AccessCred, error) {
+	out, err := s.newCreds(userID, deviceID, happ, amnezia, telegram, have)
+	if err != nil || !mistgateEnabled || !protocols.HasCapability(caps, "trusttunnel", "1") || have["trusttunnel"] {
+		return out, err
+	}
+	if !s.mistgateConsumes("trusttunnel") {
+		return out, nil
+	}
+	p, _ := s.reg.Get("trusttunnel")
+	issued, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+	if err != nil {
+		return nil, err
+	}
+	id := store.NewID("crd_")
+	out = append(out, store.AccessCred{
+		ID: id, DeviceID: deviceID, UserID: userID, Protocol: p.ID(),
+		SecretEnc: s.vault.Seal([]byte(issued.Secret), id), DataJSON: string(issued.NodeData), CreatedAt: s.now(),
+	})
 	return out, nil
 }
 
@@ -244,9 +268,10 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	if m.TermDays > 36500 {
 		return nil, invalid("term is too long")
 	}
-	happ, amnezia, telegram, mistgateOff := true, true, false, false
+	happ, amnezia, telegram, mistgateOff, trustTunnel := true, true, false, false, false
 	if m.Apps != nil {
 		happ, amnezia, telegram, mistgateOff = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram, m.Apps.Mistgate != nil && !*m.Apps.Mistgate
+		trustTunnel = m.Apps.TrustTunnel != nil && *m.Apps.TrustTunnel
 	}
 	if !happ && !amnezia {
 		return nil, invalid("at least one of Happ and Amnezia must be on")
@@ -271,23 +296,32 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	id := store.NewID("usr_")
 	u := store.AccessUser{
 		ID: id, Name: name, GroupID: m.GroupId, Status: ComputeStatus(false, expires, m.QuotaBytes, 0, now),
-		AppHapp: happ, AppAmnezia: amnezia, AppTelegram: telegram, AppMistgateOff: mistgateOff, AllNodes: all, NodeIDs: nodeIDs,
+		AppHapp: happ, AppAmnezia: amnezia, AppTelegram: telegram, AppTrustTunnel: trustTunnel, AppMistgateOff: mistgateOff, AllNodes: all, NodeIDs: nodeIDs,
 		QuotaBytes: m.QuotaBytes, QuotaReset: reset, PeriodStart: PeriodStart(reset, now), ExpiresAt: expires,
 		DeviceLimit: limit, SpeedLimitBps: m.SpeedLimitBps, DeviceSpeedLimitBps: m.DeviceSpeedLimitBps, DNSPresetID: m.DnsPresetId,
 		SubTokenHash: hash, SubTokenEnc: s.vault.Seal([]byte(token), id), CreatedAt: now,
 	}
-	// No link device yet: the first app that fetches the subscription makes its own, with its own credentials. The Telegram key
-	// is the person's own and is made with them.
-	var keyDev store.AccessDevice
-	var keyCreds []store.AccessCred
+	// No link device yet: the first app that fetches the subscription makes its own, with its own credentials. The Telegram and
+	// TrustTunnel keys are the person's own and are made with them when their switches are on.
+	var keys []store.AccessKeyDevice
 	if telegram {
-		if keyDev, keyCreds, err = s.telegramKeyForNewUser(id, now); err != nil {
+		var dev store.AccessDevice
+		var creds []store.AccessCred
+		if dev, creds, err = s.telegramKeyForNewUser(id, now); err != nil {
 			return nil, err
 		}
+		keys = append(keys, store.AccessKeyDevice{Device: dev, Creds: creds})
+	}
+	if trustTunnel && u.Status == StatusActive {
+		key, keyErr := s.trustTunnelKeyForNewUser(id, now)
+		if keyErr != nil {
+			return nil, keyErr
+		}
+		keys = append(keys, key)
 	}
 	// Creating a person is not counted against a token's hourly limit of user changes: the limit is for what takes
 	// access away or rewrites a person, and a billing script creates, extends and enables people all day.
-	switch err := s.st.Access().CreateUser(ctx, u, keyDev, keyCreds); {
+	switch err := s.st.Access().CreateUserWithKeys(ctx, u, keys...); {
 	case errors.Is(err, store.ErrAccessExists):
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
 	case errors.Is(err, store.ErrNotFound):
@@ -432,7 +466,9 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 		}
 		kind := adminv1.DeviceKind_DEVICE_KIND_LINK
 		switch {
-		case d.Kind == store.DeviceKindKey: // not an AmneziaVPN key (those are above): the Telegram key
+		case d.Kind == store.DeviceKindKey && slices.Contains(d.Protocols, store.TrustTunnelProtocol):
+			kind = adminv1.DeviceKind_DEVICE_KIND_KEY
+		case d.Kind == store.DeviceKindKey: // not an AmneziaVPN or TrustTunnel key (those are above): the Telegram key
 			kind = adminv1.DeviceKind_DEVICE_KIND_TELEGRAM_KEY
 		case d.Implicit:
 			kind = adminv1.DeviceKind_DEVICE_KIND_LINK_SHARED
@@ -507,7 +543,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			if !slices.Contains(na.NodeProtocols, f.Profile.Protocol) {
 				na.NodeProtocols = append(na.NodeProtocols, f.Profile.Protocol)
 			}
-			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
+			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && (s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AppTrustTunnel) || !u.AppMistgateOff && s.mistgateConsumes(f.Profile.Protocol)) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
 				na.Protocols = append(na.Protocols, f.Profile.Protocol)
 			}
 		}
@@ -592,6 +628,9 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	}
 	if m.Apps != nil {
 		u.AppHapp, u.AppAmnezia, u.AppTelegram = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram
+		if m.Apps.TrustTunnel != nil { // absent: the switch stays as it was (an older client does not know it)
+			u.AppTrustTunnel = *m.Apps.TrustTunnel
+		}
 		if m.Apps.Mistgate != nil { // absent: the switch stays as it was (an older client does not know it)
 			u.AppMistgateOff = !*m.Apps.Mistgate
 		}
@@ -646,12 +685,21 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 			return nil, err
 		}
 	}
+	trustTunnelKeyMade := false
+	if u.AppTrustTunnel && u.Status == StatusActive && (!old.AppTrustTunnel || old.Status != StatusActive) {
+		if trustTunnelKeyMade, err = s.issueTrustTunnelKey(ctx, actor(ctx), u); err != nil {
+			return nil, err
+		}
+	}
 	switch err := a.UpdateUser(ctx, u, setNodes); {
 	case errors.Is(err, store.ErrAccessExists):
+		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
 	case errors.Is(err, store.ErrNotFound):
+		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, notFound("user, group or node")
 	case err != nil:
+		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, s.internal("update user", err)
 	}
 	reservation.markTouched(asked)
@@ -660,8 +708,13 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 			return nil, err
 		}
 	}
+	if !u.AppTrustTunnel && old.AppTrustTunnel {
+		if err := s.revokeTrustTunnelKey(ctx, actor(ctx), u.ID); err != nil {
+			return nil, err
+		}
+	}
 	// No other credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
-	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram || u.AppMistgateOff != old.AppMistgateOff ||
+	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram || u.AppTrustTunnel != old.AppTrustTunnel || u.AppMistgateOff != old.AppMistgateOff ||
 		u.AllNodes != old.AllNodes || !slices.Equal(u.NodeIDs, old.NodeIDs) || u.SpeedLimitBps != old.SpeedLimitBps ||
 		u.DeviceSpeedLimitBps != old.DeviceSpeedLimitBps || !u.ExpiresAt.Equal(old.ExpiresAt) {
 		s.notify.StateChanged()
@@ -862,7 +915,8 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 		name string
 	}{
 		{m.Name != nil, "name"}, {m.GroupId != nil, "group"}, {m.QuotaBytes != nil, "quota"}, {m.QuotaReset != nil, "quota_reset"},
-		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Apps != nil && m.Apps.Mistgate != nil, "app_mistgate"}, {m.Nodes != nil, "nodes"},
+		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Apps != nil && m.Apps.Mistgate != nil, "app_mistgate"},
+		{m.Apps != nil && m.Apps.TrustTunnel != nil, "app_trusttunnel"}, {m.Nodes != nil, "nodes"},
 		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DeviceSpeedLimitBps != nil, "device_speed_limit"}, {m.DnsPresetId != nil, "dns"}, {m.SubscriptionName != nil, "subscription_name"},
 	} {
 		if x.set {
@@ -876,7 +930,7 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 func userUpdateChanges(old, next store.AccessUser) bool {
 	return old.Name != next.Name || old.SubscriptionName != next.SubscriptionName || old.GroupID != next.GroupID ||
 		old.Disabled != next.Disabled || old.Status != next.Status || old.AppHapp != next.AppHapp ||
-		old.AppAmnezia != next.AppAmnezia || old.AppTelegram != next.AppTelegram || old.AppMistgateOff != next.AppMistgateOff || old.AllNodes != next.AllNodes ||
+		old.AppAmnezia != next.AppAmnezia || old.AppTelegram != next.AppTelegram || old.AppTrustTunnel != next.AppTrustTunnel || old.AppMistgateOff != next.AppMistgateOff || old.AllNodes != next.AllNodes ||
 		!slices.Equal(old.NodeIDs, next.NodeIDs) || old.QuotaBytes != next.QuotaBytes || old.QuotaReset != next.QuotaReset ||
 		!old.PeriodStart.Equal(next.PeriodStart) || !old.ExpiresAt.Equal(next.ExpiresAt) || old.DeviceLimit != next.DeviceLimit ||
 		old.SpeedLimitBps != next.SpeedLimitBps || old.DeviceSpeedLimitBps != next.DeviceSpeedLimitBps || old.DNSPresetID != next.DNSPresetID

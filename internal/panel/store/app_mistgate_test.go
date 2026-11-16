@@ -33,6 +33,17 @@ func TestMistgateAppMigrationKeepsExistingPeopleOn(t *testing.T) {
 	if _, err := provider.UpTo(ctx, 128); err != nil {
 		t.Fatalf("apply the switch: %v", err)
 	}
+	var mistgateOff int
+	if err := st.R.QueryRowContext(ctx, `SELECT app_mistgate_off FROM user WHERE id = ?`, "usr_old").Scan(&mistgateOff); err != nil {
+		t.Fatal(err)
+	}
+	if mistgateOff != 0 {
+		t.Fatal("a person from before the switch did not default to Mistgate on")
+	}
+	// The store reads every user column it knows, so the later ones (app_trusttunnel) are applied before it is asked for the person.
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatalf("apply the later migrations: %v", err)
+	}
 	u, err := st.Access().User(ctx, "usr_old")
 	if err != nil {
 		t.Fatal(err)

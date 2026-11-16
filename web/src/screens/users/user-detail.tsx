@@ -26,6 +26,7 @@ import { errorText } from "@/lib/errors";
 import { clampPage } from "@/lib/paging";
 import { sameYear, useFmt, type Fmt } from "@/lib/format";
 import { useT } from "@/i18n";
+import { useEdition } from "@/lib/edition";
 import { alertIsAbout, alertTitle, alertWhy, alertsQuery, severityKind, severityWord, useCan } from "@/lib/health";
 import { plain } from "@/lib/plain";
 import { settingsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
@@ -33,8 +34,9 @@ import { DAY, GB, appsText, daysLeft, nowSec, shownKey, shownKind, shownStatus, 
 import { DnsSelect, effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns-select";
 import { AddDeviceModal, DeviceConfigsModal, platformLabel, type DeviceRef } from "./awg-devices";
 import { GroupChip, GroupEditModal, GroupLink, ImpactText, WaysOfGroup } from "./groups";
-import { BlockedList, DeviceRow, IdleBadge, IdleNote, LinkDeviceRows, RowMenu, SectionHead, Secondary, Seen, SharedRow, splitDevices, Tile } from "./link-devices";
+import { BlockedList, DeviceRow, IdleBadge, IdleNote, isTrustTunnelKey, LinkDeviceRows, RowMenu, SectionHead, Secondary, Seen, SharedRow, splitDevices, Tile } from "./link-devices";
 import { TelegramSection, telegramShown } from "./telegram-proxy";
+import { TrustTunnelSection, trustTunnelShown } from "./trusttunnel-key";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { big, detailN, type BlockedN, type DetailN, type DeviceN as Device, type UserN as User } from "./model";
 import { useGo } from "./nav";
@@ -61,7 +63,7 @@ type Patch = Partial<{
   speedLimitBps: number;
   deviceSpeedLimitBps: number;
   dnsPresetId: string;
-  apps: { happ: boolean; amnezia: boolean; telegram: boolean };
+  apps: { happ: boolean; amnezia: boolean; telegram: boolean; mistgate?: boolean; trustTunnel?: boolean };
   nodes: { all: boolean; nodeIds: string[] };
 }>;
 const write = ({ quotaBytes, expiresUnix, speedLimitBps, deviceSpeedLimitBps, ...rest }: Patch) => ({
@@ -712,10 +714,11 @@ export function DevicesPanel({
   const canAdd = !!user.apps?.amnezia && awgProfiles.length > 0;
   const [adding, setAdding] = useState(!!autoAdd && canAdd && !full);
   const now = nowSec();
-  const { link, shared, keys } = splitDevices(devices);
+  const { link, shared, keys, trustTunnel } = splitDevices(devices);
   const showSub = !!user.apps?.happ || link.length > 0 || shared.length > 0;
   const showKeys = !!user.apps?.amnezia || keys.length > 0;
   const showTg = telegramShown(user, profiles, devices);
+  const showTt = trustTunnelShown(user, profiles, devices);
   const nameOf = (d: Device) => d.model || platformLabel(d.platform, t);
   const refOf = (d: Device): DeviceRef => ({ id: d.id, label: d.model, platform: d.platform, profileName: d.awgProfileName, version: d.awgVersion, address: d.address, stale: d.stale });
   const ask = (d: Device) => {
@@ -749,7 +752,7 @@ export function DevicesPanel({
           </Link>
         </p>
       )}
-      {!showSub && !showKeys && !showTg && <p className="border-t border-line pt-3.5 pb-1 text-[13px] text-muted">{t("users.noDevices")}</p>}
+      {!showSub && !showKeys && !showTg && !showTt && <p className="border-t border-line pt-3.5 pb-1 text-[13px] text-muted">{t("users.noDevices")}</p>}
 
       {showSub && (
         <section className="flex flex-col">
@@ -841,6 +844,16 @@ export function DevicesPanel({
           user={user}
           countryOf={nodeCountry}
           onTurnOn={() => void actions.update({ apps: { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: true } }).catch(() => {})}
+          onChanged={() => void actions.refresh()}
+        />
+      )}
+
+      {showTt && (
+        <TrustTunnelSection
+          user={user}
+          hasKeyDevice={trustTunnel.length > 0}
+          countryOf={nodeCountry}
+          onTurnOn={() => void actions.update({ apps: { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, trustTunnel: true } }).catch(() => {})}
           onChanged={() => void actions.refresh()}
         />
       )}
@@ -993,7 +1006,15 @@ export function AccessPanel({ data, actions }: { data: DetailN; actions: Actions
   };
   const selected = nodes.all ? allIds.length : nodes.ids.filter((id) => allIds.includes(id)).length;
 
-  const flipApp = (which: "happ" | "amnezia" | "telegram" | "mistgate", on: boolean) => {
+  // TrustTunnel is not offered in the Cloudflare edition (the server says unavailable_in_edition); its switch says so instead
+  const edition = useEdition();
+  const ttOff = edition.edge || edition.off("trusttunnel");
+  const can = useCan().run;
+  // turning TrustTunnel off revokes the person's key: asked first (their links stop, the place in the limit is freed)
+  const [ttAskOpen, setTtAskOpen] = useState(false);
+  const holdsTtKey = data.devices.some(isTrustTunnelKey);
+  const flipApp = (which: "happ" | "amnezia" | "telegram" | "mistgate" | "trustTunnel", on: boolean) => {
+    // trustTunnel is sent only when it is the one flipped: absent in a request means "as it is" (an older panel does not know it)
     const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, mistgate: user.apps?.mistgate !== false, [which]: on };
     if (!apps.happ && !apps.amnezia) return; // at least one of the two link/key apps stays on
     void actions.update({ apps }).catch(() => {});
@@ -1065,6 +1086,13 @@ export function AccessPanel({ data, actions }: { data: DetailN; actions: Actions
             <SwitchRow label={linkApps} hint={t("users.happHint")} checked={!!user.apps?.happ} onCheckedChange={(on) => flipApp("happ", on)} />
             <SwitchRow label="AmneziaVPN" hint={t("users.awgHint")} checked={!!user.apps?.amnezia} onCheckedChange={(on) => flipApp("amnezia", on)} />
             <SwitchRow label={t("tgproxy.toggle")} hint={t("users.telegramHint")} checked={!!user.apps?.telegram} onCheckedChange={(on) => flipApp("telegram", on)} />
+            <SwitchRow
+              label={t("tt.toggle")}
+              hint={ttOff ? t("err.unavailable_in_edition", { feature: t("edition.feature.trusttunnel") }) : t("users.trustTunnelHint")}
+              checked={!!user.apps?.trustTunnel}
+              disabled={ttOff || !can}
+              onCheckedChange={(on) => (on || !holdsTtKey ? flipApp("trustTunnel", on) : setTtAskOpen(true))}
+            />
             <MistgateAppRow checked={user.apps?.mistgate !== false} linkOn={!!user.apps?.happ} onCheckedChange={(on) => flipApp("mistgate", on)} />
           </div>
 
@@ -1108,6 +1136,15 @@ export function AccessPanel({ data, actions }: { data: DetailN; actions: Actions
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={ttAskOpen}
+        onOpenChange={setTtAskOpen}
+        title={t("tt.offT")}
+        description={t("tt.offBody")}
+        confirmLabel={t("tt.offDo")}
+        danger
+        onConfirm={() => actions.update({ apps: { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, trustTunnel: false } })}
+      />
       <ConfirmModal
         open={changeOpen}
         onOpenChange={setChangeOpen}

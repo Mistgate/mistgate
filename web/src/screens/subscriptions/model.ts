@@ -648,3 +648,56 @@ export function presetSubtitle(
   if (p.splitDirect && first) parts.push(direct(first));
   return parts.join(" · ");
 }
+
+// ---- the owner's own response headers ("Response headers" tab) ----
+
+export type ResponseHeader = Settings["responseHeaders"][number];
+/** The answer formats a header can be limited to: what an app is served. */
+export const headerFormats = [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON] as const;
+/** The limits the panel enforces on save (internal/panel/subsettings/headers.go); the panel is the one that refuses, this only says why early. */
+export const headerLimit = { count: 20, name: 64, value: 1000, total: 4096 } as const;
+
+/** A message of the editor: the dictionary key and what fills it. */
+export type HeaderProblem = { key: Key; vars?: Record<string, string | number> };
+
+const utf8 = new TextEncoder();
+const tokenName = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+/** Whether the panel keeps this name (any case): `reserved` is GetSubscriptionSettingsResponse.reserved_header_names, a trailing "*" being a prefix. */
+export function reservedHeaderName(name: string, reserved: readonly string[]): boolean {
+  const l = name.toLowerCase();
+  return reserved.some((r) => (r.endsWith("*") ? l.startsWith(r.slice(0, -1).toLowerCase()) : l === r.toLowerCase()));
+}
+
+export function headerNameProblem(name: string, reserved: readonly string[]): HeaderProblem | null {
+  const n = name.trim();
+  if (n === "") return { key: "subs.hdr.err.noName" };
+  if (n.length > headerLimit.name || !tokenName.test(n)) return { key: "subs.hdr.err.name", vars: { max: headerLimit.name } };
+  if (reservedHeaderName(n, reserved)) return { key: "subs.hdr.err.reserved", vars: { name: n } };
+  return null;
+}
+
+export function headerValueProblem(value: string, base64: boolean): HeaderProblem | null {
+  const v = value.trim();
+  if (v === "") return { key: "subs.hdr.err.noValue" };
+  if (utf8.encode(v).length > headerLimit.value) return { key: "subs.hdr.err.long", vars: { max: headerLimit.value } };
+  if (/\p{Cc}/u.test(v)) return { key: "subs.hdr.err.ctl" };
+  if (!base64 && [...v].some((c) => c.charCodeAt(0) > 0x7f)) return { key: "subs.hdr.err.ascii" };
+  return null;
+}
+
+/** The bytes one header takes in an answer, as the panel counts them: the name, the value as sent and the separators. */
+export function headerSize(h: Pick<ResponseHeader, "name" | "value" | "base64">): number {
+  const bytes = utf8.encode(h.value.trim()).length;
+  return h.name.trim().length + (h.base64 ? 7 + 4 * Math.ceil(bytes / 3) : bytes) + 4;
+}
+
+/**
+ * What goes to the panel: trimmed, a format list that names every format folded into "all", and no group id of a group that is
+ * gone (`known` is the ids of the groups there are; null = not known, nothing is dropped).
+ */
+export function headerToSave(h: ResponseHeader, known: readonly string[] | null): ResponseHeader {
+  const formats = h.formats.length === headerFormats.length ? [] : [...h.formats];
+  const groupIds = !h.onlyGroups ? [] : known === null ? [...h.groupIds] : h.groupIds.filter((g) => known.includes(g));
+  return { ...h, name: h.name.trim(), value: h.value.trim(), formats, groupIds };
+}

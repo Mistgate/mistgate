@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 const (
@@ -109,10 +111,22 @@ func (s *Service) roundRelay(ctx context.Context, id string) (Result, bool) {
 	}
 
 	if !monitor.OK {
-		s.diagnoseRelay(ctx, link.ID, key, &monitor)
+		s.diagnoseRelay(ctx, link, key, &monitor)
 	}
 	if err := s.st.SetRelayMonitorCheck(ctx, link.ID, monitor); err != nil && err != store.ErrNotFound {
-		s.log.Warn("health: store relay monitor", "relay", link.ID, "err", err)
+		s.log.Warn("health: store relay monitor", "code", "relay_monitor_store_failed", "relay", link.ID, "err", err)
+	}
+	if link.Reverse() {
+		if check, ok := link.Check(); !ok || check.Leg.At <= 0 || now.Unix() >= check.Leg.At && now.Sub(time.Unix(check.Leg.At, 0)) >= relayAutoCheckInterval {
+			checkCtx, cancel := context.WithTimeout(ctx, roundBudget)
+			if _, err := s.fl.CheckRelay(checkCtx, link.ID, store.RelayStageLeg); err != nil && ctx.Err() == nil {
+				s.log.Warn("health: direct relay probe", "code", "relay_direct_probe_failed", "relay", link.ID, "err", err)
+			}
+			cancel()
+		}
+	}
+	if s.cfg.ControlRelay != nil {
+		s.cfg.ControlRelay(ctx, link.ID)
 	}
 	return res, true
 }
@@ -135,7 +149,8 @@ func (s *Service) relaySkip(ctx context.Context, t *target) (string, bool) {
 	return "", true
 }
 
-func (s *Service) diagnoseRelay(ctx context.Context, id, targetKey string, monitor *store.RelayMonitorCheck) {
+func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targetKey string, monitor *store.RelayMonitorCheck) {
+	id := link.ID
 	now := s.now()
 	due := monitor.AutoCheckTargetKey != targetKey || monitor.AutoCheckAt == 0 ||
 		(now.Unix() >= monitor.AutoCheckAt && now.Sub(time.Unix(monitor.AutoCheckAt, 0)) >= relayAutoCheckInterval)
@@ -144,17 +159,29 @@ func (s *Service) diagnoseRelay(ctx context.Context, id, targetKey string, monit
 	}
 	monitor.AutoCheckAt, monitor.AutoCheckTargetKey = now.Unix(), targetKey
 	if err := s.st.SetRelayMonitorCheck(ctx, id, *monitor); err != nil {
-		s.log.Warn("health: reserve relay diagnosis", "relay", id, "err", err)
+		s.log.Warn("health: reserve relay diagnosis", "code", "relay_diagnosis_reserve_failed", "relay", id, "err", err)
 		return
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, roundBudget)
 	defer cancel()
-	check, err := s.fl.CheckRelay(checkCtx, id)
+	var stages []string
+	if link.Network == "tcp" && link.Mode != store.RelayModeDNAT && slices.Contains(link.ViaNodeCaps, plugin.CapRelayReverse) &&
+		slices.Contains(link.ExitNodeCaps, plugin.CapRelayReverse) {
+		// a failed round may be the direct way failing (or freezing): the controller then needs to know, in the same pass, whether
+		// the exit reaches the entry's bridge endpoint, or it cannot move the relay before the next diagnosis, half an hour on
+		stages = []string{store.RelayStageLeg, store.RelayStagePath, store.RelayStageReverseReach}
+	}
+	check, err := s.fl.CheckRelay(checkCtx, id, stages...)
 	if err != nil {
-		s.log.Warn("health: diagnose relay", "relay", id, "err", err)
+		s.log.Warn("health: diagnose relay", "code", "relay_diagnosis_failed", "relay", id, "err", err)
 		return
 	}
 	switch {
+	case link.Reverse() && check.Bridge.Status != "ok":
+		monitor.Stage, monitor.Code = "bridge", check.Bridge.Code
+		if monitor.Code == "" {
+			monitor.Code = "disconnected"
+		}
 	case check.Leg.Status == "fail":
 		monitor.Stage, monitor.Code = "leg", check.Leg.Code
 	case check.Path.Status == "fail":
@@ -216,7 +243,7 @@ func (s *Service) addRelayDownConds(ctx context.Context, now time.Time, sn *snap
 			continue
 		}
 		stage := monitor.Stage
-		if stage != "leg" && stage != "entry" && stage != "path" && stage != "freeze" {
+		if stage != "leg" && stage != "entry" && stage != "path" && stage != "bridge" && stage != "freeze" {
 			stage = relayStageForCode(monitor.Code)
 		}
 		add(cond{key: k, severity: sevWarning, why: "health.alert.relay_down.why." + stage, params: map[string]string{

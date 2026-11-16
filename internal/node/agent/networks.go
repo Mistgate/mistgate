@@ -171,7 +171,7 @@ waitForTarget:
 			continue
 		}
 		if err != nil && !errors.Is(err, context.Canceled) {
-			a.log.Warn("network table cache unavailable", "err", err)
+			a.log.Warn("network table cache unavailable", "code", "network_table_cache_unavailable", "err", err)
 		}
 
 		for {

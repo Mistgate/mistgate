@@ -65,6 +65,7 @@ const keys: Record<string, MessageKey> = {
   inbound_add: "audit.inbound_add",
   inbound_update: "audit.inbound_update",
   inbound_remove: "audit.inbound_remove",
+  inbounds_remove: "audit.inbounds_remove",
   "relay.create": "audit.relay.create",
   "relay.update": "audit.relay.update",
   "relay.delete": "audit.relay.delete",
@@ -176,6 +177,7 @@ function sentenceKey(e: Pick<AuditEntry, "action" | "result">, p: Record<string,
     case "users_disable":
     case "users_enable":
     case "users_extend":
+    case "inbounds_remove":
       return p.count === "1" ? variant("one") : { key: base, worded: false };
     case "inbound_update":
       return p.enabled === "false" ? variant("off") : { key: base, worded: false };

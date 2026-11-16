@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { nodesQuery } from "@/lib/queries";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { PillToggle, wayOf } from "@/screens/users/groups";
-import { telegramOnly } from "./protocol-meta";
+import { telegramOnly, trustTunnelOnly } from "./protocol-meta";
 import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
 import { isIp } from "./deploy";
@@ -63,7 +63,7 @@ const quoted = (t: Tx, gs: Group[]) => gs.map((g) => t("common.quoted", { name: 
 
 /** The app a protocol reaches, in words for the hint: Telegram (MTProto), AmneziaVPN, or the subscription apps by name. */
 const appWords = (t: Tx, info: ProtocolInfo, linkApps: string) =>
-  telegramOnly(info.apps) ? t("profiles.appTg") : wayOf(info.id, [{ id: info.id, apps: info.apps }]) === "awg" ? t("profiles.appAwg") : t("profiles.appSub", { apps: linkApps });
+  telegramOnly(info.apps) ? t("profiles.appTg") : trustTunnelOnly(info.apps) ? t("profiles.appTt") : wayOf(info.id, [{ id: info.id, apps: info.apps }]) === "awg" ? t("profiles.appAwg") : t("profiles.appSub", { apps: linkApps });
 
 export function AfterCreate({ a, info, settings }: { a: AfterState; info: ProtocolInfo; settings: Settings }) {
   const t = useTx();

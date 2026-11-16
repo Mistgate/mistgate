@@ -20,7 +20,7 @@ From top to bottom:
    - **Your device**: the platform, detected from the browser (iPhone, Android, Windows, Mac, Linux) and switchable.
    - **With an app** (the names come from the apps list; only link apps are listed, never a key app): the app, then install it (with the store or download button and the card's description) and **Add to Happ**, the one-tap link from the app's template. "Won't open? Copy the link" sits right under it. "All your servers (4) appear in Happ — pick any". A QR code of the link, for connecting a phone, when **QR for a second device** is on. "Connected with the subscription" says when the apps on the link last fetched it. Opening the page does not update this time, and does not add a device; only an app fetch does.
    - **With a key**: install AmneziaVPN, **Add a device** (the key form opens), paste the key. When self-service is off the step says "Ask for a key".
-5. **Telegram proxy**, when the owner switched Telegram on for the person, under the servers (see [Telegram proxy](#telegram-proxy)).
+5. **Telegram proxy** and **TrustTunnel**, when the owner switched them on for the person, under the servers (see [Telegram proxy](#telegram-proxy)).
 6. **My devices**: one list with the apps on the link and the person's keys, and one **Add a device** button for both ways (see [My devices](#my-devices)).
 7. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
 8. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
@@ -86,6 +86,13 @@ When the owner has switched **Telegram proxy** on for the person (see [Users and
 - The person cannot re-issue or remove the key on the page. The owner does it in the admin.
 
 The links carry the person's key, so they are as private as the subscription link.
+
+**TrustTunnel.** When the owner has switched **TrustTunnel** on for the person (see [Users and groups](users-and-groups.md#trusttunnel)), the page has a block **TrustTunnel** for the official TrustTunnel apps. It is independent of the steps above.
+
+- Each row is one [TrustTunnel](trusttunnel.md) server, named by the server's country and place, never by the node's or the profile's name in the panel, with a QR code and **Copy link** for its `tt://` link. The person installs the TrustTunnel app (the block links the apps), scans the code or opens the link, and the server appears in the app. The link is always HTTP/2.
+- A server whose certificate is self-signed has no link; its row says "needs a domain with a public certificate". The Mistgate app uses it without a link.
+- Before the owner has made the person's key, or while no TrustTunnel server runs for them, the block says the key is still being prepared. A person with TrustTunnel switched off has no block, and a revoked key leaves no links.
+- The person cannot issue or revoke the key on the page. The owner does it in the admin.
 
 ## My devices
 

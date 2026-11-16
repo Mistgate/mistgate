@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/apernet/hysteria/extras/v2/correctnet"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"golang.org/x/crypto/acme"
 )
 
@@ -54,6 +55,10 @@ func startTCPMasq(port int, getCert func(*tls.ClientHelloInfo) (*tls.Certificate
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 		ErrorLog:          log.New(io.Discard, "", 0),
+	}
+	if err := sitehttp.ConfigureSiteHTTP2(srv); err != nil {
+		_ = ln.Close()
+		return nil, fmt.Errorf("configure HTTPS site: %w", err)
 	}
 	go srv.ServeTLS(ln, "", "")
 	return &tcpMasq{srv: srv, ln: ln}, nil

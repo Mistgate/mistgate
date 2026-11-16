@@ -33,6 +33,7 @@ import (
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/hosttunnel"
+	"github.com/mistgate/mistgate/internal/node/sitehttp/sitehttptest"
 )
 
 // sessionLinkPanel is a panel's link endpoint that runs the whole v2 handshake (sealed) and answers the Hello with a
@@ -457,4 +458,21 @@ func TestTunnelLinkSession(t *testing.T) {
 		t.Fatal("the agent dialled the mTLS panel although the tunnel is up")
 	default:
 	}
+}
+
+// The subscription host's own site on a free 443 sends the same first HTTP/2 frames as every other site of the node.
+func TestStandaloneSiteSpeaksHTTP2LikeEverySite(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	a := h.a
+	a.standaloneListen = func(network, _ string) (net.Listener, error) { return net.Listen(network, "127.0.0.1:0") }
+	t.Cleanup(a.closeHostRole)
+	a.applyPanelRouting(&pb.NodeSettings{HostTunnel: &pb.HostTunnel{TunnelSni: "t-7c1d.example.com", ForwardNames: []string{"sub.example.com"}}})
+	if a.standalone.ln == nil {
+		t.Fatal("no standalone site")
+	}
+	conn, err := net.Dial("tcp", a.standalone.ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sitehttptest.Check(t, "subscription host", conn)
 }

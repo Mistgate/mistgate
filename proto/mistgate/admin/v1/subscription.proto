@@ -15,6 +15,9 @@ service SubscriptionService {
   rpc ListClients(ListClientsRequest) returns (ListClientsResponse);
   // "Serving rules" tab: which rule and format a sample User-Agent gets.
   rpc TestUserAgent(TestUserAgentRequest) returns (TestUserAgentResponse);
+  // "Response headers" tab: the headers of the list (the editor's draft, checked like a save) one person gets with one
+  // User-Agent. INVALID_ARGUMENT for a list that a save would refuse; NOT_FOUND for an unknown person.
+  rpc PreviewResponseHeaders(PreviewResponseHeadersRequest) returns (PreviewResponseHeadersResponse);
 }
 
 message SubscriptionSettings {
@@ -58,6 +61,25 @@ message SubscriptionSettings {
   // Days without a connection or subscription fetch before a device stops counting. 0 disables idling; otherwise 7 to 365.
   // Absent in an update = keep the stored setting.
   optional uint32 device_idle_after_days = 16;
+  // The owner's own response headers of a successful subscription answer (e.g. flclashx-servicename). In order: when two
+  // entries of one name both apply, the first wins. Refusals (device limit, a blocked device, no access) carry none of them.
+  repeated ResponseHeader response_headers = 17;
+}
+
+// One response header the owner adds to the subscription answer the apps fetch. The name is an HTTP token (RFC 9110) that is
+// none of the panel's own headers (GetSubscriptionSettingsResponse.reserved_header_names); the value has no control
+// characters; at most 20 entries, a name of at most 64 bytes, a value of at most 1000 bytes and 4096 bytes in all.
+message ResponseHeader {
+  string name = 1;
+  string value = 2;
+  // Send the value as "base64:" plus its base64, the way the panel sends the title (apps that read text headers decode it).
+  bool base64 = 3;
+  // The answer formats it goes with: SUB_FORMAT_BASE64_URIS, _MIHOMO_YAML, _XRAY_JSON or _SINGBOX_JSON. Empty = all of them.
+  repeated SubFormat formats = 4;
+  // false = every group; true = only the people of group_ids (none listed = nobody gets it).
+  bool only_groups = 5;
+  // Group ids, only with only_groups. A group that is deleted later drops out of the list the next time the settings are saved.
+  repeated string group_ids = 6;
 }
 
 // The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).
@@ -173,6 +195,9 @@ message GetSubscriptionSettingsResponse {
   // Live AmneziaWG credentials held by the subscription link's devices, across all users. Turning link_awg off drops
   // each credential the next time its app fetches a Mihomo profile.
   uint32 link_awg_keys = 7;
+  // What an own response header may not be named, from the code that sets the headers: exact names, and prefixes written with a
+  // trailing "*" ("X-Hwid-*"). Compared without regard to case. The panel refuses such a name on save; the editor shows it first.
+  repeated string reserved_header_names = 8;
 }
 
 // One server of the preview: what a server name is built from.
@@ -219,4 +244,33 @@ message TestUserAgentResponse {
   SubFormat format = 2;
   // True when the fallback treated the User-Agent as a browser.
   bool browser = 3;
+}
+
+message PreviewResponseHeadersRequest {
+  string user_id = 1;
+  string user_agent = 2;
+  // The list to preview: the editor's draft, or the saved one.
+  repeated ResponseHeader headers = 3;
+}
+
+// One header as it goes out.
+message SentHeader {
+  string name = 1;
+  // As sent: with "base64:" and the encoded text when the entry asks for base64.
+  string value = 2;
+  bool base64 = 3;
+}
+
+message PreviewResponseHeadersResponse {
+  // The answer format the User-Agent gets (SUB_FORMAT_USER_PAGE for a browser: the page, not a subscription).
+  SubFormat format = 1;
+  // The own headers that person's answer carries, in the order they are listed. Empty when the answer is not a subscription
+  // (see not_served) or no entry applies.
+  repeated SentHeader headers = 2;
+  // Why there are none by design: "page" (a browser gets the user page), "decoy" (the User-Agent is served as an unknown link),
+  // "no_access" (the person's subscription is off, expired or over its quota: the answer carries a note and no own headers).
+  // "" = the answer is a subscription.
+  string not_served = 3;
+  // The person's group, for the preview's caption.
+  string group_name = 4;
 }

@@ -428,6 +428,20 @@ func TestPortConflicts(t *testing.T) {
 		param(t, r, "inbound_id", "inb_1")
 		code(t, r, CodePortsHeld, "network", "udp")
 	})
+	t.Run("foreign UDP listener holds a TrustTunnel HTTP3 side port", func(t *testing.T) {
+		f := newFake(t)
+		tt := Inbound{
+			ID: "tt", Protocol: "trusttunnel", Enabled: true, Network: "tcp", Port: 8443, State: "running",
+			SideListens: []InboundListen{{Network: "udp", Port: 8443}},
+		}
+		tw := setup(f, tt, h{812, "caddy", 8443, 1004})
+		r := run(t, f.doctor(tw), CheckPortConflicts)
+		want(t, r, Fail, "")
+		param(t, r, "process", "caddy(812)")
+		param(t, r, "port", "8443")
+		param(t, r, "inbound_id", "tt")
+		code(t, r, CodePortsHeld, "network", "udp")
+	})
 	t.Run("foreign listener inside the hop range", func(t *testing.T) {
 		f := newFake(t)
 		tw := setup(f, ib, h{100, "mistgate-node", 443, 1001}, h{900, "ntpd", 20050, 1003})

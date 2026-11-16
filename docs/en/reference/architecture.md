@@ -88,6 +88,16 @@ Stats batches (traffic per credential, open sessions, host metrics, the health o
 
 Doctor reports are snapshots, not reliable messages: the newest one wins. The agent also answers commands (restart a server, kick sessions, retire, run the doctor, apply a fix, update, roll back, prepare the AmneziaWG kernel module, measure its bandwidth, stream its log) with exactly one result each.
 
+### The bridge
+
+A relay passes traffic on in one of two ways. In the direct way the entry's agent connects to the exit (a DNAT forward). In the bridge way the exit's agent dials the entry and keeps TLS connections open to it, and the entry hands each person's TCP session to one of them. Both agents must list `relay-reverse/1`, and only TCP relays can use it.
+
+- **Desired state.** The entry gets `BridgeServe` (a secret path and the exits allowed to dial); the exit gets `BridgeDial` (the entry's address, the pin of its certificate and the pool size). The entry's side is served on the site it already has (Hysteria2's or VLESS "self" on 443) or on a port of its own. Every HTTPS site of a node takes its HTTP/2 settings from one package, `sitehttp`, so none of them differs from another on the wire.
+- **Protocol.** Per person the exit sends two HTTP/2 requests on one TLS connection: `down` (the person's bytes to the entry) and `up` (the entry's bytes back). The exit proves itself with a signature over the TLS exporter of that connection; anyone else gets the ordinary site. A connection that proved itself leaves the anonymous set of the site for good.
+- **Capacity.** One connection serves 121 people (250 streams, minus 8 for waiting pairs, 2 streams each): 242 with the pool of two, 484 with four. Past that, new people are turned away within a second.
+- **Control session.** An exit that cannot reach the panel opens its control stream through the same bridge; the entry dials only its own panel address, and the session stays encrypted from the exit to the panel.
+- **Who decides.** The way is set per relay (`auto`, `dnat` or `reverse`). In `auto` the panel moves a relay to the bridge after two failed rounds and back after three direct passes at least 30 minutes apart plus a flow test, so returning takes an hour at the least. The decision is one pure function over stored checks, `store.EvaluateRelayMode`; the agents only do what the desired state says.
+
 ## Updates, SSH installs and backups
 
 - **Node agents** update from the signed bundle in `<data-dir>/dist`. You copy it there, or the panel downloads a newer one from the latest stable GitHub release every 10 minutes when the installation's key (`release.pub`) verifies it. A rollout, an update of one node or a scheduled update sends the agent the signed manifest; the agent fetches the binary from the panel over its own mutual-TLS connection, verifies it with the key compiled into it, puts it next to itself and restarts. The panel's health gate decides, and a failed update rolls back; the systemd unit also puts the previous binary back after a crash loop. See [Updates](../operations/updates.md).

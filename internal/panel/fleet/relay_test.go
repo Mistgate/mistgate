@@ -11,6 +11,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -27,8 +28,9 @@ type relayEnv struct {
 }
 
 const (
-	relayInbound  = "inb_exit"
-	relayInbound2 = "inb_exit2"
+	relayInbound    = "inb_exit"
+	relayInbound2   = "inb_exit2"
+	relayInboundTCP = "inb_exit_tcp"
 )
 
 func TestInboundStateRefreshRequiresARealChange(t *testing.T) {
@@ -74,7 +76,11 @@ func TestRelayApplyTreatsInboundReadFailureAsChanged(t *testing.T) {
 
 func newRelayEnv(t *testing.T) *relayEnv {
 	t.Helper()
-	e := newEnv(t)
+	reg, err := protocols.NewRegistry(fakeProto{"fakehy", plugin.ClientHapp}, fakeProto{"fakewg", plugin.ClientAmnezia}, fakeProto{"vless", plugin.ClientHapp})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := newEnvWith(t, reg)
 	x := &relayEnv{env: e, entry: e.enroll("entry"), exit: e.enroll("exit")}
 	now := time.Now().Unix()
 	e.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_hy', 'fakehy', 'hy', '{"port":4443}', 1, ?, ?)`, now, now)
@@ -122,7 +128,9 @@ func (c *conn) next(m *model) *agentv1.DesiredState {
 	if m.hash() != ds.StateHash {
 		c.t.Fatalf("the agent computes %s, the panel announced %s", m.hash(), ds.StateHash)
 	}
-	c.send(0, applied(ds, m.hash()))
+	result := applied(ds, m.hash())
+	result.GetApplyResult().Bridges = c.bridges
+	c.send(0, result)
 	return ds
 }
 

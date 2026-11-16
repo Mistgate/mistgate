@@ -26,6 +26,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 type nodeService struct{ f *Fleet }
@@ -262,9 +263,12 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	out.TorrentBlockerSupported = store.CapabilityPresent(caps, capTorrentGuard)
 	out.ClientIpv6Supported = store.CapabilityPresent(caps, capClientIPv6)
 	out.UserRateLimitSupported = store.CapabilityPresent(caps, capUserRateLimit)
+	out.BridgePort = uint32(n.BridgePort)
+	out.BridgePortReason, out.BridgePortProfileId = f.bridgePortReason(ctx, n)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	out.Ipv6 = ipv6Msg(n, d6)
 	if live.Connected {
+		out.LinkViaNodeId = view.LinkViaNodeID
 		out.Online = protocolCounts(onlineByProtocolView(view))
 		if m := view.Metrics; m != nil {
 			out.HasMetrics, out.CpuPct, out.RamPct, out.UptimeS = true, float32(m.CPUPct), pct(m.RAMUsedBytes, m.RAMTotalBytes), m.UptimeS
@@ -325,6 +329,77 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	out.DecoyAgentMode = agentMode
 	out.DecoyAgentSha256 = n.DecoyAgentHash
 	return out
+}
+
+func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, string) {
+	if n.BridgePort == 0 || n.BridgePort == 443 {
+		return "", ""
+	}
+	inbounds, err := f.st.FleetInbounds(ctx, n.ID, false)
+	if err != nil {
+		return "port_443_taken", ""
+	}
+	type inboundSpec struct {
+		row  store.FleetInboundRow
+		spec plugin.InboundSpec
+	}
+	var specs []inboundSpec
+	vless443 := false
+	for _, row := range inbounds {
+		if !row.Enabled {
+			continue
+		}
+		spec, err := f.buildSpec(n, row)
+		if err != nil {
+			continue
+		}
+		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && spec.Listen.Port == 443 {
+			vless443 = true
+			if vlessExternalReality(spec) {
+				return "reality_external_target", row.ProfileID
+			}
+		}
+		specs = append(specs, inboundSpec{row: row, spec: spec})
+	}
+	for _, inbound := range specs {
+		spec := inbound.spec
+		if spec.Protocol == "hysteria2" && hy2SitePort(spec) == 443 {
+			if !vless443 {
+				return "", ""
+			}
+			continue
+		}
+		if spec.Protocol == "vless" && spec.Listen.Port == 443 && bridgeVLESSOwnSite([]tcpSpec{{Profile: inbound.row.ProfileName, Spec: spec}}, inbound.row.ProfileName) {
+			continue
+		}
+		holds := spec.Listen.Network == "tcp" && (spec.Listen.Port == 443 || spec.Listen.HopFrom != 0 && spec.Listen.HopFrom <= 443 && spec.Listen.HopTo >= 443)
+		if holds {
+			return "port_443_taken", inbound.row.ProfileID
+		}
+	}
+	relays, err := f.st.RelayLinks(ctx, store.RelayFilter{ViaNodeID: n.ID})
+	if err != nil {
+		return "port_443_taken", ""
+	}
+	for _, relay := range relays {
+		if relay.Network == "tcp" && relay.Port == 443 {
+			return "port_443_taken", ""
+		}
+	}
+	return "", ""
+}
+
+func vlessExternalReality(spec plugin.InboundSpec) bool {
+	var settings struct {
+		Security string `json:"security"`
+		Reality  struct {
+			Target string `json:"target"`
+		} `json:"reality"`
+	}
+	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
+		return false
+	}
+	return settings.Security == "reality" && settings.Reality.Target != "self"
 }
 
 func fleetUnix(t time.Time) int64 {

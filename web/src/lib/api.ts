@@ -26,6 +26,7 @@ import { RelayService } from "@/gen/mistgate/admin/v1/relay_pb";
 import { SubscriptionService } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { SubscriptionHostService } from "@/gen/mistgate/admin/v1/subscription_host_pb";
 import { TelegramService } from "@/gen/mistgate/admin/v1/telegram_pb";
+import { TrustTunnelService } from "@/gen/mistgate/trusttunnel/v1/trusttunnel_pb";
 import { TspuProbeService } from "@/gen/mistgate/admin/v1/tspu_probe_pb";
 import { UpdateService } from "@/gen/mistgate/admin/v1/update_pb";
 import { UserService } from "@/gen/mistgate/admin/v1/user_pb";
@@ -68,6 +69,8 @@ export const apiTokens = createClient(ApiTokenService, transport);
 export const approvals = createClient(ApprovalService, transport);
 export const assistant = createClient(AssistantService, transport);
 export const telegram = createClient(TelegramService, transport);
+// The tt:// keys of the official TrustTunnel apps (a package of its own: the Cloudflare edition answers unavailable_in_edition).
+export const trustTunnel = createClient(TrustTunnelService, transport);
 export const globalping = createClient(GlobalpingService, transport);
 export const countryReach = createClient(CountryReachabilityService, transport);
 export const blocklist = createClient(BlocklistService, transport);

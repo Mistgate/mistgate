@@ -13,7 +13,7 @@ import { entryOffered, entryState, type Ipv6Entry, type Ipv6Fact, type Lane, typ
 export type Net = "udp" | "tcp";
 /** The network a protocol's server listens on (the plugins' Listen.Network). */
 export const networkOf = (protocol: string): Net | undefined =>
-  (({ hysteria2: "udp", awg: "udp", vless: "tcp", mtproto: "tcp" }) as Record<string, Net>)[protocol];
+  (({ hysteria2: "udp", awg: "udp", vless: "tcp", mtproto: "tcp", trusttunnel: "tcp" }) as Record<string, Net>)[protocol];
 
 /** A port's type: a relay joins a network to the same network; people and exits join anything of theirs. */
 export type PortType = Net | "people" | "egress";

@@ -4,6 +4,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -137,6 +138,16 @@ func TestSubscriptionSettingsPlansAndApplies(t *testing.T) {
 				t.Fatalf("texts: %+v", e.w.subs)
 			}
 		}},
+		{"headers", map[string]any{"response_headers": []any{
+			map[string]any{"name": "flclashx-servicename", "value": "My VPN"},
+			map[string]any{"name": "flclashx-view", "value": "Мой VPN", "base64": true, "formats": []any{"mihomo_yaml"}, "groups": []any{"grp_1"}},
+		}}, func(t *testing.T, e *testEnv) {
+			h := e.w.subs.GetResponseHeaders()
+			if len(h) != 2 || h[0].GetName() != "flclashx-servicename" || h[0].GetOnlyGroups() || len(h[0].GetFormats()) != 0 ||
+				!h[1].GetBase64() || h[1].GetFormats()[0] != adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML || !h[1].GetOnlyGroups() || h[1].GetGroupIds()[0] != "grp_1" {
+				t.Fatalf("headers: %+v", h)
+			}
+		}},
 		{"link_limits", map[string]any{"mode": "strict", "link_awg": false, "link_auto_select": false}, func(t *testing.T, e *testEnv) {
 			if e.w.subs.GetLinkDeviceLimit() != adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_STRICT || e.w.subs.GetLinkAwg() || e.w.subs.GetLinkAutoSelect() {
 				t.Fatalf("link limits: %+v", e.w.subs)
@@ -158,7 +169,7 @@ func TestSubscriptionSettingsPlansAndApplies(t *testing.T) {
 			e := newTestEnv(t)
 			_, operator := e.token(ProfileOperator)
 			s := e.session(operator)
-			tool := map[string]string{"rules": "subscription_rules_set", "texts": "subscription_texts_set", "link_limits": "subscription_link_limits_set", "page": "subscription_page_set", "dns": "dns_settings_set"}[tc.name]
+			tool := map[string]string{"rules": "subscription_rules_set", "texts": "subscription_texts_set", "headers": "subscription_texts_set", "link_limits": "subscription_link_limits_set", "page": "subscription_page_set", "dns": "dns_settings_set"}[tc.name]
 			p := planOf(t, s, tool, tc.args)
 			if !p.NeedsApproval || len(p.Danger) != 1 || p.Danger[0] != dangerPage || strings.TrimSpace(p.Summary) == "" {
 				t.Fatalf("plan: %+v", p)
@@ -167,6 +178,11 @@ func TestSubscriptionSettingsPlansAndApplies(t *testing.T) {
 			if tc.name == "link_limits" {
 				if factIn(t, p.Facts, "shared_link_users").Params["n"] != "5" || factIn(t, p.Facts, "link_awg_keys").Params["n"] != "7" {
 					t.Fatalf("strict/AWG impact facts: %+v", p.Facts)
+				}
+			}
+			if tc.name == "headers" {
+				if f := factIn(t, p.Facts, "header_2"); !f.Untrusted || !strings.Contains(f.Value, "base64") || !strings.Contains(f.Value, "mihomo_yaml") || factIn(t, p.Facts, "response_headers").Params["n"] != "2" {
+					t.Fatalf("header facts: %+v", p.Facts)
 				}
 			}
 			if tc.name == "rules" && !factIn(t, p.Facts, "rule_1").Untrusted {
@@ -187,6 +203,7 @@ func TestSubscriptionSettingsPlansAndApplies(t *testing.T) {
 	}
 	for _, tc := range []struct{ tool, args string }{
 		{"subscription_texts_set", `{"announcement":"token tk1_QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"}`},
+		{"subscription_texts_set", `{"response_headers":[{"name":"x-token","value":"token tk1_QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"}]}`},
 		{"subscription_rules_set", `{"rules":[{"ua_contains":"vless://11111111-2222-3333-4444-555555555555@203.0.113.77:443","format":"user_page"}]}`},
 	} {
 		e := newTestEnv(t)
@@ -328,5 +345,51 @@ func TestNodeUpdatePlanAppliesOnlyMetadataAndSubscriptionSwitches(t *testing.T) 
 	}
 	if len(e.plans.byID) != 1 {
 		t.Fatal("secret-shaped node note created a plan")
+	}
+}
+
+// An agent cannot plan a header the panel keeps for itself, a value with a line break, a group that does not exist or a format
+// that is not served as a subscription: the plan fails before anything is stored.
+func TestSubscriptionHeaderPlansRefuseWhatASaveRefuses(t *testing.T) {
+	e := newTestEnv(t)
+	_, operator := e.token(ProfileOperator)
+	s := e.session(operator)
+	for name, h := range map[string]map[string]any{
+		"a panel header":     {"name": "Profile-Title", "value": "x"},
+		"a transport header": {"name": "content-length", "value": "1"},
+		"a header family":    {"name": "X-Hwid-Limit-2", "value": "1"},
+		"a line break":       {"name": "x-a", "value": "a\r\nSet-Cookie: x=y"},
+		"a bad name":         {"name": "x a", "value": "v"},
+		"non-ASCII as is":    {"name": "x-a", "value": "Мой VPN"},
+		"an unknown group":   {"name": "x-a", "value": "v", "groups": []any{"grp_nosuch"}},
+		"the user page":      {"name": "x-a", "value": "v", "formats": []any{"user_page"}},
+		"an invisible value": {"name": "x-a", "value": "a\u200bb"},
+	} {
+		mustFail(t, s, "subscription_texts_set_plan", map[string]any{"response_headers": []any{h}})
+		if len(e.plans.byID) != 0 {
+			t.Fatalf("%s created a stored plan", name)
+		}
+	}
+	tooMany := make([]any, 21)
+	for i := range tooMany {
+		tooMany[i] = map[string]any{"name": fmt.Sprintf("x-n%d", i), "value": "v"}
+	}
+	mustFail(t, s, "subscription_texts_set_plan", map[string]any{"response_headers": tooMany})
+	if out := mustFail(t, s, "subscription_texts_set_plan", map[string]any{"response_headers": []any{}}); !strings.Contains(out, "nothing to change") {
+		t.Fatalf("removing none: %s", out)
+	}
+}
+
+// The settings read shows the headers and the reserved names.
+func TestSubscriptionSettingsGetShowsResponseHeaders(t *testing.T) {
+	e := newTestEnv(t)
+	_, operator := e.token(ProfileOperator)
+	s := e.session(operator)
+	e.w.mu.Lock()
+	e.w.subs.ResponseHeaders = []*adminv1.ResponseHeader{{Name: "flclashx-servicename", Value: "My VPN", Formats: []adminv1.SubFormat{adminv1.SubFormat_SUB_FORMAT_XRAY_JSON}, OnlyGroups: true, GroupIds: []string{"grp_1"}}}
+	e.w.mu.Unlock()
+	v := decode[SubsSettingsV](t, mustOK(t, s, "subscription_settings_get", map[string]any{}))
+	if len(v.ResponseHeaders) != 1 || v.ResponseHeaders[0].Name != "flclashx-servicename" || v.ResponseHeaders[0].Formats[0] != "xray_json" || !v.ResponseHeaders[0].Only || v.ResponseHeaders[0].Groups[0] != "grp_1" {
+		t.Fatalf("headers: %+v", v.ResponseHeaders)
 	}
 }

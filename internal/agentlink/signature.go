@@ -12,6 +12,7 @@ const (
 	agentDomain   = "mistgate-agent-link/1\x00"
 	agentDomainV2 = "mistgate-agent-link/2\x00"
 	panelDomain   = "mistgate-panel-link/1\x00"
+	bridgeDomain  = "mistgate-bridge/1\x00"
 	scalarSize    = 32
 	signatureSize = 2 * scalarSize
 )
@@ -33,6 +34,17 @@ func AgentDigestV2(nodeID, audience string, panelNonce, agentNonce []byte) []byt
 // PanelDigest hashes the mistgate-panel-link/1 domain, NUL-separated node ID and audience, and concatenated nonces with SHA-256.
 func PanelDigest(nodeID, audience string, panelNonce, agentNonce []byte) []byte {
 	h := sha256.Sum256([]byte(panelDomain + nodeID + "\x00" + audience + "\x00" + string(panelNonce) + string(agentNonce)))
+	return h[:]
+}
+
+// BridgeDigest hashes the bridge domain, TLS exporter and accepting entry id. The exporter is unique to that connection,
+// so a captured proof cannot be replayed over another TLS session or protocol.
+func BridgeDigest(entryNodeID string, exporter []byte) []byte {
+	message := make([]byte, 0, len(bridgeDomain)+len(exporter)+len(entryNodeID))
+	message = append(message, bridgeDomain...)
+	message = append(message, exporter...)
+	message = append(message, entryNodeID...)
+	h := sha256.Sum256(message)
 	return h[:]
 }
 

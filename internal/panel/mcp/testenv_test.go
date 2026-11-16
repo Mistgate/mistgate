@@ -34,6 +34,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/tasks/v1/tasksv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -435,6 +436,7 @@ type world struct {
 	warpRestarts        []*adminv1.RestartWarpRequest
 	warpRegistrations   []*adminv1.RegisterWarpRequest
 	nodeDecoyReqs       []*adminv1.SetNodeDecoyModeRequest
+	noOwnDecoy          bool // the node's edition does not store own decoy bundles
 	relay               relayFixture
 
 	// awgStatus makes a node report one AmneziaWG inbound with this state (nil = the node serves none); awgFallback adds the
@@ -723,7 +725,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 		Node: &adminv1.Node{
 			AwgBackend: awgMode,
 			Id:         r.Msg.GetNodeId(), Name: name, Address: canaryAddr, CountryCode: country, Location: location, Provider: provider, Status: w.nodeStatuses[r.Msg.GetNodeId()],
-			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: true,
+			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: !w.noOwnDecoy,
 			Ipv6: w.ipv6Of(r.Msg.GetNodeId()),
 		},
 		Metrics:  w.metricsOf(r.Msg.GetNodeId()),
@@ -1471,7 +1473,7 @@ func (w *world) ListClients(context.Context, *connect.Request[adminv1.ListClient
 func (w *world) GetSubscriptionSettings(context.Context, *connect.Request[adminv1.GetSubscriptionSettingsRequest]) (*connect.Response[adminv1.GetSubscriptionSettingsResponse], error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return connect.NewResponse(&adminv1.GetSubscriptionSettingsResponse{Settings: proto.Clone(w.subs).(*adminv1.SubscriptionSettings), EffectiveTitle: "Example VPN", SharedLinkUsers: 5, LinkAwgKeys: 7}), nil
+	return connect.NewResponse(&adminv1.GetSubscriptionSettingsResponse{Settings: proto.Clone(w.subs).(*adminv1.SubscriptionSettings), EffectiveTitle: "Example VPN", SharedLinkUsers: 5, LinkAwgKeys: 7, ReservedHeaderNames: subhdr.ReservedNames()}), nil
 }
 
 // UpdateSubscriptionSettings is the real save's check and store: what the MCP layer sends must pass the admin's validation.

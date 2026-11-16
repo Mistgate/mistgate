@@ -18,19 +18,25 @@ import type { BlockedN, DeviceN as Device } from "./model";
 import { useTx, type Tx } from "./t";
 import { ConfirmModal } from "./ui";
 
+/** The person's TrustTunnel key among their devices: a KEY device that holds this protocol (an AmneziaVPN key has an AWG profile instead). */
+export const isTrustTunnelKey = (d: Pick<Device, "kind" | "protocols" | "awgProfileId">) => d.kind === DeviceKind.KEY && (d.protocols ?? []).includes("trusttunnel") && !d.awgProfileId;
+
 /**
  * The person's devices by what they are: apps on the link with a device ID of their own, the one place the apps without a
- * device ID share, AmneziaVPN keys, and the Telegram key (a device of its own kind, shown in the Telegram block). A device of an older panel has no kind: a key has its profile, the rest is the
- * shared place (before device IDs every app on the link was that one device).
+ * device ID share, AmneziaVPN keys, the Telegram key (a device of its own kind, shown in the Telegram block) and the TrustTunnel key
+ * (a KEY device like an AmneziaVPN one, told apart by its protocol, and shown in the TrustTunnel block). A device of an older panel
+ * has no kind: a key has its profile, the rest is the shared place (before device IDs every app on the link was that one device).
  */
 export function splitDevices(devices: Device[]) {
-  const isKey = (d: Device) => d.kind === DeviceKind.KEY || d.awgProfileId !== "";
+  const isTrustTunnel = isTrustTunnelKey;
+  const isKey = (d: Device) => !isTrustTunnel(d) && (d.kind === DeviceKind.KEY || d.awgProfileId !== "");
   const isTelegram = (d: Device) => d.kind === DeviceKind.TELEGRAM_KEY;
   return {
-    link: devices.filter((d) => !isKey(d) && d.kind === DeviceKind.LINK),
-    shared: devices.filter((d) => !isKey(d) && !isTelegram(d) && d.kind !== DeviceKind.LINK),
+    link: devices.filter((d) => !isKey(d) && !isTrustTunnel(d) && d.kind === DeviceKind.LINK),
+    shared: devices.filter((d) => !isKey(d) && !isTelegram(d) && !isTrustTunnel(d) && d.kind !== DeviceKind.LINK),
     keys: devices.filter(isKey),
     telegram: devices.filter(isTelegram),
+    trustTunnel: devices.filter(isTrustTunnel),
   };
 }
 

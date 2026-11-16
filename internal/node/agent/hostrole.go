@@ -21,6 +21,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/node/subhost"
 )
 
@@ -145,7 +146,7 @@ func (a *Agent) endForNewLink() {
 func (a *Agent) nextLinkSession(ctx context.Context, next string) error {
 	a.log.Info("trying the new panel link address")
 	err := a.linkSession(ctx, func(ctx context.Context) (*websocketAgentTransport, func(), error) {
-		t, cleanup, err := a.dialLinkBase(ctx, next)
+		t, cleanup, err := a.dialLinkBase(ctx, next, "")
 		if err == nil {
 			t.onEstablished = func() { a.commitNextLink(next) }
 		}
@@ -305,6 +306,12 @@ func (a *Agent) syncStandaloneLocked() {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 		ErrorLog:          log.New(io.Discard, "", 0),
+	}
+	// Same HTTP/2 frames as every other site of the node (sitehttp), so this one is not told apart by them.
+	if err := sitehttp.ConfigureSiteHTTP2(srv); err != nil {
+		_ = ln.Close()
+		a.log.Warn("subscription host site not started", "code", "sub_host_site_failed", "err", err)
+		return
 	}
 	s.srv, s.ln = srv, a.subhost.WrapSite(ln, 443, false)
 	go func(ln net.Listener) { _ = srv.ServeTLS(ln, "", "") }(s.ln)

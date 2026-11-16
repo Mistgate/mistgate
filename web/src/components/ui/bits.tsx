@@ -5,9 +5,10 @@ import { initialOf } from "@/lib/initial";
 import { IconChip, type IconName, type Tone } from "./icons";
 
 /** Small static label: 22px, grey on surface-2. */
-export function Chip({ children, mono, className }: { children: ReactNode; mono?: boolean; className?: string }) {
+export function Chip({ children, mono, className, title }: { children: ReactNode; mono?: boolean; className?: string; title?: string }) {
   return (
     <span
+      title={title}
       className={cx(
         "inline-flex h-[22px] flex-none items-center rounded-ctl bg-surface-2 px-2 text-[11px] font-semibold whitespace-nowrap text-muted",
         mono && "font-mono",

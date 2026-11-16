@@ -43,7 +43,7 @@ export const isIp = (address: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(address)
  * address=…", "already_on_node") come first; the panel's older English sentences of the same refusals are recognised too.
  * Anything else reads as errorText does.
  */
-export function refusalOf(e: unknown, t: Tx, node: { name: string; address: string }): Refusal {
+export function refusalOf(e: unknown, t: Tx, node: { name: string; address: string }, protocol?: string): Refusal {
   const msg = ConnectError.from(e).rawMessage;
   const code = errorCode(msg);
   const v = errorVars(msg);
@@ -58,7 +58,9 @@ export function refusalOf(e: unknown, t: Tx, node: { name: string; address: stri
     const port = v.port ?? old?.[1] ?? "";
     const profile = v.profile ?? old?.[2] ?? "";
     const free = v.free || undefined;
-    return { kind: "port", free, text: t(free ? "where.portTakenFree" : "where.portTaken", { port, node: node.name, profile, free: free ?? "" }) };
+    // TrustTunnel holds TCP and, with HTTP/3, the UDP port of the same number, so it says which one may be the clash
+    const key = protocol === "trusttunnel" ? (free ? "where.portTakenTtFree" : "where.portTakenTt") : free ? "where.portTakenFree" : "where.portTaken";
+    return { kind: "port", free, text: t(key, { port, node: node.name, profile, free: free ?? "" }) };
   }
   if (code === "acme_needs_domain" || /host name is required for a Let's Encrypt certificate/.test(msg)) {
     return { kind: "domain", text: t("where.domainNeed", { node: node.name, address: v.address || node.address }) };
@@ -203,7 +205,7 @@ function DeployBody({
         patch(id, { state: "ok", notes: portNotes(t, added?.warnings) });
         ok++;
       } catch (e) {
-        const ref = refusalOf(e, t, n);
+        const ref = refusalOf(e, t, n, profile.protocol);
         if (ref.kind === "already") {
           patch(id, { state: "already", refusal: ref });
           ok++;

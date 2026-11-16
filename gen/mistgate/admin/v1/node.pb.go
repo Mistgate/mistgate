@@ -321,8 +321,19 @@ type Node struct {
 	// Bytes this node passed on as a relay entry since 00:00 (the same day boundary as traffic_today_bytes). Until agents count the
 	// way back it is the direction towards the exits only.
 	RelayTodayBytes uint64 `protobuf:"varint,39,opt,name=relay_today_bytes,json=relayTodayBytes,proto3" json:"relay_today_bytes,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The TCP port of this node's site that the bridge of a reverse relay arrives at when the node is an entry; 0 = 443 on the
+	// node's own site (the usual case). The path of the bridge is not shown: it is the panel's, like the key of a link.
+	BridgePort uint32 `protobuf:"varint,40,opt,name=bridge_port,json=bridgePort,proto3" json:"bridge_port,omitempty"`
+	// Why the bridge is not on 443: "" (it is, or no reverse relay needs it), "reality_external_target" (a VLESS inbound holds 443
+	// with a foreign REALITY target, so the bridge has a port of its own) or "port_443_taken" (another server of the node holds 443).
+	BridgePortReason string `protobuf:"bytes,41,opt,name=bridge_port_reason,json=bridgePortReason,proto3" json:"bridge_port_reason,omitempty"`
+	// The profile whose inbound holds 443 in those two cases, for the "open the profile" button; empty otherwise.
+	BridgePortProfileId string `protobuf:"bytes,42,opt,name=bridge_port_profile_id,json=bridgePortProfileId,proto3" json:"bridge_port_profile_id,omitempty"`
+	// The entry node whose bridge the agent of this node runs its control channel through, because it cannot reach the panel
+	// directly; empty = a direct connection (Hello.link_via_node_id; live state, not stored).
+	LinkViaNodeId string `protobuf:"bytes,43,opt,name=link_via_node_id,json=linkViaNodeId,proto3" json:"link_via_node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Node) Reset() {
@@ -626,6 +637,34 @@ func (x *Node) GetRelayTodayBytes() uint64 {
 		return x.RelayTodayBytes
 	}
 	return 0
+}
+
+func (x *Node) GetBridgePort() uint32 {
+	if x != nil {
+		return x.BridgePort
+	}
+	return 0
+}
+
+func (x *Node) GetBridgePortReason() string {
+	if x != nil {
+		return x.BridgePortReason
+	}
+	return ""
+}
+
+func (x *Node) GetBridgePortProfileId() string {
+	if x != nil {
+		return x.BridgePortProfileId
+	}
+	return ""
+}
+
+func (x *Node) GetLinkViaNodeId() string {
+	if x != nil {
+		return x.LinkViaNodeId
+	}
+	return ""
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",
@@ -6518,7 +6557,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xb7\f\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xe4\r\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -6565,7 +6604,12 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\fpublic_label\x18% \x01(\tR\vpublicLabel\x12\x1f\n" +
 	"\vlink_sealed\x18& \x01(\bR\n" +
 	"linkSealed\x12.\n" +
-	"\x11relay_today_bytes\x18' \x01(\x04B\x020\x02R\x0frelayTodayBytes\"\x8d\x02\n" +
+	"\x11relay_today_bytes\x18' \x01(\x04B\x020\x02R\x0frelayTodayBytes\x12\x1f\n" +
+	"\vbridge_port\x18( \x01(\rR\n" +
+	"bridgePort\x12,\n" +
+	"\x12bridge_port_reason\x18) \x01(\tR\x10bridgePortReason\x123\n" +
+	"\x16bridge_port_profile_id\x18* \x01(\tR\x13bridgePortProfileId\x12'\n" +
+	"\x10link_via_node_id\x18+ \x01(\tR\rlinkViaNodeId\"\x8d\x02\n" +
 	"\bNodeIpv6\x12\x14\n" +
 	"\x05entry\x18\x01 \x01(\tR\x05entry\x12'\n" +
 	"\x0fentry_supported\x18\x02 \x01(\bR\x0eentrySupported\x12-\n" +

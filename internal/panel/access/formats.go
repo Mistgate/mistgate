@@ -48,8 +48,12 @@ func (s *Service) trialInbound(proto protocols.Protocol, merged json.RawMessage,
 
 // trialRender is one masked render of a profile on the trial inbound, as the subscription would make it.
 func trialRender(proto protocols.Protocol, merged json.RawMessage, node store.AccessNode, in protocols.InboundInput, spec plugin.InboundSpec, format plugin.ClientFormat, pin string) (plugin.Fragment, bool) {
+	var caps []string
+	if protocols.AllowedForApps(proto, plugin.ClientMistgate) { // a protocol of that app alone is shown to it as a client that can use it
+		caps = []string{proto.ID() + "=1"}
+	}
 	return proto.Render(protocols.RenderInput{
-		Format: format, Settings: merged, UserName: "user", MaskSecrets: true,
+		Format: format, Capabilities: caps, Settings: merged, UserName: "user", MaskSecrets: true,
 		Inbound: inboundView(nodeView(node), spec, pin), InboundPublic: in.PluginPublic, NodeAddr: node.Address,
 	})
 }

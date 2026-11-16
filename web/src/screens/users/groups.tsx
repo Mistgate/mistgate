@@ -25,7 +25,7 @@ import { meQuery } from "@/lib/session";
 import { FormatDrops } from "@/screens/profiles/formats";
 import { presetName } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppList } from "@/screens/subscriptions/queries";
-import { telegramOnly } from "@/screens/profiles/protocol-meta";
+import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { groupsQuery, profileListQuery, protocolsQuery } from "./rpc";
 import { groupTone, groupTones, leastUsedTone } from "./format";
@@ -144,8 +144,14 @@ export function WaysOfGroup({
     const apps = protocols.data?.find((x) => x.id === p.protocol)?.apps;
     return apps ? telegramOnly(apps) : p.protocol === "mtproto";
   };
-  const of = (w: Way) => profiles.filter((p) => !tgOnly(p) && wayOf(p.protocol, protocols.data) === w);
+  // TrustTunnel too: its tt:// keys are the person's own, on their page, and not in the subscription
+  const ttOnly = (p: { protocol: string }) => {
+    const apps = protocols.data?.find((x) => x.id === p.protocol)?.apps;
+    return apps ? trustTunnelOnly(apps) : p.protocol === "trusttunnel";
+  };
+  const of = (w: Way) => profiles.filter((p) => !tgOnly(p) && !ttOnly(p) && wayOf(p.protocol, protocols.data) === w);
   const tg = profiles.filter(tgOnly);
+  const tt = profiles.filter(ttOnly);
   return (
     <div className={cx("flex flex-col", compact ? "gap-2.5" : "gap-3")}>
       {(["sub", "awg"] as const).map((w) => {
@@ -187,6 +193,19 @@ export function WaysOfGroup({
             <span className="text-xs leading-[22px] font-bold">{t("tgproxy.toggle")}</span>
             <div className="flex flex-wrap gap-1.5">
               {tg.map((p) => (
+                <ProfileLink key={p.id} id={p.id} name={p.name} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {tt.length > 0 && (
+        <div className="flex items-start gap-2.5">
+          <IconChip icon="tunnel" tone="sage" size={22} className="mt-px" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span className="text-xs leading-[22px] font-bold">{t("tt.toggle")}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {tt.map((p) => (
                 <ProfileLink key={p.id} id={p.id} name={p.name} />
               ))}
             </div>

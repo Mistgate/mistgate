@@ -38,6 +38,7 @@ const maxCertLife = 11 * 365 * 24 * time.Hour
 type SessionState struct {
 	Version         uint8     `json:"v"`
 	NodeID          string    `json:"n,omitempty"`
+	LinkViaNodeID   string    `json:"lv,omitempty"`
 	OwnerGeneration uint64    `json:"o,omitempty"`
 	InstanceID      string    `json:"i,omitempty"`
 	AgentCaps       []string  `json:"ac,omitempty"`
@@ -337,6 +338,10 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	}
 	tr.state.Version = sessionStateVersion
 	tr.state.InstanceID = h.InstanceId
+	tr.state.LinkViaNodeID = ""
+	if bridgeNodeIDPattern.MatchString(h.LinkViaNodeId) && h.LinkViaNodeId != tr.state.NodeID {
+		tr.state.LinkViaNodeID = h.LinkViaNodeId
+	}
 	tr.state.HelloDeadline = time.Time{}
 	// The stats credit a node starts with: one minute plus the panel time since the node last reached the panel, so a
 	// restart or an outage of the panel does not cost the node the batches it queued meanwhile (stats are committed
@@ -363,6 +368,9 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
 	autoMeasure = autoMeasure && slices.Contains(info.Caps, capBandwidth)
 	tr.state.AgentCaps = slices.Clone(info.Caps)
+	if !slices.Equal(prev.AgentCaps, info.Caps) {
+		c.f.controlRelaysForNode(ctx, tr.state.NodeID)
+	}
 	settings := c.f.nodeSettings(node, info.Caps)
 	tr.state.OsStatusEnabled = settings.GetOsStatus()
 	tr.state.SentSettingsHash = settingsSig(settings)
@@ -611,6 +619,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	if !out.Duplicate {
 		budget.spend(g.creditedSpan)
 		c.l3Stats(ctx, tr.state, st, out.InboundIDs, now)
+		c.f.recordBridgeReports(ctx, tr.state.NodeID, st.Bridges, now)
 		if out.OffNode > 0 || out.Clamped > 0 {
 			c.statsAdjusted(ctx, tr.state, out.OffNode, out.Clamped, now)
 		}
@@ -632,6 +641,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 type liveJSONView struct {
 	IntervalEndUnix   int64             `json:"interval_end_unix"`
 	MetricsAtUnix     int64             `json:"metrics_at_unix"`
+	LinkViaNodeID     string            `json:"link_via_node_id,omitempty"`
 	Metrics           *liveJSONMetrics  `json:"metrics,omitempty"`
 	Health            []liveJSONHealth  `json:"health"`
 	RunningInboundIDs []string          `json:"running_inbound_ids,omitempty"`
@@ -720,6 +730,7 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 	const maxRate = uint64(1 << 50)
 	view := liveJSONView{
 		IntervalEndUnix:   end,
+		LinkViaNodeID:     state.LinkViaNodeID,
 		Health:            make([]liveJSONHealth, 0, min(len(st.Health), 64)),
 		RunningInboundIDs: make([]string, 0, min(len(st.Health), maxLiveRunningInbounds)),
 		Online:            make([]liveJSONOnline, 0, min(len(st.Sessions), 2000)),
@@ -1149,6 +1160,7 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	if err := c.f.st.RecordNodeApplyMeta(ctx, tr.state.NodeID, status, r.DurationMs, tr.state.Drift, now); err != nil {
 		c.f.log.Warn("record apply time", "code", "apply_time_failed", "node", tr.state.NodeID, "err", err)
 	}
+	c.f.recordBridgeReports(ctx, tr.state.NodeID, r.Bridges, now)
 	c.relaysApplied(ctx, tr.state.NodeID, r, len(in) > 0, inboundStateChanged, now)
 	return nil
 }
@@ -1326,6 +1338,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		ds.Inbounds = fullInbounds(want)
 		ds.Warp = warpProto(want.warp)
 		ds.Relays = relaysProto(want.relays)
+		ds.BridgeServe, ds.BridgeDials = bridgeServeProto(want.bridgeServe), bridgeDialsProto(want.bridgeDials)
 	} else {
 		ds.BaseRevision = state.SentRevision
 		ds.Inbounds, ds.RemovedInboundIds = diffState(digest, want)
@@ -1334,6 +1347,12 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		}
 		if digest.Relays != relaysHash(want.relays) {
 			ds.Relays = relayProtoAlways(want.relays) // presence replaces the list; the empty wrapper clears it
+		}
+		if digest.Serve != serveHash(want.bridgeServe) {
+			ds.BridgeServe = bridgeServeAlways(want.bridgeServe) // presence replaces the setting; the empty message stops the bridge
+		}
+		if digest.Dials != dialsHash(want.bridgeDials) {
+			ds.BridgeDials = bridgeDialsAlways(want.bridgeDials) // the empty wrapper clears the list
 		}
 	}
 	_, raw, err := marshalSentDigest(want, rev)

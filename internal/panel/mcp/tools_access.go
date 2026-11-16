@@ -49,7 +49,7 @@ func accessTools() []toolDef {
 		readToolWithin(accessTimeout, "access_report", ProfileReadonly, accessProcs,
 			"Which servers do not open for people, for whom, and what to change, in one call. hours is 1 to 168 (default 24); optional country (two letters), group (id or exact name), node (id or exact name) and protocol (hysteria2, awg, vless ...) narrow it. "+
 				"matrix: per node and server (protocol, transport, port, network, egress, CDN) over the window: given_users, devices and users that tried and that succeeded, success_pct (absent for VLESS, which keeps no failure counter per device: attempts_observable false), "+
-				"rejects split as far as the counters allow (reject_split: key_expired, unknown_key, handshake_incomplete, no_auth, stalled_handshake, and with links/3 agents why: no_reply (the node answered, nothing came back), cert_refused, alerts_sent, alerts_recv, reality_fallback, reality_auth_failed, answers_lost and unanswered for AmneziaWG on the userspace backend), stalls, freezes, loss and rtt for Hysteria2, tcp_stalls and tcp_stalls_16k for VLESS, signals (tcp_freeze_16k, answers_lost, cert_refused among them), never-connected and untried people given the server, a verdict, and the same per group. "+
+				"rejects split as far as the counters allow (reject_split: key_expired, unknown_key, handshake_incomplete, no_auth, stalled_handshake, and with links/3 agents why: no_reply (the node answered, nothing came back), cert_refused, alerts_sent, alerts_recv, reality_fallback, reality_auth_failed, TrustTunnel auth_failed, answers_lost and unanswered for AmneziaWG on the userspace backend), stalls, freezes, loss and rtt for Hysteria2, tcp_stalls and tcp_stalls_16k for VLESS, signals (tcp_freeze_16k, answers_lost, cert_refused among them), never-connected and untried people given the server, a verdict, and the same per group. "+
 				"country: per node the country verdict, TSPU ports (blocked, open, refused, timeout), dark and reaching operators, and the kl!ck reports by operator and by server kind. "+
 				"block_diagnosis: the block class of each node (see block_diagnosis). "+
 				"findings: machine-readable codes (node_down, node_blocked_in_country, ip_blocked, port_blocked, tcp_throttled, udp_blocked, protocol_fingerprinted, whitelist_mode, operator_specific, regional, not_blocked_but_broken, protocol_blocked_on_node, udp_lossy_path, awg_handshake_no_reply, relay_down, group_without_working_way, cdn_only_option, given_never_connected, counters_unavailable) with severity, evidence refs and affected users and groups. "+
@@ -63,7 +63,7 @@ func accessTools() []toolDef {
 				"Classes: ip_blocked (every TCP port dark, often ICMP too, the address itself is banned; changing ports does not help; scope tcp_only when ICMP still passes), "+
 				"port_blocked (the TSPU probe or Globalping sees some ports cut while others of the same address open), "+
 				"tcp_throttled (TCP connects but downloads stall after a few KB: kl!ck downloads, or the node's own VLESS connections whose client stopped acknowledging after 8 to 32 KiB (tcp_stalls_16k); DPI freezing), "+
-				"udp_blocked (packets from in-country senders are lost or QUIC and WireGuard handshakes never complete, while TCP works), "+
+				"udp_blocked (packets from in-country senders are lost or QUIC, WireGuard and TrustTunnel HTTP/3 cannot be reached, while TCP works; TrustTunnel also has HTTP/2 over TCP), "+
 				"protocol_fingerprinted (UDP passes as a whole but one protocol's handshakes fail while another works, stronger where the node sees its answers lost: Hysteria2 hs_unfinished, AmneziaWG responses_unmatched; or VLESS REALITY handshakes answered and never finished: cut after the ClientHello), "+
 				"whitelist_mode (mobile networks dark, fixed lines reach it: only whitelisted addresses help, ports and protocols do not), "+
 				"operator_specific and regional (dark only for some operators or regions), not_blocked_but_broken (the node is down, a server failed or a port is closed on the host, apps refuse the node's certificate, AmneziaWG initiations go unanswered, or REALITY authentication fails for everyone (detail.reason): our problem, not the censor's), and unknown (no view from inside the country). "+
@@ -262,6 +262,12 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 			in.Profiles[p.GetId()] = accProfile{ID: p.GetId(), Name: nm(p.GetName()), Protocol: clean(p.GetProtocol(), 40), Summary: clean(p.GetSummary(), 200)}
 		}
 	}
+	for i := range in.Inbounds {
+		x := &in.Inbounds[i]
+		if normProtocol(x.Protocol) == "trusttunnel" {
+			x.H3 = strings.Contains(strings.ToLower(in.Profiles[x.ProfileID].Summary), "http/3")
+		}
+	}
 	if r, err := c.cl.Node.GetFleetConnections(c.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{Hours: uint32(in.Hours)})); err != nil {
 		miss("connection_counters")
 	} else {
@@ -309,9 +315,12 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 		for _, x := range r.Msg.GetRelays() {
 			ar := accRelay{ID: clean(x.GetId(), 80), EntryID: clean(x.GetViaNodeId(), 80), ExitID: clean(x.GetExitNodeId(), 80), InboundID: clean(x.GetInboundId(), 80),
 				ProfileID: clean(x.GetProfileId(), 80), State: inboundStateName(x.GetState()), Enabled: x.GetEnabled(), ExitLive: x.GetExitLive(), AgentSupported: x.GetAgentSupported(),
+				Mode: x.GetMode(), ActiveMode: x.GetActiveMode(), ReverseSupported: x.GetReverseBlocked() == "",
 				MonitorAtUnix: x.GetMonitor().GetAtUnix(), MonitorFails: x.GetMonitor().GetFailStreak()}
 			if ck := x.GetCheck(); ck != nil && ck.GetAtUnix() != 0 {
 				ar.Checked, ar.CheckOK = true, ck.GetOk()
+				ar.PathOK = ck.GetPath().GetStatus() == "ok" || ck.GetPath().GetStatus() == "skipped" && ck.GetPath().GetCode() == "unverifiable"
+				ar.BridgeOK, ar.BridgeAtUnix = ck.GetBridge().GetStatus() == "ok", ck.GetBridge().GetAtUnix()
 			}
 			in.Relays = append(in.Relays, ar)
 		}

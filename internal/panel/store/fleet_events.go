@@ -40,6 +40,7 @@ var panelEventCodes = map[string]struct{}{
 	"update_step_passed": {}, "update_step_failed": {}, "update_step_rolled_back": {}, "update_download_source": {},
 	"os_step_passed": {}, "os_step_failed": {}, "client_logs_declined": {}, "client_logs_received": {},
 	"subscription_shared_suspect": {}, "sub_host_tunnel_down": {}, "sub_host_tunnel_not_recognised": {}, "sub_host_tunnel_up": {},
+	"relay_mode_changed": {},
 }
 
 const deviceLimitEventWindow = time.Hour

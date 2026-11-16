@@ -66,8 +66,8 @@ type Config struct {
 	AfterResponse AfterResponseRunner
 	// CheckPorts runs the fleet UDP delivery check; nil disables save-time checks.
 	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
-	// CheckRelay runs the fleet's check of a relay (fleet.CheckRelay): the stages it names (store.RelayStageLeg, RelayStagePath;
-	// none = both), the result stored in the relay and returned. nil: relays cannot be checked, so none is switched on.
+	// CheckRelay runs the fleet's check of a relay (fleet.CheckRelay): the stages it names (store.RelayStageLeg, RelayStagePath,
+	// RelayStageReverseReach, RelayStageReverseSpeed; none = leg and path), the result stored in the relay and returned. nil: relays cannot be checked, so none is switched on.
 	CheckRelay func(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
 	// Limiter is the shared backend for token user-change budgets and their refusal-event gate.
 	Limiter securitylimit.Limiter
@@ -103,8 +103,15 @@ type Service struct {
 
 	// relayMu makes "check the entry's ports, then write the relay" one step in this process (relay_rpc.go); the unique keys
 	// of the relay table keep several panels apart. relayGate decides whether a relay may be switched on.
-	relayMu   sync.Mutex
-	relayGate func(context.Context, store.RelayLink) error
+	relayMu sync.Mutex
+	// controlling holds the relays the mode controller is deciding now: a second call for the same relay (the next report, the next
+	// round) is dropped, not queued, because it would decide from the same state, and the proof it may run takes a minute.
+	controlling sync.Map
+	// bridgeWanted is, per relay, whether the last decision of the controller wanted the exit to hold the bridge
+	// (RelayLink.BridgeWanted). The exit's dials are part of its desired state and a stored check stage does not rebuild it, so a
+	// change is told to the nodes.
+	bridgeWanted sync.Map
+	relayGate    func(context.Context, store.RelayLink) error
 	// relaySettleFn follows the switch on (relaySettle); relayWait and relayPoll are how long it waits for the entry's report
 	// and how often it looks; relayHints is the source of the candidates' hints (SetRelayHints).
 	relaySettleFn func(context.Context, store.RelayLink) error
@@ -365,7 +372,7 @@ func (s *Service) mergedSettings(p store.AccessProfile) (json.RawMessage, error)
 }
 
 // appsOf lists the client apps a user has switched on.
-func appsOf(happ, amnezia, telegram bool) []plugin.ClientID {
+func appsOf(happ, amnezia, telegram, trustTunnel bool) []plugin.ClientID {
 	var apps []plugin.ClientID
 	if happ {
 		apps = append(apps, plugin.ClientHapp)
@@ -376,13 +383,16 @@ func appsOf(happ, amnezia, telegram bool) []plugin.ClientID {
 	if telegram {
 		apps = append(apps, plugin.ClientTelegram)
 	}
+	if trustTunnel {
+		apps = append(apps, plugin.ClientTrustTunnel)
+	}
 	return apps
 }
 
 // allowed reports whether one of the user's enabled apps consumes the protocol.
-func (s *Service) allowed(protocol string, happ, amnezia, telegram bool) bool {
+func (s *Service) allowed(protocol string, happ, amnezia, telegram, trustTunnel bool) bool {
 	p, ok := s.reg.Get(protocol)
-	return ok && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram)...)
+	return ok && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram, trustTunnel)...)
 }
 
 func nodeView(n store.AccessNode) protocols.NodeView {

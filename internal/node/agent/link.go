@@ -74,11 +74,17 @@ func parseLinkBase(raw string) (*url.URL, error) {
 }
 
 func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(), error) {
-	return a.dialLinkBase(ctx, a.linkURL())
+	return a.dialLinkVia(ctx, "")
 }
 
-// dialLinkBase dials the link of the panel at the link base address raw (wss://host/<secret-prefix>/).
-func (a *Agent) dialLinkBase(ctx context.Context, raw string) (*websocketAgentTransport, func(), error) {
+// dialLinkVia dials the panel's link at its current address, through the panel bridge of entry node viaNodeID when set.
+func (a *Agent) dialLinkVia(ctx context.Context, viaNodeID string) (*websocketAgentTransport, func(), error) {
+	return a.dialLinkBase(ctx, a.linkURL(), viaNodeID)
+}
+
+// dialLinkBase dials the link of the panel at the link base address raw (wss://host/<secret-prefix>/), through the panel
+// bridge of entry node viaNodeID when set.
+func (a *Agent) dialLinkBase(ctx context.Context, raw, viaNodeID string) (*websocketAgentTransport, func(), error) {
 	base, err := parseLinkBase(raw)
 	if err != nil {
 		return nil, nil, err
@@ -90,7 +96,13 @@ func (a *Agent) dialLinkBase(ctx context.Context, raw string) (*websocketAgentTr
 	endpoint.Fragment = ""
 	endpoint.Scheme = "wss"
 
-	client, cleanup := a.newLinkHTTPClient()
+	var client *http.Client
+	var cleanup func()
+	if viaNodeID == "" {
+		client, cleanup = a.newLinkHTTPClient()
+	} else if client, cleanup, err = a.newLinkHTTPClientVia(viaNodeID); err != nil {
+		return nil, nil, err
+	}
 	return a.dialLinkAt(ctx, endpoint.String(), base.Host, client, cleanup)
 }
 
@@ -204,15 +216,36 @@ func (a *Agent) newLinkHTTPClient() (*http.Client, func()) {
 		st = &pb.NodeSettings{}
 	}
 	timeout := dialTimeout(st)
+	dialContext := (&net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}).DialContext
+	if a.directDialContext != nil {
+		dialContext = a.directDialContext
+	}
 	transport := &http.Transport{
 		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}},
-		DialContext:         (&net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}).DialContext,
+		DialContext:         dialContext,
 		TLSHandshakeTimeout: timeout,
 		IdleConnTimeout:     30 * time.Second,
 		MaxIdleConns:        1,
 	}
 	client := &http.Client{Transport: transport}
 	return client, client.CloseIdleConnections
+}
+
+func (a *Agent) newLinkHTTPClientVia(entryNodeID string) (*http.Client, func(), error) {
+	base, _ := a.newLinkHTTPClient()
+	var transport *http.Transport
+	switch current := base.Transport.(type) {
+	case nil:
+		transport = http.DefaultTransport.(*http.Transport).Clone()
+	case *http.Transport:
+		transport = current.Clone()
+	default:
+		return nil, nil, errors.New("link transport cannot use the bridge")
+	}
+	transport.DialContext = a.panelBridgeDial(entryNodeID)
+	client := *base
+	client.Transport = transport
+	return &client, transport.CloseIdleConnections, nil
 }
 
 var _ agentTransport = (*websocketAgentTransport)(nil)

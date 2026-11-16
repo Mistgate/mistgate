@@ -120,13 +120,14 @@ export function termText(u: User, t: Tx, now = nowSec()): { text: string; tone: 
   return { text: t("users.days", { n: d }), tone: d <= 7 ? "fg" : "muted" };
 }
 
-/** What the user actually connected with in the last 7 days: by the subscription link, by an AmneziaVPN key, or both. */
-export function viaOf(u: User): { link: boolean; keys: boolean } {
-  return { link: u.via.includes(App.HAPP), keys: u.via.includes(App.AMNEZIA) };
+/** What the user actually connected with in the last 7 days: by the subscription link, by an AmneziaVPN key, by a TrustTunnel key, or several. */
+export function viaOf(u: User): { link: boolean; keys: boolean; trustTunnel: boolean } {
+  return { link: u.via.includes(App.HAPP), keys: u.via.includes(App.AMNEZIA), trustTunnel: u.via.includes(App.TRUST_TUNNEL) };
 }
 
 /** "Link + AmneziaVPN keys", "Subscription link" or "AmneziaVPN keys": the ways the admin switched on. */
 export function appsText(u: User, t: Tx): string {
   const ways = u.apps?.happ && u.apps.amnezia ? t("users.appsBoth") : u.apps?.amnezia ? t("users.appsAwg") : t("users.appsHapp");
-  return u.apps?.telegram ? t("users.appsWithTg", { apps: ways }) : ways;
+  const withTg = u.apps?.telegram ? t("users.appsWithTg", { apps: ways }) : ways;
+  return u.apps?.trustTunnel ? t("users.appsWithTt", { apps: withTg }) : withTg;
 }

@@ -67,6 +67,55 @@ Every relay that is on joins the client-eye check rounds as a target of its own:
 
 The panel's own checks run from the panel's server, outside the entry's country, so they catch a broken leg or a stall on the panel's path, not a freeze that the TSPU applies to people inside the country; for that, look at the bsbord and kl!ck reports on [Reachability](../operations/reachability.md).
 
+## Bridge: when the entry cannot reach the exit
+
+A direct relay (**Direct**) works in one direction: the entry connects to the exit. Some filters cut connections in that direction but let through a connection the exit opens to the entry. The **bridge** uses that. The exit connects to the entry and keeps several encrypted connections open. When a person connects to the entry's port, the entry hands their session to one of those connections, and the exit answers it. The entry does not open the session, as with a direct relay.
+
+The bridge carries TCP only.
+
+The way is set for each relay with **Change way** on its **Way** line:
+
+| Way | What it does |
+|:--|:--|
+| **Auto (recommended)** | Direct while it works. When the entry stops reaching the exit, the panel moves to the bridge by itself, and comes back when direct works again. |
+| **Direct** | The entry connects to the exit. Nothing switches by itself. |
+| **Via bridge** | The exit connects to the entry and keeps the line open. Nothing switches back by itself: only you can change it. |
+
+**What works through the bridge:**
+
+- **VLESS over TCP** (with Vision, and with XHTTP): yes.
+- **MTProto**: part of the first version, but not yet proven with real traffic. In the lab, a server with its own site showed its direct path as dead and the bridge as up, yet the panel still refused to switch it to the bridge. The node's site had a self-signed certificate, and the path check needs one it can verify (the lab has no Let's Encrypt). A server whose Fake TLS falls back to another site cannot use the bridge: the panel cannot check its path and refuses cleanly. Telegram's own traffic through the bridge has not been tested.
+- **Hysteria2 and AmneziaWG** (UDP): direct only. Putting UDP inside a TCP connection spoils AmneziaWG and breaks Hysteria2's own congestion control, so the panel does not offer the bridge for them.
+
+**How Auto switches:**
+
+- **To the bridge.** The panel checks each relay about every 10 minutes. Two failed checks in a row switch it to the bridge, when the entry does not reach the exit or the transfer freezes after the first kilobytes. The switch needs the bridge to be up and the exit to reach the entry. If the bridge does not hold, a `relay_down` alert opens with the stage `bridge`.
+- **Back to direct.** Every 30 minutes the panel checks the direct path with a quick packet test. Three passes in a row, at least 30 minutes apart and at least 30 minutes after the last switch, start a flow test: the entry opens a connection to the exit, and the exit sends 8 MB back. If it passes, the relay goes back to direct. If not, the relay stays on the bridge, the count starts again, and the next flow test waits at least 6 hours. Going back takes at least an hour.
+- **If direct fails again soon after.** Within 30 minutes of going back, one failed check is enough to return to the bridge.
+- The row shows the progress: "Returning to direct: 2 of 3 checks passed in a row."
+- Each switch is logged as an event, with no Telegram message.
+- A switch drops the open connections of people. Their apps reconnect by themselves.
+
+**Load on the bridge:**
+
+- The bridge holds a few connections, and people share them. Each connection serves about 120 people: about 240 people with two connections, about 480 with four.
+- The panel starts with two. It moves to four by itself when the bridge reaches 80 % of the two-connection limit (about 190 people), or when the relay carries 10 Mbit/s or more. It goes back to two after 30 minutes with no reason to keep four, once fewer than about 100 people use it.
+- The bridge line shows **In use: N of ~capacity**. From 80 % it says **nearly full**. That is information only: no alert and no Telegram message.
+- At four connections the bridge cannot grow. New people are turned away within a second, and their apps move to another server. The line then offers **Another entry for {exit}…**: a second entry shares the people.
+
+**Speed check:** the **Speed check (8 MB)** button sends 8 MB from the exit to the entry, and counts toward the daily limit of speed checks on both nodes. The test uses a separate port of the entry, not the bridge's port. It shows that the line can carry a full flow, not that the bridge itself works.
+
+**When the exit cannot reach the panel:** its agent connects through the bridge and keeps its control session there. The encryption to the panel is end to end, so the entry sees only encrypted bytes. While on the bridge, the agent tests the direct path about every 10 minutes; two passes in a row bring it back to direct. After a restart it first tries direct for about 50 seconds.
+
+Agent updates do not go through the bridge. An exit on the bridge updates from GitHub or Cloudflare, if the panel offers them; by default it offers GitHub. If only the `panel` source is on, such an exit cannot update while its direct path to the panel is closed.
+
+**Limits of the first version:**
+
+- **TCP only.** UDP servers stay direct.
+- **The exit sees its own agent, not the person.** For connections through the bridge, the exit sees its agent's address, so their network (ASN) and logs are wrong. Traffic, quotas, speed limits, devices and torrent protection still work per person, because they use the key. The panel marks these connections **via bridge**.
+- **Both nodes need the new agent.** If one is older, the panel names the node to update, and the relay stays direct.
+- **Tested in a lab, not on live networks.** The lab simulates a filter. It shows the logic works, not how a real filter treats the bridge. Not yet tested: a session longer than a day; real Mihomo and Telegram clients; older agent versions; VLESS on the node's own site and VLESS with TLS (both need a Let's Encrypt certificate); a second entry at four connections; an exit and an entry that reach the panel in different ways.
+
 ## The second server in subscriptions
 
 For each relay that works, a person gets a **twin** of the exit's server right after it in their subscription: the same keys, SNI and certificate pin, with the entry's address and the relay's port. Its name ends with the entry's country code: `🇩🇪 DE · VLESS · via RU` (in a Russian subscription `через RU`, in a Chinese one `经 RU`), cut to fit Happ's 30-character limit. It appears in every format (link list, Mihomo YAML, Xray JSON, sing-box JSON); in a Mihomo group it is one more entry of the same selector.
@@ -75,6 +124,8 @@ For each relay that works, a person gets a **twin** of the exit's server right a
 - **When:** at the subscription's next refresh (12 hours by default). A relay that is off or failed has no twin.
 - **What people see:** a second server to pick when the first does not connect. Nothing changes for the servers they already use.
 - **MTProto:** a relay passes an [MTProto](mtproto.md) server on as well. The twin is not in the subscription: it is one more link in the person's **Telegram proxy** block, marked **via RU**, with the same key and the same name in the handshake as the exit's.
+
+- **TrustTunnel:** a relay passes a [TrustTunnel](trusttunnel.md) server on over HTTP/2 only: the twin is TCP only and goes to the Mistgate app, not into a `tt://` link.
 
 ## AmneziaWG through a relay
 

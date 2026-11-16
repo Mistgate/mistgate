@@ -26,15 +26,21 @@ type relayHost struct {
 	unsupported bool
 	err         error
 	calls       [][]hostctl.Forward
+	duringSet   func([]hostctl.Forward)
 }
 
 func (h *relayHost) RelaySupported() bool { return !h.unsupported }
 
 func (h *relayHost) SetRelays(_ context.Context, fs []hostctl.Forward) error {
 	h.rmu.Lock()
-	defer h.rmu.Unlock()
-	h.calls = append(h.calls, append([]hostctl.Forward(nil), fs...))
-	return h.err
+	copyFS := append([]hostctl.Forward(nil), fs...)
+	h.calls = append(h.calls, copyFS)
+	err, duringSet := h.err, h.duringSet
+	h.rmu.Unlock()
+	if duringSet != nil {
+		duringSet(copyFS)
+	}
+	return err
 }
 
 func (h *relayHost) setErr(err error) {
@@ -449,19 +455,19 @@ func TestRelaysOnAHostThatCannotForward(t *testing.T) {
 	}
 }
 
-func TestRelayCapabilityOnlyWithAHostThatForwards(t *testing.T) {
+func TestRelayCapabilitiesSeparateForwardHostSupportFromReverseBridge(t *testing.T) {
 	plain := newHarness(t, harnessOpts{noStart: true})
 	t.Cleanup(plain.a.closeEngines)
-	if slices.Contains(plain.a.capabilities(), plugin.CapRelayForward) {
-		t.Error("a host that cannot forward announces the capability")
+	if slices.Contains(plain.a.capabilities(), plugin.CapRelayForward) || !slices.Contains(plain.a.capabilities(), plugin.CapRelayReverse) {
+		t.Error("reverse bridge capability must not depend on nft forward support")
 	}
 	l := newRelayLab(t)
-	if !slices.Contains(l.a.capabilities(), "relay-forward/1") {
+	if !slices.Contains(l.a.capabilities(), plugin.CapRelayForward) || !slices.Contains(l.a.capabilities(), plugin.CapRelayReverse) {
 		t.Errorf("capabilities = %v", l.a.capabilities())
 	}
 	l.host.unsupported = true
-	if slices.Contains(l.a.capabilities(), "relay-forward/1") {
-		t.Error("a host without nft announces the capability")
+	if slices.Contains(l.a.capabilities(), plugin.CapRelayForward) || !slices.Contains(l.a.capabilities(), plugin.CapRelayReverse) {
+		t.Error("a host without nft must keep reverse bridge capability and drop forward capability")
 	}
 }
 

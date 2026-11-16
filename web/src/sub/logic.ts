@@ -23,6 +23,7 @@ import type {
   ServerLoad,
   Status,
   Theme,
+  TrustTunnelLink,
 } from "./types";
 
 // Pure functions of the page data: normalisation, platform detection, the numbers in the status card, the server cards.
@@ -32,7 +33,7 @@ export const platformOrder: Platform[] = ["ios", "android", "windows", "macos", 
 const kindOrder: Kind[] = ["happ", "amnezia"];
 const statuses: Status[] = ["active", "expired", "limited", "disabled"];
 const levels: LoadLevel[] = ["low", "medium", "high"];
-const deviceKinds: Device["kind"][] = ["link", "shared", "key", "telegram"];
+const deviceKinds: Device["kind"][] = ["link", "shared", "key", "telegram", "trusttunnel"];
 const linkModes: LinkMode[] = ["track", "enforce", "strict"];
 const resets = ["none", "day", "week", "month", "rolling_month"] as const;
 const day = 86400;
@@ -191,6 +192,20 @@ export function normalize(raw: unknown): MgData {
         }),
       }
     : null;
+  const tt = r.trust_tunnel && typeof r.trust_tunnel === "object" ? rec(r.trust_tunnel) : null;
+  const trust_tunnel = tt
+    ? {
+        links: list(tt.links).flatMap((l): TrustTunnelLink[] => {
+          const x = rec(l);
+          const url = safeTtUrl(str(x.url));
+          const note = str(x.note);
+          // a link the page cannot open (not tt://) and says nothing about is not a row
+          return url || note
+            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), has_ipv6: x.has_ipv6 === true, relay: x.relay === true, via: str(x.via), note, url }]
+            : [];
+        }),
+      }
+    : null;
   return {
     v: num(r.v) || 1,
     lang: isLang(r.lang) ? r.lang : "ru",
@@ -227,8 +242,9 @@ export function normalize(raw: unknown): MgData {
         ? [{ platform: a.platform as Platform, kind: a.kind as Kind, name: str(a.name), download_url: str(a.download_url), add_url: str(a.add_url), description: str(a.description).trim(), recommended: a.recommended === true }]
         : [],
     ),
-    access: { happ: acc.happ === true, amnezia: acc.amnezia === true, telegram: acc.telegram === true },
+    access: { happ: acc.happ === true, amnezia: acc.amnezia === true, telegram: acc.telegram === true, trust_tunnel: acc.trust_tunnel === true },
     telegram,
+    trust_tunnel,
     devices: list(r.devices).map(
       (d): Device => ({
         id: str(d.id),
@@ -256,6 +272,10 @@ export function normalize(raw: unknown): MgData {
 /** Links the page may open: http(s), tg and mailto. Anything else (javascript:, data:, ...) becomes "". */
 export function safeUrl(u: string): string {
   return /^(https?|tg|mailto):/i.test(u.trim()) && canParse(u) ? u.trim() : "";
+}
+/** The link of the official TrustTunnel apps: tt:// only ("" for anything else, a link too long to parse included). */
+export function safeTtUrl(u: string): string {
+  return /^tt:\/\//i.test(u.trim()) && canParse(u) ? u.trim() : "";
 }
 /** Add links are app deep links (happ://add/...), so any scheme goes except the script-carrying ones. */
 export function safeAddUrl(u: string): string {

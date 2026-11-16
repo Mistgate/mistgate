@@ -8,16 +8,20 @@
 # FAKE_CURL_VERSION is the version it reports (default 8.5.0); FAKE_DELAY makes a target check last that many seconds and
 # writes "S n" / "E n" lines to $FAKE_DIR/events, to see how many run at once.
 D=${FAKE_DIR:?FAKE_DIR is not set}
+# The script runs two curls at once, so the number of a call is taken with mkdir (atomic: no two calls get one number); seq only
+# tells where to start looking. A call is written whole and moved into place, so a reader never sees half of one.
+mkdir -p "$D/calls/.lk"
 n=0
 [ ! -f "$D/seq" ] || read -r n <"$D/seq"
-n=$((n + 1))
-echo "$n" >"$D/seq"
-mkdir -p "$D/calls"
-: >"$D/calls/$n"
-for a in "$@"; do printf '%s\n' "$a" >>"$D/calls/$n"; done
+case $n in '' | *[!0-9]*) n=0 ;; esac
+while n=$((n + 1)); ! mkdir "$D/calls/.lk/$n" 2>/dev/null; do :; done
+echo "$n" >"$D/seq.$$" && mv "$D/seq.$$" "$D/seq"
 clock=0
 [ ! -f "$D/clock" ] || read -r clock <"$D/clock"
 echo "$clock" >"$D/calls/$n.t"
+: >"$D/calls/.w$n"
+[ $# -eq 0 ] || printf '%s\n' "$@" >"$D/calls/.w$n"
+mv "$D/calls/.w$n" "$D/calls/$n"
 if [ "${1:-}" = --version ]; then
 	echo "curl ${FAKE_CURL_VERSION:-8.5.0} (x86_64-pc-linux-gnu) libcurl/${FAKE_CURL_VERSION:-8.5.0} OpenSSL/3.0.13"
 	exit 0

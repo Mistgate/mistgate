@@ -107,6 +107,44 @@ func TestCountryBlockedAlertIsInfoWhenEveryServerUsesHealthyRelays(t *testing.T)
 	}
 }
 
+func TestCountryBlockedAlertIsInfoWhenEveryServerUsesHealthyReverseRelay(t *testing.T) {
+	c := newCountryEnv(t)
+	fixture := newCountryRelayFixture(t, c)
+	addHealthyCountryRelay(t, c, "rly_vless", fixture.vless, "tcp", 8443)
+	addHealthyCountryRelay(t, c, "rly_hysteria2", fixture.hysteria2, "udp", 8444)
+	now := c.clock.Now()
+	c.exec(`UPDATE node SET agent_caps = 'relay-forward/1 relay-reverse/1' WHERE id = 'msk1'`)
+	c.exec(`UPDATE node SET agent_caps = 'relay-forward/1 relay-reverse/1' WHERE id = 'de1'`)
+	link, err := c.st.RelayLink(c.ctx, "rly_vless")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check, _ := link.Check()
+	check.Path = store.RelayStage{Status: "ok", At: now.Unix()}
+	if err := c.st.SetRelayCheck(c.ctx, "rly_vless", check); err != nil {
+		t.Fatal(err)
+	}
+	// the exit's agent holds the bridge (reported: the stage is derived from it)
+	if err := c.st.SetRelayBridgeSide(c.ctx, "rly_vless", "exit", &store.RelayBridgeSideCheck{Connected: true, Conns: 2,
+		SinceUnix: now.Unix() - 60, AtUnix: now.Unix()}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.st.SetRelayActiveMode(c.ctx, "rly_vless", store.RelayModeReverse, "leg_failed", now); err != nil {
+		t.Fatal(err)
+	}
+	a := openCountryRelayAlert(t, c)
+	if a.Severity != sevInfo || a.WhyKey != "health.alert.country_blocked.why.reached_through_relays" {
+		t.Fatalf("country alert for a healthy reverse relay = %+v", a)
+	}
+	if err := c.st.SetRelayBridgeSide(c.ctx, "rly_vless", "exit", &store.RelayBridgeSideCheck{AtUnix: now.Unix()}); err != nil {
+		t.Fatal(err)
+	}
+	c.evaluate()
+	if a := c.active()["country_blocked/de1/"]; a.Severity != sevWarning || a.Params["why"] != "" {
+		t.Fatalf("country alert did not return to warning after reverse bridge failed: %+v", a)
+	}
+}
+
 func TestCountryBlockedAlertStaysWarningWhenOneServerHasNoRelay(t *testing.T) {
 	c := newCountryEnv(t)
 	fixture := newCountryRelayFixture(t, c)

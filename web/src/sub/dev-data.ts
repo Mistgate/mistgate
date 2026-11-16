@@ -433,6 +433,27 @@ cases["telegram-first"] = { ...base, access: { ...base.access, telegram: true },
 // Telegram is on, no MTProto profile runs yet
 cases["telegram-soon"] = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: [] } };
 
+// TrustTunnel: one card per tt:// link (the secret is made up; a real one is about this long, so the QR code has the density a
+// person will see), the twins of a server marked ("IPv6" on the exit, a relay in RU), and a server with no link (a self-signed
+// certificate: only the Mistgate app trusts it) as a card that says so
+const ttUrl = (name: string) => `tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDA${name}DRYKMTkyLjAuMi41MwoxOTIuMC4yLjU0`;
+const ttDe = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", has_ipv6: false, relay: false, via: "", note: "", url: ttUrl("DZGUx") };
+const ttLinks = [
+  ttDe,
+  { ...ttDe, relay: true, via: "RU", url: ttUrl("DZGUy") },
+  { label: "Нидерланды", country_code: "NL", place: "", has_ipv6: true, relay: false, via: "", note: "", url: ttUrl("DbmwxA") },
+  { label: "Финляндия", country_code: "FI", place: "", has_ipv6: false, relay: false, via: "", note: "self_signed", url: "" },
+];
+// the TrustTunnel key among the devices: issued by the admin, used by an app yesterday
+const ttKey = { ...dev("tt1", "", "TrustTunnel key", "trusttunnel", day, false, "trusttunnel"), can_remove: false, can_rename: false };
+cases.trusttunnel = { ...returning, access: { ...returning.access, trust_tunnel: true }, trust_tunnel: { links: ttLinks }, devices: [...returning.devices, ttKey] };
+// a first visit with it on: the steps first, then the servers and the key
+cases["trusttunnel-first"] = { ...base, access: { ...base.access, trust_tunnel: true }, trust_tunnel: { links: ttLinks.slice(0, 2) } };
+// on, but no TrustTunnel profile runs yet
+cases["trusttunnel-soon"] = { ...returning, access: { ...returning.access, trust_tunnel: true }, trust_tunnel: { links: [] } };
+// the subscription is off: the page shows the devices only, the key among them (no block, no links)
+cases["trusttunnel-disabled"] = { ...off({ status: "disabled" }), access: { happ: false, amnezia: false, trust_tunnel: true }, trust_tunnel: { links: [] }, devices: [...shared(2 * day), ttKey] };
+
 export function devPage(query: string): MgData {
   const p = new URLSearchParams(query);
   const c = cases[p.get("case") ?? ""] ?? base;

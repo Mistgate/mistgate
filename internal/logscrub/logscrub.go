@@ -25,6 +25,21 @@ var JournalAttrs = [...]string{
 	"kernel", "iface", "check", "fix", "count", "err", "error", "event", "peer",
 }
 
+// credential finds what a credential looks like in log text: an Authorization or Proxy-Authorization header (its whole value),
+// and a bare "Basic <base64>" or "Bearer <token>". An HTTP library's error text can quote a request header; the node journal
+// must not carry a TrustTunnel password because of it.
+var credential = regexp.MustCompile(`(?i)\b(?:proxy-)?authorization\b["']?\s*[:=]\s*["']?(?:(?:basic|bearer)\s+)?[A-Za-z0-9+/=._~-]+` +
+	`|\b(?:basic|bearer)\s+[A-Za-z0-9+/=._~-]{8,}`)
+
+// Credentials replaces every Authorization / Proxy-Authorization header value and every Basic or Bearer credential in s by
+// "[REDACTED]". Credentials(Credentials(s)) == Credentials(s).
+func Credentials(s string) string {
+	if len(s) < 8 {
+		return s
+	}
+	return credential.ReplaceAllString(s, "[REDACTED]")
+}
+
 // candidate finds what may be an address: a bracketed IPv6 (with zone and port), an IPv4 (with port), or an unbracketed IPv6
 // (two colons or more, a zone, a dotted IPv4 tail). Every match is checked with netip before it is replaced.
 var candidate = regexp.MustCompile(`\[[0-9A-Fa-f:.]+(?:%[0-9A-Za-z_.-]+)?\](?::[0-9]{1,5})?` +

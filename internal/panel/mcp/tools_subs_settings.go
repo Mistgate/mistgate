@@ -180,14 +180,16 @@ type subsTextsArgs struct {
 	SupportURL          *string `json:"support_url,omitempty" jsonschema:"support link; empty removes it"`
 	UpdateIntervalHours *uint32 `json:"update_interval_hours,omitempty" jsonschema:"hours between app refreshes; 0 uses the default 12"`
 	ServerNameTemplate  *string `json:"server_name_template,omitempty" jsonschema:"server name template using {flag}, {country}, {node}, and {profile}; empty uses the default"`
-	SettingsHash        string  `json:"settings_hash,omitempty" jsonschema:"-"`
+	// ResponseHeaders replaces the whole list of the owner's own response headers of a successful subscription answer; [] removes them.
+	ResponseHeaders *[]responseHeaderArg `json:"response_headers,omitempty" jsonschema:"the complete ordered list of the owner's own response headers (for example the flclashx-* headers FlClashX reads), each with the formats and groups it goes to; [] removes them all. The names of the panel's own and the web server's headers are refused; at most 20 entries and 4096 bytes in all as sent. When two entries of one name apply to an answer, the first wins. Refusals and the user page carry none"`
+	SettingsHash    string               `json:"settings_hash,omitempty" jsonschema:"-"`
 }
 
 var subsTextsSet = changeSpec[subsTextsArgs]{
-	name: "subscription_texts_set", min: ProfileOperator, danger: true, procs: settingsProcs,
-	desc: "Change the subscription title, announcement, support link, refresh interval or server-name template shared by users. Give only fields to change. Text is shown in the owner's approval card; this always waits for approval.",
+	name: "subscription_texts_set", min: ProfileOperator, danger: true, procs: slices.Concat(settingsProcs, procs(adminv1connect.GroupServiceListGroupsProcedure)),
+	desc: "Change the subscription title, announcement, support link, refresh interval, server-name template or the owner's own response headers shared by users. Give only fields to change. Text is shown in the owner's approval card; this always waits for approval.",
 	plan: func(c *call, a subsTextsArgs) (*planned, error) {
-		if a.Title == nil && a.Announcement == nil && a.SupportURL == nil && a.UpdateIntervalHours == nil && a.ServerNameTemplate == nil {
+		if a.Title == nil && a.Announcement == nil && a.SupportURL == nil && a.UpdateIntervalHours == nil && a.ServerNameTemplate == nil && a.ResponseHeaders == nil {
 			return nil, errors.New("give at least one subscription text field to change")
 		}
 		cur, err := c.subscriptionSnapshot()
@@ -223,6 +225,25 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 			facts = append(facts, changeFact("update_interval_hours", strconv.FormatUint(uint64(next.GetUpdateIntervalHours()), 10)+" -> "+strconv.FormatUint(uint64(*a.UpdateIntervalHours), 10), strconv.FormatUint(uint64(next.GetUpdateIntervalHours()), 10), strconv.FormatUint(uint64(*a.UpdateIntervalHours), 10)))
 			next.UpdateIntervalHours = *a.UpdateIntervalHours
 		}
+		if a.ResponseHeaders != nil {
+			groups, err := c.groupNames()
+			if err != nil {
+				return nil, err
+			}
+			list, err := makeResponseHeaders(*a.ResponseHeaders, groups)
+			if err != nil {
+				return nil, err
+			}
+			next.ResponseHeaders = list
+			if err := checked(next); err != nil { // normalized: the facts and the stored plan show what is saved
+				return nil, err
+			}
+			if !slices.EqualFunc(cur.settings.ResponseHeaders, next.ResponseHeaders, func(x, y *adminv1.ResponseHeader) bool { return proto.Equal(x, y) }) {
+				facts = append(facts, responseHeaderFacts(next.ResponseHeaders, groups)...)
+			}
+			args := responseHeaderArgs(next.ResponseHeaders)
+			a.ResponseHeaders = &args
+		}
 		if len(facts) == 0 {
 			return nil, errors.New("nothing to change: the settings already look like this")
 		}
@@ -230,7 +251,7 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 			return nil, err
 		}
 		a.SettingsHash = cur.hash
-		return &planned{Summary: "Change the shared subscription title, texts or display settings. The owner must approve this change.", Facts: facts, Danger: []string{dangerPage}, Params: a}, nil
+		return &planned{Summary: "Change the shared subscription title, texts, own response headers or display settings. The owner must approve this change.", Facts: facts, Danger: []string{dangerPage}, Params: a}, nil
 	},
 	apply: func(c *call, a subsTextsArgs, _ Plan) (done, error) {
 		cur, err := c.subscriptionSnapshot()
@@ -256,11 +277,139 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 		if a.ServerNameTemplate != nil {
 			next.ServerNameTemplate = *a.ServerNameTemplate
 		}
+		if a.ResponseHeaders != nil {
+			groups, err := c.groupNames()
+			if err != nil {
+				return done{}, err
+			}
+			list, err := makeResponseHeaders(*a.ResponseHeaders, groups)
+			if err != nil {
+				return done{}, failure("plan_unreadable", "the stored headers are unreadable: make a new plan")
+			}
+			next.ResponseHeaders = list
+		}
 		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
 			return done{}, err
 		}
 		return doneWith("subscription_texts_updated", "Subscription text settings updated."), nil
 	},
+}
+
+type responseHeaderArg struct {
+	Name    string   `json:"name" jsonschema:"an HTTP header name, e.g. flclashx-servicename; the panel's own and the web server's headers are refused (Profile-*, Subscription-*, X-Hwid-*, Mistgate-*, Content-*, Cache-Control, Set-Cookie and the like: the full list is reserved_header_names of subscription_settings_get)"`
+	Value   string   `json:"value" jsonschema:"1 to 1000 bytes, no line breaks or control characters; ASCII unless base64 is true"`
+	Base64  bool     `json:"base64,omitempty" jsonschema:"send the value as base64: and its base64 (text with other than ASCII characters needs it)"`
+	Formats []string `json:"formats,omitempty" jsonschema:"base64_uris, mihomo_yaml, xray_json or singbox_json; empty = every format"`
+	Groups  []string `json:"groups,omitempty" jsonschema:"ids of the groups whose people get it; empty = every group"`
+}
+
+var headerFormatWords = map[string]adminv1.SubFormat{
+	"base64_uris": adminv1.SubFormat_SUB_FORMAT_BASE64_URIS, "mihomo_yaml": adminv1.SubFormat_SUB_FORMAT_MIHOMO_YAML,
+	"xray_json": adminv1.SubFormat_SUB_FORMAT_XRAY_JSON, "singbox_json": adminv1.SubFormat_SUB_FORMAT_SINGBOX_JSON,
+}
+
+// makeResponseHeaders turns the agent's list into the settings' own; groupName is the name of each group id the panel has.
+func makeResponseHeaders(in []responseHeaderArg, groupName map[string]string) ([]*adminv1.ResponseHeader, error) {
+	if len(in) > subsettings.MaxResponseHeaders {
+		return nil, fmt.Errorf("headers: at most %d entries", subsettings.MaxResponseHeaders)
+	}
+	out := make([]*adminv1.ResponseHeader, 0, len(in))
+	for i, h := range in {
+		w := fmt.Sprintf("headers[%d]", i)
+		name, value := strings.TrimSpace(h.Name), strings.TrimSpace(h.Value)
+		for _, f := range []struct{ what, s string }{{w + ".name", name}, {w + ".value", value}} {
+			if err := visible(f.what, f.s); err != nil {
+				return nil, err
+			}
+			if err := rejectSecretShaped(f.what, f.s); err != nil {
+				return nil, err
+			}
+		}
+		e := &adminv1.ResponseHeader{Name: name, Value: value, Base64: h.Base64}
+		for _, word := range h.Formats {
+			f, ok := headerFormatWords[strings.ToLower(strings.TrimSpace(word))]
+			if !ok {
+				return nil, fmt.Errorf("%s.formats: base64_uris, mihomo_yaml, xray_json or singbox_json", w)
+			}
+			e.Formats = append(e.Formats, f)
+		}
+		if len(h.Groups) > 0 {
+			ids, err := uniqueIDs(w+".groups", h.Groups, false)
+			if err != nil {
+				return nil, err
+			}
+			for _, id := range ids {
+				if _, ok := groupName[id]; !ok {
+					return nil, fmt.Errorf("%s.groups: no group with id %s (group ids are in groups_list)", w, clean(id, 60))
+				}
+			}
+			e.OnlyGroups, e.GroupIds = true, ids
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+// groupNames is the name of every group by id.
+func (c *call) groupNames() (map[string]string, error) {
+	r, err := c.cl.Group.ListGroups(c.ctx, connect.NewRequest(&adminv1.ListGroupsRequest{}))
+	if err != nil {
+		return nil, apiError(err)
+	}
+	out := map[string]string{}
+	for _, g := range r.Msg.GetGroups() {
+		out[g.GetId()] = g.GetName()
+	}
+	return out, nil
+}
+
+func headerWords(formats []adminv1.SubFormat) []string {
+	out := make([]string, 0, len(formats))
+	for _, f := range formats {
+		out = append(out, subFormatWord(f))
+	}
+	return out
+}
+
+// responseHeaderFacts shows the owner what the list will be: one fact per entry, in order. The text is the agent's, so untrusted.
+func responseHeaderFacts(list []*adminv1.ResponseHeader, groups map[string]string) []Fact {
+	facts := []Fact{codedFact("response_headers", fmt.Sprintf("replace the own response headers with %d entries", len(list)), "response_header_count", "n", strconv.Itoa(len(list)))}
+	for i, e := range list {
+		scope := "all formats"
+		if len(e.Formats) > 0 {
+			scope = strings.Join(headerWords(e.Formats), ", ")
+		}
+		who := "all groups"
+		if e.OnlyGroups {
+			var names []string
+			for _, id := range e.GroupIds {
+				names = append(names, clean(groups[id], 60))
+			}
+			who = "groups: " + strings.Join(names, ", ")
+		}
+		enc := ""
+		if e.Base64 {
+			enc = " [base64]"
+		}
+		facts = append(facts, Fact{Key: fmt.Sprintf("header_%d", i+1), Value: strconv.Quote(e.Name) + ": " + strconv.Quote(e.Value) + enc + " (" + scope + "; " + who + ")", Untrusted: true})
+	}
+	return facts
+}
+
+// responseHeaderArgs is the normalized list as the plan stores it for the apply.
+func responseHeaderArgs(list []*adminv1.ResponseHeader) []responseHeaderArg {
+	out := make([]responseHeaderArg, 0, len(list))
+	for _, e := range list {
+		arg := responseHeaderArg{Name: e.Name, Value: e.Value, Base64: e.Base64}
+		if len(e.Formats) > 0 {
+			arg.Formats = headerWords(e.Formats)
+		}
+		if e.OnlyGroups {
+			arg.Groups = e.GroupIds
+		}
+		out = append(out, arg)
+	}
+	return out
 }
 
 type subsLinkLimitsArgs struct {

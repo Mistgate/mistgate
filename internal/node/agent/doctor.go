@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/node/unit"
@@ -150,6 +151,9 @@ func (a *Agent) doctorInbounds() []doctor.Inbound {
 			TLSMode: tlsModeName(sp.TLS.Mode), ServerName: sp.TLS.ServerName, State: "stopped", CertNotAfter: na[id],
 		}
 		in.TLSPort = tlsPortOf(sp)
+		for _, side := range plugin.SideListens(sp) {
+			in.SideListens = append(in.SideListens, doctor.InboundListen{Network: side.Network, Port: int(side.Port)})
+		}
 		if h, ok := health[id]; ok {
 			if h.CertNotAfter.After(in.CertNotAfter) { // an ACME leaf issued or renewed after the last apply
 				in.CertNotAfter = h.CertNotAfter
@@ -195,8 +199,9 @@ func runStateName(s plugin.RunState) string {
 
 // tlsPortOf is the TCP port whose served certificate the doctor can read, 0 = none. Hysteria2: its HTTPS masquerade
 // listener, settings.masquerade.tcp_port, 443 when absent, 0 = none (hysteria2/settings.go). VLESS with security tls: the
-// inbound's own port. VLESS with REALITY, whatever its target: nothing, because the certificate of a "self" site is behind
-// REALITY (a visitor of the port gets it, but the doctor's own handshake is not one of them), and before the first
+// inbound's own port. TrustTunnel: its own TCP port, where the site and the tunnel share one certificate (the QUIC listener
+// on the same number serves the same one). VLESS with REALITY, whatever its target: nothing, because the certificate of a
+// "self" site is behind REALITY (a visitor of the port gets it, but the doctor's own handshake is not one of them), and before the first
 // issuance that site shows a self-signed certificate that would read as a healthy 10-year one; the engine reports the
 // issued certificate instead (Inbound.CertNotAfter). The agent peeks into the engines' settings; an engine-provided
 // accessor replaces this when a third protocol has a TLS listener.
@@ -225,6 +230,8 @@ func tlsPortOf(sp plugin.InboundSpec) int {
 		if json.Unmarshal(sp.Settings, &j) != nil || j.Security != "tls" {
 			return 0
 		}
+		return int(sp.Listen.Port)
+	case "trusttunnel":
 		return int(sp.Listen.Port)
 	}
 	return 0
@@ -310,7 +317,13 @@ func (a *Agent) doctorReportMsg(ctx context.Context, requestID string, rep *doct
 	if rep == nil {
 		return reportMsg(requestID, nil, errText)
 	}
-	counters := relayCounterResults(ctx, a.doctorRun, a.snapshotModel().relays, a.now())
+	model := a.snapshotModel()
+	counters := relayCounterResults(ctx, a.doctorRun, model.relays, a.now())
+	var reverseCounters map[string]nodebridge.RelayCounters
+	if a.bridgeEntry != nil {
+		reverseCounters = a.bridgeEntry.RelayCounters()
+	}
+	counters = append(counters, reverseRelayCounterResults(model.relays, reverseCounters, a.now())...)
 	if len(counters) == 0 {
 		return reportMsg(requestID, rep, errText)
 	}
@@ -339,6 +352,17 @@ func relayCounterResults(ctx context.Context, run func(context.Context, string, 
 	if run == nil || len(forwards) == 0 {
 		return nil
 	}
+	// Reverse TCP listeners report counters from the bridge and must never
+	// inspect the nftables DNAT counters used by ordinary forwards.
+	dnatForwards := make([]plugin.RelayForward, 0, len(forwards))
+	for _, f := range forwards {
+		if f.Mode != "reverse" && f.ID != "" && (f.Network == "tcp" || f.Network == "udp") && f.Port != 0 {
+			dnatForwards = append(dnatForwards, f)
+		}
+	}
+	if len(dnatForwards) == 0 {
+		return nil
+	}
 	out, err := run(ctx, "nft", "-j", "list", "counters", "table", "inet", hostctl.NftRelayTable)
 	if err != nil {
 		return nil
@@ -353,12 +377,12 @@ func relayCounterResults(ctx context.Context, run func(context.Context, string, 
 			counts[c.Name] = *c
 		}
 	}
-	items := append([]plugin.RelayForward(nil), forwards...)
+	items := dnatForwards
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
 	results := make([]doctor.Result, 0, len(items))
 	seen := map[string]bool{}
 	for _, f := range items {
-		if f.ID == "" || (f.Network != "tcp" && f.Network != "udp") || f.Port == 0 {
+		if f.Mode == "reverse" || f.ID == "" || (f.Network != "tcp" && f.Network != "udp") || f.Port == 0 {
 			continue
 		}
 		name := f.Network + "_" + strconv.FormatUint(uint64(f.Port), 10)
@@ -367,9 +391,27 @@ func relayCounterResults(ctx context.Context, run func(context.Context, string, 
 			continue
 		}
 		seen[name] = true
+		back := counts[name+"_back"]
 		results = append(results, doctor.Result{ID: "relay", Status: doctor.OK, Measured: now,
 			Params: map[string]string{"relay": f.ID, "network": f.Network, "port": strconv.FormatUint(uint64(f.Port), 10),
-				"bytes": strconv.FormatUint(counter.Bytes, 10), "packets": strconv.FormatUint(counter.Packets, 10)}})
+				"bytes": strconv.FormatUint(counter.Bytes, 10), "packets": strconv.FormatUint(counter.Packets, 10),
+				"bytes_back": strconv.FormatUint(back.Bytes, 10), "packets_back": strconv.FormatUint(back.Packets, 10)}})
+	}
+	return results
+}
+
+func reverseRelayCounterResults(forwards []plugin.RelayForward, counters map[string]nodebridge.RelayCounters, now time.Time) []doctor.Result {
+	items := append([]plugin.RelayForward(nil), forwards...)
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	results := make([]doctor.Result, 0, len(items))
+	for _, f := range items {
+		if f.Mode != "reverse" || f.ID == "" || f.Network != "tcp" || f.Port == 0 {
+			continue
+		}
+		c := counters[f.ID]
+		results = append(results, doctor.Result{ID: "relay", Status: doctor.OK, Measured: now,
+			Params: map[string]string{"relay": f.ID, "network": f.Network, "port": strconv.FormatUint(uint64(f.Port), 10),
+				"bytes": strconv.FormatUint(c.Bytes, 10), "bytes_back": strconv.FormatUint(c.BytesBack, 10)}})
 	}
 	return results
 }

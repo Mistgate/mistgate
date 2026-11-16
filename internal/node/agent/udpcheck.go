@@ -115,7 +115,7 @@ func (a *Agent) expireUDPCount(arm *udpCountArm) {
 		err = hostctl.CleanupUDPCount(ctx)
 	}
 	if err != nil {
-		a.log.Warn("UDP check hold cleanup failed", "err", err)
+		a.log.Warn("UDP check hold cleanup failed", "code", "udp_check_cleanup_failed", "err", err)
 	}
 	a.udpArmed = nil
 }

@@ -331,7 +331,7 @@ const (
 	DeviceKind_DEVICE_KIND_LINK DeviceKind = 1
 	// The place shared by every app that sends no HWID.
 	DeviceKind_DEVICE_KIND_LINK_SHARED DeviceKind = 2
-	// An AmneziaVPN key (DeviceService.CreateAwgDevice).
+	// An AmneziaVPN or TrustTunnel key.
 	DeviceKind_DEVICE_KIND_KEY DeviceKind = 3
 	// The person's Telegram proxy key (UserService.IssueTelegramKey): one secret for every MTProto link of the person.
 	DeviceKind_DEVICE_KIND_TELEGRAM_KEY DeviceKind = 4
@@ -831,7 +831,10 @@ type AppToggles struct {
 	// happ is on as well. Absent in a request = leave it as it is (a new person: on); a response always carries it. Off: the
 	// person's enrolment is refused (app_disabled) and the devices they already enrolled get no servers (their keys are kept
 	// and work again when it is switched on).
-	Mistgate      *bool `protobuf:"varint,4,opt,name=mistgate,proto3,oneof" json:"mistgate,omitempty"`
+	Mistgate *bool `protobuf:"varint,4,opt,name=mistgate,proto3,oneof" json:"mistgate,omitempty"`
+	// The official TrustTunnel apps receive tt:// links for the user's TrustTunnel inbounds. This is independent of Mistgate,
+	// Happ and Amnezia; absent in an update = leave the existing value as it is.
+	TrustTunnel   *bool `protobuf:"varint,5,opt,name=trust_tunnel,json=trustTunnel,proto3,oneof" json:"trust_tunnel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -890,6 +893,13 @@ func (x *AppToggles) GetTelegram() bool {
 func (x *AppToggles) GetMistgate() bool {
 	if x != nil && x.Mistgate != nil {
 		return *x.Mistgate
+	}
+	return false
+}
+
+func (x *AppToggles) GetTrustTunnel() bool {
+	if x != nil && x.TrustTunnel != nil {
+		return *x.TrustTunnel
 	}
 	return false
 }
@@ -1384,7 +1394,7 @@ type UserCounts struct {
 	Expiring  uint32                 `protobuf:"varint,3,opt,name=expiring,proto3" json:"expiring,omitempty"`
 	OverQuota uint32                 `protobuf:"varint,4,opt,name=over_quota,json=overQuota,proto3" json:"over_quota,omitempty"`
 	// Live, non-revoked devices in use for users matching query/group_id, regardless of filter or page. All apps on
-	// one implicit subscription-fetch device count once; each AmneziaWG key counts as one device.
+	// one implicit subscription-fetch device count once; each AmneziaWG or TrustTunnel key counts as one device.
 	DevicesUsed uint32 `protobuf:"varint,5,opt,name=devices_used,json=devicesUsed,proto3" json:"devices_used,omitempty"`
 	// Matching devices whose Device.online value is true, regardless of filter or page. Subscription devices are
 	// online while their user is online; AmneziaWG devices are online after a handshake within the 3-minute window.
@@ -1612,7 +1622,7 @@ type Device struct {
 	// Last handshake of the peer on any node; 0 = never connected.
 	LastHandshakeUnix int64 `protobuf:"varint,13,opt,name=last_handshake_unix,json=lastHandshakeUnix,proto3" json:"last_handshake_unix,omitempty"`
 	// What the device is: an app on the subscription link (its own HWID), the one place the apps without a HWID share, or an
-	// AmneziaVPN key.
+	// AmneziaVPN or TrustTunnel key.
 	Kind DeviceKind `protobuf:"varint,14,opt,name=kind,proto3,enum=mistgate.admin.v1.DeviceKind" json:"kind,omitempty"`
 	// The OS version and the app ("Happ/3.4.2") the device last fetched with; empty when it never said.
 	OsVersion string `protobuf:"bytes,15,opt,name=os_version,json=osVersion,proto3" json:"os_version,omitempty"`
@@ -4035,14 +4045,16 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x127\n" +
 	"\x04rows\x18\x03 \x03(\v2#.mistgate.admin.v1.DeviceConnectionR\x04rows\x124\n" +
 	"\x16nodes_without_counters\x18\x04 \x03(\tR\x14nodesWithoutCounters\x12>\n" +
-	"\thello_kex\x18\x05 \x03(\v2!.mistgate.admin.v1.HelloKexDeviceR\bhelloKex\"\x84\x01\n" +
+	"\thello_kex\x18\x05 \x03(\v2!.mistgate.admin.v1.HelloKexDeviceR\bhelloKex\"\xbd\x01\n" +
 	"\n" +
 	"AppToggles\x12\x12\n" +
 	"\x04happ\x18\x01 \x01(\bR\x04happ\x12\x18\n" +
 	"\aamnezia\x18\x02 \x01(\bR\aamnezia\x12\x1a\n" +
 	"\btelegram\x18\x03 \x01(\bR\btelegram\x12\x1f\n" +
-	"\bmistgate\x18\x04 \x01(\bH\x00R\bmistgate\x88\x01\x01B\v\n" +
-	"\t_mistgate\"<\n" +
+	"\bmistgate\x18\x04 \x01(\bH\x00R\bmistgate\x88\x01\x01\x12&\n" +
+	"\ftrust_tunnel\x18\x05 \x01(\bH\x01R\vtrustTunnel\x88\x01\x01B\v\n" +
+	"\t_mistgateB\x0f\n" +
+	"\r_trust_tunnel\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
 	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xd1\n" +

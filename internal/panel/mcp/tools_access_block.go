@@ -75,7 +75,7 @@ type accTCPCheck struct {
 type accInbound struct {
 	ID, NodeID, ProfileID, Protocol, Egress string
 	Port                                    uint32
-	Enabled, Direct, CDN                    bool
+	Enabled, Direct, CDN, H3                bool
 	State                                   string // active, pending, failed, disabled
 	LastErrorCode                           string
 }
@@ -178,8 +178,11 @@ type accKlick struct {
 
 type accRelay struct {
 	ID, EntryID, ExitID, InboundID, ProfileID, State string
+	Mode, ActiveMode                                 string
 	Enabled, ExitLive, AgentSupported                bool
-	Checked, CheckOK                                 bool
+	ReverseSupported, Checked, CheckOK               bool
+	BridgeOK, PathOK                                 bool
+	BridgeAtUnix                                     int64
 	MonitorAtUnix                                    int64
 	MonitorFails                                     uint32
 }
@@ -278,6 +281,20 @@ func isUDPProto(p string) bool { return store.RelayPathNetwork(normProtocol(p)) 
 
 func netOf(p string) string { return store.RelayPathNetwork(normProtocol(p)) }
 
+func hasUDPPath(x *accInbound) bool {
+	return x != nil && (isUDPProto(x.Protocol) || normProtocol(x.Protocol) == "trusttunnel" && x.H3)
+}
+
+func networkOfInbound(x *accInbound) string {
+	if x != nil && normProtocol(x.Protocol) == "trusttunnel" && x.H3 {
+		return "tcp+udp"
+	}
+	if x == nil {
+		return ""
+	}
+	return netOf(x.Protocol)
+}
+
 func u32(n uint32) string { return strconv.FormatUint(uint64(n), 10) }
 
 func portScope(port uint32, network string) string { return "port:" + u32(port) + "/" + network }
@@ -331,6 +348,10 @@ func (t accTotals) health(proto string) string {
 		}
 		if !t.unsupportedHas("accepted") && t.Hellos > t.HellosForeign && t.Hellos-t.HellosForeign >= minHellosNoHS && t.Accepted == 0 {
 			return stateFailing
+		}
+	case "trusttunnel":
+		if t.known("connects") && t.Connects >= minFleetAttempts {
+			return stateWorking
 		}
 	}
 	return stateUnknown
@@ -753,10 +774,11 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 		if !x.Enabled || x.State == "disabled" || x.State == "failed" {
 			continue
 		}
-		if isUDPProto(x.Protocol) {
-			udpIn = append(udpIn, x)
-		} else {
+		if !isUDPProto(x.Protocol) {
 			tcpIn = append(tcpIn, x)
+		}
+		if hasUDPPath(x) {
+			udpIn = append(udpIn, x)
 		}
 	}
 	// TCP works also when a TCP kind of kl!ck passes.
@@ -767,6 +789,11 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 	}
 	udpWorks := false
 	for _, x := range udpIn {
+		// TrustTunnel's counters belong to the protocol, not a negotiated h2/h3 path, so a successful h2
+		// connection cannot prove that its optional UDP listener is reachable.
+		if normProtocol(x.Protocol) == "trusttunnel" {
+			continue
+		}
 		if in.Totals[x.ID].health(x.Protocol) == stateWorking {
 			udpWorks = true
 		}
@@ -889,6 +916,9 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 	}
 	var failingUDP, workingUDP []*accInbound
 	for _, x := range udpIn {
+		if normProtocol(x.Protocol) == "trusttunnel" {
+			continue
+		}
 		switch in.Totals[x.ID].health(x.Protocol) {
 		case stateFailing:
 			failingUDP = append(failingUDP, x)
@@ -1072,24 +1102,44 @@ func (b *blockCtx) wayStates(diags map[string]*blockNodeV) map[string]*wayV {
 						w.BlockedBy = append(w.BlockedBy, clsBroken)
 					}
 				case clsIPBlocked:
-					if c.Detail["scope"] == "tcp_only" && net == "udp" || c.Confidence == confLow {
+					if c.Detail["scope"] == "tcp_only" && net == "udp" {
+						continue
+					}
+					if c.Detail["scope"] == "tcp_only" && hasUDPPath(&x) {
+						w.Soft = true
+						w.BlockedBy = append(w.BlockedBy, clsIPBlocked)
+						continue
+					}
+					if c.Confidence == confLow {
 						continue
 					}
 					hard = true
 					w.BlockedBy = append(w.BlockedBy, clsIPBlocked)
 				case clsPortBlocked:
 					if net == "tcp" && c.port == x.Port && c.Confidence != confLow {
-						hard = true
+						if hasUDPPath(&x) {
+							w.Soft = true
+						} else {
+							hard = true
+						}
 						w.BlockedBy = append(w.BlockedBy, clsPortBlocked)
 					}
 				case clsTCPThrottled:
 					if net == "tcp" && (c.protocol == normProtocol(x.Protocol)) {
-						hard = true
+						if hasUDPPath(&x) {
+							w.Soft = true
+						} else {
+							hard = true
+						}
 						w.BlockedBy = append(w.BlockedBy, clsTCPThrottled)
 					}
 				case clsUDPBlocked:
-					if net == "udp" {
-						hard = true
+					if hasUDPPath(&x) {
+						if net == "udp" {
+							hard = true
+						} else {
+							w.Soft = true
+						}
 						w.BlockedBy = append(w.BlockedBy, clsUDPBlocked)
 					}
 				case clsFingerprinted:

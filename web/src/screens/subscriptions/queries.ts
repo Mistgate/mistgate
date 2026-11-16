@@ -3,7 +3,7 @@ import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
 import { dns, subscriptions, users } from "@/lib/api";
 import { plain } from "@/lib/plain";
-import type { DnsData, Settings } from "./model";
+import type { DnsData, ResponseHeader, Settings } from "./model";
 
 // Query keys sit under "subs" / "dns". Settings change only when an admin saves, so there is no polling; a save
 // invalidates them. The user card reads the presets through the same key, so a change here shows there.
@@ -15,7 +15,7 @@ export const settingsQuery = queryOptions({
     const samples = (r.serverSamples ?? []).map((s) => ({ node: s.node, countryCode: s.countryCode, profile: s.profile, loadPercent: s.loadPercent }));
     // sharedLinkUsers: people on the place the apps without a device ID share, for the "strict" confirmation; linkAwgKeys: the
     // AmneziaWG keys the link apps hold, for the confirmation of taking AmneziaWG out of them
-    return { settings: plain(r.settings!), effectiveTitle: r.effectiveTitle, samples, sampleGroup: r.sampleGroup ?? "", namesLanguage: r.namesLanguage ?? "", sharedLinkUsers: r.sharedLinkUsers ?? 0, linkAwgKeys: r.linkAwgKeys ?? 0 };
+    return { settings: plain(r.settings!), reservedHeaderNames: r.reservedHeaderNames ?? [], effectiveTitle: r.effectiveTitle, samples, sampleGroup: r.sampleGroup ?? "", namesLanguage: r.namesLanguage ?? "", sharedLinkUsers: r.sharedLinkUsers ?? 0, linkAwgKeys: r.linkAwgKeys ?? 0 };
   },
   staleTime: 30_000,
 });
@@ -56,6 +56,14 @@ export const pickerUsersQuery = queryOptions({
   queryFn: async ({ signal }) => plain((await users.listUsers({ pageSize: 50 }, { signal })).users).map((u) => ({ id: u.id, name: u.name })),
   staleTime: 30_000,
 });
+
+/** What the answer of one person to one User-Agent carries of the headers in `headers` (the editor's draft), asked of the panel. */
+export const headerPreviewQuery = (userId: string, userAgent: string, headers: ResponseHeader[]) =>
+  queryOptions({
+    queryKey: ["subs", "hdr-preview", userId, userAgent, headers],
+    queryFn: async ({ signal }) => plain(await subscriptions.previewResponseHeaders({ userId, userAgent, headers }, { signal })),
+    staleTime: 0,
+  });
 
 export const dnsPresetsQuery = queryOptions({
   queryKey: ["dns", "presets"],

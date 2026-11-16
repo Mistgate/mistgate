@@ -15,6 +15,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/pagepass"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subhdr"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -75,7 +76,7 @@ func (h *handler) unlockCounters(token, client string) []unlockCounter {
 
 func lockedAnswer(w http.ResponseWriter, retry time.Duration) {
 	secs := int((retry + time.Second - 1) / time.Second)
-	w.Header().Set("Retry-After", strconv.Itoa(secs))
+	w.Header().Set(subhdr.RetryAfter, strconv.Itoa(secs))
 	writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "locked", "retry_after": secs})
 }
 

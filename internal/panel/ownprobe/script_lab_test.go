@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -21,6 +22,38 @@ import (
 
 //go:embed testdata/fakecurl.sh
 var fakeCurl []byte
+
+// A fork that happens while a test holds the write handle of an executable it is writing takes the handle into the child until
+// the child's exec; a process that starts before then finds the file "text file busy" (golang/go#22315), and a child that waits
+// for a CPU under load keeps the handle long. So a write of an executable holds forkMu for writing and every start of a process
+// holds it for reading (Start returns after the child's exec).
+var forkMu sync.RWMutex
+
+func writeExe(path string, data []byte) error {
+	forkMu.Lock()
+	defer forkMu.Unlock()
+	return os.WriteFile(path, data, 0o755)
+}
+
+func startCmd(c *exec.Cmd) error {
+	forkMu.RLock()
+	defer forkMu.RUnlock()
+	return c.Start()
+}
+
+func runCmd(c *exec.Cmd) error {
+	if err := startCmd(c); err != nil {
+		return err
+	}
+	return c.Wait()
+}
+
+func combinedOutput(c *exec.Cmd) ([]byte, error) {
+	var out bytes.Buffer
+	c.Stdout, c.Stderr = &out, &out
+	err := runCmd(c)
+	return out.Bytes(), err
+}
 
 type shellSpec struct {
 	name string
@@ -36,7 +69,7 @@ func scriptShells(t testing.TB) []shellSpec {
 		t.Skipf("SKIP: the probe script tests need busybox ash or dash on Linux; they run under WSL and in CI, not on %s", runtime.GOOS)
 	}
 	var out []shellSpec
-	if p, err := exec.LookPath("busybox"); err == nil && exec.Command(p, "ash", "-c", "exit 0").Run() == nil {
+	if p, err := exec.LookPath("busybox"); err == nil && runCmd(exec.Command(p, "ash", "-c", "exit 0")) == nil {
 		out = append(out, shellSpec{"busybox-ash", []string{p, "ash"}, p})
 	} else if os.Getenv("MGP_REQUIRE_BUSYBOX") != "" {
 		t.Fatal("MGP_REQUIRE_BUSYBOX is set and there is no busybox with ash")
@@ -115,22 +148,22 @@ func newLab(t testing.TB, sh shellSpec, opts labOptions) *lab {
 	}
 	must(t, os.MkdirAll(filepath.Dir(l.script), 0o755))
 	if !opts.notInstalled {
-		must(t, os.WriteFile(l.script, opts.scriptBytes, 0o755))
+		must(t, writeExe(l.script, opts.scriptBytes))
 	}
 	bin := filepath.Join(root, "bin")
-	must(t, os.WriteFile(filepath.Join(bin, "curl"), fakeCurl, 0o755))
+	must(t, writeExe(filepath.Join(bin, "curl"), fakeCurl))
 	if sh.name == "busybox-ash" && !opts.realClock {
-		must(t, os.WriteFile(filepath.Join(bin, "sh"), []byte(busyboxSh(sh.path)), 0o755))
+		must(t, writeExe(filepath.Join(bin, "sh"), []byte(busyboxSh(sh.path))))
 	} else {
 		must(t, os.Symlink(sh.path, filepath.Join(bin, "sh")))
 	}
 	for _, tool := range []string{"opkg", "systemctl"} {
-		must(t, os.WriteFile(filepath.Join(bin, tool), []byte("#!/bin/sh\necho \"$0 $*\" >>\"$FAKE_DIR/tools.log\"\nexit 0\n"), 0o755))
+		must(t, writeExe(filepath.Join(bin, tool), []byte("#!/bin/sh\necho \"$0 $*\" >>\"$FAKE_DIR/tools.log\"\nexit 0\n")))
 	}
-	must(t, os.WriteFile(filepath.Join(bin, "logger"), []byte("#!/bin/sh\necho \"$*\" >>\"$FAKE_DIR/logger.log\"\n"), 0o755))
+	must(t, writeExe(filepath.Join(bin, "logger"), []byte("#!/bin/sh\necho \"$*\" >>\"$FAKE_DIR/logger.log\"\n")))
 	if !opts.realClock {
-		must(t, os.WriteFile(filepath.Join(bin, "date"), []byte("#!/bin/sh\ncase ${1:-} in +%s) read -r t <\"$FAKE_DIR/clock\"; echo \"$t\" ;; *) exec /bin/date \"$@\" ;; esac\n"), 0o755))
-		must(t, os.WriteFile(filepath.Join(bin, "sleep"), []byte("#!/bin/sh\n[ -z \"${FAKE_SLEEP_BROKEN:-}\" ] || exit 1\nread -r t <\"$FAKE_DIR/clock\"; echo $((t + $1)) >\"$FAKE_DIR/clock\"\n"), 0o755))
+		must(t, writeExe(filepath.Join(bin, "date"), []byte("#!/bin/sh\ncase ${1:-} in +%s) read -r t <\"$FAKE_DIR/clock\"; echo \"$t\" ;; *) exec /bin/date \"$@\" ;; esac\n")))
+		must(t, writeExe(filepath.Join(bin, "sleep"), []byte("#!/bin/sh\n[ -z \"${FAKE_SLEEP_BROKEN:-}\" ] || exit 1\nread -r t <\"$FAKE_DIR/clock\"; echo $((t + $1)) >\"$FAKE_DIR/clock\"\n")))
 	}
 	l.setClock(1_700_000_000)
 	l.env = []string{"MGP_ROOT=" + root, "FAKE_DIR=" + l.fake, "PATH=" + os.Getenv("PATH"), "HOME=" + root, "LAB_SH=" + strings.Join(l.shellArgv(), " ")}
@@ -232,7 +265,7 @@ func (l *lab) runEnv(extraEnv []string, args ...string) (string, int) {
 	var out bytes.Buffer
 	c := l.cmd(extraEnv, args...)
 	c.Stdout, c.Stderr = &out, &out
-	err := c.Run()
+	err := runCmd(c)
 	code := 0
 	if err != nil {
 		ee, ok := err.(*exec.ExitError)
@@ -253,7 +286,7 @@ func (l *lab) shellScript(program string, args ...string) (string, int) {
 	c.Env = append(append([]string{}, l.env...), "PATH="+filepath.Join(l.root, "bin")+":"+os.Getenv("PATH"))
 	var out bytes.Buffer
 	c.Stdout, c.Stderr = &out, &out
-	err := c.Run()
+	err := runCmd(c)
 	code := 0
 	if ee, ok := err.(*exec.ExitError); ok {
 		code = ee.ExitCode()

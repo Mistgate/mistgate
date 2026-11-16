@@ -6,9 +6,9 @@ import "mistgate/admin/v1/common.proto";
 import "mistgate/admin/v1/profile.proto";
 
 // Users screen, create-user modal, user detail. Product rules:
-//  - Every user gets Happ and Amnezia by default; Telegram is opt-in. Three toggles (Happ, Amnezia,
-//    Telegram); at least one of Happ and Amnezia stays on (the user table constraint; Telegram is
-//    additive in the first version).
+//  - Every user gets Happ and Amnezia by default; Telegram and the official TrustTunnel app are opt-in.
+//    At least one of Happ and Amnezia stays on (the user table constraint); Telegram and TrustTunnel are
+//    independent, additive switches.
 //  - Node selection per user: all nodes (automatic, includes nodes added later) or an explicit list.
 //  - Group, quota (+ reset period), term, device limit, optional speed limit.
 //  - "Via" = the apps the user really used recently (derived from traffic/sessions of the last 7 days),
@@ -197,6 +197,9 @@ message AppToggles {
   // person's enrolment is refused (app_disabled) and the devices they already enrolled get no servers (their keys are kept
   // and work again when it is switched on).
   optional bool mistgate = 4;
+  // The official TrustTunnel apps receive tt:// links for the user's TrustTunnel inbounds. This is independent of Mistgate,
+  // Happ and Amnezia; absent in an update = leave the existing value as it is.
+  optional bool trust_tunnel = 5;
 }
 
 message NodeSelection {
@@ -295,7 +298,7 @@ message UserCounts {
   uint32 expiring = 3;
   uint32 over_quota = 4;
   // Live, non-revoked devices in use for users matching query/group_id, regardless of filter or page. All apps on
-  // one implicit subscription-fetch device count once; each AmneziaWG key counts as one device.
+  // one implicit subscription-fetch device count once; each AmneziaWG or TrustTunnel key counts as one device.
   uint32 devices_used = 5;
   // Matching devices whose Device.online value is true, regardless of filter or page. Subscription devices are
   // online while their user is online; AmneziaWG devices are online after a handshake within the 3-minute window.
@@ -340,7 +343,7 @@ message Device {
   // Last handshake of the peer on any node; 0 = never connected.
   int64 last_handshake_unix = 13 [jstype = JS_NUMBER];
   // What the device is: an app on the subscription link (its own HWID), the one place the apps without a HWID share, or an
-  // AmneziaVPN key.
+  // AmneziaVPN or TrustTunnel key.
   DeviceKind kind = 14;
   // The OS version and the app ("Happ/3.4.2") the device last fetched with; empty when it never said.
   string os_version = 15;
@@ -373,7 +376,7 @@ enum DeviceKind {
   DEVICE_KIND_LINK = 1;
   // The place shared by every app that sends no HWID.
   DEVICE_KIND_LINK_SHARED = 2;
-  // An AmneziaVPN key (DeviceService.CreateAwgDevice).
+  // An AmneziaVPN or TrustTunnel key.
   DEVICE_KIND_KEY = 3;
   // The person's Telegram proxy key (UserService.IssueTelegramKey): one secret for every MTProto link of the person.
   DEVICE_KIND_TELEGRAM_KEY = 4;

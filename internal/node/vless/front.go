@@ -27,6 +27,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/certs"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/nets"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/node/subhost"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -79,6 +80,11 @@ func startSite(id string, cert func(*tls.ClientHelloInfo) (*tls.Certificate, err
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 		ErrorLog:          log.New(io.Discard, "", 0),
+	}
+	if err := sitehttp.ConfigureSiteHTTP2(srv); err != nil {
+		cleanup()
+		_ = ln.Close()
+		return nil, fmt.Errorf("configure HTTPS site: %w", err)
 	}
 	go srv.ServeTLS(ln, "", "")
 	return &site{network: network, addr: addr, ln: ln, srv: srv, cleanup: cleanup}, nil

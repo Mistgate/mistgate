@@ -89,12 +89,12 @@ func TestScriptStaticChecks(t *testing.T) {
 	}
 	for _, sh := range scriptShells(t) {
 		args := append(append([]string{}, sh.argv[1:]...), "-n", "mistgate-probe.sh")
-		if out, err := exec.Command(sh.argv[0], args...).CombinedOutput(); err != nil {
+		if out, err := combinedOutput(exec.Command(sh.argv[0], args...)); err != nil {
 			t.Errorf("%s -n: %v\n%s", sh.name, err, out)
 		}
 	}
 	if p, err := exec.LookPath("shellcheck"); err == nil {
-		if out, err := exec.Command(p, "-s", "sh", "-o", "all", "mistgate-probe.sh").CombinedOutput(); err != nil {
+		if out, err := combinedOutput(exec.Command(p, "-s", "sh", "-o", "all", "mistgate-probe.sh")); err != nil {
 			t.Errorf("shellcheck -s sh -o all:\n%s", out)
 		}
 	} else {
@@ -282,7 +282,7 @@ func TestTamperedScriptStopsTheInstall(t *testing.T) {
 		}
 		// the real script: the line works (this is also the end to end install of the entware layout)
 		good := newLab(t, sh, labOptions{noConf: true, notInstalled: true, realClock: true})
-		t.Cleanup(func() { good.run("uninstall") })
+		t.Cleanup(func() { pids := good.probePids(); good.run("uninstall"); waitGone(pids) })
 		if out, code := serve(good, probeScript); code != 0 || !strings.Contains(out, "OK: probe "+labID+" registered and running") {
 			t.Fatalf("the untouched script did not install (exit %d): %s", code, out)
 		}
@@ -305,7 +305,7 @@ func TestTamperedScriptStopsTheInstall(t *testing.T) {
 		}
 		// and a script that does not parse, run by hand: install refuses before it changes anything
 		broken := newLab(t, sh, labOptions{noConf: true, notInstalled: true})
-		must(t, os.WriteFile(filepath.Join(broken.root, "mgp.sh"), append(append([]byte{}, probeScript...), []byte("\nfi\n")...), 0o755))
+		must(t, writeExe(filepath.Join(broken.root, "mgp.sh"), append(append([]byte{}, probeScript...), []byte("\nfi\n")...)))
 		out, code := broken.runAt(filepath.Join(broken.root, "mgp.sh"), "install", labBase, token)
 		if code == 0 || broken.exists("opt/sbin/mistgate-probe") || broken.exists("opt/etc/mistgate-probe") {
 			t.Errorf("a script that does not parse was installed (exit %d): %s", code, out)
@@ -483,12 +483,12 @@ func TestPrivilegeHygiene(t *testing.T) {
 		evil := t.TempDir()
 		trap := filepath.Join(evil, "pwned")
 		for _, tool := range []string{"sha256sum", "curl", "id", "tr", "wc", "date", "logger", "systemctl", "sh"} {
-			must(t, os.WriteFile(filepath.Join(evil, tool), []byte("#!/bin/sh\ntouch "+trap+"\nexit 1\n"), 0o755))
+			must(t, writeExe(filepath.Join(evil, tool), []byte("#!/bin/sh\ntouch "+trap+"\nexit 1\n")))
 		}
 		argv := append(append([]string{}, sh.argv[1:]...), l.script, "status")
 		c := exec.Command(sh.argv[0], argv...)
 		c.Env = []string{"PATH=" + evil + ":" + os.Getenv("PATH"), "HOME=" + evil, "FAKE_DIR=" + l.fake}
-		out, _ := c.CombinedOutput()
+		out, _ := combinedOutput(c)
 		if _, err := os.Stat(trap); err == nil {
 			t.Errorf("a program from the caller's PATH was run: %s", out)
 		}
@@ -763,7 +763,7 @@ func TestStopTouchesOnlyItsOwnProcesses(t *testing.T) {
 		l := newLab(t, sh, labOptions{realClock: true})
 		must(t, os.MkdirAll(l.state, 0o700))
 		foreign := exec.Command("sleep", "300")
-		must(t, foreign.Start())
+		must(t, startCmd(foreign))
 		t.Cleanup(func() { _ = foreign.Process.Kill(); _ = foreign.Wait() })
 		for _, name := range []string{"supervisor.pid", "worker.pid"} {
 			must(t, os.WriteFile(filepath.Join(l.state, name), []byte(strconv.Itoa(foreign.Process.Pid)+"\n"), 0o600))
@@ -817,6 +817,36 @@ func (l *lab) pidOf(name string) int {
 	return n
 }
 
+// stopAndWait is "stop" that returns when the supervisor and the worker it names are gone. The script's stop only signals them and
+// removes the pid files; a worker in the middle of a cycle ends, and drops its lock, only when the command it runs returns (under
+// load, much later). A test that takes a snapshot of the tree, or runs a cycle itself, right after stop must wait for the pids.
+func (l *lab) stopAndWait() (string, int) {
+	l.t.Helper()
+	pids := l.probePids()
+	out, code := l.run("stop")
+	waitGone(pids)
+	return out, code
+}
+
+// probePids are the supervisor and the worker the pid files name now (read them before a stop removes the files).
+func (l *lab) probePids() []int {
+	return []int{l.pidOf("supervisor.pid"), l.pidOf("worker.pid")}
+}
+
+// waitGone waits (by pid, not by a sleep of a guessed length) until none of the processes lives; false when one still does.
+func waitGone(pids []int) bool {
+	deadline := time.Now().Add(30 * time.Second)
+	for _, p := range pids {
+		for p > 0 && procAlive(p) {
+			if time.Now().After(deadline) {
+				return false
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	return true
+}
+
 // the supervisor and its worker really run, answer the fake panel, and stop on stop; the install, upgrade and uninstall of the
 // entware layout and the systemd unit are written as they must be.
 func TestInstallRunUpgradeUninstall(t *testing.T) {
@@ -824,10 +854,10 @@ func TestInstallRunUpgradeUninstall(t *testing.T) {
 	forShells(t, func(t *testing.T, sh shellSpec) {
 		t.Parallel()
 		l := newLab(t, sh, labOptions{noConf: true, notInstalled: true, realClock: true})
-		t.Cleanup(func() { l.run("stop") })
+		t.Cleanup(func() { l.stopAndWait() })
 		token := "mgp_" + strings.Repeat("b", 52)
 		down := filepath.Join(l.root, "mgp.sh")
-		must(t, os.WriteFile(down, probeScript, 0o755))
+		must(t, writeExe(down, probeScript))
 		must(t, os.WriteFile(filepath.Join(l.fake, "enroll.resp"), []byte("mgp 1\nid "+labID+"\nsecret "+labSecret+"\nend\n"), 0o644))
 		// bad inputs change nothing
 		for _, args := range [][]string{{"install"}, {"install", labBase}, {"install", "http://panel.example.com/abcdefghijklmnopqrstuvwx", token}, {"install", labBase, "mgp_short"}, {"install", labBase + ";touch x", token}} {
@@ -885,7 +915,7 @@ func TestInstallRunUpgradeUninstall(t *testing.T) {
 		waitFor(t, "the restarted worker", 5*time.Second, func() bool { w := l.pidOf("worker.pid"); return w > 0 && procAlive(w) })
 		// upgrade: a changed script replaces the installed one, the registration stays
 		newer := append(append([]byte{}, probeScript...), []byte("# a newer build\n")...)
-		must(t, os.WriteFile(down, newer, 0o755))
+		must(t, writeExe(down, newer))
 		if out, code := l.runAt(down, "upgrade"); code != 0 || !strings.HasPrefix(out, "OK: upgraded to ") {
 			t.Fatalf("upgrade: %d %s", code, out)
 		}
@@ -931,7 +961,7 @@ func TestSystemdUnit(t *testing.T) {
 		t.Parallel()
 		l := newLab(t, sh, labOptions{noConf: true, notInstalled: true, mode: "systemd"})
 		down := filepath.Join(l.root, "mgp.sh")
-		must(t, os.WriteFile(down, probeScript, 0o755))
+		must(t, writeExe(down, probeScript))
 		must(t, os.WriteFile(filepath.Join(l.fake, "enroll.resp"), []byte("mgp 1\nid "+labID+"\nsecret "+labSecret+"\nend\n"), 0o644))
 		out, code := l.runAt(down, "install", labBase, "mgp_"+strings.Repeat("c", 52))
 		if code != 0 || !strings.Contains(out, "WARNING: probe "+labID) {

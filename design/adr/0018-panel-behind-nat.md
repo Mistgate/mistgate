@@ -38,7 +38,8 @@ firewall, and the panel would still need to be reachable. SSH reverse forwarding
 node held open by the panel, and the forwarded port would be one more thing to protect.
 
 **The host must own its 443.** The node's 443 must belong to a site the agent controls: a Hysteria2 profile's site, a
-REALITY profile that points at itself with PROXY protocol v2 (`xver`), or a free 443 where the agent runs its own site.
+TrustTunnel profile, a REALITY profile that points at itself with PROXY protocol v2 (`xver`), or a free 443 where the
+agent runs its own site.
 A REALITY profile whose target is someone else's site is refused (`sub_host_node_unfit: reason=reality_foreign_target`):
 the host could not tell its subdomain's connections from the cover traffic. Only the subscription name is forwarded.
 

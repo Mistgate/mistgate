@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -359,6 +360,29 @@ func TestAccessWorkingRelayIsAWay(t *testing.T) {
 	}
 }
 
+func TestAccessWorkingReverseRelayIsAWay(t *testing.T) {
+	f := newFx().node("be", "BE", "online").node("de1", "DE", "online").group("kids", "prf_vless").users("kids", 2, 1699990000)
+	v := f.inbound("be", "prf_vless", "vless", 443)
+	f.cc("be", "blocked", func(c *accCountry) {
+		c.TSPU = ports(443, "blocked")
+		c.Vantages = []accVantage{vant("MTS", "home", "dark", false)}
+	})
+	f.cc("de1", "ok", func(c *accCountry) { c.Vantages = []accVantage{vant("MTS", "home", "reach", true)} })
+	f.in.Relays = []accRelay{{ID: "rly_reverse", EntryID: "nod_de1", ExitID: "nod_be", InboundID: v, State: "active", Enabled: true,
+		ExitLive: true, AgentSupported: true, Mode: "auto", ActiveMode: "reverse", ReverseSupported: true,
+		BridgeOK: true, BridgeAtUnix: f.in.NowUnix, PathOK: true, MonitorAtUnix: f.in.NowUnix}}
+	r := buildAccess(f.in)
+	if accFinding(r, "group_without_working_way", "") != nil || accFinding(r, "relay_down", "") != nil || rec(r, "add_relay") != nil {
+		t.Fatalf("a healthy reverse relay was not treated as a way: findings=%+v recommendations=%+v", r.Findings, r.Recommendations)
+	}
+	f.in.Relays[0].BridgeOK = false
+	f.in.Relays[0].MonitorFails = 2
+	r = buildAccess(f.in)
+	if accFinding(r, "group_without_working_way", "") == nil || accFinding(r, "relay_down", "") == nil {
+		t.Fatalf("a reverse relay with a down bridge remained healthy: findings=%+v", r.Findings)
+	}
+}
+
 func TestAccessSameCountryEntryIsSkippedAndInlandEntryStaysFirst(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
@@ -603,6 +627,69 @@ func TestAccessFilters(t *testing.T) {
 	f.in.Node, f.in.Protocol = "", "hysteria2"
 	if r := buildAccess(f.in); len(r.Matrix) != 1 || r.Matrix[0].Protocol != "hysteria2" {
 		t.Fatalf("protocol filter: %+v", r.Matrix)
+	}
+}
+
+func TestTrustTunnelAccessReportUsesHTTP2AndHTTP3WithoutCredentials(t *testing.T) {
+	f := newFx().node("de1", "DE", "online").group("g", "prf_tt").users("g", 1, 1699990000)
+	f.in.Profiles["prf_tt"] = accProfile{
+		ID: "prf_tt", Name: "Tunnel", Protocol: "trusttunnel",
+		Summary: "TCP 443 · HTTP/2 · Let's Encrypt + HTTP/3 username=tt-user password=tt-password tt://fake-link",
+	}
+	id := f.inbound("de1", "prf_tt", "trusttunnel", 443)
+	f.in.Inbounds[len(f.in.Inbounds)-1].H3 = true
+	f.in.Totals[id] = accTotals{Protocol: "trusttunnel", UnknownKeys: 2, AuthFailed: 3}
+
+	report := buildAccess(f.in)
+	if len(report.Matrix) != 1 {
+		t.Fatalf("TrustTunnel matrix = %+v", report.Matrix)
+	}
+	cell := report.Matrix[0]
+	if cell.Transport != "h2+h3" || cell.Network != "tcp+udp" {
+		t.Fatalf("TrustTunnel transport/network = %q/%q, want h2+h3/tcp+udp", cell.Transport, cell.Network)
+	}
+	if cell.RejectSplit == nil || cell.RejectSplit.UnknownKey != 2 || cell.RejectSplit.AuthFailed != 3 {
+		t.Fatalf("TrustTunnel reject split = %+v", cell.RejectSplit)
+	}
+
+	wire, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{"tt-user", "tt-password", "fake-link", `"username":`, `"password":`, "tt://"} {
+		if strings.Contains(string(wire), secret) {
+			t.Fatalf("MCP access report contains %q: %s", secret, wire)
+		}
+	}
+}
+
+func TestTrustTunnelBlockDiagnosisUsesOptionalHTTP3Path(t *testing.T) {
+	way := func(h3 bool, class string) *wayV {
+		x := accInbound{ID: "inb_tt", NodeID: "nod_de1", Protocol: "trusttunnel", Port: 443, H3: h3}
+		in := &accessInput{
+			Nodes:     []accNode{{ID: "nod_de1", Name: "de1", Status: "online"}},
+			Inbounds:  []accInbound{x},
+			Countries: map[string]*accCountry{}, Klick: map[string]*accKlick{},
+			Totals: map[string]accTotals{},
+		}
+		b := newBlockCtx(in)
+		diags := map[string]*blockNodeV{
+			"nod_de1": {Classes: []blockClassV{{Class: class, Confidence: confHigh, port: 443}}},
+		}
+		return b.wayStates(diags)[x.ID]
+	}
+
+	if got := way(true, clsPortBlocked); got.State != statePartial || !got.Soft {
+		t.Fatalf("HTTP/3 TrustTunnel over a TCP port block = %+v, want a soft alternate-path warning", got)
+	}
+	if got := way(false, clsPortBlocked); got.State != stateFailing || got.Soft {
+		t.Fatalf("HTTP/2-only TrustTunnel over a TCP port block = %+v, want a hard failure", got)
+	}
+	if got := way(true, clsUDPBlocked); got.State != statePartial || !got.Soft {
+		t.Fatalf("HTTP/3 TrustTunnel over a UDP block = %+v, want a soft alternate-path warning", got)
+	}
+	if got := way(false, clsUDPBlocked); got.State != stateUnknown || got.Soft || len(got.BlockedBy) != 0 {
+		t.Fatalf("HTTP/2-only TrustTunnel over a UDP block = %+v, want no UDP classification", got)
 	}
 }
 

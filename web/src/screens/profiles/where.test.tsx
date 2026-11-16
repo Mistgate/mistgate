@@ -15,6 +15,7 @@ const updateGroup = vi.fn();
 const createGroup = vi.fn();
 const listNodes = vi.fn();
 const createInbound = vi.fn();
+const removeFrom = vi.fn();
 let role = Role.OWNER;
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
@@ -24,8 +25,10 @@ vi.mock("@/lib/api", async (orig) => ({
     listProfiles: () => Promise.resolve({ profiles: [{ id: "prf_1", name: "Amnezia 3.1 test", protocol: "awg" }] }),
     listProtocols: () => Promise.resolve({ protocols: [] }),
     createInbound: (...a: unknown[]) => createInbound(...a),
+    removeProfileFromNodes: (...a: unknown[]) => removeFrom(...a),
     twinProfile: () => Promise.resolve({ name: "x", egress: "warp", port: 8443, nodeIds: [], groupIds: [], hopDropped: false }),
   },
+  relays: { listRelays: () => Promise.resolve({ relays: [{ id: "rly_1", inboundId: "inb_2", viaNodeName: "msk1" }] }) },
   dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
 }));
@@ -52,7 +55,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [listGroups, updateGroup, createGroup, listNodes, createInbound]) m.mockReset();
+  for (const m of [listGroups, updateGroup, createGroup, listNodes, createInbound, removeFrom]) m.mockReset();
 });
 
 const profile = (over: Record<string, unknown> = {}) => ({ id: "prf_1", name: "Amnezia 3.1 test", protocol: "awg", nodeCount: 1, userCount: 7, version: 1, ...over }) as unknown as ProfileSummary;
@@ -291,5 +294,75 @@ describe("putting it on nodes", () => {
     await settle();
     expect(dialog()!.textContent).toContain("Port 443 on fi1 is taken by the profile “Main”; 8443 is free.");
     expect(dialog()!.querySelector<HTMLInputElement>('input[inputmode="numeric"]')!.value).toBe("8443");
+  });
+});
+
+describe("taking it off several nodes", () => {
+  const three = () => [inbound(), inbound({ id: "inb_2", nodeId: "nod_2", nodeName: "nl1" }), inbound({ id: "inb_3", nodeId: "nod_3", nodeName: "fi1" })];
+  const boxes = () => [...document.querySelectorAll<HTMLElement>("li [role=checkbox]")];
+
+  it("looks as before until the choosing mode is on, then shows a box on every row and what is ticked", async () => {
+    await mount(profile(), three(), [group()]);
+    expect(boxes()).toHaveLength(0);
+    await click(button("Choose nodes to take the profile off"));
+    expect(boxes()).toHaveLength(4); // "All nodes" and three rows
+    expect(button("Take off")?.hasAttribute("disabled")).toBe(true);
+    await click(document.querySelector('li [role=checkbox][aria-label="de1"]'));
+    await click(document.querySelector('li [role=checkbox][aria-label="nl1"]'));
+    expect(text()).toContain("2 of 3");
+    expect(button("Take off 2 nodes")).toBeDefined();
+    await click(button("Done"));
+    expect(boxes()).toHaveLength(0);
+  });
+
+  it("asks what happens, then removes the ticked nodes in one call and leaves the choosing mode", async () => {
+    removeFrom.mockResolvedValue({ removed: 2, profileDeleted: false, relaysRemoved: 1 });
+    await mount(profile(), three(), [group()]);
+    await click(button("Choose nodes to take the profile off"));
+    await click(document.querySelector('li [role=checkbox][aria-label="nl1"]'));
+    await click(document.querySelector('li [role=checkbox][aria-label="fi1"]'));
+    await click(button("Take off 2 nodes"));
+    await settle();
+    expect(dialog()!.textContent).toContain("Take “Amnezia 3.1 test” off these nodes?");
+    expect(dialog()!.textContent).toContain("Nodes: nl1, fi1");
+    expect(dialog()!.textContent).toContain("lose the connection");
+    expect(dialog()!.textContent).toContain("Also removes 1 relay through msk1"); // the relay of nl1's server goes with it
+    expect(removeFrom).not.toHaveBeenCalled();
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Take off 2 nodes"));
+    await settle();
+    expect(removeFrom).toHaveBeenCalledTimes(1);
+    expect(removeFrom).toHaveBeenCalledWith({ profileId: "prf_1", nodeIds: ["nod_2", "nod_3"], deleteProfile: false, confirmName: "" });
+    expect(text()).not.toContain("off these nodes?"); // the window is closed (what is left of role=dialog is the toast)
+    expect(boxes()).toHaveLength(0);
+    expect(text()).toContain("Taken off 2 nodes");
+  });
+
+  it("keeps the window and says why when the panel refuses", async () => {
+    removeFrom.mockRejectedValue(new ConnectError("stale_version", Code.Aborted));
+    await mount(profile(), three(), [group()]);
+    await click(button("Choose nodes to take the profile off"));
+    await click(document.querySelector('li [role=checkbox][aria-label="de1"]'));
+    await click(button("Take off 1 node"));
+    await settle();
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Take off 1 node"));
+    await settle();
+    expect(dialog()!.textContent).toContain("The profile was changed in another tab");
+    expect(boxes().length).toBeGreaterThan(0); // the mode is still on: nothing was removed
+  });
+
+  it("marks a node that is not connected, and says it drops the profile when it connects", async () => {
+    listNodes.mockResolvedValue({ nodes: [node("nod_1", "de1"), node("nod_2", "nl1", { status: NodeStatus.DOWN })] });
+    await mount(profile(), three().slice(0, 2), [group()]);
+    await click(button("Choose nodes to take the profile off"));
+    await click(button("All nodes") ?? document.querySelector('[role=checkbox][aria-label="All nodes"]'));
+    await click(button("Take off 2 nodes"));
+    await settle();
+    expect(dialog()!.textContent).toContain("1 of them is not connected now and drops the profile as soon as it connects");
+  });
+
+  it("is the owner's: a helper has no choosing mode", async () => {
+    role = Role.HELPER;
+    await mount(profile(), three(), [group()]);
+    expect(button("Choose nodes to take the profile off")).toBeUndefined();
   });
 });

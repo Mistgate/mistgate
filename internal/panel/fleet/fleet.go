@@ -165,12 +165,16 @@ type Fleet struct {
 	// start the automatic measurement waits. Test seams.
 	measureWait, measureDelay time.Duration
 
-	portCheckMu    sync.Mutex
-	portCheckLocks map[string]*portCheckLock
-	decoySyncMu    sync.Mutex
-	decoySyncing   map[string]bool
-	decoySyncDirty map[string]bool
-	decoyAttempts  map[string]decoyAttempt
+	portCheckMu     sync.Mutex
+	portCheckLocks  map[string]*portCheckLock
+	bridgeSeenMu    sync.Mutex
+	bridgeSeen      map[string]bridgeSeen
+	bridgeControlMu sync.RWMutex
+	relayControl    func(context.Context, string)
+	decoySyncMu     sync.Mutex
+	decoySyncing    map[string]bool
+	decoySyncDirty  map[string]bool
+	decoyAttempts   map[string]decoyAttempt
 
 	panelDecoyMu  sync.Mutex
 	panelDecoyDir string
@@ -182,6 +186,43 @@ type Fleet struct {
 	settleUDP     func(context.Context) error
 	probes        probeState                 // on-demand probes between nodes (path_probe.go); its zero value is ready
 	panelIPv6     func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
+}
+
+// SetRelayControl attaches the access module's mode controller after both services are built.
+func (f *Fleet) SetRelayControl(control func(context.Context, string)) {
+	f.bridgeControlMu.Lock()
+	f.relayControl = control
+	f.bridgeControlMu.Unlock()
+}
+
+// controlRelayLater asks the mode controller to look at a relay after the work of the session that found something new (a bridge
+// report, a change of capabilities). It never runs in the session's own path: the controller may check, or run a minute long proof.
+func (f *Fleet) controlRelayLater(relayID string) {
+	f.bridgeControlMu.RLock()
+	control := f.relayControl
+	f.bridgeControlMu.RUnlock()
+	if control == nil {
+		return
+	}
+	f.afterResponse(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), relayControlBudget)
+		defer cancel()
+		control(ctx, relayID)
+	})
+}
+
+// relayControlBudget bounds one pass of the controller, the 8 MB proof of the direct way included.
+const relayControlBudget = 3 * time.Minute
+
+func (f *Fleet) controlRelaysForNode(ctx context.Context, nodeID string) {
+	links, err := f.st.RelayLinks(ctx, store.RelayFilter{NodeID: nodeID, EnabledOnly: true})
+	if err != nil {
+		f.log.Warn("read relays after agent capability change", "code", "relay_capability_read_failed", "node", nodeID, "err", err)
+		return
+	}
+	for _, link := range links {
+		f.controlRelayLater(link.ID)
+	}
 }
 
 // HasSession reports whether this process currently owns the node's agent stream.
@@ -227,6 +268,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		stuck:                map[string]stuckSeq{},
 		statsBudgets:         map[string]*statsBudgetEntry{},
 		portCheckLocks:       map[string]*portCheckLock{},
+		bridgeSeen:           map[string]bridgeSeen{},
 		decoySyncing:         map[string]bool{},
 		decoySyncDirty:       map[string]bool{},
 		decoyAttempts:        map[string]decoyAttempt{},
