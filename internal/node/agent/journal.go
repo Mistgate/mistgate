@@ -159,9 +159,9 @@ func (j *journal) take(offset time.Duration) []*pb.JournalEntry {
 	return out
 }
 
-// scrub cuts addresses, and for xray also names: its text may name a destination.
+// scrub cuts credentials and addresses, and for xray also names: its text may name a destination.
 func scrub(source, s string) string {
-	s = logscrub.Addrs(s)
+	s = logscrub.Addrs(logscrub.Credentials(s))
 	if source == "xray" {
 		s = logscrub.Hosts(s)
 	}
