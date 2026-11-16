@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"net/http"
 	"net/netip"
 	"testing"
 	"time"
@@ -169,17 +170,17 @@ func TestStreamMovesBytesBothWays(t *testing.T) {
 	}
 }
 
-// The panel's HTTP server closes its TLS connection on a stream after the tunnel died and the stream's handler returned:
-// the close-notify sets a write deadline, which must not reach the finished HTTP/2 response writer (it panics there).
+// After the tunnel died and a stream's handler returned, the panel's HTTP server still sets a write deadline on the
+// connection it closes (TLS close-notify). That must not reach the finished HTTP/2 response writer: it panics there.
 func TestDeadlineAfterTunnelDeathIsHarmless(t *testing.T) {
-	cert, _ := selfSigned(t, "sub.example.com")
 	accepted := make(chan net.Conn, 1)
+	returned := make(chan struct{})
+	inner := ServerHandler(func(_ string, c net.Conn) bool { accepted <- c; return true })
 	a, b := net.Pipe()
-	served := make(chan struct{})
-	go func() {
-		(&http2.Server{}).ServeConn(a, &http2.ServeConnOpts{Handler: ServerHandler(func(_ string, c net.Conn) bool { accepted <- c; return true })})
-		close(served)
-	}()
+	go (&http2.Server{}).ServeConn(a, &http2.ServeConnOpts{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		inner.ServeHTTP(w, r)
+		close(returned)
+	})})
 	cc, err := (&http2.Transport{}).NewClientConn(b)
 	if err != nil {
 		t.Fatal(err)
@@ -189,15 +190,16 @@ func TestDeadlineAfterTunnelDeathIsHarmless(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer node.Close()
-	panel := tls.Server(<-accepted, &tls.Config{Certificates: []tls.Certificate{cert}})
-	_ = a.Close() // the tunnel dies: every handler returns
+	panel := <-accepted
+	_ = a.Close() // the tunnel dies
 	_ = b.Close()
-	<-served
-	// The handler returns a moment after the connection is gone; from then on the response writer is finished.
-	for deadline := time.Now().Add(500 * time.Millisecond); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		_ = panel.SetWriteDeadline(time.Now().Add(time.Second))
+	<-returned // the response writer is finished from here on
+	if err := panel.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
 	}
-	_ = panel.Close()
+	if _, err := panel.Write([]byte("x")); err == nil {
+		t.Fatal("a write after the stream ended succeeded")
+	}
 }
 
 // A read deadline that passed fails the pending read only: net/http does that to a hijacked connection (it aborts its
