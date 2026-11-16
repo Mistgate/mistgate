@@ -57,6 +57,8 @@ export const errorCodes = [
   "relay_unchecked",
   "relay_check_stale",
   "relay_check_failed",
+  // a bridge the pair cannot do (UpdateRelay / CreateRelay with mode "reverse"): "reverse_unavailable: reason=udp|entry_agent_old|exit_agent_old"
+  "reverse_unavailable",
   "check_unavailable",
   // a debug capture of a node (ops.proto StartDebugCapture): one at a time per node
   "debug_busy",
@@ -95,10 +97,12 @@ function editionVars(t: T, vars: Record<string, string>): Record<string, string>
 function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
   const reason = vars.reason ?? "";
   const worded = ["cdn", "acme_ip", "build_failed"].includes(reason);
+  const bridge = ["udp", "entry_agent_old", "exit_agent_old"].includes(reason);
+  const stage = vars.stage === "path" || vars.stage === "reverse_reach" || vars.stage === "bridge" ? vars.stage : "leg";
   return {
     ...vars,
-    reason: worded ? t(`relay.unsupported.${reason as "cdn"}`) : reason,
-    stage: vars.stage === "path" ? t("relay.stageName.path") : t("relay.stageName.leg"),
+    reason: worded ? t(`relay.unsupported.${reason as "cdn"}`) : bridge ? t(`relay.way.blockedWord.${reason as "udp"}`) : reason,
+    stage: t(`relay.stageName.${stage}`),
   };
 }
 
@@ -129,7 +133,7 @@ function known(c: ConnectError, t: T): string | undefined {
         ? editionVars(t, vars)
         : code.startsWith("decoy_bundle_")
           ? { path: "?", ...vars }
-          : code.startsWith("relay_")
+          : code.startsWith("relay_") || code === "reverse_unavailable"
             ? relayVars(t, vars)
             : code === "os_blocked"
               ? osVars(t, vars)
