@@ -18,6 +18,11 @@ func TestScrub(t *testing.T) {
 		{"panel token", "x " + canaryTK + " y", []string{canaryTK, "QQQQQQ"}, []string{"x ", " y"}},
 		{"confirm token", "cf_" + strings.Repeat("A", 43), []string{"AAAAAAAA"}, nil},
 		{"vless link", "see " + canaryVless + " now", []string{"vless://", "CANARYPBK", "11111111"}, []string{"see ", " now"}},
+		{"TrustTunnel deep link", "see tt://?v=2&hostname=de1.example.com&username=ualice2345672345&password=SecretTrustTunnelKey now", []string{"tt://", "ualice2345672345", "SecretTrustTunnelKey"}, []string{"see ", " now"}},
+		{"TrustTunnel link as the app writes it", "key tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDANkZTE end", []string{"tt://", "AAECAQ9k", "NzIzNDU"}, []string{"key ", " end"}},
+		{"TrustTunnel link in capitals", "TT://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDU", []string{"TT://", "AAECAQ9k"}, nil},
+		{"TrustTunnel link in a JSON string", `{"url":"tt://?AAECAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDU"}`, []string{"AAECAQ9k"}, []string{`{"url":"`}},
+		{"http is not a TrustTunnel link", "http://example.com/a and att://x and port tt: 5", nil, []string{"http://example.com/a", "att://x", "port tt: 5"}},
 		{"hysteria link", "hysteria2://pw@203.0.113.7:443/?sni=example.com#n", []string{"hysteria2://", "pw@"}, nil},
 		{"private key line", "[Interface]\nPrivateKey = " + key43 + "=\nAddress = 10.0.0.2", []string{key43, "[Interface]"}, []string{"Address"}},
 		{"Telegram bot token", "bot 123456:" + strings.Repeat("Ab3_-", 6), []string{"123456:"}, []string{"bot ", "[token]"}},
@@ -56,6 +61,10 @@ func TestScrub(t *testing.T) {
 	got := scrubJSON(j)
 	if strings.Contains(got, "vless") || strings.Contains(got, "b=c") || !strings.Contains(got, `"c":"keep"`) || !strings.HasSuffix(got, `"}`) {
 		t.Errorf("json pass: %s", got)
+	}
+	ttJSON := `{"link":"tt://?v=2&username=ualice2345672345&password=SecretTrustTunnelKey"}`
+	if redacted := scrubJSON(ttJSON); strings.Contains(redacted, "tt://") || strings.Contains(redacted, "SecretTrustTunnelKey") {
+		t.Errorf("TrustTunnel JSON link was not redacted: %s", redacted)
 	}
 }
 

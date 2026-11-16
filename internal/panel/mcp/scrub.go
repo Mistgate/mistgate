@@ -46,7 +46,7 @@ func scrubbers(stop string) []scrubber {
 		{regexp.MustCompile(`eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]{8,}`), `[token]`},
 		{regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`), `[private key]`},
 		// share links and tunnel configs
-		{regexp.MustCompile(`(?i)\b(?:vless|vmess|trojan|ss|ssr|hysteria2|hysteria|hy2|tuic|wireguard|awg|socks5?)://[^\s` + stop + `]+`), `[link]`},
+		{regexp.MustCompile(`(?i)\b(?:vless|vmess|trojan|ss|ssr|hysteria2|hysteria|hy2|tuic|wireguard|awg|trusttunnel|tt|socks5?)://[^\s` + stop + `]+`), `[link]`},
 		{regexp.MustCompile(`(?i)\[(?:Interface|Peer)\]`), `[config]`},
 		// key material by name
 		{regexp.MustCompile(`(?i)(private[_ -]?key|preshared[_ -]?key|secret[_ -]?key)\W{0,8}[A-Za-z0-9+/=_-]{16,}`), `$1 [key]`},
