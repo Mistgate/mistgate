@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 import { cx } from "@/lib/cx";
 
-// Inline stroke icons on a 24 grid, stroke 2.2, round caps and joins.
+// Inline stroke icons on a 24 grid, stroke 1.5, round caps and joins.
 const paths = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z M20 20l-4-4",
   back: "M15 5l-7 7 7 7",
@@ -98,7 +98,7 @@ export function Icon({ name, size = 16, ...rest }: { name: IconName; size?: numb
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={2.2}
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
@@ -127,36 +127,39 @@ export function IconChip({ icon, tone, size = 22, className }: { icon: IconName;
   );
 }
 
-// Sections and their pastel. Light theme darkens each through --_text-pct.
+// Sections and their pastel (the section tones of index.css: a colour and a darker one for the light theme).
 export const navPaths = {
-  overview: ["M3 3h8v10H3zM13 3h8v6h-8zM13 13h8v8h-8zM3 17h8v4H3z", "lavender"],
-  nodes: ["M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4", "sky"],
+  overview: ["M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z", "lavender"],
+  nodes: ["M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01", "sky"],
   users: [
-    "M15 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM21 20v-1.5a4 4 0 0 0-3-3.9M15.5 4.2a3.5 3.5 0 0 1 0 6.6",
+    "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 0 1 0 6.5M21 20c0-2.6-1.6-4.8-4-5.6",
     "sand",
   ],
-  profiles: ["M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4", "sage"],
-  subscriptions: [
-    "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
-    "mint",
+  profiles: ["M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4", "sage"],
+  subscriptions: ["M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1", "mint"],
+  health: ["M3 12h4l2.5-6 4 12 2.5-6h5", "rose"],
+  reachability: [
+    "M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8",
+    "sky",
   ],
-  health: ["M3 12h4l3-7 4 14 3-7h4", "rose"],
-  reachability: ["M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8", "mint"],
-  updates: ["M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5", "sky"],
-  ai: ["M11 3l1.7 4.8L17.5 9.5l-4.8 1.7L11 16l-1.7-4.8L4.5 9.5l4.8-1.7L11 3zM18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14z", "lavender"],
-  integrations: ["M9 3v4M15 3v4M6 7h12v4a6 6 0 0 1-12 0zM12 17v4", "lavender"],
+  updates: ["M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4", "sky"],
+  ai: [
+    "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z",
+    "lavender",
+  ],
+  integrations: ["M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4", "lavender"],
   settings: [
-    "M9.92 5.21L10.33 2.55L13.67 2.55L14.08 5.21A7.1 7.1 0 0 1 16.84 6.81L19.35 5.83L21.02 8.72L18.92 10.4A7.1 7.1 0 0 1 18.92 13.6L21.02 15.28L19.35 18.17L16.84 17.19A7.1 7.1 0 0 1 14.08 18.79L13.67 21.45L10.33 21.45L9.92 18.79A7.1 7.1 0 0 1 7.16 17.19L4.65 18.17L2.98 15.28L5.08 13.6A7.1 7.1 0 0 1 5.08 10.4L2.98 8.72L4.65 5.83L7.16 6.81A7.1 7.1 0 0 1 9.92 5.21zM12 14.8a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6z",
+    "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
     "sand",
   ],
-  more: ["M5 12h.01M12 12h.01M19 12h.01M5 6h.01M12 6h.01M19 6h.01M5 18h.01M12 18h.01M19 18h.01", "muted"],
+  more: ["M5 12h.01M12 12h.01M19 12h.01", "muted"],
 } as const;
 
 export type NavIconName = keyof typeof navPaths;
 
 export function NavIcon({ name, size = 16, dim }: { name: NavIconName; size?: number; dim?: boolean }) {
   const [d, tone] = navPaths[name];
-  const color = tone === "muted" ? "var(--muted)" : `color-mix(in oklch, var(--accent-${tone}) var(--_text-pct), #000)`;
+  const color = tone === "muted" ? "var(--muted)" : `var(--tone-${tone})`;
   return (
     <svg
       width={size}
@@ -164,7 +167,7 @@ export function NavIcon({ name, size = 16, dim }: { name: NavIconName; size?: nu
       viewBox="0 0 24 24"
       fill="none"
       stroke={color}
-      strokeWidth={2.2}
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
