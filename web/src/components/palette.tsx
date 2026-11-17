@@ -71,6 +71,7 @@ export const places: readonly Place[] = [
   { id: "users", label: "nav.users", words: "люди друзья группы people friends groups 用户 人员 朋友 分组 群组", go: { to: "/users" } },
   { id: "profiles", label: "nav.profiles", words: "протоколы protocols 协议 协议配置 配置 入站", go: { to: "/profiles" } },
   { id: "subscriptions", label: "nav.subscriptions", words: "ссылки links 订阅 链接 订阅链接", go: { to: "/subscriptions" } },
+  { id: "decoys", label: "nav.decoys", words: "ширма сайт заглушка маскировка decoy site masquerade cover 伪装 网站 伪装站点", go: { to: "/decoys" } },
   { id: "health", label: "nav.health", words: "健康 状态 监控 告警 检测", go: { to: "/health" } },
   {
     id: "reachability",

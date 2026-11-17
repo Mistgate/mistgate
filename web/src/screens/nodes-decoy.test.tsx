@@ -10,6 +10,7 @@ import { NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { editionFeatures } from "@/i18n/edition";
 import { en } from "@/i18n/en";
 import { setLang } from "@/i18n";
+import { sitesQuery } from "@/lib/decoysites";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
@@ -19,9 +20,11 @@ import { NodesScreen } from "./nodes";
 // bar lists each node with its state read live. Own is off while one of them has no uploaded site, and in the Cloudflare edition.
 
 const setNodesDecoyMode = vi.fn();
+const assignDecoySite = vi.fn();
 vi.mock("@/lib/api", () => ({
   basepath: "/",
   nodes: { setNodesDecoyMode: (...a: unknown[]) => setNodesDecoyMode(...a) },
+  decoySites: { assignDecoySite: (...a: unknown[]) => assignDecoySite(...a) },
   auth: { me: () => Promise.resolve({}) },
 }));
 vi.mock("@tanstack/react-router", () => ({
@@ -48,6 +51,7 @@ afterEach(() => {
   host?.remove();
   root = host = null;
   setNodesDecoyMode.mockReset();
+  assignDecoySite.mockReset();
 });
 
 const node = (name: string, over: Record<string, unknown> = {}) => ({
@@ -74,7 +78,7 @@ const node = (name: string, over: Record<string, unknown> = {}) => ({
 });
 const withBundle = { decoyBundleSha256: "ab".repeat(32) };
 
-async function mount(nodes: ReturnType<typeof node>[], me: Record<string, unknown> = { admin: { id: "adm_1", role: Role.OWNER } }, updates: Record<string, unknown>[] = []) {
+async function mount(nodes: ReturnType<typeof node>[], me: Record<string, unknown> = { admin: { id: "adm_1", role: Role.OWNER } }, updates: Record<string, unknown>[] = [], library: Record<string, unknown>[] | undefined = []) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -82,6 +86,7 @@ async function mount(nodes: ReturnType<typeof node>[], me: Record<string, unknow
   qc.setQueryData(meQuery.queryKey, me as never);
   qc.setQueryData(updatesQuery.queryKey, { nodes: updates } as never);
   qc.setQueryData(nodesQuery.queryKey, { nodes, expectedAgentVersion: "0.3.1" } as never);
+  if (library) qc.setQueryData(sitesQuery.queryKey, { sites: library, builtin: [], panelSource: "builtin", siteLimit: 100, versionLimit: 5 } as never);
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
@@ -258,22 +263,37 @@ describe("Set decoy site", () => {
     expect(bar()?.textContent).toContain("2 nodes selected"); // the selection stays for the next action
   });
 
-  it("keeps own on while every ticked node has its uploaded site", async () => {
-    await mount([node("de1", withBundle), node("fi1")]);
-    await selecting();
-    await click(tick("de1"));
-    await openDecoy();
-    expect(radio("own").disabled).toBe(false);
-  });
+  const lib = (over: Record<string, unknown> = {}) => ({ id: "dsi_a", name: "Bakery", note: "bakery, German", state: "ready", source: "upload", sourceLabel: "owner", bundleSha256: "ab".repeat(32), checks: [], nodeCount: 0, onPanel: false, sizeBytes: 100, fileCount: 2, updatedUnix: 1, ...over });
 
-  it("turns own off while a ticked node has no uploaded site, and says which", async () => {
-    await mount([node("de1", withBundle), node("fi1")]);
+  it("puts one site of the library on every ticked node, and links to it", async () => {
+    assignDecoySite.mockResolvedValue({ applied: true });
+    await mount([node("de1"), node("fi1")], undefined, undefined, [lib(), lib({ id: "dsi_b", name: "Draft site", state: "draft" })]);
     await selecting();
     await click(tick("de1"));
     await click(tick("fi1"));
     await openDecoy();
+    expect(radio("own").disabled).toBe(false);
+    await click(radio("own"));
+    const dialog = document.querySelector("[role=dialog]")!;
+    expect(dialog.textContent).toContain("Bakery");
+    expect(dialog.textContent).not.toContain("Draft site"); // a draft cannot be put on a node
+    expect(dialog.querySelector('a[href="/decoys/$id"]')?.textContent).toBe(en["dz.pk.open"]);
+    const applyBtn = () => [...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === en["decoy.apply"])!;
+    expect(applyBtn().hasAttribute("disabled") || applyBtn().getAttribute("data-disabled") !== null).toBe(true); // no site chosen yet
+    await click(dialog.querySelector('[role=radio][aria-checked=false]'));
+    await click(applyBtn());
+    expect(assignDecoySite).toHaveBeenCalledWith({ siteId: "dsi_a", nodeIds: ["nod_de1", "nod_fi1"], panel: false });
+    expect(setNodesDecoyMode).not.toHaveBeenCalled();
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+  });
+
+  it("turns own off while the library has no ready site, and says what to do", async () => {
+    await mount([node("de1")], undefined, undefined, [lib({ state: "draft" })]);
+    await selecting();
+    await click(tick("de1"));
+    await openDecoy();
     expect(radio("own").disabled).toBe(true);
-    expect(document.querySelector("[role=dialog]")?.textContent).toContain(en["decoy.bulk.ownBlocked"].replace("{names}", "fi1"));
+    expect(document.querySelector("[role=dialog]")?.textContent).toContain(en["dz.bulk.noSites"]);
   });
 
   it("turns own off in the Cloudflare edition", async () => {

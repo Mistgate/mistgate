@@ -1,10 +1,5 @@
-import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
-import type { Plain } from "@/lib/plain";
-
 // The per-node decoy site (docs: guide/decoy-site.md, "Nodes: three options"): the three modes, the one limit the panel and the
 // browser share, and the reasons a node's site is not applied yet. The server decides everything; this only names it.
-
-type Node = Plain<NodeMsg>;
 
 export const decoyModes = ["builtin", "panel", "own"] as const;
 export type DecoyMode = (typeof decoyModes)[number];
@@ -33,8 +28,3 @@ export const isDecoyReason = (v: string): v is DecoyReason => (decoyReasons as r
 
 /** The first 12 hex digits of a SHA-256: enough to tell two bundles apart. */
 export const shortHash = (h: string) => h.replace(/^sha256:/, "").slice(0, 12);
-
-/** Own can be chosen for these nodes together only if every one already has its bundle (the server refuses the rest): the names that stand in the way. */
-export function ownBlockedBy(nodes: readonly Pick<Node, "name" | "decoyBundleSha256" | "decoyOwnAvailable">[]): string[] {
-  return nodes.filter((n) => !n.decoyBundleSha256 || !n.decoyOwnAvailable).map((n) => n.name);
-}
