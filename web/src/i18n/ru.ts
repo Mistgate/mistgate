@@ -36,6 +36,7 @@ import { ru as osupdatesRu } from "./osupdates";
 import { ru as fleetuiRu } from "./fleetui";
 import { ru as clientlogsRu } from "./clientlogs";
 import { ru as trusttunnelRu } from "./trusttunnel";
+import { ru as shellRu } from "./shell";
 
 // Typed against the English shape: a missing or extra key fails `pnpm typecheck`. The admin UI speaks «ты».
 const core: CoreMessages = {
@@ -79,8 +80,8 @@ const core: CoreMessages = {
   "nav.more": "Ещё",
   "nav.main": "Основная навигация",
   "nav.skip": "Перейти к содержимому",
-  "nav.group.setup": "НАСТРОЙКА",
-  "nav.group.ops": "ЭКСПЛУАТАЦИЯ",
+  "nav.group.setup": "Настройка",
+  "nav.group.ops": "Эксплуатация",
 
   "section.overview.desc": "Здоровье флота с первого взгляда: карточки нод, трафик и последние события.",
   "section.nodes.desc": "Серверы флота, их протоколы и нагрузка, а также мастер добавления новой ноды.",
@@ -97,8 +98,6 @@ const core: CoreMessages = {
   "header.search": "Поиск нод, пользователей и разделов",
   "header.language": "Язык",
   "header.theme": "Тема",
-  "header.theme.toLight": "Включить светлую тему",
-  "header.theme.toDark": "Включить тёмную тему",
   "header.signOut": "Выйти",
   "header.version": "Версия панели {version}",
   "stale.title": "Панель обновлена до {version}",
@@ -107,8 +106,6 @@ const core: CoreMessages = {
   "stale.expand": "Показать напоминание о перезагрузке",
   "header.source": "Исходный код",
   "header.star": "Поставить звезду на GitHub",
-  "more.theme": "Тёмная тема",
-  "more.language": "Язык",
 
   "health.none": "Нет нод",
   "health.ok": "Флот в порядке",
@@ -307,4 +304,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "Сертификат Let’s Encrypt на IP-адрес пока недоступен: возьми домен или самоподписанный",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu, ...shellRu };

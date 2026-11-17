@@ -36,6 +36,7 @@ import { fa as osupdatesFa } from "./osupdates";
 import { fa as fleetuiFa } from "./fleetui";
 import { fa as clientlogsFa } from "./clientlogs";
 import { fa as trusttunnelFa } from "./trusttunnel";
+import { fa as shellFa } from "./shell";
 
 // Persian (fa, right to left). Typed against the English shape: a missing or extra key fails `pnpm typecheck`.
 // The admin speaks to the owner as «تو» in standard written Persian (اگر می‌خواهی…، ایجنت را به‌روز کن); buttons and tabs
@@ -89,7 +90,7 @@ const core: CoreMessages = {
   "nav.main": "ناوبری اصلی",
   "nav.skip": "رفتن به محتوا",
   "nav.group.setup": "راه‌اندازی",
-  "nav.group.ops": "عملیات",
+  "nav.group.ops": "بهره‌برداری",
   "section.overview.desc": "سلامت همهٔ نودها در یک نگاه: کارت نودها، ترافیک و آخرین رویدادها.",
   "section.nodes.desc": "سرورهای تو، پروتکل‌ها و بارشان، و راهنمای گام‌به‌گام افزودن نود جدید.",
   "section.users.desc": "افرادی که دسترسی دارند: برنامه‌ها، دستگاه‌ها، سهمیهٔ ترافیک و تاریخ انقضا.",
@@ -104,8 +105,6 @@ const core: CoreMessages = {
   "header.search": "جستجوی نودها، کاربران و بخش‌ها",
   "header.language": "زبان",
   "header.theme": "تم",
-  "header.theme.toLight": "تغییر به تم روشن",
-  "header.theme.toDark": "تغییر به تم تاریک",
   "header.signOut": "خروج",
   "header.version": "نسخهٔ پنل {version}",
   "stale.title": "پنل به نسخهٔ {version} به‌روز شد",
@@ -114,8 +113,6 @@ const core: CoreMessages = {
   "stale.expand": "نمایش یادآوری بارگذاری دوباره",
   "header.source": "کد منبع",
   "header.star": "ستاره دادن در GitHub",
-  "more.theme": "تم تاریک",
-  "more.language": "زبان",
   "health.none": "بدون نود",
   "health.ok": "همهٔ نودها سالم‌اند",
   "health.okShort": "همه‌چیز خوب است",
@@ -300,4 +297,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "گواهی Let’s Encrypt برای نشانی IP هنوز در دسترس نیست: دامنه یا گواهی خودامضا را انتخاب کن",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...shellFa };

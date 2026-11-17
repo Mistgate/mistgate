@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import type { StatusKind } from "@/components/ui/status";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
-import { isProblem, nodeKind } from "./node-status";
+import { isProblem, nodeKind, sortByProblems } from "./node-status";
 import { overviewQuery, userCountQuery } from "./queries";
 
 // What the shell needs to know about the fleet: counts for the sidebar and the health pill. They come from
@@ -10,6 +11,8 @@ import { overviewQuery, userCountQuery } from "./queries";
 export type FleetSummary = {
   nodes: number;
   users: number;
+  /** People online right now (the menu's counter beside Users). */
+  usersOnline: number;
   /** Nodes that count as a problem (isProblem): broken ones and those that need attention; not host blips, updates or pending nodes. */
   problems: number;
   /** Of those, the broken ones (red). */
@@ -44,11 +47,29 @@ export function useFleetSummary(): FleetSummary {
   return {
     nodes: overview.data?.nodesTotal ?? 0,
     users: users.data?.counts?.all ?? 0,
+    usersOnline: users.data?.counts?.online ?? 0,
     ...countNodes(overview.data?.nodes ?? []),
     alerts: overview.data?.alertsActive ?? 0,
     critical: overview.data?.alertsCritical ?? 0,
     loading: overview.isPending,
   };
+}
+
+/** The node cards the shell draws as dots and as the list under the fleet pill, problems first. Same query as the Overview's. */
+export function useFleetNodes() {
+  const cards = useQuery(overviewQuery()).data?.nodes;
+  return useMemo(() => sortByProblems(cards ?? []), [cards]);
+}
+
+/**
+ * The dots that stand for the nodes in the menu and on the fleet button: one per node up to six, then three at most (the
+ * broken ones, the ones that need a look, the rest) so the row stays short. `kinds` is nodeKind of each card, problems first.
+ */
+export function fleetDots(kinds: readonly StatusKind[]): StatusKind[] {
+  if (kinds.length <= 6) return [...kinds];
+  const bad = kinds.some((k) => k === "bad");
+  const warn = kinds.some((k) => k === "warn");
+  return [...(bad ? (["bad"] as const) : []), ...(warn ? (["warn", "ok"] as const) : (["ok"] as const))];
 }
 
 /**

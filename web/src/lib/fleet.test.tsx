@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { countNodes, foldView, healthKind, problemCount, useFleetHealth } from "./fleet";
+import { countNodes, fleetDots, foldView, healthKind, problemCount, useFleetHealth } from "./fleet";
 
 let overview: Record<string, unknown> = {};
 vi.mock("@/lib/api", () => ({
@@ -87,5 +87,15 @@ describe("the header pill", () => {
   });
   it("is green when everything that is connected works", async () => {
     expect(await pill({ nodesTotal: 2, nodes: [card(NodeStatus.ONLINE), card(NodeStatus.PENDING, "enrollment_pending")] })).toEqual({ kind: "ok", to: "/", label: "Fleet is healthy" });
+  });
+});
+
+describe("the dots of the menu", () => {
+  it("is a dot for each node up to six, then at most three: the broken, the ones to look at, the rest", () => {
+    expect(fleetDots(["ok", "bad", "warn"])).toEqual(["ok", "bad", "warn"]);
+    expect(fleetDots(Array(6).fill("ok"))).toHaveLength(6);
+    expect(fleetDots(Array(7).fill("ok"))).toEqual(["ok"]);
+    expect(fleetDots(["bad", "warn", ...Array(5).fill("ok")])).toEqual(["bad", "warn", "ok"]);
+    expect(fleetDots(["warn", ...Array(6).fill("ok")])).toEqual(["warn", "ok"]);
   });
 });

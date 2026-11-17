@@ -11,6 +11,7 @@ import { useT } from "@/i18n";
 import { groups as groupsApi, users as usersApi } from "@/lib/api";
 import type { Job, Row } from "@/lib/batch";
 import { meQuery } from "@/lib/session";
+import { useMenuWidth } from "@/lib/menu";
 import { Dock, Sidebar } from "@/screens/shell";
 import { availability, DeleteDialog, DisableDialog, EnableDialog, ExtendDialog, panelFor, ResetDialog, type ActionId, type UsersRun } from "@/screens/users/bulk-actions";
 import { UsersBulkBar } from "@/screens/users/bulk";
@@ -266,6 +267,8 @@ function fakeCalls() {
 
 /** The real People tab in the shell's frame: sidebar, the page, the dock (the bar takes its place on a phone). */
 export function UsersBulkPage() {
+  useMenuWidth(); // the menu column's width, for the page beside it and the bulk bar
+
   const [qc] = useState(() => {
     fakeCalls();
     const c = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
@@ -276,10 +279,10 @@ export function UsersBulkPage() {
   return (
     <QueryClientProvider client={qc}>
       <ToastProvider>
-        <div className="min-h-dvh md:ps-56">
+        <div className="min-h-dvh ps-(--menu-w)">
           <Sidebar />
-          <main className="px-4 pt-4 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
-            <div className="mx-auto max-w-[1360px]">
+          <main className="px-4 pt-5 pb-24 md:px-5 md:pt-7 md:pb-10 rail:px-8">
+            <div className="mx-auto max-w-[1240px]">
               <UsersScreen />
             </div>
           </main>

@@ -63,7 +63,7 @@ export function Wordmark({ size = 16 }: { size?: number }) {
     wordmark: [a, b],
   } = useBrand();
   return (
-    <span className="leading-none font-extrabold tracking-[-0.03em]" style={{ fontSize: size }}>
+    <span className="leading-none font-extrabold tracking-[-0.02em]" style={{ fontSize: size }}>
       {a}
       <span className="text-accent-text transition-colors duration-500">{b}</span>
     </span>
@@ -73,7 +73,7 @@ export function Wordmark({ size = 16 }: { size?: number }) {
 /** Logo + wordmark, as in the sidebar and the auth header. `motion` plays the logo's intro once (the sidebar stays still). */
 export function Brand({ logoSize = 30, textSize = 16, motion }: { logoSize?: number; textSize?: number; motion?: "intro" }) {
   return (
-    <span className="flex items-center gap-[9px]">
+    <span className="flex items-center gap-2.5">
       {motion ? <AnimatedMark size={logoSize} mode={motion} /> : <Logo size={logoSize} />}
       <Wordmark size={textSize} />
     </span>

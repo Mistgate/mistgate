@@ -36,6 +36,7 @@ import { tr as osupdatesTr } from "./osupdates";
 import { tr as fleetuiTr } from "./fleetui";
 import { tr as clientlogsTr } from "./clientlogs";
 import { tr as trusttunnelTr } from "./trusttunnel";
+import { tr as shellTr } from "./shell";
 
 // Turkish (tr). Typed against the English shape: a missing or extra key fails `pnpm typecheck`.
 // The admin speaks to the owner as «sen» (İstersen…, ajanı güncelle, emin misin?); buttons and tabs are short imperatives
@@ -89,8 +90,8 @@ const core: CoreMessages = {
   "nav.more": "Daha fazla",
   "nav.main": "Ana gezinme",
   "nav.skip": "İçeriğe geç",
-  "nav.group.setup": "KURULUM",
-  "nav.group.ops": "İŞLETİM",
+  "nav.group.setup": "Kurulum",
+  "nav.group.ops": "İşletim",
   "section.overview.desc": "Tüm düğümlerin durumu tek bakışta: düğüm kartları, trafik ve son olaylar.",
   "section.nodes.desc": "Düğümlerin çalıştığı sunucular, protokolleri, yükleri ve yeni düğüm eklemek için sihirbaz.",
   "section.users.desc": "Erişimi olan kişiler: uygulamalar, cihazlar, trafik kotaları ve bitiş tarihleri.",
@@ -105,8 +106,6 @@ const core: CoreMessages = {
   "header.search": "Düğüm, kullanıcı ve bölüm ara",
   "header.language": "Dil",
   "header.theme": "Tema",
-  "header.theme.toLight": "Açık temaya geç",
-  "header.theme.toDark": "Koyu temaya geç",
   "header.signOut": "Çıkış yap",
   "header.version": "Panel sürümü {version}",
   "stale.title": "Panel {version} sürümüne güncellendi",
@@ -115,8 +114,6 @@ const core: CoreMessages = {
   "stale.expand": "Yenileme uyarısını göster",
   "header.source": "Kaynak kod",
   "header.star": "GitHub'da yıldızla",
-  "more.theme": "Koyu tema",
-  "more.language": "Dil",
   "health.none": "Düğüm yok",
   "health.ok": "Tüm düğümler çalışıyor",
   "health.okShort": "Her şey yolunda",
@@ -301,4 +298,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "IP adresi için Let’s Encrypt sertifikası henüz yok: bir alan adı ya da kendi imzalı sertifikayı seç",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...shellTr };

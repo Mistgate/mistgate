@@ -1,43 +1,24 @@
-import { Dialog } from "@base-ui/react/dialog";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { AddNodeProvider } from "@/components/add-node";
 import { StepUpProvider } from "@/components/step-up";
-import { Brand, Logo, Wordmark } from "@/components/brand";
-import { navKey, sections, type SectionId } from "@/components/nav";
 import { ChatDock } from "@/components/assistant/chat";
-import { LangToggle, ThemeToggle } from "@/components/prefs";
+import { type SectionId } from "@/components/nav";
 import { StaleToast } from "@/components/stale-toast";
-import { UpdateToast } from "@/components/update-toast";
-import { Avatar, Kbd } from "@/components/ui/bits";
-import { Icon, NavIcon } from "@/components/ui/icons";
-import { StatusPill } from "@/components/ui/status";
-import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
-import type { MessageKey } from "@/i18n/en";
-import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { healthKind, problemCount, useFleetHealth, useFleetSummary } from "@/lib/fleet";
-import { useAwaitingApprovals } from "@/lib/integrations";
-import { basepath } from "@/lib/api";
-import { meQuery, useSignOut } from "@/lib/session";
 import { noteNavigation, usePageTransition } from "@/components/fx/page";
 import { setEffectsAllowed, useEffectKind, useEffectsEnabled } from "@/lib/effects";
 import { useEdition } from "@/lib/edition";
-import { cx } from "@/lib/cx";
+import { useMenuWidth } from "@/lib/menu";
+import { TopBar } from "./shell-bar";
+import { Dock, Sidebar } from "./shell-nav";
+
+// What was here moved next to its kin; these stay importable from the shell.
+export { Dock, Sidebar } from "./shell-nav";
+export { compactStars, GitHubButton, roleKey, VersionLine } from "./shell-parts";
 
 // The palette (and Base UI's dialog behind it) is loaded the first time it is opened.
 const Palette = lazy(() => import("@/components/palette"));
-
-export const roleKey: Record<Role, MessageKey> = {
-  [Role.UNSPECIFIED]: "role.unknown",
-  [Role.OWNER]: "role.owner",
-  [Role.HELPER]: "role.helper",
-  [Role.READONLY]: "role.readonly",
-};
-
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-const paletteKeys = isMac ? ["⌘", "K"] : ["Ctrl", "K"];
 
 export function Shell() {
   return (
@@ -50,12 +31,9 @@ export function Shell() {
 }
 
 function ShellFrame() {
-  const t = useT();
   // the Cloudflare edition has no reveal animation: set before the effects below read it
   const edge = useEdition().edge;
   setEffectsAllowed(!edge);
-  const [palette, setPalette] = useState(false);
-  const [paletteLoaded, setPaletteLoaded] = useState(false);
   // matches: root, app layout, then the section route: the key that restarts the enter animation
   // the page sweep: once per pathname change (a tab switch is a search change: it does not), and once when the shell first appears
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -67,6 +45,42 @@ function ShellFrame() {
   const content = useRef<HTMLDivElement>(null);
   usePageTransition(content, pathname, pageFx);
   const section = useRouterState({ select: (s) => s.matches[2]?.routeId ?? "" });
+  return (
+    <ShellLayout fab={<ChatDock />} contentKey={section} contentRef={content} pathname={pathname}>
+      <Outlet />
+    </ShellLayout>
+  );
+}
+
+/**
+ * The frame of every screen of the admin: the menu column, the top bar, the page, the dock of a phone and the assistant's
+ * button. The page is as wide as 1240px, with 32px at its sides (20 from 720px, 16 on a phone). `demo` opens one of the lists
+ * from the start and `current` names the open section without a route: the dev kit's scenes use them, the app does not.
+ */
+export function ShellLayout({
+  children,
+  fab,
+  contentKey,
+  contentRef,
+  pathname,
+  current,
+  demo,
+}: {
+  children: ReactNode;
+  fab?: ReactNode;
+  contentKey?: string;
+  contentRef?: Ref<HTMLDivElement>;
+  pathname?: string;
+  current?: SectionId;
+  demo?: { fleet?: boolean; lang?: boolean; owner?: boolean; mobile?: boolean };
+}) {
+  const t = useT();
+  const mode = useMenuWidth();
+  const [palette, setPalette] = useState(false);
+  const [paletteLoaded, setPaletteLoaded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(!!demo?.mobile);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
 
   function openPalette() {
     setPaletteLoaded(true);
@@ -77,39 +91,72 @@ function ShellFrame() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteLoaded(true);
-        setPalette(true);
+        openPalette();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // the phone's menu: opened by the burger or by "More" in the dock; Esc, a press outside it and a page change close it, and the
+  // focus goes back to what opened it (a disclosure under the bar, not a window: the bar stays in reach)
+  const close = (restore = true) => {
+    setMenuOpen(false);
+    if (restore) opener.current?.focus();
+  };
+  const toggle = () => {
+    if (!menuOpen) opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setMenuOpen(!menuOpen);
+  };
+  useEffect(() => {
+    if (!menuOpen) return;
+    menuRef.current?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    const onPress = (e: PointerEvent) => {
+      if (e.target instanceof Element && !e.target.closest("[data-mobile-menu], [data-menu-toggle]")) close(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPress);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPress);
+    };
+    // close() only reads refs and sets state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuOpen]);
+  const lastPath = useRef(pathname);
+  useEffect(() => {
+    if (lastPath.current !== pathname) setMenuOpen(false);
+    lastPath.current = pathname;
+  }, [pathname]);
+  useEffect(() => {
+    if (mode !== "none" && !demo?.mobile) setMenuOpen(false); // the window grew past a phone: there is no such menu any more
+  }, [mode, demo?.mobile]);
+
   return (
-    <div className="min-h-dvh md:ps-56">
+    <div className="min-h-dvh ps-(--menu-w)">
       <a
         href="#main"
-        className="sr-only z-50 rounded-ctl bg-accent px-3 py-2 font-semibold text-on-accent focus:not-sr-only focus:fixed focus:top-2 focus:inset-s-2"
+        className="sr-only z-50 rounded-ctl bg-accent px-3 py-2 font-medium text-on-accent focus:not-sr-only focus:fixed focus:top-2 focus:inset-s-2"
       >
         {t("nav.skip")}
       </a>
 
-      <Sidebar />
-      <TopBar onSearch={openPalette} />
-      <MobileHeader onSearch={openPalette} />
+      <Sidebar current={current} defaultOwnerOpen={demo?.owner} />
+      <TopBar onSearch={openPalette} menuOpen={menuOpen} onToggleMenu={toggle} onCloseMenu={() => close(false)} menuRef={menuRef} demo={demo} />
 
       {/* keyed by the section so every screen fades and rises in; sub-pages of one section do not */}
-      {/* one width rule for every screen: a centred column of at most 1360px, side padding that grows with the window.
+      {/* one width rule for every screen: a centred column of at most 1240px, side padding that grows with the window (16, 20, 32).
           A screen that needs more (a wide table) puts an element with the class "app-wide" inside and the column lifts its cap. */}
-      <main id="main" tabIndex={-1} className="outline-none px-4 pt-1.5 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
-        <div key={section} ref={content} className="screen-enter mx-auto max-w-[1360px] has-[.app-wide]:max-w-none">
-          <Outlet />
+      <main id="main" tabIndex={-1} className="shell-in px-4 pt-5 pb-[104px] outline-none md:px-5 md:pt-7 md:pb-10 rail:px-8">
+        <div key={contentKey} ref={contentRef} className="screen-enter mx-auto max-w-[1240px] has-[.app-wide]:max-w-none">
+          {children}
         </div>
       </main>
 
-      <Dock />
-      <ChatDock />
-      <UpdateToast />
+      <Dock moreOpen={menuOpen} onMore={toggle} current={current} />
+      {/* on a phone the open menu has the screen: the button waits */}
+      <div className={menuOpen ? "max-md:hidden" : undefined}>{fab}</div>
       <StaleToast />
       {paletteLoaded && (
         <Suspense fallback={null}>
@@ -117,304 +164,5 @@ function ShellFrame() {
         </Suspense>
       )}
     </div>
-  );
-}
-
-/** A count in a nav row: red for faults (health), amber for something that waits for the owner. `label` is spoken instead of the bare number. */
-function CountBadge({ n, tone = "danger", label }: { n: number; tone?: "danger" | "warn"; label?: string }) {
-  return (
-    <span
-      role={label ? "img" : undefined}
-      aria-label={label}
-      title={label}
-      className={cx(
-        "flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] px-[5px] font-mono text-[11px] font-bold",
-        tone === "warn" ? "bg-warn-soft text-warn-text" : "bg-danger-soft text-danger-text",
-      )}
-    >
-      {n}
-    </span>
-  );
-}
-
-/** The Health badge: the same number of problems as the header pill, red when something is broken or critical, amber otherwise. */
-function useProblemsBadge(): { n: number; tone: "danger" | "warn" } {
-  const s = useFleetSummary();
-  const n = problemCount(s);
-  return { n, tone: healthKind(s.broken, n, s.critical) === "bad" ? "danger" : "warn" };
-}
-
-const linkCls =
-  "flex h-[34px] items-center gap-2.5 rounded-ctl px-2.5 text-[13px] font-semibold text-muted transition-colors duration-200 data-[status=active]:bg-surface-2 data-[status=active]:font-bold data-[status=active]:text-fg";
-
-/** Exported for the dev kit's page frame (dev-kit-bulk.tsx); the app shows it only here. */
-export function Sidebar() {
-  const t = useT();
-  const signOut = useSignOut();
-  const { data } = useSuspenseQuery(meQuery);
-  const { nodes, users } = useFleetSummary();
-  const problems = useProblemsBadge();
-  const approvals = useAwaitingApprovals();
-  const name = data.admin?.displayName ?? "";
-  const counts: Partial<Record<SectionId, number>> = { nodes, users };
-
-  return (
-    <aside className="fixed inset-y-0 inset-s-0 hidden w-56 flex-col gap-0.5 border-e border-line px-2.5 py-3.5 md:flex">
-      <Link to="/" className="mb-3 flex h-[34px] items-center px-2" aria-label={t("nav.overview")}>
-        <Brand />
-      </Link>
-      <nav aria-label={t("nav.main")} className="flex flex-col gap-0.5">
-        {sections.map((s) => {
-          const count = counts[s.id];
-          return (
-            <div key={s.id} className="contents">
-              {"group" in s && (
-                <div className="px-2.5 pt-[18px] pb-1.5 text-[10px] font-bold tracking-[0.12em] text-faint">
-                  {t(s.group)}
-                </div>
-              )}
-              <Link to={s.to} activeOptions={{ exact: s.to === "/" }} className={linkCls}>
-                <NavIcon name={s.id} />
-                <span className="min-w-0 flex-1 truncate">{t(navKey(s.id))}</span>
-                {!!count && <span className="font-mono text-[11px] font-medium text-muted">{count}</span>}
-                {s.id === "health" && problems.n > 0 && <CountBadge n={problems.n} tone={problems.tone} label={t.n("health.problems", problems.n)} />}
-                {s.id === "ai" && approvals > 0 && <CountBadge n={approvals} tone="warn" label={t.n("int.badge", approvals)} />}
-              </Link>
-            </div>
-          );
-        })}
-      </nav>
-      <div className="flex-1" />
-      <div className="flex items-center gap-2.5 border-t border-line px-2 py-2.5">
-        <Avatar name={name} size={28} />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-[13px] font-bold">{name}</span>
-          <span className="text-[11px] text-muted lowercase">{t(roleKey[data.admin?.role ?? Role.UNSPECIFIED])}</span>
-        </div>
-        <button type="button" onClick={signOut} className="text-xs font-semibold text-muted transition-colors hover:text-fg">
-          {t("header.signOut")}
-        </button>
-      </div>
-      <VersionLine className="px-2" />
-    </aside>
-  );
-}
-
-/**
- * The panel's version and, when the panel names one (serve --source-url), the link to its source code (AGPL-3.0
- * section 13). Admin only: the decoy site and the user page never show it.
- */
-export function VersionLine({ className }: { className?: string }) {
-  const t = useT();
-  const { data } = useSuspenseQuery(meQuery);
-  return (
-    <p className={cx("font-mono text-[11px] text-muted", className)}>
-      {t("header.version", { version: data.version })}
-      {data.sourceUrl && (
-        <>
-          {" · "}
-          <a href={data.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline-offset-2 transition-colors hover:text-fg hover:underline">
-            {t("header.source")}
-          </a>
-        </>
-      )}
-    </p>
-  );
-}
-
-function TopBar({ onSearch }: { onSearch: () => void }) {
-  const t = useT();
-  const health = useFleetHealth();
-  return (
-    <header data-fx-chrome="top" className="sticky top-0 z-10 hidden h-14 items-center gap-3 border-b border-line bg-canvas px-5 md:flex">
-      {/* the whole placeholder and the shortcut fit beside the other controls from 1280 px; narrower, the search is the
-          icon button of the phone, as tall as its neighbours, rather than a box that cuts its own words */}
-      <button
-        type="button"
-        onClick={onSearch}
-        className="hidden h-bar max-w-[420px] min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-ctl border border-line bg-surface pe-1.5 ps-3 text-[13px] text-muted outline-none transition-colors duration-200 hover:bg-surface-2 focus-visible:border-accent xl:flex"
-      >
-        <Icon name="search" size={15} />
-        <span className="flex-1 truncate text-start">{t("header.search")}</span>
-        <Kbd keys={paletteKeys} />
-      </button>
-      <button
-        type="button"
-        onClick={onSearch}
-        aria-label={t("header.search")}
-        title={t("header.search")}
-        className="grid size-bar flex-none place-items-center rounded-ctl border border-line bg-surface text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg xl:hidden"
-      >
-        <Icon name="search" />
-      </button>
-      <div className="flex-1" />
-      <Link to={health.to} className="flex">
-        <StatusPill kind={health.kind} label={health.label} bar />
-      </Link>
-      <GitHubButton />
-      <LangToggle />
-      <ThemeToggle />
-    </header>
-  );
-}
-
-/** A star count as GitHub shows it: 823, 1.2k, 3.4M (rounded down, never more than there is). */
-export function compactStars(n: number): string {
-  const one = (x: number) => (Math.floor(x * 10) / 10).toFixed(1).replace(/\.0$/, "");
-  return n < 1000 ? String(n) : n < 1e6 ? `${one(n / 1e3)}k` : `${one(n / 1e6)}M`;
-}
-
-/**
- * The panel's source repository as a top-bar button: the GitHub mark, then the star count and an outline star. The link
- * is the one of the version line (serve --source-url) and the button is gone without it. The count is read by the panel
- * (Me.source_stars), never by the browser; without one (not read yet, not a GitHub repository, the edge) the mark stands
- * alone, as it does in the phone header.
- */
-export function GitHubButton({ iconOnly }: { iconOnly?: boolean }) {
-  const t = useT();
-  const { data } = useSuspenseQuery(meQuery);
-  if (!data.sourceUrl) return null;
-  const stars = iconOnly ? undefined : data.sourceStars;
-  const label = t("header.star");
-  return (
-    <Tip label={label}>
-      <a
-        href={data.sourceUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={stars === undefined ? label : `${label}: ${stars}`}
-        className={cx(
-          "inline-flex h-bar flex-none items-center gap-1.5 rounded-ctl border border-line bg-surface text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent",
-          stars === undefined ? "w-bar justify-center" : "px-2.5",
-        )}
-      >
-        <svg aria-hidden width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="flex-none">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-        </svg>
-        {stars !== undefined && (
-          <>
-            <span className="font-mono tabular-nums">{compactStars(stars)}</span>
-            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" className="flex-none">
-              <path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6-5.38-2.83-5.38 2.83 1.03-6L3.3 9.6l6-.9z" />
-            </svg>
-          </>
-        )}
-      </a>
-    </Tip>
-  );
-}
-
-function MobileHeader({ onSearch }: { onSearch: () => void }) {
-  const t = useT();
-  const health = useFleetHealth();
-  return (
-    <header data-fx-chrome="top" className="sticky top-0 z-10 flex h-14 items-center gap-2.5 bg-canvas px-4 pt-2 md:hidden">
-      <Logo size={32} />
-      <Wordmark size={16} />
-      <div className="flex-1" />
-      <Link to={health.to} aria-label={health.label} className="flex">
-        <StatusPill kind={health.kind} label={health.short} bar />
-      </Link>
-      <GitHubButton iconOnly />
-      <button
-        type="button"
-        onClick={onSearch}
-        aria-label={t("header.search")}
-        className="grid size-bar flex-none place-items-center rounded-ctl border border-line bg-surface"
-      >
-        <Icon name="search" />
-      </button>
-    </header>
-  );
-}
-
-const tabCls =
-  "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[14px] text-[11px] font-bold text-muted transition-colors duration-300 data-[status=active]:bg-surface-2 data-[status=active]:text-fg";
-
-/** Floating dock: three sections and "More", which opens a sheet with the rest. The Nodes page's bulk bar takes its place (index.css). */
-export function Dock() {
-  const t = useT();
-  const [more, setMore] = useState(false);
-  const problems = useProblemsBadge();
-  const approvals = useAwaitingApprovals();
-  const base = basepath.replace(/\/$/, "");
-  const path = useRouterState({ select: (s) => s.location.pathname }).replace(base, ""); // tolerate a prefixed pathname
-  const primary = sections.slice(0, 3);
-  const rest = sections.slice(3);
-  const moreActive = more || rest.some((s) => path.startsWith(s.to));
-
-  return (
-    <nav
-      data-dock
-      aria-label={t("nav.main")}
-      data-fx-chrome="bottom" className="fixed inset-x-3.5 bottom-3.5 z-10 flex h-[60px] gap-1 rounded-dock border border-line bg-dock p-1.5 shadow-(--shadow-dock) backdrop-blur-[16px] md:hidden"
-    >
-      {primary.map((s) => (
-        <Link key={s.id} to={s.to} activeOptions={{ exact: s.to === "/" }} className={tabCls}>
-          <NavIcon name={s.id} size={20} />
-          <span className="max-w-full truncate">{t(navKey(s.id))}</span>
-          {s.id === "overview" && problems.n > 0 && (
-            <span aria-hidden className={cx("absolute top-1.5 inset-e-3.5 size-[7px] rounded-full", problems.tone === "danger" ? "bg-danger" : "bg-warn")} />
-          )}
-        </Link>
-      ))}
-      <Dialog.Root open={more} onOpenChange={setMore}>
-        <Dialog.Trigger data-status={moreActive ? "active" : undefined} className={tabCls}>
-          <NavIcon name="more" size={20} />
-          <span>{t("nav.more")}</span>
-          {approvals > 0 && <span aria-hidden className="absolute top-1.5 inset-e-3.5 size-[7px] rounded-full bg-warn" />}
-        </Dialog.Trigger>
-        <Dialog.Portal>
-          <Dialog.Backdrop className="fixed inset-0 z-20 bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-          <Dialog.Popup className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-0.5 rounded-t-sheet border-t border-line bg-surface px-3 pt-2.5 pb-7 outline-none transition-transform duration-300 ease-out-soft data-ending-style:translate-y-full data-starting-style:translate-y-full">
-            <div aria-hidden className="mx-auto mb-2.5 h-1 w-9 rounded-sm bg-line" />
-            <Dialog.Title className="sr-only">{t("nav.more")}</Dialog.Title>
-            {rest.map((s) => (
-              <Link
-                key={s.id}
-                to={s.to}
-                onClick={() => setMore(false)}
-                className="flex h-12 items-center gap-3 rounded-field px-3 text-[15px] font-semibold"
-              >
-                <NavIcon name={s.id} size={20} />
-                <span className="flex-1">{t(navKey(s.id))}</span>
-                {s.id === "health" && problems.n > 0 && <CountBadge n={problems.n} tone={problems.tone} label={t.n("health.problems", problems.n)} />}
-                {s.id === "ai" && approvals > 0 && <CountBadge n={approvals} tone="warn" label={t.n("int.badge", approvals)} />}
-                <span aria-hidden className="text-base text-faint">
-                  ›
-                </span>
-              </Link>
-            ))}
-            <div className="mx-3 my-1.5 h-px bg-line" />
-            <div className="flex h-[52px] items-center gap-2.5 px-3">
-              <span className="flex-1 text-[15px] font-semibold">{t("more.theme")}</span>
-              <ThemeToggle />
-            </div>
-            <div className="flex h-[52px] items-center gap-2.5 px-3">
-              <span className="flex-1 text-[15px] font-semibold">{t("more.language")}</span>
-              <LangToggle />
-            </div>
-            <SignOutRow />
-          </Dialog.Popup>
-        </Dialog.Portal>
-      </Dialog.Root>
-    </nav>
-  );
-}
-
-function SignOutRow() {
-  const t = useT();
-  const signOut = useSignOut();
-  return (
-    <>
-      <button
-        type="button"
-        onClick={signOut}
-        className={cx("flex h-12 items-center px-3 text-start text-[15px] font-semibold text-danger-text")}
-      >
-        {t("header.signOut")}
-      </button>
-      <VersionLine className="px-3 pt-1" />
-    </>
   );
 }

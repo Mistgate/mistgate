@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { AddNodeProvider } from "@/components/add-node";
 import { DangerZone, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,7 @@ import { AuditPage } from "@/screens/settings-pages/audit";
 import { passkeysQuery, SecurityPage } from "@/screens/settings-pages/security";
 import { SessionsPage } from "@/screens/settings-pages/sessions";
 import { StaleToastView } from "@/components/stale-toast";
-import { UpdateToast } from "@/components/update-toast";
+import { UpdateCard } from "@/components/update-card";
 import { updatesQuery } from "@/lib/updates";
 import { UpdatesScreen } from "@/screens/updates";
 import { GroupForm } from "@/screens/users/groups";
@@ -212,11 +211,11 @@ export function PolishKit() {
         <NodesScreen />
         <UpdatesScreen />
       </Shot>
-      {/* fixed in the corner of the window, so it only appears when asked for: /dev-kit?update-toast (its collapsed and closed states live in localStorage) */}
+      {/* the card at the foot of the menu: /dev-kit?update-toast, or =nodes for the nodes behind the bundle (the shell scene shows it in place) */}
       {new URLSearchParams(location.search).has("update-toast") && (
         <Shot
           id="polish-update-toast"
-          title="Update notice: a newer panel release, or with =nodes the nodes behind the bundle (fixed in the corner)"
+          title="Update card of the menu: a newer panel release, or with =nodes the nodes behind the bundle"
           seed={[
             owner,
             [
@@ -230,11 +229,12 @@ export function PolishKit() {
             ],
           ]}
         >
-          {/* the kit page centres its column with a transform, which would turn "fixed" into "inside the column" */}
-          {createPortal(<UpdateToast />, document.body)}
+          <div className="w-[264px]">
+            <UpdateCard />
+          </div>
         </Shot>
       )}
-      <Shot id="polish-stale-toast" title="Stale tab: the panel was updated under an open admin (in the corner of every page like the update notice, here in place; the profile form swaps Save for Reload)">
+      <Shot id="polish-stale-toast" title="Stale tab: the panel was updated under an open admin (in the corner of every page, here in place; the profile form swaps Save for Reload)">
         <div className="flex justify-end">
           <StaleToastView version="0.1.36" />
         </div>

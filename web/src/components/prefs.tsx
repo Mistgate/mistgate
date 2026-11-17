@@ -1,88 +1,85 @@
-import { Select as BaseSelect } from "@base-ui/react/select";
-import { isLang, langNames, langShort, langs, localeOf, setLang, useLang, useT } from "@/i18n";
+import type { MouseEvent } from "react";
+import { currentLang, isLang, langNames, langShort, langs, localeOf, setLang, useLang, useT, type Lang } from "@/i18n";
 import { Icon } from "@/components/ui/icons";
-import { SelectCheck, selectItemClass, selectPopupClass } from "@/components/ui/select";
+import { Menu, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
+import { playWave, originOf } from "@/components/fx/wave";
 import { cx } from "@/lib/cx";
-import { toggleTheme, useTheme } from "@/lib/theme";
+import { setTheme, themeNow, useTheme } from "@/lib/theme";
 
 /**
- * The language menu of the top bar, the More sheet and the auth screens: a globe, the short code of the current language and
- * a chevron; the list under it names every language in its own script (and sets `lang` on the row so the right font draws it).
- * One row per entry of `langs`, so a new language adds a row and nothing else.
+ * The language menu of the top bar, the phone's menu and the auth screens: a 40px button with a globe, the short code of the
+ * current language and a chevron; the list under it names every language in its own script (and sets `lang` on the row so the
+ * right font draws it). One row per entry of `langs`, so a new language adds a row and nothing else.
  */
-export function LangToggle({ className }: { className?: string }) {
+export function LangToggle({ className, defaultOpen }: { className?: string; defaultOpen?: boolean }) {
   const t = useT();
   const lang = useLang();
   return (
-    <BaseSelect.Root value={lang} onValueChange={(v) => isLang(v) && setLang(v)}>
-      <BaseSelect.Trigger
-        aria-label={t("common.labeled", { label: t("header.language"), value: langNames[lang] })}
-        className={cx(
-          // 40px where a finger taps, the top-bar height (h-bar, 36px) from md up
-          "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-ctl border border-line bg-surface pe-2 ps-2.5 text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent data-popup-open:border-accent-line data-popup-open:text-fg md:h-bar",
-          className,
-        )}
+    <Menu
+      narrow
+      defaultOpen={defaultOpen}
+      aria-label={t("shell.lang.list")}
+      trigger={
+        <button
+          type="button"
+          aria-label={t("common.labeled", { label: t("header.language"), value: langNames[lang] })}
+          className={cx(
+            "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-field border border-line bg-step ps-3 pe-2 font-mono text-xs font-medium text-fg outline-none transition-[background-color,transform] duration-150 ease-out hover:bg-(--step-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-mark active:scale-[0.98] data-popup-open:bg-(--step-hover)",
+            className,
+          )}
+        >
+          <Icon name="globe" size={16} className="text-sec" />
+          <span lang={localeOf(lang)}>{langShort[lang]}</span>
+          <Icon name="chevronDown" size={16} className="text-muted" />
+        </button>
+      }
+    >
+      <MenuRadioGroup
+        value={lang}
+        aria-label={t("shell.lang.list")}
+        onValueChange={(v, row) => isLang(v) && chooseLanguage(v, row)}
       >
-        <Icon name="globe" size={16} />
-        <span lang={localeOf(lang)}>{langShort[lang]}</span>
-        <svg aria-hidden width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 4.5l3 3 3-3" />
-        </svg>
-      </BaseSelect.Trigger>
-      <BaseSelect.Portal>
-        <BaseSelect.Positioner side="bottom" align="end" sideOffset={6} alignItemWithTrigger={false} className="z-50 outline-none">
-          <BaseSelect.Popup className={cx(selectPopupClass, "min-w-44")}>
-            <BaseSelect.List>
-              {langs.map((l) => (
-                <BaseSelect.Item key={l} value={l} lang={localeOf(l)} className={selectItemClass}>
-                  <BaseSelect.ItemText className="flex-1">{langNames[l]}</BaseSelect.ItemText>
-                  <span aria-hidden className="font-mono text-[11px] font-bold text-muted">
-                    {langShort[l]}
-                  </span>
-                  <span aria-hidden className="grid w-3 place-items-center text-accent-text">
-                    <BaseSelect.ItemIndicator>
-                      <SelectCheck />
-                    </BaseSelect.ItemIndicator>
-                  </span>
-                </BaseSelect.Item>
-              ))}
-            </BaseSelect.List>
-          </BaseSelect.Popup>
-        </BaseSelect.Positioner>
-      </BaseSelect.Portal>
-    </BaseSelect.Root>
+        {langs.map((l) => (
+          <MenuRadioItem key={l} value={l} code={langShort[l]} lang={localeOf(l)}>
+            {langNames[l]}
+          </MenuRadioItem>
+        ))}
+      </MenuRadioGroup>
+    </Menu>
   );
 }
 
+/** Picks a language: the wave runs from `from` (the row or button that was pressed), then the page changes under it. */
+export function chooseLanguage(next: Lang, from?: Element | null) {
+  if (next === currentLang()) return;
+  playWave(originOf(from), { light: themeNow() === "light" });
+  setLang(next);
+}
+
+const themeBtn =
+  "grid size-[34px] cursor-pointer place-items-center rounded-ctl text-sec outline-none transition-colors duration-150 ease-out hover:text-fg focus-visible:outline-2 focus-visible:outline-accent-mark aria-pressed:bg-surface-2 aria-pressed:text-fg";
+
 /**
- * The theme switch: a track as tall as the language menu beside it (40px where a finger taps, h-bar from md up) with the
- * radius of the other controls, and a knob whose sun turns into a moon in the dark theme. Hover and focus change colours
- * only, never the size.
+ * The theme switch: two 34px buttons, the sun and the moon, in a 40px frame; the one that is on is a step lighter. A pressed
+ * button is the theme in use (aria-pressed), so a screen reader hears the state and not an action.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const t = useT();
   const dark = useTheme() === "dark";
+  // the wave starts at the button; the theme changes under it
+  const pick = (next: "light" | "dark") => (e: MouseEvent<HTMLElement>) => {
+    if ((next === "dark") === dark) return;
+    playWave(originOf(e.currentTarget), { light: next === "light", theme: true });
+    setTheme(next);
+  };
   return (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      aria-label={t(dark ? "header.theme.toLight" : "header.theme.toDark")}
-      className="relative h-10 w-[66px] flex-none cursor-pointer rounded-ctl border border-line bg-surface p-0 outline-none transition-colors duration-500 hover:bg-surface-2 focus-visible:border-accent md:h-bar md:w-[60px]"
-    >
-      <span
-        aria-hidden
-        className={`absolute top-[3px] inset-s-[3px] grid size-8 place-items-center rounded-[8px] bg-accent transition-[transform,background-color] duration-[550ms] ease-spring md:size-7 ${
-          dark ? "translate-x-[26px] rotate-0 md:translate-x-6 rtl:-translate-x-[26px] md:rtl:-translate-x-6" : "rotate-180"
-        }`}
-      >
-        <span
-          className={`size-3 rounded-full transition-all duration-[450ms] ${
-            dark
-              ? "bg-transparent shadow-[inset_-3px_-2px_0_0_#0c0c0e]"
-              : "bg-[#0c0c0e] shadow-[0_0_0_2px_color-mix(in_oklch,#0c0c0e_25%,transparent)]"
-          }`}
-        />
-      </span>
-    </button>
+    <div role="group" aria-label={t("header.theme")} className={cx("inline-flex h-10 flex-none items-center gap-0.5 rounded-field border border-line bg-surface p-0.5", className)}>
+      <button type="button" aria-pressed={!dark} aria-label={t("shell.theme.light")} onClick={pick("light")} className={themeBtn}>
+        <Icon name="sun" size={16} />
+      </button>
+      <button type="button" aria-pressed={dark} aria-label={t("shell.theme.dark")} onClick={pick("dark")} className={themeBtn}>
+        <Icon name="moon" size={16} />
+      </button>
+    </div>
   );
 }

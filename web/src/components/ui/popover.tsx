@@ -50,6 +50,10 @@ export function Popover({
   );
 }
 
+/** The look of a PopRow, for a row that has to be the router's Link (whose typed props PopRow's `as` cannot carry). */
+export const popRowClass =
+  "grid h-10 w-full cursor-pointer items-center gap-2.5 rounded-ctl px-2.5 text-start text-[13px] transition-colors duration-150 ease-out hover:bg-step";
+
 type PopRowProps<T extends ElementType> = { as?: T; className?: string } & Omit<ComponentPropsWithoutRef<T>, "className">;
 
 /** A row of a Popover: 40px, an 8px radius, a step of grey on hover. The columns are the caller's (`grid-cols-[24px_44px_minmax(0,1fr)_auto]`); a button by default. */
@@ -57,20 +61,18 @@ export function PopRow<T extends ElementType = "button">({ as, className, ...res
   const Tag: ElementType = as ?? "button";
   return (
     <Tag
-      className={cx(
-        "grid h-10 w-full cursor-pointer items-center gap-2.5 rounded-ctl px-2.5 text-start text-[13px] transition-colors duration-150 ease-out hover:bg-step",
-        className,
-      )}
+      className={cx(popRowClass, className)}
       {...(Tag === "button" ? { type: "button" } : {})}
       {...rest}
     />
   );
 }
 
-/** The last line of a Popover (a link to the whole list): a hairline above it, quiet text that brightens on hover. */
-export function PopFooter({ className, ...rest }: Omit<ComponentPropsWithoutRef<"a">, "className"> & { className?: string }) {
+/** The last line of a Popover (a link to the whole list; `as` takes the router's Link): a hairline above it, quiet text that brightens on hover. */
+export function PopFooter<T extends ElementType = "a">({ as, className, ...rest }: PopRowProps<T>) {
+  const Tag: ElementType = as ?? "a";
   return (
-    <a
+    <Tag
       className={cx("mt-1.5 flex h-10 items-center justify-between border-t border-line px-2.5 text-[13px] text-sec transition-colors duration-150 hover:text-fg", className)}
       {...rest}
     />

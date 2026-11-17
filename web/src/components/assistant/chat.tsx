@@ -312,17 +312,42 @@ export function ChatDock() {
   );
 }
 
+/** The assistant's cat: a head, two eyes and the arc of a wink (the motion is in index.css, .cat-*). Decorative. */
+function CatMark({ size = 34 }: { size?: number }) {
+  return (
+    <svg aria-hidden className="cat flex-none" width={size} height={size} viewBox="0 0 48 48">
+      <path className="cat-h" d="M24 43c-9 0-16-6-16-15 0-3.5.8-6.5 2-9L9 6l10 7c1.6-.4 3.3-.6 5-.6s3.4.2 5 .6L39 6l-1 13c1.2 2.5 2 5.5 2 9 0 9-7 15-16 15z" />
+      <ellipse className="cat-l" cx="17.5" cy="27" rx="2.6" ry="3.7" />
+      <ellipse className="cat-r" cx="30.5" cy="27" rx="2.6" ry="3.7" />
+      <path className="cat-w" d="M27.3 28.3q3.2-3.8 6.4 0" />
+    </svg>
+  );
+}
+
+/**
+ * The assistant's open button: 56px, the accent, the cat. A count of answers that came while the admin was away sits on its
+ * corner (and in its name); a turn that is running draws a ring round it. It floats at the end of the window, above the dock on a phone.
+ */
 export function ChatButton({ onClick, running, unread = 0 }: { onClick: () => void; running: boolean; unread?: number }) {
   const t = useT();
-  // a follow-up answered while the admin was away: a dot on the button, and the count in its name
+  // a follow-up answered while the admin was away: the count on the button, and in its name
   const label = unread > 0 ? `${t("ai.chat.open")}: ${t.n("ai.chat.unread", unread)}` : t("ai.chat.open");
   return (
-    <div className="fixed end-4 bottom-[92px] z-20 md:end-6 md:bottom-6">
+    <div className="fixed end-4 bottom-[104px] z-20 md:end-8 md:bottom-8">
       <Tip label={`${label} (Ctrl+J)`}>
-        <button type="button" onClick={onClick} aria-label={label} className="chat-fab relative grid size-[52px] place-items-center rounded-full text-on-accent">
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={label}
+          className="cat-fab relative grid size-14 place-items-center rounded-full bg-accent text-on-accent shadow-(--shadow-toast) transition-[transform,background-color] duration-200 ease-spring hover:-translate-y-0.5 hover:bg-accent-hover active:scale-[0.96]"
+        >
           {running && <span aria-hidden className="chat-fab-ring pointer-events-none absolute inset-0 rounded-full border-2 border-accent" />}
-          <Icon name="sparkle" size={22} fill="currentColor" strokeWidth={1.6} />
-          {unread > 0 && <span aria-hidden data-slot="unread" className="absolute end-0.5 top-0.5 size-3 rounded-full border-2 border-surface bg-danger" />}
+          <CatMark />
+          {unread > 0 && (
+            <span aria-hidden data-slot="unread" className="absolute -end-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-[10px] bg-(--accent-sky) px-1.5 font-mono text-[11px] leading-none font-medium text-on-accent shadow-[0_0_0_3px_var(--bg)]">
+              {unread}
+            </span>
+          )}
         </button>
       </Tip>
     </div>

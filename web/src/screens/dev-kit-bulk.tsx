@@ -19,6 +19,7 @@ import { BatchPanel, BulkDock, type Avail } from "@/components/bulk";
 import { BulkControls } from "@/screens/nodes-bulk";
 import { AgentDialog, BindDialog, panelFor, PasswordDialog, UnbindDialog, type ActionId, type BulkRun } from "@/screens/nodes-bulk-actions";
 import { PanelKeyOffer } from "@/screens/nodes-panel-key";
+import { useMenuWidth } from "@/lib/menu";
 import { Dock, Sidebar } from "@/screens/shell";
 
 // Development only. /dev-kit?only=bulk: the Nodes page's bulk bar drawn in place (no portal), on a desktop width and in a
@@ -273,6 +274,8 @@ export function BulkKit() {
 
 /** The real Nodes screen in the shell's frame: sidebar, the page, the dock (the bar takes its place on a phone). */
 export function BulkPage() {
+  useMenuWidth(); // the menu column's width, for the page beside it and the bulk bar
+
   const [qc] = useState(() => {
     fakeCalls();
     const c = cache();
@@ -282,10 +285,10 @@ export function BulkPage() {
   return (
     <QueryClientProvider client={qc}>
       <ToastProvider>
-        <div className="min-h-dvh md:ps-56">
+        <div className="min-h-dvh ps-(--menu-w)">
           <Sidebar />
-          <main className="px-4 pt-4 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
-            <div className="mx-auto max-w-[1360px]">
+          <main className="px-4 pt-5 pb-24 md:px-5 md:pt-7 md:pb-10 rail:px-8">
+            <div className="mx-auto max-w-[1240px]">
               <NodesScreen />
             </div>
           </main>

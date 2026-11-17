@@ -36,6 +36,7 @@ import { zh as osupdatesZh } from "./osupdates";
 import { zh as fleetuiZh } from "./fleetui";
 import { zh as clientlogsZh } from "./clientlogs";
 import { zh as trusttunnelZh } from "./trusttunnel";
+import { zh as shellZh } from "./shell";
 
 // Simplified Chinese (zh-CN). Typed against the English shape: a missing or extra key fails `pnpm typecheck`. Plurals: one form, no "|".
 // `core` is the shell, auth and navigation copy (what ru.ts keeps in its own `core`).
@@ -98,8 +99,6 @@ const core: CoreMessages = {
   "header.search": "搜索节点、用户和页面",
   "header.language": "语言",
   "header.theme": "主题",
-  "header.theme.toLight": "切换到浅色主题",
-  "header.theme.toDark": "切换到深色主题",
   "header.signOut": "退出登录",
   "header.version": "面板版本 {version}",
   "stale.title": "面板已更新到 {version}",
@@ -108,8 +107,6 @@ const core: CoreMessages = {
   "stale.expand": "显示刷新提示",
   "header.source": "源代码",
   "header.star": "在 GitHub 上标星",
-  "more.theme": "深色主题",
-  "more.language": "语言",
 
   "health.none": "暂无节点",
   "health.ok": "集群运行正常",
@@ -303,4 +300,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh };

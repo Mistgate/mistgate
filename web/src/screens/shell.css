@@ -1,0 +1,148 @@
+/*
+ * What the shell's utilities cannot say (screens/shell*.tsx, components/fx/wave.ts): key frames and the layers of the wave.
+ * The values are the redesign board's (pn.css): the curves are the --e and --spring of index.css.
+ */
+
+/* the menu, the bar and the page come in once when the panel opens: 8px of rise in 0.3s (pn-up) */
+.shell-in {
+  animation: mg-up 0.3s var(--e) backwards;
+}
+
+/* a theme change is instant: for a moment no transition runs, or a frame would have the old background under the new text */
+html.mg-thx,
+html.mg-thx *,
+html.mg-thx *::before,
+html.mg-thx *::after {
+  transition: none !important;
+}
+
+/* the wave: one canvas over the window (WebGL, see fx/wave.ts); the shader draws a smooth field, the mask makes it dots */
+@property --r {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+canvas.mg-wave {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  contain: strict;
+  will-change: opacity;
+  mask-image: radial-gradient(circle, #000 2.3px, rgb(0 0 0 / 0.26) 3.1px);
+  mask-size: 11px 11px;
+  image-rendering: auto;
+}
+/* without WebGL: a ring of the same colours grows from the point */
+.mg-wave-css {
+  --w1: rgb(80 220 175 / 0.42);
+  --w2: rgb(70 195 225 / 0.38);
+  --w3: rgb(180 240 150 / 0.34);
+  --w4: rgb(235 255 245 / 0.22);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  pointer-events: none;
+}
+.mg-wave-css[data-light="1"] {
+  --w1: rgb(40 190 150 / 0.34);
+  --w2: rgb(50 170 210 / 0.3);
+  --w3: rgb(140 210 90 / 0.26);
+  --w4: rgb(180 235 215 / 0.24);
+}
+.mg-wave-css i {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle at var(--ox) var(--oy),
+    transparent calc(var(--r) - 300px),
+    var(--w1) calc(var(--r) - 170px),
+    var(--w2) calc(var(--r) - 60px),
+    var(--w3) calc(var(--r) + 60px),
+    var(--w4) calc(var(--r) + 170px),
+    transparent calc(var(--r) + 300px)
+  );
+  animation:
+    mg-wave-r 2s cubic-bezier(0.3, 0.62, 0.35, 1) both,
+    mg-wave-a 2s linear both;
+}
+.mg-wave-css[data-light="1"] i {
+  mix-blend-mode: multiply;
+}
+@keyframes mg-wave-r {
+  from {
+    --r: 20px;
+  }
+  to {
+    --r: 2800px;
+  }
+}
+@keyframes mg-wave-a {
+  0% {
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.82;
+  }
+  55% {
+    opacity: 0.5;
+  }
+  78% {
+    opacity: 0.18;
+  }
+  92% {
+    opacity: 0.04;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* the toast comes out with a halo of dots in the accent (only with the effects on) */
+.toast-halo {
+  position: absolute;
+  left: 50%;
+  bottom: -24px;
+  z-index: -1;
+  width: 560px;
+  height: 200px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 80%, transparent) 1.2px, transparent 1.7px);
+  background-size: 10px 10px;
+  mask-image: radial-gradient(closest-side, #000 0%, transparent 100%);
+  animation: mg-toast-halo 8s var(--e) both;
+}
+@keyframes mg-toast-halo {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.7);
+  }
+  8% {
+    opacity: 0.9;
+    transform: translateX(-50%);
+  }
+  40% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0.25;
+    transform: translateX(-50%);
+  }
+}
+
+/* the fold button's glyph leans toward the edge it would fold to: the rail line steps 1.5px (the spring), mirrored in rtl */
+.fold-glyph .sb {
+  transition: transform 0.25s var(--ease-spring);
+}
+.fold-btn:hover .sb {
+  transform: translateX(calc(1.5px * var(--x-dir)));
+}

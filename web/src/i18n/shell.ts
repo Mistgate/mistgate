@@ -1,0 +1,87 @@
+// The shell of the admin: the menu, the top bar, the phone's menu, the owner's menu, the update card, the theme and language
+// switches (screens/shell*.tsx, components/prefs.tsx, components/update-card.tsx). English is the source of truth: `ru` is
+// type-checked against it. The admin speaks «ты». "a|b" is a plural.
+export const en = {
+  "nav.group.system": "System",
+  "shell.menu.title": "Menu",
+  "shell.menu.toggle": "Collapse or expand the menu",
+  "shell.nav.online": "{n} online",
+  "shell.owner.aria": "Account menu: {name}, {role}",
+  "shell.owner.signedIn": "Signed in as",
+  "shell.owner.security": "Sign-in and passkeys",
+  "shell.owner.sessions": "Sessions",
+  "shell.fleet.label": "Node status",
+  "shell.fleet.open": "Open Health",
+  "shell.lang.list": "Interface language",
+  "shell.theme.light": "Light",
+  "shell.theme.dark": "Dark",
+  "shell.upd.have": "You run {current}. The panel updates after you confirm and rolls back if something goes wrong.",
+};
+
+export const ru: typeof en = {
+  "nav.group.system": "Система",
+  "shell.menu.title": "Меню",
+  "shell.menu.toggle": "Свернуть или развернуть меню",
+  "shell.nav.online": "{n} онлайн",
+  "shell.owner.aria": "Меню учётной записи: {name}, {role}",
+  "shell.owner.signedIn": "Вошёл как",
+  "shell.owner.security": "Вход и passkey",
+  "shell.owner.sessions": "Сессии",
+  "shell.fleet.label": "Состояние нод",
+  "shell.fleet.open": "Открыть «Здоровье»",
+  "shell.lang.list": "Язык интерфейса",
+  "shell.theme.light": "Светлая",
+  "shell.theme.dark": "Тёмная",
+  "shell.upd.have": "У тебя {current}. Панель обновится с твоего подтверждения и откатится, если что-то пойдёт не так.",
+};
+
+export const zh: typeof en = {
+  "nav.group.system": "系统",
+  "shell.menu.title": "菜单",
+  "shell.menu.toggle": "折叠或展开菜单",
+  "shell.nav.online": "{n} 在线",
+  "shell.owner.aria": "账户菜单：{name}，{role}",
+  "shell.owner.signedIn": "当前登录：",
+  "shell.owner.security": "登录与 passkey",
+  "shell.owner.sessions": "会话",
+  "shell.fleet.label": "节点状态",
+  "shell.fleet.open": "打开“健康”",
+  "shell.lang.list": "界面语言",
+  "shell.theme.light": "浅色",
+  "shell.theme.dark": "深色",
+  "shell.upd.have": "你当前是 {current}。面板在你确认后更新，出现问题会自动回滚。",
+};
+
+export const fa: typeof en = {
+  "nav.group.system": "سیستم",
+  "shell.menu.title": "منو",
+  "shell.menu.toggle": "جمع یا باز کردن منو",
+  "shell.nav.online": "{n} آنلاین",
+  "shell.owner.aria": "منوی حساب: {name}، {role}",
+  "shell.owner.signedIn": "وارد شده با",
+  "shell.owner.security": "ورود و passkey",
+  "shell.owner.sessions": "نشست‌ها",
+  "shell.fleet.label": "وضعیت نودها",
+  "shell.fleet.open": "باز کردن «سلامت»",
+  "shell.lang.list": "زبان رابط",
+  "shell.theme.light": "روشن",
+  "shell.theme.dark": "تیره",
+  "shell.upd.have": "نسخهٔ تو {current} است. پنل با تأیید تو به‌روز می‌شود و اگر مشکلی پیش بیاید به عقب برمی‌گردد.",
+};
+
+export const tr: typeof en = {
+  "nav.group.system": "Sistem",
+  "shell.menu.title": "Menü",
+  "shell.menu.toggle": "Menüyü daralt veya genişlet",
+  "shell.nav.online": "{n} aktif",
+  "shell.owner.aria": "Hesap menüsü: {name}, {role}",
+  "shell.owner.signedIn": "Oturum:",
+  "shell.owner.security": "Giriş ve passkey",
+  "shell.owner.sessions": "Oturumlar",
+  "shell.fleet.label": "Düğüm durumu",
+  "shell.fleet.open": "«Sağlık»ı aç",
+  "shell.lang.list": "Arayüz dili",
+  "shell.theme.light": "Açık",
+  "shell.theme.dark": "Koyu",
+  "shell.upd.have": "Sende {current} var. Panel sen onaylayınca güncellenir ve bir şey ters giderse geri alınır.",
+};

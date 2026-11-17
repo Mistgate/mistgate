@@ -57,18 +57,20 @@ describe("the GitHub button of the top bar", () => {
     const a = host!.querySelector("a")!;
     expect(a.getAttribute("href")).toBe(repo);
     expect(a.getAttribute("rel")).toContain("noopener");
-    expect(a.textContent).toBe("823");
+    expect(a.textContent).toBe("GitHub823");
     expect(a.getAttribute("aria-label")).toBe("Star on GitHub: 823");
   });
 
-  it("shows the mark alone without a count, and in the phone header", async () => {
+  it("shows the mark and the word without a count, and all of it in the phone's menu", async () => {
     await mount({ version: "0.3.0", sourceUrl: repo }, <GitHubButton />);
-    expect(host!.querySelector("a")!.textContent).toBe("");
+    expect(host!.querySelector("a")!.textContent).toBe("GitHub");
     expect(host!.querySelector("a")!.getAttribute("aria-label")).toBe("Star on GitHub");
     act(() => root?.unmount());
     host?.remove();
-    await mount({ version: "0.3.0", sourceUrl: repo, sourceStars: 823 }, <GitHubButton iconOnly />);
-    expect(host!.querySelector("a")!.textContent).toBe("");
+    await mount({ version: "0.3.0", sourceUrl: repo, sourceStars: 823 }, <GitHubButton full />);
+    expect(host!.querySelector("a")!.className).toContain("flex-1");
+    expect(host!.querySelector("a")!.className).not.toContain("max-[900px]");
+    expect(host!.querySelector("a span")!.className).not.toContain("max-mid:hidden");
   });
 
   it("is gone when the panel names no source", async () => {

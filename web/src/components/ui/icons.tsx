@@ -86,6 +86,9 @@ const paths = {
   fit: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
   expand: "M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7",
   arrange: "M3 8h5v8H3zM16 4h5v5h-5zM16 15h5v5h-5zM8 12h4M12 6.5h4M12 17.5h4M12 6.5v11",
+  // the theme switch of the top bar
+  sun: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4",
+  moon: "M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z",
 } as const;
 
 export type IconName = keyof typeof paths;

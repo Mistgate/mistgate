@@ -35,8 +35,8 @@ describe("LangToggle", () => {
       trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     });
     await settle();
-    const rows = [...document.querySelectorAll<HTMLElement>("[role=option]")];
-    expect(rows.map((r) => r.textContent)).toEqual(["EnglishEN", "РусскийRU", "简体中文中文", "فارسیFA", "TürkçeTR"]);
+    const rows = [...document.querySelectorAll<HTMLElement>("[role=menuitemradio]")];
+    expect(rows.map((r) => r.textContent)).toEqual(["ENEnglish", "RUРусский", "中文简体中文", "FAفارسی", "TRTürkçe"]);
     expect(rows.map((r) => r.getAttribute("lang"))).toEqual(["en", "ru", "zh-CN", "fa", "tr"]);
 
     await act(async () => rows[2]!.click());
@@ -58,7 +58,7 @@ describe("LangToggle", () => {
       trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     });
     await settle();
-    await act(async () => [...document.querySelectorAll<HTMLElement>("[role=option]")][3]!.click());
+    await act(async () => [...document.querySelectorAll<HTMLElement>("[role=menuitemradio]")][3]!.click());
     await settle();
     expect(document.documentElement.lang).toBe("fa");
     expect(document.documentElement.dir).toBe("rtl");

@@ -104,6 +104,9 @@ export type T = {
   n: (key: MessageKey, count: number, vars?: Record<string, string | number>) => string;
 };
 
+/** The language in use right now (outside a render). */
+export const currentLang = (): Lang => current;
+
 export function useLang(): Lang {
   return useSyncExternalStore(subscribe, () => current);
 }

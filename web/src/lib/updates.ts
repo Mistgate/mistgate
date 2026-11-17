@@ -52,7 +52,7 @@ export function useIsOwner(): boolean {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// The notice on every page (components/update-toast.tsx)
+// The notice at the foot of the menu (components/update-card.tsx)
 
 export type UpdateNotice =
   | { kind: "panel"; id: string; version: string; url: string; installable: boolean }

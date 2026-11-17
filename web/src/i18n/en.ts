@@ -38,6 +38,7 @@ import { en as osupdatesEn } from "./osupdates";
 import { en as fleetuiEn } from "./fleetui";
 import { en as clientlogsEn } from "./clientlogs";
 import { en as trusttunnelEn } from "./trusttunnel";
+import { en as shellEn } from "./shell";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
 // settings), users.ts and profiles.ts; `en` below is all of it, so `MessageKey` covers every key.
@@ -86,8 +87,8 @@ const core = {
   "nav.more": "More",
   "nav.main": "Main navigation",
   "nav.skip": "Skip to content",
-  "nav.group.setup": "SETUP",
-  "nav.group.ops": "OPERATIONS",
+  "nav.group.setup": "Setup",
+  "nav.group.ops": "Operations",
 
   "section.overview.desc": "Fleet health at a glance, node cards, traffic and the latest events.",
   "section.nodes.desc": "Servers in your fleet, their protocols, load and the wizard to add a new one.",
@@ -104,8 +105,6 @@ const core = {
   "header.search": "Search nodes, users and sections",
   "header.language": "Language",
   "header.theme": "Theme",
-  "header.theme.toLight": "Switch to light theme",
-  "header.theme.toDark": "Switch to dark theme",
   "header.signOut": "Sign out",
   "header.version": "Panel version {version}",
   "stale.title": "The panel was updated to {version}",
@@ -114,8 +113,6 @@ const core = {
   "stale.expand": "Show the reload notice",
   "header.source": "Source code",
   "header.star": "Star on GitHub",
-  "more.theme": "Dark theme",
-  "more.language": "Language",
 
   "health.none": "No nodes",
   "health.ok": "Fleet is healthy",
@@ -318,7 +315,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

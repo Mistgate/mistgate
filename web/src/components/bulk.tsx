@@ -67,7 +67,7 @@ export function BulkDock({ float = true, wide, region, children }: { float?: boo
   );
   if (!float) return frame;
   return (
-    <div data-bulk-bar className="pointer-events-none fixed inset-x-3.5 bottom-3.5 z-20 flex justify-center md:inset-s-56 md:inset-e-0 md:bottom-5 md:px-[clamp(24px,4vw,64px)]">
+    <div data-bulk-bar className="pointer-events-none fixed inset-x-3.5 bottom-3.5 z-20 flex justify-center md:inset-s-(--menu-w) md:inset-e-0 md:bottom-6 md:px-5 rail:px-8">
       {frame}
     </div>
   );
