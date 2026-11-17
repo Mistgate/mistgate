@@ -379,7 +379,7 @@ export function PeopleTab({ group, groups, manage, pick, setPick, demo }: { grou
   else
     body = (
       <>
-        <div role="row" className={cx(head, "border-t border-line")}>
+        <div aria-hidden className={cx(head, "border-t border-line")}>
           <span>{t("grp.col.person")}</span>
           <span>{t("grp.col.devices")}</span>
           <span>{t("grp.col.traffic")}</span>
