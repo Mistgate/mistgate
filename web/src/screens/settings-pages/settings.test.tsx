@@ -9,6 +9,7 @@ import { en } from "@/i18n/en";
 import { setAccent } from "@/lib/accent";
 import { readPref } from "@/lib/storage";
 import { SettingsLayout } from "../settings";
+import { SxGate } from "./sx-bits";
 import { AdminsPage } from "./admins";
 import { BackupsPage } from "./backups";
 import { cloudflareAllowed } from "./cloudflare";
@@ -48,6 +49,7 @@ vi.mock("@/lib/api", async (orig) => ({
   webauthnSupported: () => true,
 }));
 let section = "interface";
+const navigate = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, to, params, ...rest }: { children?: ReactNode; className?: string; to: string; params?: { section?: string } }) => (
     <a href={params?.section ? `/settings/${params.section}` : to} data-status={params?.section === section ? "active" : undefined} className={className} {...rest}>
@@ -56,8 +58,8 @@ vi.mock("@tanstack/react-router", () => ({
   ),
   useParams: () => ({ section }),
   useSearch: () => ({}),
-  useNavigate: () => () => {},
-  Outlet: () => null,
+  useNavigate: () => navigate,
+  Outlet: () => <p>the page of the tab</p>,
   Navigate: () => null,
 }));
 
@@ -73,6 +75,7 @@ let host: HTMLDivElement | null = null;
 beforeEach(() => {
   role = Role.OWNER;
   section = "interface";
+  navigate.mockReset();
   widgets = [];
   window.turnstile = {
     render: (_el, options) => {
@@ -149,12 +152,36 @@ function servedAt(path: string, search = "") {
 }
 const coded = (code: string, c = Code.InvalidArgument) => new ConnectError(code, c);
 
-describe("Settings: the strip of pages", () => {
-  it("puts Interface first and the pages that only explain what is missing last", async () => {
+describe("Settings: the frame", () => {
+  const tabs = () => [...document.querySelectorAll<HTMLElement>("[role=tab]")];
+  it("says what the page is for and lists the eight tabs in the board's order, the open one chosen", async () => {
     await mount(<SettingsLayout />);
-    const labels = [...document.querySelectorAll("nav a")].map((a) => a.textContent);
-    expect(labels).toEqual(["Interface", "System", "Security", "Sessions", "Audit", "Admins", "Domains", "Backups"]);
-    expect(document.querySelector("nav a[data-status=active]")?.textContent).toBe("Interface");
+    expect(document.querySelector("h1")?.textContent).toBe("Settings");
+    expect(document.querySelector(".sb-h p")?.textContent).toBe(en["sx.sum"]);
+    expect(tabs().map((a) => a.textContent)).toEqual(["Interface", "System", "Security", "Sessions", "Audit", "Admins", "Domains", "Backups"]);
+    expect(tabs().find((a) => a.getAttribute("aria-selected") === "true")?.textContent).toBe("Interface");
+    expect(document.querySelector("[role=tabpanel]")?.textContent).toContain("the page of the tab");
+  });
+
+  it("opens the tab of the address and takes the route to another one on a click", async () => {
+    section = "sessions";
+    await mount(<SettingsLayout />);
+    expect(tabs().find((a) => a.getAttribute("aria-selected") === "true")?.textContent).toBe("Sessions");
+    await click(tabs().find((a) => a.textContent === "Domains"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/settings/$section", params: { section: "domains" } });
+  });
+
+  it("draws the load of a tab and its failure, with a way to try again", async () => {
+    const retry = vi.fn();
+    await mount(<SxGate pending error={false} onRetry={retry}><p>ready</p></SxGate>);
+    expect(document.querySelector("[aria-busy=true]")).not.toBeNull();
+    expect(text()).not.toContain("ready");
+    await act(async () => root!.render(<SxGate pending={false} error onRetry={retry}><p>ready</p></SxGate>));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain(en["sx.err.title"]);
+    await click(button(en["sx.err.retry"]));
+    expect(retry).toHaveBeenCalled();
+    await act(async () => root!.render(<SxGate pending={false} error={false} onRetry={retry}><p>ready</p></SxGate>));
+    expect(text()).toContain("ready");
   });
 });
 

@@ -1,0 +1,852 @@
+/*
+ * Settings of the redesign (screens/settings.tsx, screens/settings-pages/*): the frame and what every tab is built of, in the board's own
+ * numbers (PnSettings + pn.css: the sb-, pp-, rc-, an-, rw-, uq- and sx- rules, the last rule of a selector wins). The board's page wears
+ * "upp sbp hlp aip sxp", so the rules of all five apply; they are under the one root .sx here. A container query of the board (the whole
+ * panel is its container) is a media query here. The tabs, the buttons, the switch, the segments, the select and the window are the base
+ * components'; what they do not carry is below. Part B's tabs add their own rules in settings-b.css under the same root.
+ */
+
+/* L84, L6063: the page is a column of 16, and it never scrolls sideways */
+.sx {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  overflow-x: clip;
+}
+.sx .mono {
+  font-family: var(--font-mono);
+}
+
+/* L35 */
+.sx .card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+/* L4838: the head of the page (the line height is the page's own, 20px) */
+.sx .sb-h {
+  margin-top: 4px;
+}
+.sx .sb-h h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+}
+.sx .sb-h p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--sec);
+}
+
+/* L4839, L4840, L5864, L6060-6062, L6677-6678: the strip of tabs and the column under it */
+.sx .sx-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+}
+.sx .sx-tabs [role="tablist"] {
+  margin-top: 20px;
+  gap: 0;
+}
+.sx .sx-tabs [role="tab"] {
+  padding-inline: 10px;
+}
+.sx .sx-tabs [role="tabpanel"] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 20px;
+  padding-top: 0;
+  animation: none;
+}
+
+/* ---- a card: its head, its lead, its rows (L4586-4601, L4843, L4894) ---- */
+.sx .pp-sec {
+  padding: 0;
+  overflow: visible;
+}
+.sx .sb-sec {
+  padding-bottom: 4px;
+}
+.sx .pp-sh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 12px 20px 4px;
+}
+.sx .pp-sh h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--sec);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sx .pp-sh>:nth-child(3),.sx .pp-sh>.ic {
+  margin-inline-start: auto;
+}
+.sx .sb-sec .pp-sh .btn {
+  margin-inline-start: auto;
+  gap: 8px;
+}
+.sx .pp-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--step);
+  color: var(--sec);
+}
+.sx .pp-ic svg {
+  width: 15px;
+  height: 15px;
+}
+.sx .pp-ic.sand {
+  background: var(--tone-sand-bg);
+  color: var(--tone-sand);
+}
+.sx .pp-ic.sage {
+  background: var(--tone-sage-bg);
+  color: var(--tone-sage);
+}
+.sx .pp-ic.sky {
+  background: var(--tone-sky-bg);
+  color: var(--tone-sky);
+}
+.sx .pp-ic.mint {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+.sx .pp-ic.lav {
+  background: var(--tone-lavender-bg);
+  color: var(--tone-lavender);
+}
+.sx .pp-ic.rose {
+  background: var(--tone-rose-bg);
+  color: var(--tone-rose);
+}
+.sx .pp-ic.none {
+  background: var(--step);
+  color: var(--muted);
+}
+.sx .sb-lead {
+  margin: 0;
+  padding: 0 20px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx .sb-vfoot {
+  margin: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.sx .sb-emp {
+  margin: 0;
+  padding: 0 20px 12px;
+  font-size: 13px;
+  color: var(--sec);
+}
+.sx .ai-emp {
+  padding: 4px 20px 16px;
+}
+.sx .pp-rows {
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 12px;
+}
+.sx .pp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 8px 20px;
+  align-items: start;
+  min-height: 56px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.sx .pp-rows>.pp-row:first-child {
+  border-top: 0;
+}
+.sx .pp-lb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.sx .pp-lb>b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.sx .pp-lb>span {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sx .pp-ct {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.sx .pp-ct .fz-sw {
+  align-self: flex-end;
+  margin-top: 6px;
+}
+/* L6124-6126: the settings page's rows */
+.sx .pp-ct {
+  gap: 10px;
+}
+.sx .pp-ct.sx-end {
+  align-items: flex-end;
+}
+.sx .pp-lb b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* L5594, L6057: the small quiet tag after a label */
+.sx .uq-otg {
+  flex: none;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  line-height: 18px;
+  background: var(--step);
+  color: var(--sec);
+  white-space: nowrap;
+}
+.sx .uq-otg.now {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+
+/* the two columns of a tab (L4251, L4252, L4583, L4665, L4722, L5863, L6370) */
+.sx .pf-g {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+.sx .pf-g>.col {
+  min-width: 0;
+}
+.sx .pp-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+}
+.sx .col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sx .pp-as {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sx .sx-tabs [role="tabpanel"]>.pf-g,
+.sx .pp-sec+.sx-grid {
+  margin-top: 0;
+}
+@media (max-width: 1040px) {
+  .sx .pf-g,
+  .sx .pp-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sx .pp-as {
+    position: static;
+  }
+}
+/* L6285, L6296: in the settings page the label sits over its control */
+@media (max-width: 1400px) {
+  .sx .sx-grid .pp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+@media (max-width: 720px) {
+  .sx .pp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .sx .pp-lb {
+    padding-top: 0;
+  }
+  .sx .pp-ct .fz-sw {
+    align-self: flex-start;
+  }
+  .sx .pp-rows {
+    padding: 0 16px 12px;
+  }
+  .sx .pp-sh {
+    padding: 12px 16px 4px;
+  }
+  .sx .sb-lead,
+  .sx .sb-emp {
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 640px) {
+  .sx .pp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+/* L6122, L6317, L6324: a tab of one column (Admins, Domains) */
+.sx .sx-one {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: none;
+}
+.sx .sx-one .pp-row {
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: 24px;
+}
+@media (max-width: 640px) {
+  .sx .sx-one .pp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+/* ---- the fields (L723-739, L769-770; an-f is a label over a field) ---- */
+.sx .an-f {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.sx .an-f>span {
+  font-size: 13px;
+  color: var(--sec);
+}
+.sx .an-f small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sx .an-f small:empty {
+  display: none;
+}
+.sx .an-i {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color .15s var(--e), box-shadow .15s var(--e);
+}
+.sx .an-i.mono {
+  font-size: 13px;
+}
+.sx .an-i::placeholder {
+  color: var(--muted);
+}
+.sx .an-i:hover {
+  border-color: color-mix(in srgb, var(--text) 18%, transparent);
+}
+.sx .an-i:focus {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-mark) 16%, transparent);
+}
+.sx .an-f.err .an-i {
+  border-color: var(--danger);
+}
+.sx .an-f.err small {
+  color: var(--danger-text);
+}
+.sx .an-lk {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 4px;
+}
+.sx .an-lk:hover {
+  text-decoration-color: currentColor;
+}
+.sx button.an-lk {
+  font: inherit;
+  background: none;
+}
+/* L722 */
+.sx .an-sp {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  animation: sx-spin .7s linear infinite;
+}
+@keyframes sx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* L6163, L6164: a button the board holds shut while it works or has nothing to save */
+.sx button[aria-disabled="true"] {
+  opacity: .45;
+  pointer-events: none;
+}
+.sx .sx-busy {
+  pointer-events: none;
+}
+.sx .sx-done {
+  animation: sx-pop .4s var(--ease-spring);
+}
+@keyframes sx-pop {
+  0% {
+    transform: scale(.2);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes sx-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes sx-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- a value to copy (L765-768, L873, L6241, L6242, L6339) ---- */
+.sx .an-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 4px;
+  padding-inline: 12px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  min-width: 0;
+}
+.sx .an-code code {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sx .an-code.an-cw {
+  align-items: flex-start;
+}
+.sx .an-code.an-cw code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 4px 0;
+  display: block;
+  overflow: visible;
+  text-overflow: clip;
+}
+.sx .sx-cmd code {
+  white-space: nowrap;
+}
+.sx .sx-cmd.an-cw code {
+  white-space: normal;
+}
+@media (max-width: 760px) {
+  .sx .an-code.an-cw {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px;
+  }
+  .sx .an-code.an-cw code {
+    padding: 0 4px;
+  }
+}
+
+/* ---- the foot of a card, a switch row, a padded line, a list (L6158-6162, L6209-6214, L6221-6230) ---- */
+.sx .sx-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 20px 16px;
+}
+.sx .sx-foot .btn,
+.sx .sx-foot button {
+  gap: 8px;
+  flex: none;
+}
+.sx .sx-foot.sx-tk {
+  justify-content: space-between;
+}
+.sx .sx-foot.sx-tk em {
+  flex: 1;
+  min-width: 160px;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sx .sx-pad {
+  padding: 0 20px 12px;
+}
+.sx .sx-swr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 20px 16px;
+}
+.sx .sx-swr b {
+  font-weight: 500;
+}
+.sx .sx-swr>span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sx .sx-swr em {
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sx .sx-swr2 {
+  padding-top: 0;
+}
+.sx .fz-sw {
+  flex: none;
+}
+.sx .sx-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 8px;
+}
+.sx .sx-it {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  gap: 12px 16px;
+  align-items: center;
+  min-height: 56px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.sx .sx-list>.sx-it:first-child {
+  border-top: 0;
+}
+.sx .sx-it>div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sx .sx-it b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 500;
+}
+.sx .sx-it em {
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sx .sx-it>code {
+  font-size: 12px;
+  color: var(--sec);
+}
+.sx .sx-se {
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+}
+.sx .ai-mono {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--step);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sec);
+}
+.sx .ai-na {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  .sx .sx-pad,
+  .sx .sx-swr,
+  .sx .sx-foot,
+  .sx .sx-list {
+    padding-inline: 16px;
+  }
+  .sx .sx-it {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .sx .sx-it>code,
+  .sx .sx-it>.btn,
+  .sx .sx-it>.ai-na,
+  .sx .sx-it>.an-lk,
+  .sx .sx-it>button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ---- the board's banner (L5095-5098, L6158, L6159) ---- */
+.sx .rc-pb {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 20px 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--warning-soft);
+}
+.sx .rc-pb.bad {
+  background: var(--danger-soft);
+}
+.sx .rc-pb .rw-gl {
+  flex: none;
+  margin-top: 4px;
+}
+.sx .rc-pb>div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sx .rc-pb b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.sx .rc-pb span {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--sec);
+}
+.sx .rc-pb .btn {
+  flex: none;
+  align-self: center;
+}
+.sx .sx-pb {
+  margin: 0;
+}
+.sx .sx-pbm {
+  margin: 0 20px 12px;
+}
+@media (max-width: 720px) {
+  .sx .rc-pb {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 640px) {
+  .sx .sx-pbm {
+    margin-inline: 16px;
+  }
+}
+/* L4048, L4049, L4165-4169: the glyph of a state, a shape as well as a colour */
+.sx .rw-gl {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  background: none;
+  font-size: 0;
+  line-height: 0;
+}
+.sx .rw-gl.ok {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+.sx .rw-gl.part {
+  border-color: var(--warning);
+  background: linear-gradient(90deg, var(--warning) 50%, transparent 50%);
+}
+[dir="rtl"] .sx .rw-gl.part {
+  background: linear-gradient(270deg, var(--warning) 50%, transparent 50%);
+}
+.sx .rw-gl.bad {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%), linear-gradient(-45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%);
+}
+/* L4081 */
+.sx .rw-sl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---- the load and the failure of a tab (L4811-4817, L4820-4825, L4829-4832, L5039) ---- */
+.sx .hl-skl {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+.sx .pp-skc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+.sx .sk {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--step);
+  animation: sx-skp 1.4s ease-in-out infinite;
+}
+.sx .sk.b {
+  width: 100%;
+  height: 44px;
+  border-radius: 10px;
+}
+@keyframes sx-skp {
+  50% {
+    opacity: .45;
+  }
+}
+.sx .us-none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.sx .us-none>.g {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: var(--step);
+  color: var(--sec);
+}
+.sx .us-none>.g svg {
+  width: 20px;
+  height: 20px;
+}
+.sx .us-none>.g.bad {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+.sx .us-none>b {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+.sx .us-none>span:not(.g) {
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--sec);
+}
+.sx .us-none .btn,
+.sx .us-none button {
+  margin-top: 14px;
+}
+.sx .pv-qe {
+  margin-top: 16px;
+}
+
+/* ---- a read-only card: the board dims it and takes the pointer away (L6151) ---- */
+.sx .sx-all.ro {
+  pointer-events: none;
+  opacity: .6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sx .sk,
+  .sx .an-sp,
+  .sx .sx-done {
+    animation: none;
+  }
+}
+
+/* L5838, L5839, L6248: a quiet link in a row (the board's collision with the red "delete" hover of the integrations is left out) */
+.sx .ig-lk {
+  font-size: 13px;
+  color: var(--sec);
+  text-decoration: none;
+}
+.sx .ig-lk:hover {
+  color: var(--text);
+}
+.sx .sx-none {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
