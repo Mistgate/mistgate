@@ -80,7 +80,7 @@ const dash = "—";
 /**
  * What the nodes counted of the person's connections in the last 24 hours (the board's .up-q table): a line per device and profile,
  * connections, drops (amber from three), the delay, the loss and the time online; what else the node saw (refusals, freezes, the reasons
- * handshakes fail) under the line. Nothing at all is shown while the nodes have counted nothing and no node lacks the counters.
+ * handshakes fail) under the line. While the nodes have counted nothing the card says so.
  */
 export function ConnectionCounts({ userId, devices = [], nodeName = (id) => id }: { userId: string; devices?: Device[]; nodeName?: (id: string) => string }) {
   const t = useT();
@@ -89,8 +89,6 @@ export function ConnectionCounts({ userId, devices = [], nodeName = (id) => id }
   const conn = useQuery(userConnectionQuery(userId)).data;
   const [wanted, setPage] = useState(1);
   if (!conn) return null;
-  const counted = conn.rows.length > 0 || conn.nodesWithoutCounters.length > 0;
-  if (!counted) return null;
   const page = clampPage(wanted, conn.rows.length, connPageSize);
   const name = (id: string) => {
     const d = devices.find((x) => x.id === id);

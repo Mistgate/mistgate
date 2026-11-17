@@ -694,7 +694,7 @@ export function NodesCard({ data, actions }: { data: DetailN; actions: Actions }
         const can = !readonly && !nodes.all && (usable || on);
         return (
           <div key={n.nodeId} className={cx("up-nd", !usable && "none", nodes.all && "lock")} onClick={() => can && flipNode(n.nodeId)}>
-            <Checkbox.Root checked={on && usable} disabled={!can} aria-label={n.nodeName} className="up-cb" onClick={(e) => e.stopPropagation()} onCheckedChange={() => flipNode(n.nodeId)}>
+            <Checkbox.Root checked={on} disabled={!can} aria-label={n.nodeName} className="up-cb" onClick={(e) => e.stopPropagation()} onCheckedChange={() => flipNode(n.nodeId)}>
               <i>
                 <G d={P.check} size={14} stroke={2.5} />
               </i>

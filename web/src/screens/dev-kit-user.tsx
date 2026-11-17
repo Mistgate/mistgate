@@ -24,14 +24,14 @@ import { Shot } from "./dev-kit-redesign";
 import { ShellLayout } from "./shell";
 import type { DetailN } from "./users/model";
 import { groupsQuery, protocolsQuery } from "./users/rpc";
-import { UserDetail, userTabs, type UserTab } from "./users/user-detail";
+import { GoneCard, UserDetail, userTabs, type UserTab } from "./users/user-detail";
 
 // Development only. /dev-kit?only=pn-user: the person's page of the redesign in every state of the board, each in a frame of its own width (an
 // iframe, so the window's breakpoints answer to the frame); each frame is a page of its own, for the screenshot script and for the side-by-side:
 //   /dev-kit?only=user-page&state=<state>[&tab=overview|devices|access|logs|settings][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1][&ui=<what is open>]
 // state: ok (alice: active, 38 GB of 100) | over (the quota is used up) | exp (the term ended) | off (disabled) | new (never connected) | full (every place
 //   is taken) | groups (ten groups) | tt-off | tt-none | tt-nol (a key and no link) | tt-paused (a key on hold) | track (over the limit, only counted) |
-//   alert (an open alert about alice) | logs (devices of the Mistgate app and what came of their logs)
+//   alert (an open alert about alice) | logs (devices of the Mistgate app and what came of their logs) | gone (the person was just deleted)
 // ui: dirty (a limit changed: the save bar) | group | newgroup | dns | menu | qr (the TrustTunnel QR) | link-qr | pw (the page password shown) | rotate |
 //   reset | delete | add (add a key) | hover (a day of the chart) | tgqr
 // Made-up data of the board: alice, family and friends, de1, fi1, nl1 and msk1, documentation addresses.
@@ -290,7 +290,7 @@ export function UserPage() {
       <ToastProvider>
         <AddNodeProvider>
           <ShellLayout current="users" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
-            <UserDetail data={detailOf(state)} scene={{ tab }} />
+            {state === "gone" ? <GoneCard name="alice" /> : <UserDetail data={detailOf(state)} scene={{ tab }} />}
           </ShellLayout>
         </AddNodeProvider>
       </ToastProvider>
@@ -311,6 +311,8 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "user-ov-off", state: "off", title: "Disabled by the owner", w: 1440, h: 900 },
   { id: "user-ov-new", state: "new", title: "Never connected: no traffic, nobody online", w: 1440, h: 900 },
   { id: "user-ov-alert", state: "alert", title: "An open alert about alice above the traffic", w: 1440, h: 900 },
+  { id: "user-gone", state: "gone", title: "Deleted: what the page says and the way back", w: 1440, h: 600 },
+  { id: "user-gone-phone", state: "gone", title: "Deleted, a phone", w: 400, h: 600 },
   { id: "user-ov-qr", state: "ok", title: "The link and its QR window", w: 1440, h: 900, params: "&ui=link-qr" },
   { id: "user-ov-pw", state: "ok", title: "The page password shown", w: 1440, h: 900, params: "&ui=pw" },
   { id: "user-ov-rotate", state: "ok", title: "A new link and password: the question", w: 1440, h: 900, params: "&ui=rotate" },

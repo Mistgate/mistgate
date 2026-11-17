@@ -833,6 +833,15 @@ a.up-gtag:hover {
   font-family: var(--font-mono);
   color: var(--sec);
 }
+.up-lkc .up-pw {
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+.up-lkc .up-pw > .a {
+  grid-column: 1 / -1;
+}
+[dir="rtl"] .up-chw {
+  direction: ltr;
+}
 .up-pw > .a {
   display: flex;
   align-items: center;
@@ -921,7 +930,7 @@ a.up-gtag:hover {
   border: 1px dashed color-mix(in srgb, var(--text) 22%, transparent);
   background: none;
 }
-.up-dv.fresh {
+.up-fx .up-dv.fresh {
   animation: up-fresh 2.4s var(--e) both;
 }
 .up-dv.idle > .g,

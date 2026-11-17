@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
 import { cacheOf, detailOf, frames } from "./dev-kit-user";
+import { GoneCard } from "./users/user-detail";
 import { userTabs, UserDetail, type UserTab } from "./users/user-detail";
 
 // The scenes of /dev-kit?only=pn-user draw the real page on made-up data: every state a frame names must draw, in every language and
@@ -60,7 +61,7 @@ async function draw(scene: ReturnType<typeof sceneOf>) {
 }
 
 describe("the scenes of the person's page", () => {
-  it.each(frames.map((f) => [f.id, f] as const))("%s draws", async (_, f) => {
+  it.each(frames.filter((f) => f.state !== "gone").map((f) => [f.id, f] as const))("%s draws", async (_, f) => {
     const scene = sceneOf(f);
     await draw(scene);
     expect(host!.querySelector("h1")?.textContent).toBe("alice");
@@ -78,6 +79,15 @@ describe("the scenes of the person's page", () => {
       act(() => root?.unmount());
       host?.remove();
     }
+  });
+
+  it("says a deleted person is gone and leads back to the list", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root!.render(<GoneCard name="alice" />));
+    expect(host.textContent).toContain("alice is deleted");
+    expect(host.textContent).toContain("Back to users");
   });
 
   it("keeps the write buttons from an observer", async () => {

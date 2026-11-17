@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Code } from "@connectrpc/connect";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/notice";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { Pending, QueryError } from "@/components/ui/query-error";
@@ -10,6 +10,7 @@ import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { Avatar } from "@/components/ui/bits";
 import { cx } from "@/lib/cx";
+import { useEffectsEnabled } from "@/lib/effects";
 import { sameYear } from "@/lib/format";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { GB, agoText, avatarIndex, daysLeft, nowSec, shownStatus } from "./format";
@@ -47,13 +48,16 @@ export function UserScreen() {
   const { id = "" } = useParams({ strict: false }) as { id?: string };
   const t = useTx();
   const go = useGo();
+  // the name of a person just deleted: the page says so and stops asking for them
+  const [gone, setGone] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["users", "detail", id],
     queryFn: ({ signal }) => users.getUser({ userId: id }, { signal }).then(detailN),
     refetchInterval: 10_000,
-    enabled: id !== "",
+    enabled: id !== "" && gone === null,
   });
 
+  if (gone !== null) return <GoneCard name={gone} />;
   if (q.isPending) return <Pending />;
   if (q.isError) {
     if (isCode(q.error, Code.NotFound)) {
@@ -73,7 +77,31 @@ export function UserScreen() {
     return <QueryError error={q.error} onRetry={() => void q.refetch()} />;
   }
   // keyed by user: going from one user to another (the palette does) must not carry unsaved drafts over
-  return <UserDetail key={q.data.user.id} data={q.data} />;
+  return <UserDetail key={q.data.user.id} data={q.data} onDeleted={() => setGone(q.data.user.name)} />;
+}
+
+/** What the page says once the person is deleted (the board's .up-gone): the link and the keys no longer work, and the way back. */
+export function GoneCard({ name }: { name: string }) {
+  const t = useTx();
+  const fx = useEffectsEnabled();
+  return (
+    <div className={cx("up", fx && "up-fx")}>
+      <AppLink to="/users" className="up-back">
+        <G d={P.back} size={16} />
+        {t("users.back")}
+      </AppLink>
+      <section className="up-card up-gone" role="status">
+        <span className="g" aria-hidden>
+          <G d={P.check} size={24} />
+        </span>
+        <b>{t("up.gone", { name })}</b>
+        <span>{t("up.goneBody")}</span>
+        <AppLink to="/users" className={cx(buttonClass("secondary", "lg"), "up-gone-a")}>
+          {t("up.goneBack")}
+        </AppLink>
+      </section>
+    </div>
+  );
 }
 
 const dayDate = (t: Tx, unix: number, withYear: boolean) => new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "long", ...(withYear && { year: "numeric" }) }).format(new Date(unix * 1000));
@@ -111,10 +139,12 @@ function bannerOf(data: DetailN, t: Tx, now: number, tracked: boolean, a: { acti
  * One person's page on data it is given. `scene` (the dev kit) fixes the tab in the page's own state, so a scene's address names it and
  * a click on a tab does not leave the scene.
  */
-export function UserDetail({ data, scene }: { data: DetailN; scene?: { tab: UserTab } }) {
+export function UserDetail({ data, scene, onDeleted }: { data: DetailN; scene?: { tab: UserTab }; onDeleted?: () => void }) {
   const user = data.user!;
   const t = useTx();
   const navigate = useNavigate();
+  const go = useGo();
+  const fx = useEffectsEnabled();
   const actions = useUserActions(user);
   const readonly = useReadonly();
   const [linkOpen, setLinkOpen] = useState(false);
@@ -210,7 +240,7 @@ export function UserDetail({ data, scene }: { data: DetailN; scene?: { tab: User
   ];
 
   return (
-    <div className="up" data-testid="user-page">
+    <div className={cx("up", fx && "up-fx")} data-testid="user-page">
       <AppLink to="/users" className="up-back">
         <G d={P.back} size={16} />
         {t("users.back")}
@@ -251,9 +281,8 @@ export function UserDetail({ data, scene }: { data: DetailN; scene?: { tab: User
       <LinkModal target={linkOpen ? linkTargetOf(user, group) : null} onClose={() => setLinkOpen(false)} />
       <GroupEditModal group={group} open={groupOpen} onOpenChange={setGroupOpen} />
       <ResetTrafficModal user={user} actions={actions} open={resetOpen} onOpenChange={setResetOpen} />
-      <DeleteModal user={user} actions={actions} open={deleteOpen} onOpenChange={setDeleteOpen} />
+      <DeleteModal user={user} actions={actions} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={() => (onDeleted ? onDeleted() : go("/users", { replace: true }))} />
     </div>
   );
 }
 
-export type { CSSProperties };

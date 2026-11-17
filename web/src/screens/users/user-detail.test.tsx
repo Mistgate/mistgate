@@ -8,6 +8,7 @@ import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { LinkDeviceLimit, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { DeviceKind, QuotaReset, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { en } from "@/i18n/en";
 import { UserScreen } from "./user-detail";
 
 const getUser = vi.fn();
@@ -22,6 +23,11 @@ const unblockDevice = vi.fn();
 const renameDevice = vi.fn();
 const getUserConnection = vi.fn();
 const deleteUsers = vi.fn();
+const getSubscriptionLink = vi.fn();
+const extendUsers = vi.fn();
+const resetUserTraffic = vi.fn();
+const createGroup = vi.fn();
+const navigate = vi.fn();
 const subsMode = { v: LinkDeviceLimit.ENFORCE as LinkDeviceLimit };
 const panelApp = { enabled: true }; // the owner's switch of the Mistgate app, as the panel says it
 // the sign-in check in front of a delete: passes the call through, or turns it down as the admin closing the dialog would
@@ -50,10 +56,14 @@ vi.mock("@/lib/api", async (orig) => ({
     unblockDevice: (...a: unknown[]) => unblockDevice(...a),
     getUserConnection: (...a: unknown[]) => getUserConnection(...a),
     deleteUsers: (...a: unknown[]) => deleteUsers(...a),
+    getSubscriptionLink: (...a: unknown[]) => getSubscriptionLink(...a),
+    extendUsers: (...a: unknown[]) => extendUsers(...a),
+    resetUserTraffic: (...a: unknown[]) => resetUserTraffic(...a),
   },
   devices: { renameDevice: (...a: unknown[]) => renameDevice(...a) },
   clientApi: { getClientApi: () => Promise.resolve({ settings: { enabled: panelApp.enabled } }) },
   groups: {
+    createGroup: (...a: unknown[]) => createGroup(...a),
     listGroups: () =>
       Promise.resolve({
         groups: [
@@ -89,7 +99,7 @@ vi.mock("@/components/ui/select", () => ({
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ id: "usr_1" }),
   useSearch: () => route.search,
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
   Link: ({ children, to, params, search, hash, className, ...rest }: { children?: ReactNode; to: string; params?: object; search?: object; hash?: string; className?: string }) => (
     <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(search ?? {})} data-hash={hash} className={className} aria-label={(rest as { "aria-label"?: string })["aria-label"]}>
       {children}
@@ -107,7 +117,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice, getUserConnection, deleteUsers]) m.mockReset();
+  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice, getUserConnection, deleteUsers, getSubscriptionLink, extendUsers, resetUserTraffic, createGroup, navigate]) m.mockReset();
   subsMode.v = LinkDeviceLimit.ENFORCE;
   stepUp.cancel = false;
   panelApp.enabled = true;
@@ -282,7 +292,7 @@ describe("the user card", () => {
     expect(warned).toEqual(["dropped at once: 2", "handshake did not complete: 7", "key refused: 1"]);
   });
 
-  it("says which nodes do not count yet, by name, and keeps the block hidden when nothing is counted at all", async () => {
+  it("says which nodes do not count yet, by name, and says nothing was counted when it was not", async () => {
     getUserConnection.mockResolvedValue({ sinceUnix: NOW - 86_400, nowUnix: NOW, rows: [], nodesWithoutCounters: ["nod_1"] });
     tab("devices");
     await mount();
@@ -292,7 +302,7 @@ describe("the user card", () => {
     getUserConnection.mockResolvedValue({ sinceUnix: NOW - 86_400, nowUnix: NOW, rows: [], nodesWithoutCounters: [] });
     tab("devices");
     await mount();
-    expect(text()).not.toContain("Connection");
+    expect(text()).toContain("No connection attempt reached the nodes in the last 24 hours.");
   });
 
   it("pages the counts of the nodes six at a time, as the last card of the Devices tab", async () => {
@@ -820,5 +830,169 @@ describe("deleting the user from the card", () => {
     await mount();
     await confirmDelete();
     expect(deleteUsers).toHaveBeenCalledWith({ userIds: ["usr_1"] });
+    expect(text()).toContain("alice is deleted"); // the board's card: the link and the keys are gone, the way back
+  });
+});
+
+describe("the tabs and the head of the page", () => {
+  const link = { url: "https://sub.example.com/s/alice-7f3k9q", pagePassword: "lake-2718-moss" };
+  const tabs = () => [...document.querySelectorAll("[role=tab]")].map((t) => t.textContent);
+
+  it("has five tabs, the Devices one with the places taken, and puts the chosen one in the address (the Overview has none)", async () => {
+    await mount();
+    expect(tabs()).toEqual(["Overview", "Devices2", "Access and limits", "Logs", "Settings"]);
+    expect(document.querySelector("[role=tab][aria-selected=true]")?.textContent).toBe("Overview");
+    await click([...document.querySelectorAll("[role=tab]")].find((t) => t.textContent === "Logs"));
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: "/users/$id", params: { id: "usr_1" }, search: { tab: "logs" }, replace: true }));
+    act(() => root?.unmount());
+    host?.remove();
+    tab("devices");
+    await mount();
+    await click([...document.querySelectorAll("[role=tab]")].find((t) => t.textContent === "Overview"));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: {} }));
+  });
+
+  it("opens the tab the address names, and leads the old #client-logs link to the Logs tab", async () => {
+    tab("settings");
+    await mount();
+    expect(document.querySelector("[role=tab][aria-selected=true]")?.textContent).toBe("Settings");
+    act(() => root?.unmount());
+    host?.remove();
+    route.search = {};
+    window.location.hash = "#client-logs";
+    await mount();
+    window.location.hash = "";
+    expect(document.querySelector("[role=tab][aria-selected=true]")?.textContent).toBe("Logs");
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ search: { tab: "logs" }, hash: "client-logs" }));
+  });
+
+  it("opens Add device on the Devices tab for ?add=device", async () => {
+    route.search = { add: "device" };
+    await mount();
+    expect(document.querySelector("[role=tab][aria-selected=true]")?.textContent).toBe("Devices2");
+    expect(document.querySelector("[role=dialog]")?.textContent).toContain("Add a device");
+  });
+
+  it("says why a person is stopped in a banner with what puts it right: disabled, expired, over the quota, never connected", async () => {
+    await mount(1, [], [], { ...detail, user: { ...user, status: UserStatus.DISABLED } });
+    expect(text()).toContain("Disabled by you");
+    setUsersEnabled.mockResolvedValue({ users: [] });
+    await click([...document.querySelectorAll(".up-ban button")].find((b) => b.textContent === "Enable"));
+    expect(setUsersEnabled).toHaveBeenCalledWith({ userIds: ["usr_1"], enabled: true });
+    act(() => root?.unmount());
+    host?.remove();
+    extendUsers.mockResolvedValue({ users: [] });
+    await mount(1, [], [], { ...detail, user: { ...user, status: UserStatus.EXPIRED, expiresUnix: BigInt(Math.floor(Date.now() / 1000) - 3 * 86_400) } });
+    expect(document.querySelector(".up-ban")?.textContent).toContain("The term ended 3 days ago");
+    await click([...document.querySelectorAll(".up-ban button")].find((b) => b.textContent === "Extend 30 days"));
+    expect(extendUsers).toHaveBeenCalledWith({ userIds: ["usr_1"], days: 30 });
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(1, [], [], { ...detail, user: { ...user, status: UserStatus.LIMITED, usedBytes: 104_000_000_000n, quotaBytes: 100_000_000_000n } });
+    expect(document.querySelector(".up-ban")?.textContent).toContain("Quota used up");
+    resetUserTraffic.mockResolvedValue({});
+    await click([...document.querySelectorAll(".up-ban button")].find((b) => b.textContent === "Reset"));
+    expect(resetUserTraffic).not.toHaveBeenCalled(); // asks first
+    await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent === "Reset"));
+    await settle();
+    expect(resetUserTraffic).toHaveBeenCalledWith({ userIds: ["usr_1"] });
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(1, [], [], { ...detail, devices: [], user: { ...user, devicesUsed: 0 } });
+    expect(document.querySelector(".up-ban")?.textContent).toContain("Never connected");
+  });
+
+  it("shows no write button to an observer: no quick actions, no banner action", async () => {
+    await mount(3, [], [], { ...detail, user: { ...user, status: UserStatus.DISABLED } });
+    expect(button("Disable")).toBeUndefined();
+    expect(button("Enable")).toBeUndefined();
+    expect(document.querySelector(".up-ban button")).toBeNull();
+    expect(document.querySelector(".up-ban")).not.toBeNull(); // the reason is still said
+  });
+
+  it("extends by 30 from the head, and by 90 or for ever from the Access tab", async () => {
+    extendUsers.mockResolvedValue({ users: [] });
+    updateUser.mockResolvedValue({ user });
+    await mount(1, [], [], { ...detail, user: { ...user, expiresUnix: BigInt(Math.floor(Date.now() / 1000) + 10 * 86_400) } });
+    await click(button("Extend 30 days"));
+    expect(extendUsers).toHaveBeenCalledWith({ userIds: ["usr_1"], days: 30 });
+    act(() => root?.unmount());
+    host?.remove();
+    tab("access");
+    await mount(1, [], [], { ...detail, user: { ...user, expiresUnix: BigInt(Math.floor(Date.now() / 1000) + 10 * 86_400) } });
+    await click(button("+90 days"));
+    expect(extendUsers).toHaveBeenLastCalledWith({ userIds: ["usr_1"], days: 90 });
+    await click(button("Never"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", expiresUnix: 0n });
+  });
+
+  it("shows the link and its password on the Overview, copies the link, and asks before a new one", async () => {
+    getSubscriptionLink.mockResolvedValue(link);
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
+    await mount();
+    expect(document.querySelector(".up-code code")?.textContent).toBe(link.url);
+    expect(text()).toContain("••••••••••••");
+    expect(text()).not.toContain(link.pagePassword);
+    await click(button("Show"));
+    expect(text()).toContain(link.pagePassword);
+    await click(document.querySelector(".up-code button"));
+    expect(write).toHaveBeenCalledWith(link.url);
+    getSubscriptionLink.mockResolvedValue({ url: "https://sub.example.com/s/alice-new", pagePassword: "fern-4409-dune" });
+    await click(button("Change"));
+    expect(getSubscriptionLink).toHaveBeenCalledTimes(1); // nothing before the question
+    await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent === en["users.rotateDo"]));
+    await settle();
+    expect(getSubscriptionLink).toHaveBeenLastCalledWith({ userId: "usr_1", rotate: true });
+    expect(document.querySelector(".up-code code")?.textContent).toBe("https://sub.example.com/s/alice-new");
+  });
+
+  it("does not ask the panel for the link of an observer, and says who sees it", async () => {
+    await mount(3);
+    expect(text()).toContain("The link is visible to the owner and helpers");
+    expect(document.querySelector(".up-code")).toBeNull();
+  });
+
+  it("makes a new group from the list as a copy of this one, and moves the person into it without the question", async () => {
+    createGroup.mockResolvedValue({ group: { id: "grp_new", name: "colleagues" } });
+    updateUser.mockResolvedValue({ user });
+    tab("access");
+    await mount();
+    await click(document.querySelector(".up-gsel"));
+    await click(document.querySelector(".up-gnew"));
+    const field = document.querySelector<HTMLInputElement>(".up-gnf input")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "colleagues");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("Create and move"));
+    await settle();
+    expect(createGroup).toHaveBeenCalledWith(expect.objectContaining({ name: "colleagues", profileIds: ["p_hy", "p_awg"], dnsPresetId: "", color: "" }));
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", groupId: "grp_new" });
+  });
+
+  it("refuses a name a group already has, in the form", async () => {
+    tab("access");
+    await mount();
+    await click(document.querySelector(".up-gsel"));
+    await click(document.querySelector(".up-gnew"));
+    const field = document.querySelector<HTMLInputElement>(".up-gnf input")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "Friends");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(document.querySelector(".up-gnf")?.textContent).toContain("Such a group already exists");
+    expect(button("Create and move")?.hasAttribute("data-disabled") || (button("Create and move") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("asks the key's switch of the nodes: one by one, or all at once, one call each", async () => {
+    updateUser.mockResolvedValue({ user });
+    tab("access");
+    await mount(1, [], [], { ...detail, user: { ...user, nodes: { all: false, nodeIds: ["nod_1"] } } });
+    expect(document.querySelector("[aria-label=de1][role=checkbox]")?.getAttribute("aria-checked")).toBe("true");
+    await click(document.querySelector("[aria-label=de1][role=checkbox]"));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", nodes: { all: false, nodeIds: [] } });
   });
 });

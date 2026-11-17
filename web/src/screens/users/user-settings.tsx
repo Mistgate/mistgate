@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { cx } from "@/lib/cx";
-import { useGo } from "./nav";
 import type { UserN as User } from "./model";
 import { useTx } from "./t";
 import { ConfirmModal, TypeConfirmModal } from "./ui";
@@ -29,9 +28,8 @@ export function ResetTrafficModal({ user, actions, open, onOpenChange }: { user:
 }
 
 /** "Delete the person": the name is typed first (and the owner's second factor asked, when it is on); then the list. */
-export function DeleteModal({ user, actions, open, onOpenChange }: { user: User; actions: Actions; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function DeleteModal({ user, actions, open, onOpenChange, onDeleted }: { user: User; actions: Actions; open: boolean; onOpenChange: (o: boolean) => void; onDeleted: () => void }) {
   const t = useTx();
-  const go = useGo();
   return (
     <TypeConfirmModal
       open={open}
@@ -42,7 +40,7 @@ export function DeleteModal({ user, actions, open, onOpenChange }: { user: User;
       confirmLabel={t("users.delete")}
       onConfirm={async () => {
         await actions.remove();
-        go("/users", { replace: true });
+        onDeleted();
       }}
     />
   );

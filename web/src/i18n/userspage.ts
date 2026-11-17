@@ -123,6 +123,9 @@ export const en = {
   "up.tt.qr": "QR code",
   "up.undo": "Cancel",
   "up.unsaved": "Changes not saved",
+  "up.gone": "{name} is deleted",
+  "up.goneBody": "The link and keys no longer work; everything is removed from the nodes",
+  "up.goneBack": "To users",
 };
 
 export const ru: typeof en = {
@@ -248,6 +251,9 @@ export const ru: typeof en = {
   "up.tt.qr": "QR-код",
   "up.undo": "Отменить",
   "up.unsaved": "Изменения не сохранены",
+  "up.gone": "{name} удалён",
+  "up.goneBody": "Ссылка и ключи больше не работают, с нод всё убрано",
+  "up.goneBack": "К пользователям",
 };
 
 export const zh: typeof en = {
@@ -373,6 +379,9 @@ export const zh: typeof en = {
   "up.tt.qr": "二维码",
   "up.undo": "取消",
   "up.unsaved": "更改未保存",
+  "up.gone": "{name} 已删除",
+  "up.goneBody": "链接和密钥已失效，节点上的相关内容已全部移除",
+  "up.goneBack": "返回用户列表",
 };
 
 export const fa: typeof en = {
@@ -498,6 +507,9 @@ export const fa: typeof en = {
   "up.tt.qr": "کد QR",
   "up.undo": "لغو",
   "up.unsaved": "تغییرات ذخیره نشده",
+  "up.gone": "{name} حذف شد",
+  "up.goneBody": "پیوند و کلیدها دیگر کار نمی‌کنند و همه‌چیز از نودها برداشته شده",
+  "up.goneBack": "به کاربران",
 };
 
 export const tr: typeof en = {
@@ -623,4 +635,7 @@ export const tr: typeof en = {
   "up.tt.qr": "QR kodu",
   "up.undo": "İptal et",
   "up.unsaved": "Değişiklikler kaydedilmedi",
+  "up.gone": "{name} silindi",
+  "up.goneBody": "Bağlantı ve anahtarlar artık çalışmıyor; düğümlerden her şey kaldırıldı",
+  "up.goneBack": "Kullanıcılara",
 };

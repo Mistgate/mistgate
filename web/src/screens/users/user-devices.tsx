@@ -74,6 +74,8 @@ export function DevicesPanel({
   const awgProfiles = profiles.filter((p) => p.protocol === "awg");
   const canAdd = !readonly && !!user.apps?.amnezia && awgProfiles.length > 0;
   const [adding, setAdding] = useState(!!autoAdd && canAdd && !full);
+  // the key just made glows once in the list (the board's .fresh)
+  const [fresh, setFresh] = useState("");
   const now = nowSec();
   const { link, shared, keys, trustTunnel } = splitDevices(devices);
   const showSub = !!user.apps?.happ || link.length > 0 || shared.length > 0;
@@ -166,7 +168,7 @@ export function DevicesPanel({
               {keys.map((d) => (
                 <DeviceRow
                   key={d.id}
-                  className={cx("up-key", d.idle && "idle")}
+                  className={cx("up-key", d.idle && "idle", d.id === fresh && "fresh")}
                   tile={<Tile d={P.key} />}
                   name={nameOf(d)}
                   badge={
@@ -254,6 +256,7 @@ export function DevicesPanel({
         onCreated={(device, configs) => {
           void actions.refresh();
           setOpened({ device, initial: configs });
+          setFresh(device.id);
         }}
       />
       <DeviceConfigsModal device={opened?.device ?? null} initial={opened?.initial} onClose={() => setOpened(null)} onChanged={() => void actions.refresh()} />
