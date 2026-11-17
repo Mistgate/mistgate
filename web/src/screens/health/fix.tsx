@@ -38,6 +38,8 @@ const doneFor = 30_000; // "Fixed" stays on the row until the re-check report re
 export type FixFlow = {
   start: (target: FixTarget) => void;
   phase: (key: string) => "idle" | "busy" | "done";
+  /** How many times the fix of this key has failed since the page opened (a card shakes when it grows). */
+  failures: (key: string) => number;
   /** Fixes that are running or finished a moment ago. */
   pending: () => FixTarget[];
   modal: ReactNode;
@@ -49,6 +51,7 @@ export function useFixFlow(): FixFlow {
   const qc = useQueryClient();
   const [dlg, setDlg] = useState<Dialog | null>(null);
   const [phases, setPhases] = useState<Record<string, Phase>>({});
+  const [failed, setFailed] = useState<Record<string, number>>({});
   const seq = useRef(0); // a dry run that comes back after the dialog was closed is ignored
   const timers = useRef<number[]>([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -98,6 +101,7 @@ export function useFixFlow(): FixFlow {
       const r = plain(await health.applyFix({ nodeId: target.nodeId, fixId: target.fixId, params: target.params, dryRun: false, planId: d.planId }));
       if (!r.applied) {
         setPhase(target.key, null);
+        setFailed((f) => ({ ...f, [target.key]: (f[target.key] ?? 0) + 1 }));
         toast.error(t("hl.fix.failed", { error: fixErrorText(t, r.error) }));
         return;
       }
@@ -106,6 +110,7 @@ export function useFixFlow(): FixFlow {
       toast(r.resultParams.noop === "1" ? t("hl.fix.doneNothing", { node: target.nodeName }) : t("hl.fix.done", { node: target.nodeName, label }));
     } catch (e) {
       setPhase(target.key, null);
+      setFailed((f) => ({ ...f, [target.key]: (f[target.key] ?? 0) + 1 }));
       toast.error(errorText(e, t));
     } finally {
       refresh();
@@ -113,8 +118,9 @@ export function useFixFlow(): FixFlow {
   };
 
   const phase = useCallback((key: string) => phases[key]?.phase ?? "idle", [phases]);
+  const failures = useCallback((key: string) => failed[key] ?? 0, [failed]);
   const pending = () => Object.values(phases).map((p) => p.target);
-  return { start, phase, pending, modal: <FixDialog dlg={dlg} onClose={close} onConfirm={confirm} /> };
+  return { start, phase, failures, pending, modal: <FixDialog dlg={dlg} onClose={close} onConfirm={confirm} /> };
 }
 
 function FixDialog({ dlg, onClose, onConfirm }: { dlg: Dialog | null; onClose: () => void; onConfirm: (d: Extract<Dialog, { state: "ready" }>) => void }) {

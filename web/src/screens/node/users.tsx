@@ -1,3 +1,4 @@
+import { Scramble } from "@/components/fx/scramble-react";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/bits";
@@ -114,7 +115,9 @@ export function TopToday({ data }: { data: Plain<GetNodeResponse> }) {
         <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className={cx("grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 border-t border-line py-2.5 last:pb-4", rowPad)}>
           <span className="truncate">{u.userName}</span>
           <i className="nd-bar tall" style={{ "--w": `${Math.max(3, Math.round((u.bytes / best) * 100))}%` } as CSSProperties} />
-          <b className="font-mono text-[13px] font-medium tabular-nums">{fmt.bytes(u.bytes)}</b>
+          <b className="font-mono text-[13px] font-medium tabular-nums">
+            <Scramble value={fmt.bytes(u.bytes)} once />
+          </b>
         </Link>
       ))}
       {data.topToday.length === 0 && <p className={cx("border-t border-line py-4 text-[13px] text-muted", rowPad)}>{t("node.noTopToday")}</p>}

@@ -54,8 +54,19 @@ const families = ["server", "net", "mg"] as const;
 
 /** What needs attention: the title and its family, how bad it is, why, the node's own fact, and what can be done. */
 function IssueCard({ flow, nodeId, nodeName, item, stale }: { flow: FixFlow; nodeId: string; nodeName: string; item: DoctorItem; stale?: string }) {
-  const { t, can, accept, open, why, fact, command, steps, phase, canAccept, who, action } = useDoctorItem({ flow, nodeId, nodeName, item, stale });
+  const { t, can, accept, open, why, fact, command, steps, phase, canAccept, who, action, fixKey } = useDoctorItem({ flow, nodeId, nodeName, item, stale });
   const category = useCategory();
+  // a repair that failed shakes the card once (the board's dr-shake); the toast says why
+  const fails = flow.failures(fixKey);
+  const seen = useRef(fails);
+  const [shaking, setShaking] = useState(false);
+  useEffect(() => {
+    if (fails <= seen.current) return;
+    seen.current = fails;
+    setShaking(true);
+    const id = window.setTimeout(() => setShaking(false), 400);
+    return () => window.clearTimeout(id);
+  }, [fails]);
   const crit = item.status === DoctorStatus.FAIL;
   const raw = fact || item.detail;
   return (
@@ -63,6 +74,7 @@ function IssueCard({ flow, nodeId, nodeName, item, stale }: { flow: FixFlow; nod
       title={stale ? t("hl.doctor.stale", { age: stale }) : undefined}
       className={cx(
         "flex animate-[mg-up_0.3s_var(--e)_both] flex-col gap-3 rounded-card border bg-surface px-6 py-5 max-[720px]:p-4",
+        shaking && "nd-shaking",
         crit ? "border-[color-mix(in_srgb,var(--danger)_55%,transparent)]" : "border-[color-mix(in_srgb,var(--warning)_40%,transparent)]",
         stale && "opacity-60",
       )}

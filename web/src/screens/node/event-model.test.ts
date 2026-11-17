@@ -289,10 +289,10 @@ describe("kernel readiness of a node", () => {
 describe("weekSummary", () => {
   const NOW = Math.floor(new Date(2026, 10, 13, 20, 50).getTime() / 1000);
   const at = (day: number, h: number, m = 0) => Math.floor(new Date(2026, 10, day, h, m).getTime() / 1000);
-  const ev = (id: number, code: string, timeUnix: number) => ({ id, code, timeUnix, severity: 0, params: {} }) as never;
+  const evt = (id: number, code: string, timeUnix: number) => ({ id, code, timeUnix, severity: 0, params: {} }) as never;
 
   it("counts the downtime from a node_down to the next node_recovered, and a blip as a failure that costs none", () => {
-    const events = [ev(1, "node_down", at(13, 11, 20)), ev(2, "node_recovered", at(13, 11, 22)), ev(3, "node_blip", at(13, 10, 11))];
+    const events = [evt(1, "node_down", at(13, 11, 20)), evt(2, "node_recovered", at(13, 11, 22)), evt(3, "node_blip", at(13, 10, 11))];
     const s = weekSummary(events, NOW, at(1, 0), false);
     expect(s.failures).toBe(2);
     expect(s.downS).toBe(120);
@@ -306,10 +306,10 @@ describe("weekSummary", () => {
   });
 
   it("a node that is down now has been down since its node_down, up to now", () => {
-    const s = weekSummary([ev(1, "node_down", at(13, 20, 30))], NOW, at(1, 0), true);
+    const s = weekSummary([evt(1, "node_down", at(13, 20, 30))], NOW, at(1, 0), true);
     expect(s.downS).toBe(20 * 60);
     expect(s.cells.find((c) => c.fromUnix === at(13, 20))!.kind).toBe("crit");
-    expect(weekSummary([ev(1, "node_down", at(13, 20, 30))], NOW, at(1, 0), false).downS).toBe(0); // no longer down: recovered rows are what close it
+    expect(weekSummary([evt(1, "node_down", at(13, 20, 30))], NOW, at(1, 0), false).downS).toBe(0); // no longer down: recovered rows are what close it
   });
 
   it("leaves the cells before the node was added empty, and gives no share for a node under an hour old", () => {

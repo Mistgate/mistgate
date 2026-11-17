@@ -1,3 +1,4 @@
+import { Scramble } from "@/components/fx/scramble-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useId, useState, type ReactNode } from "react";
@@ -245,7 +246,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                     />
                   ))}
                 </span>
-                <span className={cx("text-end font-mono text-[13px] font-medium whitespace-nowrap tabular-nums max-[1200px]:order-6", look?.kind === "warn" && "text-warn-text", look?.kind === "bad" && "text-danger-text")}>{look && cell ? look.label : ""}</span>
+                <span className={cx("text-end font-mono text-[13px] font-medium whitespace-nowrap tabular-nums max-[1200px]:order-6", look?.kind === "warn" && "text-warn-text", look?.kind === "bad" && "text-danger-text")}>{look && cell && look.label ? <Scramble value={look.label} once /> : ""}</span>
                 <div className="flex items-center gap-1.5 max-[1200px]:order-7 max-[1200px]:col-[1/-1] max-[720px]:[&>*]:flex-1">
                   {fix}
                   {owner && (
@@ -288,7 +289,9 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                   <span className="text-[13px] text-muted">{t("np.pf.day")}</span>
                   {stats.map((x) => (
                     <span key={x.k} className="inline-flex items-baseline gap-1.5 text-[13px] text-sec">
-                      <b className={cx("font-mono text-[13px] font-medium text-fg", x.cls)}>{x.v}</b>
+                      <b className={cx("font-mono text-[13px] font-medium text-fg", x.cls)}>
+                        <Scramble value={x.v} once />
+                      </b>
                       {x.k}
                     </span>
                   ))}

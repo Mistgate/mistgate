@@ -9,7 +9,7 @@ import { NodeDoctorTab } from "./doctor";
 
 // The Doctor tab on the data of the dev-kit scene: the summary card with a cell per check, the problems as cards, the rest as lists.
 
-const health = vi.hoisted(() => ({ runDoctor: vi.fn() }));
+const health = vi.hoisted(() => ({ runDoctor: vi.fn(), applyFix: vi.fn() }));
 vi.mock("@/lib/api", async (orig) => ({ ...(await orig<typeof import("@/lib/api")>()), health: { ...(await orig<typeof import("@/lib/api")>()).health, ...health } }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, className }: { children?: ReactNode; to: string; className?: string }) => (
@@ -27,6 +27,7 @@ beforeAll(() => {
 beforeEach(() => {
   setLang("en");
   health.runDoctor.mockReset();
+  health.applyFix.mockReset();
 });
 
 let root: Root | null = null;
@@ -110,5 +111,18 @@ describe("the Doctor tab", () => {
     expect(buttons("Inspecting")[0]!.hasAttribute("disabled") || buttons("Inspecting")[0]!.getAttribute("data-disabled") !== null).toBe(true);
     expect(health.runDoctor).toHaveBeenCalledWith({ nodeId: "nod_de1" });
     await act(async () => answer({ nowUnix: 1, nodes: [] }));
+  });
+
+  it("shakes the card of a repair that failed, once", async () => {
+    await mount("alerts");
+    health.applyFix.mockImplementation(async (r: { dryRun: boolean }) => (r.dryRun ? { planId: "p1", plan: { params: {}, labelKey: "", detail: "" } } : { applied: false, error: "refused", resultParams: {} }));
+    const card = () => [...host!.querySelectorAll("section")].find((c) => c.textContent?.includes("Trim the journal"))!;
+    await act(async () => buttons("Trim the journal")[0]!.click());
+    await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(card().classList.contains("nd-shaking")).toBe(false);
+    const apply = () => [...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent === "Apply");
+    await act(async () => (apply() as HTMLElement | undefined)?.click());
+    await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    expect(card().classList.contains("nd-shaking")).toBe(true);
   });
 });
