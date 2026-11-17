@@ -313,7 +313,3 @@ export const builtinPreviewDoc = `<!doctype html>
 <title>Coming soon</title>
 <style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font:16px/1.5 system-ui,sans-serif;color:#444;background:#fafafa}main{text-align:center;padding:1rem}h1{font-weight:500;margin:0 0 .5rem}p{margin:0;color:#888}</style>
 </head><body><main><h1>Coming soon</h1><p>Something new is on its way.</p></main></body></html>`;
-
-export const builtinNotFoundDoc = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>404 Not Found</title></head>
-<body><h1>Not Found</h1><p>The requested URL was not found on this server.</p></body></html>`;

@@ -1225,62 +1225,6 @@
   font-weight: 400;
 }
 
-/* the menu of "More" */
-.dz-mw {
-  position: relative;
-  display: flex;
-}
-.dz-mn {
-  position: absolute;
-  inset-inline-end: 0;
-  top: calc(100% + 6px);
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  width: 240px;
-  padding: 6px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  box-shadow: var(--shadow-pop);
-  transform-origin: 100% 0;
-  animation: dz-pop 0.2s var(--ease-spring) both;
-}
-[dir="rtl"] .dz-mn {
-  transform-origin: 0 0;
-}
-@keyframes dz-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-}
-.dz-mn button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  text-align: start;
-  transition: background-color 0.15s var(--e);
-}
-.dz-mn button:hover,
-.dz-mn button:focus-visible {
-  background: var(--step);
-}
-.dz-mn button svg {
-  color: var(--sec);
-}
-.dz-mn button.risk {
-  color: var(--danger-text);
-}
-.dz-mn button.risk svg {
-  color: var(--danger-text);
-}
-
 /* the assign window */
 .dz-asb {
   display: flex;
@@ -1558,9 +1502,6 @@
   .dz-ha > * {
     flex: 1 1 auto;
   }
-  .dz-ha .dz-mw > button {
-    flex: 1 1 auto;
-  }
   .dz-stage {
     padding: 12px;
   }
@@ -1593,8 +1534,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dz-sk,
   .dz-gl.busy,
-  .dz-spin,
-  .dz-mn {
+  .dz-spin {
     animation: none;
   }
 }

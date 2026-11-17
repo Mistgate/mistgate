@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/notice";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { useT } from "@/i18n";
+import type { MessageKey } from "@/i18n/en";
 import { decoySites } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import {
@@ -157,7 +158,7 @@ export function DecoySiteScreen({ id: idProp, demo }: { id?: string; demo?: Site
       </div>
     );
   }
-  return <Loaded id={id} fixed={fixed} back={back} nodesAll={nodes.data.nodes} demo={demo} />;
+  return <Loaded key={id} id={id} fixed={fixed} back={back} nodesAll={nodes.data.nodes} demo={demo} />;
 }
 
 function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "builtin" | "dir"; back: React.ReactNode; nodesAll: readonly Node[]; demo?: SiteDemo }) {
@@ -265,8 +266,10 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
       ? { kind: "" as const, title: t("dz.ban.copied"), text: t("dz.ban.copiedText") }
       : fixed === "builtin"
         ? { kind: "" as const, title: t("dz.ban.builtin"), text: t("dz.ban.builtinText") }
-        : fixed === "dir"
-          ? { kind: "" as const, title: t("dz.ban.dir"), text: t("dz.ban.dirText") }
+        : fixed === "dir" && !dirAvailable
+          ? { kind: "part" as const, title: t("dz.ban.dirOff"), text: t(`err.${dirItem?.reasonCode || "panel_unavailable"}` as MessageKey) }
+          : fixed === "dir"
+            ? { kind: "" as const, title: t("dz.ban.dir"), text: t("dz.ban.dirText") }
           : draft
             ? { kind: "" as const, title: t("dz.ban.draft"), text: t("dz.ban.draftText") }
             : undefined;
@@ -366,9 +369,10 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
               align="end"
               defaultOpen={demo?.menu}
               className="w-60"
+              pop
               aria-label={t("dz.act.more")}
               trigger={
-                <Button variant="secondary" size="lg" className="dz-mb">
+                <Button variant="secondary" size="lg" className="dz-mb gap-1.5 ps-3.5 pe-2.5">
                   {t("dz.act.more")}
                   <Icon name="chevronDown" size={16} />
                 </Button>
@@ -388,7 +392,7 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
       </header>
 
       {banner && (
-        <Msg kind={banner.kind === "bad" ? "bad" : ""} title={banner.title}>
+        <Msg kind={banner.kind} title={banner.title}>
           <span>{banner.text}</span>
         </Msg>
       )}

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
-import { builtinNotFoundDoc, builtinPreviewDoc, pageLabel, pagesQuery, previewQuery } from "@/lib/decoysites";
+import { builtinPreviewDoc, pageLabel, pagesQuery, previewQuery } from "@/lib/decoysites";
 import { errorText } from "@/lib/errors";
 import { useIsPhone } from "@/lib/media";
 import { DzCard, DzIcon } from "./parts";
@@ -30,7 +30,7 @@ export function PreviewCard({ id, sha, kind, bad, demo }: { id: string; sha: str
   const doc = useQuery({ ...previewQuery(id, sha, list[at] === "index.html" ? "" : (list[at] ?? ""), notFound), enabled: site && (!!pages.data || pages.isError) });
 
   const has404 = pages.data?.has404 ?? false;
-  const shown = kind === "builtin" ? (notFound ? builtinNotFoundDoc : builtinPreviewDoc) : site ? doc.data : undefined;
+  const shown = kind === "builtin" ? builtinPreviewDoc : site ? doc.data : undefined;
   const wd = phone ? "ph" : width;
   const placeholder = kind === "dir" ? "dir" : bad ? "none" : undefined;
   const waiting = site && !doc.data && !doc.isError;
@@ -38,7 +38,7 @@ export function PreviewCard({ id, sha, kind, bad, demo }: { id: string; sha: str
 
   return (
     <DzCard className={cx("dz-pv", `v${wd}`, placeholder && "nodoc")} data-shot="decoy-preview">
-      {(kind === "builtin" || (site && list.length > 0)) && (
+      {(site && list.length > 0) || !phone ? (
         <div className="dz-pvb">
           {site && list.length > 0 && (
             <>
@@ -53,11 +53,11 @@ export function PreviewCard({ id, sha, kind, bad, demo }: { id: string; sha: str
                 options={list.map((p, i) => ({ value: String(i), label: <span className="font-mono text-xs" dir="ltr">{pageLabel(p)}</span> }))}
                 variant="inset"
               />
+              <Button variant="secondary" size="md" aria-pressed={notFound} className={cx(notFound && "dz-on")} onClick={() => setNotFound(!notFound)}>
+                {t("dz.pv.show404")}
+              </Button>
             </>
           )}
-          <Button variant="secondary" size="md" aria-pressed={notFound} className={cx(notFound && "dz-on")} onClick={() => setNotFound(!notFound)}>
-            {t("dz.pv.show404")}
-          </Button>
           {!phone && (
             <Segmented
               aria-label={t("dz.pv.width")}
@@ -71,7 +71,7 @@ export function PreviewCard({ id, sha, kind, bad, demo }: { id: string; sha: str
             />
           )}
         </div>
-      )}
+      ) : null}
       <div className="dz-stage">
         <div className="dz-fr">
           {shown !== undefined && (
