@@ -165,7 +165,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 46 || b != 94 || c != 179 {
+	if a, b, c := count(ro), count(op), count(ad); a != 49 || b != 100 || c != 195 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -391,6 +391,121 @@ func TestMCPEndToEnd(t *testing.T) {
 	}
 	t.Logf("node_fix_plan on a node that never connected: %s", out)
 
+	// -- the library of decoy sites on the real services, the real token policy and the real fleet: a draft is saved by the token
+	// at once and is on no node; the panel itself refuses a draft call on a ready site; putting a site on a node and a new version
+	// of a site that stands on one wait for the owner and then reach the node.
+	// tokens of their own, so that the earlier calls do not eat into the request-rate burst
+	_, lopSecret := mkToken("libops", store.ProfileOperator)
+	_, ladSecret := mkToken("libboss", store.ProfileAdmin)
+	_, lroSecret := mkToken("libreader", store.ProfileReadonly)
+	lop, lad, lro := session(lopSecret), session(ladSecret), session(lroSecret)
+	const siteMarker = "Marker-DECOY-4417"
+	index := map[string]any{"path": "index.html", "content": "<title>Bakery</title><p>" + siteMarker}
+	if out, isErr := tool(lop, "decoy_site_draft_save", map[string]any{"name": "Bakery", "note": "a small neighbourhood bakery", "files": []any{index, map[string]any{"path": "404.html", "content": "<p>gone"}}}); isErr {
+		t.Fatalf("decoy_site_draft_save: %s", out)
+	} else if d := decodeJSON[mcp.DecoyDraftV](t, out); d.State != "draft" || d.Version != 1 || d.Files != 2 {
+		t.Fatalf("draft = %+v", d)
+	}
+	sites := decodeJSON[mcp.DecoySitesV](t, ok(lro, "decoy_sites_list", map[string]any{}))
+	if len(sites.Sites) != 1 || sites.Sites[0].State != "draft" || sites.Sites[0].Source != "mcp" || sites.Sites[0].MadeBy != "libops" || sites.Sites[0].NodeN != 0 {
+		t.Fatalf("decoy_sites_list: %+v", sites)
+	}
+	siteID := sites.Sites[0].ID
+	// no plan was made for the draft, and no token reaches the library over /api except to read
+	for _, p := range [][2]string{{"CreateDecoySite", `{}`}, {"AddDecoySiteVersion", `{}`}, {"DownloadDecoySite", `{}`}, {"AssignDecoySite", `{"siteId":"` + siteID + `","nodeIds":["x"],"dryRun":true}`}, {"DeleteDecoySite", `{}`}} {
+		for _, s := range []string{lopSecret, ladSecret} {
+			req, _ := http.NewRequest("POST", admin.URL+"/api/mistgate.decoysite.v1.DecoySiteService/"+p[0], strings.NewReader(p[1]))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+s)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != 403 {
+				t.Errorf("%s over /api with a token: %d", p[0], resp.StatusCode)
+			}
+		}
+	}
+	// the owner's plan puts the draft on de1 in one step; it waits for the owner
+	assign := decodeJSON[mcp.PlanOut](t, ok(lad, "decoy_site_assign_plan", map[string]any{"site_id": siteID, "nodes": []string{"de1"}, "mark_ready": true}))
+	if !assign.NeedsApproval {
+		t.Fatalf("assign plan: %+v", assign)
+	}
+	if out, isErr := tool(lad, "decoy_site_assign_apply", map[string]any{"confirm_token": assign.ConfirmToken}); !isErr || !strings.Contains(out, "waiting for the owner") {
+		t.Errorf("assign before the approval: %v %s", isErr, out)
+	}
+	if got := decodeJSON[mcp.DecoySiteGetV](t, ok(lro, "decoy_site_get", map[string]any{"site_id": siteID})); got.Site.State != "draft" || len(got.Nodes) != 0 {
+		t.Fatalf("the plan changed the site: %+v", got.Site)
+	}
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+assign.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	if ap := decodeJSON[mcp.ApplyOut](t, ok(lad, "decoy_site_assign_apply", map[string]any{"confirm_token": assign.ConfirmToken})); ap.Status != "applied" {
+		t.Fatalf("assign apply: %+v", ap)
+	}
+	on := decodeJSON[mcp.DecoySiteGetV](t, ok(lro, "decoy_site_get", map[string]any{"site_id": siteID}))
+	if on.Site.State != "ready" || len(on.Nodes) != 1 || on.Nodes[0].Node != "de1" {
+		t.Fatalf("after the assignment: %+v", on)
+	}
+	nodes, err := st.Nodes(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var de1 store.NodeRow
+	for _, n := range nodes {
+		if n.Name == "de1" {
+			de1 = n
+		}
+	}
+	if de1.DecoyMode != "own" || de1.DecoySiteID != siteID || de1.DecoyBundleHash == "" {
+		t.Fatalf("node de1 = mode %q site %q bundle %q", de1.DecoyMode, de1.DecoySiteID, de1.DecoyBundleHash)
+	}
+	// a ready site is not a draft: the panel refuses the draft tool whatever the tool does, and says what to do
+	if out, isErr := tool(lop, "decoy_site_draft_save", map[string]any{"site_id": siteID, "files": []any{index}}); !isErr || !strings.Contains(out, "decoy_site_not_draft") || !strings.Contains(out, "decoy_site_version_plan") {
+		t.Errorf("draft tool on a ready site: %v %s", isErr, out)
+	}
+	if out, isErr := tool(lop, "decoy_site_draft_save", map[string]any{"name": "Other", "note": "n", "files": []any{index}}); isErr {
+		t.Errorf("a second draft: %s", out)
+	}
+	// a new version of the site on the node: the operator's plan, the owner's approval, then the node's bundle changes
+	ver := decodeJSON[mcp.PlanOut](t, ok(lop, "decoy_site_version_plan", map[string]any{"site_id": siteID, "change_files": []any{map[string]any{"path": "menu.html", "content": "<p>menu"}}}))
+	if !ver.NeedsApproval || !strings.Contains(ver.Summary, "1 node") {
+		t.Fatalf("version plan: %+v", ver)
+	}
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+ver.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	if ap := decodeJSON[mcp.ApplyOut](t, ok(lop, "decoy_site_version_apply", map[string]any{"confirm_token": ver.ConfirmToken})); ap.Status != "applied" {
+		t.Fatalf("version apply: %+v", ap)
+	}
+	if after, err := st.Node(ctx, de1.ID); err != nil || after.DecoyBundleHash == de1.DecoyBundleHash || after.DecoyMode != "own" {
+		t.Fatalf("node de1 after the new version: %+v %v", after, err)
+	}
+	if got := decodeJSON[mcp.DecoySiteGetV](t, ok(lro, "decoy_site_get", map[string]any{"site_id": siteID})); got.Site.Version != 2 || len(got.Files) != 3 {
+		t.Fatalf("after the new version: %+v", got)
+	}
+	if file := decodeJSON[mcp.DecoyFileV](t, ok(lro, "decoy_site_file", map[string]any{"site_id": siteID, "path": "index.html"})); !strings.Contains(file.Text, siteMarker) {
+		t.Fatalf("decoy_site_file: %+v", file)
+	}
+	// the audit log names the site and the hash, never the text
+	decoyAudit, err := st.ListAudit(ctx, "", 0, 400)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoyRows int
+	for _, r := range decoyAudit {
+		if strings.HasPrefix(r.Action, "decoy_site.") || strings.HasPrefix(r.Action, "mcp_") {
+			decoyRows++
+		}
+		if strings.Contains(r.Params, siteMarker) || strings.Contains(r.Params, "menu</p>") {
+			t.Errorf("audit row %s carries the text of a site: %s", r.Action, r.Params)
+		}
+	}
+	if decoyRows == 0 {
+		t.Error("no audit rows for the library")
+	}
+
 	// -- the connection counters on the real services: a node that never connected does not send them, and a person nobody
 	// connected for has no rows; a readonly token reads both
 	if out := ok(ro, "node_connections", map[string]any{"node": "de1"}); !strings.Contains(out, `"supported":false`) || !strings.Contains(out, `"inbounds":[]`) {
@@ -572,7 +687,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 46 {
+	if n := count(ps); n != 49 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {
