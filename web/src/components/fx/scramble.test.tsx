@@ -1,91 +1,106 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { Scramble } from "./scramble";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { setEffectsEnabled } from "@/lib/effects";
+import { play, playing, settle } from "./scramble";
+import { Scramble } from "./scramble-react";
 
-// A figure that scrambles in: the text is there from the first frame, it plays once when the figure is mostly in view, and not at
-// all with reduced motion or without an observer.
+// The number effect of the Overview: digits shuffle among digits and land one by one; off with the switch.
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
-
-let root: Root | null = null;
-let host: HTMLDivElement | null = null;
-let seen: ((entries: { target: Element; isIntersecting: boolean }[]) => void) | null = null;
-let frames: ((t: number) => void)[] = [];
-
-beforeEach(() => {
-  frames = [];
-  class FakeObserver {
-    constructor(cb: (entries: { target: Element; isIntersecting: boolean }[]) => void) {
-      // one observer serves the module for good: its callback is kept for the next test
-      seen = cb;
-    }
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
-  vi.stubGlobal("IntersectionObserver", FakeObserver);
-  vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void) => frames.push(cb));
-  vi.stubGlobal("cancelAnimationFrame", () => {});
-});
 afterEach(() => {
-  act(() => root?.unmount());
-  host?.remove();
-  root = host = null;
-  vi.unstubAllGlobals();
+  vi.useRealTimers();
+  setEffectsEnabled(false);
 });
 
-async function mount(text = "1 234 ГБ") {
-  host = document.createElement("div");
-  document.body.append(host);
-  root = createRoot(host);
-  await act(async () => root!.render(<Scramble text={text} />));
-}
-/** The browser calls the frames, 16 ms apart. */
-async function play(n: number) {
-  let t = performance.now();
-  for (let i = 0; i < n; i++) {
-    const run = frames.splice(0);
-    t += 16;
-    await act(async () => run.forEach((f) => f(t)));
-  }
-}
+const frames = (ms: number) => {
+  for (let t = 0; t < ms; t += 16) vi.advanceTimersByTime(16);
+};
 
-describe("Scramble", () => {
-  it("shows its text at once, shuffles a copy over it when first seen, and is still again afterwards", async () => {
-    await mount("128 GB");
-    expect(host!.textContent).toBe("128 GB");
-    expect(host!.querySelector("[aria-hidden]")).toBeNull();
-
-    // seen: the copy appears (the real text stays for readers, drawn transparent)
-    const span = host!.firstElementChild as HTMLElement;
-    await act(async () => seen!([{ target: span, isIntersecting: true }]));
-    expect(host!.querySelectorAll("[aria-hidden] .fz-scr-c")).toHaveLength(6);
-    expect(host!.querySelector(".text-transparent")?.textContent).toBe("128 GB");
-
-    // every digit and letter lands in its place, then the copy is gone
-    await play(200);
-    expect(host!.querySelector("[aria-hidden]")).toBeNull();
-    expect(host!.querySelector(".text-transparent")).toBeNull();
-    expect(host!.textContent).toBe("128 GB");
+describe("the scramble engine", () => {
+  it("keeps the shape of the text while it plays (digits stay digits, the rest stays) and ends on the text", () => {
+    vi.useFakeTimers();
+    const el = document.createElement("span");
+    document.body.append(el);
+    play(el, "76,2 GB");
+    expect(playing(el)).toBe(true);
+    expect(el.textContent).toHaveLength(7);
+    frames(80);
+    const mid = el.textContent!;
+    expect(mid).toHaveLength(7);
+    expect(mid[2]).toBe(",");
+    expect(mid[4]).toBe(" ");
+    expect(/^\d\d,\d [A-Z]{2}$/.test(mid)).toBe(true);
+    frames(2500);
+    expect(el.textContent).toBe("76,2 GB");
+    expect(playing(el)).toBe(false);
+    el.remove();
   });
 
-  it("plays once: a second sighting does nothing", async () => {
-    await mount("42");
-    const span = host!.firstElementChild as HTMLElement;
-    await act(async () => seen!([{ target: span, isIntersecting: true }]));
-    await play(200);
-    await act(async () => seen!([{ target: span, isIntersecting: true }]));
-    expect(host!.querySelector("[aria-hidden]")).toBeNull();
+  it("settles at once on request", () => {
+    vi.useFakeTimers();
+    const el = document.createElement("span");
+    document.body.append(el);
+    play(el, "123");
+    settle(el, "456");
+    expect(el.textContent).toBe("456");
+    expect(playing(el)).toBe(false);
+    el.remove();
+  });
+});
+
+describe("the Scramble element", () => {
+  let root: Root | null = null;
+  let host: HTMLDivElement | null = null;
+  afterEach(() => {
+    act(() => root?.unmount());
+    host?.remove();
+    root = host = null;
+  });
+  const mount = (value: string) => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => root!.render(<Scramble value={value} />));
+  };
+
+  it("is the plain text, labelled with the value, while the effects are off", () => {
+    mount("42");
+    const el = host!.firstElementChild!;
+    expect(el.textContent).toBe("42");
+    expect(el.getAttribute("aria-label")).toBe("42");
+    act(() => root!.render(<Scramble value="43" />));
+    expect(el.textContent).toBe("43");
   });
 
-  it("does not play with reduced motion", async () => {
-    vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }));
-    await mount("42");
-    await act(async () => seen?.([{ target: host!.firstElementChild!, isIntersecting: true }]));
-    expect(host!.querySelector(".fz-scr-c")).toBeNull(); // not even observed
-    expect(host!.textContent).toBe("42");
+  it("plays with the effects on, and the text is what it says in the end", () => {
+    vi.useFakeTimers();
+    setEffectsEnabled(true);
+    mount("42");
+    const el = host!.firstElementChild as HTMLElement;
+    expect(playing(el)).toBe(true); // no IntersectionObserver in the test: it plays at once
+    frames(2500);
+    expect(el.textContent).toBe("42");
+    act(() => root!.render(<Scramble value="1,5" />));
+    expect(playing(el)).toBe(true);
+    frames(2500);
+    expect(el.textContent).toBe("1,5");
+  });
+
+  it("with once, plays the first time and sets a changed value plainly", () => {
+    vi.useFakeTimers();
+    setEffectsEnabled(true);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => root!.render(<Scramble value="42" once />));
+    const el = host.firstElementChild as HTMLElement;
+    expect(playing(el)).toBe(true);
+    frames(2500);
+    act(() => root!.render(<Scramble value="43" once />));
+    expect(playing(el)).toBe(false);
+    expect(el.textContent).toBe("43");
   });
 });

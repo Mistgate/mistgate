@@ -74,23 +74,25 @@ export function Banner({
   );
 }
 
-/** Calm empty state: an optional icon in a soft square, a 16px title, one quiet line, an optional action. */
+/** Calm empty state: an optional icon in a soft square (red with `bad`: a load that failed), a 16px title, one quiet line, an optional action. */
 export function EmptyState({
   icon,
   title,
   children,
   action,
+  bad,
   className,
 }: {
   icon?: ReactNode;
   title: ReactNode;
   children?: ReactNode;
   action?: ReactNode;
+  bad?: boolean;
   className?: string;
 }) {
   return (
     <div className={cx("screen-enter flex flex-col items-center gap-1 px-6 py-10 text-center", className)}>
-      {icon && <span className="mb-2.5 grid size-11 place-items-center rounded-[14px] bg-step text-sec">{icon}</span>}
+      {icon && <span className={cx("mb-2.5 grid size-11 place-items-center rounded-[14px]", bad ? "bg-danger-soft text-danger" : "bg-step text-sec")}>{icon}</span>}
       <div className="text-base leading-6 font-medium">{title}</div>
       {children && <div className="max-w-[420px] text-sm leading-5 text-sec">{children}</div>}
       {action && <div className="mt-3.5">{action}</div>}

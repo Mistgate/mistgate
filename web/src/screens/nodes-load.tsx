@@ -1,7 +1,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
-import { Scramble } from "@/components/fx/scramble";
+import { Scramble } from "@/components/fx/scramble-react";
 import { Flag } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
@@ -142,13 +142,13 @@ function Summary({ data }: { data: Load }) {
         k={t("nv.load.room")}
         note={free && free.headroomPeople !== undefined ? t("load.sum.freest", { name: free.nodeName, n: String(free.headroomPeople) }) : "—"}
       >
-        {s.headroomNodes > 0 ? around(t.n("load.sum.room", roomN), roomN, <Scramble text={String(roomN)} className={num} />) : "—"}
+        {s.headroomNodes > 0 ? around(t.n("load.sum.room", roomN), roomN, <Scramble once value={String(roomN)} className={num} />) : "—"}
       </Figure>
       <Figure k={t("nv.load.busy")} note={t("nv.load.busyNote")}>
-        <Scramble text={String(s.busy + s.overloaded)} className={num} />
+        <Scramble once value={String(s.busy + s.overloaded)} className={num} />
       </Figure>
       <Figure k={t("load.status.ok")} note={t("nv.load.okNote") + (s.unknown > 0 ? ` · ${t("nv.load.noData", { n: s.unknown })}` : "")}>
-        <Scramble text={String(s.ok)} className={num} />
+        <Scramble once value={String(s.ok)} className={num} />
       </Figure>
     </div>
   );
@@ -226,7 +226,7 @@ function Meter({ label, value, note, first, shown }: { label: string; value: num
         style={{ "--w": `${pct}%` } as CSSProperties}
       />
       <b className="text-end font-mono text-[13px] font-medium tabular-nums">
-        <Scramble text={shown} />
+        <Scramble once value={shown} />
       </b>
       <em className={cx("text-[12px] whitespace-nowrap not-italic text-muted @max-[520px]/fzt:hidden", first && "justify-self-start rounded-chip bg-warn-soft px-2 py-0.5 text-warn-text")}>{first ? t("nv.load.first") : note}</em>
     </div>

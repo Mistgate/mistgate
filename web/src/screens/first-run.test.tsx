@@ -101,6 +101,26 @@ describe("the checklist on screen", () => {
     expect(groups.className).not.toContain("bg-accent");
   });
 
+  it("on an empty panel says the panel is ready, heads with the node step and keeps the later buttons quiet", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root!.render(<FirstRunView steps={steps()} onHide={() => {}} empty />));
+    expect(host.querySelector("h2")!.textContent).toBe("Добавь первый сервер, дальше панель сама");
+    expect(host.textContent).toContain("Панель готова · нод пока нет");
+    expect(host.textContent).not.toContain("из 4"); // no node yet: nothing is counted
+    expect(host.querySelectorAll("ol li")).toHaveLength(4);
+    const add = [...host.querySelectorAll("button")].find((b) => b.textContent === "Добавить ноду")!;
+    expect(add.className).toContain("bg-accent");
+    // the profile step cannot be taken without a node (disabled, with the reason); groups and users can
+    const groups = [...host.querySelectorAll("a")].find((a) => a.textContent === "Открыть группы")!;
+    const users = [...host.querySelectorAll("a")].find((a) => a.textContent === "Создать пользователя")!;
+    expect(groups.className).not.toContain("bg-accent");
+    expect(users.className).not.toContain("bg-accent");
+    expect([...host.querySelectorAll("button")].some((b) => b.textContent === "Добавить профиль")).toBe(false);
+    expect(host.querySelector("li[aria-current=step]")!.textContent).toContain("Нода подключена");
+  });
+
   it("folds into one line once everything is done, and hides on request", async () => {
     const onHide = vi.fn();
     const done = steps({

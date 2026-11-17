@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode } from "react";
-import { Scramble } from "@/components/fx/scramble";
+import { Scramble } from "@/components/fx/scramble-react";
 import { Fresh } from "@/components/fx/fresh";
 import { Check } from "@/components/ui/bits";
 import { Flag } from "@/components/ui/flag";
@@ -216,14 +216,14 @@ export function NodeList({
               </span>
             </div>
             <span className={numCell}>
-              <Scramble text={String(onlineOf(n))} />
+              <Scramble once value={String(onlineOf(n))} />
             </span>
             <span className={cx(numCell, sumCell)}>
-              <Scramble text={fmt.bytes(n.trafficTodayBytes)} />
+              <Scramble once value={fmt.bytes(n.trafficTodayBytes)} />
             </span>
             <span className={cx("grid grid-cols-[36px_minmax(0,1fr)] items-center gap-2", sumCell)}>
               <span className={cx(numCell)}>
-                <Scramble text={n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—"} />
+                <Scramble once value={n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—"} />
               </span>
               <i
                 aria-hidden
@@ -232,7 +232,7 @@ export function NodeList({
               />
             </span>
             <span className={cx(numCell, upCell)}>
-              <Scramble text={n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"} />
+              <Scramble once value={n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"} />
             </span>
             <Icon name="chevronRight" size={16} className="block flex-none text-muted transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-fg rtl:group-hover:-translate-x-0.5" />
             {/* last, so it lies over what is not a control of its own (the row is one big target) */}

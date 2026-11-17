@@ -25,9 +25,9 @@ const alias: Record<string, ProtocolKind> = { hy2: "hysteria2", amneziawg: "awg"
 /**
  * A protocol as a tag: its glyph in its tone, then its name (24px, 6px radius). `compact` is the 28px glyph alone that opens
  * into the name when the pointer or focus is on it, for dense lists; the name stays in the tag for screen readers. `label`
- * replaces the name (a translated one: the relay, the DNS tunnel).
+ * replaces the name (a translated one: the relay, the DNS tunnel). `expanded` keeps a compact tag open (a phone has no pointer).
  */
-export function ProtocolTag({ protocol, label, compact, className }: { protocol: string; label?: string; compact?: boolean; className?: string }) {
+export function ProtocolTag({ protocol, label, compact, expanded, className }: { protocol: string; label?: string; compact?: boolean; expanded?: boolean; className?: string }) {
   const kind = protocol in kinds ? (protocol as ProtocolKind) : alias[protocol];
   const look: Look | undefined = kind ? kinds[kind] : undefined;
   const name = label ?? (kind === "trusttunnel" ? "TrustTunnel" : protocolName(protocol));
@@ -48,7 +48,9 @@ export function ProtocolTag({ protocol, label, compact, className }: { protocol:
       <span
         className={cx(
           compact &&
-            "inline-block max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity,margin] duration-[350ms] ease-out group-hover/pt:ms-1.5 group-hover/pt:max-w-[120px] group-hover/pt:opacity-100 group-focus-visible/pt:ms-1.5 group-focus-visible/pt:max-w-[120px] group-focus-visible/pt:opacity-100",
+            (expanded
+              ? "ms-1.5 inline-block max-w-[120px] overflow-hidden"
+              : "inline-block max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity,margin] duration-[350ms] ease-out group-hover/pt:ms-1.5 group-hover/pt:max-w-[120px] group-hover/pt:opacity-100 group-focus-visible/pt:ms-1.5 group-focus-visible/pt:max-w-[120px] group-focus-visible/pt:opacity-100"),
         )}
       >
         {name}
