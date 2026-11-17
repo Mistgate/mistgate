@@ -93,11 +93,13 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
   const addNode = useAddNode();
   const fx = useEffectsEnabled();
   // "?node=<id>": made from that node's page, the node is ticked and Done goes back there; "?protocol=" skips the first step
-  const { node: fromNode = "", protocol: urlProtocol = "" } = useSearch({ strict: false }) as { node?: string; protocol?: string };
+  const { node: fromNode = "", protocol: urlProtocol = "", task: urlTask = "" } = useSearch({ strict: false }) as { node?: string; protocol?: string; task?: string };
   const known = demo ? undefined : protocols.find((p) => p.id === urlProtocol);
 
   const shown = tasks.filter((k) => k.protocol === "" || protocols.some((p) => p.id === k.protocol));
-  const [pick, setPick] = useState<TaskId>(demo?.task ?? (known ? taskOfProtocol(known.id) : "fast"));
+  // VLESS is two tasks: REALITY for phones, or behind a CDN (?task=cdn)
+  const urlTaskId = (): TaskId => (known && urlTask === "cdn" && known.id === "vless" ? "cdn" : known ? taskOfProtocol(known.id) : "fast");
+  const [pick, setPick] = useState<TaskId>(demo?.task ?? urlTaskId());
   const infoOf = (task: TaskId, id?: string) => protocols.find((p) => p.id === (id ?? taskById(task).protocol)) ?? protocols[0]!;
   const begin = (task: TaskId, id?: string, cdn = ""): Cfg => {
     const info = infoOf(task, id);
@@ -107,7 +109,7 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(demo?.step ?? (known ? 2 : 1));
   const [cfg, setCfg] = useState<Cfg | null>(() => {
     if (!(demo ? (demo.step ?? 1) > 1 || demo.task : known)) return null;
-    const task = demo?.task ?? taskOfProtocol(known!.id);
+    const task = demo?.task ?? urlTaskId();
     const c = begin(task, known && task === "own" ? known.id : demo?.protocol, demo?.cdn ?? "");
     const edited = demo?.settings ? demo.settings(c.settings) : c.settings;
     return { ...c, settings: edited, typed: demo?.name ?? null, portEdit: demo?.port ?? null };
@@ -126,7 +128,7 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
     if (demo || step === 5) return;
     if (!urlProtocol && step > 1) setStep(1);
     else if (urlProtocol && step === 1 && known) {
-      const task = taskOfProtocol(known.id);
+      const task = urlTaskId();
       setPick(task);
       setCfg(begin(task, known.id));
       setAll(task === "own");
@@ -134,7 +136,7 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- when the URL changes
   }, [urlProtocol]);
-  const url = (protocol?: string) => void navigate({ to: "/profiles/new", search: { ...(fromNode && { node: fromNode }), ...(protocol && { protocol }) } } as never);
+  const url = (protocol?: string, task?: TaskId) => void navigate({ to: "/profiles/new", search: { ...(fromNode && { node: fromNode }), ...(protocol && { protocol }), ...(task === "cdn" && { task }) } } as never);
 
   // ---- step 2
   const info = cfg ? infoOf(cfg.task, cfg.protocol) : undefined;
@@ -336,7 +338,7 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
       setPicked({});
       setFixes({});
       setStep(2);
-      url(c.protocol);
+      url(c.protocol, c.task);
     } else if (step === 2) {
       if (!errs2) setStep(3);
     } else if (step === 3) setStep(4);

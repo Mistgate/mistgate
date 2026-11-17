@@ -19,9 +19,10 @@ export function validateProfilesSearch(s: Record<string, unknown>): ProfilesSear
   return { ...(protocol && { protocol }), ...(q && { q }), ...(isFacet(state) && { state }) };
 }
 
-/** /profiles/new: `node` (made from that node's page) and the chosen `protocol` (step 2; without it, step 1). */
-export function validateNewProfileSearch(s: Record<string, unknown>): { node?: string; protocol?: string } {
+/** /profiles/new: `node` (made from that node's page), the chosen `protocol` (step 2; without it, step 1) and, where one protocol serves two tasks (VLESS: REALITY or behind a CDN), the `task`. */
+export function validateNewProfileSearch(s: Record<string, unknown>): { node?: string; protocol?: string; task?: string } {
   const node = text(s.node);
   const protocol = id(s.protocol);
-  return { ...(node && { node }), ...(protocol && { protocol }) };
+  const task = protocol && text(s.task) === "cdn" ? "cdn" : "";
+  return { ...(node && { node }), ...(protocol && { protocol }), ...(task && { task }) };
 }
