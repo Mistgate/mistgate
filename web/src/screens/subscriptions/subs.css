@@ -2140,7 +2140,7 @@
     }
     .sbp .pp-ic.none {
       background: var(--step);
-      color: var(--muted;
+      color: var(--muted);
     }
   }
 }
