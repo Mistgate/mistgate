@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/decoysite/v1/decoysite.proto.
  */
 export const file_mistgate_decoysite_v1_decoysite: GenFile = /*@__PURE__*/
-  fileDesc("CiVtaXN0Z2F0ZS9kZWNveXNpdGUvdjEvZGVjb3lzaXRlLnByb3RvEhVtaXN0Z2F0ZS5kZWNveXNpdGUudjEiRAoKRGVjb3lDaGVjaxIMCgRjb2RlGAEgASgJEg0KBWxldmVsGAIgASgJEgoKAm9rGAMgASgIEg0KBXBhdGhzGAQgAygJIi8KDURlY295RmlsZUluZm8SDAoEcGF0aBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAiKAAwoJRGVjb3lTaXRlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEbm90ZRgDIAEoCRIOCgZzb3VyY2UYBCABKAkSFAoMc291cmNlX2xhYmVsGAUgASgJEg0KBXN0YXRlGAYgASgJEhUKDWJ1bmRsZV9zaGEyNTYYByABKAkSGAoMY3JlYXRlZF91bml4GAggASgDQgIwAhISCgpjcmVhdGVkX2J5GAkgASgJEhgKDHVwZGF0ZWRfdW5peBgKIAEoA0ICMAISEgoKdXBkYXRlZF9ieRgLIAEoCRIPCgd2ZXJzaW9uGAwgASgNEhYKCnNpemVfYnl0ZXMYDSABKARCAjACEhIKCmZpbGVfY291bnQYDiABKA0SDQoFdGl0bGUYDyABKAkSMQoGY2hlY2tzGBAgAygLMiEubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295Q2hlY2sSEgoKbm9kZV9jb3VudBgRIAEoDRIQCghvbl9wYW5lbBgSIAEoCCLfAQoMRGVjb3lWZXJzaW9uEgsKA3NlcRgBIAEoDRIVCg1idW5kbGVfc2hhMjU2GAIgASgJEhgKDGNyZWF0ZWRfdW5peBgDIAEoA0ICMAISEgoKY3JlYXRlZF9ieRgEIAEoCRIWCgpzaXplX2J5dGVzGAUgASgEQgIwAhISCgpmaWxlX2NvdW50GAYgASgNEg0KBXRpdGxlGAcgASgJEjEKBmNoZWNrcxgIIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEg8KB2N1cnJlbnQYCSABKAgibAoQRGVjb3lCdWlsdGluSXRlbRIKCgJpZBgBIAEoCRIRCglhdmFpbGFibGUYAiABKAgSEwoLcmVhc29uX2NvZGUYAyABKAkSEgoKbm9kZV9jb3VudBgEIAEoDRIQCghvbl9wYW5lbBgFIAEoCCJxCg1EZWNveVNpdGVOb2RlEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEhMKC3JlYXNvbl9jb2RlGAMgASgJEhEKCXN1cHBvcnRlZBgEIAEoCBIUCgxhZ2VudF9zaGEyNTYYBSABKAkiFwoVTGlzdERlY295U2l0ZXNSZXF1ZXN0IsQBChZMaXN0RGVjb3lTaXRlc1Jlc3BvbnNlEi8KBXNpdGVzGAEgAygLMiAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZRI4CgdidWlsdGluGAIgAygLMicubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295QnVpbHRpbkl0ZW0SFAoMcGFuZWxfc291cmNlGAMgASgJEhIKCnNpdGVfbGltaXQYBCABKA0SFQoNdmVyc2lvbl9saW1pdBgFIAEoDSImChNHZXREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAki5wEKFEdldERlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEjUKCHZlcnNpb25zGAIgAygLMiMubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295VmVyc2lvbhIzCgVmaWxlcxgDIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEjMKBW5vZGVzGAQgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZU5vZGUiawoWQ3JlYXRlRGVjb3lTaXRlUmVxdWVzdBIMCgRuYW1lGAEgASgJEgwKBG5vdGUYAiABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAyABKAwSDQoFc3RhdGUYBCABKAkSDgoGc291cmNlGAUgASgJIkkKF0NyZWF0ZURlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKGkFkZERlY295U2l0ZVZlcnNpb25SZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAiABKAwiZwobQWRkRGVjb3lTaXRlVmVyc2lvblJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEhgKEHVwZGF0ZWRfbm9kZV9pZHMYAiADKAkiWgoYRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSDAoEcGF0aBgCIAEoCRIPCgdjb250ZW50GAMgASgMEg4KBmRlbGV0ZRgEIAEoCCJLChlFZGl0RGVjb3lTaXRlRmlsZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKFlVwZGF0ZURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBG5vdGUYAyABKAkiSQoXVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUiNQoUQ29weURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIkcKFUNvcHlEZWNveVNpdGVSZXNwb25zZRIuCgRzaXRlGAEgASgLMiAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZSI6ChhTZXREZWNveVNpdGVSZWFkeVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRINCgVyZWFkeRgCIAEoCCJLChlTZXREZWNveVNpdGVSZWFkeVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIlsKFkFzc2lnbkRlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIQCghub2RlX2lkcxgCIAMoCRINCgVwYW5lbBgDIAEoCBIPCgdkcnlfcnVuGAQgASgIImcKDURlY295UmVwbGFjZWQSDgoGdGFyZ2V0GAEgASgJEhAKCHByZXZpb3VzGAIgASgJEhgKEHByZXZpb3VzX3NpdGVfaWQYAyABKAkSGgoScHJldmlvdXNfc2l0ZV9uYW1lGAQgASgJIr8BChdBc3NpZ25EZWNveVNpdGVSZXNwb25zZRIzCgh3YXJuaW5ncxgBIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEjYKCHJlcGxhY2VkGAIgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295UmVwbGFjZWQSJgoFbm9kZXMYAyADKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlEg8KB2FwcGxpZWQYBCABKAgiXgoYVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSEAoIbm9kZV9pZHMYAiADKAkSDQoFcGFuZWwYAyABKAgSEAoIZmFsbGJhY2sYBCABKAkiWQoZVW5hc3NpZ25EZWNveVNpdGVSZXNwb25zZRImCgVub2RlcxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUSFAoMcGFuZWxfc291cmNlGAIgASgJIiwKGlNldFBhbmVsRGVjb3lTb3VyY2VSZXF1ZXN0Eg4KBnNvdXJjZRgBIAEoCSIzChtTZXRQYW5lbERlY295U291cmNlUmVzcG9uc2USFAoMcGFuZWxfc291cmNlGAEgASgJIjYKFlJldmVydERlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0iYwoXUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUSGAoQdXBkYXRlZF9ub2RlX2lkcxgCIAMoCSIpChZEZWxldGVEZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkiGQoXRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2UiOAoYRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNIj4KGURvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USEAoIZmlsZW5hbWUYASABKAkSDwoHYXJjaGl2ZRgCIAEoDCI1ChVMaXN0RGVjb3lQYWdlc1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0ibQoWTGlzdERlY295UGFnZXNSZXNwb25zZRINCgVwYWdlcxgBIAMoCRIzCgVmaWxlcxgCIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEg8KB2hhc180MDQYAyABKAgiWwoaR2V0RGVjb3lQYWdlUHJldmlld1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0SDAoEcGF0aBgDIAEoCRIRCglub3RfZm91bmQYBCABKAgiOQobR2V0RGVjb3lQYWdlUHJldmlld1Jlc3BvbnNlEgwKBGh0bWwYASABKAkSDAoEcGF0aBgCIAEoCSJBChNHZXREZWNveUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNEgwKBHBhdGgYAyABKAkiSQoUR2V0RGVjb3lGaWxlUmVzcG9uc2USDAoEdGV4dBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAhIRCgl0cnVuY2F0ZWQYAyABKAgywg8KEERlY295U2l0ZVNlcnZpY2USbQoOTGlzdERlY295U2l0ZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295U2l0ZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVNpdGVzUmVzcG9uc2USZwoMR2V0RGVjb3lTaXRlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295U2l0ZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lTaXRlUmVzcG9uc2UScAoPQ3JlYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkNyZWF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQ3JlYXRlRGVjb3lTaXRlUmVzcG9uc2USfAoTQWRkRGVjb3lTaXRlVmVyc2lvbhIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVzcG9uc2USdgoRRWRpdERlY295U2l0ZUZpbGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkVkaXREZWNveVNpdGVGaWxlUmVzcG9uc2UScAoPVXBkYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVwZGF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USagoNQ29weURlY295U2l0ZRIrLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVxdWVzdBosLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVzcG9uc2USdgoRU2V0RGVjb3lTaXRlUmVhZHkSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuU2V0RGVjb3lTaXRlUmVhZHlSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlNldERlY295U2l0ZVJlYWR5UmVzcG9uc2UScAoPQXNzaWduRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkFzc2lnbkRlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQXNzaWduRGVjb3lTaXRlUmVzcG9uc2USdgoRVW5hc3NpZ25EZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVuYXNzaWduRGVjb3lTaXRlUmVzcG9uc2USfAoTU2V0UGFuZWxEZWNveVNvdXJjZRIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVzcG9uc2UScAoPUmV2ZXJ0RGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlJldmVydERlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2UScAoPRGVsZXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlbGV0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2USdgoRRG93bmxvYWREZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USbQoOTGlzdERlY295UGFnZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295UGFnZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVBhZ2VzUmVzcG9uc2USfAoTR2V0RGVjb3lQYWdlUHJldmlldxIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVzcG9uc2USZwoMR2V0RGVjb3lGaWxlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295RmlsZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lGaWxlUmVzcG9uc2VC5QEKGWNvbS5taXN0Z2F0ZS5kZWNveXNpdGUudjFCDkRlY295c2l0ZVByb3RvUAFaQmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2RlY295c2l0ZS92MTtkZWNveXNpdGV2MaICA01EWKoCFU1pc3RnYXRlLkRlY295c2l0ZS5WMcoCFU1pc3RnYXRlXERlY295c2l0ZVxWMeICIU1pc3RnYXRlXERlY295c2l0ZVxWMVxHUEJNZXRhZGF0YeoCF01pc3RnYXRlOjpEZWNveXNpdGU6OlYxYgZwcm90bzM", [file_mistgate_admin_v1_node]);
+  fileDesc("CiVtaXN0Z2F0ZS9kZWNveXNpdGUvdjEvZGVjb3lzaXRlLnByb3RvEhVtaXN0Z2F0ZS5kZWNveXNpdGUudjEiRAoKRGVjb3lDaGVjaxIMCgRjb2RlGAEgASgJEg0KBWxldmVsGAIgASgJEgoKAm9rGAMgASgIEg0KBXBhdGhzGAQgAygJIi8KDURlY295RmlsZUluZm8SDAoEcGF0aBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAiKAAwoJRGVjb3lTaXRlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEbm90ZRgDIAEoCRIOCgZzb3VyY2UYBCABKAkSFAoMc291cmNlX2xhYmVsGAUgASgJEg0KBXN0YXRlGAYgASgJEhUKDWJ1bmRsZV9zaGEyNTYYByABKAkSGAoMY3JlYXRlZF91bml4GAggASgDQgIwAhISCgpjcmVhdGVkX2J5GAkgASgJEhgKDHVwZGF0ZWRfdW5peBgKIAEoA0ICMAISEgoKdXBkYXRlZF9ieRgLIAEoCRIPCgd2ZXJzaW9uGAwgASgNEhYKCnNpemVfYnl0ZXMYDSABKARCAjACEhIKCmZpbGVfY291bnQYDiABKA0SDQoFdGl0bGUYDyABKAkSMQoGY2hlY2tzGBAgAygLMiEubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295Q2hlY2sSEgoKbm9kZV9jb3VudBgRIAEoDRIQCghvbl9wYW5lbBgSIAEoCCLfAQoMRGVjb3lWZXJzaW9uEgsKA3NlcRgBIAEoDRIVCg1idW5kbGVfc2hhMjU2GAIgASgJEhgKDGNyZWF0ZWRfdW5peBgDIAEoA0ICMAISEgoKY3JlYXRlZF9ieRgEIAEoCRIWCgpzaXplX2J5dGVzGAUgASgEQgIwAhISCgpmaWxlX2NvdW50GAYgASgNEg0KBXRpdGxlGAcgASgJEjEKBmNoZWNrcxgIIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEg8KB2N1cnJlbnQYCSABKAgibAoQRGVjb3lCdWlsdGluSXRlbRIKCgJpZBgBIAEoCRIRCglhdmFpbGFibGUYAiABKAgSEwoLcmVhc29uX2NvZGUYAyABKAkSEgoKbm9kZV9jb3VudBgEIAEoDRIQCghvbl9wYW5lbBgFIAEoCCJICg9EZWNveVBhbmVsU3RhdGUSDwoHYWRkcmVzcxgBIAEoCRIPCgdzZXJ2aW5nGAIgASgJEhMKC3JlYXNvbl9jb2RlGAMgASgJInEKDURlY295U2l0ZU5vZGUSDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSEwoLcmVhc29uX2NvZGUYAyABKAkSEQoJc3VwcG9ydGVkGAQgASgIEhQKDGFnZW50X3NoYTI1NhgFIAEoCSIXChVMaXN0RGVjb3lTaXRlc1JlcXVlc3Qi+wEKFkxpc3REZWNveVNpdGVzUmVzcG9uc2USLwoFc2l0ZXMYASADKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEjgKB2J1aWx0aW4YAiADKAsyJy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lCdWlsdGluSXRlbRIUCgxwYW5lbF9zb3VyY2UYAyABKAkSEgoKc2l0ZV9saW1pdBgEIAEoDRIVCg12ZXJzaW9uX2xpbWl0GAUgASgNEjUKBXBhbmVsGAYgASgLMiYubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295UGFuZWxTdGF0ZSImChNHZXREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAki2QIKFEdldERlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEjUKCHZlcnNpb25zGAIgAygLMiMubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295VmVyc2lvbhIzCgVmaWxlcxgDIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEjMKBW5vZGVzGAQgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZU5vZGUSOQoOc2hhcmVkX2RvbWFpbnMYBSABKAsyIS5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lDaGVjaxI1CgVwYW5lbBgGIAEoCzImLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVBhbmVsU3RhdGUiawoWQ3JlYXRlRGVjb3lTaXRlUmVxdWVzdBIMCgRuYW1lGAEgASgJEgwKBG5vdGUYAiABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAyABKAwSDQoFc3RhdGUYBCABKAkSDgoGc291cmNlGAUgASgJIkkKF0NyZWF0ZURlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKGkFkZERlY295U2l0ZVZlcnNpb25SZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAiABKAwiZwobQWRkRGVjb3lTaXRlVmVyc2lvblJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEhgKEHVwZGF0ZWRfbm9kZV9pZHMYAiADKAkiWgoYRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSDAoEcGF0aBgCIAEoCRIPCgdjb250ZW50GAMgASgMEg4KBmRlbGV0ZRgEIAEoCCJLChlFZGl0RGVjb3lTaXRlRmlsZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKFlVwZGF0ZURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBG5vdGUYAyABKAkiSQoXVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUiNQoUQ29weURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIkcKFUNvcHlEZWNveVNpdGVSZXNwb25zZRIuCgRzaXRlGAEgASgLMiAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZSI6ChhTZXREZWNveVNpdGVSZWFkeVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRINCgVyZWFkeRgCIAEoCCJLChlTZXREZWNveVNpdGVSZWFkeVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIlsKFkFzc2lnbkRlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIQCghub2RlX2lkcxgCIAMoCRINCgVwYW5lbBgDIAEoCBIPCgdkcnlfcnVuGAQgASgIImcKDURlY295UmVwbGFjZWQSDgoGdGFyZ2V0GAEgASgJEhAKCHByZXZpb3VzGAIgASgJEhgKEHByZXZpb3VzX3NpdGVfaWQYAyABKAkSGgoScHJldmlvdXNfc2l0ZV9uYW1lGAQgASgJIr8BChdBc3NpZ25EZWNveVNpdGVSZXNwb25zZRIzCgh3YXJuaW5ncxgBIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEjYKCHJlcGxhY2VkGAIgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295UmVwbGFjZWQSJgoFbm9kZXMYAyADKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlEg8KB2FwcGxpZWQYBCABKAgiXgoYVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSEAoIbm9kZV9pZHMYAiADKAkSDQoFcGFuZWwYAyABKAgSEAoIZmFsbGJhY2sYBCABKAkiWQoZVW5hc3NpZ25EZWNveVNpdGVSZXNwb25zZRImCgVub2RlcxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUSFAoMcGFuZWxfc291cmNlGAIgASgJIiwKGlNldFBhbmVsRGVjb3lTb3VyY2VSZXF1ZXN0Eg4KBnNvdXJjZRgBIAEoCSIzChtTZXRQYW5lbERlY295U291cmNlUmVzcG9uc2USFAoMcGFuZWxfc291cmNlGAEgASgJIjYKFlJldmVydERlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0iYwoXUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUSGAoQdXBkYXRlZF9ub2RlX2lkcxgCIAMoCSIpChZEZWxldGVEZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkiGQoXRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2UiOAoYRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNIj4KGURvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USEAoIZmlsZW5hbWUYASABKAkSDwoHYXJjaGl2ZRgCIAEoDCI1ChVMaXN0RGVjb3lQYWdlc1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0ibQoWTGlzdERlY295UGFnZXNSZXNwb25zZRINCgVwYWdlcxgBIAMoCRIzCgVmaWxlcxgCIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEg8KB2hhc180MDQYAyABKAgiWwoaR2V0RGVjb3lQYWdlUHJldmlld1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0SDAoEcGF0aBgDIAEoCRIRCglub3RfZm91bmQYBCABKAgiOQobR2V0RGVjb3lQYWdlUHJldmlld1Jlc3BvbnNlEgwKBGh0bWwYASABKAkSDAoEcGF0aBgCIAEoCSJBChNHZXREZWNveUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNEgwKBHBhdGgYAyABKAkiSQoUR2V0RGVjb3lGaWxlUmVzcG9uc2USDAoEdGV4dBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAhIRCgl0cnVuY2F0ZWQYAyABKAgywg8KEERlY295U2l0ZVNlcnZpY2USbQoOTGlzdERlY295U2l0ZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295U2l0ZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVNpdGVzUmVzcG9uc2USZwoMR2V0RGVjb3lTaXRlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295U2l0ZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lTaXRlUmVzcG9uc2UScAoPQ3JlYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkNyZWF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQ3JlYXRlRGVjb3lTaXRlUmVzcG9uc2USfAoTQWRkRGVjb3lTaXRlVmVyc2lvbhIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVzcG9uc2USdgoRRWRpdERlY295U2l0ZUZpbGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkVkaXREZWNveVNpdGVGaWxlUmVzcG9uc2UScAoPVXBkYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVwZGF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USagoNQ29weURlY295U2l0ZRIrLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVxdWVzdBosLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVzcG9uc2USdgoRU2V0RGVjb3lTaXRlUmVhZHkSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuU2V0RGVjb3lTaXRlUmVhZHlSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlNldERlY295U2l0ZVJlYWR5UmVzcG9uc2UScAoPQXNzaWduRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkFzc2lnbkRlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQXNzaWduRGVjb3lTaXRlUmVzcG9uc2USdgoRVW5hc3NpZ25EZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVuYXNzaWduRGVjb3lTaXRlUmVzcG9uc2USfAoTU2V0UGFuZWxEZWNveVNvdXJjZRIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVzcG9uc2UScAoPUmV2ZXJ0RGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlJldmVydERlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2UScAoPRGVsZXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlbGV0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2USdgoRRG93bmxvYWREZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USbQoOTGlzdERlY295UGFnZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295UGFnZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVBhZ2VzUmVzcG9uc2USfAoTR2V0RGVjb3lQYWdlUHJldmlldxIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVzcG9uc2USZwoMR2V0RGVjb3lGaWxlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295RmlsZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lGaWxlUmVzcG9uc2VC5QEKGWNvbS5taXN0Z2F0ZS5kZWNveXNpdGUudjFCDkRlY295c2l0ZVByb3RvUAFaQmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2RlY295c2l0ZS92MTtkZWNveXNpdGV2MaICA01EWKoCFU1pc3RnYXRlLkRlY295c2l0ZS5WMcoCFU1pc3RnYXRlXERlY295c2l0ZVxWMeICIU1pc3RnYXRlXERlY295c2l0ZVxWMVxHUEJNZXRhZGF0YeoCF01pc3RnYXRlOjpEZWNveXNpdGU6OlYxYgZwcm90bzM", [file_mistgate_admin_v1_node]);
 
 /**
  * One check of a site's version. level "required" (a failed one cannot exist: the version would not have been saved) or "warning".
@@ -289,6 +289,43 @@ export const DecoyBuiltinItemSchema: GenMessage<DecoyBuiltinItem> = /*@__PURE__*
   messageDesc(file_mistgate_decoysite_v1_decoysite, 4);
 
 /**
+ * The panel as a place a site stands on: the address its public listener answers on and what that listener serves now.
+ *
+ * @generated from message mistgate.decoysite.v1.DecoyPanelState
+ */
+export type DecoyPanelState = Message<"mistgate.decoysite.v1.DecoyPanelState"> & {
+  /**
+   * The host (and port, when not the default) of the panel's public URL; empty when the panel does not know it.
+   *
+   * @generated from field: string address = 1;
+   */
+  address: string;
+
+  /**
+   * What it serves now: "builtin", "dir" or "site:<id>".
+   *
+   * @generated from field: string serving = 2;
+   */
+  serving: string;
+
+  /**
+   * Why that is not what the owner chose (panel_source), empty when it is: decoy_site_not_found or decoy_site_draft (the chosen
+   * library site is gone or is a draft), panel_unavailable (the panel's directory was chosen and there is none). The listener
+   * never serves nothing: it falls back to its directory, or to the built-in page when there is no directory.
+   *
+   * @generated from field: string reason_code = 3;
+   */
+  reasonCode: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.DecoyPanelState.
+ * Use `create(DecoyPanelStateSchema)` to create a new message.
+ */
+export const DecoyPanelStateSchema: GenMessage<DecoyPanelState> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 5);
+
+/**
  * A node that serves a site and how far the delivery is: reason_code is Node.decoy_reason_code ("" = it stands).
  *
  * @generated from message mistgate.decoysite.v1.DecoySiteNode
@@ -325,7 +362,7 @@ export type DecoySiteNode = Message<"mistgate.decoysite.v1.DecoySiteNode"> & {
  * Use `create(DecoySiteNodeSchema)` to create a new message.
  */
 export const DecoySiteNodeSchema: GenMessage<DecoySiteNode> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 5);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 6);
 
 /**
  * @generated from message mistgate.decoysite.v1.ListDecoySitesRequest
@@ -338,7 +375,7 @@ export type ListDecoySitesRequest = Message<"mistgate.decoysite.v1.ListDecoySite
  * Use `create(ListDecoySitesRequestSchema)` to create a new message.
  */
 export const ListDecoySitesRequestSchema: GenMessage<ListDecoySitesRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 6);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 7);
 
 /**
  * @generated from message mistgate.decoysite.v1.ListDecoySitesResponse
@@ -372,6 +409,11 @@ export type ListDecoySitesResponse = Message<"mistgate.decoysite.v1.ListDecoySit
    * @generated from field: uint32 version_limit = 5;
    */
   versionLimit: number;
+
+  /**
+   * @generated from field: mistgate.decoysite.v1.DecoyPanelState panel = 6;
+   */
+  panel?: DecoyPanelState | undefined;
 };
 
 /**
@@ -379,7 +421,7 @@ export type ListDecoySitesResponse = Message<"mistgate.decoysite.v1.ListDecoySit
  * Use `create(ListDecoySitesResponseSchema)` to create a new message.
  */
 export const ListDecoySitesResponseSchema: GenMessage<ListDecoySitesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 7);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 8);
 
 /**
  * @generated from message mistgate.decoysite.v1.GetDecoySiteRequest
@@ -396,7 +438,7 @@ export type GetDecoySiteRequest = Message<"mistgate.decoysite.v1.GetDecoySiteReq
  * Use `create(GetDecoySiteRequestSchema)` to create a new message.
  */
 export const GetDecoySiteRequestSchema: GenMessage<GetDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 8);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 9);
 
 /**
  * @generated from message mistgate.decoysite.v1.GetDecoySiteResponse
@@ -421,6 +463,19 @@ export type GetDecoySiteResponse = Message<"mistgate.decoysite.v1.GetDecoySiteRe
    * @generated from field: repeated mistgate.decoysite.v1.DecoySiteNode nodes = 4;
    */
   nodes: DecoySiteNode[];
+
+  /**
+   * The warning shared_domains of the nodes the site stands on now (the one AssignDecoySite computes), unset when it does not fire.
+   * Its paths are the names of those nodes.
+   *
+   * @generated from field: mistgate.decoysite.v1.DecoyCheck shared_domains = 5;
+   */
+  sharedDomains?: DecoyCheck | undefined;
+
+  /**
+   * @generated from field: mistgate.decoysite.v1.DecoyPanelState panel = 6;
+   */
+  panel?: DecoyPanelState | undefined;
 };
 
 /**
@@ -428,7 +483,7 @@ export type GetDecoySiteResponse = Message<"mistgate.decoysite.v1.GetDecoySiteRe
  * Use `create(GetDecoySiteResponseSchema)` to create a new message.
  */
 export const GetDecoySiteResponseSchema: GenMessage<GetDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 9);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 10);
 
 /**
  * @generated from message mistgate.decoysite.v1.CreateDecoySiteRequest
@@ -465,7 +520,7 @@ export type CreateDecoySiteRequest = Message<"mistgate.decoysite.v1.CreateDecoyS
  * Use `create(CreateDecoySiteRequestSchema)` to create a new message.
  */
 export const CreateDecoySiteRequestSchema: GenMessage<CreateDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 10);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 11);
 
 /**
  * @generated from message mistgate.decoysite.v1.CreateDecoySiteResponse
@@ -482,7 +537,7 @@ export type CreateDecoySiteResponse = Message<"mistgate.decoysite.v1.CreateDecoy
  * Use `create(CreateDecoySiteResponseSchema)` to create a new message.
  */
 export const CreateDecoySiteResponseSchema: GenMessage<CreateDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 11);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 12);
 
 /**
  * @generated from message mistgate.decoysite.v1.AddDecoySiteVersionRequest
@@ -504,7 +559,7 @@ export type AddDecoySiteVersionRequest = Message<"mistgate.decoysite.v1.AddDecoy
  * Use `create(AddDecoySiteVersionRequestSchema)` to create a new message.
  */
 export const AddDecoySiteVersionRequestSchema: GenMessage<AddDecoySiteVersionRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 12);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 13);
 
 /**
  * @generated from message mistgate.decoysite.v1.AddDecoySiteVersionResponse
@@ -528,7 +583,7 @@ export type AddDecoySiteVersionResponse = Message<"mistgate.decoysite.v1.AddDeco
  * Use `create(AddDecoySiteVersionResponseSchema)` to create a new message.
  */
 export const AddDecoySiteVersionResponseSchema: GenMessage<AddDecoySiteVersionResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 13);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 14);
 
 /**
  * @generated from message mistgate.decoysite.v1.EditDecoySiteFileRequest
@@ -562,7 +617,7 @@ export type EditDecoySiteFileRequest = Message<"mistgate.decoysite.v1.EditDecoyS
  * Use `create(EditDecoySiteFileRequestSchema)` to create a new message.
  */
 export const EditDecoySiteFileRequestSchema: GenMessage<EditDecoySiteFileRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 14);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 15);
 
 /**
  * @generated from message mistgate.decoysite.v1.EditDecoySiteFileResponse
@@ -579,7 +634,7 @@ export type EditDecoySiteFileResponse = Message<"mistgate.decoysite.v1.EditDecoy
  * Use `create(EditDecoySiteFileResponseSchema)` to create a new message.
  */
 export const EditDecoySiteFileResponseSchema: GenMessage<EditDecoySiteFileResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 15);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 16);
 
 /**
  * @generated from message mistgate.decoysite.v1.UpdateDecoySiteRequest
@@ -606,7 +661,7 @@ export type UpdateDecoySiteRequest = Message<"mistgate.decoysite.v1.UpdateDecoyS
  * Use `create(UpdateDecoySiteRequestSchema)` to create a new message.
  */
 export const UpdateDecoySiteRequestSchema: GenMessage<UpdateDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 16);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 17);
 
 /**
  * @generated from message mistgate.decoysite.v1.UpdateDecoySiteResponse
@@ -623,7 +678,7 @@ export type UpdateDecoySiteResponse = Message<"mistgate.decoysite.v1.UpdateDecoy
  * Use `create(UpdateDecoySiteResponseSchema)` to create a new message.
  */
 export const UpdateDecoySiteResponseSchema: GenMessage<UpdateDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 17);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 18);
 
 /**
  * @generated from message mistgate.decoysite.v1.CopyDecoySiteRequest
@@ -645,7 +700,7 @@ export type CopyDecoySiteRequest = Message<"mistgate.decoysite.v1.CopyDecoySiteR
  * Use `create(CopyDecoySiteRequestSchema)` to create a new message.
  */
 export const CopyDecoySiteRequestSchema: GenMessage<CopyDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 18);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 19);
 
 /**
  * @generated from message mistgate.decoysite.v1.CopyDecoySiteResponse
@@ -662,7 +717,7 @@ export type CopyDecoySiteResponse = Message<"mistgate.decoysite.v1.CopyDecoySite
  * Use `create(CopyDecoySiteResponseSchema)` to create a new message.
  */
 export const CopyDecoySiteResponseSchema: GenMessage<CopyDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 19);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 20);
 
 /**
  * @generated from message mistgate.decoysite.v1.SetDecoySiteReadyRequest
@@ -684,7 +739,7 @@ export type SetDecoySiteReadyRequest = Message<"mistgate.decoysite.v1.SetDecoySi
  * Use `create(SetDecoySiteReadyRequestSchema)` to create a new message.
  */
 export const SetDecoySiteReadyRequestSchema: GenMessage<SetDecoySiteReadyRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 20);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 21);
 
 /**
  * @generated from message mistgate.decoysite.v1.SetDecoySiteReadyResponse
@@ -701,7 +756,7 @@ export type SetDecoySiteReadyResponse = Message<"mistgate.decoysite.v1.SetDecoyS
  * Use `create(SetDecoySiteReadyResponseSchema)` to create a new message.
  */
 export const SetDecoySiteReadyResponseSchema: GenMessage<SetDecoySiteReadyResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 21);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 22);
 
 /**
  * @generated from message mistgate.decoysite.v1.AssignDecoySiteRequest
@@ -733,7 +788,7 @@ export type AssignDecoySiteRequest = Message<"mistgate.decoysite.v1.AssignDecoyS
  * Use `create(AssignDecoySiteRequestSchema)` to create a new message.
  */
 export const AssignDecoySiteRequestSchema: GenMessage<AssignDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 22);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 23);
 
 /**
  * What an assignment replaces: the site (or built-in entry) a node or the panel stood on.
@@ -771,7 +826,7 @@ export type DecoyReplaced = Message<"mistgate.decoysite.v1.DecoyReplaced"> & {
  * Use `create(DecoyReplacedSchema)` to create a new message.
  */
 export const DecoyReplacedSchema: GenMessage<DecoyReplaced> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 23);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 24);
 
 /**
  * @generated from message mistgate.decoysite.v1.AssignDecoySiteResponse
@@ -807,7 +862,7 @@ export type AssignDecoySiteResponse = Message<"mistgate.decoysite.v1.AssignDecoy
  * Use `create(AssignDecoySiteResponseSchema)` to create a new message.
  */
 export const AssignDecoySiteResponseSchema: GenMessage<AssignDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 24);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 25);
 
 /**
  * @generated from message mistgate.decoysite.v1.UnassignDecoySiteRequest
@@ -841,7 +896,7 @@ export type UnassignDecoySiteRequest = Message<"mistgate.decoysite.v1.UnassignDe
  * Use `create(UnassignDecoySiteRequestSchema)` to create a new message.
  */
 export const UnassignDecoySiteRequestSchema: GenMessage<UnassignDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 25);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 26);
 
 /**
  * @generated from message mistgate.decoysite.v1.UnassignDecoySiteResponse
@@ -863,7 +918,7 @@ export type UnassignDecoySiteResponse = Message<"mistgate.decoysite.v1.UnassignD
  * Use `create(UnassignDecoySiteResponseSchema)` to create a new message.
  */
 export const UnassignDecoySiteResponseSchema: GenMessage<UnassignDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 26);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 27);
 
 /**
  * @generated from message mistgate.decoysite.v1.SetPanelDecoySourceRequest
@@ -882,7 +937,7 @@ export type SetPanelDecoySourceRequest = Message<"mistgate.decoysite.v1.SetPanel
  * Use `create(SetPanelDecoySourceRequestSchema)` to create a new message.
  */
 export const SetPanelDecoySourceRequestSchema: GenMessage<SetPanelDecoySourceRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 27);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 28);
 
 /**
  * @generated from message mistgate.decoysite.v1.SetPanelDecoySourceResponse
@@ -899,7 +954,7 @@ export type SetPanelDecoySourceResponse = Message<"mistgate.decoysite.v1.SetPane
  * Use `create(SetPanelDecoySourceResponseSchema)` to create a new message.
  */
 export const SetPanelDecoySourceResponseSchema: GenMessage<SetPanelDecoySourceResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 28);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 29);
 
 /**
  * @generated from message mistgate.decoysite.v1.RevertDecoySiteRequest
@@ -921,7 +976,7 @@ export type RevertDecoySiteRequest = Message<"mistgate.decoysite.v1.RevertDecoyS
  * Use `create(RevertDecoySiteRequestSchema)` to create a new message.
  */
 export const RevertDecoySiteRequestSchema: GenMessage<RevertDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 29);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 30);
 
 /**
  * @generated from message mistgate.decoysite.v1.RevertDecoySiteResponse
@@ -943,7 +998,7 @@ export type RevertDecoySiteResponse = Message<"mistgate.decoysite.v1.RevertDecoy
  * Use `create(RevertDecoySiteResponseSchema)` to create a new message.
  */
 export const RevertDecoySiteResponseSchema: GenMessage<RevertDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 30);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 31);
 
 /**
  * @generated from message mistgate.decoysite.v1.DeleteDecoySiteRequest
@@ -960,7 +1015,7 @@ export type DeleteDecoySiteRequest = Message<"mistgate.decoysite.v1.DeleteDecoyS
  * Use `create(DeleteDecoySiteRequestSchema)` to create a new message.
  */
 export const DeleteDecoySiteRequestSchema: GenMessage<DeleteDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 31);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 32);
 
 /**
  * @generated from message mistgate.decoysite.v1.DeleteDecoySiteResponse
@@ -973,7 +1028,7 @@ export type DeleteDecoySiteResponse = Message<"mistgate.decoysite.v1.DeleteDecoy
  * Use `create(DeleteDecoySiteResponseSchema)` to create a new message.
  */
 export const DeleteDecoySiteResponseSchema: GenMessage<DeleteDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 32);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 33);
 
 /**
  * @generated from message mistgate.decoysite.v1.DownloadDecoySiteRequest
@@ -997,7 +1052,7 @@ export type DownloadDecoySiteRequest = Message<"mistgate.decoysite.v1.DownloadDe
  * Use `create(DownloadDecoySiteRequestSchema)` to create a new message.
  */
 export const DownloadDecoySiteRequestSchema: GenMessage<DownloadDecoySiteRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 33);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 34);
 
 /**
  * @generated from message mistgate.decoysite.v1.DownloadDecoySiteResponse
@@ -1019,7 +1074,7 @@ export type DownloadDecoySiteResponse = Message<"mistgate.decoysite.v1.DownloadD
  * Use `create(DownloadDecoySiteResponseSchema)` to create a new message.
  */
 export const DownloadDecoySiteResponseSchema: GenMessage<DownloadDecoySiteResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 34);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 35);
 
 /**
  * @generated from message mistgate.decoysite.v1.ListDecoyPagesRequest
@@ -1041,7 +1096,7 @@ export type ListDecoyPagesRequest = Message<"mistgate.decoysite.v1.ListDecoyPage
  * Use `create(ListDecoyPagesRequestSchema)` to create a new message.
  */
 export const ListDecoyPagesRequestSchema: GenMessage<ListDecoyPagesRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 35);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 36);
 
 /**
  * @generated from message mistgate.decoysite.v1.ListDecoyPagesResponse
@@ -1070,7 +1125,7 @@ export type ListDecoyPagesResponse = Message<"mistgate.decoysite.v1.ListDecoyPag
  * Use `create(ListDecoyPagesResponseSchema)` to create a new message.
  */
 export const ListDecoyPagesResponseSchema: GenMessage<ListDecoyPagesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 36);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 37);
 
 /**
  * @generated from message mistgate.decoysite.v1.GetDecoyPagePreviewRequest
@@ -1106,7 +1161,7 @@ export type GetDecoyPagePreviewRequest = Message<"mistgate.decoysite.v1.GetDecoy
  * Use `create(GetDecoyPagePreviewRequestSchema)` to create a new message.
  */
 export const GetDecoyPagePreviewRequestSchema: GenMessage<GetDecoyPagePreviewRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 37);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 38);
 
 /**
  * @generated from message mistgate.decoysite.v1.GetDecoyPagePreviewResponse
@@ -1128,7 +1183,7 @@ export type GetDecoyPagePreviewResponse = Message<"mistgate.decoysite.v1.GetDeco
  * Use `create(GetDecoyPagePreviewResponseSchema)` to create a new message.
  */
 export const GetDecoyPagePreviewResponseSchema: GenMessage<GetDecoyPagePreviewResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 38);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 39);
 
 /**
  * @generated from message mistgate.decoysite.v1.GetDecoyFileRequest
@@ -1155,7 +1210,7 @@ export type GetDecoyFileRequest = Message<"mistgate.decoysite.v1.GetDecoyFileReq
  * Use `create(GetDecoyFileRequestSchema)` to create a new message.
  */
 export const GetDecoyFileRequestSchema: GenMessage<GetDecoyFileRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 39);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 40);
 
 /**
  * @generated from message mistgate.decoysite.v1.GetDecoyFileResponse
@@ -1182,7 +1237,7 @@ export type GetDecoyFileResponse = Message<"mistgate.decoysite.v1.GetDecoyFileRe
  * Use `create(GetDecoyFileResponseSchema)` to create a new message.
  */
 export const GetDecoyFileResponseSchema: GenMessage<GetDecoyFileResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_decoysite_v1_decoysite, 40);
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 41);
 
 /**
  * The library of decoy sites: the static sites the owner (or the assistant, or an MCP agent) keeps in the panel and puts on nodes
@@ -1342,7 +1397,8 @@ export const DecoySiteService: GenService<{
     output: typeof DownloadDecoySiteResponseSchema;
   },
   /**
-   * The HTML pages and all files (with sizes) of a version.
+   * The HTML pages and all files (with sizes) of a version. site_id may also be the built-in entries "builtin" (the Mistgate page)
+   * and "panel_dir" (the panel's --decoy-dir, a snapshot under the limits of a copy to nodes); seq is ignored for them.
    *
    * @generated from rpc mistgate.decoysite.v1.DecoySiteService.ListDecoyPages
    */
@@ -1353,7 +1409,7 @@ export const DecoySiteService: GenService<{
   },
   /**
    * One HTML page as a single self-contained document for <iframe sandbox="" srcdoc>: styles inlined, local images as data: URIs,
-   * scripts removed, links made inert (the page they lead to is in data-page), nothing external loads.
+   * scripts removed, links made inert (the page they lead to is in data-page), nothing external loads. site_id as in ListDecoyPages.
    *
    * @generated from rpc mistgate.decoysite.v1.DecoySiteService.GetDecoyPagePreview
    */
@@ -1363,7 +1419,7 @@ export const DecoySiteService: GenService<{
     output: typeof GetDecoyPagePreviewResponseSchema;
   },
   /**
-   * The text of one text file of a version (the first 256 KiB).
+   * The text of one text file of a version (the first 256 KiB). site_id as in ListDecoyPages.
    *
    * @generated from rpc mistgate.decoysite.v1.DecoySiteService.GetDecoyFile
    */

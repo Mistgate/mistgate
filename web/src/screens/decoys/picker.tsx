@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { isDraft, sitesQuery } from "@/lib/decoysites";
@@ -11,9 +12,10 @@ import "./decoys.css";
 /**
  * The choice of one ready site of the library (the board's "Site from the library" on a node's Server tab): the sites as a radio list,
  * each with its miniature, its name and note and where it stands, a link to open it, and a link to all of them. A draft is not
- * offered: it cannot be put on a node. The window of the Nodes page's bulk change and the node's own card use it.
+ * offered: it cannot be put on a node. The window of the Nodes page's bulk change and the node's own card use it; `children` go
+ * under the list (the node's card puts its drop zone for an archive there).
  */
-export function LibraryPicker({ value, onChange, disabled }: { value: string; onChange: (siteId: string) => void; disabled?: boolean }) {
+export function LibraryPicker({ value, onChange, disabled, children }: { value: string; onChange: (siteId: string) => void; disabled?: boolean; children?: ReactNode }) {
   const t = useT();
   const q = useQuery(sitesQuery);
   const sites = (q.data?.sites ?? []).filter((s) => !isDraft(s));
@@ -50,6 +52,7 @@ export function LibraryPicker({ value, onChange, disabled }: { value: string; on
           ))}
         </div>
       )}
+      {children}
     </div>
   );
 }

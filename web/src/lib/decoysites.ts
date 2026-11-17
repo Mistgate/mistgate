@@ -1,6 +1,6 @@
 import { ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
-import type { DecoyBuiltinItem, DecoyCheck, DecoyFileInfo, DecoySite, DecoySiteNode, DecoyVersion, GetDecoySiteResponse, ListDecoySitesResponse } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
+import type { DecoyBuiltinItem, DecoyCheck, DecoyFileInfo, DecoyPanelState, DecoySite, DecoySiteNode, DecoyVersion, GetDecoySiteResponse, ListDecoySitesResponse } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
 import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
@@ -19,6 +19,7 @@ export type SiteCheck = Plain<DecoyCheck>;
 export type SiteFile = Plain<DecoyFileInfo>;
 export type SiteNode = Plain<DecoySiteNode>;
 export type BuiltinItem = Plain<DecoyBuiltinItem>;
+export type PanelState = Plain<DecoyPanelState>;
 export type Library = Plain<ListDecoySitesResponse>;
 export type SiteDetail = Plain<GetDecoySiteResponse>;
 export type Node = Plain<NodeMsg>;
@@ -39,6 +40,9 @@ export function panelSourceOf(source: string): { kind: "builtin" | "dir" | "site
 
 // ---- queries (the panel is polled like the rest of the admin; a new draft from the assistant or an agent shows up by itself)
 
+/** How long what the panel read of a version is kept: a version never changes; the panel's directory changes on its server. */
+const keptFor = (id: string) => (id === panelDirId ? 10_000 : Infinity);
+
 export const sitesQuery = queryOptions({
   queryKey: ["decoy-sites"],
   queryFn: async ({ signal }) => plain(await decoySites.listDecoySites({}, { signal })),
@@ -54,12 +58,13 @@ export const siteQuery = (id: string) =>
     retry: false,
   });
 
-/** The pages and files of the current version; `sha` is part of the key, so a new version is asked for again. */
+/** The pages and files of the current version (or of a built-in entry, by its id); `sha` is part of the key, so a new version is asked for again. */
 export const pagesQuery = (id: string, sha: string) =>
   queryOptions({
     queryKey: ["decoy-pages", id, sha],
     queryFn: async ({ signal }) => plain(await decoySites.listDecoyPages({ siteId: id, seq: 0 }, { signal })),
-    staleTime: Infinity,
+    staleTime: keptFor(id),
+    retry: false,
   });
 
 /** One page as a self-contained document for <iframe sandbox="" srcdoc>. A version never changes, so the document is kept by its hash. */
@@ -67,7 +72,7 @@ export const previewQuery = (id: string, sha: string, path: string, notFound: bo
   queryOptions({
     queryKey: ["decoy-preview", id, sha, path, notFound],
     queryFn: async ({ signal }) => (await decoySites.getDecoyPagePreview({ siteId: id, seq: 0, path, notFound }, { signal })).html,
-    staleTime: Infinity,
+    staleTime: keptFor(id),
     gcTime: 10 * 60_000,
     retry: false,
   });
@@ -77,7 +82,7 @@ export const fileQuery = (id: string, sha: string, path: string) =>
   queryOptions({
     queryKey: ["decoy-file", id, sha, path],
     queryFn: async ({ signal }) => plain(await decoySites.getDecoyFile({ siteId: id, seq: 0, path }, { signal })),
-    staleTime: Infinity,
+    staleTime: keptFor(id),
     retry: false,
   });
 
@@ -150,18 +155,14 @@ export function deliveryHint(t: T, d: Delivery): string {
   return isDecoyReason(d.reason) ? t(`decoy.reason.${d.reason}` as MessageKey) : t("decoy.reason.unknown", { code: d.reason });
 }
 
+/** Why the panel serves something other than what was chosen, as the key of its words ("" when it serves the choice). */
+export const panelFallbackKey = (p: Pick<PanelState, "reasonCode"> | undefined): MessageKey | "" => (p?.reasonCode ? (`dz.now.fb.${p.reasonCode}` as MessageKey) : "");
+
 /** What a node serves now, for the "Showing now" strip and the assign window: the entry, and the site it stands on. */
 export function nodeServes(n: Pick<Node, "decoyMode" | "decoySiteId">): { kind: "builtin" | "dir" | "site"; siteId: string } {
   const mode = asDecoyMode(n.decoyMode);
   if (mode === "own") return { kind: "site", siteId: n.decoySiteId };
   return { kind: mode === "panel" ? "dir" : "builtin", siteId: "" };
-}
-
-/** The registrable part of an address as the page can tell it (the last two labels; an IP stands alone): the server's list is longer (public suffixes). */
-export function linkKey(address: string, id: string): string {
-  const host = address.toLowerCase().replace(/^\[|\](?::\d+)?$/g, "").replace(/:\d+$/, "").replace(/\.$/, "");
-  if (!host || /^[\d.]+$/.test(host) || host.includes(":")) return `node:${id}`;
-  return host.split(".").slice(-2).join(".");
 }
 
 // ---- the files of a site
@@ -306,10 +307,3 @@ export function saveBytes(filename: string, bytes: Uint8Array, type = "applicati
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-// ---- the built-in page, for its preview (the library has no call that returns it: this is a copy of internal/decoy/decoy.go)
-
-export const builtinPreviewDoc = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Coming soon</title>
-<style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font:16px/1.5 system-ui,sans-serif;color:#444;background:#fafafa}main{text-align:center;padding:1rem}h1{font-weight:500;margin:0 0 .5rem}p{margin:0;color:#888}</style>
-</head><body><main><h1>Coming soon</h1><p>Something new is on its way.</p></main></body></html>`;

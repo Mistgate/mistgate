@@ -171,6 +171,27 @@
 .sv-save.off > span {
   color: var(--sec);
 }
+/* "Open the site" in the bar: between the words and Apply, the free space on both sides of it */
+.sv-save .dz-open {
+  margin-inline-start: auto;
+}
+.sv-save .dz-open + button {
+  margin-inline-start: 0;
+}
+/* the library's choice under the options of the decoy site (the board's .dz-pk inside .sv-c), its notes under it */
+.sv-c > .dz-pk {
+  margin: -8px 24px 20px;
+}
+.sv-c > .dz-pk .sv-drop {
+  margin: 0;
+  padding: 16px;
+  animation: none;
+}
+.sv-warns {
+  display: grid;
+  gap: 8px;
+  margin: 0 24px 20px;
+}
 
 /* the channel */
 .sv-ch {
@@ -946,6 +967,10 @@
   }
   .sv-drop {
     margin: 0 16px 16px;
+  }
+  .sv-c > .dz-pk,
+  .sv-warns {
+    margin-inline: 16px;
   }
   .sv-oh {
     padding: 16px;

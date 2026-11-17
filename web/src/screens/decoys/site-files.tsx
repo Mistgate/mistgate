@@ -23,9 +23,10 @@ export type FilesDemo = { file?: string; open?: readonly string[] };
 /**
  * The files of the current version (the board's .dz-fs): the tree with sizes on the left, the text of the chosen file on the
  * right. A draft lets one file be replaced or deleted (a new version of the draft); a ready site is changed by an archive.
- * A directory with many files folds the rest into "N more files", which opens on a click.
+ * A directory with many files folds the rest into "N more files", which opens on a click. The panel's directory (id "panel_dir")
+ * is read the same way and cannot be changed here: it has no hash of its own.
  */
-export function FilesCard({ site, files, demo }: { site: Site; files: readonly SiteFile[]; demo?: FilesDemo }) {
+export function FilesCard({ site, files, demo }: { site: Pick<Site, "id" | "state" | "checks" | "fileCount" | "sizeBytes" | "bundleSha256">; files: readonly SiteFile[]; demo?: FilesDemo }) {
   const t = useT();
   const fmt = useFmt();
   const toast = useToast();
@@ -78,9 +79,11 @@ export function FilesCard({ site, files, demo }: { site: Site; files: readonly S
     <DzCard className="dz-fs" data-shot="decoy-files">
       <CardHead title={t("dz.files")}>
         <span className="dz-lc dz-m">{t.n("dz.files.sum", site.fileCount, { size: fmt.bytes(site.sizeBytes, 1024) })}</span>
-        <span className="dz-lc dz-m dz-sha" title={t("dz.shaTitle")} dir="ltr">
-          {t("dz.sha", { sha: site.bundleSha256.slice(0, 8) })}
-        </span>
+        {site.bundleSha256 && (
+          <span className="dz-lc dz-m dz-sha" title={t("dz.shaTitle")} dir="ltr">
+            {t("dz.sha", { sha: site.bundleSha256.slice(0, 8) })}
+          </span>
+        )}
       </CardHead>
       <div className="dz-fsb">
         <ul className="dz-tree" role="listbox" aria-label={t("dz.tree")}>

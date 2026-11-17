@@ -13,10 +13,10 @@ import {
   deliveryOf,
   filterSites,
   isBad,
-  linkKey,
   nameFromFile,
   nodeServes,
   pageLabel,
+  panelFallbackKey,
   panelSourceOf,
   treeRows,
   uploadError,
@@ -88,11 +88,10 @@ describe("what a node or the panel shows", () => {
     expect(panelSourceOf("dir").kind).toBe("dir");
     expect(panelSourceOf("").kind).toBe("builtin");
   });
-  it("ties nodes by the last two labels of an address, an IP stands alone", () => {
-    expect(linkKey("de1.example.com", "a")).toBe(linkKey("nl1.example.com", "b"));
-    expect(linkKey("de1.example.com", "a")).not.toBe(linkKey("de1.example.net", "a"));
-    expect(linkKey("203.0.113.7", "a")).toBe("node:a");
-    expect(linkKey("[2001:db8::1]:443", "a")).toBe("node:a");
+  it("words why the panel shows something else than it was told to, and says nothing when it shows the choice", () => {
+    expect(panelFallbackKey({ reasonCode: "decoy_site_draft" })).toBe("dz.now.fb.decoy_site_draft");
+    expect(panelFallbackKey({ reasonCode: "" })).toBe("");
+    expect(panelFallbackKey(undefined)).toBe("");
   });
 });
 

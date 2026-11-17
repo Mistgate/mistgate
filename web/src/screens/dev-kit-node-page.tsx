@@ -27,6 +27,9 @@ import { WarpSource } from "@/gen/mistgate/admin/v1/common_pb";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { LogLevel } from "@/gen/mistgate/admin/v1/node_pb";
 import { fleet as fleetApi, nodes as nodesApi, warp as warpApi } from "@/lib/api";
+import { sitesQuery } from "@/lib/decoysites";
+import { cardDemo } from "./node/decoy";
+import { installLibrary } from "./dev-kit-decoys";
 import { warpQuery } from "./node/warp-model";
 import { nodeDnsOptionsQuery } from "./node/dns-options";
 import { dnsPresetsQuery } from "./subscriptions/queries";
@@ -39,7 +42,8 @@ import { osUpdatesQuery } from "@/lib/os-updates";
 // each in a frame of its own width (an iframe, so the window's breakpoints answer to the frame), inside the real shell. Each frame is
 // a page of its own: /dev-kit?only=nodepage-frame&tab=<tab>&state=<state>
 //   calm | alerts | many | high | limit | down | new | retired | viewer | edge | via | entry
-// `fx=1` turns the reveal animation on. Made-up data: nodes de1, nl1, fi1, msk1, people alice, dave, bob, a panel called owner.
+// `fx=1` turns the reveal animation on. The decoy site card (?tab=server&sv=site) takes `ds=panel|own|pending|offline|failed|old|none|pick|warn|
+// empty` for the states of its choice and its delivery. Made-up data: nodes de1, nl1, fi1, msk1, people alice, dave, bob, a panel called owner.
 
 const NOW = Math.floor(Date.now() / 1000);
 const H = 3600;
@@ -386,9 +390,40 @@ export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | 
     sourceStars: 298,
     stepUpUntilUnix: 0,
     edition: sp.edge ? "edge" : "vps",
-    unavailable: sp.edge ? ["health_checks"] : [],
+    unavailable: sp.edge ? ["health_checks", "decoy_own"] : [],
   } as never);
   return { qc, data };
+}
+
+/**
+ * The states of the decoy site card: what the node says (`node`), what the card starts with as if a click had brought it there
+ * (`demo`), and whether the library has no ready site. The node stands on the bakery, which stands on two nodes of two domains.
+ */
+function decoyScene(ds: string): { node: Record<string, unknown>; demo?: { mode?: "builtin" | "panel" | "own"; site?: string }; empty?: boolean } {
+  const own = { decoyMode: "own", decoySiteId: "dsi_bk", decoyAgentMode: "own" };
+  switch (ds) {
+    case "panel":
+      return { node: { decoyMode: "panel", decoyAgentMode: "panel" } };
+    case "own":
+      return { node: own };
+    case "pending":
+      return { node: { ...own, decoyAgentMode: "builtin", decoyReasonCode: "pending" } };
+    case "offline":
+      return { node: { ...own, decoyAgentMode: "builtin", decoyReasonCode: "node_offline" } };
+    case "failed":
+      return { node: { ...own, decoyAgentMode: "builtin", decoyReasonCode: "apply_failed" } };
+    case "old":
+      return { node: { ...own, decoyAgentMode: "builtin", decoyReasonCode: "agent_too_old", decoySupported: false } };
+    case "none":
+      return { node: { decoyMode: "own", decoySiteId: "", decoyAgentMode: "builtin", decoyReasonCode: "own_bundle_missing" } };
+    case "pick":
+      return { node: {}, demo: { mode: "own", site: "dsi_boat" } };
+    case "warn":
+      return { node: {}, demo: { mode: "own", site: "dsi_bk" } };
+    case "empty":
+      return { node: {}, demo: { mode: "own" }, empty: true };
+  }
+  return { node: {} };
 }
 
 /** One whole page of the scene, for a frame or a screenshot at the window's own width. */
@@ -411,6 +446,12 @@ export function NodePageFrame() {
         return {};
       };
     }
+    // the decoy site card: its library, and the state of the node it opens with
+    const decoy = decoyScene(params.get("ds") ?? "");
+    const library = installLibrary();
+    made.qc.setQueryData(sitesQuery.queryKey, (decoy.empty ? { ...library, sites: [] } : library) as never);
+    Object.assign(made.data.node, decoy.node, state === "edge" ? { decoyOwnAvailable: false } : {});
+    cardDemo.current = decoy.demo;
     return made;
   });
   return (
@@ -455,7 +496,20 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-server-ch", state: "calm", tab: "server", q: "sv=ch", title: "Server: bandwidth", w: 1440, h: 700 },
   { id: "node-server-ag", state: "calm", tab: "server", q: "sv=ag", title: "Server: the agent and the link", w: 1440, h: 900 },
   { id: "node-server-ssh", state: "calm", tab: "server", q: "sv=ssh", title: "Server: SSH access and the keys on the server", w: 1440, h: 1400 },
-  { id: "node-server-site", state: "calm", tab: "server", q: "sv=site", title: "Server: the decoy site", w: 1440, h: 900 },
+  { id: "node-server-site", state: "calm", tab: "server", q: "sv=site", title: "Server: the decoy site, the built-in page applied", w: 1440, h: 900 },
+  { id: "node-server-site-panel", state: "calm", tab: "server", q: "sv=site&ds=panel", title: "Server: the decoy site, the panel's site applied", w: 1440, h: 900 },
+  { id: "node-server-site-own", state: "calm", tab: "server", q: "sv=site&ds=own", title: "Server: the decoy site, a site of the library applied", w: 1440, h: 1500 },
+  { id: "node-server-site-pick", state: "calm", tab: "server", q: "sv=site&ds=pick", title: "Server: a site of the library chosen, not applied yet", w: 1440, h: 1500 },
+  { id: "node-server-site-warn", state: "calm", tab: "server", q: "sv=site&ds=warn", title: "Server: the dry run warns (nodes of different domains, notes of the site)", w: 1440, h: 1700 },
+  { id: "node-server-site-none", state: "calm", tab: "server", q: "sv=site&ds=none", title: "Server: own site, none chosen yet", w: 1440, h: 1500 },
+  { id: "node-server-site-empty", state: "calm", tab: "server", q: "sv=site&ds=empty", title: "Server: own site, the library has no ready site", w: 1440, h: 900 },
+  { id: "node-server-site-pending", state: "calm", tab: "server", q: "sv=site&ds=pending", title: "Server: the site is on its way to the node", w: 1440, h: 1500 },
+  { id: "node-server-site-offline", state: "calm", tab: "server", q: "sv=site&ds=offline", title: "Server: the node is offline, it gets the site when it is back", w: 1440, h: 1500 },
+  { id: "node-server-site-failed", state: "calm", tab: "server", q: "sv=site&ds=failed", title: "Server: the last delivery failed", w: 1440, h: 1500 },
+  { id: "node-server-site-old", state: "calm", tab: "server", q: "sv=site&ds=old", title: "Server: the agent is too old for decoy sites", w: 1440, h: 1500 },
+  { id: "node-server-site-viewer", state: "viewer", tab: "server", q: "sv=site&ds=own", title: "Server: the decoy site, a read-only role", w: 1440, h: 1500 },
+  { id: "node-server-site-edge", state: "edge", tab: "server", q: "sv=site", title: "Server: the decoy site in the Cloudflare edition, no own site", w: 1440, h: 900 },
+  { id: "node-server-site-phone", state: "calm", tab: "server", q: "sv=site&ds=own", title: "Server: the decoy site on a phone, 400 wide", w: 400, h: 2000 },
   { id: "node-server-awg", state: "calm", tab: "server", q: "sv=awg", title: "Server: the AmneziaWG backend", w: 1440, h: 800 },
   { id: "node-server-sys-ok", state: "calm", tab: "server", q: "sv=sys&os=ok", title: "Server: the system is up to date, and the host", w: 1440, h: 1200 },
   { id: "node-server-sys-upd", state: "alerts", tab: "server", q: "sv=sys&os=upd", title: "Server: updates wait", w: 1440, h: 1200 },

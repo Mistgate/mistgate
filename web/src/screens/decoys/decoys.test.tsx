@@ -88,6 +88,8 @@ const node = (name: string, over: Record<string, unknown> = {}) => ({
 const library = (sites: ReturnType<typeof site>[], over: Record<string, unknown> = {}) => ({
   sites,
   builtin: [{ id: "builtin", available: true, reasonCode: "", nodeCount: 1, onPanel: false }, { id: "panel_dir", available: true, reasonCode: "", nodeCount: 0, onPanel: false }],
+  // the panel's row: what it was told to show and, unless a test says otherwise, that is what it shows
+  panel: { address: "panel.example.com", serving: (over.panelSource as string | undefined) ?? "builtin", reasonCode: "" },
   panelSource: "builtin", siteLimit: 100, versionLimit: 5, ...over,
 });
 
@@ -140,6 +142,14 @@ describe("the list", () => {
     site("bt", { name: "Boats", note: "boat rental", source: "mcp", sourceLabel: "claude-desktop" }),
   ];
   const nodes = [node("de1"), node("nl1", { decoyMode: "own", decoySiteId: "dsi_bk" }), node("fi1", { decoyMode: "own", decoySiteId: "dsi_bk", decoyReasonCode: "pending" })];
+
+  it("says when the panel shows something else than it was told to: the chosen site is a draft again", async () => {
+    await mountUi(list(), { lib: library(sites, { panelSource: "site:dsi_ph", panel: { address: "panel.example.com", serving: "dir", reasonCode: "decoy_site_draft" } }), nodes });
+    const panel = [...document.querySelectorAll("[data-shot=decoy-now] .dz-nw")].find((c) => c.textContent?.includes(en["dz.now.panel"]))!;
+    expect(panel.textContent).toContain(en["dz.now.dir"]);
+    expect(panel.textContent).toContain(en["dz.now.fb.decoy_site_draft"]);
+    expect(panel.textContent).not.toContain("Studio");
+  });
 
   it("shows what stands on each node, the built-in entries and the own sites", async () => {
     await mountUi(list(), { lib: library(sites, { panelSource: "site:dsi_wd" }), nodes });
@@ -363,7 +373,7 @@ describe("the page of a site", () => {
   const used = { site: site("a", { name: "Bakery", nodeCount: 2, checks: checks([{ code: "external_urls", level: "warning", ok: false, paths: ["css/style.css"] }]) }), nodes: [
     { nodeId: "nod_nl1", nodeName: "nl1", reasonCode: "", supported: true, agentSha256: "" },
     { nodeId: "nod_fi1", nodeName: "fi1", reasonCode: "pending", supported: true, agentSha256: "" },
-  ] };
+  ], sharedDomains: { code: "shared_domains", level: "warning", ok: false, paths: ["fi1", "nl1"] } };
   const free = { site: site("c", { name: "Boats" }) };
   const draft = { site: site("b", { name: "Studio", state: "draft" }) };
   const bad = { site: site("d", { name: "Backup", state: "draft", checks: checks().map((c) => (c.code === "index_html" ? { ...c, ok: false } : c)) }) };
@@ -382,7 +392,27 @@ describe("the page of a site", () => {
     const checksCard = document.querySelector("[data-shot=decoy-checks]")!;
     expect(checksCard.textContent).toContain(en["dz.ck.external_urls"]);
     expect(checksCard.textContent).toContain("css/style.css"); // the file that fired it
-    expect(checksCard.textContent).toContain(en["dz.ck.shared_domains"]); // two addresses of two domains
+    expect(checksCard.textContent).toContain(en["dz.ck.shared_domains"]); // the panel's own warning for the nodes it stands on
+    expect(checksCard.textContent).toContain("fi1, nl1");
+  });
+
+  it("does not count domains itself: no warning from the panel, none on the page, whatever the addresses are", async () => {
+    // fi1 is on another domain than nl1, but the panel says nothing
+    await mountUi(page("dsi_a"), { lib: lib(), nodes, detail: { ...used, sharedDomains: undefined } });
+    expect(document.querySelector("[data-shot=decoy-checks]")!.textContent).not.toContain(en["dz.ck.shared_domains"]);
+    expect(document.querySelector("[data-shot=decoy-checks]")!.textContent).not.toContain("fi1, nl1");
+    expect(document.querySelector("[data-shot=decoy-checks]")!.querySelectorAll("li.part")).toHaveLength(1); // only the external address
+  });
+
+  it("puts the panel's address on its row in the window that assigns", async () => {
+    await mountUi(page("dsi_c", { dialog: "as" }), { lib: library([site("c", { name: "Boats" })]), nodes, detail: free });
+    expect(document.querySelector(".dz-asl")!.textContent).toContain("panel.example.com");
+  });
+
+  it("puts the panel's address on its row", async () => {
+    await mountUi(page("dsi_w"), { lib: library([site("w", { name: "Joinery", onPanel: true })], { panelSource: "site:dsi_w" }), nodes, detail: { site: site("w", { name: "Joinery", onPanel: true }) } });
+    const row = [...document.querySelectorAll("[data-shot=decoy-placement] .dz-plr")].find((r) => r.textContent?.includes(en["dz.pl.panel"]))!;
+    expect(row.textContent).toContain("panel.example.com");
   });
 
   it("a draft cannot be assigned: no Assign button, 'Ready to install' instead, and the place says so", async () => {
@@ -513,7 +543,36 @@ describe("the page of a site", () => {
     expect(button(en["dz.act.more"])).toBeUndefined();
     expect(document.querySelector(`[aria-label="${en["dz.edit"]}"]`)).toBeNull();
     expect(api.getDecoySite).not.toHaveBeenCalled();
-    expect(document.querySelector("iframe")?.getAttribute("srcdoc")).toContain("Coming soon");
+    // the page comes from the panel under the id of the entry: the web keeps no copy of it
+    expect(api.getDecoyPagePreview).toHaveBeenCalledWith({ siteId: "builtin", seq: 0, path: "", notFound: false }, expect.anything());
+    expect(document.querySelector("iframe")?.getAttribute("srcdoc")).toBe("<p>home</p>");
+    expect(document.querySelector("[data-shot=decoy-files]")).toBeNull(); // one page: nothing to look through
+  });
+
+  it("shows the panel's directory for real: its pages, its files and the text of one, from the panel", async () => {
+    api.listDecoyPages.mockResolvedValue({ pages: ["index.html"], files: [{ path: "index.html", size: 138 }, { path: "css/site.css", size: 40 }], has404: false });
+    api.getDecoyPagePreview.mockResolvedValue({ html: "<p>Welcome</p>", path: "index.html" });
+    api.getDecoyFile.mockResolvedValue({ text: "<h1>Welcome</h1>", size: 138, truncated: false });
+    await mountUi(page("panel_dir"), { lib: lib(), nodes });
+    await settle();
+    expect(document.querySelector("iframe")?.getAttribute("srcdoc")).toBe("<p>Welcome</p>");
+    const files = document.querySelector("[data-shot=decoy-files]")!;
+    expect(files.textContent).toContain("css/site.css");
+    expect(files.textContent).toContain("<h1>Welcome</h1>");
+    expect(api.getDecoyFile).toHaveBeenCalledWith({ siteId: "panel_dir", seq: 0, path: "index.html" }, expect.anything());
+    expect(files.textContent).not.toContain("sha256"); // the directory has no hash of its own
+    expect(button(en["dz.v.replace"])).toBeUndefined(); // and cannot be changed here
+    expect(api.getDecoySite).not.toHaveBeenCalled();
+  });
+
+  it("says why the panel's directory cannot be shown, in the frame", async () => {
+    api.listDecoyPages.mockRejectedValue(new ConnectError("panel_too_large", Code.FailedPrecondition));
+    api.getDecoyPagePreview.mockRejectedValue(new ConnectError("panel_too_large", Code.FailedPrecondition));
+    await mountUi(page("panel_dir"), { lib: library([site("a")], { builtin: [{ id: "builtin", available: true, reasonCode: "", nodeCount: 0, onPanel: false }, { id: "panel_dir", available: false, reasonCode: "panel_too_large", nodeCount: 0, onPanel: false }] }), nodes });
+    await settle();
+    expect(document.querySelector(".dz-fr")!.textContent).toContain(en["dz.pv.failed"]);
+    expect(document.querySelector(".dz-fr")!.textContent).toContain(en["err.panel_too_large"]);
+    expect(document.querySelector("[data-shot=decoy-files]")).toBeNull();
   });
 
   it("draws the preview in a frame with no permissions at all", async () => {

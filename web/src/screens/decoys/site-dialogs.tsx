@@ -45,6 +45,7 @@ export function AssignDialog({
   target,
   nodes,
   panelSource,
+  panelAddress,
   siteName,
   standsOn,
   onClose,
@@ -53,6 +54,8 @@ export function AssignDialog({
   target: AssignTarget;
   nodes: readonly Node[];
   panelSource: string;
+  /** The address the panel answers on, under its row; empty when the panel does not know it. */
+  panelAddress?: string;
   siteName: (id: string) => string;
   /** The nodes (and the panel as "panel") the target already stands on: their rows are locked. */
   standsOn: ReadonlySet<string>;
@@ -185,6 +188,11 @@ export function AssignDialog({
               </span>
               <div>
                 <b>{t("dz.pl.panel")}</b>
+                {panelAddress && (
+                  <span className="dz-m" dir="ltr">
+                    {panelAddress}
+                  </span>
+                )}
               </div>
               <em>
                 {standsOn.has("panel") ? t("dz.as.has") : t("dz.as.now")} {!standsOn.has("panel") && <span dir="auto">{nowFor("panel").text}</span>}

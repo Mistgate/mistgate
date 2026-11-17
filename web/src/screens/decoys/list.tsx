@@ -12,7 +12,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
-import { builtinId, countOfFilter, deliveryOf, filterSites, isBad, isDraft, isUsed, nodeServes, panelDirId, panelSourceOf, sitesQuery, siteFilters, warningsOf, type Node, type Site, type SiteFilter } from "@/lib/decoysites";
+import { builtinId, countOfFilter, deliveryOf, filterSites, isBad, isDraft, isUsed, nodeServes, panelDirId, panelFallbackKey, panelSourceOf, sitesQuery, siteFilters, warningsOf, type Node, type PanelState, type Site, type SiteFilter } from "@/lib/decoysites";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { nodesQuery } from "@/lib/queries";
@@ -115,7 +115,7 @@ export function DecoysScreen({ demo }: { demo?: DecoysDemo } = {}) {
         </div>
       ) : (
         <>
-          <Showing nodes={liveNodes(nodes.data?.nodes)} sites={sites} panelSource={lib.data.panelSource} ready={nodes.isSuccess} />
+          <Showing nodes={liveNodes(nodes.data?.nodes)} sites={sites} panelSource={lib.data.panelSource} panel={lib.data.panel} ready={nodes.isSuccess} />
           <Builtins dirAvailable={lib.data.builtin.find((b) => b.id === "panel_dir")?.available ?? false} dirReason={lib.data.builtin.find((b) => b.id === "panel_dir")?.reasonCode ?? ""} />
           <Mine sites={sites} nodes={liveNodes(nodes.data?.nodes)} limit={limit} demo={demo} entrance={entrance} onWay={{ up: () => setDialog("up"), as: askNew, mcp: () => setDialog("mcp") }} />
         </>
@@ -130,11 +130,15 @@ export function DecoysScreen({ demo }: { demo?: DecoysDemo } = {}) {
 
 // ---- showing now
 
-/** What each node and the panel show now: the site, the built-in page or the panel's directory, with the delivery where it is not done. */
-export function Showing({ nodes, sites, panelSource, ready }: { nodes: readonly Node[]; sites: readonly Site[]; panelSource: string; ready: boolean }) {
+/**
+ * What each node and the panel show now: the site, the built-in page or the panel's directory, with the delivery where it is not done.
+ * The panel says itself what it shows: a chosen site that is gone or is a draft is not shown, and the card says what stands instead.
+ */
+export function Showing({ nodes, sites, panelSource, panel: panelState, ready }: { nodes: readonly Node[]; sites: readonly Site[]; panelSource: string; panel?: PanelState; ready: boolean }) {
   const t = useT();
   const byId = new Map(sites.map((s) => [s.id, s]));
-  const panel = panelSourceOf(panelSource);
+  const panel = panelSourceOf(panelState?.serving || panelSource);
+  const fallback = panelFallbackKey(panelState);
   const cells = [
     ...nodes.map((n) => ({ key: n.id, node: n, serves: nodeServes(n) })),
     { key: "panel", node: undefined, serves: { kind: panel.kind, siteId: panel.siteId } },
@@ -153,6 +157,7 @@ export function Showing({ nodes, sites, panelSource, ready }: { nodes: readonly 
           const site = c.serves.kind === "site" ? byId.get(c.serves.siteId) : undefined;
           const d = c.node ? deliveryOf({ reasonCode: c.node.decoyReasonCode, supported: c.node.decoySupported }) : undefined;
           const to = site ? site.id : c.serves.kind === "dir" ? panelDirId : builtinId;
+          const fb = c.node ? "" : fallback;
           return (
             <SiteLink key={c.key} id={to} className="dz-nw">
               <span className="dz-nwh">
@@ -173,7 +178,14 @@ export function Showing({ nodes, sites, panelSource, ready }: { nodes: readonly 
               ) : c.serves.kind === "dir" ? (
                 <>
                   <b>{t("dz.now.dir")}</b>
-                  <em>{t("dz.now.dirSub")}</em>
+                  {fb ? (
+                    <em className="w">
+                      <Gl kind="part" />
+                      {t(fb)}
+                    </em>
+                  ) : (
+                    <em>{t("dz.now.dirSub")}</em>
+                  )}
                 </>
               ) : c.serves.kind === "site" ? (
                 <>
@@ -188,7 +200,7 @@ export function Showing({ nodes, sites, panelSource, ready }: { nodes: readonly 
                   <b>{t("dz.now.builtin")}</b>
                   <em className="w">
                     <Gl kind="part" />
-                    {t("dz.now.builtinSub")}
+                    {fb ? t(fb) : t("dz.now.builtinSub")}
                   </em>
                 </>
               )}

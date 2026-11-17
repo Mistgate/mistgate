@@ -9,7 +9,7 @@ import { asSource, CardHead, DeliveryWord, DzCard, Gl, TargetMark, usageText, wh
 
 // The right-hand column of a site's page: where it stands, what its checks say, its versions, and a few facts.
 
-export type Place = { key: string; panel?: boolean; node?: Node; name: string; delivery: Delivery };
+export type Place = { key: string; panel?: boolean; node?: Node; name: string; address?: string; delivery: Delivery };
 
 /** Where the site stands: the nodes with the delivery of each, the panel, and "Take off" on a row of a site that can be taken off. */
 export function PlacementCard({ places, draft, onOff }: { places: readonly Place[]; draft: boolean; onOff?: (p: Place) => void }) {
@@ -29,9 +29,9 @@ export function PlacementCard({ places, draft, onOff }: { places: readonly Place
             <TargetMark node={p.node} panel={p.panel} />
             <div>
               <b className={p.panel ? "" : "dz-m"}>{p.panel ? t("dz.pl.panel") : p.name}</b>
-              {p.node?.address && (
+              {(p.node?.address ?? p.address) && (
                 <span className="dz-m" dir="ltr">
-                  {p.node.address}
+                  {p.node?.address ?? p.address}
                 </span>
               )}
             </div>
@@ -61,10 +61,10 @@ export type CheckLines = { required: CheckLine[]; warnings: CheckLine[]; passed:
 /**
  * What the checks of a version say, as lines. The required ones are the bundle rules (the panel keeps no version that breaks
  * them, so they read as passed, unless a page is shown one that does); the warnings are the ones that fired, with the files that
- * fired them; the passed warnings are folded away. "Stands on nodes of different domains" is the page's own reading of the
- * addresses of the nodes (the panel decides it for sure when the site is assigned).
+ * fired them; the passed warnings are folded away. "Stands on nodes of different domains" is the panel's own, among the checks the
+ * caller hands in (its paths are the names of the nodes).
  */
-export function checkLines(t: T, fmt: Fmt, site: Pick<Site, "checks" | "source" | "sizeBytes" | "fileCount">, domains: readonly string[]): CheckLines {
+export function checkLines(t: T, fmt: Fmt, site: Pick<Site, "checks" | "source" | "sizeBytes" | "fileCount">): CheckLines {
   const find = (code: string): SiteCheck | undefined => site.checks.find((c) => c.level === "required" && c.code === code);
   const ok = (code: string) => find(code)?.ok ?? true;
   const sizeOk = ok("size") && ok("file_count");
@@ -74,7 +74,6 @@ export function checkLines(t: T, fmt: Fmt, site: Pick<Site, "checks" | "source" 
     ok("safe_paths") ? { kind: "ok", title: t("dz.ck.pathsOk") } : { kind: "bad", title: t("dz.ck.pathsBad") },
   ];
   const fired = site.checks.filter((c) => c.level === "warning");
-  const shared = domains.length > 1 && !fired.some((c) => c.code === "shared_domains");
   const warnings: CheckLine[] = fired.map((c) => {
     if (!isWarningCode(c.code)) return { kind: "part", title: t("dz.ck.unknown", { code: c.code }), mono: c.paths.join(", ") };
     return {
@@ -84,8 +83,7 @@ export function checkLines(t: T, fmt: Fmt, site: Pick<Site, "checks" | "source" 
       mono: c.paths.join(", "),
     };
   });
-  if (shared) warnings.push({ kind: "part", title: t("dz.ck.shared_domains"), text: t("dz.ck.shared_domains.s"), mono: domains.join(", ") });
-  const firedCodes = new Set([...fired.map((c) => c.code), ...(shared ? ["shared_domains"] : [])]);
+  const firedCodes = new Set(fired.map((c) => c.code));
   // "fewer than three pages" is asked of the assistant's sites only; the others are asked of every site
   const asked = warningCodes.filter((c) => c !== "few_pages" || asSource(site.source) === "assistant");
   const failed = required.some((l) => l.kind === "bad");

@@ -27,8 +27,8 @@ import { ShellLayout } from "./shell";
 // (an iframe, so the window's breakpoints answer to the frame); each frame is a page of its own, for the screenshot script and for the
 // side-by-side with the boards (PnDecoys, PnDecoy):
 //   /dev-kit?only=decoys-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&fx=1]
-// list states: list | list-delivery | list-empty | list-full | list-load | list-err | list-deny | list-edge | list-draft | list-used |
-//   list-free | list-find | list-nomatch
+// list states: list | list-delivery | list-panel-fb | list-empty | list-full | list-load | list-err | list-deny | list-edge | list-draft |
+//   list-used | list-free | list-find | list-nomatch
 // the windows of the list: dlg-new | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
 //   dlg-up-many | dlg-up-unsafe | dlg-up-fmt | dlg-up-noindex | dlg-mcp
 // page states: site-used | site-ready | site-draft | site-bad | site-builtin | site-dir | site-dir-off | site-way | site-fail | site-off |
@@ -40,6 +40,8 @@ import { ShellLayout } from "./shell";
 // The panel's calls are answered here (the scene installs a small stand-in for the library service), nothing leaves the page.
 
 const now = Math.floor(Date.now() / 1000);
+// the index.html of the made-up panel directory
+const PANEL_DIR_INDEX = ["<!doctype html>", "<html>", "<title>Welcome</title>", "<body>", "  <h1>Welcome</h1>", "  <span>This site is under construction</span>", "</body>", "</html>"].join("\n");
 const kb = 1024;
 
 type World = {
@@ -88,6 +90,8 @@ function worldOf(state: string): World {
   if (state === "site-dir" || state === "site-dir-off") w.serves = { ...w.serves, nod_de1: "panel" };
   if (state === "site-dir-off") w.dirOk = false;
   if (state === "site-builtin") w.panelSource = "builtin";
+  // the panel was told to show a site that is a draft again: it shows its directory, and says so
+  if (state === "list-panel-fb") w.panelSource = "site:dsi_bike";
   return w;
 }
 
@@ -107,8 +111,25 @@ function siteMsg(s: DemoSite, w: World): Site {
   } as Site;
 }
 
+/** The panel's row as the panel answers it: its address, what its listener serves, and why that is not the choice. */
+function panelOf(w: World) {
+  const chosen = w.panelSource;
+  const draft = chosen.startsWith("site:") && w.sites.find((s) => s.id === chosen.slice(5))?.state === "draft";
+  if (draft) return { address: "panel.example.com", serving: w.dirOk ? "dir" : "builtin", reasonCode: "decoy_site_draft" };
+  if (chosen === "dir" && !w.dirOk) return { address: "panel.example.com", serving: "builtin", reasonCode: "panel_unavailable" };
+  return { address: "panel.example.com", serving: chosen, reasonCode: "" };
+}
+
+/** The warning the panel computes for the nodes a site stands on now: more than one registrable domain among them. */
+function sharedOf(standing: string[]) {
+  const domain = (id: string) => demoNodes.find((n) => n.id === id)?.address.split(".").slice(-2).join(".");
+  if (new Set(standing.map(domain)).size < 2) return undefined;
+  return { code: "shared_domains", level: "warning", ok: false, paths: standing.map((id) => demoNodes.find((n) => n.id === id)?.name ?? id).sort() };
+}
+
 function libraryOf(w: World) {
   return {
+    panel: panelOf(w),
     sites: w.sites.map((s) => siteMsg(s, w)),
     builtin: [
       { id: "builtin", available: true, reasonCode: "", nodeCount: Object.values(w.serves).filter((v) => v === "builtin").length, onPanel: w.panelSource === "builtin" },
@@ -126,6 +147,8 @@ function detailOf(s: DemoSite, w: World) {
     site: siteMsg(s, w),
     versions: s.versions.map((v, i) => ({ seq: s.versions.length - i, bundleSha256: s.sha, createdUnix: now - v.agoS, createdBy: v.by, sizeBytes: v.bytes, fileCount: s.files, title: s.title, checks: checks(s), current: i === 0 })),
     files: s.tree.map(([path, k]) => ({ path, size: Math.round(k * kb) })),
+    panel: panelOf(w),
+    sharedDomains: sharedOf(standing),
     nodes: standing.map((id) => ({ nodeId: id, nodeName: demoNodes.find((n) => n.id === id)?.name ?? id, reasonCode: w.reasons[id] ?? "", supported: w.reasons[id] !== "agent_too_old", agentSha256: "" })),
   };
 }
@@ -157,17 +180,29 @@ function installFake(w: World) {
       return detailOf(s, w);
     },
     listDecoyPages: async ({ siteId }: { siteId: string }) => {
+      if (siteId === "builtin") return { pages: ["index.html"], files: [{ path: "index.html", size: 392 }], has404: false };
+      if (siteId === "panel_dir") {
+        if (!w.dirOk) throw new ConnectError("panel_unavailable", Code.FailedPrecondition);
+        return { pages: ["index.html"], files: [{ path: "index.html", size: PANEL_DIR_INDEX.length }], has404: false };
+      }
       const s = find(siteId)!;
       return { pages: pagesOf(s), files: s.tree.map(([path, k]) => ({ path, size: Math.round(k * kb) })), has404: s.has404 };
     },
     getDecoyPagePreview: async ({ siteId, path, notFound }: { siteId: string; path: string; notFound: boolean }) => {
+      if (siteId === "builtin" || siteId === "panel_dir") {
+        if (siteId === "panel_dir" && !w.dirOk) throw new ConnectError("panel_unavailable", Code.FailedPrecondition);
+        // a stand-in for the panel's answer: the built-in page is the panel's own text, which this scene does not carry
+        const [title, text] = siteId === "builtin" ? ["Coming soon", "Something new is on its way."] : ["Welcome", "This site is under construction"];
+        return { html: `<!doctype html><meta charset="utf-8"><body style="margin:0;height:100vh;display:grid;place-items:center;font:16px system-ui;color:#444;background:#fafafa;text-align:center"><main><h1 style="font-weight:500">${notFound ? "Not Found" : title}</h1><p style="color:#888">${notFound ? "" : text}</p></main>`, path: path || "index.html" };
+      }
       const s = find(siteId)!;
       const pages = pagesOf(s);
       const i = Math.max(0, pages.indexOf(path || "index.html"));
       const page = notFound ? (s.has404 ? 404 : "nf") : i === 0 ? 0 : i === pages.length - 1 ? 2 : 1;
       return { html: pageDoc(siteId.replace("dsi_", ""), page, 0), path };
     },
-    getDecoyFile: async ({ siteId, path }: { siteId: string; path: string }) => ({ text: fileText(siteId.replace("dsi_", ""), path), size: 1024, truncated: false }),
+    getDecoyFile: async ({ siteId, path }: { siteId: string; path: string }) =>
+      siteId === "panel_dir" ? { text: PANEL_DIR_INDEX, size: PANEL_DIR_INDEX.length, truncated: false } : { text: fileText(siteId.replace("dsi_", ""), path), size: 1024, truncated: false },
     assignDecoySite: async ({ siteId, nodeIds, panel }: { siteId: string; nodeIds: string[]; panel: boolean }) => {
       const s = find(siteId)!;
       const replaced = nodeIds.map((id) => {
@@ -179,12 +214,19 @@ function installFake(w: World) {
         replaced.push({ target: "panel", previous: src === "builtin" ? "builtin" : src === "dir" ? "dir" : "site", previousSiteId: src.startsWith("site:") ? src.slice(5) : "", previousSiteName: find(src.slice(5))?.name ?? "" });
       }
       const standing = Object.entries(w.serves).filter(([, v]) => v === s.id).map(([k]) => k);
-      const hosts = new Set([...standing, ...nodeIds].map((id) => demoNodes.find((n) => n.id === id)?.address.split(".").slice(-2).join(".")));
-      const warnings = [...checks(s).filter((c) => c.level === "warning"), ...(hosts.size > 1 && nodeIds.length ? [{ code: "shared_domains", level: "warning", ok: false, paths: [...new Set([...standing, ...nodeIds])].map((id) => demoNodes.find((n) => n.id === id)?.name ?? id).sort() }] : [])];
+      const shared = nodeIds.length ? sharedOf([...new Set([...standing, ...nodeIds])]) : undefined;
+      const warnings = [...checks(s).filter((c) => c.level === "warning"), ...(shared ? [shared] : [])];
       return { warnings, replaced, nodes: [], applied: false };
     },
   };
   Object.assign(decoySites, fake);
+}
+
+/** The made-up library the node page's card chooses from (the stand-in for the panel installed, the library it answers with). */
+export function installLibrary() {
+  const w = worldOf("list");
+  installFake(w);
+  return libraryOf(w);
 }
 
 function seeded(w: World) {
@@ -299,6 +341,7 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "decoys-list-phone", state: "list", title: "A phone, 400 wide", w: 400, h: 2400 },
   { id: "decoys-list-fa", state: "list", title: "Right to left (fa)", w: 1440, h: 1500, params: "&lang=fa" },
   { id: "decoys-list-delivery", state: "list-delivery", title: "Showing now with a delivery on its way, failed, offline", w: 1440, h: 900 },
+  { id: "decoys-list-panel-fb", state: "list-panel-fb", title: "Showing now: the site chosen for the panel is a draft, the directory is shown", w: 1440, h: 900 },
   { id: "decoys-list-empty", state: "list-empty", title: "No own site yet: the three ways", w: 1440, h: 900 },
   { id: "decoys-list-empty-phone", state: "list-empty", title: "No own site yet, a phone", w: 400, h: 1500 },
   { id: "decoys-list-full", state: "list-full", title: "The library is full: 100 of 100, the button is off", w: 1440, h: 1200 },

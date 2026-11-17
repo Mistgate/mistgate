@@ -23,10 +23,11 @@ import {
   isBad,
   isBuiltinId,
   isDraft,
-  linkKey,
   maxNameLen,
   maxNoteLen,
   nodeServes,
+  pagesQuery,
+  panelDirId,
   panelSourceOf,
   saveBytes,
   siteQuery,
@@ -182,10 +183,14 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
   const site = detail.data?.site;
   const files = detail.data?.files ?? [];
   const library = lib.data;
-  const panelSource = library?.panelSource ?? "builtin";
+  // what the panel shows now (the panel's own answer: a chosen site that is gone or a draft is not what it shows), and the address it answers on
+  const panelState = library?.panel ?? detail.data?.panel;
+  const panelSource = panelState?.serving || library?.panelSource || "builtin";
   const panel = panelSourceOf(panelSource);
   const dirItem = library?.builtin.find((b) => b.id === "panel_dir");
   const dirAvailable = dirItem?.available ?? false;
+  // the files of the panel's directory come from the panel the way a site's do
+  const dirFiles = useQuery({ ...pagesQuery(panelDirId, ""), enabled: fixed === "dir" && !edge && dirAvailable });
   const sitesById = new Map((library?.sites ?? []).map((s) => [s.id, s]));
   const siteName = (sid: string) => sitesById.get(sid)?.name ?? t("dz.now.noSite");
 
@@ -196,10 +201,10 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
       const s = nodeServes(n);
       if (s.kind === (fixed === "builtin" ? "builtin" : "dir")) places.push({ key: n.id, node: n, name: n.name, delivery: deliveryOf({ reasonCode: n.decoyReasonCode, supported: n.decoySupported }) });
     }
-    if (panel.kind === (fixed === "builtin" ? "builtin" : "dir")) places.push({ key: "panel", panel: true, name: t("dz.pl.panel"), delivery: { kind: "ok", word: "dz.dl.ok" } });
+    if (panel.kind === (fixed === "builtin" ? "builtin" : "dir")) places.push({ key: "panel", panel: true, name: t("dz.pl.panel"), address: panelState?.address, delivery: { kind: "ok", word: "dz.dl.ok" } });
   } else if (site) {
     for (const n of detail.data?.nodes ?? []) places.push({ key: n.nodeId, node: byId.get(n.nodeId), name: n.nodeName, delivery: deliveryOf({ reasonCode: n.reasonCode, supported: n.supported }) });
-    if (site.onPanel) places.push({ key: "panel", panel: true, name: t("dz.pl.panel"), delivery: { kind: "ok", word: "dz.dl.ok" } });
+    if (site.onPanel) places.push({ key: "panel", panel: true, name: t("dz.pl.panel"), address: panelState?.address, delivery: { kind: "ok", word: "dz.dl.ok" } });
   }
   const placeNodes = places.filter((p) => !p.panel).length;
   const placePanel = places.some((p) => p.panel);
@@ -258,8 +263,9 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
   const noteText = fixed ? t(fixed === "builtin" ? "dz.bi.builtinNote" : "dz.bi.dirNote") : (site?.note ?? "");
   const src = site ? asSource(site.source) : "upload";
   const canAssign = !draft;
-  const domains = [...new Set(places.filter((p) => p.node).map((p) => linkKey(p.node!.address, p.node!.id)))];
-  const lines = site ? checkLines(t, fmt, site, domains.length > 1 ? [...new Set(places.filter((p) => p.node).map((p) => p.node!.address))] : []) : undefined;
+  // the warning "stands on nodes of different domains" is the panel's own (the one an assignment shows), for the nodes it stands on now
+  const shared = detail.data?.sharedDomains;
+  const lines = site ? checkLines(t, fmt, shared ? { ...site, checks: [...site.checks, shared] } : site) : undefined;
   const banner = bad
     ? { kind: "bad" as const, title: t("dz.ban.bad"), text: lines?.required.some((l) => l.kind === "bad" && l.title === t("dz.ck.indexBad")) ? t("dz.ban.badText") : t("dz.ban.badOther") }
     : copied
@@ -401,6 +407,13 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
         <div className="dz-col">
           <PreviewCard id={id} sha={site?.bundleSha256 ?? ""} kind={fixed ?? "site"} bad={bad} demo={demo?.preview} />
           {site && files.length > 0 && <FilesCard site={site} files={files} demo={demo?.files} />}
+          {fixed === "dir" && dirFiles.data && dirFiles.data.files.length > 0 && (
+            <FilesCard
+              site={{ id: panelDirId, state: "ready", checks: [], bundleSha256: "", fileCount: dirFiles.data.files.length, sizeBytes: dirFiles.data.files.reduce((n, f) => n + f.size, 0) }}
+              files={dirFiles.data.files}
+              demo={demo?.files}
+            />
+          )}
         </div>
         <div className="dz-col">
           <PlacementCard
@@ -433,7 +446,7 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
       </div>
 
       {dlg === "as" && (
-        <AssignDialog target={assignTarget} nodes={live} panelSource={panelSource} siteName={siteName} standsOn={standsOn} onClose={close} demo={demo?.assign} />
+        <AssignDialog target={assignTarget} nodes={live} panelSource={panelSource} panelAddress={panelState?.address} siteName={siteName} standsOn={standsOn} onClose={close} demo={demo?.assign} />
       )}
       {dlg === "un" && unTarget && site && <UnassignDialog siteId={id} target={unTarget} dirAvailable={dirAvailable} onClose={close} demo={{ to: demo?.unTo }} />}
       {dlg === "del" && site && <DeleteDialog site={site} places={places} onClose={close} onDone={() => void navigate({ to: "/decoys" })} />}
