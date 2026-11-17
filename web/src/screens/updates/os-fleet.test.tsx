@@ -300,7 +300,7 @@ describe("the queue of a run", () => {
     expect(c).toContain("next in 11 min");
     // who holds the lock is said once, on the node's own row, not again in the card
     expect(c).not.toContain("unattended-upgr");
-    expect(host!.textContent!.match(/unattended-upgr has been installing/g)).toHaveLength(2);
+    expect(host!.textContent!.match(/unattended-upgr has been installing/g)).toHaveLength(1);
     expect(card().querySelector("[class*=text-danger]")).toBeNull();
     expect(card().querySelector("[role=alert]")).toBeNull();
     // the row of the node does not say it again, and has no moving bar
@@ -415,6 +415,8 @@ describe("the names of the security packages", () => {
   it("opens 'Security: 4' to the list of names, the stuck one marked and a calm note that says it will be installed from the panel", async () => {
     await mount(<OsSection />, named());
     expect(text()).not.toContain("libbar-common");
+    // the names sit behind the row: it opens first
+    await click(buttonStarting("de1", host!)!);
     const toggle = buttonStarting("Security: 4")!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     await click(toggle);

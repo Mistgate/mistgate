@@ -51,6 +51,7 @@ import { en as nodewaysEn } from "./nodeways";
 import { en as usersgroupEn } from "./usersgroup";
 import { en as decoysitesEn } from "./decoysites";
 import { en as profilespageEn } from "./profilespage";
+import { en as updatespageEn } from "./updatespage";
 import { en as profilesrvEn } from "./profilesrv";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
@@ -328,7 +329,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...decoysitesEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...profilesrvEn, ...profilenewEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...decoysitesEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...updatespageEn, ...profilesrvEn, ...profilenewEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

@@ -8,17 +8,14 @@ import { StatusPill, type StatusKind } from "@/components/ui/status";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
-import { bundleErrorText, heroOf, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
+import { bundleErrorText, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
 import { Command } from "./nodes";
 import { asChannel, panelChannelCommand } from "@/lib/channels";
-import { ChannelChip, ChannelDialog, channelName } from "./channel";
-import { WhatsNew } from "./notes";
 import { PanelUpdateWindow } from "./update-dialog";
 
-const bundleStates: Record<BundleStatus, { kind: StatusKind; key: MessageKey }> = {
+export const bundleStates: Record<BundleStatus, { kind: StatusKind; key: MessageKey }> = {
   [BundleStatus.UNSPECIFIED]: { kind: "off", key: "up.bundle.status.missing" },
   [BundleStatus.MISSING]: { kind: "off", key: "up.bundle.status.missing" },
   [BundleStatus.TRUSTED]: { kind: "ok", key: "up.bundle.status.trusted" },
@@ -37,29 +34,13 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Code({ children }: { children: string }) {
+export function Code({ children }: { children: string }) {
   return (
     <pre className="overflow-x-auto rounded-field border border-line bg-canvas p-3 font-mono text-xs leading-relaxed whitespace-pre text-fg select-all">{children}</pre>
   );
 }
 
-const shortHash = (h: string) => h.slice(0, 12);
-
-/** A quiet "Details ⌄" toggle: the fold of a card that keeps its reference facts out of the way. */
-function Fold({ open, onToggle, label, controls }: { open: boolean; onToggle: () => void; label: string; controls: string }) {
-  return (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-controls={controls}
-      onClick={onToggle}
-      className="-me-1 flex h-7 flex-none items-center gap-1 rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
-    >
-      {label}
-      <Icon name="chevronRight" size={12} className={cx("block flex-none transition-transform duration-200", open ? "-rotate-90" : "rotate-90")} />
-    </button>
-  );
-}
+export const shortHash = (h: string) => h.slice(0, 12);
 
 function BundleFiles({ bundle }: { bundle: Bundle }) {
   const t = useT();
@@ -84,7 +65,7 @@ function BundleFiles({ bundle }: { bundle: Bundle }) {
 }
 
 /** What the panel found in <data-dir>/dist and why it trusts it or not; the steps to make a bundle when there is none. */
-function BundleDetails({ data, hideError }: { data: Updates; hideError?: boolean }) {
+export function BundleDetails({ data, hideError }: { data: Updates; hideError?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const b = data.bundle;
@@ -123,53 +104,6 @@ function BundleDetails({ data, hideError }: { data: Updates; hideError?: boolean
         </>
       )}
       <p className="text-xs leading-normal text-pretty text-muted">{t("up.bundle.githubNote")}</p>
-    </div>
-  );
-}
-
-/**
- * The foot of the fleet card: whether the panel trusts the release bundle (the signature check) with its version and dates
- * in one line, "Read the folder again" for the owner, and the details folded away. A bundle that is missing or not trusted
- * opens by itself: that is where its reason and the steps to fix it are.
- */
-export function BundleStrip({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
-  const t = useT();
-  const fmt = useFmt();
-  const [touched, setTouched] = useState<boolean | null>(null);
-  const b = data.bundle;
-  const status = b?.status ?? BundleStatus.MISSING;
-  const s = bundleStates[status];
-  const missing = status === BundleStatus.MISSING || status === BundleStatus.UNSPECIFIED;
-  const open = touched ?? status !== BundleStatus.TRUSTED;
-  const expired = !!b && b.expiresUnix > 0 && b.expiresUnix <= data.nowUnix;
-  // the pill names what is wrong when it is the signature; the details say the rest
-  const pill = status === BundleStatus.UNTRUSTED && b?.errorKey.endsWith(".bad_signature") ? t("up.bundle.status.badSignature") : t(s.key);
-  const facts = b && !missing ? [b.version, b.built ? t("up.built", { date: fmt.date(b.built) }) : "", b.expiresUnix ? (expired ? t("up.bundle.expired", { date: fmt.date(b.expiresUnix) }) : t("up.bundle.validUntil", { date: fmt.date(b.expiresUnix) })) : ""].filter(Boolean) : [];
-
-  return (
-    <div className="border-t border-line">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 md:px-5">
-        <SectionLabel as="h3" icon="shield" tone="sage" className="flex-none">
-          {t("up.bundle.title")}
-        </SectionLabel>
-        <StatusPill kind={s.kind} label={pill} sm />
-        {facts.length > 0 && (
-          <span className={cx("min-w-0 basis-full font-mono text-[11px] md:flex-1 md:basis-auto md:truncate", expired ? "text-danger-text" : "text-muted")}>{facts.join(" · ")}</span>
-        )}
-        {facts.length === 0 && <span className="hidden flex-1 md:block" />}
-        {owner && (
-          <Button variant="ghost" size="sm" disabled={actions.busy} onClick={() => void actions.rescan()}>
-            <Icon name="refresh" size={12} />
-            {t("up.bundle.rescan")}
-          </Button>
-        )}
-        <Fold open={open} onToggle={() => setTouched(!open)} label={t("up.bundle.details")} controls="up-bundle-details" />
-      </div>
-      {open && (
-        <div id="up-bundle-details" className="px-4 pb-4 md:px-5">
-          <BundleDetails data={data} hideError={heroOf(data).id === "untrusted"} />
-        </div>
-      )}
     </div>
   );
 }
@@ -223,7 +157,7 @@ export function panelUpdate(t: ReturnType<typeof useT>, data: Updates, edge: boo
  * The root update helper follows its own channel file, and it names another channel than the one selected (or cannot be
  * read): shown as a state of the card, once, with the command that fixes it, instead of an error at every check.
  */
-function ChannelPolicy({ data, owner }: { data: Updates; owner: boolean }) {
+export function ChannelPolicy({ data, owner }: { data: Updates; owner: boolean }) {
   const t = useT();
   const key = data.panel?.update?.errorKey;
   if (!owner || (key !== "channel_not_allowed" && key !== "channel_config_invalid")) return null;
@@ -237,7 +171,7 @@ function ChannelPolicy({ data, owner }: { data: Updates; owner: boolean }) {
 }
 
 /** The steps for a panel that cannot update itself from here (no systemd service). */
-function PanelHow() {
+export function PanelHow() {
   const t = useT();
   return (
     <div className="flex flex-col gap-2.5">
@@ -252,7 +186,7 @@ function PanelHow() {
  * The Cloudflare edition's own update: one line on where it is done and the command, with the newest release in it once
  * GitHub was checked. The admin is served on the panel's public host, which is what --host names.
  */
-function EdgeDeploy({ version }: { version?: string }) {
+export function EdgeDeploy({ version }: { version?: string }) {
   const t = useT();
   return (
     <div className="flex flex-col gap-1.5">
@@ -336,88 +270,6 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
       {!update?.supported && !off && (
         <div className="border-t border-line pt-3">
           <PanelHow />
-        </div>
-      )}
-    </section>
-  );
-}
-
-/**
- * This panel on the Updates page: one line (version, state, Check GitHub), the install button when a signed release is out
- * (the card takes the accent then), and the key, the SHA-256 and the long explanation folded away. A panel that cannot
- * update itself opens its steps by itself.
- */
-export function PanelBar({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
-  const t = useT();
-  const fmt = useFmt();
-  const edition = useEdition();
-  const off = edition.off("panel_update");
-  const { p, update, label, kind } = panelUpdate(t, data, edition.edge);
-  const [touched, setTouched] = useState<boolean | null>(null);
-  const open = touched ?? (!update?.supported && !off);
-  const offer = !!update?.available && !update.installing;
-  const [win, setWin] = useState<"" | "channel" | "update">("");
-  const channel = asChannel(data.updateChannel);
-  const running = { version: p?.version ?? "", channel: asChannel(data.runningVersionChannel) };
-  return (
-    <section className={cx("flex min-w-0 flex-col gap-3 rounded-card-lg border p-4", offer ? "border-accent-line bg-accent-soft" : "border-line bg-surface")}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <SectionLabel as="h2" icon="server" tone="lavender" className="flex-none">
-          {t("up.panel.title")}
-        </SectionLabel>
-        <span className="font-mono text-xs font-bold">{p?.version || "—"}</span>
-        {!edition.edge && <ChannelChip channel={channel} onClick={owner ? () => setWin("channel") : undefined} />}
-        {p?.built ? <span className="text-xs text-muted">{t("up.built", { date: fmt.date(p.built) })}</span> : null}
-        <span className="flex-1" />
-        <StatusPill kind={kind} label={label} sm />
-        <Button variant="ghost" size="sm" disabled={actions.busy} onClick={() => void actions.checkPanel()}>
-          <Icon name="refresh" size={12} />
-          {t("up.panel.check")}
-        </Button>
-        {owner && !off && update?.available && update.installable && (
-          <Button variant="primary" size="md" disabled={actions.busy || update.installing} onClick={() => setWin("update")}>
-            {t("up.panel.install")}
-          </Button>
-        )}
-        <Fold open={open} onToggle={() => setTouched(!open)} label={t("up.panel.details")} controls="up-panel-details" />
-      </div>
-      {data.runningNewerThanChannelOffers && (
-        <p className="text-xs leading-snug text-pretty text-muted">{t("up.ch.ahead", { version: running.version, channel: channelName(t, channel) })}</p>
-      )}
-      {edition.edge ? <EdgeDeploy version={update?.version} /> : <EditionNotice feature="panel_update" />}
-      {!off && <ChannelPolicy data={data} owner={owner} />}
-      <WhatsNew notes={data.panelNotes} />
-      {owner && (
-        <ChannelDialog open={win === "channel"} onOpenChange={(o) => setWin(o ? "channel" : "")} current={channel} running={running} onPick={actions.setChannel} />
-      )}
-      {owner && !off && <PanelUpdateWindow open={win === "update"} onOpenChange={(o) => setWin(o ? "update" : "")} data={data} actions={actions} />}
-      {open && (
-        <div id="up-panel-details" className="flex flex-col gap-3 border-t border-line pt-3">
-          <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            <Row label={t("up.panel.latest")}>
-              {update?.version && update.url ? (
-                <a href={update.url} target="_blank" rel="noreferrer" className="font-mono text-xs font-bold text-accent-text underline underline-offset-2">
-                  {update.version}
-                </a>
-              ) : (
-                <span className="text-muted">{label}</span>
-              )}
-              {update?.checkedUnix ? <span className="ms-2 text-xs text-faint">{t("up.panel.checkedAt", { ago: fmt.ago(update.checkedUnix) })}</span> : null}
-            </Row>
-            {update?.built ? (
-              <Row label={t("up.panel.sha")}>
-                <span className="font-mono text-xs" title={update.sha256}>
-                  {shortHash(update.sha256)}
-                </span>
-                <span className="ms-2 text-xs text-muted">{fmt.dateTime(update.built)}</span>
-              </Row>
-            ) : null}
-            <Row label={t("up.panel.key")}>
-              {p?.hasReleaseKey ? <span className="font-mono text-xs">{p.releaseKeyFingerprint}</span> : <span className="font-semibold text-warn-text">{t("up.panel.noKey")}</span>}
-            </Row>
-          </dl>
-          {!off && <p className="text-xs leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
-          {!update?.supported && !off && <PanelHow />}
         </div>
       )}
     </section>

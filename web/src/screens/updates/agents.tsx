@@ -1,0 +1,260 @@
+import { Link } from "@tanstack/react-router";
+import { EditionNotice } from "@/components/edition-notice";
+import { Scramble } from "@/components/fx/scramble-react";
+import { Button, buttonClass } from "@/components/ui/button";
+import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
+import { useT, type T } from "@/i18n";
+import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
+import { useFmt, type Fmt } from "@/lib/format";
+import {
+  bundleErrorText,
+  heroOf,
+  isActive,
+  isFailurePause,
+
+  pausedStep,
+  pauseText,
+  progressOf,
+  type Hero,
+  type NodeUpdate,
+  type UpdateActions,
+  type Updates,
+} from "@/lib/updates";
+import { G } from "@/screens/users/user-bits";
+import { Bar, D, NodeName, Pill, useFlags, w, type Gk } from "./bits";
+import { fleetCards, rolloutNow, type FleetCard } from "./fleet";
+import { ReleaseCard } from "./notes";
+import { NodesCard } from "./nodes";
+import { BundleCard, RolloutHistory } from "./rollout";
+
+// The "Node agents" tab (the board's second): where the fleet stands against the release ("2 of 4 nodes on v0.1.24"), the one
+// button that moves it, a card per node, the rollout that is going on (and what to do when it stops), then the nodes in a table
+// and, at the foot, the signed bundle and the last rollout.
+
+type Look = { title: string; text: string; pill: { k: Gk; label: string } | null };
+
+/** What the header of the card says for each situation: the board's "N of M nodes on vX" when there is a release to measure by. */
+function look(t: T, d: Updates, hero: Hero, edge: boolean): Look {
+  const version = d.bundle?.version ?? "";
+  const trusted = d.bundle?.status === BundleStatus.TRUSTED;
+  const count = trusted ? t.n("up.hero.available.title", d.nodes.length, { done: d.nodes.filter((n) => n.state === NodeUpdateState.UP_TO_DATE).length, version }) : "";
+  switch (hero.id) {
+    case "available":
+    case "running":
+      return { title: count, text: t("up.hero.available.text", { version }), pill: hero.id === "running" ? { k: "busy", label: t("up.layer.pill.running") } : null };
+    case "paused":
+      return { title: count, text: t("up.hero.available.text", { version }), pill: { k: "part", label: t("up.layer.pill.paused") } };
+    case "current":
+      return { title: count, text: t("uq.ag.allSub", { version }), pill: { k: "ok", label: t("uq.ag.all") } };
+    case "attention":
+      return { title: count, text: t.n("up.hero.attention.text", hero.retry), pill: { k: "part", label: t("up.layer.pill.attention") } };
+    case "manual":
+      return {
+        title: t.n("up.hero.manual.title", hero.nodes.length, { names: hero.nodes.map((n) => n.name).join(", ") }),
+        text: t.n(edge ? "up.hero.manual.textEdge" : "up.hero.manual.text", hero.nodes.length),
+        pill: { k: "part", label: t("up.state.unsupported") },
+      };
+    case "noBundle": {
+      const text = edge ? bundleErrorText(t, d.bundle?.errorKey ?? "", d.bundle?.params) : hero.older > 0 ? t.n("up.hero.noBundle.older", hero.older) : t("up.hero.noBundle.text");
+      return { title: t("up.hero.noBundle.title"), text, pill: { k: "", label: t("up.bundle.status.missing") } };
+    }
+    case "untrusted":
+      return { title: t("up.hero.untrusted.title"), text: bundleErrorText(t, d.bundle?.errorKey ?? "", d.bundle?.params), pill: { k: "bad", label: t("up.bundle.status.untrusted") } };
+    case "noKey":
+      return { title: t("up.hero.noKey.title"), text: t(edge ? "up.hero.noKey.edge" : "up.hero.noKey.text"), pill: { k: "part", label: t("up.bundle.status.noKey") } };
+    default:
+      return { title: t("up.hero.none.title"), text: t("up.hero.none.text"), pill: null };
+  }
+}
+
+const wordKey = { ok: "uq.fl.ok", can: "uq.fl.can", sent: "uq.fl.sent", gate: "uq.fl.gate", back: "uq.fl.back", off: "uq.fl.off", wait: "uq.fl.wait", manual: "uq.fl.manual", failed: "uq.fl.failed" } as const;
+
+/** One card of the strip: flag and name, the canary mark, the tick (or the spinner, or the cross), the version and what it is doing. */
+function Card({ c, countryCode, t }: { c: FleetCard; countryCode?: string; t: T }) {
+  return (
+    <div className={cx("uq-ft", c.kind, c.canary && "can", c.just && "just")}>
+      <div className="uq-fc">
+        <NodeName name={c.name} countryCode={countryCode} />
+        {c.canary && <em className="uq-fr">{t("uq.fl.canary")}</em>}
+        <i className="uq-fd" aria-hidden>
+          <svg viewBox="0 0 24 24">
+            <path d={D.check} />
+          </svg>
+          <svg className="x" viewBox="0 0 24 24">
+            <path d={D.x} />
+          </svg>
+        </i>
+      </div>
+      <b className="mono uq-fv">
+        <Scramble value={c.version} once />
+      </b>
+      <span className="uq-fs">{t(wordKey[c.word], { version: c.wordVersion })}</span>
+      {c.pg !== undefined && <i className="rw-pg" style={w(c.pg)} aria-hidden />}
+    </div>
+  );
+}
+
+/** What the rollout is doing this moment, on one line, with the buttons that act on it. */
+function Now({ d, owner, actions, onCancel }: { d: Updates; owner: boolean; actions: UpdateActions; onCancel: () => void }) {
+  const t = useT();
+  const r = d.rollout!;
+  const now = rolloutNow(r);
+  const { done, total } = progressOf(r);
+  const text =
+    now.kind === "gate" ? t("uq.roll.gate", { node: now.node }) : now.kind === "canary" ? t("uq.roll.canary", { node: now.node, version: r.toVersion }) : now.kind === "batch" ? t("uq.roll.batch", { nodes: now.names, version: r.toVersion }) : t("uq.roll.wait");
+  return (
+    <div className="uq-now" role="status">
+      <span className="an-sp" aria-hidden />
+      <div>
+        <b>{text}</b>
+        <span>{t("uq.roll.sub")}</span>
+      </div>
+      <em className="mono">{t.n("up.progress", total, { done })}</em>
+      {owner && (
+        <>
+          <Button variant="secondary" size="md" disabled={actions.busy} onClick={() => void actions.pause(r.id)}>
+            {t("up.pause")}
+          </Button>
+          <Button variant="secondary" size="md" disabled={actions.busy} onClick={onCancel}>
+            {t("uq.roll.stop")}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A paused rollout: the reason (and the node it names, when a node caused it), and the way on. */
+function Paused({ d, owner, actions, onCancel }: { d: Updates; owner: boolean; actions: UpdateActions; onCancel: () => void }) {
+  const t = useT();
+  const r = d.rollout!;
+  const failed = isFailurePause(r.pauseKey);
+  const culprit = failed ? pausedStep(r) : undefined;
+  return (
+    <Bar
+      bad={failed}
+      action={
+        <>
+          {culprit && (
+            <Link to="/nodes/$id" params={{ id: culprit.nodeId }} search={{ tab: "history" }} className={buttonClass("secondary", "md")}>
+              {t("up.openNode", { name: culprit.nodeName })}
+            </Link>
+          )}
+          {owner && (
+            <Button variant="secondary" size="md" disabled={actions.busy} onClick={() => void actions.resume(r.id)}>
+              {t("up.resume")}
+            </Button>
+          )}
+          {owner && (
+            <Button variant="secondary" size="md" disabled={actions.busy} onClick={onCancel}>
+              {t("up.cancel")}
+            </Button>
+          )}
+        </>
+      }
+    >
+      <b>{t("up.hero.paused.title")}</b>
+      <span>{pauseText(t, r.pauseKey, r.pauseParams)}</span>
+    </Bar>
+  );
+}
+
+/** Nodes that are not reachable and have an update waiting: "x is offline", and the schedule that will catch up with them. */
+function Offline({ nodes }: { nodes: readonly NodeUpdate[] }) {
+  const t = useT();
+  if (nodes.length === 0) return null;
+  const first = nodes[0]!;
+  return (
+    <Bar
+      action={
+        <Link to="/nodes/$id" params={{ id: first.nodeId }} className={buttonClass("secondary", "md")}>
+          {t("up.openNode", { name: first.name })}
+        </Link>
+      }
+    >
+      <b>{t.n("uq.off.title", nodes.length, { names: nodes.map((n) => n.name).join(", ") })}</b>
+      <span>{t.n("uq.off.text", nodes.length)}</span>
+    </Bar>
+  );
+}
+
+export type AgentsProps = {
+  data: Updates;
+  owner: boolean;
+  actions: UpdateActions;
+  onRollout: () => void;
+  onCancel: () => void;
+  onSchedule: (n: NodeUpdate) => void;
+  onRollback: (n: NodeUpdate) => void;
+};
+
+export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSchedule, onRollback }: AgentsProps) {
+  const t = useT();
+  const fmt: Fmt = useFmt();
+  const edition = useEdition();
+  const flags = useFlags();
+  const noUpdates = edition.off("agent_updates"); // there the buttons are gone for everyone, not just for a helper
+  const hero = heroOf(d);
+  const l = look(t, d, hero, edition.edge);
+  const active = isActive(d.rollout) ? d.rollout : null;
+  const cards = fleetCards(d);
+  const trusted = d.bundle?.status === BundleStatus.TRUSTED;
+  const offline = trusted ? d.nodes.filter((n) => n.state === NodeUpdateState.OFFLINE && n.supportsUpdate && n.built < d.bundle!.built) : [];
+  const canStart = owner && !noUpdates && hero.id === "available" && !!d.bundle;
+  const readOnly = !owner && !noUpdates && (hero.id === "available" || !!active);
+  void fmt;
+
+  if (d.nodes.length === 0) {
+    return (
+      <>
+        <EditionNotice feature="agent_updates" />
+        <section className="uq-card us-none hl-calm rc-emp">
+          <span className="g" aria-hidden>
+            <G d={D.server} size={20} stroke={1.75} />
+          </span>
+          <b>{t("up.nodes.empty")}</b>
+          <span>{t("uq.none.text")}</span>
+          <Link to="/nodes" className={buttonClass("secondary", "lg")}>
+            {t("uq.none.open")}
+          </Link>
+        </section>
+      </>
+    );
+  }
+  return (
+    <>
+      <EditionNotice feature="agent_updates" />
+      <section className={cx("uq-card uq-ag", active?.status === RolloutStatus.RUNNING && "run")} aria-label={t("up.tab.agents")}>
+        <div className="uq-agh">
+          <div>
+            <b>{l.title}</b>
+            <span>{l.text}</span>
+          </div>
+          {canStart && hero.id === "available" && (
+            <Button variant="primary" size="lg" disabled={actions.busy} onClick={onRollout}>
+              {t.n("up.rollout.start", hero.outdated)}
+            </Button>
+          )}
+          {l.pill && !(canStart && hero.id === "available") && <Pill k={l.pill.k}>{l.pill.label}</Pill>}
+        </div>
+        <div className="uq-fleet">
+          {cards.map((c) => (
+            <Card key={c.id} c={c} countryCode={flags.get(c.id)} t={t} />
+          ))}
+        </div>
+        {readOnly && <p className="uq-ro">{t("uq.ro.agents")}</p>}
+        {active?.status === RolloutStatus.RUNNING && <Now d={d} owner={owner} actions={actions} onCancel={onCancel} />}
+        {active?.status === RolloutStatus.PAUSED && <Paused d={d} owner={owner} actions={actions} onCancel={onCancel} />}
+        <Offline nodes={offline} />
+      </section>
+      {!active && <ReleaseCard notes={d.agentNotes} />}
+      <NodesCard nodes={d.nodes} data={d} owner={owner && !noUpdates} rollout={active} onSchedule={onSchedule} onRollback={onRollback} />
+      <div className="uq-two">
+        {!edition.edge && <BundleCard data={d} owner={owner} actions={actions} />}
+        {d.rollout && <RolloutHistory rollout={d.rollout} />}
+      </div>
+    </>
+  );
+}
+

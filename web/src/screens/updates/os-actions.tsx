@@ -213,7 +213,7 @@ export function OsRowMenu({ row, defaultOpen }: { row: OsRow; /** The dev kit sh
  * has them) and what stops them. Shows nothing for the panel's own server row, and nothing to a non-owner when there is
  * nothing to report.
  */
-export function OsNodeActions({ row, compact = false, size: sizeProp }: { row: OsRow; compact?: boolean; /** The buttons' size; the Server tab's card has the 40 px ones. */ size?: "lg" | "md" | "sm" }) {
+export function OsNodeActions({ row, compact = false, size: sizeProp, installLabel }: { row: OsRow; compact?: boolean; /** The buttons' size; the Server tab's card has the 40 px ones. */ size?: "lg" | "md" | "sm"; /** The install button's words, when the page has better ones ("Install security updates · 4"). */ installLabel?: string }) {
   const t = useT();
   const owner = useIsOwner();
   const actions = useOsActions();
@@ -248,7 +248,7 @@ export function OsNodeActions({ row, compact = false, size: sizeProp }: { row: O
         <>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="primary" size={size} disabled={!!install || off} onClick={() => setDialog("install")}>
-              {t("os.btn.install")}
+              {installLabel ?? t("os.btn.install")}
             </Button>
             <Button variant="secondary" size={size} disabled={!!reboot || off} onClick={() => setDialog("reboot")}>
               {t("os.btn.reboot")}

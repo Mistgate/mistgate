@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { Chip } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
+import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { canaryOf, defaultBatch, updateDateTimeAtOffset, updateDateTimeInputAtOffset, updateTimezoneName, type NodeUpdate, type Updates } from "@/lib/updates";
+import { NodeName, useFlags } from "./bits";
 
 /**
  * Update the rest of the fleet: the nodes that can be updated, each with a tick (all ticked), the canary named, and what
@@ -29,6 +30,7 @@ export function RolloutDialog({
   children?: ReactNode;
 }) {
   const t = useT();
+  const flags = useFlags();
   const noProbe = useEdition().off("health_checks"); // the gate there has no client-eye check yet
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
   const picked = nodes.filter((n) => !off.has(n.nodeId));
@@ -44,36 +46,48 @@ export function RolloutDialog({
       open
       onOpenChange={(o) => !o && !busy && onClose()}
       title={t("up.rollout.title", { version })}
-      description={picked.length > 1 ? t("up.rollout.lead", { batch: defaultBatch(picked.length) }) : t("up.rollout.leadOne")}
+      closeLabel={t("common.close")}
+      className="uq-dlg"
+      shot="updates-rollout-dialog"
       footer={
         <>
-          <Button variant="ghost" size="md" disabled={busy} onClick={onClose}>
+          <Button variant="secondary" size="lg" disabled={busy} onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" size="md" disabled={busy || picked.length === 0} onClick={() => onStart(picked.map((n) => n.nodeId))}>
+          <Button variant="primary" size="lg" disabled={busy || picked.length === 0} onClick={() => onStart(picked.map((n) => n.nodeId))}>
             {t("up.rollout.go")}
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-3.5">
-        <ul aria-label={t("up.rollout.nodes")} className="flex flex-col gap-1.5">
+      <div className="uq-db">
+        <p>{picked.length > 1 ? t("up.rollout.lead", { batch: defaultBatch(picked.length) }) : t("up.rollout.leadOne")}</p>
+        <ul aria-label={t("up.rollout.nodes")} className="uq-can">
           {nodes.map((n) => {
             const on = !off.has(n.nodeId);
+            const row = (
+              <>
+                <NodeName name={n.name} countryCode={flags.get(n.nodeId)} />
+                {n === canary && <span className="pv-pill">{t("up.rollout.canary")}</span>}
+                <em>{t("up.nodes.online", { n: n.onlineUsers })}</em>
+              </>
+            );
             return (
               <li key={n.nodeId}>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-field border border-line bg-surface-2 px-3 py-2 text-[13px] has-checked:border-accent-line has-checked:bg-accent-soft">
-                  <input type="checkbox" checked={on} onChange={() => toggle(n.nodeId)} className="size-4 flex-none accent-accent" />
-                  <b className="min-w-0 flex-1 truncate font-mono">{n.name}</b>
-                  {n === canary && <Chip>{t("up.rollout.canary")}</Chip>}
-                  <span className="flex-none text-xs text-muted">{t("up.nodes.online", { n: n.onlineUsers })}</span>
-                </label>
+                {nodes.length > 1 ? (
+                  <label>
+                    <input type="checkbox" checked={on} onChange={() => toggle(n.nodeId)} aria-label={n.name} />
+                    {row}
+                  </label>
+                ) : (
+                  <div className="uq-canrow">{row}</div>
+                )}
               </li>
             );
           })}
         </ul>
         {children}
-        <p className="text-xs leading-normal text-pretty text-muted">
+        <p>
           {t("up.rollout.restart")} {t("up.ro.safety")}
           {noProbe && ` ${t("up.gate.noProbe")}`}
         </p>
@@ -117,82 +131,94 @@ export function UpdateNodeDialog({
   const offset = data.scheduleTimezoneOffsetMinutes;
   const hasSchedule = node.scheduledUnix > 0;
   const canSchedule = !!bundle && bundle.status === BundleStatus.TRUSTED && node.supportsUpdate && node.built < bundle.built && !nodeInActiveRollout;
-  const blockedMessage = blockedReason ? t(({
-    offline: "up.schedule.offline",
-    queued: "up.schedule.alreadyQueued",
-    paused: "up.schedule.rolloutPaused",
-    differentRelease: "up.schedule.otherRelease",
-    unavailable: "up.schedule.busy",
-  } as const)[blockedReason]) : "";
+  const blockedMessage = blockedReason
+    ? t(
+        (
+          {
+            offline: "up.schedule.offline",
+            queued: "up.schedule.alreadyQueued",
+            paused: "up.schedule.rolloutPaused",
+            differentRelease: "up.schedule.otherRelease",
+            unavailable: "up.schedule.busy",
+          } as const
+        )[blockedReason],
+      )
+    : "";
   const [mode, setMode] = useState<"now" | "schedule">(initialMode ?? (hasSchedule ? "schedule" : "now"));
-  const [localDatetime, setLocalDatetime] = useState(() =>
-    hasSchedule
-      ? updateDateTimeInputAtOffset(node.scheduledUnix, offset)
-      : updateDateTimeInputAtOffset(data.nowUnix + 3600, offset),
-  );
+  const [localDatetime, setLocalDatetime] = useState(() => (hasSchedule ? updateDateTimeInputAtOffset(node.scheduledUnix, offset) : updateDateTimeInputAtOffset(data.nowUnix + 3600, offset)));
   // datetime-local only has minute precision. Round up so the displayed minimum can never be rejected by
   // the server's exact 60-second lead-time check when the current time has non-zero seconds.
   const minUnix = Math.ceil((data.nowUnix + 60) / 60) * 60;
   const min = updateDateTimeInputAtOffset(minUnix, offset);
   const savedAt = hasSchedule ? updateDateTimeAtOffset(node.scheduledUnix, node.scheduledTimezoneOffsetMinutes) : "";
   const scheduleIsCurrent = hasSchedule && node.scheduledBuilt === bundle?.built && node.scheduledVersion === version;
+  const options = [
+    { id: "now" as const, title: t(queueAfterRollout ? "up.schedule.queueChoice" : "up.schedule.nowChoice"), sub: t("uq.opt.nowSub") },
+    { id: "schedule" as const, title: t("up.schedule.laterChoice"), sub: t("uq.opt.laterSub") },
+  ];
   return (
     <Modal
       open
       onOpenChange={(o) => !o && !busy && onClose()}
       title={t("up.schedule.title", { name: node.name })}
-      description={t("up.schedule.lead", { version })}
+      closeLabel={t("common.close")}
+      className="uq-dlg"
+      shot="updates-schedule-dialog"
       footer={
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <Button variant="ghost" size="md" disabled={busy} onClick={onClose}>
+        <>
+          <Button variant="secondary" size="lg" disabled={busy} onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <div className="flex flex-wrap gap-2">
-            {hasSchedule && (
-              <Button variant="danger" size="md" disabled={busy} onClick={onCancelSchedule}>
-                {t("up.schedule.cancel")}
-              </Button>
-            )}
-            {mode === "now" ? (
-              <Button variant="primary" size="md" disabled={busy || !canUpdateNow} onClick={onUpdateNow}>
-                {t(queueAfterRollout ? "up.schedule.addToRollout" : "up.schedule.now")}
-              </Button>
-            ) : (
-              <Button variant="primary" size="md" disabled={busy || !canSchedule || !localDatetime || localDatetime < min} onClick={() => onSchedule(localDatetime)}>
-                {t("up.schedule.save")}
-              </Button>
-            )}
-          </div>
-        </div>
+          {hasSchedule && (
+            <Button variant="secondary" size="lg" disabled={busy} onClick={onCancelSchedule}>
+              {t("up.schedule.cancel")}
+            </Button>
+          )}
+          {mode === "now" ? (
+            <Button variant="primary" size="lg" disabled={busy || !canUpdateNow} onClick={onUpdateNow}>
+              {t(queueAfterRollout ? "up.schedule.addToRollout" : "up.schedule.now")}
+            </Button>
+          ) : (
+            <Button variant="primary" size="lg" disabled={busy || !canSchedule || !localDatetime || localDatetime < min} onClick={() => onSchedule(localDatetime)}>
+              {t("up.schedule.save")}
+            </Button>
+          )}
+        </>
       }
     >
-      <div className="flex flex-col gap-3.5">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="flex cursor-pointer items-center gap-2 rounded-field border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-semibold has-checked:border-accent has-checked:bg-accent-soft">
-            <input type="radio" name="node-update-mode" value="now" checked={mode === "now"} onChange={() => setMode("now")} />
-            {t(queueAfterRollout ? "up.schedule.queueChoice" : "up.schedule.nowChoice")}
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 rounded-field border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-semibold has-checked:border-accent has-checked:bg-accent-soft">
-            <input type="radio" name="node-update-mode" value="schedule" checked={mode === "schedule"} onChange={() => setMode("schedule")} />
-            {t("up.schedule.laterChoice")}
-          </label>
+      <div className="uq-db">
+        <p>{t("up.schedule.lead", { version })}</p>
+        <div className="uq-opts" role="radiogroup" aria-label={t("up.schedule.title", { name: node.name })}>
+          {options.map((o) => (
+            <button key={o.id} type="button" role="radio" aria-checked={mode === o.id} className="uq-opt" onClick={() => setMode(o.id)}>
+              <span className="nx-rad" aria-hidden data-checked={mode === o.id}>
+                <i />
+              </span>
+              <span>
+                <b>{o.title}</b>
+                <em>{o.sub}</em>
+              </span>
+            </button>
+          ))}
         </div>
         {mode === "now" ? (
-          <div className="rounded-field border border-line bg-canvas p-3.5 text-[13px] leading-relaxed text-muted">
+          <>
             <p>{t(queueAfterRollout ? "up.schedule.queueBody" : "up.schedule.nowBody", { name: node.name, version })}</p>
-            <p className="mt-1">
+            <p>
               {t("up.schedule.safety")}
               {noProbe && ` ${t("up.gate.noProbe")}`}
             </p>
-            {!canUpdateNow && blockedMessage && <p className="mt-2 text-warn">{blockedMessage}</p>}
-          </div>
+            {!canUpdateNow && blockedMessage && <p className="uq-warn">{blockedMessage}</p>}
+          </>
         ) : (
-          <div className="flex flex-col gap-2.5 rounded-field border border-line bg-canvas p-3.5">
-            <label htmlFor="node-update-at" className="text-xs font-semibold">{t("up.schedule.dateTime")}</label>
-            <input id="node-update-at" type="datetime-local" min={min} value={localDatetime} onChange={(event) => setLocalDatetime(event.target.value)} className="h-10 rounded-ctl border border-line bg-surface px-3 font-mono text-sm text-fg" />
-            <span className="text-xs text-muted">{t("up.schedule.timezone", { timezone: updateTimezoneName(offset) })}</span>
+          <>
+            <label className="uq-when" htmlFor="node-update-at">
+              <span>{t("up.schedule.dateTime")}</span>
+              <input id="node-update-at" type="datetime-local" min={min} value={localDatetime} onChange={(event) => setLocalDatetime(event.target.value)} className={cx("an-i", "mono")} />
+              <small>{t("up.schedule.timezone", { timezone: updateTimezoneName(offset) })}</small>
+            </label>
             {hasSchedule && (
-              <p className="rounded-field border border-line bg-surface-2 px-3 py-2 text-xs leading-relaxed text-muted">
+              <p className="uq-cur mono">
                 {t(scheduleIsCurrent ? "up.schedule.current" : "up.schedule.stale", {
                   version: node.scheduledVersion,
                   at: savedAt,
@@ -200,8 +226,8 @@ export function UpdateNodeDialog({
                 })}
               </p>
             )}
-            {!canSchedule && <p className="text-xs text-warn">{t(nodeInActiveRollout ? "up.schedule.alreadyQueued" : "up.schedule.unavailable")}</p>}
-          </div>
+            {!canSchedule && <p className="uq-warn">{t(nodeInActiveRollout ? "up.schedule.alreadyQueued" : "up.schedule.unavailable")}</p>}
+          </>
         )}
       </div>
     </Modal>
@@ -214,15 +240,17 @@ export function RollbackDialog({ node, busy, onConfirm, onClose }: { node: NodeU
   return (
     <Modal
       open
+      className="uq-dlg"
+      closeLabel={t("common.close")}
       onOpenChange={(o) => !o && !busy && onClose()}
       title={t("up.rollback.title", { name: node.name })}
       description={from ? t("up.rollback.body", { version: from }) : t("up.rollback.bodyNoVersion")}
       footer={
         <>
-          <Button variant="ghost" size="md" disabled={busy} onClick={onClose}>
+          <Button variant="secondary" size="lg" disabled={busy} onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button variant="danger" size="md" disabled={busy} onClick={onConfirm}>
+          <Button variant="danger" size="lg" disabled={busy} onClick={onConfirm}>
             {t("up.rollback.confirm")}
           </Button>
         </>
@@ -236,15 +264,17 @@ export function CancelDialog({ busy, onConfirm, onClose }: { busy: boolean; onCo
   return (
     <Modal
       open
+      className="uq-dlg"
+      closeLabel={t("common.close")}
       onOpenChange={(o) => !o && !busy && onClose()}
       title={t("up.cancel.title")}
       description={t("up.cancel.body")}
       footer={
         <>
-          <Button variant="ghost" size="md" disabled={busy} onClick={onClose}>
+          <Button variant="secondary" size="lg" disabled={busy} onClick={onClose}>
             {t("up.cancel.keep")}
           </Button>
-          <Button variant="danger" size="md" disabled={busy} onClick={onConfirm}>
+          <Button variant="danger" size="lg" disabled={busy} onClick={onConfirm}>
             {t("up.cancel.confirm")}
           </Button>
         </>

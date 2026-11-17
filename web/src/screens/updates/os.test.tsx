@@ -8,9 +8,9 @@ import { setLang } from "@/i18n";
 import { meQuery } from "@/lib/session";
 import { OsSection } from "./os";
 
-// Updates -> Server operating system: a row for the panel's server and one per node from GetOsUpdates; the owner also gets the
-// ⋯ menu of each node row that installs security updates, reboots it and checks for updates (os-actions.test.tsx has the
-// buttons of the node's card and the window in full).
+// Updates -> Server operating system: a row for the panel's server and one per node from GetOsUpdates; the owner opens a node's row
+// to install security updates, reboot it and check for updates (os-actions.test.tsx has the buttons of the node's card and the
+// window in full).
 
 const updates = vi.hoisted(() => ({ getOsUpdates: vi.fn(), startOsRollout: vi.fn(), refreshOsUpdates: vi.fn() }));
 vi.mock("@/lib/api", async (orig) => ({ ...(await orig<typeof import("@/lib/api")>()), updates }));
@@ -42,19 +42,19 @@ afterEach(() => {
 });
 
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
-/** Base UI opens a menu on the press, not on the click. */
-async function press(el: Element | null | undefined) {
+const click = (el: Element | null | undefined) => {
   expect(el).toBeTruthy();
-  await act(async () => {
-    for (const type of ["pointerdown", "mousedown"]) el!.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
-    for (const type of ["pointerup", "mouseup", "click"]) el!.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
-  });
-  for (let i = 0; i < 3; i++) await settle();
-}
-const trigger = (node: string, label = "Operating system actions for") => host!.querySelector(`button[aria-label="${label} ${node}"]`);
-const items = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
-const item = (label: string) => items().find((i) => i.textContent?.startsWith(label));
-const popup = () => document.querySelector("[role=menu]")?.textContent ?? "";
+  return act(async () => void el!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+};
+/** The row of a server: the button that opens it. */
+const rowBtn = (name: string) => [...host!.querySelectorAll<HTMLButtonElement>("button.uq-r")].find((b) => b.textContent!.startsWith(name));
+const open = async (name: string) => {
+  await click(rowBtn(name));
+  await settle();
+};
+const bar = () => host!.querySelector<HTMLElement>("[data-shot=os-node-actions]");
+const action = (label: string) => [...(bar()?.querySelectorAll("button") ?? [])].find((b) => b.textContent!.trim().startsWith(label));
+const chips = () => [...host!.querySelectorAll(".uq-chip")].map((c) => c.textContent);
 async function mount(unavailable: string[] = [], role?: Role) {
   host = document.createElement("div");
   document.body.append(host);
@@ -91,8 +91,7 @@ describe("Server operating system", () => {
     await mount();
     const text = host!.textContent!;
     expect(text).toContain("This panel's server");
-    expect(text).toContain("Need a reboot: 1"); // the summary names what asks for attention
-    expect(text).toContain("With security updates: 1");
+    expect(chips()).toEqual(["Reboot needed1", "With security updates1"]); // the chips name what asks for attention
     // de1: a newer kernel is installed and waits for a reboot
     expect(text).toContain("6.8.0-147-generic");
     expect(text).toContain("→ 6.8.0-150-generic");
@@ -112,7 +111,8 @@ describe("Server operating system", () => {
     // what the panel can do (several nodes in one run, ordinary packages) and what stays by hand (its own server); not the owner: no button
     expect(text).toContain("Mistgate installs the security updates (or every package) and reboots servers from the panel. Tick several nodes to update them in one run, the quietest first.");
     expect(text).toContain("Update the panel's own server over SSH for now.");
-    expect(host!.querySelector("button")).toBeNull();
+    expect([...host!.querySelectorAll("button")].filter((b) => !b.classList.contains("uq-r"))).toHaveLength(0);
+    expect(host!.querySelector("input[type=checkbox]")).toBeNull();
   });
 
   const owned = (extra: Record<string, unknown> = {}) => {
@@ -124,67 +124,73 @@ describe("Server operating system", () => {
     });
   };
 
-  it("gives the owner a ⋯ menu on each node row, not three buttons, and none for the panel's server", async () => {
+  it("gives the owner a row that opens to the actions, on each node and not on the panel's server", async () => {
     owned();
     await mount([], Role.OWNER);
-    // four nodes, each in the table and in the phone's card
-    expect(host!.querySelectorAll("button[aria-label^='Operating system actions for']")).toHaveLength(8);
-    expect([...host!.querySelectorAll("button")].filter((b) => b.textContent === "Install updates…")).toHaveLength(0);
-    // an idle node has nothing under its row, and the menu is closed until it is pressed
-    expect(host!.querySelectorAll("[data-shot=os-node-actions]")).toHaveLength(0);
-    expect(items()).toHaveLength(0);
+    expect(host!.querySelectorAll(".uq-w")).toHaveLength(5);
+    expect(host!.querySelector(".uq-w.flat")?.textContent).toContain("This panel's server");
+    expect(host!.querySelectorAll("button[aria-label^='Operating system actions for']")).toHaveLength(0);
+    // an idle node has nothing under its row until it is opened
+    expect(bar()).toBeNull();
+    await open("de1");
+    expect(rowBtn("de1")!.getAttribute("aria-expanded")).toBe("true");
+    expect(bar()).not.toBeNull();
+    await open("de1");
+    expect(bar()).toBeNull();
   });
 
-  it("lists the three actions in the menu of a node that can be updated, all on", async () => {
+  it("lists the three actions of a node that can be updated, all on, the install one naming the security updates", async () => {
     owned();
     await mount([], Role.OWNER);
-    await press(trigger("de1"));
-    expect(items().map((i) => i.textContent)).toEqual(["Install updates…", "Reboot…", "Check for updates"]);
-    expect(items().filter((i) => i.hasAttribute("data-disabled"))).toHaveLength(0);
+    await open("de1");
+    const labels = [...bar()!.querySelectorAll("button")].map((b) => b.textContent!.trim());
+    expect(labels).toEqual(["Install security updates · 4", "Reboot…", "Check for updates"]);
+    expect([...bar()!.querySelectorAll("button")].filter((b) => b.disabled)).toHaveLength(0);
+    // the node's page is one click away
+    expect(host!.textContent).toContain("Open node ›");
   });
 
-  it("greys the actions out with the reason in the item when the node cannot be updated", async () => {
+  it("greys the actions out with the reason under them when the node cannot be updated", async () => {
     owned();
     await mount([], Role.OWNER);
-    await press(trigger("fi1"));
-    expect(item("Install updates…")?.hasAttribute("data-disabled")).toBe(true);
-    expect(item("Reboot…")?.hasAttribute("data-disabled")).toBe(true);
-    // one reason for all three is said once, on top of the menu
-    expect(popup().match(/The node agent is too old to run updates/g)).toHaveLength(1);
+    await open("fi1");
+    expect(action("Install")?.disabled).toBe(true);
+    expect(action("Reboot")?.disabled).toBe(true);
+    // one reason for all three is said once
+    expect(bar()!.textContent!.match(/The node agent is too old to run updates/g)).toHaveLength(1);
     // checking only reads, but an old agent cannot do it either
-    expect(item("Check for updates")?.hasAttribute("data-disabled")).toBe(true);
+    expect(action("Check for updates")?.disabled).toBe(true);
   });
 
-  it("says the node is offline in the menu of an offline node", async () => {
+  it("says the node is offline in the row of an offline node", async () => {
     owned();
     await mount([], Role.OWNER);
-    await press(trigger("msk1"));
-    expect(popup()).toContain("The node is offline.");
+    await open("msk1");
+    expect(bar()!.textContent).toContain("The node is offline.");
   });
 
-  it("puts a reason under the item it belongs to when the items have different ones", async () => {
+  it("puts the reason next to the action it belongs to when the actions have different ones", async () => {
     owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "nothing_to_do", updateBlockAll: "nothing_to_do", rebootBlock: "", status: n.status && { ...n.status, pending: 0, security: 0 } })) });
     await mount([], Role.OWNER);
-    await press(trigger("de1"));
-    expect(item("Install updates…")?.hasAttribute("data-disabled")).toBe(true);
-    expect(item("Install updates…")?.textContent).toContain("There are no security updates to install.");
-    expect(item("Reboot…")?.hasAttribute("data-disabled")).toBe(false);
-    expect(item("Reboot…")?.textContent).toBe("Reboot…");
+    await open("de1");
+    expect(action("Install")?.disabled).toBe(true);
+    expect(bar()!.textContent).toContain("There are no security updates to install.");
+    expect(action("Reboot")?.disabled).toBe(false);
   });
 
   it("explains that a check for updates that has just started holds the node", async () => {
     owned({ nodes: answer.nodes.map((n) => ({ ...n, updateCapable: true, updateBlock: "node_busy", updateBlockAll: "node_busy", rebootBlock: "node_busy" })) });
     await mount([], Role.OWNER);
-    await press(trigger("de1"));
-    expect(items().every((i) => i.hasAttribute("data-disabled"))).toBe(true);
-    expect(popup()).toContain("for example a check for updates you have just started");
+    await open("de1");
+    expect([...bar()!.querySelectorAll("button")].every((b) => b.disabled)).toBe(true);
+    expect(bar()!.textContent).toContain("for example a check for updates you have just started");
   });
 
-  it("opens the window from the menu, and starts the update after the step-up", async () => {
+  it("opens the window from the row, and starts the update after the step-up", async () => {
     owned();
     await mount([], Role.OWNER);
-    await press(trigger("de1"));
-    await press(item("Install updates…"));
+    await open("de1");
+    await click(action("Install"));
     const dialog = document.querySelector<HTMLElement>("[data-shot=os-confirm]")!;
     expect(dialog.textContent).toContain("Install security updates on de1");
     await act(async () => [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Install updates")!.click());
@@ -193,37 +199,46 @@ describe("Server operating system", () => {
     expect(updates.startOsRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED });
   });
 
-  it("opens the reboot window from the menu", async () => {
+  it("opens the reboot window from the row", async () => {
     owned();
     await mount([], Role.OWNER);
-    await press(trigger("de1"));
-    await press(item("Reboot…"));
+    await open("de1");
+    await click(action("Reboot"));
     expect(document.querySelector<HTMLElement>("[data-shot=os-confirm]")!.textContent).toContain("Reboot de1");
   });
 
-  it("checks for updates from the menu without a window or a step-up", async () => {
+  it("checks for updates from the row without a window or a step-up", async () => {
     owned();
     await mount([], Role.OWNER);
-    await press(trigger("de1"));
-    await press(item("Check for updates"));
+    await open("de1");
+    await click(action("Check for updates"));
     expect(updates.refreshOsUpdates).toHaveBeenCalledWith({ nodeIds: ["nod_1"] });
     expect(guard).not.toHaveBeenCalled();
     expect(document.querySelector("[data-shot=os-confirm]")).toBeNull();
   });
 
-  it("keeps install and reboot off while a stopped update waits to be closed, and shows that run under its row", async () => {
+  it("shows a stopped update under its closed row, and keeps install and reboot off while it waits to be closed", async () => {
     const stopped = {
       id: "osr_1", status: OsRolloutStatus.PAUSED, mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED, createdUnix: now - 600, finishedUnix: 0, pauseKey: "step_failed", pauseParams: { node: "fi1" },
       steps: [{ nodeId: "nod_3", nodeName: "fi1", state: OsStepState.FAILED, jobId: "osj_1", phase: "", phaseUnix: 0, kernelFrom: "", kernelTo: "", sentUnix: now - 500, rebootUnix: 0, backUnix: 0, finishedUnix: now - 400, errorKey: "job_failed", params: { code: "disk_full", mode: "security" } }],
     };
     owned({ rollout: stopped });
     await mount([], Role.OWNER);
-    await press(trigger("de1"));
-    expect(item("Install updates…")?.hasAttribute("data-disabled")).toBe(true);
-    expect(popup()).toContain("Another OS update is running or waits to be closed.");
-    // checking the lists stays possible: the run is on another node
-    expect(item("Check for updates")?.hasAttribute("data-disabled")).toBe(false);
     expect(host!.querySelector("[data-shot=os-node-actions] [role=alert]")?.textContent).toContain("The update of fi1 stopped.");
+    await open("de1");
+    expect(action("Install")?.disabled).toBe(true);
+    expect(bar()!.textContent).toContain("Another OS update is running or waits to be closed.");
+    // checking the lists stays possible: the run is on another node
+    expect(action("Check for updates")?.disabled).toBe(false);
+  });
+
+  it("gives an observer the security names and the reason there are no buttons, and nothing to press", async () => {
+    owned();
+    await mount([], Role.READONLY);
+    await open("de1");
+    expect(host!.textContent).toContain("Only the owner can install updates and reboot");
+    expect([...host!.querySelectorAll("button")].filter((b) => !b.classList.contains("uq-r"))).toHaveLength(0);
+    expect(host!.textContent).toContain("Open node ›");
   });
 
   it("says why the panel cannot read its own server, and that everything is up to date", async () => {
@@ -232,7 +247,7 @@ describe("Server operating system", () => {
     const text = host!.textContent!;
     expect(text).toContain("The panel does not run as root");
     expect(text).toContain("Runs on the panel's server");
-    expect(text).toContain("Every server is up to date");
+    expect(text).toContain("The system is up to date on all servers");
   });
 
   it("is absent on the Cloudflare edition and asks for nothing", async () => {
@@ -246,16 +261,16 @@ describe("Server operating system", () => {
     updates.getOsUpdates.mockResolvedValue(answer);
     await mount();
     const text = host!.textContent!;
-    expect(text).toContain("Нужна перезагрузка: 1");
+    expect(chips()).toEqual(["Нужна перезагрузка1", "С обновлениями безопасности1"]);
     expect(text).toContain("Ждут: 12 · безопасности: 4");
     expect(text).not.toContain("security: 4");
   });
 
-  it("names the menu in Russian", async () => {
+  it("names the actions in Russian", async () => {
     setLang("ru");
     owned();
     await mount([], Role.OWNER);
-    await press(trigger("de1", "Действия с ОС:"));
-    expect(items().map((i) => i.textContent)).toEqual(["Установить обновления…", "Перезагрузить…", "Проверить обновления"]);
+    await open("de1");
+    expect([...bar()!.querySelectorAll("button")].map((b) => b.textContent!.trim())).toEqual(["Поставить обновления безопасности · 4", "Перезагрузить…", "Проверить обновления"]);
   });
 });

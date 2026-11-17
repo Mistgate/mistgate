@@ -177,7 +177,8 @@ describe("panel self-update", () => {
   it("lets an owner check GitHub and exposes an available release", async () => {
     checkPanelUpdate.mockResolvedValue({ update: {} });
     await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
-    expect(text()).toContain("Version v0.3.0 is available");
+    expect(text()).toContain("Available");
+    expect(document.querySelector(".uq-v.new")?.textContent).toContain("v0.3.0");
     expect(button("Update panel")).toBeTruthy();
     await click(button("Check GitHub"));
     expect(checkPanelUpdate).toHaveBeenCalledTimes(1);
@@ -187,9 +188,9 @@ describe("panel self-update", () => {
     installPanelUpdate.mockResolvedValue({ update: {} });
     const sha = "ab".repeat(32);
     await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "", publishedUnix: 2000, checkedUnix: 1000, built: 1500, sha256: sha, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
-    // the SHA-256 is a detail of the panel's bar: folded until asked for
+    // the SHA-256 is a detail of the panel's card: folded until asked for
     expect(text()).not.toContain("abababababab");
-    await click(document.querySelector("button[aria-controls='up-panel-details']"));
+    await click(document.querySelector("button[aria-controls='uq-det']"));
     expect(text()).toContain("abababababab");
     await click(button("Update panel"));
     await settle();
@@ -206,7 +207,8 @@ describe("panel self-update", () => {
 
   it("says a release without a valid panel signature cannot be installed", async () => {
     await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "", publishedUnix: 2000, checkedUnix: 1000, built: 0, sha256: "", available: false, supported: true, installable: false, installing: false, errorKey: "unsigned" } } }));
-    expect(text()).toContain("v0.3.0 is not signed with this panel’s release key: it cannot be installed");
+    expect(text()).toContain("Release not installed: the signature didn’t match");
+    expect(text()).toContain("The manifest of v0.3.0 is signed with a different key than the one built into the panel. The panel stayed on 0.2.0-bbb, nothing changed");
     expect(button("Update panel")).toBeUndefined();
   });
 
@@ -222,7 +224,8 @@ describe("panel self-update", () => {
     role = Role.READONLY;
     await mount(page({ panel: { ...page().panel, update: { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" } } }));
     expect(button("Update panel")).toBeUndefined();
-    expect(text()).toContain("Version v0.3.0 is available");
+    expect(text()).toContain("Available");
+    expect(text()).toContain("Only the owner can update the panel");
   });
 
   it("shows the same update controls and an About card in Settings → System", async () => {
@@ -332,8 +335,9 @@ describe("the Updates screen", () => {
 
   it("says all is current when every node is", async () => {
     await mount(page({ nodes: [node({ state: NodeUpdateState.UP_TO_DATE })] }));
-    expect(text()).toContain("All nodes are up to date");
-    expect(text()).toContain("Every node runs the newest agent");
+    expect(text()).toContain("1 of 1 node on 0.2.0-bbb");
+    expect(text()).toContain("The node agent 0.2.0-bbb is on every node");
+    expect(text()).toContain("All up to date");
     expect(bulk()).toBeUndefined();
     expect(text()).toContain("Signature verified");
   });
@@ -341,8 +345,11 @@ describe("the Updates screen", () => {
   it("counts a node as up to date only when it said so: offline nodes are named apart", async () => {
     const off = (id: string, name: string) => node({ nodeId: id, name, state: NodeUpdateState.OFFLINE });
     await mount(page({ nodes: [...outdated, off("nod_3", "fi1"), off("nod_4", "se1"), off("nod_5", "lv1")] }));
-    expect(text()).toContain("0 of 5 up to date · 3 offline");
-    expect(text()).not.toContain("3 of 5 up to date");
+    expect(text()).toContain("0 of 5 nodes on 0.2.0-bbb");
+    expect(text()).not.toContain("3 of 5 nodes on");
+    // the offline ones are named apart, with what happens to them
+    expect(text()).toContain("fi1, se1, lv1 are offline");
+    expect(text()).toContain("A schedule runs when the nodes are back");
   });
 
   it("says how far the fleet is and leads with one button that updates the rest, plus one button per node", async () => {
@@ -355,10 +362,15 @@ describe("the Updates screen", () => {
     expect(document.querySelector("button[aria-label='Update nl1']")).not.toBeNull();
     // the other rows are done: no update button
     expect(document.querySelector("button[aria-label='Update fi1']")).toBeNull();
-    // the fleet in one look: a segment per node and the count of each group
-    const bar = document.querySelector<HTMLElement>("[role=img][aria-label^='Nodes by update state']")!;
-    expect(bar.getAttribute("aria-label")).toBe("Nodes by update state: 2 up to date, 2 can be updated");
-    expect(bar.children).toHaveLength(4);
+    // the fleet in one look: a card per node, in the colour of where it stands; the canary (the quietest) leads
+    const cards = [...document.querySelectorAll(".uq-ft")];
+    expect(cards).toHaveLength(4);
+    expect(cards.filter((c) => c.classList.contains("part"))).toHaveLength(2);
+    expect(cards.filter((c) => c.classList.contains("ok"))).toHaveLength(2);
+    expect(cards[0]!.classList.contains("can")).toBe(true);
+    expect(cards[0]!.textContent).toContain("nl1");
+    expect(cards[0]!.textContent).toContain("canary");
+    expect(cards[0]!.textContent).toContain("can be updated to 0.2.0-bbb");
   });
 
   it("starts a rollout of every node that can be updated, the canary named, after a window that says what happens", async () => {
@@ -423,14 +435,18 @@ describe("the Updates screen", () => {
     expect(button("Update 2 nodes")).toBeUndefined();
   });
 
-  it("opens the schedule of one node from its menu", async () => {
+  it("opens the window of one node from its Schedule button, with the two ways to update it", async () => {
     await mount(page({ nodes: outdated }));
     expect(menuItem("Schedule…")).toBeUndefined();
-    await press(document.querySelector("button[aria-label='More actions for de1']"));
-    expect(menuItem("Roll back…")).toBeUndefined(); // nothing to roll back yet
-    await click(menuItem("Schedule…"));
+    // nothing to roll back yet: no menu on the row
+    expect(document.querySelector("button[aria-label='More actions for de1']")).toBeNull();
+    const row = document.querySelector("button[aria-label='Update de1']")!;
+    expect(row.textContent).toBe("Schedule");
+    await click(row);
     expect(dialog()!.textContent).toContain("Update de1");
-    expect(dialog()!.querySelector<HTMLInputElement>('input[name="node-update-mode"][value="schedule"]')!.checked).toBe(true);
+    const choices = [...dialog()!.querySelectorAll("[role=radio]")];
+    expect(choices.map((c) => c.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+    expect(choices[1]!.textContent).toContain("Choose a date and time");
   });
 
   it("keeps a row without a second action free of the menu", async () => {
@@ -474,7 +490,7 @@ describe("the Updates screen", () => {
     await click(document.querySelector("button[aria-label='Update de1']")!);
     const modal = dialog()!;
     expect(modal.textContent).toContain("This node is offline");
-    const later = modal.querySelector<HTMLInputElement>('input[name="node-update-mode"][value="schedule"]')!;
+    const later = modal.querySelectorAll<HTMLElement>("[role=radio]")[1]!;
     await act(async () => later.click());
     const date = modal.querySelector<HTMLInputElement>("#node-update-at")!;
     await act(async () => {
@@ -511,7 +527,7 @@ describe("the Updates screen", () => {
     role = Role.HELPER;
     await mount(page({ nodes: [...outdated, node({ nodeId: "nod_3", name: "fi1", lastUpdate: { outcome: "ok", fromVersion: "0.0.9", toVersion: "0.1.0", atUnix: 5 } })] }));
     expect(text()).toContain("Node agent 0.2.0-bbb");
-    expect(text()).toContain("Only the owner can update nodes, set schedules, and manage rollouts");
+    expect(text()).toContain("Only the owner can update agents");
     expect(bulk()).toBeUndefined();
     expect(button("Update")).toBeUndefined();
     expect(button("Roll back")).toBeUndefined();
@@ -532,15 +548,15 @@ describe("the Updates screen", () => {
         }),
       }),
     );
-    expect(text()).toContain("Updating the fleet to 0.2.0-bbb");
-    expect(text()).toContain("1 of 3 nodes updated");
+    // what the rollout does this moment, and how far it got
+    expect(document.querySelector(".uq-now")?.textContent).toContain("Checking de1 for 5 minutes…");
+    expect(document.querySelector(".uq-now")?.textContent).toContain("1 of 3 nodes updated");
+    expect(text()).toContain("1 of 2 nodes on 0.2.0-bbb");
     expect(text()).toContain("Canary");
     expect(text()).toContain("Batch 1");
-    expect(text()).toContain("2 nodes together");
     expect(text()).toContain("checking");
     expect(text()).toContain("waiting");
     expect(bulk()).toBeUndefined();
-    expect(document.querySelector("[role=progressbar]")?.getAttribute("aria-valuenow")).toBe("1");
 
     await click(button("Pause"));
     expect(pauseRollout).toHaveBeenCalledWith({ rolloutId: "rol_1" });
@@ -549,7 +565,7 @@ describe("the Updates screen", () => {
   it("asks before cancelling a rollout", async () => {
     cancelRollout.mockResolvedValue({});
     await mount(page({ nodes: [node({ state: NodeUpdateState.UPDATING })], rollout: rollout({ steps: [step({ state: StepState.SENT })] }) }));
-    await click(button("Cancel rollout"));
+    await click(button("Stop"));
     expect(dialog()!.textContent).toContain("Cancel the rollout?");
     expect(cancelRollout).not.toHaveBeenCalled();
     await click(inDialog("Cancel rollout"));
@@ -582,6 +598,7 @@ describe("the Updates screen", () => {
     expect(open.dataset.params).toBe(JSON.stringify({ id: "nod_2" }));
     expect(open.dataset.search).toBe(JSON.stringify({ tab: "history" }));
     expect(button("Resume")!.className).not.toContain("bg-accent");
+    expect(document.querySelector(".rc-pb.bad")).not.toBeNull();
     // the node's name in the rollout steps leads to it too
     expect([...document.querySelectorAll("a")].some((a) => a.textContent === "de1" && a.dataset.params === JSON.stringify({ id: "nod_2" }))).toBe(true);
     await click(button("Resume"));
@@ -590,7 +607,9 @@ describe("the Updates screen", () => {
 
   it("offers Resume as the main button after the owner's own pause", async () => {
     await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.PAUSED, pauseKey: "updates.pause.owner", steps: [step({ state: StepState.PASSED })] }) }));
-    expect(button("Resume")!.className).toContain("bg-accent");
+    expect(button("Resume")).toBeTruthy();
+    // the owner's own pause is amber, not the red of a node that failed
+    expect(document.querySelector(".rc-pb")?.classList.contains("bad")).toBe(false);
     expect([...document.querySelectorAll("a")].some((a) => a.textContent?.startsWith("Open "))).toBe(false);
   });
 
@@ -605,19 +624,19 @@ describe("the Updates screen", () => {
       }),
     );
     // a finished rollout folds to its header; its stages are one click away
-    expect(text()).not.toContain("These nodes were not touched");
+    expect(document.querySelector(".uq-ls")).toBeNull();
     await click(button("Show stages"));
     expect(text()).toContain("Skipped");
-    expect(text()).toContain("These nodes were not touched");
-    const chips = [...document.querySelectorAll("ol li ul li")].map((li) => li.textContent);
+    const rows = [...document.querySelectorAll(".uq-ls > div")].map((r) => r.textContent);
     // the node that was passed over says "skipped", never the "updated" of an update that did not happen
-    expect(chips).toEqual(["de1updated · 0.2.0-bbb", "de2skipped"]);
+    expect(rows[0]).toBe("de1Canaryupdated · 0.2.0-bbb");
+    expect(rows[1]).toContain("de2Skippedskipped");
     expect(text()).toContain("Skipped: the node was offline.");
   });
 
   it("keeps the last finished rollout on the page without making it the hero", async () => {
     await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.DONE, finishedUnix: 50, steps: [step({ state: StepState.PASSED })] }) }));
-    expect(text()).toContain("All nodes are up to date");
+    expect(text()).toContain("All up to date");
     expect(text()).toContain("The last rollout");
     expect(text()).toContain("Done");
     expect(button("Pause")).toBeUndefined();
@@ -648,10 +667,9 @@ describe("the Updates screen", () => {
 
   it("says a node waits for a manual update instead of 'all up to date', and gives the two commands to copy", async () => {
     await mount(page({ nodes: [node(), node({ nodeId: "nod_9", name: "de2", state: NodeUpdateState.UNSUPPORTED, supportsUpdate: false, address: "de2.example.com", arch: "arm64" })], bundle: bundle({ files: [{ os: "linux", arch: "arm64", name: "mistgate-node-linux-arm64", size: 1, sha256: "ab" }] }) }));
-    expect(text()).toContain("MANUAL STEP NEEDED");
     expect(text()).toContain("1 node waits for a manual update: de2");
     expect(text()).toContain("Update by hand: de2"); // the page's subtitle
-    expect(text()).not.toContain("All nodes are up to date");
+    expect(text()).not.toContain("All up to date");
     const toggles = buttons().filter((b) => b.textContent === "How to update");
     expect(toggles.length).toBeGreaterThan(0);
     expect(document.querySelector("code")).toBeNull();
@@ -741,29 +759,29 @@ describe("the folds of the Updates screen", () => {
     expect(text()).toContain("Failed: de1's profiles did not answer the panel, and not from nl2 either.");
   });
 
-  it("shows a running rollout as chips, one per node, never as bars that run across the page", async () => {
+  it("shows a running rollout as rows, one per node, and as a card per node above", async () => {
     await mount(page({ nodes: [node({ state: NodeUpdateState.UPDATING })], rollout: rollout({ steps: [step({ nodeName: "de1", state: StepState.GATING })] }) }));
-    const chips = [...document.querySelectorAll("ol li ul li")].map((li) => li.textContent);
-    expect(chips).toEqual(["de1checking…"]);
+    const rows = [...document.querySelectorAll(".uq-ls > div")].map((r) => r.textContent);
+    expect(rows).toEqual(["de1Canarychecking…"]);
+    expect(document.querySelector(".uq-ft.now")?.textContent).toContain("checking for 5 minutes");
     expect(button("Hide stages")).toBeUndefined(); // a running rollout cannot be folded
   });
 
   it("opens the panel's steps by itself when it cannot update itself, and leaves the details folded otherwise", async () => {
-    route.search = { tab: "panel" }; // the panel's own layer
+    route.search = { tab: "panel" }; // the panel's own tab
     await mount(page({ nodes: [node()] }));
-    expect(detailsOf("up-panel-details")!.getAttribute("aria-expanded")).toBe("false");
+    expect(detailsOf("uq-det")!.getAttribute("aria-expanded")).toBe("false");
     expect(text()).not.toContain("Updating the panel itself");
     act(() => root?.unmount());
     host?.remove();
     await mount(page({ nodes: [node()], panel: { ...page().panel, update: { ...page().panel.update, supported: false } } }));
-    expect(detailsOf("up-panel-details")!.getAttribute("aria-expanded")).toBe("true");
+    expect(detailsOf("uq-det")!.getAttribute("aria-expanded")).toBe("true");
     expect(text()).toContain("Updating the panel itself");
   });
 });
 
 describe("the nodes of a rollout in progress", () => {
-  const table = () => document.querySelector<HTMLElement>(".md\\:block")!;
-  const row = (name: string) => [...table().querySelectorAll<HTMLElement>(":scope > div:not(:first-child)")].find((r) => r.textContent?.startsWith(name))!;
+  const row = (name: string) => [...document.querySelectorAll<HTMLElement>(".uq-t > .uq-r:not(.uq-h)")].find((r) => r.textContent?.startsWith(name))!;
   // the server plans a canary and then one node per stage while fewer than five are to be updated
   const fleet = [
     node({ nodeId: "nod_1", name: "nl1", state: NodeUpdateState.UP_TO_DATE, lastUpdate: { outcome: "ok", fromVersion: "0.1.0", toVersion: "0.2.0", atUnix: 900 } }),
@@ -811,7 +829,7 @@ describe("the nodes of a rollout in progress", () => {
         }),
       }),
     );
-    const progress = document.querySelector<HTMLElement>('div[role="progressbar"][aria-valuenow="50"]');
+    const progress = document.querySelector<HTMLElement>('[role="progressbar"][aria-valuenow="50"]');
     expect(progress?.getAttribute("aria-label")).toBe("Download progress: 50%");
     expect(progress?.textContent).toContain("50% · 128 B/s");
     expect(progress?.textContent).toContain("512 B / 1 KiB");
@@ -826,13 +844,13 @@ describe("the nodes of a rollout in progress", () => {
         rollout: rollout({ steps: [step({ nodeId: "nod_1", nodeName: "de1", state: StepState.SENT, downloadPhase: "downloading", downloadedBytes: 512, totalBytes: 1024, bytesPerSecond: 128, downloadSource })] }),
       });
     await mount(sent("github"));
-    expect(document.querySelector('div[role="progressbar"][aria-valuenow="50"]')?.textContent).toContain("50% · 128 B/s · from GitHub");
+    expect(document.querySelector('[role="progressbar"][aria-valuenow="50"]')?.textContent).toContain("50% · 128 B/s · from GitHub");
     // a name the node made up is not worded
     await act(async () => root!.unmount());
     host!.remove();
     await mount(sent("<b>evil</b>"));
-    expect(document.querySelector('div[role="progressbar"][aria-valuenow="50"]')?.textContent).toContain("50% · 128 B/s");
-    expect(document.querySelector('div[role="progressbar"][aria-valuenow="50"]')?.textContent).not.toContain("from");
+    expect(document.querySelector('[role="progressbar"][aria-valuenow="50"]')?.textContent).toContain("50% · 128 B/s");
+    expect(document.querySelector('[role="progressbar"][aria-valuenow="50"]')?.textContent).not.toContain("from");
   });
 
   it("lists what a failed download tried under the error, and keeps the node's odd text out of it", async () => {
@@ -853,10 +871,10 @@ describe("the nodes of a rollout in progress", () => {
     }
   });
 
-  it("subtitle a stage of one node neutrally (it is not always the next one) and a stage of several as together", async () => {
+  it("names the stage of every node: the canary first, then the batches, two nodes of one batch under the same name", async () => {
     await mount(page({ nodes: fleet, rollout: rollout({ steps: [...steps, step({ nodeId: "nod_6", nodeName: "x1", stage: 3, state: StepState.PENDING })] }) }));
-    const stages = [...document.querySelectorAll("ol > li")].map((li) => li.firstElementChild!.textContent);
-    expect(stages).toEqual(["CanaryOne node first, checked for 5 minutes", "Batch 11 node", "Batch 21 node", "Batch 32 nodes together"]);
+    const stages = [...document.querySelectorAll(".uq-ls > div > em")].map((e) => e.textContent);
+    expect(stages).toEqual(["Canary", "Batch 1", "Batch 2", "Batch 3", "Batch 3"]);
     expect(text()).not.toContain("next node");
   });
   it("keep Roll back where it is allowed, and lose Schedule", async () => {
@@ -957,25 +975,22 @@ describe("What's new", () => {
 
   it("badges a release with security fixes and says so plainly", async () => {
     await mount(behind({ agentNotes: [note("v0.1.40"), note("v0.1.39", { security: true, en: "## Security\n\n- Fixed a hole." })] }));
-    expect(text()).toContain("Includes security fixes — update soon.");
-    // the badge is on the release that has the fixes, which is folded here
+    expect(text()).toContain("There are security fixes — better update soon");
+    // the fixes are in the release that is folded here: its line carries the word "Security"
     expect(text()).not.toContain("Fixed a hole.");
     await click(button("and 1 earlier version"));
     expect(text()).toContain("Fixed a hole.");
-    expect(article("v0.1.39")?.textContent).toContain("Security fixes");
-    expect(article("v0.1.40")?.textContent).not.toContain("Security fixes");
+    expect(article("v0.1.39")?.textContent).toContain("Security");
+    expect(article("v0.1.40")?.textContent).not.toContain("Security");
   });
 
-  it("clamps a long release and offers Show all", async () => {
-    const long = Array.from({ length: 14 }, (_, i) => `- line ${i}`).join("\n");
-    await mount(behind({ agentNotes: [note("v0.1.40", { en: long })] }));
-    expect(document.querySelector("article div.max-h-56")).toBeTruthy();
-    await click(button("Show all"));
-    expect(document.querySelector("article div.max-h-56")).toBeNull();
-    expect(button("Show less")).toBeTruthy();
-    // a short one has no button
-    await remount(behind({ agentNotes: [note("v0.1.40")] }));
-    expect(button("Show all")).toBeUndefined();
+  it("puts every bullet on a line of its own, with the word of its section in front, and a nested bullet under it", async () => {
+    const en = ["## Features", "", "- **Node page:** keeps the filters.", "  - the choice is kept per device", "", "## Fixes", "", "- A fix.", "", "## Docs", "", "- A page."].join("\n");
+    await mount(behind({ agentNotes: [note("v0.1.40", { en })] }));
+    const lines = [...document.querySelectorAll("article li")].map((li) => li.textContent);
+    expect(lines).toEqual(["NewNode page: keeps the filters.– the choice is kept per device", "FixedA fix.", "DocsA page."]);
+    expect([...document.querySelectorAll("article .uq-tg")].map((e) => e.className)).toEqual(["uq-tg new", "uq-tg fix", "uq-tg"]);
+    // a single release has no earlier versions to offer
     expect(text()).not.toContain("earlier version");
   });
 
@@ -1075,7 +1090,7 @@ describe("the Cloudflare edition", () => {
   });
 
   it("says the panel row is updated with mistgate edge deploy, without systemd, and gives the command", async () => {
-    route.search = { tab: "panel" }; // the panel's own layer
+    route.search = { tab: "panel" }; // the panel's own tab
     await mount(edgePage({ nodes: [node()] }));
     expect(text()).toContain("Updated with mistgate edge deploy");
     expect(text()).toContain("This panel runs on Cloudflare. Update it from your computer with this command; --rollback in place of --version returns the previous version.");
@@ -1084,7 +1099,7 @@ describe("the Cloudflare edition", () => {
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     expect(button("Update panel")).toBeUndefined();
     // the details hold no steps for a panel that cannot update itself
-    await click(document.querySelector("button[aria-controls='up-panel-details']"));
+    await click(document.querySelector("button[aria-controls='uq-det']"));
     expect(text()).not.toContain("Updating the panel itself");
   });
 

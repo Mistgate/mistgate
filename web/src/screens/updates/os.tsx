@@ -1,85 +1,26 @@
 import { Link } from "@tanstack/react-router";
-import { useId, useState, type ReactNode } from "react";
-import { Pending, QueryError } from "@/components/ui/query-error";
-import { StatusPill, kindTextClass } from "@/components/ui/status";
+import { useId, useState } from "react";
 import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
-import { useFmt, type Fmt } from "@/lib/format";
+import { useFmt } from "@/lib/format";
 import { fleetPhase, installable, isFleetRun, lockNowText, phaseOpen } from "@/lib/os-fleet";
 import { resultHorizonS, rolloutBlocksOthers, useOsActions } from "@/lib/os-run";
 import { osPill, osRows, osSummary, osSystem, osUpdatesLine, useOsUpdates, type OsRow } from "@/lib/os-updates";
 import { useIsOwner } from "@/lib/updates";
-import { OsNodeActions, OsRowMenu } from "./os-actions";
+import { G } from "@/screens/users/user-bits";
+import { CardHead, D, ErrorCard, Gl, NodeName, Pill, Skeleton, gk, useFlags } from "./bits";
+import { OsNodeActions } from "./os-actions";
 import { OsFleetDialog } from "./os-fleet-dialog";
 import { OsFleetRun, OsSelectionBar } from "./os-fleet-run";
 import { OsKernels } from "./os-kernels";
 import { SecurityList, SecurityToggle } from "./os-security";
 
-// Updates -> Server operating system: the packages and the kernel of the panel's own server and of every node, as the
-// servers read them from disk. A node's row ends in the ⋯ menu that installs its updates, reboots it or checks for
-// updates; the run that is going on, and its outcome, sit under the row (os-actions). For the owner each node has a tick:
-// several ticked nodes are updated in one run (os-fleet-dialog), which then shows as a queue above the table (os-fleet-run).
-
-// The same columns for the header and every row: server, system, kernel, updates, state, the ⋯ of the row; for the owner a tick in front.
-const cols = "md:grid-cols-[minmax(120px,1fr)_110px_minmax(170px,1.1fr)_minmax(190px,1fr)_minmax(180px,1.4fr)_36px]";
-const colsTick = "md:grid-cols-[20px_minmax(120px,1fr)_110px_minmax(170px,1.1fr)_minmax(190px,1fr)_minmax(180px,1.4fr)_36px]";
-
-function Server({ row }: { row: OsRow }) {
-  const t = useT();
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      {row.nodeId ? (
-        <Link to="/nodes/$id" params={{ id: row.nodeId }} className="truncate text-sm font-bold hover:underline">
-          {row.name}
-        </Link>
-      ) : (
-        <span className="truncate text-sm font-bold">{t("up.os.panelHost")}</span>
-      )}
-      <span className="text-[11px] text-muted">
-        {row.onPanelServer ? t("up.os.onPanel") : row.online !== undefined ? t("up.nodes.online", { n: row.online }) : t("up.os.panelHost.sub")}
-      </span>
-    </div>
-  );
-}
-
-function Kernel({ row }: { row: OsRow }) {
-  const t = useT();
-  const s = row.status;
-  if (!s?.kernelRunning) return <span className="text-xs text-faint">—</span>;
-  const next = s.kernelNewest && s.kernelNewest !== s.kernelRunning ? s.kernelNewest : "";
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="truncate font-mono text-xs font-bold" title={s.kernelRunning}>
-        {s.kernelRunning}
-      </span>
-      {next ? (
-        <span className={cx("truncate font-mono text-[11px]", kindTextClass.warn)} title={next}>
-          → {next}
-        </span>
-      ) : s.container ? (
-        <span className="text-[11px] text-muted">{t("up.os.container")}</span>
-      ) : null}
-    </div>
-  );
-}
-
-type Names = { open: boolean; onToggle: () => void; id: string };
-
-function Updates({ row, fmt, names }: { row: OsRow; fmt: Fmt; names: Names }) {
-  const t = useT();
-  const s = row.status;
-  if (!s || s.error) return <span className="text-xs text-faint">—</span>;
-  const line = osUpdatesLine(t, s);
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 text-xs">
-      <span className={cx("font-bold md:whitespace-nowrap", line.warn && kindTextClass.warn)}>{line.main}</span>
-      {line.note && <span className="text-[11px] text-muted">{line.note}</span>}
-      <SecurityToggle status={s} open={names.open} onToggle={names.onToggle} controls={names.id} />
-      <span className="text-[11px] text-muted">{s.listsUnix > 0 ? t("up.os.lists", { ago: fmt.ago(s.listsUnix) }) : t("up.os.lists.none")}</span>
-    </div>
-  );
-}
+// Updates -> Server operating system: the packages and the kernel of the panel's own server and of every node, as the servers read
+// them from disk, in the board's table: the server, its system, its kernel, what waits, the state and a chevron that opens what can be
+// done (install the security updates, reboot, check for updates). The run that is going on, and its outcome, sit under the row. For
+// the owner each node has a tick: several ticked nodes are updated in one run (os-fleet-dialog), which then shows as a queue above the
+// table (os-fleet-run).
 
 /** The lines under the pill: why a reboot, and what on the server needs a look before anyone updates it. */
 function notes(t: T, row: OsRow): { text: string; warn: boolean }[] {
@@ -104,105 +45,135 @@ function notes(t: T, row: OsRow): { text: string; warn: boolean }[] {
   return out;
 }
 
-function State({ row }: { row: OsRow }) {
+type Pick = { on: boolean; onChange: (on: boolean) => void };
+
+/** One server: the row (a button that opens what can be done) and, under it, the run that is going on or its outcome. */
+function ServerRow({ row, tick, owner, countryCode, defaultOpen }: { row: OsRow; tick?: Pick; owner: boolean; countryCode?: string; defaultOpen?: boolean }) {
   const t = useT();
+  const fmt = useFmt();
+  const [open, setOpen] = useState(!!defaultOpen);
+  const [names, setNames] = useState(false);
+  const id = useId();
+  const s = row.status;
   const pill = osPill(row);
+  const line = s && !s.error ? osUpdatesLine(t, s) : null;
+  const next = s?.kernelNewest && s.kernelNewest !== s.kernelRunning ? s.kernelNewest : "";
+  const lines = notes(t, row);
+  const busy = pill.key === "up.os.state.busy";
+  // a row opens when there is something behind it: the owner's three actions on a node, the names of the security packages, the node's page
+  const act = !!row.nodeId && (owner || !!s?.security || !!s?.kernelRunning);
+  const security = s?.security ?? 0;
+  const just = !busy && row.step?.state !== undefined && row.rollout !== undefined && row.rollout.finishedUnix > 0 && (row.nowUnix ?? 0) - row.rollout.finishedUnix < 60;
   return (
-    <div className="flex min-w-0 flex-col items-start gap-1">
-      <StatusPill kind={pill.kind} label={t(pill.key)} sm />
-      {notes(t, row).map((n) => (
-        <span key={n.text} className={cx("text-[11px] leading-snug text-pretty", n.warn ? kindTextClass.warn : "text-muted")}>
-          {n.text}
+    <div className={cx("uq-w", open && act && "open", !act && "flat", busy && "cking", just && "ckn")}>
+      <button type="button" className="uq-r" aria-expanded={open && act} aria-controls={id} onClick={() => act && setOpen(!open)}>
+        {tick && <span aria-hidden className="uq-tk0" />}
+        <span className="uq-n">
+          {row.nodeId ? <NodeName name={row.name ?? ""} countryCode={countryCode} /> : <b>{t("up.os.panelHost")}</b>}
+          <em>{row.onPanelServer ? t("up.os.onPanel") : row.online !== undefined ? t("up.nodes.online", { n: row.online }) : t("up.os.panelHost.sub")}</em>
         </span>
-      ))}
+        <span className="uq-sys" data-l={t("up.os.col.system")} data-k="sys">
+          {osSystem(s) || "—"}
+        </span>
+        <span className="uq-k mono" data-l={t("up.os.col.kernel")}>
+          {s?.kernelRunning ? (
+            <>
+              <span title={s.kernelRunning}>{s.kernelRunning}</span>
+              {next ? <em title={next}>→ {next}</em> : s.container ? <em className="uq-cont">{t("up.os.container")}</em> : null}
+            </>
+          ) : (
+            <span>—</span>
+          )}
+        </span>
+        <span className="uq-up" data-l={t("up.os.col.updates")}>
+          {line ? (
+            <>
+              <b className={cx(line.warn && "part")}>{line.main}</b>
+              {line.note && <em>{line.note}</em>}
+              <em>{s && s.listsUnix > 0 ? t("up.os.lists", { ago: fmt.ago(s.listsUnix) }) : t("up.os.lists.none")}</em>
+            </>
+          ) : (
+            <span>—</span>
+          )}
+        </span>
+        <span className="uq-st">
+          <Pill k={gk(pill.kind)}>{t(pill.key)}</Pill>
+          {lines.slice(0, 2).map((n) => (
+            <em key={n.text} className={cx(n.warn && "uq-lx")}>
+              {n.text}
+            </em>
+          ))}
+        </span>
+        <G d={D.chev} size={16} stroke={1.75} className="uq-chev" />
+      </button>
+      {tick && row.nodeId && (
+        <span className="uq-rtick">
+          <input type="checkbox" checked={tick.on} onChange={(e) => tick.onChange(e.target.checked)} aria-label={t("osf.sel.row", { name: row.name ?? "" })} />
+        </span>
+      )}
+      <div id={id}>
+        {open && act ? (
+          <>
+            <div className="uq-ob">
+              <SecurityToggle status={s} open={names} onToggle={() => setNames(!names)} controls={`${id}-names`} />
+              {names && <SecurityList status={s} node={row.name ?? ""} id={`${id}-names`} />}
+              {owner ? <OsNodeActions row={row} installLabel={security > 0 ? t("uq.os.secBtn", { n: security }) : undefined} /> : <OsNodeActions row={row} compact />}
+              <OsKernels row={row} />
+            </div>
+            <div className="uq-oa">
+              {!owner && <span>{t("uq.ro.os")}</span>}
+              {row.nodeId && (
+                <Link to="/nodes/$id" params={{ id: row.nodeId }} className="nd-lk">
+                  {t("uq.os.openNode")} ›
+                </Link>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="uq-ob">
+            {/* under a closed row: the run that is going on or its outcome, and a reboot the kernel table says would be refused */}
+            <OsNodeActions row={row} compact />
+            <OsKernels row={row} onlyBlocked />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
+/** The chips over the table: how many servers wait for a reboot, how many for security updates. */
 function Summary({ rows }: { rows: OsRow[] }) {
   const t = useT();
   const s = osSummary(rows);
   if (s.known === 0) return null;
-  const parts: ReactNode[] = [];
-  if (s.reboot > 0) parts.push(<span key="reboot" className={kindTextClass.warn}>{t("up.os.summary.reboot", { n: s.reboot })}</span>);
-  if (s.security > 0) parts.push(<span key="security" className={kindTextClass.warn}>{t("up.os.summary.security", { n: s.security })}</span>);
-  if (parts.length === 0) parts.push(<span key="ok">{s.updates > 0 ? t.n("up.os.summary.updates", s.updates) : t("up.os.summary.ok")}</span>);
+  const calm = s.reboot + s.security === 0;
   return (
-    <p className="flex flex-wrap gap-x-3 gap-y-1 text-[13px] font-semibold text-muted">
-      {parts}
-    </p>
-  );
-}
-
-function Tick({ row, on, onChange }: { row: OsRow; on: boolean; onChange: (on: boolean) => void }) {
-  const t = useT();
-  return <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} aria-label={t("osf.sel.row", { name: row.name ?? "" })} className="size-4 flex-none accent-accent" />;
-}
-
-type Pick = { on: boolean; onChange: (on: boolean) => void };
-type RowProps = { row: OsRow; fmt: Fmt; tick?: Pick; defaultOpen?: boolean };
-
-/** A node's row of the table (the wide screen). */
-function TableRow({ row, fmt, tick, defaultOpen }: RowProps) {
-  const [open, setOpen] = useState(!!defaultOpen);
-  const id = useId();
-  return (
-    <div className={cx("grid min-h-[60px] items-center gap-x-4 gap-y-2.5 border-b border-line px-5 py-2.5 text-[13px] last:border-b-0", tick ? colsTick : cols)}>
-      {tick && (row.nodeId ? <Tick row={row} {...tick} /> : <span aria-hidden />)}
-      <Server row={row} />
-      <span className="truncate text-xs text-muted">{osSystem(row.status) || "—"}</span>
-      <Kernel row={row} />
-      <Updates row={row} fmt={fmt} names={{ open, onToggle: () => setOpen(!open), id }} />
-      <State row={row} />
-      <div className="-me-2 flex justify-end">
-        <OsRowMenu row={row} />
-      </div>
-      {/* under the row, the full width: the names of the security packages, then the run that is going on or its outcome; a row with nothing to report has no such line */}
-      <div className="col-span-full empty:hidden">{open && <SecurityList status={row.status} node={row.name ?? ""} id={id} />}</div>
-      <div className="col-span-full empty:hidden">
-        <OsNodeActions row={row} compact />
-      </div>
-      {/* a reboot the kernel table says would be refused: shown open, only then */}
-      <div className="col-span-full empty:hidden">
-        <OsKernels row={row} onlyBlocked />
-      </div>
-    </div>
-  );
-}
-
-/** A node's card (the phone). */
-function Card({ row, fmt, tick, defaultOpen }: RowProps) {
-  const [open, setOpen] = useState(!!defaultOpen);
-  const id = useId();
-  return (
-    <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-3">
-          {tick && row.nodeId && (
-            <span className="mt-0.5">
-              <Tick row={row} {...tick} />
+    <>
+      {calm && (
+        <p className="rc-nt uq-osn">
+          <Gl k="ok" />
+          <span>{s.updates > 0 ? t.n("up.os.summary.updates", s.updates) : t("uq.os.calm")}</span>
+        </p>
+      )}
+      {!calm && (
+        <div className="uq-chips">
+          {s.reboot > 0 && (
+            <span className="uq-chip">
+              <Gl k="part" />
+              {t("uq.os.chip.reboot")}
+              <b className="mono">{s.reboot}</b>
             </span>
           )}
-          <Server row={row} />
+          {s.security > 0 && (
+            <span className="uq-chip">
+              <Gl k="part" />
+              {t("uq.os.chip.sec")}
+              <b className="mono">{s.security}</b>
+            </span>
+          )}
         </div>
-        <div className="-my-1.5 -me-2 flex shrink-0 items-center gap-1">
-          <span className="text-xs text-muted">{osSystem(row.status)}</span>
-          <OsRowMenu row={row} />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Kernel row={row} />
-        <Updates row={row} fmt={fmt} names={{ open, onToggle: () => setOpen(!open), id }} />
-      </div>
-      <div className="empty:hidden">{open && <SecurityList status={row.status} node={row.name ?? ""} id={id} />}</div>
-      <State row={row} />
-      <div className="empty:hidden">
-        <OsNodeActions row={row} compact />
-      </div>
-      <div className="empty:hidden">
-        <OsKernels row={row} onlyBlocked />
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
@@ -210,19 +181,20 @@ function Card({ row, fmt, tick, defaultOpen }: RowProps) {
 /** The dev kit shows ticks and the lists of names already set (`defaultPicked`, `defaultOpenNames`: node ids). */
 export function OsSection({ defaultPicked, defaultOpenNames }: { defaultPicked?: string[]; defaultOpenNames?: string[] } = {}) {
   const t = useT();
-  const fmt = useFmt();
   const { off } = useEdition();
   const owner = useIsOwner();
   const actions = useOsActions();
+  const flags = useFlags();
   const lacking = off("os_updates");
   const q = useOsUpdates(!lacking);
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set(defaultPicked));
   const [asking, setAsking] = useState(false);
   if (lacking) return null;
-  const rows = q.data ? osRows(q.data) : [];
+  if (!q.data) return q.isError ? <ErrorCard onRetry={() => void q.refetch()} /> : <Skeleton />;
+  const rows = osRows(q.data);
   const nodeRows = rows.filter((r) => !!r.nodeId);
-  const run = q.data?.rollout;
-  const nowSec = q.data?.nowUnix ?? 0;
+  const run = q.data.rollout;
+  const nowSec = q.data.nowUnix;
   // ticks only for the owner, when there is more than one node to choose from and no run holds the next one
   const canPick = owner && nodeRows.length > 1 && !rolloutBlocksOthers(run);
   const ticked = nodeRows.filter((r) => picked.has(r.id));
@@ -235,56 +207,51 @@ export function OsSection({ defaultPicked, defaultOpenNames }: { defaultPicked?:
       return next;
     });
   const tickOf = (r: OsRow): Pick | undefined => (canPick ? { on: picked.has(r.id), onChange: toggle(r.id) } : undefined);
-  const heads = [t("up.os.col.server"), t("up.os.col.system"), t("up.os.col.kernel"), t("up.os.col.updates"), t("up.nodes.col.state")];
   const allTicked = fit.length > 0 && fit.every((r) => picked.has(r.id));
   const showRun = isFleetRun(run) && (phaseOpen(fleetPhase(run)) || nowSec - (run.finishedUnix || run.createdUnix) <= resultHorizonS);
   return (
-    <section className="flex flex-col gap-3">
-      {!q.data ? (
-        q.isError ? <QueryError error={q.error} onRetry={() => void q.refetch()} /> : <Pending />
-      ) : (
-        <>
-          <Summary rows={rows} />
-          {showRun && run && <OsFleetRun run={run} owner={owner} actions={actions} nowSec={nowSec} />}
-          {canPick && (
-            <OsSelectionBar
-              count={ticked.length}
-              installable={fit.length}
-              onSelectAll={() => setPicked(new Set(fit.map((r) => r.id)))}
-              onClear={() => setPicked(new Set())}
-              onStart={() => setAsking(true)}
-            />
-          )}
-          <div className="hidden overflow-hidden rounded-card-lg border border-line bg-surface md:block">
-            <div className={cx("grid h-10 items-center gap-4 border-b border-line px-5 text-xs font-semibold text-muted", canPick ? colsTick : cols)}>
-              {canPick && (
-                <input
-                  type="checkbox"
-                  checked={allTicked}
-                  disabled={fit.length === 0}
-                  onChange={() => setPicked(allTicked ? new Set() : new Set(fit.map((r) => r.id)))}
-                  aria-label={t("osf.sel.master")}
-                  className="size-4 accent-accent"
-                />
-              )}
-              {heads.map((h) => (
-                <span key={h}>{h}</span>
-              ))}
-              <span aria-hidden />
-            </div>
-            {rows.map((row) => (
-              <TableRow key={row.id} row={row} fmt={fmt} tick={tickOf(row)} defaultOpen={defaultOpenNames?.includes(row.id)} />
-            ))}
-          </div>
-          <div className="flex flex-col gap-2 md:hidden">
-            {rows.map((row) => (
-              <Card key={row.id} row={row} fmt={fmt} tick={tickOf(row)} defaultOpen={defaultOpenNames?.includes(row.id)} />
-            ))}
-          </div>
-          <p className="text-xs text-pretty text-muted">{t("up.os.readonly")}</p>
-          {asking && ticked.length > 0 && <OsFleetDialog rows={ticked} actions={actions} onClose={() => setAsking(false)} onStarted={() => setPicked(new Set())} />}
-        </>
+    <>
+      <Summary rows={rows} />
+      {showRun && run && (
+        <div className="uq-sel">
+          <OsFleetRun run={run} owner={owner} actions={actions} nowSec={nowSec} />
+        </div>
       )}
-    </section>
+      {canPick && (
+        <div className="uq-sel">
+          <OsSelectionBar
+            count={ticked.length}
+            installable={fit.length}
+            onSelectAll={() => setPicked(new Set(fit.map((r) => r.id)))}
+            onClear={() => setPicked(new Set())}
+            onStart={() => setAsking(true)}
+          />
+        </div>
+      )}
+      <section className="uq-card pp-sec" aria-label={t("uq.os.title")}>
+        <CardHead icon={D.chip} tone="sky" title={t("uq.os.title")} />
+        <div className={cx("uq-t uq-os", canPick && "tick")}>
+          <div className="uq-r uq-h" aria-hidden>
+            {canPick && <span className="uq-tk0" />}
+            <span>{t("up.os.col.server")}</span>
+            <span>{t("up.os.col.system")}</span>
+            <span>{t("up.os.col.kernel")}</span>
+            <span>{t("up.os.col.updates")}</span>
+            <span>{t("up.nodes.col.state")}</span>
+            <span />
+          </div>
+          {canPick && (
+            <span className="uq-rtick uq-selall">
+              <input type="checkbox" checked={allTicked} disabled={fit.length === 0} onChange={() => setPicked(allTicked ? new Set() : new Set(fit.map((r) => r.id)))} aria-label={t("osf.sel.master")} />
+            </span>
+          )}
+          {rows.map((row) => (
+            <ServerRow key={row.id} row={row} tick={tickOf(row)} owner={owner} countryCode={row.nodeId ? flags.get(row.nodeId) : undefined} defaultOpen={defaultOpenNames?.includes(row.id)} />
+          ))}
+        </div>
+        <p className="sb-vfoot">{t("up.os.readonly")}</p>
+      </section>
+      {asking && ticked.length > 0 && <OsFleetDialog rows={ticked} actions={actions} onClose={() => setAsking(false)} onStarted={() => setPicked(new Set())} />}
+    </>
   );
 }

@@ -478,6 +478,8 @@ export function useUpdateActions() {
 
   return {
     busy: call.isPending || checkPanel.isPending,
+    /** GitHub is being asked right now (the Check button of the panel, its spinner and the sweep over the card). */
+    checking: checkPanel.isPending,
     /** Updates the nodes to the bundle the owner saw; the server refuses when the trusted bundle is another one by then. */
     start: (nodeIds: string[], bundle: { version: string; built: number }) =>
       run(() => updates.startRollout({ nodeIds, batchSize: 0, expectedVersion: bundle.version, expectedBuilt: BigInt(bundle.built) }), t("up.start.started"), true),

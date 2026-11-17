@@ -1,32 +1,19 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { EditionNotice } from "@/components/edition-notice";
-import { PageTitle } from "@/components/ui/bits";
-import { Pending, QueryError } from "@/components/ui/query-error";
-import type { StatusKind } from "@/components/ui/status";
 import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
+import { cx } from "@/lib/cx";
+import { useEffectsEnabled } from "@/lib/effects";
 import { useEdition } from "@/lib/edition";
 import { osRows, osSummary, useOsUpdates } from "@/lib/os-updates";
-import {
-  heroOf,
-  isActive,
-  outdatedNodes,
-  canUpdateNode,
-  useIsOwner,
-  useUpdateActions,
-  useUpdates,
-  type NodeUpdate,
-  type Updates,
-} from "@/lib/updates";
-import { PanelBar, panelUpdate } from "./cards";
+import { canUpdateNode, fleetCounts, heroOf, isActive, outdatedNodes, useIsOwner, useUpdateActions, useUpdates, type NodeUpdate, type Updates } from "@/lib/updates";
+import { AgentsTab } from "./agents";
+import { ErrorCard, Skeleton } from "./bits";
 import { CancelDialog, RollbackDialog, RolloutDialog, UpdateNodeDialog } from "./dialogs";
-import { HeroCard } from "./hero";
-import { Layers, type Layer } from "./layers";
-import { NodeTable } from "./nodes";
 import { OsSection } from "./os";
-import { RolloutCard } from "./rollout";
+import { PanelTab, type PanelScene } from "./panel";
 import type { UpdateTab } from "./tabs";
+import "./updates.css";
 
 type Dialog =
   | { kind: "update"; node: NodeUpdate; mode?: "now" | "schedule" }
@@ -35,51 +22,73 @@ type Dialog =
   | { kind: "rollout" }
   | null;
 
-function subtitle(t: T, d?: Updates): string {
-  if (!d) return t("up.sub.loading");
-  if (d.nodes.length === 0) return t("up.sub.none");
-  if (d.rollout && isActive(d.rollout)) return d.rollout.status === RolloutStatus.RUNNING ? t("up.sub.running") : t("up.sub.paused");
-  const n = outdatedNodes(d.nodes).length;
-  if (n > 0) return t.n("up.sub.outdated", n);
+/** What a scene of the dev kit puts in place of what the page would find out by itself (the open tab, the panel's update, a window). */
+export type UpdatesScene = { tab?: UpdateTab; panel?: PanelScene; dialog?: NonNullable<Dialog> };
+
+/** The line under the title: what can be updated now, what is going on, and the servers that wait for a reboot. */
+function summary(t: T, d: Updates | undefined, rebooting: number, loading: boolean): string {
+  if (!d) return loading ? t("uq.sum.load") : t("uq.sum.err");
+  const panel = !!d.panel?.update?.available;
+  const nodes = outdatedNodes(d.nodes).length;
   const hero = heroOf(d);
-  if (hero.id === "manual") return t("up.sub.manual", { names: hero.nodes.map((x) => x.name).join(", ") });
-  return hero.id === "attention" ? t("up.hero.attention.title") : t("up.sub.current");
+  const what =
+    panel && nodes > 0
+      ? t("uq.sum.panelNodes", { nodes: t.n("uq.sum.nodes", nodes) })
+      : panel
+        ? t("uq.sum.panelOnly")
+        : hero.id === "running"
+          ? t("up.sub.running")
+          : hero.id === "paused"
+            ? t("up.sub.paused")
+            : nodes > 0
+              ? t("uq.sum.nodesOnly", { nodes: t.n("uq.sum.nodes", nodes) })
+              : hero.id === "manual"
+                ? t("up.sub.manual", { names: hero.nodes.map((n) => n.name).join(", ") })
+                : hero.id === "attention"
+                  ? t("up.hero.attention.title")
+                  : hero.id === "none"
+                    ? t("up.sub.none")
+                    : t("uq.sum.ok");
+  return rebooting > 0 ? `${what} · ${t("uq.sum.reboot", { n: rebooting })}` : what;
 }
+
+const hashTabs: Record<string, UpdateTab> = { "#panel": "panel", "#pn": "panel", "#agents": "agents", "#ag": "agents", "#os": "os" };
 
 /**
  * Updates, in the order they are done: this panel's own update first (the panel is updated before the nodes), then where
  * the fleet stands and the one button that moves it (with the signed release bundle at its foot), the rollout in progress
- * or the last one, then every node with one main action per row.
+ * or the last one, then every node; the servers' operating system is a tab of its own.
  */
 export function UpdatesScreen() {
+  return <UpdatesView />;
+}
+
+export function UpdatesView({ scene }: { scene?: UpdatesScene }) {
   const t = useT();
   const q = useUpdates();
   // no update, schedule, roll back or bundle rescan there: the buttons go and the nodes stay listed
   const isOwner = useIsOwner();
   const edition = useEdition();
+  const fx = useEffectsEnabled();
   const owner = !edition.off("agent_updates") && isOwner;
-  // the servers' operating system is a tab of its own; the edition without it keeps the page as one list
+  // the servers' operating system is a tab of its own; the edition without it keeps the page as two
   const hasOs = !edition.off("os_updates");
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as { tab?: UpdateTab };
-  const setTab = (next: UpdateTab) => void navigate({ to: "/updates", search: { tab: next }, replace: true });
+  const [sceneTab, setSceneTab] = useState<UpdateTab | undefined>(scene?.tab);
   const os = useOsUpdates(hasOs);
   const actions = useUpdateActions();
-  const [dialog, setDialog] = useState<Dialog>(null);
+  const [dialog, setDialog] = useState<Dialog>(scene?.dialog ?? null);
   const d = q.data;
-
-  const header = (
-    <div className="flex flex-col gap-[3px]">
-      <PageTitle>{t("up.title")}</PageTitle>
-      {!(q.isError && !d) && <span className="text-xs text-muted">{subtitle(t, d)}</span>}
-    </div>
-  );
 
   if (!d) {
     return (
-      <div className="flex flex-col gap-3.5">
-        {header}
-        {q.isError ? <QueryError error={q.error} onRetry={() => void q.refetch()} /> : <Pending />}
+      <div className={cx("uq", fx && "uq-fx")}>
+        <header className="uq-h">
+          <h1>{t("up.title")}</h1>
+          <p>{summary(t, d, 0, !q.isError)}</p>
+        </header>
+        {q.isError ? <ErrorCard onRetry={() => void q.refetch()} /> : <Skeleton />}
       </div>
     );
   }
@@ -93,88 +102,91 @@ export function UpdatesScreen() {
   const updateStep = activeRollout?.steps.find((step) => step.nodeId === selectedUpdate?.nodeId);
   const activeBundleMatches = !!activeRollout && !!currentBundle && activeRollout.toVersion === currentBundle.version && activeRollout.toBuilt === currentBundle.built;
   const queueAfterRollout = !!selectedUpdate && activeRollout?.status === RolloutStatus.RUNNING && activeBundleMatches && !updateStep;
-  const canUpdateNow = !!selectedUpdate && !!currentBundle && selectedUpdate.state !== NodeUpdateState.OFFLINE &&
-    canUpdateNode(selectedUpdate, currentBundle.built) && (!activeRollout || queueAfterRollout);
-  const updateBlockReason = !selectedUpdate ? undefined
-    : selectedUpdate.state === NodeUpdateState.OFFLINE ? "offline"
-      : updateStep ? "queued"
-        : activeRollout?.status === RolloutStatus.PAUSED ? "paused"
-          : activeRollout && !activeBundleMatches ? "differentRelease"
-            : !canUpdateNow ? "unavailable" : undefined;
+  const canUpdateNow = !!selectedUpdate && !!currentBundle && selectedUpdate.state !== NodeUpdateState.OFFLINE && canUpdateNode(selectedUpdate, currentBundle.built) && (!activeRollout || queueAfterRollout);
+  const updateBlockReason = !selectedUpdate
+    ? undefined
+    : selectedUpdate.state === NodeUpdateState.OFFLINE
+      ? "offline"
+      : updateStep
+        ? "queued"
+        : activeRollout?.status === RolloutStatus.PAUSED
+          ? "paused"
+          : activeRollout && !activeBundleMatches
+            ? "differentRelease"
+            : !canUpdateNow
+              ? "unavailable"
+              : undefined;
 
-  const agents = (
-    <div className="flex flex-col gap-3.5">
-      <HeroCard
-        data={d}
-        owner={owner}
-        actions={actions}
-        onCancel={() => d.rollout && setDialog({ kind: "cancel", id: d.rollout.id })}
-        onRollout={() => setDialog({ kind: "rollout" })}
-      />
-      {/* a rollout in progress sits right under the hero; the last finished one is history, after the nodes */}
-      {activeRollout && <RolloutCard rollout={activeRollout} />}
-      <NodeTable
-        nodes={d.nodes}
-        data={d}
-        owner={owner}
-        rollout={activeRollout}
-        onUpdate={(n) => setDialog({ kind: "update", node: n })}
-        onSchedule={(n) => setDialog({ kind: "update", node: n, mode: "schedule" })}
-        onRollback={(n) => setDialog({ kind: "rollback", node: n })}
-      />
-      {d.rollout && !activeRollout && <RolloutCard rollout={d.rollout} />}
-    </div>
-  );
-  // ---- the three layers: each card says where its layer stands, the chosen one opens below
-  const panelLook = panelUpdate(t, d, edition.edge);
-  const hero = heroOf(d);
-  const outdated = outdatedNodes(d.nodes).length;
-  // "up to date" is what the node itself reported, not "whatever is not outdated": an offline node's version is unknown
-  // against a new bundle, and counting it as current made the card say 3 of 11 when the three were simply offline.
-  const upToDate = d.nodes.filter((n) => n.state === NodeUpdateState.UP_TO_DATE).length;
-  const offline = d.nodes.filter((n) => n.state === NodeUpdateState.OFFLINE).length;
-  const agentsPill: { kind: StatusKind; label: string } =
-    hero.id === "running" ? { kind: "busy", label: t("up.layer.pill.running") }
-      : hero.id === "paused" ? { kind: "warn", label: t("up.layer.pill.paused") }
-        : hero.id === "none" ? { kind: "off", label: t("up.nodes.empty") }
-          : outdated > 0 ? { kind: "warn", label: t("up.layer.pill.outdated", { n: outdated }) }
-            : hero.id === "current" ? { kind: "ok", label: t("up.layer.pill.ok") }
-              : { kind: "warn", label: t("up.layer.pill.attention") };
+  // ---- the three tabs: each says what it holds in a number when something wants a hand
+  const panelNew = !!d.panel?.update?.available;
+  // a release that is out but not signed for this panel, or an update that went back, wants a look at the panel's tab too
+  const panelKey = d.panel?.update?.errorKey ?? "";
+  const panelLook = panelNew || panelKey === "unsigned" || panelKey === "expired" || panelKey === "install_failed";
+  const c = fleetCounts(d.nodes);
+  const nodesNeed = c.outdated + c.attention + c.manual + c.updating;
   const osNeeds = os.data ? osSummary(osRows(os.data)) : undefined;
-  const osPill: { kind: StatusKind; label: string } = !osNeeds || osNeeds.known === 0 ? { kind: "off", label: t("up.os.state.unknown") }
-    : osNeeds.reboot > 0 ? { kind: "warn", label: t("up.layer.pill.reboot", { n: osNeeds.reboot }) }
-      : osNeeds.security > 0 ? { kind: "warn", label: t("up.layer.pill.security", { n: osNeeds.security }) }
-        : osNeeds.updates > 0 ? { kind: "off", label: t("up.layer.pill.updates", { n: osNeeds.updates }) }
-          : { kind: "ok", label: t("up.layer.pill.ok") };
-  const layers: Layer[] = [
-    {
-      value: "panel", icon: "server", tone: "lavender", title: t("up.panel.title"), fact: d.panel?.version || "—",
-      pill: { kind: panelLook.kind, label: panelLook.label },
-      content: <PanelBar data={d} owner={isOwner} actions={actions} />,
-    },
-    {
-      value: "agents", icon: "network", tone: "sky", title: t("up.tab.agents"),
-      fact: d.nodes.length === 0 ? "—"
-        : t("up.layer.agents.fact", { ok: upToDate, n: d.nodes.length }) + (offline > 0 ? " · " + t("up.layer.agents.offline", { n: offline }) : ""),
-      pill: agentsPill, content: agents,
-    },
-    ...(hasOs
-      ? [{
-          value: "os" as const, icon: "cpu" as const, tone: "mint" as const, title: t("up.tab.os"),
-          fact: os.data ? t("up.layer.os.fact", { n: os.data.nodes.length + 1 }) : "—",
-          pill: osPill, content: <OsSection />,
-        }]
-      : []),
+  const osCount = osNeeds ? osNeeds.reboot + osNeeds.security : 0;
+  const tabs: { value: UpdateTab; label: string; n: number }[] = [
+    { value: "panel", label: t("up.panel.title"), n: panelNew ? 1 : 0 },
+    { value: "agents", label: t("up.tab.agents"), n: nodesNeed },
+    ...(hasOs ? [{ value: "os" as const, label: t("up.tab.os"), n: osCount }] : []),
   ];
-  // without a choice in the address the page opens on the layer that needs a hand: the panel is updated before its nodes
-  const wanted = search.tab && layers.some((l) => l.value === search.tab) ? search.tab : undefined;
-  const tab: UpdateTab = wanted ?? (panelLook.update?.available ? "panel" : "agents");
+  // without a choice in the address the page opens on the tab that needs a hand: the panel is updated before its nodes
+  const hashTab = hashTabs[location.hash];
+  const wanted = [sceneTab ?? search.tab, hashTab].find((v) => v && tabs.some((x) => x.value === v));
+  const tab: UpdateTab = wanted ?? (panelLook ? "panel" : "agents");
+  const setTab = (next: UpdateTab) => (scene ? setSceneTab(next) : void navigate({ to: "/updates", search: { tab: next }, replace: true }));
+  const pick = (i: number) => {
+    const next = tabs[(i + tabs.length) % tabs.length];
+    if (!next) return;
+    setTab(next.value);
+    document.getElementById(`uq-tab-${next.value}`)?.focus();
+  };
 
   return (
-    <div className="flex flex-col gap-3.5">
-      {header}
-      <EditionNotice feature="agent_updates" />
-      <Layers aria-label={t("up.tabs")} layers={layers} value={tab} onValueChange={setTab} />
+    <div className={cx("uq", fx && "uq-fx")}>
+      <header className="uq-h">
+        <h1>{t("up.title")}</h1>
+        <p>{summary(t, d, osNeeds?.reboot ?? 0, false)}</p>
+      </header>
+      <div role="tablist" aria-label={t("up.tabs")} className="uq-tabs">
+        {tabs.map((x, i) => (
+          <button
+            key={x.value}
+            id={`uq-tab-${x.value}`}
+            type="button"
+            role="tab"
+            aria-selected={x.value === tab}
+            aria-controls="uq-tabpanel"
+            tabIndex={x.value === tab ? 0 : -1}
+            onClick={() => setTab(x.value)}
+            onKeyDown={(e) => {
+              const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+              if (step === 0) return;
+              e.preventDefault();
+              pick(i + step);
+            }}
+          >
+            {x.label}
+            {x.n > 0 && <span className="bdg up-n">{x.n}</span>}
+          </button>
+        ))}
+      </div>
+      <div id="uq-tabpanel" role="tabpanel" aria-labelledby={`uq-tab-${tab}`} key={tab} className="uq-tab">
+        {tab === "panel" && <PanelTab data={d} owner={isOwner} actions={actions} refetch={() => q.refetch()} answeredAt={q.dataUpdatedAt} scene={scene?.panel} />}
+        {tab === "agents" && (
+          <AgentsTab
+            data={d}
+            owner={owner}
+            actions={actions}
+            onRollout={() => setDialog({ kind: "rollout" })}
+            onCancel={() => d.rollout && setDialog({ kind: "cancel", id: d.rollout.id })}
+            onSchedule={(n) => setDialog({ kind: "update", node: n, mode: n.scheduledUnix > 0 ? "schedule" : undefined })}
+            onRollback={(n) => setDialog({ kind: "rollback", node: n })}
+          />
+        )}
+        {tab === "os" && hasOs && <OsSection />}
+      </div>
       {dialog?.kind === "rollout" && currentBundle && (
         <RolloutDialog
           version={currentBundle.version}
@@ -196,13 +208,17 @@ export function UpdatesScreen() {
           busy={actions.busy}
           onClose={close}
           onUpdateNow={() => go(actions.start([dialog.node.nodeId], { version: d.bundle?.version ?? "", built: d.bundle?.built ?? 0 }))}
-          onSchedule={(localDatetime) => go(actions.scheduleNode({
-            nodeId: dialog.node.nodeId,
-            localDatetime,
-            timezoneOffsetMinutes: d.scheduleTimezoneOffsetMinutes,
-            expectedVersion: d.bundle?.version ?? "",
-            expectedBuilt: d.bundle?.built ?? 0,
-          }))}
+          onSchedule={(localDatetime) =>
+            go(
+              actions.scheduleNode({
+                nodeId: dialog.node.nodeId,
+                localDatetime,
+                timezoneOffsetMinutes: d.scheduleTimezoneOffsetMinutes,
+                expectedVersion: d.bundle?.version ?? "",
+                expectedBuilt: d.bundle?.built ?? 0,
+              }),
+            )
+          }
           onCancelSchedule={() => go(actions.cancelNodeSchedule(dialog.node.nodeId))}
         />
       )}
