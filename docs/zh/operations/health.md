@@ -139,7 +139,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 
 ## 节点诊断
 
-每个节点 Agent 都会运行 21 项主机检查。这些检查只读取内容：`/proc` 和 `/sys` 下的文件、少量配置文件，以及只读命令（`systemctl list-*`、`nft list`、`timedatectl show`、`dmesg`、`journalctl -k`）。任何更改都必须通过另一个单独确认的步骤执行（见下文「修复」）。
+每个节点 Agent 都会运行 22 项主机检查。这些检查只读取内容：`/proc` 和 `/sys` 下的文件、少量配置文件，以及只读命令（`systemctl list-*`、`nft list`、`timedatectl show`、`dmesg`、`journalctl -k`）。任何更改都必须通过另一个单独确认的步骤执行（见下文「修复」）。
 
 ### 运行时间
 
@@ -176,6 +176,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | WARP 出口（`warp_path`） | 检查节点的 WARP 隧道及路由。节点没有 WARP 账户且没有协议配置经 WARP 出口时会跳过。 | 协议配置经 WARP 出口时，WARP 处于暂停状态；或隧道已建立，但最近一次检测失败 | 协议配置经 WARP 出口，但节点没有账户；主机与 WARP 的路由表、规则优先级或接口名称冲突；没有 WireGuard 后端；或 WARP 离线 | 隧道离线或最近一次检测失败时，检查 WARP；如果离线则重连 |
 | 单元版本（`unit_generation`） | 检查运行 Agent 的 systemd 单元是否与当前构建版本一致。Agent 手动启动时会跳过。 | 单元版本早于当前构建 | 无 | 刷新服务单元；Agent 会重启，连接可能中断几秒 |
 | 安全更新（`security_updates`） | 在 Debian 和 Ubuntu 上检查 unattended-upgrades 是否已安装、有效的 APT::Periodic 设置，以及两个 apt-daily 定时器是否已启用并在运行。此项只读取状态；不会安装更新。Debian 的默认软件源规则也可能包含稳定版更新。 | 未安装软件包，或设置/定时器已关闭 | 无 | 开启安全更新，需所有者确认（Agent 以 root 身份在 systemd 下运行时提供；否则诊断显示手动命令） |
+| nftables（`nftables`） | 服务器上是否有 `nft` 命令。Debian 13 的云镜像不带 nftables 软件包，此时 SSH 防护、端口跳跃、WARP 地址伪装和 UDP 交付检测都无法工作：节点能运行，但只有一半功能可用。Agent 只会用节点事件 `nft_missing` 说明一次，而不是每次循环都写一行日志；恢复后记录 `nft_restored`。 | 缺少 `nft`，或上次安装失败 | 无 | 安装 nftables，需所有者确认（Agent 在 Debian 或 Ubuntu 上以 root 身份在 systemd 下运行时提供；否则诊断会显示手动命令 `apt-get install -y nftables`） |
 
 没有 IPv6 但运行 WARP 的节点没有问题：WARP 使用 IPv4 端点；管理后台会将 IPv6 项显示为正常。
 
@@ -183,7 +184,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 
 ### 修复
 
-一共有 8 项修复。它们已编译进 Agent：面板只发送修复 ID，Agent 会检查参数（必须是节点正在运行的协议配置）。只有 `enable_security_updates` 会安装软件包，并且需要所有者确认。修复不会删除数据。
+一共有 10 项修复。它们已编译进 Agent：面板只发送修复 ID，Agent 会检查参数（必须是节点正在运行的协议配置）。只有 `enable_security_updates` 和 `install_nftables` 会安装软件包，并且都需要所有者确认。修复不会删除数据。
 
 | 按钮 | 执行内容 | 提供来源 |
 |---|---|---|
@@ -195,6 +196,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | 刷新服务单元 | 使用固定的临时 systemd 单元运行已安装的二进制，以写入编译好的单元模板、重新加载 systemd 并重启 Agent。节点身份和状态保持不变；连接可能中断几秒。 | 单元版本；报告 `unit_outdated` 的 AmneziaWG 后端 |
 | 允许 Mistgate 转发流量 | 在主机上每条默认策略为 `DROP` 的 `FORWARD` 链开头添加带标记的接受规则。规则只匹配：从 `mgawg*` 隧道进入的流量（客户端发起的新连接，但不包括去往容器网桥 `docker*` 和 `br-*` 的流量）、经 `mgawg*` 返回的属于客户端已建立连接的流量（不放行指向客户端的新连接；经 WARP 的客户端流量同样被覆盖），以及转发到当前 Mistgate 中继目标的 DNAT 流量（双向）。其他流量仍由主机防火墙处理。防火墙重载后，Agent 会在定期同步时恢复这些规则；节点退役时会删除这些规则。 | AmneziaWG 后端检测到转发流量被丢弃时 |
 | 开启安全更新 | 在独立的临时 root systemd 单元中运行内置的 `host enable-security-updates` 命令。若未安装 unattended-upgrades，则从节点现有的 apt 软件源安装；只将已关闭的 APT::Periodic 设置写入 `/etc/apt/apt.conf.d/99mistgate-security-updates`，并取消屏蔽、启用并按原有计划启动 apt-daily 定时器（关闭期间错过的每日运行不会立即开始）。它绝不会运行 `apt-get upgrade` 或 `unattended-upgrade`，不会重启服务器，不会修改 `Automatic-Reboot`，也不会编辑 `50unattended-upgrades`。若另一个 apt 进程持有锁，最多可能需要 20 分钟。 | 安全更新 |
+| 安装 nftables | 在独立的临时 root systemd 单元（`mistgate-install-nftables`）中运行内置的 `host install-nftables` 辅助程序。它会等待其他包管理器结束（最多 20 分钟），运行 `apt-get install nftables`（第一次失败时先 `apt-get update` 再试一次），不安装其他任何东西。Agent 不会重启：它会在下一次循环（一分钟内）自行找到 `nft`，并设置 SSH 防护、端口跳跃和 WARP 路由。如果失败，检查会说明原因并再次提供该修复。 | nftables |
 | 切回内核模块 | 重新询问节点：当前运行内核的 AmneziaWG 模块是否已加载。若已加载，AmneziaWG 协议配置会在模块上重建，已连接设备最多暂停约 20 秒；若未加载，则不做任何更改，节点会提示先构建模块。它不构建也不安装任何内容。 | AmneziaWG 后端（处于用户态回退时） |
 
 如需手动撤销此修复，请删除 `/etc/apt/apt.conf.d/99mistgate-security-updates`。对于修复前处于禁用状态的每个定时器，请运行 `systemctl disable --now <timer>`（`apt-daily.timer` 或 `apt-daily-upgrade.timer`）。如果此修复安装了软件包，请运行 `apt-get remove unattended-upgrades` 将其删除。任务日志（`journalctl -u mistgate-security-updates`）会记录执行内容。
@@ -354,6 +356,7 @@ API 中还存在两种类型，但面板不会将它们作为告警触发：用�
 | 「<profile>」检测已恢复（……） | 告警以「已自行消除」或「已修复」状态关闭。 |
 | 可能存在 BitTorrent 尝试：…… | 节点的 BT 下载拦截功能拦截了客户端发起且识别为 BitTorrent 的流量。单独一次 uTP SYN 不会记录：同一用户和协议配置在 10 分钟内向 3 个目标端口发送至少 5 次此类数据包才会记录；其他匹配会立即记录。事件下方会说明协议、节点匹配到的内容以及目标端口。只有客户端隧道地址明确属于一个账户时才会显示用户名称，否则显示「未知用户」。不会存储客户端地址或目标地址，只会存储端口。参见[BT 下载拦截](../guide/torrent-protection.md)。 |
 | 已更新至…… / 更新失败 / 更新已回滚 | 一项滚动更新步骤已结束。 |
+| 服务器上没有 nft…… / nft 已可用…… | 服务器没有 `nft` 命令（Agent 发现时只写一次），以及：该命令已就绪且防火墙步骤已完成。 |
 
 部分 Agent 警告尚无对应描述，会显示代码，并在下方显示错误文本：
 

@@ -80,7 +80,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 `install`:
 
-1. Проверяет, что запущен от root и что в каталоге состояния есть данные подключения.
+1. Проверяет, что запущен от root, что в каталоге состояния есть данные подключения и что на сервере есть команда `nft`. Пакетов сам не ставит: без `nft` ничего не меняет, говорит об этом, называет команду (на Debian и Ubuntu `apt-get install -y nftables`; в облачных образах Debian 13 её нет) и завершается с кодом возврата 3.
 2. Копирует себя в `/usr/local/bin/mistgate-node`. Файл в `/root` больше не нужен.
 3. Пишет защищённый юнит `/etc/systemd/system/mistgate-node.service` с лимитами под память сервера и выполняет `systemctl daemon-reload`, `enable` и `restart`.
 
@@ -171,6 +171,7 @@ systemctl restart systemd-journald
 | Таймаут или `connection refused` | Панель не запущена, файрвол закрывает TCP 443 к панели или в команде неверный адрес. | Проверьте панель и её файрвол; с ноды проверьте `curl -I https://panel.example.com/`. |
 | `already enrolled; use --force to replace the identity` | В каталоге состояния уже есть данные подключения. | Добавьте `--force` после `enroll` или сначала удалите `/var/lib/mistgate-node`. |
 | `install: must run as root` | Запуск не от root. | Выполните команду от root. |
+| `install: nft is not installed on this server` (код возврата 3) | Нет пакета `nftables`, как в облачных образах Debian 13. Ничего не изменено. | Выполните команду из сообщения (`apt-get install -y nftables`) и запустите `install` ещё раз. |
 | `holds no identity: run mistgate-node enroll first` | `enroll` не прошёл, или `install` получил другой `--state-dir`. | Повторите `enroll` с тем же каталогом состояния. |
 | Админка отвечает на **Получить команду установки** сообщением «panel address is not configured» | Панель не знает адреса для агентов: `setup` запускали без `--public-url`, а у `serve` нет `--agent-addr`. | Перезапустите панель с `--agent-addr panel.example.com:443`. |
 
