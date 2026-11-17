@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
@@ -72,6 +72,14 @@ const tpl = (name: string, groupIds: string[] = [], yaml = GOOD): MihomoTemplate
 const doc = (list: MihomoTemplate[], extra: object = {}) => ({ title: "", rules: [], apps: [], mihomoTemplates: list, ...extra }) as unknown as Settings;
 const reply = (o: object = {}) => ({ yaml: "proxies:\n  - {name: de1, type: vless, server: de1.example.com, port: 443}\n" + GOOD, warnings: [], groupName: "ROUTER", notServed: "", ...o });
 
+// the screen hands the tab the settings again once a save has made them new: this stands in for it
+let renew: ((s: Settings) => void) | null = null;
+function Renewed({ settings, initial }: { settings: Settings; initial?: number | null }) {
+  const [now, setNow] = useState(settings);
+  renew = setNow;
+  return <MihomoTab data={{ settings: now }} initial={initial} />;
+}
+
 async function mount(list: MihomoTemplate[], opts: { role?: Role; initial?: number | null; settings?: object; guard?: (d: boolean) => void } = {}) {
   const settings = doc(list, opts.settings);
   getSubscriptionSettings.mockResolvedValue({ settings, effectiveTitle: "", reservedHeaderNames: [] });
@@ -87,7 +95,7 @@ async function mount(list: MihomoTemplate[], opts: { role?: Role; initial?: numb
       <QueryClientProvider client={qc}>
         <ToastProvider>
           <LeaveGuard.Provider value={opts.guard ?? (() => {})}>
-            <MihomoTab data={{ settings }} initial={opts.initial} />
+            <Renewed settings={settings} initial={opts.initial} />
           </LeaveGuard.Provider>
         </ToastProvider>
       </QueryClientProvider>,
@@ -462,6 +470,25 @@ describe("saving", () => {
     await click(buttonWith(en["subs.discard"]));
     expect(document.querySelector<HTMLInputElement>("#mt-name")!.value).toBe("A");
     expect(text()).not.toContain(en["subs.discard"]);
+  });
+});
+
+describe("after a save", () => {
+  it("starts again from what is saved with the same template open, says so, and has nothing left to save", async () => {
+    await mount([tpl("A", ["grp_router"]), tpl("B")], { initial: 1 });
+    updateSubscriptionSettings.mockImplementation(async (r: { settings: Settings }) => {
+      renew!(r.settings);
+      return { settings: r.settings };
+    });
+    await typeInto(document.querySelector("#mt-name")!, "B2");
+    await click(buttonWith(en["subs.save"]));
+    await settle();
+    expect(head("B2").getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector(".hx-fh")!.textContent).toBe(en["subs.saved"]);
+    expect(buttonWith(en["subs.save"]).hasAttribute("disabled")).toBe(true);
+    expect(text()).not.toContain(en["subs.discard"]);
+    await typeInto(document.querySelector("#mt-name")!, "B3"); // the next change takes the word away
+    expect(document.querySelector(".hx-fh")!.textContent).toBe(en["sx.hx.m.ftDirty"]);
   });
 });
 

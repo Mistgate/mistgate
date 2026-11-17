@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
@@ -46,6 +46,14 @@ afterEach(() => {
 const hdr = (name: string, value: string, o: Partial<ResponseHeader> = {}): ResponseHeader => ({ name, value, base64: false, formats: [], onlyGroups: false, groupIds: [], ...o });
 const settings = (list: ResponseHeader[]) => ({ title: "", rules: [], apps: [], responseHeaders: list }) as unknown as Settings;
 
+// the screen hands the tab the settings again once a save has made them new: this stands in for it
+let renew: ((s: Settings) => void) | null = null;
+function Renewed({ settings: first, reserved }: { settings: Settings; reserved: string[] }) {
+  const [now, setNow] = useState(first);
+  renew = setNow;
+  return <HeadersTab data={{ settings: now, reservedHeaderNames: reserved }} />;
+}
+
 async function mount(list: ResponseHeader[]) {
   getSubscriptionSettings.mockResolvedValue({ settings: settings(list), effectiveTitle: "", reservedHeaderNames: table.reserved });
   updateSubscriptionSettings.mockImplementation(async (r: { settings: Settings }) => ({ settings: r.settings }));
@@ -58,7 +66,7 @@ async function mount(list: ResponseHeader[]) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <HeadersTab data={{ settings: settings(list), reservedHeaderNames: table.reserved }} />
+          <Renewed settings={settings(list)} reserved={table.reserved} />
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -267,6 +275,24 @@ describe("Response headers tab", () => {
     await mount(Array.from({ length: 5 }, (_, i) => hdr(`x-h-${i}`, "v".repeat(900))));
     expect(text()).toContain(fill(en["sx.hx.h.ftOver"], { max: 4096 }));
     expect(disabled(buttonWith(en["subs.save"]))).toBe(true);
+  });
+
+  it("starts again from what is saved with the same header open, and says it is saved", async () => {
+    await mount([hdr("x-a", "1"), hdr("x-b", "2")]);
+    updateSubscriptionSettings.mockImplementation(async (r: { settings: Settings }) => {
+      renew!(r.settings);
+      return { settings: r.settings };
+    });
+    await openRow(2);
+    await typeInto(valueBox(), "3");
+    await click(buttonWith(en["subs.save"]));
+    await settle();
+    expect(heads()[1]!.getAttribute("aria-expanded")).toBe("true");
+    expect(valueBox().value).toBe("3");
+    expect(document.querySelector(".hx-fh")!.textContent).toBe(en["subs.saved"]);
+    expect(text()).not.toContain(en["subs.discard"]);
+    await typeInto(valueBox(), "4");
+    expect(document.querySelector(".hx-fh")!.textContent).toBe(en["sx.hx.h.ftHint"]);
   });
 
   it("discards what was changed", async () => {

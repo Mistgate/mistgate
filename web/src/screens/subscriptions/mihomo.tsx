@@ -1,7 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -46,6 +46,7 @@ export function MihomoTab({ data, initial }: { data: { settings: Settings }; ini
   // the open row survives a save (the form starts again from what is saved, which keeps the rows in the order they were sent), and so does the word "Saved", once
   const [keep, setKeep] = useState<number | null | undefined>(initial);
   const [done, setDone] = useState(false);
+  const shown = useCallback(() => setDone(false), []);
   const saved = data.settings.mihomoTemplates ?? [];
   const start = keep === undefined ? (saved.length > 0 ? 0 : null) : keep === null || saved.length === 0 ? null : Math.min(keep, saved.length - 1);
   return (
@@ -58,7 +59,7 @@ export function MihomoTab({ data, initial }: { data: { settings: Settings }; ini
         setKeep(i);
         setDone(true);
       }}
-      onShown={() => setDone(false)}
+      onShown={shown}
     />
   );
 }
