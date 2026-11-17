@@ -2,13 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Step } from "@/components/add-node";
-import { Chip } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Callout } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
 import { StatusPill, type StatusKind } from "@/components/ui/status";
+import { Dot, Pill } from "@/screens/health/page-parts";
+import { pillOf } from "./source-ui";
 import { TextField } from "@/components/ui/text-field";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
@@ -59,7 +60,7 @@ export function ProbeList({ probes, now, scriptVersion, actions }: { probes: rea
   const [asked, setAsked] = useState<string | null>(null);
   return (
     <>
-      <ul aria-label={t("pr.block.probes")} className="flex flex-col divide-y divide-line rounded-field border border-line bg-canvas">
+      <ul aria-label={t("pr.block.probes")} className="rc-pl">
         {sortProbes(probes, now).map((p) => (
           <ProbeRow
             key={p.id}
@@ -117,59 +118,63 @@ function ProbeRow(p: {
     probe.version && !quiet ? <span key="v" className="font-mono text-[11px]">{t("pr.version", { v: probe.version })}</span> : "",
   ].filter(Boolean);
   return (
-    <li data-testid="probe" data-look={look} className={cx("flex flex-col gap-2 px-3 py-2.5", look === "revoked" && "opacity-60")}>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <span className="min-w-0 text-[13px] font-bold break-words">{probe.name}</span>
-        <Chip>{kindWord(t, probe.kind)}</Chip>
-        <StatusPill sm kind={pill.kind} label={word} />
+    <li data-testid="probe" data-look={look} className={cx("rc-pr", look === "revoked" && "dim")}>
+      <div className="rc-prh">
+        <b>{probe.name}</b>
+        <span className="rc-scope">{kindWord(t, probe.kind)}</span>
+        <Pill kind={pillOf[pill.kind].kind} glyph={pillOf[pill.kind].glyph}>
+          {word}
+        </Pill>
         {p.outdated && (
           <span title={t("pr.outdated.hint")} data-testid="probe-outdated">
-            <StatusPill sm kind="warn" label={t("pr.outdated")} />
+            <Pill kind="part" glyph="part">
+              {t("pr.outdated")}
+            </Pill>
           </span>
         )}
       </div>
-      <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs leading-snug text-muted">
+      <p className="rc-prm">
         {meta.map((m, i) => (
-          <span key={i} className="whitespace-nowrap">
+          <span key={i}>
             {m}
             {i < meta.length - 1 && <span aria-hidden> ·</span>}
           </span>
         ))}
       </p>
       {look === "netChanged" && (
-        <Callout
-          kind="warn"
-          action={
-            <Button variant="secondary" size="sm" disabled={p.busy} onClick={p.onConfirm}>
-              {t("pr.confirmNetwork")}
-            </Button>
-          }
-        >
-          {t("pr.confirmNetwork.note", { now: probe.operator || `AS${probe.asn}`, was: probe.pinnedOperator || "?" })}
-        </Callout>
+        <div className="rc-pb part" role="note">
+          <Dot kind="part" />
+          <div>
+            <span>{t("pr.confirmNetwork.note", { now: probe.operator || `AS${probe.asn}`, was: probe.pinnedOperator || "?" })}</span>
+          </div>
+          <Button size="md" disabled={p.busy} onClick={p.onConfirm}>
+            {t("pr.confirmNetwork")}
+          </Button>
+        </div>
       )}
-      {look === "pending" && <p className="text-xs leading-snug text-pretty text-muted">{[t("pr.expires", { time: fmt.stamp(probe.tokenExpiresUnix) }), t("pr.pending.note")].join(" ")}</p>}
-      {look === "expired" && <p className="text-xs leading-snug text-muted">{t("pr.expired")}</p>}
-      {look === "noFilter" && <p className="text-xs leading-snug text-pretty text-muted">{t("pr.noFilter.note")}</p>}
-      {live && look !== "noFilter" && probe.reference === "unavailable" && <p className="text-xs leading-snug text-pretty text-muted">{t("pr.refUnavailable.note")}</p>}
+      {look === "pending" && <p className="rc-prn">{[t("pr.expires", { time: fmt.stamp(probe.tokenExpiresUnix) }), t("pr.pending.note")].join(" ")}</p>}
+      {look === "expired" && <p className="rc-prn">{t("pr.expired")}</p>}
+      {look === "noFilter" && <p className="rc-prn">{t("pr.noFilter.note")}</p>}
+      {live && look !== "noFilter" && probe.reference === "unavailable" && <p className="rc-prn">{t("pr.refUnavailable.note")}</p>}
       {look !== "revoked" && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hl-act">
           {live && (
-            <Button variant="secondary" size="sm" disabled={p.busy} onClick={p.onCheck}>
+            <Button size="md" disabled={p.busy} onClick={p.onCheck}>
               {t("pr.checkNow")}
             </Button>
           )}
           {live && (
-            <Button variant="secondary" size="sm" onClick={p.onUpdate}>
+            <Button size="md" data-act="update" onClick={p.onUpdate}>
               {t("pr.update")}
             </Button>
           )}
-          <Button variant="ghostDanger" size="sm" className="ms-auto" onClick={p.onRevoke}>
+          <span className="hl-sp" />
+          <Button variant="ghostDanger" size="md" data-act="revoke" onClick={p.onRevoke}>
             {t("pr.revoke")}
           </Button>
         </div>
       )}
-      {p.asked && <p className="text-xs leading-snug text-muted">{t("pr.checkNow.note")}</p>}
+      {p.asked && <p className="rc-prn">{t("pr.checkNow.note")}</p>}
     </li>
   );
 }
