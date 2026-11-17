@@ -25,7 +25,7 @@ import { NodeHeader } from "./header";
 import { OverviewTab } from "./overview";
 import { ProfilesTab } from "./profiles";
 import { ServerTab } from "./server";
-import type { HistoryView, NodeSearch, NodeTab } from "./tabs";
+import type { HistoryView, NodeSearch, NodeTab, ServerSection } from "./tabs";
 import { useWays, WaysTab } from "./ways";
 
 export function NodeScreen() {
@@ -60,6 +60,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
   const [restart, setRestart] = useState(false);
   const go = (next: NodeSearch) => void navigate({ to: "/nodes/$id", params: { id: node.id }, search: next, replace: true });
   const setTab = (next: string) => go(next === "overview" ? {} : { tab: next as NodeTab });
+  const setSection = (sv: ServerSection) => go(sv === "node" ? { tab: "server" } : { tab: "server", sv });
   const setView = (view: HistoryView) => go(view === "events" ? { tab: "history" } : { tab: "history", view });
 
   const retired = node.status === NodeStatus.RETIRED;
@@ -91,7 +92,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
       badge: issues,
       content: search.tab === "doctor" ? <NodeDoctorTab nodeId={node.id} nodeName={node.name} /> : null,
     },
-    { value: "server", label: t("node.tab.server"), content: <ServerTab data={data} /> },
+    { value: "server", label: t("node.tab.server"), content: search.tab === "server" ? <ServerTab data={data} section={search.sv ?? "node"} onSection={setSection} /> : null },
   ];
   // a retired node has nothing left to run or route: what it was, what happened, and the server (SSH access stays)
   const items = retired ? all.filter((i) => i.value === "overview" || i.value === "history" || i.value === "server") : all;

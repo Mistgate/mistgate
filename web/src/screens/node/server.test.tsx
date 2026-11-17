@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
+import { en as np } from "@/i18n/nodepage";
 import { ServerTab } from "./server";
+import type { ServerSection } from "./tabs";
 
 // Node → Server: the node form saves only what changed, a new install command for an enrolled node, measuring the network
 // capacity, and what retiring says when the node could not be told.
@@ -56,7 +58,13 @@ const data = (status = NodeStatus.DOWN, node: Record<string, unknown> = {}) =>
     facts: { hostname: "de1", os: "Debian 13", kernel: "6.12", arch: "amd64", cpuCount: 2, ramTotalBytes: 0, diskTotalBytes: 0, virt: "kvm", hasIpv6: true, bootUnix: 0, engines: [] },
   }) as never;
 
-async function mount(status?: NodeStatus, node?: Record<string, unknown>) {
+/** The tab as the page holds it: the section is the page's state, the menu changes it. */
+function Harness({ status, node, first }: { status?: NodeStatus; node?: Record<string, unknown>; first: ServerSection }) {
+  const [section, setSection] = useState(first);
+  return <ServerTab data={data(status, node)} section={section} onSection={setSection} />;
+}
+
+async function mount(status?: NodeStatus, node?: Record<string, unknown>, first: ServerSection = "node") {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -65,7 +73,7 @@ async function mount(status?: NodeStatus, node?: Record<string, unknown>) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <ServerTab data={data(status, node)} />
+          <Harness status={status} node={node} first={first} />
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -74,6 +82,8 @@ async function mount(status?: NodeStatus, node?: Record<string, unknown>) {
 }
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const text = () => document.body.textContent ?? "";
+/** The menu's button of a section. */
+const nav = (section: ServerSection) => [...document.querySelectorAll<HTMLButtonElement>(".sv-nav button")].find((b) => b.textContent?.trim().startsWith(section === "del" ? en["node.danger"] : np[`np.sv.nav.${section}`]));
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]:not([aria-modal=false])");
 const inDialog = (label: string) => [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
@@ -81,9 +91,10 @@ const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   for (let i = 0; i < 3; i++) await settle();
 };
-async function type(el: HTMLInputElement, value: string) {
+async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -96,7 +107,7 @@ async function retire() {
 
 describe("a new install command", () => {
   it("is offered to the owner for a node that was enrolled before", async () => {
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ag");
     expect(text()).toContain(en["node.add.reenrollBody"]);
     await click(button(en["node.banner.newCommand"]));
     expect(addNode).toHaveBeenCalledWith({ id: "nod_1", name: "de1" });
@@ -104,12 +115,12 @@ describe("a new install command", () => {
 
   it("is not offered to a helper, whom the API refuses", async () => {
     me.mockResolvedValue({ admin: { id: "adm_2", role: 2 } });
-    await mount(NodeStatus.DOWN);
+    await mount(NodeStatus.DOWN, undefined, "ag");
     expect(button(en["node.banner.newCommand"])).toBeUndefined();
   });
 
   it("is not offered for a retired node", async () => {
-    await mount(NodeStatus.RETIRED);
+    await mount(NodeStatus.RETIRED, undefined, "ag");
     expect(button(en["node.banner.newCommand"])).toBeUndefined();
   });
 });
@@ -138,7 +149,7 @@ describe("measuring the network capacity", () => {
   it("starts as a button with what it does, and a click shows it is busy until the node answers", async () => {
     let answer!: (v: unknown) => void;
     measureBandwidth.mockReturnValue(new Promise((r) => (answer = r)));
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
     expect(text()).toContain(en["node.settings.bandwidthMeasureHint"]);
     await click(button(en["node.settings.bandwidthMeasure"]));
     expect(measureBandwidth).toHaveBeenCalledWith({ nodeId: "nod_1" });
@@ -151,12 +162,12 @@ describe("measuring the network capacity", () => {
     await act(async () => answer(measured()));
     for (let i = 0; i < 3; i++) await settle();
     expect(button(en["node.settings.bandwidthMeasuring"])).toBeUndefined();
-    expect(button(en["node.settings.bandwidthMeasure"])).toBeDefined();
+    expect(button(np["np.sv.ch.again"])).toBeDefined();
   });
 
   it("shows the result and fills the field with the rounded download figure only when asked, leaving the saving to the form", async () => {
     measureBandwidth.mockResolvedValue(measured());
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
     await click(button(en["node.settings.bandwidthMeasure"]));
     expect(text()).toContain("Measured: 937 Mbps ↓ · 871 ↑");
     expect(text()).toContain("speed.cloudflare.com");
@@ -172,7 +183,7 @@ describe("measuring the network capacity", () => {
 
   it("says how much of the figure is the people already on the node, only when there is some", async () => {
     measureBandwidth.mockResolvedValue(measured());
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
     await click(button(en["node.settings.bandwidthMeasure"]));
     expect(text()).not.toContain("people's traffic");
     expect(text()).toContain("best of 3 runs");
@@ -185,7 +196,7 @@ describe("measuring the network capacity", () => {
       act(() => root?.unmount());
       host?.remove();
       measureBandwidth.mockResolvedValue(measured(over));
-      await mount(NodeStatus.ONLINE);
+      await mount(NodeStatus.ONLINE, undefined, "ch");
       await click(button(en["node.settings.bandwidthMeasure"]));
       expect(text()).toContain(want);
       expect(text()).toContain("Measured: 937 Mbps ↓ · 871 ↑"); // the figures already include them
@@ -194,14 +205,14 @@ describe("measuring the network capacity", () => {
 
   it("says which server answered, and how many of the runs worked and why the others did not", async () => {
     measureBandwidth.mockResolvedValue(measured({ server: "Ookla", serverDetail: "MTS, Moscow" }));
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
     await click(button(en["node.settings.bandwidthMeasure"]));
     expect(text()).toContain("Through Ookla · MTS, Moscow, the best of 3 runs.");
 
     act(() => root?.unmount());
     host?.remove();
     measureBandwidth.mockResolvedValue(measured({ runs: 1, runFailures: ["rate_limited", "rate_limited"] }));
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
     await click(button(en["node.settings.bandwidthMeasure"]));
     expect(text()).toContain("Through speed.cloudflare.com, 1 of 3 runs worked: the others — the server limited the requests.");
     expect(text()).not.toContain("best of 1");
@@ -209,7 +220,7 @@ describe("measuring the network capacity", () => {
 
   it("says so when only the download could be measured", async () => {
     measureBandwidth.mockResolvedValue(measured({ upMbps: 0 }));
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
     await click(button(en["node.settings.bandwidthMeasure"]));
     expect(text()).toContain("Measured: 937 Mbps ↓ · the upload could not be measured");
     expect(button("Use 940")).toBeDefined(); // no upload figure: the download
@@ -218,7 +229,7 @@ describe("measuring the network capacity", () => {
   it("words what the node answered", async () => {
     for (const code of ["busy", "unreachable", "unsupported", "failed"] as const) {
       measureBandwidth.mockResolvedValue({ downMbps: 0, upMbps: 0, server: "", errorCode: code, seconds: 0 });
-      await mount(NodeStatus.ONLINE);
+      await mount(NodeStatus.ONLINE, undefined, "ch");
       await click(button(en["node.settings.bandwidthMeasure"]));
       expect(document.querySelector("[role=alert]")?.textContent, code).toBe(en[`node.settings.bandwidthErr.${code}`]);
       expect(button("Use 0")).toBeUndefined();
@@ -234,7 +245,7 @@ describe("measuring the network capacity", () => {
       [new ConnectError("the node did not answer in time", Code.DeadlineExceeded), en["node.settings.bandwidthErr.noAnswer"]],
     ] as const) {
       measureBandwidth.mockRejectedValue(err);
-      await mount(NodeStatus.ONLINE);
+      await mount(NodeStatus.ONLINE, undefined, "ch");
       await click(button(en["node.settings.bandwidthMeasure"]));
       expect(document.querySelector("[role=alert]")?.textContent).toBe(want);
       act(() => root?.unmount());
@@ -244,27 +255,43 @@ describe("measuring the network capacity", () => {
 
   it("is for the owner of a node that is not retired", async () => {
     me.mockResolvedValue({ admin: { id: "adm_2", role: 2 } });
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
     expect(button(en["node.settings.bandwidthMeasure"])).toBeUndefined();
     act(() => root?.unmount());
     host?.remove();
     me.mockResolvedValue({ admin: { id: "adm_1", role: 1 } });
-    await mount(NodeStatus.RETIRED);
+    await mount(NodeStatus.RETIRED, undefined, "ch");
     expect(button(en["node.settings.bandwidthMeasure"])).toBeUndefined();
   });
 });
 
 describe("the node form", () => {
-  it("saves only the fields that changed, with the timeouts as one", async () => {
+  it("saves only the fields that changed, each form with its own bar, the timeouts as one", async () => {
     updateNode.mockResolvedValue({});
     await mount(NodeStatus.ONLINE);
     const save = button(en["common.save"])!;
     expect(save.hasAttribute("disabled") || save.getAttribute("data-disabled") !== null).toBe(true);
-    await type(document.querySelector<HTMLInputElement>(`input[placeholder="${en["node.settings.notesPh"]}"]`)!, "paid until March");
-    await click(document.querySelector(`[aria-label="${en["common.increase"].replace("{what}", en["node.settings.dial"])}"]`));
+    await type(document.querySelector<HTMLInputElement>(`input[placeholder="${en["node.settings.notesPh"]}"], textarea[placeholder="${en["node.settings.notesPh"]}"]`)! as never, "paid until March");
     await click(button(en["common.save"]));
     expect(updateNode).toHaveBeenCalledTimes(1);
-    expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", notes: "paid until March", timeouts: { livenessTimeoutS: 0, applyTimeoutS: 0, dialTimeoutS: 20 } });
+    expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", notes: "paid until March" });
+    // the agent's link is another form: its bar sends the timeouts alone
+    await click(nav("ag"));
+    await click(document.querySelector(`[aria-label="${en["common.increase"].replace("{what}", en["node.settings.dial"])}"]`));
+    await click(button(en["common.save"]));
+    expect(updateNode).toHaveBeenCalledTimes(2);
+    expect(updateNode.mock.calls[1]![0]).toEqual({ nodeId: "nod_1", timeouts: { livenessTimeoutS: 0, applyTimeoutS: 0, dialTimeoutS: 20 } });
+  });
+
+  it("keeps what was typed when another section is looked at, and puts it back on Cancel", async () => {
+    await mount(NodeStatus.ONLINE);
+    const notes = () => document.querySelector<HTMLTextAreaElement>("textarea")!;
+    await type(notes() as never, "x");
+    await click(nav("ssh"));
+    await click(nav("node"));
+    expect(notes().value).toBe("x");
+    await click(button(np["np.sv.cancel"]));
+    expect(notes().value).toBe("");
   });
 
   it("has a public label, says who sees it, and sends it trimmed and alone", async () => {
@@ -289,7 +316,7 @@ describe("the node form", () => {
     host?.remove();
     updateNode.mockClear();
     await mount(NodeStatus.ONLINE, { publicLabel: "Fast" });
-    await type(document.querySelector<HTMLInputElement>(`input[placeholder="${en["node.settings.notesPh"]}"]`)!, "x");
+    await type(document.querySelector<HTMLTextAreaElement>("textarea")! as never, "x");
     await click(button(en["common.save"]));
     expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", notes: "x" });
   });
@@ -299,27 +326,32 @@ describe("the node form", () => {
     expect([...document.querySelectorAll("input")].find((i) => i.value === "Fast")!.disabled).toBe(true);
   });
 
-  it("puts the agent and the host beside the form", async () => {
-    await mount(NodeStatus.ONLINE, { agentVersion: "v0.1.71" });
+  it("puts the agent and the host in sections of their own, and hides what a retired node cannot have", async () => {
+    await mount(NodeStatus.ONLINE, { agentVersion: "v0.1.71" }, "ag");
     expect(text()).toContain(en["node.server.agent"]);
     expect(text()).toContain("v0.1.71");
+    await click(nav("sys"));
     expect(text()).toContain(en["node.server.host"]);
     expect(text()).toContain("Debian 13");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(NodeStatus.RETIRED);
+    expect([...document.querySelectorAll(".sv-nav button")].map((b) => b.textContent?.trim())).toEqual([np["np.sv.nav.node"], np["np.sv.nav.ag"], np["np.sv.nav.ssh"], np["np.sv.nav.sys"]]);
   });
 });
 
 describe("per-person speed limit", () => {
   it("says an agent that cannot share a bucket holds each device to the smaller limit", async () => {
-    await mount(NodeStatus.ONLINE, { lastSeenUnix: 1000, userRateLimitSupported: false });
+    await mount(NodeStatus.ONLINE, { lastSeenUnix: 1000, userRateLimitSupported: false }, "ag");
     expect(text()).toContain(en["node.settings.userRateLimitUnsupported"]);
   });
 
   it("is quiet for an agent that applies it, and for a node that never connected", async () => {
-    await mount(NodeStatus.ONLINE, { lastSeenUnix: 1000, userRateLimitSupported: true });
+    await mount(NodeStatus.ONLINE, { lastSeenUnix: 1000, userRateLimitSupported: true }, "ag");
     expect(text()).not.toContain(en["node.settings.userRateLimitUnsupported"]);
     act(() => root?.unmount());
     host?.remove();
-    await mount(NodeStatus.ONLINE, { lastSeenUnix: 0, userRateLimitSupported: false });
+    await mount(NodeStatus.ONLINE, { lastSeenUnix: 0, userRateLimitSupported: false }, "ag");
     expect(text()).not.toContain(en["node.settings.userRateLimitUnsupported"]);
   });
 });
@@ -327,7 +359,7 @@ describe("per-person speed limit", () => {
 describe("retiring a node", () => {
   it("goes back to the list when the agent got the order", async () => {
     retireNode.mockResolvedValue({ agentNotified: true });
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "del");
     await retire();
     expect(retireNode).toHaveBeenCalledWith({ nodeId: "nod_1", confirmName: "de1" });
     expect(navigate).toHaveBeenCalledWith({ to: "/nodes" });
@@ -335,7 +367,7 @@ describe("retiring a node", () => {
   });
 
   it("warns when the panel generated the server password, which only the panel knows", async () => {
-    await mount(NodeStatus.ONLINE);
+    await mount(NodeStatus.ONLINE, undefined, "del");
     await click(button(en["node.retire"]));
     expect(dialog()?.textContent).not.toContain(en["node.retireGeneratedPassword"]);
     await click(inDialog(en["common.cancel"]));
@@ -347,7 +379,7 @@ describe("retiring a node", () => {
 
   it("says an offline node was not reached and gives the cleanup to run on the server", async () => {
     retireNode.mockResolvedValue({ agentNotified: false });
-    await mount();
+    await mount(undefined, undefined, "del");
     await retire();
     expect(navigate).not.toHaveBeenCalled();
     expect(dialog()?.textContent).toContain("de1 did not get the order");

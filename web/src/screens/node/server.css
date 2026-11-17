@@ -1,0 +1,979 @@
+/*
+ * The Server tab of the node page (screens/node/server*.tsx): the left menu of sections and the cards of the board PnNode
+ * (.sv, .sv-nav, .sv-c, .sv-h, .sv-row, .sv-save, ...). The values are pn.css's last rules of each selector; the tokens are
+ * the project's (acc -> --accent-mark, hair -> --border, crit -> --danger, sky -> --tone-sky, warn -> --warning, raise -> --surface-2).
+ * The breakpoints of the board's @container are the window's own here (the board's container is the whole window).
+ */
+
+.sv {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.sv-nav {
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sv-nav button {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  text-align: start;
+  color: var(--sec);
+  cursor: pointer;
+  transition:
+    background-color 0.15s var(--e),
+    color 0.15s var(--e);
+}
+.sv-nav button svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  transition: color 0.15s var(--e);
+}
+.sv-nav button:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--text);
+}
+.sv-nav button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 500;
+}
+.sv-nav button[aria-pressed="true"] svg {
+  color: var(--accent-mark);
+}
+.sv-nav button.danger svg {
+  color: color-mix(in srgb, var(--danger) 80%, var(--muted));
+}
+.sv-nav em {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--warning-soft);
+  font-style: normal;
+  font-size: 11px;
+  color: var(--warning);
+}
+.sv-nav em.rec {
+  background: none;
+  color: var(--danger);
+  animation: mg-ui-blink 1.2s var(--e) infinite;
+}
+.sv-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  max-width: 880px;
+}
+
+/* a card of a section: it rises as the section opens */
+.sv-c {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  animation: mg-up 0.25s var(--e) both;
+}
+.sv-c.danger {
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+.sv-h {
+  padding: 20px 24px 16px;
+}
+.sv-h h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+.sv-h > span {
+  display: block;
+  margin-top: 2px;
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.sv-h > span.mono {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sv-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  padding: 4px 24px 24px;
+}
+.sv-form .wide {
+  grid-column: 1 / -1;
+}
+.sv-form small.w,
+.sv-warnhint {
+  color: var(--warning);
+}
+/* mono text: addresses, hashes, numbers */
+.sv-c .mono,
+.sv-rec .mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.sv-lb em {
+  font-style: normal;
+  color: var(--muted);
+  margin-inline-start: 4px;
+}
+
+/* the bar that opens under a form when something is changed */
+.sv-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-height: 0;
+  padding: 0 24px;
+  overflow: hidden;
+  border-top: 1px solid transparent;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  transition:
+    max-height 0.3s var(--e),
+    padding 0.3s var(--e),
+    border-color 0.3s var(--e);
+}
+.sv-save.on {
+  max-height: 64px;
+  padding: 12px 24px;
+  border-top-color: var(--border);
+}
+.sv-save > span {
+  margin-inline-end: auto;
+  font-size: 13px;
+  color: var(--warning);
+}
+.sv-save.ok > span {
+  color: var(--accent-text);
+}
+.sv-save.ok .btn,
+.sv-save.ok button {
+  visibility: hidden;
+}
+.sv-save.off > span {
+  color: var(--sec);
+}
+
+/* the channel */
+.sv-ch {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 4px 24px 16px;
+}
+.sv-ch > button,
+.sv-ch > .btn {
+  margin-top: 25px;
+  gap: 8px;
+  justify-self: start;
+}
+.sv-unit {
+  position: relative;
+}
+.sv-unit input {
+  padding-inline-end: 72px;
+  font-size: 16px;
+}
+.sv-unit em {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-style: normal;
+  font-size: 13px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.sv-runs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 24px 16px;
+  animation: mg-up 0.25s var(--e) both;
+}
+.sv-runs > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  align-items: baseline;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  transition:
+    border-color 0.3s var(--e),
+    opacity 0.3s var(--e);
+}
+.sv-runs > div > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sv-runs b {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sec);
+}
+.sv-runs i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent-mark) var(--w), var(--step) 0);
+}
+[dir="rtl"] .sv-runs i {
+  background: linear-gradient(270deg, var(--accent-mark) var(--w), var(--step) 0);
+}
+.sv-runs em {
+  grid-column: 1 / -1;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  min-height: 16px;
+  color: var(--accent-text);
+}
+.sv-runs .done b {
+  color: var(--text);
+}
+.sv-runs .now {
+  border-color: var(--tone-sky);
+}
+.sv-runs .now i,
+.sv-os.run .sv-prog i {
+  background: linear-gradient(90deg, var(--step) 0, var(--tone-sky) 50%, var(--step) 100%);
+  background-size: 200% 100%;
+  animation: sv-sweep 1s linear infinite;
+}
+.sv-os.run .sv-prog i {
+  animation-duration: 1.2s;
+}
+@keyframes sv-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.sv-runs .best {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent-mark) 6%, transparent);
+}
+.sv-note {
+  margin: 0;
+  padding: 14px 24px 20px;
+  max-width: none;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+
+/* a row of a card: a title and what it means, and the control at the end */
+.sv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+}
+.sv-row > div > b {
+  display: block;
+  font-weight: 500;
+}
+.sv-row > div > b .mono {
+  margin-inline-start: 4px;
+  font-weight: 400;
+}
+.sv-row > div > span {
+  display: block;
+  margin-top: 2px;
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.sv-row > div > span.mono {
+  font-size: 12px;
+}
+.sv-row > div > span.sv-pw {
+  color: var(--text);
+  font-size: 13px;
+  animation: mg-up 0.2s var(--e) both;
+}
+.sv-row .btn,
+.sv-row button.btn {
+  gap: 8px;
+  white-space: nowrap;
+}
+.sv-code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 24px 20px;
+  padding-block: 12px;
+  padding-inline: 16px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  animation: mg-up 0.25s var(--e) both;
+}
+.sv-code code {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: all;
+}
+.sv-code > span {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sv-row + .sv-code {
+  margin-top: 4px;
+}
+.sv-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 2px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.sv-step button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--sec);
+  cursor: pointer;
+  transition:
+    background-color 0.15s var(--e),
+    color 0.15s var(--e);
+}
+.sv-step button:hover:not(:disabled) {
+  background: var(--step);
+  color: var(--text);
+}
+.sv-step button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sv-step button svg {
+  width: 16px;
+  height: 16px;
+}
+.sv-step b {
+  min-width: 56px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* facts: a term and its value, as many to a row as fit */
+.nx-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+  padding: 20px 24px 4px;
+}
+.nx-facts dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.nx-facts dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+}
+.nx-facts dd.mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+}
+.nx-facts dd.crit {
+  color: var(--danger);
+}
+.sv .sv-facts {
+  padding: 4px 24px 20px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  justify-content: stretch;
+  gap: 16px 24px;
+}
+.sv-facts dd.warn {
+  color: var(--warning);
+}
+.sv .sv-host {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.sv-fp {
+  font-size: 12px;
+}
+.nx-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.nx-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+}
+.nx-act .btn,
+.nx-act button {
+  gap: 8px;
+}
+.sv-act {
+  border-top: 1px solid var(--border);
+}
+
+/* the keys of the server */
+.sv-key {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--border);
+  animation: mg-up 0.2s var(--e) both;
+}
+.sv-key .tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--step);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--sec);
+}
+.sv-key b,
+.sv-opt b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.sv-key b em,
+.sv-opt b em {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--step);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--sec);
+}
+.sv-key div > span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sv-lk {
+  font-size: 13px;
+  color: var(--sec);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 4px;
+}
+.sv-lk:hover {
+  color: var(--danger);
+  text-decoration-color: currentColor;
+}
+.sv-lock {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sv-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--border);
+}
+.sv-foot > span {
+  font-size: 13px;
+  color: var(--sec);
+}
+/* the ghost add: an icon and a word, flush with the card's text */
+.sv-foot .fz-ga {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  height: 32px;
+  margin-block: 0;
+  margin-inline: -8px 0;
+  padding-block: 0;
+  padding-inline: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--sec);
+  cursor: pointer;
+  transition:
+    background-color 0.15s var(--e),
+    color 0.15s var(--e);
+}
+.sv-foot .fz-ga:hover {
+  background: var(--step);
+  color: var(--text);
+}
+.sv-foot .fz-ga svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+/* the choices of a section: the decoy site, the AmneziaWG backend */
+.sv-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 24px 20px;
+}
+.sv-opt {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color 0.15s var(--e),
+    background-color 0.15s var(--e);
+}
+.sv-opt:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.sv-opt.on {
+  border-color: var(--accent-mark);
+  background: color-mix(in srgb, var(--accent-mark) 5%, transparent);
+}
+.sv-opt:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.sv-opt .nx-rad {
+  margin-top: 1px;
+}
+.sv-opt b em {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+.sv-opt div > span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.sv-opt div > span.w {
+  color: var(--warning);
+}
+/* the radio of the board: a ring with a dot that springs in */
+.nx-rad {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--text) 30%, transparent);
+  transition: border-color 0.15s var(--e);
+  justify-self: center;
+}
+.nx-rad i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-mark);
+  transform: scale(0);
+  transition: transform 0.25s var(--ease-spring);
+}
+.nx-rad[aria-checked="true"],
+.sv-opt.on .nx-rad {
+  border-color: var(--accent-mark);
+}
+.nx-rad[aria-checked="true"] i,
+.sv-opt.on .nx-rad i {
+  transform: scale(1);
+}
+.nx-rad:hover {
+  border-color: var(--text);
+}
+.sv-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0 24px 20px;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--text) 22%, transparent);
+  text-align: center;
+  cursor: pointer;
+  animation: mg-up 0.25s var(--e) both;
+  transition:
+    border-color 0.15s var(--e),
+    background-color 0.15s var(--e);
+}
+.sv-drop:hover,
+.sv-drop.over {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent-mark) 4%, transparent);
+}
+.sv-drop svg {
+  width: 24px;
+  height: 24px;
+  color: var(--sec);
+  margin-bottom: 4px;
+}
+.sv-drop b {
+  font-weight: 500;
+}
+.sv-drop span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.sv-drop .file {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--sec);
+  word-break: break-all;
+}
+
+/* the system */
+.sv-oh {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px 16px;
+}
+.sv-os.warn {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+}
+.sv-os .dr-ic {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--tone-mint-bg);
+  color: var(--accent-mark);
+  transition:
+    background-color 0.3s var(--e),
+    color 0.3s var(--e);
+}
+.sv-os .dr-ic.warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.sv-os .dr-ic.crit {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.sv-os .dr-ic.run {
+  background: var(--tone-sky-bg);
+  color: var(--tone-sky);
+}
+.sv-os .dr-ic svg {
+  width: 24px;
+  height: 24px;
+}
+.sv-os .dr-ic.run svg {
+  animation: mg-ui-spin 1.2s linear infinite;
+}
+.sv-os .dr-h h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+}
+.sv-os .dr-h > span {
+  display: block;
+  font-size: 13px;
+  color: var(--sec);
+}
+.sv-ask {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  margin: 0 24px 16px;
+  animation: mg-up 0.25s var(--e) both;
+}
+.sv-prog {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 24px 16px;
+  animation: mg-up 0.25s var(--e) both;
+}
+.sv-prog i {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--tone-sky) var(--w), var(--step) 0);
+  transition: background 0.25s;
+}
+.sv-prog span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sv-eng {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--border);
+}
+.sv-eng > span:first-child {
+  margin-inline-end: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sv-eng .tag {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--step);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--sec);
+}
+
+/* the debug recording */
+.sv-rec {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border);
+}
+.sv-rec > .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: mg-ui-blink 1.2s var(--e) infinite;
+}
+.sv-rec b {
+  display: block;
+  font-weight: 500;
+}
+.sv-rec div > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.sv-rec .bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--danger) var(--w), var(--step) 0);
+  transition: background 0.4s;
+}
+[dir="rtl"] .sv-rec .bar {
+  background: linear-gradient(270deg, var(--danger) var(--w), var(--step) 0);
+}
+.sv-body {
+  padding: 4px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sv-body.line {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.sv-lb {
+  font-size: 13px;
+  color: var(--sec);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-runs .now i,
+  .sv-os.run .sv-prog i,
+  .sv-os .dr-ic.run svg,
+  .sv-c,
+  .sv-runs,
+  .sv-key,
+  .sv-code,
+  .sv-prog,
+  .sv-ask,
+  .sv-drop,
+  .sv-nav em.rec,
+  .sv-rec > .dot {
+    animation: none;
+  }
+  .sv-save,
+  .nx-rad i {
+    transition: none;
+  }
+}
+
+@media (width <= 1000px) {
+  .sv {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .sv-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 4px;
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+  .sv-nav button {
+    flex: none;
+    display: inline-flex;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding-block: 0;
+    padding-inline: 10px 12px;
+    gap: 6px;
+  }
+  .sv-nav button[aria-pressed="true"] {
+    border-color: transparent;
+  }
+}
+@media (width <= 720px) {
+  .sv-h {
+    padding: 16px 16px 12px;
+  }
+  .sv-form {
+    grid-template-columns: 1fr;
+    padding: 4px 16px 20px;
+  }
+  .sv-save,
+  .sv-save.on {
+    padding-inline: 16px;
+    flex-wrap: wrap;
+  }
+  .sv-ch {
+    grid-template-columns: 1fr;
+    padding: 4px 16px 16px;
+  }
+  .sv-ch > button,
+  .sv-ch > .btn {
+    margin-top: 0;
+    justify-self: stretch;
+    justify-content: center;
+  }
+  .sv-runs {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px;
+  }
+  .sv-note {
+    padding: 14px 16px 16px;
+  }
+  .sv-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .sv-code {
+    margin: 0 16px 16px;
+    grid-template-columns: 1fr;
+  }
+  .sv-code code {
+    white-space: normal;
+    word-break: break-all;
+  }
+  .sv .sv-facts {
+    padding: 4px 16px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sv-key {
+    padding: 12px 16px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sv-key .tag {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .sv-foot {
+    padding: 12px 16px 16px;
+    flex-wrap: wrap;
+  }
+  .sv-opts {
+    padding: 4px 16px 16px;
+  }
+  .sv-drop {
+    margin: 0 16px 16px;
+  }
+  .sv-oh {
+    padding: 16px;
+  }
+  .sv-ask {
+    grid-template-columns: 32px minmax(0, 1fr);
+    margin: 0 16px 16px;
+  }
+  .sv-ask .nx-row {
+    grid-column: 1 / -1;
+  }
+  .sv-prog {
+    padding: 0 16px 16px;
+  }
+  .sv-eng {
+    padding: 14px 16px 16px;
+  }
+  .sv-rec {
+    padding: 16px;
+  }
+  .sv-body {
+    padding: 4px 16px 16px;
+  }
+  .nx-act {
+    padding: 12px 16px;
+    gap: 6px;
+  }
+  .nx-facts {
+    padding: 16px 16px 4px;
+  }
+}

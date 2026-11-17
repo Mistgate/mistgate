@@ -213,7 +213,7 @@ export function OsRowMenu({ row, defaultOpen }: { row: OsRow; /** The dev kit sh
  * has them) and what stops them. Shows nothing for the panel's own server row, and nothing to a non-owner when there is
  * nothing to report.
  */
-export function OsNodeActions({ row, compact = false }: { row: OsRow; compact?: boolean }) {
+export function OsNodeActions({ row, compact = false, size: sizeProp }: { row: OsRow; compact?: boolean; /** The buttons' size; the Server tab's card has the 40 px ones. */ size?: "lg" | "md" | "sm" }) {
   const t = useT();
   const owner = useIsOwner();
   const actions = useOsActions();
@@ -227,7 +227,7 @@ export function OsNodeActions({ row, compact = false }: { row: OsRow; compact?: 
   if ((!owner || compact) && (run.kind === "idle" || queued)) return null;
 
   const name = row.name ?? "";
-  const size = compact ? "sm" : "md";
+  const size = sizeProp ?? (compact ? "sm" : "md");
   const install = blockOf(row, "install");
   const reboot = blockOf(row, "reboot");
   const refresh = blockOf(row, "refresh");

@@ -68,7 +68,8 @@ const settle = async () => {
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (b: Element | undefined) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.trim() === label);
+// a choice reads as its title, then what it means
+const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.querySelector("b")?.firstChild?.textContent?.trim() === label);
 // the toast is a role=dialog too (a non-modal one): the confirm window is the modal one
 const dialog = () => document.querySelector('[role=dialog]:not([aria-modal="false"])');
 const manualCommand = "mistgate-node awg prepare-kernel --yes";
@@ -144,7 +145,7 @@ describe("the kernel module on a node whose agent builds it itself", () => {
     prepareAwgKernel.mockResolvedValue({ outcome: PrepareAwgOutcome.NEEDS_PREPARE });
     await mount(data({ supported: true }));
     await pickKernelAndSave();
-    await click(button("Cancel"));
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel"));
     await settle();
     expect(dialog()).toBeNull();
     expect(prepareAwgKernel).toHaveBeenCalledTimes(1);

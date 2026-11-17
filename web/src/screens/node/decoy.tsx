@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useRef, useState, type ReactNode } from "react";
 import { EditionNotice } from "@/components/edition-notice";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { kindTextClass, StatusDot, type StatusKind } from "@/components/ui/status";
+import type { StatusKind } from "@/components/ui/status";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
@@ -14,8 +13,11 @@ import { asDecoyMode, decoyModes, isDecoyReason, maxBundleBytes, shortHash, type
 import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { cx } from "@/lib/cx";
 import type { Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
+import { Glyph } from "@/screens/overview-parts";
+import { Facts, SvCard, SvHead, SvOpt } from "./server-parts";
 
 type Node = Plain<NodeMsg>;
 
@@ -145,98 +147,99 @@ export function DecoyCard({ node }: { node: Node }) {
     setFile(f);
   }
 
-  const ownExtra = (
-    <div className="flex flex-col gap-2 rounded-field border border-dashed border-line px-3.5 py-3">
-      <SectionLabel as="span">{t("decoy.own.label")}</SectionLabel>
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={picker}
-          type="file"
-          hidden
-          aria-label={t("decoy.own.label")}
-          accept=".zip,.tar,.tgz,.gz,application/zip,application/x-tar,application/gzip"
-          onChange={(e) => {
-            pick(e.target.files?.[0]);
-            e.target.value = ""; // the same file can be picked again after a refusal
-          }}
-        />
-        <Button variant="secondary" size="md" disabled={!owner || ownOff} onClick={() => picker.current?.click()}>
-          <span>{file || hasBundle ? t("decoy.own.change") : t("decoy.own.choose")}</span>
-        </Button>
-        <span className="min-w-0 font-mono text-xs break-all text-muted">{file ? `${file.name} · ${fmt.bytes(file.size, 1024)}` : t("decoy.own.none")}</span>
-      </div>
-      <span className="text-xs leading-snug text-pretty text-muted">{t("decoy.own.hint")}</span>
-      <span className="text-xs leading-snug text-muted">
-        {hasBundle ? t("decoy.own.uploaded", { hash: shortHash(node.decoyBundleSha256) }) : t("decoy.own.notUploaded")}
-      </span>
-    </div>
-  );
+  const [over, setOver] = useState(false);
+  const live = node.decoyAgentMode && node.decoyReasonCode === "" ? asDecoyMode(node.decoyAgentMode) : undefined;
+  const off = (m: DecoyMode) => !owner || apply.isPending || (m === "panel" && !node.decoyPanelAvailable && saved !== "panel") || (m === "own" && ownOff);
+  const bar = apply.isPending ? t("np.sv.site.sending") : needsFile ? t("decoy.own.needFile") : dirty ? t("np.sv.site.pending") : node.decoyReasonCode === "" ? t("decoy.state.ok") : reasonText(t, node.decoyReasonCode);
+  const barKind = !apply.isPending && !needsFile && !dirty && node.decoyReasonCode === "" ? "ok" : !apply.isPending && !needsFile && !dirty && decoyReasonKind(node.decoyReasonCode) === "off" ? "off" : "";
 
   return (
-    <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
-      <SectionLabel as="h2" icon="mask" tone="lavender">
-        {t("decoy.title")}
-      </SectionLabel>
-      <p className="text-[13px] leading-snug text-pretty text-muted">{t("decoy.intro")}</p>
-      <DecoyModeChoice
-        label={t("decoy.title")}
-        value={mode}
-        onChange={(m) => {
-          setMode(m);
-          setProblem("");
-        }}
-        disabled={!owner || apply.isPending}
-        panelOff={!node.decoyPanelAvailable && saved !== "panel"}
-        panelNote={!node.decoyPanelAvailable ? t("decoy.panelNone") : undefined}
-        ownOff={ownOff}
-        ownExtra={ownExtra}
-      />
+    <SvCard aria-label={t("decoy.title")}>
+      <SvHead title={t("decoy.title")} hint={t("decoy.intro")} />
+      <div role="radiogroup" aria-label={t("decoy.title")} className="sv-opts">
+        {decoyModes.map((m) => (
+          <SvOpt key={m} on={mode === m} disabled={off(m)} title={t(`decoy.mode.${m}`)} mark={live === m ? t("np.sv.site.live") : undefined} onPick={() => (setMode(m), setProblem(""))}>
+            <span>{t(`decoy.mode.${m}Hint`)}</span>
+            {m === "panel" && !node.decoyPanelAvailable && <span className="w">{t("decoy.panelNone")}</span>}
+          </SvOpt>
+        ))}
+      </div>
+      {mode === "own" && (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={t("decoy.own.label")}
+          className={cx("sv-drop", over && "over", (!owner || ownOff) && "pointer-events-none opacity-60")}
+          onClick={() => picker.current?.click()}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), picker.current?.click())}
+          onDragOver={(e) => (e.preventDefault(), setOver(true))}
+          onDragLeave={() => setOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOver(false);
+            if (owner && !ownOff) pick(e.dataTransfer.files[0]);
+          }}
+        >
+          <input
+            ref={picker}
+            type="file"
+            hidden
+            aria-label={t("decoy.own.label")}
+            accept=".zip,.tar,.tgz,.gz,application/zip,application/x-tar,application/gzip"
+            onChange={(e) => {
+              pick(e.target.files?.[0]);
+              e.target.value = ""; // the same file can be picked again after a refusal
+            }}
+          />
+          <Glyph d="M12 16V5M7 9l5-5 5 5M5 19h14" size={24} stroke={1.5} />
+          <b>{file || hasBundle ? t("decoy.own.change") : t("decoy.own.choose")}</b>
+          <span className={file ? "file" : undefined}>{file ? `${file.name} · ${fmt.bytes(file.size, 1024)}` : t("decoy.own.none")}</span>
+          <span>{t("decoy.own.hint")}</span>
+          <span>{hasBundle ? t("decoy.own.uploaded", { hash: shortHash(node.decoyBundleSha256) }) : t("decoy.own.notUploaded")}</span>
+        </div>
+      )}
       <EditionNotice feature="decoy_own" />
-      {!owner && <p className="text-xs text-muted">{t("decoy.ownerOnly")}</p>}
-      {problem && <Notice tone="danger">{problem}</Notice>}
-      {owner && (
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {needsFile && <span className="text-xs text-muted">{t("decoy.own.needFile")}</span>}
+      {problem && (
+        <div className="px-6 pb-4 max-[720px]:px-4">
+          <Notice tone="danger">{problem}</Notice>
+        </div>
+      )}
+      <div className={cx("sv-save on", barKind)}>
+        <span>{bar}</span>
+        {owner ? (
           <Button variant="primary" size="md" disabled={!dirty || needsFile || apply.isPending || (mode === "own" && ownOff)} onClick={() => apply.mutate()}>
             {mode === "own" && file ? t("decoy.upload") : t("decoy.apply")}
           </Button>
-        </div>
-      )}
+        ) : (
+          <span className="!ms-0 !text-muted">{t("decoy.ownerOnly")}</span>
+        )}
+      </div>
       <AppliedState node={node} />
-    </section>
+    </SvCard>
   );
 }
+
 
 /** What is configured against what the node reported (mode and the first digits of the hash), and why they differ. */
 function AppliedState({ node }: { node: Node }) {
   const t = useT();
   const mode = asDecoyMode(node.decoyMode);
-  const reason = node.decoyReasonCode;
-  const kind: StatusKind = reason === "" ? "ok" : decoyReasonKind(reason);
   const agent = node.decoyAgentMode ? t(`decoy.mode.${asDecoyMode(node.decoyAgentMode)}`) : t("decoy.state.noReport");
-  const row = (label: string, value: string, hash: string) => (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-[11px] text-muted">{label}</span>
-      <span className="text-[13px] font-bold">{value}</span>
-      <span title={hash} className="font-mono text-[11px] break-all text-muted">
-        {hash ? shortHash(hash) : "—"}
-      </span>
-    </div>
+  const hash = (h: string) => (
+    <span title={h} className="block font-mono text-[11px] font-normal break-all text-muted">
+      {h ? shortHash(h) : "—"}
+    </span>
   );
   return (
-    <div className="flex flex-col gap-2.5 border-t border-line pt-3">
-      <SectionLabel as="h3">{t("decoy.state.title")}</SectionLabel>
-      <div className="grid grid-cols-2 gap-3">
-        {row(t("decoy.state.configured"), t(`decoy.mode.${mode}`), mode === "own" ? node.decoyBundleSha256 : "")}
-        {row(t("decoy.state.reported"), agent, node.decoyAgentSha256)}
-      </div>
-      <p className={`flex items-start gap-2 text-xs leading-snug text-pretty ${kindTextClass[kind]}`}>
-        <span className="mt-[3px]">
-          <StatusDot kind={kind} />
-        </span>
-        <span>{reason === "" ? t("decoy.state.ok") : reasonText(t, reason)}</span>
-      </p>
-      {!node.decoySupported && reason !== "agent_too_old" && <p className="text-xs leading-snug text-pretty text-muted">{t("decoy.unsupported")}</p>}
-    </div>
+    <>
+      <Facts
+        className="sv-facts"
+        items={[
+          { l: t("decoy.state.configured"), v: <>{t(`decoy.mode.${mode}`)}{hash(mode === "own" ? node.decoyBundleSha256 : "")}</> },
+          { l: t("decoy.state.reported"), v: <>{agent}{hash(node.decoyAgentSha256)}</> },
+        ]}
+      />
+      {!node.decoySupported && node.decoyReasonCode !== "agent_too_old" && <p className="sv-note !pt-3.5">{t("decoy.unsupported")}</p>}
+    </>
   );
 }

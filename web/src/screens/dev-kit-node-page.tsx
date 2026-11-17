@@ -22,6 +22,9 @@ import { NodeDetail } from "./node";
 import { hostHistoryQuery } from "./node/load-history";
 import { nodeAlertsQuery } from "./node/overview-parts";
 import { OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
+import { OsUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
+import { debugListQuery } from "@/lib/debug-capture";
+import { osUpdatesQuery } from "@/lib/os-updates";
 
 // Development only. /dev-kit?only=nodepage: the node page of the redesign, a tab at a time (?tab=overview|profiles|server|doctor|...),
 // in every state of the board's switch (load low / high / at the limit, alerts none / a few / many, the node answering / silent / new)
@@ -140,8 +143,12 @@ const columns = [
   { profileId: "prf_aw", profileName: "AmneziaWG 3.1", protocol: "amneziawg" },
 ];
 
+/** What the Server tab's system card reads: fine, security updates waiting, or a reboot due (?os=ok|upd|boot; by default a state's own). */
+export type OsKind = "ok" | "upd" | "boot";
+const osOf: Record<NState, OsKind> = { calm: "ok", alerts: "upd", many: "boot", high: "ok", limit: "boot", down: "ok", new: "ok", retired: "ok", viewer: "upd", edge: "ok", via: "ok", entry: "ok" };
+
 /** The node page's data (what GetNode says) and the query cache around it, for a state. */
-export function nodePageData(state: NState) {
+export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done" } = {}) {
   const sp = specs[state];
   const lo = sp.load;
   const status = sp.retired ? NodeStatus.RETIRED : sp.down ? NodeStatus.DOWN : sp.fresh ? NodeStatus.ONLINE : NodeStatus.ONLINE;
@@ -268,6 +275,23 @@ export function nodePageData(state: NState) {
   }
   if (sp.fresh) qc.setQueryData(hostHistoryQuery("nod_de1", 24).queryKey, { nodeId: "nod_de1", nodeName: "de1", nowUnix: NOW, sinceUnix: NOW - 300, hours: [] } as never);
   qc.setQueryData(relaysQuery("nod_de1").queryKey, (sp.entry ? [] : []) as never);
+  // the Server tab: the SSH access and its keys, the system of the node and a debug recording
+  const osKind = extra.os ?? osOf[state];
+  const fp = "SHA256:Qm4Vw7dJ1xN8cR2tY5pL0sW9hD4gF6aJ8NvK2Ws";
+  qc.setQueryData(["node-server-access", "nod_de1"], {
+    nodeId: "nod_de1", nodeName: "de1", host: "203.0.113.7", port: 22, username: "root", fingerprint: fp, configuredUnix: NOW - 12 * D, passwordSaved: true, passwordLogin: true, passwordGenerated: true,
+    panelKeyFingerprint: "SHA256:Zp8Lr1NvTc5KJd3Fq7YwB2mXa9RbE1c", nodeRetired: !!sp.retired, rotationPending: false,
+  } as never);
+  const key = (type: string, bits: number, f: string, comment: string, over: object = {}) => ({ type, bits, fingerprint: f, comment, panelKey: false, restricted: false, lines: 1, ...over });
+  qc.setQueryData(["node-server-keys", "nod_de1"], { keys: [key("ssh-ed25519", 256, "SHA256:Zp8Lr1NvTc5KJd3Fq7YwB2mXa9RbE1c", "mistgate-panel", { panelKey: true }), key("ssh-ed25519", 256, "SHA256:Hb3Jk7QwXn1TrPz5Lm8Vc2Ys6DfGa9KtN2e", "owner@laptop", { lines: 2 }), key("ssh-rsa", 4096, "SHA256:Dv6Cx2MbPq8NhZr4Wt7Ly1Ks3FgJa5BrE8g", "backup-key", { restricted: true })], otherLines: 0 } as never);
+  const osStatus = { measuredUnix: NOW - 3600, distroId: "debian", distroVersion: "13", pending: osKind === "upd" ? 12 : 0, security: osKind === "upd" ? 6 : 0, notable: [], kernelRunning: "6.12.48+deb13-amd64", kernelNewest: osKind === "boot" ? "6.12.57+deb13-amd64" : "6.12.48+deb13-amd64", rebootRequired: osKind === "boot", rebootReasons: osKind === "boot" ? ["kernel"] : [], held: [], apt: "ok", halfConfigured: [], listsUnix: NOW - 3600, dpkgUnix: NOW - 7200, autoUpdates: "on", autoReboot: false, awgModuleNext: "", container: "", bootIdHash: "", error: "" };
+  qc.setQueryData(osUpdatesQuery.queryKey, {
+    nowUnix: NOW, scheduleTimezoneOffsetMinutes: 0, panelHost: { ...osStatus, pending: 0, security: 0, rebootRequired: false, rebootReasons: [] },
+    nodes: [{ nodeId: "nod_de1", name: "de1", connected: !sp.down, supported: true, onlineUsers: people, onPanelServer: false, state: osKind === "boot" ? OsUpdateState.REBOOT_REQUIRED : osKind === "upd" ? OsUpdateState.UPDATES : OsUpdateState.UP_TO_DATE, status: osStatus, updateCapable: true, updateBlock: "", updateBlockAll: "", inbounds: 3, rebootBlock: "" }],
+  } as never);
+  qc.setQueryData(debugListQuery("nod_de1").queryKey, {
+    captures: extra.dbg === "rec" ? [{ captureId: "req_1", nodeId: "nod_de1", nodeName: "de1", state: "running", level: "debug", sources: ["xray", "hysteria"], minutes: 5, startedUnix: NOW - 100, endsUnix: NOW + 200, records: 0, dropped: 0, actor: "owner" }] : [],
+  } as never);
   const nodes = (qc.getQueryData(nodesQuery.queryKey) as { nodes: Record<string, unknown>[] }).nodes;
   qc.setQueryData(nodesQuery.queryKey, { ...(qc.getQueryData(nodesQuery.queryKey) as object), nodes: [...nodes, { ...nodes[0], id: "nod_msk1", name: "msk1", countryCode: "RU", location: "Moscow" }] } as never);
   qc.setQueryData(meQuery.queryKey, {
@@ -288,7 +312,9 @@ export function NodePageFrame() {
   const state = (params.get("state") ?? "calm") as NState;
   const [scene] = useState(() => {
     if (params.get("fx") === "1") setEffectsEnabled(true);
-    return nodePageData(state);
+    const os = params.get("os");
+    const dbg = params.get("dbg");
+    return nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined });
   });
   return (
     <QueryClientProvider client={scene.qc}>
@@ -303,7 +329,7 @@ export function NodePageFrame() {
   );
 }
 
-const frames: { id: string; state: NState; tab: string; title: string; w: number; h: number }[] = [
+const frames: { id: string; state: NState; tab: string; title: string; w: number; h: number; /** More of the frame own params (?sv=, ?os=, ...). */ q?: string }[] = [
   { id: "node-overview-calm", state: "calm", tab: "overview", title: "Overview: load low, no alerts", w: 1440, h: 1700 },
   { id: "node-overview-alerts", state: "alerts", tab: "overview", title: "Overview: three alerts, one of them failing a check", w: 1440, h: 1800 },
   { id: "node-overview-many", state: "many", tab: "overview", title: "Overview: six alerts fold into 'show more', load high", w: 1440, h: 1900 },
@@ -328,6 +354,23 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-doctor-down", state: "down", tab: "doctor", title: "Doctor: the node does not answer, the last report", w: 1440, h: 1500 },
   { id: "node-doctor-viewer", state: "viewer", tab: "doctor", title: "Doctor: a read-only role, no buttons", w: 1440, h: 1700 },
   { id: "node-doctor-phone", state: "alerts", tab: "doctor", title: "Doctor on a phone, 400 wide", w: 400, h: 2600 },
+  { id: "node-server-node", state: "calm", tab: "server", title: "Server: the node", w: 1440, h: 1000 },
+  { id: "node-server-ch", state: "calm", tab: "server", q: "sv=ch", title: "Server: bandwidth", w: 1440, h: 700 },
+  { id: "node-server-ag", state: "calm", tab: "server", q: "sv=ag", title: "Server: the agent and the link", w: 1440, h: 900 },
+  { id: "node-server-ssh", state: "calm", tab: "server", q: "sv=ssh", title: "Server: SSH access and the keys on the server", w: 1440, h: 1400 },
+  { id: "node-server-site", state: "calm", tab: "server", q: "sv=site", title: "Server: the decoy site", w: 1440, h: 900 },
+  { id: "node-server-awg", state: "calm", tab: "server", q: "sv=awg", title: "Server: the AmneziaWG backend", w: 1440, h: 800 },
+  { id: "node-server-sys-ok", state: "calm", tab: "server", q: "sv=sys&os=ok", title: "Server: the system is up to date, and the host", w: 1440, h: 1200 },
+  { id: "node-server-sys-upd", state: "alerts", tab: "server", q: "sv=sys&os=upd", title: "Server: updates wait", w: 1440, h: 1200 },
+  { id: "node-server-sys-boot", state: "many", tab: "server", q: "sv=sys&os=boot", title: "Server: a reboot is due", w: 1440, h: 1200 },
+  { id: "node-server-dbg", state: "calm", tab: "server", q: "sv=dbg", title: "Server: the debug recording, idle", w: 1440, h: 800 },
+  { id: "node-server-dbg-rec", state: "calm", tab: "server", q: "sv=dbg&dbg=rec", title: "Server: the debug recording runs", w: 1440, h: 700 },
+  { id: "node-server-del", state: "calm", tab: "server", q: "sv=del", title: "Server: retiring the node", w: 1440, h: 500 },
+  { id: "node-server-retired", state: "retired", tab: "server", q: "sv=ssh", title: "Server: a retired node keeps four sections", w: 1440, h: 800 },
+  { id: "node-server-viewer", state: "viewer", tab: "server", title: "Server: a read-only role", w: 1440, h: 1000 },
+  { id: "node-server-edge", state: "edge", tab: "server", q: "sv=sys", title: "Server: the Cloudflare edition has no system card", w: 1440, h: 700 },
+  { id: "node-server-phone", state: "calm", tab: "server", title: "Server on a phone, 400 wide", w: 400, h: 2000 },
+  { id: "node-server-phone-ssh", state: "calm", tab: "server", q: "sv=ssh", title: "Server: SSH access on a phone, 400 wide", w: 400, h: 2400 },
   { id: "node-overview-1100", state: "alerts", tab: "overview", title: "Overview at 1100 wide: one column", w: 1100, h: 2600 },
   { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
 ];
@@ -352,7 +395,7 @@ export function NodePageKit() {
             <div className="max-w-full overflow-x-auto rounded-card border border-line">
               {/* the frame is this same app (a made-up page of it), so a sandbox would only break it */}
               {/* oxlint-disable-next-line react/iframe-missing-sandbox */}
-              <iframe key={key} title={f.title} src={`${path}?only=nodepage-frame&tab=${f.tab}&state=${f.state}`} width={f.w} height={f.h} className="block max-w-none border-0" />
+              <iframe key={key} title={f.title} src={`${path}?only=nodepage-frame&tab=${f.tab}&state=${f.state}${f.q ? `&${f.q}` : ""}`} width={f.w} height={f.h} className="block max-w-none border-0" />
             </div>
           </Shot>
         ))}

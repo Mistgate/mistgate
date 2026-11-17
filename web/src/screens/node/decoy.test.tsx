@@ -72,7 +72,16 @@ async function mount(n = node(), me: Record<string, unknown> = { admin: { id: "a
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
-const radio = (mode: string) => document.querySelector<HTMLInputElement>(`input[type=radio][value=${mode}]`)!;
+// a choice is a radio button; they come in the order of the modes
+const modeOrder = ["builtin", "panel", "own"];
+const radio = (mode: string) => {
+  const r = document.querySelectorAll<HTMLButtonElement>("[role=radio]")[modeOrder.indexOf(mode)]!;
+  return Object.assign(r, {
+    get checked() {
+      return r.getAttribute("aria-checked") === "true";
+    },
+  });
+};
 const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   await settle();
@@ -180,7 +189,6 @@ describe("the own archive", () => {
 describe("the applied state", () => {
   it("shows the configured and the reported mode with the first digits of their hashes, and no complaint when they agree", async () => {
     await mount(node({ decoyMode: "own", decoyBundleSha256: sha("a3"), decoyAgentMode: "own", decoyAgentSha256: sha("a3") }));
-    expect(text()).toContain(en["decoy.state.title"]);
     expect(text().match(/a3a3a3a3a3a3/g)).toHaveLength(3); // the uploaded line, configured, reported: the short form only
     expect(text()).not.toContain("a3a3a3a3a3a3a");
     expect(text()).toContain(en["decoy.state.ok"]);
