@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
@@ -9,6 +9,11 @@ import "./ai.css";
 // What every tab of the AI screen is built of, as the board draws it (PnAI + pn.css): a card with a tinted glyph and a small-caps head
 // (`Sec`), a state glyph with its pill (`Pill`), the load and the failure of a tab, the board's own dropdown (`Dd`) and the window (`Dlg`).
 // Every rule is in ai.css, under .aip (the page) or .ai-dlg (a window).
+
+/** The dev kit's scene: the flags of what a page opens with (a window, a row asking "Delete?"). The product has none: the set is empty. */
+const SceneCtx = createContext<ReadonlySet<string>>(new Set());
+export const SceneProvider = SceneCtx.Provider;
+export const useScene = () => useContext(SceneCtx);
 
 /** The board's 24-grid glyphs. */
 export const ICONS = {
@@ -149,8 +154,8 @@ export function Empty({ d, title, body, action, calm }: { d: string; title: Reac
 }
 
 /** The board's dropdown: a button with the chosen name, a list under it with a tick on the chosen one; Esc and a click outside close it. */
-export function Dd({ label, value, options, onChange, disabled }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
+export function Dd({ label, value, options, onChange, disabled, defaultOpen }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; disabled?: boolean; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(!!defaultOpen);
   const list = useRef<HTMLDivElement>(null);
   const chosen = options.find((o) => o.value === value);
   useEffect(() => {

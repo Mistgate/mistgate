@@ -8,7 +8,7 @@ import { accessQuery, assistantErrorKey, conversationsQuery, looksSecret, memory
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
-import { Dlg, ErrCard, Gl, ICONS, Sec, Skeleton } from "./bits";
+import { Dlg, ErrCard, Gl, ICONS, Sec, Skeleton, useScene } from "./bits";
 
 // What the assistant remembers (each admin's own notes) and the admin's conversations (ADR 0014), as the board draws them (PnAI "Память").
 
@@ -33,12 +33,16 @@ function Notes() {
   const toast = useToast();
   const qc = useQueryClient();
   const q = useQuery(memoryQuery);
+  const scene = useScene();
   const [draft, setDraft] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
-  const [asking, setAsking] = useState("");
-  const [fresh, setFresh] = useState("");
-  const [forget, setForget] = useState(false);
+  const [adding, setAdding] = useState(scene.has("new-note"));
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(() => {
+    const n = q.data?.[0];
+    return scene.has("edit-note") && n ? { id: n.id, text: n.text } : null;
+  });
+  const [asking, setAsking] = useState(() => (scene.has("ask-note") ? (q.data?.[1]?.id ?? "") : ""));
+  const [fresh, setFresh] = useState(() => (scene.has("fresh-note") ? (q.data?.[0]?.id ?? "") : ""));
+  const [forget, setForget] = useState(scene.has("dlg-forget"));
   const refusal = (e: unknown) => {
     const k = assistantErrorKey(e);
     toast.error(k ? t(k) : errorText(e, t));
@@ -194,8 +198,9 @@ function Conversations() {
   const [query, setQuery] = useState("");
   const q = useQuery(conversationsQuery(query.trim()));
   const tz = useQuery(accessQuery).data?.timezoneOffsetMinutes ?? 0;
-  const [wipe, setWipe] = useState(false);
-  const [asking, setAsking] = useState("");
+  const scene = useScene();
+  const [wipe, setWipe] = useState(scene.has("dlg-wipe"));
+  const [asking, setAsking] = useState(() => (scene.has("ask-conv") ? (q.data?.[1]?.id ?? "") : ""));
   const done = () => void qc.invalidateQueries({ queryKey: ["assistant", "conversations"] });
   const del = useMutation({ mutationFn: (id: string) => assistant.deleteConversation({ id }), onSuccess: () => (setAsking(""), done()), onError: (e) => toast.error(errorText(e, t)) });
   const all = useMutation({ mutationFn: () => assistant.deleteAllConversations({ allAdmins: false }), onSuccess: () => (setWipe(false), toast(t("aip.conv.wipedToast")), done()), onError: (e) => toast.error(errorText(e, t)) });

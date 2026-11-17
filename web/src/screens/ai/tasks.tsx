@@ -43,7 +43,7 @@ import {
   type StepDraft,
   type TaskP,
 } from "@/lib/tasks";
-import { Dlg, Empty, ErrCard, Gl, ICONS, OwnerOnly, Pill, Skeleton, SwRow, useFresh, type Kind } from "./bits";
+import { Dlg, Empty, ErrCard, Gl, ICONS, OwnerOnly, Pill, Skeleton, SwRow, useFresh, useScene, type Kind } from "./bits";
 import { openInChat } from "./memory";
 
 // The owner's scheduled tasks (mistgate.tasks.v1, ADR 0017 section 5), as the board draws them (PnAI "Задачи по расписанию"): the list
@@ -71,9 +71,13 @@ function TaskList({ owner, focus }: { owner: boolean; focus?: string }) {
   const qc = useQueryClient();
   const q = useQuery(tasksQuery);
   const tools = useQuery({ ...checkToolsQuery, enabled: owner });
-  const [editing, setEditing] = useState<Editing | null>(null);
-  const [open, setOpen] = useState<string | null>(focus ?? null);
-  const [asking, setAsking] = useState("");
+  const scene = useScene();
+  const [editing, setEditing] = useState<Editing | null>(() => {
+    const first = q.data?.tasks[0];
+    return scene.has("dlg-task") ? { kind: "check" } : scene.has("dlg-task-as") ? { kind: "assistant" } : scene.has("dlg-task-edit") && first ? { task: first, kind: first.kind === TaskKind.ASSISTANT ? "assistant" : "check" } : null;
+  });
+  const [open, setOpen] = useState<string | null>(focus ?? (scene.has("runs") ? (q.data?.tasks[2]?.id ?? null) : null));
+  const [asking, setAsking] = useState(() => (scene.has("ask-task") ? (q.data?.tasks[0]?.id ?? "") : ""));
   const refresh = () => void qc.invalidateQueries({ queryKey: ["tasks"] });
   const list = q.data?.tasks ?? [];
   const fresh = useFresh(list.map((x) => x.id));
@@ -362,7 +366,7 @@ function TaskEditor({ editing, tz, onClose, onSaved }: { editing: Editing; tz: n
   const t = useT();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>(() => (editing.task ? draftOf(editing.task) : emptyDraft(editing.kind)));
-  const [tried, setTried] = useState(false);
+  const [tried, setTried] = useState(useScene().has("tried"));
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const tools = useQuery({ ...checkToolsQuery, enabled: draft.kind === "check" });
   const schemas = useMemo(() => Object.fromEntries((tools.data ?? []).map((tool) => [tool.name, tool.inputSchemaJson])), [tools.data]);

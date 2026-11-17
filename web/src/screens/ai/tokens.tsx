@@ -36,7 +36,7 @@ import {
   type NewToken,
   type Token,
 } from "@/lib/integrations";
-import { CopyBtn, Dlg, ErrCard, Gl, ICONS, Sec, Skeleton, SwRow, useFresh, type Kind } from "./bits";
+import { CopyBtn, Dlg, ErrCard, Gl, ICONS, Sec, Skeleton, SwRow, useFresh, useScene, type Kind } from "./bits";
 
 // API tokens and MCP, as the board draws them (PnAI "MCP и токены"): the list of tokens (last use, expiry, limit, revoke), the create
 // window (the secret is shown once, in the same window) and the card with the address and a ready snippet for each kind of client.
@@ -78,7 +78,8 @@ function TokensCard() {
   const fmt = useFmt();
   const q = useQuery(tokensQuery);
   const { create, revoke, setBulk } = useTokenActions();
-  const [creating, setCreating] = useState(false);
+  const scene = useScene();
+  const [creating, setCreating] = useState(scene.has("dlg-tok"));
   const noCreate = useEdition().off("mcp"); // the edition refuses CreateApiToken: the list stays, the way to a new token goes
   // "?new=token" (the palette's "New API token") opens the form, then leaves the address
   const wantsNew = (useSearch({ strict: false }) as { new?: string }).new === "token";
@@ -91,10 +92,10 @@ function TokensCard() {
   useEffect(() => {
     if (wantsNew) void navigate({ to: "/ai", search: { tab: "mcp" }, replace: true } as never);
   }, [wantsNew, navigate]);
-  const [secret, setSecret] = useState<{ name: string; value: string } | null>(null);
-  const [revoking, setRevoking] = useState<Token | null>(null);
-  const [bulkOf, setBulkOf] = useState<Token | null>(null);
-  const [showOld, setShowOld] = useState(false);
+  const [secret, setSecret] = useState<{ name: string; value: string } | null>(scene.has("dlg-secret") ? { name: "claude-ops", value: "not-a-real-token-Zk4Tq9Wm2Xc7Lp5Rb8Hd3Ns6Vy1Fj0Ge" } : null);
+  const [revoking, setRevoking] = useState<Token | null>(() => (scene.has("dlg-rev") ? (q.data?.tokens[0] ?? null) : null));
+  const [bulkOf, setBulkOf] = useState<Token | null>(() => (scene.has("dlg-lim") ? (q.data?.tokens.find((x) => changesUsers(x.profile) && !x.allowBulkUserChanges) ?? null) : null));
+  const [showOld, setShowOld] = useState(scene.has("old"));
   const now = q.data?.nowUnix ?? 0;
   const { live, old } = splitTokens(q.data?.tokens ?? [], now);
   const fresh = useFresh(live.map((x) => x.id));
@@ -224,11 +225,11 @@ function TokensCard() {
 function CreateDialog({ busy, onCreate, onClose }: { busy: boolean; onCreate: (token: NewToken) => void; onClose: () => void }) {
   const t = useT();
   const [name, setName] = useState("");
-  const [profile, setProfile] = useState(TokenProfile.READONLY);
+  const [profile, setProfile] = useState(useScene().has("op") ? TokenProfile.OPERATOR : TokenProfile.READONLY);
   const [ttl, setTtl] = useState<number>(defaultTtl);
   const [rate, setRate] = useState(String(defaultRate));
   const [bulk, setBulk] = useState(false);
-  const [tried, setTried] = useState(false);
+  const [tried, setTried] = useState(useScene().has("tried"));
   const nameOk = validName(name);
   const rateValue = parseRate(rate);
   const go = () => {

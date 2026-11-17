@@ -16,7 +16,7 @@ import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { plain, type Plain } from "@/lib/plain";
 import { SaveBar } from "@/screens/subscriptions/ui";
-import { Dd, Dlg, ErrCard, Gl, ICONS, Pill, Row, Sec, Skeleton } from "./bits";
+import { Dd, Dlg, ErrCard, Gl, ICONS, Pill, Row, Sec, Skeleton, useScene } from "./bits";
 
 // The owner's settings of the assistant (ADR 0014), as the board draws them (PnAI): on or off, the provider the chat uses, how hard it
 // thinks, who may use it, the notes every admin's assistant reads, how long conversations are kept; per provider the key (sealed,
@@ -27,6 +27,8 @@ type Status = Plain<ProviderStatus>;
 type Choice = Plain<ProviderChoice>;
 
 const retentions = [7, 30, 90, 180, 365, 0] as const;
+/** What a scene calls a provider. */
+const providerSlug: Partial<Record<AssistantProvider, string>> = { [AssistantProvider.ANTHROPIC]: "anthropic", [AssistantProvider.DEEPSEEK]: "deepseek", [AssistantProvider.ZAI]: "zai", [AssistantProvider.OLLAMA_CLOUD]: "ollama" };
 const isCustom = (p: AssistantProvider) => p >= AssistantProvider.CUSTOM_1 && p <= AssistantProvider.CUSTOM_5;
 
 export function AssistantTab() {
@@ -41,6 +43,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
   const fmt = useFmt();
   const toast = useToast();
   const qc = useQueryClient();
+  const scene = useScene();
   const settings = (data.settings ?? {}) as Settings;
   const statuses = (data.providers ?? []) as Status[];
   // what the form starts from (the same object tells whether anything changed, and is what Discard goes back to)
@@ -52,7 +55,8 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
   const [initChoices] = useState<Record<number, Choice>>(() =>
     Object.fromEntries(statuses.map((s) => [s.provider, { provider: s.provider, model: s.choice?.model ?? "", budgetUsdMonth: s.choice?.budgetUsdMonth ?? 20 } as Choice])),
   );
-  const [draft, setDraft] = useState<Settings>(initDraft);
+  // a scene may open the form with something changed, so the bar of Save is there to look at
+  const [draft, setDraft] = useState<Settings>(scene.has("dirty") ? { ...initDraft, effort: AssistantEffort.THOROUGH } : initDraft);
   const [choices, setChoices] = useState<Record<number, Choice>>(initChoices);
   const connected = statuses.filter((s) => s.connected);
   const shownProvider = connected.some((s) => s.provider === draft.provider) ? draft.provider : (connected[0]?.provider ?? AssistantProvider.UNSPECIFIED);
@@ -141,12 +145,13 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
                   {connected.length === 0 ? (
                     <span className="ai-cs">{t("ai.set.providerNone")}</span>
                   ) : (
-                    <Dd label={t("ai.set.provider")} value={String(shownProvider)} onChange={(v) => set({ provider: Number(v) as AssistantProvider })} options={connected.map((s) => ({ value: String(s.provider), label: displayName(s) }))} />
+                    <Dd defaultOpen={scene.has("dd-chat")} label={t("ai.set.provider")} value={String(shownProvider)} onChange={(v) => set({ provider: Number(v) as AssistantProvider })} options={connected.map((s) => ({ value: String(s.provider), label: displayName(s) }))} />
                   )}
                 </Row>
                 {fallbacks.length > 0 && (
                   <Row label={t("ai.set.fallback")} hint={t("aip.fall.hint")}>
                     <Dd
+                      defaultOpen={scene.has("dd-fall")}
                       label={t("ai.set.fallback")}
                       value={String(shownFallback)}
                       onChange={(v) => set({ fallbackProvider: Number(v) as AssistantProvider })}
@@ -263,9 +268,11 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
   const qc = useQueryClient();
   const fmt = useFmt();
   const custom = isCustom(status.provider);
-  const [keying, setKeying] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [open, setOpen] = useState(inUse);
+  const scene = useScene();
+  const id = custom ? `custom${status.provider - AssistantProvider.CUSTOM_1 + 1}` : (providerSlug[status.provider] ?? "");
+  const [keying, setKeying] = useState(scene.has(`dlg-connect-${id}`) || scene.has(`dlg-replace-${id}`));
+  const [removing, setRemoving] = useState(scene.has(`dlg-remove-${id}`));
+  const [open, setOpen] = useState((inUse && !scene.has(`shut-${id}`)) || scene.has(`open-${id}`));
   const [just, setJust] = useState(false);
   const models = useQuery({
     queryKey: ["assistant", "models", status.provider],
@@ -415,14 +422,15 @@ function KeyDialog({ status, name, custom, replace, onClose, onDone }: { status:
   const t = useT();
   const toast = useToast();
   const guard = useStepUp();
-  const [key, setKey] = useState("");
+  const [key, setKey] = useState(useScene().has("keyfilled") ? "not-a-real-key-0000" : "");
   const [customName, setCustomName] = useState(status.customName || "");
   const [customUrl, setCustomUrl] = useState(status.customUrl || "");
   const [customModel, setCustomModel] = useState(status.choice?.model || "");
   const [allowLocal, setAllowLocal] = useState(status.allowLocal || false);
   const [inputPrice, setInputPrice] = useState(String(status.inputUsdPerMtok || 0));
   const [outputPrice, setOutputPrice] = useState(String(status.outputUsdPerMtok || 0));
-  const [err, setErr] = useState("");
+  const scene = useScene();
+  const [err, setErr] = useState(scene.has("keyerr") ? t("aip.key.bad") : "");
   const setKeyM = useMutation({
     mutationFn: () => guard(() => assistant.setProviderKey({ provider: status.provider, apiKey: key.trim(), customName, customUrl, customModel, allowLocal, inputUsdPerMtok: Number(inputPrice), outputUsdPerMtok: Number(outputPrice) })),
     onSuccess: () => {
