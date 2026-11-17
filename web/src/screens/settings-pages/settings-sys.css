@@ -1,0 +1,509 @@
+/*
+ * Settings -> System (screens/settings-pages/system.tsx, system-ops.tsx, panel-resources.tsx): the four columns of the panel's own
+ * cost, the logs, the node updates' settings and their sources, the build, retention, the links and the window of a metrics token
+ * (PnSettings + pn.css: the sx-, uq-dl, ai-dl and ai-made rules, in the board's order). A container query of the board is a media
+ * query here. Everything is under .sx (settings.css).
+ */
+
+/* L6165, L6355-6369, L6372-6381: what the panel costs this server, four columns */
+.sx .sx-res {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 4px 0 8px;
+}
+.sx .sx-rg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 20px 12px;
+  border-inline-start: 1px solid var(--border);
+  min-width: 0;
+}
+.sx .sx-rg:first-child {
+  border-inline-start: 0;
+}
+.sx .sx-rr {
+  display: flex;
+  flex-direction: column;
+}
+.sx .sx-r {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.sx .sx-rr>.sx-r:first-child {
+  border-top: 0;
+}
+.sx .sx-r>span {
+  font-size: 13px;
+  color: var(--sec);
+}
+.sx .sx-r>b {
+  font-size: 14px;
+  font-weight: 500;
+  text-align: end;
+  white-space: nowrap;
+}
+.sx .sx-bar {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  margin: 2px 0;
+  background: linear-gradient(90deg, var(--accent-mark) var(--w), var(--step) 0);
+  grid-column: 1 / -1;
+  margin-block: 4px 2px;
+}
+[dir="rtl"] .sx .sx-bar {
+  background: linear-gradient(270deg, var(--accent-mark) var(--w), var(--step) 0);
+}
+.sx .sx-r em {
+  grid-column: 1 / -1;
+  font-style: normal;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx .sx-r.warn>b {
+  color: var(--warning-text);
+}
+.sx .sx-r.warn .sx-bar {
+  background: linear-gradient(90deg, var(--warning) var(--w), var(--step) 0);
+}
+.sx .sx-r.bad>b {
+  color: var(--danger-text);
+}
+.sx .sx-r.bad .sx-bar {
+  background: linear-gradient(90deg, var(--danger) var(--w), var(--step) 0);
+}
+[dir="rtl"] .sx .sx-r.warn .sx-bar {
+  background: linear-gradient(270deg, var(--warning) var(--w), var(--step) 0);
+}
+[dir="rtl"] .sx .sx-r.bad .sx-bar {
+  background: linear-gradient(270deg, var(--danger) var(--w), var(--step) 0);
+}
+.sx .sx-rn {
+  margin: 0;
+  padding: 10px 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+@media (max-width: 1180px) {
+  .sx .sx-res {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sx .sx-rg:nth-child(odd) {
+    border-inline-start: 0;
+  }
+  .sx .sx-rg:nth-child(n+3) {
+    border-top: 1px solid var(--border);
+  }
+}
+@media (max-width: 640px) {
+  .sx .sx-res {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 0;
+  }
+  .sx .sx-rg {
+    border-inline-start: 0;
+    padding: 8px 16px 12px;
+  }
+  .sx .sx-rg:nth-child(n+2) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* L6178-6199: the logs */
+.sx .sx-lc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  padding: 0 20px 12px;
+}
+.sx .sx-lf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.sx .sx-q {
+  width: 200px;
+  height: 32px;
+  font-size: 13px;
+}
+.sx .sx-more {
+  font-size: 13px;
+  color: var(--sec);
+}
+.sx .sx-xf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 0 20px 12px;
+}
+.sx .sx-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--sec);
+}
+.sx .sx-live>span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sx .sx-live>span>i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.sx .sx-live.live>span>i {
+  background: var(--accent-mark);
+  animation: sx-blink 1.6s var(--e) infinite;
+}
+@keyframes sx-blink {
+  50% {
+    opacity: .25;
+  }
+}
+.sx .sx-logs {
+  display: flex;
+  flex-direction: column;
+  max-height: 28rem;
+  overflow-y: auto;
+  margin: 0 20px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.sx .sx-log {
+  display: grid;
+  grid-template-columns: 44px 44px 64px minmax(0, 1fr);
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 18px;
+}
+.sx .sx-logs>.sx-log:first-child {
+  border-top: 0;
+}
+.sx .sx-log>em {
+  font-style: normal;
+  color: var(--muted);
+}
+.sx .sx-log>i {
+  font-style: normal;
+  color: var(--tone-sky);
+}
+.sx .sx-log.warn>i {
+  color: var(--warning-text);
+}
+.sx .sx-log.error>i {
+  color: var(--danger-text);
+}
+.sx .sx-log.debug>i {
+  color: var(--muted);
+}
+.sx .sx-part {
+  color: var(--sec);
+  overflow-wrap: anywhere;
+}
+.sx .sx-msg {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.sx .sx-kv {
+  grid-column: 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  color: var(--sec);
+}
+.sx .sx-kv i {
+  font-style: normal;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.sx .sx-kv em {
+  font-style: normal;
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .sx .sx-lc,
+  .sx .sx-xf {
+    padding-inline: 16px;
+  }
+  .sx .sx-logs {
+    margin-inline: 16px;
+  }
+  .sx .sx-q {
+    width: 100%;
+  }
+  .sx .sx-lf {
+    width: 100%;
+  }
+  .sx .sx-lf [role="radiogroup"] {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sx .sx-log {
+    grid-template-columns: 44px 44px minmax(0, 1fr);
+  }
+  .sx .sx-log .sx-msg,
+  .sx .sx-kv {
+    grid-column: 1 / -1;
+  }
+}
+
+/* L6200: the time zone, a native select with the board's own arrow */
+.sx .sx-sel {
+  height: 36px;
+  max-width: 200px;
+  appearance: none;
+  color: var(--text);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 15px, calc(100% - 12px) 15px;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-inline-end: 32px;
+}
+[dir="rtl"] .sx .sx-sel {
+  background-position: 17px 15px, 12px 15px;
+}
+
+/* L6201-6208: where a node fetches the update from */
+.sx .sx-srcs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--border);
+}
+.sx .sx-srcs>p {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx .sx-so {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.sx .sx-so>b {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--step);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sec);
+}
+.sx .sx-so>span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sx .sx-so>span>b {
+  font-weight: 500;
+}
+.sx .sx-so em {
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx .sx-so.off>span,
+.sx .sx-so.off>b {
+  opacity: .55;
+}
+@media (max-width: 640px) {
+  .sx .sx-srcs {
+    padding-inline: 16px;
+  }
+  .sx .sx-so {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+  .sx .sx-so>.fz-sw,
+  .sx .sx-so>.uq-otg {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* L5403-5406, L5896-5900, L6209, L6337: "This panel", the figures in a list */
+.sx .uq-dl {
+  display: grid;
+  margin: 0;
+  padding-block: 0 8px;
+  padding-inline: 44px 20px;
+}
+.sx .uq-dl>div {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  align-items: baseline;
+}
+.sx .uq-dl dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx .uq-dl dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 13px;
+  min-width: 0;
+}
+.sx .uq-dl dd b {
+  font-weight: 500;
+}
+.sx .uq-dl dd>span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx .ai-dl>div:first-child {
+  border-top: 0;
+}
+.sx .sx-dl {
+  padding: 0 20px 8px;
+}
+@media (max-width: 720px) {
+  .sx .uq-dl>div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .sx .sx-dl {
+    padding: 0 16px 8px;
+  }
+}
+
+/* L6215-6220: retention */
+.sx .sx-ret {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px 12px;
+}
+.sx .sx-num {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sx .sx-num .an-i {
+  width: 88px;
+  height: 36px;
+}
+.sx .sx-num em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sx .sx-rf>span:first-child {
+  font-size: 13px;
+  color: var(--sec);
+}
+.sx .sx-pbr {
+  margin: 0 20px 8px;
+}
+@media (max-width: 640px) {
+  .sx .sx-ret {
+    padding-inline: 16px;
+  }
+  .sx .sx-pbr {
+    margin-inline: 16px;
+  }
+}
+
+/* L6226, L6227: the links of "About" */
+.sx .sx-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 0 20px 16px;
+  font-size: 13px;
+}
+.sx .sx-lic {
+  color: var(--muted);
+  text-decoration: none;
+}
+.sx .sx-lic:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@media (max-width: 640px) {
+  .sx .sx-links {
+    padding-inline: 16px;
+  }
+}
+
+/* L6003-6007, L5995: the window of a new metrics token (it is drawn in a portal, so it carries its own root) */
+.sx.sx-dlg {
+  gap: 12px;
+  overflow: visible;
+}
+.sx .sx-dp {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--sec);
+  text-wrap: pretty;
+}
+.sx .ai-made {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.sx .ai-made>.g {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+  margin-bottom: 8px;
+  animation: sx-pop .4s var(--ease-spring);
+}
+.sx .ai-made>b {
+  font-size: 15px;
+  font-weight: 500;
+}
+.sx .ai-made>span {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--sec);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx .sx-live.live>span>i,
+  .sx .ai-made>.g {
+    animation: none;
+  }
+}

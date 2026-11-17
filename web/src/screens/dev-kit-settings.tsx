@@ -23,6 +23,7 @@ import { InterfacePage } from "@/screens/settings-pages/interface";
 import { ChangePassword, Enroll, passwordLoginQuery } from "@/screens/settings-pages/password";
 import { passkeysQuery, SecurityPage } from "@/screens/settings-pages/security";
 import { SessionsPage } from "@/screens/settings-pages/sessions";
+import { SxRoot } from "@/screens/settings-pages/sx-bits";
 import { DnsTab } from "@/screens/subscriptions/dns";
 import { FormatsTab } from "@/screens/subscriptions/formats";
 import type { Settings } from "@/screens/subscriptions/model";
@@ -291,7 +292,9 @@ export function SettingsDemos() {
         <SettingsLayout />
       </Demo>
       <Demo id="demo-settings-interface" title="Settings → Interface (owner)" seed={[me(), instance]}>
-        <InterfacePage />
+        <SxRoot>
+          <InterfacePage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-settings-security" title="Settings → Security: passkeys, password and code, sign-in (check on)" seed={[me(), passkeys(2), [passwordLoginQuery.queryKey, { enabled: true, login: "alice", available: true }], security(true)]}>
         <SecurityPage />
@@ -331,10 +334,14 @@ export function SettingsDemos() {
         <AuditPage />
       </Demo>
       <Demo id="demo-settings-admins" title="Settings → Admins" seed={[me(), passkeys(2), [passwordLoginQuery.queryKey, { enabled: true, login: "alice", available: true }]]}>
-        <AdminsPage />
+        <SxRoot>
+          <AdminsPage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-settings-domains" title="Settings → Domains (owner)" seed={[me(), instance]}>
-        <DomainsPage />
+        <SxRoot>
+          <DomainsPage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-settings-backups" title="Settings → Backups">
         <BackupsPage />

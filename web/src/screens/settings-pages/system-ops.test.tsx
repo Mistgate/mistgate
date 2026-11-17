@@ -81,6 +81,8 @@ async function mount() {
   for (let i = 0; i < 4; i++) await settle();
 }
 const text = () => document.body.textContent ?? "";
+// a toast is a dialog too, a modeless one
+const dialog = () => document.querySelector<HTMLElement>("[role=dialog]:not([aria-modal=false])");
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
 const click = async (b: Element | undefined | null) => {
   await act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
@@ -98,10 +100,11 @@ describe("Settings → System → the panel's diagnostics", () => {
     await mount();
     for (const title of [en["obs.logs.title"], en["obs.ret.title"], en["obs.exp.title"], en["obs.met.title"]]) expect(text()).toContain(title);
     expect(text()).toContain("dial failed to <ip>:port");
-    expect(text()).toContain("dial_failed");
-    expect(text()).toContain("abc12345");
+    expect(text()).toContain("code=dial_failed");
+    expect(text()).toContain("request=abc12345");
     expect(text()).toContain("sweep done");
-    expect(text()).toContain("2 of 5000 records held");
+    expect(text()).toContain("Records held: 2 of 5000");
+    expect(text()).toContain("Log level: “Info” until the panel restarts, then it goes back to “Info”");
     expect(ops.getPanelLogs.mock.calls[0]?.[0]).toMatchObject({ minLevel: "info", limit: 100 });
   });
 
@@ -141,11 +144,60 @@ describe("Settings → System → the panel's diagnostics", () => {
     expect(ops.setRetention.mock.calls[0]?.[0]).toEqual({ values: { audit_days: 100 } });
   });
 
-  it("shows a new metrics token once", async () => {
+  it("shows a new metrics token once, in a window the Escape key does not close", async () => {
     await mount();
     await click(document.querySelector<HTMLElement>('[role=switch][aria-label="Serve /metrics"]'));
     expect(ops.setMetricsSettings.mock.calls[0]?.[0]).toMatchObject({ enabled: true });
+    expect(dialog()?.textContent).toContain("mgm_tokenshownonce");
+    expect(text()).toContain(en["sx.sys.met.made"]);
+    await act(async () => void document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     expect(text()).toContain("mgm_tokenshownonce");
-    expect(text()).toContain(en["obs.met.tokenOnce"]);
+    await click(button(en["sx.sys.met.done"]));
+    expect(dialog()).toBeNull();
+  });
+
+  it("asks before a new token replaces the old one, then makes it", async () => {
+    ops.getMetricsSettings.mockResolvedValue({ enabled: true, hasToken: true });
+    ops.setMetricsSettings.mockResolvedValue({ enabled: true, hasToken: true, token: "mgm_second" });
+    await mount();
+    expect(text()).toContain(en["sx.sys.met.tok"]);
+    await click(button(en["obs.met.rotate"]));
+    expect(dialog()?.textContent).toContain(en["sx.sys.met.dlg.body"]);
+    expect(ops.setMetricsSettings).not.toHaveBeenCalled();
+    await click(button(en["sx.sys.met.make"]));
+    expect(ops.setMetricsSettings.mock.calls[0]?.[0]).toMatchObject({ rotateToken: true });
+    expect(dialog()?.textContent).toContain("mgm_second");
+  });
+
+  it("warns that a shorter time deletes rows for good, and only then", async () => {
+    await mount();
+    const audit = document.querySelectorAll<HTMLInputElement>('input[inputmode="numeric"]')[1]!;
+    await type(audit, "500");
+    expect(text()).not.toContain(en["sx.sys.ret.warn"]);
+    await type(audit, "100");
+    expect(text()).toContain(en["sx.sys.ret.warn"]);
+  });
+
+  it("downloads the period chosen, 30 days being 720 hours", async () => {
+    const urls = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:export");
+    ops.exportData.mockImplementation(async function* () {
+      yield { data: new Uint8Array([123, 125, 10]) };
+    });
+    await mount();
+    await click([...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === en["sx.sys.exp.30"]));
+    await click(button(en["obs.exp.download"]));
+    const req = ops.exportData.mock.calls[0]?.[0] as { sinceUnix: bigint; untilUnix: bigint };
+    expect(Number(req.untilUnix - req.sinceUnix)).toBe(720 * 3600);
+    expect(urls).toHaveBeenCalled();
+    urls.mockRestore();
+  });
+
+  it("filters the logs by level and writes the level the panel logs at", async () => {
+    await mount();
+    await click([...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === "Errors"));
+    expect(ops.getPanelLogs.mock.calls.at(-1)?.[0]).toMatchObject({ minLevel: "error" });
+    await click(button(en["sx.sys.logs.more"]));
+    expect(text()).toContain(en["obs.logs.level"]);
+    expect(text()).toContain(en["obs.logs.window"]);
   });
 });

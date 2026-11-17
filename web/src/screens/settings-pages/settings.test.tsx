@@ -7,8 +7,10 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { en } from "@/i18n/en";
 import { setAccent } from "@/lib/accent";
+import { setEffectsEnabled } from "@/lib/effects";
 import { readPref } from "@/lib/storage";
 import { SettingsLayout } from "../settings";
+import { SxGate } from "./sx-bits";
 import { AdminsPage } from "./admins";
 import { BackupsPage } from "./backups";
 import { cloudflareAllowed } from "./cloudflare";
@@ -33,6 +35,7 @@ const auth = vi.hoisted(() => ({
   endOtherSessions: vi.fn(),
 }));
 const getInstance = vi.hoisted(() => vi.fn());
+const updateInstance = vi.hoisted(() => vi.fn());
 const backupApi = vi.hoisted(() => ({
   getBackupSettings: vi.fn(),
   listBackups: vi.fn(),
@@ -43,11 +46,12 @@ const backupApi = vi.hoisted(() => ({
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
   auth,
-  instance: { getInstance: (...a: unknown[]) => getInstance(...a) },
+  instance: { getInstance: (...a: unknown[]) => getInstance(...a), updateInstance: (...a: unknown[]) => updateInstance(...a) },
   backups: backupApi,
   webauthnSupported: () => true,
 }));
 let section = "interface";
+const navigate = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, to, params, ...rest }: { children?: ReactNode; className?: string; to: string; params?: { section?: string } }) => (
     <a href={params?.section ? `/settings/${params.section}` : to} data-status={params?.section === section ? "active" : undefined} className={className} {...rest}>
@@ -56,8 +60,8 @@ vi.mock("@tanstack/react-router", () => ({
   ),
   useParams: () => ({ section }),
   useSearch: () => ({}),
-  useNavigate: () => () => {},
-  Outlet: () => null,
+  useNavigate: () => navigate,
+  Outlet: () => <p>the page of the tab</p>,
   Navigate: () => null,
 }));
 
@@ -73,6 +77,7 @@ let host: HTMLDivElement | null = null;
 beforeEach(() => {
   role = Role.OWNER;
   section = "interface";
+  navigate.mockReset();
   widgets = [];
   window.turnstile = {
     render: (_el, options) => {
@@ -100,6 +105,7 @@ afterEach(() => {
   Object.values(auth).forEach((m) => m.mockReset());
   Object.values(backupApi).forEach((m) => m.mockReset());
   getInstance.mockReset();
+  updateInstance.mockReset();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -149,12 +155,36 @@ function servedAt(path: string, search = "") {
 }
 const coded = (code: string, c = Code.InvalidArgument) => new ConnectError(code, c);
 
-describe("Settings: the strip of pages", () => {
-  it("puts Interface first and the pages that only explain what is missing last", async () => {
+describe("Settings: the frame", () => {
+  const tabs = () => [...document.querySelectorAll<HTMLElement>("[role=tab]")];
+  it("says what the page is for and lists the eight tabs in the board's order, the open one chosen", async () => {
     await mount(<SettingsLayout />);
-    const labels = [...document.querySelectorAll("nav a")].map((a) => a.textContent);
-    expect(labels).toEqual(["Interface", "System", "Security", "Sessions", "Audit", "Admins", "Domains", "Backups"]);
-    expect(document.querySelector("nav a[data-status=active]")?.textContent).toBe("Interface");
+    expect(document.querySelector("h1")?.textContent).toBe("Settings");
+    expect(document.querySelector(".sb-h p")?.textContent).toBe(en["sx.sum"]);
+    expect(tabs().map((a) => a.textContent)).toEqual(["Interface", "System", "Security", "Sessions", "Audit", "Admins", "Domains", "Backups"]);
+    expect(tabs().find((a) => a.getAttribute("aria-selected") === "true")?.textContent).toBe("Interface");
+    expect(document.querySelector("[role=tabpanel]")?.textContent).toContain("the page of the tab");
+  });
+
+  it("opens the tab of the address and takes the route to another one on a click", async () => {
+    section = "sessions";
+    await mount(<SettingsLayout />);
+    expect(tabs().find((a) => a.getAttribute("aria-selected") === "true")?.textContent).toBe("Sessions");
+    await click(tabs().find((a) => a.textContent === "Domains"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/settings/$section", params: { section: "domains" } });
+  });
+
+  it("draws the load of a tab and its failure, with a way to try again", async () => {
+    const retry = vi.fn();
+    await mount(<SxGate pending error={false} onRetry={retry}><p>ready</p></SxGate>);
+    expect(document.querySelector("[aria-busy=true]")).not.toBeNull();
+    expect(text()).not.toContain("ready");
+    await act(async () => root!.render(<SxGate pending={false} error onRetry={retry}><p>ready</p></SxGate>));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain(en["sx.err.title"]);
+    await click(button(en["sx.err.retry"]));
+    expect(retry).toHaveBeenCalled();
+    await act(async () => root!.render(<SxGate pending={false} error={false} onRetry={retry}><p>ready</p></SxGate>));
+    expect(text()).toContain("ready");
   });
 });
 
@@ -364,9 +394,10 @@ describe("Settings → Admins, Domains, Backups", () => {
     await mount(<AdminsPage />);
     expect(text()).toContain("Alice");
     expect(text()).toContain("Owner");
-    expect(text()).toContain("Signs in with 2 passkeys, a password and a code (login “alice”)");
-    expect(text()).toContain(en["set.admins.more"]);
-    expect(document.querySelector("a[href='/ai']")?.textContent).toBe(en["set.admins.tokens"]);
+    expect(text()).toContain("Signs in with: 2 passkeys, password and code (login “alice”)");
+    expect(text()).toContain("A helper cannot be added yet.");
+    expect(document.querySelector("a[href='/ai']")?.textContent).toBe(en["sx.adm.tokens"]);
+    expect(document.querySelector("a[href='/settings/security']")?.textContent).toBe(en["settings.security"]);
   });
 
   it("shows the owner both addresses to copy and that setup fixed them", async () => {
@@ -374,7 +405,8 @@ describe("Settings → Admins, Domains, Backups", () => {
     await mount(<DomainsPage />);
     expect(text()).toContain("https://panel.example/s3cret/");
     expect(text()).toContain(en["set.domains.subNone"]);
-    expect(text()).toContain("mistgate setup sets them once, when the panel is installed; they cannot be changed yet.");
+    expect(text()).toContain("mistgate setup sets them once, when the panel is installed; they cannot be changed yet");
+    expect(text()).toContain(en["sx.dom.warn"]);
     expect(button(en["common.copy"])).toBeDefined();
   });
 
@@ -462,15 +494,124 @@ describe("Settings → Admins, Domains, Backups", () => {
 });
 
 describe("Settings → Interface", () => {
-  it("says when this device has a colour of its own, and Reset follows the panel again", async () => {
-    role = Role.HELPER; // no brand card
+  const stored = { brandHead: "mist", brandTail: "gate", accent: "#7dd3a0", language: "en", hasLogo: false, logoVersion: "", adminUrl: "", subscriptionBase: "" };
+  beforeEach(() => {
+    localStorage.clear();
     setAccent("#7dd3a0");
+    getInstance.mockResolvedValue({ instance: stored });
+    updateInstance.mockImplementation(async (r: Record<string, unknown>) => ({ instance: { ...stored, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v !== undefined)) } }));
+  });
+  afterEach(() => {
+    setEffectsEnabled(false);
+    localStorage.clear();
+  });
+  const group = (label: string, n = 0) => document.querySelectorAll<HTMLElement>(`[role=radiogroup][aria-label="${label}"]`)[n]!;
+  const pill = (g: HTMLElement, label: string) => [...g.querySelectorAll<HTMLElement>("[role=radio]")].find((b) => b.textContent === label)!;
+  const field = (label: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+  const save = () => button(en["common.save"]) as HTMLButtonElement | undefined;
+
+  it("draws what the three screens will look like, then what is only this device's and what is for everyone", async () => {
     await mount(<InterfacePage />);
-    expect(text()).toContain(en["settings.device"]);
-    expect(text()).toContain(en["settings.accent.own"]);
-    expect(document.querySelector(`[aria-label="${en["settings.accent.follow"]}"]`)).not.toBeNull();
-    await click(button(en["settings.accent.reset"]));
-    expect(text()).not.toContain(en["settings.accent.own"]);
+    for (const k of ["sx.if.pv.menu", "sx.if.pv.login", "sx.if.pv.friends", "settings.device", "sx.if.all", "sx.if.local"] as const) expect(text()).toContain(en[k]);
+    expect(document.querySelectorAll(".sx-pv .sx-mock")).toHaveLength(3);
+    // the preview wears the name that is typed, before it is saved
+    await type(field(en["sx.if.name.a2"]), "gates");
+    expect(document.querySelector(".sx-pv b")?.textContent).toBe("mistgates");
+  });
+
+  it("follows the panel's colour until a colour is picked, and Like the panel goes back to it", async () => {
+    await mount(<InterfacePage />);
+    const mine = group(en["settings.accent"]);
+    expect(pill(mine, en["settings.accent.mint"]).getAttribute("aria-checked")).toBe("true");
+    expect(pill(mine, en["settings.accent.follow"]).getAttribute("aria-checked")).toBe("false");
+    await click(pill(mine, en["settings.accent.sky"]));
+    expect(readPref("accent")).toBe("#8ec8ea");
+    await click(pill(mine, en["settings.accent.follow"]));
     expect(readPref("accent")).toBeNull();
+    expect(pill(mine, en["settings.accent.follow"]).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("takes a colour of its own as six hex digits, and says when they are not", async () => {
+    await mount(<InterfacePage />);
+    const hex = document.querySelector<HTMLInputElement>(`input[aria-label="${en["sx.if.acc.hex"]}"]`)!;
+    await type(hex, "b8ac");
+    expect(readPref("accent")).toBe("#7dd3a0");
+    expect(hex.getAttribute("aria-invalid")).toBe("true");
+    await type(hex, "b8acf2");
+    expect(readPref("accent")).toBe("#b8acf2");
+  });
+
+  it("saves only what the owner changed, and says so", async () => {
+    await mount(<InterfacePage />);
+    expect(save()?.getAttribute("aria-disabled")).toBe("true");
+    await type(field(en["sx.if.name.a2"]), "gates");
+    expect(text()).toContain(en["sx.if.dirty"]);
+    await submit(en["common.save"]);
+    expect(updateInstance).toHaveBeenCalledTimes(1);
+    expect(updateInstance.mock.calls[0]?.[0]).toEqual({ brandHead: undefined, brandTail: "gates", accent: undefined, language: undefined, logoSvg: undefined });
+    expect(text()).toContain(en["sx.if.toast"]);
+  });
+
+  it("keeps the first part of the name from being empty or odd, and the Save button off", async () => {
+    await mount(<InterfacePage />);
+    await type(field(en["sx.if.name.a1"]), "");
+    expect(text()).toContain(en["sx.if.name.empty"]);
+    expect(save()?.getAttribute("aria-disabled")).toBe("true");
+    await type(field(en["sx.if.name.a1"]), "mist<>");
+    expect(text()).toContain(en["brand.nameError"]);
+    await submit(en["common.save"]);
+    expect(updateInstance).not.toHaveBeenCalled();
+  });
+
+  it("draws the card for everyone to a helper, read-only, with no Save and the reason", async () => {
+    role = Role.HELPER;
+    await mount(<InterfacePage />);
+    expect(text()).toContain(en["sx.if.all"]);
+    expect(document.querySelector<HTMLFieldSetElement>("fieldset")?.disabled).toBe(true);
+    expect(save()).toBeUndefined();
+    expect(text()).toContain(en["sx.if.ro"]);
+  });
+
+  it("refuses a logo over 64 KB with the reason, and one that is not an SVG", async () => {
+    await mount(<InterfacePage />);
+    const file = document.querySelector<HTMLInputElement>("input[type=file]")!;
+    const choose = async (f: File) => {
+      Object.defineProperty(file, "files", { configurable: true, value: [f] });
+      await act(async () => void file.dispatchEvent(new Event("change", { bubbles: true })));
+      await settle();
+    };
+    await choose(new File([new Uint8Array(70 * 1024)], "big.svg"));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain(en["sx.if.logo.big"]);
+    expect(document.querySelector("[role=alert]")?.textContent).toContain(en["sx.if.logo.big.body"]);
+    await choose(Object.assign(new File(["x"], "bad.svg"), { text: async () => "not svg" }));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain(en["brand.logoInvalid"]);
+    expect(save()?.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("takes a logo, shows it in the preview at once and sends it when saved", async () => {
+    await mount(<InterfacePage />);
+    const file = document.querySelector<HTMLInputElement>("input[type=file]")!;
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="#ffffff"/></svg>';
+    Object.defineProperty(file, "files", { configurable: true, value: [Object.assign(new File([svg], "logo.svg"), { text: async () => svg })] });
+    await act(async () => void file.dispatchEvent(new Event("change", { bubbles: true })));
+    await settle();
+    expect(text()).toContain(en["sx.if.logo.new"]);
+    expect(document.querySelector(".sx-pv .sx-mk svg circle")).not.toBeNull();
+    await submit(en["common.save"]);
+    expect(updateInstance.mock.calls[0]?.[0]).toMatchObject({ logoSvg: svg });
+  });
+
+  it("puts the moments of the reveal animation under its switch once it is on, and draws none on the Cloudflare edition", async () => {
+    await mount(<InterfacePage />);
+    expect(text()).not.toContain(en["settings.fx.create"]);
+    await click(document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx"]}"]`));
+    for (const k of ["settings.fx.create", "settings.fx.save", "settings.fx.pages"] as const) expect(text()).toContain(en[k]);
+    await click(document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx.save"]}"]`));
+    expect(readPref("fx-save")).toBe("off");
+    await act(async () => root!.unmount());
+    host!.remove();
+    auth.me.mockImplementation(async () => ({ admin: { id: "adm_1", displayName: "Alice", role }, edition: "edge", unavailable: [] }));
+    await mount(<InterfacePage />);
+    expect(text()).not.toContain(en["settings.fx"]);
   });
 });
