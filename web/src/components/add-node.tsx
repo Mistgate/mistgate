@@ -1,49 +1,49 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { CopyButton } from "@/components/copy-button";
-import { SSHNodeInstall } from "@/components/ssh-node-install";
+import { CloseX, CodeBox, CountryField, FootNote, noCountry, Panel, PanelFoot, PanelHead, Rail, type NodeDraft, type RailStep } from "@/components/add-node-frame";
+import { AddNodeShell } from "@/components/add-node-frame";
+import { markFresh } from "@/components/fx/registry";
+import { NodeReady, SSHNodeInstall, type InstallSeed } from "@/components/ssh-node-install";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
-import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
-import { Select } from "@/components/ui/select";
-import { StatusPill } from "@/components/ui/status";
 import { TextField } from "@/components/ui/text-field";
+import { Spinner } from "@/components/windows";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { CreateEnrollmentResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { plain, type Plain } from "@/lib/plain";
 import { useT } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
-import { countryCodes } from "@/lib/countries";
-import { markFresh } from "@/components/fx/registry";
-import { Sweep } from "@/components/fx/sweep-react";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
-import { nodeKind, useNodeStatus } from "@/lib/node-status";
+import { useNodeStatus } from "@/lib/node-status";
 
-// New nodes can be installed automatically over SSH or enrolled with the manual one-time command below.
+// New nodes can be installed automatically over SSH or enrolled with the manual one-time command. The window is the board's
+// PnAddNode: one window with the two ways in its rail (ssh-node-install.tsx, and the by-command flow below).
 
 export type AddNodeTarget = { id: string; name: string };
-type Open = (reenroll?: AddNodeTarget) => void;
+export type AddNodeMode = "ssh" | "cmd";
+type Open = (reenroll?: AddNodeTarget, mode?: AddNodeMode) => void;
 
 const AddNodeContext = createContext<Open>(() => {});
-/** addNode() opens the modal; addNode({ id, name }) issues a fresh install command for an existing node. */
+/** addNode() opens the window (by SSH; addNode(undefined, "cmd") by a command); addNode({ id, name }) issues a fresh install command for an existing node. */
 export const useAddNode = () => use(AddNodeContext);
 
 export function AddNodeProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState({ seq: 0, open: false, reenroll: undefined as AddNodeTarget | undefined });
-  const open = useCallback<Open>((reenroll) => setState((s) => ({ seq: s.seq + 1, open: true, reenroll })), []);
+  const [state, setState] = useState({ seq: 0, open: false, reenroll: undefined as AddNodeTarget | undefined, mode: "ssh" as AddNodeMode });
+  const open = useCallback<Open>((reenroll, mode = "ssh") => setState((s) => ({ seq: s.seq + 1, open: true, reenroll, mode })), []);
   const value = useMemo(() => open, [open]);
   return (
     <AddNodeContext value={value}>
       {children}
       {/* a new key per opening: the form starts empty and the token of the last opening is gone */}
-      <AddNodeModal
+      <AddNodeWindow
         key={state.seq}
         open={state.open}
         reenroll={state.reenroll}
+        initialMode={state.mode}
         onClose={() => setState((s) => ({ ...s, open: false }))}
       />
     </AddNodeContext>
@@ -52,161 +52,75 @@ export function AddNodeProvider({ children }: { children: ReactNode }) {
 
 const namePattern = /^[a-z0-9-]{2,24}$/;
 const addressPattern = /^[A-Za-z0-9.:-]{1,253}$/;
-const none = "none";
 
 /** An IPv4 or IPv6 address rather than a domain: Let's Encrypt does not issue for it. */
 export const isIPAddress = (address: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(address) || address.includes(":");
 
-function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: AddNodeTarget; onClose: () => void }) {
-  const t = useT();
-  const fmt = useFmt();
-  const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [country, setCountry] = useState(none);
-  const [touched, setTouched] = useState(false);
-  const [method, setMethod] = useState<"choose" | "manual" | "ssh">("choose");
-  const [issued, setIssued] = useState<Plain<CreateEnrollmentResponse> | null>(null);
+/** A place to start from for the dev kit: the ways of the window and what they hold. */
+export type AddNodeSeed = { draft?: Partial<NodeDraft>; ssh?: InstallSeed; issued?: Plain<CreateEnrollmentResponse> };
 
-  // The token is single-use and shown once: once the modal is closed (after its exit animation) drop it from memory.
+/**
+ * The window: the rail on the left (the way to install and the steps), the page of the step on the right. The two ways keep what
+ * the first page asked for (the name, the address, the country) when the person switches between them. `reenroll` is a node that
+ * exists: only a new command for it, nothing to fill in.
+ */
+export function AddNodeWindow({
+  open,
+  reenroll,
+  initialMode = "ssh",
+  onClose,
+  seed,
+}: {
+  open: boolean;
+  reenroll?: AddNodeTarget;
+  initialMode?: AddNodeMode;
+  onClose: () => void;
+  seed?: AddNodeSeed;
+}) {
+  const qc = useQueryClient();
+  const [mode, setMode] = useState<AddNodeMode>(reenroll ? "cmd" : initialMode);
+  const [draft, setDraft] = useState<NodeDraft>({ name: "", address: "", country: noCountry, ...seed?.draft });
+  const [issued, setIssued] = useState<Plain<CreateEnrollmentResponse> | null>(seed?.issued ?? null);
+
+  // The token is single-use and shown once: once the window is closed (after its exit animation) drop it from memory.
   useEffect(() => {
     if (open) return;
     const id = setTimeout(() => setIssued(null), 400);
     return () => clearTimeout(id);
   }, [open]);
 
-  const nameError = !reenroll && !namePattern.test(name) ? t("node.add.nameError") : undefined;
-  const addressError = !reenroll && !addressPattern.test(address.trim()) ? t("node.add.addressError") : undefined;
-  // said before the click: a node on an IP gets no Let's Encrypt certificate
-  const ip = !reenroll && !addressError && isIPAddress(address.trim());
-  const close = () => {
-    setMethod("choose");
-    onClose();
-  };
-
-  const countries = useMemo(
-    () => [
-      { value: none, label: t("node.add.countryNone") },
-      ...countryCodes
-        .map((c) => ({ value: c, label: `${c} · ${fmt.country(c)}` }))
-        .sort((a, b) => fmt.country(a.value).localeCompare(fmt.country(b.value), fmt.locale)),
-    ],
-    [fmt, t],
-  );
-
-  const create = useMutation({
-    mutationFn: () =>
-      reenroll
-        ? nodesApi.createEnrollment({ nodeId: reenroll.id })
-        : nodesApi.createEnrollment({
-            name,
-            address: address.trim(),
-            countryCode: country === none ? "" : country,
-          }),
-    onSuccess: (r) => {
-      setIssued(plain(r));
-      // the new node shows up as PENDING in every list at once
+  // the new node shows up as PENDING in every list at once
+  const issuedNow = useCallback(
+    (r: Plain<CreateEnrollmentResponse>) => {
+      setIssued(r);
       void qc.invalidateQueries({ queryKey: ["nodes"] });
       void qc.invalidateQueries({ queryKey: ["overview"] });
     },
-  });
-
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    setTouched(true);
-    if (nameError || addressError) return;
-    create.mutate();
-  }
+    [qc],
+  );
 
   return (
-    <Modal
-      open={open}
-      onOpenChange={(o) => !o && close()}
-      title={method === "ssh" ? t("node.ssh.title") : issued ? t("node.add.commandTitle", { name: issued.node?.name ?? "" }) : reenroll ? t("node.add.reenrollTitle", { name: reenroll.name }) : t("node.add.title")}
-      description={method === "ssh" ? t("node.ssh.body") : issued ? t("node.add.commandBody") : reenroll ? t("node.add.reenrollBody") : method === "manual" ? t("node.add.manualBody") : t("node.add.body")}
-      closeLabel={t("common.close")}
-      className={method === "ssh" ? "md:max-w-[760px] md:max-h-[90vh]" : undefined}
-    >
-      {issued ? (
-        <InstallSteps issued={issued} onClose={onClose} fresh={!reenroll} />
-      ) : !reenroll && method === "ssh" ? (
-        <SSHNodeInstall onBack={() => setMethod("choose")} onClose={close} onManual={() => setMethod("manual")} />
-      ) : !reenroll && method === "choose" ? (
-        <div className="flex flex-col gap-4">
-          <section className="rounded-card border border-accent/40 bg-accent/5 p-4">
-            <h3 className="text-base font-bold text-ink">{t("node.add.sshInstallTitle")}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">{t("node.add.sshInstallHint")}</p>
-            <Button type="button" variant="primary" size="lg" full className="mt-4" onClick={() => setMethod("ssh")}>
-              {t("node.add.sshInstall")}
-            </Button>
-          </section>
-          <div className="flex flex-col gap-2 border-t border-line pt-3">
-            <p className="text-center text-xs text-muted">{t("node.add.manualDivider")}</p>
-            <Button type="button" variant="outline" size="md" onClick={() => setMethod("manual")}>
-              {t("node.add.manualOption")}
-            </Button>
-          </div>
-        </div>
+    <AddNodeShell open={open} onOpenChange={(o) => !o && onClose()}>
+      {mode === "ssh" && !reenroll ? (
+        <SSHNodeInstall
+          draft={draft}
+          onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
+          onMode={(m) => setMode(m)}
+          onClose={onClose}
+          seed={seed?.ssh}
+        />
       ) : (
-        <form onSubmit={submit} className="flex flex-col gap-3.5">
-          {!reenroll && (
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-bold text-ink">{t("node.add.manualTitle")}</h3>
-              <Button type="button" variant="ghost" size="md" onClick={() => { create.reset(); setTouched(false); setMethod("choose"); }}>
-                {t("node.add.manualBack")}
-              </Button>
-            </div>
-          )}
-          {!reenroll && (
-            <>
-              <TextField
-                label={t("node.add.name")}
-                value={name}
-                onChange={(e) => setName(e.target.value.toLowerCase())}
-                placeholder="de1"
-                mono
-                maxLength={24}
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                autoFocus
-                error={touched ? nameError : undefined}
-                hint={t("node.add.nameHint")}
-              />
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("node.add.country")}</span>
-                <Select value={country} onValueChange={setCountry} options={countries} aria-label={t("node.add.country")} />
-                <p className="text-xs leading-snug text-muted">{t("node.add.countryHint")}</p>
-              </div>
-              <TextField
-                label={t("node.add.address")}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="de1.example.com"
-                mono
-                maxLength={253}
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                error={touched ? addressError : undefined}
-                hint={t("node.add.addressHint")}
-              />
-              {ip && <Notice title={t("node.add.ipTitle")}>{t("node.add.ipBody")}</Notice>}
-            </>
-          )}
-          {/* a refusal stays in the window, above its buttons */}
-          {create.isError && <Notice tone="danger">{errorText(create.error, t)}</Notice>}
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="ghost" size="md" onClick={onClose}>
-              {t("common.cancel")}
-            </Button>
-            <Button type="submit" variant="primary" size="md" disabled={create.isPending}>
-              {create.isPending ? t("common.creating") : t("node.add.create")}
-            </Button>
-          </div>
-        </form>
+        <CommandInstall
+          draft={draft}
+          onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
+          onMode={(m) => setMode(m)}
+          onClose={onClose}
+          reenroll={reenroll}
+          issued={issued}
+          onIssued={issuedNow}
+        />
       )}
-    </Modal>
+    </AddNodeShell>
   );
 }
 
@@ -230,22 +144,61 @@ export function Step({ n, title, done, children }: { n: number; title: string; d
   );
 }
 
-const codeCls = "rounded-field border border-line bg-canvas p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-fg select-all";
-
 /**
- * Three steps: put the binary on the server (a ready scp from the panel's own trusted bundle when it has one), paste the
- * one-line command as root, wait. The CA fingerprint is under "Details": it is inside the command already.
+ * The way by a command (the board's "Командой"): the name and the address, then three steps on the server (the scp of the agent,
+ * the one-line command, the node that shows up by itself), then the page that says the node is there. The command is shown
+ * once; a new one is a new enrollment of the same node.
  */
-/** `fresh`: the node is new (not a re-enrolment), so its card sweeps in when the agent comes online. */
-export function InstallSteps({ issued, onClose, fresh = true }: { issued: Plain<CreateEnrollmentResponse>; onClose: () => void; fresh?: boolean }) {
+function CommandInstall({
+  draft,
+  onDraft,
+  onMode,
+  onClose,
+  reenroll,
+  issued,
+  onIssued,
+}: {
+  draft: NodeDraft;
+  onDraft: (patch: Partial<NodeDraft>) => void;
+  onMode: (mode: AddNodeMode) => void;
+  onClose: () => void;
+  reenroll?: AddNodeTarget;
+  issued: Plain<CreateEnrollmentResponse> | null;
+  onIssued: (r: Plain<CreateEnrollmentResponse>) => void;
+}) {
   const t = useT();
   const fmt = useFmt();
-  const navigate = useNavigate();
   const qc = useQueryClient();
-  const node = issued.node;
-  const id = node?.id ?? "";
-  const name = node?.name ?? "";
+  const navigate = useNavigate();
+  const st = useNodeStatus();
+  const [touched, setTouched] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const { name, address, country } = draft;
 
+  const nameBad = !!name && !namePattern.test(name);
+  const nameError = !reenroll && !namePattern.test(name) ? t("node.add.nameError") : undefined;
+  const addressError = !reenroll && !addressPattern.test(address.trim()) ? t("node.add.addressError") : undefined;
+  // said before the click: a node on an IP gets no Let's Encrypt certificate
+  const ip = !reenroll && !addressError && isIPAddress(address.trim());
+
+  const create = useMutation({
+    mutationFn: (again?: boolean) =>
+      reenroll || (again && issued?.node?.id)
+        ? nodesApi.createEnrollment({ nodeId: reenroll?.id ?? issued?.node?.id ?? "" })
+        : nodesApi.createEnrollment({ name, address: address.trim(), countryCode: country === noCountry ? "" : country }),
+    onSuccess: (r) => onIssued(plain(r)),
+  });
+
+  function submit(e?: FormEvent, again?: boolean) {
+    e?.preventDefault();
+    setTouched(true);
+    if (!again && (nameError || addressError)) return;
+    create.mutate(again);
+  }
+
+  // ---- the agent's coming: the live state of the node, every few seconds
+  const node = issued?.node;
+  const id = node?.id ?? "";
   const live = useQuery({
     queryKey: ["node", id],
     queryFn: async ({ signal }) => plain(await nodesApi.getNode({ nodeId: id }, { signal })),
@@ -254,11 +207,8 @@ export function InstallSteps({ issued, onClose, fresh = true }: { issued: Plain<
   });
   const status = live.data?.node?.status ?? node?.status ?? NodeStatus.PENDING;
   const online = status === NodeStatus.ONLINE;
-  const st = useNodeStatus();
-  // the next step after the agent: a profile, unless the node already has some (a new command for a reinstall)
-  const needsProfile = (live.data?.inbounds.length ?? 0) === 0;
-
-  // a node that just came online: refresh the lists once, the modal has done its job
+  const fresh = !reenroll;
+  // a node that just came online: refresh the lists once, the window has done its job
   useEffect(() => {
     if (!online) return;
     if (fresh && id) markFresh("node", id); // its card in the Nodes list sweeps in once
@@ -266,75 +216,175 @@ export function InstallSteps({ issued, onClose, fresh = true }: { issued: Plain<
     void qc.invalidateQueries({ queryKey: ["overview"] });
   }, [online, qc, fresh, id]);
 
-  const go = (tab?: "profiles") => {
+  const view: "form" | "run" | "done" = !issued ? "form" : online ? "done" : "run";
+  const at = view === "form" ? 0 : view === "run" ? 1 : 3;
+  const shownName = node?.name ?? reenroll?.name ?? name;
+  const steps: RailStep[] = [
+    { label: t("win.node.cmdStep1"), sum: at > 0 ? [shownName, address.trim()].filter(Boolean).join(" · ") : "", state: at > 0 ? "done" : "now" },
+    { label: t("win.node.cmdStep2"), sum: at > 1 ? t("win.node.expires", { time: fmt.clock(issued?.expiresUnix ?? 0) }) : at === 1 ? t("win.node.expires", { time: fmt.clock(issued?.expiresUnix ?? 0) }) : "", state: at > 1 ? "done" : at === 1 ? "now" : "" },
+    { label: t("win.node.cmdStep3"), sum: view === "done" ? t("win.node.connected") : "", state: at > 2 ? "done" : "" },
+  ];
+
+  const goNode = (tab?: "profiles") => {
     onClose();
     void navigate({ to: "/nodes/$id", params: { id }, search: tab ? { tab } : {} });
   };
 
+  const title = reenroll ? t("node.add.reenrollTitle", { name: reenroll.name }) : t("win.node.title");
   return (
-    <div className="flex flex-col gap-4">
-      <ol className="flex flex-col gap-4">
-        <Step n={1} title={t("node.add.step1")}>
-          {issued.copyCommand ? (
-            <>
-              <pre tabIndex={0} className={codeCls}>
-                {issued.copyCommand}
-              </pre>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <CopyButton value={issued.copyCommand} />
-                <span className="min-w-0 flex-1 text-xs leading-snug text-pretty text-muted">{t("node.add.step1.copyHint")}</span>
+    <>
+      <Rail title={title} mode={reenroll ? undefined : "cmd"} onMode={reenroll ? undefined : onMode} modeLocked={!!issued} steps={steps} note={t("win.node.noteCommand")} />
+      <div className="an-m">
+        <CloseX onClose={onClose} />
+
+        {view === "form" && (
+          <Panel key="form" onSubmit={(e) => submit(e)}>
+            <PanelHead eyebrow={t("auth.step", { n: 1, total: 3 })} title={reenroll ? t("node.add.reenrollTitle", { name: reenroll.name }) : t("win.node.cmdTitle")}>
+              {reenroll ? t("node.add.reenrollBody") : t("win.node.cmdBody")}
+            </PanelHead>
+            <div className="an-b">
+              {create.isError && <Notice tone="danger">{errorText(create.error, t)}</Notice>}
+              {!reenroll && (
+                <>
+                  <div className="an-r an-r1">
+                    <TextField
+                      className={cx("an-f", nameBad && "bad")}
+                      label={t("node.add.name")}
+                      value={name}
+                      onChange={(e) => onDraft({ name: e.target.value.toLowerCase() })}
+                      placeholder="de1"
+                      mono
+                      maxLength={24}
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      autoFocus
+                      error={touched ? nameError : nameBad ? t("node.add.nameError") : undefined}
+                      hint={t("node.add.nameHint")}
+                    />
+                    <CountryField
+                      label={
+                        <>
+                          {t("node.add.country")} <em className="ms-1 text-muted not-italic">{t("win.node.optional")}</em>
+                        </>
+                      }
+                      value={country}
+                      onChange={(c) => onDraft({ country: c })}
+                      hint={t("node.add.countryHint")}
+                    />
+                  </div>
+                  <TextField
+                    className="an-f"
+                    label={t("node.add.address")}
+                    value={address}
+                    onChange={(e) => onDraft({ address: e.target.value })}
+                    placeholder="de1.example.com"
+                    mono
+                    maxLength={253}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    error={touched ? addressError : undefined}
+                    hint={t("node.add.addressHint")}
+                  />
+                  {ip && <Notice title={t("node.add.ipTitle")}>{t("node.add.ipBody")}</Notice>}
+                </>
+              )}
+            </div>
+            <PanelFoot>
+              <FootNote />
+              <Button type="submit" variant="primary" size="lg" disabled={create.isPending || (!reenroll && (!name || !address.trim() || !!nameError || !!addressError))}>
+                {create.isPending && <Spinner />}
+                {create.isPending ? t("common.creating") : t("node.add.create")}
+              </Button>
+            </PanelFoot>
+          </Panel>
+        )}
+
+        {view === "run" && issued && (
+          <Panel key="run">
+            <PanelHead eyebrow={t("auth.step", { n: 2, total: 3 })} title={t("win.node.cmdRunTitle")}>
+              {t("win.node.cmdRunBody")}
+            </PanelHead>
+            <div className="an-b">
+              {create.isError && <Notice tone="danger">{errorText(create.error, t)}</Notice>}
+              <ol className="an-ms">
+                <li>
+                  <span className="an-g an-mono" aria-hidden>
+                    1
+                  </span>
+                  <div>
+                    <b>{t("node.add.step1")}</b>
+                    {issued.copyCommand ? (
+                      <>
+                        <CodeBox code={issued.copyCommand} />
+                        <span>{t("node.add.step1.copyHint")}</span>
+                      </>
+                    ) : (
+                      <span>{t("node.add.step1.manual")}</span>
+                    )}
+                  </div>
+                </li>
+                <li>
+                  <span className="an-g an-mono" aria-hidden>
+                    2
+                  </span>
+                  <div>
+                    <b>{t("node.add.step2")}</b>
+                    <CodeBox wrap code={issued.installCommand} label={t("node.add.copyCommand")} />
+                    <span>{t("node.add.once", { time: fmt.clock(issued.expiresUnix) })}</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="an-g an-mono" aria-hidden>
+                    3
+                  </span>
+                  <div>
+                    <b>{t("node.add.step3")}</b>
+                    <span className="an-wt" aria-live="polite">
+                      <Spinner />
+                      {st.word({ status })} · {t("node.add.waiting")}
+                    </span>
+                  </div>
+                </li>
+              </ol>
+              <div className="an-kc">
+                <button type="button" className="an-lk self-start text-[13px]" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((v) => !v)}>
+                  {t("node.add.details")}
+                </button>
+                {detailsOpen && (
+                  <>
+                    <span>{t("node.add.fingerprint")}</span>
+                    <div className="an-code">
+                      <code dir="ltr">{issued.caFingerprint}</code>
+                    </div>
+                    <span>{t("node.add.fingerprintHint")}</span>
+                  </>
+                )}
               </div>
-            </>
-          ) : (
-            <p className="text-xs leading-snug text-pretty text-muted">{t("node.add.step1.manual")}</p>
-          )}
-        </Step>
-        <Step n={2} title={t("node.add.step2")}>
-          <pre tabIndex={0} className={codeCls}>
-            {issued.installCommand}
-          </pre>
-          <CopyButton value={issued.installCommand} label={t("node.add.copyCommand")} variant="primary" size="md" full />
-          <span className="text-xs text-muted">{t("node.add.once", { time: fmt.clock(issued.expiresUnix) })}</span>
-        </Step>
-        <Step n={3} title={t("node.add.step3")} done={online}>
-          {/* the wizard's own success step: "connected" sweeps in when the agent comes online */}
-          <Sweep play={online} className="flex items-center gap-2.5 rounded-field border border-line bg-surface-2 px-3 py-2.5" aria-live="polite">
-            <StatusPill kind={online ? "ok" : nodeKind({ status })} label={online ? t("node.add.connected") : st.word({ status })} sm />
-            <span className="text-xs leading-snug text-pretty text-muted">{online ? t("node.add.connectedBody") : t("node.add.waiting")}</span>
-          </Sweep>
-        </Step>
-      </ol>
+            </div>
+            <PanelFoot>
+              <Button type="button" variant="secondary" size="lg" disabled={create.isPending} onClick={() => submit(undefined, true)}>
+                {create.isPending && <Spinner />}
+                {t("win.node.newCommand")}
+              </Button>
+              <FootNote end />
+              <Button type="button" variant="secondary" size="lg" onClick={onClose}>
+                {t("common.close")}
+              </Button>
+            </PanelFoot>
+          </Panel>
+        )}
 
-      <details className="group rounded-field border border-line px-3 py-2">
-        <summary className="cursor-pointer list-none text-xs font-bold text-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden">
-          <span className="inline-flex items-center gap-1.5">
-            <Icon name="chevronRight" size={12} className="transition-transform duration-200 group-open:rotate-90 rtl:group-open:-rotate-90" />
-            {t("node.add.details")}
-          </span>
-        </summary>
-        <div className="flex flex-col gap-1.5 pt-2.5 pb-1">
-          <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("node.add.fingerprint")}</span>
-          <code className="font-mono text-xs leading-relaxed break-all text-muted select-all">{issued.caFingerprint}</code>
-          <p className="text-xs leading-snug text-muted">{t("node.add.fingerprintHint")}</p>
-        </div>
-      </details>
-
-      <div className="flex flex-wrap justify-end gap-2">
-        {online && id ? (
-          <>
-            <Button variant="secondary" size="md" onClick={onClose}>
-              {t("common.done")}
-            </Button>
-            <Button variant="primary" size="md" onClick={() => go(needsProfile ? "profiles" : undefined)}>
-              {needsProfile ? t("node.add.addProfile", { name }) : t("node.add.open")}
-            </Button>
-          </>
-        ) : (
-          <Button variant="ghost" size="md" onClick={onClose}>
-            {t("common.close")}
-          </Button>
+        {view === "done" && (
+          <NodeReady
+            nodeId={id}
+            line={[shownName, country !== noCountry ? fmt.country(country) : "", address.trim()].filter(Boolean).join(" · ")}
+            onClose={onClose}
+            onOpen={goNode}
+          />
         )}
       </div>
-    </div>
+    </>
   );
 }

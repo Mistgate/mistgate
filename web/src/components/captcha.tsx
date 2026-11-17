@@ -15,7 +15,7 @@ export type Captcha = {
   reset: () => void;
   /** Reloads the page when the panel demands a check this page was loaded without; true if it did. */
   stale: (e: unknown) => boolean;
-  /** The 65 px block (null when off). Put it right above the buttons it gates. */
+  /** The check row of the board (44 px; Cloudflare's own 65 px widget takes its place when it needs a click); null when off. Put it right above the buttons it gates. */
   widget: ReactNode;
 };
 
@@ -40,6 +40,6 @@ export function useCaptcha(): Captcha {
       window.location.reload();
       return true;
     },
-    widget: on ? <Turnstile siteKey={info.turnstileSiteKey} onToken={setToken} ref={handle} /> : null,
+    widget: on ? <Turnstile quiet siteKey={info.turnstileSiteKey} onToken={setToken} ref={handle} /> : null,
   };
 }

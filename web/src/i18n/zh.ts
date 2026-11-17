@@ -39,6 +39,7 @@ import { zh as trusttunnelZh } from "./trusttunnel";
 import { zh as shellZh } from "./shell";
 import { zh as nodesviewZh } from "./nodesview";
 import { zh as overviewZh } from "./overview";
+import { zh as windowsZh } from "./windows";
 
 // Simplified Chinese (zh-CN). Typed against the English shape: a missing or extra key fails `pnpm typecheck`. Plurals: one form, no "|".
 // `core` is the shell, auth and navigation copy (what ru.ts keeps in its own `core`).
@@ -116,7 +117,7 @@ const core: CoreMessages = {
   "health.problems": "{n} 个问题",
 
   "palette.title": "命令面板",
-  "palette.placeholder": "节点、用户、页面…",
+  "palette.placeholder": "节点、用户、页面或操作",
   "palette.empty": "未找到结果",
   "palette.searching": "正在搜索…",
   "palette.nodes": "节点",
@@ -124,7 +125,7 @@ const core: CoreMessages = {
   "palette.places": "页面",
   "palette.actions": "操作",
   "palette.addNode": "添加节点",
-  "palette.createUser": "新建用户",
+  "palette.createUser": "添加用户",
   "palette.newToken": "新建 API 令牌",
   "palette.newProfile": "新建协议配置",
   "palette.approvals": "审批",
@@ -184,7 +185,7 @@ const core: CoreMessages = {
   "auth.password": "密码",
   "auth.code": "身份验证器验证码",
   "auth.createPasskey": "创建通行密钥",
-  "auth.waitingPasskey": "正在等待你的设备…",
+  "auth.waitingPasskey": "正在等待通行密钥",
   "auth.setup.passkeyHint": "浏览器会请求指纹、面部识别或 PIN",
   "auth.setup.otherWay": "改用密码 + 身份验证器验证码",
   "auth.setup.totpScan": "使用 Google Authenticator、1Password 或 Aegis 扫描",
@@ -302,4 +303,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh };

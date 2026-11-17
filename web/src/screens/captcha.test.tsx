@@ -127,6 +127,31 @@ describe("sign-in", () => {
     // Finish* rides on the ceremony id, not on a second token
     expect(api.finishLogin).toHaveBeenCalledWith({ ceremonyId: "c1", credentialJson: "{}" });
     expect(reset).toHaveBeenCalledWith("w1"); // a token works once
+    // the button turned into the confirmation while the panel loads: nothing to press, the check row says it passed
+    expect(document.body.textContent).toContain(en["win.login.done"]);
+    expect(document.body.textContent).toContain(en["win.login.opening"]);
+    expect(document.body.textContent).toContain(en["win.cf.passed"]);
+    expect([...document.querySelectorAll("[role=status]")].some((r) => r.textContent?.includes(en["win.login.done"]))).toBe(true);
+    expect(navigate).toHaveBeenCalledWith({ to: "/" });
+  });
+
+  it("shows the check as a row of the page: a ring while it works, the tick when it passed", async () => {
+    api.beginLogin.mockResolvedValue({ optionsJson: "{}", ceremonyId: "c1" });
+    await mount(<LoginScreen />, true);
+    // Cloudflare's own widget shows only when it has to be clicked: the page asks for the quiet look
+    expect(widgets[0]!.options.appearance).toBe("interaction-only");
+    const row = () => document.querySelector("[role=status]")!;
+    expect(row().textContent).toContain(en["win.cf.checking"]);
+    expect(row().textContent).toContain("Cloudflare Turnstile");
+    expect(row().querySelector(".wn-ts")?.className).toContain("now");
+    solve("tok-1");
+    expect(row().textContent).toContain(en["win.cf.passed"]);
+    expect(row().querySelector(".wn-ts")?.className).toContain("done");
+    // the widget asks for a click: it takes the row's place, and gives it back
+    await act(async () => void (widgets[0]!.options["before-interactive-callback"] as () => void)());
+    expect(document.querySelector("[role=status]")).toBeNull();
+    await act(async () => void (widgets[0]!.options["after-interactive-callback"] as () => void)());
+    expect(document.querySelector("[role=status]")).not.toBeNull();
   });
 
   it("starts over after a refusal: the message, a reset widget, the button off again", async () => {
@@ -137,9 +162,10 @@ describe("sign-in", () => {
 
     expect(document.body.textContent).toContain(en["err.captcha"]);
     expect(reset).toHaveBeenCalledWith("w1");
-    expect(button(en["auth.login.passkey"]).disabled).toBe(true); // the old token is gone
+    // after a refusal the button says "Try again" and waits for a fresh token: the old one is gone
+    expect(button(en["win.retry"]).disabled).toBe(true);
     solve("fresh");
-    expect(button(en["auth.login.passkey"]).disabled).toBe(false);
+    expect(button(en["win.retry"]).disabled).toBe(false);
   });
 
   it("gates the password form too, sends the token with PasswordLogin and resets after a wrong code", async () => {

@@ -1,4 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { Icon } from "@/components/ui/icons";
+import { Tick } from "@/components/windows";
 import { useLang, useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useTheme } from "@/lib/theme";
@@ -81,6 +83,37 @@ export function TurnstileFrame({ status, label, onClick }: { status: FrameStatus
   );
 }
 
+/**
+ * The check as the sign-in page of the board draws it (.lg-ck): a row 44 high with the mark of a step (a ring while Cloudflare
+ * works, the tick when it is done), what is going on in words, and "Cloudflare Turnstile" at the end. Cloudflare's own
+ * widget shows only when it has to be clicked (see `quiet` of Turnstile), and then it takes the row's place.
+ */
+export function TurnstileRow({ status, label, onClick }: { status: FrameStatus; label: string; onClick?: () => void }) {
+  const cls = cx(
+    "grid h-11 w-full grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 text-start text-[13px] transition-[border-color] duration-300 ease-out select-none",
+    status === "ok" ? "text-fg" : "text-sec",
+  );
+  const body = (
+    <>
+      <Tick state={status === "ok" ? "done" : status === "error" ? "bad" : status === "busy" ? "now" : ""} />
+      <span className="min-w-0 truncate">{label}</span>
+      <span className="flex items-center text-[11px] text-muted">
+        <Icon name="cloud" size={16} className="me-1.5" />
+        Cloudflare Turnstile
+      </span>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className={cx(cls, "cursor-pointer")}>
+      {body}
+    </button>
+  ) : (
+    <div role="status" className={cls}>
+      {body}
+    </div>
+  );
+}
+
 export type TurnstileHandle = {
   /** A token works once: call this after every attempt that used it (failed or not). */
   reset: () => void;
@@ -92,6 +125,11 @@ type WidgetProps = {
   ref?: Ref<TurnstileHandle>;
   /** The challenge gave up, with Cloudflare's last error code ("110200": the site key does not allow this domain). */
   onFail?: (code: string) => void;
+  /**
+   * The sign-in page's way: a row of the board (TurnstileRow) says what is going on, and Cloudflare's widget is shown only
+   * when it needs a click (appearance "interaction-only"). Without it the 65 px frame and the widget over it, as before.
+   */
+  quiet?: boolean;
 };
 
 /**
@@ -104,7 +142,7 @@ export function Turnstile(props: WidgetProps) {
   return <Widget key={attempt} {...props} onRetry={() => setAttempt((n) => n + 1)} />;
 }
 
-function Widget({ siteKey, onToken, ref, onRetry, onFail }: WidgetProps & { onRetry: () => void }) {
+function Widget({ siteKey, onToken, ref, onRetry, onFail, quiet }: WidgetProps & { onRetry: () => void }) {
   const t = useT();
   const lang = useLang();
   const theme = useTheme();
@@ -114,6 +152,9 @@ function Widget({ siteKey, onToken, ref, onRetry, onFail }: WidgetProps & { onRe
   const fail = useRef(onFail);
   // "error": the script did not load; "failed": it loaded, but the challenge keeps failing (a wrong site key, a blocked visitor)
   const [state, setState] = useState<"loading" | "ready" | "error" | "failed">("loading");
+  // quiet mode: a token is in hand (the row says "passed"), and Cloudflare asks for a click (its widget shows)
+  const [passed, setPassed] = useState(false);
+  const [asking, setAsking] = useState(false);
 
   useEffect(() => {
     report.current = onToken;
@@ -121,6 +162,7 @@ function Widget({ siteKey, onToken, ref, onRetry, onFail }: WidgetProps & { onRe
   });
   useImperativeHandle(ref, () => ({
     reset() {
+      setPassed(false);
       report.current(null);
       if (widget.current) window.turnstile?.reset(widget.current);
     },
@@ -138,13 +180,25 @@ function Widget({ siteKey, onToken, ref, onRetry, onFail }: WidgetProps & { onRe
           theme,
           language: lang === "zh" ? "zh-cn" : lang, // Turnstile spells the Chinese widget "zh-cn"
           size: "flexible",
+          ...(quiet ? { appearance: "interaction-only" } : {}),
           callback: (token: string) => {
             errors = 0;
+            setPassed(true);
+            setAsking(false);
             report.current(token);
           },
-          "expired-callback": () => report.current(null), // the widget refreshes itself and calls back again
-          "timeout-callback": () => report.current(null),
+          "before-interactive-callback": () => setAsking(true),
+          "after-interactive-callback": () => setAsking(false),
+          "expired-callback": () => {
+            setPassed(false);
+            report.current(null); // the widget refreshes itself and calls back again
+          },
+          "timeout-callback": () => {
+            setPassed(false);
+            report.current(null);
+          },
           "error-callback": (code?: unknown) => {
+            setPassed(false);
             report.current(null);
             // a transient hiccup heals with a reset; a wrong site key or a blocked challenge does not, so give up after two
             if (++errors <= 2) retry = setTimeout(() => api.reset(id), 1000);
@@ -170,10 +224,23 @@ function Widget({ siteKey, onToken, ref, onRetry, onFail }: WidgetProps & { onRe
       if (widget.current) window.turnstile?.remove(widget.current);
       widget.current = null;
       report.current(null);
+      // the next widget starts from nothing: no token, no click asked for
+      setPassed(false);
+      setAsking(false);
     };
-  }, [siteKey, theme, lang]);
+  }, [siteKey, theme, lang, quiet]);
 
   const dead = state === "error" || state === "failed";
+  if (quiet) {
+    const label = dead ? `${t(state === "failed" ? "cf.failed" : "cf.error")} ${t("cf.retry")}` : passed ? t("win.cf.passed") : t("win.cf.checking");
+    return (
+      <div className="w-full">
+        {!asking && <TurnstileRow status={dead ? "error" : passed ? "ok" : "busy"} label={label} onClick={dead ? onRetry : undefined} />}
+        {/* Cloudflare's iframe lives here: hidden until it has to be clicked, then 65 px tall in the row's place */}
+        <div ref={box} hidden={dead} className="w-full" />
+      </div>
+    );
+  }
   return (
     <div className="relative h-[65px] w-full">
       <TurnstileFrame

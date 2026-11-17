@@ -136,7 +136,7 @@ export function InstallPanelKeyBox({ login }: { login: SSHLogin }) {
  * dropped key file or a pasted key and never shows it back, and the passphrase once the server asked for it. `warn`
  * false drops the warning where it was already read (the check step, a retry).
  */
-export function OwnKeyField({ login, warn = true, note }: { login: SSHLogin; warn?: boolean; note?: string }) {
+export function OwnKeyField({ login, warn = true, note, plain }: { login: SSHLogin; warn?: boolean; note?: string; /** The new-node window's look: the field of the panel (mono, four lines, a solid line) and a quiet label. */ plain?: boolean }) {
   const t = useT();
   const id = useId();
   const file = useRef<HTMLInputElement>(null);
@@ -172,7 +172,7 @@ export function OwnKeyField({ login, warn = true, note }: { login: SSHLogin; war
       {warn && <Callout kind="warn">{t("node.ssh.ownWarn")}</Callout>}
       {note && <p className="text-xs leading-snug text-pretty text-muted">{note}</p>}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={id} className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
+        <label htmlFor={id} className={plain ? "text-[13px] text-sec" : "text-[11px] font-bold tracking-[0.1em] text-muted uppercase"}>
           {t("node.ssh.ownKey")}
         </label>
         {login.ownKey ? (
@@ -204,7 +204,7 @@ export function OwnKeyField({ login, warn = true, note }: { login: SSHLogin; war
                 e.preventDefault();
                 void takeFile(f);
               }}
-              rows={2}
+              rows={plain ? 4 : 2}
               placeholder={t("node.ssh.ownKeyDrop")}
               spellCheck={false}
               autoComplete="off"
@@ -212,11 +212,13 @@ export function OwnKeyField({ login, warn = true, note }: { login: SSHLogin; war
               aria-describedby={`${id}-hint`}
               aria-invalid={!!problem || undefined}
               className={cx(
-                "block min-h-[76px] w-full resize-none rounded-field border border-dashed bg-surface py-3 ps-3.5 pe-[132px] text-sm leading-snug text-fg outline-none transition-colors duration-200 placeholder:text-muted focus:border-solid focus:border-accent",
+                plain
+                  ? "block min-h-[104px] w-full resize-none rounded-field border bg-canvas py-2.5 ps-3 pe-[132px] font-mono text-[13px] leading-5 text-fg outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-muted hover:border-(--border-hover) focus:border-accent-line focus:shadow-[0_0_0_3px_var(--focus-ring)]"
+                  : "block min-h-[76px] w-full resize-none rounded-field border border-dashed bg-surface py-3 ps-3.5 pe-[132px] text-sm leading-snug text-fg outline-none transition-colors duration-200 placeholder:text-muted focus:border-solid focus:border-accent",
                 over ? "border-accent bg-accent-soft" : problem ? "border-danger" : "border-line",
               )}
             />
-            <Button variant="secondary" size="sm" className="absolute end-2.5 top-1/2 -translate-y-1/2" onClick={() => file.current?.click()}>
+            <Button variant="secondary" size="sm" className={cx("absolute end-2.5", plain ? "top-2.5" : "top-1/2 -translate-y-1/2")} onClick={() => file.current?.click()}>
               <Icon name="upload" size={12} />
               {t("node.ssh.ownKeyFile")}
             </Button>

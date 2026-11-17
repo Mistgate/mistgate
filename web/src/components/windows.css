@@ -1,0 +1,302 @@
+/*
+ * The four windows of the panel (sign-in, confirm, search, new node) and the atoms they share: what utilities cannot say.
+ * Key frames, the dotted halo, the wave inside a window, the six boxes of a code. The values are the redesign board's
+ * (pn.css); the class names are the board's too (lg-, cfm-, sr-, an-), so a rule here can be found there.
+ * The window's own structure lives next to its code: add-node.css for the new node.
+ */
+
+@keyframes wn-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes wn-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes wn-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* a window comes in: 16px up and a little smaller (an-pop; the search window 0.25s, the others 0.35 and 0.3) */
+@keyframes wn-dlg {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* the phone's sheet comes up from the bottom edge (an-sheet) */
+@keyframes wn-sheet {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes wn-ring {
+  0% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+/* the check mark of a step (as-ts): a ring turns while it works, the tick draws itself when it is done */
+.wn-ts {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--accent-mark);
+}
+.wn-ts svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity 0.3s var(--e);
+}
+.wn-ts::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--tone-sky);
+  border-top-color: transparent;
+  opacity: 0;
+  transition: opacity 0.3s var(--e);
+  animation: mg-ui-spin 0.8s linear infinite;
+}
+.wn-ts.now::before {
+  opacity: 1;
+}
+.wn-ts.done svg {
+  opacity: 1;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: wn-draw 0.4s var(--e) forwards;
+}
+.wn-ts.bad {
+  color: var(--danger);
+}
+.wn-ts.bad svg {
+  opacity: 1;
+}
+:root[data-theme="light"] .wn-ts {
+  color: var(--accent-text);
+}
+:root[data-theme="light"] .wn-ts.bad {
+  color: var(--danger);
+}
+
+/* the dotted halo behind a window (lg::before, cfm::before, an-dn::before): dots in the accent, faded to nothing at the edge.
+   It belongs to the reveal animation (Settings -> Interface), as the board's wave and halo do. */
+.wn-halo {
+  position: absolute;
+  pointer-events: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 80%, transparent) 1.2px, transparent 1.7px);
+  background-size: 10px 10px;
+  mask-image: radial-gradient(closest-side, #000 0, transparent 100%);
+}
+
+/* the wave inside a window (.wave): one ring of colour, from the point it plays at, across the window */
+.wn-wave {
+  --w1: rgb(80 220 175 / 0.42);
+  --w2: rgb(70 195 225 / 0.38);
+  --w3: rgb(180 240 150 / 0.34);
+  --w4: rgb(235 255 245 / 0.22);
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.wn-wave i {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle at var(--wave-at, 50% 46%),
+    transparent calc(var(--r) - 260px),
+    var(--w1) calc(var(--r) - 150px),
+    var(--w2) calc(var(--r) - 50px),
+    var(--w3) calc(var(--r) + 50px),
+    var(--w4) calc(var(--r) + 150px),
+    transparent calc(var(--r) + 260px)
+  );
+  animation:
+    wn-wave-r 1.8s cubic-bezier(0.3, 0.62, 0.35, 1) both,
+    wn-wave-a 1.8s linear both;
+}
+:root[data-theme="light"] .wn-wave {
+  --w1: rgb(40 190 150 / 0.3);
+  --w2: rgb(50 170 210 / 0.26);
+  --w3: rgb(140 210 90 / 0.24);
+  --w4: rgb(180 235 215 / 0.2);
+}
+:root[data-theme="light"] .wn-wave i {
+  mix-blend-mode: normal;
+}
+@keyframes wn-wave-r {
+  from {
+    --r: 30px;
+  }
+  to {
+    --r: 1400px;
+  }
+}
+@keyframes wn-wave-a {
+  0% {
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.82;
+  }
+  55% {
+    opacity: 0.5;
+  }
+  78% {
+    opacity: 0.18;
+  }
+  92% {
+    opacity: 0.04;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* six boxes for a code (otp): one box per digit, a short line after the third; the box in focus rises a pixel on a spring */
+.wn-otp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wn-otp input {
+  flex: 1;
+  min-width: 0;
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: 500 20px/1 var(--font-mono);
+  text-align: center;
+  outline: none;
+  transition:
+    border-color 0.15s var(--e),
+    box-shadow 0.15s var(--e),
+    transform 0.15s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.wn-otp input:hover {
+  border-color: var(--border-hover);
+}
+.wn-otp input:focus {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  transform: translateY(-1px);
+}
+.wn-otp input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.wn-otp i {
+  flex: none;
+  width: 8px;
+  border-top: 1.5px solid var(--border);
+}
+
+/* the fingerprint of a server: tone of a step */
+.wn-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 18%, transparent) transparent;
+}
+.wn-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.wn-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wn-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+  background-clip: content-box;
+}
+.wn-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text) 32%, transparent);
+  background-clip: content-box;
+}
+.wn-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* the sign-in that went through (lg-dn, lg-pg): the button turns into a confirmation, a line under it fills while the panel loads */
+@keyframes wn-confirm {
+  0% {
+    transform: scale(0.97);
+  }
+  60% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes wn-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.wn-confirm {
+  animation: wn-confirm 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+.wn-confirm .wn-ts {
+  width: 20px;
+  height: 20px;
+}
+.wn-confirm .wn-ts svg {
+  width: 18px;
+  height: 18px;
+}
+:root[data-theme="light"] .wn-confirm {
+  color: var(--accent-text);
+}
+.wn-fill {
+  transform-origin: 0 50%;
+  animation: wn-fill 1.8s var(--e) both;
+}
+[dir="rtl"] .wn-fill {
+  transform-origin: 100% 50%;
+}

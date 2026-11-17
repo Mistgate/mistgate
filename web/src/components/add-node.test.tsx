@@ -18,6 +18,7 @@ const getSSHFingerprint = vi.fn();
 const checkSSH = vi.fn();
 const startNodeProvision = vi.fn();
 const getNodeProvision = vi.fn();
+const listNodeProvisionEvents = vi.fn();
 const retryNodeProvision = vi.fn();
 const finishStepUp = vi.fn();
 // the saved access of other nodes: one with panelKeyFingerprint makes the panel key the default way in
@@ -33,6 +34,7 @@ vi.mock("@/lib/api", () => ({
     checkSSH: (...a: unknown[]) => checkSSH(...a),
     startNodeProvision: (...a: unknown[]) => startNodeProvision(...a),
     getNodeProvision: (...a: unknown[]) => getNodeProvision(...a),
+    listNodeProvisionEvents: (...a: unknown[]) => listNodeProvisionEvents(...a),
     retryNodeProvision: (...a: unknown[]) => retryNodeProvision(...a),
     listNodeServerAccess: async () => ({ access: accessList }),
     getPanelSSHKey: async () => panelKey,
@@ -41,8 +43,14 @@ vi.mock("@/lib/api", () => ({
 const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
 
+// the rows of the check answer one by one on the board; here (and for anyone who asks for calm) all at once
+let calm = true;
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string) => ({ matches: calm && query.includes("prefers-reduced-motion"), media: query, addEventListener() {}, removeEventListener() {} }),
+  });
 });
 
 let root: Root | null = null;
@@ -51,16 +59,9 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  createEnrollment.mockReset();
-  getNode.mockReset();
-  getSSHFingerprint.mockReset();
-  checkSSH.mockReset();
-  startNodeProvision.mockReset();
-  getNodeProvision.mockReset();
-  retryNodeProvision.mockReset();
-  finishStepUp.mockReset();
-  navigate.mockReset();
+  for (const m of [createEnrollment, getNode, getSSHFingerprint, checkSSH, startNodeProvision, getNodeProvision, listNodeProvisionEvents, retryNodeProvision, finishStepUp, navigate]) m.mockReset();
   accessList = [];
+  calm = true;
 });
 
 function Opener() {
@@ -73,11 +74,15 @@ function Opener() {
 }
 
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+const wait = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-const toggle = (el: HTMLInputElement | null | undefined) => act(async () => void el?.click());
 const input = (placeholder: string) => document.querySelector<HTMLInputElement>(`input[placeholder="${placeholder}"]`)!;
+const radio = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === label);
+const checked = (label: string) => radio(label)?.getAttribute("aria-checked") === "true";
+// the boxes of the window: the first is the one the step is about (the server key, the install)
+const box = (i = 0) => document.querySelectorAll<HTMLElement>("[role=checkbox]")[i];
 async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -106,8 +111,18 @@ async function open() {
   await settle();
 }
 
-async function manual() {
-  await click(button("Get a manual install command"));
+/** The first page: the server, the name, the address for clients. */
+async function fillServer(address = "de1.example.com", name = "de1") {
+  await type(input("IP or domain"), address);
+  await type(input("de1"), name);
+  await type(input("de1.example.com"), address);
+}
+const probe = async () => {
+  await click(button("Check server"));
+  await settle();
+};
+async function byCommand() {
+  await click(radio("By command"));
   await settle();
 }
 
@@ -123,59 +138,78 @@ const issued = (over: Record<string, unknown> = {}) => ({
 async function issue(over: Record<string, unknown> = {}) {
   createEnrollment.mockResolvedValue(issued(over));
   await open();
-  await manual();
+  await byCommand();
   await type(input("de1"), "de1");
   await type(input("de1.example.com"), "de1.example.com");
-  await click(button("Create install command"));
+  await click(button("Get install command"));
   await settle();
   await settle();
 }
 
+const preflight = { distribution: "Ubuntu", version: "24.04", kernel: "6.8.0", architecture: "amd64", cpuCount: 2, memoryBytes: 2_147_483_648n, diskAvailableBytes: 10_737_418_240n, systemd: true, alreadyEnrolled: false, panelReachable: true };
+const rail = () => [...document.querySelectorAll(".an-st li")].map((li) => li.textContent ?? "");
+
 describe("the add-node window", () => {
-  it("says before the click that an IP gets no Let's Encrypt certificate, and what to do", async () => {
+  it("opens on the server step: the way to install, four steps, nothing sent yet", async () => {
     await open();
-    expect(document.querySelector<HTMLAnchorElement>('a[href="/secret-panel/nodes/install"]')).toBeNull();
-    expect(button("Install automatically over SSH")).toBeDefined();
-    expect(text()).toContain("Automatic installation over SSH");
-    expect(input("de1")).toBeNull();
-    await manual();
-    expect(input("de1")).not.toBeNull();
-    expect(text()).toContain("run the one-time install command on the server yourself");
-    expect(text()).toContain("A Let’s Encrypt certificate needs a domain with an A record");
-    expect(text()).toContain("Needed for DNS: on nodes in Russia the panel checks Yandex DNS and Gosuslugi, in China AliDNS, DNSPod and Baidu.");
-    await type(input("de1.example.com"), "203.0.113.10");
-    expect(text()).toContain("This is an IP, not a domain.");
-    expect(text()).toContain("Happ is not verified yet");
-    await type(input("de1.example.com"), "de1.example.com");
-    expect(text()).not.toContain("This is an IP, not a domain.");
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(text()).toContain(en["win.node.title"]);
+    expect(checked("Over SSH")).toBe(true);
+    expect(rail()).toHaveLength(4);
+    expect(text()).toContain(en["win.node.srvTitle"]);
+    expect(text()).toContain(en["win.node.noteStart"]);
+    // the board's first page asks for the server, the name and the address for clients; the button waits for all three
+    expect(button("Check server")?.disabled).toBe(true);
+    expect(text()).toContain(en["win.node.srvFill"]);
+    await type(input("de1"), "DE 1");
+    expect(input("de1").value).toBe("de 1");
+    expect(text()).toContain(en["node.add.nameError"]);
+    expect(getSSHFingerprint).not.toHaveBeenCalled();
   });
 
-  it("opens the SSH setup as a panel modal and confirms the server fingerprint before credentials", async () => {
+  it("fills the name and the address for clients from the host when the host field is left", async () => {
+    await open();
+    await type(input("IP or domain"), "nl1.example.com");
+    await act(async () => void input("IP or domain").dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    expect(input("de1").value).toBe("nl1");
+    expect(input("de1.example.com").value).toBe("nl1.example.com");
+    expect(button("Check server")?.disabled).toBe(false);
+  });
+
+  it("confirms the server fingerprint before credentials", async () => {
     getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key", algorithm: "ssh-ed25519" });
     await open();
-    await click(button("Install automatically over SSH"));
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(text()).toContain("Install a node over SSH");
-    expect(input("de1.example.com")).not.toBeNull();
-    expect(document.querySelector<HTMLAnchorElement>('a[href="/secret-panel/nodes/install"]')).toBeNull();
-
-    await type(input("de1.example.com"), "de1.example.com");
-    await click(button("Check server"));
-    await settle();
+    await fillServer();
+    await probe();
     expect(getSSHFingerprint).toHaveBeenCalledWith({ host: "de1.example.com", port: 22 });
-    expect(text()).toContain("Confirm the server key");
+    expect(text()).toContain(en["win.node.authTitle"]);
     expect(text()).toContain("SHA256:server-key");
-    expect(text()).toContain("Key type: ssh-ed25519"); // a provider lists one fingerprint per key type
+    expect(text()).toContain("ssh-ed25519"); // a provider lists one fingerprint per key type
     expect(button("Continue")?.disabled).toBe(true);
+    expect(text()).toContain(en["win.node.authHint"]);
+    expect(rail()[0]).toContain("de1.example.com:22"); // what was entered stays in the rail
+  });
+
+  it("shows the fingerprint in groups of four and the command that prints it on the server", async () => {
+    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:Vq3n0cX9Lr2bT8kM1pZs6YwE4hJ7uGdA5fNiQoRlKe0", algorithm: "ssh-rsa" });
+    await open();
+    await fillServer();
+    await probe();
+    const groups = [...document.querySelectorAll("[data-testid=fingerprint] [aria-hidden]")].map((s) => s.textContent);
+    expect(groups.join("")).toBe("Vq3n0cX9Lr2bT8kM1pZs6YwE4hJ7uGdA5fNiQoRlKe0");
+    expect(groups[0]).toBe("Vq3n");
+    expect(text()).not.toContain("ssh_host_rsa_key.pub");
+    await click(button(en["win.node.keyWhereLink"]));
+    expect(text()).toContain("ssh-keygen -lf /etc/ssh/ssh_host_rsa_key.pub");
+    await click(button(en["win.node.hide"]));
+    expect(text()).not.toContain("ssh-keygen");
   });
 
   it("explains that SSH fingerprint timeouts are measured from the panel server", async () => {
     getSSHFingerprint.mockRejectedValue(new ConnectError("ssh_fingerprint_timeout", Code.DeadlineExceeded));
     await open();
-    await click(button("Install automatically over SSH"));
-    await type(input("de1.example.com"), "de1.example.com");
-    await click(button("Check server"));
-    await settle();
+    await fillServer();
+    await probe();
     expect(text()).toContain("from the panel server");
     expect(text()).toContain("allow inbound TCP from the panel server's public egress IP");
     expect(text()).toContain("If the host firewall blocks SSH, use provider console or recovery access to open it first");
@@ -183,38 +217,37 @@ describe("the add-node window", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("keeps what the first page asked for when the way to install changes, in both directions", async () => {
+    await open();
+    await fillServer("nl1.example.com", "nl1");
+    await byCommand();
+    expect(checked("By command")).toBe(true);
+    expect(input("de1").value).toBe("nl1");
+    expect(input("de1.example.com").value).toBe("nl1.example.com");
+    await click(radio("Over SSH"));
+    await settle();
+    expect(input("de1").value).toBe("nl1");
+    expect(input("IP or domain")).not.toBeNull();
+  });
+
   it("preflights before installation, asks for the password again, and starts only after explicit confirmation", async () => {
     getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
-    checkSSH.mockResolvedValue({
-      preflight: {
-        distribution: "Ubuntu",
-        version: "22.04",
-        kernel: "6.8.0",
-        architecture: "amd64",
-        cpuCount: 2,
-        memoryBytes: 2_147_483_648n,
-        diskAvailableBytes: 10_737_418_240n,
-        systemd: true,
-        alreadyEnrolled: false,
-        panelReachable: true,
-      },
-    });
+    checkSSH.mockResolvedValue({ preflight: { ...preflight, nftables: true } });
     startNodeProvision.mockResolvedValue({
       job: { id: "prv_1", nodeId: "nod_1", name: "de1", state: "queued", phase: "queued", errorCode: "" },
     });
     getNodeProvision.mockReturnValue(new Promise(() => {}));
+    listNodeProvisionEvents.mockResolvedValue({ events: [] });
 
     await open();
-    await click(button("Install automatically over SSH"));
-    await type(input("de1.example.com"), "de1.example.com");
-    await click(button("Check server"));
-    await settle();
-    expect(text()).toContain("Confirm the server key");
+    await fillServer();
+    await probe();
+    expect(text()).toContain(en["win.node.authTitle"]);
     expect(checkSSH).not.toHaveBeenCalled();
 
     const passwords = () => document.querySelector<HTMLInputElement>('input[type="password"]')!;
     await type(passwords(), "check-only-secret");
-    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(box(0));
     await click(button("Continue"));
     await settle();
     expect(checkSSH).toHaveBeenCalledWith({
@@ -225,13 +258,14 @@ describe("the add-node window", () => {
       username: "root",
       usePanelKey: false,
     });
-    expect(text()).toContain("Server checks passed");
-    expect(text()).toContain("After SSH succeeds");
+    expect(text()).toContain(en["win.node.chkOk"]);
+    expect(text()).toContain(en["win.node.planTitle"]);
     expect(text()).toContain("An inactive firewall stays inactive");
     expect(passwords().value).toBe("");
+    expect(button("Start installation")?.disabled).toBe(true); // nothing starts before the box is ticked
 
     await type(passwords(), "install-secret");
-    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(box(0));
     await click(button("Start installation"));
     await settle();
     expect(startNodeProvision).toHaveBeenCalledWith({
@@ -249,31 +283,51 @@ describe("the add-node window", () => {
       usePanelKey: false,
       installPanelKey: true, // a password install adds the panel key unless the owner unticks it
     });
-    expect(text()).toContain("Waiting to start");
+    expect(document.querySelector(".an-sg li.now")?.textContent).toContain("Connecting over SSH");
   });
 
+  it("shows the rows of the check one by one when calm is not asked for", async () => {
+    calm = false;
+    getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
+    checkSSH.mockResolvedValue({ preflight: { ...preflight, nftables: true } });
+    await open();
+    await fillServer();
+    await probe();
+    await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "x");
+    await click(box(0));
+    await click(button("Continue"));
+    await settle();
+    const rows = () => [...document.querySelectorAll(".an-fr")].map((r) => r.className.replace("an-fr", "").trim());
+    expect(text()).toContain(en["win.node.chkBusy"]);
+    expect(rows()[0]).toBe("now");
+    expect(rows()[1]).toBe("wait");
+    expect(document.querySelector(".an-fx")?.getAttribute("aria-busy")).toBe("true");
+    expect(text()).not.toContain(en["win.node.planTitle"]);
+    // 450 ms, then 190 per row, then a moment: in steps, so that every answer is drawn before the next
+    for (let i = 0; i < 14; i++) await wait(200);
+    expect(rows()).toEqual(Array(9).fill("done"));
+    expect(text()).toContain(en["win.node.planTitle"]);
+    expect(document.querySelector(".an-fx")?.getAttribute("aria-busy")).toBe("false");
+  }, 8_000);
+
   describe("how the panel logs in", () => {
-    const preflight = { distribution: "Ubuntu", version: "24.04", architecture: "amd64", cpuCount: 2, memoryBytes: 1n, diskAvailableBytes: 1n, systemd: true, panelReachable: true };
-    const radio = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === label);
-    const checked = (label: string) => radio(label)?.getAttribute("aria-checked") === "true";
-    const hostKeyBox = () => document.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    const pre = { distribution: "Ubuntu", version: "24.04", architecture: "amd64", cpuCount: 2, memoryBytes: 1n, diskAvailableBytes: 1n, systemd: true, panelReachable: true };
+    const how = () => !!button(en["win.node.hideHow"]);
     async function toLogin() {
       getSSHFingerprint.mockResolvedValue({ host: "nl1.example.com", port: 22, fingerprint: "SHA256:server-key", algorithm: "ssh-ed25519" });
       await open();
-      await click(button("Install automatically over SSH"));
-      await type(input("de1.example.com"), "nl1.example.com");
-      await click(button("Check server"));
-      await settle();
+      await fillServer("nl1.example.com", "nl1");
+      await probe();
     }
 
     async function toChecks(nftables: boolean) {
-      checkSSH.mockResolvedValue({ preflight: { ...preflight, nftables } });
+      checkSSH.mockResolvedValue({ preflight: { ...pre, nftables } });
       await toLogin();
-      await toggle(hostKeyBox());
+      await click(box(0));
       await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "check-only-secret");
       await click(button("Continue"));
       await settle();
-      expect(text()).toContain("Server checks passed");
+      expect(text()).toContain(en["win.node.chkOk"]);
     }
 
     it("says the install adds the nftables package when the server has no nft", async () => {
@@ -282,6 +336,7 @@ describe("the add-node window", () => {
       expect(text()).toContain("No, the install adds it");
       expect(text()).toContain("The server has no nft command");
       expect(text()).toContain("separate step before the firewall step");
+      expect(text()).toContain(en["win.node.planNftables"]);
     });
 
     it("shows nft as there, and no note, when the server has it", async () => {
@@ -289,16 +344,17 @@ describe("the add-node window", () => {
       expect(text()).toContain("nftables");
       expect(text()).not.toContain("No, the install adds it");
       expect(text()).not.toContain("The server has no nft command");
+      expect(text()).not.toContain(en["win.node.planNftables"]);
     });
 
     it("starts on the password while no node uses the panel key, and installs by key with no password anywhere", async () => {
-      checkSSH.mockResolvedValue({ preflight });
+      checkSSH.mockResolvedValue({ preflight: pre });
       startNodeProvision.mockResolvedValue({ job: { id: "prv_2", nodeId: "nod_2", name: "nl1", state: "queued", phase: "queued", errorCode: "" } });
       getNodeProvision.mockReturnValue(new Promise(() => {}));
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
       await toLogin();
-      expect(text()).toContain("Login"); // the step's name
+      expect(text()).toContain(en["win.node.authTitle"]);
       expect(checked("Password")).toBe(true);
       expect(document.querySelector('input[type="password"]')).not.toBeNull();
 
@@ -309,22 +365,22 @@ describe("the add-node window", () => {
       expect(document.querySelector("[data-testid=panel-key]")?.getAttribute("dir")).toBe("ltr");
       expect(text()).toContain(panelKey.fingerprint);
       // a key nobody uses yet comes with the how-to open: the hoster's SSH keys, then the one-line command
-      expect(document.querySelector("details")?.open).toBe(true);
+      expect(how()).toBe(true);
       expect(text()).toContain("Name it mistgate");
-      expect(document.querySelector("pre")?.textContent).toBe(`mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${panelKey.publicKey}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`);
+      expect(document.querySelector(".an-cw code")?.textContent).toBe(`mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${panelKey.publicKey}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`);
       await click(button("Copy key"));
       expect(writeText).toHaveBeenCalledWith(panelKey.publicKey);
       expect(checkSSH).not.toHaveBeenCalled(); // copying inside the form does not submit it
 
-      await toggle(hostKeyBox());
+      await click(box(0));
       expect(button("Continue")?.disabled).toBe(false);
       await click(button("Continue"));
       await settle();
       expect(checkSSH).toHaveBeenCalledWith({ host: "nl1.example.com", port: 22, fingerprint: "SHA256:server-key", password: "", username: "root", usePanelKey: true });
-      expect(text()).toContain("Server checks passed");
+      expect(text()).toContain(en["win.node.chkOk"]);
       expect(document.querySelector('input[type="password"]')).toBeNull();
 
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Start installation"));
       await settle();
       expect(startNodeProvision).toHaveBeenCalledWith(expect.objectContaining({ password: "", usePanelKey: true, sshUsername: "root" }));
@@ -335,7 +391,9 @@ describe("the add-node window", () => {
       await toLogin();
       expect(checked("Panel key")).toBe(true);
       expect(document.querySelector('input[type="password"]')).toBeNull();
-      expect(document.querySelector("details")?.open).toBe(false);
+      expect(how()).toBe(false);
+      await click(button("How to add it at your hoster"));
+      expect(how()).toBe(true);
     });
 
     it("says where a refused panel key must be, and opens the how-to", async () => {
@@ -343,29 +401,36 @@ describe("the add-node window", () => {
       checkSSH.mockRejectedValue(new ConnectError("ssh_panel_key_not_accepted", Code.Unauthenticated));
       await toLogin();
       await type(input("root"), "deploy");
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Continue"));
       await settle();
+      // the check page opened for the call and went back to the login with the refusal
+      expect(text()).toContain(en["win.node.authTitle"]);
       expect(document.querySelector("[role=alert]")?.textContent).toBe("The server did not accept the panel key. Check that it is in ~/.ssh/authorized_keys of deploy.");
-      expect(document.querySelector("details")?.open).toBe(true);
+      expect(how()).toBe(true);
     });
 
     it("retries a key install by key, and words a refused login as the key", async () => {
       accessList = [{ nodeId: "nod_9", panelKeyFingerprint: panelKey.fingerprint }];
-      checkSSH.mockResolvedValue({ preflight });
+      checkSSH.mockResolvedValue({ preflight: pre });
       startNodeProvision.mockResolvedValue({ job: { id: "prv_2", nodeId: "nod_2", name: "nl1", state: "queued", phase: "queued", errorCode: "" } });
-      getNodeProvision.mockResolvedValue({ job: { id: "prv_2", nodeId: "nod_2", name: "nl1", state: "failed", phase: "connecting", errorCode: "ssh_authentication_failed" } });
+      getNodeProvision.mockResolvedValue({ job: { id: "prv_2", nodeId: "nod_2", name: "nl1", state: "failed", phase: "failed", errorCode: "ssh_authentication_failed" } });
+      listNodeProvisionEvents.mockResolvedValue({ events: [{ id: 1, phase: "queued", code: "queued" }, { id: 2, phase: "connecting", code: "connecting" }] });
       retryNodeProvision.mockResolvedValue({});
       await toLogin();
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Continue"));
       await settle();
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Start installation"));
       await settle();
       await settle();
       expect(text()).toContain("The server did not accept the panel key.");
       expect(document.querySelector('input[type="password"]')).toBeNull();
+      // the stage the worker stopped at says why, in two words
+      expect(document.querySelector(".an-sg li.err")?.textContent).toContain("Connecting over SSH");
+      expect(document.querySelector(".an-sg li.err")?.textContent).toContain(en["win.node.loginRefused"]);
+      expect(text()).toContain(en["win.node.serverUntouched"]);
       await click(button("Retry installation"));
       await settle();
       expect(retryNodeProvision).toHaveBeenCalledWith({ jobId: "prv_2", confirmInstall: true, password: "", sshUsername: "root", usePanelKey: true });
@@ -376,36 +441,39 @@ describe("the add-node window", () => {
     const queued = { job: { id: "prv_4", nodeId: "nod_4", name: "nl1", state: "queued", phase: "queued", errorCode: "" } };
 
     it("adds the panel key on a password install by default, and not when the owner unticks it", async () => {
-      checkSSH.mockResolvedValue({ preflight });
+      checkSSH.mockResolvedValue({ preflight: pre });
       startNodeProvision.mockResolvedValue(queued);
       getNodeProvision.mockReturnValue(new Promise(() => {}));
       await toLogin();
-      const box = () => document.querySelector<HTMLInputElement>("input[data-install-panel-key]");
-      expect(box()?.checked).toBe(true);
+      // the box of the panel key is the one after the server key's
+      const panelBox = () => box(1);
+      expect(panelBox()?.getAttribute("aria-checked")).toBe("true");
       expect(text()).toContain(en["node.ssh.installPanelKeyHint"]);
-      await toggle(box());
-      expect(box()?.checked).toBe(false);
+      await click(panelBox());
+      expect(panelBox()?.getAttribute("aria-checked")).toBe("false");
 
       await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "check-secret");
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Continue"));
       await settle();
       expect(checkSSH.mock.calls[0]![0]).not.toHaveProperty("installPanelKey"); // the check installs nothing
       await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "install-secret");
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Start installation"));
       await settle();
       expect(startNodeProvision).toHaveBeenCalledWith(expect.objectContaining({ password: "install-secret", usePanelKey: false, installPanelKey: false }));
       expect(startNodeProvision.mock.calls[0]![0]).not.toHaveProperty("privateKey");
+      // the stages of the install follow the choice: no step for a panel key that was not asked for
+      expect(document.querySelector(".an-sg")?.textContent).not.toContain("Adding the panel key to the server");
     });
 
     it("logs in with an own key: last and never the default, never shown back, no password sent, the passphrase only once asked", async () => {
       accessList = [{ nodeId: "nod_9", panelKeyFingerprint: panelKey.fingerprint }];
-      checkSSH.mockRejectedValueOnce(new ConnectError("ssh_key_passphrase_required", Code.FailedPrecondition)).mockResolvedValue({ preflight });
+      checkSSH.mockRejectedValueOnce(new ConnectError("ssh_key_passphrase_required", Code.FailedPrecondition)).mockResolvedValue({ preflight: pre });
       startNodeProvision.mockResolvedValue(queued);
       getNodeProvision.mockReturnValue(new Promise(() => {}));
       await toLogin();
-      expect([...document.querySelectorAll("[role=radio]")].map((r) => r.textContent)).toEqual(["Panel key", "Password", "Own key"]);
+      expect([...document.querySelectorAll(".an-ws [role=radio]")].map((r) => r.textContent)).toEqual(["Panel key", "Password", "Own key"]);
       expect(checked("Panel key")).toBe(true);
 
       await click(radio("Own key"));
@@ -424,11 +492,11 @@ describe("the add-node window", () => {
       expect(keyField()).toBeNull(); // the field goes once the key is in: nothing on screen holds it
       expect(document.body.innerHTML).not.toContain("b3BlbnNzaC1rZXktdjE");
 
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Continue"));
       await settle();
       expect(checkSSH).toHaveBeenLastCalledWith({ host: "nl1.example.com", port: 22, fingerprint: "SHA256:server-key", password: "", usePanelKey: false, privateKey: ownKey, username: "root" });
-      // the server asked for the passphrase: its field, no error
+      // the server asked for the passphrase: its field, no error, and the window is back on the login
       expect(document.querySelector("[role=alert]")).toBeNull();
       const phrase = document.querySelector<HTMLInputElement>('input[type="password"]');
       expect(phrase).not.toBeNull();
@@ -437,9 +505,9 @@ describe("the add-node window", () => {
       await click(button("Continue"));
       await settle();
       expect(checkSSH).toHaveBeenLastCalledWith(expect.objectContaining({ password: "", usePanelKey: false, privateKey: ownKey, privateKeyPassphrase: "correct horse" }));
-      expect(text()).toContain("Server checks passed");
+      expect(text()).toContain(en["win.node.chkOk"]);
 
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Start installation"));
       await settle();
       expect(startNodeProvision).toHaveBeenCalledWith(
@@ -462,10 +530,8 @@ describe("the add-node window", () => {
       await settle();
       await click(button("open"));
       await settle();
-      await click(button("Install automatically over SSH"));
-      await type(input("de1.example.com"), "nl1.example.com");
-      await click(button("Check server"));
-      await settle();
+      await fillServer("nl1.example.com", "nl1");
+      await probe();
       expect(checked("Password")).toBe(true);
       await click(radio("Own key"));
       expect(text()).not.toContain(en["node.ssh.ownKeyLoaded"]);
@@ -473,17 +539,17 @@ describe("the add-node window", () => {
     });
 
     it("retries an own-key install only with the key given again, and words the server refusing it", async () => {
-      checkSSH.mockResolvedValue({ preflight });
+      checkSSH.mockResolvedValue({ preflight: pre });
       startNodeProvision.mockResolvedValue(queued);
-      getNodeProvision.mockResolvedValue({ job: { ...queued.job, state: "failed", phase: "connecting", errorCode: "ssh_authentication_failed" } });
+      getNodeProvision.mockResolvedValue({ job: { ...queued.job, state: "failed", phase: "failed", errorCode: "ssh_authentication_failed" } });
       retryNodeProvision.mockResolvedValue({});
       await toLogin();
       await click(radio("Own key"));
       await type(keyField()!, ownKey);
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Continue"));
       await settle();
-      await toggle(hostKeyBox());
+      await click(box(0));
       await click(button("Start installation"));
       await settle();
       await settle();
@@ -498,24 +564,20 @@ describe("the add-node window", () => {
   });
 
   const job = { id: "prv_1", nodeId: "nod_1", name: "de1", errorCode: "" };
-  async function startInstall() {
+  async function startInstall(over: Partial<typeof preflight & { nftables: boolean }> = {}) {
     getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
-    checkSSH.mockResolvedValue({
-      preflight: { distribution: "Ubuntu", version: "22.04", architecture: "amd64", cpuCount: 2, memoryBytes: 1n, diskAvailableBytes: 1n, systemd: true, panelReachable: true },
-    });
+    checkSSH.mockResolvedValue({ preflight: { distribution: "Ubuntu", version: "22.04", architecture: "amd64", cpuCount: 2, memoryBytes: 1n, diskAvailableBytes: 1n, systemd: true, panelReachable: true, nftables: true, ...over } });
     startNodeProvision.mockResolvedValue({ job: { ...job, state: "queued", phase: "queued" } });
     await open();
-    await click(button("Install automatically over SSH"));
-    await type(input("de1.example.com"), "de1.example.com");
-    await click(button("Check server"));
-    await settle();
+    await fillServer();
+    await probe();
     const password = () => document.querySelector<HTMLInputElement>('input[type="password"]')!;
     await type(password(), "check-only-secret");
-    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(box(0));
     await click(button("Continue"));
     await settle();
     await type(password(), "install-secret");
-    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(box(0));
     await click(button("Start installation"));
     await settle();
     await settle();
@@ -526,36 +588,45 @@ describe("the add-node window", () => {
     await startInstall();
     expect(text()).toContain("inspect the server before retrying");
     expect(button("Retry installation")).toBeDefined();
+    expect(text()).not.toContain(en["win.node.serverUntouched"]); // the server may have been changed
   });
 
-  it("stacks the footer on a phone: every button full width and free to wrap its label", async () => {
-    getNodeProvision.mockReturnValue(new Promise(() => {}));
-    await startInstall();
-    const close = button("Close; keep running in background")!;
-    for (const cls of ["max-sm:w-full", "max-sm:whitespace-normal", "max-sm:h-auto"]) expect(close.className).toContain(cls);
-    expect(close.parentElement!.className).toContain("flex-col-reverse");
-  });
-
-  it("words the worker's phases and shows a completed install with a way to the node", async () => {
+  it("words the worker's phases, follows them down the list and shows a completed install with a way to the node", async () => {
     getNodeProvision.mockResolvedValueOnce({ job: { ...job, state: "running", phase: "transfer" } });
+    listNodeProvisionEvents.mockResolvedValue({ events: [{ id: 1, phase: "connecting" }, { id: 2, phase: "preflight" }, { id: 3, phase: "firewall" }, { id: 4, phase: "transfer" }] });
     await startInstall();
-    expect(text()).toContain("Sending the agent");
+    // the stage that runs, the ones behind it done, the ones ahead waiting
+    expect(document.querySelector(".an-sg li.now")?.textContent).toContain("Sending the agent");
+    expect([...document.querySelectorAll(".an-sg li.done")].map((l) => l.querySelector("b")?.textContent)).toEqual(["Connecting over SSH", "Checking the server", "Adding the panel key to the server", "Preparing the host firewall"]);
+    expect(rail()[3]).toContain("stage 5 of 8"); // a password install adds the panel key, nftables was there, so no step for it
     expect(text()).not.toContain("transfer");
 
     // the backend's terminal state is "completed" (store.CompleteNodeProvisionJob)
     getNodeProvision.mockResolvedValue({ job: { ...job, state: "completed", phase: "completed" } });
-    await act(async () => void (await new Promise((r) => setTimeout(r, 2_600))));
+    await wait(2_600);
     await settle();
     expect(text()).toContain("Node installed and connected");
-    expect(text()).not.toContain("Installing");
+    expect(rail()[3]).toContain(en["win.node.connected"]);
     const calls = getNodeProvision.mock.calls.length;
-    await act(async () => void (await new Promise((r) => setTimeout(r, 2_600))));
+    await wait(2_600);
     expect(getNodeProvision.mock.calls.length).toBe(calls); // no more polling once it is done
+    expect(text()).toContain(en["win.node.noProfiles"]); // the next thing is a profile
     await click(button("Open node"));
     expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_1" } });
   }, 10_000);
 
-  it("opens step-up for the SSH modal and retries the credential check after confirmation", async () => {
+  it("has a stage of its own for the nftables package when the server has none, and where it stopped", async () => {
+    getNodeProvision.mockResolvedValue({ job: { ...job, state: "failed", phase: "failed", errorCode: "nftables_install_failed" } });
+    listNodeProvisionEvents.mockResolvedValue({ events: [{ id: 1, phase: "connecting" }, { id: 2, phase: "preflight" }, { id: 3, phase: "nftables" }] });
+    await startInstall({ nftables: false });
+    const stages = [...document.querySelectorAll(".an-sg li")].map((l) => l.querySelector("b")?.textContent);
+    expect(stages).toContain("Installing nftables");
+    expect(stages.indexOf("Installing nftables")).toBeLessThan(stages.indexOf("Preparing the host firewall")); // before the firewall step, as the worker does
+    expect(document.querySelector(".an-sg li.err")?.textContent).toContain("Installing nftables");
+    expect(text()).toContain("The server has no nft command and the panel could not install the nftables package");
+  });
+
+  it("opens step-up for the SSH window and retries the credential check after confirmation", async () => {
     getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
     checkSSH
       .mockRejectedValueOnce(
@@ -563,86 +634,122 @@ describe("the add-node window", () => {
           { desc: StepUpRequiredSchema, value: { passkey: false, totp: true } },
         ]),
       )
-      .mockResolvedValue({
-        preflight: {
-          distribution: "Ubuntu",
-          version: "22.04",
-          kernel: "6.8.0",
-          architecture: "amd64",
-          cpuCount: 2,
-          memoryBytes: 2_147_483_648n,
-          diskAvailableBytes: 10_737_418_240n,
-          systemd: true,
-          alreadyEnrolled: false,
-          panelReachable: true,
-        },
-      });
+      .mockResolvedValue({ preflight: { ...preflight, nftables: true } });
     finishStepUp.mockResolvedValue({ stepUpUntilUnix: 1n });
 
     await open();
-    await click(button("Install automatically over SSH"));
-    await type(input("de1.example.com"), "de1.example.com");
-    await click(button("Check server"));
-    await settle();
+    await fillServer();
+    await probe();
     await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "check-only-secret");
-    await toggle(document.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(box(0));
     await click(button("Continue"));
     await settle();
 
     expect(text()).toContain("Confirm it is you");
+    expect(text()).toContain("Check the server de1.example.com over SSH"); // what is being allowed
     const code = document.querySelector<HTMLInputElement>('input[autocomplete="one-time-code"]');
     expect(code).not.toBeNull();
     await type(code!, "123456");
     await click(button("Confirm"));
     await settle();
+    await wait(400); // the window says "Confirmed" for a moment, then the call goes on
 
     expect(finishStepUp).toHaveBeenCalledWith({ totpCode: "123456" });
     expect(checkSSH).toHaveBeenCalledTimes(2);
-    expect(text()).toContain("Server checks passed");
+    expect(text()).toContain(en["win.node.chkOk"]);
   });
 
-  it("keeps a refusal in the window, above its buttons", async () => {
-    createEnrollment.mockRejectedValue(new ConnectError("name_taken", Code.AlreadyExists));
-    await open();
-    await manual();
-    await type(input("de1"), "de1");
-    await type(input("de1.example.com"), "de1.example.com");
-    await click(button("Create install command"));
-    await settle();
-    await settle();
-    expect(document.querySelector("[role=alert]")?.textContent).toContain("This name is taken");
-    expect(button("Create install command")).toBeDefined(); // the form is still there
-  });
+  describe("by a command", () => {
+    it("says before the click that an IP gets no Let's Encrypt certificate, and what to do", async () => {
+      await open();
+      await byCommand();
+      expect(text()).toContain(en["win.node.cmdTitle"]);
+      expect(text()).toContain("you run it on the server as root");
+      expect(text()).toContain("A Let’s Encrypt certificate needs a domain with an A record");
+      expect(text()).toContain("Needed for DNS: on nodes in Russia the panel checks Yandex DNS and Gosuslugi, in China AliDNS, DNSPod and Baidu.");
+      await type(input("de1.example.com"), "203.0.113.10");
+      expect(text()).toContain("This is an IP, not a domain.");
+      expect(text()).toContain("Happ is not verified yet");
+      await type(input("de1.example.com"), "de1.example.com");
+      expect(text()).not.toContain("This is an IP, not a domain.");
+      expect(rail().map((s) => s.replace(/\d/, ""))).toEqual([en["win.node.cmdStep1"], en["win.node.cmdStep2"], en["win.node.cmdStep3"]]);
+    });
 
-  it("gives three steps: the ready scp from the panel, the one-line command as the main button, the live wait", async () => {
-    getNode.mockReturnValue(new Promise(() => {})); // the agent has not come yet
-    await issue();
-    const steps = [...document.querySelectorAll("ol > li")].map((li) => li.textContent ?? "");
-    expect(steps).toHaveLength(3);
-    expect(steps[0]).toContain("Put mistgate-node on the server");
-    expect(steps[0]).toContain("scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@de1.example.com:/root/mistgate-node");
-    expect(steps[0]).toContain("Run it on the panel’s server");
-    expect(steps[1]).toContain("chmod +x /root/mistgate-node");
-    expect(steps[1]).toContain("The command works once, until");
-    expect(button("Copy the command")?.className).toContain("bg-accent");
-    expect(steps[2]).toContain("Waiting for the node to connect");
-    expect(text()).not.toContain("Shown only once"); // the old banner is gone; the fingerprint is under Details
-    expect(document.querySelector("details")?.textContent).toContain("sha256:ab");
-  });
+    it("keeps a refusal in the window, above its buttons", async () => {
+      createEnrollment.mockRejectedValue(new ConnectError("name_taken", Code.AlreadyExists));
+      await open();
+      await byCommand();
+      await type(input("de1"), "de1");
+      await type(input("de1.example.com"), "de1.example.com");
+      await click(button("Get install command"));
+      await settle();
+      await settle();
+      expect(document.querySelector("[role=alert]")?.textContent).toContain("This name is taken");
+      expect(button("Get install command")).toBeDefined(); // the form is still there
+    });
 
-  it("without a trusted bundle says where the binary comes from", async () => {
-    getNode.mockReturnValue(new Promise(() => {}));
-    await issue({ copyCommand: "" });
-    expect(document.querySelector("ol > li")?.textContent).toContain("Take mistgate-node from the same release as the panel and put it at /root/mistgate-node.");
-  });
+    it("sends the country picked from the list with the name and the address", async () => {
+      createEnrollment.mockResolvedValue(issued());
+      getNode.mockReturnValue(new Promise(() => {}));
+      await open();
+      await byCommand();
+      await type(input("de1"), "de1");
+      await type(input("de1.example.com"), "de1.example.com");
+      await click(document.querySelector(".an-sel"));
+      await settle();
+      await type(document.querySelector<HTMLInputElement>(`input[placeholder="${en["win.node.findCountry"]}"]`)!, "germ");
+      await click([...document.querySelectorAll("[role=option]")].find((o) => o.textContent?.includes("Germany")));
+      await settle();
+      await click(button("Get install command"));
+      await settle();
+      expect(createEnrollment).toHaveBeenCalledWith({ name: "de1", address: "de1.example.com", countryCode: "DE" });
+    });
 
-  it("once the node is connected, the next step is a profile on it", async () => {
-    getNode.mockResolvedValue({ node: { id: "nod_1", name: "de1", status: NodeStatus.ONLINE }, inbounds: [] });
-    await issue();
-    await settle();
-    expect(text()).toContain("Connected");
-    await click(button("Add a profile to de1"));
-    expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_1" }, search: { tab: "profiles" } });
+    it("gives three steps: the ready scp from the panel, the one-line command, the live wait", async () => {
+      getNode.mockReturnValue(new Promise(() => {})); // the agent has not come yet
+      await issue();
+      const steps = [...document.querySelectorAll("ol.an-ms > li")].map((li) => li.textContent ?? "");
+      expect(steps).toHaveLength(3);
+      expect(steps[0]).toContain("Put mistgate-node on the server");
+      expect(steps[0]).toContain("scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@de1.example.com:/root/mistgate-node");
+      expect(steps[0]).toContain("Run it on the panel’s server");
+      expect(steps[1]).toContain("chmod +x /root/mistgate-node");
+      expect(steps[1]).toContain("The command works once, until");
+      expect(button("Copy the command")).toBeDefined();
+      expect(steps[2]).toContain("Waiting for the node to connect");
+      expect(text()).not.toContain("Shown only once"); // the old banner is gone; the fingerprint is behind "Details"
+      expect(text()).not.toContain("sha256:ab");
+      await click(button("Details"));
+      expect(text()).toContain("sha256:ab");
+      expect(rail()[1]).toContain(en["win.node.expires"].replace("{time}", "")); // the rail keeps how long the command lives
+      // both ways to install are locked once a node is waiting: a second one would be a second node
+      expect(radio("Over SSH")?.getAttribute("aria-disabled")).toBe("true");
+    });
+
+    it("issues a new command for the same node, not for a new one", async () => {
+      getNode.mockReturnValue(new Promise(() => {}));
+      await issue();
+      createEnrollment.mockResolvedValue(issued({ installCommand: "second --token tok2" }));
+      await click(button("New install command"));
+      await settle();
+      expect(createEnrollment).toHaveBeenLastCalledWith({ nodeId: "nod_1" });
+      expect(text()).toContain("second --token tok2");
+    });
+
+    it("without a trusted bundle says where the binary comes from", async () => {
+      getNode.mockReturnValue(new Promise(() => {}));
+      await issue({ copyCommand: "" });
+      expect(document.querySelector("ol.an-ms > li")?.textContent).toContain("Take mistgate-node from the same release as the panel and put it at /root/mistgate-node.");
+    });
+
+    it("once the node is connected, the next step is a profile on it", async () => {
+      getNode.mockResolvedValue({ node: { id: "nod_1", name: "de1", status: NodeStatus.ONLINE }, inbounds: [] });
+      await issue();
+      await settle();
+      expect(text()).toContain(en["node.ssh.done"]);
+      await click(button(en["win.node.addProfile"]));
+      expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_1" }, search: { tab: "profiles" } });
+    });
   });
 });
 
@@ -694,13 +801,12 @@ describe("why an SSH install failed", () => {
   it("offers the manual command after a refusal of the target", async () => {
     getSSHFingerprint.mockRejectedValue(new ConnectError("ssh_target_refused", Code.FailedPrecondition));
     await open();
-    await click(button("Install automatically over SSH"));
-    await type(input("de1.example.com"), "de1.example.com");
-    await click(button("Check server"));
-    await settle();
+    await fillServer();
+    await probe();
     expect(text()).toContain(en["node.ssh.error.refused"]);
     await click(button("Use the manual command"));
     await settle();
-    expect(document.querySelector('input[placeholder="de1"]')).not.toBeNull(); // the manual form
+    expect(checked("By command")).toBe(true);
+    expect(text()).toContain(en["win.node.cmdTitle"]); // the form by command
   });
 });

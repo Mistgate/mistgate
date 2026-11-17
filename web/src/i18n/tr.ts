@@ -39,6 +39,7 @@ import { tr as trusttunnelTr } from "./trusttunnel";
 import { tr as shellTr } from "./shell";
 import { tr as nodesviewTr } from "./nodesview";
 import { tr as overviewTr } from "./overview";
+import { tr as windowsTr } from "./windows";
 
 // Turkish (tr). Typed against the English shape: a missing or extra key fails `pnpm typecheck`.
 // The admin speaks to the owner as «sen» (İstersen…, ajanı güncelle, emin misin?); buttons and tabs are short imperatives
@@ -121,15 +122,15 @@ const core: CoreMessages = {
   "health.okShort": "Her şey yolunda",
   "health.problems": "{n} sorun",
   "palette.title": "Komut paleti",
-  "palette.placeholder": "Düğüm, kullanıcı, bölüm…",
+  "palette.placeholder": "Düğüm, kişi, bölüm veya işlem",
   "palette.empty": "Hiçbir şey bulunamadı",
   "palette.searching": "Aranıyor…",
-  "palette.nodes": "DÜĞÜMLER",
-  "palette.users": "KULLANICILAR",
-  "palette.places": "BÖLÜMLER",
-  "palette.actions": "İŞLEMLER",
+  "palette.nodes": "Düğümler",
+  "palette.users": "Kişiler",
+  "palette.places": "Bölümler",
+  "palette.actions": "İşlemler",
   "palette.addNode": "Düğüm ekle",
-  "palette.createUser": "Yeni kullanıcı",
+  "palette.createUser": "Kişi ekle",
   "palette.newToken": "Yeni API token'ı",
   "palette.newProfile": "Yeni profil",
   "palette.approvals": "Onaylar",
@@ -181,11 +182,11 @@ const core: CoreMessages = {
   "auth.next": "İleri",
   "auth.setup.adminTitle": "Yöneticiyi oluştur",
   "auth.setup.adminBody": "En iyisi geçiş anahtarı: parmak izi ya da Face ID ile giriş yaparsın, parola yok. Anahtar yalnızca cihazında durur.",
-  "auth.login": "KULLANICI ADI",
-  "auth.password": "PAROLA",
-  "auth.code": "DOĞRULAYICI KODU",
+  "auth.login": "Kullanıcı adı",
+  "auth.password": "Parola",
+  "auth.code": "Doğrulayıcı kodu",
   "auth.createPasskey": "Geçiş anahtarı oluştur",
-  "auth.waitingPasskey": "Cihazından onay bekleniyor…",
+  "auth.waitingPasskey": "Geçiş anahtarı bekleniyor",
   "auth.setup.passkeyHint": "Tarayıcı parmak izi, yüz ya da PIN isteyecek",
   "auth.setup.otherWay": "parola + doğrulayıcı kodu",
   "auth.setup.totpScan": "Google Authenticator, 1Password veya Aegis ile tara",
@@ -203,7 +204,7 @@ const core: CoreMessages = {
   "auth.recover.submit": "Girişi sıfırla",
   "auth.recover.doneTitle": "Yeni giriş bilgileri",
   "auth.recover.doneBody": "{admin} için. Parolayı şimdi kaydet ve QR kodunu şimdi tara.",
-  "auth.recover.password": "YENİ PAROLA",
+  "auth.recover.password": "Yeni parola",
   "auth.recover.onceTitle": "Yalnızca bir kez gösterilir.",
   "auth.recover.onceBody": "Sayfa yenilenirse ya da sayfadan ayrılırsan bir daha gösterilemez.",
   "auth.recover.nextTitle": "Sonraki adım",
@@ -300,4 +301,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "IP adresi için Let’s Encrypt sertifikası henüz yok: bir alan adı ya da kendi imzalı sertifikayı seç",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...shellTr, ...overviewTr, ...nodesviewTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...shellTr, ...overviewTr, ...nodesviewTr, ...windowsTr };

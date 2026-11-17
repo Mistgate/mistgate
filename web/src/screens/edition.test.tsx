@@ -215,8 +215,9 @@ describe("Add node on the edge", () => {
   it("offers the SSH install next to the manual command, with no notice", async () => {
     await openAddNode();
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
-    expect(buttons()).toContain("Install automatically over SSH");
-    expect(buttons()).toContain("Get a manual install command");
+    // the window offers both ways in its rail: over SSH (the page it opens on) and by a command
+    expect([...document.querySelectorAll("[role=radio]")].map((r) => r.textContent)).toEqual(["Over SSH", "By command"]);
+    expect(document.querySelector("[role=radio][aria-checked=true]")?.textContent).toBe("Over SSH");
   });
 });
 

@@ -39,6 +39,7 @@ import { fa as trusttunnelFa } from "./trusttunnel";
 import { fa as shellFa } from "./shell";
 import { fa as nodesviewFa } from "./nodesview";
 import { fa as overviewFa } from "./overview";
+import { fa as windowsFa } from "./windows";
 
 // Persian (fa, right to left). Typed against the English shape: a missing or extra key fails `pnpm typecheck`.
 // The admin speaks to the owner as «تو» in standard written Persian (اگر می‌خواهی…، ایجنت را به‌روز کن); buttons and tabs
@@ -120,7 +121,7 @@ const core: CoreMessages = {
   "health.okShort": "همه‌چیز خوب است",
   "health.problems": "{n} مشکل",
   "palette.title": "پالت فرمان",
-  "palette.placeholder": "نود، کاربر، بخش…",
+  "palette.placeholder": "نود، کاربر، بخش یا اقدام",
   "palette.empty": "چیزی پیدا نشد",
   "palette.searching": "در حال جستجو…",
   "palette.nodes": "نودها",
@@ -128,7 +129,7 @@ const core: CoreMessages = {
   "palette.places": "بخش‌ها",
   "palette.actions": "اقدام‌ها",
   "palette.addNode": "افزودن نود",
-  "palette.createUser": "کاربر جدید",
+  "palette.createUser": "افزودن کاربر",
   "palette.newToken": "توکن API جدید",
   "palette.newProfile": "پروفایل جدید",
   "palette.approvals": "تأییدیه‌ها",
@@ -184,7 +185,7 @@ const core: CoreMessages = {
   "auth.password": "رمز عبور",
   "auth.code": "کد برنامهٔ احراز هویت",
   "auth.createPasskey": "ساخت کلید عبور",
-  "auth.waitingPasskey": "در انتظار دستگاهت…",
+  "auth.waitingPasskey": "در انتظار کلید عبور",
   "auth.setup.passkeyHint": "مرورگر اثر انگشت، چهره یا PIN می‌خواهد",
   "auth.setup.otherWay": "رمز عبور + کد برنامهٔ احراز هویت",
   "auth.setup.totpScan": "با Google Authenticator، 1Password یا Aegis اسکن کن",
@@ -299,4 +300,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "گواهی Let’s Encrypt برای نشانی IP هنوز در دسترس نیست: دامنه یا گواهی خودامضا را انتخاب کن",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...shellFa, ...overviewFa, ...nodesviewFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...shellFa, ...overviewFa, ...nodesviewFa, ...windowsFa };

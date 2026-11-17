@@ -1,0 +1,60 @@
+/*
+ * The confirm window's ring (pn.css .cfm-o): a disc with the fingerprint and two rings that go out from it while the passkey is
+ * awaited; the disc fills when it is done and turns red when it failed. The values are the board's.
+ */
+.cfm-o {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 12px;
+}
+.cfm-o i {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px solid var(--accent-mark);
+  opacity: 0;
+}
+.cfm-o.on i {
+  animation: wn-ring 1.6s var(--e) infinite;
+}
+.cfm-o.on i:nth-child(2) {
+  animation-delay: 0.8s;
+}
+.cfm-o span {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--tone-mint-bg);
+  color: var(--accent-mark);
+  box-shadow: 0 0 0 1px var(--accent-line);
+  transition:
+    background-color 0.35s var(--e),
+    color 0.35s var(--e),
+    transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+:root[data-theme="light"] .cfm-o span {
+  color: var(--accent-text);
+}
+.cfm-o.ok span,
+:root[data-theme="light"] .cfm-o.ok span {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  transform: scale(1.06);
+}
+.cfm-o.ok svg {
+  stroke-width: 2;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: wn-draw 0.4s var(--e) 0.1s forwards;
+}
+.cfm.err .cfm-o span {
+  background: var(--danger-soft);
+  color: var(--danger);
+  box-shadow: none;
+}
