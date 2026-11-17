@@ -116,7 +116,7 @@ function plainOf(nodes: Inline[]): string {
     .join("");
 }
 
-function renderInline(nodes: Inline[]): ReactNode[] {
+export function renderInline(nodes: Inline[]): ReactNode[] {
   return nodes.map((n, i) => {
     switch (n.kind) {
       case "text":

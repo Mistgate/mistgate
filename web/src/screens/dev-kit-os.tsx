@@ -14,7 +14,6 @@ import { meQuery } from "@/lib/session";
 import { OsCard } from "@/screens/node/os-card";
 import { ServerTab } from "@/screens/node/server";
 import { baseNode, facts, inbound, metrics, Mock, nodeFill } from "@/screens/dev-kit-node";
-import { OsRowMenu } from "@/screens/updates/os-actions";
 import { OsConfirmDialog, type OsDialogMode } from "@/screens/updates/os-confirm";
 import { OsSection } from "@/screens/updates/os";
 
@@ -22,8 +21,8 @@ import { OsSection } from "@/screens/updates/os";
 // in each state, on made-up data: updates waiting, a job running (installing, rebooting), a stopped run with its reason and
 // Close, an old agent, an offline node, a finished run, nothing to install; a green node with ordinary packages waiting, a reboot
 // that is not possible yet, the check that waits for named profiles, a refusal that closed itself. The calls are answered here and nothing goes to
-// the network. ?dialog=install|reboot|warn opens the confirmation window in its own block; ?menu=open shows the ⋯ menu of a
-// table row open (an open menu holds the page still, so it is not open by default and comes first); ?lang=ru|fa|zh|tr is the page's.
+// the network. ?dialog=install|reboot|warn opens the confirmation window in its own block; ?row=open shows a
+// table row open (the actions of a node, and why they are off), first; ?lang=ru|fa|zh|tr is the page's.
 
 // ?lang=ru|fa|zh|tr|en switches the page's language (kept in this browser, like the picker)
 const wantedLang = new URLSearchParams(location.search).get("lang");
@@ -212,7 +211,7 @@ export function Shot({ id, title, data, children }: { id: string; title: string;
       <QueryClientProvider client={qc}>
         <ToastProvider>
           <StepUpProvider>
-            <div className="flex flex-col gap-3.5">{children}</div>
+            <div className="uq">{children}</div>
           </StepUpProvider>
         </ToastProvider>
       </QueryClientProvider>
@@ -256,12 +255,9 @@ export function OsKit() {
   const confirmData = dialog === "warn" ? scenes.warnings : scenes.available;
   return (
     <div className="flex flex-col gap-8">
-      {params.get("menu") === "open" && (
-        <Shot id="os-menu-open" title="The ⋯ menu of a table row (?menu=open): nl1 is busy, so installing and rebooting are off with the reason" data={scenes.menu}>
-          <div className="flex min-h-72 items-start justify-between gap-3 rounded-card border border-line bg-surface p-3.5">
-            <b className="text-sm">nl1</b>
-            <OsRowMenu row={osRows(scenes.menu)[1]!} defaultOpen />
-          </div>
+      {params.get("row") === "open" && (
+        <Shot id="os-row-open" title="The row of a node opened (?row=open): nl1 is busy, so installing and rebooting are off with the reason" data={scenes.menu}>
+          <OsSection defaultOpenNames={["nod_nl1"]} />
         </Shot>
       )}
       <Shot id="os-available" title="de1: 12 packages (4 security) and a new kernel wait, 5 people online" data={scenes.available}>

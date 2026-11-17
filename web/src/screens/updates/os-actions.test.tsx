@@ -555,16 +555,6 @@ describe("a reboot that is not possible yet", () => {
     expect(text()).not.toContain("Reboot possible in");
   });
 
-  it("is said in the \u22ef menu of a table row too", async () => {
-    const { OsRowMenu } = await import("./os-actions");
-    await mount(<OsRowMenu row={rowOf(data([node({ ...waitFor, onlineUsers: 0 })]))} defaultOpen />);
-    await settle();
-    const items = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")];
-    const reboot = items.find((i) => i.textContent?.startsWith("Reboot"));
-    expect(reboot?.hasAttribute("data-disabled")).toBe(true);
-    expect(reboot?.textContent).toContain("Reboot possible in 12 min");
-  });
-
   it("asks an install for no reboot by default, and says why", async () => {
     await mount(actions(data([node(waitFor)])));
     await click(button("Install updates\u2026"));

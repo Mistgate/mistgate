@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button, buttonClass } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
@@ -12,13 +12,14 @@ import { useT } from "@/i18n";
 import { backups } from "@/lib/api";
 import { BackupDownloadError, backupFileName, downloadBackup, lastDownload } from "@/lib/backup-download";
 import { asChannel, type Channel } from "@/lib/channels";
-import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { plain } from "@/lib/plain";
 import type { UpdateActions, Updates } from "@/lib/updates";
-import { ChannelChip } from "./channel";
+import { G } from "@/screens/users/user-bits";
+import { D } from "./bits";
+import { channelName } from "./channel";
 
 // The window before the panel updates itself (ADR 0012): what happens, then a backup — to Cloudflare R2 when the owner set
 // it up, and a file on this computer in any case — and Update. Nothing blocks the update but a backup to R2 that is still
@@ -38,23 +39,6 @@ export type BackupView = {
 };
 
 const day = 24 * 3600;
-
-function Row({ icon, tone, title, line, lineTone, action, children }: { icon: IconName; tone: Tone; title: string; line: ReactNode; lineTone?: "ok" | "bad"; action?: ReactNode; children?: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 rounded-field border border-line bg-surface-2 p-3.5">
-      {/* on a narrow screen the action goes under the words instead of squeezing them */}
-      <div className="flex flex-wrap items-center gap-3">
-        <IconChip icon={icon} tone={tone} size={30} />
-        <div className="flex min-w-[11rem] flex-1 flex-col gap-0.5">
-          <span className="text-[13px] font-bold">{title}</span>
-          <span className={cx("text-xs leading-snug text-pretty", lineTone === "ok" ? "text-ok-text" : lineTone === "bad" ? "text-danger-text" : "text-muted")}>{line}</span>
-        </div>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
 
 /**
  * The passphrase of a downloaded backup when Settings → Backups has no recovery key: made up for this file alone, typed
@@ -148,121 +132,101 @@ export function UpdatePanelDialog({
           ? t("up.dlg.r2.last", { ago: fmt.ago(backup.lastSuccessUnix) })
           : t("up.dlg.r2.never");
   const r2Tone = backup.r2 && !backup.running ? (backup.lastErrorCode ? "bad" : now - backup.lastSuccessUnix < 600 ? "ok" : undefined) : undefined;
+  const downloaded = backup.downloadedUnix > 0 && now - backup.downloadedUnix < day;
 
   return (
     <Modal
       open={open}
       onOpenChange={(o) => !busy && onOpenChange(o)}
       title={t("up.dlg.title", { version: to.version })}
+      closeLabel={t("common.close")}
+      className="uq-dlg"
+      shot="updates-update-dialog"
       footer={
         <div className="flex w-full flex-col gap-3">
           {!fresh && <Notice tone="warn">{t("up.dlg.noFresh")}</Notice>}
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="md" disabled={!!busy} onClick={() => onOpenChange(false)}>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" size="lg" disabled={!!busy} onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
             </Button>
-            <Button variant="primary" size="md" disabled={!!busy || backup.running} title={backup.running ? t("up.dlg.waitBackup") : undefined} onClick={() => void act("update", onUpdate).then((ok) => ok && onOpenChange(false))}>
+            <Button
+              variant="primary"
+              size="lg"
+              disabled={!!busy || backup.running}
+              title={backup.running ? t("up.dlg.waitBackup") : undefined}
+              onClick={() => void act("update", onUpdate).then((ok) => ok && onOpenChange(false))}
+            >
               {backup.running ? t("up.dlg.waitBackup") : t("up.dlg.update")}
             </Button>
           </div>
         </div>
       }
     >
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-        <span>{t("up.dlg.now")}</span>
-        <span className="font-mono font-bold text-fg">{from.version}</span>
-        <ChannelChip channel={from.channel} />
-        <Icon name="chevronRight" size={12} aria-hidden />
-        <span className="font-mono font-bold text-fg">{to.version}</span>
-        {to.channel !== from.channel && <ChannelChip channel={to.channel} />}
-      </div>
-
-      <ul className="flex flex-col gap-2">
-        {(
-          [
-            ["refresh", "up.dlg.what.restart"],
-            ["server", "up.dlg.what.nodes"],
-            ["shield", "up.dlg.what.rollback"],
-          ] as const
-        ).map(([icon, key]) => (
-          <li key={key} className="flex items-start gap-2.5 text-[13px] leading-snug">
-            <Icon name={icon} size={15} className="mt-0.5 flex-none text-muted" aria-hidden />
-            <span className="text-pretty">{t(key)}</span>
-          </li>
-        ))}
-      </ul>
-
-      <section aria-labelledby="up-dlg-backup" className="flex flex-col gap-2">
-        <h3 id="up-dlg-backup" className="text-[11px] font-bold tracking-wide text-muted uppercase">
-          {t("up.dlg.backup")}
-        </h3>
-        <Row
-          icon="cloud"
-          tone="sky"
-          title={t("up.dlg.r2")}
-          line={r2Line}
-          lineTone={r2Tone}
-          action={
-            backup.r2 ? (
-              <Button variant="secondary" size="sm" disabled={!!busy || backup.running} onClick={() => void act("r2", onBackupR2)}>
-                {backup.running ? <Icon name="refresh" size={12} className="animate-spin" /> : null}
+      <div className="uq-db">
+        <div className="uq-fromto">
+          <span className="mono">{from.version}</span>
+          <G d={D.arrow} size={16} stroke={1.75} />
+          <b className="mono">{to.version}</b>
+          <em>{channelName(t, to.channel)}</em>
+        </div>
+        <ul className="uq-ul">
+          <li>{t("up.dlg.what.restart")}</li>
+          <li>{t("up.dlg.what.nodes")}</li>
+          <li>{t("up.dlg.what.rollback")}</li>
+        </ul>
+        <div className="uq-bk" role="group" aria-label={t("up.dlg.backup")}>
+          <span className="rw-sl">{t("up.dlg.backup")}</span>
+          <div>
+            <span>
+              <b>{t("up.dlg.r2")}</b>
+              <em className={r2Tone}>{r2Line}</em>
+            </span>
+            {backup.r2 ? (
+              <Button variant="secondary" size="md" disabled={!!busy || backup.running} onClick={() => void act("r2", onBackupR2)}>
+                {backup.running && <span className="an-sp" aria-hidden />}
                 {backup.running ? t("up.dlg.r2.running.short") : t("up.dlg.r2.now")}
               </Button>
             ) : (
               setUp
-            )
-          }
-        />
-        <Row
-          icon="laptop"
-          tone="lavender"
-          title={t("up.dlg.file")}
-          line={
-            backup.downloadedUnix > 0 && now - backup.downloadedUnix < day ? (
-              <>
-                <Icon name="check" size={11} className="me-1 inline" aria-hidden />
-                {t("up.dlg.file.done", { time: fmt.clock(backup.downloadedUnix) })}
-              </>
-            ) : (
-              // breaks only after its dashes: the panel, the version and the date stay whole
-              <span className="font-mono text-[11px]">
-                {fileName.split("-").map((part, i, all) => (
-                  <span key={i}>
-                    {part}
-                    {i < all.length - 1 && (
-                      <>
-                        -<wbr />
-                      </>
-                    )}
-                  </span>
-                ))}
-              </span>
-            )
-          }
-          lineTone={backup.downloadedUnix > 0 && now - backup.downloadedUnix < day ? "ok" : undefined}
-          action={
-            !passOpen && (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!!busy}
-                onClick={() => (backup.recipient ? void act("file", () => onDownload()) : setPassOpen(true))}
-              >
-                <Icon name="arrowDown" size={12} />
+            )}
+          </div>
+          <div>
+            <span>
+              <b>{t("up.dlg.file")}</b>
+              {downloaded ? (
+                <em className="ok">
+                  <Icon name="check" size={11} className="me-1 inline" aria-hidden />
+                  {t("up.dlg.file.done", { time: fmt.clock(backup.downloadedUnix) })}
+                </em>
+              ) : (
+                // breaks only after its dashes: the panel, the version and the date stay whole
+                <em className="mono">
+                  {fileName.split("-").map((part, i, all) => (
+                    <span key={i}>
+                      {part}
+                      {i < all.length - 1 && (
+                        <>
+                          -<wbr />
+                        </>
+                      )}
+                    </span>
+                  ))}
+                </em>
+              )}
+            </span>
+            {!passOpen && (
+              <Button variant="secondary" size="md" disabled={!!busy} onClick={() => (backup.recipient ? void act("file", () => onDownload()) : setPassOpen(true))}>
                 {t("up.dlg.file.download")}
               </Button>
-            )
-          }
-        >
+            )}
+          </div>
           {passOpen && (
-            <PassphraseForm
-              busy={!!busy}
-              onCancel={() => setPassOpen(false)}
-              onDownload={(passphrase) => void act("file", () => onDownload(passphrase)).then((ok) => ok && setPassOpen(false))}
-            />
+            <div className="uq-bkx">
+              <PassphraseForm busy={!!busy} onCancel={() => setPassOpen(false)} onDownload={(passphrase) => void act("file", () => onDownload(passphrase)).then((ok) => ok && setPassOpen(false))} />
+            </div>
           )}
-        </Row>
-      </section>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -271,7 +235,7 @@ export function UpdatePanelDialog({
  * The window on the Updates page: reads the backup settings while it is open (following a running backup), backs up to R2,
  * saves a file, and installs exactly the release the owner saw.
  */
-export function PanelUpdateWindow({ open, onOpenChange, data, actions }: { open: boolean; onOpenChange: (open: boolean) => void; data: Updates; actions: UpdateActions }) {
+export function PanelUpdateWindow({ open, onOpenChange, data, actions, onStarted }: { open: boolean; onOpenChange: (open: boolean) => void; data: Updates; actions: UpdateActions; /** The install was accepted: the page follows the update from here. */ onStarted?: () => void }) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
@@ -334,7 +298,12 @@ export function PanelUpdateWindow({ open, onOpenChange, data, actions }: { open:
           return true;
         }, failed)
       }
-      onUpdate={() => actions.installPanel({ version: update.version, sha256: update.sha256 })}
+      onUpdate={() =>
+        actions.installPanel({ version: update.version, sha256: update.sha256 }).then((ok) => {
+          if (ok) onStarted?.();
+          return ok;
+        })
+      }
     />
   );
 }
