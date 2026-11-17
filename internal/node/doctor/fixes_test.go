@@ -64,6 +64,7 @@ type fixRig struct {
 	forward           *fakeForwardFixer
 	baseline          int
 	securityLaunches  int
+	nftLaunches       int
 	restarts          []string
 	warpReconnections int
 	warpRechecks      int
@@ -85,7 +86,7 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 	f.put("/proc/sys/net/ipv4/tcp_available_congestion_control", "cubic bbr\n")
 	f.put("/run/systemd/system/.keep", "")
 	f.put("/etc/os-release", "ID=ubuntu\n")
-	f.bin("apt-config")
+	f.bin("apt-config", "apt-get") // and no nft: the install_nftables fix has something to do
 	f.cmd(securityPackageQuery, "deinstall ok config-files", nil)
 	f.cmd(securityAPTConfig, "E='0'; L='0'; U='0';", nil)
 	f.cmd(securityTimers, "masked\ndisabled\n", nil)
@@ -114,6 +115,7 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 				return AwgBackend{Mode: "kernel", Name: "userspace", Available: true, Fallback: true, Reason: "the amneziawg kernel module is not loaded"}
 			}
 			e.AwgModuleRepair = func(context.Context) error { r.awgRepairs++; return nil }
+			e.LaunchInstallNftables = func(context.Context) error { r.nftLaunches++; return nil }
 			e.RestartInbound = func(_ context.Context, id string) (uint32, error) { r.restarts = append(r.restarts, id); return 1, nil }
 			e.Warp = func(context.Context) WarpInfo { return WarpInfo{Configured: true, State: "down"} }
 			e.ReconnectWarp = func(context.Context) (bool, error) { r.warpReconnections++; return true, nil }
@@ -151,7 +153,7 @@ func TestDryRunChangesNothing(t *testing.T) {
 			t.Errorf("%s dry run found nothing to do on a host that needs it: %+v", fix, out)
 		}
 	}
-	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 || r.warpReconnections != 0 || r.forward.applies != 0 || r.securityLaunches != 0 || r.awgRepairs != 0 {
+	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 || r.warpReconnections != 0 || r.forward.applies != 0 || r.securityLaunches != 0 || r.nftLaunches != 0 || r.awgRepairs != 0 {
 		t.Fatalf("a dry run acted: vacuum=%d set=%d baseline=%d restarts=%v warp_reconnects=%d forward_applies=%d security_launches=%d", r.fx.vacuum, r.fx.set, r.baseline, r.restarts, r.warpReconnections, r.forward.applies, r.securityLaunches)
 	}
 	if after := snapshot(t, r.f.root); after != before {

@@ -80,7 +80,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 `install`：
 
-1. 检查是否以 root 身份运行，以及状态目录中是否有身份信息。
+1. 检查是否以 root 身份运行、状态目录中是否有身份信息，以及服务器上是否有 `nft` 命令。它自己不安装任何软件包：没有 `nft` 时不会更改任何内容，只给出提示和要运行的命令（Debian 和 Ubuntu 上为 `apt-get install -y nftables`；Debian 13 云镜像不带它），并以退出码 3 结束。
 2. 将自身复制到 `/usr/local/bin/mistgate-node`。之后不再需要 `/root` 中的文件。
 3. 根据服务器内存写入加固过的服务单元 `/etc/systemd/system/mistgate-node.service`，然后运行 `systemctl daemon-reload`、`enable` 和 `restart`。
 
@@ -171,6 +171,7 @@ systemctl restart systemd-journald
 | 超时或 `connection refused` | 面板已停止、防火墙阻止到面板 TCP 443 的连接，或命令中的地址错误。 | 检查面板和防火墙；从节点运行 `curl -I https://panel.example.com/` 测试。 |
 | `already enrolled; use --force to replace the identity` | 状态目录中已有身份信息。 | 在 `enroll` 后添加 `--force`，或者先移除 `/var/lib/mistgate-node`。 |
 | `install: must run as root` | 当前用户不是 root。 | 以 root 身份运行命令。 |
+| `install: nft is not installed on this server`（退出码 3） | 缺少 `nftables` 软件包，Debian 13 云镜像就是如此。没有任何更改。 | 运行提示中给出的命令（`apt-get install -y nftables`），然后再次运行 `install`。 |
 | `holds no identity: run mistgate-node enroll first` | `enroll` 失败，或 `install` 使用了另一个 `--state-dir`。 | 在相同状态目录中重新运行 `enroll`。 |
 | 管理后台在**生成安装命令**后显示「未配置面板地址」 | 面板没有 Agent 地址：setup 未使用 `--public-url`，且 `serve` 没有 `--agent-addr`。 | 重启面板并传入 `--agent-addr panel.example.com:443`。 |
 

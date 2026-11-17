@@ -124,6 +124,11 @@ const (
 	CodeSecurityUpdatesEnabling     = "security_updates.enabling"
 	CodeSecurityUpdatesEnableFailed = "security_updates.enable_failed"
 	CodeSecurityUpdatesAutoReboot   = "security_updates.auto_reboot"
+	// nftables: reason
+	CodeNftablesOn            = "nftables.on"
+	CodeNftablesMissing       = "nftables.missing"
+	CodeNftablesInstalling    = "nftables.installing"
+	CodeNftablesInstallFailed = "nftables.install_failed"
 	// Any check: why it did not run. skip.unsupported has reason (English, from the host probe).
 	CodeSkipUnsupported = "skip.unsupported"
 	CodeSkipTimeout     = "skip.timeout"
@@ -150,6 +155,7 @@ var Codes = []string{
 	CodeUnitCurrent, CodeUnitOutdated, CodeUnitManual, CodeUnitOtherUnit, CodeUnitUnknown, CodeUnitRefreshFailed,
 	CodeSecurityUpdatesOn, CodeSecurityUpdatesNotInstalled, CodeSecurityUpdatesOff, CodeSecurityUpdatesNotAPT, CodeSecurityUpdatesNoSystemd,
 	CodeSecurityUpdatesEnabling, CodeSecurityUpdatesEnableFailed, CodeSecurityUpdatesAutoReboot,
+	CodeNftablesOn, CodeNftablesMissing, CodeNftablesInstalling, CodeNftablesInstallFailed,
 	CodeStealLoad, CodeStealCollecting, CodeConntrackFill, CodeConntrackNotLoaded, CodeFDsUsage, CodeFDsUnknown,
 	CodeSkipUnsupported, CodeSkipTimeout, CodeSkipInternal, CodeSkipUnknown,
 }

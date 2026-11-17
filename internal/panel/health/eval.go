@@ -785,7 +785,7 @@ func latest(ts ...time.Time) time.Time {
 
 // checkOrder is the fixed order of agent.proto "CHECK IDS"; unknown ids go after these, by name.
 var checkOrder = []string{"disk_space", "journald_size", "dstate_tasks", "time_sync", "resolver", "ipv6", "foreign_vpn", "foreign_nft",
-	"port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation", "security_updates", "cpu_steal", "conntrack_fill", "agent_fds"}
+	"port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation", "security_updates", "nftables", "cpu_steal", "conntrack_fill", "agent_fds"}
 
 func checkRank(id string) int {
 	for i, c := range checkOrder {

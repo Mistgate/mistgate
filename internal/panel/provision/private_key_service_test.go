@@ -52,7 +52,7 @@ func TestCheckSSHUsesOwnersPrivateKeyAndMapsPassphraseErrors(t *testing.T) {
 		return []byte(strings.Join([]string{
 			"distribution=ubuntu", "version=22.04", "kernel=6.8.0", "architecture=x86_64",
 			"cpu_count=4", "memory_bytes=1073741824", "disk_available_bytes=1073741824",
-			"systemd=yes", "already_enrolled=no", "existing_node_id=", "panel_reachable=yes", "",
+			"systemd=yes", "nftables=yes", "already_enrolled=no", "existing_node_id=", "panel_reachable=yes", "",
 		}, "\n")), nil
 	}
 	server := newFakeSSHD(t, loginMethods{key: true}, exec)

@@ -25,7 +25,7 @@ const capUnitRefresh = unit.CapabilityRefresh
 const capAwgFallback = "awg-fallback/1"
 
 // fixIDs are the fixes the agent has (agent.proto "FIX IDS"). A fix id anywhere else is ignored.
-var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit", "allow_forwarding", "enable_security_updates", "awg_module_repair"}
+var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit", "allow_forwarding", "enable_security_updates", "awg_module_repair", "install_nftables"}
 
 func knownFix(id string) string {
 	if slices.Contains(fixIDs, id) {

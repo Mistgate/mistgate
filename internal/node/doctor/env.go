@@ -87,6 +87,9 @@ type Env struct {
 	// LaunchSecurityUpdates starts the fixed transient root job that installs and enables unattended security updates.
 	// Nil means this agent cannot launch the job outside its service sandbox.
 	LaunchSecurityUpdates func(context.Context) error
+	// LaunchInstallNftables starts the fixed transient root job that installs the nftables package (nftinstall).
+	// Nil means this agent cannot launch it outside its service sandbox.
+	LaunchInstallNftables func(context.Context) error
 	// Warp is the WARP manager's view (warp_path check); nil = this build has no WARP manager.
 	Warp func(ctx context.Context) WarpInfo
 	// HostPath lists clashes of the host with the tunnel path (a routing table or rule preference another tool uses, a

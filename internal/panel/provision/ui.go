@@ -67,6 +67,7 @@ type preflightView struct {
 	Memory         uint64 // bytes
 	Disk           uint64 // bytes
 	Systemd        bool
+	Nftables       bool // the nft command is there; without it the install adds the nftables package as a step of its own
 	PanelReachable bool
 }
 
@@ -426,7 +427,7 @@ func makePreflightView(facts *adminv1.NodePreflight) *preflightView {
 	return &preflightView{
 		Distribution: facts.Distribution, Version: facts.Version, Kernel: facts.Kernel, Architecture: facts.Architecture,
 		CPUCount: facts.CpuCount, Memory: facts.MemoryBytes, Disk: facts.DiskAvailableBytes,
-		Systemd: facts.Systemd, PanelReachable: facts.PanelReachable,
+		Systemd: facts.Systemd, Nftables: facts.Nftables, PanelReachable: facts.PanelReachable,
 	}
 }
 
@@ -480,6 +481,8 @@ func phaseLabel(phase string) string {
 		return "Проверка сервера"
 	case "access":
 		return "Установка ключа панели"
+	case "nftables":
+		return "Установка nftables"
 	case "firewall":
 		return "Настройка firewall сервера"
 	case "transfer":
@@ -517,6 +520,8 @@ func eventLabel(phase, code string) string {
 		return "SSH-работа остановлена; состояние сервера нужно проверить"
 	case "checking_host":
 		return "Проверка сервера и SSH-ключа"
+	case "installing_nftables":
+		return "Установка пакета nftables на сервер (команды nft на нём нет)"
 	case "preparing_host_firewall":
 		return "Настройка активного firewall сервера"
 	case "uploading_agent":
@@ -627,6 +632,8 @@ func errorLabel(code string) string {
 		return "Панели не удалось безопасно продолжить это задание. Проверьте журналы панели."
 	case "node_retired":
 		return "Эта нода была выведена из эксплуатации и не может быть зарегистрирована повторно."
+	case "nftables_install_failed":
+		return "Не удалось установить пакет nftables: на сервере нет команды nft, а агенту она нужна для защиты SSH, прыжков по портам и WARP. Установите его вручную (apt-get install nftables) и повторите установку."
 	case "host_firewall_configuration_failed":
 		return "Не удалось настроить активный firewall на сервере. Проверьте права SSH-пользователя и правила UFW/firewalld, затем повторите установку. Firewall хостера настраивается отдельно."
 	case "agent_bundle_unavailable":

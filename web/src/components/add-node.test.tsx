@@ -266,6 +266,31 @@ describe("the add-node window", () => {
       await settle();
     }
 
+    async function toChecks(nftables: boolean) {
+      checkSSH.mockResolvedValue({ preflight: { ...preflight, nftables } });
+      await toLogin();
+      await toggle(hostKeyBox());
+      await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "check-only-secret");
+      await click(button("Continue"));
+      await settle();
+      expect(text()).toContain("Server checks passed");
+    }
+
+    it("says the install adds the nftables package when the server has no nft", async () => {
+      await toChecks(false);
+      expect(text()).toContain("nftables");
+      expect(text()).toContain("No, the install adds it");
+      expect(text()).toContain("The server has no nft command");
+      expect(text()).toContain("separate step before the firewall step");
+    });
+
+    it("shows nft as there, and no note, when the server has it", async () => {
+      await toChecks(true);
+      expect(text()).toContain("nftables");
+      expect(text()).not.toContain("No, the install adds it");
+      expect(text()).not.toContain("The server has no nft command");
+    });
+
     it("starts on the password while no node uses the panel key, and installs by key with no password anywhere", async () => {
       checkSSH.mockResolvedValue({ preflight });
       startNodeProvision.mockResolvedValue({ job: { id: "prv_2", nodeId: "nod_2", name: "nl1", state: "queued", phase: "queued", errorCode: "" } });
@@ -623,7 +648,7 @@ describe("the add-node window", () => {
 
 describe("why an SSH install failed", () => {
   const tOf = (dict: Record<string, string>) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dict[key]!, vars), { n: () => "" }) as unknown as T;
-  const codes = ["panel_unreachable", "agent_bundle_unavailable", "insufficient_resources", "insufficient_disk_space", "node_identity_mismatch", "node_identity_unreadable", "systemd_required"];
+  const codes = ["panel_unreachable", "agent_bundle_unavailable", "insufficient_resources", "insufficient_disk_space", "node_identity_mismatch", "node_identity_unreadable", "systemd_required", "nftables_install_failed"];
   it("names each preflight and job code in its own words, never as the generic error or the panel-address one", () => {
     for (const dict of [en, ru] as Record<string, string>[]) {
       const t = tOf(dict);

@@ -82,6 +82,15 @@ func (a *Agent) doctorEnv() doctor.Env {
 			return base(ctx)
 		}
 	}
+	e.LaunchInstallNftables = a.cfg.NftInstallLauncher
+	if base := a.cfg.NftInstallLauncher; base != nil {
+		e.LaunchInstallNftables = func(ctx context.Context) error {
+			if a.osJobActive() { // an OS job may be in the middle of dpkg
+				return unit.ErrBusy
+			}
+			return base(ctx)
+		}
+	}
 	e.AgentStartedAt = a.startedAt
 	e.ApplyBaseline = a.host.ApplyBaseline
 	e.RestartInbound = a.doctorRestart

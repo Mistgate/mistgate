@@ -80,7 +80,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 `install`:
 
-1. Checks that it runs as root and that the state directory holds an identity.
+1. Checks that it runs as root, that the state directory holds an identity and that the server has the `nft` command. It installs no package itself: without `nft` it changes nothing, says so, names the command to run (on Debian and Ubuntu `apt-get install -y nftables`; Debian 13 cloud images come without it) and ends with exit status 3.
 2. Copies itself to `/usr/local/bin/mistgate-node`. The file in `/root` is no longer needed.
 3. Writes the hardened unit `/etc/systemd/system/mistgate-node.service`, sized to the server's memory, then runs `systemctl daemon-reload`, `enable` and `restart`.
 
@@ -171,6 +171,7 @@ If you applied the doctor's resolver fix on that node, remove `/etc/systemd/reso
 | A timeout or `connection refused` | The panel is down, a firewall blocks TCP 443 to the panel, or the address in the command is wrong. | Check the panel and its firewall; test with `curl -I https://panel.example.com/` from the node. |
 | `already enrolled; use --force to replace the identity` | The state directory already holds an identity. | Add `--force` after `enroll`, or remove `/var/lib/mistgate-node` first. |
 | `install: must run as root` | Not root. | Run the command as root. |
+| `install: nft is not installed on this server` (exit status 3) | The `nftables` package is missing, as on cloud images of Debian 13. Nothing was changed. | Run the command the message names (`apt-get install -y nftables`), then run `install` again. |
 | `holds no identity: run mistgate-node enroll first` | `enroll` failed, or `install` got another `--state-dir`. | Run `enroll` again with the same state directory. |
 | The admin answers **Create install command** with "panel address is not configured" | The panel knows no address for agents: setup ran without `--public-url` and `serve` has no `--agent-addr`. | Restart the panel with `--agent-addr panel.example.com:443`. |
 

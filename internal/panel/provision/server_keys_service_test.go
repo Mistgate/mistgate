@@ -51,7 +51,7 @@ func TestServerKeyManagementAndAttachNodeServerAccess(t *testing.T) {
 		return []byte(strings.Join([]string{
 			"distribution=ubuntu", "version=22.04", "kernel=6.8.0", "architecture=x86_64",
 			"cpu_count=4", "memory_bytes=1073741824", "disk_available_bytes=1073741824",
-			"systemd=yes", "already_enrolled=yes", "existing_node_id=" + preflightNodeID, "panel_reachable=yes", "",
+			"systemd=yes", "nftables=yes", "already_enrolled=yes", "existing_node_id=" + preflightNodeID, "panel_reachable=yes", "",
 		}, "\n"))
 	}
 	server := newFakeSSHD(t, loginMethods{password: true, key: true}, func(command string, channel ssh.Channel) ([]byte, error) {

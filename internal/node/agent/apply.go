@@ -555,7 +555,10 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 	}
 	if err := a.host.SetPortHops(ctx, hops); err != nil {
 		a.hopsSet = false
-		a.log.Error("port hopping not installed", "code", "port_hop_sync_failed", "err", err)
+		if a.nftNote(err) != nil { // a missing nft is said once (nft.go), not at every sweep
+			a.log.Error("port hopping not installed", "code", "port_hop_sync_failed", "err", err)
+			a.event(pb.Severity_SEVERITY_ERROR, "hop_failed", "", map[string]string{"error": err.Error()})
+		}
 		for _, r := range results {
 			for _, h := range hops {
 				if h.InboundID == r.InboundId && r.Error == "" {
@@ -563,10 +566,10 @@ func (a *Agent) syncHops(ctx context.Context, next *model, results []*pb.Inbound
 				}
 			}
 		}
-		a.event(pb.Severity_SEVERITY_ERROR, "hop_failed", "", map[string]string{"error": err.Error()})
 		return nil
 	}
 	a.hops, a.hopsSet = hops, true
+	a.nftOK()
 	return hops
 }
 

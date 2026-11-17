@@ -1050,6 +1050,8 @@ export function manualSteps(i: DoctorItem): ManualStep[] {
     }
     case "foreign_nft":
       return [{ text: "hl.manual.foreign_nft", command: "nft list ruleset" }];
+    case "nftables":
+      return [{ text: "hl.manual.nftables", command: "apt-get install -y nftables" }];
     case "dstate_tasks":
       return [{ text: "hl.manual.reboot" }];
     case "cert_expiry":

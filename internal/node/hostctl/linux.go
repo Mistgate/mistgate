@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/node/nftmissing"
 	torrentlinux "github.com/mistgate/mistgate/internal/node/torrentguard/linux"
 	"github.com/mistgate/mistgate/internal/sysstat"
 )
@@ -390,7 +391,7 @@ func (h *linuxHost) nft(ctx context.Context, script string, quiet bool) error {
 			if quiet {
 				return nil
 			}
-			return fmt.Errorf("nft is not installed: %w", err)
+			return fmt.Errorf("%w: %w", nftmissing.ErrMissing, err)
 		}
 		return fmt.Errorf("nft: %w: %s", err, bytes.TrimSpace(out))
 	}

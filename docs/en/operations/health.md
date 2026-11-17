@@ -139,7 +139,7 @@ Whether the nodes open from inside a country (Russia by default) is checked by G
 
 ## Node doctor
 
-Every node agent runs 21 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
+Every node agent runs 22 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
 
 ### When it runs
 
@@ -176,6 +176,7 @@ Each item has one of four states: **OK**, **Attention** (a warning), **Problem**
 | WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it, or the tunnel is up but its latest check failed | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | Check WARP / reconnect if down, when the tunnel is down or its latest check failed |
 | Unit generation (`unit_generation`) | Whether the systemd unit running the agent matches this build. Skipped when the agent was started by hand. | The unit is older than this build | None | Refresh the service; the agent restarts and connections can drop for a few seconds |
 | Security updates (`security_updates`) | On Debian and Ubuntu, checks whether unattended-upgrades is installed, whether the effective APT::Periodic settings enable package-list updates and unattended upgrades, and whether both apt-daily timers are enabled and running. It only reads; it never runs an upgrade. On Debian, the package's default origin pattern can include stable point releases too. | The package is missing or a setting/timer is off | None | Turn on security updates, with owner confirmation (offered when the agent runs as root under systemd; otherwise the Doctor shows a manual command) |
+| nftables (`nftables`) | Whether the `nft` command is installed. A cloud image of Debian 13 ships without the nftables package, and then the SSH guard, port hopping, the WARP masquerade and the UDP delivery check cannot work: the node runs, but half of it does not. The agent also says so once, as the node event `nft_missing`, instead of one log line at every sweep, and `nft_restored` when it works again. | `nft` is missing, or the last install failed | None | Install nftables, with owner confirmation (offered when the agent runs as root under systemd on Debian or Ubuntu; otherwise the Doctor shows the manual command `apt-get install -y nftables`) |
 
 A node without IPv6 that runs WARP is fine: WARP uses its IPv4 endpoint, and the admin shows the IPv6 item as OK.
 
@@ -183,7 +184,7 @@ A warning or problem opens an alert (see "Kinds of alerts" below). The certifica
 
 ### Fixes
 
-There are exactly eight fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). `enable_security_updates` is the only fix that can install a package, and it requires owner confirmation. No fix deletes data.
+There are exactly ten fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). `enable_security_updates` and `install_nftables` are the only fixes that can install a package, and both require owner confirmation. No fix deletes data.
 
 | Button | What it does | Offered by |
 |---|---|---|
@@ -195,6 +196,7 @@ There are exactly eight fixes. They are compiled into the agent: the panel sends
 | Refresh the service | Runs the installed binary from a fixed transient systemd unit to write its compiled unit template, reload systemd and restart the agent. The node identity and state stay in place; connections can drop for a few seconds. | Unit generation; AmneziaWG backend when it reports `unit_outdated` |
 | Allow Mistgate forwarding | Adds tagged accepts at the start of each host `FORWARD` chain with policy `DROP`. They match only traffic that enters through a `mgawg*` tunnel (new connections from clients, except towards container bridges `docker*` and `br-*`), what leaves through `mgawg*` as part of a connection the client began (never a new connection towards a client; WARP-routed client traffic is covered the same way), and the DNAT flows to current Mistgate relay targets, both directions. Other traffic stays under the host firewall. The agent reasserts the rules during its sweep after firewall reloads and removes them on node retirement. | AmneziaWG backend when forwarded traffic is dropped |
 | Turn on security updates | Runs the compiled `host enable-security-updates` helper in a separate transient root systemd unit. It installs unattended-upgrades from the node's existing apt sources if missing, writes only disabled APT::Periodic settings to `/etc/apt/apt.conf.d/99mistgate-security-updates`, and unmasks, enables and starts the apt-daily timers on their usual schedule (a daily run missed while they were off does not start at once). It never runs `apt-get upgrade` or `unattended-upgrade`, reboots, changes `Automatic-Reboot` or edits `50unattended-upgrades`. It can take up to 20 minutes while another apt process holds the lock. | Security updates |
+| Install nftables | Runs the compiled `host install-nftables` helper in a separate transient root systemd unit (`mistgate-install-nftables`). It waits for another package manager to finish (up to 20 minutes), runs `apt-get install nftables` (once more after `apt-get update` if the first try fails) and installs nothing else. The agent is not restarted: it finds `nft` by itself at its next sweep, within a minute, and sets up the SSH guard, port hopping and WARP routing. If it fails, the check shows why and offers the fix again. | nftables |
 | Switch back to the module | Asks the node again whether the AmneziaWG module for the running kernel is loaded. If it is, the AmneziaWG profiles are rebuilt on the module and connected devices pause for up to about 20 seconds; if it is not, nothing changes and the node says to build it first. It builds and installs nothing. | AmneziaWG backend, on the userspace fallback |
 
 To undo this fix by hand, remove `/etc/apt/apt.conf.d/99mistgate-security-updates`. For each timer that was disabled before the fix, run `systemctl disable --now <timer>` (`apt-daily.timer` or `apt-daily-upgrade.timer`). If this fix installed unattended-upgrades, remove it with `apt-get remove unattended-upgrades`. The task's journal (`journalctl -u mistgate-security-updates`) records what it did.
@@ -354,6 +356,7 @@ The node's **History → Events** and the Overview's event feed keep a timeline 
 | "<profile>" passes the check again (…) | It closed as cleared or fixed. |
 | Possible BitTorrent attempt by … | The node's torrent protection blocked a flow that a client started and that it recognised as BitTorrent. A uTP SYN alone is not reported: it takes at least five of them to three destination ports from the same user and profile within 10 minutes; the other matches are reported at once. The line under it names the protocol, what the node matched and the destination port. The user is named only when the client's tunnel address belongs to exactly one account, otherwise it says "an unknown user". Neither the client's address nor the destination address is stored, only the port. See [Torrent protection](../guide/torrent-protection.md). |
 | updated to … / update failed / update rolled back | A rollout step ended. |
+| nft is not installed on the server … / nft is installed now … | The server has no `nft` command (written once, when the agent finds out), and the command is there again and the firewall steps went through. |
 
 A few warnings of the agent have no sentence of their own yet and are shown by their code, with the error text under it:
 

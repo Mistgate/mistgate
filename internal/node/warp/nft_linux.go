@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mistgate/mistgate/internal/node/nftmissing"
 	"github.com/vishvananda/netlink"
 )
 
@@ -51,7 +52,7 @@ func (p *linuxPlane) syncNft(ctx context.Context, rs routeSpec) (bool, error) {
 	}
 	if out, err := p.run(ctx, text, "nft", "-f", "-"); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			return false, errors.New("nft is not installed: masquerade for WARP cannot be set up")
+			return false, fmt.Errorf("%w: masquerade for WARP cannot be set up", nftmissing.ErrMissing)
 		}
 		return false, fmt.Errorf("nft: %s: %w", trimOut(out), err)
 	}

@@ -208,6 +208,7 @@ type fakeHost struct {
 	baselines int
 	hopCalls  [][]hostctl.Hop
 	hopErr    error
+	baseErr   error
 	udpCalls  [][]hostctl.UDPInboundPort
 	tcpCalls  [][]uint16
 	udpErr    error
@@ -226,8 +227,9 @@ func (h *fakeHost) Metrics() hostctl.Metrics {
 func (h *fakeHost) ApplyBaseline(context.Context) error {
 	h.mu.Lock()
 	h.baselines++
+	err := h.baseErr
 	h.mu.Unlock()
-	return nil
+	return err
 }
 func (h *fakeHost) SetPortHops(_ context.Context, hops []hostctl.Hop) error {
 	h.mu.Lock()

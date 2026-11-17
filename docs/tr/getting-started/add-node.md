@@ -80,7 +80,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 `install`:
 
-1. Root olarak çalıştığını ve durum dizininde bir kimlik bulunduğunu kontrol eder.
+1. Root olarak çalıştığını, durum dizininde bir kimlik bulunduğunu ve sunucuda `nft` komutunun olduğunu kontrol eder. Kendisi paket kurmaz: `nft` yoksa hiçbir şeyi değiştirmez, bunu söyler, çalıştırılacak komutu bildirir (Debian ve Ubuntu'da `apt-get install -y nftables`; Debian 13 bulut görüntüleri onsuz gelir) ve 3 çıkış koduyla biter.
 2. Kendini `/usr/local/bin/mistgate-node` konumuna kopyalar. `/root` içindeki dosyaya artık gerek yoktur.
 3. Sunucunun belleğine göre boyutlandırılmış sertleştirilmiş `/etc/systemd/system/mistgate-node.service` birimini yazar, ardından `systemctl daemon-reload`, `enable` ve `restart` çalıştırır.
 
@@ -171,6 +171,7 @@ O düğümde Teşhis'in çözümleyici düzeltmesini uyguladıysanız `/etc/syst
 | Zaman aşımı ya da `connection refused` | Panel kapalı, bir güvenlik duvarı panele giden TCP 443'ü engelliyor ya da komuttaki adres yanlış. | Paneli ve güvenlik duvarını kontrol edin; düğümden `curl -I https://panel.example.com/` ile deneyin. |
 | `already enrolled; use --force to replace the identity` | Durum dizininde zaten bir kimlik var. | `enroll` komutundan sonra `--force` ekleyin ya da önce `/var/lib/mistgate-node` dizinini silin. |
 | `install: must run as root` | Root değilsiniz. | Komutu root olarak çalıştırın. |
+| `install: nft is not installed on this server` (çıkış kodu 3) | `nftables` paketi yok; Debian 13 bulut görüntülerinde olduğu gibi. Hiçbir şey değiştirilmedi. | İletinin adını verdiği komutu çalıştırın (`apt-get install -y nftables`), sonra `install` komutunu yeniden çalıştırın. |
 | `holds no identity: run mistgate-node enroll first` | `enroll` başarısız oldu ya da `install` başka bir `--state-dir` aldı. | `enroll` komutunu aynı durum dizini ile yeniden çalıştırın. |
 | Yönetim paneli **Kurulum komutu oluştur** işlemine “panel address is not configured” yanıtını veriyor | Panel ajanlar için hiçbir adres bilmiyor: setup `--public-url` olmadan çalıştı ve `serve` için `--agent-addr` yok. | Paneli `--agent-addr panel.example.com:443` ile yeniden başlatın. |
 

@@ -452,7 +452,9 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 	}
 	if err := th.SetTunnels(ctx, ts, tunnelPublishedPorts(next, a.host.SSHPorts())); err != nil {
 		msg := "tunnel firewall: " + shortMsg(err)
-		a.log.Error("tunnel firewall not installed", "code", "tunnel_firewall_failed", "err", err)
+		if a.nftNote(err) != nil { // a missing nft is said once (nft.go), not at every sweep
+			a.log.Error("tunnel firewall not installed", "code", "tunnel_firewall_failed", "err", err)
+		}
 		for _, t := range ts {
 			for _, id := range next.ids() {
 				if hostctl.TunnelIface(next.inbounds[id].spec.Listen.Port) == t.Iface && !next.inbounds[id].spec.Tunnel.IsZero() {

@@ -123,33 +123,8 @@ func runJob(ctx context.Context, out io.Writer, run awgprep.Runner, sys awgprep.
 	packageStatus, queryErr := run(ctx, out, "", "dpkg-query", "-W", "-f=${Status}", "unattended-upgrades")
 	installed := queryErr == nil && strings.TrimSpace(packageStatus) == "install ok installed"
 	if !installed {
-		installArgs := installArgs()
-		steps := []awgprep.Step{{Cmd: append([]string{"apt-get"}, installArgs...)}}
-		if err := awgprep.WaitAptLock(ctx, out, steps, sys, lockWait); err != nil {
+		if err := awgprep.AptInstall(ctx, out, run, sys, lockWait, "unattended-upgrades", installArgs()); err != nil {
 			return err
-		}
-		// Once apt-get runs it may be inside a dpkg transaction: it is not cut by the task's deadline (see JobTimeout).
-		// It only starts while the deadline has not passed.
-		install := func() (string, error) {
-			if err := ctx.Err(); err != nil {
-				return "", err
-			}
-			return run(context.WithoutCancel(ctx), out, "", append([]string{"apt-get"}, installArgs...)...)
-		}
-		installOutput, installErr := install()
-		if installErr != nil && ctx.Err() == nil {
-			if awgprep.IsAptLockOutput(installOutput) {
-				return &awgprep.Failure{Code: awgprep.CodeAptLock, Detail: "another package manager prevented access to the package lock"}
-			}
-			fmt.Fprintln(out, "package install failed; refreshing apt package lists and retrying once")
-			_, _ = run(ctx, out, "", "apt-get", "update")
-			installOutput, installErr = install()
-		}
-		if installErr != nil {
-			if awgprep.IsAptLockOutput(installOutput) {
-				return &awgprep.Failure{Code: awgprep.CodeAptLock, Detail: "another package manager prevented access to the package lock"}
-			}
-			return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "installing unattended-upgrades failed"}
 		}
 	}
 

@@ -48,6 +48,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/node/nets"
+	"github.com/mistgate/mistgate/internal/node/nftmissing"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/node/speedtest"
@@ -101,6 +102,8 @@ type Config struct {
 	// SecurityUpdatesLauncher starts the bounded apt configuration job in its own transient root systemd unit.
 	// Nil disables the fix on builds or hosts that cannot launch it.
 	SecurityUpdatesLauncher func(context.Context) error
+	// NftInstallLauncher starts the job that installs the nftables package, the same way. Nil disables install_nftables.
+	NftInstallLauncher func(context.Context) error
 	// OSUpdateReader replaces the read-only operating-system snapshot source in tests.
 	OSUpdateReader *osupdate.Reader
 	// OSUpdateCapability replaces host detection in tests; nil uses Linux/root/systemd detection.
@@ -222,6 +225,7 @@ type Agent struct {
 	held    map[string]*held
 	hops    []hostctl.Hop
 	hopsSet bool
+	nft     nftmissing.Watch // the server has no nft command: said once when it goes, once when it is back (nft.go)
 	// warm: the persisted state was restored (or there was none), so an inbound that starts now was asked for, not
 	// brought back by this process starting (the reason of engine_started). upMarker is the update marker of a new build.
 	warm               bool
@@ -606,7 +610,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			a.log.Warn("stale UDP check table not removed", "code", "udp_check_cleanup_failed", "err", err)
 		}
 	}
-	if err := a.host.ApplyBaseline(ctx); err != nil {
+	if err := a.nftNote(a.host.ApplyBaseline(ctx)); err != nil {
 		a.log.Warn("host baseline not fully applied", "code", "host_baseline_failed", "err", err)
 	}
 	a.restore(ctx)

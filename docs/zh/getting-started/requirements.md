@@ -28,7 +28,7 @@ Mistgate 需要一台 Linux 面板服务器、一台或多台 Linux 节点服务
 | 系统 | 使用 systemd 的 Linux：Ubuntu 22.04 或更高版本，或 Debian 12 或更高版本。amd64 或 arm64。 |
 | 访问权限 | 使用 SSH 安装器时：通过 SSH 使用 root 登录，或使用支持非交互式 `sudo -n` 的 SSH 用户，并通过密码登录；面板服务器必须能访问 SSH 端口。安装器以 root 身份更改系统，需要服务器至少有 256 MB 内存，面板中还必须有已签名的节点包；如果 UFW 或 firewalld 已启用，安装器会开放 SSH 端口、TCP 80、TCP 443 和 UDP 443。手动运行 `mistgate-node install` 也需要 root；Agent 以 root 身份运行，但可用能力集受到限制。 |
 | 地址 | 公网 IPv4 地址。客户端连接节点地址：指向服务器的域名，或服务器 IP。 |
-| nftables | `nft` 命令（Debian 12 和 Ubuntu 22.04 及更高版本默认安装）。Agent 通过它管理防火墙规则。端口跳跃需要 `inet` 族中的 `redirect`，Linux 内核 5.2 及更高版本支持此功能。 |
+| nftables | `nft` 命令（软件包 `nftables`）。Debian 12 和 Ubuntu 22.04 及更高版本通常带有它，但 **Debian 13 的云镜像没有**。SSH 安装会检查它，并作为向导中可见的单独一步自行安装该软件包；手动 `mistgate-node install` 会以退出码 3 停止，并给出要运行的命令（`apt-get install -y nftables`）；对已在运行的节点，节点诊断的 `nftables` 检查提供同样的安装作为修复。没有 `nft` 时 Agent 仍会运行，但 SSH 防护、端口跳跃、WARP 路由和 UDP 交付检测都无法工作。Agent 通过它管理防火墙规则。端口跳跃需要 `inet` 族中的 `redirect`，Linux 内核 5.2 及更高版本支持此功能。 |
 | TUN 设备 | 用户态 AmneziaWG 后端和 WARP 需要 `/dev/net/tun`。在容器 VPS（OpenVZ、LXC）上，需要在服务商控制面板中启用 TUN。 |
 | 时钟 | 通过 NTP 同步。Agent 会报告与面板相差超过 30 秒的时钟；诊断中的 `time_sync` 检查也会检查这一点。 |
 | 入站端口 | 节点上每个 Hysteria2 和 AmneziaWG 服务器的 UDP 端口：Hysteria2 默认使用 443，AmneziaWG 协议配置会获得 10000 到 60000 之间的随机端口。每个 VLESS 服务器的 TCP 端口（默认 443，不使用 80）。启用 Hysteria2 协议配置的端口跳跃时，还需开放其范围（从 1024 起，最多 20,000 个端口）。TCP 443 用于向非客户端访问者展示 Hysteria2 HTTPS 站点，也用于 Let’s Encrypt。没有其他服务占用时，TCP 80 用于 Let’s Encrypt。 |

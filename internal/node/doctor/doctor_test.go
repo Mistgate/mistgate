@@ -16,7 +16,7 @@ func TestFullRunListsEveryCheckInOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	ids := CheckIDs()
-	if len(ids) != 21 || rep.Partial || len(rep.Results) != len(ids) {
+	if len(ids) != 22 || rep.Partial || len(rep.Results) != len(ids) {
 		t.Fatalf("partial=%v results=%d ids=%d", rep.Partial, len(rep.Results), len(ids))
 	}
 	for i, r := range rep.Results {
@@ -34,11 +34,11 @@ func TestFullRunListsEveryCheckInOrder(t *testing.T) {
 		}
 	}
 	// The id list is the contract in agent.proto: pin it.
-	want := "disk_space,journald_size,dstate_tasks,time_sync,resolver,ipv6,foreign_vpn,foreign_nft,port_conflicts,net_baseline,cert_expiry,memory_pressure,cpu_softirq,kernel_headers,awg_backend,warp_path,unit_generation,security_updates,cpu_steal,conntrack_fill,agent_fds"
+	want := "disk_space,journald_size,dstate_tasks,time_sync,resolver,ipv6,foreign_vpn,foreign_nft,port_conflicts,net_baseline,cert_expiry,memory_pressure,cpu_softirq,kernel_headers,awg_backend,warp_path,unit_generation,security_updates,nftables,cpu_steal,conntrack_fill,agent_fds"
 	if got := strings.Join(ids, ","); got != want {
 		t.Errorf("check ids changed:\n got %s\nwant %s", got, want)
 	}
-	if got := strings.Join(FixIDs(), ","); got != "journald_vacuum,apply_baseline,restart_inbound,set_resolver,reconnect_warp,refresh_unit,allow_forwarding,enable_security_updates,awg_module_repair" {
+	if got := strings.Join(FixIDs(), ","); got != "journald_vacuum,apply_baseline,restart_inbound,set_resolver,reconnect_warp,refresh_unit,allow_forwarding,enable_security_updates,awg_module_repair,install_nftables" {
 		t.Errorf("fix ids = %s", got)
 	}
 }
