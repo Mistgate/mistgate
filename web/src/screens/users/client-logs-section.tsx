@@ -4,10 +4,10 @@ import { logView, type ClientLog, type LogView } from "@/lib/client-debug";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
 import { appText, deviceLabel, type LogsCtl } from "./client-logs";
-import { RowMenu, deviceName, platformGlyph } from "./link-devices";
+import { RowMenu, deviceName } from "./link-devices";
 import type { DeviceN } from "./model";
 import { useTx, type Tx } from "./t";
-import { G, P, SetHead } from "./user-bits";
+import { P, SetHead } from "./user-bits";
 
 /** The quiet line under a row: when, how much and from which app version; for an open request, who asked and until when. */
 function lineOf(l: ClientLog, t: Tx, fmt: Fmt): string {
@@ -51,9 +51,6 @@ export function ClientLogsSection({ ctl, devices = [] }: { ctl?: LogsCtl; device
         ];
         return (
           <div key={l.id} className="up-lg">
-            <span aria-hidden className="g">
-              <G d={platformGlyph({ platform: l.devicePlatform, model: l.deviceModel })} />
-            </span>
             <div>
               <b>{name}</b>
               <span>{lineOf(l, t, fmt)}</span>
@@ -81,9 +78,6 @@ export function ClientLogsSection({ ctl, devices = [] }: { ctl?: LogsCtl; device
         const name = deviceName(d, t);
         return (
           <div key={d.id} className="up-lg">
-            <span aria-hidden className="g">
-              <G d={platformGlyph(d)} />
-            </span>
             <div>
               <b>{name}</b>
               <span>{t("up.logsNeverAsked")}</span>
