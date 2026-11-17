@@ -67,6 +67,11 @@ type Meta struct {
 	// NextLink is a new link address the panel sent (NodeSettings.panel_link_url) or `set-panel` saved. The agent tries it
 	// in turn with its current one and makes it Link once a session over it succeeds.
 	NextLink string `json:"next_link,omitempty"`
+	// PrevLink and PrevMTLS are the address the agent used before its last new link address took over (PrevMTLS: it was
+	// on mTLS, which an empty PrevLink alone could not tell from "none"). While the current link does not answer, the
+	// agent tries the previous address every other turn and makes it current again once a session over it succeeds.
+	PrevLink string `json:"prev_link,omitempty"`
+	PrevMTLS bool   `json:"prev_mtls,omitempty"`
 }
 
 // saveMeta writes agent.json.

@@ -303,7 +303,7 @@ next: mistgate-node install   (or, in the foreground: mistgate-node run)
 | `--link-url` | none | none | The panel's new link address, `wss://host/<secret-prefix>/`. Required. |
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
 
-Saves the address in `agent.json` as the one to try next; the node must be enrolled. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. A panel can send the same change to its agents (`panel_link_url`); nothing sends it yet. The command is for a node that cannot reach the panel any more. It prints `Saved. Restart the agent: systemctl restart mistgate-node`.
+Saves the address in `agent.json` as the one to try next; the node must be enrolled. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. The agent keeps the previous address and goes back to it if the new one stops answering. A panel can send the same change to its agents (`panel_link_url`); nothing sends it yet. The command is for a node that cannot reach the panel any more. It prints `Saved. Restart the agent: systemctl restart mistgate-node`.
 
 ### mistgate-node install
 

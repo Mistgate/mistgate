@@ -143,10 +143,11 @@ type Agent struct {
 	awgKmodAttempted atomic.Bool
 	decoySite        *decoy.Site
 
-	// A new panel link address (panellink.go). meta.Link, meta.NextLink and cfg.LinkURL change at run time and are guarded
-	// by metaMu; the rest of meta is fixed at start.
+	// A new panel link address (panellink.go). meta.Link, meta.NextLink, meta.PrevLink, meta.PrevMTLS and cfg.LinkURL
+	// change at run time and are guarded by metaMu; the rest of meta is fixed at start.
 	metaMu        sync.Mutex
 	triedNext     bool        // connectLoop only: the last session tried meta.NextLink
+	currentFailed bool        // connectLoop only: the last session over the current link did not establish
 	switchPending atomic.Bool // the current session ends to try a new panel link address
 
 	engines            map[string]engine.Engine
@@ -1160,10 +1161,11 @@ type agentTransport interface {
 }
 
 type connectAgentTransport struct {
-	ctx       context.Context
-	stream    *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
-	sendOnce  sync.Once
-	closeOnce sync.Once
+	ctx           context.Context
+	stream        *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
+	sendOnce      sync.Once
+	closeOnce     sync.Once
+	onEstablished func() // runs once the HelloAck arrived (the previous panel address is then current again: panellink.go)
 }
 
 func (s *connectAgentTransport) Context() context.Context              { return s.ctx }
@@ -1297,16 +1299,28 @@ func (a *Agent) linkOnly() bool {
 	return a.meta.Link != ""
 }
 
-// session runs one panel session: every other turn a new link address the panel sent (panellink.go), else the link or
-// mTLS as before.
+// session runs one panel session: every other turn a new link address the panel sent (panellink.go); after a turn on
+// which the current link did not answer, the previous panel address (panellink.go); else the link or mTLS as before.
 func (a *Agent) session(ctx context.Context) error {
 	if next := a.nextLink(); next != "" && !a.triedNext {
 		a.triedNext = true
-		return a.nextLinkSession(ctx, next)
+		err := a.nextLinkSession(ctx, next)
+		if a.linkURL() == next {
+			a.currentFailed = false // a new current link: the old one's failure says nothing about it
+		}
+		return err
 	}
 	a.triedNext = false
+	if a.currentFailed {
+		a.currentFailed = false
+		if prev, mtls := a.prevAddress(); prev != "" || mtls {
+			return a.prevSession(ctx, prev, mtls)
+		}
+	}
 	if a.linkOnly() {
-		return a.linkSession(ctx, a.dialLink)
+		err := a.linkSession(ctx, a.dialLink)
+		a.currentFailed = errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil
+		return err
 	}
 	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
 		err := a.linkSession(ctx, a.dialLink)
@@ -1328,6 +1342,12 @@ func (a *Agent) mtlsSession(ctx context.Context) error {
 }
 
 func (a *Agent) mtlsSessionVia(ctx context.Context, viaNodeID string) error {
+	return a.mtlsSessionOn(ctx, viaNodeID, nil)
+}
+
+// mtlsSessionOn runs a mTLS session, through the panel bridge of entry node viaNodeID when set; onEstablished, when
+// set, runs once the HelloAck arrived.
+func (a *Agent) mtlsSessionOn(ctx context.Context, viaNodeID string, onEstablished func()) error {
 	st := a.settings.Load()
 	client := newHTTPClient(a.mtlsConfig(), dialTimeout(st), &http.HTTP2Config{
 		SendPingTimeout: secs(st.KeepaliveIntervalS, 20*time.Second),
@@ -1345,7 +1365,7 @@ func (a *Agent) mtlsSessionVia(ctx context.Context, viaNodeID string) error {
 	sctx, cancel := context.WithCancel(ctx)
 	stream := agentv1connect.NewAgentServiceClient(client, "https://"+a.meta.Panel,
 		connect.WithReadMaxBytes(64<<20)).Connect(sctx)
-	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream}, viaNodeID)
+	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream, onEstablished: onEstablished}, viaNodeID)
 }
 
 // linkSession runs a session over the signed WebSocket link that dial opens.
@@ -1425,10 +1445,15 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 		return errors.New("first panel message is not HelloAck")
 	}
 	a.sessionEpoch.Add(1)
-	if link, ok := stream.(*websocketAgentTransport); ok {
-		link.established = true
-		if link.onEstablished != nil {
-			link.onEstablished()
+	switch t := stream.(type) {
+	case *websocketAgentTransport:
+		t.established = true
+		if t.onEstablished != nil {
+			t.onEstablished()
+		}
+	case *connectAgentTransport:
+		if t.onEstablished != nil {
+			t.onEstablished()
 		}
 	}
 	a.linkAdvertised.Store(ack.LinkSupported)
