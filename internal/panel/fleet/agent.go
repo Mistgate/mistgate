@@ -728,6 +728,9 @@ func settingsSig(s *agentv1.NodeSettings) string {
 	if s.GetOsStatus() {
 		sig += "|os-status=1"
 	}
+	if s.PanelLinkUrl != "" { // absent unless a panel link address is set: other signatures stay as they were
+		sig += "|panel-link=" + s.PanelLinkUrl
+	}
 	return sig
 }
 
