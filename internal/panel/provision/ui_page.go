@@ -162,6 +162,12 @@ func renderInstallPage(out io.Writer, l pageLang, d installPageData) error {
 			} else {
 				w(tr("Не найден"))
 			}
+			w(`</b></div><div class="fact"><span>nftables</span><b>`)
+			if pf.Nftables {
+				w(tr("Есть"))
+			} else {
+				w(tr("Нет, установка поставит"))
+			}
 			w(`</b></div><div class="fact"><span>` + tr("Связь с панелью") + `</span><b>`)
 			if pf.PanelReachable {
 				w(tr("Есть"))

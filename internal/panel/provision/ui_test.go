@@ -161,18 +161,18 @@ func TestInstallPageInEnglishAndChinese(t *testing.T) {
 		jobs = append(jobs, makeJobView(&adminv1.NodeProvisionJob{Id: "prv_" + st, Name: "edge-1", SshHost: "203.0.113.5", SshPort: 22, State: st}))
 	}
 	var events []eventView
-	for _, phase := range []string{"queued", "preflight", "firewall", "transfer", "enrollment", "install", "waiting_node", "completed", "cancelling", "cancelled", "failed", "odd"} {
+	for _, phase := range []string{"queued", "preflight", "nftables", "firewall", "transfer", "enrollment", "install", "waiting_node", "completed", "cancelling", "cancelled", "failed", "odd"} {
 		events = append(events, eventView{Label: eventLabel(phase, "")}, eventView{Label: eventLabel(phase, "some_new_code")})
 	}
 	for _, code := range []string{"queued", "retry_requested", "cancel_requested", "cancelled_before_start", "remote_outcome_unknown", "checking_host",
-		"preparing_host_firewall", "uploading_agent", "enrolling_node", "starting_agent", "waiting_for_agent", "agent_connected"} {
+		"preparing_host_firewall", "installing_nftables", "uploading_agent", "enrolling_node", "starting_agent", "waiting_for_agent", "agent_connected"} {
 		events = append(events, eventView{Label: eventLabel("install", code)})
 	}
 	var errs []string
 	for _, code := range []string{"remote_outcome_unknown", "ssh_target_invalid", "ssh_host_key_changed", "ssh_authentication_failed", "ssh_password_auth_unavailable", "ssh_connection_timeout",
 		"unsupported_os", "unsupported_architecture", "systemd_required", "panel_unreachable", "insufficient_resources", "insufficient_disk_space",
 		"node_not_connected", "ssh_connection_failed", "ssh_connection_refused", "ssh_preflight_failed", "node_identity_mismatch", "node_state_unavailable",
-		"node_retired", "host_firewall_configuration_failed", "agent_bundle_unavailable", "agent_transfer_failed", "node_enrollment_failed", "node_name_taken",
+		"node_retired", "host_firewall_configuration_failed", "nftables_install_failed", "agent_bundle_unavailable", "agent_transfer_failed", "node_enrollment_failed", "node_name_taken",
 		"systemd_install_failed", "ssh_target_refused", "a_code_from_tomorrow"} {
 		errs = append(errs, errorLabel(code))
 	}
@@ -186,6 +186,7 @@ func TestInstallPageInEnglishAndChinese(t *testing.T) {
 		{Step: "host", Jobs: jobs, Access: []serverAccessView{{ID: "nod_1", Name: "edge-1", Host: "203.0.113.5:22", Username: "deploy"}, {ID: "nod_2", Name: "edge-2", Retired: true, Pending: true}}},
 		{Step: "fingerprint", Fingerprint: "SHA256:pin", Message: "Сначала получите и подтвердите отпечаток SSH host key."},
 		{Step: "preflight", Fingerprint: "SHA256:pin", Preflight: &preflightView{Memory: 2 << 30, Disk: 20 << 30, Systemd: true}},
+		{Step: "preflight", Preflight: &preflightView{Memory: 2 << 30, Disk: 20 << 30, Systemd: true, Nftables: true}},
 		{Step: "preflight", Preflight: &preflightView{}},
 		{Step: "job", Job: &job, Events: events, Refresh: true},
 		{Step: "job", Job: &jobs[1]},

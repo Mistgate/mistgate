@@ -274,4 +274,10 @@ var pageEnglish = map[string]string{
 	"Имя уже используется. Укажите другое имя ноды.":       "The name is taken. Choose another node name.",
 	"Не удалось установить или запустить службу агента.":   "Could not install or start the agent service.",
 	"Установка остановлена":                                "The installation stopped",
+
+	// A server without the nft command: the install adds the nftables package as a step of its own.
+	"Нет, установка поставит": "No, the install will add it",
+	"Установка nftables":      "Installing nftables",
+	"Установка пакета nftables на сервер (команды nft на нём нет)": "Installing the nftables package on the server (it has no nft command)",
+	"Не удалось установить пакет nftables: на сервере нет команды nft, а агенту она нужна для защиты SSH, прыжков по портам и WARP. Установите его вручную (apt-get install nftables) и повторите установку.": "Could not install the nftables package: the server has no nft command, and the agent needs it for the SSH guard, port hopping and WARP. Install it by hand (apt-get install nftables) and retry.",
 }

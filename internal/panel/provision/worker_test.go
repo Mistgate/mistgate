@@ -16,14 +16,22 @@ func TestParsePreflightOutput(t *testing.T) {
 	output := []byte(strings.Join([]string{
 		"distribution=ubuntu", "version=22.04", "kernel=6.8.0", "architecture=x86_64",
 		"cpu_count=4", "memory_bytes=1073741824", "disk_available_bytes=2147483648",
-		"systemd=yes", "already_enrolled=yes", "existing_node_id=" + nodeID, "panel_reachable=yes",
+		"systemd=yes", "nftables=yes", "already_enrolled=yes", "existing_node_id=" + nodeID, "panel_reachable=yes",
 	}, "\n"))
 	got, err := parsePreflightOutput(output)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.nodeID != nodeID || !got.facts.AlreadyEnrolled || got.facts.CpuCount != 4 || got.facts.MemoryBytes != 1<<30 {
+	if got.nodeID != nodeID || !got.facts.AlreadyEnrolled || got.facts.CpuCount != 4 || got.facts.MemoryBytes != 1<<30 || !got.facts.Nftables {
 		t.Fatalf("parsed preflight = %+v", got)
+	}
+	// a server without nft is a server to install the package on, not a refusal
+	noNft, err := parsePreflightOutput([]byte(strings.Replace(string(output), "nftables=yes", "nftables=no", 1)))
+	if err != nil || noNft.facts.Nftables {
+		t.Fatalf("preflight of a server without nft = %+v, %v", noNft, err)
+	}
+	if _, code := supportedPreflight(noNft.facts); code != "" {
+		t.Fatalf("a server without nft was refused: %q", code)
 	}
 	if arch, code := supportedPreflight(got.facts); arch != "amd64" || code != "" {
 		t.Fatalf("supportedPreflight = %q, %q", arch, code)
@@ -34,7 +42,7 @@ func TestParsePreflightRejectsMalformedIdentityAndOutput(t *testing.T) {
 	base := strings.Join([]string{
 		"distribution=debian", "version=12", "kernel=6.1", "architecture=aarch64",
 		"cpu_count=2", "memory_bytes=536870912", "disk_available_bytes=1073741824",
-		"systemd=yes", "already_enrolled=no", "existing_node_id=", "panel_reachable=yes",
+		"systemd=yes", "nftables=yes", "already_enrolled=no", "existing_node_id=", "panel_reachable=yes",
 	}, "\n")
 	if _, err := parsePreflightOutput([]byte(base)); err != nil {
 		t.Fatalf("supported Debian 12 facts rejected: %v", err)
@@ -53,6 +61,12 @@ func TestParsePreflightRejectsMalformedIdentityAndOutput(t *testing.T) {
 	}
 	if _, err := parsePreflightOutput([]byte(strings.Replace(base, "\nexisting_node_id=", "", 1))); err == nil {
 		t.Fatal("missing existing-node field accepted")
+	}
+	if _, err := parsePreflightOutput([]byte(strings.Replace(base, "\nnftables=yes", "", 1))); err == nil {
+		t.Fatal("a preflight without the nftables fact accepted")
+	}
+	if _, err := parsePreflightOutput([]byte(strings.Replace(base, "nftables=yes", "nftables=maybe", 1))); err == nil {
+		t.Fatal("a nftables fact that is neither yes nor no accepted")
 	}
 	duplicate := base + "\nsystemd=yes"
 	if _, err := parsePreflightOutput([]byte(duplicate)); err == nil {

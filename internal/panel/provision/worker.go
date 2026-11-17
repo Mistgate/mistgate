@@ -42,9 +42,44 @@ printf 'architecture=%s\n' "$(uname -m)"
 printf 'cpu_count=%s\n' "$cpu_count"
 printf 'memory_bytes=%s\n' "$((memory_kb * 1024))"
 printf 'disk_available_bytes=%s\n' "$((disk_kb * 1024))"
+if command -v nft >/dev/null 2>&1; then nftables=yes; else nftables=no; fi
 printf 'systemd=%s\n' "$systemd"
+printf 'nftables=%s\n' "$nftables"
 printf 'already_enrolled=%s\n' "$enrolled"
 printf 'existing_node_id=%s\n' "$node_id"
+`
+
+// remoteNftablesInstallScript puts the nftables package on a server without the nft command (a cloud image of Debian 13
+// has none; the agent's SSH guard, port hopping, WARP routing and UDP delivery check need it). It is the one package the
+// install adds, and the wizard shows it as a step of its own. Exit status: 0 nft is there, 20 the server has no apt-get
+// (Debian and Ubuntu are the only supported systems, so this is a damaged image), 21 the install did not work.
+//
+// apt waits for another package manager (cloud-init and unattended-upgrades run in the first minutes of a fresh image):
+// a refused lock is retried every 5 s, 60 times in all, so the wait is 5 minutes whatever apt-get ran. A started apt-get
+// is never cut. A first failure that is not the lock refreshes the package lists (a fresh image has none) and installs once
+// more. Output is captured, not shown: the wizard reports only the step and its code.
+const remoteNftablesInstallScript = `set -eu
+if command -v nft >/dev/null 2>&1; then exit 0; fi
+command -v apt-get >/dev/null 2>&1 || exit 20
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C NEEDRESTART_MODE=l NEEDRESTART_SUSPEND=1
+waited=0
+apt_run() {
+  while :; do
+    if out="$(apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "$@" 2>&1)"; then return 0; fi
+    case "$out" in
+      *'Could not get lock'*|*'Unable to acquire the dpkg'*|*'Unable to lock directory'*|*'is held by process'*|*'Waiting for cache lock'*) ;;
+      *) return 1 ;;
+    esac
+    waited=$((waited + 1))
+    if [ "$waited" -ge 60 ]; then return 1; fi
+    sleep 5
+  done
+}
+if ! apt_run install -y --no-install-recommends nftables; then
+  apt_run update || true
+  apt_run install -y --no-install-recommends nftables || exit 21
+fi
+command -v nft >/dev/null 2>&1 || exit 21
 `
 
 // remoteFirewallPreparationScript adjusts only an already-active host firewall.
@@ -309,6 +344,23 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 				s.cfg.Log.Error("record optional panel SSH key installation failure", "job_id", job.ID, "err", recordErr)
 			}
 			panelFingerprint = ""
+		}
+	}
+
+	if !remote.facts.Nftables {
+		// Installing a package changes the owner's server: it is a step of its own, shown by name in the wizard, and a
+		// server that cannot get it stops here, before the agent is put on a host where half of it would not work.
+		if err := s.setPhase(ctx, &job, "nftables", "installing_nftables", secret); err != nil {
+			return
+		}
+		if !s.mayContinue(ctx, &job) {
+			return
+		}
+		if err := installNftables(ctx, conn); err != nil {
+			if ctx.Err() == nil {
+				s.failJob(ctx, job, "nftables_install_failed")
+			}
+			return
 		}
 	}
 
@@ -583,6 +635,14 @@ func readPreflight(ctx context.Context, conn *Connection, panelAddr string) (*re
 	return parsePreflightOutput(output)
 }
 
+// installNftables runs remoteNftablesInstallScript. The timeout is the lock wait (5 minutes) plus two apt-get runs on a
+// slow mirror; a script that is cut by it may leave apt half way, which the next try finishes.
+func installNftables(ctx context.Context, conn *Connection) error {
+	return runSSH(ctx, conn, "sh -s", strings.NewReader(remoteNftablesInstallScript), nftablesInstallTimeout)
+}
+
+const nftablesInstallTimeout = 15 * time.Minute
+
 func prepareHostFirewall(ctx context.Context, conn *Connection, sshPort uint16) error {
 	if sshPort == 0 {
 		return errors.New("provision: invalid SSH port for firewall preparation")
@@ -595,7 +655,7 @@ func parsePreflightOutput(output []byte) (*remotePreflight, error) {
 	allowed := map[string]struct{}{
 		"distribution": {}, "version": {}, "kernel": {}, "architecture": {}, "cpu_count": {},
 		"memory_bytes": {}, "disk_available_bytes": {}, "systemd": {}, "already_enrolled": {},
-		"existing_node_id": {}, "panel_reachable": {},
+		"existing_node_id": {}, "panel_reachable": {}, "nftables": {},
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		key, value, ok := strings.Cut(strings.TrimSuffix(line, "\r"), "=")
@@ -664,6 +724,10 @@ func parsePreflightOutput(output []byte) (*remotePreflight, error) {
 	if enrolled == "yes" && !nodeIDPattern.MatchString(nodeID) || enrolled == "no" && nodeID != "" {
 		return nil, preflightFailure("node_identity_unreadable")
 	}
+	nftables, ok := get("nftables")
+	if !ok || nftables != "yes" && nftables != "no" {
+		return nil, invalidPreflightFacts()
+	}
 	panelReachable, ok := get("panel_reachable")
 	if !ok || panelReachable != "yes" && panelReachable != "no" {
 		return nil, invalidPreflightFacts()
@@ -675,7 +739,7 @@ func parsePreflightOutput(output []byte) (*remotePreflight, error) {
 		facts: &adminv1.NodePreflight{
 			Distribution: distribution, Version: version, Kernel: kernel, Architecture: architecture,
 			CpuCount: uint32(cpus), MemoryBytes: memory, DiskAvailableBytes: disk,
-			Systemd: systemd == "yes", AlreadyEnrolled: enrolled == "yes", PanelReachable: panelReachable == "yes",
+			Systemd: systemd == "yes", AlreadyEnrolled: enrolled == "yes", PanelReachable: panelReachable == "yes", Nftables: nftables == "yes",
 		},
 		nodeID: nodeID,
 	}, nil

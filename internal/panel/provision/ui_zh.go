@@ -199,4 +199,10 @@ var pageChinese = map[string]string{
 	"Имя уже используется. Укажите другое имя ноды.":       "名称已被使用。请换一个节点名称。",
 	"Не удалось установить или запустить службу агента.":   "无法安装或启动 Agent 服务。",
 	"Установка остановлена":                                "安装已停止",
+
+	// A server without the nft command: the install adds the nftables package as a step of its own.
+	"Нет, установка поставит": "没有，安装时会装上",
+	"Установка nftables":      "正在安装 nftables",
+	"Установка пакета nftables на сервер (команды nft на нём нет)": "正在服务器上安装 nftables 软件包（服务器上没有 nft 命令）",
+	"Не удалось установить пакет nftables: на сервере нет команды nft, а агенту она нужна для защиты SSH, прыжков по портам и WARP. Установите его вручную (apt-get install nftables) и повторите установку.": "无法安装 nftables 软件包：服务器上没有 nft 命令，而 Agent 需要它来提供 SSH 防护、端口跳跃和 WARP。请手动安装（apt-get install nftables）后重试。",
 }

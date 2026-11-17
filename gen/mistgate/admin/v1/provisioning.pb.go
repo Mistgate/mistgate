@@ -345,8 +345,11 @@ type NodePreflight struct {
 	Systemd            bool                   `protobuf:"varint,8,opt,name=systemd,proto3" json:"systemd,omitempty"`
 	AlreadyEnrolled    bool                   `protobuf:"varint,9,opt,name=already_enrolled,json=alreadyEnrolled,proto3" json:"already_enrolled,omitempty"`
 	PanelReachable     bool                   `protobuf:"varint,10,opt,name=panel_reachable,json=panelReachable,proto3" json:"panel_reachable,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// The nft command is on the server. When it is not, the install adds a step of its own and installs the nftables package
+	// (a cloud image of Debian 13 has none); a server where that fails stops with nftables_install_failed.
+	Nftables      bool `protobuf:"varint,11,opt,name=nftables,proto3" json:"nftables,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NodePreflight) Reset() {
@@ -445,6 +448,13 @@ func (x *NodePreflight) GetAlreadyEnrolled() bool {
 func (x *NodePreflight) GetPanelReachable() bool {
 	if x != nil {
 		return x.PanelReachable
+	}
+	return false
+}
+
+func (x *NodePreflight) GetNftables() bool {
+	if x != nil {
+		return x.Nftables
 	}
 	return false
 }
@@ -2455,7 +2465,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\ruse_panel_key\x18\x06 \x01(\bR\vusePanelKey\x12\x1f\n" +
 	"\vprivate_key\x18\a \x01(\tR\n" +
 	"privateKey\x124\n" +
-	"\x16private_key_passphrase\x18\b \x01(\tR\x14privateKeyPassphrase\"\xf1\x02\n" +
+	"\x16private_key_passphrase\x18\b \x01(\tR\x14privateKeyPassphrase\"\x8d\x03\n" +
 	"\rNodePreflight\x12\"\n" +
 	"\fdistribution\x18\x01 \x01(\tR\fdistribution\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
@@ -2467,7 +2477,8 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\asystemd\x18\b \x01(\bR\asystemd\x12)\n" +
 	"\x10already_enrolled\x18\t \x01(\bR\x0falreadyEnrolled\x12'\n" +
 	"\x0fpanel_reachable\x18\n" +
-	" \x01(\bR\x0epanelReachable\"R\n" +
+	" \x01(\bR\x0epanelReachable\x12\x1a\n" +
+	"\bnftables\x18\v \x01(\bR\bnftables\"R\n" +
 	"\x10CheckSSHResponse\x12>\n" +
 	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xa4\x04\n" +
 	"\x19StartNodeProvisionRequest\x12'\n" +

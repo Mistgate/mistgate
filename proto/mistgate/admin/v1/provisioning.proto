@@ -69,6 +69,9 @@ message NodePreflight {
   bool systemd = 8;
   bool already_enrolled = 9;
   bool panel_reachable = 10;
+  // The nft command is on the server. When it is not, the install adds a step of its own and installs the nftables package
+  // (a cloud image of Debian 13 has none); a server where that fails stops with nftables_install_failed.
+  bool nftables = 11;
 }
 
 message CheckSSHResponse {

@@ -69,6 +69,7 @@ const codeText: Record<string, MessageKey> = {
   agent_bundle_unavailable: "node.ssh.error.bundle",
   remote_outcome_unknown: "node.ssh.error.remoteOutcome",
   host_firewall_configuration_failed: "node.ssh.error.firewall",
+  nftables_install_failed: "node.ssh.error.nftables",
   node_not_connected: "node.ssh.error.notConnected",
   systemd_install_failed: "node.ssh.error.systemd",
   agent_install_failed: "node.ssh.error.systemd",
@@ -126,6 +127,8 @@ function phaseLabel(phase: string, t: T): string {
       return t("node.ssh.phase.preflight");
     case "access":
       return t("node.ssh.phase.access");
+    case "nftables":
+      return t("node.ssh.phase.nftables");
     case "firewall":
       return t("node.ssh.phase.firewall");
     case "transfer":
@@ -603,8 +606,10 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
             <Fact label={t("node.ssh.memory")} value={fmt.bytes(Number(preflight.memoryBytes), 1024)} />
             <Fact label={t("node.ssh.disk")} value={fmt.bytes(Number(preflight.diskAvailableBytes), 1024)} />
             <Fact label={t("node.ssh.systemd")} value={preflight.systemd ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.systemd ? "good" : "bad"} />
+            <Fact label={t("node.ssh.nftables")} value={preflight.nftables ? t("node.ssh.available") : t("node.ssh.nftablesWillInstall")} tone={preflight.nftables ? "good" : undefined} />
             <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : "bad"} />
           </div>
+          {!preflight.nftables && <Notice>{t("node.ssh.nftablesNote")}</Notice>}
           <p className="rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-muted">{t("node.ssh.firewallHint")}</p>
           {login.method === "password" && (
             <TextField
