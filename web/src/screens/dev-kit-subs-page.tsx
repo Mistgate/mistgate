@@ -143,7 +143,8 @@ export function sceneOf(state: string, tab?: string) {
   c.setQueryData(accessQuery.queryKey, { available: true, unread: 0, readOnly: false, model: "", provider: undefined } as never);
   c.setQueryData(nodesQuery.queryKey, { nodes: demoNodes.map(nodeRow), expectedAgentVersion: "0.1.71" } as never);
   // what a scene did not seed itself is the board's base
-  const has = (key: readonly unknown[]) => c.getQueryData(key) !== undefined;
+  // (a query a scene left loading or failed, with prefetchQuery, is not seeded over)
+  const has = (key: readonly unknown[]) => c.getQueryData(key) !== undefined || c.getQueryState(key) !== undefined;
   c.setQueryData(settingsQuery.queryKey, { settings: w.settings, ...w.extra });
   if (!has(clientsQuery.queryKey)) c.setQueryData(clientsQuery.queryKey, clients as never);
   if (!has(protocolsQuery.queryKey)) c.setQueryData(protocolsQuery.queryKey, protocols as never);
