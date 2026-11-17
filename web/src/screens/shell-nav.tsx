@@ -321,7 +321,7 @@ export function Sidebar({ current, defaultOwnerOpen }: { current?: SectionId; de
         )}
       </div>
       {/* the marker of the current row sits 12px outside it: the list is padded to make room, so its scrolling cannot cut it */}
-      <nav aria-label={t("nav.main")} className={cx("shell-in -mx-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 [scrollbar-width:thin]", rail && "items-center")}>
+      <nav aria-label={t("nav.main")} className={cx("shell-in -mx-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 [scrollbar-width:none]", rail && "items-center")}>
         {sections.map((s) => (
           <div key={s.id} className="contents">
             {"group" in s &&
