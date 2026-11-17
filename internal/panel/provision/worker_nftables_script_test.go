@@ -69,14 +69,15 @@ func TestPreflightReportsNft(t *testing.T) {
 		t.Fatal(err)
 	}
 	// the preflight reads the system, so it runs on the real tools; only nft is the fake's to give or to withhold
-	tools := []string{"id", "getconf", "awk", "df", "sed", "uname"}
+	// (and id: the script leaves at once when it is not root, and a CI runner is not)
+	tools := []string{"getconf", "awk", "df", "sed", "uname"}
 	for _, tc := range []struct {
 		name string
 		nft  bool
 		want string
 	}{{"with nft", true, "nftables=yes"}, {"without nft", false, "nftables=no"}} {
 		t.Run(tc.name, func(t *testing.T) {
-			fakes := map[string]string{"getent": getentFake}
+			fakes := map[string]string{"getent": getentFake, "id": "echo 0"}
 			if tc.nft {
 				fakes["nft"] = ""
 			}
