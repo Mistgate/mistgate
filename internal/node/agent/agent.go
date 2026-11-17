@@ -221,6 +221,14 @@ type Agent struct {
 	// cannot say it failed; the update's commit watch reads this too.
 	failedApply atomic.Pointer[[]string]
 
+	// The shared TCP ports (front.go). shared is read by the engines while they apply and by the stats goroutine, so frontMu
+	// guards it; the rest is worker-owned like held.
+	frontMu  sync.Mutex
+	shared   map[uint16]*sharedPort
+	place    map[string]uint32 // inbound id -> the shared port it runs behind, or placeOff; absent = alone
+	noRun    map[string]string // inbound id -> why it must not run in this reconcile (a name it lost, a port that cannot be bound)
+	replaced map[string]bool   // inbounds removed because their place changed, applied again next: not a new profile
+
 	// Owned by the worker goroutine (and by restore, which runs before the worker starts).
 	held    map[string]*held
 	hops    []hostctl.Hop
@@ -382,6 +390,7 @@ func (a *Agent) endHeldSession(s *session, wait time.Duration, expired *atomic.B
 type held struct {
 	spec    string // statehash.Spec
 	creds   string // statehash.Creds of the ACTIVE credentials
+	place   uint32 // Agent.place of the inbound when it was applied
 	expired int    // credentials withheld because their term ended
 	res     *pb.InboundResult
 }
@@ -494,6 +503,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 			Masquerade: a.masquerade,
 			Now:        a.now,
 			Nets:       a.nets,
+
+			SharedListener: a.sharedListener,
 		})
 		if err != nil {
 			a.closeEngines()
@@ -588,6 +599,7 @@ func (a *Agent) closeEngines() {
 				a.log.Warn("engine close", "code", "engine_close_failed", "protocol", p, "err", err)
 			}
 		}
+		a.closeFronts()
 	})
 }
 
