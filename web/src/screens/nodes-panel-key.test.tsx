@@ -111,7 +111,7 @@ const text = () => document.body.textContent ?? "";
 const offer = () => document.querySelector("[data-panel-key-offer]");
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const rowOf = (name: string) => [...document.querySelectorAll("[data-batch] li")].find((li) => li.querySelector("b")?.textContent === name)!;
-const ticked = (name: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${en["bulk.select"].replace("{name}", name)}"]`)!.checked;
+const ticked = (name: string) => document.querySelector<HTMLElement>(`[role=checkbox][aria-label="${en["bulk.select"].replace("{name}", name)}"]`)!.getAttribute("aria-checked") === "true";
 
 describe("the panel key on every password-only node", () => {
   it("counts only live nodes that log in with a password alone", async () => {
@@ -132,7 +132,8 @@ describe("the panel key on every password-only node", () => {
     expect(["de1", "nl1", "fi1", "de2"].filter(ticked)).toEqual(["de1", "nl1"]);
     expect(api.addNodeServerKey).toHaveBeenCalledTimes(1); // nl1 waits for de1
     expect(api.addNodeServerKey).toHaveBeenCalledWith({ nodeId: "nod_de1", panelKey: true, confirm: true });
-    expect(text()).toContain(`${en["bulk.title.panelKey"]} · 0 of 2`);
+    expect(text()).toContain(en["bulk.title.panelKey"]);
+    expect(text()).toContain("1 of 2"); // the node at work
     expect(rowOf("de1").textContent).toContain(en["bulk.state.running"]);
     expect(rowOf("nl1").textContent).toContain(en["bulk.state.waiting"]);
 

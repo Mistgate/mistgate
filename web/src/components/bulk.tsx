@@ -355,7 +355,7 @@ export function BatchPanel({
   );
 }
 
-function BatchRow({ row, link }: { row: Row; link: RowLink | null }) {
+export function BatchRow({ row, link }: { row: Row; link: RowLink | null }) {
   const t = useT();
   const look = stateLook[row.state];
   const ok = row.state === "ok";

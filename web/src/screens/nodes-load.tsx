@@ -1,11 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
+import { Scramble } from "@/components/fx/scramble";
+import { Flag } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Segmented } from "@/components/ui/segmented";
-import { StatusDot, StatusPill } from "@/components/ui/status";
+import { StatusDot } from "@/components/ui/status";
 import type { GetFleetLoadResponse, LoadRecommendation, NodeLoad } from "@/gen/mistgate/ops/v1/ops_pb";
 import { useT, type T } from "@/i18n";
 import { ops } from "@/lib/api";
@@ -13,12 +15,14 @@ import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
 import { isUnavailable } from "@/lib/ops";
 import { plain, type Plain } from "@/lib/plain";
+import { nodesQuery } from "@/lib/queries";
 import { bottleneckKey, fitKey, isLoadStatus, loadStatusKind, recKey, severityKind } from "@/lib/resources";
+import "./nodes.css";
 
-// Nodes -> Load: one row per node from the capacity read (OpsService.GetFleetLoad) over a window of its hourly host load:
-// people at peak, the busy hour's CPU, what runs out first, how many more people it can take, and a status. A row opens in
-// place to what to do about it and the numbers behind. The VPS edition only: the Nodes page does not offer the view on the
-// Cloudflare edition.
+// Nodes -> Load, as the redesign board draws it: three figures over a table with a row per node from the capacity read
+// (OpsService.GetFleetLoad) over a window of its hourly host load: people at peak, the busy hour's CPU, what runs out first,
+// how many more people it can take, and a state. A row opens in place to what to do about it, the five meters closest to their
+// limit and the numbers behind. The VPS edition only: the Nodes page does not offer the view on the Cloudflare edition.
 
 type Load = Plain<GetFleetLoadResponse>;
 type Row = Plain<NodeLoad>;
@@ -35,7 +39,17 @@ export const fleetLoadQuery = (hours: number) =>
     retry: false,
   });
 
-const cols = "md:grid-cols-[minmax(160px,1.6fr)_88px_minmax(130px,1fr)_minmax(120px,1fr)_minmax(110px,0.9fr)_112px_28px]";
+// The columns follow the card's own width: the node, people, the processor, what runs out first, the room, the state, an arrow.
+const grid =
+  "grid-cols-[minmax(170px,1.2fr)_110px_minmax(160px,1.2fr)_minmax(120px,1fr)_minmax(140px,1fr)_120px_16px] " +
+  "@max-[1120px]/fzt:grid-cols-[minmax(150px,1.2fr)_96px_minmax(120px,1fr)_minmax(110px,1fr)_120px_16px] " +
+  "@max-[780px]/fzt:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_110px_16px] " +
+  "@max-[520px]/fzt:grid-cols-[minmax(0,1fr)_104px_16px]";
+const rowBase = "grid min-h-14 w-full items-center gap-4 border-t border-line px-6 text-start text-sm @max-[520px]/fzt:px-4 " + grid;
+// the cells that give way as the card narrows: the room (1120), people and what runs out first (780), the processor (520)
+const roomCell = "@max-[1120px]/fzt:hidden";
+const midCell = "@max-[780px]/fzt:hidden";
+const cpuCell = "@max-[520px]/fzt:hidden";
 
 export function FleetLoad() {
   const t = useT();
@@ -43,81 +57,99 @@ export function FleetLoad() {
   const [hours, setHours] = useState<LoadWindow>(168);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const q = useQuery(fleetLoadQuery(hours));
+  const fleet = useQuery(nodesQuery).data?.nodes;
   const toggle = (id: string) => setOpen((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id])));
 
-  const range = (
-    <Segmented
-      variant="flat"
-      aria-label={t("load.range")}
-      value={String(hours)}
-      onValueChange={(v) => setHours(Number(v) as LoadWindow)}
-      options={loadWindows.map((h) => ({ value: String(h), label: t(`load.range.${h}`) }))}
-    />
-  );
   if (!q.data) {
     if (q.isError) return isUnavailable(q.error) ? <Notice tone="quiet">{t("load.unavailable")}</Notice> : <QueryError error={q.error} onRetry={() => void q.refetch()} />;
     return <Pending />;
   }
   const data = q.data;
+  const where = new Map((fleet ?? []).map((n) => [n.id, n]));
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <Summary data={data} />
-        <span className="flex-1" />
-        {range}
-      </div>
+    <div className="flex flex-col gap-4">
+      <Summary data={data} />
       {data.nodes.length === 0 ? (
         <p className="p-8 text-center text-[13px] text-muted">{t("load.empty")}</p>
       ) : (
-        <div className="overflow-hidden rounded-card-lg border border-line bg-surface">
-          <div className={cx("hidden h-10 items-center gap-4 border-b border-line px-5 text-xs font-semibold text-muted md:grid", cols)}>
+        <section className="@container/fzt relative rounded-card border border-line bg-surface">
+          <div className="flex items-center gap-3 px-6 pt-4 pb-3 @max-[520px]/fzt:px-4">
+            <h3 className="me-auto text-base leading-6 font-medium">{t("nv.load.title")}</h3>
+            <Segmented
+              variant="flat"
+              aria-label={t("load.range")}
+              value={String(hours)}
+              onValueChange={(v) => setHours(Number(v) as LoadWindow)}
+              options={loadWindows.map((h) => ({ value: String(h), label: t(`load.range.${h}`) }))}
+            />
+          </div>
+          <div role="row" className={cx(rowBase, "min-h-10 text-[13px] text-muted")}>
             <span>{t("load.col.node")}</span>
-            <span className="text-end">{t("load.col.people")}</span>
-            <span>{t("load.col.cpu")}</span>
-            <span>{t("load.col.bottleneck")}</span>
-            <span className="text-end">{t("load.col.headroom")}</span>
+            <span className={midCell}>{t("load.col.people")}</span>
+            <span className={cpuCell}>{t("load.col.cpu")}</span>
+            <span className={midCell}>{t("load.col.bottleneck")}</span>
+            <span className={roomCell}>{t("load.col.headroom")}</span>
             <span>{t("load.col.status")}</span>
             <span />
           </div>
           {data.nodes.map((n) => (
             <Fragment key={n.nodeId}>
-              <NodeRow n={n} fmt={fmt} expanded={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} />
+              <NodeRow n={n} fmt={fmt} expanded={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} country={where.get(n.nodeId)?.countryCode} place={where.get(n.nodeId)?.location} />
               {open.has(n.nodeId) && <Details n={n} hours={data.hours} fmt={fmt} />}
             </Fragment>
           ))}
-        </div>
+        </section>
       )}
     </div>
   );
 }
 
-/** Nodes by status, the room left across the fleet and where it is. */
+/** A figure of the three at the top: its name, the number, a line under it. */
+function Figure({ k, children, note, className }: { k: string; children: ReactNode; note: ReactNode; className?: string }) {
+  return (
+    <div className={cx("flex flex-col gap-1 rounded-card border border-line bg-surface px-5 py-4", className)}>
+      <span className="text-[13px] text-sec">{k}</span>
+      <span className="text-xl leading-7 tracking-[-0.01em]">{children}</span>
+      <span className="text-[12px] text-muted">{note}</span>
+    </div>
+  );
+}
+
+/** A sentence with a number in it, the number drawn big and in mono: split where the translation put it. */
+function around(sentence: string, n: number, big: ReactNode) {
+  const at = sentence.indexOf(String(n));
+  if (at < 0) return sentence;
+  return (
+    <>
+      {sentence.slice(0, at)}
+      {big}
+      {sentence.slice(at + String(n).length)}
+    </>
+  );
+}
+
+/** The room left across the fleet and where it is, how many are close to the limit, how many are fine. */
 function Summary({ data }: { data: Load }) {
   const t = useT();
   const s = data.summary;
   if (!s) return null;
-  const counts = [
-    { kind: "bad" as const, n: s.overloaded, label: t("load.status.overloaded") },
-    { kind: "warn" as const, n: s.busy, label: t("load.status.busy") },
-    { kind: "ok" as const, n: s.ok, label: t("load.status.ok") },
-    { kind: "off" as const, n: s.unknown, label: t("load.status.unknown") },
-  ].filter((c) => c.n > 0);
   const free = s.mostFree[0];
+  const num = "font-mono text-[24px] font-medium tabular-nums";
+  const roomN = s.headroomPeople;
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px]">
-      {counts.map((c) => (
-        <span key={c.kind} className="flex items-center gap-1.5">
-          <StatusDot kind={c.kind} />
-          {c.label}
-          <b className="font-mono">{c.n}</b>
-        </span>
-      ))}
-      {s.headroomNodes > 0 && <span className="text-muted">{t.n("load.sum.room", s.headroomPeople)}</span>}
-      {free && free.headroomPeople !== undefined && (
-        <span className="text-muted">
-          {t("load.sum.freest", { name: free.nodeName, n: String(free.headroomPeople) })}
-        </span>
-      )}
+    <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-4 max-[1000px]:grid-cols-1">
+      <Figure
+        k={t("nv.load.room")}
+        note={free && free.headroomPeople !== undefined ? t("load.sum.freest", { name: free.nodeName, n: String(free.headroomPeople) }) : "—"}
+      >
+        {s.headroomNodes > 0 ? around(t.n("load.sum.room", roomN), roomN, <Scramble text={String(roomN)} className={num} />) : "—"}
+      </Figure>
+      <Figure k={t("nv.load.busy")} note={t("nv.load.busyNote")}>
+        <Scramble text={String(s.busy + s.overloaded)} className={num} />
+      </Figure>
+      <Figure k={t("load.status.ok")} note={t("nv.load.okNote") + (s.unknown > 0 ? ` · ${t("nv.load.noData", { n: s.unknown })}` : "")}>
+        <Scramble text={String(s.ok)} className={num} />
+      </Figure>
     </div>
   );
 }
@@ -133,7 +165,7 @@ function headroomText(t: T, n: Row): { text: string; title?: string } {
   return { text: t.n("load.headroom.n", n.headroomPeople) };
 }
 
-function NodeRow({ n, fmt, expanded, onToggle }: { n: Row; fmt: Fmt; expanded: boolean; onToggle: () => void }) {
+function NodeRow({ n, fmt, expanded, onToggle, country, place }: { n: Row; fmt: Fmt; expanded: boolean; onToggle: () => void; country?: string; place?: string }) {
   const t = useT();
   const status = isLoadStatus(n.status) ? n.status : "unknown";
   const kind = loadStatusKind(status);
@@ -141,68 +173,77 @@ function NodeRow({ n, fmt, expanded, onToggle }: { n: Row; fmt: Fmt; expanded: b
   const bk = bottleneckKey(n.bottleneck);
   const room = headroomText(t, n);
   const cpu = Math.min(100, Math.max(0, n.busyHourCpuPct));
-  const label = (s: string, v: ReactNode) => (
-    <span className="flex items-baseline gap-2 md:contents">
-      <span className="w-32 flex-none text-xs text-muted md:hidden">{s}</span>
-      {v}
-    </span>
-  );
+  const fill = cpu >= 80 ? "var(--danger)" : cpu >= 60 ? "var(--warning)" : "var(--accent-mark)";
   return (
-    <div className={cx("relative grid items-center gap-x-4 gap-y-1.5 border-b border-line px-4 py-2.5 text-[13px] last:border-b-0 md:min-h-[52px] md:px-5", cols)}>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <StatusDot kind={kind} />
-        <Link to="/nodes/$id" params={{ id: n.nodeId }} className="min-w-0 truncate font-bold hover:text-accent-text">
-          {n.nodeName}
-        </Link>
-        {!n.connected && known && <span className="text-xs text-muted">{t("load.offline")}</span>}
-      </div>
-      {label(t("load.col.people"), <span className="font-mono md:text-end">{known ? fmt.num(n.peoplePeak, 0) : "—"}</span>)}
-      {label(
-        t("load.col.cpu"),
-        known ? (
-          <span className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="h-1 w-16 flex-none overflow-hidden rounded-[2px] bg-surface-2">
-              <span className={cx("block h-full", cpu >= 80 ? "bg-danger" : cpu >= 60 ? "bg-warn" : "bg-accent")} style={{ width: `${cpu}%` }} />
-            </span>
-            <span className="font-mono text-xs">{fmt.num(n.busyHourCpuPct, 0)}%</span>
-          </span>
+    <button
+      type="button"
+      aria-expanded={expanded}
+      aria-label={t(expanded ? "load.collapse" : "load.expand", { name: n.nodeName })}
+      onClick={onToggle}
+      className={cx(rowBase, "cursor-pointer transition-colors duration-150 ease-out hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]", expanded && "bg-[color-mix(in_srgb,var(--text)_3%,transparent)]")}
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        {country && <Flag code={country} size={16} />}
+        <span className="flex min-w-0 flex-col">
+          <b className="truncate font-mono font-medium tabular-nums">{n.nodeName}</b>
+          {(place || !n.connected) && <span className="truncate text-[13px] text-sec">{[place, !n.connected && known ? t("load.offline") : ""].filter(Boolean).join(" · ")}</span>}
+        </span>
+      </span>
+      <span className={cx("font-mono font-medium tabular-nums", midCell)}>{known ? fmt.num(n.peoplePeak, 0) : "—"}</span>
+      <span className={cx("grid grid-cols-[44px_minmax(0,1fr)] items-center gap-2", cpuCell)}>
+        {known ? (
+          <>
+            <span className="text-end font-mono text-[13px] font-medium tabular-nums">{fmt.num(n.busyHourCpuPct, 0)}%</span>
+            <i aria-hidden className="block h-1 rounded-[2px]" style={{ background: `linear-gradient(90deg, ${fill} ${cpu}%, var(--step) 0)` } as CSSProperties} />
+          </>
         ) : (
           <span className="text-muted">—</span>
-        ),
-      )}
-      {label(t("load.col.bottleneck"), <span className={cx("truncate", !bk && "text-muted")}>{bk ? t(bk) : known ? t("load.res.none") : "—"}</span>)}
-      {label(
-        t("load.col.headroom"),
-        <span title={room.title} className={cx("font-mono text-xs md:text-end", room.title && "cursor-help underline decoration-faint decoration-dotted underline-offset-[3px]")}>
-          {room.text}
-        </span>,
-      )}
-      <span>
-        <StatusPill kind={kind} label={t(`load.status.${status}`)} sm />
+        )}
       </span>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label={t(expanded ? "load.collapse" : "load.expand", { name: n.nodeName })}
-        onClick={onToggle}
-        className="flex size-7 items-center justify-center justify-self-end rounded-ctl text-muted transition-colors hover:bg-surface-2 hover:text-fg max-md:absolute max-md:end-3 max-md:top-2"
-      >
-        <Icon name="chevronDown" size={14} className={cx("transition-transform duration-200", expanded && "rotate-180")} />
-      </button>
+      <span className={cx("truncate", !bk && "text-muted", midCell)}>{bk ? t(bk) : known ? t("load.res.none") : "—"}</span>
+      <span title={room.title} className={cx("text-[14px]", room.title && "cursor-help", roomCell)}>
+        {room.text}
+      </span>
+      <span className={cx("inline-flex items-center gap-2 whitespace-nowrap", `tone-${kind}`, kind !== "ok" && "tone-text")}>
+        <StatusDot kind={kind} />
+        {t(`load.status.${status}`)}
+      </span>
+      <Icon name="chevronDown" size={16} className={cx("block flex-none text-muted transition-[transform,color] duration-[250ms] ease-out", expanded && "rotate-180 text-fg")} />
+    </button>
+  );
+}
+
+/** One of the five meters: the peak of a resource over the period, as a bar; the one that runs out first says so. */
+function Meter({ label, value, note, first, shown }: { label: string; value: number | undefined; note?: string; first?: boolean; shown: string }) {
+  const t = useT();
+  const pct = value === undefined ? 0 : Math.max(2, Math.min(100, value));
+  return (
+    <div className="grid h-8 grid-cols-[150px_minmax(0,1fr)_56px_120px] items-center gap-3 @max-[520px]/fzt:h-auto @max-[520px]/fzt:grid-cols-[minmax(0,1fr)_56px] @max-[520px]/fzt:gap-y-1 @max-[520px]/fzt:py-1.5">
+      <span>{label}</span>
+      <i
+        aria-hidden
+        className={cx("fz-meter relative h-1.5 overflow-hidden rounded-[3px] bg-step @max-[520px]/fzt:order-3 @max-[520px]/fzt:col-span-full", value !== undefined && value >= 60 && "[--meter:var(--warning)]")}
+        style={{ "--w": `${pct}%` } as CSSProperties}
+      />
+      <b className="text-end font-mono text-[13px] font-medium tabular-nums">
+        <Scramble text={shown} />
+      </b>
+      <em className={cx("text-[12px] whitespace-nowrap not-italic text-muted @max-[520px]/fzt:hidden", first && "justify-self-start rounded-chip bg-warn-soft px-2 py-0.5 text-warn-text")}>{first ? t("nv.load.first") : note}</em>
     </div>
   );
 }
 
-/** What to do about a node, then the numbers the read went by. */
+/** What to do about a node, the meters closest to their limit, then the numbers the read went by. */
 function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
   const t = useT();
+  const known = n.status !== "unknown";
   const pct = (v: number | undefined) => (v === undefined ? t("load.d.unknown") : `${fmt.num(v, v < 10 ? 1 : 0)}%`);
   const b = (v: number | undefined) => (v === undefined ? t("load.d.unknown") : fmt.bytes(v, 1024));
   const fitWhy = fitKey(n.fit);
   const facts: { label: string; value: string }[] = [
     { label: t("load.d.hours"), value: t("load.d.hours.value", { n: String(n.hoursWithData), total: String(hours) }) },
   ];
-  if (n.status !== "unknown") {
+  if (known) {
     facts.push(
       { label: t("load.d.busyHour"), value: t("load.d.busyHour.value", { time: fmt.stamp(n.busyHourUnix), cpu: pct(n.busyHourCpuPct), people: fmt.num(n.peopleBusyHour, 0) }) },
       { label: t("load.d.peaks"), value: t("load.d.peaks.value", { typical: pct(n.cpuPeakTypicalPct), top: pct(n.cpuPeakP95Pct) }) },
@@ -235,13 +276,36 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
       },
     );
   }
+  const [lead, ...rest] = n.recommendations;
+  const warn = n.status === "busy" || n.status === "overloaded" || lead?.severity === "crit" || lead?.severity === "warn";
+  // the five meters: the peak over the period of what a node runs out of (the first of them says so)
+  const meter = (label: string, key: string, value: number | undefined, note?: string) => (
+    <Meter key={key} label={label} value={value} note={note} first={known && n.bottleneck === key} shown={value === undefined ? "—" : `${fmt.num(value, value < 10 ? 1 : 0)}%`} />
+  );
   return (
-    <div className="flex flex-col gap-3 border-b border-line bg-canvas px-4 py-3.5 last:border-b-0 md:px-5">
-      {n.recommendations.length === 0 ? (
-        <p className="text-[13px] text-muted">{n.status === "unknown" ? t("load.noData") : t("load.noRecs")}</p>
-      ) : (
+    <div className="fz-ld grid animate-[mg-up_0.25s_var(--e)_both] grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-x-10 gap-y-5 border-t border-line bg-[color-mix(in_srgb,var(--text)_3%,transparent)] px-6 pt-4 pb-6 @max-[940px]/fzt:grid-cols-1 @max-[520px]/fzt:px-4 @max-[520px]/fzt:pt-3 @max-[520px]/fzt:pb-5">
+      <div className={cx("col-span-full flex items-center gap-2.5 rounded-field px-3 py-2.5 @max-[520px]/fzt:flex-wrap", warn ? "bg-warn-soft" : "bg-step")}>
+        <i aria-hidden className={cx("size-2 flex-none rounded-full @max-[520px]/fzt:mt-2 @max-[520px]/fzt:self-start", warn ? "bg-warn" : "bg-accent-mark")} />
+        <b className="font-medium text-pretty @max-[520px]/fzt:min-w-0 @max-[520px]/fzt:flex-1">{lead ? recText(t, lead) : known ? t("load.noRecs") : t("load.noData")}</b>
+        <Link to="/nodes/$id" params={{ id: n.nodeId }} className="ms-auto text-[13px] whitespace-nowrap text-fg underline decoration-line underline-offset-4 hover:decoration-current @max-[520px]/fzt:ms-[18px] @max-[520px]/fzt:basis-full">
+          {t("fm.openNode")}
+        </Link>
+      </div>
+      {known && (
+        <div className={cx(rest.length === 0 && "col-span-full")}>
+          <h4 className="mb-2 flex items-baseline justify-between text-[13px] font-medium text-sec">
+            {t("nv.load.near")} <span className="text-[12px] font-normal text-muted">{t("nv.load.peak")}</span>
+          </h4>
+          {meter(t("load.res.cpu"), "cpu", n.cpuPeakP95Pct, n.cpuPeakTypicalPct !== undefined ? t("nv.load.usually", { v: pct(n.cpuPeakTypicalPct) }) : undefined)}
+          {meter(t("load.res.ram"), "ram", n.ramPeakPct)}
+          {meter(t("load.res.disk"), "disk", n.diskUsedPct, t("nv.load.now"))}
+          {meter(t("load.res.bandwidth"), "bandwidth", n.bandwidthPeakPct, n.capacityMbps > 0 ? t("nv.load.from", { n: fmt.num(n.capacityMbps, 0) }) : undefined)}
+          {meter(t("load.res.conntrack"), "conntrack", n.conntrackPeakPct)}
+        </div>
+      )}
+      {rest.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {n.recommendations.map((r, i) => (
+          {rest.map((r, i) => (
             <li key={`${r.code}/${i}`} className="flex items-start gap-2.5 text-[13px] leading-snug">
               <span className="mt-[5px] flex">
                 <StatusDot kind={severityKind(r.severity)} />
@@ -251,11 +315,11 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
           ))}
         </ul>
       )}
-      <dl className="grid gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2 lg:grid-cols-3">
+      <dl className="col-span-full m-0 grid grid-cols-4 gap-x-6 gap-y-3 border-t border-line pt-4 @max-[940px]/fzt:grid-cols-2">
         {facts.map((f) => (
-          <div key={f.label} className="flex min-w-0 gap-2">
-            <dt className="flex-none text-muted">{f.label}</dt>
-            <dd className="min-w-0 truncate text-end font-mono text-fg sm:ms-auto" title={f.value}>
+          <div key={f.label} className="min-w-0">
+            <dt className="text-[12px] text-muted">{f.label}</dt>
+            <dd className="mt-0.5 font-mono text-[13px] font-medium break-words" title={f.value}>
               {f.value}
             </dd>
           </div>

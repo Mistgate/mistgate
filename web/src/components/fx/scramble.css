@@ -1,0 +1,11 @@
+/* The cells of a figure that scrambles in (components/fx/scramble.tsx): quiet grey while they shuffle, the figure's own colour once placed. */
+.fz-scr-c {
+  display: inline-block;
+  white-space: pre;
+  color: var(--muted);
+  transition: color 0.28s var(--e);
+  will-change: transform, opacity;
+}
+.fz-scr-c.in {
+  color: inherit;
+}

@@ -159,17 +159,30 @@ async function press(el: Element | null | undefined) {
   });
   await settle();
 }
-const tick = (name: string) => document.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${en["bulk.select"].replace("{name}", name)}"]`)!;
-const tickAll = () => document.querySelector<HTMLInputElement>(`input[aria-label="${en["bulk.selectAll"]}"]`)!;
-const bar = () => document.querySelector<HTMLElement>("[data-bulk-bar]");
+const tick = (name: string) => document.querySelector<HTMLElement>(`[role=checkbox][aria-label="${en["bulk.select"].replace("{name}", name)}"]`)!;
+const ticked = (name: string) => tick(name).getAttribute("aria-checked") === "true";
+const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
+const bar = () => document.querySelector<HTMLElement>("[data-nodes-bar]");
+const moreButton = () => bar()?.querySelector<HTMLElement>(`button[aria-label="${en["bulk.more"]}"]`);
 const barButton = (label: string) => [...(bar()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim().startsWith(label));
 const menuItem = (label: string) => [...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent?.startsWith(label));
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]");
 const inDialog = (label: string) => [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
 const row = (name: string) => [...document.querySelectorAll("[data-batch] li")].find((li) => li.querySelector("b")?.textContent === name) as HTMLElement | undefined;
-const batchText = () => document.querySelector("[data-batch]")?.textContent ?? "";
+const batchText = () => bar()?.textContent ?? "";
+/** The check column opens with "Select". */
+async function selecting() {
+  if (!button(en["nv.done"])) await press(button(en["nv.select"]));
+}
 async function pick(...names: string[]) {
+  await selecting();
   for (const n of names) await press(tick(n));
+}
+/** Every shown node, by the quick pick. */
+async function tickAll() {
+  await selecting();
+  await press(button(en["bulk.pick"]));
+  await press(menuItem(en["bulk.pick.shown"]));
 }
 async function enter(el: Element | null, value: string) {
   const area = el as HTMLTextAreaElement;
@@ -224,30 +237,30 @@ describe("the bar", () => {
     await mount();
     expect(bar()).toBeNull();
     await pick("de1");
-    expect(bar()?.textContent).toContain("1node selected");
+    expect(bar()?.textContent).toContain("1 node selected");
     await pick("nl1");
-    expect(bar()?.textContent).toContain("2nodes selected");
+    expect(bar()?.textContent).toContain("2 nodes selected");
     act(() => root?.unmount());
     host?.remove();
 
     await mount({ me: { admin: { id: "adm_2", role: Role.HELPER } } });
     expect(tick("de1")).toBeNull();
-    expect([...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === en["bulk.pick"])).toBe(false);
+    expect(button(en["nv.select"])).toBeUndefined();
   });
 
   it("says how much of the selection the filter hides", async () => {
     await mount();
     await pick("de1", "nl1", "lv1");
-    await press([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.startsWith(en["nodes.problems"])));
-    expect(bar()?.textContent).toContain("3nodes selected");
+    await press([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.startsWith(en["nv.f.problems"])));
+    expect(bar()?.textContent).toContain("3 nodes selected");
     expect(bar()?.textContent).toContain("2 hidden by the filter");
   });
 
   it("clears on Esc, but not while a menu is open", async () => {
     await mount();
     await pick("de1");
-    await press(barButton(en["bulk.check"]));
-    expect(menuItem(en["bulk.ports"])).toBeTruthy();
+    await press(moreButton());
+    expect(menuItem(en["bulk.password"])).toBeTruthy();
     await act(async () => void document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     await settle();
     expect(bar()).not.toBeNull();
@@ -257,21 +270,23 @@ describe("the bar", () => {
     await act(async () => void document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     await settle();
     expect(bar()).toBeNull();
-    expect(tick("de1").checked).toBe(false);
+    expect(ticked("de1")).toBe(false);
+    // the selecting mode ended with the next Esc
+    expect(button(en["nv.select"])).toBeTruthy();
   });
 
   it("a quick pick replaces the selection", async () => {
     await mount();
     await pick("de1", "nl1");
-    await press([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === en["bulk.pick"]));
+    await press(button(en["bulk.pick"]));
     await press(menuItem(en["bulk.pick.problems"]));
-    expect(tick("lv1").checked).toBe(true);
-    expect(tick("de1").checked).toBe(false);
-    expect(bar()?.textContent).toContain("1node selected");
-    await press([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === en["bulk.pick"]));
+    expect(ticked("lv1")).toBe(true);
+    expect(ticked("de1")).toBe(false);
+    expect(bar()?.textContent).toContain("1 node selected");
+    await press(button(en["bulk.pick"]));
     await press(menuItem(en["bulk.pick.password"]));
-    expect(["de1", "nl1", "fi1", "lv1", "msk1"].filter((n) => tick(n).checked)).toEqual(["de1", "msk1"]);
-    await press([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === en["bulk.pick"]));
+    expect(["de1", "nl1", "fi1", "lv1", "msk1"].filter((n) => ticked(n))).toEqual(["de1", "msk1"]);
+    await press(button(en["bulk.pick"]));
     await press(menuItem(en["bulk.clear"]));
     expect(bar()).toBeNull();
   });
@@ -279,11 +294,12 @@ describe("the bar", () => {
   it("an action no selected node can take is off, and says why", async () => {
     await mount();
     await pick("lv1");
-    await press(barButton(en["bulk.check"]));
-    const ports = menuItem(en["bulk.ports"])!;
-    expect(ports.getAttribute("aria-disabled")).toBe("true");
-    expect(ports.textContent).toContain(en["bulk.skip.offline"]);
-    expect(barButton(en["bulk.password"])?.disabled).toBe(true);
+    const ports = barButton(en["bulk.ports"])!;
+    expect(ports.disabled).toBe(true);
+    await press(moreButton());
+    const password = menuItem(en["bulk.password"])!;
+    expect(password.getAttribute("aria-disabled")).toBe("true");
+    expect(password.textContent).toContain(en["bulk.skip.noAccess"]);
   });
 });
 
@@ -292,9 +308,8 @@ describe("checks", () => {
     const calls = held();
     api.checkPorts.mockImplementation(calls.fn);
     await mount();
-    await press(tickAll());
-    await press(barButton(en["bulk.check"]));
-    await press(menuItem(en["bulk.ports"]));
+    await tickAll();
+    await press(barButton(en["bulk.ports"]));
     expect(calls.pending()).toEqual(["nod_de1"]);
     expect(row("lv1")?.textContent).toContain(en["bulk.skip.offline"]);
     expect(row("msk1")?.textContent).toContain(en["bulk.skip.noProfiles"]);
@@ -316,14 +331,47 @@ describe("checks", () => {
     expect(api.checkPorts).toHaveBeenCalledTimes(3);
   });
 
+  it("the batch takes the buttons' place: a count while it runs, then what came of it, a fold for the list, Got it", async () => {
+    const calls = held();
+    api.checkPorts.mockImplementation(calls.fn);
+    await mount();
+    await pick("de1", "nl1");
+    await press(barButton(en["bulk.ports"]));
+    // running: the title, "1 of 2", a stop; the actions are gone
+    expect(bar()?.textContent).toContain(en["bulk.title.ports"]);
+    expect(bar()?.textContent).toContain("1 of 2");
+    expect(barButton(en["bulk.stop"])).toBeTruthy();
+    expect(barButton(en["bulk.doctor"])).toBeUndefined();
+    expect(document.querySelector("[data-batch]")).not.toBeNull(); // the nodes' list is open with the batch
+
+    await calls.answer("nod_de1", { errorCode: "", ports: [{ verdict: "ok" }], tcp: [] });
+    expect(bar()?.textContent).toContain("2 of 2");
+    await calls.answer("nod_nl1", { errorCode: "", ports: [{ verdict: "ok" }], tcp: [] });
+    expect(bar()?.textContent).toContain("Ports checked on 2 of 2 nodes");
+    expect(barButton(en["bulk.stop"])).toBeUndefined();
+
+    // the arrow folds the list in and out
+    const arrow = () => bar()?.querySelector<HTMLElement>(`button[aria-label="${en["nv.bulk.details"]}"]`);
+    expect(arrow()?.getAttribute("aria-expanded")).toBe("true");
+    await press(arrow());
+    expect(document.querySelector("[data-batch]")).toBeNull();
+    await press(arrow());
+    expect(document.querySelector("[data-batch]")).not.toBeNull();
+
+    // Got it closes the batch; the selection stays, the actions are back
+    await press(barButton(en["nv.bulk.got"]));
+    expect(document.querySelector("[data-batch]")).toBeNull();
+    expect(bar()?.textContent).toContain("2 nodes selected");
+    expect(barButton(en["bulk.doctor"])).toBeTruthy();
+  });
+
   it("the doctor runs at most four nodes at once", async () => {
     const calls = held();
     api.runDoctor.mockImplementation(calls.fn);
     const six = ["de1", "de2", "nl1", "nl2", "fi1", "fi2"].map((n) => node(n));
     await mount({ nodes: six });
-    await press(tickAll());
-    await press(barButton(en["bulk.check"]));
-    await press(menuItem(en["bulk.doctor"]));
+    await tickAll();
+    await press(barButton(en["bulk.doctor"]));
     expect(calls.pending()).toEqual(["nod_de1", "nod_de2", "nod_nl1", "nod_nl2"]);
     const report = (items: { status: DoctorStatus; acceptedUnix?: number }[]) => ({ nodes: [{ agentSupported: true, hasReport: true, items }] });
     await calls.answer("nod_de2", report([{ status: DoctorStatus.FAIL }, { status: DoctorStatus.FAIL }, { status: DoctorStatus.WARN, acceptedUnix: 5 }]));
@@ -340,7 +388,8 @@ describe("SSH", () => {
     api.rotateNodeServerPassword.mockImplementation(calls.fn);
     await mount();
     await pick("de1", "nl1", "fi1");
-    await press(barButton(en["bulk.password"]));
+    await press(moreButton());
+    await press(menuItem(en["bulk.password"]));
     expect(dialog()?.textContent).toContain("Change the SSH password on 2 nodes");
     expect(dialog()?.textContent).toContain(en["bulk.password.warn"]);
     expect(dialog()?.textContent).toContain(`fi1 — ${en["bulk.skip.keyOnly"]}`);
@@ -367,7 +416,7 @@ describe("SSH", () => {
     // Retry takes only the failed one
     api.rotateNodeServerPassword.mockReset();
     api.rotateNodeServerPassword.mockResolvedValue({ rotated: true });
-    await press([...document.querySelectorAll("[data-batch] button")].find((b) => b.textContent?.includes("Retry for 1")));
+    await press([...(bar()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.includes("Retry for 1")));
     expect(api.rotateNodeServerPassword).toHaveBeenCalledTimes(1);
     expect(api.rotateNodeServerPassword).toHaveBeenCalledWith({ nodeId: "nod_nl1", newPassword: "", generate: true, confirm: true });
   });
@@ -376,7 +425,7 @@ describe("SSH", () => {
     api.addNodeServerKey.mockResolvedValue({ key: {} });
     await mount();
     await pick("de1", "lv1");
-    await press(barButton(en["bulk.more"]));
+    await press(moreButton());
     await press(menuItem(en["bulk.bindKey"]));
     const field = dialog()!.querySelector("textarea");
     await enter(field, "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ==\n-----END OPENSSH PRIVATE KEY-----");
@@ -404,7 +453,7 @@ describe("SSH", () => {
     });
     await mount();
     await pick("de1", "nl1");
-    await press(barButton(en["bulk.more"]));
+    await press(moreButton());
     await press(menuItem(en["bulk.unbindKey"]));
     const field = dialog()!.querySelector("textarea");
     await enter(field, panelFp);
@@ -437,7 +486,7 @@ describe("agent", () => {
     await mount();
     await pick("de1", "fi1", "msk1");
     const update = barButton(en["bulk.agent"])!;
-    expect(update.textContent).toContain("· 1");
+    expect(update.textContent).toContain("1");
     await press(update);
     expect(dialog()?.querySelectorAll("input[type=checkbox]")).toHaveLength(1);
     expect(dialog()?.textContent).toContain(`fi1 — ${en["bulk.skip.current"]}`);

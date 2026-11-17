@@ -1,0 +1,381 @@
+/*
+ * What the Nodes screen's utilities cannot say (screens/nodes*.tsx): key frames, the dotted halos and the skin of the map.
+ * The values are the redesign board's (pn.css, the fz- rules): its --e and --spring are the --e and --ease-spring of index.css.
+ */
+
+/* the live dot of the title line: a ring that spreads and fades */
+@keyframes fz-live {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.fz-live-dot {
+  animation: fz-live 2.4s ease-out infinite;
+}
+
+/* the first node's slot blinks while it waits */
+@keyframes fz-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.fz-slot-dot {
+  animation: fz-blink 1.6s var(--e) infinite;
+}
+
+/* a meter fills from empty, a figure pops in */
+@keyframes fz-grow {
+  from {
+    width: 0;
+  }
+}
+.fz-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--w);
+  border-radius: 3px;
+  background: var(--meter, var(--accent-mark));
+  animation: fz-grow 0.6s var(--e) both;
+}
+[dir="rtl"] .fz-meter::after {
+  inset: 0 0 0 auto;
+}
+@keyframes fz-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+/* the bar of the selected nodes: it rises with a spring, a halo of dots lies around it */
+@keyframes fz-bulk {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fz-bulk {
+  animation: fz-bulk 0.4s var(--ease-spring) both;
+}
+.fz-bulk::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -20px;
+  z-index: -1;
+  width: min(720px, 120%);
+  height: 160px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 80%, transparent) 1.2px, transparent 1.7px);
+  background-size: 10px 10px;
+  -webkit-mask-image: radial-gradient(closest-side, #000 0, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 0, transparent 100%);
+  opacity: 0.35;
+}
+.fz-bulk-pop {
+  animation: fz-pop 0.3s var(--ease-spring) both;
+}
+.fz-bulk-in {
+  animation: mg-up 0.25s var(--e) both;
+}
+:root[data-theme="light"] .fz-bulk {
+  background: #fff;
+  box-shadow:
+    0 16px 40px rgb(20 20 30 / 0.16),
+    0 0 0 1px rgb(20 20 30 / 0.06);
+}
+/* on a phone the bar floats above the dock, and the toast keeps clear of it */
+@media (width >= 45rem) {
+  body:has([data-nodes-bar]) [data-toast-viewport] {
+    bottom: 100px;
+  }
+}
+@media (width < 45rem) {
+  body:has([data-nodes-bar]) [data-toast-viewport] {
+    bottom: 176px;
+  }
+}
+
+/* the first state: a dotted glow in the corner of the card, a ghost list fading under it */
+.fz-first::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 70%, transparent) 1.1px, transparent 1.6px);
+  background-size: 10px 10px;
+  -webkit-mask-image:
+    radial-gradient(58% 95% at 26% 100%, #000 0, rgb(0 0 0 / 0.55) 38%, transparent 76%),
+    linear-gradient(to top, transparent 84px, rgb(0 0 0 / 0.35) 130px, #000 220px);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    radial-gradient(58% 95% at 26% 100%, #000 0, rgb(0 0 0 / 0.55) 38%, transparent 76%),
+    linear-gradient(to top, transparent 84px, rgb(0 0 0 / 0.35) 130px, #000 220px);
+  mask-composite: intersect;
+  opacity: 0.5;
+}
+@media (width < 75rem) {
+  .fz-first::before {
+    -webkit-mask-image: radial-gradient(70% 60% at 30% 60%, #000 0, transparent 75%);
+    mask-image: radial-gradient(70% 60% at 30% 60%, #000 0, transparent 75%);
+    -webkit-mask-composite: initial;
+    mask-composite: initial;
+  }
+}
+.fz-ghosts {
+  -webkit-mask-image: linear-gradient(#000 60%, transparent);
+  mask-image: linear-gradient(#000 60%, transparent);
+}
+
+/* the map: wires flow, the lit ones faster; the fz-skin class dresses the node graph in the board's look */
+@keyframes fz-flow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fz-live-dot,
+  .fz-slot-dot {
+    animation: none;
+  }
+}
+
+/*
+ * The bar over the list (view switch, state chips, search, filters and "Select"): it folds by ITS OWN width, not the window's.
+ *   wide      the switch and the chips, the search at the end, 200..320px
+ *   to 960    the chips take the middle and fade out at their end, the search is a 36px button that opens on a click
+ *   to 720    the chips drop to a line of their own
+ *   to 520    the switch takes a whole line, the chips and the search button share the next
+ * A search that holds a word (data-has) or has the focus stays open.
+ */
+.fz-bar {
+  container: fzb / inline-size;
+}
+.fz-bar > .fz-seg {
+  flex: none;
+}
+.fz-ch {
+  flex: none;
+}
+.fz-ch > * {
+  flex: none;
+}
+.fz-q {
+  order: 0;
+  flex: 1 1 200px;
+  max-width: 320px;
+  margin-inline-start: auto;
+  transition:
+    flex-basis 0.3s var(--e),
+    padding 0.3s var(--e),
+    border-color 0.15s var(--e);
+}
+.fz-q input {
+  transition: opacity 0.2s var(--e);
+}
+.fz-sbw {
+  order: 0;
+}
+@container fzb (max-width: 960px) {
+  .fz-seg {
+    order: 1;
+  }
+  .fz-ch {
+    order: 2;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 20px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 20px), transparent);
+  }
+  [dir="rtl"] .fz-ch {
+    -webkit-mask-image: linear-gradient(270deg, #000 calc(100% - 20px), transparent);
+    mask-image: linear-gradient(270deg, #000 calc(100% - 20px), transparent);
+  }
+  .fz-q {
+    order: 3;
+    flex: 0 0 36px;
+    min-width: 36px;
+    margin-inline-start: 0;
+    padding: 0 9px;
+    gap: 0;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .fz-q input {
+    width: 0;
+    flex: 0 0 0;
+    opacity: 0;
+    padding: 0;
+  }
+  .fz-q:focus-within,
+  .fz-q[data-has] {
+    flex-basis: 240px;
+    padding: 0 12px;
+    gap: 8px;
+    cursor: text;
+  }
+  .fz-q:focus-within input,
+  .fz-q[data-has] input {
+    flex: 1;
+    width: auto;
+    opacity: 1;
+  }
+  .fz-q:hover {
+    border-color: color-mix(in srgb, var(--text) 26%, transparent);
+  }
+  .fz-sbw {
+    order: 4;
+  }
+}
+@container fzb (max-width: 720px) {
+  .fz-ch {
+    order: 5;
+    flex: 1 1 100%;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .fz-q {
+    order: 2;
+    margin-inline-start: auto;
+  }
+  .fz-q:focus-within,
+  .fz-q[data-has] {
+    flex: 1 1 140px;
+    margin-inline-start: 0;
+  }
+  .fz-sbw {
+    order: 3;
+  }
+}
+@container fzb (max-width: 520px) {
+  .fz-seg {
+    order: 1;
+    flex: 1 1 100%;
+    display: flex;
+  }
+  .fz-seg > * {
+    flex: 1;
+  }
+  .fz-ch {
+    order: 3;
+    flex: 1 1 0;
+    min-width: 0;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 20px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 20px), transparent);
+  }
+  [dir="rtl"] .fz-ch {
+    -webkit-mask-image: linear-gradient(270deg, #000 calc(100% - 20px), transparent);
+    mask-image: linear-gradient(270deg, #000 calc(100% - 20px), transparent);
+  }
+  .fz-q {
+    order: 4;
+    margin-inline-start: 0;
+  }
+  .fz-sbw {
+    order: 5;
+  }
+  .fz-q:focus-within,
+  .fz-q[data-has] {
+    order: 2;
+    flex: 1 1 100%;
+  }
+}
+
+/*
+ * The map (screens/nodes-map.tsx) is the node graph of components/graph; .fz-skin dresses it in the board's look (fz-cv, fz-gn,
+ * fz-gt): a 20px grid of dots on the card colour, 56px cards on a hairline, the selected one ringed in the accent, a 40px
+ * toolbar of 32px buttons. Only this map wears it: the node page's graph keeps its own.
+ */
+.fz-skin .mg-graph {
+  --gstep: 20px;
+  --gdot: 12%;
+  --node-bg: var(--surface);
+  --node-border: var(--border);
+  --shadow-node: none;
+  background-color: var(--surface);
+  border-color: var(--border);
+  border-radius: 16px;
+}
+:root[data-theme="light"] .fz-skin .mg-graph {
+  background-color: var(--surface);
+  --shadow-node: none;
+}
+.fz-skin .mg-gnode {
+  border-radius: 12px;
+  transition:
+    opacity 0.2s var(--e),
+    border-color 0.15s var(--e),
+    box-shadow 0.2s var(--e);
+}
+.fz-skin .mg-gnode:hover {
+  border-color: color-mix(in srgb, var(--text) 28%, transparent);
+}
+.fz-skin .mg-gnode:has(.fz-raise) {
+  background: var(--surface-2);
+}
+.fz-skin .mg-gnode:has(.fz-bad) {
+  border-color: var(--danger);
+}
+.fz-skin .mg-gnode[data-selected] {
+  border-color: var(--accent-mark);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-mark) 18%, transparent);
+}
+.fz-skin .mg-gnode[data-dim] {
+  opacity: 0.3;
+  filter: none;
+}
+.fz-skin .mg-gnode:focus-visible {
+  outline: 2px solid var(--accent-mark);
+  outline-offset: 2px;
+}
+.fz-skin .mg-graph[data-mode="drag"] .mg-gnode:active {
+  border-color: var(--accent-line);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+.fz-skin .mg-gtoolbar {
+  top: 12px;
+  right: auto;
+  inset-inline-end: 12px;
+  gap: 2px;
+  height: 40px;
+  padding: 0 4px;
+  border-color: var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.fz-skin .mg-gtoolbar button {
+  width: 32px;
+  height: 32px;
+}
+.fz-skin .mg-glegend {
+  left: auto;
+  inset-inline-start: 16px;
+  bottom: 12px;
+}
+.fz-skin .mg-glegend-btn {
+  border-radius: 8px;
+  background: var(--surface-2);
+  backdrop-filter: none;
+  font-weight: 500;
+}
+.fz-skin .mg-gminimap {
+  border-color: var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  backdrop-filter: none;
+  box-shadow: none;
+}

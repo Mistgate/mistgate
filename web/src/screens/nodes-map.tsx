@@ -2,11 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, type DragEvent, type ReactNode } from "react";
 import { Graph, HelpGroup, Kbd, KeyRow, computeLayout, type GraphEdge, type GraphNode } from "@/components/graph";
+import "./nodes.css";
 import { Flag } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
-import { Button } from "@/components/ui/button";
 import { Pending } from "@/components/ui/query-error";
+import { StatusDot, type StatusKind } from "@/components/ui/status";
+import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Switch } from "@/components/ui/switch";
+import { Button, buttonClass } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
@@ -14,6 +17,9 @@ import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
+import { agentLinked } from "@/lib/node-status";
+import { meQuery } from "@/lib/session";
+import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { findNodes, fleetMap, relayPairRefusal, type FleetNodeIn, type FmNode, type FmVerdict } from "@/lib/fleet-map";
 import { countryQuery } from "@/lib/globalping";
 import { checksQuery, countryColumn } from "@/lib/health";
@@ -21,14 +27,13 @@ import type { Plain } from "@/lib/plain";
 import { nodeQuery } from "@/lib/queries";
 import { relaysQuery, type RelayMsg } from "@/lib/relay";
 import { routeMap } from "@/lib/route-map";
-import { protocolShort } from "@/lib/series";
 import { hintOf } from "@/lib/ways";
 import { AddRelayDialog, RemoveRelay, ChangeRelayPort, useRelayRuns, type Entry } from "@/screens/node/relays";
-import { CheckPortsButton, usePortCheck } from "@/screens/node/ports";
+import { usePortCheck } from "@/screens/node/ports";
 import { useInSubscriptions } from "@/screens/node/subs-switches";
 import { useWays } from "@/screens/node/ways";
 import { badgeKind, say } from "@/screens/node/ways-graph";
-import { Badge, Dot, PopItem, type ChipKind } from "@/screens/node/ways-map-parts";
+import { Badge, PopItem } from "@/screens/node/ways-map-parts";
 
 // The Nodes page's Map view: People on the left, the nodes in columns by role, the exits on the right; a wire per way people
 // reach a node, per pair of nodes a relay joins, and per node to its exits. The mapping is lib/fleet-map.ts's (pure, with
@@ -39,7 +44,7 @@ type Node = Plain<NodeMsg>;
 const NODE = "application/x-mg-node";
 const colors = { udp: "var(--muted)" };
 
-const statusDot: Record<FmNode["status"], ChipKind> = { online: "ok", blip: "warn", offline: "bad", pending: "off", updating: "busy" };
+const statusKind: Record<FmNode["status"], StatusKind> = { online: "ok", blip: "blip", offline: "bad", pending: "off", updating: "busy" };
 const verdictOf = (word: string | undefined): FmVerdict => (word === "ok" ? "ok" : word === "partial" ? "partial" : word === "blocked" || word === "listed" ? "blocked" : "unknown");
 
 type Dialog = { kind: "draw"; entry: Entry; exitId?: string } | { kind: "remove"; r: RelayMsg } | { kind: "port"; r: RelayMsg };
@@ -109,7 +114,7 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
       id: n.id,
       title: n.name,
       label: n.name,
-      width: 236,
+      width: 224,
       headless: true,
       anchors: true,
       draggable: true,
@@ -119,51 +124,38 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
         { id: "out", side: "out", type: "udp" },
       ],
       body: (
-        <div className="flex flex-col gap-1.5 p-3.5" onDragOver={overNode} onDrop={dropOn(n)}>
-          <div className="flex items-center gap-2">
-            <Flag code={n.countryCode} size={16} />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{n.name}</span>
-            <Badge kind={statusDot[n.status]}>{t(`fm.st.${n.status}`)}</Badge>
+        <div className={cx("grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 px-3", n.status === "offline" && "fz-bad")} onDragOver={overNode} onDrop={dropOn(n)}>
+          <Flag code={n.countryCode} size={16} />
+          <div className="min-w-0">
+            <b className="block truncate font-mono leading-5 font-medium tabular-nums">{n.name}</b>
+            <span className="block truncate text-xs leading-4 text-muted">{n.status === "offline" ? t("fm.st.offline") : n.role === "entry" || n.role === "idle" ? [src.location || fmt.country(n.countryCode), t(n.role === "entry" ? "fm.entryOnly" : "fm.idle")].filter(Boolean).join(" · ") : sub}</span>
           </div>
-          <p className="text-[12px] leading-snug text-muted">{sub}</p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {n.role === "entry" && <Badge kind="busy">{t("fm.entryOnly")}</Badge>}
-            {n.role === "idle" && <span className="text-[11.5px] text-muted">{t("fm.idle")}</span>}
-            {n.protocols.map((p) => (
-              <span key={p} className="inline-flex h-[20px] items-center rounded-full bg-surface-2 px-2 text-[11px] font-medium text-fg">
-                {protocolShort(p)}
-              </span>
-            ))}
-            {owner && n.status === "online" && (
-              <span
-                data-nodrag
-                draggable
-                onDragStart={(e) => e.dataTransfer.setData(NODE, n.nodeId)}
-                title={t("fm.relayHandleHint")}
-                className="ms-auto inline-flex h-[20px] cursor-grab items-center gap-1 rounded-full border border-dashed border-line px-2 text-[10.5px] font-semibold text-muted transition-colors hover:border-accent hover:text-accent-text"
-              >
-                <Icon name="chevronRight" size={11} />
-                {t("fm.relayHandle")}
-              </span>
-            )}
-          </div>
+          <span title={t(`fm.st.${n.status}`)} className="flex">
+            <StatusDot kind={statusKind[n.status]} />
+          </span>
         </div>
       ),
     };
   };
   const plain = (id: string, w: number, rank: number, body: ReactNode, label: string, ports: GraphNode["ports"]): GraphNode => ({ id, title: label, label, width: w, headless: true, anchors: true, draggable: true, selectable: false, rank, ports, body });
+  // the cards of the two ends: the people at the start, the places the traffic leaves to at the end (the board's raised cards, 184px)
+  const end = (glyph: ReactNode, chip: string, title: string, sub: string) => (
+    <div className="fz-raise grid h-14 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 px-3">
+      <span aria-hidden className={cx("grid size-7 place-items-center rounded-ctl", chip)}>
+        {glyph}
+      </span>
+      <div className="min-w-0">
+        <b className="block truncate leading-5 font-medium">{title}</b>
+        <span className="block truncate text-xs leading-4 text-muted">{sub}</span>
+      </div>
+    </div>
+  );
   const graphNodes: GraphNode[] = [
     plain(
       "people",
-      190,
+      184,
       0,
-      <div className="p-3.5">
-        <div className="flex items-center gap-2">
-          <Icon name="people" size={15} />
-          <span className="text-[14px] font-semibold">{t("fm.people", { country: fmt.country(country) })}</span>
-        </div>
-        <p className="mt-1 text-[12px] text-muted">{t("fm.people.sub")}</p>
-      </div>,
+      end(<Icon name="people" size={16} />, "bg-step text-sec", t("fm.people", { country: fmt.country(country) }), t("fm.people.sub")),
       t("fm.people", { country: fmt.country(country) }),
       [{ id: "out", side: "out", type: "udp" }],
     ),
@@ -171,15 +163,9 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
     ...model.exits.map((e) =>
       plain(
         `exit:${e}`,
-        200,
+        184,
         4,
-        <div className="p-3.5">
-          <div className="flex items-center gap-2">
-            <Icon name={e === "warp" ? "cloud" : "globe"} size={15} />
-            <span className="text-[14px] font-semibold">{t(e === "warp" ? "fm.warp" : "fm.internet")}</span>
-          </div>
-          <p className="mt-1 text-[12px] text-muted">{t(e === "warp" ? "fm.warp.sub" : "fm.internet.sub")}</p>
-        </div>,
+        end(<Icon name={e === "warp" ? "cloud" : "globe"} size={16} />, e === "warp" ? "bg-tone-sand-bg text-tone-sand" : "bg-tone-sky-bg text-tone-sky", t(e === "warp" ? "fm.warp" : "fm.internet"), t(e === "warp" ? "fm.warp.sub" : "fm.internet.sub")),
         t(e === "warp" ? "fm.warp" : "fm.internet"),
         [{ id: "in", side: "in", type: "udp" }],
       ),
@@ -211,7 +197,7 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
       edges={edges}
       typeColors={colors}
       ariaLabel={t("fm.fleetMap")}
-      height="fit"
+      height={680}
       layoutKey="fleetmap"
       autoArrange
       arrange={(sizes, es) => computeLayout(sizes, es, { colGap: 76, rowGap: 14 })}
@@ -250,11 +236,11 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
               if (e.key === "Enter" && matches[0]) focusNode(matches[0]);
               if (e.key === "Escape") setQ("");
             }}
-            className="h-9 w-full rounded-ctl border border-line bg-surface ps-9 pe-3 text-[13px] outline-none focus:border-accent"
+            className="h-9 w-full rounded-field border border-line bg-surface ps-9 pe-3 text-sm outline-none transition-colors duration-150 focus:border-accent-line"
           />
         </div>
         {q.trim() && (
-          <ul className="absolute z-20 mt-1 w-full rounded-card border border-line bg-surface p-1 shadow-(--shadow-toast)">
+          <ul className="absolute z-20 mt-1 w-full rounded-pop border border-line bg-surface p-1.5 shadow-(--shadow-pop)">
             {matches.length === 0 && <li className="px-2.5 py-2 text-[12.5px] text-muted">{t("fm.searchNone")}</li>}
             {matches.slice(0, 6).map((id) => (
               <li key={id}>
@@ -264,11 +250,11 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
           </ul>
         )}
       </div>
-      <div className="relative min-w-0">
+      <div className="fz-skin relative min-w-0">
         {graph}
         {(selected || wire) && (
           // over the canvas's right edge, under its toolbar: the map keeps its size and its fit
-          <aside className="absolute inset-e-3 top-[62px] bottom-3 z-20 flex w-[340px] max-w-[calc(100%-24px)] flex-col overflow-y-auto rounded-card border border-line bg-surface shadow-(--shadow-toast)" aria-label={t("fm.d.actions")}>
+          <aside className="absolute inset-e-3 top-16 z-20 flex max-h-[calc(100%-76px)] w-80 max-w-[calc(100%-24px)] animate-[mg-up_0.25s_var(--e)_both] flex-col overflow-hidden rounded-card border border-line bg-surface-2 max-md:inset-s-3 max-md:top-auto max-md:bottom-11 max-md:w-auto" aria-label={t("fm.d.actions")}>
             {wire && wire.kind === "relay" && wire.relays ? (
               <WireDrawer key={wire.id} wire={wire} nodes={nodes} owner={owner} onDialog={setDlg} onClose={() => setWireId(null)} />
             ) : selected ? (
@@ -284,49 +270,85 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
   );
 }
 
+/** The head of a drawer (the board's card): what it is about at the start, a cross at the end. */
 function DrawerHead({ title, sub, onClose, children }: { title: ReactNode; sub?: ReactNode; onClose: () => void; children?: ReactNode }) {
   const t = useT();
   return (
-    <div className="flex items-start gap-2 border-b border-line p-3.5">
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex items-center gap-2 text-[15px] font-semibold">{title}</div>
-        {sub && <p className="text-[12px] text-muted">{sub}</p>}
-        {children}
+    <header className="flex flex-col gap-1 px-4 pt-4">
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-base leading-6 font-medium">{title}</div>
+        <button type="button" aria-label={t("fm.d.close")} onClick={onClose} className="-my-1 -me-2 grid size-8 flex-none place-items-center rounded-field text-sec transition-colors duration-150 ease-out hover:bg-step hover:text-fg">
+          <Icon name="x" size={16} />
+        </button>
       </div>
-      <button type="button" aria-label={t("fm.d.close")} onClick={onClose} className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg">
-        <Icon name="x" size={14} />
-      </button>
-    </div>
+      {sub && <p className="text-[13px] text-muted">{sub}</p>}
+      {children}
+    </header>
   );
 }
 
-const section = "flex flex-col gap-1.5 border-b border-line p-3.5 last:border-b-0";
-const h = "text-[11px] font-semibold tracking-[0.04em] text-faint uppercase";
-const linkCls = "flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium hover:bg-surface-2";
+/** A section of a drawer: a hairline above it, its small heading, its count at the end. */
+function Section({ title, count, children }: { title: ReactNode; count?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="flex flex-col border-t border-line px-4 py-3 first:border-t-0">
+      <h4 className="mb-1 flex items-baseline justify-between text-[13px] font-medium text-sec">
+        {title}
+        {count !== undefined && <span className="text-xs font-normal text-muted">{count}</span>}
+      </h4>
+      {children}
+    </section>
+  );
+}
+const muted = "text-[13px] leading-6 text-muted";
+const footerGrid = "grid grid-cols-2 gap-2 border-t border-line px-4 pt-3 pb-4";
 
 function NodeDrawer({ id, node, fm, country, owner, relays, onDialog, onClose }: { id: string; node: Node; fm: FmNode; country: string; owner: boolean; relays: RelayMsg[]; onDialog: (d: Dialog) => void; onClose: () => void }) {
   const q = useQuery(nodeQuery(id));
   const t = useT();
+  const fmt = useFmt();
+  const word = t(`fm.st.${fm.status}`);
   return (
-    <div className="flex flex-col">
+    <>
       <DrawerHead
         title={
           <>
             <Flag code={fm.countryCode} size={16} />
-            {fm.name}
-            <Badge kind={statusDot[fm.status]}>{t(`fm.st.${fm.status}`)}</Badge>
+            <b className="font-mono font-medium tabular-nums">{fm.name}</b>
+            <span className={cx("inline-flex items-center gap-1.5 text-xs font-normal text-sec", `tone-${statusKind[fm.status]}`, fm.status === "offline" || fm.status === "blip" || fm.status === "updating" ? "tone-text" : "")}>
+              <StatusDot kind={statusKind[fm.status]} />
+              {word}
+            </span>
           </>
         }
-        sub={[node.location, node.address].filter(Boolean).join(" · ")}
+        sub={
+          <>
+            {[node.location || fmt.country(fm.countryCode)].filter(Boolean).join("")}
+            {node.location || fm.countryCode ? " · " : ""}
+            <span className="font-mono">{node.address}</span>
+          </>
+        }
         onClose={onClose}
-      >
-        <p className="text-[12px] text-muted">
-          {fm.load !== null ? `${t("fm.d.load")} ${fm.load}% · ` : ""}
-          {t("fm.d.people", { n: fm.online })}
-        </p>
-      </DrawerHead>
-      {q.data ? <NodeDrawerBody data={q.data} id={id} fm={fm} country={country} owner={owner} relays={relays} onDialog={onDialog} /> : <div className="p-3.5"><Pending /></div>}
-    </div>
+      />
+      <dl className="mx-4 mt-3 grid grid-cols-3 gap-2 pb-3">
+        {[
+          [t("nodes.col.online"), String(fm.online)],
+          [t("nodes.col.today"), fmt.bytes(node.trafficTodayBytes)],
+          [t("nodes.col.cpu"), node.hasMetrics ? `${Math.round(node.cpuPct)}%` : "—"],
+        ].map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-[12px] text-muted">{k}</dt>
+            <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {q.data ? (
+        <NodeDrawerBody data={q.data} id={id} fm={fm} country={country} owner={owner} relays={relays} onDialog={onDialog} />
+      ) : (
+        <div className="border-t border-line p-4">
+          <Pending />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -335,64 +357,82 @@ function NodeDrawerBody({ data, id, fm, country, owner, relays, onDialog }: { da
   const w = useWays(data);
   const subs = useInSubscriptions(id, fm.name);
   const ports = usePortCheck(id);
+  const role = useQuery(meQuery).data?.admin?.role;
   const model = routeMap({ node: { id, name: fm.name, address: data.node!.address, countryCode: fm.countryCode }, inbounds: data.inbounds, ways: w, country, warp: false, ipv6: { fact: w.ipv6, v6: w.v6 }, relaysKnown: owner });
   const out = relays.filter((r) => r.viaNodeId === id);
   const inn = relays.filter((r) => r.exitNodeId === id);
-  const dotOf = (s: InboundState): ChipKind => (s === InboundState.ACTIVE ? "ok" : s === InboundState.FAILED ? "bad" : s === InboundState.DISABLED ? "off" : "warn");
+  const dotOf = (s: InboundState): StatusKind => (s === InboundState.ACTIVE ? "ok" : s === InboundState.FAILED ? "bad" : s === InboundState.DISABLED ? "off" : "warn");
+  const inSubs = data.inbounds.filter((i) => i.directInSubscriptions).length;
+  const linked = agentLinked(data.node!.status);
   return (
     <>
-      <div className={section}>
-        <p className={h}>{t("fm.d.servers")}</p>
-        {data.inbounds.length === 0 && <p className="text-[12.5px] text-muted">{t("fm.idle")}</p>}
-        {data.inbounds.map((i) => (
-          <div key={i.id} className="flex items-center gap-2 text-[13px]">
-            <Dot kind={dotOf(i.state)} />
-            <span className="min-w-0 flex-1 truncate font-medium">{i.profileName}</span>
-            <span className="font-mono text-[11px] text-muted">{i.port}</span>
-            {owner && !i.cdn && i.enabled && (
-              <Switch checked={i.directInSubscriptions} disabled={subs.busy} aria-label={t("ways.subs.switch", { name: i.profileName })} onCheckedChange={(on) => void subs.toggle(i, on, t(on ? "wg.subs.in" : "wg.subs.out", { name: i.profileName }))} />
-            )}
-          </div>
-        ))}
-        {owner && data.inbounds.some((i) => !i.cdn && i.enabled) && <p className="text-[11px] text-faint">{t("fm.d.subs")}</p>}
-      </div>
-      <div className={section}>
-        <p className={h}>{t("fm.d.ways")}</p>
-        {model.ways.length === 0 && <p className="text-[12.5px] text-muted">{t("fm.d.noWays")}</p>}
-        {model.ways.map((x) => (
-          <div key={x.id} className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2 text-[13px] font-medium">
-              <span className="min-w-0 flex-1 truncate">{x.kind === "via" ? t("rm.way.via", { node: x.peer?.name ?? "" }) : t(`rm.way.${x.kind}` as MessageKey)}</span>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-line [scrollbar-width:thin]">
+        <Section title={t("fm.d.servers")} count={data.inbounds.length > 0 ? t("nv.map.inSubs", { n: String(inSubs), m: String(data.inbounds.length) }) : undefined}>
+          {data.inbounds.length === 0 && <p className={muted}>{t("fm.idle")}</p>}
+          {data.inbounds.map((i) => (
+            <div key={i.id} className="grid h-10 grid-cols-[28px_minmax(0,1fr)_auto_36px] items-center gap-2.5">
+              <ProtocolTag protocol={i.protocol} compact />
+              <b className="truncate font-medium">{i.profileName}</b>
+              <span className="flex items-center gap-2 font-mono text-xs text-muted">
+                <StatusDot kind={dotOf(i.state)} />
+                {i.port}
+              </span>
+              {owner && !i.cdn && i.enabled ? (
+                <Switch checked={i.directInSubscriptions} disabled={subs.busy} aria-label={t("ways.subs.switch", { name: i.profileName })} onCheckedChange={(on) => void subs.toggle(i, on, t(on ? "wg.subs.in" : "wg.subs.out", { name: i.profileName }))} />
+              ) : (
+                <span />
+              )}
+            </div>
+          ))}
+        </Section>
+        <Section
+          title={t("fm.d.ways")}
+          count={
+            <Link to="/nodes/$id" params={{ id }} search={{ tab: "ways", view: "graph", from: "map" }} className="text-sec underline decoration-line underline-offset-4 hover:text-fg hover:decoration-current">
+              {t("fm.waysMap")}
+            </Link>
+          }
+        >
+          {model.ways.length === 0 && <p className={muted}>{t("fm.d.noWays")}</p>}
+          {model.ways.map((x) => (
+            <div key={x.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-1.5">
+              <div className="min-w-0">
+                <b className="block truncate font-medium">{x.kind === "via" ? t("rm.way.via", { node: x.peer?.name ?? "" }) : t(`rm.way.${x.kind}` as MessageKey)}</b>
+                <span className="block text-xs leading-4 text-muted">{say(t, x.sub)}</span>
+              </div>
               <Badge kind={badgeKind[x.state]}>{say(t, x.badge)}</Badge>
             </div>
-            <p className="text-[11.5px] text-muted">{say(t, x.sub)}</p>
-          </div>
-        ))}
+          ))}
+        </Section>
+        <Section title={t("fm.d.relaysOut")}>
+          {out.length === 0 ? <p className={muted}>{t("fm.d.none")}</p> : <RelayLines list={out} side="entry" />}
+          {owner && fm.status === "online" && (
+            <button
+              type="button"
+              draggable
+              onDragStart={(e) => e.dataTransfer.setData(NODE, id)}
+              title={t("fm.relayHandleHint")}
+              onClick={() => onDialog({ kind: "draw", entry: { id, name: fm.name, cc: fm.countryCode } })}
+              className="mt-1 -ms-2 inline-flex h-8 cursor-pointer items-center gap-2 self-start rounded-ctl ps-2 pe-2.5 text-[13px] text-sec transition-colors duration-150 ease-out hover:bg-step hover:text-fg"
+            >
+              <Icon name="plus" size={16} />
+              {t("fm.d.addRelay")}
+            </button>
+          )}
+        </Section>
+        <Section title={t("fm.d.relaysIn")}>{inn.length === 0 ? <p className={muted}>{t("fm.d.none")}</p> : <RelayLines list={inn} side="exit" />}</Section>
       </div>
-      <div className={section}>
-        <p className={h}>{t("fm.d.relaysOut")}</p>
-        {out.length === 0 ? <p className="text-[12.5px] text-muted">{t("fm.d.none")}</p> : <RelayLines list={out} side="entry" />}
-        <p className={cx(h, "mt-1")}>{t("fm.d.relaysIn")}</p>
-        {inn.length === 0 ? <p className="text-[12.5px] text-muted">{t("fm.d.none")}</p> : <RelayLines list={inn} side="exit" />}
-      </div>
-      <div className="flex flex-col gap-0.5 p-2">
-        <Link to="/nodes/$id" params={{ id }} search={{ from: "map" }} className={linkCls}>
-          <Icon name="externalLink" size={14} />
+      <footer className={footerGrid}>
+        <Link to="/nodes/$id" params={{ id }} search={{ from: "map" }} className={cx(buttonClass("secondary", "lg"), "justify-center gap-2 px-2")}>
           {t("fm.openNode")}
         </Link>
-        <Link to="/nodes/$id" params={{ id }} search={{ tab: "ways", view: "graph", from: "map" }} className={linkCls}>
-          <Icon name="network" size={14} />
-          {t("fm.waysMap")}
-        </Link>
-        {owner && fm.status === "online" && (
-          <PopItem icon={<Icon name="plus" size={14} />} onClick={() => onDialog({ kind: "draw", entry: { id, name: fm.name, cc: fm.countryCode } })}>
-            {t("fm.d.addRelay")}
-          </PopItem>
+        {(role === Role.OWNER || role === Role.HELPER) && (
+          <Button variant="secondary" size="lg" className="justify-center gap-2 px-2" disabled={ports.isPending || !linked} title={linked ? undefined : t("ports.offline")} onClick={() => ports.mutate()}>
+            {ports.isPending ? <span aria-hidden className="size-3.5 animate-[mg-ui-spin_0.7s_linear_infinite] rounded-full border-[1.5px] border-current border-t-transparent" /> : null}
+            {ports.isPending ? t("ports.checking") : t("ports.check")}
+          </Button>
         )}
-        <div className="px-2.5 pt-1.5">
-          <CheckPortsButton data={data} run={ports} />
-        </div>
-      </div>
+      </footer>
       {subs.dialog}
     </>
   );
@@ -400,14 +440,14 @@ function NodeDrawerBody({ data, id, fm, country, owner, relays, onDialog }: { da
 
 function RelayLines({ list, side }: { list: RelayMsg[]; side: "entry" | "exit" }) {
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex flex-col">
       {list.map((r) => (
-        <li key={r.id} className="flex items-center gap-2 text-[12.5px]">
-          <Dot kind={r.enabled ? (r.state === InboundState.ACTIVE ? "ok" : r.state === InboundState.FAILED ? "bad" : "warn") : "off"} />
-          <span className="min-w-0 flex-1 truncate">
+        <li key={r.id} className="grid h-8 grid-cols-[8px_minmax(0,1fr)_auto] items-center gap-2.5">
+          <StatusDot kind={r.enabled ? (r.state === InboundState.ACTIVE ? "ok" : r.state === InboundState.FAILED ? "bad" : "warn") : "off"} />
+          <b className="truncate font-medium">
             {r.profileName} · {side === "entry" ? r.exitNodeName : r.viaNodeName}
-          </span>
-          <span className="font-mono text-[11px] text-muted">
+          </b>
+          <span className="font-mono text-xs text-muted">
             {r.network}/{r.port}
           </span>
         </li>
@@ -422,50 +462,60 @@ function WireDrawer({ wire, nodes, owner, onDialog, onClose }: { wire: NonNullab
   const list = wire.relays ?? [];
   const first = list[0]!;
   const entry = nodes.find((n) => n.id === first.viaNodeId);
-  const anyOff = list.some((r) => !r.enabled);
   return (
-    <div className="flex flex-col">
-      <DrawerHead title={`${first.viaNodeName} → ${first.exitNodeName}`} sub={t.n("fm.w.sub", list.length)} onClose={onClose} />
-      <div className={section}>
-        {list.map((r) => (
-          <div key={r.id} className="flex flex-col gap-1 rounded-lg border border-line p-2.5">
-            <div className="flex items-center gap-2 text-[13px]">
-              <Dot kind={r.enabled ? (r.state === InboundState.ACTIVE ? "ok" : r.state === InboundState.FAILED ? "bad" : "warn") : "off"} />
-              <span className="min-w-0 flex-1 truncate font-medium">{r.profileName}</span>
-              <span className="font-mono text-[11px] text-muted">
-                {r.network}/{r.port}
-              </span>
-            </div>
-            {owner && (
-              <div className="flex flex-wrap gap-1">
-                <Button size="xs" variant="ghost" onClick={() => runs.check(r)}>
-                  {t("wg.menu.check")}
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => (r.enabled ? runs.off(r) : runs.on(r))}>
-                  {r.enabled ? t("wg.menu.off") : t("wg.menu.on")}
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => onDialog({ kind: "port", r })}>
-                  {t("wg.menu.port")}
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => onDialog({ kind: "remove", r })}>
-                  {t("wg.menu.remove")}
-                </Button>
+    <>
+      <DrawerHead
+        title={
+          <b className="font-mono font-medium">
+            {first.viaNodeName} → {first.exitNodeName}
+          </b>
+        }
+        sub={t.n("fm.w.sub", list.length)}
+        onClose={onClose}
+      />
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-line px-4 py-3 [scrollbar-width:thin]">
+        <div className="flex flex-col gap-2">
+          {list.map((r) => (
+            <div key={r.id} className="flex flex-col gap-1 rounded-field border border-line p-2.5">
+              <div className="grid grid-cols-[8px_minmax(0,1fr)_auto] items-center gap-2.5">
+                <StatusDot kind={r.enabled ? (r.state === InboundState.ACTIVE ? "ok" : r.state === InboundState.FAILED ? "bad" : "warn") : "off"} />
+                <b className="truncate font-medium">{r.profileName}</b>
+                <span className="font-mono text-xs text-muted">
+                  {r.network}/{r.port}
+                </span>
               </div>
-            )}
-          </div>
-        ))}
+              {owner && (
+                <div className="flex flex-wrap gap-1">
+                  <Button size="xs" variant="ghost" onClick={() => runs.check(r)}>
+                    {t("wg.menu.check")}
+                  </Button>
+                  <Button size="xs" variant="ghost" onClick={() => (r.enabled ? runs.off(r) : runs.on(r))}>
+                    {r.enabled ? t("wg.menu.off") : t("wg.menu.on")}
+                  </Button>
+                  <Button size="xs" variant="ghost" onClick={() => onDialog({ kind: "port", r })}>
+                    {t("wg.menu.port")}
+                  </Button>
+                  <Button size="xs" variant="ghost" onClick={() => onDialog({ kind: "remove", r })}>
+                    {t("wg.menu.remove")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
       {owner && (
-        <div className="flex flex-col gap-0.5 p-2">
-          <PopItem icon={<Icon name="pulse" size={14} />} onClick={() => void runs.checkAll(list)}>
-            {anyOff ? t("wg.menu.check") : t("wg.menu.check")}
-          </PopItem>
-          <PopItem icon={<Icon name="plus" size={14} />} onClick={() => onDialog({ kind: "draw", entry: { id: first.viaNodeId, name: first.viaNodeName, cc: entry?.countryCode ?? "" }, exitId: first.exitNodeId })}>
+        <footer className={footerGrid}>
+          <Button variant="secondary" size="lg" className="justify-center gap-2 px-2" onClick={() => void runs.checkAll(list)}>
+            {t("wg.menu.check")}
+          </Button>
+          <Button variant="secondary" size="lg" className="justify-center gap-2 px-2" onClick={() => onDialog({ kind: "draw", entry: { id: first.viaNodeId, name: first.viaNodeName, cc: entry?.countryCode ?? "" }, exitId: first.exitNodeId })}>
+            <Icon name="plus" size={16} />
             {t("fm.w.add")}
-          </PopItem>
-        </div>
+          </Button>
+        </footer>
       )}
-    </div>
+    </>
   );
 }
 

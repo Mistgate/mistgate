@@ -58,7 +58,7 @@ const drop = (el: Element, id: string) =>
     Object.defineProperty(ev, "dataTransfer", { value: { types: ["application/x-mg-node"], getData: (t: string) => (t === "application/x-mg-node" ? id : "") } });
     el.dispatchEvent(ev);
   });
-const body = (id: string) => card(id)!.querySelector<HTMLElement>(".p-3\\.5")!;
+const body = (id: string) => card(id)!.querySelector<HTMLElement>(".h-14")!;
 
 describe("the fleet map", () => {
   it("a card for every node, People on the left, the internet and WARP on the right", async () => {
@@ -74,8 +74,8 @@ describe("the fleet map", () => {
     await mount();
     expect(text("node:nod_mass")).toContain("online");
     expect(text("node:nod_mass")).toContain("load 72% · 41 online");
-    expect(text("node:nod_mass")).toContain("HY2");
-    expect(text("node:nod_ro")).toContain("unstable");
+    expect(card("node:nod_ro")!.querySelector("[title=unstable]")).not.toBeNull(); // the status is a dot with its word
+    expect(card("node:nod_ro")!.querySelector("[title=online]")).toBeNull();
     expect(text("node:nod_tll")).toContain("offline");
     expect(text("node:nod_ru")).toContain("entry only");
     expect(text("node:nod_ru2")).toContain("entry only");

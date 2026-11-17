@@ -79,8 +79,8 @@ describe("the Load view", () => {
     await mount(<FleetLoad />);
     expect(ops.getFleetLoad).toHaveBeenCalledWith({ hours: 168 }, expect.anything());
     const text = host!.textContent!;
-    for (const s of ["Overloaded1", "OK1", "No data1", "room for about 80 more people", "Most room: nl1 (+80)"]) expect(text).toContain(s);
-    const rows = [...host!.querySelectorAll("a")].map((a) => a.textContent);
+    for (const s of ["Fleet headroom", "room for about 80 more people", "Most room: nl1 (+80)", "Loaded", "closest to the limit", "1 without data", "Overloaded", "OK", "No data"]) expect(text).toContain(s);
+    const rows = [...host!.querySelectorAll("button[aria-expanded] b")].map((b) => b.textContent);
     expect(rows).toEqual(["de1", "nl1", "fi1"]);
     expect(text).toContain("86%");
     expect(text).toContain("No room"); // de1 is overloaded

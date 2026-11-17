@@ -29,12 +29,12 @@ export function PanelKeyOffer({ onStart, busy }: { onStart: (ids: string[]) => v
   }
 
   return (
-    <section data-panel-key-offer className="flex flex-wrap items-center gap-x-3 gap-y-3 rounded-card border border-line bg-surface px-3.5 py-3">
-      <div className="flex min-w-[240px] flex-1 items-start gap-2.5">
-        <IconChip icon="key" tone="lavender" />
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="text-[13px] leading-snug font-bold text-pretty">{t.n("nodes.panelKey.banner", candidates.length)}</p>
-          <p className="text-xs leading-snug text-pretty text-muted">{t("nodes.panelKey.body")}</p>
+    <section data-panel-key-offer className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-card border border-line bg-surface px-5 py-4">
+      <div className="flex min-w-[240px] flex-1 items-start gap-3">
+        <IconChip icon="key" tone="lavender" size={32} />
+        <div className="flex min-w-0 flex-col">
+          <p className="font-medium text-pretty">{t.n("nodes.panelKey.banner", candidates.length)}</p>
+          <p className="text-[13px] text-pretty text-sec">{t("nodes.panelKey.body")}</p>
         </div>
       </div>
       <div className="flex flex-wrap gap-2 max-sm:w-full">

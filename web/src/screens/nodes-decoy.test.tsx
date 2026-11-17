@@ -94,7 +94,9 @@ async function mount(nodes: ReturnType<typeof node>[], me: Record<string, unknow
 }
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const text = () => document.body.textContent ?? "";
-const tick = (name: string) => document.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${en["bulk.select"].replace("{name}", name)}"]`)!;
+const tick = (name: string) => document.querySelector<HTMLElement>(`[role=checkbox][aria-label="${en["bulk.select"].replace("{name}", name)}"]`)!;
+const ticked = (name: string) => tick(name).getAttribute("aria-checked") === "true";
+const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const radio = (mode: string) => document.querySelector<HTMLInputElement>(`input[type=radio][value=${mode}]`)!;
 const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
@@ -107,10 +109,14 @@ const press = async (el: Element | null | undefined) => {
   });
   await settle();
 };
-const bar = () => document.querySelector("[data-bulk-bar]");
+const bar = () => document.querySelector("[data-nodes-bar]");
+/** The check column opens with "Select". */
+const selecting = async () => {
+  if (!button(en["nv.done"])) await press(button(en["nv.select"]));
+};
 /** More ▾ → Decoy site… */
 const openDecoy = async () => {
-  await press([...(bar()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim().startsWith(en["bulk.more"])));
+  await press(bar()?.querySelector(`button[aria-label="${en["bulk.more"]}"]`));
   await press([...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent?.startsWith(en["bulk.decoy"])));
 };
 
@@ -119,9 +125,9 @@ describe("node notes", () => {
     const notes = "<b>Renew in March</b>\n备用节点";
     await mount([node("de1", { notes })]);
     const summaries = [...document.querySelectorAll("p")].filter((p) => p.textContent === notes);
-    expect(summaries).toHaveLength(2);
+    expect(summaries).toHaveLength(1);
     expect(summaries.every((p) => p.querySelector("b") === null)).toBe(true);
-    expect([...document.querySelectorAll("a")].filter((a) => a.title === notes)).toHaveLength(2);
+    expect([...document.querySelectorAll("a")].filter((a) => a.title === notes)).toHaveLength(1);
     for (const summary of summaries) {
       const link = summary.closest("a")!;
       expect(link.title).toBe(notes);
@@ -129,13 +135,8 @@ describe("node notes", () => {
       expect(link.tabIndex).toBe(-1); // the row link remains the single keyboard stop
     }
     const rowLinks = document.querySelectorAll("a.absolute");
-    expect(rowLinks).toHaveLength(2);
+    expect(rowLinks).toHaveLength(1);
     expect([...rowLinks].every((a) => !a.hasAttribute("title"))).toBe(true);
-  });
-
-  it("keeps the country chip on mobile cards", async () => {
-    await mount([node("de1")]);
-    expect([...document.querySelectorAll("span.bg-surface-2")].filter((span) => span.textContent === "DE")).toHaveLength(1);
   });
 
   it("omits empty and whitespace-only notes", async () => {
@@ -149,7 +150,7 @@ describe("node status and metadata", () => {
   it("says the status once, with one dot, and keeps the notes out of the heading", async () => {
     await mount([node("de1", { notes: "Renew in March", provider: "examplehost" })]);
     const names = [...document.querySelectorAll("b")].filter((b) => b.textContent === "de1");
-    expect(names).toHaveLength(2); // a table row and a card
+    expect(names).toHaveLength(1);
     for (const name of names) {
       const heading = name.parentElement!;
       expect(heading.textContent).toContain("examplehost");
@@ -162,14 +163,14 @@ describe("node status and metadata", () => {
 
   it("keeps diagnostic reasons without repeating the pending status", async () => {
     await mount([node("de1", { status: NodeStatus.PENDING, reason: { code: "enrollment_expired", params: {} } })]);
-    expect(text().split(en["node.status.pending"])).toHaveLength(3);
-    expect(text().split(en["node.reason.enrollment_expired"])).toHaveLength(3);
+    expect(text().split(en["node.status.pending"])).toHaveLength(2);
+    expect(text().split(en["node.reason.enrollment_expired"])).toHaveLength(2);
   });
 
   it("keeps location metadata on the heading when notes are absent", async () => {
     await mount([node("de1", { location: "Germany", provider: "examplehost" })]);
     const names = [...document.querySelectorAll("b")].filter((b) => b.textContent === "de1");
-    expect(names).toHaveLength(2);
+    expect(names).toHaveLength(1);
     expect(names.every((name) => name.parentElement?.textContent?.includes("Germany · examplehost"))).toBe(true);
     expect(document.querySelectorAll("p")).toHaveLength(0);
   });
@@ -177,10 +178,9 @@ describe("node status and metadata", () => {
   it("keeps the separate update action for an outdated healthy node", async () => {
     await mount([node("de1")], undefined, [{ nodeId: "nod_de1", state: NodeUpdateState.OUTDATED }]);
     const updates = [...document.querySelectorAll('a[href="/updates"]')];
-    expect(updates).toHaveLength(2);
+    expect(updates).toHaveLength(1);
     expect(updates.every((a) => a.textContent?.includes("0.3.1"))).toBe(true);
-    // the table's line says the status itself; a card has the word beside the name already
-    expect(updates.map((a) => a.textContent!.replace(/ 0\.3\.1$/, "")).sort()).toEqual([en["nodes.agentOldLine"], en["nodes.agentOld"]].sort());
+    expect(updates.map((a) => a.textContent!.replace(/ 0\.3\.1$/, ""))).toEqual([en["nodes.agentOld"]]);
     for (const update of updates) {
       expect(update.closest("div.relative")!.textContent!.split(en["node.status.online"])).toHaveLength(2);
     }
@@ -191,18 +191,38 @@ describe("ticking nodes", () => {
   it("shows how many are ticked, and clears them", async () => {
     await mount([node("de1"), node("fi1")]);
     expect(bar()).toBeNull(); // nothing ticked: no bar
+    await selecting();
     await click(tick("de1"));
-    expect(bar()?.textContent).toContain("1node selected");
+    expect(bar()?.textContent).toContain("1 node selected");
     await click(tick("fi1"));
-    expect(bar()?.textContent).toContain("2nodes selected");
-    await click(document.querySelector(`[data-bulk-bar] button[aria-label="${en["bulk.clear"]}"]`));
+    expect(bar()?.textContent).toContain("2 nodes selected");
+    await click(document.querySelector(`[data-nodes-bar] button[aria-label="${en["bulk.clear"]}"]`));
     expect(bar()).toBeNull();
   });
 
-  it("ticks every shown node from the header box", async () => {
+  it("opens the check column with Select and closes it, clearing the ticks, with Done", async () => {
+    await mount([node("de1"), node("fi1")]);
+    expect(button(en["nv.done"])).toBeUndefined();
+    expect(document.querySelector("section[data-select]")?.getAttribute("data-select")).toBe("false");
+    await selecting();
+    expect(document.querySelector("section[data-select]")?.getAttribute("data-select")).toBe("true");
+    await click(tick("de1"));
+    expect(bar()).not.toBeNull();
+    await press(button(en["nv.done"]));
+    expect(bar()).toBeNull();
+    expect(document.querySelector("section[data-select]")?.getAttribute("data-select")).toBe("false");
+    expect(ticked("de1")).toBe(false);
+  });
+
+  it("ticks every shown node from the quick pick", async () => {
     await mount([node("de1"), node("fi1"), node("se1")]);
-    await click(document.querySelector(`input[aria-label="${en["bulk.selectAll"]}"]`));
-    expect(bar()?.textContent).toContain("3nodes selected");
+    await selecting();
+    await press(button(en["bulk.pick"]));
+    await press([...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent?.startsWith(en["bulk.pick.shown"])));
+    expect(bar()?.textContent).toContain("3 nodes selected");
+    // "clear all" under the count takes them off again
+    await click([...(bar()?.querySelectorAll("button") ?? [])].find((b) => b.textContent === en["nv.bulk.none"]));
+    expect(bar()).toBeNull();
   });
 
   it("is for the owner only", async () => {
@@ -212,7 +232,8 @@ describe("ticking nodes", () => {
 
   it("does not offer a retired node", async () => {
     await mount([node("de1", { status: NodeStatus.RETIRED })]);
-    expect(tick("de1").disabled).toBe(true);
+    await selecting();
+    expect(tick("de1").hasAttribute("data-disabled")).toBe(true);
   });
 });
 
@@ -220,6 +241,7 @@ describe("Set decoy site", () => {
   it("sends the ticked nodes and the picked mode in one call", async () => {
     setNodesDecoyMode.mockResolvedValue({ nodes: [node("de1"), node("fi1")] });
     await mount([node("de1"), node("fi1", { decoyReasonCode: "pending" }), node("se1")]);
+    await selecting();
     await click(tick("de1"));
     await click(tick("fi1"));
     await openDecoy();
@@ -233,11 +255,12 @@ describe("Set decoy site", () => {
     const rows = [...document.querySelectorAll("[data-batch] li")].map((li) => li.textContent);
     expect(rows).toEqual([expect.stringContaining(en["bulk.state.ok"]), expect.stringContaining(en["bulk.state.running"])]);
     expect(text()).toContain("Decoy site set on 2 nodes");
-    expect(bar()?.textContent).toContain("2nodes selected"); // the selection stays for the next action
+    expect(bar()?.textContent).toContain("2 nodes selected"); // the selection stays for the next action
   });
 
   it("keeps own on while every ticked node has its uploaded site", async () => {
     await mount([node("de1", withBundle), node("fi1")]);
+    await selecting();
     await click(tick("de1"));
     await openDecoy();
     expect(radio("own").disabled).toBe(false);
@@ -245,6 +268,7 @@ describe("Set decoy site", () => {
 
   it("turns own off while a ticked node has no uploaded site, and says which", async () => {
     await mount([node("de1", withBundle), node("fi1")]);
+    await selecting();
     await click(tick("de1"));
     await click(tick("fi1"));
     await openDecoy();
@@ -254,6 +278,7 @@ describe("Set decoy site", () => {
 
   it("turns own off in the Cloudflare edition", async () => {
     await mount([node("de1", { ...withBundle, decoyOwnAvailable: false })], { admin: { id: "adm_1", role: Role.OWNER }, edition: "edge", unavailable: [...editionFeatures] });
+    await selecting();
     await click(tick("de1"));
     await openDecoy();
     expect(radio("own").disabled).toBe(true);
@@ -263,11 +288,12 @@ describe("Set decoy site", () => {
   it("shows the panel's refusal in words and keeps the selection", async () => {
     setNodesDecoyMode.mockRejectedValue(new ConnectError("panel_unavailable", Code.FailedPrecondition));
     await mount([node("de1")]);
+    await selecting();
     await click(tick("de1"));
     await openDecoy();
     await click(radio("panel"));
     await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim() === en["decoy.apply"]));
     expect(document.querySelector("[role=dialog] [role=alert]")?.textContent).toBe(en["err.panel_unavailable"]);
-    expect(tick("de1").checked).toBe(true);
+    expect(ticked("de1")).toBe(true);
   });
 });

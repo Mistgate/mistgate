@@ -15,8 +15,8 @@ import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
 import { NodesScreen } from "@/screens/nodes";
-import { BatchPanel, BulkDock, type Avail } from "@/components/bulk";
-import { BulkControls } from "@/screens/nodes-bulk";
+import type { Avail } from "@/components/bulk";
+import { BulkBar } from "@/screens/nodes-bulk";
 import { AgentDialog, BindDialog, panelFor, PasswordDialog, UnbindDialog, type ActionId, type BulkRun } from "@/screens/nodes-bulk-actions";
 import { PanelKeyOffer } from "@/screens/nodes-panel-key";
 import { useMenuWidth } from "@/lib/menu";
@@ -138,7 +138,7 @@ function Shot({ id, title, phone, tall, children }: { id: string; title: string;
 }
 
 /** Three selected: one logs in by key only (no password to change), all three already use the panel key (off, and says why). */
-function Bar({ busy }: { busy?: boolean }) {
+function Bar({ busy, job, panel }: { busy?: boolean; job?: Job; panel?: ReturnType<typeof panelFor> }) {
   const t = useT();
   const avail: Record<ActionId, Avail> = {
     ports: { count: 3 },
@@ -150,7 +150,28 @@ function Bar({ busy }: { busy?: boolean }) {
     unbindKey: { count: 3 },
     decoy: { count: 3 },
   };
-  return <BulkControls count={3} hidden={1} avail={avail} agentOff={false} busy={!!busy} onAction={() => {}} onClear={() => {}} />;
+  const noop = () => {};
+  return (
+    <BulkBar
+      nodes={picked}
+      hidden={1}
+      allShown={false}
+      total={5}
+      avail={avail}
+      agentOff={false}
+      busy={!!busy}
+      job={job ?? null}
+      rows={job?.rows ?? []}
+      panel={panel ?? null}
+      float={false}
+      onAction={noop}
+      onClear={noop}
+      onAll={noop}
+      onStop={noop}
+      onRetry={noop}
+      onCloseJob={noop}
+    />
+  );
 }
 
 const row = (name: string, host: string, state: Row["state"], over: Partial<Row> = {}): Row => ({ id: `nod_${name}`, name, host, state, ...over });
@@ -227,31 +248,19 @@ function Confirm({ id, title, which }: { id: string; title: string; which: "pass
 export function BulkKit() {
   const t = useT();
   const jobs = useJobs();
-  const noop = () => {};
   const frames = (phone: boolean) => (
     <>
       <Shot id={phone ? "bulk-bar-phone" : "bulk-bar"} title="Three selected, one hidden by the filter" phone={phone} tall>
-        <BulkDock float={false} region={t("bulk.region")}>
-          <Bar />
-        </BulkDock>
+        <Bar />
       </Shot>
       <Shot id={phone ? "bulk-running-phone" : "bulk-running"} title="A batch: done, failed, running, waiting, skipped" phone={phone}>
-        <BulkDock float={false} wide region={t("bulk.region")}>
-          <BatchPanel job={jobs.running} rows={jobs.running.rows} head={panelFor(t, "password").head} open={panelFor(t, "password").open} onStop={noop} onRetry={noop} onClose={noop} />
-          <Bar busy />
-        </BulkDock>
+        <Bar busy job={jobs.running} panel={panelFor(t, "password")} />
       </Shot>
-      <Shot id={phone ? "bulk-summary-phone" : "bulk-summary"} title="Its end: a failure, one not started, Retry" phone={phone}>
-        <BulkDock float={false} wide region={t("bulk.region")}>
-          <BatchPanel job={jobs.finished} rows={jobs.finished.rows} head={panelFor(t, "password").head} open={panelFor(t, "password").open} onStop={noop} onRetry={noop} onClose={noop} />
-          <Bar />
-        </BulkDock>
+      <Shot id={phone ? "bulk-summary-phone" : "bulk-summary"} title="Its end: a failure, one not started, Retry (the list opens by itself)" phone={phone}>
+        <Bar job={jobs.finished} panel={panelFor(t, "password")} />
       </Shot>
       <Shot id={phone ? "bulk-ports-phone" : "bulk-ports"} title="A port check: each node's verdict" phone={phone}>
-        <BulkDock float={false} wide region={t("bulk.region")}>
-          <BatchPanel job={jobs.ports} rows={jobs.ports.rows} head={panelFor(t, "ports").head} open={panelFor(t, "ports").open} onStop={noop} onRetry={noop} onClose={noop} />
-          <Bar />
-        </BulkDock>
+        <Bar job={jobs.ports} panel={panelFor(t, "ports")} />
       </Shot>
     </>
   );
@@ -261,7 +270,7 @@ export function BulkKit() {
       {frames(false)}
       <div className="flex flex-wrap items-start gap-8">{frames(true)}</div>
       <Shot id="bulk-offer" title="The offer above the list">
-        <PanelKeyOffer busy={false} onStart={noop} />
+        <PanelKeyOffer busy={false} onStart={() => {}} />
       </Shot>
       <Confirm id="bulk-password" title="Confirm: change the SSH password" which="password" />
       <Confirm id="bulk-bind" title="Confirm: bind own key" which="bind" />
