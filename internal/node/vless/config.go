@@ -43,8 +43,13 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 			PrivateKey: append([]byte(nil), cfg.reality.privateKey...), ShortIds: cloneByteSlices(cfg.reality.shortIDs),
 		})}
 	}
+	shared := tracker != nil && tracker.shared != nil
 	if tracker != nil {
 		stream.Tcpmasks = []*serial.TypedMessage{serial.ToTypedMessage(newTCPConnMaskConfig(tracker.key.inboundID, tracker.key.generation))}
+	}
+	if shared {
+		// Xray reverses the list: the shared mask takes the listener first, then the tracker wraps what it accepts.
+		stream.Tcpmasks = append(stream.Tcpmasks, serial.ToTypedMessage(newSharedMaskConfig(tracker.key.inboundID, tracker.key.generation)))
 	}
 	switch cfg.transport {
 	case "xhttp":
@@ -69,7 +74,7 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 	// time). Destinations come from the app (an IP is kept, a name is resolved by the node's DNS) and the torrent guard
 	// works on the egress socket, not on the sniffer.
 	receiver := &proxyman.ReceiverConfig{StreamSettings: stream}
-	if cfg.security == "tls" {
+	if cfg.security == "tls" || shared { // Xray listens on the private socket; the shared mask swaps it for the route
 		receiver.Listen = net.NewIPOrDomain(net.DomainAddress(unixAddr))
 	} else {
 		receiver.PortList = &net.PortList{Range: []*net.PortRange{net.SinglePortRange(net.Port(spec.Listen.Port))}}

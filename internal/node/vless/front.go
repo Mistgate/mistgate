@@ -155,16 +155,19 @@ func tlsFrontProtos(transport string) []string {
 	return []string{"h2", "http/1.1", acme.ALPNProto}
 }
 
-// startTLSFront listens on the inbound port. protos is the ALPN list: WebSocket speaks HTTP/1.1 only, so h2 is not offered
-// to it (a client that insisted on h2 would reach a WebSocket server with h2 frames).
-func startTLSFront(id string, port uint16, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), protos []string, unixNetwork, unixAddr string, links frontLinks) (*tlsFront, error) {
-	host := ""
-	if BindIP != nil {
-		host = BindIP.String()
-	}
-	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(int(port))))
-	if err != nil {
-		return nil, fmt.Errorf("TLS front for %q: %w", id, err)
+// startTLSFront listens on the inbound port, or accepts from ln when the port is shared (Env.SharedListener). protos is
+// the ALPN list: WebSocket speaks HTTP/1.1 only, so h2 is not offered to it (a client that insisted on h2 would reach a
+// WebSocket server with h2 frames).
+func startTLSFront(id string, port uint16, ln net.Listener, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), protos []string, unixNetwork, unixAddr string, links frontLinks) (*tlsFront, error) {
+	if ln == nil {
+		host := ""
+		if BindIP != nil {
+			host = BindIP.String()
+		}
+		var err error
+		if ln, err = net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(int(port)))); err != nil {
+			return nil, fmt.Errorf("TLS front for %q: %w", id, err)
+		}
 	}
 	front := &tlsFront{
 		ln: ln, unixNetwork: unixNetwork, unixAddr: unixAddr, cert: cert, protos: protos, links: links,

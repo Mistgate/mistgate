@@ -274,6 +274,13 @@ func (in *inbound) start(ctx context.Context) error {
 	if tracker.reality && in.cfg.transport == "xhttp" {
 		tracker.byAddr = make(map[netip.AddrPort]*trackedTCPConn)
 	}
+	var shared net.Listener // the route of a shared port: Xray's REALITY listener takes it, or the TLS front does
+	if in.e.env.SharedListener != nil {
+		shared = in.e.env.SharedListener(in.spec.ID, in.spec.Listen.Port)
+	}
+	if in.cfg.security == "reality" {
+		tracker.shared = shared
+	}
 	tracker.register()
 	in.connTracker = tracker
 	started := false
@@ -318,6 +325,13 @@ func (in *inbound) start(ctx context.Context) error {
 		network, addr, cleanup, err := tlsSocketFn(in.spec.ID)
 		if err != nil {
 			return fmt.Errorf("TLS socket: %w", err)
+		}
+		in.tlsSocketNetwork, in.tlsSocketAddr, in.tlsSocketCleanup = network, addr, cleanup
+	} else if tracker.shared != nil {
+		// REALITY on a shared port: Xray is given a private socket to open and gives it up for the route (config.go)
+		network, addr, cleanup, err := tlsSocketFn(in.spec.ID)
+		if err != nil {
+			return fmt.Errorf("shared port socket: %w", err)
 		}
 		in.tlsSocketNetwork, in.tlsSocketAddr, in.tlsSocketCleanup = network, addr, cleanup
 	}
@@ -374,7 +388,7 @@ func (in *inbound) start(ctx context.Context) error {
 			stalls: in.cfg.cdnHost == "", nets: in.e.env.Nets, inboundID: in.spec.ID,
 			countNetworks: in.cfg.cdnHost == "",
 		}
-		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, in.cert.GetCertificate, tlsFrontProtos(in.cfg.transport), in.tlsSocketNetwork, in.tlsSocketAddr, links)
+		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, shared, in.cert.GetCertificate, tlsFrontProtos(in.cfg.transport), in.tlsSocketNetwork, in.tlsSocketAddr, links)
 		if err != nil {
 			return err
 		}

@@ -52,6 +52,9 @@ type tcpConnTracker struct {
 	// dispatch of an XHTTP session; kexOfAddr). It lives in this process's memory only, like recentCloses. nil when the inbound
 	// is not REALITY over XHTTP.
 	byAddr map[netip.AddrPort]*trackedTCPConn
+	// shared is the inbound's route on a TCP port the agent shares between services (Env.SharedListener). Set, Xray
+	// accepts from it through sharedMaskConfig instead of from a socket of its own.
+	shared net.Listener
 
 	mu     sync.Mutex
 	conns  map[*trackedTCPConn]struct{}
@@ -312,7 +315,7 @@ func (c *tcpConnMaskConfig) ProtoReflect() protoreflect.Message {
 	if c == nil || c.message == nil {
 		return nil
 	}
-	return &tcpConnMaskReflection{Message: c.message, owner: c}
+	return &maskReflection{Message: c.message, owner: c, typ: tcpConnMaskType}
 }
 
 func (c *tcpConnMaskConfig) WrapConnClient(conn net.Conn, _ *xnet.Destination, _ *finalmask.Dialer) (net.Conn, error) {
@@ -338,34 +341,26 @@ func (c *tcpConnMaskConfig) WrapConnServer(conn net.Conn) (net.Conn, error) {
 	return tracker.track(conn), nil
 }
 
-type tcpConnMaskMessageType struct{}
-
-func (tcpConnMaskMessageType) New() protoreflect.Message {
-	return newTCPConnMaskConfig("", 0).ProtoReflect()
+// maskMessageType and maskReflection make a dynamic message of one of the two masks a proto message Xray can build from a
+// TypedMessage and hand back as the mask itself.
+type maskMessageType struct {
+	desc protoreflect.MessageDescriptor
+	zero func() protoreflect.ProtoMessage
 }
 
-func (tcpConnMaskMessageType) Zero() protoreflect.Message {
-	return newTCPConnMaskConfig("", 0).ProtoReflect()
-}
+func (t maskMessageType) New() protoreflect.Message                  { return t.zero().ProtoReflect() }
+func (t maskMessageType) Zero() protoreflect.Message                 { return t.zero().ProtoReflect() }
+func (t maskMessageType) Descriptor() protoreflect.MessageDescriptor { return t.desc }
 
-func (tcpConnMaskMessageType) Descriptor() protoreflect.MessageDescriptor {
-	return tcpConnMaskDescriptor
-}
-
-type tcpConnMaskReflection struct {
+type maskReflection struct {
 	protoreflect.Message
-	owner *tcpConnMaskConfig
+	owner protoreflect.ProtoMessage
+	typ   protoreflect.MessageType
 }
 
-func (m *tcpConnMaskReflection) Type() protoreflect.MessageType {
-	return tcpConnMaskType
-}
-
-func (m *tcpConnMaskReflection) New() protoreflect.Message {
-	return tcpConnMaskType.New()
-}
-
-func (m *tcpConnMaskReflection) Interface() protoreflect.ProtoMessage {
+func (m *maskReflection) Type() protoreflect.MessageType { return m.typ }
+func (m *maskReflection) New() protoreflect.Message      { return m.typ.New() }
+func (m *maskReflection) Interface() protoreflect.ProtoMessage {
 	return m.owner
 }
 
@@ -373,17 +368,20 @@ func init() {
 	optional := descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
 	stringType := descriptorpb.FieldDescriptorProto_TYPE_STRING
 	uint64Type := descriptorpb.FieldDescriptorProto_TYPE_UINT64
+	keyFields := func() []*descriptorpb.FieldDescriptorProto {
+		return []*descriptorpb.FieldDescriptorProto{
+			{Name: proto.String("inbound_id"), JsonName: proto.String("inboundId"), Number: proto.Int32(1), Label: &optional, Type: &stringType},
+			{Name: proto.String("generation"), Number: proto.Int32(2), Label: &optional, Type: &uint64Type},
+		}
+	}
 	file, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
 		Name:    proto.String("internal/node/vless/tcpmask.proto"),
 		Package: proto.String("mistgate.node.vless"),
 		Syntax:  proto.String("proto3"),
-		MessageType: []*descriptorpb.DescriptorProto{{
-			Name: proto.String("ConnectionTracker"),
-			Field: []*descriptorpb.FieldDescriptorProto{
-				{Name: proto.String("inbound_id"), JsonName: proto.String("inboundId"), Number: proto.Int32(1), Label: &optional, Type: &stringType},
-				{Name: proto.String("generation"), Number: proto.Int32(2), Label: &optional, Type: &uint64Type},
-			},
-		}},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{Name: proto.String("ConnectionTracker"), Field: keyFields()},
+			{Name: proto.String(sharedMaskMessageName), Field: keyFields()},
+		},
 	}, nil)
 	if err != nil {
 		panic(err)
@@ -391,16 +389,83 @@ func init() {
 	tcpConnMaskDescriptor = file.Messages().ByName("ConnectionTracker")
 	tcpConnMaskFields.inboundID = tcpConnMaskDescriptor.Fields().ByName("inbound_id")
 	tcpConnMaskFields.generation = tcpConnMaskDescriptor.Fields().ByName("generation")
-	tcpConnMaskType = tcpConnMaskMessageType{}
-	if err := protoregistry.GlobalTypes.RegisterMessage(tcpConnMaskType); err != nil {
-		panic(err)
+	tcpConnMaskType = maskMessageType{desc: tcpConnMaskDescriptor, zero: func() protoreflect.ProtoMessage { return newTCPConnMaskConfig("", 0) }}
+	sharedMaskDescriptor = file.Messages().ByName(sharedMaskMessageName)
+	sharedMaskType = maskMessageType{desc: sharedMaskDescriptor, zero: func() protoreflect.ProtoMessage { return newSharedMaskConfig("", 0) }}
+	for _, t := range []protoreflect.MessageType{tcpConnMaskType, sharedMaskType} {
+		if err := protoregistry.GlobalTypes.RegisterMessage(t); err != nil {
+			panic(err)
+		}
 	}
 }
 
 var (
 	_ finalmask.TCPMask     = (*tcpConnMaskConfig)(nil)
+	_ finalmask.TCPMask     = (*sharedMaskConfig)(nil)
 	_ finalmask.TcpMaskConn = (*trackedTCPConn)(nil)
 )
+
+// sharedMaskConfig is the mask of an inbound whose TCP port the agent shares: FinalMask.Listen asks it for the listener
+// instead of binding the one it opened for the inbound, which is a private abstract Unix socket (config.go) that closes
+// with the listener. It names the inbound's tracker the way the tracker mask does. It stands after the tracker in the
+// config's list, which Xray reverses: it takes the listener first, and the tracker still wraps every connection accepted.
+type sharedMaskConfig struct {
+	message *dynamicpb.Message
+}
+
+const sharedMaskMessageName = "SharedListener"
+
+var (
+	sharedMaskDescriptor protoreflect.MessageDescriptor
+	sharedMaskType       protoreflect.MessageType
+)
+
+func newSharedMaskConfig(inboundID string, generation uint64) *sharedMaskConfig {
+	message := dynamicpb.NewMessage(sharedMaskDescriptor)
+	message.Set(sharedMaskDescriptor.Fields().ByName("inbound_id"), protoreflect.ValueOfString(inboundID))
+	message.Set(sharedMaskDescriptor.Fields().ByName("generation"), protoreflect.ValueOfUint64(generation))
+	return &sharedMaskConfig{message: message}
+}
+
+func (c *sharedMaskConfig) ProtoReflect() protoreflect.Message {
+	if c == nil || c.message == nil {
+		return nil
+	}
+	return &maskReflection{Message: c.message, owner: c, typ: sharedMaskType}
+}
+
+func (c *sharedMaskConfig) WrapConnClient(conn net.Conn, _ *xnet.Destination, _ *finalmask.Dialer) (net.Conn, error) {
+	return conn, nil
+}
+
+// WrapConnServer is not called: FinalMask.Listen leaves a mask that has Listen out of the connection wrappers.
+func (c *sharedMaskConfig) WrapConnServer(conn net.Conn) (net.Conn, error) { return conn, nil }
+
+func (c *sharedMaskConfig) Listen(private net.Listener) (net.Listener, error) {
+	key := tcpConnTrackerKey{
+		inboundID:  c.message.Get(sharedMaskDescriptor.Fields().ByName("inbound_id")).String(),
+		generation: c.message.Get(sharedMaskDescriptor.Fields().ByName("generation")).Uint(),
+	}
+	tcpConnTrackersMu.Lock()
+	tracker := tcpConnTrackers[key]
+	tcpConnTrackersMu.Unlock()
+	if tracker == nil || tracker.shared == nil {
+		return nil, errors.New("no shared listener for the inbound")
+	}
+	return &sharedListener{Listener: tracker.shared, private: private}, nil
+}
+
+// sharedListener accepts from the shared port's route; closing it ends this inbound's Accept (the route stays) and frees
+// the private socket Xray opened.
+type sharedListener struct {
+	net.Listener
+	private net.Listener
+}
+
+func (l *sharedListener) Close() error {
+	_ = l.private.Close()
+	return l.Listener.Close()
+}
 
 // sessionKex counts the ClientHello of the XHTTP request that opened a session for its key: the request's source is the TCP
 // peer (the engine never sets trustedXForwardedFor, so a forwarded address has port 0 and finds nothing: unknown).
