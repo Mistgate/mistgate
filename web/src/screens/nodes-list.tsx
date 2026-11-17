@@ -17,6 +17,10 @@ import type { Plain } from "@/lib/plain";
 import { sortProtocols } from "@/lib/series";
 import { useOlderNodes } from "@/lib/updates";
 import type { useListEntrance } from "@/components/fx/page";
+import type { FleetWays } from "@/lib/fleet-map";
+import { countryIn } from "@/lib/health";
+import { ruCell, type RuState } from "./nodes-ways-text";
+import { toneWord, WayGlyph } from "./nodes-ways-parts";
 
 type Node = Plain<NodeMsg>;
 type Entrance = ReturnType<typeof useListEntrance>;
@@ -65,8 +69,8 @@ export type Select = {
 // The columns: the check (0 or 20px, --cb), the node, the state, the profiles, online, today, the processor, the uptime, the
 // arrow. The widths the card's own width picks (rows and head share them).
 const grid =
-  "grid-cols-[var(--cb)_minmax(170px,1.2fr)_minmax(130px,.9fr)_150px_56px_78px_96px_52px_16px] " +
-  "@max-[1120px]/fzt:grid-cols-[var(--cb)_minmax(160px,1.2fr)_minmax(120px,.8fr)_150px_48px_76px_88px_16px] " +
+  "grid-cols-[var(--cb)_minmax(170px,1.2fr)_minmax(130px,.9fr)_minmax(190px,1fr)_150px_56px_78px_96px_52px_16px] " +
+  "@max-[1120px]/fzt:grid-cols-[var(--cb)_minmax(160px,1.2fr)_minmax(120px,.8fr)_minmax(180px,1fr)_150px_48px_76px_88px_16px] " +
   "@max-[1000px]/fzt:grid-cols-[var(--cb)_minmax(170px,1.3fr)_minmax(130px,1fr)_150px_56px_80px_96px_16px] " +
   "@max-[780px]/fzt:grid-cols-[var(--cb)_minmax(0,1.3fr)_minmax(0,1fr)_150px_44px_16px] " +
   "@max-[600px]/fzt:grid-cols-[var(--cb)_minmax(0,1.3fr)_minmax(0,1fr)_44px_16px]";
@@ -74,6 +78,8 @@ const rowBase =
   "grid items-center gap-4 px-6 [transition:background-color_.12s_var(--e),grid-template-columns_.25s_var(--e)] @max-[940px]/fzt:gap-3 max-md:gap-3 max-md:px-4 " + grid;
 // the columns that give way as the card narrows
 const upCell = "@max-[1120px]/fzt:hidden";
+// "From Russia" has a column of its own down to 1000; narrower, its word goes under the node's name
+const ruCol = "@max-[1000px]/fzt:hidden";
 const sumCell = "@max-[780px]/fzt:hidden";
 const chipsCell = "@max-[600px]/fzt:hidden";
 
@@ -121,6 +127,9 @@ function SortHead({ id, label, sort, onSort, right, title, className }: { id: So
 
 const numCell = "font-mono text-[13px] font-medium text-end tabular-nums";
 
+/** What the "From Russia" column stands on: the model, the state of its data, the country, whether the viewer is a helper, and what "Get around…" does. */
+export type ListWays = { model: FleetWays; state: RuState; country: string; helper: boolean; onFix: (nodeId: string) => void };
+
 export function NodeList({
   rows,
   fmt,
@@ -131,6 +140,7 @@ export function NodeList({
   filtered,
   onReset,
   onAdd,
+  ways,
 }: {
   rows: Node[];
   fmt: Fmt;
@@ -142,6 +152,8 @@ export function NodeList({
   filtered: boolean;
   onReset: () => void;
   onAdd: () => void;
+  /** The ways out of the country (the "From Russia" column); without it the column says nothing. */
+  ways?: ListWays;
 }) {
   const t = useT();
   const sub = useSub();
@@ -154,6 +166,7 @@ export function NodeList({
           <span aria-hidden />
           <SortHead id="name" label={t("nodes.col.node")} sort={sort} onSort={onSort} />
           <SortHead id="state" label={t("nv.col.state")} sort={sort} onSort={onSort} />
+          <SortHead id={null} label={t("nw.col", { country: countryIn(t, ways?.country || "RU") })} sort={sort} onSort={onSort} className={ruCol} />
           <SortHead id={null} label={t("nodes.col.protocols")} sort={sort} onSort={onSort} className={chipsCell} />
           <SortHead id="online" label={t("nodes.col.online")} sort={sort} onSort={onSort} right />
           <SortHead id="today" label={t("nodes.col.today")} sort={sort} onSort={onSort} right title={t("nodes.todayHint")} className={sumCell} />
@@ -169,6 +182,15 @@ export function NodeList({
         const dead = n.status === NodeStatus.DOWN;
         const where = [n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ");
         const protocols = sortProtocols(n.protocols);
+        const w = ways?.model.byNode.get(n.id);
+        const cell = ways ? ruCell(t, w, { country: countryIn(t, ways.country), unmeasured: ways.model.unmeasured, state: ways.state, helper: ways.helper }) : null;
+        // an entry-only node passes relays on: people are not counted on it, and what it carries is what it relays to exits
+        const entryOnly = w?.role === "entry";
+        const open = () => {
+          // selecting: the row is a tick box, not a door
+          if (select?.on) return select.pickable(n) && !(select.full && !on) ? select.toggle(n.id) : undefined;
+          void navigate({ to: "/nodes/$id", params: { id: n.id } });
+        };
         return (
           <Fresh
             kind="node"
@@ -188,8 +210,19 @@ export function NodeList({
               <Flag code={n.countryCode} size={16} />
               <span className="flex min-w-0 flex-col">
                 <span className="flex min-w-0 flex-col">
-                  <b className="truncate font-mono font-medium tabular-nums">{n.name}</b>
+                  <b className="truncate font-mono font-medium tabular-nums">
+                    {n.name}
+                    {(w?.role === "entry" || w?.role === "mixed") && (
+                      <i className="ms-2 inline-flex h-[18px] items-center rounded-[9px] bg-tone-sand-bg px-1.5 align-[1px] font-sans text-[11px] leading-none font-medium text-tone-sand not-italic">{t("nw.role")}</i>
+                    )}
+                  </b>
                   {where && <span className="truncate text-[13px] text-sec">{where}</span>}
+                  {cell && (
+                    <span className={cx("mt-1 hidden min-w-0 items-center gap-1.5 text-xs whitespace-nowrap @max-[1000px]/fzt:flex", cell.tone === "bad" ? "text-danger-text" : cell.tone === "part" ? "text-warn-text" : "text-sec")}>
+                      <WayGlyph kind={cell.tone} />
+                      <span className="truncate">{cell.word}</span>
+                    </span>
+                  )}
                 </span>
                 <NodeNotes node={n} />
               </span>
@@ -210,16 +243,41 @@ export function NodeList({
                   </span>
                 ))}
             </div>
+            <div data-ru={n.id} className={cx("relative z-10 flex min-w-0 cursor-pointer flex-col text-xs font-normal text-sec", ruCol)} title={cell?.tip || undefined} onClick={open}>
+              {cell ? (
+                <>
+                  <span className="flex min-w-0 items-center gap-2 text-sm leading-5 text-fg">
+                    <WayGlyph kind={cell.tone} />
+                    <b className={cx("truncate font-medium", cell.tone === "none" && "font-normal text-muted", toneWord[cell.tone])}>{cell.word}</b>
+                    {cell.noWay && ways && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          ways.onFix(n.id);
+                        }}
+                        className="ms-1 text-[13px] font-medium whitespace-nowrap text-accent-text hover:underline hover:underline-offset-[3px]"
+                      >
+                        {t("nw.fix")}
+                      </button>
+                    )}
+                  </span>
+                  {cell.sub && <span className="truncate text-xs text-muted">{cell.sub}</span>}
+                </>
+              ) : (
+                <span className="text-muted">—</span>
+              )}
+            </div>
             <div className={cx("relative z-10 w-max max-w-none cursor-pointer", chipsCell, dead && "opacity-50")} onClick={() => void navigate({ to: "/nodes/$id", params: { id: n.id } })}>
               <span className="flex gap-1">
                 {protocols.length > 0 ? protocols.map((p) => <ProtocolTag key={p} protocol={p} compact />) : <span className="text-muted">—</span>}
               </span>
             </div>
             <span className={numCell}>
-              <Scramble once value={String(onlineOf(n))} />
+              <Scramble once value={entryOnly ? "—" : String(onlineOf(n))} />
             </span>
-            <span className={cx(numCell, sumCell)}>
-              <Scramble once value={fmt.bytes(n.trafficTodayBytes)} />
+            <span className={cx(numCell, sumCell, entryOnly && "cursor-help text-tone-lavender")} title={entryOnly ? t("nw.tip.today") : undefined}>
+              <Scramble once value={fmt.bytes(entryOnly ? (n.relayTodayBytes ?? 0) : n.trafficTodayBytes)} />
             </span>
             <span className={cx("grid grid-cols-[36px_minmax(0,1fr)] items-center gap-2", sumCell)}>
               <span className={cx(numCell)}>
