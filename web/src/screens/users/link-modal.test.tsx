@@ -46,7 +46,7 @@ async function mount(props: { initialUrl?: string; initialPassword?: string; amn
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const target: LinkTarget = { id: "usr_1", name: "Marina", happ: true, amnezia, ...over };
+  const target: LinkTarget = { id: "usr_1", name: "carol", happ: true, amnezia, ...over };
   await act(async () => root!.render(<QueryClientProvider client={qc}><LinkModal target={target} onClose={() => {}} {...rest} /></QueryClientProvider>));
   for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 }
@@ -166,7 +166,7 @@ describe("a link that gives nothing yet", () => {
   it("says so in red above the button, with the way to the group", async () => {
     await mount({ initialUrl: url, initialPassword: "", target: nothing });
     const alert = document.querySelector("[role=alert]")!;
-    expect(alert.textContent).toContain("Marina gets nothing yet: no profile of the group “Friends” runs on a node.");
+    expect(alert.textContent).toContain("carol gets nothing yet: no profile of the group “Friends” runs on a node.");
     const open = alert.querySelector<HTMLAnchorElement>("a")!;
     expect(open.textContent).toBe("Open group “Friends”");
     expect(open.dataset.search).toBe(JSON.stringify({ tab: "groups", group: "grp_f" }));

@@ -510,35 +510,35 @@ describe("the people list, filtered and found", () => {
 
 describe("a new person", () => {
   it("does not copy the link of a person who gets nothing yet: the window says why", async () => {
-    createUser.mockResolvedValue({ user: person({ id: "usr_n", name: "nina" }), subscriptionUrl: "https://sub.example.com/p/T", pagePassword: "" });
+    createUser.mockResolvedValue({ user: person({ id: "usr_n", name: "erin" }), subscriptionUrl: "https://sub.example.com/p/T", pagePassword: "" });
     await mount();
     await click(button("Person"));
     await settle();
-    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "nina");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "erin");
     await click(button("Create"));
     await settle();
     expect(createUser).toHaveBeenCalled();
     expect(written).toEqual([]);
-    expect(text()).toContain("nina gets nothing yet: no profile of the group “empty” runs on a node.");
+    expect(text()).toContain("erin gets nothing yet: no profile of the group “empty” runs on a node.");
   });
 
   it("copies the link of a new person who gets something, shows the done screen with the link and the page password", async () => {
-    createUser.mockResolvedValue({ user: person({ id: "usr_n", name: "nina", accessHapp: true }), subscriptionUrl: "https://sub.example.com/p/T", pagePassword: "tide-8132-pine" });
+    createUser.mockResolvedValue({ user: person({ id: "usr_n", name: "erin", accessHapp: true }), subscriptionUrl: "https://sub.example.com/p/T", pagePassword: "tide-8132-pine" });
     await mount();
     await click(button("Person"));
     await settle();
-    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "nina");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "erin");
     await click(button("Create"));
     await settle();
     expect(written).toEqual(["Link: https://sub.example.com/p/T\nPage password: tide-8132-pine"].map((s) => written[0] ?? s));
     expect(written[0]).toContain("https://sub.example.com/p/T");
     expect(written[0]).toContain("tide-8132-pine");
     const dialog = document.querySelector("[data-shot=create-user]")!;
-    expect(dialog.textContent).toContain("nina added");
+    expect(dialog.textContent).toContain("erin added");
     expect(dialog.textContent).toContain("tide-8132-pine");
     await click([...dialog.querySelectorAll("button")].find((b) => b.textContent === "Add another"));
     await settle();
-    expect(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!.value).toBe("");
+    expect(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!.value).toBe("");
   });
 });
 

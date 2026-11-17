@@ -95,10 +95,10 @@ describe("the new user form", () => {
     expect(text()).toContain("Off: no AmneziaWG of the group runs on a node");
     expect(text()).not.toContain("gets nothing yet");
 
-    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "Marina");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "carol");
     await click(button("Create"));
     await settle();
-    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ name: "Marina", groupId: "grp_all", apps: { happ: true, amnezia: false, telegram: false, mistgate: true } }));
+    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ name: "carol", groupId: "grp_all", apps: { happ: true, amnezia: false, telegram: false, mistgate: true } }));
   });
 
   it("offers the Mistgate app on for the new person, switches it off alone, and locks it while the subscription link is off", async () => {
@@ -110,7 +110,7 @@ describe("the new user form", () => {
     expect(mgSwitch().getAttribute("aria-checked")).toBe("true");
     await click(mgSwitch());
     expect(mgSwitch().getAttribute("aria-checked")).toBe("false");
-    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "Marina");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "carol");
     await click(button("Create"));
     await settle();
     expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ apps: { happ: true, amnezia: false, telegram: false, mistgate: false } }));
@@ -128,9 +128,9 @@ describe("the new user form", () => {
   it("marks the new person fresh, so their row sweeps in once when the list shows it", async () => {
     resetFresh();
     setEffectsEnabled(true); // off by default while the reveal animation is in Beta
-    createUser.mockResolvedValue({ user: { id: "usr_new", name: "Marina", usedBytes: 0n, quotaBytes: 0n, nextResetUnix: 0n, expiresUnix: 0n, lastSeenUnix: 0n, speedLimitBps: 0n, deviceSpeedLimitBps: 0n, createdUnix: 0n }, subscriptionUrl: "https://x/s", pagePassword: "" });
+    createUser.mockResolvedValue({ user: { id: "usr_new", name: "carol", usedBytes: 0n, quotaBytes: 0n, nextResetUnix: 0n, expiresUnix: 0n, lastSeenUnix: 0n, speedLimitBps: 0n, deviceSpeedLimitBps: 0n, createdUnix: 0n }, subscriptionUrl: "https://x/s", pagePassword: "" });
     await mount([group()]);
-    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "Marina");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "carol");
     expect(isFresh("user", "usr_new")).toBe(false);
     await click(button("Create"));
     await settle();
@@ -169,7 +169,7 @@ describe("the new user form", () => {
     const step = (label: string) => click(document.querySelector(`[aria-label='${label}']`));
     const preset = (group: string, label: string) => click([...document.querySelectorAll(`[aria-label='${group}'] [role=radio]`)].find((r) => r.textContent === label));
     expect([...more.querySelectorAll("[aria-label='Speed per device'] [role=radio]")].find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("no limit");
-    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "alice");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "alice");
     await click(button("Create"));
     await settle();
     expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ speedLimitBps: 0n, deviceSpeedLimitBps: 0n }));
@@ -193,7 +193,7 @@ describe("the new user form", () => {
     const trigger = document.querySelector<HTMLElement>("[aria-label='Resets']")!;
     expect(trigger.textContent).toContain("Monthly");
     expect(text()).toContain("per month");
-    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "alice");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "alice");
     await click(button("Create"));
     await settle();
     expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alice", quotaReset: QuotaReset.MONTH, quotaBytes: 100_000_000_000n }));

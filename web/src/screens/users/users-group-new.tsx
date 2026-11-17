@@ -4,10 +4,9 @@ import { halo } from "@/components/fx/halo";
 import { markFresh } from "@/components/fx/registry";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
-import { Icon, IconChip, type IconName } from "@/components/ui/icons";
+import { Icon, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
-import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Segmented } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
@@ -214,21 +213,15 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
                 .filter((w) => w.id !== "tt" || !ttOff)
                 .map((w) => {
                   const list = byWay[w.id];
-                  const protocols = [...new Set(list.map((p) => p.protocol))];
                   const on = onWay(w.id);
                   return (
-                    <label key={w.id} className={cx("grid cursor-pointer grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-t border-line px-3 py-2 first:border-t-0", !on && "[&>span:nth-child(2)]:opacity-60", list.length === 0 && "cursor-default")}>
-                      <IconChip icon={w.icon} tone={on ? "mint" : "sage"} size={32} />
-                      <span className="flex min-w-0 flex-col transition-opacity">
+                    <label key={w.id} className={cx("grid cursor-pointer grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-t border-line px-3 py-2 transition-opacity first:border-t-0", list.length === 0 && "cursor-default")}>
+                      <span aria-hidden className={cx("grid size-8 place-items-center rounded-ctl bg-step text-sec transition-opacity", !on && "opacity-45")}>
+                        <Icon name={w.icon} size={18} />
+                      </span>
+                      <span className={cx("flex min-w-0 flex-col transition-opacity", !on && "opacity-45")}>
                         <b className="truncate text-sm font-medium text-fg">{w.id === "sub" ? apps : t(w.title)}</b>
-                        <span className="truncate text-xs text-muted">{list.length === 0 ? t("ul.g.noProfiles") : t(w.hint)}</span>
-                        {protocols.length > 0 && (
-                          <span className="mt-1 flex flex-wrap gap-1">
-                            {protocols.map((p) => (
-                              <ProtocolTag key={p} protocol={p} className="h-5 text-[11px]" />
-                            ))}
-                          </span>
-                        )}
+                        <span className="truncate text-xs leading-4 text-muted">{list.length === 0 ? t("ul.g.noProfiles") : t(w.hint)}</span>
                       </span>
                       <Switch aria-label={w.id === "sub" ? apps : t(w.title)} checked={on} disabled={list.length === 0} onCheckedChange={(v) => flip(w.id, v)} />
                     </label>

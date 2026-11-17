@@ -302,7 +302,7 @@ function CreateForm({ onCreated, onClose, startName }: { onCreated: (c: Created)
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={t("users.namePh")}
+                placeholder={t("ul.new.namePh")}
                 autoFocus
                 autoComplete="off"
                 spellCheck={false}
