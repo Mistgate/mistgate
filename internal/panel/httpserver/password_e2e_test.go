@@ -68,7 +68,7 @@ func TestPasswordAndTOTPEndToEnd(t *testing.T) {
 
 	info, err := b.api.GetLoginInfo(ctx, connect.NewRequest(&adminv1.GetLoginInfoRequest{}))
 	if err != nil || !info.Msg.SetupOpen || info.Msg.PasswordLogin || info.Msg.BrandHead != "Mist" || info.Msg.BrandTail != "gate" ||
-		info.Msg.Accent != "#b8acf2" || info.Msg.Language != "en" || info.Msg.HasLogo {
+		info.Msg.Accent != "#7dd3a0" || info.Msg.Language != "en" || info.Msg.HasLogo {
 		t.Fatalf("login info before setup: %+v %v", info, err)
 	}
 

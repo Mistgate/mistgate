@@ -394,7 +394,7 @@ func TestUserPageForBrowsers(t *testing.T) {
 	if ios == nil || ios["name"] != "Happ" || ios["add_url"] != "happ://add/https://sub.example.com/k3xq8/"+tok || !strings.HasPrefix(ios["download_url"].(string), "https://") {
 		t.Errorf("ios app: %v", ios)
 	}
-	if b := d["brand"].(map[string]any); b["accent"] != "#b8acf2" || len(b["parts"].([]any)) != 2 {
+	if b := d["brand"].(map[string]any); b["accent"] != "#7dd3a0" || len(b["parts"].([]any)) != 2 {
 		t.Errorf("brand: %v", b)
 	}
 	if o := d["options"].(map[string]any); o["show_qr"] != true || o["show_announcement"] != true {

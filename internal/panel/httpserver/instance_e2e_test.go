@@ -79,7 +79,7 @@ func TestInstanceService(t *testing.T) {
 	}
 
 	got, err := get(inst)
-	if err != nil || got.BrandHead != "Mist" || got.BrandTail != "gate" || got.Accent != "#b8acf2" || got.Language != "en" || got.HasLogo || got.LogoVersion != "" {
+	if err != nil || got.BrandHead != "Mist" || got.BrandTail != "gate" || got.Accent != "#7dd3a0" || got.Language != "en" || got.HasLogo || got.LogoVersion != "" {
 		t.Fatalf("defaults: %+v %v", got, err)
 	}
 	// The owner sees where the admin and the subscription links live (Settings -> Domains), read-only.

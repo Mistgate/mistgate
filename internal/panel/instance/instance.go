@@ -33,11 +33,11 @@ func SettingKeys() []string {
 }
 
 // Defaults of a fresh installation: brand "Mistgate" (wordmark "mist" + "gate"), no
-// custom logo, lavender accent, English.
+// custom logo, mint accent, English.
 const (
 	DefaultBrandHead = "Mist"
 	DefaultBrandTail = "gate"
-	DefaultAccent    = "#b8acf2"
+	DefaultAccent    = "#7dd3a0"
 	DefaultLanguage  = "en"
 
 	maxBrandPart = 24 // runes per wordmark part

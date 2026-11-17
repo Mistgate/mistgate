@@ -147,7 +147,7 @@ func TestDefaultsAndUpdate(t *testing.T) {
 	st := openTemp(t)
 	ctx := context.Background()
 	s, err := Load(ctx, st)
-	if err != nil || s != Defaults() || s.BrandName() != "Mistgate" || s.LogoSVG != "" || s.Accent != "#b8acf2" || s.Language != "en" {
+	if err != nil || s != Defaults() || s.BrandName() != "Mistgate" || s.LogoSVG != "" || s.Accent != "#7dd3a0" || s.Language != "en" {
 		t.Fatalf("defaults: %+v %v", s, err)
 	}
 	// A partial update changes only what it names.
