@@ -649,6 +649,12 @@ export function presetSubtitle(
   return parts.join(" · ");
 }
 
+/** The first thing a preset's split sends direct: a suffix, else (a rule of country lists only) the country; "" when it has no rule (what a row of the list says under its servers). */
+export function splitFirst(split: readonly SplitRuleN[], country: (code: string) => string): string {
+  const rule = split.find((r) => r.suffixes.length > 0 || r.geo.length > 0);
+  return rule?.suffixes[0] !== undefined ? unicodeSuffix(rule.suffixes[0]) : rule?.geo[0] ? country(rule.geo[0]) : "";
+}
+
 // ---- the owner's own response headers ("Response headers" tab) ----
 
 export type ResponseHeader = Settings["responseHeaders"][number];
