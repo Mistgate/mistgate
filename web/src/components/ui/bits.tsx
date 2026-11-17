@@ -1,16 +1,28 @@
-import type { ReactNode } from "react";
+import { Checkbox } from "@base-ui/react/checkbox";
+import type { ComponentProps, ReactNode } from "react";
 import { useLang } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { initialOf } from "@/lib/initial";
-import { IconChip, type IconName, type Tone } from "./icons";
+import { Icon, IconChip, type IconName, type Tone } from "./icons";
 
-/** Small static label: 22px, grey on surface-2. */
-export function Chip({ children, mono, className, title }: { children: ReactNode; mono?: boolean; className?: string; title?: string }) {
+/** A tone as a tag's colours: the pastel on its own dark (or light) background. */
+export const toneTagClass: Record<Tone, string> = {
+  lavender: "bg-tone-lavender-bg text-tone-lavender",
+  sky: "bg-tone-sky-bg text-tone-sky",
+  sand: "bg-tone-sand-bg text-tone-sand",
+  sage: "bg-tone-sage-bg text-tone-sage",
+  mint: "bg-tone-mint-bg text-tone-mint",
+  rose: "bg-tone-rose-bg text-tone-rose",
+};
+
+/** Small static label (a tag): 24px, grey on a step of grey; with a `tone` it takes that tone's pair. */
+export function Chip({ children, mono, className, title, tone }: { children: ReactNode; mono?: boolean; className?: string; title?: string; tone?: Tone }) {
   return (
     <span
       title={title}
       className={cx(
-        "inline-flex h-[22px] flex-none items-center rounded-ctl bg-surface-2 px-2 text-[11px] font-semibold whitespace-nowrap text-muted",
+        "inline-flex h-6 flex-none items-center gap-1 rounded-chip px-2 text-xs leading-4 whitespace-nowrap",
+        tone ? toneTagClass[tone] : "bg-step text-sec",
         mono && "font-mono",
         className,
       )}
@@ -25,10 +37,7 @@ export function Kbd({ keys }: { keys: readonly string[] }) {
   return (
     <span className="flex gap-1">
       {keys.map((k) => (
-        <kbd
-          key={k}
-          className="flex h-6 min-w-6 items-center justify-center rounded-[7px] border border-b-2 border-line bg-surface-2 px-1.5 font-mono text-xs font-bold text-fg"
-        >
+        <kbd key={k} className="rounded-chip bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] leading-4 text-sec">
           {k}
         </kbd>
       ))}
@@ -37,38 +46,51 @@ export function Kbd({ keys }: { keys: readonly string[] }) {
 }
 
 /**
- * Eyebrow: 11px / 700 / +0.1em / uppercase / muted. With `icon` + `tone` a small tinted chip leads the text (the text
- * itself stays muted, so contrast does not depend on the tone). `as` picks the element for a real heading.
+ * A section's heading, two ways. The default is a card's heading: 16/24, medium, with an optional `count` after it in muted.
+ * `caps` is the small capital label (12px, spaced, quiet) that only the profile editor's sections use. With `icon` + `tone`
+ * a small tinted chip leads the text (the text itself stays plain, so contrast does not depend on the tone). `as` picks
+ * the element for a real heading.
  */
 export function SectionLabel({
   children,
   className,
   icon,
   tone,
+  count,
+  caps,
   as: Tag = "div",
 }: {
   children: ReactNode;
   className?: string;
   icon?: IconName;
   tone?: Tone;
+  count?: ReactNode;
+  caps?: boolean;
   as?: "div" | "h2" | "h3" | "h4" | "span";
 }) {
   return (
-    <Tag className={cx("text-[11px] font-bold tracking-[0.1em] text-muted uppercase", icon && tone && "flex items-center gap-2", className)}>
+    <Tag
+      className={cx(
+        caps ? "text-xs leading-4 font-medium tracking-[0.07em] text-sec uppercase" : "text-base leading-6 font-medium text-fg",
+        icon && tone && "flex items-center gap-2",
+        className,
+      )}
+    >
       {icon && tone && <IconChip icon={icon} tone={tone} />}
       {icon && tone ? <span className="min-w-0">{children}</span> : children}
+      {count != null && <span className="ms-1 font-normal text-muted">{count}</span>}
     </Tag>
   );
 }
 
 /**
- * "Danger zone" at the end of a page (node, user, profile, DNS preset): the same pink section everywhere, its label in
+ * "Danger zone" at the end of a page (node, user, profile, DNS preset): the same pink section everywhere, its heading in
  * the danger colour. It holds the page's own rows and buttons.
  */
 export function DangerZone({ title, children, className }: { title: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx("flex min-w-0 flex-col gap-3 rounded-card-lg border border-[color-mix(in_oklch,var(--danger)_40%,var(--border))] bg-danger-soft p-4", className)}>
-      <h2 className="flex items-center gap-2 text-[11px] font-bold tracking-[0.1em] text-danger-text uppercase">
+    <section className={cx("flex min-w-0 flex-col gap-3 rounded-card border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-danger-soft p-4", className)}>
+      <h2 className="flex items-center gap-2 text-base leading-6 font-medium text-danger-text">
         <IconChip icon="warn" tone="rose" />
         {title}
       </h2>
@@ -157,9 +179,34 @@ export function Card({
   );
 }
 
-/** Screen H1: 26px (24 on the phone), heavy, tight. */
+/** Screen H1: 28/32, medium, tight (24 on the phone). */
 export function PageTitle({ children, className }: { children: ReactNode; className?: string }) {
+  return <h1 className={cx("text-2xl leading-8 font-medium tracking-[-0.02em] md:text-[28px]", className)}>{children}</h1>;
+}
+
+/**
+ * A checkbox on Base UI: 20px, a 6px radius, the accent when ticked. With `label` the box and the words are one <label>
+ * (a click on the words ticks it); without, give it an aria-label.
+ */
+export function Check({ label, className, ...rest }: Omit<ComponentProps<typeof Checkbox.Root>, "className"> & { label?: ReactNode; className?: string }) {
+  const box = (
+    <Checkbox.Root
+      className={cx(
+        "grid size-5 flex-none cursor-pointer place-items-center rounded-chip border border-[color-mix(in_srgb,var(--text)_28%,transparent)] text-transparent transition-[background-color,border-color,transform] duration-150 ease-out hover:border-(--border-hover) data-checked:scale-[1.06] data-checked:border-accent-mark data-checked:bg-accent-mark data-checked:text-on-accent data-disabled:cursor-default data-disabled:opacity-45",
+        !label && className,
+      )}
+      {...rest}
+    >
+      <Checkbox.Indicator className="grid place-items-center">
+        <Icon name="check" size={14} strokeWidth={2.5} />
+      </Checkbox.Indicator>
+    </Checkbox.Root>
+  );
+  if (!label) return box;
   return (
-    <h1 className={cx("text-2xl font-extrabold tracking-[-0.035em] md:text-[26px]", className)}>{children}</h1>
+    <label className={cx("flex cursor-pointer items-center gap-2.5 font-medium", className)}>
+      {box}
+      {label}
+    </label>
   );
 }

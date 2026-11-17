@@ -13,16 +13,16 @@ type Props = {
   onValueChange: (value: string) => void;
   options: readonly SelectOption[];
   "aria-label": string;
-  /** 36px filter box for toolbars (Nodes list); the default is the 44px field. */
+  /** 32px filter box for toolbars (Nodes list); the default is the 40px field. */
   compact?: boolean;
   className?: string;
 };
 
 /** The look of a dropdown list, shared with the language menu (components/prefs.tsx). */
 export const selectPopupClass =
-  "min-w-(--anchor-width) origin-(--transform-origin) rounded-card border border-line bg-surface p-1.5 shadow-(--shadow-toast) outline-none transition-[scale,opacity] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0";
+  "min-w-(--anchor-width) origin-(--transform-origin) rounded-pop border border-line bg-surface p-1.5 shadow-(--shadow-pop) outline-none transition-[scale,opacity] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0";
 export const selectItemClass =
-  "flex min-h-10 cursor-pointer items-center gap-2 rounded-ctl px-2.5 py-1.5 text-[13px] font-semibold text-fg outline-none select-none data-highlighted:bg-surface-2";
+  "flex min-h-10 cursor-pointer items-center gap-2.5 rounded-ctl px-2.5 py-1.5 text-[13px] text-fg outline-none select-none data-highlighted:bg-step";
 /** The tick of the chosen row. */
 export function SelectCheck() {
   return (
@@ -32,7 +32,7 @@ export function SelectCheck() {
   );
 }
 
-/** Dropdown styled like a 44px text field; the list pops over in a card. */
+/** Dropdown styled like a 40px text field; the list pops over in a menu. */
 export function Select({ value, onValueChange, options, compact, className, ...rest }: Props) {
   return (
     <BaseSelect.Root
@@ -42,8 +42,8 @@ export function Select({ value, onValueChange, options, compact, className, ...r
     >
       <BaseSelect.Trigger
         className={cx(
-          "flex w-full items-center justify-between gap-3 border border-line bg-surface text-start font-medium text-fg outline-none transition-colors duration-200 focus-visible:border-accent data-popup-open:border-accent-line",
-          compact ? "h-9 rounded-ctl px-3 text-xs" : "h-11 rounded-field px-3.5 text-sm",
+          "group flex w-full items-center justify-between gap-3 border border-line bg-canvas text-start text-fg outline-none transition-[border-color,box-shadow] duration-150 ease-out hover:border-(--border-hover) focus-visible:border-accent-line focus-visible:shadow-[0_0_0_3px_var(--focus-ring)] data-popup-open:border-accent-line data-disabled:opacity-45",
+          compact ? "h-8 rounded-ctl px-3 text-[13px]" : "h-10 rounded-field px-3 text-sm",
           className,
         )}
         {...rest}
@@ -57,7 +57,7 @@ export function Select({ value, onValueChange, options, compact, className, ...r
           )}
           <BaseSelect.Value className="min-w-0 truncate" />
         </span>
-        <BaseSelect.Icon className="flex-none text-muted">
+        <BaseSelect.Icon className="flex-none text-muted transition-transform duration-200 ease-out group-data-popup-open:rotate-180">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 4.5l3 3 3-3" />
           </svg>

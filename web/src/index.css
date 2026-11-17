@@ -49,6 +49,7 @@
   --accent-text: var(--accent);
   --accent-soft: color-mix(in srgb, var(--accent-mark) 12%, var(--surface));
   --accent-line: color-mix(in srgb, var(--accent-mark) 36%, var(--surface));
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, #fff);
   --focus-ring: color-mix(in srgb, var(--accent-mark) 16%, transparent);
   /* "works" is always mint, whatever the accent */
   --ok: var(--accent-mint);
@@ -119,6 +120,7 @@
 
   --accent-mark: oklch(from var(--accent) calc(l * 0.86) calc(c * 1.36) h);
   --accent-text: oklch(from var(--accent) calc(l * 0.64) calc(c * 1.04) h);
+  --accent-hover: color-mix(in srgb, var(--accent) 92%, #000);
   --ok: oklch(from var(--accent-mint) calc(l * 0.86) calc(c * 1.36) h);
 
   --tone-lavender: #5a48a8;
@@ -192,6 +194,7 @@
   --color-them: var(--them);
   --color-accent: var(--accent);
   --color-accent-mark: var(--accent-mark);
+  --color-accent-hover: var(--accent-hover);
   --color-on-accent: var(--ink-on-accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-line);
@@ -276,32 +279,38 @@
    Status is always colour + glyph + word, never colour alone. */
 .tone-ok {
   --c: var(--ok);
+  --c-ink: var(--ink-on-accent);
   --c-fg: var(--tone-mint);
   --c-bg: var(--tone-mint-bg);
 }
 .tone-warn {
   --c: var(--warning);
+  --c-ink: var(--ink-on-accent);
   --c-fg: var(--warning-text);
   --c-bg: var(--warning-soft);
 }
 .tone-bad {
   --c: var(--danger);
+  --c-ink: var(--ink-on-accent);
   --c-fg: var(--danger-text);
   --c-bg: var(--danger-soft);
 }
 .tone-off {
   --c: var(--muted);
+  --c-ink: var(--ink-on-accent);
   --c-fg: var(--muted);
   --c-bg: var(--step);
 }
 .tone-busy {
   --c: var(--tone-sky);
+  --c-ink: var(--ink-on-accent);
   --c-fg: var(--tone-sky);
   --c-bg: var(--tone-sky-bg);
 }
 .tone-blip {
   /* grey-blue, never red: a hoster blip is not an outage */
   --c: var(--tone-blip);
+  --c-ink: var(--ink-on-accent);
   --c-fg: var(--tone-blip);
   --c-bg: color-mix(in srgb, var(--tone-blip) 16%, var(--surface));
 }
@@ -396,6 +405,11 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+@keyframes mg-skp {
+  50% {
+    opacity: 0.45;
   }
 }
 @keyframes mg-ui-pop {

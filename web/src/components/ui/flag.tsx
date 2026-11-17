@@ -158,13 +158,13 @@ export function Flag({ code, size = 16, className }: { code: string; size?: numb
   const art = c in special ? special[c] : c in stripes ? bands(stripes[c]!) : null;
   if (!art) {
     return (
-      <span aria-hidden className={cx("inline-flex flex-none items-center justify-center rounded-[3px] bg-surface-2 font-mono font-bold text-muted", className)} style={{ width, height: size, fontSize: Math.max(7, Math.round(size * 0.5)) }}>
+      <span aria-hidden className={cx("inline-flex flex-none items-center justify-center rounded-[4px] bg-surface-2 font-mono font-bold text-muted", className)} style={{ width, height: size, fontSize: Math.max(7, Math.round(size * 0.5)) }}>
         {c.slice(0, 2)}
       </span>
     );
   }
   return (
-    <svg aria-hidden width={width} height={size} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={cx("block flex-none rounded-[3px] shadow-[0_0_0_1px_rgb(128_128_128/0.35)]", className)}>
+    <svg aria-hidden width={width} height={size} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={cx("block flex-none rounded-[4px] shadow-[0_0_0_1px_rgb(128_128_128/0.3)]", className)}>
       {art}
     </svg>
   );

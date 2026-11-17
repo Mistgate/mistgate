@@ -33,7 +33,7 @@ export const kindTextClass: Record<StatusKind, string> = {
   blip: "text-muted",
   warn: "text-warn-text",
   bad: "text-danger-text",
-  busy: "text-[color-mix(in_oklch,var(--accent-sky)_var(--_text-pct),#000)]",
+  busy: "text-tone-sky",
 };
 
 /** Bare dot for dense lists (nodes table, cards). `busy` is a spinning ring. */
@@ -49,7 +49,7 @@ export function StatusDot({ kind }: { kind: StatusKind }) {
   );
 }
 
-/** Tinted pill: glyph, then the word. `label` overrides the default word; `sm` is the 22px size. */
+/** Tinted pill, 32px with a full round: glyph, then the word. `label` overrides the default word; `sm` is the 24px size. */
 export function StatusPill({
   kind,
   label,
@@ -73,8 +73,8 @@ export function StatusPill({
       role={glyphOnly ? "img" : undefined}
       aria-label={glyphOnly ? t(word) : undefined}
       className={cx(
-        `tone-${kind} pill inline-flex flex-none items-center gap-1.5 font-bold whitespace-nowrap leading-none`,
-        glyphOnly ? "h-5 rounded-xl px-0.5" : bar ? "h-bar rounded-ctl pe-3 ps-2 text-xs" : sm ? "h-[22px] rounded-xl pe-2 ps-1 text-[11px]" : "h-[26px] rounded-xl pe-2.5 ps-1.5 text-xs",
+        `tone-${kind} pill inline-flex flex-none items-center font-medium whitespace-nowrap leading-none transition-colors duration-[400ms] ease-out`,
+        glyphOnly ? "h-5 gap-1.5 rounded-xl px-0.5" : bar ? "h-bar gap-2 rounded-field pe-3 ps-2.5 text-[13px]" : sm ? "h-6 gap-1.5 rounded-xl pe-2.5 ps-2 text-xs" : "h-8 gap-2 rounded-2xl pe-3 ps-2.5 text-[13px]",
       )}
     >
       <StatusGlyph kind={kind} />
@@ -93,7 +93,7 @@ export function StatusGlyph({ kind, glyph }: { kind: StatusKind; glyph?: ReactNo
     <span
       aria-hidden
       className={cx(
-        `tone-${kind} box-border grid size-3.5 flex-none place-items-center rounded-full text-on-accent`,
+        `tone-${kind} box-border grid size-3.5 flex-none place-items-center rounded-full text-(--c-ink,var(--ink-on-accent))`,
         kind === "busy" ? "animate-[mg-ui-spin_1s_linear_infinite] border-2 border-(color:--c) border-t-transparent" : "bg-(--c)",
       )}
     >

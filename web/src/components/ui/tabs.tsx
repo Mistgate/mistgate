@@ -5,7 +5,7 @@ import { cx } from "@/lib/cx";
 export type TabItem = { value: string; label: ReactNode; badge?: number; content: ReactNode };
 
 /**
- * Underlined tabs (node detail, health, subscriptions). A red badge carries a problem count. A strip wider than the screen
+ * Underlined tabs, 44px (node detail, health, subscriptions): the line of the chosen one is under its text. An amber badge carries a count. A strip wider than the screen
  * scrolls: the chosen tab is brought into view (also when the page opens on it from a link), and a fade at the end edge
  * says there is more while there is.
  */
@@ -54,18 +54,18 @@ export function Tabs({
 
   return (
     <BaseTabs.Root value={value} onValueChange={(v) => onValueChange(String(v))} className={className}>
-      <BaseTabs.List ref={list} className="no-scrollbar relative flex overflow-x-auto border-b border-line" {...rest}>
+      <BaseTabs.List ref={list} className="no-scrollbar relative flex gap-1 overflow-x-auto border-b border-line" {...rest}>
         {items.map((it) => (
           <BaseTabs.Tab
             key={it.value}
             value={it.value}
             className={cx(
-              "flex h-[38px] flex-none items-center gap-1.5 px-3 text-[13px] font-bold whitespace-nowrap text-muted transition-colors data-active:text-fg focus-visible:-outline-offset-2",
+              "flex h-11 flex-none items-center gap-2 px-3 text-sm whitespace-nowrap text-sec transition-colors duration-150 ease-out hover:text-fg data-active:font-medium data-active:text-fg focus-visible:-outline-offset-2",
             )}
           >
             {it.label}
             {!!it.badge && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-lg bg-danger-soft px-1 font-mono text-[10px] text-danger-text">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-warn-soft px-1.5 font-mono text-[11px] font-normal text-warn-text">
                 {it.badge}
               </span>
             )}
@@ -78,7 +78,7 @@ export function Tabs({
             more ? "opacity-100" : "opacity-0",
           )}
         />
-        <BaseTabs.Indicator className="absolute bottom-[-1px] left-(--active-tab-left) h-0.5 w-(--active-tab-width) translate-x-0 rounded-[1px] bg-accent transition-[left,width] duration-300 ease-spring" />
+        <BaseTabs.Indicator className="absolute bottom-[-1px] left-[calc(var(--active-tab-left)+12px)] h-0.5 w-[calc(var(--active-tab-width)-24px)] translate-x-0 rounded-[1px] bg-accent-mark transition-[left,width] duration-300 ease-out" />
       </BaseTabs.List>
       {items.map((it) => (
         <BaseTabs.Panel key={it.value} value={it.value} className="screen-enter pt-4 outline-none">

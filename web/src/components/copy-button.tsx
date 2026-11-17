@@ -40,10 +40,20 @@ export function CopyButton({
     }
   }
 
+  const idle = label ?? t("common.copy");
+  const now = done ? t("common.copied") : idle;
+  // the icon turns into the tick and the words swap with a short rise; the button keeps the width of the longer word
+  // (the other word is a hidden ::after sizer, not text of the button)
   return (
     <Button variant={variant} size={size} full={full} onClick={copy}>
-      <Icon name={done ? "check" : "copy"} size={size === "sm" ? 12 : 14} />
-      {done ? t("common.copied") : (label ?? t("common.copy"))}
+      <Icon key={done ? "ok" : "copy"} name={done ? "check" : "copy"} size={16} strokeWidth={done ? 2.6 : 1.5} className="animate-[mg-ui-pop_0.35s_var(--e)_both]" />
+      <span
+        key={done ? "ok" : "copy"}
+        data-w={done ? idle : t("common.copied")}
+        className="animate-[mg-up_0.3s_var(--e)_both] after:invisible after:block after:h-0 after:overflow-hidden after:content-[attr(data-w)]"
+      >
+        {now}
+      </span>
     </Button>
   );
 }

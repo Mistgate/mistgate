@@ -12,7 +12,7 @@ export function Tip({ label, children }: { label: ReactNode; children: ReactElem
       <Tooltip.Trigger delay={200} render={children} />
       <Tooltip.Portal>
         <Tooltip.Positioner side="top" align="start" sideOffset={6} className="z-50">
-          <Tooltip.Popup className="max-w-[280px] origin-(--transform-origin) rounded-ctl border border-line bg-surface px-2.5 py-1.5 text-xs leading-snug font-semibold text-pretty text-fg shadow-(--shadow-toast) transition-[scale,opacity] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
+          <Tooltip.Popup className="max-w-[280px] origin-(--transform-origin) rounded-field border border-line bg-surface-2 px-3 py-2 text-xs leading-4 text-pretty text-fg transition-[scale,opacity] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
             {label}
           </Tooltip.Popup>
         </Tooltip.Positioner>

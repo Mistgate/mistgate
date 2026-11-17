@@ -22,42 +22,45 @@ type Props = {
 };
 
 /**
- * Modal on the desktop, bottom sheet on the phone (same component, one breakpoint). Max 520 wide (760 when `wide`),
- * 18px radius; the sheet has 22px top corners and a grab handle. Esc and the backdrop close it. The title and the footer
- * stay where they are: only the content between them scrolls when it is taller than the window.
+ * Modal on the desktop, bottom sheet on the phone (same component, one breakpoint). Max 520 wide (760 when `wide`), a 20px
+ * radius (top corners only on the sheet). Esc and the backdrop close it. The header and the footer stay where they are: only
+ * the content between them scrolls when it is taller than the window. The footer is a band with a hairline above it.
  */
 export function Modal({ open, onOpenChange, title, description, children, footer, className, closeLabel, wide, shot }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <Dialog.Backdrop className="fixed inset-0 z-50 bg-(--scrim) transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Viewport className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto md:items-center md:p-4">
           <Dialog.Popup
             data-shot={shot}
             className={cx(
-              "flex max-h-full w-full flex-col gap-4 overflow-hidden border border-line bg-surface p-5 shadow-(--shadow-toast) outline-none transition-[transform,opacity] duration-300 ease-out-soft md:rounded-card-lg",
+              "flex max-h-full w-full flex-col overflow-hidden border border-line bg-surface shadow-(--shadow-dlg) outline-none transition-[transform,opacity] duration-300 ease-out md:rounded-sheet",
               wide ? "md:max-w-[760px]" : "md:max-w-[520px]",
               "rounded-t-sheet data-ending-style:translate-y-full data-starting-style:translate-y-full md:data-ending-style:translate-y-2 md:data-ending-style:opacity-0 md:data-starting-style:translate-y-2 md:data-starting-style:opacity-0",
               className,
             )}
           >
-            <div aria-hidden className="mx-auto -mt-2 h-1 w-9 flex-none rounded-sm bg-line md:hidden" />
-            <div className="flex flex-none items-start gap-3">
+            <div className={cx("flex flex-none items-start gap-3 ps-4 pe-3 pt-4 pb-2 md:ps-6 md:pe-4 md:pt-5 md:pb-3", !children && !footer && "pb-5 md:pb-6")}>
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <Dialog.Title className="text-[19px] leading-tight font-extrabold tracking-[-0.03em]">{title}</Dialog.Title>
+                <Dialog.Title className="text-xl leading-7 font-medium">{title}</Dialog.Title>
                 {description && (
-                  <Dialog.Description className="text-[13px] leading-normal text-muted">{description}</Dialog.Description>
+                  <Dialog.Description className="text-sm leading-5 text-sec">{description}</Dialog.Description>
                 )}
               </div>
               {closeLabel && (
-                <Dialog.Close render={<IconButton variant="close" aria-label={closeLabel} className="bg-surface-2" />}>
-                  <Icon name="x" size={14} />
+                <Dialog.Close render={<IconButton variant="close" aria-label={closeLabel} />}>
+                  <Icon name="x" size={16} />
                 </Dialog.Close>
               )}
             </div>
             {/* the scrolling part reaches the edges, so its scrollbar sits on the border and focus rings are not cut */}
-            {children && <div className="-mx-5 -my-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-5 py-1">{children}</div>}
-            {footer && <div className="flex flex-none justify-end gap-2">{footer}</div>}
+            {children && <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-4 pt-2 pb-5 md:px-6 md:pb-6">{children}</div>}
+            {footer && (
+              <div className="flex flex-none flex-wrap items-center justify-end gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,transparent)] px-4 py-3 md:px-6 md:py-3.5">
+                {footer}
+              </div>
+            )}
           </Dialog.Popup>
         </Dialog.Viewport>
       </Dialog.Portal>

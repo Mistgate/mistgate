@@ -38,3 +38,8 @@ export function Pending({ compact, className }: { compact?: boolean; className?:
   const t = useT();
   return <p data-fx-pending="" className={cx("pending-delay", compact ? "text-[13px] text-muted" : "px-1 py-8 text-muted", className)}>{t("common.loading")}</p>;
 }
+
+/** A placeholder bar while the data is on its way (a line of text, a number, a pill): the size comes from `className`; it breathes. */
+export function Skeleton({ className }: { className?: string }) {
+  return <span aria-hidden className={cx("block h-3 animate-[mg-skp_1.4s_ease-in-out_infinite] rounded-md bg-step", className)} />;
+}

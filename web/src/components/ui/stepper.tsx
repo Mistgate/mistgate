@@ -37,7 +37,7 @@ export function Stepper({
       <IconButton variant="round" aria-label={decrementLabel} disabled={decrementDisabled} onClick={onDecrement}>
         <span aria-hidden className="h-0.5 w-2.5 rounded-[1px] bg-fg" />
       </IconButton>
-      <output className="flex min-w-0 flex-1 items-center justify-center text-sm font-extrabold whitespace-nowrap tabular-nums">
+      <output className="flex min-w-0 flex-1 items-center justify-center text-sm font-medium whitespace-nowrap tabular-nums">
         {children}
       </output>
       <IconButton variant="roundAccent" aria-label={incrementLabel} disabled={incrementDisabled} onClick={onIncrement}>
