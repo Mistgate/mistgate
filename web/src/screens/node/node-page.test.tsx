@@ -288,7 +288,7 @@ describe("the tabs", () => {
     expect(people?.textContent).toContain("On this node now");
     expect(people?.textContent).toContain("mila");
     expect(people?.textContent).toContain("timur");
-    expect(text()).toContain("Top today");
+    expect(text()).toContain("Traffic today");
   });
 
   it("open History's parts from its switch, the events without a view", async () => {

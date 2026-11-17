@@ -1,0 +1,317 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
+import { AddNodeProvider } from "@/components/add-node";
+import { ChatButton } from "@/components/assistant/chat";
+import { LangToggle, ThemeToggle } from "@/components/prefs";
+import { PageTitle } from "@/components/ui/bits";
+import { ToastProvider } from "@/components/ui/toast";
+import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { InboundState, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
+import { AlertKind, AlertSeverity, CheckStatus, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
+import { useLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
+import { checksQuery, doctorQuery } from "@/lib/health";
+import { nodeQuery, nodesQuery, overviewQuery } from "@/lib/queries";
+import { relaysQuery } from "@/lib/relay";
+import { meQuery } from "@/lib/session";
+import { useTheme } from "@/lib/theme";
+import { seeded } from "./dev-kit-overview";
+import { Shot } from "./dev-kit-redesign";
+import { ShellLayout } from "./shell";
+import { NodeDetail } from "./node";
+import { hostHistoryQuery } from "./node/load-history";
+import { nodeAlertsQuery } from "./node/overview-parts";
+import { OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
+
+// Development only. /dev-kit?only=nodepage: the node page of the redesign, a tab at a time (?tab=overview|profiles|server|doctor|...),
+// in every state of the board's switch (load low / high / at the limit, alerts none / a few / many, the node answering / silent / new)
+// and the states of the product the board does not draw (retired, read-only role, the Cloudflare edition, the agent behind an entry),
+// each in a frame of its own width (an iframe, so the window's breakpoints answer to the frame), inside the real shell. Each frame is
+// a page of its own: /dev-kit?only=nodepage-frame&tab=<tab>&state=<state>
+//   calm | alerts | many | high | limit | down | new | retired | viewer | edge | via | entry
+// `fx=1` turns the reveal animation on. Made-up data: nodes de1, nl1, fi1, msk1, people alice, dave, bob, a panel called owner.
+
+const NOW = Math.floor(Date.now() / 1000);
+const H = 3600;
+const D = 86_400;
+const GB = 1e9;
+
+export type NState = "calm" | "alerts" | "many" | "high" | "limit" | "down" | "new" | "retired" | "viewer" | "edge" | "via" | "entry";
+type Spec = { load: 0 | 1 | 2; alerts: number; down?: boolean; fresh?: boolean; retired?: boolean; role?: Role; edge?: boolean; via?: boolean; entry?: boolean };
+const specs: Record<NState, Spec> = {
+  calm: { load: 0, alerts: 0 },
+  alerts: { load: 0, alerts: 3 },
+  many: { load: 1, alerts: 6 },
+  high: { load: 1, alerts: 1 },
+  limit: { load: 2, alerts: 2 },
+  down: { load: 0, alerts: 1, down: true },
+  new: { load: 0, alerts: 0, fresh: true },
+  retired: { load: 0, alerts: 0, retired: true },
+  viewer: { load: 0, alerts: 3, role: Role.READONLY },
+  edge: { load: 0, alerts: 1, edge: true },
+  via: { load: 0, alerts: 1, via: true },
+  entry: { load: 0, alerts: 0, entry: true },
+};
+export const nodeStates = Object.keys(specs) as NState[];
+
+const rnd = (k: number) => {
+  const x = Math.sin(k * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+const day = (hr: number) => 0.16 + 0.55 * Math.max(0, Math.cos(((hr - 21) / 24) * 2 * Math.PI)) ** 2 + 0.3 * Math.max(0, Math.cos(((hr - 13) / 24) * 2 * Math.PI)) ** 3;
+
+const alertOf = (over: Record<string, unknown>) => ({
+  id: `alt_${Math.random().toString(36).slice(2, 8)}`,
+  severity: AlertSeverity.WARNING,
+  kind: AlertKind.DOCTOR_WARN,
+  nodeId: "nod_de1",
+  nodeName: "de1",
+  subject: "",
+  titleKey: "health.alert.doctor_warn.title",
+  params: {},
+  whyKey: "",
+  firstSeenUnix: NOW - 1800,
+  openedUnix: NOW - 1800,
+  lastSeenUnix: NOW,
+  resolvedAtUnix: 0,
+  resolution: "",
+  mutedUntilUnix: 0,
+  actions: ["open_node", "mute"],
+  ...over,
+});
+
+/** The open alerts of the board's pool for this many warnings. */
+function alertPool(n: number) {
+  const pool = [
+    alertOf({ subject: "journald_size", whyKey: "health.doctor.journald_size.why", params: { check: "journald_size", journal_mb: "3891", cap_mb: "500" }, actions: ["apply_fix:journald_vacuum", "open_node", "accept", "mute"], openedUnix: NOW - 4 * H }),
+    alertOf({ kind: AlertKind.CERT_EXPIRY, subject: "inb_1", titleKey: "health.alert.cert_expiry.title", whyKey: "health.alert.cert_expiry.why", params: { profile: "hy2 · 443", days_left: "9", server_part: "" }, actions: ["open_profiles", "mute"], openedUnix: NOW - 2 * D }),
+    alertOf({ kind: AlertKind.CHECK_FAILED, severity: AlertSeverity.CRITICAL, subject: "inb_2", titleKey: "health.alert.check_failed.title", params: { profile: "vless · 443", inbound: "inb_2", port: "443" }, actions: ["restart_inbound", "open_node", "mute"], openedUnix: NOW - 25 * 60 }),
+    alertOf({ subject: "unit_generation", params: { check: "unit_generation" }, actions: ["apply_fix:refresh_unit", "open_node", "mute"], openedUnix: NOW - 5 * H }),
+    alertOf({ kind: AlertKind.CERT_EXPIRY, subject: "inb_3", titleKey: "health.alert.cert_expiry.title", whyKey: "health.alert.cert_expiry.why", params: { profile: "awg · 51820", days_left: "12", server_part: "" }, actions: ["open_profiles", "mute"], openedUnix: NOW - 3 * D }),
+    alertOf({ subject: "time_sync", params: { check: "time_sync" }, actions: ["open_node", "accept", "mute"], openedUnix: NOW - 9 * H }),
+  ];
+  return pool.slice(0, n);
+}
+
+const closed = [
+  { ...alertOf({ resolvedAtUnix: NOW - 3 * H, openedUnix: NOW - 3 * H - 2 * 60, firstSeenUnix: NOW - 3 * H - 2 * 60, resolution: "cleared", kind: AlertKind.NODE_DOWN, titleKey: "health.alert.node_down.title", params: { minutes: "2" } }) },
+  { ...alertOf({ resolvedAtUnix: NOW - 5 * H, openedUnix: NOW - 5 * H - 60, firstSeenUnix: NOW - 5 * H - 60, resolution: "cleared", kind: AlertKind.NODE_DOWN, titleKey: "health.alert.node_down.title", params: { minutes: "1" } }) },
+  { ...alertOf({ resolvedAtUnix: NOW - 6 * D, openedUnix: NOW - 6 * D - 60, firstSeenUnix: NOW - 6 * D - 60, resolution: "cleared", kind: AlertKind.NODE_DOWN, titleKey: "health.alert.node_down.title", params: { minutes: "1" } }) },
+];
+
+const history48 = (fail: (i: number) => boolean) => Array.from({ length: 48 }, (_, i) => ({ startUnix: NOW - (47 - i) * 1800, ok: fail(i) ? 0 : 6, failed: fail(i) ? 6 : 0, latencyMs: 28 + Math.round(rnd(i) * 20) }));
+const cell = (id: string, ms: number, fail: (i: number) => boolean = () => false, status = CheckStatus.OK) => ({
+  deployed: true,
+  inboundId: id,
+  failStreak: status === CheckStatus.FAILED ? 3 : 0,
+  history: history48(fail),
+  latencyHourMs: ms,
+  responseHourMs: ms,
+  connectHourMs: ms,
+  last: { status, atUnix: NOW - 120, latencyMs: ms, responseMs: ms, connectMs: ms, exitIp: "", exitCountry: "", errorCode: status === CheckStatus.FAILED ? "timeout" : "", errorDetail: "" },
+});
+
+const columns = [
+  { profileId: "prf_hy", profileName: "Hysteria2 · 443", protocol: "hysteria2" },
+  { profileId: "prf_vl", profileName: "VLESS · Reality", protocol: "vless" },
+  { profileId: "prf_aw", profileName: "AmneziaWG 3.1", protocol: "amneziawg" },
+];
+
+/** The node page's data (what GetNode says) and the query cache around it, for a state. */
+export function nodePageData(state: NState) {
+  const sp = specs[state];
+  const lo = sp.load;
+  const status = sp.retired ? NodeStatus.RETIRED : sp.down ? NodeStatus.DOWN : sp.fresh ? NodeStatus.ONLINE : NodeStatus.ONLINE;
+  const people = sp.down || sp.fresh ? 0 : 2;
+  const cpu = [9, 64, 93][lo]!;
+  const ram = [23, 71, 92][lo]!;
+  const disk = [10, 58, 88][lo]!;
+  const rx = [64, 318, 466][lo]! * 1e6;
+  const tx = [67, 322, 474][lo]! * 1e6;
+  const metrics = {
+    cpuPct: cpu,
+    softirqPct: [4.1, 41, 58][lo]!,
+    load1: [0.31, 1.42, 3.87][lo]!,
+    stealPct: [0.1, 1.8, 9][lo]!,
+    iowaitPct: 0.2,
+    ramUsedBytes: (ram / 100) * 4 * 2 ** 30,
+    ramTotalBytes: 4 * 2 ** 30,
+    swapUsedBytes: [0, 48, 410][lo]! * 2 ** 20,
+    swapTotalBytes: 512 * 2 ** 20,
+    diskUsedBytes: (disk / 100) * 40 * 2 ** 30,
+    diskTotalBytes: 40 * 2 ** 30,
+    netRxBps: rx,
+    netTxBps: tx,
+    nicSpeedMbps: 1000,
+    conntrackCount: [3120, 48200, 231000][lo]!,
+    conntrackMax: 262144,
+    tcpSockets: [9, 96, 310][lo]!,
+    udpSockets: [7, 41, 122][lo]!,
+    agent: { cpuPct: [0.6, 6.2, 9.4][lo]!, rssBytes: [75, 212, 340][lo]! * 1e6, goTotalBytes: 90e6, goHeapBytes: 4.9e6, goroutines: 42, threads: 13, openFds: [215, 1840, 4100][lo]!, fdLimit: 65536 },
+    atUnix: sp.down ? NOW - 14 * 60 : NOW - 5,
+  };
+  const node = {
+    id: "nod_de1",
+    name: "de1",
+    countryCode: "DE",
+    location: "Frankfurt",
+    publicLabel: "Fast route",
+    provider: "Example Cloud",
+    address: "203.0.113.7",
+    status,
+    protocols: ["hysteria2", "vless", "amneziawg"],
+    online: sp.down || sp.fresh ? [] : [{ protocol: "hysteria2", users: 1 }, { protocol: "amneziawg", users: 1 }],
+    agentVersion: "0.1.71",
+    lastSeenUnix: sp.down ? NOW - 14 * 60 : NOW - 5,
+    awgBackend: "auto",
+    bandwidthMbps: 1000,
+    decoyMode: "builtin",
+    decoySupported: true,
+    decoyReasonCode: "",
+    decoyBundleSha256: "",
+    decoyPanelAvailable: true,
+    decoyOwnAvailable: true,
+    decoyAgentMode: "builtin",
+    decoyAgentSha256: "",
+    warp: { state: WarpState.UP, source: 1, colo: "FRA", accountType: "free" },
+    linkViaNodeId: sp.via ? "nod_msk1" : "",
+    reason: sp.down ? { code: "agent_silent", params: { minutes: "14" } } : undefined,
+  };
+  const inbound = (id: string, protocol: string, name: string, port: number, istate = InboundState.ACTIVE) => ({
+    id, profileId: `prf_${id}`, profileName: name, protocol, nodeId: "nod_de1", nodeName: "de1", state: istate, port, tlsServerName: "de1.example.com", certNotAfterUnix: NOW + 70 * D, certPinSha256: "", lastError: "", egress: "direct", enabled: true, portOverride: 0, directInSubscriptions: true, cdn: false,
+  });
+  const inbounds = sp.fresh ? [] : [inbound("inb_1", "hysteria2", "Hysteria2 · 443", 443), inbound("inb_2", "vless", "VLESS · Reality", 443), inbound("inb_3", "amneziawg", "AmneziaWG 3.1", 51820)];
+  const data = {
+    node,
+    metrics: sp.fresh ? undefined : metrics,
+    facts: { hostname: "de1", os: "Ubuntu 24.04", kernel: "6.8.0-45", arch: "amd64", cpuCount: 2, ramTotalBytes: 4 * 2 ** 30, diskTotalBytes: 40 * 2 ** 30, virt: "kvm", hasIpv6: true, bootUnix: NOW - 31 * D, engines: ["hysteria2: hysteria core v2.6.1"] },
+    inbounds,
+    onlineUsers: people ? [{ userId: "usr_alice", userName: "alice", protocol: "hysteria2", deviceModel: "Desktop-Alice", connectedAtUnix: NOW - 3600, downBps: 31e6 }, { userId: "usr_alice", userName: "alice", protocol: "hysteria2", deviceModel: "iPad", connectedAtUnix: NOW - 3000, downBps: 31e6 }, { userId: "usr_dave", userName: "dave", protocol: "amneziawg", deviceModel: "Pixel 9", connectedAtUnix: NOW - 900, downBps: 2e6 }] : [],
+    topToday: sp.fresh ? [] : [{ userId: "usr_alice", userName: "alice", bytes: 5.0 * GB }, { userId: "usr_dave", userName: "dave", bytes: 1.2 * GB }, { userId: "usr_bob", userName: "bob", bytes: 322e6 }],
+    notes: "",
+    dnsResolvers: [],
+    createdUnix: NOW - 40 * D,
+    enrollmentExpiresUnix: 0,
+    portChecks: [],
+    tcpChecks: [],
+  };
+
+  const qc = seeded("calm");
+  const hostHours = (n: number) =>
+    Array.from({ length: n }, (_, i) => {
+      const hrOf = new Date((NOW - (n - 1 - i) * H) * 1000).getHours();
+      const d = day(hrOf) * (0.85 + rnd(i) * 0.3);
+      const base = [0.3, 1, 1.4][lo]!;
+      return { hourStartUnix: NOW - (NOW % H) - (n - 1 - i) * H, samples: 360, cpuAvgPct: Math.min(99, Math.max(2, d * 22 * base + 4)), cpuMaxPct: Math.min(100, d * 30 * base + 12), sessionsAvg: d * 2.4, sessionsMax: Math.ceil(d * 3.2), extSamples: 360, stealAvgPct: [0.1, 1.8, 6][lo]!, stealMaxPct: [0.4, 3, 9][lo]!, agentCpuAvgPct: [0.5, 5, 8][lo]!, agentCpuMaxPct: [1, 8, 12][lo]! };
+    });
+  const live = !sp.retired;
+  const failing = state === "many" || state === "limit" || state === "alerts";
+  qc.setQueryData(nodeQuery("nod_de1").queryKey, data as never);
+  qc.setQueryData(nodeAlertsQuery("nod_de1").queryKey, { nowUnix: NOW, active: sp.fresh ? [] : alertPool(sp.alerts), history: sp.fresh ? [] : closed } as never);
+  qc.setQueryData(
+    checksQuery("nod_de1").queryKey,
+    {
+      nowUnix: NOW,
+      intervalS: 300,
+      columns: sp.fresh ? [] : columns,
+      rows: sp.fresh
+        ? []
+        : [
+            {
+              nodeId: "nod_de1",
+              nodeName: "de1",
+              countryCode: "DE",
+              nodeStatus: status,
+              cells: [cell("inb_1", 31), cell("inb_2", 29, (i) => (failing ? i > 38 : false), failing ? CheckStatus.FAILED : CheckStatus.OK), cell("inb_3", 34)],
+            },
+          ],
+      countryChecks: [],
+    } as never,
+  );
+  qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns, rows: [], countryChecks: [] } as never);
+  qc.setQueryData(doctorQuery("nod_de1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_de1", nodeName: "de1", nodeStatus: status, agentSupported: true, hasReport: true, receivedUnix: NOW - 60, ageS: 60, stale: false, items: sp.alerts ? [{ id: "journald_size", status: DoctorStatus.WARN, titleKey: "doctor.journald_size.title", detail: "", detailCode: "", params: { journal_mb: "3891", cap_mb: "500" }, whyKey: "health.doctor.journald_size.why", fixId: "journald_vacuum", measuredUnix: NOW }] : [] }] } as never);
+  qc.setQueryData(overviewQuery().queryKey, { nowUnix: NOW, nodes: [{ id: "nod_de1", name: "de1", sparkBytes: Array.from({ length: 24 }, (_, i) => Math.round((0.4 + Math.sin(i / 3.2) * 0.3 + (i > 17 ? 0.5 : 0)) * 2.1e9)) }], traffic: [], online: [], events: [], topConsumers: [] } as never);
+  qc.setQueryData(overviewQuery(OverviewRange.OVERVIEW_RANGE_24H).queryKey, qc.getQueryData(overviewQuery().queryKey) as never);
+  if (live && !sp.fresh && !sp.edge) {
+    qc.setQueryData(hostHistoryQuery("nod_de1", 24).queryKey, { nodeId: "nod_de1", nodeName: "de1", nowUnix: NOW, sinceUnix: NOW - 31 * D, hours: hostHours(24) } as never);
+    qc.setQueryData(hostHistoryQuery("nod_de1", 168).queryKey, { nodeId: "nod_de1", nodeName: "de1", nowUnix: NOW, sinceUnix: NOW - 31 * D, hours: hostHours(168) } as never);
+  }
+  if (sp.fresh) qc.setQueryData(hostHistoryQuery("nod_de1", 24).queryKey, { nodeId: "nod_de1", nodeName: "de1", nowUnix: NOW, sinceUnix: NOW - 300, hours: [] } as never);
+  qc.setQueryData(relaysQuery("nod_de1").queryKey, (sp.entry ? [] : []) as never);
+  const nodes = (qc.getQueryData(nodesQuery.queryKey) as { nodes: Record<string, unknown>[] }).nodes;
+  qc.setQueryData(nodesQuery.queryKey, { ...(qc.getQueryData(nodesQuery.queryKey) as object), nodes: [...nodes, { ...nodes[0], id: "nod_msk1", name: "msk1", countryCode: "RU", location: "Moscow" }] } as never);
+  qc.setQueryData(meQuery.queryKey, {
+    admin: { id: "adm_1", displayName: "owner", role: sp.role ?? Role.OWNER },
+    version: "0.1.71",
+    sourceUrl: "https://github.com/example/mistgate",
+    sourceStars: 298,
+    stepUpUntilUnix: 0,
+    edition: sp.edge ? "edge" : "vps",
+    unavailable: sp.edge ? ["health_checks"] : [],
+  } as never);
+  return { qc, data };
+}
+
+/** One whole page of the scene, for a frame or a screenshot at the window's own width. */
+export function NodePageFrame() {
+  const params = new URLSearchParams(location.search);
+  const state = (params.get("state") ?? "calm") as NState;
+  const [scene] = useState(() => {
+    if (params.get("fx") === "1") setEffectsEnabled(true);
+    return nodePageData(state);
+  });
+  return (
+    <QueryClientProvider client={scene.qc}>
+      <ToastProvider>
+        <AddNodeProvider>
+          <ShellLayout current="nodes" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
+            <NodeDetail data={scene.data as never} />
+          </ShellLayout>
+        </AddNodeProvider>
+      </ToastProvider>
+    </QueryClientProvider>
+  );
+}
+
+const frames: { id: string; state: NState; tab: string; title: string; w: number; h: number }[] = [
+  { id: "node-overview-calm", state: "calm", tab: "overview", title: "Overview: load low, no alerts", w: 1440, h: 1700 },
+  { id: "node-overview-alerts", state: "alerts", tab: "overview", title: "Overview: three alerts, one of them failing a check", w: 1440, h: 1800 },
+  { id: "node-overview-many", state: "many", tab: "overview", title: "Overview: six alerts fold into 'show more', load high", w: 1440, h: 1900 },
+  { id: "node-overview-limit", state: "limit", tab: "overview", title: "Overview: load at the limit, the meters turn red", w: 1440, h: 1800 },
+  { id: "node-overview-down", state: "down", tab: "overview", title: "Overview: the node is silent, the last readings are dimmed", w: 1440, h: 1700 },
+  { id: "node-overview-new", state: "new", tab: "overview", title: "Overview: a node just added, no history yet", w: 1440, h: 1500 },
+  { id: "node-overview-retired", state: "retired", tab: "overview", title: "Overview: a retired node", w: 1440, h: 1200 },
+  { id: "node-overview-viewer", state: "viewer", tab: "overview", title: "Overview: a read-only role, no fix buttons", w: 1440, h: 1800 },
+  { id: "node-overview-via", state: "via", tab: "overview", title: "Overview: the agent reaches the panel through msk1", w: 1440, h: 1800 },
+  { id: "node-overview-edge", state: "edge", tab: "overview", title: "Overview: the Cloudflare edition, no checks, no load hours", w: 1440, h: 1500 },
+  { id: "node-overview-1100", state: "alerts", tab: "overview", title: "Overview at 1100 wide: one column", w: 1100, h: 2600 },
+  { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
+];
+
+export function NodePageKit() {
+  // the frames read the theme and the language when they load: a change at the top reloads them
+  const key = `${useTheme()}-${useLang()}`;
+  const path = location.pathname;
+  const only = new URLSearchParams(location.search).get("tab");
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex items-center gap-3">
+        <PageTitle>Node page</PageTitle>
+        <div className="flex-1" />
+        <LangToggle />
+        <ThemeToggle />
+      </div>
+      {frames
+        .filter((f) => !only || f.tab === only)
+        .map((f) => (
+          <Shot key={f.id} id={f.id} title={`${f.title} · ${f.w} px`}>
+            <div className="max-w-full overflow-x-auto rounded-card border border-line">
+              {/* the frame is this same app (a made-up page of it), so a sandbox would only break it */}
+              {/* oxlint-disable-next-line react/iframe-missing-sandbox */}
+              <iframe key={key} title={f.title} src={`${path}?only=nodepage-frame&tab=${f.tab}&state=${f.state}`} width={f.w} height={f.h} className="block max-w-none border-0" />
+            </div>
+          </Shot>
+        ))}
+    </div>
+  );
+}

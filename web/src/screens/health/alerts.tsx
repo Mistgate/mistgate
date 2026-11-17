@@ -361,7 +361,7 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false, fold = fals
  * `part`: "card" everything; "fold" the same without the muted line (the fold's line says until when); "row" an alert inside a
  * card of several: only its own buttons, the card has the shared ones.
  */
-function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert; now: number; flow: FixFlow; onNodePage: boolean; part: "card" | "fold" | "row"; id?: string; className?: string }) {
+export function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert; now: number; flow: FixFlow; onNodePage: boolean; part: "card" | "fold" | "row"; id?: string; className?: string }) {
   const t = useT();
   const fmt = useFmt();
   const can = useCan();

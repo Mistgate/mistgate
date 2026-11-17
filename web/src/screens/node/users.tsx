@@ -1,13 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Avatar, Chip, SectionLabel } from "@/components/ui/bits";
-import type { IconName, Tone } from "@/components/ui/icons";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Avatar } from "@/components/ui/bits";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
+import { cx } from "@/lib/cx";
 import type { Plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
 import { protocolName, protocolShort } from "@/lib/series";
+import { CardHead } from "@/screens/overview-parts";
 
 type Online = Plain<GetNodeResponse>["onlineUsers"][number];
 
@@ -32,8 +33,8 @@ export function onlinePeople(online: readonly Online[]) {
   return [...people.values()];
 }
 
-/** A card of the Overview with its heading and, when there are more rows than it shows, "All N" that opens them in place. */
-function PeopleCard({ id, icon, tone, title, total, shown, onAll, children }: { id?: string; icon: IconName; tone: Tone; title: ReactNode; total: number; shown: number; onAll: () => void; children: ReactNode }) {
+/** A card of the Overview with its heading and, under the rows, "All N" that opens the rest in place (the board's foot link). */
+function PeopleCard({ id, title, count, hint, total, shown, onAll, children }: { id?: string; title: ReactNode; count?: ReactNode; hint?: ReactNode; total: number; shown: number; onAll: () => void; children: ReactNode }) {
   const t = useT();
   const ref = useRef<HTMLElement>(null);
   // the old Users tab (?tab=users) lands on the Overview at #people
@@ -41,23 +42,25 @@ function PeopleCard({ id, icon, tone, title, total, shown, onAll, children }: { 
     if (id && window.location.hash === `#${id}`) ref.current?.scrollIntoView?.({ block: "start" });
   }, [id]);
   return (
-    <section ref={ref} id={id} className="flex scroll-mt-4 flex-col gap-2.5 rounded-card-lg border border-line bg-surface p-4">
-      <div className="flex items-center gap-2">
-        <SectionLabel as="h2" icon={icon} tone={tone} className="flex-1">
-          {title}
-        </SectionLabel>
-        {total > shown && (
-          <button type="button" onClick={onAll} className="text-xs font-bold text-muted hover:text-fg">
+    <section ref={ref} id={id} className="scroll-mt-4 rounded-card border border-line bg-surface">
+      <CardHead title={title} count={count}>
+        {hint}
+      </CardHead>
+      {children}
+      {total > shown && (
+        <div className="border-t border-line px-6 py-3 text-[13px] max-[720px]:px-4">
+          <button type="button" onClick={onAll} className="text-sec underline decoration-(--border) underline-offset-4 hover:text-fg">
             {t("node.showAll", { n: total })}
           </button>
-        )}
-      </div>
-      {children}
+        </div>
+      )}
     </section>
   );
 }
 
-/** "On this node now": people online per protocol, then who they are and how fast they go. */
+const rowPad = "px-6 max-[720px]:px-4";
+
+/** "On this node now": who is connected and how fast they go; the people online per protocol sit in the head. */
 export function OnlineNow({ data }: { data: Plain<GetNodeResponse> }) {
   const t = useT();
   const fmt = useFmt();
@@ -66,47 +69,39 @@ export function OnlineNow({ data }: { data: Plain<GetNodeResponse> }) {
   const people = onlinePeople(data.onlineUsers);
   const [all, setAll] = useState(false);
   const shown = all ? people : people.slice(0, peopleRows);
+  const fastest = Math.max(1, ...people.map((p) => p.downBps));
   return (
-    <PeopleCard id="people" icon="people" tone="mint" title={t("node.onlineHere")} total={people.length} shown={shown.length} onAll={() => setAll(true)}>
-      <div className="flex flex-wrap gap-x-6 gap-y-2 pb-1">
-        {node.online.length === 0 && (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-mono text-[22px] leading-tight font-bold">0</span>
-            <span className="text-xs text-muted">{offline ? t("node.onlineOffline") : t("node.onlineNone")}</span>
-          </div>
-        )}
-        {node.online.map((o) => (
-          <div key={o.protocol} className="flex flex-col gap-0.5">
-            <span className="font-mono text-[22px] leading-tight font-bold">{o.users}</span>
-            <span className="text-xs text-muted">{protocolName(o.protocol)}</span>
-          </div>
-        ))}
-      </div>
+    <PeopleCard
+      id="people"
+      title={t("node.onlineHere")}
+      count={people.length || node.online.length ? Math.max(people.length, node.online.reduce((n, o) => n + o.users, 0)) : undefined}
+      hint={node.online.length > 0 && <span className="font-mono text-xs text-muted">{node.online.map((o) => `${protocolShort(o.protocol)} ${o.users}`).join(" · ")}</span>}
+      total={people.length}
+      shown={shown.length}
+      onAll={() => setAll(true)}
+    >
       {shown.map((u, i) => {
-        const detail = [...u.models, u.connections > 1 ? t.n("node.connections", u.connections) : ""].filter(Boolean).join(" · ");
+        const detail = [...u.models, ...u.protocols.map(protocolName), u.connections > 1 ? t.n("node.connections", u.connections) : ""].filter(Boolean).join(" · ");
         return (
-          <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className="flex min-h-9 items-center gap-2.5 border-t border-line pt-2.5">
+          <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className={cx("grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-t border-line py-2.5 transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]", rowPad)}>
             <Avatar name={u.userName} index={i} />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <b className="truncate text-[13px]">{u.userName}</b>
-              {detail && <span className="truncate text-[11px] text-muted">{detail}</span>}
-            </span>
-            <span className="flex gap-1">
-              {u.protocols.map((p) => (
-                <span key={p} title={protocolName(p)}>
-                  <Chip mono>{protocolShort(p)}</Chip>
-                </span>
-              ))}
-            </span>
-            <span className="w-[84px] text-end font-mono text-xs">{fmt.mbit(u.downBps)}</span>
+            <div className="min-w-0 overflow-hidden">
+              <b className="font-medium">{u.userName}</b>
+              <span className="block truncate text-xs text-muted">{detail}</span>
+            </div>
+            <div className="text-end font-mono text-[13px] tabular-nums">
+              {fmt.mbit(u.downBps)}
+              <i className="nd-bar thin ms-auto mt-1.5 block w-24" style={{ "--w": `${Math.max(4, Math.round((u.downBps / fastest) * 100))}%`, "--nd-track": "var(--surface-2)" } as CSSProperties} />
+            </div>
           </Link>
         );
       })}
+      {people.length === 0 && <p className={cx("border-t border-line py-4 text-[13px] text-muted", rowPad)}>{offline ? t("node.onlineOffline") : t("node.onlineNone")}</p>}
     </PeopleCard>
   );
 }
 
-/** "Top today": who moved the most through this node since midnight UTC. */
+/** "Traffic today": who moved the most through this node since midnight UTC. */
 export function TopToday({ data }: { data: Plain<GetNodeResponse> }) {
   const t = useT();
   const fmt = useFmt();
@@ -114,30 +109,15 @@ export function TopToday({ data }: { data: Plain<GetNodeResponse> }) {
   const best = Math.max(1, ...data.topToday.map((u) => u.bytes));
   const shown = all ? data.topToday : data.topToday.slice(0, topRows);
   return (
-    <PeopleCard
-      icon="traffic"
-      tone="sky"
-      title={
-        <>
-          {t("node.topToday")} <span className="font-medium tracking-normal normal-case">· {t("nodes.todayHint")}</span>
-        </>
-      }
-      total={data.topToday.length}
-      shown={shown.length}
-      onAll={() => setAll(true)}
-    >
+    <PeopleCard title={t("np.today.title")} hint={<span className="text-[13px] text-muted">{t("nodes.todayHint")}</span>} total={data.topToday.length} shown={shown.length} onAll={() => setAll(true)}>
       {shown.map((u) => (
-        <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className="flex flex-col gap-[5px]">
-          <div className="flex text-[13px]">
-            <b className="min-w-0 flex-1 truncate">{u.userName}</b>
-            <span className="font-mono text-xs">{fmt.bytes(u.bytes)}</span>
-          </div>
-          <div className="h-1 overflow-hidden rounded-[2px] bg-surface-2">
-            <div className="h-full bg-accent" style={{ width: `${Math.max(3, Math.round((u.bytes / best) * 100))}%` }} />
-          </div>
+        <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className={cx("grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 border-t border-line py-2.5 last:pb-4", rowPad)}>
+          <span className="truncate">{u.userName}</span>
+          <i className="nd-bar tall" style={{ "--w": `${Math.max(3, Math.round((u.bytes / best) * 100))}%` } as CSSProperties} />
+          <b className="font-mono text-[13px] font-medium tabular-nums">{fmt.bytes(u.bytes)}</b>
         </Link>
       ))}
-      {data.topToday.length === 0 && <p className="text-[13px] text-muted">{t("node.noTopToday")}</p>}
+      {data.topToday.length === 0 && <p className={cx("border-t border-line py-4 text-[13px] text-muted", rowPad)}>{t("node.noTopToday")}</p>}
     </PeopleCard>
   );
 }

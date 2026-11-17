@@ -1,0 +1,267 @@
+/*
+ * What the node page's utilities cannot say (screens/node/*): the cells of the checks with their tooltip, the layers of the
+ * chart, the bars that grow in, the way a node's alert opens, the pulse of a profile that restarts. The values are the redesign
+ * board's (PnNode + pn.css); the curves are the --e and --ease-spring of index.css.
+ */
+
+.nd {
+  /* the board's amber dot is a step brighter than its amber text in the light theme */
+  --nd-warn: var(--warning);
+  /* the track of a bar */
+  --nd-track: var(--step);
+}
+:root[data-theme="light"] .nd {
+  --nd-warn: #e0a100;
+}
+
+/* a bar with a fill: the fill grows in once, and follows when the number changes */
+.nd-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--fill, var(--accent-mark)) var(--w), var(--nd-track) 0);
+  transition: background 0.4s var(--e);
+}
+.nd-bar.thin {
+  height: 3px;
+}
+.nd-bar.tall {
+  height: 6px;
+}
+[dir="rtl"] .nd-bar {
+  background: linear-gradient(270deg, var(--fill, var(--accent-mark)) var(--w), var(--nd-track) 0);
+}
+
+/* the stacked bar of a resource: parts side by side, each grows from zero */
+.nd-sbar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin-top: 12px;
+  border-radius: 4px;
+  background: var(--step);
+  overflow: hidden;
+}
+.nd-sbar i {
+  width: var(--w);
+  min-width: 3px;
+  background: var(--muted);
+  animation: nd-grow 0.6s var(--e) both;
+}
+.nd-sbar i:first-child {
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+}
+@keyframes nd-grow {
+  from {
+    width: 0;
+  }
+}
+.nd-sbar i.mg,
+.nd-slg i.mg {
+  background: var(--accent-mark);
+}
+.nd-sbar i.net,
+.nd-slg i.net {
+  background: var(--tone-sand);
+}
+.nd-sbar i.st,
+.nd-slg i.st {
+  background: var(--danger);
+}
+.nd-sbar i.dn,
+.nd-slg i.dn {
+  background: var(--tone-sky);
+}
+.nd-sbar i.up,
+.nd-slg i.up {
+  background: var(--tone-lavender);
+}
+.nd-sbar i.oth,
+.nd-slg i.oth {
+  background: color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+/* the meters of the resource card line up in rows: name, number, bar (subgrid keeps the bars on one line) */
+.nd-rm {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
+  gap: 0 24px;
+  margin: 0;
+  padding: 16px 24px;
+}
+.nd-rm > div {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  min-width: 0;
+}
+.nd-rm.nob i {
+  visibility: hidden;
+}
+@media (width <= 720px) {
+  .nd-rm {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    gap: 0 16px;
+    padding: 14px 16px;
+  }
+  .nd-rm > div:nth-child(n + 3) {
+    margin-top: 16px;
+  }
+}
+
+/* the checks of a profile: one cell an hour; the one under the pointer grows and says what the check found */
+.nd-tk {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 2px;
+}
+.nd-tk i {
+  position: relative;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--ok);
+  opacity: 0.8;
+  transition:
+    transform 0.18s var(--ease-spring),
+    opacity 0.18s var(--e);
+}
+:root[data-theme="light"] .nd-tk i {
+  opacity: 1;
+}
+.nd-tk i.warn {
+  background: var(--nd-warn);
+}
+.nd-tk i.bad {
+  background: var(--danger);
+  opacity: 1;
+}
+.nd-tk i.none {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--border);
+  opacity: 1;
+}
+@media (hover: hover) {
+  .nd-tk:hover i {
+    opacity: 0.4;
+  }
+  .nd-tk i:hover {
+    opacity: 1;
+    transform: scaleY(1.35);
+    z-index: 4;
+  }
+  .nd-tk i:hover::after {
+    content: attr(data-t) "\A" attr(data-s);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 4px);
+    transform: translateX(-50%) scaleY(0.74);
+    transform-origin: 50% 100%;
+    white-space: pre;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--sec);
+    font: 400 12px/16px var(--font-sans);
+    font-style: normal;
+    text-align: start;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+    pointer-events: none;
+  }
+  .nd-tk i:hover::first-line {
+    color: var(--text);
+  }
+}
+/* a round of checks runs: the line under the head fills, the numbers shuffle */
+.nd-pg {
+  display: block;
+  height: 2px;
+  margin-top: -2px;
+  width: var(--w);
+  background: linear-gradient(90deg, transparent, var(--accent-mark));
+  opacity: 0;
+  transition:
+    width 0.6s var(--e),
+    opacity 0.6s var(--e) 0.5s;
+}
+[dir="rtl"] .nd-pg {
+  background: linear-gradient(270deg, transparent, var(--accent-mark));
+}
+.nd-pg.on {
+  opacity: 1;
+  transition:
+    width 0.6s var(--e),
+    opacity 0.15s var(--e);
+}
+
+/* the chart: stroke widths stay as they are when the box stretches */
+.nd-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.nd-plot path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.nd-plot .grid {
+  stroke: color-mix(in srgb, var(--text) 6%, transparent);
+  stroke-width: 1;
+}
+.nd-plot .base {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.nd-plot .ln {
+  stroke: var(--accent-mark);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.nd-plot .ln.pk {
+  stroke: var(--them);
+  stroke-width: 1.5;
+}
+.nd-plot .area {
+  stroke: none;
+}
+
+/* a dotted field: the graph that comes after the first hour */
+.nd-nh {
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text) 8%, transparent) 1px, transparent 1.4px);
+  background-size: 20px 20px;
+}
+
+/* a node's alert opens: the body rises, the chevron turns */
+.nd-alb {
+  animation: mg-up 0.25s var(--e) both;
+}
+
+/* the number of a closed alert, the check that comes in: a quiet fade */
+@keyframes nd-blip {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nd-sbar i,
+  .nd-alb {
+    animation: none;
+  }
+  .nd-pg,
+  .nd-bar,
+  .nd-tk i {
+    transition: none;
+  }
+}
