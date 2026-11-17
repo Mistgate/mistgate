@@ -329,6 +329,17 @@ describe("the list of presets", () => {
     expect(button("Create")?.disabled).toBe(true);
   });
 
+  it("moves the focus with the view: to Back when a preset opens, to its row when Back is pressed", async () => {
+    await mount(undefined, <DnsTab />, { list, providers });
+    const later = () => act(async () => void (await new Promise((r) => setTimeout(r, 60))));
+    await click(rowOf("Beta").querySelector(".dq-open"));
+    await later();
+    expect(document.activeElement).toBe(document.querySelector(".nd-back"));
+    await click(document.querySelector(".nd-back"));
+    await later();
+    expect(document.activeElement).toBe(rowOf("Beta").querySelector(".dq-open"));
+  });
+
   it("asks before the back button throws a change away, and tells the screen so it asks before another tab", async () => {
     const guard = vi.fn();
     await mount(undefined, <DnsTab />, { list, providers, guard });

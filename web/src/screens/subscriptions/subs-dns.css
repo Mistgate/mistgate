@@ -447,10 +447,10 @@
   font-weight: 400;
   color: var(--muted);
 }
-.sbp .dq-nm>div>b {
-  overflow-wrap: anywhere;
-}
-.sbp .dq-nm>div>em {
+.sbp .dq-nm>div>b,
+.sbp .dq-nm>div>em,
+.sbp .dq-n>b,
+.sbp .dq-n>em {
   overflow-wrap: anywhere;
 }
 .sbp .dq-list>.dq-emp {

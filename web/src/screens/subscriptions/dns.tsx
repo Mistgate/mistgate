@@ -49,10 +49,17 @@ export function DnsTab() {
   const defId = chosen ?? def?.id ?? "";
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  // the list and the editor take the same place: a change of one for the other brings the top of the tab into view
+  // the list and the editor take the same place: a change of one for the other brings the top of the tab into view, and the focus
+  // goes where a person who used the keyboard would look next (the back button; the row that was open, or the New button)
   const show = (p: Pick) => {
+    const from = pick;
     setPick(p);
-    requestAnimationFrame(() => top.current?.scrollIntoView?.({ block: "nearest" }));
+    requestAnimationFrame(() => {
+      const box = top.current;
+      box?.scrollIntoView?.({ block: "nearest" });
+      const next = p !== null ? box?.querySelector<HTMLElement>(".nd-back") : [...(box?.querySelectorAll<HTMLElement>(".dq-r") ?? [])].find((r) => r.dataset.preset === from)?.querySelector<HTMLElement>(".dq-open") ?? box?.querySelector<HTMLElement>(".dq-h .sb-btn");
+      next?.focus({ preventScroll: true });
+    });
   };
 
   const flash = (id: string) => {
@@ -223,7 +230,7 @@ function PresetRow({ p, t, catalog, isDef, just, canPick, onDefault, onOpen }: {
   const direct = p.splitDirect ? splitFirst(p.split, (c) => countryName(c, t)) : "";
   const modes = [t(transportKey[p.preferredTransport === DnsTransport.UNSPECIFIED ? DnsTransport.PLAIN : p.preferredTransport]), ...(direct ? [t("subs.dns.sub.direct", { s: direct })] : [])];
   return (
-    <div ref={ref} className={cx("dq-r", isDef && "def", just && "just")}>
+    <div ref={ref} data-preset={p.id} className={cx("dq-r", isDef && "def", just && "just")}>
       <button
         type="button"
         className="dq-def"
