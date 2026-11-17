@@ -21,7 +21,7 @@ import { validateHealthSearch } from "@/screens/health/tabs";
 import { validateUpdatesSearch } from "@/screens/updates/tabs";
 import { upgradeNodeLink, validateNodeSearch } from "@/screens/node/tabs";
 import { validateReachSearch } from "@/screens/reachability/search";
-import { validateNewProfileSearch, validateProfilesSearch } from "@/screens/profiles/search";
+import { validateNewProfileSearch, validateProfileSearch, validateProfilesSearch } from "@/screens/profiles/search";
 import { validateSubsSearch } from "@/screens/subscriptions/tabs";
 import { validateAiSearch } from "@/screens/ai/tabs";
 
@@ -198,11 +198,12 @@ const profileNew = createRoute({
   getParentRoute: () => app,
   path: "/profiles/new",
   validateSearch: validateNewProfileSearch,
-  component: lazyRouteComponent(() => import("@/screens/profiles"), "ProfileEditorScreen"),
+  component: lazyRouteComponent(() => import("@/screens/profiles"), "LegacyNewProfileScreen"),
 });
 const profile = createRoute({
   getParentRoute: () => app,
   path: "/profiles/$id",
+  validateSearch: validateProfileSearch,
   component: lazyRouteComponent(() => import("@/screens/profiles"), "ProfileEditorScreen"),
 });
 

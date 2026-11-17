@@ -25,3 +25,11 @@ export function validateNewProfileSearch(s: Record<string, unknown>): { node?: s
   const protocol = id(s.protocol);
   return { ...(node && { node }), ...(protocol && { protocol }) };
 }
+
+/** /profiles/$id: the tab ("settings" is the first and has none in the address). */
+export const profileTabs = ["settings", "servers", "people"] as const;
+export type ProfileTab = (typeof profileTabs)[number];
+export function validateProfileSearch(s: Record<string, unknown>): { tab?: Exclude<ProfileTab, "settings"> } {
+  const tab = text(s.tab);
+  return tab === "servers" || tab === "people" ? { tab } : {};
+}

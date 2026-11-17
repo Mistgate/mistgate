@@ -58,7 +58,7 @@ function certOfSettings(protocol: string, settings: Settings): Pick<DeployProfil
   return { tlsMode: String(getAt(settings, ["tls_mode"]) ?? ""), sni: String(getAt(settings, ["sni"]) ?? "") };
 }
 
-/** /profiles/new and /profiles/$id: one editor, the same form; a new profile starts from the plugin's defaults. */
+/** /profiles/new until the wizard replaces it: the old form (stage 8a keeps it working; /profiles/$id is the page of page.tsx). */
 export function ProfileEditorScreen() {
   const { id } = useParams({ strict: false }) as { id?: string };
   return !id || id === "new" ? <NewProfile /> : <EditProfile id={id} />;

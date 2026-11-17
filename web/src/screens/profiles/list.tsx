@@ -304,7 +304,7 @@ function Loading({ t, where }: { t: Tx; where: boolean }) {
 }
 
 /** What the profile's own words say under its name ("Hysteria2 · UDP 443 · Salamander"), and in its tooltip what the formats leave out. */
-function words(p: ProfileSummary, protocol: ProtocolInfo | undefined, t: Tx) {
+export function words(p: ProfileSummary, protocol: ProtocolInfo | undefined, t: Tx) {
   const w = `${protocol?.displayName ?? p.protocol} · ${p.summary}`;
   const drops = dropsOf(p.formats).filter((d) => !keysOnly([d]));
   return { w, title: drops.length ? `${w} · ${drops.map((d) => dropWords(d, t).text).join(" · ")}` : w };

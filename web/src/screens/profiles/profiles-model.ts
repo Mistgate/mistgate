@@ -1,5 +1,5 @@
 import { CheckStatus, type GetChecksResponse } from "@/gen/mistgate/admin/v1/health_pb";
-import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { InboundState, NodeStatus, type Inbound } from "@/gen/mistgate/admin/v1/common_pb";
 import type { ProfileSummary } from "@/gen/mistgate/admin/v1/profile_pb";
 import { cellMs } from "@/lib/health";
 import type { Plain } from "@/lib/plain";
@@ -90,7 +90,7 @@ export type PState = "none" | "off" | "bad" | "part" | "busy" | "nogr" | "ok";
  * The profile's state as the page says it ("Works", "Partly · 2 of 3", "Not on any node", "In no group"): from its servers and
  * whether a group carries it. `on` counts the servers that are not switched off, `up` the ones that work.
  */
-export function stateOf(cells: readonly PCell[], inGroups: number, deployed = cells.length): { kind: PState; gl: Gk; on: number; up: number } {
+export function stateOf(cells: readonly { kind: CellKind }[], inGroups: number, deployed = cells.length): { kind: PState; gl: Gk; on: number; up: number } {
   const on = cells.filter((c) => c.kind !== "off");
   const bad = on.filter((c) => c.kind === "bad" || c.kind === "gone");
   const starting = on.filter((c) => c.kind === "busy");
@@ -107,3 +107,42 @@ export function stateOf(cells: readonly PCell[], inGroups: number, deployed = ce
 
 /** The worst glyph of a profile's cells (what a count of remarks takes its colour from). */
 export const worstOf = (gls: readonly Gk[]): "" | "part" | "bad" => (gls.includes("bad") ? "bad" : gls.includes("part") ? "part" : "");
+
+// ---------------------------------------------------------------------------------------------------
+// The servers of one profile (its inbounds), for the profile page
+
+/** One server of the page: the inbound as the panel holds it, its node, how it looks and what the checks say of it. */
+export type ServerRow = {
+  inbound: Inbound;
+  nodeId: string;
+  nodeName: string;
+  countryCode: string;
+  port: number;
+  kind: CellKind;
+  gl: Gk;
+  /** The panel's check of this server, when there is one. */
+  cell?: PCell;
+};
+
+/** What the server's state says: the node out of touch, a start that failed, one that is on its way, one switched off, or a running one whose checks fail. */
+export function kindOfInbound(i: Pick<Inbound, "state">, nodeStatus: NodeStatus | undefined, rounds = 0): CellKind {
+  if (nodeStatus === NodeStatus.DOWN) return "gone";
+  if (i.state === InboundState.FAILED) return "bad";
+  if (i.state === InboundState.PENDING || nodeStatus === NodeStatus.UPDATING) return "busy";
+  if (i.state === InboundState.ACTIVE) return rounds > 0 ? "part" : "ok";
+  return "off";
+}
+
+/** The profile's inbounds by node name, each with its node's face and the check of the same inbound. */
+export function serverRows(inbounds: readonly Inbound[], nodes: readonly { id: string; name: string; countryCode: string; status: NodeStatus }[], cells: readonly PCell[]): ServerRow[] {
+  const node = new Map(nodes.map((n) => [n.id, n]));
+  const cell = new Map(cells.map((c) => [c.inboundId, c]));
+  return inbounds
+    .map((inbound): ServerRow => {
+      const n = node.get(inbound.nodeId);
+      const c = cell.get(inbound.id);
+      const kind = kindOfInbound(inbound, n?.status, c?.kind === "part" ? c.streak : 0);
+      return { inbound, nodeId: inbound.nodeId, nodeName: n?.name ?? inbound.nodeName, countryCode: n?.countryCode ?? "", port: inbound.port, kind, gl: glOf[kind], ...(c && { cell: c }) };
+    })
+    .sort((a, b) => a.nodeName.localeCompare(b.nodeName));
+}

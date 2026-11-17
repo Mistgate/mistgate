@@ -26,6 +26,7 @@ export const D = {
   warn: "M12 8v5M12 16.5v.01M10.3 4l-7.3 12.5a2 2 0 0 0 1.7 3h14.6a2 2 0 0 0 1.7-3L13.7 4a2 2 0 0 0-3.4 0z",
   stack: "M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0M14 5v4M8 10v4M16 15v4",
   close: "M6 6l12 12M18 6L6 18",
+  dots: "M6 12h.01M12 12h.01M18 12h.01",
   back: "M15 6l-6 6 6 6",
   server: "M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01",
 } as const;
