@@ -440,6 +440,15 @@ func (s decoySiteService) SetDecoySiteReady(ctx context.Context, req *connect.Re
 	if err := checkSiteID(m.SiteId); err != nil {
 		return nil, err
 	}
+	if m.Ready {
+		// a site is ready only when its current version still passes the required checks: the files are there and are a valid bundle
+		if _, _, err := f.st.DecoySiteBundle(ctx, m.SiteId, 0); err != nil {
+			if coded := decoyLibraryError(err); coded != nil {
+				return nil, coded
+			}
+			return nil, refuse("decoy_checks_failed")
+		}
+	}
 	row, err := f.st.SetDecoySiteReady(ctx, f.now(), m.SiteId, m.Ready, f.actor(ctx))
 	if err != nil {
 		return nil, s.fail("set decoy site state", err)
