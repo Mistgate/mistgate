@@ -194,6 +194,18 @@ const subscriptions = createRoute({
   component: lazyRouteComponent(() => import("@/screens/subscriptions"), "SubscriptionsScreen"),
 });
 
+// The library of decoy sites and one site of it ("builtin" and "panel_dir" are its two built-in entries).
+const decoys = createRoute({
+  getParentRoute: () => app,
+  path: "/decoys",
+  component: lazyRouteComponent(() => import("@/screens/decoys"), "DecoysScreen"),
+});
+const decoy = createRoute({
+  getParentRoute: () => app,
+  path: "/decoys/$id",
+  component: lazyRouteComponent(() => import("@/screens/decoys"), "DecoySiteScreen"),
+});
+
 // Settings has sub-pages (/settings/interface, ...); the sections without a backend yet are one calm screen each.
 const settings = createRoute({
   getParentRoute: () => app,
@@ -253,7 +265,7 @@ const integrations = createRoute({
   component: lazyRouteComponent(() => import("@/screens/integrations"), "IntegrationsScreen"),
 });
 
-const built = new Set(["overview", "nodes", "users", "profiles", "subscriptions", "health", "reachability", "updates", "ai", "integrations", "settings"]);
+const built = new Set(["overview", "nodes", "users", "profiles", "subscriptions", "decoys", "health", "reachability", "updates", "ai", "integrations", "settings"]);
 const placeholderRoutes = sections
   .filter((s) => !built.has(s.id))
   .map((s) => createRoute({ getParentRoute: () => app, path: s.to, component: () => <SectionScreen id={s.id} /> }));
@@ -274,6 +286,8 @@ const routeTree = root.addChildren([
     profileNew,
     profile,
     subscriptions,
+    decoys,
+    decoy,
     health,
     reachability,
     updates,
