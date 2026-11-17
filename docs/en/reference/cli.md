@@ -243,6 +243,7 @@ Prints `mistgate <version>`, then `built <time>` when the binary was built with 
 | Command | What it does |
 |---|---|
 | `enroll` | Exchanges a one-time token for a node certificate. |
+| `set-panel` | Saves a new panel link address for the agent to switch to. |
 | `install` | Writes the hardened systemd unit, enables and starts it. |
 | `run` | Runs the agent in the foreground. |
 | `cleanup-net` | Removes the agent's tunnel interfaces, WARP routes and nftables tables. |
@@ -279,6 +280,15 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
+
+### mistgate-node set-panel
+
+| Flag | Environment | Default | Meaning |
+|---|---|---|---|
+| `--link-url` | none | none | The panel's new link address, `wss://host/<secret-prefix>/`. Required. |
+| `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
+
+Saves the address in `agent.json` as the one to try next; the node must be enrolled. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. A panel can send the same change to its agents (`panel_link_url`); nothing sends it yet. The command is for a node that cannot reach the panel any more. It prints `Saved. Restart the agent: systemctl restart mistgate-node`.
 
 ### mistgate-node install
 

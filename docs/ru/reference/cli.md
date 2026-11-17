@@ -243,6 +243,7 @@ mistgate edge setup-link --file FILE
 | Команда | Что делает |
 |---|---|
 | `enroll` | Обменивает одноразовый токен на сертификат ноды. |
+| `set-panel` | Сохраняет новый адрес связи с панелью, на который агент перейдёт. |
 | `install` | Пишет защищённый unit systemd, включает и запускает его. |
 | `run` | Запускает агента на переднем плане. |
 | `cleanup-net` | Убирает туннельные интерфейсы агента, маршруты WARP и таблицы nftables. |
@@ -279,6 +280,15 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
+
+### mistgate-node set-panel
+
+| Флаг | Переменная | По умолчанию | Значение |
+|---|---|---|---|
+| `--link-url` | нет | нет | Новый адрес связи с панелью, `wss://host/<секретный-префикс>/`. Обязателен. |
+| `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | Каталог состояния. |
+
+Сохраняет адрес в `agent.json` как следующий для попытки; нода должна быть подключена. После перезапуска агент пробует новый адрес и текущий по очереди и оставляет новый, как только сессия через него удалась. Панель может сообщить своим агентам то же изменение (`panel_link_url`); пока его ничто не отправляет. Команда нужна ноде, которая до панели больше не достаёт. Печатает `Saved. Restart the agent: systemctl restart mistgate-node`.
 
 ### mistgate-node install
 

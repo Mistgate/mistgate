@@ -75,6 +75,9 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 			a.wakeOsStatusReader()
 		}
 		a.configureNetworks(ds.Settings)
+		if a.applyPanelLink(ds.Settings) {
+			a.endForNewLink()
+		}
 	}
 	a.startAwgKmod(ctx, next)
 	if ds.StateHash != "" && ds.StateHash != next.hash() {
