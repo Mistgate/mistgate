@@ -1,9 +1,9 @@
 #!/bin/sh
 # mistgate-probe: availability probe of a Mistgate panel; POSIX sh and curl (busybox ash, dash).
-#   sh mgp.sh install <base-url> <token> | upgrade       (the downloaded file; the panel prints the command)
+#   sh mgp.sh install <base-url> <token> | upgrade
 #   mistgate-probe uninstall | run | supervise | status | start | stop | restart
-# The panel can only make it run curl against targets of an answer whose every line matched a strict pattern. No
-# self-update, no eval, no sourcing; the limits below are fixed here. MGP_ROOT (tests only) puts every path under it.
+# The panel can only make it run curl against targets of an answer whose every line matched a strict pattern.
+# No self-update, eval or sourcing; the limits are fixed here. MGP_ROOT (tests) roots every path.
 # shellcheck disable=SC2249,SC2312
 set -u
 umask 077
@@ -742,7 +742,10 @@ cmd_upgrade() {
 }
 cmd_uninstall() {
 	need_root
+	un_w=x; if pid_is "${S}/worker.pid" worker; then un_w=${PIDOF}; fi
 	svc_stop
+	# a worker's curl must end before the state goes
+	un_i=40; while [ -d "/proc/${un_w}" ] && [ $((un_i=un_i-1)) -gt 0 ]; do sleep 1; done
 	if [ "${MODE}" = systemd ] && [ -z "${ROOT}" ]; then systemctl disable mistgate-probe >/dev/null 2>&1; fi
 	rm -f "${INIT}" "${BIN}"
 	[ "${MODE}" != systemd ] || [ -n "${ROOT}" ] || systemctl daemon-reload >/dev/null 2>&1
@@ -765,5 +768,5 @@ case ${cmd} in
 	start) svc_start ;;
 	stop) svc_stop ;;
 	restart) svc_stop; svc_start ;;
-	*) die 'usage: install <base-url> <token> | upgrade | uninstall | run | supervise | status | start | stop | restart' ;;
+	*) die 'usage: install <base-url> <token>|upgrade|uninstall|run|supervise|status|start|stop|restart' ;;
 esac
