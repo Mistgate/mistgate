@@ -81,78 +81,7 @@ async function mount(data: object = checks) {
   await act(async () => root!.render(<QueryClientProvider client={qc}><ChecksTab data={data as never} /></QueryClientProvider>));
   for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 }
-const cellButton = (aria: string) => [...document.querySelectorAll<HTMLButtonElement>("button[aria-label]")].find((b) => b.getAttribute("aria-label")?.startsWith(aria));
 
-describe("the checks matrix", () => {
-  it("shows a profile that failed to start in red, apart from one switched off, and a node without link apart from both", async () => {
-    await mount();
-    const failed = cellButton("de1, hy2 · WARP · 8443");
-    expect(failed?.textContent).toBe("✕ not started");
-    expect(failed?.className).toContain("tone-bad");
-    const off = cellButton("de2, hy2 · 443 · Salamander");
-    expect(off?.textContent).toBe("off");
-    expect(off?.className).not.toContain("tone-bad");
-    const offline = cellButton("nl1, hy2 · 443 · Salamander");
-    expect(offline?.textContent).toBe("no link");
-    expect(offline?.className).toContain("tone-blip");
-    expect(cellButton("de2, hy2 · WARP · 8443")?.textContent).toBe("✕ fails");
-  });
-
-  it("explains its words under the matrix, for a phone that has no hover", async () => {
-    await mount();
-    const legend = document.body.textContent ?? "";
-    for (const words of ["ms — response through an open tunnel, hourly median, from the panel's server", "✕ — fails the check", "✕ not started — the node could not start it", "off — switched off by you", "no link — the node is offline", "not checked — no test client"]) {
-      expect(legend).toContain(words);
-    }
-  });
-
-  it("names the nodes of the UDP-loss notice above the matrix, and shows none without it", async () => {
-    await mount(udp);
-    const notice = [...document.querySelectorAll("[role=status]")].find((n) => n.textContent?.includes("loses UDP"));
-    expect(notice?.textContent).toBe(
-      "The panel's server loses UDP: Hysteria2 checks to de1 and nl1 often take a second or more longer than VLESS to the same node (38% in the last hour); lost Hysteria2 packets: 3.1% on the way to the nodes, 5.5% on the way back. People are not affected: they connect to the nodes directly. If this keeps happening, contact the hoster of the panel's server.",
-    );
-    // above the matrix, not in a corner
-    expect(notice!.compareDocumentPosition(cellButton("de1, hy2 · 443 · Salamander")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    act(() => root?.unmount());
-    host?.remove();
-    await mount();
-    expect(document.body.textContent).not.toContain("loses UDP");
-  });
-
-  it("puts a slow connect on a second line from 2 s on, keeps the cell calm, and explains the mark", async () => {
-    await mount(udp);
-    const slow = cellButton("de1, hy2 · 443 · Salamander")!;
-    expect(slow.textContent).toBe("48 ms2.6 s");
-    expect(slow.className).toContain("tone-ok");
-    expect(slow.querySelector("svg")).not.toBeNull(); // a shape, not only a colour
-    expect(slow.getAttribute("aria-label")).toBe("de1, hy2 · 443 · Salamander: Response 48 ms, median over the last hour · Connect 2.6 s, median over the last hour");
-    expect(cellButton("de1, VLESS · 443")?.textContent).toBe("61 ms");
-    expect(cellButton("nl1, VLESS · 443")?.textContent).toBe("90 ms2 s");
-    expect(document.body.textContent).toContain("slow connect, 2 s or more; the tunnel works");
-    // the phone row says it in words
-    expect([...document.querySelectorAll("button[aria-expanded]")].map((b) => b.textContent)).toContain("hy2 · 443 · Salamander48 msconnect 2.6 s");
-  });
-
-  it("opens the tooltip of a cell on keyboard focus", async () => {
-    await mount(udp);
-    const slow = cellButton("de1, hy2 · 443 · Salamander")!;
-    await act(async () => slow.focus());
-    for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
-    const text = document.body.textContent ?? "";
-    for (const line of ["Response 48 ms, median over the last hour", "Connect 2.6 s, median over the last hour", "24 h: 48 ok, 0 failed", "Measured from the panel's server"]) expect(text).toContain(line);
-  });
-
-  it("gives a phone a card per node, the history opening right under the row it belongs to", async () => {
-    await mount();
-    const rows = [...document.querySelectorAll<HTMLButtonElement>("button[aria-expanded]")];
-    expect(rows.map((r) => r.textContent)).toContain("hy2 · WARP · 8443✕ not startedThe node could not start the profile");
-    const row = rows.find((r) => r.textContent?.startsWith("hy2 · 443 · Salamander42 ms"))!;
-    await act(async () => void row.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    expect(row.getAttribute("aria-expanded")).toBe("true");
-    expect(row.nextElementSibling?.textContent).toContain("24 h"); // the history card follows its row
-  });
-});
 
 // ---------------------------------------------------------------------------------------------------
 // Reachability from a country: the last column, the phone rows and the node page
@@ -205,101 +134,8 @@ const four = {
   rows: [...checks.rows, { ...checks.rows[0]!, nodeId: "nod_4", nodeName: "fi1", countryCode: "FI" }, { ...checks.rows[0]!, nodeId: "nod_5", nodeName: "fi2", countryCode: "FI" }],
   countryChecks: [...countryChecks, verdict("nod_4", CountryVerdict.UNKNOWN, [probe("Selectel", "Moscow", 38, [[443, true]])], { reason: "too_few_probes", eyeball: false })],
 };
-// zh writes "{node}，{profile}：{state}"
-const countryCell = (node: string) => [...document.querySelectorAll<HTMLElement>("[role=img][aria-label]")].find((b) => new RegExp(`^${node}[,，]`).test(b.getAttribute("aria-label") ?? ""));
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 
-describe("the country column", () => {
-  afterEach(() => act(() => setLang("en")));
-
-  it("is not there while the integration is off or before a round", async () => {
-    await mount();
-    expect(document.body.textContent).not.toContain("From Russia");
-    act(() => root?.unmount());
-    host?.remove();
-    await mount({ ...checks, countryChecks: [] });
-    expect(document.body.textContent).not.toContain("From Russia");
-    expect(document.querySelector("[data-testid=country-row]")).toBeNull();
-  });
-
-  it("has a head that leads to the Reachability section, where the sources and their week are", async () => {
-    await mount(four);
-    const head = [...document.querySelectorAll('a[href="/reachability"]')].find((a) => a.textContent === "From Russia");
-    expect(head).toBeDefined();
-    // the phone cards' rows lead there too
-    const rows = document.querySelectorAll("[data-testid=country-row]");
-    expect([...document.querySelectorAll('[data-testid=country-row] a[href="/reachability"]')].map((a) => a.textContent)).toEqual(Array(rows.length).fill("From Russia"));
-  });
-
-  it("shows each verdict: OK and no data quiet, the two blocks in their tone with a glyph", async () => {
-    await mount(four);
-    expect(document.body.textContent).toContain("From Russia");
-    const fine = countryCell("de1")!;
-    expect(fine.textContent).toBe("reachable");
-    expect(fine.getAttribute("aria-label")).toBe("de1, From Russia: Reachable from Russia");
-    expect(fine.className).not.toMatch(/tone-/);
-    const tcp = countryCell("de2")!;
-    expect(tcp.textContent).toBe("TCP blockedICMP passes");
-    expect(tcp.className).toContain("tone-warn");
-    expect(tcp.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked, ICMP passes");
-    const cut = countryCell("nl1")!;
-    expect(cut.textContent).toBe("unreachable");
-    expect(cut.className).toContain("tone-bad");
-    const none = countryCell("fi1")!;
-    expect(none.textContent).toBe("no data");
-    expect(none.className).not.toMatch(/tone-(warn|bad)/);
-    expect(none.getAttribute("aria-label")).toBe("fi1, From Russia: No data: too few probes answered");
-    // a node with no round yet has a dash that says so
-    expect(document.body.textContent).toContain("fi2, From Russia: not checked yet");
-  });
-
-  it("opens the tooltip on keyboard focus: the probes, ICMP and TCP per port, the round, where it was checked from", async () => {
-    await mount(four);
-    await act(async () => countryCell("de2")!.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    const text = document.body.textContent ?? "";
-    for (const line of [
-      "TCP is blocked, ICMP passes",
-      "Rostelecom, Moscow",
-      "ICMP 51 ms · TCP 443, 8443 ✕",
-      "MegaFon, Kazan (not counted)",
-      "ICMP ✕ · TCP 443, 8443 ✕",
-      "Last round: ",
-      "Checked via Globalping from home and mobile networks",
-    ])
-      expect(text).toContain(line);
-  });
-
-  it("gives every phone card a row in words, where there is no hover", async () => {
-    await mount(four);
-    const rows = [...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent);
-    expect(rows).toEqual([
-      "From RussiareachableRostelecom, Beeline · 4 min ago",
-      "From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago",
-      "From RussiaunreachableMTS · 4 min ago",
-      "From Russiano datatoo few probes answered · 4 min ago",
-      "From Russia—not checked yet",
-    ]);
-  });
-
-  it("speaks Russian, the country in the genitive", async () => {
-    act(() => setLang("ru"));
-    await mount(four);
-    expect(document.body.textContent).toContain("Из России");
-    expect(countryCell("de2")?.textContent).toBe("TCP режутICMP проходит");
-    expect(countryCell("nl1")?.textContent).toBe("недоступна");
-    expect(countryCell("de1")?.textContent).toBe("доступна");
-    expect(countryCell("fi1")?.getAttribute("aria-label")).toBe("fi1, Из России: Нет данных: ответило слишком мало зондов");
-  });
-
-  it("speaks Chinese", async () => {
-    act(() => setLang("zh"));
-    await mount(four);
-    expect(document.body.textContent).toContain("从俄罗斯访问");
-    expect(countryCell("de2")?.textContent).toBe("TCP 被封锁ICMP 可通");
-    expect(countryCell("fi1")?.textContent).toBe("无数据");
-  });
-});
 
 describe("the country row on the node page", () => {
   async function mountNode(data: object) {
@@ -377,156 +213,7 @@ const some = {
   ],
 };
 const items = (ul: Element) => [...ul.querySelectorAll("li")].map((li) => li.textContent);
-const labelOf = (ul: Element) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent;
 
-describe("a block on some networks in the country column", () => {
-  afterEach(() => act(() => setLang("en")));
-
-  it("shows PARTIAL in the warn tone with its own glyph and word, the dark networks of every source under it", async () => {
-    await mount(some);
-    const partial = countryCell("de1")!;
-    expect(partial.textContent).toBe("some networksMTS");
-    expect(partial.className).toContain("tone-warn");
-    expect(partial.querySelector("svg circle")).not.toBeNull(); // the half disc, not TCP blocked's "!"
-    expect(countryCell("de2")!.textContent).toBe("TCP blockedICMP passes");
-    expect(partial.getAttribute("aria-label")).toBe(
-      "de1, From Russia: Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk), MTS (КРЫМ)",
-    );
-  });
-
-  it("opens the tooltip on keyboard focus: what each source said and when, the networks that get nothing, the dark probe, who was not asked", async () => {
-    await mount(some);
-    await act(async () => countryCell("de1")!.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    const text = document.body.textContent ?? "";
-    for (const line of [
-      "Reachable from Russia, but not from every network",
-      "Globalping: blocked on some networks · 4 min ago",
-      "cheburcheck: reachable · 2 h ago",
-      "bsbord: unreachable · 3 h ago",
-      "Blocked on some networks: MTS (AS8359, Novosibirsk), MTS (КРЫМ)",
-      "MTS, Novosibirsk (reaches your other nodes, not this one)",
-      "Beeline, Moscow",
-      "No home/mobile probe this round: MegaFon, T2",
-      "Checked by Globalping, cheburcheck, and bsbord",
-    ])
-      expect(text).toContain(line);
-  });
-
-  it("does not say “some networks” on a full block, though every probe of it is dark", async () => {
-    await mount(some);
-    const cut = countryCell("nl1")!;
-    expect(cut.textContent).toBe("unreachable");
-    expect(cut.getAttribute("aria-label")).not.toContain("some networks");
-    await act(async () => cut.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    // the tooltip alone: de1's phone row says it, rightly, further down the page
-    const tip = document.querySelector('[class*="max-w-[280px]"]')?.textContent ?? "";
-    expect(tip).toContain("Neither ICMP nor TCP gets through");
-    expect(tip).not.toContain("Blocked on some networks");
-    expect(tip).not.toContain("reaches your other nodes");
-  });
-
-  it("breaks it down under the phone card's row, every source in its group: who does not see the node, who does, the white list", async () => {
-    await mount(some);
-    const rows = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")];
-    expect(rows[0]?.textContent).toBe("From Russiasome networks");
-    // one tinted box: the row (the tooltip's trigger) on top, the breakdown under it and outside the trigger
-    const box = rows[0]!.parentElement!;
-    expect(box.className).toContain("tone-warn");
-    const breakdown = box.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
-    expect(rows[0]!.contains(breakdown)).toBe(false);
-    // de1 and the full block of nl1; the desktop cells stay compact
-    expect(document.querySelectorAll("[data-testid=partial-breakdown]")).toHaveLength(2);
-    const lists = [...breakdown.querySelectorAll("ul")];
-    expect(lists.map(labelOf)).toEqual(["Cannot reach the node", "Reach it", "White list on (cuts every foreign address)"]);
-    expect(items(lists[0]!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · mobile · bsbord"]);
-    expect(items(lists[2]!)).toEqual(["○Volna КРЫМ · mobile · bsbord"]);
-    for (const mark of breakdown.querySelectorAll("li > span:first-child")) expect(mark.getAttribute("aria-hidden")).toBe("true");
-    // ten that reach it: six and "and 4 more", a button that says what it opens
-    expect(items(lists[1]!)).toEqual([
-      "✓Beeline AS3216 · Moscow · Globalping",
-      "✓Rostelecom AS12389 · Kazan · cheburcheck",
-      "✓Rostelecom AS12389 · Moscow · cheburcheck",
-      "✓Rostelecom AS12389 · Omsk · cheburcheck",
-      "✓Rostelecom AS12389 · Perm · cheburcheck",
-      "✓Rostelecom AS12389 · Samara · cheburcheck",
-    ]);
-    const more = breakdown.querySelector<HTMLButtonElement>("button")!;
-    expect([more.textContent, more.getAttribute("aria-expanded"), more.getAttribute("aria-controls")]).toEqual(["and 4 more", "false", lists[1]!.id]);
-    await act(async () => more.click());
-    expect(items(lists[1]!)).toHaveLength(10);
-    expect([more.textContent, more.getAttribute("aria-expanded")]).toEqual(["Show fewer", "true"]);
-    expect(breakdown.textContent).toContain("Not checked this round: MegaFon, T2");
-    expect(breakdown.textContent).toContain("A profile behind a CDN may help people on these networks.");
-    const guide = breakdown.querySelector("a")!;
-    expect([guide.textContent, guide.getAttribute("href"), guide.getAttribute("target"), guide.getAttribute("rel")]).toEqual([
-      "Guide: VLESS behind a CDN",
-      "https://mistgate.app/guide/vless/#vless-behind-a-cdn",
-      "_blank",
-      "noopener noreferrer",
-    ]);
-    expect(breakdown.lastElementChild?.textContent).toBe("Checked: Globalping 4 min ago · cheburcheck 2 h ago · bsbord 3 h ago");
-  });
-
-  it("breaks a full block down as well, in its own tone, instead of the quiet line", async () => {
-    await mount(some);
-    const cut = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")][2]!;
-    expect(cut.textContent).toBe("From Russiaunreachable");
-    expect(cut.parentElement!.className).toContain("tone-bad");
-    const breakdown = cut.parentElement!.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
-    expect([...breakdown.querySelectorAll("ul")].map(labelOf)).toEqual(["Cannot reach the node"]);
-    expect(items(breakdown.querySelector("ul")!)).toEqual(["✕Beeline AS3216 · Moscow · Globalping", "✕MTS AS8359 · Omsk · Globalping"]);
-    // a row with nothing dark keeps its quiet line
-    expect([...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")][1]!.parentElement!.querySelector("[data-testid=partial-breakdown]")).toBeNull();
-  });
-
-  it("shows it on the node page as well", async () => {
-    getChecks.mockResolvedValue({ ...checks, rows: [checks.rows[1]!], countryChecks: [{ ...some.countryChecks[0]!, nodeId: "nod_2" }] });
-    host = document.createElement("div");
-    document.body.append(host);
-    root = createRoot(host);
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_2" /></QueryClientProvider>));
-    for (let i = 0; i < 4; i++) await settle();
-    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("From Russiasome networks");
-    expect(row.querySelector("svg circle")).not.toBeNull();
-    expect(row.tabIndex).toBe(0);
-    const breakdown = row.parentElement!.querySelector("[data-testid=partial-breakdown]")!;
-    expect(items(breakdown.querySelector("ul")!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · mobile · bsbord"]);
-    // the row's tooltip still opens on focus
-    await act(async () => row.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    expect(document.body.textContent).toContain("MTS, Novosibirsk (reaches your other nodes, not this one)");
-  });
-
-  it("speaks Russian and Chinese", async () => {
-    act(() => setLang("ru"));
-    await mount(some);
-    expect(countryCell("de1")?.textContent).toBe("часть сетейMTS");
-    expect(countryCell("de1")?.getAttribute("aria-label")).toBe(
-      "de1, Из России: Доступна из России, но не из всех сетей · Недоступна из части сетей: MTS (AS8359, Novosibirsk), MTS (КРЫМ)",
-    );
-    const ruB = document.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
-    expect([...ruB.querySelectorAll("ul")].map(labelOf)).toEqual(["Не видят ноду", "Видят", "Белый список (режет все зарубежные адреса)"]);
-    expect(items(ruB.querySelector("ul")!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · мобильная · bsbord"]);
-    expect(ruB.querySelector("button")?.textContent).toBe("и ещё 4");
-    for (const l of ["Не проверены в этом круге: MegaFon, T2", "Людям в этих сетях может помочь профиль через CDN.", "Проверено: Globalping 4 мин назад · cheburcheck 2 ч назад · bsbord 3 ч назад"])
-      expect(ruB.textContent).toContain(l);
-    expect([ruB.querySelector("a")?.textContent, ruB.querySelector("a")?.getAttribute("href")]).toEqual(["Руководство: VLESS за CDN", "https://mistgate.app/ru/guide/vless/#vless-за-cdn"]);
-    act(() => root?.unmount());
-    host?.remove();
-    act(() => setLang("zh"));
-    await mount(some);
-    expect(countryCell("de1")?.textContent).toBe("部分网络MTS");
-    const zhB = document.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
-    expect(labelOf(zhB.querySelector("ul")!)).toBe("无法连接节点");
-    expect(zhB.querySelector("button")?.textContent).toBe("还有 4 个");
-    expect(zhB.textContent).toContain("白名单模式（所有境外地址均被切断）");
-    expect(zhB.querySelector("a")?.getAttribute("href")).toBe("https://mistgate.app/zh/guide/vless/#vless-经-cdn-连接");
-  });
-});
 
 // ---------------------------------------------------------------------------------------------------
 // The block lists in the same column: LISTED, a row of the lists alone, a live verdict with their detail
@@ -547,79 +234,6 @@ const withLists = {
   ],
 };
 
-describe("the block lists in the country column", () => {
-  afterEach(() => act(() => setLang("en")));
-
-  it("shows LISTED in its own word and glyph, the warn colour drawn dashed, apart from TCP blocked", async () => {
-    await mount(withLists);
-    const listed = countryCell("nl1")!;
-    expect(listed.textContent).toBe("listed");
-    expect(listed.className).toContain("tone-warn");
-    expect(listed.className).toContain("tint-dashed");
-    expect(listed.querySelector("svg")).not.toBeNull(); // the list mark, not the "!" of TCP blocked
-    expect(listed.getAttribute("aria-label")).toBe("nl1, From Russia: In the RKN registry, not checked live");
-    expect(countryCell("de2")!.className).not.toContain("tint-dashed");
-  });
-
-  it("explains LISTED in the tooltip: not checked live, from the lists only, which lists, the subnet, when they were compared", async () => {
-    await mount(withLists);
-    await act(async () => countryCell("nl1")!.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    const text = document.body.textContent ?? "";
-    for (const line of ["In the RKN registry, not checked live", "Lists: RKN registry (antifilter ipsum), community list (antifilter)", "Hetzner subnet, DE", "Lists compared: ", "From the block lists only"])
-      expect(text).toContain(line);
-    expect(text).not.toContain("Last round");
-  });
-
-  it("shows a row of the lists alone that holds no hit as no data, and says why", async () => {
-    await mount(withLists);
-    const none = countryCell("fi1")!;
-    expect(none.textContent).toBe("no data");
-    expect(none.className).not.toMatch(/tone-/);
-    expect(none.getAttribute("aria-label")).toBe("fi1, From Russia: Not in the block lists, not checked live");
-  });
-
-  it("keeps a live verdict with the lists' detail, adds the list mark, and shows both in the tooltip", async () => {
-    await mount(withLists);
-    const tcp = countryCell("de2")!;
-    expect(tcp.textContent).toBe("TCP blockedICMP passes");
-    expect(tcp.querySelector("[data-testid=also-listed]")).not.toBeNull();
-    expect(tcp.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked, ICMP passes · in the RKN registry");
-    // the subnet alone adds no mark
-    expect(countryCell("de1")!.querySelector("[data-testid=also-listed]")).toBeNull();
-    await act(async () => tcp.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    const text = document.body.textContent ?? "";
-    for (const line of ["TCP is blocked, ICMP passes", "ICMP 51 ms · TCP 443, 8443 ✕", "Last round: ", "Lists: RKN registry (antifilter ipsum)", "Hetzner subnet, DE", "Checked via Globalping from home and mobile networks"])
-      expect(text).toContain(line);
-  });
-
-  it("gives every phone card the same in words", async () => {
-    await mount(withLists);
-    expect([...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent)).toEqual([
-      "From RussiareachableRostelecom, Beeline · Hetzner subnet, DE · 4 min ago",
-      "From RussiaTCP blockedICMP passes · Rostelecom · in the RKN registry · Hetzner subnet, DE · 4 min ago",
-      "From RussialistedRKN registry (antifilter ipsum), community list (antifilter) · Hetzner subnet, DE · 4 min ago",
-      "From Russiano datanot in the block lists · 4 min ago",
-      "From Russia—not checked yet",
-    ]);
-  });
-
-  it("speaks Russian and Chinese", async () => {
-    act(() => setLang("ru"));
-    await mount(withLists);
-    expect(countryCell("nl1")?.textContent).toBe("в реестре");
-    expect(countryCell("nl1")?.getAttribute("aria-label")).toBe("nl1, Из России: В реестре РКН, живьём не проверено");
-    expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2, Из России: TCP режут, ICMP проходит · в реестре РКН");
-    expect(document.querySelectorAll("[data-testid=country-row]")[2]?.textContent).toBe("Из Россиив реестререестр РКН (antifilter ipsum), список сообщества (antifilter) · подсеть Hetzner, DE · 4 мин назад");
-    act(() => root?.unmount());
-    host?.remove();
-    act(() => setLang("zh"));
-    await mount(withLists);
-    expect(countryCell("nl1")?.textContent).toBe("在名录中");
-    expect(countryCell("nl1")?.getAttribute("aria-label")).toBe("nl1，从俄罗斯访问：在 RKN 封锁名录中，未经实测");
-  });
-});
 
 describe("the block lists on the node page", () => {
   it("shows LISTED in the country row, with its tooltip", async () => {
@@ -684,95 +298,6 @@ const withProbe = {
   tspuRun: { status: "ok", atUnix: runAt, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "" },
 };
 
-describe("the TSPU probe in the country column", () => {
-  afterEach(() => act(() => setLang("en")));
-
-  it("says under the verdict that the sources disagree, and the screen reader hears both verdicts", async () => {
-    await mount(withProbe);
-    const box = countryCell("de2")!;
-    expect(box.textContent).toBe("TCP blockedsources disagree");
-    expect(box.className).toContain("tone-warn");
-    expect(box.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked · The sources disagree · Globalping: reachable · probe: TCP blocked");
-    // agreeing sources stay quiet
-    expect(countryCell("de1")!.textContent).toBe("reachable");
-  });
-
-  it("opens the conflict's tooltip on keyboard focus: both verdicts, Globalping's probes, the probe node with its ports, both sources", async () => {
-    await mount(withProbe);
-    await act(async () => countryCell("de2")!.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    const text = document.body.textContent ?? "";
-    for (const line of [
-      "TCP is blocked",
-      "The sources disagree",
-      "Globalping: reachable · probe: TCP blocked",
-      "Rostelecom, Moscow",
-      "ICMP 51 ms · TCP 443, 8443 ✓",
-      "Last round: ",
-      "Probe node probe1 · TSPU after hop 6",
-      "TCP 443, 8443: blocked",
-      "Probe run: ",
-      "Checked by Globalping (home and mobile networks) and your TSPU probe (a data center)",
-    ])
-      expect(text).toContain(line);
-  });
-
-  it("shows a verdict of the probe alone: TCP blocked with the probe's name under it, no word on ICMP", async () => {
-    await mount(withProbe);
-    const box = countryCell("fi1")!;
-    expect(box.textContent).toBe("TCP blockedTSPU probe");
-    expect(box.getAttribute("aria-label")).toBe("fi1, From Russia: TCP is blocked · TSPU probe");
-    await act(async () => box.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    const text = document.body.textContent ?? "";
-    for (const line of ["TCP is blocked", "Probe node probe1 · TSPU after hop 6", "TCP 443, 8443: blocked", "Probe run: ", "Checked by your TSPU probe from a data center, TCP only"]) expect(text).toContain(line);
-    for (const absent of ["ICMP passes", "Last round", "Lists compared"]) expect(text).not.toContain(absent);
-  });
-
-  it("gives every phone card the same in words", async () => {
-    await mount(withProbe);
-    expect([...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent)).toEqual([
-      "From RussiareachableRostelecom, Beeline · probe node probe1 · 4 min ago",
-      "From RussiaTCP blockedsources disagree · Globalping: reachable · probe: TCP blocked · 4 min ago",
-      "From RussiaunreachableMTS · 4 min ago",
-      "From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago",
-      "From Russia—not checked yet",
-    ]);
-  });
-
-  it("puts the probe's last run under the matrix: where it ran, when, where the box sits, or why it gave no verdicts", async () => {
-    await mount(withProbe);
-    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe("TSPU probe · probe1 · last run 14 min ago · TSPU after hop 6 · reference 31.13.72.36 · 3 nodes checked");
-    act(() => root?.unmount());
-    host?.remove();
-    // the probe node is a node of the fleet: its name comes from the rows; a run without verdicts leaves no row, only this line
-    await mount({ ...checks, rows: [...checks.rows, { ...checks.rows[0]!, nodeId: "nod_probe1", nodeName: "probe1", countryCode: "RU" }], countryChecks: [], tspuRun: { ...withProbe.tspuRun, status: "control_failed", dpiHop: 0, nodesChecked: 0 } });
-    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe(
-      "TSPU probe · probe1 · The method does not work on this network · even the control address is cut behind the TSPU, so there are no verdicts · last run 14 min ago",
-    );
-    expect(document.body.textContent).not.toContain("From Russia");
-    act(() => root?.unmount());
-    host?.remove();
-    await mount(four);
-    expect(document.querySelector("[data-testid=tspu-run]")).toBeNull();
-  });
-
-  it("speaks Russian and Chinese", async () => {
-    act(() => setLang("ru"));
-    await mount(withProbe);
-    expect(countryCell("de2")?.textContent).toBe("TCP режутисточники расходятся");
-    expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2, Из России: TCP режут · Источники расходятся · Globalping: доступна · зонд: TCP режут");
-    expect(countryCell("fi1")?.textContent).toBe("TCP режутТСПУ-зонд");
-    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe("ТСПУ-зонд · probe1 · последний запуск 14 мин назад · ТСПУ за 6-м хопом · опорный адрес 31.13.72.36 · проверены 3 ноды");
-    act(() => root?.unmount());
-    host?.remove();
-    act(() => setLang("zh"));
-    await mount(withProbe);
-    expect(countryCell("de2")?.textContent).toBe("TCP 被封锁来源不一致");
-    expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2，从俄罗斯访问：TCP 被封锁 · 各来源的结果不一致 · Globalping：可访问 · TSPU 探测：TCP 被封锁");
-    expect(countryCell("fi1")?.textContent).toBe("TCP 被封锁TSPU 探测");
-  });
-});
 
 describe("the TSPU probe on the node page", () => {
   it("shows a verdict of the probe alone in the country row, with its tooltip", async () => {
@@ -790,5 +315,228 @@ describe("the TSPU probe on the node page", () => {
     for (let i = 0; i < 3; i++) await settle();
     expect(document.body.textContent).toContain("Probe node probe1 · TSPU after hop 6");
     expect(document.body.textContent).toContain("Checked by your TSPU probe from a data center, TCP only");
+  });
+});
+
+
+describe("a partial block on the node page", () => {
+  it("shows it on the node page as well", async () => {
+    getChecks.mockResolvedValue({ ...checks, rows: [checks.rows[1]!], countryChecks: [{ ...some.countryChecks[0]!, nodeId: "nod_2" }] });
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_2" /></QueryClientProvider>));
+    for (let i = 0; i < 4; i++) await settle();
+    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
+    expect(row.textContent).toBe("From Russiasome networks");
+    expect(row.querySelector("svg circle")).not.toBeNull();
+    expect(row.tabIndex).toBe(0);
+    const breakdown = row.parentElement!.querySelector("[data-testid=partial-breakdown]")!;
+    expect(items(breakdown.querySelector("ul")!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · mobile · bsbord"]);
+    // the row's tooltip still opens on focus
+    await act(async () => row.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    expect(document.body.textContent).toContain("MTS, Novosibirsk (reaches your other nodes, not this one)");
+  });
+});
+// ---------------------------------------------------------------------------------------------------
+// The Checks tab in the board's table: a row a node, a cell a profile, a press opens the row into a box per profile
+
+const rowOf = (node: string) => [...document.querySelectorAll<HTMLElement>(".hl-cw")].find((r) => r.querySelector(".hl-cnode b")?.textContent === node)!;
+const words = (row: Element) => [...row.querySelectorAll(".hl-cv")].map((c) => c.textContent);
+const press = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+const rowButton = (node: string) => rowOf(node).querySelector<HTMLButtonElement>("button.hl-cr")!;
+
+describe("the checks table", () => {
+  afterEach(() => act(() => setLang("en")));
+
+  it("says what each profile does on each node, a failed start in red apart from one switched off and a node without link", async () => {
+    await mount();
+    expect([...document.querySelectorAll(".hl-ch > span")].map((s) => s.textContent)).toEqual(["Node", "hy2 · 443 · Salamander", "hy2 · WARP · 8443", ""]);
+    expect(words(rowOf("de1"))).toEqual(["42 ms", "✕ not started"]);
+    expect(words(rowOf("de2"))).toEqual(["off", "✕ fails"]);
+    expect(words(rowOf("nl1"))).toEqual(["no link", "—"]);
+    const cells = [...rowOf("de1").querySelectorAll(".hl-cv")];
+    expect(cells[1]!.className).toContain("bad");
+    expect(cells[0]!.className).not.toMatch(/bad|part/);
+    expect(cells[1]!.querySelector(".rw-gl")?.className).toContain("bad");
+    expect(rowOf("de2").querySelector(".hl-cv")!.className).toContain("dim"); // off is quiet, not red
+    // the phone puts the profile before each value
+    expect(cells[0]!.getAttribute("data-l")).toBe("hy2 · 443 · Salamander");
+  });
+
+  it("opens the row that fails by itself, one at a time, into a box per profile with its last result and its day", async () => {
+    await mount();
+    expect(rowOf("de2").className).toContain("open");
+    expect(rowButton("de2").getAttribute("aria-expanded")).toBe("true");
+    expect(rowOf("de1").querySelector(".hl-cd")).toBeNull();
+    await press(rowButton("de1"));
+    expect([rowButton("de1"), rowButton("de2")].map((b) => b.getAttribute("aria-expanded"))).toEqual(["true", "false"]);
+    const boxes = [...rowOf("de1").querySelectorAll(".hl-cd > div:not(.hl-cda)")].map((b) => b.textContent);
+    expect(boxes[0]).toContain("hy2 · 443 · Salamander42 ms");
+    expect(boxes[1]).toContain("hy2 · WARP · 8443✕ not started");
+    expect(boxes[1]).toContain("The node could not start the profile");
+    expect(rowOf("de1").querySelector(".hl-cd")!.textContent).toContain("24 h");
+    expect([...rowOf("de1").querySelectorAll("a")].map((a) => a.textContent)).toContain("Open node");
+    await press(rowButton("de1"));
+    expect(rowOf("de1").querySelector(".hl-cd")).toBeNull();
+  });
+
+  it("walks the rows on «Check now»: the one asked sweeps, the rest wait, then they flash once", async () => {
+    await mount();
+    vi.useFakeTimers();
+    try {
+      const go = [...document.querySelectorAll("button")].find((b) => b.textContent === "Check now")!;
+      await press(go);
+      expect(go.textContent).toBe("Checking");
+      expect(go.getAttribute("aria-disabled")).toBe("true");
+      // de1 and de2 are on line, nl1 is not: de1 is asked, de2 waits
+      expect(rowOf("de1").className).toContain("cking");
+      expect(rowOf("de2").className).toContain("ckw");
+      expect(words(rowOf("de1"))).toEqual(["checking…", "checking…"]);
+      expect(words(rowOf("de2"))).toEqual(["queued", "queued"]);
+      expect(rowOf("nl1").className).not.toMatch(/cking|ckw/);
+      expect(document.body.textContent).toContain("last round running now");
+      await act(async () => void vi.advanceTimersByTime(650));
+      expect(rowOf("de1").className).not.toContain("cking");
+      expect(rowOf("de2").className).toContain("cking");
+      await act(async () => void vi.advanceTimersByTime(650));
+      // done: every row flashes (the tick pops), then quiet
+      expect(go.textContent).toBe("Check now");
+      expect([...document.querySelectorAll(".hl-cw")].every((r) => r.className.includes("ckn"))).toBe(true);
+      await act(async () => void vi.advanceTimersByTime(1700));
+      expect(document.querySelector(".hl-cw.ckn")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("explains its words in a fold under the table, for a phone that has no hover", async () => {
+    await mount();
+    const fold = document.querySelector<HTMLElement>(".sb-mvh")!;
+    expect(fold.getAttribute("aria-expanded")).toBe("false");
+    expect(fold.textContent).toContain("What the values mean");
+    expect(fold.textContent).toContain("ms — response through an open tunnel, hourly median, from the panel's server");
+    expect(document.querySelector(".hl-leg")).toBeNull();
+    await press(fold);
+    const legend = document.querySelector(".hl-leg")!.textContent ?? "";
+    for (const pair of ["✕ failingcheck failed", "✕ not runningthe node could not bring it up", "offturned off by you", "no linkthe node is offline", "not checkedthere is no test client for the protocol"]) expect(legend).toContain(pair);
+    expect(legend).not.toContain("slow");
+  });
+
+  it("names the nodes of the UDP-loss notice above the table, and shows none without it", async () => {
+    await mount(udp);
+    const notice = [...document.querySelectorAll(".rc-nt")].find((n) => n.textContent?.includes("loses UDP"));
+    expect(notice?.textContent).toBe(
+      "The panel's server loses UDP: Hysteria2 checks to de1 and nl1 often take a second or more longer than VLESS to the same node (38% in the last hour); lost Hysteria2 packets: 3.1% on the way to the nodes, 5.5% on the way back. People are not affected: they connect to the nodes directly. If this keeps happening, contact the hoster of the panel's server.",
+    );
+    expect(notice!.compareDocumentPosition(document.querySelector(".hl-ct")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    act(() => root?.unmount());
+    host?.remove();
+    await mount();
+    expect(document.body.textContent).not.toContain("loses UDP");
+  });
+
+  it("puts a slow connect beside the figure from 2 s on, keeps the cell calm, and explains the mark", async () => {
+    await mount(udp);
+    const de1 = [...rowOf("de1").querySelectorAll(".hl-cv")];
+    expect(de1[0]!.textContent).toBe("48 ms2.6 s");
+    expect(de1[0]!.className).not.toMatch(/bad|part/);
+    expect(de1[0]!.querySelector(".hl-slow svg")).not.toBeNull(); // a shape, not only a colour
+    expect(de1[2]!.textContent).toBe("61 ms");
+    expect([...rowOf("nl1").querySelectorAll(".hl-cv")][2]!.textContent).toBe("90 ms2 s");
+    await press(document.querySelector(".sb-mvh"));
+    expect(document.querySelector(".hl-leg")!.textContent).toContain("slow connect, 2 s or more; the tunnel works");
+  });
+
+  it("has no profile columns to show before any is deployed, and says so", async () => {
+    await mount({ ...checks, columns: [], rows: [] });
+    expect(document.body.textContent).toContain("No profile is deployed on any node yet.");
+    expect(document.querySelector(".hl-ct")).toBeNull();
+  });
+});
+
+describe("the country column of the table", () => {
+  afterEach(() => act(() => setLang("en")));
+
+  it("is not there while the integration is off or before a round", async () => {
+    await mount();
+    expect(document.body.textContent).not.toContain("From Russia");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount({ ...checks, countryChecks: [] });
+    expect(document.body.textContent).not.toContain("From Russia");
+  });
+
+  it("says the verdict of each node in its tone and its dot: reachable and no data quiet, the blocks coloured", async () => {
+    await mount(four);
+    expect(document.querySelector(".hl-ch")!.textContent).toContain("From Russia");
+    const verdictOf = (node: string) => [...rowOf(node).querySelectorAll(".hl-cv")].at(-1)!;
+    expect(verdictOf("de1").textContent).toBe("reachable");
+    expect(verdictOf("de1").querySelector(".rw-gl")!.className).toContain("ok");
+    expect(verdictOf("de2").textContent).toBe("TCP blocked");
+    expect(verdictOf("de2").className).toContain("part");
+    expect(verdictOf("nl1").textContent).toBe("unreachable");
+    expect(verdictOf("nl1").className).toContain("bad");
+    expect(verdictOf("fi1").textContent).toBe("no data");
+    expect(verdictOf("fi1").className).toContain("dim");
+    // a node with no round yet has a dash, and its box says so
+    expect(verdictOf("fi2").textContent).toBe("—");
+    await press(rowButton("fi2"));
+    expect(rowOf("fi2").querySelector(".hl-cd")!.textContent).toContain("not checked yet");
+  });
+
+  it("opens into what the sources said and the way to Reachability", async () => {
+    await mount(four);
+    // de2 is the row that fails, so it is open already
+    expect(rowButton("de2").getAttribute("aria-expanded")).toBe("true");
+    const box = [...rowOf("de2").querySelectorAll(".hl-cd > div")].at(-2)!;
+    expect(box.textContent).toContain("From RussiaTCP blocked");
+    expect(box.textContent).toContain("Rostelecom");
+    expect(box.querySelector('a[href="/reachability"]')).not.toBeNull();
+  });
+
+  it("speaks Russian, the country in the genitive", async () => {
+    act(() => setLang("ru"));
+    await mount(four);
+    expect(document.querySelector(".hl-ch")!.textContent).toContain("Из России");
+    expect([...rowOf("de2").querySelectorAll(".hl-cv")].at(-1)!.textContent).toBe("TCP режут");
+    expect([...rowOf("nl1").querySelectorAll(".hl-cv")].at(-1)!.textContent).toBe("недоступна");
+  });
+
+  it("shows a block on some networks in the warn tone with the dark networks of every source in the open row", async () => {
+    await mount(some);
+    const last = [...rowOf("de1").querySelectorAll(".hl-cv")].at(-1)!;
+    expect(last.textContent).toBe("some networks");
+    expect(last.className).toContain("part");
+    await press(rowButton("de1"));
+    const breakdown = rowOf("de1").querySelector("[data-testid=partial-breakdown]")!;
+    expect(items(breakdown.querySelector("ul")!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · mobile · bsbord"]);
+  });
+
+  it("puts the TSPU probe's last run at the foot of the table: where it ran, when, where the box sits, or why it gave no verdicts", async () => {
+    await mount(withProbe);
+    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe("TSPU probe · probe1 · last run 14 min ago · TSPU after hop 6 · reference 31.13.72.36 · 3 nodes checked");
+    expect(document.querySelector("[data-testid=tspu-run]")!.className).toContain("sb-vfoot");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount({ ...checks, rows: [...checks.rows, { ...checks.rows[0]!, nodeId: "nod_probe1", nodeName: "probe1", countryCode: "RU" }], countryChecks: [], tspuRun: { ...withProbe.tspuRun, status: "control_failed", dpiHop: 0, nodesChecked: 0 } });
+    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe(
+      "TSPU probe · probe1 · The method does not work on this network · even the control address is cut behind the TSPU, so there are no verdicts · last run 14 min ago",
+    );
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(four);
+    expect(document.querySelector("[data-testid=tspu-run]")).toBeNull();
+  });
+
+  it("a listed node says so in the warn tone and the open row names the lists", async () => {
+    await mount(withLists);
+    const last = [...rowOf("nl1").querySelectorAll(".hl-cv")].at(-1)!;
+    expect(last.textContent).toBe("listed");
+    expect(last.className).toContain("part");
+    await press(rowButton("nl1"));
+    expect(rowOf("nl1").querySelector(".hl-cd")!.textContent).toContain("RKN registry");
   });
 });
