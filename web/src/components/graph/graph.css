@@ -7,7 +7,7 @@
   --shadow-node: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px rgb(0 0 0 / 0.35);
   --wp: 100%; /* how much of a type or state colour a wire and a port keep: darkened a little on the light theme */
   --node-bg: var(--surface);
-  --node-border: color-mix(in oklch, var(--border) 72%, #fff);
+  --node-border: color-mix(in oklch, var(--border-solid) 72%, #fff);
   --gstep: 24px;
   --gdot: 7%;
   --gx: 0px;
@@ -23,8 +23,8 @@
 :root[data-theme="light"] .mg-graph {
   --wp: 90%;
   --shadow-node: 0 1px 2px rgb(20 20 30 / 0.06), 0 8px 24px -8px rgb(20 20 30 / 0.2);
-  --node-border: color-mix(in oklch, var(--border) 82%, #000);
-  background-color: color-mix(in oklch, var(--surface-2) 78%, var(--border));
+  --node-border: color-mix(in oklch, var(--border-solid) 82%, #000);
+  background-color: color-mix(in oklch, var(--surface-2) 78%, var(--border-solid));
 }
 .mg-graph[data-space] {
   cursor: grab;
@@ -419,7 +419,7 @@
   transform: translate(-100%, -50%);
 }
 .mg-glabel[data-state="warn"] {
-  border-color: color-mix(in oklch, var(--warning) 40%, var(--border));
+  border-color: color-mix(in oklch, var(--warning) 40%, var(--border-solid));
   color: var(--warning-text);
 }
 /* the legend, bottom-left */

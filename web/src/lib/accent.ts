@@ -12,7 +12,7 @@ export const accentPresets = [
   { id: "sage", color: "#b0cc90" },
 ] as const;
 
-export const defaultAccent = "#b8acf2";
+export const defaultAccent = "#7dd3a0";
 export const isHex = (v: string) => /^#[0-9a-f]{6}$/i.test(v);
 
 const listeners = new Set<() => void>();

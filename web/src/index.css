@@ -4,11 +4,13 @@
 @import "./components/graph/graph.css";
 
 /*
- * Design tokens. This is the ONE place colours, radii, type and
- * motion live. Dark is the default theme, light is `data-theme="light"` on <html> (src/lib/theme.ts).
- * The accent is user-selectable (src/lib/accent.ts sets --accent inline on <html>); everything tinted is
- * derived from it with color-mix(in oklch). No shadows, except the dock/toast/modal ones noted below.
- * Components use the Tailwind names mapped in @theme below, never raw colours.
+ * Design tokens. This is the ONE place colours, radii, type and motion live. Dark is the default theme, light is
+ * `data-theme="light"` on <html> (src/lib/theme.ts). The accent is user-selectable (src/lib/accent.ts sets --accent inline
+ * on <html>, mint unless chosen otherwise); what is tinted by it derives from it below. Section tones and status colours are
+ * explicit pairs (a colour and the background it sits on), one set per theme, so contrast is fixed by hand, not by a mix
+ * ratio. Components use the Tailwind names mapped in @theme below, never raw colours.
+ * The calm look (hairline borders, three roles of text, no gradients, weights 400/500) follows the redesign of the panel;
+ * the ideas come from the "unslop" pass by Damir Sokolovsky (CC BY 4.0).
  */
 :root {
   color-scheme: dark;
@@ -20,39 +22,67 @@
   --accent-sand: #dcc68c;
   --accent-rose: #e6a6b0;
   --accent-sage: #b0cc90;
-  --accent: #b8acf2;
+  --accent: #7dd3a0;
 
   --bg: #0c0c0e;
   --surface: #141417;
   --surface-2: #1d1d22;
-  --border: #25252b;
   --text: #f3f3f5;
   --muted: #8b8b94;
+  /* the three roles of text: --text, --sec (a step quieter), --muted (labels, hints) */
+  --sec: color-mix(in srgb, var(--text) 66%, var(--bg));
+  /* the hairline: text at 9 %, see-through, so it sits right on any surface; --border-solid is the same on a surface */
+  --border: color-mix(in srgb, var(--text) 9%, transparent);
+  --border-solid: color-mix(in srgb, var(--text) 9%, var(--surface));
+  --border-hover: color-mix(in srgb, var(--text) 18%, transparent);
+  /* the quiet fill: a secondary button, a tag, a hovered row */
+  --step: color-mix(in srgb, var(--text) 5%, var(--surface));
+  --step-hover: color-mix(in srgb, var(--text) 9%, var(--surface));
   --faint: #4a4a52;
-  --them: #d4d4dc;
   --them: #d4d4dc; /* second series on charts */
   --dock: rgb(24 24 28 / 0.78);
   --ink-on-accent: #0c0c0e; /* text on the accent: always this, in both themes */
 
+  /* the accent in its three jobs: the fill (--accent), a line or a mark (a tab's line, a switch, a tick), and text; the
+     light theme takes the last two darker, as the design does for its mint (#2bb673 and #0b7a4b) */
+  --accent-mark: var(--accent);
+  --accent-text: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent-mark) 12%, var(--surface));
+  --accent-line: color-mix(in srgb, var(--accent-mark) 36%, var(--surface));
+  --focus-ring: color-mix(in srgb, var(--accent-mark) 16%, transparent);
+  /* "works" is always mint, whatever the accent */
+  --ok: var(--accent-mint);
+
+  /* tones: a foreground and the background it sits on. Section identity (the sidebar's pastels) and protocol tags. */
+  --tone-lavender: #b8acf2;
+  --tone-lavender-bg: #2d2b38;
+  --tone-sky: #8ec8ea;
+  --tone-sky-bg: #263037;
+  --tone-sand: #dcc68c;
+  --tone-sand-bg: #332f25;
+  --tone-rose: #e6a6b0;
+  --tone-rose-bg: #362a2c;
+  --tone-sage: #b0cc90;
+  --tone-sage-bg: #2b3126; /* not drawn on the boards in the dark theme: the sage at ~16 % on the surface, as its neighbours are */
+  --tone-mint: #7dd3a0;
+  --tone-mint-bg: #243229;
+  --tone-blip: #89a5b5;
+
   /* status */
   --warning: #febc2e;
-  --warning-soft: rgb(254 188 46 / 0.12);
-  --warning-line: rgb(254 188 46 / 0.35);
+  --warning-soft: #33290f;
+  --warning-line: color-mix(in srgb, var(--warning) 35%, transparent);
+  --warning-text: var(--warning);
   --danger: #ff5a5f;
   --danger-soft: rgb(255 90 95 / 0.14);
+  --danger-text: var(--danger);
 
-  /* theme-dependent mix ratios */
+  /* legacy mix ratios: the screens that are not redesigned yet still tint through them (accent presets mixed in oklch);
+     the redesigned parts read the pairs above. Removed with the last of those screens. */
   --_soft-pct: 14%;
   --_line-pct: 50%;
   --_text-pct: 100%;
-  --_chroma: 1; /* the darkened light-theme tones lose colour, so section tones get it back (index.css .id-chip) */
-
-  /* derived accent tokens */
-  --accent-soft: color-mix(in oklch, var(--accent) var(--_soft-pct), var(--bg));
-  --accent-line: color-mix(in oklch, var(--accent) var(--_line-pct), var(--border));
-  --accent-text: color-mix(in oklch, var(--accent) var(--_text-pct), #000);
-  --warning-text: color-mix(in oklch, var(--warning) var(--_text-pct), #000);
-  --danger-text: color-mix(in oklch, var(--danger) var(--_text-pct), #000);
+  --_chroma: 1;
 
   /* the logo has three fills: white, light, dark; the last two are tinted by the accent */
   --logo-w: #fff;
@@ -60,61 +90,108 @@
   --logo-d: oklch(from var(--accent) calc(l * 0.56) calc(c * 2.1) h);
 
   /* charts: the accent line and how strong the fill under each line is (first line = accent, the rest = --them) */
-  --chart-line: var(--accent);
+  --chart-line: var(--accent-mark);
   --chart-fill-a: 0.3;
   --chart-fill-b: 0.2;
 
-  /* the only shadows in the product; off in the light theme */
+  /* shadows: only on what floats (a menu, a toast, a window, the dock), in both themes */
   --shadow-dock: 0 12px 30px -12px rgb(0 0 0 / 0.5);
-  --shadow-toast: 0 14px 30px -10px rgb(0 0 0 / 0.5);
+  --shadow-pop: 0 16px 40px rgb(0 0 0 / 0.5);
+  --shadow-toast: 0 12px 32px rgb(0 0 0 / 0.4);
+  --shadow-dlg: 0 32px 80px rgb(0 0 0 / 0.55);
+  --scrim: color-mix(in srgb, #000 62%, transparent);
+
+  --e: cubic-bezier(0.22, 1, 0.36, 1);
 }
 :root[data-theme="light"] {
   color-scheme: light;
   --bg: #f8f8f6;
   --surface: #ffffff;
   --surface-2: #efefec;
-  --border: #e3e3df;
   --text: #16161a;
   --muted: #6b6b73;
+  --border: color-mix(in srgb, var(--text) 11%, transparent);
+  --border-solid: color-mix(in srgb, var(--text) 11%, var(--surface));
+  --step: color-mix(in srgb, var(--text) 4%, var(--surface));
   --faint: #c4c4c8;
   --them: #a4a4ac;
-  --them: #a4a4ac;
   --dock: rgb(255 255 255 / 0.82);
-  --chart-line: color-mix(in oklch, var(--accent) 65%, #3a2f7a);
-  --chart-fill-a: 0.16;
-  --chart-fill-b: 0;
+
+  --accent-mark: oklch(from var(--accent) calc(l * 0.86) calc(c * 1.36) h);
+  --accent-text: oklch(from var(--accent) calc(l * 0.64) calc(c * 1.04) h);
+  --ok: oklch(from var(--accent-mint) calc(l * 0.86) calc(c * 1.36) h);
+
+  --tone-lavender: #5a48a8;
+  --tone-lavender-bg: #eae8fc;
+  --tone-sky: #1d6d95;
+  --tone-sky-bg: #e0f0fa;
+  --tone-sand: #7a6212;
+  --tone-sand-bg: #f5efdf;
+  --tone-rose: #8a3e4c;
+  --tone-rose-bg: #f9e6e8;
+  --tone-sage: #4d6b22;
+  --tone-sage-bg: #e8f1e0;
+  --tone-mint: #0b7a4b;
+  --tone-mint-bg: #dcf3e4;
+  --tone-blip: #7691a0;
+
+  --warning: #b07400;
+  --warning-soft: #fbefd0;
+  --danger: #c9353b;
+  --danger-soft: #fde6e5;
+
   --_soft-pct: 24%;
   --_line-pct: 65%;
   --_text-pct: 50%;
   --_chroma: 1.9;
+
   --shadow-dock: none;
-  --shadow-toast: none;
+  --shadow-pop: 0 16px 40px rgb(22 22 26 / 0.14);
+  --shadow-toast: 0 12px 32px rgb(22 22 26 / 0.18);
+  --shadow-dlg: 0 32px 80px rgb(22 22 26 / 0.2);
+  --scrim: color-mix(in srgb, #1a1a1e 38%, transparent);
+  --chart-fill-a: 0.16;
+  --chart-fill-b: 0;
 }
 
 @theme {
-  /* the single breakpoint is ~720px: tables -> cards, sidebar -> dock, modal -> sheet */
+  /* a phone is below ~720px: tables -> cards, sidebar -> dock, modal -> sheet */
   --breakpoint-md: 45rem;
   /* the node grid goes from 3 to 5 columns here (5 need ~1000px of content width) */
   --breakpoint-wide: 68.75rem;
+  /* the redesigned shell (menu folds to a rail below `rail`, content widths step at `mid` and `full`); lg: and xl: stay the stock ones */
+  --breakpoint-rail: 62.5rem;
+  --breakpoint-mid: 75rem;
+  --breakpoint-full: 85rem;
 
   /* one height for every control of the top bar (search, fleet pill, GitHub, language, theme): h-bar, size-bar */
-  --spacing-bar: 2.25rem;
+  --spacing-bar: 2.5rem;
 
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.3, 1.5, 0.5, 1);
   --ease-spring-strong: cubic-bezier(0.3, 1.6, 0.5, 1);
+
+  /* the new weights are two: 400 for text, 500 for headings, buttons and accents (600 is rare). The old classes are bent to
+     them here, so no class changes at the call sites; the last stage of the redesign renames them and takes this out. */
+  --font-weight-semibold: 500;
+  --font-weight-bold: 500;
+  --font-weight-extrabold: 600;
 }
 
 @theme inline {
   --color-canvas: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-step: var(--step);
   --color-line: var(--border);
   --color-fg: var(--text);
+  --color-sec: var(--sec);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-them: var(--them);
   --color-accent: var(--accent);
+  --color-accent-mark: var(--accent-mark);
   --color-on-accent: var(--ink-on-accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-line);
@@ -126,23 +203,38 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-danger-text: var(--danger-text);
-  --color-ok: var(--accent-mint);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--tone-mint-bg);
+  --color-ok-text: var(--tone-mint);
   --color-busy: var(--accent-sky);
   --color-dock: var(--dock);
+  --color-tone-lavender: var(--tone-lavender);
+  --color-tone-lavender-bg: var(--tone-lavender-bg);
+  --color-tone-sky: var(--tone-sky);
+  --color-tone-sky-bg: var(--tone-sky-bg);
+  --color-tone-sand: var(--tone-sand);
+  --color-tone-sand-bg: var(--tone-sand-bg);
+  --color-tone-rose: var(--tone-rose);
+  --color-tone-rose-bg: var(--tone-rose-bg);
+  --color-tone-sage: var(--tone-sage);
+  --color-tone-sage-bg: var(--tone-sage-bg);
+  --color-tone-mint: var(--tone-mint);
+  --color-tone-mint-bg: var(--tone-mint-bg);
+  --color-tone-blip: var(--tone-blip);
 
-  /* radii: fields/44px buttons 14 . 36px buttons/chips 11 . cards 16 . large cards 18 . dock 20 . sheet 22 */
-  --radius-chip: 11px;
-  --radius-ctl: 11px;
-  --radius-field: 14px;
+  /* radii: buttons and fields 10 . small buttons and rows 8 . tags 6 . cards 16 . windows and sheets 20 . menus 14 */
+  --radius-chip: 6px;
+  --radius-ctl: 8px;
+  --radius-field: 10px;
+  --radius-pop: 14px;
   --radius-card: 16px;
-  --radius-card-lg: 18px;
+  --radius-card-lg: 16px;
   --radius-dock: 20px;
-  --radius-sheet: 22px;
+  --radius-sheet: 20px;
 
   /* The ideographs are in no web font: after the Latin faces come the system CJK ones (nothing is downloaded). */
   --font-sans: "Onest", "Vazirmatn", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
   --font-mono: "JetBrains Mono", "Vazirmatn", ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", monospace;
-
 }
 
 @layer base {
@@ -156,14 +248,15 @@
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 20px;
+    text-wrap: pretty;
     -webkit-font-smoothing: antialiased;
     transition:
       background-color 0.5s,
       color 0.5s;
   }
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--accent-mark);
     outline-offset: 2px;
   }
   button {
@@ -173,70 +266,98 @@
     cursor: default;
   }
   ::placeholder {
-    color: inherit;
-    opacity: 0.4;
+    color: var(--muted);
+    opacity: 1;
   }
 }
 
-/* Status tones: one --c per state; pills, dots and glyphs derive everything from it.
+/* Status tones: three roles per state. --c is the fill (a dot, a bar, the glyph's disc), --c-fg the text and --c-bg the
+   background a pill or a banner sits on; the pairs are explicit per theme (see the tokens above).
    Status is always colour + glyph + word, never colour alone. */
 .tone-ok {
-  --c: var(--accent-mint);
+  --c: var(--ok);
+  --c-fg: var(--tone-mint);
+  --c-bg: var(--tone-mint-bg);
 }
 .tone-warn {
   --c: var(--warning);
+  --c-fg: var(--warning-text);
+  --c-bg: var(--warning-soft);
 }
 .tone-bad {
   --c: var(--danger);
+  --c-fg: var(--danger-text);
+  --c-bg: var(--danger-soft);
 }
 .tone-off {
   --c: var(--muted);
+  --c-fg: var(--muted);
+  --c-bg: var(--step);
 }
 .tone-busy {
-  --c: var(--accent-sky);
+  --c: var(--tone-sky);
+  --c-fg: var(--tone-sky);
+  --c-bg: var(--tone-sky-bg);
 }
 .tone-blip {
   /* grey-blue, never red: a hoster blip is not an outage */
-  --c: color-mix(in oklch, var(--accent-sky) 40%, var(--muted));
+  --c: var(--tone-blip);
+  --c-fg: var(--tone-blip);
+  --c-bg: color-mix(in srgb, var(--tone-blip) 16%, var(--surface));
 }
-/* status-coloured text that stays readable on the light theme (like the pill's text) */
+/* the glyph's mark sits on --c: dark ink, white only on the light theme's deeper red */
+:root[data-theme="light"] .tone-bad {
+  --c-ink: #fff;
+}
+/* status-coloured text (like the pill's text) */
 .tone-text {
-  color: color-mix(in oklch, var(--c) var(--_text-pct), #000);
+  color: var(--c-fg);
 }
-/* a status-tinted panel (node state banner): the pill's background and border without its text colour */
+/* a status-tinted panel (node state banner): the pill's background and a line of the status colour, without its text colour */
 .tint {
-  background: color-mix(in oklch, var(--c) var(--_soft-pct), var(--bg));
-  border: 1px solid color-mix(in oklch, var(--c) 40%, var(--border));
+  background: var(--c-bg);
+  border: 1px solid color-mix(in srgb, var(--c) 32%, transparent);
 }
 /* the tint drawn dashed: a state on record that nobody saw live (a node in a block list) */
 .tint-dashed {
   border-style: dashed;
 }
 .pill {
-  background: color-mix(in oklch, var(--c) var(--_soft-pct), var(--bg));
-  border: 1px solid color-mix(in oklch, var(--c) 40%, var(--border));
-  color: color-mix(in oklch, var(--c) var(--_text-pct), #000);
+  background: var(--c-bg);
+  color: var(--c-fg);
 }
 
-/* Section identity tones (the sidebar's pastels): data-tone sets --t; the chip and .id-fg derive from it, darkened on
-   the light theme like the status tones. Names a section, never a state. */
+/* Section identity tones (the sidebar's pastels): data-tone sets --t (the raw pastel, for a swatch or a bar) and the pair
+   --t-fg / --t-bg (a chip and its text, explicit per theme). Names a section, never a state. */
 [data-tone="lavender"] {
   --t: var(--accent-lavender);
+  --t-fg: var(--tone-lavender);
+  --t-bg: var(--tone-lavender-bg);
 }
 [data-tone="sky"] {
   --t: var(--accent-sky);
+  --t-fg: var(--tone-sky);
+  --t-bg: var(--tone-sky-bg);
 }
 [data-tone="sand"] {
   --t: var(--accent-sand);
+  --t-fg: var(--tone-sand);
+  --t-bg: var(--tone-sand-bg);
 }
 [data-tone="sage"] {
   --t: var(--accent-sage);
+  --t-fg: var(--tone-sage);
+  --t-bg: var(--tone-sage-bg);
 }
 [data-tone="mint"] {
   --t: var(--accent-mint);
+  --t-fg: var(--tone-mint);
+  --t-bg: var(--tone-mint-bg);
 }
 [data-tone="rose"] {
   --t: var(--accent-rose);
+  --t-fg: var(--tone-rose);
+  --t-bg: var(--tone-rose-bg);
 }
 .id-chip {
   display: inline-flex;
@@ -248,11 +369,11 @@
 .id-chip,
 .tone-chip {
   border-radius: 7px;
-  background: color-mix(in oklch, var(--t) calc(var(--_soft-pct) + 4%), var(--surface));
-  color: oklch(from color-mix(in oklch, var(--t) var(--_text-pct), #000) l calc(c * var(--_chroma)) h);
+  background: var(--t-bg);
+  color: var(--t-fg);
 }
 .id-fg {
-  color: oklch(from color-mix(in oklch, var(--t) var(--_text-pct), #000) l calc(c * var(--_chroma)) h);
+  color: var(--t-fg);
 }
 
 /* Motion: screens fade + rise in, cards lift on hover, buttons press. Reduced motion is honoured below. */
@@ -260,6 +381,17 @@
   from {
     opacity: 0;
     transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* a floating thing (a menu, a toast) rises 8px as it appears */
+@keyframes mg-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
