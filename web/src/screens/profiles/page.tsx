@@ -236,7 +236,7 @@ export function ProfilePage({ data, behind, onEdits, onReload, onGone, scene }: 
   const nodeCount = new Set(servers.map((s) => s.nodeId)).size;
   const canPut = owner && (nodeList.data?.nodes.length ?? 0) > nodeCount;
 
-  const ctx: TabCtx = { data, owner, canGroups, servers, groups, inGroups, cert, edits: form.count, egress, openDlg: setDlg, goTab, edit, onEdit: setEdit };
+  const ctx: TabCtx = { data, owner, canGroups, servers, groups, inGroups, cert, edits: form.count, egress, openDlg: setDlg, goTab, edit, onEdit: setEdit, variant: scene?.variant ?? "" };
   const verdict = verdictOf({ st, bad, owner, canGroups, t, processOf: () => "" });
   const doVerdict = () => {
     if (!verdict) return;

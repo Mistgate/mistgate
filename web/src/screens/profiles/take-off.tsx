@@ -115,7 +115,7 @@ function Consequences({ chosen, nodeOf, deleting }: { chosen: readonly Inbound[]
 }
 
 /** The call, and what the screens that show the profile must read again afterwards. */
-function useTakeOff(profileId: string) {
+export function useTakeOff(profileId: string) {
   const qc = useQueryClient();
   return async (nodeIds: string[], remove?: { name: string }) => {
     const res = await profilesApi.removeProfileFromNodes({ profileId, nodeIds, deleteProfile: !!remove, confirmName: remove?.name ?? "" });

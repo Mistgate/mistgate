@@ -40,4 +40,6 @@ export type TabCtx = {
   /** The address of a server the head or the verdict wants the Servers tab to open for editing (its port and domain), once. */
   edit: string;
   onEdit: (inboundId: string) => void;
+  /** The dev kit's scene variant ("menu", "edit", "put-run": the state a scene fixes inside a tab or a window); empty on a real page. */
+  variant: string;
 };
