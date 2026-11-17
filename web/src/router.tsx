@@ -193,12 +193,12 @@ const profiles = createRoute({
   validateSearch: validateProfilesSearch,
   component: lazyRouteComponent(() => import("@/screens/profiles"), "ProfilesScreen"),
 });
-// "?node=<id>": made from that node's page; the new profile goes on it and the editor returns there. "?protocol=": step 2.
+// "?node=<id>": made from that node's page; the new profile goes on it and the wizard returns there. "?protocol=": skips the task, the settings step.
 const profileNew = createRoute({
   getParentRoute: () => app,
   path: "/profiles/new",
   validateSearch: validateNewProfileSearch,
-  component: lazyRouteComponent(() => import("@/screens/profiles"), "ProfileEditorScreen"),
+  component: lazyRouteComponent(() => import("@/screens/profiles"), "ProfileNewScreen"),
 });
 const profile = createRoute({
   getParentRoute: () => app,
