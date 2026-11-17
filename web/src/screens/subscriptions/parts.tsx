@@ -88,14 +88,14 @@ export function Row({ label, hint, children, className }: { label: ReactNode; hi
 }
 
 /** A switch with its title and an explanation: the rows of "What the apps get" and of the page's switches. */
-export function Toggle({ title, hint, checked, onChange, disabled, shot }: { title: ReactNode; hint?: ReactNode; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean; shot?: string }) {
+export function Toggle({ id, title, label, hint, checked, onChange, disabled, shot }: { id?: string; title: ReactNode; /** The accessible name, where the title alone ("On") would not say what the switch is for. */ label?: string; hint?: ReactNode; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean; shot?: string }) {
   return (
-    <div className="sb-tg" data-shot={shot}>
+    <div className="sb-tg" id={id} data-shot={shot}>
       <div>
         <b>{title}</b>
         {hint && <span>{hint}</span>}
       </div>
-      <Switch className="sb-sw" aria-label={typeof title === "string" ? title : undefined} checked={checked} onCheckedChange={onChange} disabled={disabled} />
+      <Switch className="sb-sw" aria-label={label ?? (typeof title === "string" ? title : undefined)} checked={checked} onCheckedChange={onChange} disabled={disabled} />
     </div>
   );
 }

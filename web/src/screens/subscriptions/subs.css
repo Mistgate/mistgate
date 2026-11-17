@@ -597,7 +597,7 @@
 }
 .sbp .sb-ar {
   display: grid;
-  grid-template-columns: minmax(160px,1fr) 88px 88px 96px minmax(0,2fr);
+  grid-template-columns: var(--sb-cols, minmax(160px,1fr) 88px 88px 96px minmax(0,2fr));
   align-items: center;
   gap: 12px;
   min-height: 52px;
@@ -2053,4 +2053,152 @@
 .sbp .sb-tabs .bdg.up-n {
   background: var(--step);
   color: var(--sec);
+}
+
+/* the board mirrors nothing itself (it is drawn left to right); the arrows of the product turn over right to left */
+:root[dir="rtl"] .sbp .flip {
+  transform: scaleX(-1);
+}
+.sbp .flip {
+  display: inline-block;
+}
+/* a link inside a quiet line (the AmneziaWG note of an app) */
+.sbp .sb-go {
+  padding: 0;
+  font: inherit;
+  color: var(--accent-mark);
+  text-align: start;
+}
+.sbp .sb-go:hover {
+  text-decoration: underline;
+}
+.sbp .sb-days {
+  max-width: 140px;
+}
+.sbp .sb-lead-end {
+  padding-bottom: 16px;
+}
+/* the chips of a filter (the board's .fz-ch) */
+.sbp .sb-ch {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.sbp .sb-ch>button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--sec);
+  transition: background-color .15s var(--e), color .15s var(--e), border-color .15s var(--e);
+}
+.sbp .sb-ch>button .mono {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sbp .sb-ch>button:hover {
+  color: var(--text);
+}
+.sbp .sb-ch>button[aria-pressed="true"],
+.sbp .sb-ch>button[aria-checked="true"] {
+  background: var(--surface-2);
+  border-color: transparent;
+  color: var(--text);
+}
+/* the state tiles and the chips are radios in the product (one choice, arrow keys), pressed buttons on the board */
+.sbp .sb-tiles>button[aria-checked="true"] {
+  border-color: var(--accent-mark);
+  background: color-mix(in srgb, var(--accent-mark) 5%, var(--surface));
+}
+.sbp .sb-tiles>button[aria-checked="false"]:hover {
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.sbp .sb-nf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+.sbp .sb-nf p {
+  margin: 0;
+}
+.sbp .sb-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+
+/* the table of devices is a real table drawn as the board's grid of rows */
+.sbp .sb-vt table,
+.sbp .sb-vt thead,
+.sbp .sb-vt tbody {
+  display: block;
+  width: 100%;
+  border-collapse: collapse;
+}
+.sbp .sb-vt tbody {
+  transition: opacity .2s var(--e);
+}
+.sbp .sb-vt tbody.busy {
+  opacity: .6;
+}
+.sbp .sb-vt td,
+.sbp .sb-vt th {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  font-weight: 400;
+  text-align: start;
+}
+@media (width <= 600px) {
+  .sbp .sb-vt tbody tr:first-child {
+    border-top: 0;
+  }
+}
+.sbp .sb-v2 a {
+  color: inherit;
+}
+.sbp .sb-v2 a:hover {
+  text-decoration: underline;
+}
+.sbp .sb-v2 b.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+.sbp .sb-v2 b[tabindex] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sbp .sb-ne {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+}
+.sbp .sb-ne.ok {
+  background: var(--tone-mint-bg);
+  color: var(--accent-mark);
+}
+.sbp .sb-ne.part {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
