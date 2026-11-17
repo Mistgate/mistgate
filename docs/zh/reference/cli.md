@@ -17,6 +17,7 @@ Mistgate 有两个二进制文件：`mistgate` 是面板，`mistgate-node` 是�
 | `backup restore` | 在离线状态下将下载的面板备份解密到新的数据目录。 |
 | `auth turnstile off` | 关闭登录页和设置页上的 Cloudflare 人机验证。 |
 | `auth reset-login` | 为管理员设置新密码和身份验证器应用，或添加密码登录方式。 |
+| `admin-address` | 当管理后台的公开地址不再可用时，将其移到单独的监听地址。 |
 | `mcp` | 为无法使用 HTTP 的智能体客户端提供连接面板 MCP 端点的本地 stdio 代理。 |
 | `release keygen` | 生成所有者的发布密钥。 |
 | `release build` | 以唯一可复现的方式构建发布二进制文件（CI 和 `make build` 都使用此命令）。 |
@@ -147,6 +148,20 @@ mistgate auth reset-login [<login>] [--admin ID] [--qr-invert] [--data-dir DIR]
 ```sh
 mistgate auth reset-login alice
 ```
+
+### mistgate admin-address
+
+```text
+mistgate admin-address --admin-listen host:port [--data-dir DIR]
+```
+
+| 标志 | 环境变量 | 默认值 | 含义 |
+|---|---|---|---|
+| `--admin-listen` | none | none | 单独的管理后台监听地址 `host:port`，例如 `127.0.0.1:8443`，通过 SSH 隧道访问。必填。 |
+| `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | 数据目录。若目录中没有面板数据库，命令会拒绝执行。 |
+| `--dev` | `MISTGATE_DEV` | off | 开发安装：数据位于 `./.data`。 |
+
+将管理后台移到单独的监听地址，并去掉管理后台主机名和私密管理前缀，效果与 `mistgate setup --admin-listen` 的设置相同。当管理后台的公开地址不再可用时，可用它重新进入面板。公开 URL、Agent SNI 以及订阅、连接和探测的私密前缀保持不变。命令会输出新的管理后台地址（`http://localhost:<port>/`），并提醒为原地址注册的通行密钥在此处不再可用：请使用密码和身份验证器代码登录，然后添加新的通行密钥。之后使用相同的 `--admin-listen` 重启面板。
 
 ### mistgate mcp
 

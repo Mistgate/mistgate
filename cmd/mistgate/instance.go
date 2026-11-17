@@ -71,12 +71,9 @@ func newInstance(o setupOpts) (instance, error) {
 
 	switch {
 	case o.adminListen != "":
-		_, port, err := net.SplitHostPort(o.adminListen)
-		if err != nil {
-			return in, fmt.Errorf("--admin-listen %q: %w", o.adminListen, err)
+		if err := in.listenAdmin(o.adminListen); err != nil {
+			return in, err
 		}
-		in.RPID = "localhost"
-		in.RPOrigins = []string{"http://localhost:" + port}
 	case in.AdminHost != "":
 		scheme, port := "https", ""
 		if pub != nil {
@@ -106,6 +103,18 @@ func newInstance(o setupOpts) (instance, error) {
 		}
 	}
 	return in, nil
+}
+
+// listenAdmin is the admin on a separate listener: no admin host, no secret prefix, WebAuthn on localhost.
+func (in *instance) listenAdmin(listen string) error {
+	_, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return fmt.Errorf("--admin-listen %q: %w", listen, err)
+	}
+	in.AdminListen, in.AdminHost, in.AdminPrefix = listen, "", "/"
+	in.RPID = "localhost"
+	in.RPOrigins = []string{"http://localhost:" + port}
+	return nil
 }
 
 // newSecretPrefix is "/" + 24 random base32 characters (120 bits) + "/".
