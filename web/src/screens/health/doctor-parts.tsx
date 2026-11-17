@@ -4,8 +4,7 @@ import { useState } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Chip } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
-import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
-import { StatusDot, StatusPill } from "@/components/ui/status";
+import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
@@ -18,11 +17,9 @@ import {
   checkTitle,
   doctorKind,
   doctorQuery,
-  doctorWord,
   isAccepted,
   itemCommand,
   itemFix,
-  itemTitle,
   itemWhy,
   manualSteps,
   useCan,
@@ -59,12 +56,7 @@ export const checkMarks: Record<string, { icon: IconName; tone: Tone }> = {
   awg_backend: { icon: "shield", tone: "sage" },
 };
 
-function CheckChip({ id }: { id: string }) {
-  const m = checkMarks[id];
-  return m ? <IconChip icon={m.icon} tone={m.tone} size={20} /> : <span className="size-5 flex-none" />;
-}
-
-const linkClass = "font-mono text-xs font-bold underline decoration-dotted underline-offset-2 hover:text-accent-text";
+const linkClass = "font-mono text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-accent-text";
 
 /** A node's name that opens its Doctor tab (the fleet tab names the node of every row). */
 export function NodeDoctorLink({ id, name }: { id: string; name: string }) {
@@ -182,88 +174,6 @@ export function useDoctorItem({ flow, nodeId, nodeName, item, stale }: { flow: F
   return { t, fmt, can, accept, me, open, setOpen, kind, accepted, issue, why, fact, command, steps, phase, canAccept, who, action, fixKey: target?.key ?? "" };
 }
 
-/**
- * One doctor item: a status dot, the title (with the node's name on the fleet tab) and its status word, the
- * plain-language reason of a problem, the agent's own fact line, and on the right the fix button or what stands in its
- * place: the copyable command, the WARP card, the steps by hand ("Manual ▾"). A warning can be accepted as normal for
- * the node; an accepted one says by whom and when, with the way back. A row that is fine or skipped is one quiet line.
- */
-export function DoctorRow({
-  flow,
-  nodeId,
-  nodeName,
-  item,
-  showNode,
-  first,
-  stale,
-}: {
-  flow: FixFlow;
-  nodeId: string;
-  nodeName: string;
-  item: DoctorItem;
-  showNode?: boolean;
-  first?: boolean;
-  /** The node has not sent a newer report than this (its age as text): the row is greyed out. */
-  stale?: string;
-}) {
-  const { t, fmt, can, accept, me, open, kind, accepted, issue, why, fact, command, steps, phase, canAccept, who, action } = useDoctorItem({ flow, nodeId, nodeName, item, stale });
-  return (
-    <div
-      title={stale ? t("hl.doctor.stale", { age: stale }) : undefined}
-      className={cx("flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5", !first && "border-t border-line", issue && "min-h-16", stale && "opacity-60")}
-    >
-      <div className="flex min-w-0 flex-[1_1_260px] items-start gap-2.5">
-        <span className="mt-[5px] flex">
-          <StatusDot kind={phase === "done" ? "ok" : accepted ? "off" : kind} />
-        </span>
-        <CheckChip id={item.id} />
-        <div className="flex min-w-0 flex-col gap-[3px]">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
-            {showNode && <NodeDoctorLink id={nodeId} name={nodeName} />}
-            <b>{itemTitle(t, item)}</b>
-            {issue && phase === "idle" && <StatusPill kind={kind} label={t(doctorWord(item.status))} sm />}
-            {!issue && !accepted && item.status !== DoctorStatus.OK && <span className="text-xs text-muted">{t("hl.doctor.status.skip")}</span>}
-          </span>
-          {why && <span className="text-xs leading-[1.45] text-pretty text-muted">{why}</span>}
-          {fact ? (
-            <span className="text-xs leading-snug break-words text-muted">{fact}</span>
-          ) : (
-            item.detail && <span className="font-mono text-[11px] leading-snug break-words text-muted">{item.detail}</span>
-          )}
-          {command && <span className="text-xs leading-snug text-muted">{t("hl.doctor.runCommand")}</span>}
-        </div>
-      </div>
-      {accepted ? (
-        <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-          {item.acceptedBy === me
-            ? t("hl.doctor.acceptedByYou", { date: fmt.date(item.acceptedUnix) })
-            : t("hl.doctor.acceptedBy", { name: item.acceptedByName || item.acceptedBy, date: fmt.date(item.acceptedUnix) })}
-          {can.run && (
-            <>
-              <span aria-hidden>·</span>
-              <button type="button" disabled={accept.busy} onClick={() => accept.run(who, false)} className="font-bold text-accent-text underline decoration-dotted underline-offset-2 disabled:opacity-50">
-                {t("hl.doctor.unaccept")}
-              </button>
-            </>
-          )}
-        </span>
-      ) : (
-        (action || canAccept) && (
-          <div className="flex max-w-full flex-wrap items-center gap-2">
-            {action}
-            {canAccept && (
-              <Button variant="ghost" size="md" disabled={accept.busy} title={t("hl.doctor.acceptHint")} onClick={() => accept.run(who, true)}>
-                {t("hl.doctor.accept")}
-              </Button>
-            )}
-          </div>
-        )
-      )}
-      {open && steps.length > 0 && <ManualSteps steps={steps} nodeId={nodeId} />}
-    </div>
-  );
-}
-
 /** "Manual ▾" opened: each step in words, with the exact command to copy or the button to where it is done. */
 export function ManualSteps({ steps, nodeId }: { steps: readonly ManualStep[]; nodeId: string }) {
   const t = useT();
@@ -326,33 +236,5 @@ function WarpPathActions({ nodeId, hasFix = false }: { nodeId: string; hasFix?: 
         {run.isPending ? t("hl.doctor.rerunning") : t("warp.recheck")}
       </Button>
     </div>
-  );
-}
-
-/**
- * What is fine or was not checked, as a compact two-column list (one column on a phone): the title and the node's
- * fact in one line each, no explanation and no button. Problems stay in DoctorRow with their full text.
- */
-export function DoctorCompact({ items, stale }: { items: readonly DoctorItem[]; stale?: boolean }) {
-  const t = useT();
-  const fmt = useFmt();
-  return (
-    <ul className={cx("grid gap-x-8 pt-1.5 pb-2.5 sm:grid-cols-2", stale && "opacity-60")}>
-      {items.map((item) => {
-        const fact = itemDetail(t, item, itemParams(t, fmt, item)) ?? item.detail;
-        return (
-          <li key={item.id} className="flex items-start gap-2.5 border-t border-line py-1.5 first:border-t-0 sm:[&:nth-child(2)]:border-t-0">
-            <span className="mt-[5px] flex">
-              <StatusDot kind={doctorKind(item.status)} />
-            </span>
-            <CheckChip id={item.id} />
-            <span className="min-w-0 text-[13px] leading-snug">
-              <b>{itemTitle(t, item)}</b>
-              {fact && <span className="ms-2 text-xs break-words text-muted">{fact}</span>}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
