@@ -42,6 +42,10 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		s.Close()
 		return nil, err
 	}
+	if err := s.BackfillDecoyVersions(ctx); err != nil {
+		s.Close()
+		return nil, fmt.Errorf("read the decoy versions the migration made: %w", err)
+	}
 	for _, suffix := range []string{"-wal", "-shm"} { // belt and braces next to the umask and SQLite's own rule
 		if err := chmodIfExists(path + suffix); err != nil {
 			s.Close()

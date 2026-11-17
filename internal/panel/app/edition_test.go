@@ -15,6 +15,8 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/decoysite/v1/decoysitev1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -131,6 +133,11 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 		"UploadNodeDecoy": {edition.DecoyOwn, func(p *Panel, _ *auth.Service) error {
 			base, hc := serve(p.Fleet.NodeHandler())
 			_, err := adminv1connect.NewNodeServiceClient(hc, base).UploadNodeDecoy(ctx, connect.NewRequest(&adminv1.UploadNodeDecoyRequest{}))
+			return err
+		}},
+		"ListDecoySites": {edition.DecoyOwn, func(p *Panel, _ *auth.Service) error {
+			base, hc := serve(p.Fleet.DecoySiteHandler())
+			_, err := decoysitev1connect.NewDecoySiteServiceClient(hc, base).ListDecoySites(ctx, connect.NewRequest(&decoysitev1.ListDecoySitesRequest{}))
 			return err
 		}},
 	}

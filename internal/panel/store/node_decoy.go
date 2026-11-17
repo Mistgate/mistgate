@@ -81,36 +81,6 @@ func (s *Store) SetNodesDecoyMode(ctx context.Context, nodeIDs []string, mode st
 	return out, nil
 }
 
-// SetNodeDecoyBundle stores a normalized bundle by content hash and selects it as this node's own site.
-func (s *Store) SetNodeDecoyBundle(ctx context.Context, nodeID, hash string, archive []byte) (NodeRow, error) {
-	b, err := decoy.ParseStoredArchive(archive)
-	if err != nil || b.Hash() != hash {
-		return NodeRow{}, decoy.ErrInvalidBundle
-	}
-	prev, err := s.Node(ctx, nodeID)
-	if err != nil {
-		return NodeRow{}, err
-	}
-	if prev.State == "retired" {
-		return NodeRow{}, ErrNodeRetired
-	}
-	stmts := []Stmt{
-		guard(`EXISTS (SELECT 1 FROM node WHERE id = ? AND state <> 'retired')`, nodeID),
-		{Query: `INSERT INTO node_decoy_bundle (sha256, content) VALUES (?, ?) ON CONFLICT (sha256) DO UPDATE SET content = excluded.content`, Args: []any{hash, archive}},
-		{Query: `UPDATE node SET decoy_bundle_hash = ?, decoy_mode = 'own' WHERE id = ? AND state <> 'retired'`, Args: []any{hash, nodeID}},
-		{Query: `DELETE FROM node_decoy_bundle WHERE sha256 = ? AND NOT EXISTS (SELECT 1 FROM node WHERE decoy_bundle_hash = ?)`, Args: []any{prev.DecoyBundleHash, prev.DecoyBundleHash}},
-		{Query: `SELECT ` + nodeCols + ` FROM node WHERE id = ?`, Args: []any{nodeID}, Returning: true},
-	}
-	results, err := s.batch(ctx, stmts...)
-	if errors.Is(err, errGuard) {
-		return NodeRow{}, ErrNodeRetired
-	}
-	if err != nil {
-		return NodeRow{}, err
-	}
-	return scanNode(batchRow(results[len(results)-1].Rows[0]))
-}
-
 // NodeDecoyBundle reads a bundle by its content address and verifies the stored bytes.
 func (s *Store) NodeDecoyBundle(ctx context.Context, hash string) ([]byte, error) {
 	var archive []byte

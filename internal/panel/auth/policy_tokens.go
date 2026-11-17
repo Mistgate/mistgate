@@ -20,6 +20,10 @@ const (
 	// that matters (CheckRelay stores its own result), but the raw response is not a free tool for a script (for example,
 	// GetSSHFingerprint probes a host and GetWarp contains node network details). Never over /api.
 	TokenAccessPlanning = 3
+	// TokenAccessDraft: an in-process MCP call made while planning, with no approved plan (WithPlanning), or inside an approved plan of the
+	// procedure's tool. The handler itself refuses a call that has no approved plan whatever changes what a node or the panel serves
+	// (AddDecoySiteVersion: only a draft), so a token saves drafts freely and a live site only through the owner.
+	TokenAccessDraft = 4
 )
 
 // tokenProcedures is the allow-list for tokens. Adding a line is a deliberate act with a test

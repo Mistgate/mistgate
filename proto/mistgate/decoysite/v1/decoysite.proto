@@ -1,0 +1,329 @@
+syntax = "proto3";
+
+package mistgate.decoysite.v1;
+
+import "mistgate/admin/v1/node.proto";
+
+// The library of decoy sites: the static sites the owner (or the assistant, or an MCP agent) keeps in the panel and puts on nodes
+// or on the panel itself. A package of its own on purpose, like mistgate.trusttunnel.v1: the Cloudflare edition keeps no
+// bundles, so its Workers link none of this code and answer every procedure with unavailable_in_edition: feature=decoy_own.
+// Owner only (internal/panel/auth policy_decoysite.go). File contents never reach the audit log or any other log.
+//
+// Refusals are FAILED_PRECONDITION / INVALID_ARGUMENT / NOT_FOUND / ALREADY_EXISTS whose message is a stable code, optionally
+// followed by ": key=value" (values URL-escaped): decoy_site_not_found, decoy_name_taken, decoy_name_invalid, decoy_note_invalid,
+// decoy_library_full, decoy_site_in_use (nodes=<ids>, panel=1), decoy_site_draft, decoy_site_not_draft, decoy_version_not_found,
+// decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, node_not_assigned, node_retired,
+// panel_unavailable / panel_too_large / panel_no_index / panel_invalid, and decoy_bundle_<reason> (with ": path=<entry>") for an
+// archive the bundle rules refuse (empty, bad_archive, too_large, too_many_files, bad_path, not_static, no_index, duplicate).
+service DecoySiteService {
+  // Every site of the library (no file contents) and the two built-in entries. Read.
+  rpc ListDecoySites(ListDecoySitesRequest) returns (ListDecoySitesResponse);
+  // One site: versions, files of the current version, checks, and where it stands with the delivery status of each node.
+  rpc GetDecoySite(GetDecoySiteRequest) returns (GetDecoySiteResponse);
+  // Saves an uploaded archive (ZIP, TAR, TAR.GZ; the rules of node uploads) as a new site. state "ready" (the default for uploads)
+  // or "draft"; source "upload" (default), "assistant" or "mcp". The archive passes every required check or is refused.
+  rpc CreateDecoySite(CreateDecoySiteRequest) returns (CreateDecoySiteResponse);
+  // Saves an archive as a new version of the site. A site that stands on nodes sends them the new files at once.
+  rpc AddDecoySiteVersion(AddDecoySiteVersionRequest) returns (AddDecoySiteVersionResponse);
+  // Replaces or deletes one file of a draft (a new version). Not for a ready site: decoy_site_not_draft.
+  rpc EditDecoySiteFile(EditDecoySiteFileRequest) returns (EditDecoySiteFileResponse);
+  // Renames the site and/or changes its note.
+  rpc UpdateDecoySite(UpdateDecoySiteRequest) returns (UpdateDecoySiteResponse);
+  // A copy of the current version, as a draft with a name of its own.
+  rpc CopyDecoySite(CopyDecoySiteRequest) returns (CopyDecoySiteResponse);
+  // draft -> ready (the required checks of the current version must pass) and ready -> draft (refused while the site stands anywhere).
+  rpc SetDecoySiteReady(SetDecoySiteReadyRequest) returns (SetDecoySiteReadyResponse);
+  // Puts a ready site on nodes (their mode becomes "own") and/or on the panel. dry_run only answers what would be replaced.
+  rpc AssignDecoySite(AssignDecoySiteRequest) returns (AssignDecoySiteResponse);
+  // Takes the site off nodes (they get "builtin" or the panel's directory) and/or off the panel.
+  rpc UnassignDecoySite(UnassignDecoySiteRequest) returns (UnassignDecoySiteResponse);
+  // The panel's own public site: "builtin" or "dir" (the --decoy-dir directory). A library site goes through AssignDecoySite.
+  rpc SetPanelDecoySource(SetPanelDecoySourceRequest) returns (SetPanelDecoySourceResponse);
+  // Makes an earlier version the current one again (saved as a new version).
+  rpc RevertDecoySite(RevertDecoySiteRequest) returns (RevertDecoySiteResponse);
+  // Deletes a site that stands nowhere.
+  rpc DeleteDecoySite(DeleteDecoySiteRequest) returns (DeleteDecoySiteResponse);
+  // The version as a ZIP.
+  rpc DownloadDecoySite(DownloadDecoySiteRequest) returns (DownloadDecoySiteResponse);
+  // The HTML pages and all files (with sizes) of a version.
+  rpc ListDecoyPages(ListDecoyPagesRequest) returns (ListDecoyPagesResponse);
+  // One HTML page as a single self-contained document for <iframe sandbox="" srcdoc>: styles inlined, local images as data: URIs,
+  // scripts removed, links made inert (the page they lead to is in data-page), nothing external loads.
+  rpc GetDecoyPagePreview(GetDecoyPagePreviewRequest) returns (GetDecoyPagePreviewResponse);
+  // The text of one text file of a version (the first 256 KiB).
+  rpc GetDecoyFile(GetDecoyFileRequest) returns (GetDecoyFileResponse);
+}
+
+// One check of a site's version. level "required" (a failed one cannot exist: the version would not have been saved) or "warning".
+// A warning is listed only when it fired. Codes: no_404, external_urls, telltale_words, scripts_or_forms, duplicate_title,
+// few_pages; at assignment also shared_domains. paths: the files that fired it (at most 5; for shared_domains the domains).
+message DecoyCheck {
+  string code = 1;
+  string level = 2;
+  bool ok = 3;
+  repeated string paths = 4;
+}
+
+message DecoyFileInfo {
+  string path = 1;
+  uint64 size = 2 [jstype = JS_NUMBER];
+}
+
+// A site as the list shows it.
+message DecoySite {
+  string id = 1;
+  string name = 2;
+  string note = 3;
+  // "upload" | "assistant" | "mcp"
+  string source = 4;
+  // Who made it: the administrator or the API token.
+  string source_label = 5;
+  // "draft" | "ready"
+  string state = 6;
+  string bundle_sha256 = 7;
+  int64 created_unix = 8 [jstype = JS_NUMBER];
+  string created_by = 9;
+  int64 updated_unix = 10 [jstype = JS_NUMBER];
+  string updated_by = 11;
+  // The current version.
+  uint32 version = 12;
+  uint64 size_bytes = 13 [jstype = JS_NUMBER];
+  uint32 file_count = 14;
+  // The title of the home page, "" when it has none.
+  string title = 15;
+  repeated DecoyCheck checks = 16;
+  // Nodes (not retired) that serve it.
+  uint32 node_count = 17;
+  bool on_panel = 18;
+}
+
+message DecoyVersion {
+  uint32 seq = 1;
+  string bundle_sha256 = 2;
+  int64 created_unix = 3 [jstype = JS_NUMBER];
+  string created_by = 4;
+  uint64 size_bytes = 5 [jstype = JS_NUMBER];
+  uint32 file_count = 6;
+  string title = 7;
+  repeated DecoyCheck checks = 8;
+  bool current = 9;
+}
+
+// "builtin" (the Mistgate page, the same everywhere) or "panel_dir" (the panel's --decoy-dir).
+message DecoyBuiltinItem {
+  string id = 1;
+  bool available = 2;
+  // Why it is not available: panel_unavailable, panel_too_large, panel_no_index, panel_invalid. Empty when it is.
+  string reason_code = 3;
+  // Nodes with mode "builtin" / "panel".
+  uint32 node_count = 4;
+  bool on_panel = 5;
+}
+
+// A node that serves a site and how far the delivery is: reason_code is Node.decoy_reason_code ("" = it stands).
+message DecoySiteNode {
+  string node_id = 1;
+  string node_name = 2;
+  string reason_code = 3;
+  bool supported = 4;
+  string agent_sha256 = 5;
+}
+
+message ListDecoySitesRequest {}
+
+message ListDecoySitesResponse {
+  repeated DecoySite sites = 1;
+  repeated DecoyBuiltinItem builtin = 2;
+  // What the panel's public site is now: "builtin", "dir" or "site:<id>".
+  string panel_source = 3;
+  // The most sites the library holds, and the most versions a site keeps.
+  uint32 site_limit = 4;
+  uint32 version_limit = 5;
+}
+
+message GetDecoySiteRequest {
+  string site_id = 1;
+}
+
+message GetDecoySiteResponse {
+  DecoySite site = 1;
+  repeated DecoyVersion versions = 2;
+  repeated DecoyFileInfo files = 3;
+  repeated DecoySiteNode nodes = 4;
+}
+
+message CreateDecoySiteRequest {
+  string name = 1;
+  string note = 2;
+  bytes bundle_archive = 3;
+  string state = 4;
+  string source = 5;
+}
+
+message CreateDecoySiteResponse {
+  DecoySite site = 1;
+}
+
+message AddDecoySiteVersionRequest {
+  string site_id = 1;
+  bytes bundle_archive = 2;
+}
+
+message AddDecoySiteVersionResponse {
+  DecoySite site = 1;
+  // Nodes that are sent the new files.
+  repeated string updated_node_ids = 2;
+}
+
+message EditDecoySiteFileRequest {
+  string site_id = 1;
+  string path = 2;
+  // The new content of the file (it is created when it does not exist). Ignored when delete is set.
+  bytes content = 3;
+  bool delete = 4;
+}
+
+message EditDecoySiteFileResponse {
+  DecoySite site = 1;
+}
+
+message UpdateDecoySiteRequest {
+  string site_id = 1;
+  string name = 2;
+  string note = 3;
+}
+
+message UpdateDecoySiteResponse {
+  DecoySite site = 1;
+}
+
+message CopyDecoySiteRequest {
+  string site_id = 1;
+  string name = 2;
+}
+
+message CopyDecoySiteResponse {
+  DecoySite site = 1;
+}
+
+message SetDecoySiteReadyRequest {
+  string site_id = 1;
+  bool ready = 2;
+}
+
+message SetDecoySiteReadyResponse {
+  DecoySite site = 1;
+}
+
+message AssignDecoySiteRequest {
+  string site_id = 1;
+  repeated string node_ids = 2;
+  bool panel = 3;
+  bool dry_run = 4;
+}
+
+// What an assignment replaces: the site (or built-in entry) a node or the panel stood on.
+message DecoyReplaced {
+  // A node id, or "panel".
+  string target = 1;
+  // "builtin" | "panel" | "own" for a node; "builtin" | "dir" | "site" for the panel.
+  string previous = 2;
+  string previous_site_id = 3;
+  string previous_site_name = 4;
+}
+
+message AssignDecoySiteResponse {
+  // The site's warnings plus shared_domains when the site would stand on nodes with different addresses.
+  repeated DecoyCheck warnings = 1;
+  repeated DecoyReplaced replaced = 2;
+  // The nodes after the change (empty for a dry run).
+  repeated mistgate.admin.v1.Node nodes = 3;
+  bool applied = 4;
+}
+
+message UnassignDecoySiteRequest {
+  string site_id = 1;
+  repeated string node_ids = 2;
+  bool panel = 3;
+  // What the nodes (and the panel) get instead: "builtin" or "panel" (the panel's --decoy-dir).
+  string fallback = 4;
+}
+
+message UnassignDecoySiteResponse {
+  repeated mistgate.admin.v1.Node nodes = 1;
+  string panel_source = 2;
+}
+
+message SetPanelDecoySourceRequest {
+  // "builtin" | "dir"
+  string source = 1;
+}
+
+message SetPanelDecoySourceResponse {
+  string panel_source = 1;
+}
+
+message RevertDecoySiteRequest {
+  string site_id = 1;
+  uint32 seq = 2;
+}
+
+message RevertDecoySiteResponse {
+  DecoySite site = 1;
+  repeated string updated_node_ids = 2;
+}
+
+message DeleteDecoySiteRequest {
+  string site_id = 1;
+}
+
+message DeleteDecoySiteResponse {}
+
+message DownloadDecoySiteRequest {
+  string site_id = 1;
+  // 0 = the current version.
+  uint32 seq = 2;
+}
+
+message DownloadDecoySiteResponse {
+  string filename = 1;
+  bytes archive = 2;
+}
+
+message ListDecoyPagesRequest {
+  string site_id = 1;
+  uint32 seq = 2;
+}
+
+message ListDecoyPagesResponse {
+  // The .html and .htm files, index.html first.
+  repeated string pages = 1;
+  repeated DecoyFileInfo files = 2;
+  bool has_404 = 3;
+}
+
+message GetDecoyPagePreviewRequest {
+  string site_id = 1;
+  uint32 seq = 2;
+  // The page, as a path from the site root ("index.html", "about/index.html"); empty = index.html.
+  string path = 3;
+  // Preview the 404 page (404.html, or the built-in one when the site has none) instead of path.
+  bool not_found = 4;
+}
+
+message GetDecoyPagePreviewResponse {
+  string html = 1;
+  string path = 2;
+}
+
+message GetDecoyFileRequest {
+  string site_id = 1;
+  uint32 seq = 2;
+  string path = 3;
+}
+
+message GetDecoyFileResponse {
+  string text = 1;
+  uint64 size = 2 [jstype = JS_NUMBER];
+  bool truncated = 3;
+}

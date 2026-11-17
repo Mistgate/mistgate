@@ -15,6 +15,14 @@ import (
 )
 
 var transactionShape1 = map[string]string{
+	"decoy_site.go:CreateDecoySite":                  "A library-size guard precedes the bundle upsert, the site insert and its first version in one fixed batch.",
+	"decoy_site.go:SetPanelDecoySource":              "A ready-site guard precedes the panel-source upsert in one fixed batch.",
+	"decoy_site.go:SetDecoySiteReady":                "A not-in-use guard (for a draft) and a site guard precede the state change, the clearing of stale node references and the bundle collection in one fixed batch.",
+	"decoy_site.go:AddDecoySiteVersion":              "A site guard precedes the bundle upsert, the new version, the site and node hash updates, the version pruning and the bundle collection in one fixed batch.",
+	"decoy_site.go:RevertDecoySite":                  "A version guard precedes the copy of the old version as the newest one, the site and node hash updates, the pruning and the bundle collection in one fixed batch.",
+	"decoy_site.go:DeleteDecoySite":                  "A not-in-use guard precedes the node reference clearing, the version and site deletion and the bundle collection in one fixed batch.",
+	"decoy_site.go:AssignDecoySite":                  "A ready-site guard and a live-node guard per node precede the mode, site and hash updates and the bundle collection in one fixed batch.",
+	"decoy_site.go:UnassignDecoySite":                "A guard per node (it serves this site) precedes the mode change, the site and hash clearing and the bundle collection in one fixed batch.",
 	"admin.go:OfferSetupToken":                       "Inserts the supplied token hash only while no admin exists and reads it back, in one fixed batch.",
 	"admin.go:OfferRecoveryToken":                    "Offers a recovery hash only while an admin exists, preserves earlier rows, and reads back its first expiry in one fixed batch.",
 	"admin.go:ConsumeRecoveryToken":                  "A single live, unused-token UPDATE RETURNING spends the recovery token atomically.",
@@ -107,7 +115,6 @@ var transactionShape2 = map[string]string{
 	"fleet_ca.go:RenewCert":                          "A guard on the presenting certificate (valid for this node, node not retired) and the hourly certificate count precedes the insert and the two updates in one batch.",
 	"fleet_ca.go:Enroll":                             "A reader batch loads the token, node, and replay certificate; signing runs outside one guarded consume-and-issue batch.",
 	"fleet_node.go:NodeHello":                        "Previous and current node rows bracket the guarded facts update and live-session replacement in one D1 batch.",
-	"node_decoy.go:SetNodeDecoyBundle":               "A live-node guard, content-addressed bundle upsert, mode/hash update, old-bundle collection, and row read commit in one batch.",
 	"node_decoy.go:SetNodesDecoyMode":                "Each requested node has a live-state guard and mode update in the same atomic batch.",
 	"fleet_node.go:NodeDisconnected":                 "The matching live session guards last-seen/disconnect time and row deletion in one fixed batch.",
 	"fleet_node.go:RetireNode":                       "A node-state guard precedes retirement, certificate/token changes, provisioning cancellation, and retained-key and relay deletion.",

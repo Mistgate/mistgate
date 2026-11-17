@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // Built-in decoy pages. Every install ships the same ones, so they are recognisable;
@@ -64,6 +66,28 @@ func withStart(r *http.Request) *http.Request {
 // up in the same two code paths (serve / notFound), so they cannot be told apart.
 type decoy struct {
 	dir fs.FS // nil means built-in
+	// lib, when set, lets the owner choose the panel's own site in the library of decoy sites (setting decoy_panel_source): the
+	// built-in page, dir or a library site, changed without a restart. Nil on the edge, which keeps no library.
+	lib librarySource
+}
+
+// librarySource says what the library chose for the panel: kind "builtin" (the built-in page), "site" (fsys is the site) or
+// anything else for the directory (or the built-in page when there is no directory).
+type librarySource interface {
+	resolve() (kind string, fsys fs.FS)
+}
+
+// site is the file system the decoy serves now; nil is the built-in page.
+func (d *decoy) site() fs.FS {
+	if d.lib != nil {
+		switch kind, fsys := d.lib.resolve(); kind {
+		case "builtin":
+			return nil
+		case "site":
+			return fsys
+		}
+	}
+	return d.dir
 }
 
 type emptyFS struct{}
@@ -113,17 +137,34 @@ func (f *rootedFile) Close() error {
 // not its own: the same 404 the public listener gives every unknown path, for any path and method. It is
 // not the decoy site itself: a mount sees its prefix stripped, so the site's "/" page would answer the
 // bare prefix with 200 and tell a guessed prefix from a wrong one.
-func NewDecoy(dir string) http.Handler {
-	return http.HandlerFunc(newDecoy(dir, nil).notFound)
+func NewDecoy(dir string) http.Handler { return NewDecoyFor(dir, nil) }
+
+// NewDecoyFor is NewDecoy for a panel that has the library of decoy sites: the 404 is the one of the site the owner chose for the
+// panel, like the public listener's, so a secret mount cannot be told from a stranger's path.
+func NewDecoyFor(dir string, st *store.Store) http.Handler {
+	return http.HandlerFunc(newDecoy(dir, nil, st).notFound)
 }
 
 // NewTooMany returns the 429 of the decoy site (429.html of the decoy dir, else the built-in page, Retry-After in whole
 // seconds). A secret mount answers with it when a stranger has failed too often, so the limit looks like the one of the site.
 func NewTooMany(dir string) func(w http.ResponseWriter, r *http.Request, retry time.Duration) {
-	return newDecoy(dir, nil).tooMany
+	return NewTooManyFor(dir, nil)
 }
 
-func newDecoy(dir string, log *slog.Logger) *decoy {
+// NewTooManyFor is NewTooMany for a panel that has the library of decoy sites (see NewDecoyFor).
+func NewTooManyFor(dir string, st *store.Store) func(w http.ResponseWriter, r *http.Request, retry time.Duration) {
+	return newDecoy(dir, nil, st).tooMany
+}
+
+func newDecoy(dir string, log *slog.Logger, st *store.Store) *decoy {
+	d := newDirDecoy(dir, log)
+	if st != nil {
+		d.lib = newLibrary(st)
+	}
+	return d
+}
+
+func newDirDecoy(dir string, log *slog.Logger) *decoy {
 	if dir == "" {
 		return &decoy{}
 	}
@@ -146,7 +187,8 @@ func (d *decoy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := r.URL.Path
-	if d.dir == nil {
+	dir := d.site()
+	if dir == nil {
 		switch p {
 		case "/":
 			writeHTML(w, r, http.StatusOK, comingSoonHTML)
@@ -165,10 +207,10 @@ func (d *decoy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		d.notFound(w, r)
 		return
 	}
-	if st, err := fs.Stat(d.dir, name); err == nil && st.IsDir() {
+	if st, err := fs.Stat(dir, name); err == nil && st.IsDir() {
 		name = path.Join(name, "index.html")
 	}
-	f, err := d.dir.Open(name)
+	f, err := dir.Open(name)
 	if err != nil {
 		if p == "/robots.txt" {
 			d.robots(w, r)
@@ -228,8 +270,8 @@ func (d *decoy) notFoundBody() string { return d.pageBody("404.html", notFoundHT
 
 // pageBody is the named file of the decoy dir if there is one, else builtin.
 func (d *decoy) pageBody(name, builtin string) string {
-	if d.dir != nil {
-		if f, err := d.dir.Open(name); err == nil {
+	if dir := d.site(); dir != nil {
+		if f, err := dir.Open(name); err == nil {
 			defer f.Close()
 			if b, err := io.ReadAll(io.LimitReader(f, 1<<20)); err == nil {
 				return string(b)

@@ -159,7 +159,7 @@ pid_is() { # pid file $1 names a live process whose command line is "... mistgat
 }
 stop_pid() { # SIGTERM to the process of pid file $1 when it is ours (kind $2); never to anything else
 	if pid_is "$1" "$2"; then kill -TERM "${PIDOF}" 2>/dev/null; fi
-	rm -f "$1"
+	rm -f "$1" 2>/dev/null
 }
 version_of() { # first 12 characters of the sha256 of file $1
 	VER=000000000000
