@@ -10,13 +10,13 @@ const isFacet = (v: string): v is FacetId => (facetIds as readonly string[]).inc
 const text = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : "");
 const id = (v: unknown) => (/^[a-z0-9_-]{1,32}$/.test(text(v)) ? text(v) : "");
 
-export type ProfilesSearch = { protocol?: string; q?: string; state?: FacetId };
+export type ProfilesSearch = { protocol?: string; q?: string; state?: FacetId; /** The matrix "Where it passes" (the list has none). */ view?: "where" };
 
 export function validateProfilesSearch(s: Record<string, unknown>): ProfilesSearch {
   const protocol = id(s.protocol);
   const q = text(s.q).slice(0, 64);
   const state = text(s.state);
-  return { ...(protocol && { protocol }), ...(q && { q }), ...(isFacet(state) && { state }) };
+  return { ...(protocol && { protocol }), ...(q && { q }), ...(isFacet(state) && { state }), ...(text(s.view) === "where" && { view: "where" as const }) };
 }
 
 /** /profiles/new: `node` (made from that node's page) and the chosen `protocol` (step 2; without it, step 1). */
