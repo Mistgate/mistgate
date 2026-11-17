@@ -265,3 +265,184 @@
     transition: none;
   }
 }
+
+/* ---- the Doctor tab ---- */
+
+/* the summary card: a dotted field fades in from its top corner, in the colour of the state; while the node is looked at it breathes */
+.nd-dr-sum {
+  --dr: var(--accent-mark);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.nd-dr-sum::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -70px;
+  top: -90px;
+  z-index: -1;
+  width: 340px;
+  height: 280px;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--dr) 80%, transparent) 1.2px, transparent 1.7px);
+  background-size: 10px 10px;
+  mask-image: radial-gradient(closest-side, #000 0, transparent 100%);
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 0.3s var(--e);
+}
+.nd-dr-sum.warn {
+  --dr: var(--warning);
+}
+.nd-dr-sum.warn::before {
+  opacity: 0.3;
+}
+.nd-dr-sum.crit {
+  --dr: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.nd-dr-sum.idle {
+  --dr: var(--text);
+}
+.nd-dr-sum.idle::before {
+  opacity: 0.2;
+}
+.nd-dr-sum.run {
+  --dr: var(--tone-sky);
+}
+.nd-dr-sum.run::before {
+  animation: nd-halo 1.4s var(--e) infinite;
+}
+@keyframes nd-halo {
+  50% {
+    opacity: 0.25;
+    transform: scale(1.08);
+  }
+}
+.nd-dr-ic.run svg {
+  stroke-dasharray: 60;
+  animation: nd-dash 1.1s linear infinite;
+}
+@keyframes nd-dash {
+  from {
+    stroke-dashoffset: 120;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* one cell per check: it fills in turn while the node is looked at, and shows what the check found */
+.nd-dr-strip {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 14), 1fr);
+  gap: 3px;
+}
+.nd-dr-strip i {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.nd-dr-strip i::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--accent-mark);
+  transition:
+    background-color 0.6s var(--e),
+    width 0.4s var(--e),
+    box-shadow 0.4s var(--e);
+}
+.nd-dr-strip i.warn::before {
+  background: var(--warning);
+}
+.nd-dr-strip i.crit::before {
+  background: var(--danger);
+}
+.nd-dr-strip i.mute::before {
+  background: color-mix(in srgb, var(--text) 30%, transparent);
+}
+.nd-dr-strip i.wait::before {
+  width: 0;
+  transition: none;
+}
+.nd-dr-strip i.now::before {
+  background: var(--tone-sky);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tone-sky) 70%, transparent);
+  animation: nd-fill 0.32s linear both;
+  transition: none;
+}
+@keyframes nd-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+[dir="rtl"] .nd-dr-strip i::before {
+  inset-inline-start: auto;
+}
+.nd-dr-strip i:hover::after {
+  content: attr(data-t);
+  position: absolute;
+  inset-inline-start: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text);
+  white-space: nowrap;
+  z-index: 5;
+}
+.nd-dr-strip i:nth-child(-n + 2):hover::after {
+  inset-inline-start: 0;
+  transform: none;
+}
+.nd-dr-strip i:nth-last-child(-n + 2):hover::after {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+  transform: none;
+}
+
+/* a check that has just come back as fine: a quiet wash of the accent that fades */
+@keyframes nd-fresh {
+  0% {
+    background: color-mix(in srgb, var(--accent-mark) 18%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.nd-dr-fresh {
+  animation: nd-fresh 1.8s var(--e) both;
+}
+@keyframes nd-shake {
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nd-dr-ic.run svg,
+  .nd-dr-sum.run::before,
+  .nd-dr-strip i.now::before,
+  .nd-dr-fresh {
+    animation: none;
+  }
+}

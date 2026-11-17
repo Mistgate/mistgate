@@ -93,6 +93,29 @@ function alertPool(n: number) {
   return pool.slice(0, n);
 }
 
+
+// the doctor's report of the board: fourteen checks of the host; a state decides which of them are not fine
+const checkIds = ["disk_space", "journald_size", "dstate_tasks", "memory_pressure", "cpu_softirq", "cpu_steal", "agent_fds", "time_sync", "resolver", "ipv6", "port_conflicts", "conntrack_fill", "cert_expiry", "unit_generation"];
+const details: Record<string, string> = { disk_space: "used 10% of 40 GB", journald_size: "journal 48 MB", time_sync: "chrony, offset 3 ms", resolver: "1.1.1.1, 4 ms", cert_expiry: "70 days left", conntrack_fill: "1.2% of 262144" };
+function doctorItems(state: NState) {
+  const bad = (id: string) => (state === "limit" ? ["disk_space", "journald_size", "time_sync"].includes(id) : state === "alerts" || state === "many" || state === "viewer" || state === "high" ? ["journald_size", "time_sync"].includes(id) : state === "down" ? id === "time_sync" : false);
+  const crit = (id: string) => state === "limit" && id === "disk_space";
+  return checkIds.map((id) => ({
+    id,
+    status: crit(id) ? DoctorStatus.FAIL : bad(id) || (state === "calm" && id === "cpu_steal") ? DoctorStatus.WARN : id === "dstate_tasks" && state === "down" ? DoctorStatus.SKIP : DoctorStatus.OK,
+    titleKey: `doctor.${id}.title`,
+    detail: details[id] ?? "",
+    detailCode: "",
+    params: id === "journald_size" ? { journal_mb: "3891", cap_mb: "500" } : id === "disk_space" ? { used_pct: "88", free_gb: "4.8" } : {},
+    whyKey: `health.doctor.${id}.why`,
+    fixId: id === "journald_size" && bad(id) ? "journald_vacuum" : "",
+    measuredUnix: NOW - 300,
+    acceptedUnix: state === "calm" && id === "cpu_steal" ? NOW - 2 * D : 0,
+    acceptedBy: "adm_1",
+    acceptedByName: "owner",
+  }));
+}
+
 const closed = [
   { ...alertOf({ resolvedAtUnix: NOW - 3 * H, openedUnix: NOW - 3 * H - 2 * 60, firstSeenUnix: NOW - 3 * H - 2 * 60, resolution: "cleared", kind: AlertKind.NODE_DOWN, titleKey: "health.alert.node_down.title", params: { minutes: "2" } }) },
   { ...alertOf({ resolvedAtUnix: NOW - 5 * H, openedUnix: NOW - 5 * H - 60, firstSeenUnix: NOW - 5 * H - 60, resolution: "cleared", kind: AlertKind.NODE_DOWN, titleKey: "health.alert.node_down.title", params: { minutes: "1" } }) },
@@ -229,7 +252,7 @@ export function nodePageData(state: NState) {
     } as never,
   );
   qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns, rows: [], countryChecks: [] } as never);
-  qc.setQueryData(doctorQuery("nod_de1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_de1", nodeName: "de1", nodeStatus: status, agentSupported: true, hasReport: true, receivedUnix: NOW - 60, ageS: 60, stale: false, items: sp.alerts ? [{ id: "journald_size", status: DoctorStatus.WARN, titleKey: "doctor.journald_size.title", detail: "", detailCode: "", params: { journal_mb: "3891", cap_mb: "500" }, whyKey: "health.doctor.journald_size.why", fixId: "journald_vacuum", measuredUnix: NOW }] : [] }] } as never);
+  qc.setQueryData(doctorQuery("nod_de1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_de1", nodeName: "de1", nodeStatus: status, agentSupported: true, hasReport: !sp.fresh, receivedUnix: sp.down ? NOW - 14 * 60 : NOW - 5 * 60, ageS: sp.down ? 14 * 60 : 5 * 60, stale: false, items: sp.fresh ? [] : doctorItems(state) }] } as never);
   qc.setQueryData(overviewQuery().queryKey, { nowUnix: NOW, nodes: [{ id: "nod_de1", name: "de1", sparkBytes: Array.from({ length: 24 }, (_, i) => Math.round((0.4 + Math.sin(i / 3.2) * 0.3 + (i > 17 ? 0.5 : 0)) * 2.1e9)) }], traffic: [], online: [], events: [], topConsumers: [] } as never);
   qc.setQueryData(overviewQuery(OverviewRange.OVERVIEW_RANGE_24H).queryKey, qc.getQueryData(overviewQuery().queryKey) as never);
   if (live && !sp.fresh && !sp.edge) {
@@ -284,6 +307,13 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-overview-viewer", state: "viewer", tab: "overview", title: "Overview: a read-only role, no fix buttons", w: 1440, h: 1800 },
   { id: "node-overview-via", state: "via", tab: "overview", title: "Overview: the agent reaches the panel through msk1", w: 1440, h: 1800 },
   { id: "node-overview-edge", state: "edge", tab: "overview", title: "Overview: the Cloudflare edition, no checks, no load hours", w: 1440, h: 1500 },
+  { id: "node-doctor-calm", state: "calm", tab: "doctor", title: "Doctor: the node is healthy, one warning accepted as normal", w: 1440, h: 1500 },
+  { id: "node-doctor-alerts", state: "alerts", tab: "doctor", title: "Doctor: two checks need attention", w: 1440, h: 1700 },
+  { id: "node-doctor-limit", state: "limit", tab: "doctor", title: "Doctor: a check failed, the card is red", w: 1440, h: 1700 },
+  { id: "node-doctor-new", state: "new", tab: "doctor", title: "Doctor: the node has no report yet", w: 1440, h: 800 },
+  { id: "node-doctor-down", state: "down", tab: "doctor", title: "Doctor: the node does not answer, the last report", w: 1440, h: 1500 },
+  { id: "node-doctor-viewer", state: "viewer", tab: "doctor", title: "Doctor: a read-only role, no buttons", w: 1440, h: 1700 },
+  { id: "node-doctor-phone", state: "alerts", tab: "doctor", title: "Doctor on a phone, 400 wide", w: 400, h: 2600 },
   { id: "node-overview-1100", state: "alerts", tab: "overview", title: "Overview at 1100 wide: one column", w: 1100, h: 2600 },
   { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
 ];
