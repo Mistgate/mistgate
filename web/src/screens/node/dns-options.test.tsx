@@ -62,13 +62,15 @@ async function mount(role: number, offered: { presetIds: string[]; defaultPreset
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
-const input = (aria: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${aria}"]`);
+const input = (aria: string) => document.querySelector<HTMLElement>(`[aria-label="${aria}"]`);
+const checked = (el: Element | null | undefined) => el?.getAttribute("aria-checked") === "true";
+const locked = (el: Element | null | undefined) => !!el && (el.hasAttribute("disabled") || el.hasAttribute("data-disabled") || el.getAttribute("aria-disabled") === "true");
 const labelled = (aria: string) => document.querySelector<HTMLElement>(`[aria-label="${aria}"]`);
 const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   for (let i = 0; i < 3; i++) await settle();
 };
-const order = () => [...document.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].filter((c) => c.checked).map((c) => c.getAttribute("aria-label"));
+const order = () => [...document.querySelectorAll<HTMLElement>("[role=switch]")].filter((c) => checked(c)).map((c) => c.getAttribute("aria-label"));
 
 describe("DNS choice on the user page (node)", () => {
   it("says what it is not and warns that only AmneziaWG keys get a DNS per node", async () => {
@@ -102,7 +104,7 @@ describe("DNS choice on the user page (node)", () => {
 
   it("drops the default when its preset is no longer offered, and an empty list is a valid save", async () => {
     await mount(1, { presetIds: ["dns_b"], defaultPresetId: "dns_b" });
-    expect(input("Default: Preset B")?.checked).toBe(true);
+    expect(checked(input("Default: Preset B"))).toBe(true);
     await click(input("Offer Preset B"));
     expect(text()).toContain(en["subs.dnsOpt.nothing"]);
     await click(button("Save"));
@@ -120,8 +122,8 @@ describe("DNS choice on the user page (node)", () => {
     expect(text()).toContain(en["subs.dnsOpt.ownerOnly"]);
     expect(button("Save")).toBeUndefined();
     expect(labelled("Move Preset B up")).toBeNull();
-    expect(input("Offer Preset A")?.disabled).toBe(true);
-    expect(input("Default: Preset B")?.disabled).toBe(true);
+    expect(locked(input("Offer Preset A"))).toBe(true);
+    expect(locked(input("Default: Preset B"))).toBe(true);
     expect(text()).toContain("Happ, the Mihomo apps, Xray JSON and sing-box have one DNS for all nodes"); // still shown
   });
 });

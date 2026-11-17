@@ -23,6 +23,11 @@ import { hostHistoryQuery } from "./node/load-history";
 import { nodeAlertsQuery } from "./node/overview-parts";
 import { OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { OsUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
+import { WarpSource } from "@/gen/mistgate/admin/v1/common_pb";
+import { warp as warpApi } from "@/lib/api";
+import { warpQuery } from "./node/warp-model";
+import { nodeDnsOptionsQuery } from "./node/dns-options";
+import { dnsPresetsQuery } from "./subscriptions/queries";
 import { debugListQuery } from "@/lib/debug-capture";
 import { osUpdatesQuery } from "@/lib/os-updates";
 
@@ -148,7 +153,29 @@ export type OsKind = "ok" | "upd" | "boot";
 const osOf: Record<NState, OsKind> = { calm: "ok", alerts: "upd", many: "boot", high: "ok", limit: "boot", down: "ok", new: "ok", retired: "ok", viewer: "upd", edge: "ok", via: "ok", entry: "ok" };
 
 /** The node page's data (what GetNode says) and the query cache around it, for a state. */
-export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done" } = {}) {
+export type WarpKind = "ok" | "pause" | "bad" | "none" | "revoked";
+
+/** The WARP card of the board's states: working, paused, not answering, none connected (the registration then plays on a press), revoked. */
+function warpOf(kind: WarpKind) {
+  const shake = kind === "ok" ? NOW - 20 : NOW - 3 * H;
+  return {
+    account: kind === "none" ? undefined : { enabled: kind !== "pause", source: WarpSource.REGISTERED, accountType: "free", hasToken: true, useReserved: true, endpointV4: "198.51.100.1" },
+    health:
+      kind === "none"
+        ? undefined
+        : {
+            state: kind === "ok" ? WarpState.UP : kind === "pause" ? WarpState.DISABLED : WarpState.DOWN,
+            backend: "wireguard-go", endpoint: "198.51.100.1:2408", lastHandshakeUnix: shake, warpFlag: "on", colo: "FRA", probeCloudflareOk: kind === "ok", probeOtherOk: kind === "ok",
+            probeCloudflare: kind === "ok" ? { ok: true, latencyMs: 70, atUnix: NOW - 40 } : { ok: false, latencyMs: 0, atUnix: NOW - 40, errorCode: "timeout" },
+            probeOther: kind === "ok" ? { ok: true, latencyMs: 90, atUnix: NOW - 40 } : { ok: false, latencyMs: 0, atUnix: NOW - 40, errorCode: "timeout" },
+            consecutiveFailures: kind === "bad" || kind === "revoked" ? 12 : 0, rxBytes: 19.8 * GB, txBytes: 3.1 * GB, lastError: kind === "bad" ? "handshake_stale" : kind === "revoked" ? "warp_flag_off" : "", reportedUnix: NOW - 5, checkedUnix: NOW - 40,
+          },
+    pendingApply: false, applyError: "", agentSupports: true, tosUrl: "https://www.cloudflare.com/application/terms/", needsAttention: kind === "revoked", attentionReason: kind === "revoked" ? "revoked" : "",
+    inbounds: kind === "none" ? [] : [{ inboundId: "inb_3", profileName: "AmneziaWG 3.1", online: 1 }],
+  };
+}
+
+export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind } = {}) {
   const sp = specs[state];
   const lo = sp.load;
   const status = sp.retired ? NodeStatus.RETIRED : sp.down ? NodeStatus.DOWN : sp.fresh ? NodeStatus.ONLINE : NodeStatus.ONLINE;
@@ -275,6 +302,12 @@ export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | 
   }
   if (sp.fresh) qc.setQueryData(hostHistoryQuery("nod_de1", 24).queryKey, { nodeId: "nod_de1", nodeName: "de1", nowUnix: NOW, sinceUnix: NOW - 300, hours: [] } as never);
   qc.setQueryData(relaysQuery("nod_de1").queryKey, (sp.entry ? [] : []) as never);
+  // the Exit tab: the WARP account, the DNS presets of the people's page
+  const wp = extra.wp ?? "ok";
+  qc.setQueryData(warpQuery("nod_de1").queryKey, warpOf(wp) as never);
+  const dnsPreset = (id: string, name: string, over: object = {}) => ({ id, name, servers: [], split: [], splitDirect: false, isDefault: false, blockAds: false, ...over });
+  qc.setQueryData(dnsPresetsQuery.queryKey, { presets: [dnsPreset("dns_cf", "Cloudflare"), dnsPreset("dns_q9", "Quad9"), dnsPreset("dns_ag", "AdGuard", { blockAds: true }), dnsPreset("dns_fm", "Family"), dnsPreset("dns_ru", "Russia: Yandex + split")], providers: [], clientSupport: [] } as never);
+  qc.setQueryData(nodeDnsOptionsQuery.queryKey, [{ nodeId: "nod_de1", presetIds: ["dns_cf", "dns_q9", "dns_ag"], defaultPresetId: "dns_cf" }] as never);
   // the Server tab: the SSH access and its keys, the system of the node and a debug recording
   const osKind = extra.os ?? osOf[state];
   const fp = "SHA256:Qm4Vw7dJ1xN8cR2tY5pL0sW9hD4gF6aJ8NvK2Ws";
@@ -314,7 +347,18 @@ export function NodePageFrame() {
     if (params.get("fx") === "1") setEffectsEnabled(true);
     const os = params.get("os");
     const dbg = params.get("dbg");
-    return nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined });
+    const wp = params.get("wp");
+    const kind = wp === "ok" || wp === "pause" || wp === "bad" || wp === "none" || wp === "revoked" ? wp : undefined;
+    const made = nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind });
+    // no WARP yet: the registration the scene plays takes nine seconds (four steps), then the account is there
+    if (kind === "none") {
+      (warpApi as unknown as Record<string, unknown>).registerWarp = async () => {
+        await new Promise((r) => setTimeout(r, 9000));
+        made.qc.setQueryData(warpQuery("nod_de1").queryKey, warpOf("ok") as never);
+        return {};
+      };
+    }
+    return made;
   });
   return (
     <QueryClientProvider client={scene.qc}>
@@ -371,6 +415,15 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-server-edge", state: "edge", tab: "server", q: "sv=sys", title: "Server: the Cloudflare edition has no system card", w: 1440, h: 700 },
   { id: "node-server-phone", state: "calm", tab: "server", title: "Server on a phone, 400 wide", w: 400, h: 2000 },
   { id: "node-server-phone-ssh", state: "calm", tab: "server", q: "sv=ssh", title: "Server: SSH access on a phone, 400 wide", w: 400, h: 2400 },
+  { id: "node-exit-ok", state: "calm", tab: "exit", q: "wp=ok", title: "Exit: WARP works, three rows, the traffic and the DNS cards", w: 1440, h: 1500 },
+  { id: "node-exit-pause", state: "calm", tab: "exit", q: "wp=pause", title: "Exit: WARP is paused", w: 1440, h: 1500 },
+  { id: "node-exit-bad", state: "alerts", tab: "exit", q: "wp=bad", title: "Exit: WARP does not answer, the tunnel is down", w: 1440, h: 1600 },
+  { id: "node-exit-revoked", state: "calm", tab: "exit", q: "wp=revoked", title: "Exit: Cloudflare revoked the account, Register again leads", w: 1440, h: 1600 },
+  { id: "node-exit-dead", state: "down", tab: "exit", q: "wp=ok", title: "Exit: the node is silent, WARP is unknown", w: 1440, h: 1500 },
+  { id: "node-exit-none", state: "calm", tab: "exit", q: "wp=none", title: "Exit: no WARP yet (Enable WARP plays the registration, nine seconds)", w: 1440, h: 1300 },
+  { id: "node-exit-viewer", state: "viewer", tab: "exit", q: "wp=ok", title: "Exit: a read-only role", w: 1440, h: 1500 },
+  { id: "node-exit-1100", state: "calm", tab: "exit", q: "wp=ok", title: "Exit at 1100 wide: one column", w: 1100, h: 1900 },
+  { id: "node-exit-phone", state: "calm", tab: "exit", q: "wp=ok", title: "Exit on a phone, 400 wide", w: 400, h: 3000 },
   { id: "node-overview-1100", state: "alerts", tab: "overview", title: "Overview at 1100 wide: one column", w: 1100, h: 2600 },
   { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
 ];

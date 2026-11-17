@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
@@ -57,21 +57,6 @@ export function SvSave({ dirty, saved, busy, invalid, onCancel, onSave, note }: 
       </Button>
     </div>
   );
-}
-
-/** "Saved" for a second and a half after a save went through: the bar's confirmation. */
-export function useSavedFlash() {
-  const [saved, setSaved] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  return [
-    saved,
-    () => {
-      setSaved(true);
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => setSaved(false), 1800);
-    },
-  ] as const;
 }
 
 /** The ring that fills with a dot (the board's .nx-rad). */

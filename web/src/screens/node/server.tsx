@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { halo } from "@/components/fx/halo";
 import { useAddNode } from "@/components/add-node";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
@@ -31,10 +30,10 @@ import { AwgBackendCard } from "./awg-backend";
 import { MeasureButton, MeasureResult, useBandwidthMeasure } from "./bandwidth-measure";
 import { DebugCaptureCard } from "./debug-capture";
 import { DecoyCard } from "./decoy";
-import { useNodeForm, useSaveNode } from "./node-form";
+import { useNodeForm, useSaveSection } from "./node-form";
 import { OsCard } from "./os-card";
 import { useRelaysOf } from "./relays";
-import { Facts, SvCard, SvHead, SvRow, SvSave, SvStep, useSavedFlash } from "./server-parts";
+import { Facts, SvCard, SvHead, SvRow, SvSave, SvStep } from "./server-parts";
 import { SSHAccessCard, useServerAccess } from "./ssh-access";
 import { serverSections, type ServerSection } from "./tabs";
 
@@ -169,27 +168,6 @@ function useServerForm(data: Plain<GetNodeResponse>) {
   }));
 }
 type Form = ReturnType<typeof useServerForm>;
-
-/** Save of one of the forms: what changed in its fields goes to UpdateNode; the bar says "Saved" and the page's wave runs. */
-function useSaveSection(nodeId: string, form: Form, fields: readonly (keyof Form["f"])[], payload: () => Parameters<typeof useSaveNode>[1] extends () => infer R ? R : never) {
-  const [saved, flash] = useSavedFlash();
-  const save = useSaveNode(nodeId, payload);
-  const dirty = form.dirtyOf(fields);
-  return {
-    saved,
-    dirty,
-    busy: save.isPending,
-    cancel: () => form.revert(fields),
-    save: () =>
-      save.mutate(undefined, {
-        onSuccess: () => {
-          form.commit(fields);
-          flash();
-          halo("save");
-        },
-      }),
-  };
-}
 
 /** The node (name, address, country, place, public label, hoster, notes): one form, one bar at its end. */
 function NodeSection({ data, owner, form }: { data: Plain<GetNodeResponse>; owner: boolean; form: Form }) {

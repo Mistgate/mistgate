@@ -1,4 +1,3 @@
-import { Code, ConnectError } from "@connectrpc/connect";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
@@ -20,68 +19,53 @@ function useRefresh(nodeId: string) {
 
 /**
  * "Enable WARP": the terms link, what the click does in the owner's name, a checkbox that must be ticked, then the
- * step-up. The panel registers an anonymous device account with Cloudflare from its own address, accepts the terms
- * on the owner's behalf and stores the account for this node. `again`: Cloudflare revoked the node's account, and the
- * new one replaces it in the same step (the server deletes the old device; nothing is left half done).
+ * step-up (the card makes the call, so it can show the registration while it goes on). The panel registers an anonymous
+ * device account with Cloudflare from its own address, accepts the terms on the owner's behalf and stores the account for
+ * this node. `again`: Cloudflare revoked the node's account, and the new one replaces it in the same step (the server
+ * deletes the old device; nothing is left half done). `error`: why the last try failed, above the buttons.
  */
 export function RegisterWarpDialog({
   open,
   onOpenChange,
-  nodeId,
   tosUrl,
   onImport,
+  onRegister,
+  error,
   again = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  nodeId: string;
   tosUrl: string;
   onImport: () => void;
+  onRegister: () => void;
+  error: { text: string; rateLimited: boolean } | null;
   again?: boolean;
 }) {
   const t = useTx();
-  const toast = useToast();
-  const guard = useStepUp();
-  const refresh = useRefresh(nodeId);
   const [accepted, setAccepted] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ text: string; rateLimited: boolean } | null>(null);
   const url = safeHttpUrl(tosUrl);
-
-  async function register() {
-    setBusy(true);
-    setError(null);
-    try {
-      await guard(() => warpApi.registerWarp({ nodeId, acceptTos: true, tosUrlShown: tosUrl, replaceExisting: again }));
-      await refresh();
-      onOpenChange(false);
-      setAccepted(false);
-      toast(t(again ? "warp.reregistered" : "warp.registered"));
-    } catch (e) {
-      if (isStepUpCancelled(e)) return;
-      // the window stays open with the reason above its buttons
-      setError({ text: warpError(e, t), rateLimited: ConnectError.from(e).code === Code.ResourceExhausted });
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <Modal
       open={open}
-      onOpenChange={(o) => {
-        if (!busy) onOpenChange(o);
-        if (!o) setError(null);
-      }}
+      onOpenChange={onOpenChange}
       title={t(again ? "warp.reg.titleAgain" : "warp.reg.title")}
       description={t(again ? "warp.reg.bodyAgain" : "warp.reg.body")}
       footer={
         <>
-          <Button variant="ghost" size="md" disabled={busy} onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" size="md" onClick={() => onOpenChange(false)}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" size="md" disabled={!accepted || busy} onClick={() => void register()}>
-            {busy ? t("warp.reg.busy") : t(again ? "warp.reregister" : "warp.reg.do")}
+          <Button
+            variant="primary"
+            size="md"
+            disabled={!accepted}
+            onClick={() => {
+              setAccepted(false);
+              onRegister();
+            }}
+          >
+            {t(again ? "warp.reregister" : "warp.reg.do")}
           </Button>
         </>
       }

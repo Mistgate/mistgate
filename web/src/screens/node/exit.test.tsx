@@ -5,6 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
+import { en as np } from "@/i18n/nodepage";
 import { ExitTab } from "./exit";
 
 // Node → Exit: WARP first, then the people's traffic form (the IPv6 exit, BitTorrent, the node's DNS) with one Save that
@@ -40,6 +41,7 @@ const data = (node: Record<string, unknown> = {}) =>
   ({
     node: { id: "nod_1", name: "de1", status: NodeStatus.ONLINE, torrentBlockerEnabled: false, torrentBlockerSupported: true, clientIpv6: true, clientIpv6Supported: true, ...node },
     dnsResolvers: [],
+    inbounds: [],
   }) as never;
 
 async function mount(node?: Record<string, unknown>) {
@@ -65,6 +67,9 @@ const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   for (let i = 0; i < 3; i++) await settle();
 };
+// the bars of the cards come in order: the traffic's, then the node's own DNS
+const seg = (label: string) => [...document.querySelectorAll("[role=radio]")].find((b) => b.textContent?.trim() === label);
+const saveOf = (i: number) => [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === en["common.save"])[i];
 const toggle = (label: string) => [...document.querySelectorAll("label")].find((l) => l.textContent?.includes(label))!.querySelector<HTMLElement>("[role=switch]")!;
 const on = (el: HTMLElement) => el.getAttribute("aria-checked") === "true";
 const off = (el: HTMLElement) => el.hasAttribute("data-disabled") || el.getAttribute("aria-disabled") === "true";
@@ -73,8 +78,8 @@ describe("the Exit tab", () => {
   it("puts WARP first, where every “Open WARP” lands", async () => {
     await mount();
     const warp = document.getElementById("warp")!;
-    const form = document.querySelector("form")!;
-    expect(warp.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const traffic = document.querySelector(".nx-opt")!;
+    expect(warp.compareDocumentPosition(traffic) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(text()).toContain(en["node.exit.traffic"]);
   });
 });
@@ -88,7 +93,7 @@ describe("the IPv6 exit", () => {
     expect(text()).not.toContain(en["node.settings.clientIpv6Unsupported"]);
     await click(toggle(en["node.settings.clientIpv6"]));
     expect(on(toggle(en["node.settings.clientIpv6"]))).toBe(false);
-    await click(button(en["common.save"]));
+    await click(saveOf(0));
     expect(updateNode).toHaveBeenCalledTimes(1);
     expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", clientIpv6: false });
   });
@@ -118,7 +123,7 @@ describe("BitTorrent", () => {
   it("is switched on and saved alone", async () => {
     await mount();
     await click(toggle(en["node.settings.torrentBlocker"]));
-    await click(button(en["common.save"]));
+    await click(saveOf(0));
     expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", torrentBlockerEnabled: true });
   });
 
@@ -130,21 +135,25 @@ describe("BitTorrent", () => {
 });
 
 describe("DNS for user traffic", () => {
-  it("offers custom servers to a node that uses a preset or the server's resolver", async () => {
+  it("offers custom servers to a node that uses the server's resolver, once Custom is picked, with a quick fill of the two presets", async () => {
     await mount();
     expect(text()).not.toContain(en["node.settings.dnsCustom"]);
-    const trigger = document.querySelector<HTMLElement>(`[aria-label="${en["node.settings.dns"]}"]`)!;
-    await act(async () => {
-      trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
-      trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-      trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    // the popup opens asynchronously; a slow CI runner needs more than a few ticks
-    const option = () => [...document.querySelectorAll("[role=option]")].find((o) => o.textContent?.includes(en["node.settings.dnsMode.custom"]));
-    for (let i = 0; i < 100 && !option(); i++) await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
-    const custom = option();
-    expect(custom).toBeDefined();
-    await click(custom);
+    expect(text()).toContain(np["np.ex.dns.systemHint"]);
+    await click(seg(np["np.ex.dns.own"]));
     expect(text()).toContain(en["node.settings.dnsCustom"]);
+    await click(button(en["node.settings.dnsMode.yandex"]));
+    expect(document.querySelector<HTMLInputElement>(`#nx-dns-nod_1`)!.value).toBe("77.88.8.8, 77.88.8.1");
+    await click(saveOf(1));
+    expect(updateNode.mock.calls[0]![0]).toEqual({ nodeId: "nod_1", dnsResolvers: { values: ["77.88.8.8", "77.88.8.1"] } });
+  });
+
+  it("goes back to the server's resolver with an empty list", async () => {
+    await mount();
+    await click(seg(np["np.ex.dns.own"]));
+    await click(button(en["node.settings.dnsMode.cloudflareGoogle"]));
+    await click(saveOf(1));
+    await click(seg(np["np.ex.dns.system"]));
+    await click(saveOf(1));
+    expect(updateNode.mock.calls[1]![0]).toEqual({ nodeId: "nod_1", dnsResolvers: { values: [] } });
   });
 });
