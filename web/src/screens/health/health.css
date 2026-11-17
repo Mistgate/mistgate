@@ -731,9 +731,11 @@
 .hlp [role="tabpanel"] > .hl-skl {
   margin-top: 0;
 }
-.hlp [role="tabpanel"] > .pv-qe,
-.hlp [role="tabpanel"] > .hl-top {
+.hlp [role="tabpanel"] > .pv-qe {
   margin-top: -4px;
+}
+.hlp [role="tabpanel"] > .hl-top {
+  margin-top: 0;
 }
 .hlp .sb-tab > .rc-nt {
   margin-bottom: 16px;

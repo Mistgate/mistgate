@@ -143,12 +143,28 @@ export function HealthPage({ tab, onTab: setTab, scene }: { tab: HealthTab; onTa
     {
       value: "checks",
       label: t("hl.tab.checks"),
-      content: tab !== "checks" ? null : state(checks, () => <ChecksTab data={checks.data!} init={scene?.checks} />),
+      content:
+        tab !== "checks"
+          ? null
+          : state(checks, () => (
+              <>
+                {note}
+                <ChecksTab data={checks.data!} init={scene?.checks} />
+              </>
+            )),
     },
     {
       value: "doctor",
       label: <TabLabel text={t("hl.tab.doctor")} n={on ? issues : 0} />,
-      content: tab !== "doctor" ? null : state(doctor, () => <DoctorTab data={doctor.data!} flow={flow} first={first} init={scene?.doctor} />),
+      content:
+        tab !== "doctor"
+          ? null
+          : state(doctor, () => (
+              <>
+                {note}
+                <DoctorTab data={doctor.data!} flow={flow} first={first} init={scene?.doctor} />
+              </>
+            )),
     },
   ];
 

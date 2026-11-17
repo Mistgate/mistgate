@@ -155,6 +155,11 @@ export function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a
               {t("task.open")}
             </Link>
           )}
+          {shared && !onNodePage && (a.kind === AlertKind.COUNTRY_BLOCKED || a.kind === AlertKind.NODE_DOWN) && (
+            <Link to="/reachability" className={linkBtn()}>
+              {t("rc.open")}
+            </Link>
+          )}
           {shared && a.nodeId && a.actions.includes("open_node") && !go && !onNodePage && (
             <Link to="/nodes/$id" params={{ id: a.nodeId }} className={linkBtn()}>
               {t("hl.alerts.openNode")}
