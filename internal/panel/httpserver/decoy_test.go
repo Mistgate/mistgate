@@ -27,7 +27,7 @@ func TestDecoyDoesNotFollowSymlinksOutsideRoot(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	newDecoy(dir, nil).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/outside.html", nil))
+	newDecoy(dir, nil, nil).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/outside.html", nil))
 	if w.Code != http.StatusNotFound || w.Body.String() != notFoundHTML {
 		t.Fatalf("symlink response: %d %q", w.Code, w.Body.String())
 	}

@@ -423,5 +423,5 @@ func limitKey(ip netip.Addr) string {
 
 // PublicHandler is the handler of the probes' endpoint, to mount under probe_prefix; decoyDir is the decoy site's directory.
 func (s *Service) PublicHandler(decoyDir string) http.Handler {
-	return publicHandler{service: s, decoy: httpserver.NewDecoy(decoyDir), tooMany: httpserver.NewTooMany(decoyDir)}
+	return publicHandler{service: s, decoy: httpserver.NewDecoyFor(decoyDir, s.cfg.Store), tooMany: httpserver.NewTooManyFor(decoyDir, s.cfg.Store)}
 }

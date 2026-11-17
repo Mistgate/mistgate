@@ -181,7 +181,7 @@ func (b base) newSubParts(migrate bool) subParts {
 func (p subParts) mux(b base, acc *access.Service) http.Handler {
 	sub := http.NewServeMux()
 	sub.Handle("GET /brand/logo.svg", httpserver.NewLogoHandler(b.st, b.log))
-	sub.Handle("/", subs.Handler(acc, httpserver.NewDecoy(b.c.DecoyDir), p.cfg))
+	sub.Handle("/", subs.Handler(acc, httpserver.NewDecoyFor(b.c.DecoyDir, b.st), p.cfg))
 	return sub
 }
 
