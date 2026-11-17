@@ -162,10 +162,10 @@ export function Spin() {
   return <span className="an-sp" aria-hidden />;
 }
 
-/** A button that works and says so: the board's busy button (the spinner ahead of the words, the press ignored while it runs). */
-export function BusyButton({ busy, children, ...rest }: { busy?: boolean; children: ReactNode } & Omit<ComponentProps<typeof Button>, "children">) {
+/** A button that works and says so: the board's busy button (the spinner ahead of the words, the press ignored while it runs; `disabled` is for nothing to do yet). */
+export function BusyButton({ busy, disabled, className, onClick, children, ...rest }: { busy?: boolean; children: ReactNode } & Omit<ComponentProps<typeof Button>, "children">) {
   return (
-    <Button {...rest} className={cx(busy && "sx-busy", rest.className)} aria-disabled={busy || rest.disabled || undefined} onClick={busy ? undefined : rest.onClick}>
+    <Button {...rest} disabled={disabled && !busy} aria-busy={busy || undefined} className={cx(busy && "sx-busy", className)} onClick={busy ? undefined : onClick}>
       {busy && <Spin />}
       {children}
     </Button>

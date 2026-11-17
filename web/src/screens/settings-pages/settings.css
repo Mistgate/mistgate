@@ -182,7 +182,8 @@
   padding: 12px 0;
   border-top: 1px solid var(--border);
 }
-.sx .pp-rows>.pp-row:first-child {
+.sx .pp-rows>.pp-row:first-child,
+.sx .pp-rows>fieldset>.pp-row:first-child {
   border-top: 0;
 }
 .sx .pp-lb {
@@ -683,7 +684,8 @@
   line-height: 20px;
   color: var(--sec);
 }
-.sx .rc-pb .btn {
+.sx .rc-pb .btn,
+.sx .rc-pb button {
   flex: none;
   align-self: center;
 }
@@ -744,6 +746,11 @@
   letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* a tab that is loading or failed has no column of its own: the board puts the skeleton and the failure straight under the strip */
+.sx .sx-tabs [role="tabpanel"]:has(> .hl-skl, > .pv-qe) {
+  margin-top: 0;
 }
 
 /* ---- the load and the failure of a tab (L4811-4817, L4820-4825, L4829-4832, L5039) ---- */
