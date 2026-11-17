@@ -115,7 +115,6 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
   const toggle = (id: string, on: boolean) => setIds(on ? [...ids, id] : ids.filter((y) => y !== id));
   // the offered ones first, in the owner's order, then the rest as the presets are listed
   const rows = [...ids.flatMap((id) => byId.get(id) ?? []), ...data.presets.filter((p) => !ids.includes(p.id))];
-  const group = `dns-default-${nodeId}`;
 
   return (
     <>
@@ -139,7 +138,7 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
             <span>{t("subs.dnsOpt.defShort")}</span>
             <span>{t("np.ex.pre.col.offer")}</span>
           </div>
-          <div role="radiogroup" aria-label={group}>
+          <div role="radiogroup" aria-label={t("subs.dnsOpt.defShort")}>
             {rows.map((p) => {
               const at = ids.indexOf(p.id);
               const on = at >= 0;

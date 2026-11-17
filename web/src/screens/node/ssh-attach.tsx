@@ -5,15 +5,14 @@ import { PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
 import { Fingerprint, InstallPanelKeyBox, LoginSwitch, OwnKeyField, useSSHLogin } from "@/components/ssh-login";
 import { loginError, sshError } from "@/components/ssh-node-install";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
-import { StatusPill } from "@/components/ui/status";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
+import { SvCard, SvHead } from "./server-parts";
 import { provisioning } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
@@ -30,26 +29,21 @@ export function SSHAttach({ nodeId, name, address, onAttached }: { nodeId: strin
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
-    <section className="flex flex-col gap-4 rounded-card-lg border border-line bg-surface p-4">
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <SectionLabel as="h2" icon="server" tone="sky" className="me-auto">
-            {t("node.sshAccess.title")}
-          </SectionLabel>
-          <StatusPill sm kind="off" label={t("node.sshAccess.none")} />
-        </div>
-        <p className="text-[13px] leading-snug font-semibold text-pretty text-fg">{t("node.sshAccess.noAccess")}</p>
-        <p className="text-[13px] leading-snug text-pretty text-muted">{t("node.sshAccess.noAccessBody")}</p>
+    <SvCard aria-label={t("np.sv.ssh.title")}>
+      <SvHead title={t("np.sv.ssh.title")} hint={t("node.sshAccess.noAccessBody")} />
+      <div className="mx-6 mb-4 flex flex-col gap-1 max-[720px]:mx-4">
+        <p className="text-[13px] leading-[18px] font-medium text-pretty text-fg">{t("node.sshAccess.noAccess")}</p>
+        <span className="text-xs text-muted">{t("node.sshAccess.none")}</span>
       </div>
-      <div className="grid gap-2 md:flex">
-        <Button variant="secondary" size="md" data-attach onClick={() => setOpen(true)}>
+      <div className="sv-foot">
+        <Button variant="secondary" size="lg" data-attach onClick={() => setOpen(true)}>
           <Icon name="plug" size={14} />
           {t("node.sshAccess.connect")}
         </Button>
       </div>
       {/* mounted only while open: closing drops whatever secret it held */}
       {open && <AttachDialog nodeId={nodeId} name={name} address={address} onClose={() => setOpen(false)} onAttached={onAttached} />}
-    </section>
+    </SvCard>
   );
 }
 
