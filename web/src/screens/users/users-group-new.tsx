@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { halo } from "@/components/fx/halo";
 import { markFresh } from "@/components/fx/registry";
 import { Button } from "@/components/ui/button";
+import { Flag } from "@/components/ui/flag";
 import { Icon, IconChip, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
@@ -278,9 +279,7 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
                       onClick={() => !allNodes && setOff(off.includes(n.id) ? off.filter((x) => x !== n.id) : [...off, n.id])}
                       className={cx("inline-flex h-8 items-center gap-2 rounded-2xl border ps-2 pe-3 text-xs transition-[border-color,color] duration-150", on ? "border-accent-line text-fg" : "border-line text-muted", allNodes && "cursor-default border-line")}
                     >
-                      <span aria-hidden className="font-mono text-[11px] text-muted">
-                        {n.countryCode}
-                      </span>
+                      <Flag code={n.countryCode} size={14} />
                       <span className="font-mono">{n.name}</span>
                     </button>
                   );

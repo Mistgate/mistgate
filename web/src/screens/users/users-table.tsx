@@ -87,7 +87,8 @@ export function PeopleTable({
   /** Nobody to show although people exist (a filter or a search hides them all). */
   emptyNote: boolean;
   onReset: () => void;
-  onAdd: () => void;
+  /** Absent for an admin who cannot add people: no "Add a person" row. */
+  onAdd?: () => void;
   onLink: (u: User) => void;
 }) {
   const t = useTx();
@@ -135,17 +136,19 @@ export function PeopleTable({
         ))}
       </div>
       {showPager && <Pagination className="border-t border-line px-4" {...pager} />}
-      <button
-        type="button"
-        onClick={onAdd}
-        className={cx(
-          "flex h-12 w-full items-center justify-center gap-2 rounded-b-card border-t border-dashed border-line text-sm font-medium text-sec transition-colors duration-150 ease-out hover:text-fg",
-          rows.length === 0 && !emptyNote && "border-t-0",
-        )}
-      >
-        <Icon name="plus" size={16} />
-        {t("ul.add")}
-      </button>
+      {onAdd && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className={cx(
+            "flex h-12 w-full items-center justify-center gap-2 rounded-b-card border-t border-dashed border-line text-sm font-medium text-sec transition-colors duration-150 ease-out hover:text-fg",
+            rows.length === 0 && !emptyNote && "border-t-0",
+          )}
+        >
+          <Icon name="plus" size={16} />
+          {t("ul.add")}
+        </button>
+      )}
     </section>
   );
 }
@@ -279,7 +282,7 @@ function PersonRow({
       id={u.id}
       style={style}
       className={cx(
-        "us-e group/e border-t border-line transition-colors first:border-t-0 [[role=row]+&]:border-t-0",
+        "us-e group/e border-t border-line transition-colors",
         on ? "bg-[color-mix(in_srgb,var(--accent-mark)_6%,transparent)]" : "hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]",
         expanded && "bg-[color-mix(in_srgb,var(--text)_3%,transparent)]",
       )}
@@ -289,7 +292,7 @@ function PersonRow({
           {select && <Check aria-label={t("users.selectOne", { name: u.name })} checked={on} onCheckedChange={() => select.toggle(u)} />}
         </span>
         <span className={cx("flex min-w-0 items-center gap-3", off && "opacity-50")}>
-          <Avatar name={u.name} index={avatarIndex(u.id)} size={32} />
+          <Avatar name={u.name} index={avatarIndex(u.id)} size={32} fontSize={13} />
           <span className="flex min-w-0 flex-col">
             <span className="flex min-w-0 items-center gap-2">
               <b className="min-w-0 truncate font-medium">{u.name}</b>

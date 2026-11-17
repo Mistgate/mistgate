@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { halo } from "@/components/fx/halo";
 import { markFresh } from "@/components/fx/registry";
 import { Avatar } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
+import { Flag } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
@@ -28,7 +29,7 @@ import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
 import { InfoTip, ResetSelect, resetCode } from "./ui";
 import { MistgateAppRow } from "./mistgate-app";
-import { linkTargetOf } from "./link-modal";
+import { LinkModal, linkTargetOf } from "./link-modal";
 import { AppLink } from "./nav";
 
 export { GroupEditModal, PillToggle } from "./groups";
@@ -296,7 +297,7 @@ function CreateForm({ onCreated, onClose, startName }: { onCreated: (c: Created)
             {t("users.name")}
             <span className="relative block">
               <span className="pointer-events-none absolute start-2 top-1/2 -mt-3.5">
-                <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim().toLowerCase())} size={28} />
+                <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim().toLowerCase())} size={28} fontSize={12} />
               </span>
               <input
                 value={name}
@@ -445,9 +446,7 @@ function CreateForm({ onCreated, onClose, startName }: { onCreated: (c: Created)
                         allNodes && "cursor-default border-line",
                       )}
                     >
-                      <span aria-hidden className={cx("font-mono text-[11px] text-muted transition-opacity", !on && "opacity-40")}>
-                        {n.countryCode}
-                      </span>
+                      <Flag code={n.countryCode} size={14} className={cx("transition-opacity", !on && "opacity-40")} />
                       <span className="font-mono">{n.name}</span>
                     </button>
                   );
@@ -523,7 +522,7 @@ function CreateForm({ onCreated, onClose, startName }: { onCreated: (c: Created)
         <aside aria-label={t("ul.new.preview")} className="sticky top-0 flex flex-col gap-4 rounded-card bg-[color-mix(in_srgb,var(--text)_3%,transparent)] p-4 @max-[672px]/usd:static">
           <span className="text-xs text-muted">{t("ul.new.preview")}</span>
           <div className="flex min-w-0 items-center gap-3 @max-[672px]/usd:hidden">
-            <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim().toLowerCase())} size={40} />
+            <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim().toLowerCase())} size={40} fontSize={15} />
             <div className="flex min-w-0 flex-col">
               <b className={cx("truncate text-[15px] font-medium", name.trim() ? "font-mono" : "font-mono text-muted")}>{name.trim() || t("ul.new.nameLow")}</b>
               {group && (
@@ -560,7 +559,7 @@ function CreateForm({ onCreated, onClose, startName }: { onCreated: (c: Created)
         </aside>
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
-      <div className="sticky -bottom-px -mx-4 -mb-5 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
+      <div className="sticky -bottom-px -mx-4 -mb-5 flex flex-wrap items-center gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
         <span className="me-auto min-w-0 text-xs text-muted @max-[672px]/usd:basis-full">{name.trim() ? t("ul.new.enter") : t("ul.new.footEmpty")}</span>
         <Button variant="secondary" size="lg" onClick={onClose}>
           {t("users.cancel")}
@@ -619,13 +618,12 @@ function Done({ created, onAgain, onClose }: { created: Created; onAgain: () => 
   const groupList = useQuery(groupsQuery);
   const target = linkTargetOf(user, groupList.data?.find((g) => g.id === user.groupId));
   const nothing = !target.access.happ && !target.access.amnezia;
+  const [qr, setQr] = useState(false);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   // the effects' halo plays inside the window (data-fx-halo keeps it there), once, when the screen is there
-  const [played, setPlayed] = useState(false);
-  if (host && !played) {
-    setPlayed(true);
-    halo("create", { target: host });
-  }
+  useEffect(() => {
+    if (host) halo("create", { target: host });
+  }, [host]);
   return (
     <div ref={setHost} data-fx-halo className="relative flex flex-col items-center gap-2 pt-4 text-center">
       <span aria-hidden className="grid size-14 animate-[fz-pop_0.45s_var(--ease-spring)_both] place-items-center rounded-full bg-accent text-on-accent">
@@ -669,7 +667,10 @@ function Done({ created, onAgain, onClose }: { created: Created; onAgain: () => 
           </div>
         ))}
       </dl>
-      <div className="sticky -bottom-px -mx-4 -mb-5 mt-5 flex w-[calc(100%+2rem)] items-center justify-end gap-2 border-t border-line bg-surface px-4 py-3 md:-mx-6 md:-mb-6 md:w-[calc(100%+3rem)] md:px-6 md:py-3.5">
+      <div className="sticky -bottom-px -mx-4 -mb-5 mt-5 flex w-[calc(100%+2rem)] items-center justify-end gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-4 py-3 md:-mx-6 md:-mb-6 md:w-[calc(100%+3rem)] md:px-6 md:py-3.5">
+        <Button variant="secondary" size="lg" onClick={() => setQr(true)}>
+          {t("ul.act.link")}
+        </Button>
         <Button variant="secondary" size="lg" onClick={onAgain}>
           {t("ul.new.again")}
         </Button>
@@ -677,6 +678,7 @@ function Done({ created, onAgain, onClose }: { created: Created; onAgain: () => 
           {t("ul.done")}
         </Button>
       </div>
+      <LinkModal target={qr ? target : null} initialUrl={url} initialPassword={password} onClose={() => setQr(false)} />
     </div>
   );
 }

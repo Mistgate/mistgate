@@ -342,7 +342,7 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
       </Bar>
 
       {hasNone ? (
-        <UsersFirst onAdd={() => setCreating(true)} />
+        <UsersFirst onAdd={manage ? () => setCreating(true) : undefined} />
       ) : list.isPending ? (
         <Pending />
       ) : list.isError && rows.length === 0 ? (
@@ -365,7 +365,7 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
             showPager={total > Math.min(...pageSizes)}
             emptyNote={rows.length === 0 && narrowed}
             onReset={reset}
-            onAdd={() => setCreating(true)}
+            onAdd={manage ? () => setCreating(true) : undefined}
             onLink={(u) => setLink(linkTargetOf(u, groupList.data?.find((g) => g.id === u.groupId)))}
           />
         </>

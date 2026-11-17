@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Fresh } from "@/components/fx/fresh";
 import { markFresh } from "@/components/fx/registry";
@@ -20,7 +21,7 @@ import { useToast } from "@/components/ui/toast";
 import { presetName } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import { avatarIndex, groupTone } from "./format";
-import { AppLink, useGo } from "./nav";
+import { AppLink } from "./nav";
 import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
 import { NewGroupModal, useWayOf } from "./users-group-new";
@@ -54,7 +55,7 @@ export function GroupsTab({
   const t = useTx();
   const toast = useToast();
   const qc = useQueryClient();
-  const go = useGo();
+  const navigate = useNavigate();
   const list = useQuery(groupsQuery);
   const profiles = useQuery(profileListQuery);
   const nodes = useQuery(nodesQuery);
@@ -65,13 +66,17 @@ export function GroupsTab({
   const [ask, setAsk] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
-  // an old link to a group opens its page, once
-  const [went, setWent] = useState("");
-  if (focus && focus !== went && list.data?.some((g) => g.id === focus)) {
-    setWent(focus);
-    go("/users/groups/$id", { params: { id: focus }, replace: true });
-    onFocusDone?.();
-  }
+  // an old link to a group opens its page, once the list says there is such a group
+  const target = focus && list.data?.some((g) => g.id === focus) ? focus : "";
+  const done = useRef(onFocusDone);
+  useEffect(() => {
+    done.current = onFocusDone;
+  });
+  useEffect(() => {
+    if (!target) return;
+    void navigate({ to: "/users/groups/$id", params: { id: target }, replace: true } as never);
+    done.current?.();
+  }, [target, navigate]);
   const everyone = useMutation({
     mutationFn: () => groupsApi.createGroup({ name: t("users.everyone"), profileIds: (profiles.data ?? []).map((p) => p.id) }),
     onSuccess: async (r) => {
@@ -188,7 +193,7 @@ export function GroupsTab({
                   ))
                 )}
               </div>
-              <dl className="m-0 grid grid-cols-4 justify-between gap-x-6 gap-y-3 border-t border-line px-6 py-4 max-md:grid-cols-2">
+              <dl className="m-0 grid grid-cols-[repeat(4,auto)] justify-between gap-x-6 gap-y-3 border-t border-line px-6 py-4 max-md:grid-cols-[repeat(2,minmax(0,1fr))] max-md:justify-stretch">
                 {facts.map(([l, v]) => (
                   <div key={l} className="min-w-0">
                     <dt className="text-xs text-muted">{l}</dt>
@@ -240,7 +245,7 @@ function Stack({ groupId }: { groupId: string }) {
     <span aria-hidden className="flex flex-none ps-2">
       {q.data.map((u) => (
         <span key={u.id} className="-ms-2 flex animate-[fz-pop_0.3s_var(--ease-spring)_both] rounded-full shadow-[0_0_0_2px_var(--surface)]">
-          <Avatar name={u.name} index={avatarIndex(u.id)} size={28} />
+          <Avatar name={u.name} index={avatarIndex(u.id)} size={28} fontSize={12} />
         </span>
       ))}
     </span>

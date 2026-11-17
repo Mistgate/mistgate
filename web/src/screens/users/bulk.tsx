@@ -68,7 +68,7 @@ export function UsersBulk({ initialAsk, picked, shown, allShown, total, onAll, o
   const [seen, setSeen] = useState(picked.length);
   if (seen !== picked.length) {
     setSeen(picked.length);
-    if (ask) setAsk(null);
+    if (ask && seen > 0) setAsk(null);
   }
 
   const panel = job ? panelFor(t, job.spec.action as RunId) : null;
@@ -221,7 +221,7 @@ export function UsersBulkBar({
             <span aria-hidden className="flex ps-2 max-md:hidden">
               {people.slice(0, 4).map((u) => (
                 <span key={u.id} className="fz-bulk-pop -ms-2 flex rounded-full shadow-[0_0_0_2px_var(--surface-2)]">
-                  <Avatar name={u.name} index={avatarIndex(u.id)} size={28} />
+                  <Avatar name={u.name} index={avatarIndex(u.id)} size={28} fontSize={12} />
                 </span>
               ))}
             </span>

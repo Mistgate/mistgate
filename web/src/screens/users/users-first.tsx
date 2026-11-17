@@ -14,7 +14,7 @@ const steps: { title: MessageKey; hint: MessageKey }[] = [
 
 const ghost = "bg-[color-mix(in_srgb,var(--text)_14%,transparent)]";
 
-export function UsersFirst({ onAdd }: { onAdd: () => void }) {
+export function UsersFirst({ onAdd }: { onAdd?: () => void }) {
   const t = useT();
   return (
     <section className="fz-first relative grid grid-cols-[minmax(0,1fr)_minmax(0,440px)] items-center overflow-hidden rounded-card border border-line bg-surface max-mid:grid-cols-1">
@@ -27,12 +27,14 @@ export function UsersFirst({ onAdd }: { onAdd: () => void }) {
           {t("ul.first.lead")} <span className="text-[color-mix(in_srgb,var(--text)_62%,transparent)]">{t("ul.first.lead2")}</span>
         </h2>
         <p className="mt-3 max-w-[520px] text-[color-mix(in_srgb,var(--text)_78%,transparent)]">{t("ul.first.text")}</p>
-        <div className="mt-8 flex flex-wrap gap-2 max-md:w-full">
-          <Button variant="primary" size="lg" className="max-md:flex-[1_1_100%]" onClick={onAdd}>
-            <Icon name="plus" size={16} />
-            {t("ul.new")}
-          </Button>
-        </div>
+        {onAdd && (
+          <div className="mt-8 flex flex-wrap gap-2 max-md:w-full">
+            <Button variant="primary" size="lg" className="max-md:flex-[1_1_100%]" onClick={onAdd}>
+              <Icon name="plus" size={16} />
+              {t("ul.new")}
+            </Button>
+          </div>
+        )}
       </div>
       <div aria-hidden className="fz-ghosts relative flex flex-col gap-2 py-8 ps-0 pe-10 max-mid:max-h-[150px] max-mid:overflow-hidden max-mid:ps-10 max-mid:pe-8 max-mid:pt-0 max-mid:pb-2 max-md:px-5 max-md:pb-2">
         <button type="button" tabIndex={-1} onClick={onAdd} className="grid h-[60px] grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-[12px] border border-dashed border-accent-mark bg-[color-mix(in_srgb,var(--accent-mark)_9%,var(--surface))] px-4 text-start [transition:background-color_.15s_var(--e),border-color_.15s_var(--e),transform_.2s_var(--ease-spring)] hover:-translate-y-px hover:bg-[color-mix(in_srgb,var(--accent-mark)_10%,var(--surface))]">
