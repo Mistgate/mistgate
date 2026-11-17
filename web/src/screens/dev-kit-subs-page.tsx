@@ -17,6 +17,9 @@ import { setTheme, useTheme } from "@/lib/theme";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { groupsQuery, protocolsQuery } from "@/screens/users/rpc";
 import { SubscriptionsScreen } from "./subscriptions";
+import { setDnsDemo } from "./subscriptions/demo-dns";
+import { setHxDemo } from "./subscriptions/demo";
+import { setSbDemo } from "./subscriptions/demo-sb";
 import type { Settings } from "./subscriptions/model";
 import { clientsQuery, pickerUsersQuery, settingsQuery } from "./subscriptions/queries";
 import type { SubsTab } from "./subscriptions/tabs";
@@ -65,8 +68,8 @@ export const allScenes: SceneDef[] = [...baseScenes, ...hxScenes, ...dnsScenes];
 
 const clients = [
   { id: "happ", name: "Happ", protocols: ["vless", "hysteria2"], formats: [SubFormat.BASE64_URIS, SubFormat.XRAY_JSON] },
-  { id: "klick", name: "kl!ck", protocols: ["vless", "hysteria2", "awg"], formats: [SubFormat.MIHOMO_YAML, SubFormat.BASE64_URIS] },
-  { id: "mihomo", name: "Mihomo", protocols: ["vless", "hysteria2"], formats: [SubFormat.MIHOMO_YAML] },
+  { id: "mihomo", name: "kl!ck", protocols: ["vless", "hysteria2", "awg"], formats: [SubFormat.MIHOMO_YAML, SubFormat.BASE64_URIS] },
+  { id: "clash", name: "Mihomo", protocols: ["vless", "hysteria2"], formats: [SubFormat.MIHOMO_YAML] },
   { id: "singbox", name: "sing-box", protocols: ["vless", "hysteria2"], formats: [SubFormat.SINGBOX_JSON] },
   { id: "v2rayng", name: "v2rayNG", protocols: ["vless"], formats: [SubFormat.XRAY_JSON, SubFormat.BASE64_URIS] },
   { id: "amnezia", name: "AmneziaVPN", protocols: ["awg"], formats: [] },
@@ -135,6 +138,10 @@ const nodeRow = (n: (typeof demoNodes)[number]) => ({
 
 /** What a scene starts the screen with (exported for its smoke test): the world drawn on, the tab, the person of the versions tab. */
 export function sceneOf(state: string, tab?: string) {
+  // whatever an earlier scene left of the tabs' demo states is dropped; the scene sets its own in its setup
+  setHxDemo({});
+  setDnsDemo({});
+  setSbDemo({});
   const def = allScenes.find((s) => s.state === state) ?? allScenes[0]!;
   const role = state.endsWith("-helper") ? Role.HELPER : Role.OWNER;
   const w = worldOf(def, role, state.endsWith("-edge"));

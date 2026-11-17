@@ -24,9 +24,6 @@ export type SbDemo = {
   appOpen?: number;
   /** The platform and the kind the "Add app" bar starts on. */
   addPlatform?: number;
-  /** A save is on its way / the panel's own words about a refused save. */
-  busy?: boolean;
-  fail?: string;
 };
 
 export const sbDemo: SbDemo = {};

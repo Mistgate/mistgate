@@ -12,6 +12,7 @@ import { useTx, type Tx } from "@/screens/users/t";
 import { ScrollFade } from "@/components/ui/scroll-fade";
 import { announceMax, cutAnnounce, defaultNameTemplate, serverNames, validSupportLink, type Settings } from "./model";
 import { useSaveSettings } from "./queries";
+import { sbDemo } from "./demo-sb";
 import { Grid, path, Row, Section, Toggle } from "./parts";
 
 const DEFAULT_HOURS = 12;
@@ -64,7 +65,7 @@ function TextsForm({ data }: { data: Data }) {
     ping: s.happPing ?? HappPing.UNSPECIFIED,
     pingOnOpen: !!s.happPingOnOpen,
   };
-  const [f, setF] = useState(base);
+  const [f, setF] = useState(() => ({ ...base, title: sbDemo.draft?.title ?? base.title, announcement: sbDemo.draft?.announcement ?? base.announcement, supportUrl: sbDemo.draft?.supportUrl ?? base.supportUrl, template: sbDemo.draft?.template ?? base.template }));
   const set = <K extends keyof typeof base>(k: K, v: (typeof base)[K]) => setF((x) => ({ ...x, [k]: v }));
   const tplRef = useRef<HTMLInputElement>(null);
 

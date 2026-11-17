@@ -72,10 +72,6 @@ const labelled = (aria: string) => document.querySelector<HTMLElement>(`[aria-la
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const switchOf = (label: string) => document.querySelector<HTMLElement>(`[role=switch][aria-label="${label}"]`);
 const stripOn = () => document.querySelector(".sb-save")!.classList.contains("on");
-// the cards of the apps are folded: open them all to reach their fields
-const openAll = async () => {
-  for (const h of [...document.querySelectorAll<HTMLElement>(".sb-aph")]) await click(h);
-};
 const type = (el: HTMLInputElement, v: string) =>
   act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, v);
@@ -189,7 +185,7 @@ async function open(label: string) {
   for (let i = 0; i < 100 && options(label).length === 0; i++) await tick(10); // the popup opens asynchronously
 }
 /** The platform and the kind are segments: press the one with this text. */
-const segment = (label: string, text: string) => click([...(document.querySelector(`[aria-label="${label}"]`)?.querySelectorAll("[role=radio]") ?? [])].find((r) => r.textContent === text));
+const segment = (label: string, word: string) => click([...(document.querySelector(`[aria-label="${label}"]`)?.querySelectorAll("[role=radio]") ?? [])].find((r) => r.textContent === word));
 /** Opens a Select by its label and takes the option with this text. */
 async function choose(label: string, optionText: string) {
   await open(label);

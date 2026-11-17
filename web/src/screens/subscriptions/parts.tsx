@@ -117,6 +117,7 @@ export function SbTabs({ items, value, onValueChange, label }: { items: readonly
     const tab = active.getBoundingClientRect();
     if (tab.left < box.left) el.scrollLeft -= box.left - tab.left + 16;
     else if (tab.right > box.right) el.scrollLeft += tab.right - box.right + 16;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- the chosen tab is read from the DOM, and the effect runs when it changes
   }, [value]);
   return (
     <Tabs.Root value={value} onValueChange={(v) => onValueChange(String(v))}>
