@@ -2,10 +2,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useId, useState, type ReactNode } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
-import { Icon, IconChip } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
+import { IconButton } from "@/components/ui/icon-button";
+import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Modal } from "@/components/ui/modal";
-import { EmptyState, Notice } from "@/components/ui/notice";
-import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
+import { Notice } from "@/components/ui/notice";
+import { kindTextClass, StatusDot, type StatusKind } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -21,7 +23,7 @@ import { inboundConnParts, nodeConnectionsQuery, type InboundConn } from "@/lib/
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
-import { doctorQuery } from "@/lib/health";
+import { cellLook, checksQuery, doctorQuery } from "@/lib/health";
 import { inboundErrorKind, inboundErrorText } from "@/lib/inbound-error";
 import { portNotes, withNotes } from "@/lib/port-check";
 import { agentLinked } from "@/lib/node-status";
@@ -39,6 +41,7 @@ import { LossyNotice, lossyRefusal } from "./port-lossy";
 import { tcpPill, verdictPill } from "./ports";
 import { Fresh } from "@/components/fx/fresh";
 import { alsoRemovesText, useRelaysOf } from "./relays";
+import { nodeTicks } from "@/screens/overview-checks";
 
 export const states: Record<InboundState, { kind: StatusKind; word: MessageKey }> = {
   [InboundState.UNSPECIFIED]: { kind: "off", word: "node.inbound.off" },
@@ -83,9 +86,6 @@ function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number, dot?: Cell["dot"]
 }
 
 const toneText = { warn: "text-warn-text", bad: "text-danger-text" } as const;
-
-// The port column fits "udp/65535" with its dot (70 + 6 + 16 px) on one line; the last one the longest pill ("Не запустился").
-const gridClass = "md:grid-cols-[minmax(0,1.4fr)_96px_minmax(0,0.7fr)_minmax(0,1.3fr)_minmax(0,1fr)_124px]";
 
 /** The last port check of a profile's port, as a dot: its verdict on hover and to a screen reader, the check a click away. */
 function PortDot({ nodeId, dot }: { nodeId: string; dot: NonNullable<Cell["dot"]> }) {
@@ -147,116 +147,157 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
   const connOf = new Map((conn?.inbounds ?? []).map((x) => [x.inboundId, x]));
   // relays are the owner's (RelayService): removing a server says which relays go with it
 
+  // the checks as a client sees them: a day of hourly cells and the time of each profile (the same round the Overview reads)
+  const checks = useQuery({ ...checksQuery(node.id), enabled: data.inbounds.length > 0 && node.status !== NodeStatus.RETIRED });
+  const checkRow = checks.data?.rows.find((r) => r.nodeId === node.id);
+  const dead = node.status === NodeStatus.DOWN;
+
   const add = owner ? (
-    <Button variant="primary" size="md" onClick={() => setAdding(true)}>
-      <Icon name="plus" size={14} />
+    <Button variant="primary" size="lg" onClick={() => setAdding(true)}>
+      <Icon name="plus" size={16} />
       {t("node.profiles.add")}
     </Button>
   ) : undefined;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       {data.inbounds.length === 0 ? (
-        <div className="rounded-card-lg border border-dashed border-line">
-          <EmptyState title={t("node.profiles.none", { name: node.name })} action={add}>
-            {t(owner ? "node.profiles.noneBody" : "node.profiles.ownerOnly")}
-          </EmptyState>
-        </div>
+        <section className="flex flex-col items-center gap-2 rounded-card border border-line bg-surface px-6 py-12 text-center">
+          <span aria-hidden className="mb-1 grid size-12 place-items-center rounded-[14px] bg-step text-sec">
+            <Icon name="sliders" size={24} />
+          </span>
+          <b className="text-base font-medium">{t("node.profiles.none", { name: node.name })}</b>
+          <span className="max-w-[420px] text-[13px] text-sec">{t(owner ? "node.profiles.noneBody" : "node.profiles.ownerOnly")}</span>
+          {add && <div className="mt-3">{add}</div>}
+        </section>
       ) : (
         <>
-          {conn && !conn.supported && linked && <p data-testid="conn-unsupported" className="text-xs leading-normal text-pretty text-muted">{t("conn.node.unsupported")}</p>}
-          <div className="flex items-center gap-2 pb-1">
-            <span className="flex-1 text-xs text-muted">{t.n("node.profiles.count", data.inbounds.length)}</span>
+          <div className="mt-2 flex items-center gap-4 max-[720px]:flex-wrap">
+            <h2 className="me-auto text-xl leading-7 font-medium tracking-[-0.01em]">{t.n("node.profiles.count", data.inbounds.length)}</h2>
+            <span className="text-[13px] text-muted max-[720px]:hidden">{t("np.pf.every")}</span>
             {add}
           </div>
+          {conn && !conn.supported && linked && (
+            <p data-testid="conn-unsupported" className="text-xs leading-normal text-pretty text-muted">
+              {t("conn.node.unsupported")}
+            </p>
+          )}
           {!owner && <Notice tone="quiet">{t("node.profiles.ownerOnly")}</Notice>}
         </>
       )}
 
-      {data.inbounds.map((i) => {
-        const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
-        // the last port check of this profile's port: a dot that leads to it in the ways in
-        const tcp = networkOf(i.protocol) === "tcp";
-        const checked = tcp ? data.tcpChecks?.find((c) => c.port === i.port && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
-        const cs = cells(t, fmt, i, now, checked && (tcp ? tcpPill(t, checked.verdict) : verdictPill(t, checked as never)));
-        const kind = i.lastError ? inboundErrorKind(i.lastError) : null;
-        const fix: ReactNode = !owner ? null : kind === "port" ? (
-            <Button variant="primary" size="sm" onClick={() => setEditing({ inbound: i, focus: "port" })}>
-              {t("node.profiles.changePort")}
-            </Button>
-          ) : kind === "cert" && i.protocol !== "awg" ? (
-            <Button variant="primary" size="sm" onClick={() => setEditing({ inbound: i, focus: "sni" })}>
-              {t("node.profiles.setDomain")}
-            </Button>
-          ) : kind === "warp" ? (
-            <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "exit" }} hash="warp" className={buttonClass("primary", "sm")}>
-              {t("warp.open")}
-            </Link>
-          ) : null;
-        return (
-          <Fresh key={i.id} kind="inbound" id={i.id} className="flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
-            <div className={`grid items-center gap-3 max-md:grid-cols-[minmax(0,1fr)_auto] ${gridClass}`}>
-              <div className="flex min-w-0 items-center gap-2.5">
-                <IconChip icon="sliders" tone="sage" size={28} />
-                <div className="flex min-w-0 flex-col gap-[3px]">
-                  {/* the name is read, never cut: it wraps */}
-                  <Link to="/profiles/$id" params={{ id: i.profileId }} className="text-sm leading-snug font-bold break-words hover:text-accent-text hover:underline">
+      <div className="flex flex-col gap-3">
+        {data.inbounds.map((i) => {
+          const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
+          // the last port check of this profile's port: a dot that leads to it in the ways in
+          const tcp = networkOf(i.protocol) === "tcp";
+          const checked = tcp ? data.tcpChecks?.find((c) => c.port === i.port && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
+          const cs = cells(t, fmt, i, now, checked && (tcp ? tcpPill(t, checked.verdict) : verdictPill(t, checked as never)));
+          const kind = i.lastError ? inboundErrorKind(i.lastError) : null;
+          const cell = checkRow?.cells.find((c) => c.deployed && c.inboundId === i.id);
+          const look = cell && checkRow ? cellLook(t, fmt, cell, checkRow.nodeStatus) : undefined;
+          const ticks = nodeTicks(cell ? { cells: [cell] } : undefined);
+          const st = cell?.stats24h;
+          const okN = cell?.history.reduce((n, h) => n + h.ok, 0) ?? 0;
+          const failN = cell?.history.reduce((n, h) => n + h.failed, 0) ?? 0;
+          const stats: { v: string; k: string; cls?: string }[] = cell
+            ? [
+                { v: fmt.num(okN, 0), k: t("np.pf.ok") },
+                { v: fmt.num(failN, 0), k: t("np.pf.failed"), cls: failN > 0 ? "text-danger-text" : undefined },
+                ...(st && st.responseP50Ms > 0 ? [{ v: `${st.responseP50Ms} ${t("hl.ms")}`, k: t("np.pf.response") }] : []),
+                ...(st && st.connectP50Ms > 0 ? [{ v: `${st.connectP50Ms} ${t("hl.ms")}`, k: t("np.pf.connect") }] : []),
+              ]
+            : [];
+          const fix: ReactNode = !owner ? null : kind === "port" ? (
+              <Button variant="primary" size="md" onClick={() => setEditing({ inbound: i, focus: "port" })}>
+                {t("node.profiles.changePort")}
+              </Button>
+            ) : kind === "cert" && i.protocol !== "awg" ? (
+              <Button variant="primary" size="md" onClick={() => setEditing({ inbound: i, focus: "sni" })}>
+                {t("node.profiles.setDomain")}
+              </Button>
+            ) : kind === "warp" ? (
+              <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "exit" }} hash="warp" className={buttonClass("primary", "md")}>
+                {t("warp.open")}
+              </Link>
+            ) : null;
+          return (
+            <Fresh key={i.id} kind="inbound" id={i.id} className="flex min-w-0 flex-col rounded-card border border-line bg-surface transition-colors duration-200 ease-out hover:border-[color-mix(in_srgb,var(--text)_18%,transparent)]">
+              <div className="grid grid-cols-[28px_minmax(160px,220px)_minmax(120px,170px)_minmax(0,1fr)_88px_auto] items-center gap-4 py-4 ps-6 pe-4 max-[1200px]:grid-cols-[28px_minmax(0,1fr)_auto_auto] max-[1200px]:gap-y-3 max-[720px]:gap-3 max-[720px]:px-4 max-[720px]:py-3.5">
+                <ProtocolTag protocol={i.protocol} compact className="w-7 justify-center px-0" />
+                <div className="flex min-w-0 flex-col">
+                  <Link to="/profiles/$id" params={{ id: i.profileId }} className="truncate font-medium hover:text-accent-text hover:underline">
                     {i.profileName}
                   </Link>
-                  <span className="text-xs text-muted">{protocolName(i.protocol)}</span>
+                  <span className="font-mono text-[11px] font-normal text-muted">{i.port ? `${networkOf(i.protocol) ?? "udp"}/${i.port}` : protocolName(i.protocol)}</span>
+                </div>
+                <span className={cx("inline-flex items-center gap-2 text-[13px] whitespace-nowrap", kindTextClass[s.kind])}>
+                  <StatusDot kind={s.kind} />
+                  {t(s.word)}
+                </span>
+                <span role="img" aria-label={t("ov.tick.aria")} className={cx("nd-tk max-[1200px]:order-5 max-[1200px]:col-[1/4]", dead && "opacity-40")}>
+                  {ticks.map((k, n) => (
+                    <i
+                      key={n}
+                      className={k.state === "ok" ? undefined : k.state}
+                      data-t={k.from ? `${fmt.clock(k.from)}–${fmt.clock(k.to)}` : t("ov.tick.none")}
+                      data-s={k.state === "none" ? (k.from ? t("ov.tick.none") : "") : k.state === "ok" ? t("ov.tick.ok", { ms: k.ms || "–" }) : k.state === "warn" ? t("ov.tick.part", { failed: k.failed, total: k.ok + k.failed }) : t("ov.tick.fail")}
+                    />
+                  ))}
+                </span>
+                <span className={cx("text-end font-mono text-[13px] font-medium whitespace-nowrap tabular-nums max-[1200px]:order-6", look?.kind === "warn" && "text-warn-text", look?.kind === "bad" && "text-danger-text")}>{look && cell ? look.label : ""}</span>
+                <div className="flex items-center gap-1.5 max-[1200px]:order-7 max-[1200px]:col-[1/-1] max-[720px]:[&>*]:flex-1">
+                  {fix}
+                  {owner && (
+                    <Button variant="secondary" size="md" onClick={() => setEditing({ inbound: i })}>
+                      {t("common.edit")}
+                    </Button>
+                  )}
+                  {canRestart && linked && i.state !== InboundState.DISABLED && (
+                    <Button variant="secondary" size="md" onClick={() => setRestarting(i)}>
+                      {t("node.profiles.restart")}
+                    </Button>
+                  )}
+                  {owner && (
+                    <IconButton aria-label={t("node.profiles.remove")} title={t("node.profiles.remove")} className="hover:text-danger-text" onClick={() => setRemoving(i)}>
+                      <Icon name="trash" size={16} />
+                    </IconButton>
+                  )}
                 </div>
               </div>
-              {cs.map((c) => (
-                <div key={c.label} className="min-w-0 max-md:hidden">
-                  <div className="flex min-w-0 flex-col gap-[3px]">
-                    <span className="text-[11px] text-muted">{c.label}</span>
-                    <span title={c.title} className={cx("flex min-w-0 items-center gap-1.5", c.mono ? "font-mono text-[13px] break-all" : "text-xs font-semibold break-words", c.tone && toneText[c.tone])}>
+              {(i.awg || conn?.supported || i.lastError) && (
+                <div className="flex flex-col gap-2.5 px-6 pb-4 max-[720px]:px-4">
+                  {i.awg && <AwgStatusLine awg={i.awg} />}
+                  {conn?.supported && <ConnLine x={connOf.get(i.id)} />}
+                  {i.lastError && <InboundErrorNote inbound={i} process={holders[i.id]} />}
+                </div>
+              )}
+              <dl className="m-0 grid grid-cols-4 gap-4 border-t border-line px-6 py-3.5 max-[1200px]:grid-cols-2 max-[720px]:px-4">
+                {cs.map((c) => (
+                  <div key={c.label} className="flex min-w-0 flex-col gap-0.5">
+                    <dt className="text-xs text-muted">{c.label}</dt>
+                    <dd title={c.title} className={cx("m-0 flex min-w-0 items-center gap-1.5 truncate", c.mono && "font-mono text-[13px] font-normal", c.tone && toneText[c.tone])}>
                       {c.value || "—"}
                       {c.dot && <PortDot nodeId={node.id} dot={c.dot} />}
-                    </span>
+                    </dd>
                   </div>
+                ))}
+              </dl>
+              {stats.length > 0 && (
+                <div className={cx("flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-b-[15px] border-t border-line bg-step px-6 pt-3 pb-3.5 max-[720px]:px-4", dead && "opacity-40")}>
+                  <span className="text-[13px] text-muted">{t("np.pf.day")}</span>
+                  {stats.map((x) => (
+                    <span key={x.k} className="inline-flex items-baseline gap-1.5 text-[13px] text-sec">
+                      <b className={cx("font-mono text-[13px] font-medium text-fg", x.cls)}>{x.v}</b>
+                      {x.k}
+                    </span>
+                  ))}
                 </div>
-              ))}
-              <div className="flex justify-end">
-                <StatusPill kind={s.kind} label={t(s.word)} sm />
-              </div>
-            </div>
-            {/* the phone has no columns: each fact with its name */}
-            <dl className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] md:hidden">
-              {cs.map((c) => (
-                <div key={c.label} className="flex min-w-0 gap-1.5">
-                  <dt className="text-muted">{c.label}</dt>
-                  <dd className={cx("flex min-w-0 items-center gap-1.5 font-semibold", c.mono ? "font-mono break-all" : "break-words", c.tone && toneText[c.tone])}>
-                    {c.value || "—"}
-                    {c.dot && <PortDot nodeId={node.id} dot={c.dot} />}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            {i.awg && <AwgStatusLine awg={i.awg} />}
-            {conn?.supported && <ConnLine x={connOf.get(i.id)} />}
-            {i.lastError && <InboundErrorNote inbound={i} process={holders[i.id]} />}
-            <div className="flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
-              {fix}
-              {owner && (
-                <Button variant="secondary" size="sm" onClick={() => setEditing({ inbound: i })}>
-                  {t("common.edit")}
-                </Button>
               )}
-              {canRestart && linked && i.state !== InboundState.DISABLED && (
-                <Button variant="secondary" size="sm" onClick={() => setRestarting(i)}>
-                  {t("node.profiles.restart")}
-                </Button>
-              )}
-              {owner && (
-                <Button variant="ghostDanger" size="sm" className="ms-auto" onClick={() => setRemoving(i)}>
-                  {t("node.profiles.remove")}
-                </Button>
-              )}
-            </div>
-          </Fresh>
-        );
-      })}
+            </Fresh>
+          );
+        })}
+      </div>
 
       {owner && <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />}
       {editing && (

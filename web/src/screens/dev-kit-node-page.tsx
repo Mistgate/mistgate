@@ -203,7 +203,14 @@ export function nodePageData(state: NState) {
   const inbound = (id: string, protocol: string, name: string, port: number, istate = InboundState.ACTIVE) => ({
     id, profileId: `prf_${id}`, profileName: name, protocol, nodeId: "nod_de1", nodeName: "de1", state: istate, port, tlsServerName: "de1.example.com", certNotAfterUnix: NOW + 70 * D, certPinSha256: "", lastError: "", egress: "direct", enabled: true, portOverride: 0, directInSubscriptions: true, cdn: false,
   });
-  const inbounds = sp.fresh ? [] : [inbound("inb_1", "hysteria2", "Hysteria2 · 443", 443), inbound("inb_2", "vless", "VLESS · Reality", 443), inbound("inb_3", "amneziawg", "AmneziaWG 3.1", 51820)];
+  const broken = state === "many";
+  const inbounds = sp.fresh
+    ? []
+    : [
+        inbound("inb_1", "hysteria2", "Hysteria2 · 443", 443),
+        { ...inbound("inb_2", "vless", "VLESS · Reality", 443, broken ? InboundState.FAILED : InboundState.ACTIVE), lastError: broken ? "listen tcp :443: bind: address already in use" : "", certNotAfterUnix: 0 },
+        { ...inbound("inb_3", "amneziawg", "AmneziaWG 3.1", 51820), certNotAfterUnix: 0, tlsServerName: "", egress: "warp", awg: { backend: "kernel", backendVersion: "amneziawg kernel module", ifaceUp: true, peers: 3, peersOnline: 1, peersHandshaken: 2, newestHandshakeUnix: NOW - 70, udpRxPackets: 900 } },
+      ];
   const data = {
     node,
     metrics: sp.fresh ? undefined : metrics,
@@ -307,6 +314,13 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-overview-viewer", state: "viewer", tab: "overview", title: "Overview: a read-only role, no fix buttons", w: 1440, h: 1800 },
   { id: "node-overview-via", state: "via", tab: "overview", title: "Overview: the agent reaches the panel through msk1", w: 1440, h: 1800 },
   { id: "node-overview-edge", state: "edge", tab: "overview", title: "Overview: the Cloudflare edition, no checks, no load hours", w: 1440, h: 1500 },
+  { id: "node-profiles-calm", state: "calm", tab: "profiles", title: "Profiles: three servers running, a day of checks each", w: 1440, h: 1100 },
+  { id: "node-profiles-many", state: "many", tab: "profiles", title: "Profiles: one did not start (the port is taken), its fix and the error", w: 1440, h: 1300 },
+  { id: "node-profiles-down", state: "down", tab: "profiles", title: "Profiles: the node is silent, the day of checks is dimmed", w: 1440, h: 1100 },
+  { id: "node-profiles-new", state: "new", tab: "profiles", title: "Profiles: none on the node yet", w: 1440, h: 700 },
+  { id: "node-profiles-viewer", state: "viewer", tab: "profiles", title: "Profiles: a read-only role, no buttons", w: 1440, h: 1100 },
+  { id: "node-profiles-1100", state: "calm", tab: "profiles", title: "Profiles at 1100 wide: the cells take a row of their own", w: 1100, h: 1300 },
+  { id: "node-profiles-phone", state: "calm", tab: "profiles", title: "Profiles on a phone, 400 wide", w: 400, h: 1900 },
   { id: "node-doctor-calm", state: "calm", tab: "doctor", title: "Doctor: the node is healthy, one warning accepted as normal", w: 1440, h: 1500 },
   { id: "node-doctor-alerts", state: "alerts", tab: "doctor", title: "Doctor: two checks need attention", w: 1440, h: 1700 },
   { id: "node-doctor-limit", state: "limit", tab: "doctor", title: "Doctor: a check failed, the card is red", w: 1440, h: 1700 },

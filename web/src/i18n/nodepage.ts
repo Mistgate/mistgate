@@ -73,6 +73,12 @@ export const en = {
   "np.doc.of": "{bad} of {n}",
   "np.doc.notChecked": "not checked",
   "np.doc.foot": "The doctor inspects the host every 10 minutes. It fixes only on your command",
+  "np.pf.every": "client-side checks every 5 minutes",
+  "np.pf.day": "Last 24 hours",
+  "np.pf.ok": "checks passed",
+  "np.pf.failed": "failed",
+  "np.pf.response": "response",
+  "np.pf.connect": "connect",
 };
 
 export const ru: typeof en = {
@@ -147,6 +153,12 @@ export const ru: typeof en = {
   "np.doc.of": "{bad} из {n}",
   "np.doc.notChecked": "не проверялось",
   "np.doc.foot": "Доктор осматривает хост каждые 10 минут. Чинит только по твоей команде",
+  "np.pf.every": "проверки глазами клиента каждые 5 минут",
+  "np.pf.day": "За 24 часа",
+  "np.pf.ok": "проверок прошло",
+  "np.pf.failed": "сбоев",
+  "np.pf.response": "отклик",
+  "np.pf.connect": "соединение",
 };
 
 export const zh: typeof en = {
@@ -221,6 +233,12 @@ export const zh: typeof en = {
   "np.doc.of": "{n} 项中 {bad} 项",
   "np.doc.notChecked": "未检查",
   "np.doc.foot": "医生每 10 分钟检查一次主机，只在你下令时才修复",
+  "np.pf.every": "客户端视角检查每 5 分钟一次",
+  "np.pf.day": "最近 24 小时",
+  "np.pf.ok": "次检查通过",
+  "np.pf.failed": "次失败",
+  "np.pf.response": "响应",
+  "np.pf.connect": "连接",
 };
 
 export const fa: typeof en = {
@@ -295,6 +313,12 @@ export const fa: typeof en = {
   "np.doc.of": "{bad} از {n}",
   "np.doc.notChecked": "بررسی نشد",
   "np.doc.foot": "دکتر هر ۱۰ دقیقه میزبان را معاینه می‌کند و فقط به دستور تو رفع می‌کند",
+  "np.pf.every": "بررسی از دید کاربر هر ۵ دقیقه",
+  "np.pf.day": "۲۴ ساعت گذشته",
+  "np.pf.ok": "بررسی موفق",
+  "np.pf.failed": "ناموفق",
+  "np.pf.response": "پاسخ",
+  "np.pf.connect": "اتصال",
 };
 
 export const tr: typeof en = {
@@ -369,4 +393,10 @@ export const tr: typeof en = {
   "np.doc.of": "{n} içinden {bad}",
   "np.doc.notChecked": "denetlenmedi",
   "np.doc.foot": "Doktor sunucuyu 10 dakikada bir inceler. Yalnızca senin komutunla düzeltir",
+  "np.pf.every": "istemci gözünden denetimler 5 dakikada bir",
+  "np.pf.day": "Son 24 saat",
+  "np.pf.ok": "kontrol geçti",
+  "np.pf.failed": "başarısız",
+  "np.pf.response": "yanıt",
+  "np.pf.connect": "bağlantı",
 };
