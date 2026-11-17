@@ -54,9 +54,9 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
-  // the open source of the Sources section (sources.test.tsx walks it)
-  useSearch: () => ({}),
-  useNavigate: () => () => undefined,
+  // the tab and the open source are the address (`?tab=`, `?source=`): navigate stores the new search and the test draws the page again, as the router would
+  useSearch: () => search,
+  useNavigate: () => navigate,
 }));
 
 beforeAll(() => {
@@ -125,6 +125,8 @@ const alert = (id: string, nodeName: string, verdict: string, firstSeenUnix: num
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
+let search: Record<string, unknown> = {};
+const navigate = vi.fn();
 beforeEach(() => {
   role = Role.OWNER;
   getHistory.mockResolvedValue(history(["globalping", "lists", "tspu"]));
@@ -139,6 +141,9 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
+  search = {};
+  navigate.mockReset();
+  window.history.replaceState(null, "", window.location.pathname);
   act(() => setLang("en"));
   for (const m of [getHistory, getChecks, listAlerts]) m.mockReset();
   fleetV6 = {};
@@ -149,21 +154,36 @@ async function mount() {
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  await act(async () =>
+  const draw = () =>
     root!.render(
       <QueryClientProvider client={qc}>
         <ReachabilityScreen />
       </QueryClientProvider>,
-    ),
-  );
+    );
+  // called from a click, inside its act(): the address changes and the page is drawn again, as the router would
+  navigate.mockImplementation((to: { search: Record<string, unknown> }) => {
+    search = to.search;
+    draw();
+  });
+  await act(async () => draw());
   for (let i = 0; i < 4; i++) await settle();
 }
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+const click = async (el: Element | undefined | null) => {
+  await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  for (let i = 0; i < 3; i++) await settle();
+};
 const text = () => document.body.textContent ?? "";
 const rows = () => [...document.querySelectorAll<HTMLElement>("[data-testid=reach-node]")];
-const row = (name: string) => rows().find((r) => r.querySelector("a span:last-child")?.textContent === name)!;
-const line = (name: string, source: string) => row(name).querySelector<HTMLElement>(`[data-testid=line-${source}]`)!;
+const row = (name: string) => rows().find((r) => r.querySelector(".hl-cnode b")?.textContent === name)!;
+const trigger = (name: string) => row(name).querySelector<HTMLElement>("button.rc-r")!;
+/** opens the row of a node (one at a time, as a click does) */
+const open = (name: string) => click(trigger(name));
+const detail = (name: string) => row(name).querySelector<HTMLElement>(".rc-d")!;
+const line = (name: string, source: string) => detail(name).querySelector<HTMLElement>(`[data-testid=line-${source}]`)!;
 const segs = (name: string, source: string) => [...line(name, source).querySelectorAll<HTMLElement>("[data-seg]")];
+const cell = (name: string, source: string) => row(name).querySelector<HTMLElement>(`[data-testid=cell-${source}]`)!;
+const tab = (name: string) => [...document.querySelectorAll<HTMLElement>("[role=tab]")].find((t) => t.textContent?.startsWith(name));
 /** The text a reader gets: without the decorative glyphs ("!", "×") that are aria-hidden. */
 function words(el: Element | null | undefined): string {
   if (!el) return "";
@@ -171,10 +191,11 @@ function words(el: Element | null | undefined): string {
   for (const h of copy.querySelectorAll("[aria-hidden]")) h.remove();
   return copy.textContent ?? "";
 }
-const tally = () => Object.fromEntries([...document.querySelectorAll("[data-kind]")].map((li) => [li.getAttribute("data-kind"), words(li)]));
+/** The chips of the summary: the board's state (ok, part, tcp, bad, reg, nd) and what a chip says. */
+const tally = () => Object.fromEntries([...document.querySelectorAll<HTMLElement>(".rc-sumf button")].map((b) => [b.className, words(b)]));
 
 describe("the Reachability page with every source on", () => {
-  it("names the country in its subtitle and offers the owner the country picker", async () => {
+  it("names the country in its head and offers the owner the country picker", async () => {
     await mount();
     expect(document.querySelector("h1")?.textContent).toBe("Reachability");
     expect(text()).toContain("Whether the nodes open from Russia");
@@ -182,68 +203,175 @@ describe("the Reachability page with every source on", () => {
     expect(getHistory).toHaveBeenCalledWith({ days: 7 }, expect.anything());
   });
 
-  it("counts the nodes by their verdict now, in the colours of Health", async () => {
+  it("has three tabs, Nodes first, with the count of the events and of the sources that are on", async () => {
     await mount();
-    expect(tally()).toEqual({ ok: "3reachable", partial: "0blocked on some networks", warn: "1TCP blocked", bad: "0unreachable", listed: "1listed", unknown: "0no data" });
-    const warn = document.querySelector("[data-kind=warn]")!;
-    expect(warn.className).toContain("tone-warn");
-    expect(document.querySelector("[data-kind=bad]")!.className).not.toContain("tone-bad"); // nobody there: quiet
-    expect(document.querySelector("[data-kind=listed]")!.className).toContain("tint-dashed");
+    expect(document.querySelector("[role=tablist][aria-label='Reachability sections']")).not.toBeNull();
+    expect([...document.querySelectorAll("[role=tab]")].map((t) => t.textContent).slice(0, 3)).toEqual(["Nodes", "Events2", "Sources5"]);
+    expect(tab("Nodes")?.getAttribute("aria-selected")).toBe("true");
+    expect(tab("Events")?.querySelector(".bdg")?.textContent).toBe("2");
   });
 
-  it("lists the nodes by name, without the one that waits for its install, each with its verdict and the Health tooltip", async () => {
+  it("counts the nodes by their verdict now, as the summary of the board: the share of the ones that open, the states as a filter, the bar", async () => {
     await mount();
-    expect(rows().map((r) => r.querySelector("a span:last-child")?.textContent)).toEqual(["de1", "fi1", "nl1", "probe1", "se1"]);
-    expect(row("de1").querySelector("a")?.getAttribute("href")).toBe("/nodes/$id");
-    const pill = row("fi1").querySelector<HTMLElement>("[role=img][tabindex='0']")!;
-    expect(pill.getAttribute("aria-label")).toBe("fi1, From Russia: TCP is blocked · The sources disagree · Globalping: reachable · probe: TCP blocked");
-    expect(words(row("fi1"))).toContain("sources disagree");
-    expect(row("nl1").querySelector("[role=img]")?.getAttribute("aria-label")).toBe("nl1, From Russia: Reachable from Russia · in the RKN registry");
-    await act(async () => pill.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    expect(text()).toContain("The sources disagreeGlobalping: reachable · probe: TCP blocked");
+    expect(document.querySelector(".rc-sumh b")?.textContent).toBe("3 of 5");
+    expect(document.querySelector(".rc-sumh span")?.textContent).toBe("nodes open from Russia without caveats");
+    expect(tally()).toEqual({ ok: "reachable3", tcp: "TCP blocked1", reg: "listed1" });
+    expect([...document.querySelectorAll<HTMLElement>(".rc-bar i")].map((i) => [i.className, i.style.flexGrow])).toEqual([["ok", "3"], ["tcp", "1"], ["reg", "1"]]);
+    // a state nobody is in is said once, not drawn
+    expect(document.querySelector(".rc-zero")?.textContent).toBe("No nodes with the verdict: some networks and unreachable");
+    expect(document.querySelectorAll(".rc-sumf button[aria-pressed=true]")).toHaveLength(0);
+  });
+
+  it("lists the nodes by name, without the one that waits for its install, each with its verdict as a pill", async () => {
+    await mount();
+    expect(rows().map((r) => r.querySelector(".hl-cnode b")?.textContent)).toEqual(["de1", "fi1", "nl1", "probe1", "se1"]);
+    expect(rows().map((r) => words(r.querySelector(".pv-pill")))).toEqual(["reachable", "TCP blocked", "reachable", "reachable", "listed"]);
+    expect(row("fi1").querySelector(".pv-pill")?.className).toContain("part");
+    expect(row("se1").querySelector(".pv-pill")?.className).toContain("bad");
+    // the row is a button that opens, and a pill is not a tab stop of its own
+    expect(trigger("de1").getAttribute("aria-expanded")).toBe("false");
+    expect(row("de1").querySelector("[role=img][tabindex='0']")).toBeNull();
   });
 
   it("gives each source its word for the node now: the lists say listed or not, the probe node is named, a source with nothing yet has a dash", async () => {
     await mount();
-    const now = (name: string) => ["globalping", "lists", "tspu"].map((s) => words(line(name, s).children[1]));
+    const now = (name: string) => ["globalping", "lists", "tspu"].map((s) => words(cell(name, s)));
     expect(now("de1")).toEqual(["reachable", "not listed", "reachable"]);
     expect(now("fi1")).toEqual(["reachable", "not listed", "TCP blocked"]);
     expect(now("nl1")).toEqual(["reachable", "listed", "reachable"]);
     expect(now("probe1")).toEqual(["reachable", "not listed", "probe node"]);
     expect(now("se1")).toEqual(["no data", "listed", "—"]);
-    expect(line("fi1", "tspu").children[1]?.className).toContain("tone-warn");
-    for (const r of rows()) for (const s of ["globalping", "lists", "tspu"]) expect(r.querySelector(`[data-testid=line-${s}]`)?.getAttribute("data-on")).toBe("true");
+    expect(cell("fi1", "tspu").className).toContain("part");
+    expect(cell("se1", "tspu").className).toContain("mut");
   });
 
-  it("lists the country_blocked alerts of the week, open first, each a link to its alert", async () => {
+  it("draws the week as seven cells, the worst verdict of each day over every source", async () => {
+    await mount();
+    const days = (name: string) => [...row(name).querySelectorAll<HTMLElement>(".rc-days i")].map((i) => i.className);
+    expect(days("de1")).toEqual(Array(7).fill("ok"));
+    // fi1: the probe saw TCP blocked 30 h ago, so the last days are warned and the first are well
+    expect(days("fi1").slice(0, 5)).toEqual(Array(5).fill("ok"));
+    expect(days("fi1").slice(5)).toContain("part");
+    expect(row("de1").querySelector(".rc-days")?.getAttribute("aria-label")).toBe("reachable: no problems in 7 days");
+    expect(row("de1").querySelector(".rc-days i")?.getAttribute("title")).toMatch(/: reachable$/);
+  });
+
+  it("lists the country_blocked alerts of the week in the card of the Nodes tab, open first, each a link to its alert", async () => {
     await mount();
     const events = [...document.querySelectorAll("[data-testid=reach-event]")];
     expect(events.map((e) => e.getAttribute("href"))).toEqual(["/health#alert-alt_fi1", `/health#alert-alt_nl1-${CUT + 16 * H + 1800}`]);
-    expect(events[0]?.textContent).toContain("fi1TCP blocked · opened 1 d ago");
-    expect(events[1]?.textContent).toContain("nl1TCP blocked · closed");
+    expect(events[0]?.textContent).toContain("fi1 · TCP blocked");
+    expect(events[0]?.textContent).toContain("opened 1 d ago");
+    expect(events[1]?.textContent).toContain("nl1 · TCP blocked");
     expect(events[1]?.textContent).toContain("lasted 16 h");
   });
 
-  it("ends with the seven sources for the owner, the first one that is on open, and leads to its parts from the header", async () => {
+  it("brings the Events tab with the same alerts, each with its pill, and what opens and closes an event", async () => {
+    search = { tab: "events" };
     await mount();
-    expect(document.querySelector("#sources h2")?.textContent).toBe("Sources");
-    expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
-    expect([...document.querySelectorAll("#sources [role=tabpanel]:not([hidden]) h3")].map((h) => h.textContent)).toEqual(["Globalping"]);
-    const nav = document.querySelector("nav[aria-label='On this page']");
-    expect([...nav!.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
-      ["Nodes", "#reach-nodes"],
-      ["Events", "#reach-events"],
-      ["Sources", "#sources"],
-    ]);
-    // each one leads to a section that takes the focus
-    for (const id of ["reach-nodes", "reach-events", "sources"]) expect(document.getElementById(id)?.closest("section")?.tabIndex).toBe(-1);
+    expect(tab("Events")?.getAttribute("aria-selected")).toBe("true");
+    const events = [...document.querySelectorAll("[data-testid=reach-event]")];
+    expect(events.map((e) => words(e.querySelector(".pv-pill")))).toEqual(["Open", "Closed"]);
+    expect(text()).toContain("An event opens when a node stops opening from Russia and closes when the recheck is clean");
+    expect(document.querySelector(".rc-sum")).toBeNull();
+  });
+});
+
+describe("the tabs", () => {
+  it("put the tab in the address: a click goes to ?tab=, Nodes is the page's own and has no key", async () => {
+    await mount();
+    await click(tab("Events"));
+    expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { tab: "events" }, replace: true, resetScroll: false });
+    expect(tab("Events")?.getAttribute("aria-selected")).toBe("true");
+    await click(tab("Nodes"));
+    expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: {}, replace: true, resetScroll: false });
+    await click(tab("Sources"));
+    expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { tab: "sources" }, replace: true, resetScroll: false });
+  });
+
+  it("open the Sources tab for a ?source= link, with that source open", async () => {
+    search = { source: "bsbord" };
+    await mount();
+    expect(tab("Sources")?.getAttribute("aria-selected")).toBe("true");
+    expect([...document.querySelectorAll<HTMLElement>(".rc-sp > [role=tabpanel]:not([hidden]) [data-source]")].map((s) => s.getAttribute("data-source"))).toEqual(["bsbord"]);
+  });
+
+  it.each([
+    ["#sources", { tab: "sources" }],
+    ["#reach-events", { tab: "events" }],
+    ["#reach-nodes", {}],
+  ])("lead the old anchor %s to its tab and take it off the address", async (hash, to) => {
+    window.history.replaceState(null, "", `${window.location.pathname}${hash}`);
+    await mount();
+    expect(navigate).toHaveBeenCalledWith({ to: "/reachability", search: to, replace: true, resetScroll: false });
+  });
+
+  it("show the Sources tab at once for the old #sources anchor", async () => {
+    window.history.replaceState(null, "", `${window.location.pathname}#sources`);
+    await mount();
+    expect(tab("Sources")?.getAttribute("aria-selected")).toBe("true");
+  });
+});
+
+describe("a row of the table", () => {
+  it("opens on a click and takes the one that was open with it, one at a time", async () => {
+    await mount();
+    await open("de1");
+    expect(trigger("de1").getAttribute("aria-expanded")).toBe("true");
+    expect(row("de1").classList.contains("open")).toBe(true);
+    expect(trigger("de1").getAttribute("aria-controls")).toBe(detail("de1").id);
+    await open("fi1");
+    expect(detail("de1")).toBeNull();
+    expect(trigger("fi1").getAttribute("aria-expanded")).toBe("true");
+    await open("fi1");
+    expect(detail("fi1")).toBeNull();
+  });
+
+  it("says in the open row what the sources said, the verdict in full, and leads to the node and to its alert", async () => {
+    await mount();
+    await open("fi1");
+    const d = detail("fi1");
+    expect(words(d.querySelector(".rc-dsrc"))).toContain("Globalping: reachable");
+    expect(words(d.querySelector(".rc-dsrc"))).toContain("Probe: TCP blocked");
+    expect(words(d.querySelector("[data-testid=reach-verdict]"))).toContain("The sources disagree");
+    expect(words(d.querySelector("[data-testid=reach-verdict]"))).toContain("Globalping: reachable · probe: TCP blocked");
+    const links = [...d.querySelectorAll(".hl-act a")];
+    expect(links.map((a) => a.textContent)).toEqual(["Open the node", "Open the alert"]);
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/nodes/$id", "/health#alert-alt_fi1"]);
+    // a node that is well has no alert to open
+    await open("de1");
+    expect([...detail("de1").querySelectorAll(".hl-act a")].map((a) => a.textContent)).toEqual(["Open the node"]);
+  });
+
+  it("is a button a keyboard reaches, with its state said", async () => {
+    await mount();
+    const b = trigger("nl1");
+    act(() => b.focus());
+    expect(document.activeElement).toBe(b);
+    expect(b.tagName).toBe("BUTTON");
+    expect(b.getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("the chips of the summary", () => {
+  it("filter the rows by the state, press again to clear, and say so when nobody is in it", async () => {
+    await mount();
+    const chip = (k: string) => document.querySelector<HTMLElement>(`.rc-sumf button.${k}`)!;
+    await click(chip("tcp"));
+    expect(chip("tcp").getAttribute("aria-pressed")).toBe("true");
+    expect(rows().map((r) => r.querySelector(".hl-cnode b")?.textContent)).toEqual(["fi1"]);
+    await click(chip("tcp"));
+    expect(rows()).toHaveLength(5);
+    await click(chip("reg"));
+    expect(rows().map((r) => r.querySelector(".hl-cnode b")?.textContent)).toEqual(["se1"]);
   });
 });
 
 describe("the lanes", () => {
-  it("draw the compacted week of a source as segments, each saying its verdict and time", async () => {
+  it("draw the compacted week of a source as segments, each saying its verdict and time, in the open row", async () => {
     await mount();
+    expect(row("nl1").querySelector("[data-testid=lane-globalping]")).toBeNull(); // the row is closed: the cells say the week
+    await open("nl1");
     const gp = segs("nl1", "globalping");
     expect(gp).toHaveLength(3);
     expect(gp.map((s) => s.getAttribute("aria-label")?.split(",")[0])).toEqual(["reachable", "TCP blocked", "reachable"]);
@@ -251,18 +379,22 @@ describe("the lanes", () => {
     expect(line("nl1", "globalping").querySelectorAll("[data-verdict]")).toHaveLength(3);
     expect([...line("nl1", "lists").querySelectorAll("[data-verdict]")].map((s) => s.getAttribute("data-verdict"))).toEqual(["listed"]);
     // the lists' "ok" is their own word
+    await open("de1");
     expect(segs("de1", "lists")[0]?.getAttribute("aria-label")).toMatch(/^not listed, /);
   });
 
   it("leave a source with nothing on the node empty: no segment, no tab stop", async () => {
     await mount();
+    await open("probe1");
     expect(segs("probe1", "tspu")).toHaveLength(0);
-    expect(segs("se1", "tspu")).toHaveLength(0);
     expect(line("probe1", "tspu").querySelector("[data-testid=lane-tspu]")?.getAttribute("aria-label")).toBe("Probe, last 7 days");
+    await open("se1");
+    expect(segs("se1", "tspu")).toHaveLength(0);
   });
 
   it("are one tab stop on the newest segment; the arrows walk the lane and the tooltip follows the focus", async () => {
     await mount();
+    await open("nl1");
     const gp = segs("nl1", "globalping");
     expect(gp.map((s) => s.tabIndex)).toEqual([-1, -1, 0]);
     await act(async () => gp[2]!.focus());
@@ -307,67 +439,57 @@ describe("a block on some networks", () => {
     listAlerts.mockResolvedValue({ nowUnix: NOW, active: [{ ...alert("alt_de1", "de1", "partial", NOW - 3 * H), subject: "partial" }], history: [] });
   });
 
-  it("counts it apart from TCP blocked: the warn colour with a half disc, not the “!”", async () => {
+  it("counts it apart from TCP blocked: its own chip, the warn tone, the short word", async () => {
     await mount();
-    expect(tally()).toEqual({ ok: "2reachable", partial: "1blocked on some networks", warn: "1TCP blocked", bad: "0unreachable", listed: "1listed", unknown: "0no data" });
-    const partial = document.querySelector("[data-kind=partial]")!;
-    expect(partial.className).toContain("tone-warn");
-    expect(partial.querySelector("svg circle")).not.toBeNull();
-    expect(partial.textContent).not.toContain("!");
-    expect(document.querySelector("[data-kind=warn] svg circle")).toBeNull();
+    expect(tally()).toEqual({ ok: "reachable2", part: "some networks1", tcp: "TCP blocked1", reg: "listed1" });
+    expect(document.querySelector(".rc-sumf .part")?.getAttribute("aria-pressed")).toBe("false");
+    expect(document.querySelector(".rc-sumh b")?.textContent).toBe("2 of 5");
   });
 
-  it("names the networks in the pill, its tooltip on keyboard focus, and the source's word now", async () => {
+  it("says it in the pill and the source's word now, and its verdict in the open row", async () => {
     await mount();
-    const pill = row("de1").querySelector<HTMLElement>("[role=img][tabindex='0']")!;
-    expect(pill.getAttribute("aria-label")).toBe("de1, From Russia: Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk)");
-    expect(pill.className).toContain("tone-warn");
-    expect(words(pill)).toBe("some networks");
-    expect(words(pill.parentElement)).toBe("some networksMTS"); // the dark networks under the pill
-    expect(words(line("de1", "globalping").children[1])).toBe("some networks");
-    expect(line("de1", "globalping").children[1]?.className).toContain("tone-warn");
-    await act(async () => pill.focus());
-    for (let i = 0; i < 3; i++) await settle();
-    for (const l of ["Blocked on some networks: MTS (AS8359, Novosibirsk)", "MTS, Novosibirsk (reaches your other nodes, not this one)", "Beeline, Moscow", "No home/mobile probe this round: MegaFon, T2"])
-      expect(text()).toContain(l);
+    expect(words(row("de1").querySelector(".pv-pill"))).toBe("some networks");
+    expect(row("de1").querySelector(".pv-pill")?.className).toContain("part");
+    expect(words(cell("de1", "globalping"))).toBe("some networks");
+    expect(cell("de1", "globalping").className).toContain("part");
+    await open("de1");
+    expect(words(detail("de1").querySelector("[data-testid=reach-verdict]"))).toContain("Reachable from Russia, but not from every network");
+    expect(words(detail("de1").querySelector("[data-testid=reach-verdict]"))).toContain("MTS");
   });
 
   it("splits its lane segment, which says the verdict in full, and names it in the recent events", async () => {
     await mount();
+    await open("de1");
     const gpLane = segs("de1", "globalping");
     expect(gpLane.map((s) => s.getAttribute("aria-label")?.split(",")[0])).toEqual(["reachable", "blocked on some networks"]);
     expect([...line("de1", "globalping").querySelectorAll("[data-verdict]")].map((s) => s.getAttribute("data-verdict"))).toEqual(["ok", "partial"]);
-    expect(line("de1", "globalping").querySelector("[data-verdict=partial]")?.className).toContain("linear-gradient");
     const events = [...document.querySelectorAll("[data-testid=reach-event]")];
-    expect(events.map((e) => e.textContent)).toEqual([expect.stringContaining("de1blocked on some networks · opened 3 h ago")]);
+    expect(events.map((e) => e.textContent)).toEqual([expect.stringContaining("de1 · blocked on some networks")]);
   });
 
-  it("offers its breakdown behind a disclosure across the row, closed until asked, on that node only", async () => {
+  it("opens its breakdown with the row, in full, on that node only", async () => {
     await mount();
-    expect(document.querySelectorAll("[data-testid=reach-breakdown]")).toHaveLength(1);
-    const more = row("de1").querySelector<HTMLDetailsElement>("details[data-testid=reach-breakdown]")!;
-    expect(more.className).toContain("xl:col-span-3");
-    expect(more.open).toBe(false);
-    expect(more.querySelector("summary")?.textContent).toBe("Networks in detail");
-    act(() => more.querySelector("summary")!.click());
-    expect(more.open).toBe(true);
+    expect(document.querySelectorAll("[data-testid=partial-breakdown]")).toHaveLength(0);
+    await open("de1");
+    const more = detail("de1").querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
     const lists = [...more.querySelectorAll("ul")];
     expect(lists.map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Cannot reach the node", "Reach it"]);
     expect([...more.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✓Beeline AS3216 · Moscow · Globalping"]);
     expect(more.textContent).toContain("Not checked this round: MegaFon, T2");
     // the box takes the verdict's tone
-    expect(more.querySelector("[data-testid=partial-breakdown]")?.className).toContain("tone-warn");
+    expect(more.className).toContain("part");
     // fi1 is TCP blocked with nothing dark named: no breakdown
-    expect(row("fi1").querySelector("[data-testid=reach-breakdown]")).toBeNull();
+    await open("fi1");
+    expect(detail("fi1").querySelector("[data-testid=partial-breakdown]")).toBeNull();
   });
 
   it("speaks Russian", async () => {
     act(() => setLang("ru"));
     await mount();
-    expect(tally()).toMatchObject({ partial: "1недоступны из части сетей", warn: "1TCP режут" });
-    expect(row("de1").querySelector("summary")?.textContent).toBe("Подробнее по сетям");
-    expect(words(row("de1").querySelector("[role=img][tabindex='0']"))).toBe("часть сетей");
-    expect(document.querySelector("[data-testid=reach-event]")?.textContent).toContain("de1недоступна из части сетей");
+    expect(tally()).toMatchObject({ part: "часть сетей1", tcp: "TCP режут1" });
+    expect(words(row("de1").querySelector(".pv-pill"))).toBe("часть сетей");
+    expect(document.querySelector("[data-testid=reach-event]")?.textContent).toContain("de1 · недоступна из части сетей");
+    await open("de1");
     expect(segs("de1", "globalping")[1]?.getAttribute("aria-label")).toMatch(/^недоступна из части сетей, /);
   });
 });
@@ -406,24 +528,27 @@ describe("the external sources", () => {
     });
   });
 
-  it("give each node a line for cheburcheck and bsbord while they are on, with the word now and the week; the own probe has none", async () => {
+  it("give each node a line for cheburcheck and bsbord in the open row while they are on, with the word now and the week; the own probe has none", async () => {
     await mount();
+    await open("de1");
     expect(["globalping", "lists", "tspu", "cheburcheck", "bsbord"].map((s) => line("de1", s).firstElementChild?.textContent)).toEqual(["Globalping", "Lists", "Probe", "cheburcheck", "bsbord"]);
-    expect(row("de1").querySelector("[data-testid=line-cheburcheck_own]")).toBeNull();
+    expect(detail("de1").querySelector("[data-testid=line-cheburcheck_own]")).toBeNull();
     expect(words(line("de1", "bsbord").children[1])).toBe("some networks");
     expect([...line("de1", "bsbord").querySelectorAll("[data-verdict]")].map((s) => s.getAttribute("data-verdict"))).toEqual(["ok", "partial"]);
     expect(segs("de1", "cheburcheck").map((s) => s.getAttribute("aria-label")?.split(",")[0])).toEqual(["reachable"]);
     expect(line("de1", "bsbord").querySelector("[role=group]")?.getAttribute("aria-label")).toBe("bsbord, last 7 days");
+    await open("nl1");
     expect(words(line("nl1", "bsbord").children[1])).toBe("unreachable");
     // a node bsbord has nothing on yet: a dash, no segment
+    await open("fi1");
     expect(line("fi1", "bsbord").children[1]?.textContent).toBe("—");
     expect(segs("fi1", "bsbord")).toHaveLength(0);
   });
 
   it("break a verdict down across every source, the white-list unit apart", async () => {
     await mount();
-    const more = row("de1").querySelector<HTMLDetailsElement>("details[data-testid=reach-breakdown]")!;
-    act(() => more.querySelector("summary")!.click());
+    await open("de1");
+    const more = detail("de1").querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
     const lists = [...more.querySelectorAll("ul")];
     expect(lists.map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Cannot reach the node", "Reach it", "White list on (cuts every foreign address)"]);
     expect(lists.map((ul) => [...ul.querySelectorAll("li")].map((li) => li.textContent))).toEqual([
@@ -437,17 +562,18 @@ describe("the external sources", () => {
   it("say which network reaches none of the nodes, the case no alert covers", async () => {
     await mount();
     const lines = [...document.querySelectorAll("[data-testid=dark-everywhere]")];
-    expect(lines.map((l) => l.textContent)).toEqual(["✕MTS (КРЫМ) reaches none of your nodes · bsbord"]);
+    expect(lines.map((l) => l.textContent)).toEqual(["MTS (КРЫМ) reaches none of your nodes · bsbord"]);
     const box = lines[0]!.closest("section")!;
     expect(box.getAttribute("aria-label")).toBe("Networks that reach none of your nodes");
     expect(box.textContent).toContain("No alert covers this: the network cuts every node alike.");
-    // it sits under the counts, before the nodes
-    expect(box.previousElementSibling?.getAttribute("aria-label")).toBe("Nodes by verdict");
+    // it sits under the summary, before the nodes
+    expect(box.previousElementSibling?.className).toContain("rc-sum");
     act(() => root?.unmount());
     host?.remove();
     act(() => setLang("ru"));
     await mount();
-    expect(document.querySelector("[data-testid=dark-everywhere]")?.textContent).toBe("✕MTS (КРЫМ) не достаёт ни до одной твоей ноды · bsbord");
+    expect(document.querySelector("[data-testid=dark-everywhere]")?.textContent).toBe("MTS (КРЫМ) не достаёт ни до одной твоей ноды · bsbord");
+    await open("de1");
     expect(line("de1", "bsbord").firstElementChild?.textContent).toBe("bsbord");
   });
 
@@ -459,31 +585,46 @@ describe("the external sources", () => {
 });
 
 describe("the Reachability page with the sources off", () => {
-  it("says every source is off and leads the owner to them; no counts, no nodes, the alerts of the week stay", async () => {
+  it("says no source is connected and leads the owner to them; no summary, no nodes", async () => {
     getHistory.mockResolvedValue(history([]));
     getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: [] });
     await mount();
-    const off = document.querySelector("[data-testid=all-off]")!;
-    expect(off.textContent).toContain("Every source is off");
-    expect(off.textContent).toContain("Switch one on below: Globalping, the block lists, the TSPU probe, cheburcheck or bsbord.");
-    expect([...off.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["To the sources"]);
-    expect(document.querySelector("[data-kind]")).toBeNull();
+    const off = document.querySelector(".rc-emp")!;
+    expect(off.textContent).toContain("No sources connected");
+    expect(off.textContent).toContain("Until a source is on, the panel does not know whether the nodes open from Russia.");
+    expect([...off.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Connect a source"]);
+    expect(document.querySelector(".rc-sumf")).toBeNull();
     expect(rows()).toHaveLength(0);
+    await click(off.querySelector("button"));
+    expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { tab: "sources" }, replace: true, resetScroll: false });
+  });
+
+  it("keeps the alerts of the week on the Events tab and says why when there are none", async () => {
+    getHistory.mockResolvedValue(history([]));
+    search = { tab: "events" };
+    await mount();
     expect(document.querySelectorAll("[data-testid=reach-event]")).toHaveLength(2);
-    expect(document.querySelectorAll("#sources h3")).toHaveLength(7);
+    act(() => root?.unmount());
+    host?.remove();
+    listAlerts.mockResolvedValue({ nowUnix: NOW, active: [], history: [] });
+    await mount();
+    expect(text()).toContain("No events: no sources are connected");
   });
 
   it("dims a source that is off and leaves its lanes empty, while the others draw", async () => {
     getHistory.mockResolvedValue(history(["globalping", "tspu"]));
     await mount();
     for (const name of ["de1", "nl1", "se1"]) {
-      const l = line(name, "lists");
-      expect(l.getAttribute("data-on")).toBe("false");
-      expect(l.className).toContain("opacity-55");
-      expect(l.children[1]?.textContent).toBe("off");
-      expect(l.querySelector("[data-verdict]")).toBeNull();
-      expect(l.querySelector("[aria-hidden].border-dashed")).not.toBeNull();
+      expect(words(cell(name, "lists"))).toBe("off");
+      expect(cell(name, "lists").className).toContain("mut");
     }
+    await open("nl1");
+    const l = line("nl1", "lists");
+    expect(l.getAttribute("data-on")).toBe("false");
+    expect(l.className).toContain("off");
+    expect(l.children[1]?.textContent).toBe("off");
+    expect(l.querySelector("[data-verdict]")).toBeNull();
+    expect(l.querySelector(".rc-track.off")).not.toBeNull();
     expect(segs("nl1", "globalping")).toHaveLength(3);
     expect(segs("nl1", "tspu")).toHaveLength(3);
   });
@@ -492,13 +633,58 @@ describe("the Reachability page with the sources off", () => {
     role = Role.READONLY;
     getHistory.mockResolvedValue(history([]));
     await mount();
-    expect(document.querySelector("[data-testid=all-off]")?.textContent).toContain("Nothing is checked until the owner switches a source on.");
-    expect(document.querySelector("[data-testid=all-off] button")).toBeNull();
+    expect(document.querySelector(".rc-emp")?.textContent).toContain("Nothing is checked until the owner switches a source on.");
+    expect(document.querySelector(".rc-emp button")).toBeNull();
     expect(document.querySelector("[aria-label=Country]")).toBeNull();
-    expect(document.querySelectorAll("#sources h3")).toHaveLength(0);
-    expect(text()).toContain("Only the owner sees and changes the sources.");
-    // the country of the subtitle comes from the history, which every role reads
+    expect(document.querySelectorAll(".rc-sd")).toHaveLength(0);
+    // the country of the head comes from the history, which every role reads
     expect(text()).toContain("Whether the nodes open from Russia");
+    act(() => root?.unmount());
+    host?.remove();
+    search = { tab: "sources" };
+    await mount();
+    expect(text()).toContain("Only the owner sees and changes the sources.");
+  });
+});
+
+describe("the states of the load", () => {
+  it("shows the grey cards while the history comes, and the tabs stay", async () => {
+    getHistory.mockReturnValue(new Promise(() => {}));
+    await mount();
+    expect(document.querySelector(".hl-skl")?.getAttribute("aria-busy")).toBe("true");
+    expect(tab("Nodes")).toBeDefined();
+    expect(tab("Events")?.querySelector(".bdg")).toBeNull(); // no count until the page is ready
+  });
+
+  it("says the page did not load, with a way to ask again", async () => {
+    getHistory.mockRejectedValueOnce(new Error("down"));
+    await mount();
+    const err = document.querySelector<HTMLElement>(".pv-qe")!;
+    expect(err.textContent).toContain("Reachability failed to load");
+    expect(err.textContent).toContain("Nothing changed on the nodes.");
+    await click(err.querySelector("button"));
+    expect(rows()).toHaveLength(5);
+  });
+
+  it("says the first round is running while sources are on and nothing has been checked yet", async () => {
+    getHistory.mockResolvedValue({ ...history(["globalping", "lists", "tspu"]), nodes: [] });
+    getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: [] });
+    await mount();
+    expect(document.querySelector("[data-testid=first-round]")?.textContent).toContain("The first round of checks is running");
+    expect(document.querySelector(".rc-sumh b")?.textContent).toBe("—");
+    expect(document.querySelector(".rc-sumh span")?.textContent).toBe("waiting for the first round of checks");
+    expect(rows().every((r) => words(r.querySelector(".pv-pill")).startsWith("no data"))).toBe(true);
+  });
+
+  it("says there are no nodes yet", async () => {
+    const was = fleet.splice(0);
+    try {
+      await mount();
+      expect(document.querySelector(".rc-emp")?.textContent).toContain("No nodes yet");
+      expect(document.querySelector(".rc-emp a")?.getAttribute("href")).toBe("/nodes");
+    } finally {
+      fleet.push(...was);
+    }
   });
 });
 
@@ -513,13 +699,14 @@ describe("the points of own probes, for everyone who reads the page", () => {
     getHistory.mockResolvedValue(history(["globalping", "probes"]));
     getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: [check("nod_de1", OK, { sources: ["globalping", "probes"], vantages: probes })] });
     await mount();
-    const points = [...row("de1").querySelectorAll("[data-testid=own-points] li")].map((li) => li.textContent);
+    await open("de1");
+    const points = [...detail("de1").querySelectorAll("[data-testid=own-points] li")].map((li) => li.textContent);
     expect(points).toEqual([
       "?Demo Telecom · Shelbyville — probe “office” no filtering on its path, so “reachable” proves nothing · 4 min ago",
       "✓ExampleNet · Springfield — probe “kitchen” reaches the node · 4 min ago",
     ]);
     expect(line("de1", "probes").getAttribute("data-on")).toBe("true");
-    expect(document.querySelectorAll("#sources h3")).toHaveLength(0);
+    expect(document.querySelectorAll(".rc-sd")).toHaveLength(0);
     expect(text()).toContain("Only the owner sees and changes the sources.");
     const labels = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
     for (const word of ["Revoke", "Add a probe", "Check now", "Update command", "Confirm network", "Disconnect"]) expect(labels).not.toContain(word);
@@ -534,30 +721,29 @@ describe("the points of own probes, for everyone who reads the page", () => {
       countryChecks: [check("nod_de1", CountryVerdict.PARTIAL, { sources: ["probes"], vantages: [vantage("probes", "probe:prb_a", "dark", { network: "ExampleNet · Springfield", probeName: "kitchen", port: 443, asn: "64496", kind: "home", why: "tls_reset" })] })],
     });
     await mount();
-    expect(words(row("de1").querySelector("[data-testid=partial-breakdown]"))).toContain("ExampleNet · Springfield — probe “kitchen” AS64496 · home · TLS is reset (443)");
-    expect(row("de1").querySelector("[data-testid=own-points]")).toBeNull();
+    await open("de1");
+    expect(words(detail("de1").querySelector("[data-testid=partial-breakdown]"))).toContain("ExampleNet · Springfield — probe “kitchen” AS64496 · home · TLS is reset (443)");
+    expect(detail("de1").querySelector("[data-testid=own-points]")).toBeNull();
   });
 });
 
-describe("the Reachability page on a phone (375 px)", () => {
-  it("turns each row into a card: the verdict next to the name on top, then the source lines with their lanes stacked under them", async () => {
+describe("the sources in the Nodes tab, for the owner", () => {
+  it("lists the seven in a card, each leading to its own place", async () => {
     await mount();
-    // six kinds: two to a row on a phone, three on a tablet, all six on the wide screen; none spans a row
-    const sum = document.querySelector("ul[aria-label='Nodes by verdict']")!;
-    expect(sum.className).toContain("grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6");
-    expect([...sum.children].map((li) => li.getAttribute("data-kind"))).toEqual(["ok", "partial", "warn", "bad", "listed", "unknown"]);
-    for (const li of sum.children) expect(li.className).not.toContain("col-span");
-    const card = row("nl1");
-    expect(card.className).toMatch(/(^| )flex flex-col/);
-    expect(card.className).toContain("xl:grid");
-    expect(card.firstElementChild?.className).toContain("xl:contents"); // name and pill share the top line
-    expect(card.firstElementChild?.querySelector("[role=img]")).not.toBeNull();
-    // each lane takes the whole width under its name and word below md
-    for (const s of ["globalping", "lists", "tspu"]) expect(line("nl1", s).querySelector(`[data-testid=lane-${s}]`)?.parentElement?.className).toContain("col-span-2 md:col-span-1");
-    const axis = [...card.querySelectorAll("[aria-hidden].xl\\:hidden")].map((a) => a.textContent);
-    expect(axis).toEqual(["7 days agonow"]);
-    // the day marks over the lanes are for the wide screen only
-    expect(document.querySelector("[aria-hidden].hidden.xl\\:grid")).not.toBeNull();
+    const names = [...document.querySelectorAll(".rc-sl button")].map((b) => b.querySelector("b")?.textContent);
+    expect(names).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
+    await click(document.querySelector(".rc-sl button"));
+    expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { source: "globalping" }, replace: true, resetScroll: false });
+  });
+
+  it("puts a note over the nodes for a source that does not work, and leads to it", async () => {
+    getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: countryChecks.map((c) => ({ ...c, reason: "rate_limited" })) });
+    await mount();
+    const note = document.querySelector("[data-testid=source-warn]")!;
+    expect(note.textContent).toContain("Globalping");
+    expect(note.className).toContain("part");
+    await click(note.querySelector("button"));
+    expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { source: "globalping" }, replace: true, resetScroll: false });
   });
 });
 
@@ -567,16 +753,17 @@ describe("the Reachability page in Russian and Chinese", () => {
     await mount();
     expect(document.querySelector("h1")?.textContent).toBe("Доступность");
     expect(text()).toContain("Открываются ли ноды из России");
-    expect(tally()).toMatchObject({ ok: "3доступны", warn: "1TCP режут", listed: "1в реестре" });
-    expect(["globalping", "lists", "tspu"].map((s) => line("probe1", s).firstElementChild?.textContent)).toEqual(["Globalping", "Списки", "Зонд"]);
-    expect(line("probe1", "tspu").children[1]?.textContent).toBe("нода-зонд");
+    expect(tally()).toMatchObject({ ok: "доступны3", tcp: "TCP режут1", reg: "в реестре1" });
+    expect(document.querySelector(".rc-sumh b")?.textContent).toBe("3 из 5");
+    expect(["globalping", "lists", "tspu"].map((s) => words(cell("probe1", s)))).toEqual(["доступна", "нет в списках", "нода-зонд"]);
+    expect(tab("Ноды")).toBeDefined();
     act(() => root?.unmount());
     host?.remove();
     act(() => setLang("zh"));
     await mount();
     expect(document.querySelector("h1")?.textContent).toBe("可达性");
     expect(text()).toContain("能否从俄罗斯访问节点");
-    expect(line("de1", "lists").children[1]?.textContent).toBe("不在名单中");
+    expect(words(cell("de1", "lists"))).toBe("不在名单中");
   });
 });
 
@@ -602,14 +789,14 @@ describe("IPv6 on the Reachability page", () => {
     getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: countryChecks.map((c) => ({ ...c, ipv6: by[c.nodeId] })) });
     getHistory.mockImplementation((req: { family?: number }) => Promise.resolve(req.family === 6 ? week6 : history(["globalping", "lists", "tspu"])));
   });
-  const pills = (name: string) => [...row(name).querySelectorAll<HTMLElement>("[role=img][tabindex='0']")].filter((p) => p.closest("[data-testid^=line-]") === null);
-  const none = (name: string) => row(name).querySelector("[data-testid=line-ipv6-none]");
+  const pills = (name: string) => [...row(name).querySelectorAll<HTMLElement>(".rc-now .pv-pill")];
+  const none = (name: string) => detail(name)?.querySelector("[data-testid=line-ipv6-none]");
 
   it("asks for the IPv6 week and puts an IPv6 pill after the IPv4 one, with its lane right under Globalping's", async () => {
     await mount();
     expect(getHistory).toHaveBeenCalledWith({ days: 7, family: 6 }, expect.anything());
     expect(pills("fi1").map((p) => p.textContent)).toEqual(["IPv4TCP blocked", "IPv6reachable"]);
-    expect(pills("fi1")[1]!.getAttribute("aria-label")).toBe("fi1, From Russia · IPv6: Reachable from Russia");
+    await open("fi1");
     expect(line("fi1", "globalping").nextElementSibling).toBe(line("fi1", "globalping6"));
     expect(words(line("fi1", "globalping6").children[1])).toBe("reachable");
     expect(line("fi1", "globalping6").querySelector("[data-testid=lane-globalping6]")?.getAttribute("aria-label")).toBe("Globalping · IPv6, last 7 days");
@@ -619,15 +806,19 @@ describe("IPv6 on the Reachability page", () => {
 
   it("gives a node without an IPv6 verdict one quiet line why, in Globalping's place, and only the IPv4 pill", async () => {
     await mount();
-    const why = (name: string) => none(name)?.lastElementChild?.textContent;
-    expect(why("de1")).toBe("The server has no IPv6");
-    expect(why("nl1")).toBe("The server has an IPv6 address, but IPv6 does not work at the hoster");
-    expect(why("probe1")).toBe("The node agent is too old to report IPv6: update it");
+    const why = async (name: string) => {
+      await open(name);
+      return none(name)?.lastElementChild?.textContent;
+    };
+    expect(await why("de1")).toBe("The server has no IPv6");
+    expect(await why("nl1")).toBe("The server has an IPv6 address, but IPv6 does not work at the hoster");
+    expect(await why("probe1")).toBe("The node agent is too old to report IPv6: update it");
     // a week of rounds without a verdict is no data either
-    expect(why("se1")).toBe("Globalping has no IPv6 probes in Russia right now");
+    expect(await why("se1")).toBe("Globalping has no IPv6 probes in Russia right now");
     for (const name of ["de1", "nl1", "probe1", "se1"]) {
       expect(pills(name).map((p) => p.textContent?.slice(0, 4))).toEqual(["IPv4"]);
-      expect(row(name).querySelector("[data-testid=line-globalping6]")).toBeNull();
+      await open(name);
+      expect(detail(name).querySelector("[data-testid=line-globalping6]")).toBeNull();
       expect(line(name, "globalping").nextElementSibling).toBe(none(name));
     }
   });
@@ -641,15 +832,16 @@ describe("IPv6 on the Reachability page", () => {
       Promise.resolve(req.family === 6 ? { ...week6, nodes: [{ nodeId: "nod_se1", lanes: [lane("globalping", pts([NOW - 50 * H, CountryVerdict.BLOCKED]))] }] } : history(["globalping", "lists", "tspu"])),
     );
     await mount();
+    await open("se1");
     expect(none("se1")?.lastElementChild?.textContent).toBe("The IPv6 entry is off and IPv4 is seen from here: IPv6 is not measured");
     expect(pills("se1").map((p) => p.textContent?.slice(0, 4))).toEqual(["IPv4"]);
-    expect(row("se1").querySelector("[data-testid=line-globalping6]")).toBeNull();
+    expect(detail("se1").querySelector("[data-testid=line-globalping6]")).toBeNull();
   });
 
-  it("counts the nodes cut over IPv4 that IPv6 still reaches, under the IPv4 tally", async () => {
+  it("counts the nodes cut over IPv4 that IPv6 still reaches, under the IPv4 summary", async () => {
     await mount();
     expect(document.querySelector("[data-testid=ipv6-helps]")?.textContent).toContain("Cut over IPv4, open over IPv6: 1");
-    expect(tally().warn).toBe("1TCP blocked"); // the tally stays IPv4
+    expect(tally().tcp).toBe("TCP blocked1"); // the summary stays IPv4
   });
 
   it("tags the events: the IPv6 alert, and an IPv4 one whose node IPv6 reaches", async () => {
@@ -660,40 +852,47 @@ describe("IPv6 on the Reachability page", () => {
     });
     await mount();
     const events = [...document.querySelectorAll("[data-testid=reach-event]")].map((e) => words(e));
-    expect(events[0]).toContain("TCP blockedreachable over IPv6 · opened");
-    expect(events[1]).toContain("unreachableIPv6 · closed");
+    expect(events[0]).toContain("TCP blocked");
+    expect(events[0]).toContain("reachable over IPv6");
+    expect(events[1]).toContain("unreachable");
+    expect(events[1]).toContain("IPv6");
   });
 
   describe("the hint for the IPv6 entry", () => {
     const entry = (over: object = {}) => ({ entry: "", entrySupported: true, unavailableReason: "", addresses: [{ address: "2001:db8::5", prefixLen: 64 }], src: "2001:db8::5", ...over });
-    const hint = (name: string) => row(name).querySelector<HTMLElement>("[data-testid=reach-v6-hint]");
+    const hint = (name: string) => detail(name)?.querySelector<HTMLElement>("[data-testid=reach-v6-hint]");
 
     it("under a node cut over IPv4 that IPv6 reaches, with the entry off: the hint and, for the owner, the way to the entry's dialog", async () => {
       fleetV6 = { nod_fi1: entry(), nod_de1: entry() };
       await mount();
+      await open("fi1");
       expect(hint("fi1")?.textContent).toBe("IPv4 is blocked from Russia, IPv6 gets through.Add IPv6 entry…");
       const add = hint("fi1")!.querySelector("a")!;
       expect(add.getAttribute("href")).toBe("/nodes/$id?tab=ways&way=ipv6&add=ipv6");
       expect(add.dataset.id).toBe("nod_fi1");
       // de1 is reachable over IPv4: nothing to say
+      await open("de1");
       expect(hint("de1")).toBeNull();
     });
 
     it("says it without a button to a helper, and to the owner of a node that cannot take an entry", async () => {
       fleetV6 = { nod_fi1: entry({ entrySupported: false, unavailableReason: "agent_old" }) };
       await mount();
+      await open("fi1");
       expect(hint("fi1")?.textContent).toBe("IPv4 is blocked from Russia, IPv6 gets through.");
       act(() => root?.unmount());
       host?.remove();
       role = Role.HELPER;
       fleetV6 = { nod_fi1: entry() };
       await mount();
+      await open("fi1");
       expect(hint("fi1")?.querySelector("a")).toBeNull();
     });
 
     it("is gone once the entry is on", async () => {
       fleetV6 = { nod_fi1: entry({ entry: "2001:db8::5" }) };
       await mount();
+      await open("fi1");
       expect(hint("fi1")).toBeNull();
     });
   });
@@ -702,8 +901,11 @@ describe("IPv6 on the Reachability page", () => {
     act(() => setLang("ru"));
     fleetV6 = { nod_fi1: { entry: "", entrySupported: true, unavailableReason: "", addresses: [], src: "" } };
     await mount();
-    expect(row("fi1").querySelector("[data-testid=reach-v6-hint]")?.textContent).toBe("Из России IPv4 заблокирован, а IPv6 проходит.Добавить вход по IPv6…");
+    await open("fi1");
+    expect(detail("fi1").querySelector("[data-testid=reach-v6-hint]")?.textContent).toBe("Из России IPv4 заблокирован, а IPv6 проходит.Добавить вход по IPv6…");
+    await open("de1");
     expect(none("de1")?.textContent).toBe("Globalping · IPv6На сервере нет IPv6"); // the source for a screen reader
+    await open("se1");
     expect(none("se1")?.lastElementChild?.textContent).toBe("У Globalping сейчас нет IPv6-зондов из России");
     expect(document.querySelector("[data-testid=ipv6-helps]")?.textContent).toContain("По IPv4 режут, по IPv6 доступны: 1");
   });
@@ -713,9 +915,10 @@ describe("the Reachability page while Globalping does not check IPv6", () => {
   it("looks as before: no IPv6 week asked for, no family tags, no IPv6 lines", async () => {
     await mount();
     expect(getHistory.mock.calls.some(([req]) => (req as { family?: number }).family === 6)).toBe(false);
-    const table = document.querySelector("[aria-labelledby=reach-nodes]")?.textContent ?? "";
+    const table = document.querySelector(".rc-main")?.textContent ?? "";
     expect(table).toContain("de1");
     expect(table).not.toMatch(/IPv[46]/);
+    await open("de1");
     expect(document.querySelector("[data-testid=line-ipv6-none], [data-testid=line-globalping6], [data-testid=ipv6-helps]")).toBeNull();
   });
 });

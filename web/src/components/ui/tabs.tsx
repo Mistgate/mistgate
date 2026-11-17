@@ -2,7 +2,7 @@ import { Tabs as BaseTabs } from "@base-ui/react/tabs";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
-export type TabItem = { value: string; label: ReactNode; badge?: number; content: ReactNode };
+export type TabItem = { value: string; label: ReactNode; badge?: number; content: ReactNode; /** Keeps the panel in the page (hidden) while another tab is open: a tab whose state must outlive a look at the others. */ keepMounted?: boolean };
 
 /**
  * Underlined tabs, 44px (node detail, health, subscriptions): the line of the chosen one is under its text. An amber badge carries a count. A strip wider than the screen
@@ -81,7 +81,7 @@ export function Tabs({
         <BaseTabs.Indicator className="absolute bottom-[-1px] left-[calc(var(--active-tab-left)+12px)] h-0.5 w-[calc(var(--active-tab-width)-24px)] translate-x-0 rounded-[1px] bg-accent-mark transition-[left,width] duration-300 ease-out" />
       </BaseTabs.List>
       {items.map((it) => (
-        <BaseTabs.Panel key={it.value} value={it.value} className="screen-enter pt-4 outline-none">
+        <BaseTabs.Panel key={it.value} value={it.value} keepMounted={it.keepMounted} className="screen-enter pt-4 outline-none">
           {it.content}
         </BaseTabs.Panel>
       ))}

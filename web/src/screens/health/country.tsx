@@ -6,6 +6,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
+import { Dot, type DotKind } from "@/screens/health/page-parts";
 import { countryIn, countryLook, type BreakdownNet, type CountryCheck, type CountryLook, type OwnPoint } from "@/lib/health";
 
 // What one country makes of a node (GetChecksResponse.country_checks): what Globalping's probes inside it saw, what the TSPU
@@ -82,7 +83,7 @@ export function CountryMark({ kind }: { kind: Kind }) {
  * what it got; one that did not count is greyed) and the round's time; the probe node with its ports and the run's time; what
  * the lists add; where it comes from.
  */
-function CountryTip({ look, children }: { look: CountryLook; children: ReactElement }) {
+export function CountryTip({ look, children }: { look: CountryLook; children: ReactElement }) {
   const t = useT();
   const label = (
     <span className="flex flex-col gap-1">
@@ -191,42 +192,46 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
   );
 }
 
+/** The board's pill of a verdict (`.pv-pill` and its dot): the tone and the dot of each look; a block on some networks and TCP blocked are both the warn pill. */
+const pillTone: Record<Kind, "ok" | "part" | "bad" | ""> = { ok: "ok", partial: "part", warn: "part", bad: "bad", listed: "bad", unknown: "", none: "" };
+const pillDot: Record<Kind, DotKind> = { ok: "ok", partial: "part", warn: "part", bad: "bad", listed: "bad", unknown: "none", none: "none" };
+
 /**
- * The verdict as a pill with the cell's second line under it (the Reachability page's table): the same colours, glyphs and
- * tooltip as the cell. A node with no row yet gets a dash. `tag`: the address family ("IPv4", "IPv6") while IPv6 is checked too.
+ * The verdict as the board's pill (the Reachability page's table): the dot of its state, then its word, with the cell's tooltip. A node with
+ * no row yet gets a dash. `tag`: the address family ("IPv4", "IPv6") while IPv6 is checked too. `inButton`: the pill sits inside a button (a
+ * row that opens), so it is no tab stop of its own and the tooltip comes with the mouse; what it says is in the opened row.
  */
-export function CountryPill({ check, node, code, tag = "" }: { check: CountryCheck | undefined; node: string; code: string; tag?: string }) {
+export function CountryPill({ check, node, code, tag = "", inButton = false }: { check: CountryCheck | undefined; node: string; code: string; tag?: string; inButton?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const title = [useCountryTitle(code), tag].filter(Boolean).join(" · ");
-  const pill = "inline-flex h-[26px] w-fit max-w-full items-center gap-1.5 rounded-[13px] px-2.5 text-xs leading-none font-bold whitespace-nowrap";
-  const tagged = tag && (
-    <span aria-hidden className="font-mono text-[10px] font-bold opacity-70">
+  const fam = tag && (
+    <span aria-hidden className="rc-fam mono">
       {tag}
     </span>
   );
   if (!check)
     return (
-      <span className={cx(pill, cellCls.none)} title={t("cr.v.notYet")}>
-        {tagged}
-        <span aria-hidden>{t("hl.cell.none")}</span>
+      <span className="pv-pill" title={t("cr.v.notYet")}>
+        {fam}
+        <Dot kind="none" />
+        <span>{t("cr.v.unknown")}</span>
         <span className="sr-only">{t("hl.cell.aria", { node, profile: title, state: t("cr.v.notYet") })}</span>
       </span>
     );
   const look = countryLook(t, fmt, check);
-  return (
-    <span className="flex min-w-0 flex-col items-start gap-1">
-      <CountryTip look={look}>
-        <span role="img" tabIndex={0} aria-label={t("hl.cell.aria", { node, profile: title, state: look.state })} className={cx(pill, cellCls[look.kind])}>
-          {tagged}
-          <CountryMark kind={look.kind} />
-          {look.label}
-          {look.alsoListed && <ListedGlyph />}
-        </span>
-      </CountryTip>
-      {look.note && <span className="text-[11px] leading-tight font-semibold text-muted">{look.note}</span>}
+  const pill = (
+    <span
+      className={cx("pv-pill", pillTone[look.kind])}
+      {...(inButton ? {} : { role: "img", tabIndex: 0, "aria-label": t("hl.cell.aria", { node, profile: title, state: look.state }) })}
+    >
+      {fam}
+      <Dot kind={pillDot[look.kind]} />
+      {look.label}
+      {look.alsoListed && <ListedGlyph />}
     </span>
   );
+  return <CountryTip look={look}>{pill}</CountryTip>;
 }
 
 /**
