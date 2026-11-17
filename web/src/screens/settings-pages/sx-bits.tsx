@@ -139,9 +139,9 @@ export function CmdRow({ value, wrap, className }: { value: string; wrap?: boole
 }
 
 /** The board's banner (rc-pb): a glyph that is a shape as well as a colour, a bold line and a quiet one, a button at the end. */
-export function Pb({ tone, title, children, action, className }: { tone: "bad" | "part"; title?: ReactNode; children?: ReactNode; action?: ReactNode; className?: string }) {
+export function Pb({ tone, title, children, action, className }: { tone: "bad" | "part" | "ok"; title?: ReactNode; children?: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className={cx("rc-pb sx-pb", tone === "bad" && "bad", className)} role={tone === "bad" ? "alert" : undefined}>
+    <div className={cx("rc-pb sx-pb", tone === "bad" && "bad", tone === "ok" && "ok", className)} role={tone === "bad" ? "alert" : undefined}>
       <i className={cx("rw-gl", tone)} aria-hidden />
       <div>
         {title && <b>{title}</b>}

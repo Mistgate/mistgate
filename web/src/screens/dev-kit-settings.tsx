@@ -297,10 +297,14 @@ export function SettingsDemos() {
         </SxRoot>
       </Demo>
       <Demo id="demo-settings-security" title="Settings → Security: passkeys, password and code, sign-in (check on)" seed={[me(), passkeys(2), [passwordLoginQuery.queryKey, { enabled: true, login: "alice", available: true }], security(true)]}>
-        <SecurityPage />
+        <SxRoot>
+          <SecurityPage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-settings-security-passkey" title="Settings → Security: a passkey admin, the check off" seed={[me(), passkeys(1), [passwordLoginQuery.queryKey, { enabled: false, login: "", available: true }], security(false)]}>
-        <SecurityPage />
+        <SxRoot>
+          <SecurityPage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-settings-password-modals" title="Password and code: the windows">
         <div className="flex flex-wrap gap-2">
@@ -328,10 +332,14 @@ export function SettingsDemos() {
           ],
         ]}
       >
-        <SessionsPage />
+        <SxRoot>
+          <SessionsPage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-settings-audit" title="Settings → Audit" seed={[[["audit", "all", "all"], auditPage]]}>
-        <AuditPage />
+        <SxRoot>
+          <AuditPage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-settings-admins" title="Settings → Admins" seed={[me(), passkeys(2), [passwordLoginQuery.queryKey, { enabled: true, login: "alice", available: true }]]}>
         <SxRoot>
@@ -344,7 +352,9 @@ export function SettingsDemos() {
         </SxRoot>
       </Demo>
       <Demo id="demo-settings-backups" title="Settings → Backups">
-        <BackupsPage />
+        <SxRoot>
+          <BackupsPage />
+        </SxRoot>
       </Demo>
       <Demo id="demo-subs-formats" title="Subscriptions → Apps & formats" seed={subsSeed}>
         <FormatsTab go={() => {}} />

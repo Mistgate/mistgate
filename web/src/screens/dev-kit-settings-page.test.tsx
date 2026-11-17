@@ -9,7 +9,7 @@ import { addressOf, scenes, seeded, SettingsSceneBody, variantOf } from "./dev-k
 // The scenes of /dev-kit?only=pn-settings draw the real screen on made-up data: every state a scene names must draw, in every language.
 
 // the scene's own calls are put on these objects by `seeded`
-vi.mock("@/lib/api", () => ({ basepath: "/", assetUrl: (p: string) => p, auth: {}, instance: {}, ops: {}, updates: {}, backups: {} }));
+vi.mock("@/lib/api", () => ({ basepath: "/", assetUrl: (p: string) => p, auth: {}, instance: {}, ops: {}, updates: {}, backups: {}, webauthnSupported: () => true }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, params: _p, search: _s, to, ...rest }: { children?: ReactNode; className?: string; params?: unknown; search?: unknown; to?: string }) => (
     <a className={className} href={to} {...rest}>
@@ -20,6 +20,7 @@ vi.mock("@tanstack/react-router", () => ({
   useSearch: () => ({}),
   useNavigate: () => vi.fn(),
   useParams: () => ({}),
+  useLocation: ({ select }: { select?: (l: { state: object }) => unknown } = {}) => (select ? select({ state: {} }) : { state: {} }),
 }));
 
 beforeAll(() => {

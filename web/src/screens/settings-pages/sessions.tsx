@@ -1,10 +1,7 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { Pending, QueryError } from "@/components/ui/query-error";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
 import { auth } from "@/lib/api";
@@ -12,15 +9,23 @@ import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { plain } from "@/lib/plain";
 import { describeUserAgent } from "@/lib/ua";
+import { ICONS, Otg, Sec, SxGate } from "./sx-bits";
+import { SxWindow } from "./sx-dlg";
 
-const sessionsQuery = queryOptions({
+export const sessionsQuery = queryOptions({
   queryKey: ["sessions"],
   queryFn: async ({ signal }) => plain(await auth.listSessions({}, { signal })),
   refetchInterval: 30_000,
 });
 
-/** Settings -> Sessions: where this admin is signed in. The current one is marked; the others can be ended. */
-export function SessionsPage() {
+/** What a scene says about the page: the window that ends the other sessions is open. */
+export type SessionsDemo = { end?: boolean };
+
+/**
+ * Settings -> Sessions (the board's sxIs_ses): where this admin is signed in. The current one is marked; the others can be ended, one by
+ * one or all at once (a window asks first for all of them). The list is the page's own call: the strip stays while it loads or fails.
+ */
+export function SessionsPage({ demo }: { demo?: SessionsDemo }) {
   const t = useT();
   const fmt = useFmt();
   const toast = useToast();
@@ -38,7 +43,7 @@ export function SessionsPage() {
     },
     onError: (e) => isStepUpCancelled(e) || toast.error(errorText(e, t)),
   });
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState(!!demo?.end);
   const endOthers = useMutation({
     mutationFn: () => guard(() => auth.endOtherSessions({})),
     onSuccess: () => {
@@ -50,62 +55,71 @@ export function SessionsPage() {
   });
 
   return (
-    <section className="rounded-card-lg border border-line bg-surface px-4 py-1.5">
-      <div className="flex items-center gap-2.5 py-2">
-        <SectionLabel as="h2" className="flex-1" icon="phone" tone="mint">
-          {t("sess.title")}
-        </SectionLabel>
-        {others > 0 && (
-          <Button variant="ghostDanger" size="sm" disabled={endOthers.isPending} onClick={() => setConfirming(true)}>
-            {t("sess.endOthers")}
-          </Button>
-        )}
+    <SxGate pending={q.isPending} error={q.isError} onRetry={() => void q.refetch()}>
+      <div className="sx-one">
+        <Sec
+          tone="sky"
+          d={ICONS.device}
+          title={t("sess.title")}
+          foot={others === 0 ? t("sx.ses.alone") : undefined}
+          aside={
+            others > 0 ? (
+              <span className="ai-hb">
+                <Button size="md" disabled={endOthers.isPending} onClick={() => setConfirming(true)}>
+                  {t("sess.endOthers")}
+                </Button>
+              </span>
+            ) : undefined
+          }
+        >
+          <div className="sx-list">
+            {sessions.map((s) => {
+              const { browser, system } = describeUserAgent(s.userAgent);
+              const name = [browser, system].filter(Boolean).join(" · ") || t("sess.unknown");
+              return (
+                <div key={s.id} className="sx-it sx-se">
+                  <span className="ai-mono" aria-hidden>
+                    {name.slice(0, 1)}
+                  </span>
+                  <div>
+                    <b>
+                      {name}
+                      {s.current && <Otg className="now">{t("sess.thisOne")}</Otg>}
+                    </b>
+                    <em>{t("sess.meta", { started: fmt.dateTime(s.createdAtUnix), seen: fmt.ago(s.lastSeenAtUnix) })}</em>
+                  </div>
+                  <code className="mono">{s.ip}</code>
+                  {!s.current && (
+                    <Button size="md" disabled={end.isPending} onClick={() => end.mutate(s.id)}>
+                      {t("sess.end")}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Sec>
       </div>
       {confirming && (
-        <Modal
+        <SxWindow
           open
           onOpenChange={(o) => !o && !endOthers.isPending && setConfirming(false)}
           title={t.n("sess.endOthersTitle", others)}
-          description={t("sess.endOthersBody")}
+          shot="sessions-end-others"
           footer={
             <>
-              <Button variant="ghost" size="md" disabled={endOthers.isPending} onClick={() => setConfirming(false)}>
+              <Button size="lg" disabled={endOthers.isPending} onClick={() => setConfirming(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button variant="danger" size="md" disabled={endOthers.isPending} onClick={() => endOthers.mutate()}>
+              <Button variant="primary" size="lg" className="sx-dng" disabled={endOthers.isPending} onClick={() => endOthers.mutate()}>
                 {t("sess.endOthers")}
               </Button>
             </>
           }
-        />
+        >
+          <p className="sx-dp">{t("sess.endOthersBody")}</p>
+        </SxWindow>
       )}
-      {q.isPending && <Pending compact className="border-t border-line py-3.5" />}
-      {q.isError && <QueryError compact className="border-t border-line py-3" error={q.error} onRetry={() => void q.refetch()} />}
-      {sessions.map((s) => {
-        const { browser, system } = describeUserAgent(s.userAgent);
-        const name = [browser, system].filter(Boolean).join(" · ") || t("sess.unknown");
-        return (
-          <div key={s.id} className="flex min-h-[58px] flex-wrap items-center gap-3 border-t border-line py-2">
-            <div className="flex min-w-[160px] flex-1 flex-col gap-0.5">
-              <span className="flex items-center gap-2 text-[13px] font-bold">
-                {name}
-                {s.current && (
-                  <span className="flex h-[18px] items-center rounded-[5px] bg-accent-soft px-1.5 text-[10px] font-bold text-accent-text">{t("sess.thisOne")}</span>
-                )}
-              </span>
-              <span className="text-[11px] text-muted">
-                {t("sess.meta", { started: fmt.dateTime(s.createdAtUnix), seen: fmt.ago(s.lastSeenAtUnix) })}
-              </span>
-            </div>
-            <span className="font-mono text-xs text-muted">{s.ip}</span>
-            {!s.current && (
-              <Button variant="ghostDanger" size="sm" className="ms-auto" disabled={end.isPending} onClick={() => end.mutate(s.id)}>
-                {t("sess.end")}
-              </Button>
-            )}
-          </div>
-        );
-      })}
-    </section>
+    </SxGate>
   );
 }

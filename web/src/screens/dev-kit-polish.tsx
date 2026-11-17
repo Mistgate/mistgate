@@ -18,6 +18,7 @@ import { NodesScreen } from "@/screens/nodes";
 import { AuditPage } from "@/screens/settings-pages/audit";
 import { passkeysQuery, SecurityPage } from "@/screens/settings-pages/security";
 import { SessionsPage } from "@/screens/settings-pages/sessions";
+import { SxRoot } from "@/screens/settings-pages/sx-bits";
 import { StaleToastView } from "@/components/stale-toast";
 import { UpdateCard } from "@/components/update-card";
 import { updatesQuery } from "@/lib/updates";
@@ -203,9 +204,11 @@ export function PolishKit() {
         <DangerZones />
       </Shot>
       <Shot id="polish-settings-errors" title="Security (the Cloudflare card keeps its place), Sessions and Audit: the load failed" seed={[owner, [passkeysQuery.queryKey, { passkeys: [{ id: "pk1", name: "iPhone", createdAtUnix: now - 86400 * 40, lastUsedAtUnix: now - 3600, backedUp: true }] }]]}>
-        <SecurityPage />
-        <SessionsPage />
-        <AuditPage />
+        <SxRoot>
+          <SecurityPage />
+          <SessionsPage />
+          <AuditPage />
+        </SxRoot>
       </Shot>
       <Shot id="polish-pages-errors" title="Nodes and Updates: the load failed (a screen of its own)">
         <NodesScreen />

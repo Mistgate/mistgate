@@ -3,24 +3,23 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { useEffect, useState, type FormEvent } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Turnstile } from "@/components/turnstile";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { Notice } from "@/components/ui/notice";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Switch } from "@/components/ui/switch";
-import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import type { GetSecuritySettingsResponse } from "@/gen/mistgate/admin/v1/auth_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { auth } from "@/lib/api";
+import { cx } from "@/lib/cx";
 import { errorCode, errorText } from "@/lib/errors";
 import { plain, type Plain } from "@/lib/plain";
+import { Foot, ICONS, Mono, Pb, Sec, slots, Spin, Swr } from "./sx-bits";
+import { SxWindow } from "./sx-dlg";
 
 type Stored = Plain<GetSecuritySettingsResponse>;
 
-const securityQuery = queryOptions({
+export const securityQuery = queryOptions({
   queryKey: ["security-settings"],
   queryFn: async ({ signal }) => plain(await auth.getSecuritySettings({}, { signal })),
 });
@@ -60,8 +59,15 @@ function servedPath() {
   return new URL(nav?.name || location.href).pathname;
 }
 
-/** Settings -> Security -> "Sign-in": the Cloudflare check. Owner only (the server refuses everyone else). */
-export function CloudflareCard() {
+/** What a scene says about the card: the window that removes the secret key, and the proof of new keys (drawn without Cloudflare's own script). */
+export type CloudflareDemo = { removing?: boolean; proving?: boolean };
+
+/**
+ * Settings -> Security -> "Sign-in" (the board's third card): the Cloudflare check at the sign-in form. Owner only (the server refuses
+ * everyone else). The switch, then the keys; new keys are tried with a check of Cloudflare's own before they are saved.
+ */
+export function CloudflareCard({ demo }: { demo?: CloudflareDemo }) {
+  const t = useT();
   const q = useQuery(securityQuery);
   // "?turnstile=on": the page was opened afresh to switch the check on (see cloudflareAllowed), so the switch starts on
   const [startOn] = useState(() => new URLSearchParams(location.search).get("turnstile") === "on");
@@ -71,41 +77,29 @@ export function CloudflareCard() {
   if (!q.data)
     // the card keeps its place while it loads and when the load fails, with the reason and "Try again"
     return (
-      <section className="rounded-card-lg border border-line bg-surface px-4 py-1">
-        <CardHead />
-        {q.isError ? <QueryError compact className="border-t border-line py-3" error={q.error} onRetry={() => void q.refetch()} /> : <Pending compact className="border-t border-line py-3.5" />}
-      </section>
+      <Sec tone="sky" d={ICONS.cloud} title={t("cf.card")}>
+        <div className="sx-pad">{q.isError ? <QueryError compact error={q.error} onRetry={() => void q.refetch()} /> : <Pending compact />}</div>
+      </Sec>
     );
   const s = q.data;
   // a saved change starts the draft over from what the server now holds
-  return <CloudflareForm key={`${s.turnstileEnabled}|${s.turnstileSiteKey}|${s.turnstileSecretSet}`} stored={s} startOn={startOn} />;
-}
-
-function CardHead() {
-  const t = useT();
-  return (
-    <div className="flex min-h-12 items-center py-2">
-      <SectionLabel as="h2" icon="shield" tone="lavender">
-        {t("cf.card")}
-      </SectionLabel>
-    </div>
-  );
+  return <CloudflareForm key={`${s.turnstileEnabled}|${s.turnstileSiteKey}|${s.turnstileSecretSet}`} stored={s} startOn={startOn} demo={demo} />;
 }
 
 type Update = { turnstileEnabled?: boolean; turnstileSiteKey?: string; turnstileSecretKey?: string; turnstileTestToken?: string };
 
-function CloudflareForm({ stored, startOn }: { stored: Stored; startOn: boolean }) {
+function CloudflareForm({ stored, startOn, demo }: { stored: Stored; startOn: boolean; demo?: CloudflareDemo }) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
   const guard = useStepUp();
   const [enabled, setEnabled] = useState(stored.turnstileEnabled || startOn);
   const [siteKey, setSiteKey] = useState(stored.turnstileSiteKey);
-  const [secret, setSecret] = useState("");
+  const [secret, setSecret] = useState(demo?.proving ? "not-a-real-secret" : "");
   // the check of new keys: the widget runs with the new site key, and the server tries its token with the new secret
-  const [proving, setProving] = useState(false);
+  const [proving, setProving] = useState(!!demo?.proving);
   const [proofError, setProofError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState(false);
+  const [removing, setRemoving] = useState(!!demo?.removing);
 
   const dirty = enabled !== stored.turnstileEnabled || siteKey !== stored.turnstileSiteKey || secret !== "";
   const problem = draftProblem({ enabled, siteKey, secret }, stored);
@@ -164,114 +158,115 @@ function CloudflareForm({ stored, startOn }: { stored: Stored; startOn: boolean 
     else save.mutate(draft());
   }
 
+  // the board's yellow line: the check is on, and nothing yet to ask Cloudflare with
+  const noSecret = enabled && !stored.turnstileSecretSet && !secret;
+  const siteOk = siteKeyPattern.test(siteKey);
   return (
-    <section className="rounded-card-lg border border-line bg-surface px-4 py-1">
-      <CardHead />
+    <Sec tone="sky" d={ICONS.cloud} title={t("cf.card")} foot={slots(t("sx.cf.foot"), { cmd: <Mono>mistgate auth turnstile off</Mono> })}>
       <form onSubmit={submit}>
-        <label className="flex min-h-[56px] cursor-pointer items-center gap-3 border-t border-line">
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[13px] font-bold">{t("cf.title")}</span>
-            <span className="text-[11px] leading-snug text-muted">{t("cf.hint")}</span>
-          </span>
-          <Switch checked={enabled} onCheckedChange={toggle} />
-        </label>
+        <Swr label={t("cf.title")} hint={t("cf.hint")}>
+          <Switch className="fz-sw" checked={enabled} onCheckedChange={toggle} aria-label={t("cf.title")} />
+        </Swr>
         {enabled && (
-          <div className="screen-enter flex flex-col gap-3.5 border-t border-line py-3.5">
-            <div className="grid gap-3.5 md:grid-cols-2">
-              <TextField
-                label={t("cf.siteKey")}
+          <div className="sx-form">
+            {noSecret && <Pb tone="part">{t("sx.cf.nosecret")}</Pb>}
+            <label className={cx("an-f", !siteOk && "err")}>
+              <span>{t("cf.siteKey")}</span>
+              <input
+                className="an-i mono"
+                type="text"
                 value={siteKey}
+                maxLength={maxSiteKey}
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                aria-invalid={!siteOk || undefined}
                 onChange={(e) => {
                   setSiteKey(e.target.value.trim());
                   edited();
                 }}
-                maxLength={maxSiteKey}
-                mono
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                error={siteKeyPattern.test(siteKey) ? undefined : t("cf.siteKeyError")}
-                hint={t("cf.siteKeyHint")}
               />
-              <TextField
-                label={
-                  <span className="flex items-center gap-2">
-                    {t("cf.secretKey")}
-                    <span className={stored.turnstileSecretSet ? "tone-ok tone-text" : "text-faint"}>· {stored.turnstileSecretSet ? t("cf.secretSet") : t("cf.secretNotSet")}</span>
-                  </span>
-                }
+              <small>{siteOk ? t("cf.siteKeyHint") : t("cf.siteKeyError")}</small>
+            </label>
+            <div className="an-f">
+              <span id="sx-cf-sl">{stored.turnstileSecretSet ? `${t("cf.secretKey")} · ${t("cf.secretSet")}` : t("cf.secretKey")}</span>
+              <input
+                aria-labelledby="sx-cf-sl"
+                className="an-i mono"
                 type="password"
-                className="[&_input::placeholder]:font-sans"
                 value={secret}
+                maxLength={maxSecret}
+                autoComplete="new-password"
+                placeholder={stored.turnstileSecretSet ? t("cf.secretKeep") : "0x4AAA…"}
                 onChange={(e) => {
                   setSecret(e.target.value);
                   edited();
                 }}
-                maxLength={maxSecret}
-                mono
-                autoComplete="new-password"
-                placeholder={stored.turnstileSecretSet ? t("cf.secretKeep") : t("cf.secretPaste")}
-                hint={t("cf.secretHint")}
               />
-            </div>
-            <Notice>{t("cf.warn")}</Notice>
-            {stored.turnstileSecretSet && (
-              <div>
-                <Button variant="ghostDanger" size="sm" disabled={save.isPending} onClick={() => setRemoving(true)}>
+              <small>{t("cf.secretHint")}</small>
+              {stored.turnstileSecretSet && (
+                <button type="button" className="an-lk ig-lk sx-lkl" disabled={save.isPending} onClick={() => setRemoving(true)}>
                   {t("cf.secretRemove")}
-                </Button>
+                </button>
+              )}
+            </div>
+            {proving && (
+              <div className="sx-proof">
+                <p>{save.isPending ? t("cf.proving") : t("cf.proveHint")}</p>
+                {demo?.proving ? (
+                  <div className="an-code">
+                    <code className="mono">{t("cf.idle")}</code>
+                  </div>
+                ) : (
+                  <Turnstile
+                    key={siteKey}
+                    siteKey={siteKey}
+                    onToken={(token) => token && !save.isPending && save.mutate(draft(token))}
+                    // 1101xx: the site key is unknown; 1102xx: it does not allow this domain
+                    onFail={(code) => code.startsWith("110") && setProofError(t("cf.err.sitekey"))}
+                  />
+                )}
               </div>
             )}
+            {proofError && <Pb tone="bad">{proofError}</Pb>}
           </div>
         )}
-        {proving && (
-          <div className="screen-enter flex flex-col gap-2.5 border-t border-line py-3.5">
-            <p className="text-xs leading-normal text-pretty text-muted">{save.isPending ? t("cf.proving") : t("cf.proveHint")}</p>
-            <Turnstile
-              key={siteKey}
-              siteKey={siteKey}
-              onToken={(token) => token && !save.isPending && save.mutate(draft(token))}
-              // 1101xx: the site key is unknown; 1102xx: it does not allow this domain
-              onFail={(code) => code.startsWith("110") && setProofError(t("cf.err.sitekey"))}
-            />
-          </div>
-        )}
-        {proofError && <Notice tone="danger" className="mb-3">{proofError}</Notice>}
         {(dirty || problem) && (
-          <div className="screen-enter flex items-center gap-3 border-t border-line py-2.5">
-            <span className={problem === "cf.needKeys" ? "min-w-0 flex-1 text-xs text-muted" : "min-w-0 flex-1 text-xs text-danger-text"}>
-              {problem && problem !== "cf.siteKeyError" ? t(problem) : ""}
-            </span>
+          <Foot className="sx-tk">
+            <em className={cx(problem && problem !== "cf.needKeys" && problem !== "cf.siteKeyError" && "bad")}>{problem && problem !== "cf.siteKeyError" ? t(problem) : ""}</em>
             {proving ? (
-              <Button variant="ghost" size="md" disabled={save.isPending} onClick={() => setProving(false)}>
+              <Button size="md" disabled={save.isPending} onClick={() => setProving(false)}>
                 {t("common.cancel")}
               </Button>
             ) : (
               <Button type="submit" variant="primary" size="md" disabled={!dirty || !!problem || save.isPending}>
+                {save.isPending && <Spin />}
                 {needsProof ? (stored.turnstileEnabled ? t("cf.proveSave") : t("cf.prove")) : t("common.save")}
               </Button>
             )}
-          </div>
+          </Foot>
         )}
       </form>
       {removing && (
-        <Modal
+        <SxWindow
           open
           onOpenChange={(o) => !o && !save.isPending && setRemoving(false)}
           title={t("cf.removeTitle")}
-          description={t("cf.removeBody")}
+          shot="cloudflare-secret-remove"
           footer={
             <>
-              <Button variant="ghost" size="md" disabled={save.isPending} onClick={() => setRemoving(false)}>
+              <Button size="lg" disabled={save.isPending} onClick={() => setRemoving(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button variant="danger" size="md" disabled={save.isPending} onClick={() => save.mutate({ turnstileSecretKey: "" })}>
+              <Button variant="primary" size="lg" className="sx-dng" disabled={save.isPending} onClick={() => save.mutate({ turnstileSecretKey: "" })}>
                 {t("cf.secretRemove")}
               </Button>
             </>
           }
-        />
+        >
+          <p className="sx-dp">{t("cf.removeBody")}</p>
+        </SxWindow>
       )}
-    </section>
+    </Sec>
   );
 }

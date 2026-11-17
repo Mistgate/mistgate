@@ -2,11 +2,10 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { FilterChips } from "@/components/ui/chips";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
-import { EmptyState, Notice } from "@/components/ui/notice";
 import { CursorPagination } from "@/components/ui/pagination";
-import { Pending, QueryError } from "@/components/ui/query-error";
-import { Select } from "@/components/ui/select";
+import { Segmented } from "@/components/ui/segmented";
 import { AuditKind, AuditSource } from "@/gen/mistgate/admin/v1/auth_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
@@ -16,10 +15,13 @@ import { cx } from "@/lib/cx";
 import { useCursorPaging } from "@/lib/paging";
 import { plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
+import { G } from "@/screens/users/user-bits";
+import { ICONS, SxGate } from "./sx-bits";
+import "./settings-b.css";
 
 const pageSizes = [25, 50, 100] as const;
 
-type Source = "all" | "panel" | "bot" | "mcp" | "api" | "assistant";
+export type Source = "all" | "panel" | "bot" | "mcp" | "api" | "assistant";
 const sources: Record<Source, AuditSource> = {
   all: AuditSource.UNSPECIFIED,
   panel: AuditSource.PANEL,
@@ -28,41 +30,45 @@ const sources: Record<Source, AuditSource> = {
   api: AuditSource.API,
   assistant: AuditSource.ASSISTANT,
 };
-const sourceLabels: Record<Source, MessageKey> = { all: "audit.all", panel: "audit.panel", bot: "audit.bot", mcp: "audit.mcp", api: "audit.api", assistant: "audit.assistant" };
+// the board's chips say the source by its mark, as the badge of a row does (only "all" is a word)
+const sourceMarks: Record<Exclude<Source, "all">, string> = { panel: "WEB", bot: "BOT", mcp: "MCP", api: "API", assistant: "AI" };
 
-type Kind = "all" | "signin" | "changes" | "failures";
+export type Kind = "all" | "signin" | "changes" | "failures";
 const kinds: Record<Kind, AuditKind> = {
   all: AuditKind.UNSPECIFIED,
   signin: AuditKind.SIGN_IN,
   changes: AuditKind.CHANGES,
   failures: AuditKind.FAILURES,
 };
+const kindLabels: Record<Kind, MessageKey> = { all: "audit.kind.all", signin: "audit.kind.signin", changes: "audit.kind.changes", failures: "audit.kind.failures" };
 
-// Source badges: WEB grey, BOT sky, MCP accent, API sand.
+// The mark of a row's source, and its colour: WEB grey, BOT sky, MCP and AI lavender, API sand.
 const badge: Record<AuditSource, { label: string; cls: string }> = {
-  [AuditSource.UNSPECIFIED]: { label: "—", cls: "bg-surface-2 text-muted" },
-  [AuditSource.PANEL]: { label: "WEB", cls: "bg-surface-2 text-muted" },
-  [AuditSource.BOT]: { label: "BOT", cls: "bg-[color-mix(in_oklch,var(--accent-sky)_var(--_soft-pct),var(--bg))] text-[color-mix(in_oklch,var(--accent-sky)_var(--_text-pct),#000)]" },
-  [AuditSource.MCP]: { label: "MCP", cls: "bg-accent-soft text-accent-text" },
-  [AuditSource.ASSISTANT]: { label: "AI", cls: "bg-accent-soft text-accent-text" },
-  [AuditSource.API]: { label: "API", cls: "bg-[color-mix(in_oklch,var(--accent-sand)_var(--_soft-pct),var(--bg))] text-[color-mix(in_oklch,var(--accent-sand)_var(--_text-pct),#000)]" },
+  [AuditSource.UNSPECIFIED]: { label: "—", cls: "" },
+  [AuditSource.PANEL]: { label: "WEB", cls: "web" },
+  [AuditSource.BOT]: { label: "BOT", cls: "bot" },
+  [AuditSource.MCP]: { label: "MCP", cls: "mcp" },
+  [AuditSource.ASSISTANT]: { label: "AI", cls: "ai" },
+  [AuditSource.API]: { label: "API", cls: "api" },
 };
 
+/** What a scene says about the page: the filters it starts with. */
+export type AuditDemo = { kind?: Kind; source?: Source };
+
 /**
- * Settings -> Audit (owner only): what was done, by whom and from where. What kind (sign-ins, changes, failures) and
- * which source, newest first, cursor paging. A failed row is red with a cross, in words, never the server's English.
+ * Settings -> Audit (the board's sxIs_aud, owner only): what was done, by whom and from where. What kind (sign-ins, changes, failures) and
+ * which source, newest first, a page of the log at a time by cursor. A failed row is red with a cross, in words, never the server's English.
  */
-export function AuditPage() {
+export function AuditPage({ demo }: { demo?: AuditDemo }) {
   const t = useT();
   const fmt = useFmt();
-  const [kind, setKind] = useState<Kind>("all");
-  const [source, setSource] = useState<Source>("all");
+  const [kind, setKind] = useState<Kind>(demo?.kind ?? "all");
+  const [source, setSource] = useState<Source>(demo?.source ?? "all");
   // a page of the log at a time, newest first; where it starts (`before`) is in the URL
   const paging = useCursorPaging({ sizes: pageSizes, defaultSize: 50 });
   const q = useQuery({
     queryKey: ["audit", source, kind, paging.before, paging.size],
-    queryFn: async ({ signal }) =>
-      plain(await auth.listAudit({ source: sources[source], kind: kinds[kind], beforeId: BigInt(paging.before), pageSize: paging.size }, { signal })),
+    queryFn: async ({ signal }) => plain(await auth.listAudit({ source: sources[source], kind: kinds[kind], beforeId: BigInt(paging.before), pageSize: paging.size }, { signal })),
     // the old page stays on screen while the next one loads
     placeholderData: keepPreviousData,
     retry: (n, e) => ConnectError.from(e).code !== Code.PermissionDenied && n < 2,
@@ -71,15 +77,27 @@ export function AuditPage() {
   const older = q.data && q.data.nextBeforeId > 0 ? q.data.nextBeforeId : undefined;
   const denied = q.isError && ConnectError.from(q.error).code === Code.PermissionDenied;
   const filtered = kind !== "all" || source !== "all";
+  const clear = () => {
+    setKind("all");
+    setSource("all");
+    paging.reset();
+  };
 
-  const kindLabels: Record<Kind, MessageKey> = { all: "audit.kind.all", signin: "audit.kind.signin", changes: "audit.kind.changes", failures: "audit.kind.failures" };
+  if (denied)
+    return (
+      <section className="card us-none hl-calm" role="alert">
+        <span className="g" aria-hidden>
+          <G d={ICONS.lock} size={20} stroke={1.5} />
+        </span>
+        <b>{t("audit.ownerOnly")}</b>
+      </section>
+    );
 
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-2.5">
-        <FilterChips
+    <SxGate pending={q.isPending} error={q.isError} onRetry={() => void q.refetch()}>
+      <div className="sx-af">
+        <Segmented
           aria-label={t("audit.kindFilter")}
-          className="min-w-0 flex-1"
           value={kind}
           onValueChange={(k) => {
             setKind(k);
@@ -87,75 +105,65 @@ export function AuditPage() {
           }}
           options={(Object.keys(kindLabels) as Kind[]).map((k) => ({ value: k, label: t(kindLabels[k]) }))}
         />
-        <div className="w-full sm:w-[170px]">
-          <Select
-            compact
-            aria-label={t("audit.filter")}
-            value={source}
-            onValueChange={(v) => {
-              setSource(v as Source);
-              paging.reset();
-            }}
-            options={(Object.keys(sourceLabels) as Source[]).map((s) => ({ value: s, label: t(sourceLabels[s]) }))}
-          />
-        </div>
+        <FilterChips
+          aria-label={t("audit.filter")}
+          className="sx-as"
+          value={source}
+          onValueChange={(s) => {
+            setSource(s);
+            paging.reset();
+          }}
+          options={(Object.keys(sources) as Source[]).map((s) => ({ value: s, label: s === "all" ? t("audit.all") : sourceMarks[s] }))}
+        />
       </div>
-      {denied && <Notice>{t("audit.ownerOnly")}</Notice>}
-      {q.isError && !denied && <QueryError error={q.error} onRetry={() => void q.refetch()} />}
-      {q.isPending && <Pending />}
-      {q.data && entries.length === 0 && (
-        <div className="rounded-card-lg border border-dashed border-line">
-          <EmptyState title={filtered ? t("audit.noneKind") : t("audit.none")} />
-        </div>
+      {q.data && entries.length === 0 && !paging.hasNewer && (
+        <section className="card us-none hl-calm rc-emp">
+          <span className="g" aria-hidden>
+            <G d={ICONS.history} size={20} stroke={1.5} />
+          </span>
+          <b>{t("sx.aud.none")}</b>
+          {filtered && (
+            <>
+              <span>{t("sx.aud.nomatch")}</span>
+              <Button size="lg" onClick={clear}>
+                {t("sx.aud.reset")}
+              </Button>
+            </>
+          )}
+        </section>
       )}
-      {entries.length > 0 && (
-        <div className="rounded-card-lg border border-line bg-surface px-4 py-1">
-          <div className={cx("transition-opacity duration-200", q.isPlaceholderData && "opacity-60")} aria-busy={q.isPlaceholderData || undefined}>
-          {entries.map((e, i) => {
-            const b = badge[e.source as AuditSource] ?? badge[AuditSource.UNSPECIFIED];
-            const failed = isFailure(e.result);
-            return (
-              <div
-                key={e.id}
-                className={cx(
-                  "grid min-h-12 items-center gap-x-3 gap-y-1 py-1.5 text-[13px] max-[1099px]:grid-cols-[minmax(0,1fr)_auto] min-[1100px]:grid-cols-[170px_minmax(0,1fr)_110px_112px]",
-                  i > 0 && "border-t border-line",
-                )}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className={cx("flex h-5 flex-none items-center rounded-md px-[7px] font-mono text-[10px] font-bold", b.cls)}>{b.label}</span>
-                  <b className="truncate">{actorLabel(t, e)}</b>
-                </span>
-                <span className={cx("flex min-w-0 items-start gap-1.5 text-pretty max-[1099px]:order-3 max-[1099px]:col-span-2", failed && "text-danger-text")}>
-                  {failed && <Icon name="x" size={13} strokeWidth={3} className="mt-[3px] block flex-none" />}
-                  <span className="min-w-0">{describeAudit(t, e)}</span>
-                </span>
-                <span className="truncate font-mono text-[11px] text-muted max-[1099px]:order-2">{e.ip}</span>
-                <span className="text-end font-mono text-[11px] text-muted max-[1099px]:order-1">{fmt.stamp(e.timeUnix)}</span>
-              </div>
-            );
-          })}
+      {(entries.length > 0 || paging.hasNewer) && (
+        <section className="card sx-aud-card">
+          <div className={cx("sx-aud", q.isPlaceholderData && "wait")} aria-busy={q.isPlaceholderData || undefined}>
+            {entries.map((e) => {
+              const b = badge[e.source as AuditSource] ?? badge[AuditSource.UNSPECIFIED];
+              const failed = isFailure(e.result);
+              return (
+                <div key={e.id} className={cx("sx-ar", failed && "fail")}>
+                  <i className={cx("sx-src mono", b.cls)}>{b.label}</i>
+                  <span className="sx-aw">
+                    {failed && <Icon name="x" size={12} strokeWidth={3} className="me-1 inline-block align-[-1px]" />}
+                    <b>{actorLabel(t, e)}</b> {describeAudit(t, e)}
+                  </span>
+                  <code className="mono">{e.ip}</code>
+                  <em>{fmt.stamp(e.timeUnix)}</em>
+                </div>
+              );
+            })}
           </div>
-          <CursorPagination
-            busy={q.isPlaceholderData}
-            label={t("settings.audit")}
-            size={paging.size}
-            sizes={pageSizes}
-            onSize={paging.setSize}
-            cursor={{ before: paging.before, count: entries.length, hasOlder: older !== undefined, hasNewer: paging.hasNewer, toNewest: paging.newerToFirst, index: paging.index, onOlder: () => older !== undefined && paging.older(older), onNewer: paging.newer }}
-          />
-        </div>
+          <div className="sx-aud-pg">
+            <CursorPagination
+              flush={entries.length === 0}
+              busy={q.isPlaceholderData}
+              label={t("settings.audit")}
+              size={paging.size}
+              sizes={pageSizes}
+              onSize={paging.setSize}
+              cursor={{ before: paging.before, count: entries.length, hasOlder: older !== undefined, hasNewer: paging.hasNewer, toNewest: paging.newerToFirst, index: paging.index, onOlder: () => older !== undefined && paging.older(older), onNewer: paging.newer }}
+            />
+          </div>
+        </section>
       )}
-      {/* a page past the end (an old link) holds no rows: the way back is still there */}
-      {q.data && entries.length === 0 && paging.hasNewer && (
-        <div className="rounded-card-lg border border-line bg-surface px-4">
-          <CursorPagination
-            flush
-            size={paging.size}
-            cursor={{ before: paging.before, count: 0, hasOlder: false, hasNewer: true, toNewest: paging.newerToFirst, index: paging.index, onOlder: () => {}, onNewer: paging.newer }}
-          />
-        </div>
-      )}
-    </>
+    </SxGate>
   );
 }

@@ -143,7 +143,9 @@ async function type(el: HTMLInputElement, value: string) {
 }
 async function submit(label: string) {
   const b = (dialog() ? inDialog(label) : button(label)) as HTMLButtonElement | undefined;
-  await act(async () => void b?.closest("form")?.requestSubmit(b));
+  // a window's buttons stand in its footer, outside the form, tied to it by the form attribute
+  const form = b?.getAttribute("form") ? document.getElementById(b.getAttribute("form")!) : b?.closest("form");
+  await act(async () => void (form as HTMLFormElement | null)?.requestSubmit(b));
   for (let i = 0; i < 3; i++) await settle();
 }
 /** location as a page loaded from `path` would have it (the CSP of a document follows the path it was served at). */
@@ -191,7 +193,7 @@ describe("Settings: the frame", () => {
 describe("Settings → Security → Password and code", () => {
   it("shows the login, the two changes and the way back from the server for an admin with a password", async () => {
     await mount(<SecurityPage />);
-    expect(text()).toContain(en["pw.on"]);
+    expect(text()).toContain(en["sx.sec.pw.on"]);
     expect(text()).toContain("alice");
     expect(button(en["pw.change"])).toBeDefined();
     expect(button(en["pw.rebind"])).toBeDefined();
@@ -222,8 +224,11 @@ describe("Settings → Security → Password and code", () => {
     await click(button(en["pw.change"]));
     expect(dialog()?.textContent).toContain(en["pw.changeBody"]);
     await type(input("[role=dialog] input[autocomplete=current-password]"), "old password 1");
+    // the board asks on the press: a short new password is refused there, and nothing is sent
     await type(input("[role=dialog] input[autocomplete=new-password]"), "short");
-    expect(dialog()?.textContent).toContain(en["auth.err.passwordShort"]);
+    await submit(en["pw.change"]);
+    expect(dialog()?.querySelector(".an-f.err small")?.textContent).toBe(en["auth.err.passwordShort"]);
+    expect(auth.changePassword).not.toHaveBeenCalled();
     await type(input("[role=dialog] input[autocomplete=new-password]"), "a much longer new password");
     await submit(en["pw.change"]);
     expect(auth.changePassword).toHaveBeenCalledWith({ currentPassword: "old password 1", newPassword: "a much longer new password" });
@@ -274,6 +279,7 @@ describe("Settings → Security → Password and code", () => {
     await click(button(en["pw.add"]));
     await type(input("[role=dialog] input[autocomplete=username]"), "bad login!");
     expect(dialog()?.textContent).toContain(en["auth.err.login"]);
+    expect((inDialog(en["auth.next"]) as HTMLButtonElement).disabled).toBe(true);
     await type(input("[role=dialog] input[autocomplete=username]"), "alice");
     await type(input("[role=dialog] input[autocomplete=new-password]"), "correct horse battery");
     await submit(en["auth.next"]);
@@ -445,7 +451,7 @@ describe("Settings → Admins, Domains, Backups", () => {
     it("says the backup started and keeps the button busy while the panel makes it", async () => {
       await create({ running: true });
       expect(text()).toContain(en["set.backups.started"]);
-      expect(button(en["set.backups.creating"])?.disabled).toBe(true);
+      expect(button(en["sx.bk.running"])?.getAttribute("aria-busy")).toBe("true");
       expect(text()).not.toContain(en["set.backups.created"]);
     });
 

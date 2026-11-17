@@ -3,19 +3,17 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { useState, type FormEvent } from "react";
 import { CodeField, TotpEnroll } from "@/components/auth-parts";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { Notice } from "@/components/ui/notice";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { useT, type T } from "@/i18n";
 import { auth } from "@/lib/api";
 import { loginPattern, passwordTooLong, passwordTooShort, type TotpEnrolment } from "@/lib/credentials";
 import { errorCode, errorText } from "@/lib/errors";
 import { plain } from "@/lib/plain";
-import { CopyRow } from "./domains";
+import { ICONS, CmdRow, Mono, Pb, Sec, Spin } from "./sx-bits";
+import { SxWindow } from "./sx-dlg";
+import { cx } from "@/lib/cx";
 
 /** GetPasswordLogin: whether the signed-in admin can sign in with a login, a password and an authenticator code. */
 export const passwordLoginQuery = queryOptions({
@@ -39,95 +37,115 @@ function failText(e: unknown, t: T) {
   return c.code === Code.ResourceExhausted ? t("pw.locked") : errorText(e, t);
 }
 
-const passwordError = (pw: string, t: T) =>
-  passwordTooShort(pw) ? t("auth.err.passwordShort") : passwordTooLong(pw) ? t("auth.err.passwordLong") : undefined;
+/** Too many wrong attempts: the server answers "exhausted" and the password stays shut for 15 minutes (the board's red line over the card). */
+const lockedBy = (e: unknown) => ConnectError.from(e).code === Code.ResourceExhausted;
+
+const passwordError = (pw: string, t: T) => (passwordTooShort(pw) ? t("auth.err.passwordShort") : passwordTooLong(pw) ? t("auth.err.passwordLong") : undefined);
+
+/** What a scene says about the card: the lock over it, and a window that is open (the re-bind one holds a made-up secret). */
+export type PasswordDemo = { lock?: boolean; window?: "change" | "change-err" | "change-busy" | "add" | "add-qr" | "rebind" };
+
+const demoTotp: TotpEnrolment = { ceremonyId: "cer_demo", uri: "otpauth://totp/mistgate:owner?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=mistgate", secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP" };
 
 /**
- * Settings -> Security -> "Password and code": the spare way in next to the passkeys. Change the password, re-bind the
- * authenticator app, or (an admin with passkeys only) add the password login; and the way back from the panel server
- * for a lost phone.
+ * "Password and code" (the board's second card of Security): the spare way in next to the passkeys. Change the password, re-bind the
+ * authenticator app, or (an admin with passkeys only) add the password login; and the way back from the panel server for a lost phone.
+ * A refusal for too many wrong attempts puts the board's red line over the card.
  */
-export function PasswordCard() {
+export function PasswordCard({ demo }: { demo?: PasswordDemo }) {
   const t = useT();
   const toast = useToast();
   const guard = useStepUp();
   const q = useQuery(passwordLoginQuery);
-  const [open, setOpen] = useState<"change" | "add" | null>(null);
-  const [rebind, setRebind] = useState<TotpEnrolment | null>(null);
+  const [open, setOpen] = useState<"change" | "add" | null>(demo?.window?.startsWith("change") ? "change" : demo?.window?.startsWith("add") ? "add" : null);
+  const [rebind, setRebind] = useState<TotpEnrolment | null>(demo?.window === "rebind" ? demoTotp : null);
+  const [locked, setLocked] = useState(!!demo?.lock);
   const pw = q.data;
   // the server's step-up comes first, then the new secret: the QR opens only once it is there
   const begin = useMutation({
     mutationFn: () => guard(() => auth.beginTotpEnrollment({})),
     onSuccess: (r) => setRebind({ ceremonyId: r.ceremonyId, uri: r.totpUri, secret: r.totpSecret }),
-    onError: (e) => isStepUpCancelled(e) || toast.error(failText(e, t)),
+    onError: (e) => {
+      if (isStepUpCancelled(e)) return;
+      if (lockedBy(e)) setLocked(true);
+      toast.error(failText(e, t));
+    },
   });
 
   return (
-    <section className="rounded-card-lg border border-line bg-surface px-4 py-1.5">
-      <div className="flex min-h-12 items-center py-2">
-        <SectionLabel as="h2" icon="key" tone="lavender">
-          {t("pw.title")}
-        </SectionLabel>
-      </div>
-      {q.isPending && <Pending compact className="border-t border-line py-3.5" />}
-      {q.isError && <QueryError compact className="border-t border-line py-3" error={q.error} onRetry={() => void q.refetch()} />}
+    <Sec tone="sand" d={ICONS.lock} title={t("pw.title")} foot={pw?.available && pw.enabled ? t("pw.lockout") : undefined}>
+      {locked && (
+        <Pb tone="bad" className="sx-pbm" title={t("sx.sec.lock")}>
+          {t("sx.sec.lock.body")}
+        </Pb>
+      )}
+      {q.isPending && (
+        <div className="sx-pad" aria-busy="true">
+          <Pending compact />
+        </div>
+      )}
+      {q.isError && (
+        <div className="sx-pad">
+          <QueryError compact error={q.error} onRetry={() => void q.refetch()} />
+        </div>
+      )}
       {pw && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 border-t border-line py-3.5">
-          <p className="min-w-[200px] flex-1 text-[13px] leading-normal text-pretty">
-            {pw.enabled ? (
-              <>
-                {t("pw.on")}{" "}
-                <span className="text-muted">
-                  {t("pw.login")}: <b className="font-mono text-fg">{pw.login}</b>
-                </span>
-              </>
-            ) : (
-              <span className="text-muted">{pw.available ? t("pw.off") : t("pw.noKey")}</span>
-            )}
-          </p>
-          <div className="flex flex-wrap gap-2">
+        <div className="sx-it sx-pw">
+          {pw.enabled ? (
+            <div>
+              <b>{t("sx.sec.pw.on")}</b>
+              <em>
+                {t("pw.login")}: <Mono>{pw.login}</Mono>
+              </em>
+            </div>
+          ) : (
+            <div>
+              <b>{pw.available ? t("pw.off") : t("pw.noKey")}</b>
+            </div>
+          )}
+          <span className="ai-na">
             {pw.enabled && (
               <>
-                <Button variant="secondary" size="sm" onClick={() => setOpen("change")}>
+                <Button size="md" onClick={() => setOpen("change")}>
                   {t("pw.change")}
                 </Button>
-                <Button variant="secondary" size="sm" disabled={!pw.available || begin.isPending} onClick={() => begin.mutate()}>
+                <Button size="md" disabled={!pw.available || begin.isPending} onClick={() => begin.mutate()}>
                   {t("pw.rebind")}
                 </Button>
               </>
             )}
             {!pw.enabled && pw.available && (
-              <Button variant="secondary" size="sm" onClick={() => setOpen("add")}>
+              <Button size="md" onClick={() => setOpen("add")}>
                 {t("pw.add")}
               </Button>
             )}
-          </div>
+          </span>
         </div>
       )}
       {pw?.available && (
-        <div className="flex flex-col gap-2 border-t border-line py-3.5">
-          <span className="text-xs leading-normal text-pretty text-muted">{t("pw.lost")}</span>
-          <CopyRow value={pw.enabled ? `mistgate auth reset-login ${pw.login}` : "mistgate auth reset-login"} />
-          {pw.enabled && <span className="text-xs leading-normal text-pretty text-muted">{t("pw.lockout")}</span>}
+        <div className="sx-rl">
+          <span>{t("pw.lost")}</span>
+          <CmdRow value={pw.enabled ? `mistgate auth reset-login ${pw.login}` : "mistgate auth reset-login"} />
         </div>
       )}
-      {open === "change" && pw && <ChangePassword login={pw.login} onClose={() => setOpen(null)} />}
-      {open === "add" && <Enroll onClose={() => setOpen(null)} />}
-      {rebind && <Enroll begun={rebind} onClose={() => setRebind(null)} />}
-    </section>
+      {open === "change" && <ChangePassword login={pw?.login ?? ""} demo={demo?.window} onLocked={() => setLocked(true)} onClose={() => setOpen(null)} />}
+      {open === "add" && <Enroll demo={demo?.window === "add-qr" ? "add-qr" : undefined} onLocked={() => setLocked(true)} onClose={() => setOpen(null)} />}
+      {rebind && <Enroll begun={rebind} onLocked={() => setLocked(true)} onClose={() => setRebind(null)} />}
+    </Sec>
   );
 }
 
-export function ChangePassword({ login, onClose }: { login: string; onClose: () => void }) {
+/** The window "Change password": the current one, a new one of 12 characters or more. Asks on the press, not on every key; the other sessions end. */
+export function ChangePassword({ login, onClose, onLocked, demo }: { login: string; onClose: () => void; onLocked?: () => void; demo?: PasswordDemo["window"] }) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
   const guard = useStepUp();
   const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [wrong, setWrong] = useState(false);
+  const [next, setNext] = useState(demo === "change-err" ? "short" : "");
+  const [e1, setE1] = useState(demo === "change-err" ? t("sx.sec.pw.cur.empty") : "");
+  const [e2, setE2] = useState(demo === "change-err" ? t("auth.err.passwordShort") : "");
   const [fail, setFail] = useState<string | null>(null);
-  const nextError = next ? passwordError(next, t) : undefined;
 
   const change = useMutation({
     mutationFn: () => guard(() => auth.changePassword({ currentPassword: current, newPassword: next })),
@@ -139,55 +157,83 @@ export function ChangePassword({ login, onClose }: { login: string; onClose: () 
     onError: (e) => {
       if (isStepUpCancelled(e)) return;
       if (errorCode(ConnectError.from(e).rawMessage) === "wrong_password") {
-        setWrong(true);
+        setE1(t("pw.wrong"));
         setCurrent("");
-      } else setFail(failText(e, t));
+        return;
+      }
+      if (lockedBy(e)) onLocked?.();
+      setFail(failText(e, t));
     },
   });
+  const busy = change.isPending || demo === "change-busy";
 
   function submit(e: FormEvent) {
     e.preventDefault();
     setFail(null);
-    if (current && next && !nextError && !change.isPending) change.mutate();
+    if (busy) return;
+    const a = current ? "" : t("sx.sec.pw.cur.empty");
+    const b = passwordError(next, t) ?? "";
+    setE1(a);
+    setE2(b);
+    if (!a && !b) change.mutate();
   }
 
   return (
-    <Modal open onOpenChange={(o) => !o && !change.isPending && onClose()} title={t("pw.changeTitle")} description={t("pw.changeBody")}>
-      <form onSubmit={submit} className="flex flex-col gap-3.5">
-        {/* tells a password manager whose password this is */}
-        <input type="text" name="username" autoComplete="username" value={login} readOnly hidden />
-        {fail && <Notice tone="danger">{fail}</Notice>}
-        <TextField
-          label={t("pw.current")}
-          type="password"
-          autoComplete="current-password"
-          value={current}
-          onChange={(e) => {
-            setCurrent(e.target.value);
-            setWrong(false);
-          }}
-          error={wrong ? t("pw.wrong") : undefined}
-          autoFocus
-        />
-        <TextField
-          label={t("pw.new")}
-          type="password"
-          autoComplete="new-password"
-          value={next}
-          onChange={(e) => setNext(e.target.value)}
-          error={nextError}
-          hint={t("auth.err.passwordShort")}
-        />
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="md" disabled={change.isPending} onClick={onClose}>
+    <SxWindow
+      open
+      onOpenChange={(o) => !o && !busy && onClose()}
+      title={t("pw.changeTitle")}
+      shot="password-change"
+      footer={
+        <>
+          <Button size="lg" disabled={busy} onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" size="md" disabled={change.isPending || !current || !next || !!nextError}>
-            {change.isPending ? t("auth.checking") : t("pw.change")}
+          <Button variant="primary" size="lg" type="submit" form="sx-pw" className={cx(busy && "sx-busy")} aria-busy={busy || undefined}>
+            {busy && <Spin />}
+            {busy ? t("sx.sec.pw.busy") : t("pw.change")}
           </Button>
-        </div>
+        </>
+      }
+    >
+      <form id="sx-pw" onSubmit={submit} className="contents">
+        {/* tells a password manager whose password this is */}
+        <input type="text" name="username" autoComplete="username" value={login} readOnly hidden />
+        <p className="sx-dp">{t("pw.changeBody")}</p>
+        {fail && <Pb tone="bad">{fail}</Pb>}
+        <label className={cx("an-f", e1 && "err")}>
+          <span>{t("pw.current")}</span>
+          <input
+            className="an-i"
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            autoFocus
+            aria-invalid={!!e1 || undefined}
+            onChange={(e) => {
+              setCurrent(e.target.value);
+              setE1("");
+            }}
+          />
+          <small>{e1}</small>
+        </label>
+        <label className={cx("an-f", e2 && "err")}>
+          <span>{t("pw.new")}</span>
+          <input
+            className="an-i"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            aria-invalid={!!e2 || undefined}
+            onChange={(e) => {
+              setNext(e.target.value);
+              setE2("");
+            }}
+          />
+          <small>{e2 || t("auth.err.passwordShort")}</small>
+        </label>
       </form>
-    </Modal>
+    </SxWindow>
   );
 }
 
@@ -196,15 +242,15 @@ export function ChangePassword({ login, onClose }: { login: string; onClose: () 
  * `begun` it re-binds the app of an existing password login; without, it first asks for the login and the password of a
  * new one (a passkey admin adding the spare way in).
  */
-export function Enroll({ begun, onClose }: { begun?: TotpEnrolment; onClose: () => void }) {
+export function Enroll({ begun, onClose, onLocked, demo }: { begun?: TotpEnrolment; onClose: () => void; onLocked?: () => void; demo?: "add-qr" }) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
   const guard = useStepUp();
   const adding = !begun;
-  const [login, setLogin] = useState("");
+  const [login, setLogin] = useState(demo ? "owner" : "");
   const [password, setPassword] = useState("");
-  const [totp, setTotp] = useState<TotpEnrolment | null>(begun ?? null);
+  const [totp, setTotp] = useState<TotpEnrolment | null>(begun ?? (demo ? demoTotp : null));
   const [code, setCode] = useState("");
   const [badCode, setBadCode] = useState(false);
   const [fail, setFail] = useState<string | null>(null);
@@ -217,7 +263,11 @@ export function Enroll({ begun, onClose }: { begun?: TotpEnrolment; onClose: () 
       setTotp({ ceremonyId: r.ceremonyId, uri: r.totpUri, secret: r.totpSecret });
       setCode("");
     },
-    onError: (e) => isStepUpCancelled(e) || setFail(failText(e, t)),
+    onError: (e) => {
+      if (isStepUpCancelled(e)) return;
+      if (lockedBy(e)) onLocked?.();
+      setFail(failText(e, t));
+    },
   });
   const finish = useMutation({
     mutationFn: () => auth.finishTotpEnrollment({ ceremonyId: totp!.ceremonyId, totpCode: code }),
@@ -235,6 +285,7 @@ export function Enroll({ begun, onClose }: { begun?: TotpEnrolment; onClose: () 
         setCode("");
         return;
       }
+      if (lockedBy(e)) onLocked?.();
       if (!adding) {
         onClose(); // the QR on screen is dead: the card's button starts a fresh one
         toast.error(failText(e, t));
@@ -255,40 +306,42 @@ export function Enroll({ begun, onClose }: { begun?: TotpEnrolment; onClose: () 
       if (code.length === 6) finish.mutate();
     } else if (login.trim() && password && !loginError && !pwError) start.mutate();
   }
+  const disabled = busy || (totp ? code.length < 6 : !login.trim() || !password || !!loginError || !!pwError);
 
   return (
-    <Modal
+    <SxWindow
       open
       onOpenChange={(o) => !o && !busy && onClose()}
       title={adding ? t("pw.addTitle") : t("pw.rebindTitle")}
-      description={adding ? t("pw.addBody") : t("pw.rebindBody")}
+      shot={adding ? "password-add" : "password-rebind"}
+      footer={
+        <>
+          <Button size="lg" disabled={busy} onClick={adding && totp ? () => setTotp(null) : onClose}>
+            {adding && totp ? t("auth.back") : t("common.cancel")}
+          </Button>
+          <Button variant="primary" size="lg" type="submit" form="sx-totp" className={cx(busy && "sx-busy")} aria-busy={busy || undefined} disabled={disabled && !busy}>
+            {busy && <Spin />}
+            {busy ? t("auth.checking") : totp ? t("stepup.confirm") : t("auth.next")}
+          </Button>
+        </>
+      }
     >
-      <form onSubmit={submit} className="flex flex-col gap-3.5">
-        {fail && <Notice tone="danger">{fail}</Notice>}
+      <form id="sx-totp" onSubmit={submit} className="contents">
+        <p className="sx-dp">{adding ? t("pw.addBody") : t("pw.rebindBody")}</p>
+        {fail && <Pb tone="bad">{fail}</Pb>}
         {adding && (
           <>
-            <TextField
-              label={t("auth.login")}
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              maxLength={64}
-              autoComplete="username"
-              autoCapitalize="off"
-              spellCheck={false}
-              disabled={!!totp}
-              error={loginError}
-              autoFocus
-            />
+            <label className={cx("an-f", loginError && "err")}>
+              <span>{t("auth.login")}</span>
+              <input className="an-i" value={login} maxLength={64} autoComplete="username" autoCapitalize="off" spellCheck={false} disabled={!!totp} autoFocus aria-invalid={!!loginError || undefined} onChange={(e) => setLogin(e.target.value)} />
+              <small>{loginError ?? ""}</small>
+            </label>
             {!totp && (
-              <TextField
-                label={t("auth.password")}
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                error={pwError}
-                hint={t("auth.setup.passwordHint")}
-              />
+              <label className={cx("an-f", pwError && "err")}>
+                <span>{t("auth.password")}</span>
+                <input className="an-i" type="password" autoComplete="new-password" value={password} aria-invalid={!!pwError || undefined} onChange={(e) => setPassword(e.target.value)} />
+                <small>{pwError ?? t("auth.setup.passwordHint")}</small>
+              </label>
             )}
           </>
         )}
@@ -306,20 +359,7 @@ export function Enroll({ begun, onClose }: { begun?: TotpEnrolment; onClose: () 
             />
           </>
         )}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="md" disabled={busy} onClick={adding && totp ? () => setTotp(null) : onClose}>
-            {adding && totp ? t("auth.back") : t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            disabled={busy || (totp ? code.length < 6 : !login.trim() || !password || !!loginError || !!pwError)}
-          >
-            {busy ? t("auth.checking") : totp ? t("stepup.confirm") : t("auth.next")}
-          </Button>
-        </div>
       </form>
-    </Modal>
+    </SxWindow>
   );
 }

@@ -74,7 +74,7 @@ function type(input: HTMLInputElement, value: string) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
-const field = (label: string) => [...document.querySelectorAll("label")].find((l) => l.textContent?.includes(label))?.parentElement?.querySelector("input") as HTMLInputElement;
+const field = (label: string) => [...document.querySelectorAll("label")].find((l) => l.textContent?.includes(label))?.querySelector("input") as HTMLInputElement;
 async function choose(input: HTMLInputElement, file: File) {
   Object.defineProperty(input, "files", { value: [file], configurable: true });
   await act(async () => void input.dispatchEvent(new Event("change", { bubbles: true })));

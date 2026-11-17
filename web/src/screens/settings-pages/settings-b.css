@@ -1,0 +1,732 @@
+/*
+ * Settings -> Security, Sessions, Audit and Backups (screens/settings-pages/security.tsx, password.tsx, cloudflare.tsx, sessions.tsx,
+ * audit.tsx, backups.tsx, restore.tsx): what these four tabs add to the cards of settings.css (PnSettings + pn.css: the sx- rules of
+ * the passkeys, the password, the sessions, the audit log and the backups, in the board's order; the last rule of a selector wins). A
+ * container query of the board is a media query here. Everything is under .sx, so nothing leaks to the other screens; a window is
+ * drawn in a portal, so its body wears `.sx.sx-dlg` and its buttons `.sx.sx-dfoot` (settings-sys.css).
+ */
+
+/* L6236: a passkey's row has no end column of its own */
+.sx .sx-pk {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+}
+/* L6237, L4598: a passkey or a backup that has just appeared glows once, then settles */
+.sx .sx-pk.fresh,
+.sx .sx-bk.fresh {
+  animation: sx-flash 1.4s var(--e);
+}
+@keyframes sx-flash {
+  0%,
+  40% {
+    background: color-mix(in srgb, var(--accent-mark) 12%, transparent);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-mark) 12%, transparent);
+  }
+  100% {
+    background: none;
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+/* L6236 */
+.sx .sx-it .ai-mono svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* L6238-6240: the password line, and the way back from the server */
+.sx .sx-pw {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0 20px;
+  padding-top: 0;
+  border-top: 0;
+}
+.sx .sx-rl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 20px 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.sx .sx-rl>span {
+  font-size: 13px;
+  color: var(--sec);
+}
+/* L6238: with no password login yet, the line holds one sentence and the card goes on without a rule */
+.sx .sx-pw+.sx-rl:last-child {
+  margin-bottom: 16px;
+}
+
+/* L6243-6249: a form in a card, its fields and the links under them */
+.sx .sx-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 20px 16px;
+}
+.sx .sx-f2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.sx .sx-f2 .sx-w2 {
+  grid-column: 1 / -1;
+}
+.sx .sx-lkl {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.sx .sx-lks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+/* L4898 */
+.sx .sb-ta {
+  height: auto;
+  min-height: 72px;
+  padding: 12px;
+  line-height: 20px;
+  resize: vertical;
+}
+/* the proof of new Cloudflare keys, and the words next to the save button */
+.sx .sx-proof {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: sx-up .3s var(--e);
+}
+.sx .sx-proof>p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx .sx-foot.sx-tk em.bad {
+  color: var(--danger-text);
+}
+
+/* L6251-6252: the filters of the audit log */
+.sx .sx-af {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sx .sx-as {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sx .sx-af>.seg,
+.sx .sx-af>div:first-child {
+  flex: none;
+  width: auto;
+  display: inline-flex;
+}
+.sx .sx-af>div:first-child button {
+  flex: none;
+  padding-inline: 14px;
+}
+
+/* L6253-6264: the log */
+.sx .sx-aud {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 20px;
+}
+.sx .sx-aud:empty {
+  display: none;
+}
+.sx .sx-ar {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 120px 120px;
+  gap: 12px 16px;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.sx .sx-aud>.sx-ar:first-child {
+  border-top: 0;
+}
+.sx .sx-src {
+  justify-self: start;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 500;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--step);
+  color: var(--sec);
+}
+.sx .sx-src.mcp,
+.sx .sx-src.ai {
+  background: var(--tone-lavender-bg);
+  color: var(--tone-lavender);
+}
+.sx .sx-src.bot {
+  background: var(--tone-sky-bg);
+  color: var(--tone-sky);
+}
+.sx .sx-src.api {
+  background: var(--tone-sand-bg);
+  color: var(--tone-sand);
+}
+.sx .sx-aw {
+  line-height: 20px;
+  color: var(--sec);
+  text-wrap: pretty;
+}
+.sx .sx-aw b {
+  font-weight: 500;
+  color: var(--text);
+}
+.sx .sx-ar>code {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sx .sx-ar>em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: end;
+}
+.sx .sx-ar.fail .sx-aw,
+.sx .sx-ar.fail .sx-aw b {
+  color: var(--danger-text);
+}
+/* a log page that is on its way: the old one stays, a step dimmer */
+.sx .sx-aud.wait {
+  opacity: .6;
+  transition: opacity .2s var(--e);
+}
+/* the pager sits in the card, under the rows, behind its own hairline */
+.sx .sx-aud-card {
+  overflow: hidden;
+}
+.sx .sx-aud-pg {
+  padding: 0 20px;
+}
+.sx .rc-emp {
+  margin-top: 4px;
+}
+.sx .rc-emp .btn,
+.sx .rc-emp button {
+  display: inline-flex;
+}
+.sx .hl-calm {
+  margin-bottom: 16px;
+}
+.sx .us-none>.g.ok {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+
+/* L6265-6275: the state of the backups, a card of its own */
+.sx .sx-bkst {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 20px;
+}
+.sx .sx-bkst .pp-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--step);
+  color: var(--muted);
+}
+.sx .sx-bkst .pp-ic svg {
+  width: 22px;
+  height: 22px;
+}
+.sx .sx-bkst.ok {
+  border-color: var(--accent-line);
+}
+.sx .sx-bkst.ok .pp-ic {
+  background: var(--tone-mint-bg);
+  color: var(--accent-mark);
+}
+.sx .sx-bkst.bad .pp-ic {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+.sx .sx-bkst>div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sx .sx-bkst>div>b {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.sx .sx-bkst>div>span {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.sx .sx-bkst.bad>div>span {
+  color: var(--danger-text);
+}
+.sx .sx-bkst .ai-na {
+  grid-column: 2;
+}
+.sx .sx-bkst .ai-na>button,
+.sx .sx-bkst .ai-na>a {
+  gap: 8px;
+  flex: none;
+}
+/* L6276, L6277: a backup in the list */
+.sx .sx-bk {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.sx .sx-bk>div>b,
+.sx .sx-bk>div>em {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.sx .sx-l2 {
+  padding-top: 4px;
+}
+/* L6279-6282: the window of a restore that is checking or running */
+.sx .sx-rsw {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 0;
+  text-align: center;
+}
+.sx .sx-rsw .an-sp {
+  margin-bottom: 8px;
+}
+.sx .sx-rsw b {
+  font-weight: 500;
+}
+.sx .sx-rsw span:last-child {
+  font-size: 13px;
+  color: var(--muted);
+}
+.sx .sx-dl.sx-rsd {
+  padding: 0;
+}
+
+/* the restore window beyond the board's three steps (the same cards, fields and lines as the windows beside it) */
+.sx.sx-dlg .sx-fs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sx.sx-dlg .sx-fs>legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--sec);
+}
+.sx.sx-dlg .sx-ch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  transition: border-color .2s var(--e), background-color .2s var(--e);
+}
+.sx.sx-dlg .sx-ch.on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.sx.sx-dlg .sx-ch.dis {
+  opacity: .6;
+}
+.sx.sx-dlg .sx-ch>label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+.sx.sx-dlg .sx-ch.dis>label {
+  cursor: default;
+}
+.sx.sx-dlg .sx-ch .sx-rd {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+}
+.sx.sx-dlg .sx-ch.on .sx-rd {
+  border-color: var(--accent-mark);
+}
+.sx.sx-dlg .sx-ch.on .sx-rd::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-mark);
+}
+.sx.sx-dlg .sx-ch input:focus-visible+.sx-rd {
+  outline: 2px solid var(--accent-mark);
+  outline-offset: 2px;
+}
+.sx.sx-dlg .sx-ch>label>span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sx.sx-dlg .sx-ch b {
+  font-size: 13px;
+  font-weight: 500;
+}
+.sx.sx-dlg .sx-ch em {
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx.sx-dlg .sx-ch>div {
+  padding-inline-start: 28px;
+}
+.sx.sx-dlg .sx-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sx.sx-dlg .sx-pick>span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx.sx-dlg .sx-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx.sx-dlg .sx-note svg {
+  flex: none;
+}
+.sx.sx-dlg .sx-sum {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--step);
+}
+.sx.sx-dlg .sx-sum>svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-text);
+}
+.sx.sx-dlg .sx-sum>div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sx.sx-dlg .sx-sum b {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.sx.sx-dlg .sx-sum span {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sx.sx-dlg .sx-cmp {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sx.sx-dlg .sx-cmp th {
+  padding-bottom: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: end;
+}
+.sx.sx-dlg .sx-cmp td {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.sx.sx-dlg .sx-cmp th:first-child,
+.sx.sx-dlg .sx-cmp td:first-child {
+  text-align: start;
+}
+.sx.sx-dlg .sx-cmp td:nth-child(2) {
+  font-weight: 500;
+}
+.sx.sx-dlg .sx-cmp td.same {
+  color: var(--muted);
+}
+.sx.sx-dlg .sx-er {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger-text);
+}
+.sx.sx-dlg .sx-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  text-align: center;
+}
+.sx.sx-dlg .sx-end>.g {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: var(--step);
+  color: var(--sec);
+}
+.sx.sx-dlg .sx-end>.g.ok {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+.sx.sx-dlg .sx-end>.g.warn {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+.sx.sx-dlg .sx-end>b {
+  font-size: 15px;
+  font-weight: 500;
+}
+.sx.sx-dlg .sx-end>p {
+  max-width: 26rem;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx.sx-dlg .sx-pw2 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* the buttons in a window's footer: the board's red one is a filled red (L5866) */
+.sx.sx-dfoot {
+  display: contents;
+  overflow: visible;
+}
+.sx .sx-dng,
+.sx.sx-dfoot .sx-dng {
+  background: var(--danger);
+  color: var(--ink-on-accent);
+}
+.sx .sx-dng:hover,
+.sx.sx-dfoot .sx-dng:hover {
+  background: color-mix(in srgb, var(--danger) 88%, #fff);
+}
+
+/* the short list of the data kept from before a restore, and the last result (the card of the restore start) */
+.sx .sx-kept {
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 8px;
+}
+.sx .sx-kept>.sx-it {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  min-height: 48px;
+}
+.sx .sx-kept>.sx-it:first-child {
+  border-top: 1px solid var(--border);
+}
+.sx .sx-kept .sx-nm {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sx .sx-kept .sx-sz {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx .sx-ks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 20px 0;
+}
+.sx .sx-ks>b {
+  font-weight: 500;
+}
+.sx .sx-ks>span {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sx .sx-rs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 0 20px 16px;
+}
+.sx .sx-rs>span {
+  flex: 1;
+  min-width: 14rem;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx .sx-fb {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 20px 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 16px;
+}
+.sx .sx-fb>div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.sx .sx-fb>div>span {
+  display: flex;
+  flex: 1;
+  min-width: 12rem;
+  flex-direction: column;
+  gap: 2px;
+}
+.sx .sx-fb b {
+  font-weight: 500;
+}
+.sx .sx-fb em {
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sx.sx-dlg .sx-fine {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sx .sx-last {
+  margin: 0 20px 16px;
+}
+
+/* L6285-6330: narrower windows (the board's container is the whole panel, so the window is the measure) */
+@media (max-width: 900px) {
+  .sx .sx-ar {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+  .sx .sx-ar>code {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .sx .sx-ar>em {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+@media (max-width: 640px) {
+  .sx .sx-form,
+  .sx .sx-aud,
+  .sx .sx-aud-pg,
+  .sx .sx-kept,
+  .sx .sx-rs,
+  .sx .sx-fb,
+  .sx .sx-ks {
+    padding-inline: 16px;
+  }
+  .sx .sx-pw,
+  .sx .sx-rl,
+  .sx .sx-last {
+    margin-inline: 16px;
+  }
+  .sx .sx-pw,
+  .sx .sx-bk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sx .sx-pw>.ai-na,
+  .sx .sx-bk>code,
+  .sx .sx-bk>.ai-na {
+    grid-column: 1;
+  }
+  .sx .sx-f2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sx .sx-af>.seg,
+  .sx .sx-af>div:first-child {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sx .sx-bkst .ai-na {
+    grid-column: 1 / -1;
+  }
+  .sx .sx-ar {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .sx .sx-ar>em {
+    grid-column: 2;
+    grid-row: 3;
+    text-align: start;
+  }
+  .sx .sx-kept>.sx-it {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sx .sx-kept .sx-nm {
+    grid-column: 1 / -1;
+  }
+}
+/* a wide window of the board is a single column of cards below 1040 (settings.css); one without a side column fills the row */
+.sx .pf-g.sx-solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sx .sx-pk.fresh,
+  .sx .sx-bk.fresh,
+  .sx .sx-proof,
+  .sx.sx-dlg .sx-ch {
+    animation: none;
+    transition: none;
+  }
+}
