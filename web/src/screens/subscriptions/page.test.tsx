@@ -70,13 +70,18 @@ const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const labelled = (aria: string) => document.querySelector<HTMLElement>(`[aria-label="${aria}"]`);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-const switchOf = (label: string) => [...document.querySelectorAll("label")].find((l) => l.textContent?.includes(label))?.querySelector<HTMLElement>("[role=switch]");
+const switchOf = (label: string) => document.querySelector<HTMLElement>(`[role=switch][aria-label="${label}"]`);
+const stripOn = () => document.querySelector(".sb-save")!.classList.contains("on");
+// the cards of the apps are folded: open them all to reach their fields
+const openAll = async () => {
+  for (const h of [...document.querySelectorAll<HTMLElement>(".sb-aph")]) await click(h);
+};
 const type = (el: HTMLInputElement, v: string) =>
   act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, v);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
-const names = () => [...document.querySelectorAll<HTMLInputElement>("input[maxlength='60']")].map((i) => i.value);
+const names = () => [...document.querySelectorAll<HTMLElement>(".sb-aph b")].map((b) => b.textContent);
 const saved = () => (updateSubscriptionSettings.mock.calls[0]![0] as { settings: Settings }).settings;
 
 describe("the password setting", () => {
@@ -114,7 +119,7 @@ describe("the DNS choice setting", () => {
     await mount(settingsOf({ userPage: { showAnnouncement: true, showSupport: true, showQr: true, allowDeviceSelfService: true, allowDnsChoice: true } as Settings["userPage"] }));
     const sw = switchOf("DNS choice on the page");
     expect(sw?.getAttribute("aria-checked")).toBe("true");
-    expect(button("Save")).toBeUndefined();
+    expect(stripOn()).toBe(false);
     await click(sw);
     await click(button("Save"));
     expect(saved().userPage?.allowDnsChoice).toBe(false);
@@ -130,36 +135,43 @@ describe("the apps list", () => {
 
   it("a description and the recommended mark are saved, the description trimmed", async () => {
     await mount(settingsOf());
+    await click(document.querySelector(".sb-aph")); // the first card
     const desc = document.querySelectorAll<HTMLInputElement>("input[maxlength='80']");
-    expect(desc).toHaveLength(4);
+    expect(desc).toHaveLength(1);
     expect(desc[0]!.maxLength).toBe(80);
     await type(desc[0]!, "  Two protocols in one app  ");
     expect(text()).toContain("28/80");
-    await click([...document.querySelectorAll("[role=switch]")].find((s) => s.closest("label")?.textContent?.includes("Recommended")));
+    await click([...document.querySelectorAll("[role=checkbox]")].find((s) => s.textContent?.includes("Recommended")));
     await click(button("Save"));
     const a = saved().apps[0]!;
     expect(a).toMatchObject({ name: "First", description: "Two protocols in one app", recommended: true });
     expect(saved().apps[2]).toMatchObject({ name: "Second", description: "", recommended: false });
   });
 
-  it("an app moves among the apps of its own platform only", async () => {
+  it("an app moves one place up or down the list, the first and the last stay put", async () => {
     await mount(settingsOf());
+    await click(document.querySelector(".sb-aph")); // the first card holds the arrows
     expect(names()).toEqual(["First", "Phone", "Second", "Third"]);
-    expect(labelled("Move First up")?.hasAttribute("disabled")).toBe(true); // first of its platform
-    expect(labelled("Move Phone down")?.hasAttribute("disabled")).toBe(true); // alone on its platform
-    await click(labelled("Move First down")); // past the phone app, to the place of the next Windows one
-    expect(names()).toEqual(["Second", "Phone", "First", "Third"]);
-    await click(labelled("Move Third up"));
-    expect(names()).toEqual(["Second", "Phone", "Third", "First"]);
+    expect(labelled("Move First up")?.getAttribute("aria-disabled")).toBe("true");
+    await click(labelled("Move First down"));
+    expect(names()).toEqual(["Phone", "First", "Second", "Third"]);
     await click(button("Save"));
-    expect(saved().apps.map((x) => x.name)).toEqual(["Second", "Phone", "Third", "First"]);
+    expect(saved().apps.map((x) => x.name)).toEqual(["Phone", "First", "Second", "Third"]);
+  });
+
+  it("the grip moves a card with the arrow keys", async () => {
+    await mount(settingsOf());
+    const grip = document.querySelectorAll<HTMLElement>(".sb-grip")[2]!;
+    await act(async () => void grip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true })));
+    expect(names()).toEqual(["First", "Second", "Phone", "Third"]);
   });
 
   it("several apps of one kind on one platform are fine, and a new app starts without description or badge", async () => {
     await mount(settingsOf({ apps: [] }));
     await click(button("Add app"));
     await click(button("Add app"));
-    expect(document.querySelectorAll("input[maxlength='60']")).toHaveLength(2);
+    expect(document.querySelectorAll(".sb-ap")).toHaveLength(2);
+    expect(document.querySelectorAll("input[maxlength='60']")).toHaveLength(1); // the new card is the one that is open
     expect(text()).toContain("0/80");
   });
 });
@@ -176,6 +188,8 @@ async function open(label: string) {
   await press(labelled(label)!);
   for (let i = 0; i < 100 && options(label).length === 0; i++) await tick(10); // the popup opens asynchronously
 }
+/** The platform and the kind are segments: press the one with this text. */
+const segment = (label: string, text: string) => click([...(document.querySelector(`[aria-label="${label}"]`)?.querySelectorAll("[role=radio]") ?? [])].find((r) => r.textContent === text));
 /** Opens a Select by its label and takes the option with this text. */
 async function choose(label: string, optionText: string) {
   await open(label);
@@ -195,7 +209,7 @@ async function optionTexts(label: string) {
 describe("the known-apps picker", () => {
   it("fills a new card from a known app for the chosen platform, and the card stays editable", async () => {
     await mount(settingsOf({ apps: [] }));
-    await choose("Platform", "Windows");
+    await segment("Platform", "Windows");
     await choose("Known app", "kl!ck");
     expect(labelled("Takes")).toBeNull(); // a known app brings its own kind
     await click(button("Add app"));
@@ -212,22 +226,22 @@ describe("the known-apps picker", () => {
   it("offers the apps that exist on the platform: kl!ck on a computer, not on a phone", async () => {
     await mount(settingsOf({ apps: [] }));
     expect(await optionTexts("Known app")).toEqual(["Custom app, fill in by hand", "Happ", "AmneziaVPN", "Hiddify", "sing-box"]); // iOS, the platform it opens on
-    await choose("Platform", "macOS");
+    await segment("Platform", "macOS");
     expect(await optionTexts("Known app")).toEqual(["Custom app, fill in by hand", "kl!ck", "Happ", "AmneziaVPN", "Clash Verge Rev", "FlClash", "Hiddify", "sing-box"]);
   });
 
   it("an AmneziaVPN pick is the key kind and has no add link; a change of platform takes the pick back to a blank card", async () => {
     await mount(settingsOf({ apps: [] }));
-    await choose("Platform", "Android");
+    await segment("Platform", "Android");
     await choose("Known app", "AmneziaVPN");
     await click(button("Add app"));
-    await choose("Platform", "Windows"); // the same pick has a build here too, so it stays
+    await segment("Platform", "Windows"); // the same pick has a build here too, so it stays
     await click(button("Add app"));
     await choose("Known app", "kl!ck");
-    await choose("Platform", "iOS"); // kl!ck has no iOS build: back to the blank card and its kind choice
+    await segment("Platform", "iOS"); // kl!ck has no iOS build: back to the blank card and its kind choice
     expect(labelled("Takes")).not.toBeNull();
     await click(button("Add app"));
-    await type(document.querySelectorAll<HTMLInputElement>("input[maxlength='60']")[2]!, "Mine"); // a blank card cannot be saved
+    await type(document.querySelector<HTMLInputElement>("input[maxlength='60']")!, "Mine"); // a blank card cannot be saved (the new card is the one open)
     await click(button("Save"));
     expect(saved().apps).toMatchObject([
       { platform: Platform.ANDROID, kind: App.AMNEZIA, name: "AmneziaVPN", downloadUrl: "https://play.google.com/store/apps/details?id=org.amnezia.vpn", addLinkTemplate: "" },
@@ -271,21 +285,22 @@ describe("the known-apps catalog", () => {
 describe("the DNS offer for the apps on the link", () => {
   const on = (linkDns?: Settings["linkDns"]) =>
     settingsOf({ userPage: { showAnnouncement: true, showSupport: true, showQr: true, allowDeviceSelfService: true, allowDnsChoice: true } as Settings["userPage"], ...(linkDns && { linkDns }) });
-  const box = (aria: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${aria}"]`);
-  const ticked = () => [...document.querySelectorAll<HTMLInputElement>("input[type=checkbox][aria-label^=Offer]")].filter((c) => c.checked).map((c) => c.getAttribute("aria-label"));
+  const box = (aria: string) => document.querySelector<HTMLElement>(`[role=checkbox][aria-label="${aria}"]`);
+  const ticked = () => [...document.querySelectorAll<HTMLElement>("[role=checkbox][aria-label^=Offer]")].filter((c) => c.getAttribute("aria-checked") === "true").map((c) => c.getAttribute("aria-label"));
   const settle = async () => {
     for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
   };
 
-  it("stands under the switch while the choice is on, says what it reaches and what goes first", async () => {
+  it("is always there; dimmed while the choice is off, with what it reaches and what goes first", async () => {
     await mount(settingsOf());
-    expect(text()).not.toContain("DNS for the apps on the link");
-    await click(switchOf("DNS choice on the page"));
     await settle();
     expect(text()).toContain("DNS for the apps on the link");
     expect(text()).toContain("One DNS for all servers in Happ, the Mihomo apps, Xray JSON and sing-box.");
-    expect(text()).toContain("Nothing offered: the page shows no DNS choice for the apps on the link.");
-    expect(document.querySelector("section[aria-labelledby=link-dns-t] h3")?.textContent).toBe("DNS for the apps on the link");
+    expect(document.querySelector(".sb-dl")!.classList.contains("off")).toBe(true);
+    expect(text()).toContain("DNS choice on the page is off: the list is saved and comes back when you turn it on");
+    await click(switchOf("DNS choice on the page"));
+    expect(document.querySelector(".sb-dl")!.classList.contains("off")).toBe(false);
+    expect(text()).toContain("Without a default, a person who picked nothing gets the preset of their user, group or instance.");
   });
 
   it("ticks presets in their order, marks a default and saves them with the settings", async () => {
@@ -295,7 +310,7 @@ describe("the DNS offer for the apps on the link", () => {
     await click(labelled("Default: Preset A"));
     await click(labelled("Move Preset A up"));
     expect(ticked()).toEqual(["Offer Preset A", "Offer Preset C"]);
-    expect(text()).toContain("2 of 20 offered");
+    expect(text()).toContain("2 of 20");
     await click(button("Save"));
     expect(saved().linkDns).toEqual({ presetIds: ["dns_a", "dns_c"], defaultPresetId: "dns_a" });
     expect(saved().userPage?.allowDnsChoice).toBe(true);
@@ -304,7 +319,7 @@ describe("the DNS offer for the apps on the link", () => {
   it("reads a saved offer back; unticking the default leaves no default; the other settings go along with it", async () => {
     await mount(on({ presetIds: ["dns_b", "dns_a"], defaultPresetId: "dns_b" }));
     expect(ticked()).toEqual(["Offer Preset B", "Offer Preset A"]);
-    expect((labelled("Default: Preset B") as HTMLInputElement).checked).toBe(true);
+    expect(labelled("Default: Preset B")!.getAttribute("aria-pressed")).toBe("true");
     await click(box("Offer Preset B"));
     await click(button("Save"));
     expect(saved().linkDns).toEqual({ presetIds: ["dns_a"], defaultPresetId: "" });

@@ -2253,3 +2253,75 @@
 .sbp .sb-pha {
   white-space: pre-line;
 }
+
+/* the tick box of a row (the board's .fz-cb, ticked: .us-cb.on) */
+.sbp .sb-cb {
+  display: grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+}
+.sbp .sb-cb i {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 28%, transparent);
+  color: transparent;
+  transition: background-color .15s var(--e), border-color .15s var(--e);
+}
+.sbp .sb-cb i .i {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+.sbp .sb-cb.on i {
+  background: var(--accent-mark);
+  border-color: var(--accent-mark);
+  color: var(--ink-on-accent);
+}
+.sbp .sb-dck:disabled {
+  opacity: .45;
+  cursor: default;
+}
+/* an app's card: the error under the link, the "known app" choice of the add bar */
+.sbp .sb-apb em.bad {
+  color: var(--danger);
+}
+.sbp .sb-known {
+  min-width: 200px;
+}
+.sbp .sb-dr .sb-mv {
+  flex: none;
+}
+/* the page in its phone frame, with the choice of the person above it */
+.sbp .sb-who2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sbp .sb-who2 > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.sbp .sb-skel {
+  height: 40px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.sbp .sb-phone {
+  width: calc(100% - 40px);
+  max-width: 360px;
+  height: 720px;
+  margin: 0 auto 16px;
+  overflow: hidden;
+  border-radius: 36px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+@media (width <= 720px) {
+  .sbp .sb-phone {
+    width: calc(100% - 32px);
+  }
+}
