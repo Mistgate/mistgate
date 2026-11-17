@@ -8,6 +8,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 type networkBundleInfo interface {
@@ -21,10 +22,13 @@ type networkTableReader interface {
 }
 
 // nodeSettings is what one agent is sent: the node's own settings, the operating-system status request for agents
-// with os-status/1 and the network settings for agents with nets/1. An agent without a capability gets nothing of it,
-// so its settings and their signature stay what they were.
+// with os-status/1, the network settings for agents with nets/1 and a set panel link address for agents with
+// panel-link/1. An agent without a capability gets nothing of it, so its settings and their signature stay what they were.
 func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 	s := nodeSettingsFor(n, caps, f.osStatusAllowed())
+	if l := f.panelLink.Load(); l != nil && *l != "" && store.CapabilityPresent(caps, plugin.CapPanelLink) {
+		s.PanelLinkUrl = *l
+	}
 	if !store.CapabilityPresent(caps, capNetworks) {
 		return s
 	}
@@ -38,6 +42,10 @@ func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettin
 	}
 	return s
 }
+
+// SetPanelLink sets the link address agents with panel-link/1 are told to move to; "" (the default) sends nothing.
+// The caller calls StateChanged so connected agents get their new settings.
+func (f *Fleet) SetPanelLink(linkURL string) { f.panelLink.Store(&linkURL) }
 
 // NetworkMode returns the in-memory operator setting. The edge edition always returns zero.
 func (f *Fleet) NetworkMode() uint32 { return f.networkMode.Load() }
