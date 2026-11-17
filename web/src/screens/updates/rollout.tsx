@@ -15,7 +15,7 @@ import { CardHead, D, NodeName, Pill, gk, useFlags, w } from "./bits";
 // rollout (the stages it went through, one row a node). A rollout that is going on opens by itself.
 
 /** The signed bundle in one line (does the panel trust it, which version, built and valid until), "Read the folder again" and the details folded away. */
-export function BundleCard({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
+export function BundleCard({ data, owner, actions, reading: readingNow }: { data: Updates; owner: boolean; actions: UpdateActions; /** The dev kit shows the folder being read. */ reading?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const b = data.bundle;
@@ -23,7 +23,8 @@ export function BundleCard({ data, owner, actions }: { data: Updates; owner: boo
   const s = bundleStates[status];
   const missing = status === BundleStatus.MISSING || status === BundleStatus.UNSPECIFIED;
   const [touched, setTouched] = useState<boolean | null>(null);
-  const [reading, setReading] = useState(false);
+  const [readingOwn, setReading] = useState(false);
+  const reading = readingOwn || !!readingNow;
   // a bundle that is missing or not trusted opens by itself: that is where its reason and the steps to fix it are
   const open = touched ?? status !== BundleStatus.TRUSTED;
   const expired = !!b && b.expiresUnix > 0 && b.expiresUnix <= data.nowUnix;
@@ -152,14 +153,14 @@ function Stages({ rollout }: { rollout: Rollout }) {
  * The rollout in progress, or the last one: its release, when it began, how many nodes are done and the state; the stages are one
  * click away (a running rollout, and one that ended badly, show them at once).
  */
-export function RolloutHistory({ rollout }: { rollout: Rollout }) {
+export function RolloutHistory({ rollout, defaultOpen }: { rollout: Rollout; /** The dev kit shows the stages of a finished rollout open. */ defaultOpen?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const info = rolloutInfo(rollout.status);
   const active = isActive(rollout);
   const { done, total } = progressOf(rollout);
   const [touched, setTouched] = useState<boolean | null>(null);
-  const open = touched ?? (active || rollout.status === RolloutStatus.FAILED);
+  const open = touched ?? (defaultOpen || active || rollout.status === RolloutStatus.FAILED);
   return (
     <section className="uq-card pp-sec" aria-label={active ? t("up.ro.title") : t("up.ro.titleLast")}>
       <CardHead icon={D.history} tone="sand" title={active ? t("up.ro.title") : t("up.ro.titleLast")} />

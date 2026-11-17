@@ -43,6 +43,7 @@ export function ChannelDialog({
   current,
   running,
   onPick,
+  pick,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -50,9 +51,11 @@ export function ChannelDialog({
   /** The running version and its channel: a switch to a more stable channel keeps it. */
   running: { version: string; channel: Channel };
   onPick: (c: Channel) => Promise<boolean>;
+  /** The dev kit opens the window with a channel already chosen. */
+  pick?: Channel;
 }) {
   const t = useT();
-  const [picked, setPicked] = useState<Channel>(current);
+  const [picked, setPicked] = useState<Channel>(pick ?? current);
   const [busy, setBusy] = useState(false);
   const choice = open ? picked : current;
   // to a more stable channel than the build that runs: nothing is installed backwards

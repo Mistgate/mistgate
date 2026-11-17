@@ -19,7 +19,7 @@ import { Track, trackOf } from "./track";
 
 export type TakeMode = "run" | "slow" | "out";
 
-export function Takeover({ mode, step, from, to, onReload }: { mode: TakeMode; step?: number; from: string; to: string; onReload: () => void }) {
+export function Takeover({ mode, step, from, to, onReload, hold }: { mode: TakeMode; step?: number; from: string; to: string; onReload: () => void; /** The "done" screen stays (the dev kit's screenshot). */ hold?: boolean }) {
   const t = useT();
   const light = useTheme() === "light";
   const out = mode === "out";
@@ -40,7 +40,7 @@ export function Takeover({ mode, step, from, to, onReload }: { mode: TakeMode; s
   const note = known && step >= 2 ? t("uq.take.n2") : t("uq.take.n1");
   const tr = trackOf({ run: true, step: known ? step : -1 });
   return createPortal(
-    <div className={cx("uq-take", out && "out", slow && "slow")} role="alertdialog" aria-modal="true" aria-label={title} data-shot="updates-takeover">
+    <div className={cx("uq-take", out && "out", hold && "hold", slow && "slow")} role="alertdialog" aria-modal="true" aria-label={title} data-shot="updates-takeover">
       <div className="uq-tw">
         <canvas ref={cv} className="uq-mx" aria-hidden />
         <div className="uq-tk">

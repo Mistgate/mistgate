@@ -1069,7 +1069,7 @@ describe("the Cloudflare edition", () => {
     await mount(edgePage({ nodes: [node(), legacy] }));
     expect(text()).toContain("1 node waits for a manual update: nl1");
     expect(text()).toContain("Its agent was built before nodes could update on the Cloudflare edition.");
-    expect(text()).not.toContain("cannot update itself");
+    expect(text()).not.toContain("Automatic updates need a supported system");
     await click(howTo());
     expect(howTo()!.getAttribute("aria-expanded")).toBe("true");
     expect(codes()).toContain(`curl -fL -o /root/mistgate-node.new ${base}mistgate-node-linux-amd64 && echo "${sha}  /root/mistgate-node.new" | sha256sum -c -`);
@@ -1136,5 +1136,236 @@ describe("the Cloudflare edition", () => {
     await click(howTo());
     expect(text()).toContain("1. On the panel’s server: put the new agent on the node");
     expect(codes()).toContain("scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@nl1.example.com:/root/mistgate-node");
+  });
+});
+
+describe("the tabs of the Updates screen", () => {
+  const release = { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
+  const withRelease = (over: Record<string, unknown> = {}) => page({ panel: { ...page().panel, update: release }, nodes: [node()], ...over });
+  const tabs = () => [...document.querySelectorAll<HTMLElement>("[role=tab]")];
+  const selected = () => document.querySelector("[role=tab][aria-selected=true]")?.id;
+
+  it("opens on the panel when a release is out, and on the agents when it is not", async () => {
+    await mount(withRelease());
+    expect(selected()).toBe("uq-tab-panel");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(page({ nodes: [node()] }));
+    expect(selected()).toBe("uq-tab-agents");
+  });
+
+  it("opens on the panel for a release it cannot install, and for an update that went back", async () => {
+    await mount(page({ panel: { ...page().panel, update: { ...release, available: false, installable: false, errorKey: "unsigned" } }, nodes: [node()] }));
+    expect(selected()).toBe("uq-tab-panel");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(page({ panel: { ...page().panel, update: { ...release, available: false, errorKey: "install_failed" } }, nodes: [node()] }));
+    expect(selected()).toBe("uq-tab-panel");
+  });
+
+  it("opens on the tab the address names, and on the one a link's anchor names", async () => {
+    route.search = { tab: "agents" };
+    await mount(withRelease());
+    expect(selected()).toBe("uq-tab-agents");
+    act(() => root?.unmount());
+    host?.remove();
+    route.search = {};
+    location.hash = "#os";
+    try {
+      await mount(withRelease());
+      expect(selected()).toBe("uq-tab-os");
+    } finally {
+      location.hash = "";
+    }
+  });
+
+  it("puts a number on a tab only when something waits there, and says what in the line under the title", async () => {
+    await mount(withRelease({ nodes: outdated }));
+    expect(tabs().map((t) => t.textContent)).toEqual(["This panel1", "Node agents2", "Server systems"]);
+    expect(document.querySelector(".uq-h p")?.textContent).toBe("You can update the panel and 2 nodes");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(page({ nodes: [node()] }));
+    expect(tabs().map((t) => t.textContent)).toEqual(["This panel", "Node agents", "Server systems"]);
+    expect(document.querySelector(".uq-h p")?.textContent).toBe("Panel and agents are up to date");
+  });
+
+  it("moves between the tabs with the arrow keys, through the address", async () => {
+    await mount(page({ nodes: [node()] }));
+    const key = (el: Element, k: string) => act(async () => void el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })));
+    await key(tabs()[1]!, "ArrowRight");
+    expect(route.navigate).toHaveBeenCalledWith({ to: "/updates", search: { tab: "os" }, replace: true });
+    await key(tabs()[1]!, "ArrowLeft");
+    expect(route.navigate).toHaveBeenLastCalledWith({ to: "/updates", search: { tab: "panel" }, replace: true });
+  });
+
+  it("keeps the tabs on the page while it loads", async () => {
+    getUpdates.mockReturnValue(new Promise(() => {}));
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () =>
+      root!.render(
+        <QueryClientProvider client={qc}>
+          <UpdatesScreen />
+        </QueryClientProvider>,
+      ),
+    );
+    expect(tabs()).toHaveLength(3);
+    expect(document.querySelector("[aria-busy=true]")).not.toBeNull();
+    expect(document.querySelector(".uq-h p")?.textContent).toBe("Loading…");
+  });
+
+  it("keeps the tabs on the page when it did not load, with a card that says nothing changed on the nodes and a way to try again", async () => {
+    getUpdates.mockRejectedValue(new Error("down"));
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () =>
+      root!.render(
+        <QueryClientProvider client={qc}>
+          <UpdatesScreen />
+        </QueryClientProvider>,
+      ),
+    );
+    for (let i = 0; i < 3; i++) await settle();
+    expect(document.querySelector("[role=alert]")?.textContent).toContain("Updates failed to load");
+    expect(document.querySelector("[role=alert]")?.textContent).toContain("Nothing changed on the nodes.");
+    expect(tabs()).toHaveLength(3);
+    expect(document.querySelector(".uq-h p")?.textContent).toBe("No data");
+    await click(button("Retry"));
+    expect(getUpdates).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("the panel's own update, as the page follows it", () => {
+  const release = { version: "v0.3.0", url: "", publishedUnix: 2000, checkedUnix: 1000, built: 1500, sha256: "ab".repeat(32), available: true, supported: true, installable: true, installing: false, errorKey: "" };
+  const offer = (over: Record<string, unknown> = {}) => page({ panel: { ...page().panel, update: { ...release, ...over } }, nodes: [node()] });
+
+  it("takes the whole window while the panel installs itself, and says what holds: the nodes and the people go on", async () => {
+    installPanelUpdate.mockResolvedValue({ update: {} });
+    await mount(offer());
+    await click(button("Update panel"));
+    await settle();
+    await click(inDialog("Update"));
+    await settle();
+    const take = document.querySelector<HTMLElement>(".uq-take[role=alertdialog]")!;
+    expect(take.textContent).toContain("The panel is updating");
+    expect(take.textContent).toContain("0.2.0-bbb");
+    expect(take.textContent).toContain("v0.3.0");
+    expect(take.textContent).toContain("Nodes and people’s connections keep working. The page comes back by itself");
+    // the panel reports no step: the page shows none
+    expect(take.querySelector(".uq-ttrk")).toBeNull();
+    expect(document.querySelector(".uq-now")?.textContent).toContain("Updating the panel to v0.3.0");
+    expect(document.querySelector(".uq-ha")).toBeNull();
+  });
+
+  it("shows it from the panel's own word that it is installing, to whoever opens the page", async () => {
+    await mount(offer({ installing: true }));
+    expect(document.querySelector(".uq-take")).not.toBeNull();
+    expect(document.querySelector(".uq-hero.run")).not.toBeNull();
+  });
+
+  it("tells a panel that went back: the old version, why, and a button to try again", async () => {
+    await mount(offer({ errorKey: "install_failed" }));
+    const bar = document.querySelector(".uq-hero.back .rc-pb.bad")!;
+    expect(bar.textContent).toContain("The panel is back on 0.2.0-bbb");
+    expect(bar.textContent).toContain("journalctl -u mistgate-panel-update");
+    await click(button("Try again"));
+    expect(dialog()!.textContent).toContain("Update the panel to v0.3.0");
+  });
+
+  it("asks GitHub again from the bar when it did not answer", async () => {
+    checkPanelUpdate.mockResolvedValue({ update: {} });
+    await mount(offer({ errorKey: "check_failed", checkedUnix: 1 }));
+    expect(document.querySelector(".uq-hero .rc-pb")?.textContent).toContain("GitHub didn’t respond");
+    await click(button("Check again"));
+    expect(checkPanelUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains a release that is out but cannot be installed here, and still lets the owner check", async () => {
+    await mount(offer({ installable: false, supported: false }));
+    expect(document.querySelector(".uq-hint .rc-nt")?.textContent).toContain("Automatic updates need a supported system");
+    expect(button("Update panel")).toBeUndefined();
+    expect(button("Check GitHub")).toBeDefined();
+  });
+
+  it("opens the channel window from the chip, for the owner only", async () => {
+    await mount(offer());
+    const chip = document.querySelector<HTMLElement>(".uq-ch")!;
+    expect(chip.tagName).toBe("BUTTON");
+    await click(chip);
+    expect(dialog()!.textContent).toContain("Release channel");
+    act(() => root?.unmount());
+    host?.remove();
+    role = Role.READONLY;
+    await mount(offer());
+    expect(document.querySelector(".uq-ch")?.tagName).toBe("SPAN");
+  });
+
+  it("folds the earlier versions of the release notes, and opens them", async () => {
+    const notes = ["v0.3.0", "v0.2.9", "v0.2.8"].map((version) => ({ version, url: "", publishedUnix: 2000, en: `## Fixes\n\n- Fix in ${version}.`, ru: "", zh: "", security: false, channel: "stable" }));
+    await mount(page({ panel: { ...page().panel, update: release }, nodes: [node()], panelNotes: notes }));
+    expect(text()).toContain("Fix in v0.3.0.");
+    expect(text()).not.toContain("Fix in v0.2.9.");
+    await click(button("and 2 earlier versions"));
+    expect(document.querySelectorAll(".uq-rel")).toHaveLength(3);
+    expect(document.querySelectorAll(".uq-rel.top")).toHaveLength(1);
+  });
+});
+
+describe("the agents tab", () => {
+  it("shows the folder being read while the owner's request is on its way", async () => {
+    rescanBundle.mockReturnValue(new Promise(() => {}));
+    await mount(page({ nodes: [node()] }));
+    await click(button("Read the folder again"));
+    expect(button("Reading")?.disabled).toBe(true);
+    expect(button("Reading")?.querySelector(".an-sp")).not.toBeNull();
+  });
+
+  it("points the observer to the owner, and shows the cards without a button", async () => {
+    role = Role.READONLY;
+    await mount(page({ nodes: outdated }));
+    expect(document.querySelector(".uq-ro")?.textContent).toBe("Only the owner can update agents");
+    expect(document.querySelectorAll(".uq-ft")).toHaveLength(2);
+    expect(bulk()).toBeUndefined();
+  });
+
+  it("says there are no nodes, and where to add one", async () => {
+    await mount(page({ nodes: [] }));
+    const none = document.querySelector(".us-none")!;
+    expect(none.textContent).toContain("No nodes yet");
+    expect(none.textContent).toContain("Nothing to update.");
+    expect(none.querySelector("a")?.getAttribute("href")).toBe("/nodes");
+  });
+
+  it("shows the tick for the nodes of a rollout window, one node too, with the canary named", async () => {
+    await mount(page({ nodes: [outdated[0]!] }));
+    await click(bulk());
+    expect(dialog()!.querySelectorAll("input[type=checkbox]")).toHaveLength(1);
+    expect(dialog()!.textContent).toContain("Canary");
+  });
+
+  it("names the canary on its card while the fleet waits for the rollout", async () => {
+    await mount(page({ nodes: outdated }));
+    const first = document.querySelector(".uq-ft")!;
+    expect(first.textContent).toContain("nl1");
+    expect(first.classList.contains("can")).toBe(true);
+  });
+
+  it("offers Stop and Pause while a rollout runs, and keeps both from an observer", async () => {
+    const running = () => page({ nodes: [node({ state: NodeUpdateState.UPDATING })], rollout: rollout({ steps: [step({ state: StepState.SENT })] }) });
+    await mount(running());
+    expect(button("Pause")).toBeDefined();
+    expect(button("Stop")).toBeDefined();
+    act(() => root?.unmount());
+    host?.remove();
+    role = Role.READONLY;
+    await mount(running());
+    expect(button("Pause")).toBeUndefined();
+    expect(button("Stop")).toBeUndefined();
+    expect(document.querySelector(".uq-now")).not.toBeNull();
   });
 });

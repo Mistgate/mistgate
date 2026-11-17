@@ -1,10 +1,8 @@
-import { Menu } from "@base-ui/react/menu";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Callout } from "@/components/ui/notice";
-import { selectItemClass, selectPopupClass } from "@/components/ui/select";
 import { StatusDot, StatusPill } from "@/components/ui/status";
 import { OsRolloutMode, OsStepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
@@ -19,8 +17,8 @@ import { OsConfirmDialog, type OsDialogMode } from "./os-confirm";
 // What the owner does with one node's operating system, and what is going on there: the buttons (install the security
 // updates, reboot, check for updates), the run of the step with its phase and an unending bar, and the outcome of the last
 // run for a day. One block for the node's Server tab (the card, with the buttons) and the Updates table (`compact`: only the
-// run and its outcome under the row; the three actions are the ⋯ menu of the row, OsRowMenu). What cannot be done says why:
-// under the button, or in the menu item.
+// run and its outcome under the row; the three actions are the buttons of the opened row). What cannot be done says why:
+// under the button.
 
 /** A clock that ticks while `active`, for "3 min so far". */
 export function useNowSec(active: boolean, everyMs = 15_000) {
@@ -158,53 +156,6 @@ function Why({ keys }: { keys: string[] }) {
         </p>
       ))}
     </div>
-  );
-}
-
-/** The ⋯ of a table row: the three actions of the card's buttons, an unavailable one greyed out with its reason under it. Owner only; nothing while a step is under way. */
-export function OsRowMenu({ row, defaultOpen }: { row: OsRow; /** The dev kit shows the menu open. */ defaultOpen?: boolean }) {
-  const t = useT();
-  const owner = useIsOwner();
-  const actions = useOsActions();
-  const [dialog, setDialog] = useState<OsDialogMode | null>(null);
-  if (!owner || !row.nodeId || osRunOf(row).kind === "running") return null;
-  const nodeId = row.nodeId;
-  const name = row.name ?? "";
-  const items = [
-    { id: "install", label: t("os.btn.install"), block: blockOf(row, "install"), run: () => setDialog("install") },
-    { id: "reboot", label: t("os.btn.reboot"), block: blockOf(row, "reboot"), run: () => setDialog("reboot") },
-    { id: "refresh", label: t(actions.refreshing ? "os.btn.refreshing" : "os.btn.refresh"), block: blockOf(row, "refresh"), run: () => void actions.refresh({ nodeId, name }) },
-  ];
-  // one reason for several items (a busy node, an open run) is said once on top, not under each of them
-  const reasons = [...new Set(items.map((i) => i.block).filter(Boolean))];
-  const shared = reasons.length === 1 && items.filter((i) => i.block).length > 1 ? reasons[0]! : "";
-  return (
-    <>
-      <Menu.Root defaultOpen={defaultOpen}>
-        <Menu.Trigger
-          aria-label={t("os.menu.label", { name })}
-          className="inline-flex size-9 flex-none items-center justify-center rounded-ctl text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg data-popup-open:bg-surface-2 data-popup-open:text-fg"
-        >
-          <Icon name="ellipsis" size={16} />
-        </Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Positioner sideOffset={6} align="end" collisionPadding={14} className="z-50 outline-none">
-            <Menu.Popup className={cx(selectPopupClass, "w-max max-w-[calc(100vw-28px)] min-w-56")}>
-              {shared && <p className="max-w-64 px-2.5 py-1.5 text-[11px] leading-snug font-medium text-pretty text-muted">{blockText(t, shared)}</p>}
-              {items.map((i) => (
-                <Menu.Item key={i.id} disabled={!!i.block || actions.busy} onClick={i.run} className={cx(selectItemClass, "data-disabled:cursor-default")}>
-                  <span className="flex min-w-0 flex-col">
-                    <span className={i.block || actions.busy ? "text-muted" : undefined}>{i.label}</span>
-                    {i.block && !shared && <span className="max-w-64 text-[11px] leading-snug font-medium text-pretty text-muted">{blockText(t, i.block)}</span>}
-                  </span>
-                </Menu.Item>
-              ))}
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
-      {dialog && <OsConfirmDialog row={row} mode={dialog} actions={actions} onClose={() => setDialog(null)} />}
-    </>
   );
 }
 

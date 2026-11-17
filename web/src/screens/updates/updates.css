@@ -327,6 +327,7 @@
 .uq.uq-fx .uq-halo { transition: opacity 0.4s var(--e); }
 .uq.uq-fx .uq-hero.done .uq-halo { animation: uq-halo 1.4s var(--e) both; }
 .uq .uq-hero.upto .uq-halo { opacity: 0.3; }
+.uq .uq-hero.upto > .rc-pb, .uq .uq-hero.upto > .uq-hint, .uq .uq-hero.upto > .uq-now { flex: 1 1 100%; order: 3; }
 .uq .uq-hero > *:not(.uq-halo) { position: relative; }
 /* L5485-5495: the track of the four steps */
 .uq .uq-trk { position: relative; flex: 1 1 0; min-width: 200px; margin-top: 34px; }
@@ -667,6 +668,7 @@
 /* L5581-5598 */
 .uq-take { position: fixed; inset: 0; z-index: 70; background: var(--bg); color: var(--text); animation: uq-tin 0.35s var(--e) both; }
 .uq-take.out { animation: uq-tout 0.7s var(--e) 0.8s both; pointer-events: none; }
+.uq-take.out.hold { animation: uq-tin 0.35s var(--e) both; }
 .uq-take .mono { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
 .uq-take .uq-tw { position: sticky; top: 0; height: 100vh; max-height: 100%; display: grid; place-items: center; padding: 24px; overflow: hidden; }
 .uq-take .uq-mx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; animation: uq-tin 0.6s var(--e) both; }

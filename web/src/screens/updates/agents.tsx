@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { EditionNotice } from "@/components/edition-notice";
 import { Scramble } from "@/components/fx/scramble-react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
@@ -179,6 +178,9 @@ function Offline({ nodes }: { nodes: readonly NodeUpdate[] }) {
   );
 }
 
+/** What a scene of the dev kit puts in place of what the cards would find out by themselves. */
+export type AgentsScene = { last?: boolean; reading?: boolean };
+
 export type AgentsProps = {
   data: Updates;
   owner: boolean;
@@ -187,9 +189,10 @@ export type AgentsProps = {
   onCancel: () => void;
   onSchedule: (n: NodeUpdate) => void;
   onRollback: (n: NodeUpdate) => void;
+  scene?: AgentsScene;
 };
 
-export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSchedule, onRollback }: AgentsProps) {
+export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSchedule, onRollback, scene }: AgentsProps) {
   const t = useT();
   const fmt: Fmt = useFmt();
   const edition = useEdition();
@@ -208,7 +211,6 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
   if (d.nodes.length === 0) {
     return (
       <>
-        <EditionNotice feature="agent_updates" />
         <section className="uq-card us-none hl-calm rc-emp">
           <span className="g" aria-hidden>
             <G d={D.server} size={20} stroke={1.75} />
@@ -224,7 +226,6 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
   }
   return (
     <>
-      <EditionNotice feature="agent_updates" />
       <section className={cx("uq-card uq-ag", active?.status === RolloutStatus.RUNNING && "run")} aria-label={t("up.tab.agents")}>
         <div className="uq-agh">
           <div>
@@ -251,8 +252,8 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
       {!active && <ReleaseCard notes={d.agentNotes} />}
       <NodesCard nodes={d.nodes} data={d} owner={owner && !noUpdates} rollout={active} onSchedule={onSchedule} onRollback={onRollback} />
       <div className="uq-two">
-        {!edition.edge && <BundleCard data={d} owner={owner} actions={actions} />}
-        {d.rollout && <RolloutHistory rollout={d.rollout} />}
+        {!edition.edge && <BundleCard data={d} owner={owner} actions={actions} reading={scene?.reading} />}
+        {d.rollout && <RolloutHistory rollout={d.rollout} defaultOpen={scene?.last} />}
       </div>
     </>
   );

@@ -74,14 +74,10 @@ export function RolloutDialog({
             );
             return (
               <li key={n.nodeId}>
-                {nodes.length > 1 ? (
-                  <label>
-                    <input type="checkbox" checked={on} onChange={() => toggle(n.nodeId)} aria-label={n.name} />
-                    {row}
-                  </label>
-                ) : (
-                  <div className="uq-canrow">{row}</div>
-                )}
+                <label>
+                  <input type="checkbox" checked={on} onChange={() => toggle(n.nodeId)} aria-label={n.name} />
+                  {row}
+                </label>
               </li>
             );
           })}

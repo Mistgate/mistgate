@@ -107,10 +107,10 @@ function Entry({ note, top }: { note: ReleaseNote; top: boolean }) {
  * line that says the update is worth doing soon; without one nothing of the kind is said. Nothing renders without notes (the
  * edition, a release the panel could not read, nothing behind).
  */
-export function ReleaseCard({ notes, done }: { notes: readonly ReleaseNote[] | undefined; done?: boolean }) {
+export function ReleaseCard({ notes, done, defaultAll }: { notes: readonly ReleaseNote[] | undefined; done?: boolean; /** The dev kit shows the earlier versions open. */ defaultAll?: boolean }) {
   const t = useT();
   const id = useId();
-  const [all, setAll] = useState(false);
+  const [all, setAll] = useState(!!defaultAll);
   if (!notes || notes.length === 0) return null;
   const shown = all ? notes : notes.slice(0, 1);
   const older = notes.length - 1;

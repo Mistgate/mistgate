@@ -74,6 +74,8 @@ export function fleetCards(d: Updates, rollout: Rollout | null | undefined = d.r
   const to = d.bundle?.version ?? "";
   const active = isActive(rollout) ? rollout : null;
   const steps = new Map(active?.steps.map((s) => [s.nodeId, s] as const));
+  // the card of a node that finished a moment ago flashes, in the last rollout as well as in the running one
+  const finished = new Map(rollout?.steps.map((s) => [s.nodeId, s] as const));
   const first = active ? undefined : canaryOf(outdatedNodes(d.nodes));
   const cards = d.nodes.map((n): FleetCard => {
     const s = active ? steps.get(n.nodeId) : undefined;
@@ -85,7 +87,7 @@ export function fleetCards(d: Updates, rollout: Rollout | null | undefined = d.r
       ...look,
       pg: look.pg ?? (n.state === NodeUpdateState.UPDATING ? 35 : undefined),
       canary: (!!s && s.stage === 0) || n === first,
-      just: !!s && s.state === StepState.PASSED && d.nowUnix - s.finishedUnix < 60,
+      just: finished.get(n.nodeId)?.state === StepState.PASSED && d.nowUnix - (finished.get(n.nodeId)?.finishedUnix ?? 0) < 60,
     };
   });
   // the canary leads, the others keep the panel's order

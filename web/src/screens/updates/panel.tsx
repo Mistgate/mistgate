@@ -5,7 +5,7 @@ import { EditionNotice } from "@/components/edition-notice";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
-import { asChannel } from "@/lib/channels";
+import { asChannel, type Channel } from "@/lib/channels";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
@@ -27,11 +27,11 @@ import { PanelUpdateWindow } from "./update-dialog";
 export type PanelPhase =
   | { kind: "idle" }
   | { kind: "run"; from: string; to: string; step?: number; slow: boolean }
-  | { kind: "out"; from: string; to: string }
+  | { kind: "out"; from: string; to: string; /** The dev kit keeps the screen from fading out, so a screenshot finds it. */ hold?: boolean }
   | { kind: "done"; from: string; to: string };
 
 /** A scene of the dev kit puts a phase and the card's own folds in place of what the page would find out. */
-export type PanelScene = { phase?: PanelPhase; notes?: readonly ReleaseNote[]; checking?: boolean; details?: boolean; more?: boolean };
+export type PanelScene = { phase?: PanelPhase; notes?: readonly ReleaseNote[]; checking?: boolean; details?: boolean; more?: boolean; win?: "channel" | "update"; pick?: Channel };
 
 const SLOW_MS = 120_000;
 /** After the click, how long the panel may say "not installing" before the run counts as over (it takes a moment to mark itself). */
@@ -106,7 +106,7 @@ export function usePanelPhase(data: Updates, refetch: () => unknown, answeredAt:
 export function PanelTakeover({ phase, onReload }: { phase: PanelPhase; onReload: () => void }) {
   if (phase.kind !== "run" && phase.kind !== "out") return null;
   const mode: TakeMode = phase.kind === "out" ? "out" : phase.slow ? "slow" : "run";
-  return <Takeover mode={mode} step={phase.kind === "run" ? phase.step : undefined} from={phase.from} to={phase.to} onReload={onReload} />;
+  return <Takeover mode={mode} step={phase.kind === "run" ? phase.step : undefined} from={phase.from} to={phase.to} onReload={onReload} hold={phase.kind === "out" && phase.hold} />;
 }
 
 /** The fold with the facts behind a release: the signature, the checksum and what happens on failure. */
@@ -184,7 +184,7 @@ export function PanelTab({ data, owner, actions, refetch, answeredAt, scene }: {
   const key = update?.errorKey ?? "";
   const channel = asChannel(data.updateChannel);
   const running = { version: p?.version ?? "", channel: asChannel(data.runningVersionChannel) };
-  const [win, setWin] = useState<"" | "channel" | "update">("");
+  const [win, setWin] = useState<"" | "channel" | "update">(scene?.win ?? "");
   const [detTouched, setDetTouched] = useState<boolean | null>(null);
   const detOpen = scene?.details ?? detTouched ?? (!update?.supported && !off);
 
@@ -224,7 +224,7 @@ export function PanelTab({ data, owner, actions, refetch, answeredAt, scene }: {
   }
   if (edition.edge) hints.push(<EdgeDeploy key="edge" version={update?.version} />);
   else if (off) hints.push(<EditionNotice key="ed" feature="panel_update" />);
-  if (!off) hints.push(<ChannelPolicy key="policy" data={data} owner={owner} />);
+  if (!off && owner && (key === "channel_not_allowed" || key === "channel_config_invalid")) hints.push(<ChannelPolicy key="policy" data={data} owner={owner} />);
 
   return (
     <>
@@ -322,10 +322,10 @@ export function PanelTab({ data, owner, actions, refetch, answeredAt, scene }: {
           </div>
         )}
       </section>
-      {(hasNew || done) && <ReleaseCard notes={notes} done={done} />}
+      {(hasNew || done) && <ReleaseCard notes={notes} done={done} defaultAll={scene?.more} />}
       <Details data={data} open={detOpen} onToggle={() => setDetTouched(!detOpen)} />
       {owner && !edition.edge && (
-        <ChannelDialog open={win === "channel"} onOpenChange={(o) => setWin(o ? "channel" : "")} current={channel} running={running} onPick={actions.setChannel} />
+        <ChannelDialog open={win === "channel"} onOpenChange={(o) => setWin(o ? "channel" : "")} current={channel} running={running} onPick={actions.setChannel} pick={scene?.pick} />
       )}
       {owner && !off && (
         <PanelUpdateWindow
