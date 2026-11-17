@@ -392,8 +392,8 @@ export function AlertRows({ groups, now, flow, open, setOpen, onNodePage = false
  * Which row is open: the board opens one at a time. Until the person chooses, it is the one a link points at, else the first critical, else the first
  * (as the board opens its first); once chosen, that (or none).
  */
-export function useOpenRow(groups: Alert[][]): [string, (id: string) => void] {
-  const [chosen, setChosen] = useState<string | null>(null);
+export function useOpenRow(groups: Alert[][], start: string | null = null): [string, (id: string) => void] {
+  const [chosen, setChosen] = useState<string | null>(start);
   const hash = groups.find((g) => targeted(anchors(g)));
   const crit = groups.find((g) => groupSeverity(g) === AlertSeverity.CRITICAL);
   const first = hash?.[0]?.id ?? crit?.[0]?.id ?? groups[0]?.[0]?.id ?? "";
@@ -472,12 +472,15 @@ function ChecksSide({ onOpen }: { onOpen?: () => void }) {
  * history of the week; at the side the filter "By node" and the card "Checks". The Cloudflare edition evaluates the alerts too, but has no tunnel checks (so
  * none of their alerts, and no card of checks): one line says so above them.
  */
-export function AlertsTab({ active: all, history: closed, now, flow, onChecks, first = false }: { active: Alert[]; history: Alert[]; now: number; flow: FixFlow; onChecks?: () => void; first?: boolean }) {
+/** What a scene of the dev kit starts the tab with: the node the list is filtered to, the row that is open, the window of "Close all shown". */
+export type AlertsInit = { node?: string; open?: string; closeAll?: boolean };
+
+export function AlertsTab({ active: all, history: closed, now, flow, onChecks, first = false, init }: { active: Alert[]; history: Alert[]; now: number; flow: FixFlow; onChecks?: () => void; first?: boolean; init?: AlertsInit }) {
   const t = useT();
   const fmt = useFmt();
   const noChecks = useEdition().off("health_checks");
   const fleet = useQuery(overviewQuery()).data?.nodes;
-  const [node, setNode] = useState("");
+  const [node, setNode] = useState(init?.node ?? "");
   const active = all.filter((a) => !isPeopleAlert(a));
   const live = groupAlerts(active.filter((a) => a.mutedUntilUnix <= now));
   const muted = groupAlerts(active.filter((a) => a.mutedUntilUnix > now));
@@ -486,7 +489,7 @@ export function AlertsTab({ active: all, history: closed, now, flow, onChecks, f
   const shown = node ? live.filter((g) => g[0]!.nodeId === node) : live;
   // nodes that count as a problem and have no alert of their own are named above the alerts (they are in the number of the header)
   const problemNodes = useProblemNodes(new Set(active.filter((a) => isLoud(a, now)).map((a) => a.nodeId)));
-  const [open, setOpen] = useOpenRow([...shown, ...muted]);
+  const [open, setOpen] = useOpenRow([...shown, ...muted], init?.open ?? null);
 
   // a link to an alert (/health#alert-<id>) opens its row (above) and brings it into view once the list is there
   const scrolled = useRef(false);
@@ -516,7 +519,7 @@ export function AlertsTab({ active: all, history: closed, now, flow, onChecks, f
             <Calm kind="ok" className="hl-calm" title={t("hlp.calm.title")} text={lastClosed ? t("hl.alerts.quietLast", { ago: fmt.ago(lastClosed) }) : t("hl.alerts.quietNone")} />
           )}
           {live.length > 0 && (
-            <Sec tone="rose" icon={P.bell} title={t("hlp.open")} count={shown.flat().length} action={<CloseAll alerts={shown.flat()} />}>
+            <Sec tone="rose" icon={P.bell} title={t("hlp.open")} count={shown.flat().length} action={<CloseAll alerts={shown.flat()} defaultOpen={init?.closeAll} />}>
               <div className="hl-als">
                 <AlertRows groups={shown} now={now} flow={flow} open={open} setOpen={setOpen} />
               </div>

@@ -81,10 +81,10 @@ export function TspuRunLine({ data }: { data: Checks }) {
 }
 
 /** What the words in the cells mean, under the table: the tooltip says it too, but a phone has no hover. Folded, as the board folds it. */
-export function CheckLegend({ slow = false }: { slow?: boolean }) {
+export function CheckLegend({ slow = false, defaultOpen = false }: { slow?: boolean; defaultOpen?: boolean }) {
   const t = useT();
   const id = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const items = [
     ["hlp.leg.fail", "hlp.leg.fail.d"],
     ["hlp.leg.failed", "hlp.leg.failed.d"],
@@ -122,9 +122,10 @@ export function CheckLegend({ slow = false }: { slow?: boolean }) {
 }
 
 /** The walk of "Check now" over the rows (the board's ckr): the one asked is "run", the rest "wait", the done ones "done"; when the last is done they flash. */
-function useCheckWalk(ids: readonly string[]) {
-  const [step, setStep] = useState(0);
-  const [flash, setFlash] = useState(false);
+function useCheckWalk(ids: readonly string[], frozen: "" | "run" | "flash" = "") {
+  // a scene fixes the walk at its first step ("run") or at the flash after it ("flash"); a real page starts at rest
+  const [step, setStep] = useState(frozen === "run" ? 1 : 0);
+  const [flash, setFlash] = useState(frozen === "flash");
   const timer = useRef<ReturnType<typeof setInterval>>(undefined);
   const wait = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(
@@ -135,7 +136,7 @@ function useCheckWalk(ids: readonly string[]) {
     [],
   );
   const start = () => {
-    if (step > 0) return;
+    if (step > 0 || frozen) return;
     clearTimeout(wait.current);
     setFlash(true);
     if (ids.length === 0) {
@@ -263,20 +264,24 @@ function CountryBox({ title, look }: { title: string; look: CountryLook | null }
  * on) with its last result and the 24 h strip, the way to the node and "check this node now". A phone stacks a row's cells under its node. The TSPU probe's
  * last run is the foot of the table, the UDP notice stands over it; the legend folds under the card.
  */
-export function ChecksTab({ data }: { data: Checks }) {
+/** What a scene of the dev kit starts the tab with: the row that is open, the walk of "Check now" fixed at a step, the legend opened. */
+export type ChecksInit = { open?: string; walk?: "run" | "flash"; legend?: boolean };
+
+export function ChecksTab({ data, init }: { data: Checks; init?: ChecksInit }) {
   const t = useT();
   const fmt = useFmt();
-  const run = useRunChecks();
   const noChecks = useEdition().off("health_checks"); // no rounds there: no "every 5 min"
   const cols = data.columns;
   const country = countryColumn(data.countryChecks);
   const countryTitle = useCountryTitle(country?.code ?? "");
   // the row that opens by itself: the first node with a profile that fails
   const worst = data.rows.find((r) => r.cells.some((c) => c.last?.status === CheckStatus.FAILED))?.nodeId ?? "";
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(init?.open ?? null);
   const open = chosen ?? worst;
   const online = data.rows.filter((r) => r.cells.some((c) => c.deployed) && (r.nodeStatus === NodeStatus.ONLINE || r.nodeStatus === NodeStatus.NO_TRAFFIC)).map((r) => r.nodeId);
-  const walk = useCheckWalk(online);
+  const walk = useCheckWalk(online, init?.walk ?? "");
+  // the rows walk once the panel says it has something to ask (not while the nodes are offline or were checked a moment ago)
+  const run = useRunChecks("", (scheduled) => scheduled > 0 && walk.start());
   const newest = Math.max(0, ...data.rows.flatMap((r) => r.cells.map((c) => c.last?.atUnix ?? 0)));
   const slow = data.rows.some((r) => r.cells.some((c) => c.connectHourMs >= SLOW_CONNECT_MS));
   const n = cols.length + (country ? 1 : 0);
@@ -289,8 +294,7 @@ export function ChecksTab({ data }: { data: Checks }) {
     );
 
   const go = () => {
-    if (walk.busy) return;
-    walk.start();
+    if (walk.busy || run.running) return;
     run.run();
   };
   const cellOf = (r: Row, i: number) => {
@@ -388,7 +392,7 @@ export function ChecksTab({ data }: { data: Checks }) {
         </div>
         <TspuRunLine data={data} />
       </Sec>
-      <CheckLegend slow={slow} />
+      <CheckLegend slow={slow} defaultOpen={init?.legend} />
     </div>
   );
 }

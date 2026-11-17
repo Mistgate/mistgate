@@ -37,6 +37,9 @@ type Dialog =
 
 const doneFor = 30_000; // "Fixed" stays on the row until the re-check report replaces it
 
+/** What a scene of the dev kit starts the flow with: the window asking (its plan in), the fixes that run, what a failed one said. A real page starts with none. */
+export type FixSeed = { dlg?: { target: FixTarget; plan: Plain<FixPlan>; planId: string }; busy?: FixTarget[]; errors?: Record<string, string> };
+
 export type FixFlow = {
   start: (target: FixTarget) => void;
   phase: (key: string) => "idle" | "busy" | "done";
@@ -53,14 +56,14 @@ export type FixFlow = {
  * `inline`: the page shows a failure in the row itself (the board's "Could not do it" box with "Try again"), so no toast says it twice.
  * The node's own page leaves it off: its toast is the only word.
  */
-export function useFixFlow({ inline = false }: { inline?: boolean } = {}): FixFlow {
+export function useFixFlow({ inline = false, seed }: { inline?: boolean; seed?: FixSeed } = {}): FixFlow {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
-  const [dlg, setDlg] = useState<Dialog | null>(null);
-  const [phases, setPhases] = useState<Record<string, Phase>>({});
+  const [dlg, setDlg] = useState<Dialog | null>(() => (seed?.dlg ? { state: "ready", ...seed.dlg } : null));
+  const [phases, setPhases] = useState<Record<string, Phase>>(() => Object.fromEntries((seed?.busy ?? []).map((target) => [target.key, { phase: "busy" as const, target }])));
   const [failed, setFailed] = useState<Record<string, number>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>(seed?.errors ?? {});
   const seq = useRef(0); // a dry run that comes back after the dialog was closed is ignored
   const timers = useRef<number[]>([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);

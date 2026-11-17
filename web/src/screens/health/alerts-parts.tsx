@@ -89,11 +89,11 @@ export function useClose() {
  * "Close all shown", in the head of a card of alerts (the board's .btn.sm after the count): asks first, naming how many, in the board's window;
  * the toast that follows has "Undo". Nothing for a role that cannot close, or for an empty list.
  */
-export function CloseAll({ alerts }: { alerts: readonly Alert[] }) {
+export function CloseAll({ alerts, defaultOpen = false }: { alerts: readonly Alert[]; defaultOpen?: boolean }) {
   const t = useT();
   const can = useCan();
   const close = useClose();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   if (!can.run || alerts.length < 1) return null;
   return (
     <>

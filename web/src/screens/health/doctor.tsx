@@ -20,17 +20,17 @@ import "./health.css";
 const keyOf = (x: Pick<FleetIssue, "nodeId" | "item">) => `${x.nodeId}/${x.item.id}/${x.item.params.inbound_id ?? ""}`;
 
 /** The walk of "Run again" over the nodes (the board's hlDoc): the one asked is "run", the rest "wait"; it keeps to the last while the call is on. */
-function useDoctorWalk(count: number, pending: boolean) {
+function useDoctorWalk(count: number, pending: boolean, frozen = false) {
   const [ticks, setTicks] = useState(0);
   useEffect(() => {
-    if (!pending) return;
+    if (!pending || frozen) return;
     const id = setInterval(() => setTicks((k) => k + 1), 700);
     return () => {
       clearInterval(id);
       setTicks(0);
     };
-  }, [pending]);
-  const step = pending ? Math.min(Math.max(1, count), 1 + ticks) : 0;
+  }, [pending, frozen]);
+  const step = pending ? Math.min(Math.max(1, count), 1 + (frozen ? 1 : ticks)) : 0;
   const phase = (i: number): "" | "run" | "wait" | "done" => (step === 0 ? "" : i === step - 1 ? "run" : i > step - 1 ? "wait" : "done");
   return { phase, width: step > 0 && count > 1 ? `${Math.round(((step - 1) / (count - 1)) * 100)}%` : "0%", busy: step > 0 };
 }
@@ -120,7 +120,10 @@ function nodeLine(t: ReturnType<typeof useT>, n: NodeDoctor, never: boolean): { 
 }
 
 /** The fleet doctor: the sum, then every problem the nodes report, worst first, each with its explanation and, where there is one, a fix; the nodes at the side. */
-export function DoctorTab({ data, flow, first = false }: { data: Plain<GetDoctorResponse>; flow: FixFlow; first?: boolean }) {
+/** What a scene of the dev kit starts the tab with: "Run again" going, fixed at its second node. */
+export type DoctorInit = { busy?: boolean };
+
+export function DoctorTab({ data, flow, first = false, init }: { data: Plain<GetDoctorResponse>; flow: FixFlow; first?: boolean; init?: DoctorInit }) {
   const t = useT();
   const can = useCan();
   const run = useRunDoctor();
@@ -128,7 +131,8 @@ export function DoctorTab({ data, flow, first = false }: { data: Plain<GetDoctor
   const issues = fleetIssues(data.nodes);
   const totals = doctorTotals(data.nodes);
   const never = first || totals.nodes === 0;
-  const walk = useDoctorWalk(data.nodes.length, run.isPending);
+  const busy = run.isPending || !!init?.busy;
+  const walk = useDoctorWalk(data.nodes.length, busy, !!init?.busy);
 
   // A row whose fix just worked leaves the report at once; it stays as "Fixed" until the fix's 30 s are over.
   const live = new Set(issues.map(keyOf));
@@ -154,9 +158,9 @@ export function DoctorTab({ data, flow, first = false }: { data: Plain<GetDoctor
           <b className={cx("mono", issues.length > 0 && !walk.busy && "warn")}>{walk.busy ? "…" : never ? "—" : issues.length}</b>
         </div>
         {can.run && (
-          <Button variant="secondary" size="md" className={cx("btn", walk.busy && "busy")} aria-disabled={run.isPending} onClick={() => !run.isPending && run.mutate()}>
-            {run.isPending && <span className="an-sp" aria-hidden="true" />}
-            {run.isPending ? t("hlp.ck.busy") : t("hl.doctor.rerun")}
+          <Button variant="secondary" size="md" className={cx("btn", busy && "busy")} aria-disabled={busy} onClick={() => !busy && run.mutate()}>
+            {busy && <span className="an-sp" aria-hidden="true" />}
+            {busy ? t("hlp.ck.busy") : t("hl.doctor.rerun")}
           </Button>
         )}
         <i className="rw-pg" style={{ "--w": walk.width } as React.CSSProperties} aria-hidden="true" />

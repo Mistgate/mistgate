@@ -11,10 +11,10 @@ import { useEdition } from "@/lib/edition";
 import { problemCount, useFleetSummary } from "@/lib/fleet";
 import { alertsQuery, checksQuery, doctorQuery, fleetIssues, isLoud, isPeopleAlert } from "@/lib/health";
 import { useNow } from "@/lib/time";
-import { AlertsTab } from "./alerts";
-import { ChecksTab } from "./checks";
-import { DoctorTab } from "./doctor";
-import { useFixFlow } from "./fix";
+import { AlertsTab, type AlertsInit } from "./alerts";
+import { ChecksTab, type ChecksInit } from "./checks";
+import { DoctorTab, type DoctorInit } from "./doctor";
+import { useFixFlow, type FixSeed } from "./fix";
 import { Calm, Dot, LoadCards, LoadFailed, P, PageHead, TabLabel } from "./page-parts";
 import { PeopleTab } from "./people";
 import type { HealthTab } from "./tabs";
@@ -27,18 +27,25 @@ export function isFirstRound(checks: { columns: readonly unknown[]; rows: readon
 
 /** "Health": Alerts (what is wrong with the nodes now and what was), People (the same for people), Checks (the client's view of every profile), Doctor (host checks with fixes). */
 export function HealthScreen() {
-  const t = useT();
-  const addNode = useAddNode();
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as { tab?: HealthTab };
-  const tab = search.tab ?? "alerts";
+  const setTab = (next: string) => void navigate({ to: "/health", search: next === "alerts" ? {} : { tab: next as HealthTab }, replace: true });
+  return <HealthPage tab={search.tab ?? "alerts"} onTab={setTab} />;
+}
+
+/** What a scene of the dev kit starts the page with (a window open, a row open, a walk fixed); a real page has none. */
+export type HealthScene = { flow?: FixSeed; alerts?: AlertsInit; people?: { open?: string; closeAll?: boolean }; checks?: ChecksInit; doctor?: DoctorInit };
+
+/** The page itself: the tab is the caller's (the route has it in `?tab=`, a scene in its state). */
+export function HealthPage({ tab, onTab: setTab, scene }: { tab: HealthTab; onTab: (tab: string) => void; scene?: HealthScene }) {
+  const t = useT();
+  const addNode = useAddNode();
   const fleet = useFleetSummary();
-  const flow = useFixFlow({ inline: true }); // one flow for the Alerts and Doctor tabs: a fix started on one shows its progress on the other
+  const flow = useFixFlow({ inline: true, seed: scene?.flow }); // one flow for the Alerts and Doctor tabs: a fix started on one shows its progress on the other
 
   const alerts = useQuery(alertsQuery);
   const checks = useQuery(checksQuery());
   const doctor = useQuery(doctorQuery());
-  const setTab = (next: string) => void navigate({ to: "/health", search: next === "alerts" ? {} : { tab: next as HealthTab }, replace: true });
 
   const clock = useNow();
   const now = alerts.data?.nowUnix ?? Math.floor(clock / 1000);
@@ -117,7 +124,7 @@ export function HealthScreen() {
       content: state(alerts, () => (
         <>
           {note}
-          <AlertsTab active={active} history={alerts.data!.history} now={now} flow={flow} first={first} onChecks={noChecks ? undefined : () => setTab("checks")} />
+          <AlertsTab active={active} history={alerts.data!.history} now={now} flow={flow} first={first} onChecks={noChecks ? undefined : () => setTab("checks")} init={scene?.alerts} />
         </>
       )),
     },
@@ -127,19 +134,19 @@ export function HealthScreen() {
       content: state(alerts, () => (
         <>
           {note}
-          <PeopleTab active={active} now={now} flow={flow} first={first} />
+          <PeopleTab active={active} now={now} flow={flow} first={first} init={scene?.people} />
         </>
       )),
     },
     {
       value: "checks",
       label: t("hl.tab.checks"),
-      content: tab !== "checks" ? null : state(checks, () => <ChecksTab data={checks.data!} />),
+      content: tab !== "checks" ? null : state(checks, () => <ChecksTab data={checks.data!} init={scene?.checks} />),
     },
     {
       value: "doctor",
       label: <TabLabel text={t("hl.tab.doctor")} n={on ? issues : 0} />,
-      content: tab !== "doctor" ? null : state(doctor, () => <DoctorTab data={doctor.data!} flow={flow} first={first} />),
+      content: tab !== "doctor" ? null : state(doctor, () => <DoctorTab data={doctor.data!} flow={flow} first={first} init={scene?.doctor} />),
     },
   ];
 

@@ -144,7 +144,8 @@ export function HistoryCard({
 }
 
 /** "Check now": schedule an immediate round, then look at the results after a few seconds. The server limits it to one round per profile per 30 s. */
-export function useRunChecks(nodeId = "") {
+/** `onDone` hears how many profiles the panel scheduled (none: the nodes are offline or were checked a moment ago). */
+export function useRunChecks(nodeId = "", onDone?: (scheduled: number) => void) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
@@ -153,6 +154,7 @@ export function useRunChecks(nodeId = "") {
   const m = useMutation({
     mutationFn: async () => plain(await health.runChecksNow({ nodeId })),
     onSuccess: (r) => {
+      onDone?.(r.scheduled);
       toast(r.scheduled > 0 ? t.n("hl.checks.nowToast", r.scheduled) : t("hl.checks.nowNone"));
       // the round takes a few seconds (a failing one up to 25 s): look twice
       for (const ms of [4000, 14000]) setTimeout(() => void qc.invalidateQueries({ queryKey: ["health", "checks"] }), ms);
