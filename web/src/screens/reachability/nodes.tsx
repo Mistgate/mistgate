@@ -16,6 +16,7 @@ import { entryOffered, type Ipv6Entry } from "@/lib/ways";
 import { CountryMark, CountryPill, OwnPoints, PartialBreakdown } from "@/screens/health/country";
 import { Gl, P } from "@/screens/health/page-parts";
 import { Scope } from "./source-ui";
+import "./reach.css";
 
 // The nodes of the Reachability page, as the board draws them (PnReach): the summary card (the count, the states as a filter, the bar of
 // their shares) and the table, a row per node with its verdict now, the word of Globalping, of the lists and of the probe, and the week as

@@ -11,6 +11,7 @@ import { cx } from "@/lib/cx";
 import { minutesText } from "@/lib/format";
 import { Dot, Gl, P, Pill, type DotKind } from "@/screens/health/page-parts";
 import type { SourceId } from "./search";
+import "./reach.css";
 
 // The parts every source card is made of, in the board's marks (PnReach + pn.css: .rc-sd, .rc-pb, .pp-row, .rc-set, .rc-go, .rc-sf; the
 // rules are in ./reach.css, all under .hlp): the open source's frame with its head, its last line and its problem; a row of a setting; the
