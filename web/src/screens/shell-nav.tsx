@@ -392,7 +392,7 @@ export function Dock({ moreOpen = false, onMore, current }: { moreOpen?: boolean
         style={toneVar("more")}
         className={cx(dockTab, moreOpen && "bg-surface-2 text-fg")}
       >
-        <Tile id="more" className="bg-step duration-200 group-hover/ni:bg-step group-active/ni:bg-step" />
+        <Tile id="more" className="bg-step duration-200 [&_svg]:[stroke-width:2.8] group-hover/ni:bg-step group-active/ni:bg-step" />
         <span>{t("nav.more")}</span>
         {attention && <span aria-hidden className="absolute inset-s-[calc(50%+8px)] top-1.5 size-2 rounded-full bg-warn shadow-[0_0_0_2px_var(--surface)]" />}
       </button>
@@ -422,7 +422,7 @@ export function MobileMenu({ open, onNavigate, menuRef, current }: { open: boole
       aria-label={t("shell.menu.title")}
       tabIndex={-1}
       data-mobile-menu
-      className="absolute inset-x-2 top-[calc(100%+8px)] flex max-h-[min(620px,calc(100dvh-140px))] animate-[mg-up_0.25s_var(--e)_both] flex-col gap-3 overflow-y-auto rounded-card border border-line bg-surface p-3 shadow-(--shadow-pop) outline-none md:hidden"
+      className="absolute inset-x-2 top-[calc(100%+8px)] flex max-h-[min(620px,calc(100dvh-140px))] animate-[mg-up_0.25s_var(--e)_both] flex-col gap-3 overflow-y-auto [scrollbar-width:none] rounded-card border border-line bg-surface p-3 shadow-(--shadow-pop) outline-none md:hidden"
     >
       <nav aria-label={t("nav.main")} className="flex flex-col gap-0.5">
         {sections.map((s) => {
