@@ -13,8 +13,9 @@ import { meQuery } from "@/lib/session";
 import { setTheme } from "@/lib/theme";
 import { baseNode, facts, inbound, metrics, Mock, nodeFill } from "@/screens/dev-kit-node";
 import { NodeDetail } from "@/screens/node/index";
-import { AddRelayDialog, RelayRows, useRelayRuns } from "@/screens/node/relays";
-import { ChangeWay, LinkViaLine, SpeedCheck } from "@/screens/node/relay-way";
+import { AddRelayDialog, useRelayRuns } from "@/screens/node/relays";
+import { RelayRows } from "@/screens/node/relay-rows";
+import { ChangeWay, LinkViaLine } from "@/screens/node/relay-way";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 
 // Development only, /dev-kit?only=bridge&state=…&tab=ways&way=via:nod_msk1&lang=ru&theme=light: the bridge of a relay (the
@@ -29,7 +30,6 @@ import { settingsQuery } from "@/screens/subscriptions/queries";
 //   old-agent     the exit's agent has no bridge: the reason, the node to update
 //   change        "Change" of a TCP relay (direct picked: the drop note)
 //   udp           "Change" of a UDP relay: the bridge greyed with the reason
-//   speed         the speed check's confirmation
 //   add           "Relay through msk1": notes under the servers, the way opened
 //   check         the check window after "Check and turn on": direct fails, the bridge carries
 //   link-via      the exit's page: the agent reaches the panel through msk1
@@ -196,8 +196,6 @@ const scrollDown = () => {
 };
 const dlg = () => document.querySelector("[role=dialog]");
 
-const first = (rs: unknown[]) => rs[0] as RelayMsg;
-
 function Change({ udp = false, pick }: { udp?: boolean; pick?: string }) {
   const r = (udp ? scenes.direct!.relays[2] : scenes.bridge!.relays[0]) as RelayMsg;
   useEnsure(pick ? [() => { const want = dlg()?.querySelector<HTMLInputElement>(`input[type=radio][value=${pick}]`); if (want && !want.checked) want.click(); }] : []);
@@ -238,7 +236,7 @@ function Reader() {
         <LinkViaLine viaNodeId="nod_msk1" />
         <Card lg>
           <Block flush className="pt-4" title="de1 · msk1">
-            <RelayRows list={scenes.returning!.relays as RelayMsg[]} side="exit" runs={runs} readOnly />
+            <RelayRows list={scenes.returning!.relays as RelayMsg[]} runs={runs} readOnly people="RU" />
           </Block>
         </Card>
       </div>
@@ -259,12 +257,6 @@ export function BridgeKit() {
       return <Change pick="dnat" />;
     case "udp":
       return <Change udp />;
-    case "speed":
-      return (
-        <Mock fill={common(scenes.bridge!.relays)}>
-          <SpeedCheck r={first(scenes.bridge!.relays)} onClose={() => {}} />
-        </Mock>
-      );
     case "add":
       return <Add />;
     case "check":

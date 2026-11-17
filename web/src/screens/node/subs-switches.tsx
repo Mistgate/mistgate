@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { halo } from "@/components/fx/halo";
-import { Block } from "@/components/ui/bits";
+import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
@@ -113,30 +113,36 @@ export function InSubscriptions({ nodeId, nodeName, address, inbounds, cdn }: { 
   const owner = useIsOwner();
   const { toggle, busy, error, asking, dialog } = useInSubscriptions(nodeId, nodeName);
   return (
-    <Block title={t("ways.subs.title")}>
-      <p className="text-xs leading-snug text-pretty text-muted">{cdn ? t("ways.subs.note.cdn") : t("ways.subs.note.direct", { address })}</p>
-      <ul className="flex flex-col">
+    <>
+      <div className="wy-sh">
+        <h4>{t("ways.subs.title")}</h4>
+        <span>{cdn ? t("ways.subs.note.cdn") : t("ways.subs.note.direct", { address })}</span>
+      </div>
+      <ul className="wy-pt">
         {inbounds.map((i) => (
-          <li key={i.id}>
-            <label className="flex min-h-11 items-center gap-3 py-1">
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13px] leading-5 font-bold">{i.profileName}</span>
-                <span className="truncate font-mono text-[11px] text-muted">
-                  {protocolShort(i.protocol)} · {i.port}
-                </span>
+          <li key={i.id} className={`wy-po${i.directInSubscriptions ? "" : " off"}`}>
+            <span className="tg">
+              <ProtocolTag protocol={i.protocol} compact />
+            </span>
+            <div className="nm">
+              <b>{i.profileName}</b>
+              <span className="mono">
+                {protocolShort(i.protocol)} · {i.port}
               </span>
-              <Switch
-                checked={i.directInSubscriptions}
-                disabled={!owner || busy}
-                onCheckedChange={(on) => void toggle(i, on)}
-                aria-label={t("ways.subs.switch", { name: i.profileName })}
-              />
-            </label>
+            </div>
+            <span />
+            <span className="sw">
+              <Switch checked={i.directInSubscriptions} disabled={!owner || busy} onCheckedChange={(on) => void toggle(i, on)} aria-label={t("ways.subs.switch", { name: i.profileName })} />
+            </span>
           </li>
         ))}
       </ul>
-      {error && !asking && <Notice tone="danger">{error}</Notice>}
+      {error && !asking && (
+        <Notice tone="danger" className="wy-nt">
+          {error}
+        </Notice>
+      )}
       {dialog}
-    </Block>
+    </>
   );
 }

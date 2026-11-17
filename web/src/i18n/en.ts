@@ -46,6 +46,7 @@ import { en as userspageEn } from "./userspage";
 import { en as overviewEn } from "./overview";
 import { en as windowsEn } from "./windows";
 import { en as nodepageEn } from "./nodepage";
+import { en as nodewaysEn } from "./nodeways";
 import { en as usersgroupEn } from "./usersgroup";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
@@ -323,7 +324,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...nodeswaysEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...nodeswaysEn, ...windowsEn, ...nodepageEn, ...nodewaysEn, ...userslistEn, ...userspageEn, ...usersgroupEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

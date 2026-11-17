@@ -176,7 +176,7 @@ describe("the line of a node dark on part of the country", () => {
     expect(lane("direct").textContent).toContain("203.0.113.7 · 1 port");
     expect(lane("direct").textContent).toContain("Dark on MTS");
     expect(lane("via:nod_msk1").textContent).toContain("People reach msk1 from MTS");
-    expect(lane("ipv6").textContent).toBe("IPv6 entryOffoff");
+    expect(lane("ipv6").textContent).toBe("IPv6 entryoffOff");
     expect(text()).toContain("People · Russia");
     expect(text()).toContain("Dark on MTS — add a way around");
     // the first lane with a problem is open: direct, with the ports and the country row
@@ -190,7 +190,7 @@ describe("the line of a node dark on part of the country", () => {
     await mount(de1());
     expect(panel().textContent).toContain("People connect to msk1; it passes their traffic to de1 unchanged.");
     expect(panel().querySelectorAll("[data-testid=relay-row]")).toHaveLength(1);
-    expect(panel().textContent).toContain("Port on msk1");
+    expect(panel().textContent).toContain("tcp/443 on msk1");
     expect(panel().querySelector("a[href*='way=out']")?.getAttribute("href")).toBe("/nodes/nod_msk1?tab=ways&way=out%3Anod_de1");
     act(() => lane("via:nod_msk1").focus());
     await act(async () => void lane("via:nod_msk1").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
@@ -199,22 +199,15 @@ describe("the line of a node dark on part of the country", () => {
     expect(document.activeElement).toBe(lane("direct"));
   });
 
-  it("on a phone the list and the lane take turns: a tap pushes the lane, the way back goes back", async () => {
+  it("on a phone the list and the open way stand one above the other: a tap opens the way in place", async () => {
     (window as { matchMedia?: unknown }).matchMedia = () => ({ matches: true });
     search = { tab: "ways" };
     await mount(de1());
     const list = document.querySelector("[role=tablist]")!;
     expect(list.className).not.toContain("max-md:hidden");
-    expect(panel().parentElement!.className).toContain("max-md:hidden");
+    expect(panel().className).not.toContain("max-md:hidden");
     await click(lane("via:nod_msk1"));
-    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ search: { tab: "ways", way: "via:nod_msk1" }, replace: false }));
-    search = { tab: "ways", way: "via:nod_msk1" };
-    await act(async () => root!.render(ui(de1())));
-    expect(document.querySelector("[role=tablist]")!.className).toContain("max-md:hidden");
-    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    await click(document.getElementById("way-back"));
-    expect(back).toHaveBeenCalled();
-    back.mockRestore();
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ search: { tab: "ways", way: "via:nod_msk1" }, replace: true }));
   });
 });
 
@@ -297,17 +290,18 @@ describe("other nodes and roles", () => {
       ["way-tab-ipv6", "off"],
     ]);
     expect(lane("direct").textContent).toContain("From Russia: all networks");
-    expect(text()).toContain("If people’s network does not see this node, give them another way in");
+    expect(text()).toContain("through another node or over IPv6, if people’s network does not see this node");
   });
 
   it("an entry node lists the nodes reached through it, with a way to relay another", async () => {
     listRelays.mockResolvedValue({ relays: [relay(), relay({ id: "rly_2", inboundId: "inb_h", profileName: "Hysteria2", enabled: false, state: InboundState.PENDING, check: { ok: false, stage: "leg", leg: { status: "fail", code: "timeout", atUnix: now } } })] });
     const msk1 = { ...(de1() as object), node: { id: "nod_msk1", name: "msk1", countryCode: "RU", address: "198.51.100.20", status: NodeStatus.ONLINE, bandwidthMbps: 0 }, facts: {} } as never;
     await mount(msk1);
-    expect(text()).toContain("Reached through msk1");
-    expect(lane("out:nod_de1").textContent).toContain("2 servers · Partly down");
+    expect(text()).toContain("Whom it carries");
+    expect(lane("out:nod_de1").textContent).toContain("2 servers · forwarding");
+    expect(lane("out:nod_de1").textContent).toContain("Partly down");
     expect(lane("out:nod_de1").getAttribute("aria-selected")).toBe("true"); // the lane with a problem opens first
-    expect(text()).toContain("Relay another node…");
+    expect(text()).toContain("Carry more nodes…");
   });
 
   it("a helper sees direct and IPv6 only: no relays asked for, no way to add one", async () => {
