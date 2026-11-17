@@ -44,20 +44,22 @@ const focusRing = "outline-2 outline-offset-2 outline-accent-mark";
 
 /** A token colour with its name and the colour the browser resolved it to (it follows the theme). */
 function Swatch({ token, label }: { token: string; label?: string }) {
-  useTheme(); // a theme change re-renders this, and the effect below reads the colour again
-  const ref = useRef<HTMLSpanElement>(null);
-  const [value, setValue] = useState("");
+  const theme = useTheme();
+  const chip = useRef<HTMLSpanElement>(null);
+  const out = useRef<HTMLSpanElement>(null);
+  // written into the DOM, not into state: read again whenever the theme changes
   useEffect(() => {
-    if (ref.current) setValue(getComputedStyle(ref.current).backgroundColor);
-  });
+    if (chip.current && out.current) {
+      out.current.textContent = getComputedStyle(chip.current).backgroundColor;
+      out.current.dataset.theme = theme;
+    }
+  }, [theme]);
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <span ref={ref} className="size-8 flex-none rounded-ctl border border-line" style={{ background: `var(--${token})` }} />
+      <span ref={chip} className="size-8 flex-none rounded-ctl border border-line" style={{ background: `var(--${token})` }} />
       <span className="flex min-w-0 flex-col text-xs leading-4">
         <span className="truncate text-fg">{label ?? token}</span>
-        <span className="truncate font-mono text-[11px] text-muted" dir="ltr">
-          {value}
-        </span>
+        <span ref={out} className="truncate font-mono text-[11px] text-muted" dir="ltr" />
       </span>
     </div>
   );

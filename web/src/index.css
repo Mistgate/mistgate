@@ -141,6 +141,10 @@
   --warning-soft: #fbefd0;
   --danger: #c9353b;
   --danger-soft: #fde6e5;
+  /* the design's amber and red as text on their own wash are 3.4 and 4.4 : 1; these two are the same hues a step deeper
+     (4.7 and 4.9 : 1), for text only; dots, bars and glyphs keep the designed colours */
+  --warning-text: #946000;
+  --danger-text: #bb2f35;
 
   --_soft-pct: 24%;
   --_line-pct: 65%;
@@ -308,10 +312,10 @@
   --c-bg: var(--tone-sky-bg);
 }
 .tone-blip {
-  /* grey-blue, never red: a hoster blip is not an outage */
+  /* grey-blue, never red: a hoster blip is not an outage; its text is the blue pulled toward the text colour to stay legible */
   --c: var(--tone-blip);
   --c-ink: var(--ink-on-accent);
-  --c-fg: var(--tone-blip);
+  --c-fg: color-mix(in srgb, var(--tone-blip) 55%, var(--text));
   --c-bg: color-mix(in srgb, var(--tone-blip) 16%, var(--surface));
 }
 /* the glyph's mark sits on --c: dark ink, white only on the light theme's deeper red */
