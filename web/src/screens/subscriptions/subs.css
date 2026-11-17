@@ -165,6 +165,7 @@
   animation: rw-spin 1s linear infinite;
 }
 @keyframes rw-spin{to{transform:rotate(360deg)}}
+@keyframes pp-fade{from{opacity:1}to{opacity:0}}
 .sbp .rw-later {
   font-style: normal;
   font-size: 10px;

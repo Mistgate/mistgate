@@ -9,7 +9,6 @@
  * new name's blink, the dot's spring, the back arrow's step, the row's wash) and the entrance of a panel the board draws for a
  * new row (pp-fadein); all of it goes under prefers-reduced-motion.
  */
-@keyframes pp-fade{from{opacity:1}to{opacity:0}}
 @keyframes pp-fadein{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 .sbp .nd-back {
   display: inline-flex;

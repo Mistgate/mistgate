@@ -11,6 +11,7 @@ import { HappPing, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { isLang, setLang, useLang } from "@/i18n";
 import { accessQuery } from "@/lib/assistant";
 import { setEffectsEnabled } from "@/lib/effects";
+import { readPref, writePref } from "@/lib/storage";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { setTheme, useTheme } from "@/lib/theme";
@@ -167,11 +168,15 @@ export function SubsPage() {
   const params = new URLSearchParams(location.search);
   const state = params.get("state") ?? allScenes[0]!.state;
   const [scene] = useState(() => {
+    // the scene takes the language, the theme and the effects of its address for this page only: what the browser keeps of them
+    // (the setters write it) is put back at once, so another scene on the same origin does not meet them
+    const kept = { lang: readPref("lang"), theme: readPref("theme"), fx: readPref("fx") };
     const lang = params.get("lang");
     if (isLang(lang)) setLang(lang);
     const theme = params.get("theme");
     if (theme === "light" || theme === "dark") setTheme(theme);
     if (params.get("fx") === "1") setEffectsEnabled(true);
+    for (const [k, v] of Object.entries(kept)) writePref(k, v);
     return sceneOf(state, params.get("tab") ?? undefined);
   });
   return (
