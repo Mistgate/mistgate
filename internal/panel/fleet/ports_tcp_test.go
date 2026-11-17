@@ -116,7 +116,23 @@ func TestTCPTargets(t *testing.T) {
 			specs: []tcpSpec{{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
 				TLS: plugin.TLS{ServerName: "node-a.example.com"}, Settings: json.RawMessage(`{"domains":["node-a.example.com"],"fallback":"decoy"}`)}}},
 			pins: map[string]string{"mt": pin},
-			want: []tcpTarget{{Port: 443, Role: "mtproto", Profile: "Telegram", Kind: "tls", SNI: "node-a.example.com", Pin: pin}},
+			want: []tcpTarget{{Port: 443, Role: "mtproto", Profile: "Telegram", Kind: "tls", SNI: "node-a.example.com", Pin: pin, PublicCert: true}},
+		},
+		// The node closes the Hysteria2 site on a TCP port MTProto holds, so the port is MTProto's whichever id is lower.
+		"MTProto and a Hysteria2 site on 443: the target is MTProto": {
+			specs: []tcpSpec{hy2Spec("a", plugin.TLSAcmeDomain, "hy2.example.com", ""),
+				{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+					TLS: plugin.TLS{ServerName: "node-a.example.com"}, Settings: json.RawMessage(`{"domains":["node-a.example.com"],"fallback":"decoy"}`)}}},
+			want: []tcpTarget{
+				{Port: 80, Role: "acme", Kind: "http_mark"},
+				{Port: 443, Role: "mtproto", Profile: "Telegram", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
+			},
+		},
+		"MTProto with another site and a Hysteria2 site on 443: nothing proves this node's identity there": {
+			specs: []tcpSpec{hy2Spec("a", plugin.TLSAcmeDomain, "hy2.example.com", ""),
+				{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+					TLS: plugin.TLS{ServerName: "www.example.org"}, Settings: json.RawMessage(`{"domains":["www.example.org"],"fallback":"site"}`)}}},
+			want: []tcpTarget{{Port: 80, Role: "acme", Kind: "http_mark"}},
 		},
 		"MTProto foreign-site fallback does not prove this node's identity": {
 			specs: []tcpSpec{{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
@@ -133,7 +149,7 @@ func TestTCPTargets(t *testing.T) {
 			pins: map[string]string{"tt": pin},
 			want: []tcpTarget{
 				{Port: 80, Role: "acme", Kind: "http_mark"},
-				{Port: 443, Role: "site", ALPN: true, Profile: "TrustTunnel", Kind: "tls", SNI: "node-a.example.com", Pin: pin},
+				{Port: 443, Role: "site", ALPN: true, Profile: "TrustTunnel", Kind: "tls", SNI: "node-a.example.com", Pin: pin, PublicCert: true},
 			},
 		},
 		"a UDP inbound of another protocol is not a TCP port": {
@@ -198,6 +214,8 @@ func (p tcpProto) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, e
 		spec.TLS = plugin.TLS{Mode: plugin.TLSAcmeIP, ServerName: s.Name}
 	case "self":
 		spec.TLS = plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: s.Name}
+	case "name": // a server name and no certificate mode, like MTProto's
+		spec.TLS = plugin.TLS{ServerName: s.Name}
 	}
 	return spec, nil
 }
@@ -851,5 +869,49 @@ func TestGetNodeNamesTheSendersOfUDPAndTCPRows(t *testing.T) {
 	tcp := got.Msg.TcpChecks
 	if len(tcp) != 3 || tcp[0].Sender != "sender" || tcp[1].Sender != "unknown" || tcp[2].Sender != "panel" {
 		t.Errorf("TCP rows = %+v", tcp)
+	}
+}
+
+// The bridge on the entry's 443 verifies the entry by the name of what answers there. A Hysteria2 site gives the port up to
+// any TCP inbound, so the name is TrustTunnel's or MTProto's even where the Hysteria2 inbound has the lower id; MTProto with
+// another site has no name of the node's.
+func TestBridgeTLSNameIsTheOwnerOf443(t *testing.T) {
+	pin := "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+	const hy2 = `{"port":443,"network":"udp","tls":"acme","name":"hy2.example.com"}`
+	for name, tc := range map[string]struct {
+		protocol, settings, pin string
+		wantSNI, wantPin        string
+	}{
+		"hysteria2 alone":                   {"", "", "", "hy2.example.com", ""},
+		"trusttunnel":                       {"trusttunnel", `{"port":443,"network":"tcp","tls":"acme","name":"tt.example.com"}`, "", "tt.example.com", ""},
+		"trusttunnel with the reported pin": {"trusttunnel", `{"port":443,"network":"tcp","tls":"acme","name":"tt.example.com"}`, pin, "tt.example.com", pin},
+		"mtproto decoy":                     {"mtproto", `{"port":443,"network":"tcp","tls":"name","name":"tg.example.com","fallback":"decoy"}`, "", "tg.example.com", ""},
+		"mtproto with another site":         {"mtproto", `{"port":443,"network":"tcp","tls":"name","name":"www.example.org","fallback":"site"}`, "", "", ""},
+		"mtproto decoy on another port":     {"mtproto", `{"port":8443,"network":"tcp","tls":"name","name":"tg.example.com","fallback":"decoy"}`, "", "hy2.example.com", ""},
+		"trusttunnel on another port":       {"trusttunnel", `{"port":8443,"network":"tcp","tls":"acme","name":"tt.example.com"}`, "", "hy2.example.com", ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			reg, err := protocols.NewRegistry(tcpProto{fakeProto{"hysteria2", plugin.ClientHapp}}, tcpProto{fakeProto{"trusttunnel", plugin.ClientMihomo}},
+				tcpProto{fakeProto{"mtproto", plugin.ClientTelegram}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			x := newEnvWith(t, reg)
+			node := x.enroll("entry")
+			x.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_hy2', 'hysteria2', 'hy2', ?, 1, 1, 1)`, hy2)
+			x.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, enabled, created_at, updated_at) VALUES ('inb_a', 'prf_hy2', ?, 1, 1, 1, 1)`, node.nodeID)
+			if tc.protocol != "" {
+				x.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_b', ?, 'b', ?, 1, 1, 1)`, tc.protocol, tc.settings)
+				x.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, enabled, cert_pin_sha256, created_at, updated_at) VALUES ('inb_b', 'prf_b', ?, 1, 1, ?, 1, 1)`, node.nodeID, tc.pin)
+			}
+			entry, err := x.st.Node(x.ctx, node.nodeID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, ok := x.f.bridgeTLSName(x.ctx, entry)
+			if ok != (tc.wantSNI != "") || got.SNI != tc.wantSNI || got.Pin != tc.wantPin {
+				t.Fatalf("bridgeTLSName = %q pin %q ok %v, want %q pin %q", got.SNI, got.Pin, ok, tc.wantSNI, tc.wantPin)
+			}
+		})
 	}
 }

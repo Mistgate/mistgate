@@ -12,6 +12,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/protocols/hysteria2"
 	"github.com/mistgate/mistgate/internal/panel/protocols/vless"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The targets of the own probes. A file of its own, built for the VPS only: the Cloudflare edition has no probes, and its Workers
@@ -63,13 +64,7 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 				if json.Unmarshal(t.settings, &cfg) != nil {
 					continue
 				}
-				sni := ""
-				if len(cfg.Reality.ServerNames) > 0 {
-					sni = cfg.Reality.ServerNames[0]
-				}
-				if sni == "" {
-					sni = cfg.SNI
-				}
+				sni := probeName(t.spec)
 				if !countryreach.ProbeSNI(sni) {
 					continue
 				}
@@ -93,13 +88,12 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 				}
 				tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: t.spec.Listen.Port, Kind: kind, SNI: sni, Path: path})
 			case hysteria2.ID:
-				var cfg hysteria2.Settings
-				if json.Unmarshal(t.settings, &cfg) != nil || !countryreach.ProbeSNI(cfg.SNI) {
+				sni := probeName(t.spec)
+				if !countryreach.ProbeSNI(sni) {
 					continue
 				}
-				port := hy2DecoyPort(t)
-				if port > 0 {
-					tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: port, Kind: "tls", SNI: cfg.SNI, Path: "/"})
+				if port := hy2DecoyPort(t); port > 0 {
+					tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: port, Kind: "tls", SNI: sni, Path: "/"})
 				}
 			}
 		}
@@ -119,4 +113,22 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 		return strings.Compare(a.Kind, b.Kind)
 	})
 	return out, nil
+}
+
+// probeName is the name the inbound answers to: the one in its node-side spec, which carries the node's own "Domain (SNI)"
+// (the inbound's override) where the profile's settings only carry the default. A REALITY inbound with another site has none
+// in its TLS block and takes the first of its server names.
+func probeName(spec plugin.InboundSpec) string {
+	if spec.TLS.ServerName != "" {
+		return spec.TLS.ServerName
+	}
+	var settings struct {
+		Reality struct {
+			ServerNames []string `json:"server_names"`
+		} `json:"reality"`
+	}
+	if json.Unmarshal(spec.Settings, &settings) == nil && len(settings.Reality.ServerNames) > 0 {
+		return settings.Reality.ServerNames[0]
+	}
+	return ""
 }

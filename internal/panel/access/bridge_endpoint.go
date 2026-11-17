@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 
 	"connectrpc.com/connect"
 
@@ -24,27 +23,19 @@ func (s *Service) ensureBridgeEndpoint(ctx context.Context, entryID string, extr
 		return store.NodeRow{}, err
 	}
 	base := make([]nodeListen, 0, len(others)+1)
-	var owns443 bool
-	vless443 := false
-	for _, other := range others {
-		if other.enabled && other.spec.Protocol == "vless" && other.spec.Listen.Network == "tcp" && other.spec.Listen.Port == 443 {
-			vless443 = true
-			break
-		}
-	}
+	var specs []plugin.InboundSpec
 	for _, other := range others {
 		if other.protocol == "bridge" {
 			continue
 		}
 		base = append(base, other)
-		if other.enabled && hasOwnHTTPSite(other.spec) {
-			// The Hysteria site cannot carry the bridge when a VLESS inbound owns its TCP port.
-			if other.spec.Protocol == "hysteria2" && hy2SitePortForBridge(other.spec) == 443 && vless443 {
-				continue
-			}
-			owns443 = true
+		if other.enabled && other.spec.Protocol != "" {
+			specs = append(specs, other.spec)
 		}
 	}
+	// The bridge rides the node's own site on 443 when one answers there (plugin.TCPPortOwners): a Hysteria2 site that gave
+	// the port up to a TCP inbound is not that site.
+	owns443 := plugin.TCPPortOwners(specs)[443].Site
 	if extra != nil {
 		base = append(base, nodeListen{profile: "relay being created", protocol: relayProtocol, enabled: true, l: *extra})
 	}
@@ -90,38 +81,4 @@ func (s *Service) ensureBridgeEndpoint(ctx context.Context, entryID string, extr
 		s.notify.StateChanged() // a probe of the old endpoint carries its port, so it cannot be mistaken for one of this
 	}
 	return n, nil
-}
-
-func hasOwnHTTPSite(spec plugin.InboundSpec) bool {
-	if spec.Protocol == "hysteria2" && spec.TLS.Mode != 0 && hy2SitePortForBridge(spec) == 443 {
-		return true
-	}
-	if spec.Protocol != "vless" || spec.Listen.Network != "tcp" || spec.Listen.Port != 443 {
-		return false
-	}
-	var settings struct {
-		Security string `json:"security"`
-		Reality  struct {
-			Target string `json:"target"`
-		} `json:"reality"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-		return false
-	}
-	return settings.Security == "tls" || settings.Security == "reality" && settings.Reality.Target == "self"
-}
-
-func hy2SitePortForBridge(spec plugin.InboundSpec) uint16 {
-	var settings struct {
-		Masquerade struct {
-			TCPPort *uint16 `json:"tcp_port"`
-		} `json:"masquerade"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-		return 0
-	}
-	if settings.Masquerade.TCPPort != nil {
-		return *settings.Masquerade.TCPPort
-	}
-	return 443
 }

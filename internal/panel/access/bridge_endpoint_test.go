@@ -112,3 +112,49 @@ func TestMovingBridgeEndpointInvalidatesReverseReach(t *testing.T) {
 		t.Fatalf("a probe carries the port it was made for, and passes for that port only: %+v", check.ReverseReach)
 	}
 }
+
+// The bridge rides the node's own site on 443, whoever holds the port: TrustTunnel and the decoy of MTProto have one, and the
+// Hysteria2 site beside them gave the port up. MTProto with another site (and a Hysteria2 site beside it, which also gave the
+// port up) shows no site of the node, so the bridge needs a port of its own; with 443 free it takes it.
+func TestEnsureBridgeEndpointRidesTheSiteOfTrustTunnelAndMTProto(t *testing.T) {
+	const (
+		onSite = "site" // port 0: the bridge is served by the site of 443
+		own    = "own"  // a port of its own, neither 0 nor 443
+		on443  = "443"  // a listener of its own on 443
+	)
+	for name, tc := range map[string]struct {
+		protocol, settings string
+		hy2                bool
+		want               string
+	}{
+		"trusttunnel":                   {"trusttunnel", `{"port":443}`, false, onSite},
+		"trusttunnel beside a hy2":      {"trusttunnel", `{"port":443}`, true, onSite},
+		"mtproto decoy":                 {"mtproto", `{"port":443}`, false, onSite},
+		"mtproto decoy beside a hy2":    {"mtproto", `{"port":443}`, true, onSite},
+		"mtproto site beside a hy2":     {"mtproto", `{"port":443,"fake_tls":{"kind":"site","domain":"site.example.net"}}`, true, own},
+		"mtproto decoy on another port": {"mtproto", `{"port":8443}`, false, on443},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newRelayFix(t)
+			if tc.hy2 {
+				f.inbound(f.profile("entry Hysteria site", "").Id, "nod_fi1")
+			}
+			p := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: tc.protocol, Name: name, SettingsJson: tc.settings}))).Msg.Profile
+			f.inbound(p.Id, "nod_fi1")
+			node, err := f.s.ensureBridgeEndpoint(f.ctx, "nod_fi1", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := own
+			switch node.BridgePort {
+			case 0:
+				got = onSite
+			case 443:
+				got = on443
+			}
+			if got != tc.want {
+				t.Fatalf("bridge port = %d (%s), want %s", node.BridgePort, got, tc.want)
+			}
+		})
+	}
+}

@@ -959,15 +959,21 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_decoy_paused", Params: params})
 	}
 	// TrustTunnel serves the node's own site on its TCP port, so a Hysteria2 site there is closed and nothing else changes: the
-	// same pause as under VLESS, told apart by its code because the admin's sentence for hy2_decoy_paused names VLESS.
-	appendTakenWarning := func(port int, hy2, trustTunnel string) {
-		warnings = append(warnings, &adminv1.StatusReason{Code: "hy2_site_taken", Params: map[string]string{
-			"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "trusttunnel": trustTunnel}})
+	// same pause as under VLESS, told apart by its code because the admin's sentence for hy2_decoy_paused names VLESS. An MTProto
+	// inbound closes the site the same way (the agent gives the port up to any TCP inbound) and shows its own fallback instead;
+	// its code is hy2_site_taken_mtproto, since the sentence of hy2_site_taken names TrustTunnel.
+	appendTakenWarning := func(port int, hy2, taker, protocol string) {
+		code := "hy2_site_taken"
+		if protocol == "mtproto" {
+			code += "_mtproto"
+		}
+		warnings = append(warnings, &adminv1.StatusReason{Code: code, Params: map[string]string{
+			"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, protocol: taker}})
 	}
-	if spec.Protocol == "trusttunnel" && spec.Listen.Network == "tcp" {
+	if (spec.Protocol == "trusttunnel" || spec.Protocol == "mtproto") && spec.Listen.Network == "tcp" {
 		for _, other := range others {
 			if other.enabled && other.protocol == "hysteria2" && hy2TCPPort(other.spec) == int(spec.Listen.Port) {
-				appendTakenWarning(int(spec.Listen.Port), other.profile, profileName)
+				appendTakenWarning(int(spec.Listen.Port), other.profile, profileName, spec.Protocol)
 				break
 			}
 		}
@@ -991,8 +997,8 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 					appendDecoyWarning(port, profileName, other.profile, other.spec, spec)
 					break
 				}
-				if other.protocol == "trusttunnel" {
-					appendTakenWarning(port, profileName, other.profile)
+				if other.protocol == "trusttunnel" || other.protocol == "mtproto" {
+					appendTakenWarning(port, profileName, other.profile, other.protocol)
 					break
 				}
 			}

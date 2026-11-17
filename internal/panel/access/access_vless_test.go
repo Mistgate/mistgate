@@ -347,3 +347,50 @@ func TestHy2SiteTakenByTrustTunnel(t *testing.T) {
 		})
 	}
 }
+
+// An MTProto listener on the TCP port of a Hysteria2 site closes that site too (the node gives the port up to any TCP inbound):
+// hy2_site_taken_mtproto, whichever of the two is being added. The site fallback of MTProto takes the port as well.
+func TestHy2SiteTakenByMTProto(t *testing.T) {
+	hy2 := plugin.InboundSpec{Protocol: "hysteria2", Listen: plugin.Listen{Network: "udp", Port: 443},
+		TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "de1.example.com"}, Settings: []byte(`{}`)}
+	mt := plugin.InboundSpec{Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+		TLS: plugin.TLS{ServerName: "tg.example.com"}, Settings: []byte(`{"domains":["tg.example.com"],"fallback":"decoy"}`)}
+	mtOn := func(port uint16) nodeListen {
+		s := mt
+		s.Listen.Port = port
+		return nodeListen{profile: "tg", protocol: "mtproto", enabled: true, l: s.Listen, spec: s}
+	}
+	hy2Other := nodeListen{profile: "hy2", protocol: "hysteria2", enabled: true, l: hy2.Listen, spec: hy2}
+	e := newEnv(t)
+	for name, tc := range map[string]struct {
+		add    plugin.InboundSpec
+		others []nodeListen
+		want   map[string]string // nil = no warning
+	}{
+		"mtproto added beside the site":  {mt, []nodeListen{hy2Other}, map[string]string{"node": "de1", "port": "443", "hy2": "hy2", "mtproto": "added"}},
+		"hysteria2 added beside mtproto": {hy2, []nodeListen{mtOn(443)}, map[string]string{"node": "de1", "port": "443", "hy2": "added", "mtproto": "tg"}},
+		"mtproto on another port": {mt, []nodeListen{func() nodeListen {
+			n := hy2Other
+			n.spec.Settings = []byte(`{"masquerade":{"tcp_port":8443}}`)
+			return n
+		}()}, nil},
+		"hysteria2 beside mtproto on 8443": {hy2, []nodeListen{mtOn(8443)}, nil},
+		"a disabled site":                  {mt, []nodeListen{func() nodeListen { n := hy2Other; n.enabled = false; return n }()}, nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tc.add, tc.others)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == nil {
+				if len(got) != 0 {
+					t.Fatalf("warnings = %+v", got)
+				}
+				return
+			}
+			if len(got) != 1 || got[0].Code != "hy2_site_taken_mtproto" || !reflect.DeepEqual(got[0].Params, tc.want) {
+				t.Fatalf("warnings = %+v, want hy2_site_taken_mtproto %v", got, tc.want)
+			}
+		})
+	}
+}

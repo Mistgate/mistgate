@@ -193,7 +193,7 @@ func (f *Fleet) bridgeTLSName(ctx context.Context, entry store.NodeRow) (tcpTarg
 		return tcpTarget{}, false
 	}
 	for _, target := range tcpTargets(specs, pins) {
-		if target.Port == 443 && (target.Role == tcpRoleSite || target.Role == tcpRoleVLESS && bridgeVLESSOwnSite(specs, target.Profile)) &&
+		if target.Port == 443 && (target.Role == tcpRoleSite || target.Role == tcpRoleMTProto || target.Role == tcpRoleVLESS && bridgeVLESSOwnSite(specs, target.Profile)) &&
 			(target.Pin != "" || target.PublicCert) {
 			return target, true
 		}
