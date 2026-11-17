@@ -894,7 +894,7 @@ func TestTokenAllowList(t *testing.T) {
 		if _, ok := procedureLevels[path]; !ok {
 			t.Errorf("the allow-list names %s, which has no level (not a procedure?)", path)
 		}
-		if access != TokenAccessDirect && access != TokenAccessApproved && access != TokenAccessPlanning {
+		if access != TokenAccessDirect && access != TokenAccessApproved && access != TokenAccessPlanning && access != TokenAccessDraft {
 			t.Errorf("%s: access %d", path, access)
 		}
 		if got, ok := TokenAccess(path); !ok || got != access {
@@ -913,12 +913,13 @@ func TestTokenAllowList(t *testing.T) {
 	// the exact set that goes through the owner's approval
 	approved := map[string]bool{}
 	for path, access := range tokenProcedures {
-		if access == TokenAccessApproved {
+		// a draft call also runs inside an approved plan (a new version of a site that stands somewhere)
+		if access == TokenAccessApproved || access == TokenAccessDraft {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 41 {
-		t.Errorf("%d procedures need approval, want 41: %v", len(approved), approved)
+	if len(approved) != 47 {
+		t.Errorf("%d procedures need approval, want 47: %v", len(approved), approved)
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)

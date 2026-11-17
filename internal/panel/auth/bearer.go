@@ -244,6 +244,12 @@ func (s *Service) tokenDenied(r *http.Request, tok store.APIToken, path string) 
 		return ""
 	}
 	ctx := context.WithValue(r.Context(), procedureKey{}, path)
+	if access == TokenAccessDraft {
+		if planningAllows(ctx) || s.grantAllows(ctx, tok.ID, path) {
+			return ""
+		}
+		return msgPlanning
+	}
 	if access == TokenAccessPlanning {
 		if planningAllows(ctx) {
 			return ""
@@ -297,8 +303,17 @@ func planningDryRun(r *http.Request) bool {
 	case *adminv1.UpdateGroupRequest:
 		return m.GetDryRun()
 	}
+	if x, ok := planningExtra[r.URL.Path]; ok {
+		return x.dry(m)
+	}
 	return false
 }
+
+// planningExtra is the dry-run requests of services the Cloudflare edition does not link, added by their policy files.
+var planningExtra = map[string]struct {
+	message func() proto.Message
+	dry     func(proto.Message) bool
+}{}
 
 func planningRequest(path string) proto.Message {
 	switch path {
@@ -311,6 +326,9 @@ func planningRequest(path string) proto.Message {
 	case adminv1connect.GroupServiceUpdateGroupProcedure:
 		return &adminv1.UpdateGroupRequest{}
 	default:
+		if x, ok := planningExtra[path]; ok {
+			return x.message()
+		}
 		return nil
 	}
 }

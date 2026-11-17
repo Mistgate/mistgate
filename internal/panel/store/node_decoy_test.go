@@ -22,14 +22,14 @@ func TestNodeDecoyBundleIsContentAddressedAndOwnedByNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := s.SetNodeDecoyBundle(ctx, nodeA, bundle.Hash(), bundle.Archive())
+	first, err := assignOwn(ctx, s, nodeA, bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.DecoyMode != decoy.ModeOwn || first.DecoyBundleHash != bundle.Hash() {
 		t.Fatalf("first upload state = %+v", first)
 	}
-	second, err := s.SetNodeDecoyBundle(ctx, nodeB, bundle.Hash(), bundle.Archive())
+	second, err := assignOwn(ctx, s, nodeB, bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestBulkOwnDecoyModeRefusesWithoutEveryBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.SetNodeDecoyBundle(ctx, nodeA, bundle.Hash(), bundle.Archive()); err != nil {
+	if _, err := assignOwn(ctx, s, nodeA, bundle); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SetNodeDecoyMode(ctx, nodeA, decoy.ModeBuiltin); err != nil {

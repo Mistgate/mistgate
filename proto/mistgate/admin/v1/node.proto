@@ -180,6 +180,8 @@ message Node {
   // The entry node whose bridge the agent of this node runs its control channel through, because it cannot reach the panel
   // directly; empty = a direct connection (Hello.link_via_node_id; live state, not stored).
   string link_via_node_id = 43;
+  // The library site this node serves (mode "own"); empty when none (DecoySiteService).
+  string decoy_site_id = 44;
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",

@@ -31,53 +31,57 @@ type decoyFileArg struct {
 
 // ownBundle is the bundle an own-mode call carries and its archive. Exactly one of bundle_base64 and files must be given.
 func (a nodeDecoyArgs) ownBundle() (*decoy.Bundle, []byte, error) {
-	switch {
-	case a.BundleBase64 != "" && len(a.Files) > 0:
-		return nil, nil, errors.New("give either bundle_base64 or files, not both")
-	case a.BundleBase64 == "" && len(a.Files) == 0:
-		return nil, nil, errors.New("bundle_base64 or files is required for own mode")
-	case len(a.Files) > 0:
-		built, err := decoyFromFiles(a.Files)
-		if err != nil {
-			return nil, nil, err
-		}
-		archive := built.Archive()
-		bundle, err := decoy.ParseArchive(archive)
-		if err != nil {
-			return nil, nil, errors.New(decoy.ClientMessage(err))
-		}
-		return bundle, archive, nil
-	}
-	archive, err := base64.StdEncoding.Strict().DecodeString(a.BundleBase64)
+	b, err := wholeDecoySite(a.BundleBase64, a.Files, "bundle_base64 or files is required for own mode")
 	if err != nil {
-		return nil, nil, errors.New("bundle_base64 must encode a ZIP or TAR archive")
+		return nil, nil, err
+	}
+	return b, b.Archive(), nil
+}
+
+// wholeDecoySite is the site a call gives as an archive (base64) or as a list of files; missing is the refusal for neither.
+func wholeDecoySite(bundleBase64 string, files []decoyFileArg, missing string) (*decoy.Bundle, error) {
+	switch {
+	case bundleBase64 != "" && len(files) > 0:
+		return nil, errors.New("give either bundle_base64 or files, not both")
+	case bundleBase64 == "" && len(files) == 0:
+		return nil, errors.New(missing)
+	case len(files) > 0:
+		return decoyFromFiles(files)
+	}
+	archive, err := base64.StdEncoding.Strict().DecodeString(bundleBase64)
+	if err != nil {
+		return nil, errors.New("bundle_base64 must encode a ZIP or TAR archive")
 	}
 	bundle, err := decoy.ParseArchive(archive)
 	if err != nil {
-		return nil, nil, errors.New(decoy.ClientMessage(err))
+		return nil, errors.New(decoy.ClientMessage(err))
 	}
-	return bundle, archive, nil
+	return bundle, nil
 }
 
 // decoyFromFiles checks a list of files and builds its bundle. The archive is canonical (sorted paths, fixed times and
 // modes), so the same files always give the same SHA-256 and a node that has the site is not sent it again.
 func decoyFromFiles(in []decoyFileArg) (*decoy.Bundle, error) {
+	files, err := decodeDecoyFiles(in, "files")
+	if err != nil {
+		return nil, err
+	}
+	return bundleOfDecoyFiles(files)
+}
+
+// decodeDecoyFiles checks the paths and sizes of a list as given and decodes the contents; label names the list in a refusal.
+func decodeDecoyFiles(in []decoyFileArg, label string) ([]decoy.File, error) {
 	if len(in) > maxDecoyFiles {
-		return nil, fmt.Errorf("files: at most %d files, got %d", maxDecoyFiles, len(in))
+		return nil, fmt.Errorf("%s: at most %d files, got %d", label, maxDecoyFiles, len(in))
 	}
 	files := make([]decoy.File, 0, len(in))
-	lower := make(map[string]int, len(in))
 	total := 0
 	for i, f := range in {
 		if err := checkDecoyPath(f.Path); err != nil {
-			return nil, fmt.Errorf("files[%d] %q: %w", i, clean(f.Path, 60), err)
+			return nil, fmt.Errorf("%s[%d] %q: %w", label, i, clean(f.Path, 60), err)
 		}
-		if j, dup := lower[strings.ToLower(f.Path)]; dup {
-			return nil, fmt.Errorf("files[%d] %q repeats files[%d]: paths are compared ignoring case", i, clean(f.Path, 60), j)
-		}
-		lower[strings.ToLower(f.Path)] = i
 		if (f.Content == "") == (f.ContentBase64 == "") {
-			return nil, fmt.Errorf("files[%d] %q: give exactly one of content and content_base64, not empty", i, clean(f.Path, 60))
+			return nil, fmt.Errorf("%s[%d] %q: give exactly one of content and content_base64, not empty", label, i, clean(f.Path, 60))
 		}
 		// the size is checked before anything is decoded, so a huge list costs no memory
 		size := len(f.Content)
@@ -85,27 +89,41 @@ func decoyFromFiles(in []decoyFileArg) (*decoy.Bundle, error) {
 			size = base64.StdEncoding.DecodedLen(len(f.ContentBase64))
 		}
 		if total += size; total > decoy.MaxBundleBytes {
-			return nil, fmt.Errorf("files: more than %d bytes in total", decoy.MaxBundleBytes)
+			return nil, fmt.Errorf("%s: more than %d bytes in total", label, decoy.MaxBundleBytes)
 		}
 		content := []byte(f.Content)
 		if f.ContentBase64 != "" {
 			var err error
 			if content, err = base64.StdEncoding.Strict().DecodeString(f.ContentBase64); err != nil {
-				return nil, fmt.Errorf("files[%d] %q: content_base64 is not valid base64", i, clean(f.Path, 60))
+				return nil, fmt.Errorf("%s[%d] %q: content_base64 is not valid base64", label, i, clean(f.Path, 60))
 			}
 		}
 		files = append(files, decoy.File{Path: f.Path, Content: content})
 	}
+	return files, nil
+}
+
+// bundleOfDecoyFiles builds the bundle of a whole site's files: the paths must not repeat (ignoring case) or ask a file to be a
+// folder, then the bundle rules of the decoy package apply.
+func bundleOfDecoyFiles(files []decoy.File) (*decoy.Bundle, error) {
+	lower := make(map[string]string, len(files))
+	for _, f := range files {
+		k := strings.ToLower(f.Path)
+		if other, dup := lower[k]; dup {
+			return nil, fmt.Errorf("%q repeats %q: paths are compared ignoring case", clean(f.Path, 60), clean(other, 60))
+		}
+		lower[k] = f.Path
+	}
 	// a file where another needs a folder ("a" and "a/b"), also across case
-	for i, f := range in {
+	for _, f := range files {
 		for dir := strings.ToLower(f.Path); ; {
 			k := strings.LastIndexByte(dir, '/')
 			if k < 0 {
 				break
 			}
 			dir = dir[:k]
-			if j, clash := lower[dir]; clash {
-				return nil, fmt.Errorf("files[%d] is a file, but files[%d] needs it to be a folder", j, i)
+			if file, clash := lower[dir]; clash {
+				return nil, fmt.Errorf("%q is a file, but %q needs it to be a folder", clean(file, 60), clean(f.Path, 60))
 			}
 		}
 	}
