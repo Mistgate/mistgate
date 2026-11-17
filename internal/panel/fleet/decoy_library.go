@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -139,6 +140,33 @@ func (s decoySiteService) siteMessage(ctx context.Context, id string) (*decoysit
 
 // --- reads ---
 
+// panelState is the panel's row: its public address and what its public listener serves now. The listener falls back (see
+// httpserver.libraryDecoy) when the site chosen for it is gone or is a draft, and a chosen directory it does not have is the built-in page.
+func (f *Fleet) panelState(ctx context.Context, chosen string) (*decoysitev1.DecoyPanelState, error) {
+	out := &decoysitev1.DecoyPanelState{Serving: chosen}
+	if u, err := url.Parse(f.cfg.PublicURL); err == nil {
+		out.Address = u.Host
+	}
+	rest := "builtin"
+	if f.cfg.DecoyDir != "" {
+		rest = "dir"
+	}
+	if id, isSite := strings.CutPrefix(chosen, "site:"); isSite {
+		info, err := f.st.DecoySiteInfoOf(ctx, id)
+		switch {
+		case errors.Is(err, store.ErrDecoySiteNotFound):
+			out.Serving, out.ReasonCode = rest, "decoy_site_not_found"
+		case err != nil:
+			return nil, err
+		case info.State != store.DecoyStateReady:
+			out.Serving, out.ReasonCode = rest, "decoy_site_draft"
+		}
+	} else if chosen == "dir" && rest == "builtin" {
+		out.Serving, out.ReasonCode = rest, "panel_unavailable"
+	}
+	return out, nil
+}
+
 func (s decoySiteService) ListDecoySites(ctx context.Context, _ *connect.Request[decoysitev1.ListDecoySitesRequest]) (*connect.Response[decoysitev1.ListDecoySitesResponse], error) {
 	f := s.f
 	infos, err := f.st.DecoySites(ctx)
@@ -154,8 +182,12 @@ func (s decoySiteService) ListDecoySites(ctx context.Context, _ *connect.Request
 		return nil, s.fail("read the panel decoy source", err)
 	}
 	_, perr := f.panelDecoyBundle()
+	panel, err := f.panelState(ctx, source)
+	if err != nil {
+		return nil, s.fail("read the panel decoy state", err)
+	}
 	out := &decoysitev1.ListDecoySitesResponse{
-		PanelSource: source, SiteLimit: store.DecoySiteLimit, VersionLimit: store.DecoyVersionLimit,
+		Panel: panel, PanelSource: source, SiteLimit: store.DecoySiteLimit, VersionLimit: store.DecoyVersionLimit,
 		Builtin: []*decoysitev1.DecoyBuiltinItem{
 			{Id: "builtin", Available: true, NodeCount: uint32(counts[decoy.ModeBuiltin]), OnPanel: source == "builtin"},
 			{Id: "panel_dir", Available: perr == nil, ReasonCode: panelReason(perr), NodeCount: uint32(counts[decoy.ModePanel]), OnPanel: source == "dir"},
@@ -172,15 +204,23 @@ func (s decoySiteService) GetDecoySite(ctx context.Context, req *connect.Request
 	if err := checkSiteID(req.Msg.SiteId); err != nil {
 		return nil, err
 	}
-	site, err := s.siteMessage(ctx, req.Msg.SiteId)
+	info, err := f.st.DecoySiteInfoOf(ctx, req.Msg.SiteId)
 	if err != nil {
 		return nil, s.fail("read decoy site", err)
 	}
+	source, err := f.panelSource(ctx)
+	if err != nil {
+		return nil, s.fail("read the panel decoy source", err)
+	}
+	site := siteMsg(info, source)
 	versions, err := f.st.DecoySiteVersions(ctx, req.Msg.SiteId)
 	if err != nil {
 		return nil, s.fail("read decoy versions", err)
 	}
 	out := &decoysitev1.GetDecoySiteResponse{Site: site}
+	if out.Panel, err = f.panelState(ctx, source); err != nil {
+		return nil, s.fail("read the panel decoy state", err)
+	}
 	for _, v := range versions {
 		out.Versions = append(out.Versions, versionMsg(v, int(site.Version)))
 		if v.Seq == int(site.Version) {
@@ -192,6 +232,9 @@ func (s decoySiteService) GetDecoySite(ctx context.Context, req *connect.Request
 	nodes, err := f.st.DecoySiteNodes(ctx, req.Msg.SiteId)
 	if err != nil {
 		return nil, s.fail("read decoy site nodes", err)
+	}
+	if w := sharedDomains(nodes); w != nil {
+		out.SharedDomains = &decoysitev1.DecoyCheck{Code: w.Code, Level: "warning", Paths: w.Paths}
 	}
 	msgs, err := f.nodeMessages(ctx, nodes)
 	if err != nil {
@@ -205,7 +248,30 @@ func (s decoySiteService) GetDecoySite(ctx context.Context, req *connect.Request
 	return connect.NewResponse(out), nil
 }
 
-// bundleOf reads the files of a version (seq 0 = the current one).
+// The two entries of the library that are not sites are read by the calls that read a site's files (pages, preview, file) under
+// these ids: the built-in page, and a snapshot of the panel's --decoy-dir under the limits of its copy to nodes.
+const (
+	builtinEntryID  = "builtin"
+	panelDirEntryID = "panel_dir"
+)
+
+// viewBundleOf is bundleOf for the three calls that only look at files: they also take the built-in entries (seq is ignored for those).
+func (s decoySiteService) viewBundleOf(ctx context.Context, id string, seq uint32) (*decoy.Bundle, error) {
+	switch id {
+	case builtinEntryID:
+		return decoy.BuiltinBundle(), nil
+	case panelDirEntryID:
+		b, err := s.f.panelDecoyBundle()
+		if err != nil {
+			return nil, panelUnavailable(err)
+		}
+		return b, nil
+	}
+	b, _, err := s.bundleOf(ctx, id, seq)
+	return b, err
+}
+
+// bundleOf reads the files of a version of a site (seq 0 = the current one).
 func (s decoySiteService) bundleOf(ctx context.Context, id string, seq uint32) (*decoy.Bundle, store.DecoyVersionRow, error) {
 	if err := checkSiteID(id); err != nil {
 		return nil, store.DecoyVersionRow{}, err
@@ -218,7 +284,7 @@ func (s decoySiteService) bundleOf(ctx context.Context, id string, seq uint32) (
 }
 
 func (s decoySiteService) ListDecoyPages(ctx context.Context, req *connect.Request[decoysitev1.ListDecoyPagesRequest]) (*connect.Response[decoysitev1.ListDecoyPagesResponse], error) {
-	b, _, err := s.bundleOf(ctx, req.Msg.SiteId, req.Msg.Seq)
+	b, err := s.viewBundleOf(ctx, req.Msg.SiteId, req.Msg.Seq)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +297,7 @@ func (s decoySiteService) ListDecoyPages(ctx context.Context, req *connect.Reque
 }
 
 func (s decoySiteService) GetDecoyPagePreview(ctx context.Context, req *connect.Request[decoysitev1.GetDecoyPagePreviewRequest]) (*connect.Response[decoysitev1.GetDecoyPagePreviewResponse], error) {
-	b, _, err := s.bundleOf(ctx, req.Msg.SiteId, req.Msg.Seq)
+	b, err := s.viewBundleOf(ctx, req.Msg.SiteId, req.Msg.Seq)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +319,7 @@ func (s decoySiteService) GetDecoyPagePreview(ctx context.Context, req *connect.
 }
 
 func (s decoySiteService) GetDecoyFile(ctx context.Context, req *connect.Request[decoysitev1.GetDecoyFileRequest]) (*connect.Response[decoysitev1.GetDecoyFileResponse], error) {
-	b, _, err := s.bundleOf(ctx, req.Msg.SiteId, req.Msg.Seq)
+	b, err := s.viewBundleOf(ctx, req.Msg.SiteId, req.Msg.Seq)
 	if err != nil {
 		return nil, err
 	}

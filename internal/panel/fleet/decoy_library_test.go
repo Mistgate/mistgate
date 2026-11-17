@@ -332,6 +332,13 @@ func TestLibraryRefusesOnTheEdge(t *testing.T) {
 	})(e.ctx, connect.NewRequest(&decoysitev1.ListDecoySitesRequest{})); err == nil || !strings.Contains(err.Error(), "unavailable_in_edition: feature=decoy_own") {
 		t.Fatalf("edge call = %v", err)
 	}
+	// the built-in entries are no way round it: the gate stands before every procedure
+	if _, err := e.f.editionGate().WrapUnary(func(_ context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
+		t.Fatal("the call went through")
+		return nil, nil
+	})(e.ctx, connect.NewRequest(&decoysitev1.ListDecoyPagesRequest{SiteId: "panel_dir"})); err == nil || !strings.Contains(err.Error(), "unavailable_in_edition: feature=decoy_own") {
+		t.Fatalf("edge call for the panel's directory = %v", err)
+	}
 	if _, err := e.f.ownSiteFromUpload(e.ctx, "nod_x", librarySite(t, "x")); err == nil || !strings.Contains(err.Error(), "feature=decoy_own") {
 		t.Fatalf("edge upload = %v", err)
 	}

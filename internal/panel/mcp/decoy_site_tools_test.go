@@ -164,6 +164,9 @@ func (l *fakeLibrary) GetDecoyFile(_ context.Context, r *connect.Request[decoysi
 	if err := l.gate("GetDecoyFile"); err != nil {
 		return nil, err
 	}
+	if r.Msg.SiteId == "builtin" && r.Msg.Path == "index.html" { // the panel reads the built-in entries by these ids
+		return connect.NewResponse(&decoysitev1.GetDecoyFileResponse{Text: decoy.BuiltinHTML(), Size: uint64(len(decoy.BuiltinHTML()))}), nil
+	}
 	s := l.sites[r.Msg.SiteId]
 	if s == nil {
 		return nil, notFound()
@@ -465,6 +468,15 @@ func TestDecoyReads(t *testing.T) {
 	file := decode[DecoyFileV](t, mustOK(t, s, "decoy_site_file", map[string]any{"site_id": site.id, "path": "about.html"}))
 	if file.Text != "<p>"+markerAbout || file.Bytes != uint64(len(file.Text)) || file.Truncated {
 		t.Fatalf("file = %+v", file)
+	}
+
+	// the built-in entries are read by their own ids (and only by this tool: every other tool wants a site's id)
+	builtin := decode[DecoyFileV](t, mustOK(t, s, "decoy_site_file", map[string]any{"site_id": "builtin", "path": "index.html"}))
+	if builtin.Text != decoy.BuiltinHTML() || builtin.SiteID != "builtin" {
+		t.Fatalf("built-in file = %+v", builtin)
+	}
+	if out := mustFail(t, s, "decoy_site_get", map[string]any{"site_id": "builtin"}); !strings.Contains(out, "not a valid decoy site id") {
+		t.Errorf("decoy_site_get of the built-in entry: %q", out)
 	}
 
 	for name, tc := range map[string]struct {

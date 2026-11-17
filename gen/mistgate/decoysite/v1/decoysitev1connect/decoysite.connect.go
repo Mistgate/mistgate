@@ -117,12 +117,13 @@ type DecoySiteServiceClient interface {
 	DeleteDecoySite(context.Context, *connect.Request[v1.DeleteDecoySiteRequest]) (*connect.Response[v1.DeleteDecoySiteResponse], error)
 	// The version as a ZIP.
 	DownloadDecoySite(context.Context, *connect.Request[v1.DownloadDecoySiteRequest]) (*connect.Response[v1.DownloadDecoySiteResponse], error)
-	// The HTML pages and all files (with sizes) of a version.
+	// The HTML pages and all files (with sizes) of a version. site_id may also be the built-in entries "builtin" (the Mistgate page)
+	// and "panel_dir" (the panel's --decoy-dir, a snapshot under the limits of a copy to nodes); seq is ignored for them.
 	ListDecoyPages(context.Context, *connect.Request[v1.ListDecoyPagesRequest]) (*connect.Response[v1.ListDecoyPagesResponse], error)
 	// One HTML page as a single self-contained document for <iframe sandbox="" srcdoc>: styles inlined, local images as data: URIs,
-	// scripts removed, links made inert (the page they lead to is in data-page), nothing external loads.
+	// scripts removed, links made inert (the page they lead to is in data-page), nothing external loads. site_id as in ListDecoyPages.
 	GetDecoyPagePreview(context.Context, *connect.Request[v1.GetDecoyPagePreviewRequest]) (*connect.Response[v1.GetDecoyPagePreviewResponse], error)
-	// The text of one text file of a version (the first 256 KiB).
+	// The text of one text file of a version (the first 256 KiB). site_id as in ListDecoyPages.
 	GetDecoyFile(context.Context, *connect.Request[v1.GetDecoyFileRequest]) (*connect.Response[v1.GetDecoyFileResponse], error)
 }
 
@@ -380,12 +381,13 @@ type DecoySiteServiceHandler interface {
 	DeleteDecoySite(context.Context, *connect.Request[v1.DeleteDecoySiteRequest]) (*connect.Response[v1.DeleteDecoySiteResponse], error)
 	// The version as a ZIP.
 	DownloadDecoySite(context.Context, *connect.Request[v1.DownloadDecoySiteRequest]) (*connect.Response[v1.DownloadDecoySiteResponse], error)
-	// The HTML pages and all files (with sizes) of a version.
+	// The HTML pages and all files (with sizes) of a version. site_id may also be the built-in entries "builtin" (the Mistgate page)
+	// and "panel_dir" (the panel's --decoy-dir, a snapshot under the limits of a copy to nodes); seq is ignored for them.
 	ListDecoyPages(context.Context, *connect.Request[v1.ListDecoyPagesRequest]) (*connect.Response[v1.ListDecoyPagesResponse], error)
 	// One HTML page as a single self-contained document for <iframe sandbox="" srcdoc>: styles inlined, local images as data: URIs,
-	// scripts removed, links made inert (the page they lead to is in data-page), nothing external loads.
+	// scripts removed, links made inert (the page they lead to is in data-page), nothing external loads. site_id as in ListDecoyPages.
 	GetDecoyPagePreview(context.Context, *connect.Request[v1.GetDecoyPagePreviewRequest]) (*connect.Response[v1.GetDecoyPagePreviewResponse], error)
-	// The text of one text file of a version (the first 256 KiB).
+	// The text of one text file of a version (the first 256 KiB). site_id as in ListDecoyPages.
 	GetDecoyFile(context.Context, *connect.Request[v1.GetDecoyFileRequest]) (*connect.Response[v1.GetDecoyFileResponse], error)
 }
 

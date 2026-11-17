@@ -125,6 +125,7 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 		PanelAddr:            b.c.PanelAddr,
 		ExpectedAgentVersion: buildinfo.Version,
 		DecoyDir:             b.c.DecoyDir,
+		PublicURL:            b.in.PublicURL,
 		Desired:              desired,
 		OnUsage:              onUsage,
 		Log:                  b.log,

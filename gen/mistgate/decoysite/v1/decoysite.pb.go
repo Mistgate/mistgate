@@ -519,6 +519,72 @@ func (x *DecoyBuiltinItem) GetOnPanel() bool {
 	return false
 }
 
+// The panel as a place a site stands on: the address its public listener answers on and what that listener serves now.
+type DecoyPanelState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The host (and port, when not the default) of the panel's public URL; empty when the panel does not know it.
+	Address string `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	// What it serves now: "builtin", "dir" or "site:<id>".
+	Serving string `protobuf:"bytes,2,opt,name=serving,proto3" json:"serving,omitempty"`
+	// Why that is not what the owner chose (panel_source), empty when it is: decoy_site_not_found or decoy_site_draft (the chosen
+	// library site is gone or is a draft), panel_unavailable (the panel's directory was chosen and there is none). The listener
+	// never serves nothing: it falls back to its directory, or to the built-in page when there is no directory.
+	ReasonCode    string `protobuf:"bytes,3,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecoyPanelState) Reset() {
+	*x = DecoyPanelState{}
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecoyPanelState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecoyPanelState) ProtoMessage() {}
+
+func (x *DecoyPanelState) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecoyPanelState.ProtoReflect.Descriptor instead.
+func (*DecoyPanelState) Descriptor() ([]byte, []int) {
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *DecoyPanelState) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *DecoyPanelState) GetServing() string {
+	if x != nil {
+		return x.Serving
+	}
+	return ""
+}
+
+func (x *DecoyPanelState) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
 // A node that serves a site and how far the delivery is: reason_code is Node.decoy_reason_code ("" = it stands).
 type DecoySiteNode struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -533,7 +599,7 @@ type DecoySiteNode struct {
 
 func (x *DecoySiteNode) Reset() {
 	*x = DecoySiteNode{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[5]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -545,7 +611,7 @@ func (x *DecoySiteNode) String() string {
 func (*DecoySiteNode) ProtoMessage() {}
 
 func (x *DecoySiteNode) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[5]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -558,7 +624,7 @@ func (x *DecoySiteNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecoySiteNode.ProtoReflect.Descriptor instead.
 func (*DecoySiteNode) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DecoySiteNode) GetNodeId() string {
@@ -604,7 +670,7 @@ type ListDecoySitesRequest struct {
 
 func (x *ListDecoySitesRequest) Reset() {
 	*x = ListDecoySitesRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[6]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +682,7 @@ func (x *ListDecoySitesRequest) String() string {
 func (*ListDecoySitesRequest) ProtoMessage() {}
 
 func (x *ListDecoySitesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[6]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +695,7 @@ func (x *ListDecoySitesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDecoySitesRequest.ProtoReflect.Descriptor instead.
 func (*ListDecoySitesRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{7}
 }
 
 type ListDecoySitesResponse struct {
@@ -639,15 +705,16 @@ type ListDecoySitesResponse struct {
 	// What the panel's public site is now: "builtin", "dir" or "site:<id>".
 	PanelSource string `protobuf:"bytes,3,opt,name=panel_source,json=panelSource,proto3" json:"panel_source,omitempty"`
 	// The most sites the library holds, and the most versions a site keeps.
-	SiteLimit     uint32 `protobuf:"varint,4,opt,name=site_limit,json=siteLimit,proto3" json:"site_limit,omitempty"`
-	VersionLimit  uint32 `protobuf:"varint,5,opt,name=version_limit,json=versionLimit,proto3" json:"version_limit,omitempty"`
+	SiteLimit     uint32           `protobuf:"varint,4,opt,name=site_limit,json=siteLimit,proto3" json:"site_limit,omitempty"`
+	VersionLimit  uint32           `protobuf:"varint,5,opt,name=version_limit,json=versionLimit,proto3" json:"version_limit,omitempty"`
+	Panel         *DecoyPanelState `protobuf:"bytes,6,opt,name=panel,proto3" json:"panel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListDecoySitesResponse) Reset() {
 	*x = ListDecoySitesResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[7]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -659,7 +726,7 @@ func (x *ListDecoySitesResponse) String() string {
 func (*ListDecoySitesResponse) ProtoMessage() {}
 
 func (x *ListDecoySitesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[7]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -672,7 +739,7 @@ func (x *ListDecoySitesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDecoySitesResponse.ProtoReflect.Descriptor instead.
 func (*ListDecoySitesResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListDecoySitesResponse) GetSites() []*DecoySite {
@@ -710,6 +777,13 @@ func (x *ListDecoySitesResponse) GetVersionLimit() uint32 {
 	return 0
 }
 
+func (x *ListDecoySitesResponse) GetPanel() *DecoyPanelState {
+	if x != nil {
+		return x.Panel
+	}
+	return nil
+}
+
 type GetDecoySiteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SiteId        string                 `protobuf:"bytes,1,opt,name=site_id,json=siteId,proto3" json:"site_id,omitempty"`
@@ -719,7 +793,7 @@ type GetDecoySiteRequest struct {
 
 func (x *GetDecoySiteRequest) Reset() {
 	*x = GetDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[8]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -731,7 +805,7 @@ func (x *GetDecoySiteRequest) String() string {
 func (*GetDecoySiteRequest) ProtoMessage() {}
 
 func (x *GetDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[8]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -744,7 +818,7 @@ func (x *GetDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*GetDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetDecoySiteRequest) GetSiteId() string {
@@ -755,18 +829,22 @@ func (x *GetDecoySiteRequest) GetSiteId() string {
 }
 
 type GetDecoySiteResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Site          *DecoySite             `protobuf:"bytes,1,opt,name=site,proto3" json:"site,omitempty"`
-	Versions      []*DecoyVersion        `protobuf:"bytes,2,rep,name=versions,proto3" json:"versions,omitempty"`
-	Files         []*DecoyFileInfo       `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
-	Nodes         []*DecoySiteNode       `protobuf:"bytes,4,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Site     *DecoySite             `protobuf:"bytes,1,opt,name=site,proto3" json:"site,omitempty"`
+	Versions []*DecoyVersion        `protobuf:"bytes,2,rep,name=versions,proto3" json:"versions,omitempty"`
+	Files    []*DecoyFileInfo       `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
+	Nodes    []*DecoySiteNode       `protobuf:"bytes,4,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	// The warning shared_domains of the nodes the site stands on now (the one AssignDecoySite computes), unset when it does not fire.
+	// Its paths are the names of those nodes.
+	SharedDomains *DecoyCheck      `protobuf:"bytes,5,opt,name=shared_domains,json=sharedDomains,proto3" json:"shared_domains,omitempty"`
+	Panel         *DecoyPanelState `protobuf:"bytes,6,opt,name=panel,proto3" json:"panel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetDecoySiteResponse) Reset() {
 	*x = GetDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[9]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +856,7 @@ func (x *GetDecoySiteResponse) String() string {
 func (*GetDecoySiteResponse) ProtoMessage() {}
 
 func (x *GetDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[9]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,7 +869,7 @@ func (x *GetDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*GetDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetDecoySiteResponse) GetSite() *DecoySite {
@@ -822,6 +900,20 @@ func (x *GetDecoySiteResponse) GetNodes() []*DecoySiteNode {
 	return nil
 }
 
+func (x *GetDecoySiteResponse) GetSharedDomains() *DecoyCheck {
+	if x != nil {
+		return x.SharedDomains
+	}
+	return nil
+}
+
+func (x *GetDecoySiteResponse) GetPanel() *DecoyPanelState {
+	if x != nil {
+		return x.Panel
+	}
+	return nil
+}
+
 type CreateDecoySiteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -835,7 +927,7 @@ type CreateDecoySiteRequest struct {
 
 func (x *CreateDecoySiteRequest) Reset() {
 	*x = CreateDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[10]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -847,7 +939,7 @@ func (x *CreateDecoySiteRequest) String() string {
 func (*CreateDecoySiteRequest) ProtoMessage() {}
 
 func (x *CreateDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[10]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -860,7 +952,7 @@ func (x *CreateDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*CreateDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateDecoySiteRequest) GetName() string {
@@ -907,7 +999,7 @@ type CreateDecoySiteResponse struct {
 
 func (x *CreateDecoySiteResponse) Reset() {
 	*x = CreateDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[11]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -919,7 +1011,7 @@ func (x *CreateDecoySiteResponse) String() string {
 func (*CreateDecoySiteResponse) ProtoMessage() {}
 
 func (x *CreateDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[11]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -932,7 +1024,7 @@ func (x *CreateDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*CreateDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CreateDecoySiteResponse) GetSite() *DecoySite {
@@ -952,7 +1044,7 @@ type AddDecoySiteVersionRequest struct {
 
 func (x *AddDecoySiteVersionRequest) Reset() {
 	*x = AddDecoySiteVersionRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[12]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -964,7 +1056,7 @@ func (x *AddDecoySiteVersionRequest) String() string {
 func (*AddDecoySiteVersionRequest) ProtoMessage() {}
 
 func (x *AddDecoySiteVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[12]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -977,7 +1069,7 @@ func (x *AddDecoySiteVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddDecoySiteVersionRequest.ProtoReflect.Descriptor instead.
 func (*AddDecoySiteVersionRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AddDecoySiteVersionRequest) GetSiteId() string {
@@ -1005,7 +1097,7 @@ type AddDecoySiteVersionResponse struct {
 
 func (x *AddDecoySiteVersionResponse) Reset() {
 	*x = AddDecoySiteVersionResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[13]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1017,7 +1109,7 @@ func (x *AddDecoySiteVersionResponse) String() string {
 func (*AddDecoySiteVersionResponse) ProtoMessage() {}
 
 func (x *AddDecoySiteVersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[13]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1030,7 +1122,7 @@ func (x *AddDecoySiteVersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddDecoySiteVersionResponse.ProtoReflect.Descriptor instead.
 func (*AddDecoySiteVersionResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AddDecoySiteVersionResponse) GetSite() *DecoySite {
@@ -1060,7 +1152,7 @@ type EditDecoySiteFileRequest struct {
 
 func (x *EditDecoySiteFileRequest) Reset() {
 	*x = EditDecoySiteFileRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[14]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1072,7 +1164,7 @@ func (x *EditDecoySiteFileRequest) String() string {
 func (*EditDecoySiteFileRequest) ProtoMessage() {}
 
 func (x *EditDecoySiteFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[14]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1085,7 +1177,7 @@ func (x *EditDecoySiteFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditDecoySiteFileRequest.ProtoReflect.Descriptor instead.
 func (*EditDecoySiteFileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *EditDecoySiteFileRequest) GetSiteId() string {
@@ -1125,7 +1217,7 @@ type EditDecoySiteFileResponse struct {
 
 func (x *EditDecoySiteFileResponse) Reset() {
 	*x = EditDecoySiteFileResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[15]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1137,7 +1229,7 @@ func (x *EditDecoySiteFileResponse) String() string {
 func (*EditDecoySiteFileResponse) ProtoMessage() {}
 
 func (x *EditDecoySiteFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[15]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1150,7 +1242,7 @@ func (x *EditDecoySiteFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditDecoySiteFileResponse.ProtoReflect.Descriptor instead.
 func (*EditDecoySiteFileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *EditDecoySiteFileResponse) GetSite() *DecoySite {
@@ -1171,7 +1263,7 @@ type UpdateDecoySiteRequest struct {
 
 func (x *UpdateDecoySiteRequest) Reset() {
 	*x = UpdateDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[16]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1183,7 +1275,7 @@ func (x *UpdateDecoySiteRequest) String() string {
 func (*UpdateDecoySiteRequest) ProtoMessage() {}
 
 func (x *UpdateDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[16]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1196,7 +1288,7 @@ func (x *UpdateDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *UpdateDecoySiteRequest) GetSiteId() string {
@@ -1229,7 +1321,7 @@ type UpdateDecoySiteResponse struct {
 
 func (x *UpdateDecoySiteResponse) Reset() {
 	*x = UpdateDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[17]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1241,7 +1333,7 @@ func (x *UpdateDecoySiteResponse) String() string {
 func (*UpdateDecoySiteResponse) ProtoMessage() {}
 
 func (x *UpdateDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[17]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1254,7 +1346,7 @@ func (x *UpdateDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*UpdateDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UpdateDecoySiteResponse) GetSite() *DecoySite {
@@ -1274,7 +1366,7 @@ type CopyDecoySiteRequest struct {
 
 func (x *CopyDecoySiteRequest) Reset() {
 	*x = CopyDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[18]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1286,7 +1378,7 @@ func (x *CopyDecoySiteRequest) String() string {
 func (*CopyDecoySiteRequest) ProtoMessage() {}
 
 func (x *CopyDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[18]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1299,7 +1391,7 @@ func (x *CopyDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CopyDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*CopyDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CopyDecoySiteRequest) GetSiteId() string {
@@ -1325,7 +1417,7 @@ type CopyDecoySiteResponse struct {
 
 func (x *CopyDecoySiteResponse) Reset() {
 	*x = CopyDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[19]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1337,7 +1429,7 @@ func (x *CopyDecoySiteResponse) String() string {
 func (*CopyDecoySiteResponse) ProtoMessage() {}
 
 func (x *CopyDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[19]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1350,7 +1442,7 @@ func (x *CopyDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CopyDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*CopyDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CopyDecoySiteResponse) GetSite() *DecoySite {
@@ -1370,7 +1462,7 @@ type SetDecoySiteReadyRequest struct {
 
 func (x *SetDecoySiteReadyRequest) Reset() {
 	*x = SetDecoySiteReadyRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[20]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1382,7 +1474,7 @@ func (x *SetDecoySiteReadyRequest) String() string {
 func (*SetDecoySiteReadyRequest) ProtoMessage() {}
 
 func (x *SetDecoySiteReadyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[20]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1395,7 +1487,7 @@ func (x *SetDecoySiteReadyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDecoySiteReadyRequest.ProtoReflect.Descriptor instead.
 func (*SetDecoySiteReadyRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{20}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SetDecoySiteReadyRequest) GetSiteId() string {
@@ -1421,7 +1513,7 @@ type SetDecoySiteReadyResponse struct {
 
 func (x *SetDecoySiteReadyResponse) Reset() {
 	*x = SetDecoySiteReadyResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[21]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1433,7 +1525,7 @@ func (x *SetDecoySiteReadyResponse) String() string {
 func (*SetDecoySiteReadyResponse) ProtoMessage() {}
 
 func (x *SetDecoySiteReadyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[21]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1446,7 +1538,7 @@ func (x *SetDecoySiteReadyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDecoySiteReadyResponse.ProtoReflect.Descriptor instead.
 func (*SetDecoySiteReadyResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{21}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SetDecoySiteReadyResponse) GetSite() *DecoySite {
@@ -1468,7 +1560,7 @@ type AssignDecoySiteRequest struct {
 
 func (x *AssignDecoySiteRequest) Reset() {
 	*x = AssignDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[22]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1480,7 +1572,7 @@ func (x *AssignDecoySiteRequest) String() string {
 func (*AssignDecoySiteRequest) ProtoMessage() {}
 
 func (x *AssignDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[22]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1493,7 +1585,7 @@ func (x *AssignDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*AssignDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *AssignDecoySiteRequest) GetSiteId() string {
@@ -1539,7 +1631,7 @@ type DecoyReplaced struct {
 
 func (x *DecoyReplaced) Reset() {
 	*x = DecoyReplaced{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[23]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1551,7 +1643,7 @@ func (x *DecoyReplaced) String() string {
 func (*DecoyReplaced) ProtoMessage() {}
 
 func (x *DecoyReplaced) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[23]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1564,7 +1656,7 @@ func (x *DecoyReplaced) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecoyReplaced.ProtoReflect.Descriptor instead.
 func (*DecoyReplaced) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DecoyReplaced) GetTarget() string {
@@ -1609,7 +1701,7 @@ type AssignDecoySiteResponse struct {
 
 func (x *AssignDecoySiteResponse) Reset() {
 	*x = AssignDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[24]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1621,7 +1713,7 @@ func (x *AssignDecoySiteResponse) String() string {
 func (*AssignDecoySiteResponse) ProtoMessage() {}
 
 func (x *AssignDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[24]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1634,7 +1726,7 @@ func (x *AssignDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*AssignDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *AssignDecoySiteResponse) GetWarnings() []*DecoyCheck {
@@ -1678,7 +1770,7 @@ type UnassignDecoySiteRequest struct {
 
 func (x *UnassignDecoySiteRequest) Reset() {
 	*x = UnassignDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[25]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1690,7 +1782,7 @@ func (x *UnassignDecoySiteRequest) String() string {
 func (*UnassignDecoySiteRequest) ProtoMessage() {}
 
 func (x *UnassignDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[25]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1703,7 +1795,7 @@ func (x *UnassignDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnassignDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*UnassignDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UnassignDecoySiteRequest) GetSiteId() string {
@@ -1744,7 +1836,7 @@ type UnassignDecoySiteResponse struct {
 
 func (x *UnassignDecoySiteResponse) Reset() {
 	*x = UnassignDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[26]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1756,7 +1848,7 @@ func (x *UnassignDecoySiteResponse) String() string {
 func (*UnassignDecoySiteResponse) ProtoMessage() {}
 
 func (x *UnassignDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[26]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1769,7 +1861,7 @@ func (x *UnassignDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnassignDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*UnassignDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *UnassignDecoySiteResponse) GetNodes() []*v1.Node {
@@ -1796,7 +1888,7 @@ type SetPanelDecoySourceRequest struct {
 
 func (x *SetPanelDecoySourceRequest) Reset() {
 	*x = SetPanelDecoySourceRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[27]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1808,7 +1900,7 @@ func (x *SetPanelDecoySourceRequest) String() string {
 func (*SetPanelDecoySourceRequest) ProtoMessage() {}
 
 func (x *SetPanelDecoySourceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[27]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1821,7 +1913,7 @@ func (x *SetPanelDecoySourceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPanelDecoySourceRequest.ProtoReflect.Descriptor instead.
 func (*SetPanelDecoySourceRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SetPanelDecoySourceRequest) GetSource() string {
@@ -1840,7 +1932,7 @@ type SetPanelDecoySourceResponse struct {
 
 func (x *SetPanelDecoySourceResponse) Reset() {
 	*x = SetPanelDecoySourceResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[28]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1852,7 +1944,7 @@ func (x *SetPanelDecoySourceResponse) String() string {
 func (*SetPanelDecoySourceResponse) ProtoMessage() {}
 
 func (x *SetPanelDecoySourceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[28]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1865,7 +1957,7 @@ func (x *SetPanelDecoySourceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPanelDecoySourceResponse.ProtoReflect.Descriptor instead.
 func (*SetPanelDecoySourceResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{28}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SetPanelDecoySourceResponse) GetPanelSource() string {
@@ -1885,7 +1977,7 @@ type RevertDecoySiteRequest struct {
 
 func (x *RevertDecoySiteRequest) Reset() {
 	*x = RevertDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[29]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1897,7 +1989,7 @@ func (x *RevertDecoySiteRequest) String() string {
 func (*RevertDecoySiteRequest) ProtoMessage() {}
 
 func (x *RevertDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[29]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1910,7 +2002,7 @@ func (x *RevertDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevertDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*RevertDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{29}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *RevertDecoySiteRequest) GetSiteId() string {
@@ -1937,7 +2029,7 @@ type RevertDecoySiteResponse struct {
 
 func (x *RevertDecoySiteResponse) Reset() {
 	*x = RevertDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[30]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1949,7 +2041,7 @@ func (x *RevertDecoySiteResponse) String() string {
 func (*RevertDecoySiteResponse) ProtoMessage() {}
 
 func (x *RevertDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[30]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1962,7 +2054,7 @@ func (x *RevertDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevertDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*RevertDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{30}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RevertDecoySiteResponse) GetSite() *DecoySite {
@@ -1988,7 +2080,7 @@ type DeleteDecoySiteRequest struct {
 
 func (x *DeleteDecoySiteRequest) Reset() {
 	*x = DeleteDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[31]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2000,7 +2092,7 @@ func (x *DeleteDecoySiteRequest) String() string {
 func (*DeleteDecoySiteRequest) ProtoMessage() {}
 
 func (x *DeleteDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[31]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2013,7 +2105,7 @@ func (x *DeleteDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{31}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DeleteDecoySiteRequest) GetSiteId() string {
@@ -2031,7 +2123,7 @@ type DeleteDecoySiteResponse struct {
 
 func (x *DeleteDecoySiteResponse) Reset() {
 	*x = DeleteDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[32]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2043,7 +2135,7 @@ func (x *DeleteDecoySiteResponse) String() string {
 func (*DeleteDecoySiteResponse) ProtoMessage() {}
 
 func (x *DeleteDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[32]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2056,7 +2148,7 @@ func (x *DeleteDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*DeleteDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{32}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{33}
 }
 
 type DownloadDecoySiteRequest struct {
@@ -2070,7 +2162,7 @@ type DownloadDecoySiteRequest struct {
 
 func (x *DownloadDecoySiteRequest) Reset() {
 	*x = DownloadDecoySiteRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[33]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2082,7 +2174,7 @@ func (x *DownloadDecoySiteRequest) String() string {
 func (*DownloadDecoySiteRequest) ProtoMessage() {}
 
 func (x *DownloadDecoySiteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[33]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2095,7 +2187,7 @@ func (x *DownloadDecoySiteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadDecoySiteRequest.ProtoReflect.Descriptor instead.
 func (*DownloadDecoySiteRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{33}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *DownloadDecoySiteRequest) GetSiteId() string {
@@ -2122,7 +2214,7 @@ type DownloadDecoySiteResponse struct {
 
 func (x *DownloadDecoySiteResponse) Reset() {
 	*x = DownloadDecoySiteResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[34]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2134,7 +2226,7 @@ func (x *DownloadDecoySiteResponse) String() string {
 func (*DownloadDecoySiteResponse) ProtoMessage() {}
 
 func (x *DownloadDecoySiteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[34]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2147,7 +2239,7 @@ func (x *DownloadDecoySiteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadDecoySiteResponse.ProtoReflect.Descriptor instead.
 func (*DownloadDecoySiteResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{34}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *DownloadDecoySiteResponse) GetFilename() string {
@@ -2174,7 +2266,7 @@ type ListDecoyPagesRequest struct {
 
 func (x *ListDecoyPagesRequest) Reset() {
 	*x = ListDecoyPagesRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[35]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2186,7 +2278,7 @@ func (x *ListDecoyPagesRequest) String() string {
 func (*ListDecoyPagesRequest) ProtoMessage() {}
 
 func (x *ListDecoyPagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[35]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2199,7 +2291,7 @@ func (x *ListDecoyPagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDecoyPagesRequest.ProtoReflect.Descriptor instead.
 func (*ListDecoyPagesRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{35}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListDecoyPagesRequest) GetSiteId() string {
@@ -2228,7 +2320,7 @@ type ListDecoyPagesResponse struct {
 
 func (x *ListDecoyPagesResponse) Reset() {
 	*x = ListDecoyPagesResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[36]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2240,7 +2332,7 @@ func (x *ListDecoyPagesResponse) String() string {
 func (*ListDecoyPagesResponse) ProtoMessage() {}
 
 func (x *ListDecoyPagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[36]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2253,7 +2345,7 @@ func (x *ListDecoyPagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDecoyPagesResponse.ProtoReflect.Descriptor instead.
 func (*ListDecoyPagesResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{36}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListDecoyPagesResponse) GetPages() []string {
@@ -2291,7 +2383,7 @@ type GetDecoyPagePreviewRequest struct {
 
 func (x *GetDecoyPagePreviewRequest) Reset() {
 	*x = GetDecoyPagePreviewRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[37]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2303,7 +2395,7 @@ func (x *GetDecoyPagePreviewRequest) String() string {
 func (*GetDecoyPagePreviewRequest) ProtoMessage() {}
 
 func (x *GetDecoyPagePreviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[37]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2316,7 +2408,7 @@ func (x *GetDecoyPagePreviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDecoyPagePreviewRequest.ProtoReflect.Descriptor instead.
 func (*GetDecoyPagePreviewRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{37}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetDecoyPagePreviewRequest) GetSiteId() string {
@@ -2357,7 +2449,7 @@ type GetDecoyPagePreviewResponse struct {
 
 func (x *GetDecoyPagePreviewResponse) Reset() {
 	*x = GetDecoyPagePreviewResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[38]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2369,7 +2461,7 @@ func (x *GetDecoyPagePreviewResponse) String() string {
 func (*GetDecoyPagePreviewResponse) ProtoMessage() {}
 
 func (x *GetDecoyPagePreviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[38]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2382,7 +2474,7 @@ func (x *GetDecoyPagePreviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDecoyPagePreviewResponse.ProtoReflect.Descriptor instead.
 func (*GetDecoyPagePreviewResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{38}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetDecoyPagePreviewResponse) GetHtml() string {
@@ -2410,7 +2502,7 @@ type GetDecoyFileRequest struct {
 
 func (x *GetDecoyFileRequest) Reset() {
 	*x = GetDecoyFileRequest{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[39]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2422,7 +2514,7 @@ func (x *GetDecoyFileRequest) String() string {
 func (*GetDecoyFileRequest) ProtoMessage() {}
 
 func (x *GetDecoyFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[39]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2435,7 +2527,7 @@ func (x *GetDecoyFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDecoyFileRequest.ProtoReflect.Descriptor instead.
 func (*GetDecoyFileRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{39}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *GetDecoyFileRequest) GetSiteId() string {
@@ -2470,7 +2562,7 @@ type GetDecoyFileResponse struct {
 
 func (x *GetDecoyFileResponse) Reset() {
 	*x = GetDecoyFileResponse{}
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[40]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2482,7 +2574,7 @@ func (x *GetDecoyFileResponse) String() string {
 func (*GetDecoyFileResponse) ProtoMessage() {}
 
 func (x *GetDecoyFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[40]
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2495,7 +2587,7 @@ func (x *GetDecoyFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDecoyFileResponse.ProtoReflect.Descriptor instead.
 func (*GetDecoyFileResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{40}
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetDecoyFileResponse) GetText() string {
@@ -2578,7 +2670,12 @@ const file_mistgate_decoysite_v1_decoysite_proto_rawDesc = "" +
 	"reasonCode\x12\x1d\n" +
 	"\n" +
 	"node_count\x18\x04 \x01(\rR\tnodeCount\x12\x19\n" +
-	"\bon_panel\x18\x05 \x01(\bR\aonPanel\"\xa7\x01\n" +
+	"\bon_panel\x18\x05 \x01(\bR\aonPanel\"f\n" +
+	"\x0fDecoyPanelState\x12\x18\n" +
+	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x18\n" +
+	"\aserving\x18\x02 \x01(\tR\aserving\x12\x1f\n" +
+	"\vreason_code\x18\x03 \x01(\tR\n" +
+	"reasonCode\"\xa7\x01\n" +
 	"\rDecoySiteNode\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1f\n" +
@@ -2586,21 +2683,24 @@ const file_mistgate_decoysite_v1_decoysite_proto_rawDesc = "" +
 	"reasonCode\x12\x1c\n" +
 	"\tsupported\x18\x04 \x01(\bR\tsupported\x12!\n" +
 	"\fagent_sha256\x18\x05 \x01(\tR\vagentSha256\"\x17\n" +
-	"\x15ListDecoySitesRequest\"\xfa\x01\n" +
+	"\x15ListDecoySitesRequest\"\xb8\x02\n" +
 	"\x16ListDecoySitesResponse\x126\n" +
 	"\x05sites\x18\x01 \x03(\v2 .mistgate.decoysite.v1.DecoySiteR\x05sites\x12A\n" +
 	"\abuiltin\x18\x02 \x03(\v2'.mistgate.decoysite.v1.DecoyBuiltinItemR\abuiltin\x12!\n" +
 	"\fpanel_source\x18\x03 \x01(\tR\vpanelSource\x12\x1d\n" +
 	"\n" +
 	"site_limit\x18\x04 \x01(\rR\tsiteLimit\x12#\n" +
-	"\rversion_limit\x18\x05 \x01(\rR\fversionLimit\".\n" +
+	"\rversion_limit\x18\x05 \x01(\rR\fversionLimit\x12<\n" +
+	"\x05panel\x18\x06 \x01(\v2&.mistgate.decoysite.v1.DecoyPanelStateR\x05panel\".\n" +
 	"\x13GetDecoySiteRequest\x12\x17\n" +
-	"\asite_id\x18\x01 \x01(\tR\x06siteId\"\x85\x02\n" +
+	"\asite_id\x18\x01 \x01(\tR\x06siteId\"\x8d\x03\n" +
 	"\x14GetDecoySiteResponse\x124\n" +
 	"\x04site\x18\x01 \x01(\v2 .mistgate.decoysite.v1.DecoySiteR\x04site\x12?\n" +
 	"\bversions\x18\x02 \x03(\v2#.mistgate.decoysite.v1.DecoyVersionR\bversions\x12:\n" +
 	"\x05files\x18\x03 \x03(\v2$.mistgate.decoysite.v1.DecoyFileInfoR\x05files\x12:\n" +
-	"\x05nodes\x18\x04 \x03(\v2$.mistgate.decoysite.v1.DecoySiteNodeR\x05nodes\"\x95\x01\n" +
+	"\x05nodes\x18\x04 \x03(\v2$.mistgate.decoysite.v1.DecoySiteNodeR\x05nodes\x12H\n" +
+	"\x0eshared_domains\x18\x05 \x01(\v2!.mistgate.decoysite.v1.DecoyCheckR\rsharedDomains\x12<\n" +
+	"\x05panel\x18\x06 \x01(\v2&.mistgate.decoysite.v1.DecoyPanelStateR\x05panel\"\x95\x01\n" +
 	"\x16CreateDecoySiteRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04note\x18\x02 \x01(\tR\x04note\x12%\n" +
@@ -2735,111 +2835,115 @@ func file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP() []byte {
 	return file_mistgate_decoysite_v1_decoysite_proto_rawDescData
 }
 
-var file_mistgate_decoysite_v1_decoysite_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_mistgate_decoysite_v1_decoysite_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_mistgate_decoysite_v1_decoysite_proto_goTypes = []any{
 	(*DecoyCheck)(nil),                  // 0: mistgate.decoysite.v1.DecoyCheck
 	(*DecoyFileInfo)(nil),               // 1: mistgate.decoysite.v1.DecoyFileInfo
 	(*DecoySite)(nil),                   // 2: mistgate.decoysite.v1.DecoySite
 	(*DecoyVersion)(nil),                // 3: mistgate.decoysite.v1.DecoyVersion
 	(*DecoyBuiltinItem)(nil),            // 4: mistgate.decoysite.v1.DecoyBuiltinItem
-	(*DecoySiteNode)(nil),               // 5: mistgate.decoysite.v1.DecoySiteNode
-	(*ListDecoySitesRequest)(nil),       // 6: mistgate.decoysite.v1.ListDecoySitesRequest
-	(*ListDecoySitesResponse)(nil),      // 7: mistgate.decoysite.v1.ListDecoySitesResponse
-	(*GetDecoySiteRequest)(nil),         // 8: mistgate.decoysite.v1.GetDecoySiteRequest
-	(*GetDecoySiteResponse)(nil),        // 9: mistgate.decoysite.v1.GetDecoySiteResponse
-	(*CreateDecoySiteRequest)(nil),      // 10: mistgate.decoysite.v1.CreateDecoySiteRequest
-	(*CreateDecoySiteResponse)(nil),     // 11: mistgate.decoysite.v1.CreateDecoySiteResponse
-	(*AddDecoySiteVersionRequest)(nil),  // 12: mistgate.decoysite.v1.AddDecoySiteVersionRequest
-	(*AddDecoySiteVersionResponse)(nil), // 13: mistgate.decoysite.v1.AddDecoySiteVersionResponse
-	(*EditDecoySiteFileRequest)(nil),    // 14: mistgate.decoysite.v1.EditDecoySiteFileRequest
-	(*EditDecoySiteFileResponse)(nil),   // 15: mistgate.decoysite.v1.EditDecoySiteFileResponse
-	(*UpdateDecoySiteRequest)(nil),      // 16: mistgate.decoysite.v1.UpdateDecoySiteRequest
-	(*UpdateDecoySiteResponse)(nil),     // 17: mistgate.decoysite.v1.UpdateDecoySiteResponse
-	(*CopyDecoySiteRequest)(nil),        // 18: mistgate.decoysite.v1.CopyDecoySiteRequest
-	(*CopyDecoySiteResponse)(nil),       // 19: mistgate.decoysite.v1.CopyDecoySiteResponse
-	(*SetDecoySiteReadyRequest)(nil),    // 20: mistgate.decoysite.v1.SetDecoySiteReadyRequest
-	(*SetDecoySiteReadyResponse)(nil),   // 21: mistgate.decoysite.v1.SetDecoySiteReadyResponse
-	(*AssignDecoySiteRequest)(nil),      // 22: mistgate.decoysite.v1.AssignDecoySiteRequest
-	(*DecoyReplaced)(nil),               // 23: mistgate.decoysite.v1.DecoyReplaced
-	(*AssignDecoySiteResponse)(nil),     // 24: mistgate.decoysite.v1.AssignDecoySiteResponse
-	(*UnassignDecoySiteRequest)(nil),    // 25: mistgate.decoysite.v1.UnassignDecoySiteRequest
-	(*UnassignDecoySiteResponse)(nil),   // 26: mistgate.decoysite.v1.UnassignDecoySiteResponse
-	(*SetPanelDecoySourceRequest)(nil),  // 27: mistgate.decoysite.v1.SetPanelDecoySourceRequest
-	(*SetPanelDecoySourceResponse)(nil), // 28: mistgate.decoysite.v1.SetPanelDecoySourceResponse
-	(*RevertDecoySiteRequest)(nil),      // 29: mistgate.decoysite.v1.RevertDecoySiteRequest
-	(*RevertDecoySiteResponse)(nil),     // 30: mistgate.decoysite.v1.RevertDecoySiteResponse
-	(*DeleteDecoySiteRequest)(nil),      // 31: mistgate.decoysite.v1.DeleteDecoySiteRequest
-	(*DeleteDecoySiteResponse)(nil),     // 32: mistgate.decoysite.v1.DeleteDecoySiteResponse
-	(*DownloadDecoySiteRequest)(nil),    // 33: mistgate.decoysite.v1.DownloadDecoySiteRequest
-	(*DownloadDecoySiteResponse)(nil),   // 34: mistgate.decoysite.v1.DownloadDecoySiteResponse
-	(*ListDecoyPagesRequest)(nil),       // 35: mistgate.decoysite.v1.ListDecoyPagesRequest
-	(*ListDecoyPagesResponse)(nil),      // 36: mistgate.decoysite.v1.ListDecoyPagesResponse
-	(*GetDecoyPagePreviewRequest)(nil),  // 37: mistgate.decoysite.v1.GetDecoyPagePreviewRequest
-	(*GetDecoyPagePreviewResponse)(nil), // 38: mistgate.decoysite.v1.GetDecoyPagePreviewResponse
-	(*GetDecoyFileRequest)(nil),         // 39: mistgate.decoysite.v1.GetDecoyFileRequest
-	(*GetDecoyFileResponse)(nil),        // 40: mistgate.decoysite.v1.GetDecoyFileResponse
-	(*v1.Node)(nil),                     // 41: mistgate.admin.v1.Node
+	(*DecoyPanelState)(nil),             // 5: mistgate.decoysite.v1.DecoyPanelState
+	(*DecoySiteNode)(nil),               // 6: mistgate.decoysite.v1.DecoySiteNode
+	(*ListDecoySitesRequest)(nil),       // 7: mistgate.decoysite.v1.ListDecoySitesRequest
+	(*ListDecoySitesResponse)(nil),      // 8: mistgate.decoysite.v1.ListDecoySitesResponse
+	(*GetDecoySiteRequest)(nil),         // 9: mistgate.decoysite.v1.GetDecoySiteRequest
+	(*GetDecoySiteResponse)(nil),        // 10: mistgate.decoysite.v1.GetDecoySiteResponse
+	(*CreateDecoySiteRequest)(nil),      // 11: mistgate.decoysite.v1.CreateDecoySiteRequest
+	(*CreateDecoySiteResponse)(nil),     // 12: mistgate.decoysite.v1.CreateDecoySiteResponse
+	(*AddDecoySiteVersionRequest)(nil),  // 13: mistgate.decoysite.v1.AddDecoySiteVersionRequest
+	(*AddDecoySiteVersionResponse)(nil), // 14: mistgate.decoysite.v1.AddDecoySiteVersionResponse
+	(*EditDecoySiteFileRequest)(nil),    // 15: mistgate.decoysite.v1.EditDecoySiteFileRequest
+	(*EditDecoySiteFileResponse)(nil),   // 16: mistgate.decoysite.v1.EditDecoySiteFileResponse
+	(*UpdateDecoySiteRequest)(nil),      // 17: mistgate.decoysite.v1.UpdateDecoySiteRequest
+	(*UpdateDecoySiteResponse)(nil),     // 18: mistgate.decoysite.v1.UpdateDecoySiteResponse
+	(*CopyDecoySiteRequest)(nil),        // 19: mistgate.decoysite.v1.CopyDecoySiteRequest
+	(*CopyDecoySiteResponse)(nil),       // 20: mistgate.decoysite.v1.CopyDecoySiteResponse
+	(*SetDecoySiteReadyRequest)(nil),    // 21: mistgate.decoysite.v1.SetDecoySiteReadyRequest
+	(*SetDecoySiteReadyResponse)(nil),   // 22: mistgate.decoysite.v1.SetDecoySiteReadyResponse
+	(*AssignDecoySiteRequest)(nil),      // 23: mistgate.decoysite.v1.AssignDecoySiteRequest
+	(*DecoyReplaced)(nil),               // 24: mistgate.decoysite.v1.DecoyReplaced
+	(*AssignDecoySiteResponse)(nil),     // 25: mistgate.decoysite.v1.AssignDecoySiteResponse
+	(*UnassignDecoySiteRequest)(nil),    // 26: mistgate.decoysite.v1.UnassignDecoySiteRequest
+	(*UnassignDecoySiteResponse)(nil),   // 27: mistgate.decoysite.v1.UnassignDecoySiteResponse
+	(*SetPanelDecoySourceRequest)(nil),  // 28: mistgate.decoysite.v1.SetPanelDecoySourceRequest
+	(*SetPanelDecoySourceResponse)(nil), // 29: mistgate.decoysite.v1.SetPanelDecoySourceResponse
+	(*RevertDecoySiteRequest)(nil),      // 30: mistgate.decoysite.v1.RevertDecoySiteRequest
+	(*RevertDecoySiteResponse)(nil),     // 31: mistgate.decoysite.v1.RevertDecoySiteResponse
+	(*DeleteDecoySiteRequest)(nil),      // 32: mistgate.decoysite.v1.DeleteDecoySiteRequest
+	(*DeleteDecoySiteResponse)(nil),     // 33: mistgate.decoysite.v1.DeleteDecoySiteResponse
+	(*DownloadDecoySiteRequest)(nil),    // 34: mistgate.decoysite.v1.DownloadDecoySiteRequest
+	(*DownloadDecoySiteResponse)(nil),   // 35: mistgate.decoysite.v1.DownloadDecoySiteResponse
+	(*ListDecoyPagesRequest)(nil),       // 36: mistgate.decoysite.v1.ListDecoyPagesRequest
+	(*ListDecoyPagesResponse)(nil),      // 37: mistgate.decoysite.v1.ListDecoyPagesResponse
+	(*GetDecoyPagePreviewRequest)(nil),  // 38: mistgate.decoysite.v1.GetDecoyPagePreviewRequest
+	(*GetDecoyPagePreviewResponse)(nil), // 39: mistgate.decoysite.v1.GetDecoyPagePreviewResponse
+	(*GetDecoyFileRequest)(nil),         // 40: mistgate.decoysite.v1.GetDecoyFileRequest
+	(*GetDecoyFileResponse)(nil),        // 41: mistgate.decoysite.v1.GetDecoyFileResponse
+	(*v1.Node)(nil),                     // 42: mistgate.admin.v1.Node
 }
 var file_mistgate_decoysite_v1_decoysite_proto_depIdxs = []int32{
 	0,  // 0: mistgate.decoysite.v1.DecoySite.checks:type_name -> mistgate.decoysite.v1.DecoyCheck
 	0,  // 1: mistgate.decoysite.v1.DecoyVersion.checks:type_name -> mistgate.decoysite.v1.DecoyCheck
 	2,  // 2: mistgate.decoysite.v1.ListDecoySitesResponse.sites:type_name -> mistgate.decoysite.v1.DecoySite
 	4,  // 3: mistgate.decoysite.v1.ListDecoySitesResponse.builtin:type_name -> mistgate.decoysite.v1.DecoyBuiltinItem
-	2,  // 4: mistgate.decoysite.v1.GetDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	3,  // 5: mistgate.decoysite.v1.GetDecoySiteResponse.versions:type_name -> mistgate.decoysite.v1.DecoyVersion
-	1,  // 6: mistgate.decoysite.v1.GetDecoySiteResponse.files:type_name -> mistgate.decoysite.v1.DecoyFileInfo
-	5,  // 7: mistgate.decoysite.v1.GetDecoySiteResponse.nodes:type_name -> mistgate.decoysite.v1.DecoySiteNode
-	2,  // 8: mistgate.decoysite.v1.CreateDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	2,  // 9: mistgate.decoysite.v1.AddDecoySiteVersionResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	2,  // 10: mistgate.decoysite.v1.EditDecoySiteFileResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	2,  // 11: mistgate.decoysite.v1.UpdateDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	2,  // 12: mistgate.decoysite.v1.CopyDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	2,  // 13: mistgate.decoysite.v1.SetDecoySiteReadyResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	0,  // 14: mistgate.decoysite.v1.AssignDecoySiteResponse.warnings:type_name -> mistgate.decoysite.v1.DecoyCheck
-	23, // 15: mistgate.decoysite.v1.AssignDecoySiteResponse.replaced:type_name -> mistgate.decoysite.v1.DecoyReplaced
-	41, // 16: mistgate.decoysite.v1.AssignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
-	41, // 17: mistgate.decoysite.v1.UnassignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
-	2,  // 18: mistgate.decoysite.v1.RevertDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
-	1,  // 19: mistgate.decoysite.v1.ListDecoyPagesResponse.files:type_name -> mistgate.decoysite.v1.DecoyFileInfo
-	6,  // 20: mistgate.decoysite.v1.DecoySiteService.ListDecoySites:input_type -> mistgate.decoysite.v1.ListDecoySitesRequest
-	8,  // 21: mistgate.decoysite.v1.DecoySiteService.GetDecoySite:input_type -> mistgate.decoysite.v1.GetDecoySiteRequest
-	10, // 22: mistgate.decoysite.v1.DecoySiteService.CreateDecoySite:input_type -> mistgate.decoysite.v1.CreateDecoySiteRequest
-	12, // 23: mistgate.decoysite.v1.DecoySiteService.AddDecoySiteVersion:input_type -> mistgate.decoysite.v1.AddDecoySiteVersionRequest
-	14, // 24: mistgate.decoysite.v1.DecoySiteService.EditDecoySiteFile:input_type -> mistgate.decoysite.v1.EditDecoySiteFileRequest
-	16, // 25: mistgate.decoysite.v1.DecoySiteService.UpdateDecoySite:input_type -> mistgate.decoysite.v1.UpdateDecoySiteRequest
-	18, // 26: mistgate.decoysite.v1.DecoySiteService.CopyDecoySite:input_type -> mistgate.decoysite.v1.CopyDecoySiteRequest
-	20, // 27: mistgate.decoysite.v1.DecoySiteService.SetDecoySiteReady:input_type -> mistgate.decoysite.v1.SetDecoySiteReadyRequest
-	22, // 28: mistgate.decoysite.v1.DecoySiteService.AssignDecoySite:input_type -> mistgate.decoysite.v1.AssignDecoySiteRequest
-	25, // 29: mistgate.decoysite.v1.DecoySiteService.UnassignDecoySite:input_type -> mistgate.decoysite.v1.UnassignDecoySiteRequest
-	27, // 30: mistgate.decoysite.v1.DecoySiteService.SetPanelDecoySource:input_type -> mistgate.decoysite.v1.SetPanelDecoySourceRequest
-	29, // 31: mistgate.decoysite.v1.DecoySiteService.RevertDecoySite:input_type -> mistgate.decoysite.v1.RevertDecoySiteRequest
-	31, // 32: mistgate.decoysite.v1.DecoySiteService.DeleteDecoySite:input_type -> mistgate.decoysite.v1.DeleteDecoySiteRequest
-	33, // 33: mistgate.decoysite.v1.DecoySiteService.DownloadDecoySite:input_type -> mistgate.decoysite.v1.DownloadDecoySiteRequest
-	35, // 34: mistgate.decoysite.v1.DecoySiteService.ListDecoyPages:input_type -> mistgate.decoysite.v1.ListDecoyPagesRequest
-	37, // 35: mistgate.decoysite.v1.DecoySiteService.GetDecoyPagePreview:input_type -> mistgate.decoysite.v1.GetDecoyPagePreviewRequest
-	39, // 36: mistgate.decoysite.v1.DecoySiteService.GetDecoyFile:input_type -> mistgate.decoysite.v1.GetDecoyFileRequest
-	7,  // 37: mistgate.decoysite.v1.DecoySiteService.ListDecoySites:output_type -> mistgate.decoysite.v1.ListDecoySitesResponse
-	9,  // 38: mistgate.decoysite.v1.DecoySiteService.GetDecoySite:output_type -> mistgate.decoysite.v1.GetDecoySiteResponse
-	11, // 39: mistgate.decoysite.v1.DecoySiteService.CreateDecoySite:output_type -> mistgate.decoysite.v1.CreateDecoySiteResponse
-	13, // 40: mistgate.decoysite.v1.DecoySiteService.AddDecoySiteVersion:output_type -> mistgate.decoysite.v1.AddDecoySiteVersionResponse
-	15, // 41: mistgate.decoysite.v1.DecoySiteService.EditDecoySiteFile:output_type -> mistgate.decoysite.v1.EditDecoySiteFileResponse
-	17, // 42: mistgate.decoysite.v1.DecoySiteService.UpdateDecoySite:output_type -> mistgate.decoysite.v1.UpdateDecoySiteResponse
-	19, // 43: mistgate.decoysite.v1.DecoySiteService.CopyDecoySite:output_type -> mistgate.decoysite.v1.CopyDecoySiteResponse
-	21, // 44: mistgate.decoysite.v1.DecoySiteService.SetDecoySiteReady:output_type -> mistgate.decoysite.v1.SetDecoySiteReadyResponse
-	24, // 45: mistgate.decoysite.v1.DecoySiteService.AssignDecoySite:output_type -> mistgate.decoysite.v1.AssignDecoySiteResponse
-	26, // 46: mistgate.decoysite.v1.DecoySiteService.UnassignDecoySite:output_type -> mistgate.decoysite.v1.UnassignDecoySiteResponse
-	28, // 47: mistgate.decoysite.v1.DecoySiteService.SetPanelDecoySource:output_type -> mistgate.decoysite.v1.SetPanelDecoySourceResponse
-	30, // 48: mistgate.decoysite.v1.DecoySiteService.RevertDecoySite:output_type -> mistgate.decoysite.v1.RevertDecoySiteResponse
-	32, // 49: mistgate.decoysite.v1.DecoySiteService.DeleteDecoySite:output_type -> mistgate.decoysite.v1.DeleteDecoySiteResponse
-	34, // 50: mistgate.decoysite.v1.DecoySiteService.DownloadDecoySite:output_type -> mistgate.decoysite.v1.DownloadDecoySiteResponse
-	36, // 51: mistgate.decoysite.v1.DecoySiteService.ListDecoyPages:output_type -> mistgate.decoysite.v1.ListDecoyPagesResponse
-	38, // 52: mistgate.decoysite.v1.DecoySiteService.GetDecoyPagePreview:output_type -> mistgate.decoysite.v1.GetDecoyPagePreviewResponse
-	40, // 53: mistgate.decoysite.v1.DecoySiteService.GetDecoyFile:output_type -> mistgate.decoysite.v1.GetDecoyFileResponse
-	37, // [37:54] is the sub-list for method output_type
-	20, // [20:37] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	5,  // 4: mistgate.decoysite.v1.ListDecoySitesResponse.panel:type_name -> mistgate.decoysite.v1.DecoyPanelState
+	2,  // 5: mistgate.decoysite.v1.GetDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	3,  // 6: mistgate.decoysite.v1.GetDecoySiteResponse.versions:type_name -> mistgate.decoysite.v1.DecoyVersion
+	1,  // 7: mistgate.decoysite.v1.GetDecoySiteResponse.files:type_name -> mistgate.decoysite.v1.DecoyFileInfo
+	6,  // 8: mistgate.decoysite.v1.GetDecoySiteResponse.nodes:type_name -> mistgate.decoysite.v1.DecoySiteNode
+	0,  // 9: mistgate.decoysite.v1.GetDecoySiteResponse.shared_domains:type_name -> mistgate.decoysite.v1.DecoyCheck
+	5,  // 10: mistgate.decoysite.v1.GetDecoySiteResponse.panel:type_name -> mistgate.decoysite.v1.DecoyPanelState
+	2,  // 11: mistgate.decoysite.v1.CreateDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	2,  // 12: mistgate.decoysite.v1.AddDecoySiteVersionResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	2,  // 13: mistgate.decoysite.v1.EditDecoySiteFileResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	2,  // 14: mistgate.decoysite.v1.UpdateDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	2,  // 15: mistgate.decoysite.v1.CopyDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	2,  // 16: mistgate.decoysite.v1.SetDecoySiteReadyResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	0,  // 17: mistgate.decoysite.v1.AssignDecoySiteResponse.warnings:type_name -> mistgate.decoysite.v1.DecoyCheck
+	24, // 18: mistgate.decoysite.v1.AssignDecoySiteResponse.replaced:type_name -> mistgate.decoysite.v1.DecoyReplaced
+	42, // 19: mistgate.decoysite.v1.AssignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
+	42, // 20: mistgate.decoysite.v1.UnassignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
+	2,  // 21: mistgate.decoysite.v1.RevertDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
+	1,  // 22: mistgate.decoysite.v1.ListDecoyPagesResponse.files:type_name -> mistgate.decoysite.v1.DecoyFileInfo
+	7,  // 23: mistgate.decoysite.v1.DecoySiteService.ListDecoySites:input_type -> mistgate.decoysite.v1.ListDecoySitesRequest
+	9,  // 24: mistgate.decoysite.v1.DecoySiteService.GetDecoySite:input_type -> mistgate.decoysite.v1.GetDecoySiteRequest
+	11, // 25: mistgate.decoysite.v1.DecoySiteService.CreateDecoySite:input_type -> mistgate.decoysite.v1.CreateDecoySiteRequest
+	13, // 26: mistgate.decoysite.v1.DecoySiteService.AddDecoySiteVersion:input_type -> mistgate.decoysite.v1.AddDecoySiteVersionRequest
+	15, // 27: mistgate.decoysite.v1.DecoySiteService.EditDecoySiteFile:input_type -> mistgate.decoysite.v1.EditDecoySiteFileRequest
+	17, // 28: mistgate.decoysite.v1.DecoySiteService.UpdateDecoySite:input_type -> mistgate.decoysite.v1.UpdateDecoySiteRequest
+	19, // 29: mistgate.decoysite.v1.DecoySiteService.CopyDecoySite:input_type -> mistgate.decoysite.v1.CopyDecoySiteRequest
+	21, // 30: mistgate.decoysite.v1.DecoySiteService.SetDecoySiteReady:input_type -> mistgate.decoysite.v1.SetDecoySiteReadyRequest
+	23, // 31: mistgate.decoysite.v1.DecoySiteService.AssignDecoySite:input_type -> mistgate.decoysite.v1.AssignDecoySiteRequest
+	26, // 32: mistgate.decoysite.v1.DecoySiteService.UnassignDecoySite:input_type -> mistgate.decoysite.v1.UnassignDecoySiteRequest
+	28, // 33: mistgate.decoysite.v1.DecoySiteService.SetPanelDecoySource:input_type -> mistgate.decoysite.v1.SetPanelDecoySourceRequest
+	30, // 34: mistgate.decoysite.v1.DecoySiteService.RevertDecoySite:input_type -> mistgate.decoysite.v1.RevertDecoySiteRequest
+	32, // 35: mistgate.decoysite.v1.DecoySiteService.DeleteDecoySite:input_type -> mistgate.decoysite.v1.DeleteDecoySiteRequest
+	34, // 36: mistgate.decoysite.v1.DecoySiteService.DownloadDecoySite:input_type -> mistgate.decoysite.v1.DownloadDecoySiteRequest
+	36, // 37: mistgate.decoysite.v1.DecoySiteService.ListDecoyPages:input_type -> mistgate.decoysite.v1.ListDecoyPagesRequest
+	38, // 38: mistgate.decoysite.v1.DecoySiteService.GetDecoyPagePreview:input_type -> mistgate.decoysite.v1.GetDecoyPagePreviewRequest
+	40, // 39: mistgate.decoysite.v1.DecoySiteService.GetDecoyFile:input_type -> mistgate.decoysite.v1.GetDecoyFileRequest
+	8,  // 40: mistgate.decoysite.v1.DecoySiteService.ListDecoySites:output_type -> mistgate.decoysite.v1.ListDecoySitesResponse
+	10, // 41: mistgate.decoysite.v1.DecoySiteService.GetDecoySite:output_type -> mistgate.decoysite.v1.GetDecoySiteResponse
+	12, // 42: mistgate.decoysite.v1.DecoySiteService.CreateDecoySite:output_type -> mistgate.decoysite.v1.CreateDecoySiteResponse
+	14, // 43: mistgate.decoysite.v1.DecoySiteService.AddDecoySiteVersion:output_type -> mistgate.decoysite.v1.AddDecoySiteVersionResponse
+	16, // 44: mistgate.decoysite.v1.DecoySiteService.EditDecoySiteFile:output_type -> mistgate.decoysite.v1.EditDecoySiteFileResponse
+	18, // 45: mistgate.decoysite.v1.DecoySiteService.UpdateDecoySite:output_type -> mistgate.decoysite.v1.UpdateDecoySiteResponse
+	20, // 46: mistgate.decoysite.v1.DecoySiteService.CopyDecoySite:output_type -> mistgate.decoysite.v1.CopyDecoySiteResponse
+	22, // 47: mistgate.decoysite.v1.DecoySiteService.SetDecoySiteReady:output_type -> mistgate.decoysite.v1.SetDecoySiteReadyResponse
+	25, // 48: mistgate.decoysite.v1.DecoySiteService.AssignDecoySite:output_type -> mistgate.decoysite.v1.AssignDecoySiteResponse
+	27, // 49: mistgate.decoysite.v1.DecoySiteService.UnassignDecoySite:output_type -> mistgate.decoysite.v1.UnassignDecoySiteResponse
+	29, // 50: mistgate.decoysite.v1.DecoySiteService.SetPanelDecoySource:output_type -> mistgate.decoysite.v1.SetPanelDecoySourceResponse
+	31, // 51: mistgate.decoysite.v1.DecoySiteService.RevertDecoySite:output_type -> mistgate.decoysite.v1.RevertDecoySiteResponse
+	33, // 52: mistgate.decoysite.v1.DecoySiteService.DeleteDecoySite:output_type -> mistgate.decoysite.v1.DeleteDecoySiteResponse
+	35, // 53: mistgate.decoysite.v1.DecoySiteService.DownloadDecoySite:output_type -> mistgate.decoysite.v1.DownloadDecoySiteResponse
+	37, // 54: mistgate.decoysite.v1.DecoySiteService.ListDecoyPages:output_type -> mistgate.decoysite.v1.ListDecoyPagesResponse
+	39, // 55: mistgate.decoysite.v1.DecoySiteService.GetDecoyPagePreview:output_type -> mistgate.decoysite.v1.GetDecoyPagePreviewResponse
+	41, // 56: mistgate.decoysite.v1.DecoySiteService.GetDecoyFile:output_type -> mistgate.decoysite.v1.GetDecoyFileResponse
+	40, // [40:57] is the sub-list for method output_type
+	23, // [23:40] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_decoysite_v1_decoysite_proto_init() }
@@ -2853,7 +2957,7 @@ func file_mistgate_decoysite_v1_decoysite_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_decoysite_v1_decoysite_proto_rawDesc), len(file_mistgate_decoysite_v1_decoysite_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   41,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -131,3 +131,20 @@ func TestPagesAndTextFile(t *testing.T) {
 		t.Fatalf("long file: %d bytes of %d, cut %v, %v", len(text), size, cut, err)
 	}
 }
+
+// The library shows the built-in page from the text the node serves, not from a copy.
+func TestBuiltinBundleIsTheServedPage(t *testing.T) {
+	b := BuiltinBundle()
+	if b == nil || len(b.Pages()) != 1 {
+		t.Fatalf("builtin bundle = %+v", b)
+	}
+	if got, _ := b.File("index.html"); string(got) != BuiltinHTML() {
+		t.Fatal("the bundle's page differs from BuiltinHTML")
+	}
+	if served := do(Handler(), "GET", "/").Body.String(); served != BuiltinHTML() {
+		t.Fatal("the handler serves another text than BuiltinHTML")
+	}
+	if doc, err := PreviewDocument(b, ""); err != nil || !strings.Contains(doc, "Coming soon") {
+		t.Fatalf("preview = %q, %v", doc, err)
+	}
+}

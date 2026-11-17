@@ -75,6 +75,8 @@ type Config struct {
 	ExpectedAgentVersion string
 	// DecoyDir is the panel's own --decoy-dir bundle. Empty means new nodes default to builtin.
 	DecoyDir string
+	// PublicURL is the panel's public address (its public listener shows the panel's decoy site there). Empty = not known.
+	PublicURL string
 	// Debounce is the StateChanged coalescing window. Default 200 ms.
 	Debounce time.Duration
 	// Desired is the desired-state source, required: it returns the enabled inbounds of a node with their

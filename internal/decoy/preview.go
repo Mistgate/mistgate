@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"golang.org/x/net/html"
@@ -37,8 +38,17 @@ const (
 	maxCSSDepth  = 3
 )
 
-// NotFoundHTML is the 404 page of a site without a 404.html.
-func NotFoundHTML() string { return notFoundHTML }
+// BuiltinBundle is the built-in page as a bundle of one file, so the library reads it as it reads a site (preview, files). The text is
+// BuiltinHTML, the one the node and the panel serve.
+func BuiltinBundle() *Bundle {
+	builtinOnce.Do(func() { builtinBundle, _ = FromFiles([]File{{Path: "index.html", Content: []byte(BuiltinHTML())}}) })
+	return builtinBundle
+}
+
+var (
+	builtinOnce   sync.Once
+	builtinBundle *Bundle
+)
 
 // Pages lists the HTML files of the bundle, index.html first.
 func (b *Bundle) Pages() []string {

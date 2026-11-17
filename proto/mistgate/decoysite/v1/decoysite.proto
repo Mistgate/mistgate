@@ -45,12 +45,13 @@ service DecoySiteService {
   rpc DeleteDecoySite(DeleteDecoySiteRequest) returns (DeleteDecoySiteResponse);
   // The version as a ZIP.
   rpc DownloadDecoySite(DownloadDecoySiteRequest) returns (DownloadDecoySiteResponse);
-  // The HTML pages and all files (with sizes) of a version.
+  // The HTML pages and all files (with sizes) of a version. site_id may also be the built-in entries "builtin" (the Mistgate page)
+  // and "panel_dir" (the panel's --decoy-dir, a snapshot under the limits of a copy to nodes); seq is ignored for them.
   rpc ListDecoyPages(ListDecoyPagesRequest) returns (ListDecoyPagesResponse);
   // One HTML page as a single self-contained document for <iframe sandbox="" srcdoc>: styles inlined, local images as data: URIs,
-  // scripts removed, links made inert (the page they lead to is in data-page), nothing external loads.
+  // scripts removed, links made inert (the page they lead to is in data-page), nothing external loads. site_id as in ListDecoyPages.
   rpc GetDecoyPagePreview(GetDecoyPagePreviewRequest) returns (GetDecoyPagePreviewResponse);
-  // The text of one text file of a version (the first 256 KiB).
+  // The text of one text file of a version (the first 256 KiB). site_id as in ListDecoyPages.
   rpc GetDecoyFile(GetDecoyFileRequest) returns (GetDecoyFileResponse);
 }
 
@@ -120,6 +121,18 @@ message DecoyBuiltinItem {
   bool on_panel = 5;
 }
 
+// The panel as a place a site stands on: the address its public listener answers on and what that listener serves now.
+message DecoyPanelState {
+  // The host (and port, when not the default) of the panel's public URL; empty when the panel does not know it.
+  string address = 1;
+  // What it serves now: "builtin", "dir" or "site:<id>".
+  string serving = 2;
+  // Why that is not what the owner chose (panel_source), empty when it is: decoy_site_not_found or decoy_site_draft (the chosen
+  // library site is gone or is a draft), panel_unavailable (the panel's directory was chosen and there is none). The listener
+  // never serves nothing: it falls back to its directory, or to the built-in page when there is no directory.
+  string reason_code = 3;
+}
+
 // A node that serves a site and how far the delivery is: reason_code is Node.decoy_reason_code ("" = it stands).
 message DecoySiteNode {
   string node_id = 1;
@@ -139,6 +152,7 @@ message ListDecoySitesResponse {
   // The most sites the library holds, and the most versions a site keeps.
   uint32 site_limit = 4;
   uint32 version_limit = 5;
+  DecoyPanelState panel = 6;
 }
 
 message GetDecoySiteRequest {
@@ -150,6 +164,10 @@ message GetDecoySiteResponse {
   repeated DecoyVersion versions = 2;
   repeated DecoyFileInfo files = 3;
   repeated DecoySiteNode nodes = 4;
+  // The warning shared_domains of the nodes the site stands on now (the one AssignDecoySite computes), unset when it does not fire.
+  // Its paths are the names of those nodes.
+  DecoyCheck shared_domains = 5;
+  DecoyPanelState panel = 6;
 }
 
 message CreateDecoySiteRequest {

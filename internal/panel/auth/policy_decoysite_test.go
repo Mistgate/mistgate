@@ -198,3 +198,20 @@ func TestDecoySiteTokenCalls(t *testing.T) {
 		t.Errorf("AssignDecoySite dry run over /api: %d", got)
 	}
 }
+
+// The built-in entries ("builtin", "panel_dir") are read by the three calls that read a site, under their ids, so they follow the
+// rights of those calls and nothing else: the file read is the read-only tools' (decoy_site_file), the pages and the preview are the
+// owner's own.
+func TestDecoyBuiltinEntriesFollowTheRightsOfTheReadsOfASite(t *testing.T) {
+	if access, ok := TokenAccess(pDecoyFile); !ok || access != TokenAccessDirect || TokenProcedureRole(pDecoyFile) != store.RoleReadonly {
+		t.Errorf("GetDecoyFile: access %d on the token list %v, role %s", access, ok, TokenProcedureRole(pDecoyFile))
+	}
+	for _, p := range []string{decoysitev1connect.DecoySiteServiceListDecoyPagesProcedure, decoysitev1connect.DecoySiteServiceGetDecoyPagePreviewProcedure} {
+		if _, ok := TokenAccess(p); ok {
+			t.Errorf("%s is on the token list", p)
+		}
+		if procedureLevels[p] != levelOwner {
+			t.Errorf("%s level = %v, want owner", p, procedureLevels[p])
+		}
+	}
+}

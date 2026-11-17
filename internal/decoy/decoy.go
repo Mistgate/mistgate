@@ -27,6 +27,12 @@ const notFoundHTML = `<!doctype html>
 <body><h1>Not Found</h1><p>The requested URL was not found on this server.</p></body></html>
 `
 
+// BuiltinHTML is the built-in page: the one the node, the panel's public listener and the library's preview all show.
+func BuiltinHTML() string { return pageHTML }
+
+// NotFoundHTML is the built-in 404 page (a site without a 404.html answers with it).
+func NotFoundHTML() string { return notFoundHTML }
+
 // Handler serves the built-in page on "/" and the identical 404 everywhere else.
 func Handler() http.Handler { return http.HandlerFunc(serve) }
 
@@ -39,7 +45,7 @@ func NotFound() http.Handler {
 
 func serve(w http.ResponseWriter, r *http.Request) {
 	if (r.Method == http.MethodGet || r.Method == http.MethodHead) && r.URL.Path == "/" {
-		write(w, r, http.StatusOK, pageHTML)
+		write(w, r, http.StatusOK, BuiltinHTML())
 		return
 	}
 	write(w, r, http.StatusNotFound, notFoundHTML)
