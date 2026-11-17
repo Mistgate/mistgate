@@ -563,4 +563,31 @@ describe("the Overview's strip", () => {
     for (const n of ["MTS", "Beeline", "MegaFon", "Tele2", "Rostelecom"]) expect(title).toContain(n);
     expect(direct.className).toContain("max-w-full");
   });
+
+  it("an entry node has a second line, Carries: a chip per exit it passes on, the ones on the bridge say so, its load at the end", async () => {
+    listRelays.mockResolvedValue({ relays: [relay(), relay({ id: "rly_2", exitNodeId: "nod_fi1", exitNodeName: "fi1", inboundId: "inb_f", profileName: "Trojan", activeMode: "reverse" })] });
+    const msk1 = { ...(de1() as object), node: { id: "nod_msk1", name: "msk1", countryCode: "RU", address: "198.51.100.20", status: NodeStatus.ONLINE, bandwidthMbps: 1000 }, metrics: { cpuPct: 20, netRxBps: 340_000_000, netTxBps: 100_000_000, atUnix: Math.floor(Date.now() / 1000) }, facts: {} } as never;
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () =>
+      root!.render(
+        <QueryClientProvider client={qc}>
+          <ToastProvider>
+            <Strip data={msk1} />
+          </ToastProvider>
+        </QueryClientProvider>,
+      ),
+    );
+    await settle();
+    const line = document.querySelector<HTMLElement>('section[aria-label="Carries"]')!;
+    expect(line).not.toBeNull();
+    expect(line.textContent).toContain("msk1");
+    expect([...line.querySelectorAll("a")].map((a) => a.textContent)).toEqual(["de1", "fi1· bridge"]);
+    expect(line.textContent).toContain("load 34 %");
+    // the exit has no such line
+    act(() => root!.unmount());
+    host.remove();
+  });
 });
