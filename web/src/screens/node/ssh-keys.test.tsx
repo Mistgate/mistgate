@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { en } from "@/i18n/en";
+import { en as np } from "@/i18n/nodepage";
 import { keyTypeLabel } from "./ssh-keys";
 import { SSHAccessCard } from "./ssh-access";
 
@@ -102,7 +103,7 @@ const click = async (el: Element | null | undefined) => {
   await flush();
 };
 // a pill reads glyph + word; the word is what the owner reads
-const pills = () => [...document.querySelectorAll(".pill")].map((p) => p.textContent?.replace(/^[–!×~]/, ""));
+const pills = () => [...document.querySelectorAll(".pill, .sv-key b em")].map((p) => p.textContent?.replace(/^[–!×~]/, ""));
 async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -143,11 +144,11 @@ describe("the keys block", () => {
     expect(listNodeServerKeys).not.toHaveBeenCalled();
   });
 
-  it("the panel key gone from the file: amber in the header, and Restore puts it back", async () => {
+  it("the panel key gone from the file: amber in the facts, and Restore puts it back", async () => {
     addNodeServerKey.mockResolvedValue({ key: panel });
     await mount({}, [alice]);
     expect(text()).toContain(en["node.sshKeys.missing"]);
-    expect(document.querySelector(".pill.tone-warn")?.textContent).toContain(en["panelKey.title"]);
+    expect(document.querySelector(".nx-facts dd.warn")?.textContent).toBe(np["np.sv.ssh.byKey"]); // the way in turns amber
     await click(button(en["node.sshKeys.restore"]));
     expect(addNodeServerKey).toHaveBeenCalledWith({ nodeId: "nod_1", panelKey: true, confirm: true });
     expect(listNodeServerKeys).toHaveBeenCalledTimes(2); // read again after the change

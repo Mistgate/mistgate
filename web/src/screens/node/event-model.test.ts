@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { fill, pickForm } from "@/i18n";
 import { en } from "@/i18n/en";
-import { byDay, buildLines, foldWindowS, lineRows, matchesFilter, updateWindowS, type NodeEvent } from "./event-model";
+import { byDay, buildLines, foldWindowS, lineRows, matchesFilter, updateWindowS, weekSummary, type NodeEvent } from "./event-model";
 import { lineText } from "./event-text";
 import { kernelReadiness } from "./awg-kernel";
 
@@ -283,5 +283,39 @@ describe("kernel readiness of a node", () => {
     expect(kernelReadiness(undefined, "kvm").state).toBe("unchecked");
     expect(kernelReadiness(undefined, "OpenVZ")).toMatchObject({ state: "container", virt: "OpenVZ" });
     expect(kernelReadiness(item("kernel_headers.container", { virt: "lxc" }), "").state).toBe("container");
+  });
+});
+
+describe("weekSummary", () => {
+  const NOW = Math.floor(new Date(2026, 10, 13, 20, 50).getTime() / 1000);
+  const at = (day: number, h: number, m = 0) => Math.floor(new Date(2026, 10, day, h, m).getTime() / 1000);
+  const evt = (id: number, code: string, timeUnix: number) => ({ id, code, timeUnix, severity: 0, params: {} }) as never;
+
+  it("counts the downtime from a node_down to the next node_recovered, and a blip as a failure that costs none", () => {
+    const events = [evt(1, "node_down", at(13, 11, 20)), evt(2, "node_recovered", at(13, 11, 22)), evt(3, "node_blip", at(13, 10, 11))];
+    const s = weekSummary(events, NOW, at(1, 0), false);
+    expect(s.failures).toBe(2);
+    expect(s.downS).toBe(120);
+    expect(s.uptime).toBeGreaterThan(99.9);
+    // seven days of twelve cells: the 11:20 outage is in the 10:00 cell of today, the blip in the 10:00 one too (crit wins)
+    expect(s.cells).toHaveLength(84);
+    const cell = (day: number, h: number) => s.cells.find((c) => c.fromUnix === at(day, h))!.kind;
+    expect(cell(13, 10)).toBe("crit");
+    expect(cell(13, 8)).toBe("ok");
+    expect(cell(13, 22)).toBe("none"); // still to come
+  });
+
+  it("a node that is down now has been down since its node_down, up to now", () => {
+    const s = weekSummary([evt(1, "node_down", at(13, 20, 30))], NOW, at(1, 0), true);
+    expect(s.downS).toBe(20 * 60);
+    expect(s.cells.find((c) => c.fromUnix === at(13, 20))!.kind).toBe("crit");
+    expect(weekSummary([evt(1, "node_down", at(13, 20, 30))], NOW, at(1, 0), false).downS).toBe(0); // no longer down: recovered rows are what close it
+  });
+
+  it("leaves the cells before the node was added empty, and gives no share for a node under an hour old", () => {
+    const s = weekSummary([], NOW, at(12, 12), false);
+    expect(s.cells.find((c) => c.fromUnix === at(11, 8))!.kind).toBe("none");
+    expect(s.cells.find((c) => c.fromUnix === at(12, 12))!.kind).toBe("ok");
+    expect(weekSummary([], NOW, NOW - 600, false).uptime).toBeNull();
   });
 });

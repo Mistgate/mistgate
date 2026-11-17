@@ -8,9 +8,13 @@ export type NodeTab = (typeof nodeTabs)[number];
 export const historyViews = ["events", "journal", "logs"] as const;
 export type HistoryView = (typeof historyViews)[number];
 
+/** The sections of the Server tab, the menu on its left; the bare `?tab=server` is the first. */
+export const serverSections = ["node", "ch", "ag", "ssh", "site", "awg", "sys", "dbg", "del"] as const;
+export type ServerSection = (typeof serverSections)[number];
+
 /** The Ways in tab's view: the list or the graph (ADR 0016). */
 export type WaysView = "list" | "graph";
-export type NodeSearch = { tab?: NodeTab; way?: WayId; add?: string; view?: Exclude<HistoryView, "events"> | WaysView; before?: number; size?: number; /** The graph of the Ways in tab, full screen. */ full?: "1"; /** Came from the fleet map: the page shows its breadcrumb back. */ from?: "map" };
+export type NodeSearch = { tab?: NodeTab; sv?: Exclude<ServerSection, "node">; way?: WayId; add?: string; view?: Exclude<HistoryView, "events"> | WaysView; before?: number; size?: number; /** The graph of the Ways in tab, full screen. */ full?: "1"; /** Came from the fleet map: the page shows its breadcrumb back. */ from?: "map" };
 
 /**
  * Search-param validation of /nodes/$id: only a known tab other than the first is kept in the URL. `add` (a profile id,
@@ -36,6 +40,7 @@ const validateTab = (s: Record<string, unknown>): NodeSearch => {
     const add = s.add === "1" || s.add === 1 ? "1" : typeof s.add === "string" && (s.add === "ipv6" || /^via:[\w-]+$/.test(s.add)) ? s.add : undefined;
     return { tab, ...(isWayId(s.way) ? { way: s.way } : {}), ...(add ? { add } : {}), ...(s.view === "graph" || s.view === "list" ? { view: s.view } : {}), ...(s.full === "1" || s.full === 1 ? { full: "1" as const } : {}) };
   }
+  if (tab === "server") return serverSections.includes(s.sv as ServerSection) && s.sv !== "node" ? { tab, sv: s.sv as Exclude<ServerSection, "node"> } : { tab };
   return tab === "profiles" && typeof s.add === "string" && s.add !== "" ? { tab, add: s.add } : { tab };
 };
 

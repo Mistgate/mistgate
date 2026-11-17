@@ -19,6 +19,14 @@ describe("validateNodeSearch", () => {
     expect(validateNodeSearch({ tab: "exit", way: "direct" })).toEqual({ tab: "exit" });
   });
 
+  it("keeps the open section of the Server tab, the first without one", () => {
+    expect(validateNodeSearch({ tab: "server", sv: "ssh" })).toEqual({ tab: "server", sv: "ssh" });
+    expect(validateNodeSearch({ tab: "server", sv: "del" })).toEqual({ tab: "server", sv: "del" });
+    expect(validateNodeSearch({ tab: "server", sv: "node" })).toEqual({ tab: "server" });
+    expect(validateNodeSearch({ tab: "server", sv: "nope" })).toEqual({ tab: "server" });
+    expect(validateNodeSearch({ tab: "exit", sv: "ssh" })).toEqual({ tab: "exit" });
+  });
+
   it("keeps the profile to add only on the profiles tab", () => {
     expect(validateNodeSearch({ tab: "profiles", add: "prf_1" })).toEqual({ tab: "profiles", add: "prf_1" });
     expect(validateNodeSearch({ tab: "profiles", add: "" })).toEqual({ tab: "profiles" });

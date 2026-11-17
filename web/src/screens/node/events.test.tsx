@@ -69,15 +69,15 @@ describe("the node's events tab", () => {
     expect(text()).toContain("Today");
     expect(text()).toContain("Agent updated 0.1.0-a → 0.1.0-b");
     expect(text()).toContain("profiles up: test, Amnezia 3.1 test");
-    expect(document.querySelectorAll("section")).toHaveLength(1);
+    expect(document.querySelectorAll(".nh-tl")).toHaveLength(1);
     expect(text()).not.toContain("engine_started");
 
-    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Details"));
+    await click(document.querySelector(".nh-r"));
     expect(text()).toContain("engine_started");
     expect(text()).toContain("Amnezia 3.1 test");
-    expect(text()).toContain("reason=agent_start");
-    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Hide"));
-    expect(text()).not.toContain("reason=agent_start");
+    expect(text()).toContain("reasonagent_start"); // a parameter is a chip: its name, then its value
+    await click(document.querySelector(".nh-r"));
+    expect(text()).not.toContain("reasonagent_start");
   });
 
   it("shows a torrent attempt with the resolved user and the protocol, never an address", async () => {
@@ -173,5 +173,18 @@ describe("the node's events tab", () => {
     listEvents.mockResolvedValue({ events: rows, hasMore: false });
     await mount();
     expect(document.querySelector("nav")).toBeNull();
+  });
+
+  it("reads the week from the node's own events: failures, how long it was away, how much of the time it was there, and a cell for each two hours", async () => {
+    const at = (h: number) => now - h * 3600;
+    const week = [ev(12, at(5) + 240, "node_recovered", {}), ev(11, at(5), "node_down", {}), ev(10, at(30), "node_blip", {})];
+    listEvents.mockImplementation(async (req: { limit: number }) => (req.limit === 200 ? { events: week, hasMore: false } : { events: rows, hasMore: false }));
+    await mount();
+    const week1 = document.querySelector(".nh-sum")!;
+    expect(week1.querySelector(".nh-s1")!.textContent).toContain("2"); // the outage and the blip
+    expect(week1.textContent).toContain("4 min");
+    expect(week1.querySelectorAll(".nh-up i")).toHaveLength(84);
+    expect(week1.querySelectorAll(".nh-up i.crit").length).toBeGreaterThan(0);
+    expect(week1.querySelectorAll(".nh-up i.warn").length).toBeGreaterThan(0);
   });
 });

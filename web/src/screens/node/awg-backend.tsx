@@ -12,10 +12,11 @@ import { AwgPrepareState, PrepareAwgOutcome, type GetNodeResponse } from "@/gen/
 import { nodes as nodesApi } from "@/lib/api";
 import { codedError } from "@/lib/coded-error";
 import { doctorQuery } from "@/lib/health";
+import { cx } from "@/lib/cx";
 import type { Plain } from "@/lib/plain";
 import { useTx } from "@/screens/users/t";
-import { Panel } from "@/screens/users/ui";
 import { kernelReadiness, prepDetailCodes, prepMinutes, prepReasonText } from "./awg-kernel";
+import { SvCard, SvCode, SvHead, SvOpt, SvRow } from "./server-parts";
 
 const modes = ["auto", "kernel", "userspace"] as const;
 export type AwgMode = (typeof modes)[number];
@@ -219,26 +220,52 @@ export function AwgBackendCard({ data }: { data: Plain<GetNodeResponse> }) {
     return run(() => askNode(true));
   }
 
+  const live = running.backend === "kernel" || running.backend === "userspace" ? running.backend : "";
+  const runningText = running.backend ? `${running.backend} · ${running.version}` : running.count === 0 ? t("awg.backend.noInbounds") : t("awg.backend.notReported");
   return (
-    <Panel title={t("awg.backend.title")} icon="mask" tone="sage">
-      <p className="-mt-1 text-xs leading-normal text-pretty text-muted">{t("awg.backend.body")}</p>
-      <AwgBackendFields mode={mode} onChange={setMode} label={t("awg.backend.title")} auto={auto} />
+    <SvCard aria-label={t("awg.backend.title")}>
+      <SvHead title={t("awg.backend.title")} hint={t("awg.backend.body")} />
+      <div role="radiogroup" aria-label={t("awg.backend.title")} className="sv-opts">
+        {modes.map((m) => (
+          <SvOpt key={m} on={mode === m} disabled={busy} title={t(`awg.backend.${m}`)} mark={live && m === live ? t("np.sv.awg.live") : undefined} onPick={() => setMode(m)}>
+            <span>{t(`awg.backend.${m}Hint`)}</span>
+          </SvOpt>
+        ))}
+      </div>
+      <SvRow title={t("awg.backend.running")} hint={runningText} mono>
+        {running.backend && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-accent-text">
+            <i aria-hidden className="size-2 rounded-full bg-accent-mark" />
+            {t(`awg.backend.${running.backend === "kernel" ? "kernel" : "userspace"}`)}
+          </span>
+        )}
+      </SvRow>
+      {mode === "kernel" &&
+        (auto ? (
+          <div className="sv-body line">
+            <p className="text-[13px] leading-[18px] text-pretty text-muted">{t("awg.backend.kernelAuto")}</p>
+            <ManualDisclosure />
+          </div>
+        ) : (
+          <SvCode command={prepareKernelCommand} note={t("awg.backend.kernelPrepare")}>
+            <CopyButton value={prepareKernelCommand} />
+          </SvCode>
+        ))}
       {noAuto && (
-        <Notice>
-          <span className="flex flex-col gap-2">
-            <span>{t("awg.prep.unsupported", { reason: prepReasonText(t, noAuto.code, noAuto.reason) })}</span>
-            <Command />
-          </span>
-        </Notice>
+        <SvCode command={prepareKernelCommand} note={t("awg.prep.unsupported", { reason: prepReasonText(t, noAuto.code, noAuto.reason) })}>
+          <CopyButton value={prepareKernelCommand} />
+        </SvCode>
       )}
-      {auto && prep && <PrepStatus prep={prep} now={now} usingKernel={saved === "kernel"} busy={busy} onRetry={() => void retry()} />}
-      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[11px] text-muted">{t("awg.backend.running")}</span>
-          <span className="font-mono text-[13px] break-words">
-            {running.backend ? `${running.backend} · ${running.version}` : running.count === 0 ? t("awg.backend.noInbounds") : t("awg.backend.notReported")}
-          </span>
+      {auto && prep && (
+        <div className="mx-6 mb-4 max-[720px]:mx-4">
+          <PrepStatus prep={prep} now={now} usingKernel={saved === "kernel"} busy={busy} onRetry={() => void retry()} />
         </div>
+      )}
+      <div className={cx("sv-save", (dirty || busy) && "on")}>
+        <span>{busy ? t("np.sv.site.sending") : t("np.sv.unsaved")}</span>
+        <Button variant="secondary" size="md" disabled={busy} onClick={() => setMode(saved)}>
+          {t("np.sv.cancel")}
+        </Button>
         <Button variant="primary" size="md" disabled={!dirty || busy || (building && mode === "kernel")} onClick={() => void submit()}>
           {t("common.save")}
         </Button>
@@ -259,7 +286,7 @@ export function AwgBackendCard({ data }: { data: Plain<GetNodeResponse> }) {
           </>
         }
       />
-    </Panel>
+    </SvCard>
   );
 }
 

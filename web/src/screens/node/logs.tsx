@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EditionNotice } from "@/components/edition-notice";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
+import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { LogLevel, type GetNodeResponse, type LogLine } from "@/gen/mistgate/admin/v1/node_pb";
@@ -13,6 +14,7 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
+import "./history.css";
 
 const maxLines = 1000;
 type Link = "connecting" | "live" | "lost";
@@ -23,7 +25,6 @@ const levelWord = (l: Line["level"]) => (l === LogLevel.ERROR ? "ERROR" : l === 
 const levelMatches = (f: Level, l: Line["level"]) =>
   f === "all" || (f === "error" ? l === LogLevel.ERROR : f === "warn" ? l === LogLevel.WARNING : l !== LogLevel.ERROR && l !== LogLevel.WARNING);
 
-const levelTone: Record<string, string> = { INFO: "text-accent-text", WARN: "text-warn", ERROR: "text-danger" };
 
 function sleep(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve) => {
@@ -37,7 +38,7 @@ function sleep(ms: number, signal: AbortSignal) {
  * arrive first, then new ones as they are written; if the link drops the stream is retried every 5 s while
  * the node is online, and the lines already on screen stay.
  */
-export function LogsTab({ data, onJournal }: { data: Plain<GetNodeResponse>; onJournal?: () => void }) {
+export function LogsTab({ data, onJournal, lead }: { data: Plain<GetNodeResponse>; onJournal?: () => void; lead?: ReactNode }) {
   const t = useT();
   const fmt = useFmt();
   const toast = useToast();
@@ -49,6 +50,10 @@ export function LogsTab({ data, onJournal }: { data: Plain<GetNodeResponse>; onJ
   const [frozen, setFrozen] = useState<Line[] | null>(null); // paused: what was on screen when Pause was pressed
   const [level, setLevel] = useState<Level>("all");
   const [query, setQuery] = useState("");
+  const [source, setSource] = useState("");
+  const [copied, setCopied] = useState(false);
+  // lines that come after the page opened are the fresh ones: they flash in
+  const [openedMs] = useState(() => Date.now());
   const box = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
@@ -85,8 +90,9 @@ export function LogsTab({ data, onJournal }: { data: Plain<GetNodeResponse>; onJ
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (frozen ?? lines).filter((l) => levelMatches(level, l.level) && (!q || l.message.toLowerCase().includes(q) || l.source.toLowerCase().includes(q)));
-  }, [frozen, lines, level, query]);
+    return (frozen ?? lines).filter((l) => levelMatches(level, l.level) && (!source || l.source === source) && (!q || l.message.toLowerCase().includes(q) || l.source.toLowerCase().includes(q)));
+  }, [frozen, lines, level, query, source]);
+  const sources = useMemo(() => [...new Set(lines.map((l) => l.source))].sort(), [lines]);
 
   // follow the tail unless the admin scrolled up to read
   useEffect(() => {
@@ -96,14 +102,17 @@ export function LogsTab({ data, onJournal }: { data: Plain<GetNodeResponse>; onJ
 
   if (off)
     return (
-      <EditionNotice feature="agent_logs">
-        <p>{t("journal.edgeHint")}</p>
-        {onJournal && (
-          <Button variant="secondary" size="md" className="mt-2" onClick={onJournal}>
-            {t("journal.open")}
-          </Button>
-        )}
-      </EditionNotice>
+      <div className="nh">
+        {lead && <div className="nh-bar">{lead}</div>}
+        <EditionNotice feature="agent_logs">
+          <p>{t("journal.edgeHint")}</p>
+          {onJournal && (
+            <Button variant="secondary" size="md" className="mt-2" onClick={onJournal}>
+              {t("journal.open")}
+            </Button>
+          )}
+        </EditionNotice>
+      </div>
     );
 
   function download() {
@@ -119,6 +128,17 @@ export function LogsTab({ data, onJournal }: { data: Plain<GetNodeResponse>; onJ
     toast(t("node.logs.downloaded", { name: `${node.name}-agent.log` }));
   }
 
+  async function copy() {
+    const text = shown.map((l) => `${new Date(l.timeUnixMs).toISOString()} ${levelWord(l.level).padEnd(5)} ${l.source} ${l.message}`).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      toast(t("common.copyFailed"));
+    }
+  }
+
   const paused = frozen !== null;
   const status = !online ? "off" : paused ? "paused" : link;
   const last = lines.at(-1);
@@ -129,68 +149,81 @@ export function LogsTab({ data, onJournal }: { data: Plain<GetNodeResponse>; onJ
     live: t("node.logs.live"),
     lost: last ? t("node.logs.noLinkSince", { time: fmt.clock(last.timeUnixMs / 1000) }) : t("node.logs.noLink"),
   }[status];
-  const dot = status === "live" ? "bg-ok animate-[mg-ui-blink_1.2s_infinite]" : status === "paused" || status === "connecting" ? "bg-warn" : "bg-muted";
+  const following = status === "live";
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterChips
-          aria-label={t("node.logs.level")}
-          value={level}
-          onValueChange={setLevel}
-          options={[
-            { value: "all", label: t("node.logs.all") },
-            { value: "info", label: t("node.logs.info") },
-            { value: "warn", label: t("node.logs.warn") },
-            { value: "error", label: t("node.logs.errors") },
-          ]}
-          className="flex-nowrap gap-1"
-        />
-        <TextField
-          search
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("node.logs.search")}
-          aria-label={t("node.logs.search")}
-          className="min-w-40 flex-1"
-        />
-        <Button variant="secondary" size="md" onClick={() => setFrozen(paused ? null : lines)}>
+    <div className="nh">
+      <div className="nh-bar">
+        {lead}
+        {sources.length > 1 && (
+          <FilterChips
+            aria-label={t("np.hi.log.source")}
+            value={source}
+            onValueChange={setSource}
+            options={[{ value: "", label: t("np.hi.log.allSources") }, ...sources.map((s) => ({ value: s, label: s }))]}
+            className="nh-chips flex-nowrap"
+          />
+        )}
+        <TextField search value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("node.logs.search")} aria-label={t("node.logs.search")} className="min-w-40 max-w-72 flex-1" />
+        <button type="button" className={cx("nh-tail", following && "on")} aria-pressed={!paused} disabled={!online} onClick={() => setFrozen(paused ? null : lines)}>
+          <i className="dot" aria-hidden />
           {paused ? t("node.logs.resume") : t("node.logs.pause")}
-        </Button>
-        <Button variant="ghost" size="md" disabled={lines.length === 0} onClick={download}>
-          {t("node.logs.download")}
-        </Button>
+        </button>
       </div>
-      <div role="status" className="flex items-center gap-2 text-xs text-muted">
-        <span aria-hidden className={cx("size-[7px] rounded-full", dot)} />
-        {liveText}
-      </div>
-      <div
-        ref={box}
-        tabIndex={0}
-        aria-label={t("node.tab.logs")}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-        }}
-        className="h-[420px] overflow-auto rounded-[14px] border border-line bg-surface py-2.5 font-mono text-xs leading-[1.6] md:h-[380px]"
-      >
-        {shown.map((l, i) => {
-          const w = levelWord(l.level);
-          return (
-            <div
-              key={`${l.timeUnixMs}/${i}`}
-              className={cx("flex gap-2.5 px-3.5 whitespace-nowrap", w === "ERROR" ? "bg-danger-soft" : w === "WARN" ? "bg-warn-soft" : "")}
-            >
-              <span className="text-faint">{new Date(l.timeUnixMs).toLocaleTimeString(fmt.locale, { hour12: false })}</span>
-              <span className={cx("w-10 flex-none font-bold", levelTone[w])}>{w}</span>
-              <span className="w-[72px] flex-none truncate text-muted">{l.source}</span>
-              <span>{l.message}</span>
-            </div>
-          );
-        })}
-        {shown.length === 0 && <p className="px-3.5 text-muted">{online ? t("node.logs.empty") : t("node.logs.offlineEmpty")}</p>}
-      </div>
+      <section className="nh-log rounded-card border border-line bg-surface">
+        <div className="nh-lh">
+          <span className="mono">
+            {node.name}-agent.log
+            <small role="status">{liveText}</small>
+          </span>
+          <Segmented
+            aria-label={t("node.logs.level")}
+            value={level}
+            onValueChange={setLevel}
+            options={[
+              { value: "all", label: t("node.logs.all") },
+              { value: "info", label: t("node.logs.info") },
+              { value: "warn", label: t("node.logs.warn") },
+              { value: "error", label: t("node.logs.errors") },
+            ]}
+          />
+          <Button variant="secondary" size="md" disabled={shown.length === 0} onClick={() => void copy()}>
+            {copied ? t("np.hi.log.copied") : t("np.hi.log.copy")}
+          </Button>
+          <Button variant="ghost" size="md" disabled={lines.length === 0} onClick={download}>
+            {t("node.logs.download")}
+          </Button>
+        </div>
+        <div
+          ref={box}
+          role="log"
+          tabIndex={0}
+          aria-label={t("node.tab.logs")}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+          }}
+          className="nh-lb"
+        >
+          {shown.map((l, i) => {
+            const w = levelWord(l.level);
+            return (
+              <div key={`${l.timeUnixMs}/${i}`} className={cx(w === "ERROR" ? "crit" : w === "WARN" ? "warn" : "", l.timeUnixMs > openedMs && "fresh")}>
+                <span className="t">{new Date(l.timeUnixMs).toLocaleTimeString(fmt.locale, { hour12: false })}</span>
+                <span className="lv">{w}</span>
+                <span className="src truncate">{l.source}</span>
+                <span className="m">{l.message}</span>
+              </div>
+            );
+          })}
+          {shown.length === 0 && <span className="none">{online ? t("node.logs.empty") : t("node.logs.offlineEmpty")}</span>}
+          {following && (
+            <span className="nh-cur" aria-hidden>
+              <i />
+            </span>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

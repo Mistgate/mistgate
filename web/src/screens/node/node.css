@@ -438,7 +438,12 @@
     transform: translateX(2px);
   }
 }
+/* a repair that failed: the card shakes once */
+.nd-shaking {
+  animation: nd-shake 0.4s var(--e);
+}
 @media (prefers-reduced-motion: reduce) {
+  .nd-shaking,
   .nd-dr-ic.run svg,
   .nd-dr-sum.run::before,
   .nd-dr-strip i.now::before,

@@ -1,3 +1,4 @@
+import { Scramble } from "@/components/fx/scramble-react";
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState, type CSSProperties } from "react";
 import { EditionNotice } from "@/components/edition-notice";
@@ -146,7 +147,7 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
                   />
                 ))}
               </span>
-              <span className={cx("text-end font-mono text-[13px] font-medium whitespace-nowrap tabular-nums", kind === "warn" && "text-warn-text", kind === "bad" && "text-danger-text")}>{look.label}</span>
+              <span className={cx("text-end font-mono text-[13px] font-medium whitespace-nowrap tabular-nums", kind === "warn" && "text-warn-text", kind === "bad" && "text-danger-text")}>{look.label && <Scramble value={look.label} once />}</span>
             </div>
             {on && (
               <div className="flex flex-col gap-2 border-t border-line px-6 py-3 max-[720px]:px-4">

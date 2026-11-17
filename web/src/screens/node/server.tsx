@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useAddNode } from "@/components/add-node";
-import { ActionBar, Block, DangerZone, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
+import { Flag } from "@/components/ui/flag";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
-import { Stepper } from "@/components/ui/stepper";
-import { TextField } from "@/components/ui/text-field";
+import { fieldClass, TextArea, TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
@@ -17,20 +16,26 @@ import { useT } from "@/i18n";
 import type { Plain } from "@/lib/plain";
 import { nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
+import { cx } from "@/lib/cx";
+import { debugListQuery, isLive } from "@/lib/debug-capture";
+import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { osRows, useOsUpdates } from "@/lib/os-updates";
 import { meQuery } from "@/lib/session";
 import { useIsOwner, useOlderNodes } from "@/lib/updates";
 import { CodeBlock } from "@/screens/integrations/parts";
-import { Panel, SettingRow } from "@/screens/users/ui";
+import { Glyph } from "@/screens/overview-parts";
 import { AwgBackendCard } from "./awg-backend";
-import { BandwidthMeasure } from "./bandwidth-measure";
+import { MeasureButton, MeasureResult, useBandwidthMeasure } from "./bandwidth-measure";
 import { DebugCaptureCard } from "./debug-capture";
 import { DecoyCard } from "./decoy";
-import { useNodeForm, useSaveNode } from "./node-form";
+import { useNodeForm, useSaveSection } from "./node-form";
 import { OsCard } from "./os-card";
 import { useRelaysOf } from "./relays";
+import { Facts, SvCard, SvHead, SvRow, SvSave, SvStep } from "./server-parts";
 import { SSHAccessCard, useServerAccess } from "./ssh-access";
+import { serverSections, type ServerSection } from "./tabs";
 
 // Defaults the panel uses when a timeout is 0 (node.proto, NodeTimeouts).
 const timeoutDefs = {
@@ -59,48 +64,96 @@ export const retiredCleanupCommand = [
   "rm -rf /var/lib/mistgate-node",
 ].join("\n");
 
+// the icons of the menu (the board's svNav)
+const navIcon: Record<ServerSection, string> = {
+  node: "M4 6h16v5H4zM4 13h16v5H4zM7 8.5h.5M7 15.5h.5",
+  ch: "M4 17l5-5 4 3 7-8M15 7h5v5",
+  ag: "M12 4v10M8 10l4 4 4-4M5 19h14",
+  ssh: "M8 15a4 4 0 1 1 3.9-5H21v3h-2v2h-3v-2h-4.1A4 4 0 0 1 8 15z",
+  site: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18",
+  awg: "M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z",
+  sys: "M5 5h14v10H5zM9 19h6M12 15v4",
+  dbg: "M9 6a3 3 0 0 1 6 0M7 9h10v5a5 5 0 0 1-10 0zM3 12h4M17 12h4M5 19l3-2M19 19l-3-2",
+  del: "M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5",
+};
+
 /**
- * Server: what this machine is. From xl two columns: on the left the node's passport, capacity and agent link as one form
- * with one Save at its end, and the agent under it; on the right SSH access, the decoy site, the AmneziaWG backend, the
- * operating system and the host facts. The danger zone comes last, full width. One column below xl in the same order, the form first.
+ * Server: what this machine is. The sections of the board's left menu, one at a time: the node's passport, its channel, the agent
+ * and the link to it, SSH access with its keys, the decoy site, the AmneziaWG backend, the operating system with the host, the
+ * debug recording, and the end of the node's life. A retired node keeps what is still true of it: the passport (locked), the agent,
+ * SSH access (to forget it) and the host. Below 1000 px the menu is a row of pills above the card.
  */
-export function ServerTab({ data }: { data: Plain<GetNodeResponse> }) {
+export function ServerTab({ data, section = "node", onSection }: { data: Plain<GetNodeResponse>; section?: ServerSection; onSection?: (s: ServerSection) => void }) {
+  return <ServerBody key={data.node!.id} data={data} section={section} onSection={onSection ?? (() => {})} />;
+}
+
+function ServerBody({ data, section, onSection }: { data: Plain<GetNodeResponse>; section: ServerSection; onSection: (s: ServerSection) => void }) {
+  const t = useT();
   const node = data.node!;
   const retired = node.status === NodeStatus.RETIRED;
   const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;
+  const edition = useEdition();
   // retired while offline: shown here, not in the retire dialog, which goes once the node reads as retired
   const [unreached, setUnreached] = useState(false);
+  const form = useServerForm(data);
+
+  // what the menu says about the system and the recording: the same queries the cards read, so no second poll
+  const lacking = edition.off("os_updates");
+  const os = useOsUpdates(!lacking && !retired);
+  const osRow = os.data ? osRows(os.data).find((r) => r.nodeId === node.id) : undefined;
+  const recording = useQuery({ ...debugListQuery(node.id), enabled: owner && !retired }).data?.captures.some(isLive) ?? false;
+  const sys = osRow?.status && !osRow.status.error ? (osRow.status.rebootRequired ? { b: "!", warn: true } : osRow.status.security > 0 ? { b: String(osRow.status.security), warn: true } : null) : null;
+
+  const shown = serverSections.filter((s) => (retired ? s === "node" || s === "ag" || s === "ssh" || s === "sys" : true));
+  const open = shown.includes(section) ? section : "node";
+  const badge = (s: ServerSection) => (s === "sys" && sys ? { text: sys.b, cls: "" } : s === "dbg" && recording ? { text: "●", cls: "rec" } : null);
+
   return (
-    <div className="flex flex-col gap-3.5">
-      <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-3.5">
-          {/* keyed by the node: switching nodes starts from that node's values */}
-          <NodeForm key={node.id} data={data} owner={owner} />
-          <AgentPanel data={data} owner={owner} />
-        </div>
-        <div className="flex min-w-0 flex-col gap-3.5">
-          <SSHAccessCard nodeId={node.id} attach={retired ? undefined : { name: node.name, address: node.address }} />
-          {!retired && <DecoyCard node={node} />}
-          {!retired && <AwgBackendCard data={data} />}
-          {!retired && <OsCard nodeId={node.id} />}
-          <HostPanel data={data} />
-          {!retired && <DebugCaptureCard node={node} />}
-        </div>
+    <div className="sv">
+      <nav className="sv-nav" aria-label={t("np.sv.nav")}>
+        {shown.map((s) => {
+          const b = badge(s);
+          return (
+            <button key={s} type="button" aria-pressed={open === s} className={s === "del" ? "danger" : undefined} onClick={() => onSection(s)}>
+              <Glyph d={navIcon[s]} size={18} stroke={1.5} />
+              <span>{s === "del" ? t("node.danger") : t(`np.sv.nav.${s}`)}</span>
+              {b && <em className={b.cls}>{b.text}</em>}
+            </button>
+          );
+        })}
+      </nav>
+      {/* keyed by the section: it rises as it opens */}
+      <div className="sv-main" key={open}>
+        {open === "node" && <NodeSection data={data} owner={owner} form={form} />}
+        {open === "ch" && <ChannelSection data={data} form={form} />}
+        {open === "ag" && <AgentSections data={data} owner={owner} form={form} />}
+        {open === "ssh" && <SSHAccessCard nodeId={node.id} attach={retired ? undefined : { name: node.name, address: node.address }} />}
+        {open === "site" && !retired && <DecoyCard node={node} />}
+        {open === "awg" && !retired && <AwgBackendCard data={data} />}
+        {open === "sys" && (
+          <>
+            {!retired && <OsCard nodeId={node.id} />}
+            <HostPanel data={data} />
+          </>
+        )}
+        {open === "dbg" && !retired && <DebugCaptureCard node={node} />}
+        {open === "del" && !retired && <RetireZone nodeId={node.id} name={node.name} onUnreached={() => setUnreached(true)} />}
       </div>
-      {!retired && <RetireZone nodeId={node.id} name={node.name} onUnreached={() => setUnreached(true)} />}
       {unreached && <UnreachedModal name={node.name} />}
     </div>
   );
 }
 
-/** Node (name, address, country, place, hoster, notes), capacity and the agent link: one form, one Save at its end. */
-function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolean }) {
-  const t = useT();
-  const fmt = useFmt();
+// the fields of the node's three forms: what each Save sends and each Cancel puts back
+const nodeFields = ["name", "address", "country", "location", "publicLabel", "provider", "notes"] as const;
+const channelFields = ["bandwidth"] as const;
+const agentFields = ["liveness", "apply", "dial"] as const;
+
+/** The state of the three forms of the Server tab: it lives above the menu, so a half-typed field survives a look at another section. */
+function useServerForm(data: Plain<GetNodeResponse>) {
   const node = data.node!;
-  const retired = node.status === NodeStatus.RETIRED;
   const startCountry = node.countryCode || none;
-  const { f, set, changed, dirty } = useNodeForm(() => ({
+  return useNodeForm(() => ({
     name: node.name,
     address: node.address,
     country: startCountry,
@@ -113,6 +166,17 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
     apply: data.timeouts?.applyTimeoutS || timeoutDefs.apply.def,
     dial: data.timeouts?.dialTimeoutS || timeoutDefs.dial.def,
   }));
+}
+type Form = ReturnType<typeof useServerForm>;
+
+/** The node (name, address, country, place, public label, hoster, notes): one form, one bar at its end. */
+function NodeSection({ data, owner, form }: { data: Plain<GetNodeResponse>; owner: boolean; form: Form }) {
+  const t = useT();
+  const fmt = useFmt();
+  const node = data.node!;
+  const retired = node.status === NodeStatus.RETIRED;
+  const { f, set, changed } = form;
+  const startCountry = node.countryCode || none;
 
   const countries = useMemo(() => {
     const codes = new Set<string>(countryCodes);
@@ -121,202 +185,222 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
       { value: none, label: t("node.add.countryNone") },
       ...[...codes]
         .sort((a, b) => fmt.country(a).localeCompare(fmt.country(b), fmt.locale))
-        .map((c) => ({ value: c, label: `${c} · ${fmt.country(c)}` })),
+        .map((c) => ({ value: c, label: `${c} · ${fmt.country(c)}`, icon: <Flag code={c} size={22} className="h-4 w-[22px] rounded-[4px]" /> })),
     ];
   }, [fmt, t, startCountry]);
 
-  const errors = {
-    name: namePattern.test(f.name) ? undefined : t("node.add.nameError"),
-    address: addressPattern.test(f.address.trim()) ? undefined : t("node.add.addressError"),
-    bandwidth: f.bandwidth.trim() === "" || (/^\d+$/.test(f.bandwidth.trim()) && Number(f.bandwidth) <= 1_000_000)
-      ? undefined
-      : t("node.settings.bandwidthError"),
-  };
-  const invalid = !!errors.name || !!errors.address || !!errors.bandwidth;
-
-  const save = useSaveNode(node.id, () => {
-    const timeoutsChanged = changed("liveness") || changed("apply") || changed("dial");
-    const tv = (k: TimeoutKey) => (f[k] === timeoutDefs[k].def ? 0 : f[k]); // the default is stored as "0 = default"
-    return {
-      name: changed("name") ? f.name : undefined,
-      address: changed("address") ? f.address.trim() : undefined,
-      countryCode: changed("country") ? (f.country === none ? "" : f.country) : undefined,
-      location: changed("location") ? f.location.trim() : undefined,
-      publicLabel: changed("publicLabel") ? f.publicLabel.trim() : undefined,
-      provider: changed("provider") ? f.provider.trim() : undefined,
-      bandwidthMbps: changed("bandwidth") ? Number(f.bandwidth || "0") : undefined,
-      notes: changed("notes") ? f.notes : undefined,
-      timeouts: timeoutsChanged ? { livenessTimeoutS: tv("liveness"), applyTimeoutS: tv("apply"), dialTimeoutS: tv("dial") } : undefined,
-    };
-  });
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    if (dirty && !invalid) save.mutate();
-  }
-
-  const steppers: { key: TimeoutKey; label: string; hint: string }[] = [
-    { key: "liveness", label: t("node.settings.liveness"), hint: t("node.settings.livenessHint") },
-    { key: "apply", label: t("node.settings.apply"), hint: t("node.settings.applyHint") },
-    { key: "dial", label: t("node.settings.dial"), hint: t("node.settings.dialHint") },
-  ];
+  const nameError = namePattern.test(f.name) ? undefined : t("node.add.nameError");
+  const addressError = addressPattern.test(f.address.trim()) ? undefined : t("node.add.addressError");
+  const sec = useSaveSection(node.id, form, nodeFields, () => ({
+    name: changed("name") ? f.name : undefined,
+    address: changed("address") ? f.address.trim() : undefined,
+    countryCode: changed("country") ? (f.country === none ? "" : f.country) : undefined,
+    location: changed("location") ? f.location.trim() : undefined,
+    publicLabel: changed("publicLabel") ? f.publicLabel.trim() : undefined,
+    provider: changed("provider") ? f.provider.trim() : undefined,
+    notes: changed("notes") ? f.notes : undefined,
+  }));
 
   return (
-    <form onSubmit={submit} data-shot="node-public-label" className="flex min-w-0 flex-col rounded-card-lg border border-line bg-surface">
-      <SectionLabel as="h2" icon="server" tone="sky" className="px-4 pt-4 pb-3.5 md:px-5">
-        {t("node.server.node")}
-      </SectionLabel>
-      <Block>
-        <TextField icon="tag" tone="lavender" label={t("node.add.name")} value={f.name} onChange={(e) => set("name", e.target.value.toLowerCase())} mono maxLength={24} error={errors.name} autoCapitalize="off" spellCheck={false} disabled={retired} />
+    <SvCard data-shot="node-public-label" aria-label={t("np.sv.nav.node")}>
+      <SvHead title={t("np.sv.node.title")} hint={t("np.sv.node.hint")} />
+      <div className="sv-form">
+        <TextField label={t("node.add.name")} hint={t("np.sv.node.nameHint")} value={f.name} onChange={(e) => set("name", e.target.value.toLowerCase())} mono maxLength={24} error={nameError} autoCapitalize="off" spellCheck={false} disabled={retired} />
         {/* moving a node is the owner's call; the API refuses a helper that changes it */}
-        <TextField icon="network" tone="sky" label={t("node.add.address")} value={f.address} onChange={(e) => set("address", e.target.value)} mono maxLength={253} error={errors.address} hint={t(owner ? "node.settings.addressHint" : "node.settings.addressOwnerHint")} autoCapitalize="off" spellCheck={false} disabled={retired || !owner} />
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <SectionLabel as="span" icon="globe" tone="sand">
-              {t("node.add.country")}
-            </SectionLabel>
-            <Select value={f.country} onValueChange={(v) => set("country", v)} options={countries} aria-label={t("node.add.country")} />
-            <span className="text-xs leading-snug text-pretty text-muted">{t("node.settings.countryHint")}</span>
-          </div>
-          <TextField icon="map" tone="sand" label={t("node.settings.location")} value={f.location} onChange={(e) => set("location", e.target.value)} placeholder={fmt.country(f.country === none ? "" : f.country)} maxLength={100} disabled={retired} />
-        </div>
-        <TextField icon="eye" tone="sand" label={t("node.settings.publicLabel")} hint={t("node.settings.publicLabelHint")} value={f.publicLabel} onChange={(e) => set("publicLabel", e.target.value)} maxLength={40} disabled={retired} />
-        <TextField icon="server" tone="sky" label={t("node.settings.provider")} value={f.provider} onChange={(e) => set("provider", e.target.value)} maxLength={100} disabled={retired} />
-        <TextField icon="text" tone="sand" label={t("node.settings.notes")} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder={t("node.settings.notesPh")} maxLength={500} />
-      </Block>
-      <Block title={t("node.server.capacity")}>
         <TextField
-          icon="network"
-          tone="sky"
-          label={t("node.settings.bandwidth")}
-          hint={t("node.settings.bandwidthHint")}
-          value={f.bandwidth}
-          onChange={(e) => set("bandwidth", e.target.value)}
-          type="number"
-          min={0}
-          max={1_000_000}
-          step={1}
-          placeholder="0"
-          inputMode="numeric"
-          error={errors.bandwidth}
+          label={t("node.add.address")}
+          value={f.address}
+          onChange={(e) => set("address", e.target.value)}
+          mono
+          maxLength={253}
+          error={addressError}
+          hint={<span className={owner ? "sv-warnhint" : undefined}>{t(owner ? "node.settings.addressHint" : "node.settings.addressOwnerHint")}</span>}
+          autoCapitalize="off"
+          spellCheck={false}
+          disabled={retired || !owner}
+        />
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-[13px] text-sec">{t("node.add.country")}</span>
+          <Select value={f.country} onValueChange={(v) => set("country", v)} options={countries} aria-label={t("node.add.country")} />
+          <span className="text-xs leading-4 text-muted">{t("node.settings.countryHint")}</span>
+        </div>
+        <TextField label={t("node.settings.location")} value={f.location} onChange={(e) => set("location", e.target.value)} placeholder={fmt.country(f.country === none ? "" : f.country)} maxLength={100} disabled={retired} />
+        <TextField
+          label={
+            <>
+              {t("node.settings.publicLabel")}
+              <em className="ms-1 font-normal text-muted not-italic">{t("np.sv.optional")}</em>
+            </>
+          }
+          hint={t("node.settings.publicLabelHint")}
+          value={f.publicLabel}
+          onChange={(e) => set("publicLabel", e.target.value)}
+          maxLength={40}
           disabled={retired}
         />
-        {!retired && owner && <BandwidthMeasure nodeId={node.id} current={f.bandwidth} onUse={(v) => set("bandwidth", v)} />}
-      </Block>
-      <Block title={t("node.server.agentLink")} className="gap-1 pb-1">
-        {steppers.map((s) => {
-          const d = timeoutDefs[s.key];
-          return (
-            <SettingRow key={s.key} label={s.label} hint={s.hint}>
-              <div className="w-[130px] flex-none">
-                <Stepper
-                  decrementLabel={t("common.decrease", { what: s.label })}
-                  incrementLabel={t("common.increase", { what: s.label })}
-                  decrementDisabled={f[s.key] <= d.min}
-                  incrementDisabled={f[s.key] >= d.max}
-                  onDecrement={() => set(s.key, Math.max(d.min, f[s.key] - d.step))}
-                  onIncrement={() => set(s.key, Math.min(d.max, f[s.key] + d.step))}
-                >
-                  {f[s.key]} {t("unit.s")}
-                </Stepper>
-              </div>
-            </SettingRow>
-          );
-        })}
-      </Block>
-      <ActionBar>
-        <Button type="submit" variant="primary" size="md" className="ms-auto" disabled={!dirty || invalid || save.isPending}>
-          {t("common.save")}
-        </Button>
-      </ActionBar>
-    </form>
+        <TextField label={t("node.settings.provider")} value={f.provider} onChange={(e) => set("provider", e.target.value)} maxLength={100} disabled={retired} />
+        <TextArea className="wide" label={t("node.settings.notes")} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder={t("node.settings.notesPh")} maxLength={500} rows={2} />
+      </div>
+      <SvSave dirty={sec.dirty} saved={sec.saved} busy={sec.busy} invalid={!!nameError || !!addressError} onCancel={sec.cancel} onSave={sec.save} />
+    </SvCard>
   );
 }
 
-/** The agent: its version (and the way to the update when it is behind), what an old one cannot do, a new install command. */
-function AgentPanel({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolean }) {
+/** The channel: the capacity from the plan, which the load people see is counted from, and the measurement of it. */
+function ChannelSection({ data, form }: { data: Plain<GetNodeResponse>; form: Form }) {
+  const t = useT();
+  const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;
+  const node = data.node!;
+  const retired = node.status === NodeStatus.RETIRED;
+  const { f, set, changed } = form;
+  const m = useBandwidthMeasure(node.id);
+  const error = f.bandwidth.trim() === "" || (/^\d+$/.test(f.bandwidth.trim()) && Number(f.bandwidth) <= 1_000_000) ? undefined : t("node.settings.bandwidthError");
+  const sec = useSaveSection(node.id, form, channelFields, () => ({ bandwidthMbps: changed("bandwidth") ? Number(f.bandwidth || "0") : undefined }));
+  return (
+    <SvCard aria-label={t("np.sv.nav.ch")}>
+      <SvHead title={t("np.sv.ch.title")} hint={t("np.sv.ch.hint")} />
+      <div className="sv-ch">
+        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-[13px] text-sec">{t("node.settings.bandwidth")}</span>
+          <div className="sv-unit">
+            <input
+              className={cx(fieldClass, "h-10 px-3 font-mono")}
+              dir="ltr"
+              type="number"
+              min={0}
+              max={1_000_000}
+              step={1}
+              placeholder="0"
+              inputMode="numeric"
+              value={f.bandwidth}
+              onChange={(e) => set("bandwidth", e.target.value)}
+              disabled={retired}
+              data-invalid={error ? "" : undefined}
+            />
+            <em>{t("np.sv.ch.unit")}</em>
+          </div>
+          <small className={cx("text-xs leading-4", error ? "text-danger-text" : "text-muted")}>{error ?? t("node.settings.bandwidthHint")}</small>
+        </label>
+        {!retired && owner && <MeasureButton m={m} />}
+      </div>
+      {!retired && owner && <MeasureResult m={m} current={f.bandwidth} onUse={(v) => set("bandwidth", v)} />}
+      <SvSave dirty={sec.dirty} saved={sec.saved} busy={sec.busy} invalid={!!error} onCancel={sec.cancel} onSave={sec.save} />
+    </SvCard>
+  );
+}
+
+/** The agent (its version, what an old one cannot do, a new install command) and the link to it (how long the panel waits). */
+function AgentSections({ data, owner, form }: { data: Plain<GetNodeResponse>; owner: boolean; form: Form }) {
   const t = useT();
   const addNode = useAddNode();
   const node = data.node!;
   const retired = node.status === NodeStatus.RETIRED;
   const older = useOlderNodes().has(node.id);
+  const { f, set } = form;
+  const sec = useSaveSection(node.id, form, agentFields, () => {
+    const tv = (k: TimeoutKey) => (f[k] === timeoutDefs[k].def ? 0 : f[k]); // the default is stored as "0 = default"
+    return { timeouts: { livenessTimeoutS: tv("liveness"), applyTimeoutS: tv("apply"), dialTimeoutS: tv("dial") } };
+  });
+  const steppers: { key: TimeoutKey; label: string; hint: string }[] = [
+    { key: "liveness", label: t("node.settings.liveness"), hint: t("node.settings.livenessHint") },
+    { key: "apply", label: t("node.settings.apply"), hint: t("node.settings.applyHint") },
+    { key: "dial", label: t("node.settings.dial"), hint: t("node.settings.dialHint") },
+  ];
   return (
-    <Panel title={t("node.server.agent")} icon="cpu" tone="lavender" className="pb-1.5">
-      <div className="flex flex-col">
-        <SettingRow
-          label={t("node.server.version")}
-          hint={
-            older ? (
-              <Link to="/updates" className="font-semibold text-warn-text underline decoration-dotted underline-offset-2">
+    <>
+      <SvCard aria-label={t("node.server.agent")}>
+        <SvHead title={t("node.server.agent")} hint={t("np.sv.ag.hint")} />
+        <SvRow
+          title={
+            <>
+              {t("node.server.version")} <span className="mono">{node.agentVersion || "—"}</span>
+            </>
+          }
+          hint={t("np.sv.ag.versionHint")}
+        >
+          {node.agentVersion &&
+            (older ? (
+              <Link to="/updates" className="inline-flex items-center gap-1.5 text-xs text-warn underline decoration-dotted underline-offset-2">
+                <i aria-hidden className="size-2 rounded-full bg-(--nd-warn)" />
                 {t("up.node.outdated")}
               </Link>
-            ) : undefined
-          }
-        >
-          <span className="font-mono text-xs font-semibold">{node.agentVersion || "—"}</span>
-        </SettingRow>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs text-accent-text">
+                <i aria-hidden className="size-2 rounded-full bg-accent-mark" />
+                {t("np.sv.ag.current")}
+              </span>
+            ))}
+        </SvRow>
         {/* an agent without "user-rate-limit/1" holds every device to the smaller of the person and device limits */}
-        {!retired && node.lastSeenUnix > 0 && !node.userRateLimitSupported && (
-          <p className="border-t border-line py-3 text-xs leading-snug text-pretty text-muted">{t("node.settings.userRateLimitUnsupported")}</p>
-        )}
+        {!retired && node.lastSeenUnix > 0 && !node.userRateLimitSupported && <p className="sv-note !pt-3.5">{t("node.settings.userRateLimitUnsupported")}</p>}
         {/* a lost certificate or a reinstalled server; owner only, like the API */}
         {!retired && owner && (
-          <SettingRow label={t("node.server.reinstall")} hint={t("node.add.reenrollBody")} className="py-2.5">
-            <Button variant="secondary" size="md" onClick={() => addNode({ id: node.id, name: node.name })}>
+          <SvRow title={t("node.server.reinstall")} hint={t("node.add.reenrollBody")}>
+            <Button variant="secondary" size="lg" onClick={() => addNode({ id: node.id, name: node.name })}>
               {t("node.banner.newCommand")}
             </Button>
-          </SettingRow>
+          </SvRow>
         )}
-      </div>
-    </Panel>
+      </SvCard>
+      <SvCard aria-label={t("node.server.agentLink")}>
+        <SvHead title={t("node.server.agentLink")} hint={t("np.sv.ag.linkHint")} />
+        {steppers.map((s) => {
+          const d = timeoutDefs[s.key];
+          return (
+            <SvRow key={s.key} title={s.label} hint={s.hint}>
+              <SvStep
+                decLabel={t("common.decrease", { what: s.label })}
+                incLabel={t("common.increase", { what: s.label })}
+                decOff={f[s.key] <= d.min}
+                incOff={f[s.key] >= d.max}
+                onDec={() => set(s.key, Math.max(d.min, f[s.key] - d.step))}
+                onInc={() => set(s.key, Math.min(d.max, f[s.key] + d.step))}
+                value={`${f[s.key]} ${t("unit.s")}`}
+              />
+            </SvRow>
+          );
+        })}
+        <SvSave dirty={sec.dirty} saved={sec.saved} busy={sec.busy} onCancel={sec.cancel} onSave={sec.save} />
+      </SvCard>
+    </>
   );
 }
 
-/** What the agent reported about the machine. */
+/** What the agent reported about the machine, and the engines it runs. */
 function HostPanel({ data }: { data: Plain<GetNodeResponse> }) {
   const t = useT();
   const fmt = useFmt();
   const f = data.facts;
-  const fact = (k: string, v: ReactNode) => ({ k, v });
+  const fact = (l: string, v: ReactNode, mono?: boolean) => ({ l, v, mono });
   const facts = f
     ? [
-        fact(t("node.f.hostname"), f.hostname),
+        fact(t("node.f.hostname"), f.hostname, true),
         fact(t("node.f.os"), f.os),
-        fact(t("node.f.kernel"), f.kernel),
-        fact(t("node.f.arch"), f.arch),
-        fact(t("node.f.cpu"), f.cpuCount ? String(f.cpuCount) : ""),
+        fact(t("node.f.kernel"), f.kernel, true),
+        fact(t("node.f.arch"), f.arch, true),
+        fact(t("node.f.cpu"), f.cpuCount ? String(f.cpuCount) : "", true),
         fact(t("node.f.ram"), f.ramTotalBytes ? fmt.bytes(f.ramTotalBytes, 1024) : ""),
         fact(t("node.f.disk"), f.diskTotalBytes ? fmt.bytes(f.diskTotalBytes, 1024) : ""),
-        fact(t("node.f.virt"), f.virt),
+        fact(t("node.f.virt"), f.virt, true),
         fact("IPv6", f.hasIpv6 ? t("common.yes") : t("common.no")),
         fact(t("node.f.booted"), f.bootUnix ? fmt.dateTime(f.bootUnix) : ""),
-        fact(
-          t("node.f.engines"),
-          f.engines.length ? (
-            <span className="flex flex-col items-end gap-0.5">
-              {f.engines.map((e) => (
-                <span key={e}>{e}</span>
-              ))}
-            </span>
-          ) : (
-            ""
-          ),
-        ),
-      ]
+      ].filter((x) => x.v !== "")
     : [];
   return (
-    <Panel title={t("node.server.host")} icon="info" tone="sand" className="pb-1.5">
-      <div className="flex flex-col">
-        {facts.length === 0 && <p className="py-2 text-[13px] text-muted">{t("node.factsNone")}</p>}
-        {facts
-          .filter(({ v }) => v !== "")
-          .map(({ k, v }, i) => (
-            <div key={k} className={`flex min-h-[38px] items-center gap-2.5 py-1.5 text-[13px] ${i ? "border-t border-line" : ""}`}>
-              <span className="flex-1 text-muted">{k}</span>
-              <span className="min-w-0 text-end font-mono text-xs font-semibold break-all">{v}</span>
-            </div>
+    <SvCard aria-label={t("node.server.host")}>
+      <SvHead title={t("node.server.host")} hint={t("np.sv.host.hint")} />
+      {facts.length === 0 ? <p className="sv-note !border-t-0 !pt-0">{t("node.factsNone")}</p> : <Facts className="sv-facts sv-host" items={facts} />}
+      {f && f.engines.length > 0 && (
+        <div className="sv-eng">
+          <span>{t("node.f.engines")}</span>
+          {f.engines.map((e) => (
+            <span key={e} className="tag">
+              {e}
+            </span>
           ))}
-      </div>
-    </Panel>
+        </div>
+      )}
+    </SvCard>
   );
 }
 
@@ -324,15 +408,15 @@ function RetireZone({ nodeId, name, onUnreached }: { nodeId: string; name: strin
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
-    <DangerZone title={t("node.danger")}>
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-[220px] flex-1 text-[13px] leading-snug text-pretty">{t("node.retireText")}</p>
-        <Button variant="danger" size="md" onClick={() => setOpen(true)}>
+    <SvCard tone="danger" aria-label={t("node.danger")}>
+      <SvHead title={t("node.danger")} hint={t("np.sv.del.hint")} />
+      <SvRow title={t("node.retire")} hint={t("node.retireText")}>
+        <Button variant="danger" size="lg" onClick={() => setOpen(true)}>
           {t("node.retire")}
         </Button>
-      </div>
+      </SvRow>
       {open && <RetireModal nodeId={nodeId} name={name} onClose={() => setOpen(false)} onUnreached={onUnreached} />}
-    </DangerZone>
+    </SvCard>
   );
 }
 

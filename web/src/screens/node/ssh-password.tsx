@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { authorizedKeysFile } from "@/components/panel-ssh-key";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
@@ -185,11 +184,9 @@ export function SSHPassword({ nodeId, access }: { nodeId: string; access: NodeSe
   ];
 
   return (
-    <div ref={blockRef} className="flex flex-col gap-3 border-t border-line pt-4">
+    <div ref={blockRef} className="sv-body line">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <SectionLabel as="h3" icon="lock" tone="lavender" className="me-auto">
-          {t("node.sshAccess.passwordTitle")}
-        </SectionLabel>
+        <h4 className="me-auto font-medium">{t("np.sv.ssh.rootPassword")}</h4>
         <div className="flex flex-wrap items-center gap-1.5">
           {saved && access.passwordGenerated && (
             <span data-tone="lavender" className="tone-chip inline-flex h-[22px] items-center rounded-xl px-2 text-[11px] font-bold whitespace-nowrap">

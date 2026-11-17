@@ -5,12 +5,11 @@ import { authorizedKeysFile } from "@/components/panel-ssh-key";
 import { Fingerprint } from "@/components/ssh-login";
 import { sshError } from "@/components/ssh-node-install";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { Chip, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
 import { Callout } from "@/components/ui/notice";
-import { StatusPill } from "@/components/ui/status";
+import { fieldClass } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Tip } from "@/components/ui/tooltip";
 import type { NodeServerAccess, NodeServerKey } from "@/gen/mistgate/admin/v1/provisioning_pb";
@@ -19,6 +18,8 @@ import type { MessageKey } from "@/i18n/en";
 import { provisioning } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
+import { Glyph } from "@/screens/overview-parts";
+import { SvCard, SvHead } from "./server-parts";
 
 /** The keys in a node's authorized_keys. Each read is an SSH login to the server (up to ~8 s): kept 5 minutes, not refetched on focus or retried on its own. */
 export function useServerKeys(nodeId: string, enabled = true) {
@@ -173,21 +174,18 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
     ) : null;
 
   return (
-    <div className="flex flex-col gap-3 border-t border-line pt-4">
-      <div className="flex items-center gap-x-3 gap-y-2">
-        <SectionLabel as="h3" icon="key" tone="sage" className="flex-none">
-          {t("node.sshKeys.title")}
-        </SectionLabel>
-        <span dir="ltr" className="me-auto min-w-0 truncate font-mono text-[11px] text-muted">
-          {authorizedKeysFile} · {access.username}
-        </span>
-        <IconButton variant="flat" aria-label={t("node.sshKeys.reload")} title={t("node.sshKeys.reload")} disabled={keys.isFetching || busy !== ""} onClick={() => void keys.refetch()}>
+    <SvCard aria-label={t("node.sshKeys.title")}>
+      <div className="flex items-start gap-3 pe-4">
+        <div className="min-w-0 flex-1">
+          <SvHead title={t("np.sv.keys.title")} hint={`${authorizedKeysFile} · ${access.username}`} mono />
+        </div>
+        <IconButton variant="flat" className="mt-3.5 flex-none" aria-label={t("node.sshKeys.reload")} title={t("node.sshKeys.reload")} disabled={keys.isFetching || busy !== ""} onClick={() => void keys.refetch()}>
           <Icon name="refresh" size={14} className={keys.isFetching ? "animate-[mg-ui-spin_1s_linear_infinite]" : undefined} />
         </IconButton>
       </div>
 
       {keys.isPending ? (
-        <div role="status" className="flex flex-col gap-3">
+        <div role="status" className="flex flex-col gap-3 px-6 pb-4 max-[720px]:px-4">
           {/* two still rows the shape of a key, while the panel logs in (no shimmer: it is waiting, not working harder) */}
           {[0, 1].map((i) => (
             <div key={i} aria-hidden className="flex flex-col gap-2 border-t border-line pt-3 first:border-t-0 first:pt-0">
@@ -201,7 +199,7 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
           <span className="text-xs text-muted">{t("node.sshKeys.loading")}</span>
         </div>
       ) : keys.isError ? (
-        <Callout
+        <Callout className="mx-6 mb-4 max-[720px]:mx-4"
           kind="bad"
           alert
           action={
@@ -216,6 +214,7 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
         <>
           {missing && (
             <Callout
+              className="mx-6 mb-3 max-[720px]:mx-4"
               kind="bad"
               action={
                 <Button variant="secondary" size="sm" disabled={busy !== ""} onClick={() => usePanelKey("missing", "node.sshKeys.restored")}>
@@ -227,9 +226,9 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
               <span className="text-muted">{t("node.sshKeys.missingHint", { file: authorizedKeysFile })}</span>
             </Callout>
           )}
-          {problemAt("missing")}
+          {problemAt("missing") && <div className="mx-6 mb-3 max-[720px]:mx-4">{problemAt("missing")}</div>}
           {list.length === 0 ? (
-            <p className="text-[13px] text-muted">{t("node.sshKeys.empty")}</p>
+            <p className="border-t border-line px-6 py-3 text-[13px] text-muted max-[720px]:px-4">{t("node.sshKeys.empty")}</p>
           ) : (
             <ul className="flex flex-col">
               {list.map((key) => (
@@ -250,14 +249,14 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
               ))}
             </ul>
           )}
-          {keys.data.otherLines > 0 && <p className="text-xs text-muted">{t.n("node.sshKeys.other", keys.data.otherLines)}</p>}
+          {keys.data.otherLines > 0 && <p className="border-t border-line px-6 py-3 text-xs text-muted max-[720px]:px-4">{t.n("node.sshKeys.other", keys.data.otherLines)}</p>}
         </>
       )}
 
       {binding ? (
-        <form data-bind-form onSubmit={(e) => void bind(e)} className="flex flex-col gap-3 rounded-card border border-line bg-surface-2 p-3">
+        <form data-bind-form onSubmit={(e) => void bind(e)} className="sv-body line">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor={`ssh-bind-${nodeId}`} className="text-xs font-semibold text-muted">
+            <label htmlFor={`ssh-bind-${nodeId}`} className="text-[13px] text-sec">
               {t("node.sshKeys.publicKey")}
             </label>
             <textarea
@@ -271,9 +270,9 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
               autoComplete="off"
               autoCapitalize="off"
               aria-describedby={`ssh-bind-hint-${nodeId}`}
-              className="min-h-[88px] w-full resize-y rounded-field border border-line bg-surface p-3 font-mono text-xs leading-relaxed wrap-anywhere text-fg outline-none transition-colors duration-200 placeholder:text-faint focus:border-accent"
+              className={cx(fieldClass, "min-h-[88px] resize-y p-3 font-mono text-xs leading-relaxed wrap-anywhere")}
             />
-            <p id={`ssh-bind-hint-${nodeId}`} className="text-xs leading-snug text-muted">
+            <p id={`ssh-bind-hint-${nodeId}`} className="text-xs leading-4 text-muted">
               {t("node.sshKeys.publicKeyHint")}
             </p>
           </div>
@@ -288,14 +287,14 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
           </div>
         </form>
       ) : (
-        <div className="grid gap-2 md:flex md:flex-wrap">
-          <Button variant="secondary" size="md" data-bind disabled={busy !== ""} onClick={() => setBinding(true)}>
-            <Icon name="plus" size={14} />
+        <div className="sv-foot">
+          <button type="button" className="fz-ga" data-bind disabled={busy !== ""} onClick={() => setBinding(true)}>
+            <Glyph d="M6 12h12M12 6v12" size={16} stroke={1.5} />
             {t("node.sshKeys.bind")}
-          </Button>
+          </button>
         </div>
       )}
-    </div>
+    </SvCard>
   );
 }
 
@@ -328,52 +327,50 @@ function KeyRow({
   const unbinding = busy === `unbind:${item.fingerprint}`;
 
   return (
-    <li className="flex flex-col gap-2 border-t border-line py-3 first:border-t-0 first:pt-0 last:pb-0">
-      <div className="flex items-start gap-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pt-[3px]">
-          <Chip mono className="text-fg">
-            {keyTypeLabel(item.type, item.bits)}
-          </Chip>
-          {/* a comment is the server's text, cleaned by the panel: it wraps at its own spaces, mid-word only if it must */}
-          <span className={cx("min-w-0 text-[13px] leading-snug break-words", item.comment ? "font-semibold text-fg" : "text-muted")}>
-            {item.comment ? <bdi>{item.comment}</bdi> : t("node.sshKeys.noComment")}
-          </span>
-          {used && <StatusPill sm kind="ok" label={t("panelKey.title")} />}
-          {unused && <StatusPill sm kind="warn" label={t("node.sshKeys.unused")} />}
+    <li className="sv-key [&>*]:min-w-0">
+      <span className="tag max-[720px]:col-span-full max-[720px]:justify-self-start">{keyTypeLabel(item.type, item.bits)}</span>
+      <div>
+        {/* a comment is the server's text, cleaned by the panel: it wraps at its own spaces, mid-word only if it must */}
+        <b className="flex-wrap">
+          {item.comment ? <bdi className="break-words">{item.comment}</bdi> : <span className="font-normal text-muted">{t("node.sshKeys.noComment")}</span>}
+          {used && <em>{t("panelKey.title")}</em>}
+          {unused && <em className="!bg-warn-soft !text-warn">{t("node.sshKeys.unused")}</em>}
           {item.restricted && (
             <Tip label={t("node.sshKeys.restrictedTip")}>
-              <span tabIndex={0} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                <StatusPill sm kind="off" label={t("node.sshKeys.restricted")} />
-              </span>
+              <em tabIndex={0} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                {t("node.sshKeys.restricted")}
+              </em>
             </Tip>
           )}
-          {item.lines > 1 && <Chip>{t.n("node.sshKeys.lines", item.lines)}</Chip>}
-        </div>
-        {/* quiet in the list; the red belongs to the confirm under the row */}
-        <Button variant="ghost" size="sm" data-unbind aria-expanded={confirming} disabled={busy !== ""} className="flex-none aria-expanded:bg-surface-2 aria-expanded:text-fg" onClick={() => onConfirm(!confirming)}>
-          {t("node.sshKeys.unbind")}
-        </Button>
+          {item.lines > 1 && <em>{t.n("node.sshKeys.lines", item.lines)}</em>}
+        </b>
+        {/* the fingerprint has the row's full width: on one line from ~400 px, else broken after "SHA256:" */}
+        <span className="flex items-center gap-1 !overflow-visible">
+          <Fingerprint value={item.fingerprint} className="min-w-0 !text-xs text-muted" />
+          <CopyFingerprint value={item.fingerprint} />
+        </span>
       </div>
-      {/* the fingerprint has the row's full width: on one line from ~400 px, else broken after "SHA256:" */}
-      <div className="flex items-center gap-1">
-        <Fingerprint value={item.fingerprint} className="min-w-0 text-muted" />
-        <CopyFingerprint value={item.fingerprint} />
-      </div>
+      {/* quiet in the list; the red belongs to the confirm under the row */}
+      <button type="button" className="sv-lk bg-transparent" data-unbind aria-expanded={confirming} disabled={busy !== ""} onClick={() => onConfirm(!confirming)}>
+        {t("node.sshKeys.unbind")}
+      </button>
       {unused && (
-        <Callout
-          kind="warn"
-          action={
-            <Button variant="secondary" size="sm" disabled={busy !== ""} onClick={onUse}>
-              {busy === "panel" ? t("node.sshAccess.installingKey") : t("node.sshKeys.use")}
-            </Button>
-          }
-        >
-          {t("node.sshKeys.unusedHint")}
-        </Callout>
+        <div className="col-span-full">
+          <Callout
+            kind="warn"
+            action={
+              <Button variant="secondary" size="sm" disabled={busy !== ""} onClick={onUse}>
+                {busy === "panel" ? t("node.sshAccess.installingKey") : t("node.sshKeys.use")}
+              </Button>
+            }
+          >
+            {t("node.sshKeys.unusedHint")}
+          </Callout>
+        </div>
       )}
       {confirming && (
-        <div role="group" aria-label={t("node.sshKeys.unbindTitle")} className="mt-1 flex flex-col gap-2.5 rounded-ctl border border-line bg-surface-2 p-3">
-          <p className="text-[13px] font-semibold text-fg">{t("node.sshKeys.unbindTitle")}</p>
+        <div role="group" aria-label={t("node.sshKeys.unbindTitle")} className="col-span-full flex flex-col gap-2.5 rounded-xl border border-line bg-surface-2 p-3">
+          <p className="text-[13px] font-medium text-fg">{t("node.sshKeys.unbindTitle")}</p>
           <p className="text-xs leading-snug">
             <Fingerprint value={item.fingerprint} className="text-fg" />
             {item.comment && <span className="text-muted"> {t("common.quoted", { name: item.comment })}</span>}
@@ -392,7 +389,7 @@ function KeyRow({
           </div>
         </div>
       )}
-      {!confirming && problem}
+      {!confirming && problem && <div className="col-span-full">{problem}</div>}
     </li>
   );
 }

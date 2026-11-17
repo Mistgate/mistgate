@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
+import { en as np } from "@/i18n/nodepage";
 import { en } from "@/i18n/ops";
 import { SSHAccessCard } from "./ssh-access";
 
@@ -411,13 +412,12 @@ describe("node SSH access", () => {
       await mount("nod_1", over);
     }
 
-    it("says in the header how the panel gets in", async () => {
+    it("says in the facts how the panel gets in", async () => {
+      const login = () => [...document.querySelectorAll("dt")].find((d) => d.textContent === np["np.sv.ssh.login"])?.nextElementSibling?.textContent;
       await mount();
-      expect(pills()).toContain(en["node.sshAccess.passwordOnly"]);
-      expect(pills()).not.toContain(en["panelKey.title"]);
+      expect(login()).toBe(en["node.sshAccess.passwordOnly"]);
       await remount({ panelKeyFingerprint: keyFp });
-      expect(pills()).toContain(en["panelKey.title"]);
-      expect(pills()).not.toContain(en["node.sshAccess.passwordOnly"]);
+      expect(login()).toBe(np["np.sv.ssh.byKey"]);
     });
 
     it("a key install keeps no password: Not saved, nothing to reveal, and Set password through the key", async () => {

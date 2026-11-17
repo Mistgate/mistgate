@@ -167,7 +167,7 @@ describe("while the node captures", () => {
     expect(shown).toBeTruthy();
     const [m, s] = shown![1]!.split(":").map(Number);
     expect(m! * 60 + s!).toBeGreaterThan(240);
-    expect(button(label("debug.button", { n: 5 }))!.hasAttribute("data-disabled")).toBe(true); // one at a time
+    expect(button(label("debug.button", { n: 5 }))).toBeUndefined(); // one at a time: the choices give way to the recording
     await click(button(en["debug.stop"]));
     expect(ops.stopDebugCapture).toHaveBeenCalledWith({ captureId: "req_1" });
   });

@@ -226,3 +226,58 @@ export function byDay(lines: readonly EventLine[]): { day: string; unix: number;
   }
   return out;
 }
+
+export type WeekKind = "ok" | "warn" | "crit" | "none";
+export type WeekSummary = {
+  /** How many times the node went quiet or blinked in the week. */
+  failures: number;
+  /** Seconds the node was down in the week. */
+  downS: number;
+  /** Share of the week (or of the node's life, when younger) it was on the line, 0..100; null for a node under an hour old. */
+  uptime: number | null;
+  /** The cells of the strip: 84 of two hours, the oldest first; the first starts at midnight six days ago. */
+  cells: { kind: WeekKind; fromUnix: number }[];
+  /** Rows of the week the summary read. */
+  events: number;
+};
+
+const cellS = 2 * 3600;
+
+/**
+ * The week at a glance, out of the node's own events (node_down, node_recovered, node_blip): an interval from a node_down to the
+ * next node_recovered (or to now, for a node that is down now) is downtime; a blip is a mark on its two hours. `events` are the
+ * newest ones of the node in any order. Cells before the node was added and cells still to come are empty. Pure.
+ */
+export function weekSummary(events: readonly NodeEvent[], nowUnix: number, createdUnix: number, downNow: boolean): WeekSummary {
+  const day0 = new Date(nowUnix * 1000);
+  day0.setHours(0, 0, 0, 0);
+  day0.setDate(day0.getDate() - 6);
+  const start = Math.floor(day0.getTime() / 1000);
+  const rows = events.filter((e) => e.timeUnix >= start).sort((a, b) => a.timeUnix - b.timeUnix || a.id - b.id);
+  const downs: [number, number][] = [];
+  let since = 0;
+  let blips = 0;
+  const blipAt: number[] = [];
+  for (const e of [...events].sort((a, b) => a.timeUnix - b.timeUnix || a.id - b.id)) {
+    if (e.code === "node_down") since = since || e.timeUnix;
+    else if (e.code === "node_recovered" && since) {
+      downs.push([since, e.timeUnix]);
+      since = 0;
+    } else if (e.code === "node_blip" && e.timeUnix >= start) {
+      blips++;
+      blipAt.push(e.timeUnix);
+    }
+  }
+  if (since && downNow) downs.push([since, nowUnix]);
+  const failures = downs.filter(([from]) => from >= start).length + blips;
+  const lo = Math.max(start, createdUnix || start);
+  const downS = downs.reduce((s, [a, b]) => s + Math.max(0, Math.min(b, nowUnix) - Math.max(a, lo)), 0);
+  const span = nowUnix - lo;
+  const cells = Array.from({ length: 84 }, (_, i) => {
+    const from = start + i * cellS;
+    const to = from + cellS;
+    const kind: WeekKind = to <= (createdUnix || 0) || from >= nowUnix ? "none" : downs.some(([a, b]) => a < to && b > from) ? "crit" : blipAt.some((t) => t >= from && t < to) ? "warn" : "ok";
+    return { kind, fromUnix: from };
+  });
+  return { failures, downS, uptime: span < 3600 ? null : Math.max(0, Math.min(100, (1 - downS / span) * 100)), cells, events: rows.length };
+}

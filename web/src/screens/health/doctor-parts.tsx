@@ -179,7 +179,7 @@ export function useDoctorItem({ flow, nodeId, nodeName, item, stale }: { flow: F
     );
   else if (issue) action = <Chip>{t("hl.doctor.manual")}</Chip>;
 
-  return { t, fmt, can, accept, me, open, setOpen, kind, accepted, issue, why, fact, command, steps, phase, canAccept, who, action };
+  return { t, fmt, can, accept, me, open, setOpen, kind, accepted, issue, why, fact, command, steps, phase, canAccept, who, action, fixKey: target?.key ?? "" };
 }
 
 /**

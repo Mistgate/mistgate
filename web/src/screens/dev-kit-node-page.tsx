@@ -22,6 +22,16 @@ import { NodeDetail } from "./node";
 import { hostHistoryQuery } from "./node/load-history";
 import { nodeAlertsQuery } from "./node/overview-parts";
 import { OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
+import { OsUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
+import { WarpSource } from "@/gen/mistgate/admin/v1/common_pb";
+import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
+import { LogLevel } from "@/gen/mistgate/admin/v1/node_pb";
+import { fleet as fleetApi, nodes as nodesApi, warp as warpApi } from "@/lib/api";
+import { warpQuery } from "./node/warp-model";
+import { nodeDnsOptionsQuery } from "./node/dns-options";
+import { dnsPresetsQuery } from "./subscriptions/queries";
+import { debugListQuery } from "@/lib/debug-capture";
+import { osUpdatesQuery } from "@/lib/os-updates";
 
 // Development only. /dev-kit?only=nodepage: the node page of the redesign, a tab at a time (?tab=overview|profiles|server|doctor|...),
 // in every state of the board's switch (load low / high / at the limit, alerts none / a few / many, the node answering / silent / new)
@@ -140,8 +150,84 @@ const columns = [
   { profileId: "prf_aw", profileName: "AmneziaWG 3.1", protocol: "amneziawg" },
 ];
 
+/** What the Server tab's system card reads: fine, security updates waiting, or a reboot due (?os=ok|upd|boot; by default a state's own). */
+export type OsKind = "ok" | "upd" | "boot";
+const osOf: Record<NState, OsKind> = { calm: "ok", alerts: "upd", many: "boot", high: "ok", limit: "boot", down: "ok", new: "ok", retired: "ok", viewer: "upd", edge: "ok", via: "ok", entry: "ok" };
+
 /** The node page's data (what GetNode says) and the query cache around it, for a state. */
-export function nodePageData(state: NState) {
+/**
+ * The History tab's calls, answered here: the node's events (the board's list: an outage, a blip, a certificate, an update, a restart),
+ * the journal of warnings, and an agent log that grows a line every second or so. The state decides what the node has been through.
+ */
+function fakeHistory(state: NState) {
+  const fresh = state === "new";
+  const down = state === "down";
+  const e = (id: number, ago: number, code: string, params: Record<string, string> = {}, over: Record<string, unknown> = {}) => ({
+    id: BigInt(id), timeUnix: BigInt(NOW - ago), severity: EventSeverity.INFO, code, params, nodeId: "nod_de1", nodeName: "de1", userId: "", userName: "", inboundId: "", profileName: "", protocol: "", source: "agent", ...over,
+  });
+  const warn = { severity: EventSeverity.WARNING };
+  const events = fresh
+    ? [e(1, 600, "node_enrolled", {}, { source: "panel" })]
+    : [
+        ...(down ? [e(30, 14 * 60, "node_down", { minutes: "14" }, { ...warn, source: "panel" })] : []),
+        e(20, 7 * H, "config_applied", { revision: "418" }),
+        e(19, 9 * H + 600, "node_down", { minutes: "2" }, { ...warn, source: "panel" }),
+        e(18, 9 * H + 480, "node_recovered", {}, { source: "panel" }),
+        e(17, 10 * H, "node_blip", {}, { ...warn, source: "panel" }),
+        e(16, 11 * H, "cert_renewed", { domain: "de1.example.com" }),
+        e(15, 26 * H, "agent_started", { version: "0.1.71", prev_version: "0.1.70", reason: "update" }),
+        e(14, 30 * H, "engine_restarted", { protocol: "hysteria2", reason: "restart_command" }, { source: "admin", profileName: "Hysteria2 · 443", inboundId: "inb_1", protocol: "hysteria2" }),
+        e(13, 32 * H, "profile_added", { protocol: "awg" }, { source: "admin", profileName: "AmneziaWG 3.1", inboundId: "inb_3", protocol: "awg" }),
+        e(12, 6 * D, "node_blip", {}, { ...warn, source: "panel" }),
+      ];
+  (fleetApi as unknown as Record<string, unknown>).listEvents = async (req: { family?: string; minSeverity?: number; limit?: number }) => ({
+    events: events.filter((x) => (!req.minSeverity || x.severity >= req.minSeverity) && (req.family !== "agent" || !x.code.startsWith("engine_") && !x.code.startsWith("profile_"))).slice(0, req.limit ?? 50),
+    hasMore: false,
+  });
+  const entry = (ago: number, level: number, source: string, message: string, count: number, attrs: Record<string, string> = {}) => ({ nodeId: "nod_de1", hourStartUnix: BigInt(NOW - (NOW % H) - ago), lastUnix: BigInt(NOW - ago), level, source, message, inboundId: "", profileName: "", count, attrs });
+  (nodesApi as unknown as Record<string, unknown>).getNodeJournal = async () => ({
+    entries: fresh ? [] : [entry(1200, EventSeverity.ERROR, "xray", "failed to dial upstream: i/o timeout", 6, { code: "dial_timeout" }), entry(3 * H, EventSeverity.WARNING, "agent", "journald size above the limit", 1, { journal_mb: "3891", cap_mb: "500" }), entry(5 * H, EventSeverity.WARNING, "hysteria", "client rate limited", 14, { user: "bob" })],
+    truncated: false,
+    nodesWithoutJournal: [],
+  });
+  const lines = [
+    [LogLevel.INFO, "agent", "heartbeat sent seq=48211 rtt=31ms"], [LogLevel.INFO, "agent", "probe hysteria2 ok 31ms"], [LogLevel.INFO, "xray", "accepted tcp reality from 203.0.113.50"],
+    [LogLevel.WARNING, "agent", "journald size above limit 3870MB > 500MB"], [LogLevel.INFO, "agent", "probe awg-3.1 ok 34ms"], [LogLevel.ERROR, "agent", "port check tcp/80 refused from panel"],
+    [LogLevel.INFO, "hysteria", "client connected id=alice addr=203.0.113.50"], [LogLevel.WARNING, "hysteria", "client rate limited id=bob"], [LogLevel.INFO, "agent", "stats pushed online=3 rx=64Mbit tx=67Mbit"],
+  ] as const;
+  const line = (i: number, ago: number) => ({ timeUnixMs: BigInt(Date.now() - ago), level: lines[i % lines.length]![0], source: lines[i % lines.length]![1], message: lines[i % lines.length]![2] });
+  (nodesApi as unknown as Record<string, unknown>).streamLogs = async function* (_req: unknown, opts?: { signal?: AbortSignal }) {
+    yield { lines: Array.from({ length: 12 }, (_, i) => line(i, (12 - i) * 3000)), eof: false, error: "" };
+    for (let i = 12; !opts?.signal?.aborted; i++) {
+      await new Promise((r) => setTimeout(r, 1100));
+      yield { lines: [line(i, 0)], eof: false, error: "" };
+    }
+  };
+}
+
+export type WarpKind = "ok" | "pause" | "bad" | "none" | "revoked";
+
+/** The WARP card of the board's states: working, paused, not answering, none connected (the registration then plays on a press), revoked. */
+function warpOf(kind: WarpKind) {
+  const shake = kind === "ok" ? NOW - 20 : NOW - 3 * H;
+  return {
+    account: kind === "none" ? undefined : { enabled: kind !== "pause", source: WarpSource.REGISTERED, accountType: "free", hasToken: true, useReserved: true, endpointV4: "198.51.100.1" },
+    health:
+      kind === "none"
+        ? undefined
+        : {
+            state: kind === "ok" ? WarpState.UP : kind === "pause" ? WarpState.DISABLED : WarpState.DOWN,
+            backend: "wireguard-go", endpoint: "198.51.100.1:2408", lastHandshakeUnix: shake, warpFlag: "on", colo: "FRA", probeCloudflareOk: kind === "ok", probeOtherOk: kind === "ok",
+            probeCloudflare: kind === "ok" ? { ok: true, latencyMs: 70, atUnix: NOW - 40 } : { ok: false, latencyMs: 0, atUnix: NOW - 40, errorCode: "timeout" },
+            probeOther: kind === "ok" ? { ok: true, latencyMs: 90, atUnix: NOW - 40 } : { ok: false, latencyMs: 0, atUnix: NOW - 40, errorCode: "timeout" },
+            consecutiveFailures: kind === "bad" || kind === "revoked" ? 12 : 0, rxBytes: 19.8 * GB, txBytes: 3.1 * GB, lastError: kind === "bad" ? "handshake_stale" : kind === "revoked" ? "warp_flag_off" : "", reportedUnix: NOW - 5, checkedUnix: NOW - 40,
+          },
+    pendingApply: false, applyError: "", agentSupports: true, tosUrl: "https://www.cloudflare.com/application/terms/", needsAttention: kind === "revoked", attentionReason: kind === "revoked" ? "revoked" : "",
+    inbounds: kind === "none" ? [] : [{ inboundId: "inb_3", profileName: "AmneziaWG 3.1", online: 1 }],
+  };
+}
+
+export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind } = {}) {
   const sp = specs[state];
   const lo = sp.load;
   const status = sp.retired ? NodeStatus.RETIRED : sp.down ? NodeStatus.DOWN : sp.fresh ? NodeStatus.ONLINE : NodeStatus.ONLINE;
@@ -268,6 +354,29 @@ export function nodePageData(state: NState) {
   }
   if (sp.fresh) qc.setQueryData(hostHistoryQuery("nod_de1", 24).queryKey, { nodeId: "nod_de1", nodeName: "de1", nowUnix: NOW, sinceUnix: NOW - 300, hours: [] } as never);
   qc.setQueryData(relaysQuery("nod_de1").queryKey, (sp.entry ? [] : []) as never);
+  // the Exit tab: the WARP account, the DNS presets of the people's page
+  const wp = extra.wp ?? "ok";
+  qc.setQueryData(warpQuery("nod_de1").queryKey, warpOf(wp) as never);
+  const dnsPreset = (id: string, name: string, over: object = {}) => ({ id, name, servers: [], split: [], splitDirect: false, isDefault: false, blockAds: false, ...over });
+  qc.setQueryData(dnsPresetsQuery.queryKey, { presets: [dnsPreset("dns_cf", "Cloudflare"), dnsPreset("dns_q9", "Quad9"), dnsPreset("dns_ag", "AdGuard", { blockAds: true }), dnsPreset("dns_fm", "Family"), dnsPreset("dns_ru", "Russia: Yandex + split")], providers: [], clientSupport: [] } as never);
+  qc.setQueryData(nodeDnsOptionsQuery.queryKey, [{ nodeId: "nod_de1", presetIds: ["dns_cf", "dns_q9", "dns_ag"], defaultPresetId: "dns_cf" }] as never);
+  // the Server tab: the SSH access and its keys, the system of the node and a debug recording
+  const osKind = extra.os ?? osOf[state];
+  const fp = "SHA256:Qm4Vw7dJ1xN8cR2tY5pL0sW9hD4gF6aJ8NvK2Ws";
+  qc.setQueryData(["node-server-access", "nod_de1"], {
+    nodeId: "nod_de1", nodeName: "de1", host: "203.0.113.7", port: 22, username: "root", fingerprint: fp, configuredUnix: NOW - 12 * D, passwordSaved: true, passwordLogin: true, passwordGenerated: true,
+    panelKeyFingerprint: "SHA256:Zp8Lr1NvTc5KJd3Fq7YwB2mXa9RbE1c", nodeRetired: !!sp.retired, rotationPending: false,
+  } as never);
+  const key = (type: string, bits: number, f: string, comment: string, over: object = {}) => ({ type, bits, fingerprint: f, comment, panelKey: false, restricted: false, lines: 1, ...over });
+  qc.setQueryData(["node-server-keys", "nod_de1"], { keys: [key("ssh-ed25519", 256, "SHA256:Zp8Lr1NvTc5KJd3Fq7YwB2mXa9RbE1c", "mistgate-panel", { panelKey: true }), key("ssh-ed25519", 256, "SHA256:Hb3Jk7QwXn1TrPz5Lm8Vc2Ys6DfGa9KtN2e", "owner@laptop", { lines: 2 }), key("ssh-rsa", 4096, "SHA256:Dv6Cx2MbPq8NhZr4Wt7Ly1Ks3FgJa5BrE8g", "backup-key", { restricted: true })], otherLines: 0 } as never);
+  const osStatus = { measuredUnix: NOW - 3600, distroId: "debian", distroVersion: "13", pending: osKind === "upd" ? 12 : 0, security: osKind === "upd" ? 6 : 0, notable: [], kernelRunning: "6.12.48+deb13-amd64", kernelNewest: osKind === "boot" ? "6.12.57+deb13-amd64" : "6.12.48+deb13-amd64", rebootRequired: osKind === "boot", rebootReasons: osKind === "boot" ? ["kernel"] : [], held: [], apt: "ok", halfConfigured: [], listsUnix: NOW - 3600, dpkgUnix: NOW - 7200, autoUpdates: "on", autoReboot: false, awgModuleNext: "", container: "", bootIdHash: "", error: "" };
+  qc.setQueryData(osUpdatesQuery.queryKey, {
+    nowUnix: NOW, scheduleTimezoneOffsetMinutes: 0, panelHost: { ...osStatus, pending: 0, security: 0, rebootRequired: false, rebootReasons: [] },
+    nodes: [{ nodeId: "nod_de1", name: "de1", connected: !sp.down, supported: true, onlineUsers: people, onPanelServer: false, state: osKind === "boot" ? OsUpdateState.REBOOT_REQUIRED : osKind === "upd" ? OsUpdateState.UPDATES : OsUpdateState.UP_TO_DATE, status: osStatus, updateCapable: true, updateBlock: "", updateBlockAll: "", inbounds: 3, rebootBlock: "" }],
+  } as never);
+  qc.setQueryData(debugListQuery("nod_de1").queryKey, {
+    captures: extra.dbg === "rec" ? [{ captureId: "req_1", nodeId: "nod_de1", nodeName: "de1", state: "running", level: "debug", sources: ["xray", "hysteria"], minutes: 5, startedUnix: NOW - 100, endsUnix: NOW + 200, records: 0, dropped: 0, actor: "owner" }] : [],
+  } as never);
   const nodes = (qc.getQueryData(nodesQuery.queryKey) as { nodes: Record<string, unknown>[] }).nodes;
   qc.setQueryData(nodesQuery.queryKey, { ...(qc.getQueryData(nodesQuery.queryKey) as object), nodes: [...nodes, { ...nodes[0], id: "nod_msk1", name: "msk1", countryCode: "RU", location: "Moscow" }] } as never);
   qc.setQueryData(meQuery.queryKey, {
@@ -288,7 +397,21 @@ export function NodePageFrame() {
   const state = (params.get("state") ?? "calm") as NState;
   const [scene] = useState(() => {
     if (params.get("fx") === "1") setEffectsEnabled(true);
-    return nodePageData(state);
+    const os = params.get("os");
+    const dbg = params.get("dbg");
+    const wp = params.get("wp");
+    const kind = wp === "ok" || wp === "pause" || wp === "bad" || wp === "none" || wp === "revoked" ? wp : undefined;
+    if (params.get("tab") === "history") fakeHistory(state);
+    const made = nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind });
+    // no WARP yet: the registration the scene plays takes nine seconds (four steps), then the account is there
+    if (kind === "none") {
+      (warpApi as unknown as Record<string, unknown>).registerWarp = async () => {
+        await new Promise((r) => setTimeout(r, 9000));
+        made.qc.setQueryData(warpQuery("nod_de1").queryKey, warpOf("ok") as never);
+        return {};
+      };
+    }
+    return made;
   });
   return (
     <QueryClientProvider client={scene.qc}>
@@ -303,7 +426,7 @@ export function NodePageFrame() {
   );
 }
 
-const frames: { id: string; state: NState; tab: string; title: string; w: number; h: number }[] = [
+const frames: { id: string; state: NState; tab: string; title: string; w: number; h: number; /** More of the frame own params (?sv=, ?os=, ...). */ q?: string }[] = [
   { id: "node-overview-calm", state: "calm", tab: "overview", title: "Overview: load low, no alerts", w: 1440, h: 1700 },
   { id: "node-overview-alerts", state: "alerts", tab: "overview", title: "Overview: three alerts, one of them failing a check", w: 1440, h: 1800 },
   { id: "node-overview-many", state: "many", tab: "overview", title: "Overview: six alerts fold into 'show more', load high", w: 1440, h: 1900 },
@@ -328,6 +451,39 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-doctor-down", state: "down", tab: "doctor", title: "Doctor: the node does not answer, the last report", w: 1440, h: 1500 },
   { id: "node-doctor-viewer", state: "viewer", tab: "doctor", title: "Doctor: a read-only role, no buttons", w: 1440, h: 1700 },
   { id: "node-doctor-phone", state: "alerts", tab: "doctor", title: "Doctor on a phone, 400 wide", w: 400, h: 2600 },
+  { id: "node-server-node", state: "calm", tab: "server", title: "Server: the node", w: 1440, h: 1000 },
+  { id: "node-server-ch", state: "calm", tab: "server", q: "sv=ch", title: "Server: bandwidth", w: 1440, h: 700 },
+  { id: "node-server-ag", state: "calm", tab: "server", q: "sv=ag", title: "Server: the agent and the link", w: 1440, h: 900 },
+  { id: "node-server-ssh", state: "calm", tab: "server", q: "sv=ssh", title: "Server: SSH access and the keys on the server", w: 1440, h: 1400 },
+  { id: "node-server-site", state: "calm", tab: "server", q: "sv=site", title: "Server: the decoy site", w: 1440, h: 900 },
+  { id: "node-server-awg", state: "calm", tab: "server", q: "sv=awg", title: "Server: the AmneziaWG backend", w: 1440, h: 800 },
+  { id: "node-server-sys-ok", state: "calm", tab: "server", q: "sv=sys&os=ok", title: "Server: the system is up to date, and the host", w: 1440, h: 1200 },
+  { id: "node-server-sys-upd", state: "alerts", tab: "server", q: "sv=sys&os=upd", title: "Server: updates wait", w: 1440, h: 1200 },
+  { id: "node-server-sys-boot", state: "many", tab: "server", q: "sv=sys&os=boot", title: "Server: a reboot is due", w: 1440, h: 1200 },
+  { id: "node-server-dbg", state: "calm", tab: "server", q: "sv=dbg", title: "Server: the debug recording, idle", w: 1440, h: 800 },
+  { id: "node-server-dbg-rec", state: "calm", tab: "server", q: "sv=dbg&dbg=rec", title: "Server: the debug recording runs", w: 1440, h: 700 },
+  { id: "node-server-del", state: "calm", tab: "server", q: "sv=del", title: "Server: retiring the node", w: 1440, h: 500 },
+  { id: "node-server-retired", state: "retired", tab: "server", q: "sv=ssh", title: "Server: a retired node keeps four sections", w: 1440, h: 800 },
+  { id: "node-server-viewer", state: "viewer", tab: "server", title: "Server: a read-only role", w: 1440, h: 1000 },
+  { id: "node-server-edge", state: "edge", tab: "server", q: "sv=sys", title: "Server: the Cloudflare edition has no system card", w: 1440, h: 700 },
+  { id: "node-server-phone", state: "calm", tab: "server", title: "Server on a phone, 400 wide", w: 400, h: 2000 },
+  { id: "node-server-phone-ssh", state: "calm", tab: "server", q: "sv=ssh", title: "Server: SSH access on a phone, 400 wide", w: 400, h: 2400 },
+  { id: "node-exit-ok", state: "calm", tab: "exit", q: "wp=ok", title: "Exit: WARP works, three rows, the traffic and the DNS cards", w: 1440, h: 1500 },
+  { id: "node-exit-pause", state: "calm", tab: "exit", q: "wp=pause", title: "Exit: WARP is paused", w: 1440, h: 1500 },
+  { id: "node-exit-bad", state: "alerts", tab: "exit", q: "wp=bad", title: "Exit: WARP does not answer, the tunnel is down", w: 1440, h: 1600 },
+  { id: "node-exit-revoked", state: "calm", tab: "exit", q: "wp=revoked", title: "Exit: Cloudflare revoked the account, Register again leads", w: 1440, h: 1600 },
+  { id: "node-exit-dead", state: "down", tab: "exit", q: "wp=ok", title: "Exit: the node is silent, WARP is unknown", w: 1440, h: 1500 },
+  { id: "node-exit-none", state: "calm", tab: "exit", q: "wp=none", title: "Exit: no WARP yet (Enable WARP plays the registration, nine seconds)", w: 1440, h: 1300 },
+  { id: "node-exit-viewer", state: "viewer", tab: "exit", q: "wp=ok", title: "Exit: a read-only role", w: 1440, h: 1500 },
+  { id: "node-exit-1100", state: "calm", tab: "exit", q: "wp=ok", title: "Exit at 1100 wide: one column", w: 1100, h: 1900 },
+  { id: "node-exit-phone", state: "calm", tab: "exit", q: "wp=ok", title: "Exit on a phone, 400 wide", w: 400, h: 3000 },
+  { id: "node-history-events", state: "calm", tab: "history", title: "History: the week at a glance and the timeline of events", w: 1440, h: 1200 },
+  { id: "node-history-down", state: "down", tab: "history", title: "History: the node is down, the last cell is red", w: 1440, h: 1200 },
+  { id: "node-history-new", state: "new", tab: "history", title: "History: a node added today, one event", w: 1440, h: 700 },
+  { id: "node-history-journal", state: "calm", tab: "history", q: "view=journal", title: "History: the journal of warnings and errors", w: 1440, h: 800 },
+  { id: "node-history-logs", state: "calm", tab: "history", q: "view=logs", title: "History: the log of the agent, a line comes every second", w: 1440, h: 900 },
+  { id: "node-history-phone", state: "calm", tab: "history", title: "History on a phone, 400 wide", w: 400, h: 2000 },
+  { id: "node-history-logs-phone", state: "calm", tab: "history", q: "view=logs", title: "History: the log on a phone, 400 wide", w: 400, h: 900 },
   { id: "node-overview-1100", state: "alerts", tab: "overview", title: "Overview at 1100 wide: one column", w: 1100, h: 2600 },
   { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
 ];
@@ -352,7 +508,7 @@ export function NodePageKit() {
             <div className="max-w-full overflow-x-auto rounded-card border border-line">
               {/* the frame is this same app (a made-up page of it), so a sandbox would only break it */}
               {/* oxlint-disable-next-line react/iframe-missing-sandbox */}
-              <iframe key={key} title={f.title} src={`${path}?only=nodepage-frame&tab=${f.tab}&state=${f.state}`} width={f.w} height={f.h} className="block max-w-none border-0" />
+              <iframe key={key} title={f.title} src={`${path}?only=nodepage-frame&tab=${f.tab}&state=${f.state}${f.q ? `&${f.q}` : ""}`} width={f.w} height={f.h} className="block max-w-none border-0" />
             </div>
           </Shot>
         ))}

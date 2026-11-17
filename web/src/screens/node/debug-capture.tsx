@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { LogViewer } from "@/components/log-viewer";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Pending } from "@/components/ui/query-error";
@@ -28,6 +27,7 @@ import { agentLinked } from "@/lib/node-status";
 import { isUnavailable } from "@/lib/ops";
 import type { Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
+import { SvCard, SvHead, SvRow } from "./server-parts";
 
 type Node = Plain<NodeMsg>;
 
@@ -67,93 +67,87 @@ export function DebugCaptureCard({ node }: { node: Node }) {
   const current = captures.find((c) => c.captureId === picked) ?? captures[0];
   const toggle = (s: string) => setSources((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
 
+  const unavailable = list.isError && isUnavailable(list.error);
   return (
-    <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
-      <SectionLabel as="h2" icon="pulse" tone="rose">
-        {t("debug.title")}
-      </SectionLabel>
-      <p className="text-[13px] leading-snug text-pretty text-muted">{t("debug.intro")}</p>
-      {list.isError && isUnavailable(list.error) && <Notice tone="quiet">{t("debug.unavailable")}</Notice>}
-      {!(list.isError && isUnavailable(list.error)) && (
-        owner ? (
+    <SvCard aria-label={t("debug.title")}>
+      <SvHead title={t("debug.title")} hint={t("debug.intro")} />
+      {unavailable && (
+        <div className="px-6 pb-5 max-[720px]:px-4">
+          <Notice tone="quiet">{t("debug.unavailable")}</Notice>
+        </div>
+      )}
+      {!unavailable &&
+        (owner ? (
           <>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("debug.sources")}</span>
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("debug.sources")}>
-                  {debugSources.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      aria-pressed={sources.includes(s)}
-                      onClick={() => toggle(s)}
-                      className="h-[30px] cursor-pointer rounded-[15px] border border-line bg-surface px-3 font-mono text-xs font-bold text-muted transition-colors duration-200 aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-fg"
-                    >
-                      {s}
-                    </button>
-                  ))}
+            {!running && (
+              <>
+                <SvRow title={t("np.sv.dbg.howLong")} hint={t("np.sv.dbg.howLongHint")}>
+                  <Segmented aria-label={t("debug.duration")} value={String(minutes)} onValueChange={(v) => setMinutes(Number(v))} options={debugMinutes.map((m) => ({ value: String(m), label: t("debug.minutes", { n: m }) }))} />
+                </SvRow>
+                <SvRow title={t("debug.level")}>
+                  <Segmented aria-label={t("debug.level")} value={level} onValueChange={setLevel} options={debugLevels.map((l) => ({ value: l, label: t(`debug.level.${l}`) }))} />
+                </SvRow>
+                <div className="sv-body line">
+                  <span className="sv-lb">{t("debug.sources")}</span>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("debug.sources")}>
+                    {debugSources.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        aria-pressed={sources.includes(s)}
+                        onClick={() => toggle(s)}
+                        className="h-8 cursor-pointer rounded-[16px] border border-line bg-surface px-3 font-mono text-xs text-sec transition-colors duration-150 hover:text-fg aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-fg"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted">{sources.length === 0 ? t("debug.sourcesAll") : t("debug.sourcesHint")}</span>
                 </div>
-                <span className="text-xs text-muted">{sources.length === 0 ? t("debug.sourcesAll") : t("debug.sourcesHint")}</span>
-              </div>
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("debug.level")}</span>
-                  <Segmented
-                    aria-label={t("debug.level")}
-                    value={level}
-                    onValueChange={setLevel}
-                    options={debugLevels.map((l) => ({ value: l, label: t(`debug.level.${l}`) }))}
-                  />
+                <div className="sv-foot">
+                  <span>{!online ? t("debug.offline") : ""}</span>
+                  <Button variant="primary" size="lg" disabled={!online || start.isPending} onClick={() => start.mutate({ level, sources, minutes })}>
+                    {t("debug.button", { n: minutes })}
+                  </Button>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("debug.duration")}</span>
-                  <Segmented
-                    aria-label={t("debug.duration")}
-                    value={String(minutes)}
-                    onValueChange={(v) => setMinutes(Number(v))}
-                    options={debugMinutes.map((m) => ({ value: String(m), label: t("debug.minutes", { n: m }) }))}
-                  />
-                </div>
-                <Button
-                  variant="primary"
-                  size="md"
-                  disabled={!online || running !== undefined || start.isPending}
-                  onClick={() => start.mutate({ level, sources, minutes })}
-                >
-                  <span>{t("debug.button", { n: minutes })}</span>
-                </Button>
-              </div>
-              {!online && <p className="text-xs text-muted">{t("debug.offline")}</p>}
-            </div>
+              </>
+            )}
 
             {running && <RunningRow capture={running} now={now} owner={owner} stopping={stop.isPending} onStop={() => stop.mutate(running.captureId)} />}
 
-            {list.isPending && <Pending />}
-            {list.data && captures.length === 0 && <p className="text-[13px] text-muted">{t("debug.none")}</p>}
+            {list.isPending && (
+              <div className="sv-body line">
+                <Pending />
+              </div>
+            )}
+            {list.data && captures.length === 0 && <p className="sv-note !pt-3.5">{t("debug.none")}</p>}
             {current && !isLive(current) && <Viewer key={`${current.captureId}:${current.state}`} capture={current} captures={captures} onPick={setPicked} />}
           </>
         ) : (
-          <p className="text-xs text-muted">{t("debug.ownerOnly")}</p>
-        )
-      )}
-    </section>
+          <p className="sv-note">{t("debug.ownerOnly")}</p>
+        ))}
+    </SvCard>
   );
 }
 
 function RunningRow({ capture, now, owner, stopping, onStop }: { capture: DebugCapture; now: number; owner: boolean; stopping: boolean; onStop: () => void }) {
   const t = useT();
   const left = secondsLeft(capture.endsUnix, now);
+  const total = Math.max(1, capture.endsUnix - capture.startedUnix);
+  const w = Math.min(100, Math.max(0, Math.round((1 - left / total) * 100)));
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-field border border-accent-line bg-accent-soft px-3.5 py-2.5" role="status">
-      <span className="min-w-0 flex-1 text-[13px] font-semibold">
-        {left > 0 ? t("debug.running", { time: clockLeft(left) }) : t("debug.shipping")}
-        <span className="ms-2 font-mono text-xs font-normal text-muted">{capture.sources.length ? capture.sources.join(", ") : t("debug.sourcesAll")}</span>
-      </span>
+    <div className="sv-rec" role="status">
+      <i className="dot" aria-hidden />
+      <div>
+        <b>{left > 0 ? t("debug.running", { time: clockLeft(left) }) : t("debug.shipping")}</b>
+        <span className="font-mono text-xs">{capture.sources.length ? capture.sources.join(", ") : t("debug.sourcesAll")}</span>
+      </div>
       {owner && (
         <Button variant="secondary" size="md" disabled={stopping} onClick={onStop}>
-          <span>{t("debug.stop")}</span>
+          {t("debug.stop")}
         </Button>
       )}
+      <i className="bar" style={{ "--w": `${w}%` } as CSSProperties} aria-hidden />
     </div>
   );
 }
@@ -163,9 +157,9 @@ function Viewer({ capture, captures, onPick }: { capture: DebugCapture; captures
   const t = useT();
   const fmt = useFmt();
   return (
-    <div className="flex flex-col gap-2.5 border-t border-line pt-3">
+    <div className="sv-body line">
       <div className="flex flex-wrap items-center gap-2.5">
-        <SectionLabel as="h3">{t("debug.records")}</SectionLabel>
+        <h4 className="font-medium">{t("debug.records")}</h4>
         {captures.length > 1 && (
           <Select
             compact

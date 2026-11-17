@@ -79,10 +79,7 @@ async function mount(d: unknown) {
 const text = () => document.body.textContent ?? "";
 const spinner = () => document.querySelector('[class*="mg-ui-spin"]');
 /** The class of the dot of one probe row ("Cloudflare", "Other site"). */
-const dotOf = (label: string) => {
-  const row = [...document.querySelectorAll("span.flex")].find((r) => r.children[1]?.textContent === label);
-  return row?.children[0]?.className ?? "";
-};
+const dotOf = (label: string) => [...document.querySelectorAll(".nx-cks > span")].find((r) => r.textContent?.startsWith(label))?.className ?? "";
 
 // The case the owner saw: Cloudflare's edge answers every request late, the probe times out, the other probe passes.
 const slowEdge = {
@@ -110,9 +107,9 @@ describe("the WARP card after a failed check", () => {
     await mount(data(slowEdge));
     expect(text()).toContain("Cloudflarefailed");
     expect(text()).toContain("Other siteok · 0.4 s");
-    expect(dotOf("Cloudflare")).toContain("tone-bad");
-    expect(dotOf("Cloudflare")).not.toContain("tone-ok");
-    expect(dotOf("Other site")).toContain("tone-ok");
+    expect(dotOf("Cloudflare")).toContain("crit");
+    expect(dotOf("Cloudflare")).not.toContain("ok");
+    expect(dotOf("Other site")).toContain("ok");
   });
 
   it("says how long ago the node checked", async () => {
@@ -139,7 +136,7 @@ describe("slow probes", () => {
   it("a probe that passes but takes over 2 s is 'slow' with a warn dot", async () => {
     await mount(data({ checkedUnix: nowS() - 1, probeCloudflare: { ok: true, latencyMs: 3200, atUnix: nowS() }, probeOther: { ok: true, latencyMs: 300, atUnix: nowS() } }));
     expect(text()).toContain("Cloudflareslow · 3.2 s");
-    expect(dotOf("Cloudflare")).toContain("tone-warn");
+    expect(dotOf("Cloudflare")).toContain("warn");
   });
 });
 
@@ -228,6 +225,7 @@ describe("what the owner can do with a node's WARP", () => {
   it("a working but slow account still offers «Register again» and «Restart WARP», neither as the main action", async () => {
     registerWarp.mockResolvedValue({});
     await mount(data({ state: WarpState.UP, lastHandshakeUnix: nowS() - 30 }));
+    await click(button("Details"));
     const again = button("Register again")!;
     const restart = button("Restart WARP")!;
     expect(again.className).not.toContain("bg-accent");
@@ -261,11 +259,31 @@ describe("what the owner can do with a node's WARP", () => {
   it("the backend, Cloudflare's flag and the reserved bytes sit under «Details»", async () => {
     const d = data({});
     await mount({ ...d, account: { ...d.account, useReserved: true } });
-    const details = document.querySelector("details")!;
-    expect(details.querySelector("summary")?.textContent).toContain("Details");
+    expect(text()).not.toContain("warp=on");
+    await click(button("Details"));
+    const details = document.querySelector(".nx-det")!;
     expect(details.textContent).toContain("kernel");
     expect(details.textContent).toContain("warp=on");
     expect(details.textContent).toContain("stamped");
+    expect(button("Delete account", details)).toBeDefined();
+    await click(button("Hide"));
+    expect(document.querySelector(".nx-det")).toBeNull();
+  });
+
+  it("shows the registration as four steps while the call is on, and the account when it is back", async () => {
+    let answer!: (v: unknown) => void;
+    registerWarp.mockReturnValue(new Promise((r) => (answer = r)));
+    await mount(data({ state: WarpState.DOWN, lastError: "warp_flag_off" }, { needsAttention: true, attentionReason: "revoked" }));
+    await click(button("Register again"));
+    await click(dialog().querySelector('[role="checkbox"]'));
+    await click(button("Register again", dialog()));
+    expect(document.querySelector(".nx-reg")).not.toBeNull();
+    expect(document.querySelectorAll(".nx-st2 li")).toHaveLength(4);
+    expect(document.querySelector(".nx-st2 li.now")?.textContent).toContain("Account");
+    expect(document.querySelector(".nx-ls")).toBeNull();
+    await act(async () => answer({}));
+    for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(document.querySelectorAll(".nx-st2 li.done")).toHaveLength(4);
   });
 });
 

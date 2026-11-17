@@ -510,7 +510,7 @@ describe("the card on the node's Server tab", () => {
   it("shows what the node reads and the same buttons, from the page's own list", async () => {
     await mount(<OsCard nodeId="nod_de1" />, { seed: data([node()]) });
     const s = text();
-    expect(s).toContain("Operating system");
+    expect(s).toContain("Reboot needed"); // the card says how the system is
     expect(s).toContain("Ubuntu 24.04");
     expect(s).toContain("6.8.0-147-generic");
     expect(s).toContain("→ 6.8.0-150-generic");
