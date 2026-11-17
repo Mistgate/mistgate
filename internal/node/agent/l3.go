@@ -56,6 +56,9 @@ const (
 	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
+	// capTCPShare: the agent shares a TCP port between services by SNI (front.go; agent.proto "SHARED TCP PORT") and reports
+	// StatsBatch.shared_ports. Listed only when every engine that can take a route or give its site up is here.
+	capTCPShare   = "tcp-share/1"
 	capLinkCounts = "links/1"
 	// capNets enables locally mapped ASN counters. Link-only agents cannot fetch the signed table in v1.
 	capNets = "nets/1"
@@ -192,6 +195,9 @@ func (a *Agent) capabilities() []string {
 	if _, ok := a.engines["trusttunnel"]; ok {
 		caps = append(caps, capTrustTunnel, capTrustTunnelH3, capTrustTunnelRefusals)
 	}
+	if a.sharesTCP() {
+		caps = append(caps, capTCPShare)
+	}
 	if a.appliesUserRateLimit() {
 		caps = append(caps, capUserRateLimit)
 	}
@@ -239,6 +245,17 @@ func (a *Agent) capabilities() []string {
 		return caps
 	}
 	return append(caps, updateCaps...)
+}
+
+// sharesTCP: the four engines that hold a TCP port or give up its site (VLESS, TrustTunnel, MTProto and Hysteria2) are all
+// built in, so a port the panel puts two of them on is one this agent can share.
+func (a *Agent) sharesTCP() bool {
+	for _, p := range []string{"vless", "trusttunnel", "mtproto", "hysteria2"} {
+		if _, ok := a.engines[p]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // appliesUserRateLimit: some engine shares a bucket per person and none that shapes per credential cannot (an engine that

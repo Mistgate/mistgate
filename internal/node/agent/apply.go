@@ -153,6 +153,7 @@ func diffModels(cur, next *model) (added, removed, changed, creds int) {
 func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]bool) []*pb.InboundResult {
 	prev := a.snapshotModel()
 	prevRelayClaims := a.relay.claims
+	fronts := a.planShares(next) // before the removal below, which needs to know who changes place
 	// The host side of the L3 protocols comes first (l3.go): WARP, then the routes and the firewall of the tunnel
 	// interfaces, then the engines that create those interfaces. An inbound that depends on a step that failed is
 	// blocked (a.blocked) instead of started.
@@ -175,8 +176,17 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	for _, id := range prev.ids() {
 		old := prev.inbounds[id]
 		n := next.inbounds[id]
-		if n != nil && n.parseErr == "" && n.applyErr == "" && n.spec.Protocol == old.spec.Protocol {
+		// An inbound that runs somewhere else than the plan puts it (alone, behind a front, or not at all) is removed and
+		// applied again: a port is held by the front or by one engine, never by both.
+		moved := a.held[id] != nil && a.held[id].place != a.place[id]
+		if n != nil && n.parseErr == "" && n.applyErr == "" && n.spec.Protocol == old.spec.Protocol && !moved {
 			continue
+		}
+		if moved && n != nil {
+			if a.replaced == nil {
+				a.replaced = map[string]bool{}
+			}
+			a.replaced[id] = true
 		}
 		if e := a.engines[old.spec.Protocol]; e != nil {
 			if err := a.removeEngine(ctx, old.spec.Protocol, e, id); err != nil {
@@ -194,7 +204,8 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 		}
 		delete(a.held, id)
 	}
-	a.syncTCPClaims(ctx, claimedTCP)
+	a.syncTCPClaims(ctx, claimedTCP) // a Hysteria2 site gives its TCP port up here, before the front binds it
+	a.syncFronts(fronts)
 	now := a.now()
 	results := make([]*pb.InboundResult, 0, len(next.inbounds))
 	for _, id := range next.ids() {
@@ -270,7 +281,7 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 	// the cache: a running one is stopped, there is never a silent direct exit.
 	why, blocked := a.blocked[spec.ID]
 	blocked = blocked && spec.Enabled
-	if !blocked && in.parseErr == "" && in.applyErr == "" && h != nil && !force && h.spec == sh && h.creds == ch &&
+	if !blocked && in.parseErr == "" && in.applyErr == "" && a.noRun[spec.ID] == "" && h != nil && !force && h.spec == sh && h.creds == ch &&
 		h.res.State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
 		res := proto.Clone(h.res).(*pb.InboundResult)
 		a.refreshState(res)
@@ -286,12 +297,16 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 		err = errors.New(in.applyErr)
 	} else if in.parseErr != "" {
 		err = errors.New(in.parseErr)
+	} else if msg := a.noRun[spec.ID]; msg != "" {
+		err = errors.New(msg)
 	} else if blocked {
 		err = a.blockedFail(ctx, spec, why)
 	} else {
 		rep, err = a.applyEngine(ctx, spec, creds, eng)
 	}
 	res := &pb.InboundResult{InboundId: spec.ID, SpecHash: sh}
+	replaced := a.replaced[spec.ID]
+	delete(a.replaced, spec.ID)
 	wasFailing := h != nil && h.res.State == pb.InboundRunState_INBOUND_RUN_STATE_FAILED
 	if err != nil {
 		res.State, res.Error = pb.InboundRunState_INBOUND_RUN_STATE_FAILED, err.Error()
@@ -327,6 +342,8 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 		// protocol are joined in by the event list).
 		switch {
 		case !spec.Enabled:
+		case replaced: // the port it runs on changed hands (a front came or went): the same inbound, started again
+			a.event(pb.Severity_SEVERITY_INFO, "engine_restarted", spec.ID, map[string]string{"protocol": spec.Protocol, "reason": "config_changed"})
 		case force:
 			a.event(pb.Severity_SEVERITY_INFO, "engine_restarted", spec.ID, map[string]string{"protocol": spec.Protocol, "reason": "restart_command"})
 		case rep.Restarted && h != nil && !wasFailing:
@@ -349,7 +366,7 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 	if expired > prevExpired {
 		a.event(pb.Severity_SEVERITY_INFO, "credential_expired", spec.ID, map[string]string{"count": strconv.Itoa(expired - prevExpired)})
 	}
-	a.held[spec.ID] = &held{spec: sh, creds: ch, expired: expired, res: proto.Clone(res).(*pb.InboundResult)}
+	a.held[spec.ID] = &held{spec: sh, creds: ch, place: a.place[spec.ID], expired: expired, res: proto.Clone(res).(*pb.InboundResult)}
 	return res
 }
 
@@ -753,8 +770,8 @@ func (a *Agent) cachedResults(m *model) []*pb.InboundResult {
 
 // observedHash hashes what the engines ACTUALLY hold (Engine.Observed), with two deliberate additions so
 // that intended behaviour is not reported as drift: credentials the agent withheld because their term
-// ended (the panel still lists them until it recomputes), and inbounds that are disabled (an engine keeps
-// nothing for them, the panel still lists them).
+// ended (the panel still lists them until it recomputes), and inbounds that are disabled or that lost their name on a
+// shared port (an engine keeps nothing for them, the panel still lists them).
 func (a *Agent) observedHash(m *model) string {
 	now := a.now()
 	var all []statehash.Inbound
@@ -769,7 +786,7 @@ func (a *Agent) observedHash(m *model) string {
 		}
 	}
 	for id, in := range m.inbounds {
-		if in.parseErr == "" && in.applyErr == "" && !in.spec.Enabled && !have[id] {
+		if in.parseErr == "" && in.applyErr == "" && (!in.spec.Enabled || a.isNoRun(id)) && !have[id] {
 			all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 		}
 	}

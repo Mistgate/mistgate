@@ -19,12 +19,16 @@ import (
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hysteria2"
+	"github.com/mistgate/mistgate/internal/node/mtproto"
+	"github.com/mistgate/mistgate/internal/node/trusttunnel"
+	"github.com/mistgate/mistgate/internal/node/vless"
 )
 
-// TestMain keeps the real engine of this package on loopback: a test binary that listens on all interfaces makes Windows
+// TestMain keeps the real engines of this package on loopback: a test binary that listens on all interfaces makes Windows
 // ask for a firewall rule on each run.
 func TestMain(m *testing.M) {
-	hysteria2.BindIP = net.IPv4(127, 0, 0, 1)
+	loopback := net.IPv4(127, 0, 0, 1)
+	hysteria2.BindIP, mtproto.BindIP, trusttunnel.BindIP, vless.BindIP, BindIP = loopback, loopback, loopback, loopback, loopback
 	os.Exit(m.Run())
 }
 
