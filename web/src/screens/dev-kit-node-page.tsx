@@ -16,6 +16,7 @@ import { relaysQuery } from "@/lib/relay";
 import { meQuery } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { seeded } from "./dev-kit-overview";
+import { seedWays, waysFrames, waysSceneOf } from "./dev-kit-node-ways";
 import { Shot } from "./dev-kit-redesign";
 import { ShellLayout } from "./shell";
 import { NodeDetail } from "./node";
@@ -403,6 +404,8 @@ export function NodePageFrame() {
     const kind = wp === "ok" || wp === "pause" || wp === "bad" || wp === "none" || wp === "revoked" ? wp : undefined;
     if (params.get("tab") === "history") fakeHistory(state);
     const made = nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind });
+    // the Ways in tab: the scene's relays, checks and ports (w=1 and the switches of dev-kit-node-ways.tsx)
+    if (params.get("w")) made.data = seedWays(made.qc, made.data as never, waysSceneOf(params), (made.data.node as { status: NodeStatus }).status) as never;
     // no WARP yet: the registration the scene plays takes nine seconds (four steps), then the account is there
     if (kind === "none") {
       (warpApi as unknown as Record<string, unknown>).registerWarp = async () => {
@@ -487,6 +490,8 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-overview-1100", state: "alerts", tab: "overview", title: "Overview at 1100 wide: one column", w: 1100, h: 2600 },
   { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
 ];
+
+frames.push(...waysFrames.map((f) => ({ id: f.id, state: (f.state ?? "calm") as NState, tab: "ways", title: f.title, w: f.w, h: f.h, q: f.q })));
 
 export function NodePageKit() {
   // the frames read the theme and the language when they load: a change at the top reloads them

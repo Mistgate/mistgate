@@ -1,0 +1,264 @@
+import type { QueryClient } from "@tanstack/react-query";
+import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
+import { checksQuery, doctorQuery } from "@/lib/health";
+import { nodesQuery } from "@/lib/queries";
+import { relaysQuery } from "@/lib/relay";
+
+// Development only. The scenes of the node page's Ways in tab, /dev-kit?only=nodepage-frame&tab=ways&w=<scene>: the states of the board's
+// PnNode switches, each a page of its own. The parameters (all optional, names as the board's switches):
+//   role=exit|entry   de1 (an exit, "How people get here") or msk1 (an entry, "Whom it carries")
+//   dir=open|part|shut  how de1 opens straight from Russia: every network, all but Operator C, none
+//   ways=ok|part|bad    the relay path of the exit: works, not for Operator C, msk1 does not reach de1
+//   set=all|norl|nov6|dir  the ways de1 has: all, no relay, no IPv6 entry, direct only
+//   cas=<cascade>     how the relays work: "" (forwarding), br, back, manual, near, full, udp, fwd, port, drop, stale, nobr, unk, none
+//   cause=<break>     a broken relay server: fw, old, leg, out, taken, down, gate, br
+//   extra=spb1        a second entry for de1; pairs=2|3|4 the exits of msk1
+//   way=<lane>        the open way (?way= of the page), view=graph|list, map=1
+// Made-up data: nodes de1, nl1, fi1, msk1, spb1, the networks Operator A to D.
+
+const NOW = Math.floor(Date.now() / 1000);
+const MIN = 60;
+
+export type WaysScene = {
+  role: "exit" | "entry";
+  dir: "open" | "part" | "shut";
+  ways: "ok" | "part" | "bad";
+  set: "all" | "norl" | "nov6" | "dir";
+  cas: string;
+  cause: string;
+  extra: string;
+  pairs: number;
+};
+
+export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
+  role: p.get("role") === "entry" ? "entry" : "exit",
+  dir: p.get("dir") === "shut" ? "shut" : p.get("dir") === "part" ? "part" : "open",
+  ways: p.get("ways") === "bad" ? "bad" : p.get("ways") === "part" ? "part" : "ok",
+  set: p.get("set") === "norl" || p.get("set") === "nov6" || p.get("set") === "dir" ? (p.get("set") as WaysScene["set"]) : "all",
+  cas: p.get("cas") ?? "",
+  cause: p.get("cause") ?? "",
+  extra: p.get("extra") ?? "",
+  pairs: Math.min(4, Math.max(1, Number(p.get("pairs") ?? 3))),
+});
+
+const NETS = ["Operator A", "Operator B", "Operator C", "Operator D"];
+const vantage = (network: string, state: string) => ({ source: "globalping", key: network, network, region: "", asn: "", kind: "mobile", state, atUnix: NOW - 10 * MIN, dpiHop: 0, icmpOk: state === "reach", tcpOk: state === "reach" });
+/** The CountryCheck of a node as Russia sees it; `dark` the networks that do not open it. */
+const country = (nodeId: string, dark: string[], over: object = {}) => {
+  const verdict = dark.length === 0 ? CountryVerdict.OK : dark.length === NETS.length ? CountryVerdict.BLOCKED : CountryVerdict.PARTIAL;
+  return {
+    nodeId, country: "RU", verdict, atUnix: NOW - 10 * MIN, probes: [], reason: "", eyeball: true, confidence: "eyeball", listedBy: [], cdnProvider: "", cdnRegion: "", sources: ["globalping"],
+    globalpingVerdict: verdict, tspuVerdict: CountryVerdict.UNSPECIFIED, tspuPorts: [], dpiHop: 0, tspuVantageId: "", tspuVantageName: "", tspuAtUnix: 0, noProbe: [],
+    vantages: NETS.map((n) => vantage(n, dark.includes(n) ? "dark" : "reach")), sourceVerdicts: [], ...over,
+  };
+};
+
+const stage = (over: Record<string, unknown> = {}) => ({ status: "ok", code: "", senderId: "", senderName: "", verdict: "ours", sent: 0, got: 0, atUnix: NOW - 4 * MIN, mb: 0, mbitS: 0, bytes: 0, connectMs: 0, firstByteMs: 0, durationMs: 0, port: 0, ...over });
+const bridgeOf = (over: Record<string, unknown> = {}) => ({ connected: true, conns: 2, rttMs: 38, sinceUnix: NOW - 3 * 3600, error: "", clients: 120, pool: 2, capacity: 230, nearFull: false, ...over });
+
+type Relay = Record<string, unknown>;
+const relayOf = (entry: { id: string; name: string }, exit: { id: string; name: string; ip: string }, k: "vless" | "hy2" | "awg", over: Relay = {}): Relay => {
+  const udp = k !== "vless";
+  const base: Relay = {
+    id: `rly_${entry.name}_${exit.name}_${k}`, inboundId: `inb_${exit.name}_${k}`, exitNodeId: exit.id, exitNodeName: exit.name, profileId: `prf_${k}`,
+    profileName: k === "vless" ? "VLESS · Reality" : k === "hy2" ? "Hysteria2 · 443" : "AmneziaWG 3.1", protocol: k === "vless" ? "vless" : k === "hy2" ? "hysteria2" : "amneziawg",
+    viaNodeId: entry.id, viaNodeName: entry.name, network: udp ? "udp" : "tcp", port: k === "vless" ? 8443 : 443, exitPort: 443, enabled: true, state: InboundState.ACTIVE, lastError: "", toIp: exit.ip,
+    appliedUnix: NOW - 3 * 3600, exitLive: true, agentSupported: true, createdUnix: NOW - 2 * 86400, bytes: 22_800n, packets: 82n, countedUnix: NOW - 3 * MIN, bps: 0n,
+    mode: "auto", activeMode: "dnat", modeChangedUnix: 0, modeReason: "", directStreak: 0, reverseBlocked: udp ? "udp" : "",
+    check: { atUnix: NOW - 4 * MIN, network: udp ? "udp" : "tcp", port: 443, to: `${exit.ip}:443`, leg: stage(), path: stage({ senderId: "nod_nl1", senderName: "nl1" }), ok: true, stage: "", verified: true },
+    monitor: { atUnix: NOW - 4 * MIN, ok: true, stage: "", code: "", responseMs: 182, failStreak: 0 },
+  };
+  return { ...base, ...over };
+};
+
+/** The cascade's states of the board, as relay messages for the pair entry → exit. */
+function pairRelays(entry: { id: string; name: string }, exit: { id: string; name: string; ip: string }, cas: string, cause: string): Relay[] {
+  const v = relayOf(entry, exit, "vless");
+  const h = relayOf(entry, exit, "hy2");
+  const legDown = (r: Relay, over: Relay = {}): Relay => ({ ...r, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout", verdict: "timeout" }), ...over } });
+  const onBridge = (r: Relay, b: Relay = {}): Relay => ({
+    ...legDown(r, { reverseReach: stage({ port: 8443 }), bridge: stage() }),
+    activeMode: "reverse", modeReason: "leg_failed", modeChangedUnix: NOW - 3 * 3600, directStreak: 1, reverseBlocked: "", bridge: bridgeOf(b),
+  });
+  let rs: Relay[] = [v, h];
+  switch (cas) {
+    case "br":
+      rs = [onBridge(v), h];
+      break;
+    case "port":
+      rs = [onBridge(v), h];
+      break;
+    case "back":
+      rs = [{ ...v, modeReason: "direct_back", modeChangedUnix: NOW - 3600, check: { ...(v.check as object), reverseReach: stage({ port: 8443 }) } }, h];
+      break;
+    case "manual":
+      rs = [{ ...onBridge(v), mode: "reverse", modeReason: "owner" }, h];
+      break;
+    case "near":
+      rs = [onBridge(v, { clients: 196, capacity: 230, nearFull: true }), h];
+      break;
+    case "full":
+      rs = [onBridge(v, { clients: 468, capacity: 470, pool: 4, nearFull: true, error: "stream_limit" }), h];
+      break;
+    case "udp":
+      rs = [onBridge(v), legDown({ ...h, state: InboundState.FAILED, lastError: "" }, { stage: "path", path: stage({ status: "fail", code: "timeout" }) })];
+      break;
+    case "fwd":
+      rs = [{ ...v, mode: "dnat" }, { ...h, mode: "dnat" }];
+      break;
+    case "drop":
+      rs = [{ ...onBridge(v, { connected: false, error: "connect" }), check: { ...(onBridge(v).check as object), bridge: stage({ status: "fail", code: "connect" }) } }, h];
+      break;
+    case "stale":
+      rs = [{ ...v, check: { ...(v.check as object), reverseReach: stage({ port: 8443, atUnix: NOW - 40 * MIN }) } }, h];
+      break;
+    case "nobr":
+      rs = [{ ...v, reverseBlocked: "exit_agent_old", modeReason: "reverse_unsupported" }, h];
+      break;
+    case "unk":
+      rs = [v, h];
+      break;
+    case "none":
+      rs = [legDown({ ...v, state: InboundState.FAILED }, { reverseReach: stage({ status: "fail", code: "connect", port: 8443 }) }), legDown({ ...h, state: InboundState.FAILED })];
+      break;
+    default:
+      if (cas === "") rs = [{ ...v, check: { ...(v.check as object), reverseReach: stage({ port: 8443 }) } }, h];
+  }
+  // a broken server of the pair
+  const w = rs[0]!;
+  const broken = (patch: Relay): Relay[] => [{ ...w, ...patch }, ...rs.slice(1)];
+  switch (cause) {
+    case "fw":
+      return broken({ state: InboundState.FAILED, lastError: "forward_drop" });
+    case "old":
+      return broken({ state: InboundState.FAILED, lastError: "agent_old", agentSupported: false });
+    case "leg":
+      return broken({ state: InboundState.FAILED, ...legDown(w) });
+    case "out":
+      return broken({ state: InboundState.FAILED, check: { ...(w.check as object), ok: false, stage: "path", path: stage({ status: "fail", code: "timeout" }) } });
+    case "taken":
+      return broken({ state: InboundState.FAILED, lastError: "port_taken" });
+    case "down":
+      return broken({ state: InboundState.FAILED, exitLive: false, lastError: "exit_offline" });
+    case "gate":
+      return broken({ enabled: false, state: InboundState.PENDING, check: undefined, monitor: undefined });
+    case "br":
+      return broken({ ...onBridge(w, { connected: false, error: "connect" }), state: InboundState.FAILED });
+  }
+  return rs;
+}
+
+const de1 = { id: "nod_de1", name: "de1", ip: "203.0.113.7" };
+const NODE_SPEC = [
+  { id: "nod_msk1", name: "msk1", countryCode: "RU", location: "Moscow" },
+  { id: "nod_spb1", name: "spb1", countryCode: "RU", location: "Saint Petersburg" },
+  { id: "nod_nl1", name: "nl1", countryCode: "NL", location: "Amsterdam" },
+  { id: "nod_nl2", name: "nl2", countryCode: "NL", location: "Amsterdam" },
+  { id: "nod_fi1", name: "fi1", countryCode: "FI", location: "Helsinki" },
+];
+const EXITS = [
+  { id: "nod_nl1", name: "nl1", ip: "203.0.113.21" },
+  { id: "nod_fi1", name: "fi1", ip: "203.0.113.31" },
+  { id: "nod_nl2", name: "nl2", ip: "203.0.113.22" },
+  { id: de1.id, name: "de1", ip: de1.ip },
+];
+
+/** Seeds the scene's queries into `qc` and returns the page data of the node it is about (de1, or msk1 for an entry). */
+export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: WaysScene, nodeStatus: NodeStatus): Record<string, unknown> {
+  const msk1 = { id: "nod_msk1", name: "msk1" };
+  const spb1 = { id: "nod_spb1", name: "spb1" };
+  // the fleet: every node the tab names
+  const base = qc.getQueryData(nodesQuery.queryKey) as { nodes: Record<string, unknown>[] };
+  const own = base.nodes[0]!;
+  const fleet = [own, ...NODE_SPEC.map((n) => ({ ...own, ...n, status: NodeStatus.ONLINE }))];
+  qc.setQueryData(nodesQuery.queryKey, { ...base, nodes: fleet } as never);
+
+  const darkOf = sc.dir === "shut" ? NETS : sc.dir === "part" ? [NETS[2]!] : [];
+  const checks = [country("nod_de1", darkOf), country("nod_msk1", sc.ways === "bad" && sc.cas === "" ? [] : []), country("nod_spb1", [NETS[0]!]), ...EXITS.slice(0, 3).map((e) => country(e.id, darkOf.length ? [] : []))];
+  const rowsOf = (id: string) => ({ nodeId: id, nodeName: id.slice(4), countryCode: "", nodeStatus, cells: [] });
+
+  if (sc.role === "exit") {
+    const withRelay = sc.set === "all" || sc.set === "nov6";
+    const relays: Relay[] = !withRelay
+      ? []
+      : [
+          ...pairRelays(msk1, de1, sc.cas, sc.cause).map((r) => (sc.ways === "bad" ? { ...r, state: InboundState.FAILED, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout" }) } } : r)),
+          ...(sc.extra === "spb1" ? pairRelays(spb1, de1, "", "").slice(0, 1) : []),
+        ];
+    qc.setQueryData(relaysQuery("nod_de1").queryKey, relays as never);
+    const cs = checks.map((c) => (c.nodeId === "nod_msk1" && sc.ways === "part" ? country("nod_msk1", [NETS[2]!]) : c));
+    qc.setQueryData(checksQuery("nod_de1").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [rowsOf("nod_de1")], countryChecks: cs } as never);
+    qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: cs } as never);
+    const v6 = sc.set === "nov6" || sc.set === "dir";
+    const node = data.node as Record<string, unknown>;
+    node.ipv6 = { entry: v6 ? "" : "2001:db8:7::1", entrySupported: true, unavailableReason: "", addresses: [{ address: "2001:db8:7::1", prefixLen: 64 }], src: "2001:db8:7::1" };
+    node.status = nodeStatus;
+    // the ports of the Direct way: what the check found and when
+    const check = (port: number, over: object = {}) => ({ nodeId: "nod_de1", port, verdict: "ok", sent: 300, got: 300, checkedUnix: NOW - 6 * MIN, badUnix: 0, sender: "fi1", reason: "", senderVerdict: "", confirmSender: "", confirmSent: 0, confirmGot: 0, confirmVerdict: "", blame: "", protocolOkUnix: 0, ...over });
+    data.portChecks = [check(443), check(51820, { checkedUnix: NOW - 15 * MIN, got: 299 })];
+    data.tcpChecks = [
+      { nodeId: "nod_de1", port: 443, verdict: "ours", role: "vless", profile: "VLESS · Reality", checkedUnix: NOW - 11 * MIN, sender: "fi1", reason: "", alpn: false },
+      { nodeId: "nod_de1", port: 80, verdict: "ours", role: "acme", profile: "", checkedUnix: NOW - 11 * MIN, sender: "fi1", reason: "", alpn: false },
+    ];
+    if (sc.set === "dir") qc.setQueryData(relaysQuery("nod_de1").queryKey, [] as never);
+    return data;
+  }
+
+  // an entry: msk1 passes several exits on
+  const list = (sc.pairs === 4 ? EXITS : EXITS.slice(0, sc.pairs)).map((x, i) => ({ x, cas: i === 0 ? sc.cas : i === 1 ? "br" : "", cause: i === 0 ? sc.cause : i === 2 ? "leg" : "" }));
+  const relays = list.flatMap(({ x, cas, cause }) => pairRelays(msk1, x, cas, cause));
+  qc.setQueryData(relaysQuery("nod_msk1").queryKey, relays as never);
+  qc.setQueryData(checksQuery("nod_msk1").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [rowsOf("nod_msk1")], countryChecks: checks } as never);
+  qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: checks } as never);
+  qc.setQueryData(doctorQuery("nod_msk1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_msk1", nodeName: "msk1", nodeStatus, agentSupported: true, hasReport: true, receivedUnix: NOW - 5 * MIN, ageS: 300, stale: false, items: [] }] } as never);
+  const node = {
+    ...(data.node as object), id: "nod_msk1", name: "msk1", countryCode: "RU", location: "Moscow", address: "198.51.100.20", status: nodeStatus, protocols: [], online: [],
+    bandwidthMbps: sc.cas === "near" ? 0 : 1000, bridgePort: sc.cas === "port" ? 8443 : 443, bridgePortReason: sc.cas === "port" ? "reality_external_target" : "", bridgePortProfileId: sc.cas === "port" ? "prf_vless" : "",
+    ipv6: { entry: "", entrySupported: false, unavailableReason: "no_ipv6", addresses: [], src: "" },
+  };
+  return { ...data, node, inbounds: [], portChecks: [], tcpChecks: [], facts: { ...(data.facts as object), hasIpv6: false } };
+}
+
+/** The frames of the scene kit: [id, title, query, width, height]. */
+export const waysFrames: { id: string; title: string; q: string; w: number; h: number; state?: string }[] = [
+  { id: "ways-exit-ok", title: "Ways: de1 works direct and through msk1, three ways (forwarding)", q: "w=1", w: 1440, h: 1500 },
+  { id: "ways-exit-graph", title: "Ways: the same, the graph", q: "w=1&view=graph", w: 1440, h: 1700 },
+  { id: "ways-exit-relay", title: "Ways: the open way is through msk1, the servers", q: "w=1&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-exit-part", title: "Ways: through msk1 works, not for Operator C", q: "w=1&ways=part&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-exit-bad", title: "Ways: msk1 does not reach de1, the relay does not pass anyone", q: "w=1&ways=bad&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-exit-shut", title: "Ways: direct is closed from Russia, the bypass is through msk1", q: "w=1&dir=shut", w: 1440, h: 1500 },
+  { id: "ways-exit-part-direct", title: "Ways: direct is dark on Operator C", q: "w=1&dir=part", w: 1440, h: 1500 },
+  { id: "ways-exit-norelay", title: "Ways: no relay (a ghost row and a button to make it reachable)", q: "w=1&set=norl&dir=shut", w: 1440, h: 1400 },
+  { id: "ways-exit-nov6", title: "Ways: IPv6 entry is off", q: "w=1&set=nov6&way=ipv6", w: 1440, h: 1300 },
+  { id: "ways-exit-dir", title: "Ways: direct only", q: "w=1&set=dir", w: 1440, h: 1300 },
+  { id: "ways-exit-two", title: "Ways: a second entry, spb1", q: "w=1&extra=spb1", w: 1440, h: 1500 },
+  { id: "ways-cas-br", title: "Cascade: the bridge (auto)", q: "w=1&cas=br&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-back", title: "Cascade: back on forwarding", q: "w=1&cas=back&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-manual", title: "Cascade: the bridge only, by hand", q: "w=1&cas=manual&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-near", title: "Cascade: the bridge is almost full", q: "w=1&cas=near&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-full", title: "Cascade: the bridge is at its limit", q: "w=1&cas=full&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-udp", title: "Cascade: the bridge for TCP, a UDP server down", q: "w=1&cas=udp&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-fwd", title: "Cascade: forwarding only, chosen by hand", q: "w=1&cas=fwd&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-drop", title: "Cascade: the bridge does not hold", q: "w=1&cas=drop&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-stale", title: "Cascade: the check of the bridge is old", q: "w=1&cas=stale&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-nobr", title: "Cascade: the bridge is not available, the agent is old", q: "w=1&cas=nobr&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-unk", title: "Cascade: the bridge was not checked yet", q: "w=1&cas=unk&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cas-none", title: "Cascade: neither forwarding nor the bridge works", q: "w=1&cas=none&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cause-fw", title: "A broken server: the firewall drops forwarding", q: "w=1&cause=fw&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cause-leg", title: "A broken server: the leg does not pass", q: "w=1&cause=leg&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cause-out", title: "A broken server: nothing comes from outside", q: "w=1&cause=out&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cause-gate", title: "A server that was not checked: it cannot be turned on yet", q: "w=1&cause=gate&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-cause-br", title: "A broken server on the bridge", q: "w=1&cas=br&cause=br&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-entry", title: "Entry: msk1 passes three exits (the list)", q: "w=1&role=entry", w: 1440, h: 1700 },
+  { id: "ways-entry-graph", title: "Entry: the graph", q: "w=1&role=entry&view=graph", w: 1440, h: 1700 },
+  { id: "ways-entry-four", title: "Entry: four exits", q: "w=1&role=entry&pairs=4", w: 1440, h: 1700 },
+  { id: "ways-entry-bridge", title: "Entry: a pair on the bridge, its port is 8443", q: "w=1&role=entry&cas=port&way=out:nod_nl1", w: 1440, h: 2000 },
+  { id: "ways-entry-limit", title: "Entry: the bridge of nl1 is at its limit", q: "w=1&role=entry&cas=full&way=out:nod_nl1", w: 1440, h: 2000 },
+  { id: "ways-entry-fw", title: "Entry: the firewall drops forwarding (the firewall of the entry)", q: "w=1&role=entry&cause=fw&way=out:nod_nl1", w: 1440, h: 2000 },
+  { id: "ways-exit-down", title: "Ways: the node does not answer", q: "w=1", w: 1440, h: 1500, state: "down" },
+  { id: "ways-exit-viewer", title: "Ways: a read-only role", q: "w=1", w: 1440, h: 1300, state: "viewer" },
+  { id: "ways-exit-1100", title: "Ways at 1100 wide: one column", q: "w=1&way=via:nod_msk1", w: 1100, h: 2600 },
+  { id: "ways-exit-phone", title: "Ways on a phone, 400 wide", q: "w=1&way=via:nod_msk1", w: 400, h: 3600 },
+  { id: "ways-entry-phone", title: "Entry on a phone, 400 wide", q: "w=1&role=entry", w: 400, h: 3400 },
+];
