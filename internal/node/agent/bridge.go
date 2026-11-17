@@ -244,8 +244,9 @@ func bridgeTargetIsLocal(m *model, results map[string]*pb.InboundResult, target 
 		if in.parseErr != "" || in.applyErr != "" || !in.spec.Enabled || in.spec.Listen.Network != target.Network || in.spec.Listen.Port != target.Port {
 			continue
 		}
-		result := results[id]
-		return result != nil && result.Error == "" && result.State == pb.InboundRunState_INBOUND_RUN_STATE_RUNNING
+		if result := results[id]; result != nil && result.Error == "" && result.State == pb.InboundRunState_INBOUND_RUN_STATE_RUNNING {
+			return true // any inbound on the port that runs: others may share it, and the first need not be the one that works
+		}
 	}
 	return false
 }

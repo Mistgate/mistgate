@@ -23,6 +23,7 @@ import (
 	"github.com/mistgate/mistgate/internal/decoy"
 	mp "github.com/mistgate/mistgate/internal/mtproto"
 	"github.com/mistgate/mistgate/internal/node/certs"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -85,6 +86,9 @@ func (in *inbound) startDecoy(ctx context.Context) (*decoySite, error) {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 		ErrorLog:          log.New(io.Discard, "", 0),
+	}
+	if err := sitehttp.ConfigureSiteHTTP2(d.srv); err != nil {
+		return nil, fmt.Errorf("configure HTTPS site: %w", err)
 	}
 	go d.srv.ServeTLS(d, "", "")
 	return d, nil
