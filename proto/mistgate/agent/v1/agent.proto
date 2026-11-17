@@ -1207,6 +1207,37 @@ message LinkCounters {
   uint32 hello_pq = 31;
   uint32 hello_classic = 32;
   uint32 hello_unknown = 33;
+
+  // Event, inbound row only, TrustTunnel agents with "trusttunnel-refusals/1": the tunnel requests the engine refused after the
+  // credential had authenticated, by reason; every request is counted once, under the first reason that applies. A refused
+  // request is answered as it always was (X-Warning 300/301/302/310, or the site when the stream was not accepted). No credential,
+  // person or destination is attached: these are counts on the inbound. A _udp2 stream counts one refusal per datagram it
+  // lost to a refusal.
+  //   tunnel_blocked: the egress forbids the destination (310).
+  //   tunnel_no_ipv4: the destination has no IPv4 address and IPv6 is off for clients (301); ordinary traffic of any client.
+  //   tunnel_conn_refused, tunnel_conn_unreachable, tunnel_conn_dns, tunnel_conn_other: the connection to the destination
+  //     failed (301): refused, no route to the network or host, the name did not resolve, anything else.
+  //   tunnel_timeout: the connect timeout (302).
+  //   tunnel_other_deadlines, tunnel_other_authority, tunnel_other_icmp, tunnel_other_dial (300): the site's deadlines could not
+  //     be lifted; the request's authority could not be read; an ICMP tunnel, which the engine does not carry; the egress failed
+  //     in a way none of the other reasons names (a missing WARP device, say).
+  //   tunnel_stream_closed, tunnel_stream_cred_gone, tunnel_stream_conn_limit: the stream was not accepted and the client got the
+  //     site: the connection was closing, the credential was removed, kicked or expired, the credential already holds the most
+  //     connections it may (16).
+  uint32 tunnel_blocked = 34;
+  uint32 tunnel_no_ipv4 = 35;
+  uint32 tunnel_conn_refused = 36;
+  uint32 tunnel_conn_unreachable = 37;
+  uint32 tunnel_conn_dns = 38;
+  uint32 tunnel_conn_other = 39;
+  uint32 tunnel_timeout = 40;
+  uint32 tunnel_other_deadlines = 41;
+  uint32 tunnel_other_authority = 42;
+  uint32 tunnel_other_icmp = 43;
+  uint32 tunnel_other_dial = 44;
+  uint32 tunnel_stream_closed = 45;
+  uint32 tunnel_stream_cred_gone = 46;
+  uint32 tunnel_stream_conn_limit = 47;
 }
 
 // Directions are from the END USER's point of view, not the server-remote view used inside the

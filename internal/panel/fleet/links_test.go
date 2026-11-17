@@ -259,6 +259,89 @@ func TestStatsLinks3ReasonsAreStoredAndRead(t *testing.T) {
 	}
 }
 
+// trusttunnel-refusals/1: the refusals of a TrustTunnel inbound are stored by the hour on the inbound's own row and read back in every
+// field; a credential's row that carries them is dropped (a refusal is never attributed); an agent without the capability has them
+// listed as unsupported, and another protocol never lists them.
+func TestStatsTunnelRefusalsAreStoredAndRead(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	ids := e.fixture(a.nodeID)
+	e.exec(`UPDATE profile SET protocol = CASE id WHEN 'prf_1' THEN 'trusttunnel' WHEN 'prf_2' THEN 'awg' END WHERE id IN ('prf_1', 'prf_2')`)
+	e.exec(`UPDATE device_credential SET protocol = CASE protocol WHEN 'fakehy' THEN 'trusttunnel' WHEN 'fakewg' THEN 'awg' END WHERE protocol IN ('fakehy', 'fakewg')`)
+	c := connectLinksWithCaps(a, "insttt", capLinks, connectiondiag.TrustTunnelCapability, connectiondiag.TrustTunnelRefusalsCapability)
+	row := &agentv1.LinkCounters{InboundId: ids.i1, TunnelBlocked: 1, TunnelNoIpv4: 2, TunnelConnRefused: 3, TunnelConnUnreachable: 4, TunnelConnDns: 5,
+		TunnelConnOther: 6, TunnelTimeout: 7, TunnelOtherDeadlines: 8, TunnelOtherAuthority: 9, TunnelOtherIcmp: 10, TunnelOtherDial: 11,
+		TunnelStreamClosed: 12, TunnelStreamCredGone: 13, TunnelStreamConnLimit: 14}
+	c.send(1, linksBatch(row, &agentv1.LinkCounters{CredId: "crd_alice_hy", InboundId: ids.i1, Connects: 2, TunnelBlocked: 99}))
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
+	c.send(2, linksBatch(&agentv1.LinkCounters{InboundId: ids.i1, TunnelNoIpv4: 40, TunnelStreamConnLimit: 1}))
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 2 })
+
+	node := nodeService{e.f}
+	resp, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: a.nodeID, ByHour: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]*adminv1.InboundConnections{}
+	for _, in := range resp.Msg.Inbounds {
+		by[in.InboundId] = in
+	}
+	tt, wg := by[ids.i1], by[ids.i2]
+	got := []uint32{tt.TunnelBlocked, tt.TunnelNoIpv4, tt.TunnelConnRefused, tt.TunnelConnUnreachable, tt.TunnelConnDns, tt.TunnelConnOther, tt.TunnelTimeout,
+		tt.TunnelOtherDeadlines, tt.TunnelOtherAuthority, tt.TunnelOtherIcmp, tt.TunnelOtherDial, tt.TunnelStreamClosed, tt.TunnelStreamCredGone, tt.TunnelStreamConnLimit}
+	want := []uint32{1, 42, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15}
+	if !equalUint32s(got, want) {
+		t.Errorf("TrustTunnel refusals = %v, want %v (the credential row's 99 must not count)", got, want)
+	}
+	if len(tt.Hours) != 1 || tt.Hours[0].TunnelNoIpv4 != 42 || tt.Hours[0].TunnelStreamConnLimit != 15 || tt.Hours[0].TunnelBlocked != 1 {
+		t.Errorf("TrustTunnel hours = %+v", tt.Hours)
+	}
+	if tt.Connects != 2 || contains(tt.Unsupported, "tunnel_blocked") || contains(tt.Unsupported, "auth_failed") || !contains(tt.Unsupported, "hs_unfinished") {
+		t.Errorf("TrustTunnel counters = %+v", tt)
+	}
+	if contains(wg.Unsupported, "tunnel_blocked") || wg.TunnelBlocked != 0 {
+		t.Errorf("AWG lists or counts refusals: %+v", wg)
+	}
+	fleet, err := node.GetFleetConnections(e.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{}))
+	if err != nil || len(fleet.Msg.Nodes) == 0 {
+		t.Fatalf("GetFleetConnections = %+v, %v", fleet, err)
+	}
+	for _, in := range fleet.Msg.Nodes[0].Inbounds {
+		if in.InboundId == ids.i1 && (in.TunnelNoIpv4 != 42 || in.TunnelStreamConnLimit != 15 || in.TunnelConnDns != 5) {
+			t.Errorf("fleet TrustTunnel inbound = %+v", in)
+		}
+	}
+
+	// An agent that does not list the capability: the fields are unsupported, whatever the batch carried.
+	b := e.enroll("nodec")
+	e.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, created_at, updated_at) VALUES ('inb_old', 'prf_1', ?, 1, unixepoch(), unixepoch())`, b.nodeID)
+	idsB := fixtureIDs{i1: "inb_old"}
+	old := connectLinksWithCaps(b, "instold", capLinks, connectiondiag.TrustTunnelCapability)
+	old.send(1, linksBatch(&agentv1.LinkCounters{InboundId: idsB.i1, Connects: 1}))
+	old.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
+	oldResp, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: b.nodeID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range oldResp.Msg.Inbounds {
+		if in.InboundId == idsB.i1 && (!contains(in.Unsupported, "tunnel_blocked") || !contains(in.Unsupported, "tunnel_stream_conn_limit") || contains(in.Unsupported, "auth_failed")) {
+			t.Errorf("an agent without trusttunnel-refusals/1 lists %v", in.Unsupported)
+		}
+	}
+}
+
+func equalUint32s(a, b []uint32) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // vless-hello-kex/1: the hello counts of a REALITY key are stored by the hour, summed per device and read back for the fleet, with
 // the nodes that do not count yet; an agent without the capability sends none and the panel reads none; an absurd number is clamped.
 func TestStatsHelloKexIsStoredAndRead(t *testing.T) {

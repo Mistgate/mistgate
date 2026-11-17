@@ -12,6 +12,16 @@ const Links3Capability = "links/3"
 const VLESSUnknownKeysCapability = "vless-unknown-keys/1"
 const TrustTunnelCapability = "trusttunnel/1"
 
+// TrustTunnelRefusalsCapability marks agents whose TrustTunnel engine counts the tunnel requests it refused, by reason
+// (agent.proto LinkCounters tunnel_*), on the inbound's row.
+const TrustTunnelRefusalsCapability = "trusttunnel-refusals/1"
+
+// TunnelRefusalFields are those counters, in the order of plugin.TunnelRefusal. Only TrustTunnel has them: for another protocol
+// they are zero and left out of the views, and unsupported does not name them.
+var TunnelRefusalFields = []string{"tunnel_blocked", "tunnel_no_ipv4", "tunnel_conn_refused", "tunnel_conn_unreachable", "tunnel_conn_dns",
+	"tunnel_conn_other", "tunnel_timeout", "tunnel_other_deadlines", "tunnel_other_authority", "tunnel_other_icmp", "tunnel_other_dial",
+	"tunnel_stream_closed", "tunnel_stream_cred_gone", "tunnel_stream_conn_limit"}
+
 // VLESSHelloKexCapability marks agents that count the key exchange of the ClientHellos of REALITY connections per key
 // (agent.proto LinkCounters hello_pq, hello_classic, hello_unknown).
 const VLESSHelloKexCapability = "vless-hello-kex/1"
@@ -103,6 +113,9 @@ func UnsupportedCountersFor(protocol string, agentCaps []string, v Variant) []st
 			out = append(out, f)
 		}
 	}
+	if protocol == "trusttunnel" && !slices.Contains(agentCaps, TrustTunnelRefusalsCapability) {
+		out = append(out, TunnelRefusalFields...)
+	}
 	if protocol == "vless" && links3 {
 		out = slices.DeleteFunc(out, func(f string) bool {
 			return f == "hellos" || f == "hellos_foreign" || f == "connects" && v.Security == "reality" && v.Transport == "tcp"
@@ -164,5 +177,5 @@ func SupportsHysteria2Links2(protocol string, supportsLinks2 bool) bool {
 
 // UnsupportedDescription is the common note used by MCP descriptions and tests.
 func UnsupportedDescription() string {
-	return "unsupported names counters the current protocol, its transport, the AWG backend or the agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: unknown_keys is supported with vless-unknown-keys/1, hellos, hellos_foreign and over REALITY TCP connects with links/3, and every other connection counter except online_s is unsupported; TrustTunnel: only connects and the inbound-only unknown_keys, and with trusttunnel/1 the inbound-only auth_failed, are reported; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms, loss_permille, rtt_samples and pkts_sent; links/3 reasons only where the engine sees them: Hysteria2 hs_unfinished and the tls_* alerts, VLESS REALITY reality_fallback, auth_failed and hs_unfinished, VLESS tls hs_unfinished and the tls_* alerts, VLESS tcp_stalls over REALITY TCP or a direct TLS front, AWG initiations, responses and responses_unmatched on the userspace backend only (the kernel backend cannot tell them apart))."
+	return "unsupported names counters the current protocol, its transport, the AWG backend or the agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: unknown_keys is supported with vless-unknown-keys/1, hellos, hellos_foreign and over REALITY TCP connects with links/3, and every other connection counter except online_s is unsupported; TrustTunnel: only connects and the inbound-only unknown_keys, and with trusttunnel/1 the inbound-only auth_failed, and with trusttunnel-refusals/1 the inbound-only tunnel_* refusal reasons, are reported; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms, loss_permille, rtt_samples and pkts_sent; links/3 reasons only where the engine sees them: Hysteria2 hs_unfinished and the tls_* alerts, VLESS REALITY reality_fallback, auth_failed and hs_unfinished, VLESS tls hs_unfinished and the tls_* alerts, VLESS tcp_stalls over REALITY TCP or a direct TLS front, AWG initiations, responses and responses_unmatched on the userspace backend only (the kernel backend cannot tell them apart))."
 }

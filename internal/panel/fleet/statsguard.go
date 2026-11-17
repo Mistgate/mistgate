@@ -280,9 +280,20 @@ func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
 			HsUnfinished: l.HsUnfinished, TLSAlertsSent: l.TlsAlertsSent, TLSAlertsRecv: l.TlsAlertsRecv, TLSCertRefused: l.TlsCertRefused,
 			RealityFallback: l.RealityFallback, AuthFailed: l.AuthFailed, TCPStalls: l.TcpStalls, TCPStalls16K: l.TcpStalls_16K,
 			Initiations: l.Initiations, Responses: l.Responses, ResponsesUnmatched: l.ResponsesUnmatched,
-			HelloPQ: l.HelloPq, HelloClassic: l.HelloClassic, HelloUnknown: l.HelloUnknown})
+			HelloPQ: l.HelloPq, HelloClassic: l.HelloClassic, HelloUnknown: l.HelloUnknown, Tunnel: tunnelRefusals(l)})
 	}
 	return out
+}
+
+// tunnelRefusals are the trusttunnel-refusals/1 counters of a row, in the order of plugin.TunnelRefusal. Only the inbound's own
+// row carries them: a credential's row that does is a node that attributes a refusal to someone, and they are left out.
+func tunnelRefusals(l *agentv1.LinkCounters) (out [14]uint32) {
+	if l.CredId != "" {
+		return out
+	}
+	return [14]uint32{l.TunnelBlocked, l.TunnelNoIpv4, l.TunnelConnRefused, l.TunnelConnUnreachable, l.TunnelConnDns, l.TunnelConnOther,
+		l.TunnelTimeout, l.TunnelOtherDeadlines, l.TunnelOtherAuthority, l.TunnelOtherIcmp, l.TunnelOtherDial, l.TunnelStreamClosed,
+		l.TunnelStreamCredGone, l.TunnelStreamConnLimit}
 }
 
 func satAdd(a, b uint64) uint64 {

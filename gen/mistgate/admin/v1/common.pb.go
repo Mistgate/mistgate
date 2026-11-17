@@ -1162,8 +1162,23 @@ type LinkHour struct {
 	Initiations        uint32 `protobuf:"varint,27,opt,name=initiations,proto3" json:"initiations,omitempty"`
 	Responses          uint32 `protobuf:"varint,28,opt,name=responses,proto3" json:"responses,omitempty"`
 	ResponsesUnmatched uint32 `protobuf:"varint,29,opt,name=responses_unmatched,json=responsesUnmatched,proto3" json:"responses_unmatched,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// TrustTunnel agents with "trusttunnel-refusals/1", inbound rows (see InboundConnections).
+	TunnelBlocked         uint32 `protobuf:"varint,30,opt,name=tunnel_blocked,json=tunnelBlocked,proto3" json:"tunnel_blocked,omitempty"`
+	TunnelNoIpv4          uint32 `protobuf:"varint,31,opt,name=tunnel_no_ipv4,json=tunnelNoIpv4,proto3" json:"tunnel_no_ipv4,omitempty"`
+	TunnelConnRefused     uint32 `protobuf:"varint,32,opt,name=tunnel_conn_refused,json=tunnelConnRefused,proto3" json:"tunnel_conn_refused,omitempty"`
+	TunnelConnUnreachable uint32 `protobuf:"varint,33,opt,name=tunnel_conn_unreachable,json=tunnelConnUnreachable,proto3" json:"tunnel_conn_unreachable,omitempty"`
+	TunnelConnDns         uint32 `protobuf:"varint,34,opt,name=tunnel_conn_dns,json=tunnelConnDns,proto3" json:"tunnel_conn_dns,omitempty"`
+	TunnelConnOther       uint32 `protobuf:"varint,35,opt,name=tunnel_conn_other,json=tunnelConnOther,proto3" json:"tunnel_conn_other,omitempty"`
+	TunnelTimeout         uint32 `protobuf:"varint,36,opt,name=tunnel_timeout,json=tunnelTimeout,proto3" json:"tunnel_timeout,omitempty"`
+	TunnelOtherDeadlines  uint32 `protobuf:"varint,37,opt,name=tunnel_other_deadlines,json=tunnelOtherDeadlines,proto3" json:"tunnel_other_deadlines,omitempty"`
+	TunnelOtherAuthority  uint32 `protobuf:"varint,38,opt,name=tunnel_other_authority,json=tunnelOtherAuthority,proto3" json:"tunnel_other_authority,omitempty"`
+	TunnelOtherIcmp       uint32 `protobuf:"varint,39,opt,name=tunnel_other_icmp,json=tunnelOtherIcmp,proto3" json:"tunnel_other_icmp,omitempty"`
+	TunnelOtherDial       uint32 `protobuf:"varint,40,opt,name=tunnel_other_dial,json=tunnelOtherDial,proto3" json:"tunnel_other_dial,omitempty"`
+	TunnelStreamClosed    uint32 `protobuf:"varint,41,opt,name=tunnel_stream_closed,json=tunnelStreamClosed,proto3" json:"tunnel_stream_closed,omitempty"`
+	TunnelStreamCredGone  uint32 `protobuf:"varint,42,opt,name=tunnel_stream_cred_gone,json=tunnelStreamCredGone,proto3" json:"tunnel_stream_cred_gone,omitempty"`
+	TunnelStreamConnLimit uint32 `protobuf:"varint,43,opt,name=tunnel_stream_conn_limit,json=tunnelStreamConnLimit,proto3" json:"tunnel_stream_conn_limit,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *LinkHour) Reset() {
@@ -1399,6 +1414,104 @@ func (x *LinkHour) GetResponsesUnmatched() uint32 {
 	return 0
 }
 
+func (x *LinkHour) GetTunnelBlocked() uint32 {
+	if x != nil {
+		return x.TunnelBlocked
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelNoIpv4() uint32 {
+	if x != nil {
+		return x.TunnelNoIpv4
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelConnRefused() uint32 {
+	if x != nil {
+		return x.TunnelConnRefused
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelConnUnreachable() uint32 {
+	if x != nil {
+		return x.TunnelConnUnreachable
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelConnDns() uint32 {
+	if x != nil {
+		return x.TunnelConnDns
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelConnOther() uint32 {
+	if x != nil {
+		return x.TunnelConnOther
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelTimeout() uint32 {
+	if x != nil {
+		return x.TunnelTimeout
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelOtherDeadlines() uint32 {
+	if x != nil {
+		return x.TunnelOtherDeadlines
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelOtherAuthority() uint32 {
+	if x != nil {
+		return x.TunnelOtherAuthority
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelOtherIcmp() uint32 {
+	if x != nil {
+		return x.TunnelOtherIcmp
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelOtherDial() uint32 {
+	if x != nil {
+		return x.TunnelOtherDial
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelStreamClosed() uint32 {
+	if x != nil {
+		return x.TunnelStreamClosed
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelStreamCredGone() uint32 {
+	if x != nil {
+		return x.TunnelStreamCredGone
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTunnelStreamConnLimit() uint32 {
+	if x != nil {
+		return x.TunnelStreamConnLimit
+	}
+	return 0
+}
+
 // One device's ClientHello counts over the window (GetFleetConnectionsResponse.hello_kex_classic, GetUserConnectionResponse.hello_kex).
 // A device is pq in a window when every hello counted had an X25519MLKEM768 key share before any X25519 share (the condition a
 // strict REALITY library demands), classic when one lacked it: that library turns the device away. unknown ones could not be read
@@ -1594,7 +1707,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\averdict\x18\x05 \x01(\tR\averdict\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x16\n" +
 	"\x06sender\x18\a \x01(\tR\x06sender\x12%\n" +
-	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix\"\xcb\a\n" +
+	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix\"\xe1\f\n" +
 	"\bLinkHour\x12*\n" +
 	"\x0fhour_start_unix\x18\x01 \x01(\x03B\x020\x02R\rhourStartUnix\x12\x1a\n" +
 	"\bconnects\x18\x02 \x01(\rR\bconnects\x12\x18\n" +
@@ -1630,7 +1743,21 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x0etcp_stalls_16k\x18\x1a \x01(\rR\ftcpStalls16k\x12 \n" +
 	"\vinitiations\x18\x1b \x01(\rR\vinitiations\x12\x1c\n" +
 	"\tresponses\x18\x1c \x01(\rR\tresponses\x12/\n" +
-	"\x13responses_unmatched\x18\x1d \x01(\rR\x12responsesUnmatched\"\xa6\x02\n" +
+	"\x13responses_unmatched\x18\x1d \x01(\rR\x12responsesUnmatched\x12%\n" +
+	"\x0etunnel_blocked\x18\x1e \x01(\rR\rtunnelBlocked\x12$\n" +
+	"\x0etunnel_no_ipv4\x18\x1f \x01(\rR\ftunnelNoIpv4\x12.\n" +
+	"\x13tunnel_conn_refused\x18  \x01(\rR\x11tunnelConnRefused\x126\n" +
+	"\x17tunnel_conn_unreachable\x18! \x01(\rR\x15tunnelConnUnreachable\x12&\n" +
+	"\x0ftunnel_conn_dns\x18\" \x01(\rR\rtunnelConnDns\x12*\n" +
+	"\x11tunnel_conn_other\x18# \x01(\rR\x0ftunnelConnOther\x12%\n" +
+	"\x0etunnel_timeout\x18$ \x01(\rR\rtunnelTimeout\x124\n" +
+	"\x16tunnel_other_deadlines\x18% \x01(\rR\x14tunnelOtherDeadlines\x124\n" +
+	"\x16tunnel_other_authority\x18& \x01(\rR\x14tunnelOtherAuthority\x12*\n" +
+	"\x11tunnel_other_icmp\x18' \x01(\rR\x0ftunnelOtherIcmp\x12*\n" +
+	"\x11tunnel_other_dial\x18( \x01(\rR\x0ftunnelOtherDial\x120\n" +
+	"\x14tunnel_stream_closed\x18) \x01(\rR\x12tunnelStreamClosed\x125\n" +
+	"\x17tunnel_stream_cred_gone\x18* \x01(\rR\x14tunnelStreamCredGone\x127\n" +
+	"\x18tunnel_stream_conn_limit\x18+ \x01(\rR\x15tunnelStreamConnLimit\"\xa6\x02\n" +
 	"\x0eHelloKexDevice\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +

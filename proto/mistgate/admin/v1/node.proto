@@ -846,6 +846,26 @@ message InboundConnections {
   uint32 initiations = 36;
   uint32 responses = 37;
   uint32 responses_unmatched = 38;
+  // TrustTunnel agents that list "trusttunnel-refusals/1" (agent.proto LinkCounters tunnel_*): the tunnel requests the engine
+  // refused after the credential had authenticated, by reason, counted on the inbound and never on a person or a device.
+  // tunnel_no_ipv4 and tunnel_blocked are ordinary traffic (an app that asks for an IPv6 address on a node without IPv6, one
+  // that asks for a private address); tunnel_conn_* and tunnel_timeout are a fault of the node only in numbers (a dead uplink or
+  // route makes every connect fail); tunnel_other_deadlines, tunnel_other_dial and tunnel_stream_* point at the node or at
+  // a credential that was just removed. unsupported names them for other protocols and for agents without the capability.
+  uint32 tunnel_blocked = 39;
+  uint32 tunnel_no_ipv4 = 40;
+  uint32 tunnel_conn_refused = 41;
+  uint32 tunnel_conn_unreachable = 42;
+  uint32 tunnel_conn_dns = 43;
+  uint32 tunnel_conn_other = 44;
+  uint32 tunnel_timeout = 45;
+  uint32 tunnel_other_deadlines = 46;
+  uint32 tunnel_other_authority = 47;
+  uint32 tunnel_other_icmp = 48;
+  uint32 tunnel_other_dial = 49;
+  uint32 tunnel_stream_closed = 50;
+  uint32 tunnel_stream_cred_gone = 51;
+  uint32 tunnel_stream_conn_limit = 52;
 }
 
 message ClientConnections {

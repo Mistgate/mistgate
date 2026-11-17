@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
+	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/trusttunnel"
 )
 
@@ -75,11 +76,13 @@ func (in *inbound) beginStream(r *http.Request, w http.ResponseWriter, conn net.
 
 func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key any, closeConn func(), out io.Writer, cs *credState) (*streamState, bool) {
 	if key == nil || r.Context().Err() != nil {
+		in.refuse(plugin.RefusedStreamClosed, 0)
 		return nil, false
 	}
 	in.connMu.Lock()
 	if r.Context().Err() != nil {
 		in.connMu.Unlock()
+		in.refuse(plugin.RefusedStreamClosed, 0)
 		return nil, false
 	}
 	connection := in.conns[key]
@@ -99,9 +102,16 @@ func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key
 		h3: r.ProtoMajor == 3, cancel: cancel,
 	}
 	connection.mu.Lock()
-	if _, banned := connection.banned[cs]; banned || connection.closed || connection.expiring {
+	if _, banned := connection.banned[cs]; banned {
 		connection.mu.Unlock()
 		cancel()
+		in.refuse(plugin.RefusedStreamCredGone, 0)
+		return nil, false
+	}
+	if connection.closed || connection.expiring {
+		connection.mu.Unlock()
+		cancel()
+		in.refuse(plugin.RefusedStreamClosed, 0)
 		return nil, false
 	}
 	cs.mu.Lock()
@@ -109,6 +119,7 @@ func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key
 		cs.mu.Unlock()
 		connection.mu.Unlock()
 		cancel()
+		in.refuse(plugin.RefusedStreamCredGone, 0)
 		return nil, false
 	}
 	if _, exists := cs.connections[connection]; !exists {
@@ -116,6 +127,7 @@ func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key
 			cs.mu.Unlock()
 			connection.mu.Unlock()
 			cancel()
+			in.refuse(plugin.RefusedStreamLimit, 0)
 			return nil, false
 		}
 		cs.connections[connection] = in.e.now()
@@ -420,7 +432,9 @@ func (in *inbound) serveTCP(w http.ResponseWriter, stream *streamState, authorit
 	upstream, err := in.dialTCP(stream.ctx, target)
 	if err != nil {
 		if stream.ctx.Err() == nil {
-			writeTunnelError(w, warningForDialError(err), authority.Host)
+			reason := classifyDial(err)
+			in.refuse(reason, authority.Port)
+			writeTunnelError(w, warningFor(reason), authority.Host)
 		}
 		return
 	}

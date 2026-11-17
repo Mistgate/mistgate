@@ -22,7 +22,12 @@ type FleetLink struct {
 	Initiations, Responses, ResponsesUnmatched                 uint32
 	// vless-hello-kex/1 (migration 00127)
 	HelloPQ, HelloClassic, HelloUnknown uint32
+	// trusttunnel-refusals/1 (migration 00142): the inbound row's refusals, indexed like plugin.TunnelRefusal.
+	Tunnel [tunnelRefusalKinds]uint32
 }
+
+// tunnelRefusalKinds is plugin.TunnelRefusalKinds (the store does not import the plugin package; a test pins the two).
+const tunnelRefusalKinds = 14
 
 // linkRow is one row of the link_hour statement: the key, its person and the counters in the order of linkHourColumns. A
 // typed row written straight to JSON keeps the edge's largest batch inside the isolate's memory (TestD1IngestStatsAtEdgeCap),
@@ -33,7 +38,7 @@ type linkRow struct {
 }
 
 // linkHourCounters is len(linkHourColumns).
-const linkHourCounters = 34
+const linkHourCounters = 48
 
 // Positions in linkRow.n (linkHourColumns).
 const (
@@ -57,7 +62,8 @@ const (
 	lcPktsLost
 	lcProbePktsSent
 	lcProbePktsLost
-	lcHsUnfinished // links/3 from here on
+	lcHsUnfinished      // links/3 from here on
+	lcTunnel       = 34 // trusttunnel-refusals/1: the first of tunnelRefusalKinds columns, after the hello_kex counters
 )
 
 // row is the link as a stored row of user, with every counter clamped (maxLinkCount, maxLinkSum).
@@ -71,6 +77,9 @@ func (l FleetLink) row(user string) linkRow {
 		c(l.HsUnfinished), c(l.TLSAlertsSent), c(l.TLSAlertsRecv), c(l.TLSCertRefused), c(l.RealityFallback), c(l.AuthFailed),
 		c(l.TCPStalls), c(l.TCPStalls16K), c(l.Initiations), c(l.Responses), c(l.ResponsesUnmatched),
 		c(l.HelloPQ), c(l.HelloClassic), c(l.HelloUnknown)})
+	for i, n := range l.Tunnel {
+		r.n[lcTunnel+i] = c(n)
+	}
 	return r
 }
 
@@ -125,7 +134,7 @@ func (l FleetLink) zero() bool {
 	return l.Connects|l.Rejects|l.Drops|l.Stalls|l.OnlineS|l.UnknownKeys|l.Hellos|l.Handshakes|
 		l.ClientCloses|l.Freezes|l.Quiet|l.Accepted|l.HellosForeign|l.RttSamples|l.HsUnfinished|l.TLSAlertsSent|l.TLSAlertsRecv|
 		l.TLSCertRefused|l.RealityFallback|l.AuthFailed|l.TCPStalls|l.TCPStalls16K|l.Initiations|l.Responses|l.ResponsesUnmatched|
-		l.HelloPQ|l.HelloClassic|l.HelloUnknown == 0 &&
+		l.HelloPQ|l.HelloClassic|l.HelloUnknown == 0 && l.Tunnel == [tunnelRefusalKinds]uint32{} &&
 		l.RttMSSum|l.PktsSent|l.PktsLost == 0
 }
 
@@ -135,11 +144,14 @@ var linkHourColumns = []string{"connects", "rejects", "drops", "stalls", "online
 	"probe_handshakes", "client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms_sum", "rtt_samples", "pkts_sent",
 	"pkts_lost", "probe_pkts_sent", "probe_pkts_lost",
 	"hs_unfinished", "tls_alerts_sent", "tls_alerts_recv", "tls_cert_refused", "reality_fallback", "auth_failed", "tcp_stalls",
-	"tcp_stalls_16k", "initiations", "responses", "responses_unmatched", "hello_pq", "hello_classic", "hello_unknown"}
+	"tcp_stalls_16k", "initiations", "responses", "responses_unmatched", "hello_pq", "hello_classic", "hello_unknown",
+	"tunnel_blocked", "tunnel_no_ipv4", "tunnel_conn_refused", "tunnel_conn_unreachable", "tunnel_conn_dns", "tunnel_conn_other",
+	"tunnel_timeout", "tunnel_other_deadlines", "tunnel_other_authority", "tunnel_other_icmp", "tunnel_other_dial",
+	"tunnel_stream_closed", "tunnel_stream_cred_gone", "tunnel_stream_conn_limit"}
 
 // linkHourParts is how many JSON arguments the rows are split into: one bound value stays under D1's 2,000,000 bytes at the
 // 10,000-row edge cap (TestD1IngestStatsAtEdgeCap) with every counter of every row at its clamp.
-const linkHourParts = 3
+const linkHourParts = 4
 
 var linkHourQuery = func() string {
 	var cols, sel, set, from strings.Builder

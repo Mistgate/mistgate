@@ -55,6 +55,17 @@ type timings struct {
 	read           time.Duration
 	write          time.Duration
 	serverIdle     time.Duration
+	// refusalLog is how long a reason on an inbound stays out of the journal after it was written there (refusal.go).
+	refusalLog time.Duration
+	// refusalMin, when set, replaces the number of refusals a threshold reason needs (refusalFaultThreshold) in a test.
+	refusalMin uint32
+}
+
+func (ts timings) refusalAfter(after uint32) uint32 {
+	if after > 1 && ts.refusalMin > 0 {
+		return ts.refusalMin
+	}
+	return after
 }
 
 var defaultTimings = timings{
@@ -68,6 +79,7 @@ var defaultTimings = timings{
 	read:           30 * time.Second,
 	write:          30 * time.Second,
 	serverIdle:     60 * time.Second,
+	refusalLog:     refusalLogEvery,
 }
 
 type eng struct {
@@ -162,6 +174,7 @@ type inbound struct {
 	conns  map[any]*connectionState
 
 	unknownKeys atomic.Uint32
+	refused     refusals
 
 	mu       sync.Mutex
 	state    plugin.RunState
@@ -435,8 +448,8 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 			}
 			cs.mu.Unlock()
 		}
-		if unknown := in.unknownKeys.Swap(0); unknown != 0 {
-			out.Links = append(out.Links, plugin.LinkStat{InboundID: in.spec.ID, UnknownKeys: unknown})
+		if stat, ok := in.inboundStat(); ok {
+			out.Links = append(out.Links, stat)
 		}
 	}
 	kept := e.retired[:0]
@@ -451,8 +464,8 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 	}
 	e.retired = kept
 	for _, in := range e.retiredInbounds {
-		if unknown := in.unknownKeys.Swap(0); unknown != 0 {
-			out.Links = append(out.Links, plugin.LinkStat{InboundID: in.spec.ID, UnknownKeys: unknown})
+		if stat, ok := in.inboundStat(); ok {
+			out.Links = append(out.Links, stat)
 		}
 	}
 	e.retiredInbounds = nil

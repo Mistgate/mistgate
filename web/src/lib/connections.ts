@@ -87,6 +87,43 @@ function inboundReasonParts(t: T, x: InboundConn): Part[] {
   return parts;
 }
 
+/** A TrustTunnel inbound that refuses this many connect errors, or timeouts, in the window is in trouble (the journal's own threshold). */
+const TUNNEL_FAULT = 30;
+
+/**
+ * What a TrustTunnel node refused after the key had authenticated (an agent with trusttunnel-refusals/1; agent.proto LinkCounters
+ * tunnel_*): counts on the inbound, never per person. Blocked and IPv6-only destinations are ordinary traffic and are shown plain; connect
+ * errors and timeouts are trouble in numbers; what could not be served and the streams that were not accepted point at the node.
+ */
+function tunnelRefusalParts(t: T, x: InboundConn): Part[] {
+  if (x.protocol !== "trusttunnel" || x.unsupported.includes("tunnel_blocked")) return [];
+  const parts: Part[] = [];
+  const connect = x.tunnelConnRefused + x.tunnelConnUnreachable + x.tunnelConnDns + x.tunnelConnOther;
+  const unread = x.tunnelOtherAuthority + x.tunnelOtherIcmp;
+  const served = x.tunnelOtherDeadlines + x.tunnelOtherDial;
+  const streams = x.tunnelStreamClosed + x.tunnelStreamCredGone + x.tunnelStreamConnLimit;
+  if (x.tunnelBlocked > 0) parts.push({ text: t("conn.tunnelBlocked", { n: x.tunnelBlocked }), hint: t("conn.tunnelBlocked.hint") });
+  if (x.tunnelNoIpv4 > 0) parts.push({ text: t("conn.tunnelNoV6", { n: x.tunnelNoIpv4 }), hint: t("conn.tunnelNoV6.hint") });
+  if (connect > 0) {
+    parts.push({
+      text: t("conn.tunnelConnect", { n: connect }),
+      warn: connect >= TUNNEL_FAULT,
+      hint: t("conn.tunnelConnect.hint", { refused: x.tunnelConnRefused, route: x.tunnelConnUnreachable, dns: x.tunnelConnDns, other: x.tunnelConnOther }),
+    });
+  }
+  if (x.tunnelTimeout > 0) parts.push({ text: t("conn.tunnelTimeout", { n: x.tunnelTimeout }), warn: x.tunnelTimeout >= TUNNEL_FAULT, hint: t("conn.tunnelTimeout.hint") });
+  if (served > 0) parts.push({ text: t("conn.tunnelServe", { n: served }), warn: true, hint: t("conn.tunnelServe.hint", { deadlines: x.tunnelOtherDeadlines, dial: x.tunnelOtherDial }) });
+  if (unread > 0) parts.push({ text: t("conn.tunnelUnread", { n: unread }), hint: t("conn.tunnelUnread.hint", { authority: x.tunnelOtherAuthority, icmp: x.tunnelOtherIcmp }) });
+  if (streams > 0) {
+    parts.push({
+      text: t("conn.tunnelStream", { n: streams }),
+      warn: streams >= 10 || x.tunnelStreamConnLimit > 0,
+      hint: t("conn.tunnelStream.hint", { closed: x.tunnelStreamClosed, gone: x.tunnelStreamCredGone, limit: x.tunnelStreamConnLimit }),
+    });
+  }
+  return parts;
+}
+
 type Quality = { freezes: number; rttMs: number; rttSamples: number; lossPermille: number; pktsSent: number };
 
 /**
@@ -135,7 +172,7 @@ export function inboundConnParts(t: T, fmt: Fmt, x: InboundConn): Part[] {
   if (x.drops) parts.push({ text: t("conn.drops", { n: x.drops }), warn: !links2 });
   if (x.rejects) parts.push({ text: t("conn.rejects", { n: x.rejects }), warn: true });
   if (links2) parts.push(...qualityParts(t, x));
-  parts.push(...keyReasonParts(t, x), ...inboundReasonParts(t, x));
+  parts.push(...keyReasonParts(t, x), ...inboundReasonParts(t, x), ...tunnelRefusalParts(t, x));
   if (x.protocol === "hysteria2" && x.hellos > 0) {
     // with links/2 the handshakes that never completed are known apart from pings that never authenticate
     const failed = links2 ? Math.max(0, x.hellos - x.accepted) : Math.max(0, x.hellos - x.handshakes);

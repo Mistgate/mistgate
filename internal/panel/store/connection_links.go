@@ -12,15 +12,24 @@ type LinkReasons struct {
 	HsUnfinished, TLSAlertsSent, TLSAlertsRecv, TLSCertRefused uint64
 	RealityFallback, AuthFailed, TCPStalls, TCPStalls16K       uint64
 	Initiations, Responses, ResponsesUnmatched                 uint64
+	// Tunnel is trusttunnel-refusals/1 (migration 00142), indexed like plugin.TunnelRefusal; inbound rows only.
+	Tunnel [tunnelRefusalKinds]uint64
 }
 
 // linkReasonColumns are the LinkReasons columns of link_hour, in the order of the struct.
 var linkReasonColumns = []string{"hs_unfinished", "tls_alerts_sent", "tls_alerts_recv", "tls_cert_refused", "reality_fallback",
-	"auth_failed", "tcp_stalls", "tcp_stalls_16k", "initiations", "responses", "responses_unmatched"}
+	"auth_failed", "tcp_stalls", "tcp_stalls_16k", "initiations", "responses", "responses_unmatched",
+	"tunnel_blocked", "tunnel_no_ipv4", "tunnel_conn_refused", "tunnel_conn_unreachable", "tunnel_conn_dns", "tunnel_conn_other",
+	"tunnel_timeout", "tunnel_other_deadlines", "tunnel_other_authority", "tunnel_other_icmp", "tunnel_other_dial",
+	"tunnel_stream_closed", "tunnel_stream_cred_gone", "tunnel_stream_conn_limit"}
 
 func (r *LinkReasons) dest() []any {
-	return []any{&r.HsUnfinished, &r.TLSAlertsSent, &r.TLSAlertsRecv, &r.TLSCertRefused, &r.RealityFallback, &r.AuthFailed,
+	out := []any{&r.HsUnfinished, &r.TLSAlertsSent, &r.TLSAlertsRecv, &r.TLSCertRefused, &r.RealityFallback, &r.AuthFailed,
 		&r.TCPStalls, &r.TCPStalls16K, &r.Initiations, &r.Responses, &r.ResponsesUnmatched}
+	for i := range r.Tunnel {
+		out = append(out, &r.Tunnel[i])
+	}
+	return out
 }
 
 // reasonSQL renders the reason columns: format gets the prefix and the column for each, and they are joined by sep.

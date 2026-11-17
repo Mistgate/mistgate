@@ -177,14 +177,58 @@ type LinkStat struct {
 	Initiations, Responses, ResponsesUnmatched                 uint32
 	// vless-hello-kex/1. Event, on a VLESS REALITY key: the ClientHellos of its connections by key exchange.
 	HelloPQ, HelloClassic, HelloUnknown uint32
+	// trusttunnel-refusals/1. Event, on the inbound row: the tunnel requests the engine refused after the credential had
+	// passed, by reason. No credential, person or destination is attached.
+	Refusals TunnelRefusals
 }
 
 // Zero reports a delta without any counter (an engine leaves it out).
 func (s LinkStat) Zero() bool {
 	return s.Connects|s.Rejects|s.Drops|s.Stalls|s.UnknownKeys|s.Hellos|s.Handshakes|s.ClientCloses|s.Freezes|s.Quiet|s.Accepted|
 		s.HellosForeign|s.RTTSamples|s.HsUnfinished|s.TLSAlertsSent|s.TLSAlertsRecv|s.TLSCertRefused|s.RealityFallback|s.AuthFailed|
-		s.TCPStalls|s.TCPStalls16K|s.Initiations|s.Responses|s.ResponsesUnmatched|s.HelloPQ|s.HelloClassic|s.HelloUnknown == 0 && s.RTTMSSum|s.PktsSent|s.PktsLost == 0
+		s.TCPStalls|s.TCPStalls16K|s.Initiations|s.Responses|s.ResponsesUnmatched|s.HelloPQ|s.HelloClassic|s.HelloUnknown == 0 &&
+		s.RTTMSSum|s.PktsSent|s.PktsLost == 0 && s.Refusals.Zero()
 }
+
+// TunnelRefusal is why a TrustTunnel engine refused a tunnel request (CONNECT host:port or _udp2) of a credential that had
+// authenticated. The list is closed: agent.proto LinkCounters (capability "trusttunnel-refusals/1") has one counter for each.
+type TunnelRefusal uint8
+
+const (
+	RefusedBlocked         TunnelRefusal = iota // the egress forbids the address (X-Warning 310)
+	RefusedNoIPv4                               // the destination has no IPv4 address and IPv6 is off for clients (301)
+	RefusedConnRefused                          // the connection was refused (301)
+	RefusedConnUnreachable                      // no route to the network or the host (301)
+	RefusedConnDNS                              // the name did not resolve (301)
+	RefusedConnOther                            // any other connection error (301)
+	RefusedTimeout                              // the connect timeout (302)
+	RefusedOtherDeadlines                       // the site's deadlines could not be lifted (300)
+	RefusedOtherAuthority                       // the request's authority could not be read (300)
+	RefusedOtherICMP                            // an ICMP tunnel, which the engine does not carry (300)
+	RefusedOtherDial                            // the egress failed in a way none of the above names (300)
+	RefusedStreamClosed                         // the connection was closing (the client left, or the connection expired)
+	RefusedStreamCredGone                       // the credential was removed, kicked or expired
+	RefusedStreamLimit                          // the credential already holds the most connections it may
+
+	TunnelRefusalKinds = iota
+)
+
+// Name is the reason as the journal and the counters' documentation call it.
+func (r TunnelRefusal) Name() string {
+	if int(r) < len(tunnelRefusalNames) {
+		return tunnelRefusalNames[r]
+	}
+	return "unknown"
+}
+
+var tunnelRefusalNames = [TunnelRefusalKinds]string{"blocked", "no_ipv4", "conn_refused", "conn_unreachable", "conn_dns", "conn_other",
+	"timeout", "other_deadlines", "other_authority", "other_icmp", "other_dial", "stream_closed", "stream_cred_gone", "stream_conn_limit"}
+
+// TunnelRefusals counts refusals by reason, indexed by TunnelRefusal.
+type TunnelRefusals [TunnelRefusalKinds]uint32
+
+// Zero reports no refusal at all.
+func (r TunnelRefusals) Zero() bool { return r == TunnelRefusals{} }
 
 // Session is one open client connection (QUIC connection for Hysteria2, recent handshake for AWG).
 type Session struct {

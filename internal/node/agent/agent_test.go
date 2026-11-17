@@ -44,6 +44,11 @@ func TestCapabilitiesAdvertiseTrustTunnelHTTP3OnlyWithEngine(t *testing.T) {
 	if !slices.Contains(with, capTrustTunnel) || !slices.Contains(with, capTrustTunnelH3) {
 		t.Fatalf("TrustTunnel capabilities = %v, want %s and %s", with, capTrustTunnel, capTrustTunnelH3)
 	}
+	// The panel (internal/panel/connectiondiag) reads the refusal counters of an agent that lists this exact string.
+	if capTrustTunnelRefusals != "trusttunnel-refusals/1" || !slices.Contains(with, capTrustTunnelRefusals) ||
+		slices.Contains(without, capTrustTunnelRefusals) {
+		t.Fatalf("trusttunnel-refusals/1 must be listed with the engine and not without it: %v", with)
+	}
 }
 
 func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {

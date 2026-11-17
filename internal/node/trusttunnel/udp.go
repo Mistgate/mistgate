@@ -88,12 +88,14 @@ func (in *inbound) serveUDP(w http.ResponseWriter, r *http.Request, stream *stre
 				}
 				flow, err := tunnel.flowFor(frame.Source, frame.Target)
 				if err != nil {
+					in.refuseDatagram(err, frame.Target.Port())
 					continue // a forbidden or unreachable destination loses its datagram, not the stream
 				}
 				flow.sending(frame.Target)
 				written, err := flow.conn.WriteTo(frame.Payload, frame.Target.String())
 				if err != nil {
 					flow.notSent(frame.Target)
+					in.refuseDatagram(err, frame.Target.Port())
 					continue
 				}
 				stream.cred.up.Add(uint64(written))

@@ -38,6 +38,9 @@ const (
 	// capVLESSHelloKex marks agents that count the key exchange the ClientHellos of REALITY connections offer, per key
 	// (agent.proto LinkCounters hello_pq, hello_classic, hello_unknown).
 	capVLESSHelloKex = "vless-hello-kex/1"
+	// capTrustTunnelRefusals marks the TrustTunnel engine that counts the tunnel requests it refused, by reason, on the
+	// inbound's row (agent.proto LinkCounters tunnel_*). A panel without it ignores the fields; an agent without it sends none.
+	capTrustTunnelRefusals = "trusttunnel-refusals/1"
 	// capVLESSTLS: the VLESS engine terminates TLS through its certificate source before Xray receives a connection.
 	capVLESSTLS = "vless-tls/1"
 	// capVLESSSelf: the VLESS engine serves the node's own site behind REALITY (reality.target "self", design/vless.md
@@ -187,7 +190,7 @@ func (a *Agent) capabilities() []string {
 		}
 	}
 	if _, ok := a.engines["trusttunnel"]; ok {
-		caps = append(caps, capTrustTunnel, capTrustTunnelH3)
+		caps = append(caps, capTrustTunnel, capTrustTunnelH3, capTrustTunnelRefusals)
 	}
 	if a.appliesUserRateLimit() {
 		caps = append(caps, capUserRateLimit)

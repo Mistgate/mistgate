@@ -71,6 +71,28 @@ func TestTrustTunnelCounters(t *testing.T) {
 	}
 }
 
+// trusttunnel-refusals/1: the refusal reasons are TrustTunnel's, on the agents that count them; nobody else lists them.
+func TestTrustTunnelRefusalCounters(t *testing.T) {
+	without := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, Links3Capability})
+	with := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, TrustTunnelRefusalsCapability})
+	for _, f := range TunnelRefusalFields {
+		if !slices.Contains(without, f) || slices.Contains(with, f) {
+			t.Errorf("%s: unsupported without the capability %v, with it %v", f, slices.Contains(without, f), slices.Contains(with, f))
+		}
+	}
+	if len(TunnelRefusalFields) != 14 || len(with) != len(without)-14 {
+		t.Fatalf("the refusal capability changed other counters: %v vs %v", with, without)
+	}
+	for _, protocol := range []string{"hysteria2", "vless", "awg"} {
+		all := UnsupportedCountersForNode(protocol, []string{TrustTunnelRefusalsCapability})
+		for _, f := range TunnelRefusalFields {
+			if slices.Contains(all, f) {
+				t.Errorf("%s lists %s, which only TrustTunnel has", protocol, f)
+			}
+		}
+	}
+}
+
 // links/3: each engine's reasons only where it sees them; an old agent, an unknown backend or an unknown transport is "not known".
 func TestLinks3Unsupported(t *testing.T) {
 	caps := []string{"links/1", "links/2", Links3Capability, VLESSUnknownKeysCapability}

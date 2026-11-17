@@ -112,6 +112,11 @@ func setInboundReasons(msg *adminv1.InboundConnections, r store.LinkReasons) {
 	msg.TlsCertRefused, msg.RealityFallback, msg.AuthFailed = clamp32(r.TLSCertRefused), clamp32(r.RealityFallback), clamp32(r.AuthFailed)
 	msg.TcpStalls, msg.TcpStalls_16K = clamp32(r.TCPStalls), clamp32(r.TCPStalls16K)
 	msg.Initiations, msg.Responses, msg.ResponsesUnmatched = clamp32(r.Initiations), clamp32(r.Responses), clamp32(r.ResponsesUnmatched)
+	t := r.Tunnel // trusttunnel-refusals/1
+	msg.TunnelBlocked, msg.TunnelNoIpv4, msg.TunnelConnRefused, msg.TunnelConnUnreachable = clamp32(t[0]), clamp32(t[1]), clamp32(t[2]), clamp32(t[3])
+	msg.TunnelConnDns, msg.TunnelConnOther, msg.TunnelTimeout = clamp32(t[4]), clamp32(t[5]), clamp32(t[6])
+	msg.TunnelOtherDeadlines, msg.TunnelOtherAuthority, msg.TunnelOtherIcmp, msg.TunnelOtherDial = clamp32(t[7]), clamp32(t[8]), clamp32(t[9]), clamp32(t[10])
+	msg.TunnelStreamClosed, msg.TunnelStreamCredGone, msg.TunnelStreamConnLimit = clamp32(t[11]), clamp32(t[12]), clamp32(t[13])
 }
 
 // setHourReasons copies the links/3 sums of an hour bucket.
@@ -120,6 +125,11 @@ func setHourReasons(h *adminv1.LinkHour, r store.LinkReasons) {
 	h.TlsCertRefused, h.RealityFallback, h.AuthFailed = clamp32(r.TLSCertRefused), clamp32(r.RealityFallback), clamp32(r.AuthFailed)
 	h.TcpStalls, h.TcpStalls_16K = clamp32(r.TCPStalls), clamp32(r.TCPStalls16K)
 	h.Initiations, h.Responses, h.ResponsesUnmatched = clamp32(r.Initiations), clamp32(r.Responses), clamp32(r.ResponsesUnmatched)
+	t := r.Tunnel // trusttunnel-refusals/1
+	h.TunnelBlocked, h.TunnelNoIpv4, h.TunnelConnRefused, h.TunnelConnUnreachable = clamp32(t[0]), clamp32(t[1]), clamp32(t[2]), clamp32(t[3])
+	h.TunnelConnDns, h.TunnelConnOther, h.TunnelTimeout = clamp32(t[4]), clamp32(t[5]), clamp32(t[6])
+	h.TunnelOtherDeadlines, h.TunnelOtherAuthority, h.TunnelOtherIcmp, h.TunnelOtherDial = clamp32(t[7]), clamp32(t[8]), clamp32(t[9]), clamp32(t[10])
+	h.TunnelStreamClosed, h.TunnelStreamCredGone, h.TunnelStreamConnLimit = clamp32(t[11]), clamp32(t[12]), clamp32(t[13])
 }
 
 // helloKexListLimit is how many devices with classic hellos GetFleetConnections lists.

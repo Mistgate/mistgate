@@ -1,19 +1,16 @@
 package trusttunnel
 
 import (
-	"context"
 	"crypto/sha256"
 	"crypto/subtle"
-	"errors"
 	"fmt"
-	"net"
 	"net/http"
 
 	"github.com/apernet/quic-go"
 	"github.com/apernet/quic-go/http3"
 	"github.com/mistgate/mistgate/internal/decoy"
-	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/sitehttp"
+	"github.com/mistgate/mistgate/internal/plugin"
 	wire "github.com/mistgate/mistgate/internal/trusttunnel"
 )
 
@@ -89,15 +86,22 @@ func (in *inbound) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		sitehttp.MarkAuthenticated(r.Context())
 	}
+	in.serveTunnel(w, r, stream)
+}
+
+// serveTunnel answers the CONNECT of an authenticated credential whose stream has begun.
+func (in *inbound) serveTunnel(w http.ResponseWriter, r *http.Request, stream *streamState) {
 	// The site's Read/WriteTimeout belong to its pages. They would end a tunnel (and its own connect timeout) after 30 s,
 	// so they go first, before anything is dialled.
 	if stream.clearDeadlines() != nil {
+		in.refuse(plugin.RefusedOtherDeadlines, 0)
 		writeTunnelError(w, 300, "")
 		return
 	}
 
 	authority, err := wire.ParseAuthority(r.Host)
 	if err != nil {
+		in.refuse(plugin.RefusedOtherAuthority, 0)
 		writeTunnelError(w, 300, "")
 		return
 	}
@@ -108,10 +112,12 @@ func (in *inbound) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case wire.AuthorityUDP2:
 		in.serveUDP(w, r, stream)
 	case wire.AuthorityICMP:
+		in.refuse(plugin.RefusedOtherICMP, 0)
 		writeTunnelError(w, 300, "")
 	case wire.AuthorityHostPort:
 		in.serveTCP(w, stream, authority)
 	default:
+		in.refuse(plugin.RefusedOtherAuthority, 0)
 		writeTunnelError(w, 300, "")
 	}
 }
@@ -152,21 +158,4 @@ func writeTunnelError(w http.ResponseWriter, code int, host string) {
 	w.WriteHeader(http.StatusBadGateway)
 }
 
-func warningForDialError(err error) int {
-	if errors.Is(err, egress.ErrBlocked) {
-		return 310
-	}
-	if errors.Is(err, egress.ErrNoIPv4) {
-		return 301
-	}
-	var netErr interface{ Timeout() bool }
-	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
-		return 302
-	}
-	var opErr *net.OpError
-	var dnsErr *net.DNSError
-	if errors.As(err, &opErr) || errors.As(err, &dnsErr) {
-		return 301
-	}
-	return 300
-}
+func warningForDialError(err error) int { return warningFor(classifyDial(err)) }

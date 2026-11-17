@@ -1884,6 +1884,51 @@ type linkReasonsV struct {
 	RealityFallback uint32 `json:"reality_fallback,omitempty"`
 	AuthFailed      uint32 `json:"auth_failed,omitempty"`
 	keyReasonsV
+	tunnelReasonsV
+}
+
+// tunnelReasonsV are the trusttunnel-refusals/1 counters of a TrustTunnel inbound (agent.proto LinkCounters tunnel_*): the tunnel
+// requests refused after the credential had authenticated, by reason. Never attributed to a person or a device.
+type tunnelReasonsV struct {
+	Blocked         uint32 `json:"tunnel_blocked,omitempty"`
+	NoIPv4          uint32 `json:"tunnel_no_ipv4,omitempty"`
+	ConnRefused     uint32 `json:"tunnel_conn_refused,omitempty"`
+	ConnUnreachable uint32 `json:"tunnel_conn_unreachable,omitempty"`
+	ConnDNS         uint32 `json:"tunnel_conn_dns,omitempty"`
+	ConnOther       uint32 `json:"tunnel_conn_other,omitempty"`
+	Timeout         uint32 `json:"tunnel_timeout,omitempty"`
+	OtherDeadlines  uint32 `json:"tunnel_other_deadlines,omitempty"`
+	OtherAuthority  uint32 `json:"tunnel_other_authority,omitempty"`
+	OtherICMP       uint32 `json:"tunnel_other_icmp,omitempty"`
+	OtherDial       uint32 `json:"tunnel_other_dial,omitempty"`
+	StreamClosed    uint32 `json:"tunnel_stream_closed,omitempty"`
+	StreamCredGone  uint32 `json:"tunnel_stream_cred_gone,omitempty"`
+	StreamConnLimit uint32 `json:"tunnel_stream_conn_limit,omitempty"`
+}
+
+type tunnelReasonsSource interface {
+	GetTunnelBlocked() uint32
+	GetTunnelNoIpv4() uint32
+	GetTunnelConnRefused() uint32
+	GetTunnelConnUnreachable() uint32
+	GetTunnelConnDns() uint32
+	GetTunnelConnOther() uint32
+	GetTunnelTimeout() uint32
+	GetTunnelOtherDeadlines() uint32
+	GetTunnelOtherAuthority() uint32
+	GetTunnelOtherIcmp() uint32
+	GetTunnelOtherDial() uint32
+	GetTunnelStreamClosed() uint32
+	GetTunnelStreamCredGone() uint32
+	GetTunnelStreamConnLimit() uint32
+}
+
+func tunnelReasonsView(s tunnelReasonsSource) tunnelReasonsV {
+	return tunnelReasonsV{Blocked: s.GetTunnelBlocked(), NoIPv4: s.GetTunnelNoIpv4(), ConnRefused: s.GetTunnelConnRefused(),
+		ConnUnreachable: s.GetTunnelConnUnreachable(), ConnDNS: s.GetTunnelConnDns(), ConnOther: s.GetTunnelConnOther(),
+		Timeout: s.GetTunnelTimeout(), OtherDeadlines: s.GetTunnelOtherDeadlines(), OtherAuthority: s.GetTunnelOtherAuthority(),
+		OtherICMP: s.GetTunnelOtherIcmp(), OtherDial: s.GetTunnelOtherDial(), StreamClosed: s.GetTunnelStreamClosed(),
+		StreamCredGone: s.GetTunnelStreamCredGone(), StreamConnLimit: s.GetTunnelStreamConnLimit()}
 }
 
 type linkReasonsSource interface {
@@ -1894,6 +1939,7 @@ type linkReasonsSource interface {
 	GetRealityFallback() uint32
 	GetAuthFailed() uint32
 	keyReasonsSource
+	tunnelReasonsSource
 }
 
 type keyReasonsSource interface {
@@ -1911,7 +1957,8 @@ func keyReasonsView(s keyReasonsSource) keyReasonsV {
 
 func linkReasonsView(s linkReasonsSource) linkReasonsV {
 	return linkReasonsV{HsUnfinished: s.GetHsUnfinished(), TLSAlertsSent: s.GetTlsAlertsSent(), TLSAlertsRecv: s.GetTlsAlertsRecv(),
-		TLSCertRefused: s.GetTlsCertRefused(), RealityFallback: s.GetRealityFallback(), AuthFailed: s.GetAuthFailed(), keyReasonsV: keyReasonsView(s)}
+		TLSCertRefused: s.GetTlsCertRefused(), RealityFallback: s.GetRealityFallback(), AuthFailed: s.GetAuthFailed(), keyReasonsV: keyReasonsView(s),
+		tunnelReasonsV: tunnelReasonsView(s)}
 }
 
 type nodeWithoutV struct {

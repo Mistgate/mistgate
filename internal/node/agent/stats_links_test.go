@@ -155,6 +155,51 @@ func TestBuildBatchHelloKexCounters(t *testing.T) {
 	}
 }
 
+// trusttunnel-refusals/1: the refusals of an inbound are event counters on its own row, sent in the next batch, each reason in its field.
+func TestBuildBatchTunnelRefusals(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	h.a.statsEvery = 10 * time.Second
+	h.a.linkWindow = 10 * time.Minute
+	start := time.Date(2026, 11, 17, 12, 9, 40, 0, time.UTC)
+	collect := func(from, to time.Time, c engine.Collected) *pb.StatsBatch {
+		t.Helper()
+		h.eng.mu.Lock()
+		h.eng.collectQueue = append(h.eng.collectQueue, c)
+		h.eng.mu.Unlock()
+		return h.a.buildBatch(context.Background(), from, to)
+	}
+	var all, some plugin.TunnelRefusals
+	for i := range all {
+		all[i] = uint32(i + 1) // a different count for each reason, so a swapped field shows
+	}
+	some[plugin.RefusedNoIPv4] = 7
+	first := collect(start, start.Add(10*time.Second), engine.Collected{Links: []plugin.LinkStat{
+		{InboundID: "inb_t", Refusals: all}, {InboundID: "inb_t", Refusals: some},
+	}})
+	if len(first.Links) != 1 || first.Links[0].CredId != "" || first.Links[0].InboundId != "inb_t" {
+		t.Fatalf("rows = %+v, want the inbound's own row", first.Links)
+	}
+	r := first.Links[0]
+	got := []uint32{r.TunnelBlocked, r.TunnelNoIpv4, r.TunnelConnRefused, r.TunnelConnUnreachable, r.TunnelConnDns, r.TunnelConnOther,
+		r.TunnelTimeout, r.TunnelOtherDeadlines, r.TunnelOtherAuthority, r.TunnelOtherIcmp, r.TunnelOtherDial, r.TunnelStreamClosed,
+		r.TunnelStreamCredGone, r.TunnelStreamConnLimit}
+	if len(got) != plugin.TunnelRefusalKinds {
+		t.Fatalf("the test lists %d fields for %d reasons", len(got), plugin.TunnelRefusalKinds)
+	}
+	for i, n := range got {
+		want := uint32(i + 1)
+		if plugin.TunnelRefusal(i) == plugin.RefusedNoIPv4 {
+			want += 7
+		}
+		if n != want {
+			t.Fatalf("%s = %d, want %d (row %+v)", plugin.TunnelRefusal(i).Name(), n, want, r)
+		}
+	}
+	if after := collect(start.Add(10*time.Second), start.Add(20*time.Second), engine.Collected{}); len(after.Links) != 0 {
+		t.Fatalf("the counts were sent twice: %+v", after.Links)
+	}
+}
+
 func TestCapabilitiesAdvertiseLinkCountersV3(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true})
 	if !contains(h.a.capabilities(), "links/3") {

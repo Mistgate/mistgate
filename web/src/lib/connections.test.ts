@@ -13,6 +13,9 @@ const inbound = (over: Partial<InboundConn>): InboundConn => ({
   unknownKeys: 0, hellos: 0, handshakes: 0, keysStalled: 0, keysTried: 0, hours: [], clients: [], clientCloses: 0, freezes: 0, quiet: 0,
   accepted: 0, hellosForeign: 0, rttMs: 0, lossPermille: 0, rttSamples: 0, pktsSent: 0, hsUnfinished: 0, tlsAlertsSent: 0, tlsAlertsRecv: 0,
   tlsCertRefused: 0, realityFallback: 0, authFailed: 0, tcpStalls: 0, tcpStalls16k: 0, initiations: 0, responses: 0, responsesUnmatched: 0,
+  tunnelBlocked: 0, tunnelNoIpv4: 0, tunnelConnRefused: 0, tunnelConnUnreachable: 0, tunnelConnDns: 0, tunnelConnOther: 0, tunnelTimeout: 0,
+  tunnelOtherDeadlines: 0, tunnelOtherAuthority: 0, tunnelOtherIcmp: 0, tunnelOtherDial: 0, tunnelStreamClosed: 0, tunnelStreamCredGone: 0,
+  tunnelStreamConnLimit: 0,
   unsupported: ["client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"], // an agent before links/2
   ...over,
 });
@@ -79,6 +82,44 @@ describe("why handshakes fail (links/3)", () => {
     ]);
     // an agent before links/3: the same zeros say nothing, and VLESS hellos are not read as failures
     expect(inboundConnParts(t, fmt, inbound({ protocol: "vless", hellos: 0, onlineS: 60 })).map((p) => p.text)).toEqual(["online 1 min"]);
+  });
+});
+
+describe("what a TrustTunnel node refused (trusttunnel-refusals/1)", () => {
+  const tt = (over: Partial<InboundConn>) => inbound({ protocol: "trusttunnel", connects: 4, unsupported: ["rejects", "tls_alerts_sent"], ...over });
+
+  it("shows the ordinary refusals plain, and the connect errors in numbers as trouble", () => {
+    const quiet = inboundConnParts(t, fmt, tt({ tunnelBlocked: 3, tunnelNoIpv4: 120, tunnelConnRefused: 4, tunnelConnDns: 2, tunnelTimeout: 5 }));
+    expect(quiet.map((p) => [p.text, p.warn])).toEqual([
+      ["4 connections", undefined],
+      ["destination blocked: 3", undefined],
+      ["IPv6-only destinations: 120", undefined],
+      ["connect errors: 6", false],
+      ["connect timeouts: 5", false],
+    ]);
+    expect(quiet[3]!.hint).toContain("refused 4, no route 0, name not found 2, other 0");
+    const broken = inboundConnParts(t, fmt, tt({ tunnelConnUnreachable: 25, tunnelConnOther: 10, tunnelTimeout: 31 }));
+    expect(broken.map((p) => [p.text, p.warn])).toEqual([
+      ["4 connections", undefined],
+      ["connect errors: 35", true],
+      ["connect timeouts: 31", true],
+    ]);
+  });
+
+  it("flags what points at the node itself, and says what the streams that were not accepted were", () => {
+    const parts = inboundConnParts(t, fmt, tt({ tunnelOtherDeadlines: 1, tunnelOtherDial: 2, tunnelOtherIcmp: 3, tunnelStreamClosed: 2, tunnelStreamConnLimit: 1 }));
+    expect(parts.map((p) => [p.text, p.warn])).toEqual([
+      ["4 connections", undefined],
+      ["could not be served: 3", true],
+      ["unreadable requests: 3", undefined],
+      ["streams not accepted: 3", true],
+    ]);
+    expect(parts[3]!.hint).toContain("closing 2");
+  });
+
+  it("says nothing for an agent without the capability, or for another protocol", () => {
+    expect(inboundConnParts(t, fmt, tt({ tunnelBlocked: 9, unsupported: ["tunnel_blocked", "tunnel_no_ipv4"] })).map((p) => p.text)).toEqual(["4 connections"]);
+    expect(inboundConnParts(t, fmt, inbound({ tunnelBlocked: 9, connects: 1 })).map((p) => p.text)).toEqual(["1 connection"]);
   });
 });
 

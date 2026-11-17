@@ -69,7 +69,28 @@ func linkRowEmpty(row *pb.LinkCounters) bool {
 	return row.Connects|row.Rejects|row.Drops|row.Stalls|row.OnlineS|row.UnknownKeys|row.Hellos|row.Handshakes|row.ClientCloses|
 		row.Freezes|row.Quiet|row.Accepted|row.HellosForeign|row.RttSamples|row.HsUnfinished|row.TlsAlertsSent|row.TlsAlertsRecv|
 		row.TlsCertRefused|row.RealityFallback|row.AuthFailed|row.TcpStalls|row.TcpStalls_16K|row.Initiations|row.Responses|
-		row.ResponsesUnmatched|row.HelloPq|row.HelloClassic|row.HelloUnknown == 0 && row.RttMsSum|row.PktsSent|row.PktsLost == 0
+		row.ResponsesUnmatched|row.HelloPq|row.HelloClassic|row.HelloUnknown == 0 && row.RttMsSum|row.PktsSent|row.PktsLost == 0 &&
+		refusalsOfRow(row).Zero()
+}
+
+// refusalCounters are the trusttunnel-refusals/1 fields of a row, indexed by plugin.TunnelRefusal.
+func refusalCounters(row *pb.LinkCounters) [plugin.TunnelRefusalKinds]*uint32 {
+	return [plugin.TunnelRefusalKinds]*uint32{
+		plugin.RefusedBlocked: &row.TunnelBlocked, plugin.RefusedNoIPv4: &row.TunnelNoIpv4, plugin.RefusedConnRefused: &row.TunnelConnRefused,
+		plugin.RefusedConnUnreachable: &row.TunnelConnUnreachable, plugin.RefusedConnDNS: &row.TunnelConnDns,
+		plugin.RefusedConnOther: &row.TunnelConnOther, plugin.RefusedTimeout: &row.TunnelTimeout,
+		plugin.RefusedOtherDeadlines: &row.TunnelOtherDeadlines, plugin.RefusedOtherAuthority: &row.TunnelOtherAuthority,
+		plugin.RefusedOtherICMP: &row.TunnelOtherIcmp, plugin.RefusedOtherDial: &row.TunnelOtherDial,
+		plugin.RefusedStreamClosed: &row.TunnelStreamClosed, plugin.RefusedStreamCredGone: &row.TunnelStreamCredGone,
+		plugin.RefusedStreamLimit: &row.TunnelStreamConnLimit,
+	}
+}
+
+func refusalsOfRow(row *pb.LinkCounters) (out plugin.TunnelRefusals) {
+	for i, p := range refusalCounters(row) {
+		out[i] = *p
+	}
+	return out
 }
 
 // collectLoop produces one StatsBatch per stats interval, even when it is empty (it doubles as the
@@ -175,7 +196,7 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 	for _, stat := range stats {
 		key := linkCounterKey{credID: stat.CredID, inboundID: stat.InboundID}
 		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.ClientCloses|stat.Freezes|stat.Quiet|stat.TCPStalls|stat.TCPStalls16K|
-			stat.HelloPQ|stat.HelloClassic|stat.HelloUnknown != 0 {
+			stat.HelloPQ|stat.HelloClassic|stat.HelloUnknown != 0 || !stat.Refusals.Zero() {
 			row := rowFor(key)
 			row.Connects += stat.Connects
 			row.Rejects += stat.Rejects
@@ -190,6 +211,9 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 			row.HelloPq += stat.HelloPQ
 			row.HelloClassic += stat.HelloClassic
 			row.HelloUnknown += stat.HelloUnknown
+			for i, p := range refusalCounters(row) {
+				*p += stat.Refusals[i]
+			}
 		}
 		if hasLinkVolume(stat) {
 			a.linkCounterMu.Lock()

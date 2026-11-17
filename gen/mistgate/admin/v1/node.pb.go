@@ -4666,8 +4666,28 @@ type InboundConnections struct {
 	Initiations        uint32      `protobuf:"varint,36,opt,name=initiations,proto3" json:"initiations,omitempty"`
 	Responses          uint32      `protobuf:"varint,37,opt,name=responses,proto3" json:"responses,omitempty"`
 	ResponsesUnmatched uint32      `protobuf:"varint,38,opt,name=responses_unmatched,json=responsesUnmatched,proto3" json:"responses_unmatched,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// TrustTunnel agents that list "trusttunnel-refusals/1" (agent.proto LinkCounters tunnel_*): the tunnel requests the engine
+	// refused after the credential had authenticated, by reason, counted on the inbound and never on a person or a device.
+	// tunnel_no_ipv4 and tunnel_blocked are ordinary traffic (an app that asks for an IPv6 address on a node without IPv6, one
+	// that asks for a private address); tunnel_conn_* and tunnel_timeout are a fault of the node only in numbers (a dead uplink or
+	// route makes every connect fail); tunnel_other_deadlines, tunnel_other_dial and tunnel_stream_* point at the node or at
+	// a credential that was just removed. unsupported names them for other protocols and for agents without the capability.
+	TunnelBlocked         uint32 `protobuf:"varint,39,opt,name=tunnel_blocked,json=tunnelBlocked,proto3" json:"tunnel_blocked,omitempty"`
+	TunnelNoIpv4          uint32 `protobuf:"varint,40,opt,name=tunnel_no_ipv4,json=tunnelNoIpv4,proto3" json:"tunnel_no_ipv4,omitempty"`
+	TunnelConnRefused     uint32 `protobuf:"varint,41,opt,name=tunnel_conn_refused,json=tunnelConnRefused,proto3" json:"tunnel_conn_refused,omitempty"`
+	TunnelConnUnreachable uint32 `protobuf:"varint,42,opt,name=tunnel_conn_unreachable,json=tunnelConnUnreachable,proto3" json:"tunnel_conn_unreachable,omitempty"`
+	TunnelConnDns         uint32 `protobuf:"varint,43,opt,name=tunnel_conn_dns,json=tunnelConnDns,proto3" json:"tunnel_conn_dns,omitempty"`
+	TunnelConnOther       uint32 `protobuf:"varint,44,opt,name=tunnel_conn_other,json=tunnelConnOther,proto3" json:"tunnel_conn_other,omitempty"`
+	TunnelTimeout         uint32 `protobuf:"varint,45,opt,name=tunnel_timeout,json=tunnelTimeout,proto3" json:"tunnel_timeout,omitempty"`
+	TunnelOtherDeadlines  uint32 `protobuf:"varint,46,opt,name=tunnel_other_deadlines,json=tunnelOtherDeadlines,proto3" json:"tunnel_other_deadlines,omitempty"`
+	TunnelOtherAuthority  uint32 `protobuf:"varint,47,opt,name=tunnel_other_authority,json=tunnelOtherAuthority,proto3" json:"tunnel_other_authority,omitempty"`
+	TunnelOtherIcmp       uint32 `protobuf:"varint,48,opt,name=tunnel_other_icmp,json=tunnelOtherIcmp,proto3" json:"tunnel_other_icmp,omitempty"`
+	TunnelOtherDial       uint32 `protobuf:"varint,49,opt,name=tunnel_other_dial,json=tunnelOtherDial,proto3" json:"tunnel_other_dial,omitempty"`
+	TunnelStreamClosed    uint32 `protobuf:"varint,50,opt,name=tunnel_stream_closed,json=tunnelStreamClosed,proto3" json:"tunnel_stream_closed,omitempty"`
+	TunnelStreamCredGone  uint32 `protobuf:"varint,51,opt,name=tunnel_stream_cred_gone,json=tunnelStreamCredGone,proto3" json:"tunnel_stream_cred_gone,omitempty"`
+	TunnelStreamConnLimit uint32 `protobuf:"varint,52,opt,name=tunnel_stream_conn_limit,json=tunnelStreamConnLimit,proto3" json:"tunnel_stream_conn_limit,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *InboundConnections) Reset() {
@@ -4962,6 +4982,104 @@ func (x *InboundConnections) GetResponses() uint32 {
 func (x *InboundConnections) GetResponsesUnmatched() uint32 {
 	if x != nil {
 		return x.ResponsesUnmatched
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelBlocked() uint32 {
+	if x != nil {
+		return x.TunnelBlocked
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelNoIpv4() uint32 {
+	if x != nil {
+		return x.TunnelNoIpv4
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelConnRefused() uint32 {
+	if x != nil {
+		return x.TunnelConnRefused
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelConnUnreachable() uint32 {
+	if x != nil {
+		return x.TunnelConnUnreachable
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelConnDns() uint32 {
+	if x != nil {
+		return x.TunnelConnDns
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelConnOther() uint32 {
+	if x != nil {
+		return x.TunnelConnOther
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelTimeout() uint32 {
+	if x != nil {
+		return x.TunnelTimeout
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelOtherDeadlines() uint32 {
+	if x != nil {
+		return x.TunnelOtherDeadlines
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelOtherAuthority() uint32 {
+	if x != nil {
+		return x.TunnelOtherAuthority
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelOtherIcmp() uint32 {
+	if x != nil {
+		return x.TunnelOtherIcmp
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelOtherDial() uint32 {
+	if x != nil {
+		return x.TunnelOtherDial
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelStreamClosed() uint32 {
+	if x != nil {
+		return x.TunnelStreamClosed
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelStreamCredGone() uint32 {
+	if x != nil {
+		return x.TunnelStreamCredGone
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetTunnelStreamConnLimit() uint32 {
+	if x != nil {
+		return x.TunnelStreamConnLimit
 	}
 	return 0
 }
@@ -6966,8 +7084,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x12=\n" +
 	"\aentries\x18\x03 \x03(\v2#.mistgate.admin.v1.NodeJournalEntryR\aentries\x12\x1c\n" +
 	"\ttruncated\x18\x04 \x01(\bR\ttruncated\x122\n" +
-	"\x15nodes_without_journal\x18\x05 \x03(\tR\x13nodesWithoutJournal\"\xae\n" +
-	"\n" +
+	"\x15nodes_without_journal\x18\x05 \x03(\tR\x13nodesWithoutJournal\"\xc4\x0f\n" +
 	"\x12InboundConnections\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x1d\n" +
@@ -7015,7 +7132,21 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x0etcp_stalls_16k\x18# \x01(\rR\ftcpStalls16k\x12 \n" +
 	"\vinitiations\x18$ \x01(\rR\vinitiations\x12\x1c\n" +
 	"\tresponses\x18% \x01(\rR\tresponses\x12/\n" +
-	"\x13responses_unmatched\x18& \x01(\rR\x12responsesUnmatched\"\xd0\x02\n" +
+	"\x13responses_unmatched\x18& \x01(\rR\x12responsesUnmatched\x12%\n" +
+	"\x0etunnel_blocked\x18' \x01(\rR\rtunnelBlocked\x12$\n" +
+	"\x0etunnel_no_ipv4\x18( \x01(\rR\ftunnelNoIpv4\x12.\n" +
+	"\x13tunnel_conn_refused\x18) \x01(\rR\x11tunnelConnRefused\x126\n" +
+	"\x17tunnel_conn_unreachable\x18* \x01(\rR\x15tunnelConnUnreachable\x12&\n" +
+	"\x0ftunnel_conn_dns\x18+ \x01(\rR\rtunnelConnDns\x12*\n" +
+	"\x11tunnel_conn_other\x18, \x01(\rR\x0ftunnelConnOther\x12%\n" +
+	"\x0etunnel_timeout\x18- \x01(\rR\rtunnelTimeout\x124\n" +
+	"\x16tunnel_other_deadlines\x18. \x01(\rR\x14tunnelOtherDeadlines\x124\n" +
+	"\x16tunnel_other_authority\x18/ \x01(\rR\x14tunnelOtherAuthority\x12*\n" +
+	"\x11tunnel_other_icmp\x180 \x01(\rR\x0ftunnelOtherIcmp\x12*\n" +
+	"\x11tunnel_other_dial\x181 \x01(\rR\x0ftunnelOtherDial\x120\n" +
+	"\x14tunnel_stream_closed\x182 \x01(\rR\x12tunnelStreamClosed\x125\n" +
+	"\x17tunnel_stream_cred_gone\x183 \x01(\rR\x14tunnelStreamCredGone\x127\n" +
+	"\x18tunnel_stream_conn_limit\x184 \x01(\rR\x15tunnelStreamConnLimit\"\xd0\x02\n" +
 	"\x11ClientConnections\x12\x16\n" +
 	"\x06client\x18\x01 \x01(\tR\x06client\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x18\n" +

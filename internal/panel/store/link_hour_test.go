@@ -6,7 +6,23 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/mistgate/mistgate/internal/plugin"
 )
+
+// The refusal reasons are the engine's list, in its order, in the columns the migration adds.
+func TestTunnelRefusalColumnsFollowThePluginList(t *testing.T) {
+	if tunnelRefusalKinds != plugin.TunnelRefusalKinds {
+		t.Fatalf("the store has %d refusal reasons, the engine %d", tunnelRefusalKinds, plugin.TunnelRefusalKinds)
+	}
+	for i := range plugin.TunnelRefusalKinds {
+		want := "tunnel_" + plugin.TunnelRefusal(i).Name()
+		if linkHourColumns[lcTunnel+i] != want || linkReasonColumns[len(linkReasonColumns)-tunnelRefusalKinds+i] != want {
+			t.Errorf("reason %d: link_hour column %q, reason column %q, want %q", i, linkHourColumns[lcTunnel+i],
+				linkReasonColumns[len(linkReasonColumns)-tunnelRefusalKinds+i], want)
+		}
+	}
+}
 
 func TestLinkHourSQLite(t *testing.T) {
 	linkHourStoreProof(t, openTemp(t))
@@ -14,6 +30,10 @@ func TestLinkHourSQLite(t *testing.T) {
 
 func TestLinkReasonsSQLite(t *testing.T) {
 	linkReasonsStoreProof(t, openTemp(t))
+}
+
+func TestTunnelRefusalsSQLite(t *testing.T) {
+	tunnelRefusalsStoreProof(t, openTemp(t))
 }
 
 func TestHelloKexSQLite(t *testing.T) {
