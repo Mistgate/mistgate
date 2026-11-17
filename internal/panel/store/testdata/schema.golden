@@ -169,6 +169,18 @@
   },
   {
     "type": "index",
+    "name": "decoy_site_name",
+    "tbl_name": "decoy_site",
+    "sql": "CREATE UNIQUE INDEX decoy_site_name ON decoy_site (name)"
+  },
+  {
+    "type": "index",
+    "name": "decoy_site_version_hash",
+    "tbl_name": "decoy_site_version",
+    "sql": "CREATE INDEX decoy_site_version_hash ON decoy_site_version (bundle_hash)"
+  },
+  {
+    "type": "index",
     "name": "device_credential_live",
     "tbl_name": "device_credential",
     "sql": "CREATE UNIQUE INDEX device_credential_live ON device_credential (device_id, protocol, COALESCE(profile_id, ''), path) WHERE revoked_at IS NULL"
@@ -781,6 +793,18 @@
   },
   {
     "type": "table",
+    "name": "decoy_site",
+    "tbl_name": "decoy_site",
+    "sql": "CREATE TABLE decoy_site ( id TEXT PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE CHECK (length(name) BETWEEN 1 AND 60), note TEXT NOT NULL DEFAULT '' CHECK (length(note) \u003c= 200), source TEXT NOT NULL CHECK (source IN ('upload', 'assistant', 'mcp')), source_label TEXT NOT NULL DEFAULT '', state TEXT NOT NULL CHECK (state IN ('draft', 'ready')), bundle_hash TEXT NOT NULL, created_at INTEGER NOT NULL, created_by TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL, updated_by TEXT NOT NULL DEFAULT '' )"
+  },
+  {
+    "type": "table",
+    "name": "decoy_site_version",
+    "tbl_name": "decoy_site_version",
+    "sql": "CREATE TABLE decoy_site_version ( site_id TEXT NOT NULL, seq INTEGER NOT NULL, bundle_hash TEXT NOT NULL, created_at INTEGER NOT NULL, created_by TEXT NOT NULL DEFAULT '', size_bytes INTEGER NOT NULL DEFAULT 0, file_count INTEGER NOT NULL DEFAULT 0, files_json TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '', checks_json TEXT NOT NULL DEFAULT '', PRIMARY KEY (site_id, seq) )"
+  },
+  {
+    "type": "table",
     "name": "device",
     "tbl_name": "device",
     "sql": "CREATE TABLE device ( id TEXT PRIMARY KEY, -- dev_... user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, -- sha256 of the client HWID header (Happ etc.). NULL = the implicit per-user device used -- for subscription fetches without a HWID (one shared token, counted as 1 device). hwid_hash BLOB, platform TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', os_version TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER -- soft delete: stats of a revoked device must still resolve , kind TEXT NOT NULL DEFAULT 'link' CHECK (kind IN ('link', 'key')), client TEXT NOT NULL DEFAULT '', blocked_at INTEGER, used_bytes INTEGER NOT NULL DEFAULT 0, key_hash BLOB CHECK (key_hash IS NULL OR length(key_hash) = 32), enrol_token_hash BLOB CHECK (enrol_token_hash IS NULL OR length(enrol_token_hash) = 32), last_connected_at INTEGER NOT NULL DEFAULT 0) STRICT"
@@ -897,7 +921,7 @@
     "type": "table",
     "name": "node",
     "tbl_name": "node",
-    "sql": "CREATE TABLE \"node\" ( id TEXT PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE, address TEXT NOT NULL, country_code TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', dns_resolvers TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(dns_resolvers)), liveness_timeout_s INTEGER NOT NULL DEFAULT 90 CHECK (liveness_timeout_s BETWEEN 15 AND 3600), apply_timeout_s INTEGER NOT NULL DEFAULT 120 CHECK (apply_timeout_s BETWEEN 10 AND 3600), dial_timeout_s INTEGER NOT NULL DEFAULT 15 CHECK (dial_timeout_s BETWEEN 5 AND 120), state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'active', 'retired')), cert_serial TEXT, agent_version TEXT NOT NULL DEFAULT '', api_version INTEGER NOT NULL DEFAULT 0, boot_at INTEGER NOT NULL DEFAULT 0, last_seen_at INTEGER NOT NULL DEFAULT 0, last_connected_at INTEGER NOT NULL DEFAULT 0, last_disconnected_at INTEGER NOT NULL DEFAULT 0, agent_instance_id TEXT NOT NULL DEFAULT '', last_seq INTEGER NOT NULL DEFAULT 0, desired_revision INTEGER NOT NULL DEFAULT 0, desired_hash TEXT NOT NULL DEFAULT '', applied_revision INTEGER NOT NULL DEFAULT 0, applied_hash TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, retired_at INTEGER, agent_built INTEGER NOT NULL DEFAULT 0, agent_caps TEXT NOT NULL DEFAULT '', last_update_json TEXT NOT NULL DEFAULT '' CHECK (last_update_json = '' OR json_valid(last_update_json)), awg_backend TEXT NOT NULL DEFAULT 'auto' CHECK (awg_backend IN ('auto', 'kernel', 'userspace')), awg_prepare_json TEXT NOT NULL DEFAULT '' CHECK (awg_prepare_json = '' OR json_valid(awg_prepare_json)) , torrent_blocker_enabled INTEGER NOT NULL DEFAULT 0 CHECK (torrent_blocker_enabled IN (0, 1)), bandwidth_mbps INTEGER NOT NULL DEFAULT 0 CHECK (bandwidth_mbps BETWEEN 0 AND 1000000), client_ipv6 INTEGER NOT NULL DEFAULT 1 CHECK (client_ipv6 IN (0, 1)), decoy_mode TEXT NOT NULL DEFAULT 'builtin' CHECK (decoy_mode IN ('builtin', 'panel', 'own')), decoy_bundle_hash TEXT NOT NULL DEFAULT '', decoy_agent_mode TEXT NOT NULL DEFAULT '', decoy_agent_hash TEXT NOT NULL DEFAULT '', ipv6_entry TEXT NOT NULL DEFAULT '', ipv6_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(ipv6_json)), udp_filtered_at INTEGER NOT NULL DEFAULT 0, udp_filtered_sender TEXT NOT NULL DEFAULT '', udp_filtered_checked_at INTEGER NOT NULL DEFAULT 0, networks_db_sha256 TEXT NOT NULL DEFAULT '', public_label TEXT NOT NULL DEFAULT '' CHECK (length(public_label) \u003c= 40), link_sealed INTEGER NOT NULL DEFAULT 0 CHECK (link_sealed IN (0, 1)), bridge_port INTEGER NOT NULL DEFAULT 0 CHECK (bridge_port BETWEEN 0 AND 65535), bridge_path TEXT NOT NULL DEFAULT '') STRICT"
+    "sql": "CREATE TABLE \"node\" ( id TEXT PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE, address TEXT NOT NULL, country_code TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', dns_resolvers TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(dns_resolvers)), liveness_timeout_s INTEGER NOT NULL DEFAULT 90 CHECK (liveness_timeout_s BETWEEN 15 AND 3600), apply_timeout_s INTEGER NOT NULL DEFAULT 120 CHECK (apply_timeout_s BETWEEN 10 AND 3600), dial_timeout_s INTEGER NOT NULL DEFAULT 15 CHECK (dial_timeout_s BETWEEN 5 AND 120), state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'active', 'retired')), cert_serial TEXT, agent_version TEXT NOT NULL DEFAULT '', api_version INTEGER NOT NULL DEFAULT 0, boot_at INTEGER NOT NULL DEFAULT 0, last_seen_at INTEGER NOT NULL DEFAULT 0, last_connected_at INTEGER NOT NULL DEFAULT 0, last_disconnected_at INTEGER NOT NULL DEFAULT 0, agent_instance_id TEXT NOT NULL DEFAULT '', last_seq INTEGER NOT NULL DEFAULT 0, desired_revision INTEGER NOT NULL DEFAULT 0, desired_hash TEXT NOT NULL DEFAULT '', applied_revision INTEGER NOT NULL DEFAULT 0, applied_hash TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, retired_at INTEGER, agent_built INTEGER NOT NULL DEFAULT 0, agent_caps TEXT NOT NULL DEFAULT '', last_update_json TEXT NOT NULL DEFAULT '' CHECK (last_update_json = '' OR json_valid(last_update_json)), awg_backend TEXT NOT NULL DEFAULT 'auto' CHECK (awg_backend IN ('auto', 'kernel', 'userspace')), awg_prepare_json TEXT NOT NULL DEFAULT '' CHECK (awg_prepare_json = '' OR json_valid(awg_prepare_json)) , torrent_blocker_enabled INTEGER NOT NULL DEFAULT 0 CHECK (torrent_blocker_enabled IN (0, 1)), bandwidth_mbps INTEGER NOT NULL DEFAULT 0 CHECK (bandwidth_mbps BETWEEN 0 AND 1000000), client_ipv6 INTEGER NOT NULL DEFAULT 1 CHECK (client_ipv6 IN (0, 1)), decoy_mode TEXT NOT NULL DEFAULT 'builtin' CHECK (decoy_mode IN ('builtin', 'panel', 'own')), decoy_bundle_hash TEXT NOT NULL DEFAULT '', decoy_agent_mode TEXT NOT NULL DEFAULT '', decoy_agent_hash TEXT NOT NULL DEFAULT '', ipv6_entry TEXT NOT NULL DEFAULT '', ipv6_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(ipv6_json)), udp_filtered_at INTEGER NOT NULL DEFAULT 0, udp_filtered_sender TEXT NOT NULL DEFAULT '', udp_filtered_checked_at INTEGER NOT NULL DEFAULT 0, networks_db_sha256 TEXT NOT NULL DEFAULT '', public_label TEXT NOT NULL DEFAULT '' CHECK (length(public_label) \u003c= 40), link_sealed INTEGER NOT NULL DEFAULT 0 CHECK (link_sealed IN (0, 1)), bridge_port INTEGER NOT NULL DEFAULT 0 CHECK (bridge_port BETWEEN 0 AND 65535), bridge_path TEXT NOT NULL DEFAULT '', decoy_site_id TEXT NOT NULL DEFAULT '') STRICT"
   },
   {
     "type": "table",

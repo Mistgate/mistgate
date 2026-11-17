@@ -328,6 +328,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	out.DecoyOwnAvailable = f.cfg.Remote == nil
 	out.DecoyAgentMode = agentMode
 	out.DecoyAgentSha256 = n.DecoyAgentHash
+	out.DecoySiteId = n.DecoySiteID
 	return out
 }
 
@@ -764,6 +765,9 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 }
 
 func nodeDecoyError(f *Fleet, action string, err error) error {
+	if coded := decoyLibraryError(err); coded != nil {
+		return coded
+	}
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return connect.NewError(connect.CodeNotFound, errors.New("node not found"))
@@ -832,7 +836,7 @@ func (s nodeService) UploadNodeDecoy(ctx context.Context, req *connect.Request[a
 	if err != nil {
 		return nil, internalErr(f.log.Error, "read node decoy bundle", err)
 	}
-	n, err := f.st.SetNodeDecoyBundle(ctx, m.NodeId, bundle.Hash(), bundle.Archive())
+	n, err := f.ownSiteFromUpload(ctx, m.NodeId, bundle)
 	if err != nil {
 		return nil, nodeDecoyError(f, "upload node decoy bundle", err)
 	}

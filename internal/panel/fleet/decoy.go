@@ -267,7 +267,7 @@ func (f *Fleet) applyDecoyMode(ctx context.Context, nodeID, mode string, bundle 
 			if err != nil {
 				return store.NodeRow{}, invalid(decoy.ClientMessage(err))
 			}
-			return f.st.SetNodeDecoyBundle(ctx, nodeID, parsed.Hash(), parsed.Archive())
+			return f.ownSiteFromUpload(ctx, nodeID, parsed)
 		}
 	}
 	if len(bundle) != 0 {
