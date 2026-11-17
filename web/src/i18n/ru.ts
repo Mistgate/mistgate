@@ -45,6 +45,9 @@ import { ru as overviewRu } from "./overview";
 import { ru as windowsRu } from "./windows";
 import { ru as nodepageRu } from "./nodepage";
 import { ru as nodewaysRu } from "./nodeways";
+import { ru as subspnRu } from "./subspn";
+import { ru as subshxRu } from "./subshx";
+import { ru as subsdnsRu } from "./subsdns";
 import { ru as usersgroupRu } from "./usersgroup";
 import { ru as decoysitesRu } from "./decoysites";
 
@@ -314,4 +317,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "Сертификат Let’s Encrypt на IP-адрес пока недоступен: возьми домен или самоподписанный",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu, ...shellRu, ...overviewRu, ...nodesviewRu, ...windowsRu, ...nodepageRu, ...userslistRu, ...userspageRu, ...usersgroupRu, ...decoysitesRu, ...nodeswaysRu, ...nodewaysRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu, ...shellRu, ...overviewRu, ...nodesviewRu, ...windowsRu, ...nodepageRu, ...userslistRu, ...userspageRu, ...usersgroupRu, ...decoysitesRu, ...nodeswaysRu, ...nodewaysRu, ...subspnRu, ...subshxRu, ...subsdnsRu };

@@ -47,6 +47,9 @@ import { en as overviewEn } from "./overview";
 import { en as windowsEn } from "./windows";
 import { en as nodepageEn } from "./nodepage";
 import { en as nodewaysEn } from "./nodeways";
+import { en as subspnEn } from "./subspn";
+import { en as subshxEn } from "./subshx";
+import { en as subsdnsEn } from "./subsdns";
 import { en as usersgroupEn } from "./usersgroup";
 import { en as decoysitesEn } from "./decoysites";
 
@@ -325,7 +328,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...decoysitesEn, ...nodeswaysEn, ...nodewaysEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...decoysitesEn, ...nodeswaysEn, ...nodewaysEn, ...subspnEn, ...subshxEn, ...subsdnsEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;
