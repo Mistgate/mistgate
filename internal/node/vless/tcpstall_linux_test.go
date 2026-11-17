@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/mistgate/mistgate/internal/node/engine"
 )
 
 // TestTCPStallOfAFreezeAfter16K drives the real TCP_INFO reading: on loopback, nftables drops everything the server sends
@@ -62,7 +64,7 @@ func TestTCPStallOfAFreezeAfter16K(t *testing.T) {
 		go func() { _, _ = conn.Write(make([]byte, 1<<20)) }()
 		_, _ = io.Copy(io.Discard, conn) // until the client's FIN, which still gets through
 		time.Sleep(4 * time.Second)      // the retransmissions of the frozen data go on
-		stalled, first := tcpStallOf(conn)
+		stalled, first := engine.TCPStallOf(conn)
 		if raw, err := conn.(*net.TCPConn).SyscallConn(); err == nil {
 			_ = raw.Control(func(fd uintptr) {
 				if i, err := unix.GetsockoptTCPInfo(int(fd), unix.IPPROTO_TCP, unix.TCP_INFO); err == nil {
@@ -99,7 +101,7 @@ func TestTCPStallOfAFreezeAfter16K(t *testing.T) {
 		_, _ = conn.Write(make([]byte, 256<<10))
 		_ = conn.(*net.TCPConn).CloseWrite()
 		_, _ = io.Copy(io.Discard, conn)
-		stalled, first := tcpStallOf(conn)
+		stalled, first := engine.TCPStallOf(conn)
 		_ = conn.Close()
 		got <- [2]bool{stalled, first}
 	}()

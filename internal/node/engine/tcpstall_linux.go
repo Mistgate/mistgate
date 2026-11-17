@@ -1,6 +1,6 @@
 //go:build linux
 
-package vless
+package engine
 
 import (
 	"net"
@@ -9,9 +9,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// tcpStallOf reads TCP_INFO of a TCP connection that is about to be closed (one getsockopt) and applies the stall rule
-// (links.go). Anything that is not a TCP socket, or a failed read, is no stall.
-func tcpStallOf(conn net.Conn) (stalled, first16K bool) {
+// TCPStallOf reads TCP_INFO of a TCP connection that is about to be closed (one getsockopt) and applies the stall rule
+// (tcpstall.go). Anything that is not a TCP socket, or a failed read, is no stall.
+func TCPStallOf(conn net.Conn) (stalled, first16K bool) {
 	sc, ok := conn.(syscall.Conn)
 	if !ok {
 		return false, false
@@ -29,5 +29,5 @@ func tcpStallOf(conn net.Conn) (stalled, first16K bool) {
 	}); err != nil || info == nil {
 		return false, false
 	}
-	return tcpStallRule(info.Total_retrans, info.Bytes_sent, info.Bytes_retrans, info.Bytes_acked, info.Unacked)
+	return TCPStallRule(info.Total_retrans, info.Bytes_sent, info.Bytes_retrans, info.Bytes_acked, info.Unacked)
 }

@@ -216,32 +216,6 @@ func tlsHandshakeFailure(err error) (sent, recv, certificate bool) {
 
 // ---- TCP stalls ----
 
-// The stall rule (tcpStallOf on Linux): the connection ended with bytes of the node the client never acknowledged, after at
-// least stallMinRetrans retransmissions. A stall whose client had acknowledged first16KMin to first16KMax bytes is the
-// TSPU's freeze after the first bytes.
-const (
-	stallMinRetrans = 3
-	first16KMin     = 8 << 10
-	first16KMax     = 32 << 10
-)
-
-// tcpStall is the seam the closes go through (tests replace it; the Linux root test drives the real one).
-var tcpStall = tcpStallOf
-
-// tcpStallRule applies the rule to the TCP_INFO numbers: bytesSent counts retransmitted bytes too (0 on kernels before
-// 4.19, where unackedSegs, the segments still in flight, decides).
-func tcpStallRule(totalRetrans uint32, bytesSent, bytesRetrans, bytesAcked uint64, unackedSegs uint32) (stalled, first16K bool) {
-	if totalRetrans < stallMinRetrans {
-		return false, false
-	}
-	switch {
-	case bytesSent > 0:
-		fresh := bytesSent - min(bytesRetrans, bytesSent)
-		if fresh <= bytesAcked {
-			return false, false
-		}
-	case unackedSegs == 0:
-		return false, false
-	}
-	return true, bytesAcked >= first16KMin && bytesAcked <= first16KMax
-}
+// tcpStall is the seam the closes go through (tests replace it; the Linux root test drives the real one). The rule is
+// engine.TCPStallRule, shared with TrustTunnel.
+var tcpStall = engine.TCPStallOf

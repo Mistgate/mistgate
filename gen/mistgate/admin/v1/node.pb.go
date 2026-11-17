@@ -4618,7 +4618,7 @@ func (x *GetNodeJournalResponse) GetNodesWithoutJournal() []string {
 //     client's, those that refused the node's certificate (a pin or certificate problem on our side).
 //   - reality_fallback (VLESS REALITY): connections sent to the target as not a client (scanners, probes, another name);
 //     auth_failed: of them, hellos with our name that failed REALITY authentication (a wrong key or short id).
-//   - tcp_stalls (VLESS): connections whose data stopped being acknowledged; tcp_stalls_16k: of them, those that stalled
+//   - tcp_stalls (VLESS; TrustTunnel with "trusttunnel-tcp-stalls/1", on the inbound only): connections whose data stopped being acknowledged; tcp_stalls_16k: of them, those that stalled
 //     after 8 to 32 KiB (the TSPU's freeze after the first bytes).
 //   - initiations, responses, responses_unmatched (AmneziaWG, userspace backend): handshake initiations of known keys, the
 //     node's answers, and answers the device never confirmed (lost on the way back).

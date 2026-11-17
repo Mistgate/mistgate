@@ -350,6 +350,9 @@ func (t accTotals) health(proto string) string {
 			return stateFailing
 		}
 	case "trusttunnel":
+		if freeze, conf, _ := t.tcpFreeze(); freeze && conf == confHigh {
+			return stateFailing // connects, then freezes after the first bytes
+		}
 		if t.known("connects") && t.Connects >= minFleetAttempts {
 			return stateWorking
 		}
@@ -805,30 +808,35 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 		udpWorks = true
 	}
 
-	// tcp throttled: connects fine, downloads stall (the 16 KB pattern), as kl!ck users see it and as the node's own VLESS
-	// connections show it (links/3 tcp_stalls_16k: the client stopped acknowledging after 8 to 32 KiB).
+	// tcp throttled: connects fine, downloads stall (the 16 KB pattern), as kl!ck users see it and as the node's own VLESS and
+	// TrustTunnel connections show it (links/3 tcp_stalls_16k: the client stopped acknowledging after 8 to 32 KiB).
 	if !ipBlocked {
 		type freezeEv struct {
 			conf    string
 			ev      []string
 			d       map[string]string
-			counted bool // some VLESS server of the node counts its stalls at all
+			counted bool // some server of the protocol on the node counts its stalls at all
 		}
-		var fz freezeEv
+		fz := map[string]*freezeEv{}
 		for _, x := range tcpIn {
-			t := in.Totals[x.ID]
-			if normProtocol(x.Protocol) != "vless" || !t.known("tcp_stalls_16k") {
+			t, proto := in.Totals[x.ID], normProtocol(x.Protocol)
+			if !countsTCPStalls(proto) || !t.known("tcp_stalls_16k") {
 				continue
 			}
-			fz.counted = true
-			if ok, conf, d := t.tcpFreeze(); ok && (fz.d == nil || conf == confHigh) {
-				fz.conf, fz.d = conf, d
-				fz.ev = append(fz.ev, "conn:"+x.ID)
+			f := fz[proto]
+			if f == nil {
+				f = &freezeEv{}
+				fz[proto] = f
+			}
+			f.counted = true
+			if ok, conf, d := t.tcpFreeze(); ok && (f.d == nil || conf == confHigh) {
+				f.conf, f.d = conf, d
+				f.ev = append(f.ev, "conn:"+x.ID)
 			} else if ok {
-				fz.ev = append(fz.ev, "conn:"+x.ID)
+				f.ev = append(f.ev, "conn:"+x.ID)
 			}
 		}
-		klickVLESS := false
+		klickProto := map[string]bool{}
 		for _, k := range kindsOf(km) {
 			if isUDPProto(k.Kind) || k.DLChecked < throttleMinStalls || k.DLStalled < throttleMinStalls || k.DLStalled*2 < k.DLChecked {
 				continue
@@ -842,17 +850,17 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 				e = append(e, "check:"+n.ID)
 				d["tcp_connects"] = "yes"
 			}
-			if normProtocol(k.Kind) == "vless" {
-				klickVLESS = true
-				switch {
-				case fz.d != nil:
+			if kp := normProtocol(k.Kind); countsTCPStalls(kp) {
+				klickProto[kp] = true
+				switch f := fz[kp]; {
+				case f != nil && f.d != nil:
 					conf = confHigh // the node's own connections freeze the same way
-					e = append(e, fz.ev...)
-					reasonDetail(d, fz.d)
-				case fz.counted:
-					d["tcp_stalls_16k"] = "0" // the node's VLESS connections do not freeze: maybe other servers, or other people
+					e = append(e, f.ev...)
+					reasonDetail(d, f.d)
+				case f != nil:
+					d["tcp_stalls_16k"] = "0" // the node's connections do not freeze: maybe other servers, or other people
 				default:
-					unk = append(unk, "the node's VLESS servers count no TCP stalls (an agent without links/3, or a transport where the node does not hold the client's TCP connection): tcp_stalls_16k would confirm it")
+					unk = append(unk, "the node's "+tcpStallProtocolName(kp)+" servers count no TCP stalls (an agent without links/3, or a transport where the node does not hold the client's TCP connection): tcp_stalls_16k would confirm it")
 				}
 			}
 			if udpWorks {
@@ -862,18 +870,22 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 				Explain: "TCP connects, but a download stalls after a few KB for kl!ck users (" + u32(k.DLStalled) + " of " + u32(k.DLChecked) + "): the DPI freezes the stream. " +
 					"A port change does not help; UDP protocols or XHTTP behind a CDN do."})
 		}
-		if fz.d != nil && !klickVLESS {
-			conf := fz.conf
+		for _, proto := range []string{"vless", "trusttunnel"} {
+			f := fz[proto]
+			if f == nil || f.d == nil || klickProto[proto] {
+				continue
+			}
+			conf := f.conf
 			if !tcpWorks && conf == confHigh {
 				conf = confMedium
 			}
-			d := map[string]string{"kind": "vless"}
-			reasonDetail(d, fz.d)
+			d := map[string]string{"kind": proto}
+			reasonDetail(d, f.d)
 			if udpWorks {
 				d["udp_works"] = "yes"
 			}
-			add(blockClassV{Class: clsTCPThrottled, Scope: "protocol:vless", Confidence: conf, hard: true, protocol: "vless", Evidence: append(fz.ev, "check:"+n.ID), Detail: d,
-				Explain: "VLESS connections reach the node and their data stops after the first 8 to 32 KiB (" + fz.d["tcp_stalls_16k"] + " connections): the client stopped " +
+			add(blockClassV{Class: clsTCPThrottled, Scope: "protocol:" + proto, Confidence: conf, hard: true, protocol: proto, Evidence: append(f.ev, "check:"+n.ID), Detail: d,
+				Explain: tcpStallProtocolName(proto) + " connections reach the node and their data stops after the first 8 to 32 KiB (" + f.d["tcp_stalls_16k"] + " connections): the client stopped " +
 					"acknowledging, the TSPU's freeze of a TCP stream after its first bytes. A port change does not help; UDP protocols or XHTTP behind a CDN do."})
 		}
 	}

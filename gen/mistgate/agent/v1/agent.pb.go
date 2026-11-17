@@ -2892,6 +2892,8 @@ func (x *JournalEntry) GetLastUnix() int64 {
 //     transport), hs_unfinished, reality_fallback and auth_failed (REALITY), tls_alerts_sent, tls_alerts_recv and
 //     tls_cert_refused (security tls), tcp_stalls and tcp_stalls_16k (RAW transport, Linux), and with
 //     "vless-hello-kex/1" hello_pq, hello_classic and hello_unknown on the keys' rows (REALITY, both transports).
+//   - trusttunnel: with "trusttunnel-tcp-stalls/1" tcp_stalls and tcp_stalls_16k on the inbound's row, for its HTTP/2 (TCP)
+//     connections that served a request (Linux); the same rule as VLESS.
 type LinkCounters struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "" = the inbound itself.

@@ -110,7 +110,8 @@ func (in *inbound) takeRefusals() plugin.TunnelRefusals {
 
 // inboundStat is the inbound's own row of Collect: what cannot be put on a credential. false when there is nothing to say.
 func (in *inbound) inboundStat() (plugin.LinkStat, bool) {
-	stat := plugin.LinkStat{InboundID: in.spec.ID, UnknownKeys: in.unknownKeys.Swap(0), Refusals: in.takeRefusals()}
+	stat := plugin.LinkStat{InboundID: in.spec.ID, UnknownKeys: in.unknownKeys.Swap(0), Refusals: in.takeRefusals(),
+		TCPStalls: in.tcpStalls.Swap(0), TCPStalls16K: in.tcpStalls16K.Swap(0)}
 	return stat, !stat.Zero()
 }
 
