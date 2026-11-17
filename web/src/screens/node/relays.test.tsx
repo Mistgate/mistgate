@@ -186,6 +186,56 @@ describe("the Add relay dialog", () => {
   });
 });
 
+describe("the Add relay dialog as the wizard of a new way", () => {
+  const withAudience = {
+    ...candidates,
+    candidates: [
+      cand({ audience: { people: 7, staticAwgDevices: 2 } }),
+      cand({ inboundId: "inb_h", profileName: "Hysteria2", protocol: "hysteria2", network: "udp", port: 8443, audience: { people: 5, staticAwgDevices: 0 } }),
+      cand({ inboundId: "inb_y", nodeId: "nod_fi1", nodeName: "fi1", profileName: "Trojan", audience: { people: 3, staticAwgDevices: 0 } }),
+    ],
+  };
+  const open = async () => {
+    listRelayCandidates.mockResolvedValue(withAudience);
+    listRelays.mockResolvedValue({ relays: [] });
+    await mount(<AddRelayDialog open onOpenChange={() => {}} entry={msk1} />);
+    await settle();
+  };
+
+  it("says who gets the new path before anything is made, counting the people of the chosen servers and the AmneziaVPN devices", async () => {
+    await open();
+    expect(dialog().querySelector("[data-testid=relay-preview]")).toBeNull();
+    await tick("Relay VLESS · TCP of de1");
+    await tick("Relay Trojan of fi1");
+    const preview = dialog().querySelector("[data-testid=relay-preview]")!;
+    expect(preview.textContent).toContain("What people get");
+    expect(preview.textContent).toContain("10 people get the new path with the next subscription update");
+    expect(preview.textContent).toContain("AmneziaVPN: 2 devices need a new config");
+  });
+
+  it("selects every suitable server of every exit at once, and clears the choice", async () => {
+    await open();
+    await click(buttonIn(dialog(), "Select all 3 suitable servers"));
+    expect(dialog().querySelectorAll<HTMLInputElement>("[data-testid=relay-candidate] input[type=checkbox]:checked")).toHaveLength(3);
+    expect(dialog().querySelector("[data-testid=relay-preview]")?.textContent).toContain("15 people");
+    await click(buttonIn(dialog(), "Clear the choice"));
+    expect(dialog().querySelectorAll<HTMLInputElement>("[data-testid=relay-candidate] input[type=checkbox]:checked")).toHaveLength(0);
+  });
+
+  it("stops after the server that runs: the rest stay as they were, nothing is made twice", async () => {
+    await open();
+    createRelay.mockImplementation(() => new Promise((r) => setTimeout(() => r({ relay: relay({ id: "rly_new", enabled: false, check: undefined }) }), 20)));
+    checkRelay.mockResolvedValue({ relay: relay({ id: "rly_new", enabled: false, check: check({}) }) });
+    await click(buttonIn(dialog(), "Select all 3 suitable servers"));
+    await click(buttonIn(dialog(), "Only check"));
+    await click(buttonIn(dialog(), "Stop"));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 120))));
+    await settle();
+    expect(createRelay).toHaveBeenCalledTimes(1);
+    expect(dialog().textContent).toContain("Not started: stopped");
+  });
+});
+
 describe("AmneziaWG through a relay", () => {
   const awgDe = cand({ inboundId: "inb_awg", profileId: "prf_awg", profileName: "AWG 3.1", protocol: "awg", network: "udp", port: 51820 });
   // an exit in the entry's own country (RU, as msk1): cut from RU, but the route would not change

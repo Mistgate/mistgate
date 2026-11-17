@@ -1,7 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -199,6 +199,9 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   const [way, setWay] = useState<Mode>("auto");
   const [wayOpen, setWayOpen] = useState(false);
   const [working, setWorking] = useState(false);
+  // "Stop": the server that runs is finished, the ones after it are left as they were (nothing is made twice: a relay made is on the list)
+  const stopAsked = useRef(false);
+  const [stopping, setStopping] = useState(false);
   const candidates = (cands.data?.candidates ?? []).filter((c) => !exitId || c.nodeId === exitId);
   const ready = !!cands.data?.agentSupported && candidates.length > 0;
   // an exit in the entry's own country gains the people nothing: it is not suggested, and says why
@@ -206,6 +209,10 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   const groups = groupCandidates(candidates, sameCountry);
   const chosen = candidates.filter((c) => c.inboundId in picked);
   // a bridge is not for every server: the first picked one that cannot (UDP, an agent to update) says why it is greyed
+  // the servers that can be picked (not made yet, supported), and who gets the new path with the chosen ones
+  const pickable = candidates.filter((c) => !c.unsupported && !c.relayId);
+  const people = chosen.reduce((a, c) => a + (c.audience?.people ?? 0), 0);
+  const awgDevices = chosen.reduce((a, c) => a + (c.audience?.staticAwgDevices ?? 0), 0);
   const blockedPick = chosen.find((c) => blockedOf(c) !== "");
   const blockedSay = blockedPick ? blockedText(t, blockedOf(blockedPick), { entry: entry.name, exit: blockedPick.nodeName }) : "";
   const wayNow: Mode = way === "reverse" && blockedPick ? "auto" : way;
@@ -302,7 +309,16 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
     setWorking(true);
     setRuns((all) => ({ ...(only ? all : {}), ...Object.fromEntries(list.map((c) => [c.inboundId, { leg: "waiting", path: on ? "waiting" : null } satisfies Run])) }));
     // one at a time: the panel checks one relay per exit at a time anyway, and the owner reads them in order
-    for (const c of list) await one(c, on, port ?? picked[c.inboundId] ?? "");
+    stopAsked.current = false;
+    for (const c of list) {
+      if (stopAsked.current) {
+        set(c.inboundId, { leg: "skipped", path: null, tone: "bad", text: t("wy.wiz.stopped") });
+        continue;
+      }
+      await one(c, on, port ?? picked[c.inboundId] ?? "");
+    }
+    stopAsked.current = false;
+    setStopping(false);
     setWorking(false);
     await qc.invalidateQueries({ queryKey: ["relays"] });
   };
@@ -366,7 +382,19 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
     <>
       {groups.suggested.length > 0 && candidateGroup(exitId ? "" : t("relay.dlg.suggested", { cc }), groups.suggested, cands.data.entryCountry)}
       {groups.others.length > 0 && candidateGroup(groups.suggested.length > 0 ? t("relay.dlg.others") : "", groups.others, cands.data.entryCountry)}
+      {!exitId && pickable.length > 1 && (
+        <button type="button" className="w-fit text-[13px] font-medium text-sec underline decoration-line underline-offset-4 hover:text-fg" onClick={() => setPicked(chosen.length === pickable.length ? {} : Object.fromEntries(pickable.map((c) => [c.inboundId, picked[c.inboundId] ?? ""])))}>
+          {chosen.length === pickable.length ? t("wy.wiz.none") : t("wy.wiz.all", { n: pickable.length })}
+        </button>
+      )}
       {chosen.some((c) => c.protocol === "awg") && <Notice tone="quiet">{t("relay.dlg.awgNote")}</Notice>}
+      {chosen.length > 0 && (
+        <div data-testid="relay-preview" className="flex flex-col gap-0.5 rounded-xl bg-step px-3.5 py-3 text-[13px] leading-[18px]">
+          <b className="font-medium">{t("wy.wiz.get", { via: viaLabel(t, entry.cc) })}</b>
+          <span className="text-sec">{t.n("wy.wiz.people", people, { hours })}</span>
+          {awgDevices > 0 && <span className="text-sec">{t.n("wy.wiz.awg", awgDevices)}</span>}
+        </div>
+      )}
       <p className="text-xs leading-snug text-muted">{t("relay.dlg.portHint", { entry: entry.name })}</p>
       <div className="flex flex-col gap-2">
         <button
@@ -482,9 +510,24 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   }
 
   const footer = runs ? (
-    <Button variant="primary" size="md" disabled={working} onClick={close}>
-      {t("common.done")}
-    </Button>
+    <>
+      {working && chosen.length > 1 && (
+        <Button
+          variant="ghost"
+          size="md"
+          disabled={stopping}
+          onClick={() => {
+            stopAsked.current = true;
+            setStopping(true);
+          }}
+        >
+          {stopping ? t("wy.wiz.stopping") : t("wy.wiz.stop")}
+        </Button>
+      )}
+      <Button variant="primary" size="md" disabled={working} onClick={close}>
+        {t("common.done")}
+      </Button>
+    </>
   ) : (
     <>
       {onBack ? (

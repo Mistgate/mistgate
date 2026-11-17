@@ -1503,3 +1503,8 @@ button.wy-nm:hover b {
     animation: none;
   }
 }
+
+/* the lines of the graph are drawn left to right: a right-to-left page mirrors them with its columns */
+[dir="rtl"] .wy-wg > svg {
+  transform: scaleX(-1);
+}
