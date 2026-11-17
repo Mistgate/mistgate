@@ -310,6 +310,10 @@ func (in *inbound) setState(state plugin.RunState, detail string) {
 	in.mu.Unlock()
 }
 
+// KeepAlive is what the engine sets on the connections of the listener it binds. On a port the agent shares, the front
+// sets it on a connection once it has chosen this route (front.Route.KeepAlive).
+var KeepAlive = net.KeepAliveConfig{Enable: true, Idle: 15 * time.Second, Interval: 5 * time.Second, Count: 3}
+
 func (in *inbound) start(ctx context.Context) error {
 	out, err := in.e.out(in.spec.Egress)
 	if err != nil {
@@ -331,10 +335,15 @@ func (in *inbound) start(ctx context.Context) error {
 	addr := net.JoinHostPort(host, strconv.Itoa(int(in.spec.Listen.Port)))
 	// A client that vanished (a phone that changed networks) is dropped in about 30 s, not in the system's two and a half
 	// minutes. Only TCP keepalive probes: an HTTP/2 PING from the server would tell this node from an ordinary web server.
-	lc := net.ListenConfig{KeepAliveConfig: net.KeepAliveConfig{Enable: true, Idle: 15 * time.Second, Interval: 5 * time.Second, Count: 3}}
-	ln, err := lc.Listen(ctx, "tcp", addr)
-	if err != nil {
-		return fmt.Errorf("listen tcp %d: %w", in.spec.Listen.Port, err)
+	var ln net.Listener
+	if in.e.env.SharedListener != nil {
+		ln = in.e.env.SharedListener(in.spec.ID, in.spec.Listen.Port)
+	}
+	if ln == nil {
+		lc := net.ListenConfig{KeepAliveConfig: KeepAlive}
+		if ln, err = lc.Listen(ctx, "tcp", addr); err != nil {
+			return fmt.Errorf("listen tcp %d: %w", in.spec.Listen.Port, err)
+		}
 	}
 	in.ln = ln
 	in.srv = &http.Server{
