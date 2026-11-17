@@ -52,7 +52,6 @@ import { PolishKit } from "./dev-kit-polish";
 import { DnsAdsKit, DnsLinkKit } from "./dev-kit-dns";
 import { EdgeKit } from "./dev-kit-edge";
 import { UsersKit } from "./dev-kit-users";
-import { SubsKit } from "./dev-kit-subs";
 import { DecoyKit } from "./dev-kit-decoy";
 import { SSHKit } from "./dev-kit-ssh";
 import { OsKit, OsPageKit } from "./dev-kit-os";
@@ -76,6 +75,7 @@ import { NodePageFrame, NodePageKit } from "./dev-kit-node-page";
 import { OverviewKit, OverviewPage } from "./dev-kit-overview";
 import { ShellKit, ShellPage } from "./dev-kit-shell";
 import { DecoysKit, DecoysPage } from "./dev-kit-decoys";
+import { SubsPage, SubsScenesKit } from "./dev-kit-subs-page";
 import { NodesKit, NodesPage } from "./dev-kit-nodes";
 import { PnUsersKit, UsersPage } from "./dev-kit-users-page";
 import { PnProfilesKit, ProfilesPage } from "./dev-kit-profiles";
@@ -330,11 +330,12 @@ export default function DevKit() {
   if (which === "user-page") return <UserPage />;
   if (which === "group-page") return <GroupScenePage />;
   if (which === "decoys-page") return <DecoysPage />;
+  if (which === "subs-page") return <SubsPage />;
   if (which === "windows-page") return <WindowsPage />;
   if (which === "nodepage-frame") return <NodePageFrame />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, decoys: DecoysKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit }[which];
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, decoys: DecoysKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit, subs: SubsScenesKit, "subs-scenes": SubsScenesKit }[which];
   if (only) {
     const Kit = only;
     return (
@@ -576,7 +577,6 @@ export default function DevKit() {
       <EdgeKit />
       <DecoyKit />
       <UsersKit />
-      <SubsKit />
 
       <LinkModal
         target={

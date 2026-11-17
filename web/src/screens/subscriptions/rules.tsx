@@ -1,25 +1,22 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
-import { Icon } from "@/components/ui/icons";
 import { Select } from "@/components/ui/select";
-import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useTx, type Tx } from "@/screens/users/t";
 import { useDebounced } from "@/screens/users/ui";
-import { formatKey, move, ruleFormats, singboxAgents, type Rule, type Settings } from "./model";
-import { testAgentQuery, useSaveSettings } from "./queries";
+import { ClientApiCard } from "./client-api";
 import { DeviceIdleCard } from "./device-idle";
 import { DeviceLimitCard } from "./device-limit";
 import { LinkAutoCard } from "./link-auto";
-import { ClientApiCard } from "./client-api";
 import { LinkAwgCard } from "./link-awg";
-import { Lead } from "./ui";
+import { formatKey, move, ruleFormats, singboxAgents, type Rule, type Settings } from "./model";
+import { Glyph, Grid, path, Section, Svg } from "./parts";
+import { testAgentQuery, useSaveSettings } from "./queries";
+import { sbDemo } from "./demo-sb";
 
 // Client User-Agents to try: the chip label and what it fills in.
 export const samples = [
@@ -31,200 +28,143 @@ export const samples = [
   ["Safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1"],
 ] as const;
 
-/** "Who gets what": which format a User-Agent gets. The rules on the left, a tester beside them. Every change is saved at once (the order is the rules). */
+/** The line under the rules that says what was saved (and undoes a removal) for a few seconds. */
+type Note = { text: string; undo?: () => void };
+
+/**
+ * "Who gets what": which format a User-Agent gets, the two switches of what the apps get, the device limit and the inactive devices, and
+ * beside them the tester of a User-Agent and the Mistgate app. Every change is saved at once (the order is the rules).
+ */
 export function RulesTab({ settings }: { settings: Settings }) {
+  const t = useTx();
+  return (
+    <Grid
+      main={
+        <>
+          <RulesCard settings={settings} />
+          <Section tone="sand" icon={path.sliders} title={t("sx.rules.gets")}>
+            <div className="sb-tgs">
+              <LinkAutoCard settings={settings} />
+              <LinkAwgCard settings={settings} />
+            </div>
+          </Section>
+          <DeviceLimitCard settings={settings} />
+          <DeviceIdleCard settings={settings} />
+        </>
+      }
+      side={
+        <>
+          <Tester settings={settings} />
+          <ClientApiCard />
+        </>
+      }
+    />
+  );
+}
+
+function RulesCard({ settings }: { settings: Settings }) {
   const t = useTx();
   const toast = useToast();
   const save = useSaveSettings();
   const rules = settings.rules;
-  const [ua, setUa] = useState<string>(samples[2][1]);
-  const [adding, setAdding] = useState(false);
-  const probe = useDebounced(ua.trim(), 300);
-  const test = useQuery({ ...testAgentQuery(probe), enabled: probe !== "", placeholderData: keepPreviousData });
-  const shown = probe !== "" && test.data !== undefined;
-  const hit = shown && test.data!.ruleIndex >= 0 ? test.data!.ruleIndex : -1;
+  const [note, setNote] = useState<Note | null>(() => sbDemo.note ?? null);
+  const [adding, setAdding] = useState(() => sbDemo.adding ?? false);
+  const clear = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(clear.current), []);
+  const say = (n: Note) => {
+    setNote(n);
+    clearTimeout(clear.current);
+    clear.current = setTimeout(() => setNote(null), 6000);
+  };
   const fmtName = (f: SubFormat) => t(formatKey[f] ?? "subs.fmt.base64");
-  const fmtOption = fmtName;
 
   const run = (change: (s: Settings) => Settings, done?: string, undo?: () => void) =>
     save.mutateAsync(change).then(
       () => {
-        if (done) toast(done, undo && { undo });
+        if (done) say({ text: done, undo });
       },
       (e: unknown) => {
         toast.error(errorText(e, t));
         throw e;
       },
     );
-
-  let result: string;
-  if (probe === "") result = t("subs.test.empty");
-  else if (!test.data) result = test.isError ? errorText(test.error, t) : t("subs.test.busy");
-  else if (test.data.ruleIndex >= 0) result = t("subs.test.match", { n: test.data.ruleIndex + 1, format: fmtName(test.data.format) });
-  else result = t(test.data.browser ? "subs.test.noneBrowser" : "subs.test.noneOther");
+  const hit = sbDemo.hit ?? -1;
 
   return (
-    <div className="flex flex-col gap-4">
-      <Lead>{t("subs.rules.lead")}</Lead>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card lg className="flex min-w-0 flex-col gap-3 p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex min-w-[220px] flex-1 flex-col gap-0.5">
-              <SectionLabel icon="filter" tone="sage">
-                {t("subs.rules.title")}
-              </SectionLabel>
-              <span className="text-xs leading-snug text-muted">{t("subs.rules.hint")}</span>
-            </div>
-            {rules.length > 0 && !adding && (
-              <Button variant="secondary" onClick={() => setAdding(true)}>
-                <Icon name="plus" size={14} />
-                {t("subs.rules.add")}
-              </Button>
-            )}
-          </div>
-
-          {adding && <AddRule rules={rules} t={t} fmtOption={fmtOption} onCancel={() => setAdding(false)} onAdd={(r) => run((s) => ({ ...s, rules: [...s.rules, r] }), t("subs.rules.added")).then(() => setAdding(false))} />}
-
-          {rules.length === 0 && !adding && (
-            <div className="flex flex-col items-center gap-2 rounded-card bg-surface-2 px-5 py-7 text-center">
-              <span aria-hidden className="grid size-11 place-items-center rounded-xl bg-surface text-muted">
-                <Icon name="link" size={20} />
-              </span>
-              <b className="text-sm">{t("subs.rules.noneT")}</b>
-              <p className="max-w-[420px] text-xs leading-normal text-muted">{t("subs.rules.noneBody")}</p>
-              <Button variant="primary" size="lg" className="mt-1" onClick={() => setAdding(true)}>
-                <Icon name="plus" size={14} />
-                {t("subs.rules.addFirst")}
-              </Button>
-            </div>
-          )}
-
-          {/* a container: a rule row is one line where the list is wide, and puts its format under the text where it is not */}
-          <div className="@container flex flex-col gap-1">
-            <RuleList
-              rules={rules}
-              hit={hit}
-              t={t}
-              fmtOption={fmtOption}
-              onMove={(from, to) => void run((s) => ({ ...s, rules: move(s.rules, from, to) }), t("subs.rules.moved")).catch(() => {})}
-              onEdit={(i, patch) => run((s) => ({ ...s, rules: s.rules.map((r, j) => (j === i ? { ...r, ...patch } : r)) }), t("subs.saved"))}
-              onRemove={(i) => {
-                const gone = rules[i]!;
-                // Undo puts it back where it was (or last, if the list got shorter meanwhile)
-                const restore = () => void run((s) => ({ ...s, rules: [...s.rules.slice(0, i), gone, ...s.rules.slice(i)] }), t("subs.rules.restored")).catch(() => {});
-                void run((s) => ({ ...s, rules: s.rules.filter((_, j) => j !== i) }), t("subs.rules.removedName", { ua: gone.uaContains }), restore).catch(() => {});
-              }}
-            />
-            <div className={cx("flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed px-3 py-2 transition-colors duration-200", shown && hit < 0 ? "border-accent-line bg-accent-soft" : "border-line")}>
-              <Icon name="arrowDown" size={14} className="text-faint" />
-              <b className="text-[13px]">{t("subs.rules.fallback")}</b>
-              <span className="min-w-[180px] flex-1 text-xs text-muted">{t("subs.rules.fallbackV")}</span>
-            </div>
-          </div>
-        </Card>
-
-        <Card lg className="flex min-w-0 flex-col gap-3 p-4 lg:sticky lg:top-[72px]">
-          <div className="flex flex-col gap-0.5">
-            <SectionLabel icon="code" tone="mint">
-              {t("subs.test")}
-            </SectionLabel>
-            <span className="text-xs leading-snug text-muted">{t("subs.test.hint")}</span>
-          </div>
-          <input
-            aria-label={t("subs.test.ph")}
-            placeholder={t("subs.test.ph")}
-            value={ua}
-            onChange={(e) => setUa(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            className="h-10 w-full min-w-0 rounded-field border border-line bg-canvas px-3 font-mono text-xs text-fg outline-none transition-colors duration-200 focus:border-accent"
+    <Section
+      tone="mint"
+      icon={path.list}
+      title={t("subs.rules.title")}
+      shot="subs-rules"
+      side={
+        <Button className="sb-btn" onClick={() => setAdding(true)} disabled={adding}>
+          <Svg d={path.plus} />
+          {t("subs.rules.add")}
+        </Button>
+      }
+    >
+      <p className="sb-lead">{t("sx.rules.lead")}</p>
+      <div className="sb-rls">
+        {rules.length === 0 && !adding && (
+          <p className="sb-emp">
+            <b>{t("subs.rules.noneT")}</b> {t("subs.rules.noneBody")}
+          </p>
+        )}
+        {rules.map((r, i) => (
+          <RuleRow
+            key={`${i}:${r.uaContains}:${r.format}`}
+            rule={r}
+            i={i}
+            total={rules.length}
+            hit={hit === i}
+            t={t}
+            taken={rules.filter((_, j) => j !== i).map((x) => x.uaContains.toLowerCase())}
+            onMove={(from, to) => void run((s) => ({ ...s, rules: move(s.rules, from, to) }), t("subs.rules.moved")).catch(() => {})}
+            onEdit={(patch) => run((s) => ({ ...s, rules: s.rules.map((x, j) => (j === i ? { ...x, ...patch } : x)) }), t("subs.saved"))}
+            onRemove={() => {
+              const gone = rules[i]!;
+              // Undo puts it back where it was (or last, if the list got shorter meanwhile)
+              const restore = () => void run((s) => ({ ...s, rules: [...s.rules.slice(0, i), gone, ...s.rules.slice(i)] }), t("subs.rules.restored")).catch(() => {});
+              void run((s) => ({ ...s, rules: s.rules.filter((_, j) => j !== i) }), t("subs.rules.removedName", { ua: gone.uaContains || t("sx.rules.noText") }), restore).catch(() => {});
+            }}
+            fmtName={fmtName}
           />
-          <div role="group" aria-label={t("subs.test.samples")} className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-muted">{t("subs.test.samples")}:</span>
-            {samples.map(([label, sample]) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setUa(sample)}
-                className={cx("h-[26px] rounded-[13px] px-2.5 text-[11px] font-bold transition-colors", ua === sample ? "bg-accent-soft text-fg" : "bg-surface-2 text-muted hover:text-fg")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div role="status" className={cx("flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-[13px] leading-snug", hit >= 0 || (shown && hit < 0) ? "bg-accent-soft" : "bg-surface-2 text-muted")}>
-            <Icon name={shown ? "check" : "info"} size={15} className="mt-px text-accent-text" />
-            <span className="min-w-0">{result}</span>
-          </div>
-        </Card>
+        ))}
+        {adding && <AddRow rules={rules} t={t} fmtName={fmtName} onCancel={() => setAdding(false)} onAdd={(r) => run((s) => ({ ...s, rules: [...s.rules, r] }), t("subs.rules.added")).then(() => setAdding(false))} />}
+        <div className={cx("sb-rl sb-rest", sbDemo.rest && "hit")}>
+          <span className="sb-no mono" aria-hidden="true">
+            ∗
+          </span>
+          <b>{t("subs.rules.fallback")}</b>
+          <Svg d={path.arrowR} className="sb-arr flip" />
+          <span className="sb-rt">{t("sx.rules.rest")}</span>
+        </div>
       </div>
-      <LinkAutoCard settings={settings} />
-      <LinkAwgCard settings={settings} />
-      <ClientApiCard />
-      <DeviceLimitCard settings={settings} />
-      <DeviceIdleCard settings={settings} />
-    </div>
+      {note && (
+        <p className="sb-msg" role="status">
+          <Glyph kind="ok" />
+          {note.text}
+          {note.undo && (
+            <button
+              type="button"
+              className="an-lk"
+              onClick={() => {
+                setNote(null);
+                note.undo?.();
+              }}
+            >
+              {t("common.undo")}
+            </button>
+          )}
+        </p>
+      )}
+    </Section>
   );
 }
 
-type ListProps = { rules: Rule[]; hit: number; t: Tx; fmtOption: (f: SubFormat) => string; onMove: (from: number, to: number) => void; onEdit: (i: number, patch: Partial<Rule>) => Promise<unknown>; onRemove: (i: number) => void };
+type RowProps = { rule: Rule; i: number; total: number; hit: boolean; t: Tx; taken: string[]; fmtName: (f: SubFormat) => string; onMove: (from: number, to: number) => void; onEdit: (patch: Partial<Rule>) => Promise<unknown>; onRemove: () => void };
 
-function RuleList({ rules, hit, t, fmtOption, onMove, onEdit, onRemove }: ListProps) {
-  const [drag, setDrag] = useState<number | null>(null);
-  const [over, setOver] = useState<number | null>(null);
-  return (
-    <>
-      {rules.map((r, i) => (
-        <RuleRow
-          key={`${i}:${r.uaContains}:${r.format}`}
-          rule={r}
-          i={i}
-          total={rules.length}
-          hit={hit === i}
-          over={over === i && drag !== null && drag !== i}
-          t={t}
-          fmtOption={fmtOption}
-          taken={rules.filter((_, j) => j !== i).map((x) => x.uaContains.toLowerCase())}
-          onDragStart={() => setDrag(i)}
-          onDragOver={() => setOver(i)}
-          onDrop={() => {
-            if (drag !== null) onMove(drag, i);
-            setDrag(null);
-            setOver(null);
-          }}
-          onDragEnd={() => {
-            setDrag(null);
-            setOver(null);
-          }}
-          onMove={onMove}
-          onEdit={onEdit}
-          onRemove={onRemove}
-        />
-      ))}
-    </>
-  );
-}
-
-type RowProps = {
-  rule: Rule;
-  i: number;
-  total: number;
-  hit: boolean;
-  over: boolean;
-  t: Tx;
-  fmtOption: (f: SubFormat) => string;
-  taken: string[];
-  onDragStart: () => void;
-  onDragOver: () => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
-  onMove: (from: number, to: number) => void;
-  onEdit: (i: number, patch: Partial<Rule>) => Promise<unknown>;
-  onRemove: (i: number) => void;
-};
-
-function RuleRow({ rule, i, total, hit, over, t, fmtOption, taken, onDragStart, onDragOver, onDrop, onDragEnd, onMove, onEdit, onRemove }: RowProps) {
-  const row = useRef<HTMLDivElement>(null);
+function RuleRow({ rule, i, total, hit, t, taken, fmtName, onMove, onEdit, onRemove }: RowProps) {
   const [text, setText] = useState(rule.uaContains);
   const n = i + 1;
   // an empty text would match every client, a repeated one never fires: both go back to the saved text
@@ -232,88 +172,56 @@ function RuleRow({ rule, i, total, hit, over, t, fmtOption, taken, onDragStart, 
     const v = text.trim();
     if (v === rule.uaContains) return;
     if (v === "" || taken.includes(v.toLowerCase())) setText(rule.uaContains);
-    else void onEdit(i, { uaContains: v }).catch(() => setText(rule.uaContains));
+    else void onEdit({ uaContains: v }).catch(() => setText(rule.uaContains));
   };
   return (
-    <div
-      ref={row}
-      onDragOver={(e) => {
-        e.preventDefault();
-        onDragOver();
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDrop();
-      }}
-      className={cx(
-        "flex min-h-[52px] flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-xl border px-2 py-1.5 transition-colors duration-200",
-        hit ? "border-accent-line bg-accent-soft" : "border-line bg-surface",
-        over && "border-t-accent",
-      )}
-    >
-      <span
-        draggable
-        role="img"
-        aria-label={t("subs.rules.drag")}
-        title={t("subs.rules.drag")}
-        onDragStart={(e) => {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", String(i));
-          if (row.current) e.dataTransfer.setDragImage(row.current, 12, 20);
-          onDragStart();
-        }}
-        onDragEnd={onDragEnd}
-        className="flex h-7 w-5 flex-none cursor-grab items-center justify-center text-faint active:cursor-grabbing"
-      >
-        <Icon name="grip" size={16} strokeWidth={3} />
-      </span>
-      <span className="grid size-5 flex-none place-items-center rounded-md bg-surface-2 font-mono text-[11px] font-bold text-muted">{n}</span>
-      <input
-        aria-label={t("subs.rules.uaLabel", { n })}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") setText(rule.uaContains);
-        }}
-        autoComplete="off"
-        spellCheck={false}
-        className="h-[30px] min-w-[120px] flex-1 rounded-lg border border-line bg-canvas px-2.5 font-mono text-xs text-fg outline-none transition-colors duration-200 focus:border-accent"
-      />
-      <span aria-hidden className="hidden text-faint @min-[520px]:inline-block rtl:-scale-x-100">→</span>
-      {/* as wide as the add-rule select, so the longest format ("Список ссылок (base64)") stays on one line; in a narrow list
-          it takes its own line under the text, from the text's left edge */}
-      <div className="order-last basis-full ps-[60px] @min-[520px]:order-none @min-[520px]:basis-[210px] @min-[520px]:ps-0">
-        <Select
-          compact
-          aria-label={t("subs.rules.formatLabel", { n })}
-          value={String(rule.format)}
-          onValueChange={(v) => void onEdit(i, { format: Number(v) as SubFormat }).catch(() => {})}
-          options={ruleFormats.map((f) => ({ value: String(f), label: fmtOption(f) }))}
+    <div className={cx("sb-rl", hit && "hit")}>
+      <span className="sb-no mono">{n}</span>
+      <label className="sb-ua">
+        <span>{t("sx.rules.ua")}</span>
+        <input
+          className="an-i mono"
+          type="text"
+          aria-label={t("subs.rules.uaLabel", { n })}
+          placeholder={t("sx.rules.uaPh")}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setText(rule.uaContains);
+          }}
+          autoComplete="off"
+          spellCheck={false}
         />
+      </label>
+      <Svg d={path.arrowR} className="sb-arr flip" />
+      <div className="sb-sel">
+        <Select aria-label={t("subs.rules.formatLabel", { n })} value={String(rule.format)} onValueChange={(v) => void onEdit({ format: Number(v) as SubFormat }).catch(() => {})} options={ruleFormats.map((f) => ({ value: String(f), label: fmtName(f) }))} />
       </div>
-      <span className="ms-auto flex flex-none gap-0.5">
-        <IconButton aria-label={t("subs.rules.up", { n })} variant="flat" disabled={i === 0} onClick={() => onMove(i, i - 1)}>
-          <Icon name="arrowUp" size={14} />
-        </IconButton>
-        <IconButton aria-label={t("subs.rules.down", { n })} variant="flat" disabled={i === total - 1} onClick={() => onMove(i, i + 1)}>
-          <Icon name="arrowDown" size={14} />
-        </IconButton>
-        <IconButton aria-label={t("subs.rules.remove", { n })} variant="flat" onClick={() => onRemove(i)}>
-          <Icon name="trash" size={14} />
-        </IconButton>
+      <span className="sb-mv">
+        <button type="button" className="sb-ic" aria-label={t("subs.rules.up", { n })} aria-disabled={i === 0} onClick={() => i > 0 && onMove(i, i - 1)}>
+          <Svg d={path.up} />
+        </button>
+        <button type="button" className="sb-ic" aria-label={t("subs.rules.down", { n })} aria-disabled={i === total - 1} onClick={() => i < total - 1 && onMove(i, i + 1)}>
+          <Svg d={path.chevD} />
+        </button>
+        <button type="button" className="sb-ic" aria-label={t("subs.rules.remove", { n })} onClick={onRemove}>
+          <Svg d={path.x} />
+        </button>
       </span>
     </div>
   );
 }
 
-function AddRule({ rules, t, fmtOption, onAdd, onCancel }: { rules: Rule[]; t: Tx; fmtOption: (f: SubFormat) => string; onAdd: (r: Rule) => Promise<unknown>; onCancel: () => void }) {
+/** The row of a rule that is not made yet: the text and the format, saved when the text is left (Enter), dropped by Esc or the cross. */
+function AddRow({ rules, t, fmtName, onAdd, onCancel }: { rules: Rule[]; t: Tx; fmtName: (f: SubFormat) => string; onAdd: (r: Rule) => Promise<unknown>; onCancel: () => void }) {
   const [ua, setUa] = useState("");
   const [format, setFormat] = useState<SubFormat>(SubFormat.BASE64_URIS);
   const [busy, setBusy] = useState(false);
   const v = ua.trim();
   const dup = v !== "" && rules.some((r) => r.uaContains.toLowerCase() === v.toLowerCase());
+  const n = rules.length + 1;
   async function add() {
     if (v === "" || dup || busy) return;
     setBusy(true);
@@ -326,28 +234,90 @@ function AddRule({ rules, t, fmtOption, onAdd, onCancel }: { rules: Rule[]; t: T
     }
   }
   return (
-    <form
-      className="screen-enter flex flex-col gap-3 rounded-card bg-surface-2 p-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void add();
-      }}
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <TextField className="sm:flex-1" mono autoFocus label={t("subs.rules.addUa")} placeholder={t("subs.rules.addPh")} value={ua} onChange={(e) => setUa(e.target.value)} error={dup ? t("subs.rules.dup") : undefined} hint={t("subs.rules.addHint")} autoComplete="off" spellCheck={false} />
-        <div className="flex flex-col gap-1.5 sm:w-[210px]">
-          <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.rules.addFormat")}</span>
-          <Select aria-label={t("subs.rules.formatLabel", { n: rules.length + 1 })} value={String(format)} onValueChange={(x) => setFormat(Number(x) as SubFormat)} options={ruleFormats.map((f) => ({ value: String(f), label: fmtOption(f) }))} />
+    <>
+      <div className="sb-rl sb-new" data-shot="subs-rule-new">
+        <span className="sb-no mono">{n}</span>
+        <label className="sb-ua">
+          <span>{t("sx.rules.ua")}</span>
+          <input
+            className="an-i mono"
+            type="text"
+            autoFocus
+            aria-label={t("subs.rules.uaLabel", { n })}
+            aria-invalid={dup || undefined}
+            placeholder={t("subs.rules.addPh")}
+            value={ua}
+            onChange={(e) => setUa(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void add();
+              if (e.key === "Escape") onCancel();
+            }}
+            onBlur={() => (v === "" ? onCancel() : void add())}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        <Svg d={path.arrowR} className="sb-arr flip" />
+        <div className="sb-sel">
+          <Select aria-label={t("subs.rules.formatLabel", { n })} value={String(format)} onValueChange={(x) => setFormat(Number(x) as SubFormat)} options={ruleFormats.map((f) => ({ value: String(f), label: fmtName(f) }))} />
+        </div>
+        <span className="sb-mv">
+          <button type="button" className="sb-ic" aria-label={t("subs.rules.cancel")} onMouseDown={(e) => e.preventDefault()} onClick={onCancel}>
+            <Svg d={path.x} />
+          </button>
+        </span>
+      </div>
+      {dup && (
+        <p className="pp-q1 bad sb-pad" role="alert">
+          {t("subs.rules.dup")}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** "Try a User-Agent": the rule (or the rest) the panel would pick for a pasted User-Agent. */
+function Tester({ settings }: { settings: Settings }) {
+  const t = useTx();
+  const [ua, setUa] = useState<string>(() => sbDemo.ua ?? samples[2][1]);
+  const probe = useDebounced(ua.trim(), sbDemo.ua !== undefined ? 0 : 300);
+  const test = useQuery({ ...testAgentQuery(probe), enabled: probe !== "", placeholderData: keepPreviousData });
+  const shown = probe !== "" && test.data !== undefined;
+  const hitRule = shown && test.data!.ruleIndex >= 0 ? settings.rules[test.data!.ruleIndex] : undefined;
+  const fmtName = (f: SubFormat) => t(formatKey[f] ?? "subs.fmt.base64");
+
+  let title: string;
+  let sub = "";
+  if (probe === "") title = t("sx.test.empty");
+  else if (!test.data) title = test.isError ? errorText(test.error, t) : t("subs.test.busy");
+  else if (test.data.ruleIndex >= 0) {
+    title = t("sx.test.hit", { n: test.data.ruleIndex + 1, format: fmtName(test.data.format) });
+    sub = hitRule ? t("sx.test.has", { text: hitRule.uaContains }) : "";
+  } else {
+    title = t("sx.test.rest", { format: fmtName(test.data.format) });
+    sub = t(test.data.browser ? "sx.test.nobr" : "sx.test.noapp");
+  }
+
+  return (
+    <Section tone="sky" icon={path.search} title={t("sx.test.title")} shot="subs-tester">
+      <div className="sb-pad">
+        <p className="pp-q1">{t("sx.test.lead")}</p>
+        <input className="an-i mono sb-uain" type="text" aria-label={t("subs.test.ph")} placeholder={t("subs.test.ph")} value={ua} onChange={(e) => setUa(e.target.value)} autoComplete="off" spellCheck={false} />
+        <div className="sb-ex" role="group" aria-label={t("subs.test.samples")}>
+          {samples.map(([label, sample]) => (
+            <button key={label} type="button" aria-pressed={ua === sample} onClick={() => setUa(sample)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className={cx("sb-res", !shown ? "none" : "ok")} role="status">
+          <Glyph kind={shown ? "ok" : "none"} />
+          <span>
+            <b>{title}</b>
+            {sub && <em>{sub}</em>}
+          </span>
         </div>
       </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onCancel}>
-          {t("subs.rules.cancel")}
-        </Button>
-        <Button type="submit" variant="primary" disabled={v === "" || dup || busy}>
-          {t("subs.rules.add")}
-        </Button>
-      </div>
-    </form>
+    </Section>
   );
 }

@@ -168,8 +168,8 @@ describe("the JSON formats", () => {
     for (let i = 0; i < 100 && document.querySelectorAll("[role=option]").length === 0; i++) await settle();
     expect([...document.querySelectorAll("[role=option]")].map((o) => o.textContent?.trim())).toEqual(["Link list (base64)", "Mihomo YAML", "Xray JSON", "sing-box JSON", "Web page", "Fake 404"]);
     for (const [chip, want] of [
-      ["sing-box", "Rule 3 matches → sing-box JSON"],
-      ["v2rayNG", "Rule 4 matches → Xray JSON"],
+      ["sing-box", "Rule 3 → sing-box JSON"],
+      ["v2rayNG", "Rule 4 → Xray JSON"],
     ] as const) {
       await click([...document.querySelectorAll("button")].find((b) => b.textContent === chip));
       for (let i = 0; i < 40 && !text().includes(want); i++) await act(async () => void (await new Promise((r) => setTimeout(r, 25)))); // the probe is debounced

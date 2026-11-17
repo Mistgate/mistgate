@@ -7,7 +7,6 @@ import { DnsCategory, DnsClient, DnsTransport } from "@/gen/mistgate/admin/v1/dn
 import { Platform } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { meQuery } from "@/lib/session";
 import { DnsOptionsCard, nodeDnsOptionsQuery } from "@/screens/node/dns-options";
-import { DnsTab } from "@/screens/subscriptions/dns";
 import type { DnsData, Preset, Settings } from "@/screens/subscriptions/model";
 import { PageTab } from "@/screens/subscriptions/page";
 import { dnsPresetsQuery, pickerUsersQuery, settingsQuery } from "@/screens/subscriptions/queries";
@@ -86,8 +85,8 @@ export function DnsLinkKit() {
   );
 }
 
-// ?only=ads: Subscriptions → DNS with the built-in "No ads on the device" and its badge (a card opens the editor with the
-// switch), and a node's "DNS choice on the user page" with the AmneziaWG line.
+// ?only=ads: a node's "DNS choice on the user page" with the AmneziaWG line. (The list of Subscriptions → DNS with the built-in "No ads on
+// the device" and its badge is the scene dns-ads of ?only=subs-page, dev-kit-subs-dns.tsx.)
 const variant = (id: string, nameEn: string, ipv4: string[], noteEn: string, category = DnsCategory.REGULAR) => ({
   id, nameRu: nameEn, nameEn, category, country: "", ipv4, ipv6: [], plain: true, dotHost: "dns.example.com", dotPort: 853, dohUrl: "https://dns.example.com/dns-query", noteRu: noteEn, noteEn,
 });
@@ -123,9 +122,6 @@ export function DnsAdsKit() {
   const seed: Seed = [owner, [dnsPresetsQuery.queryKey, adsData], [settingsQuery.queryKey, { settings, effectiveTitle: "" }]];
   return (
     <div className="flex flex-col gap-8">
-      <Shot id="ads-list" title="Subscriptions → DNS: the presets, the built-in No ads on the device with its badge" seed={seed}>
-        <DnsTab />
-      </Shot>
       <Shot id="ads-node" title="Node → DNS choice on the user page: AmneziaWG keys do not block ads" seed={[...seed, [nodeDnsOptionsQuery.queryKey, [{ nodeId: "nod_de1", presetIds: ["dns_builtin_standard", "dns_builtin_ads_device"], defaultPresetId: "dns_builtin_standard" }]]]}>
         <div className="max-w-2xl">
           <DnsOptionsCard nodeId="nod_de1" />

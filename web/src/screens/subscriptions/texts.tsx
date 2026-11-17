@@ -1,8 +1,7 @@
 import { useRef, useState } from "react";
 import { halo } from "@/components/fx/halo";
-import { Card, SectionLabel } from "@/components/ui/bits";
+import { Button } from "@/components/ui/button";
 import { FlagText } from "@/components/ui/flag";
-import { Icon } from "@/components/ui/icons";
 import { Segmented } from "@/components/ui/segmented";
 import { Stepper } from "@/components/ui/stepper";
 import { useToast } from "@/components/ui/toast";
@@ -11,10 +10,10 @@ import { errorText } from "@/lib/errors";
 import { cx } from "@/lib/cx";
 import { useTx, type Tx } from "@/screens/users/t";
 import { ScrollFade } from "@/components/ui/scroll-fade";
-import { SwitchRow } from "@/screens/users/ui";
 import { announceMax, cutAnnounce, defaultNameTemplate, serverNames, validSupportLink, type Settings } from "./model";
 import { useSaveSettings } from "./queries";
-import { FieldBlock, inputCls, Lead, SaveBar } from "./ui";
+import { sbDemo } from "./demo-sb";
+import { Grid, path, Row, Section, Toggle } from "./parts";
 
 const DEFAULT_HOURS = 12;
 const chips = [
@@ -23,6 +22,12 @@ const chips = [
   { ph: "{node}", hint: "subs.ph.node" },
   { ph: "{profile}", hint: "subs.ph.profile" },
 ] as const;
+
+/** A server name as the panel sends it ends with " · 64%" (and a number when two names are alike): the preview sets the percent apart. */
+function split(name: string): { name: string; pct: string } {
+  const m = /^(.*?) · (\d+%)(?: (\d+))?$/u.exec(name);
+  return m ? { name: m[1]! + (m[3] ? ` ${m[3]}` : ""), pct: m[2]! } : { name, pct: "" };
+}
 
 type Sample = { node: string; countryCode: string; profile: string; loadPercent?: number };
 
@@ -60,7 +65,7 @@ function TextsForm({ data }: { data: Data }) {
     ping: s.happPing ?? HappPing.UNSPECIFIED,
     pingOnOpen: !!s.happPingOnOpen,
   };
-  const [f, setF] = useState(base);
+  const [f, setF] = useState(() => ({ ...base, title: sbDemo.draft?.title ?? base.title, announcement: sbDemo.draft?.announcement ?? base.announcement, supportUrl: sbDemo.draft?.supportUrl ?? base.supportUrl, template: sbDemo.draft?.template ?? base.template }));
   const set = <K extends keyof typeof base>(k: K, v: (typeof base)[K]) => setF((x) => ({ ...x, [k]: v }));
   const tplRef = useRef<HTMLInputElement>(null);
 
@@ -97,141 +102,120 @@ function TextsForm({ data }: { data: Data }) {
       .catch((e: unknown) => toast.error(errorText(e, t)));
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <Lead>{t("subs.texts.lead")}</Lead>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,680px)_minmax(320px,400px)]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card lg className="flex flex-col px-4 py-4">
-            <SectionLabel className="pb-3" icon="text" tone="sand">
-              {t("subs.texts.sub")}
-            </SectionLabel>
-            <FieldBlock label={t("subs.texts.title")} htmlFor="subs-title" hint={t("subs.texts.titleHint")} className="border-t-0! pt-0!">
-              <input id="subs-title" className={inputCls} value={f.title} placeholder={data.effectiveTitle} onChange={(e) => set("title", e.target.value)} maxLength={100} autoComplete="off" />
-            </FieldBlock>
-            <FieldBlock label={t("subs.texts.announce")} htmlFor="subs-announce" hint={<AnnounceHint t={t} text={f.announcement} />}>
-              <textarea
-                id="subs-announce"
-                rows={2}
-                value={f.announcement}
-                placeholder={t("subs.texts.announcePh")}
-                onChange={(e) => set("announcement", e.target.value)}
-                maxLength={1000}
-                aria-describedby="subs-announce-count"
-                className="min-h-[64px] w-full resize-y rounded-field border border-line bg-canvas px-3 py-2.5 text-[13px] leading-normal text-fg outline-none transition-colors duration-200 placeholder:text-faint focus:border-accent"
-              />
-            </FieldBlock>
-            <FieldBlock label={t("subs.texts.support")} htmlFor="subs-support" hint={t("subs.texts.supportHint")} error={supportOk ? undefined : t("subs.texts.supportBad")}>
-              <input id="subs-support" className={`${inputCls} font-mono`} aria-invalid={!supportOk || undefined} value={f.supportUrl} placeholder="https://t.me/…" onChange={(e) => set("supportUrl", e.target.value)} autoComplete="off" spellCheck={false} inputMode="url" />
-            </FieldBlock>
-            <div className="flex min-h-[60px] items-center gap-3 border-t border-line pt-3.5">
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[13px] font-bold">{t("subs.texts.interval")}</span>
-                <span className="text-[11px] leading-snug text-muted">{t("subs.texts.intervalHint")}</span>
-              </div>
-              <div className="w-[130px]">
-                <Stepper
-                  decrementLabel={t("users.less", { what: t("subs.texts.interval") })}
-                  incrementLabel={t("users.more", { what: t("subs.texts.interval") })}
-                  onDecrement={() => set("hours", Math.max(1, f.hours - 1))}
-                  onIncrement={() => set("hours", Math.min(72, f.hours + 1))}
-                  decrementDisabled={f.hours <= 1}
-                  incrementDisabled={f.hours >= 72}
-                >
-                  {t("subs.texts.hours", { n: f.hours })}
-                </Stepper>
-              </div>
-            </div>
-          </Card>
-
-          <Card lg className="flex flex-col px-4 py-4">
-            <SectionLabel className="pb-3" icon="server" tone="sky">
-              {t("subs.texts.servers")}
-            </SectionLabel>
-            <FieldBlock label={t("subs.texts.name")} htmlFor="subs-template" hint={<FlagText text={t("subs.texts.nameHint")} size={10} />} className="border-t-0! pt-0!">
-              <input ref={tplRef} id="subs-template" className={`${inputCls} font-mono`} value={f.template} placeholder={defaultNameTemplate} onChange={(e) => set("template", e.target.value)} maxLength={100} autoComplete="off" spellCheck={false} />
-              <div role="group" aria-label={t("subs.texts.nameChips")} className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-muted">{t("subs.texts.pieces")}:</span>
-                {chips.map((c) => (
-                  <button
-                    key={c.ph}
-                    type="button"
-                    title={t(c.hint)}
-                    onClick={() => insert(c.ph)}
-                    className="h-[26px] rounded-[13px] bg-surface-2 px-2.5 font-mono text-[11px] text-muted transition-colors hover:bg-accent-soft hover:text-fg"
-                  >
-                    {c.ph}
-                  </button>
-                ))}
-              </div>
-            </FieldBlock>
-          </Card>
-
-          <Card lg className="flex flex-col px-4 pt-4 pb-1">
-            <SectionLabel className="pb-3" icon="pulse" tone="mint">
-              {t("subs.texts.ping")}
-            </SectionLabel>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-3.5">
-              <div className="flex min-w-[200px] flex-1 flex-col gap-0.5">
-                <span className="text-[13px] font-bold">{t("subs.texts.pingHow")}</span>
-                <span className="text-[11px] leading-snug text-muted">{t(f.ping === HappPing.TCP ? "subs.texts.pingHint.tcp" : "subs.texts.pingHint.default")}</span>
-              </div>
-              <Segmented
-                aria-label={t("subs.texts.pingHow")}
-                value={String(f.ping)}
-                onValueChange={(v) => set("ping", Number(v) as HappPing)}
-                options={[
-                  { value: String(HappPing.UNSPECIFIED), label: t("subs.texts.ping.default") },
-                  { value: String(HappPing.TCP), label: t("subs.texts.ping.tcp") },
-                ]}
-              />
-            </div>
-            <SwitchRow
-              label={t("subs.texts.pingOpen")}
-              hint={f.ping === HappPing.UNSPECIFIED ? t("subs.texts.pingOpenOff") : t("subs.texts.pingOpenHint")}
-              checked={f.pingOnOpen}
-              disabled={f.ping === HappPing.UNSPECIFIED}
-              onCheckedChange={(on) => set("pingOnOpen", on)}
-            />
-          </Card>
-        </div>
-
-        <SubscriptionPreview
-          t={t}
-          title={f.title.trim() || data.effectiveTitle}
-          announcement={f.announcement.trim()}
-          hours={f.hours}
-          support={supportOk ? f.supportUrl.trim() : ""}
-          template={f.template}
-          samples={data.samples?.length ? data.samples : madeUp}
-          group={data.samples?.length ? (data.sampleGroup ?? "") : ""}
-          lang={data.namesLanguage || t.locale}
-        />
-      </div>
-
-      {dirty && <SaveBar busy={save.isPending} canSave={supportOk} onSave={onSave} onDiscard={() => setF(base)} />}
-    </div>
-  );
-}
-
-/** The announcement's hint with how much of it Happ shows: "120 / 200", in the warning tone past the limit. */
-function AnnounceHint({ t, text }: { t: Tx; text: string }) {
-  const n = [...text.trim()].length;
+  const hint = (k: "subs.texts.pingHint.default" | "subs.texts.pingHint.tcp") => t(k);
+  const n = [...f.announcement.trim()].length;
   const over = n > announceMax;
+
   return (
-    <span className="flex flex-col gap-0.5">
-      <span>{t("subs.texts.announceHint")}</span>
-      <span id="subs-announce-count" className={cx("tabular-nums", over && "font-bold text-warn-text")}>
-        {t(over ? "subs.texts.announceOver" : "subs.texts.announceCount", { n, max: announceMax })}
-      </span>
-    </span>
+    <>
+      <Grid
+        main={
+          <>
+            <Section tone="lav" icon={path.lines} title={t("subs.texts.sub")} shot="subs-texts">
+              <div className="pp-rows">
+                <Row label={t("subs.texts.title")} hint={t("subs.texts.titleHint")}>
+                  <input id="subs-title" className="an-i" type="text" aria-label={t("subs.texts.title")} value={f.title} placeholder={data.effectiveTitle} onChange={(e) => set("title", e.target.value)} maxLength={100} autoComplete="off" />
+                </Row>
+                <Row label={t("subs.texts.announce")} hint={t("subs.texts.announceHint")}>
+                  <textarea id="subs-announce" className="an-i sb-ta" rows={3} aria-label={t("subs.texts.announce")} aria-describedby="subs-announce-count" value={f.announcement} placeholder={t("subs.texts.announcePh")} onChange={(e) => set("announcement", e.target.value)} maxLength={1000} />
+                  <p id="subs-announce-count" className={cx("pp-q1 sb-cnt", over && "bad")}>
+                    {t(over ? "subs.texts.announceOver" : "subs.texts.announceCount", { n, max: announceMax })}
+                  </p>
+                </Row>
+                <Row label={t("subs.texts.support")} hint={t("subs.texts.supportHint")}>
+                  <input id="subs-support" className="an-i mono" type="text" aria-label={t("subs.texts.support")} aria-invalid={!supportOk || undefined} value={f.supportUrl} placeholder="https://t.me/…" onChange={(e) => set("supportUrl", e.target.value)} autoComplete="off" spellCheck={false} inputMode="url" />
+                  {!supportOk && (
+                    <p className="pp-q1 bad" role="alert">
+                      {t("subs.texts.supportBad")}
+                    </p>
+                  )}
+                </Row>
+                <Row label={t("subs.texts.interval")} hint={t("subs.texts.intervalHint")}>
+                  <div className="sb-step">
+                    <Stepper
+                      decrementLabel={t("users.less", { what: t("subs.texts.interval") })}
+                      incrementLabel={t("users.more", { what: t("subs.texts.interval") })}
+                      onDecrement={() => set("hours", Math.max(1, f.hours - 1))}
+                      onIncrement={() => set("hours", Math.min(72, f.hours + 1))}
+                      decrementDisabled={f.hours <= 1}
+                      incrementDisabled={f.hours >= 72}
+                    >
+                      {t("subs.texts.hours", { n: f.hours })}
+                    </Stepper>
+                  </div>
+                </Row>
+              </div>
+            </Section>
+
+            <Section tone="sand" icon={path.sliders} title={t("subs.texts.servers")}>
+              <div className="pp-rows">
+                <Row label={t("subs.texts.name")} hint={t("sx.texts.nameHint")}>
+                  <input id="subs-template" ref={tplRef} className="an-i mono" type="text" aria-label={t("subs.texts.name")} value={f.template} placeholder={defaultNameTemplate} onChange={(e) => set("template", e.target.value)} maxLength={100} autoComplete="off" spellCheck={false} />
+                  <div className="sb-parts" role="group" aria-label={t("subs.texts.nameChips")}>
+                    <span>{t("subs.texts.pieces")}</span>
+                    {chips.map((c) => (
+                      <button key={c.ph} type="button" className="mono" title={t(c.hint)} onClick={() => insert(c.ph)}>
+                        {c.ph}
+                      </button>
+                    ))}
+                  </div>
+                </Row>
+              </div>
+            </Section>
+
+            <Section tone="sky" icon={path.pulse} title={t("subs.texts.ping")}>
+              <div className="pp-rows">
+                <Row label={t("subs.texts.pingHow")} hint={hint(f.ping === HappPing.TCP ? "subs.texts.pingHint.tcp" : "subs.texts.pingHint.default")}>
+                  <Segmented
+                    className="pp-seg"
+                    aria-label={t("subs.texts.pingHow")}
+                    value={String(f.ping)}
+                    onValueChange={(v) => set("ping", Number(v) as HappPing)}
+                    options={[
+                      { value: String(HappPing.UNSPECIFIED), label: t("subs.texts.ping.default") },
+                      { value: String(HappPing.TCP), label: t("subs.texts.ping.tcp") },
+                    ]}
+                  />
+                </Row>
+              </div>
+              <div className="sb-tgs">
+                <Toggle title={t("subs.texts.pingOpen")} hint={f.ping === HappPing.UNSPECIFIED ? t("subs.texts.pingOpenOff") : t("subs.texts.pingOpenHint")} checked={f.pingOnOpen} disabled={f.ping === HappPing.UNSPECIFIED} onChange={(on) => set("pingOnOpen", on)} />
+              </div>
+            </Section>
+
+            <div className={cx("sb-save", (dirty || save.isPending) && "on")} role="status">
+              <span>{t("subs.dirty")}</span>
+              <Button variant="ghost" onClick={() => setF(base)} disabled={save.isPending}>
+                {t("subs.discard")}
+              </Button>
+              <Button variant="primary" disabled={!supportOk || save.isPending || !dirty} onClick={onSave}>
+                {t("subs.save")}
+              </Button>
+            </div>
+          </>
+        }
+        side={
+          <SubscriptionPreview
+            t={t}
+            title={f.title.trim() || data.effectiveTitle}
+            announcement={f.announcement.trim()}
+            hours={f.hours}
+            support={supportOk ? f.supportUrl.trim() : ""}
+            template={f.template}
+            samples={data.samples?.length ? data.samples : madeUp}
+            group={data.samples?.length ? (data.sampleGroup ?? "") : ""}
+            lang={data.namesLanguage || t.locale}
+          />
+        }
+      />
+    </>
   );
 }
 
 /**
- * A mock of how the subscription looks in Happ, drawn from the form as it stands: title, the announcement as Happ cuts
- * it, update interval, expiry and traffic, and the servers of the busiest group named by the template (made-up ones on an
- * install that runs none yet). Country codes keep the load percentage visible in Happ's narrow server rows.
+ * The mock of how the subscription looks in Happ, drawn from the form as it stands: title, the announcement as Happ cuts it, update
+ * interval, expiry and traffic, and the servers of the busiest group named by the template (made-up ones on an install that runs none
+ * yet). Country codes keep the load percentage visible in Happ's narrow server rows.
  */
 function SubscriptionPreview({ t, title, announcement, hours, support, template, samples, group, lang }: { t: Tx; title: string; announcement: string; hours: number; support: string; template: string; samples: Sample[]; group: string; lang: string }) {
   const regions = new Intl.DisplayNames([lang], { type: "region" });
@@ -239,57 +223,33 @@ function SubscriptionPreview({ t, title, announcement, hours, support, template,
   const [now] = useState(() => Date.now());
   const until = new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "long" }).format(new Date(now + 76 * 86_400_000));
   return (
-    <Card lg className="flex min-w-0 flex-col gap-3 p-4 lg:sticky lg:top-[72px]">
-      <SectionLabel icon="phone" tone="mint">
-        {t("subs.texts.preview")}
-      </SectionLabel>
-      <div className="flex flex-col gap-3 rounded-[22px] border border-line bg-canvas p-3.5">
-        <div className="flex flex-col gap-0.5">
-          <b className="truncate text-base tracking-[-0.02em]">{title}</b>
-          <span className="flex items-center gap-1.5 text-[11px] text-muted">
-            <Icon name="refresh" size={11} />
-            {t("subs.texts.pv.refresh", { n: hours })}
-          </span>
+    <Section tone="mint" icon={path.eye} title={t("subs.texts.preview")} className="sb-prev" shot="subs-preview">
+      <div className="sb-ph">
+        <div className="sb-pht">
+          <b>{title}</b>
+          <span>{t("subs.texts.pv.refresh", { n: hours })}</span>
         </div>
-        {announcement && (
-          <div className="flex items-start gap-2 rounded-xl border border-warn-line bg-warn-soft px-3 py-2 text-xs leading-snug">
-            <Icon name="bell" size={14} className="mt-px text-warn-text" />
-            <span className="min-w-0 break-words whitespace-pre-line">{cutAnnounce(announcement)}</span>
+        {announcement && <p className="sb-pha">{cutAnnounce(announcement)}</p>}
+        <span className="sb-phl">{t("subs.texts.pv.servers")}</span>
+        <ScrollFade label={t("subs.texts.pv.servers")} className="max-h-[300px]">
+          <div aria-live="polite">
+            {names.map((name, i) => (
+              <div className="sb-phr" key={i}>
+                <span>
+                  <FlagText text={split(name).name} size={13} />
+                </span>
+                {split(name).pct && <em className="mono">{split(name).pct}</em>}
+              </div>
+            ))}
           </div>
-        )}
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.texts.pv.servers")}</span>
-          {/* about seven rows and a half: the cut row says there is more */}
-          <ScrollFade label={t("subs.texts.pv.servers")} className="-me-1.5 max-h-[300px] pe-1.5">
-            <div aria-live="polite" className="flex flex-col gap-1.5">
-              {names.map((name, i) => (
-                <div key={i} className="flex h-10 flex-none items-center gap-2.5 rounded-xl border border-line bg-surface px-3">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
-                    <FlagText text={name} size={14} />
-                  </span>
-                  <span aria-hidden className="size-1.5 flex-none rounded-full bg-ok" />
-                </div>
-              ))}
-            </div>
-          </ScrollFade>
+        </ScrollFade>
+        <div className="sb-phf">
+          <span className="mono">{t("subs.texts.pv.traffic")}</span>
+          <span>{t("subs.texts.pv.until", { date: until })}</span>
         </div>
-        <div className="flex flex-col gap-1.5 border-t border-line pt-3">
-          <div className="flex items-baseline gap-2 text-xs">
-            <span className="flex-1 font-mono font-bold">{t("subs.texts.pv.traffic")}</span>
-            <span className="text-muted">{t("subs.texts.pv.until", { date: until })}</span>
-          </div>
-          <div className="h-[3px] overflow-hidden rounded-sm bg-surface-2">
-            <div className="h-full w-[12%] rounded-sm bg-accent" />
-          </div>
-        </div>
-        {support && (
-          <span className="inline-flex h-8 items-center gap-1.5 self-start rounded-ctl border border-line bg-surface px-3 text-xs font-bold">
-            <Icon name="link" size={13} />
-            {t("subs.texts.pv.support")}
-          </span>
-        )}
+        {support && <div className="sb-phb">{t("subs.texts.pv.support")}</div>}
       </div>
-      <p className="text-[11px] leading-snug text-muted">{group ? t("subs.texts.previewHintGroup", { group }) : t("subs.texts.previewHint")}</p>
-    </Card>
+      <p className="pp-q1 sb-pad">{group ? t("subs.texts.previewHintGroup", { group }) : t("subs.texts.previewHint")}</p>
+    </Section>
   );
 }

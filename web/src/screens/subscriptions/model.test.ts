@@ -4,7 +4,7 @@ import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { zh } from "@/i18n/zh";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, chipCountry, chipLabel, chipOf, cleanSplit, countryName, geoChoices, toggleGeo, cutAnnounce, dnsChips, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, chipCountry, chipLabel, chipOf, cleanSplit, countryName, geoChoices, toggleGeo, cutAnnounce, dnsChips, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, splitFirst, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -437,5 +437,19 @@ describe("the country lists of a split rule in the editor", () => {
     }
     expect(ru["subs.dns.directHint" as keyof typeof ru]).not.toMatch(/России/);
     expect(en["subs.dns.directHint" as keyof typeof en]).not.toMatch(/Russia/);
+  });
+});
+
+describe("what a preset sends direct, first", () => {
+  const server = { kind: DnsServerKind.PLAIN, address: "77.88.8.8", providerVariant: "" };
+  const country = (c: string) => (c === "cn" ? "China" : c);
+  it("is the first suffix, shown as people write it, the first rule that has any", () => {
+    expect(splitFirst([{ suffixes: [".xn--p1ai", ".ru"], geo: [], servers: [server] }], country)).toBe(".рф");
+    expect(splitFirst([{ suffixes: [], geo: [], servers: [server] }, { suffixes: [".ru"], geo: [], servers: [server] }], country)).toBe(".ru");
+  });
+  it("is the country of a rule of country lists only, and nothing when there is no rule", () => {
+    expect(splitFirst([{ suffixes: [], geo: ["cn"], servers: [server] }], country)).toBe("China");
+    expect(splitFirst([], country)).toBe("");
+    expect(splitFirst([{ suffixes: [], geo: [], servers: [server] }], country)).toBe("");
   });
 });
