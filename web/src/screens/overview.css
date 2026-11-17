@@ -1,0 +1,519 @@
+/*
+ * What the Overview's utilities cannot say (screens/overview*.tsx, first-run.tsx): key frames, the cells of the checks with
+ * their tooltip, the dotted field of the first-run card, the ghost previews and the layers of the chart. The values are the
+ * redesign board's (PnOverview + pn.css); the curves are the --e and --ease-spring of index.css.
+ */
+
+.ov {
+  /* the board's amber dot is a step brighter than its amber text in the light theme */
+  --ov-warn: var(--warning);
+  /* the lines of the chart: the first protocol takes the accent, then sky, lavender, and three more for any other */
+  --pl-a: var(--accent-mark);
+  --pl-b: #8ec8ea;
+  --pl-c: #b8acf2;
+  --pl-d: #dcc68c;
+  --pl-e: #e6a6b0;
+  --pl-f: #b0cc90;
+  /* the track of a bar (speed, a person's rate) */
+  --ov-track: var(--surface-2);
+}
+:root[data-theme="light"] .ov {
+  --ov-warn: #e0a100;
+  --pl-b: #3d94c4;
+  --pl-c: #8573d6;
+  --pl-d: #a68a1c;
+  --pl-e: #c0606f;
+  --pl-f: #6d9a3c;
+  --ov-track: #e3e3df;
+}
+
+/* the dot of "refreshes every 10 s" breathes; the dot of a fault pulses red */
+@keyframes ov-live {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.ov-live-dot {
+  animation: ov-live 2.4s ease-out infinite;
+}
+@keyframes ov-crit {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 50%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.ov-crit-dot {
+  animation: ov-crit 1.6s ease-in-out infinite;
+}
+@keyframes ov-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ov-pop {
+  animation: ov-pop 0.5s var(--ease-spring) both;
+}
+
+/* "Needs you": a row comes in (a new warning) and leaves (a fix is done): it slides, blurs and folds, a sweep of its colour over it */
+.ov-td {
+  position: relative;
+  overflow: hidden;
+}
+.ov-td.inn {
+  --tdc: var(--ov-warn);
+  animation: ov-td-in 0.7s var(--e) both;
+}
+.ov-td.out {
+  --tdc: var(--accent);
+  animation: ov-td-out 0.62s var(--e) both;
+}
+.ov-td.inn::after,
+.ov-td.out::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 0, color-mix(in srgb, var(--tdc) 20%, transparent) 46%, color-mix(in srgb, var(--tdc) 5%, transparent) 62%, transparent 100%);
+  transform: translateX(calc(-100% * var(--x-dir)));
+  animation: ov-td-sw 0.6s var(--e) 0.08s both;
+}
+.ov-td.out .ov-g {
+  background: var(--tone-mint-bg);
+  color: var(--accent-mark);
+  animation: ov-pop 0.4s var(--ease-spring) both;
+}
+@keyframes ov-td-sw {
+  to {
+    transform: translateX(calc(100% * var(--x-dir)));
+  }
+}
+@keyframes ov-td-in {
+  0% {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    transform: translateX(calc(-16px * var(--x-dir)));
+    filter: blur(6px);
+  }
+  40% {
+    max-height: 160px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    opacity: 0;
+    transform: translateX(calc(-16px * var(--x-dir)));
+    filter: blur(6px);
+  }
+  100% {
+    max-height: 160px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes ov-td-out {
+  0%,
+  42% {
+    max-height: 88px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  70% {
+    max-height: 88px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    opacity: 0;
+    transform: translateX(calc(24px * var(--x-dir)));
+    filter: blur(6px);
+  }
+  100% {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    transform: translateX(calc(24px * var(--x-dir)));
+    filter: blur(6px);
+    border-top-color: transparent;
+  }
+}
+
+/* the glyph tile of a row of "Needs you": amber for a warning, red for a fault, sky for something an agent asked */
+.ov-g {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+}
+.ov-g.warn {
+  background: color-mix(in srgb, var(--ov-warn) 16%, var(--surface));
+  color: var(--ov-warn);
+}
+:root[data-theme="light"] .ov-g.warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.ov-g.bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.ov-g.ai {
+  background: var(--tone-sky-bg);
+  color: var(--tone-sky);
+}
+
+/* the checks of a node: one cell an hour; the one under the pointer grows and says what the check found */
+.ov-tk {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 2px;
+}
+.ov-tk i {
+  position: relative;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--ok);
+  opacity: 0.8;
+  transition:
+    transform 0.18s var(--ease-spring),
+    opacity 0.18s var(--e);
+}
+:root[data-theme="light"] .ov-tk i {
+  opacity: 1;
+}
+.ov-tk i.warn {
+  background: var(--ov-warn);
+}
+.ov-tk i.bad {
+  background: var(--danger);
+  opacity: 1;
+}
+.ov-tk i.none {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--border);
+  opacity: 1;
+}
+@media (hover: hover) {
+  .ov-tk:hover i {
+    opacity: 0.4;
+  }
+  .ov-tk i:hover {
+    opacity: 1;
+    transform: scaleY(1.35);
+    z-index: 4;
+  }
+  .ov-tk i:hover::after {
+    content: attr(data-t) "\A" attr(data-s);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 4px);
+    transform: translateX(-50%) scaleY(0.74);
+    transform-origin: 50% 100%;
+    white-space: pre;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--sec);
+    font: 400 12px/16px var(--font-sans);
+    font-style: normal;
+    text-align: start;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+    pointer-events: none;
+  }
+  .ov-tk i:hover::first-line {
+    color: var(--text);
+  }
+}
+
+/* the bars of a speed and of a person's rate */
+.ov-bar {
+  display: block;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--ov-track);
+}
+.ov-bar[data-end]::after {
+  margin-inline-start: auto;
+}
+.ov-bar::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--w);
+  border-radius: 2px;
+  background: var(--fill);
+}
+
+/* the chart: stroke widths stay as they are when the box stretches */
+.ov-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ov-plot path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.ov-plot .grid {
+  stroke: color-mix(in srgb, var(--text) 6%, transparent);
+  stroke-width: 1;
+}
+.ov-plot .base {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.ov-plot .ln {
+  stroke: var(--c);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.ov-plot .area {
+  stroke: none;
+}
+
+/* first run: a dotted field rising from the lower left corner of the card */
+.ov-first::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 70%, transparent) 1.1px, transparent 1.6px);
+  background-size: 10px 10px;
+  mask-image: radial-gradient(60% 90% at 30% 110%, #000 0, transparent 70%);
+  opacity: 0.5;
+}
+/* the dashed line that joins the numbered steps */
+.ov-steps li + li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 39.5px;
+  top: -12px;
+  height: 24px;
+  border-inline-start: 1px dashed var(--border);
+}
+@media (width < 45rem) {
+  .ov-steps li + li::before {
+    inset-inline-start: 31.5px;
+  }
+}
+
+/* an empty panel: ghost previews of what will appear */
+.ov-so-v {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  height: 88px;
+  mask-image: linear-gradient(90deg, #000 55%, transparent);
+}
+:dir(rtl) > .ov-so-v {
+  mask-image: linear-gradient(270deg, #000 55%, transparent);
+}
+.ov-so-v i {
+  display: block;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.ov-so-r {
+  display: grid;
+  grid-template-columns: 24px 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.ov-so-r .a {
+  height: 16px;
+}
+.ov-so-r .b {
+  height: 8px;
+}
+.ov-so-r .b.s {
+  width: 40px;
+}
+.ov-so-tk {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 2px;
+}
+.ov-so-tk i {
+  height: 14px;
+  border-radius: 2px;
+  animation: ov-so-tk 2.8s var(--e) infinite;
+}
+.ov-so-r:nth-child(2) .ov-so-tk i {
+  animation-delay: 0.3s;
+}
+.ov-so-r:nth-child(3) .ov-so-tk i {
+  animation-delay: 0.6s;
+}
+.ov-so-tk i:nth-child(3n) {
+  animation-delay: 0.9s;
+}
+.ov-so-tk i:nth-child(4n + 1) {
+  animation-delay: 1.5s;
+}
+@keyframes ov-so-tk {
+  0%,
+  70%,
+  100% {
+    background: color-mix(in srgb, var(--text) 9%, transparent);
+  }
+  82% {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+.ov-so-v svg {
+  width: 100%;
+  height: 88px;
+}
+.ov-so-v svg path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.ov-so-v svg .l {
+  stroke: color-mix(in srgb, var(--accent) 60%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 5;
+  animation: ov-flow 1.6s linear infinite;
+}
+.ov-so-v svg .f {
+  fill: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.ov-so-v svg .g {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+@keyframes ov-flow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+.ov-so-e {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+}
+.ov-so-e .d {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.ov-so-e .b {
+  height: 8px;
+  width: 70%;
+}
+.ov-so-e .b.s {
+  width: 48%;
+}
+.ov-so-e .b.m {
+  width: 60%;
+}
+.ov-so-e .t {
+  height: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-so-tk i,
+  .ov-so-v svg .l {
+    animation: none;
+  }
+}
+
+/* the nodes table: the columns the board gives at each width (more room, the checks go, the speed goes, the phone's two columns) */
+.ov-nr {
+  grid-template-columns: minmax(168px, 1.1fr) minmax(0, 0.8fr) minmax(176px, 1fr) 76px 112px 272px 16px;
+}
+.ov-nr.nochk {
+  grid-template-columns: minmax(168px, 1.1fr) minmax(0, 0.8fr) 76px 112px 272px 16px;
+}
+@media (width <= 1360px) {
+  .ov-nr {
+    grid-template-columns: minmax(160px, 1.1fr) minmax(124px, 0.8fr) 144px 76px 112px 272px 16px;
+  }
+  .ov-nr.nochk {
+    grid-template-columns: minmax(160px, 1.1fr) minmax(124px, 0.8fr) 76px 112px 272px 16px;
+  }
+}
+@media (width <= 1200px) {
+  .ov-nr,
+  .ov-nr.nochk {
+    grid-template-columns: minmax(150px, 1fr) minmax(124px, 0.8fr) 84px 272px 16px;
+  }
+  .ov-nr .c-tk,
+  .ov-nr .c-sp {
+    display: none;
+  }
+}
+@media (width < 45rem) {
+  .ov-nr,
+  .ov-nr.nochk {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding-block: 14px;
+  }
+  .ov-nr .c-on,
+  .ov-nr .c-ch {
+    display: none;
+  }
+  .ov-nr .c-pf {
+    grid-column: 1 / -1;
+  }
+}
+
+/* the grids of the cards: wide, the board's 1360 (a narrower side column) and 1200 (one column) */
+.ov-hero,
+.ov-first {
+  grid-template-columns: minmax(0, 1fr) 472px;
+}
+.ov-todo {
+  min-height: 296px;
+  border-inline-start: 1px solid var(--border);
+}
+.ov-row2 {
+  grid-template-columns: minmax(0, 1fr) 400px;
+}
+@media (width <= 1360px) {
+  .ov-hero {
+    grid-template-columns: minmax(0, 1fr) 420px;
+  }
+  .ov-row2 {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+@media (width <= 1200px) {
+  .ov-hero,
+  .ov-first,
+  .ov-row2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ov-todo {
+    min-height: 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
+  }
+  .ov-steps {
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
+  }
+}

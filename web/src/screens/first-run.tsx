@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { isIPAddress, useAddNode } from "@/components/add-node";
 import { Button, buttonClass } from "@/components/ui/button";
-import { Icon, IconChip } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { Node } from "@/gen/mistgate/admin/v1/node_pb";
@@ -16,6 +16,8 @@ import type { Plain } from "@/lib/plain";
 import { nodesQuery, userCountQuery } from "@/lib/queries";
 import { readPref, writePref } from "@/lib/storage";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
+import { OvDot } from "./overview-parts";
+import "./overview.css";
 import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 
 // "First run": from an empty panel to a friend who connects, as a checklist on the Overview. Every item is computed from
@@ -150,18 +152,22 @@ export function useFirstRun(): { steps: Step[]; open: StepAction | null; hide: (
   };
 }
 
-/** The list itself (the dev kit shows it with made-up steps): open while a step is left, one line once all are done. */
-export function FirstRunView({ steps, onHide }: { steps: readonly Step[]; onHide: () => void }) {
+/**
+ * The card itself (the dev kit shows it with made-up steps): while a step is left, the board's two columns, the step to take on
+ * the left with its button and the whole list on the right; one line once all are done. `empty` is a panel with no node at all:
+ * the card then says the panel is ready instead of counting steps.
+ */
+export function FirstRunView({ steps, onHide, empty = false }: { steps: readonly Step[]; onHide: () => void; empty?: boolean }) {
   const t = useT();
   const done = steps.filter((s) => s.done).length;
   const current = steps.findIndex((s) => !s.done);
 
   if (current < 0)
     return (
-      <section className="screen-enter flex items-center gap-3 rounded-card-lg border border-line bg-surface px-4 py-3">
+      <section className="screen-enter flex items-center gap-3 rounded-card border border-line bg-surface px-6 py-3 max-md:px-4">
         <Circle state="done" />
         <p className="min-w-0 flex-1 text-[13px] text-pretty">
-          <b className="font-bold">{t("fr.title")}</b> <span className="text-muted">· {t("fr.allDone")}</span>
+          <b className="font-medium">{t("fr.title")}</b> <span className="text-muted">· {t("fr.allDone")}</span>
         </p>
         <Button variant="ghost" size="sm" onClick={onHide}>
           {t("fr.hide")}
@@ -169,32 +175,36 @@ export function FirstRunView({ steps, onHide }: { steps: readonly Step[]; onHide
       </section>
     );
 
+  const step = steps[current]!;
+  const id = step.id;
   return (
-    <section aria-labelledby="first-run-title" className="screen-enter flex flex-col gap-4 rounded-card-lg border border-line bg-surface p-4 md:p-5">
-      <div className="flex items-center gap-2.5">
-        <IconChip icon="sparkle" tone="lavender" />
-        <h2 id="first-run-title" className="flex-1 text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
-          {t("fr.title")}
+    <section aria-labelledby="first-run-title" className="ov-first screen-enter relative grid overflow-hidden rounded-card border border-line bg-surface">
+      <div className="relative flex min-w-0 flex-col items-start px-8 pt-7 pb-8 max-md:p-5">
+        <span className="flex flex-wrap items-center gap-2 text-[13px] text-sec">
+          <OvDot kind="ok" />
+          <b className="font-medium text-fg">{t(empty ? "ov.first.ready" : "ov.first.setup")}</b>
+          {` · ${empty ? t("ov.first.noNodes") : t("fr.progress", { done, total: steps.length })}`}
+        </span>
+        <h2 id="first-run-title" className="mt-3 text-[32px] leading-9 font-medium tracking-[-0.02em] max-md:text-2xl max-md:leading-7">
+          {t(`ov.first.${id}.head`)} <span className="text-sec">{t(`ov.first.${id}.tail`)}</span>
         </h2>
-        <span className="font-mono text-xs text-muted">{t("fr.progress", { done, total: steps.length })}</span>
+        <p className="mt-3 max-w-[520px] text-sec">{step.text}</p>
+        {step.action && (
+          <div className="mt-8 flex flex-wrap gap-2 max-md:w-full max-md:[&>*]:flex-[1_1_100%]">
+            <StepButton action={step.action} variant="primary" size="lg" />
+          </div>
+        )}
       </div>
-      <div aria-hidden className="h-1 overflow-hidden rounded-[2px] bg-surface-2">
-        <div className="h-full rounded-[2px] bg-accent transition-[width] duration-500" style={{ width: `${(done / steps.length) * 100}%` }} />
-      </div>
-      <ol className="flex flex-col">
+      <ol aria-label={t("fr.title")} className="ov-steps relative m-0 flex list-none flex-col justify-center border-s border-line bg-step py-2">
         {steps.map((s, i) => (
-          <li key={s.id} className="flex gap-3.5">
-            <div className="flex w-7 flex-none flex-col items-center">
-              <Circle state={s.done ? "done" : i === current ? "current" : "later"} n={i + 1} />
-              {i < steps.length - 1 && <span aria-hidden className="my-1 w-px flex-1 bg-line" />}
+          <li key={s.id} aria-current={i === current ? "step" : undefined} className="relative grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 px-6 py-4 max-md:px-4 max-md:py-3">
+            <Circle state={s.done ? "done" : i === current ? "current" : "later"} n={i + 1} />
+            <div className="min-w-0">
+              <b className={cx("block font-medium", i === current ? "text-fg" : "text-sec")}>{s.title}</b>
+              <span className="block text-[13px] text-muted">{s.done ? s.text : t(`ov.first.${s.id}.hint`)}</span>
             </div>
-            <div className={cx("flex min-w-0 flex-1 flex-wrap items-start gap-x-4 gap-y-2.5 pt-1", i < steps.length - 1 && "pb-5")}>
-              <div className="flex min-w-[min(100%,260px)] flex-1 flex-col gap-1">
-                <span className={cx("text-[15px] font-bold", s.done && "text-muted")}>{s.title}</span>
-                <span className="text-[13px] leading-snug text-pretty text-muted">{s.text}</span>
-              </div>
-              {s.action && <StepButton action={s.action} primary={i === current} />}
-            </div>
+            {/* a step that is not the next one still has its button, quiet, when it can be taken */}
+            {!s.done && i !== current && s.action && !s.action.disabled && <StepButton action={s.action} variant="ghost" size="sm" />}
           </li>
         ))}
       </ol>
@@ -206,36 +216,35 @@ function Circle({ state, n }: { state: "done" | "current" | "later"; n?: number 
   return (
     <span
       className={cx(
-        "box-border grid size-7 flex-none place-items-center rounded-full border font-mono text-[13px] font-bold",
-        state === "done" && "tone-ok border-transparent bg-(--c) text-on-accent",
-        state === "current" && "border-accent bg-accent text-on-accent",
+        "box-border grid size-8 flex-none place-items-center rounded-full border font-mono text-[13px] font-medium",
+        state === "done" && "border-transparent bg-tone-mint-bg text-tone-mint",
+        state === "current" && "border-accent-mark text-fg",
         state === "later" && "border-line text-muted",
       )}
     >
-      {state === "done" ? <Icon name="check" size={14} /> : n}
+      {state === "done" ? <Icon name="check" size={16} strokeWidth={2} /> : n}
     </span>
   );
 }
 
-function StepButton({ action, primary }: { action: NonNullable<Step["action"]>; primary: boolean }) {
+function StepButton({ action, variant, size }: { action: NonNullable<Step["action"]>; variant: "primary" | "ghost"; size: "lg" | "sm" }) {
   const addNode = useAddNode();
-  const variant = primary ? "primary" : "secondary";
   if (action.disabled)
     return (
       <span className="flex flex-col items-start gap-1">
-        <Button variant="secondary" size="md" disabled>
+        <Button variant="secondary" size={size} disabled>
           {action.label}
         </Button>
         <span className="text-xs text-muted">{action.disabled}</span>
       </span>
     );
   const r = action.run;
-  const cls = buttonClass(variant, "md");
+  const cls = buttonClass(variant, size);
   switch (r.kind) {
     case "addNode":
     case "newCommand":
       return (
-        <Button variant={variant} size="md" onClick={() => addNode(r.kind === "newCommand" ? { id: r.id, name: r.name } : undefined)}>
+        <Button variant={variant} size={size} onClick={() => addNode(r.kind === "newCommand" ? { id: r.id, name: r.name } : undefined)}>
           {action.label}
         </Button>
       );
@@ -258,6 +267,59 @@ function StepButton({ action, primary }: { action: NonNullable<Step["action"]>; 
         </Link>
       );
   }
+}
+
+/** Ghost previews of what an empty panel will show (the board's three tiles): the nodes with their checks, the chart, the feed. */
+export function SoonCards() {
+  const t = useT();
+  const cell = "relative flex min-w-0 flex-col gap-1 overflow-hidden rounded-card border border-line bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] px-5 pt-4 pb-5";
+  const title = "mt-4 font-medium text-fg";
+  const text = "text-[13px] text-muted";
+  return (
+    <div className="grid grid-cols-3 gap-4 max-md:grid-cols-1">
+      <div className={cell}>
+        <div aria-hidden className="ov-so-v">
+          {[false, true, false].map((short, r) => (
+            <div key={r} className="ov-so-r">
+              <i className="a" />
+              <i className={cx("b", short && "s")} />
+              <span className="ov-so-tk">
+                {Array.from({ length: 14 }, (_, i) => (
+                  <i key={i} />
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+        <b className={title}>{t("ov.soon.nodes.title")}</b>
+        <span className={text}>{t("ov.soon.nodes.text")}</span>
+      </div>
+      <div className={cell}>
+        <div aria-hidden className="ov-so-v">
+          <svg viewBox="0 0 320 88" preserveAspectRatio="none">
+            <path className="f" d="M0 70C40 66 56 40 96 44s52 26 92 14 56-40 92-36 28 14 40 12V88H0z" />
+            <path className="l" d="M0 70C40 66 56 40 96 44s52 26 92 14 56-40 92-36 28 14 40 12" />
+            <path className="g" d="M0 22h320M0 44h320M0 66h320" />
+          </svg>
+        </div>
+        <b className={title}>{t("ov.soon.traffic.title")}</b>
+        <span className={text}>{t("ov.soon.traffic.text")}</span>
+      </div>
+      <div className={cell}>
+        <div aria-hidden className="ov-so-v">
+          {["", "s", "m"].map((w) => (
+            <div key={w} className="ov-so-e">
+              <i className="d" />
+              <i className={cx("b", w)} />
+              <i className="t" />
+            </div>
+          ))}
+        </div>
+        <b className={title}>{t("ov.soon.events.title")}</b>
+        <span className={text}>{t("ov.soon.events.text")}</span>
+      </div>
+    </div>
+  );
 }
 
 /** "/?add=1" (the end of the setup wizard) opens the add-node window once, then drops the parameter. */

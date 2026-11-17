@@ -1,0 +1,11 @@
+/* The characters of a scrambling number (components/fx/scramble.ts): quiet grey until they land, then the text colour */
+.scr-c {
+  display: inline-block;
+  white-space: pre;
+  color: var(--muted);
+  transition: color 0.28s var(--e);
+  will-change: transform, opacity;
+}
+.scr-c.in {
+  color: inherit;
+}

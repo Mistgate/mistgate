@@ -90,6 +90,19 @@ describe("ProtocolTag", () => {
     expect(tags[0]!.querySelector("svg")!.getAttribute("stroke-width")).toBe("1.5");
   });
 
+  it("opens a compact tag by itself with `expanded` (a phone has no pointer) and leaves the others folded", () => {
+    const el = mount(
+      <>
+        <ProtocolTag protocol="vless" compact expanded />
+        <ProtocolTag protocol="vless" compact />
+      </>,
+    );
+    const label = (i: number) => (el.children[i] as HTMLElement).querySelector("span")!.className;
+    expect(label(0)).toContain("max-w-[120px]");
+    expect(label(0)).not.toContain("opacity-0");
+    expect(label(1)).toContain("max-w-0");
+  });
+
   it("falls back to a grey tag with the raw id for a protocol it does not know", () => {
     const el = mount(<ProtocolTag protocol="quic9" />);
     expect(el.textContent).toBe("quic9");
