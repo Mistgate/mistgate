@@ -8,7 +8,6 @@ import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { LinkDeviceLimit, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { DeviceKind, QuotaReset, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
-import { dateTimeOf } from "@/lib/format";
 import { UserScreen } from "./user-detail";
 
 const getUser = vi.fn();
@@ -27,6 +26,9 @@ const subsMode = { v: LinkDeviceLimit.ENFORCE as LinkDeviceLimit };
 const panelApp = { enabled: true }; // the owner's switch of the Mistgate app, as the panel says it
 // the sign-in check in front of a delete: passes the call through, or turns it down as the admin closing the dialog would
 const stepUp = { cancel: false };
+// the tab of the page, as the address says it (the Overview has none)
+const route = { search: {} as Record<string, string> };
+const tab = (name: string) => void (route.search = { tab: name });
 vi.mock("@/components/step-up", async (orig) => {
   const m = await orig<typeof import("@/components/step-up")>();
   return {
@@ -86,7 +88,7 @@ vi.mock("@/components/ui/select", () => ({
 }));
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ id: "usr_1" }),
-  useSearch: () => ({}),
+  useSearch: () => route.search,
   useNavigate: () => vi.fn(),
   Link: ({ children, to, params, search, hash, className, ...rest }: { children?: ReactNode; to: string; params?: object; search?: object; hash?: string; className?: string }) => (
     <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(search ?? {})} data-hash={hash} className={className} aria-label={(rest as { "aria-label"?: string })["aria-label"]}>
@@ -109,6 +111,7 @@ afterEach(() => {
   subsMode.v = LinkDeviceLimit.ENFORCE;
   stepUp.cancel = false;
   panelApp.enabled = true;
+  route.search = {};
 });
 
 const user = {
@@ -212,9 +215,9 @@ describe("the user card", () => {
         alert({ id: "alt_4", kind: AlertKind.USERS_IMPACTED, nodeId: "nod_1", nodeName: "de1", subject: "hysteria2", params: {}, titleKey: "health.alert.users_impacted.title", whyKey: "" }), // a node
       ],
     );
-    const list = [...document.querySelectorAll("ul")].find((ul) => ul.textContent?.includes("Access ended"));
+    const list = document.querySelector("[data-testid=conn-alerts]");
     expect(list).toBeTruthy();
-    expect(list!.querySelectorAll("li")).toHaveLength(2);
+    expect(list!.querySelectorAll(".up-alerts > div")).toHaveLength(2);
     expect(list!.textContent).toContain("Access ended, but the person keeps trying");
     expect(list!.textContent).toContain("Marina’s subscription ended on");
     expect(list!.textContent).toContain("for 1 h"); // from the start of the episode
@@ -244,14 +247,15 @@ describe("the user card", () => {
       sinceUnix: NOW - 86_400, nowUnix: NOW, nodesWithoutCounters: [],
       rows: [row({}), row({ connects: 9, viaCountry: "RU", viaNodeId: "nod_msk1" })],
     });
+    tab("devices");
     await mount();
     const rows = [...document.querySelectorAll("[data-testid=conn-row]")];
     expect(rows).toHaveLength(2);
     expect(rows[0]!.querySelector("[data-testid=conn-via]")).toBeNull();
-    expect(rows[0]!.textContent).toContain("4 connections");
+    expect(rows[0]!.querySelector("[data-l=Connections]")?.textContent).toBe("4");
     expect(rows[1]!.querySelector("[data-testid=conn-via]")?.textContent).toBe("via RU");
-    expect(rows[1]!.textContent).toContain("de1 · AWG 3.1");
-    expect(rows[1]!.textContent).toContain("9 connections");
+    expect(rows[1]!.textContent).toContain("de1 AWG 3.1");
+    expect(rows[1]!.querySelector("[data-l=Connections]")?.textContent).toBe("9");
   });
 
   it("adds what the nodes counted per device and profile to the Connection block, trouble in the warning colour", async () => {
@@ -263,14 +267,15 @@ describe("the user card", () => {
         { deviceId: "dev_gone", nodeId: "nod_1", nodeName: "de1", inboundId: "inb_hy", profileName: "hy2 · 443", protocol: "hysteria2", connects: 1, rejects: 1, drops: 0, stalls: 0, onlineS: 60n, lastHourUnix: NOW - 3600 },
       ],
     });
+    tab("devices");
     await mount();
     expect(text()).toContain("Connection");
     const rows = [...document.querySelectorAll("[data-testid=conn-row]")].map((r) => r.textContent);
     expect(rows[0]).toContain("Apps without a device ID");
-    expect(rows[0]).toContain("de1 · hy2 · 443");
-    expect(rows[0]).toContain("3 connections · dropped at once: 2 · online 1 h");
+    expect(rows[0]).toContain("de1 hy2 · 443");
+    expect(rows[0]).toContain("1 h"); // the time online
     expect(rows[1]).toContain("Pixel");
-    expect(rows[1]).toContain("0 connections · handshake did not complete: 7");
+    expect(rows[1]).toContain("handshake did not complete: 7"); // what the columns have no room for sits under the line
     expect(rows[2]).toContain("A removed device");
     expect(rows[2]).toContain("key refused: 1");
     const warned = [...document.querySelectorAll("[data-testid=conn-counts] .text-warn-text")].map((e) => e.textContent);
@@ -279,28 +284,28 @@ describe("the user card", () => {
 
   it("says which nodes do not count yet, by name, and keeps the block hidden when nothing is counted at all", async () => {
     getUserConnection.mockResolvedValue({ sinceUnix: NOW - 86_400, nowUnix: NOW, rows: [], nodesWithoutCounters: ["nod_1"] });
+    tab("devices");
     await mount();
     expect(text()).toContain("Not counted on de1: the node's agent does not send connection counters yet.");
     act(() => root?.unmount());
     host?.remove();
     getUserConnection.mockResolvedValue({ sinceUnix: NOW - 86_400, nowUnix: NOW, rows: [], nodesWithoutCounters: [] });
+    tab("devices");
     await mount();
     expect(text()).not.toContain("Connection");
   });
 
-  it("puts the Connection block at the foot of the left column, under the devices, and pages its counts six at a time", async () => {
+  it("pages the counts of the nodes six at a time, as the last card of the Devices tab", async () => {
     getUserConnection.mockResolvedValue({
       sinceUnix: NOW - 86_400, nowUnix: NOW, nodesWithoutCounters: [],
       rows: Array.from({ length: 8 }, (_, i) => ({
         deviceId: "dev_k", nodeId: "nod_1", nodeName: `n${i}`, inboundId: `inb_${i}`, profileName: "AWG 3.1", protocol: "awg", connects: 1, rejects: 0, drops: 0, stalls: 0, onlineS: 60n, lastHourUnix: NOW - 3600,
       })),
     });
+    tab("devices");
     await mount();
     const counts = document.querySelector("[data-testid=conn-counts]")!;
-    const column = [...document.querySelectorAll(".grid > div")].find((c) => c.contains(counts))!; // one of the page's two columns
-    expect(column).toBe(column.parentElement!.firstElementChild); // the left one
-    expect(column.lastElementChild!.contains(counts)).toBe(true); // at its foot
-    expect(column.lastElementChild!.previousElementSibling!.textContent).toContain("Devices"); // right under the devices
+    expect(counts.parentElement!.lastElementChild).toBe(counts); // the last card of the tab (the dialogs are portals)
     const shown = () => [...document.querySelectorAll("[data-testid=conn-row]")].map((r) => r.textContent?.match(/n\d/)?.[0]);
     expect(shown()).toEqual(["n0", "n1", "n2", "n3", "n4", "n5"]);
     expect(text()).toContain("Showing 1–6 of 8");
@@ -325,6 +330,7 @@ describe("the user card", () => {
   });
 
   it("saves a separate public name while the account name stays unchanged", async () => {
+    tab("settings");
     await mount();
     const field = document.querySelector<HTMLInputElement>('input[aria-label="Name shown on the subscription page"]')!;
     await act(async () => {
@@ -338,6 +344,7 @@ describe("the user card", () => {
   });
 
   it("splits the devices into the subscription's apps and the AmneziaVPN keys, and lists both", async () => {
+    tab("devices");
     await mount();
     expect(text()).toContain("Apps on the link");
     expect(text()).toContain("Apps without a device ID");
@@ -350,21 +357,26 @@ describe("the user card", () => {
     expect(button("Disconnect")).toBeUndefined(); // in the row's menu
   });
 
-  it("shows the group's profiles in the two ways as links, and the group as a link in the hint", async () => {
+  it("shows the group's profiles by what takes them as links, and the group as a link to its page", async () => {
+    tab("access");
     await mount();
-    expect(text()).toContain("Subscription (Happ, FlClash)");
+    expect(text()).toContain("Happ, FlClash");
     const profiles = [...document.querySelectorAll<HTMLAnchorElement>("a[href='/profiles/$id']")].map((a) => a.dataset.params);
     expect(profiles).toContain(JSON.stringify({ id: "p_hy" }));
     expect(profiles).toContain(JSON.stringify({ id: "p_awg" }));
-    const group = document.querySelector<HTMLAnchorElement>('a[aria-label="Open group “Everyone”"]')!;
-    expect(group.dataset.search).toBe(JSON.stringify({ tab: "groups", group: "grp_all" }));
     expect(anchor("de1")?.dataset.search).toBe(JSON.stringify({ tab: "profiles" }));
+    tab("overview");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount();
+    const group = [...document.querySelectorAll<HTMLAnchorElement>("a[href='/users/groups/$id']")].find((a) => a.textContent === "Everyone")!;
+    expect(group.dataset.params).toBe(JSON.stringify({ id: "grp_all" }));
   });
 
   it("marks a link profile that a subscription format leaves out, and only that one", async () => {
+    tab("access");
     await mount();
-    const vl = [...document.querySelectorAll<HTMLAnchorElement>("a[href='/profiles/$id']")].find((a) => a.textContent === "vless · xhttp")!;
-    expect(vl.parentElement!.textContent).toBe("vless · xhttpnot in sing-box: XHTTP");
+    expect(document.querySelector("[data-app=link] .up-drops")!.textContent).toBe("not in sing-box: XHTTP");
     // one mark in the card: hy2 works everywhere, and AmneziaWG's own way already says it goes by keys
     expect(text().match(/not in /g)).toHaveLength(1);
   });
@@ -373,12 +385,10 @@ describe("the user card", () => {
     updateUser.mockImplementation(async (r: { dryRun?: boolean }) =>
       r.dryRun ? { user, impact: { users: 1, lost: [{ id: "p_awg", name: "AWG 3.1", protocol: "awg", awgDevices: 1 }], gained: [] } } : { user },
     );
+    tab("access");
     await mount();
-    const select = document.querySelector<HTMLSelectElement>("select[aria-label='Group']")!;
-    await act(async () => {
-      select.value = "grp_f";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await click(document.querySelector("button[aria-label='Group']"));
+    await click([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.includes("friends")));
     await settle();
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", groupId: "grp_f", dryRun: true });
     const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!;
@@ -395,12 +405,15 @@ describe("the user card", () => {
     // the card has another "Reset" (traffic): this one is inside the DNS panel
     const resetButtons = () => [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Reset" && b.closest("section, div")?.parentElement?.textContent?.includes("DNS picked on the page"));
 
-    it("is not shown for a person who picked nothing", async () => {
+    it("says nothing was picked, and has nothing to reset, for a person who picked nothing", async () => {
+      tab("access");
       await mount(1, []);
-      expect(text()).not.toContain("DNS picked on the page");
+      expect(text()).toContain("nothing, the DNS above applies");
+      expect(resetButtons().every((b) => b.hasAttribute("data-disabled") || (b as HTMLButtonElement).disabled)).toBe(true);
     });
 
     it("lists the picks per server and says what applies when the node stopped offering one", async () => {
+      tab("access");
       await mount(1, picks);
       expect(getUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" }, expect.anything());
       expect(text()).toContain("DNS picked on the page");
@@ -411,6 +424,7 @@ describe("the user card", () => {
     });
 
     it("resets after a confirmation and refreshes", async () => {
+      tab("access");
       await mount(1, picks);
       await click(resetButtons()[0]);
       expect(resetUserDnsChoices).not.toHaveBeenCalled();
@@ -420,27 +434,28 @@ describe("the user card", () => {
       await click([...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Reset"));
       await settle();
       expect(resetUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" });
-      expect(text()).not.toContain("DNS picked on the page"); // refetched: nothing picked any more
+      expect(text()).toContain("nothing, the DNS above applies"); // refetched: nothing picked any more
     });
 
     it("shows a read-only admin the picks but not the button", async () => {
+      tab("access");
       await mount(3, picks);
       expect(text()).toContain("DNS picked on the page");
       expect(resetButtons()).toHaveLength(0);
     });
 
-    // the panel: its hint's card (the card lists devices too, one of them "Apps on the link"-like)
-    const panel = () => [...document.querySelectorAll("p")].find((p) => p.textContent === "What the person picked on their page: for the apps on the link and for each server.")?.parentElement ?? null;
+    // the row of the picks under the DNS list
+    const panel = () => [...document.querySelectorAll(".up-sv-row")].find((r) => r.textContent?.includes("DNS picked on the page")) ?? null;
 
     it("shows the pick for the apps on the link first", async () => {
+      tab("access");
       const link = { ...choice("", "AdGuard"), nodeId: "", nodeName: "" };
       await mount(1, { choices: picks, link });
-      const rows = [...panel()!.querySelectorAll("li")].map((li) => li.textContent);
-      expect(rows[0]).toBe("Apps on the linkAdGuard");
-      expect(rows.slice(1).map((r) => r?.slice(0, 3))).toEqual(["de1", "nl1"]);
+      expect(panel()!.textContent).toContain("Apps on the link: AdGuard · de1: Family · nl1: Family");
     });
 
     it("a pick for the apps on the link that is no longer offered says what applies", async () => {
+      tab("access");
       const link = { ...choice("", "AdGuard"), nodeId: "", nodeName: "", offered: false, effectivePresetId: "dns_Plain", effectivePresetName: "Plain" };
       await mount(1, { choices: [], link });
       expect(panel()?.textContent).toContain("Apps on the link");
@@ -448,6 +463,7 @@ describe("the user card", () => {
     });
 
     it("a person who picked only for the apps on the link has the block and the reset, which clears it", async () => {
+      tab("access");
       await mount(1, { choices: [], link: { ...choice("", "AdGuard"), nodeId: "", nodeName: "" } });
       expect(text()).toContain("DNS picked on the page");
       await click(resetButtons()[0]);
@@ -457,16 +473,14 @@ describe("the user card", () => {
       await click([...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Reset"));
       await settle();
       expect(resetUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" });
-      expect(panel()).toBeNull();
+      expect(panel()!.textContent).not.toContain("AdGuard");
     });
   });
 
   it("disables in red, and the toast can undo it", async () => {
     setUsersEnabled.mockResolvedValue({ users: [] });
     await mount();
-    const off = button("Disable")!;
-    expect(off.className).toContain("text-danger-text");
-    await click(off);
+    await click(button("Disable"));
     await settle();
     expect(setUsersEnabled).toHaveBeenCalledWith({ userIds: ["usr_1"], enabled: false });
     expect(text()).toContain("Marina disabled");
@@ -482,6 +496,7 @@ describe("the Mistgate app among the apps of a person", () => {
   const withApps = (apps: object) => ({ ...detail, user: { ...user, apps } });
 
   it("is the fourth row of the apps, with the panel's mark, its name and what it gives; on when the panel says nothing", async () => {
+    tab("access");
     await mount();
     expect(row()).toBeTruthy();
     expect(row().textContent).toContain("Mistgate app");
@@ -489,14 +504,15 @@ describe("the Mistgate app among the apps of a person", () => {
     expect(row().querySelector("[aria-label=Mistgate]")).not.toBeNull();
     expect(sw().getAttribute("aria-checked")).toBe("true"); // a person without the field is the default: on
     expect(row().getAttribute("data-state")).toBe("on");
-    expect(row().querySelector("a")).toBeNull(); // no pill while the panel has it on
-    // the other four rows (link, AmneziaVPN, Telegram, TrustTunnel) are its neighbours in the same block, and it comes last
-    expect(row().parentElement!.querySelectorAll(":scope > label [role=switch]")).toHaveLength(4);
-    expect(row().parentElement!.lastElementChild).toBe(row());
+    expect(row().querySelector("a[href='/subscriptions']")).toBeNull(); // no pill while the panel has it on
+    // the other three rows (link, AmneziaVPN, Telegram) are its neighbours in the same card, and it comes last
+    expect(document.querySelectorAll("[data-app] [role=switch]")).toHaveLength(4);
+    expect([...document.querySelectorAll("[data-app]")].at(-1)).toBe(row());
   });
 
   it("switches off with the other three kept as they are, and the switch is the person's own", async () => {
     updateUser.mockResolvedValue({ user });
+    tab("access");
     await mount();
     await click(sw());
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", apps: { happ: true, amnezia: true, telegram: false, mistgate: false } });
@@ -504,6 +520,7 @@ describe("the Mistgate app among the apps of a person", () => {
 
   it("shows an off switch with what off does, and turns on again", async () => {
     updateUser.mockResolvedValue({ user });
+    tab("access");
     await mount(1, [], [], withApps({ happ: true, amnezia: true, mistgate: false }));
     expect(sw().getAttribute("aria-checked")).toBe("false");
     expect(row().getAttribute("data-state")).toBe("off");
@@ -514,13 +531,14 @@ describe("the Mistgate app among the apps of a person", () => {
 
   it("changing another app keeps the Mistgate switch where it is", async () => {
     updateUser.mockResolvedValue({ user });
+    tab("access");
     await mount(1, [], [], withApps({ happ: true, amnezia: true, mistgate: false }));
-    const amnezia = [...document.querySelectorAll("label")].find((l) => l.textContent?.includes("AmneziaVPN") && l.querySelector("[role=switch]"))!;
-    await click(amnezia.querySelector("[role=switch]"));
+    await click(document.querySelector("[role=switch][aria-label=AmneziaVPN]"));
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", apps: { happ: true, amnezia: false, telegram: false, mistgate: false } });
   });
 
   it("is locked while the subscription link is off, and says why; nothing is sent", async () => {
+    tab("access");
     await mount(1, [], [], withApps({ happ: false, amnezia: true, mistgate: true }));
     expect(row().getAttribute("data-state")).toBe("locked");
     expect(sw().hasAttribute("data-disabled")).toBe(true);
@@ -532,8 +550,9 @@ describe("the Mistgate app among the apps of a person", () => {
 
   it("carries a quiet pill to the owner's setting when the app is off for the whole panel", async () => {
     panelApp.enabled = false;
+    tab("access");
     await mount();
-    const pill = row().querySelector("a")!;
+    const pill = row().querySelector("a[href='/subscriptions']")!;
     expect(pill.textContent).toBe("Off for the whole panel");
     expect(pill.getAttribute("href")).toBe("/subscriptions");
     expect(pill.getAttribute("data-search")).toBe(JSON.stringify({ tab: "rules" }));
@@ -574,13 +593,14 @@ describe("the devices of the user card", () => {
   const inDialog = (label: string) => click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.trim() === label));
 
   it("shows a calm row per app on the link with its tile, two servers explained only where they are, the shared place and the keys", async () => {
+    tab("devices");
     await mount(1, [], [], many);
     const iphone = row("iPhone 15");
     expect(iphone.textContent).toContain("de1, nl1");
     expect(iphone.textContent).toContain("iOS 18.1 · Happ 3.4.2");
     // the two servers say it themselves; the tooltip (and the status's name) explains what that means
     expect(iphone.querySelector("[aria-label*='The same keys are connected to 2 servers right now']")).not.toBeNull();
-    expect(iphone.querySelector("[data-tone='sky']")).not.toBeNull(); // the tile of the way, as on the person's page
+    expect(iphone.querySelector(".g")).not.toBeNull(); // the tile of the device, as on the board
     // since when, all-time traffic and the fingerprint wait in the tooltip, named for a screen reader
     expect(iphone.textContent).not.toContain("a1b2c3");
     expect(iphone.textContent).not.toContain("2.4 GB");
@@ -588,34 +608,32 @@ describe("the devices of the user card", () => {
     expect(details).toContain("All-time traffic: 2.4 GB");
     expect(details).toContain("Fingerprint a1b2c3: tells two identical phones apart");
     expect(details).toContain("updated just now");
-    expect(row("Pixel 8").textContent).toContain("online· de1");
+    expect(row("Pixel 8").textContent).toContain("online · de1");
     expect(row("Pixel 8").textContent).not.toContain("servers");
     expect(row("MacBook").textContent).toContain("5 min ago");
     expect(document.querySelectorAll("[aria-label*='The same keys are connected']")).toHaveLength(1);
     expect(row("Apps without a device ID").textContent).toContain("Hiddify 2.5 · share one place");
-    expect(row("Router").querySelector("[data-tone='mint']")).not.toBeNull(); // a key: the same row, the mint tile
-    // the header counts with the limit, red when over it
-    const count = [...document.querySelectorAll("span")].find((s) => s.textContent === "4 of 3")!;
-    expect(count.className).toContain("text-danger-text");
+    expect(row("Router").querySelector(".g")).not.toBeNull(); // a key: the same row
+    // the line on top counts the places with the limit, amber when none is free
+    const sum = document.querySelector(".up-sum")!;
+    expect(sum.textContent).toContain("4 of 3");
+    expect(sum.className).toContain("full");
   });
 
   it("folds the blocked devices and unblocks one from its menu", async () => {
     unblockDevice.mockResolvedValue({ user });
+    tab("devices");
     await mount(1, [], [], many);
-    const fold = button("Blocked (1)")!;
-    expect(fold.getAttribute("aria-expanded")).toBe("false");
-    expect(text()).not.toContain("Work PC");
-    await click(fold);
+    expect(text()).toContain("Blocked"); // a card of its own, no fold
     expect(row("Work PC").textContent).toContain("v2rayN 7.1 · blocked");
-    await menu("Work PC");
-    expect(items()).toEqual(["Unblock"]);
-    await item("Unblock");
+    await click(button("Unblock"));
     await settle();
     expect(unblockDevice).toHaveBeenCalledWith({ deviceId: "dev_x" });
     expect(text()).toContain("Unblocked. The app gets new keys at its next subscription refresh.");
   });
 
   it("renames, deletes and blocks from the row menu with the right calls; blocking asks first", async () => {
+    tab("devices");
     renameDevice.mockResolvedValue({ device: {} });
     revokeDevice.mockResolvedValue({ user });
     await mount(1, [], [], many);
@@ -654,6 +672,7 @@ describe("the devices of the user card", () => {
   });
 
   it("disconnects the shared place from its menu", async () => {
+    tab("devices");
     revokeDevice.mockResolvedValue({ user });
     await mount(1, [], [], many);
     await menu("Apps without a device ID");
@@ -666,6 +685,7 @@ describe("the devices of the user card", () => {
   });
 
   it("says in the panel's words why a device cannot be blocked", async () => {
+    tab("devices");
     revokeDevice.mockRejectedValue(new ConnectError("cannot_block", Code.FailedPrecondition));
     await mount(1, [], [], many);
     await menu("iPhone 15");
@@ -677,28 +697,59 @@ describe("the devices of the user card", () => {
 
   it("in the “only count” mode gives a person over the limit one quiet line to the setting instead of the alert", async () => {
     subsMode.v = LinkDeviceLimit.TRACK;
+    tab("devices");
     await mount(1, [], [], many);
     expect(text()).toContain("The limit only counts for now: apps over it still connect.");
     expect(anchor("Limit mode")?.dataset.search).toBe(JSON.stringify({ tab: "rules" }));
-    expect(button("+1 device")).toBeUndefined();
+    expect(button("Raise the limit to 4")).toBeUndefined();
   });
 
   it("keeps the alert and drops the line when the limit refuses", async () => {
+    tab("devices");
     await mount(1, [], [], many);
     expect(text()).not.toContain("The limit only counts for now");
-    expect(button("+1 device")).toBeDefined();
+    expect(button("Raise the limit to 4")).toBeDefined();
   });
 
-  it("sets the two speed limits on their own steppers, 0 = no limit", async () => {
+  it("sets the two speed limits on their own segments, 0 = no limit, and saves them with one click", async () => {
     updateUser.mockResolvedValue({ user });
-    await mount(1, [], [], { ...many, user: { ...many.user, speedLimitBps: 20_000_000n } });
+    tab("access");
+    await mount(1, [], [], { ...detail, user: { ...user, speedLimitBps: 20_000_000n } });
     expect(text()).toContain("Speed per person");
-    expect(text()).toContain("20 Mbit/s");
     expect(text()).toContain("Speed per device");
-    await click(document.querySelector("[aria-label='Increase Speed per device']"));
-    expect(text()).toContain("5 Mbit/s");
-    await act(async () => void (await new Promise((r) => setTimeout(r, 600))));
-    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", deviceSpeedLimitBps: 5_000_000n });
+    const radio = (group: string, label: string) => [...document.querySelectorAll(`[aria-label='${group}'] [role=radio]`)].find((r) => r.textContent === label)!;
+    expect(radio("Speed per person", "20").getAttribute("aria-checked")).toBe("true");
+    await click(radio("Speed per device", "20"));
+    expect(text()).toContain("Changes not saved");
+    expect(updateUser).not.toHaveBeenCalled(); // nothing goes out before Save
+    await click(button("Save"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", deviceSpeedLimitBps: 20_000_000n });
+  });
+
+  it("takes a quota that is none of the ready ones through its own field", async () => {
+    updateUser.mockResolvedValue({ user });
+    tab("access");
+    await mount(1, [], [], { ...many, user: { ...many.user, quotaBytes: 120_000_000_000n } });
+    const field = document.querySelector<HTMLInputElement>("input[aria-label='Quota, GB']")!;
+    expect(field.value).toBe("120");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "150");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("Save"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", quotaBytes: 150_000_000_000n });
+  });
+
+  it("undoes an unsaved change, and a limit below the places in use says nobody is cut off", async () => {
+    tab("access");
+    await mount(1, [], [], { ...many, user: { ...many.user, devicesUsed: 3, deviceLimit: 5 } });
+    for (let i = 0; i < 3; i++) await click(document.querySelector("[aria-label='Decrease Devices']"));
+    expect(text()).toContain("extra devices stay connected, but new ones won’t connect");
+    await click(button("Undo"));
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(text()).not.toContain("Changes not saved");
   });
 });
 
@@ -712,27 +763,30 @@ describe("the quota period on the user card", () => {
   const labels = () => [...select().options].map((o) => o.textContent);
 
   it("says when the quota starts again and changes the period with one pick", async () => {
+    tab("access");
     updateUser.mockResolvedValue({ user });
     const next = Date.UTC(2027, 0, 4) / 1000; // a Monday, 00:00 UTC
     await mount(1, [], [], { ...detail, user: { ...user, quotaBytes: 100_000_000_000n, quotaReset: QuotaReset.WEEK, nextResetUnix: BigInt(next) } });
-    expect(text()).toContain("resets every week");
-    expect(text()).toContain(`Next reset ${dateTimeOf(next, "en")}`);
+    expect(text()).toContain("Weekly");
     expect(labels()).toEqual(["Daily", "Weekly", "Monthly", "Never"]);
     expect(select().value).toBe(String(QuotaReset.WEEK));
     await pick(select(), QuotaReset.DAY);
+    await click(button("Save"));
     await settle();
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", quotaReset: QuotaReset.DAY });
   });
 
   it("keeps a 30-day period it was given, and names no next reset when there is none", async () => {
+    tab("access");
     await mount(1, [], [], { ...detail, user: { ...user, quotaReset: QuotaReset.ROLLING_MONTH, nextResetUnix: 1_900_000_000n } });
     expect(labels()).toEqual(["Daily", "Weekly", "Monthly", "Every 30 days", "Never"]);
     expect(select().value).toBe(String(QuotaReset.ROLLING_MONTH));
     act(() => root?.unmount());
     host?.remove();
+    tab("overview");
     await mount(1, [], [], { ...detail, user: { ...user, quotaReset: QuotaReset.NONE, nextResetUnix: 0n } });
     expect(text()).toContain("no reset");
-    expect(text()).not.toContain("Next reset");
+    expect(text()).not.toContain("resets ");
     expect(updateUser).not.toHaveBeenCalled();
   });
 });
@@ -751,6 +805,7 @@ describe("deleting the user from the card", () => {
   }
 
   it("asks for the sign-in check, and a check turned down deletes nobody and shows no error", async () => {
+    tab("settings");
     stepUp.cancel = true;
     deleteUsers.mockResolvedValue({});
     await mount();
@@ -760,6 +815,7 @@ describe("deleting the user from the card", () => {
   });
 
   it("deletes the user once the check passes", async () => {
+    tab("settings");
     deleteUsers.mockResolvedValue({});
     await mount();
     await confirmDelete();

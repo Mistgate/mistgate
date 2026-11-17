@@ -69,6 +69,7 @@ const proxy = {
   links: [link({}), link({ ipv6: true, url: "tg://proxy?server=[2001:db8::7]&port=443&secret=ee00" }), link({ relay: true, via: "RU", url: "tg://proxy?server=198.51.100.20&port=8443&secret=ee00" })],
 };
 const rows = () => [...document.querySelectorAll("section li")];
+const linkRows = () => [...document.querySelectorAll(".up-tg > div")];
 
 describe("the Telegram proxy of a person", () => {
   it("off: one line and the switch, which turns it on", async () => {
@@ -85,14 +86,16 @@ describe("the Telegram proxy of a person", () => {
     await mount(<TelegramSection user={user(true)} countryOf={() => "DE"} onTurnOn={vi.fn()} onChanged={vi.fn()} />);
     expect(rows()[0]!.textContent).toContain("Telegram key");
     expect(rows()[0]!.textContent).toContain("not counted in the device limit");
-    const links = rows().slice(1);
-    expect(links.map((r) => r.querySelector("b")!.parentElement!.textContent)).toEqual(["de1", "de1IPv6", "de1via RU"]);
+    const links = linkRows();
+    expect(links.map((r) => r.querySelector("b")!.textContent)).toEqual(["de1", "de1", "de1"]);
+    expect(links.map((r) => r.querySelector("b")!.nextElementSibling!.textContent)).toEqual(["Telegram · 443", "Telegram · 443 · IPv6", "Telegram · 443 · via RU"]);
     // the link holds the key: opened, copied or scanned, never printed
     expect(links[0]!.querySelector("a")!.getAttribute("href")).toBe(proxy.links[0]!.url);
     expect(text()).not.toContain("secret=");
-    expect(links[0]!.querySelector("svg[role=img]")).toBeNull();
+    expect(document.querySelector("svg[role=img]")).toBeNull();
     await click(links[0]!.querySelector('button[aria-label="QR code"]'));
-    expect(rows()[1]!.querySelector("svg[role=img]")?.getAttribute("aria-label")).toBe("QR code of the tg:// link to de1");
+    await settle();
+    expect(document.querySelector("[role=dialog] svg[role=img]")?.getAttribute("aria-label")).toBe("QR code of the tg:// link to de1");
   });
 
   it("on without a key: issues one and shows its links", async () => {
@@ -105,7 +108,8 @@ describe("the Telegram proxy of a person", () => {
     await settle();
     expect(issueTelegramKey).toHaveBeenCalledWith({ userId: "usr_alice" });
     expect(onChanged).toHaveBeenCalled();
-    expect(rows()).toHaveLength(4);
+    expect(rows()).toHaveLength(1); // the key
+    expect(linkRows()).toHaveLength(3);
   });
 });
 
