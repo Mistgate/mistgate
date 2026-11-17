@@ -14,14 +14,15 @@ const usage = `usage: mistgate-node <command> [flags]
 commands:
   enroll    exchange a one-time token for a node certificate (--panel and --sni, or --link-url; --ca-sha256, --token;
             the panel shows this command when you add a node)
-  install   write a hardened systemd unit, enable and start it (root, Linux; -h for --state-dir, --bin, --no-start)
+  install   write a hardened systemd unit, enable and start it (root, Linux; -h for --state-dir, --bin, --no-start).
+            It needs the nft command (the nftables package): without it nothing is changed and it exits with status 3
   run       run the agent in the foreground: what the systemd unit does, and the way to try it without systemd
   cleanup-net  remove the tunnel interfaces, the WARP routes and the nft tables of the agent (what the unit runs after every stop);
             --ipv6-addresses also removes the IPv6 addresses it added (a hand clean of the server)
   awg       awg prepare-kernel: install the AmneziaWG kernel module (root, explicit; the default userspace backend needs none);
             awg fix-source: repair a module source that does not build on some kernels (root)
-  host      host enable-security-updates: enable unattended security updates; host os-update: install updates and/or reboot
-            this server (root, Linux; -h for details)
+  host      host enable-security-updates: enable unattended security updates; host install-nftables: install the nftables
+            package; host os-update: install updates and/or reboot this server (root, Linux; -h for details)
   version   print the version
 
 Both enroll and run take --state-dir (default /var/lib/mistgate-node); give them the same one.

@@ -47,6 +47,8 @@ const textKeys: Record<string, MessageKey> = {
   torrent_guard_degraded: "event.torrent_guard_degraded",
   host_firewall_sync_failed: "event.host_firewall_sync_failed",
   host_firewall_sync_recovered: "event.host_firewall_sync_recovered",
+  nft_missing: "event.nft_missing",
+  nft_restored: "event.nft_restored",
   user_created: "event.user_created",
   user_over_quota: "event.user_over_quota",
   user_expired: "event.user_expired",

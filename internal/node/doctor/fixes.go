@@ -85,6 +85,8 @@ func (d *Doctor) ApplyWithRefreshAck(ctx context.Context, fixID string, dryRun b
 		return fixAwgModuleRepair(ctx, e, dryRun, params)
 	case FixEnableSecurityUpdates:
 		return fixEnableSecurityUpdates(ctx, e, dryRun, params)
+	case FixInstallNftables:
+		return fixInstallNftables(ctx, e, dryRun, params)
 	case FixSetResolver:
 		return fixResolver(ctx, e, dryRun, params)
 	default:

@@ -42,3 +42,32 @@ func TestUnitPassesSystemdVerify(t *testing.T) {
 	}
 	t.Logf("systemd-analyze verify: %v\n%s", err, out)
 }
+
+// A manual install on a server without nft stops before anything is written, says which command to run, and ends with a
+// status a script can tell from other failures. It installs no package itself.
+func TestInstallRefusesAServerWithoutNft(t *testing.T) {
+	was := nftInstalled
+	defer func() { nftInstalled = was }()
+
+	nftInstalled = func() bool { return true }
+	if err := checkNft(); err != nil {
+		t.Fatalf("a server with nft was refused: %v", err)
+	}
+
+	nftInstalled = func() bool { return false }
+	err := checkNft()
+	if err == nil {
+		t.Fatal("a server without nft was accepted")
+	}
+	for _, want := range []string{"nft is not installed", "nothing was changed", "nftables"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("%q is missing from %q", want, err)
+		}
+	}
+	if got := installExit(err); got != exitNftMissing || exitNftMissing == 1 {
+		t.Fatalf("exit status = %d", got)
+	}
+	if got := installExit(os.ErrPermission); got != 1 {
+		t.Fatalf("another failure ended with %d", got)
+	}
+}

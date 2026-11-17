@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/node/agent"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/nftmissing"
 	"github.com/mistgate/mistgate/internal/node/unit"
 )
 
@@ -43,9 +45,34 @@ func cmdInstall(args []string) int {
 	}
 	if err := install(*stateDir, *bin, !*noStart); err != nil {
 		fmt.Fprintln(os.Stderr, "install:", err)
-		return 1
+		return installExit(err)
 	}
 	return 0
+}
+
+func installExit(err error) int {
+	if errors.Is(err, nftmissing.ErrMissing) {
+		return exitNftMissing
+	}
+	return 1
+}
+
+// exitNftMissing is the exit status of install on a server without the nft command, so a script can tell it from any
+// other failure. Nothing was changed on the server.
+const exitNftMissing = 3
+
+// nftInstalled is a seam for the test.
+var nftInstalled = nftmissing.Installed
+
+// checkNft refuses to install the agent on a server that cannot run its firewall steps. The command installs no
+// packages: a manual install is the owner's own server, so it says which command to run.
+func checkNft() error {
+	if nftInstalled() {
+		return nil
+	}
+	return fmt.Errorf("%w on this server. The agent needs it for the SSH guard, port hopping, WARP routing and the UDP delivery check, "+
+		"and Debian 13 cloud images ship without it. Install the package, then run this command again (nothing was changed): %s",
+		nftmissing.ErrMissing, nftmissing.InstallHint())
 }
 
 func validateRefreshInstall(stateDir, bin string) error {
@@ -73,6 +100,9 @@ func install(stateDir, bin string, start bool) error {
 	}
 	if !agent.IsEnrolled(stateDir) {
 		return fmt.Errorf("%s holds no identity: run `mistgate-node enroll` first", stateDir)
+	}
+	if err := checkNft(); err != nil {
+		return err
 	}
 	ram := hostctl.New(slog.New(slog.DiscardHandler)).Facts(context.Background()).RAMTotal
 	unit, err := renderUnit(bin, stateDir, ram)

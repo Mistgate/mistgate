@@ -140,6 +140,7 @@ func newAgent(stateDir, linkURL string, log *slog.Logger, level *slog.LevelVar) 
 		}
 	}
 	cfg.SecurityUpdatesLauncher = newSecurityUpdatesLauncher(stateDir)
+	cfg.NftInstallLauncher = newNftInstallLauncher(stateDir)
 	cfg.OSUpdate = newOSUpdate(stateDir, cfg.Updater)
 	a, err := agent.New(cfg, engines, hostctl.New(log))
 	if err != nil {

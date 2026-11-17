@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	"github.com/mistgate/mistgate/internal/node/nftmissing"
 )
 
 type call struct{ stdin, name, args string }
@@ -443,5 +445,32 @@ func TestTorrentGuardRulesetLoadsInPrivateNetns(t *testing.T) {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("listed table lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+// A server without the nft command fails the firewall steps with the failure the agent says once (nftmissing); an nft that
+// ran and refused is another failure, and a cleanup of a host that never had nft is not a failure at all.
+func TestMissingNftBinaryIsTheSharedFailure(t *testing.T) {
+	h, _ := testHost(t)
+	h.sshPorts = []uint16{22}
+	h.run = func(_ context.Context, _, name string, _ ...string) ([]byte, error) {
+		return nil, &exec.Error{Name: name, Err: exec.ErrNotFound}
+	}
+	err := h.SetPortHops(context.Background(), []Hop{{InboundID: "inb_a", Network: "udp", From: 20000, To: 39999, Port: 443}})
+	if !nftmissing.Is(err) || !strings.Contains(err.Error(), "nft is not installed") {
+		t.Fatalf("missing nft = %v", err)
+	}
+	if err := h.ApplyBaseline(context.Background()); !nftmissing.Is(err) || !strings.Contains(err.Error(), "ssh guard") {
+		t.Fatalf("the baseline did not report the SSH guard without nft: %v", err)
+	}
+	if err := h.nft(context.Background(), "", true); err != nil {
+		t.Fatalf("cleaning a host without nft failed: %v", err)
+	}
+
+	h.run = func(context.Context, string, string, ...string) ([]byte, error) {
+		return []byte("Error: Operation not supported"), errors.New("exit status 1")
+	}
+	if err := h.SetPortHops(context.Background(), []Hop{{InboundID: "inb_a", Network: "udp", From: 20000, To: 39999, Port: 443}}); err == nil || nftmissing.Is(err) {
+		t.Fatalf("an nft that ran and refused read as missing: %v", err)
 	}
 }

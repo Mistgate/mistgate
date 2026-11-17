@@ -50,8 +50,11 @@ type securityUpdatesSnapshot struct {
 
 // jobRunning: systemd runs the job's unit right now, whatever its status file says yet (the job writes "running" only
 // once it has started, so right after the launch the file may still hold the previous run).
-func (s securityUpdatesSnapshot) jobRunning() bool {
-	switch s.activeState {
+func (s securityUpdatesSnapshot) jobRunning() bool { return jobUnitActive(s.activeState) }
+
+// jobUnitActive: the ActiveState of a transient job unit says it is working (the security updates and nftables jobs).
+func jobUnitActive(activeState string) bool {
+	switch activeState {
 	case "active", "activating", "deactivating", "reloading", "refreshing":
 		return true
 	}
@@ -59,9 +62,9 @@ func (s securityUpdatesSnapshot) jobRunning() bool {
 }
 
 // jobLoaded: systemd still holds a unit of that name, so systemd-run would refuse a new one ("Unit ... already exists").
-func (s securityUpdatesSnapshot) jobLoaded() bool {
-	return s.loadState != "" && s.loadState != "not-found"
-}
+func (s securityUpdatesSnapshot) jobLoaded() bool { return jobUnitLoaded(s.loadState) }
+
+func jobUnitLoaded(loadState string) bool { return loadState != "" && loadState != "not-found" }
 
 // parseUnitShow reads LoadState and ActiveState from `systemctl show` output (Key=Value lines, in any order).
 func parseUnitShow(out string) (load, active string) {

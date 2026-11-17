@@ -62,6 +62,11 @@ describe("events", () => {
     expect(describeEvent(t as never, { code: "host_firewall_sync_failed", params: { error: "x" } }).text).toBe(en["event.host_firewall_sync_failed.plain"]);
     expect(describeEvent(t as never, { code: "host_firewall_sync_recovered", params: { resolved_error: "x" } }).text).toBe(en["event.host_firewall_sync_recovered"]);
   });
+  it("words the missing nft command of a server, and its return", () => {
+    expect(describeEvent(t as never, { code: "nft_missing", params: {} }).text).toBe(en["event.nft_missing"]);
+    expect(describeEvent(t as never, { code: "nft_restored", params: {} }).text).toBe(en["event.nft_restored"]);
+    expect(en["event.nft_missing"]).toContain("nft is not installed");
+  });
   it("words the OS update of a node: the agent's job, its reboot, and the panel's verdict", () => {
     const d = (code: string, params: Record<string, string> = {}) => describeEvent(t as never, { code, params }).text;
     expect(d("os_update_started", { action: "update" })).toBe("OS update started");

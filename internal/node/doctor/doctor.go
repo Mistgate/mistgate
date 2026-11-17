@@ -73,6 +73,7 @@ const (
 	CheckWarpPath        = "warp_path"
 	CheckUnitGeneration  = "unit_generation"
 	CheckSecurityUpdates = "security_updates"
+	CheckNftables        = "nftables"
 	CheckCPUSteal        = "cpu_steal"
 	CheckConntrackFill   = "conntrack_fill"
 	CheckAgentFDs        = "agent_fds"
@@ -89,6 +90,7 @@ const (
 	FixAllowForwarding       = "allow_forwarding"
 	FixEnableSecurityUpdates = "enable_security_updates"
 	FixAwgModuleRepair       = "awg_module_repair"
+	FixInstallNftables       = "install_nftables"
 )
 
 // Result is one check's outcome; it becomes one DoctorResult.
@@ -144,6 +146,7 @@ var checks = []check{
 	{CheckWarpPath, checkWarpPath},
 	{CheckUnitGeneration, checkUnitGeneration},
 	{CheckSecurityUpdates, checkSecurityUpdates},
+	{CheckNftables, checkNftables},
 	{CheckCPUSteal, checkCPUSteal},
 	{CheckConntrackFill, checkConntrackFill},
 	{CheckAgentFDs, checkAgentFDs},
@@ -160,7 +163,7 @@ func CheckIDs() []string {
 
 // FixIDs returns the fix ids.
 func FixIDs() []string {
-	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp, FixRefreshUnit, FixAllowForwarding, FixEnableSecurityUpdates, FixAwgModuleRepair}
+	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp, FixRefreshUnit, FixAllowForwarding, FixEnableSecurityUpdates, FixAwgModuleRepair, FixInstallNftables}
 }
 
 // fixChecks says which checks offer a fix; the agent re-runs them after the fix (agent.proto "ApplyFix"). A unit
@@ -174,6 +177,7 @@ var fixChecks = map[string][]string{
 	FixAllowForwarding:       {CheckAwgBackend},
 	FixAwgModuleRepair:       {CheckAwgBackend, CheckKernelHeaders},
 	FixEnableSecurityUpdates: {CheckSecurityUpdates},
+	FixInstallNftables:       {CheckNftables},
 }
 
 // RecheckIDs returns the checks to re-run after a fix, nil for an unknown fix id.
