@@ -149,6 +149,7 @@ type Agent struct {
 	triedNext     bool        // connectLoop only: the last session tried meta.NextLink
 	currentFailed bool        // connectLoop only: the last session over the current link did not establish
 	switchPending atomic.Bool // the current session ends to try a new panel link address
+	configLink    string      // cfg.LinkURL as configured, before agent.json's link replaced it: an mTLS agent's own link
 
 	engines            map[string]engine.Engine
 	protocols          []string // sorted keys of engines
@@ -434,6 +435,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	if siteErr != nil {
 		site = decoy.BuiltinSite(cfg.StateDir)
 	}
+	configLink := cfg.LinkURL
 	if id.meta.Link != "" { // enrolled over the link: that address is the only way to the panel
 		if _, err := parseLinkBase(id.meta.Link); err != nil {
 			return nil, fmt.Errorf("%s link: %w", fileMeta, err)
@@ -451,7 +453,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	journal := newJournal()
 	dbg := newDebugState(cfg.Level, time.Now)
 	a := &Agent{
-		cfg: cfg, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
+		cfg: cfg, configLink: configLink, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
 		decoySite:     site,
 		nets:          nets.New(0),
 		networkWake:   make(chan struct{}, 1),
