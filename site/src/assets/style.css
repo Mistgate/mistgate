@@ -17,7 +17,7 @@
   --bg: light-dark(#f8f8f6, #0c0c0e);
   --surface: light-dark(#ffffff, #141417);
   --surface-2: light-dark(#efefec, #1d1d22);
-  --border: light-dark(#e3e3df, #25252b);
+  --border: light-dark(color-mix(in srgb, var(--text) 11%, transparent), color-mix(in srgb, var(--text) 9%, transparent));
   --text: light-dark(#16161a, #f3f3f5);
   --muted: light-dark(#6b6b73, #8b8b94);
   --faint: light-dark(#c4c4c8, #4a4a52);
