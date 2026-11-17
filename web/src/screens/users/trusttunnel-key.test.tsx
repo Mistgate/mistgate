@@ -75,6 +75,7 @@ const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const rows = () => [...document.querySelectorAll("section li")];
+const links = () => [...document.querySelectorAll(".tq-sv > div")];
 // the dictionary as the page reads it (errorText takes a T)
 const tOf = () => ((k: string, v?: Record<string, string | number>) => fill((dictionaries.en as Record<string, string>)[k] ?? k, v)) as unknown as T;
 
@@ -83,17 +84,17 @@ const url = "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDU";
 const link = (over: object = {}) => ({ nodeId: "nod_de1", nodeName: "de1", profileId: "prf_tt", profileName: "TrustTunnel · 443", url, hasIpv6: false, relay: false, via: "", note: "", ...over });
 const key = (over: object = {}) => ({ hasKey: true, keyDeviceId: "dev_tt", keyIssuedUnix: BigInt(1_790_000_000), links: [link()], ...over });
 const section = (u: UserN, extra: Partial<Parameters<typeof TrustTunnelSection>[0]> = {}) => (
-  <TrustTunnelSection user={u} hasKeyDevice={false} countryOf={() => "DE"} onTurnOn={vi.fn()} onChanged={vi.fn()} {...extra} />
+  <TrustTunnelSection user={u} hasKeyDevice={false} countryOf={() => "DE"} onToggle={vi.fn()} onChanged={vi.fn()} {...extra} />
 );
 
 describe("the TrustTunnel key of a person: the states", () => {
   it("1. the switch is off: a line and the switch, which turns it on; nothing is asked of the panel", async () => {
-    const onTurnOn = vi.fn();
-    await mount(section(user({ apps: { happ: true, trustTunnel: false } }), { onTurnOn }));
-    expect(text()).toContain("Off: the person gets no tt:// links.");
+    const onToggle = vi.fn();
+    await mount(section(user({ apps: { happ: true, trustTunnel: false } }), { onToggle }));
+    expect(text()).toContain("Off: the person has no tt:// links");
     expect(getTrustTunnelLinks).not.toHaveBeenCalled();
     await click(document.querySelector("[role=switch]"));
-    expect(onTurnOn).toHaveBeenCalled();
+    expect(onToggle).toHaveBeenCalledWith(true);
   });
 
   it("2. on, an active person, no key: \"Issue key\" makes one and shows its links", async () => {
@@ -108,7 +109,8 @@ describe("the TrustTunnel key of a person: the states", () => {
     expect(onChanged).toHaveBeenCalled();
     expect(rows()[0]!.textContent).toContain("TrustTunnel key");
     expect(rows()[0]!.textContent).toContain("takes 1 place");
-    expect(rows()).toHaveLength(2);
+    expect(rows()).toHaveLength(1);
+    expect(links()).toHaveLength(1);
   });
 
   it("2. on, a person who is disabled, expired or over the quota, no key: no button that would be refused, and why", async () => {
@@ -131,7 +133,8 @@ describe("the TrustTunnel key of a person: the states", () => {
     await mount(section(user({ status: UserStatus.DISABLED })));
     expect(text()).toContain("Paused");
     expect(text()).toContain("Paused: the person is disabled. The key is kept and works again once they are enabled.");
-    expect(rows()).toHaveLength(2); // the key and the note
+    expect(rows()).toHaveLength(1); // the key (the note is the line under the head)
+    expect(links()).toHaveLength(0);
     expect(document.querySelector("svg[role=img]")).toBeNull();
     expect(button("Copy link")).toBeUndefined();
     act(() => root?.unmount());
@@ -151,7 +154,7 @@ describe("the TrustTunnel key of a person: the states", () => {
   it("5. a server with a self-signed certificate: no link, no QR, \"needs a domain with a public certificate\", and the way to its profile", async () => {
     getTrustTunnelLinks.mockResolvedValue(key({ links: [link({ url: "", note: "self_signed", nodeName: "fi1", profileId: "prf_self" })] }));
     await mount(section(user()));
-    const row = rows()[1]!;
+    const row = links()[0]!;
     expect(row.textContent).toContain("fi1");
     expect(row.textContent).toContain("Needs a domain with a public certificate");
     expect(row.querySelector("button")).toBeNull();
@@ -162,8 +165,7 @@ describe("the TrustTunnel key of a person: the states", () => {
   it("6 and 7. a relay's link is marked \"via RU\" and one with IPv6 on its exit \"IPv6\"", async () => {
     getTrustTunnelLinks.mockResolvedValue(key({ links: [link(), link({ hasIpv6: true, url: `${url}2` }), link({ relay: true, via: "RU", url: `${url}3` })] }));
     await mount(section(user()));
-    const links = rows().slice(1);
-    expect(links.map((r) => r.querySelector("b")!.parentElement!.textContent)).toEqual(["de1", "de1IPv6", "de1via RU"]);
+    expect(links().map((r) => r.querySelector("b")!.textContent + r.querySelector(".tq-mks")!.textContent)).toEqual(["de1", "de1IPv6", "de1via RU"]);
   });
 
   it("8. a refusal at the device limit stays in the block, in words, with who holds the places", async () => {
@@ -215,6 +217,7 @@ describe("the link of a key", () => {
     expect(document.querySelector("svg[role=img]")).toBeNull();
     await click(button("Copy link"));
     expect(write).toHaveBeenCalledWith(real);
+    expect(document.querySelector(".tq-sv [data-cp=done]")).not.toBeNull(); // the button says it
     expect(text()).toContain("Link copied. It holds the key: send it to this person only");
     await click(button("QR code"));
     await settle();

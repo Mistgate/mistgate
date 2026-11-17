@@ -60,14 +60,14 @@ describe("the app-key labels on a device row", () => {
     expect(badge("Old Link PC")?.textContent).toBe("Link changed");
     expect(badge("Old Link PC")?.getAttribute("aria-label")).toContain("reconnects on its own at the next sync");
     // the stale one is amber, the keyed one quiet grey
-    expect(badge("Old Link PC")?.className).toContain("text-warn-text");
-    expect(badge("Keyed PC")?.className).not.toContain("text-warn-text");
+    expect(badge("Old Link PC")?.className).toContain("warn");
+    expect(badge("Keyed PC")?.className).not.toContain("warn");
   });
 });
 
 describe("an inactive device", () => {
   const IDLE_SINCE = Math.floor(Date.UTC(2026, 9, 12, 12) / 1000);
-  const counter = () => [...document.querySelectorAll("span")].find((s) => /^\d+ of \d+$/.test(s.textContent ?? ""))?.parentElement?.textContent ?? "";
+  const counter = () => document.querySelector(".up-sum")?.textContent ?? "";
 
   it("gets a calm plaque with the date and a line that it takes no place, and a live device gets neither", async () => {
     await mount([device("d1", "Live PC"), device("d2", "Old Tablet", { idle: true, idleSinceUnix: IDLE_SINCE })], { devicesIdle: 1 });

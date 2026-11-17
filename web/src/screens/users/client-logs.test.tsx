@@ -12,6 +12,7 @@ import { ru } from "@/i18n/ru";
 import { meQuery } from "@/lib/session";
 import type { DeviceN } from "./model";
 import { DevicesPanel } from "./user-detail";
+import { LogsTab } from "./user-logs";
 
 // The person's page, Devices: for the owner on the VPS edition, a device of the Mistgate app can be asked for its logs, says so in a
 // badge, and a list of what came sits under the devices with the viewer behind "Open".
@@ -56,7 +57,8 @@ const owner = { admin: { id: "adm_1", role: Role.OWNER } };
 const settle = async () => {
   for (let i = 0; i < 4; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 };
-async function mount(devices: DeviceN[], me: object = owner) {
+/** The Devices tab (the badges and the menu of a row), or the Logs tab (the list of what came). */
+async function mount(devices: DeviceN[], me: object = owner, view: "devices" | "logs" = "devices") {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -67,7 +69,7 @@ async function mount(devices: DeviceN[], me: object = owner) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <DevicesPanel user={user} devices={devices} profiles={[]} actions={{ refresh: vi.fn() } as never} onEditGroup={vi.fn()} />
+          {view === "logs" ? <LogsTab user={user} devices={devices} /> : <DevicesPanel user={user} devices={devices} profiles={[]} actions={{ refresh: vi.fn() } as never} onEditGroup={vi.fn()} />}
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -84,7 +86,7 @@ const rec = (seq: number, level: string, source: string, message: string, attrs:
 
 const text = () => document.body.textContent ?? "";
 const row = (name: string) => [...document.querySelectorAll("li")].find((li) => li.textContent?.startsWith(name));
-const logRow = (name: string, state: string) => [...document.querySelectorAll("[data-shot=client-logs-list] li")].find((li) => li.textContent?.startsWith(name) && li.textContent.includes(state));
+const logRow = (name: string, state: string) => [...document.querySelectorAll("[data-shot=client-logs-list] .up-lg")].find((li) => li.textContent?.startsWith(name) && li.textContent.includes(state));
 const button = (label: string, within: ParentNode = document) => [...within.querySelectorAll<HTMLElement>("button")].find((b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label);
 const dialog = () => [...document.querySelectorAll("[role=dialog]")].at(-1)!;
 const click = async (el: Element | null | undefined) => {
@@ -226,7 +228,7 @@ describe("the list of logs for support", () => {
 
   it("shows one row per request with a pill for what became of it, and only the actions that fit", async () => {
     ops.listClientDebug.mockResolvedValue({ items: items4() });
-    await mount(devices());
+    await mount(devices(), owner, "logs");
     expect(text()).toContain(en["clientlogs.title"]);
     expect(logRow("Office PC", "Requested")!.textContent).toContain("Asked by adm_owner");
     expect(button("Cancel the request", logRow("Office PC", "Requested")!)).toBeTruthy();
@@ -247,28 +249,39 @@ describe("the list of logs for support", () => {
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
     ops.listClientDebug.mockResolvedValue({ items: items4() });
-    await mount(devices());
+    await mount(devices(), owner, "logs");
     expect(document.getElementById("client-logs")).toBeTruthy();
     expect(scroll).not.toHaveBeenCalled();
     act(() => root?.unmount());
     host?.remove();
     window.location.hash = "#client-logs";
-    await mount(devices());
+    await mount(devices(), owner, "logs");
     window.location.hash = "";
     expect(scroll).toHaveBeenCalledTimes(1);
     expect(scroll.mock.contexts[0]).toBe(document.getElementById("client-logs"));
   });
 
-  it("draws nothing for a person with no requests and no logs, though the menu can still ask", async () => {
+  it("says there are none for a person with no requests and no logs, and offers each device of the app a request; the Devices tab has no list", async () => {
     ops.listClientDebug.mockResolvedValue({ items: [] });
+    await mount(devices(), owner, "logs");
+    expect(text()).toContain(en["clientlogs.title"]);
+    expect(button("Request logs: Office PC")).toBeTruthy();
+    act(() => root?.unmount());
+    host?.remove();
     await mount(devices());
     expect(text()).not.toContain(en["clientlogs.title"]);
+  });
+
+  it("tells a helper that the owner reads them", async () => {
+    await mount(devices(), { admin: { id: "adm_2", role: Role.HELPER } }, "logs");
+    expect(text()).toContain(en["up.logsNone"]);
+    expect(ops.listClientDebug).not.toHaveBeenCalled();
   });
 
   it("speaks Russian in the pills", async () => {
     setLang("ru");
     ops.listClientDebug.mockResolvedValue({ items: items4() });
-    await mount(devices());
+    await mount(devices(), owner, "logs");
     expect(text()).toContain(ru["clientlogs.title"]);
     for (const k of ["clientlogs.state.open", "clientlogs.state.received", "clientlogs.state.unasked", "clientlogs.state.declined"] as const) expect(text()).toContain(ru[k]);
   });
@@ -276,7 +289,7 @@ describe("the list of logs for support", () => {
   it("deletes a bundle only after asking, and a request that is open only by withdrawing it", async () => {
     ops.listClientDebug.mockResolvedValue({ items: items4() });
     ops.deleteClientDebug.mockResolvedValue({});
-    await mount(devices());
+    await mount(devices(), owner, "logs");
     const got = logRow("MacBook Air", "Received")!;
     await press(got.querySelector("button[aria-label^='Actions for the logs']"));
     expect(items()).toEqual(["Download", "Delete"]);
@@ -306,7 +319,7 @@ describe("the list of logs for support", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
       saved.push(this.download);
     });
-    await mount(devices());
+    await mount(devices(), owner, "logs");
     await click(button("Open", logRow("MacBook Air", "Received")!));
     const d = dialog();
     expect(d.textContent).toContain("Asked by adm_owner");
@@ -322,7 +335,7 @@ describe("the list of logs for support", () => {
   it("says that a bundle was sent on its own, and how many fields were dropped", async () => {
     ops.listClientDebug.mockResolvedValue({ items: [items4()[2]!, { ...items4()[1]!, droppedAttrs: 3 }] });
     ops.getClientDebug.mockResolvedValue({ bundle: {}, records: [], nextCursor: 0n, sources: [] });
-    await mount(devices());
+    await mount(devices(), owner, "logs");
     await click(button("Open", logRow("iPhone 15", "Sent on their own")!));
     expect(dialog().textContent).toContain(en["clientlogs.unaskedNote"]);
     expect(dialog().textContent).toContain(en["debug.empty"]);
@@ -334,7 +347,7 @@ describe("the viewer's filters", () => {
   const page = (records: ReturnType<typeof rec>[], next = 0n) => ({ bundle: {}, records, nextCursor: next, sources: ["service", "tunnel"] });
   async function open() {
     ops.listClientDebug.mockResolvedValue({ items: [bundle] });
-    await mount([device("dev_mac", "MacBook Air", { platform: "macos" })]);
+    await mount([device("dev_mac", "MacBook Air", { platform: "macos" })], owner, "logs");
     await click(button("Open", logRow("MacBook Air", "Received")!));
   }
   const inputs = () => [...dialog().querySelectorAll<HTMLInputElement>("input[type=datetime-local]")];

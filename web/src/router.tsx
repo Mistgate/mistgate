@@ -151,11 +151,16 @@ const users = createRoute({
   }),
   component: lazyRouteComponent(() => import("@/screens/users"), "UsersScreen"),
 });
-// "?add=device" opens "Add device" (the link window sends the owner here when self-service is off).
+// "?add=device" opens "Add device" (the link window sends the owner here when self-service is off); "?tab=" is the tab of the page
+// (the Overview has none), and "#client-logs" lands on the Logs tab.
+const userTabs = ["devices", "access", "logs", "settings"] as const;
 const user = createRoute({
   getParentRoute: () => app,
   path: "/users/$id",
-  validateSearch: (s: Record<string, unknown>): { add?: "device" } => (s.add === "device" ? { add: "device" } : {}),
+  validateSearch: (s: Record<string, unknown>): { add?: "device"; tab?: (typeof userTabs)[number] } => ({
+    ...(s.add === "device" ? { add: "device" as const } : {}),
+    ...(userTabs.includes(s.tab as never) ? { tab: s.tab as (typeof userTabs)[number] } : {}),
+  }),
   component: lazyRouteComponent(() => import("@/screens/users"), "UserScreen"),
 });
 
