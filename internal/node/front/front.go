@@ -336,9 +336,9 @@ func (f *Front) route(p *pending) bool {
 	out := newReplayConn(conn, head)
 	timer := time.NewTimer(f.routeWait)
 	defer timer.Stop()
+	rt.q.delivered.Add(1) // before the hand-off, so whoever accepted it already sees it counted
 	select {
 	case rt.q.ch <- out:
-		rt.q.delivered.Add(1)
 		return true
 	case <-timer.C:
 		f.refused.Add(1)
@@ -347,6 +347,7 @@ func (f *Front) route(p *pending) bool {
 	case <-p.gone:
 	case <-f.done:
 	}
+	rt.q.delivered.Add(^uint64(0))
 	return false
 }
 
