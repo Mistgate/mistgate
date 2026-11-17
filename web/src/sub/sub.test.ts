@@ -487,7 +487,8 @@ describe("Persian and Turkish", () => {
     const el = view(data("return"), state("ios", { returning: true }, "tr"), actions());
     expect(text(el.querySelector(".hero .h1"))).toBe("Merhaba, Alice");
     expect(text(el.querySelector(".hero .pill"))).toBe("Etkin");
-    expect(text(el.querySelector(".hero"))).toMatch(/\d+ \S+ tarihine kadar/);
+    // The year is shown when the term ends in another year (45 days from mid-November is 1 January).
+    expect(text(el.querySelector(".hero"))).toMatch(/\d+ \S+( \d{4})? tarihine kadar/);
     expect(text(el.querySelector("section[aria-label='Cihazlarım']"))).toContain("Cihaz ekle");
     expect(plain(dict.tr.txt.limitedReset("1 Aralık", "month").body)).toBe("Bu ayki trafik bitti — VPN 1 Aralık tarihine kadar çalışmıyor.");
     expect(plain(dict.tr.txt.limitedReset("1 Aralık", "none").body)).toBe("Trafik bitti — VPN 1 Aralık tarihine kadar çalışmıyor.");
