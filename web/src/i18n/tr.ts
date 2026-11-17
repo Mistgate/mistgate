@@ -38,11 +38,13 @@ import { tr as clientlogsTr } from "./clientlogs";
 import { tr as trusttunnelTr } from "./trusttunnel";
 import { tr as shellTr } from "./shell";
 import { tr as nodesviewTr } from "./nodesview";
+import { tr as nodeswaysTr } from "./nodesways";
 import { tr as userslistTr } from "./userslist";
 import { tr as userspageTr } from "./userspage";
 import { tr as overviewTr } from "./overview";
 import { tr as windowsTr } from "./windows";
 import { tr as nodepageTr } from "./nodepage";
+import { tr as nodewaysTr } from "./nodeways";
 import { tr as usersgroupTr } from "./usersgroup";
 import { tr as decoysitesTr } from "./decoysites";
 
@@ -306,4 +308,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "IP adresi için Let’s Encrypt sertifikası henüz yok: bir alan adı ya da kendi imzalı sertifikayı seç",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...shellTr, ...overviewTr, ...nodesviewTr, ...windowsTr, ...nodepageTr, ...userslistTr, ...userspageTr, ...usersgroupTr, ...decoysitesTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...shellTr, ...overviewTr, ...nodesviewTr, ...windowsTr, ...nodepageTr, ...userslistTr, ...userspageTr, ...usersgroupTr, ...decoysitesTr, ...nodeswaysTr, ...nodewaysTr };

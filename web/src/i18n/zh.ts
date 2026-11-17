@@ -38,11 +38,13 @@ import { zh as clientlogsZh } from "./clientlogs";
 import { zh as trusttunnelZh } from "./trusttunnel";
 import { zh as shellZh } from "./shell";
 import { zh as nodesviewZh } from "./nodesview";
+import { zh as nodeswaysZh } from "./nodesways";
 import { zh as userslistZh } from "./userslist";
 import { zh as userspageZh } from "./userspage";
 import { zh as overviewZh } from "./overview";
 import { zh as windowsZh } from "./windows";
 import { zh as nodepageZh } from "./nodepage";
+import { zh as nodewaysZh } from "./nodeways";
 import { zh as usersgroupZh } from "./usersgroup";
 import { zh as decoysitesZh } from "./decoysites";
 
@@ -308,4 +310,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...decoysitesZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...decoysitesZh, ...nodeswaysZh, ...nodewaysZh };

@@ -89,13 +89,13 @@ describe("the List | Map switch", () => {
     expect(ctl.navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: {} }));
   });
 
-  it("has no map on a phone: the switch offers the list and the load", async () => {
+  it("has no map on a phone: the switch offers the list, the paths and the load", async () => {
     (window as { matchMedia?: unknown }).matchMedia = () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} });
     ctl.search = { view: "map" };
     await mount();
     expect(document.querySelector("[data-testid=fleet-map]")).toBeNull();
     const options = [...document.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label='Nodes view'] [role=radio]")].map((r) => r.textContent);
-    expect(options).toEqual(["List", "Load"]);
+    expect(options).toEqual(["List", "Paths", "Load"]);
   });
 
   it("shows the load for ?view=load and remembers it", async () => {
@@ -118,12 +118,13 @@ describe("the List | Map switch", () => {
     await mount("edge");
     expect(document.querySelector("[data-testid=fleet-load]")).toBeNull();
     const options = [...document.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label='Nodes view'] [role=radio]")].map((r) => r.textContent);
-    expect(options).toEqual(["List", "Map"]);
-    // on a phone the edition has nothing to switch to
+    expect(options).toEqual(["List", "Paths", "Map"]);
+    // on a phone the edition has the paths to switch to (the owner's), and no map, no load
     act(() => root!.unmount());
     host!.remove();
     (window as { matchMedia?: unknown }).matchMedia = () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} });
     await mount("edge");
-    expect(document.querySelector("[role=radiogroup][aria-label='Nodes view']")).toBeNull();
+    const phone = [...document.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label='Nodes view'] [role=radio]")].map((r) => r.textContent);
+    expect(phone).toEqual(["List", "Paths"]);
   });
 });

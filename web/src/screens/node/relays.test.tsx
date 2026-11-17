@@ -1,13 +1,13 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
-import { relaysQuery, type RelayMsg } from "@/lib/relay";
-import { AddRelayDialog, ChangeRelayPort, RelayRows, useRelayRuns } from "./relays";
+import type { RelayMsg } from "@/lib/relay";
+import { AddRelayDialog, ChangeRelayPort } from "./relays";
 
 const listRelays = vi.fn();
 const listRelayCandidates = vi.fn();
@@ -50,10 +50,7 @@ const relay = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const on = relay({ enabled: true, state: InboundState.ACTIVE, toIp: "203.0.113.7", check: check({ path: stage({ senderId: "nod_nl1", senderName: "nl1" }), verified: true }) });
-const down = relay({ id: "rly_2", inboundId: "inb_h", profileName: "Hysteria2", protocol: "hysteria2", network: "udp", port: 8444, exitPort: 8444, check: check({ network: "udp", ok: false, stage: "path", path: stage({ status: "fail", code: "timeout", verdict: "" }) }) });
 const fresh = relay({ id: "rly_3", inboundId: "inb_f", exitNodeId: "nod_fi1", exitNodeName: "fi1", profileName: "VLESS · Reality", check: check() });
-const unchecked = relay({ id: "rly_4", inboundId: "inb_u", exitNodeId: "nod_fi1", exitNodeName: "fi1", profileName: "Trojan" });
-const stale = relay({ id: "rly_5", inboundId: "inb_s", exitNodeId: "nod_fi1", exitNodeName: "fi1", profileName: "Old", check: check({ atUnix: now - 30 * 60, leg: stage({ atUnix: now - 30 * 60 }) }) });
 
 const cut = { verdict: "partial", dark: ["MTS"], atUnix: now };
 const cand = (over: Record<string, unknown>) => ({ inboundId: "inb_v", nodeId: "nod_de1", nodeName: "de1", profileId: "prf_v", profileName: "VLESS · TCP", protocol: "vless", network: "tcp", port: 443, unsupported: "", hop: false, relayId: "", country: cut, reach: { verdict: "reach", source: "tspu_row", atUnix: now }, ...over });
@@ -82,12 +79,6 @@ afterEach(() => {
   for (const m of [listRelays, listRelayCandidates, createRelay, checkRelay, updateRelay, deleteRelay]) m.mockReset();
 });
 
-/** The relays of a node as a lane of the ways in shows them: the rows and what runs on them. */
-function Rows({ node = "nod_msk1", side = "entry" }: { node?: string; side?: "entry" | "exit" }) {
-  const q = useQuery(relaysQuery(node));
-  const runs = useRelayRuns();
-  return <RelayRows list={(q.data ?? []) as RelayMsg[]} side={side} runs={runs} />;
-}
 const msk1 = { id: "nod_msk1", name: "msk1", cc: "RU" };
 
 async function mount(ui: ReactNode) {
@@ -107,103 +98,10 @@ async function mount(ui: ReactNode) {
 const settle = async () => {
   for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 };
-const text = () => document.body.textContent ?? "";
-const rows = () => [...document.querySelectorAll<HTMLElement>("[data-testid=relay-row]")];
-const rowOf = (name: string) => rows().find((r) => r.textContent?.includes(name))!;
 const buttonIn = (el: ParentNode, label: string) => [...el.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]")!;
 const tick = (label: string) => click(dialog().querySelector(`input[aria-label="${label}"]`));
-
-describe("the relay rows of a lane", () => {
-  it("lists relays that work, are down and are off, each with its state, checks and why", async () => {
-    listRelays.mockResolvedValue({ relays: [on, down, fresh, unchecked, stale] });
-    await mount(<Rows />);
-    expect(rows().map((r) => r.dataset.state)).toEqual(["on", "failed", "off", "off", "off"]);
-
-    const works = rowOf("VLESS · TCP");
-    expect(works.textContent).toContain("Works");
-    expect(works.textContent).toContain("tcp/8443");
-    expect(works.textContent).toContain("203.0.113.7:443");
-    expect(works.querySelector("[data-testid=relay-stages]")?.textContent).toBe("msk1 → de1passesFrom nl1 through msk1passes");
-    expect(works.textContent).toContain("Works, checked 2 min ago.");
-    expect(buttonIn(works, "Turn off")).toBeDefined();
-
-    const broken = rowOf("Hysteria2");
-    expect(broken.textContent).toContain("Down");
-    expect(broken.querySelector("[data-testid=relay-down]")?.textContent).toMatch(/^Down since .+: 8444\/udp on msk1 is not reachable from outside\.$/);
-  });
-
-  it("offers 'Turn on' only after a check that passed in the last 15 minutes, and says why not otherwise", async () => {
-    listRelays.mockResolvedValue({ relays: [fresh, unchecked, stale] });
-    await mount(<Rows />);
-    const ready = buttonIn(rowOf("VLESS · Reality"), "Turn on")!;
-    expect(ready.disabled).toBe(false);
-    expect(rowOf("VLESS · Reality").textContent).toContain("The check passed 2 min ago: it can be turned on now.");
-    const never = buttonIn(rowOf("Trojan"), "Turn on")!;
-    expect(never.disabled).toBe(true);
-    expect(never.parentElement?.title).toBe(en["relay.gate.unchecked"]);
-    expect(buttonIn(rowOf("Trojan"), "Check now")?.className).toContain("bg-accent"); // the next step is to check
-    expect(buttonIn(rowOf("Old"), "Turn on")?.parentElement?.title).toBe(en["relay.gate.stale"]);
-
-    updateRelay.mockResolvedValue({ relay: { ...fresh, enabled: true, state: InboundState.ACTIVE } });
-    await click(ready);
-    await settle();
-    expect(updateRelay).toHaveBeenCalledWith({ id: "rly_3", enabled: true });
-    expect(text()).toContain("The relay works. People get the server “via RU” with their next subscription update (every 12 h).");
-  });
-
-  it("checks now: the row says what it checks while it runs, and a refused switch leaves its reason, not a second one", async () => {
-    listRelays.mockResolvedValue({ relays: [on] });
-    let finish: (v: unknown) => void = () => {};
-    checkRelay.mockReturnValue(new Promise((r) => (finish = r)));
-    await mount(<Rows />);
-    await click(buttonIn(rowOf("VLESS · TCP"), "Check now"));
-    expect(rowOf("VLESS · TCP").dataset.state).toBe("checking");
-    expect(rowOf("VLESS · TCP").textContent).toContain("Checking msk1 → de1…");
-    expect(rowOf("VLESS · TCP").querySelector("[data-testid=relay-stages]")?.textContent).toBe("msk1 → de1checking…From outside through msk1next");
-    await act(async () => finish({ relay: on }));
-    await settle();
-    expect(checkRelay).toHaveBeenCalledWith({ id: "rly_1" });
-    expect(rowOf("VLESS · TCP").dataset.state).toBe("on");
-    expect(listRelays.mock.calls.length).toBeGreaterThan(1); // the list is read again
-  });
-
-  it("switching on that fails its outside check reads from the stored check; any other refusal is said under the row", async () => {
-    listRelays.mockResolvedValue({ relays: [fresh] });
-    await mount(<Rows />);
-    let finish: (e: unknown) => void = () => {};
-    updateRelay.mockReturnValue(new Promise((_, j) => (finish = j)));
-    await click(buttonIn(rowOf("VLESS · Reality"), "Turn on"));
-    expect(rowOf("VLESS · Reality").textContent).toContain("Checking from outside through msk1…");
-    listRelays.mockResolvedValue({ relays: [{ ...fresh, check: check({ ok: false, stage: "path", path: stage({ status: "fail", code: "timeout" }) }) }] });
-    await act(async () => finish(new ConnectError("relay_check_failed: code=timeout&stage=path", Code.FailedPrecondition)));
-    await settle();
-    const row = rowOf("VLESS · Reality");
-    expect(row.dataset.state).toBe("failed");
-    expect(row.querySelector("[data-testid=relay-down]")?.textContent).toContain("8443/tcp on msk1 is not reachable from outside");
-    expect(row.querySelector("[role=alert]")).toBeNull(); // no second sentence
-
-    listRelays.mockResolvedValue({ relays: [fresh] });
-    updateRelay.mockRejectedValue(new ConnectError("relay_check_stale", Code.FailedPrecondition));
-    await settle();
-    await click(buttonIn(rowOf("VLESS · Reality"), "Turn on"));
-    await settle();
-    expect(rowOf("VLESS · Reality").querySelector("[role=alert]")?.textContent).toBe(en["err.relay_check_stale"]);
-  });
-
-  it("asks before removing, and says who loses what", async () => {
-    listRelays.mockResolvedValue({ relays: [on] });
-    await mount(<Rows />);
-    await click(buttonIn(rowOf("VLESS · TCP"), "Remove"));
-    expect(dialog().textContent).toContain("Remove the relay msk1 → de1?");
-    expect(dialog().textContent).toContain("VLESS · TCP on de1 is no longer reachable through msk1.");
-    await click(buttonIn(dialog(), "Remove"));
-    await settle();
-    expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
-  });
-
-});
 
 describe("the Add relay dialog", () => {
   it("an old agent on the entry gets the reason and a way to Updates instead of the list", async () => {
@@ -288,37 +186,53 @@ describe("the Add relay dialog", () => {
   });
 });
 
-describe("the exit's side and the panel's watch", () => {
-  it("on the exit a row leads with the profile and names the port on the entry", async () => {
-    listRelays.mockResolvedValue({ relays: [on] });
-    await mount(<Rows node="nod_de1" side="exit" />);
-    const row = rowOf("VLESS · TCP");
-    expect(row.textContent).toContain("Port on msk1");
-    expect(row.textContent).not.toContain("de1 · ");
-    expect(row.querySelector("a")?.getAttribute("href")).toBe("/profiles/$id");
+describe("the Add relay dialog as the wizard of a new way", () => {
+  const withAudience = {
+    ...candidates,
+    candidates: [
+      cand({ audience: { people: 7, staticAwgDevices: 2 } }),
+      cand({ inboundId: "inb_h", profileName: "Hysteria2", protocol: "hysteria2", network: "udp", port: 8443, audience: { people: 5, staticAwgDevices: 0 } }),
+      cand({ inboundId: "inb_y", nodeId: "nod_fi1", nodeName: "fi1", profileName: "Trojan", audience: { people: 3, staticAwgDevices: 0 } }),
+    ],
+  };
+  const open = async () => {
+    listRelayCandidates.mockResolvedValue(withAudience);
+    listRelays.mockResolvedValue({ relays: [] });
+    await mount(<AddRelayDialog open onOpenChange={() => {}} entry={msk1} />);
+    await settle();
+  };
+
+  it("says who gets the new path before anything is made, counting the people of the chosen servers and the AmneziaVPN devices", async () => {
+    await open();
+    expect(dialog().querySelector("[data-testid=relay-preview]")).toBeNull();
+    await tick("Relay VLESS · TCP of de1");
+    await tick("Relay Trojan of fi1");
+    const preview = dialog().querySelector("[data-testid=relay-preview]")!;
+    expect(preview.textContent).toContain("What people get");
+    expect(preview.textContent).toContain("10 people get the new path with the next subscription update");
+    expect(preview.textContent).toContain("AmneziaVPN: 2 devices need a new config");
   });
 
-  it("a relay that is on says how the last round through it went, and what went through the forward", async () => {
-    const watched = relay({ ...on, monitor: { atUnix: now - 240, ok: true, stage: "", code: "", responseMs: 182, failStreak: 0 }, bytes: 1_200_000_000, packets: 18_400, countedUnix: now - 180 });
-    listRelays.mockResolvedValue({ relays: [watched] });
-    await mount(<Rows />);
-    const watch = rowOf("VLESS · TCP").querySelector("[data-testid=relay-watch]")!;
-    expect(watch.textContent).toContain("Through the relay: works, 182 ms, 4 min ago");
-    expect(watch.textContent).toContain("Through the forward: 1.2 GB, 18,400 packets, counted 3 min ago");
-    expect(rowOf("VLESS · TCP").textContent).not.toContain("Works, checked"); // the round says it
+  it("selects every suitable server of every exit at once, and clears the choice", async () => {
+    await open();
+    await click(buttonIn(dialog(), "Select all 3 suitable servers"));
+    expect(dialog().querySelectorAll<HTMLInputElement>("[data-testid=relay-candidate] input[type=checkbox]:checked")).toHaveLength(3);
+    expect(dialog().querySelector("[data-testid=relay-preview]")?.textContent).toContain("15 people");
+    await click(buttonIn(dialog(), "Clear the choice"));
+    expect(dialog().querySelectorAll<HTMLInputElement>("[data-testid=relay-candidate] input[type=checkbox]:checked")).toHaveLength(0);
   });
 
-  it("two failed rounds make it down, with the stage in words; an agent without counters says nothing of bytes", async () => {
-    const frozen = relay({ ...on, monitor: { atUnix: now - 60, ok: false, stage: "freeze", code: "", responseMs: 0, failStreak: 3 } });
-    const once = relay({ ...on, id: "rly_8", profileName: "Once", monitor: { atUnix: now - 60, ok: false, stage: "path", code: "timeout", responseMs: 0, failStreak: 1 } });
-    listRelays.mockResolvedValue({ relays: [frozen, once] });
-    await mount(<Rows />);
-    const row = rowOf("VLESS · TCP");
-    expect(row.dataset.state).toBe("failed");
-    expect(row.textContent).toContain("Through the relay: the transfer stalls after the first kilobytes, 1 min ago · 3 rounds in a row");
-    expect(row.textContent).not.toContain("Through the forward");
-    expect(rowOf("Once").dataset.state).toBe("on"); // one bad round is not an outage yet
-    expect(rowOf("Once").textContent).toContain("nothing comes through msk1 from outside");
+  it("stops after the server that runs: the rest stay as they were, nothing is made twice", async () => {
+    await open();
+    createRelay.mockImplementation(() => new Promise((r) => setTimeout(() => r({ relay: relay({ id: "rly_new", enabled: false, check: undefined }) }), 20)));
+    checkRelay.mockResolvedValue({ relay: relay({ id: "rly_new", enabled: false, check: check({}) }) });
+    await click(buttonIn(dialog(), "Select all 3 suitable servers"));
+    await click(buttonIn(dialog(), "Only check"));
+    await click(buttonIn(dialog(), "Stop"));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 120))));
+    await settle();
+    expect(createRelay).toHaveBeenCalledTimes(1);
+    expect(dialog().textContent).toContain("Not started: stopped");
   });
 });
 

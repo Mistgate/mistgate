@@ -4,6 +4,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useAddNode } from "@/components/add-node";
 import { useEscClear } from "@/components/bulk";
+import { useToast } from "@/components/ui/toast";
 import { useListEntrance } from "@/components/fx/page";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
@@ -21,15 +22,21 @@ import { useBatch } from "@/lib/batch";
 import { cx } from "@/lib/cx";
 import { maxBulkNodes } from "@/lib/decoy";
 import { useEdition } from "@/lib/edition";
+import { fleetWays, relayPairRefusal, type FleetNodeIn } from "@/lib/fleet-map";
+import { countryQuery } from "@/lib/globalping";
+import { checksQuery, countryColumn, countryIn } from "@/lib/health";
 import { useFmt } from "@/lib/format";
 import { useIsPhone } from "@/lib/media";
 import { isProblem, nodeKind } from "@/lib/node-status";
 import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
+import { relaysQuery } from "@/lib/relay";
 import { protocolName, sortProtocols } from "@/lib/series";
 import { meQuery } from "@/lib/session";
 import { readPref, writePref } from "@/lib/storage";
+import { useNow } from "@/lib/time";
 import { useOlderNodes } from "@/lib/updates";
+import { AddRelayDialog, type Entry } from "./node/relays";
 import { passwordOnly, useBulkRun } from "./nodes-bulk-actions";
 import { NodesBulk } from "./nodes-bulk";
 import { NodesFirst } from "./nodes-first";
@@ -37,11 +44,12 @@ import { FleetLoad } from "./nodes-load";
 import { FleetMap } from "./nodes-map";
 import { firstSort, NodeList, onlineOf, sortNodes, type Select as Ticking, type Sort, type SortKey } from "./nodes-list";
 import { PanelKeyOffer } from "./nodes-panel-key";
+import { WaysView, type WaysData, type WaysDemo } from "./nodes-ways";
 import "./nodes.css";
 
 type Node = Plain<NodeMsg>;
-type StatusFilter = "all" | "problems" | "working";
-type NodesView = "list" | "map" | "load";
+type StatusFilter = "all" | "problems" | "working" | "noway";
+type NodesView = "list" | "ways" | "map" | "load";
 const all = "all";
 
 /** The 36px buttons of the bar: a secondary button, the accent's wash while it is pressed or holds a choice. */
@@ -49,7 +57,7 @@ const barButton =
   "inline-flex h-9 flex-none items-center justify-center gap-2 rounded-field border border-line bg-step px-4 text-sm font-medium whitespace-nowrap text-fg transition-[background-color,border-color,transform] duration-150 ease-out hover:bg-(--step-hover) active:scale-[0.98] aria-pressed:border-accent-line aria-pressed:bg-accent-soft data-popup-open:border-accent-line";
 
 /** What the dev kit starts the screen with (a filter, a search, ticked nodes, a selected node on the map); the app starts with none. */
-export type NodesDemo = { status?: StatusFilter; find?: string; selecting?: boolean; ticked?: readonly string[]; focus?: string };
+export type NodesDemo = { status?: StatusFilter; find?: string; selecting?: boolean; ticked?: readonly string[]; focus?: string; /** The view it opens on (the app opens on the browser's last choice). */ view?: NodesView; ways?: WaysDemo };
 
 export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
   const t = useT();
@@ -74,16 +82,60 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
   // map; the Cloudflare edition has no load (OpsService is the VPS edition's).
   const navigate = useNavigate();
   const phone = useIsPhone();
-  const { edge } = useEdition();
+  const { edge, off } = useEdition();
   const search = useSearch({ strict: false }) as { view?: NodesView; focus?: string };
-  const wanted = search.view ?? readPref("nodes.view");
-  const view: NodesView = wanted === "map" && !phone ? "map" : wanted === "load" && !edge ? "load" : "list";
+  // the ways are the owner's (RelayService is); a helper has the list, the map and the load
+  const wanted = demo?.view ?? search.view ?? readPref("nodes.view");
+  const view: NodesView = wanted === "ways" && owner ? "ways" : wanted === "map" && !phone ? "map" : wanted === "load" && !edge ? "load" : "list";
   const setView = (v: NodesView) => {
     writePref("nodes.view", v);
     void navigate({ to: "/nodes", search: v === "list" ? {} : { view: v }, replace: true });
   };
 
   const nodes = useMemo(() => q.data?.nodes ?? [], [q.data]);
+
+  // The ways out of the country: the relays (the owner's), what the country sees of each node, and the one verdict they make
+  const toast = useToast();
+  const relaysQ = useQuery({ ...relaysQuery(""), enabled: owner });
+  // no round to read where the checks are off (a Cloudflare panel); whatever the cache still holds is not one
+  const checksOn = !edge && !off("health_checks");
+  const checksQ = useQuery({ ...checksQuery(""), enabled: checksOn });
+  const asked = useQuery({ ...countryQuery, enabled: owner }).data?.country;
+  const checksData = checksQ.data;
+  const column = useMemo(() => (checksOn ? countryColumn(checksData?.countryChecks) : null), [checksOn, checksData]);
+  const audience = column?.code || asked || "RU";
+  const nowS = Math.floor(useNow() / 1000);
+  const nodesIn: FleetNodeIn[] = useMemo(
+    () => nodes.map((n) => ({ id: n.id, name: n.name, countryCode: n.countryCode, location: n.location, status: n.status, protocols: n.protocols, online: onlineOf(n), cpu: n.hasMetrics ? n.cpuPct : null, warp: n.warp?.state ?? 0 })),
+    [nodes],
+  );
+  const relays = relaysQ.data;
+  const ways = useMemo(
+    () => fleetWays({ nodes: nodesIn, relays: owner ? (relays ?? []) : undefined, checks: column?.byNode ?? new Map(), country: audience, nowS }),
+    [nodesIn, owner, relays, column, audience, nowS],
+  );
+  const checking = checksQ.isPending && checksQ.fetchStatus !== "idle";
+  const waysData: WaysData = owner && relaysQ.isError && relays === undefined ? "error" : (owner && relays === undefined) || checking ? "load" : "ready";
+  // "Get around…" and "＋ Pass through …": the dialog of a relay, until the wizard takes this over
+  const [dlg, setDlg] = useState<{ entry: Entry; exitId?: string } | null>(null);
+  const byId = (id: string) => nodes.find((n) => n.id === id);
+  /** The entry an exit would best go through, other than `except`: one that is up and seen, in another country than the exit, that the panel accepts for it. */
+  const entryFor = (exitId?: string, except?: string): string | undefined => {
+    const ok = ways.entries.filter((e) => e.nodeId !== except && !e.entry!.offline && !e.entry!.hidden && (!exitId || (!relayPairRefusal(e.nodeId, exitId, nodesIn) && byId(e.nodeId)?.countryCode !== byId(exitId)?.countryCode)));
+    return (ok.find((e) => e.direct.tone === "ok") ?? ok[0])?.nodeId;
+  };
+  const openWay = (exitId?: string, entryId?: string) => {
+    const eid = entryId ?? entryFor(exitId);
+    const entry = eid ? byId(eid) : undefined;
+    if (!entry) return void toast.error(t("nw.noEntry"));
+    setDlg({ entry: { id: entry.id, name: entry.name, cc: entry.countryCode }, exitId });
+  };
+  // the exits with no way in: closed, and nothing carries them
+  const noWayIds = useMemo(() => new Set(ways.exits.filter((x) => x.tone === "bad").map((x) => x.nodeId)), [ways]);
+  const noWayN = owner && waysData === "ready" ? noWayIds.size : 0;
+  const waysList = { model: ways, state: waysData, country: audience, helper: !owner, onFix: (id: string) => openWay(id) };
+  const shownStatus = status === "noway" && noWayN === 0 ? "all" : status;
+
   const problems = nodes.filter(isProblem).length;
   const working = nodes.filter((n) => nodeKind(n) === "ok").length;
   const onlineTotal = nodes.reduce((a, n) => a + onlineOf(n), 0);
@@ -100,16 +152,16 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
       sortNodes(
         nodes.filter(
           (n) =>
-            (status === "all" || (status === "problems" ? isProblem(n) : nodeKind(n) === "ok")) &&
+            (shownStatus === "all" || (shownStatus === "noway" ? noWayIds.has(n.id) : shownStatus === "problems" ? isProblem(n) : nodeKind(n) === "ok")) &&
             (protocol === all || n.protocols.includes(protocol)) &&
             (country === all || n.countryCode === country) &&
             (!needle || [n.name, n.location, fmt.country(n.countryCode), n.address].some((s) => s.toLowerCase().includes(needle))),
         ),
         sort,
       ),
-    [nodes, status, protocol, country, needle, sort, fmt],
+    [nodes, shownStatus, noWayIds, protocol, country, needle, sort, fmt],
   );
-  const narrowed = status !== all || protocol !== all || country !== all || needle !== "";
+  const narrowed = shownStatus !== all || protocol !== all || country !== all || needle !== "";
   const reset = () => {
     setStatus("all");
     setProtocol(all);
@@ -156,6 +208,13 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
     </>
   );
   const filtersOn = (protocol !== all ? 1 : 0) + (country !== all ? 1 : 0);
+  // List, Ways (the owner's), the map (not on a phone), the load (not on the Cloudflare edition)
+  const viewOptions = [
+    { value: "list" as const, label: t("wg.view.list") },
+    ...(owner ? [{ value: "ways" as const, label: t("nw.view") }] : []),
+    ...(phone ? [] : [{ value: "map" as const, label: t("fm.view.map") }]),
+    ...(edge ? [] : [{ value: "load" as const, label: t("load.view") }]),
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -163,7 +222,7 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
         <PageTitle>{t("nav.nodes")}</PageTitle>
         <span className="me-auto inline-flex items-center gap-2 text-[13px] text-muted max-md:flex-none max-md:text-[0px]">
           <i aria-hidden className="fz-live-dot size-2 flex-none rounded-full bg-accent-mark" />
-          {nodes.length > 0 ? `${t.n("nodes.summary", nodes.length, { o: onlineTotal })}${problems ? ` · ${t.n("nodes.withProblems", problems)}` : ""}` : t("nv.none")}
+          {nodes.length > 0 ? `${t.n("nodes.summary", nodes.length, { o: onlineTotal })}${problems ? ` · ${t.n("nodes.withProblems", problems)}` : ""}${noWayN > 0 ? ` · ${t("nw.sum.noway", { n: noWayN, country: countryIn(t, audience) })}` : ""}${owner && waysData === "ready" && ways.downN > 0 ? ` · ${t.n("nw.sum.down", ways.downN)}` : ""}` : t("nv.none")}
         </span>
         <Button variant="primary" size="lg" className="max-md:flex-none" onClick={() => addNode()}>
           <Icon name="plus" size={16} />
@@ -187,31 +246,19 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
             />
           )}
           <div className="fz-bar flex flex-wrap items-center gap-3">
-            {(!phone || !edge) && (
-              <Segmented
-                variant="flat"
-                className="fz-seg"
-                aria-label={t("fm.view")}
-                value={view}
-                onValueChange={setView}
-                options={[
-                  { value: "list" as const, label: t("wg.view.list") },
-                  ...(phone ? [] : [{ value: "map" as const, label: t("fm.view.map") }]),
-                  ...(edge ? [] : [{ value: "load" as const, label: t("load.view") }]),
-                ]}
-              />
-            )}
+            {viewOptions.length > 1 && <Segmented variant="flat" className="fz-seg" aria-label={t("fm.view")} value={view} onValueChange={setView} options={viewOptions} />}
             {view === "list" && (
               <>
                 <FilterChips
                   className="fz-ch flex-nowrap!"
                   aria-label={t("nodes.filterStatus")}
-                  value={status}
+                  value={shownStatus}
                   onValueChange={setStatus}
                   options={[
                     { value: "all", label: count(t("nodes.all"), nodes.length) },
                     { value: "problems", label: count(t("nv.f.problems"), problems) },
                     { value: "working", label: count(t("nodes.working"), working) },
+                    ...(noWayN > 0 ? [{ value: "noway" as const, label: count(t("nw.f.noway"), noWayN) }] : []),
                   ]}
                 />
                 <label
@@ -273,14 +320,30 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
             <FleetMap nodes={nodes} owner={owner} focus={search.focus ?? demo?.focus} />
           ) : view === "load" ? (
             <FleetLoad />
+          ) : view === "ways" ? (
+            <WaysView
+              nodes={nodes}
+              nodesIn={nodesIn}
+              model={ways}
+              data={waysData}
+              edge={edge}
+              country={audience}
+              nowS={nowS}
+              openWay={openWay}
+              entryFor={entryFor}
+              onRetry={() => void relaysQ.refetch()}
+              onAddNode={() => addNode()}
+              demo={demo?.ways}
+            />
           ) : (
             <>
-              <NodeList rows={rows} fmt={fmt} select={select} sort={sort} onSort={onSort} entrance={entrance} filtered={narrowed} onReset={reset} onAdd={() => addNode()} />
+              <NodeList rows={rows} fmt={fmt} select={select} sort={sort} onSort={onSort} entrance={entrance} filtered={narrowed} onReset={reset} onAdd={() => addNode()} ways={waysList} />
               {owner && <NodesBulk nodes={nodes} picked={picked} shown={new Set(rows.map((n) => n.id))} batch={batch} run={run} onClear={clear} onAll={allShown ? clear : toggleAll} allShown={allShown} total={shownIds.length} />}
             </>
           )}
         </>
       )}
+      {dlg && <AddRelayDialog open entry={dlg.entry} exitId={dlg.exitId} onOpenChange={(o) => !o && setDlg(null)} />}
     </div>
   );
 }

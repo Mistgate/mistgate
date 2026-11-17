@@ -4,10 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AddNodeProvider } from "@/components/add-node";
 import { ToastProvider } from "@/components/ui/toast";
-import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
-import { writePref } from "@/lib/storage";
-import { demoOf, frames, seeded } from "./dev-kit-nodes";
+import { demoFor, edgeOfScene, frames, roleOfScene, sceneOf, seeded } from "./dev-kit-nodes";
 import { NodesScreen } from "./nodes";
 
 // The scenes of /dev-kit?only=nodes draw the real screen on made-up data: every state a scene names must draw, in every language.
@@ -37,17 +35,16 @@ afterEach(() => {
 const states = [...new Set(frames.map((f) => f.state))].filter((s) => !s.startsWith("job-"));
 
 async function draw(state: string) {
-  writePref("nodes.view", state === "load" ? "load" : state === "map" || state === "map-card" ? "map" : "list");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  const qc = seeded(state, Role.OWNER, state === "edge");
+  const qc = seeded(state, roleOfScene(state, null), edgeOfScene(state));
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
           <AddNodeProvider>
-            <NodesScreen demo={demoOf[state]} />
+            <NodesScreen demo={demoFor(state)} />
           </AddNodeProvider>
         </ToastProvider>
       </QueryClientProvider>,
@@ -72,5 +69,38 @@ describe("the scenes of the Nodes screen", () => {
     setLang(lang);
     await draw("mixed");
     expect(host!.querySelectorAll("section[data-select] a.absolute")).toHaveLength(12);
+  });
+
+  it.each(["ru", "zh", "fa", "tr"] as const)("the Paths view draws in %s, its sheet open", async (lang) => {
+    setLang(lang);
+    await draw("rw-br-near");
+    expect(host!.querySelector("aside")).not.toBeNull();
+    expect(host!.querySelectorAll(".rw-row[data-node]")).toHaveLength(9);
+  });
+});
+
+describe("the scenes of the ways", () => {
+  it("name a state each: the list and the Paths view of every toggle of the board", () => {
+    for (const r of ["norm", "load", "err", "empty", "noent", "nomeas", "entoff", "enthid", "oldagent", "stale", "cf"]) {
+      expect(states).toContain(`ru-${r}`);
+      expect(states).toContain(`rw-${r}`);
+    }
+    expect(states).toContain("ru-helper");
+    for (const b of ["near", "norm", "lim", "drop", "udp"]) expect(sceneOf(`rw-br-${b}`)).toMatchObject({ view: "ways", br: b, open: "nod_nl1>nod_msk1" });
+    expect(sceneOf("rw-f-part")).toMatchObject({ view: "ways", filter: "part" });
+    expect(sceneOf("ru-f-noway")).toMatchObject({ view: "list", status: "noway" });
+    expect(sceneOf("rw-sheet-part")).toMatchObject({ count: 12, open: "nod_nl2>nod_msk1" });
+  });
+  it("write no preference to the browser: the view comes with the demo", async () => {
+    expect(demoFor("rw-norm")?.view).toBe("ways");
+    expect(demoFor("ru-norm")).toBeUndefined();
+    await draw("rw-norm");
+    expect(host!.querySelector(".rw-mx")).not.toBeNull();
+    expect(localStorage.getItem("nodes.view")).toBeNull();
+  });
+  it("seat a helper for the helper's toggle and the edge edition for Cloudflare's", () => {
+    expect(roleOfScene("ru-helper", null)).not.toBe(roleOfScene("ru-norm", null));
+    expect(edgeOfScene("rw-cf")).toBe(true);
+    expect(edgeOfScene("rw-norm")).toBe(false);
   });
 });

@@ -84,7 +84,8 @@ describe("the stored results", () => {
     await mount(data());
     // the title is the Direct way in's block heading (ways.tsx)
     expect(text()).toContain(en["ports.never"]);
-    expect(rows()).toEqual([]);
+    // the profile that listens has its row all the same, with no verdict
+    expect(rows()).toEqual(["hy2 · 443udp/443Not checked—"]);
     expect(button("Check ports")).toBeDefined();
   });
 
@@ -223,7 +224,7 @@ describe("a port whose test is blocked while the protocol works", () => {
     await mount(data({ inbounds, portChecks: [both({}), both({ port: 2053, ...lost, protocolOkUnix: now - 60 })] }));
     expect(row(2053)?.textContent).toContain("udp/2053Test blocked");
     expect(row(2053)?.textContent).toContain("from minsk1 0/150 · from fi1 0/150 · 2 min ago");
-    expect(row(2053)?.querySelector(".tone-warn.pill")?.textContent).toBe("Test blocked");
+    expect(row(2053)?.querySelector(".wy-gs.warn")?.textContent).toBe("Test blocked");
     // no red, no amber in the counts, and the line under them clears the port instead of blaming it
     expect(row(2053)?.querySelectorAll(".text-danger-text, .text-warn-text")).toHaveLength(0);
     expect(row(2053)?.querySelector("[data-blame=node]")).toBeNull();
@@ -312,15 +313,17 @@ describe("the TCP rows and the renewal line", () => {
 
   it("shows only TCP rows when there are no UDP ones, and is no longer 'never checked'", async () => {
     await mount(data({ inbounds: [vless], tcpChecks: [tcp({})] }));
-    expect(rows()).toHaveLength(1);
+    // the certificates' port, then the VLESS profile whose port was never probed
+    expect(rows()).toHaveLength(2);
     expect(rows()[0]).toContain("tcp/80");
     expect(text()).not.toContain(en["ports.never"]);
   });
 
   it("names the reason of a row that could not be probed", async () => {
     await mount(data({ tcpChecks: [tcp({ verdict: "", reason: "agent_too_old", sender: "" })] }));
-    expect(rows()[0]).toContain(en["ports.unchecked"]);
-    expect(rows()[0]).toContain(en["ports.short.agent_too_old"]);
+    const tcpRow = rows().find((r) => r?.includes("tcp/80"));
+    expect(tcpRow).toContain(en["ports.unchecked"]);
+    expect(tcpRow).toContain(en["ports.short.agent_too_old"]);
   });
 
   it("says the certificates renew when port 80 is ours", async () => {
@@ -395,7 +398,7 @@ describe("running the check", () => {
     await click(button("Check ports"));
     await settle();
     expect(text()).toContain(en["ports.why.same_host"]);
-    expect(rows()).toEqual([]);
+    expect(rows().join()).not.toContain("tcp/");
   });
 
   it("says why when the TCP part of a run could not probe anything", async () => {

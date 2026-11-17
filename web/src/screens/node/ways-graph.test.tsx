@@ -83,7 +83,7 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
   role = Role.OWNER;
-  search = { tab: "ways", view: "graph" };
+  search = { tab: "ways", view: "graph", map: "1" };
   localStorage.clear();
   listRelays.mockResolvedValue({ relays: [relay()] });
   listRelayCandidates.mockResolvedValue({
@@ -138,27 +138,36 @@ describe("the List | Graph switch", () => {
     expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.objectContaining({ tab: "ways", view: "graph" }) }));
   });
 
-  it("opens the graph from ?view=graph, and from the browser's memory when the URL says nothing", async () => {
+  it("opens the route map from ?view=graph&map=1; the graph alone is the diagram, which has a button for the map", async () => {
     await mount();
     expect(app()?.getAttribute("aria-label")).toBe("Ways in to de1");
     act(() => root!.unmount());
     host!.remove();
+    search = { tab: "ways", view: "graph" };
+    await mount();
+    expect(app()).toBeNull();
+    expect(document.querySelector("[data-testid=ways-graph]")).not.toBeNull();
+    await click([...document.querySelectorAll<HTMLElement>("button")].find((b) => b.textContent === "Open the whole route map"));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.objectContaining({ tab: "ways", view: "graph", map: "1" }) }));
+  });
+
+  it("takes the graph from the browser's memory when the URL says nothing, and the list from ?view=list", async () => {
     search = { tab: "ways" };
     localStorage.setItem("ways.view", "graph");
     await mount();
-    expect(app()).not.toBeNull();
+    expect(document.querySelector("[data-testid=ways-graph]")).not.toBeNull();
     act(() => root!.unmount());
     host!.remove();
     search = { tab: "ways", view: "list" };
     await mount();
-    expect(app()).toBeNull();
+    expect(document.querySelector("[data-testid=ways-graph]")).toBeNull();
   });
 
-  it("is the list only on a phone, with no switch", async () => {
+  it("is the diagram or the list on a phone, never the route map", async () => {
     (window as { matchMedia?: unknown }).matchMedia = () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} });
     await mount();
     expect(app()).toBeNull();
-    expect(document.querySelector("[role=radiogroup]")).toBeNull();
+    expect(document.querySelector("[data-testid=ways-graph]")).not.toBeNull();
   });
 });
 
@@ -408,7 +417,7 @@ describe("full screen", () => {
   });
 
   it("?full=1 restores the overlay: a top bar, the map, a drawer with the detail, and no page scroll behind", async () => {
-    search = { tab: "ways", view: "graph", full: "1" };
+    search = { tab: "ways", view: "graph", map: "1", full: "1" };
     await mount();
     const overlay = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
     expect(overlay).not.toBeNull();
@@ -419,7 +428,7 @@ describe("full screen", () => {
   });
 
   it("Esc and the close button leave it", async () => {
-    search = { tab: "ways", view: "graph", full: "1" };
+    search = { tab: "ways", view: "graph", map: "1", full: "1" };
     await mount();
     const overlay = () => document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
     await act(async () => void overlay().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));

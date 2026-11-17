@@ -119,9 +119,9 @@ const overview = createRoute({
 const nodes = createRoute({
   getParentRoute: () => app,
   path: "/nodes",
-  // ?view=map is the fleet map, ?view=load the fleet's load, ?focus=<node id> the node the map selects and centres
-  validateSearch: (s: Record<string, unknown>): { view?: "map" | "load"; focus?: string } => ({
-    ...(s.view === "map" || s.view === "load" ? { view: s.view } : {}),
+  // ?view=ways is the ways out of the country (the owner's), ?view=map the fleet map, ?view=load the fleet's load, ?focus=<node id> the node the map selects and centres
+  validateSearch: (s: Record<string, unknown>): { view?: "ways" | "map" | "load"; focus?: string } => ({
+    ...(s.view === "ways" || s.view === "map" || s.view === "load" ? { view: s.view } : {}),
     ...(typeof s.focus === "string" && /^[\w-]{1,64}$/.test(s.focus) ? { focus: s.focus } : {}),
   }),
   component: lazyRouteComponent(() => import("@/screens/nodes"), "NodesScreen"),

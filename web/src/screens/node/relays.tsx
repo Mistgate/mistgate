@@ -1,56 +1,45 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
-import { Icon, IconChip } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
+import { StatusDot, type StatusKind } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
-import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT, type T } from "@/i18n";
 import { relays as relaysApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorCode, errorText, errorVars } from "@/lib/errors";
-import { useFmt } from "@/lib/format";
 import { countryQuery } from "@/lib/globalping";
-import { msText } from "@/lib/health";
 import { plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import {
-  agentError,
   candidatesQuery,
-  checkReason,
   countryHint,
-  enableGate,
   groupCandidates,
   namesOf,
   reachHint,
-  relayState,
   relaysQuery,
   seenHint,
   stageReason,
-  statePill,
-  unverifiable,
   viaLabel,
   type Candidate,
   type CandidateNode,
   type CountryHint,
   type Hint,
   type RelayMsg,
-  type RelayState,
   type Stage,
 } from "@/lib/relay";
 import { activeOf, blockedOf, blockedText, bridgeNote, bridgeReason, modeOf, reachReason, wantsReach, type Mode } from "@/lib/relay-bridge";
 import { protocolName } from "@/lib/series";
 import { markFresh } from "@/components/fx/registry";
-import { useNow } from "@/lib/time";
 import { settingsQuery } from "@/screens/subscriptions/queries";
-import { ChangeWay, SpeedCheck, WayChoice, WayLine } from "./relay-way";
+import { WayChoice } from "./relay-way";
 
 // Relays on the node page (relay.proto; the cascade plan §8 screens 1-3), the pieces the "Ways in" tab (ways.tsx) is made
 // of: a relay's row with its state, its two checks (the leg from the entry to the exit's server, the path from outside
@@ -121,267 +110,10 @@ export function useRelayRuns() {
 }
 export type RelayRuns = ReturnType<typeof useRelayRuns>;
 
-/**
- * The relays of one lane. On the exit's page (`side` "exit") each row leads with the profile, the entry being the lane; on
- * the entry's page ("entry") with the exit and its profile.
- */
-export function RelayRows({ list, side, runs, readOnly }: { list: readonly RelayMsg[]; side: "entry" | "exit"; runs: RelayRuns; readOnly?: boolean }) {
-  const t = useT();
-  const ccOf = useCountryOf();
-  const nowS = Math.floor(useNow(15_000) / 1000);
-  const [removing, setRemoving] = useState<RelayMsg | null>(null);
-  const [changing, setChanging] = useState<RelayMsg | null>(null);
-  const [speeding, setSpeeding] = useState<RelayMsg | null>(null);
-  return (
-    <>
-      {/* the owner's calls: a reader (helper, observer) sees the state, with one line saying who changes it */}
-      {readOnly && <Notice tone="quiet" className="mb-2">{t("relay.way.readOnly")}</Notice>}
-      <ul className="flex flex-col">
-        {list.map((r) => (
-          <RelayRow
-            key={r.id}
-            r={r}
-            side={side}
-            cc={ccOf(r.exitNodeId)}
-            busy={runs.busy[r.id]}
-            note={runs.notes[r.id]}
-            nowS={nowS}
-            onCheck={() => runs.check(r)}
-            onOn={() => runs.on(r)}
-            onOff={() => runs.off(r)}
-            onRemove={() => setRemoving(r)}
-            readOnly={readOnly}
-            onChange={() => setChanging(r)}
-            onSpeed={() => setSpeeding(r)}
-          />
-        ))}
-      </ul>
-      {removing && <RemoveRelay r={removing} onClose={() => setRemoving(null)} />}
-      {changing && <ChangeWay key={changing.id} r={changing} onClose={() => setChanging(null)} />}
-      {speeding && <SpeedCheck key={speeding.id} r={speeding} onClose={() => setSpeeding(null)} />}
-    </>
-  );
-}
-
-type RowProps = {
-  r: RelayMsg;
-  side: "entry" | "exit";
-  cc: string;
-  busy?: Busy;
-  note?: string;
-  nowS: number;
-  onCheck: () => void;
-  onOn: () => void;
-  onOff: () => void;
-  onRemove: () => void;
-  /** A reader: the state and its words, none of the buttons. */
-  readOnly?: boolean;
-  onChange?: () => void;
-  onSpeed?: () => void;
-};
-
-// the columns line up from row to row: the server, the port on the entry, where it goes, the state. Only from lg: at 720-1000
-// px the list beside it leaves the detail too narrow for four columns, and an address would break in the middle
-const gridClass = "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.7fr)_minmax(0,1fr)_124px]";
-
-/** One relay: what it passes on, where to, its state and checks, and the switches. */
-export function RelayRow({ r, side, cc, busy, note, nowS, onCheck, onOn, onOff, onRemove, readOnly, onChange, onSpeed }: RowProps) {
-  const t = useT();
-  const fmt = useFmt();
-  const state: RelayState = busy === "check" || busy === "on" ? "checking" : relayState(r);
-  const pill = statePill[state];
-  const gate = enableGate(r, nowS);
-  const reason = checkReason(t, r);
-  const cells = [
-    { label: side === "exit" ? t("ways.col.port", { entry: r.viaNodeName }) : t("relay.col.port"), value: `${r.network || "tcp"}/${r.port}` },
-    { label: t("relay.col.to"), value: r.toIp ? `${r.toIp}:${r.exitPort}` : r.check?.to || `${r.exitNodeName}:${r.exitPort || "—"}` },
-  ];
-  // what the row says under the facts: the failure, the check, or why it cannot be turned on yet
-  let line: ReactNode = null;
-  if (busy === "check" || busy === "on") {
-    // in the slot of the line below, so a row keeps its height while it is checked
-    const names = { entry: r.viaNodeName, exit: r.exitNodeName };
-    line = (
-      <p role="status" className="text-xs leading-snug font-semibold text-fg">
-        {busy === "on" ? t("relay.progress.path", names) : t("relay.progress.leg", names)}
-      </p>
-    );
-  } else if (!busy) {
-    if (state === "failed") {
-      const agent = r.enabled && r.state === InboundState.FAILED && r.lastError !== "forward_drop" ? agentError(t, r.lastError, { entry: r.viaNodeName, exit: r.exitNodeName }) : "";
-      const since = r.check && !r.check.ok ? r.check.atUnix : r.appliedUnix;
-      line = (reason || agent) && (
-        <div data-testid="relay-down" className="flex flex-col gap-0.5 rounded-field border border-[color-mix(in_oklch,var(--danger)_45%,var(--border))] bg-danger-soft px-3 py-2">
-          <p className="text-[13px] leading-snug font-semibold text-danger-text">
-            {reason ? t("relay.line.down", { time: since ? fmt.stamp(since) : "—", reason }) : agent}
-          </p>
-          {agent && reason && <p className="text-xs leading-snug text-danger-text">{agent}</p>}
-          {r.lastError && r.lastError !== "forward_drop" && r.state === InboundState.FAILED && <p className="font-mono text-[11px] leading-snug break-words text-muted">{r.lastError}</p>}
-        </div>
-      );
-    } else if (state === "on" && r.check && unverifiable(r.check.leg)) {
-      line = <p className="text-xs leading-snug text-pretty text-muted">{t("relay.line.onUnverified", { reason: t("relay.why.unverifiable") })}</p>;
-    } else if (state === "on" && r.check && !r.monitor) {
-      line = <p className="text-xs leading-snug text-muted">{t("relay.line.on", { ago: fmt.ago(r.check.atUnix, nowS * 1000) })}</p>;
-    } else if (state === "off") {
-      // the leg failed and the exit reaches the entry's bridge: it can be turned on, as a bridge
-      const bridgeOnly = !gate && r.check?.leg?.status !== "ok" && r.check?.reverseReach?.status === "ok";
-      const off = gate
-        ? t(`relay.gate.${gate}`, { exit: r.exitNodeName })
-        : bridgeOnly
-          ? t("relay.line.offReadyBridge", { exit: r.exitNodeName, entry: r.viaNodeName, ago: fmt.ago(r.check!.reverseReach!.atUnix, nowS * 1000) })
-          : unverifiable(r.check?.leg)
-            ? t("relay.line.offUnverified", { reason: t("relay.why.unverifiable") })
-            : t("relay.line.offReady", { ago: fmt.ago(r.check!.leg!.atUnix, nowS * 1000) });
-      line = <p className="text-xs leading-snug text-pretty text-muted">{off}</p>;
-    }
-  }
-  // the next useful step is the filled button: turn on after a fresh pass, else check
-  const checkFirst = !r.enabled && (gate === "unchecked" || gate === "stale" || gate === "failed");
-  return (
-    <li data-testid="relay-row" data-state={state} className="flex flex-col gap-2.5 border-t border-line py-3 first:border-t-0 first:pt-1">
-      <div className={`grid items-center gap-3 max-lg:grid-cols-[minmax(0,1fr)_auto] ${gridClass}`}>
-        <div className="flex min-w-0 items-center gap-2.5">
-          {side === "exit" ? <IconChip icon="sliders" tone="sage" size={28} /> : ccChip(cc)}
-          <div className="flex min-w-0 flex-col gap-[3px]">
-            <span className="text-sm leading-snug font-bold break-words">
-              {side === "entry" && (
-                <>
-                  <Link to="/nodes/$id" params={{ id: r.exitNodeId }} search={{ tab: "ways", way: `via:${r.viaNodeId}` }} className="hover:text-accent-text hover:underline">
-                    {r.exitNodeName}
-                  </Link>
-                  <span className="text-muted"> · </span>
-                </>
-              )}
-              <Link to="/profiles/$id" params={{ id: r.profileId }} className="hover:text-accent-text hover:underline">
-                {r.profileName}
-              </Link>
-            </span>
-            <span className="text-xs text-muted">{protocolName(r.protocol)}</span>
-          </div>
-        </div>
-        {cells.map((c) => (
-          <div key={c.label} className="flex min-w-0 flex-col gap-[3px] max-lg:hidden">
-            <span className="text-[11px] text-muted">{c.label}</span>
-            <span className="font-mono text-[13px] break-all">{c.value}</span>
-          </div>
-        ))}
-        <div className="flex justify-end">
-          <StatusPill kind={pill.kind} label={t(pill.word)} sm />
-        </div>
-      </div>
-      <dl className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] lg:hidden">
-        {cells.map((c) => (
-          <div key={c.label} className="flex min-w-0 gap-1.5">
-            <dt className="text-muted">{c.label}</dt>
-            <dd className="min-w-0 font-mono font-semibold break-all">{c.value}</dd>
-          </div>
-        ))}
-      </dl>
-      <Stages r={r} busy={busy} />
-      {!busy && <Watch r={r} nowS={nowS} />}
-      <WayLine r={r} nowS={nowS} readOnly={readOnly} onChange={onChange ?? (() => {})} onSpeed={onSpeed ?? (() => {})} />
-      {line}
-      {note && (
-        <Notice tone="danger" className="items-start">
-          {note}
-        </Notice>
-      )}
-      {!readOnly && (
-        <div className="flex flex-wrap items-center gap-2">
-          {r.enabled ? (
-            <Button variant="secondary" size="sm" disabled={!!busy} onClick={onOff}>
-              {t("relay.off")}
-            </Button>
-          ) : (
-            // a disabled button shows no tooltip: the reason sits on a wrapper (and in the line above)
-            <span title={gate ? t(`relay.gate.${gate}`, { exit: r.exitNodeName }) : undefined} className="flex">
-              <Button variant={gate ? "secondary" : "primary"} size="sm" disabled={!!busy || !!gate} onClick={onOn}>
-                {t("relay.on")}
-              </Button>
-            </span>
-          )}
-          <Button variant={checkFirst ? "primary" : "secondary"} size="sm" disabled={!!busy} onClick={onCheck}>
-            {t("relay.check")}
-          </Button>
-          <Button variant="ghostDanger" size="sm" className="ms-auto" disabled={!!busy} onClick={onRemove}>
-            {t("relay.remove")}
-          </Button>
-        </div>
-      )}
-    </li>
-  );
-}
-
-const monStages = ["leg", "entry", "path", "bridge", "freeze"] as const;
-
-/**
- * What the panel's rounds through a relay that is on say (Relay.monitor): works with the response time, or the stage that
- * fails and for how many rounds; and what went through the forward by the entry's counter, when its agent reports one.
- */
-function Watch({ r, nowS }: { r: RelayMsg; nowS: number }) {
-  const t = useT();
-  const fmt = useFmt();
-  const m = r.enabled ? r.monitor : undefined;
-  const names = { entry: r.viaNodeName, exit: r.exitNodeName };
-  const ago = (unix: number) => fmt.ago(unix, nowS * 1000);
-  if (!m && !r.countedUnix) return null;
-  const stage = monStages.find((s) => s === m?.stage) ?? "path";
-  return (
-    <div data-testid="relay-watch" className="flex flex-col gap-1 text-xs leading-snug">
-      {m && (
-        <p className="flex min-w-0 items-start gap-1.5">
-          <span className="mt-[4px] flex">
-            <StatusDot kind={m.ok ? "ok" : "bad"} />
-          </span>
-          <span className={m.ok ? "text-muted" : "font-semibold text-danger-text"}>
-            {m.ok
-              ? t("relay.mon.ok", { ms: msText(t, fmt, m.responseMs), ago: ago(m.atUnix) })
-              : [t("relay.mon.fail", { why: t(`relay.mon.stage.${stage}`, names), ago: ago(m.atUnix) }), m.failStreak > 1 ? t.n("relay.mon.streak", m.failStreak) : ""].filter(Boolean).join(" · ")}
-          </span>
-        </p>
-      )}
-      {r.countedUnix > 0 && <p className="ps-3.5 text-muted">{t("relay.bytes", { bytes: fmt.bytes(r.bytes), packets: fmt.num(r.packets, 0), ago: ago(r.countedUnix) })}</p>}
-    </div>
-  );
-}
 
 type StageLook = "ok" | "fail" | "skipped" | "running" | "waiting";
 const stageDot: Record<StageLook, StatusKind> = { ok: "ok", fail: "bad", skipped: "off", running: "busy", waiting: "off" };
 const lookOf = (s?: Stage): StageLook | null => (s?.status === "ok" ? "ok" : s?.status === "fail" ? "fail" : s?.status === "skipped" ? "skipped" : null);
-
-/**
- * The checks of a relay, each with its result: the leg from the entry, what a bridge needs (the exit reaching the entry's
- * bridge, the exit holding it), the path from outside (when the relay is on). The leg failing is no red mark on a relay that
- * stands in the bridge: it is why it does.
- */
-function Stages({ r, busy }: { r: RelayMsg; busy?: Busy }) {
-  const t = useT();
-  const c = r.check;
-  const names = { entry: r.viaNodeName, exit: r.exitNodeName };
-  const sender = c?.path?.senderName === "panel" ? t("ports.senderPanel") : c?.path?.senderName;
-  const reverse = r.enabled && activeOf(r) === "reverse";
-  // while a call runs: "check" re-runs both (the path only when on), "on" keeps the leg that let it on and checks the path
-  const leg: StageLook | null = busy === "check" ? "running" : lookOf(c?.leg);
-  const reach: StageLook | null = busy === "check" ? (wantsReach(r) ? "waiting" : null) : busy === "on" ? null : lookOf(c?.reverseReach);
-  const path: StageLook | null = busy === "check" ? (r.enabled ? "waiting" : null) : busy === "on" ? "running" : lookOf(c?.path);
-  const showPath = path && (path !== "skipped" || r.enabled);
-  if (!leg && !showPath && !reach) return null;
-  const item = (label: string, look: StageLook, soft = false) => (
-    <li className="flex min-w-0 items-center gap-1.5">
-      <StatusDot kind={soft && look === "fail" ? "off" : stageDot[look]} />
-      <span className="text-muted">{label}</span>
-      <span className={cx("font-semibold", look === "fail" && !soft ? "text-danger-text" : look === "ok" ? "text-fg" : "text-muted")}>{t(`relay.stage.${look}`)}</span>
-    </li>
-  );
-  return (
-    <ul data-testid="relay-stages" className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
-      {leg && item(t("relay.stage.leg", names), leg, reverse)}
-      {reach && item(t("relay.stage.reverseReach", names), reach)}
-      {showPath && item(sender && (path === "ok" || path === "fail") ? t("relay.stage.pathFrom", { sender, entry: r.viaNodeName }) : t("relay.stage.path", { entry: r.viaNodeName }), path)}
-    </ul>
-  );
-}
 
 export function RemoveRelay({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
   const t = useT();
@@ -467,6 +199,9 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   const [way, setWay] = useState<Mode>("auto");
   const [wayOpen, setWayOpen] = useState(false);
   const [working, setWorking] = useState(false);
+  // "Stop": the server that runs is finished, the ones after it are left as they were (nothing is made twice: a relay made is on the list)
+  const stopAsked = useRef(false);
+  const [stopping, setStopping] = useState(false);
   const candidates = (cands.data?.candidates ?? []).filter((c) => !exitId || c.nodeId === exitId);
   const ready = !!cands.data?.agentSupported && candidates.length > 0;
   // an exit in the entry's own country gains the people nothing: it is not suggested, and says why
@@ -474,6 +209,10 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   const groups = groupCandidates(candidates, sameCountry);
   const chosen = candidates.filter((c) => c.inboundId in picked);
   // a bridge is not for every server: the first picked one that cannot (UDP, an agent to update) says why it is greyed
+  // the servers that can be picked (not made yet, supported), and who gets the new path with the chosen ones
+  const pickable = candidates.filter((c) => !c.unsupported && !c.relayId);
+  const people = chosen.reduce((a, c) => a + (c.audience?.people ?? 0), 0);
+  const awgDevices = chosen.reduce((a, c) => a + (c.audience?.staticAwgDevices ?? 0), 0);
   const blockedPick = chosen.find((c) => blockedOf(c) !== "");
   const blockedSay = blockedPick ? blockedText(t, blockedOf(blockedPick), { entry: entry.name, exit: blockedPick.nodeName }) : "";
   const wayNow: Mode = way === "reverse" && blockedPick ? "auto" : way;
@@ -570,7 +309,16 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
     setWorking(true);
     setRuns((all) => ({ ...(only ? all : {}), ...Object.fromEntries(list.map((c) => [c.inboundId, { leg: "waiting", path: on ? "waiting" : null } satisfies Run])) }));
     // one at a time: the panel checks one relay per exit at a time anyway, and the owner reads them in order
-    for (const c of list) await one(c, on, port ?? picked[c.inboundId] ?? "");
+    stopAsked.current = false;
+    for (const c of list) {
+      if (stopAsked.current) {
+        set(c.inboundId, { leg: "skipped", path: null, tone: "bad", text: t("wy.wiz.stopped") });
+        continue;
+      }
+      await one(c, on, port ?? picked[c.inboundId] ?? "");
+    }
+    stopAsked.current = false;
+    setStopping(false);
     setWorking(false);
     await qc.invalidateQueries({ queryKey: ["relays"] });
   };
@@ -634,7 +382,19 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
     <>
       {groups.suggested.length > 0 && candidateGroup(exitId ? "" : t("relay.dlg.suggested", { cc }), groups.suggested, cands.data.entryCountry)}
       {groups.others.length > 0 && candidateGroup(groups.suggested.length > 0 ? t("relay.dlg.others") : "", groups.others, cands.data.entryCountry)}
+      {!exitId && pickable.length > 1 && (
+        <button type="button" className="w-fit text-[13px] font-medium text-sec underline decoration-line underline-offset-4 hover:text-fg" onClick={() => setPicked(chosen.length === pickable.length ? {} : Object.fromEntries(pickable.map((c) => [c.inboundId, picked[c.inboundId] ?? ""])))}>
+          {chosen.length === pickable.length ? t("wy.wiz.none") : t("wy.wiz.all", { n: pickable.length })}
+        </button>
+      )}
       {chosen.some((c) => c.protocol === "awg") && <Notice tone="quiet">{t("relay.dlg.awgNote")}</Notice>}
+      {chosen.length > 0 && (
+        <div data-testid="relay-preview" className="flex flex-col gap-0.5 rounded-xl bg-step px-3.5 py-3 text-[13px] leading-[18px]">
+          <b className="font-medium">{t("wy.wiz.get", { via: viaLabel(t, entry.cc) })}</b>
+          <span className="text-sec">{t.n("wy.wiz.people", people, { hours })}</span>
+          {awgDevices > 0 && <span className="text-sec">{t.n("wy.wiz.awg", awgDevices)}</span>}
+        </div>
+      )}
       <p className="text-xs leading-snug text-muted">{t("relay.dlg.portHint", { entry: entry.name })}</p>
       <div className="flex flex-col gap-2">
         <button
@@ -750,9 +510,24 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   }
 
   const footer = runs ? (
-    <Button variant="primary" size="md" disabled={working} onClick={close}>
-      {t("common.done")}
-    </Button>
+    <>
+      {working && chosen.length > 1 && (
+        <Button
+          variant="ghost"
+          size="md"
+          disabled={stopping}
+          onClick={() => {
+            stopAsked.current = true;
+            setStopping(true);
+          }}
+        >
+          {stopping ? t("wy.wiz.stopping") : t("wy.wiz.stop")}
+        </Button>
+      )}
+      <Button variant="primary" size="md" disabled={working} onClick={close}>
+        {t("common.done")}
+      </Button>
+    </>
   ) : (
     <>
       {onBack ? (
