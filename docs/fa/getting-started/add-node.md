@@ -80,7 +80,7 @@ started; follow it with: journalctl -u mistgate-node -f
 
 `install`:
 
-1. بررسی می‌کند با root اجرا می‌شود و پوشهٔ وضعیت یک هویت دارد.
+1. بررسی می‌کند با root اجرا می‌شود، پوشهٔ وضعیت یک هویت دارد و سرور فرمان `nft` را دارد. خودش بسته‌ای نصب نمی‌کند: بدون `nft` چیزی را تغییر نمی‌دهد، این را می‌گوید، فرمانی را که باید اجرا شود نام می‌برد (روی Debian و Ubuntu `apt-get install -y nftables`؛ تصویرهای ابری Debian 13 بدون آن می‌آیند) و با کد خروج 3 تمام می‌شود.
 2. خودش را به `/usr/local/bin/mistgate-node` کپی می‌کند. فایل داخل `/root` دیگر لازم نیست.
 3. unit سخت‌شدهٔ `/etc/systemd/system/mistgate-node.service` را متناسب با حافظهٔ سرور می‌نویسد، سپس `systemctl daemon-reload`، `enable` و `restart` را اجرا می‌کند.
 
@@ -171,6 +171,7 @@ systemctl restart systemd-journald
 | timeout یا `connection refused` | پنل از کار افتاده، فایروالی TCP 443 را به پنل می‌بندد، یا آدرس داخل فرمان اشتباه است. | پنل و فایروالش را بررسی کنید؛ از نود با `curl -I https://panel.example.com/` امتحان کنید. |
 | `already enrolled; use --force to replace the identity` | پوشهٔ وضعیت از قبل یک هویت دارد. | بعد از `enroll` پرچم `--force` را اضافه کنید، یا اول `/var/lib/mistgate-node` را حذف کنید. |
 | `install: must run as root` | root نیستید. | فرمان را با root اجرا کنید. |
+| `install: nft is not installed on this server` (کد خروج 3) | بستهٔ `nftables` نیست، مثل تصویرهای ابری Debian 13. چیزی تغییر نکرد. | فرمانی را که پیام نام می‌برد اجرا کنید (`apt-get install -y nftables`) و دوباره `install` را اجرا کنید. |
 | `holds no identity: run mistgate-node enroll first` | `enroll` شکست خورد، یا `install` یک `--state-dir` دیگر گرفت. | `enroll` را با همان پوشهٔ وضعیت دوباره اجرا کنید. |
 | پنل مدیریت به **ساخت دستور نصب** با «panel address is not configured» پاسخ می‌دهد | پنل هیچ نشانی‌ای برای ایجنت‌ها نمی‌شناسد: setup بدون `--public-url` اجرا شده و `serve` پرچم `--agent-addr` را ندارد. | پنل را با `--agent-addr panel.example.com:443` دوباره راه‌اندازی کنید. |
 
