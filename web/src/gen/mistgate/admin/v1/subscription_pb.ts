@@ -168,7 +168,7 @@ export const SubscriptionSettingsSchema: GenMessage<SubscriptionSettings> = /*@_
  * `proxy-groups`; groups take the servers with `include-all-proxies` or `filter`. `dns` is added (resolvers of the person's preset,
  * respect-rules on) only when the template has none. Everything else is left as written, comments included. The panel never
  * fetches a URL of a template.
- * 
+ *
  * A save is refused (INVALID_ARGUMENT, the text names the line) unless the text is one valid YAML document that parses in full (no
  * alias bomb, no repeated key), has a mapping at its root, `proxies` and `proxy-groups` that are lists (or absent) with named
  * entries, groups that refer only to names of the template, the core and `Auto`, and `use` that names its `proxy-providers`; a
