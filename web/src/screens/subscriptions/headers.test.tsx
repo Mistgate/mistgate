@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, useState } from "react";
+import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
@@ -50,7 +50,9 @@ const settings = (list: ResponseHeader[]) => ({ title: "", rules: [], apps: [], 
 let renew: ((s: Settings) => void) | null = null;
 function Renewed({ settings: first, reserved }: { settings: Settings; reserved: string[] }) {
   const [now, setNow] = useState(first);
-  renew = setNow;
+  useEffect(() => {
+    renew = setNow;
+  }, []);
   return <HeadersTab data={{ settings: now, reservedHeaderNames: reserved }} />;
 }
 

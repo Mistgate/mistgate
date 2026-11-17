@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, useState } from "react";
+import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
@@ -76,7 +76,9 @@ const reply = (o: object = {}) => ({ yaml: "proxies:\n  - {name: de1, type: vles
 let renew: ((s: Settings) => void) | null = null;
 function Renewed({ settings, initial }: { settings: Settings; initial?: number | null }) {
   const [now, setNow] = useState(settings);
-  renew = setNow;
+  useEffect(() => {
+    renew = setNow;
+  }, []);
   return <MihomoTab data={{ settings: now }} initial={initial} />;
 }
 
