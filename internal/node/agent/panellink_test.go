@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,18 +24,49 @@ import (
 )
 
 // sessionLinkPanel is a panel's link endpoint that runs the whole v2 handshake (sealed) and answers the Hello with a
-// HelloAck. It records the audience (the Host) of every session that got as far as the Hello.
+// HelloAck. It records the audience (the Host) and the link prefix of every session that got as far as the Hello, and
+// answers 404 under a refused prefix (an address that stopped answering).
 type sessionLinkPanel struct {
 	h        *harness
 	hellos   chan string
+	sessions chan string      // the link prefix of every session that got as far as the Hello
 	settings *pb.NodeSettings // the HelloAck's; nil = empty
+
+	mu      sync.Mutex
+	refused map[string]bool
+	dials   map[string]int // requests per link prefix
 }
 
 func newSessionLinkPanel(h *harness) *sessionLinkPanel {
-	return &sessionLinkPanel{h: h, hellos: make(chan string, 8)}
+	return &sessionLinkPanel{h: h, hellos: make(chan string, 8), sessions: make(chan string, 32),
+		refused: map[string]bool{}, dials: map[string]int{}}
+}
+
+func linkPrefix(c byte) string { return strings.Repeat(string(c), 24) }
+
+// refuse makes the link address with prefix linkPrefix(c) stop answering.
+func (p *sessionLinkPanel) refuse(c byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.refused[linkPrefix(c)] = true
+}
+
+func (p *sessionLinkPanel) dialsTo(c byte) int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.dials[linkPrefix(c)]
 }
 
 func (p *sessionLinkPanel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	prefix, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
+	p.mu.Lock()
+	p.dials[prefix]++
+	refused := p.refused[prefix]
+	p.mu.Unlock()
+	if refused {
+		http.NotFound(w, r)
+		return
+	}
 	ws, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
@@ -70,7 +102,14 @@ func (p *sessionLinkPanel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil || proto.Unmarshal(frame, &req) != nil || req.GetHello() == nil {
 		return
 	}
-	p.hellos <- audience
+	select {
+	case p.hellos <- audience:
+	default:
+	}
+	select {
+	case p.sessions <- prefix:
+	default:
+	}
 	if link.Write(ctx, &pb.ConnectResponse{Message: &pb.ConnectResponse_HelloAck{HelloAck: &pb.HelloAck{
 		ServerTimeUnix: time.Now().Unix(), Settings: cmp.Or(p.settings, &pb.NodeSettings{}),
 	}}}) != nil {
@@ -238,4 +277,142 @@ func TestSetPanelLink(t *testing.T) {
 	if m := readMeta(t, h.dir); m.NextLink != link || m.Panel == "" {
 		t.Fatalf("saved %+v", m)
 	}
+}
+
+// session waits for the next session on the link panel and returns its link prefix.
+func (p *sessionLinkPanel) session(t *testing.T) string {
+	t.Helper()
+	select {
+	case got := <-p.sessions:
+		return got
+	case <-time.After(8 * time.Second):
+		t.Fatal("no session on the link panel")
+		return ""
+	}
+}
+
+// endSession ends the agent's current panel session.
+func endSession(t *testing.T, h *harness) {
+	t.Helper()
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "a panel session")
+	h.a.cur.Load().cancel()
+}
+
+// prevLinkHarness is an agent on link address A with a new address B pending, both served by one link panel. The agent
+// is not started.
+func prevLinkHarness(t *testing.T) (h *harness, lp *sessionLinkPanel, a, b string) {
+	h = newHarness(t, harnessOpts{noStart: true})
+	lp = newSessionLinkPanel(h)
+	server := httptest.NewTLSServer(lp)
+	t.Cleanup(server.Close)
+	a, b = linkBaseOf(server, 'a'), linkBaseOf(server, 'b')
+	h.a.linkHTTPClient = server.Client()
+	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink = a, a, b
+	return h, lp, a, b
+}
+
+// committedTo waits until the agent uses link (and has saved it) with prev as its previous address.
+func committedTo(t *testing.T, h *harness, link, prev string, prevMTLS bool) {
+	t.Helper()
+	eventually(t, func() bool {
+		h.a.metaMu.Lock()
+		defer h.a.metaMu.Unlock()
+		return h.a.meta.Link == link && h.a.cfg.LinkURL == link && h.a.meta.NextLink == "" &&
+			h.a.meta.PrevLink == prev && h.a.meta.PrevMTLS == prevMTLS
+	}, "link and previous address")
+	if m := readMeta(t, h.dir); m.Link != link || m.NextLink != "" || m.PrevLink != prev || m.PrevMTLS != prevMTLS {
+		t.Fatalf("saved link=%t next=%t prev=%t prev_mtls=%v", m.Link == link, m.NextLink == "", m.PrevLink == prev, m.PrevMTLS)
+	}
+}
+
+// A committed new link address that stops answering: the agent goes back to the link it had, and forgets the new one.
+func TestPrevLinkWhenTheNewOneStopsAnswering(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	h.start()
+	if got := lp.session(t); got != linkPrefix('b') {
+		t.Fatal("the first session was not on the new address")
+	}
+	committedTo(t, h, b, a, false)
+
+	lp.refuse('b')
+	endSession(t, h)
+	if got := lp.session(t); got != linkPrefix('a') {
+		t.Fatal("the next session was not on the previous address")
+	}
+	committedTo(t, h, a, "", false)
+	if !h.a.linkOnly() || lp.dialsTo('b') < 2 {
+		t.Fatalf("linkOnly=%v, new address dialled %d times", h.a.linkOnly(), lp.dialsTo('b'))
+	}
+}
+
+// An mTLS agent whose first link address stops answering goes back to mTLS and is no longer link-only.
+func TestPrevMTLSWhenTheNewLinkStopsAnswering(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	lp := newSessionLinkPanel(h)
+	server := httptest.NewTLSServer(lp)
+	t.Cleanup(server.Close)
+	b := linkBaseOf(server, 'b')
+	h.a.linkHTTPClient = server.Client()
+	h.a.meta.NextLink = b
+	h.start()
+	lp.session(t)
+	committedTo(t, h, b, "", true)
+	if !h.a.linkOnly() {
+		t.Fatal("not link-only on the new link")
+	}
+	select {
+	case <-h.panel.connects:
+		t.Fatal("a mTLS session before the new link failed")
+	default:
+	}
+
+	lp.refuse('b')
+	endSession(t, h)
+	h.waitConnected()
+	committedTo(t, h, "", "", false)
+	if h.a.linkOnly() || h.a.linkURL() != "" {
+		t.Fatalf("linkOnly=%v after the return to mTLS", h.a.linkOnly())
+	}
+}
+
+// The previous address survives a restart: an agent that starts on a committed link that does not answer goes back.
+func TestPrevLinkAfterARestart(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	h.start()
+	lp.session(t)
+	committedTo(t, h, b, a, false)
+	if err := h.stop(); err != nil {
+		t.Fatal(err)
+	}
+
+	lp.refuse('b')
+	client := h.a.linkHTTPClient
+	h.a = h.newAgent()
+	if p, mtls := h.a.prevAddress(); p != a || mtls || h.a.linkURL() != b || !h.a.linkOnly() {
+		t.Fatal("the restarted agent lost its link or its previous address")
+	}
+	h.a.linkHTTPClient = client
+	h.start()
+	if got := lp.session(t); got != linkPrefix('a') {
+		t.Fatal("the restarted agent did not go back to the previous address")
+	}
+	committedTo(t, h, a, "", false)
+}
+
+// While the current link answers, the previous address is never dialled.
+func TestPrevLinkUnusedWhileTheCurrentAnswers(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	h.start()
+	lp.session(t)
+	committedTo(t, h, b, a, false)
+	for range 3 {
+		endSession(t, h)
+		if got := lp.session(t); got != linkPrefix('b') {
+			t.Fatal("a session left the current address")
+		}
+	}
+	if n := lp.dialsTo('a'); n != 0 {
+		t.Fatalf("previous address dialled %d times", n)
+	}
+	committedTo(t, h, b, a, false)
 }

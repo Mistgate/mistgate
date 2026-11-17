@@ -9,7 +9,9 @@ import (
 )
 
 // A new panel link address (NodeSettings.panel_link_url, Meta.NextLink): the agent tries it in turn with the address it
-// has, and keeps it once a session over it succeeds.
+// has, and keeps it once a session over it succeeds. The address it had stays as the previous one (Meta.PrevLink, or
+// Meta.PrevMTLS for mTLS): while the new one does not answer the agent tries the previous one every other turn, and
+// goes back to it once a session over it succeeds, so a wrong address does not cut the node off.
 
 // linkURL is the link base address the agent dials (cfg.LinkURL, which follows Meta.Link once a new address works).
 func (a *Agent) linkURL() string {
@@ -22,6 +24,13 @@ func (a *Agent) nextLink() string {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
 	return a.meta.NextLink
+}
+
+// prevAddress is the previous panel address: a link base, or mtls for the pinned mTLS endpoint ("", false: none).
+func (a *Agent) prevAddress() (link string, mtls bool) {
+	a.metaMu.Lock()
+	defer a.metaMu.Unlock()
+	return a.meta.PrevLink, a.meta.PrevMTLS
 }
 
 // applyPanelLink takes in NodeSettings.panel_link_url. reconnect: the current session should end so that the next one
@@ -99,6 +108,7 @@ func (a *Agent) commitNextLink(next string) {
 	if a.meta.NextLink != next {
 		return
 	}
+	a.meta.PrevLink, a.meta.PrevMTLS = a.meta.Link, a.meta.Link == "" // the address in use until now; "" = mTLS
 	a.meta.Link, a.meta.NextLink = next, ""
 	a.cfg.LinkURL = next
 	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
@@ -106,4 +116,43 @@ func (a *Agent) commitNextLink(next string) {
 		return
 	}
 	a.log.Info("new panel link address in use")
+}
+
+// prevSession runs a session over the previous panel address: the link base prev, or mTLS when mtls. Once its HelloAck
+// arrives the previous address is the current one again. A failure is an ordinary connection failure (backoff), and
+// the next turn uses the current address.
+func (a *Agent) prevSession(ctx context.Context, prev string, mtls bool) error {
+	a.log.Info("the panel address does not answer; trying the previous one", "mtls", mtls)
+	commit := func() { a.commitPrevAddress(prev, mtls) }
+	if mtls {
+		return a.mtlsSessionOn(ctx, "", commit)
+	}
+	err := a.linkSession(ctx, func(ctx context.Context) (*websocketAgentTransport, func(), error) {
+		t, cleanup, err := a.dialLinkBase(ctx, prev, "")
+		if err == nil {
+			t.onEstablished = commit
+		}
+		return t, cleanup, err
+	})
+	if errors.Is(err, errLinkNotEstablished) {
+		return fmt.Errorf("previous panel link address: %v", err) // not errLinkNotEstablished: no mTLS hold period for it
+	}
+	return err
+}
+
+// commitPrevAddress makes the previous panel address current again and drops the one that stopped answering. For mTLS
+// the agent is no longer link-only.
+func (a *Agent) commitPrevAddress(prev string, mtls bool) {
+	a.metaMu.Lock()
+	defer a.metaMu.Unlock()
+	if a.meta.PrevLink != prev || a.meta.PrevMTLS != mtls {
+		return
+	}
+	a.meta.Link, a.meta.PrevLink, a.meta.PrevMTLS = prev, "", false
+	a.cfg.LinkURL = prev
+	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
+		a.log.Error("previous panel address not saved", "err", err)
+		return
+	}
+	a.log.Info("back on the previous panel address", "mtls", mtls)
 }
