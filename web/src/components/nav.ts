@@ -9,7 +9,7 @@ export const sections = [
   { id: "users", to: "/users" },
   { id: "profiles", to: "/profiles", group: "nav.group.setup" },
   { id: "subscriptions", to: "/subscriptions" },
-  // the Decoy sites section (design board PnDecoys) goes here, last in Setup, when its screen exists
+  { id: "decoys", to: "/decoys" },
   { id: "health", to: "/health", group: "nav.group.ops" },
   { id: "reachability", to: "/reachability" },
   { id: "updates", to: "/updates" },

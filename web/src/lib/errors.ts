@@ -51,6 +51,24 @@ export const errorCodes = [
   "panel_too_large",
   "panel_no_index",
   "panel_invalid",
+  // the library of decoy sites (decoysite.proto): the refusals of its calls; "decoy_site_in_use: nodes=<ids>[&panel=1]" names where the site stands
+  "decoy_site_not_found",
+  "decoy_version_not_found",
+  "decoy_name_taken",
+  "decoy_name_invalid",
+  "decoy_note_invalid",
+  "decoy_library_full",
+  "decoy_site_draft",
+  "decoy_site_not_draft",
+  "decoy_site_changed",
+  "decoy_checks_failed",
+  "decoy_site_in_use",
+  "node_not_assigned",
+  "panel_not_assigned",
+  "decoy_file_not_found",
+  "decoy_file_binary",
+  "decoy_page_not_found",
+  "decoy_preview_too_large",
   // relays (relay.proto): CreateRelay / UpdateRelay / CheckRelay
   "relay_exists",
   "same_node",
@@ -101,6 +119,12 @@ function deviceLimitVars(vars: Record<string, string>): Record<string, string> {
   return { ...vars, used: m?.[1] ?? "?", limit: m?.[2] ?? "?", names: m?.[3] ? `: ${m[3]}` : "" };
 }
 
+/** "nodes de1, nl1 and the panel": where a site that cannot be deleted stands (the names, or the ids when the page has no names). */
+export function inUseWhere(t: T, names: readonly string[], panel: boolean): string {
+  const list = names.join(", ");
+  return list && panel ? t("err.decoy_site_in_use.both", { nodes: list }) : panel ? t("err.decoy_site_in_use.panel") : t("err.decoy_site_in_use.nodes", { nodes: list });
+}
+
 /** The words of a relay refusal's values: why a server cannot be relayed, which stage of the check failed. */
 function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
   const reason = vars.reason ?? "";
@@ -135,6 +159,8 @@ function known(c: ConnectError, t: T): string | undefined {
   // a relay holds the port: the panel names it "relay" or "relay to <exit>", not a profile
   if (code === "port_taken" && /^relay($| )/.test(vars.profile ?? "")) return t("err.port_taken_relay", vars);
   if (code === "device_limit") return t("err.device_limit", deviceLimitVars(vars));
+  // where a site stands is the node ids the panel sent (a screen that knows the names words it itself: lib/decoysites.ts decoyErrorText)
+  if (code === "decoy_site_in_use") return t("err.decoy_site_in_use", { where: inUseWhere(t, (vars.nodes ?? "").split(",").filter(Boolean), vars.panel === "1") });
   // the bridge needs a path the panel can prove from a third node; a server whose path cannot be checked (an MTProto server with the site
   // fallback) never passes that proof, so the refusal says so instead of "the relay did not pass its check"
   if (code === "relay_check_failed" && vars.stage === "path" && vars.code === "unverifiable") return t("err.relay_bridge_unverifiable", vars);
