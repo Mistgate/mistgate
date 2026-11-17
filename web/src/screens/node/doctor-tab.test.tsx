@@ -104,7 +104,8 @@ describe("the Doctor tab", () => {
     health.runDoctor.mockReturnValue(new Promise((r) => (answer = r)));
     await mount("alerts");
     await act(async () => buttons("Run again")[0]!.click());
-    expect(host!.querySelector("h3")!.textContent).toBe("Inspecting the node");
+    // the mutation turns pending on the render after the click: on a busy machine that is not yet the same tick
+    await act(async () => vi.waitFor(() => expect(host!.querySelector("h3")!.textContent).toBe("Inspecting the node"), { timeout: 3000 }));
     expect(cells().filter((c) => c === "now")).toHaveLength(1);
     expect(buttons("Inspecting")[0]!.hasAttribute("disabled") || buttons("Inspecting")[0]!.getAttribute("data-disabled") !== null).toBe(true);
     expect(health.runDoctor).toHaveBeenCalledWith({ nodeId: "nod_de1" });
