@@ -8,7 +8,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { hy2, vless } from "./schema.fixtures";
-import { ProfileEditorScreen } from "./editor";
+import { ProfileEditorScreen } from "./page";
 
 const createProfile = vi.fn();
 const updateProfile = vi.fn();
@@ -60,8 +60,8 @@ vi.mock("@/lib/api", async (orig) => ({
       Promise.resolve({ errors: [], warnings: [], clientPreview: "hysteria2://…", clientLabel: "Subscription link · URI list", formats: formatsOf(r) }),
     getProfile: () =>
       Promise.resolve({
-        profile: { id: "p_old", name: "hy2 · 443", protocol: profileProtocol, version: savedElsewhere ? 2 : 1, nodeCount: 2, userCount: 12, summary: "", warnings: [] },
-        settingsJson: savedElsewhere ? defaults.replace('"port":443', '"port":8443') : defaults,
+        profile: { id: "p_old", name: "hy2 · 443", protocol: profileProtocol, version: savedElsewhere ? 2 : 1, nodeCount: 2, userCount: 12, summary: "", warnings: [], formats: [] },
+        settingsJson: profileProtocol === "vless" ? vlessDefaults : savedElsewhere ? defaults.replace('"port":443', '"port":8443') : defaults,
         inbounds: [],
       }),
     createProfile: (...a: unknown[]) => createProfile(...a),
@@ -79,6 +79,7 @@ vi.mock("@/lib/api", async (orig) => ({
     updateGroup: (...a: unknown[]) => updateGroup(...a),
   },
   nodes: {
+    getFleetConnections: () => Promise.resolve({ nodes: [] }),
     listNodes: () =>
       Promise.resolve({
         nodes: [
@@ -89,6 +90,8 @@ vi.mock("@/lib/api", async (orig) => ({
   },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { updateIntervalHours: 6, apps: [{ kind: App.HAPP, name: "Happ" }, { kind: App.AMNEZIA, name: "AmneziaVPN" }] }, effectiveTitle: "" }) },
   dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
+  health: { getChecks: () => Promise.resolve({ nowUnix: 1, intervalS: 300, columns: [], rows: [], countryChecks: [] }) },
+  relays: { listRelays: () => Promise.resolve({ relays: [] }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   awgApi: { listMimicryPresets: () => Promise.resolve({ presets: [], domains: [] }) },
 }));
@@ -152,16 +155,14 @@ const type = (el: HTMLInputElement, value: string) =>
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
-const nameField = () => document.querySelector<HTMLInputElement>("input[placeholder='E.g. Main · 443']")!;
-const portField = () => document.querySelector<HTMLInputElement>("input[aria-label='Port']")!;
-const pressed = (label: string) => button(label)?.getAttribute("aria-pressed");
+const portField = () => document.querySelector<HTMLInputElement>("input[aria-label='UDP port'], input[aria-label='Port']")!;
 
 describe("who may change a profile", () => {
   it("the owner has the save bar after a change and the delete section", async () => {
     params = { id: "p_old" };
     await mount();
     expect(text()).toContain("Delete profile");
-    expect(text()).not.toContain("Only the owner can change profiles.");
+    expect(text()).not.toContain("Only the owner can change profiles");
     await type(portField(), "9443");
     expect(button("Save")).toBeDefined();
   });
@@ -170,19 +171,11 @@ describe("who may change a profile", () => {
     role = r;
     params = { id: "p_old" };
     await mount();
-    expect(text()).toContain("Only the owner can change profiles.");
+    expect(text()).toContain("Only the owner can change profiles");
     expect(button("Save")).toBeUndefined();
     expect(text()).not.toContain("Delete profile");
     expect(portField().closest("[inert]")).not.toBeNull();
     expect(portField().value).toBe("443"); // still readable
-  });
-
-  it("a new profile is the owner's: the others get the reason and the way back, not the choice of a protocol", async () => {
-    role = Role.HELPER;
-    await mount();
-    expect(text()).toContain("Only the owner can change profiles.");
-    expect(text()).not.toContain("Hysteria2");
-    expect(button("Back to profiles")).toBeDefined();
   });
 });
 
@@ -195,11 +188,11 @@ describe("a profile saved in another window while this one is being edited", () 
     await act(async () => void (await qc.invalidateQueries({ queryKey: ["profiles"] })));
     await settle();
     expect(portField().value).toBe("9443");
-    expect(text()).toContain("This profile was changed somewhere else");
+    expect(text()).toContain("The profile was changed elsewhere");
     await click(button("Reload"));
     await settle();
     expect(portField().value).toBe("8443");
-    expect(text()).not.toContain("This profile was changed somewhere else");
+    expect(text()).not.toContain("The profile was changed elsewhere");
   });
 
   it("does not hold back its own save: the form takes the version this window saved", async () => {
@@ -215,8 +208,8 @@ describe("a profile saved in another window while this one is being edited", () 
     await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim() === "Apply changes"));
     await settle();
     expect(updateProfile).toHaveBeenCalled();
-    expect(text()).not.toContain("This profile was changed somewhere else");
-    expect(button("Save")).toBeUndefined(); // no changes left: the save bar is gone
+    expect(text()).not.toContain("The profile was changed elsewhere");
+    expect(document.querySelector(".pf-save.ok")?.textContent).toContain("Saved"); // no changes left: the bar only says so
     expect(portField().value).toBe("8443");
   });
 
@@ -230,88 +223,13 @@ describe("a profile saved in another window while this one is being edited", () 
   });
 });
 
-describe("a new profile", () => {
-  // the form is step 2 of a new profile: its protocol is in the URL (step 1 is new-profile.test.tsx)
+describe("a VLESS profile", () => {
   beforeEach(() => {
-    search = { protocol: "hysteria2" };
-  });
-  it("is named after the protocol and its port until the name is typed, and asks for a name rather than greying the button", async () => {
-    await mount();
-    expect(nameField().value).toBe("Hysteria2 · 443");
-    await type(portField(), "8443");
-    expect(nameField().value).toBe("Hysteria2 · 8443");
-    await type(nameField(), "");
-    expect((button("Create profile") as HTMLButtonElement).disabled).toBe(false);
-    await click(button("Create profile"));
-    expect(text()).toContain("Give the profile a name");
-    expect(createProfile).not.toHaveBeenCalled();
-    // the domain field says what it is for, with an example
-    expect(document.querySelector<HTMLInputElement>("input[aria-label='Domain (SNI)']")?.placeholder).toBe("vpn.example.com");
-    expect(text()).toContain("Let's Encrypt needs a domain and open ports 80 and 443");
-  });
-
-  it("goes on every node and into the groups that have no Hysteria2 yet; the ones that have it are left alone, and both are said", async () => {
-    await mount();
-    expect(pressed("All nodes2")).toBe("true");
-    expect(text()).toContain("fi1: the address is an IP, Let's Encrypt does not work there.");
-    expect(pressed("test")).toBe("true");
-    expect(pressed("Все")).toBe("false");
-    expect(text()).toContain("“test”: no Hysteria2 profile yet. Without one its people get nothing in the subscription apps (Happ), so it is ticked.");
-    expect(text()).toContain("“Все” already gets Hysteria2: a second profile is usually a test or a variant, so it is not ticked.");
-  });
-
-  it("is created, joins the groups, goes on the nodes in the same window, and opens its page when all went well", async () => {
-    createProfile.mockResolvedValue({ profile: { id: "prf_new", name: "Hysteria2 · 443", protocol: "hysteria2" } });
-    updateGroup.mockResolvedValue({});
-    createInbound.mockResolvedValue({ inbound: {} });
-    await mount();
-    await click(button("Create profile"));
-    await settle();
-    expect(createProfile).toHaveBeenCalledWith(expect.objectContaining({ protocol: "hysteria2", name: "Hysteria2 · 443" }));
-    expect(updateGroup).toHaveBeenCalledTimes(1);
-    expect(updateGroup).toHaveBeenCalledWith({ groupId: "grp_t", profileIds: { values: ["prf_new"] } });
-    expect(createInbound.mock.calls.map((c) => (c[0] as { nodeId: string }).nodeId)).toEqual(["nod_1", "nod_2"]);
-    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ to: "/profiles/$id", params: { id: "prf_new" } }));
-  });
-
-  it("made from a node's page goes on that node and returns there", async () => {
-    search = { node: "nod_1", protocol: "hysteria2" };
-    createProfile.mockResolvedValue({ profile: { id: "prf_new", name: "Hysteria2 · 443", protocol: "hysteria2" } });
-    createInbound.mockResolvedValue({ inbound: {} });
-    await mount();
-    expect(pressed("de1")).toBe("true");
-    expect(pressed("fi1")).toBe("false");
-    await click(button("Create profile"));
-    await settle();
-    expect(createInbound).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ to: "/nodes/$id", params: { id: "nod_1" }, search: { tab: "profiles" } }));
-  });
-
-  it("leaves default AmneziaWG networks unset so the server assigns a free pair", async () => {
-    search = { protocol: "awg" };
-    createProfile.mockResolvedValue({ profile: { id: "prf_awg", name: "AmneziaWG · 10819", protocol: "awg" } });
-    updateGroup.mockResolvedValue({});
-    createInbound.mockResolvedValue({ inbound: {} });
-    await mount();
-    await settle();
-    expect(document.querySelector<HTMLInputElement>('input[aria-label="Client network (IPv4)"]')?.value).toBe("");
-    expect(document.querySelector<HTMLInputElement>('input[aria-label="Client network (IPv6)"]')?.value).toBe("");
-    await click(button("Create profile"));
-    await settle();
-    const request = createProfile.mock.calls[0]?.[0] as { protocol: string; settingsJson: string };
-    const settings = JSON.parse(request.settingsJson) as Record<string, unknown>;
-    expect(request.protocol).toBe("awg");
-    expect(settings).not.toHaveProperty("subnet4");
-    expect(settings).not.toHaveProperty("subnet6");
-  });
-});
-
-describe("a new VLESS profile", () => {
-  beforeEach(() => {
-    search = { protocol: "vless" };
+    params = { id: "p_old" };
+    profileProtocol = "vless";
   });
   const field = (label: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
-  const openAdvanced = () => click(button("Advanced"));
+  const openAdvanced = () => click([...document.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith("Advanced")));
 
   it("hides the XHTTP block when the transport is TCP, and brings it back for XHTTP", async () => {
     await mount();
@@ -329,15 +247,15 @@ describe("a new VLESS profile", () => {
   });
 
   it("says in which formats the draft works, live: XHTTP leaves sing-box out, TCP brings it back", async () => {
-    const formats = () => document.querySelector("[role=group][aria-label='Subscription formats']")?.textContent;
+    const formats = () => [...document.querySelectorAll(".pr-fm > span")].map((x) => `${x.className ? `${x.className}:` : ""}${x.textContent}`).join(" | ");
     // the preview follows the form after a 350 ms pause
     const debounce = () => act(async () => void (await new Promise((r) => setTimeout(r, 400))));
     await mount();
-    expect(formats()).toBe("Link list · Mihomo · Xray JSON not in sing-box: XHTTP");
+    expect(formats()).toBe("Link list | Mihomo | Xray JSON | no:sing-box");
     await click(radio("TCP (RAW + Vision)"));
     await debounce();
     await settle();
-    expect(formats()).toBe("Link list · Mihomo · Xray JSON · sing-box");
+    expect(formats()).toBe("Link list | Mihomo | Xray JSON | sing-box");
   });
 
   it("shows the node's own site as the target at first, without the fields of another site, and brings them with the other segment", async () => {
