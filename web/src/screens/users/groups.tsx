@@ -6,14 +6,12 @@ import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
 import type { ProfileFormat } from "@/gen/mistgate/admin/v1/profile_pb";
-import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { Fresh } from "@/components/fx/fresh";
 import { markFresh } from "@/components/fx/registry";
-import { Card, SectionLabel } from "@/components/ui/bits";
+import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
-import { EmptyState, Notice } from "@/components/ui/notice";
+import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -21,10 +19,8 @@ import { groups as groupsApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { nodesQuery } from "@/lib/queries";
-import { meQuery } from "@/lib/session";
 import { FormatDrops } from "@/screens/profiles/formats";
-import { presetName } from "@/screens/subscriptions/model";
-import { dnsPresetsQuery, useLinkAppList } from "@/screens/subscriptions/queries";
+import { useLinkAppList } from "@/screens/subscriptions/queries";
 import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { groupsQuery, profileListQuery, protocolsQuery } from "./rpc";
@@ -33,7 +29,7 @@ import { useTx } from "./t";
 import { ConfirmModal } from "./ui";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { Pending, QueryError } from "@/components/ui/query-error";
+import { QueryError } from "@/components/ui/query-error";
 
 // The Groups tab of the users screen and the pieces every screen shows about a group: what it gives (the two ways,
 // "Подписка" and "Ключ AmneziaVPN"), its profiles as links, the forms to make, edit and delete one.
@@ -113,7 +109,7 @@ export function GroupChip({ id, name, color, className }: { id: string; name: st
       search={{ tab: "groups", group: id }}
       data-tone={groupTone(id, color)}
       aria-label={t("users.groupOpen", { name })}
-      className={cx("tone-chip inline-flex h-[22px] max-w-full min-w-0 items-center px-2 text-xs font-bold hover:underline", className)}
+      className={cx("tone-chip inline-flex h-6 max-w-full min-w-0 items-center px-2.5 text-xs font-medium hover:underline", className)}
     >
       <span className="truncate">{name}</span>
     </Link>
@@ -270,144 +266,9 @@ export function ImpactText({ impact, who }: { impact: AccessImpact; who?: string
 
 // ---- the tab ----
 
-/** Who may change people and groups: the owner and the helper (a read-only admin sees the lists). */
-export const canManage = (role: Role | undefined) => role === Role.OWNER || role === Role.HELPER;
-
-/** /users?tab=groups: every group with what it gives and to how many people, and the ways to make, change and delete one. */
-export function GroupsTab({ creating, onCreatingChange, focus, onFocusDone }: { creating: boolean; onCreatingChange: (o: boolean) => void; focus?: string; onFocusDone?: () => void }) {
-  const t = useTx();
-  const toast = useToast();
-  const qc = useQueryClient();
-  const list = useQuery(groupsQuery);
-  const profiles = useQuery(profileListQuery);
-  const presets = useQuery(dnsPresetsQuery);
-  const manage = canManage(useQuery(meQuery).data?.admin?.role);
-  const [editId, setEditId] = useState("");
-  const [deleting, setDeleting] = useState<Group | null>(null);
-  // "?group=<id>" opens that group's editor once
-  const [seenFocus, setSeenFocus] = useState("");
-  if (focus && focus !== seenFocus && list.data?.some((g) => g.id === focus)) {
-    setSeenFocus(focus);
-    setEditId(focus);
-  }
-  const everyone = useMutation({
-    mutationFn: () => groupsApi.createGroup({ name: t("users.everyone"), profileIds: (profiles.data ?? []).map((p) => p.id) }),
-    onSuccess: async (r) => {
-      if (r.group) markFresh("group", r.group.id);
-      await Promise.all(["groups", "users", "profiles"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
-      toast(t("users.everyoneCreated", { name: r.group?.name ?? t("users.everyone") }));
-    },
-    onError: (e) => toast.error(errorText(e, t)),
-  });
-
-  if (list.isPending) return <Pending />;
-  if (list.isError) return <QueryError error={list.error} onRetry={() => void list.refetch()} />;
-  const profileOf = (id: string) => profiles.data?.find((p) => p.id === id);
-  const dnsName = (id: string) => {
-    const p = presets.data?.presets.find((x) => x.id === id);
-    return p ? presetName(p, t.lang) : "";
-  };
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      {list.data.length === 0 ? (
-        <Card lg className="border-dashed">
-          <EmptyState
-            title={t("users.groupsNone")}
-            action={
-              manage && (
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Button variant="primary" size="lg" disabled={everyone.isPending} onClick={() => everyone.mutate()}>
-                    {t("users.everyoneCreate")}
-                  </Button>
-                  <Button variant="secondary" size="lg" onClick={() => onCreatingChange(true)}>
-                    {t("users.newGroup")}
-                  </Button>
-                </div>
-              )
-            }
-          >
-            {t("users.groupsNoneBody")}
-          </EmptyState>
-        </Card>
-      ) : (
-        list.data.map((g) => {
-          const ps = g.profileIds.map(profileOf).filter((p) => p !== undefined);
-          return (
-            <Fresh key={g.id} kind="group" id={g.id} className={cx("flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4 transition-colors", focus === g.id && "border-accent-line")}>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
-                <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-3">
-                  <IconChip icon="family" tone={groupTone(g.id, g.color)} size={28} />
-                  <b className="min-w-0 text-[15px] tracking-[-0.01em] break-words">{g.name}</b>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Link
-                    to="/users"
-                    search={{ group: g.id }}
-                    aria-label={t("where.usersOfGroup", { name: g.name })}
-                    className="inline-flex h-7 items-center gap-1 rounded-[14px] border border-line px-2.5 text-xs font-bold whitespace-nowrap transition-colors hover:border-accent-line hover:bg-accent-soft"
-                  >
-                    {t.n("users.groupPeople", g.userCount)}
-                    <Icon name="chevronRight" size={12} className="text-muted" />
-                  </Link>
-                  {manage && (
-                    <>
-                      <Button size="sm" onClick={() => setEditId(g.id)}>
-                        {t("common.edit")}
-                      </Button>
-                      <Button variant="ghostDanger" size="sm" onClick={() => setDeleting(g)}>
-                        {t("users.delete")}
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-              {ps.length === 0 ? (
-                <p className="text-xs text-warn-text">{t("users.groupNoProfilesRow")}</p>
-              ) : (
-                <WaysOfGroup profiles={ps} reach={{ sub: g.happNodes, awg: g.amneziaNodes }} />
-              )}
-              {g.dnsPresetId && dnsName(g.dnsPresetId) && <span className="text-[11px] text-muted">{t("users.groupDns", { name: dnsName(g.dnsPresetId) })}</span>}
-            </Fresh>
-          );
-        })
-      )}
-      <NewGroupModal open={creating} onOpenChange={onCreatingChange} />
-      <GroupEditModal
-        group={list.data.find((g) => g.id === editId)}
-        open={editId !== ""}
-        onOpenChange={(o) => {
-          if (o) return;
-          setEditId("");
-          onFocusDone?.();
-        }}
-      />
-      <DeleteGroupModal group={deleting} groups={list.data} onClose={() => setDeleting(null)} />
-    </div>
-  );
-}
-
-/** "New group": a name, the profiles (all of them to begin with), the DNS preset under "More". */
-export function NewGroupModal({ open, onOpenChange, initialProfiles, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; initialProfiles?: string[]; onCreated?: (g: Group) => void }) {
-  const t = useTx();
-  const toast = useToast();
-  const profiles = useQuery(profileListQuery);
-  return (
-    <Modal open={open} onOpenChange={onOpenChange} title={t("users.newGroup")} closeLabel={t("common.close")}>
-      <GroupForm
-        first={false}
-        initialProfiles={initialProfiles}
-        profiles={(profiles.data ?? []).map((p) => ({ id: p.id, name: p.name }))}
-        onCancel={() => onOpenChange(false)}
-        onCreated={(g) => {
-          onOpenChange(false);
-          toast(t("users.groupCreated", { name: g.name }));
-          onCreated?.(g);
-        }}
-      />
-    </Modal>
-  );
-}
+// The Groups tab (cards, the tile, the search), "New group" and who may manage are the redesign's: users-groups.tsx, users-group-new.tsx.
+export { canManage, GroupsTab } from "./users-groups";
+export { NewGroupModal } from "./users-group-new";
 
 /** The edit-group modal (Groups tab, user card, profile page): the same form, prefilled, saved with UpdateGroup. Mounted only while open. */
 export function GroupEditModal({ group, open, onOpenChange }: { group: Group | undefined; open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -649,7 +510,7 @@ export function GroupForm({
  * "Delete group". An empty one asks and goes. One with people asks where they go (another group, "Everyone" first) and
  * moves them in the same call; without another group there is nowhere to go, so it says that instead.
  */
-function DeleteGroupModal({ group, groups, onClose }: { group: Group | null; groups: Group[]; onClose: () => void }) {
+export function DeleteGroupModal({ group, groups, onClose }: { group: Group | null; groups: Group[]; onClose: () => void }) {
   const t = useTx();
   const toast = useToast();
   const qc = useQueryClient();

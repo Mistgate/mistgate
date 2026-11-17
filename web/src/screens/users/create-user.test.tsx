@@ -70,6 +70,7 @@ const settle = async () => {
 };
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
+const groupButton = (name: string) => [...document.querySelectorAll("button[aria-pressed]")].find((b) => b.querySelector("b")?.textContent === name);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const switches = () => [...document.querySelectorAll("[role=switch]")].map((s) => s.getAttribute("aria-checked"));
 const type = (el: HTMLInputElement, value: string) =>
@@ -82,11 +83,15 @@ describe("the new user form", () => {
   it("starts in “Everyone”, says what the person gets, and switches off the way the group gives nothing for", async () => {
     createUser.mockResolvedValue({});
     await mount([group({ id: "grp_f", name: "friends", amneziaNodes: 1 }), group()]);
-    expect(document.querySelector("[role=combobox]")?.textContent).toContain("Все");
-    expect(text()).toContain("Subscription (Happ) — 2 nodes");
-    expect(text()).toContain("AmneziaVPN keys — no: no AmneziaWG of the group runs on an enabled node");
-    // Happ on, AmneziaVPN off with the reason, Telegram off, the Mistgate app on, "all nodes" on
-    expect(switches()).toEqual(["true", "false", "false", "false", "true", "true"]); // link, AmneziaVPN, Telegram, TrustTunnel, Mistgate app, all nodes
+    expect(groupButton("Все")?.getAttribute("aria-pressed")).toBe("true");
+    expect(groupButton("friends")?.getAttribute("aria-pressed")).toBe("false");
+    // what the person gets, in the preview: the subscription on two nodes, and nothing for the keys (no AmneziaWG runs on a node)
+    const preview = document.querySelector("aside")!.textContent!;
+    expect(preview).toContain("Subscription");
+    expect(preview).toContain("2 nodes");
+    expect(preview).not.toContain("AmneziaVPN keys");
+    // "all nodes" on, then Happ on, AmneziaVPN off with the reason, Telegram off, TrustTunnel off, the Mistgate app on
+    expect(switches()).toEqual(["true", "true", "false", "false", "false", "true"]); // all nodes, link, AmneziaVPN, Telegram, TrustTunnel, Mistgate app
     expect(text()).toContain("Off: no AmneziaWG of the group runs on a node");
     expect(text()).not.toContain("gets nothing yet");
 
@@ -135,9 +140,8 @@ describe("the new user form", () => {
 
   it("says in red when the group gives nothing at all, and leaves Happ on", async () => {
     await mount([group({ happNodes: 0, amneziaNodes: 0 })]);
-    expect(text()).toContain("This person gets nothing yet: no enabled node has a profile from the group “Все”.");
-    expect(document.querySelector("[role=alert]")).not.toBeNull();
-    expect(switches().slice(0, 2)).toEqual(["true", "false"]);
+    expect(document.querySelector("aside")!.textContent).toContain("This person gets nothing yet: no enabled node has a profile from the group “Все”.");
+    expect(switches().slice(1, 3)).toEqual(["true", "false"]);
   });
 
   it("shows the group form inline only when there is no group at all, without a DNS of the group, and its button is not the main one", async () => {
@@ -146,14 +150,15 @@ describe("the new user form", () => {
     const add = button("Add group")!;
     expect(add.className).not.toContain("bg-accent");
     // one DNS choice, the person's own, waiting under "More" (the group's is not asked here)
+    await click(button("More"));
     expect(document.querySelectorAll("[aria-label='DNS']")).toHaveLength(1);
-    expect(document.querySelector("details summary")?.textContent).toContain("More");
   });
 
   it("offers the two speed limits under “More”, both off by default, and sends them in bit/s", async () => {
     createUser.mockResolvedValue({});
     await mount([group()]);
-    const more = document.querySelector("details")!;
+    await click(button("More"));
+    const more = button("More")!.nextElementSibling as HTMLElement;
     expect(more.textContent).toContain("Speed per person");
     expect(more.textContent).toContain("all devices on one node");
     expect(more.textContent).toContain("Speed per device");
@@ -162,25 +167,29 @@ describe("the new user form", () => {
     // the DNS keeps one line; when it reaches the apps and what "empty" means are behind the (i)
     expect(more.querySelector("button[aria-label^='When it arrives']")?.getAttribute("aria-label")).toContain("Empty means the group’s preset");
     const step = (label: string) => click(document.querySelector(`[aria-label='${label}']`));
-    expect(document.querySelector<HTMLButtonElement>("[aria-label='Decrease Speed per device']")?.disabled).toBe(true); // 0 = no limit, ∞
+    const preset = (group: string, label: string) => click([...document.querySelectorAll(`[aria-label='${group}'] [role=radio]`)].find((r) => r.textContent === label));
+    expect([...more.querySelectorAll("[aria-label='Speed per device'] [role=radio]")].find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("no limit");
     await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "alice");
     await click(button("Create"));
     await settle();
     expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ speedLimitBps: 0n, deviceSpeedLimitBps: 0n }));
 
-    await step("Increase Speed per person");
-    await step("Increase Speed per person");
+    // a preset, then a value of its own on the stepper that "Other" opens (5 at a time)
+    await preset("Speed per person", "20");
+    await preset("Speed per device", "Other");
     await step("Increase Speed per device");
+    await step("Increase Speed per device");
+    expect([...more.querySelectorAll("[aria-label='Speed per person'] [role=radio]")].find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("20");
     expect(more.textContent).toContain("10 Mbit/s");
-    expect(more.textContent).toContain("5 Mbit/s");
     await click(button("Create"));
     await settle();
-    expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alice", speedLimitBps: 10_000_000n, deviceSpeedLimitBps: 5_000_000n }));
+    expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alice", speedLimitBps: 20_000_000n, deviceSpeedLimitBps: 10_000_000n }));
   });
 
   it("resets the quota every month by default, and sends the period picked instead", async () => {
     createUser.mockResolvedValue({});
     await mount([group()]);
+    await click(button("More"));
     const trigger = document.querySelector<HTMLElement>("[aria-label='Resets']")!;
     expect(trigger.textContent).toContain("Monthly");
     expect(text()).toContain("per month");

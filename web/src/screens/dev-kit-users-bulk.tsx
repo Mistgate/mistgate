@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { BatchPanel, BulkDock, PickMenu } from "@/components/bulk";
+import { PickMenu } from "@/components/bulk";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
@@ -13,7 +12,7 @@ import type { Job, Row } from "@/lib/batch";
 import { meQuery } from "@/lib/session";
 import { useMenuWidth } from "@/lib/menu";
 import { Dock, Sidebar } from "@/screens/shell";
-import { availability, DeleteDialog, DisableDialog, EnableDialog, ExtendDialog, panelFor, ResetDialog, type ActionId, type UsersRun } from "@/screens/users/bulk-actions";
+import { availability, DeleteDialog, DisableDialog, EnableDialog, ExtendDialog, panelFor, ResetDialog, type ActionId, type RunId, type UsersRun } from "@/screens/users/bulk-actions";
 import { UsersBulkBar } from "@/screens/users/bulk";
 import { UsersScreen } from "@/screens/users/list";
 import type { UserN } from "@/screens/users/model";
@@ -89,10 +88,29 @@ function Shot({ id, title, phone, tall, children }: { id: string; title: string;
 
 const noop = () => {};
 
-function Bar({ busy, toggle = "disable" }: { busy?: boolean; toggle?: "disable" | "enable" }) {
+function Bar({ busy, toggle = "disable", job, ask }: { busy?: boolean; toggle?: "disable" | "enable"; job?: Job; ask?: "disable" | "reset" }) {
   const t = useTx();
   const avail = Object.fromEntries((["extend", "disable", "enable", "reset", "delete"] as ActionId[]).map((a) => [a, availability(a, crowd, t)])) as Record<ActionId, ReturnType<typeof availability>>;
-  return <UsersBulkBar count={crowd.length} offPage={12} avail={avail} toggle={toggle} busy={!!busy} onAction={noop} onClear={noop} />;
+  return (
+    <UsersBulkBar
+      float={false}
+      people={crowd}
+      offPage={12}
+      allShown={false}
+      total={50}
+      avail={avail}
+      toggle={toggle}
+      ask={ask}
+      busy={!!busy}
+      job={job}
+      panel={job ? panelFor(t, job.spec.action as RunId) : null}
+      extra={job && !job.running && job.spec.action === "disable" ? <Button variant="secondary" size="md">{t("bulk.people.undo")}</Button> : undefined}
+      onAction={noop}
+      onMore={noop}
+      onClear={noop}
+      onAll={noop}
+    />
+  );
 }
 
 const row = (i: number, state: Row["state"], over: Partial<Row> = {}): Row => ({ id: `usr_${pad(i)}`, name: person(i).name, host: "", state, ...over });
@@ -167,39 +185,23 @@ function PickShot({ id, title, loaded, phone }: { id: string; title: string; loa
 }
 
 export function UsersBulkKit() {
-  const t = useT();
-  const tx = useTx();
   const jobs = useJobs();
-  const region = t("bulk.people.region");
-  const enableAgain = (
-    <Button variant="secondary" size="sm">
-      <Icon name="check" size={12} />
-      {t("bulk.people.undo")}
-    </Button>
-  );
   const frames = (phone: boolean) => (
     <>
       <Shot id={phone ? "ub-bar-phone" : "ub-bar"} title="37 selected, 12 of them on other pages" phone={phone} tall>
-        <BulkDock float={false} region={region}>
-          <Bar />
-        </BulkDock>
+        <Bar />
+      </Shot>
+      <Shot id={phone ? "ub-bar-ask-phone" : "ub-bar-ask"} title="The bar asks once before it switches people off" phone={phone} tall>
+        <Bar ask="disable" />
       </Shot>
       <Shot id={phone ? "ub-bar-off-phone" : "ub-bar-off"} title="Most of them off: the bar offers Enable" phone={phone} tall>
-        <BulkDock float={false} region={region}>
-          <Bar toggle="enable" />
-        </BulkDock>
+        <Bar toggle="enable" />
       </Shot>
       <Shot id={phone ? "ub-running-phone" : "ub-running"} title="A long batch folded: 500 people, two failed" phone={phone}>
-        <BulkDock float={false} wide region={region}>
-          <BatchPanel job={jobs.long} rows={jobs.long.rows} {...panelFor(tx, "until")} fold={30} onStop={noop} onRetry={noop} onClose={noop} />
-          <Bar busy />
-        </BulkDock>
+        <Bar busy job={jobs.long} />
       </Shot>
       <Shot id={phone ? "ub-summary-phone" : "ub-summary"} title="The end of a Disable, with Enable again" phone={phone}>
-        <BulkDock float={false} wide region={region}>
-          <BatchPanel job={jobs.off} rows={jobs.off.rows} {...panelFor(tx, "disable")} fold={30} extra={enableAgain} onStop={noop} onRetry={noop} onClose={noop} />
-          <Bar toggle="enable" />
-        </BulkDock>
+        <Bar toggle="enable" job={jobs.off} />
       </Shot>
     </>
   );
