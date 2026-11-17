@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { halo } from "@/components/fx/halo";
+import { playWave } from "@/components/fx/wave";
 import { Scramble } from "@/components/fx/scramble-react";
 import { EditionNotice } from "@/components/edition-notice";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { asChannel, type Channel } from "@/lib/channels";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
+import { themeNow } from "@/lib/theme";
 import type { UpdateActions, Updates } from "@/lib/updates";
 import { G } from "@/screens/users/user-bits";
 import { Bar, D, Gl, Pill, gk } from "./bits";
@@ -71,9 +73,10 @@ export function usePanelPhase(data: Updates, refetch: () => unknown, answeredAt:
     return () => clearInterval(id);
   }, [pending, finished, scene, refetch]);
 
-  // the new version answered: a moment for the screen to say so, then the card is the page again
+  // the new version answered: the wave goes over the window at once, a moment for the screen to say so, then the card is the page again
   useEffect(() => {
     if (!finished || scene) return;
+    playWave({ x: Math.round(window.innerWidth / 2), y: Math.round(window.innerHeight * 0.42) }, { light: themeNow() === "light", theme: true });
     const id = window.setTimeout(() => {
       setSettled(true);
       toast(t("uq.toast.done", { version }));

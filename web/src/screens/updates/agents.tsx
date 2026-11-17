@@ -1,11 +1,14 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
+import { playWave } from "@/components/fx/wave";
+import { useToast } from "@/components/ui/toast";
 import { Scramble } from "@/components/fx/scramble-react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
-import { useFmt, type Fmt } from "@/lib/format";
+import { themeNow } from "@/lib/theme";
 import {
   bundleErrorText,
   heroOf,
@@ -40,14 +43,19 @@ function look(t: T, d: Updates, hero: Hero, edge: boolean): Look {
   const count = trusted ? t.n("up.hero.available.title", d.nodes.length, { done: d.nodes.filter((n) => n.state === NodeUpdateState.UP_TO_DATE).length, version }) : "";
   switch (hero.id) {
     case "available":
+      return { title: count, text: t("up.hero.available.text", { version }), pill: null };
     case "running":
-      return { title: count, text: t("up.hero.available.text", { version }), pill: hero.id === "running" ? { k: "busy", label: t("up.layer.pill.running") } : null };
+      return count
+        ? { title: count, text: t("up.hero.available.text", { version }), pill: { k: "busy", label: t("up.layer.pill.running") } }
+        : { title: t("up.hero.running.title", { version: hero.rollout.toVersion }), text: t("up.hero.running.text"), pill: { k: "busy", label: t("up.layer.pill.running") } };
     case "paused":
-      return { title: count, text: t("up.hero.available.text", { version }), pill: { k: "part", label: t("up.layer.pill.paused") } };
+      return { title: count || t("up.hero.paused.title"), text: count ? t("up.hero.available.text", { version }) : "", pill: { k: "part", label: t("up.layer.pill.paused") } };
     case "current":
-      return { title: count, text: t("uq.ag.allSub", { version }), pill: { k: "ok", label: t("uq.ag.all") } };
+      return count
+        ? { title: count, text: t("uq.ag.allSub", { version }), pill: { k: "ok", label: t("uq.ag.all") } }
+        : { title: t("up.hero.current.title"), text: t("up.hero.current.text"), pill: { k: "ok", label: t("uq.ag.all") } };
     case "attention":
-      return { title: count, text: t.n("up.hero.attention.text", hero.retry), pill: { k: "part", label: t("up.layer.pill.attention") } };
+      return { title: count || t("up.hero.attention.title"), text: t.n("up.hero.attention.text", hero.retry), pill: { k: "part", label: t("up.layer.pill.attention") } };
     case "manual":
       return {
         title: t.n("up.hero.manual.title", hero.nodes.length, { names: hero.nodes.map((n) => n.name).join(", ") }),
@@ -194,7 +202,6 @@ export type AgentsProps = {
 
 export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSchedule, onRollback, scene }: AgentsProps) {
   const t = useT();
-  const fmt: Fmt = useFmt();
   const edition = useEdition();
   const flags = useFlags();
   const noUpdates = edition.off("agent_updates"); // there the buttons are gone for everyone, not just for a helper
@@ -206,7 +213,20 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
   const offline = trusted ? d.nodes.filter((n) => n.state === NodeUpdateState.OFFLINE && n.supportsUpdate && n.built < d.bundle!.built) : [];
   const canStart = owner && !noUpdates && hero.id === "available" && !!d.bundle;
   const readOnly = !owner && !noUpdates && (hero.id === "available" || !!active);
-  void fmt;
+  // a rollout that ends while the page is open: the wave from the card and a word
+  const toast = useToast();
+  const card = useRef<HTMLElement>(null);
+  const status = d.rollout?.status;
+  const was = useRef(status);
+  const toVersion = d.rollout?.toVersion ?? "";
+  useEffect(() => {
+    if (was.current === RolloutStatus.RUNNING && status === RolloutStatus.DONE) {
+      toast(t("uq.toast.rolled", { version: toVersion }));
+      const r = card.current?.getBoundingClientRect();
+      if (r) playWave({ x: r.left + 120, y: r.top + 60 }, { light: themeNow() === "light" });
+    }
+    was.current = status;
+  }, [status, toVersion, toast, t]);
 
   if (d.nodes.length === 0) {
     return (
@@ -226,11 +246,11 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
   }
   return (
     <>
-      <section className={cx("uq-card uq-ag", active?.status === RolloutStatus.RUNNING && "run")} aria-label={t("up.tab.agents")}>
+      <section ref={card} className={cx("uq-card uq-ag", active?.status === RolloutStatus.RUNNING && "run")} aria-label={t("up.tab.agents")}>
         <div className="uq-agh">
           <div>
             <b>{l.title}</b>
-            <span>{l.text}</span>
+            {l.text && <span>{l.text}</span>}
           </div>
           {canStart && hero.id === "available" && (
             <Button variant="primary" size="lg" disabled={actions.busy} onClick={onRollout}>
