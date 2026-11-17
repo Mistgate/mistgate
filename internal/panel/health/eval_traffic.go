@@ -39,7 +39,7 @@ func (s *Service) withTrafficVolume(ctx context.Context, now time.Time, d *deriv
 		if had[paramTraffic24h] != "" {
 			c.params[paramTraffic24h], c.params[paramTraffic7d] = had[paramTraffic24h], had[paramTraffic7d]
 		} else if err := s.st.AddTrafficParams(ctx, k.node, now, c.params); err != nil {
-			s.log.Warn("health: node traffic for an alert", "node", k.node, "err", err)
+			s.log.Warn("health: node traffic for an alert", "code", "health_alert_traffic_failed", "node", k.node, "err", err)
 		}
 	}
 }

@@ -3,6 +3,7 @@
 package warp
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -343,4 +344,18 @@ func TestReachConditionEndsWithItsReasons(t *testing.T) {
 	if got := e.s.Conditions(e.ctx); len(got) != 0 {
 		t.Fatalf("a result of %s ago: %+v", reachFresh, got)
 	}
+}
+
+// reachFn is what the fake node answers to WarpReach; the Workers build has no such check and no such type.
+type reachFn = func(nodeID string, domains []string) (string, []store.WarpReachItem, error)
+
+func (f *envFleet) WarpReach(_ context.Context, nodeID string, domains []string) (string, []store.WarpReachItem, error) {
+	f.mu.Lock()
+	f.reachAsked = append(f.reachAsked, append([]string(nil), domains...))
+	reach := f.reach
+	f.mu.Unlock()
+	if reach == nil {
+		return "", nil, errors.New("no answer")
+	}
+	return reach(nodeID, domains)
 }
