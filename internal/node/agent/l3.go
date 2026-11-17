@@ -110,7 +110,8 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{agentcap.Doctor, agentcap.Bandwidth, agentcap.ClientIPv6, agentcap.WSLink, agentcap.TCPCheck, agentcap.Decoy, agentcap.Links, agentcap.Links2, agentcap.Links3, agentcap.Journal, agentcap.Probe, agentcap.SNIScan, agentcap.Speed, agentcap.SpeedChannel, agentcap.Debug}
+	caps := []string{agentcap.Doctor, agentcap.Bandwidth, agentcap.ClientIPv6, agentcap.WSLink, agentcap.TCPCheck, agentcap.Decoy, agentcap.Links, agentcap.Links2, agentcap.Links3, agentcap.Journal, agentcap.Probe, agentcap.SNIScan, agentcap.Speed, agentcap.SpeedChannel, agentcap.Debug,
+		agentcap.PanelLink}
 	if a.canOSUpdate() {
 		caps = append(caps, agentcap.OSStatus)
 		if a.cfg.OSUpdate != nil {

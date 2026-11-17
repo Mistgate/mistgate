@@ -14,6 +14,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+panel-link/1
 nets/1
 debug/2
 torrentguard/1
@@ -33,6 +34,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+panel-link/1
 os-status/1
 os-update/1
 nets/1
@@ -82,6 +84,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+panel-link/1
 nets/1
 debug/2
 awg/1
@@ -121,6 +124,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+panel-link/1
 os-status/1
 os-update/1
 nets/1
@@ -165,6 +169,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+panel-link/1
 os-status/1
 os-update/1
 debug/2
