@@ -131,3 +131,52 @@ export function appsText(u: User, t: Tx): string {
   const withTg = u.apps?.telegram ? t("users.appsWithTg", { apps: ways }) : ways;
   return u.apps?.trustTunnel ? t("users.appsWithTt", { apps: withTg }) : withTg;
 }
+
+// ---------------------------------------------------------------------------------------------------
+// The people table of the redesign (list.tsx, users-table.tsx): what each cell says and in which tone.
+
+/** The tone of a cell of the table: nothing, amber, red, or quiet (the person is off). */
+export type CellTone = "" | "warn" | "crit" | "off";
+
+/** The term column: days left (amber in the last week), "expired" in red, "no expiry", or "off" for a person who is disabled. */
+export function termView(u: User, t: Tx, now = nowSec()): { text: string; tone: CellTone } {
+  if (u.status === UserStatus.DISABLED) return { text: t("ul.term.off"), tone: "off" };
+  if (u.status === UserStatus.EXPIRED || (u.expiresUnix > 0 && u.expiresUnix <= now)) return { text: t("ul.term.expired"), tone: "crit" };
+  const d = daysLeft(u.expiresUnix, now);
+  if (d === null) return { text: t("ul.term.never"), tone: "" };
+  return { text: t.n("ul.days", d), tone: d <= 7 ? "warn" : "" };
+}
+
+/** The devices cell: "2/5", how full it is (the bar), and whether the limit is reached; no limit has no bar. */
+export function devicesView(u: Pick<User, "devicesUsed" | "deviceLimit">) {
+  const limit = u.deviceLimit;
+  return {
+    text: `${u.devicesUsed}/${limit > 0 ? limit : "∞"}`,
+    full: limit > 0 && u.devicesUsed >= limit,
+    /** A limit of up to six is drawn as a dot per place, a bigger one as a bar; no limit is neither. */
+    dots: limit > 0 && limit <= 6 ? limit : 0,
+    pct: limit > 0 ? Math.min(100, Math.round((u.devicesUsed / limit) * 100)) : 0,
+  };
+}
+
+/** The traffic cell's bar: the share of the quota, amber from 80 %, red once used up; no quota is a dashed line. */
+export function trafficTone(u: Pick<User, "usedBytes" | "quotaBytes" | "status">): "" | "warn" | "crit" | "inf" {
+  if (u.quotaBytes <= 0) return "inf";
+  const pct = u.usedBytes / u.quotaBytes;
+  return u.status === UserStatus.LIMITED || pct >= 1 ? "crit" : pct >= 0.8 ? "warn" : "";
+}
+
+/** The line at the head of an open row: what is wrong with the person (or what to do), and in which tone. `info` is the quiet one. */
+export type RowWarn = { tone: "crit" | "warn" | "info"; text: string };
+
+export function warnOf(u: User, group: { happNodes: number; amneziaNodes: number } | undefined, t: Tx, fmt: Fmt, now = nowSec()): RowWarn | null {
+  const d = daysLeft(u.expiresUnix, now);
+  if (u.status === UserStatus.DISABLED) return { tone: "crit", text: t("ul.warn.off") };
+  if (u.status === UserStatus.EXPIRED) return { tone: "crit", text: t.n("ul.warn.expired", Math.max(0, -(d ?? 0)) || 0) };
+  if (u.status === UserStatus.LIMITED) return { tone: "crit", text: u.nextResetUnix > 0 ? t("ul.warn.quota", { date: fmt.date(u.nextResetUnix) }) : t("ul.warn.quotaNoReset") };
+  if (noAccess(u)) return { tone: "warn", text: t(!group || (group.happNodes === 0 && group.amneziaNodes === 0) ? "users.noAccessGroup" : "users.noAccessApps") };
+  if (d !== null && d <= 7) return { tone: "warn", text: t.n("ul.warn.soon", Math.max(0, d)) };
+  if (u.deviceLimit > 0 && u.devicesUsed >= u.deviceLimit) return { tone: "warn", text: t("ul.warn.full", { n: u.deviceLimit }) };
+  if (u.lastSeenUnix === 0 && u.devicesUsed === 0) return { tone: "info", text: t("ul.warn.new") };
+  return null;
+}

@@ -135,7 +135,7 @@ const avatarColors = [
  * upper-case. A flex box with line-height 1 centres the line; Onest (ascent 0.97, descent 0.305, cap height 0.707)
  * then puts the middle of a capital 0.02em above the middle of the circle, so the letter moves down by that much.
  */
-export function Avatar({ name, index = 0, size = 28 }: { name: string; index?: number; size?: number }) {
+export function Avatar({ name, index = 0, size = 28, fontSize }: { name: string; index?: number; size?: number; fontSize?: number }) {
   const lang = useLang();
   return (
     <span
@@ -144,7 +144,7 @@ export function Avatar({ name, index = 0, size = 28 }: { name: string; index?: n
       style={{
         width: size,
         height: size,
-        fontSize: Math.round(size * 0.44),
+        fontSize: fontSize ?? Math.round(size * 0.44),
         background: avatarColors[index % avatarColors.length],
       }}
     >

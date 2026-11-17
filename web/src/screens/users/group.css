@@ -1,0 +1,20 @@
+/*
+ * What the group page's utilities cannot say (screens/users/group-*.tsx): the wash of a row that has just moved in.
+ * The values are the redesign board's (pn.css, dr-fresh); its --e is the --e of index.css.
+ */
+@keyframes grp-fresh {
+  0% {
+    background: color-mix(in srgb, var(--accent-mark) 18%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.grp-fresh {
+  animation: grp-fresh 2.4s var(--e) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .grp-fresh {
+    animation: none;
+  }
+}

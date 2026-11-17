@@ -149,13 +149,32 @@ const users = createRoute({
     ...(typeof s.group === "string" && s.group !== "" ? { group: s.group } : {}),
     ...(s.tab === "groups" ? { tab: "groups" as const } : { ...validatePaging(s), ...validateSort(s) }),
   }),
+  // a link made for the group's old window ("?tab=groups&group=<id>") goes to the group's page
+  beforeLoad: ({ search }) => {
+    if (search.tab === "groups" && search.group) throw redirect({ to: "/users/groups/$id", params: { id: search.group }, replace: true });
+  },
   component: lazyRouteComponent(() => import("@/screens/users"), "UsersScreen"),
 });
-// "?add=device" opens "Add device" (the link window sends the owner here when self-service is off).
+// The page of a group; "?tab=access|settings" is its tab (the people are the first), "?page=" and "?size=" page its people.
+const group = createRoute({
+  getParentRoute: () => app,
+  path: "/users/groups/$id",
+  validateSearch: (s: Record<string, unknown>): { tab?: "access" | "settings" } & PagingSearch => ({
+    ...(s.tab === "access" || s.tab === "settings" ? { tab: s.tab } : {}),
+    ...validatePaging(s),
+  }),
+  component: lazyRouteComponent(() => import("@/screens/users"), "GroupScreen"),
+});
+// "?add=device" opens "Add device" (the link window sends the owner here when self-service is off); "?tab=" is the tab of the page
+// (the Overview has none), and "#client-logs" lands on the Logs tab.
+const userTabs = ["devices", "access", "logs", "settings"] as const;
 const user = createRoute({
   getParentRoute: () => app,
   path: "/users/$id",
-  validateSearch: (s: Record<string, unknown>): { add?: "device" } => (s.add === "device" ? { add: "device" } : {}),
+  validateSearch: (s: Record<string, unknown>): { add?: "device"; tab?: (typeof userTabs)[number] } => ({
+    ...(s.add === "device" ? { add: "device" as const } : {}),
+    ...(userTabs.includes(s.tab as never) ? { tab: s.tab as (typeof userTabs)[number] } : {}),
+  }),
   component: lazyRouteComponent(() => import("@/screens/users"), "UserScreen"),
 });
 
@@ -268,6 +287,7 @@ const routeTree = root.addChildren([
     nodes,
     node,
     users,
+    group,
     user,
     telegramProxy,
     profiles,

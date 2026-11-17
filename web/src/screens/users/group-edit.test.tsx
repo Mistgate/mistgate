@@ -91,7 +91,7 @@ describe("editing a group from the user card", () => {
 });
 
 describe("the Devices section of a user without an AmneziaWG profile", () => {
-  const user = { id: "u1", name: "Marina", groupName: "тест", deviceLimit: 5, devicesUsed: 0, apps: { happ: true, amnezia: true } } as unknown as UserN;
+  const user = { id: "u1", name: "alice", groupName: "тест", deviceLimit: 5, devicesUsed: 0, apps: { happ: true, amnezia: true } } as unknown as UserN;
   const panel = (u: UserN, profiles: { protocol: string }[], onEditGroup = vi.fn()) => (
     <DevicesPanel user={u} devices={[]} profiles={profiles as never} actions={{ refresh: vi.fn() } as never} onEditGroup={onEditGroup} />
   );

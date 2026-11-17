@@ -170,13 +170,14 @@ async function mount() {
     ),
   );
   await settle();
+  await selectOn(); // the check column opens with "Select": the owner and the helper tick people there
 }
 const settle = async (n = 8) => {
   for (let i = 0; i < n; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 };
-const bar = () => document.querySelector("[data-bulk-bar]");
+const bar = () => document.querySelector("[role=toolbar]");
 const barText = () => bar()?.textContent ?? "";
-const boxes = () => [...document.querySelectorAll("table tbody [role=checkbox]")] as HTMLElement[];
+const boxes = () => [...document.querySelectorAll("section [role=checkbox]")] as HTMLElement[];
 const click = (el: Element | undefined | null) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 /** Base UI opens a menu on the press, not on the click. */
 const press = async (el: Element | null | undefined) => {
@@ -189,12 +190,22 @@ const press = async (el: Element | null | undefined) => {
 const text = (b: Element) => b.textContent?.trim();
 const barButton = (label: string) => {
   const all = [...(bar()?.querySelectorAll("button") ?? [])];
-  return all.find((b) => text(b) === label) ?? all.find((b) => text(b)?.startsWith(label));
+  return all.find((b) => text(b) === label) ?? all.find((b) => text(b)?.startsWith(label)) ?? all.find((b) => b.getAttribute("aria-label") === label);
+};
+/** The menu of the rest ("More"), and the window of one of its items. */
+const more = async (label: string) => {
+  await press(barButton("More"));
+  await click(item(label));
+  await settle();
+};
+const selectOn = async () => {
+  const toggle = [...document.querySelectorAll("button")].find((b) => text(b) === "Select");
+  if (toggle) await click(toggle);
 };
 const item = (label: string) => [...document.querySelectorAll("[role=menuitem]")].find((b) => text(b)?.startsWith(label));
 const dialog = () => document.querySelector("[role=dialog]");
 const dialogButton = (label: string) => [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => text(b) === label);
-const selectMenu = () => [...document.querySelectorAll("button")].find((b) => text(b) === "Select");
+const selectMenu = () => [...document.querySelectorAll("button")].find((b) => text(b) === "Select" && b.getAttribute("aria-pressed") === null);
 /** Until the condition holds (a collected list takes a few turns of the event loop per page). */
 async function waitFor(cond: () => boolean, turns = 30) {
   for (let i = 0; i < turns && !cond(); i++) await settle(1);
@@ -220,14 +231,13 @@ describe("the bar", () => {
     await mount();
     expect(bar()).toBeNull();
     await tick(3);
-    expect(barText()).toContain("3");
-    expect(barText()).toContain("people selected");
-    expect(document.querySelector("[data-bulk-bar] [role=region]")?.getAttribute("aria-label")).toBe("Selected people");
+    expect(barText()).toContain("3 people");
+    expect(bar()?.getAttribute("aria-label")).toBe("Selected people");
     await click(boxes()[0]);
     await click(boxes()[1]);
     await click(boxes()[2]);
     await tick(1);
-    expect(barText()).toContain("person selected");
+    expect(barText()).toContain("1 person");
     await escape();
     expect(bar()).toBeNull();
     await tick(2);
@@ -245,10 +255,10 @@ describe("the bar", () => {
     api.role.current = Role.READONLY;
     await mount();
     expect(boxes()).toHaveLength(0);
-    expect(document.querySelector("table [role=checkbox]")).toBeNull();
     expect(selectMenu()).toBeUndefined();
+    expect([...document.querySelectorAll("button")].some((b) => text(b) === "Select")).toBe(false);
     expect(bar()).toBeNull();
-    expect(document.querySelectorAll("table tbody tr")).toHaveLength(50);
+    expect(document.querySelectorAll("section .us-e")).toHaveLength(50);
   });
 
   it("speaks Russian with its three forms", async () => {
@@ -259,11 +269,11 @@ describe("the bar", () => {
       await tick(n);
       return barText();
     };
-    expect(await says(1)).toContain("человек выбран");
-    expect(await says(2)).toContain("человека выбрано");
-    expect(await says(5)).toContain("человек выбрано");
-    expect(ru["bulk.people.selected"].split("|")).toHaveLength(3);
-    expect(en["bulk.people.selected"].split("|")).toHaveLength(2);
+    expect(await says(1)).toContain("1 человек");
+    expect(await says(2)).toContain("2 человека");
+    expect(await says(5)).toContain("5 человек");
+    expect(ru["ul.bulk.selected"].split("|")).toHaveLength(3);
+    expect(en["ul.bulk.selected"].split("|")).toHaveLength(2);
   });
 
   it("counts the ones on other pages after a move to page 2, and keeps them", async () => {
@@ -276,7 +286,7 @@ describe("the bar", () => {
     await settle();
     expect(api.listUsers).toHaveBeenCalledWith(expect.objectContaining({ offset: 50 }), expect.anything());
     await click(boxes()[0]);
-    expect(barText()).toMatch(/^3people selected/);
+    expect(barText()).toContain("3 people");
     expect(barText()).toContain("2 not on this page");
   });
 });
@@ -288,7 +298,7 @@ describe("Select", () => {
     await pick("This page");
     expect(barText()).toContain("50");
     await pick("All found");
-    expect(barText()).toMatch(/^120people selected/);
+    expect(barText()).toContain("120 people");
     // collected once, when the menu first opened
     const scope = api.listUsers.mock.calls.map((c) => c[0]).filter((r: { pageSize: number }) => r.pageSize === 200);
     expect(scope).toHaveLength(1);
@@ -318,7 +328,7 @@ describe("Select", () => {
     for (const [label, n] of cases) {
       await pick(label);
       expect(barText(), label).toContain(`${n}`);
-      expect(barText(), label).toContain(n === 1 ? "person selected" : "people selected");
+      expect(barText(), label).toContain(n === 1 ? "1 person" : `${n} people`);
     }
   });
 });
@@ -328,8 +338,7 @@ describe("Extend", () => {
     serve(makePeople(900));
     await mount();
     await pick("All found");
-    await press(barButton("Extend"));
-    await settle();
+    await more("Extend");
     expect(dialog()?.textContent).toContain("Change the term of 900 people");
     const endless = everyone.filter((p) => p.expiresUnix === 0n).length;
     expect(dialog()?.textContent).toContain(`Will change (${900 - endless})`);
@@ -348,8 +357,7 @@ describe("Extend", () => {
   it("sets a fixed date with one UpdateUser per person, and warns about the ones it shortens", async () => {
     await mount();
     await tick(8);
-    await press(barButton("Extend"));
-    await settle();
+    await more("Extend");
     await click([...dialog()!.querySelectorAll("[role=radio]")].find((r) => text(r) === "Until a date"));
     await settle();
     const date = dialog()!.querySelector("input[type=date]") as HTMLInputElement;
@@ -373,8 +381,7 @@ describe("Extend", () => {
   it("takes the expiry away with 0, from the people who have one", async () => {
     await mount();
     await tick(8);
-    await press(barButton("Extend"));
-    await settle();
+    await more("Extend");
     await click([...dialog()!.querySelectorAll("[role=radio]")].find((r) => text(r) === "No expiry"));
     await settle();
     const withEnd = everyone.slice(0, 8).filter((p) => p.expiresUnix > 0n);
@@ -391,12 +398,11 @@ describe("Disable and Enable", () => {
     await tick(12);
     const pickedPeople = everyone.slice(0, 12);
     const active = pickedPeople.filter((p) => p.status !== UserStatus.DISABLED);
-    await press(barButton("Disable"));
-    await settle();
-    expect(dialog()?.textContent).toContain("They lose access at once");
-    expect(dialog()?.textContent).toContain(`Will change (${active.length})`);
-    expect(dialog()?.textContent).toContain("Already disabled");
-    await click(dialogButton("Disable"));
+    // the first press asks, in the button itself; nothing is sent yet
+    await click(barButton("Disable"));
+    expect(text(barButton("Links stop working. Sure?")!)).toBe("Links stop working. Sure?");
+    expect(api.setUsersEnabled).not.toHaveBeenCalled();
+    await click(barButton("Links stop working. Sure?"));
     await settle(12);
     expect(api.setUsersEnabled).toHaveBeenCalledTimes(1);
     expect(api.setUsersEnabled).toHaveBeenCalledWith({ userIds: active.map((p) => p.id), enabled: false });
@@ -416,11 +422,11 @@ describe("Disable and Enable", () => {
     await press(barButton("More"));
     expect(item("Enable")?.textContent).toContain(String(before));
     await escape();
-    await press(barButton("Disable"));
-    await settle();
-    await click(dialogButton("Disable"));
+    await click(barButton("Disable"));
+    await click(barButton("Links stop working. Sure?"));
     await settle(12);
-    // most of them are off now, so the bar offers Enable itself, and it takes all twelve
+    // most of them are off now, so the bar offers Enable itself (once the summary is put away), and it takes all twelve
+    await click(barButton("Got it"));
     await press(barButton("Enable"));
     await settle();
     expect(dialog()?.textContent).toContain("Will change (12)");
@@ -441,22 +447,20 @@ describe("Reset traffic and Delete", () => {
     await mount();
     await tick(6);
     const used = everyone.slice(0, 6).filter((p) => p.usedBytes > 0n);
-    await press(barButton("More"));
-    await click(item("Reset traffic"));
-    await settle();
-    expect(dialog()?.textContent).toContain("No traffic used");
-    await click(dialogButton("Reset traffic"));
+    await click(barButton("Reset traffic"));
+    expect(api.resetUserTraffic).not.toHaveBeenCalled(); // it asks first
+    await click(barButton("The counters start from zero. Sure?"));
     await settle(12);
     expect(api.resetUserTraffic).toHaveBeenCalledWith({ userIds: used.map((p) => p.id) });
+    // the ones that used nothing sit out and are named in the list of the batch
+    expect(barText()).toContain("No traffic used");
   });
 
   it("asks for the exact number, deletes nothing before it is typed, and the deleted leave the selection", async () => {
     await mount();
     await tick(4);
     const four = ids(everyone.slice(0, 4));
-    await press(barButton("More"));
-    await click(item("Delete"));
-    await settle();
+    await more("Delete");
     expect(dialog()?.textContent).toContain("Delete 4 people");
     expect(dialog()?.textContent).toContain("confirm your sign-in");
     const go = dialogButton("Delete")!;
@@ -472,16 +476,14 @@ describe("Reset traffic and Delete", () => {
     expect(api.deleteUsers).toHaveBeenCalledWith({ userIds: four });
     expect(barText()).toContain("Deleted 4 of 4 people");
     // nobody is left in the selection: the bar is only the summary
-    expect(barText()).not.toContain("selected");
+    expect(barText()).not.toContain("select all");
   });
 
   it("deletes nothing when the step-up is refused: the rows read not started", async () => {
     api.refuse.current = true;
     await mount();
     await tick(3);
-    await press(barButton("More"));
-    await click(item("Delete"));
-    await settle();
+    await more("Delete");
     await setInput(dialog()!.querySelector("input")!, "3");
     await click(dialogButton("Delete"));
     await settle(12);
@@ -496,21 +498,17 @@ describe("what the bar never touches", () => {
   it("never fetches a link, a page password or a Telegram key, whatever it runs", async () => {
     await mount();
     await pick("This page");
-    await press(barButton("Extend"));
-    await settle();
-    await click(dialogButton("Add 30 days"));
+    await click(barButton("Extend by 30 days"));
     await settle(12);
+    expect(api.extendUsers).toHaveBeenCalled();
     for (const run of [
       async () => {
-        await press(barButton("Disable"));
-        await settle();
-        await click(dialogButton("Disable"));
+        await click(barButton("Disable"));
+        await click(barButton("Links stop working. Sure?"));
       },
       async () => {
-        await press(barButton("More"));
-        await click(item("Reset traffic"));
-        await settle();
-        await click(dialogButton("Reset traffic"));
+        await click(barButton("Reset traffic"));
+        await click(barButton("The counters start from zero. Sure?"));
       },
     ]) {
       await run();
@@ -541,14 +539,8 @@ describe("leaving the page", () => {
     const next = (fullPath: string, search = {}) => ({ next: { fullPath, search }, current: { fullPath: "/users", search: {} } });
     expect(api.blocker.current!.shouldBlockFn(next("/nodes"))).toBe(false);
     expect(api.blocker.current!.enableBeforeUnload()).toBe(false);
-    await press(barButton("More"));
-    await click(item("Enable"));
-    await settle();
-    // two of the first two are active: nothing to enable, so use Disable
-    await escape();
-    await press(barButton("Disable"));
-    await settle();
-    await click(dialogButton("Disable"));
+    await click(barButton("Disable"));
+    await click(barButton("Links stop working. Sure?"));
     await settle();
     expect(api.blocker.current!.shouldBlockFn(next("/nodes"))).toBe(true);
     expect(api.blocker.current!.shouldBlockFn(next("/users", { tab: "groups" }))).toBe(true);
@@ -589,7 +581,7 @@ describe("UsersBulk alone", () => {
     await act(async () =>
       root!.render(
         <QueryClientProvider client={qc}>
-          <UsersBulk picked={[]} shown={new Set()} onClear={() => {}} onMerge={() => {}} />
+          <UsersBulk picked={[]} shown={new Set()} allShown={false} total={0} onAll={() => {}} onClear={() => {}} onMerge={() => {}} />
         </QueryClientProvider>,
       ),
     );
