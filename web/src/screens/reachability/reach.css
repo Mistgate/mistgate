@@ -808,22 +808,13 @@
 }
 .rcp .rc-bud .rw-pg {
   margin: 0;
-  background: linear-gradient(90deg, var(--ok) var(--w), var(--step-hover) 0);
 }
-.rcp .rc-bud .rw-pg.warn {
-  background: linear-gradient(90deg, var(--warning) var(--w), var(--step-hover) 0);
-}
+/* L5903: a spent month is the crit colour (page.css has the plain and the warn fill; the board's track is the box's own step of grey) */
 .rcp .rc-bud .rw-pg.bad {
-  background: linear-gradient(90deg, var(--danger) var(--w), var(--step-hover) 0);
-}
-[dir="rtl"] .rcp .rc-bud .rw-pg {
-  background: linear-gradient(270deg, var(--ok) var(--w), var(--step-hover) 0);
-}
-[dir="rtl"] .rcp .rc-bud .rw-pg.warn {
-  background: linear-gradient(270deg, var(--warning) var(--w), var(--step-hover) 0);
+  background: linear-gradient(90deg, var(--danger) var(--w), var(--step) 0);
 }
 [dir="rtl"] .rcp .rc-bud .rw-pg.bad {
-  background: linear-gradient(270deg, var(--danger) var(--w), var(--step-hover) 0);
+  background: linear-gradient(270deg, var(--danger) var(--w), var(--step) 0);
 }
 
 /* the rows of a setting (L4593-4609, L4723) */

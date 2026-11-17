@@ -121,7 +121,7 @@ export function ReachabilityScreen({ scene }: { scene?: { filter?: State; open?:
     },
     {
       value: "sources",
-      label: <TabLabel text={t("rc.sources")} n={ready || owner ? onSources : 0} tone={problem ? "warn" : "mut"} />,
+      label: <TabLabel text={t("rc.sources")} n={ready ? onSources : 0} tone={problem ? "warn" : "mut"} />,
       // the owner's cards stay in the page while another tab is open: their words are the counts and notes of the other tabs
       keepMounted: owner,
       content: <div className="rc-tab">{owner ? <SourceCards looks={looks} reporters={reporters} /> : <SourcesRead sources={sources} loading={loading} />}</div>,
