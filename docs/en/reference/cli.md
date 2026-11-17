@@ -17,6 +17,7 @@ Many flags fall back to an environment variable. A flag given on the command lin
 | `backup restore` | Decrypts a downloaded panel backup into a new data directory, offline. |
 | `auth turnstile off` | Switches the Cloudflare captcha off on the sign-in and setup pages. |
 | `auth reset-login` | Gives an admin a new password and authenticator app, or adds a password login. |
+| `admin-address` | Moves the admin to a separate listener when its public address no longer works. |
 | `mcp` | A local stdio proxy to the panel's MCP endpoint, for agent clients that cannot speak HTTP. |
 | `release keygen` | Makes the owner's release key. |
 | `release build` | Builds release binaries the one reproducible way (CI and `make build` use it). |
@@ -147,6 +148,20 @@ It prints the login, the new password, and the authenticator key as a QR code dr
 ```sh
 mistgate auth reset-login alice
 ```
+
+### mistgate admin-address
+
+```text
+mistgate admin-address --admin-listen host:port [--data-dir DIR]
+```
+
+| Flag | Environment | Default | Meaning |
+|---|---|---|---|
+| `--admin-listen` | none | none | `host:port` of the separate admin listener, e.g. `127.0.0.1:8443`, reached over an SSH tunnel. Required. |
+| `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | Data directory. The command refuses a directory without a panel database. |
+| `--dev` | `MISTGATE_DEV` | off | A development installation: data in `./.data`. |
+
+Moves the admin to a separate listener, dropping the admin host and the secret admin prefix, the way `mistgate setup --admin-listen` sets it up. It is the way back in when the admin's public address no longer works. The public URL, the agent SNI and the secret subscription, link and probe prefixes stay as they are. It prints the new admin URL (`http://localhost:<port>/`) and a reminder that passkeys registered for the previous address no longer work there: sign in with the password and authenticator code, then add a new passkey. Restart the panel with the same `--admin-listen` afterwards.
 
 ### mistgate mcp
 
