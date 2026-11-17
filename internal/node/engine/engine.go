@@ -118,6 +118,10 @@ type Env struct {
 	UserLimits *ratelimit.Registry
 	// Nets resolves client addresses inside an engine and records only ASN-level connection events. Nil disables counting.
 	Nets *nets.Aggregator
+	// SharedListener returns the listener of the inbound's route on a TCP port the agent shares between services by SNI
+	// (internal/node/front), or nil when the engine listens itself, as it does alone on a port. The engine accepts from it
+	// instead of binding the port; closing it ends that engine's Accept only. Nil: no port is shared.
+	SharedListener func(inboundID string, port uint16) net.Listener
 }
 
 // Event is a small, protocol-neutral signal from an engine to the node agent.
