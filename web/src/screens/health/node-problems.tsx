@@ -29,7 +29,7 @@ export function NodeProblems({ nodes }: { nodes: ReturnType<typeof useProblemNod
           const kind = nodeKind(n);
           return (
             <Link key={n.id} to="/nodes/$id" params={{ id: n.id }} search={toProfiles ? { tab: "profiles" } : {}}>
-              <Flag code={n.countryCode} size={13} />
+              <Flag code={n.countryCode ?? ""} size={13} />
               <b className="mono">{n.name}</b>
               <span className={kind === "bad" ? "crit" : "warn"}>
                 <Dot kind={kind === "bad" ? "bad" : "part"} />

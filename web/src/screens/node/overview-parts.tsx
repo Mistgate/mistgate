@@ -11,7 +11,7 @@ import { alertTitle, groupFact, resolutionWord, severityWord, type Alert } from 
 import { plain } from "@/lib/plain";
 import { pollMs } from "@/lib/queries";
 import { useNow } from "@/lib/time";
-import { AlertBody } from "@/screens/health/alerts";
+import { AlertBody } from "@/screens/health/alert-body";
 import { useFixFlow, type FixFlow } from "@/screens/health/fix";
 import { CardFoot, CardHead, Glyph, glyphs, OvDot } from "@/screens/overview-parts";
 

@@ -349,7 +349,7 @@ export function ChecksTab({ data, init }: { data: Checks; init?: ChecksInit }) {
                 <div key={r.nodeId} className={cx("hl-cw", isOpen && "open", ph === "run" && "cking", ph === "wait" && "ckw", !ph && walk.flash && "ckn")}>
                   <button type="button" className="hl-cr" aria-expanded={isOpen} onClick={() => setChosen(isOpen ? "" : r.nodeId)}>
                     <span className="hl-cnode">
-                      <Flag code={r.countryCode} size={13} />
+                      <Flag code={r.countryCode ?? ""} size={13} />
                       <b className="mono">{r.nodeName}</b>
                     </span>
                     {cols.map((col, i) => {

@@ -20,9 +20,10 @@ import { PeopleTab } from "./people";
 import type { HealthTab } from "./tabs";
 import "./health.css";
 
-/** The first round of the checks has not run: nodes and profiles are there, and no cell has a result yet. */
-export function isFirstRound(checks: { columns: readonly unknown[]; rows: readonly { cells: readonly { last?: unknown }[] }[] } | undefined): boolean {
-  return !!checks && checks.columns.length > 0 && checks.rows.length > 0 && checks.rows.every((r) => r.cells.every((c) => !c.last));
+/** The first round of the checks has not run: profiles are deployed on the nodes, and no cell has a result yet. */
+export function isFirstRound(checks: { rows: readonly { cells: readonly { deployed?: boolean; last?: unknown }[] }[] } | undefined): boolean {
+  const cells = (checks?.rows ?? []).flatMap((r) => r.cells).filter((c) => c.deployed);
+  return cells.length > 0 && cells.every((c) => !c.last);
 }
 
 /** "Health": Alerts (what is wrong with the nodes now and what was), People (the same for people), Checks (the client's view of every profile), Doctor (host checks with fixes). */
@@ -66,6 +67,7 @@ export function HealthPage({ tab, onTab: setTab, scene }: { tab: HealthTab; onTa
   const failed = !loading && alerts.isError && !alerts.data;
   const bare = !loading && !failed && fleet.nodes === 0;
 
+  const count = t.n("health.problems", problems) + (critical > 0 ? ` · ${t("hlp.sum.crit", { n: critical })}` : "");
   const sum = loading
     ? t("hl.sum.loading")
     : failed
@@ -76,10 +78,10 @@ export function HealthPage({ tab, onTab: setTab, scene }: { tab: HealthTab; onTa
           ? t("hlp.sum.first")
           : noChecks
             ? problems > 0
-              ? t("hl.sum.edgeActive", { problems: t.n("health.problems", problems) })
+              ? t("hl.sum.edgeActive", { problems: count })
               : t("hl.sum.edgeQuiet")
             : problems > 0
-              ? t("hl.sum.active", { problems: t.n("health.problems", problems) + (critical > 0 ? ` · ${t("hlp.sum.crit", { n: critical })}` : ""), min })
+              ? t("hl.sum.active", { problems: count, min })
               : t("hl.sum.quiet", { min });
 
   // a tab whose own query has not come, has failed, or the state of the whole page (the board's skeleton, error card and "no nodes")

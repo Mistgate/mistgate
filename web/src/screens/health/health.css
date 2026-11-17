@@ -5,213 +5,8 @@
  * board's hairline, --danger-text / --warning-text its crit / warn text, --tone-sky its sky, --ease-spring its spring. Motion: the sweep over the
  * row that is being checked, the pop of its tick, the spinner dots, the open row's wash and the chevron's turn play by themselves (a hand's answer,
  * short); the shake of a card whose fix failed too; reduced motion stills all of it (page.css L193).
- * What a node's Overview shares (the body of an alert: its text, its buttons, its running line, its failure) hangs on .hlx and .hl-alb, not on .hlp,
- * because that page is not under .hlp; the rest hangs on .hlp.
+ * The body of an alert, shared with a node's Overview, is in ./alert-body.css; everything here hangs on .hlp.
  */
-@keyframes hlp-shake {
-  20% {
-    transform: translateX(-4px);
-  }
-  40% {
-    transform: translateX(4px);
-  }
-  60% {
-    transform: translateX(-2px);
-  }
-  80% {
-    transform: translateX(2px);
-  }
-}
-
-/* ---- the body of an alert, wherever it stands (the board's .hl-alb; .hlx carries what .hlp gives the page) ---- */
-/* L5002 */
-.hl-alb {
-  padding: 0 20px 16px;
-}
-.hl-alb.hl-flush {
-  padding: 0;
-}
-.hl-alb > p {
-  max-width: 680px;
-  margin: 0;
-  font-size: 14px;
-  line-height: 24px;
-  color: var(--sec);
-}
-.hl-alb > p + p,
-.hl-alb > p + div,
-.hl-alb > div + p {
-  margin-top: 8px;
-}
-.hl-alb > .hl-v6 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ok);
-  font-size: 13px;
-  line-height: 20px;
-  font-weight: 500;
-}
-.hl-alb > .hl-mu {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--muted);
-}
-/* the raw line of the node's own fact (L5036) */
-.hl-raw {
-  display: inline-block;
-  margin-top: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: var(--step);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--sec);
-  overflow-wrap: anywhere;
-}
-/* L5003-5004, L5109 */
-.hlx .hl-act {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-.hlx .hl-act .btn {
-  text-decoration: none;
-}
-.hlx .hl-sp {
-  flex: 1;
-}
-.hlx .hl-act .an-lk {
-  color: var(--muted);
-}
-.hlx .hl-act .an-lk:hover {
-  color: var(--text);
-}
-.hlx .hl-run {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 16px 0 0 !important;
-  color: var(--tone-sky) !important;
-}
-.hlx .hl-run.ok {
-  color: var(--ok) !important;
-}
-.hlx .hl-ro {
-  margin: 12px 0 0 !important;
-  font-size: 13px !important;
-  color: var(--muted) !important;
-}
-.hlx .hl-fail {
-  margin: 12px 0 0;
-}
-.hlx .an-lk {
-  color: var(--text);
-  text-decoration: underline;
-  text-decoration-color: var(--border);
-  text-underline-offset: 4px;
-  cursor: pointer;
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-}
-.hlx .an-lk:hover {
-  text-decoration-color: currentColor;
-}
-.hlx .i {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.hlx .rw-gl {
-  display: inline-block;
-  flex: none;
-  width: 8px;
-  height: 8px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 1.5px solid var(--muted);
-  background: none;
-  font-size: 0;
-  line-height: 0;
-  font-style: normal;
-}
-.hlx .rw-gl.ok {
-  border-color: var(--ok);
-  background: var(--ok);
-}
-.hlx .rw-gl.bad {
-  width: 10px;
-  height: 10px;
-  border: 0;
-  border-radius: 0;
-  background:
-    linear-gradient(45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%),
-    linear-gradient(-45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%);
-}
-.hlx .rw-gl.busy {
-  border-color: var(--tone-sky);
-  border-inline-end-color: transparent;
-  animation: hlp-spin 1s linear infinite;
-}
-.hlx .rc-pb {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 12px 0 0;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--warning-soft);
-}
-.hlx .rc-pb.bad {
-  background: var(--danger-soft);
-}
-.hlx .rc-pb .rw-gl {
-  margin-top: 4px;
-}
-.hlx .rc-pb > div {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.hlx .rc-pb b {
-  font-size: 14px;
-  font-weight: 500;
-}
-.hlx .rc-pb span {
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--sec);
-  overflow-wrap: anywhere;
-}
-.hlx .rc-pb .btn {
-  flex: none;
-  align-self: center;
-}
-/* a card whose fix failed shakes once (the board's dr-shake, .4s) */
-.hl-shake {
-  animation: hlp-shake 0.4s var(--e);
-}
-@media (max-width: 720px) {
-  .hl-alb {
-    padding: 0 16px 16px;
-  }
-  .hl-alb.hl-flush {
-    padding: 0;
-  }
-}
-
 /* ---- the open alerts: one line each that opens into its body (L4994-5002, L5133-5136, L5172) ---- */
 .hlp .hl-als {
   border-top: 1px solid var(--border);
@@ -441,12 +236,10 @@
 }
 .hlp .hl-hs {
   list-style: none;
-  margin: 0 0 8px 52px;
+  margin: 0 0 8px;
+  margin-inline-start: 52px;
   padding: 0 12px;
   border-inline-start: 1px solid var(--border);
-}
-[dir="rtl"] .hlp .hl-hs {
-  margin: 0 52px 8px 0;
 }
 .hlp .hl-hs > li {
   display: flex;
@@ -512,7 +305,7 @@
 .hlp .hl-nodes b {
   font-weight: 500;
 }
-.hlp .hl-nodes span {
+.hlp .hl-nodes span:not(:first-child) {
   margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
@@ -851,9 +644,6 @@
 .hlp .hl-find.stale {
   opacity: 0.6;
 }
-.hlp .hl-find > .hl-alb {
-  padding-bottom: 12px;
-}
 .hlp .hl-acc {
   margin: 12px 0 0;
   font-size: 13px;
@@ -937,34 +727,6 @@
   padding-top: 4px;
 }
 
-/* ---- a window of a fix, a close of several (the board's .hl-dlg): in a portal, so not under .hlp ---- */
-.hl-dlgb {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.hl-dlgb p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 24px;
-  color: var(--sec);
-  text-wrap: pretty;
-}
-.hl-dlgb .hl-dl-more {
-  font-size: 13px;
-}
-.hl-dlgb .hl-dl-det {
-  margin: 4px 0 0;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--step);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
 /* ---- the states before the tabs (the order of the board's: the skeleton, the error and the quiet card keep their place under the tabs) ---- */
 .hlp [role="tabpanel"] > .hl-skl {
   margin-top: 0;
@@ -979,6 +741,10 @@
 .hlp .sb-tab > .hl-calm,
 .hlp .col > .hl-calm {
   margin-bottom: 16px;
+}
+/* the quiet card brings its own gap under it (the board's), so the card after it does not add another */
+.hlp .hl-calm + .card {
+  margin-top: 0 !important;
 }
 
 /* ---- narrow: ≤720 the card's paddings step in (L5075-5077); ≤600 the lines fold (L5114-5147, L5172, L5192-5193) ---- */

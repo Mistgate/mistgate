@@ -13,7 +13,7 @@ import { quoteNames } from "@/lib/doctor-detail";
 import { fixErrorText, fixLabel, lookup, restartConsequence, useCan, type DoctorItem, type FixRequest } from "@/lib/health";
 import { plain, type Plain } from "@/lib/plain";
 import type { FixPlan } from "@/gen/mistgate/admin/v1/health_pb";
-import "./health.css";
+import "./alert-body.css";
 
 // The two-step fix (health.proto ApplyFix): ask the node what it would do (dry run), show that, and only a click on
 // "Apply" performs it with the one-time plan id. While it runs the row says "Fixing…", afterwards "Fixed".

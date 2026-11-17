@@ -15,7 +15,7 @@ import { useFmt } from "@/lib/format";
 import { NETS_INLINE, alertNetworks, muteChoices, networkSources, networksByOperator, restartConsequence, sourceName, useCan, type Alert } from "@/lib/health";
 import { plain } from "@/lib/plain";
 import { lossPct, regionWord, senderLabel } from "@/lib/port-check";
-import "./health.css";
+import "./alert-body.css";
 
 // What an alert's body and its buttons are made of, apart from the rows (alerts.tsx): the hooks that mute and close, the menu of "Mute", the tables of
 // the ports that lose packets and of the two senders of a lossy path, the networks of a country alert, the windows of a restart and of the IPv6 switch.
