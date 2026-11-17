@@ -270,7 +270,7 @@ describe("the add-node window", () => {
       checkSSH.mockResolvedValue({ preflight: { ...preflight, nftables } });
       await toLogin();
       await toggle(hostKeyBox());
-      await type(document.querySelector<HTMLInputElement>('input[type="password"]'), "check-only-secret");
+      await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "check-only-secret");
       await click(button("Continue"));
       await settle();
       expect(text()).toContain("Server checks passed");
