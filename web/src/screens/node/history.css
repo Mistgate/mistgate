@@ -1,0 +1,600 @@
+/*
+ * The History tab of the node page (screens/node/history.tsx, events.tsx, journal.tsx, logs.tsx): the bar with the view and its filters, the
+ * week summary with the strip of 84 two-hour cells, the timeline of events by day, the journal, the log. The values are pn.css's last
+ * rules of each selector (.nh*, .fz-ch, .fz-gs); the tokens are the project's; the board's @container is the window's width here.
+ */
+
+.nh {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.nh-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.nh-bar > [role="radiogroup"] {
+  flex: none;
+}
+.nh-bar .nh-chips {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nh-bar .nh-chips > * {
+  flex: none;
+}
+.nh-bar .nh-chips .mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--muted);
+}
+.nh-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin-inline-start: auto;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s var(--e),
+    color 0.15s var(--e),
+    background-color 0.15s var(--e);
+}
+.nh-tail:hover {
+  background: var(--step);
+}
+.nh-tail .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.nh-tail.on {
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}
+.nh-tail.on .dot {
+  background: var(--accent-mark);
+  animation: mg-ui-blink 1.2s var(--e) infinite;
+}
+
+/* the week at a glance */
+.nh-sum {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 24px 40px;
+  align-items: center;
+  padding: 20px 24px;
+}
+.nh-s1 {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.nh-s1 b {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  line-height: 28px;
+  white-space: nowrap;
+}
+.nh-s1 b.warn {
+  color: var(--warning);
+}
+.nh-s1 b.ok {
+  color: var(--accent-text);
+}
+.nh-s1 div > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.nh-up {
+  display: grid;
+  grid-template-columns: repeat(84, 1fr);
+  gap: 2px;
+  height: 28px;
+}
+.nh-up i {
+  position: relative;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent-mark) 55%, transparent);
+  transition:
+    transform 0.15s var(--e),
+    background-color 0.15s var(--e);
+}
+.nh-up i:nth-child(12n + 1) {
+  margin-inline-start: 3px;
+}
+.nh-up i.warn {
+  background: var(--nd-warn, var(--warning));
+}
+.nh-up i.crit {
+  background: var(--danger);
+}
+.nh-up i.none {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.nh-up i:hover {
+  transform: scaleY(1.25);
+  background: var(--text);
+  z-index: 4;
+}
+.nh-up i:hover::after {
+  content: attr(data-t);
+  position: absolute;
+  inset-inline-start: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) scaleY(0.8);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font: 400 11px/16px var(--font-sans);
+  color: var(--text);
+  white-space: nowrap;
+}
+.nh-up i:nth-child(n + 70):hover::after {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+  transform: scaleY(0.8);
+}
+.nh-up i:nth-child(-n + 14):hover::after {
+  inset-inline-start: 0;
+  transform: scaleY(0.8);
+}
+.nh-ux {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* the timeline: a heading of the day, a line for each thing that happened, its details under it */
+.nh-tl {
+  padding: 0;
+}
+.nh-day {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 16px 24px 8px;
+  border-top: 1px solid var(--border);
+}
+.nh-tl > .nh-day:first-child {
+  border-top: 0;
+}
+.nh-day b {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sec);
+}
+.nh-day span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.nh-e.open {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.nh-r {
+  display: grid;
+  grid-template-columns: 44px 32px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 24px;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 0.15s var(--e);
+}
+.nh-r:hover {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.nh-e.open .nh-r,
+.nh-e.open .nh-r:hover {
+  background: none;
+}
+.nh-r .t,
+.nh-a .t {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+}
+.nh-r .g {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--step);
+  color: var(--sec);
+}
+.nh-r .g.crit {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.nh-r .g.warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.nh-r .g.ok {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+.nh-r b,
+.nh-a b {
+  display: block;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nh-r div > span,
+.nh-a div > span {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nh-r .who {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.nh-r .cv {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transition:
+    transform 0.25s var(--e),
+    color 0.25s var(--e);
+}
+.nh-e.open .nh-r .cv {
+  transform: rotate(180deg);
+  color: var(--text);
+}
+/* the opened line is one piece with its row: the details start under the title */
+.nh-d {
+  margin: 0;
+  padding-block: 4px 16px;
+  padding-inline: 124px 24px;
+  animation: mg-up 0.25s var(--e) both;
+}
+.nh-d + .nh-d {
+  padding-top: 0;
+  border-top: 0;
+}
+.nh-d dl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 40px;
+  margin: 0;
+}
+.nh-d dl > div {
+  flex: none;
+}
+.nh-d dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.nh-d dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+}
+.nh-d dd.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.nh-d .kv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.nh-d .kv span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--step);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 12px;
+}
+.nh-d .kv span i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+.nh-d p {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.nh-foot {
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* the journal: a line for each kind of warning or error in an hour */
+.nh-a {
+  display: grid;
+  grid-template-columns: 96px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 6px 24px;
+  border-top: 1px solid var(--border);
+}
+.nh-a:first-child {
+  border-top: 0;
+}
+.nh-a .av {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.nh-a .av.crit {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.nh-a b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.nh-a div > span {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.nh-a .tail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* the log */
+.nh-log {
+  overflow: hidden;
+}
+.nh-lh {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-block: 12px;
+  padding-inline: 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.nh-lh > .mono {
+  margin-inline-end: auto;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--sec);
+}
+.nh-lh > .mono small {
+  margin-inline-start: 10px;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+}
+.nh-lb {
+  padding: 12px 0;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 22px;
+  max-height: 520px;
+  min-height: 160px;
+  overflow: auto;
+  background: color-mix(in srgb, #000 22%, var(--surface));
+}
+:root[data-theme="light"] .nh-lb {
+  background: #f1f1ee;
+}
+.nh-lb > div {
+  display: grid;
+  grid-template-columns: 72px 44px 72px minmax(0, 1fr);
+  gap: 12px;
+  padding: 0 24px;
+  white-space: pre;
+  color: var(--sec);
+}
+.nh-lb > div:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+.nh-lb .t,
+.nh-lb .lv,
+.nh-lb .src {
+  color: var(--muted);
+}
+.nh-lb .m {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nh-lb .warn .lv,
+.nh-lb .warn .m {
+  color: var(--warning);
+}
+.nh-lb .crit .lv,
+.nh-lb .crit .m {
+  color: var(--danger);
+}
+.nh-lb .fresh {
+  animation: nh-in 0.5s var(--e) both;
+}
+@keyframes nh-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    background: color-mix(in srgb, var(--accent-mark) 14%, transparent);
+  }
+}
+.nh-lb .nh-cur {
+  display: block;
+  padding: 0 24px;
+}
+.nh-lb .nh-cur i {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  vertical-align: -2px;
+  background: var(--accent-mark);
+  animation: mg-ui-blink 1s steps(2, jump-none) infinite;
+}
+.nh-lb .none {
+  display: block;
+  padding: 0 24px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nh-tail.on .dot,
+  .nh-d,
+  .nh-lb .fresh,
+  .nh-lb .nh-cur i {
+    animation: none;
+  }
+  .nh-up i,
+  .nh-r .cv {
+    transition: none;
+  }
+}
+
+@media (width <= 1200px) {
+  .nh-sum {
+    grid-template-columns: 1fr;
+  }
+}
+@media (width <= 720px) {
+  .nh-bar .nh-chips {
+    flex: 1 1 100%;
+  }
+  .nh-sum {
+    padding: 16px;
+  }
+  .nh-s1 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .nh-up {
+    grid-template-columns: repeat(42, 1fr);
+    height: auto;
+    grid-auto-rows: 14px;
+  }
+  .nh-up i:nth-child(12n + 1) {
+    margin-inline-start: 0;
+  }
+  .nh-ux {
+    display: none;
+  }
+  .nh-day {
+    padding: 14px 16px 6px;
+  }
+  .nh-r {
+    grid-template-columns: 40px 28px minmax(0, 1fr) 16px;
+    gap: 10px;
+    padding: 6px 16px;
+  }
+  .nh-r .who {
+    display: none;
+  }
+  .nh-r .g {
+    width: 28px;
+    height: 28px;
+  }
+  .nh-r b,
+  .nh-r div > span {
+    white-space: normal;
+  }
+  .nh-d {
+    padding-block: 0 14px;
+    padding-inline: 104px 16px;
+  }
+  .nh-a {
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding: 10px 16px;
+  }
+  .nh-a .t {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .nh-a .av {
+    grid-row: 1 / 4;
+  }
+  .nh-a div {
+    grid-column: 2;
+  }
+  .nh-a .tail {
+    grid-column: 2;
+    align-items: flex-start;
+  }
+  .nh-lh {
+    padding: 12px 16px;
+  }
+  .nh-lb > div {
+    grid-template-columns: 60px minmax(0, 1fr);
+    padding: 0 16px;
+  }
+  .nh-lb .lv,
+  .nh-lb .src {
+    display: none;
+  }
+  .nh-tail {
+    margin-inline-start: 0;
+  }
+  .nh-foot {
+    padding-inline: 16px;
+  }
+}

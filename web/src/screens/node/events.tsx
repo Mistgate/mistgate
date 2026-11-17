@@ -1,61 +1,65 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { SectionLabel } from "@/components/ui/bits";
+import { useMemo, useState, type ReactNode } from "react";
+import { Scramble } from "@/components/fx/scramble-react";
 import { Button } from "@/components/ui/button";
-import { IconChip, type IconName, type Tone } from "@/components/ui/icons";
+import { FilterChips } from "@/components/ui/chips";
+import type { IconName } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/notice";
 import { CursorPagination } from "@/components/ui/pagination";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { Segmented } from "@/components/ui/segmented";
-import { StatusPill } from "@/components/ui/status";
+import type { StatusKind } from "@/components/ui/status";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { useT } from "@/i18n";
 import { fleet } from "@/lib/api";
+import { cx } from "@/lib/cx";
 import { useCursorPaging } from "@/lib/paging";
 import { dayLabel, useFmt, type Fmt } from "@/lib/format";
 import { plain } from "@/lib/plain";
 import { pollMs } from "@/lib/queries";
-import { byDay, buildLines, eventFilters, lineRows, type EventFilter, type EventLine, type NodeEvent } from "./event-model";
+import { byDay, buildLines, eventFilters, lineRows, weekSummary, type EventFilter, type EventLine, type NodeEvent } from "./event-model";
 import { lineText, profileLabel, rowDetail } from "./event-text";
+import "./history.css";
 
 /**
- * The glyph that says what kind of thing a line is, and the tone of its family: the node and its updates sky,
- * profiles and engines sage, certificates lavender, the host's clock and facts sand. The status pill next to it says
- * how it went; the tone never does.
+ * The glyph that says what kind of thing a line is. The box around it says how it went (red a failure, amber a warning or a blink,
+ * grey the rest); the glyph is the family: the node and its updates, profiles and engines, certificates, the host's clock and facts.
  */
-function lineMark(l: EventLine): { icon: IconName; tone: Tone } {
+function lineMark(l: EventLine): IconName {
   switch (l.kind) {
     case "agent_started":
-      return { icon: "server", tone: "sky" };
+      return "server";
     case "update":
     case "rollback":
-      return { icon: "upload", tone: "sky" };
+      return "upload";
     case "profile_added":
-      return { icon: "plus", tone: "sage" };
+      return "plus";
     case "profile_removed":
-      return { icon: "trash", tone: "sage" };
+      return "trash";
     case "profiles_restarted":
-      return { icon: "refresh", tone: "sage" };
+      return "refresh";
     case "profiles_started":
-      return { icon: l.head.code === "engine_restarted" ? "refresh" : "check", tone: "sage" };
+      return l.head.code === "engine_restarted" ? "refresh" : "check";
   }
   const c = l.head.code;
-  if (c.startsWith("update_")) return { icon: "upload", tone: "sky" };
-  if (c === "engine_failed" || c === "awg_backend_unavailable" || c === "apply_rejected") return { icon: "x", tone: "sage" };
-  if (c === "cert_renewed") return { icon: "lock", tone: "lavender" };
-  if (c.startsWith("node_") || c === "host_rebooted" || c === "stats_stale" || c === "clock_skew") return { icon: "clock", tone: "sand" };
-  return { icon: "info", tone: "sand" };
+  if (c.startsWith("update_")) return "upload";
+  if (c === "engine_failed" || c === "awg_backend_unavailable" || c === "apply_rejected") return "x";
+  if (c === "cert_renewed") return "lock";
+  if (c.startsWith("node_") || c === "host_rebooted" || c === "stats_stale" || c === "clock_skew") return "clock";
+  return "info";
 }
 
+const tone = (s: StatusKind) => (s === "bad" ? "crit" : s === "warn" || s === "blip" ? "warn" : "");
 const exact = (fmt: Fmt, unix: number) => new Date(unix * 1000).toLocaleString(fmt.locale, { dateStyle: "short", timeStyle: "medium" });
 
 const pageSizes = [25, 50, 100] as const;
 
 /**
  * Everything the node reported and the panel concluded about it, one line per thing, newest first, one page of the
- * server's log at a time (Newer / Older; where the page starts is in the URL).
+ * server's log at a time (Newer / Older; where the page starts is in the URL). Above it the week at a glance, read from the
+ * node's own events. `lead` is the bar's first part (the view switch), `createdUnix` and `down` say how much of the week the node had.
  */
-export function EventsTab({ nodeId }: { nodeId: string }) {
+export function EventsTab({ nodeId, lead, createdUnix = 0, down = false }: { nodeId: string; lead?: ReactNode; createdUnix?: number; down?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const [filter, setFilter] = useState<EventFilter>("all");
@@ -103,33 +107,39 @@ export function EventsTab({ nodeId }: { nodeId: string }) {
       return next;
     });
 
-  const filterBar = (
-    <Segmented
-      aria-label={t("node.ev.filter")}
-      value={filter}
-      onValueChange={(f) => {
-        setFilter(f);
-        paging.reset();
-      }}
-      variant="flat"
-      options={eventFilters.map((f) => ({ value: f, label: t(`node.ev.filter.${f}`) }))}
-      className="w-fit max-w-full flex-wrap"
-    />
+  const bar = (
+    <div className="nh-bar">
+      {lead}
+      <FilterChips
+        aria-label={t("node.ev.filter")}
+        value={filter}
+        onValueChange={(f) => {
+          setFilter(f);
+          paging.reset();
+        }}
+        options={eventFilters.map((f) => ({ value: f, label: t(`node.ev.filter.${f}`) }))}
+        className="nh-chips flex-nowrap"
+      />
+    </div>
   );
 
   if (events.length === 0 && filter === "all" && !paging.hasNewer) {
     return (
-      <div className="rounded-card-lg border border-dashed border-line">
-        <EmptyState title={t("node.events.none")}>{t("node.events.noneBody")}</EmptyState>
+      <div className="nh">
+        {bar}
+        <div className="rounded-card border border-dashed border-line">
+          <EmptyState title={t("node.events.none")}>{t("node.events.noneBody")}</EmptyState>
+        </div>
       </div>
     );
   }
   return (
-    <div className="flex flex-col gap-3">
-      {filterBar}
-      {days.length === 0 ? (
-        <div className="rounded-card-lg border border-dashed border-line">
-          {older !== undefined ? (
+    <div className="nh">
+      {bar}
+      <WeekCard nodeId={nodeId} createdUnix={createdUnix} down={down} />
+      <section className="nh-tl rounded-card border border-line bg-surface" aria-label={t("node.tab.events")}>
+        {days.length === 0 ? (
+          older !== undefined ? (
             // nothing of this kind on this page, but there is more: say so, never "none at all"
             <EmptyState
               title={t("node.ev.noneFilteredMore", { n: events.length })}
@@ -141,72 +151,108 @@ export function EventsTab({ nodeId }: { nodeId: string }) {
             />
           ) : (
             <EmptyState title={t("node.ev.noneFiltered")}>{t("node.ev.noneFilteredBody")}</EmptyState>
-          )}
-        </div>
-      ) : (
-        days.map((d) => (
-          <section key={d.day} aria-label={dayLabel(t, fmt, d.unix)} className="flex flex-col gap-1.5">
-            <SectionLabel as="h3" icon="calendar" tone="sand" className="px-1">
-              {dayLabel(t, fmt, d.unix)}
-            </SectionLabel>
-            <div className="rounded-card-lg border border-line bg-surface px-4 py-1.5">
-              {d.lines.map((l, i) => (
-                <Line key={l.id} line={l} first={i === 0} open={open.has(l.id)} onToggle={() => toggle(l.id)} />
+          )
+        ) : (
+          days.map((d) => (
+            <div key={d.day} role="group" aria-label={dayLabel(t, fmt, d.unix)}>
+              <div className="nh-day">
+                <b>{dayLabel(t, fmt, d.unix)}</b>
+                <span>{t.n("np.hi.events", d.lines.length)}</span>
+              </div>
+              {d.lines.map((l) => (
+                <Line key={l.id} line={l} open={open.has(l.id)} onToggle={() => toggle(l.id)} />
               ))}
             </div>
-          </section>
-        ))
-      )}
-      {(older !== undefined || paging.hasNewer) && <div className="rounded-card-lg border border-line bg-surface">{pager}</div>}
+          ))
+        )}
+        <div className="nh-foot">
+          <span>{t("np.hi.keep")}</span>
+        </div>
+        {(older !== undefined || paging.hasNewer) && <div className="border-t border-line">{pager}</div>}
+      </section>
     </div>
   );
 }
 
+/** The week: how many failures, how long the node was away, how much of the time it was on the line, how much happened; and the cells of it. */
+function WeekCard({ nodeId, createdUnix, down }: { nodeId: string; createdUnix: number; down: boolean }) {
+  const t = useT();
+  const fmt = useFmt();
+  // the agent's family holds the node's own up and down; the newest 200 cover a week unless the node is very chatty
+  const q = useQuery({
+    queryKey: ["node-events-week", nodeId],
+    queryFn: async ({ signal }) => plain(await fleet.listEvents({ nodeId, limit: 200, family: "agent" }, { signal })),
+    refetchInterval: pollMs * 6,
+  });
+  // the week is read as of the moment the list came in
+  const now = Math.floor(q.dataUpdatedAt / 1000);
+  const w = useMemo(() => (q.data ? weekSummary(q.data.events, now - (now % 60), createdUnix, down) : null), [q.data, now, createdUnix, down]);
+  if (!w) return null;
+  const capped = (q.data?.events.length ?? 0) >= 200 && !!q.data?.hasMore;
+  const day = (i: number) => {
+    const c = w.cells[i * 12]!;
+    return dayLabel(t, fmt, c.fromUnix + 3600);
+  };
+  const cellText = (kind: string, from: number) => `${dayLabel(t, fmt, from + 60)}, ${fmt.clock(from)} · ${t(`np.hi.cell.${kind}` as "np.hi.cell.ok")}`;
+  const stats: { v: string; l: string; c: string }[] = [
+    { v: String(w.failures), l: t.n("np.hi.stat.failures", w.failures), c: w.failures > 0 ? "warn" : "" },
+    { v: w.downS > 0 ? fmt.duration(w.downS) : t("np.hi.stat.noDown"), l: t("np.hi.stat.down"), c: "" },
+    { v: w.uptime === null ? "—" : `${fmt.num(Math.floor(w.uptime * 100) / 100, 2)}%`, l: t("np.hi.stat.up"), c: w.uptime !== null && w.uptime >= 99 ? "ok" : w.uptime !== null ? "warn" : "" },
+    { v: `${w.events}${capped ? "+" : ""}`, l: t.n("np.hi.stat.events", w.events), c: "" },
+  ];
+  return (
+    <section className="nh-sum relative rounded-card border border-line bg-surface" aria-label={t("np.hi.week")}>
+      <div className="nh-s1">
+        {stats.map((x) => (
+          <div key={x.l}>
+            <b className={x.c}>
+              <Scramble value={x.v} once />
+            </b>
+            <span>{x.l}</span>
+          </div>
+        ))}
+      </div>
+      <div>
+        <div className="nh-up" aria-hidden>
+          {w.cells.map((c) => (
+            <i key={c.fromUnix} className={c.kind === "ok" ? undefined : c.kind} data-t={cellText(c.kind, c.fromUnix)} />
+          ))}
+        </div>
+        <div className="nh-ux" aria-hidden>
+          {Array.from({ length: 7 }, (_, i) => (
+            <span key={i}>{day(i)}</span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /**
- * One line. On a phone the time and the glyph go on a line of their own above the title and the family chip is left
- * out, so the title has the whole width and wraps between words; "Details" becomes a text link under it.
+ * One line (the board's .nh-e): the time, the box with the glyph, the title and what it says, who did it, a chevron; opened, the rows behind
+ * it with their exact time, the source and every parameter. On a phone the source is dropped and the title wraps.
  */
-function Line({ line, first, open, onToggle }: { line: EventLine; first: boolean; open: boolean; onToggle: () => void }) {
+function Line({ line, open, onToggle }: { line: EventLine; open: boolean; onToggle: () => void }) {
   const t = useT();
   const fmt = useFmt();
   const { title, sub } = lineText(t, line, fmt.stamp);
-  const rows = lineRows(line);
-  const mark = lineMark(line);
-  const toggle = (cls: string) => (
-    <button type="button" onClick={onToggle} aria-expanded={open} className={cls}>
-      {open ? t("node.ev.hide") : t("node.ev.details")}
-    </button>
-  );
+  const e = line.head;
+  const who = t(`node.ev.src.${e.source === "admin" || e.source === "panel" ? e.source : "agent"}`);
   return (
-    <div className={`flex flex-col gap-2 py-3 ${first ? "" : "border-t border-line"}`}>
-      <div className="flex items-start gap-3">
-        <span className="w-11 flex-none pt-[3px] font-mono text-[11px] text-muted max-sm:hidden">{fmt.clock(line.timeUnix)}</span>
-        <span className="flex-none max-sm:hidden">
-          <StatusPill kind={line.status} glyphOnly />
+    <div className={cx("nh-e", open && "open")}>
+      <button type="button" className="nh-r" aria-expanded={open} aria-label={`${fmt.clock(line.timeUnix)} ${title}`} onClick={onToggle}>
+        <span className="t">{fmt.clock(line.timeUnix)}</span>
+        <span className={cx("g", tone(line.status))} aria-hidden>
+          <Icon name={lineMark(line)} size={16} />
         </span>
-        {/* the chip's own display rule outranks the utilities, so the wrapper hides it */}
-        <span className="flex flex-none max-sm:hidden">
-          <IconChip icon={mark.icon} tone={mark.tone} size={22} />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-          <span className="flex items-center gap-2 font-mono text-[11px] text-muted sm:hidden">
-            {fmt.clock(line.timeUnix)}
-            <StatusPill kind={line.status} glyphOnly />
-          </span>
-          <span className="text-[13px] font-bold text-pretty first-letter:uppercase">{title}</span>
-          {/* an agent's error can be one long word: only that may break anywhere */}
-          {sub && <span className="text-xs break-words text-pretty text-muted">{sub}</span>}
-          {toggle("w-fit pt-1 text-[11px] font-bold text-accent-text sm:hidden")}
+        <div className="min-w-0">
+          <b className="first-letter:uppercase">{title}</b>
+          {sub && <span>{sub}</span>}
         </div>
-        {toggle("flex-none rounded-ctl px-2 py-0.5 text-[11px] font-bold text-muted hover:text-fg max-sm:hidden")}
-      </div>
-      {open && (
-        <ul className="flex flex-col gap-1.5 rounded-field bg-surface-2 px-3 py-2.5 sm:ms-14">
-          {rows.map((e) => (
-            <RowDetail key={e.id} e={e} />
-          ))}
-        </ul>
-      )}
+        <span className="who">{who}</span>
+        <Icon name="chevronDown" size={16} aria-hidden className="cv" />
+      </button>
+      {open && lineRows(line).map((r) => <RowDetail key={r.id} e={r} />)}
     </div>
   );
 }
@@ -215,14 +261,39 @@ function RowDetail({ e }: { e: NodeEvent }) {
   const t = useT();
   const fmt = useFmt();
   const profile = e.profileName || e.params.profile || e.inboundId ? profileLabel(t, e) : "";
-  const params = rowDetail(e);
+  const params = Object.entries(e.params);
   return (
-    <li className="flex flex-col gap-0.5 font-mono text-[11px] break-words">
-      <span>
-        <b>{e.code}</b> <span className="text-muted">· {exact(fmt, e.timeUnix)} · {t(`node.ev.src.${e.source === "admin" || e.source === "panel" ? e.source : "agent"}`)}</span>
-      </span>
-      {profile && <span className="text-muted">{profile}</span>}
-      {params && <span className="text-muted">{params}</span>}
-    </li>
+    <div className="nh-d">
+      <dl>
+        <div>
+          <dt>{t("np.hi.d.event")}</dt>
+          <dd className="mono">{e.code}</dd>
+        </div>
+        <div>
+          <dt>{t("np.hi.d.when")}</dt>
+          <dd className="mono">{exact(fmt, e.timeUnix)}</dd>
+        </div>
+        <div>
+          <dt>{t("np.hi.d.source")}</dt>
+          <dd>{t(`node.ev.src.${e.source === "admin" || e.source === "panel" ? e.source : "agent"}`)}</dd>
+        </div>
+        {profile && (
+          <div>
+            <dt>{t("np.hi.d.profile")}</dt>
+            <dd>{profile}</dd>
+          </div>
+        )}
+      </dl>
+      {params.length > 0 && (
+        <div className="kv" title={rowDetail(e)}>
+          {params.map(([k, v]) => (
+            <span key={k}>
+              <i>{k}</i>
+              {v}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

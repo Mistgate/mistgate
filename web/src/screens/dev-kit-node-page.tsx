@@ -24,7 +24,9 @@ import { nodeAlertsQuery } from "./node/overview-parts";
 import { OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { OsUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { WarpSource } from "@/gen/mistgate/admin/v1/common_pb";
-import { warp as warpApi } from "@/lib/api";
+import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
+import { LogLevel } from "@/gen/mistgate/admin/v1/node_pb";
+import { fleet as fleetApi, nodes as nodesApi, warp as warpApi } from "@/lib/api";
 import { warpQuery } from "./node/warp-model";
 import { nodeDnsOptionsQuery } from "./node/dns-options";
 import { dnsPresetsQuery } from "./subscriptions/queries";
@@ -153,6 +155,56 @@ export type OsKind = "ok" | "upd" | "boot";
 const osOf: Record<NState, OsKind> = { calm: "ok", alerts: "upd", many: "boot", high: "ok", limit: "boot", down: "ok", new: "ok", retired: "ok", viewer: "upd", edge: "ok", via: "ok", entry: "ok" };
 
 /** The node page's data (what GetNode says) and the query cache around it, for a state. */
+/**
+ * The History tab's calls, answered here: the node's events (the board's list: an outage, a blip, a certificate, an update, a restart),
+ * the journal of warnings, and an agent log that grows a line every second or so. The state decides what the node has been through.
+ */
+function fakeHistory(state: NState) {
+  const fresh = state === "new";
+  const down = state === "down";
+  const e = (id: number, ago: number, code: string, params: Record<string, string> = {}, over: Record<string, unknown> = {}) => ({
+    id: BigInt(id), timeUnix: BigInt(NOW - ago), severity: EventSeverity.INFO, code, params, nodeId: "nod_de1", nodeName: "de1", userId: "", userName: "", inboundId: "", profileName: "", protocol: "", source: "agent", ...over,
+  });
+  const warn = { severity: EventSeverity.WARNING };
+  const events = fresh
+    ? [e(1, 600, "node_enrolled", {}, { source: "panel" })]
+    : [
+        ...(down ? [e(30, 14 * 60, "node_down", { minutes: "14" }, { ...warn, source: "panel" })] : []),
+        e(20, 7 * H, "config_applied", { revision: "418" }),
+        e(19, 9 * H + 600, "node_down", { minutes: "2" }, { ...warn, source: "panel" }),
+        e(18, 9 * H + 480, "node_recovered", {}, { source: "panel" }),
+        e(17, 10 * H, "node_blip", {}, { ...warn, source: "panel" }),
+        e(16, 11 * H, "cert_renewed", { domain: "de1.example.com" }),
+        e(15, 26 * H, "agent_started", { version: "0.1.71", prev_version: "0.1.70", reason: "update" }),
+        e(14, 30 * H, "engine_restarted", { protocol: "hysteria2", reason: "restart_command" }, { source: "admin", profileName: "Hysteria2 · 443", inboundId: "inb_1", protocol: "hysteria2" }),
+        e(13, 32 * H, "profile_added", { protocol: "awg" }, { source: "admin", profileName: "AmneziaWG 3.1", inboundId: "inb_3", protocol: "awg" }),
+        e(12, 6 * D, "node_blip", {}, { ...warn, source: "panel" }),
+      ];
+  (fleetApi as unknown as Record<string, unknown>).listEvents = async (req: { family?: string; minSeverity?: number; limit?: number }) => ({
+    events: events.filter((x) => (!req.minSeverity || x.severity >= req.minSeverity) && (req.family !== "agent" || !x.code.startsWith("engine_") && !x.code.startsWith("profile_"))).slice(0, req.limit ?? 50),
+    hasMore: false,
+  });
+  const entry = (ago: number, level: number, source: string, message: string, count: number, attrs: Record<string, string> = {}) => ({ nodeId: "nod_de1", hourStartUnix: BigInt(NOW - (NOW % H) - ago), lastUnix: BigInt(NOW - ago), level, source, message, inboundId: "", profileName: "", count, attrs });
+  (nodesApi as unknown as Record<string, unknown>).getNodeJournal = async () => ({
+    entries: fresh ? [] : [entry(1200, EventSeverity.ERROR, "xray", "failed to dial upstream: i/o timeout", 6, { code: "dial_timeout" }), entry(3 * H, EventSeverity.WARNING, "agent", "journald size above the limit", 1, { journal_mb: "3891", cap_mb: "500" }), entry(5 * H, EventSeverity.WARNING, "hysteria", "client rate limited", 14, { user: "bob" })],
+    truncated: false,
+    nodesWithoutJournal: [],
+  });
+  const lines = [
+    [LogLevel.INFO, "agent", "heartbeat sent seq=48211 rtt=31ms"], [LogLevel.INFO, "agent", "probe hysteria2 ok 31ms"], [LogLevel.INFO, "xray", "accepted tcp reality from 203.0.113.50"],
+    [LogLevel.WARNING, "agent", "journald size above limit 3870MB > 500MB"], [LogLevel.INFO, "agent", "probe awg-3.1 ok 34ms"], [LogLevel.ERROR, "agent", "port check tcp/80 refused from panel"],
+    [LogLevel.INFO, "hysteria", "client connected id=alice addr=203.0.113.50"], [LogLevel.WARNING, "hysteria", "client rate limited id=bob"], [LogLevel.INFO, "agent", "stats pushed online=3 rx=64Mbit tx=67Mbit"],
+  ] as const;
+  const line = (i: number, ago: number) => ({ timeUnixMs: BigInt(Date.now() - ago), level: lines[i % lines.length]![0], source: lines[i % lines.length]![1], message: lines[i % lines.length]![2] });
+  (nodesApi as unknown as Record<string, unknown>).streamLogs = async function* (_req: unknown, opts?: { signal?: AbortSignal }) {
+    yield { lines: Array.from({ length: 12 }, (_, i) => line(i, (12 - i) * 3000)), eof: false, error: "" };
+    for (let i = 12; !opts?.signal?.aborted; i++) {
+      await new Promise((r) => setTimeout(r, 1100));
+      yield { lines: [line(i, 0)], eof: false, error: "" };
+    }
+  };
+}
+
 export type WarpKind = "ok" | "pause" | "bad" | "none" | "revoked";
 
 /** The WARP card of the board's states: working, paused, not answering, none connected (the registration then plays on a press), revoked. */
@@ -349,6 +401,7 @@ export function NodePageFrame() {
     const dbg = params.get("dbg");
     const wp = params.get("wp");
     const kind = wp === "ok" || wp === "pause" || wp === "bad" || wp === "none" || wp === "revoked" ? wp : undefined;
+    if (params.get("tab") === "history") fakeHistory(state);
     const made = nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind });
     // no WARP yet: the registration the scene plays takes nine seconds (four steps), then the account is there
     if (kind === "none") {
@@ -424,6 +477,13 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-exit-viewer", state: "viewer", tab: "exit", q: "wp=ok", title: "Exit: a read-only role", w: 1440, h: 1500 },
   { id: "node-exit-1100", state: "calm", tab: "exit", q: "wp=ok", title: "Exit at 1100 wide: one column", w: 1100, h: 1900 },
   { id: "node-exit-phone", state: "calm", tab: "exit", q: "wp=ok", title: "Exit on a phone, 400 wide", w: 400, h: 3000 },
+  { id: "node-history-events", state: "calm", tab: "history", title: "History: the week at a glance and the timeline of events", w: 1440, h: 1200 },
+  { id: "node-history-down", state: "down", tab: "history", title: "History: the node is down, the last cell is red", w: 1440, h: 1200 },
+  { id: "node-history-new", state: "new", tab: "history", title: "History: a node added today, one event", w: 1440, h: 700 },
+  { id: "node-history-journal", state: "calm", tab: "history", q: "view=journal", title: "History: the journal of warnings and errors", w: 1440, h: 800 },
+  { id: "node-history-logs", state: "calm", tab: "history", q: "view=logs", title: "History: the log of the agent, a line comes every second", w: 1440, h: 900 },
+  { id: "node-history-phone", state: "calm", tab: "history", title: "History on a phone, 400 wide", w: 400, h: 2000 },
+  { id: "node-history-logs-phone", state: "calm", tab: "history", q: "view=logs", title: "History: the log on a phone, 400 wide", w: 400, h: 900 },
   { id: "node-overview-1100", state: "alerts", tab: "overview", title: "Overview at 1100 wide: one column", w: 1100, h: 2600 },
   { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
 ];
