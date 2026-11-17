@@ -225,7 +225,7 @@ describe("panel self-update", () => {
     expect(text()).toContain("Version v0.3.0 is available");
   });
 
-  it("shows the same update controls and an About card in Settings → System", async () => {
+  it("shows the build, the latest release and a way to the Updates page, the About card and the time zone in Settings → System", async () => {
     await mount(
       page({
         panel: {
@@ -236,10 +236,13 @@ describe("panel self-update", () => {
       <SystemPage />,
     );
     expect(text()).toContain("About Mistgate");
-    expect(text()).toContain("Panel version");
-    expect(text()).toContain("Build date");
-    expect(button("Update panel")).toBeTruthy();
-    expect(text()).toContain("Node update schedule time zone");
+    expect(text()).toContain("This panel");
+    expect(text()).toContain("Latest release");
+    expect(text()).toContain("v0.3.0");
+    // the update itself is on the Updates page: Settings only points to it
+    expect(button("Update panel")).toBeUndefined();
+    expect(document.querySelector('a[href="/updates"]')?.textContent).toBe("Open updates");
+    expect(text()).toContain("Time zone for new schedules");
     const timezone = document.querySelector<HTMLSelectElement>("select")!;
     expect(timezone.value).toBe("180");
     setUpdateTimezone.mockResolvedValue(true);
@@ -255,7 +258,7 @@ describe("panel self-update", () => {
 });
 
 describe("Settings → System → download sources", () => {
-  const sw = () => document.querySelector<HTMLElement>('[role=switch][aria-label="GitHub"]');
+  const sw = () => document.querySelector<HTMLElement>('[role=switch][aria-label="GitHub as a source"]');
   async function remount(data: unknown) {
     await act(async () => root!.unmount());
     host!.remove();
@@ -265,10 +268,10 @@ describe("Settings → System → download sources", () => {
   it("shows the panel as always first, without a switch, and GitHub on or off as the panel reports", async () => {
     await mount(page(), <SystemPage />);
     expect(text()).toContain("Download sources");
-    expect(text()).toContain("Always first. It cannot be turned off.");
-    expect(text()).toContain("Always on");
-    expect(text()).toContain("Used only if the download from the panel fails.");
-    expect(text()).toContain("GitHub sees the addresses of the nodes that download.");
+    expect(text()).toContain("Always first. It can’t be turned off");
+    expect(text()).toContain("always on");
+    expect(text()).toContain("Needed only if downloading from the panel failed or it’s busy.");
+    expect(text()).toContain("GitHub will see the addresses of nodes that download the agent.");
     expect(text()).toContain("signed with this panel’s key");
     // one switch, for GitHub; the panel row has none
     expect(document.querySelectorAll("[role=switch]")).toHaveLength(1);
@@ -287,18 +290,20 @@ describe("Settings → System → download sources", () => {
     expect(setUpdateDownloadSources).toHaveBeenLastCalledWith({ sources: ["github"] });
   });
 
-  it("gives a non-owner the state in words and no switch", async () => {
+  it("gives a non-owner the switch as it is, held shut", async () => {
     role = Role.READONLY;
     await mount(page(), <SystemPage />);
-    expect(document.querySelector("[role=switch]")).toBeNull();
     expect(text()).toContain("Download sources");
-    expect(document.querySelector("section:has(h2) ul")?.textContent).toContain("On");
+    expect(sw()?.getAttribute("aria-checked")).toBe("true");
+    expect(sw()?.hasAttribute("data-disabled")).toBe(true);
+    await click(sw());
+    expect(setUpdateDownloadSources).not.toHaveBeenCalled();
   });
 
   it("is not drawn on the Cloudflare edition, where the call is not implemented", async () => {
     edition = { edition: "edge", unavailable: ["backups"] };
     await mount(page({ updateDownloadSources: [] }), <SystemPage />);
-    expect(text()).toContain("Download timeout");
+    expect(text()).toContain("Maximum download time");
     expect(text()).not.toContain("Download sources");
     expect(document.querySelector("[role=switch]")).toBeNull();
   });
