@@ -407,7 +407,8 @@ func requestKind(frame *agentv1.ConnectResponse) PendingRequestKind {
 		frame.GetPathTrace() != nil,
 		frame.GetSpeedTest() != nil,
 		frame.GetDebugCapture() != nil,
-		frame.GetSetDecoy() != nil:
+		frame.GetSetDecoy() != nil,
+		frame.GetWarpReach() != nil:
 		return PendingCommand
 	case frame.GetRetire() != nil:
 		return PendingRetire

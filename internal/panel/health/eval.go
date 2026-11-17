@@ -52,6 +52,7 @@ var kindProto = map[string]adminv1.AlertKind{
 	"quota": adminv1.AlertKind_ALERT_KIND_QUOTA, "subscription_shared_suspect": adminv1.AlertKind_ALERT_KIND_SUBSCRIPTION_SHARED_SUSPECT,
 	kUpdateFailed:     adminv1.AlertKind_ALERT_KIND_UPDATE_FAILED,
 	kOsUpdateFailed:   adminv1.AlertKind_ALERT_KIND_OS_UPDATE_FAILED,
+	kWarpReach:        adminv1.AlertKind_ALERT_KIND_WARP_REACH,
 	kAccessEnded:      adminv1.AlertKind_ALERT_KIND_ACCESS_ENDED,
 	kUserConnection:   adminv1.AlertKind_ALERT_KIND_USER_CONNECTION,
 	kUsersImpacted:    adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED,
@@ -132,7 +133,7 @@ func (d *derived) holds(a store.HealthAlert) bool {
 		return false
 	}
 	switch {
-	case a.Kind == kUpdateFailed || a.Kind == kOsUpdateFailed: // a fact about the rollout in the database, not about the node's link
+	case a.Kind == kUpdateFailed || a.Kind == kOsUpdateFailed || a.Kind == kWarpReach: // a fact in the database (a rollout, a stored result), not about the node's link
 		return false
 	case a.Kind == kPortLossy: // latest stored verdict and inbound configuration remain judgeable while offline
 		return false

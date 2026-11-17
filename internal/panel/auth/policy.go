@@ -279,6 +279,8 @@ var procedureLevels = map[string]level{
 	adminv1connect.WarpServiceDeleteWarpProcedure:                   levelOwner, // also needs a step-up
 	adminv1connect.WarpServiceGetWarpRegistrationParamsProcedure:    levelOwner,
 	adminv1connect.WarpServiceUpdateWarpRegistrationParamsProcedure: levelOwner,
+	adminv1connect.WarpServiceGetWarpReachSettingsProcedure:         levelOwner,
+	adminv1connect.WarpServiceUpdateWarpReachSettingsProcedure:      levelOwner,
 
 	// ApiTokenService and ApprovalService: the owner only, in the signed-in UI, never with a
 	// token. Creating or changing a token's bulk permission, revoking a token and approving a change decide what an agent may do, so the handlers

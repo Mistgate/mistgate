@@ -165,6 +165,10 @@ type env struct {
 	secret []string // secrets the test knows besides what the fake issued (private keys)
 	paused bool     // the node confirmed a state with WARP paused (WarpPauseApplied); under mu
 	mu     sync.Mutex
+
+	// WarpReach: what the fake node answers (nil = an error) and the lists it was asked about, in order; under mu.
+	reach      func(nodeID string, domains []string) (string, []store.WarpReachItem, error)
+	reachAsked [][]string
 }
 
 func newEnv(t *testing.T) *env {
@@ -233,6 +237,16 @@ func (f *envFleet) WarpPauseApplied(context.Context, string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.paused
+}
+func (f *envFleet) WarpReach(_ context.Context, nodeID string, domains []string) (string, []store.WarpReachItem, error) {
+	f.mu.Lock()
+	f.reachAsked = append(f.reachAsked, append([]string(nil), domains...))
+	reach := f.reach
+	f.mu.Unlock()
+	if reach == nil {
+		return "", nil, errors.New("no answer")
+	}
+	return reach(nodeID, domains)
 }
 func (f *envFleet) StateChanged() {
 	f.kicks++

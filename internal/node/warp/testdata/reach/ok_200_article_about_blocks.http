@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Server: cloudflare
+Connection: close
+
+<!doctype html>
+<html lang="en"><head><title>How to fix Cloudflare error 1020 Access denied</title></head>
+<body><article><h1>Error 1020: Access denied</h1>
+<p>If you see "Sorry, you have been blocked" or "You are unable to access" a site, the owner used Cloudflare to restrict access.</p>
+<p>The owner of this website has banned your country or region. Cloudflare Ray ID: example. Content not available in your country is a different problem.</p></article></body></html>

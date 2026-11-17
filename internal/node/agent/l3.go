@@ -115,6 +115,8 @@ type WarpManager interface {
 	Run(ctx context.Context)
 	// Cleanup removes everything the manager installed on the host.
 	Cleanup(ctx context.Context) error
+	// Reach fetches the sites through the tunnel and says which show a block page (agent.proto "WARP REACH").
+	Reach(ctx context.Context, domains []string) (warp.ReachReport, error)
 }
 
 // SettingsAware is implemented by an engine whose configuration comes from NodeSettings (awg: the backend). The worker
@@ -205,7 +207,7 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, capUserRateLimit)
 	}
 	if a.cfg.Warp != nil {
-		caps = append(caps, capWarp)
+		caps = append(caps, capWarp, capWarpReach)
 	}
 	if rh, ok := a.host.(hostctl.RelayHost); ok && rh.RelaySupported() {
 		caps = append(caps, plugin.CapRelayForward)

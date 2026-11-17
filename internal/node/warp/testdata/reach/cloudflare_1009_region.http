@@ -1,0 +1,35 @@
+HTTP/1.1 403 Forbidden
+Date: Tue, 17 Nov 2026 12:00:00 GMT
+Content-Type: text/html; charset=UTF-8
+Server: cloudflare
+CF-RAY: 8a1b2c3d4e5f6a7c-AMS
+Connection: close
+
+<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+<title>Access denied | example.com used Cloudflare to restrict access</title>
+<meta charset="UTF-8" />
+<meta name="robots" content="noindex, nofollow" />
+</head>
+<body>
+<div id="cf-wrapper">
+    <div id="cf-error-details" class="p-0">
+        <header class="mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-8">
+            <h1 class="inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight">
+                <span data-translate="error">Error</span>
+                <span>1009</span>
+            </h1>
+            <span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed">Ray ID: 8a1b2c3d4e5f6a7c &bull;</span>
+            <span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed">2026-11-17 12:00:00 UTC</span>
+            <h2 class="text-gray-600 leading-1.3 text-3xl lg:text-2xl font-light">Access denied</h2>
+        </header>
+        <section class="w-240 lg:w-full mx-auto mb-8 lg:px-8">
+            <h2 class="text-3xl leading-tight font-normal mb-4 text-black-dark antialiased" data-translate="what_happened">What happened?</h2>
+            <p>The owner of this website (example.com) has banned the country or region your IP address is in (NL) from accessing this website.</p>
+        </section>
+        <div class="py-8 text-center">Cloudflare Ray ID: <strong>8a1b2c3d4e5f6a7c</strong> &bull; Your IP: 192.0.2.10 &bull; Performance &amp; security by <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing">Cloudflare</a></div>
+    </div>
+</div>
+</body>
+</html>

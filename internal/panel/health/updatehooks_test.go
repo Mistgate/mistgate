@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -97,6 +98,44 @@ func TestScheduledTaskConditionsOpenAlerts(t *testing.T) {
 	}
 	set(failing)
 	want(t, e.active(), "scheduled_task_failing//tsk_1")
+	set()
+	want(t, e.active())
+}
+
+// The WARP module raises WARP_REACH per node and site through the same source: it survives the node being offline (a stored
+// result, not a link fact), carries the words of its Telegram message and the button that opens the WARP card, and closes when
+// the module stops returning it.
+func TestWarpReachConditionOpensAnAlertOnTheNode(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", false) // offline
+	var mu sync.Mutex
+	var conds []ExtCond
+	e.s.AddConditionSource(func(context.Context) []ExtCond {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]ExtCond(nil), conds...)
+	})
+	set := func(c ...ExtCond) {
+		mu.Lock()
+		conds = c
+		mu.Unlock()
+		e.evaluate()
+	}
+	c := ExtCond{Kind: "warp_reach", NodeID: "de1", Subject: "notes.example.com", Severity: sevWarning, Why: "health.alert.warp_reach.why",
+		Params: map[string]string{"domain": "notes.example.com", "colo": "FRA", "http_status": "403", "streak": "2"}}
+	set(c)
+	got := e.active()["warp_reach/de1/notes.example.com"]
+	if got.Kind != "warp_reach" || got.Params["colo"] != "FRA" || got.WhyKey != "health.alert.warp_reach.why" {
+		t.Fatalf("alert = %+v", got)
+	}
+	if msg := alertMsg(got, nil, func(store.HealthAlert) string { return "" }); msg.Kind != adminv1.AlertKind_ALERT_KIND_WARP_REACH ||
+		msg.TitleKey != "health.alert.warp_reach.title" || !slices.Contains(msg.Actions, "open_warp") {
+		t.Fatalf("message = %+v", msg)
+	}
+	set(c) // again: nothing new
+	if len(e.active()) != 1 {
+		t.Fatalf("active %v", e.active())
+	}
 	set()
 	want(t, e.active())
 }

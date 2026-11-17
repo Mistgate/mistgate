@@ -55,6 +55,12 @@ const (
 	// WarpServiceUpdateWarpRegistrationParamsProcedure is the fully-qualified name of the WarpService's
 	// UpdateWarpRegistrationParams RPC.
 	WarpServiceUpdateWarpRegistrationParamsProcedure = "/mistgate.admin.v1.WarpService/UpdateWarpRegistrationParams"
+	// WarpServiceGetWarpReachSettingsProcedure is the fully-qualified name of the WarpService's
+	// GetWarpReachSettings RPC.
+	WarpServiceGetWarpReachSettingsProcedure = "/mistgate.admin.v1.WarpService/GetWarpReachSettings"
+	// WarpServiceUpdateWarpReachSettingsProcedure is the fully-qualified name of the WarpService's
+	// UpdateWarpReachSettings RPC.
+	WarpServiceUpdateWarpReachSettingsProcedure = "/mistgate.admin.v1.WarpService/UpdateWarpReachSettings"
 )
 
 // WarpServiceClient is a client for the mistgate.admin.v1.WarpService service.
@@ -82,6 +88,11 @@ type WarpServiceClient interface {
 	// data, not code).
 	GetWarpRegistrationParams(context.Context, *connect.Request[v1.GetWarpRegistrationParamsRequest]) (*connect.Response[v1.GetWarpRegistrationParamsResponse], error)
 	UpdateWarpRegistrationParams(context.Context, *connect.Request[v1.UpdateWarpRegistrationParamsRequest]) (*connect.Response[v1.UpdateWarpRegistrationParamsResponse], error)
+	// The sites each node's WARP is checked against ("WARP reach": the node fetches them through its tunnel and says which show a
+	// block page, see GetWarpResponse.reach). A built-in short list unless the owner changed it; an empty list switches the check
+	// off. Owner only; a change is audited as warp_reach_settings.
+	GetWarpReachSettings(context.Context, *connect.Request[v1.GetWarpReachSettingsRequest]) (*connect.Response[v1.GetWarpReachSettingsResponse], error)
+	UpdateWarpReachSettings(context.Context, *connect.Request[v1.UpdateWarpReachSettingsRequest]) (*connect.Response[v1.UpdateWarpReachSettingsResponse], error)
 }
 
 // NewWarpServiceClient constructs a client for the mistgate.admin.v1.WarpService service. By
@@ -149,6 +160,18 @@ func NewWarpServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(warpServiceMethods.ByName("UpdateWarpRegistrationParams")),
 			connect.WithClientOptions(opts...),
 		),
+		getWarpReachSettings: connect.NewClient[v1.GetWarpReachSettingsRequest, v1.GetWarpReachSettingsResponse](
+			httpClient,
+			baseURL+WarpServiceGetWarpReachSettingsProcedure,
+			connect.WithSchema(warpServiceMethods.ByName("GetWarpReachSettings")),
+			connect.WithClientOptions(opts...),
+		),
+		updateWarpReachSettings: connect.NewClient[v1.UpdateWarpReachSettingsRequest, v1.UpdateWarpReachSettingsResponse](
+			httpClient,
+			baseURL+WarpServiceUpdateWarpReachSettingsProcedure,
+			connect.WithSchema(warpServiceMethods.ByName("UpdateWarpReachSettings")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -163,6 +186,8 @@ type warpServiceClient struct {
 	deleteWarp                   *connect.Client[v1.DeleteWarpRequest, v1.DeleteWarpResponse]
 	getWarpRegistrationParams    *connect.Client[v1.GetWarpRegistrationParamsRequest, v1.GetWarpRegistrationParamsResponse]
 	updateWarpRegistrationParams *connect.Client[v1.UpdateWarpRegistrationParamsRequest, v1.UpdateWarpRegistrationParamsResponse]
+	getWarpReachSettings         *connect.Client[v1.GetWarpReachSettingsRequest, v1.GetWarpReachSettingsResponse]
+	updateWarpReachSettings      *connect.Client[v1.UpdateWarpReachSettingsRequest, v1.UpdateWarpReachSettingsResponse]
 }
 
 // GetWarp calls mistgate.admin.v1.WarpService.GetWarp.
@@ -210,6 +235,16 @@ func (c *warpServiceClient) UpdateWarpRegistrationParams(ctx context.Context, re
 	return c.updateWarpRegistrationParams.CallUnary(ctx, req)
 }
 
+// GetWarpReachSettings calls mistgate.admin.v1.WarpService.GetWarpReachSettings.
+func (c *warpServiceClient) GetWarpReachSettings(ctx context.Context, req *connect.Request[v1.GetWarpReachSettingsRequest]) (*connect.Response[v1.GetWarpReachSettingsResponse], error) {
+	return c.getWarpReachSettings.CallUnary(ctx, req)
+}
+
+// UpdateWarpReachSettings calls mistgate.admin.v1.WarpService.UpdateWarpReachSettings.
+func (c *warpServiceClient) UpdateWarpReachSettings(ctx context.Context, req *connect.Request[v1.UpdateWarpReachSettingsRequest]) (*connect.Response[v1.UpdateWarpReachSettingsResponse], error) {
+	return c.updateWarpReachSettings.CallUnary(ctx, req)
+}
+
 // WarpServiceHandler is an implementation of the mistgate.admin.v1.WarpService service.
 type WarpServiceHandler interface {
 	// Account summary (no secrets), the node's last WarpHealth and whether the node has applied the account.
@@ -235,6 +270,11 @@ type WarpServiceHandler interface {
 	// data, not code).
 	GetWarpRegistrationParams(context.Context, *connect.Request[v1.GetWarpRegistrationParamsRequest]) (*connect.Response[v1.GetWarpRegistrationParamsResponse], error)
 	UpdateWarpRegistrationParams(context.Context, *connect.Request[v1.UpdateWarpRegistrationParamsRequest]) (*connect.Response[v1.UpdateWarpRegistrationParamsResponse], error)
+	// The sites each node's WARP is checked against ("WARP reach": the node fetches them through its tunnel and says which show a
+	// block page, see GetWarpResponse.reach). A built-in short list unless the owner changed it; an empty list switches the check
+	// off. Owner only; a change is audited as warp_reach_settings.
+	GetWarpReachSettings(context.Context, *connect.Request[v1.GetWarpReachSettingsRequest]) (*connect.Response[v1.GetWarpReachSettingsResponse], error)
+	UpdateWarpReachSettings(context.Context, *connect.Request[v1.UpdateWarpReachSettingsRequest]) (*connect.Response[v1.UpdateWarpReachSettingsResponse], error)
 }
 
 // NewWarpServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -298,6 +338,18 @@ func NewWarpServiceHandler(svc WarpServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(warpServiceMethods.ByName("UpdateWarpRegistrationParams")),
 		connect.WithHandlerOptions(opts...),
 	)
+	warpServiceGetWarpReachSettingsHandler := connect.NewUnaryHandler(
+		WarpServiceGetWarpReachSettingsProcedure,
+		svc.GetWarpReachSettings,
+		connect.WithSchema(warpServiceMethods.ByName("GetWarpReachSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	warpServiceUpdateWarpReachSettingsHandler := connect.NewUnaryHandler(
+		WarpServiceUpdateWarpReachSettingsProcedure,
+		svc.UpdateWarpReachSettings,
+		connect.WithSchema(warpServiceMethods.ByName("UpdateWarpReachSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.WarpService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case WarpServiceGetWarpProcedure:
@@ -318,6 +370,10 @@ func NewWarpServiceHandler(svc WarpServiceHandler, opts ...connect.HandlerOption
 			warpServiceGetWarpRegistrationParamsHandler.ServeHTTP(w, r)
 		case WarpServiceUpdateWarpRegistrationParamsProcedure:
 			warpServiceUpdateWarpRegistrationParamsHandler.ServeHTTP(w, r)
+		case WarpServiceGetWarpReachSettingsProcedure:
+			warpServiceGetWarpReachSettingsHandler.ServeHTTP(w, r)
+		case WarpServiceUpdateWarpReachSettingsProcedure:
+			warpServiceUpdateWarpReachSettingsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -361,4 +417,12 @@ func (UnimplementedWarpServiceHandler) GetWarpRegistrationParams(context.Context
 
 func (UnimplementedWarpServiceHandler) UpdateWarpRegistrationParams(context.Context, *connect.Request[v1.UpdateWarpRegistrationParamsRequest]) (*connect.Response[v1.UpdateWarpRegistrationParamsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.WarpService.UpdateWarpRegistrationParams is not implemented"))
+}
+
+func (UnimplementedWarpServiceHandler) GetWarpReachSettings(context.Context, *connect.Request[v1.GetWarpReachSettingsRequest]) (*connect.Response[v1.GetWarpReachSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.WarpService.GetWarpReachSettings is not implemented"))
+}
+
+func (UnimplementedWarpServiceHandler) UpdateWarpReachSettings(context.Context, *connect.Request[v1.UpdateWarpReachSettingsRequest]) (*connect.Response[v1.UpdateWarpReachSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.WarpService.UpdateWarpReachSettings is not implemented"))
 }

@@ -222,7 +222,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("warp_status", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.WarpServiceGetWarpProcedure),
-			"One node's WARP account and last agent report: whether it is enabled or paused, agent state, colo, handshake age, Cloudflare and other-site probes, registration time, refresh availability, and profiles using WARP egress. With no node: the same compact row for every node that is not retired (unavailable names the nodes that did not answer). No addresses, keys or tokens.",
+			"One node's WARP account and last agent report: whether it is enabled or paused, agent state, colo, handshake age, Cloudflare and other-site probes, registration time, refresh availability, and profiles using WARP egress. reach is what the owner's list of sites showed through the node's WARP the last time the node fetched them (colo of that run; per site verdict ok, blocked (a block page), unreachable or error, the HTTP status, the time and how many runs in a row said blocked; two make the warp_reach alert), and reach_state says why it is missing (waiting, disabled: the list is empty, agent_too_old). With no node: the same compact row for every node that is not retired (unavailable names the nodes that did not answer). No addresses, keys or tokens.",
 			func(c *call, in nodeOptArg) (any, error) {
 				if in.Node == "" {
 					return c.fleetWarp()

@@ -1,0 +1,7 @@
+HTTP/1.1 451 Unavailable For Legal Reasons
+Content-Type: text/html
+Server: nginx
+Connection: close
+
+<html><head><title>Unavailable For Legal Reasons</title></head>
+<body><h1>Unavailable For Legal Reasons</h1><p>This request may not be serviced in the registry of restricted websites.</p></body></html>

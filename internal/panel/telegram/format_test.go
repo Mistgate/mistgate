@@ -67,6 +67,28 @@ func TestRelayDownTelegramTextIsLocalized(t *testing.T) {
 	}
 }
 
+func TestWarpReachTelegramText(t *testing.T) {
+	a := store.HealthAlert{Kind: "warp_reach", Subject: "notes.example.com", NodeID: "de1", WhyKey: "health.alert.warp_reach.why",
+		Params: map[string]string{"domain": "notes.example.com", "colo": "FRA", "http_status": "403", "streak": "2"}}
+	wantTitle := "A site blocks the WARP exit of the node"
+	wantReason := "notes.example.com showed a block page through the node's WARP in two checks (Cloudflare colo FRA). Restarting WARP may give another exit."
+	if got := alertTitle("en", a); got != wantTitle {
+		t.Errorf("English title = %q, want %q", got, wantTitle)
+	}
+	if got := alertReason("en", a); got != wantReason {
+		t.Errorf("English reason = %q, want %q", got, wantReason)
+	}
+	for _, lang := range []L{"ru", "zh"} {
+		title, reason := alertTitle(lang, a), alertReason(lang, a)
+		if title == wantTitle || reason == wantReason || !strings.Contains(reason, "notes.example.com") || !strings.Contains(reason, "FRA") {
+			t.Errorf("%s text: %q / %q", lang, title, reason)
+		}
+		if lang == "zh" && (!hasHan(title) || !hasHan(reason)) {
+			t.Errorf("Chinese text has no Han characters: %q / %q", title, reason)
+		}
+	}
+}
+
 // The Chinese sentences join with their own stop, separators and no space after the stop; the values stay in place.
 func TestChineseTorrentAndDurationText(t *testing.T) {
 	p := map[string]string{"user_name": "Alice", "nodes": "nl", "count": "3", "evidence": "dht_query", "ports": "443"}

@@ -1,0 +1,24 @@
+HTTP/1.1 403 Forbidden
+Date: Tue, 17 Nov 2026 12:00:00 GMT
+Content-Type: text/html; charset=UTF-8
+Server: cloudflare
+CF-RAY: 8a1b2c3d4e5f6a7d-WAW
+Connection: close
+
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<title>Access denied</title>
+<meta charset="UTF-8" />
+</head>
+<body>
+<div id="cf-wrapper">
+  <div id="cf-error-details">
+    <h1>Error <span class="cf-error-code">1006</span></h1>
+    <h2>Access denied</h2>
+    <p>The owner of this website (www.example.com) has banned your IP address (192.0.2.10).</p>
+    <p>Cloudflare Ray ID: 8a1b2c3d4e5f6a7d</p>
+  </div>
+</div>
+</body>
+</html>

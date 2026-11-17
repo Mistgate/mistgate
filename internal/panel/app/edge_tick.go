@@ -35,7 +35,7 @@ var edgeTickJobs = map[string]string{
 // edgeDeferred describes background-job functions that stay VPS-only; a job can also have an edge phase above.
 var edgeDeferred = map[string]string{
 	"fleet":               "event-driven Run, local sessions, closeAll and recomputeAll remain VPS-only",
-	"health":              "client-eye checker and periodic UDP port rechecks",
+	"health":              "client-eye checker, periodic UDP port rechecks and the WARP reach check (a run asks every node, up to a minute each)",
 	"updates":             "installing a panel binary remains an edge deploy operation",
 	"backups":             "R2",
 	"mcp-plan-sweep":      "MCP is not served on the edge",

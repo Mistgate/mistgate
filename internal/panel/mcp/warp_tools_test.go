@@ -216,3 +216,43 @@ func TestWarpToolsProfiles(t *testing.T) {
 		}
 	}
 }
+
+type warpReachResult struct {
+	ReachState string `json:"reach_state"`
+	Reach      *struct {
+		CheckedUnix int64  `json:"checked_unix"`
+		Colo        string `json:"colo"`
+		Domains     []struct {
+			Domain        string `json:"domain"`
+			Verdict       string `json:"verdict"`
+			HTTPStatus    uint32 `json:"http_status"`
+			LatencyMS     uint32 `json:"latency_ms"`
+			BlockedStreak uint32 `json:"blocked_streak"`
+		} `json:"domains"`
+	} `json:"reach"`
+}
+
+// The reach of the owner's sites is told with its colo and per-site verdicts, and the states that say why it is missing.
+func TestWarpStatusShowsTheReachOfTheOwnersSites(t *testing.T) {
+	e := newTestEnv(t)
+	e.w.warp[nodeA].ReachState = "ready"
+	e.w.warp[nodeA].Reach = &adminv1.WarpReachView{CheckedUnix: 1700000500, Colo: "FRA", Domains: []*adminv1.WarpReachDomain{
+		{Domain: "notes.example.com", Verdict: "blocked", HttpStatus: 403, LatencyMs: 95, BlockedStreak: 2},
+		{Domain: "chat.example.com", Verdict: "ok", HttpStatus: 200, LatencyMs: 310},
+		{Domain: "gone.example.com", Verdict: "unreachable"}}}
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	out := mustOK(t, s, "warp_status", map[string]any{"node": "de1"})
+	v := decode[warpReachResult](t, out)
+	if v.ReachState != "ready" || v.Reach == nil || v.Reach.Colo != "FRA" || v.Reach.CheckedUnix != 1700000500 || len(v.Reach.Domains) != 3 ||
+		v.Reach.Domains[0].Domain != "notes.example.com" || v.Reach.Domains[0].Verdict != "blocked" || v.Reach.Domains[0].HTTPStatus != 403 ||
+		v.Reach.Domains[0].BlockedStreak != 2 || v.Reach.Domains[2].Verdict != "unreachable" {
+		t.Fatalf("reach = %s", out)
+	}
+
+	e.w.warp[nodeA].Reach, e.w.warp[nodeA].ReachState = nil, "agent_too_old"
+	out = mustOK(t, s, "warp_status", map[string]any{"node": "de1"})
+	if !strings.Contains(out, `"reach_state":"agent_too_old"`) || strings.Contains(out, `"reach":`) {
+		t.Fatalf("an agent without warp-reach/1: %s", out)
+	}
+}

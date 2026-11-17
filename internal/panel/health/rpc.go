@@ -97,6 +97,8 @@ func alertActions(a store.HealthAlert) []string {
 	switch a.Kind {
 	case kPortLossy:
 		return []string{"open_profiles"}
+	case kWarpReach: // another exit: restart WARP from its card
+		return []string{"open_warp"}
 	case kCheckFailed:
 		switch variant {
 		case "timeout", "auth", "refused":

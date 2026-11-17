@@ -108,6 +108,15 @@ Some problems need you, not a button. The card names them:
 - a network interface named `mgwarp` already exists and is not WARP's;
 - the node could not apply the account: the reason is in the node's events.
 
+## Sites that refuse WARP
+
+Some sites show a block page to WARP addresses at one Cloudflare colo and not at another, while the tunnel itself is healthy. Every 15 minutes the panel asks each node whose WARP is up to fetch a short list of sites through its tunnel and to say which answer with a block page. The list is the panel's built-in one (`notion.com`, `discord.com`, `chatgpt.com`, `claude.ai`) unless you change it; an empty list switches the check off. The list is set in the API only (`WarpService.GetWarpReachSettings` and `UpdateWarpReachSettings`, owner only, at most 8 lower-case host names, audited as `warp_reach_settings`).
+
+- The node reads at most 64 KiB of a page, follows at most one redirect, and refuses any address inside its own network after resolving the name. A node whose agent is older answers nothing, and the WARP card says so.
+- The verdict is `blocked` for HTTP 451 or a 403 page of a known kind (a Cloudflare error 1006 to 1012 or 1020, "Sorry, you have been blocked", an Akamai "Access Denied" page, CloudFront's country block, a site's own "not available in your country"). A bare 403, a challenge page, a rate limit and a server error read `error`; no answer reads `unreachable`.
+- The card and `warp_status` show the colo of the exit at that run. A site that is `blocked` in two runs, with no `ok` between them, raises the Health alert `warp_reach` (one per node and site, with the colo); restarting WARP may give another exit. The alert ends when a run says `ok` for the site (a timeout or an error does not end it), when the site leaves the list, or when no run renews the result for 3 hours.
+- This check runs in the VPS edition; the Cloudflare edition runs no loops yet.
+
 ## IPv4 and IPv6
 
 - The account stores Cloudflare's endpoint as IP addresses, never as a name. The node tries the IPv4 endpoint on every port first, then the IPv6 one, if the account has it.

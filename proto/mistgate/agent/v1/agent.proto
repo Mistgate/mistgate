@@ -652,6 +652,29 @@ package mistgate.agent.v1;
 //     (the request had no blocked_ref); an older agent sends no reason) | control_failed (params{"dpi_hop", "control":
 //     "fail"}) | "failed: <short message>".
 //
+// WARP REACH (additive, protocol api_version stays 1)
+//   Does a site show its block page to the WARP addresses of this node? Some sites refuse one Cloudflare colo and not another
+//   while the tunnel itself is healthy, which the node's own health check (cdn-cgi/trace, a gstatic 204) cannot see.
+//   - CAPABILITY GATE. An agent lists "warp-reach/1" in Hello.capabilities when it runs WARP. The panel sends WarpReach ONLY to
+//     a stream that listed it, so an older agent is refused by the panel ("agent too old"), never sent a field it would ignore.
+//   - ASK. WarpReach{request_id, domains}: 1-8 lower-case host names (no address, port or path). The domains are the
+//     owner's, set in the panel (WarpService.GetWarpReachSettings); the panel sends them as they are and the agent validates
+//     them again (bad_params). The agent fetches https://<domain>/ through the WARP tunnel, all the names in parallel, each
+//     within 12 s, reading at most 64 KiB of the page and following at most one redirect (to https). The names are resolved with
+//     the node's own resolvers and every request goes out through the tunnel's guarded dial, which refuses any address that is
+//     private, shared, link-local, loopback or the node's own: a name that points inside the node's network reaches nothing and
+//     reads "unreachable". One run at a time ("busy"), and one per health interval of the WARP manager (30 s: "too_soon"), so
+//     the check costs no more than the health check does.
+//   - ANSWER. One CommandResult. ok = true: params{"colo": "<the colo of cdn-cgi/trace in this run, "" when the trace failed>",
+//     "r<i>": "<verdict>:<http status>:<ms>"} for every domain i (0-based, in the order asked): verdict ok (answered, not a
+//     block page), blocked (451, or a 403 whose page a table of known block pages recognises: Cloudflare error 1006-1008, 1009,
+//     1010, 1012 and 1020 and "Sorry, you have been blocked", Akamai "Access Denied" with its reference, CloudFront's country
+//     block, a site's own "not available in your country"), unreachable (DNS, connect, TLS or the time ran out; status 0) or
+//     error (an answer that is neither: a server error, a rate limit, a challenge, a 403 no table row knows). Status 0 when
+//     there is none. The agent returns no page and no address.
+//   - ERRORS (CommandResult.error): bad_params, busy, too_soon, warp_down (the tunnel is not up, or WARP is paused or absent),
+//     "failed: <short message>".
+//
 // NODE DECOY SITE (additive, protocol api_version stays 1)
 //   A node reports the active mode and bundle SHA-256 in Hello. Agents that implement this command list "decoy/1".
 //   SetDecoy changes the site used by Hysteria2 masquerade and VLESS REALITY self. files is omitted when the agent
@@ -963,7 +986,7 @@ message Hello {
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
   // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "vless-hello-kex/1" (the LinkCounters fields hello_pq, hello_classic and hello_unknown), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug), and "warp-reach/1" (WarpReach; see "WARP REACH").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
   // "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
@@ -1669,7 +1692,17 @@ message ConnectResponse {
     DebugCaptureAck debug_capture_ack = 41;
     // Only sent to agents with "os-update/1" in Hello.capabilities (see UpdateOs).
     UpdateOs update_os = 34;
+    // Only sent to agents with "warp-reach/1" in Hello.capabilities (see "WARP REACH").
+    WarpReach warp_reach = 42;
   }
+}
+
+// Ask the node to fetch a few sites through its WARP tunnel and say whether each shows a block page (see "WARP REACH").
+// Answered with one CommandResult.
+message WarpReach {
+  string request_id = 1;
+  // 1-8 lower-case host names, the owner's list.
+  repeated string domains = 2;
 }
 
 // Select a node's decoy site. A missing file list is valid only when the node already has the named hash.

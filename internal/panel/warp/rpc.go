@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // rpc is the admin WarpService (warp.proto). Roles are decided by auth/policy.go before a call gets here (all
@@ -37,6 +40,7 @@ func (r rpc) GetWarp(ctx context.Context, req *connect.Request[adminv1.GetWarpRe
 	resp.Account = s.accountMsg(a)
 	resp.Health = healthMsg(a)
 	resp.NeedsAttention, resp.AttentionReason = a.Attention != "", a.Attention
+	resp.Reach, resp.ReachState = s.reachView(ctx, n, a)
 	if resp.Inbounds, err = s.warpInbounds(ctx, n.ID); err != nil {
 		return nil, s.internal("warp inbounds", err)
 	}
@@ -141,4 +145,39 @@ func (r rpc) UpdateWarpRegistrationParams(ctx context.Context, req *connect.Requ
 	s.audit(ctx, s.cfg.Actor(ctx), "warp_params", map[string]string{"api": p.APIVersion, "customised": fmt.Sprint(p.Customised()),
 		"auto_reregister": fmt.Sprint(p.AutoReregister)})
 	return connect.NewResponse(&adminv1.UpdateWarpRegistrationParamsResponse{Params: paramsMsg(p), Customised: p.Customised()}), nil
+}
+
+func (r rpc) GetWarpReachSettings(ctx context.Context, _ *connect.Request[adminv1.GetWarpReachSettingsRequest]) (*connect.Response[adminv1.GetWarpReachSettingsResponse], error) {
+	domains, customised := r.s.reachDomains(ctx)
+	return connect.NewResponse(&adminv1.GetWarpReachSettingsResponse{Settings: &adminv1.WarpReachSettings{Domains: domains},
+		Defaults: &adminv1.WarpReachSettings{Domains: DefaultReachDomains}, Customised: customised}), nil
+}
+
+func (r rpc) UpdateWarpReachSettings(ctx context.Context, req *connect.Request[adminv1.UpdateWarpReachSettingsRequest]) (*connect.Response[adminv1.UpdateWarpReachSettingsResponse], error) {
+	s := r.s
+	if req.Msg.UseDefaults {
+		if err := s.st.DeleteSettings(ctx, SettingReach); err != nil {
+			return nil, s.internal("store reach settings", err)
+		}
+		s.audit(ctx, s.cfg.Actor(ctx), "warp_reach_settings", map[string]string{"customised": "false", "domains": strings.Join(DefaultReachDomains, ",")})
+		return connect.NewResponse(&adminv1.UpdateWarpReachSettingsResponse{Settings: &adminv1.WarpReachSettings{Domains: DefaultReachDomains}}), nil
+	}
+	list := req.Msg.GetSettings().GetDomains()
+	if len(list) > plugin.MaxWarpReachDomains {
+		return nil, fail(connect.CodeInvalidArgument, "reach_domains_too_many")
+	}
+	for i, d := range list {
+		if !plugin.ValidWarpReachDomain(d) {
+			return nil, fail(connect.CodeInvalidArgument, "reach_domain_invalid")
+		}
+		if slices.Contains(list[:i], d) {
+			return nil, fail(connect.CodeInvalidArgument, "reach_domain_duplicate")
+		}
+	}
+	raw, _ := json.Marshal(append([]string{}, list...)) // [] and not null: an empty list is stored, and it means "off"
+	if err := s.st.SetSettings(ctx, map[string]string{SettingReach: string(raw)}); err != nil {
+		return nil, s.internal("store reach settings", err)
+	}
+	s.audit(ctx, s.cfg.Actor(ctx), "warp_reach_settings", map[string]string{"customised": "true", "domains": strings.Join(list, ",")})
+	return connect.NewResponse(&adminv1.UpdateWarpReachSettingsResponse{Settings: &adminv1.WarpReachSettings{Domains: append([]string{}, list...)}, Customised: true}), nil
 }

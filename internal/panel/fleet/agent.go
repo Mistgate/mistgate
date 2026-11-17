@@ -917,6 +917,8 @@ func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capabilit
 		return capCountryProbe, "agent too old"
 	case frame.GetSetDecoy() != nil:
 		return capDecoy, "agent too old"
+	case frame.GetWarpReach() != nil:
+		return capWarpReach, "agent too old"
 	default:
 		return "", ""
 	}

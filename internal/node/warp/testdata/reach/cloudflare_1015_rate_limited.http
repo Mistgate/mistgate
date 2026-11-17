@@ -1,0 +1,19 @@
+HTTP/1.1 429 Too Many Requests
+Date: Tue, 17 Nov 2026 12:00:00 GMT
+Content-Type: text/html; charset=UTF-8
+Server: cloudflare
+Retry-After: 30
+Connection: close
+
+<!DOCTYPE html>
+<html lang="en-US">
+<head><title>Access denied | example.com used Cloudflare to restrict access</title></head>
+<body>
+<div id="cf-wrapper"><div id="cf-error-details">
+<h1>Error <span class="cf-error-code">1015</span></h1>
+<h2>You are being rate limited</h2>
+<p>The owner of this website (example.com) has banned you temporarily from accessing this website.</p>
+<p>Cloudflare Ray ID: 8a1b2c3d4e5f6a80</p>
+</div></div>
+</body>
+</html>

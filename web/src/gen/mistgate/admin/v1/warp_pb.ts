@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/warp.proto.
  */
 export const file_mistgate_admin_v1_warp: GenFile = /*@__PURE__*/
-  fileDesc("ChxtaXN0Z2F0ZS9hZG1pbi92MS93YXJwLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSK6AwoLV2FycEFjY291bnQSDwoHbm9kZV9pZBgBIAEoCRItCgZzb3VyY2UYAiABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwU291cmNlEhQKDGFjY291bnRfdHlwZRgDIAEoCRIPCgdlbmFibGVkGAQgASgIEhcKD3BlZXJfcHVibGljX2tleRgFIAEoCRITCgtlbmRwb2ludF92NBgGIAEoCRITCgtlbmRwb2ludF92NhgHIAEoCRINCgVwb3J0cxgIIAMoDRISCgphZGRyZXNzX3Y0GAkgASgJEhIKCmFkZHJlc3NfdjYYCiABKAkSCwoDbXR1GAsgASgNEhQKDHVzZV9yZXNlcnZlZBgMIAEoCBIRCgloYXNfdG9rZW4YDSABKAgSDwoHdG9zX3VybBgOIAEoCRIXCg90b3NfYWNjZXB0ZWRfYnkYDyABKAkSHQoRdG9zX2FjY2VwdGVkX3VuaXgYECABKANCAjACEhcKD3JlZ2lzdGVyZWRfd2l0aBgRIAEoCRIYCgxjcmVhdGVkX3VuaXgYEiABKANCAjACEhgKDHVwZGF0ZWRfdW5peBgTIAEoA0ICMAIi4QMKDldhcnBIZWFsdGhWaWV3EisKBXN0YXRlGAEgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuV2FycFN0YXRlEg8KB2JhY2tlbmQYAiABKAkSEAoIZW5kcG9pbnQYAyABKAkSHwoTbGFzdF9oYW5kc2hha2VfdW5peBgEIAEoA0ICMAISEQoJd2FycF9mbGFnGAUgASgJEgwKBGNvbG8YBiABKAkSGwoTcHJvYmVfY2xvdWRmbGFyZV9vaxgHIAEoCBIWCg5wcm9iZV9vdGhlcl9vaxgIIAEoCBIcChRjb25zZWN1dGl2ZV9mYWlsdXJlcxgJIAEoDRIUCghyeF9ieXRlcxgKIAEoBEICMAISFAoIdHhfYnl0ZXMYCyABKARCAjACEhIKCmxhc3RfZXJyb3IYDCABKAkSGQoNcmVwb3J0ZWRfdW5peBgNIAEoA0ICMAISPAoQcHJvYmVfY2xvdWRmbGFyZRgOIAEoCzIiLm1pc3RnYXRlLmFkbWluLnYxLldhcnBQcm9iZVJlc3VsdBI3Cgtwcm9iZV9vdGhlchgPIAEoCzIiLm1pc3RnYXRlLmFkbWluLnYxLldhcnBQcm9iZVJlc3VsdBIYCgxjaGVja2VkX3VuaXgYECABKANCAjACIlwKD1dhcnBQcm9iZVJlc3VsdBIKCgJvaxgBIAEoCBISCgpsYXRlbmN5X21zGAIgASgNEhMKB2F0X3VuaXgYAyABKANCAjACEhQKDGZhaWx1cmVfY29kZRgEIAEoCSIhCg5HZXRXYXJwUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIq8CCg9HZXRXYXJwUmVzcG9uc2USLwoHYWNjb3VudBgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBBY2NvdW50EjEKBmhlYWx0aBgCIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLldhcnBIZWFsdGhWaWV3EhUKDXBlbmRpbmdfYXBwbHkYAyABKAgSEwoLYXBwbHlfZXJyb3IYBCABKAkSFgoOYWdlbnRfc3VwcG9ydHMYBSABKAgSDwoHdG9zX3VybBgGIAEoCRIXCg9uZWVkc19hdHRlbnRpb24YByABKAgSGAoQYXR0ZW50aW9uX3JlYXNvbhgIIAEoCRIwCghpbmJvdW5kcxgJIAMoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBJbmJvdW5kIkcKC1dhcnBJbmJvdW5kEhIKCmluYm91bmRfaWQYASABKAkSFAoMcHJvZmlsZV9uYW1lGAIgASgJEg4KBm9ubGluZRgDIAEoDSJrChNSZWdpc3RlcldhcnBSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSEgoKYWNjZXB0X3RvcxgCIAEoCBIVCg10b3NfdXJsX3Nob3duGAMgASgJEhgKEHJlcGxhY2VfZXhpc3RpbmcYBCABKAgiRwoUUmVnaXN0ZXJXYXJwUmVzcG9uc2USLwoHYWNjb3VudBgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBBY2NvdW50IlAKEUltcG9ydFdhcnBSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSFAoMcHJvZmlsZV9jb25mGAIgASgJEhQKDGFjY291bnRfdG9tbBgDIAEoCSJFChJJbXBvcnRXYXJwUmVzcG9uc2USLwoHYWNjb3VudBgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBBY2NvdW50IjkKFVNldFdhcnBFbmFibGVkUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEg8KB2VuYWJsZWQYAiABKAgiSQoWU2V0V2FycEVuYWJsZWRSZXNwb25zZRIvCgdhY2NvdW50GAEgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuV2FycEFjY291bnQiJQoSUmVzdGFydFdhcnBSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiWQoTUmVzdGFydFdhcnBSZXNwb25zZRIvCgdhY2NvdW50GAEgASgLMh4ubWlzdGdhdGUuYWRtaW4udjEuV2FycEFjY291bnQSEQoJY29uZmlybWVkGAIgASgIIiUKElJlZnJlc2hXYXJwUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIkYKE1JlZnJlc2hXYXJwUmVzcG9uc2USLwoHYWNjb3VudBgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBBY2NvdW50IjoKEURlbGV0ZVdhcnBSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSFAoMY29uZmlybV9uYW1lGAIgASgJIiwKEkRlbGV0ZVdhcnBSZXNwb25zZRIWCg5yZW1vdGVfZGVsZXRlZBgBIAEoCCKKAQoWV2FycFJlZ2lzdHJhdGlvblBhcmFtcxITCgthcGlfdmVyc2lvbhgBIAEoCRISCgp1c2VyX2FnZW50GAIgASgJEhkKEWNmX2NsaWVudF92ZXJzaW9uGAMgASgJEhMKC3Rsc19zcGVjX2lkGAQgASgJEhcKD2F1dG9fcmVyZWdpc3RlchgFIAEoCCIiCiBHZXRXYXJwUmVnaXN0cmF0aW9uUGFyYW1zUmVxdWVzdCKvAQohR2V0V2FycFJlZ2lzdHJhdGlvblBhcmFtc1Jlc3BvbnNlEjkKBnBhcmFtcxgBIAEoCzIpLm1pc3RnYXRlLmFkbWluLnYxLldhcnBSZWdpc3RyYXRpb25QYXJhbXMSOwoIZGVmYXVsdHMYAiABKAsyKS5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwUmVnaXN0cmF0aW9uUGFyYW1zEhIKCmN1c3RvbWlzZWQYAyABKAgiYAojVXBkYXRlV2FycFJlZ2lzdHJhdGlvblBhcmFtc1JlcXVlc3QSOQoGcGFyYW1zGAEgASgLMikubWlzdGdhdGUuYWRtaW4udjEuV2FycFJlZ2lzdHJhdGlvblBhcmFtcyJ1CiRVcGRhdGVXYXJwUmVnaXN0cmF0aW9uUGFyYW1zUmVzcG9uc2USOQoGcGFyYW1zGAEgASgLMikubWlzdGdhdGUuYWRtaW4udjEuV2FycFJlZ2lzdHJhdGlvblBhcmFtcxISCgpjdXN0b21pc2VkGAIgASgIMrQHCgtXYXJwU2VydmljZRJQCgdHZXRXYXJwEiEubWlzdGdhdGUuYWRtaW4udjEuR2V0V2FycFJlcXVlc3QaIi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRXYXJwUmVzcG9uc2USXwoMUmVnaXN0ZXJXYXJwEiYubWlzdGdhdGUuYWRtaW4udjEuUmVnaXN0ZXJXYXJwUmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlJlZ2lzdGVyV2FycFJlc3BvbnNlElkKCkltcG9ydFdhcnASJC5taXN0Z2F0ZS5hZG1pbi52MS5JbXBvcnRXYXJwUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkltcG9ydFdhcnBSZXNwb25zZRJlCg5TZXRXYXJwRW5hYmxlZBIoLm1pc3RnYXRlLmFkbWluLnYxLlNldFdhcnBFbmFibGVkUmVxdWVzdBopLm1pc3RnYXRlLmFkbWluLnYxLlNldFdhcnBFbmFibGVkUmVzcG9uc2USXAoLUmVzdGFydFdhcnASJS5taXN0Z2F0ZS5hZG1pbi52MS5SZXN0YXJ0V2FycFJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5SZXN0YXJ0V2FycFJlc3BvbnNlElwKC1JlZnJlc2hXYXJwEiUubWlzdGdhdGUuYWRtaW4udjEuUmVmcmVzaFdhcnBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuUmVmcmVzaFdhcnBSZXNwb25zZRJZCgpEZWxldGVXYXJwEiQubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlV2FycFJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5EZWxldGVXYXJwUmVzcG9uc2UShgEKGUdldFdhcnBSZWdpc3RyYXRpb25QYXJhbXMSMy5taXN0Z2F0ZS5hZG1pbi52MS5HZXRXYXJwUmVnaXN0cmF0aW9uUGFyYW1zUmVxdWVzdBo0Lm1pc3RnYXRlLmFkbWluLnYxLkdldFdhcnBSZWdpc3RyYXRpb25QYXJhbXNSZXNwb25zZRKPAQocVXBkYXRlV2FycFJlZ2lzdHJhdGlvblBhcmFtcxI2Lm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVdhcnBSZWdpc3RyYXRpb25QYXJhbXNSZXF1ZXN0GjcubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlV2FycFJlZ2lzdHJhdGlvblBhcmFtc1Jlc3BvbnNlQsQBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCCVdhcnBQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
+  fileDesc("ChxtaXN0Z2F0ZS9hZG1pbi92MS93YXJwLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSK6AwoLV2FycEFjY291bnQSDwoHbm9kZV9pZBgBIAEoCRItCgZzb3VyY2UYAiABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwU291cmNlEhQKDGFjY291bnRfdHlwZRgDIAEoCRIPCgdlbmFibGVkGAQgASgIEhcKD3BlZXJfcHVibGljX2tleRgFIAEoCRITCgtlbmRwb2ludF92NBgGIAEoCRITCgtlbmRwb2ludF92NhgHIAEoCRINCgVwb3J0cxgIIAMoDRISCgphZGRyZXNzX3Y0GAkgASgJEhIKCmFkZHJlc3NfdjYYCiABKAkSCwoDbXR1GAsgASgNEhQKDHVzZV9yZXNlcnZlZBgMIAEoCBIRCgloYXNfdG9rZW4YDSABKAgSDwoHdG9zX3VybBgOIAEoCRIXCg90b3NfYWNjZXB0ZWRfYnkYDyABKAkSHQoRdG9zX2FjY2VwdGVkX3VuaXgYECABKANCAjACEhcKD3JlZ2lzdGVyZWRfd2l0aBgRIAEoCRIYCgxjcmVhdGVkX3VuaXgYEiABKANCAjACEhgKDHVwZGF0ZWRfdW5peBgTIAEoA0ICMAIi4QMKDldhcnBIZWFsdGhWaWV3EisKBXN0YXRlGAEgASgOMhwubWlzdGdhdGUuYWRtaW4udjEuV2FycFN0YXRlEg8KB2JhY2tlbmQYAiABKAkSEAoIZW5kcG9pbnQYAyABKAkSHwoTbGFzdF9oYW5kc2hha2VfdW5peBgEIAEoA0ICMAISEQoJd2FycF9mbGFnGAUgASgJEgwKBGNvbG8YBiABKAkSGwoTcHJvYmVfY2xvdWRmbGFyZV9vaxgHIAEoCBIWCg5wcm9iZV9vdGhlcl9vaxgIIAEoCBIcChRjb25zZWN1dGl2ZV9mYWlsdXJlcxgJIAEoDRIUCghyeF9ieXRlcxgKIAEoBEICMAISFAoIdHhfYnl0ZXMYCyABKARCAjACEhIKCmxhc3RfZXJyb3IYDCABKAkSGQoNcmVwb3J0ZWRfdW5peBgNIAEoA0ICMAISPAoQcHJvYmVfY2xvdWRmbGFyZRgOIAEoCzIiLm1pc3RnYXRlLmFkbWluLnYxLldhcnBQcm9iZVJlc3VsdBI3Cgtwcm9iZV9vdGhlchgPIAEoCzIiLm1pc3RnYXRlLmFkbWluLnYxLldhcnBQcm9iZVJlc3VsdBIYCgxjaGVja2VkX3VuaXgYECABKANCAjACIlwKD1dhcnBQcm9iZVJlc3VsdBIKCgJvaxgBIAEoCBISCgpsYXRlbmN5X21zGAIgASgNEhMKB2F0X3VuaXgYAyABKANCAjACEhQKDGZhaWx1cmVfY29kZRgEIAEoCSIhCg5HZXRXYXJwUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIvUCCg9HZXRXYXJwUmVzcG9uc2USLwoHYWNjb3VudBgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBBY2NvdW50EjEKBmhlYWx0aBgCIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLldhcnBIZWFsdGhWaWV3EhUKDXBlbmRpbmdfYXBwbHkYAyABKAgSEwoLYXBwbHlfZXJyb3IYBCABKAkSFgoOYWdlbnRfc3VwcG9ydHMYBSABKAgSDwoHdG9zX3VybBgGIAEoCRIXCg9uZWVkc19hdHRlbnRpb24YByABKAgSGAoQYXR0ZW50aW9uX3JlYXNvbhgIIAEoCRIwCghpbmJvdW5kcxgJIAMoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBJbmJvdW5kEi8KBXJlYWNoGAogASgLMiAubWlzdGdhdGUuYWRtaW4udjEuV2FycFJlYWNoVmlldxITCgtyZWFjaF9zdGF0ZRgLIAEoCSJzCg9XYXJwUmVhY2hEb21haW4SDgoGZG9tYWluGAEgASgJEg8KB3ZlcmRpY3QYAiABKAkSEwoLaHR0cF9zdGF0dXMYAyABKA0SEgoKbGF0ZW5jeV9tcxgEIAEoDRIWCg5ibG9ja2VkX3N0cmVhaxgFIAEoDSJsCg1XYXJwUmVhY2hWaWV3EhgKDGNoZWNrZWRfdW5peBgBIAEoA0ICMAISDAoEY29sbxgCIAEoCRIzCgdkb21haW5zGAMgAygLMiIubWlzdGdhdGUuYWRtaW4udjEuV2FycFJlYWNoRG9tYWluIiQKEVdhcnBSZWFjaFNldHRpbmdzEg8KB2RvbWFpbnMYASADKAkiHQobR2V0V2FycFJlYWNoU2V0dGluZ3NSZXF1ZXN0IqIBChxHZXRXYXJwUmVhY2hTZXR0aW5nc1Jlc3BvbnNlEjYKCHNldHRpbmdzGAEgASgLMiQubWlzdGdhdGUuYWRtaW4udjEuV2FycFJlYWNoU2V0dGluZ3MSNgoIZGVmYXVsdHMYAiABKAsyJC5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwUmVhY2hTZXR0aW5ncxISCgpjdXN0b21pc2VkGAMgASgIIm4KHlVwZGF0ZVdhcnBSZWFjaFNldHRpbmdzUmVxdWVzdBI2CghzZXR0aW5ncxgBIAEoCzIkLm1pc3RnYXRlLmFkbWluLnYxLldhcnBSZWFjaFNldHRpbmdzEhQKDHVzZV9kZWZhdWx0cxgCIAEoCCJtCh9VcGRhdGVXYXJwUmVhY2hTZXR0aW5nc1Jlc3BvbnNlEjYKCHNldHRpbmdzGAEgASgLMiQubWlzdGdhdGUuYWRtaW4udjEuV2FycFJlYWNoU2V0dGluZ3MSEgoKY3VzdG9taXNlZBgCIAEoCCJHCgtXYXJwSW5ib3VuZBISCgppbmJvdW5kX2lkGAEgASgJEhQKDHByb2ZpbGVfbmFtZRgCIAEoCRIOCgZvbmxpbmUYAyABKA0iawoTUmVnaXN0ZXJXYXJwUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhIKCmFjY2VwdF90b3MYAiABKAgSFQoNdG9zX3VybF9zaG93bhgDIAEoCRIYChByZXBsYWNlX2V4aXN0aW5nGAQgASgIIkcKFFJlZ2lzdGVyV2FycFJlc3BvbnNlEi8KB2FjY291bnQYASABKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwQWNjb3VudCJQChFJbXBvcnRXYXJwUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhQKDHByb2ZpbGVfY29uZhgCIAEoCRIUCgxhY2NvdW50X3RvbWwYAyABKAkiRQoSSW1wb3J0V2FycFJlc3BvbnNlEi8KB2FjY291bnQYASABKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwQWNjb3VudCI5ChVTZXRXYXJwRW5hYmxlZFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIPCgdlbmFibGVkGAIgASgIIkkKFlNldFdhcnBFbmFibGVkUmVzcG9uc2USLwoHYWNjb3VudBgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBBY2NvdW50IiUKElJlc3RhcnRXYXJwUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIlkKE1Jlc3RhcnRXYXJwUmVzcG9uc2USLwoHYWNjb3VudBgBIAEoCzIeLm1pc3RnYXRlLmFkbWluLnYxLldhcnBBY2NvdW50EhEKCWNvbmZpcm1lZBgCIAEoCCIlChJSZWZyZXNoV2FycFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSJGChNSZWZyZXNoV2FycFJlc3BvbnNlEi8KB2FjY291bnQYASABKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwQWNjb3VudCI6ChFEZWxldGVXYXJwUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEhQKDGNvbmZpcm1fbmFtZRgCIAEoCSIsChJEZWxldGVXYXJwUmVzcG9uc2USFgoOcmVtb3RlX2RlbGV0ZWQYASABKAgiigEKFldhcnBSZWdpc3RyYXRpb25QYXJhbXMSEwoLYXBpX3ZlcnNpb24YASABKAkSEgoKdXNlcl9hZ2VudBgCIAEoCRIZChFjZl9jbGllbnRfdmVyc2lvbhgDIAEoCRITCgt0bHNfc3BlY19pZBgEIAEoCRIXCg9hdXRvX3JlcmVnaXN0ZXIYBSABKAgiIgogR2V0V2FycFJlZ2lzdHJhdGlvblBhcmFtc1JlcXVlc3QirwEKIUdldFdhcnBSZWdpc3RyYXRpb25QYXJhbXNSZXNwb25zZRI5CgZwYXJhbXMYASABKAsyKS5taXN0Z2F0ZS5hZG1pbi52MS5XYXJwUmVnaXN0cmF0aW9uUGFyYW1zEjsKCGRlZmF1bHRzGAIgASgLMikubWlzdGdhdGUuYWRtaW4udjEuV2FycFJlZ2lzdHJhdGlvblBhcmFtcxISCgpjdXN0b21pc2VkGAMgASgIImAKI1VwZGF0ZVdhcnBSZWdpc3RyYXRpb25QYXJhbXNSZXF1ZXN0EjkKBnBhcmFtcxgBIAEoCzIpLm1pc3RnYXRlLmFkbWluLnYxLldhcnBSZWdpc3RyYXRpb25QYXJhbXMidQokVXBkYXRlV2FycFJlZ2lzdHJhdGlvblBhcmFtc1Jlc3BvbnNlEjkKBnBhcmFtcxgBIAEoCzIpLm1pc3RnYXRlLmFkbWluLnYxLldhcnBSZWdpc3RyYXRpb25QYXJhbXMSEgoKY3VzdG9taXNlZBgCIAEoCDKwCQoLV2FycFNlcnZpY2USUAoHR2V0V2FycBIhLm1pc3RnYXRlLmFkbWluLnYxLkdldFdhcnBSZXF1ZXN0GiIubWlzdGdhdGUuYWRtaW4udjEuR2V0V2FycFJlc3BvbnNlEl8KDFJlZ2lzdGVyV2FycBImLm1pc3RnYXRlLmFkbWluLnYxLlJlZ2lzdGVyV2FycFJlcXVlc3QaJy5taXN0Z2F0ZS5hZG1pbi52MS5SZWdpc3RlcldhcnBSZXNwb25zZRJZCgpJbXBvcnRXYXJwEiQubWlzdGdhdGUuYWRtaW4udjEuSW1wb3J0V2FycFJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5JbXBvcnRXYXJwUmVzcG9uc2USZQoOU2V0V2FycEVuYWJsZWQSKC5taXN0Z2F0ZS5hZG1pbi52MS5TZXRXYXJwRW5hYmxlZFJlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5TZXRXYXJwRW5hYmxlZFJlc3BvbnNlElwKC1Jlc3RhcnRXYXJwEiUubWlzdGdhdGUuYWRtaW4udjEuUmVzdGFydFdhcnBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuUmVzdGFydFdhcnBSZXNwb25zZRJcCgtSZWZyZXNoV2FycBIlLm1pc3RnYXRlLmFkbWluLnYxLlJlZnJlc2hXYXJwUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLlJlZnJlc2hXYXJwUmVzcG9uc2USWQoKRGVsZXRlV2FycBIkLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZVdhcnBSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlV2FycFJlc3BvbnNlEoYBChlHZXRXYXJwUmVnaXN0cmF0aW9uUGFyYW1zEjMubWlzdGdhdGUuYWRtaW4udjEuR2V0V2FycFJlZ2lzdHJhdGlvblBhcmFtc1JlcXVlc3QaNC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRXYXJwUmVnaXN0cmF0aW9uUGFyYW1zUmVzcG9uc2USjwEKHFVwZGF0ZVdhcnBSZWdpc3RyYXRpb25QYXJhbXMSNi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVXYXJwUmVnaXN0cmF0aW9uUGFyYW1zUmVxdWVzdBo3Lm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVdhcnBSZWdpc3RyYXRpb25QYXJhbXNSZXNwb25zZRJ3ChRHZXRXYXJwUmVhY2hTZXR0aW5ncxIuLm1pc3RnYXRlLmFkbWluLnYxLkdldFdhcnBSZWFjaFNldHRpbmdzUmVxdWVzdBovLm1pc3RnYXRlLmFkbWluLnYxLkdldFdhcnBSZWFjaFNldHRpbmdzUmVzcG9uc2USgAEKF1VwZGF0ZVdhcnBSZWFjaFNldHRpbmdzEjEubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlV2FycFJlYWNoU2V0dGluZ3NSZXF1ZXN0GjIubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlV2FycFJlYWNoU2V0dGluZ3NSZXNwb25zZULEAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQglXYXJwUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common]);
 
 /**
  * A WARP account without its secrets (private key, access token, license).
@@ -354,6 +354,24 @@ export type GetWarpResponse = Message<"mistgate.admin.v1.GetWarpResponse"> & {
    * @generated from field: repeated mistgate.admin.v1.WarpInbound inbounds = 9;
    */
   inbounds: WarpInbound[];
+
+  /**
+   * What the sites of the reach settings showed through this node's WARP the last time the node checked; unset while it has no
+   * result (see reach_state).
+   *
+   * @generated from field: mistgate.admin.v1.WarpReachView reach = 10;
+   */
+  reach?: WarpReachView | undefined;
+
+  /**
+   * Why reach is, or is not, set: "ready" (reach is the node's latest result), "waiting" (the check is on and the node has
+   * not answered yet: it is offline, its WARP is not up, or the first round has not come), "disabled" (the owner's list is
+   * empty) or "agent_too_old" (the node's agent lacks "warp-reach/1", so the panel sends it nothing; the rest of this response
+   * is unaffected).
+   *
+   * @generated from field: string reach_state = 11;
+   */
+  reachState: string;
 };
 
 /**
@@ -362,6 +380,198 @@ export type GetWarpResponse = Message<"mistgate.admin.v1.GetWarpResponse"> & {
  */
 export const GetWarpResponseSchema: GenMessage<GetWarpResponse> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_warp, 4);
+
+/**
+ * One site's answer in WarpReachView.
+ *
+ * @generated from message mistgate.admin.v1.WarpReachDomain
+ */
+export type WarpReachDomain = Message<"mistgate.admin.v1.WarpReachDomain"> & {
+  /**
+   * @generated from field: string domain = 1;
+   */
+  domain: string;
+
+  /**
+   * "ok" | "blocked" | "unreachable" | "error". blocked: a block page (451, or a 403 page of Cloudflare error 1006-1012/1020,
+   * Akamai, CloudFront's country block, a site's own "not available in your country"); unreachable: no answer (DNS, connect,
+   * TLS, time); error: an answer that is neither (a server error, a rate limit, a challenge, a 403 the node cannot place).
+   *
+   * @generated from field: string verdict = 2;
+   */
+  verdict: string;
+
+  /**
+   * HTTP status of the page the verdict is about; 0 = no answer.
+   *
+   * @generated from field: uint32 http_status = 3;
+   */
+  httpStatus: number;
+
+  /**
+   * @generated from field: uint32 latency_ms = 4;
+   */
+  latencyMs: number;
+
+  /**
+   * How many checks of this node said "blocked" since the last "ok" (a timeout or an error between them does not end it). The
+   * Health alert WARP_REACH is open from 2 until the next "ok".
+   *
+   * @generated from field: uint32 blocked_streak = 5;
+   */
+  blockedStreak: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.WarpReachDomain.
+ * Use `create(WarpReachDomainSchema)` to create a new message.
+ */
+export const WarpReachDomainSchema: GenMessage<WarpReachDomain> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_warp, 5);
+
+/**
+ * The node's latest reach check.
+ *
+ * @generated from message mistgate.admin.v1.WarpReachView
+ */
+export type WarpReachView = Message<"mistgate.admin.v1.WarpReachView"> & {
+  /**
+   * When the panel stored it.
+   *
+   * @generated from field: int64 checked_unix = 1 [jstype = JS_NUMBER];
+   */
+  checkedUnix: bigint;
+
+  /**
+   * The Cloudflare colo of the node's WARP exit at that run ("" = the trace failed).
+   *
+   * @generated from field: string colo = 2;
+   */
+  colo: string;
+
+  /**
+   * In the order of the settings at that time.
+   *
+   * @generated from field: repeated mistgate.admin.v1.WarpReachDomain domains = 3;
+   */
+  domains: WarpReachDomain[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.WarpReachView.
+ * Use `create(WarpReachViewSchema)` to create a new message.
+ */
+export const WarpReachViewSchema: GenMessage<WarpReachView> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_warp, 6);
+
+/**
+ * @generated from message mistgate.admin.v1.WarpReachSettings
+ */
+export type WarpReachSettings = Message<"mistgate.admin.v1.WarpReachSettings"> & {
+  /**
+   * Lower-case host names (at least two labels, no address, port or path), at most 8. Empty = the check is off.
+   *
+   * @generated from field: repeated string domains = 1;
+   */
+  domains: string[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.WarpReachSettings.
+ * Use `create(WarpReachSettingsSchema)` to create a new message.
+ */
+export const WarpReachSettingsSchema: GenMessage<WarpReachSettings> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_warp, 7);
+
+/**
+ * @generated from message mistgate.admin.v1.GetWarpReachSettingsRequest
+ */
+export type GetWarpReachSettingsRequest = Message<"mistgate.admin.v1.GetWarpReachSettingsRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetWarpReachSettingsRequest.
+ * Use `create(GetWarpReachSettingsRequestSchema)` to create a new message.
+ */
+export const GetWarpReachSettingsRequestSchema: GenMessage<GetWarpReachSettingsRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_warp, 8);
+
+/**
+ * @generated from message mistgate.admin.v1.GetWarpReachSettingsResponse
+ */
+export type GetWarpReachSettingsResponse = Message<"mistgate.admin.v1.GetWarpReachSettingsResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.WarpReachSettings settings = 1;
+   */
+  settings?: WarpReachSettings | undefined;
+
+  /**
+   * The built-in list: what "use the built-in list" gives.
+   *
+   * @generated from field: mistgate.admin.v1.WarpReachSettings defaults = 2;
+   */
+  defaults?: WarpReachSettings | undefined;
+
+  /**
+   * The owner changed the list (it is stored, even when it equals the built-in one or is empty).
+   *
+   * @generated from field: bool customised = 3;
+   */
+  customised: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetWarpReachSettingsResponse.
+ * Use `create(GetWarpReachSettingsResponseSchema)` to create a new message.
+ */
+export const GetWarpReachSettingsResponseSchema: GenMessage<GetWarpReachSettingsResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_warp, 9);
+
+/**
+ * @generated from message mistgate.admin.v1.UpdateWarpReachSettingsRequest
+ */
+export type UpdateWarpReachSettingsRequest = Message<"mistgate.admin.v1.UpdateWarpReachSettingsRequest"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.WarpReachSettings settings = 1;
+   */
+  settings?: WarpReachSettings | undefined;
+
+  /**
+   * true: forget the owner's list and use the built-in one again (settings is ignored).
+   *
+   * @generated from field: bool use_defaults = 2;
+   */
+  useDefaults: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.UpdateWarpReachSettingsRequest.
+ * Use `create(UpdateWarpReachSettingsRequestSchema)` to create a new message.
+ */
+export const UpdateWarpReachSettingsRequestSchema: GenMessage<UpdateWarpReachSettingsRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_warp, 10);
+
+/**
+ * @generated from message mistgate.admin.v1.UpdateWarpReachSettingsResponse
+ */
+export type UpdateWarpReachSettingsResponse = Message<"mistgate.admin.v1.UpdateWarpReachSettingsResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.WarpReachSettings settings = 1;
+   */
+  settings?: WarpReachSettings | undefined;
+
+  /**
+   * @generated from field: bool customised = 2;
+   */
+  customised: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.UpdateWarpReachSettingsResponse.
+ * Use `create(UpdateWarpReachSettingsResponseSchema)` to create a new message.
+ */
+export const UpdateWarpReachSettingsResponseSchema: GenMessage<UpdateWarpReachSettingsResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_warp, 11);
 
 /**
  * A profile on the node whose traffic leaves through WARP.
@@ -392,7 +602,7 @@ export type WarpInbound = Message<"mistgate.admin.v1.WarpInbound"> & {
  * Use `create(WarpInboundSchema)` to create a new message.
  */
 export const WarpInboundSchema: GenMessage<WarpInbound> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 5);
+  messageDesc(file_mistgate_admin_v1_warp, 12);
 
 /**
  * @generated from message mistgate.admin.v1.RegisterWarpRequest
@@ -432,7 +642,7 @@ export type RegisterWarpRequest = Message<"mistgate.admin.v1.RegisterWarpRequest
  * Use `create(RegisterWarpRequestSchema)` to create a new message.
  */
 export const RegisterWarpRequestSchema: GenMessage<RegisterWarpRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 6);
+  messageDesc(file_mistgate_admin_v1_warp, 13);
 
 /**
  * @generated from message mistgate.admin.v1.RegisterWarpResponse
@@ -449,7 +659,7 @@ export type RegisterWarpResponse = Message<"mistgate.admin.v1.RegisterWarpRespon
  * Use `create(RegisterWarpResponseSchema)` to create a new message.
  */
 export const RegisterWarpResponseSchema: GenMessage<RegisterWarpResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 7);
+  messageDesc(file_mistgate_admin_v1_warp, 14);
 
 /**
  * @generated from message mistgate.admin.v1.ImportWarpRequest
@@ -480,7 +690,7 @@ export type ImportWarpRequest = Message<"mistgate.admin.v1.ImportWarpRequest"> &
  * Use `create(ImportWarpRequestSchema)` to create a new message.
  */
 export const ImportWarpRequestSchema: GenMessage<ImportWarpRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 8);
+  messageDesc(file_mistgate_admin_v1_warp, 15);
 
 /**
  * @generated from message mistgate.admin.v1.ImportWarpResponse
@@ -497,7 +707,7 @@ export type ImportWarpResponse = Message<"mistgate.admin.v1.ImportWarpResponse">
  * Use `create(ImportWarpResponseSchema)` to create a new message.
  */
 export const ImportWarpResponseSchema: GenMessage<ImportWarpResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 9);
+  messageDesc(file_mistgate_admin_v1_warp, 16);
 
 /**
  * @generated from message mistgate.admin.v1.SetWarpEnabledRequest
@@ -519,7 +729,7 @@ export type SetWarpEnabledRequest = Message<"mistgate.admin.v1.SetWarpEnabledReq
  * Use `create(SetWarpEnabledRequestSchema)` to create a new message.
  */
 export const SetWarpEnabledRequestSchema: GenMessage<SetWarpEnabledRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 10);
+  messageDesc(file_mistgate_admin_v1_warp, 17);
 
 /**
  * @generated from message mistgate.admin.v1.SetWarpEnabledResponse
@@ -536,7 +746,7 @@ export type SetWarpEnabledResponse = Message<"mistgate.admin.v1.SetWarpEnabledRe
  * Use `create(SetWarpEnabledResponseSchema)` to create a new message.
  */
 export const SetWarpEnabledResponseSchema: GenMessage<SetWarpEnabledResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 11);
+  messageDesc(file_mistgate_admin_v1_warp, 18);
 
 /**
  * @generated from message mistgate.admin.v1.RestartWarpRequest
@@ -553,7 +763,7 @@ export type RestartWarpRequest = Message<"mistgate.admin.v1.RestartWarpRequest">
  * Use `create(RestartWarpRequestSchema)` to create a new message.
  */
 export const RestartWarpRequestSchema: GenMessage<RestartWarpRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 12);
+  messageDesc(file_mistgate_admin_v1_warp, 19);
 
 /**
  * @generated from message mistgate.admin.v1.RestartWarpResponse
@@ -578,7 +788,7 @@ export type RestartWarpResponse = Message<"mistgate.admin.v1.RestartWarpResponse
  * Use `create(RestartWarpResponseSchema)` to create a new message.
  */
 export const RestartWarpResponseSchema: GenMessage<RestartWarpResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 13);
+  messageDesc(file_mistgate_admin_v1_warp, 20);
 
 /**
  * @generated from message mistgate.admin.v1.RefreshWarpRequest
@@ -595,7 +805,7 @@ export type RefreshWarpRequest = Message<"mistgate.admin.v1.RefreshWarpRequest">
  * Use `create(RefreshWarpRequestSchema)` to create a new message.
  */
 export const RefreshWarpRequestSchema: GenMessage<RefreshWarpRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 14);
+  messageDesc(file_mistgate_admin_v1_warp, 21);
 
 /**
  * @generated from message mistgate.admin.v1.RefreshWarpResponse
@@ -612,7 +822,7 @@ export type RefreshWarpResponse = Message<"mistgate.admin.v1.RefreshWarpResponse
  * Use `create(RefreshWarpResponseSchema)` to create a new message.
  */
 export const RefreshWarpResponseSchema: GenMessage<RefreshWarpResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 15);
+  messageDesc(file_mistgate_admin_v1_warp, 22);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteWarpRequest
@@ -636,7 +846,7 @@ export type DeleteWarpRequest = Message<"mistgate.admin.v1.DeleteWarpRequest"> &
  * Use `create(DeleteWarpRequestSchema)` to create a new message.
  */
 export const DeleteWarpRequestSchema: GenMessage<DeleteWarpRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 16);
+  messageDesc(file_mistgate_admin_v1_warp, 23);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteWarpResponse
@@ -656,7 +866,7 @@ export type DeleteWarpResponse = Message<"mistgate.admin.v1.DeleteWarpResponse">
  * Use `create(DeleteWarpResponseSchema)` to create a new message.
  */
 export const DeleteWarpResponseSchema: GenMessage<DeleteWarpResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 17);
+  messageDesc(file_mistgate_admin_v1_warp, 24);
 
 /**
  * What the registration request is built from. Empty fields in an update fall back to the built-in value.
@@ -702,7 +912,7 @@ export type WarpRegistrationParams = Message<"mistgate.admin.v1.WarpRegistration
  * Use `create(WarpRegistrationParamsSchema)` to create a new message.
  */
 export const WarpRegistrationParamsSchema: GenMessage<WarpRegistrationParams> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 18);
+  messageDesc(file_mistgate_admin_v1_warp, 25);
 
 /**
  * @generated from message mistgate.admin.v1.GetWarpRegistrationParamsRequest
@@ -715,7 +925,7 @@ export type GetWarpRegistrationParamsRequest = Message<"mistgate.admin.v1.GetWar
  * Use `create(GetWarpRegistrationParamsRequestSchema)` to create a new message.
  */
 export const GetWarpRegistrationParamsRequestSchema: GenMessage<GetWarpRegistrationParamsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 19);
+  messageDesc(file_mistgate_admin_v1_warp, 26);
 
 /**
  * @generated from message mistgate.admin.v1.GetWarpRegistrationParamsResponse
@@ -746,7 +956,7 @@ export type GetWarpRegistrationParamsResponse = Message<"mistgate.admin.v1.GetWa
  * Use `create(GetWarpRegistrationParamsResponseSchema)` to create a new message.
  */
 export const GetWarpRegistrationParamsResponseSchema: GenMessage<GetWarpRegistrationParamsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 20);
+  messageDesc(file_mistgate_admin_v1_warp, 27);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateWarpRegistrationParamsRequest
@@ -763,7 +973,7 @@ export type UpdateWarpRegistrationParamsRequest = Message<"mistgate.admin.v1.Upd
  * Use `create(UpdateWarpRegistrationParamsRequestSchema)` to create a new message.
  */
 export const UpdateWarpRegistrationParamsRequestSchema: GenMessage<UpdateWarpRegistrationParamsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 21);
+  messageDesc(file_mistgate_admin_v1_warp, 28);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateWarpRegistrationParamsResponse
@@ -785,7 +995,7 @@ export type UpdateWarpRegistrationParamsResponse = Message<"mistgate.admin.v1.Up
  * Use `create(UpdateWarpRegistrationParamsResponseSchema)` to create a new message.
  */
 export const UpdateWarpRegistrationParamsResponseSchema: GenMessage<UpdateWarpRegistrationParamsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_warp, 22);
+  messageDesc(file_mistgate_admin_v1_warp, 29);
 
 /**
  * WARP egress of a node. One Cloudflare WARP
@@ -903,6 +1113,26 @@ export const WarpService: GenService<{
     methodKind: "unary";
     input: typeof UpdateWarpRegistrationParamsRequestSchema;
     output: typeof UpdateWarpRegistrationParamsResponseSchema;
+  },
+  /**
+   * The sites each node's WARP is checked against ("WARP reach": the node fetches them through its tunnel and says which show a
+   * block page, see GetWarpResponse.reach). A built-in short list unless the owner changed it; an empty list switches the check
+   * off. Owner only; a change is audited as warp_reach_settings.
+   *
+   * @generated from rpc mistgate.admin.v1.WarpService.GetWarpReachSettings
+   */
+  getWarpReachSettings: {
+    methodKind: "unary";
+    input: typeof GetWarpReachSettingsRequestSchema;
+    output: typeof GetWarpReachSettingsResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.WarpService.UpdateWarpReachSettings
+   */
+  updateWarpReachSettings: {
+    methodKind: "unary";
+    input: typeof UpdateWarpReachSettingsRequestSchema;
+    output: typeof UpdateWarpReachSettingsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_warp, 0);
