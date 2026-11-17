@@ -1,7 +1,7 @@
 import { Code } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Menu, MenuItem, MenuLink } from "@/components/ui/menu";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
@@ -18,7 +18,7 @@ import { G } from "@/screens/users/user-bits";
 import { inboundErrorKind, inboundErrorText } from "@/lib/inbound-error";
 import { words } from "./list";
 import { PageDialogs } from "./page-dialogs";
-import { useProfileForm } from "./page-form";
+import { useProfileForm, type FormSeed } from "./page-form";
 import { PeopleTab } from "./page-people";
 import { ServersTab } from "./page-servers";
 import { SettingsTab } from "./page-settings";
@@ -34,7 +34,7 @@ import "./profile-page.css";
 const Lnk = Link as unknown as (props: Record<string, unknown>) => ReactNode;
 
 /** What a scene fixes: the tab, the window and the state of the check's load (the app starts on the address). */
-export type PageScene = { tab?: ProfileTab; dlg?: Dlg; stale?: boolean; gone?: boolean; /** What the scene adds for a tab (its own demo state, named by the tab). */ variant?: string };
+export type PageScene = { tab?: ProfileTab; dlg?: Dlg; stale?: boolean; gone?: boolean; seed?: FormSeed; saved?: boolean; /** What the scene adds for a tab (its own demo state, named by the tab). */ variant?: string };
 
 /**
  * /profiles/$id (the board's PnProfile): the saved profile on a page of three tabs, Settings, Servers on nodes and People. The page loads the
@@ -52,6 +52,8 @@ export function ProfileEditorScreen() {
   const [edits, setEdits] = useState(0);
   const [shown, setShown] = useState<{ key: string; data: PageData } | undefined>();
   const [gone, setGone] = useState(false);
+  // the bar says "Saved" after a save; the page is drawn anew with the new version, so it is kept here
+  const [saved, setSaved] = useState(false);
   const profile = q.data?.profile;
   const info = profile && protocols.data?.find((p) => p.id === profile.protocol);
   const live = q.data && profile && info ? { key: `${profile.id}:${profile.version}:${profile.name}`, data: { profile, info, inbounds: q.data.inbounds, initial: { name: profile.name, settingsJson: q.data.settingsJson } } satisfies PageData } : undefined;
@@ -72,7 +74,7 @@ export function ProfileEditorScreen() {
   if (protocols.isError) return <Wrap><Failed t={t} onRetry={() => void protocols.refetch()} /></Wrap>;
   if (!info) return <Wrap><NotFound t={t} /></Wrap>;
   const on = shown ?? live!;
-  return <ProfilePage key={on.key} data={on.data} behind={!!live && live.key !== on.key} onEdits={setEdits} onReload={reload} onGone={() => setGone(true)} />;
+  return <ProfilePage key={on.key} data={on.data} behind={!!live && live.key !== on.key} onEdits={setEdits} saved={saved} onSaved={(v) => { setSaved(v); if (v) setEdits(0); }} onReload={reload} onGone={() => setGone(true)} />;
 }
 
 /** The page's frame: the way back above whatever the page says. */
@@ -200,7 +202,7 @@ function verdictOf(args: { st: ReturnType<typeof stateOf>; bad: ServerRow[]; own
  * people, "Put on nodes" and the menu), the verdict, the three tabs. `scene` (the dev kit) fixes the tab and a window in the page's own
  * state, so a scene's address names them and a click on a tab does not leave the scene.
  */
-export function ProfilePage({ data, behind, onEdits, onReload, onGone, scene }: { data: PageData; behind?: boolean; onEdits?: (n: number) => void; onReload?: () => void; onGone?: () => void; scene?: PageScene }) {
+export function ProfilePage({ data, behind, onEdits, saved = false, onSaved, onReload, onGone, scene }: { data: PageData; behind?: boolean; onEdits?: (n: number) => void; saved?: boolean; onSaved?: (on: boolean) => void; onReload?: () => void; onGone?: () => void; scene?: PageScene }) {
   const t = useTx();
   const fx = useEffectsEnabled();
   const navigate = useNavigate();
@@ -220,10 +222,16 @@ export function ProfilePage({ data, behind, onEdits, onReload, onGone, scene }: 
   const [stale, setStale] = useState(!!scene?.stale);
   const readOnly = !owner;
 
-  const form = useProfileForm(data, readOnly, () => setStale(true));
+  const form = useProfileForm(data, readOnly, () => setStale(true), (on) => onSaved?.(on), scene?.seed);
+  const latest = useRef({ onEdits, onSaved });
   useEffect(() => {
-    onEdits?.(form.count);
-  }, [onEdits, form.count]);
+    latest.current = { onEdits, onSaved };
+  });
+  useEffect(() => {
+    latest.current.onEdits?.(form.count);
+    // typing after a save takes the "Saved" back
+    if (form.count > 0) latest.current.onSaved?.(false);
+  }, [form.count]);
 
   const servers = serverRows(inbounds, nodeList.data?.nodes ?? [], checks.cells(profile.id));
   const groups = groupList.data ?? [];
@@ -282,7 +290,7 @@ export function ProfilePage({ data, behind, onEdits, onReload, onGone, scene }: 
       content: (
         <>
           {lead}
-          <SettingsTab ctx={ctx} form={form} readOnly={readOnly} />
+          <SettingsTab ctx={ctx} form={form} readOnly={readOnly} saved={saved || !!scene?.saved} />
         </>
       ),
     },

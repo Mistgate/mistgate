@@ -40,6 +40,7 @@ import { zh as shellZh } from "./shell";
 import { zh as nodesviewZh } from "./nodesview";
 import { zh as userslistZh } from "./userslist";
 import { zh as userspageZh } from "./userspage";
+import { zh as profilenewZh } from "./profilenew";
 import { zh as overviewZh } from "./overview";
 import { zh as windowsZh } from "./windows";
 import { zh as nodepageZh } from "./nodepage";
@@ -309,4 +310,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...profilespageZh, ...profilesrvZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...profilespageZh, ...profilesrvZh, ...profilenewZh };

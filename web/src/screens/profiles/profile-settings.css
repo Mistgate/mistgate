@@ -1,0 +1,364 @@
+/*
+ * The Settings tab of the profile page (screens/profiles/page-settings.tsx, page-fields.tsx): the form's rows and controls, the remarks, the
+ * bar that holds the changes, the right column and the window "Save changes?" (PnProfile + pn.css: the pp-, pf-, pr- and up-dz rules, in
+ * the board's order). A container query of the board is a media query here.
+ */
+/* L3551 */
+.pf .up-dz .btn.up-del:hover {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+/* L3973 */
+.pf .pr-fm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+/* L3974 */
+.pf .pr-fm>span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding-block: 0 0;
+  padding-inline: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+/* L3975 */
+.pf .pr-fm svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.6;
+  color: var(--accent-text);
+}
+/* L3976 */
+.pf .pr-fm .no {
+  color: var(--muted);
+  border-style: dashed;
+}
+/* L3976 */
+.pf .pr-fm .no svg {
+  color: var(--muted);
+}
+/* L4306 */
+.pf .pf-dn {
+  color: var(--warning-text)!important;
+}
+/* L4411 */
+.pf .pf-ib {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* L4412 */
+.pf .pf-ib>.an-i {
+  flex: 1;
+  min-width: 0;
+}
+/* L4412 */
+.pf .pf-ib>.btn {
+  flex: none;
+  height: 44px;
+}
+/* L4413 */
+.pf .pf-ib>em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--muted);
+}
+/* L4584 */
+.pf .pp-grid.ro .pp-ct {
+  pointer-events: none;
+  opacity: .7;
+}
+/* L4607 */
+.pf .pp-ct>.an-i,.pf .pp-ct .pf-ib>.an-i {
+  height: 44px;
+}
+/* L4609 */
+.pf .pp-short>.an-i {
+  flex: 0 1 140px;
+}
+/* L4610 */
+.pf .pp-seg {
+  align-self: flex-start;
+  max-width: 100%;
+}
+/* L4611 */
+.pf .pp-seg button.dis {
+  opacity: .4;
+  cursor: default;
+}
+/* L4630 */
+.pf .pp-more {
+  align-self: flex-start;
+  font-size: 13px;
+}
+/* L4644 */
+.pf .pp-show {
+  font-size: 13px;
+}
+/* L4657 */
+.pf .pp-rmc .pp-sh {
+  padding-bottom: 8px;
+}
+/* L4658 */
+.pf .pp-errh {
+  margin: 0 20px 8px;
+  font-size: 13px;
+  color: var(--danger-text);
+}
+/* L4659 */
+.pf .pp-rm {
+  display: grid;
+  grid-template-columns: 10px minmax(0,1fr) auto auto auto;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 48px;
+  padding: 8px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+/* L4660 */
+.pf .pp-rm>.rw-gl {
+  margin-top: 0;
+}
+/* L4660 */
+.pf .pp-rm em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+/* L4661 */
+.pf .pp-rm .an-lk,.pf .pp-sci .an-lk {
+  font-size: 13px;
+  white-space: nowrap;
+}
+/* L4664 */
+.pf .pp-save {
+  bottom: 64px;
+}
+/* L4665 */
+.pf .pp-as {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* L4666 */
+.pf .pp-asb {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px 16px;
+}
+/* L4667 */
+.pf .pp-ash {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* L4672 */
+.pf .pp-pre {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--sec);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+/* L4706 */
+.pf .pp-db {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* L4706 */
+.pf .pp-db>* {
+  flex: none;
+}
+/* L4707 */
+.pf .pp-db>.rw-sl {
+  margin-top: 8px;
+}
+/* L4707 */
+.pf .pp-db>.rw-sl:first-child {
+  margin-top: 0;
+}
+/* L4707 */
+.pf .pp-db>p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--sec);
+}
+/* L4708 */
+.pf .pp-chg {
+  display: grid;
+  grid-template-columns: minmax(0,200px) minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 14px;
+}
+/* L4709 */
+.pf .pp-chg b {
+  font-weight: 500;
+}
+/* L4709 */
+.pf .pp-chg span {
+  color: var(--sec);
+  overflow-wrap: anywhere;
+}
+/* L4710 */
+.pf .pp-imp {
+  display: grid;
+  grid-template-columns: 10px minmax(0,1fr) auto;
+  align-items: start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 20px;
+}
+/* L4711 */
+.pf .pp-imp>.rw-gl {
+  margin-top: 6px;
+}
+/* L4711 */
+.pf .pp-imp em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+/* L4711 */
+.pf .pp-imp .an-lk {
+  font-size: 13px;
+  white-space: nowrap;
+}
+/* L4712 */
+.pf .pp-imp span {
+  display: inline;
+}
+/* L4712 */
+.pf .pp-imp .rw-later {
+  margin-inline-start: 6px;
+}
+/* L4720 */
+.pf .pp-dlg .btn[aria-disabled="true"],.pf .pp-save .btn[aria-disabled="true"],.pf .pp-mn2 button[aria-disabled="true"] {
+  opacity: .45;
+  cursor: default;
+}
+/* L4722 */
+@media (max-width: 1040px) {
+  .pf .pp-as {
+    position: static;
+  }
+}
+/* L4723 */
+@media (max-width: 720px) {
+  .pf .pp-rm {
+    grid-template-columns: 10px minmax(0,1fr);
+    padding: 10px 16px;
+  }
+}
+/* L4723 */
+@media (max-width: 720px) {
+  .pf .pp-rm>.btn {
+    grid-column: 1/-1;
+  }
+}
+/* L4723 */
+@media (max-width: 720px) {
+  .pf .pp-rm>.an-lk {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+/* L4725 */
+@media (max-width: 720px) {
+  .pf .pp-chg {
+    grid-template-columns: minmax(0,1fr) auto;
+  }
+}
+/* L4725 */
+@media (max-width: 720px) {
+  .pf .pp-chg span {
+    grid-column: 1/-1;
+    grid-row: 2;
+  }
+}
+/* L4725 */
+@media (max-width: 720px) {
+  .pf .pp-save {
+    bottom: 88px;
+  }
+}
+/* L4792 */
+.pf .pp-pcn {
+  margin: 8px 0 0;
+}
+/* L5216 */
+.pf .pp-row.err .an-i {
+  border-color: color-mix(in srgb,var(--danger) 60%,var(--border));
+}
+/* L5217 */
+.pf .pp-row.err .pp-lb>b {
+  color: var(--danger-text);
+}
+
+
+/* ---- what the form of the product adds to the board's rows ---- */
+.pf .pp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pf .pp-form.ro .pp-ct {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.pf .pp-ct > .pf-ib.pp-range {
+  gap: 6px;
+}
+.pf .pp-range > .pf-ib > .an-i {
+  flex: 0 1 100px;
+  width: 100px;
+}
+.pf .pp-fes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pf .pp-sec > .pp-quiet {
+  padding-top: 0;
+}
+/* the sticky bar sits at the foot of the window: the board's 64px leaves room for its own demo switcher */
+.pf .pp-save {
+  bottom: 16px;
+}
+@media (max-width: 720px) {
+  .pf .pp-save {
+    bottom: 88px;
+  }
+}
+.pf .pp-sec > .pp-adv > .pp-advb > .pp-row:first-child {
+  border-top: 0;
+}
+.pf .pp-asb .pp-pre > div {
+  white-space: pre-wrap;
+}

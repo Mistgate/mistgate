@@ -205,7 +205,7 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
 }
 
 /** Digits only (plus one dot for a non-integer); an empty box stays empty and the server names the problem. */
-function NumberInput({ label, value, integer, invalid, describedBy, onChange, className }: { label: string; value: unknown; integer: boolean; invalid: boolean; describedBy?: string; onChange: (v: number | string) => void; className?: string }) {
+export function NumberInput({ label, value, integer, invalid, describedBy, onChange, className }: { label: string; value: unknown; integer: boolean; invalid: boolean; describedBy?: string; onChange: (v: number | string) => void; className?: string }) {
   return (
     <input
       aria-label={label}
@@ -230,7 +230,7 @@ const asList = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : [])
  * the schema's limit, and a bad value's problem right under its box. An empty box stays on screen while it is being
  * filled but is not part of the value, so a fresh "Add" never turns into a server error.
  */
-function StringList({ f, label, t, value, describedBy, onChange }: { f: Field; label: string; t: Tx; value: unknown; describedBy?: string; onChange: (v: string[]) => void }) {
+export function StringList({ f, label, t, value, describedBy, onChange }: { f: Field; label: string; t: Tx; value: unknown; describedBy?: string; onChange: (v: string[]) => void }) {
   const values = asList(value);
   const [rows, setRows] = useState(values);
   const id = useId();
@@ -318,7 +318,7 @@ function StringList({ f, label, t, value, describedBy, onChange }: { f: Field; l
  * says "••••"), so a saved one can be replaced but not read; a value typed or generated here stays local until the
  * profile is saved, so showing and copying it costs nothing.
  */
-function SecretField({ label, value, invalid, t, make, onChange }: { label: string; value: unknown; invalid: boolean; t: Tx; make: () => string; onChange: (v: string) => void }) {
+export function SecretField({ label, value, invalid, t, make, onChange }: { label: string; value: unknown; invalid: boolean; t: Tx; make: () => string; onChange: (v: string) => void }) {
   const toast = useToast();
   const [shown, setShown] = useState(false);
   const stored = value === MASK; // kept on the server: nothing to show or copy

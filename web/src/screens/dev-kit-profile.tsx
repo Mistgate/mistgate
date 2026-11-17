@@ -21,6 +21,7 @@ import { updatesQuery } from "@/lib/updates";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { checksOf, connectionsOf, GROUPS, NODES, NOW, nid, nodeRows, PROFILES, PROTOCOLS, relaysOf, summaries, type Fleet } from "@/screens/dev-kit-profiles-data";
 import { ProfilePage, type PageScene } from "@/screens/profiles/page";
+import { setAt, type Settings } from "@/screens/profiles/schema";
 import type { PageData } from "@/screens/profiles/page-types";
 import { fleetConnectionsQuery } from "@/screens/profiles/profiles-data";
 import * as fixture from "@/screens/profiles/schema.fixtures";
@@ -72,15 +73,15 @@ const SETTINGS: Record<string, string> = {
   tg1: JSON.stringify({ port: 8443, fake_tls: { kind: "own", domain: "" } }),
 };
 
-const key = (id: string) => id.replace("prf_", "");
+const kid = (id: string) => id.replace("prf_", "");
 
 /** The profile a scene shows, as the panel answers GetProfile for it. */
 export function pageDataOf(profileKey: string): PageData {
-  const spec = PROFILES.find((p) => key(p.id) === profileKey) ?? PROFILES[0]!;
+  const spec = PROFILES.find((p) => kid(p.id) === profileKey) ?? PROFILES[0]!;
   const info = PROTOCOLS.find((p) => p.id === spec.protocol)!;
   const sum = summaries().find((s) => s.id === spec.id)!;
   const inbounds = Object.entries(spec.sv).map(([node, st]) => ({
-    id: `inb_${key(spec.id)}_${node}`,
+    id: `inb_${kid(spec.id)}_${node}`,
     profileId: spec.id,
     profileName: spec.name,
     protocol: spec.protocol,
@@ -118,22 +119,35 @@ export const partsOf = (state: string): Parts => {
 export function sceneOf(state: string): PageScene {
   const { tab, variant } = partsOf(state);
   const dlg = (["put", "take", "twin", "del"] as const).find((d) => variant.split(".").includes(d));
-  return { tab, ...(dlg && { dlg }), ...(variant.split(".").includes("stale") && { stale: true }), ...(variant.split(".").includes("gone") && { gone: true }), variant };
+  const v = variant.split(".");
+  const bumped = (b: Settings) => setAt(b, ["port"], 9443);
+  return {
+    tab,
+    ...(dlg && { dlg }),
+    ...(v.includes("stale") && { stale: true }),
+    ...(v.includes("gone") && { gone: true }),
+    ...(v.includes("saved") && { saved: true }),
+    ...((v.includes("dirty") || v.includes("impact")) && { seed: { settings: bumped, ...(v.includes("impact") && { impact: { criticalFields: ["/port"], inboundsRestarted: 2, usersOnline: 3, devicesNeedReissue: 0, affectedUserNames: ["alice", "bob", "carol"] } as never }) } }),
+    ...(v.includes("errors") && { seed: { settings: (b: Settings) => setAt(b, ["port"], 0), name: "" } }),
+    variant,
+  };
 }
 
 const fleetOf = (variant: string): Fleet => ({ out: variant.split(".").includes("out"), noChecks: variant.split(".").includes("nochecks") });
 
 /** The panel's calls of the page's own load states (the scene is its own page, so patching the shared client is safe). */
-function fakeCalls() {
+function fakeCalls(variant: string) {
   const p = profilesApi as unknown as Record<string, unknown>;
-  p.previewProfile = async () => ({ errors: [], warnings: [], clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined });
+  const errors = variant.split(".").includes("errors") ? [{ pointer: "/port", code: "invalid", message: "Port must be from 1 to 65535", params: {} }] : [];
+  const warnings = variant.split(".").includes("warns") ? [{ pointer: "/port", code: "preset_port", message: "The look of DNS is usually on port 53", params: { preset: "dns" } }] : [];
+  p.previewProfile = async () => ({ errors, warnings, clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined });
   p.updateProfile = async () => ({ profile: undefined, impact: undefined });
 }
 
 /** The private query cache of a scene (exported for its smoke test). */
 export function seeded(state: string, role: Role) {
   const { variant } = partsOf(state);
-  fakeCalls();
+  fakeCalls(variant);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0 } as never);
   c.setQueryData(nodesQuery.queryKey, { nodes: nodeRows(), expectedAgentVersion: "0.1.71" } as never);
@@ -185,6 +199,11 @@ export const frames: Frame[] = [
   { id: "profile-hy1-phone", state: "hy1.settings", title: "A phone, 400 wide", w: 400, h: 1800 },
   { id: "profile-hy1-fa", state: "hy1.settings", title: "Right to left (fa)", w: 1440, h: 1100, params: "&lang=fa" },
   { id: "profile-hy1-dirty", state: "hy1.settings.dirty", title: "Changes typed: the bar, the dot on the tab", w: 1440, h: 1100 },
+  { id: "profile-hy1-impact", state: "hy1.settings.impact", title: "\"Save changes?\": what the critical change does to people", w: 1440, h: 1100 },
+  { id: "profile-hy1-impact-phone", state: "hy1.settings.impact", title: "The same window on a phone (a sheet)", w: 400, h: 900 },
+  { id: "profile-hy1-errors", state: "hy1.settings.errors", title: "A field the server refuses: the remark, the red row, Save cannot be pressed", w: 1440, h: 1100 },
+  { id: "profile-aw1-warns", state: "aw1.settings.warns", title: "A warning of the server: the remark with \"To the field\"", w: 1440, h: 1400 },
+  { id: "profile-hy1-saved", state: "hy1.settings.saved", title: "Saved: the bar says so", w: 1440, h: 1100 },
   { id: "profile-hy1-stale", state: "hy1.settings.stale", title: "Saved in another window", w: 1440, h: 1100 },
   { id: "profile-hy1-readonly", state: "hy1.settings", title: "An observer: the form reads, nothing changes", w: 1440, h: 1100, params: "&role=readonly" },
   { id: "profile-hy3", state: "hy3.settings", title: "On no node: the verdict says so", w: 1440, h: 1000 },

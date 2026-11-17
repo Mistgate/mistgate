@@ -33,9 +33,6 @@ import { TextsTab } from "@/screens/subscriptions/texts";
 import { LinkModal } from "@/screens/users/link-modal";
 import { NodeDemos } from "@/screens/dev-kit-node";
 import { PortsKit } from "@/screens/dev-kit-ports";
-import { VlessKit } from "@/screens/dev-kit-vless";
-import { ProfileDeleteKit } from "@/screens/dev-kit-profile-delete";
-import { ProfileFixesKit } from "@/screens/dev-kit-profile-fixes";
 import { useT } from "@/i18n";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
@@ -73,7 +70,6 @@ import { AiKit } from "./dev-kit-ai";
 import { FxKit } from "./dev-kit-fx";
 import { GraphKit } from "./dev-kit-graph";
 import { AwgRelayKit } from "./dev-kit-awg-relay";
-import { TrustTunnelKit } from "./dev-kit-trusttunnel";
 import { BridgeKit } from "./dev-kit-bridge";
 import { FoundationKit } from "./dev-kit-foundation";
 import { NodePageFrame, NodePageKit } from "./dev-kit-node-page";
@@ -83,6 +79,7 @@ import { NodesKit, NodesPage } from "./dev-kit-nodes";
 import { PnUsersKit, UsersPage } from "./dev-kit-users-page";
 import { PnProfilesKit, ProfilesPage } from "./dev-kit-profiles";
 import { PnProfileKit, ProfileScenePage } from "./dev-kit-profile";
+import { PnProfileNewKit, ProfileNewPage } from "./dev-kit-profile-new";
 import { UserKit, UserPage } from "./dev-kit-user";
 import { GroupKit, GroupScenePage } from "./dev-kit-group";
 import { WindowsKit, WindowsPage } from "./dev-kit-windows";
@@ -328,13 +325,14 @@ export default function DevKit() {
   if (which === "users-page") return <UsersPage />;
   if (which === "profiles-page") return <ProfilesPage />;
   if (which === "profile-page") return <ProfileScenePage />;
+  if (which === "profile-new-page") return <ProfileNewPage />;
   if (which === "user-page") return <UserPage />;
   if (which === "group-page") return <GroupScenePage />;
   if (which === "windows-page") return <WindowsPage />;
   if (which === "nodepage-frame") return <NodePageFrame />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { "profile-fixes": ProfileFixesKit, "profile-delete": ProfileDeleteKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "pn-users": PnUsersKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-user": UserKit, "pn-group": GroupKit }[which];
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "pn-users": PnUsersKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit, "pn-user": UserKit, "pn-group": GroupKit }[which];
   if (only) {
     const Kit = only;
     return (
@@ -558,8 +556,6 @@ export default function DevKit() {
 
       <NodeDemos />
       <PortsKit />
-      <VlessKit />
-      <ProfileFixesKit />
 
       <HealthWarpKit />
       <PagingKit />

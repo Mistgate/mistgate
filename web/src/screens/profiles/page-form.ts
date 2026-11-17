@@ -10,7 +10,7 @@ import { fieldErrors, isCode } from "@/screens/users/rpc";
 import { useTx } from "@/screens/users/t";
 import { useDebounced } from "@/screens/users/ui";
 import type { PageData } from "./page-types";
-import { allFields, changedFields, getAt, parseSchema, parseSettings, type Field, type Settings } from "./schema";
+import { allFields, changedFields, parseSchema, parseSettings, type Field, type Settings } from "./schema";
 import type { Problem } from "./schema-form";
 
 /**
@@ -19,7 +19,10 @@ import type { Problem } from "./schema-form";
  * would change for people (the window "Save changes?"), and the answers a save can get: a version saved elsewhere, a port the delivery
  * check refuses. `count` is the number of changed fields (the name is one); the page shows it on the tab and in the bar.
  */
-export function useProfileForm(data: PageData, readOnly: boolean, onStale: () => void) {
+/** What the dev kit starts the form with: a changed setting and name, and the window "Save changes?" open with an answer made up for it. */
+export type FormSeed = { settings?: (base: Settings) => Settings; name?: string; impact?: ProfileImpact };
+
+export function useProfileForm(data: PageData, readOnly: boolean, onStale: () => void, onSaved?: (on: boolean) => void, seed?: FormSeed) {
   const t = useTx();
   const toast = useToast();
   const qc = useQueryClient();
@@ -27,18 +30,17 @@ export function useProfileForm(data: PageData, readOnly: boolean, onStale: () =>
   const groups = useMemo(() => parseSchema(info.settingsSchemaJson), [info.settingsSchemaJson]);
   const fields = useMemo(() => allFields(groups), [groups]);
   const base = useMemo(() => parseSettings(initial.settingsJson), [initial.settingsJson]);
-  const [settings, setSettings] = useState<Settings>(base);
-  const [name, setName] = useState(initial.name);
+  const [settings, setSettings] = useState<Settings>(() => seed?.settings?.(base) ?? base);
+  const [name, setName] = useState(seed?.name ?? initial.name);
   const [nameError, setNameError] = useState(false);
   const [saveProblems, setSaveProblems] = useState<Problem[]>([]);
   // the delivery check refused the new port on a node (port_lossy), and the admin's "save anyway" (allow_lossy_port)
   const [lossy, setLossy] = useState<Record<string, string> | null>(null);
   const [anyway, setAnyway] = useState(false);
   // kept after the window closes, so its text does not go blank while it fades out
-  const [impact, setImpact] = useState<{ impact: ProfileImpact; fields: Field[] } | null>(null);
-  const [impactOpen, setImpactOpen] = useState(false);
+  const [impact, setImpact] = useState<{ impact: ProfileImpact; fields: Field[] } | null>(() => (seed?.impact ? { impact: seed.impact, fields: allFields(parseSchema(info.settingsSchemaJson)).filter((f) => f.critical).slice(0, 1) } : null));
+  const [impactOpen, setImpactOpen] = useState(!!seed?.impact);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const settingsJson = JSON.stringify(settings);
   const debounced = useDebounced(settingsJson, 350);
@@ -62,12 +64,10 @@ export function useProfileForm(data: PageData, readOnly: boolean, onStale: () =>
     setSaveProblems([]);
     setLossy(null);
     setAnyway(false);
-    setSaved(false);
   };
   const rename = (v: string) => {
     setName(v);
     setNameError(false);
-    setSaved(false);
   };
   const discard = () => {
     setSettings(base);
@@ -105,7 +105,7 @@ export function useProfileForm(data: PageData, readOnly: boolean, onStale: () =>
       }
       await profiles.updateProfile(request);
       setImpactOpen(false);
-      setSaved(true);
+      onSaved?.(true); // saved: the form takes the new version when it arrives, and the bar says so
       await qc.invalidateQueries({ queryKey: ["profiles"] });
       toast(profile.nodeCount > 0 ? t.n("profiles.savedRollout", profile.nodeCount) : t("profiles.saved"));
     } catch (e) {
@@ -138,10 +138,8 @@ export function useProfileForm(data: PageData, readOnly: boolean, onStale: () =>
     discard,
     save,
     busy,
-    saved,
     lossy,
     setAnyway,
-    getAt: (path: string[]) => getAt(settings, path),
     impact,
     impactOpen,
     closeImpact: () => setImpactOpen(false),
