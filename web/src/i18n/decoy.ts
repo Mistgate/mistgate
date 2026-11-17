@@ -59,7 +59,6 @@ export const en = {
   // the bulk change on Nodes
   "decoy.bulk.action": "Set decoy site",
   "decoy.bulk.title": "Decoy site for {n} node|Decoy site for {n} nodes",
-  "decoy.bulk.ownBlocked": "Own site is off: no site is uploaded for {names}. Upload one in each node’s Settings first.",
 };
 
 export const ru: typeof en = {
@@ -116,7 +115,6 @@ export const ru: typeof en = {
 
   "decoy.bulk.action": "Сменить сайт-ширму",
   "decoy.bulk.title": "Сайт-ширма для {n} ноды|Сайт-ширма для {n} нод|Сайт-ширма для {n} нод",
-  "decoy.bulk.ownBlocked": "«Свой сайт» выключен: для {names} ничего не загружено. Сначала загрузи сайт в настройках каждой ноды.",
 };
 
 export const zh: typeof en = {
@@ -173,7 +171,6 @@ export const zh: typeof en = {
 
   "decoy.bulk.action": "设置伪装站点",
   "decoy.bulk.title": "为 {n} 个节点设置伪装站点",
-  "decoy.bulk.ownBlocked": "「自有站点」不可用：尚未为 {names} 上传站点。请先在各节点的「设置」中上传。",
 };
 
 export const fa: typeof en = {
@@ -226,7 +223,6 @@ export const fa: typeof en = {
   "decoy.reason.unknown": "هنوز اعمال نشده ({code}).",
   "decoy.bulk.action": "تغییر سایت پوششی",
   "decoy.bulk.title": "سایت پوششی برای {n} نود",
-  "decoy.bulk.ownBlocked": "«سایت اختصاصی» غیرفعال است: برای {names} چیزی بارگذاری نشده. اول در تنظیمات هر نود یک سایت بارگذاری کن.",
 };
 
 export const tr: typeof en = {
@@ -279,5 +275,4 @@ export const tr: typeof en = {
   "decoy.reason.unknown": "Henüz uygulanmadı ({code}).",
   "decoy.bulk.action": "Kamuflaj sitesini ayarla",
   "decoy.bulk.title": "{n} düğüm için kamuflaj sitesi",
-  "decoy.bulk.ownBlocked": "“Kendi sitem” kapalı: şu düğümler için site yüklenmedi: {names}. Önce her düğümün Ayarlar bölümünden bir site yükle.",
 };
