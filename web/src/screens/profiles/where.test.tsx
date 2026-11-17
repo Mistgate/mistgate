@@ -94,14 +94,14 @@ const type = (el: HTMLInputElement, value: string) =>
   });
 
 describe("the status line and the three columns", () => {
-  it("says what works, and every name is a link: the node to its profiles, the group to its editor, the users to the list", async () => {
+  it("says what works, and every name is a link: the node to its profiles, the group to its page, the users to the list", async () => {
     await mount(profile(), [inbound()], [group(), group({ id: "grp_2", name: "friends", userCount: 2 })]);
     expect(text()).toContain("Working: 1 node, 2 groups, 7 users");
     const nodeLink = [...document.querySelectorAll<HTMLAnchorElement>("a")].find((a) => a.textContent === "de1")!;
     expect(nodeLink.dataset.search).toBe(JSON.stringify({ tab: "profiles" }));
     expect(text()).toContain(":51820");
     const groupLink = document.querySelector<HTMLAnchorElement>('a[aria-label="Open group “friends”"]')!;
-    expect(groupLink.dataset.search).toBe(JSON.stringify({ tab: "groups", group: "grp_2" }));
+    expect(groupLink.dataset.params).toBe(JSON.stringify({ id: "grp_2" }));
     // users per group link to the users list filtered by that group
     const users = document.querySelector<HTMLAnchorElement>('a[aria-label="Users of group “family”"]');
     expect(users?.dataset.search).toBe(JSON.stringify({ group: "grp_1" }));

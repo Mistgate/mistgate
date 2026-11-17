@@ -169,7 +169,7 @@ describe("a link that gives nothing yet", () => {
     expect(alert.textContent).toContain("carol gets nothing yet: no profile of the group “Friends” runs on a node.");
     const open = alert.querySelector<HTMLAnchorElement>("a")!;
     expect(open.textContent).toBe("Open group “Friends”");
-    expect(open.dataset.search).toBe(JSON.stringify({ tab: "groups", group: "grp_f" }));
+    expect(open.dataset.params).toBe(JSON.stringify({ id: "grp_f" }));
   });
 
   it("names the apps and nodes when the group itself gives something", async () => {

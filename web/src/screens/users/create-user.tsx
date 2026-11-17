@@ -42,7 +42,7 @@ export type Created = { user: User; url: string; password: string };
  * link (and the page password, when the instance asks for one). The content is mounted only while the window is open, so the
  * form starts clean every time.
  */
-export function CreateUserModal({ open, onOpenChange, onCreated, startName, startDone }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (user: User, url: string, password: string) => void; startName?: string; startDone?: Created }) {
+export function CreateUserModal({ open, onOpenChange, onCreated, startName, startDone, startGroup }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (user: User, url: string, password: string) => void; startName?: string; startDone?: Created; startGroup?: string }) {
   const t = useTx();
   // `startName` and `startDone` are the dev kit's: a name already typed, or the done screen at once
   const [done, setDone] = useState<Created | null>(startDone ?? null);
@@ -73,6 +73,7 @@ export function CreateUserModal({ open, onOpenChange, onCreated, startName, star
         <CreateForm
           key={round}
           startName={round === 0 ? startName : undefined}
+          startGroup={startGroup}
           onClose={() => onOpenChange(false)}
           onCreated={(c) => {
             setDone(c);
@@ -184,7 +185,7 @@ const terms = [30, 90, 365, 0] as const;
 /** What a new person starts with: the numbers the form opened with (the preview marks what the admin moved). */
 const start = { quota: 100, term: 30, devices: 5 };
 
-function CreateForm({ onCreated, onClose, startName }: { onCreated: (c: Created) => void; onClose: () => void; startName?: string }) {
+function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: (c: Created) => void; onClose: () => void; startName?: string; startGroup?: string }) {
   const t = useTx();
   const qc = useQueryClient();
   const groupList = useQuery(groupsQuery);
@@ -193,7 +194,7 @@ function CreateForm({ onCreated, onClose, startName }: { onCreated: (c: Created)
   const linkApps = useLinkAppNames();
 
   const [name, setName] = useState(startName ?? "");
-  const [pickedGroup, setGroupId] = useState("");
+  const [pickedGroup, setGroupId] = useState(startGroup ?? "");
   const [quotaGb, setQuotaGb] = useState(start.quota);
   const [reset, setReset] = useState(QuotaReset.MONTH);
   const [termDays, setTermDays] = useState(start.term);

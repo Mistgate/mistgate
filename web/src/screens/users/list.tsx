@@ -371,7 +371,7 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
         </>
       )}
 
-      <CreateUserModal open={creating} onOpenChange={setCreating} onCreated={afterCreate} startName={demo?.name} startDone={demo?.done ? demoCreated : undefined} />
+      <CreateUserModal open={creating} onOpenChange={setCreating} startGroup={groupId || undefined} onCreated={afterCreate} startName={demo?.name} startDone={demo?.done ? demoCreated : undefined} />
       <LinkModal target={link} onClose={() => setLink(null)} />
       {manage && <UsersBulk initialAsk={demo?.ask} picked={pickedList} shown={shownIds} allShown={allOnPage} total={rows.length} onAll={toggleAll} onClear={clear} onMerge={merge} />}
     </>

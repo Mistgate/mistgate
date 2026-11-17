@@ -72,7 +72,6 @@ export const en = {
 
   "users.new": "New user",
   "users.name": "Name",
-  "users.namePh": "E.g. Marina",
   "users.subscriptionPage": "Subscription page",
   "users.subscriptionName": "Name shown on the subscription page",
   "users.subscriptionNameHint": "Shown in the greeting to anyone with the subscription link. Leave blank to use the account name.",
@@ -392,7 +391,6 @@ export const ru: typeof en = {
 
   "users.new": "Новый пользователь",
   "users.name": "Имя",
-  "users.namePh": "Например, Марина",
   "users.subscriptionPage": "Страница подписки",
   "users.subscriptionName": "Имя на странице подписки",
   "users.subscriptionNameHint": "Его увидит каждый, у кого есть ссылка на подписку. Если оставить поле пустым, покажем имя пользователя из панели.",
@@ -714,7 +712,6 @@ export const zh: typeof en = {
 
   "users.new": "新建用户",
   "users.name": "名称",
-  "users.namePh": "例如：Marina",
   "users.subscriptionPage": "订阅页面",
   "users.subscriptionName": "订阅页面上显示的名称",
   "users.subscriptionNameHint": "显示在问候语中，所有打开订阅链接的人都会看到。留空则使用账户名称。",
@@ -1033,7 +1030,6 @@ export const fa: typeof en = {
   "users.unitD": "روز",
   "users.new": "کاربر جدید",
   "users.name": "نام",
-  "users.namePh": "مثلاً مریم",
   "users.subscriptionPage": "صفحهٔ اشتراک",
   "users.subscriptionName": "نامی که در صفحهٔ اشتراک نشان داده می‌شود",
   "users.subscriptionNameHint": "در خوشامدگویی به هر کسی که لینک اشتراک را دارد نشان داده می‌شود. اگر خالی بگذاری، نام حساب استفاده می‌شود.",
@@ -1350,7 +1346,6 @@ export const tr: typeof en = {
   "users.unitD": "gün",
   "users.new": "Yeni kullanıcı",
   "users.name": "Ad",
-  "users.namePh": "Örneğin Elif",
   "users.subscriptionPage": "Abonelik sayfası",
   "users.subscriptionName": "Abonelik sayfasında görünen ad",
   "users.subscriptionNameHint": "Abonelik bağlantısı olan herkese karşılama mesajında gösterilir. Boş bırakırsan hesap adı kullanılır.",

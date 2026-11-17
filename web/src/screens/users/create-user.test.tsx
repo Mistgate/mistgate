@@ -167,7 +167,7 @@ describe("the new user form", () => {
     // the DNS keeps one line; when it reaches the apps and what "empty" means are behind the (i)
     expect(more.querySelector("button[aria-label^='When it arrives']")?.getAttribute("aria-label")).toContain("Empty means the group’s preset");
     const step = (label: string) => click(document.querySelector(`[aria-label='${label}']`));
-    const preset = (group: string, label: string) => click([...document.querySelectorAll(`[aria-label='${group}'] [role=radio]`)].find((r) => r.textContent === label));
+    const preset = (name: string, label: string) => click([...document.querySelectorAll(`[aria-label='${name}'] [role=radio]`)].find((r) => r.textContent === label));
     expect([...more.querySelectorAll("[aria-label='Speed per device'] [role=radio]")].find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("no limit");
     await type(document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!, "alice");
     await click(button("Create"));

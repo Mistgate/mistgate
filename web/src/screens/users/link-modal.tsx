@@ -247,7 +247,7 @@ function Nothing({ target }: { target: LinkTarget }) {
     <Notice tone="danger" className="items-start">
       <span className="flex flex-col items-start gap-2">
         <span>{t(g.givesNothing ? "users.linkNothing" : "users.linkNothingApps", { name: target.name, group: g.name })}</span>
-        <Link to="/users" search={{ tab: "groups", group: g.id }} className={buttonClass("secondary", "sm")}>
+        <Link to="/users/groups/$id" params={{ id: g.id }} className={buttonClass("secondary", "sm")}>
           {t("users.groupOpen", { name: g.name })}
         </Link>
       </span>

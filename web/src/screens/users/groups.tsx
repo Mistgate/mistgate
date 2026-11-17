@@ -90,11 +90,11 @@ export function ProfileLink({ id, name, className }: { id: string; name: string;
   );
 }
 
-/** A group, named, as a link: its row on the Groups tab, with its editor open. */
+/** A group, named, as a link: its page. */
 export function GroupLink({ id, name, className, children }: { id: string; name: string; className?: string; children?: ReactNode }) {
   const t = useTx();
   return (
-    <Link to="/users" search={{ tab: "groups", group: id }} aria-label={t("users.groupOpen", { name })} className={cx("font-bold text-accent-text hover:underline", className)}>
+    <Link to="/users/groups/$id" params={{ id }} aria-label={t("users.groupOpen", { name })} className={cx("font-bold text-accent-text hover:underline", className)}>
       {children ?? name}
     </Link>
   );
@@ -105,8 +105,8 @@ export function GroupChip({ id, name, color, className }: { id: string; name: st
   const t = useTx();
   return (
     <Link
-      to="/users"
-      search={{ tab: "groups", group: id }}
+      to="/users/groups/$id"
+      params={{ id }}
       data-tone={groupTone(id, color)}
       aria-label={t("users.groupOpen", { name })}
       className={cx("tone-chip inline-flex h-6 max-w-full min-w-0 items-center px-2.5 text-xs font-medium hover:underline", className)}
@@ -244,7 +244,7 @@ export function ReachLine({ group, action }: { group: Group; action?: ReactNode 
   );
 }
 
-/** Lost and gained profiles of a group change, in words: "Marina loses: “AWG 3.1” (2 AmneziaVPN keys stop working)". */
+/** Lost and gained profiles of a group change, in words: "alice loses: “AWG 3.1” (2 AmneziaVPN keys stop working)". */
 export function ImpactText({ impact, who }: { impact: AccessImpact; who?: string }) {
   const t = useTx();
   const name = (p: AccessImpact["lost"][number]) => `${t("common.quoted", { name: p.name })}${p.awgDevices > 0 ? ` (${t.n("users.impactKeys", p.awgDevices)})` : ""}`;

@@ -132,8 +132,8 @@ describe("the ways a person's group gives", () => {
       { id: "p_tg", name: "Telegram · 443", protocol: "mtproto" },
     ];
     await mount(<WaysOfGroup profiles={profiles} compact />);
-    const rows = [...document.querySelectorAll(".items-start")].map((r) => r.textContent);
-    expect(rows[0]).toBe("SubscriptionMain · 443");
-    expect(rows.at(-1)).toBe("Telegram ProxyTelegram · 443");
+    const lines = [...document.querySelectorAll(".items-start")].map((r) => r.textContent);
+    expect(lines[0]).toBe("SubscriptionMain · 443");
+    expect(lines.at(-1)).toBe("Telegram ProxyTelegram · 443");
   });
 });
