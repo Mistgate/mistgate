@@ -317,7 +317,7 @@ func committedTo(t *testing.T, h *harness, link, prev string, prevMTLS bool) {
 	eventually(t, func() bool {
 		h.a.metaMu.Lock()
 		defer h.a.metaMu.Unlock()
-		return h.a.meta.Link == link && h.a.cfg.LinkURL == link && h.a.meta.NextLink == "" &&
+		return h.a.meta.Link == link && h.a.cfg.LinkURL == cmp.Or(link, h.a.configLink) && h.a.meta.NextLink == "" &&
 			h.a.meta.PrevLink == prev && h.a.meta.PrevMTLS == prevMTLS
 	}, "link and previous address")
 	if m := readMeta(t, h.dir); m.Link != link || m.NextLink != "" || m.PrevLink != prev || m.PrevMTLS != prevMTLS {
@@ -345,9 +345,14 @@ func TestPrevLinkWhenTheNewOneStopsAnswering(t *testing.T) {
 	}
 }
 
-// An mTLS agent whose first link address stops answering goes back to mTLS and is no longer link-only.
+// An mTLS agent whose first link address stops answering goes back to mTLS and is no longer link-only. Its configured
+// link (not advertised by the panel, so never dialled) is its optional link again.
 func TestPrevMTLSWhenTheNewLinkStopsAnswering(t *testing.T) {
-	h := newHarness(t, harnessOpts{noStart: true})
+	configured := "wss://link.example.com/" + linkPrefix('c') + "/"
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) { c.LinkURL = configured }})
+	if h.a.linkOnly() || h.a.linkURL() != configured {
+		t.Fatal("the configured link was not taken as the optional link")
+	}
 	lp := newSessionLinkPanel(h)
 	server := httptest.NewTLSServer(lp)
 	t.Cleanup(server.Close)
@@ -370,8 +375,8 @@ func TestPrevMTLSWhenTheNewLinkStopsAnswering(t *testing.T) {
 	endSession(t, h)
 	h.waitConnected()
 	committedTo(t, h, "", "", false)
-	if h.a.linkOnly() || h.a.linkURL() != "" {
-		t.Fatalf("linkOnly=%v after the return to mTLS", h.a.linkOnly())
+	if h.a.linkOnly() || h.a.linkURL() != configured {
+		t.Fatalf("linkOnly=%v, configured link kept=%v after the return to mTLS", h.a.linkOnly(), h.a.linkURL() == configured)
 	}
 }
 

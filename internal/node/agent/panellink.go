@@ -141,7 +141,7 @@ func (a *Agent) prevSession(ctx context.Context, prev string, mtls bool) error {
 }
 
 // commitPrevAddress makes the previous panel address current again and drops the one that stopped answering. For mTLS
-// the agent is no longer link-only.
+// the agent is no longer link-only, and its configured link (--link-url) is its optional link again.
 func (a *Agent) commitPrevAddress(prev string, mtls bool) {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
@@ -150,6 +150,9 @@ func (a *Agent) commitPrevAddress(prev string, mtls bool) {
 	}
 	a.meta.Link, a.meta.PrevLink, a.meta.PrevMTLS = prev, "", false
 	a.cfg.LinkURL = prev
+	if mtls {
+		a.cfg.LinkURL = a.configLink
+	}
 	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
 		a.log.Error("previous panel address not saved", "err", err)
 		return
