@@ -1,19 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
-import {
-  AuthFrame,
-  CodeField,
-  Heading,
-  LockedCard,
-  OtherWay,
-  PasskeyBlock,
-  PasswordField,
-} from "@/components/auth-parts";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { AuthFrame, CodeField, GoButton, GoNote, Heading, LockedCard, OtherWay, PasskeyBlock, PasswordField } from "@/components/auth-parts";
 import { useCaptcha } from "@/components/captcha";
-import { Button } from "@/components/ui/button";
+import { TurnstileRow } from "@/components/turnstile";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
+import { Tick } from "@/components/windows";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { auth, errorKey, webauthnSupported } from "@/lib/api";
@@ -35,6 +28,8 @@ export function LoginScreen() {
   const passwordLogin = !info || info.passwordLogin || devCase !== null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
+  // the sign-in went through: the button turns into a confirmation while the panel loads
+  const [done, setDone] = useState(false);
   // Without passkey support the password form is the only way in, so it starts open.
   const [alt, setAlt] = useState((!supported && passwordLogin) || devCase === "badtotp");
   const [login, setLogin] = useState("");
@@ -46,6 +41,7 @@ export function LoginScreen() {
   );
 
   async function signIn() {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -54,6 +50,7 @@ export function LoginScreen() {
       const credentialJson = await getPasskey(begin.optionsJson);
       await auth.finishLogin({ ceremonyId: begin.ceremonyId, credentialJson });
       forgetSession();
+      setDone(true);
       await router.navigate({ to: "/" });
     } catch (e) {
       if (!captcha.stale(e)) setError(errorKey(e, "login"));
@@ -63,6 +60,7 @@ export function LoginScreen() {
 
   async function signInAlt(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError(null);
     setAttemptsLeft(null);
@@ -70,6 +68,7 @@ export function LoginScreen() {
       const r = await signInWithPassword({ login: login.trim(), password, code, turnstileToken: captcha.token }).finally(captcha.reset);
       if (r.kind === "ok") {
         forgetSession();
+        setDone(true);
         await router.navigate({ to: "/" });
         return;
       }
@@ -87,71 +86,150 @@ export function LoginScreen() {
 
   if (lockedUntil !== null) {
     return (
-      <AuthFrame viewKey="locked">
+      <AuthFrame viewKey="locked" footer={t("win.login.decoy")}>
         <LockedCard until={lockedUntil} onExpire={() => setLockedUntil(null)} />
       </AuthFrame>
     );
   }
 
-  const codeError =
-    attemptsLeft === null ? undefined : `${t("auth.badLogin")} ${t.n("auth.attemptsLeft", attemptsLeft)}`;
+  return (
+    <LoginPage
+      view={done ? "done" : alt ? "password" : "key"}
+      host={location.host}
+      supported={supported}
+      passwordLogin={passwordLogin}
+      onRetryInfo={infoQuery.isError && !infoQuery.isFetching ? () => void infoQuery.refetch() : undefined}
+      captcha={captcha.widget}
+      captchaOn={captcha.on}
+      captchaReady={captcha.ready}
+      busy={busy}
+      error={error ? t(error) : undefined}
+      codeError={attemptsLeft === null ? undefined : `${t("auth.badLogin")} ${t.n("auth.attemptsLeft", attemptsLeft)}`}
+      login={login}
+      password={password}
+      code={code}
+      onLogin={setLogin}
+      onPassword={setPassword}
+      onCode={(v) => {
+        setCode(v);
+        setAttemptsLeft(null);
+      }}
+      onPasskey={() => void signIn()}
+      onSubmit={signInAlt}
+      onToggle={() => setAlt((v) => !v)}
+    />
+  );
+}
+
+export type LoginPageProps = {
+  /** The passkey button, the password form, or the sign-in that went through. */
+  view: "key" | "password" | "done";
+  host: string;
+  supported: boolean;
+  passwordLogin: boolean;
+  /** The page asked for the login info and got nothing: says so, with a way to ask again. */
+  onRetryInfo?: () => void;
+  /** The check of the page (Turnstile's row or widget), null when the panel has none. */
+  captcha: ReactNode;
+  captchaOn: boolean;
+  captchaReady: boolean;
+  /** Waiting for the passkey (key view) or for the password check (password view). */
+  busy: boolean;
+  error?: string;
+  codeError?: string;
+  login: string;
+  password: string;
+  code: string;
+  onLogin: (v: string) => void;
+  onPassword: (v: string) => void;
+  onCode: (v: string) => void;
+  onPasskey: () => void;
+  onSubmit: (e: FormEvent) => void;
+  onToggle: () => void;
+};
+
+/**
+ * The sign-in page as the board draws it (PnLogin): the brand, the title with the address, the check, the main button with its
+ * line, "another way" under it, the line about the decoy site at the foot. The same page is the password form (with the six boxes
+ * of the code) and, once the sign-in went through, the confirmation with the bar of the panel loading under it.
+ */
+export function LoginPage(p: LoginPageProps) {
+  const t = useT();
+  const footer = t("win.login.decoy");
+  const head = (
+    <Heading title={t("auth.login.title")} mono>
+      {t("auth.login.body", { host: p.host })}
+    </Heading>
+  );
+
+  if (p.view === "done") {
+    return (
+      <AuthFrame viewKey="login" footer={footer} wave>
+        {head}
+        {p.captchaOn && <TurnstileRow status="ok" label={t("win.cf.passed")} />}
+        <div className="flex animate-[mg-up_0.3s_var(--e)_both] flex-col gap-3">
+          <div role="status" className="wn-confirm flex h-12 w-full items-center justify-center gap-2.5 rounded-xl border border-accent-line bg-accent-soft text-[15px] font-medium">
+            <Tick state="done" />
+            {t("win.login.done")}
+          </div>
+          <div aria-hidden className="h-0.5 overflow-hidden rounded-[1px] bg-step">
+            <i className="wn-fill block h-full w-full rounded-[1px] bg-accent-mark" />
+          </div>
+          <GoNote>{t("win.login.opening")}</GoNote>
+        </div>
+      </AuthFrame>
+    );
+  }
+
+  const alt = p.view === "password";
+  const waiting = p.busy && !alt;
+  const failed = !!p.error && !p.busy;
 
   return (
-    <AuthFrame viewKey="login">
-      <Heading title={t("auth.login.title")}>{t("auth.login.body", { host: location.host })}</Heading>
-      {infoQuery.isError && !infoQuery.isFetching && (
+    <AuthFrame viewKey="login" footer={footer}>
+      {head}
+      {p.onRetryInfo && (
         <Notice tone="danger">
           {t("err.network")}{" "}
-          <button type="button" onClick={() => void infoQuery.refetch()} className="font-bold underline underline-offset-2">
+          <button type="button" onClick={p.onRetryInfo} className="font-medium underline underline-offset-2">
             {t("common.retry")}
           </button>
         </Notice>
       )}
-      {error && <Notice tone="danger">{t(error)}</Notice>}
-      {!supported && (
-        <Notice title={t("auth.noPasskeyTitle")}>{passwordLogin ? t("auth.noPasskeyBody") : t("auth.noPasskeyNoPassword")}</Notice>
+      {!p.supported && (
+        <Notice title={t("auth.noPasskeyTitle")}>{p.passwordLogin ? t("auth.noPasskeyBody") : t("auth.noPasskeyNoPassword")}</Notice>
       )}
-      {captcha.widget}
-      <PasskeyBlock
-        label={busy && !alt ? t("auth.waitingPasskey") : t("auth.login.passkey")}
-        hint={t("auth.login.passkeyHint")}
-        disabled={!supported || busy || !captcha.ready}
-        onClick={signIn}
-      />
-      {supported && passwordLogin && (
-        <OtherWay
-          open={alt}
-          label={alt ? t("auth.hideOtherWay") : t("auth.login.otherWay")}
-          onToggle={() => setAlt((v) => !v)}
+      {p.captcha}
+      {!alt && p.supported && (
+        <PasskeyBlock
+          label={waiting ? t("win.login.waiting") : failed ? t("win.retry") : t("auth.login.passkey")}
+          hint={waiting ? t("win.login.confirmInBrowser") : failed ? p.error! : t("auth.login.passkeyHint")}
+          bad={failed}
+          busy={waiting}
+          disabled={!p.captchaReady}
+          onClick={p.onPasskey}
         />
       )}
-      {alt && passwordLogin && (
-        <form onSubmit={signInAlt} className="screen-enter flex flex-col gap-3">
+      {alt && p.passwordLogin && (
+        <form onSubmit={p.onSubmit} className="flex animate-[mg-up_0.3s_var(--e)_both] flex-col gap-3">
           <TextField
             label={t("auth.login")}
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
+            value={p.login}
+            onChange={(e) => p.onLogin(e.target.value)}
             autoComplete="username"
             autoCapitalize="off"
             spellCheck={false}
           />
-          <PasswordField
-            label={t("auth.password")}
-            value={password}
-            onChange={setPassword}
-            autoComplete="current-password"
-          />
-          <CodeField label={t("auth.code")} value={code} onChange={(v) => { setCode(v); setAttemptsLeft(null); }} error={codeError} />
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            full
-            disabled={busy || !captcha.ready || !login.trim() || !password || code.length < 6}
-          >
-            {busy ? t("auth.checking") : t("auth.login.submit")}
-          </Button>
+          <PasswordField label={t("auth.password")} value={p.password} onChange={p.onPassword} autoComplete="current-password" />
+          <CodeField label={t("auth.code")} value={p.code} onChange={p.onCode} error={p.codeError} />
+          <GoButton type="submit" busy={p.busy} disabled={!p.captchaReady || !p.login.trim() || !p.password || p.code.length < 6}>
+            {p.busy ? t("auth.checking") : t("auth.login.submit")}
+          </GoButton>
+          <GoNote bad={failed}>{failed ? p.error! : t("win.login.codeHint")}</GoNote>
         </form>
+      )}
+      {p.supported && p.passwordLogin && (
+        <OtherWay open={alt} label={alt ? t("win.login.byPasskey") : t("auth.login.otherWay")} onToggle={p.onToggle} />
       )}
     </AuthFrame>
   );

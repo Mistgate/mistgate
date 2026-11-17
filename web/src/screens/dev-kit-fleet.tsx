@@ -1,14 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { AddNodeProvider, InstallSteps, useAddNode } from "@/components/add-node";
+import { AddNodeProvider, AddNodeWindow, useAddNode } from "@/components/add-node";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { EventSeverity, OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
-import { useT } from "@/i18n";
 import { alertsQuery, checksQuery } from "@/lib/health";
 import { nodeQuery, nodesQuery, overviewQuery, userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
@@ -194,7 +192,6 @@ const issued = (over: Over = {}) =>
   }) as never;
 
 function InstallDemo({ variant, onClose }: { variant: "scp" | "manual" | "connected"; onClose: () => void }) {
-  const t = useT();
   const [qc] = useState(() => {
     const c = client(empty);
     c.setQueryData(nodeQuery("nod_demo").queryKey, {
@@ -205,9 +202,12 @@ function InstallDemo({ variant, onClose }: { variant: "scp" | "manual" | "connec
   });
   return (
     <QueryClientProvider client={qc}>
-      <Modal open onOpenChange={(o) => !o && onClose()} title={t("node.add.commandTitle", { name: "de1" })} description={t("node.add.commandBody")}>
-        <InstallSteps issued={issued(variant === "manual" ? { copyCommand: "" } : {})} onClose={onClose} />
-      </Modal>
+      <AddNodeWindow
+        open
+        initialMode="cmd"
+        onClose={onClose}
+        seed={{ draft: { name: "de1", address: "de1.example.com" }, issued: issued(variant === "manual" ? { copyCommand: "" } : {}) }}
+      />
     </QueryClientProvider>
   );
 }

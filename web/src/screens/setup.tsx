@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import {
   AuthFrame,
   CodeField,
+  GoButton,
   Heading,
   OtherWay,
   PasskeyBlock,
@@ -110,9 +111,7 @@ function LanguageStep({ onNext }: { onNext: () => void }) {
           </Radio.Root>
         ))}
       </RadioGroup>
-      <Button variant="primary" size="lg" full onClick={onNext}>
-        {t("auth.next")}
-      </Button>
+      <GoButton onClick={onNext}>{t("auth.next")}</GoButton>
     </>
   );
 }
@@ -219,7 +218,8 @@ function AdminStep({ token, onDone }: { token: string; onDone: () => void }) {
         <PasskeyBlock
           label={busy ? t("auth.waitingPasskey") : t("auth.createPasskey")}
           hint={t("auth.setup.passkeyHint")}
-          disabled={!supported || busy || !captcha.ready || !login.trim()}
+          busy={busy}
+          disabled={!supported || !captcha.ready || !login.trim()}
           onClick={createWithPasskey}
         />
       )}
@@ -234,7 +234,7 @@ function AdminStep({ token, onDone }: { token: string; onDone: () => void }) {
         />
       )}
       {alt && !totp && (
-        <form onSubmit={beginWithPassword} className="screen-enter flex flex-col gap-3">
+        <form onSubmit={beginWithPassword} className="flex animate-[mg-up_0.3s_var(--e)_both] flex-col gap-3">
           <PasswordField
             label={t("auth.password")}
             value={password}
@@ -243,18 +243,18 @@ function AdminStep({ token, onDone }: { token: string; onDone: () => void }) {
             error={password ? passwordError : undefined}
             hint={t("auth.setup.passwordHint")}
           />
-          <Button type="submit" variant="primary" size="lg" full disabled={busy || !captcha.ready || !!loginError || !!passwordError}>
+          <GoButton type="submit" busy={busy} disabled={!captcha.ready || !!loginError || !!passwordError}>
             {busy ? t("auth.checking") : t("auth.next")}
-          </Button>
+          </GoButton>
         </form>
       )}
       {alt && totp && (
-        <form onSubmit={finishWithPassword} className="screen-enter flex flex-col gap-3">
+        <form onSubmit={finishWithPassword} className="flex animate-[mg-up_0.3s_var(--e)_both] flex-col gap-3">
           <TotpEnroll uri={totp.uri} secret={totp.secret} caption={t("auth.setup.totpScan")} />
           <CodeField label={t("auth.code")} value={code} onChange={(v) => { setCode(v); setBadCode(false); }} error={badCode ? t("auth.badCode") : undefined} />
-          <Button type="submit" variant="primary" size="lg" full disabled={busy || code.length < 6}>
+          <GoButton type="submit" busy={busy} disabled={code.length < 6}>
             {busy ? t("auth.checking") : t("auth.setup.createAdmin")}
-          </Button>
+          </GoButton>
           <Button variant="ghost" size="md" full disabled={busy} onClick={() => setTotp(null)}>
             {t("auth.back")}
           </Button>

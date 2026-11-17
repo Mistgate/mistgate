@@ -39,6 +39,7 @@ import { en as fleetuiEn } from "./fleetui";
 import { en as clientlogsEn } from "./clientlogs";
 import { en as trusttunnelEn } from "./trusttunnel";
 import { en as shellEn } from "./shell";
+import { en as windowsEn } from "./windows";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
 // settings), users.ts and profiles.ts; `en` below is all of it, so `MessageKey` covers every key.
@@ -120,15 +121,15 @@ const core = {
   "health.problems": "{n} problem|{n} problems",
 
   "palette.title": "Command palette",
-  "palette.placeholder": "Node, user, section…",
+  "palette.placeholder": "Node, person, section or action",
   "palette.empty": "Nothing found",
   "palette.searching": "Searching…",
-  "palette.nodes": "NODES",
-  "palette.users": "USERS",
-  "palette.places": "SECTIONS",
-  "palette.actions": "ACTIONS",
+  "palette.nodes": "Nodes",
+  "palette.users": "People",
+  "palette.places": "Sections",
+  "palette.actions": "Actions",
   "palette.addNode": "Add node",
-  "palette.createUser": "New user",
+  "palette.createUser": "Add a person",
   "palette.newToken": "New API token",
   "palette.newProfile": "New profile",
   "palette.approvals": "Approvals",
@@ -185,11 +186,11 @@ const core = {
   "auth.setup.adminTitle": "Create the admin",
   "auth.setup.adminBody":
     "A passkey is best: sign in with a fingerprint or Face ID, no passwords. The key lives only on your device.",
-  "auth.login": "LOGIN",
-  "auth.password": "PASSWORD",
-  "auth.code": "AUTHENTICATOR CODE",
+  "auth.login": "Login",
+  "auth.password": "Password",
+  "auth.code": "Authenticator code",
   "auth.createPasskey": "Create passkey",
-  "auth.waitingPasskey": "Waiting for your device…",
+  "auth.waitingPasskey": "Waiting for passkey",
   "auth.setup.passkeyHint": "The browser will ask for a fingerprint, face or PIN",
   "auth.setup.otherWay": "password + authenticator code",
   "auth.setup.totpScan": "Scan with Google Authenticator, 1Password or Aegis",
@@ -207,7 +208,7 @@ const core = {
   "auth.recover.submit": "Reset sign-in",
   "auth.recover.doneTitle": "New sign-in details",
   "auth.recover.doneBody": "For {admin}. Save the password and scan the QR code now.",
-  "auth.recover.password": "NEW PASSWORD",
+  "auth.recover.password": "New password",
   "auth.recover.onceTitle": "Shown only once.",
   "auth.recover.onceBody": "After a reload or leaving this page they cannot be shown again.",
   "auth.recover.nextTitle": "Next",
@@ -315,7 +316,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...windowsEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

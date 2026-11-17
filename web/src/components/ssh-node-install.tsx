@@ -1,40 +1,32 @@
 import { ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { CloseX, CodeBox, CopyChip, CountryField, FootNote, noCountry, Panel, PanelFoot, PanelHead, Rail, WaySwitch, type NodeDraft, type RailStep } from "@/components/add-node-frame";
 import { markFresh } from "@/components/fx/registry";
-import { Sweep } from "@/components/fx/sweep-react";
-import { authorizedKeysFile, PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
-import { Fingerprint, InstallPanelKeyBox, LoginSwitch, OwnKeyField, useSSHLogin, type LoginMethod } from "@/components/ssh-login";
+import { authorizedKeysFile, usePanelKeyInUse, usePanelSSHKey } from "@/components/panel-ssh-key";
+import { Fingerprint, OwnKeyField, useSSHLogin, type LoginMethod } from "@/components/ssh-login";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { Button } from "@/components/ui/button";
-import { Banner, Notice } from "@/components/ui/notice";
-import { Select } from "@/components/ui/select";
+import { Chip, Check } from "@/components/ui/bits";
+import { Button, buttonClass } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icons";
+import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
+import { Glyph, glyphs, Halo, Spinner, WaveField } from "@/components/windows";
 import type { NodePreflight } from "@/gen/mistgate/admin/v1/provisioning_pb";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { provisioning } from "@/lib/api";
-import { countryCodes } from "@/lib/countries";
+import { nodes as nodesApi, provisioning } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import { prefersReducedMotion } from "@/lib/effects";
 import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { plain } from "@/lib/plain";
 
-type Props = { onBack: () => void; onClose: () => void; onManual?: () => void };
-type Step = 0 | 1 | 2 | 3;
-type Busy = "fingerprint" | "check" | "start" | "retry" | null;
-
-// The footer of a step: side by side from sm up; on a phone stacked, the main action on top, each button full width and
-// free to wrap its label ("Close; keep running in background" is wider than a 390 px sheet).
-const footerCls = "flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:flex-wrap";
-const footBtn = "max-sm:h-auto max-sm:min-h-9 max-sm:w-full max-sm:whitespace-normal max-sm:py-2";
-
-const nodeNamePattern = /^[a-z0-9-]{2,24}$/;
-const nodeAddressPattern = /^[A-Za-z0-9.:-]{1,253}$/;
-const noCountry = "none";
-// node_provision_job.state (migration 00031): queued, running, cancel_requested, then completed, failed or cancelled.
-const terminalStates = new Set(["completed", "failed", "cancelled"]);
+// The SSH install of a node, the board's PnAddNode (.an): four steps (the server, the way in, the check, the install) in the
+// window's rail, then the page that says the node is ready. The calls and their order are the panel's own: the pinned host key
+// first, the check with the login, the confirmation, the job and its retries.
 
 // What a failure code of the provisioning calls (CheckSSH and the others) or of a job (provision/worker.go failJob) means
 // for the owner, and what to do about it. One table for both: a code means the same wherever it comes from.
@@ -116,7 +108,15 @@ export function loginError(error: unknown, method: LoginMethod, user: string, t:
   return loginCode(ConnectError.from(error).rawMessage, method, user, t) ?? sshError(error, t, edge);
 }
 
-// The worker's phases (provision/worker.go setPhase); an unknown one reads as "Installing", never as a raw code.
+
+function suggestNodeName(host: string) {
+  const first = host.trim().toLowerCase().split(".")[0] ?? "";
+  const label = first.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
+  return label.length >= 2 ? label : "node-1";
+}
+
+
+// The worker's phases (provision/worker.go setPhase) in the order they run; an unknown one reads as "Installing", never as a raw code.
 function phaseLabel(phase: string, t: T): string {
   switch (phase) {
     case "queued":
@@ -146,117 +146,96 @@ function phaseLabel(phase: string, t: T): string {
   }
 }
 
-function stateLabel(state: string, t: T): string {
-  switch (state) {
-    case "completed":
-      return t("node.ssh.done");
-    case "failed":
-      return t("node.ssh.state.failed");
-    case "cancelled":
-      return t("node.ssh.state.cancelled");
-    case "cancel_requested":
-      return t("node.ssh.state.cancelling");
-    case "queued":
-      return t("node.ssh.state.queued");
-    default:
-      return t("node.ssh.state.running");
-  }
+/** The ssh-keygen command that prints the fingerprint of the key the server offered, for the file of its algorithm. */
+function keygenCommand(algorithm: string) {
+  const kind = algorithm.startsWith("ecdsa") ? "ecdsa" : algorithm.startsWith("ssh-rsa") ? "rsa" : "ed25519";
+  return `ssh-keygen -lf /etc/ssh/ssh_host_${kind}_key.pub`;
 }
 
-function suggestNodeName(host: string) {
-  const first = host.trim().toLowerCase().split(".")[0] ?? "";
-  const label = first.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
-  return label.length >= 2 ? label : "node-1";
-}
+type Step = 0 | 1 | 2 | 3;
+type Busy = "fingerprint" | "check" | "start" | "retry" | null;
 
-function Steps({ current, labels, ariaLabel }: { current: Step; labels: string[]; ariaLabel: string }) {
-  return (
-    <>
-      <ol className="hidden grid-cols-4 gap-2 md:grid" aria-label={ariaLabel}>
-        {labels.map((label, index) => {
-          const done = index < current;
-          const active = index === current;
-          return (
-            <li key={label} aria-current={active ? "step" : undefined} className="flex min-w-0 flex-col gap-2">
-              <span className={done || active ? "h-1 rounded-full bg-accent" : "h-1 rounded-full bg-surface-2"} />
-              <span className={active ? "truncate text-xs font-bold text-fg" : done ? "truncate text-xs font-semibold text-accent-text" : "truncate text-xs font-semibold text-muted"}>
-                <span className="me-1.5 font-mono">{index + 1}</span>{label}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      <div className="flex flex-col gap-2 md:hidden">
-        <div
-          role="progressbar"
-          aria-label={labels[current]}
-          aria-valuemin={1}
-          aria-valuemax={labels.length}
-          aria-valuenow={current + 1}
-          className="h-1 overflow-hidden rounded-full bg-surface-2"
-        >
-          <span className="block h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: ((current + 1) / labels.length * 100) + "%" }} />
-        </div>
-        <span aria-live="polite" className="text-xs font-bold text-muted">{current + 1} / {labels.length} · {labels[current]}</span>
-      </div>
-    </>
-  );
-}
+const nodeNamePattern = /^[a-z0-9-]{2,24}$/;
+const nodeAddressPattern = /^[A-Za-z0-9.:-]{1,253}$/;
+const usernamePattern = /^[A-Za-z_][A-Za-z0-9_.-]{0,31}$/;
+// node_provision_job.state (migration 00031): queued, running, cancel_requested, then completed, failed or cancelled.
+const terminalStates = new Set(["completed", "failed", "cancelled"]);
+// What the install does before the first change on the server: a failure there leaves the server as it was.
+const beforeChanges = new Set(["", "queued", "connecting", "preflight", "failed"]);
 
-function Fact({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  return (
-    <div className="min-w-0 rounded-field border border-line bg-surface-2 p-3">
-      <span className="block text-[11px] font-bold tracking-[0.08em] text-muted uppercase">{label}</span>
-      <b className={tone === "good" ? "tone-ok tone-text mt-1 block break-words text-sm" : tone === "bad" ? "tone-bad tone-text mt-1 block break-words text-sm" : "mt-1 block break-words text-sm text-fg"}>
-        {value}
-      </b>
-    </div>
-  );
-}
+/** The ports the host firewall step opens: the SSH one, the web ones and the QUIC one. */
+const firewallPorts = (ssh: number) => [`${ssh}/tcp`, "80/tcp", "443/tcp", "443/udp"];
 
-export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
+/**
+ * A made-up place to start from: the dev kit opens each state of the window (the board's PnAddNode) with it. The fields are
+ * what the person would have typed; `jobId` points at a job whose state the page seeds into its query cache.
+ */
+export type InstallSeed = Partial<{
+  step: Step;
+  host: string;
+  port: string;
+  fingerprint: string;
+  algorithm: string;
+  confirmedKey: boolean;
+  username: string;
+  method: LoginMethod;
+  preflight: NodePreflight;
+  jobId: string;
+  location: string;
+  provider: string;
+  optionsOpen: boolean;
+  whereOpen: boolean;
+  countryOpen: boolean;
+  /** A refusal already on the page. */
+  failure: string;
+  /** How many rows of the check have answered (the dev kit stops the check at a row). */
+  answered: number;
+}>;
+
+type Props = {
+  draft: NodeDraft;
+  onDraft: (patch: Partial<NodeDraft>) => void;
+  onMode: (mode: "ssh" | "cmd") => void;
+  onClose: () => void;
+  seed?: InstallSeed;
+};
+
+type Fact = { key: string; label: string; value: string; bad?: boolean };
+
+export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props) {
   const t = useT();
   const { edge } = useEdition();
   const fmt = useFmt();
   const guard = useStepUp();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>(0);
+  const [step, setStep] = useState<Step>(seed?.step ?? 0);
   const [busy, setBusy] = useState<Busy>(null);
-  const [failure, setFailure] = useState("");
-  const [host, setHost] = useState("");
-  const [port, setPort] = useState("22");
-  const [fingerprint, setFingerprint] = useState("");
-  const [algorithm, setAlgorithm] = useState("");
-  const [confirmedKey, setConfirmedKey] = useState(false);
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [country, setCountry] = useState(noCountry);
-  const [location, setLocation] = useState("");
-  const [provider, setProvider] = useState("");
-  const [username, setUsername] = useState("root");
+  const [failure, setFailure] = useState(seed?.failure ?? "");
+  const [host, setHost] = useState(seed?.host ?? "");
+  const [port, setPort] = useState(seed?.port ?? "22");
+  const [fingerprint, setFingerprint] = useState(seed?.fingerprint ?? "");
+  const [algorithm, setAlgorithm] = useState(seed?.algorithm ?? "");
+  const [confirmedKey, setConfirmedKey] = useState(seed?.confirmedKey ?? false);
+  const { name, address, country } = draft;
+  const [location, setLocation] = useState(seed?.location ?? "");
+  const [provider, setProvider] = useState(seed?.provider ?? "");
+  const [username, setUsername] = useState(seed?.username ?? "root");
   const [touched, setTouched] = useState(false);
   const [confirmedInstall, setConfirmedInstall] = useState(false);
-  const [preflight, setPreflight] = useState<NodePreflight | null>(null);
-  const [jobId, setJobId] = useState("");
+  const [preflight, setPreflight] = useState<NodePreflight | null>(seed?.preflight ?? null);
+  const [jobId, setJobId] = useState(seed?.jobId ?? "");
+  const [optionsOpen, setOptionsOpen] = useState(seed?.optionsOpen ?? false);
+  const [whereOpen, setWhereOpen] = useState(seed?.whereOpen ?? false);
+  // the answers of the server check come in one by one: how many have
+  const [answered, setAnswered] = useState(seed?.answered ?? (seed?.preflight ? 99 : 0));
   // the panel key is the default once it logs in to some node, else the password; the owner's own key never is
   const keyInUse = usePanelKeyInUse();
-  const login = useSSHLogin(keyInUse ? "key" : "password");
+  const login = useSSHLogin(seed?.method ?? (keyInUse ? "key" : "password"));
   const viaKey = login.method === "key";
   const { password, setPassword } = login;
   // the how-to under the panel key: open for a key not in use yet, and whenever the server refused it
   const [howTo, setHowTo] = useState<boolean | null>(null);
-  const usernamePattern = /^[A-Za-z_][A-Za-z0-9_.-]{0,31}$/;
-
-  const countryOptions = useMemo(
-    () => [
-      { value: noCountry, label: t("node.add.countryNone") },
-      ...countryCodes
-        .map((code) => ({ value: code, label: code + " · " + fmt.country(code) }))
-        .sort((a, b) => fmt.country(a.value).localeCompare(fmt.country(b.value), fmt.locale)),
-    ],
-    [fmt, t],
-  );
 
   const job = useQuery({
     queryKey: ["node-provision", jobId],
@@ -269,6 +248,14 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
       const state = query.state.data?.state ?? "";
       return terminalStates.has(state) ? false : 2_500;
     },
+  });
+  // every phase the worker went through (it moves faster than a poll of the job can see)
+  const events = useQuery({
+    queryKey: ["node-provision-events", jobId],
+    queryFn: async ({ signal }) => (await provisioning.listNodeProvisionEvents({ jobId, limit: 100 }, { signal })).events,
+    enabled: !!jobId,
+    retry: false,
+    refetchInterval: () => (terminalStates.has(job.data?.state ?? "") ? false : 2_500),
   });
 
   const labels = [t("node.ssh.step.server"), t("node.ssh.step.login"), t("node.ssh.step.check"), t("node.ssh.step.install")];
@@ -285,11 +272,12 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     if (viaKey && (code === "ssh_panel_key_not_accepted" || code === "ssh_authentication_failed")) setHowTo(true);
   };
   const jobText = (code: string) => loginCode(code, login.method, username.trim(), t) ?? jobError(code, t, edge);
-  const nameError = touched && !nodeNamePattern.test(name.trim()) ? t("node.add.nameError") : "";
-  const addressError = touched && !nodeAddressPattern.test(address.trim()) ? t("node.add.addressError") : "";
+  const nameBad = !!name && !nodeNamePattern.test(name.trim());
+  const addressBad = !!address.trim() && !nodeAddressPattern.test(address.trim());
   const usernameError = touched && !usernamePattern.test(username.trim()) ? t("node.ssh.loginError") : "";
   const portNumber = Number(port);
   const portValid = Number.isInteger(portNumber) && portNumber >= 1 && portNumber <= 65535;
+  const serverOk = !!host.trim() && portValid && nodeNamePattern.test(name.trim()) && nodeAddressPattern.test(address.trim());
   const jobState = job.data?.state ?? "";
   // the install manager speaks the admin's language: it cannot read the SPA's choice by itself
   const installManagerHref = new URL(`nodes/install?lang=${fmt.lang}&job=${encodeURIComponent(jobId)}`, document.baseURI).href;
@@ -297,9 +285,9 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   const nodeId = job.data?.nodeId;
   const jobFailed = jobState === "failed";
   const jobCancelled = jobState === "cancelled";
+  const jobStopped = jobFailed || jobCancelled;
   // a cancelled job resumes safely (preflight checks the host's enrollment first); the panel refuses a retired node
-  const jobCanRetry = (jobFailed || jobCancelled) && job.data?.errorCode !== "node_retired";
-  const jobTone = jobDone ? "tone-ok tint tone-text" : jobFailed ? "tone-bad tint tone-text" : jobCancelled ? "tone-off tint tone-text" : "tone-busy tint tone-text";
+  const jobCanRetry = jobStopped && job.data?.errorCode !== "node_retired";
 
   useEffect(() => {
     if (!jobDone && !jobFailed) return;
@@ -308,10 +296,10 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     void qc.invalidateQueries({ queryKey: ["overview"] });
   }, [jobDone, jobFailed, nodeId, qc]);
 
-  async function getFingerprint(event: FormEvent) {
-    event.preventDefault();
+  async function getFingerprint(event?: FormEvent) {
+    event?.preventDefault();
     setFailure("");
-    if (!host.trim() || !portValid) {
+    if (!host.trim() || !portValid || !serverOk) {
       setFailure(t("node.ssh.error.notPublic"));
       return;
     }
@@ -321,8 +309,6 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
       setFingerprint(response.fingerprint);
       setAlgorithm(response.algorithm);
       setConfirmedKey(false);
-      setName(suggestNodeName(host));
-      setAddress(host.trim());
       setStep(1);
     } catch (error) {
       setFailure(sshError(error, t, edge));
@@ -331,8 +317,8 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     }
   }
 
-  async function checkServer(event: FormEvent) {
-    event.preventDefault();
+  async function checkServer(event?: FormEvent) {
+    event?.preventDefault();
     setTouched(true);
     setFailure("");
     if (!confirmedKey || !nodeNamePattern.test(name.trim()) || !nodeAddressPattern.test(address.trim()) || !usernamePattern.test(username.trim()) || !login.ready) {
@@ -340,21 +326,31 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
       return;
     }
     setBusy("check");
+    // the page of the check opens at once: its rows wait for the answer
+    setPreflight(null);
+    setAnswered(0);
+    setStep(2);
     try {
-      const response = await guard(() => provisioning.checkSSH({
-        host: host.trim(),
-        port: portNumber,
-        fingerprint,
-        ...login.request(),
-        username: username.trim(),
-      }));
+      const response = await guard(
+        () =>
+          provisioning.checkSSH({
+            host: host.trim(),
+            port: portNumber,
+            fingerprint,
+            ...login.request(),
+            username: username.trim(),
+          }),
+        t("win.node.whatCheck", { host: host.trim() }),
+      );
       if (!response.preflight) throw new Error("preflight_missing");
       setPreflight(response.preflight);
       login.hold(); // the way in just proven holds for the install and its retries (an own key stays loaded for Start)
       setPassword("");
       setConfirmedInstall(false);
-      setStep(2);
+      // the rows answer one after the other (the board's pace); with reduced motion all at once
+      setAnswered(prefersReducedMotion() ? 99 : 0);
     } catch (error) {
+      setStep(1);
       if (!isStepUpCancelled(error)) fail(error);
     } finally {
       setPassword("");
@@ -362,8 +358,8 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     }
   }
 
-  async function startInstall(event: FormEvent) {
-    event.preventDefault();
+  async function startInstall(event?: FormEvent) {
+    event?.preventDefault();
     setFailure("");
     if (!confirmedInstall || !login.ready) {
       setFailure(t("node.ssh.confirmInstall"));
@@ -371,20 +367,24 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     }
     setBusy("start");
     try {
-      const response = await guard(() => provisioning.startNodeProvision({
-        confirmInstall: true,
-        name: name.trim().toLowerCase(),
-        address: address.trim(),
-        countryCode: country === noCountry ? "" : country,
-        location: location.trim(),
-        provider: provider.trim(),
-        sshHost: host.trim(),
-        sshPort: portNumber,
-        fingerprint,
-        ...login.request(),
-        sshUsername: username.trim(),
-        ...login.install(),
-      }));
+      const response = await guard(
+        () =>
+          provisioning.startNodeProvision({
+            confirmInstall: true,
+            name: name.trim().toLowerCase(),
+            address: address.trim(),
+            countryCode: country === noCountry ? "" : country,
+            location: location.trim(),
+            provider: provider.trim(),
+            sshHost: host.trim(),
+            sshPort: portNumber,
+            fingerprint,
+            ...login.request(),
+            sshUsername: username.trim(),
+            ...login.install(),
+          }),
+        t("win.node.whatInstall", { host: host.trim() }),
+      );
       if (!response.job?.id) throw new Error("provision_job_missing");
       login.clearSecrets(); // the job holds them now, sealed; a retry asks again
       setJobId(response.job.id);
@@ -403,13 +403,17 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     setFailure("");
     setBusy("retry");
     try {
-      const response = await guard(() => provisioning.retryNodeProvision({
-        jobId,
-        confirmInstall: true,
-        ...login.request(),
-        sshUsername: username.trim(),
-        ...login.install(),
-      }));
+      const response = await guard(
+        () =>
+          provisioning.retryNodeProvision({
+            jobId,
+            confirmInstall: true,
+            ...login.request(),
+            sshUsername: username.trim(),
+            ...login.install(),
+          }),
+        t("win.node.whatInstall", { host: host.trim() }),
+      );
       login.clearSecrets();
       if (response.job) qc.setQueryData(["node-provision", jobId], response.job);
       await qc.invalidateQueries({ queryKey: ["node-provision", jobId] });
@@ -421,294 +425,593 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     }
   }
 
-  const back = () => {
+  const back = (to: Step) => {
     setFailure("");
-    if (step === 0) onBack();
-    else if (step === 1) setStep(0);
-    else if (step === 2) {
+    if (to < 2) {
       setPreflight(null);
       setPassword("");
-      setStep(1);
     }
+    setStep(to);
   };
 
-  const openNode = () => {
+  const openNode = (tab?: "profiles") => {
     if (!nodeId) return;
     onClose();
-    void navigate({ to: "/nodes/$id", params: { id: nodeId } });
+    void navigate({ to: "/nodes/$id", params: { id: nodeId }, ...(tab ? { search: { tab } } : {}) });
   };
 
+  // ---- the stages of the install and where the job is
+  const stageIds = [
+    "connecting",
+    "preflight",
+    ...(login.install().installPanelKey ? ["access"] : []),
+    ...(preflight && !preflight.nftables ? ["nftables"] : []),
+    "firewall",
+    "transfer",
+    ...(preflight?.alreadyEnrolled ? [] : ["enrollment"]),
+    "install",
+    "waiting_node",
+  ];
+  const seen = [job.data?.phase ?? "", ...(events.data ?? []).map((e) => e.phase)].map((p) => stageIds.indexOf(p));
+  // the last stage the worker reached: a failed job says "failed" as its phase, so the events tell where it stopped
+  const reached = Math.max(-1, ...seen);
+  const running = !!jobId && !jobStopped && !jobDone;
+  const at = jobDone ? stageIds.length : Math.max(0, reached);
+
   const hostHint = t(edge ? "node.ssh.hostHintEdge" : "node.ssh.hostHint");
-  // "refused or unreachable" has one way out that needs no SSH from the panel: the one-time command run by hand
-  const manualButton = onManual && (
-    <Button type="button" variant="outline" size="md" className={cx(footBtn, "self-start")} onClick={onManual}>{t("node.ssh.useManual")}</Button>
-  );
+  const factList = factRows(preflight, t, fmt);
+  // the answers come in one by one; the page of the check is done a moment after the last one
+  useEffect(() => {
+    if (!preflight || answered > factList.length) return;
+    const id = setTimeout(() => setAnswered((n) => n + 1), answered === 0 ? 450 : answered === factList.length ? 350 : 190);
+    return () => clearTimeout(id);
+  }, [preflight, answered, factList.length]);
+  const checked = !!preflight && answered > factList.length;
+
+  const view: "srv" | "auth" | "chk" | "run" | "done" = jobDone ? "done" : step === 0 ? "srv" : step === 1 ? "auth" : step === 2 ? "chk" : "run";
+  const railAt = view === "done" ? 4 : step;
+  const authName = login.method === "key" ? t("panelKey.title") : login.method === "password" ? t("node.ssh.methodPassword") : t("node.ssh.methodOwn");
+  const sums = [
+    railAt > 0 ? `${host.trim()}:${portNumber}` : "",
+    railAt > 1 ? `${username.trim()} · ${authName}` : "",
+    railAt > 2 && preflight ? [[preflight.distribution, preflight.version].filter(Boolean).join(" "), preflight.architecture].filter(Boolean).join(" · ") : "",
+    view === "done" ? t("win.node.connected") : jobStopped ? t("win.node.failed") : view === "run" ? t("win.node.stageOf", { n: Math.min(stageIds.length, at + 1), total: stageIds.length }) : "",
+  ];
+  const locked = view === "run" || view === "done";
+  const railSteps: RailStep[] = labels.map((label, i) => ({
+    label,
+    sum: sums[i] ?? "",
+    state: i < railAt ? "done" : i === railAt ? (view === "run" && jobStopped ? "err" : "now") : "",
+    onGo: i < railAt && !locked && !busy ? () => back(i as Step) : undefined,
+  }));
+  const note = jobStopped ? t("win.node.noteFailed") : view === "run" || view === "done" ? t("win.node.noteRun") : t("win.node.noteStart");
 
   return (
-    <div className="flex flex-col gap-5">
-      <Steps current={step} labels={labels} ariaLabel={t("node.ssh.steps")} />
-      {failure && <Notice tone="danger">{failure}</Notice>}
-      {failure === t("node.ssh.error.refused") && manualButton}
+    <>
+      <Rail title={t("win.node.title")} mode="ssh" onMode={onMode} modeLocked={locked} steps={railSteps} note={note} />
+      <div className="an-m">
+        <CloseX onClose={onClose} />
 
-      {step === 0 && (
-        <form onSubmit={(event) => void getFingerprint(event)} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-base font-extrabold tracking-[-0.02em]">{t("node.ssh.step.server")}</h3>
-            <p className="text-sm leading-relaxed text-muted">{hostHint}</p>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_132px]">
-            <TextField
-              label={t("node.ssh.host")}
-              value={host}
-              onChange={(event) => setHost(event.target.value)}
-              placeholder="de1.example.com"
-              mono
-              autoComplete="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              required
-              autoFocus
-            />
-            <TextField
-              label={t("node.ssh.port")}
-              value={port}
-              onChange={(event) => setPort(event.target.value)}
-              type="number"
-              min={1}
-              max={65535}
-              step={1}
-              inputMode="numeric"
-              hint={t("node.ssh.portHint")}
-              required
-            />
-            <p className="text-xs leading-relaxed text-muted sm:col-span-2">{t(edge ? "node.ssh.providerFirewallHintEdge" : "node.ssh.providerFirewallHint")}</p>
-          </div>
-          <div className={`${footerCls} sm:justify-between`}>
-            <Button type="button" variant="ghost" size="md" className={footBtn} onClick={onBack}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !host.trim() || !portValid}>
-              {busy === "fingerprint" ? t("node.ssh.checkingFingerprint") : t("node.ssh.checkServer")}
-            </Button>
-          </div>
-        </form>
-      )}
-
-      {step === 1 && (
-        <form onSubmit={(event) => void checkServer(event)} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-base font-extrabold tracking-[-0.02em]">{t("node.ssh.fingerprintTitle")}</h3>
-            <p className="text-sm leading-relaxed text-muted">{t("node.ssh.fingerprintBody")}</p>
-          </div>
-          <code className="block rounded-field border border-accent-line bg-accent-soft p-3 leading-relaxed text-accent-text select-all">
-            <Fingerprint value={fingerprint} />
-          </code>
-          {algorithm && <span className="-mt-2 text-xs text-muted">{t("node.ssh.keyType", { algorithm })}</span>}
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-fg">
-            <input
-              type="checkbox"
-              checked={confirmedKey}
-              onChange={(event) => setConfirmedKey(event.target.checked)}
-              className="mt-0.5 size-4 flex-none accent-accent"
-            />
-            <span>{t("node.ssh.confirmKey")}</span>
-          </label>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextField
-              label={t("node.add.name")}
-              value={name}
-              onChange={(event) => setName(event.target.value.toLowerCase())}
-              placeholder="de1"
-              mono
-              maxLength={24}
-              autoComplete="off"
-              error={nameError}
-              hint={t("node.ssh.nameHint")}
-              required
-            />
-            <TextField
-              label={t("node.add.address")}
-              value={address}
-              onChange={(event) => setAddress(event.target.value)}
-              placeholder="de1.example.com"
-              mono
-              maxLength={253}
-              autoComplete="off"
-              error={addressError}
-              hint={t("node.ssh.addressHint")}
-              required
-            />
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("node.add.country")}</span>
-              <Select value={country} onValueChange={setCountry} options={countryOptions} aria-label={t("node.add.country")} />
-            </div>
-            <TextField label={t("node.ssh.location")} value={location} onChange={(event) => setLocation(event.target.value)} maxLength={100} autoComplete="off" />
-            <TextField label={t("node.ssh.provider")} value={provider} onChange={(event) => setProvider(event.target.value)} maxLength={100} autoComplete="off" />
-          </div>
-
-          {/* how the panel logs in: under a hairline, apart from the node's own details */}
-          <div role="group" aria-labelledby="ssh-login-method" className="flex flex-col gap-3 border-t border-line pt-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <span id="ssh-login-method" className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
-                {t("node.ssh.method")}
-              </span>
-              <LoginSwitch login={login} onPick={() => setFailure("")} />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <TextField
-                label={t("node.ssh.login")}
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="root"
-                autoComplete="off"
-                maxLength={32}
-                pattern={usernamePattern.source}
-                hint={t("node.ssh.loginHint")}
-                error={usernameError}
-                required
-              />
-              {login.method === "password" && (
+        {view === "srv" && (
+          <Panel key="srv" onSubmit={(e) => void getFingerprint(e)}>
+            <PanelHead eyebrow={t("auth.step", { n: 1, total: 4 })} title={t("win.node.srvTitle")}>
+              {t("win.node.srvBody")}
+            </PanelHead>
+            <div className="an-b">
+              {failure && <FailureNotice failure={failure} onManual={failure === t("node.ssh.error.refused") ? () => onMode("cmd") : undefined} />}
+              <div className="an-r an-r2">
                 <TextField
-                  label={t("node.ssh.password")}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  type="password"
-                  autoComplete="new-password"
-                  maxLength={1024}
-                  hint={t("node.ssh.passwordHint")}
-                  required
+                  className="an-f"
+                  label={t("node.ssh.host")}
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  onBlur={() => {
+                    // the name and the address for clients start from the host, when they are still empty
+                    if (host.trim() && !name.trim()) onDraft({ name: suggestNodeName(host) });
+                    if (host.trim() && !address.trim()) onDraft({ address: host.trim() });
+                  }}
+                  placeholder={t("win.node.hostPlaceholder")}
+                  mono
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  autoFocus
                 />
+                <TextField
+                  className="an-f"
+                  label={t("node.ssh.port")}
+                  value={port}
+                  onChange={(e) => setPort(e.target.value)}
+                  placeholder="22"
+                  mono
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </div>
+              <p className="-mt-1 text-xs leading-4 text-muted">
+                {hostHint} {t(edge ? "node.ssh.providerFirewallHintEdge" : "node.ssh.providerFirewallHint")}
+              </p>
+              <div className="an-r an-r1">
+                <TextField
+                  className={cx("an-f", nameBad && "bad")}
+                  label={t("node.add.name")}
+                  value={name}
+                  onChange={(e) => onDraft({ name: e.target.value.toLowerCase() })}
+                  placeholder="de1"
+                  mono
+                  maxLength={24}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  error={nameBad ? t("node.add.nameError") : undefined}
+                  hint={t("node.ssh.nameHint")}
+                />
+                <TextField
+                  className={cx("an-f", addressBad && "bad")}
+                  label={t("win.node.publicAddress")}
+                  value={address}
+                  onChange={(e) => onDraft({ address: e.target.value })}
+                  placeholder="de1.example.com"
+                  mono
+                  maxLength={253}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  error={addressBad ? t("node.add.addressError") : undefined}
+                  hint={t("node.ssh.addressHint")}
+                />
+              </div>
+              <div className={cx("an-opt", optionsOpen && "open")}>
+                <button type="button" className="an-optb" aria-expanded={optionsOpen} onClick={() => setOptionsOpen((v) => !v)}>
+                  <span>{t("win.node.optionsTitle")}</span>
+                  <em>{t("win.node.optional")}</em>
+                  <Glyph d={glyphs.chevron} />
+                </button>
+                <div className="an-lb">{t("win.node.optional")}</div>
+                <div className="an-r an-r3">
+                  <CountryField label={t("node.add.country")} value={country} onChange={(c) => onDraft({ country: c })} defaultOpen={seed?.countryOpen} />
+                  <TextField className="an-f" label={t("node.ssh.location")} value={location} onChange={(e) => setLocation(e.target.value)} maxLength={100} autoComplete="off" />
+                  <TextField className="an-f" label={t("node.ssh.provider")} value={provider} onChange={(e) => setProvider(e.target.value)} maxLength={100} autoComplete="off" />
+                </div>
+              </div>
+            </div>
+            <PanelFoot>
+              <FootNote glyph={glyphs.lock}>{serverOk ? t("win.node.srvReady") : nameBad ? t("win.node.srvNameBad") : t("win.node.srvFill")}</FootNote>
+              <Button type="submit" variant="primary" size="lg" disabled={busy !== null || !serverOk}>
+                {busy === "fingerprint" && <Spinner />}
+                {busy === "fingerprint" ? t("node.ssh.checkingFingerprint") : t("node.ssh.checkServer")}
+              </Button>
+            </PanelFoot>
+          </Panel>
+        )}
+
+        {view === "auth" && (
+          <Panel key="auth" onSubmit={(e) => void checkServer(e)}>
+            <PanelHead eyebrow={t("auth.step", { n: 2, total: 4 })} title={t("win.node.authTitle")}>
+              {t("win.node.authBody")}
+            </PanelHead>
+            <div className="an-b">
+              {failure && <FailureNotice failure={failure} />}
+              <section className={cx("an-k", confirmedKey && "ok")}>
+                <div className="an-kh">
+                  <b>{t("win.node.serverKey")}</b>
+                  {algorithm && <Chip mono className="font-medium">{algorithm}</Chip>}
+                  <Chip mono className="font-medium">{fingerprint.startsWith("SHA256:") ? "SHA-256" : (fingerprint.split(":")[0] ?? "")}</Chip>
+                  <CopyChip value={fingerprint} />
+                </div>
+                <div className="an-fp" dir="ltr" data-testid="fingerprint">
+                  <span className="sr-only">{fingerprint}</span>
+                  {(fingerprint.slice(fingerprint.indexOf(":") + 1).match(/.{1,4}/g) ?? []).map((chunk, i) => (
+                    <span key={i} aria-hidden>
+                      {chunk}
+                    </span>
+                  ))}
+                </div>
+                {whereOpen && (
+                  <div className="an-kc">
+                    <span>{t("win.node.keyWhere")}</span>
+                    <CodeBox code={keygenCommand(algorithm)} />
+                  </div>
+                )}
+                <div className="an-kf">
+                  <Check label={t("node.ssh.confirmKey")} checked={confirmedKey} onCheckedChange={(v) => setConfirmedKey(v)} />
+                  <button type="button" className="an-lk" aria-expanded={whereOpen} onClick={() => setWhereOpen((v) => !v)}>
+                    {whereOpen ? t("win.node.hide") : t("win.node.keyWhereLink")}
+                  </button>
+                </div>
+              </section>
+
+              <div className="an-rw">
+                <div className="an-f flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[13px] text-sec">{t("node.ssh.method")}</span>
+                  <WaySwitch
+                    label={t("node.ssh.method")}
+                    value={login.method}
+                    onValueChange={(m: LoginMethod) => {
+                      login.pick(m);
+                      setFailure("");
+                    }}
+                    options={[
+                      { value: "key", label: t("panelKey.title"), d: glyphs.key },
+                      { value: "password", label: t("node.ssh.methodPassword"), d: glyphs.password },
+                      { value: "own", label: t("node.ssh.methodOwn"), d: glyphs.terminal },
+                    ]}
+                  />
+                </div>
+                <TextField
+                  className="an-f"
+                  label={t("node.ssh.login")}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="root"
+                  mono
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={32}
+                  pattern={usernamePattern.source}
+                  error={usernameError}
+                />
+              </div>
+
+              {viaKey && <PanelKeyBox howTo={howTo ?? !keyInUse} onHowTo={setHowTo} />}
+              {login.method === "password" && (
+                <div className="an-box">
+                  <TextField
+                    className="an-f"
+                    label={t("node.ssh.password")}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type="password"
+                    placeholder={t("win.node.passwordPlaceholder")}
+                    mono
+                    autoComplete="new-password"
+                    maxLength={1024}
+                  />
+                  <Check label={t("node.ssh.installPanelKey")} checked={login.installPanelKey} onCheckedChange={(v) => login.setInstallPanelKey(v)} />
+                  <p>{t("win.node.passwordNote")}</p>
+                  <p>{t("node.ssh.installPanelKeyHint")}</p>
+                </div>
+              )}
+              {login.method === "own" && (
+                <div className="an-box">
+                  <OwnKeyField login={login} plain />
+                </div>
               )}
             </div>
-            {viaKey && <PanelSSHKey howTo={howTo ?? !keyInUse} onHowTo={setHowTo} className="rounded-card border border-line bg-surface-2 p-4" />}
-            {login.method === "password" && <InstallPanelKeyBox login={login} />}
-            {login.method === "own" && <OwnKeyField login={login} />}
-          </div>
-          <div className={`${footerCls} sm:justify-between`}>
-            <Button type="button" variant="ghost" size="md" className={footBtn} onClick={back}>{t("node.ssh.back")}</Button>
-            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedKey || !login.ready}>
-              {busy === "check" ? t("node.ssh.checking") : t("node.ssh.continue")}
-            </Button>
-          </div>
-        </form>
-      )}
+            <PanelFoot>
+              <Button type="button" variant="secondary" size="lg" onClick={() => back(0)}>
+                {t("node.ssh.back")}
+              </Button>
+              <FootNote end>{confirmedKey ? "" : t("win.node.authHint")}</FootNote>
+              <Button type="submit" variant="primary" size="lg" disabled={busy !== null || !confirmedKey || !login.ready}>
+                {t("node.ssh.continue")}
+              </Button>
+            </PanelFoot>
+          </Panel>
+        )}
 
-      {step === 2 && preflight && (
-        <form onSubmit={(event) => void startInstall(event)} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-base font-extrabold tracking-[-0.02em]">{t("node.ssh.preflightTitle")}</h3>
-            <p className="text-sm leading-relaxed text-muted">{t("node.ssh.preflightBody")}</p>
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <Fact label={t("node.ssh.system")} value={[preflight.distribution, preflight.version].filter(Boolean).join(" ") || "—"} />
-            <Fact label={t("node.ssh.architecture")} value={preflight.architecture || "—"} />
-            <Fact label={t("node.ssh.kernel")} value={preflight.kernel || "—"} />
-            <Fact label={t("node.ssh.cpus")} value={fmt.num(preflight.cpuCount, 0)} />
-            <Fact label={t("node.ssh.memory")} value={fmt.bytes(Number(preflight.memoryBytes), 1024)} />
-            <Fact label={t("node.ssh.disk")} value={fmt.bytes(Number(preflight.diskAvailableBytes), 1024)} />
-            <Fact label={t("node.ssh.systemd")} value={preflight.systemd ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.systemd ? "good" : "bad"} />
-            <Fact label={t("node.ssh.nftables")} value={preflight.nftables ? t("node.ssh.available") : t("node.ssh.nftablesWillInstall")} tone={preflight.nftables ? "good" : undefined} />
-            <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : "bad"} />
-          </div>
-          {!preflight.nftables && <Notice>{t("node.ssh.nftablesNote")}</Notice>}
-          <p className="rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-muted">{t("node.ssh.firewallHint")}</p>
-          {login.method === "password" && (
-            <TextField
-              label={t("node.ssh.password")}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              autoComplete="new-password"
-              maxLength={1024}
-              hint={t("node.ssh.passwordHint")}
-              required
-            />
-          )}
-          {login.method === "own" && <OwnKeyField login={login} warn={false} />}
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-fg">
-            <input
-              type="checkbox"
-              checked={confirmedInstall}
-              onChange={(event) => setConfirmedInstall(event.target.checked)}
-              className="mt-0.5 size-4 flex-none accent-accent"
-            />
-            <span>{t("node.ssh.confirmInstall")}</span>
-          </label>
-          <div className={`${footerCls} sm:justify-between`}>
-            <Button type="button" variant="ghost" size="md" className={footBtn} onClick={back}>{t("node.ssh.back")}</Button>
-            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedInstall || !login.ready}>
-              {busy === "start" ? t("node.ssh.starting") : t("node.ssh.startInstall")}
-            </Button>
-          </div>
-        </form>
-      )}
-
-      {step === 3 && (
-        <div className="flex flex-col gap-4">
-          {job.isPending && <div className="rounded-card border border-line bg-surface-2 p-4 text-sm text-muted">{t("node.ssh.state.queued")}</div>}
-          {job.error && <Notice tone="danger">{sshError(job.error, t, edge)}</Notice>}
-          {job.data && (
-            <section className="flex flex-col gap-3 rounded-card border border-line bg-surface-2 p-4" aria-live="polite">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("node.add.name")}</span>
-                  <h3 className="mt-0.5 break-words text-base font-extrabold">{job.data.name}</h3>
-                </div>
-                <span className={"inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold " + jobTone}>
-                  {stateLabel(jobState, t)}
-                </span>
-              </div>
-              {jobDone ? (
-                <Sweep play onMount>
-                  <Banner kind="ok" title={t("node.ssh.done")} />
-                </Sweep>
-              ) : jobFailed ? (
-                <>
-                  <Notice tone="danger">{jobText(job.data.errorCode)}</Notice>
-                  {job.data.errorCode === "ssh_target_refused" && manualButton}
-                </>
-              ) : jobCancelled ? (
-                <Notice tone="danger">{jobText(job.data.errorCode)}</Notice>
-              ) : (
-                <>
-                  <p className="text-sm text-muted">{phaseLabel(job.data.phase, t)}</p>
-                  <div role="progressbar" aria-label={phaseLabel(job.data.phase, t)} aria-valuemin={0} aria-valuemax={100} className="h-1.5 overflow-hidden rounded-full bg-canvas">
-                    <span className="block h-full w-1/3 animate-pulse rounded-full bg-accent" />
+        {view === "chk" && (
+          <Panel key="chk" onSubmit={(e) => void startInstall(e)}>
+            <PanelHead eyebrow={t("auth.step", { n: 3, total: 4 })} title={checked ? t("win.node.chkOk") : t("win.node.chkBusy")}>
+              {checked ? t("win.node.chkOkBody") : t("win.node.chkBusyBody")}
+            </PanelHead>
+            <div className="an-b">
+              {failure && <FailureNotice failure={failure} />}
+              <div className="an-fx" aria-busy={!checked}>
+                {factList.map((f, i) => (
+                  <div key={f.key} className={cx("an-fr", i < answered ? "done" : i === answered ? "now" : "wait", f.bad && i < answered && "bad")}>
+                    <span className="an-ck" aria-hidden>
+                      <Icon name="check" />
+                    </span>
+                    <span>{f.label}</span>
+                    <b>{i < answered ? f.value : "—"}</b>
                   </div>
-                  <p className="text-xs leading-relaxed text-muted">{t("node.ssh.closeBackground")}</p>
+                ))}
+              </div>
+              {checked && preflight && (
+                <>
+                  <div className="an-lb">{t("win.node.planTitle")}</div>
+                  <div className="an-pl">
+                    <div>
+                      <span className="an-pi" aria-hidden>
+                        <Glyph d={glyphs.firewall} />
+                      </span>
+                      <div>
+                        <b>{t("win.node.planFirewall", { ports: firewallPorts(portNumber).join(", ") })}</b>
+                        <span>{t("win.node.planFirewallBody")}</span>
+                      </div>
+                    </div>
+                    {!preflight.nftables && (
+                      <div>
+                        <span className="an-pi" aria-hidden>
+                          <Glyph d={glyphs.package} />
+                        </span>
+                        <div>
+                          <b>{t("win.node.planNftables")}</b>
+                          <span>{t("node.ssh.nftablesNote")}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <span className="an-pi" aria-hidden>
+                        <Glyph d={glyphs.agent} />
+                      </span>
+                      <div>
+                        <b>{t("win.node.planAgent")}</b>
+                        <span className="an-mono">mistgate-node.service</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs leading-4 text-muted">{t("node.ssh.firewallHint")}</p>
+                  {login.method === "password" && (
+                    <TextField
+                      className="an-f"
+                      label={t("node.ssh.password")}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      type="password"
+                      placeholder={t("win.node.passwordPlaceholder")}
+                      mono
+                      autoComplete="new-password"
+                      maxLength={1024}
+                      hint={t("node.ssh.passwordHint")}
+                    />
+                  )}
+                  {login.method === "own" && <OwnKeyField login={login} warn={false} plain />}
+                  <Check label={t("node.ssh.confirmInstall")} checked={confirmedInstall} onCheckedChange={(v) => setConfirmedInstall(v)} />
                 </>
               )}
-              {jobCanRetry && login.method === "own" && <OwnKeyField login={login} warn={false} note={t("node.ssh.retryOwnKey")} />}
+            </div>
+            <PanelFoot>
+              <Button type="button" variant="secondary" size="lg" onClick={() => back(1)} disabled={busy !== null}>
+                {t("node.ssh.back")}
+              </Button>
+              <FootNote end />
+              <Button type="submit" variant="primary" size="lg" disabled={busy !== null || !checked || !confirmedInstall || !login.ready}>
+                {busy === "start" && <Spinner />}
+                {busy === "start" ? t("node.ssh.starting") : t("node.ssh.startInstall")}
+              </Button>
+            </PanelFoot>
+          </Panel>
+        )}
+
+        {view === "run" && (
+          <Panel key="run">
+            <PanelHead
+              eyebrow={jobStopped ? `${t("auth.step", { n: 4, total: 4 })} · ${t("win.node.stopped")}` : t("auth.step", { n: 4, total: 4 })}
+              title={jobStopped ? t("win.node.runStopped") : t("win.node.runTitle", { name: name.trim() || (job.data?.name ?? "") })}
+            >
+              {jobStopped ? jobText(job.data?.errorCode ?? "") : t("win.node.runBody")}
+            </PanelHead>
+            <div className="an-b">
+              {job.error && <Notice tone="danger">{sshError(job.error, t, edge)}</Notice>}
+              <div
+                role="progressbar"
+                aria-label={phaseLabel(job.data?.phase ?? "queued", t)}
+                aria-valuemin={0}
+                aria-valuemax={stageIds.length}
+                aria-valuenow={Math.min(at, stageIds.length)}
+                className={cx("an-bar", jobStopped && "err")}
+              >
+                <i style={{ ["--w" as string]: `${jobStopped ? Math.max(4, Math.round(((at + 0.5) / stageIds.length) * 100)) : Math.round(((at + 0.5) / stageIds.length) * 100)}%` }} />
+              </div>
+              <ol className="an-sg" aria-live="polite">
+                {stageIds.map((id, i) => {
+                  const err = jobStopped && i === at;
+                  const done = !err && i < at;
+                  const now = !err && running && i === at;
+                  const code = job.data?.errorCode ?? "";
+                  return (
+                    <li key={id} className={err ? "err" : done ? "done" : now ? "now" : ""}>
+                      <span className="an-si" aria-hidden>
+                        <Glyph d={err ? glyphs.cross : done ? glyphs.check : glyphs.dot} size={14} strokeWidth={2.5} />
+                      </span>
+                      <b>{phaseLabel(id, t)}</b>
+                      <span>{err ? (code === "ssh_authentication_failed" || code === "ssh_panel_key_not_accepted" ? t("win.node.loginRefused") : t("win.node.failed")) : now ? (id === "waiting_node" ? t("win.node.upTo2min") : t("win.node.inProgress")) : ""}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+              {failure && <FailureNotice failure={failure} />}
+              {jobCanRetry && login.method === "own" && <OwnKeyField login={login} warn={false} note={t("node.ssh.retryOwnKey")} plain />}
               {jobCanRetry && login.method === "password" && (
                 <TextField
+                  className="an-f"
                   label={t("node.ssh.retryPassword")}
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                   type="password"
+                  mono
                   autoComplete="new-password"
                   maxLength={1024}
                 />
               )}
-            </section>
-          )}
-          <div className={`${footerCls} sm:justify-end`}>
-            {jobDone && job.data?.nodeId ? (
-              <Button type="button" variant="primary" size="md" className={footBtn} onClick={openNode}>{t("node.ssh.openNode")}</Button>
-            ) : jobCanRetry ? (
-              <>
-                <Button type="button" variant="ghost" size="md" className={footBtn} onClick={onClose}>{t("common.close")}</Button>
-                <Button type="button" variant="primary" size="md" className={footBtn} disabled={busy !== null || !login.ready} onClick={() => void retryInstall()}>
-                  {busy === "retry" ? t("node.ssh.retrying") : t("node.ssh.retry")}
-                </Button>
-              </>
-            ) : (
-              <Button type="button" variant="secondary" size="md" className={footBtn} onClick={onClose}>
-                {jobFailed || jobCancelled ? t("common.close") : t("node.ssh.closeBackground")}
-              </Button>
-            )}
-          </div>
-          {jobId && <a href={installManagerHref} className="self-end text-xs font-semibold text-accent-text underline-offset-4 hover:underline">{t("node.ssh.manager")}</a>}
+              {job.data?.errorCode === "ssh_target_refused" && jobStopped && (
+                <div>
+                  <Button type="button" variant="secondary" size="md" onClick={() => onMode("cmd")}>
+                    {t("node.ssh.useManual")}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <PanelFoot>
+              {running ? (
+                <>
+                  <a href={installManagerHref} className={buttonClass("secondary", "lg")}>
+                    {t("node.ssh.manager")}
+                  </a>
+                  <FootNote end />
+                  <Button type="button" variant="secondary" size="lg" onClick={onClose}>
+                    {t("node.ssh.closeBackground")}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" variant="secondary" size="lg" onClick={onClose}>
+                    {t("common.close")}
+                  </Button>
+                  <FootNote end>{beforeChanges.has(job.data?.phase === "failed" ? (stageIds[at] ?? "") : (job.data?.phase ?? "")) && jobStopped ? t("win.node.serverUntouched") : ""}</FootNote>
+                  {jobCanRetry && (
+                    <Button type="button" variant="primary" size="lg" disabled={busy !== null || !login.ready} onClick={() => void retryInstall()}>
+                      {busy === "retry" ? t("node.ssh.retrying") : t("node.ssh.retry")}
+                    </Button>
+                  )}
+                </>
+              )}
+            </PanelFoot>
+          </Panel>
+        )}
+
+        {view === "done" && (
+          <NodeReady
+            nodeId={nodeId ?? ""}
+            line={[job.data?.name ?? name, location.trim() || (country !== noCountry ? fmt.country(country) : ""), host.trim()].filter(Boolean).join(" · ")}
+            onClose={onClose}
+            onOpen={openNode}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+/** The refusal of a step, in the window, above what it was about. */
+function FailureNotice({ failure, onManual }: { failure: string; onManual?: () => void }) {
+  const t = useT();
+  return (
+    <>
+      <Notice tone="danger">{failure}</Notice>
+      {onManual && (
+        <div>
+          <Button type="button" variant="secondary" size="md" onClick={onManual}>
+            {t("node.ssh.useManual")}
+          </Button>
         </div>
       )}
+    </>
+  );
+}
+
+/** The rows of the server check, in the board's order (nftables after systemd: the install adds its own step when it is missing); systemd and the panel's way back are the ones that can say "no". Without the answer the values are dashes. */
+function factRows(p: NodePreflight | null, t: T, fmt: ReturnType<typeof useFmt>): Fact[] {
+  const no = t("node.ssh.unavailable");
+  const yes = t("node.ssh.available");
+  return [
+    { key: "system", label: t("node.ssh.system"), value: (p && [p.distribution, p.version].filter(Boolean).join(" ")) || "—" },
+    { key: "arch", label: t("node.ssh.architecture"), value: p?.architecture || "—" },
+    { key: "kernel", label: t("node.ssh.kernel"), value: p?.kernel || "—" },
+    { key: "cpus", label: t("node.ssh.cpus"), value: p ? fmt.num(p.cpuCount, 0) : "—" },
+    { key: "memory", label: t("node.ssh.memory"), value: p ? fmt.bytes(Number(p.memoryBytes), 1024) : "—" },
+    { key: "disk", label: t("node.ssh.disk"), value: p ? fmt.bytes(Number(p.diskAvailableBytes), 1024) : "—" },
+    { key: "systemd", label: t("node.ssh.systemd"), value: p ? (p.systemd ? yes : no) : "—", bad: !!p && !p.systemd },
+    { key: "nftables", label: t("node.ssh.nftables"), value: p ? (p.nftables ? yes : t("node.ssh.nftablesWillInstall")) : "—" },
+    { key: "panel", label: t("node.ssh.panelReachable"), value: p ? (p.panelReachable ? yes : no) : "—", bad: !!p && !p.panelReachable },
+  ];
+}
+
+/** The panel's own key as a way in (.an-box): the key to copy, how to put it on a server, the fingerprint of the key. */
+function PanelKeyBox({ howTo, onHowTo }: { howTo: boolean; onHowTo: (open: boolean) => void }) {
+  const t = useT();
+  const key = usePanelSSHKey();
+  const publicKey = key.data?.publicKey ?? "";
+  const command = `mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${publicKey}' >> ${authorizedKeysFile} && chmod 600 ${authorizedKeysFile}`;
+  if (key.isError) {
+    return (
+      <div className="an-box">
+        <p role="alert" className="text-danger-text!">
+          {errorText(key.error, t)}
+        </p>
+        <div>
+          <Button type="button" variant="secondary" size="md" onClick={() => void key.refetch()}>
+            {t("common.retry")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="an-box">
+      {key.isPending ? (
+        <div className="an-code">
+          <code>{t("common.loading")}</code>
+        </div>
+      ) : (
+        <CodeBox code={publicKey} label={t("panelKey.copy")} testId="panel-key" />
+      )}
+      <p>
+        {t("panelKey.body")}{" "}
+        <button type="button" className="an-lk" aria-expanded={howTo} onClick={() => onHowTo(!howTo)}>
+          {howTo ? t("win.node.hideHow") : t("panelKey.howTo")}
+        </button>
+      </p>
+      {key.data?.fingerprint && (
+        <p>
+          {t("panelKey.fingerprint")} <Fingerprint value={key.data.fingerprint} />
+        </p>
+      )}
+      {howTo && (
+        <>
+          <ol className="an-ol">
+            {[t("panelKey.step1"), t("panelKey.step2", { name: "mistgate" }), t("panelKey.step3")].map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
+          {publicKey && (
+            <>
+              <p>{t("panelKey.command")}</p>
+              <CodeBox wrap code={command} label={t("node.add.copyCommand")} />
+            </>
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+/** The window's last page (.an-dn): the node is installed and connected; the next thing is a profile on it. */
+export function NodeReady({ nodeId, line, onClose, onOpen }: { nodeId: string; line: string; onClose: () => void; onOpen: (tab?: "profiles") => void }) {
+  const t = useT();
+  // a node installed again may have its profiles already: the next step is a profile only when it has none
+  const live = useQuery({
+    queryKey: ["node", nodeId],
+    queryFn: async ({ signal }) => plain(await nodesApi.getNode({ nodeId }, { signal })),
+    enabled: !!nodeId,
+    staleTime: 30_000,
+  });
+  const needsProfile = (live.data?.inbounds.length ?? 0) === 0;
+  return (
+    <Panel key="done" className="an-dn">
+      <WaveField at="50% 38%" />
+      <Halo className="top-1/2 left-1/2 h-[420px] w-[640px] animate-[an-halo_1s_var(--e)_both]" />
+      <div className="an-dn-in">
+        <div className="an-ok" aria-hidden>
+          <Icon name="check" />
+        </div>
+        <h2>{t("node.ssh.done")}</h2>
+        <p className="an-line an-mono">{line}</p>
+        {needsProfile && (
+          <div className="an-nx">
+            <span className="an-pi" aria-hidden>
+              <Glyph d={glyphs.warn} />
+            </span>
+            <div>
+              <b>{t("win.node.noProfiles")}</b>
+              <span>{t("win.node.noProfilesBody")}</span>
+            </div>
+          </div>
+        )}
+        <div className="an-da">
+          {needsProfile && (
+            <Button type="button" variant="primary" size="lg" onClick={() => onOpen("profiles")}>
+              <Glyph d={glyphs.plus} />
+              {t("win.node.addProfile")}
+            </Button>
+          )}
+          <Button type="button" variant={needsProfile ? "secondary" : "primary"} size="lg" onClick={() => (nodeId ? onOpen() : onClose())}>
+            {t("node.ssh.openNode")}
+          </Button>
+        </div>
+      </div>
+    </Panel>
   );
 }
