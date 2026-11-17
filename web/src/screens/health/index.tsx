@@ -1,30 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useAddNode } from "@/components/add-node";
-import { PageTitle, SectionLabel } from "@/components/ui/bits";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
-import { EmptyState } from "@/components/ui/notice";
-import { Pending, QueryError } from "@/components/ui/query-error";
-import { StatusDot } from "@/components/ui/status";
+import { Button, buttonClass } from "@/components/ui/button";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
+import { AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { problemCount, useFleetSummary } from "@/lib/fleet";
+import { alertsQuery, checksQuery, doctorQuery, fleetIssues, isLoud, isPeopleAlert } from "@/lib/health";
 import { useNow } from "@/lib/time";
-import { alertsQuery, checksQuery, doctorQuery, isLoud, isPeopleAlert } from "@/lib/health";
-import { isProblem, nodeKind, useNodeStatus } from "@/lib/node-status";
-import { overviewQuery } from "@/lib/queries";
 import { AlertsTab } from "./alerts";
 import { ChecksTab } from "./checks";
 import { DoctorTab } from "./doctor";
-import { PeopleTab } from "./people";
 import { useFixFlow } from "./fix";
+import { Calm, Dot, LoadCards, LoadFailed, P, PageHead, TabLabel } from "./page-parts";
+import { PeopleTab } from "./people";
 import type { HealthTab } from "./tabs";
-import { AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
+import "./health.css";
 
-/** Health: Alerts (what is wrong with the nodes now and what was), People (the same for people), Checks (the client's view of every profile), Doctor (host checks with fixes). */
+/** The first round of the checks has not run: nodes and profiles are there, and no cell has a result yet. */
+export function isFirstRound(checks: { columns: readonly unknown[]; rows: readonly { cells: readonly { last?: unknown }[] }[] } | undefined): boolean {
+  return !!checks && checks.columns.length > 0 && checks.rows.length > 0 && checks.rows.every((r) => r.cells.every((c) => !c.last));
+}
+
+/** "Health": Alerts (what is wrong with the nodes now and what was), People (the same for people), Checks (the client's view of every profile), Doctor (host checks with fixes). */
 export function HealthScreen() {
   const t = useT();
   const addNode = useAddNode();
@@ -32,11 +33,11 @@ export function HealthScreen() {
   const search = useSearch({ strict: false }) as { tab?: HealthTab };
   const tab = search.tab ?? "alerts";
   const fleet = useFleetSummary();
-  const flow = useFixFlow(); // one flow for the Alerts and Doctor tabs: a fix started on one shows its progress on the other
+  const flow = useFixFlow({ inline: true }); // one flow for the Alerts and Doctor tabs: a fix started on one shows its progress on the other
 
   const alerts = useQuery(alertsQuery);
   const checks = useQuery(checksQuery());
-  const doctor = useQuery({ ...doctorQuery(), enabled: tab === "doctor" });
+  const doctor = useQuery(doctorQuery());
   const setTab = (next: string) => void navigate({ to: "/health", search: next === "alerts" ? {} : { tab: next as HealthTab }, replace: true });
 
   const clock = useNow();
@@ -45,142 +46,108 @@ export function HealthScreen() {
   // alerts about people are not problems of a node: they have their own tab and count, and stay out of the node count and the nodes named below
   const loudAlerts = active.filter((a) => !isPeopleAlert(a) && isLoud(a, now));
   const loudPeople = active.filter((a) => isPeopleAlert(a) && isLoud(a, now)).length;
-  const critical = loudAlerts.filter((a) => a.severity === AlertSeverity.CRITICAL).length;
+  const critical = Math.max(fleet.critical, loudAlerts.filter((a) => a.severity === AlertSeverity.CRITICAL).length);
   const min = Math.max(1, Math.round((checks.data?.intervalS ?? 300) / 60));
   // the number of the header and the menu; the alerts tab counts its own rows
   const problems = problemCount(fleet);
   // the Cloudflare edition runs no checker: no check interval, but its alert pass runs every minute (internal/panel/app/edge_tick.go)
   const noChecks = useEdition().off("health_checks");
+  const first = !noChecks && isFirstRound(checks.data);
+  const issues = doctor.data ? fleetIssues(doctor.data.nodes).length : 0;
 
-  const header = (sub: string) => (
-    <div className="flex flex-col gap-[3px]">
-      <PageTitle>{t("hl.title")}</PageTitle>
-      <span className="text-xs text-muted">{sub}</span>
-    </div>
-  );
+  const loading = fleet.loading;
+  const failed = !loading && alerts.isError && !alerts.data;
+  const bare = !loading && !failed && fleet.nodes === 0;
 
-  if (!fleet.loading && fleet.nodes === 0)
-    return (
-      <div className="flex flex-col gap-3.5">
-        {header(t("hl.empty.title"))}
-        <div className="rounded-card-lg border border-dashed border-line">
-          <EmptyState
-            title={t("hl.empty.title")}
-            action={
-              <Button variant="primary" size="lg" onClick={() => addNode()}>
-                {t("node.add.button")}
-              </Button>
-            }
-          >
-            {t("hl.empty.body")}
-          </EmptyState>
-        </div>
-      </div>
-    );
-
-  const failed = (q: { error: unknown; refetch: () => unknown }) => <QueryError error={q.error} onRetry={() => void q.refetch()} />;
-  const loading = <Pending />;
-
-  const items: TabItem[] = [
-    {
-      value: "alerts",
-      label: (
-        <>
-          {t("hl.tab.alerts")}
-          {loudAlerts.length > 0 && <TabCount n={loudAlerts.length} danger={critical > 0} />}
-        </>
-      ),
-      content: alerts.data ? <AlertsTab active={active} history={alerts.data.history} now={now} flow={flow} /> : alerts.isError ? failed(alerts) : loading,
-    },
-    {
-      value: "people",
-      label: (
-        <>
-          {t("hl.tab.people")}
-          {loudPeople > 0 && <TabCount n={loudPeople} danger={false} />}
-        </>
-      ),
-      content: alerts.data ? <PeopleTab active={active} now={now} flow={flow} /> : alerts.isError ? failed(alerts) : loading,
-    },
-    {
-      value: "checks",
-      label: t("hl.tab.checks"),
-      content: tab !== "checks" ? null : checks.data ? <ChecksTab data={checks.data} /> : checks.isError ? failed(checks) : loading,
-    },
-    {
-      value: "doctor",
-      label: t("hl.tab.doctor"),
-      content: tab !== "doctor" ? null : doctor.data ? <DoctorTab data={doctor.data} flow={flow} /> : doctor.isError ? failed(doctor) : loading,
-    },
-  ];
-
-  return (
-    <div className="flex flex-col gap-3.5">
-      {header(
-        fleet.loading
-          ? t("hl.sum.loading")
+  const sum = loading
+    ? t("hl.sum.loading")
+    : failed
+      ? t("hlp.sum.err")
+      : bare
+        ? t("hlp.sum.nonodes")
+        : first
+          ? t("hlp.sum.first")
           : noChecks
             ? problems > 0
               ? t("hl.sum.edgeActive", { problems: t.n("health.problems", problems) })
               : t("hl.sum.edgeQuiet")
             : problems > 0
-              ? t("hl.sum.active", { problems: t.n("health.problems", problems), min })
-              : t("hl.sum.quiet", { min }),
-      )}
-      <NodeProblems covered={new Set(loudAlerts.map((a) => a.nodeId))} />
+              ? t("hl.sum.active", { problems: t.n("health.problems", problems) + (critical > 0 ? ` · ${t("hlp.sum.crit", { n: critical })}` : ""), min })
+              : t("hl.sum.quiet", { min });
+
+  // a tab whose own query has not come, has failed, or the state of the whole page (the board's skeleton, error card and "no nodes")
+  const state = (q: { data?: unknown; isError: boolean; refetch: () => unknown }, ready: () => ReactNode): ReactNode => {
+    if (loading) return <LoadCards label={t("hlp.loading")} />;
+    if (failed) return <LoadFailed title={t("hlp.err.title")} text={t("hlp.err.text")} retry={t("hlp.retry")} onRetry={() => void alerts.refetch()} />;
+    if (bare)
+      return (
+        <Calm
+          className="hl-calm hl-top rc-emp"
+          icon={P.server}
+          title={t("hlp.nonodes.title")}
+          text={t("hlp.nonodes.text")}
+          action={
+            <span className="hl-two">
+              <Button variant="primary" size="lg" onClick={() => addNode()}>
+                {t("node.add.button")}
+              </Button>
+              <Link to="/nodes" className={cx(buttonClass("secondary", "lg"), "btn")}>
+                {t("hlp.nonodes.open")}
+              </Link>
+            </span>
+          }
+        />
+      );
+    if (q.data) return ready();
+    if (q.isError) return <LoadFailed title={t("hlp.err.title")} text={t("hlp.err.text")} retry={t("hlp.retry")} onRetry={() => void q.refetch()} />;
+    return <LoadCards label={t("hlp.loading")} />;
+  };
+  const note = first && (
+    <p className="rc-nt">
+      <Dot kind="busy" />
+      <span>{t("hlp.first.note")}</span>
+    </p>
+  );
+  const on = !loading && !failed;
+
+  const items: TabItem[] = [
+    {
+      value: "alerts",
+      label: <TabLabel text={t("hl.tab.alerts")} n={on ? loudAlerts.length : 0} tone="warn" />,
+      content: state(alerts, () => (
+        <>
+          {note}
+          <AlertsTab active={active} history={alerts.data!.history} now={now} flow={flow} first={first} onChecks={noChecks ? undefined : () => setTab("checks")} />
+        </>
+      )),
+    },
+    {
+      value: "people",
+      label: <TabLabel text={t("hl.tab.people")} n={on ? loudPeople : 0} />,
+      content: state(alerts, () => (
+        <>
+          {note}
+          <PeopleTab active={active} now={now} flow={flow} first={first} />
+        </>
+      )),
+    },
+    {
+      value: "checks",
+      label: t("hl.tab.checks"),
+      content: tab !== "checks" ? null : state(checks, () => <ChecksTab data={checks.data!} />),
+    },
+    {
+      value: "doctor",
+      label: <TabLabel text={t("hl.tab.doctor")} n={on ? issues : 0} />,
+      content: tab !== "doctor" ? null : state(doctor, () => <DoctorTab data={doctor.data!} flow={flow} first={first} />),
+    },
+  ];
+
+  return (
+    <div className="hlp">
+      <PageHead title={t("hl.title")} sub={sum} />
       <Tabs aria-label={t("hl.tabs")} items={items} value={tab} onValueChange={setTab} />
       {flow.modal}
     </div>
-  );
-}
-
-/** The alerts tab's own count: its rows; red when one of them is critical. */
-function TabCount({ n, danger }: { n: number; danger: boolean }) {
-  return (
-    <span
-      className={cx(
-        "flex h-4 min-w-4 items-center justify-center rounded-lg px-1 font-mono text-[10px]",
-        danger ? "bg-danger-soft text-danger-text" : "bg-warn-soft text-warn-text",
-      )}
-    >
-      {n}
-    </span>
-  );
-}
-
-/**
- * Nodes that count as a problem but have no alert (yet, or by nature: a node without profiles, a profile that did not
- * start). They are in the number of the header, so they are named here, each a link to where it is fixed.
- */
-function NodeProblems({ covered }: { covered: ReadonlySet<string> }) {
-  const t = useT();
-  const st = useNodeStatus();
-  const cards = useQuery(overviewQuery()).data?.nodes ?? [];
-  const nodes = cards.filter((n) => isProblem(n) && !covered.has(n.id));
-  if (nodes.length === 0) return null;
-  return (
-    <section className="flex flex-col gap-1 rounded-card-lg border border-line bg-surface px-4 pt-3.5 pb-1.5">
-      <SectionLabel as="h2" icon="server" tone="sky" className="pb-1.5">
-        {t("hl.nodes.title")}
-      </SectionLabel>
-      {nodes.map((n) => {
-        const toProfiles = n.reason?.code === "no_profiles" || n.reason?.code === "inbound_failed";
-        return (
-          <Link
-            key={n.id}
-            to="/nodes/$id"
-            params={{ id: n.id }}
-            search={toProfiles ? { tab: "profiles" } : {}}
-            className="flex min-h-10 items-center gap-2.5 border-t border-line py-2 text-[13px]"
-          >
-            <StatusDot kind={nodeKind(n)} />
-            <span className="min-w-0 flex-1 text-pretty">
-              <b className="font-bold">{n.name}</b> <span className="text-muted">· {st.line(n)}</span>
-            </span>
-            <Icon name="chevronRight" size={14} className="flex-none text-faint" />
-          </Link>
-        );
-      })}
-    </section>
   );
 }
