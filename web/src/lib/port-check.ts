@@ -129,9 +129,12 @@ export function decoyNote(t: T, p: Record<string, string | undefined>): string {
   return [t(`node.check.decoy.${via}`, vars), port80].filter(Boolean).join(" ");
 }
 
-/** hy2_site_taken in words ({node, port, hy2, trusttunnel}): a TrustTunnel profile takes the TCP port of a Hysteria2 site, which gives way. */
+/**
+ * hy2_site_taken in words ({node, port, hy2, trusttunnel}): a TrustTunnel profile takes the TCP port of a Hysteria2 site, which
+ * gives way; hy2_site_taken_mtproto ({node, port, hy2, mtproto}): an MTProto profile does.
+ */
 export function takenNote(t: T, p: Record<string, string | undefined>): string {
-  return t("node.check.taken", Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v ?? ""])));
+  return t(p.mtproto !== undefined ? "node.check.takenMtproto" : "node.check.taken", Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v ?? ""])));
 }
 
 /**
@@ -145,7 +148,7 @@ export function portNotes(t: T, warnings: readonly Warning[] | undefined): strin
     if (w.code === "port_unchecked") out.push(t("ports.unchecked.saved", { port: w.params.port ?? "", node: w.params.node ?? "", why: reasonText(t, w.params.reason ?? "") }));
     if (w.code === "port_lossy") out.push(t("err.port_lossy", lossyVars(t, w.params)));
     if (w.code === "hy2_decoy_paused") out.push(decoyNote(t, w.params));
-    if (w.code === "hy2_site_taken") out.push(takenNote(t, w.params));
+    if (w.code === "hy2_site_taken" || w.code === "hy2_site_taken_mtproto") out.push(takenNote(t, w.params));
   }
   return out;
 }

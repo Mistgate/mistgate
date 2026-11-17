@@ -48,6 +48,9 @@ export const en = {
   // hy2_site_taken (lib/port-check.ts takenNote): the site of a Hysteria2 profile gives way to TrustTunnel on its TCP port
   "node.check.taken": "TCP {port} on {node} goes to “{trusttunnel}”: the site of “{hy2}” gives way to TrustTunnel there. Visitors of the port see the node’s own site, and nothing else changes; the Hysteria2 site returns when the port is free.",
   "approval.value.warn.hy2_site_taken": "the Hysteria2 site’s TCP port goes to TrustTunnel",
+  // hy2_site_taken_mtproto: the same, for MTProto, whose fallback is what strangers meet on the port
+  "node.check.takenMtproto": "TCP {port} on {node} goes to “{mtproto}”: the site of “{hy2}” gives way to MTProto there. Visitors of the port get what MTProto shows to strangers instead; nothing else changes, and the Hysteria2 site returns when the port is free.",
+  "approval.value.warn.hy2_site_taken_mtproto": "the Hysteria2 site’s TCP port goes to MTProto",
   // the panel's refusal of a person at the device limit: "device_limit: 3/3: alice-phone, laptop" (lib/errors.ts)
   "err.device_limit": "The device limit is reached ({used} of {limit}){names}. Raise the limit or remove a device first.",
   // the person's page
@@ -139,6 +142,8 @@ export const ru: typeof en = {
   "where.portTakenTtFree": "Порт {port} на {node} уже занят профилем «{profile}»: TrustTunnel нужен TCP {port}, а с HTTP/3 ещё и UDP {port}, который обычно держит Hysteria2. Свободен {free}; можно и выключить HTTP/3.",
   "node.check.taken": "TCP {port} на {node} отходит «{trusttunnel}»: сайт «{hy2}» там уступает место TrustTunnel. Посетители порта видят собственный сайт ноды, остальное не меняется; сайт Hysteria2 вернётся, когда порт освободится.",
   "approval.value.warn.hy2_site_taken": "TCP-порт сайта Hysteria2 переходит к TrustTunnel",
+  "node.check.takenMtproto": "TCP {port} на {node} отходит «{mtproto}»: сайт «{hy2}» там уступает место MTProto. Посетители порта видят то, что MTProto показывает посторонним; остальное не меняется, сайт Hysteria2 вернётся, когда порт освободится.",
+  "approval.value.warn.hy2_site_taken_mtproto": "TCP-порт сайта Hysteria2 переходит к MTProto",
   "err.device_limit": "Лимит устройств исчерпан ({used} из {limit}){names}. Сначала подними лимит или удали устройство.",
   "users.appsWithTt": "{apps} + TrustTunnel",
   "users.trustTunnelHint": "Ключ tt:// для официальных приложений TrustTunnel",
@@ -227,6 +232,8 @@ export const zh: typeof en = {
   "where.portTakenTtFree": "{node} 上的端口 {port} 已被协议配置「{profile}」占用：TrustTunnel 需要 TCP {port}，开启 HTTP/3 时还需要 UDP {port}，它通常被 Hysteria2 占用。{free} 可用；也可以关闭 HTTP/3。",
   "node.check.taken": "{node} 上的 TCP {port} 交给「{trusttunnel}」：「{hy2}」的站点在那里让位给 TrustTunnel。访问该端口的人看到节点自己的站点，其余不变；端口空闲后 Hysteria2 站点会回来。",
   "approval.value.warn.hy2_site_taken": "Hysteria2 站点的 TCP 端口改由 TrustTunnel 使用",
+  "node.check.takenMtproto": "{node} 上的 TCP {port} 交给「{mtproto}」：「{hy2}」的站点在那里让位给 MTProto。访问该端口的人看到的是 MTProto 给陌生人展示的内容；其余不变，端口空闲后 Hysteria2 站点会回来。",
+  "approval.value.warn.hy2_site_taken_mtproto": "Hysteria2 站点的 TCP 端口改由 MTProto 使用",
   "err.device_limit": "已达到设备上限（{used} / {limit}）{names}。请先调高上限或删除一个设备。",
   "users.appsWithTt": "{apps} + TrustTunnel",
   "users.trustTunnelHint": "给官方 TrustTunnel 应用的 tt:// 密钥",
@@ -315,6 +322,8 @@ export const fa: typeof en = {
   "where.portTakenTtFree": "پورت {port} روی {node} را پروفایل «{profile}» گرفته است: TrustTunnel به TCP {port} نیاز دارد و با HTTP/3 به UDP {port} هم که معمولاً دست Hysteria2 است. {free} آزاد است؛ یا HTTP/3 را خاموش کن.",
   "node.check.taken": "TCP {port} روی {node} به «{trusttunnel}» می‌رسد: سایت «{hy2}» آنجا جایش را به TrustTunnel می‌دهد. بازدیدکنندهٔ پورت سایت خود نود را می‌بیند و چیز دیگری عوض نمی‌شود؛ سایت Hysteria2 وقتی پورت آزاد شود برمی‌گردد.",
   "approval.value.warn.hy2_site_taken": "پورت TCP سایت Hysteria2 به TrustTunnel می‌رسد",
+  "node.check.takenMtproto": "TCP {port} روی {node} به «{mtproto}» می‌رسد: سایت «{hy2}» آنجا جایش را به MTProto می‌دهد. بازدیدکنندهٔ پورت همان چیزی را می‌بیند که MTProto به غریبه‌ها نشان می‌دهد؛ چیز دیگری عوض نمی‌شود و سایت Hysteria2 وقتی پورت آزاد شود برمی‌گردد.",
+  "approval.value.warn.hy2_site_taken_mtproto": "پورت TCP سایت Hysteria2 به MTProto می‌رسد",
   "err.device_limit": "سقف دستگاه پر شده است ({used} از {limit}){names}. اول سقف را بالا ببر یا یک دستگاه را حذف کن.",
   "users.appsWithTt": "{apps} + TrustTunnel",
   "users.trustTunnelHint": "کلید tt:// برای برنامه‌های رسمی TrustTunnel",
@@ -403,6 +412,8 @@ export const tr: typeof en = {
   "where.portTakenTtFree": "{node} düğümünde {port} portunu “{profile}” profili kullanıyor: TrustTunnel'e TCP {port}, HTTP/3 ile ayrıca UDP {port} gerekir; onu da genellikle Hysteria2 tutar. {free} boş; ya da HTTP/3'ü kapat.",
   "node.check.taken": "{node} düğümünde TCP {port}, “{trusttunnel}” profiline geçer: “{hy2}” sitesi orada TrustTunnel'e yer açar. Portu ziyaret edenler düğümün kendi sitesini görür, başka bir şey değişmez; port boşalınca Hysteria2 sitesi geri gelir.",
   "approval.value.warn.hy2_site_taken": "Hysteria2 sitesinin TCP portu TrustTunnel'e geçer",
+  "node.check.takenMtproto": "{node} düğümünde TCP {port}, “{mtproto}” profiline geçer: “{hy2}” sitesi orada MTProto'ya yer açar. Portu ziyaret edenler MTProto'nun yabancılara gösterdiğini görür, başka bir şey değişmez; port boşalınca Hysteria2 sitesi geri gelir.",
+  "approval.value.warn.hy2_site_taken_mtproto": "Hysteria2 sitesinin TCP portu MTProto'ya geçer",
   "err.device_limit": "Cihaz sınırına ulaşıldı ({used}/{limit}){names}. Önce sınırı yükselt ya da bir cihazı kaldır.",
   "users.appsWithTt": "{apps} + TrustTunnel",
   "users.trustTunnelHint": "Resmî TrustTunnel uygulamaları için tt:// anahtarı",

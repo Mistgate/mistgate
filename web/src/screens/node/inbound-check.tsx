@@ -131,12 +131,13 @@ export function WarpWarnings({ check, nodeId, nodeName, onLeave }: { check: Inbo
 
 /**
  * "hy2_decoy_paused" of the check: a VLESS profile takes the TCP port of the Hysteria2 site on this node; "hy2_site_taken": a
- * TrustTunnel profile does, and serves the node's own site there. Says so, does not stop.
+ * TrustTunnel profile does, and serves the node's own site there ("hy2_site_taken_mtproto": an MTProto profile does, and shows its
+ * fallback). Says so, does not stop.
  */
 export function DecoyNotice({ check }: { check: InboundCheck }) {
   const t = useT();
   if (check.state !== "ok") return null;
-  const taken = check.warnings.find((x) => x.code === "hy2_site_taken");
+  const taken = check.warnings.find((x) => x.code === "hy2_site_taken" || x.code === "hy2_site_taken_mtproto");
   if (taken) {
     return (
       <Notice className="items-start">

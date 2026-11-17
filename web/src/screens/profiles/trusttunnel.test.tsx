@@ -65,6 +65,20 @@ describe("the words for what the validator and the panel say about a TrustTunnel
   });
 });
 
+describe("the words for a Hysteria2 site that gives way to MTProto", () => {
+  it.each(langs)("words hy2_site_taken_mtproto in %s", (lang) => {
+    const t = txOf(lang);
+    const params = { node: "de1", port: "443", hy2: "Main", mtproto: "Telegram 443" };
+    const note = takenNote(t, params);
+    expect(note).toContain("Main");
+    expect(note).toContain("Telegram 443");
+    expect(note).not.toContain("{");
+    expect(note).not.toBe(takenNote(t, { node: "de1", port: "443", hy2: "Main", trusttunnel: "Telegram 443" }));
+    expect(portNotes(t, [{ code: "hy2_site_taken_mtproto", params }])).toEqual([note]);
+    expect(dictionaries[lang]["approval.value.warn.hy2_site_taken_mtproto"]).toBeTruthy();
+  });
+});
+
 describe("the apps of a person", () => {
   const t = txOf("en");
   it("name TrustTunnel in the ways of the card and in the list's chips", () => {
