@@ -81,6 +81,7 @@ import { ShellKit, ShellPage } from "./dev-kit-shell";
 import { NodesKit, NodesPage } from "./dev-kit-nodes";
 import { PnUsersKit, UsersPage } from "./dev-kit-users-page";
 import { UserKit, UserPage } from "./dev-kit-user";
+import { GroupKit, GroupScenePage } from "./dev-kit-group";
 import { WindowsKit, WindowsPage } from "./dev-kit-windows";
 
 // Development only (see router.tsx): every primitive in one place, to look at in both themes and at
@@ -314,7 +315,7 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=profile-delete|dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge|foundation|shell|overview|nodes|windows: one kit alone, for its screenshots;
+  // ?only=profile-delete|dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge|foundation|shell|overview|nodes|pn-group|windows: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "halo") return <HaloKit />;
@@ -323,10 +324,11 @@ export default function DevKit() {
   if (which === "nodes-page") return <NodesPage />;
   if (which === "users-page") return <UsersPage />;
   if (which === "user-page") return <UserPage />;
+  if (which === "group-page") return <GroupScenePage />;
   if (which === "windows-page") return <WindowsPage />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { "profile-fixes": ProfileFixesKit, "profile-delete": ProfileDeleteKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, "pn-users": PnUsersKit, "pn-user": UserKit, windows: WindowsKit }[which];
+  const only = { "profile-fixes": ProfileFixesKit, "profile-delete": ProfileDeleteKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, windows: WindowsKit }[which];
   if (only) {
     const Kit = only;
     return (
