@@ -1,3 +1,5 @@
+//go:build !js
+
 package fleet
 
 import (
@@ -16,7 +18,6 @@ import (
 // belong to the WARP module (internal/panel/warp).
 
 const (
-	capWarpReach = "warp-reach/1"
 	// warpReachWait is the agent's own longest run (12 s a site, in parallel, and the trace) and a margin for the answer.
 	warpReachWait = 60 * time.Second
 )

@@ -34,8 +34,6 @@ func TestM3ServiceRolePolicy(t *testing.T) {
 		{"DeleteWarp", adminv1connect.WarpServiceDeleteWarpProcedure, owner},
 		{"GetWarpRegistrationParams", adminv1connect.WarpServiceGetWarpRegistrationParamsProcedure, owner},
 		{"UpdateWarpRegistrationParams", adminv1connect.WarpServiceUpdateWarpRegistrationParamsProcedure, owner},
-		{"GetWarpReachSettings", adminv1connect.WarpServiceGetWarpReachSettingsProcedure, owner},
-		{"UpdateWarpReachSettings", adminv1connect.WarpServiceUpdateWarpReachSettingsProcedure, owner},
 	} {
 		if _, listed := procedureLevels[tc.path]; !listed {
 			t.Errorf("%s has no explicit level (it would silently be owner-only)", tc.name)

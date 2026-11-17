@@ -43,13 +43,6 @@ type WarpAccountRow struct {
 	CreatedAt, UpdatedAt   time.Time
 }
 
-// WarpReachItem is one site's answer of a WARP reach run (agent.proto "WARP REACH"): the verdict (ok, blocked, unreachable or
-// error), the HTTP status of the page it is about (0 = none) and the time the request took.
-type WarpReachItem struct {
-	Verdict            string
-	HTTPStatus, Millis uint32
-}
-
 const warpCols = `node_id, source, secret_enc, peer_public_key, endpoint_v4, endpoint_v6, ports_json, address_v4, address_v6,
 	mtu, client_id, use_reserved, account_type, enabled, tos_url, tos_accepted_by, tos_accepted_at, registered_with,
 	attention, health_json, health_at, reach_json, reach_at, created_at, updated_at`
@@ -179,12 +172,6 @@ func (s *Store) SetWarpAttention(ctx context.Context, nodeID, reason string, now
 // updated_at is not touched: health arrives every stats batch and is not a change of the account.
 func (s *Store) SetWarpHealth(ctx context.Context, nodeID, healthJSON string, at time.Time) error {
 	return s.warpExec(ctx, `UPDATE warp_account SET health_json = ?, health_at = ? WHERE node_id = ?`, healthJSON, unix(at), nodeID)
-}
-
-// SetWarpReach stores the node's latest WARP reach result (JSON, "" is not allowed). The account's updated_at is not touched:
-// a result is not a change of the account. ErrNotFound when the node has no account.
-func (s *Store) SetWarpReach(ctx context.Context, nodeID, reachJSON string, at time.Time) error {
-	return s.warpExec(ctx, `UPDATE warp_account SET reach_json = ?, reach_at = ? WHERE node_id = ?`, reachJSON, unix(at), nodeID)
 }
 
 // DeleteWarpAccount removes the account. ErrNotFound when the node has none.

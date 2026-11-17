@@ -110,12 +110,12 @@ description: 了解如何让协议配置的流量经 Cloudflare WARP 出口、�
 
 ## 拒绝 WARP 的网站
 
-有些网站会在某个 Cloudflare 数据中心（colo）向 WARP 地址显示拦截页面，换一个 colo 又正常，而隧道本身是健康的。面板每 15 分钟让每个 WARP 在线的节点通过自己的隧道请求一份简短的网站清单，并报告哪些网站返回拦截页面。清单默认使用内置的一份（`notion.com`、`discord.com`、`chatgpt.com`、`claude.ai`），你可以修改；清单为空则关闭检查。清单只能通过 API 设置（`WarpService.GetWarpReachSettings` 和 `UpdateWarpReachSettings`，仅限所有者，最多 8 个小写主机名，审计记录为 `warp_reach_settings`）。
+有些网站会在某个 Cloudflare 数据中心（colo）向 WARP 地址显示拦截页面，换一个 colo 又正常，而隧道本身是健康的。面板每 15 分钟让每个 WARP 在线的节点通过自己的隧道请求一份简短的网站清单，并报告哪些网站返回拦截页面。清单默认使用内置的一份（`notion.com`、`discord.com`、`chatgpt.com`、`claude.ai`），你可以修改；清单为空则关闭检查。清单只能通过 API 设置（`WarpReachService.GetWarpReachSettings` 和 `UpdateWarpReachSettings`，仅限所有者，最多 8 个小写主机名，审计记录为 `warp_reach_settings`）。
 
 - 节点最多读取页面的 64 KiB，最多跟随一次重定向，并且解析域名后会拒绝其自身网络内的任何地址。Agent 版本过旧的节点不会应答，WARP 卡片会注明。
 - HTTP 451，或已知类型的 403 页面（Cloudflare 错误 1006 至 1012 或 1020、“Sorry, you have been blocked”、Akamai 的 “Access Denied” 页面、CloudFront 的国家屏蔽、网站自己的“在您所在国家不可用”）的结论为 `blocked`。单纯的 403、验证页面、限流和服务器错误为 `error`；没有应答为 `unreachable`。
 - 卡片和 `warp_status` 会显示该次运行时出口的 colo。某网站在两次运行中为 `blocked`、且其间没有 `ok` 时，会触发运行状况告警 `warp_reach`（每个节点和网站一条，附带 colo）；重启 WARP 可能换到另一个出口。某次运行对该网站给出 `ok`（超时或错误不算）、网站被移出清单，或结果 3 小时未更新时，告警结束。
-- 该检查在 VPS 版本中运行；Cloudflare 版本暂时没有后台循环。
+- 该检查在 VPS 版本中运行。Cloudflare 版本暂时没有后台循环：卡片的 `reach_state` 为 `disabled`，两个设置调用返回 `unavailable_in_edition: feature=health_checks`。
 
 ## IPv4 和 IPv6
 

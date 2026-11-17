@@ -1,3 +1,5 @@
+//go:build !js
+
 package warp
 
 import (
@@ -55,6 +57,14 @@ type reachDomain struct {
 	Status  uint32 `json:"status"`
 	Ms      uint32 `json:"ms"`
 	Streak  uint32 `json:"streak"` // runs that said "blocked" since the last "ok", this one included
+}
+
+// reachFleet is what the check needs of the fleet module on top of Fleet (*fleet.Fleet implements it; the Cloudflare edition's
+// build has no such method, and no check).
+type reachFleet interface {
+	// WarpReach asks the node to fetch the sites through its WARP tunnel (agent.proto "WARP REACH") and returns the colo of
+	// the exit at that run and one answer per site, in the order asked; an error is no usable answer.
+	WarpReach(ctx context.Context, nodeID string, domains []string) (string, []store.WarpReachItem, error)
 }
 
 // reachDomains is the owner's list (customised) or the built-in one. A stored value that cannot be read, or has names that are
@@ -134,7 +144,11 @@ func (s *Service) checkReach(ctx context.Context, a store.WarpAccountRow, domain
 	if err != nil || !live.Connected || ViewState(&a, true, s.now()) != adminv1.WarpState_WARP_STATE_UP {
 		return
 	}
-	colo, items, err := s.fl.WarpReach(ctx, a.NodeID, domains)
+	rf, ok := s.fl.(reachFleet)
+	if !ok {
+		return
+	}
+	colo, items, err := rf.WarpReach(ctx, a.NodeID, domains)
 	if err != nil {
 		// busy, too_soon and warp_down are the node's say; a lost link or a timeout is the usual end of a run too
 		s.log.Debug("warp: reach", "node", a.NodeID, "err", err)

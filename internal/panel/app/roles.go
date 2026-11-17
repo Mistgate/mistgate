@@ -267,6 +267,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	k.addTasks(&cfg)
 	k.addTrustTunnel(&cfg)
 	k.addDecoySite(&cfg)
+	k.addWarpReach(&cfg)
 	return cfg
 }
 

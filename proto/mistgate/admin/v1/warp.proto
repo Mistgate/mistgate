@@ -46,11 +46,6 @@ service WarpService {
   // data, not code).
   rpc GetWarpRegistrationParams(GetWarpRegistrationParamsRequest) returns (GetWarpRegistrationParamsResponse);
   rpc UpdateWarpRegistrationParams(UpdateWarpRegistrationParamsRequest) returns (UpdateWarpRegistrationParamsResponse);
-  // The sites each node's WARP is checked against ("WARP reach": the node fetches them through its tunnel and says which show a
-  // block page, see GetWarpResponse.reach). A built-in short list unless the owner changed it; an empty list switches the check
-  // off. Owner only; a change is audited as warp_reach_settings.
-  rpc GetWarpReachSettings(GetWarpReachSettingsRequest) returns (GetWarpReachSettingsResponse);
-  rpc UpdateWarpReachSettings(UpdateWarpReachSettingsRequest) returns (UpdateWarpReachSettingsResponse);
 }
 
 // A WARP account without its secrets (private key, access token, license).
@@ -143,8 +138,8 @@ message GetWarpResponse {
   WarpReachView reach = 10;
   // Why reach is, or is not, set: "ready" (reach is the node's latest result), "waiting" (the check is on and the node has
   // not answered yet: it is offline, its WARP is not up, or the first round has not come), "disabled" (the owner's list is
-  // empty) or "agent_too_old" (the node's agent lacks "warp-reach/1", so the panel sends it nothing; the rest of this response
-  // is unaffected).
+  // empty, or the Cloudflare edition, which runs no check: reach is then unset) or "agent_too_old" (the node's agent lacks
+  // "warp-reach/1", so the panel sends it nothing; the rest of this response is unaffected).
   string reach_state = 11;
 }
 
@@ -171,32 +166,6 @@ message WarpReachView {
   string colo = 2;
   // In the order of the settings at that time.
   repeated WarpReachDomain domains = 3;
-}
-
-message WarpReachSettings {
-  // Lower-case host names (at least two labels, no address, port or path), at most 8. Empty = the check is off.
-  repeated string domains = 1;
-}
-
-message GetWarpReachSettingsRequest {}
-
-message GetWarpReachSettingsResponse {
-  WarpReachSettings settings = 1;
-  // The built-in list: what "use the built-in list" gives.
-  WarpReachSettings defaults = 2;
-  // The owner changed the list (it is stored, even when it equals the built-in one or is empty).
-  bool customised = 3;
-}
-
-message UpdateWarpReachSettingsRequest {
-  WarpReachSettings settings = 1;
-  // true: forget the owner's list and use the built-in one again (settings is ignored).
-  bool use_defaults = 2;
-}
-
-message UpdateWarpReachSettingsResponse {
-  WarpReachSettings settings = 1;
-  bool customised = 2;
 }
 
 // A profile on the node whose traffic leaves through WARP.

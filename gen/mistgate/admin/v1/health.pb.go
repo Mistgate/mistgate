@@ -173,7 +173,7 @@ const (
 	// (os.step.err.*), code the node's own code (os.job.err.*). Open while the rollout is PAUSED; closes when the owner cancels it.
 	// Produced from the updates module through a health condition source.
 	AlertKind_ALERT_KIND_OS_UPDATE_FAILED AlertKind = 24
-	// A site that the owner's WARP reach list names showed a block page through this node's WARP in two runs, with no "ok" between them (WarpService.
+	// A site that the owner's WARP reach list names showed a block page through this node's WARP in two runs, with no "ok" between them (WarpReachService.
 	// GetWarpReachSettings; the node fetches the sites through its tunnel, GetWarpResponse.reach). WARNING. node_id = the node,
 	// subject = the domain, params{domain, colo, http_status, streak}: colo is the Cloudflare colo of the node's WARP exit at the
 	// run that said so. Some sites refuse WARP at one colo and not at another; the owner can restart WARP to get another exit.

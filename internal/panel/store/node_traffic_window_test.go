@@ -8,7 +8,7 @@ import (
 
 // The windows count whole hourly rows: the hour in progress and the 23 before it for 24 hours, 167 more for the week, and
 // both directions of every protocol.
-func TestNodeTrafficWindows(t *testing.T) {
+func TestAddTrafficParams(t *testing.T) {
 	ctx := context.Background()
 	s := openTemp(t)
 	now := time.Date(2026, 10, 7, 12, 40, 0, 0, time.UTC)
@@ -34,14 +34,15 @@ func TestNodeTrafficWindows(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	day, week, err := s.NodeTrafficWindows(ctx, "nod_a", now)
-	if err != nil {
+	p := map[string]string{"node": "de1"}
+	if err := s.AddTrafficParams(ctx, "nod_a", now, p); err != nil {
 		t.Fatal(err)
 	}
-	if day != 3+30+300 || week != 3+30+300+3000+30000 {
-		t.Fatalf("day %d, week %d", day, week)
+	if p["traffic_24h_bytes"] != "333" || p["traffic_7d_bytes"] != "33333" || p["node"] != "de1" {
+		t.Fatalf("params %v, want 333 for the day and 33333 for the week", p)
 	}
-	if day, week, err = s.NodeTrafficWindows(ctx, "nod_none", now); err != nil || day != 0 || week != 0 {
-		t.Fatalf("a node without rows: %d %d %v", day, week, err)
+	p = map[string]string{}
+	if err := s.AddTrafficParams(ctx, "nod_none", now, p); err != nil || p["traffic_24h_bytes"] != "0" || p["traffic_7d_bytes"] != "0" {
+		t.Fatalf("a node without rows: %v %v", p, err)
 	}
 }

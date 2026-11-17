@@ -240,7 +240,7 @@ func alertTitle(l L, a store.HealthAlert) string {
 	case "agent_crash_loop":
 		return l.pick("The node agent keeps crashing", "Агент ноды постоянно падает", "节点 Agent 反复崩溃")
 	case "warp_reach":
-		return l.pick("A site blocks the WARP exit of the node", "Сайт блокирует WARP-выход ноды", "有网站屏蔽了该节点的 WARP 出口")
+		return warpReachTitle(l)
 	case "scheduled_check":
 		return l.pick("Scheduled check found a problem", "Задача по расписанию нашла проблему", "计划任务发现了问题")
 	case "scheduled_task_failing":
@@ -392,13 +392,7 @@ func alertReason(l L, a store.HealthAlert) string {
 		return l.pick("Task "+task+" failed "+n+" runs in a row ("+reason+").", "Задача "+task+" не выполнилась "+n+" раз подряд ("+reason+").",
 			"任务 "+task+" 连续 "+n+" 次运行失败（"+reason+"）。")
 	case "warp_reach":
-		site, colo := data(p["domain"], 80), data(p["colo"], 16)
-		if colo == "" {
-			colo = "?"
-		}
-		return l.pick(site+" showed a block page through the node's WARP in two checks (Cloudflare colo "+colo+"). Restarting WARP may give another exit.",
-			site+" в двух проверках показал страницу блокировки через WARP ноды (колокация Cloudflare "+colo+"). Перезапуск WARP может дать другой выход.",
-			site+" 在两次检查中通过该节点的 WARP 显示拦截页面（Cloudflare 数据中心 "+colo+"）。重启 WARP 可能换到另一个出口。")
+		return warpReachReason(l, p)
 	case "agent_crash_loop":
 		n, w := data(p["count"], 4), data(p["window_min"], 4)
 		return l.pick("The agent crashed and restarted "+n+" times in "+w+" minutes.", "Агент упал и перезапустился "+n+" раз за "+w+" минут.", "Agent 在 "+w+" 分钟内崩溃并重启了 "+n+" 次。")

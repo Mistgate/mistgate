@@ -49,9 +49,6 @@ type Fleet interface {
 	OnlineByInbound(ctx context.Context) map[string]int
 	// WarpPauseApplied: the node confirmed a desired state that pauses its WARP (RestartWarp waits for it).
 	WarpPauseApplied(ctx context.Context, nodeID string) bool
-	// WarpReach asks the node to fetch the sites through its WARP tunnel (agent.proto "WARP REACH") and returns the colo of
-	// the exit at that run and one answer per site, in the order asked; an error is no usable answer.
-	WarpReach(ctx context.Context, nodeID string, domains []string) (string, []store.WarpReachItem, error)
 }
 
 type noFleet struct{}
@@ -63,9 +60,6 @@ func (noFleet) NodeLive(context.Context, string) (store.NodeLiveRow, error) {
 func (noFleet) StateChanged()                                  {}
 func (noFleet) OnlineByInbound(context.Context) map[string]int { return nil }
 func (noFleet) WarpPauseApplied(context.Context, string) bool  { return false }
-func (noFleet) WarpReach(context.Context, string, []string) (string, []store.WarpReachItem, error) {
-	return "", nil, errors.New("warp: no fleet")
-}
 
 // Config configures Service.
 type Config struct {

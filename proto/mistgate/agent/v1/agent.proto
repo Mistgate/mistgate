@@ -658,7 +658,7 @@ package mistgate.agent.v1;
 //   - CAPABILITY GATE. An agent lists "warp-reach/1" in Hello.capabilities when it runs WARP. The panel sends WarpReach ONLY to
 //     a stream that listed it, so an older agent is refused by the panel ("agent too old"), never sent a field it would ignore.
 //   - ASK. WarpReach{request_id, domains}: 1-8 lower-case host names (no address, port or path). The domains are the
-//     owner's, set in the panel (WarpService.GetWarpReachSettings); the panel sends them as they are and the agent validates
+//     owner's, set in the panel (WarpReachService.GetWarpReachSettings); the panel sends them as they are and the agent validates
 //     them again (bad_params). The agent fetches https://<domain>/ through the WARP tunnel, all the names in parallel, each
 //     within 12 s, reading at most 64 KiB of the page and following at most one redirect (to https). The names are resolved with
 //     the node's own resolvers and every request goes out through the tunnel's guarded dial, which refuses any address that is

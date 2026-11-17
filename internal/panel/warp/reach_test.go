@@ -1,3 +1,5 @@
+//go:build !js
+
 package warp
 
 import (
@@ -11,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	warpreachv1 "github.com/mistgate/mistgate/gen/mistgate/warpreach/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -25,6 +28,8 @@ func (e *env) reachNode(name string) string {
 	e.warpUp(node)
 	return node
 }
+
+func (e *env) reachRPC() reachRPC { return reachRPC{e.s} }
 
 func (e *env) warpUp(node string) {
 	e.t.Helper()
@@ -70,15 +75,15 @@ func (e *env) getWarp(node string) *adminv1.GetWarpResponse {
 
 func (e *env) setReachDomains(domains ...string) {
 	e.t.Helper()
-	if _, err := e.rpc().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&adminv1.UpdateWarpReachSettingsRequest{Settings: &adminv1.WarpReachSettings{Domains: domains}})); err != nil {
+	if _, err := e.reachRPC().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&warpreachv1.UpdateWarpReachSettingsRequest{Settings: &warpreachv1.WarpReachSettings{Domains: domains}})); err != nil {
 		e.t.Fatal(err)
 	}
 }
 
 func TestReachSettingsDefaultUpdateAndReset(t *testing.T) {
 	e := newEnv(t)
-	get := func() *adminv1.GetWarpReachSettingsResponse {
-		r, err := e.rpc().GetWarpReachSettings(e.ctx, connect.NewRequest(&adminv1.GetWarpReachSettingsRequest{}))
+	get := func() *warpreachv1.GetWarpReachSettingsResponse {
+		r, err := e.reachRPC().GetWarpReachSettings(e.ctx, connect.NewRequest(&warpreachv1.GetWarpReachSettingsRequest{}))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +108,7 @@ func TestReachSettingsDefaultUpdateAndReset(t *testing.T) {
 	if g = get(); !g.Customised || len(g.Settings.Domains) != 0 {
 		t.Fatalf("after an empty list = %+v", g)
 	}
-	r, err := e.rpc().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&adminv1.UpdateWarpReachSettingsRequest{UseDefaults: true}))
+	r, err := e.reachRPC().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&warpreachv1.UpdateWarpReachSettingsRequest{UseDefaults: true}))
 	if err != nil || r.Msg.Customised || !slices.Equal(r.Msg.Settings.Domains, DefaultReachDomains) {
 		t.Fatalf("use defaults = %+v %v", r, err)
 	}
@@ -122,14 +127,14 @@ func TestReachSettingsRefuseWhatIsNotAHostName(t *testing.T) {
 		"upper case": {"Notes.example.com"}, "an address": {"192.0.2.10"}, "a port": {"notes.example.com:8443"}, "a scheme": {"https://notes.example.com"},
 		"a path": {"notes.example.com/x"}, "one label": {"localhost"}, "empty": {""}, "a space": {"a b.example.com"}, "a dash first": {"-a.example.com"},
 	} {
-		_, err := e.rpc().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&adminv1.UpdateWarpReachSettingsRequest{Settings: &adminv1.WarpReachSettings{Domains: list}}))
+		_, err := e.reachRPC().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&warpreachv1.UpdateWarpReachSettingsRequest{Settings: &warpreachv1.WarpReachSettings{Domains: list}}))
 		if c, m := code(err); c != connect.CodeInvalidArgument || m != "reach_domain_invalid" {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	_, err := e.rpc().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&adminv1.UpdateWarpReachSettingsRequest{Settings: &adminv1.WarpReachSettings{Domains: nine}}))
+	_, err := e.reachRPC().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&warpreachv1.UpdateWarpReachSettingsRequest{Settings: &warpreachv1.WarpReachSettings{Domains: nine}}))
 	e.wantErr(err, connect.CodeInvalidArgument, "reach_domains_too_many")
-	_, err = e.rpc().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&adminv1.UpdateWarpReachSettingsRequest{Settings: &adminv1.WarpReachSettings{Domains: []string{"a.example.com", "a.example.com"}}}))
+	_, err = e.reachRPC().UpdateWarpReachSettings(e.ctx, connect.NewRequest(&warpreachv1.UpdateWarpReachSettingsRequest{Settings: &warpreachv1.WarpReachSettings{Domains: []string{"a.example.com", "a.example.com"}}}))
 	e.wantErr(err, connect.CodeInvalidArgument, "reach_domain_duplicate")
 	if raw, err := e.st.Setting(e.ctx, SettingReach); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("a refused list was stored: %q %v", raw, err)

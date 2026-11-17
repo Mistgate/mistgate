@@ -578,10 +578,7 @@ func (f *Fleet) sweep(ctx context.Context) {
 			continue
 		}
 		params := map[string]string{"minutes": fmt.Sprint(int(now.Sub(last).Minutes()))}
-		// how busy the node was when it went silent (the same two numbers the node_down alert of the health module carries)
-		if day, week, err := f.st.NodeTrafficWindows(ctx, n.ID, now); err == nil {
-			params["traffic_24h_bytes"], params["traffic_7d_bytes"] = fmt.Sprint(day), fmt.Sprint(week)
-		}
+		_ = f.st.AddTrafficParams(ctx, n.ID, now, params) // how busy the node was when it went silent, as the node_down alert says
 		f.event(ctx, 3, "node_down", n.ID, params)
 	}
 }

@@ -249,7 +249,7 @@ An alert that fires again within an hour of closing reopens with its original id
 
 | Title in the admin | Kind | Severity | Opens when |
 |---|---|---|---|
-| Node is unreachable | `node_down` | Critical | The agent has had no connection for 10 minutes. A shorter outage is an event, not an alert. The alert and the `node_down` event carry `traffic_24h_bytes` and `traffic_7d_bytes`, the node's traffic over the last 24 hours and 7 days as it was when the node went silent (the `country_blocked` alert carries the same two numbers from the moment it opened). |
+| Node is unreachable | `node_down` | Critical | The agent has had no connection for 10 minutes. A shorter outage is an event, not an alert. The alert and the `node_down` event carry `traffic_24h_bytes` and `traffic_7d_bytes`, the node's traffic over the last 24 hours and 7 days as it was when the node went silent (the `country_blocked` alert carries the same two numbers from the moment it opened). The Cloudflare edition leaves them out. |
 | Host blip | `host_blip` | Info | History only: written when the link came back within 10 minutes without a reboot. It is never active. |
 | The panel lost contact with most nodes | `node_down` (fleet-wide) | Critical | At once, at least 80% of active nodes at three or more values of **Hoster** have had no connection for 10 minutes. That points at the panel's own connection: the per-node "Node is unreachable" alerts are held, and one alert stands for all. |
 | The node keeps dropping | `host_blip` (flapping) | Warning | In the last hour the agent's link dropped briefly, or the agent restarted soon after its previous start, three times or more. Each break is shorter than a "Node is unreachable", but connections on the node drop every time. |
