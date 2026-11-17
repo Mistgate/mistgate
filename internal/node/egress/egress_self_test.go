@@ -4,8 +4,11 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/apernet/hysteria/extras/v2/outbounds"
 )
 
 // A VPN user must not reach the node through its own public address (Linux routes it via lo).
@@ -76,5 +79,42 @@ func TestSelfAddrsFailClosedAndReal(t *testing.T) {
 		if _, err := e.TCP(net.JoinHostPort(a.String(), "22")); !errors.Is(err, ErrBlocked) {
 			t.Errorf("own public address %s reachable: %v", a, err)
 		}
+	}
+}
+
+// The case of a node whose interface list cannot be read: with no earlier copy every address is refused as ErrBlocked, the failure
+// is not remembered (the next dial reads the list again), and a public IPv4 literal passes as soon as the list is readable, with the
+// IPv4 address alone handed on when IPv6 is off for clients. This is the whole of what selfAddrs can do to a dial.
+func TestUnreadableInterfaceListRefusesOnlyWhileItStaysUnreadable(t *testing.T) {
+	var fail atomic.Bool
+	fail.Store(true)
+	var reads atomic.Int32
+	now := time.Now()
+	s := &stage{
+		res: &resolver{cache: map[string]cacheEntry{}},
+		self: &selfAddrs{now: func() time.Time { return now }, list: func() ([]netip.Addr, error) {
+			reads.Add(1)
+			if fail.Load() {
+				return nil, errors.New("netlink: operation not permitted")
+			}
+			return []netip.Addr{netip.MustParseAddr("192.0.2.10"), netip.MustParseAddr("2001:db8::10")}, nil
+		}},
+		v4When: func() bool { return true },
+	}
+	for _, host := range []string{"198.51.100.1", "203.0.113.5"} {
+		if err := s.prepare(&outbounds.AddrEx{Host: host, Port: 443}); !errors.Is(err, ErrBlocked) {
+			t.Fatalf("%s with an unreadable list: %v, want ErrBlocked", host, err)
+		}
+	}
+	if reads.Load() != 2 {
+		t.Fatalf("the list was read %d times for two dials: a failure must not be cached", reads.Load())
+	}
+	fail.Store(false)
+	a := &outbounds.AddrEx{Host: "198.51.100.1", Port: 443}
+	if err := s.prepare(a); err != nil || a.ResolveInfo == nil || a.ResolveInfo.IPv4 == nil || a.ResolveInfo.IPv6 != nil {
+		t.Fatalf("a public IPv4 literal once the list is readable: %+v, %v", a.ResolveInfo, err)
+	}
+	if err := s.prepare(&outbounds.AddrEx{Host: "192.0.2.10", Port: 443}); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("the node's own address: %v", err)
 	}
 }
