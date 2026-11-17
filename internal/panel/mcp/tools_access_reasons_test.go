@@ -173,6 +173,24 @@ func TestReasonsTrustTunnelFreezeAfter16K(t *testing.T) {
 	}
 }
 
+// VLESS behind its own TLS front (XHTTP or WebSocket, reached directly) counts the stalls on the inbound row like REALITY does,
+// so the freeze after 16 KiB names the class for it too; behind a CDN the connection is the CDN's and nothing is counted.
+func TestReasonsVLESSTLSFrontFreezeAfter16K(t *testing.T) {
+	f, _, h, v := reasonsFx()
+	f.in.Totals[h] = hy2Good()
+	direct := connectiondiag.Variant{Security: "tls", Transport: "xhttp"}
+	f.in.Totals[v] = accTotals{Protocol: "vless", Hellos: 12, TCPStalls: 6, TCPStalls16K: 5, OnlineS: 900, Unsupported: un3("vless", direct)}
+	c := classOf(buildAccess(f.in), "fi1", clsTCPThrottled)
+	if c == nil || c.protocol != "vless" || c.Confidence != confMedium || c.Detail["tcp_stalls_16k"] != "5" {
+		t.Fatalf("VLESS over a direct TLS front frozen after 16 KiB: %+v", c)
+	}
+	cdn := connectiondiag.Variant{Security: "tls", Transport: "xhttp", CDN: true}
+	f.in.Totals[v] = accTotals{Protocol: "vless", Hellos: 12, OnlineS: 900, Unsupported: un3("vless", cdn)}
+	if c := classOf(buildAccess(f.in), "fi1", clsTCPThrottled); c != nil {
+		t.Fatalf("a CDN path, whose stalls are not counted, named the freeze: %+v", c)
+	}
+}
+
 func TestReasonsRealityAuthFailedAndCut(t *testing.T) {
 	f, _, h, v := reasonsFx()
 	f.in.Totals[h] = hy2Good()
