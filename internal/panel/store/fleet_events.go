@@ -253,6 +253,17 @@ func (s *Store) FleetHours(ctx context.Context, sinceHour int64) ([]FleetHourRow
 	return out, rows.Err()
 }
 
+// NodeTrafficWindows is the node's traffic (up and down, all protocols) over the last 24 hours and the last 7 days, the hour in
+// progress included, from the hourly rollup. A node without rows has no traffic: both are zero.
+func (s *Store) NodeTrafficWindows(ctx context.Context, nodeID string, now time.Time) (day, week uint64, err error) {
+	h := hourBucket(now)
+	var d, w int64
+	err = s.R.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(CASE WHEN hour_start > ? THEN bytes_up + bytes_down END), 0), COALESCE(SUM(bytes_up + bytes_down), 0)
+		FROM node_traffic_hour WHERE node_id = ? AND hour_start > ?`, h-24*3600, nodeID, h-7*24*3600).Scan(&d, &w)
+	return uint64(max(d, 0)), uint64(max(w, 0)), err
+}
+
 // FleetTop is one user's bytes on a node.
 type FleetTop struct {
 	UserID, UserName string

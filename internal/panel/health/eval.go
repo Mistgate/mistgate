@@ -1008,8 +1008,49 @@ func (s *Service) doctorConds(now time.Time, n store.NodeRow, rows []store.Docto
 	return out
 }
 
+// The alerts that say a node is silent or cut off from a country carry how much the node moved just before: the traffic of the
+// last 24 hours and of the last 7 days in bytes (up and down, all protocols), as it was when the alert opened. Someone who
+// reads them later sees whether the node was busy when it went dark, which is what tells a block after a volume from a
+// block of an idle address.
+const (
+	paramTraffic24h = "traffic_24h_bytes"
+	paramTraffic7d  = "traffic_7d_bytes"
+)
+
+var trafficKinds = map[string]bool{kNodeDown: true, kCountryBlocked: true}
+
+// withTrafficVolume puts the two numbers on the conditions of those alerts. An active alert keeps the numbers it opened with
+// (they do not move as the node's quiet hours pass); a condition without one gets them now. A read that fails leaves the
+// alert without them rather than without the alert.
+func (s *Service) withTrafficVolume(ctx context.Context, now time.Time, d *derived, active []store.HealthAlert) {
+	opened := make(map[key]map[string]string, len(active))
+	for _, a := range active {
+		if trafficKinds[a.Kind] && a.Params[paramTraffic24h] != "" {
+			opened[key{a.Kind, a.NodeID, a.Subject}] = a.Params
+		}
+	}
+	for k, c := range d.conds {
+		if !trafficKinds[k.kind] || k.node == "" {
+			continue
+		}
+		params := make(map[string]string, len(c.params)+2)
+		maps.Copy(params, c.params)
+		if had, ok := opened[k]; ok {
+			params[paramTraffic24h], params[paramTraffic7d] = had[paramTraffic24h], had[paramTraffic7d]
+		} else if day, week, err := s.st.NodeTrafficWindows(ctx, k.node, now); err != nil {
+			s.log.Warn("health: node traffic for an alert", "node", k.node, "err", err)
+			continue
+		} else {
+			params[paramTraffic24h], params[paramTraffic7d] = strconv.FormatUint(day, 10), strconv.FormatUint(week, 10)
+		}
+		c.params = params
+		d.conds[k] = c
+	}
+}
+
 // reconcile applies derived conditions to the stored alerts.
 func (s *Service) reconcile(ctx context.Context, now time.Time, d *derived, active []store.HealthAlert) error {
+	s.withTrafficVolume(ctx, now, d, active)
 	have := map[key]bool{}
 	for _, a := range active {
 		k := key{a.Kind, a.NodeID, a.Subject}

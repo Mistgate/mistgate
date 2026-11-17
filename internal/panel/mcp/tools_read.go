@@ -384,7 +384,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("events_search", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.FleetServiceListEventsProcedure),
-			"The event feed, newest first, filtered by node, user, minimum severity, family (profiles or agent), exact code and age (hours: only the last N hours; use it for \"today\" or \"the last day\" instead of judging times yourself). Each event has its time (unix). Paged with before_id.",
+			"The event feed, newest first, filtered by node, user, minimum severity, family (profiles or agent), exact code and age (hours: only the last N hours; use it for \"today\" or \"the last day\" instead of judging times yourself). Each event has its time (unix). A node_down event carries traffic_24h_bytes and traffic_7d_bytes: what the node moved (up and down) in the last 24 hours and 7 days when it went silent. The node_down and country_blocked alerts carry the same two numbers as they were when the alert opened. Paged with before_id.",
 			func(c *call, in eventsArg) (any, error) {
 				sev, err := eventSeverity(in.MinSeverity)
 				if err != nil {
