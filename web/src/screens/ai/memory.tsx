@@ -1,25 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Card } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
-import { Modal } from "@/components/ui/modal";
-import { Pending, QueryError } from "@/components/ui/query-error";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
 import { assistant } from "@/lib/api";
-import { ConversationHead, ConversationMeta } from "@/components/assistant/chat";
 import { accessQuery, assistantErrorKey, conversationsQuery, looksSecret, memoryQuery, type Note } from "@/lib/assistant";
+import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
+import { useFmt } from "@/lib/format";
+import { Dlg, ErrCard, Gl, ICONS, Sec, Skeleton } from "./bits";
 
-// What the assistant remembers (each admin's own notes) and the admin's conversations (ADR 0014).
+// What the assistant remembers (each admin's own notes) and the admin's conversations (ADR 0014), as the board draws them (PnAI "Память").
 
 /** Opens a conversation in the floating chat (components/assistant/chat.tsx listens). */
 export const openInChat = (id: string) => window.dispatchEvent(new CustomEvent("mistgate:assistant-open", { detail: { id } }));
 
 export function MemoryTab() {
+  const notes = useQuery(memoryQuery);
+  const convs = useQuery(conversationsQuery(""));
+  if ((notes.isPending && !notes.data) || (convs.isPending && !convs.data)) return <Skeleton />;
+  if ((notes.isError && !notes.data) || (convs.isError && !convs.data)) return <ErrCard onRetry={() => void (notes.isError ? notes.refetch() : convs.refetch())} />;
   return (
-    <div className="grid items-start gap-3.5 xl:grid-cols-2">
+    <div className="sb-tab">
       <Notes />
       <Conversations />
     </div>
@@ -31,8 +33,11 @@ function Notes() {
   const toast = useToast();
   const qc = useQueryClient();
   const q = useQuery(memoryQuery);
-  const [text, setText] = useState("");
+  const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [asking, setAsking] = useState("");
+  const [fresh, setFresh] = useState("");
   const [forget, setForget] = useState(false);
   const refusal = (e: unknown) => {
     const k = assistantErrorKey(e);
@@ -41,176 +46,236 @@ function Notes() {
   const done = () => void qc.invalidateQueries({ queryKey: ["assistant", "memory"] });
   const save = useMutation({
     mutationFn: (n: { id: string; text: string }) => assistant.saveMemory(n),
-    onSuccess: () => {
-      setText("");
+    onSuccess: (res) => {
+      setDraft("");
+      setAdding(false);
       setEditing(null);
+      const id = res.note?.id ?? "";
+      setFresh(id);
+      if (id) setTimeout(() => setFresh((f) => (f === id ? "" : f)), 1600);
       done();
     },
     onError: refusal,
   });
-  const del = useMutation({ mutationFn: (id: string) => assistant.deleteMemory({ id }), onSuccess: () => (toast(t("ai.mem.deleted")), done()), onError: refusal });
-  const all = useMutation({ mutationFn: () => assistant.forgetAll({}), onSuccess: () => (setForget(false), done()), onError: refusal });
+  const del = useMutation({
+    mutationFn: (id: string) => assistant.deleteMemory({ id }),
+    onSuccess: () => (setAsking(""), toast(t("ai.mem.deleted")), done()),
+    onError: refusal,
+  });
+  const all = useMutation({ mutationFn: () => assistant.forgetAll({}), onSuccess: () => (setForget(false), toast(t("aip.mem.forgotToast")), done()), onError: refusal });
   const notes = q.data ?? [];
 
   return (
-    <Card lg className="flex flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="flex min-w-[14rem] flex-1 flex-col gap-0.5">
-          <b className="text-[14px] font-semibold">{t("ai.mem.title")}</b>
-          <span className="text-xs leading-snug text-pretty text-muted">{t("ai.mem.hint")}</span>
-        </div>
-        {notes.length > 0 && (
-          <Button type="button" size="sm" variant="ghostDanger" onClick={() => setForget(true)}>
-            {t("ai.mem.forgetAll")}
-          </Button>
-        )}
-      </div>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim()) save.mutate({ id: "", text: text.trim() });
-        }}
-      >
-        <input
-          aria-label={t("ai.mem.add")}
-          placeholder={t("ai.mem.ph")}
-          value={text}
-          maxLength={400}
-          onChange={(e) => setText(e.target.value)}
-          className="h-10 min-w-0 flex-1 rounded-field border border-line bg-canvas px-3 text-[13px] outline-none focus:border-accent"
-        />
-        <Button type="submit" variant="secondary" disabled={!text.trim() || save.isPending}>
-          <Icon name="plus" size={14} />
-          {t("ai.mem.add")}
-        </Button>
-      </form>
-      {looksSecret(text) && <p className="text-xs text-warn-text">{t("ai.secretHint")}</p>}
-      {q.isPending && <Pending compact />}
-      {q.isError && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
-      {q.data && notes.length === 0 && <p className="text-[13px] text-muted">{t("ai.mem.empty")}</p>}
-      <ul className="flex flex-col divide-y divide-line">
-        {notes.map((n) => (
-          <NoteRow key={n.id} note={n} editing={editing?.id === n.id ? editing.text : null} onEdit={(v) => setEditing(v === null ? null : { id: n.id, text: v })} onSave={() => editing && save.mutate(editing)} onDelete={() => del.mutate(n.id)} />
-        ))}
-      </ul>
-      <Modal
-        open={forget}
-        onOpenChange={setForget}
-        title={t("ai.mem.forgetT")}
-        description={t("ai.mem.forgetBody")}
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={() => setForget(false)}>
-              {t("ai.mem.cancel")}
-            </Button>
-            <Button type="button" variant="danger" disabled={all.isPending} onClick={() => all.mutate()}>
+    <Sec
+      tone="lav"
+      d={ICONS.note}
+      title={t("aip.mem.title")}
+      lead={t("aip.mem.lead")}
+      aside={
+        <>
+          {notes.length > 0 && (
+            <Button size="md" onClick={() => setForget(true)}>
               {t("ai.mem.forgetAll")}
             </Button>
-          </>
-        }
-      />
-    </Card>
+          )}
+          <Button size="md" variant="primary" onClick={() => (setAdding(true), setDraft(""))}>
+            <Gl d={ICONS.plus} />
+            {t("aip.mem.add")}
+          </Button>
+        </>
+      }
+    >
+      {adding && (
+        <div className="ai-note ed new">
+          <textarea className="an-i sb-ta" rows={2} maxLength={400} autoFocus aria-label={t("aip.mem.add")} placeholder={t("aip.mem.ph")} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          {looksSecret(draft) && <span className="ai-err">{t("ai.secretHint")}</span>}
+          <div className="ai-na">
+            <Button size="md" onClick={() => setAdding(false)}>
+              {t("ai.mem.cancel")}
+            </Button>
+            <Button size="md" variant="primary" aria-disabled={!draft.trim() || undefined} disabled={save.isPending} onClick={() => draft.trim() && save.mutate({ id: "", text: draft.trim() })}>
+              {t("aip.mem.addGo")}
+            </Button>
+          </div>
+        </div>
+      )}
+      {notes.length === 0 && !adding && <p className="sb-emp ai-emp">{t("aip.mem.empty")}</p>}
+      <div className="ai-notes">
+        {notes.map((n) => (
+          <NoteRow
+            key={n.id}
+            note={n}
+            fresh={fresh === n.id}
+            editing={editing?.id === n.id ? editing.text : null}
+            asking={asking === n.id}
+            onEdit={(v) => setEditing(v === null ? null : { id: n.id, text: v })}
+            onAsk={(v) => setAsking(v ? n.id : "")}
+            onSave={() => editing && editing.text.trim() && save.mutate({ id: editing.id, text: editing.text.trim() })}
+            onDelete={() => del.mutate(n.id)}
+          />
+        ))}
+      </div>
+      {forget && (
+        <Dlg
+          title={t("ai.mem.forgetT")}
+          onClose={() => setForget(false)}
+          busy={all.isPending}
+          footer={
+            <>
+              <Button size="lg" onClick={() => setForget(false)}>
+                {t("ai.mem.cancel")}
+              </Button>
+              <Button size="lg" variant="primary" className="ai-dngp" disabled={all.isPending} onClick={() => all.mutate()}>
+                {t("ai.mem.forgetAll")}
+              </Button>
+            </>
+          }
+        >
+          <p>{t("ai.mem.forgetBody")}</p>
+        </Dlg>
+      )}
+    </Sec>
   );
 }
 
-function NoteRow({ note, editing, onEdit, onSave, onDelete }: { note: Note; editing: string | null; onEdit: (v: string | null) => void; onSave: () => void; onDelete: () => void }) {
+function NoteRow({ note, fresh, editing, asking, onEdit, onAsk, onSave, onDelete }: { note: Note; fresh: boolean; editing: string | null; asking: boolean; onEdit: (v: string | null) => void; onAsk: (v: boolean) => void; onSave: () => void; onDelete: () => void }) {
   const t = useT();
   if (editing !== null) {
     return (
-      <li className="flex flex-col gap-2 py-2.5">
-        <textarea value={editing} maxLength={400} rows={2} onChange={(e) => onEdit(e.target.value)} className="resize-y rounded-field border border-line bg-canvas px-3 py-2 text-[13px] outline-none focus:border-accent" />
-        <div className="flex justify-end gap-2">
-          <Button type="button" size="sm" variant="ghost" onClick={() => onEdit(null)}>
+      <div className="ai-note ed">
+        <textarea className="an-i sb-ta" rows={2} maxLength={400} autoFocus aria-label={t("ai.mem.edit")} value={editing} onChange={(e) => onEdit(e.target.value)} />
+        {looksSecret(editing) && <span className="ai-err">{t("ai.secretHint")}</span>}
+        <div className="ai-na">
+          <Button size="md" onClick={() => onEdit(null)}>
             {t("ai.mem.cancel")}
           </Button>
-          <Button type="button" size="sm" variant="primary" disabled={!editing.trim()} onClick={onSave}>
+          <Button size="md" variant="primary" aria-disabled={!editing.trim() || undefined} onClick={onSave}>
             {t("ai.mem.save")}
           </Button>
         </div>
-      </li>
+      </div>
     );
   }
   return (
-    <li className="flex items-start gap-2.5 py-2.5 first:pt-0">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[13px] leading-snug break-words">{note.text}</span>
-        {note.byAssistant && <span className="text-[11px] text-faint">{t("ai.mem.byAssistant")}</span>}
-      </div>
-      <Button type="button" size="xs" variant="ghost" onClick={() => onEdit(note.text)}>
-        {t("ai.mem.edit")}
-      </Button>
-      <Button type="button" size="xs" variant="ghostDanger" onClick={onDelete}>
-        {t("ai.mem.delete")}
-      </Button>
-    </li>
+    <div className={cx("ai-note", fresh && "fresh")}>
+      <p>
+        {note.text}
+        {note.byAssistant && <i className="uq-otg">{t("aip.mem.by")}</i>}
+      </p>
+      {asking ? (
+        <span className="ai-ask">
+          <em>{t("aip.mem.ask")}</em>
+          <Button size="md" onClick={() => onAsk(false)}>
+            {t("ai.mem.cancel")}
+          </Button>
+          <Button size="md" className="rw-dng" onClick={onDelete}>
+            {t("ai.mem.delete")}
+          </Button>
+        </span>
+      ) : (
+        <span className="ai-na">
+          <Button size="md" onClick={() => onEdit(note.text)}>
+            {t("ai.mem.edit")}
+          </Button>
+          <Button size="md" onClick={() => onAsk(true)}>
+            {t("ai.mem.delete")}
+          </Button>
+        </span>
+      )}
+    </div>
   );
 }
 
 function Conversations() {
   const t = useT();
+  const fmt = useFmt();
   const toast = useToast();
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const q = useQuery(conversationsQuery(query.trim()));
   const tz = useQuery(accessQuery).data?.timezoneOffsetMinutes ?? 0;
   const [wipe, setWipe] = useState(false);
+  const [asking, setAsking] = useState("");
   const done = () => void qc.invalidateQueries({ queryKey: ["assistant", "conversations"] });
-  const del = useMutation({ mutationFn: (id: string) => assistant.deleteConversation({ id }), onSuccess: done, onError: (e) => toast.error(errorText(e, t)) });
-  const all = useMutation({ mutationFn: () => assistant.deleteAllConversations({ allAdmins: false }), onSuccess: () => (setWipe(false), done()), onError: (e) => toast.error(errorText(e, t)) });
+  const del = useMutation({ mutationFn: (id: string) => assistant.deleteConversation({ id }), onSuccess: () => (setAsking(""), done()), onError: (e) => toast.error(errorText(e, t)) });
+  const all = useMutation({ mutationFn: () => assistant.deleteAllConversations({ allAdmins: false }), onSuccess: () => (setWipe(false), toast(t("aip.conv.wipedToast")), done()), onError: (e) => toast.error(errorText(e, t)) });
   const list = q.data ?? [];
   return (
-    <Card lg className="flex flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <b className="flex-1 text-[14px] font-semibold">{t("ai.conv.title")}</b>
-        {list.length > 0 && !query && (
-          <Button type="button" size="sm" variant="ghostDanger" onClick={() => setWipe(true)}>
+    <Sec
+      tone="sky"
+      d={ICONS.chat}
+      title={t("aip.conv.title")}
+      foot={t("aip.conv.foot")}
+      aside={
+        list.length > 0 && !query ? (
+          <Button size="md" onClick={() => setWipe(true)}>
             {t("ai.conv.deleteAll")}
           </Button>
-        )}
+        ) : undefined
+      }
+    >
+      <input className="an-i ai-search" aria-label={t("ai.conv.search")} placeholder={t("ai.conv.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
+      {q.isError && !q.data && <p className="sb-emp ai-emp">{t("aip.err.body")}</p>}
+      {q.data && list.length === 0 && <p className="sb-emp ai-emp">{t("aip.conv.empty")}</p>}
+      <div className="ai-convs">
+        {list.map((c) => {
+          const due = Number(c.followUpUnix ?? 0);
+          return (
+            <div key={c.id} className="ai-conv">
+              <div>
+                <b>
+                  {c.unread && <i role="img" aria-label={t("ai.conv.unread")} title={t("ai.conv.unread")} className="ai-dot" />}
+                  <span>{c.title || t("ai.conv.untitled")}</span>
+                  {c.taskId && <i className="uq-otg">{t("aip.conv.sched")}</i>}
+                </b>
+                <em>
+                  {fmt.ago(c.updatedUnix)} · {t.n("ai.conv.messages", c.messages)}
+                  {due > 0 && <> · {t("ai.conv.followUp", { time: fmt.stampAt(due, tz) })}</>}
+                </em>
+              </div>
+              {asking === c.id ? (
+                <span className="ai-ask">
+                  <em>{t("aip.conv.ask")}</em>
+                  <Button size="md" onClick={() => setAsking("")}>
+                    {t("ai.mem.cancel")}
+                  </Button>
+                  <Button size="md" className="rw-dng" onClick={() => del.mutate(c.id)}>
+                    {t("ai.conv.delete")}
+                  </Button>
+                </span>
+              ) : (
+                <span className="ai-na">
+                  <Button size="md" onClick={() => openInChat(c.id)}>
+                    {t("ai.conv.open")}
+                  </Button>
+                  <Button size="md" onClick={() => setAsking(c.id)}>
+                    {t("ai.conv.delete")}
+                  </Button>
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
-      <input
-        aria-label={t("ai.conv.search")}
-        placeholder={t("ai.conv.search")}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="h-10 rounded-field border border-line bg-canvas px-3 text-[13px] outline-none focus:border-accent"
-      />
-      {q.isPending && <Pending compact />}
-      {q.isError && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
-      {q.data && list.length === 0 && <p className="text-[13px] text-muted">{t("ai.conv.empty")}</p>}
-      <ul className="flex flex-col divide-y divide-line">
-        {list.map((c) => (
-          <li key={c.id} className="flex items-center gap-2.5 py-2.5 first:pt-0">
-            <button type="button" onClick={() => openInChat(c.id)} className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-start">
-              <ConversationHead c={c} />
-              <ConversationMeta c={c} tz={tz} />
-            </button>
-            <Button type="button" size="xs" variant="ghost" onClick={() => openInChat(c.id)}>
-              {t("ai.conv.open")}
-            </Button>
-            <Button type="button" size="xs" variant="ghostDanger" onClick={() => del.mutate(c.id)}>
-              {t("ai.conv.delete")}
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <Modal
-        open={wipe}
-        onOpenChange={setWipe}
-        title={t("ai.conv.deleteAllT")}
-        description={t.n("ai.conv.deleteAllBody", list.length)}
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={() => setWipe(false)}>
-              {t("ai.mem.cancel")}
-            </Button>
-            <Button type="button" variant="danger" disabled={all.isPending} onClick={() => all.mutate()}>
-              {t("ai.conv.deleteAll")}
-            </Button>
-          </>
-        }
-      />
-    </Card>
+      {wipe && (
+        <Dlg
+          title={t("ai.conv.deleteAllT")}
+          onClose={() => setWipe(false)}
+          busy={all.isPending}
+          footer={
+            <>
+              <Button size="lg" onClick={() => setWipe(false)}>
+                {t("ai.mem.cancel")}
+              </Button>
+              <Button size="lg" variant="primary" className="ai-dngp" disabled={all.isPending} onClick={() => all.mutate()}>
+                {t("ai.conv.deleteAll")}
+              </Button>
+            </>
+          }
+        >
+          <p>{t.n("ai.conv.deleteAllBody", list.length)}</p>
+        </Dlg>
+      )}
+    </Sec>
   );
 }

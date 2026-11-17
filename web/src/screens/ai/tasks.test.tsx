@@ -133,10 +133,10 @@ describe("the scheduled tasks", () => {
     await click(button("New check"));
     await settle();
     // nothing is sent before the task has a name: the editor says what is missing
-    expect(document.body.textContent).toContain("Give the task a name.");
     await click(button("Create"));
+    expect(document.body.textContent).toContain("Give the task a name.");
     expect(createTask).not.toHaveBeenCalled();
-    await typeInto(document.querySelector<HTMLInputElement>('input[placeholder="Morning check"]'), "Fleet each morning");
+    await typeInto(document.querySelector<HTMLInputElement>('input[placeholder="Morning fleet round"]'), "Fleet each morning");
     await click(button("Create"));
     await settle();
     expect(createTask).toHaveBeenCalledTimes(1);

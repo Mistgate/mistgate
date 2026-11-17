@@ -97,21 +97,39 @@ describe("the assistant's settings", () => {
 
   it("discards changes and lists the provider in use first", async () => {
     await mount();
-    const names = [...document.querySelectorAll("section b")].map((b) => b.textContent);
+    const names = [...document.querySelectorAll(".ai-pn > b")].map((b) => b.textContent);
     expect(names[0]).toContain("Ollama Cloud");
+    expect(names[0]).toContain("In use");
     await click([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.trim() === "Quick"));
     expect(saveButton()).toBeDefined();
     await click([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Discard"));
     expect(saveButton()).toBeUndefined();
   });
 
+  it("draws the board's page: the three cards, the usage on the side, a provider opens to its model and budget", async () => {
+    await mount();
+    expect([...document.querySelectorAll(".pp-sh h3")].map((h) => h.textContent)).toEqual(["Assistant", "Access and history", "Providers", "This month"]);
+    // the provider in use is open: its model, the budget and the month's spending, and the two actions on its key
+    expect(document.querySelector("select[aria-label='Model']")).not.toBeNull();
+    expect(document.querySelector("[role=progressbar]")).not.toBeNull();
+    const texts = [...document.querySelectorAll(".ai-pd button")].map((b) => b.textContent);
+    expect(texts).toEqual(["Replace key", "Delete key"]);
+    // a provider with no key says so and offers to connect it
+    const off = [...document.querySelectorAll(".ai-prov.off")];
+    expect(off.length).toBe(3);
+    expect(off[0]!.textContent).toContain("Not connected");
+    expect([...off[0]!.querySelectorAll("button")].some((b) => b.textContent?.trim() === "Connect")).toBe(true);
+  });
+
   it("lets the owner configure a local custom provider without a key", async () => {
     await mount(true);
-    const card = [...document.querySelectorAll("section b")].find((b) => b.textContent?.includes("Custom provider 1"))?.closest("div.flex.flex-col.gap-3");
+    const card = [...document.querySelectorAll(".ai-prov")].find((el) => el.textContent?.includes("Custom provider 1"));
     expect(card).toBeTruthy();
     await click([...card!.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Connect"));
+    const win = document.querySelector<HTMLElement>("[role=dialog]")!;
+    expect(win.textContent).toContain("Connect Custom provider 1");
     const fill = async (label: string, value: string) => {
-      const input = [...card!.querySelectorAll("label")].find((el) => el.textContent?.includes(label))?.parentElement?.querySelector("input") as HTMLInputElement;
+      const input = [...win.querySelectorAll("label")].find((el) => el.textContent?.includes(label))?.querySelector("input") as HTMLInputElement;
       expect(input).toBeTruthy();
       await act(async () => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
@@ -121,9 +139,28 @@ describe("the assistant's settings", () => {
     await fill("Name", "Local model");
     await fill("API address", "http://127.0.0.1:11434/v1");
     await fill("Model ID", "model-test");
-    await click(card!.querySelector('input[type="checkbox"]'));
+    await click(win.querySelector('input[type="checkbox"]'));
     setProviderKey.mockResolvedValue({});
-    await click([...card!.querySelectorAll("button")].find((b) => b.textContent?.includes("Check and save")));
+    await click([...win.querySelectorAll("button")].find((b) => b.textContent?.includes("Check and save")));
     expect(setProviderKey).toHaveBeenCalledWith(expect.objectContaining({ provider: AssistantProvider.CUSTOM_1, customName: "Local model", customModel: "model-test", allowLocal: true, apiKey: "" }));
+  });
+
+  it("sends a key once, from a password field, and says inline when the provider refuses it", async () => {
+    await mount();
+    const card = [...document.querySelectorAll(".ai-prov.off")].find((el) => el.textContent?.includes("Anthropic"));
+    await click([...card!.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Connect"));
+    const win = document.querySelector<HTMLElement>("[role=dialog]")!;
+    const input = win.querySelector<HTMLInputElement>('input[type="password"]')!;
+    expect(input.getAttribute("autocomplete")).toBe("off");
+    // nothing goes before there is a key
+    await click([...win.querySelectorAll("button")].find((b) => b.textContent?.includes("Check and save")));
+    expect(setProviderKey).not.toHaveBeenCalled();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "not-a-real-key");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    setProviderKey.mockResolvedValue({});
+    await click([...win.querySelectorAll("button")].find((b) => b.textContent?.includes("Check and save")));
+    expect(setProviderKey).toHaveBeenCalledWith(expect.objectContaining({ provider: AssistantProvider.ANTHROPIC, apiKey: "not-a-real-key" }));
   });
 });

@@ -1,17 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { halo } from "@/components/fx/halo";
-import { Card } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Icon, NavIcon } from "@/components/ui/icons";
-import { Modal } from "@/components/ui/modal";
-import { EmptyState, Notice } from "@/components/ui/notice";
-import { Pending, QueryError } from "@/components/ui/query-error";
+import { Notice } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
-import { Select } from "@/components/ui/select";
-import { StatusPill } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
-import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { RunStatus, TaskKind } from "@/gen/mistgate/tasks/v1/tasks_pb";
@@ -37,7 +30,6 @@ import {
   pathHints,
   reasonText,
   runKind,
-  runWord,
   scheduleText,
   severities,
   taskErrorText,
@@ -51,25 +43,23 @@ import {
   type StepDraft,
   type TaskP,
 } from "@/lib/tasks";
+import { Dlg, Empty, ErrCard, Gl, ICONS, OwnerOnly, Pill, Skeleton, SwRow, useFresh, type Kind } from "./bits";
 import { openInChat } from "./memory";
-import { Heading } from "./parts";
 
-// The owner's scheduled tasks (mistgate.tasks.v1, ADR 0017 section 5): the list with each task's schedule, last and next run,
-// its run history, and the editor of both kinds. The owner and the helpers read and run them; only the owner writes them. The
-// Cloudflare edition has none: the tab says so.
+// The owner's scheduled tasks (mistgate.tasks.v1, ADR 0017 section 5), as the board draws them (PnAI "Задачи по расписанию"): the list
+// with each task's schedule, last and next run, its run history, and the editor of both kinds. The owner and the helpers read and run
+// them; only the owner writes them. The Cloudflare edition has none: the tab says so.
+
+const pillOf = (k: ReturnType<typeof runKind>): Kind => (k === "ok" ? "ok" : k === "warn" ? "part" : k === "bad" ? "bad" : k === "busy" ? "busy" : "");
+const runWordKey = (s: RunStatus): MessageKey =>
+  s === RunStatus.OK ? "aip.task.st.ok" : s === RunStatus.PROBLEM ? "aip.task.st.problem" : s === RunStatus.FAILED ? "aip.task.st.failed" : s === RunStatus.RUNNING ? "aip.task.st.running" : "task.run.skipped";
 
 export function TasksTab({ focus }: { focus?: string }) {
   const t = useT();
   const edition = useEdition();
   const role = useQuery(meQuery).data?.admin?.role;
   if (edition.off("assistant")) return <Notice tone="quiet" title={t("err.unavailable_in_edition", { feature: t("task.feature") })} />;
-  if (role !== Role.OWNER && role !== Role.HELPER) {
-    return (
-      <Card lg className="border-dashed">
-        <EmptyState icon={<NavIcon name="ai" size={20} />} title={t("task.ownerHelper")} />
-      </Card>
-    );
-  }
+  if (role !== Role.OWNER && role !== Role.HELPER) return <OwnerOnly title={t("task.ownerHelper")} icon={ICONS.clock} />;
   return <TaskList owner={role === Role.OWNER} focus={focus} />;
 }
 
@@ -80,10 +70,14 @@ function TaskList({ owner, focus }: { owner: boolean; focus?: string }) {
   const toast = useToast();
   const qc = useQueryClient();
   const q = useQuery(tasksQuery);
+  const tools = useQuery({ ...checkToolsQuery, enabled: owner });
   const [editing, setEditing] = useState<Editing | null>(null);
   const [open, setOpen] = useState<string | null>(focus ?? null);
-  const [deleting, setDeleting] = useState<TaskP | null>(null);
+  const [asking, setAsking] = useState("");
   const refresh = () => void qc.invalidateQueries({ queryKey: ["tasks"] });
+  const list = q.data?.tasks ?? [];
+  const fresh = useFresh(list.map((x) => x.id));
+  const schemas = useMemo(() => Object.fromEntries((tools.data ?? []).map((tool) => [tool.name, tool.inputSchemaJson])), [tools.data]);
   const runNow = useMutation({
     mutationFn: (id: string) => tasksApi.runTaskNow({ id }),
     onSuccess: (_, id) => {
@@ -96,177 +90,206 @@ function TaskList({ owner, focus }: { owner: boolean; focus?: string }) {
   const del = useMutation({
     mutationFn: (id: string) => tasksApi.deleteTask({ id }),
     onSuccess: () => {
-      setDeleting(null);
+      setAsking("");
       toast(t("task.deleted"));
       refresh();
     },
     onError: (e) => toast.error(taskErrorText(e, t)),
   });
-  const list = q.data?.tasks ?? [];
-  const actions = owner && (
-    <div className="flex flex-none flex-wrap gap-2">
-      <Button type="button" size="sm" variant="secondary" onClick={() => setEditing({ kind: "check" })}>
-        <Icon name="plus" size={13} />
-        {t("task.newCheck")}
-      </Button>
-      <Button type="button" size="sm" variant="secondary" onClick={() => setEditing({ kind: "assistant" })}>
-        <Icon name="sparkle" size={13} />
-        {t("task.newAssistant")}
-      </Button>
-    </div>
-  );
+  // the switch of a task: the task as it is, with only "enabled" turned over (against the version the list holds)
+  const toggle = useMutation({
+    mutationFn: (task: TaskP) => tasksApi.updateTask({ id: task.id, task: inputOf({ ...draftOf(task), enabled: !task.enabled }, schemas), expectedVersion: BigInt(task.version) }),
+    onSuccess: () => refresh(),
+    onError: (e) => toast.error(taskErrorText(e, t)),
+  });
 
+  if (q.isPending) return <Skeleton />;
+  if (q.isError) return <ErrCard onRetry={() => void q.refetch()} />;
+  const tz = q.data?.timezoneOffsetMinutes ?? 0;
   return (
-    <div className="flex flex-col gap-3.5">
-      <Heading title={t("task.title")} desc={t("task.lead")} right={actions} />
-      {q.isPending && <Pending />}
-      {q.isError && <QueryError error={q.error} onRetry={() => void q.refetch()} />}
-      {q.data && list.length === 0 && (
-        <Card lg className="border-dashed">
-          <EmptyState icon={<Icon name="clock" size={20} />} title={t("task.empty")}>
-            {t("task.emptyText")}
-          </EmptyState>
-        </Card>
-      )}
-      {list.length > 0 && (
-        <Card lg className="flex flex-col divide-y divide-line px-4 py-0">
-          {list.map((task) => (
-            <TaskRow
-              key={task.id}
-              tz={q.data?.timezoneOffsetMinutes ?? 0}
-              task={task}
-              owner={owner}
-              expanded={open === task.id}
-              onToggle={() => setOpen((cur) => (cur === task.id ? null : task.id))}
-              onRun={() => runNow.mutate(task.id)}
-              running={task.running || (runNow.isPending && runNow.variables === task.id)}
-              onEdit={() => setEditing({ task, kind: task.kind === TaskKind.ASSISTANT ? "assistant" : "check" })}
-              onDelete={() => setDeleting(task)}
-            />
-          ))}
-        </Card>
-      )}
-      {q.data && <p className="text-xs text-muted">{t("task.tz", { tz: tzLabel(q.data.timezoneOffsetMinutes) })}</p>}
-      {editing && <TaskEditor key={editing.task?.id ?? editing.kind} editing={editing} tz={q.data?.timezoneOffsetMinutes ?? 0} onClose={() => setEditing(null)} onSaved={refresh} />}
-      <Modal
-        open={deleting !== null}
-        onOpenChange={(v) => !v && setDeleting(null)}
-        title={t("task.deleteT", { name: t("common.quoted", { name: deleting?.name ?? "" }) })}
-        description={t("task.deleteBody")}
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={() => setDeleting(null)}>
-              {t("task.cancel")}
+    <div className="sb-tab">
+      <div className="ai-top">
+        <p>{t("aip.task.lead")}</p>
+        {owner && (
+          <span className="ai-hb">
+            <Button size="lg" onClick={() => setEditing({ kind: "assistant" })}>
+              {t("task.newAssistant")}
             </Button>
-            <Button type="button" variant="danger" disabled={del.isPending} onClick={() => deleting && del.mutate(deleting.id)}>
-              {t("task.delete")}
+            <Button size="lg" variant="primary" onClick={() => setEditing({ kind: "check" })}>
+              <Gl d={ICONS.plus} />
+              {t("task.newCheck")}
             </Button>
-          </>
-        }
-      />
+          </span>
+        )}
+      </div>
+      {list.length === 0 && (
+        <Empty
+          calm
+          d={ICONS.clock}
+          title={t("task.empty")}
+          body={t("aip.task.emptyBody")}
+          action={
+            owner ? (
+              <Button size="lg" variant="primary" onClick={() => setEditing({ kind: "check" })}>
+                {t("task.newCheck")}
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+      <div className="ai-tasks">
+        {list.map((task) => (
+          <TaskCard
+            key={task.id}
+            tz={tz}
+            task={task}
+            owner={owner}
+            fresh={fresh === task.id}
+            expanded={open === task.id}
+            asking={asking === task.id}
+            toggling={toggle.isPending && toggle.variables?.id === task.id}
+            canToggle={!!tools.data || tools.isError || task.kind === TaskKind.ASSISTANT}
+            onToggle={() => setOpen((cur) => (cur === task.id ? null : task.id))}
+            onSwitch={() => toggle.mutate(task)}
+            onRun={() => runNow.mutate(task.id)}
+            running={task.running || (runNow.isPending && runNow.variables === task.id)}
+            onEdit={() => setEditing({ task, kind: task.kind === TaskKind.ASSISTANT ? "assistant" : "check" })}
+            onAsk={(v) => setAsking(v ? task.id : "")}
+            onDelete={() => del.mutate(task.id)}
+          />
+        ))}
+      </div>
+      {list.length > 0 && <p className="ai-foot">{t("task.tz", { tz: tzLabel(tz) })}</p>}
+      {editing && <TaskEditor key={editing.task?.id ?? editing.kind} editing={editing} tz={tz} onClose={() => setEditing(null)} onSaved={refresh} />}
     </div>
   );
 }
 
-function TaskRow({
+function TaskCard({
   tz,
   task,
   owner,
+  fresh,
   expanded,
+  asking,
   running,
+  toggling,
+  canToggle,
   onToggle,
+  onSwitch,
   onRun,
   onEdit,
+  onAsk,
   onDelete,
 }: {
   /** The panel's schedule offset in minutes: task times are shown in it, like the schedule itself. */
   tz: number;
   task: TaskP;
   owner: boolean;
+  fresh: boolean;
   expanded: boolean;
+  asking: boolean;
   running: boolean;
+  toggling: boolean;
+  canToggle: boolean;
   onToggle: () => void;
+  onSwitch: () => void;
   onRun: () => void;
   onEdit: () => void;
+  onAsk: (v: boolean) => void;
   onDelete: () => void;
 }) {
   const t = useT();
   const fmt = useFmt();
   const last = task.lastRun;
   const runsId = useId();
+  // a run that has just ended: its button ticks once, as the board's does
+  const was = useRef(running);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (was.current && !running) {
+      setDone(true);
+      const h = setTimeout(() => setDone(false), 1600);
+      was.current = running;
+      return () => clearTimeout(h);
+    }
+    was.current = running;
+  }, [running]);
+  const off = !task.enabled;
+  const kind = last ? pillOf(runKind(last.status)) : "";
+  const found = !running && last && last.status !== RunStatus.OK ? last.summary || reasonText(t, last.reason) : "";
   return (
-    <div className="flex flex-col gap-3 py-3.5" data-task={task.id}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <b className="text-[13.5px] font-semibold break-words">{task.name}</b>
-            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10.5px] font-semibold text-muted">
-              {t(task.kind === TaskKind.ASSISTANT ? "task.kind.assistant" : "task.kind.check")}
-            </span>
-            {task.notifyTelegram && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-semibold text-accent-text">{t("task.telegramOn")}</span>}
-          </div>
-          <span className="text-xs text-muted">
-            {scheduleText(t, task.schedule)} · {task.enabled ? (task.nextRunUnix > 0 ? t("task.next", { time: fmt.stampAt(task.nextRunUnix, tz) }) : "") : t("task.off")}
+    <section className={cx("card ai-task", off && "off", fresh && "fresh")} data-task={task.id}>
+      <div className="ai-th">
+        <div className="ai-tn">
+          <b>{task.name}</b>
+          <span className="ai-tm">
+            <i className={cx("ai-kind", task.kind === TaskKind.ASSISTANT ? "asst" : "chk")}>{t(task.kind === TaskKind.ASSISTANT ? "task.kind.assistant" : "task.kind.check")}</i>
+            {task.notifyTelegram && <i className="ai-kind tg">{t("task.telegramOn")}</i>}
+            <em>
+              {scheduleText(t, task.schedule)} · {task.enabled ? (task.nextRunUnix > 0 ? t("task.next", { time: fmt.stampAt(task.nextRunUnix, tz) }) : "") : t("task.off")}
+            </em>
           </span>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-            {running ? (
-              <StatusPill sm kind="busy" label={t("task.run.running")} />
-            ) : last ? (
-              <>
-                <StatusPill sm kind={runKind(last.status)} label={t(runWord(last.status))} />
-                <span className="text-muted">{t("task.lastRun", { time: fmt.ago(last.startedUnix) })}</span>
-              </>
-            ) : (
-              <span className="text-muted">{t("task.never")}</span>
-            )}
-            {task.failStreak >= 2 && <span className="text-warn-text">{t.n("task.failStreak", task.failStreak)}</span>}
-          </div>
-          {!running && last && (last.summary || last.reason) && (
-            <p className="line-clamp-2 text-xs leading-snug break-words text-muted">{last.summary || reasonText(t, last.reason)}</p>
-          )}
         </div>
-        <div className="flex flex-none flex-wrap items-center gap-1">
-          <Button type="button" size="sm" variant="secondary" disabled={running} onClick={onRun}>
-            <Icon name="refresh" size={12} />
-            {t("task.runNow")}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" aria-expanded={expanded} aria-controls={runsId} onClick={onToggle}>
-            {t(expanded ? "task.hideRuns" : "task.runs")}
-            <Icon name="chevronDown" size={12} className={cx("transition-transform", expanded && "rotate-180")} />
-          </Button>
-          {owner && (
+        {owner && <Switch checked={task.enabled} disabled={toggling || !canToggle} onCheckedChange={onSwitch} aria-label={t("aip.task.enabled")} />}
+      </div>
+      <div className="ai-ts">
+        {running ? <Pill kind="busy">{t("aip.task.st.running")}</Pill> : last ? <Pill kind={kind}>{t(runWordKey(last.status))}</Pill> : <Pill kind="">{t("aip.task.st.never")}</Pill>}
+        <em>{running ? t("aip.task.startedNow") : last ? t("task.lastRun", { time: fmt.ago(last.startedUnix) }) : t("task.never")}</em>
+        {!running && task.failStreak >= 2 && <em>{t.n("task.failStreak", task.failStreak)}</em>}
+        {found && <code className={cx("mono ai-find", last?.status === RunStatus.FAILED && "bad")}>{found}</code>}
+      </div>
+      <div className="ai-ta">
+        <Button size="md" className={cx(done && "done")} disabled={running} onClick={onRun}>
+          {running && <span className="an-sp" aria-hidden="true" />}
+          {running ? t("aip.task.running") : t("task.runNow")}
+        </Button>
+        <Button size="md" aria-expanded={expanded} aria-controls={runsId} onClick={onToggle}>
+          {t(expanded ? "task.hideRuns" : "task.runs")}
+        </Button>
+        {owner &&
+          (asking ? (
+            <span className="ai-ask">
+              <em>{t("aip.task.ask")}</em>
+              <Button size="md" onClick={() => onAsk(false)}>
+                {t("task.cancel")}
+              </Button>
+              <Button size="md" className="rw-dng" onClick={onDelete}>
+                {t("task.delete")}
+              </Button>
+            </span>
+          ) : (
             <>
-              <Button type="button" size="sm" variant="ghost" onClick={onEdit}>
+              <Button size="md" onClick={onEdit}>
                 {t("task.edit")}
               </Button>
-              <Button type="button" size="sm" variant="ghostDanger" onClick={onDelete}>
+              <Button size="md" onClick={() => onAsk(true)}>
                 {t("task.delete")}
               </Button>
             </>
-          )}
-        </div>
+          ))}
       </div>
       {expanded && (
         <div id={runsId}>
           <Runs taskId={task.id} running={task.running} tz={tz} />
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
 function Runs({ taskId, running, tz }: { taskId: string; running: boolean; tz: number }) {
   const t = useT();
   const q = useQuery(taskRunsQuery(taskId, running));
-  if (q.isPending) return <Pending compact />;
-  if (q.isError) return <QueryError compact error={q.error} onRetry={() => void q.refetch()} />;
-  if (q.data.length === 0) return <p className="text-[13px] text-muted">{t("task.noRuns")}</p>;
+  if (q.isPending) return <p className="ai-nr">{t("aip.loading")}</p>;
+  if (q.isError) return <p className="ai-err">{t("aip.err.body")}</p>;
+  if (q.data.length === 0) return <p className="ai-nr">{t("aip.task.noRuns")}</p>;
   return (
-    <ul className="flex flex-col gap-2 rounded-field bg-surface-2 p-2.5">
+    <div className="ai-runs">
       {q.data.map((run) => (
         <RunItem key={run.id} run={run} tz={tz} />
       ))}
-    </ul>
+    </div>
   );
 }
 
@@ -275,93 +298,71 @@ function RunItem({ run, tz }: { run: RunP; tz: number }) {
   const fmt = useFmt();
   // a run or a step takes seconds: say them, and the coarse units from a minute and a half on
   const span = (seconds: number) => (seconds < 90 ? `${fmt.num(seconds, seconds < 10 ? 1 : 0)} ${t("unit.s")}` : fmt.duration(seconds));
-  const fmtMoney = (n: number) => n.toLocaleString(fmt.locale, { maximumFractionDigits: 3 });
-  const trigger =
-    run.trigger === "manual" ? t("task.trigger.manual", { actor: run.actor || "?" }) : run.trigger === "missed" ? t("task.trigger.missed") : t("task.trigger.schedule");
+  const money = (n: number) => n.toLocaleString(fmt.locale, { maximumFractionDigits: 3 });
+  const trigger = run.trigger === "manual" ? t("task.trigger.manual", { actor: run.actor || "?" }) : run.trigger === "missed" ? t("task.trigger.missed") : t("task.trigger.schedule");
   const took = run.finishedUnix > 0 ? span(Math.max(0, run.finishedUnix - run.startedUnix)) : "";
+  const said = run.status === RunStatus.OK ? "" : run.summary || reasonText(t, run.reason);
+  const details = run.steps.length > 0 || !!run.conversationId || (!!run.reason && run.status !== RunStatus.PROBLEM && run.status !== RunStatus.OK) || !!run.summary;
   return (
-    <li className="flex flex-col gap-1.5 rounded-ctl bg-surface px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <StatusPill sm kind={runKind(run.status)} label={t(runWord(run.status))} />
-        <span className="font-medium">{fmt.stampAt(run.startedUnix, tz)}</span>
-        <span className="text-muted">
-          {trigger}
-          {took && ` · ${took}`}
+    <div className="ai-run">
+      <div>
+        <em>{fmt.stampAt(run.startedUnix, tz)}</em>
+        <span>
+          <i className={cx("rw-gl", pillOf(runKind(run.status)))} aria-hidden="true" />
+          {t(runWordKey(run.status))}
+          {said && `: ${said}`}
         </span>
+        <em className="mono">{[took, run.usd > 0 ? `$${money(run.usd)}` : ""].filter(Boolean).join(" · ")}</em>
       </div>
-      {run.reason && run.status !== RunStatus.PROBLEM && <p className="text-xs text-muted">{reasonText(t, run.reason)}</p>}
-      {run.summary && <p className="text-xs leading-snug break-words">{run.summary}</p>}
-      {run.steps.map((st, i) => (
-        <div key={i} className="flex flex-col gap-1 border-s-2 border-line ps-2.5 text-xs">
-          <span className="flex items-center gap-1.5 font-mono text-[11.5px]">
-            <span aria-hidden className={cx("size-1.5 rounded-full", st.problem ? "bg-warn" : st.ok ? "bg-ok" : "bg-danger")} />
-            {st.tool}
-            <span className="font-sans text-muted">{span(st.durationMs / 1000)}</span>
-          </span>
-          {st.matches.length > 0 && (
-            <span className="text-muted">
-              {t("common.labeled", { label: t("task.step.matched"), value: "" })}
-              <span className="font-mono text-fg">{st.matches.join("; ")}</span>
-            </span>
+      {details && (
+        <div className="ai-rx">
+          <p>{[trigger, run.reason && run.status === RunStatus.OK ? reasonText(t, run.reason) : ""].filter(Boolean).join(" · ")}</p>
+          {run.summary && run.status === RunStatus.OK && <p>{run.summary}</p>}
+          {run.steps.map((st, i) => (
+            <div key={i} className="ai-st">
+              <span>
+                <i className={cx("rw-gl", st.problem ? "part" : st.ok ? "ok" : "bad")} aria-hidden="true" />
+                {st.tool}
+                <em>{span(st.durationMs / 1000)}</em>
+              </span>
+              {st.matches.length > 0 && (
+                <p>
+                  {t("common.labeled", { label: t("task.step.matched"), value: "" })}
+                  <span className="mono">{st.matches.join("; ")}</span>
+                </p>
+              )}
+              {st.error && <p className="bad">{t("common.labeled", { label: t("task.step.error"), value: st.error })}</p>}
+              {st.excerpt && (
+                <details>
+                  <summary>{t("task.step.result")}</summary>
+                  <pre dir="ltr">{st.excerpt}</pre>
+                </details>
+              )}
+            </div>
+          ))}
+          {run.conversationId && (
+            <div className="ai-co">
+              {run.provider && <span>{t("task.run.cost", { provider: run.provider, usd: money(run.usd) })}</span>}
+              {run.fellBack && <span>{t("task.run.fellBack")}</span>}
+              <Button size="md" onClick={() => openInChat(run.conversationId)}>
+                {t("task.openChat")}
+              </Button>
+            </div>
           )}
-          {st.error && (
-            <span className="text-danger-text">
-              {t("common.labeled", { label: t("task.step.error"), value: st.error })}
-            </span>
-          )}
-          {st.excerpt && (
-            <details>
-              <summary className="cursor-pointer text-muted select-none">{t("task.step.result")}</summary>
-              <pre dir="ltr" className="mt-1 max-h-48 overflow-auto rounded-ctl bg-surface-2 p-2 font-mono text-[11px] leading-snug break-all whitespace-pre-wrap">
-                {st.excerpt}
-              </pre>
-            </details>
-          )}
-        </div>
-      ))}
-      {run.conversationId && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-          {run.provider && <span>{t("task.run.cost", { provider: run.provider, usd: fmtMoney(run.usd) })}</span>}
-          {run.fellBack && <span className="text-warn-text">{t("task.run.fellBack")}</span>}
-          <Button type="button" size="xs" variant="ghost" onClick={() => openInChat(run.conversationId)}>
-            <Icon name="chat" size={11} />
-            {t("task.openChat")}
-          </Button>
         </div>
       )}
-    </li>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // the editor
 
-function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{label}</span>
-      {children}
-      {hint && <span className="text-xs leading-snug text-pretty text-muted">{hint}</span>}
-    </div>
-  );
-}
-
-function ToggleRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="flex items-start gap-3">
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[13px] font-medium">{label}</span>
-        {hint && <span className="text-xs leading-snug text-muted">{hint}</span>}
-      </span>
-      <Switch checked={checked} onCheckedChange={onChange} aria-label={label} />
-    </label>
-  );
-}
-
 function TaskEditor({ editing, tz, onClose, onSaved }: { editing: Editing; tz: number; onClose: () => void; onSaved: () => void }) {
   const t = useT();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>(() => (editing.task ? draftOf(editing.task) : emptyDraft(editing.kind)));
+  const [tried, setTried] = useState(false);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const tools = useQuery({ ...checkToolsQuery, enabled: draft.kind === "check" });
   const schemas = useMemo(() => Object.fromEntries((tools.data ?? []).map((tool) => [tool.name, tool.inputSchemaJson])), [tools.data]);
@@ -381,235 +382,248 @@ function TaskEditor({ editing, tz, onClose, onSaved }: { editing: Editing; tz: n
   });
   const problem = draftProblem(draft);
   const setStep = (i: number, step: StepDraft) => set({ steps: draft.steps.map((s, j) => (j === i ? step : s)) });
+  const nameErr = tried && !draft.name.trim();
+  const go = () => {
+    setTried(true);
+    if (problem || save.isPending) return;
+    save.mutate();
+  };
 
   return (
-    <Modal
-      open
-      wide
-      onOpenChange={(v) => !v && onClose()}
-      title={editing.task ? t("task.editor.edit", { name: t("common.quoted", { name: editing.task.name }) }) : t("task.editor.new")}
-      closeLabel={t("task.cancel")}
+    <Dlg
+      className="ai-nq"
+      shot="ai-task-dialog"
+      title={editing.task ? t("task.editor.edit", { name: t("common.quoted", { name: editing.task.name }) }) : t("aip.task.new")}
+      onClose={onClose}
+      busy={save.isPending}
       footer={
-        <div className="flex w-full flex-wrap items-center justify-end gap-2">
-          {problem && <span className="me-auto text-xs text-muted">{t(problem)}</span>}
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <>
+          {tried && problem && !nameErr && <span className="ai-tz me-auto">{t(problem)}</span>}
+          <Button size="lg" onClick={onClose}>
             {t("task.cancel")}
           </Button>
-          <Button type="button" variant="primary" disabled={!!problem || save.isPending} onClick={() => save.mutate()}>
+          <Button size="lg" variant="primary" disabled={save.isPending} onClick={go}>
+            {save.isPending && <span className="an-sp" aria-hidden="true" />}
             {t(editing.task ? "task.save" : "task.create")}
           </Button>
-        </div>
+        </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField label={t("task.f.name")} placeholder={t("task.f.namePh")} value={draft.name} maxLength={80} onChange={(e) => set({ name: e.target.value })} />
-        <Field label={t("task.f.kind")} hint={t(draft.kind === "assistant" ? "task.f.assistantHint" : "task.f.checkHint")}>
-          <Segmented
-            aria-label={t("task.f.kind")}
-            value={draft.kind}
-            onValueChange={(v) => !editing.task && setDraft({ ...emptyDraft(v), name: draft.name })}
-            options={[
-              { value: "check", label: t("task.kind.check") },
-              { value: "assistant", label: t("task.kind.assistant") },
-            ]}
-          />
-        </Field>
-      </div>
+      <label className={cx("an-f", nameErr && "err")}>
+        <span>{t("task.f.name")}</span>
+        <input className="an-i" type="text" autoComplete="off" maxLength={80} placeholder={t("aip.task.namePh")} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
+        <small>{nameErr ? t("task.need.name") : ""}</small>
+      </label>
 
-      <Field label={t("task.f.when")} hint={t("task.tz", { tz: tzLabel(tz) })}>
-        <div className="flex flex-wrap items-end gap-2.5">
-          <Segmented
-            aria-label={t("task.f.when")}
-            value={draft.scheduleKind}
-            onValueChange={(v) => set({ scheduleKind: v })}
-            options={[
-              { value: "every", label: t("task.f.every") },
-              { value: "daily", label: t("task.f.daily") },
-              { value: "weekly", label: t("task.f.weekly") },
-            ]}
-          />
-          {draft.scheduleKind === "every" ? (
-            <div className="flex items-center gap-2">
-              <TextField aria-label={t("task.f.count")} inputMode="numeric" className="w-20" value={draft.every} onChange={(e) => set({ every: e.target.value.replace(/\D/g, "").slice(0, 4) })} />
-              <Select
-                aria-label={t("task.f.count")}
-                className="min-w-[120px]"
-                value={draft.unit}
-                onValueChange={(v) => set({ unit: v as Draft["unit"] })}
-                options={[
-                  { value: "m", label: t("task.f.unit.m") },
-                  { value: "h", label: t("task.f.unit.h") },
-                ]}
-              />
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              {draft.scheduleKind === "weekly" && (
-                <Select
-                  aria-label={t("task.f.day")}
-                  className="min-w-[150px]"
-                  value={String(draft.weekday)}
-                  onValueChange={(v) => set({ weekday: Number(v) })}
-                  options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: String(d), label: t(weekdayKeys[d]!) }))}
-                />
-              )}
-              <TextField aria-label={t("task.f.time")} type="time" className="w-32" value={draft.time} onChange={(e) => set({ time: e.target.value })} />
-            </div>
-          )}
-        </div>
-      </Field>
+      <span className="rw-sl">{t("aip.task.kind")}</span>
+      <Segmented
+        className="us-seg"
+        aria-label={t("aip.task.kind")}
+        value={draft.kind}
+        onValueChange={(v) => !editing.task && setDraft({ ...emptyDraft(v), name: draft.name })}
+        options={[
+          { value: "check", label: t("task.kind.check") },
+          { value: "assistant", label: t("task.kind.assistant") },
+        ]}
+      />
+      <p className="ai-cs">{t(draft.kind === "assistant" ? "aip.task.kindAs" : "aip.task.kindChk")}</p>
+
+      <span className="rw-sl">{t("task.f.when")}</span>
+      <Segmented
+        className="us-seg"
+        aria-label={t("task.f.when")}
+        value={draft.scheduleKind}
+        onValueChange={(v) => set({ scheduleKind: v })}
+        options={[
+          { value: "every", label: t("task.f.every") },
+          { value: "daily", label: t("task.f.daily") },
+          { value: "weekly", label: t("task.f.weekly") },
+        ]}
+      />
+      <div className="ai-when">
+        {draft.scheduleKind === "every" ? (
+          <>
+            <label className="an-f">
+              <span>{t("aip.task.count")}</span>
+              <input className="an-i mono" inputMode="numeric" aria-label={t("task.f.count")} value={draft.every} onChange={(e) => set({ every: e.target.value.replace(/\D/g, "").slice(0, 4) })} />
+            </label>
+            <label className="an-f">
+              <span>{t("aip.task.unit")}</span>
+              <select className="an-i" aria-label={t("aip.task.unit")} value={draft.unit} onChange={(e) => set({ unit: e.target.value as Draft["unit"] })}>
+                <option value="m">{t("task.f.unit.m")}</option>
+                <option value="h">{t("task.f.unit.h")}</option>
+              </select>
+            </label>
+          </>
+        ) : (
+          <>
+            {draft.scheduleKind === "weekly" && (
+              <label className="an-f">
+                <span>{t("task.f.day")}</span>
+                <select className="an-i" aria-label={t("task.f.day")} value={String(draft.weekday)} onChange={(e) => set({ weekday: Number(e.target.value) })}>
+                  {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                    <option key={d} value={d}>
+                      {t(weekdayKeys[d]!)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="an-f">
+              <span>{t("task.f.time")}</span>
+              <input className="an-i mono" type="time" aria-label={t("task.f.time")} value={draft.time} onChange={(e) => set({ time: e.target.value })} />
+            </label>
+          </>
+        )}
+      </div>
+      <small className="ai-tz">{t("task.tz", { tz: tzLabel(tz) })}</small>
 
       {draft.kind === "assistant" ? (
-        <Field label={t("task.f.prompt")} hint={t("task.f.promptHint")}>
-          <textarea
-            aria-label={t("task.f.prompt")}
-            value={draft.prompt}
-            maxLength={4000}
-            rows={5}
-            placeholder={t("task.f.promptPh")}
-            onChange={(e) => set({ prompt: e.target.value })}
-            className="min-h-28 w-full resize-y rounded-field border border-line bg-canvas px-3 py-2 text-[13px] leading-snug outline-none focus:border-accent"
-          />
-          {looksSecret(draft.prompt) && <span className="text-xs text-warn-text">{t("ai.secretHint")}</span>}
-        </Field>
+        <label className="an-f">
+          <span>{t("aip.task.prompt")}</span>
+          <textarea className="an-i sb-ta" rows={3} maxLength={4000} aria-label={t("task.f.prompt")} placeholder={t("aip.task.promptPh")} value={draft.prompt} onChange={(e) => set({ prompt: e.target.value })} />
+          <small>{t("aip.task.promptHint")}</small>
+          {looksSecret(draft.prompt) && <small className="ai-err">{t("ai.secretHint")}</small>}
+        </label>
       ) : (
-        <Field label={t("task.f.steps")} hint={t("task.f.stepsHint")}>
-          {tools.isError && <QueryError compact error={tools.error} onRetry={() => void tools.refetch()} />}
-          <div className="flex flex-col gap-2.5">
-            {draft.steps.map((step, i) => (
-              <StepEditor
-                key={i}
-                n={i + 1}
-                step={step}
-                tools={(tools.data ?? []).map((tool) => ({ value: tool.name, label: tool.name, hint: tool.description.split(". ")[0]?.slice(0, 90) }))}
-                schema={schemas[step.tool] ?? ""}
-                onChange={(s) => setStep(i, s)}
-                onRemove={draft.steps.length > 1 ? () => set({ steps: draft.steps.filter((_, j) => j !== i) }) : undefined}
-              />
-            ))}
-            {draft.steps.length < 8 && (
-              <Button type="button" size="sm" variant="ghost" className="self-start" onClick={() => set({ steps: [...draft.steps, emptyStep()] })}>
-                <Icon name="plus" size={12} />
-                {t("task.f.addStep")}
-              </Button>
-            )}
-          </div>
-        </Field>
+        <>
+          {tools.isError && <p className="ai-err">{t("aip.err.body")}</p>}
+          {draft.steps.map((step, i) => (
+            <StepEditor
+              key={i}
+              n={i + 1}
+              step={step}
+              tools={(tools.data ?? []).map((tool) => ({ value: tool.name, label: tool.name }))}
+              schema={schemas[step.tool] ?? ""}
+              onChange={(s) => setStep(i, s)}
+              onRemove={draft.steps.length > 1 ? () => set({ steps: draft.steps.filter((_, j) => j !== i) }) : undefined}
+            />
+          ))}
+          {draft.steps.length < 8 && (
+            <Button size="md" className="self-start" onClick={() => set({ steps: [...draft.steps, emptyStep()] })}>
+              <Gl d={ICONS.plus} />
+              {t("task.f.addStep")}
+            </Button>
+          )}
+          <small className="ai-tz">{t("aip.task.stepsHint")}</small>
+        </>
       )}
 
-      <div className="flex flex-col gap-3 rounded-field bg-surface-2 p-3">
-        <ToggleRow label={t("task.f.telegram")} hint={t("task.f.telegramHint")} checked={draft.notifyTelegram} onChange={(v) => set({ notifyTelegram: v })} />
-        <ToggleRow label={t("task.f.enabled")} hint={t("task.f.enabledHint")} checked={draft.enabled} onChange={(v) => set({ enabled: v })} />
+      <div className="ai-sws">
+        <SwRow title={t("aip.task.tg")} hint={t("aip.task.tgHint")}>
+          <Switch checked={draft.notifyTelegram} onCheckedChange={(v) => set({ notifyTelegram: v })} aria-label={t("task.f.telegram")} />
+        </SwRow>
+        <SwRow title={t("aip.task.enabled")} hint={t("aip.task.enabledHint")}>
+          <Switch checked={draft.enabled} onCheckedChange={(v) => set({ enabled: v })} aria-label={t("task.f.enabled")} />
+        </SwRow>
       </div>
-    </Modal>
+    </Dlg>
   );
 }
 
-function StepEditor({
-  n,
-  step,
-  tools,
-  schema,
-  onChange,
-  onRemove,
-}: {
-  n: number;
-  step: StepDraft;
-  tools: { value: string; label: string; hint?: string }[];
-  schema: string;
-  onChange: (s: StepDraft) => void;
-  onRemove?: () => void;
-}) {
+function StepEditor({ n, step, tools, schema, onChange, onRemove }: { n: number; step: StepDraft; tools: { value: string; label: string }[]; schema: string; onChange: (s: StepDraft) => void; onRemove?: () => void }) {
   const t = useT();
   const fields = argFields(schema);
   const listId = useId();
   const options = tools.some((o) => o.value === step.tool) || !step.tool ? tools : [{ value: step.tool, label: step.tool }, ...tools];
   const setCond = (i: number, c: CondDraft) => onChange({ ...step, conditions: step.conditions.map((x, j) => (j === i ? c : x)) });
   return (
-    <div className="flex flex-col gap-3 rounded-field border border-line p-3">
-      <div className="flex items-center gap-2">
-        <b className="text-xs font-semibold text-muted">{t("task.f.step", { n })}</b>
-        <Select
-          aria-label={t("task.f.tool")}
-          className="min-w-0 flex-1"
-          value={step.tool}
-          onValueChange={(v) => onChange({ ...step, tool: v, args: {}, conditions: step.tool === v ? step.conditions : [] })}
-          options={options}
-        />
+    <div className="ai-sx">
+      <span className="rw-sl">{t("aip.task.step", { n })}</span>
+      <div className="ai-step">
+        <select className="an-i mono" aria-label={t("task.f.tool")} value={step.tool} onChange={(e) => onChange({ ...step, tool: e.target.value, args: {}, conditions: step.tool === e.target.value ? step.conditions : [] })}>
+          {!step.tool && <option value="">{t("task.f.tool")}</option>}
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
         {onRemove && (
-          <Button type="button" size="sm" variant="ghostDanger" aria-label={t("task.f.removeStep")} title={t("task.f.removeStep")} onClick={onRemove}>
-            <Icon name="trash" size={13} />
-          </Button>
+          <button type="button" className="ai-ic" aria-label={t("task.f.removeStep")} title={t("task.f.removeStep")} onClick={onRemove}>
+            <Gl d={ICONS.x} />
+          </button>
         )}
       </div>
-      {fields.length > 0 && (
-        <div className="grid gap-2.5 sm:grid-cols-2">
-          {fields.map((f) =>
-            f.type === "boolean" ? (
-              <label key={f.name} className="flex items-center gap-2 text-[13px]" title={f.description}>
-                <Switch checked={step.args[f.name] === true} onCheckedChange={(v) => onChange({ ...step, args: { ...step.args, [f.name]: v } })} aria-label={f.name} />
-                <span className="font-mono text-xs">{f.name}</span>
-              </label>
-            ) : f.type === "enum" ? (
-              <div key={f.name} className="flex flex-col gap-1.5" title={f.description}>
-                <span className="font-mono text-[11px] text-muted">{f.name}</span>
-                <Select
-                  aria-label={f.name}
-                  value={String(step.args[f.name] ?? "")}
-                  onValueChange={(v) => onChange({ ...step, args: { ...step.args, [f.name]: v } })}
-                  options={[{ value: "", label: "—" }, ...f.options.map((o) => ({ value: o, label: o }))]}
-                />
-              </div>
-            ) : (
-              <TextField
-                key={f.name}
-                label={<span className="font-mono normal-case tracking-normal">{f.name}</span>}
-                title={f.description}
-                placeholder={f.description.slice(0, 60)}
-                inputMode={f.type === "integer" || f.type === "number" ? "decimal" : undefined}
-                value={String(step.args[f.name] ?? "")}
-                onChange={(e) => onChange({ ...step, args: { ...step.args, [f.name]: e.target.value } })}
-              />
-            ),
+      {fields.map((f) =>
+        f.type === "boolean" ? (
+          <label key={f.name} className="ai-chk" title={f.description}>
+            <input type="checkbox" checked={step.args[f.name] === true} onChange={(e) => onChange({ ...step, args: { ...step.args, [f.name]: e.target.checked } })} />
+            <span className="mono">{f.name}</span>
+          </label>
+        ) : f.type === "enum" ? (
+          <label key={f.name} className="an-f" title={f.description}>
+            <span className="mono">{f.name}</span>
+            <select className="an-i" aria-label={f.name} value={String(step.args[f.name] ?? "")} onChange={(e) => onChange({ ...step, args: { ...step.args, [f.name]: e.target.value } })}>
+              <option value="">—</option>
+              {f.options.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label key={f.name} className="an-f" title={f.description}>
+            <span className="mono">{f.name}</span>
+            <input
+              className="an-i"
+              placeholder={f.description.slice(0, 60)}
+              inputMode={f.type === "integer" || f.type === "number" ? "decimal" : undefined}
+              value={String(step.args[f.name] ?? "")}
+              onChange={(e) => onChange({ ...step, args: { ...step.args, [f.name]: e.target.value } })}
+            />
+          </label>
+        ),
+      )}
+      <span className="rw-sl">{t("aip.task.problemIf")}</span>
+      {step.conditions.length === 0 && <small className="ai-tz">{t("task.f.noConditions")}</small>}
+      <datalist id={listId}>
+        {(pathHints[step.tool] ?? []).map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
+      {step.conditions.map((c, i) => (
+        <div key={i} className="ai-cd">
+          <input className="an-i mono" aria-label={t("task.f.path")} placeholder={t("task.f.path")} list={listId} value={c.path} onChange={(e) => setCond(i, { ...c, path: e.target.value })} />
+          <select className="an-i" aria-label={t("task.f.op")} value={c.op} onChange={(e) => setCond(i, { ...c, op: e.target.value, value: e.target.value === "severity_at_least" ? "warning" : c.value })}>
+            {ops.map((op) => (
+              <option key={op} value={op}>
+                {t(`task.op.${op}` as MessageKey)}
+              </option>
+            ))}
+          </select>
+          {c.op === "severity_at_least" ? (
+            <select className="an-i" aria-label={t("task.f.value")} value={c.value || "warning"} onChange={(e) => setCond(i, { ...c, value: e.target.value })}>
+              {severities.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          ) : opNeedsValue(c.op) ? (
+            <input className="an-i" aria-label={t("task.f.value")} placeholder={t("task.f.value")} value={c.value} onChange={(e) => setCond(i, { ...c, value: e.target.value })} />
+          ) : (
+            <span />
           )}
+          <button type="button" className="ai-ic" aria-label={t("task.f.removeCondition")} title={t("task.f.removeCondition")} onClick={() => onChange({ ...step, conditions: step.conditions.filter((_, j) => j !== i) })}>
+            <Gl d={ICONS.x} />
+          </button>
+        </div>
+      ))}
+      {step.conditions.length < 5 && (
+        <div className="ai-ch">
+          {conditionPresets.map((p) => (
+            <button key={p.key} type="button" onClick={() => onChange({ ...step, conditions: [...step.conditions, { ...p.cond }] })}>
+              + {t(p.key)}
+            </button>
+          ))}
         </div>
       )}
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-semibold">{t("task.f.conditions")}</span>
-        {step.conditions.length === 0 && <span className="text-xs text-muted">{t("task.f.noConditions")}</span>}
-        <datalist id={listId}>
-          {(pathHints[step.tool] ?? []).map((p) => (
-            <option key={p} value={p} />
-          ))}
-        </datalist>
-        {step.conditions.map((c, i) => (
-          <div key={i} className="grid items-end gap-2 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <TextField aria-label={t("task.f.path")} placeholder={t("task.f.path")} mono list={listId} value={c.path} onChange={(e) => setCond(i, { ...c, path: e.target.value })} />
-            <Select aria-label={t("task.f.op")} value={c.op} onValueChange={(v) => setCond(i, { ...c, op: v, value: v === "severity_at_least" ? "warning" : c.value })} options={ops.map((op) => ({ value: op, label: t(`task.op.${op}` as MessageKey) }))} />
-            {c.op === "severity_at_least" ? (
-              <Select aria-label={t("task.f.value")} value={c.value || "warning"} onValueChange={(v) => setCond(i, { ...c, value: v })} options={severities.map((s) => ({ value: s, label: s }))} />
-            ) : opNeedsValue(c.op) ? (
-              <TextField aria-label={t("task.f.value")} placeholder={t("task.f.value")} value={c.value} onChange={(e) => setCond(i, { ...c, value: e.target.value })} />
-            ) : (
-              <span />
-            )}
-            <Button type="button" size="sm" variant="ghost" aria-label={t("task.f.removeCondition")} title={t("task.f.removeCondition")} onClick={() => onChange({ ...step, conditions: step.conditions.filter((_, j) => j !== i) })}>
-              <Icon name="x" size={12} />
-            </Button>
-          </div>
-        ))}
-        {step.conditions.length < 5 && (
-          <div className="flex flex-wrap gap-1.5">
-            {conditionPresets.map((p) => (
-              <Button key={p.key} type="button" size="xs" variant="secondary" onClick={() => onChange({ ...step, conditions: [...step.conditions, { ...p.cond }] })}>
-                <Icon name="plus" size={10} />
-                {t(p.key)}
-              </Button>
-            ))}
-          </div>
-        )}
-      </div>
-      <ToggleRow label={t("task.f.errorIsProblem")} checked={step.errorIsProblem} onChange={(v) => onChange({ ...step, errorIsProblem: v })} />
+      <label className="ai-chk">
+        <input type="checkbox" checked={step.errorIsProblem} onChange={(e) => onChange({ ...step, errorIsProblem: e.target.checked })} />
+        {t("task.f.errorIsProblem")}
+      </label>
     </div>
   );
 }
