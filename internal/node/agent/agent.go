@@ -226,7 +226,7 @@ type Agent struct {
 	frontMu  sync.Mutex
 	shared   map[uint16]*sharedPort
 	place    map[string]uint32 // inbound id -> the shared port it runs behind, or placeOff; absent = alone
-	noRun    map[string]string // inbound id -> why it must not run in this reconcile (a name it lost, a port that cannot be bound)
+	noRun    map[string]string // (frontMu too) inbound id -> why it must not run in this reconcile (a name it lost, a port that cannot be bound)
 	replaced map[string]bool   // inbounds removed because their place changed, applied again next: not a new profile
 
 	// Owned by the worker goroutine (and by restore, which runs before the worker starts).

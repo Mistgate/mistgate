@@ -786,7 +786,7 @@ func (a *Agent) observedHash(m *model) string {
 		}
 	}
 	for id, in := range m.inbounds {
-		if in.parseErr == "" && in.applyErr == "" && (!in.spec.Enabled || a.noRun[id] != "") && !have[id] {
+		if in.parseErr == "" && in.applyErr == "" && (!in.spec.Enabled || a.isNoRun(id)) && !have[id] {
 			all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 		}
 	}

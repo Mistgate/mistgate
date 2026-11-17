@@ -65,7 +65,9 @@ func (a *Agent) planShares(next *model) map[uint16]plugin.TCPPortShare {
 			}
 		}
 	}
+	a.frontMu.Lock() // observedHash reads noRun from a session goroutine
 	a.place, a.noRun = place, noRun
+	a.frontMu.Unlock()
 	return fronts
 }
 
@@ -141,6 +143,13 @@ func (a *Agent) openFront(port uint16, sp *sharedPort, routes int) {
 	sp.err = ""
 	sp.f = front.New(ln, a.log.With("source", "front", "port", port))
 	a.log.Info("shared port opened", "port", port, "routes", routes)
+}
+
+// isNoRun says the inbound must not run now (see noRun); safe from any goroutine.
+func (a *Agent) isNoRun(id string) bool {
+	a.frontMu.Lock()
+	defer a.frontMu.Unlock()
+	return a.noRun[id] != ""
 }
 
 // sharedListener is engine.Env.SharedListener: the route of an inbound on a shared port, nil on any other port.
