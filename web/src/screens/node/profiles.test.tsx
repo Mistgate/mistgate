@@ -117,7 +117,7 @@ const checked = async () => {
   await settle();
 };
 const text = () => document.body.textContent ?? "";
-const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.textContent?.trim() === `+ ${label}`);
+const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.textContent?.trim() === `+ ${label}` || b.getAttribute("aria-label") === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.trim() === label);
 const submit = () => click(document.querySelector("[role=dialog] button[type=submit]"));
@@ -538,7 +538,7 @@ describe("the profiles list by protocol", () => {
   it("marks a certificate that runs out soon, and says 'none' instead of a dash for a profile that is not running", async () => {
     const soon = Math.floor(Date.now() / 1000) + 5 * 86400 - 60;
     await mount(data({ inbounds: [{ ...hy, certNotAfterUnix: soon }, { ...hy, id: "inb_3", profileName: "down", state: InboundState.FAILED, certNotAfterUnix: 0 }] }));
-    const cell = [...document.querySelectorAll("span")].find((s) => s.textContent?.includes("5 d left"));
+    const cell = [...document.querySelectorAll("dd")].find((s) => s.textContent?.includes("5 d left"));
     expect(cell?.className).toContain("text-warn-text");
     expect(text()).toContain("none: the profile is not running");
   });
@@ -810,7 +810,7 @@ describe("the domain of a VLESS server", () => {
 describe("who may change the servers on a node", () => {
   const hy = { id: "inb_1", profileId: "prf_1", profileName: "test", protocol: "hysteria2", state: InboundState.ACTIVE, port: 443, tlsServerName: "example.com", certNotAfterUnix: 0, certPinSha256: "", lastError: "" };
   const failed = { ...hy, id: "inb_2", state: InboundState.FAILED, lastError: "listen udp :443: bind: address already in use" };
-  const labels = () => [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
+  const labels = () => [...document.querySelectorAll("button")].map((b) => b.textContent?.trim() || b.getAttribute("aria-label"));
 
   it("the owner has every action", async () => {
     await mount(data({ inbounds: [hy, failed] }));

@@ -104,8 +104,8 @@ describe("the node's Doctor tab", () => {
   it("offers to ask for the first report while there is none", async () => {
     getDoctor.mockResolvedValue({ nowUnix: 1n, nodes: [node({ hasReport: false })] });
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
-    expect(text()).toContain("No report yet");
-    expect(button("Run again")).toBeDefined();
+    expect(text()).toContain("Doctor hasn’t inspected this node yet");
+    expect(button("Inspect")).toBeDefined();
   });
 
   it("groups the checks and runs a fix in two steps: the dry run first, then the confirmed call with its plan id", async () => {
@@ -126,7 +126,7 @@ describe("the node's Doctor tab", () => {
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
 
     expect(text()).toContain("Needs attention");
-    expect(text()).toContain("All good");
+    expect(text()).toContain("1 of 2"); // one problem of two checks
     expect(text()).toContain("baseline differs: journald_file"); // the agent's fact line
 
     await click(button("Restore the base settings"));
@@ -213,8 +213,7 @@ describe("the node's Doctor tab", () => {
       ],
     });
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
-    expect(text()).toContain("/: 50% used, 4.6 GB free, inodes 21%");
-    expect(text()).not.toContain("/ 50% used, 4.6 GB free");
+    expect(text()).toContain("/: 50% used, 4.6 GB free, inodes 21%"); // in words; the agent's own line stands beside it, as the raw reading
     expect(text()).toContain("brand new english line");
     expect(text()).toContain("all 3 control domains resolve, median 4 ms");
   });
@@ -236,9 +235,10 @@ describe("the node's Doctor tab", () => {
     });
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
     const lists = [...document.querySelectorAll("ul")];
-    expect(lists.map((l) => l.querySelectorAll("li").length)).toEqual([3, 1]); // fine, then not checked
-    expect(lists[0]!.textContent).toContain("IPv6");
-    expect(lists[0]!.textContent).not.toContain("Clock"); // the problem is not in the compact list
+    expect(lists.map((l) => l.querySelectorAll("li").length)).toEqual([1, 3]); // the server's, then the network's (the skipped one among them)
+    expect(lists[1]!.textContent).toContain("IPv6");
+    expect(lists[1]!.textContent).toContain("not checked");
+    expect(lists[0]!.textContent).not.toContain("Clock"); // the problem is not in the quiet lists
     expect(text()).toContain("The clock is 5 s off the panel"); // and has its full explanation
   });
 
@@ -334,9 +334,8 @@ describe("the node's Doctor tab", () => {
       ],
     });
     await mount(<NodeDoctorTab nodeId="nod_1" nodeName="de1" />);
-    expect(text()).toContain("Needs attention: 1"); // the accepted warning is not a problem any more
-    expect(text()).toContain("Accepted as normal");
-    expect(text()).toMatch(/Accepted by you on [A-Z][a-z]{2} \d{1,2}\b/);
+    expect(text()).toContain("1 of 2"); // the accepted warning is not a problem any more
+expect(text()).toMatch(/Accepted by you on [A-Z][a-z]{2} \d{1,2}/);
     await click(button("This is normal for this node"));
     expect(acceptDoctorItem).toHaveBeenCalledWith({ nodeId: "nod_1", checkId: "foreign_vpn" });
     await click(button("Count it again"));

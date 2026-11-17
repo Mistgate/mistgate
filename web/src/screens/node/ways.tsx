@@ -7,6 +7,7 @@ import { WaysGraph } from "./ways-graph";
 import { useState, type ReactNode } from "react";
 import { ActionBar, Block, SectionLabel } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
+import { Flag } from "@/components/ui/flag";
 import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
 import { BackButton, DetailCard, useTurns, walkTabs } from "@/components/ui/master-detail";
 import { Modal } from "@/components/ui/modal";
@@ -870,36 +871,48 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
     }
     return { text: t(look.word) };
   };
+  const arrow = (
+    <i
+      aria-hidden
+      className="relative h-px w-[18px] flex-none bg-[color-mix(in_srgb,var(--text)_22%,transparent)] after:absolute after:-top-[3px] after:inset-e-0 after:size-1.5 after:rotate-45 after:border-t after:border-e after:border-[color-mix(in_srgb,var(--text)_30%,transparent)] rtl:-scale-x-100"
+    />
+  );
   return (
-    <section aria-label={t("node.tab.ways")} className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-card border border-line bg-surface px-4 py-3">
-      <SectionLabel as="h2" icon="share" tone="sky" className="me-1">
-        {t("node.tab.ways")}
-      </SectionLabel>
-      <span className="text-xs font-semibold text-muted">{t("ways.peopleShort")}</span>
-      <Icon name="chevronRight" size={14} className="text-faint" aria-hidden />
-      {w.lanes.map((l) => {
-        const note = short(l);
-        const title = l.kind === "direct" ? t("ways.direct") : l.kind === "cdn" ? t("ways.cdn") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : t("ways.ipv6");
-        return (
-          <Link
-            key={l.id}
-            to="/nodes/$id"
-            params={{ id: node.id }}
-            search={{ tab: "ways", way: l.id }}
-            title={note.full ? `${title} · ${t("ways.darkTitle", { list: note.full })}` : undefined}
-            className="inline-flex h-[26px] max-w-full min-w-0 items-center gap-1.5 rounded-xl border border-line px-2.5 text-xs font-bold whitespace-nowrap transition-colors hover:border-accent-line hover:bg-surface-2"
-          >
-            <RingMark ring={l.ring} />
-            <span className="shrink-0">{title}</span>
-            {note.text && <span className={cx("min-w-0 truncate font-semibold", toneText[lookOf(l, w).kind])}>· {note.text}</span>}
-          </Link>
-        );
-      })}
-      <Icon name="chevronRight" size={14} className="text-faint" aria-hidden />
-      <span className="font-mono text-xs font-bold">{node.name}</span>
-      <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "ways" }} className="ms-auto flex items-center gap-1 text-xs font-bold text-accent-text hover:underline">
+    <section aria-label={t("node.tab.ways")} className="no-scrollbar mb-4 flex min-h-12 items-center gap-3 overflow-x-auto rounded-[14px] border border-line bg-surface px-4 py-2">
+      <span className="w-[92px] flex-none text-xs text-muted max-[720px]:w-auto">{t("np.ways")}</span>
+      <span className="inline-flex flex-none items-center gap-2 text-[13px] whitespace-nowrap">
+        {w.cc && <Flag code={w.cc} size={14} className="rounded-[3px]" />}
+        {t("ways.peopleShort")}
+      </span>
+      {arrow}
+      <div className="flex flex-none gap-1.5">
+        {w.lanes.map((l) => {
+          const note = short(l);
+          const title = l.kind === "direct" ? t("ways.direct") : l.kind === "cdn" ? t("ways.cdn") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : t("ways.ipv6");
+          return (
+            <Link
+              key={l.id}
+              to="/nodes/$id"
+              params={{ id: node.id }}
+              search={{ tab: "ways", way: l.id }}
+              title={note.full ? `${title} · ${t("ways.darkTitle", { list: note.full })}` : undefined}
+              className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-[14px] border border-line px-2.5 text-[13px] whitespace-nowrap transition-[border-color,background-color] duration-150 ease-out hover:border-[color-mix(in_srgb,var(--text)_26%,transparent)] hover:bg-step"
+            >
+              <RingMark ring={l.ring} />
+              <span className="shrink-0">{title}</span>
+              {note.text && <span className={cx("min-w-0 truncate", toneText[lookOf(l, w).kind])}>· {note.text}</span>}
+            </Link>
+          );
+        })}
+      </div>
+      {arrow}
+      <span className="inline-flex flex-none items-center gap-2 text-[13px] whitespace-nowrap">
+        <Flag code={node.countryCode} size={14} className="rounded-[3px]" />
+        <b className="font-mono font-medium">{node.name}</b>
+      </span>
+      <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "ways" }} className="ms-auto flex flex-none items-center gap-1 ps-2 text-[13px] text-sec hover:text-fg">
         {t("ways.back")}
-        <Icon name="chevronRight" size={13} />
+        <Icon name="chevronRight" size={13} className="rtl:rotate-180" />
       </Link>
     </section>
   );

@@ -37,7 +37,7 @@ import { FixControl, type FixFlow } from "./fix";
  * What a check looks at, by family: the host's disk, memory and clock sand, the network sky, certificates lavender,
  * the tunnel engines sage. An unknown check (a newer agent) gets no chip. The result's colour stays the status dot's.
  */
-const checkMarks: Record<string, { icon: IconName; tone: Tone }> = {
+export const checkMarks: Record<string, { icon: IconName; tone: Tone }> = {
   disk_space: { icon: "disk", tone: "sand" },
   journald_size: { icon: "disk", tone: "sand" },
   dstate_tasks: { icon: "cpu", tone: "sand" },
@@ -125,29 +125,11 @@ export function useAcceptDoctor() {
 }
 
 /**
- * One doctor item: a status dot, the title (with the node's name on the fleet tab) and its status word, the
- * plain-language reason of a problem, the agent's own fact line, and on the right the fix button or what stands in its
- * place: the copyable command, the WARP card, the steps by hand ("Manual ▾"). A warning can be accepted as normal for
- * the node; an accepted one says by whom and when, with the way back. A row that is fine or skipped is one quiet line.
+ * What one doctor item means and what can be done about it: its kind, whether it is a problem (or accepted as normal), the reason
+ * and the node's fact, the action that fits (the fix, the copyable command, the WARP card, the steps by hand), and whether it can
+ * be accepted. DoctorRow and the node's Doctor tab both read it, so a fix started from either shows its progress on both.
  */
-export function DoctorRow({
-  flow,
-  nodeId,
-  nodeName,
-  item,
-  showNode,
-  first,
-  stale,
-}: {
-  flow: FixFlow;
-  nodeId: string;
-  nodeName: string;
-  item: DoctorItem;
-  showNode?: boolean;
-  first?: boolean;
-  /** The node has not sent a newer report than this (its age as text): the row is greyed out. */
-  stale?: string;
-}) {
+export function useDoctorItem({ flow, nodeId, nodeName, item, stale }: { flow: FixFlow; nodeId: string; nodeName: string; item: DoctorItem; stale?: string }) {
   const t = useT();
   const fmt = useFmt();
   const can = useCan();
@@ -197,6 +179,34 @@ export function DoctorRow({
     );
   else if (issue) action = <Chip>{t("hl.doctor.manual")}</Chip>;
 
+  return { t, fmt, can, accept, me, open, setOpen, kind, accepted, issue, why, fact, command, steps, phase, canAccept, who, action };
+}
+
+/**
+ * One doctor item: a status dot, the title (with the node's name on the fleet tab) and its status word, the
+ * plain-language reason of a problem, the agent's own fact line, and on the right the fix button or what stands in its
+ * place: the copyable command, the WARP card, the steps by hand ("Manual ▾"). A warning can be accepted as normal for
+ * the node; an accepted one says by whom and when, with the way back. A row that is fine or skipped is one quiet line.
+ */
+export function DoctorRow({
+  flow,
+  nodeId,
+  nodeName,
+  item,
+  showNode,
+  first,
+  stale,
+}: {
+  flow: FixFlow;
+  nodeId: string;
+  nodeName: string;
+  item: DoctorItem;
+  showNode?: boolean;
+  first?: boolean;
+  /** The node has not sent a newer report than this (its age as text): the row is greyed out. */
+  stale?: string;
+}) {
+  const { t, fmt, can, accept, me, open, kind, accepted, issue, why, fact, command, steps, phase, canAccept, who, action } = useDoctorItem({ flow, nodeId, nodeName, item, stale });
   return (
     <div
       title={stale ? t("hl.doctor.stale", { age: stale }) : undefined}
@@ -255,7 +265,7 @@ export function DoctorRow({
 }
 
 /** "Manual ▾" opened: each step in words, with the exact command to copy or the button to where it is done. */
-function ManualSteps({ steps, nodeId }: { steps: readonly ManualStep[]; nodeId: string }) {
+export function ManualSteps({ steps, nodeId }: { steps: readonly ManualStep[]; nodeId: string }) {
   const t = useT();
   return (
     <ol className="flex basis-full flex-col gap-2.5 rounded-field border border-line bg-canvas p-3 sm:ms-12">

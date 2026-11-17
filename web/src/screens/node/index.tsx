@@ -5,31 +5,25 @@ import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, Notice } from "@/components/ui/notice";
-import { StatusPill } from "@/components/ui/status";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
-import { InboundState, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
+import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
-import { cx } from "@/lib/cx";
-import { nodeLoad } from "@/lib/node-load";
 import type { Plain } from "@/lib/plain";
-import { useNow } from "@/lib/time";
 import { nodes as nodesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
-import { useFmt } from "@/lib/format";
 import { doctorQuery, isIssue } from "@/lib/health";
-import { agentLinked, nodeKind, useNodeStatus } from "@/lib/node-status";
+import { agentLinked } from "@/lib/node-status";
 import { nodeQuery } from "@/lib/queries";
-import { useOlderNodes } from "@/lib/updates";
-import { warpKind, warpWord } from "@/lib/warp";
+import "./node.css";
 import { StateBanner } from "./banner";
 import { NodeDoctorTab } from "./doctor";
 import { ExitTab } from "./exit";
 import { HistoryTab } from "./history";
+import { NodeHeader } from "./header";
 import { OverviewTab } from "./overview";
 import { ProfilesTab } from "./profiles";
-import { LinkViaLine } from "./relay-way";
 import { ServerTab } from "./server";
 import type { HistoryView, NodeSearch, NodeTab } from "./tabs";
 import { useWays, WaysTab } from "./ways";
@@ -57,61 +51,11 @@ export function NodeScreen() {
   );
 }
 
-/** The WARP chip of the header: coloured by the state like a status pill, and the way to the WARP card. */
-function WarpChip({ node }: { node: NonNullable<Plain<GetNodeResponse>["node"]> }) {
-  const t = useT();
-  const state = node.warp?.state ?? WarpState.UNSPECIFIED;
-  if (state === WarpState.NOT_CONFIGURED || state === WarpState.UNSPECIFIED) return null;
-  const label = node.warp?.colo && state === WarpState.UP ? `WARP · ${node.warp.colo}` : `WARP · ${t(warpWord[state])}`;
-  return (
-    <Link
-      to="/nodes/$id"
-      params={{ id: node.id }}
-      search={{ tab: "exit" }}
-      hash="warp"
-      aria-label={t("node.warpChip", { state: t(warpWord[state]) })}
-      title={t("node.warpChip", { state: t(warpWord[state]) })}
-      className="rounded-xl transition-transform duration-200 hover:-translate-y-px"
-    >
-      <StatusPill kind={warpKind[state]} label={label} sm />
-    </Link>
-  );
-}
-
-/** The load chip of the header: the three-step meter of the user's page, plus the percentage only the admin sees. */
-function LoadChip({ data }: { data: Plain<GetNodeResponse> }) {
-  const t = useT();
-  const now = useNow(10_000);
-  const load = nodeLoad(data.metrics, data.node!.bandwidthMbps, Math.floor(now / 1000));
-  if (!load || !agentLinked(data.node!.status)) return null; // the page counts connected nodes only
-  const fill = { low: 1, medium: 2, high: 3 }[load.level];
-  const high = load.level === "high";
-  return (
-    <span
-      title={t(data.node!.bandwidthMbps > 0 ? "node.loadHint" : "node.loadHintCpu")}
-      className="inline-flex h-[26px] flex-none items-center gap-2 rounded-xl border border-line bg-surface pe-2.5 ps-2 text-xs leading-none font-bold whitespace-nowrap"
-    >
-      <span className="font-semibold text-muted">{t("node.load")}</span>
-      <span aria-hidden className="flex gap-[3px]">
-        {[1, 2, 3].map((n) => (
-          <i key={n} className={cx("block h-[5px] w-3.5 rounded-[3px]", n > fill ? "bg-surface-2" : high ? "bg-warn" : "bg-accent")} />
-        ))}
-      </span>
-      <span className={high ? "text-warn-text" : undefined}>{t(`node.loadLevel.${load.level}`)}</span>
-      <span className="font-mono text-[11px] text-muted">{load.percent}%</span>
-    </span>
-  );
-}
-
 export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
   const t = useT();
-  const fmt = useFmt();
-  const st = useNodeStatus();
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as NodeSearch;
   const node = data.node!;
-  const kind = nodeKind(node);
-  const older = useOlderNodes().has(node.id);
   const doctor = useQuery(doctorQuery(node.id));
   const [restart, setRestart] = useState(false);
   const go = (next: NodeSearch) => void navigate({ to: "/nodes/$id", params: { id: node.id }, search: next, replace: true });
@@ -153,94 +97,23 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
   const items = retired ? all.filter((i) => i.value === "overview" || i.value === "history" || i.value === "server") : all;
   const tab = items.some((i) => i.value === search.tab) ? search.tab! : "overview";
 
-  const actions = (
-    <>
-      {/* a disabled button shows no tooltip: the reason sits on a wrapper */}
-      <span title={restartOff || undefined} className="flex">
-        <Button variant="secondary" size="md" disabled={!!restartOff} onClick={() => setRestart(true)}>
-          {t("node.restart")}
-        </Button>
-      </span>
-      <Button variant="secondary" size="md" onClick={() => setTab("doctor")}>
-        {t("node.doctor")}
-      </Button>
-    </>
-  );
-
   return (
-    <div className="flex flex-col gap-3.5">
+    <div className="nd flex flex-col gap-4">
       {search.from === "map" && (
-        <nav aria-label="breadcrumb" className="flex items-center gap-1.5 text-[12.5px] text-muted">
-          <Link to="/nodes" className="hover:text-fg hover:underline">
+        <nav aria-label="breadcrumb" className="flex items-center gap-1.5 text-[13px] text-muted">
+          <Link to="/nodes" className="text-sec hover:text-fg">
             {t("fm.crumb.nodes")}
           </Link>
-          <span aria-hidden>›</span>
-          <Link to="/nodes" search={{ view: "map", focus: node.id }} className="hover:text-fg hover:underline">
+          <Icon name="chevronRight" size={12} aria-hidden className="rtl:rotate-180" />
+          <Link to="/nodes" search={{ view: "map", focus: node.id }} className="text-sec hover:text-fg">
             {t("fm.crumb.map")}
           </Link>
-          <span aria-hidden>›</span>
-          <span className="font-semibold text-fg">{node.name}</span>
+          <Icon name="chevronRight" size={12} aria-hidden className="rtl:rotate-180" />
+          <span className="font-mono font-normal text-fg">{node.name}</span>
         </nav>
       )}
-      <div className="flex items-start gap-3">
-        <Link
-          to="/nodes"
-          aria-label={t("node.back")}
-          className="inline-flex size-9 flex-none items-center justify-center rounded-ctl border border-line bg-surface text-fg transition-transform duration-200 hover:-translate-x-0.5 rtl:hover:translate-x-0.5"
-        >
-          <Icon name="back" />
-        </Link>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="flex h-[22px] items-center rounded-[7px] bg-surface-2 px-[7px] font-mono text-[11px] font-bold text-muted">
-              {node.countryCode || "—"}
-            </span>
-            <h1 className="text-2xl leading-none font-extrabold tracking-[-0.04em] md:text-[28px]">{node.name}</h1>
-            <StatusPill kind={kind} label={st.word(node)} />
-            <WarpChip node={node} />
-            <LoadChip data={data} />
-          </div>
-          {/* each piece keeps together; a piece that starts a line has its "·" clipped, so no line starts or ends with one */}
-          <p className="overflow-hidden text-xs text-muted">
-            <span className="-ms-3.5 flex flex-wrap">
-              {[
-                node.location || fmt.country(node.countryCode),
-                node.provider,
-                <span key="address" className="font-mono">
-                  {node.address}
-                </span>,
-                node.agentVersion && (
-                  <span key="agent">
-                    {t("node.agent")} <span className="font-mono">{node.agentVersion}</span>
-                  </span>
-                ),
-                older && (
-                  <Link key="outdated" to="/updates" className="font-semibold text-warn-text underline decoration-dotted underline-offset-2">
-                    {t("up.node.outdated")}
-                  </Link>
-                ),
-              ]
-                .filter(Boolean)
-                .map((piece, i) => (
-                  <span key={i} className="whitespace-nowrap before:inline-block before:w-3.5 before:text-center before:content-['·']">
-                    {piece}
-                  </span>
-                ))}
-            </span>
-          </p>
-        </div>
-        {!retired && <div className="flex gap-2 max-lg:hidden">{actions}</div>}
-      </div>
-      {/* below 1024 px the buttons take a row of their own under the meta line, as on the phone */}
-      {!retired && (
-        <div className="flex flex-col gap-1.5 lg:hidden">
-          <div className="flex gap-2">{actions}</div>
-          {restartOff && <p className="text-xs text-muted">{restartOff}</p>}
-        </div>
-      )}
+      <NodeHeader data={data} doctorN={issues} restartOff={restartOff} onRestart={() => setRestart(true)} onDoctor={() => setTab("doctor")} />
 
-      {/* the agent reaches the panel through an entry's bridge (R4): a fallback path, and the way back is its own */}
-      {!retired && <LinkViaLine viaNodeId={node.linkViaNodeId} />}
       <StateBanner data={data} tab={tab} onTab={setTab} onRestart={() => setRestart(true)} />
 
       <Tabs
@@ -248,7 +121,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
         items={items}
         value={tab}
         onValueChange={setTab}
-        className="[&>div:first-child]:-mx-4 [&>div:first-child]:px-4 md:[&>div:first-child]:mx-0 md:[&>div:first-child]:px-0"
+        className="mt-1 [&>div:first-child]:-mx-4 [&>div:first-child]:px-4 md:[&>div:first-child]:mx-0 md:[&>div:first-child]:px-0"
       />
       {restart && <RestartModal onClose={() => setRestart(false)} data={data} />}
     </div>

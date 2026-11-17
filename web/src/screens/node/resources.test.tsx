@@ -52,32 +52,36 @@ describe("the Resources card", () => {
   it("splits the CPU and the memory and shows the meters", async () => {
     await mount(<ResourcesCard metrics={metrics} cpus={2} />);
     const text = host!.textContent!;
-    expect(text).toContain("60% busy · 2 vCPU");
-    for (const part of ["Mistgate20%", "Kernel networking10%", "Steal5%", "Everything else25%"]) expect(text).toContain(part);
+    expect(text).toContain("60%"); // the busy share, the big number of the CPU block
+    expect(text).toContain("2 vCPU · load 1.2");
+    for (const part of ["Mistgate 20%", "Kernel networking 10%", "Steal 5%", "Everything else 25%"]) expect(text).toContain(part);
     expect(text).toContain("Waiting for the disk: 3%");
     expect(text).toContain("256 MB"); // the agent's resident memory
     expect(text).toContain("Swap: 64 MB of 1 GB");
-    expect(text).toContain("900 of 1,000"); // connection tracking
-    expect(text).toContain("310 of 65,536"); // open files
+    expect(text).toContain("900"); // connection tracking, with what it is of
+    expect(text).toContain("of 1,000");
+    expect(text).toContain("310");
+    expect(text).toContain("of 65,536");
     expect(text).toContain("TCP 140 · UDP 12");
     expect(text).toContain("420 goroutines");
     expect(text).toContain("120 Mbit/s of 1,000 Mbit/s"); // the busier direction against the link
-    // connection tracking at 90% is a warning meter
-    const meter = host!.querySelector("[aria-label='Connection tracking: 90%'] span");
-    expect(meter?.className).toContain("bg-warn");
+    // connection tracking at 90% is a warning meter: its fill is the amber
+    const bars = [...host!.querySelectorAll<HTMLElement>("dl i.nd-bar")];
+    expect(bars[0]?.style.getPropertyValue("--fill")).toBe("var(--warning)");
+    expect(bars[0]?.style.getPropertyValue("--w")).toBe("90%");
   });
 
-  it("asks for an agent update instead of zeros", async () => {
+  it("asks for an agent update instead of splitting what it cannot split", async () => {
     await mount(<ResourcesCard metrics={{ ...metrics, agent: undefined, stealPct: 0, conntrackMax: 0 }} cpus={2} />);
     const text = host!.textContent!;
     expect(text).toContain("Update the agent to see");
-    expect(text).not.toContain("0%");
+    expect(text).not.toContain("Kernel networking");
     expect(text).not.toContain("Connection tracking");
   });
 
-  it("is not drawn without readings, and leaves out what is not known", async () => {
+  it("says there are no readings, and leaves out what is not known", async () => {
     await mount(<ResourcesCard metrics={undefined} cpus={2} />);
-    expect(host!.textContent).toBe("");
+    expect(host!.textContent).toContain("No readings yet");
     act(() => root!.unmount());
     host!.remove();
     await mount(<ResourcesCard metrics={{ ...metrics, nicSpeedMbps: 0, conntrackMax: 0, conntrackCount: 0 }} cpus={0} />);
@@ -85,6 +89,14 @@ describe("the Resources card", () => {
     expect(text).not.toContain("Link");
     expect(text).toContain("Not loaded");
     expect(text).not.toContain("vCPU");
+  });
+
+  it("dims what a node that went quiet last said, and says since when", async () => {
+    await mount(<ResourcesCard metrics={metrics} cpus={2} offlineSince={1_800_000_000} />);
+    const text = host!.textContent!;
+    expect(text).toContain("Node not responding");
+    expect(text).toContain("The node has been offline since");
+    expect(text).not.toContain("Connection tracking"); // the meters are for a live node
   });
 });
 
@@ -102,18 +114,17 @@ describe("the load history", () => {
     nodes.getNodeHostHistory.mockResolvedValue({ nodeId: "nod_1", nodeName: "de1", nowUnix: BigInt(now), sinceUnix: 0n, hours: hours(true) });
     await mount(<LoadHistory nodeId="nod_1" />);
     expect(nodes.getNodeHostHistory).toHaveBeenCalledWith({ nodeId: "nod_1", hours: 24 }, expect.anything());
-    expect(host!.textContent).toContain("Load history");
     expect(host!.textContent).toContain("33%"); // the busiest hour's mean, 10 + 23
-    expect(radios()).toEqual(["CPU", "People", "Steal", "Mistgate"]);
+    expect(radios()).toEqual(["CPU", "People", "Steal", "Mistgate", "Traffic"]);
 
     act(() => root!.unmount());
     host!.remove();
     nodes.getNodeHostHistory.mockResolvedValue({ nodeId: "nod_1", nodeName: "de1", nowUnix: BigInt(now), sinceUnix: 0n, hours: hours(false) });
     await mount(<LoadHistory nodeId="nod_1" />);
-    expect(radios()).toEqual(["CPU", "People"]);
+    expect(radios()).toEqual(["CPU", "People", "Traffic"]);
   });
 
-  it("is not drawn on the Cloudflare edition or without hours", async () => {
+  it("is not drawn on the Cloudflare edition, and a node without hours says the chart is coming", async () => {
     nodes.getNodeHostHistory.mockRejectedValue(new ConnectError("not available on this edition", Code.Unimplemented));
     await mount(<LoadHistory nodeId="nod_1" />);
     expect(host!.textContent).toBe("");
@@ -121,6 +132,7 @@ describe("the load history", () => {
     host!.remove();
     nodes.getNodeHostHistory.mockResolvedValue({ nodeId: "nod_1", nodeName: "de1", nowUnix: BigInt(now), sinceUnix: 0n, hours: [] });
     await mount(<LoadHistory nodeId="nod_1" />);
-    expect(host!.textContent).toBe("");
+    // a young node has no hours yet: the card says when the chart comes
+    expect(host!.textContent).toContain("The chart appears in an hour");
   });
 });
