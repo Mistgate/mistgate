@@ -395,7 +395,7 @@ describe("the preview", () => {
     await debounced();
     await click(buttonWith("bob"));
     await debounced();
-    expect((previewMihomoTemplate.mock.calls.at(-1)?.[0] as { userId: string }).userId).toBe("usr_bob");
+    expect((previewMihomoTemplate.mock.calls.at(-1)![0] as { userId: string }).userId).toBe("usr_bob");
     expect(document.querySelector(".mt-res")!.textContent).toContain(en["sx.hx.m.rNoGrp"].split("{")[0]!);
   });
   it("has nobody to preview for: says so and does not ask", async () => {

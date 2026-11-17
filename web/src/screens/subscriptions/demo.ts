@@ -26,6 +26,8 @@ export type HxDemo = {
   names?: boolean;
   /** The panel's own words about a failed save. */
   fail?: string;
+  /** The panel's refusal of a save, as the form holds it (`k`: the row it names; none: the whole list). */
+  refusal?: { text: string; line?: number; k?: number };
   /** Click another tab once the screen stands (the question "Leave without saving?"). */
   leave?: boolean;
 };

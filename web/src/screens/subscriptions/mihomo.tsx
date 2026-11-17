@@ -80,7 +80,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
   const keys = useRef(first.length);
   const [rows, setRows] = useState<Row[]>(() => first.map((x, k) => ({ ...x, k })));
   const [sel, setSel] = useState<number | null>(() => (hxDemo.open !== undefined ? hxDemo.open : start));
-  const [refusal, setRefusal] = useState<(Refusal & { k?: number }) | null>(null);
+  const [refusal, setRefusal] = useState<(Refusal & { k?: number }) | null>(() => hxDemo.refusal ?? null);
   const [asking, setAsking] = useState<number | null>(() => hxDemo.ask ?? null);
   const [fileErr, setFileErr] = useState<number | null>(() => (hxDemo.fileErr ? (hxDemo.open ?? start) : null));
   const [picked, setPicked] = useState(() => hxDemo.who ?? "");
@@ -158,15 +158,16 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
 
   function onSave() {
     const out = rows.map((r) => ({ name: r.name.trim(), yaml: r.yaml, groupIds: known ? r.groupIds.filter((g) => known.includes(g)) : [...r.groupIds] }));
+    onKeep(i < 0 ? null : i); // before the save: the form starts again when the new settings arrive, which is before the save answers
     save
       .mutateAsync((c) => ({ ...c, mihomoTemplates: out }))
       .then(() => {
-        onKeep(i < 0 ? null : i);
         setDone(true);
         toast(t("subs.saved"));
         halo("save");
       })
       .catch((e: unknown) => {
+        onShown();
         const f = refusalOf(e, t);
         const row = f.index !== undefined ? rows[f.index] : undefined;
         setRefusal({ text: f.text, ...(f.line && { line: f.line }), ...(row && { k: row.k }) });

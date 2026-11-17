@@ -536,6 +536,10 @@
 }
 
 /* ---- what the product has beyond the board, built from the same rules */
+.sbp .hx-tab .an-i.mono {
+  direction: ltr;
+  text-align: start;
+}
 .sbp .hx-h .mono.bad {
   color: var(--danger);
 }

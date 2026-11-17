@@ -32,9 +32,9 @@ export function Nothing({ title, text }: { title: ReactNode; text: ReactNode }) 
 }
 
 /** The head of a row: its number, what it is (`children`, the lines of `.hx-kv`), a word at the end and the chevron. The whole is the button that unfolds it. */
-export function RowHead({ n, open, onToggle, meta, metaClass, label, children }: { n: number; open: boolean; onToggle: () => void; meta: ReactNode; metaClass?: string; label?: string; children: ReactNode }) {
+export function RowHead({ n, open, onToggle, meta, metaClass, children }: { n: number; open: boolean; onToggle: () => void; meta: ReactNode; metaClass?: string; children: ReactNode }) {
   return (
-    <button type="button" className="hx-rh" aria-expanded={open} aria-label={label} onClick={onToggle}>
+    <button type="button" className="hx-rh" aria-expanded={open} onClick={onToggle}>
       <span className="hx-i mono">{n}</span>
       <span className="hx-kv">{children}</span>
       <span className={cx("hx-meta", metaClass)}>{meta}</span>

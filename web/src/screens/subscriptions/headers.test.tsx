@@ -312,7 +312,7 @@ describe("Response headers tab", () => {
     await click(buttonWith("sing-box"));
     await act(async () => void (await new Promise((r) => setTimeout(r, 400))));
     await settle();
-    expect((previewResponseHeaders.mock.calls.at(-1)?.[0] as { userAgent: string }).userAgent).toMatch(/SFA|sing-box/);
+    expect((previewResponseHeaders.mock.calls.at(-1)![0] as { userAgent: string }).userAgent).toMatch(/SFA|sing-box/);
     expect(buttonWith("sing-box").getAttribute("aria-pressed")).toBe("true");
     expect(buttonWith("alice").getAttribute("aria-pressed")).toBe("true");
   });

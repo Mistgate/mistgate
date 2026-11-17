@@ -127,15 +127,16 @@ function HeadersForm({ settings, reserved, carry, onCarry }: { settings: Setting
 
   function onSave() {
     const at = rows.findIndex((r) => r.k === open);
+    onCarry({ open: at < 0 ? null : at, saved: true }); // before the save: the form starts again when the new settings arrive, which is before the save answers
     save
       .mutateAsync((cur) => ({ ...cur, responseHeaders: rows.map((r) => headerToSave(strip(r), known)) }))
       .then(() => {
-        onCarry({ open: at < 0 ? null : at, saved: true });
         setDone(true);
         toast(t("subs.saved"));
         halo("save");
       })
       .catch((e: unknown) => {
+        onCarry(null);
         setFail(errorText(e, t));
         toast.error(errorText(e, t));
       });
@@ -248,7 +249,7 @@ function HeaderRow({ row, n, last, open, messages, groups, known, t, onToggle, o
   const sent = 7 + 4 * Math.ceil(utf8.encode(row.value.trim()).length / 3);
   return (
     <div className={cx("hx-r", failed && "bad", open && "on")}>
-      <RowHead n={n} open={open} onToggle={onToggle} meta={meta} label={`${n}. ${row.name.trim() || t("sx.hx.h.noName")}`}>
+      <RowHead n={n} open={open} onToggle={onToggle} meta={meta}>
         <b className="mono">{row.name.trim() || t("sx.hx.h.noName")}</b>
         <span className="mono">{row.value || t("sx.hx.h.noValue")}</span>
         {!open && messages[0] && <em className={messages[0].bad ? "bad" : undefined}>{messages[0].head ?? messages[0].text}</em>}
