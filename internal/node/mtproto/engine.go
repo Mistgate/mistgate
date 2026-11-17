@@ -487,9 +487,14 @@ func (e *Engine) start(ctx context.Context, in *inbound, creds []mp.Credential) 
 	if err != nil {
 		return err
 	}
-	ln, err := listen("tcp", addr)
-	if err != nil {
-		return err
+	var ln net.Listener
+	if e.env.SharedListener != nil {
+		ln = e.env.SharedListener(in.spec.ID, port)
+	}
+	if ln == nil {
+		if ln, err = listen("tcp", addr); err != nil {
+			return err
+		}
 	}
 	in.ctx, in.cancel = context.WithCancel(context.Background())
 	in.server, in.ln = srv, ln
