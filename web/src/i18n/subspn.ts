@@ -39,6 +39,11 @@ export const en = {
   "subs.devLimit.strictHint": "As “Limit”, and apps without a device ID cannot connect",
   "cc.col.state": "By the table",
   "cc.act.sub": "for {days} d",
+  "sx.texts.nameHint": "A WARP copy keeps the “· WARP” mark. A number is added only if the whole name matches.",
+  "subs.texts.intervalHint": "How often the app downloads the subscription again",
+  "subs.texts.pingHint.tcp": "A TCP connection to each server’s port; the delay shows in ms. Other apps ignore this setting",
+  "subs.texts.pingHint.default": "Happ pings the way chosen in Happ itself. Other apps don’t read this setting.",
+  "subs.texts.pingOpenHint": "Happ checks every server each time it starts",
 };
 
 export const ru: typeof en = {
@@ -79,6 +84,11 @@ export const ru: typeof en = {
   "subs.devLimit.strictHint": "Как «Ограничивать», и приложения без ID устройства не подключаются",
   "cc.col.state": "По таблице",
   "cc.act.sub": "за {days} дн",
+  "sx.texts.nameHint": "У WARP-копии останется отметка «· WARP». Номер добавится, только если совпадёт всё название.",
+  "subs.texts.intervalHint": "Как часто приложение заново скачивает подписку",
+  "subs.texts.pingHint.tcp": "TCP-подключение к порту каждого сервера, задержка в мс. Другие приложения эту настройку не читают",
+  "subs.texts.pingHint.default": "Happ пингует так, как выбрано в нём самом. Другие приложения эту настройку не читают.",
+  "subs.texts.pingOpenHint": "Happ проверяет все серверы при каждом запуске",
 };
 
 export const zh: typeof en = {
@@ -119,6 +129,11 @@ export const zh: typeof en = {
   "subs.devLimit.strictHint": "与「限制」相同，且未提供设备 ID 的应用无法连接",
   "cc.col.state": "按表格",
   "cc.act.sub": "{days} 天内",
+  "sx.texts.nameHint": "WARP 副本会保留“· WARP”标记。仅当名称完全相同时才会追加编号。",
+  "subs.texts.intervalHint": "应用多久重新下载一次订阅",
+  "subs.texts.pingHint.tcp": "与每台服务器的端口建立 TCP 连接，延迟以 ms 显示。其他应用不读取此设置",
+  "subs.texts.pingHint.default": "Happ 按其自身的设置进行 ping。其他应用不读取此设置。",
+  "subs.texts.pingOpenHint": "Happ 每次启动时检测所有服务器",
 };
 
 export const fa: typeof en = {
@@ -159,6 +174,11 @@ export const fa: typeof en = {
   "subs.devLimit.strictHint": "مثل «محدود کردن»، و برنامه‌هایی که شناسهٔ دستگاه نمی‌فرستند نمی‌توانند وصل شوند",
   "cc.col.state": "طبق جدول",
   "cc.act.sub": "در {days} روز",
+  "sx.texts.nameHint": "کپی WARP نشان «· WARP» را نگه می‌دارد. شماره فقط وقتی اضافه می‌شود که کل نام یکی باشد.",
+  "subs.texts.intervalHint": "برنامه هر چند وقت یک بار اشتراک را دوباره دانلود می‌کند",
+  "subs.texts.pingHint.tcp": "یک اتصال TCP به پورت هر سرور؛ تأخیر به میلی‌ثانیه نشان داده می‌شود. برنامه‌های دیگر این تنظیم را نادیده می‌گیرند",
+  "subs.texts.pingHint.default": "Happ همان‌طور که در خودش انتخاب شده پینگ می‌کند. برنامه‌های دیگر این تنظیم را نمی‌خوانند.",
+  "subs.texts.pingOpenHint": "Happ هر بار که اجرا می‌شود همهٔ سرورها را بررسی می‌کند",
 };
 
 export const tr: typeof en = {
@@ -199,4 +219,9 @@ export const tr: typeof en = {
   "subs.devLimit.strictHint": "“Sınırla” gibi; ayrıca cihaz kimliği olmayan uygulamalar bağlanamaz",
   "cc.col.state": "Tabloya göre",
   "cc.act.sub": "{days} gün için",
+  "sx.texts.nameHint": "WARP kopyasında «· WARP» işareti kalır. Numara yalnızca adın tamamı çakışırsa eklenir.",
+  "subs.texts.intervalHint": "Uygulamanın aboneliği ne sıklıkla yeniden indireceği",
+  "subs.texts.pingHint.tcp": "Her sunucunun portuna bir TCP bağlantısı; gecikme ms olarak gösterilir. Diğer uygulamalar bu ayarı yok sayar",
+  "subs.texts.pingHint.default": "Happ, kendi içinde seçildiği şekilde ping atar. Diğer uygulamalar bu ayarı okumaz.",
+  "subs.texts.pingOpenHint": "Happ her açılışta tüm sunucuları kontrol eder",
 };

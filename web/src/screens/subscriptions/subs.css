@@ -2202,3 +2202,54 @@
   background: var(--warning-soft);
   color: var(--warning);
 }
+
+/* the strip that saves a form of several cards: it opens under them while something is not saved (the board's .sv-save, in a card of its own) */
+.sbp .sb-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-height: 0;
+  padding: 0 20px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text) 3%, var(--surface));
+  transition: max-height .3s var(--e), padding .3s var(--e), border-color .3s var(--e);
+}
+.sbp .sb-save.on {
+  max-height: 72px;
+  padding: 12px 12px 12px 20px;
+  border-color: var(--border);
+}
+.sbp .sb-save > span {
+  margin-inline-end: auto;
+  font-size: 13px;
+  color: var(--warning);
+}
+@media (width <= 720px) {
+  .sbp .sb-save.on {
+    flex-wrap: wrap;
+    max-height: 120px;
+    padding-inline: 16px;
+  }
+  .sbp .sb-save.on > span {
+    flex: 1 1 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sbp .sb-save {
+    transition: none;
+  }
+}
+/* the update interval stepper is a field-sized control */
+.sbp .sb-step {
+  width: 130px;
+}
+.sbp .sb-ta {
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+}
+.sbp .sb-pha {
+  white-space: pre-line;
+}

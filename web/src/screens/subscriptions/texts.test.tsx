@@ -36,7 +36,7 @@ async function mount(data: Parameters<typeof TextsTab>[0]["data"]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () => root!.render(<QueryClientProvider client={qc}><TextsTab data={data} /></QueryClientProvider>));
 }
-const rows = () => [...document.querySelectorAll("[aria-live=polite] > div")].map((r) => r.textContent?.trim());
+const rows = () => [...document.querySelectorAll("[aria-live=polite] > div")].map((r) => [...r.children].map((c) => c.textContent?.trim()).join(" · "));
 const type = (el: HTMLInputElement | HTMLTextAreaElement, v: string) =>
   act(async () => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -78,8 +78,8 @@ describe("the preview of names and texts", () => {
     expect(count().textContent).toBe("0 / 200 — столько видно в Happ");
     await type(document.querySelector<HTMLTextAreaElement>("#subs-announce")!, "обновляю серверы ".repeat(15).trim());
     expect(count().textContent).toBe("254 / 200 — в Happ видно только начало");
-    expect(count().className).toContain("text-warn-text");
-    const shown = document.querySelector(".whitespace-pre-line")!.textContent!;
+    expect(count().className).toContain("bad");
+    const shown = document.querySelector(".sb-pha")!.textContent!;
     expect(shown.endsWith(" обновляю…")).toBe(true); // the cut fell inside "серверы": back to the word before
     expect([...shown].length).toBeLessThanOrEqual(200);
   });
@@ -89,15 +89,15 @@ describe("how Happ pings the servers", () => {
   const api = subscriptions as unknown as { getSubscriptionSettings: ReturnType<typeof vi.fn>; updateSubscriptionSettings: ReturnType<typeof vi.fn> };
   const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent === label);
-  const onOpen = () => [...document.querySelectorAll("label")].find((l) => l.textContent?.includes("Пинговать при открытии"))!;
-  const toggle = () => onOpen().querySelector<HTMLElement>("[role=switch]")!;
+  const toggle = () => document.querySelector<HTMLElement>("[role=switch][aria-label='Пинговать при открытии']")!;
+  const onOpen = () => toggle().closest(".sb-tg")!;
 
   it("leaves it to the app by default, and saves TCP with the ping on open", async () => {
     api.getSubscriptionSettings.mockResolvedValue({ settings: settings(), effectiveTitle: "Mistgate" });
     api.updateSubscriptionSettings.mockImplementation(async (r: { settings: Settings }) => ({ settings: r.settings }));
     await mount({ settings: settings(), effectiveTitle: "Mistgate" });
     expect(radio("Как в приложении")?.getAttribute("aria-checked")).toBe("true");
-    expect(document.body.textContent).toContain("Решает Happ, панель ничего не отправляет.");
+    expect(document.body.textContent).toContain("Happ пингует так, как выбрано в нём самом.");
     // the switch means nothing without a ping type: it is off and says why
     expect(toggle().hasAttribute("data-disabled")).toBe(true);
     expect(onOpen().textContent).toContain("Только с TCP");
@@ -118,6 +118,6 @@ describe("how Happ pings the servers", () => {
     await mount({ settings: settings({ happPing: HappPing.TCP, happPingOnOpen: true }), effectiveTitle: "Mistgate" });
     expect(radio("TCP")?.getAttribute("aria-checked")).toBe("true");
     expect(toggle().getAttribute("aria-checked")).toBe("true");
-    expect(document.body.textContent).not.toContain("Сохранить"); // nothing changed yet
+    expect(document.querySelector(".sb-save")!.classList.contains("on")).toBe(false); // nothing changed yet
   });
 });
