@@ -177,7 +177,7 @@ function SideLink({ s, rail, active, meta }: { s: Section; rail: boolean; active
       aria-current={active ? "page" : undefined}
       style={toneVar(s.id)}
       className={cx(
-        "group/ni relative flex h-10 items-center rounded-field text-sm text-sec outline-none transition-colors duration-150 ease-out hover:bg-step hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-mark",
+        "group/ni relative flex h-10 shrink-0 items-center rounded-field text-sm text-sec outline-none transition-colors duration-150 ease-out hover:bg-step hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-mark",
         rail ? "w-11 justify-center" : "w-full gap-3 px-2",
         active && cx("bg-surface-2 font-medium text-fg", marker, rail ? "before:inset-s-[-14px]" : "before:inset-s-[-12px]"),
       )}
@@ -321,14 +321,14 @@ export function Sidebar({ current, defaultOwnerOpen }: { current?: SectionId; de
         )}
       </div>
       {/* the marker of the current row sits 12px outside it: the list is padded to make room, so its scrolling cannot cut it */}
-      <nav aria-label={t("nav.main")} className={cx("shell-in -mx-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3", rail && "items-center")}>
+      <nav aria-label={t("nav.main")} className={cx("shell-in -mx-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 [scrollbar-width:thin]", rail && "items-center")}>
         {sections.map((s) => (
           <div key={s.id} className="contents">
             {"group" in s &&
               (rail ? (
                 <div aria-hidden className="mx-1.5 my-2.5 h-px self-stretch bg-line" />
               ) : (
-                <div className="mt-3 border-t border-line px-2 pt-4 pb-2 text-xs leading-4 text-muted">{t(s.group)}</div>
+                <div className="mt-3 shrink-0 border-t border-line px-2 pt-4 pb-2 text-xs leading-4 text-muted">{t(s.group)}</div>
               ))}
             <SideLink s={s} rail={rail} active={isCurrent(s)} meta={meta} />
           </div>
