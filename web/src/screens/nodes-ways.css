@@ -188,9 +188,6 @@
 
 /* narrow: the head is a strip of entry cards, a row is a card whose cells are labelled lines */
 @container rwm (max-width: 720px) {
-  .rw-mx {
-    overflow-x: hidden;
-  }
   .rw-row {
     display: flex;
     flex-direction: column;

@@ -101,7 +101,8 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
   const checksOn = !edge && !off("health_checks");
   const checksQ = useQuery({ ...checksQuery(""), enabled: checksOn });
   const asked = useQuery({ ...countryQuery, enabled: owner }).data?.country;
-  const column = checksOn ? countryColumn(checksQ.data?.countryChecks) : null;
+  const checksData = checksQ.data;
+  const column = useMemo(() => (checksOn ? countryColumn(checksData?.countryChecks) : null), [checksOn, checksData]);
   const audience = column?.code || asked || "RU";
   const nowS = Math.floor(useNow() / 1000);
   const nodesIn: FleetNodeIn[] = useMemo(

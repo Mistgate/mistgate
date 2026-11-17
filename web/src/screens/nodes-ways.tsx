@@ -50,6 +50,7 @@ export type WaysViewProps = {
 export type WaysDemo = { filter?: WayFilter; open?: string; sheet?: PairStart };
 
 const tile = "grid size-11 place-items-center rounded-[14px] bg-step text-sec";
+const lk = "text-fg underline decoration-line underline-offset-4 hover:decoration-current";
 const noteBox = "m-0 my-3 flex items-center gap-2 rounded-[12px] border border-line px-4 py-3 text-[13px] text-sec";
 
 export function WaysView(p: WaysViewProps) {
@@ -107,7 +108,7 @@ export function WaysView(p: WaysViewProps) {
       </div>
       {ready && (
         <FilterChips
-          className="mt-3 max-md:flex-nowrap max-md:overflow-x-auto"
+          className="mt-3 max-md:flex-nowrap max-md:overflow-x-auto max-md:[scrollbar-width:none]"
           aria-label={t("nw.view")}
           value={filter}
           onValueChange={setFilter}
@@ -119,19 +120,19 @@ export function WaysView(p: WaysViewProps) {
           const note = e.entry?.offline ? "off" : e.entry?.hidden ? "hid" : null;
           if (!note) return null;
           return (
-            <Note key={e.nodeId} tone="bad" link={<Link to="/nodes/$id" params={{ id: e.nodeId }} className="an-lk">{t(note === "off" ? "nw.note.off.btn" : "nw.note.hid.btn")}</Link>}>
+            <Note key={e.nodeId} tone="bad" link={<Link to="/nodes/$id" params={{ id: e.nodeId }} className={lk}>{t(note === "off" ? "nw.note.off.btn" : "nw.note.hid.btn")}</Link>}>
               {t(note === "off" ? "nw.note.off" : "nw.note.hid", { entry: e.name, country })}
             </Note>
           );
         })}
       {data === "ready" &&
         old.map((e) => (
-          <Note key={e.nodeId} tone="part" link={<Link to="/updates" className="an-lk">{t("nw.note.old.btn")}</Link>}>
+          <Note key={e.nodeId} tone="part" link={<Link to="/updates" className={lk}>{t("nw.note.old.btn")}</Link>}>
             {t("nw.note.old", { entry: e.name })}
           </Note>
         ))}
       {ready && stale > 0 && (
-        <Note tone="none" link={<Link to="/reachability" className="an-lk">{t("nw.emp.src")}</Link>}>
+        <Note tone="none" link={<Link to="/reachability" className={lk}>{t("nw.emp.src")}</Link>}>
           {t.n("nw.note.stale", stale, { country })}
         </Note>
       )}

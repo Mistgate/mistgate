@@ -213,6 +213,8 @@ export function PairSheet(p: PairSheetProps) {
   const last = exit.direct.tone !== "ok" && !exit.pairs.some((x) => x.entryId !== pair.entryId);
   const hasAwg = rs.some((r) => r.protocol === "amneziawg");
   const checking = rs.some((r) => runs.busy[r.id] !== undefined);
+  // a check the panel did not take (not the failed result of one, which the pair says by itself)
+  const note = rs.map((r) => runs.notes[r.id]).find(Boolean);
 
   return (
     <aside aria-label={t("nw.d.aria")} className="rw-dr flex flex-col rounded-card border border-line">
@@ -225,7 +227,7 @@ export function PairSheet(p: PairSheetProps) {
             <span className="font-mono font-medium tabular-nums">{pair.entryName}</span>
           </b>
         </div>
-        <StatusPill sm kind={pill[0]} label={pill[1]} />
+        <StatusPill kind={pill[0]} label={pill[1]} />
         <button type="button" aria-label={t("common.close")} onClick={p.onClose} className="grid size-8 place-items-center rounded-ctl text-sec transition-colors duration-150 ease-out hover:bg-step hover:text-fg">
           <Icon name="x" size={16} />
         </button>
@@ -250,7 +252,7 @@ export function PairSheet(p: PairSheetProps) {
             {checking ? t("nw.m.checking") : t("nw.m.check")}
           </Button>
         </div>
-        <small className="block text-xs text-muted">{t("nw.m.hint")}</small>
+        <small className="block text-[11px] text-muted">{t("nw.m.hint")}</small>
         <p className="m-0 text-[13px] leading-[18px] text-sec">{bridge ? t("nw.m.how.bridge", n) : t("nw.m.how.fwd", n)}</p>
         {rows.length > 0 && (
           <dl className="m-0 mt-1 grid">
@@ -338,7 +340,11 @@ export function PairSheet(p: PairSheetProps) {
             <small className="text-xs text-muted">{speed === "done" ? t("nw.sp.done", n) : t("nw.sp.hint", n)}</small>
           </div>
         )}
-        {error != null && <p role="alert" className="m-0 text-[13px] text-danger-text">{errorText(error, t)}</p>}
+        {(error != null || note) && (
+          <p role="alert" className="m-0 text-[13px] text-danger-text">
+            {error != null ? errorText(error, t) : note}
+          </p>
+        )}
       </div>
 
       <div className={sec}>
@@ -376,7 +382,7 @@ export function PairSheet(p: PairSheetProps) {
             <Button size="md" onClick={() => setAsking(false)}>
               {t("common.cancel")}
             </Button>
-            <Button size="md" variant="danger" onClick={() => void remove()}>
+            <Button size="md" variant="outline" className="border-danger! text-danger-text! hover:bg-danger-soft!" onClick={() => void remove()}>
               {t("relay.remove")}
             </Button>
           </div>

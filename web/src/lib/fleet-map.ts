@@ -249,7 +249,7 @@ export type NodeWays = {
   noWay: boolean;
   /** Closed and the pairs are all through dead entries: the first and why. */
   deadBy?: { entry: string; why: "offline" | "hidden" };
-  /** An entry's (a node with no servers that takes relays, or that could): `passes` exits go through it, `broken` of them with a relay down. */
+  /** An entry's (a node with no servers that takes relays, or that could; or one that serves and passes relays on): `passes` exits go through it, `broken` of them with a relay down. */
   entry?: { offline: boolean; hidden: boolean; oldAgent: boolean; passes: number; broken: number };
   /** Days the node's measurement is old, when over a day; 0 when it is fresh or there is none. */
   staleDays: number;
@@ -360,14 +360,22 @@ export function fleetWays(w: WaysIn): FleetWays {
     }
     const serves = role === "serve" || role === "mixed";
     const takes = role === "entry" || (role === "idle" && !!w.country && n.countryCode === w.country);
-    if (takes && !serves) {
+    // what a node that passes relays on is as an entry: down, not seen, old, and the exits that go through it
+    const asEntry = () => {
       const bySrc = new Map<string, RelayMsg[]>();
       for (const r of relays) if (r.viaNodeId === n.id) bySrc.set(r.exitNodeId, [...(bySrc.get(r.exitNodeId) ?? []), r]);
-      const broken = [...bySrc.values()].filter((rs) => rs.some((r) => relayState(r) === "failed")).length;
       const offline = down(n.id);
-      const hidden = !offline && d.tone === "bad";
-      const oldAgent = [...bySrc.values()].some((rs) => rs.some((r) => !r.agentSupported));
-      byNode.set(n.id, { ...base, tone: offline || hidden ? "bad" : oldAgent && d.tone === "ok" ? "part" : d.tone, kind: "entry", entry: { offline, hidden, oldAgent, passes: bySrc.size, broken } });
+      return {
+        offline,
+        hidden: !offline && d.tone === "bad",
+        oldAgent: [...bySrc.values()].some((rs) => rs.some((r) => !r.agentSupported)),
+        passes: bySrc.size,
+        broken: [...bySrc.values()].filter((rs) => rs.some((r) => relayState(r) === "failed")).length,
+      };
+    };
+    if (takes && !serves) {
+      const e = asEntry();
+      byNode.set(n.id, { ...base, tone: e.offline || e.hidden ? "bad" : e.oldAgent && d.tone === "ok" ? "part" : d.tone, kind: "entry", entry: e });
       continue;
     }
     if (!serves) {
@@ -383,7 +391,7 @@ export function fleetWays(w: WaysIn): FleetWays {
     const tone: WayTone = d.tone === "ok" ? "ok" : pairs.length === 0 ? d.tone : full ? "ok" : partial || d.tone === "part" ? "part" : "bad";
     const dead = pairs.length > 0 && alive.length === 0 && tone === "bad" ? pairs[0]! : undefined;
     const kind: WayKind = tone === "ok" ? (d.tone === "ok" ? "direct" : "bypass") : tone === "none" ? "nodata" : tone === "part" ? (partial ? "partly" : "directPart") : dead ? "deadEntry" : "noway";
-    byNode.set(n.id, { ...base, tone, kind, pairs, busy, noWay: tone === "bad" && !dead && !busy, ...(dead && { deadBy: { entry: dead.entryName, why: dead.dead as "offline" | "hidden" } }) });
+    byNode.set(n.id, { ...base, tone, kind, pairs, busy, noWay: tone === "bad" && !dead && !busy, ...(dead && { deadBy: { entry: dead.entryName, why: dead.dead as "offline" | "hidden" } }), ...(role === "mixed" && { entry: asEntry() }) });
   }
 
   const all = [...byNode.values()];

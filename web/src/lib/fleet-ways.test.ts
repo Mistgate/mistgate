@@ -161,6 +161,9 @@ describe("fleetWays: an entry", () => {
     const w = ways([node("a", { countryCode: "RU" }), node("b")], [open("a"), closed("b")], [relay("1", "a", "b")]);
     expect(w.byNode.get(id("a"))).toMatchObject({ role: "mixed", kind: "direct" });
     expect(w.exits.map((e) => e.name)).toEqual(["a", "b"]);
+    // and its column: the pairs through it have a place in the table
+    expect(w.entries.map((e) => e.name)).toEqual(["a"]);
+    expect(w.byNode.get(id("a"))!.entry).toMatchObject({ passes: 1, offline: false });
   });
   it("leaves out a retired node and its relays", () => {
     const w = ways([node("de"), entryNode("msk"), node("old", { status: NodeStatus.RETIRED })], [closed("de"), open("msk")], [relay("1", "msk", "old")]);
