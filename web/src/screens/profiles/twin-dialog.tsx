@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import type { TwinProfileResponse } from "@/gen/mistgate/admin/v1/profile_pb";
@@ -45,6 +45,15 @@ export function TwinDialog({ ctx, onClose }: { ctx: TabCtx; onClose: () => void 
   const gaps = (r: TwinProfileResponse) => (r.egress === "warp" ? warpGaps(nodes.data?.nodes ?? [], r.nodeIds).missingNodes : []);
   const planGaps = plan.data ? gaps(plan.data) : [];
   const isTicked = (id: string) => ticked[id] ?? !planGaps.some((n) => n.id === id);
+  // a scene (dev kit) shows the window after the click: "done" in its variant makes the copy at once
+  const auto = useRef(ctx.variant.split(".").includes("done"));
+  useEffect(() => {
+    if (auto.current && plan.data && nodes.data) {
+      auto.current = false;
+      void create();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the plan is here
+  }, [plan.data, nodes.data]);
 
   async function create() {
     setBusy(true);

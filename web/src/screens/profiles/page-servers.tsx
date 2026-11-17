@@ -90,7 +90,8 @@ function useCheckWalk(okIds: readonly string[], frozen: "" | "walk" | "flash") {
  */
 function useApply(rows: readonly ServerRow[], frozen: "" | "run" | "done") {
   const busyIds = rows.filter((r) => r.kind === "busy").map((r) => r.inbound.id);
-  const [ids, setIds] = useState<string[]>([]);
+  // a scene fixes the course: the first three servers that are on, with the ones that are up already ticked off
+  const [ids, setIds] = useState<string[]>(() => (frozen ? rows.filter((r) => r.kind !== "off").slice(0, 3).map((r) => r.inbound.id) : []));
   const [done, setDone] = useState(frozen === "done");
   const seen = useRef(frozen === "done");
   useEffect(() => {
@@ -107,9 +108,9 @@ function useApply(rows: readonly ServerRow[], frozen: "" | "run" | "done") {
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the ids that are starting now, as a key
   }, [busyIds.join(",")]);
-  const list = rows.filter((r) => ids.includes(r.inbound.id) || (frozen === "done" && done && r.kind !== "off"));
+  const list = rows.filter((r) => ids.includes(r.inbound.id));
   const upN = list.filter((r) => r.kind !== "busy").length;
-  return { on: busyIds.length > 0 || done, done: busyIds.length === 0 && done, list, upN };
+  return { on: frozen === "run" || busyIds.length > 0 || done, done: busyIds.length === 0 && done, list, upN };
 }
 
 export function ServersTab(ctx: TabCtx) {
@@ -130,7 +131,7 @@ export function ServersTab(ctx: TabCtx) {
   const okIds = rows.filter((r) => r.kind === "ok").map((r) => r.inbound.id);
   const walk = useCheckWalk(okIds, has(variant, "chk") ? "walk" : has(variant, "chkd") ? "flash" : "");
   const apply = useApply(rows, has(variant, "apply") ? "run" : has(variant, "applied") ? "done" : "");
-  const [editing, setEditing] = useState(has(variant, "edit") && rows[0] ? { id: rows[0].inbound.id, focus: undefined as "port" | "sni" | undefined } : { id: "", focus: undefined as "port" | "sni" | undefined });
+  const [editing, setEditing] = useState(has(variant, "edit") && rows[0] ? { id: rows[0].inbound.id, focus: (has(variant, "port") ? "port" : has(variant, "sni") ? "sni" : undefined) as "port" | "sni" | undefined } : { id: "", focus: undefined as "port" | "sni" | undefined });
   const [ask, setAsk] = useState(has(variant, "ask") && rows[0] ? rows[0].inbound.id : "");
   // the head or the verdict asks this tab to open a server's port and domain (once)
   useEffect(() => {

@@ -150,6 +150,8 @@ export const en = {
   "ps.tw.viaWarp": "Via WARP",
   "ps.tw.lead": "A second profile is created with the same settings and a different egress. The old one doesn’t change",
   "ps.tw.make": "Create copy",
+  "ps.pt.wait": "waiting",
+  "ps.pt.applying": "The node is applying…",
 };
 export const ru: typeof en = {
   "ps.ed.port": "Порт на {node}",
@@ -300,6 +302,8 @@ export const ru: typeof en = {
   "ps.tw.viaWarp": "Через WARP",
   "ps.tw.lead": "Будет создан второй профиль с теми же настройками и другим выходом в интернет. Старый не меняется",
   "ps.tw.make": "Создать копию",
+  "ps.pt.wait": "ждёт",
+  "ps.pt.applying": "Нода применяет…",
 };
 export const zh: typeof en = {
   "ps.ed.port": "{node} 上的端口",
@@ -450,6 +454,8 @@ export const zh: typeof en = {
   "ps.tw.viaWarp": "经由 WARP",
   "ps.tw.lead": "将创建第二个配置，设置相同但出口不同。原配置不变",
   "ps.tw.make": "创建副本",
+  "ps.pt.wait": "等待中",
+  "ps.pt.applying": "节点正在应用…",
 };
 export const fa: typeof en = {
   "ps.ed.port": "پورت روی {node}",
@@ -600,6 +606,8 @@ export const fa: typeof en = {
   "ps.tw.viaWarp": "از طریق WARP",
   "ps.tw.lead": "پروفایل دومی با همان تنظیمات و خروجی متفاوت ساخته می‌شود. قدیمی تغییر نمی‌کند",
   "ps.tw.make": "ساختن کپی",
+  "ps.pt.wait": "در انتظار",
+  "ps.pt.applying": "نود در حال اعمال است…",
 };
 export const tr: typeof en = {
   "ps.ed.port": "{node} üzerindeki port",
@@ -750,4 +758,6 @@ export const tr: typeof en = {
   "ps.tw.viaWarp": "WARP üzerinden",
   "ps.tw.lead": "Aynı ayarlarla ve farklı çıkışla ikinci bir profil oluşturulur. Eskisi değişmez",
   "ps.tw.make": "Kopya oluştur",
+  "ps.pt.wait": "bekliyor",
+  "ps.pt.applying": "Düğüm uyguluyor…",
 };

@@ -24,7 +24,7 @@ import { ProfilePage, type PageScene } from "@/screens/profiles/page";
 import type { PageData } from "@/screens/profiles/page-types";
 import { fleetConnectionsQuery } from "@/screens/profiles/profiles-data";
 import * as fixture from "@/screens/profiles/schema.fixtures";
-import { seedTabs, tabFrames } from "@/screens/dev-kit-profile-tabs";
+import { seedTabs, tabFrames, tabsData } from "@/screens/dev-kit-profile-tabs";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 import { ShellLayout } from "./shell";
 
@@ -169,7 +169,7 @@ export function ProfileScenePage() {
       <ToastProvider>
         <AddNodeProvider>
           <ShellLayout current="profiles" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
-            <ProfilePage data={pageDataOf(partsOf(state).profile)} scene={sceneOf(state)} />
+            <ProfilePage data={tabsData(pageDataOf(partsOf(state).profile), state)} scene={sceneOf(state)} />
           </ShellLayout>
         </AddNodeProvider>
       </ToastProvider>

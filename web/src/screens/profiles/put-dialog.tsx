@@ -57,7 +57,9 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
   // the nodes that carried the profile when the window opened; one put on here stays listed with its result
   const [here] = useState(() => new Set(ctx.servers.map((s) => s.nodeId)));
   const cands = (list.data?.nodes ?? []).filter((n) => n.status !== NodeStatus.RETIRED && !here.has(n.id));
-  const [picked, setPicked] = useState<Record<string, boolean>>(() => Object.fromEntries((preselect ?? []).map((id) => [id, true])));
+  // `preselect` names nodes by id or by name
+  const idOf = (x: string) => list.data?.nodes.find((n) => n.id === x || n.name === x)?.id ?? x;
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [fix, setFix] = useState<Record<string, Fix>>({});
   const [typed, setTyped] = useState<Record<string, { sni: string; port: string }>>({});
   const [backendOpen, setBackendOpen] = useState<Record<string, boolean>>({});
@@ -85,7 +87,7 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
   const view = cands.map((n, i) => {
     const ni = nodeIn(n);
     const r: NodeRow = rowOf(askedOf(i), ni, { t, protocol: profile.protocol, fix: fix[n.id] ?? {} });
-    const on = !r.need && (picked[n.id] ?? r.on);
+    const on = !r.need && (picked[n.id] ?? (preselect ? preselect.map(idOf).includes(n.id) : r.on));
     const c = srv.country?.byNode.get(n.id);
     const k = c ? countryLook(tt, fmt, c).kind : "";
     const g: Verdict = !c ? "none" : k === "ok" ? "ok" : k === "partial" || k === "warn" ? "part" : k === "bad" || k === "listed" ? "bad" : "none";
@@ -157,7 +159,7 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
   useEffect(() => {
     if (!autorun || started.current || list.isPending || !preselect?.length) return;
     started.current = true;
-    void start(preselect);
+    void start(preselect.map(idOf));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the nodes are here
   }, [autorun, list.isPending]);
 
@@ -262,7 +264,7 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
                   <Gl k={g} />
                   {chip}
                 </span>
-                <em className={phase === "pick" ? (checking ? "" : r.verdict === "none" ? "" : r.verdict) : ph === "ok" ? "ok" : ph === "bad" ? "bad" : ""}>{phase === "pick" ? (checking ? t("ps.pt.check") : r.text) : (run?.text ?? "")}</em>
+                <em className={phase === "pick" ? (checking ? "" : r.verdict === "none" ? "" : r.verdict) : ph === "ok" ? "ok" : ph === "bad" ? "bad" : ""}>{phase === "pick" ? (checking ? t("ps.pt.check") : r.text) : (run?.text || (ph === "wait" ? t("ps.pt.wait") : ph === "put" ? t("ps.pt.putting") : ph === "apply" ? t("ps.pt.applying") : ph === "ok" ? t("pf.st.works") : ""))}</em>
               </button>
               {phase !== "pick" && run?.notes?.map((note) => (
                 <div key={note} className="pp-pnf">

@@ -55,7 +55,8 @@ export function TakeDialog({ ctx, mode, onClose, onGone }: { ctx: TabCtx; mode: 
   const relays = useQuery(relaysQuery("")).data ?? [];
   const nodeOf = new Map((nodes.data?.nodes ?? []).map((n) => [n.id, n]));
   const takeOff = useTakeOff(profile.id);
-  const [touched, setTouched] = useState<Record<string, boolean> | null>(mode === "take" && !v.includes("all") ? {} : null);
+  const preset = v.find((x) => x.startsWith("pick-"))?.slice(5).split("+");
+  const [touched, setTouched] = useState<Record<string, boolean> | null>(preset ? Object.fromEntries(rows.filter((r) => preset.includes(r.nodeName)).map((r) => [r.nodeId, true])) : mode === "take" ? {} : null);
   const sel = (r: ServerRow) => (touched ? !!touched[r.nodeId] : true);
   const chosen = rows.filter(sel);
   const all = rows.length > 0 && chosen.length === rows.length;

@@ -1529,3 +1529,52 @@
   background: var(--tone-sky);
   vertical-align: 1px;
 }
+
+/* ---- the board's .btn (pn.css L27-L34), for the buttons and links that carry its class ---- */
+.pf .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--step);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color 0.15s var(--e),
+    transform 0.15s var(--e);
+}
+.pf .btn:hover {
+  background: color-mix(in srgb, var(--text) 9%, var(--surface));
+}
+.pf .btn:active {
+  transform: scale(0.98);
+}
+.pf .btn svg {
+  color: var(--sec);
+}
+.pf .btn.sm {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.pf .btn.busy {
+  pointer-events: none;
+}
+.pf .btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+.pf .btn .an-sp {
+  color: var(--tone-sky);
+}
