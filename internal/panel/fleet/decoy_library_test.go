@@ -14,6 +14,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/internal/decoy"
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 func librarySite(t *testing.T, body string, extra ...decoy.File) *decoy.Bundle {
@@ -128,13 +129,28 @@ func TestLibraryAssignmentRules(t *testing.T) {
 	if _, err := svc.AssignDecoySite(e.ctx, connect.NewRequest(&decoysitev1.AssignDecoySiteRequest{SiteId: draft.Id, NodeIds: []string{a.nodeID}})); refusalOf(err) != "failed_precondition decoy_site_draft" {
 		t.Fatalf("assigning a draft = %v", err)
 	}
+	// a dry run on a draft only says what marking it ready and assigning it would replace
+	if d, err := svc.AssignDecoySite(e.ctx, connect.NewRequest(&decoysitev1.AssignDecoySiteRequest{SiteId: draft.Id, NodeIds: []string{a.nodeID}, DryRun: true})); err != nil || d.Msg.Applied || len(d.Msg.Replaced) != 1 {
+		t.Fatalf("dry run on a draft = %+v, %v", d, err)
+	}
+	if n, _ := e.st.Node(e.ctx, a.nodeID); n.DecoyMode == decoy.ModeOwn || n.DecoySiteID != "" {
+		t.Fatal("a dry run on a draft changed a node")
+	}
 	if _, err := svc.SetDecoySiteReady(e.ctx, connect.NewRequest(&decoysitev1.SetDecoySiteReadyRequest{SiteId: draft.Id, Ready: true})); err != nil {
 		t.Fatal(err)
 	}
-	// nothing is changed by a dry run, which tells what would be replaced and warns about two addresses
+	// nothing is changed by a dry run, which tells what would be replaced. Two hosts of one domain (nodea.example.com, nodeb.example.com)
+	// are tied together already: no warning; another domain makes one.
 	dry, err := svc.AssignDecoySite(e.ctx, connect.NewRequest(&decoysitev1.AssignDecoySiteRequest{SiteId: draft.Id, NodeIds: []string{a.nodeID, b.nodeID}, Panel: true, DryRun: true}))
-	if err != nil || dry.Msg.Applied || len(dry.Msg.Replaced) != 3 || dry.Msg.Replaced[0].Previous != decoy.ModeBuiltin {
+	if err != nil || dry.Msg.Applied || len(dry.Msg.Replaced) != 3 || dry.Msg.Replaced[0].Previous != decoy.ModeBuiltin || len(dry.Msg.Warnings) != 0 {
 		t.Fatalf("dry run = %+v, %v", dry, err)
+	}
+	if _, err := e.st.W.ExecContext(e.ctx, `UPDATE node SET address = ? WHERE id = ?`, "nodeb.example.org", b.nodeID); err != nil {
+		t.Fatal(err)
+	}
+	dry, err = svc.AssignDecoySite(e.ctx, connect.NewRequest(&decoysitev1.AssignDecoySiteRequest{SiteId: draft.Id, NodeIds: []string{a.nodeID, b.nodeID}, Panel: true, DryRun: true}))
+	if err != nil {
+		t.Fatal(err)
 	}
 	var codes []string
 	for _, w := range dry.Msg.Warnings {
@@ -318,5 +334,39 @@ func TestLibraryRefusesOnTheEdge(t *testing.T) {
 	}
 	if _, err := e.f.ownSiteFromUpload(e.ctx, "nod_x", librarySite(t, "x")); err == nil || !strings.Contains(err.Error(), "feature=decoy_own") {
 		t.Fatalf("edge upload = %v", err)
+	}
+}
+
+// shared_domains warns only when no registrable domain ties the nodes together: de1.example.com and nl1.example.com are one
+// domain, another domain or an IP address is a node of its own (an IP is separate from every other node, another IP included).
+func TestSharedDomainsKeyedByRegistrableDomain(t *testing.T) {
+	node := func(id, address string) store.NodeRow { return store.NodeRow{ID: id, Name: id, Address: address} }
+	for name, tc := range map[string]struct {
+		nodes []store.NodeRow
+		warn  bool
+	}{
+		"one node":                     {[]store.NodeRow{node("de1", "de1.example.com")}, false},
+		"two hosts of one domain":      {[]store.NodeRow{node("de1", "de1.example.com"), node("nl1", "nl1.example.com")}, false},
+		"deeper hosts of one domain":   {[]store.NodeRow{node("de1", "a.b.example.com"), node("nl1", "c.example.com")}, false},
+		"the domain itself and a host": {[]store.NodeRow{node("de1", "example.com"), node("nl1", "nl1.example.com")}, false},
+		"upper case and a final dot":   {[]store.NodeRow{node("de1", "DE1.Example.com."), node("nl1", "nl1.example.com")}, false},
+		"a port after the host":        {[]store.NodeRow{node("de1", "de1.example.com:8443"), node("nl1", "nl1.example.com")}, false},
+		"two domains":                  {[]store.NodeRow{node("de1", "de1.example.com"), node("nl1", "a.example.org")}, true},
+		"a domain and an IP":           {[]store.NodeRow{node("de1", "de1.example.com"), node("nl1", "192.0.2.10")}, true},
+		"two IPs":                      {[]store.NodeRow{node("de1", "192.0.2.10"), node("nl1", "192.0.2.11")}, true},
+		"the same IP twice":            {[]store.NodeRow{node("de1", "192.0.2.10"), node("nl1", "192.0.2.10")}, true},
+		"an IPv6 address and a host":   {[]store.NodeRow{node("de1", "2001:db8::1"), node("nl1", "nl1.example.com")}, true},
+		"one IP alone":                 {[]store.NodeRow{node("de1", "192.0.2.10")}, false},
+		"hosts under a public suffix":  {[]store.NodeRow{node("de1", "a.example.co.uk"), node("nl1", "b.example.co.uk")}, false},
+		"two names under co.uk":        {[]store.NodeRow{node("de1", "a.example.co.uk"), node("nl1", "a.other.co.uk")}, true},
+		"a name with no domain":        {[]store.NodeRow{node("de1", "localhost"), node("nl1", "nl1.example.com")}, true},
+	} {
+		got := sharedDomains(tc.nodes)
+		if (got != nil) != tc.warn {
+			t.Errorf("%s: warning = %v, want %v", name, got, tc.warn)
+		}
+		if got != nil && (got.Code != decoy.WarnSharedDomains || len(got.Paths) != len(tc.nodes)) {
+			t.Errorf("%s: warning = %+v", name, got)
+		}
 	}
 }

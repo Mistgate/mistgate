@@ -5,7 +5,9 @@ package fleet
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"sort"
 	"strconv"
@@ -13,10 +15,12 @@ import (
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
+	"golang.org/x/net/publicsuffix"
 
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/decoysite/v1/decoysitev1connect"
 	"github.com/mistgate/mistgate/internal/decoy"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -283,8 +287,20 @@ func (s decoySiteService) DownloadDecoySite(ctx context.Context, req *connect.Re
 
 // --- changes ---
 
-// actor is who the audit log and the site's "by" fields name.
-func (f *Fleet) actor(ctx context.Context) string { return f.cfg.Actor(ctx) }
+// actor is who the audit log and the site's "by" fields name: the administrator, or the name of the API token (or "Assistant of
+// ...") that made the call.
+func (f *Fleet) actor(ctx context.Context) string {
+	if p := auth.PrincipalFrom(ctx); p.Token && p.Name != "" {
+		return p.Name
+	}
+	return f.cfg.Actor(ctx)
+}
+
+// draftOnly is true for a call of an API token or the assistant that no approved plan covers: it may save drafts and nothing
+// that changes what a node or the panel serves (the token policy lets it reach CreateDecoySite and AddDecoySiteVersion for that).
+func draftOnly(ctx context.Context) bool {
+	return auth.PrincipalFrom(ctx).Token && auth.ApprovedPlanTool(ctx) == ""
+}
 
 func (s decoySiteService) CreateDecoySite(ctx context.Context, req *connect.Request[decoysitev1.CreateDecoySiteRequest]) (*connect.Response[decoysitev1.CreateDecoySiteResponse], error) {
 	f, m := s.f, req.Msg
@@ -309,6 +325,9 @@ func (s decoySiteService) CreateDecoySite(ctx context.Context, req *connect.Requ
 	case store.DecoyStateReady, store.DecoyStateDraft:
 	default:
 		return nil, invalid("state must be draft or ready")
+	}
+	if state != store.DecoyStateDraft && draftOnly(ctx) {
+		return nil, refuse("decoy_site_not_draft")
 	}
 	row, err := f.st.CreateDecoySite(ctx, f.now(), store.NewDecoySite{Name: m.Name, Note: m.Note, Source: source, State: state, By: f.actor(ctx), Bundle: bundle})
 	if err != nil {
@@ -349,6 +368,13 @@ func (s decoySiteService) AddDecoySiteVersion(ctx context.Context, req *connect.
 	b, err := decoy.ParseArchive(req.Msg.BundleArchive)
 	if err != nil {
 		return nil, invalid(decoy.ClientMessage(err))
+	}
+	if draftOnly(ctx) {
+		if row, err := s.f.st.DecoySite(ctx, req.Msg.SiteId); err != nil {
+			return nil, s.fail("read decoy site", err)
+		} else if row.State != store.DecoyStateDraft {
+			return nil, refuse("decoy_site_not_draft")
+		}
 	}
 	site, nodes, err := s.newVersion(ctx, req.Msg.SiteId, b)
 	if err != nil {
@@ -525,16 +551,31 @@ func (s decoySiteService) targets(ctx context.Context, ids []string) ([]store.No
 	return out, nil
 }
 
-// sharedDomains is the warning shared_domains: the site would stand on nodes of more than one address, which links them to
-// each other. Its paths are the names of those nodes.
+// linkKey is what ties a node to the others in a visitor's eyes: the registrable domain of its address (de1.example.com and
+// nl1.example.com are one), the node itself for an address that is an IP or has no registrable domain.
+func linkKey(n store.NodeRow) string {
+	host := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(n.Address), "."))
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	if _, err := netip.ParseAddr(strings.Trim(host, "[]")); err != nil {
+		if d, err := publicsuffix.EffectiveTLDPlusOne(host); err == nil {
+			return d
+		}
+	}
+	return "node:" + n.ID
+}
+
+// sharedDomains is the warning shared_domains: the site would stand on nodes that no registrable domain ties together, so a
+// visitor who sees it on two of them learns they belong together. Its paths are the names of those nodes.
 func sharedDomains(nodes []store.NodeRow) *decoy.Warning {
-	addrs := map[string]bool{}
+	keys := map[string]bool{}
 	names := make([]string, 0, len(nodes))
 	for _, n := range nodes {
-		addrs[strings.ToLower(n.Address)] = true
+		keys[linkKey(n)] = true
 		names = append(names, n.Name)
 	}
-	if len(addrs) < 2 {
+	if len(keys) < 2 {
 		return nil
 	}
 	sort.Strings(names)
@@ -553,7 +594,8 @@ func (s decoySiteService) AssignDecoySite(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, s.fail("read decoy site", err)
 	}
-	if info.State != store.DecoyStateReady {
+	// a dry run only answers what would change, so it also tells what a draft would replace once it is marked ready
+	if info.State != store.DecoyStateReady && !m.DryRun {
 		return nil, s.fail("assign decoy site", store.ErrDecoySiteDraft)
 	}
 	nodes, err := s.targets(ctx, m.NodeIds)
