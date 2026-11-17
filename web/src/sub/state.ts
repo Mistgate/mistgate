@@ -108,10 +108,15 @@ export type DnsActions = {
 };
 
 /** What the page offers its parts: copy (with a callback for the button's own "copied" state) and download. */
-export type Tools = { copy(text: string, message: string, done?: () => void): void; download(filename: string, text: string): void };
+export type Tools = { copy(text: string, message: string, done?: () => void, from?: HTMLElement): void; download(filename: string, text: string): void };
+
+/** The tabs under the status: the servers, the Telegram proxies, TrustTunnel, the devices. */
+export type Tab = "servers" | "telegram" | "trusttunnel" | "devices";
 
 export type State = {
   lang: Lang;
+  /** The open tab (the one that is not there for this person is never open: view.ts falls back to the first). */
+  tab: Tab;
   /** The device step: the chosen platform. */
   platform: Platform;
   /** What the browser says it is (null = could not tell). */
@@ -143,6 +148,7 @@ export type Ctx = { d: MgData; s: State; a: Actions; t: Dict; support: string };
 
 export type Actions = {
   lang(l: Lang): void;
+  tab(t: Tab): void;
   platform(p: Platform): void;
   app(key: string): void;
   way(way: "link" | "key"): void;

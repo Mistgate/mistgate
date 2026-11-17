@@ -38,31 +38,8 @@ export const flagsOn = (s: { amz: AmzState }) => s.amz.here !== "windows";
 /** The name of a device: its label, else its platform's word, else "Device". */
 export const label = (x: AwgDevice, t: Dict) => x.label || platformWord(x.platform, t) || t.devGeneric;
 
-/**
- * A button that copies `text` and says so on itself: its label turns into `done` with a tick for a moment. `toast` is the
- * page's toast text. The page's copy() calls back only when the clipboard took the text. `after` runs when it did.
- */
-export function copyButton(a: Tools, o: { text: string; label: string; done: string; toast: string; cls?: string; key?: string; after?: () => void; ico?: IconName; live?: boolean; aria?: string; textCls?: string }): HTMLButtonElement {
-  const text = h("span", { class: o.textCls }, o.label);
-  const own = o.cls?.split(" ") ?? [];
-  const link = own.includes("tlink");
-  const ico = o.ico ?? "copy";
-  const btn = h("button", { class: `${link ? "" : "btn "}${o.cls ?? ""}`.trim(), type: "button", "data-k": o.key, "aria-label": o.aria, "aria-live": o.live ? "polite" : false, on: { click: () => a.copy(o.text, o.toast, flash) } }, icon(ico, link ? 16 : 18), text);
-  let timer = 0;
-  function flash() {
-    o.after?.();
-    btn.classList.add("ok");
-    btn.replaceChildren(icon("check", link ? 16 : 18), text);
-    text.textContent = o.done;
-    clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      btn.classList.remove("ok");
-      btn.replaceChildren(icon(ico, link ? 16 : 18), text);
-      text.textContent = o.label;
-    }, 1800);
-  }
-  return btn;
-}
+import { copyButton } from "./ui";
+export { copyButton };
 
 /** A download link with the store under the word: "Download / App Store". Never cut short. */
 export function downloadButton(url: string, t: Dict, key: string, cls = ""): HTMLAnchorElement {

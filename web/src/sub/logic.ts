@@ -662,6 +662,9 @@ export type Hero = {
   left: string;
   /** days left, at least 1 while it is soon */
   days: number;
+  /** the used traffic with its unit ("17 GB"), and the quota without one ("100"; "" when unlimited): the board's figure and its line */
+  usedQ: string;
+  quotaN: string;
 };
 
 const tones: Record<Status, Hero["tone"]> = { active: "ok", expired: "bad", limited: "warn", disabled: "off" };
@@ -702,6 +705,8 @@ export function hero(d: MgData, lang: Lang, now = Date.now() / 1000): Hero {
     low,
     left: active && low && rest ? (resetDate ? t.leftUntil(rest, resetDate) : t.leftOnly(rest)) : "",
     days: shown,
+    usedQ: qty(fmtNum(u.used_bytes / 1024 ** i, lang), unit, lang),
+    quotaN: u.quota_bytes ? fmtNum(u.quota_bytes / 1024 ** i, lang) : "",
   };
 }
 

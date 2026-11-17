@@ -1,3 +1,6 @@
+import { add, type AddDict } from "./i18n-add";
+import { core, type CoreDict } from "./i18n-core";
+import { tabs, type TabsDict } from "./i18n-tabs";
 import type { Lang } from "./types";
 
 // Copy of the user page: the end user is addressed formally («вы» / "you").
@@ -356,9 +359,11 @@ const ru = {
   platforms: { ios: "iPhone", android: "Android", windows: "Windows", macos: "Mac", linux: "Linux", other: "Другое" },
 };
 
-export type Dict = typeof ru;
+type Base = typeof ru;
+/** The words of the page: the base above, then the redesign's own (i18n-core: the page and its status, i18n-add: the new-device window and the dialogs, i18n-tabs: the servers, the proxies and the devices). */
+export type Dict = Base & CoreDict & AddDict & TabsDict;
 
-const en: Dict = {
+const en: Base = {
   dayWord: (n) => (n === 1 ? "day" : "days"),
   hi: (n) => `Hi, ${n}`,
   hiAnon: "Hi",
@@ -695,7 +700,7 @@ function typeset<T>(v: T): T {
 
 const zhPeriod: Record<Period, string> = { none: "", day: "今天的", week: "本周的", month: "本月的", rolling_month: "本月的" };
 
-const zh: Dict = {
+const zh: Base = {
   dayWord: () => "天",
   hi: (n) => `你好，${n}`,
   hiAnon: "你好",
@@ -1031,7 +1036,7 @@ export const ltr = (s: string) => `\u2066${s}\u2069`;
 
 const faPeriod: Record<Period, string> = { none: "", day: "امروز", week: "این هفته", month: "این ماه", rolling_month: "این ماه" };
 
-const fa: Dict = {
+const fa: Base = {
   dayWord: () => "روز",
   hi: (n) => `سلام، ${iso(n)}`,
   hiAnon: "سلام",
@@ -1360,7 +1365,7 @@ const fa: Dict = {
 // the name sounds): "Happ uygulamasında", "1 Aralık tarihine kadar". Quotes are the English ones, “…”.
 const trPeriod: Record<Period, string> = { none: "", day: "Bugünkü", week: "Bu haftaki", month: "Bu ayki", rolling_month: "Bu ayki" };
 
-const tr: Dict = {
+const tr: Base = {
   dayWord: () => "gün",
   hi: (n) => `Merhaba, ${n}`,
   hiAnon: "Merhaba",
@@ -1685,7 +1690,8 @@ const tr: Dict = {
   platforms: { ios: "iPhone", android: "Android", windows: "Windows", macos: "Mac", linux: "Linux", other: "Diğer" },
 };
 
-export const dict: Record<Lang, Dict> = { ru: typeset(ru), en: typeset(en), zh: typeset(zh), fa: typeset(fa), tr: typeset(tr) };
+const merge = (base: Base, l: Lang): Dict => ({ ...base, ...core[l], ...add[l], ...tabs[l] });
+export const dict: Record<Lang, Dict> = { ru: typeset(merge(ru, "ru")), en: typeset(merge(en, "en")), zh: typeset(merge(zh, "zh")), fa: typeset(merge(fa, "fa")), tr: typeset(merge(tr, "tr")) };
 
 /** The languages of the menu in the top bar, in order. */
 export const langs: readonly Lang[] = ["en", "ru", "zh", "fa", "tr"];

@@ -32,6 +32,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
   return {
     log,
     lang: (l) => log.push(`lang ${l}`),
+    tab: (t) => log.push(`tab ${t}`),
     platform: (p) => log.push(`platform ${p}`),
     app: (k) => log.push(`app ${k}`),
     way: (w) => log.push(`way ${w}`),
@@ -57,6 +58,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
 export function state(platform: State["platform"] = "ios", over: Partial<State> = {}, lang: Lang = "ru"): State {
   return {
     lang,
+    tab: "servers",
     platform,
     detected: platform,
     app: "",
