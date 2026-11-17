@@ -332,6 +332,8 @@ type Node struct {
 	// The entry node whose bridge the agent of this node runs its control channel through, because it cannot reach the panel
 	// directly; empty = a direct connection (Hello.link_via_node_id; live state, not stored).
 	LinkViaNodeId string `protobuf:"bytes,43,opt,name=link_via_node_id,json=linkViaNodeId,proto3" json:"link_via_node_id,omitempty"`
+	// The library site this node serves (mode "own"); empty when none (DecoySiteService).
+	DecoySiteId   string `protobuf:"bytes,44,opt,name=decoy_site_id,json=decoySiteId,proto3" json:"decoy_site_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -663,6 +665,13 @@ func (x *Node) GetBridgePortProfileId() string {
 func (x *Node) GetLinkViaNodeId() string {
 	if x != nil {
 		return x.LinkViaNodeId
+	}
+	return ""
+}
+
+func (x *Node) GetDecoySiteId() string {
+	if x != nil {
+		return x.DecoySiteId
 	}
 	return ""
 }
@@ -6675,7 +6684,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xe4\r\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\x88\x0e\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -6727,7 +6736,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"bridgePort\x12,\n" +
 	"\x12bridge_port_reason\x18) \x01(\tR\x10bridgePortReason\x123\n" +
 	"\x16bridge_port_profile_id\x18* \x01(\tR\x13bridgePortProfileId\x12'\n" +
-	"\x10link_via_node_id\x18+ \x01(\tR\rlinkViaNodeId\"\x8d\x02\n" +
+	"\x10link_via_node_id\x18+ \x01(\tR\rlinkViaNodeId\x12\"\n" +
+	"\rdecoy_site_id\x18, \x01(\tR\vdecoySiteId\"\x8d\x02\n" +
 	"\bNodeIpv6\x12\x14\n" +
 	"\x05entry\x18\x01 \x01(\tR\x05entry\x12'\n" +
 	"\x0fentry_supported\x18\x02 \x01(\bR\x0eentrySupported\x12-\n" +
