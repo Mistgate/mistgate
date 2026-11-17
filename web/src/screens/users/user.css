@@ -283,6 +283,10 @@ a.up-gtag:hover {
   gap: 16px;
   min-width: 0;
 }
+.up-card:has(> .up-sh),
+.up-card:has(> .up-save) {
+  overflow: hidden;
+}
 .up-card {
   position: relative;
   border: 1px solid var(--up-hair);
@@ -1324,9 +1328,8 @@ a.up-gtag:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.up-tgkey {
-  grid-column: 1 / -1;
-  padding: 0;
+.up-tg > div > span:last-child {
+  overflow: visible;
 }
 /* what the nodes saw */
 .up-q {
@@ -1401,6 +1404,9 @@ a.up-gtag:hover {
 .tq-h h3 {
   margin-inline-end: 0;
 }
+.tq-h .tq-exp {
+  margin-inline-end: auto;
+}
 .tq-g {
   display: grid;
   place-items: center;
@@ -1439,6 +1445,9 @@ a.up-gtag:hover {
 }
 .tq-h .tq-exp:has(+ .tq-st) {
   margin-inline-end: 0;
+}
+.tq-h .tq-st {
+  margin-inline-end: auto;
 }
 .tq-msg {
   display: flex;
@@ -1540,6 +1549,7 @@ a.up-gtag:hover {
 .up-lim {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   margin: 0 24px 20px;
   border-radius: 12px;
   border: 1px solid var(--up-hair);
@@ -1581,7 +1591,7 @@ a.up-gtag:hover {
 .up-lim > div > div:first-child > span.own {
   color: var(--text);
 }
-.up-lim .up-seg button {
+.up-lim .up-seg [role="radio"] {
   font-family: var(--font-mono);
   padding-inline: 10px;
   font-size: 12px;
@@ -1997,6 +2007,7 @@ a.up-gtag:hover {
   height: 14px;
   stroke-width: 2.5;
 }
+.up-cb[data-checked] i,
 .up-cb.on i {
   background: var(--accent-mark);
   border-color: var(--accent-mark);
@@ -2338,9 +2349,12 @@ a.up-gtag:hover {
   .up-lim {
     margin: 0 16px 16px;
   }
-  .up-lim .up-seg,
-  .up-lim .up-seg > * {
+  .up-lim .up-seg {
     width: 100%;
+  }
+  .up-lim .up-seg [role="radio"] {
+    flex: 1;
+    padding-inline: 4px;
   }
   .up-gt {
     padding: 12px 16px;
@@ -2489,4 +2503,37 @@ a.up-gtag:hover {
 }
 .up-dv .g[data-muted] {
   opacity: 0.6;
+}
+
+.up-drops {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--warning-text);
+}
+.up-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 2px 10px;
+  border-radius: 13px;
+  border: 1px solid var(--up-hair);
+  font-size: 11px;
+  color: var(--muted);
+  transition: color 0.15s var(--e), border-color 0.15s var(--e);
+}
+.up-more:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+.up-qx {
+  padding: 0 24px 10px;
+  margin-top: -4px;
+}
+@media (width <= 720px) {
+  .up-qx {
+    padding-inline: 16px;
+  }
 }

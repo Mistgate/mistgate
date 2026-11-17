@@ -146,7 +146,7 @@ export function DevicesPanel({
           <CardHead title={t("users.devKeys")}>
             {full && canAdd && <span className="up-lc">{t("awg.dev.full")}</span>}
             {canAdd && (
-              <Button size="md" className="up-r" disabled={full} aria-label={t("awg.dev.add")} onClick={() => setAdding(true)}>
+              <Button size="md" className="up-r" data-testid="add-key" disabled={full} aria-label={t("awg.dev.add")} onClick={() => setAdding(true)}>
                 {t("awg.dev.add")}
               </Button>
             )}

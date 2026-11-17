@@ -10,13 +10,13 @@ import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { Avatar } from "@/components/ui/bits";
 import { cx } from "@/lib/cx";
-import { sameYear, useFmt } from "@/lib/format";
+import { sameYear } from "@/lib/format";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { GB, agoText, avatarIndex, daysLeft, nowSec, shownStatus } from "./format";
 import { GroupEditModal } from "./groups";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { detailN, type DetailN } from "./model";
-import { useGo } from "./nav";
+import { AppLink, useGo } from "./nav";
 import { groupsQuery, isCode } from "./rpc";
 import { useTx, type Tx } from "./t";
 import { useReadonly, useUserActions, type Actions } from "./user-actions";
@@ -81,8 +81,6 @@ const dayDate = (t: Tx, unix: number, withYear: boolean) => new Intl.DateTimeFor
 /** What stops the person, as the board's banner says it: a title, a line, and what puts it right. */
 function bannerOf(data: DetailN, t: Tx, now: number, tracked: boolean, a: { actions: Actions; askReset: () => void; openLink: () => void; readonly: boolean }) {
   const user = data.user!;
-  const fmt = new Intl.NumberFormat(t.locale);
-  void fmt;
   const never = user.devicesUsed === 0 && user.lastSeenUnix === 0 && user.usedBytes === 0;
   type Act = { label: string; run: () => void; primary?: boolean };
   const w = (act: Act[]) => (a.readonly ? [] : act);
@@ -109,11 +107,13 @@ function bannerOf(data: DetailN, t: Tx, now: number, tracked: boolean, a: { acti
   return null;
 }
 
-function UserDetail({ data }: { data: DetailN }) {
+/**
+ * One person's page on data it is given. `scene` (the dev kit) fixes the tab in the page's own state, so a scene's address names it and
+ * a click on a tab does not leave the scene.
+ */
+export function UserDetail({ data, scene }: { data: DetailN; scene?: { tab: UserTab } }) {
   const user = data.user!;
   const t = useTx();
-  const fmt = useFmt();
-  const go = useGo();
   const navigate = useNavigate();
   const actions = useUserActions(user);
   const readonly = useReadonly();
@@ -128,12 +128,13 @@ function UserDetail({ data }: { data: DetailN }) {
   // "?add=device" (the link window, self-service off): the Devices tab with "Add device" open, once; the address then drops it
   const addDevice = search.add === "device";
   const hashLogs = typeof window !== "undefined" && window.location.hash === "#client-logs";
-  const tab: UserTab = addDevice ? "devices" : userTabs.includes(search.tab as UserTab) ? (search.tab as UserTab) : hashLogs ? "logs" : "overview";
+  const [sceneTab, setSceneTab] = useState<UserTab>(scene?.tab ?? "overview");
+  const tab: UserTab = scene ? sceneTab : addDevice ? "devices" : userTabs.includes(search.tab as UserTab) ? (search.tab as UserTab) : hashLogs ? "logs" : "overview";
   const open = (next: UserTab) =>
-    void navigate({ to: "/users/$id", params: { id: user.id }, search: next === "overview" ? {} : { tab: next }, replace: true, hash: next === "logs" && hashLogs ? "client-logs" : undefined } as never);
+    scene ? setSceneTab(next) : void navigate({ to: "/users/$id", params: { id: user.id }, search: next === "overview" ? {} : { tab: next }, replace: true, hash: next === "logs" && hashLogs ? "client-logs" : undefined } as never);
   // an old link to the logs (#client-logs) lands on their tab, the address says so
   useEffect(() => {
-    if (hashLogs && search.tab !== "logs") open("logs");
+    if (!scene && hashLogs && search.tab !== "logs") open("logs");
     // the address is the input; opening must not loop
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [hashLogs, search.tab]);
@@ -149,7 +150,6 @@ function UserDetail({ data }: { data: DetailN }) {
   const limit = user.deviceLimit;
   const nodeName = (id: string) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id;
   const onlineText = user.online ? `${t("up.onlineNow")}${user.currentNodeName ? ` · ${user.currentNodeName}` : ""}` : user.lastSeenUnix > 0 ? agoText(user.lastSeenUnix, t, now) : t("up.neverBeen");
-  void fmt;
 
   const ban = bannerOf(data, t, now, mode === LinkDeviceLimit.TRACK, { actions, askReset: () => setResetOpen(true), openLink: () => setLinkOpen(true), readonly });
   const banner = ban && (
@@ -211,17 +211,10 @@ function UserDetail({ data }: { data: DetailN }) {
 
   return (
     <div className="up" data-testid="user-page">
-      <a
-        className="up-back"
-        href="/users"
-        onClick={(e) => {
-          e.preventDefault();
-          go("/users");
-        }}
-      >
+      <AppLink to="/users" className="up-back">
         <G d={P.back} size={16} />
         {t("users.back")}
-      </a>
+      </AppLink>
       <header className="up-h">
         <Avatar name={user.name} index={avatarIndex(user.id)} size={48} />
         <div className="up-ht">

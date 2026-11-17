@@ -20,7 +20,7 @@ import type { DeviceN as Device, UserN as User } from "./model";
 import { useTx, type Tx } from "./t";
 import { ConfirmModal } from "./ui";
 import type { Actions } from "./user-actions";
-import { CardHead, CopyBtn, G, P, QrDialog } from "./user-bits";
+import { CopyBtn, G, P, QrDialog } from "./user-bits";
 
 /** The protocol id of the plugin. */
 export const trustTunnelProtocol = "trusttunnel";
@@ -145,11 +145,15 @@ export function TrustTunnelSection({
 
   return (
     <section className={cx("up-card tq", paused && "paused")} data-testid="tt-section">
-      <CardHead title={t("tt.title")}>
+      <div className="up-chd tq-h">
+        <span className="tq-g" aria-hidden>
+          <G d={P.tunnel} size={16} />
+        </span>
+        <h3>{t("tt.title")}</h3>
         <span className="tq-exp">{t("up.tt.experimental")}</span>
         {paused && <span className="tq-st">{t("tt.paused")}</span>}
         {!readonly && !unavailable && <Switch className="tq-sw" aria-label={t("tt.toggle")} checked={on} onCheckedChange={flipped} />}
-      </CardHead>
+      </div>
       {holds && !readonly && (
         <ul>
           <DeviceRow

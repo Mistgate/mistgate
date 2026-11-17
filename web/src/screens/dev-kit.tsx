@@ -79,6 +79,7 @@ import { FoundationKit } from "./dev-kit-foundation";
 import { OverviewKit, OverviewPage } from "./dev-kit-overview";
 import { ShellKit, ShellPage } from "./dev-kit-shell";
 import { NodesKit, NodesPage } from "./dev-kit-nodes";
+import { UserKit, UserPage } from "./dev-kit-user";
 import { WindowsKit, WindowsPage } from "./dev-kit-windows";
 
 // Development only (see router.tsx): every primitive in one place, to look at in both themes and at
@@ -319,10 +320,11 @@ export default function DevKit() {
   if (which === "shell-page") return <ShellPage />;
   if (which === "overview-page") return <OverviewPage />;
   if (which === "nodes-page") return <NodesPage />;
+  if (which === "user-page") return <UserPage />;
   if (which === "windows-page") return <WindowsPage />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { "profile-fixes": ProfileFixesKit, "profile-delete": ProfileDeleteKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit }[which];
+  const only = { "profile-fixes": ProfileFixesKit, "profile-delete": ProfileDeleteKit, dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, trusttunnel: TrustTunnelKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, "pn-user": UserKit, windows: WindowsKit }[which];
   if (only) {
     const Kit = only;
     return (

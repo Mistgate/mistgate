@@ -402,7 +402,7 @@ function GroupPick({ user, onPick }: { user: User; onPick: (g: Group) => void })
   if (!list.data) return <div className="h-[52px] rounded-xl bg-step" />;
   return (
     <>
-      <button type="button" className="up-sel" aria-expanded={open} aria-haspopup="listbox" aria-label={t("users.group")} disabled={readonly} onClick={() => (setOpen(!open), setQ(""), setMaking(false))}>
+      <button type="button" className="up-sel up-gsel" aria-expanded={open} aria-haspopup="listbox" aria-label={t("users.group")} disabled={readonly} onClick={() => (setOpen(!open), setQ(""), setMaking(false))}>
         <div>
           <b>
             <GroupDot id={user.groupId} color={user.groupColor} />

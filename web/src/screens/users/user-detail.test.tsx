@@ -116,7 +116,7 @@ afterEach(() => {
 
 const user = {
   id: "usr_1",
-  name: "Marina",
+  name: "alice",
   subscriptionName: "",
   groupId: "grp_all",
   groupName: "Everyone",
@@ -166,7 +166,7 @@ const detail = {
 const NOW = 1_800_000_000;
 const alert = (over: object) => ({
   id: "alt_1", severity: AlertSeverity.WARNING, kind: AlertKind.ACCESS_ENDED, nodeId: "", nodeName: "", subject: "usr_1", titleKey: "health.alert.access_ended.title",
-  params: { user_name: "Marina", user_id: "usr_1", since: String(NOW - 86_400) }, whyKey: "health.alert.access_ended.why.expired",
+  params: { user_name: "alice", user_id: "usr_1", since: String(NOW - 86_400) }, whyKey: "health.alert.access_ended.why.expired",
   firstSeenUnix: NOW - 7200, openedUnix: NOW - 3600, lastSeenUnix: NOW, resolvedAtUnix: 0, resolution: "", mutedUntilUnix: 0, actions: ["open_user", "mute"], ...over,
 });
 const choice = (nodeName: string, presetName: string, over: object = {}) => ({
@@ -210,7 +210,7 @@ describe("the user card", () => {
       [],
       [
         alert({}),
-        alert({ id: "alt_2", severity: AlertSeverity.INFO, kind: AlertKind.USER_CONNECTION, subject: "dev_k", titleKey: "health.alert.user_connection.title", whyKey: "health.alert.user_connection.why.stale_key", params: { user_name: "Marina", user_id: "usr_1" } }),
+        alert({ id: "alt_2", severity: AlertSeverity.INFO, kind: AlertKind.USER_CONNECTION, subject: "dev_k", titleKey: "health.alert.user_connection.title", whyKey: "health.alert.user_connection.why.stale_key", params: { user_name: "alice", user_id: "usr_1" } }),
         alert({ id: "alt_3", subject: "usr_2", params: { user_name: "Other", user_id: "usr_2" } }), // somebody else
         alert({ id: "alt_4", kind: AlertKind.USERS_IMPACTED, nodeId: "nod_1", nodeName: "de1", subject: "hysteria2", params: {}, titleKey: "health.alert.users_impacted.title", whyKey: "" }), // a node
       ],
@@ -219,7 +219,7 @@ describe("the user card", () => {
     expect(list).toBeTruthy();
     expect(list!.querySelectorAll(".up-alerts > div")).toHaveLength(2);
     expect(list!.textContent).toContain("Access ended, but the person keeps trying");
-    expect(list!.textContent).toContain("Marina’s subscription ended on");
+    expect(list!.textContent).toContain("alice’s subscription ended on");
     expect(list!.textContent).toContain("for 1 h"); // from the start of the episode
     expect(list!.textContent).toContain("Someone may not be able to connect");
     expect(list!.textContent).toContain("AmneziaWG key is older than the last profile change");
@@ -230,9 +230,9 @@ describe("the user card", () => {
 
   it("lists a torrent alert of this person in the Connection block", async () => {
     await mount(1, [], [alert({ id: "alt_t", kind: AlertKind.TORRENT, subject: "usr_1", titleKey: "health.alert.torrent.title", whyKey: "health.alert.torrent.why",
-      params: { user_name: "Marina", user_id: "usr_1", nodes: "EE", count: "3", evidence: "dht_query", ports: "6881" } })]);
+      params: { user_name: "alice", user_id: "usr_1", nodes: "EE", count: "3", evidence: "dht_query", ports: "6881" } })]);
     expect(text()).toContain("Torrent attempts");
-    expect(text()).toContain("Marina is trying to use torrents on EE: 3 attempts in a day, blocked. Evidence: DHT query, port 6881.");
+    expect(text()).toContain("alice is trying to use torrents on EE: 3 attempts in a day, blocked. Evidence: DHT query, port 6881.");
   });
 
   it("shows no Connection block when this person has no such alert", async () => {
@@ -334,13 +334,13 @@ describe("the user card", () => {
     await mount();
     const field = document.querySelector<HTMLInputElement>('input[aria-label="Name shown on the subscription page"]')!;
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "Nastya");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "bob");
       field.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(text()).toContain("Page greeting: Nastya");
+    expect(text()).toContain("Page greeting: bob");
     await click(button("Save name"));
     await settle();
-    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", subscriptionName: "Nastya" });
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", subscriptionName: "bob" });
   });
 
   it("splits the devices into the subscription's apps and the AmneziaVPN keys, and lists both", async () => {
@@ -392,8 +392,8 @@ describe("the user card", () => {
     await settle();
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", groupId: "grp_f", dryRun: true });
     const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!;
-    expect(dialog.textContent).toContain("Marina: move to “friends”?");
-    expect(dialog.textContent).toContain("Marina loses: “AWG 3.1” (1 AmneziaVPN key stops working)");
+    expect(dialog.textContent).toContain("alice: move to “friends”?");
+    expect(dialog.textContent).toContain("alice loses: “AWG 3.1” (1 AmneziaVPN key stops working)");
     expect(updateUser).toHaveBeenCalledTimes(1);
     await click(button("Change group"));
     await settle();
@@ -483,7 +483,7 @@ describe("the user card", () => {
     await click(button("Disable"));
     await settle();
     expect(setUsersEnabled).toHaveBeenCalledWith({ userIds: ["usr_1"], enabled: false });
-    expect(text()).toContain("Marina disabled");
+    expect(text()).toContain("alice disabled");
     await click(button("Undo"));
     await settle();
     expect(setUsersEnabled).toHaveBeenLastCalledWith({ userIds: ["usr_1"], enabled: true });
@@ -797,7 +797,7 @@ describe("deleting the user from the card", () => {
     await click(button("Delete"));
     const field = dialog().querySelector("input")!;
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "Marina");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "alice");
       field.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.trim() === "Delete"));
@@ -811,7 +811,7 @@ describe("deleting the user from the card", () => {
     await mount();
     await confirmDelete();
     expect(deleteUsers).not.toHaveBeenCalled();
-    expect(text()).not.toContain("Marina deleted");
+    expect(text()).not.toContain("alice deleted");
   });
 
   it("deletes the user once the check passes", async () => {
