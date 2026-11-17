@@ -283,7 +283,7 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
     <Meter key={key} label={label} value={value} note={note} first={known && n.bottleneck === key} shown={value === undefined ? "—" : `${fmt.num(value, value < 10 ? 1 : 0)}%`} />
   );
   return (
-    <div className="fz-ld grid animate-[mg-up_0.25s_var(--e)_both] grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-x-10 gap-y-5 border-t border-line bg-[color-mix(in_srgb,var(--text)_3%,transparent)] px-6 pt-4 pb-6 @max-[940px]/fzt:grid-cols-1 @max-[520px]/fzt:px-4 @max-[520px]/fzt:pt-3 @max-[520px]/fzt:pb-5">
+    <div className="fz-ld grid animate-[mg-up_0.25s_var(--e)_both] grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-x-10 gap-y-5 bg-[color-mix(in_srgb,var(--text)_3%,transparent)] px-6 pt-4 pb-6 @max-[940px]/fzt:grid-cols-1 @max-[520px]/fzt:px-4 @max-[520px]/fzt:pt-3 @max-[520px]/fzt:pb-5">
       <div className={cx("col-span-full flex items-center gap-2.5 rounded-field px-3 py-2.5 @max-[520px]/fzt:flex-wrap", warn ? "bg-warn-soft" : "bg-step")}>
         <i aria-hidden className={cx("size-2 flex-none rounded-full @max-[520px]/fzt:mt-2 @max-[520px]/fzt:self-start", warn ? "bg-warn" : "bg-accent-mark")} />
         <b className="font-medium text-pretty @max-[520px]/fzt:min-w-0 @max-[520px]/fzt:flex-1">{lead ? recText(t, lead) : known ? t("load.noRecs") : t("load.noData")}</b>

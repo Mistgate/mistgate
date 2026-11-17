@@ -34,7 +34,7 @@ export function NodesFirst({ onAdd }: { onAdd: () => void }) {
         </div>
       </div>
       <div aria-hidden className="fz-ghosts relative flex flex-col gap-2 py-8 ps-0 pe-10 max-mid:max-h-[150px] max-mid:overflow-hidden max-mid:ps-10 max-mid:pe-8 max-mid:pt-0 max-mid:pb-2 max-md:px-5 max-md:pb-2">
-        <button type="button" tabIndex={-1} onClick={onAdd} className="grid h-[60px] grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-[12px] border border-dashed border-accent-mark bg-[color-mix(in_srgb,var(--accent-mark)_9%,var(--surface))] px-4 text-start transition-[background-color,border-color,transform] duration-150 ease-out hover:-translate-y-px hover:bg-[color-mix(in_srgb,var(--accent-mark)_10%,var(--surface))]">
+        <button type="button" tabIndex={-1} onClick={onAdd} className="grid h-[60px] grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-[12px] border border-dashed border-accent-mark bg-[color-mix(in_srgb,var(--accent-mark)_9%,var(--surface))] px-4 text-start [transition:background-color_.15s_var(--e),border-color_.15s_var(--e),transform_.2s_var(--ease-spring)] hover:-translate-y-px hover:bg-[color-mix(in_srgb,var(--accent-mark)_10%,var(--surface))]">
           <span className="grid size-8 place-items-center rounded-ctl bg-tone-mint-bg text-accent-text">
             <Icon name="plus" size={16} />
           </span>

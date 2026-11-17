@@ -83,7 +83,7 @@
   opacity: 0.35;
 }
 .fz-bulk-pop {
-  animation: fz-pop 0.3s var(--ease-spring) both;
+  animation: fz-pop 0.35s var(--ease-spring) both;
 }
 .fz-bulk-in {
   animation: mg-up 0.25s var(--e) both;

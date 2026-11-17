@@ -89,7 +89,7 @@ async function mount(nodes: ReturnType<typeof node>[] = fleet, role = Role.OWNER
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const names = () => [...document.querySelectorAll("section[data-select] b.font-mono")].map((b) => b.textContent);
 const head = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=columnheader]")].find((h) => h.textContent === label)!;
-const type = (el: HTMLInputElement, value: string) =>
+const typeInto = (el: HTMLInputElement, value: string) =>
   act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -129,11 +129,11 @@ describe("the list", () => {
 
   it("the search finds by name, city or address, and a search that finds nothing says so and resets", async () => {
     await mount();
-    await type(search(), "hel");
+    await typeInto(search(), "hel");
     expect(names()).toEqual(["fi1"]);
-    await type(search(), "203.0.113.3");
+    await typeInto(search(), "203.0.113.3");
     expect(names()).toEqual(["nl1", "fi1", "de1"]);
-    await type(search(), "zzz");
+    await typeInto(search(), "zzz");
     expect(names()).toEqual([]);
     expect(document.body.textContent).toContain(en["nv.noMatch"]);
     await click([...document.querySelectorAll("button")].find((b) => b.textContent === en["nv.resetFilter"]));

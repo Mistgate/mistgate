@@ -32,8 +32,8 @@ import type { Avail } from "@/components/bulk";
 // Development only. /dev-kit?only=nodes: the Nodes screen of the redesign in every state, each in a frame of its own width (an
 // iframe, so the window's breakpoints answer to the frame); each frame is a page of its own, for the screenshot script and for
 // the side-by-side with the board:
-//   /dev-kit?only=nodes-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper][&fx=1]
-// states: list (the board's four nodes) | first (no node) | one | twelve | dead (nl1 does not answer) | mixed (every state a node
+//   /dev-kit?only=nodes-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
+// states: list (the board's four nodes) | calm (the same, nothing to look at) | first (no node) | one | twelve | dead (nl1 does not answer) | mixed (every state a node
 // has) | offer (the panel-key offer) | select (selecting, two ticked: the bulk bar) | find (a search that finds one) | nomatch
 // (a search that finds none) | load | map | map-card (the map with nl1 selected) | job-running | job-done | job-failed (the bar's
 // batch states) | edge (the Cloudflare edition: no load, no map on a phone is the width's doing).
@@ -154,7 +154,8 @@ const country = (n: string) => ({
   vantages: [...(verdictOf(n) === CountryVerdict.OK ? [] : [vantage("MTS", "dark")]), vantage("Rostelecom", "reach")], sourceVerdicts: [],
 });
 
-function seeded(state: string, role: Role, edge: boolean) {
+/** The private query cache of a scene (exported for its smoke test). */
+export function seeded(state: string, role: Role, edge: boolean) {
   const rows = fleetOf(state);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0, ...(edge ? { edition: "edge" } : {}) } as never);
@@ -171,7 +172,7 @@ function seeded(state: string, role: Role, edge: boolean) {
     nowUnix: now,
     panel: { version: "v0.1.71", built: now, update: { version: "v0.1.86", url: "https://github.com/example/mistgate/releases/tag/v0.1.86", checkedUnix: now, available: true, supported: true, installable: true, installing: false, errorKey: "" } },
     bundle: { status: BundleStatus.TRUSTED, version: "v0.1.71", built: now },
-    nodes: rows.map((r) => ({ nodeId: r.id, name: r.name, state: r.name === "fi1" ? NodeUpdateState.OUTDATED : NodeUpdateState.UP_TO_DATE, supportsUpdate: true, built: now, version: r.name === "fi1" ? "0.1.70" : "0.1.71", onlineUsers: 1, inbounds: 2, scheduledUnix: 0, address: "", arch: "amd64" })),
+    nodes: rows.map((r) => ({ nodeId: r.id, name: r.name, state: r.name === "fi1" && state !== "calm" ? NodeUpdateState.OUTDATED : NodeUpdateState.UP_TO_DATE, supportsUpdate: true, built: now, version: r.name === "fi1" ? "0.1.70" : "0.1.71", onlineUsers: 1, inbounds: 2, scheduledUnix: 0, address: "", arch: "amd64" })),
   } as never);
   // the saved SSH access: two nodes log in by password only (the panel-key offer)
   c.setQueryData(["node-server-access"], {
@@ -196,7 +197,8 @@ function seeded(state: string, role: Role, edge: boolean) {
   return c;
 }
 
-const demoOf: Record<string, NodesDemo> = {
+/** What a scene starts the screen with (exported for its smoke test). */
+export const demoOf: Record<string, NodesDemo> = {
   select: { selecting: true, ticked: [id("de1"), id("nl1")] },
   find: { find: "hel" },
   nomatch: { find: "zzz" },
@@ -225,7 +227,8 @@ export function NodesPage() {
     if (params.get("fx") === "1") setEffectsEnabled(true);
     // the view the screen opens on is the browser's last choice (the scene has no ?view= of its own)
     writePref("nodes.view", state === "load" ? "load" : state === "map" || state === "map-card" ? "map" : "list");
-    return seeded(state, params.get("role") === "helper" ? Role.HELPER : Role.OWNER, state === "edge");
+    const role = params.get("role");
+    return seeded(state, role === "helper" ? Role.HELPER : role === "readonly" ? Role.READONLY : Role.OWNER, state === "edge");
   });
   const job = state.startsWith("job-");
   const picked = [id("de1"), id("nl1"), id("fi1")];
@@ -264,8 +267,9 @@ export function NodesPage() {
   );
 }
 
-const frames: { id: string; state: string; title: string; w: number; h: number; params?: string }[] = [
+export const frames: { id: string; state: string; title: string; w: number; h: number; params?: string }[] = [
   { id: "nodes-list", state: "list", title: "The board's four nodes: de1 with a remark, fi1 with an old agent (1440)", w: 1440, h: 780 },
+  { id: "nodes-calm", state: "calm", title: "Four nodes, nothing to look at", w: 1440, h: 780 },
   { id: "nodes-list-light", state: "list", title: "The same on the light theme", w: 1440, h: 780, params: "&theme=light" },
   { id: "nodes-list-rail", state: "list", title: "A 900 window: the rail, the card narrows (profiles, online, arrow)", w: 900, h: 780 },
   { id: "nodes-list-phone", state: "list", title: "A phone, 400 wide", w: 400, h: 780 },
@@ -283,6 +287,7 @@ const frames: { id: string; state: string; title: string; w: number; h: number; 
   { id: "nodes-find", state: "find", title: "A search that finds fi1 (the search is open while it holds a word)", w: 1440, h: 780 },
   { id: "nodes-nomatch", state: "nomatch", title: "A search that finds nothing", w: 1440, h: 780 },
   { id: "nodes-helper", state: "list", title: "A helper: no Select, no bulk", w: 1440, h: 780, params: "&role=helper" },
+  { id: "nodes-readonly", state: "list", title: "An observer: the same, and nothing that changes anything", w: 1440, h: 780, params: "&role=readonly" },
   { id: "nodes-job-running", state: "job-running", title: "The bar while a batch runs", w: 1440, h: 780 },
   { id: "nodes-job-done", state: "job-done", title: "The bar when a batch ended well", w: 1440, h: 780 },
   { id: "nodes-job-failed", state: "job-failed", title: "The bar when one node failed (its list opens by itself)", w: 1440, h: 780 },

@@ -241,22 +241,22 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
                     }
                   >
                     <div className="flex flex-col gap-3 p-1.5">
-                    <Field label={t("nodes.filterProtocol")}>
-                      <Select
-                        aria-label={t("nodes.filterProtocol")}
-                        value={protocol}
-                        onValueChange={setProtocol}
-                        options={[{ value: all, label: t("nodes.allProtocols") }, ...protocols.map((p) => ({ value: p, label: protocolName(p) }))]}
-                      />
-                    </Field>
-                    <Field label={t("nodes.filterCountry")}>
-                      <Select
-                        aria-label={t("nodes.filterCountry")}
-                        value={country}
-                        onValueChange={setCountry}
-                        options={[{ value: all, label: t("nodes.allCountries") }, ...countries.map((c) => ({ value: c, label: fmt.country(c) }))]}
-                      />
-                    </Field>
+                      <Field label={t("nodes.filterProtocol")}>
+                        <Select
+                          aria-label={t("nodes.filterProtocol")}
+                          value={protocol}
+                          onValueChange={setProtocol}
+                          options={[{ value: all, label: t("nodes.allProtocols") }, ...protocols.map((p) => ({ value: p, label: protocolName(p) }))]}
+                        />
+                      </Field>
+                      <Field label={t("nodes.filterCountry")}>
+                        <Select
+                          aria-label={t("nodes.filterCountry")}
+                          value={country}
+                          onValueChange={setCountry}
+                          options={[{ value: all, label: t("nodes.allCountries") }, ...countries.map((c) => ({ value: c, label: fmt.country(c) }))]}
+                        />
+                      </Field>
                     </div>
                   </Popover>
                   {owner && selecting && <PickButton picks={picks.map((p) => ({ label: t(p.label), ids: p.ids }))} any={ticked.size > 0} onPick={pick} />}

@@ -197,13 +197,13 @@ export function BulkBar({
         <div className="flex flex-none items-center gap-3 border-e border-[color-mix(in_srgb,var(--text)_18%,transparent)] pe-3 max-md:pe-2">
           <span aria-hidden className="flex ps-2 max-md:hidden">
             {nodes.slice(0, 4).map((n) => (
-              <span key={n.id} className="fz-bulk-pop -ms-2 flex rounded-[5px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--text)_9%,var(--surface))]">
+              <span key={n.id} className="fz-bulk-pop -ms-2 flex rounded-[5px] shadow-[0_0_0_2px_var(--surface-2)]">
                 <Flag code={n.countryCode} size={20} className="w-7" />
               </span>
             ))}
           </span>
           <div className="flex flex-col">
-            <b className="leading-[18px] font-medium whitespace-nowrap">
+            <b className="leading-[18px] font-extrabold whitespace-nowrap">
               {count} {t.n("bulk.selected", count)}
             </b>
             <span className="flex items-baseline gap-1.5 text-xs leading-4 whitespace-nowrap">
