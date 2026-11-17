@@ -64,7 +64,8 @@ func TestBeginStreamRefusesAnExpiredOrRemovedCredential(t *testing.T) {
 		local, remote := net.Pipe()
 		t.Cleanup(func() { _ = local.Close(); _ = remote.Close() })
 		request := httptest.NewRequest(http.MethodConnect, "https://example.com:80", nil)
-		return h.in.beginStream(request, httptest.NewRecorder(), local, credential)
+		stream, _, ok := h.in.beginStream(request, httptest.NewRecorder(), local, credential)
+		return stream, ok
 	}
 
 	stream, ok := begin()

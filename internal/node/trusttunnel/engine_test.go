@@ -1148,23 +1148,26 @@ func TestTCPStreamIdleTimeoutClosesTheTunnel(t *testing.T) {
 	})
 }
 
+// Sixteen connections that each carry a tunnel are all in use: the seventeenth CONNECT of the (proven) credential is told so
+// with 503 and an X-Warning, not shown the site, and the refusal is counted.
 func TestSixteenConnectionCredentialLimit(t *testing.T) {
 	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+	backend := echoBackend(t)
+	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
 	clients := make([]*testHTTP2Client, 17)
 	responses := make([]*http.Response, 17)
 	for i := range clients {
 		clients[i] = newHTTP2Client(t, h.addr)
-		responses[i], _ = clients[i].connect(t, "_check", authValue(t, alice), false)
-		_ = responses[i].Body.Close()
+		responses[i], _ = clients[i].connect(t, "example.com:80", authValue(t, alice), true)
 	}
 	for i := 0; i < 16; i++ {
 		if responses[i].StatusCode != http.StatusOK {
 			t.Fatalf("connection %d status = %d, want 200", i+1, responses[i].StatusCode)
 		}
 	}
-	if responses[16].StatusCode != http.StatusNotFound {
-		t.Fatalf("seventeenth connection status = %d, want masquerade 404", responses[16].StatusCode)
+	const warning = "303 - Too many connections for this account"
+	if responses[16].StatusCode != http.StatusServiceUnavailable || responses[16].Header.Get("X-Warning") != warning {
+		t.Fatalf("seventeenth connection = %d %q, want 503 %q", responses[16].StatusCode, responses[16].Header.Get("X-Warning"), warning)
 	}
 	cs := h.in.idx.Load().byID["alice"]
 	cs.mu.Lock()
@@ -1172,6 +1175,39 @@ func TestSixteenConnectionCredentialLimit(t *testing.T) {
 	cs.mu.Unlock()
 	if open != 16 {
 		t.Fatalf("credential connection count = %d, want 16", open)
+	}
+	only(t, inboundRefusals(t, collect(t, h.e), "de1"), plugin.RefusedStreamLimit, 1)
+}
+
+// Connections that carry no tunnel of the credential (the client left them silently) do not keep a live client out: the
+// seventeenth takes the place of the oldest, and nothing is refused.
+func TestSeventeenthConnectionTakesTheOldestIdleOne(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+	cs := h.in.idx.Load().byID["alice"]
+	clients := make([]*testHTTP2Client, 17)
+	for i := range clients {
+		clients[i] = newHTTP2Client(t, h.addr)
+		if got := statusOf(t, clients[i], "_check", authValue(t, alice)); got.StatusCode != http.StatusOK {
+			t.Fatalf("connection %d status = %d, want 200", i+1, got.StatusCode)
+		}
+		if i == 0 { // the oldest by the credential's own clock, whatever the resolution of the system's
+			cs.mu.Lock()
+			for connection := range cs.connections {
+				cs.connections[connection] = time.Unix(1, 0)
+			}
+			cs.mu.Unlock()
+		}
+	}
+	cs.mu.Lock()
+	open := len(cs.connections)
+	cs.mu.Unlock()
+	if open != 16 {
+		t.Fatalf("credential connection count = %d, want 16", open)
+	}
+	waitFor(t, time.Second, func() bool { return authenticatedConnectionCount(h.in) == 16 })
+	if got := inboundRefusals(t, collect(t, h.e), "de1"); !got.Zero() {
+		t.Fatalf("refusals = %v, want none", describeRefusals(got))
 	}
 }
 

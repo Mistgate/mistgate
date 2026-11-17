@@ -18,7 +18,9 @@ import (
 const (
 	tunnelBufferSize = 32 << 10
 	// maxCredentialConnections is how many HTTP/2 or HTTP/3 connections one credential may hold at once. A connection counts
-	// for every credential that has a tunnel on it.
+	// for every credential that has a tunnel on it. A new connection past the limit takes the place of the credential's
+	// oldest connection that has no tunnel of it (a client that changed networks leaves such connections behind, silent
+	// until the keepalive or the idle time ends them); when every connection has a tunnel, the CONNECT is refused.
 	maxCredentialConnections = 16
 )
 
@@ -67,23 +69,24 @@ type streamState struct {
 	closeTransport func()
 }
 
-func (in *inbound) beginStream(r *http.Request, w http.ResponseWriter, conn net.Conn, cs *credState) (*streamState, bool) {
+// beginStream and beginStreamOnConn say why a stream was not accepted; only plugin.RefusedStreamLimit is told to the client.
+func (in *inbound) beginStream(r *http.Request, w http.ResponseWriter, conn net.Conn, cs *credState) (*streamState, plugin.TunnelRefusal, bool) {
 	if conn == nil {
-		return nil, false
+		return nil, plugin.RefusedStreamClosed, false
 	}
 	return in.beginStreamOnConn(r, w, conn, func() { _ = conn.Close() }, w, cs)
 }
 
-func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key any, closeConn func(), out io.Writer, cs *credState) (*streamState, bool) {
+func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key any, closeConn func(), out io.Writer, cs *credState) (*streamState, plugin.TunnelRefusal, bool) {
 	if key == nil || r.Context().Err() != nil {
 		in.refuse(plugin.RefusedStreamClosed, 0)
-		return nil, false
+		return nil, plugin.RefusedStreamClosed, false
 	}
 	in.connMu.Lock()
 	if r.Context().Err() != nil {
 		in.connMu.Unlock()
 		in.refuse(plugin.RefusedStreamClosed, 0)
-		return nil, false
+		return nil, plugin.RefusedStreamClosed, false
 	}
 	connection := in.conns[key]
 	if connection == nil {
@@ -101,50 +104,83 @@ func (in *inbound) beginStreamOnConn(r *http.Request, w http.ResponseWriter, key
 		in: in, conn: connection, cred: cs, body: r.Body, w: w, out: out, rc: http.NewResponseController(w), ctx: ctx,
 		h3: r.ProtoMajor == 3, cancel: cancel,
 	}
-	connection.mu.Lock()
-	if _, banned := connection.banned[cs]; banned {
-		connection.mu.Unlock()
-		cancel()
-		in.refuse(plugin.RefusedStreamCredGone, 0)
-		return nil, false
-	}
-	if connection.closed || connection.expiring {
-		connection.mu.Unlock()
-		cancel()
-		in.refuse(plugin.RefusedStreamClosed, 0)
-		return nil, false
-	}
-	cs.mu.Lock()
-	if cs.removed.Load() || cs.expired(in.e.now()) {
-		cs.mu.Unlock()
-		connection.mu.Unlock()
-		cancel()
-		in.refuse(plugin.RefusedStreamCredGone, 0)
-		return nil, false
-	}
-	if _, exists := cs.connections[connection]; !exists {
-		if len(cs.connections) >= maxCredentialConnections {
+	for {
+		connection.mu.Lock()
+		if _, banned := connection.banned[cs]; banned {
+			connection.mu.Unlock()
+			cancel()
+			in.refuse(plugin.RefusedStreamCredGone, 0)
+			return nil, plugin.RefusedStreamCredGone, false
+		}
+		if connection.closed || connection.expiring {
+			connection.mu.Unlock()
+			cancel()
+			in.refuse(plugin.RefusedStreamClosed, 0)
+			return nil, plugin.RefusedStreamClosed, false
+		}
+		cs.mu.Lock()
+		if cs.removed.Load() || cs.expired(in.e.now()) {
 			cs.mu.Unlock()
 			connection.mu.Unlock()
 			cancel()
-			in.refuse(plugin.RefusedStreamLimit, 0)
-			return nil, false
+			in.refuse(plugin.RefusedStreamCredGone, 0)
+			return nil, plugin.RefusedStreamCredGone, false
 		}
-		cs.connections[connection] = in.e.now()
-		cs.connects.Add(1)
+		if _, exists := cs.connections[connection]; !exists {
+			if len(cs.connections) >= maxCredentialConnections {
+				// Another connection of the credential is detached with no lock held (detach takes the connection's lock before
+				// the credential's); the limit is checked again afterwards, so two CONNECTs racing here never exceed it.
+				victim := cs.idleConnection()
+				cs.mu.Unlock()
+				connection.mu.Unlock()
+				if victim == nil {
+					cancel()
+					in.refuse(plugin.RefusedStreamLimit, 0)
+					return nil, plugin.RefusedStreamLimit, false
+				}
+				if !victim.detach(cs) { // it is closing or being detached by someone else: it leaves the set either way
+					cs.mu.Lock()
+					delete(cs.connections, victim)
+					cs.mu.Unlock()
+				}
+				continue
+			}
+			cs.connections[connection] = in.e.now()
+			cs.connects.Add(1)
+		}
+		connection.credentials[cs] = cs.connections[connection]
+		cs.streams[stream] = struct{}{}
+		cs.active++
+		connection.streams[stream] = struct{}{}
+		connection.active++
+		if connection.idle != nil {
+			connection.idle.Stop()
+			connection.idle = nil
+		}
+		cs.mu.Unlock()
+		connection.mu.Unlock()
+		return stream, 0, true
 	}
-	connection.credentials[cs] = cs.connections[connection]
-	cs.streams[stream] = struct{}{}
-	cs.active++
-	connection.streams[stream] = struct{}{}
-	connection.active++
-	if connection.idle != nil {
-		connection.idle.Stop()
-		connection.idle = nil
+}
+
+// idleConnection is the oldest connection of the credential that has no tunnel of it, nil when there is none. The caller
+// holds cs.mu.
+func (cs *credState) idleConnection() *connectionState {
+	busy := make(map[*connectionState]struct{}, len(cs.streams))
+	for stream := range cs.streams {
+		busy[stream.conn] = struct{}{}
 	}
-	cs.mu.Unlock()
-	connection.mu.Unlock()
-	return stream, true
+	var victim *connectionState
+	var oldest time.Time
+	for connection, since := range cs.connections {
+		if _, live := busy[connection]; live {
+			continue
+		}
+		if victim == nil || since.Before(oldest) {
+			victim, oldest = connection, since
+		}
+	}
+	return victim
 }
 
 // finishStream runs when the handler is about to return.

@@ -193,21 +193,22 @@ func TestKickAndRemovalCloseTheConnectionOfAloneCredential(t *testing.T) {
 func TestConnectionLimitAndSessionsCountPerCredentialOnMixedConnections(t *testing.T) {
 	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
 	bob := makeCredential(t, "bob", "bob", "person-bob", 0, 0)
-	h := newHarness(t, []plugin.UserCred{alice.cred, bob.cred}, &testEgress{}, timings{})
+	backend := echoBackend(t)
+	h := newHarness(t, []plugin.UserCred{alice.cred, bob.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
 	clients := make([]*testHTTP2Client, 17)
 	for i := range clients {
 		clients[i] = newHTTP2Client(t, h.addr)
 	}
-	for i := 0; i < 16; i++ {
-		if got := statusOf(t, clients[i], "_check", authValue(t, alice)); got.StatusCode != http.StatusOK {
+	for i := 0; i < 16; i++ { // a tunnel on each: the limit counts the connections that are in use
+		if got, _ := clients[i].connect(t, "example.com:80", authValue(t, alice), true); got.StatusCode != http.StatusOK {
 			t.Fatalf("alice on connection %d = %d", i+1, got.StatusCode)
 		}
 	}
 	if got := statusOf(t, clients[0], "_check", authValue(t, bob)); got.StatusCode != http.StatusOK {
 		t.Fatalf("bob on alice's first connection = %d", got.StatusCode)
 	}
-	if got := statusOf(t, clients[16], "_check", authValue(t, alice)); got.StatusCode != http.StatusNotFound {
-		t.Fatalf("alice's 17th connection = %d, want the decoy's answer", got.StatusCode)
+	if got := statusOf(t, clients[16], "_check", authValue(t, alice)); got.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("alice's 17th connection = %d, want 503", got.StatusCode)
 	}
 	if got := statusOf(t, clients[16], "_check", authValue(t, bob)); got.StatusCode != http.StatusOK {
 		t.Fatalf("bob on the connection alice was refused = %d, want 200: his budget is his own", got.StatusCode)

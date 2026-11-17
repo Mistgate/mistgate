@@ -396,16 +396,17 @@ func TestHTTP3KickAndCredentialRemovalResetOnlyMatchingStreams(t *testing.T) {
 
 func TestHTTP3ConnectionLimitCountsTCPAndQUICTogether(t *testing.T) {
 	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
-	h := newH3Harness(t, []plugin.UserCred{alice.cred}, nil, timings{})
+	backend := echoBackend(t)
+	h := newH3Harness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
 	h2 := make([]*testHTTP2Client, 8)
 	h3 := make([]*testHTTP3Client, 8)
-	for i := range h2 {
+	for i := range h2 { // a tunnel on each: the limit counts the connections that are in use
 		h2[i] = newHTTP2Client(t, h.addr)
-		if got := statusOf(t, h2[i], "_check", authValue(t, alice)); got.StatusCode != http.StatusOK {
+		if got, _ := h2[i].connect(t, "example.com:80", authValue(t, alice), true); got.StatusCode != http.StatusOK {
 			t.Fatalf("TCP connection %d status = %d", i+1, got.StatusCode)
 		}
 		h3[i] = newHTTP3Client(t, h.addr)
-		if got := h3[i].status(t, "_check", authValue(t, alice)); got.StatusCode != http.StatusOK {
+		if got, _ := h3[i].connect(t, "example.com:80", authValue(t, alice), true); got.StatusCode != http.StatusOK {
 			t.Fatalf("QUIC connection %d status = %d", i+1, got.StatusCode)
 		}
 	}
@@ -417,12 +418,12 @@ func TestHTTP3ConnectionLimitCountsTCPAndQUICTogether(t *testing.T) {
 		t.Fatalf("mixed TCP+QUIC session count = %d, want %d", count, maxCredentialConnections)
 	}
 	deniedH3 := newHTTP3Client(t, h.addr)
-	if got := deniedH3.status(t, "_check", authValue(t, alice)); got.StatusCode != http.StatusNotFound {
-		t.Fatalf("17th mixed connection over QUIC = %d, want masquerade", got.StatusCode)
+	if got := deniedH3.status(t, "_check", authValue(t, alice)); got.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("17th mixed connection over QUIC = %d, want 503", got.StatusCode)
 	}
 	deniedH2 := newHTTP2Client(t, h.addr)
-	if got := statusOf(t, deniedH2, "_check", authValue(t, alice)); got.StatusCode != http.StatusNotFound {
-		t.Fatalf("17th mixed connection over TCP = %d, want masquerade", got.StatusCode)
+	if got := statusOf(t, deniedH2, "_check", authValue(t, alice)); got.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("17th mixed connection over TCP = %d, want 503", got.StatusCode)
 	}
 }
 

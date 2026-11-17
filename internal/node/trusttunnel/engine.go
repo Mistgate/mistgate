@@ -329,7 +329,10 @@ func (in *inbound) start(ctx context.Context) error {
 		host = BindIP.String()
 	}
 	addr := net.JoinHostPort(host, strconv.Itoa(int(in.spec.Listen.Port)))
-	ln, err := net.Listen("tcp", addr)
+	// A client that vanished (a phone that changed networks) is dropped in about 30 s, not in the system's two and a half
+	// minutes. Only TCP keepalive probes: an HTTP/2 PING from the server would tell this node from an ordinary web server.
+	lc := net.ListenConfig{KeepAliveConfig: net.KeepAliveConfig{Enable: true, Idle: 15 * time.Second, Interval: 5 * time.Second, Count: 3}}
+	ln, err := lc.Listen(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("listen tcp %d: %w", in.spec.Listen.Port, err)
 	}

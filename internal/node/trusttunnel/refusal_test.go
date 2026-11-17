@@ -227,7 +227,7 @@ func TestStreamsThatAreNotAcceptedAreCountedByReason(t *testing.T) {
 	credential := h.in.idx.Load().byUser["alice"]
 	begin := func(ctx context.Context, key net.Conn) bool {
 		request := httptest.NewRequest(http.MethodConnect, "https://example.com:80", nil).WithContext(ctx)
-		_, ok := h.in.beginStreamOnConn(request, httptest.NewRecorder(), key, func() { _ = key.Close() }, io.Discard, credential)
+		_, _, ok := h.in.beginStreamOnConn(request, httptest.NewRecorder(), key, func() { _ = key.Close() }, io.Discard, credential)
 		return ok
 	}
 	local, remote := net.Pipe()
@@ -283,14 +283,166 @@ func TestStreamsThatAreNotAcceptedAreCountedByReason(t *testing.T) {
 	other, otherRemote := net.Pipe()
 	t.Cleanup(func() { _ = other.Close(); _ = otherRemote.Close() })
 	credential.mu.Lock()
-	for range maxCredentialConnections {
-		credential.connections[&connectionState{}] = time.Now()
+	for range maxCredentialConnections { // sixteen connections, each with a tunnel of the credential
+		busy := &connectionState{}
+		credential.connections[busy] = time.Now()
+		credential.streams[&streamState{conn: busy, cred: credential}] = struct{}{}
 	}
 	credential.mu.Unlock()
 	if begin(context.Background(), other) {
 		t.Fatal("a credential past its connection limit began a tunnel on a new connection")
 	}
 	expect(plugin.RefusedStreamLimit)
+	credential.mu.Lock() // the stand-ins are not real streams: nothing is to abort them when the harness closes
+	clear(credential.streams)
+	clear(credential.connections)
+	credential.mu.Unlock()
+}
+
+// fullCredential gives alice sixteen connections (the first is the oldest) and returns them with the far ends of their
+// pipes. A connection in live has a tunnel of alice still open; on the others it has ended.
+func fullCredential(t *testing.T, h *testHarness, credential *credState, live map[int]bool) ([]*connectionState, []net.Conn, []net.Conn) {
+	t.Helper()
+	var states []*connectionState
+	var keys, remotes []net.Conn
+	for i := range maxCredentialConnections {
+		local, remote := net.Pipe()
+		t.Cleanup(func() { _ = local.Close(); _ = remote.Close() })
+		request := httptest.NewRequest(http.MethodConnect, "https://example.com:80", nil)
+		stream, _, ok := h.in.beginStream(request, httptest.NewRecorder(), local, credential)
+		if !ok {
+			t.Fatalf("connection %d of alice was refused", i+1)
+		}
+		if !live[i] {
+			h.in.finishStream(stream)
+		}
+		h.in.connMu.Lock()
+		states = append(states, h.in.conns[local])
+		h.in.connMu.Unlock()
+		keys, remotes = append(keys, local), append(remotes, remote)
+	}
+	credential.mu.Lock()
+	for i, connection := range states {
+		credential.connections[connection] = time.Unix(1000+int64(i), 0)
+	}
+	credential.mu.Unlock()
+	return states, keys, remotes
+}
+
+// The seventeenth connection takes the place of the oldest connection that has no tunnel of the credential; one with a
+// tunnel is never touched, however old. Nothing is refused.
+func TestFullCredentialGivesUpItsOldestIdleConnection(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+	credential := h.in.idx.Load().byUser["alice"]
+	states, _, remotes := fullCredential(t, h, credential, map[int]bool{0: true}) // the oldest still carries a tunnel
+
+	local, remote := net.Pipe()
+	t.Cleanup(func() { _ = local.Close(); _ = remote.Close() })
+	request := httptest.NewRequest(http.MethodConnect, "https://example.com:80", nil)
+	if _, refusal, ok := h.in.beginStream(request, httptest.NewRecorder(), local, credential); !ok {
+		t.Fatalf("the seventeenth connection was refused (%s), want it to take an idle one's place", refusal.Name())
+	}
+	credential.mu.Lock()
+	_, busyKept := credential.connections[states[0]]
+	_, idleKept := credential.connections[states[1]]
+	count := len(credential.connections)
+	credential.mu.Unlock()
+	if count != maxCredentialConnections || !busyKept || idleKept {
+		t.Fatalf("connections = %d, oldest busy kept = %v, oldest idle kept = %v; want 16, true, false", count, busyKept, idleKept)
+	}
+	// the evicted connection is closed (nothing else is on it); the one with the tunnel is not
+	_ = remotes[1].SetReadDeadline(time.Now().Add(time.Second))
+	if _, err := remotes[1].Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+		t.Fatalf("the evicted connection: read = %v, want it closed", err)
+	}
+	_ = remotes[0].SetReadDeadline(time.Now().Add(20 * time.Millisecond))
+	if _, err := remotes[0].Read(make([]byte, 1)); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("the connection with a tunnel: read = %v, want it open", err)
+	}
+	if got := inboundRefusals(t, collect(t, h.e), "de1"); !got.Zero() {
+		t.Fatalf("refusals = %v, want none", describeRefusals(got))
+	}
+}
+
+// With a tunnel on every connection there is nobody to give up: the seventeenth is refused and counted.
+func TestFullCredentialWithTunnelsOnEveryConnectionIsRefused(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+	credential := h.in.idx.Load().byUser["alice"]
+	live := map[int]bool{}
+	for i := range maxCredentialConnections {
+		live[i] = true
+	}
+	fullCredential(t, h, credential, live)
+
+	local, remote := net.Pipe()
+	t.Cleanup(func() { _ = local.Close(); _ = remote.Close() })
+	request := httptest.NewRequest(http.MethodConnect, "https://example.com:80", nil)
+	if _, refusal, ok := h.in.beginStream(request, httptest.NewRecorder(), local, credential); ok || refusal != plugin.RefusedStreamLimit {
+		t.Fatalf("seventeenth connection: ok = %v, refusal = %s; want refused for the limit", ok, refusal.Name())
+	}
+	only(t, inboundRefusals(t, collect(t, h.e), "de1"), plugin.RefusedStreamLimit, 1)
+}
+
+// Sixteen idle connections and many new ones at once: the limit is never exceeded, and every new connection gets in.
+func TestFullCredentialRacingConnectionsNeverExceedTheLimit(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{}, timings{})
+	credential := h.in.idx.Load().byUser["alice"]
+	fullCredential(t, h, credential, nil)
+
+	var wg sync.WaitGroup
+	results := make([]bool, 8)
+	for i := range results {
+		local, remote := net.Pipe()
+		t.Cleanup(func() { _ = local.Close(); _ = remote.Close() })
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			request := httptest.NewRequest(http.MethodConnect, "https://example.com:80", nil)
+			_, _, results[i] = h.in.beginStream(request, httptest.NewRecorder(), local, credential)
+		}()
+	}
+	wg.Wait()
+	for i, ok := range results {
+		if !ok {
+			t.Fatalf("racing connection %d was refused although idle ones could be given up", i)
+		}
+	}
+	credential.mu.Lock()
+	count := len(credential.connections)
+	credential.mu.Unlock()
+	if count != maxCredentialConnections {
+		t.Fatalf("connections = %d, want %d", count, maxCredentialConnections)
+	}
+}
+
+// Someone who is not alice learns nothing from the limit: a wrong password, even with every connection of alice busy, gets
+// the site and no 503, and nothing is counted against alice.
+func TestFullCredentialStaysInvisibleToAStranger(t *testing.T) {
+	alice := makeCredential(t, "alice", "alice", "person-alice", 0, 0)
+	backend := echoBackend(t)
+	h := newHarness(t, []plugin.UserCred{alice.cred}, &testEgress{tcpAddr: backend.listener.Addr().String()}, timings{})
+	clients := make([]*testHTTP2Client, maxCredentialConnections)
+	for i := range clients {
+		clients[i] = newHTTP2Client(t, h.addr)
+		if response, _ := clients[i].connect(t, "example.com:80", authValue(t, alice), true); response.StatusCode != http.StatusOK {
+			t.Fatalf("connection %d = %d", i+1, response.StatusCode)
+		}
+	}
+	wrong := alice
+	wrong.password = "not-" + alice.password
+	stranger := newHTTP2Client(t, h.addr)
+	response, _ := stranger.connect(t, "example.com:80", authValue(t, wrong), false)
+	body, _ := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusNotFound || string(body) != "decoy site" || response.Header.Get("X-Warning") != "" {
+		t.Fatalf("wrong password = %d %q (X-Warning %q), want the site", response.StatusCode, body, response.Header.Get("X-Warning"))
+	}
+	if got := inboundRefusals(t, collect(t, h.e), "de1"); !got.Zero() {
+		t.Fatalf("refusals = %v, want none", describeRefusals(got))
+	}
 }
 
 // The same on the wire: a kicked credential's next CONNECT on the connection still gets the site, not an error.

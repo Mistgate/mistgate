@@ -70,8 +70,13 @@ func (in *inbound) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	stream, ok := in.beginStreamOnConn(r, w, key, closeConn, w, cs)
+	stream, refusal, ok := in.beginStreamOnConn(r, w, key, closeConn, w, cs)
 	if !ok {
+		if refusal == plugin.RefusedStreamLimit {
+			// The credential is proven here, so this is the one refusal that says what it is instead of showing the site.
+			writeConnectionLimit(w)
+			return
+		}
 		in.serveMasquerade(w, r)
 		return
 	}
@@ -156,6 +161,14 @@ func writeTunnelError(w http.ResponseWriter, code int, host string) {
 		w.Header().Set("X-Warning", "300 - Connection failed for some reason")
 	}
 	w.WriteHeader(http.StatusBadGateway)
+}
+
+// writeConnectionLimit answers a CONNECT of an authenticated credential that holds the most connections it may, every one
+// of them with a tunnel. 303 is ours: the TrustTunnel codes in use are 300, 301, 302 and 310.
+func writeConnectionLimit(w http.ResponseWriter) {
+	w.Header().Set("Content-Length", "0")
+	w.Header().Set("X-Warning", "303 - Too many connections for this account")
+	w.WriteHeader(http.StatusServiceUnavailable)
 }
 
 func warningForDialError(err error) int { return warningFor(classifyDial(err)) }
