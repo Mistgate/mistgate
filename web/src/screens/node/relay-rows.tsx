@@ -1,5 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { isFresh } from "@/components/fx/registry";
+import { useFresh } from "@/components/fx/fresh";
+import { effectsFor } from "@/lib/effects";
 import { Flag } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
@@ -13,8 +16,9 @@ import { msText } from "@/lib/health";
 import { agentError, checkReason, enableGate, relayState, statePill, unverifiable, type RelayMsg, type RelayState, type Stage } from "@/lib/relay";
 import { modeOf } from "@/lib/relay-bridge";
 import { useNow } from "@/lib/time";
-import { ChangeWay } from "./relay-way";
-import { ChangeRelayPort, RemoveRelay, useCountryOf, type RelayRuns } from "./relays";
+import { ModeEditor, PortEditor } from "./relay-editors";
+import { waysDemo } from "./ways-demo";
+import { RemoveRelay, useCountryOf, type RelayRuns } from "./relays";
 
 // The servers of a relay pair (the board's .nq-sv rows): the profile and its port on the entry, its state, a menu of what to do with it,
 // the reason when it does not work, and on a click the line from people through the entry to the exit. The way of the whole pair and
@@ -43,22 +47,27 @@ type RowProps = {
   onOn: () => void;
   onOff: () => void;
   onRemove: () => void;
-  onPort?: () => void;
-  onWay?: () => void;
   /** "Another entry…" under a failed server (the way's wizard); undefined when the owner cannot or there is none. */
   onOther?: () => void;
   /** A reader: the state and its words, none of the buttons. */
   readOnly?: boolean;
   /** The line open to begin with (the dev kit). */
   open?: boolean;
+  /** The editor open to begin with (the dev kit): the port, or the method. */
+  edit?: "port" | "mode";
 };
 
 /** One server: what it passes on, its state, the menu, why it fails, the line. */
-export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck, onOn, onOff, onRemove, onPort, onWay, onOther, readOnly, open: start }: RowProps) {
+export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck, onOn, onOff, onRemove, onOther, readOnly, open: start, edit: startEdit }: RowProps) {
   const t = useT();
   const fmt = useFmt();
   const [open, setOpen] = useState(!!start);
   const [menu, setMenu] = useState(false);
+  // a relay that was just made grows into its row and sweeps (the board's nd-new): decided when the row first appears, the sweep takes the mark
+  const [grow] = useState(() => effectsFor("create") && isFresh("relay", r.id));
+  const fresh = useFresh<HTMLLIElement>("relay", r.id);
+  // the port and the method open under the row, in place of a window
+  const [edit, setEdit] = useState<"port" | "mode" | null>(startEdit ?? null);
   const state: RelayState = busy === "check" || busy === "on" ? "checking" : relayState(r);
   const gate = enableGate(r, nowS);
   const reason = checkReason(t, r);
@@ -106,7 +115,7 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
   };
 
   return (
-    <li data-testid="relay-row" data-state={state} className={cx("wy-sv", !r.enabled && "off", busy && "now")}>
+    <li ref={fresh} data-testid="relay-row" data-state={state} className={cx("wy-sv", !r.enabled && "off", busy && "now", grow && "wy-new")}>
       <div className="wy-s1">
         <span className="tg flex justify-center">
           <ProtocolTag protocol={r.protocol} compact />
@@ -147,10 +156,10 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
                       {t("relay.on")}
                     </button>
                   )}
-                  <button type="button" role="menuitem" onClick={pick(onPort)}>
+                  <button type="button" role="menuitem" onClick={pick(() => setEdit("port"))}>
                     {t("wy.mn.port")}
                   </button>
-                  <button type="button" role="menuitem" onClick={pick(onWay)}>
+                  <button type="button" role="menuitem" onClick={pick(() => setEdit("mode"))}>
                     {t("wy.mn.way")}
                   </button>
                   <button type="button" role="menuitem" className="risk" disabled={!!busy} onClick={pick(onRemove)}>
@@ -189,6 +198,8 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
           {note}
         </Notice>
       )}
+      {edit === "port" && <PortEditor key={`${r.id}/${r.port}`} r={r} onClose={() => setEdit(null)} />}
+      {edit === "mode" && <ModeEditor key={r.id} r={r} onClose={() => setEdit(null)} />}
       {open && (
         <>
           <div className="wy-chain" data-testid="relay-chain">
@@ -236,16 +247,15 @@ export function RelayRows({ list, runs, readOnly, people, onOther }: { list: rea
   const ccOf = useCountryOf();
   const nowS = Math.floor(useNow(15_000) / 1000);
   const [removing, setRemoving] = useState<RelayMsg | null>(null);
-  const [changing, setChanging] = useState<RelayMsg | null>(null);
-  const [porting, setPorting] = useState<RelayMsg | null>(null);
   return (
     <>
       {/* the owner's calls: a reader (helper, observer) sees the state, with one line saying who changes it */}
       {readOnly && <Notice tone="quiet" className="mx-6 mb-2 max-[720px]:mx-4">{t("relay.way.readOnly")}</Notice>}
       <ul>
-        {list.map((r) => (
+        {list.map((r, i) => (
           <RelayRow
             key={r.id}
+            edit={i === 0 ? waysDemo.current?.edit : undefined}
             r={r}
             busy={runs.busy[r.id]}
             note={runs.notes[r.id]}
@@ -257,16 +267,12 @@ export function RelayRows({ list, runs, readOnly, people, onOther }: { list: rea
             onOn={() => runs.on(r)}
             onOff={() => runs.off(r)}
             onRemove={() => setRemoving(r)}
-            onPort={() => setPorting(r)}
-            onWay={() => setChanging(r)}
             onOther={onOther}
             readOnly={readOnly}
           />
         ))}
       </ul>
       {removing && <RemoveRelay r={removing} onClose={() => setRemoving(null)} />}
-      {changing && <ChangeWay key={changing.id} r={changing} onClose={() => setChanging(null)} />}
-      {porting && <ChangeRelayPort key={porting.id} r={porting} onClose={() => setPorting(null)} />}
     </>
   );
 }

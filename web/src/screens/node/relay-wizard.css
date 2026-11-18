@@ -1,0 +1,775 @@
+/*
+ * The wizard "Make reachable from…" of the node page's Ways in tab (screens/node/relay-wizard.tsx) and the strip over the ways (relay-strip.tsx):
+ * the values are pn.css's last rules of the board's .rw-wz, .rw-steps, .rw-wb, .rw-lead, .rw-wr, .rw-we, .rw-pl, .rw-ps, .rw-get, .rw-rh, .rw-pg, .rw-rn,
+ * .rw-res, .rw-wv and .as-eg.rw-eg; the tokens are the project's (--border is the board's --hair, --accent-mark its --acc, --danger --crit, --warning --warn).
+ * The window itself is the Modal (the page's other windows); what moves is under [data-fx] (the reveal animation of Settings -> Interface) and is
+ * switched off by reduced motion. The board's @container is the window's width here. Class names are the board's with the prefix `wy-`.
+ */
+
+@property --asa {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 135deg;
+}
+@property --pgw {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+@property --r {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.wy-wz {
+  position: relative;
+}
+.wy-wz .i {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  width: 16px;
+  height: 16px;
+}
+
+/* the steps: a ring with the number, a tick when it is done, a line to the next; on a phone only the current one has its word */
+.wy-steps {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 4px 0 16px;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+.wy-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.wy-steps li + li {
+  flex: 1 1 auto;
+}
+.wy-steps li + li::before {
+  content: "";
+  flex: 1;
+  height: 1px;
+  min-width: 16px;
+  margin-inline-end: 4px;
+  background: var(--border);
+  transition: background-color 0.3s var(--e);
+}
+.wy-steps li > i {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-style: normal;
+  font-size: 11px;
+  transition:
+    background-color 0.2s var(--e),
+    border-color 0.2s var(--e);
+}
+.wy-steps li > i .i {
+  display: none;
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
+}
+.wy-steps li.cur {
+  color: var(--text);
+}
+.wy-steps li.cur > i {
+  border-color: var(--accent-mark);
+  color: var(--accent-mark);
+}
+.wy-steps li.done > i {
+  background: var(--accent-mark);
+  border-color: var(--accent-mark);
+  color: var(--ink-on-accent);
+}
+.wy-steps li.done > i .i {
+  display: block;
+}
+.wy-steps li.done > i span {
+  display: none;
+}
+.wy-steps li.done + li::before {
+  background: var(--accent-line);
+}
+[data-fx] .wy-steps li.done > i {
+  animation: wy-pop 0.35s var(--ease-spring) both;
+}
+@media (width <= 720px) {
+  .wy-steps {
+    padding: 0 0 10px;
+    font-size: 0;
+  }
+  .wy-steps li {
+    gap: 0;
+  }
+  .wy-steps li + li {
+    flex: 0 0 auto;
+  }
+  .wy-steps li.cur {
+    font-size: 13px;
+    gap: 8px;
+    flex: 1 1 auto;
+  }
+  .wy-steps li + li::before {
+    display: none;
+  }
+}
+
+/* the body of a step */
+.wy-wb {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.wy-wb > * {
+  flex: none;
+}
+.wy-lead {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+/* a dot: filled when it works, half when it works for some, a cross when it does not, a ring when nothing is known */
+.wy-gl {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--muted);
+  background: none;
+}
+.wy-gl.ok {
+  border-color: var(--accent-mark);
+  background: var(--accent-mark);
+}
+.wy-gl.part {
+  border-color: var(--warning);
+  background: linear-gradient(90deg, var(--warning) 50%, transparent 50%);
+}
+.wy-gl.bad {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%);
+}
+.wy-gl.busy {
+  border-color: var(--tone-sky);
+  border-inline-end-color: transparent;
+  animation: wy-spin 0.8s linear infinite;
+}
+/* the box of a choice: a rounded square, the accent when it is on */
+.wy-cb {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 28%, transparent);
+  color: transparent;
+  transition:
+    background-color 0.15s var(--e),
+    border-color 0.15s var(--e);
+}
+.wy-cb .i {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+.wy-cb.on {
+  background: var(--accent-mark);
+  border-color: var(--accent-mark);
+  color: var(--ink-on-accent);
+}
+/* step 1: the node, chosen already */
+.wy-wr {
+  display: grid;
+  grid-template-columns: 20px 20px 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--accent-mark) 4%, transparent);
+  text-align: start;
+  font-size: 13px;
+  cursor: default;
+}
+.wy-wr b {
+  font-weight: 500;
+}
+.wy-wr > span:not(.wy-cb) {
+  color: var(--muted);
+}
+.wy-wr em {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.wy-wr em.bad {
+  color: var(--danger);
+}
+.wy-wr em.part {
+  color: var(--warning);
+}
+/* step 2: an entry to go through */
+.wy-rg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wy-we {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  text-align: start;
+  transition: border-color 0.15s var(--e);
+}
+.wy-we:hover {
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+}
+.wy-we[aria-checked="true"] {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent-mark) 4%, transparent);
+}
+.wy-we > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.wy-we b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.wy-we b .wy-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 500;
+}
+.wy-we > div > span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.wy-we > div > span .wy-gl {
+  margin-top: 5px;
+}
+.wy-rad {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--text) 28%, transparent);
+  transition: border-color 0.15s var(--e);
+}
+.wy-rad i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-mark);
+  transform: scale(0);
+  transition: transform 0.2s var(--ease-spring);
+}
+[aria-checked="true"] > .wy-rad {
+  border-color: var(--accent-mark);
+}
+[aria-checked="true"] > .wy-rad i {
+  transform: none;
+}
+/* step 3: the servers of the node that go, what people get */
+.wy-pl {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.wy-pl .h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+}
+.wy-pl .h b {
+  font-weight: 500;
+}
+.wy-pl .h em {
+  margin-inline-start: auto;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.wy-pl .h .wy-mchip {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.wy-brn {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sec);
+}
+.wy-ps {
+  display: grid;
+  grid-template-columns: 20px 110px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-top: 1px solid var(--border);
+  text-align: start;
+  font-size: 13px;
+}
+.wy-ps b {
+  font-weight: 500;
+}
+.wy-ps > span.mono {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wy-ps em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.wy-ps em.warn {
+  color: var(--warning);
+}
+.wy-ps.off {
+  cursor: default;
+}
+.wy-ps.off b,
+.wy-ps.off .wy-cb,
+.wy-ps.off > span.mono {
+  opacity: 0.45;
+}
+.wy-get {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-mark) 5%, transparent);
+}
+.wy-get p {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
+.wy-get p .wy-gl {
+  margin-top: 5px;
+}
+.wy-nt {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.wy-nt > .i {
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+}
+/* step 4: the run */
+.wy-rh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+}
+.wy-rh b {
+  font-weight: 500;
+}
+.wy-pg {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent-mark) var(--pgw), var(--step) 0);
+}
+.wy-pg.bad {
+  background: linear-gradient(90deg, var(--danger) var(--pgw), var(--step) 0);
+}
+.wy-pg.soon {
+  background: linear-gradient(90deg, var(--warning) var(--pgw), var(--step) 0);
+}
+/* the bar fills smoothly with the reveal animation, and jumps without it */
+[data-fx] .wy-pg {
+  transition: --pgw 0.4s var(--e);
+}
+.wy-rn {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.wy-rn > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: start;
+  height: 24px;
+}
+.wy-rn > span b {
+  font-weight: 500;
+}
+.wy-rn > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wy-rn > div > div {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  color: var(--sec);
+}
+.wy-rn > div > div .wy-gl {
+  justify-self: center;
+}
+.wy-rn > div > div b {
+  font-weight: 500;
+  color: var(--text);
+}
+.wy-rn > div > div.none {
+  color: var(--muted);
+}
+.wy-rn > div > div.bad span {
+  color: var(--danger);
+}
+.wy-res {
+  margin: 8px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-weight: 500;
+}
+[data-fx] .wy-res {
+  animation: mg-up 0.4s var(--e) 0.15s both;
+}
+.wy-wz .wy-wf {
+  margin-inline-end: auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (width <= 720px) {
+  .wy-wz .wy-wf {
+    flex: 1 1 100%;
+  }
+  .wy-ps {
+    grid-template-columns: 20px minmax(0, 1fr);
+    padding: 8px 12px;
+    height: auto;
+    min-height: 44px;
+    row-gap: 2px;
+    align-items: start;
+  }
+  .wy-ps > .wy-cb {
+    grid-row: 1 / 4;
+    margin-top: 2px;
+  }
+  .wy-ps > span.mono,
+  .wy-ps em {
+    grid-column: 2;
+    white-space: normal;
+  }
+  .wy-ps em:empty {
+    display: none;
+  }
+  .wy-wr {
+    grid-template-columns: 20px 20px 52px minmax(0, 1fr);
+  }
+  .wy-wr > span:not(.wy-cb) {
+    display: none;
+  }
+  .wy-rn {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* the end of a run: the wave from the top of the window and the two glints along its edge (the board's rw-wv and as-eg), only with the reveal animation */
+.wy-wv {
+  --w1: rgb(80 220 175 / 0.42);
+  --w2: rgb(70 195 225 / 0.38);
+  --w3: rgb(180 240 150 / 0.34);
+  --w4: rgb(235 255 245 / 0.22);
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+:root[data-theme="light"] .wy-wv {
+  --w1: rgb(40 190 150 / 0.3);
+  --w2: rgb(50 170 210 / 0.26);
+  --w3: rgb(140 210 90 / 0.24);
+  --w4: rgb(180 235 215 / 0.2);
+}
+.wy-wv i {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle at 50% 96px,
+    transparent calc(var(--r) - 220px),
+    var(--w1) calc(var(--r) - 130px),
+    var(--w2) calc(var(--r) - 40px),
+    var(--w3) calc(var(--r) + 40px),
+    var(--w4) calc(var(--r) + 120px),
+    transparent calc(var(--r) + 220px)
+  );
+  animation:
+    wy-wv-r 1.9s cubic-bezier(0.25, 0.6, 0.3, 1) 0.1s both,
+    wy-wv-a 1.9s ease-out 0.1s both;
+}
+:root[data-theme="light"] .wy-wv i {
+  mix-blend-mode: normal;
+}
+.wy-eg {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  opacity: 0;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+.wy-eg:dir(rtl) {
+  transform: scaleX(-1);
+}
+.wy-eg.a {
+  background: conic-gradient(from calc(var(--asa) - 40deg), transparent 0, rgb(120 235 190 / 0.2) 20deg, rgb(160 245 210) 40deg, rgb(110 200 235 / 0.5) 60deg, transparent 80deg, transparent 360deg);
+  animation: wy-eg-a 2.8s cubic-bezier(0.16, 0.7, 0.2, 1) 0.1s both;
+}
+.wy-eg.b {
+  background: conic-gradient(from calc(var(--asa) - 40deg), transparent 0, rgb(110 200 235 / 0.5) 20deg, rgb(160 245 210) 40deg, rgb(120 235 190 / 0.2) 60deg, transparent 80deg, transparent 360deg);
+  animation: wy-eg-b 1.9s cubic-bezier(0.16, 0.7, 0.2, 1) 0.1s both;
+}
+@keyframes wy-wv-r {
+  from {
+    --r: 30px;
+  }
+  to {
+    --r: 1400px;
+  }
+}
+@keyframes wy-wv-a {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 0.7;
+  }
+  70% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes wy-eg-a {
+  0% {
+    --asa: 135deg;
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.85;
+  }
+  100% {
+    --asa: 560deg;
+    opacity: 0;
+  }
+}
+@keyframes wy-eg-b {
+  0% {
+    --asa: 135deg;
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  45% {
+    opacity: 0.6;
+  }
+  100% {
+    --asa: -120deg;
+    opacity: 0;
+  }
+}
+@keyframes wy-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes wy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* a relay that was just turned on grows into its place and splashes: the board's nd-new (the row scales out of nothing, a glow rings it once) */
+.wy-sv.wy-new {
+  transform-origin: 50% 0;
+  animation: wy-grow 0.7s var(--ease-spring) both;
+}
+@keyframes wy-grow {
+  0% {
+    opacity: 0;
+    transform: scaleY(0);
+    box-shadow: 0 0 0 0 var(--accent-mark);
+  }
+  45% {
+    opacity: 1;
+    transform: scaleY(1.04);
+    box-shadow: 0 0 12px 2px color-mix(in srgb, var(--accent-mark) 55%, transparent);
+  }
+  100% {
+    transform: none;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* the strip over the ways: what a run left unfinished, or how the run in the background goes */
+.wy-wip {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--warning-soft);
+}
+.wy-wip.run {
+  background: var(--step);
+}
+.wy-wip > .g {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--warning);
+}
+.wy-wip.run > .g {
+  color: var(--tone-sky);
+}
+.wy-wip b {
+  display: block;
+  font-weight: 500;
+}
+.wy-wip span.s {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.wy-wip .wy-pg {
+  margin-top: 8px;
+}
+.wy-wip > div:last-child {
+  display: flex;
+  gap: 8px;
+}
+@media (width <= 720px) {
+  .wy-wip {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .wy-wip > div:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wy-wv,
+  .wy-eg {
+    display: none;
+  }
+  .wy-steps li.done > i,
+  .wy-res,
+  .wy-sv.wy-new,
+  .wy-gl.busy {
+    animation: none !important;
+  }
+}

@@ -1,19 +1,17 @@
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Segmented } from "@/components/ui/segmented";
 import { useIsPhone } from "@/lib/media";
 import { readPref, writePref } from "@/lib/storage";
 import { WaysGraph } from "./ways-graph";
 import { useState, type ReactNode } from "react";
-import { SectionLabel } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
-import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { walkTabs } from "@/components/ui/master-detail";
-import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { Pending } from "@/components/ui/query-error";
-import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
+import { StatusPill, type StatusKind } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
@@ -31,7 +29,7 @@ import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import { useFresh } from "@/components/fx/fresh";
 import { activeOf } from "@/lib/relay-bridge";
-import { candidatesQuery, countryHint, isCut, reachHint, relayState, relaysQuery, seenHint, viaLabel, type CountryHint, type Hint, type RelayMsg } from "@/lib/relay";
+import { isCut, relayState, relaysQuery, seenHint, viaLabel, type Hint, type RelayMsg } from "@/lib/relay";
 import { useNow } from "@/lib/time";
 import { ipv6Helps } from "@/lib/reachability";
 import { useIsOwner } from "@/lib/updates";
@@ -41,9 +39,11 @@ import { Glyph } from "@/screens/overview-parts";
 import { EntryDialog, entryReason, EntryState, TurnOffDialog } from "./ipv6-entry";
 import { Spin, Wa } from "./parts";
 import { CheckPortsButton, portRows, Ports, usePortCheck } from "./ports";
+import { RelayStrip } from "./relay-strip";
+import { RelayWizard } from "./relay-wizard";
 import { PairWay } from "./relay-pair";
 import { RelayRows } from "./relay-rows";
-import { AddRelayDialog, ccChip, useAddRelay, useCountryOf, useRelayRuns, type Entry } from "./relays";
+import { AddRelayDialog, useCountryOf, useRelayRuns } from "./relays";
 import { InSubscriptions } from "./subs-switches";
 import type { NodeSearch, WaysView } from "./tabs";
 import "./ways.css";
@@ -69,6 +69,8 @@ export type WaysModel = Ways & {
   ipv6: Ipv6Fact;
   /** The IPv6 entry (Node.ipv6): on, or whether and why the node can take one. */
   v6: Ipv6Entry;
+  /** The last read of the relays failed: with relays already read (`stale`) the pair says so; with none, the tab does. */
+  readError: { stale: boolean; retry: () => void } | null;
 };
 
 /** The lanes of a node with what they rest on: the node page computes them once, for the tab, its badge and the Overview. */
@@ -101,7 +103,8 @@ export function useWays(data: Data): WaysModel {
     hasIpv6: data.facts?.hasIpv6,
     entry: entryState(v6),
   });
-  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryOf, ipv6, v6 };
+  const readError = owner && live && relays.isError ? { stale: relays.data !== undefined, retry: () => void relays.refetch() } : null;
+  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryOf, ipv6, v6, readError };
 }
 
 // ---- words of a lane ----
@@ -508,6 +511,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
   const [relayOther, setRelayOther] = useState(false);
 
   if (!w.ready) return <Pending />;
+  const unread = w.readError && !w.readError.stale ? w.readError : null;
   const lane = w.lanes.find((l) => l.id === openLane) ?? w.lanes[0]!;
   const pair = w.out.find((l) => l.id === openOut);
   const make = () => go({ way: search.way, add: "1" });
@@ -520,7 +524,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
       ) : lane.kind === "ipv6" ? (
         <Ipv6Detail data={data} w={w} lane={lane} onAdd={() => go({ way: "ipv6", add: "ipv6" })} />
       ) : (
-        <RelayDetail key={lane.id} data={data} w={w} lane={lane} onOther={make} />
+        <RelayDetail key={lane.id} data={data} w={w} lane={lane} onOther={make} onMore={() => go({ way: lane.id, add: `via:${lane.peer!.id}` })} />
       )}
     </>
   );
@@ -528,7 +532,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
   const compact = entry && w.lanes.length === 1 && w.lanes[0]!.kind === "direct" && data.inbounds.length === 0;
   const dlgs = (
     <>
-      {w.owner && <NewWayDialog data={data} w={w} start={search.add} onClose={(way) => go({ way: way ?? search.way })} onIpv6={() => go({ way: "ipv6", add: "ipv6" })} />}
+      {w.owner && <RelayWizard data={data} w={w} start={search.add} onClose={(way) => go({ way: way ?? search.way })} />}
       {w.owner && (
         <EntryDialog open={search.add === "ipv6" && entryOffered(w.v6)} onClose={() => go({ way: "ipv6" })} node={node} v6={w.v6} awg={data.inbounds.some((i) => i.protocol === "awg")} />
       )}
@@ -561,6 +565,17 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
 
   return (
     <div className="flex min-w-0 flex-col">
+      {unread && (
+        <div className="wy-plt mb-4" data-testid="relays-unread">
+          <div>
+            <span>{t("wy.br.read")}</span>
+          </div>
+          <Button size="md" onClick={unread.retry}>
+            {t("wy.br.retry")}
+          </Button>
+        </div>
+      )}
+      <RelayStrip w={w} node={node} onOpen={(id) => go({ way: search.way, add: `via:${id}` })} />
       {entry && (
         <div className={cx("wy-in wy-in2", view === "graph" && "graph")}>
           <PassList data={data} w={w} open={openOut} onPick={pickOut} onMore={() => setRelayOther(true)} view={view} onView={setView} />
@@ -756,7 +771,7 @@ function PairCard({ data, w, lane, onOther }: { data: Data; w: WaysModel; lane: 
           <Notice tone="danger">{t("relay.err.forward_drop")}</Notice>
         </div>
       )}
-      <PairWay rs={rs} entry={node.name} exit={peer.name} cc={w.cc} exitSeen={w.countryOf(peer.id)} entrySeen={w.country} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} />
+      <PairWay rs={rs} entry={node.name} exit={peer.name} cc={w.cc} exitSeen={w.countryOf(peer.id)} entrySeen={w.country} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} readError={w.readError?.stale} onRetry={w.readError?.retry} />
       <div className="wy-sh">
         <h4>{t("ways.block.servers")}</h4>
         <span>{t.n("wy.pass.onPath", rs.length)}</span>
@@ -986,17 +1001,15 @@ function CdnDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }) 
 }
 
 /** Through an entry (on the exit): the relays, how they work, what was measured, the servers, the other node. */
-function RelayDetail({ data, w, lane, onOther }: { data: Data; w: WaysModel; lane: Lane; onOther: () => void }) {
+function RelayDetail({ data, w, lane, onOther, onMore }: { data: Data; w: WaysModel; lane: Lane; onOther: () => void; onMore: () => void }) {
   const t = useT();
   const ccOf = useCountryOf();
   const runs = useRelayRuns();
   const nowS = Math.floor(useNow(15_000) / 1000);
-  const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(false);
   const node = data.node!;
   const peer = lane.peer!;
   const look = lookOf(lane, w);
-  const entry: Entry = { id: peer.id, name: peer.name, cc: ccOf(peer.id) };
   const forwardDrop = lane.relays.some((r) => r.enabled && r.lastError === "forward_drop");
   return (
     <WayCard lane={lane} icon={laneGlyph.via} tone="lav" title={t("ways.via", { entry: peer.name })} sub={t("ways.via.sub", { entry: peer.name, node: node.name })} pill={<Pill look={look} />}>
@@ -1005,7 +1018,7 @@ function RelayDetail({ data, w, lane, onOther }: { data: Data; w: WaysModel; lan
           <Notice tone="danger">{t("relay.err.forward_drop")}</Notice>
         </div>
       )}
-      <PairWay rs={lane.relays} entry={peer.name} exit={node.name} cc={w.cc} exitSeen={w.country} entrySeen={w.countryOf(peer.id)} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} />
+      <PairWay rs={lane.relays} entry={peer.name} exit={node.name} cc={w.cc} exitSeen={w.country} entrySeen={w.countryOf(peer.id)} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} readError={w.readError?.stale} onRetry={w.readError?.retry} />
       <div className="wy-sh">
         <h4>{t("ways.block.servers")}</h4>
         <span>{t.n("wy.pass.onPath", lane.relays.length)}</span>
@@ -1018,7 +1031,7 @@ function RelayDetail({ data, w, lane, onOther }: { data: Data; w: WaysModel; lan
             {runs.checking && <Spin />}
             {t("ways.checkAll")}
           </Button>
-          <Button size="md" onClick={() => setAdding(true)}>
+          <Button size="md" onClick={onMore}>
             {t("nw.a.more")}
           </Button>
           <Link to="/nodes/$id" params={{ id: peer.id }} search={{ tab: "ways", way: `out:${node.id}` }} className="wy-lk">
@@ -1027,7 +1040,6 @@ function RelayDetail({ data, w, lane, onOther }: { data: Data; w: WaysModel; lan
         </div>
       )}
       {w.owner && <RemovePair rs={lane.relays} entry={peer.name} exit={node.name} entryCc={ccOf(peer.id)} exitCc={node.countryCode} asking={removing} onAsk={setRemoving} onDone={() => setRemoving(false)} />}
-      <AddRelayDialog open={adding} onOpenChange={setAdding} entry={entry} exitId={node.id} />
     </WayCard>
   );
 }
@@ -1069,235 +1081,6 @@ function Ipv6Detail({ data, w, lane, onAdd }: { data: Data; w: WaysModel; lane: 
         </>
       )}
     </WayCard>
-  );
-}
-
-// ---- the dialog ----
-
-type Pick = { node: { id: string; name: string; countryCode: string }; hint?: CountryHint; fit: boolean; already: number };
-
-/**
- * "New way in" (§3.4): what kind of way, then through which node (the ones people see from the networks where this node is
- * dark first), then the relay dialog for this node's servers. `start` is ?add=: "1", or "via:<entry>" straight at step 3. The
- * IPv6 entry is the other kind: picked, it hands over to the entry's own dialog (`onIpv6`).
- */
-function NewWayDialog({ data, w, start, onClose, onIpv6 }: { data: Data; w: WaysModel; start?: string; onClose: (way?: WayId) => void; onIpv6: () => void }) {
-  const t = useT();
-  const node = data.node!;
-  const open = start === "1" || !!start?.startsWith("via:");
-  const ccOf = useCountryOf();
-  const nodes = useQuery({ ...nodesQuery, enabled: open }).data?.nodes ?? [];
-  const fleet = countryColumn(useQuery({ ...checksQuery(""), enabled: open }).data?.countryChecks);
-  const relays = useQuery({ ...relaysQuery(node.id), enabled: open }).data ?? [];
-  const startEntry = start?.startsWith("via:") ? start.slice(4) : "";
-  const [picked, setPicked] = useState<string | null>(null);
-  const [step, setStep] = useState<"kind" | "pick" | null>(null);
-  const entryId = picked ?? startEntry;
-  const at = step ?? (entryId ? "relay" : "kind");
-  const entryNode = nodes.find((n) => n.id === entryId);
-  const entry: Entry = { id: entryId, name: entryNode?.name ?? "", cc: entryNode?.countryCode ?? ccOf(entryId) };
-
-  const own = hintOf(w.country);
-  const cut = isCut(own) && own!.dark.length > 0;
-  const darkText = own?.dark.join(", ") ?? "";
-  const sameAsExit = (cc: string) => !!node.countryCode && cc === node.countryCode;
-  const picks: Pick[] = nodes
-    .filter((n) => n.id !== node.id && n.status !== NodeStatus.RETIRED)
-    .map((n) => {
-      const hint = hintOf(fleet?.byNode.get(n.id));
-      // an entry in the exit's own country is no good fit: the people's route to it would not change; it stays pickable
-      const fit = cut && !!hint && (hint.verdict === "ok" || hint.verdict === "partial") && !own!.dark.some((d) => hint.dark.includes(d)) && !sameAsExit(n.countryCode);
-      return { node: n, hint, fit, already: relays.filter((r) => r.exitNodeId === node.id && r.viaNodeId === n.id).length };
-    })
-    // good fits first; among them a node inside the people's country (their route to it stays at home), then one every network sees
-    .sort(
-      (a, b) =>
-        Number(b.fit) - Number(a.fit) ||
-        Number(b.node.countryCode === w.cc) - Number(a.node.countryCode === w.cc) ||
-        Number(b.hint?.verdict === "ok") - Number(a.hint?.verdict === "ok") ||
-        a.node.name.localeCompare(b.node.name),
-    );
-  const fits = picks.filter((p) => p.fit);
-  // does the entry reach this node: the TSPU probe's row, asked for the good fits only (it builds every server of the fleet)
-  const reach = useQueries({ queries: fits.map((p) => ({ ...candidatesQuery(p.node.id), enabled: open && at === "pick" })) });
-  const reachOf = (id: string) => reach[fits.findIndex((p) => p.node.id === id)]?.data?.candidates.find((c) => c.nodeId === node.id)?.reach;
-
-  const finish = (way?: WayId) => {
-    setPicked(null);
-    setStep(null);
-    onClose(way);
-  };
-  // the relay step closes through its own close (it waits for a run to end and resets), then opens the lane it made
-  const add = useAddRelay({
-    entry,
-    exitId: node.id,
-    enabled: open && at === "relay" && !!entryId,
-    onClose: () => finish(`via:${entryId}`),
-    onBack: () => {
-      setPicked(null);
-      setStep("pick");
-    },
-  });
-  const close = () => (at === "relay" ? add.close() : finish());
-
-  const intro = !cut
-    ? own?.verdict === "blocked"
-      ? t("ways.new.introAll", { country: countryIn(t, w.cc), node: node.name })
-      : t("ways.new.introOk", { node: node.name })
-    : t("ways.new.intro", { country: countryIn(t, w.cc), node: node.name, networks: darkText });
-  const best = fits[0];
-  const offered = entryOffered(w.v6);
-
-  // a way that can be taken is a button; one that cannot (IPv6 already on, or the node cannot take it) is plain text that
-  // says why, with its state on the right: no hover, no focus
-  const option = (icon: IconName, tone: Tone, title: string, what: string, note: ReactNode, onPick?: () => void, pill?: Look) => {
-    const inner = (
-      <>
-        <IconChip icon={icon} tone={tone} size={30} className={cx("mt-0.5 rounded-[9px]", !onPick && "opacity-50 grayscale")} />
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className={cx("text-sm font-bold", !onPick && "text-muted")}>{title}</span>
-          <span className="text-xs leading-snug text-pretty text-muted">{what}</span>
-          {note}
-        </span>
-        {onPick ? <Icon name="chevronRight" size={16} className="mt-1 flex-none text-muted group-hover:text-fg" /> : pill && <StatusPill sm kind={pill.kind} label={t(pill.word)} />}
-      </>
-    );
-    const cls = "flex w-full min-w-0 items-start gap-3 rounded-card border px-3.5 py-3 text-start";
-    return onPick ? (
-      <button type="button" onClick={onPick} className={cx(cls, "group border-line transition-colors duration-200 hover:border-accent-line hover:bg-surface-2")}>
-        {inner}
-      </button>
-    ) : (
-      <div aria-disabled="true" data-testid="way-option-off" className={cx(cls, "border-dashed border-line")}>
-        {inner}
-      </div>
-    );
-  };
-
-  const hintLine = (h: Hint) => (
-    <li key={h.text} className="flex items-start gap-1.5 text-xs leading-snug">
-      <span className="mt-[4px] flex">
-        <StatusDot kind={h.tone} />
-      </span>
-      <span className={h.tone === "bad" ? "text-danger-text" : "text-fg"}>{h.text}</span>
-    </li>
-  );
-
-  const pickCard = (p: Pick) => {
-    const seen = (cut ? seenHint(t, p.node.name, own, p.hint) : null) ?? countryHint(t, w.cc, p.hint);
-    const r = p.fit ? reachOf(p.node.id) : undefined;
-    const same: Hint | null = sameAsExit(p.node.countryCode) ? { tone: "off", text: t("relay.hint.sameCountry") } : null;
-    const hints = [seen, r ? reachHint(t, p.node.name, node.name, r) : null, same].filter((h): h is Hint => !!h);
-    return (
-      <button
-        key={p.node.id}
-        type="button"
-        data-testid="way-entry"
-        onClick={() => {
-          setPicked(p.node.id);
-          setStep(null);
-        }}
-        className="group flex w-full min-w-0 items-start gap-3 rounded-card border border-line px-3.5 py-2.5 text-start transition-colors duration-200 hover:border-accent-line hover:bg-surface-2"
-      >
-        {ccChip(p.node.countryCode)}
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-[13px] font-extrabold">{p.node.name}</span>
-          <ul className="flex flex-col gap-0.5">{hints.map(hintLine)}</ul>
-          {p.already > 0 && <span className="text-[11px] text-muted">{t.n("ways.new.already", p.already, { node: node.name })}</span>}
-        </span>
-        <Icon name="chevronRight" size={16} className="mt-0.5 flex-none text-muted group-hover:text-fg" />
-      </button>
-    );
-  };
-
-  const body =
-    at === "kind" ? (
-      <div className="flex flex-col gap-2">
-        {option(
-          "share",
-          "sky",
-          t("ways.new.via"),
-          t("ways.new.viaWhat", { node: node.name }),
-          picks.length === 0 ? (
-            <span className="text-xs text-muted">{t("ways.new.noNodes")}</span>
-          ) : best && cut ? (
-            <span className="tone-ok tone-text flex items-center gap-1.5 text-xs font-semibold">
-              <Icon name="check" size={13} className="flex-none" />
-              {t("ways.new.best", { entry: best.node.name, networks: darkText })}
-            </span>
-          ) : null,
-          picks.length > 0 ? () => setStep("pick") : undefined,
-        )}
-        {option(
-          "network",
-          "lavender",
-          t("ways.ipv6"),
-          t("ways.new.ipv6What", { node: node.name }),
-          offered ? (
-            ipv6Helps(w.country) && (
-              <span className="tone-ok tone-text flex items-center gap-1.5 text-xs font-semibold">
-                <Icon name="check" size={13} className="flex-none" />
-                {t("ways.ipv6.helps", { country: countryIn(t, w.cc) })}
-              </span>
-            )
-          ) : (
-            <span className="text-xs leading-snug text-pretty text-muted [overflow-wrap:anywhere]">
-              {w.v6.entry ? t("ways.new.ipv6On", { addr: w.v6.entry }) : entryReason(t, w.v6.unavailableReason)}
-            </span>
-          ),
-          offered
-            ? () => {
-                setPicked(null);
-                setStep(null);
-                onIpv6();
-              }
-            : undefined,
-          w.v6.entry ? { kind: "ok", word: "ways.pill.on" } : { kind: "off", word: "ways.pill.na" },
-        )}
-      </div>
-    ) : at === "pick" ? (
-      <div className="flex flex-col gap-3">
-        {fits.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <SectionLabel as="h3">{t("ways.new.fits", { networks: darkText })}</SectionLabel>
-            {fits.map(pickCard)}
-          </section>
-        )}
-        {picks.length > fits.length && (
-          <section className="flex flex-col gap-2">
-            {fits.length > 0 && <SectionLabel as="h3">{t("ways.new.others")}</SectionLabel>}
-            {picks.filter((p) => !p.fit).map(pickCard)}
-          </section>
-        )}
-      </div>
-    ) : (
-      add.body
-    );
-
-  return (
-    <Modal
-      open={open}
-      onOpenChange={(o) => !o && close()}
-      wide
-      closeLabel={t("common.close")}
-      title={at === "relay" && entry.name ? `${t("ways.new.title", { node: node.name })} · ${t("ways.new.through", { entry: entry.name })}` : t("ways.new.title", { node: node.name })}
-      description={at === "kind" ? intro : at === "pick" ? t("ways.new.pick") : t("relay.dlg.intro", { entry: entry.name })}
-      footer={
-        at === "relay" ? (
-          add.footer
-        ) : at === "pick" ? (
-          <Button variant="ghost" size="md" onClick={() => setStep("kind")}>
-            {t("ways.new.back")}
-          </Button>
-        ) : (
-          <Button variant="ghost" size="md" onClick={() => close()}>
-            {t("common.cancel")}
-          </Button>
-        )
-      }
-    >
-      {body}
-    </Modal>
   );
 }
 

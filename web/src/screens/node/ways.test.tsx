@@ -8,6 +8,7 @@ import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { Ipv6EntryAction } from "@/gen/mistgate/admin/v1/node_pb";
 import { en } from "@/i18n/en";
+import { setJob } from "./relay-job";
 import { useWays, WaysStrip, WaysTab } from "./ways";
 
 const listRelays = vi.fn();
@@ -139,6 +140,7 @@ afterEach(() => {
   root = host = null;
   for (const m of [listRelays, listRelayCandidates, createRelay, checkRelay, updateRelay, checkIpv6, updateIpv6Entry, updateInbound, navigate]) m.mockReset();
   delete (window as { matchMedia?: unknown }).matchMedia;
+  setJob(undefined);
 });
 
 let qc: QueryClient;
@@ -211,23 +213,46 @@ describe("the line of a node dark on part of the country", () => {
   });
 });
 
-describe("the New way in dialog", () => {
-  it("an entry in the exit's own country is no good fit: it goes under Other nodes with its reason, and can still be picked", async () => {
+describe("the wizard Make reachable", () => {
+  const step = () => dialog().querySelector<HTMLElement>("[data-testid=relay-wizard]")!.dataset.step;
+  const entries = () => [...dialog().querySelectorAll<HTMLElement>("[data-testid=way-entry]")];
+  const finishOk = () => {
+    createRelay.mockResolvedValue({ relay: relay({ id: "rly_9", enabled: false }) });
+    checkRelay.mockResolvedValue({ relay: relay({ id: "rly_9", enabled: false, check: { ok: true, leg: { status: "ok", atUnix: now } } }) });
+    updateRelay.mockResolvedValue({ relay: relay({ id: "rly_9" }) });
+  };
+
+  it("opens at the entries: the node people see where de1 is dark comes first, with what is known of it and a tag, and the steps say where we are", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    search = { tab: "ways", add: "1" };
+    await mount(de1());
+    expect(dialog().textContent).toContain("Make reachable from Russia");
+    expect(step()).toBe("2");
+    expect([...dialog().querySelectorAll(".wy-steps li")].map((l) => l.className)).toEqual(["done", "cur", "", ""]);
+    expect(dialog().textContent).toContain("Through which node should people go to de1");
+    expect(entries().map((e) => e.querySelector("b .mono")?.textContent)).toEqual(["msk1", "fi1"]);
+    expect(entries()[0]!.textContent).toContain("Fits");
+    expect(entries()[0]!.textContent).toContain("msk1 → de1 passes (TSPU check)");
+    expect(entries()[1]!.textContent).not.toContain("Fits");
+    expect(entries()[1]!.textContent).toContain("fi1 is dark too from MTS");
+    // the first is chosen, as the board does, and the footer names it
+    expect(entries()[0]!.getAttribute("aria-checked")).toBe("true");
+    expect(dialog().textContent).toContain("Entry: msk1");
+  });
+
+  it("an entry in the exit's own country is no good fit: no tag, and its reason", async () => {
     // de2 is seen from every network, as msk1 is, but it sits in Germany like de1: the people's route to de1 would not change
     nodes.push({ id: "nod_de2", name: "de2", countryCode: "DE", status: NodeStatus.ONLINE });
     countryChecks = [...countryChecks, country("nod_de2", CountryVerdict.OK)];
+    listRelays.mockResolvedValue({ relays: [] });
     try {
       search = { tab: "ways", add: "1" };
       await mount(de1());
-      await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.startsWith("Through another node")));
-      await settle();
-      expect([...dialog().querySelectorAll("section h3")].map((h) => h.textContent)).toEqual(["Good fits: seen from MTS", "Other nodes"]);
-      const entries = [...dialog().querySelectorAll<HTMLElement>("[data-testid=way-entry]")];
-      expect(entries.map((e) => e.querySelector(".font-extrabold")?.textContent)).toEqual(["msk1", "de2", "fi1"]);
-      expect(entries[0]!.textContent).not.toContain("Same country");
-      expect(entries[1]!.textContent).toContain("Same country as the exit");
-      expect(entries[1]!.closest("section")?.querySelector("h3")?.textContent).toBe("Other nodes");
-      await click(entries[1]);
+      const de2 = entries().find((e) => e.textContent?.includes("de2"))!;
+      expect(de2.textContent).not.toContain("Fits");
+      expect(de2.textContent).toContain("Same country as the exit");
+      await click(de2);
+      await click(buttonIn(dialog(), "Next"));
       await settle();
       expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_de2" }, expect.anything());
     } finally {
@@ -235,48 +260,246 @@ describe("the New way in dialog", () => {
     }
   });
 
-  it("offers the node people see where de1 is dark, then only de1's servers through it, and makes the relay through that entry", async () => {
+  it("Back from the entries shows the node, chosen already, and what is the matter with it", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
     search = { tab: "ways", add: "1" };
     await mount(de1());
-    expect(dialog().textContent).toContain("A new way in to de1");
-    expect(dialog().textContent).toContain("From Russia, de1 does not open on MTS.");
-    expect(dialog().textContent).toContain("Good fit: msk1, seen from MTS");
-    // de1 can take an IPv6 entry: the option is a choice like the other
-    expect(dialog().querySelector("[data-testid=way-option-off]")).toBeNull();
-    expect([...dialog().querySelectorAll("button")].some((b) => b.textContent?.startsWith("IPv6 entry"))).toBe(true);
+    await click(buttonIn(dialog(), "Back"));
+    expect(step()).toBe("1");
+    expect(dialog().textContent).toContain("The wizard was opened from the node’s page, so the node is already chosen");
+    expect(dialog().querySelector("[role=checkbox]")!.textContent).toContain("de1");
+    expect(dialog().querySelector("[role=checkbox]")!.textContent).toContain("partly");
+    await click(buttonIn(dialog(), "Next"));
+    expect(step()).toBe("2");
+  });
 
-    await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.startsWith("Through another node")));
-    await settle();
-    expect([...dialog().querySelectorAll("section h3")].map((h) => h.textContent)).toEqual(["Good fits: seen from MTS", "Other nodes"]);
-    const entries = [...dialog().querySelectorAll<HTMLElement>("[data-testid=way-entry]")];
-    expect(entries.map((e) => e.querySelector(".font-extrabold")?.textContent)).toEqual(["msk1", "fi1"]);
-    expect(entries[0]!.textContent).toContain("msk1 → de1 passes (TSPU check)");
-    expect(entries[1]!.textContent).toContain("fi1 is dark too from MTS");
+  it("an entry that carries de1 already is not offered again", async () => {
+    listRelays.mockResolvedValue({ relays: [relay()] });
+    search = { tab: "ways", add: "1" };
+    await mount(de1());
+    expect(entries().map((e) => e.querySelector("b .mono")?.textContent)).toEqual(["fi1"]);
+  });
 
-    await click(entries[0]);
+  it("the servers of de1 through the entry are ticked, what people get is said, and the run makes the relays, turns them on and ends in the way it made", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    listRelayCandidates.mockResolvedValue({
+      agentSupported: true,
+      entryCountry: { verdict: "ok", dark: [], atUnix: now },
+      candidates: [cand({ audience: { people: 14, staticAwgDevices: 0 } }), cand({ inboundId: "inb_f", nodeId: "nod_fi1", nodeName: "fi1", profileName: "Trojan" })],
+    });
+    search = { tab: "ways", add: "1" };
+    await mount(de1());
+    await click(buttonIn(dialog(), "Next"));
     await settle();
-    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_msk1" }, expect.anything());
-    const servers = [...dialog().querySelectorAll("[data-testid=relay-candidate]")].map((c) => c.textContent);
-    expect(servers.every((s) => !s?.includes("Trojan"))).toBe(true); // fi1's server is not a way in to de1
-    createRelay.mockResolvedValue({ relay: relay({ id: "rly_9", enabled: false }) });
-    checkRelay.mockResolvedValue({ relay: relay({ id: "rly_9", enabled: false, check: { ok: true, leg: { status: "ok", atUnix: now } } }) });
-    updateRelay.mockResolvedValue({ relay: relay({ id: "rly_9" }) });
-    await click(dialog().querySelector('input[aria-label="Relay VLESS · XHTTP of de1"]'));
+    expect(step()).toBe("3");
+    const servers = [...dialog().querySelectorAll("[data-testid=wizard-server]")];
+    expect(servers.map((s) => s.textContent)).toEqual(["VLESS · XHTTPtcp/2053 on msk1"]); // fi1's server is not a way in to de1
+    expect(servers[0]!.getAttribute("aria-checked")).toBe("true");
+    expect(dialog().textContent).toContain("1 of 1 servers");
+    expect(dialog().textContent).toContain("14 people get “DE · via RU”: 1 more server of de1 through msk1, beside the old ones");
+    expect(dialog().textContent).toContain("The old ways stay, the app picks a working one itself");
+    expect(dialog().textContent).toContain("msk1 sees people’s addresses and volumes, but not the content");
+    expect(dialog().textContent).toContain("1 relay through msk1");
+    finishOk();
     await click(buttonIn(dialog(), "Check and turn on"));
     await settle();
     expect(createRelay).toHaveBeenCalledWith({ inboundId: "inb_x", viaNodeId: "nod_msk1", port: 0 });
     expect(updateRelay).toHaveBeenCalledWith({ id: "rly_9", enabled: true });
+    expect(step()).toBe("4");
+    expect(dialog().textContent).toContain("Done · 1 of 1");
+    expect(dialog().querySelector("[data-testid=wizard-run-row]")!.getAttribute("data-state")).toBe("ok");
+    expect(dialog().textContent).toContain("de1 is reachable through msk1");
+    expect(dialog().textContent).toContain("People get the new servers with the next subscription update");
+    expect([...dialog().querySelectorAll(".wy-steps li")].map((l) => l.className)).toEqual(["done", "done", "done", "done"]);
     await click(buttonIn(dialog(), "Done"));
     expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: { tab: "ways", way: "via:nod_msk1" } }));
   });
 
-  it("?add=via:<entry> opens straight at that entry's servers, and Back returns to the choice of node", async () => {
+  it("a server can be taken out of the run: the count and the call follow", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    listRelayCandidates.mockResolvedValue({
+      agentSupported: true,
+      entryCountry: { verdict: "ok", dark: [], atUnix: now },
+      candidates: [cand({}), cand({ inboundId: "inb_y", profileName: "Hysteria2", protocol: "hysteria2", network: "udp", port: 443 })],
+    });
     search = { tab: "ways", add: "via:nod_msk1" };
     await mount(de1());
-    expect(dialog().textContent).toContain("A new way in to de1 · Through msk1");
+    expect(step()).toBe("3");
+    expect(dialog().textContent).toContain("2 of 2 servers");
+    await click([...dialog().querySelectorAll("[data-testid=wizard-server]")].find((s) => s.textContent?.includes("Hysteria2")));
+    expect(dialog().textContent).toContain("1 of 2 servers");
+    expect(dialog().textContent).toContain("1 relay through msk1");
+    finishOk();
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    expect(createRelay).toHaveBeenCalledTimes(1);
+    expect(createRelay).toHaveBeenCalledWith(expect.objectContaining({ inboundId: "inb_x" }));
+  });
+
+  it("a pair that the entry reaches only over a bridge says so: the bridge chip, the note, and the UDP server that cannot go", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    const cut = { verdict: "blocked", source: "tspu_row", atUnix: now };
+    const back = { verdict: "reach", source: "exit_probe", atUnix: now };
+    listRelayCandidates.mockResolvedValue({
+      agentSupported: true,
+      entryCountry: { verdict: "ok", dark: [], atUnix: now },
+      candidates: [cand({ reach: cut, exitReachesEntry: back }), cand({ inboundId: "inb_y", profileName: "Hysteria2", protocol: "hysteria2", network: "udp", port: 443, reach: cut, exitReachesEntry: back, reverseBlocked: "udp" })],
+    });
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await mount(de1());
+    expect(dialog().textContent).toContain("Will go through the bridge: msk1 does not reach de1 directly, de1 will connect to msk1 itself");
+    expect(dialog().textContent).toContain("Through the bridge de1 does not see the addresses of people");
+    const udp = [...dialog().querySelectorAll("[data-testid=wizard-server]")].find((s) => s.textContent?.includes("Hysteria2"))!;
+    expect(udp.getAttribute("aria-checked")).toBe("false");
+    expect(udp.textContent).toContain("does not go over the bridge yet");
+    expect(dialog().textContent).toContain("1 of 2 servers");
+  });
+
+  it("?add=via:<entry> opens straight at that entry's servers, and Back returns to the choice of node", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await mount(de1());
+    expect(step()).toBe("3");
+    expect(dialog().textContent).toContain("1 relay through msk1");
     await click(buttonIn(dialog(), "Back"));
     await settle();
+    expect(step()).toBe("2");
     expect(dialog().textContent).toContain("Through which node");
+    // the one that was in hand stays in the list
+    expect(entries().map((e) => e.querySelector("b .mono")?.textContent)).toContain("msk1");
+  });
+
+  it("a refusal of the panel says why in the row and offers another entry", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    const { ConnectError, Code } = await import("@connectrpc/connect");
+    createRelay.mockRejectedValue(new ConnectError("port_taken: free=8444", Code.AlreadyExists));
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await mount(de1());
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    const row = dialog().querySelector("[data-testid=wizard-run-row]")!;
+    expect(row.getAttribute("data-state")).toBe("bad");
+    expect(dialog().textContent).toContain("de1 — did not work out");
+    // the port the panel names is one click away: that server runs again on it, and the result is counted
+    expect(buttonIn(dialog(), "Take 8444")).toBeDefined();
+    createRelay.mockResolvedValue({ relay: relay({ id: "rly_9", enabled: false }) });
+    checkRelay.mockResolvedValue({ relay: relay({ id: "rly_9", enabled: false, check: { ok: true, leg: { status: "ok", atUnix: now } } }) });
+    updateRelay.mockResolvedValue({ relay: relay({ id: "rly_9" }) });
+    await click(buttonIn(dialog(), "Take 8444"));
+    await settle();
+    expect(createRelay).toHaveBeenLastCalledWith(expect.objectContaining({ port: 8444 }));
+    expect(dialog().querySelector("[data-testid=wizard-run-row]")!.getAttribute("data-state")).toBe("ok");
+    expect(dialog().textContent).toContain("Done · 1 of 1");
+    expect(dialog().textContent).toContain("de1 is reachable through msk1");
+  });
+
+  it("another entry after a failure goes back to the choice of node", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    const { ConnectError, Code } = await import("@connectrpc/connect");
+    createRelay.mockRejectedValue(new ConnectError("timeout", Code.Unavailable));
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await mount(de1());
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    await click(buttonIn(dialog(), "Another entry…"));
+    expect(step()).toBe("2");
+  });
+
+  it("the window can be closed over a run: the run goes on, the strip says how far it is and opens the window again", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    createRelay.mockReturnValue(new Promise(() => {})); // the first server never comes back: the run stays at 0 of 1
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await mount(de1());
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    expect(step()).toBe("4");
+    expect(dialog().textContent).toContain("Checking and turning on · 0 of 1");
+    expect(dialog().textContent).toContain("You can close the window: the run goes on");
+    expect(buttonIn(dialog(), "Stop")).toBeDefined();
+    await click(buttonIn(dialog(), "Close"));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: { tab: "ways" } }));
+    // the page goes on without the window: the strip over the ways
+    search = { tab: "ways" };
+    await act(async () => root!.render(ui(de1())));
+    await settle();
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    const strip = document.querySelector<HTMLElement>("[data-testid=relay-run-strip]")!;
+    expect(strip.textContent).toContain("Turning on relays through msk1 · 0 of 1");
+    expect(buttonIn(strip, "Stop")).toBeDefined();
+    await click(buttonIn(strip, "Open"));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.objectContaining({ add: "via:nod_msk1" }) }));
+    // and the window, asked for again, opens at the end of the run
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await act(async () => root!.render(ui(de1())));
+    await settle();
+    expect(step()).toBe("4");
+    expect(dialog().textContent).toContain("Checking and turning on · 0 of 1");
+  });
+
+  it("Stop leaves what is on, and says that the rest is not touched", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    listRelayCandidates.mockResolvedValue({
+      agentSupported: true,
+      entryCountry: { verdict: "ok", dark: [], atUnix: now },
+      candidates: [cand({}), cand({ inboundId: "inb_z", profileName: "VLESS · gRPC", port: 2054 })],
+    });
+    let release: (v: unknown) => void = () => {};
+    createRelay.mockReturnValueOnce(new Promise((r) => (release = r)));
+    checkRelay.mockResolvedValue({ relay: relay({ id: "rly_9", enabled: false, check: { ok: true, leg: { status: "ok", atUnix: now } } }) });
+    updateRelay.mockResolvedValue({ relay: relay({ id: "rly_9" }) });
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await mount(de1());
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    await click(buttonIn(dialog(), "Stop"));
+    expect(buttonIn(dialog(), "Stopping after this one…")).toBeDefined();
+    await act(async () => release({ relay: relay({ id: "rly_9", enabled: false }) }));
+    await settle();
+    expect(createRelay).toHaveBeenCalledTimes(1);
+    expect(dialog().textContent).toContain("Stopped · 1 of 2");
+    expect(dialog().textContent).toContain("What is on stays, the rest is not touched");
+    const rows = [...dialog().querySelectorAll("[data-testid=wizard-run-row]")].map((r) => r.textContent);
+    expect(rows[1]).toContain("not started");
+  });
+
+  it("relays that a run left (made, checked, never turned on) are one strip with Finish it; the wizard then has them ticked and makes nothing twice", async () => {
+    const left = relay({ id: "rly_off", enabled: false, appliedUnix: 0, state: InboundState.PENDING, check: { ok: true, leg: { status: "ok", atUnix: now - 60 } } });
+    listRelays.mockResolvedValue({ relays: [left] });
+    await mount(de1());
+    const strip = document.querySelector<HTMLElement>("[data-testid=relay-unfinished]")!;
+    expect(strip.textContent).toContain("Not finished");
+    expect(strip.textContent).toContain("1 relay through msk1 was made but not turned on.");
+    await click(buttonIn(strip, "Finish it"));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.objectContaining({ add: "via:nod_msk1" }) }));
+    // the wizard, at the servers of msk1: the relay that is there is ticked and says what it is
+    listRelayCandidates.mockResolvedValue({ agentSupported: true, entryCountry: { verdict: "ok", dark: [], atUnix: now }, candidates: [cand({ inboundId: "inb_v", relayId: "rly_off", profileName: "VLESS · TCP", port: 443 })] });
+    search = { tab: "ways", add: "via:nod_msk1" };
+    await act(async () => root!.render(ui(de1())));
+    await settle();
+    const row = dialog().querySelector("[data-testid=wizard-server]")!;
+    expect(row.getAttribute("aria-checked")).toBe("true");
+    expect(row.textContent).toContain("made, not turned on");
+    checkRelay.mockResolvedValue({ relay: { ...left, check: { ok: true, leg: { status: "ok", atUnix: now } } } });
+    updateRelay.mockResolvedValue({ relay: { ...left, enabled: true } });
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    expect(createRelay).not.toHaveBeenCalled();
+    expect(checkRelay).toHaveBeenCalledWith(expect.objectContaining({ id: "rly_off" }));
+    expect(updateRelay).toHaveBeenCalledWith({ id: "rly_off", enabled: true });
+  });
+
+  it("a relay that was turned off by hand has been on once: it is no strip", async () => {
+    listRelays.mockResolvedValue({ relays: [relay({ enabled: false })] });
+    await mount(de1());
+    expect(document.querySelector("[data-testid=relay-unfinished]")).toBeNull();
+  });
+
+  it("a reader gets no wizard and no strip", async () => {
+    role = Role.HELPER;
+    search = { tab: "ways", add: "1" };
+    await mount(de1());
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    expect(document.querySelector("[data-testid=relay-strip]")).toBeNull();
   });
 });
 
@@ -429,36 +652,13 @@ describe("the IPv6 entry", () => {
     expect(buttonIn(panel(), "Turn off")).toBeDefined();
   });
 
-  it("a node that cannot take one shows why, with no button, and the New way in dialog keeps the option greyed with the reason", async () => {
+  it("a node that cannot take one shows why, with no button", async () => {
     search = { tab: "ways", way: "ipv6" };
     await mount(de1({ ipv6: v6({ entrySupported: false, unavailableReason: "agent_old" }) }));
     expect(lane("ipv6").textContent).toContain("not available");
     expect(panel().textContent).toContain("Update the node agent to use an IPv6 entry.");
     expect(panel().textContent).toContain("Not available");
     expect(buttonIn(panel(), "Add IPv6 entry…")).toBeUndefined();
-
-    search = { tab: "ways", add: "1" };
-    await act(async () => root!.render(ui(de1({ ipv6: v6({ entrySupported: false, unavailableReason: "agent_old" }) }))));
-    const off = dialog().querySelector<HTMLElement>("[data-testid=way-option-off]")!;
-    expect(off.tagName).toBe("DIV");
-    expect(off.textContent).toContain("Update the node agent to use an IPv6 entry.");
-    expect(off.textContent).toContain("Not available");
-    expect(off.querySelector("button, [tabindex]")).toBeNull();
-  });
-
-  it("an entry that is on is not offered again in the New way in dialog", async () => {
-    search = { tab: "ways", add: "1" };
-    await mount(de1({ ipv6: v6({ entry: "2001:db8::7" }) }));
-    const off = dialog().querySelector<HTMLElement>("[data-testid=way-option-off]")!;
-    expect(off.textContent).toContain("Already on: 2001:db8::7");
-    expect(off.textContent).toContain("On");
-  });
-
-  it("picking IPv6 in the New way in dialog hands over to the entry's dialog", async () => {
-    search = { tab: "ways", add: "1" };
-    await mount(de1());
-    await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.startsWith("IPv6 entry")));
-    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: { tab: "ways", way: "ipv6", add: "ipv6" } }));
   });
 
   it("a helper sees the state and the last check, and nothing to press; ?add=ipv6 opens nothing", async () => {

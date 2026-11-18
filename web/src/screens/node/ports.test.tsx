@@ -6,8 +6,9 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { fill, type T } from "@/i18n";
 import { en } from "@/i18n/en";
+import { setEffectsEnabled } from "@/lib/effects";
 import { reasons } from "@/lib/port-check";
-import { CheckPortsButton, Ports, usePortCheck, verdictPill } from "./ports";
+import { CheckPortsButton, Ports, REVEAL_MS, usePortCheck, verdictPill } from "./ports";
 
 /** The block as the Direct way in shows it: the button in its action bar, the rows above. */
 function Block({ data }: { data: never }) {
@@ -415,5 +416,39 @@ describe("running the check", () => {
     await click(button("Check ports"));
     await settle();
     expect(text()).toContain(en["err.generic"]);
+  });
+});
+
+describe("the answer read out row by row", () => {
+  const two = () => data({ inbounds: [inbound({}), inbound({ id: "inb_2", profileName: "hy2 · 8443", port: 8443 })], portChecks: [check({}), check({ port: 8443 })] });
+  const phases = () => [...document.querySelectorAll("[data-testid=port-row]")].map((li) => ["now", "wait", "got"].find((c) => li.classList.contains(c)) ?? "");
+
+  it("shows the whole answer at once with the effects off", async () => {
+    setEffectsEnabled(false);
+    checkPorts.mockResolvedValue({ ports: [check({}), check({ port: 8443 })], tcp: [], errorCode: "", sender: "de2" });
+    await mount(two());
+    await click(button("Check ports"));
+    await settle();
+    expect(phases()).toEqual(["", ""]);
+  });
+
+  it("with the effects on: the first row is being checked, the others wait, then the rows get their result one after another", async () => {
+    setEffectsEnabled(true);
+    try {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      checkPorts.mockResolvedValue({ ports: [check({}), check({ port: 8443 })], tcp: [], errorCode: "", sender: "de2" });
+      await mount(two());
+      await click(button("Check ports"));
+      await settle();
+      expect(phases()).toEqual(["now", "wait"]);
+      expect(rows()[0]).toContain("Checking…");
+      await act(async () => void vi.advanceTimersByTime(REVEAL_MS));
+      expect(phases()).toEqual(["got", "now"]);
+      await act(async () => void vi.advanceTimersByTime(REVEAL_MS));
+      expect(phases()).toEqual(["", ""]);
+    } finally {
+      vi.useRealTimers();
+      setEffectsEnabled(false);
+    }
   });
 });

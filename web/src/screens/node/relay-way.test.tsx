@@ -106,27 +106,31 @@ const menuItem = async (row: HTMLElement, label: string) => {
 };
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]")!;
 const radio = (value: string) => dialog().querySelector<HTMLInputElement>(`input[type=radio][value=${value}]`)!;
+const editor = () => document.querySelector<HTMLElement>("[data-testid=relay-mode-editor]")!;
+const way = (label: string) => buttonIn(editor(), label)!;
 
-describe("the choice of the way", () => {
-  it("offers auto, direct and via bridge, with the line of each; saving sends the mode", async () => {
+describe("the choice of the way, under the server's row", () => {
+  it("offers auto, forwarding only and bridge only in the row; a click saves the mode", async () => {
     listRelays.mockResolvedValue({ relays: [relay()] });
     updateRelay.mockResolvedValue({ relay: relay({ mode: "dnat" }) });
     await mount(<Rows />);
     await menuItem(rowOf("VLESS · TCP"), "Method…");
-    expect(dialog().textContent).toContain("Way of the relay msk1 → de1");
-    const names = [...dialog().querySelectorAll("[data-testid=way-choice] label > span > span:first-child")].map((s) => s.textContent);
-    expect(names).toEqual(["Auto (recommended)", "Direct", "Via bridge"]);
-    expect(radio("auto").checked).toBe(true);
-    expect(radio("reverse").disabled).toBe(false);
-    expect(buttonIn(dialog(), "Change")?.disabled).toBe(true); // nothing changed yet
-    await click(radio("dnat"));
-    expect(dialog().textContent).toContain("open connections of people drop");
-    await click(buttonIn(dialog(), "Change"));
+    // no window: the editor opens in the row, with what a change does to people
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    expect(editor().textContent).toContain("Open connections of people will drop");
+    const names = [...editor().querySelectorAll("[role=group] button")].map((b) => b.textContent);
+    expect(names).toEqual(["Auto (recommended)", "Forwarding only", "Bridge only"]);
+    expect(way("Auto (recommended)").getAttribute("aria-pressed")).toBe("true");
+    expect(way("Bridge only").getAttribute("aria-disabled")).not.toBe("true");
+    await click(way("Forwarding only"));
     await settle();
     expect(updateRelay).toHaveBeenCalledWith({ id: "rly_1", mode: "dnat" });
+    expect(way("Forwarding only").getAttribute("aria-pressed")).toBe("true");
+    await click(buttonIn(editor(), "Done"));
+    expect(document.querySelector("[data-testid=relay-mode-editor]")).toBeNull();
   });
 
-  it("a UDP relay cannot be put on the bridge: the choice is greyed with the honest reason, direct and auto stay", async () => {
+  it("a UDP relay cannot be put on the bridge: the choice is greyed with the honest reason, forwarding and auto stay", async () => {
     const udp = relay({ profileName: "Hysteria2", protocol: "hysteria2", network: "udp", reverseBlocked: "udp", modeReason: "udp" });
     listRelays.mockResolvedValue({ relays: [udp] });
     await mount(<Rows />);
@@ -134,32 +138,34 @@ describe("the choice of the way", () => {
     expect(rowOf("Hysteria2").textContent).not.toContain("A bridge works only for TCP");
     expect(buttonIn(rowOf("Hysteria2"), "Speed check (8 MB)")).toBeUndefined();
     await menuItem(rowOf("Hysteria2"), "Method…");
-    expect(radio("reverse").disabled).toBe(true);
-    expect(radio("auto").disabled).toBe(false);
-    expect(radio("dnat").disabled).toBe(false);
-    expect(dialog().textContent).toContain("A bridge works only for TCP for now: VLESS and MTProto. Hysteria2 and AmneziaWG stay direct.");
-    expect(dialog().textContent).not.toContain("DNAT");
-    expect(radio("auto").checked).toBe(true);
+    expect(way("Bridge only").getAttribute("aria-disabled")).toBe("true");
+    expect(way("Auto (recommended)").getAttribute("aria-disabled")).not.toBe("true");
+    expect(editor().textContent).toContain("A bridge works only for TCP for now: VLESS and MTProto. Hysteria2 and AmneziaWG stay direct.");
+    expect(editor().textContent).not.toContain("DNAT");
+    // a click on the greyed one asks the panel for nothing
+    await click(way("Bridge only"));
+    expect(updateRelay).not.toHaveBeenCalled();
+    expect(way("Auto (recommended)").getAttribute("aria-pressed")).toBe("true");
   });
 
   it("an agent that is too old names the node to update", async () => {
     listRelays.mockResolvedValue({ relays: [relay({ reverseBlocked: "exit_agent_old", modeReason: "reverse_unsupported" })] });
     await mount(<Rows />);
     await menuItem(rowOf("VLESS · TCP"), "Method…");
-    expect(radio("reverse").disabled).toBe(true);
-    expect(dialog().textContent).toContain("A bridge is not available: update the agent of de1.");
+    expect(way("Bridge only").getAttribute("aria-disabled")).toBe("true");
+    expect(editor().textContent).toContain("A bridge is not available: update the agent of de1.");
   });
 
-  it("a refused change says why, in words", async () => {
+  it("a refused change says why, in words, and keeps the choice where it was", async () => {
     listRelays.mockResolvedValue({ relays: [relay()] });
     const { ConnectError, Code } = await import("@connectrpc/connect");
     updateRelay.mockRejectedValue(new ConnectError("reverse_unavailable: reason=entry_agent_old", Code.FailedPrecondition));
     await mount(<Rows />);
     await menuItem(rowOf("VLESS · TCP"), "Method…");
-    await click(radio("reverse"));
-    await click(buttonIn(dialog(), "Change"));
+    await click(way("Bridge only"));
     await settle();
-    expect(dialog().querySelector("[role=alert]")?.textContent).toBe("A bridge is not possible for this relay: the agent of the entry is too old.");
+    expect(editor().querySelector("[role=alert]")?.textContent).toBe("A bridge is not possible for this relay: the agent of the entry is too old.");
+    expect(way("Auto (recommended)").getAttribute("aria-pressed")).toBe("true");
   });
 });
 
@@ -288,6 +294,6 @@ describe("the Add relay dialog and the bridge", () => {
     const runs = dialog().querySelector("[data-testid=relay-runs]")!;
     expect(runs.textContent).toContain("Bridge held by de1fails");
     expect(runs.textContent).toContain("From outside through msk1not checked");
-    expect(runs.textContent).toContain("Not turned on: the certificate of the site of msk1 changed, or someone intercepts the connection");
+    expect(runs.textContent).toContain("Not turned on: the certificate of the site of msk1 did not match the expected one: it changed, or someone intercepts the connection");
   });
 });

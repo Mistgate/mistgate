@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
@@ -13,7 +13,7 @@ import { directOf, type Direct } from "@/lib/fleet-map";
 import { useFmt } from "@/lib/format";
 import { countryIn, msText, type CountryCheck } from "@/lib/health";
 import { relayState, type RelayMsg } from "@/lib/relay";
-import { activeOf, blockedOf, blockedText, bridgeErrorText, bridgeFailed, bridgeLoad, directStreakGoal, modeOf, reasonText, speedKind, speedOk, speedReason, type Mode } from "@/lib/relay-bridge";
+import { activeOf, blockedOf, blockedText, bridgeErrorText, bridgeFailed, bridgeLoad, bridgeProblem, bridgeWaits, directStreakGoal, modeOf, reasonText, speedKind, speedOk, speedReason, type BridgeAction, type Mode } from "@/lib/relay-bridge";
 import type { RelayRuns } from "./relays";
 import { Spin } from "./parts";
 
@@ -53,6 +53,9 @@ export type PairWayProps = {
   nowS: number;
   /** "Another entry…": open the way's wizard for the exit; undefined when there is no other entry. */
   onOther?: () => void;
+  /** The panel did not answer the last time the relays were read: the block says so and keeps nothing but a way to ask again. */
+  readError?: boolean;
+  onRetry?: () => void;
   /** What the dev kit starts the block with: the choice of the way open, a check done, the speed check running or done. */
   start?: { pick?: boolean; checked?: boolean; speed?: "busy" | "done" };
 };
@@ -152,13 +155,32 @@ export function PairWay(p: PairWayProps) {
   if (!bridge && mode === "auto" && reverseOk && lead.check?.reverseReach) rows.push({ k: t("nw.k.bridge"), tone: "mut", text: t("nw.bridgeOk", { ...n, ago: ago(lead.check.reverseReach.atUnix) }) });
 
   // the notices that need a button
-  const plt: { tone: "warn" | "crit"; text: string; code?: string; btn?: string; go?: () => void }[] = [];
+  type Note = { tone: "warn" | "crit" | "mut"; text: string; code?: string; btn?: string; go?: () => void; to?: { id: string; tab: "profiles" | "server" | "doctor" } };
+  let plt: Note[] = [];
+  const capital = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
   if (load?.atLimit) plt.push({ tone: "warn", text: t("nw.plt.limit"), btn: p.onOther ? t("nw.plt.other", { exit }) : undefined, go: p.onOther });
-  if (dropped) {
-    const code = b?.error ?? "";
-    plt.push({ tone: "crit", text: t("nw.plt.down", { reason: bridgeErrorText(t, code, n) || t("relay.bridge.err.disconnected", n) }), code, btn: t("nw.plt.check", n), go: () => void check() });
+  const code = bridge ? (b?.error ?? "") : "";
+  if (bridge && (dropped || bridgeWaits(code))) {
+    // what the agent said, its tone and the one thing to do about it (the board's "Ошибка моста")
+    const pr = bridgeProblem(code);
+    const reason = code === "closed" ? t("relay.bridge.err.other") : bridgeErrorText(t, code, n) || t("relay.bridge.err.disconnected", n);
+    const at: Record<BridgeAction, Pick<Note, "btn" | "go" | "to">> = {
+      check: { btn: t("nw.plt.check", n), go: () => void check() },
+      recheck: { btn: t("wy.br.recheck"), go: () => void check() },
+      speed: askSpeed ? { btn: t("wy.br.speed"), go: () => void runSpeed() } : {},
+      profilesEntry: { btn: t("wy.br.profiles", { node: entry }), to: { id: lead.viaNodeId, tab: "profiles" } },
+      profilesExit: { btn: t("wy.br.profiles", { node: exit }), to: { id: lead.exitNodeId, tab: "profiles" } },
+      server: { btn: t("wy.br.server"), to: { id: lead.exitNodeId, tab: "server" } },
+      doctorEntry: { btn: t("wy.br.doctor", { node: entry }), to: { id: lead.viaNodeId, tab: "doctor" } },
+    };
+    plt.push({ tone: pr.tone, text: pr.head ? t("nw.plt.down", { reason }) : pr.capital ? capital(reason) : reason, code, ...(pr.action ? at[pr.action] : {}) });
   }
   if (udpDown) plt.push({ tone: "warn", text: t("nw.plt.udp", { server: udpDown.profileName, ...n, port: udpDown.exitPort || udpDown.port, net: udpDown.network || "udp" }), btn: p.onOther ? t("nw.sv.other") : undefined, go: p.onOther });
+  // the panel could not read the relays: no sentence about the bridge can be trusted, one line and a way to ask again
+  if (p.readError) {
+    rows.length = 0;
+    plt = [{ tone: "warn", text: t("wy.br.read"), btn: p.onRetry ? t("wy.br.retry") : undefined, go: p.onRetry }];
+  }
 
   // ---- Measurements
   const country = countryIn(t, p.cc);
@@ -277,15 +299,20 @@ export function PairWay(p: PairWayProps) {
           </dl>
         )}
         {plt.map((l) => (
-          <div key={l.text} className={cx("wy-plt", l.tone === "crit" && "crit")}>
+          <div key={l.text} className={cx("wy-plt", l.tone === "crit" && "crit", l.tone === "mut" && "mut")} data-tone={l.tone}>
             <div>
               <span>{l.text}</span>
               {l.code && <small className="mono">{l.code}</small>}
             </div>
-            {l.btn && !p.readOnly && (
+            {l.btn && !p.readOnly && !l.to && (
               <Button size="md" onClick={l.go}>
                 {l.btn}
               </Button>
+            )}
+            {l.btn && !p.readOnly && l.to && (
+              <Link to="/nodes/$id" params={{ id: l.to.id }} search={{ tab: l.to.tab }} className={buttonClass("secondary", "md")}>
+                {l.btn}
+              </Link>
             )}
           </div>
         ))}

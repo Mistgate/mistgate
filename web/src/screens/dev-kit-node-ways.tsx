@@ -3,7 +3,11 @@ import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { checksQuery, doctorQuery } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
-import { relaysQuery } from "@/lib/relay";
+import { dictionaries, currentLang, fill } from "@/i18n";
+import type { MessageKey } from "@/i18n/en";
+import { candidatesQuery, relaysQuery } from "@/lib/relay";
+import { setJob, type Job } from "./node/relay-job";
+import { waysDemo } from "./node/ways-demo";
 
 // Development only. The scenes of the node page's Ways in tab, /dev-kit?only=nodepage-frame&tab=ways&w=<scene>: the states of the board's
 // PnNode switches, each a page of its own. The parameters (all optional, names as the board's switches):
@@ -13,6 +17,15 @@ import { relaysQuery } from "@/lib/relay";
 //   set=all|norl|nov6|dir  the ways de1 has: all, no relay, no IPv6 entry, direct only
 //   cas=<cascade>     how the relays work: "" (forwarding), br, back, manual, near, full, udp, fwd, port, drop, stale, nobr, unk, none
 //   cause=<break>     a broken relay server: fw, old, leg, out, taken, down, gate, br
+//   err=<code>        the word of the agent about the bridge (connect, pin_mismatch, no_verification, tls_protocol, connection_limit, pair_timeout,
+//                     target_connect, identity_unavailable, site_listen_failed, bad_config, closed): a pair on the bridge with that problem
+//   read=1            the panel could not read the relays the last time (the cascade's "read error")
+//   edit=port|mode    the editor of the first server's port or method open under its row
+//   add=1|via:nod_msk1|via:nod_msk2  the wizard "Make reachable" open: at the entries, or at the servers of that entry (msk2 is the one de1 reaches
+//                     only over a bridge); wz=1 the wizard at its first step, the node
+//   job=run|done|bridge|part|bad|stopped  the run of the wizard's last step (open it with add=via:...) in that state
+//   wip=1             relays made and never turned on (the strip "Not finished"); run=1 a run in the background (the strip with its bar)
+//   used=1            every other node carries de1 already: the wizard has no entry to offer
 //   extra=spb1        a second entry for de1; pairs=2|3|4 the exits of msk1
 //   way=<lane>        the open way (?way= of the page), view=graph|list, map=1
 // Made-up data: nodes de1, nl1, fi1, msk1, spb1, the networks Operator A to D.
@@ -29,6 +42,15 @@ export type WaysScene = {
   cause: string;
   extra: string;
   pairs: number;
+  err: string;
+  read: boolean;
+  edit: "" | "port" | "mode";
+  add: string;
+  wz: boolean;
+  job: string;
+  wip: boolean;
+  run: boolean;
+  used: boolean;
 };
 
 export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
@@ -40,6 +62,15 @@ export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
   cause: p.get("cause") ?? "",
   extra: p.get("extra") ?? "",
   pairs: Math.min(4, Math.max(1, Number(p.get("pairs") ?? 3))),
+  err: p.get("err") ?? "",
+  read: p.get("read") === "1",
+  edit: p.get("edit") === "port" || p.get("edit") === "mode" ? (p.get("edit") as "port" | "mode") : "",
+  add: p.get("add") ?? "",
+  wz: p.get("wz") === "1",
+  job: p.get("job") ?? "",
+  wip: p.get("wip") === "1",
+  run: p.get("run") === "1",
+  used: p.get("used") === "1",
 });
 
 const NETS = ["Operator A", "Operator B", "Operator C", "Operator D"];
@@ -72,8 +103,11 @@ const relayOf = (entry: { id: string; name: string }, exit: { id: string; name: 
   return { ...base, ...over };
 };
 
+/** The words an agent says that are no failure of the bridge: it holds, or will in a while. */
+const waiting = ["no_verification", "connection_limit", "closed"];
+
 /** The cascade's states of the board, as relay messages for the pair entry → exit. */
-function pairRelays(entry: { id: string; name: string }, exit: { id: string; name: string; ip: string }, cas: string, cause: string): Relay[] {
+function pairRelays(entry: { id: string; name: string }, exit: { id: string; name: string; ip: string }, cas: string, cause: string, err = ""): Relay[] {
   const v = relayOf(entry, exit, "vless");
   const h = relayOf(entry, exit, "hy2");
   const legDown = (r: Relay, over: Relay = {}): Relay => ({ ...r, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout", verdict: "timeout" }), ...over } });
@@ -82,6 +116,11 @@ function pairRelays(entry: { id: string; name: string }, exit: { id: string; nam
     activeMode: "reverse", modeReason: "leg_failed", modeChangedUnix: NOW - 3 * 3600, directStreak: 1, reverseBlocked: "", bridge: bridgeOf(b),
   });
   let rs: Relay[] = [v, h];
+  // a bridge with the agent's word about it: a failure (it does not hold) or a pause (it holds and will in a while)
+  if (err) {
+    const bad = !waiting.includes(err);
+    return [bad ? { ...onBridge(v, { connected: false, error: err }), check: { ...(onBridge(v).check as object), ok: false, stage: "bridge", bridge: stage({ status: "fail", code: err }) } } : onBridge(v, { error: err }), h];
+  }
   switch (cas) {
     case "br":
       rs = [onBridge(v), h];
@@ -152,6 +191,7 @@ function pairRelays(entry: { id: string; name: string }, exit: { id: string; nam
 const de1 = { id: "nod_de1", name: "de1", ip: "203.0.113.7" };
 const NODE_SPEC = [
   { id: "nod_msk1", name: "msk1", countryCode: "RU", location: "Moscow" },
+  { id: "nod_msk2", name: "msk2", countryCode: "RU", location: "Moscow" },
   { id: "nod_spb1", name: "spb1", countryCode: "RU", location: "Saint Petersburg" },
   { id: "nod_nl1", name: "nl1", countryCode: "NL", location: "Amsterdam" },
   { id: "nod_nl2", name: "nl2", countryCode: "NL", location: "Amsterdam" },
@@ -164,26 +204,93 @@ const EXITS = [
   { id: de1.id, name: "de1", ip: de1.ip },
 ];
 
+const say = (key: MessageKey, vars: Record<string, string | number> = {}) => fill(dictionaries[currentLang()][key], vars);
+
+type Kind = "vless" | "hy2" | "awg";
+const KINDS: Kind[] = ["vless", "hy2", "awg"];
+const KIND = {
+  vless: { name: "VLESS · Reality", protocol: "vless", network: "tcp", port: 2053 },
+  hy2: { name: "Hysteria2", protocol: "hysteria2", network: "udp", port: 4443 },
+  awg: { name: "AmneziaWG 3.1", protocol: "awg", network: "udp", port: 10819 },
+} as const;
+/** What de1 offers an entry: its three servers, with what the panel knows of the way (the TSPU row, whether de1 reaches the entry, who would get them). */
+const candidate = (k: Kind, entryId: string): Record<string, unknown> => {
+  const bridge = entryId === "nod_msk2";
+  const known = entryId !== "nod_spb1";
+  return {
+    inboundId: `inb_de1_${k}`, nodeId: "nod_de1", nodeName: "de1", profileId: `prf_${k}`, profileName: KIND[k].name, protocol: KIND[k].protocol, network: KIND[k].network, port: KIND[k].port,
+    unsupported: "", hop: false, relayId: "", country: { verdict: "blocked", dark: NETS, atUnix: NOW },
+    reach: { verdict: !known ? "" : bridge ? "blocked" : "reach", source: !known ? "" : bridge ? "tspu_row" : "tspu_row", atUnix: known ? NOW - 40 * MIN : 0 },
+    exitReachesEntry: { verdict: bridge ? "reach" : "", source: bridge ? "exit_probe" : "", atUnix: bridge ? NOW - 40 * MIN : 0 },
+    audience: { people: 14, staticAwgDevices: k === "awg" ? 3 : 0 }, reverseBlocked: KIND[k].network === "udp" ? "udp" : "",
+  };
+};
+const entryNode = (id: string) => ({ id, name: id.slice(4), cc: "RU" });
+
+/** The run of the wizard's last step in the state a scene wants, as the store holds it. */
+function jobScene(kind: string, entryId: string): Job {
+  const entry = entryNode(entryId);
+  const bridge = kind === "bridge" || entryId === "nod_msk2";
+  const items = KINDS.map((k) => ({ c: candidate(k, entryId) as never }));
+  const ok = { leg: "ok", path: "ok", tone: "ok", text: "" } as const;
+  const okBridge = { leg: "fail", soft: true, reach: "ok", bridge: "ok", path: "ok", tone: "ok", text: "" } as const;
+  const bad = { leg: "fail", path: "skipped", tone: "bad", text: say("relay.dlg.result.fail", { reason: say("relay.why.leg", { entry: entry.name, exit: "de1", exitPort: 4443, port: 4443, network: "udp", net: "udp" }) }) } as const;
+  const busy = { leg: "running", path: "waiting" } as const;
+  const one = bridge ? okBridge : ok;
+  const runs: Record<string, object> = {
+    run: { vless: ok, hy2: bridge ? { leg: "fail", soft: true, reach: "running", bridge: "running", path: "waiting" } : busy, awg: {} },
+    done: { vless: ok, hy2: ok, awg: ok },
+    bridge: { vless: one, hy2: one, awg: one },
+    part: { vless: ok, hy2: bad, awg: ok },
+    bad: { vless: { ...bad, free: 2054, text: say("err.port_taken", { port: 2053, node: "msk1", profile: "Trojan" }) }, hy2: bad, awg: bad },
+    stopped: { vless: ok, hy2: {}, awg: {} },
+  }[kind === "bridge" ? "bridge" : kind] ?? {};
+  const states = { run: [1, 1, "running"], done: [3, 3, "finished"], bridge: [3, 3, "finished"], part: [3, 2, "finished"], bad: [3, 0, "finished"], stopped: [1, 1, "stopped"] } as const;
+  const [done, on, state] = states[(kind in states ? kind : "run") as keyof typeof states];
+  const byServer = Object.fromEntries(KINDS.map((k) => [`inb_de1_${k}`, (runs as Record<Kind, object>)[k]]).filter(([, r]) => r && Object.keys(r).length > 0));
+  return { exitId: "nod_de1", exitName: "de1", exitCc: "DE", entry, items, bridge, runs: byServer as never, done, on, state };
+}
+
+/** Relays that a run left: made and checked, never turned on. */
+const leftOff = (entry: { id: string; name: string }, exit: { id: string; name: string; ip: string }): Relay[] =>
+  pairRelays(entry, exit, "", "").map((r) => ({ ...r, enabled: false, appliedUnix: 0, state: InboundState.PENDING, monitor: undefined, check: { ...(r.check as object), path: stage({ status: "skipped", code: "off", verdict: "" }) } }));
+
+/** The relays were read before, and the last read failed: the data stays, the query says it is in error. */
+function unread(qc: QueryClient, nodeId: string) {
+  qc.getQueryCache().find({ queryKey: relaysQuery(nodeId).queryKey })?.setState({ status: "error", error: new Error("read"), fetchStatus: "idle", errorUpdateCount: 1, errorUpdatedAt: Date.now() } as never);
+}
+
 /** Seeds the scene's queries into `qc` and returns the page data of the node it is about (de1, or msk1 for an entry). */
 export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: WaysScene, nodeStatus: NodeStatus): Record<string, unknown> {
   const msk1 = { id: "nod_msk1", name: "msk1" };
   const spb1 = { id: "nod_spb1", name: "spb1" };
   // the fleet: every node the tab names
+  waysDemo.current = sc.edit ? { edit: sc.edit } : undefined;
   const base = qc.getQueryData(nodesQuery.queryKey) as { nodes: Record<string, unknown>[] };
   const own = base.nodes[0]!;
-  const fleet = [own, ...NODE_SPEC.map((n) => ({ ...own, ...n, status: NodeStatus.ONLINE }))];
+  // the wizard's entries are the nodes of Russia, with a node or two of other countries for the list to have somewhere to go
+  const spec = sc.add || sc.wz ? NODE_SPEC.filter((n) => ["msk1", "msk2", "spb1", "fi1"].includes(n.name)) : NODE_SPEC;
+  const fleet = [own, ...spec.map((n) => ({ ...own, ...n, status: NodeStatus.ONLINE, hasMetrics: true, cpuPct: n.name === "msk1" ? 34 : n.name === "msk2" ? 12 : 6 }))];
   qc.setQueryData(nodesQuery.queryKey, { ...base, nodes: fleet } as never);
+  waysDemo.current = { ...(waysDemo.current ?? {}), ...(sc.wz ? { wizard: { step: 1 as const } } : {}) };
+  for (const n of spec) qc.setQueryData(candidatesQuery(n.id).queryKey, { agentSupported: true, entryCountry: { verdict: "ok", dark: [], atUnix: NOW }, candidates: KINDS.map((k) => candidate(k, n.id)) } as never);
+  // a run on its way (or over) for the wizard's last step, or a run in the background behind the page
+  setJob(sc.job || sc.run ? jobScene(sc.job || "run", sc.add.startsWith("via:") ? sc.add.slice(4) : "nod_msk1") : undefined);
 
   const darkOf = sc.dir === "shut" ? NETS : sc.dir === "part" ? [NETS[2]!] : [];
-  const checks = [country("nod_de1", darkOf), country("nod_msk1", sc.ways === "bad" && sc.cas === "" ? [] : []), country("nod_spb1", [NETS[0]!]), ...EXITS.slice(0, 3).map((e) => country(e.id, darkOf.length ? [] : []))];
+  const checks = [country("nod_de1", darkOf), country("nod_msk1", sc.ways === "bad" && sc.cas === "" ? [] : []), country("nod_msk2", []), country("nod_spb1", [NETS[0]!]), ...EXITS.slice(0, 3).map((e) => country(e.id, darkOf.length ? [] : []))];
   const rowsOf = (id: string) => ({ nodeId: id, nodeName: id.slice(4), countryCode: "", nodeStatus, cells: [] });
 
   if (sc.role === "exit") {
     const withRelay = sc.set === "all" || sc.set === "nov6";
-    const relays: Relay[] = !withRelay
-      ? []
-      : [
-          ...pairRelays(msk1, de1, sc.cas, sc.cause).map((r) => (sc.ways === "bad" ? { ...r, state: InboundState.FAILED, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout" }) } } : r)),
+    const relays: Relay[] = sc.wip
+      ? leftOff(msk1, de1)
+      : sc.used
+        ? ["nod_msk1", "nod_msk2", "nod_spb1", "nod_fi1"].flatMap((id) => pairRelays({ id, name: id.slice(4) }, de1, "", "").slice(0, 1))
+        : !withRelay
+        ? []
+        : [
+          ...pairRelays(msk1, de1, sc.cas, sc.cause, sc.err).map((r) => (sc.ways === "bad" ? { ...r, state: InboundState.FAILED, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout" }) } } : r)),
           ...(sc.extra === "spb1" ? pairRelays(spb1, de1, "", "").slice(0, 1) : []),
         ];
     qc.setQueryData(relaysQuery("nod_de1").queryKey, relays as never);
@@ -202,13 +309,15 @@ export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: Way
       { nodeId: "nod_de1", port: 80, verdict: "ours", role: "acme", profile: "", checkedUnix: NOW - 11 * MIN, sender: "fi1", reason: "", alpn: false },
     ];
     if (sc.set === "dir") qc.setQueryData(relaysQuery("nod_de1").queryKey, [] as never);
+    if (sc.read) unread(qc, "nod_de1");
     return data;
   }
 
   // an entry: msk1 passes several exits on
   const list = (sc.pairs === 4 ? EXITS : EXITS.slice(0, sc.pairs)).map((x, i) => ({ x, cas: i === 0 ? sc.cas : i === 1 ? "br" : "", cause: i === 0 ? sc.cause : i === 2 ? "leg" : "" }));
-  const relays = list.flatMap(({ x, cas, cause }) => pairRelays(msk1, x, cas, cause));
+  const relays = list.flatMap(({ x, cas, cause }, i) => (sc.wip && i === 1 ? leftOff(msk1, x) : pairRelays(msk1, x, cas, cause, i === 0 ? sc.err : "")));
   qc.setQueryData(relaysQuery("nod_msk1").queryKey, relays as never);
+  if (sc.read) unread(qc, "nod_msk1");
   qc.setQueryData(checksQuery("nod_msk1").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [rowsOf("nod_msk1")], countryChecks: checks } as never);
   qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: checks } as never);
   qc.setQueryData(doctorQuery("nod_msk1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_msk1", nodeName: "msk1", nodeStatus, agentSupported: true, hasReport: true, receivedUnix: NOW - 5 * MIN, ageS: 300, stale: false, items: [] }] } as never);
@@ -250,6 +359,42 @@ export const waysFrames: { id: string; title: string; q: string; w: number; h: n
   { id: "ways-cause-out", title: "A broken server: nothing comes from outside", q: "w=1&cause=out&way=via:nod_msk1", w: 1440, h: 1900 },
   { id: "ways-cause-gate", title: "A server that was not checked: it cannot be turned on yet", q: "w=1&cause=gate&way=via:nod_msk1", w: 1440, h: 1900 },
   { id: "ways-cause-br", title: "A broken server on the bridge", q: "w=1&cas=br&cause=br&way=via:nod_msk1", w: 1440, h: 1900 },
+  ...[
+    ["connect", "The bridge does not hold: the exit cannot connect to the entry"],
+    ["pin_mismatch", "The bridge does not hold: the certificate of the entry's site does not match"],
+    ["no_verification", "The bridge waits for the pin of the entry's certificate (a quiet line)"],
+    ["tls_protocol", "The bridge does not hold: something else answers on the bridge port"],
+    ["connection_limit", "The bridge is at its limit of connections from the exit (a warning, it passes by itself)"],
+    ["pair_timeout", "The bridge loses people's connections: the second half did not come in 5 s"],
+    ["target_connect", "The bridge does not hold: the server on the exit does not take the bridge's connections"],
+    ["identity_unavailable", "The bridge does not hold: the agent has no node certificate yet"],
+    ["site_listen_failed", "The bridge does not hold: the bridge site did not come up on the entry"],
+    ["bad_config", "The bridge does not hold: the panel sent bad bridge settings"],
+    ["closed", "The bridge is restarting (a quiet line)"],
+  ].map(([code, title]) => ({ id: `ways-err-${code}`, title: `Bridge error: ${title}`, q: `w=1&err=${code}&way=via:nod_msk1`, w: 1440, h: 1900 })),
+  { id: "ways-cas-err", title: "Cascade: the panel could not read the relays, one line and Try again", q: "w=1&read=1&cas=br&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-edit-port", title: "A server's row with the port editor open under it", q: "w=1&edit=port&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-edit-mode", title: "A server's row with the method editor open under it", q: "w=1&edit=mode&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-entry-err", title: "Entry: the bridge of nl1 is down, the exit cannot reach the entry", q: "w=1&role=entry&err=connect&way=out:nod_nl1", w: 1440, h: 2000 },
+  { id: "wz-1", title: "Wizard, step 1: the node, chosen already, no way in at all", q: "w=1&set=norl&dir=shut&wz=1&add=1", w: 1440, h: 1500 },
+  { id: "wz-1-part", title: "Wizard, step 1: a way works for some, a spare one is added", q: "w=1&dir=shut&wz=1&add=1&extra=spb1", w: 1440, h: 1500 },
+  { id: "wz-2", title: "Wizard, step 2: the entries, the first fits and is chosen, one only over a bridge", q: "w=1&set=norl&dir=shut&add=1", w: 1440, h: 1500 },
+  { id: "wz-2-none", title: "Wizard, step 2: every entry carries de1 already", q: "w=1&used=1&add=1", w: 1440, h: 1300 },
+  { id: "wz-3", title: "Wizard, step 3: the three servers through msk1, what people get, AmneziaVPN keys", q: "w=1&set=norl&dir=shut&add=via:nod_msk1", w: 1440, h: 1500 },
+  { id: "wz-3-bridge", title: "Wizard, step 3: through msk2 only over a bridge, the UDP servers cannot go", q: "w=1&set=norl&dir=shut&add=via:nod_msk2", w: 1440, h: 1500 },
+  { id: "wz-4-run", title: "Wizard, step 4: the run, one server through, one checking, one waits", q: "w=1&set=norl&dir=shut&add=via:nod_msk1&job=run", w: 1440, h: 1500 },
+  { id: "wz-4-run-bridge", title: "Wizard, step 4: the run over a bridge, the second server waits for the bridge", q: "w=1&set=norl&dir=shut&add=via:nod_msk2&job=run", w: 1440, h: 1500 },
+  { id: "wz-4-done", title: "Wizard, step 4: all three are on, the wave and the glints at the edge (with the effects)", q: "w=1&set=norl&dir=shut&add=via:nod_msk1&job=done&fx=1", w: 1440, h: 1500 },
+  { id: "wz-4-done-bridge", title: "Wizard, step 4: all on over a bridge", q: "w=1&set=norl&dir=shut&add=via:nod_msk2&job=bridge", w: 1440, h: 1500 },
+  { id: "wz-4-part", title: "Wizard, step 4: two of three, one did not come up and says why", q: "w=1&set=norl&dir=shut&add=via:nod_msk1&job=part", w: 1440, h: 1500 },
+  { id: "wz-4-bad", title: "Wizard, step 4: none came up, the port is taken", q: "w=1&set=norl&dir=shut&add=via:nod_msk1&job=bad", w: 1440, h: 1500 },
+  { id: "wz-4-stopped", title: "Wizard, step 4: stopped after the first", q: "w=1&set=norl&dir=shut&add=via:nod_msk1&job=stopped", w: 1440, h: 1500 },
+  { id: "wz-2-phone", title: "Wizard, step 2 on a phone, 400 wide", q: "w=1&set=norl&dir=shut&add=1", w: 400, h: 1800 },
+  { id: "wz-3-phone", title: "Wizard, step 3 on a phone, 400 wide", q: "w=1&set=norl&dir=shut&add=via:nod_msk2", w: 400, h: 2200 },
+  { id: "wz-4-phone", title: "Wizard, step 4 on a phone, 400 wide", q: "w=1&set=norl&dir=shut&add=via:nod_msk1&job=part", w: 400, h: 2000 },
+  { id: "wip-left", title: "Ways: a run left three relays made and not turned on (the strip Not finished)", q: "w=1&set=norl&dir=shut&wip=1", w: 1440, h: 1500 },
+  { id: "wip-run", title: "Ways: a run goes on in the background (the strip with its bar)", q: "w=1&set=norl&dir=shut&run=1", w: 1440, h: 1500 },
+  { id: "wip-entry", title: "Entry: a run left relays for nl1 made and not turned on", q: "w=1&role=entry&wip=1&pairs=3", w: 1440, h: 1700 },
   { id: "ways-entry", title: "Entry: msk1 passes three exits (the list)", q: "w=1&role=entry", w: 1440, h: 1700 },
   { id: "ways-entry-graph", title: "Entry: the graph", q: "w=1&role=entry&view=graph", w: 1440, h: 1700 },
   { id: "ways-entry-four", title: "Entry: four exits", q: "w=1&role=entry&pairs=4", w: 1440, h: 1700 },

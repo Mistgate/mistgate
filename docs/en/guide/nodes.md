@@ -228,11 +228,16 @@ Only the owner can check, turn on and turn off the entry; a helper and a read-on
 
 #### Add a way in
 
-For the owner. **Add a way in…** opens the dialog "A new way in to de1" (`?tab=ways&add=1`):
+For the owner. **Add a way in…** (and **Make reachable from Russia…** when no way works) opens the wizard "Make reachable from Russia" (`?tab=ways&add=1`; `add=via:<entry>` opens it at the servers of that entry):
 
-1. When the node is dark it starts: "From Russia, de1 does not open on MTS. Give those people another way in — the node and its keys stay the same." Choose **Through another node** ("People connect to a node their network sees; it passes their traffic to de1 unchanged.", with the best hint: "Good fit: msk1, seen from MTS") or **IPv6 entry**. It opens the entry's dialog when the node can take an entry and it is off; otherwise it stays greyed, with the reason or "Already on: {address}".
-2. **Through which node**: **Good fits: seen from MTS** come first, then **Other nodes**. Each shows its country code, whether people see it and, where the TSPU probe runs from it, whether it reaches this node. A node that already relays servers of this one says "Already passes on 2 servers of de1".
-3. The relay dialog, limited to this node's servers: tick the servers, the port on the entry (auto), **Only check** or **Check and turn on**, then the progress and the result per server. **Back** returns to step 2.
+1. **Node.** The node is chosen already, as the wizard opens from the node's page, with what is the matter with it: "no way", "partly" or "there is a way, adding a spare one". **Back** from step 2 leads here.
+2. **Entry.** "Through which node should people go to de1": each node with its flag. **Fits** marks one that people see on the networks where de1 is dark. Under it what is known: seen from Russia, whether it reaches de1 (the TSPU probe), a bridge where only that is possible, the load now and how many nodes it carries. The first is chosen. A node that already passes servers of this node is not offered again; when none is left the wizard says "All the entries are already used for de1".
+3. **What people get.** The servers of de1 that go through the entry, each ticked. The ones that cannot go say why (a CDN, a UDP server over a bridge, already on). Under them: how many people get "DE · via RU", that the old ways stay, how many AmneziaVPN devices need a new config, and that the entry sees addresses and volumes, not the content. **Check and turn on** starts the run.
+4. **Done.** The run server by server with a count, a bar and **Stop**; then the result for de1 ("de1 is reachable through msk1", "partly: 2 of 3" or "did not work out") and, when something did not come up, **Another entry…**; a server refused for its port has **Take 8444**. With the reveal animation on, the end of a run plays a wave across the window.
+
+The run belongs to the page, not to the window. Close the window and it goes on: a strip over the ways shows "Turning on relays through msk1 · 2 of 5" with **Open** and **Stop**, and a toast says how it ended. A run that was cut short (the tab was closed, the panel restarted) leaves relays that were made and checked but are off, so people were given nothing; the strip then says "Not finished: 2 relays through msk1 were made but not turned on." with **Finish it**. The wizard opens at the servers with those ticked, and nothing is made twice. The entry's page has the strip too, with a link to the exit's page.
+
+The IPv6 entry has its own card (see above) with **Add IPv6 entry…**.
 
 The mechanism is still called a **relay** in the dialogs and in [Relays](relays.md); "way in" is what you look for on the node's page.
 
