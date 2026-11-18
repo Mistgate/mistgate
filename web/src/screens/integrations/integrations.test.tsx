@@ -327,7 +327,7 @@ describe("the Integrations screen: approvals", () => {
     await mount(tokens([token()]), inbox([approval()]));
     expect(text()).toContain("1 change is waiting for your decision");
     expect(text()).toContain("Waiting for you");
-    expect(text()).toContain("Fix a node");
+    expect(text()).toContain("Fix de1"); // the title carries the node's name, as the assistant's card does
     expect(text()).toContain("by token claude-ops");
     expect(text()).toContain("Admin");
     expect(text()).toContain("Drops connections");
@@ -340,11 +340,31 @@ describe("the Integrations screen: approvals", () => {
     expect(text()).toContain("Written by the agent");
   });
 
+  it("titles a plan with the names its facts carry, as the assistant's card does; one without names keeps the tool's title", async () => {
+    await mount(
+      tokens([]),
+      inbox([
+        approval({
+          id: "pln_relay",
+          tool: "relay",
+          facts: [
+            { key: "action", value: "enable", untrusted: false },
+            { key: "entry", value: "msk1", untrusted: true },
+            { key: "exit", value: "fi1", untrusted: true },
+          ],
+        }),
+        approval({ id: "pln_2", tool: "rollout_start", facts: [] }),
+      ]),
+    );
+    expect([...document.querySelectorAll(".ai-ap h3")].map((h) => h.textContent)).toEqual(["Turn on the relay of fi1 through msk1", "Update nodes now"]);
+    expect(document.querySelector("button[aria-label='Approve: Turn on the relay of fi1 through msk1']")).not.toBeNull();
+  });
+
   it("approves and rejects by id", async () => {
     approve.mockResolvedValue({});
     reject.mockResolvedValue({});
     await mount(tokens([]), inbox([approval(), approval({ id: "pln_2", tool: "rollout_start" })]));
-    await click(document.querySelector("button[aria-label='Approve: Fix a node']"));
+    await click(document.querySelector("button[aria-label='Approve: Fix de1']"));
     await settle();
     expect(approve).toHaveBeenCalledWith({ id: "pln_1" });
     await click(document.querySelector("button[aria-label='Reject: Update nodes now']"));
@@ -369,7 +389,7 @@ describe("the Integrations screen: approvals", () => {
         }),
       ]),
     );
-    const approveButton = () => document.querySelector("button[aria-label='Approve: Install a node over SSH']") as HTMLButtonElement;
+    const approveButton = () => document.querySelector("button[aria-label='Approve: Install the node edge-1 over SSH']") as HTMLButtonElement;
     expect(document.querySelector("[data-testid=host-key]")?.textContent).toBe(fp);
     // a fingerprint has no spaces: on a 390 px screen it must break anywhere, in the facts and in the box
     const factValue = [...document.querySelectorAll("dd")].find((dd) => dd.textContent === fp);
@@ -404,7 +424,7 @@ describe("the Integrations screen: approvals", () => {
         { key: "panel_ssh_key", value: panelPublicKey, untrusted: false },
       ],
     });
-    const approveButton = () => document.querySelector("button[aria-label='Approve: Install a node over SSH']") as HTMLButtonElement;
+    const approveButton = () => document.querySelector("button[aria-label='Approve: Install the node nl1 over SSH']") as HTMLButtonElement;
     const loginRadio = (label: string) => [...document.querySelectorAll<HTMLElement>("article [role=radio]")].find((r) => r.textContent === label);
 
     it("lets the owner pick the panel key, then approves with no password", async () => {
@@ -508,7 +528,7 @@ describe("the Integrations screen: approvals", () => {
 
   it("words a relay plan: the tool, every fact it writes, and keeps names and networks on plates", async () => {
     await mount(tokens([]), inbox([approval({ tool: "relay", facts: relayFacts.create })]));
-    expect(text()).toContain("Change a relay");
+    expect(text()).toContain("Change the relay of de1 through msk1");
     const rows = [...document.querySelectorAll("dl > div")].map((d) => [d.querySelector("dt")?.textContent, d.querySelector("dd")?.textContent]);
     expect(rows.map(([k]) => k)).toEqual([
       "Entry node",
@@ -601,7 +621,8 @@ describe("the Integrations screen: approvals", () => {
         approval({ id: "pln_3", tool: "subscription_app_remove", state: ApprovalState.APPLIED, result: "App removed from the subscription page.", outcomeCode: "subscription_app_removed" }),
       ]),
     );
-    expect(text()).toContain("Add or change an app on the user page");
+    expect(text()).toContain("Add or change the app “My Client” on the user page");
+    expect(text()).toContain("Add or change the app “Happ” on the user page");
     expect(text()).toContain("Every user sees it on their subscription page.");
     expect(text()).toMatch(/Platform\s*macOS/);
     expect(text()).toContain("A new app card on every user’s page.");

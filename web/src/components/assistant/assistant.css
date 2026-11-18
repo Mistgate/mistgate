@@ -176,10 +176,7 @@
   text-align: start;
   font-size: 14px;
   line-height: 20px;
-  box-shadow: 0 24px 64px rgb(0 0 0 / 0.55);
-}
-:root[data-theme="light"] .as {
-  box-shadow: 0 24px 64px rgb(22 22 26 / 0.2);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.55); /* the board's .pn>.as-dock .as: the same black on the light theme (also the big window) */
 }
 .as,
 .as * {
@@ -1636,7 +1633,7 @@ button.as-rs[aria-expanded="true"] .as-i {
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-as-pop);
   animation: as-pop 0.2s var(--e) both;
   overflow: hidden;
 }

@@ -440,6 +440,8 @@ func externalReadArgs() map[string]map[string]any {
 		"panel_logs": {"min_level": "debug"}, "retention_status": {}, "access_report": {}, "block_diagnosis": {}, "node_debug_logs": {"node": "de1"}, "capacity_report": {"hours": 24}, "panel_resources": {},
 		"tasks_list": {}, "task_get": {"task_id": "tsk_missing"}, "task_runs": {"task_id": "tsk_missing"}, "task_run_now": {"task_id": "tsk_missing"},
 		"os_updates_status": {}, "client_api_settings": {}, "outdated_devices": {},
+		"decoy_sites_list": {}, "decoy_site_get": {"site_id": "dsi_missing"}, "decoy_site_file": {"site_id": "dsi_missing", "path": "index.html"},
+		"path_speed_results": {}, "subscription_mihomo_template_get": {"name": "missing"},
 	}
 }
 
@@ -451,6 +453,7 @@ func externalFixtureTools() map[string]bool {
 		"subscription_preview": true, "group_get": true, "user_diagnose": true,
 		"task_get": true, "task_runs": true, "task_run_now": true, "backup_status": true,
 		"node_debug_logs": true, // a capture is created only by the mutating node_debug_capture tool
+		"decoy_site_get":  true, "decoy_site_file": true, "subscription_mihomo_template_get": true,
 	}
 }
 
@@ -829,7 +832,10 @@ func contains(s []string, x string) bool {
 	return false
 }
 
-func isWrite(n string) bool { return strings.HasSuffix(n, "_plan") || strings.HasSuffix(n, "_apply") }
+// isWrite: a plan, an apply, or a write that needs no plan (the operator's free tools): none of them is a read.
+func isWrite(n string) bool {
+	return strings.HasSuffix(n, "_plan") || strings.HasSuffix(n, "_apply") || n == "decoy_site_draft_save"
+}
 
 // ------------------------------------------------------------------------------------------------ the scenario
 
@@ -1016,7 +1022,16 @@ func (e *env) scenario() {
 	// Every read tool the admin profile sees (all tools that are not a plan or an apply) is called here, so the scan for
 	// secrets and addresses reads every one of them. A read tool without an entry in readArgs fails the check: add its
 	// arguments when you add the tool.
+	// a decoy site for decoy_site_get and decoy_site_file to read: a draft, which the library keeps without the owner
+	draft := decode[mcp.DecoyDraftV](e.mustCall(ad, "decoy_site_draft_save", map[string]any{
+		"name": "Birch Lane Pottery", "note": "e2e: a small pottery shop",
+		"files": []map[string]any{
+			{"path": "index.html", "content": "<!doctype html><html><head><title>Birch Lane Pottery</title></head><body><h1>Birch Lane Pottery</h1></body></html>"},
+			{"path": "404.html", "content": "<!doctype html><html><head><title>Not found</title></head><body><p>Not found</p></body></html>"},
+		}}))
+	e.check("decoy_site_draft_save keeps a draft in the library", strings.HasPrefix(draft.SiteID, "dsi_"), "site_id %q", draft.SiteID)
 	readArgs := map[string]map[string]any{
+		"subscription_mihomo_template_get": {"name": "e2e-template"}, "decoy_sites_list": {}, "decoy_site_get": {"site_id": draft.SiteID}, "decoy_site_file": {"site_id": draft.SiteID, "path": "index.html"}, "path_speed_results": {},
 		"fleet_status": {}, "node_get": {"node": "de1"}, "nodes_get": {}, "node_metrics": {}, "node_doctor": {}, "node_ports": {}, "warp_status": {},
 		"users_search": {}, "groups_list": {}, "group_get": {"group_id": groupID}, "user_get": {"user_id": userIDs[0]}, "user_traffic": {"user_id": userIDs[0]},
 		"user_devices": {"user_id": userIDs[0]}, "user_connection": {"user_id": userIDs[0]}, "subscription_preview": {"user_id": userIDs[0]},
@@ -1039,6 +1054,9 @@ func (e *env) scenario() {
 		"warp_status": true, "nodes_get": true, "path_probe": true, "node_trace": true, "node_dns_check": true,
 		// the throwaway panel has no scheduled task: task_not_found is a clean answer
 		"task_get": true, "task_runs": true, "task_run_now": true,
+		// the throwaway panel has no Mihomo template of its own: the owner makes one through an approved plan, so the name is
+		// answered with a clean "no such template" (the text of a real one is read in internal/panel/mcp's tests)
+		"subscription_mihomo_template_get": true,
 		// BackupService.GetBackupSettings wants the owner session itself, so an admin token gets "owner access required" on a
 		// real panel although the fakes of the unit tests let it through. A finding, not the harness's to fix.
 		"backup_status": true,
@@ -1053,10 +1071,16 @@ func (e *env) scenario() {
 			uncovered = append(uncovered, n)
 		}
 	}
-	e.check("every read tool has arguments in the e2e harness", len(uncovered) == 0, "add them to readArgs: %v", uncovered)
+	for _, n := range uncovered {
+		e.check("arguments for "+n, false, "add arguments for %s to readArgs in scripts/e2e/mcpe2e/main.go (a tool called with none cannot be checked)", n)
+	}
+	e.check("every read tool has arguments in the e2e harness", len(uncovered) == 0, "%v", uncovered)
 	bad := []string{}
 	for _, n := range readTools {
 		a, ok := readArgs[n]
+		if !ok && !needsFixture[n] {
+			continue // reported above: no arguments, no call
+		}
 		if !ok {
 			a = map[string]any{} // a fixture-dependent tool nobody gave arguments: an empty call must still answer cleanly
 		}
@@ -1071,6 +1095,9 @@ func (e *env) scenario() {
 			continue
 		}
 		a, ok := readArgs[n]
+		if !ok && !needsFixture[n] {
+			continue // reported above
+		}
 		if !ok {
 			a = map[string]any{}
 		}

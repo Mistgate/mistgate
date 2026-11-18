@@ -196,6 +196,17 @@ export function approvalsData(mods: ReadonlySet<string>) {
               expiresUnix,
               createdUnix: expiresUnix - 420,
             }),
+            // "named": a plan the board titles with its names ("Turn on the relay of fi1 through msk1"), here in the queue as in the assistant's card
+            ...(mods.has("named")
+              ? [
+                  plan("pln_2", "relay", ApprovalState.AWAITING, {
+                    facts: [fact("action", "enable"), fact("entry", "msk1", { untrusted: true }), fact("exit", "fi1", { untrusted: true })],
+                    danger: ["fleet"],
+                    expiresUnix,
+                    createdUnix: expiresUnix - 420,
+                  }),
+                ]
+              : []),
           ]
         : []),
     // "Одобрено" / "Отклонено" of the board: the change that waited has just been decided and is the top of the history
@@ -208,6 +219,9 @@ export function approvalsData(mods: ReadonlySet<string>) {
     plan("pln_h2", "rollout_start", ApprovalState.APPLIED, { decidedByName: "owner", decidedUnix: NOW - 4 * H, appliedUnix: NOW - 4 * H, result: "rollout rol_1 started", createdUnix: NOW - 4 * H - 200 }),
     plan("pln_h3", "user_disable", ApprovalState.REJECTED, { decidedByName: "owner", decidedUnix: NOW - D, createdUnix: NOW - D - 100 }),
     plan("pln_h4", "node_rollback", ApprovalState.EXPIRED, { createdUnix: NOW - 6 * D }),
+    ...(mods.has("named")
+      ? [plan("pln_h6", "relay", ApprovalState.APPLIED, { facts: [fact("action", "port"), fact("entry", "msk1", { untrusted: true }), fact("exit", "nl1", { untrusted: true })], decidedByName: "owner", decidedUnix: NOW - 2 * D, appliedUnix: NOW - 2 * D, result: "port 8443", createdUnix: NOW - 2 * D - 100 })]
+      : []),
     plan("pln_h5", "user_reset_traffic", ApprovalState.APPLIED, { decidedByName: "owner", decidedUnix: NOW - 8 * D, appliedUnix: NOW - 8 * D, result: "traffic reset for 1 user", createdUnix: NOW - 8 * D - 100 }),
     ...(mods.has("many") ? Array.from({ length: 14 }, (_, i) => plan(`pln_x${i}`, "node_fix", ApprovalState.APPLIED, { decidedByName: "owner", decidedUnix: NOW - (9 + i) * D, appliedUnix: NOW - (9 + i) * D, result: `done ${i + 1}`, createdUnix: NOW - (9 + i) * D - 100 })) : []),
   ];
@@ -447,6 +461,7 @@ export const frames: Frame[] = [
   f("ap-wait-light", "ap", "The same on the light theme", 1440, 1300, "&theme=light"),
   f("ap-wait-phone", "ap", "A phone", 400, 2200),
   f("ap-wait-fa", "ap", "Right to left (fa)", 1440, 1300, "&lang=fa"),
+  f("ap-named", "ap.named", "Plans with names in the title: the relay of fi1 through msk1", 1440, 1500),
   f("ap-soon", "ap.soon", "Under a minute left: amber", 1440, 1300),
   f("ap-exp", "ap.exp", "The request ran out", 1440, 800),
   f("ap-none", "ap.none", "Nothing waits", 1440, 800),

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cx } from "@/lib/cx";
 import { PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
+import { PlanTitle } from "@/components/plan-title";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Segmented } from "@/components/ui/segmented";
@@ -8,7 +9,7 @@ import { SecureField } from "@/components/assistant/secure-field";
 import { useT } from "@/i18n";
 import { useFmt } from "@/lib/format";
 import { safeHttpUrl } from "@/lib/warp";
-import { clockText, dangerText, factLabel, factWords, secondsLeft, toolTitle, useApprovalActions, type Approval, type Approvals, type Fact } from "@/lib/integrations";
+import { approvalTitle, clockText, dangerText, factLabel, factWords, pieceText, secondsLeft, useApprovalActions, type Approval, type Approvals, type Fact } from "@/lib/integrations";
 import { ProfileChip } from "./parts";
 
 /** One fact. A value that came from data (a name, a node's own text) is quoted and apart from the panel's wording, so it cannot pass for it. */
@@ -110,7 +111,9 @@ export function ApprovalCard({ a, data, nowMs, focused, onDecided }: { a: Approv
   const { approve, reject, busy } = useApprovalActions();
   const left = secondsLeft(a, data, nowMs);
   const expired = left === 0;
-  const tool = toolTitle(t, a.tool);
+  const fmt = useFmt();
+  const title = approvalTitle(t, fmt, a);
+  const tool = pieceText(title);
   const install = a.tool === "node_install";
   const hostKey = a.facts.find((f) => f.key === "host_key")?.value ?? "";
   // a plan from before the panel key has no panel_ssh_key fact: the panel refuses the key for it, so only the password
@@ -147,7 +150,9 @@ export function ApprovalCard({ a, data, nowMs, focused, onDecided }: { a: Approv
     >
       <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
         <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <h3 className="text-[17px] leading-tight font-extrabold tracking-[-0.02em]">{tool}</h3>
+          <h3 className="text-[17px] leading-tight font-extrabold tracking-[-0.02em]">
+            <PlanTitle pieces={title} />
+          </h3>
           <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
             {t("int.ap.by", { token: a.tokenName })}
             <ProfileChip profile={a.tokenProfile} />

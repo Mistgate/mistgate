@@ -3,14 +3,16 @@
 A copy of `github.com/xtls/reality` at commit **4bb46b2afd8b** (module version `v0.0.0-20261108101329-4bb46b2afd8b`, the one
 `github.com/xtls/xray-core` v26.11.9 requires), used through a `replace` in Mistgate's `go.mod`. The code is under the
 Mozilla Public License 2.0 (`LICENSE`, `LICENSE-Go` for the parts derived from Go's `crypto/tls`); every file keeps its upstream
-header and nothing of upstream was removed. The patch is one hunk in `tls.go` and one new file, both small. The source of this
+header and nothing of upstream was removed. The patch is two pieces in `tls.go` (the key-share rule, the listener) and one new file, all small. The source of this
 directory is public with the rest of Mistgate.
 
 `internal/vendorcheck` keeps this copy honest: it fails when the version above differs from the one `go.mod` requires (so a bump
 of `xray-core` cannot silently go on building this copy), and when any file here differs from the upstream module in the Go module
-cache except `tls.go` (by exactly the hunk below), `mistgate_compat.go` and this file.
+cache except `tls.go` (by exactly the hunks below), `mistgate_compat.go` and this file.
 
 ## What is patched
+
+### 1. The key-share rule
 
 Since 2026-11 (upstream commit 8cdf7bf9) `reality.Server` sends every ClientHello that does not carry an X25519MLKEM768 key share
 before its optional X25519 share to the target site, as if it came from a stranger, and also turns away a hello with two such
@@ -58,11 +60,32 @@ will be such a policy that consults the profile. `SetRejectClassical(nil)` retur
 Mihomo (1.8.2) and older Xray would be turned away by it. Mistgate builds the protobuf config and leaves it empty;
 `TestRealityConfigLeavesClientVersionsOpen` keeps it so.
 
+### 2. The listener (`NewListener` in `tls.go`)
+
+Upstream's accept loop ends with `l.err = err; close(l.conns)` while the goroutines that finish a handshake send on `l.conns`
+under `defer func() { recover() }()`. When the inner listener fails (a node closes an inbound), a handshake that finishes
+afterwards sends on a closed channel: a panic that the `recover` swallows in production, a data race (`closechan` against
+`chansend`) that the race detector reports, and a finished connection that nobody ever closes. `Accept` also read `l.err` with
+no synchronisation. The patch adds a `done` channel and never closes `conns`:
+
+- the accept loop writes `l.err`, then `close(l.done)` (once: it returns right after);
+- a finished handshake does `select { case l.conns <- c: case <-l.done: c.Close() }`;
+- `Accept` is a `select` over `conns` and `done` and returns `l.err` after the close, so a caller (xray-core) sees the same error
+  as before, every time it asks. `l.err` is read only after `done` is closed, which orders it after the write.
+
+Nothing else changes. It is three small edits in `tls.go` (the `done` field, `Accept`, the accept loop in `NewListener`); the
+upstream text of each is in `internal/vendorcheck/reality_test.go` (`tlsHunks`), which fails if any of them is missing or
+occurs twice, or if `tls.go` differs from upstream anywhere else.
+
 ## Tests
 
 - `internal/node/vless/realitycompat_test.go`: `TestRealityKeyShareRuleAgainst2603` feeds nineteen shapes of key_share list to the
   library's `Server` (read through its `Show` output: whether an auth key was derived and its first 16 bytes) and compares with
   the 26.3.27 rule copied into the test, with the compatibility on (default) and off (upstream's behaviour, also copied).
+- `internal/node/vless/realitylistener_test.go`, `TestRealityListenerCloseWhileHandshakesFinish`: finished handshakes of real
+  REALITY clients wait to be accepted while the inner listener is closed; the test wants every undelivered connection closed,
+  `Accept` to return the listener's error on every call, and no goroutine of the listener left. On upstream's `NewListener` it
+  fails under `-race` (`closechan` against `chansend`) and hangs on the unclosed connections.
 - `TestRealityHelloKexPerKey` and `scripts/e2e/m3.sh` (`m3_vless_oldclients` and the steps after it) run real clients of older
   releases against a node.
 
@@ -70,8 +93,9 @@ Mihomo (1.8.2) and older Xray would be turned away by it. Mistgate builds the pr
 
 1. Copy the module that `go mod download -json github.com/xtls/reality@<version>` names (the version `xray-core`'s `go.mod`
    requires) over this directory, keeping `mistgate_compat.go` and this file.
-2. Apply the hunk to `tls.go` again (search for `ensure order`; if upstream changed the rule, read the new one and decide what the
-   older rule has to give back). Update the version above and in `go.mod`'s `require`.
+2. Apply the hunks to `tls.go` again (search for `ensure order` for the key-share rule, `REALITY] SECTION: listener` for the
+   listener; if upstream changed either, read the new text and decide what the patch has to give back; `tlsHunks` in
+   `internal/vendorcheck/reality_test.go` takes the new upstream text). Update the version above and in `go.mod`'s `require`.
 3. `go mod tidy`, `go build ./...`, `go test -p 1 ./internal/node/vless/ ./internal/vendorcheck/`, then the old-client matrix of
    the m3 e2e.
 4. Check `LICENSE`/`LICENSE-Go` and the licences of the library's new dependencies (no GPL in the node binary).
