@@ -34,7 +34,6 @@ import { useNow } from "@/lib/time";
 import { ipv6Helps } from "@/lib/reachability";
 import { useIsOwner } from "@/lib/updates";
 import { entryOf, entryOffered, entryState, hintOf, ipv6FactOf, lanesOf, type Ipv6Entry, type Ipv6Fact, type Lane, type Ring, type WayId, type Ways } from "@/lib/ways";
-import { CountryRow } from "@/screens/health/country";
 import { Glyph } from "@/screens/overview-parts";
 import { EntryDialog, entryReason, EntryState, TurnOffDialog } from "./ipv6-entry";
 import { Spin, Wa } from "./parts";
@@ -42,6 +41,7 @@ import { CheckPortsButton, portRows, Ports, usePortCheck } from "./ports";
 import { RelayStrip } from "./relay-strip";
 import { RelayWizard } from "./relay-wizard";
 import { PairWay } from "./relay-pair";
+import { Nets } from "./ways-nets";
 import { RelayRows } from "./relay-rows";
 import { useOpenWizard } from "./relay-open";
 import { useCountryOf, useRelayRuns } from "./relays";
@@ -860,59 +860,6 @@ function RemovePair({ rs, entry, exit, entryCc, exitCc, asking, onAsk, onDone }:
   );
 }
 
-/** The seen-from-the-country section: a chip per network, the sources behind them on request. */
-function Nets({ w, name, check, six }: { w: WaysModel; name: string; check?: CountryCheck; six?: boolean }) {
-  const t = useT();
-  const fmt = useFmt();
-  const [more, setMore] = useState(false);
-  const hint = hintOf(check);
-  const nets = new Map<string, boolean>();
-  for (const v of check?.vantages ?? []) {
-    const n = v.network || v.key;
-    nets.set(n, (nets.get(n) ?? false) || v.state === "dark");
-  }
-  const dark = hint?.verdict === "blocked" ? "crit" : "warn";
-  return (
-    <>
-      <div className="wy-sh">
-        <h4>{t(six ? "ways.block.seen6" : "ways.block.seen", { node: name, country: countryIn(t, w.cc) })}</h4>
-        {check && <span>{fmt.ago(check.atUnix)}</span>}
-        {check && (
-          <button type="button" className="wy-lk wy-sa" aria-expanded={more} onClick={() => setMore((x) => !x)}>
-            {more ? t("wy.nets.less") : t("wy.nets.more")}
-          </button>
-        )}
-      </div>
-      {nets.size > 0 && (
-        <div className="wy-nets">
-          {[...nets].map(([n, off]) => (
-            <span key={n} className={off ? dark : ""}>
-              <Dot kind={off ? (dark === "crit" ? "bad" : "warn") : "ok"} />
-              <b>{n}</b>
-              <em>{off ? t("wy.nets.shut") : ""}</em>
-            </span>
-          ))}
-        </div>
-      )}
-      {check && (more || nets.size === 0) && (
-        <div className="px-6 pb-5 max-[720px]:px-4">
-          <CountryRow check={check} code={w.cc} />
-        </div>
-      )}
-      {!check && (
-        <p className="wy-hint !mt-1">
-          {t("ways.noCountry")}{" "}
-          {w.owner && (
-            <Link to="/reachability" className="wy-lk">
-              {t("ways.sources")}
-            </Link>
-          )}
-        </p>
-      )}
-    </>
-  );
-}
-
 /** The entry's own way in, when people come to it directly and it has nothing else: the board's one card. */
 function SelfCard({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }) {
   const t = useT();
@@ -930,7 +877,7 @@ function SelfCard({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }) {
         </div>
         <Pill look={look} />
       </div>
-      <Nets w={w} name={node.name} check={w.country} />
+      <Nets w={w} name={node.name} check={w.country} kind="self" />
     </section>
   );
 }
@@ -970,7 +917,7 @@ function DirectDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane 
           <Ports data={data} run={run} subs />
         </>
       )}
-      <Nets w={w} name={node.name} check={w.country} />
+      <Nets w={w} name={node.name} check={w.country} kind="open" />
       {!none && (
         <div className="wy-act">
           <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "profiles" }} className="wy-lk !ms-0">
@@ -1023,7 +970,7 @@ function RelayDetail({ data, w, lane, onOther, onMore }: { data: Data; w: WaysMo
         <span>{t.n("wy.pass.onPath", lane.relays.length)}</span>
       </div>
       <RelayRows list={lane.relays} runs={runs} readOnly={!w.owner} people={w.cc} onOther={w.owner ? onOther : undefined} />
-      <Nets w={w} name={peer.name} check={w.countryOf(peer.id)} />
+      <Nets w={w} name={peer.name} check={w.countryOf(peer.id)} kind="seen" />
       {w.owner && (
         <div className="wy-act">
           <Button size="md" disabled={runs.checking} onClick={() => void runs.checkAll(lane.relays)}>
@@ -1070,7 +1017,7 @@ function Ipv6Detail({ data, w, lane, onAdd }: { data: Data; w: WaysModel; lane: 
       <div className="px-6 pb-4 max-[720px]:px-4">
         <EntryState node={node} v6={w.v6} v4={v4Note(w.country)} country={countryIn(t, w.cc)} />
       </div>
-      {w.country?.ipv6 && <Nets w={w} name={node.name} check={w.country.ipv6} six />}
+      {w.country?.ipv6 && <Nets w={w} name={node.name} check={w.country.ipv6} kind="open" />}
       {w.owner && !off && (
         <>
           <button type="button" className="wy-rm" onClick={() => setTurningOff(true)}>

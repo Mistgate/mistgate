@@ -77,6 +77,30 @@ describe("the scenes of the Ways in tab", () => {
     expect(text).toContain(f.q.includes("role=entry") ? "Whom it carries" : "How people get here");
   });
 
+  it("says in the seen block what the country check says of the node, and opens the sources behind the chips", async () => {
+    const seen = async (q: string, state = "calm") => {
+      const text = await draw(q, state);
+      const out = { head: [...host!.querySelectorAll(".wy-sh h4")].at(-1)?.textContent, chips: host!.querySelectorAll(".wy-nets > span").length, rows: [...host!.querySelectorAll(".wy-rur")].map((r) => (r as HTMLElement).dataset.testid), text };
+      act(() => root?.unmount());
+      host?.remove();
+      root = host = null;
+      return out;
+    };
+    expect(await seen("w=1&way=direct&ru=ok")).toMatchObject({ head: "From Russia it opens on every network", chips: 4, rows: [] });
+    expect(await seen("w=1&way=direct&ru=partial&more=1")).toMatchObject({ head: "From Russia it does not open for everyone", chips: 4, rows: ["ru-globalping", "ru-lists"] });
+    expect(await seen("w=1&way=direct&ru=bad&more=1")).toMatchObject({ head: "From Russia it opens on no network", chips: 4 });
+    expect((await seen("w=1&way=direct&ru=probe&more=1")).rows).toEqual(["ru-tspu", "ru-globalping", "ru-lists"]);
+    expect((await seen("w=1&way=direct&ru=points&more=1")).rows).toContain("ru-probe:probe:dacha");
+    expect((await seen("w=1&way=direct&ru=long&more=1")).chips).toBe(12);
+    // nothing on the node: the hint, no chips
+    expect((await seen("w=1&way=direct&ru=none")).text).toContain("The country check has nothing on this node yet.");
+    // a silent node: the chips have no data
+    expect((await seen("w=1&way=direct&ru=ok&more=1", "down")).text).toContain("no data");
+    // the entry's own card is the question and its answer, without More
+    const self = await seen("w=1&role=entry&ru=partial");
+    expect(self.head).toBe("Is msk1 seen from Russia");
+  });
+
   it("says what each state of the cascade is", async () => {
     const say = async (q: string) => draw(`w=1&way=via:nod_msk1&${q}`, "calm");
     expect(await say("")).toContain("Forwarding");

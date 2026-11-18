@@ -8,6 +8,8 @@ import type { MessageKey } from "@/i18n/en";
 import { candidatesQuery, relaysQuery } from "@/lib/relay";
 import { setJob, type Job } from "./node/relay-job";
 import { waysDemo } from "./node/ways-demo";
+import { ruChecksOf, ruKindOf, type RuKind } from "./dev-kit-node-ru";
+import { historyQuery } from "@/lib/reachability";
 
 // Development only. The scenes of the node page's Ways in tab, /dev-kit?only=nodepage-frame&tab=ways&w=<scene>: the states of the board's
 // PnNode switches, each a page of its own. The parameters (all optional, names as the board's switches):
@@ -26,6 +28,8 @@ import { waysDemo } from "./node/ways-demo";
 //   job=run|done|bridge|part|bad|stopped  the run of the wizard's last step (open it with add=via:...) in that state
 //   wip=1             relays made and never turned on (the strip "Not finished"); run=1 a run in the background (the strip with its bar)
 //   used=1            every other node carries de1 already: the wizard has no entry to offer
+//   ru=<kind>         what the country check says of the node whose card is open (dev-kit-node-ru.ts: ok | partial | tcp | bad | listed | unknown | none | probe | points |
+//                     conflict | old | long); more=1 opens the sources under the networks ("More")
 //   extra=spb1        a second entry for de1; pairs=2|3|4 the exits of msk1
 //   way=<lane>        the open way (?way= of the page), view=graph|list, map=1
 // Made-up data: nodes de1, nl1, fi1, msk1, spb1, the networks Operator A to D.
@@ -51,6 +55,8 @@ export type WaysScene = {
   wip: boolean;
   run: boolean;
   used: boolean;
+  ru: RuKind | "";
+  more: boolean;
 };
 
 export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
@@ -71,6 +77,8 @@ export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
   wip: p.get("wip") === "1",
   run: p.get("run") === "1",
   used: p.get("used") === "1",
+  ru: ruKindOf(p.get("ru")) ?? "",
+  more: p.get("more") === "1",
 });
 
 const NETS = ["Operator A", "Operator B", "Operator C", "Operator D"];
@@ -265,7 +273,7 @@ export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: Way
   const msk1 = { id: "nod_msk1", name: "msk1" };
   const spb1 = { id: "nod_spb1", name: "spb1" };
   // the fleet: every node the tab names
-  waysDemo.current = sc.edit ? { edit: sc.edit } : undefined;
+  waysDemo.current = sc.edit || sc.more ? { ...(sc.edit ? { edit: sc.edit } : {}), ...(sc.more ? { nets: true } : {}) } : undefined;
   const base = qc.getQueryData(nodesQuery.queryKey) as { nodes: Record<string, unknown>[] };
   const own = base.nodes[0]!;
   // the wizard's entries are the nodes of Russia, with a node or two of other countries for the list to have somewhere to go
@@ -277,8 +285,13 @@ export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: Way
   // a run on its way (or over) for the wizard's last step, or a run in the background behind the page
   setJob(sc.job || sc.run ? jobScene(sc.job || "run", sc.add.startsWith("via:") ? sc.add.slice(4) : "nod_msk1") : undefined);
 
+  // the check of the node whose card is open, as the scene says (the one of dev-kit-node-ru.ts); the block lists are on in the week's sources
+  const ruOf = (id: string) => (sc.ru && sc.ru !== "none" ? ruChecksOf(sc.ru, NOW).map((c) => ({ ...c, nodeId: id })) : []);
+  if (sc.ru) qc.setQueryData(historyQuery.queryKey, { country: "RU", sources: ["globalping", "lists", "tspu"], sinceUnix: NOW - 7 * 86400, nowUnix: NOW, nodes: [] } as never);
   const darkOf = sc.dir === "shut" ? NETS : sc.dir === "part" ? [NETS[2]!] : [];
-  const checks = [country("nod_de1", darkOf), country("nod_msk1", sc.ways === "bad" && sc.cas === "" ? [] : []), country("nod_msk2", []), country("nod_spb1", [NETS[0]!]), ...EXITS.slice(0, 3).map((e) => country(e.id, darkOf.length ? [] : []))];
+  const checks0 = [country("nod_de1", darkOf), country("nod_msk1", sc.ways === "bad" && sc.cas === "" ? [] : []), country("nod_msk2", []), country("nod_spb1", [NETS[0]!]), ...EXITS.slice(0, 3).map((e) => country(e.id, darkOf.length ? [] : []))];
+  const openId = sc.role === "exit" ? "nod_de1" : "nod_msk1";
+  const checks = sc.ru ? [...checks0.filter((c) => c.nodeId !== openId), ...(ruOf(openId) as typeof checks0)] : checks0;
   const rowsOf = (id: string) => ({ nodeId: id, nodeName: id.slice(4), countryCode: "", nodeStatus, cells: [] });
 
   if (sc.role === "exit") {
@@ -401,6 +414,31 @@ export const waysFrames: { id: string; title: string; q: string; w: number; h: n
   { id: "ways-entry-bridge", title: "Entry: a pair on the bridge, its port is 8443", q: "w=1&role=entry&cas=port&way=out:nod_nl1", w: 1440, h: 2000 },
   { id: "ways-entry-limit", title: "Entry: the bridge of nl1 is at its limit", q: "w=1&role=entry&cas=full&way=out:nod_nl1", w: 1440, h: 2000 },
   { id: "ways-entry-fw", title: "Entry: the firewall drops forwarding (the firewall of the entry)", q: "w=1&role=entry&cause=fw&way=out:nod_nl1", w: 1440, h: 2000 },
+  // the block "Is it seen from the country": the states of the board's chips and of "More", the data of dev-kit-node-ru.ts
+  ...(
+    [
+      ["ok", "every network opens it, the probe, Globalping and the lists agree"],
+      ["partial", "some networks do not open it"],
+      ["tcp", "TCP is cut"],
+      ["bad", "no network opens it"],
+      ["listed", "the address is in the registry, no live check"],
+      ["unknown", "no data: too few probes"],
+      ["probe", "the probe node and the registry say"],
+      ["points", "two own probes, one does not prove anything"],
+      ["conflict", "the sources disagree"],
+      ["old", "a result days old"],
+      ["long", "twelve networks, long names of networks and probes"],
+    ] as const
+  ).flatMap(([k, what]) => [
+    { id: `ways-ru-${k}`, title: `Seen from Russia (${k}): ${what}`, q: `w=1&way=direct&ru=${k}`, w: 1440, h: 1500 },
+    { id: `ways-ru-${k}-more`, title: `Seen from Russia (${k}), More open: ${what}`, q: `w=1&way=direct&ru=${k}&more=1`, w: 1440, h: 1700 },
+  ]),
+  { id: "ways-ru-none", title: "Seen from Russia: the check has nothing on the node", q: "w=1&way=direct&ru=none", w: 1440, h: 1500 },
+  { id: "ways-ru-down", title: "Seen from Russia: the node is silent, the chips have no data, More open", q: "w=1&way=direct&ru=ok&more=1", w: 1440, h: 1700, state: "down" },
+  { id: "ways-ru-self", title: "Seen from Russia: the entry's own card (no More)", q: "w=1&role=entry&ru=partial", w: 1440, h: 1700 },
+  { id: "ways-ru-relay", title: "Seen from Russia: msk1 under the way through it, More open", q: "w=1&way=via:nod_msk1&ru=partial&more=1", w: 1440, h: 1900 },
+  { id: "ways-ru-long-phone", title: "Seen from Russia: the long data on a phone, 400 wide", q: "w=1&way=direct&ru=long&more=1", w: 400, h: 3400 },
+  { id: "ways-ru-points-phone", title: "Seen from Russia: own probes on a phone, 400 wide", q: "w=1&way=direct&ru=points&more=1", w: 400, h: 2800 },
   { id: "ways-exit-down", title: "Ways: the node does not answer", q: "w=1", w: 1440, h: 1500, state: "down" },
   { id: "ways-exit-viewer", title: "Ways: a read-only role", q: "w=1", w: 1440, h: 1300, state: "viewer" },
   { id: "ways-exit-1100", title: "Ways at 1100 wide: one column", q: "w=1&way=via:nod_msk1", w: 1100, h: 2600 },

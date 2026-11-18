@@ -485,14 +485,24 @@ button.wy-wn.ghost {
   border-radius: 16px;
   border: 1px solid var(--border);
 }
+.wy-nets > span {
+  max-width: 100%;
+  min-width: 0;
+}
 .wy-nets b {
+  min-width: 0;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .wy-nets em {
+  flex: none;
   font-style: normal;
   font-size: 12px;
   color: var(--muted);
+  white-space: nowrap;
 }
 .wy-nets em:empty {
   display: none;
@@ -508,6 +518,89 @@ button.wy-wn.ghost {
 }
 .wy-nets .crit em {
   color: var(--danger);
+}
+
+/* the board's .an-lk of the block's head: the text colour, 13 px */
+.wy-sh > button.wy-sa {
+  color: var(--text);
+}
+/* "More" of the seen-from-the-country block (pn.css L7101-7113): a line per source, the way into Reachability */
+.wy-nets.open {
+  padding-bottom: 12px;
+}
+.wy-rud {
+  display: flex;
+  flex-direction: column;
+  padding: 0 24px 20px;
+}
+.wy-rud.fx {
+  animation: mg-up 0.2s var(--e) both;
+}
+.wy-rur {
+  display: grid;
+  grid-template-columns: 16px 160px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.wy-rur b {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wy-rur span {
+  min-width: 0;
+  color: var(--sec);
+}
+.wy-rur em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.wy-rur.mut b {
+  color: var(--sec);
+}
+.wy-rur.mut span {
+  color: var(--muted);
+}
+.wy-rud > .wy-lk {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+/* the state glyph of the board (.rw-gl): a ring, a full dot, a half dot, a cross */
+.wy-gl {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  background: none;
+}
+.wy-gl.ok {
+  border-color: var(--accent-mark);
+  background: var(--accent-mark);
+}
+.wy-gl.part {
+  border-color: var(--warning);
+  background: linear-gradient(90deg, var(--warning) 50%, transparent 50%);
+}
+[dir="rtl"] .wy-gl.part {
+  background: linear-gradient(270deg, var(--warning) 50%, transparent 50%);
+}
+.wy-gl.bad {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%);
 }
 
 /* the ports table */
@@ -1330,6 +1423,17 @@ button.wy-nm:hover b {
   }
   .wy-nets {
     padding: 0 16px 16px;
+  }
+  .wy-rud {
+    padding-inline: 16px;
+  }
+  .wy-rur {
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    padding: 8px 0;
+  }
+  .wy-rur span {
+    grid-column: 2 / -1;
+    grid-row: 2;
   }
   .wy-off {
     margin: 4px 16px 16px;
