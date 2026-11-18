@@ -394,8 +394,8 @@ describe("view", () => {
       const m = $(el, "div.u-hero-c.only-m")!;
       expect([...m.children].map((x) => x.className)).toEqual(["u-acts"]);
       expect($$(m, "button").map((b) => [b.className, text(b.querySelector(".u-cpt span:first-child") ?? b)])).toEqual([["u-btn pri grow", "Добавить устройство"], ["u-btn u-cpb", "Ссылка"]]);
-      // the short word keeps the short "Copied" in reserve: the long "Link copied" would be wider than the room next to the add button and push it to a row of its own
-      expect([...$(m, "[data-k=hero-copy] .u-cpt")!.querySelectorAll(":scope > span")].map((x) => x.textContent)).toEqual(["Ссылка", "Скопировано"]);
+      // the short word is its own "done" word: any longer one would be wider than the room left next to the add button and push it to a row of its own
+      expect([...$(m, "[data-k=hero-copy] .u-cpt")!.querySelectorAll(":scope > span")].map((x) => x.textContent)).toEqual(["Ссылка", "Ссылка"]);
       expect([...$(side, "[data-k=hero-copy] .u-cpt")!.querySelectorAll(":scope > span")].map((x) => x.textContent)).toEqual(["Скопировать ссылку подписки", "Ссылка скопирована"]);
     });
     it("the buttons add a device and copy the link of the page", () => {
