@@ -26,7 +26,6 @@ import {
 import { G } from "@/screens/users/user-bits";
 import { Bar, D, NodeName, Pill, useFlags, w, type Gk } from "./bits";
 import { fleetCards, rolloutNow, type FleetCard } from "./fleet";
-import { ReleaseCard } from "./notes";
 import { NodesCard } from "./nodes";
 import { BundleCard, RolloutHistory } from "./rollout";
 
@@ -269,7 +268,6 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
         {active?.status === RolloutStatus.PAUSED && <Paused d={d} owner={owner} actions={actions} onCancel={onCancel} />}
         <Offline nodes={offline} />
       </section>
-      {!active && <ReleaseCard notes={d.agentNotes} />}
       <NodesCard nodes={d.nodes} data={d} owner={owner && !noUpdates} rollout={active} onSchedule={onSchedule} onRollback={onRollback} />
       <div className="uq-two">
         {!edition.edge && <BundleCard data={d} owner={owner} actions={actions} reading={scene?.reading} />}
