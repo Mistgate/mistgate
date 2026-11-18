@@ -51,6 +51,9 @@ const (
 	// SubscriptionServicePreviewMihomoTemplateProcedure is the fully-qualified name of the
 	// SubscriptionService's PreviewMihomoTemplate RPC.
 	SubscriptionServicePreviewMihomoTemplateProcedure = "/mistgate.admin.v1.SubscriptionService/PreviewMihomoTemplate"
+	// SubscriptionServicePreviewRoutingProfileProcedure is the fully-qualified name of the
+	// SubscriptionService's PreviewRoutingProfile RPC.
+	SubscriptionServicePreviewRoutingProfileProcedure = "/mistgate.admin.v1.SubscriptionService/PreviewRoutingProfile"
 )
 
 // SubscriptionServiceClient is a client for the mistgate.admin.v1.SubscriptionService service.
@@ -68,6 +71,9 @@ type SubscriptionServiceClient interface {
 	// (nothing is written: no device, no credential), and what the owner should look at. INVALID_ARGUMENT for a text that a save
 	// would refuse; NOT_FOUND for an unknown person.
 	PreviewMihomoTemplate(context.Context, *connect.Request[v1.PreviewMihomoTemplateRequest]) (*connect.Response[v1.PreviewMihomoTemplateResponse], error)
+	// "Routing" tab: reads what the owner pasted (link, base64 or JSON) as a save does and returns the entry it would store, with its
+	// info and the mode of a link. INVALID_ARGUMENT with the reason for a text that a save would refuse. Nothing is written.
+	PreviewRoutingProfile(context.Context, *connect.Request[v1.PreviewRoutingProfileRequest]) (*connect.Response[v1.PreviewRoutingProfileResponse], error)
 }
 
 // NewSubscriptionServiceClient constructs a client for the mistgate.admin.v1.SubscriptionService
@@ -117,6 +123,12 @@ func NewSubscriptionServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(subscriptionServiceMethods.ByName("PreviewMihomoTemplate")),
 			connect.WithClientOptions(opts...),
 		),
+		previewRoutingProfile: connect.NewClient[v1.PreviewRoutingProfileRequest, v1.PreviewRoutingProfileResponse](
+			httpClient,
+			baseURL+SubscriptionServicePreviewRoutingProfileProcedure,
+			connect.WithSchema(subscriptionServiceMethods.ByName("PreviewRoutingProfile")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -128,6 +140,7 @@ type subscriptionServiceClient struct {
 	testUserAgent              *connect.Client[v1.TestUserAgentRequest, v1.TestUserAgentResponse]
 	previewResponseHeaders     *connect.Client[v1.PreviewResponseHeadersRequest, v1.PreviewResponseHeadersResponse]
 	previewMihomoTemplate      *connect.Client[v1.PreviewMihomoTemplateRequest, v1.PreviewMihomoTemplateResponse]
+	previewRoutingProfile      *connect.Client[v1.PreviewRoutingProfileRequest, v1.PreviewRoutingProfileResponse]
 }
 
 // GetSubscriptionSettings calls mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings.
@@ -161,6 +174,11 @@ func (c *subscriptionServiceClient) PreviewMihomoTemplate(ctx context.Context, r
 	return c.previewMihomoTemplate.CallUnary(ctx, req)
 }
 
+// PreviewRoutingProfile calls mistgate.admin.v1.SubscriptionService.PreviewRoutingProfile.
+func (c *subscriptionServiceClient) PreviewRoutingProfile(ctx context.Context, req *connect.Request[v1.PreviewRoutingProfileRequest]) (*connect.Response[v1.PreviewRoutingProfileResponse], error) {
+	return c.previewRoutingProfile.CallUnary(ctx, req)
+}
+
 // SubscriptionServiceHandler is an implementation of the mistgate.admin.v1.SubscriptionService
 // service.
 type SubscriptionServiceHandler interface {
@@ -177,6 +195,9 @@ type SubscriptionServiceHandler interface {
 	// (nothing is written: no device, no credential), and what the owner should look at. INVALID_ARGUMENT for a text that a save
 	// would refuse; NOT_FOUND for an unknown person.
 	PreviewMihomoTemplate(context.Context, *connect.Request[v1.PreviewMihomoTemplateRequest]) (*connect.Response[v1.PreviewMihomoTemplateResponse], error)
+	// "Routing" tab: reads what the owner pasted (link, base64 or JSON) as a save does and returns the entry it would store, with its
+	// info and the mode of a link. INVALID_ARGUMENT with the reason for a text that a save would refuse. Nothing is written.
+	PreviewRoutingProfile(context.Context, *connect.Request[v1.PreviewRoutingProfileRequest]) (*connect.Response[v1.PreviewRoutingProfileResponse], error)
 }
 
 // NewSubscriptionServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -222,6 +243,12 @@ func NewSubscriptionServiceHandler(svc SubscriptionServiceHandler, opts ...conne
 		connect.WithSchema(subscriptionServiceMethods.ByName("PreviewMihomoTemplate")),
 		connect.WithHandlerOptions(opts...),
 	)
+	subscriptionServicePreviewRoutingProfileHandler := connect.NewUnaryHandler(
+		SubscriptionServicePreviewRoutingProfileProcedure,
+		svc.PreviewRoutingProfile,
+		connect.WithSchema(subscriptionServiceMethods.ByName("PreviewRoutingProfile")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.SubscriptionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SubscriptionServiceGetSubscriptionSettingsProcedure:
@@ -236,6 +263,8 @@ func NewSubscriptionServiceHandler(svc SubscriptionServiceHandler, opts ...conne
 			subscriptionServicePreviewResponseHeadersHandler.ServeHTTP(w, r)
 		case SubscriptionServicePreviewMihomoTemplateProcedure:
 			subscriptionServicePreviewMihomoTemplateHandler.ServeHTTP(w, r)
+		case SubscriptionServicePreviewRoutingProfileProcedure:
+			subscriptionServicePreviewRoutingProfileHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -267,4 +296,8 @@ func (UnimplementedSubscriptionServiceHandler) PreviewResponseHeaders(context.Co
 
 func (UnimplementedSubscriptionServiceHandler) PreviewMihomoTemplate(context.Context, *connect.Request[v1.PreviewMihomoTemplateRequest]) (*connect.Response[v1.PreviewMihomoTemplateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.SubscriptionService.PreviewMihomoTemplate is not implemented"))
+}
+
+func (UnimplementedSubscriptionServiceHandler) PreviewRoutingProfile(context.Context, *connect.Request[v1.PreviewRoutingProfileRequest]) (*connect.Response[v1.PreviewRoutingProfileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.SubscriptionService.PreviewRoutingProfile is not implemented"))
 }

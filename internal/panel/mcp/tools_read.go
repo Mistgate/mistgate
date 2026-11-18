@@ -845,6 +845,7 @@ func (c *call) subscriptionPreview(in subPreviewArg) (any, error) {
 		return nil, err
 	}
 	v.Mihomo = mihomoUseOf(set, u.GetUser(), len(v.Nodes))
+	v.Routing = routingUseOf(set, u.GetUser())
 	ua := in.Client
 	known := false
 	for _, ci := range cl.Msg.GetClients() {

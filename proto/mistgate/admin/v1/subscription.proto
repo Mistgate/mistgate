@@ -22,6 +22,9 @@ service SubscriptionService {
   // (nothing is written: no device, no credential), and what the owner should look at. INVALID_ARGUMENT for a text that a save
   // would refuse; NOT_FOUND for an unknown person.
   rpc PreviewMihomoTemplate(PreviewMihomoTemplateRequest) returns (PreviewMihomoTemplateResponse);
+  // "Routing" tab: reads what the owner pasted (link, base64 or JSON) as a save does and returns the entry it would store, with its
+  // info and the mode of a link. INVALID_ARGUMENT with the reason for a text that a save would refuse. Nothing is written.
+  rpc PreviewRoutingProfile(PreviewRoutingProfileRequest) returns (PreviewRoutingProfileResponse);
 }
 
 message SubscriptionSettings {
@@ -72,6 +75,61 @@ message SubscriptionSettings {
   // panel's own profile. The list is replaced as a whole. Checked on save (see MihomoTemplate); at most 20 templates, 64 KiB each and
   // 256 KiB in all.
   repeated MihomoTemplate mihomo_templates = 18;
+  // The owner's own routing profiles for the apps Happ and INCY, one for each of the groups they name; a person gets one profile at most,
+  // by their main group. The list is replaced as a whole. Checked on save (see RoutingProfile); at most 20 profiles.
+  repeated RoutingProfile routing_profiles = 19;
+}
+
+// One routing profile of the owner, for Happ and INCY: what goes direct, through the VPN and to the block list, the app's DNS and the
+// geo files. The owner pastes a link (`happ://routing/onadd/...`, `incy://...`, `://routing/add/...`), the bare base64 or the JSON; a
+// save reads it, keeps only the fields the two apps document (the others are named in info.dropped_fields and left out) and stores the
+// JSON the panel writes out of them, so what the apps get is never the pasted text. An answer to Happ carries the profile as
+// `happ://routing/<add|onadd>/<base64>`, one to INCY as `incy://...`, in the `routing` header while the link is at most 3000 bytes, else
+// on a line of the subscription body. The person's own DNS preset replaces the DNS fields of the profile; the rules stay the owner's.
+// A save is refused (INVALID_ARGUMENT, the text names the field) for a text that is no profile, a field of the wrong type, a geo-file or
+// DoH address that is not https, a profile over 32 KiB, a name used twice, a group in two profiles or two profiles for all groups.
+message RoutingProfile {
+  // What the owner pasted, or the JSON the panel stored; always the stored JSON in a response.
+  string profile = 1;
+  // false = the app adds the profile and turns it on (`onadd`); true = it adds it and the person turns it on (`add`).
+  bool only_add = 2;
+  // false = every group; true = only the people whose main group is in group_ids (none listed = nobody gets it).
+  bool only_groups = 3;
+  // Group ids, only with only_groups; at most 100. A group that is deleted later drops out the next time the settings are saved.
+  repeated string group_ids = 4;
+  // What the profile holds, in numbers. Filled by the panel in a response, ignored in a request.
+  RoutingInfo info = 5;
+}
+
+// What a stored routing profile holds, for the admin to show in words.
+message RoutingInfo {
+  string name = 1;
+  uint32 direct_sites = 2;
+  uint32 direct_ip = 3;
+  uint32 proxy_sites = 4;
+  uint32 proxy_ip = 5;
+  uint32 block_sites = 6;
+  uint32 block_ip = 7;
+  // "DoH", "DoU" or "" (the app's own), and the address: the DoH URL, else the IP.
+  string remote_dns_type = 8;
+  string remote_dns = 9;
+  string domestic_dns_type = 10;
+  string domestic_dns = 11;
+  // Entries of DnsHosts.
+  uint32 hosts = 12;
+  string geoip_address = 13;
+  string geosite_address = 14;
+  // "true", "false" or "": what the app does with traffic no rule names.
+  string global_proxy = 15;
+  string domain_strategy = 16;
+  string fake_dns = 17;
+  string last_updated = 18;
+  bool use_chunk_files = 19;
+  // Fields of the pasted text that the panel does not keep (at most 10, names only). Filled by PreviewRoutingProfile only.
+  repeated string dropped_fields = 20;
+  // The stored JSON in bytes, and the bytes of the Happ link of it without the person's DNS (the header holds at most 3000).
+  uint32 profile_bytes = 21;
+  uint32 header_bytes = 22;
 }
 
 // One Mihomo YAML profile of the owner. The panel puts the servers of the person at the start of its `proxies` and, while
@@ -301,6 +359,19 @@ message PreviewResponseHeadersResponse {
   string not_served = 3;
   // The person's group, for the preview's caption.
   string group_name = 4;
+  // The saved routing profile is in the answer: its link is the `routing` entry of headers (Happ and INCY only). The header does not
+  // fit (the link is over 3000 bytes) and the link is on a line of the body: routing_in_body, and no `routing` entry.
+  bool routing_in_body = 5;
+}
+
+message PreviewRoutingProfileRequest {
+  // A link, a base64 text or the JSON of a profile.
+  string input = 1;
+}
+
+message PreviewRoutingProfileResponse {
+  // The entry for the list: profile as stored, only_add from the link (add = true), info with dropped_fields.
+  RoutingProfile profile = 1;
 }
 
 message PreviewMihomoTemplateRequest {

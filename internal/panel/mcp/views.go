@@ -1251,6 +1251,7 @@ type SubscriptionPreviewV struct {
 	Profiles  []profileRefV `json:"profiles,omitempty"`
 	Nodes     []nodeAccessV `json:"nodes,omitempty"`
 	Mihomo    *mihomoUseV   `json:"mihomo_yaml,omitempty"`
+	Routing   *routingUseV  `json:"routing_profile,omitempty"`
 	Note      string        `json:"note"`
 	Truncated bool          `json:"truncated,omitempty"`
 }

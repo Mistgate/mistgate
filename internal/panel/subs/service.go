@@ -39,6 +39,7 @@ type Service struct {
 	log      *slog.Logger
 	notify   StateNotifier    // told when a switch to STRICT revoked devices; nil = nobody to tell
 	preview  ProfilePreviewer // the views of the Mihomo template preview; nil = the preview is not available
+	routing  Routing          // the Happ routing of the DNS module, for the preview of what an app gets; nil = none
 }
 
 // StateNotifier is told that credentials left the database and the nodes must hear about it; the fleet implements it.
@@ -49,6 +50,9 @@ func (s *Service) NotifyWith(n StateNotifier) { s.notify = n }
 
 // PreviewWith sets where the views of the Mihomo template preview come from (the access module).
 func (s *Service) PreviewWith(p ProfilePreviewer) { s.preview = p }
+
+// RoutingWith sets the DNS module's routing (the same one the handler is given), which the preview of what the apps receive uses.
+func (s *Service) RoutingWith(r Routing) { s.routing = r }
 
 // NewService builds the service; settings is the cache the public handler reads too, brand the loader of the
 // instance brand (for effective_title).
@@ -103,6 +107,7 @@ func (s *Service) GetSubscriptionSettings(ctx context.Context, _ *connect.Reques
 	if err := s.fillDNS(ctx, set); err != nil {
 		return nil, s.internal("default dns preset", err)
 	}
+	subsettings.FillRoutingInfo(set)
 	resp := &adminv1.GetSubscriptionSettingsResponse{Settings: set, EffectiveTitle: s.effectiveTitle(ctx, set), ReservedHeaderNames: subhdr.ReservedNames()}
 	shared, err := s.st.Access().SharedLinkUsers(ctx)
 	if err != nil {
@@ -237,15 +242,17 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	} else if err != nil {
 		return nil, s.internal("save", err)
 	}
+	set = proto.Clone(set).(*adminv1.SubscriptionSettings) // the cache keeps its own copy: the info is for this answer only
 	if err := s.fillDNS(ctx, set); err != nil {
 		return nil, s.internal("default dns preset", err)
 	}
+	subsettings.FillRoutingInfo(set)
 	if revoked > 0 && s.notify != nil {
 		s.notify.StateChanged() // the shared places are gone from the database: the nodes drop their credentials
 	}
 	// The audit row says that the settings changed and how big they are, never their texts.
 	params, _ := json.Marshal(map[string]any{
-		"apps": len(set.Apps), "rules": len(set.Rules), "response_headers": len(set.ResponseHeaders), "mihomo_templates": len(set.MihomoTemplates), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
+		"apps": len(set.Apps), "rules": len(set.Rules), "response_headers": len(set.ResponseHeaders), "mihomo_templates": len(set.MihomoTemplates), "routing_profiles": len(set.RoutingProfiles), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
 		"link_awg": subsettings.LinkAWG(set), "link_auto_select": subsettings.LinkAutoSelect(set), "shared_revoked": revoked,
 	})
 	entry := store.AuditEntry{Actor: admin.ID, Action: "subscription_settings_update", Result: "ok", Params: string(params)}
@@ -328,6 +335,9 @@ func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSe
 	for _, t := range set.GetMihomoTemplates() {
 		used = used || len(t.GetGroupIds()) > 0
 	}
+	for _, e := range set.GetRoutingProfiles() {
+		used = used || len(e.GetGroupIds()) > 0
+	}
 	if !used {
 		return set, nil
 	}
@@ -343,7 +353,12 @@ func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSe
 	if err != nil {
 		return nil, err
 	}
-	hadHeader, hadTemplate := map[string]bool{}, map[string]bool{}
+	hadHeader, hadTemplate, hadRouting := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for _, e := range stored.GetRoutingProfiles() {
+		for _, id := range e.GroupIds {
+			hadRouting[id] = true
+		}
+	}
 	for _, e := range stored.GetResponseHeaders() {
 		for _, id := range e.GroupIds {
 			hadHeader[id] = true
@@ -371,7 +386,24 @@ func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSe
 			}
 		}
 	}
+	for i, e := range out.RoutingProfiles {
+		e.GroupIds = slices.DeleteFunc(e.GroupIds, func(id string) bool { return !live[id] && hadRouting[id] })
+		for _, id := range e.GroupIds {
+			if !live[id] {
+				return nil, fmt.Errorf("%w: routing_profiles[%d].group_ids: no such group", subsettings.ErrInvalid, i)
+			}
+		}
+	}
 	return out, nil
+}
+
+// PreviewRoutingProfile reads what the owner pasted as a save does, and returns the entry that would be stored with what it holds.
+func (s *Service) PreviewRoutingProfile(_ context.Context, req *connect.Request[adminv1.PreviewRoutingProfileRequest]) (*connect.Response[adminv1.PreviewRoutingProfileResponse], error) {
+	e, err := subsettings.RoutingProfileOf(req.Msg.GetInput())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&adminv1.PreviewRoutingProfileResponse{Profile: e}), nil
 }
 
 // PreviewResponseHeaders says which of the own headers of the list one person's answer carries for a User-Agent: the answer
@@ -409,8 +441,31 @@ func (s *Service) PreviewResponseHeaders(ctx context.Context, req *connect.Reque
 		for _, h := range subsettings.ResponseHeadersFor(&adminv1.SubscriptionSettings{ResponseHeaders: list}, u.GroupID, format) {
 			resp.Headers = append(resp.Headers, &adminv1.SentHeader{Name: h.Name, Value: h.Value, Base64: h.Base64})
 		}
+		// The saved routing profile goes with the link list to Happ and INCY, as the handler does it.
+		if app := routingApp(m.UserAgent); app != "" && format == adminv1.SubFormat_SUB_FORMAT_BASE64_URIS {
+			rt := routingFor(ctx, s.settings.Get(ctx), u.GroupID, u.ID, app, s.routing, s.previewPreset(ctx, u.ID), s.log)
+			if rt.Header != "" {
+				resp.Headers = append(resp.Headers, &adminv1.SentHeader{Name: "routing", Value: rt.Header})
+			}
+			resp.RoutingInBody = rt.Body != ""
+		}
 	}
 	return connect.NewResponse(resp), nil
+}
+
+// previewPreset is the person's DNS preset for the routing preview (nil when the DNS module is not wired or has none).
+func (s *Service) previewPreset(ctx context.Context, userID string) func() *dns.Preset {
+	return func() *dns.Preset {
+		e, _ := s.routing.(Effective)
+		if e == nil {
+			return nil
+		}
+		p, err := e.LinkEffective(ctx, userID)
+		if err != nil {
+			return nil
+		}
+		return &p
+	}
 }
 
 // clientNames are the display names of the client ids the plugins refer to.

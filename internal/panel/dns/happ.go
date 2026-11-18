@@ -183,6 +183,11 @@ func happBuild(p Preset) (happProfile, []string, error) {
 // happRender returns the value of the `routing` subscription header for a preset, and what of the
 // preset Happ could not take.
 func happRender(p Preset) (header string, notes []string, err error) {
+	return appRender(p, "happ")
+}
+
+// appRender is happRender for the app whose link scheme is scheme ("happ", "incy"): both read the same profile JSON.
+func appRender(p Preset, scheme string) (header string, notes []string, err error) {
 	prof, notes, err := happBuild(p)
 	if err != nil {
 		return "", nil, err
@@ -191,7 +196,7 @@ func happRender(p Preset) (header string, notes []string, err error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return "happ://routing/onadd/" + base64.StdEncoding.EncodeToString(b), notes, nil
+	return scheme + "://routing/onadd/" + base64.StdEncoding.EncodeToString(b), notes, nil
 }
 
 // HappRouting returns the value of the `routing` header for a preset; its split becomes direct domains only
@@ -202,8 +207,36 @@ func HappRouting(p Preset) (string, error) {
 	return h, err
 }
 
+// AppRouting is HappRouting for another app that reads the same profile under its own link scheme (INCY: "incy"): the
+// profile is the same JSON, only the scheme of the link differs.
+func AppRouting(p Preset, scheme string) (string, error) {
+	h, _, err := appRender(p, scheme)
+	return h, err
+}
+
 // HappRoutingNotes lists, in English, which parts of the preset the Happ profile drops or changes.
 func HappRoutingNotes(p Preset) []string {
 	_, notes, _ := happRender(p)
 	return notes
+}
+
+// ProfileDNS is the DNS part of a routing profile of a preset: the two resolvers (type, DoH address, IP) and the host pins of
+// DoH host names. It is what the owner's own routing profile takes from the person's preset; the preset's split and ad rules
+// are not part of it.
+type ProfileDNS struct {
+	RemoteType, RemoteDomain, RemoteIP, DomesticType, DomesticDomain, DomesticIP string
+	Hosts                                                                        map[string]string
+}
+
+// ProfileDNSOf returns the DNS fields the Happ profile of the preset has (what HappRouting would carry in them). An error means
+// no main server of the preset can be written in a profile.
+func ProfileDNSOf(p Preset) (ProfileDNS, error) {
+	prof, _, err := happBuild(p)
+	if err != nil {
+		return ProfileDNS{}, err
+	}
+	return ProfileDNS{
+		RemoteType: prof.RemoteDNSType, RemoteDomain: prof.RemoteDNSDomain, RemoteIP: prof.RemoteDNSIP,
+		DomesticType: prof.DomesticDNSType, DomesticDomain: prof.DomesticDNSDom, DomesticIP: prof.DomesticDNSIP, Hosts: prof.DnsHosts,
+	}, nil
 }
