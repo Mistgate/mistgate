@@ -1,6 +1,8 @@
 package fleet
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"testing"
 
@@ -36,9 +38,19 @@ func TestPanelLinkSettingsAndSignature(t *testing.T) {
 	if s.PanelLinkUrl != link {
 		t.Fatalf("panel-link/1 agent: link %q, want %q", s.PanelLinkUrl, link)
 	}
-	if settingsSig(s) == base {
+	sig := settingsSig(s)
+	if sig == base {
 		t.Fatal("a set link address did not change the panel-link/1 agent's signature")
 	}
+	sum := sha256.Sum256([]byte(link))
+	if strings.Contains(sig, link) || strings.Contains(sig, strings.Repeat("n", 24)) || !strings.Contains(sig, hex.EncodeToString(sum[:])) {
+		t.Fatalf("the signature must hold the address's SHA-256, not the address: %q", sig)
+	}
+	f.SetPanelLink("wss://panel.example.com/" + strings.Repeat("m", 24) + "/")
+	if other := settingsSig(f.nodeSettings(node, capable)); other == sig || other == base {
+		t.Fatal("another link address did not change the signature")
+	}
+	f.SetPanelLink(link)
 	old := f.nodeSettings(node, nil)
 	if old.PanelLinkUrl != "" || settingsSig(old) != base {
 		t.Fatalf("agent without panel-link/1: link %q, signature %q want %q", old.PanelLinkUrl, settingsSig(old), base)
