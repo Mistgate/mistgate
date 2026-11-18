@@ -6,7 +6,7 @@ import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { dictionaries, fill, langs, setLang, type Lang } from "@/i18n";
 import { portNotes, takenNote } from "@/lib/port-check";
 import type { Tx } from "@/screens/users/t";
-import { appsText, viaOf } from "@/screens/users/format";
+import { viaOf } from "@/screens/users/format";
 import { refusalOf } from "./deploy";
 import { ownLinkOnly, summaryParts, telegramOnly, trustTunnelOnly } from "./protocol-meta";
 import { problemText } from "./problem-text";
@@ -76,11 +76,8 @@ describe("the words for a Hysteria2 site that gives way to MTProto", () => {
 });
 
 describe("the apps of a person", () => {
-  const t = txOf("en");
-  it("name TrustTunnel in the ways of the card and in the list's chips", () => {
+  it("name TrustTunnel among the ways of the list's chips", () => {
     const user = (apps: object, via: App[] = []) => ({ apps: { happ: true, amnezia: false, ...apps }, via }) as never;
-    expect(appsText(user({ trustTunnel: true }), t)).toBe("Subscription link + TrustTunnel");
-    expect(appsText(user({ telegram: true, trustTunnel: true }), t)).toBe("Subscription link + Telegram + TrustTunnel");
     expect(viaOf(user({}, [App.TRUST_TUNNEL]))).toEqual({ link: false, keys: false, trustTunnel: true });
   });
 });

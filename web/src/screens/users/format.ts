@@ -92,24 +92,9 @@ export function seenText(u: User, t: Tx, now = nowSec()): string {
   return u.online ? t("users.now") : agoText(u.lastSeenUnix, t, now);
 }
 
-/** Term column: days left ("0 d", red, once expired), or "∞" for no expiry; a week or less is in the text colour. */
-export function termText(u: User, t: Tx, now = nowSec()): { text: string; tone: "muted" | "fg" | "bad" } {
-  const d = daysLeft(u.expiresUnix, now);
-  if (d === null) return { text: "∞", tone: "muted" };
-  if (u.expiresUnix <= now) return { text: t("users.days", { n: 0 }), tone: "bad" };
-  return { text: t("users.days", { n: d }), tone: d <= 7 ? "fg" : "muted" };
-}
-
 /** What the user actually connected with in the last 7 days: by the subscription link, by an AmneziaVPN key, by a TrustTunnel key, or several. */
 export function viaOf(u: User): { link: boolean; keys: boolean; trustTunnel: boolean } {
   return { link: u.via.includes(App.HAPP), keys: u.via.includes(App.AMNEZIA), trustTunnel: u.via.includes(App.TRUST_TUNNEL) };
-}
-
-/** "Link + AmneziaVPN keys", "Subscription link" or "AmneziaVPN keys": the ways the admin switched on. */
-export function appsText(u: User, t: Tx): string {
-  const ways = u.apps?.happ && u.apps.amnezia ? t("users.appsBoth") : u.apps?.amnezia ? t("users.appsAwg") : t("users.appsHapp");
-  const withTg = u.apps?.telegram ? t("users.appsWithTg", { apps: ways }) : ways;
-  return u.apps?.trustTunnel ? t("users.appsWithTt", { apps: withTg }) : withTg;
 }
 
 // ---------------------------------------------------------------------------------------------------
