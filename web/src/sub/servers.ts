@@ -121,7 +121,7 @@ function deskRow(c: Ctx, all: ServerEntry[], x: ServerEntry, dnsCol: boolean): H
   const { t, a } = c;
   const label = serverText(x, c.s.lang);
   const cell = x.online
-    ? h("div", { class: "u-load" }, ...(x.load ? [meter(x.load), t.loadLevel[x.load]] : [h("span", { class: "u-dim" }, "—")]))
+    ? h("div", { class: `u-load${x.load === "high" ? " hi" : ""}` }, ...(x.load ? [meter(x.load), t.loadLevel[x.load]] : [h("span", { class: "u-dim" }, "—")]))
     : h("div", { class: "u-load" }, h("i", { class: "u-dot off" }), t.down);
   return h(
     "div",

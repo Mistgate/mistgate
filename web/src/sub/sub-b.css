@@ -15,12 +15,11 @@
 .u-tr.off .fl2, .u-sr.off .fl2 { opacity: 0.55; }
 /* very busy: the filled bars and the word are amber */
 .u-meter.hi i.f { background: var(--warning); }
-.u-load:has(.u-meter.hi) { color: var(--warning-text); }
+.u-load.hi { color: var(--warning-text); }
 .u-bar .l { min-width: 0; }
 .u-bar .l .u-dot.warn { background: var(--warning); }
 div.u-sr { cursor: default; }
-.u-sr .u-tag { flex: none; }
-.u-sr .u-dim { flex: none; }
+.u-sr .u-tag, .u-sr .u-dim { flex: none; }
 .u-busy { display: flex; align-items: flex-start; gap: 8px; padding: 12px 24px; border-top: 1px solid var(--hair); font-size: 13px; line-height: 20px; color: var(--warning-text); }
 .u-busy .i { margin-top: 2px; }
 .u-note .u-tag { vertical-align: top; }
@@ -29,18 +28,17 @@ div.u-sr { cursor: default; }
 /* one proxy: nothing to choose, the pane takes the width */
 .u-tg.one { grid-template-columns: minmax(0, 1fr); }
 .u-pick > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.u-pick small, .u-h2 small, .u-prow small { margin-inline-start: 8px; font-size: 13px; font-weight: 400; color: var(--sec); }
-.u-h2 small { margin-inline-start: 0; display: block; }
+.u-pick small, .u-prow small { margin-inline-start: 8px; font-size: 13px; font-weight: 400; color: var(--sec); }
+.u-h2 small { display: block; font-size: 13px; line-height: 20px; font-weight: 400; color: var(--sec); }
 .u-pick .u-tag, .u-prow .u-tag { flex: none; height: 20px; padding: 0 6px; font-size: 11px; }
-.u-pick .ck { flex: none; }
-.u-h2 .u-tag { flex: none; }
+.u-pick .ck, .u-h2 .u-tag, .u-prow .u-btn { flex: none; }
 .u-prow .grow { overflow: hidden; }
 .u-prow .grow > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a server with no link yet: the words under its name */
 .u-prow.nolink { flex-wrap: wrap; height: auto; min-height: 60px; padding-block: 12px; }
 .u-prow.nolink .u-hint { flex-basis: 100%; }
 .u-hint .a-lnk { display: inline-flex; min-height: 20px; padding: 0 2px; vertical-align: baseline; text-decoration: none; }
 .u-hint .a-lnk .i { margin-inline-start: 2px; }
-.u-prow .u-btn { flex: none; }
 
 /* devices ------------------------------------------------------------------------------------------------------------------------ */
 .u-dvl { overflow: hidden; }
@@ -49,19 +47,26 @@ div.u-sr { cursor: default; }
 .u-dv .when { display: inline-flex; align-items: center; gap: 6px; }
 /* a row that is no device (STRICT: the apps without a device ID do not connect) */
 .u-dv.quiet .tl { background: none; box-shadow: inset 0 0 0 1px var(--hair); color: var(--muted); }
-/* a key that needs a new one: the mark and the button, on the row (a computer) or under it (a phone) */
+/* a key that needs a new one: the mark and the button, on the row (a computer) or under it (a narrow window, a phone) */
 .u-dv .sk { flex: none; display: flex; align-items: center; gap: 12px; }
 .u-dv .sk .u-btn { height: 36px; padding: 0 12px; }
-.u-dvx { padding: 0 16px 12px 64px; padding-inline: 64px 16px; margin: 0; }
+.u-dvx { margin: 0; padding: 0 16px 12px 64px; padding-inline: 64px 16px; }
 .u-dv .u-ic .spin { width: 16px; height: 16px; }
 .u-dv .u-btn .spin { width: 14px; height: 14px; }
 
+/* a computer's layout in a narrow window (720 to 960 px): the board draws 1280, so the table and the pane give way a little */
+@media (max-width: 959.98px) {
+  .u-tg { grid-template-columns: minmax(0, 1fr); }
+  .u-tr { grid-template-columns: minmax(0, 1.4fr) 128px 148px minmax(0, 1fr) 40px; gap: 16px; padding-inline: 16px 4px; }
+  .u-tbl.k3 .u-tr { grid-template-columns: minmax(0, 1.3fr) 128px minmax(0, 1fr); }
+  .u-dv.stale { flex-wrap: wrap; row-gap: 8px; height: auto; min-height: 64px; padding-block: 12px; }
+  .u-dv .sk { order: 5; flex: 1 0 100%; padding-inline-start: 48px; }
+}
+
+/* the phone */
 @media (max-width: 719.98px) {
   .u-bar .r .u-btn.quiet { height: 44px; margin-block: -6px; padding: 0 8px; }
   .u-dvh .u-acts .u-btn.pri { flex: 1 0 auto; }
-  .u-dv.stale { flex-wrap: wrap; row-gap: 8px; }
-  .u-dv .sk { order: 5; flex: 1 0 100%; padding-inline-start: 48px; }
   .u-dv .sk .u-btn { flex: 1 0 auto; height: 44px; }
-  .u-dvx { padding-inline: 64px 16px; }
   .u-busy { padding: 12px 16px; }
 }

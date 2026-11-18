@@ -41,6 +41,9 @@ export type ProxySpec = {
 // which proxy of the panel is chosen (a computer): kept while the page is open, it is not the page's state, so a drawing of the page keeps it
 const chosen: Record<string, number> = {};
 
+/** The dev server's `&proxy=<n>`: the n-th proxy of the panel ("tg", "tt") is the chosen one. */
+export const pickProxy = (key: "tg" | "tt", n: number) => void (chosen[key] = n);
+
 /** The marks of a proxy: IPv6, and a twin through a node of another country. */
 const marks = (c: Ctx, l: ProxyLink): HTMLElement[] => [l.ipv6 && h("span", { class: "u-tag dir" }, "IPv6"), l.relay && h("span", { class: "u-tag ru", title: c.t.viaHint(l.via) }, c.t.chipVia(l.via))].filter((x): x is HTMLElement => !!x);
 
