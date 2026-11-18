@@ -354,7 +354,7 @@ func TestOwnRoutingProfileIsNotSentOnARefusal(t *testing.T) {
 func TestRoutingProfilesThroughTheSettingsAPI(t *testing.T) {
 	m := newM3Rig(t)
 	svc := headerService(m)
-	ctx := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_routing", Role: store.RoleHelper})
+	ctx := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_routing", Role: store.RoleOwner})
 	temp := must(m.svc.CreateGroup(m.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "temp", ProfileIds: []string{m.profile}}))).Msg.Group.Id
 	save := func(list ...*adminv1.RoutingProfile) (*adminv1.SubscriptionSettings, error) {
 		set := subsettings.Defaults()
@@ -375,7 +375,7 @@ func TestRoutingProfilesThroughTheSettingsAPI(t *testing.T) {
 	invalid("text that is no profile", routingEntry("hello", false))
 	invalid("a geo file over http", routingEntry(`{"Name":"x","Geoipurl":"http://geo.example.com/g.dat"}`, false))
 
-	// a helper may save them (like the response headers), the pasted link is stored as the profile it holds, the info is in the answer
+	// the owner saves them, the pasted link is stored as the profile it holds, the info is in the answer
 	pasted := "happ://routing/add/" + base64.StdEncoding.EncodeToString([]byte(`{"Name":" family ","Evil":1,"DirectSites":["domain:example.ru"]}`))
 	got, err := save(routingEntry(pasted, false, temp, m.group2), routingEntry(`{"Name":"rest","DirectSites":[]}`, true, m.group))
 	if err != nil || len(got.RoutingProfiles) != 2 {

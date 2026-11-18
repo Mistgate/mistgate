@@ -620,6 +620,38 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Errorf("after the operator's text change: %d %s", code, body)
 	}
 
+	// The routing profiles of Happ and INCY are the owner's too, by the same rule: the operator plans, the apply waits for the owner,
+	// and the save passes only under the owner's approval of this tool's plan.
+	const routingMarker = "marker-routing-profile-5532"
+	routingText := `{"Name":"` + routingMarker + `","DirectSites":["domain:example.ru"]}`
+	rp := decodeJSON[mcp.PlanOut](t, ok(op2, "subscription_routing_set_plan", map[string]any{"name": routingMarker, "profile": routingText, "group_ids": []string{groupID}}))
+	if !rp.NeedsApproval {
+		t.Fatalf("subscription_routing_set_plan: %+v", rp)
+	}
+	if out, isErr := tool(op2, "subscription_routing_set_apply", map[string]any{"confirm_token": rp.ConfirmToken}); !isErr || !strings.Contains(out, "waiting for the owner") {
+		t.Errorf("routing apply before the approval: %v %s", isErr, out)
+	}
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+rp.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	if ap := decodeJSON[mcp.ApplyOut](t, ok(op2, "subscription_routing_set_apply", map[string]any{"confirm_token": rp.ConfirmToken})); ap.Status != "applied" {
+		t.Errorf("subscription_routing_set_apply: %+v", ap)
+	}
+	if code, body := rpc("owner", "", "SubscriptionService", "GetSubscriptionSettings", `{}`); code != 200 || !strings.Contains(body, routingMarker) {
+		t.Errorf("the routing profile was not saved: %d %s", code, body)
+	}
+	// another plan of the operator carries the stored profile unchanged
+	tx2 := decodeJSON[mcp.PlanOut](t, ok(op2, "subscription_texts_set_plan", map[string]any{"announcement": "Maintenance over"}))
+	if code, body := rpc("owner", "", "ApprovalService", "Approve", `{"id":"`+tx2.PlanID+`"}`); code != 200 {
+		t.Fatalf("Approve: %d %s", code, body)
+	}
+	if ap := decodeJSON[mcp.ApplyOut](t, ok(op2, "subscription_texts_set_apply", map[string]any{"confirm_token": tx2.ConfirmToken})); ap.Status != "applied" {
+		t.Errorf("subscription_texts_set_apply with a routing profile stored: %+v", ap)
+	}
+	if code, body := rpc("owner", "", "SubscriptionService", "GetSubscriptionSettings", `{}`); code != 200 || !strings.Contains(body, "Maintenance over") || !strings.Contains(body, routingMarker) {
+		t.Errorf("after the operator's text change: %d %s", code, body)
+	}
+
 	// -- the audit trail: the plan, the apply and the module's own rows carry the token as mcp:<id>
 	rows, err := st.ListAudit(ctx, "", 0, 200)
 	if err != nil {

@@ -200,7 +200,7 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
 	}
 	// Before anything is written, so a refused request changes nothing (the DNS offer below is saved first).
-	if err := s.ownerTemplates(ctx, admin, req.Msg.GetSettings()); err != nil {
+	if err := s.ownerOnly(ctx, admin, req.Msg.GetSettings()); err != nil {
 		return nil, err
 	}
 	// The document is checked before anything is written, so an invalid one leaves the DNS offer as it was. Then the DNS offer
@@ -270,17 +270,31 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 // A template is the whole config its people get, with the providers and rules it names: more than the rest of the settings.
 var errMihomoOwnerOnly = connect.NewError(connect.CodePermissionDenied, errors.New("mihomo_templates_owner_only: only the owner can change the Mihomo templates"))
 
-// ownerTemplates refuses a save that changes the Mihomo templates when the caller is not the owner. The rest of the settings stay
-// open to a helper, which is how the form sends them: the whole document, the templates as it read them.
-func (s *Service) ownerTemplates(ctx context.Context, admin store.Admin, set *adminv1.SubscriptionSettings) error {
-	if admin.Role == store.RoleOwner || auth.ApprovedPlanTool(ctx) == auth.MihomoTemplateTool {
+// errRoutingOwnerOnly is the same refusal for the routing profiles of Happ and INCY (the apply of an approved plan of
+// subscription_routing_set passes): a profile decides where the traffic of its people goes.
+var errRoutingOwnerOnly = connect.NewError(connect.CodePermissionDenied, errors.New("routing_profiles_owner_only: only the owner can change the routing profiles"))
+
+// ownerOnly refuses a save that changes the Mihomo templates or the routing profiles when the caller is not the owner. The rest of
+// the settings stay open to a helper, which is how the form sends them: the whole document, those lists as it read them.
+func (s *Service) ownerOnly(ctx context.Context, admin store.Admin, set *adminv1.SubscriptionSettings) error {
+	if admin.Role == store.RoleOwner {
+		return nil
+	}
+	tool := auth.ApprovedPlanTool(ctx) // an approved plan frees the one list its tool is for
+	checkTemplates, checkRouting := tool != auth.MihomoTemplateTool, tool != auth.RoutingProfileTool
+	if !checkTemplates && !checkRouting {
 		return nil
 	}
 	stored, err := subsettings.Load(ctx, s.st)
 	if err != nil {
 		return s.internal("settings for the owner check", err)
 	}
-	if !templatesDiffer(set.GetMihomoTemplates(), stored.GetMihomoTemplates(), nil) {
+	differs := func(skip func(id string) bool) (templates, routing bool) {
+		templates = checkTemplates && templatesDiffer(set.GetMihomoTemplates(), stored.GetMihomoTemplates(), skip)
+		routing = checkRouting && subsettings.RoutingProfilesDiffer(set.GetRoutingProfiles(), stored.GetRoutingProfiles(), skip)
+		return
+	}
+	if t, r := differs(nil); !t && !r {
 		return nil
 	}
 	// A group that was deleted since may still stand in the stored list: a save drops it (settingGroups), so it is not a change.
@@ -292,8 +306,12 @@ func (s *Service) ownerTemplates(ctx context.Context, admin store.Admin, set *ad
 	for _, g := range groups {
 		live[g.ID] = true
 	}
-	if templatesDiffer(set.GetMihomoTemplates(), stored.GetMihomoTemplates(), func(id string) bool { return !live[id] }) {
+	t, r := differs(func(id string) bool { return !live[id] })
+	switch {
+	case t:
 		return errMihomoOwnerOnly
+	case r:
+		return errRoutingOwnerOnly
 	}
 	return nil
 }

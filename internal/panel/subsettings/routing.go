@@ -624,6 +624,42 @@ func normalizeRoutingProfiles(list []*adminv1.RoutingProfile) {
 	}
 }
 
+// RoutingProfilesDiffer says whether two lists give people different routing: a profile by its name (any case), its stored JSON, its
+// mode and its groups as a set (those that skip says to leave out). The order is not compared: a group has one profile at most.
+func RoutingProfilesDiffer(a, b []*adminv1.RoutingProfile, skip func(id string) bool) bool {
+	if len(a) != len(b) {
+		return true
+	}
+	key := func(e *adminv1.RoutingProfile) (string, string) { // an entry that does not read is its text as sent
+		if p, err := ParseRoutingInput(e.GetProfile()); err == nil {
+			return strings.ToLower(p.Doc.Name), p.Doc.Canonical()
+		}
+		return "raw:" + e.GetProfile(), e.GetProfile()
+	}
+	groups := func(e *adminv1.RoutingProfile) []string {
+		ids := slices.DeleteFunc(slices.Clone(e.GetGroupIds()), func(id string) bool { return skip != nil && skip(id) })
+		slices.Sort(ids)
+		return slices.Compact(ids)
+	}
+	byName := make(map[string]*adminv1.RoutingProfile, len(b))
+	for _, e := range b {
+		k, _ := key(e)
+		byName[k] = e
+	}
+	for _, e := range a {
+		k, text := key(e)
+		o, ok := byName[k]
+		if !ok {
+			return true
+		}
+		_, otext := key(o)
+		if text != otext || o.GetOnlyAdd() != e.GetOnlyAdd() || o.GetOnlyGroups() != e.GetOnlyGroups() || !slices.Equal(groups(o), groups(e)) {
+			return true
+		}
+	}
+	return false
+}
+
 // keepValidRoutingProfiles is what a stored document is read with: an entry a save would refuse now is not served, and never
 // fails a fetch.
 func keepValidRoutingProfiles(s *adminv1.SubscriptionSettings) {

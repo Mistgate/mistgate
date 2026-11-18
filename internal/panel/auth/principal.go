@@ -127,6 +127,10 @@ func HasApprovedUserChangePlan(ctx context.Context) bool {
 // through a token that is not the owner's (an operator token): the owner's approval of that plan is the owner's own decision.
 const MihomoTemplateTool = "subscription_mihomo_template_set"
 
+// RoutingProfileTool is the same for the routing profiles of Happ and INCY: the owner's approval of a plan of this tool is what lets
+// an operator token change them.
+const RoutingProfileTool = "subscription_routing_set"
+
 // ApprovedPlanTool is the MCP tool whose plan this call is applying, when the plan is one the owner approved and its tool may call
 // this procedure (the same test as the grant that let the call through); "" for any other call, a signed-in admin's included.
 func ApprovedPlanTool(ctx context.Context) string {

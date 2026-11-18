@@ -70,6 +70,9 @@ func TestApprovedPlanToolNamesTheToolOfTheGrant(t *testing.T) {
 	if got := approvedTool(mcp(e.planFor(op, MihomoTemplateTool, true, "applying").ID)); got != MihomoTemplateTool {
 		t.Errorf("the template tool's approved plan: %q", got)
 	}
+	if got := approvedTool(mcp(e.planFor(op, RoutingProfileTool, true, "applying").ID)); got != RoutingProfileTool {
+		t.Errorf("the routing tool's approved plan: %q", got)
+	}
 	if got := approvedTool(mcp(e.planFor(op, "subscription_texts_set", true, "applying").ID)); got != "subscription_texts_set" {
 		t.Errorf("another tool's approved plan: %q", got)
 	}
