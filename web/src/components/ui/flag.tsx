@@ -28,6 +28,15 @@ const stripes: Record<string, Stripes> = {
   RO: { v: ["#002b7f", "#fcd116", "#ce1126"] },
   BE: { v: ["#000", "#fdda24", "#ef3340"] },
   IR: { h: ["#239f40", "#fff", "#da0000"] },
+  MD: { v: ["#0046ae", "#ffd200", "#cc092f"] },
+  RS: { h: ["#c6363c", "#0c4076", "#fff"] },
+  SK: { h: ["#fff", "#0b4ea2", "#ee1c25"] },
+  SI: { h: ["#fff", "#0057b8", "#ed1c24"] },
+  HR: { h: ["#f00", "#fff", "#171796"] },
+  ID: { h: ["#ce1126", "#fff"] },
+  TH: { h: ["#a51931", "#f4f5f8", "#2d2a4a", "#f4f5f8", "#a51931"], w: [1, 1, 2, 1, 1] },
+  CA: { v: ["#d80621", "#fff", "#d80621"], w: [1, 2, 1] },
+  MX: { v: ["#006847", "#fff", "#ce1126"] },
 };
 
 const W = 30;
@@ -105,6 +114,14 @@ const special: Record<string, ReactNode> = {
         const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
         return <circle key={i} cx={12.2 + 2.2 * Math.cos(a)} cy={5 + 2.2 * Math.sin(a)} r={0.8} fill="#fff" />;
       })}
+    </>
+  ),
+  BY: (
+    <>
+      <rect width={W} height={H} fill="#cf101a" />
+      <rect y={(H * 2) / 3} width={W} height={H / 3} fill="#007c30" />
+      <rect width={3.6} height={H} fill="#fff" />
+      <rect x={1.2} width={1.2} height={H} fill="#cf101a" />
     </>
   ),
   KZ: (
