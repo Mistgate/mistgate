@@ -379,3 +379,8 @@
   backdrop-filter: none;
   box-shadow: none;
 }
+
+/* The People screen's bar sits a step lower under the head (pn.css .us-bar): the board's head, bar and card are one rhythm of 16 and 4. */
+.us-bar {
+  margin-top: 16px;
+}

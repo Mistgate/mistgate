@@ -58,7 +58,7 @@ export function UserExpand({ u, group, manage, onLink }: { u: User; group: Group
             ))}
           </ul>
           {devs.length > 4 && (
-            <button type="button" onClick={() => setAll(!all)} className="mt-1 self-start text-[13px] text-sec underline decoration-line underline-offset-4 hover:text-fg">
+            <button type="button" onClick={() => setAll(!all)} className="mt-1 self-start text-[13px] text-fg underline decoration-line underline-offset-4 hover:decoration-current">
               {all ? t("ul.dev.fold") : t("ul.dev.showAll", { n: devs.length })}
             </button>
           )}
@@ -175,7 +175,7 @@ function Actions({ u, manage, onLink }: { u: User; manage: boolean; onLink: () =
           <Button onClick={onLink}>{t("ul.act.link")}</Button>
         </>
       )}
-      <AppLink to="/users/$id" params={{ id: u.id }} className="ms-auto text-[13px] text-sec underline decoration-line underline-offset-4 hover:text-fg">
+      <AppLink to="/users/$id" params={{ id: u.id }} className="ms-auto text-[13px] text-fg underline decoration-line underline-offset-4 hover:decoration-current">
         {t("ul.act.page")}
       </AppLink>
     </div>

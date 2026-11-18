@@ -175,7 +175,7 @@ export function UserDetail({ data, scene, onDeleted }: { data: DetailN; scene?: 
   const disabled = user.status === UserStatus.DISABLED;
   const d = daysLeft(user.expiresUnix, now);
   const pill = disabled ? { c: "", w: t("users.status.disabled") } : user.status === UserStatus.EXPIRED ? { c: "crit", w: t("users.status.expired") } : user.status === UserStatus.LIMITED ? { c: "crit", w: t("users.status.quota") } : isNew ? { c: "", w: t("up.pill.never") } : shown === "devices" ? { c: "warn", w: t("users.status.devices") } : { c: "ok", w: t("users.status.active") };
-  const term = d === null ? t("users.never") : user.expiresUnix <= now ? t("up.termEnded", { n: Math.max(1, Math.floor((now - user.expiresUnix) / 86400)) }) : `${t("users.until")} ${dayDate(t, user.expiresUnix, !sameYear(new Date(user.expiresUnix * 1000), new Date(now * 1000), t.locale))} · ${t("users.days", { n: d })}`;
+  const term = d === null ? t("users.never") : user.expiresUnix <= now ? t.n("up.termEnded", Math.max(1, Math.floor((now - user.expiresUnix) / 86400))) : `${t("users.until")} ${dayDate(t, user.expiresUnix, !sameYear(new Date(user.expiresUnix * 1000), new Date(now * 1000), t.locale))} · ${t("users.days", { n: d })}`;
   const termCls = d !== null && user.expiresUnix <= now ? "up-crit" : d !== null && d <= 7 ? "up-warn" : "";
   const limit = user.deviceLimit;
   const nodeName = (id: string) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id;
