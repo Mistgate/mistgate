@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { dictionaries, fill, type Lang, type T } from "@/i18n";
+import type { MessageKey } from "@/i18n/en";
 import { agentError, checkReason, countryHint, enableGate, reachHint, relayState, seenHint, stageReason, type RelayMsg } from "./relay";
 
-const tOf = (lang: Lang) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dictionaries[lang][key as "relay.title"], vars), { n: () => "" }) as unknown as T;
+const tOf = (lang: Lang) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dictionaries[lang][key as MessageKey], vars), { n: () => "" }) as unknown as T;
 const tRu = tOf("ru");
 const tEn = tOf("en");
 const now = 1_800_000_000;

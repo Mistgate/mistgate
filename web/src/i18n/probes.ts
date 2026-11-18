@@ -12,11 +12,8 @@ export const en = {
 
   "pr.title": "Own probes",
   "pr.sub": "Routers and servers in the country check your nodes from their own networks: TCP and TLS.",
-  "pr.switch": "Use own probes",
   "pr.block.probes": "Probes",
-  "pr.block.checks": "Checks",
   "pr.privacy": "A probe gets the addresses and ports of your nodes to check them from its own network. The panel keeps its operator and the city you typed, never the address of the router.",
-  "pr.owner": "Only the owner sees and changes the probes.",
 
   // the state line
   "pr.state.off.detail": "nothing is asked of the probes; the ones you installed stay and wake up when you switch it on",
@@ -149,8 +146,6 @@ export const en = {
   "pr.ok": "reaches the node",
   "pr.vantage": "{where} — probe “{name}”",
   "pr.points.title": "Own probes",
-  "pr.point": "{vantage}: {what}",
-  "pr.point.at": "{point} · {ago}",
 
   // the alert of a block seen only by own probes
   "health.alert.country_blocked.why.partial.probes":
@@ -164,11 +159,8 @@ export const ru: Record<keyof typeof en, string> = {
 
   "pr.title": "Свои зонды",
   "pr.sub": "Роутеры и серверы в стране проверяют ноды из своих сетей: TCP и TLS.",
-  "pr.switch": "Использовать свои зонды",
   "pr.block.probes": "Зонды",
-  "pr.block.checks": "Проверки",
   "pr.privacy": "Зонд получает адреса и порты твоих нод, чтобы проверить их из своей сети. Панель хранит его оператора и город, который ты ввёл, но никогда не адрес роутера.",
-  "pr.owner": "Зонды видит и меняет только владелец.",
 
   "pr.state.off.detail": "зондов никто не спрашивает; установленные остаются и оживут, когда включишь",
   "pr.state.edition": "в Cloudflare-версии пока нет, ничего не отправляется",
@@ -294,8 +286,6 @@ export const ru: Record<keyof typeof en, string> = {
   "pr.ok": "достаёт до ноды",
   "pr.vantage": "{where} — зонд «{name}»",
   "pr.points.title": "Свои зонды",
-  "pr.point": "{vantage}: {what}",
-  "pr.point.at": "{point} · {ago}",
 
   "health.alert.country_blocked.why.partial.probes":
     "Твой зонд в сети {networks} не получает ответа от этой ноды. Это одна узкая точка, поэтому это подсказка, а не доказательство: другие сети {country} не смотрели. Так показали две проверки подряд. Алерт закроется, когда зонд снова достанет до ноды.",
@@ -308,11 +298,8 @@ export const zh: Record<keyof typeof en, string> = {
 
   "pr.title": "自有探测点",
   "pr.sub": "该国境内的路由器和服务器从自己的网络检查你的节点：TCP 和 TLS。",
-  "pr.switch": "使用自有探测点",
   "pr.block.probes": "探测点",
-  "pr.block.checks": "检测",
   "pr.privacy": "探测点会拿到你节点的地址和端口，用来从自己的网络检查。面板保留它的运营商和你填写的城市，从不保存路由器的地址。",
-  "pr.owner": "只有所有者能查看和修改探测点。",
 
   "pr.state.off.detail": "不向探测点要结果；已安装的会保留，重新开启后继续工作",
   "pr.state.edition": "Cloudflare 版暂不支持，不会发送任何内容",
@@ -438,8 +425,6 @@ export const zh: Record<keyof typeof en, string> = {
   "pr.ok": "能连上节点",
   "pr.vantage": "{where} — 探测点「{name}」",
   "pr.points.title": "自有探测点",
-  "pr.point": "{vantage}：{what}",
-  "pr.point.at": "{point} · {ago}",
 
   "health.alert.country_blocked.why.partial.probes":
     "你在 {networks} 的探测点收不到这个节点的响应。这只是一个很窄的点，所以只是提示而不是证据：{country} 的其他网络没有检查过。连续两次检测都看到了。探测点重新连上节点后，该告警会关闭。",
@@ -452,11 +437,8 @@ export const fa: Record<keyof typeof en, string> = {
 
   "pr.title": "نقاط سنجش خودت",
   "pr.sub": "روترها و سرورهای داخل کشور نودهای تو را از شبکهٔ خودشان بررسی می‌کنند: TCP و TLS.",
-  "pr.switch": "استفاده از نقاط سنجش خودت",
   "pr.block.probes": "نقاط سنجش",
-  "pr.block.checks": "بررسی‌ها",
   "pr.privacy": "نقطهٔ سنجش آدرس و پورت نودهای تو را می‌گیرد تا آن‌ها را از شبکهٔ خودش بررسی کند. پنل اپراتور آن و شهری را که وارد کرده‌ای نگه می‌دارد و آدرس روتر را هرگز.",
-  "pr.owner": "نقاط سنجش را فقط مالک می‌بیند و تغییر می‌دهد.",
 
   "pr.state.off.detail": "از نقاط سنجش چیزی خواسته نمی‌شود؛ نصب‌شده‌ها می‌مانند و با روشن کردن دوباره کار می‌کنند",
   "pr.state.edition": "هنوز در نسخهٔ Cloudflare نیست؛ چیزی فرستاده نمی‌شود",
@@ -582,8 +564,6 @@ export const fa: Record<keyof typeof en, string> = {
   "pr.ok": "به نود می‌رسد",
   "pr.vantage": "{where} — نقطهٔ سنجش «{name}»",
   "pr.points.title": "نقاط سنجش خودت",
-  "pr.point": "{vantage}: {what}",
-  "pr.point.at": "{point} · {ago}",
 
   "health.alert.country_blocked.why.partial.probes":
     "نقطهٔ سنجش تو در شبکهٔ {networks} از این نود جواب نمی‌گیرد. این فقط یک نقطهٔ باریک است، پس نشانه است نه مدرک: شبکه‌های دیگر {country} بررسی نشده‌اند. دو بررسی پشت‌سرهم آن را دیدند. وقتی نقطهٔ سنجش دوباره به نود برسد بسته می‌شود.",
@@ -596,11 +576,8 @@ export const tr: Record<keyof typeof en, string> = {
 
   "pr.title": "Kendi ölçüm noktaların",
   "pr.sub": "Ülkedeki yönlendirici ve sunucular düğümlerini kendi ağlarından kontrol eder: TCP ve TLS.",
-  "pr.switch": "Kendi ölçüm noktalarını kullan",
   "pr.block.probes": "Ölçüm noktaları",
-  "pr.block.checks": "Kontroller",
   "pr.privacy": "Ölçüm noktası, düğümlerini kendi ağından kontrol etmek için adreslerini ve portlarını alır. Panel onun operatörünü ve yazdığın şehri saklar; yönlendiricinin adresini asla saklamaz.",
-  "pr.owner": "Ölçüm noktalarını yalnızca sahip görür ve değiştirir.",
 
   "pr.state.off.detail": "ölçüm noktalarından bir şey istenmiyor; kurulu olanlar durur, açınca yeniden çalışır",
   "pr.state.edition": "Cloudflare sürümünde henüz yok; hiçbir şey gönderilmez",
@@ -726,8 +703,6 @@ export const tr: Record<keyof typeof en, string> = {
   "pr.ok": "düğüme ulaşıyor",
   "pr.vantage": "{where} — ölçüm noktası “{name}”",
   "pr.points.title": "Kendi ölçüm noktaların",
-  "pr.point": "{vantage}: {what}",
-  "pr.point.at": "{point} · {ago}",
 
   "health.alert.country_blocked.why.partial.probes":
     "{networks} ağındaki ölçüm noktan bu düğümden yanıt alamıyor. Bu tek bir dar nokta, yani kanıt değil ipucu: {country} içindeki diğer ağlara bakılmadı. Üst üste iki kontrol bunu gördü. Ölçüm noktası düğüme yeniden ulaşınca kapanır.",

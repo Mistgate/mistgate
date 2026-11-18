@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { dictionaries, fill, langs, type Lang, type T } from "@/i18n";
+import type { MessageKey } from "@/i18n/en";
 import { checkReason, enableGate, relayState, type RelayMsg } from "./relay";
 import {
   activeOf,
@@ -18,7 +19,7 @@ import {
   wantsReach,
 } from "./relay-bridge";
 
-const tOf = (lang: Lang) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dictionaries[lang][key as "relay.title"], vars), { n: () => "" }) as unknown as T;
+const tOf = (lang: Lang) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dictionaries[lang][key as MessageKey], vars), { n: () => "" }) as unknown as T;
 const tEn = tOf("en");
 const now = 1_800_000_000;
 const n = { entry: "msk1", exit: "de1" };

@@ -2,7 +2,6 @@
 // the rows of the nodes and of the last. English is the source of truth: the other languages are type-checked against it. The admin speaks «ты».
 export const en = {
   "wiz.back": "Profiles",
-  "wiz.title": "New profile",
   "wiz.steps": "Steps",
   "wiz.stepN": "{n} of {m}",
   "wiz.step.1": "Task",
@@ -142,7 +141,6 @@ export const en = {
 
 export const ru: typeof en = {
   "wiz.back": "Профили",
-  "wiz.title": "Новый профиль",
   "wiz.steps": "Шаги",
   "wiz.stepN": "{n} из {m}",
   "wiz.step.1": "Задача",
@@ -282,7 +280,6 @@ export const ru: typeof en = {
 
 export const zh: typeof en = {
   "wiz.back": "配置",
-  "wiz.title": "新建配置",
   "wiz.steps": "步骤",
   "wiz.stepN": "{n} / {m}",
   "wiz.step.1": "任务",
@@ -422,7 +419,6 @@ export const zh: typeof en = {
 
 export const fa: typeof en = {
   "wiz.back": "پروفایل‌ها",
-  "wiz.title": "پروفایل جدید",
   "wiz.steps": "گام‌ها",
   "wiz.stepN": "{n} از {m}",
   "wiz.step.1": "هدف",
@@ -562,7 +558,6 @@ export const fa: typeof en = {
 
 export const tr: typeof en = {
   "wiz.back": "Profiller",
-  "wiz.title": "Yeni profil",
   "wiz.steps": "Adımlar",
   "wiz.stepN": "{n} / {m}",
   "wiz.step.1": "Görev",

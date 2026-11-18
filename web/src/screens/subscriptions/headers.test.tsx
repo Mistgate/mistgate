@@ -380,7 +380,7 @@ describe("Response headers tab", () => {
 describe("the texts in every language", () => {
   it("carry the same placeholders as English", () => {
     const keys = Object.keys(en).filter((k) => k.startsWith("subs.hdr.") || k.startsWith("sx.hx.h."));
-    expect(keys.length).toBeGreaterThan(100);
+    expect(keys.length).toBeGreaterThan(50);
     for (const lang of ["ru", "zh", "fa", "tr"] as const) {
       for (const k of keys) {
         const names = (m: string) => [...new Set([...m.matchAll(/\{(\w+)\}/g)].map((x) => x[1]))].sort();

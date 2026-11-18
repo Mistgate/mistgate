@@ -4,12 +4,10 @@
 // keeps one form, Turkish at most two.
 export const en = {
   "bulk.region": "Selected nodes",
-  "bulk.selectAll": "Select all shown nodes",
   "bulk.select": "Select {name}",
   // after the count in its pill: "[3] nodes selected"
   "bulk.selected": "node selected|nodes selected",
   // the same on a phone, where the bar has no room for the noun
-  "bulk.selectedShort": "selected",
   "bulk.hidden": "{n} hidden by the filter",
   "bulk.limit": "At most 50 at once",
   "bulk.clear": "Clear selection",
@@ -19,7 +17,6 @@ export const en = {
   "bulk.pick.problems": "With problems",
   "bulk.pick.password": "Password only",
   "bulk.pick.outdated": "Outdated agent",
-  "bulk.check": "Check",
   "bulk.more": "More",
 
   // the actions as the bar and its menus name them
@@ -66,9 +63,6 @@ export const en = {
   "bulk.state.notStarted": "Not started",
   "bulk.state.absent": "Was not there",
   // a long batch shows these counters in place of the rows that went well
-  "bulk.fold.done": "Done {n}",
-  "bulk.fold.running": "Running {n}",
-  "bulk.fold.waiting": "Waiting {n}",
   // a check's verdict in the row's pill, its counts under it
   "bulk.result.ok": "Fine",
   "bulk.result.warn": "Attention",
@@ -205,10 +199,8 @@ export const en = {
 
 export const ru: typeof en = {
   "bulk.region": "Выбранные ноды",
-  "bulk.selectAll": "Выбрать все показанные ноды",
   "bulk.select": "Выбрать {name}",
   "bulk.selected": "нода выбрана|ноды выбраны|нод выбрано",
-  "bulk.selectedShort": "выбрана|выбраны|выбрано",
   "bulk.hidden": "{n} скрыта фильтром|{n} скрыты фильтром|{n} скрыто фильтром",
   "bulk.limit": "Не больше 50 за раз",
   "bulk.clear": "Снять выбор",
@@ -217,7 +209,6 @@ export const ru: typeof en = {
   "bulk.pick.problems": "С проблемами",
   "bulk.pick.password": "Только по паролю",
   "bulk.pick.outdated": "Устаревший агент",
-  "bulk.check": "Проверить",
   "bulk.more": "Ещё",
 
   "bulk.ports": "Порты",
@@ -261,9 +252,6 @@ export const ru: typeof en = {
   "bulk.state.notStarted": "Не начато",
   "bulk.state.absent": "Не было",
   // a long batch shows these counters in place of the rows that went well
-  "bulk.fold.done": "Готово {n}",
-  "bulk.fold.running": "Идёт {n}",
-  "bulk.fold.waiting": "Ждут {n}",
   "bulk.result.ok": "В порядке",
   "bulk.result.warn": "Внимание",
   "bulk.result.bad": "Есть сбои",
@@ -390,10 +378,8 @@ export const ru: typeof en = {
 
 export const zh: typeof en = {
   "bulk.region": "已选节点",
-  "bulk.selectAll": "选择当前显示的全部节点",
   "bulk.select": "选择 {name}",
   "bulk.selected": "个节点已选",
-  "bulk.selectedShort": "已选",
   "bulk.hidden": "{n} 个被筛选隐藏",
   "bulk.limit": "一次最多 50 个",
   "bulk.clear": "清除选择",
@@ -402,7 +388,6 @@ export const zh: typeof en = {
   "bulk.pick.problems": "有问题的",
   "bulk.pick.password": "仅密码登录的",
   "bulk.pick.outdated": "Agent 过旧的",
-  "bulk.check": "检测",
   "bulk.more": "更多",
 
   "bulk.ports": "端口",
@@ -446,9 +431,6 @@ export const zh: typeof en = {
   "bulk.state.notStarted": "未开始",
   "bulk.state.absent": "原本没有",
   // a long batch shows these counters in place of the rows that went well
-  "bulk.fold.done": "已完成 {n}",
-  "bulk.fold.running": "进行中 {n}",
-  "bulk.fold.waiting": "等待中 {n}",
   "bulk.result.ok": "正常",
   "bulk.result.warn": "需注意",
   "bulk.result.bad": "有故障",
@@ -575,10 +557,8 @@ export const zh: typeof en = {
 
 export const fa: typeof en = {
   "bulk.region": "نودهای انتخاب‌شده",
-  "bulk.selectAll": "انتخاب همهٔ نودهای نمایش‌داده‌شده",
   "bulk.select": "انتخاب {name}",
   "bulk.selected": "نود انتخاب شد",
-  "bulk.selectedShort": "انتخاب شد",
   "bulk.hidden": "{n} نود با فیلتر پنهان است",
   "bulk.limit": "حداکثر 50 در هر بار",
   "bulk.clear": "برداشتن انتخاب",
@@ -587,7 +567,6 @@ export const fa: typeof en = {
   "bulk.pick.problems": "مشکل‌دارها",
   "bulk.pick.password": "فقط با رمز عبور",
   "bulk.pick.outdated": "ایجنت قدیمی",
-  "bulk.check": "بررسی",
   "bulk.more": "بیشتر",
 
   "bulk.ports": "پورت‌ها",
@@ -631,9 +610,6 @@ export const fa: typeof en = {
   "bulk.state.notStarted": "شروع نشد",
   "bulk.state.absent": "نبود",
   // a long batch shows these counters in place of the rows that went well
-  "bulk.fold.done": "انجام شد {n}",
-  "bulk.fold.running": "در حال انجام {n}",
-  "bulk.fold.waiting": "در صف {n}",
   "bulk.result.ok": "سالم",
   "bulk.result.warn": "نیاز به توجه",
   "bulk.result.bad": "مشکل دارد",
@@ -760,10 +736,8 @@ export const fa: typeof en = {
 
 export const tr: typeof en = {
   "bulk.region": "Seçili düğümler",
-  "bulk.selectAll": "Gösterilen tüm düğümleri seç",
   "bulk.select": "{name} düğümünü seç",
   "bulk.selected": "düğüm seçildi",
-  "bulk.selectedShort": "seçildi",
   "bulk.hidden": "{n} tanesi filtreyle gizli",
   "bulk.limit": "Tek seferde en fazla 50",
   "bulk.clear": "Seçimi kaldır",
@@ -772,7 +746,6 @@ export const tr: typeof en = {
   "bulk.pick.problems": "Sorunlu olanlar",
   "bulk.pick.password": "Yalnızca parolalı",
   "bulk.pick.outdated": "Eski ajanlı",
-  "bulk.check": "Kontrol et",
   "bulk.more": "Daha fazla",
 
   "bulk.ports": "Portlar",
@@ -816,9 +789,6 @@ export const tr: typeof en = {
   "bulk.state.notStarted": "Başlamadı",
   "bulk.state.absent": "Yoktu",
   // a long batch shows these counters in place of the rows that went well
-  "bulk.fold.done": "Tamam {n}",
-  "bulk.fold.running": "Sürüyor {n}",
-  "bulk.fold.waiting": "Sırada {n}",
   "bulk.result.ok": "Sorunsuz",
   "bulk.result.warn": "Dikkat",
   "bulk.result.bad": "Sorun var",

@@ -75,7 +75,6 @@ import { fa as profilesrvFa } from "./profilesrv";
 // admin مدیر · quota سهمیه · expiry انقضا · key کلید · token توکن · passkey کلید عبور · backup نسخهٔ پشتیبان ·
 // Reachability دسترس‌پذیری · verdict نتیجه · egress خروجی · handshake دست‌دهی · approve تأیید کردن · rule قانون.
 const core: CoreMessages = {
-  "app.name": "Mistgate",
   "common.loading": "در حال بارگذاری…",
   "common.retry": "تلاش دوباره",
   "common.undo": "واگرد",
@@ -149,7 +148,6 @@ const core: CoreMessages = {
   "palette.users": "کاربران",
   "palette.places": "بخش‌ها",
   "palette.actions": "اقدام‌ها",
-  "palette.addNode": "افزودن نود",
   "palette.createUser": "افزودن کاربر",
   "palette.newToken": "توکن API جدید",
   "palette.newProfile": "پروفایل جدید",

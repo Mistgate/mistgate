@@ -7,20 +7,12 @@
 export const en = {
   // ---- page
   "int.title": "Integrations",
-  "int.sub": "Telegram alerts: every admin links their own chat.",
   "int.sub.awaiting": "{n} change is waiting for your decision|{n} changes are waiting for your decision",
-  "int.loadFailed": "Cannot load integrations",
-  "int.ownerOnly.title": "Only the owner manages integrations",
-  "int.ownerOnly.text": "Tokens and approvals open the whole panel to a program, so only the owner can see and change them.",
   "int.badge": "{n} change is waiting for your approval|{n} changes are waiting for your approval",
 
   // ---- tokens
   "int.tok.title": "API tokens",
-  "int.tok.lead":
-    "One token works for scripts (an Authorization: Bearer header on the admin API) and for MCP. It is a password: it is shown once, and the panel keeps only its fingerprint.",
   "int.tok.new": "New token",
-  "int.tok.none": "No tokens yet",
-  "int.tok.none.text": "Create one to let a script or an AI agent in. You choose what it may do and when it expires.",
   "int.tok.name": "Name",
   "int.tok.name.ph": "e.g. “Grafana” or “claude-ops”",
   "int.tok.name.hint": "Pick a name that tells you who holds the token. It is what the audit log shows.",
@@ -59,15 +51,8 @@ export const en = {
   "int.tok.bulk.hint": "Off: in one hour the token may take access away from, or rewrite, at most 10 people (disable, reset traffic, revoke a device, edit, move a group's people). Beyond that an API call is refused and an MCP plan waits for your approval. Switch it on only for a script that needs it.",
   "int.tok.bulk.limited": "up to 10 user changes an hour",
   "int.tok.bulk.allowed": "bulk user changes allowed",
-  "int.tok.bulk.pill": "No hourly limit",
-  "int.tok.bulk.action": "Limit",
   "int.tok.bulk.action.aria": "User change limit of token {name}",
-  "int.tok.bulk.title": "User changes by “{name}”",
-  "int.tok.bulk.body.limited": "Without your approval this token may change at most 10 people in an hour: disable them, reset their traffic, revoke or block a device, edit a person, or move a group's people. Every person in every call counts, and the hour starts with the first change. A call over the limit is refused whole; over MCP the plan waits for your approval. Creating, extending and enabling people are not counted.",
-  "int.tok.bulk.body.allowed": "This token changes any number of people without your approval. If it leaks, whoever holds it can disable or rewrite every user before you notice.",
-  "int.tok.bulk.warn": "Without the limit, whoever holds a leaked token can disable or rewrite every user before you notice.",
   "int.tok.bulk.allow": "Allow bulk changes",
-  "int.tok.bulk.limit": "Put the limit back",
   "int.tok.bulk.saved.on": "“{name}” may change users in bulk",
   "int.tok.bulk.saved.off": "“{name}” is limited to 10 user changes an hour",
   "int.tok.showOld": "Show expired and revoked ({n})",
@@ -76,10 +61,7 @@ export const en = {
   "int.chan.mcp": "MCP",
 
   // ---- the secret, shown once
-  "int.secret.title": "Copy the token now",
   "int.secret.body": "This is the only time it is shown. The panel keeps just a fingerprint, so a lost token cannot be recovered: you would make a new one.",
-  "int.secret.label": "Token for “{name}”",
-  "int.secret.warn": "Store it like a password: in a password manager, or in a file only you can read.",
   "int.secret.done": "I have copied it",
 
   // ---- errors (the server's own English messages are replaced by these)
@@ -92,10 +74,6 @@ export const en = {
 
   // ---- MCP
   "int.mcp.title": "MCP",
-  "int.mcp.sub": "for Claude and other agents",
-  "int.mcp.url": "Address",
-  "int.mcp.lead":
-    "Streamable HTTP on this panel’s secret admin address. The agent sees only the tools its token may use. Every change is planned first, and the risky ones wait for you.",
   "int.mcp.client": "Client",
   "int.mcp.client.code": "Claude Code",
   "int.mcp.client.desktop": "Claude Desktop",
@@ -107,13 +85,9 @@ export const en = {
   "int.mcp.hint.other": "Any client that speaks Streamable HTTP MCP takes the address and an Authorization header. Replace <token> with the token you copied.",
   "int.mcp.hint.stdio":
     "A local proxy for clients that only run commands. It decides nothing: it forwards to the panel with the token from the file, and stops if the panel refuses the token.",
-  "int.mcp.safe": "Fixes, updates, rollbacks and bulk disabling are planned by the agent and wait for your approval. A token can never confirm its own plan.",
-  "int.mcp.audit": "Every call is written to the audit log under the token’s name.",
   "int.mcp.auditLink": "Open the audit log",
 
   // ---- approvals
-  "int.ap.title": "Waiting for you",
-  "int.ap.sub": "An agent asked for these changes. Nothing happens until you approve.",
   "int.ap.by": "by token {token}",
   "int.ap.left": "{time} left",
   "int.ap.expired": "expired",
@@ -429,20 +403,12 @@ export const en = {
 export const ru: Record<keyof typeof en, string> = {
   // ---- page
   "int.title": "Интеграции",
-  "int.sub": "Оповещения в Telegram: каждый админ привязывает свой чат.",
   "int.sub.awaiting": "{n} изменение ждёт твоего решения|{n} изменения ждут твоего решения|{n} изменений ждут твоего решения",
-  "int.loadFailed": "Не удалось загрузить интеграции",
-  "int.ownerOnly.title": "Интеграциями управляет только владелец",
-  "int.ownerOnly.text": "Токены и подтверждения открывают программе всю панель, поэтому видеть и менять их может только владелец.",
   "int.badge": "{n} изменение ждёт твоего одобрения|{n} изменения ждут твоего одобрения|{n} изменений ждут твоего одобрения",
 
   // ---- tokens
   "int.tok.title": "API-токены",
-  "int.tok.lead":
-    "Один токен подходит и скриптам (заголовок Authorization: Bearer к админскому API), и MCP. Это пароль: его показывают один раз, а панель хранит только отпечаток.",
   "int.tok.new": "Новый токен",
-  "int.tok.none": "Токенов пока нет",
-  "int.tok.none.text": "Создай токен, чтобы пустить скрипт или ИИ-агента. Ты решаешь, что он может и когда перестанет работать.",
   "int.tok.name": "Название",
   "int.tok.name.ph": "например «Grafana» или «claude-ops»",
   "int.tok.name.hint": "Назови так, чтобы было ясно, у кого токен. Это имя видно в журнале аудита.",
@@ -481,15 +447,8 @@ export const ru: Record<keyof typeof en, string> = {
   "int.tok.bulk.hint": "Выключено: за час токен может отнять доступ или переписать не больше 10 человек (отключить, сбросить трафик, отозвать устройство, изменить, перенести людей группы). Сверх этого вызов по API отклоняется, а план через MCP ждёт твоего одобрения. Включай только для скрипта, которому это нужно.",
   "int.tok.bulk.limited": "до 10 изменений пользователей в час",
   "int.tok.bulk.allowed": "массовые изменения разрешены",
-  "int.tok.bulk.pill": "Без лимита",
-  "int.tok.bulk.action": "Лимит",
   "int.tok.bulk.action.aria": "Лимит изменений пользователей у токена {name}",
-  "int.tok.bulk.title": "Изменения пользователей: «{name}»",
-  "int.tok.bulk.body.limited": "Без твоего одобрения этот токен может изменить не больше 10 человек за час: отключить, сбросить трафик, отозвать или заблокировать устройство, изменить человека, перенести людей группы. Считается каждый человек в каждом вызове, а час идёт от первого изменения. Вызов сверх лимита отклоняется целиком; через MCP план ждёт твоего одобрения. Создание, продление и включение людей не считаются.",
-  "int.tok.bulk.body.allowed": "Этот токен меняет любое число людей без твоего одобрения. Если он утечёт, тот, у кого он окажется, успеет отключить или переписать всех пользователей раньше, чем ты заметишь.",
-  "int.tok.bulk.warn": "Без лимита тот, к кому попадёт утёкший токен, успеет отключить или переписать всех пользователей раньше, чем ты заметишь.",
   "int.tok.bulk.allow": "Разрешить массовые изменения",
-  "int.tok.bulk.limit": "Вернуть лимит",
   "int.tok.bulk.saved.on": "«{name}» может менять пользователей пачками",
   "int.tok.bulk.saved.off": "«{name}» ограничен 10 изменениями пользователей в час",
   "int.tok.showOld": "Показать истёкшие и отозванные ({n})",
@@ -498,10 +457,7 @@ export const ru: Record<keyof typeof en, string> = {
   "int.chan.mcp": "через MCP",
 
   // ---- the secret, shown once
-  "int.secret.title": "Скопируй токен сейчас",
   "int.secret.body": "Его показывают только один раз. Панель хранит лишь отпечаток, потерянный токен не вернуть: придётся создать новый.",
-  "int.secret.label": "Токен «{name}»",
-  "int.secret.warn": "Храни как пароль: в менеджере паролей или в файле, который читаешь только ты.",
   "int.secret.done": "Я скопировал",
 
   // ---- errors
@@ -514,10 +470,6 @@ export const ru: Record<keyof typeof en, string> = {
 
   // ---- MCP
   "int.mcp.title": "MCP",
-  "int.mcp.sub": "для Claude и других агентов",
-  "int.mcp.url": "Адрес",
-  "int.mcp.lead":
-    "Streamable HTTP на секретном админском адресе этой панели. Агент видит только те инструменты, которые разрешены его токену. Любое изменение сначала планируется, а рискованные ждут тебя.",
   "int.mcp.client": "Клиент",
   "int.mcp.client.code": "Claude Code",
   "int.mcp.client.desktop": "Claude Desktop",
@@ -529,13 +481,9 @@ export const ru: Record<keyof typeof en, string> = {
   "int.mcp.hint.other": "Любой клиент с Streamable HTTP MCP принимает адрес и заголовок Authorization. Вместо <token> подставь скопированный токен.",
   "int.mcp.hint.stdio":
     "Локальный прокси для клиентов, которые умеют только запускать команды. Сам он ничего не решает: пересылает запросы в панель с токеном из файла и останавливается, если панель отказала токену.",
-  "int.mcp.safe": "Исправления, обновления, откаты и массовое отключение агент сначала планирует, и они ждут твоего одобрения. Токен никогда не подтвердит собственный план.",
-  "int.mcp.audit": "Каждый вызов записывается в журнал аудита под именем токена.",
   "int.mcp.auditLink": "Открыть журнал аудита",
 
   // ---- approvals
-  "int.ap.title": "Ждут тебя",
-  "int.ap.sub": "Агент попросил эти изменения. Пока ты не одобришь, ничего не произойдёт.",
   "int.ap.by": "токен {token}",
   "int.ap.left": "осталось {time}",
   "int.ap.expired": "истекло",
@@ -844,20 +792,12 @@ export const ru: Record<keyof typeof en, string> = {
 export const zh: typeof en = {
   // ---- page
   "int.title": "集成",
-  "int.sub": "Telegram 提醒：每位管理员都可以绑定自己的聊天。",
   "int.sub.awaiting": "{n} 项变更正在等待你的决定",
-  "int.loadFailed": "无法加载集成",
-  "int.ownerOnly.title": "只有所有者可以管理集成",
-  "int.ownerOnly.text": "令牌和审批会让程序获得整个面板的权限，因此只有所有者能查看和更改。",
   "int.badge": "{n} 项变更正在等待你审批",
 
   // ---- tokens
   "int.tok.title": "API 令牌",
-  "int.tok.lead":
-    "同一个令牌既可用于脚本（调用管理 API 时携带 Authorization: Bearer 请求头），也可用于 MCP。令牌等同于密码：只显示一次，面板只保存它的指纹。",
   "int.tok.new": "新建令牌",
-  "int.tok.none": "还没有令牌",
-  "int.tok.none.text": "创建一个令牌，让脚本或 AI 智能体接入。你可以选择它能做什么，以及何时过期。",
   "int.tok.name": "名称",
   "int.tok.name.ph": "例如「Grafana」或「claude-ops」",
   "int.tok.name.hint": "起一个能看出令牌由谁持有的名称。审计日志里显示的就是它。",
@@ -896,15 +836,8 @@ export const zh: typeof en = {
   "int.tok.bulk.hint": "关闭时：该令牌一小时内最多可收回或改写 10 人的访问（停用、重置流量、撤销设备、修改、迁移分组成员）。超出后，API 调用会被拒绝，MCP 计划则等待你的批准。仅在脚本确实需要时开启。",
   "int.tok.bulk.limited": "每小时最多更改 10 个用户",
   "int.tok.bulk.allowed": "允许批量更改用户",
-  "int.tok.bulk.pill": "无小时限额",
-  "int.tok.bulk.action": "限额",
   "int.tok.bulk.action.aria": "令牌 {name} 的用户更改限额",
-  "int.tok.bulk.title": "“{name}”对用户的更改",
-  "int.tok.bulk.body.limited": "未经你的批准，该令牌一小时内最多可更改 10 人：停用、重置流量、撤销或封禁设备、修改用户、迁移分组成员。每次调用中的每个人都会计数，一小时从第一次更改起算。超出限额的调用会被整体拒绝；通过 MCP 时，计划会等待你的批准。创建、延期和启用用户不计入。",
-  "int.tok.bulk.body.allowed": "该令牌无需你的批准即可更改任意数量的用户。一旦泄露，持有者可以在你发现之前停用或改写所有用户。",
-  "int.tok.bulk.warn": "没有限额时，一旦令牌泄露，持有者可以在你发现之前停用或改写所有用户。",
   "int.tok.bulk.allow": "允许批量更改",
-  "int.tok.bulk.limit": "恢复限额",
   "int.tok.bulk.saved.on": "“{name}”可以批量更改用户",
   "int.tok.bulk.saved.off": "“{name}”每小时最多更改 10 个用户",
   "int.tok.showOld": "显示已过期和已吊销的（{n}）",
@@ -913,10 +846,7 @@ export const zh: typeof en = {
   "int.chan.mcp": "MCP",
 
   // ---- the secret, shown once
-  "int.secret.title": "现在就复制令牌",
   "int.secret.body": "令牌只会显示这一次。面板只保存指纹，丢失的令牌无法找回：只能新建一个。",
-  "int.secret.label": "「{name}」的令牌",
-  "int.secret.warn": "像密码一样保管：存进密码管理器，或只有你能读取的文件。",
   "int.secret.done": "我已复制",
 
   // ---- errors (the server's own English messages are replaced by these)
@@ -929,10 +859,6 @@ export const zh: typeof en = {
 
   // ---- MCP
   "int.mcp.title": "MCP",
-  "int.mcp.sub": "供 Claude 和其他智能体使用",
-  "int.mcp.url": "地址",
-  "int.mcp.lead":
-    "此面板私密管理地址上的 Streamable HTTP。智能体只能看到其令牌有权使用的工具。每项变更都先生成计划，高风险的会等你批准。",
   "int.mcp.client": "客户端",
   "int.mcp.client.code": "Claude Code",
   "int.mcp.client.desktop": "Claude Desktop",
@@ -944,13 +870,9 @@ export const zh: typeof en = {
   "int.mcp.hint.other": "任何支持 Streamable HTTP MCP 的客户端，都需要这个地址和一个 Authorization 请求头。把 <token> 替换为你复制的令牌。",
   "int.mcp.hint.stdio":
     "供只能运行命令的客户端使用的本地代理。它不做任何决定：只是带着文件中的令牌转发给面板，面板拒绝该令牌时就会停止。",
-  "int.mcp.safe": "修复、更新、回滚和批量停用由智能体生成计划，并等待你的批准。令牌永远无法确认自己的计划。",
-  "int.mcp.audit": "每次调用都会以令牌的名称写入审计日志。",
   "int.mcp.auditLink": "打开审计日志",
 
   // ---- approvals
-  "int.ap.title": "待你审批",
-  "int.ap.sub": "智能体请求了这些变更。在你批准之前不会执行任何操作。",
   "int.ap.by": "来自令牌 {token}",
   "int.ap.left": "剩余 {time}",
   "int.ap.expired": "已过期",
@@ -1263,17 +1185,10 @@ export const zh: typeof en = {
 
 export const fa: Record<keyof typeof en, string> = {
   "int.title": "یکپارچه‌سازی‌ها",
-  "int.sub": "هشدارهای تلگرام: هر مدیر گفتگوی خودش را وصل می‌کند.",
   "int.sub.awaiting": "{n} تغییر منتظر تصمیم توست",
-  "int.loadFailed": "یکپارچه‌سازی‌ها بارگذاری نشد",
-  "int.ownerOnly.title": "یکپارچه‌سازی‌ها را فقط مالک مدیریت می‌کند",
-  "int.ownerOnly.text": "توکن‌ها و تأییدیه‌ها کل پنل را به روی یک برنامه باز می‌کنند، برای همین فقط مالک می‌تواند آن‌ها را ببیند و تغییر بدهد.",
   "int.badge": "{n} تغییر منتظر تأیید توست",
   "int.tok.title": "توکن‌های API",
-  "int.tok.lead": "یک توکن هم برای اسکریپت‌ها کار می‌کند (هدر Authorization: Bearer روی API مدیریت) و هم برای MCP. توکن مثل رمز عبور است: فقط یک بار نشان داده می‌شود و پنل فقط اثرانگشتش را نگه می‌دارد.",
   "int.tok.new": "توکن جدید",
-  "int.tok.none": "هنوز توکنی نیست",
-  "int.tok.none.text": "برای راه دادن یک اسکریپت یا ایجنت هوش مصنوعی، یک توکن بساز. تو تعیین می‌کنی چه کارهایی از دستش برمی‌آید و کی منقضی شود.",
   "int.tok.name": "نام",
   "int.tok.name.ph": "مثلاً «Grafana» یا «claude-ops»",
   "int.tok.name.hint": "نامی بگذار که معلوم باشد توکن دست کیست. همین نام در گزارش ممیزی دیده می‌شود.",
@@ -1312,25 +1227,15 @@ export const fa: Record<keyof typeof en, string> = {
   "int.tok.bulk.hint": "خاموش: توکن در یک ساعت حداکثر دسترسی ۱۰ نفر را می‌گیرد یا بازنویسی می‌کند (غیرفعال‌کردن، بازنشانی ترافیک، لغو دستگاه، ویرایش، جابه‌جایی اعضای گروه). بیش از آن، درخواست API رد می‌شود و برنامهٔ MCP منتظر تأیید تو می‌ماند. فقط برای اسکریپتی که نیاز دارد روشن کن.",
   "int.tok.bulk.limited": "حداکثر ۱۰ تغییر کاربر در ساعت",
   "int.tok.bulk.allowed": "تغییر گروهی کاربران مجاز است",
-  "int.tok.bulk.pill": "بدون سقف ساعتی",
-  "int.tok.bulk.action": "سقف",
   "int.tok.bulk.action.aria": "سقف تغییر کاربران برای توکن {name}",
-  "int.tok.bulk.title": "تغییر کاربران توسط «{name}»",
-  "int.tok.bulk.body.limited": "این توکن بدون تأیید تو در یک ساعت حداکثر ۱۰ نفر را تغییر می‌دهد: غیرفعال‌کردن، بازنشانی ترافیک، لغو یا مسدودکردن دستگاه، ویرایش کاربر، جابه‌جایی اعضای گروه. هر نفر در هر درخواست شمرده می‌شود و ساعت از نخستین تغییر آغاز می‌شود. درخواستِ بیش از سقف به‌طور کامل رد می‌شود؛ در MCP برنامه منتظر تأیید تو می‌ماند. ساختن، تمدید و فعال‌کردن کاربران شمرده نمی‌شود.",
-  "int.tok.bulk.body.allowed": "این توکن هر تعداد کاربر را بدون تأیید تو تغییر می‌دهد. اگر لو برود، دارنده‌اش می‌تواند پیش از آن‌که متوجه شوی همهٔ کاربران را غیرفعال یا بازنویسی کند.",
-  "int.tok.bulk.warn": "بدون سقف، هر کس توکنِ لورفته را داشته باشد می‌تواند پیش از آن‌که متوجه شوی همهٔ کاربران را غیرفعال یا بازنویسی کند.",
   "int.tok.bulk.allow": "اجازهٔ تغییر گروهی",
-  "int.tok.bulk.limit": "بازگرداندن سقف",
   "int.tok.bulk.saved.on": "«{name}» می‌تواند کاربران را گروهی تغییر دهد",
   "int.tok.bulk.saved.off": "«{name}» به ۱۰ تغییر کاربر در ساعت محدود شد",
   "int.tok.showOld": "نمایش منقضی‌شده‌ها و باطل‌شده‌ها ({n})",
   "int.tok.hideOld": "پنهان کردن منقضی‌شده‌ها و باطل‌شده‌ها",
   "int.chan.api": "از طریق API",
   "int.chan.mcp": "از طریق MCP",
-  "int.secret.title": "همین حالا توکن را کپی کن",
   "int.secret.body": "فقط همین یک بار نشان داده می‌شود. پنل فقط اثرانگشت را نگه می‌دارد و توکن گم‌شده برنمی‌گردد: باید توکن تازه بسازی.",
-  "int.secret.label": "توکن «{name}»",
-  "int.secret.warn": "مثل رمز عبور نگهش دار: در برنامهٔ مدیریت رمز عبور یا در فایلی که فقط خودت می‌توانی بخوانی.",
   "int.secret.done": "کپی کردم",
   "int.err.limit": "همین حالا 50 توکن فعال وجود دارد. یکی از توکن‌هایی را که لازم نداری باطل کن.",
   "int.err.name": "برای توکن نامی تا 64 نویسه بگذار.",
@@ -1339,9 +1244,6 @@ export const fa: Record<keyof typeof en, string> = {
   "int.err.gone": "این دیگر وجود ندارد. صفحه را دوباره بارگذاری کن.",
   "int.err.notWaiting": "این تغییر دیگر منتظر نیست: دربارهٔ آن تصمیم گرفته شده، منقضی شده یا توکنش باطل شده است.",
   "int.mcp.title": "MCP",
-  "int.mcp.sub": "برای Claude و ایجنت‌های دیگر",
-  "int.mcp.url": "آدرس",
-  "int.mcp.lead": "Streamable HTTP روی آدرس مخفی مدیریتِ همین پنل. ایجنت فقط ابزارهایی را می‌بیند که توکنش اجازه‌شان را دارد. هر تغییر اول برنامه‌ریزی می‌شود و تغییرهای پرخطر منتظر تو می‌مانند.",
   "int.mcp.client": "کلاینت",
   "int.mcp.client.code": "Claude Code",
   "int.mcp.client.desktop": "Claude Desktop",
@@ -1351,11 +1253,7 @@ export const fa: Record<keyof typeof en, string> = {
   "int.mcp.hint.desktop": "Claude Desktop یک پروکسی محلی کوچک اجرا می‌کند که با پنل حرف می‌زند. توکن را در خط اول فایلی ذخیره کن که فقط خودت می‌توانی بخوانی، بعد این را در Settings → Developer → Edit Config اضافه کن و Claude را دوباره راه‌اندازی کن.",
   "int.mcp.hint.other": "هر کلاینتی که MCP روی Streamable HTTP را بفهمد، آدرس و هدر Authorization را می‌گیرد. به‌جای <token> توکنی را که کپی کردی بگذار.",
   "int.mcp.hint.stdio": "پروکسی محلی برای کلاینت‌هایی که فقط دستور اجرا می‌کنند. خودش چیزی را تصمیم نمی‌دهد: درخواست‌ها را با توکنِ داخل فایل به پنل می‌فرستد و اگر پنل توکن را نپذیرد، متوقف می‌شود.",
-  "int.mcp.safe": "اصلاح، به‌روزرسانی، بازگردانی و غیرفعال‌سازی گروهی را ایجنت فقط برنامه‌ریزی می‌کند و منتظر تأیید تو می‌ماند. هیچ توکنی نمی‌تواند برنامهٔ خودش را تأیید کند.",
-  "int.mcp.audit": "هر فراخوانی با نام توکن در گزارش ممیزی ثبت می‌شود.",
   "int.mcp.auditLink": "باز کردن گزارش ممیزی",
-  "int.ap.title": "منتظر تو",
-  "int.ap.sub": "ایجنت این تغییرها را خواسته است. تا تو تأیید نکنی، هیچ اتفاقی نمی‌افتد.",
   "int.ap.by": "توکن {token}",
   "int.ap.left": "{time} مانده",
   "int.ap.expired": "منقضی شد",
@@ -1654,17 +1552,10 @@ export const fa: Record<keyof typeof en, string> = {
 
 export const tr: Record<keyof typeof en, string> = {
   "int.title": "Entegrasyonlar",
-  "int.sub": "Telegram uyarıları: her yönetici kendi sohbetini bağlar.",
   "int.sub.awaiting": "{n} değişiklik kararını bekliyor",
-  "int.loadFailed": "Entegrasyonlar yüklenemedi",
-  "int.ownerOnly.title": "Entegrasyonları yalnızca sahip yönetir",
-  "int.ownerOnly.text": "Token'lar ve onaylar bir programa tüm paneli açar, bu yüzden onları yalnızca sahip görebilir ve değiştirebilir.",
   "int.badge": "{n} değişiklik onayını bekliyor",
   "int.tok.title": "API token'ları",
-  "int.tok.lead": "Tek bir token hem betiklerde (yönetici API'sine Authorization: Bearer başlığıyla) hem de MCP'de işe yarar. Token bir paroladır: yalnızca bir kez gösterilir, panel de sadece parmak izini saklar.",
   "int.tok.new": "Yeni token",
-  "int.tok.none": "Henüz token yok",
-  "int.tok.none.text": "Bir betiğe ya da yapay zekâ ajanına kapıyı açmak için token oluştur. Neler yapabileceğine ve ne zaman geçersiz olacağına sen karar verirsin.",
   "int.tok.name": "Ad",
   "int.tok.name.ph": "ör. “Grafana” ya da “claude-ops”",
   "int.tok.name.hint": "Token'ın kimde olduğunu anlatan bir ad seç. Denetim günlüğünde bu ad görünür.",
@@ -1703,25 +1594,15 @@ export const tr: Record<keyof typeof en, string> = {
   "int.tok.bulk.hint": "Kapalı: token bir saatte en fazla 10 kişinin erişimini alabilir veya değiştirebilir (devre dışı bırakma, trafik sıfırlama, cihaz iptali, düzenleme, grup üyelerini taşıma). Fazlasında API çağrısı reddedilir, MCP planı ise onayını bekler. Yalnızca buna ihtiyacı olan bir betik için aç.",
   "int.tok.bulk.limited": "saatte en fazla 10 kullanıcı değişikliği",
   "int.tok.bulk.allowed": "toplu kullanıcı değişikliğine izinli",
-  "int.tok.bulk.pill": "Saatlik sınır yok",
-  "int.tok.bulk.action": "Sınır",
   "int.tok.bulk.action.aria": "{name} token'ının kullanıcı değişikliği sınırı",
-  "int.tok.bulk.title": "“{name}” ile kullanıcı değişiklikleri",
-  "int.tok.bulk.body.limited": "Bu token, onayın olmadan bir saatte en fazla 10 kişiyi değiştirebilir: devre dışı bırakma, trafik sıfırlama, cihaz iptali veya engelleme, kişiyi düzenleme, grup üyelerini taşıma. Her çağrıdaki her kişi sayılır ve saat ilk değişiklikle başlar. Sınırı aşan çağrı tümüyle reddedilir; MCP üzerinden plan onayını bekler. Kişi oluşturma, süre uzatma ve etkinleştirme sayılmaz.",
-  "int.tok.bulk.body.allowed": "Bu token, onayın olmadan istediği kadar kişiyi değiştirir. Sızarsa, elinde tutan kişi sen fark etmeden bütün kullanıcıları devre dışı bırakabilir veya değiştirebilir.",
-  "int.tok.bulk.warn": "Sınır olmadan, sızan token'ı elinde tutan kişi sen fark etmeden bütün kullanıcıları devre dışı bırakabilir veya değiştirebilir.",
   "int.tok.bulk.allow": "Toplu değişikliğe izin ver",
-  "int.tok.bulk.limit": "Sınırı geri getir",
   "int.tok.bulk.saved.on": "“{name}” kullanıcıları toplu değiştirebilir",
   "int.tok.bulk.saved.off": "“{name}” saatte 10 kullanıcı değişikliğiyle sınırlandı",
   "int.tok.showOld": "Süresi dolanları ve iptal edilenleri göster ({n})",
   "int.tok.hideOld": "Süresi dolanları ve iptal edilenleri gizle",
   "int.chan.api": "API üzerinden",
   "int.chan.mcp": "MCP üzerinden",
-  "int.secret.title": "Token'ı şimdi kopyala",
   "int.secret.body": "Token yalnızca bir kez gösterilir. Panel sadece parmak izini saklar, bu yüzden kaybolan token geri getirilemez: yenisini oluşturman gerekir.",
-  "int.secret.label": "“{name}” için token",
-  "int.secret.warn": "Parola gibi sakla: bir parola yöneticisinde ya da yalnızca senin okuyabildiğin bir dosyada.",
   "int.secret.done": "Kopyaladım",
   "int.err.limit": "Zaten 50 geçerli token var. Artık kullanmadığın birini iptal et.",
   "int.err.name": "Token'a en fazla 64 karakterlik bir ad ver.",
@@ -1730,9 +1611,6 @@ export const tr: Record<keyof typeof en, string> = {
   "int.err.gone": "Bu artık yok. Sayfayı yenile.",
   "int.err.notWaiting": "Bu değişiklik artık beklemiyor: karara bağlandı, süresi doldu ya da token'ı iptal edildi.",
   "int.mcp.title": "MCP",
-  "int.mcp.sub": "Claude ve diğer ajanlar için",
-  "int.mcp.url": "Adres",
-  "int.mcp.lead": "Bu panelin gizli yönetici adresinde Streamable HTTP. Ajan yalnızca token'ının kullanabildiği araçları görür. Her değişiklik önce planlanır, riskli olanlar da senin onayını bekler.",
   "int.mcp.client": "İstemci",
   "int.mcp.client.code": "Claude Code",
   "int.mcp.client.desktop": "Claude Desktop",
@@ -1742,11 +1620,7 @@ export const tr: Record<keyof typeof en, string> = {
   "int.mcp.hint.desktop": "Claude Desktop, panelle konuşan küçük bir yerel vekil sunucu başlatır. Token'ı yalnızca senin okuyabildiğin bir dosyanın ilk satırına kaydet, sonra bunu Settings → Developer → Edit Config bölümüne ekle ve Claude'u yeniden başlat.",
   "int.mcp.hint.other": "Streamable HTTP MCP konuşan her istemci adresi ve bir Authorization başlığını kabul eder. <token> yerine kopyaladığın token'ı yaz.",
   "int.mcp.hint.stdio": "Yalnızca komut çalıştırabilen istemciler için yerel bir vekil sunucu. Kendisi hiçbir şeye karar vermez: istekleri dosyadaki token'la panele iletir, panel token'ı reddederse durur.",
-  "int.mcp.safe": "Düzeltmeleri, güncellemeleri, geri almaları ve toplu devre dışı bırakmayı ajan planlar ve bunlar senin onayını bekler. Bir token kendi planını asla onaylayamaz.",
-  "int.mcp.audit": "Her çağrı, token'ın adıyla denetim günlüğüne yazılır.",
   "int.mcp.auditLink": "Denetim günlüğünü aç",
-  "int.ap.title": "Seni bekleyenler",
-  "int.ap.sub": "Bir ajan bu değişiklikleri istedi. Sen onaylamadan hiçbir şey olmaz.",
   "int.ap.by": "token: {token}",
   "int.ap.left": "{time} kaldı",
   "int.ap.expired": "süresi doldu",

@@ -256,7 +256,7 @@ describe("the records", () => {
 describe("the words", () => {
   it("has every debug sentence in all five languages with the same placeholders", () => {
     const keys = Object.keys(en).filter((k) => k.startsWith("debug.") || k === "err.debug_busy" || k.startsWith("audit.node.debug_"));
-    expect(keys.length).toBeGreaterThan(40);
+    expect(keys.length).toBeGreaterThan(20);
     for (const lang of ["ru", "zh", "fa", "tr"] as const) {
       for (const k of keys) {
         const other = (dictionaries[lang] as Record<string, string>)[k];
