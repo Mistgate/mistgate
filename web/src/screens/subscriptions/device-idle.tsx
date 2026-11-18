@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { halo } from "@/components/fx/halo";
-import { Card, SectionLabel } from "@/components/ui/bits";
-import { Switch } from "@/components/ui/switch";
-import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { errorText } from "@/lib/errors";
 import { useTx } from "@/screens/users/t";
 import type { Settings } from "./model";
+import { path, Row, Section, Toggle } from "./parts";
 import { useSaveSettings } from "./queries";
 
 /** The panel's own default (the settings it sends always carry one; an older answer without it reads as this). */
@@ -56,36 +54,38 @@ export function DeviceIdleCard({ settings }: { settings: Settings }) {
 
   return (
     <section id="device-idle">
-      <Card lg className="flex min-w-0 flex-col gap-3 p-4">
-        <div className="flex items-start gap-4">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <SectionLabel icon="clock" tone="mint" as="h2">
-              {t("subs.idle.title")}
-            </SectionLabel>
-            <p className="text-xs leading-snug text-pretty text-muted">{on ? t.n("subs.idle.on", days) : t("subs.idle.off")}</p>
-          </div>
-          <Switch checked={on} disabled={save.isPending} onCheckedChange={(v) => void apply(v ? idleDefaultDays : 0)} aria-label={t("subs.idle.aria")} className="mt-0.5" />
+      <Section tone="sky" icon={path.pulse} title={t("subs.idle.title")} shot="subs-device-idle">
+        <div className="sb-tgs">
+          <Toggle title={t("subs.idle.aria")} hint={on ? t.n("subs.idle.on", days) : t("subs.idle.off")} checked={on} disabled={save.isPending} onChange={(v) => void apply(v ? idleDefaultDays : 0)} />
         </div>
         {on && (
-          <div className="w-64 max-w-full">
-            <TextField
-              label={t("subs.idle.days")}
-              type="number"
-              inputMode="numeric"
-              min={idleMinDays}
-              max={idleMaxDays}
-              step={1}
-              value={shown}
-              disabled={save.isPending}
-              error={draft !== null && valid === null ? t("subs.idle.invalid") : undefined}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commit}
-              onKeyDown={(e) => e.key === "Enter" && commit()}
-            />
+          <div className="pp-rows">
+            <Row label={t("subs.idle.days")} hint={t("subs.idle.hint")}>
+              <input
+                className="an-i mono sb-days"
+                type="number"
+                inputMode="numeric"
+                aria-label={t("subs.idle.days")}
+                aria-invalid={(draft !== null && valid === null) || undefined}
+                min={idleMinDays}
+                max={idleMaxDays}
+                step={1}
+                value={shown}
+                disabled={save.isPending}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={commit}
+                onKeyDown={(e) => e.key === "Enter" && commit()}
+              />
+              {draft !== null && valid === null && (
+                <p className="pp-q1 bad" role="alert">
+                  {t("subs.idle.invalid")}
+                </p>
+              )}
+            </Row>
           </div>
         )}
-        <p className="text-xs leading-snug text-pretty text-muted">{t("subs.idle.hint")}</p>
-      </Card>
+        {!on && <p className="sb-lead sb-lead-end">{t("subs.idle.hint")}</p>}
+      </Section>
     </section>
   );
 }
