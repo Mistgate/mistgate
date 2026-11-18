@@ -16,7 +16,7 @@ https://sub.example.com/<secret prefix>/<token>
 ```
 
 - The base, up to and including the secret prefix, is set by `mistgate setup` on the panel server; **Settings** → **Domains** shows it (to the owner) as **Base of the subscription links**. Without it, no links are handed out. See [Install the panel](../getting-started/install-panel.md).
-- The token is the person's own secret. **Subscription link** on the user card shows the link and its QR code; **New link** replaces it, and the old link stops working at once (the page password changes with it).
+- The token is the person's own secret. **Subscription link** on the user card shows the link and its QR code; **New link** replaces it, and the old link stops working at once (the page password changes with it; to change the password alone, use **Change** in the password block, see [The page password](user-page.md#the-page-password)).
 - A link nobody owns answers like any other unknown path of the site, so a link cannot be found by guessing.
 
 ## Formats

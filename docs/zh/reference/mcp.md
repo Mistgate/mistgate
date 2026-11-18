@@ -166,7 +166,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | 工具 | 权限级别 | 参数 | 需要所有者审批 |
 |---|---|---|---|
 | `user_create` | 操作员 | `name`（1 到 64 个字符，不区分大小写且唯一）、`group_id`，以及可选的 `quota_bytes`、`quota_reset`（`none`、`day`、`week`、`month`（默认值）、`rolling_month`）、`term_days`（最多 3650）、`device_limit`（最多 100）、`apps`（`happ`、`amnezia`、`telegram`）、`nodes`（`all` 或 `node_ids`）、`speed_limit_bps`（每人：其所有设备在同一节点上合计）、`device_speed_limit_bps`（每台设备）、`dns_preset_id` | 否 |
-| `user_update` | 操作员 | `user_id`，可选的 `subscription_name`（最多 64 个字符；为空时使用 `name`），以及需要更改的字段（同上，但使用 `expires_unix` 替代 `term_days`；计划会同时写明两种限速：每人在单个节点上的限速和每台设备的限速）。`group_id` 是主分组。`add_group_ids` 和 `remove_group_ids` 以增量方式更改附加分组（一个用户最多属于 16 个分组；不能移出主分组）；计划会写明分组，并根据面板自己的检查写明用户将获得和失去的协议配置和节点 | 否 |
+| `user_update` | 操作员 | `user_id`，可选的 `subscription_name`（最多 64 个字符；为空时使用 `name`），以及需要更改的字段（同上，但使用 `expires_unix` 替代 `term_days`；计划会同时写明两种限速：每人在单个节点上的限速和每台设备的限速）。`group_id` 是主分组。`add_group_ids` 和 `remove_group_ids` 以增量方式更改附加分组（一个用户最多属于 16 个分组；不能移出主分组）；计划会写明分组，并根据面板自己的检查写明用户将获得和失去的协议配置和节点。`page_password`（`change`、`remove` 或 `restore`）更改该用户自己页面的密码：计划会写明操作，新密码由所有者在管理面板中查看，你看不到；已移除的密码在 `user_get` 和 `users_search` 中显示为 `page_open` | 否 |
 | `user_disable` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
 | `user_enable` | 操作员 | `user_ids`（1 到 50） | 否 |
 | `user_reset_traffic` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |

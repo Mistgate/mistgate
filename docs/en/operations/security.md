@@ -142,7 +142,7 @@ Everything the panel knows is in its data directory, `/var/lib/mistgate` by defa
 
 The node agent does not send VPN client IP addresses in session reports, and the panel does not store them in its live session view.
 
-The stored secrets include profile secrets and device keys, the authenticator secrets, the Turnstile secret key, WARP keys, saved SSH passwords and the R2 secret access key of the backups. The users' page passwords are not stored: they are derived from the master key. A new master key therefore changes every page password and makes every stored secret unreadable. Losing the data directory means enrolling every node again (the nodes trust the panel's CA) and giving users new links.
+The stored secrets include profile secrets and device keys, the authenticator secrets, the Turnstile secret key, WARP keys, saved SSH passwords and the R2 secret access key of the backups. The users' page passwords are not stored: they are derived from the master key, the person's link and a small number kept per person (the generation of the password), and the database holds only that number and a flag that the password was removed. A new master key therefore changes every page password and makes every stored secret unreadable. Losing the data directory means enrolling every node again (the nodes trust the panel's CA) and giving users new links.
 
 > **Danger:** A lost `master.key` cannot be replaced by a new one: put it back from a backup. `mistgate serve` and `mistgate setup` refuse to make a new key next to an existing database.
 
