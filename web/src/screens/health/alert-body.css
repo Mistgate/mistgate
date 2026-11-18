@@ -195,6 +195,20 @@
   flex: none;
   align-self: center;
 }
+/* on a node's Overview the body stands in the node board's .nd-alb (pn.css L1683-1685): its words 13 in the second grey to 640, a column of 12 with the line of buttons last */
+.nd-alb .hl-alb {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.nd-alb .hl-alb > * {
+  margin: 0 !important;
+}
+.nd-alb .hl-alb > p {
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 20px;
+}
 /* reduce motion stills the body of an alert wherever it stands (page.css does it under .hlp) */
 @media (prefers-reduced-motion: reduce) {
   .hlx *,

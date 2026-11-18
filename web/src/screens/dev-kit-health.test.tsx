@@ -101,6 +101,15 @@ describe("the scenes of the Health page", () => {
       expect(document.querySelectorAll(".hl-cw")).toHaveLength(4);
       expect(document.querySelector(".hl-cw.open .hl-cnode b")?.textContent).toBe("fi1");
     }
+    if (state === "checks.first") {
+      expect(document.querySelectorAll(".hl-cw.ckw")).toHaveLength(4);
+      expect(body()).toContain("queued");
+    }
+    if (state === "checks") expect(document.querySelector(".hl-cw.open")?.textContent).not.toContain("✕ ");
+    if (state === "doctor.first") {
+      expect(document.querySelector(".hl-dsum")?.textContent).toContain("Nodes4");
+      expect(document.querySelector(".hl-quiet")).toBeNull(); // the list at the side already says "not checked" of each
+    }
     if (state === "checks.ckrun") expect(document.querySelector(".hl-cw.cking")).not.toBeNull();
     if (state === "checks.ckdone") expect(document.querySelectorAll(".hl-cw.ckn")).toHaveLength(4);
     if (state === "checks.legend") expect(document.querySelector(".hl-leg")).not.toBeNull();

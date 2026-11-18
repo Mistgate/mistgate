@@ -103,7 +103,7 @@
   padding-top: 36px;
   min-width: 0;
 }
-/* L1664, L3591, L6677 */
+/* L1664, L3591: every tab counter of the board carries .up-n, the later rule: the step of grey with the second text, not L1664's amber (TabLabel's tone stays the caller's word) */
 .hlp .bdg {
   display: grid;
   place-items: center;
@@ -111,19 +111,11 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 10px;
-  background: var(--warning-soft);
-  color: var(--warning-text);
+  background: var(--step);
+  color: var(--sec);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: inherit;
-}
-.hlp .bdg.mut {
-  background: var(--step);
-  color: var(--sec);
-}
-.hlp .bdg.crit {
-  background: var(--danger-soft);
-  color: var(--danger-text);
 }
 
 /* ---- the card with its icon head (the board's .card.pp-sec.sb-sec) ---- */
