@@ -67,7 +67,7 @@ export function Modal({ open, onOpenChange, title, description, children, footer
               )}
             </div>
             {/* the scrolling part reaches the edges, so its scrollbar sits on the border and focus rings are not cut */}
-            {children && <div className="flex min-h-0 flex-col gap-5 overflow-y-auto [scrollbar-width:thin] px-6 pt-2 pb-6 @max-[720px]/win:px-4 @max-[720px]/win:pb-5">{children}</div>}
+            {children && <div className="flex min-h-0 flex-col gap-5 overflow-y-auto [scrollbar-width:thin] [&>*]:shrink-0 px-6 pt-2 pb-6 @max-[720px]/win:px-4 @max-[720px]/win:pb-5">{children}</div>}
             {footer && (
               <div className="flex flex-none flex-wrap items-center justify-end gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,transparent)] px-6 py-3.5 @max-[720px]/win:px-4 @max-[720px]/win:py-3">
                 {footer}

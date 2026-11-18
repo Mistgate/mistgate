@@ -1217,12 +1217,19 @@
   order: 0;
   margin: 0;
 }
-.dz-asl {
+/* the list scrolls inside the window, under the search that stays in place (a long fleet does not fit the window) */
+div.dz-asl {
   display: flex;
   flex-direction: column;
+  flex-shrink: 1;
+  min-height: 168px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  overflow: hidden;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+}
+div.dz-asl > * {
+  flex: none;
 }
 .dz-wsep {
   display: block;
