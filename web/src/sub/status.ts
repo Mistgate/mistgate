@@ -101,7 +101,8 @@ export function heroCard(c: Ctx, now = Date.now() / 1000): HTMLElement {
     qr.addEventListener("mouseleave", tilt.leave);
   }
   const add = (cls = "u-btn pri") => h("button", { class: cls, type: "button", "data-k": "hero-add", on: { click: () => a.amz.add(true) } }, icon("plus"), t.awgAdd);
-  const copy = (label: string, cls = "u-btn") => copyButton(a, { text: d.subscription_url, label, done: t.copied, toast: t.copied, cls, key: "hero-copy", after: a.mark });
+  // the short word on a phone ("Link") keeps its button as wide as the short "Copied": the long "Link copied" would push it to a row of its own
+  const copy = (label: string, cls = "u-btn", done = t.copied) => copyButton(a, { text: d.subscription_url, label, done, toast: t.copied, cls, key: "hero-copy", after: a.mark });
   const aside = canAdd || copyAble;
   return h(
     "section",
@@ -118,7 +119,7 @@ export function heroCard(c: Ctx, now = Date.now() / 1000): HTMLElement {
       h("div", { class: "u-stats" }, cell("term", t.termL, f.term), cell("traffic", t.trafficL, f.traffic), cell("devices", t.statDevices, f.devices, live ? () => a.tab("devices") : undefined)),
     ),
     aside && h("aside", { class: "u-hero-c only-w", "aria-label": t.newDevT }, qr && h("div", { class: "u-qrrow" }, qr, h("div", null, h("p", { class: "u-t" }, t.newDevT), h("p", { class: "u-hint" }, t.newDevH))), h("div", { class: "u-acts col" }, canAdd && add(), copyAble && copy(t.copySubLink))),
-    aside && h("div", { class: "u-hero-c only-m" }, h("div", { class: "u-acts" }, canAdd && add("u-btn pri grow"), copyAble && copy(t.copySubShort, canAdd ? "u-btn" : "u-btn grow"))),
+    aside && h("div", { class: "u-hero-c only-m" }, h("div", { class: "u-acts" }, canAdd && add("u-btn pri grow"), copyAble && copy(t.copySubShort, canAdd ? "u-btn" : "u-btn grow", t.copiedShort))),
   );
 }
 

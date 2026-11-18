@@ -152,9 +152,13 @@ async function eachOpen<T>(read: () => T[]): Promise<T[]> {
   return out;
 }
 
+/** People opens no row of itself (the board keeps its open row on a node alert): the first is opened by a click, as a person does. */
+const openFirst = () => click(document.querySelector("[data-alert-toggle]") ?? undefined);
+
 describe("Health ▸ People", () => {
   it("lists the alerts about people, warnings first, and none about nodes", async () => {
     await mount({ people: [connection(), node(), impacted, ended()] });
+    await openFirst();
     const list = cards();
     expect(list).toHaveLength(2);
     expect(list[0]!.textContent).toContain("Masha");
@@ -171,6 +175,7 @@ describe("Health ▸ People", () => {
 
   it("shows a torrent attempt: who, where, how many, what was caught and the port, and no node alert around it", async () => {
     await mount({ people: [connection(), torrent(), node()] });
+    await openFirst();
     const list = cards();
     expect(list).toHaveLength(2);
     expect(list[0]!.textContent).toContain("alice");
@@ -215,6 +220,8 @@ describe("Health ▸ People", () => {
 
   it("offers Mute like the other alerts", async () => {
     await mount({ people: [ended()] });
+    expect(document.querySelector("[data-alert-toggle]")?.getAttribute("aria-expanded")).toBe("false");
+    await openFirst();
     expect([...document.querySelectorAll("button")].some((b) => b.textContent?.includes("Mute"))).toBe(true);
   });
 

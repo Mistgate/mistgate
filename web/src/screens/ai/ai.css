@@ -171,6 +171,8 @@
 .aip .ai-hb svg { width: 14px; height: 14px; }
 /* L3253-3254, L6119-6120: a segmented control in a row or in a window fills the width, its items share it */
 .aip .ai-seg, .ai-dlg .us-seg { display: flex; width: 100%; max-width: 100%; }
+/* the board draws three retention choices; the panel has six (7, 30, 90, 180, 365 days, forever): they scroll inside the control instead of leaving the card */
+.aip .ai-seg { overflow-x: auto; scrollbar-width: none; }
 .aip .ai-seg > [role="radio"], .ai-dlg .us-seg > [role="radio"] { flex: 1 1 auto; padding-inline: 8px; white-space: nowrap; }
 
 /* L4081 */
@@ -526,7 +528,6 @@
   .aip .ai-grid .pp-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .aip .ai-grid .ai-seg, .aip .ai-grid .ai-fix { max-width: 520px; }
   .aip .ai-grid .ai-onr { grid-template-columns: minmax(0, 1fr) auto; }
-  .aip .ai-seg { overflow-x: auto; scrollbar-width: none; }
 }
 @media (max-width: 900px) {
   .aip .ai-top { flex-direction: column; gap: 12px; }

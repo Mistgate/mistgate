@@ -170,7 +170,7 @@ export function updatesData(opts: { panel?: PanelKind; nodes?: unknown[]; rollou
     offeredReleaseChannel: "stable",
     runningNewerThanChannelOffers: false,
     panel: { version: opts.running ?? (done ? NEW : CUR), built: done ? B_NEW : B_CUR, hasReleaseKey: true, releaseKeyFingerprint: KEY, update: panelUpdate(kind) },
-    panelNotes: kind === "new" || kind === "gh" || kind === "back" ? panelNotes : [],
+    panelNotes: kind === "new" || kind === "gh" || kind === "back" || kind === "sig" ? panelNotes : [],
     agentNotes: [],
     bundle: opts.bundle ?? bundle(),
     nodes: opts.nodes ?? fleetNodes(),

@@ -115,6 +115,8 @@ describe("what a scene shows", () => {
     expect($(".ai-prov.on.open")?.textContent).toContain("$3.41 of $20");
     expect($(".ai-prov.off")?.textContent).toContain("Not connected");
     expect(body()).toContain("owner");
+    // the board starts on "Owner and helpers" for who may use it
+    expect(all("[role=radiogroup] [role=radio][aria-checked=true]").map((r) => r.textContent)).toContain("Owner and helpers");
   });
 
   it("the assistant: the three trouble banners are the board's", async () => {

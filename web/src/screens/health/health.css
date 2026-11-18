@@ -344,11 +344,6 @@
 .hlp .hl-nodes .cking span {
   color: var(--tone-sky);
 }
-/* the card "Checks" on the side: its lines are the board's .pp-q1 in a padded block */
-.hlp .hl-side-ck .pp-q1 {
-  font-size: 13px;
-  line-height: 20px;
-}
 
 /* ---- the client-eye table (L5019-5031, L5133-5147) ---- */
 .hlp .hl-ct {

@@ -124,7 +124,7 @@ function LogsCard({ level, defaultLevel }: { level: string; defaultLevel: string
     <Sec tone="sand" d={ICONS.lines} title={t("obs.logs.title")} lead={t("sx.sys.logs.lead")}>
       <div className="sx-lc">
         <div className="sx-lf">
-          <Segmented aria-label={t("obs.logs.show")} value={filter.minLevel} onValueChange={(v) => patch({ minLevel: v })} options={levels} />
+          <Segmented aria-label={t("obs.logs.show")} value={filter.minLevel} onValueChange={(v) => patch({ minLevel: v })} options={levels} className="w-full [&>*]:flex-1" />
           <input className="an-i sx-q" type="search" placeholder={t("obs.logs.search")} aria-label={t("obs.logs.search")} autoComplete="off" maxLength={100} value={filter.query} onChange={(e) => patch({ query: e.target.value })} />
           <button type="button" className="an-lk sx-more" aria-expanded={more} onClick={() => setMore((m) => !m)}>
             {t("sx.sys.logs.more")}

@@ -94,7 +94,11 @@ describe("the scenes of the Updates screen", () => {
       if (tab === "panel" && kind === "out") expect($(".uq-take.out")?.textContent).toContain("Panel updated");
       if (tab === "panel" && kind === "done") expect($(".uq-hero.done")?.textContent).toContain("updated just now · was v0.1.71");
       if (tab === "panel" && kind === "back") expect($(".uq-hero.back .rc-pb.bad")?.textContent).toContain("The panel is back on v0.1.71");
-      if (tab === "panel" && kind === "sig") expect($(".uq-hero.back .rc-pb.bad")?.textContent).toContain("signature didn’t match");
+      if (tab === "panel" && kind === "sig") {
+        expect($(".uq-hero.back .rc-pb.bad")?.textContent).toContain("signature didn’t match");
+        // the board keeps What is new (and the security pill) while the release is not installable
+        expect(all(".uq-hero .pv-pill").some((p) => p.textContent?.includes("Security fixes"))).toBe(true);
+      }
       if (tab === "panel" && kind === "gh") expect($(".uq-hero .rc-pb")?.textContent).toContain("GitHub didn’t respond");
       if (tab === "panel" && kind === "cur") expect($(".uq-hero.upto")?.textContent).toContain("Up to date");
       if (state === "pn.new") expect(all(".uq-trk li")).toHaveLength(4);

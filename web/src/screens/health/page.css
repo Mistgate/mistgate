@@ -73,14 +73,14 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* L4838 */
+/* L4838: the line height is the page's own (the .pn 20px; the board sets none on this h1) */
 .hlp .sb-h {
   margin-top: 4px;
 }
 .hlp .sb-h h1 {
   margin: 0;
   font-size: 28px;
-  line-height: 32px;
+  line-height: 20px;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
