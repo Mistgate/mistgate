@@ -99,7 +99,7 @@ export function RecoverScreen() {
           <span className={eyebrow}>{t("auth.recover.password")}</span>
           <CopyBox value={result.password} big />
         </div>
-        {result.totpUri && result.totpSecret && <TotpEnroll uri={result.totpUri} secret={result.totpSecret} caption={t("auth.setup.totpScan")} />}
+        {result.totpUri && result.totpSecret && <TotpEnroll qr={result.totpQr} secret={result.totpSecret} caption={t("auth.setup.totpScan")} />}
         <Notice title={t("auth.recover.onceTitle")}>{t("auth.recover.onceBody")}</Notice>
         <div className="flex flex-col gap-1.5 rounded-card border border-line bg-surface p-4">
           <b className="text-[15px]">{t("auth.recover.nextTitle")}</b>

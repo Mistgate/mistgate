@@ -845,3 +845,8 @@
 [dir="rtl"] [role="switch"][data-checked]:active:not([data-disabled]) > span {
   translate: -0.75rem 0;
 }
+
+/* The white card of a QR code (components/qr-code.tsx): a hairline in the light theme, as the board's .t-light .u-qr has. */
+:root[data-theme="light"] .qr-card {
+  box-shadow: 0 0 0 1px var(--border);
+}

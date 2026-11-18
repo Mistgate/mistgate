@@ -69,6 +69,7 @@ import { AiKit } from "./dev-kit-ai";
 import { FxKit } from "./dev-kit-fx";
 import { GraphKit } from "./dev-kit-graph";
 import { AwgRelayKit } from "./dev-kit-awg-relay";
+import { QrKit } from "./dev-kit-qr";
 import { BridgeKit } from "./dev-kit-bridge";
 import { FoundationKit } from "./dev-kit-foundation";
 import { NodePageFrame, NodePageKit } from "./dev-kit-node-page";
@@ -324,7 +325,7 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=profile-delete|dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge|foundation|shell|overview|nodes|windows|nodepage|node-share|pn-group|decoys|pn-profiles|pn-health|pn-reach|pn-settings|pn-updates|pn-ai|pn-assistant|pn-integrations: one kit alone, for its screenshots;
+  // ?only=profile-delete|dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|qr|probes|trusttunnel|bridge|foundation|shell|overview|nodes|windows|nodepage|node-share|pn-group|decoys|pn-profiles|pn-health|pn-reach|pn-settings|pn-updates|pn-ai|pn-assistant|pn-integrations: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "halo") return <HaloKit />;
@@ -351,7 +352,7 @@ export default function DevKit() {
   if (which === "node-share-page") return <NodeSharePage />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "node-share": NodeShareKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, decoys: DecoysKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit, "pn-health": PnHealthKit, "pn-reach": PnReachKit, subs: SubsScenesKit, "subs-scenes": SubsScenesKit, "pn-settings": SettingsKit, "pn-updates": PnUpdatesKit, "pn-ai": PnAiKit, "pn-assistant": PnAssistantKit, "pn-integrations": PnIntegrationsKit }[which];
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, qr: QrKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "node-share": NodeShareKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, decoys: DecoysKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit, "pn-health": PnHealthKit, "pn-reach": PnReachKit, subs: SubsScenesKit, "subs-scenes": SubsScenesKit, "pn-settings": SettingsKit, "pn-updates": PnUpdatesKit, "pn-ai": PnAiKit, "pn-assistant": PnAssistantKit, "pn-integrations": PnIntegrationsKit }[which];
   if (only) {
     const Kit = only;
     return (

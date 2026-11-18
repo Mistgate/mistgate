@@ -8,6 +8,7 @@ import { Pending, QueryError } from "@/components/ui/query-error";
 import { useToast } from "@/components/ui/toast";
 import { useT, type T } from "@/i18n";
 import { auth } from "@/lib/api";
+import { demoQr } from "@/lib/qr-demo";
 import { loginPattern, passwordTooLong, passwordTooShort, type TotpEnrolment } from "@/lib/credentials";
 import { errorCode, errorText } from "@/lib/errors";
 import { plain } from "@/lib/plain";
@@ -45,7 +46,7 @@ const passwordError = (pw: string, t: T) => (passwordTooShort(pw) ? t("auth.err.
 /** What a scene says about the card: the lock over it, and a window that is open (the re-bind one holds a made-up secret). */
 export type PasswordDemo = { lock?: boolean; window?: "change" | "change-err" | "change-busy" | "add" | "add-qr" | "rebind" };
 
-const demoTotp: TotpEnrolment = { ceremonyId: "cer_demo", uri: "otpauth://totp/mistgate:owner?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=mistgate", secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP" };
+const demoTotp: TotpEnrolment = { ceremonyId: "cer_demo", qr: demoQr, secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP" };
 
 /**
  * "Password and code" (the board's second card of Security): the spare way in next to the passkeys. Change the password, re-bind the
@@ -64,7 +65,7 @@ export function PasswordCard({ demo }: { demo?: PasswordDemo }) {
   // the server's step-up comes first, then the new secret: the QR opens only once it is there
   const begin = useMutation({
     mutationFn: () => guard(() => auth.beginTotpEnrollment({})),
-    onSuccess: (r) => setRebind({ ceremonyId: r.ceremonyId, uri: r.totpUri, secret: r.totpSecret }),
+    onSuccess: (r) => setRebind({ ceremonyId: r.ceremonyId, qr: r.totpQr, secret: r.totpSecret }),
     onError: (e) => {
       if (isStepUpCancelled(e)) return;
       if (lockedBy(e)) setLocked(true);
@@ -260,7 +261,7 @@ export function Enroll({ begun, onClose, onLocked, demo }: { begun?: TotpEnrolme
   const start = useMutation({
     mutationFn: () => guard(() => auth.beginTotpEnrollment({ login: login.trim(), password })),
     onSuccess: (r) => {
-      setTotp({ ceremonyId: r.ceremonyId, uri: r.totpUri, secret: r.totpSecret });
+      setTotp({ ceremonyId: r.ceremonyId, qr: r.totpQr, secret: r.totpSecret });
       setCode("");
     },
     onError: (e) => {
@@ -347,7 +348,7 @@ export function Enroll({ begun, onClose, onLocked, demo }: { begun?: TotpEnrolme
         )}
         {totp && (
           <>
-            <TotpEnroll uri={totp.uri} secret={totp.secret} caption={t("auth.setup.totpScan")} />
+            <TotpEnroll qr={totp.qr} secret={totp.secret} caption={t("auth.setup.totpScan")} />
             <CodeField
               label={t("pw.codeLabel")}
               value={code}

@@ -26,9 +26,6 @@ importers:
       '@tanstack/react-router':
         specifier: ^1.170.40
         version: 1.170.40(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      qrcode-generator:
-        specifier: ^2.0.4
-        version: 2.0.4
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -1014,9 +1011,6 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
-  qrcode-generator@2.0.4:
-    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
-
   react-dom@19.3.0:
     resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
     peerDependencies:
@@ -1894,8 +1888,6 @@ snapshots:
       source-map-js: 1.2.1
 
   punycode@2.3.1: {}
-
-  qrcode-generator@2.0.4: {}
 
   react-dom@19.3.0(react@19.3.0):
     dependencies:

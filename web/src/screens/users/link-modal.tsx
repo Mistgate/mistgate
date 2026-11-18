@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { SectionLabel } from "@/components/ui/bits";
+import { QrCode, QrPending } from "@/components/qr-code";
 import { Button, buttonClass } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
@@ -43,37 +44,6 @@ export const linkTargetOf = (u: UserN, group?: Group): LinkTarget & { access: { 
   active: u.status === UserStatus.ACTIVE,
   group: { id: u.groupId, name: u.groupName, givesNothing: !group || (group.happNodes === 0 && group.amneziaNodes === 0) },
 });
-
-/**
- * QR code as a crisp SVG on a white card (scanners need the light quiet zone in both themes). The encoder
- * (qrcode-generator) loads on first use, so it stays out of the main bundle.
- */
-function LinkQr({ value, label }: { value: string; label: string }) {
-  const [cells, setCells] = useState<{ n: number; d: string } | null>(null);
-  useEffect(() => {
-    let live = true;
-    void import("qrcode-generator").then(({ default: qrcode }) => {
-      const qr = qrcode(0, "M");
-      qr.addData(value);
-      qr.make();
-      const n = qr.getModuleCount();
-      let d = "";
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) d += `M${x} ${y}h1v1h-1z`;
-      if (live) setCells({ n, d });
-    });
-    return () => {
-      live = false;
-    };
-  }, [value]);
-  const n = cells?.n ?? 29;
-  return (
-    <div className="flex-none self-center rounded-card border border-line bg-white p-3.5">
-      <svg role="img" aria-label={label} viewBox={`0 0 ${n} ${n}`} shapeRendering="crispEdges" className="block size-[208px] max-w-full">
-        {cells && <path d={cells.d} fill="#0c0c0e" />}
-      </svg>
-    </div>
-  );
-}
 
 /**
  * "Link & QR": the job of this window is "send the friend what they need". One primary button copies a ready-to-paste
@@ -164,7 +134,7 @@ function LinkBody({ target, initialUrl, initialPassword }: { target: LinkTarget;
   return (
     <>
       <div className="flex flex-col items-center gap-2">
-        <LinkQr value={url || " "} label={t("users.qrLabel")} />
+        <div className="flex-none self-center">{url ? <QrCode value={url} label={t("users.qrLabel")} size={232} /> : <QrPending size={232} />}</div>
         {keysOnly && <span className="max-w-[260px] text-center text-xs leading-snug text-muted">{t("users.qrHintAwg")}</span>}
       </div>
       {keysOnly && <SelfService target={target} />}

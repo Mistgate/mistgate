@@ -24,6 +24,7 @@ const issueTrustTunnelKey = vi.fn();
 const revokeTrustTunnelKey = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
+  instance: { encodeQr: async () => ({ qr: (await import("@/lib/qr-demo")).demoQr }) },
   trustTunnel: {
     getTrustTunnelLinks: (...a: unknown[]) => getTrustTunnelLinks(...a),
     issueTrustTunnelKey: (...a: unknown[]) => issueTrustTunnelKey(...a),
