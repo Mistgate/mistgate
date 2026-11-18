@@ -4,6 +4,7 @@ package fleet
 
 import (
 	"context"
+	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/capacity"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -37,9 +38,13 @@ func (f *Fleet) CapacityNodes(ctx context.Context, hours int) ([]capacity.Node, 
 		if err != nil {
 			return nil, err
 		}
+		tests, err := f.st.SpeedTestTimes(ctx, n.ID, now.Add(-time.Duration(store.HostMaxHours+1)*time.Hour))
+		if err != nil {
+			return nil, err
+		}
 		l := liveBy[n.ID]
 		c := capacity.Node{ID: n.ID, Name: n.Name, CPUs: facts.CPUCount, RAMTotal: facts.RAMTotal,
-			BandwidthMbps: uint32(min(max(n.BandwidthMbps, 0), 1_000_000)), Connected: l.Connected, Hours: hrs}
+			BandwidthMbps: uint32(min(max(n.BandwidthMbps, 0), 1_000_000)), Connected: l.Connected, Hours: hrs, SpeedTests: tests}
 		if v := decodeLiveView(l); v.Metrics != nil {
 			c.DiskUsed, c.DiskTotal = v.Metrics.DiskUsedBytes, v.Metrics.DiskTotalBytes
 		}
