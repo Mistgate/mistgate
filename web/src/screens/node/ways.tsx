@@ -69,6 +69,8 @@ export type WaysModel = Ways & {
   ipv6: Ipv6Fact;
   /** The IPv6 entry (Node.ipv6): on, or whether and why the node can take one. */
   v6: Ipv6Entry;
+  /** The last read of the relays failed: with relays already read (`stale`) the pair says so; with none, the tab does. */
+  readError: { stale: boolean; retry: () => void } | null;
 };
 
 /** The lanes of a node with what they rest on: the node page computes them once, for the tab, its badge and the Overview. */
@@ -101,7 +103,8 @@ export function useWays(data: Data): WaysModel {
     hasIpv6: data.facts?.hasIpv6,
     entry: entryState(v6),
   });
-  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryOf, ipv6, v6 };
+  const readError = owner && live && relays.isError ? { stale: relays.data !== undefined, retry: () => void relays.refetch() } : null;
+  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryOf, ipv6, v6, readError };
 }
 
 // ---- words of a lane ----
@@ -508,6 +511,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
   const [relayOther, setRelayOther] = useState(false);
 
   if (!w.ready) return <Pending />;
+  const unread = w.readError && !w.readError.stale ? w.readError : null;
   const lane = w.lanes.find((l) => l.id === openLane) ?? w.lanes[0]!;
   const pair = w.out.find((l) => l.id === openOut);
   const make = () => go({ way: search.way, add: "1" });
@@ -561,6 +565,16 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
 
   return (
     <div className="flex min-w-0 flex-col">
+      {unread && (
+        <div className="wy-plt mb-4" data-testid="relays-unread">
+          <div>
+            <span>{t("wy.br.read")}</span>
+          </div>
+          <Button size="md" onClick={unread.retry}>
+            {t("wy.br.retry")}
+          </Button>
+        </div>
+      )}
       {entry && (
         <div className={cx("wy-in wy-in2", view === "graph" && "graph")}>
           <PassList data={data} w={w} open={openOut} onPick={pickOut} onMore={() => setRelayOther(true)} view={view} onView={setView} />
@@ -756,7 +770,7 @@ function PairCard({ data, w, lane, onOther }: { data: Data; w: WaysModel; lane: 
           <Notice tone="danger">{t("relay.err.forward_drop")}</Notice>
         </div>
       )}
-      <PairWay rs={rs} entry={node.name} exit={peer.name} cc={w.cc} exitSeen={w.countryOf(peer.id)} entrySeen={w.country} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} />
+      <PairWay rs={rs} entry={node.name} exit={peer.name} cc={w.cc} exitSeen={w.countryOf(peer.id)} entrySeen={w.country} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} readError={w.readError?.stale} onRetry={w.readError?.retry} />
       <div className="wy-sh">
         <h4>{t("ways.block.servers")}</h4>
         <span>{t.n("wy.pass.onPath", rs.length)}</span>
@@ -1005,7 +1019,7 @@ function RelayDetail({ data, w, lane, onOther }: { data: Data; w: WaysModel; lan
           <Notice tone="danger">{t("relay.err.forward_drop")}</Notice>
         </div>
       )}
-      <PairWay rs={lane.relays} entry={peer.name} exit={node.name} cc={w.cc} exitSeen={w.country} entrySeen={w.countryOf(peer.id)} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} />
+      <PairWay rs={lane.relays} entry={peer.name} exit={node.name} cc={w.cc} exitSeen={w.country} entrySeen={w.countryOf(peer.id)} runs={runs} readOnly={!w.owner} nowS={nowS} onOther={w.owner ? onOther : undefined} readError={w.readError?.stale} onRetry={w.readError?.retry} />
       <div className="wy-sh">
         <h4>{t("ways.block.servers")}</h4>
         <span>{t.n("wy.pass.onPath", lane.relays.length)}</span>

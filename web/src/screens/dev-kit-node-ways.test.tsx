@@ -90,6 +90,40 @@ describe("the scenes of the Ways in tab", () => {
     expect(await say("cause=fw")).toContain("Allow forwarding");
   });
 
+  it.each([
+    ["connect", "The bridge is down: de1 cannot connect to msk1", "Check de1 → msk1"],
+    ["pin_mismatch", "The bridge is down: the certificate of the site of msk1 did not match the expected one", "Check again"],
+    ["no_verification", "de1 does not know how to verify the site of msk1", null],
+    ["tls_protocol", "The bridge is down: something other than the Mistgate site answers on the bridge port of msk1", "Open the profiles of msk1"],
+    ["connection_limit", "msk1 reached its limit of connections from de1", null],
+    ["pair_timeout", "The bridge loses people’s connections", "Check the speed"],
+    ["target_connect", "The bridge is down: the server on de1 does not take connections from the bridge", "Open the profiles of de1"],
+    ["identity_unavailable", "The bridge is down: the agent has no node certificate yet", "Open “Server”"],
+    ["site_listen_failed", "The bridge is down: the bridge site on msk1 did not come up (site_listen_failed)", "Open the Doctor of msk1"],
+    ["bad_config", "The bridge is down: the panel sent bad bridge settings", "Check again"],
+    ["closed", "The bridge is restarting", null],
+  ])("the bridge's word %s: its line and its button", async (code, line, action) => {
+    const text = await draw(`w=1&err=${code}&way=via:nod_msk1`, "calm");
+    expect(text).toContain(line);
+    const note = host!.querySelector<HTMLElement>(".wy-plt")!;
+    expect(note.querySelector("small")?.textContent).toBe(code);
+    const buttons = [...note.querySelectorAll("button, a")].map((b) => b.textContent);
+    expect(buttons).toEqual(action ? [action] : []);
+  });
+
+  it("the cascade's read error is one line and a way to ask again", async () => {
+    const text = await draw("w=1&read=1&cas=br&way=via:nod_msk1", "calm");
+    expect(text).toContain("Could not read the state of the bridge");
+    expect(text).toContain("Try again");
+    expect(host!.querySelector("[data-testid=pair-way] .wy-kv")).toBeNull();
+  });
+
+  it.each(["port", "mode"])("the %s editor is open under the first server's row", async (edit) => {
+    await draw(`w=1&edit=${edit}&way=via:nod_msk1`, "calm");
+    expect(host!.querySelector(`[data-testid=relay-${edit}-editor]`)).not.toBeNull();
+    expect(host!.querySelectorAll("[data-testid^=relay-][data-testid$=-editor]")).toHaveLength(1);
+  });
+
   it("draws the direct way's ports as one table with the switches of the subscriptions", async () => {
     const text = await draw("w=1", "calm");
     expect(text).toContain("Servers and ports");

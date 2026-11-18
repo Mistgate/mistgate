@@ -1,4 +1,4 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import { ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -14,31 +14,27 @@ import { useToast } from "@/components/ui/toast";
 import { useT, type T } from "@/i18n";
 import { relays as relaysApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
-import { errorCode, errorText, errorVars } from "@/lib/errors";
+import { errorCode, errorText } from "@/lib/errors";
 import { countryQuery } from "@/lib/globalping";
-import { plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import {
   candidatesQuery,
   countryHint,
   groupCandidates,
-  namesOf,
   reachHint,
   relaysQuery,
   seenHint,
-  stageReason,
   viaLabel,
   type Candidate,
   type CandidateNode,
   type CountryHint,
   type Hint,
   type RelayMsg,
-  type Stage,
 } from "@/lib/relay";
-import { activeOf, blockedOf, blockedText, bridgeNote, bridgeReason, modeOf, reachReason, wantsReach, type Mode } from "@/lib/relay-bridge";
+import { blockedOf, blockedText, bridgeNote, wantsReach, type Mode } from "@/lib/relay-bridge";
 import { protocolName } from "@/lib/series";
-import { markFresh } from "@/components/fx/registry";
 import { settingsQuery } from "@/screens/subscriptions/queries";
+import { runOne, type Entry, type Run, type StageLook } from "./relay-run";
 import { WayChoice } from "./relay-way";
 
 // Relays on the node page (relay.proto; the cascade plan §8 screens 1-3), the pieces the "Ways in" tab (ways.tsx) is made
@@ -111,9 +107,7 @@ export function useRelayRuns() {
 export type RelayRuns = ReturnType<typeof useRelayRuns>;
 
 
-type StageLook = "ok" | "fail" | "skipped" | "running" | "waiting";
 const stageDot: Record<StageLook, StatusKind> = { ok: "ok", fail: "bad", skipped: "off", running: "busy", waiting: "off" };
-const lookOf = (s?: Stage): StageLook | null => (s?.status === "ok" ? "ok" : s?.status === "fail" ? "fail" : s?.status === "skipped" ? "skipped" : null);
 
 export function RemoveRelay({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
   const t = useT();
@@ -162,9 +156,7 @@ export function RemoveRelay({ r, onClose }: { r: RelayMsg; onClose: () => void }
 
 // ---- the dialog ----
 
-export type Entry = { id: string; name: string; cc: string };
-/** One picked server while the dialog works on it. */
-type Run = { leg: StageLook; reach?: StageLook | null; bridge?: StageLook | null; path: StageLook | null; /** The leg did not pass and the bridge did: no red mark on it. */ soft?: boolean; tone?: "ok" | "bad"; text?: string; free?: number };
+export type { Entry } from "./relay-run";
 
 type AddProps = {
   /** The node that will pass the servers on. */
@@ -230,77 +222,8 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onCl
   };
   const set = (id: string, run: Partial<Run>) => setRuns((all) => ({ ...all, [id]: { ...all![id]!, ...run } }));
 
-  /**
-   * Make the relay (off) in the chosen way, check it, and on "Check and turn on" switch it on (the panel checks the path then,
-   * and in the bridge waits for the exit to hold it). A leg that does not pass is no end of it when the way may be a bridge
-   * and the exit reaches the entry: the relay then goes the bridge's way.
-   */
-  const one = async (c: Candidate, on: boolean, port: string) => {
-    const names = { entry: entry.name, exit: c.nodeName, exitPort: c.port, port: Number(port) || c.port, network: c.network };
-    const pair = { entry: entry.name, exit: c.nodeName };
-    // the way asked for: a server that cannot use a bridge is made direct, or auto (it stays direct)
-    const asked: Mode = blockedOf(c) !== "" && way === "reverse" ? "auto" : way;
-    set(c.inboundId, { leg: "running", reach: null, bridge: null, path: on ? "waiting" : null, soft: false, tone: undefined, text: undefined, free: undefined });
-    // the first relay between these two nodes makes their lane: only that one sweeps in (a second relay joins a lane that is there)
-    const hadLane = qc.getQueryData<RelayMsg[]>(["relays", c.nodeId])?.some((x) => x.viaNodeId === entry.id && x.exitNodeId === c.nodeId) ?? false;
-    let r: RelayMsg;
-    try {
-      r = plain(await relaysApi.createRelay({ inboundId: c.inboundId, viaNodeId: entry.id, port: Number(port) || 0, ...(asked !== "auto" ? { mode: asked } : {}) })).relay!;
-      r = plain(await relaysApi.checkRelay({ id: r.id, ...(wantsReach(r) ? { reverseReach: true } : {}) })).relay!;
-    } catch (e) {
-      const ce = ConnectError.from(e);
-      const free = errorCode(ce.rawMessage) === "port_taken" ? Number(errorVars(ce.rawMessage).free) || 0 : 0;
-      set(c.inboundId, { leg: "skipped", path: null, tone: "bad", text: errorText(e, t), free });
-      return;
-    }
-    const leg = r.check?.leg;
-    const reach = r.check?.reverseReach;
-    const reachLook = reach?.status ? (lookOf(reach) ?? "skipped") : null;
-    const legOk = leg?.status === "ok";
-    const bridgeOk = blockedOf(r) === "" && reach?.status === "ok";
-    const m = modeOf(r);
-    // direct, bridge, or either: what the check found is enough to go on
-    const usable = m === "dnat" ? legOk : m === "reverse" ? bridgeOk : legOk || bridgeOk;
-    const viaBridge = m === "reverse" || (m === "auto" && !legOk && bridgeOk);
-    // the panel's refusal of a switch-on names the bridge's code beside the leg's: both failed
-    const withBridge = (reason: string, code?: string) => (code ? t("relay.why.both", { reason, bridge: reachReason(t, { code, port: 0 }, pair) }) : reason);
-    if (!usable) {
-      const direct = leg ? stageReason(t, "leg", leg, namesOf(r)) : t("relay.why.leg", { ...names, port: c.port, net: c.network });
-      const reason = m === "reverse" ? (reach ? reachReason(t, reach, pair) : direct) : m === "auto" && reach?.status === "fail" ? t("relay.why.both", { reason: direct, bridge: reachReason(t, reach, pair) }) : direct;
-      set(c.inboundId, { leg: legOk ? "ok" : "fail", reach: reachLook, path: on ? "skipped" : null, tone: "bad", text: t(on ? "relay.dlg.result.fail" : "relay.dlg.result.failCheck", { reason }) });
-      return;
-    }
-    if (!on) {
-      set(c.inboundId, { leg: legOk ? "ok" : "fail", reach: reachLook, soft: !legOk, tone: "ok", text: viaBridge && !legOk ? t("relay.dlg.result.checkedBridge", pair) : t("relay.dlg.result.checked") });
-      return;
-    }
-    set(c.inboundId, { leg: legOk ? "ok" : "fail", reach: reachLook, soft: !legOk, bridge: viaBridge ? "running" : null, path: viaBridge ? "waiting" : "running" });
-    try {
-      const done = plain(await relaysApi.updateRelay({ id: r.id, enabled: true })).relay;
-      if (!hadLane) {
-        markFresh("lane", `${c.nodeId}:via:${entry.id}`); // on the exit's page ...
-        markFresh("lane", `${entry.id}:out:${c.nodeId}`); // ... and on the entry's
-      }
-      // what the panel settled on, else what the check said
-      const bridged = done ? activeOf(done) === "reverse" : viaBridge;
-      set(c.inboundId, { bridge: bridged ? "ok" : null, path: "ok", tone: "ok", text: t(bridged ? "relay.dlg.result.onBridge" : "relay.dlg.result.on", { via: viaLabel(t, entry.cc), hours }) });
-      onSuccess?.();
-    } catch (e) {
-      const ce = ConnectError.from(e);
-      const v = errorVars(ce.rawMessage);
-      const failed = ce.code === Code.FailedPrecondition && errorCode(ce.rawMessage) === "relay_check_failed";
-      // the stage that failed: the leg (and the bridge's reach beside it), the bridge, or the path from outside
-      const stage = v.stage === "leg" || v.stage === "reverse_reach" || v.stage === "bridge" ? v.stage : "path";
-      const reason = !failed
-        ? errorText(e, t)
-        : stage === "bridge"
-          ? bridgeReason(t, { code: v.code ?? "" }, pair)
-          : stage === "reverse_reach"
-            ? reachReason(t, { code: v.code ?? "", port: 0 }, pair)
-            : withBridge(stageReason(t, stage, { code: v.code ?? "", verdict: "", sent: 0, got: 0 }, namesOf(r)), stage === "leg" ? v.reverse_reach : undefined);
-      set(c.inboundId, { bridge: stage === "bridge" ? "fail" : viaBridge ? "ok" : null, path: stage === "bridge" ? "skipped" : "fail", tone: "bad", text: failed ? t("relay.dlg.result.fail", { reason }) : reason });
-    }
-  };
+  /** Makes the relay (off) in the chosen way, checks it and, with `on`, switches it on (relay-run.ts); one server of the run. */
+  const one = (c: Candidate, on: boolean, port: string) => runOne({ t, qc, entry, hours, way, onSuccess }, c, on, port, (run) => set(c.inboundId, run));
 
   /** Runs the picked servers, or `only` one again (on another port: "Take 8444"). */
   const go = async (on: boolean, only?: Candidate, port?: string) => {

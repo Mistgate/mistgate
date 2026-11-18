@@ -1,7 +1,7 @@
 import "./ways.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Switch } from "@/components/ui/switch";
 import { useIsOwner } from "@/lib/updates";
@@ -20,6 +20,7 @@ import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import { prefersReducedMotion, useEffectsEnabled } from "@/lib/effects";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
@@ -123,6 +124,33 @@ export function usePortCheck(nodeId: string) {
   });
 }
 export type PortCheck = ReturnType<typeof usePortCheck>;
+
+/** The pause between two rows when an answer is read out row by row (the board's 560 ms, a little quicker). */
+export const REVEAL_MS = 420;
+
+/**
+ * The board checks the ports one row after another. The panel answers once, so with the effects on the answer is read out row by row
+ * after it came: the row at `now` shows "checking", the ones before it their result with a short arrival, the ones after wait. -1 is
+ * no reading (the effects are off or the motion reduced: the table shows the answer at once). `at` is the run's `submittedAt`, 0 before one.
+ */
+export function useRowReveal(at: number, rows: number): number {
+  const fx = useEffectsEnabled();
+  const [now, setNow] = useState(-1);
+  const count = useRef(rows);
+  count.current = rows;
+  useEffect(() => {
+    if (!at || !fx || prefersReducedMotion() || count.current < 1) return;
+    setNow(0);
+    const id = setInterval(() => setNow((k) => (k + 1 >= count.current ? (clearInterval(id), -1) : k + 1)), REVEAL_MS);
+    return () => {
+      clearInterval(id);
+      setNow(-1);
+    };
+    // one reading per run
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [at]);
+  return now;
+}
 
 /** "Check ports", for those who may run it (owner, helper); off while the agent is not on the line. */
 export function CheckPortsButton({
@@ -347,6 +375,8 @@ export function Ports({
     });
   const udpRows = table.filter((r) => r.net === "udp");
   const tcpRows = table.filter((r) => r.net === "tcp");
+  // the answer of a run read out row by row (with the effects on): `reveal` is the row being "checked"
+  const reveal = useRowReveal(run.isSuccess ? run.submittedAt : 0, table.length);
   // two servers on one port share the check: its words stand on the first row
   const seen = new Set<string>();
   const firstOf = (r: PortRow) => {
@@ -360,7 +390,9 @@ export function Ports({
     const lead = firstOf(r);
     const c = r.check;
     const tc = r.tcp;
-    const pill = c
+    const at = table.indexOf(r);
+    const phase = reveal < 0 ? "" : at === reveal ? "now" : at > reveal ? "wait" : "got";
+    const pill = phase === "now" ? { kind: "busy" as StatusKind, label: t("ports.checking") } : c
       ? verdictPill(t, c)
       : tc
         ? tcpPill(t, tc.verdict)
@@ -413,7 +445,7 @@ export function Ports({
     return (
       <li
         key={r.key}
-        className={cx("wy-po", i && !i.directInSubscriptions && "off")}
+        className={cx("wy-po", i && !i.directInSubscriptions && "off", phase)}
         data-testid="port-row"
       >
         <span className="tg">
@@ -459,7 +491,7 @@ export function Ports({
                 />
                 {pill.label}
               </span>
-              <span className="dt">
+              <span className={cx("dt", phase === "now" && "hidden")}>
                 {runs && (
                   <Runs runs={runs} filtered={filtered} quiet={blocked} />
                 )}

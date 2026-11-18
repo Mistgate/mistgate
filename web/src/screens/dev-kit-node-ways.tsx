@@ -4,6 +4,7 @@ import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { checksQuery, doctorQuery } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
 import { relaysQuery } from "@/lib/relay";
+import { waysDemo } from "./node/ways-demo";
 
 // Development only. The scenes of the node page's Ways in tab, /dev-kit?only=nodepage-frame&tab=ways&w=<scene>: the states of the board's
 // PnNode switches, each a page of its own. The parameters (all optional, names as the board's switches):
@@ -13,6 +14,10 @@ import { relaysQuery } from "@/lib/relay";
 //   set=all|norl|nov6|dir  the ways de1 has: all, no relay, no IPv6 entry, direct only
 //   cas=<cascade>     how the relays work: "" (forwarding), br, back, manual, near, full, udp, fwd, port, drop, stale, nobr, unk, none
 //   cause=<break>     a broken relay server: fw, old, leg, out, taken, down, gate, br
+//   err=<code>        the word of the agent about the bridge (connect, pin_mismatch, no_verification, tls_protocol, connection_limit, pair_timeout,
+//                     target_connect, identity_unavailable, site_listen_failed, bad_config, closed): a pair on the bridge with that problem
+//   read=1            the panel could not read the relays the last time (the cascade's "read error")
+//   edit=port|mode    the editor of the first server's port or method open under its row
 //   extra=spb1        a second entry for de1; pairs=2|3|4 the exits of msk1
 //   way=<lane>        the open way (?way= of the page), view=graph|list, map=1
 // Made-up data: nodes de1, nl1, fi1, msk1, spb1, the networks Operator A to D.
@@ -29,6 +34,9 @@ export type WaysScene = {
   cause: string;
   extra: string;
   pairs: number;
+  err: string;
+  read: boolean;
+  edit: "" | "port" | "mode";
 };
 
 export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
@@ -40,6 +48,9 @@ export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
   cause: p.get("cause") ?? "",
   extra: p.get("extra") ?? "",
   pairs: Math.min(4, Math.max(1, Number(p.get("pairs") ?? 3))),
+  err: p.get("err") ?? "",
+  read: p.get("read") === "1",
+  edit: p.get("edit") === "port" || p.get("edit") === "mode" ? (p.get("edit") as "port" | "mode") : "",
 });
 
 const NETS = ["Operator A", "Operator B", "Operator C", "Operator D"];
@@ -72,8 +83,11 @@ const relayOf = (entry: { id: string; name: string }, exit: { id: string; name: 
   return { ...base, ...over };
 };
 
+/** The words an agent says that are no failure of the bridge: it holds, or will in a while. */
+const waiting = ["no_verification", "connection_limit", "closed"];
+
 /** The cascade's states of the board, as relay messages for the pair entry → exit. */
-function pairRelays(entry: { id: string; name: string }, exit: { id: string; name: string; ip: string }, cas: string, cause: string): Relay[] {
+function pairRelays(entry: { id: string; name: string }, exit: { id: string; name: string; ip: string }, cas: string, cause: string, err = ""): Relay[] {
   const v = relayOf(entry, exit, "vless");
   const h = relayOf(entry, exit, "hy2");
   const legDown = (r: Relay, over: Relay = {}): Relay => ({ ...r, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout", verdict: "timeout" }), ...over } });
@@ -82,6 +96,11 @@ function pairRelays(entry: { id: string; name: string }, exit: { id: string; nam
     activeMode: "reverse", modeReason: "leg_failed", modeChangedUnix: NOW - 3 * 3600, directStreak: 1, reverseBlocked: "", bridge: bridgeOf(b),
   });
   let rs: Relay[] = [v, h];
+  // a bridge with the agent's word about it: a failure (it does not hold) or a pause (it holds and will in a while)
+  if (err) {
+    const bad = !waiting.includes(err);
+    return [bad ? { ...onBridge(v, { connected: false, error: err }), check: { ...(onBridge(v).check as object), ok: false, stage: "bridge", bridge: stage({ status: "fail", code: err }) } } : onBridge(v, { error: err }), h];
+  }
   switch (cas) {
     case "br":
       rs = [onBridge(v), h];
@@ -164,11 +183,17 @@ const EXITS = [
   { id: de1.id, name: "de1", ip: de1.ip },
 ];
 
+/** The relays were read before, and the last read failed: the data stays, the query says it is in error. */
+function unread(qc: QueryClient, nodeId: string) {
+  qc.getQueryCache().find({ queryKey: relaysQuery(nodeId).queryKey })?.setState({ status: "error", error: new Error("read"), fetchStatus: "idle", errorUpdateCount: 1, errorUpdatedAt: Date.now() } as never);
+}
+
 /** Seeds the scene's queries into `qc` and returns the page data of the node it is about (de1, or msk1 for an entry). */
 export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: WaysScene, nodeStatus: NodeStatus): Record<string, unknown> {
   const msk1 = { id: "nod_msk1", name: "msk1" };
   const spb1 = { id: "nod_spb1", name: "spb1" };
   // the fleet: every node the tab names
+  waysDemo.current = sc.edit ? { edit: sc.edit } : undefined;
   const base = qc.getQueryData(nodesQuery.queryKey) as { nodes: Record<string, unknown>[] };
   const own = base.nodes[0]!;
   const fleet = [own, ...NODE_SPEC.map((n) => ({ ...own, ...n, status: NodeStatus.ONLINE }))];
@@ -183,7 +208,7 @@ export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: Way
     const relays: Relay[] = !withRelay
       ? []
       : [
-          ...pairRelays(msk1, de1, sc.cas, sc.cause).map((r) => (sc.ways === "bad" ? { ...r, state: InboundState.FAILED, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout" }) } } : r)),
+          ...pairRelays(msk1, de1, sc.cas, sc.cause, sc.err).map((r) => (sc.ways === "bad" ? { ...r, state: InboundState.FAILED, check: { ...(r.check as object), ok: false, stage: "leg", leg: stage({ status: "fail", code: "timeout" }) } } : r)),
           ...(sc.extra === "spb1" ? pairRelays(spb1, de1, "", "").slice(0, 1) : []),
         ];
     qc.setQueryData(relaysQuery("nod_de1").queryKey, relays as never);
@@ -202,13 +227,15 @@ export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: Way
       { nodeId: "nod_de1", port: 80, verdict: "ours", role: "acme", profile: "", checkedUnix: NOW - 11 * MIN, sender: "fi1", reason: "", alpn: false },
     ];
     if (sc.set === "dir") qc.setQueryData(relaysQuery("nod_de1").queryKey, [] as never);
+    if (sc.read) unread(qc, "nod_de1");
     return data;
   }
 
   // an entry: msk1 passes several exits on
   const list = (sc.pairs === 4 ? EXITS : EXITS.slice(0, sc.pairs)).map((x, i) => ({ x, cas: i === 0 ? sc.cas : i === 1 ? "br" : "", cause: i === 0 ? sc.cause : i === 2 ? "leg" : "" }));
-  const relays = list.flatMap(({ x, cas, cause }) => pairRelays(msk1, x, cas, cause));
+  const relays = list.flatMap(({ x, cas, cause }, i) => pairRelays(msk1, x, cas, cause, i === 0 ? sc.err : ""));
   qc.setQueryData(relaysQuery("nod_msk1").queryKey, relays as never);
+  if (sc.read) unread(qc, "nod_msk1");
   qc.setQueryData(checksQuery("nod_msk1").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [rowsOf("nod_msk1")], countryChecks: checks } as never);
   qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: checks } as never);
   qc.setQueryData(doctorQuery("nod_msk1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_msk1", nodeName: "msk1", nodeStatus, agentSupported: true, hasReport: true, receivedUnix: NOW - 5 * MIN, ageS: 300, stale: false, items: [] }] } as never);
@@ -250,6 +277,23 @@ export const waysFrames: { id: string; title: string; q: string; w: number; h: n
   { id: "ways-cause-out", title: "A broken server: nothing comes from outside", q: "w=1&cause=out&way=via:nod_msk1", w: 1440, h: 1900 },
   { id: "ways-cause-gate", title: "A server that was not checked: it cannot be turned on yet", q: "w=1&cause=gate&way=via:nod_msk1", w: 1440, h: 1900 },
   { id: "ways-cause-br", title: "A broken server on the bridge", q: "w=1&cas=br&cause=br&way=via:nod_msk1", w: 1440, h: 1900 },
+  ...[
+    ["connect", "The bridge does not hold: the exit cannot connect to the entry"],
+    ["pin_mismatch", "The bridge does not hold: the certificate of the entry's site does not match"],
+    ["no_verification", "The bridge waits for the pin of the entry's certificate (a quiet line)"],
+    ["tls_protocol", "The bridge does not hold: something else answers on the bridge port"],
+    ["connection_limit", "The bridge is at its limit of connections from the exit (a warning, it passes by itself)"],
+    ["pair_timeout", "The bridge loses people's connections: the second half did not come in 5 s"],
+    ["target_connect", "The bridge does not hold: the server on the exit does not take the bridge's connections"],
+    ["identity_unavailable", "The bridge does not hold: the agent has no node certificate yet"],
+    ["site_listen_failed", "The bridge does not hold: the bridge site did not come up on the entry"],
+    ["bad_config", "The bridge does not hold: the panel sent bad bridge settings"],
+    ["closed", "The bridge is restarting (a quiet line)"],
+  ].map(([code, title]) => ({ id: `ways-err-${code}`, title: `Bridge error: ${title}`, q: `w=1&err=${code}&way=via:nod_msk1`, w: 1440, h: 1900 })),
+  { id: "ways-cas-err", title: "Cascade: the panel could not read the relays, one line and Try again", q: "w=1&read=1&cas=br&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-edit-port", title: "A server's row with the port editor open under it", q: "w=1&edit=port&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-edit-mode", title: "A server's row with the method editor open under it", q: "w=1&edit=mode&way=via:nod_msk1", w: 1440, h: 1900 },
+  { id: "ways-entry-err", title: "Entry: the bridge of nl1 is down, the exit cannot reach the entry", q: "w=1&role=entry&err=connect&way=out:nod_nl1", w: 1440, h: 2000 },
   { id: "ways-entry", title: "Entry: msk1 passes three exits (the list)", q: "w=1&role=entry", w: 1440, h: 1700 },
   { id: "ways-entry-graph", title: "Entry: the graph", q: "w=1&role=entry&view=graph", w: 1440, h: 1700 },
   { id: "ways-entry-four", title: "Entry: four exits", q: "w=1&role=entry&pairs=4", w: 1440, h: 1700 },

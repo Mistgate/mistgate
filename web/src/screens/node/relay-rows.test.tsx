@@ -297,3 +297,124 @@ describe("the way and the measurements of a pair", () => {
     expect(document.querySelectorAll("button")).toHaveLength(0);
   });
 });
+
+describe("the bridge's problem, by what the agent said", () => {
+  const down = (code: string) => bridged({ bridge: bridge({ connected: false, error: code }), check: check({ ok: false, stage: "bridge", leg: stage({ status: "fail", code: "timeout" }), reverseReach: stage({ port: 8443 }), bridge: stage({ status: "fail", code }) }) });
+  // code -> tone class, the button or the link, where the link goes
+  const table: [string, "crit" | "mut" | "warn", string | null, string?][] = [
+    ["connect", "crit", "Check de1 → msk1"],
+    ["pin_mismatch", "crit", "Check again"],
+    ["tls_protocol", "crit", "Open the profiles of msk1", "nod_msk1:profiles"],
+    ["pair_timeout", "crit", "Check the speed"],
+    ["target_connect", "crit", "Open the profiles of de1", "nod_de1:profiles"],
+    ["identity_unavailable", "crit", "Open “Server”", "nod_de1:server"],
+    ["site_listen_failed", "crit", "Open the Doctor of msk1", "nod_msk1:doctor"],
+    ["bad_config", "crit", "Check again"],
+  ];
+  it.each(table)("%s: a %s line with %s", async (code, tone, action, to) => {
+    listRelays.mockResolvedValue({ relays: [down(code)] });
+    await mount(<Pair />);
+    const note = section("pair-way").querySelector<HTMLElement>(".wy-plt")!;
+    expect(note.classList.contains("crit")).toBe(tone === "crit");
+    expect(note.querySelector("small")?.textContent).toBe(code);
+    const target = [...note.querySelectorAll("button, a")].find((x) => x.textContent === action);
+    expect(target).toBeDefined();
+    if (to) {
+      const [id, tab] = to.split(":");
+      expect(JSON.parse(target!.getAttribute("data-params")!)).toEqual({ id });
+      expect(JSON.parse(target!.getAttribute("data-search")!)).toEqual({ tab });
+    }
+  });
+
+  it("a word that is no failure (a pin to wait for, a limit of connections, a restart) is a quiet line without a button, even when the bridge is held", async () => {
+    for (const [code, mut, said] of [["no_verification", true, "Passes by itself"] as const, ["connection_limit", false, "Passes by itself within minutes"] as const, ["closed", true, "The bridge is restarting"] as const]) {
+      listRelays.mockResolvedValue({ relays: [bridged({ bridge: bridge({ error: code }) })] });
+      await mount(<Pair />);
+      const note = section("pair-way").querySelector<HTMLElement>(".wy-plt")!;
+      expect(note.classList.contains("mut"), code).toBe(mut);
+      expect(note.classList.contains("crit"), code).toBe(false);
+      expect(note.textContent?.toLowerCase(), code).toContain(said.toLowerCase());
+      expect(note.querySelector("button, a"), code).toBeNull();
+      act(() => root?.unmount());
+      host?.remove();
+    }
+  });
+
+  it("when the panel could not read the relays the block keeps one line and a way to ask again", async () => {
+    const retry = vi.fn();
+    listRelays.mockResolvedValue({ relays: [bridged()] });
+    await mount(<ReadFailed onRetry={retry} />);
+    const way = section("pair-way");
+    expect(way.querySelectorAll(".wy-plt")).toHaveLength(1);
+    expect(way.textContent).toContain("Could not read the state of the bridge");
+    expect(way.querySelector(".wy-kv")).toBeNull();
+    await click(buttonIn(way, "Try again"));
+    expect(retry).toHaveBeenCalled();
+  });
+});
+
+function ReadFailed({ onRetry }: { onRetry: () => void }) {
+  const q = useQuery(relaysQuery("nod_msk1"));
+  const runs = useRelayRuns();
+  const rs = (q.data ?? []) as RelayMsg[];
+  if (rs.length === 0) return null;
+  return <PairWay rs={rs} entry="msk1" exit="de1" cc="RU" runs={runs} nowS={now} readError onRetry={onRetry} />;
+}
+
+describe("the editors under a server's row", () => {
+  const type = async (input: HTMLInputElement, value: string) => {
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  const editor = () => document.querySelector<HTMLElement>("[data-testid=relay-port-editor]")!;
+
+  it("Change port… opens a field in the row, not a window, with what it does to people", async () => {
+    listRelays.mockResolvedValue({ relays: [relay()] });
+    await mount(<Rows />);
+    await menuItem(rowOf("VLESS · TCP"), "Change port…");
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    expect(editor().textContent).toContain("Port on msk1");
+    expect(editor().textContent).toContain("People get the new port with the next subscription update");
+    expect(editor().querySelector<HTMLInputElement>("input")!.value).toBe("8443");
+    // the port it has is no change
+    expect(buttonIn(editor(), "Change")?.disabled).toBe(true);
+    // typing the port it has says it is the current one
+    await type(editor().querySelector<HTMLInputElement>("input")!, "844");
+    await type(editor().querySelector<HTMLInputElement>("input")!, "8443");
+    expect(editor().textContent).toContain("This is the current port");
+  });
+
+  it("a number that is not a port says so in the hint's place, and a good one is sent", async () => {
+    listRelays.mockResolvedValue({ relays: [relay()] });
+    updateRelay.mockResolvedValue({ relay: relay({ port: 8444 }) });
+    await mount(<Rows />);
+    await menuItem(rowOf("VLESS · TCP"), "Change port…");
+    const input = () => editor().querySelector<HTMLInputElement>("input")!;
+    await type(input(), "70000");
+    expect(editor().textContent).toContain("A number from 10 to 65535");
+    expect(editor().textContent).not.toContain("People get the new port");
+    expect(buttonIn(editor(), "Change")?.disabled).toBe(true);
+    await type(input(), "8444");
+    expect(buttonIn(editor(), "Change")?.disabled).toBe(false);
+    await click(buttonIn(editor(), "Change"));
+    await settle();
+    expect(updateRelay).toHaveBeenCalledWith({ id: "rly_1", port: 8444 });
+    expect(document.querySelector("[data-testid=relay-port-editor]")).toBeNull();
+  });
+
+  it("a port the panel refuses says why, in words, and the field stays", async () => {
+    listRelays.mockResolvedValue({ relays: [relay()] });
+    updateRelay.mockRejectedValue(new ConnectError("port_taken: free=8445", Code.AlreadyExists));
+    await mount(<Rows />);
+    await menuItem(rowOf("VLESS · TCP"), "Change port…");
+    await type(editor().querySelector<HTMLInputElement>("input")!, "8444");
+    await click(buttonIn(editor(), "Change"));
+    await settle();
+    expect(editor().querySelector("[role=alert]")).not.toBeNull();
+    await click(buttonIn(editor(), "Cancel"));
+    expect(document.querySelector("[data-testid=relay-port-editor]")).toBeNull();
+  });
+});

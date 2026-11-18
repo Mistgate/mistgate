@@ -116,6 +116,48 @@ export function bridgeErrorText(t: T, code: string, n: { entry: string; exit: st
   return t(key, { ...n, code });
 }
 
+// ---- what the bridge's problem is and what is done about it (the board's "Ошибка моста": one line, its tone and its button) ----
+
+/** The button under a bridge problem: check again, check the speed, or open the page that holds the fix. */
+export type BridgeAction = "check" | "recheck" | "speed" | "profilesEntry" | "profilesExit" | "server" | "doctorEntry";
+/**
+ * `crit`: the bridge does not hold, the line starts "The bridge is down:" (`head` false: the sentence says it itself); `warn` and
+ * `mut` are a bridge that holds or will in a while (a limit, a pin to wait for, a restart): no head, no button, it passes on its own.
+ */
+export type BridgeProblem = { tone: "crit" | "warn" | "mut"; head: boolean; /** The sentence starts with "the bridge" in small letters, and stands on its own: it gets a capital. */ capital?: boolean; action?: BridgeAction };
+
+/** The words of an agent that are no failure of the bridge: a pause, not a problem. */
+const waiting: Record<string, BridgeProblem> = {
+  no_verification: { tone: "mut", head: false },
+  closed: { tone: "mut", head: false, capital: true },
+  connection_limit: { tone: "warn", head: false },
+};
+const actions: Record<string, BridgeAction> = {
+  pin_mismatch: "recheck",
+  bad_config: "recheck",
+  target_not_local: "recheck",
+  tls_protocol: "profilesEntry",
+  tls_exporter: "profilesEntry",
+  http2: "profilesEntry",
+  pair_timeout: "speed",
+  target_connect: "profilesExit",
+  identity_unavailable: "server",
+  site_listen_failed: "doctorEntry",
+  site_certificate_unavailable: "doctorEntry",
+  port_conflict: "doctorEntry",
+  timeout_unsupported: "doctorEntry",
+};
+
+/** Whether the code is one of the quiet waiting states: shown even when the bridge has not failed. */
+export const bridgeWaits = (code: string): boolean => code in waiting;
+
+/** The tone and the button of an agent's word for the bridge; a word that is not known is a bridge that is down, with "check". */
+export function bridgeProblem(code: string): BridgeProblem {
+  const w = waiting[code];
+  if (w) return w;
+  return { tone: "crit", head: code !== "pair_timeout", capital: code === "pair_timeout", action: actions[code] ?? "check" };
+}
+
 /** Why the exit's check towards the entry's bridge failed or was skipped ("reverse_reach"), as a fragment. */
 export function reachReason(t: T, s: Pick<Stage, "code" | "port">, n: { entry: string; exit: string }): string {
   const vars = { ...n, port: s.port || 443 };
