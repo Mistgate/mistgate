@@ -945,13 +945,13 @@ describe("What's new", () => {
     ...over,
   });
   // the notes belong to the panel's own tab (the board has no "What's new" on the agents tab)
-  const update = { version: "v0.1.40", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.1.40", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
+  const releaseUpdate = { version: "v0.1.40", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.1.40", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
   const behind = (over: Record<string, unknown> = {}) => {
     route.search = { tab: "panel" };
     return page({
       bundle: bundle({ version: "v0.1.40" }),
       nodes: [node({ nodeId: "nod_1", name: "de1", version: "v0.1.37", state: NodeUpdateState.OUTDATED })],
-      panel: { ...page().panel, update },
+      panel: { ...page().panel, update: releaseUpdate },
       panelNotes: [note("v0.1.40"), note("v0.1.39"), note("v0.1.38")],
       ...over,
     });
@@ -1005,7 +1005,7 @@ describe("What's new", () => {
   });
 
   it("shows the panel's notes in the panel card, only for a verified release", async () => {
-    const update = { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
+    const releaseUpdate = { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
     await mount(page({ panel: { ...page().panel, update }, panelNotes: [note("v0.3.0", { en: "- Panel thing." }), note("v0.2.5")] }));
     expect(text()).toContain("Panel thing.");
     expect(text()).toContain("and 1 earlier version");
