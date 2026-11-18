@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ConnectError, Code } from "@connectrpc/connect";
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
@@ -228,7 +227,6 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
     onSuccess: () => {
       setEdit(false);
       setProblem("");
-      halo("save");
       toast(t("dz.t.saved"));
       invalidate();
     },

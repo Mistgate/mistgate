@@ -2,7 +2,6 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
@@ -165,7 +164,6 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
       .then(() => {
         setDone(true);
         toast(t("subs.saved"));
-        halo("save");
       })
       .catch((e: unknown) => {
         onShown();

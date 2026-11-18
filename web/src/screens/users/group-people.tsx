@@ -2,7 +2,6 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Scramble } from "@/components/fx/scramble-react";
-import { useListEntrance } from "@/components/fx/page";
 import { Avatar } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -216,7 +215,7 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
 const cols =
   "grid grid-cols-[minmax(200px,1.6fr)_112px_minmax(160px,1fr)_96px_minmax(120px,0.8fr)_32px] items-center gap-4 px-6 max-[1040px]:grid-cols-[minmax(0,1.6fr)_64px_minmax(130px,1fr)_88px_32px] max-md:grid-cols-[minmax(0,1fr)_104px_32px] max-md:gap-2.5 max-md:px-4";
 
-function Member({ u, group, groups, manage, fresh, open0, style, onMove, t, fmt, now }: { u: UserN; open0?: boolean; group: Group; groups: readonly Group[]; manage: boolean; fresh: boolean; style?: CSSProperties; onMove: (u: UserN, to: Group) => void; t: Tx; fmt: ReturnType<typeof useFmt>; now: number }) {
+function Member({ u, group, groups, manage, fresh, open0, onMove, t, fmt, now }: { u: UserN; open0?: boolean; group: Group; groups: readonly Group[]; manage: boolean; fresh: boolean; onMove: (u: UserN, to: Group) => void; t: Tx; fmt: ReturnType<typeof useFmt>; now: number }) {
   const status = shownStatus(u);
   const expired = u.status === UserStatus.EXPIRED || (u.expiresUnix > 0 && u.expiresUnix <= now);
   const left = daysLeft(u.expiresUnix, now);
@@ -226,7 +225,7 @@ function Member({ u, group, groups, manage, fresh, open0, style, onMove, t, fmt,
   const live = u.online && !expired;
   const others = groups.filter((g) => g.id !== group.id);
   return (
-    <div style={style} className={cx(cols, "min-h-[60px] border-t border-line transition-colors duration-150 ease-(--e) hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]", fresh && "grp-fresh")}>
+    <div className={cx(cols, "min-h-[60px] border-t border-line transition-colors duration-150 ease-(--e) hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]", fresh && "grp-fresh")}>
       <Link to="/users/$id" params={{ id: u.id }} className="group/n flex min-w-0 items-center gap-3 text-inherit no-underline">
         <Avatar name={u.name} index={avatarIndex(u.name)} size={32} />
         <span className="flex min-w-0 flex-col">
@@ -338,7 +337,6 @@ export function PeopleTab({ group, groups, manage, pick, setPick, demo }: { grou
     refetchInterval: 10_000,
     placeholderData: keepPreviousData,
   });
-  const entrance = useListEntrance(list.data !== undefined);
   const rows = useMemo(() => list.data?.users ?? [], [list.data]);
   const total = list.data?.counts?.all ?? 0;
   const page = clampPage(paging.page, total, paging.size);
@@ -388,7 +386,7 @@ export function PeopleTab({ group, groups, manage, pick, setPick, demo }: { grou
           <span />
         </div>
         {rows.map((u, i) => (
-          <Member key={u.id} u={u} group={group} groups={groups} manage={manage} fresh={fx && fresh.has(u.id)} open0={demo?.menu === true && i === 1} style={entrance(i)} onMove={askMove} t={t} fmt={fmt} now={now} />
+          <Member key={u.id} u={u} group={group} groups={groups} manage={manage} fresh={fx && fresh.has(u.id)} open0={demo?.menu === true && i === 1} onMove={askMove} t={t} fmt={fmt} now={now} />
         ))}
       </>
     );

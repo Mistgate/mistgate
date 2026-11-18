@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
@@ -75,7 +74,6 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
       }),
     onSuccess: () => {
       toast(t("ai.set.saved"));
-      halo("save");
       void qc.invalidateQueries({ queryKey: ["assistant"] });
     },
     onError: (e) => toast.error(t((assistantErrorKey(e) ?? "") as MessageKey) || errorText(e, t)),
@@ -389,7 +387,6 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
             setJust(true);
             setTimeout(() => setJust(false), 1600);
             toast(t("aip.prov.connectedToast", { name }));
-            halo("save");
             void qc.invalidateQueries({ queryKey: ["assistant"] });
           }}
         />

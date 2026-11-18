@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { halo } from "@/components/fx/halo";
 import { Flag } from "@/components/ui/flag";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
@@ -89,7 +88,6 @@ function GivesCard({ group, manage, demo }: { group: Group; manage: boolean; dem
       setOk(true);
       setTimeout(() => setOk(false), 2400);
       toast(t("users.groupSaved", { name: group.name }));
-      halo("save");
     },
     onError: (e) => setError(errorText(e, t)),
   });
@@ -207,7 +205,6 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
       setOk(true);
       setTimeout(() => setOk(false), 2400);
       toast(t("users.groupSaved", { name: group.name }));
-      halo("save");
     },
     onError: (e) => {
       const node = heldNodeOf(e);
@@ -332,7 +329,6 @@ function DnsCard({ group, manage }: { group: Group; manage: boolean }) {
     onSuccess: async () => {
       await Promise.all(every.map((k) => qc.invalidateQueries({ queryKey: [k] })));
       toast(t("users.groupSaved", { name: group.name }));
-      halo("save");
     },
     onError: (e) => setError(errorText(e, t)),
     onSettled: () => setSel(null),

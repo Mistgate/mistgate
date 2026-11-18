@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { ProfileSummary, ProtocolInfo } from "@/gen/mistgate/admin/v1/profile_pb";
 import { Fresh } from "@/components/fx/fresh";
-import { useListEntrance } from "@/components/fx/page";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { cx } from "@/lib/cx";
@@ -47,7 +46,6 @@ export function ProfilesScreen({ demo }: { demo?: ProfilesDemo } = {}) {
   const groups = useQuery(groupsQuery);
   const people = useQuery(userCountQuery);
   const servers = useServers(list.data);
-  const entrance = useListEntrance(list.data !== undefined && groups.data !== undefined && protocols.data !== undefined);
   // the box is the reader's own; the URL mirrors it (replace: no history entry per letter)
   const [q, setQ] = useState(search.q ?? "");
   const [open, setOpen] = useState(demo?.open ?? "");
@@ -172,8 +170,8 @@ export function ProfilesScreen({ demo }: { demo?: ProfilesDemo } = {}) {
             <span />
           </div>
           <div role="list" aria-label={t("profiles.title")} className="pv-rows">
-            {shown.map((p, i) => (
-              <Row key={p.id} style={entrance(i)} p={p} t={t} protocol={protoOf(p.protocol)} groups={groupsOf(p.id)} servers={servers} owner={owner} />
+            {shown.map((p) => (
+              <Row key={p.id} p={p} t={t} protocol={protoOf(p.protocol)} groups={groupsOf(p.id)} servers={servers} owner={owner} />
             ))}
           </div>
           {shown.length === 0 && <NoFind t={t} onReset={reset} />}
@@ -373,7 +371,7 @@ function Where({ p, cells, servers, owner, t }: { p: ProfileSummary; cells: PCel
  * the count of remarks (the words in a tooltip, on hover and on focus) and a chevron. The name is the row's link; its ::after
  * covers the row, the remarks cell stays over it so its tooltip can be reached.
  */
-function Row({ p, t, protocol, groups, servers, owner, style }: { p: ProfileSummary; t: Tx; protocol?: ProtocolInfo; groups: readonly { id: string; name: string }[]; servers: Servers; owner: boolean; style?: CSSProperties }) {
+function Row({ p, t, protocol, groups, servers, owner }: { p: ProfileSummary; t: Tx; protocol?: ProtocolInfo; groups: readonly { id: string; name: string }[]; servers: Servers; owner: boolean }) {
   const kind = kindOf(p.protocol);
   const cells = servers.cells(p.id);
   const { w, title } = words(p, protocol, t);
@@ -382,7 +380,7 @@ function Row({ p, t, protocol, groups, servers, owner, style }: { p: ProfileSumm
   const worst = worstOf(remarks.map((r) => r.g));
   const tip = useId();
   return (
-    <Fresh kind="profile" id={p.id} role="listitem" style={style} className="pv-r">
+    <Fresh kind="profile" id={p.id} role="listitem" className="pv-r">
       <span className="pv-n">
         <Mark k={kind} />
         <span>

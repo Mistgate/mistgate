@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { useToast } from "@/components/ui/toast";
 import { errorText } from "@/lib/errors";
 import { useTx } from "@/screens/users/t";
@@ -42,7 +41,6 @@ export function DeviceIdleCard({ settings }: { settings: Settings }) {
       () => {
         setDraft(null);
         toast(t("subs.saved"));
-        halo("save");
       },
       (e: unknown) => toast.error(errorText(e, t)),
     );

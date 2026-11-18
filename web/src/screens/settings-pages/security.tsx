@@ -1,7 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { halo } from "@/components/fx/halo";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -126,7 +125,6 @@ function AddPasskey({ demo, onClose }: { demo?: SecurityDemo["add"]; onClose: ()
     onSuccess: () => {
       onClose();
       toast(t("sec.added.toast"));
-      halo("create");
       void qc.invalidateQueries({ queryKey: ["passkeys"] });
     },
     onError: (e) => {

@@ -1,7 +1,6 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { useToast } from "@/components/ui/toast";
 import type { UpdateNodeRequestSchema } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
@@ -84,7 +83,6 @@ export function useSaveSection<T extends Record<string, unknown>>(nodeId: string
         onSuccess: () => {
           form.commit(fields);
           flash();
-          halo("save");
         },
       }),
   };

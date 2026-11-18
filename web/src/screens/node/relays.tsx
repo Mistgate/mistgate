@@ -1,7 +1,6 @@
 import { ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
@@ -171,7 +170,6 @@ export function ChangeRelayPort({ r, onClose }: { r: RelayMsg; onClose: () => vo
       await relaysApi.updateRelay({ id: r.id, port: n });
       onClose();
       toast(t("common.saved"));
-      halo("save");
     } catch (e) {
       setError(e);
     } finally {

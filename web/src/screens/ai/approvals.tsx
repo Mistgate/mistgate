@@ -1,5 +1,4 @@
 import { Fragment, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
 import { Pagination } from "@/components/ui/pagination";
@@ -170,7 +169,6 @@ function Card({ a, data, nowMs, focused }: { a: Approval; data: Approvals; nowMs
               { id: a.id },
               {
                 onSuccess: () => {
-                  halo("save");
                   setDone(true);
                 },
               },

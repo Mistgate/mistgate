@@ -470,11 +470,15 @@
 .pending-delay {
   animation: mg-show 0.16s ease-out 0.22s both;
 }
-/* a list that was waited for appears as one, not row by row */
-@keyframes mg-list-in {
+/* a thing that has just been created (components/fx/fresh.tsx): its row takes the accent's wash and it fades away, as the board's
+   dr-fresh does (18% of the accent, 2.4 s). Only the start is named, so the row ends as it is. */
+@keyframes mg-fresh {
   from {
-    opacity: 0;
+    background-color: color-mix(in srgb, var(--accent-mark) 18%, transparent);
   }
+}
+[data-mg-fresh] {
+  animation: mg-fresh 2.4s var(--e) backwards;
 }
 /* the line of a node's ways in draws itself from people down to the node, once */
 .pop-in {

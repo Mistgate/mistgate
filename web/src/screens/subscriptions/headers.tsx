@@ -1,6 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { QueryError } from "@/components/ui/query-error";
 import { Switch } from "@/components/ui/switch";
@@ -133,7 +132,6 @@ function HeadersForm({ settings, reserved, carry, onCarry }: { settings: Setting
       .then(() => {
         setDone(true);
         toast(t("subs.saved"));
-        halo("save");
       })
       .catch((e: unknown) => {
         onCarry(null);

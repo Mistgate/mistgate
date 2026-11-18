@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState, type ReactNode } from "react";
-import { halo } from "@/components/fx/halo";
 import { markFresh } from "@/components/fx/registry";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
@@ -167,11 +166,10 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
     },
     onSuccess: async (g) => {
       if (!g) return;
-      if (!group) markFresh("group", g.id); // a new group: its card sweeps in once
+      if (!group) markFresh("group", g.id); // a new group: its card is washed once
       // a group change reaches its users' cards, devices and subscription previews, and the profiles' "where it runs"
       await Promise.all(["groups", "users", "subs", "profiles", "nodes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
       toast(t(group ? "users.groupSaved" : "users.groupCreated", { name: g.name }));
-      halo(group ? "save" : "create");
       onCreated?.(g);
       onClose();
     },

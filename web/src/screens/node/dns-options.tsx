@@ -1,6 +1,5 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
-import { halo } from "@/components/fx/halo";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
 import { Pending, QueryError } from "@/components/ui/query-error";
@@ -98,7 +97,6 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
     mutationFn: () => dns.setNodeDnsOptions({ nodeId, ...offer }),
     onSuccess: () => {
       toast(t("common.saved"));
-      halo("save");
       setFlash(true);
       void qc.invalidateQueries({ queryKey: ["dns"] });
       void qc.invalidateQueries({ queryKey: ["users"] }); // a person's pick is "offered" or not by this

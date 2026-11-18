@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { type CSSProperties } from "react";
 import { Fresh } from "@/components/fx/fresh";
 import { Scramble } from "@/components/fx/scramble-react";
 import { Avatar, Check } from "@/components/ui/bits";
@@ -9,7 +8,6 @@ import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
-import type { useListEntrance } from "@/components/fx/page";
 import { avatarIndex, devicesView, groupTone, noAccess, nowSec, seenText, shownStatus, termView, trafficTone, usage, viaOf, type CellTone } from "./format";
 import type { UserN as User } from "./model";
 import { AppLink } from "./nav";
@@ -17,7 +15,6 @@ import { UserExpand } from "./users-expand";
 import { firstDesc, type SortId, type SortState } from "./sort";
 import { useTx, type Tx } from "./t";
 
-type Entrance = ReturnType<typeof useListEntrance>;
 
 // The people table as the redesign board draws it (PnUsers, the us-r rows): one card, a head of sortable columns and a row per
 // person; a click opens the row (the link, the page password, the devices, the quick actions) and, while "Select" is on, ticks
@@ -62,7 +59,6 @@ export function PeopleTable({
   open,
   onOpen,
   manage,
-  entrance,
   busy,
   pager,
   showPager,
@@ -79,7 +75,6 @@ export function PeopleTable({
   open: string;
   onOpen: (id: string) => void;
   manage: boolean;
-  entrance: Entrance;
   /** The next page is on its way: the rows stay, a little paler. */
   busy: boolean;
   pager: Parameters<typeof Pagination>[0];
@@ -117,7 +112,7 @@ export function PeopleTable({
         </div>
       )}
       <div className={cx("transition-opacity duration-200", busy && "opacity-60")} aria-busy={busy || undefined}>
-        {rows.map((u, i) => (
+        {rows.map((u) => (
           <PersonRow
             key={u.id}
             u={u}
@@ -125,7 +120,6 @@ export function PeopleTable({
             t={t}
             fmt={fmt}
             now={now}
-            style={entrance(i)}
             select={select}
             on={!!select?.picked[u.id]}
             expanded={!selecting && open === u.id}
@@ -245,7 +239,6 @@ function PersonRow({
   t,
   fmt,
   now,
-  style,
   select,
   on,
   expanded,
@@ -258,7 +251,6 @@ function PersonRow({
   t: Tx;
   fmt: Fmt;
   now: number;
-  style?: CSSProperties;
   select: PeopleSelect | undefined;
   on: boolean;
   expanded: boolean;
@@ -280,7 +272,6 @@ function PersonRow({
     <Fresh
       kind="user"
       id={u.id}
-      style={style}
       className={cx(
         "us-e group/e border-t border-line transition-colors",
         on ? "bg-[color-mix(in_srgb,var(--accent-mark)_6%,transparent)]" : "hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]",

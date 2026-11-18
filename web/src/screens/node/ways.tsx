@@ -274,7 +274,7 @@ function laneTitle(t: T, l: Lane) {
 
 function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysModel; data: Data; selected: boolean; tabbable: boolean; onPick: () => void }) {
   const t = useT();
-  const fresh = useFresh<HTMLButtonElement>("lane", `${data.node!.id}:${l.id}`); // a lane that just came to be sweeps in once
+  const fresh = useFresh<HTMLButtonElement>("lane", `${data.node!.id}:${l.id}`); // a lane that just came to be is washed once
   const look = lookOf(l, w);
   const seen = seenLine(t, l, w);
   // how many of its servers go through the bridge now

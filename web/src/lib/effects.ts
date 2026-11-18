@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from "react";
 import { readPref, writePref } from "./storage";
 
-// "Reveal animation" (Settings -> Interface): the motion of the boards - the sweep when something is created, the entrance of
-// pages, the assistant's waves. On by default (the interface is designed with it), turned off per device; never on the
-// Cloudflare edition (the shell says so with setEffectsAllowed). `prefers-reduced-motion` is honoured on top of it (the sweep
-// then is a quick fade, see components/fx/sweep.ts).
+// "Reveal animation" (Settings -> Interface): the motion the boards are drawn with - the wave from a pressed control, the wash of
+// what has just been created, the numbers that settle, the assistant's waves. One switch, on by default, turned off per device;
+// never on the Cloudflare edition (the shell says so with setEffectsAllowed). `prefers-reduced-motion` is honoured on top of it
+// (see prefersReducedMotion below, and the media query of index.css that stills every animation).
 const listeners = new Set<() => void>();
 let chosen = readPref("fx") !== "off";
 let allowed = true;
@@ -32,25 +32,6 @@ function subscribe(cb: () => void) {
 
 export function useEffectsEnabled(): boolean {
   return useSyncExternalStore(subscribe, effectsEnabled, () => false);
-}
-
-// The moments the effects play at, each its own switch under the main one (Settings -> Interface): "create" is a new thing
-// appearing in its list (and the halo from the button that made it), "save" the halo when something is saved or the
-// assistant has answered, "pages" a page opening (the first sweep after sign-in, the list entrance).
-export type FxKind = "create" | "save" | "pages";
-const kinds: Record<FxKind, boolean> = { create: readPref("fx-create") !== "off", save: readPref("fx-save") !== "off", pages: readPref("fx-pages") !== "off" };
-
-/** Whether the effect plays for this moment: the main switch and the moment's own. */
-export const effectsFor = (kind: FxKind) => effectsEnabled() && kinds[kind];
-
-export function setEffectKind(kind: FxKind, on: boolean) {
-  kinds[kind] = on;
-  writePref(`fx-${kind}`, on ? null : "off");
-  listeners.forEach((l) => l());
-}
-
-export function useEffectKind(kind: FxKind): boolean {
-  return useSyncExternalStore(subscribe, () => kinds[kind], () => true);
 }
 
 /** The system's "reduce motion" switch. */

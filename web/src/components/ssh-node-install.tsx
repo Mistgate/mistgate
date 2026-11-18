@@ -294,7 +294,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
 
   useEffect(() => {
     if (!jobDone && !jobFailed) return;
-    if (jobDone && nodeId) markFresh("node", nodeId); // the new node's card sweeps in once
+    if (jobDone && nodeId) markFresh("node", nodeId); // the new node's card is washed once
     void qc.invalidateQueries({ queryKey: ["nodes"] });
     void qc.invalidateQueries({ queryKey: ["overview"] });
   }, [jobDone, jobFailed, nodeId, qc]);

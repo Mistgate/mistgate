@@ -1,7 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useListEntrance } from "@/components/fx/page";
 import { PageTitle } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
@@ -196,7 +195,6 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
     placeholderData: keepPreviousData,
   });
 
-  const entrance = useListEntrance(list.data !== undefined);
   const rows = useMemo(() => list.data?.users ?? [], [list.data]);
   const counts = list.data?.counts;
   const total = counts ? { all: counts.all, online: counts.online, expiring: counts.expiring, over: counts.overQuota, devices: counts.overDeviceLimit }[filter] : 0;
@@ -359,7 +357,6 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
             open={open}
             onOpen={(id) => setOpen(open === id ? "" : id)}
             manage={manage}
-            entrance={entrance}
             busy={list.isPlaceholderData}
             pager={pager}
             showPager={total > Math.min(...pageSizes)}

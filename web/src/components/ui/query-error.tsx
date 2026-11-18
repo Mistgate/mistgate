@@ -36,7 +36,7 @@ export function QueryError({ error, onRetry, compact, className }: { error: unkn
 /** "Loading…" while a query is on its way: a screen's own line, or `compact` inside a card. */
 export function Pending({ compact, className }: { compact?: boolean; className?: string }) {
   const t = useT();
-  return <p data-fx-pending="" className={cx("pending-delay", compact ? "text-[13px] text-muted" : "px-1 py-8 text-muted", className)}>{t("common.loading")}</p>;
+  return <p className={cx("pending-delay", compact ? "text-[13px] text-muted" : "px-1 py-8 text-muted", className)}>{t("common.loading")}</p>;
 }
 
 /** A placeholder bar while the data is on its way (a line of text, a number, a pill): the size comes from `className`; it breathes. */

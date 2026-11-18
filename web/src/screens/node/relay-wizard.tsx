@@ -164,7 +164,7 @@ function Body({ data, w, start, demo, onClose }: { data: Data; w: WaysModel; sta
   const next = useRef<HTMLButtonElement>(null);
   const was = useRef(job?.state);
   useEffect(() => {
-    // the whole run came out: the wave from the button, and the page's lane sweeps in behind the window
+    // the whole run came out: the wave from the button, and the page's lane is washed behind the window
     if ((was.current === "running" || was.current === "stopping") && job?.state === "finished" && job.on === job.items.length) playWave(originOf(next.current), { light: document.documentElement.dataset.theme === "light" });
     was.current = job?.state;
   }, [job?.state, job?.on, job?.items.length]);

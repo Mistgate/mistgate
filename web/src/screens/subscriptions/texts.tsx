@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { FlagText } from "@/components/ui/flag";
 import { Segmented } from "@/components/ui/segmented";
@@ -97,7 +96,6 @@ function TextsForm({ data }: { data: Data }) {
       }))
       .then(() => {
         toast(t("subs.saved"));
-        halo("save");
       })
       .catch((e: unknown) => toast.error(errorText(e, t)));
   }

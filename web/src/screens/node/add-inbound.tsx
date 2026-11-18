@@ -153,7 +153,7 @@ function AddForm({
     },
     onSuccess: (r) => {
       onDone();
-      if (r?.inbound) markFresh("inbound", r.inbound.id); // the new server's card on the node's Profiles tab sweeps in once
+      if (r?.inbound) markFresh("inbound", r.inbound.id); // the new server's card on the node's Profiles tab is washed once
       // the UDP check could not run (port_unchecked), or the port was added although it loses packets: said once, a bit longer
       const notes = portNotes(t, r?.warnings);
       toast(withNotes(t("node.profiles.added", { name: node.name }), notes), notes.length > 0 ? { ms: 8000 } : undefined);

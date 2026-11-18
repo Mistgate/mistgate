@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { navKey, sections, type SectionId } from "@/components/nav";
 import { Button, buttonClass } from "@/components/ui/button";
 import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
@@ -123,17 +122,6 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
     return () => ro.disconnect();
   }, [history]);
 
-  // a turn watched to its end: the halo runs out from the end of the answer, inside the window
-  const wasLive = useRef(chat.live);
-  useEffect(() => {
-    const el = list.current;
-    if (wasLive.current && !chat.live && el && tail?.end === "end") {
-      const r = el.getBoundingClientRect();
-      halo("save", { target: el, origin: { x: r.left + r.width / 2, y: r.bottom - 24 } });
-    }
-    wasLive.current = chat.live;
-  }, [chat.live, tail?.end]);
-
   function submit(force = false) {
     const body = text.trim();
     if (!body || chat.running || off) return;
@@ -156,7 +144,7 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
 
   return (
     <div className="as-dock">
-      <section data-fx-halo data-fx={fx ? "1" : undefined} role="dialog" aria-label={t("ai.chat.title")} className="as">
+      <section data-fx={fx ? "1" : undefined} role="dialog" aria-label={t("ai.chat.title")} className="as">
         {fx && (
           <>
             <div className="as-wv" aria-hidden>

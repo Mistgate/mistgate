@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState, type DragEvent } from "react";
 import { CopyButton } from "@/components/copy-button";
-import { halo } from "@/components/fx/halo";
 import { markFresh } from "@/components/fx/registry";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -134,9 +133,8 @@ export function UploadDialog({ onClose, demo }: { onClose: () => void; demo?: Up
   const upload = useMutation({
     mutationFn: async (f: File) => plain(await decoySites.createDecoySite({ name: nameFromFile(f.name, sites.map((s) => s.name)), note: "", bundleArchive: new Uint8Array(await f.arrayBuffer()), state: "ready", source: "upload" })),
     onSuccess: (r) => {
-      // its card in the list sweeps in once the window is gone
+      // its card in the list is washed once the window is gone
       if (r.site) markFresh("site", r.site.id);
-      halo("create");
       setSite(r.site);
       setName(r.site?.name ?? "");
       setNote(r.site?.note ?? "");

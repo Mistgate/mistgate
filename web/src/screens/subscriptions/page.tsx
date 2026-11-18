@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { Platform } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -75,7 +74,6 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
       }))
       .then(() => {
         toast(t("subs.saved"));
-        halo("save");
       })
       .catch((e: unknown) => toast.error(errorText(e, t)));
   }

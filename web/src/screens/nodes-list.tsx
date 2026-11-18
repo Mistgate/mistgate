@@ -16,14 +16,12 @@ import { kindRank, nodeKind, useNodeStatus } from "@/lib/node-status";
 import type { Plain } from "@/lib/plain";
 import { sortProtocols } from "@/lib/series";
 import { useOlderNodes } from "@/lib/updates";
-import type { useListEntrance } from "@/components/fx/page";
 import type { FleetWays } from "@/lib/fleet-map";
 import { countryIn } from "@/lib/health";
 import { ruCell, type RuState } from "./nodes-ways-text";
 import { toneWord, WayGlyph } from "./nodes-ways-parts";
 
 type Node = Plain<NodeMsg>;
-type Entrance = ReturnType<typeof useListEntrance>;
 
 // The list of the nodes, as the redesign board draws it (PnNodes, the fz-r rows): one card, a head of sortable columns and a
 // row per node. The columns follow the width of the card itself, not the window's: a wide table shows every column, then the
@@ -136,7 +134,6 @@ export function NodeList({
   select,
   sort,
   onSort,
-  entrance,
   filtered,
   onReset,
   onAdd,
@@ -147,7 +144,6 @@ export function NodeList({
   select: Select | undefined;
   sort: Sort;
   onSort: (k: SortKey) => void;
-  entrance: Entrance;
   /** Nodes exist, the filters hide them all. */
   filtered: boolean;
   onReset: () => void;
@@ -175,7 +171,7 @@ export function NodeList({
           <span aria-hidden />
         </div>
       )}
-      {rows.map((n, i) => {
+      {rows.map((n) => {
         const kind = nodeKind(n);
         const s = sub(n);
         const on = !!select?.ticked.has(n.id);
@@ -196,7 +192,6 @@ export function NodeList({
             kind="node"
             id={n.id}
             key={n.id}
-            style={entrance(i)}
             className={cx(
               "group relative min-h-[60px] border-t border-line transition-colors max-md:min-h-16 max-md:[[role=row]+&]:border-t-0",
               rowBase,

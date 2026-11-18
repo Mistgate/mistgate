@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
@@ -66,7 +65,6 @@ function NameCard({ group, manage, demo }: { group: Group; manage: boolean; demo
       setOk(true);
       setTimeout(() => setOk(false), 2400);
       toast(t("users.groupSaved", { name: r.group?.name ?? name.trim() }));
-      halo("save");
     },
     onError: (e) => setError(errorText(e, t)),
   });

@@ -2,7 +2,6 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { halo } from "@/components/fx/halo";
 import { Flourish } from "@/components/fx/flourish";
 import { Button } from "@/components/ui/button";
 import { QueryError } from "@/components/ui/query-error";
@@ -13,7 +12,7 @@ import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { useT } from "@/i18n";
 import { warp as warpApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
-import { effectsFor, prefersReducedMotion } from "@/lib/effects";
+import { effectsEnabled, prefersReducedMotion } from "@/lib/effects";
 import { useFmt } from "@/lib/format";
 import { useNow } from "@/lib/time";
 import { ageParts, probeLook, safeHttpUrl, sourceWord, warpPill, warpTrouble, type ProbeLook } from "@/lib/warp";
@@ -130,7 +129,6 @@ function WarpCardBody({ nodeId, nodeName, retired, down, profiles }: { nodeId: s
       window.setTimeout(() => {
         setReg(null);
         setJust(true);
-        halo("create", { target: card.current });
         window.setTimeout(() => setJust(false), 3000);
       }, 750);
       toast(t(again ? "warp.reregistered" : "warp.registered"));
@@ -310,7 +308,7 @@ function WaveCanvas({ done }: { done: boolean }) {
   }, [done]);
   useEffect(() => {
     const cv = ref.current;
-    if (!cv || !effectsFor("create") || prefersReducedMotion() || !cv.getContext) return;
+    if (!cv || !effectsEnabled() || prefersReducedMotion() || !cv.getContext) return;
     const g = cv.getContext("2d");
     if (!g) return;
     const t0 = performance.now();

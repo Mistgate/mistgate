@@ -1,4 +1,3 @@
-import { halo } from "@/components/fx/halo";
 import { useToast } from "@/components/ui/toast";
 import { errorText } from "@/lib/errors";
 import { useTx } from "@/screens/users/t";
@@ -24,7 +23,6 @@ export function LinkAutoCard({ settings }: { settings: Settings }) {
     void save.mutateAsync((cur) => ({ ...cur, linkAutoSelect: v })).then(
       () => {
         toast(t("subs.saved"));
-        halo("save");
       },
       (e: unknown) => toast.error(errorText(e, t)),
     );

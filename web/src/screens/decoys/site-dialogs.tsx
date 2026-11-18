@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type DragEvent } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -404,7 +403,6 @@ export function ReplaceDialog({ site, where, onClose, demo }: { site: Site; wher
     mutationFn: async () => file && decoySites.addDecoySiteVersion({ siteId: site.id, bundleArchive: new Uint8Array(await file.arrayBuffer()) }),
     onSuccess: () => {
       refresh();
-      halo("save");
       toast(t("dz.t.version"));
       onClose();
     },

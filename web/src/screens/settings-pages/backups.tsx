@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { EditionNotice } from "@/components/edition-notice";
-import { halo } from "@/components/fx/halo";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
@@ -198,7 +197,6 @@ function BackupsForm({ stored, demo }: { stored: Stored; demo?: BackupsDemo }) {
       setDropSecret(false);
       setR2Bad(null);
       toast(request.clearSecret ? t("sx.bk.secret.gone") : t("set.backups.saved"));
-      halo("save");
     },
     onError: failed,
   });
@@ -242,7 +240,6 @@ function BackupsForm({ stored, demo }: { stored: Stored; demo?: BackupsDemo }) {
     void qc.invalidateQueries({ queryKey: backupsKey });
     if (stored.lastSuccessUnix !== mine.lastSuccess) {
       toast(stored.lastErrorCode ? t("set.backups.createdWarning") : t("set.backups.created"));
-      halo("create");
     } else toast.error(t(codeKeys[stored.lastErrorCode] ?? "set.backups.error.create"));
   }, [stored.running, stored.lastSuccessUnix, stored.lastErrorCode, qc, t, toast]);
 

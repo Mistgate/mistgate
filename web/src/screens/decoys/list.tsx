@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useFresh } from "@/components/fx/fresh";
-import { useListEntrance } from "@/components/fx/page";
 import { PageTitle } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
@@ -40,7 +39,6 @@ export function DecoysScreen({ demo }: { demo?: DecoysDemo } = {}) {
   const [dialog, setDialog] = useState<"" | "new" | "up" | "mcp">(demo?.dialog ?? "");
   const assistant = useAssistant();
   const ready = lib.data !== undefined || edge;
-  const entrance = useListEntrance(lib.data !== undefined);
   const sites = useMemo(() => lib.data?.sites ?? [], [lib.data]);
   const limit = lib.data?.siteLimit || 100;
   const full = sites.length >= limit;
@@ -117,7 +115,7 @@ export function DecoysScreen({ demo }: { demo?: DecoysDemo } = {}) {
         <>
           <Showing nodes={liveNodes(nodes.data?.nodes)} sites={sites} panelSource={lib.data.panelSource} panel={lib.data.panel} ready={nodes.isSuccess} />
           <Builtins dirAvailable={lib.data.builtin.find((b) => b.id === "panel_dir")?.available ?? false} dirReason={lib.data.builtin.find((b) => b.id === "panel_dir")?.reasonCode ?? ""} />
-          <Mine sites={sites} nodes={liveNodes(nodes.data?.nodes)} limit={limit} demo={demo} entrance={entrance} onWay={{ up: () => setDialog("up"), as: askNew, mcp: () => setDialog("mcp") }} />
+          <Mine sites={sites} nodes={liveNodes(nodes.data?.nodes)} limit={limit} demo={demo} onWay={{ up: () => setDialog("up"), as: askNew, mcp: () => setDialog("mcp") }} />
         </>
       )}
 
@@ -259,7 +257,7 @@ export function Builtins({ edge, dirAvailable, dirReason }: { edge?: boolean; di
 
 // ---- own sites
 
-function Mine({ sites, nodes, limit, demo, entrance, onWay }: { sites: readonly Site[]; nodes: readonly Node[]; limit: number; demo?: DecoysDemo; entrance: (i: number) => React.CSSProperties | undefined; onWay: { up: () => void; as: () => void; mcp: () => void } }) {
+function Mine({ sites, nodes, limit, demo, onWay }: { sites: readonly Site[]; nodes: readonly Node[]; limit: number; demo?: DecoysDemo; onWay: { up: () => void; as: () => void; mcp: () => void } }) {
   const t = useT();
   const [filter, setFilter] = useState<SiteFilter>(demo?.filter ?? "all");
   const [q, setQ] = useState(demo?.q ?? "");
@@ -319,8 +317,8 @@ function Mine({ sites, nodes, limit, demo, entrance, onWay }: { sites: readonly 
             </section>
           )}
           <div className="dz-grid">
-            {shown.map((s, i) => (
-              <SiteCard key={s.id} site={s} nodes={nodes} style={entrance(i)} />
+            {shown.map((s) => (
+              <SiteCard key={s.id} site={s} nodes={nodes} />
             ))}
           </div>
         </>
@@ -330,7 +328,7 @@ function Mine({ sites, nodes, limit, demo, entrance, onWay }: { sites: readonly 
 }
 
 /** One site: the miniature, the name and the note, who made it and how big, where it stands, and what its checks said. */
-export function SiteCard({ site, nodes, style }: { site: Site; nodes: readonly Node[]; style?: React.CSSProperties }) {
+export function SiteCard({ site, nodes }: { site: Site; nodes: readonly Node[] }) {
   const t = useT();
   const fmt = useFmt();
   const ref = useFresh<HTMLAnchorElement>("site", site.id);
@@ -340,7 +338,7 @@ export function SiteCard({ site, nodes, style }: { site: Site; nodes: readonly N
   const src = asSource(site.source);
   const bad = isBad(site);
   return (
-    <Link ref={ref} to="/decoys/$id" params={{ id: site.id }} className="dz-card dz-c" style={style} data-draft={isDraft(site) || undefined}>
+    <Link ref={ref} to="/decoys/$id" params={{ id: site.id }} className="dz-card dz-c" data-draft={isDraft(site) || undefined}>
       <Thumb site={site} />
       <div className="dz-cb">
         <b className="dz-cn" dir="auto" title={site.name}>

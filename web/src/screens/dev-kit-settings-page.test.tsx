@@ -173,7 +173,7 @@ describe("the scenes of Settings", () => {
 
   it("the WARP card waits for its data, says so when it fails, and is not there for a helper or on the Cloudflare edition", async () => {
     await draw(addressOf(states("settings-sys-warp-load")));
-    expect(document.querySelector("[data-card=warp-reach] [data-fx-pending]")).not.toBeNull();
+    expect(document.querySelector("[data-card=warp-reach] .pending-delay")).not.toBeNull();
     act(() => root?.unmount());
     host?.remove();
     await draw(addressOf(states("settings-sys-warp-err")));

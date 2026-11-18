@@ -1,7 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { StatusPill, type StatusKind } from "@/components/ui/status";
@@ -67,7 +66,6 @@ export function ShareCard({ node }: { node: Node }) {
       await Promise.all(everyKey.map((k) => qc.invalidateQueries({ queryKey: [k] })));
       setAsk(null);
       toast(c.mode === "all" ? t("ns.done.all", { name: node.name }) : c.mode === "none" ? t("ns.done.none", { name: node.name }) : t("ns.done.listed", { name: node.name, groups: t.n("ns.groupsN", c.groupIds.length) }));
-      halo("save");
     },
     onError: (e) => toast.error(errorText(e, t)),
   });

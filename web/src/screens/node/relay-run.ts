@@ -54,12 +54,12 @@ export async function runOne(ctx: RunCtx, c: Candidate, on: boolean, port: strin
   const pair = { entry: entry.name, exit: c.nodeName };
   const asked: Mode = blockedOf(c) !== "" && ctx.way === "reverse" ? "auto" : ctx.way;
   set({ leg: "running", reach: null, bridge: null, path: on ? "waiting" : null, soft: false, tone: undefined, text: undefined, free: undefined });
-  // the first relay between these two nodes makes their lane: only that one sweeps in (a second relay joins a lane that is there)
+  // the first relay between these two nodes makes their lane: only that one is washed (a second relay joins a lane that is there)
   const hadLane = qc.getQueryData<RelayMsg[]>(["relays", c.nodeId])?.some((x) => x.viaNodeId === entry.id && x.exitNodeId === c.nodeId) ?? false;
   let r: RelayMsg;
   try {
     r = existing ?? plain(await relaysApi.createRelay({ inboundId: c.inboundId, viaNodeId: entry.id, port: Number(port) || 0, ...(asked !== "auto" ? { mode: asked } : {}) })).relay!;
-    // a relay that is new grows into its row when the list reads it (the board's nd-new), and sweeps
+    // a relay that is new grows into its row when the list reads it (the board's nd-new), and is washed
     if (!existing) markFresh("relay", r.id);
     r = plain(await relaysApi.checkRelay({ id: r.id, ...(wantsReach(r) ? { reverseReach: true } : {}) })).relay!;
   } catch (e) {
@@ -96,7 +96,7 @@ export async function runOne(ctx: RunCtx, c: Candidate, on: boolean, port: strin
       markFresh("lane", `${c.nodeId}:via:${entry.id}`); // on the exit's page ...
       markFresh("lane", `${entry.id}:out:${c.nodeId}`); // ... and on the entry's
     }
-    if (existing) markFresh("relay", r.id); // a relay that was there already: it sweeps when it comes on
+    if (existing) markFresh("relay", r.id); // a relay that was there already: it is washed when it comes on
     // what the panel settled on, else what the check said
     const bridged = done ? activeOf(done) === "reverse" : viaBridge;
     set({ bridge: bridged ? "ok" : null, path: "ok", tone: "ok", text: t(bridged ? "relay.dlg.result.onBridge" : "relay.dlg.result.on", { via: viaLabel(t, entry.cc), hours }) });

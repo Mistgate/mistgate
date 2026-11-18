@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { halo } from "@/components/fx/halo";
 import { playWave } from "@/components/fx/wave";
 import { Scramble } from "@/components/fx/scramble-react";
 import { EditionNotice } from "@/components/edition-notice";
@@ -80,7 +79,6 @@ export function usePanelPhase(data: Updates, refetch: () => unknown, answeredAt:
     const id = window.setTimeout(() => {
       setSettled(true);
       toast(t("uq.toast.done", { version }));
-      halo("save");
     }, 1500);
     return () => window.clearTimeout(id);
   }, [finished, scene, version, toast, t]);

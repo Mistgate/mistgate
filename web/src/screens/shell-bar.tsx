@@ -102,7 +102,7 @@ export function TopBar({
 }) {
   const t = useT();
   return (
-    <header data-fx-chrome="top" className="shell-in sticky top-0 z-20 border-b border-line bg-canvas px-4 md:px-5 rail:px-8">
+    <header className="shell-in sticky top-0 z-20 border-b border-line bg-canvas px-4 md:px-5 rail:px-8">
       <div className="mx-auto flex h-14 max-w-[1240px] items-center gap-2 md:h-16">
         <button
           type="button"

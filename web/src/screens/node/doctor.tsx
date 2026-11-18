@@ -3,7 +3,6 @@ import { meQuery } from "@/lib/session";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { EdgeLoop, Flourish } from "@/components/fx/flourish";
-import { halo } from "@/components/fx/halo";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/notice";
@@ -211,7 +210,7 @@ export function NodeDoctorTab({ nodeId, nodeName }: { nodeId: string; nodeName: 
     };
   }, [running]);
 
-  // the answer is in: the halo of a save plays over the card, and what came back fine is marked
+  // the answer is in: what came back fine is marked
   useEffect(() => {
     if (running) {
       wasRunning.current = true;
@@ -220,7 +219,6 @@ export function NodeDoctorTab({ nodeId, nodeName }: { nodeId: string; nodeName: 
     }
     if (!wasRunning.current) return;
     wasRunning.current = false;
-    halo("save", { target: card.current });
     const now = new Set(groupDoctor(items).issues.map((i) => i.id));
     setFresh(new Set([...before.current].filter((id) => !now.has(id))));
     const timer = setTimeout(() => setFresh(new Set()), 2000);

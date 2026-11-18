@@ -5,7 +5,6 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useAddNode } from "@/components/add-node";
 import { useEscClear } from "@/components/bulk";
 import { useToast } from "@/components/ui/toast";
-import { useListEntrance } from "@/components/fx/page";
 import { Button, buttonClass } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
 import { PageTitle } from "@/components/ui/bits";
@@ -64,7 +63,6 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
   const fmt = useFmt();
   const addNode = useAddNode();
   const q = useQuery(nodesQuery);
-  const entrance = useListEntrance(q.data !== undefined);
   const [status, setStatus] = useState<StatusFilter>(demo?.status ?? "all");
   const [protocol, setProtocol] = useState(all);
   const [country, setCountry] = useState(all);
@@ -340,7 +338,7 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
             />
           ) : (
             <>
-              <NodeList rows={rows} fmt={fmt} select={select} sort={sort} onSort={onSort} entrance={entrance} filtered={narrowed} onReset={reset} onAdd={() => addNode()} ways={waysList} />
+              <NodeList rows={rows} fmt={fmt} select={select} sort={sort} onSort={onSort} filtered={narrowed} onReset={reset} onAdd={() => addNode()} ways={waysList} />
               {owner && <NodesBulk nodes={nodes} picked={picked} shown={new Set(rows.map((n) => n.id))} batch={batch} run={run} onClear={clear} onAll={allShown ? clear : toggleAll} allShown={allShown} total={shownIds.length} />}
             </>
           )}

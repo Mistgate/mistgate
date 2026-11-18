@@ -101,7 +101,7 @@ function Head() {
 export function OverviewLoading() {
   const t = useT();
   return (
-    <div aria-busy="true" data-fx-pending="" className="ov flex flex-col gap-4">
+    <div aria-busy="true" className="ov flex flex-col gap-4">
       <Head />
       <span className="pending-delay sr-only" role="status">
         {t("common.loading")}

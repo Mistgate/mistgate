@@ -607,17 +607,20 @@ describe("Settings → Interface", () => {
     expect(updateInstance.mock.calls[0]?.[0]).toMatchObject({ logoSvg: svg });
   });
 
-  it("puts the moments of the reveal animation under its switch while it is on (the default), and draws none on the Cloudflare edition", async () => {
+  it("has one switch for the reveal animation, on by default, with no Beta tag and no moments under it, and none on the Cloudflare edition", async () => {
     await mount(<InterfacePage />);
-    expect(document.querySelector(`[role=switch][aria-label="${en["settings.fx"]}"]`)?.getAttribute("aria-checked")).toBe("true");
-    for (const k of ["settings.fx.create", "settings.fx.save", "settings.fx.pages"] as const) expect(text()).toContain(en[k]);
-    await click(document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx"]}"]`));
+    const sw = () => document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx"]}"]`);
+    expect(sw()?.getAttribute("aria-checked")).toBe("true");
+    expect(readPref("fx")).toBeNull();
+    expect(text()).toContain(en["sx.if.fx.hint"]);
+    expect(text()).not.toContain("Beta");
+    expect(document.querySelectorAll(".sx-anr")).toHaveLength(1); // the row of the board, nothing under it
+    await click(sw());
+    expect(sw()?.getAttribute("aria-checked")).toBe("false");
     expect(readPref("fx")).toBe("off");
-    expect(text()).not.toContain(en["settings.fx.create"]);
-    await click(document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx"]}"]`));
-    for (const k of ["settings.fx.create", "settings.fx.save", "settings.fx.pages"] as const) expect(text()).toContain(en[k]);
-    await click(document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx.save"]}"]`));
-    expect(readPref("fx-save")).toBe("off");
+    await click(sw());
+    expect(sw()?.getAttribute("aria-checked")).toBe("true");
+    expect(readPref("fx")).toBeNull();
     await act(async () => root!.unmount());
     host!.remove();
     auth.me.mockImplementation(async () => ({ admin: { id: "adm_1", displayName: "Alice", role }, edition: "edge", unavailable: [] }));

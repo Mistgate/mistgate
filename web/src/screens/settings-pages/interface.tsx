@@ -1,9 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { DefaultMark } from "@/components/brand";
-import { halo } from "@/components/fx/halo";
-import { pageSweepOptions } from "@/components/fx/page";
-import { sweep } from "@/components/fx/sweep";
+import { originOf, playWave } from "@/components/fx/wave";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
@@ -17,13 +15,13 @@ import { instance as instanceApi } from "@/lib/api";
 import { sanitizeLogo, useBrand } from "@/lib/brand";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
-import { setEffectKind, setEffectsEnabled, useEffectKind, useEffectsEnabled, type FxKind } from "@/lib/effects";
+import { setEffectsEnabled, useEffectsEnabled } from "@/lib/effects";
 import { errorText } from "@/lib/errors";
 import { applyBrand, instanceQuery, loginInfoQuery } from "@/lib/instance";
 import { plain, type Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
-import { setTheme, useTheme } from "@/lib/theme";
-import { ICONS, Mono, Otg, Pb, Row, Rows, Sec, slots, Spin, SxGate } from "./sx-bits";
+import { setTheme, themeNow, useTheme } from "@/lib/theme";
+import { ICONS, Mono, Pb, Row, Rows, Sec, slots, Spin, SxGate } from "./sx-bits";
 import "./settings-if.css";
 
 const maxLogoBytes = 64 * 1024;
@@ -87,7 +85,6 @@ function InterfaceBody({ stored, demo }: { stored: Plain<Instance>; demo?: Inter
     onSuccess: (r) => {
       const i = r.instance!;
       toast(t("sx.if.toast"));
-      halo("save");
       setLogo({ kind: "keep" });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -273,11 +270,7 @@ function DeviceCard() {
   const choice = useAccentChoice();
   const effects = useEffectsEnabled();
   const edition = useEdition();
-  const fxRow = useRef<HTMLDivElement>(null);
-  const demo = () => {
-    halo(null);
-    if (fxRow.current) void sweep(fxRow.current, pageSweepOptions());
-  };
+  const fxSwitch = useRef<HTMLElement>(null);
   return (
     <Sec tone="lav" d={ICONS.device} title={t("settings.device")} foot={t("sx.if.local")}>
       <Rows>
@@ -300,55 +293,28 @@ function DeviceCard() {
           <Swatches value={accent} onPick={setAccent} base={choice.instance} follow={{ on: !choice.own, color: choice.instance, onPick: followInstanceAccent }} />
         </Row>
         {!edition.edge && (
-          <div ref={fxRow} className="pp-row sx-anr">
+          <div className="pp-row sx-anr">
             <div className="pp-lb">
-              <b>
-                {t("settings.fx")}
-                <Otg>{t("settings.fx.beta")}</Otg>
-              </b>
-              <span>
-                {t("sx.if.fx.hint")}
-                {effects && (
-                  <>
-                    {" "}
-                    <button type="button" className="an-lk" onClick={demo}>
-                      {t("settings.fx.show")}
-                    </button>
-                  </>
-                )}
-              </span>
+              <b>{t("settings.fx")}</b>
+              <span>{t("sx.if.fx.hint")}</span>
             </div>
             <div className="pp-ct sx-end">
               <Switch
+                ref={fxSwitch}
                 className="fz-sw"
                 checked={effects}
                 onCheckedChange={(on) => {
                   setEffectsEnabled(on);
-                  if (on) requestAnimationFrame(demo);
+                  // as the board's switch does: turned on, it sends the wave from itself
+                  if (on) playWave(originOf(fxSwitch.current), { light: themeNow() === "light" });
                 }}
                 aria-label={t("settings.fx")}
               />
             </div>
           </div>
         )}
-        {effects && !edition.edge && (["create", "save", "pages"] as const).map((k) => <FxKindRow key={k} kind={k} label={t(`settings.fx.${k}`)} />)}
       </Rows>
     </Sec>
-  );
-}
-
-/** One of the moments the reveal animation plays at, under the main switch: quiet, with its own switch. */
-function FxKindRow({ kind, label }: { kind: FxKind; label: string }) {
-  const on = useEffectKind(kind);
-  return (
-    <div className="pp-row sx-anr sx-fxk">
-      <div className="pp-lb">
-        <b>{label}</b>
-      </div>
-      <div className="pp-ct sx-end">
-        <Switch className="fz-sw" checked={on} onCheckedChange={(v) => setEffectKind(kind, v)} aria-label={label} />
-      </div>
-    </div>
   );
 }
 

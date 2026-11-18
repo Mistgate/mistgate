@@ -1,6 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -49,7 +48,6 @@ export function useInSubscriptions(nodeId: string, nodeName: string) {
       if (v.report) toast(v.report, { undo: () => set.mutate({ id: v.id, on: !v.on }) });
       else {
         toast(t("common.saved"));
-        halo("save");
       }
     },
     onError: (e) => setError(errorText(e, t)),

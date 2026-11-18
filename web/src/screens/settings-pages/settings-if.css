@@ -40,22 +40,6 @@
 .sx .sx-ddw {
   max-width: none;
 }
-/* the moments of the reveal animation under its switch: the product's, quieter than the board's main row */
-.sx .sx-fxk {
-  min-height: 48px;
-  padding-block: 8px;
-  padding-inline-start: 16px;
-}
-.sx .sx-fxk .pp-lb {
-  padding-top: 0;
-}
-.sx .sx-fxk .pp-lb b {
-  font-weight: 400;
-  color: var(--sec);
-}
-.sx .sx-anr .pp-lb>span .an-lk {
-  font-size: 12px;
-}
 
 /* L6128-6137: the pills of the accent */
 .sx .sx-sws {

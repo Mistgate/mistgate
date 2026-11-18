@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createContext, use, useMemo, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { markFresh } from "@/components/fx/registry";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
@@ -109,9 +108,8 @@ export function PresetEditor({ preset, data, t, fallback, onClose }: { preset?: 
     onSuccess: async (r) => {
       await refresh();
       toast(t(preset ? "subs.dns.saved" : "subs.dns.created"));
-      // a new preset sweeps in the list it lands in, a saved one gets the halo of every save
-      if (preset) halo("save");
-      else markFresh("dns", r.preset?.id ?? "");
+      // a new preset is washed in the list it lands in
+      if (!preset) markFresh("dns", r.preset?.id ?? "");
       onClose();
     },
     onError: (e) => setError(errorText(e, t)),

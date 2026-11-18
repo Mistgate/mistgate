@@ -364,7 +364,6 @@ export function Dock({ moreOpen = false, onMore, current }: { moreOpen?: boolean
     <nav
       data-dock
       aria-label={t("nav.main")}
-      data-fx-chrome="bottom"
       className="fixed inset-x-3.5 bottom-3.5 z-10 flex gap-1 rounded-[22px] border border-line bg-surface p-1.5 shadow-(--shadow-dock) md:hidden"
     >
       {primary.map((s) => {

@@ -2,7 +2,6 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { useToast } from "@/components/ui/toast";
 import { errorText } from "@/lib/errors";
@@ -44,7 +43,6 @@ export function DeviceLimitCard({ settings }: { settings: Settings }) {
     save.mutateAsync((cur) => ({ ...cur, linkDeviceLimit: v })).then(
       () => {
         toast(t("subs.saved"));
-        halo("save");
       },
       (e: unknown) => {
         toast.error(errorText(e, t));

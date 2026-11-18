@@ -18,16 +18,16 @@ describe("the fresh-items registry", () => {
   it("marks an item and lets exactly one taker have it", () => {
     markFresh("user", "u1");
     expect(isFresh("user", "u1")).toBe(true);
-    expect(takeFresh("user", "u1")).not.toBeNull();
-    expect(takeFresh("user", "u1")).toBeNull();
+    expect(takeFresh("user", "u1")).toBe(true);
+    expect(takeFresh("user", "u1")).toBe(false);
     expect(isFresh("user", "u1")).toBe(false);
   });
 
   it("keeps kinds apart and ignores what was never marked (a refetch of the list brings only unmarked ids)", () => {
     markFresh("user", "x1");
     expect(isFresh("node", "x1")).toBe(false);
-    expect(takeFresh("node", "x1")).toBeNull();
-    for (const id of ["a", "b", "c"]) expect(takeFresh("user", id)).toBeNull();
+    expect(takeFresh("node", "x1")).toBe(false);
+    for (const id of ["a", "b", "c"]) expect(takeFresh("user", id)).toBe(false);
     expect(isFresh("user", "x1")).toBe(true); // the unrelated takes did not eat it
   });
 
@@ -35,7 +35,7 @@ describe("the fresh-items registry", () => {
     markFresh("group", "g1");
     expect(isFresh("group", "g1")).toBe(true);
     expect(isFresh("group", "g1")).toBe(true);
-    expect(takeFresh("group", "g1")).not.toBeNull();
+    expect(takeFresh("group", "g1")).toBe(true);
   });
 
   it("lets a mark expire when its item never shows up", () => {
@@ -44,17 +44,7 @@ describe("the fresh-items registry", () => {
     expect(isFresh("profile", "p1")).toBe(true);
     now += 2;
     expect(isFresh("profile", "p1")).toBe(false);
-    expect(takeFresh("profile", "p1")).toBeNull();
-  });
-
-  it("numbers items taken together, for the stagger, and starts over after a pause", () => {
-    for (const id of ["a", "b", "c"]) markFresh("user", id);
-    expect(takeFresh("user", "a")!.order).toBe(0);
-    expect(takeFresh("user", "b")!.order).toBe(1);
-    expect(takeFresh("user", "c")!.order).toBe(2);
-    now += 1000;
-    markFresh("user", "d");
-    expect(takeFresh("user", "d")!.order).toBe(0);
+    expect(takeFresh("profile", "p1")).toBe(false);
   });
 
   it("tells subscribers (an item already on screen may be the one marked)", () => {

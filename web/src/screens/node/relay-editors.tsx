@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
@@ -42,7 +41,6 @@ export function PortEditor({ r, onClose }: { r: RelayMsg; onClose: () => void })
       await relaysApi.updateRelay({ id: r.id, port: Number(text) });
       onClose();
       toast(t("common.saved"));
-      halo("save");
     } catch (e) {
       setError(e);
     } finally {
@@ -110,7 +108,6 @@ export function ModeEditor({ r, onClose }: { r: RelayMsg; onClose: () => void })
       await relaysApi.updateRelay({ id: r.id, mode: m });
       setValue(m);
       toast(t("relay.way.saved"));
-      halo("save");
     } catch (e) {
       setError(e);
     } finally {

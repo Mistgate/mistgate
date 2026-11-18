@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
@@ -48,7 +47,7 @@ export function DeleteModal({ user, actions, open, onOpenChange, onDeleted }: { 
 
 /**
  * "Subscription page" (the board's first card of Settings): the name the page greets with, the page's password, and the save bar of the
- * name. An empty name shows the panel's. Saved with the halo of a saved setting; a refusal keeps the draft for a correction.
+ * name. An empty name shows the panel's. Saved with a toast; a refusal keeps the draft for a correction.
  */
 function PageCard({ user, actions }: { user: User; actions: Actions }) {
   const t = useTx();
@@ -67,7 +66,6 @@ function PageCard({ user, actions }: { user: User; actions: Actions }) {
     try {
       await actions.update({ subscriptionName: trimmed });
       toast(t("users.subscriptionNameSaved"));
-      halo("save");
       setOk(true);
       window.setTimeout(() => setOk(false), 2400);
     } catch {

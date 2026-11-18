@@ -217,7 +217,7 @@ function CommandInstall({
   // a node that just came online: refresh the lists once, the window has done its job
   useEffect(() => {
     if (!online) return;
-    if (fresh && id) markFresh("node", id); // its card in the Nodes list sweeps in once
+    if (fresh && id) markFresh("node", id); // its card in the Nodes list is washed once
     void qc.invalidateQueries({ queryKey: ["nodes"] });
     void qc.invalidateQueries({ queryKey: ["overview"] });
   }, [online, qc, fresh, id]);

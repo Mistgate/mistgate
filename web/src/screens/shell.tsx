@@ -1,13 +1,12 @@
-import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { Outlet, useRouterState } from "@tanstack/react-router";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { AddNodeProvider } from "@/components/add-node";
 import { StepUpProvider } from "@/components/step-up";
 import { ChatDock } from "@/components/assistant/chat";
 import { type SectionId } from "@/components/nav";
 import { StaleToast } from "@/components/stale-toast";
 import { useT } from "@/i18n";
-import { noteNavigation, usePageTransition } from "@/components/fx/page";
-import { setEffectsAllowed, useEffectKind, useEffectsEnabled } from "@/lib/effects";
+import { setEffectsAllowed } from "@/lib/effects";
 import { useEdition } from "@/lib/edition";
 import { useMenuWidth } from "@/lib/menu";
 import { TopBar } from "./shell-bar";
@@ -35,18 +34,10 @@ function ShellFrame() {
   const edge = useEdition().edge;
   setEffectsAllowed(!edge);
   // matches: root, app layout, then the section route: the key that restarts the enter animation
-  // the page sweep: once per pathname change (a tab switch is a search change: it does not), and once when the shell first appears
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const router = useRouter();
-  useEffect(() => router.subscribe("onBeforeNavigate", noteNavigation), [router]);
-  const effectsOn = useEffectsEnabled();
-  const pagesOn = useEffectKind("pages");
-  const pageFx = effectsOn && pagesOn;
-  const content = useRef<HTMLDivElement>(null);
-  usePageTransition(content, pathname, pageFx);
   const section = useRouterState({ select: (s) => s.matches[2]?.routeId ?? "" });
   return (
-    <ShellLayout fab={<ChatDock />} contentKey={section} contentRef={content} pathname={pathname}>
+    <ShellLayout fab={<ChatDock />} contentKey={section} pathname={pathname}>
       <Outlet />
     </ShellLayout>
   );
@@ -61,7 +52,6 @@ export function ShellLayout({
   children,
   fab,
   contentKey,
-  contentRef,
   pathname,
   current,
   demo,
@@ -69,7 +59,6 @@ export function ShellLayout({
   children: ReactNode;
   fab?: ReactNode;
   contentKey?: string;
-  contentRef?: Ref<HTMLDivElement>;
   pathname?: string;
   current?: SectionId;
   demo?: { fleet?: boolean; lang?: boolean; owner?: boolean; mobile?: boolean };
@@ -149,7 +138,7 @@ export function ShellLayout({
       {/* one width rule for every screen: a centred column of at most 1240px, side padding that grows with the window (16, 20, 32).
           A screen that needs more (a wide table) puts an element with the class "app-wide" inside and the column lifts its cap. */}
       <main id="main" tabIndex={-1} className="shell-in px-4 pt-5 pb-[104px] outline-none md:px-5 md:pt-7 md:pb-10 rail:px-8">
-        <div key={contentKey} ref={contentRef} className="screen-enter mx-auto max-w-[1240px] has-[.app-wide]:max-w-none">
+        <div key={contentKey} className="screen-enter mx-auto max-w-[1240px] has-[.app-wide]:max-w-none">
           {children}
         </div>
       </main>

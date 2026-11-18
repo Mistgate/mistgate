@@ -187,12 +187,6 @@ const core: CoreMessages = {
   "settings.accent.sage": "鼠尾草绿",
   "settings.local": "这些选择只保存在此设备上。",
   "settings.fx": "出现动画",
-  "settings.fx.beta": "测试版",
-  "settings.fx.show": "演示",
-  "settings.fx.create": "创建内容时",
-  "settings.fx.save": "保存内容或助手回答时",
-  "settings.fx.pages": "打开页面时",
-  "settings.fx.hint": "新的节点、用户、分组或配置会在一道轻柔的彩色光波下显现，一圈柔和的光环从你按下的按钮处扩散开。关闭，或系统设置了减少动态效果时，新内容会直接出现。",
   "settings.device": "仅限此设备",
 
   "auth.setup.welcomeTitle": "你好！",

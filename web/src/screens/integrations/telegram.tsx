@@ -2,7 +2,6 @@ import { ConnectError } from "@connectrpc/connect";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Logo } from "@/components/brand";
-import { halo } from "@/components/fx/halo";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
@@ -478,7 +477,6 @@ export function TelegramCard({ owner, extra, initialCode }: { owner: boolean; ex
       setFlash("chat");
       clearTimeout(flashTimer.current);
       flashTimer.current = setTimeout(() => setFlash(""), 1600);
-      halo("save", { target: meRow.current?.querySelector<HTMLElement>(".ig-me") ?? null });
     }
     wasLinking.current = !linked && !!code;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the moment the chat gets linked is what counts

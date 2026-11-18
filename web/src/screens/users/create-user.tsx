@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
-import { halo } from "@/components/fx/halo";
+import { Flourish } from "@/components/fx/flourish";
 import { markFresh } from "@/components/fx/registry";
 import { Avatar } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -265,7 +265,7 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
       void qc.invalidateQueries({ queryKey: ["users"] });
       void qc.invalidateQueries({ queryKey: ["groups"] });
       if (!res.user) return;
-      markFresh("user", res.user.id); // the row sweeps in once, when it shows up in the list
+      markFresh("user", res.user.id); // the row is washed once, when it shows up in the list
       onCreated({ user: userN(res.user), url: res.subscriptionUrl, password: res.pagePassword });
     },
     onError: (e) => setError(errorText(e, t)),
@@ -639,13 +639,9 @@ function Done({ created, qr, onQr }: { created: Created; qr: boolean; onQr: (ope
   const groupList = useQuery(groupsQuery);
   const target = linkTargetOf(user, groupList.data?.find((g) => g.id === user.groupId));
   const nothing = !target.access.happ && !target.access.amnezia;
-  const [host, setHost] = useState<HTMLDivElement | null>(null);
-  // the effects' halo plays inside the window (data-fx-halo keeps it there), once, when the screen is there
-  useEffect(() => {
-    if (host) halo("create", { target: host });
-  }, [host]);
   return (
-    <div ref={setHost} data-fx-halo className="relative flex flex-col items-center gap-2 text-center">
+    <div className="relative flex flex-col items-center gap-2 text-center">
+      <Flourish x="50%" y={68} />
       <span aria-hidden className="grid size-14 animate-[fz-pop_0.45s_var(--ease-spring)_both] place-items-center rounded-full bg-accent text-on-accent">
         <Icon name="check" size={28} strokeWidth={2.5} />
       </span>
