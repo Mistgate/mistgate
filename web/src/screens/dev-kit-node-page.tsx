@@ -10,6 +10,7 @@ import { InboundState, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/com
 import { AlertKind, AlertSeverity, CheckStatus, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { useLang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
+import { applyScene, SceneKeep } from "./dev-kit-scene";
 import { checksQuery, doctorQuery } from "@/lib/health";
 import { nodeQuery, nodesQuery, overviewQuery } from "@/lib/queries";
 import { relaysQuery } from "@/lib/relay";
@@ -454,6 +455,7 @@ export function NodePageFrame() {
   const params = new URLSearchParams(location.search);
   const state = (params.get("state") ?? "calm") as NState;
   const [scene] = useState(() => {
+    applyScene(params);
     if (params.get("fx") === "1") setEffectsEnabled(true);
     const os = params.get("os");
     const dbg = params.get("dbg");
@@ -484,9 +486,11 @@ export function NodePageFrame() {
     <QueryClientProvider client={scene.qc}>
       <ToastProvider>
         <AddNodeProvider>
-          <ShellLayout current="nodes" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
-            <NodeDetail data={scene.data as never} />
-          </ShellLayout>
+          <SceneKeep>
+            <ShellLayout current="nodes" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
+              <NodeDetail data={scene.data as never} />
+            </ShellLayout>
+          </SceneKeep>
         </AddNodeProvider>
       </ToastProvider>
     </QueryClientProvider>

@@ -10,12 +10,13 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeShareMode, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { NodePreflightSchema } from "@/gen/mistgate/admin/v1/provisioning_pb";
-import { isLang, setLang, useLang } from "@/i18n";
+import { useLang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
+import { applyScene, SceneKeep } from "./dev-kit-scene";
 import type { ShareChoice } from "@/lib/node-share";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
-import { setTheme, useTheme } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 import { nodePageData } from "./dev-kit-node-page";
 import { Shot } from "./dev-kit-redesign";
 import { NodeDetail } from "./node";
@@ -165,10 +166,7 @@ export function NodeSharePage() {
   const state = params.get("state") ?? "all";
   const win = state.startsWith("win-");
   const [scene] = useState(() => {
-    const lang = params.get("lang");
-    if (isLang(lang)) setLang(lang);
-    const theme = params.get("theme");
-    if (theme === "light" || theme === "dark") setTheme(theme);
+    applyScene(params);
     if (params.get("fx") === "1") setEffectsEnabled(true);
     return win ? { qc: seededWindow(state), data: undefined } : seededCard(state);
   });
@@ -179,9 +177,11 @@ export function NodeSharePage() {
           {win ? (
             <AddNodeWindow open initialMode={(windows[state] ?? windows["win-cmd-none"]!).mode} onClose={() => {}} seed={windowSeed(state)} />
           ) : (
-            <ShellLayout current="nodes" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
-              <NodeDetail data={scene.data as never} />
-            </ShellLayout>
+            <SceneKeep>
+              <ShellLayout current="nodes" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
+                <NodeDetail data={scene.data as never} />
+              </ShellLayout>
+            </SceneKeep>
           )}
         </AddNodeProvider>
       </ToastProvider>
