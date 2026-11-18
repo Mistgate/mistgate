@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { dictionaries, langs } from "@/i18n";
-import { structuralCodes } from "./integrations";
+import { planTitleVariants, planTitleWithoutNames, structuralCodes } from "./integrations";
 
 // What every plan says to the owner by key, as the Go side finds it in internal/panel/mcp (plan_vocabulary_test.go pins the file): the plan
 // tools, the keys of the facts, the codes the facts carry and the warnings. Each has to be worded in every language, so a plan card in the
@@ -40,5 +40,25 @@ describe("the words of every plan", () => {
   it("words every code a fact carries: in factWords itself, or by a message of its own", () => {
     const own = [...vocabulary.codes, ...builtCodes].filter((c) => !structuralCodes.includes(c));
     expect(missing(own, "approval.value.")).toEqual([]);
+  });
+  it("titles every plan with the names its facts carry, or says it has none", () => {
+    const named = vocabulary.tools.filter((tool) => !planTitleWithoutNames.includes(tool));
+    // a tool with no names stays out of the list of the titled, and the list names no tool that does not exist
+    expect(planTitleWithoutNames.filter((tool) => !vocabulary.tools.includes(tool))).toEqual([]);
+    expect(missing(named, "approval.title.")).toEqual([]);
+    const variants = Object.entries(planTitleVariants).flatMap(([tool, v]) => v.names.map((n) => `${tool}.${n}`));
+    expect(Object.keys(planTitleVariants).filter((tool) => !named.includes(tool))).toEqual([]);
+    expect(missing(variants, "approval.title.")).toEqual([]);
+  });
+  it("puts into a title only the facts the plan has, the same ones in every language", () => {
+    const keys = new Set(vocabulary.fact_keys);
+    const names = (lang: (typeof langs)[number], key: string) => [...new Set(((dictionaries[lang] as Record<string, string>)[key] ?? "").match(/{w+}/g) ?? [])].sort();
+    const titles = Object.keys(dictionaries.en).filter((k) => k.startsWith("approval.title."));
+    expect(titles.length).toBeGreaterThan(50);
+    for (const key of titles) {
+      const want = names("en", key);
+      for (const n of want) expect(keys.has(n.slice(1, -1)), `${key} names ${n}, which no plan has as a fact`).toBe(true);
+      for (const lang of langs) expect(names(lang, key), `${lang} ${key}`).toEqual(want);
+    }
   });
 });

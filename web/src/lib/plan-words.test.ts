@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dictionaries, fill, pickForm, type Lang, type T } from "@/i18n";
 import { makeFmt } from "./format";
 import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
-import { dangerText, factLabel, factWords, outcomeText, planTitle, type Fact, type Piece } from "./integrations";
+import { dangerText, factLabel, factWords, outcomeText, planTitle, planTitleWords, type Fact, type Piece } from "./integrations";
 
 // The plans the owner saw half in English on the live panel: a decoy site put on the panel, a speed test between two nodes. In each
 // language the title, the labels and the values are the panel's own words; a name from data stays on a plate of its own.
@@ -98,5 +98,74 @@ describe("what came of an applied plan", () => {
   it("words a refusal, and gives nothing for a code it has no words for", () => {
     expect(said("ru", "decoy_site_changed", {}, ApprovalState.FAILED)).toContain("сайт изменился после создания плана: создай план заново");
     expect(said("ru", "no_such_code", {})).toBeNull();
+  });
+});
+
+describe("the title of a plan with its names", () => {
+  const title = (lang: Lang, tool: string, facts: Fact[]) => {
+    const t = tr(lang);
+    const pieces = planTitleWords(t, makeFmt(lang, t), tool, facts);
+    return pieces && pieces.map((p) => (typeof p === "string" ? p : p.data)).join("");
+  };
+  const relay = (action: string) => [fact("action", action), fact("entry", "msk1", { untrusted: true }), fact("exit", "fi1", { untrusted: true })];
+  it("says what the board's card says: the relay of fi1 through msk1, in every language", () => {
+    expect(title("ru", "relay", relay("enable"))).toBe("Включить ретрансляцию fi1 через msk1");
+    expect(title("en", "relay", relay("disable"))).toBe("Turn off the relay of fi1 through msk1");
+    for (const lang of ["zh", "fa", "tr"] as const) {
+      const out = title(lang, "relay", relay("enable"));
+      expect(out, lang).toContain("fi1");
+      expect(out, lang).toContain("msk1");
+      expect(out, lang).not.toMatch(/\{|relay/i);
+    }
+  });
+  it("keeps the names apart from the panel's words, and takes the variant the facts ask for", () => {
+    const t = tr("ru");
+    const pieces = planTitleWords(t, makeFmt("ru", t), "relay", relay("port"))!;
+    expect(pieces.filter((p) => typeof p !== "string")).toEqual([{ data: "fi1" }, { data: "msk1" }]);
+    expect(title("ru", "relay", relay("port"))).toContain("Сменить порт");
+    expect(title("ru", "relay", relay("create"))).toContain("Создать ретрансляцию");
+    // an action it has no words for: the general title of the relay, still with the names
+    expect(title("ru", "relay", relay("other"))).toBe("Изменить ретрансляцию fi1 через msk1");
+  });
+  it("names the group, the site, the template, the person", () => {
+    expect(title("ru", "group_create", [fact("name", "Семья", { untrusted: true })])).toBe("Создать группу «Семья»");
+    expect(title("ru", "subscription_mihomo_template_set", [fact("template", "Для семьи", { untrusted: true }), fact("action", "update")])).toBe("Изменить шаблон Mihomo «Для семьи»");
+    expect(title("ru", "subscription_mihomo_template_set", [fact("template", "Для семьи", { untrusted: true }), fact("action", "remove")])).toBe("Удалить шаблон Mihomo «Для семьи»");
+    expect(title("en", "user_update", [fact("user", "alice", { untrusted: true })])).toBe("Change the user alice");
+  });
+  it("counts the people when there are several, and words a level and a time zone", () => {
+    const people = (n: number) => [fact("count", String(n)), ...["alice", "bob", "carol"].slice(0, n).map((u) => fact("users", u, { untrusted: true }))];
+    expect(title("ru", "user_disable", people(1))).toBe("Отключить alice");
+    expect(title("ru", "user_disable", people(3))).toBe("Отключить 3 пользователей");
+    expect(title("en", "user_reset_traffic", people(2))).toBe("Reset the traffic of 2 users");
+    expect(title("ru", "log_level", [fact("to", "debug")])).toContain("отладка");
+    expect(title("en", "update_timezone", [fact("to", "180 min", { code: "utc_offset", params: { minutes: "180" } })])).toBe("Set the time zone of update schedules to UTC+03:00");
+  });
+  it("falls back to the general title when a name is missing, and has none for a plan without names", () => {
+    expect(title("ru", "relay", [fact("action", "enable")])).toBeNull();
+    expect(title("ru", "group_update", [fact("group", "", { untrusted: true })])).toBeNull();
+    expect(title("ru", "retention", [fact("journal_days", "7 -> 14 days")])).toBeNull();
+    expect(planTitle(tr("ru"), "relay")).toBe("Изменить ретрансляцию");
+  });
+  it("puts a site on the nodes, the panel, or both", () => {
+    const site = [fact("site", "Studio", { untrusted: true })];
+    expect(title("en", "decoy_site_assign", [...site, fact("nodes", "de1, nl1", { untrusted: true }), fact("panel", "false")])).toBe("Put the decoy site “Studio” on de1, nl1");
+    expect(title("en", "decoy_site_assign", [...site, fact("panel", "true")])).toBe("Put the decoy site “Studio” on the panel");
+    expect(title("en", "decoy_site_assign", [...site, fact("nodes", "de1", { untrusted: true }), fact("panel", "true")])).toBe("Put the decoy site “Studio” on nodes and the panel");
+  });
+});
+
+describe("the reverse bridge's check, with its time", () => {
+  it("words a verdict and a stage with the time, not 'ok at 2026-…'", () => {
+    const reach = fact("reverse_reach", "reach at 2026-11-18 14:20 UTC");
+    const stage = fact("reverse_reach", "ok  at 2026-11-18 14:20 UTC");
+    const coded = fact("reverse_reach", "fail other at 2026-11-18 14:20 UTC");
+    for (const lang of ["en", "ru", "zh", "fa", "tr"] as const) {
+      for (const f of [reach, stage, coded]) expect(line(lang, f), `${lang} ${f.value}`).not.toMatch(/\bat\b|UTC|\b(ok|fail|reach)\b/);
+    }
+    expect(line("ru", reach)).toMatch(/^Доступ в обратную сторону: да, проверено /);
+    expect(line("ru", stage)).toMatch(/: проходит, проверено /);
+    expect(line("ru", coded)).toMatch(/: не проходит \(other\), проверено /);
+    expect(line("en", stage)).toMatch(/: passes, checked /);
   });
 });

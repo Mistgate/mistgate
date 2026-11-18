@@ -171,6 +171,57 @@ const lookup = (t: T, key: string, vars?: Record<string, string | number>) => (h
 export const toolTitle = (t: T, tool: string) => lookup(t, `approval.tool.${tool}`) ?? tool;
 /** The title of a plan in the interface language: its tool's own words, or null for a tool that has none (its English line stands in). */
 export const planTitle = (t: T, tool: string): string | null => lookup(t, `approval.tool.${tool}`);
+
+/** The plan tools whose facts carry no name, so their title is the general one ("approval.tool.<tool>") only (plan-vocabulary.test.ts). */
+export const planTitleWithoutNames = [
+  "dns_settings_set", "node_server_keys_add", "os_rollout_cancel", "os_rollout_pause", "os_rollout_resume", "os_rollout_start", "profile_deploy", "profile_update", "retention",
+  "subscription_link_limits_set", "subscription_page_set", "subscription_rules_set", "subscription_texts_set",
+];
+/**
+ * Every other plan tool has "approval.title.<tool>", with the facts' own keys as placeholders ("Close the alert on {node}"), and, where
+ * the plan can be one of several, one of these variants: "approval.title.<tool>.<variant>". The variant is picked from the facts; with no
+ * name to put in, or a message that does not exist, the general title stands.
+ */
+const sitePlace = (g: (key: string) => string) => (g("nodes") && g("panel") !== "true" ? "nodes" : !g("nodes") && g("panel") === "true" ? "panel" : "");
+const manyUsers = (g: (key: string) => string) => (Number(g("count")) > 1 ? "many" : "");
+export const planTitleVariants: Record<string, { names: string[]; pick: (get: (key: string) => string) => string }> = {
+  decoy_site_assign: { names: ["nodes", "panel"], pick: sitePlace },
+  decoy_site_unassign: { names: ["nodes", "panel"], pick: sitePlace },
+  node_ipv6: { names: ["enable", "disable"], pick: (g) => g("action") },
+  relay: { names: ["create", "enable", "disable", "port", "delete"], pick: (g) => g("action") },
+  subscription_mihomo_template_set: { names: ["create", "remove"], pick: (g) => g("action") },
+  user_disable: { names: ["many"], pick: manyUsers },
+  user_enable: { names: ["many"], pick: manyUsers },
+  user_reset_traffic: { names: ["many"], pick: manyUsers },
+};
+
+/**
+ * The title of a plan with the names its facts carry ("Turn on the relay of fi1 through msk1"), as pieces: the panel's words, and the names
+ * from data. Null for a plan with none (the general title then stands), or when a name the message needs is not in the facts.
+ */
+export function planTitleWords(t: T, fmt: Fmt, tool: string, facts: readonly Pick<Fact, "key" | "value" | "untrusted" | "code" | "params" | "untrustedParams">[]): Piece[] | null {
+  if (planTitleWithoutNames.includes(tool)) return null;
+  const find = (key: string) => facts.find((f) => f.key === key && f.value.trim() !== "");
+  const variant = planTitleVariants[tool]?.pick((key) => find(key)?.value ?? "");
+  const named = `approval.title.${tool}.${variant}`;
+  const general = `approval.title.${tool}`;
+  const key = variant && hasKey(named) ? named : hasKey(general) ? general : null;
+  if (!key) return null;
+  const used = [...new Set([...en[key].matchAll(/\{(\w+)\}/g)].map((m) => m[1]!))];
+  const vars: Record<string, string> = {};
+  const data: string[] = [];
+  for (const name of used) {
+    const f = find(name);
+    if (!f) return null;
+    const pieces = factWords(t, fmt, f);
+    vars[name] = pieces.map((p) => (typeof p === "string" ? p : p.data)).join("");
+    if (pieces.some((p) => typeof p !== "string")) data.push(name);
+  }
+  // the names go in after the message is made (their braces stay till then); a plural message is picked by {count}
+  const holders = Object.fromEntries(used.map((n) => [n, `{${n}}`]));
+  const text = en[key].includes("|") ? t.n(key, Number(vars.count ?? 1), holders) : t(key, holders);
+  return withPlates(text, vars, data);
+}
 /** The label of a fact ("approval.fact.<key>"); a profile settings field comes as "setting:<JSON pointer>". */
 export function factLabel(t: T, key: string): string {
   if (key.startsWith("setting:")) return t("approval.fact.setting", { path: key.slice(8) });
@@ -223,10 +274,16 @@ const reverseKnown: Record<string, MessageKey> = {
 };
 
 /** The relay's reverse bridge and its reach, as the panel words them; "unavailable: <why>" wraps one of its own reasons. */
-function reverseText(t: T, value: string): string {
+function reverseText(t: T, value: string, fmt?: Fmt): string {
   if (reverseKnown[value]) return t(reverseKnown[value]);
   const m = /^unavailable: (.+)$/.exec(value);
-  return m ? t("approval.value.reverse.unavailable", { why: reverseKnown[m[1]!] ? t(reverseKnown[m[1]!]!) : m[1]! }) : value;
+  if (m) return t("approval.value.reverse.unavailable", { why: reverseKnown[m[1]!] ? t(reverseKnown[m[1]!]!) : m[1]! });
+  // a check that ran: "reach at 2026-11-18 14:20 UTC" (the hint of the exit's check) or "ok other at ..." / "ok  at ..." (a stage: its status, its code)
+  const at = /^(\w+)(?:\s+(\w+))?\s+at (\d{4}-\d\d-\d\d \d\d:\d\d) UTC$/.exec(value);
+  const unix = at ? Date.parse(`${at[3]!.replace(" ", "T")}Z`) / 1000 : NaN;
+  if (!at || !fmt || Number.isNaN(unix)) return value;
+  const word = lookup(t, `approval.value.reverse.verdict.${at[1]}`) ?? lookup(t, `approval.value.relay.stage.${at[1]}`) ?? at[1]!;
+  return t("approval.value.reverse.checked", { what: at[2] ? `${word} (${at[2]})` : word, time: fmt.dateTime(unix) });
 }
 
 /** "7 -> 14 days" / "24 -> 48 hours": a retention setting changing. */
@@ -258,7 +315,7 @@ function formatText(t: T, value: string): string {
 }
 
 /** What a fact says, in the UI language where the panel's own wording is known. */
-export function factText(t: T, f: Pick<Fact, "key" | "value" | "untrusted">): string {
+export function factText(t: T, f: Pick<Fact, "key" | "value" | "untrusted">, fmt?: Fmt): string {
   if (f.untrusted) return f.value;
   if (f.value === "true" || f.value === "false") return yesNo(t, f.value);
   if (f.key === "progress") {
@@ -272,7 +329,7 @@ export function factText(t: T, f: Pick<Fact, "key" | "value" | "untrusted">): st
   if (key) return t(key);
   // why an OS update cannot start: the code of the panel's own answer, worded as the OS update screens word it
   if (f.key === "update_block") return lookup(t, `os.block.${f.value}`) ?? f.value;
-  if (f.key === "reverse_bridge" || f.key === "reverse_reach") return reverseText(t, f.value);
+  if (f.key === "reverse_bridge" || f.key === "reverse_reach") return reverseText(t, f.value, fmt);
   return tokenWords(t, f.key, f.value) ?? retentionText(t, f.value) ?? f.value;
 }
 
@@ -448,7 +505,7 @@ export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untru
   switch (f.code ?? "") {
     case "":
       // a size in bytes is written as the screens write it
-      return [f.key === "bytes" && /^\d+$/.test(f.value) ? fmt.bytes(Number(f.value)) : factText(t, f)];
+      return [f.key === "bytes" && /^\d+$/.test(f.value) ? fmt.bytes(Number(f.value)) : factText(t, f, fmt)];
     case "boolean":
       return [yesNo(t, p.value ?? f.value)];
     case "utc_offset": {
@@ -493,7 +550,7 @@ export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untru
     if (p.profile !== undefined && hasKey(full)) return withPlates(t(full), p, [...(f.untrustedParams ?? []), "profile"]);
     return [lookup(t, `health.fix.${f.code}.label`) ?? f.value];
   }
-  return [valueWords(t, `approval.value.${f.code}`, p) ?? factText(t, f)];
+  return [valueWords(t, `approval.value.${f.code}`, p) ?? factText(t, f, fmt)];
 }
 
 /** The codes factWords words itself, one by one (every other code has a message "approval.value.<code>"; plan-vocabulary.test.ts). */
