@@ -44,6 +44,9 @@ const (
 	// GroupServiceDeleteGroupProcedure is the fully-qualified name of the GroupService's DeleteGroup
 	// RPC.
 	GroupServiceDeleteGroupProcedure = "/mistgate.admin.v1.GroupService/DeleteGroup"
+	// GroupServiceSetNodeSharingProcedure is the fully-qualified name of the GroupService's
+	// SetNodeSharing RPC.
+	GroupServiceSetNodeSharingProcedure = "/mistgate.admin.v1.GroupService/SetNodeSharing"
 )
 
 // GroupServiceClient is a client for the mistgate.admin.v1.GroupService service.
@@ -53,6 +56,16 @@ type GroupServiceClient interface {
 	UpdateGroup(context.Context, *connect.Request[v1.UpdateGroupRequest]) (*connect.Response[v1.UpdateGroupResponse], error)
 	// FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
 	DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[v1.DeleteGroupResponse], error)
+	// Hands a node out as asked, in one transaction: ALL clears every group's switch for the node and lets groups made later
+	// have it, LISTED gives it to the listed groups only (groups made later do not get it), NONE to no group. The groups' own
+	// disabled lists change with it (Group.disabled_node_ids), so the group pages show the new state. dry_run says what would
+	// change without writing; asked with the node's current mode and groups, it says how many people get the node now. The
+	// mode of every node and how many groups receive it are in Node.sharing, and which ones in Group.disabled_node_ids.
+	// Same rights as UpdateGroup (owner and helper; for a token, approved with the plan); the people who gain or lose the
+	// node count against the token's user-change limit like a group update does. Audited as node_sharing_set. NOT_FOUND
+	// for a node or group that does not exist, FAILED_PRECONDITION "node_retired" for a retired node, INVALID_ARGUMENT for
+	// group_ids with ALL or NONE and for LISTED with none.
+	SetNodeSharing(context.Context, *connect.Request[v1.SetNodeSharingRequest]) (*connect.Response[v1.SetNodeSharingResponse], error)
 }
 
 // NewGroupServiceClient constructs a client for the mistgate.admin.v1.GroupService service. By
@@ -90,15 +103,22 @@ func NewGroupServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(groupServiceMethods.ByName("DeleteGroup")),
 			connect.WithClientOptions(opts...),
 		),
+		setNodeSharing: connect.NewClient[v1.SetNodeSharingRequest, v1.SetNodeSharingResponse](
+			httpClient,
+			baseURL+GroupServiceSetNodeSharingProcedure,
+			connect.WithSchema(groupServiceMethods.ByName("SetNodeSharing")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // groupServiceClient implements GroupServiceClient.
 type groupServiceClient struct {
-	listGroups  *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
-	createGroup *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
-	updateGroup *connect.Client[v1.UpdateGroupRequest, v1.UpdateGroupResponse]
-	deleteGroup *connect.Client[v1.DeleteGroupRequest, v1.DeleteGroupResponse]
+	listGroups     *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
+	createGroup    *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
+	updateGroup    *connect.Client[v1.UpdateGroupRequest, v1.UpdateGroupResponse]
+	deleteGroup    *connect.Client[v1.DeleteGroupRequest, v1.DeleteGroupResponse]
+	setNodeSharing *connect.Client[v1.SetNodeSharingRequest, v1.SetNodeSharingResponse]
 }
 
 // ListGroups calls mistgate.admin.v1.GroupService.ListGroups.
@@ -121,6 +141,11 @@ func (c *groupServiceClient) DeleteGroup(ctx context.Context, req *connect.Reque
 	return c.deleteGroup.CallUnary(ctx, req)
 }
 
+// SetNodeSharing calls mistgate.admin.v1.GroupService.SetNodeSharing.
+func (c *groupServiceClient) SetNodeSharing(ctx context.Context, req *connect.Request[v1.SetNodeSharingRequest]) (*connect.Response[v1.SetNodeSharingResponse], error) {
+	return c.setNodeSharing.CallUnary(ctx, req)
+}
+
 // GroupServiceHandler is an implementation of the mistgate.admin.v1.GroupService service.
 type GroupServiceHandler interface {
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
@@ -128,6 +153,16 @@ type GroupServiceHandler interface {
 	UpdateGroup(context.Context, *connect.Request[v1.UpdateGroupRequest]) (*connect.Response[v1.UpdateGroupResponse], error)
 	// FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
 	DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[v1.DeleteGroupResponse], error)
+	// Hands a node out as asked, in one transaction: ALL clears every group's switch for the node and lets groups made later
+	// have it, LISTED gives it to the listed groups only (groups made later do not get it), NONE to no group. The groups' own
+	// disabled lists change with it (Group.disabled_node_ids), so the group pages show the new state. dry_run says what would
+	// change without writing; asked with the node's current mode and groups, it says how many people get the node now. The
+	// mode of every node and how many groups receive it are in Node.sharing, and which ones in Group.disabled_node_ids.
+	// Same rights as UpdateGroup (owner and helper; for a token, approved with the plan); the people who gain or lose the
+	// node count against the token's user-change limit like a group update does. Audited as node_sharing_set. NOT_FOUND
+	// for a node or group that does not exist, FAILED_PRECONDITION "node_retired" for a retired node, INVALID_ARGUMENT for
+	// group_ids with ALL or NONE and for LISTED with none.
+	SetNodeSharing(context.Context, *connect.Request[v1.SetNodeSharingRequest]) (*connect.Response[v1.SetNodeSharingResponse], error)
 }
 
 // NewGroupServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -161,6 +196,12 @@ func NewGroupServiceHandler(svc GroupServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(groupServiceMethods.ByName("DeleteGroup")),
 		connect.WithHandlerOptions(opts...),
 	)
+	groupServiceSetNodeSharingHandler := connect.NewUnaryHandler(
+		GroupServiceSetNodeSharingProcedure,
+		svc.SetNodeSharing,
+		connect.WithSchema(groupServiceMethods.ByName("SetNodeSharing")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.GroupService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GroupServiceListGroupsProcedure:
@@ -171,6 +212,8 @@ func NewGroupServiceHandler(svc GroupServiceHandler, opts ...connect.HandlerOpti
 			groupServiceUpdateGroupHandler.ServeHTTP(w, r)
 		case GroupServiceDeleteGroupProcedure:
 			groupServiceDeleteGroupHandler.ServeHTTP(w, r)
+		case GroupServiceSetNodeSharingProcedure:
+			groupServiceSetNodeSharingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -194,4 +237,8 @@ func (UnimplementedGroupServiceHandler) UpdateGroup(context.Context, *connect.Re
 
 func (UnimplementedGroupServiceHandler) DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[v1.DeleteGroupResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.GroupService.DeleteGroup is not implemented"))
+}
+
+func (UnimplementedGroupServiceHandler) SetNodeSharing(context.Context, *connect.Request[v1.SetNodeSharingRequest]) (*connect.Response[v1.SetNodeSharingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.GroupService.SetNodeSharing is not implemented"))
 }

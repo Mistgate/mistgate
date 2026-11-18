@@ -73,6 +73,9 @@ type NodeRow struct {
 	// DecoySiteID is the library site this node serves in mode "own" ("" = none; migration 00143). DecoyBundleHash follows the site's
 	// current version while it is set.
 	DecoySiteID string
+	// Share is how a new node is handed out to groups: an input of CreateEnrollment only (read it with NodeShares). The zero
+	// value decides by whether the node is the panel's first.
+	Share NodeShareChoice
 }
 
 const nodeCols = `id, name, address, country_code, location, provider, notes, dns_resolvers,

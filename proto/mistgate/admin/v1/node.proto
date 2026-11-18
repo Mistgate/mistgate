@@ -182,6 +182,21 @@ message Node {
   string link_via_node_id = 43;
   // The library site this node serves (mode "own"); empty when none (DecoySiteService).
   string decoy_site_id = 44;
+  // Who the node is handed out to; the groups that receive it are those whose Group.disabled_node_ids lacks this node. Always set.
+  NodeShareSummary sharing = 45;
+}
+
+// How a node is handed out, for the nodes list and the node's page.
+message NodeShareSummary {
+  NodeShareMode mode = 1;
+  // Groups that receive the node now, of all groups; a group made later counts in groups_total only.
+  uint32 groups_receiving = 2;
+  uint32 groups_total = 3;
+  // When the owner last set the share (the node's creation until then). A group's own page does not move it.
+  int64 changed_unix = 4 [jstype = JS_NUMBER];
+  // NONE for more than a day on a node that is enrolled and has an enabled server: the label "nobody gets this node". Only a
+  // field, never an alert: handing a node to nobody is a state the owner may want.
+  bool idle = 5;
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",
@@ -376,6 +391,9 @@ message CreateEnrollmentRequest {
   string provider = 6;
   // Token lifetime. 0 = 3600. Max 86400.
   uint32 ttl_seconds = 7;
+  // Only for a new node (node_id empty; INVALID_ARGUMENT with node_id): who the node is handed out to. Unset or mode
+  // UNSPECIFIED = the panel decides: the first node of the panel goes to every group, a later one to none.
+  NodeSharing sharing = 8;
 }
 
 message CreateEnrollmentResponse {

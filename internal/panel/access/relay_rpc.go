@@ -62,7 +62,7 @@ func (s *Service) relayRecipientUsable(l store.RelayLink, exit store.AccessInbou
 }
 
 func (s *Service) relayRecipientUsableFor(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
-	return s.usableForFormat(exit, g, u, format) && !slices.Contains(g.DisabledNodeIDs, l.ViaNodeID) &&
+	return s.usableForFormat(exit, g, u, format) && g.GetsNode(l.ViaNodeID) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, l.ViaNodeID))
 }
 

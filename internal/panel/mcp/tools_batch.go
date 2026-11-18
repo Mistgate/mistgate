@@ -51,8 +51,8 @@ type checksRunArg struct {
 
 func batchTools() []toolDef {
 	return []toolDef{
-		readTool("nodes_get", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"node_get for many nodes in one call: nodes is a list of node ids or exact names, empty = every node that is not retired (at most 50). Each entry is the node_get view (status and reason, host facts, inbounds with their state, up to 10 online users, notes, ipv6); when the answer is too large the online users go first, then whole nodes, and truncated is set. No addresses, keys or certificate pins.",
+		readTool("nodes_get", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.GroupServiceListGroupsProcedure),
+			"node_get for many nodes in one call: nodes is a list of node ids or exact names, empty = every node that is not retired (at most 50). Each entry is the node_get view (status and reason, host facts, inbounds with their state, up to 10 online users, notes, ipv6, sharing); when the answer is too large the online users go first, then whole nodes, and truncated is set. No addresses, keys or certificate pins.",
 			func(c *call, in nodesGetArg) (any, error) { return c.nodesGet(in.Nodes) }),
 
 		readToolWithin(checksWait+20*time.Second, "checks_run_now", ProfileOperator,
@@ -175,6 +175,10 @@ func (c *call) nodesGet(refs []string) (any, error) {
 			}
 		}
 	}
+	groups, err := c.groups()
+	if err != nil {
+		return nil, err
+	}
 	v := &NodesGetV{Nodes: []*NodeGetV{}}
 	for i, n := range picked {
 		if i == maxFleetNodes {
@@ -185,7 +189,9 @@ func (c *call) nodesGet(refs []string) (any, error) {
 		if err != nil {
 			return nil, apiError(err)
 		}
-		v.Nodes = append(v.Nodes, nodeGetView(r.Msg))
+		nv := nodeGetView(r.Msg)
+		nv.Sharing = nodeSharingView(r.Msg.GetNode(), groups)
+		v.Nodes = append(v.Nodes, nv)
 	}
 	return v, nil
 }

@@ -521,6 +521,16 @@ type AccessGroup struct {
 	Color string
 }
 
+// GroupGetsNode is the one rule of which nodes a group hands out: every node except the ones on its disabled list. A node the
+// owner holds back (NodeShare) is on the list of every group that was not given it, groups made later included, so the rule has
+// no case for it. Every reader of a group's nodes asks here (or, in SQL, uses accGroupGetsNode).
+func GroupGetsNode(disabledNodeIDs []string, nodeID string) bool {
+	return !slices.Contains(disabledNodeIDs, nodeID)
+}
+
+// GetsNode is GroupGetsNode for the group.
+func (g AccessGroup) GetsNode(nodeID string) bool { return GroupGetsNode(g.DisabledNodeIDs, nodeID) }
+
 // GroupTones is the palette of a group's colour, in the order the admin offers it and the order a new group takes the least
 // used tone in (ties go to the earlier one). Sky and mint come last: they are also the Link and Keys chips.
 var GroupTones = []string{"lavender", "sand", "sage", "rose", "sky", "mint"}
@@ -554,6 +564,9 @@ func (a Access) CreateGroup(ctx context.Context, g AccessGroup) error {
 	stmts := []Stmt{insert}
 	stmts = append(stmts, accSetGroupProfileStmts(g.ID, g.ProfileIDs)...)
 	stmts = append(stmts, accSetGroupDisabledNodeStmts(g.ID, g.DisabledNodeIDs)...)
+	// a node the owner holds back is not given to a group made later
+	stmts = append(stmts, Stmt{Query: `INSERT OR IGNORE INTO user_group_disabled_node (group_id, node_id)
+		SELECT ?, id FROM node WHERE hold_new_groups = 1 AND state <> 'retired'`, Args: []any{g.ID}})
 	_, err := a.s.batch(ctx, stmts...)
 	switch {
 	case accIsUnique(err):

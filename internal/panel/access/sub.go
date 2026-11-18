@@ -1314,7 +1314,7 @@ func (s *Service) usable(f store.AccessInboundFull, g store.AccessGroup, u store
 // only that app consumes (while the person's Mistgate switch is on); every other format leaves them out.
 func (s *Service) usableForFormat(f store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
 	if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) ||
-		slices.Contains(g.DisabledNodeIDs, f.Node.ID) || !(u.AllNodes || slices.Contains(u.NodeIDs, f.Node.ID)) {
+		!g.GetsNode(f.Node.ID) || !(u.AllNodes || slices.Contains(u.NodeIDs, f.Node.ID)) {
 		return false
 	}
 	if format == plugin.FormatTTLink {

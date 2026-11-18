@@ -2705,3 +2705,52 @@ func TestD1ClientCompatDevices(t *testing.T) {
 func TestD1RelayAudienceStorage(t *testing.T) {
 	relayAudienceProof(t, openD1Store(t))
 }
+
+// How a node is handed out runs on D1 too: the first node goes to every group, a later one to none, a group made later does not
+// get a held node, and a share set afterwards reads back.
+func TestD1NodeShare(t *testing.T) {
+	st := openD1Store(t)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0).UTC()
+	for _, g := range []string{"family", "friends"} {
+		if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_" + g, Name: g, CreatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, n := range []string{"de1", "nl1"} {
+		if _, err := st.CreateEnrollment(ctx, &NodeRow{ID: "nod_" + n, Name: n, Address: n + ".example.com"}, "", []byte("tok-"+n), "adm_test", now, now.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_later", Name: "later", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	shares, err := st.NodeShares(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shares["nod_de1"].Mode() != ShareAll || shares["nod_de1"].Receiving != 3 || shares["nod_nl1"].Mode() != ShareNone || shares["nod_nl1"].Groups != 3 {
+		t.Fatalf("shares: %+v", shares)
+	}
+	if err := st.Access().SetNodeShare(ctx, "nod_nl1", NodeShareChoice{Mode: ShareListed, GroupIDs: []string{"grp_family", "grp_later"}}, now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if shares, err = st.NodeShares(ctx); err != nil || shares["nod_nl1"].Mode() != ShareListed || shares["nod_nl1"].Receiving != 2 || shares["nod_nl1"].ChangedAt.Unix() != now.Add(time.Hour).Unix() {
+		t.Fatalf("after listing: %+v %v", shares["nod_nl1"], err)
+	}
+	groups, err := st.Access().Groups(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range groups {
+		if want := g.Name == "friends"; want != (len(g.DisabledNodeIDs) == 1 && g.DisabledNodeIDs[0] == "nod_nl1") {
+			t.Errorf("group %s: disabled %v", g.Name, g.DisabledNodeIDs)
+		}
+	}
+	if err := st.Access().SetNodeShare(ctx, "nod_nl1", NodeShareChoice{Mode: ShareAll}, now.Add(2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if shares, err = st.NodeShares(ctx); err != nil || shares["nod_nl1"].Mode() != ShareAll || shares["nod_nl1"].Receiving != 3 {
+		t.Fatalf("after all: %+v %v", shares["nod_nl1"], err)
+	}
+}

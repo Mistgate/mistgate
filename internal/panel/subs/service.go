@@ -149,7 +149,7 @@ func (s *Service) nameSamples(ctx context.Context) (string, []*adminv1.ServerSam
 	var candidates []sample
 	for _, f := range full {
 		p, ok := s.reg.Get(f.Profile.Protocol)
-		if !ok || !slices.Contains(g.ProfileIDs, f.Profile.ID) || slices.Contains(g.DisabledNodeIDs, f.Node.ID) || !f.Inbound.Enabled || f.Node.State != "active" ||
+		if !ok || !slices.Contains(g.ProfileIDs, f.Profile.ID) || !g.GetsNode(f.Node.ID) || !f.Inbound.Enabled || f.Node.State != "active" ||
 			(f.Inbound.State != "pending" && f.Inbound.State != "active") || !protocols.AllowedForApps(p, plugin.ClientHapp) {
 			continue
 		}

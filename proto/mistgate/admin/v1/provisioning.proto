@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
+import "mistgate/admin/v1/common.proto";
+
 // Owner-only SSH installation of a Mistgate node. Credentials are accepted only after the
 // administrator has confirmed the SSH host-key fingerprint shown by GetSSHFingerprint.
 service ProvisioningService {
@@ -100,6 +102,8 @@ message StartNodeProvisionRequest {
   // An owner's private key is used for this install only; the worker replaces it with the panel key for saved access.
   string private_key = 15;
   string private_key_passphrase = 16;
+  // Who the new node is handed out to once installed (see CreateEnrollmentRequest.sharing); unset = the panel decides.
+  NodeSharing sharing = 17;
 }
 
 message RetryNodeProvisionRequest {

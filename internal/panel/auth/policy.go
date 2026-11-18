@@ -129,6 +129,8 @@ var procedureLevels = map[string]level{
 	adminv1connect.GroupServiceCreateGroupProcedure: levelWrite,
 	adminv1connect.GroupServiceUpdateGroupProcedure: levelWrite,
 	adminv1connect.GroupServiceDeleteGroupProcedure: levelWrite,
+	// Who a node is handed out to is a group edit, with the same rights as UpdateGroup.
+	adminv1connect.GroupServiceSetNodeSharingProcedure: levelWrite,
 
 	// DnsService: presets decide which resolvers a user's traffic trusts, so editing them is owner-only;
 	// choosing one for a user or group is a user/group edit (levelWrite above).

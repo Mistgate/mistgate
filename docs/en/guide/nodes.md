@@ -31,6 +31,8 @@ On a phone the table becomes one card per node with the same facts. The list ref
 
 A healthy node whose agent is older than the version this panel ships reads **Healthy · outdated agent** with its version; the line is a link to **Updates**. See [Updates](../operations/updates.md).
 
+**Who gets a node.** A node is handed out to groups: to every group, to the groups you pick, or to none. The first node of a panel goes to every group, so a new panel works at once. Each later node goes to nobody until you give it to a group, and a group made later does not receive it either: adding a node never changes what people already get. You can choose when you add the node, and change it later from the node's side (the API call `SetNodeSharing`, the MCP tools `node_sharing_set_plan` and `node_sharing_set_apply`); the answer says how many people will gain and lose the node before anything is written. A group's own page can still switch a node off for that group, but not switch a held node on. A node that is running and that nobody has received for more than a day is marked in the list (`sharing.idle`); it is a label, not an alert, because handing a node to nobody is a state you may want.
+
 ## Bulk actions
 
 The owner can tick nodes in the list (on a phone, on each card) and act on all of them at once. The box in the table's header ticks every shown node; **Select ▾** next to the status chips replaces the selection with **All shown**, **With problems**, **Password only** or **Outdated agent**, or clears it. At most 50 nodes are selected at once, and a retired node cannot be.

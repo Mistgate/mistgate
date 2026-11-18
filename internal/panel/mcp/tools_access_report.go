@@ -911,7 +911,7 @@ func (a *accessCtx) findings() []accessFindingV {
 }
 
 func (a *accessCtx) groupGives(g *accGroup, x *accInbound) bool {
-	if !x.Enabled || x.State == "disabled" || !slices.Contains(g.ProfileIDs, x.ProfileID) || slices.Contains(g.DisabledNodes, x.NodeID) {
+	if !x.Enabled || x.State == "disabled" || !slices.Contains(g.ProfileIDs, x.ProfileID) || !store.GroupGetsNode(g.DisabledNodes, x.NodeID) {
 		return false
 	}
 	if x.Direct || x.CDN {

@@ -277,6 +277,17 @@ func TestRevokeAPITokenRacePreservesFirstRevocation(t *testing.T) {
 
 func rewriteAccessGroup(t *testing.T, s *Store, id, name string) {
 	t.Helper()
+	var hasShareColumn int
+	if err := s.R.QueryRowContext(context.Background(), `SELECT count(*) FROM pragma_table_info('node') WHERE name = 'hold_new_groups'`).Scan(&hasShareColumn); err != nil {
+		t.Fatal(err)
+	}
+	if hasShareColumn == 0 {
+		// These migration tests intentionally build an older schema and exercise the store only to seed a row.
+		if _, err := s.W.ExecContext(context.Background(), `INSERT INTO user_group (id, name, created_at, color) VALUES (?, ?, ?, 'lavender')`, id, name, unix(t0)); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
 	if err := s.Access().CreateGroup(context.Background(), AccessGroup{ID: id, Name: name, CreatedAt: t0}); err != nil {
 		t.Fatal(err)
 	}

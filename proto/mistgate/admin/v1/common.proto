@@ -286,3 +286,26 @@ message HelloKexDevice {
   // Start of the newest hour with a hello counter.
   int64 last_hour_unix = 9 [jstype = JS_NUMBER];
 }
+
+// How a node is handed out to groups. A group receives every node that is not on its disabled list (Group.disabled_node_ids).
+// A node the owner holds back is on that list of every group that was not given it, and a group made later starts with it
+// there too; so the mode is read off the node: ALL when nothing is held back, LISTED while some group receives it, NONE when
+// no group does. Set with GroupService.SetNodeSharing, or at the node's creation (CreateEnrollmentRequest.sharing,
+// StartNodeProvisionRequest.sharing); read in Node.sharing and, per group, in Group.disabled_node_ids.
+enum NodeShareMode {
+  // Only in a request that makes a node: the panel decides. The first node of the panel that is not retired goes to every group
+  // (ALL), each later one to no group (NONE). Never in a response.
+  NODE_SHARE_MODE_UNSPECIFIED = 0;
+  // Every group, groups made later too. A group can still turn the node off for itself (UpdateGroup.disabled_node_ids).
+  NODE_SHARE_MODE_ALL = 1;
+  // Only the listed groups; a group made later does not get the node.
+  NODE_SHARE_MODE_LISTED = 2;
+  // No group, and no group made later, until the owner gives the node to one. A legitimate state: nothing alerts on it.
+  NODE_SHARE_MODE_NONE = 3;
+}
+
+// A share asked for: the mode, and for LISTED the groups that receive the node (at least one; empty for ALL and NONE).
+message NodeSharing {
+  NodeShareMode mode = 1;
+  repeated string group_ids = 2;
+}

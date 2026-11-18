@@ -30,7 +30,7 @@ func groupTools() []toolDef {
 					return groupView(g), nil
 				}),
 		},
-		change(groupCreate), change(groupUpdate), change(groupDelete),
+		change(groupCreate), change(groupUpdate), change(groupDelete), change(nodeSharingSet),
 	)
 }
 

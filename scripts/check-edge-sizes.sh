@@ -28,7 +28,10 @@ entries=(
   # the admin Worker, which keeps 1.5 MiB under its own limit; this entry still ships nowhere.
   # 49 MiB with relay keys for AmneziaWG devices (48.02 MiB measured): a key per relay path, the relay twin in subscriptions,
   # the audience and traffic of a relay are code of the public and admin Workers, each within its own limit below.
-  "mistgate-edge:49"
+  # 50 MiB with who a node is handed out to (48.999 MiB measured, 814 bytes under 49): the rule of what a group receives is
+  # the subscription's own rule, so it runs in the public Worker, and setting it is the admin Worker's; this entry is their
+  # sum and ships nowhere.
+  "mistgate-edge:50"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   # 29 MiB with the reverse relay (28.23 MiB measured with TrustTunnel and own probes also in, 28.03 MiB for the relay alone):
   # the agent contract grew by the bridge messages, and every Worker that builds an agent's desired state or reads its reports
@@ -59,7 +62,9 @@ entries=(
   # admin RPCs and UI state, so they stay here rather than adding another Worker boundary. 47 MiB with the owner's own
   # subscription response headers (46.01 MiB measured, 9 KiB over 46): the settings RPC, its validation and the preview are
   # admin RPCs, and the TrustTunnel and bridge settings merged just before had left 91 KiB of room.
-  "mistgate-edge-admin:47"
+  # 48 MiB with who a node is handed out to (46.97 MiB measured, 28 KiB under 47): SetNodeSharing and the sharing a node
+  # carries in every list are admin calls and cannot live in another Worker; the connect handler of one new call is most of it.
+  "mistgate-edge-admin:48"
   # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB; 31.9 MiB in November 2026 with the panel's SSH key, the
   # authorized_keys management and the login by an own private key, which need that SSH client and so cannot live elsewhere.
   "mistgate-edge-provision:35"

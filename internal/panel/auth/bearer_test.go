@@ -851,6 +851,7 @@ func TestPlanningGrantOpensOnlyTheDryRun(t *testing.T) {
 		{adminv1connect.ProfileServiceCreateInboundProcedure, `{"validateOnly":true}`, `{"validateOnly":false}`},
 		{adminv1connect.ProfileServiceUpdateProfileProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
 		{adminv1connect.GroupServiceUpdateGroupProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
+		{adminv1connect.GroupServiceSetNodeSharingProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
 	} {
 		e.seen.calls = 0
 		body := []byte(tc.ok)
@@ -918,8 +919,8 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 47 {
-		t.Errorf("%d procedures need approval, want 47: %v", len(approved), approved)
+	if len(approved) != 48 {
+		t.Errorf("%d procedures need approval, want 48: %v", len(approved), approved)
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)
@@ -957,6 +958,7 @@ func TestTokenAllowList(t *testing.T) {
 	wantProfileGrants["path_speed"] = []string{PathSpeedProcedure}
 	wantProfileGrants["node_update"] = []string{adminv1connect.NodeServiceUpdateNodeProcedure, adminv1connect.ProfileServiceUpdateInboundProcedure}
 	wantProfileGrants["group_update"] = []string{adminv1connect.GroupServiceUpdateGroupProcedure}
+	wantProfileGrants["node_sharing_set"] = []string{adminv1connect.GroupServiceSetNodeSharingProcedure}
 	wantProfileGrants["subscription_rules_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
 	wantProfileGrants["subscription_texts_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
 	wantProfileGrants["subscription_link_limits_set"] = []string{adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure}
