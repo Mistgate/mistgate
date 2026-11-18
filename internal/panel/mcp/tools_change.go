@@ -205,7 +205,7 @@ var nodeDecoy = changeSpec[nodeDecoyArgs]{
 		if err != nil {
 			return done{}, apiError(err)
 		}
-		return done{text: "Node decoy site change applied."}, nil
+		return doneWith("node_decoy_applied", "Node decoy site change applied."), nil
 	},
 }
 
@@ -271,9 +271,9 @@ var warpRestart = changeSpec[warpRestartArgs]{
 			return done{}, apiError(err)
 		}
 		if !r.Msg.GetConfirmed() {
-			return done{text: "Restart sent, but the node did not confirm the pause before resume."}, nil
+			return doneWith("warp_restart_unconfirmed", "Restart sent, but the node did not confirm the pause before resume."), nil
 		}
-		return done{text: "WARP tunnel restarted."}, nil
+		return doneWith("warp_restarted", "WARP tunnel restarted."), nil
 	},
 }
 
@@ -328,7 +328,7 @@ var warpReregister = changeSpec[warpReregisterArgs]{
 		if err != nil {
 			return done{}, apiError(err)
 		}
-		return done{text: "New WARP device registered, replacing the previous account."}, nil
+		return doneWith("warp_registered", "New WARP device registered, replacing the previous account."), nil
 	},
 }
 

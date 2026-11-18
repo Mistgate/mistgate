@@ -541,10 +541,14 @@ export function outcomeText(t: T, fmt: Fmt, a: Pick<Approval, "state" | "outcome
     return why ? t("approval.failed", { text: why }) : null;
   }
   const key = `approval.outcome.${code}`;
-  if (!hasKey(key)) return null;
+  if (!hasKey(key) && !hasKey(`${key}.${a.outcomeParams?.direction}`)) return null;
   const p = a.outcomeParams ?? {};
-  if (p.seconds !== undefined) return t(key, { time: fmt.duration(Number(p.seconds)) });
-  return p.n !== undefined && en[key].includes("|") ? t.n(key, Number(p.n)) : t(key);
+  if (p.seconds !== undefined) return t(key as MessageKey, { time: fmt.duration(Number(p.seconds)) });
+  // a code with variants: by direction (a speed test), by where a site went (nodes, the panel, both)
+  const variant = code === "decoy_site_assigned" ? (Number(p.n) > 0 ? (p.panel === "true" ? "both" : "") : "panel") : (p.direction ?? "");
+  const used = (variant ? `${key}.${variant}` : key) as MessageKey;
+  if (!hasKey(used)) return null;
+  return en[used].includes("|") && p.n !== undefined ? t.n(used, Number(p.n), p) : t(used, p);
 }
 
 // ---------------------------------------------------------------------------------------------------

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { dictionaries, fill, pickForm, type Lang, type T } from "@/i18n";
 import { makeFmt } from "./format";
-import { dangerText, factLabel, factWords, planTitle, type Fact, type Piece } from "./integrations";
+import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
+import { dangerText, factLabel, factWords, outcomeText, planTitle, type Fact, type Piece } from "./integrations";
 
 // The plans the owner saw half in English on the live panel: a decoy site put on the panel, a speed test between two nodes. In each
 // language the title, the labels and the values are the panel's own words; a name from data stays on a plate of its own.
@@ -74,5 +75,28 @@ describe("retention and tokens", () => {
   it("words a retention change and a log level", () => {
     expect(line("ru", fact("journal_days", "7 -> 14 days"))).toBe("Журнал нод: 7 дней → 14 дней");
     expect(line("ru", fact("to", "debug"))).toContain("отладка");
+  });
+});
+
+describe("what came of an applied plan", () => {
+  const speed = { from: "nl1", to: "de1", direction: "down", mb: "32", mbit_s: "308.3", duration_ms: "870", connect_ms: "37", first_byte_ms: "37" };
+  const said = (lang: Lang, outcomeCode: string, outcomeParams: Record<string, string>, state = ApprovalState.APPLIED) => {
+    const t = tr(lang);
+    return outcomeText(t, makeFmt(lang, t), { state, outcomeCode, outcomeParams });
+  };
+  it("words a speed test with its figures and names, not the panel's English line", () => {
+    expect(said("ru", "path_speed_done", speed)).toBe("Замер скорости nl1 → de1, 32 МБ от целевой ноды к измеряющей: 308.3 Мбит/с за 870 мс, соединение 37 мс, первый байт через 37 мс.");
+    expect(said("ru", "path_speed_done", { ...speed, direction: "up" })).not.toContain("первый байт");
+    expect(said("en", "path_speed_done", speed)).toContain("308.3 Mbit/s over 870 ms");
+    for (const lang of ["zh", "fa", "tr"] as const) expect(said(lang, "path_speed_done", speed), lang).toContain("308.3");
+  });
+  it("words where a decoy site went: nodes, the panel, or both", () => {
+    expect(said("ru", "decoy_site_assigned", { n: "0", panel: "true" })).toBe("Сайт-ширма стоит на адресе панели");
+    expect(said("ru", "decoy_site_assigned", { n: "2", panel: "false" })).toBe("Сайт-ширма стоит на 2 нодах");
+    expect(said("ru", "decoy_site_assigned", { n: "2", panel: "true" })).toBe("Сайт-ширма стоит на 2 нодах и на адресе панели");
+  });
+  it("words a refusal, and gives nothing for a code it has no words for", () => {
+    expect(said("ru", "decoy_site_changed", {}, ApprovalState.FAILED)).toContain("сайт изменился после создания плана: создай план заново");
+    expect(said("ru", "no_such_code", {})).toBeNull();
   });
 });

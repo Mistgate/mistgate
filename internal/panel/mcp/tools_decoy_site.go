@@ -695,7 +695,7 @@ var decoySiteReady = changeSpec[decoyReadyArgs]{
 		if _, err := c.cl.DecoySite.SetDecoySiteReady(c.ctx, connect.NewRequest(&decoysitev1.SetDecoySiteReadyRequest{SiteId: a.SiteID, Ready: true})); err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: "The decoy site is ready."}, nil
+		return doneWith("decoy_site_ready", "The decoy site is ready."), nil
 	},
 }
 
@@ -836,7 +836,8 @@ var decoySiteAssign = changeSpec[decoyAssignArgs]{
 		if err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: fmt.Sprintf("The decoy site is on %d node(s)%s; the nodes are being sent its files. Warnings: %d.", len(a.Nodes), map[bool]string{true: " and the panel", false: ""}[a.Panel], len(r.Msg.GetWarnings()))}, nil
+		return doneWith("decoy_site_assigned", fmt.Sprintf("The decoy site is on %d node(s)%s; the nodes are being sent its files. Warnings: %d.", len(a.Nodes), map[bool]string{true: " and the panel", false: ""}[a.Panel], len(r.Msg.GetWarnings())),
+			"n", fmt.Sprint(len(a.Nodes)), "panel", fmt.Sprint(a.Panel), "warnings", fmt.Sprint(len(r.Msg.GetWarnings()))), nil
 	},
 }
 
@@ -899,7 +900,7 @@ var decoySiteUnassign = changeSpec[decoyUnassignArgs]{
 		if _, err := c.cl.DecoySite.UnassignDecoySite(c.ctx, connect.NewRequest(&decoysitev1.UnassignDecoySiteRequest{SiteId: a.SiteID, NodeIds: a.Nodes, Panel: a.Panel, Fallback: a.Fallback})); err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: "The decoy site is off the targets."}, nil
+		return doneWith("decoy_site_unassigned", "The decoy site is off the targets."), nil
 	},
 }
 
@@ -974,7 +975,8 @@ var decoySiteVersion = changeSpec[decoyVersionArgs]{
 		if err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: fmt.Sprintf("Saved version %d of the decoy site; %d node(s) are being sent the new files.", out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds()))}, nil
+		return doneWith("decoy_site_version_saved", fmt.Sprintf("Saved version %d of the decoy site; %d node(s) are being sent the new files.", out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds())),
+			"version", fmt.Sprint(out.Msg.GetSite().GetVersion()), "n", fmt.Sprint(len(out.Msg.GetUpdatedNodeIds()))), nil
 	},
 }
 
@@ -1033,7 +1035,8 @@ var decoySiteRevert = changeSpec[decoyRevertArgs]{
 		if err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: fmt.Sprintf("The decoy site is back to version %d (saved as version %d); %d node(s) are being sent the files.", a.Version, out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds()))}, nil
+		return doneWith("decoy_site_reverted", fmt.Sprintf("The decoy site is back to version %d (saved as version %d); %d node(s) are being sent the files.", a.Version, out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds())),
+			"version", fmt.Sprint(a.Version), "saved_as", fmt.Sprint(out.Msg.GetSite().GetVersion()), "n", fmt.Sprint(len(out.Msg.GetUpdatedNodeIds()))), nil
 	},
 }
 
@@ -1066,6 +1069,6 @@ var decoySiteDelete = changeSpec[decoyDeleteArgs]{
 		if _, err := c.cl.DecoySite.DeleteDecoySite(c.ctx, connect.NewRequest(&decoysitev1.DeleteDecoySiteRequest{SiteId: a.SiteID})); err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: "The decoy site is deleted."}, nil
+		return doneWith("decoy_site_deleted", "The decoy site is deleted."), nil
 	},
 }

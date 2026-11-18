@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
+import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
 import type { Plan } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { dangerText, factLabel, factWords, planTitle, toolTitle, type Fact } from "@/lib/integrations";
+import { dangerText, factLabel, factWords, outcomeText, planTitle, toolTitle, type Fact } from "@/lib/integrations";
 import { I, type Glyph } from "./as-icons";
 
 /**
@@ -18,7 +19,7 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
   const t = useT();
   const fmt = useFmt();
   const open = plan.state === PlanState.PROPOSED;
-  const status = statusLine(t, plan);
+  const status = statusLine(t, fmt, plan);
   // a plan that waits for the owner is decided on the approval screen (for an install, where the host key is compared and the
   // password typed: never in the chat): this button opens that screen at this plan
   const openApproval = owner && !!onOpenApproval && ((open && plan.inboxOnly) || plan.state === PlanState.WAITING_OWNER);
@@ -111,14 +112,18 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
   );
 }
 
-function statusLine(t: ReturnType<typeof useT>, p: Plan): string {
+function statusLine(t: ReturnType<typeof useT>, fmt: ReturnType<typeof useFmt>, p: Plan): string {
   switch (p.state) {
     case PlanState.WAITING_OWNER:
       return t("ai.plan.waiting");
-    case PlanState.APPLIED:
-      return p.result ? `${t("ai.plan.applied")}: ${p.result}` : t("ai.plan.applied");
+    case PlanState.APPLIED: {
+      // what came of it in the interface language (the code and its values); the panel's English line only for a code with no words
+      const said = outcomeText(t, fmt, { state: ApprovalState.APPLIED, outcomeCode: p.outcomeCode, outcomeParams: p.outcomeParams });
+      const result = said ?? p.result;
+      return result ? `${t("ai.plan.applied")}: ${result}` : t("ai.plan.applied");
+    }
     case PlanState.FAILED:
-      return t("ai.plan.failed", { error: p.error || "—" });
+      return t("ai.plan.failed", { error: outcomeText(t, fmt, { state: ApprovalState.FAILED, outcomeCode: p.outcomeCode, outcomeParams: p.outcomeParams }) ?? (p.error || "—") });
     case PlanState.REJECTED:
       return t("ai.plan.rejected");
     case PlanState.DISMISSED:

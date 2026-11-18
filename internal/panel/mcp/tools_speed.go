@@ -150,7 +150,10 @@ func speedDone(m *probev1.PathSpeedResponse) (done, error) {
 	if m.GetDirection() != "up" {
 		text += fmt.Sprintf(", first byte after %d ms", m.GetFirstByteMs())
 	}
-	return doneWith("path_speed_done", text+"."), nil
+	return doneWith("path_speed_done", text+".",
+		"from", nm(m.GetFromName()), "to", nm(m.GetToName()), "direction", m.GetDirection(), "mb", strconv.FormatUint(uint64(m.GetMb()), 10),
+		"mbit_s", strconv.FormatFloat(m.GetMbitS(), 'f', 1, 64), "duration_ms", strconv.FormatUint(uint64(m.GetDurationMs()), 10),
+		"connect_ms", strconv.FormatUint(uint64(m.GetConnectMs()), 10), "first_byte_ms", strconv.FormatUint(uint64(m.GetFirstByteMs()), 10)), nil
 }
 
 type pathSpeedResultsArg struct {

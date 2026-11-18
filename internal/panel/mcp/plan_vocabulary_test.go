@@ -28,6 +28,9 @@ type planVocabulary struct {
 	FactKeys []string `json:"fact_keys"`
 	Codes    []string `json:"codes"`
 	Dangers  []string `json:"dangers"`
+	// Outcomes are the codes of what an applied plan reports (doneWith), Failures the codes of why one did not apply (failure, retryLater).
+	Outcomes []string `json:"outcomes"`
+	Failures []string `json:"failures"`
 }
 
 // not plans: the files whose Key: fields are of reads (timeline, access reports), not of an approval fact.
@@ -102,6 +105,15 @@ func currentPlanVocabulary(t *testing.T) planVocabulary {
 			case *ast.CallExpr:
 				// codedFact("key", value, "code", ...), secondsFact("key", n), approvalTextFacts("key", ...), changeFact("key", ...)
 				id, ok := x.Fun.(*ast.Ident)
+				if ok && len(x.Args) > 0 && (id.Name == "doneWith" || id.Name == "failure" || id.Name == "retryLater") {
+					if c, ok := strLit(x.Args[0]); ok {
+						if id.Name == "doneWith" {
+							v.Outcomes = append(v.Outcomes, c)
+						} else {
+							v.Failures = append(v.Failures, c)
+						}
+					}
+				}
 				if !ok || !(strings.HasSuffix(id.Name, "Fact") || strings.HasSuffix(id.Name, "Facts")) || len(x.Args) == 0 {
 					return true
 				}
@@ -124,7 +136,7 @@ func currentPlanVocabulary(t *testing.T) planVocabulary {
 			return true
 		})
 	}
-	for _, s := range []*[]string{&v.Tools, &v.FactKeys, &v.Codes, &v.Dangers} {
+	for _, s := range []*[]string{&v.Tools, &v.FactKeys, &v.Codes, &v.Dangers, &v.Outcomes, &v.Failures} {
 		slices.Sort(*s)
 		*s = slices.Compact(*s)
 	}

@@ -4,6 +4,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -129,6 +130,15 @@ func TestPathSpeedIsAdminOnlyAndWaitsForTheOwner(t *testing.T) {
 		t.Fatalf("apply: %+v", ap)
 	}
 	noCanary(t, "path_speed_apply", ap.Result)
+	// the owner's screen words the result from its code and values, in its language: the names, the size, the figures
+	pl := storedPlan(t, e, p.PlanID)
+	var params map[string]string
+	if err := json.Unmarshal([]byte(pl.OutcomeParams), &params); err != nil {
+		t.Fatal(err)
+	}
+	if pl.OutcomeCode != "path_speed_done" || params["from"] != "nl1" || params["to"] != "de1" || params["direction"] != "up" || params["mb"] != "24" || params["mbit_s"] != "412.3" || params["duration_ms"] != "311" || params["connect_ms"] != "12" {
+		t.Errorf("outcome: %q %v", pl.OutcomeCode, params)
+	}
 	if len(e.w.speedReqs) != 1 {
 		t.Fatalf("the panel was asked %d times", len(e.w.speedReqs))
 	}

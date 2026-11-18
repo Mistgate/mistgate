@@ -595,6 +595,10 @@ func TestAssistantRealMCPPlanTokenIsSealedAndApplied(t *testing.T) {
 	if err != nil || applied.Msg.Plan.State != adminv1.PlanState_PLAN_STATE_APPLIED {
 		t.Fatalf("ApplyPlan did not run the real MCP apply: %+v %v", applied, err)
 	}
+	// the card carries what came of it as a code with values, so the owner's screen words it in its own language
+	if applied.Msg.Plan.OutcomeCode == "" || applied.Msg.Plan.OutcomeParams["n"] == "" {
+		t.Fatalf("the applied card has no outcome code and values: %+v", applied.Msg.Plan)
+	}
 	users.mu.Lock()
 	enabled := users.enabled
 	users.mu.Unlock()

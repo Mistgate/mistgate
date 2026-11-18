@@ -360,7 +360,9 @@ message PlanCard {
   // Once APPLIED or FAILED, as on an Approval.
   string result = 10;
   string error = 11;
+  // What came of an APPLIED or FAILED plan as a code the SPA words itself (as on an Approval), and its values.
   string outcome_code = 12;
+  map<string, string> outcome_params = 13;
 }
 
 message MemoryNote {
