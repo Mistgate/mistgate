@@ -1,28 +1,10 @@
-// How a protocol is shown wherever the profiles screens name it: its mark, its place in lists, and what its one-line
+// How a protocol is shown wherever the profiles screens name it: its place in lists, and what its one-line
 // summary says. Nothing here changes what a protocol can do; a protocol this file does not know still works everywhere.
 
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
-import type { IconName, Tone } from "@/components/ui/icons";
 
-/**
- * One icon and one pastel per protocol, a hue apart: Hysteria2 mint (fast), VLESS sky (looks like a web site), AmneziaWG
- * lavender (a key per device), MTProto rose (Telegram's plane), TrustTunnel sage (a tunnel mouth: HTTPS and the official apps). Sand
- * stays out: next to the warnings' yellow it would read as one. The order is the guide's advice: start with Hysteria2, add VLESS,
- * then the keys, then Telegram, then the newest.
- */
-// `badge`: the one honest word on its card in the New profile choice: where the guide says to start, and what is still new.
-type Look = { icon: IconName; tone: Tone; badge?: "start" | "experimental" };
-const looks: Record<string, Look> = {
-  hysteria2: { icon: "bolt", tone: "mint", badge: "start" },
-  vless: { icon: "globe", tone: "sky" },
-  awg: { icon: "key", tone: "lavender" },
-  mtproto: { icon: "plane", tone: "rose", badge: "experimental" },
-  trusttunnel: { icon: "tunnel", tone: "sage", badge: "experimental" },
-};
-const order = Object.keys(looks);
-
-/** A protocol this file does not know (a new plugin) wears the mark of the profiles section. */
-export const lookOf = (id: string): Look => looks[id] ?? { icon: "layers", tone: "sage" };
+// The guide's advice: start with Hysteria2, add VLESS, then the keys, then Telegram, then the newest.
+const order = ["hysteria2", "vless", "awg", "mtproto", "trusttunnel"];
 
 /** Sort protocol ids: the known ones in their order, the others after them by id. */
 export function byProtocol(a: string, b: string): number {

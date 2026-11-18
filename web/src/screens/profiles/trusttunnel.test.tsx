@@ -8,7 +8,7 @@ import { portNotes, takenNote } from "@/lib/port-check";
 import type { Tx } from "@/screens/users/t";
 import { appsText, viaOf } from "@/screens/users/format";
 import { refusalOf } from "./deploy";
-import { lookOf, ownLinkOnly, summaryParts, telegramOnly, trustTunnelOnly } from "./protocol-meta";
+import { ownLinkOnly, summaryParts, telegramOnly, trustTunnelOnly } from "./protocol-meta";
 import { problemText } from "./problem-text";
 import { parseSettings } from "./schema";
 import { TrustTunnelLink } from "./tt-link";
@@ -21,12 +21,8 @@ const txOf = (lang: Lang) => {
   return t;
 };
 
-describe("the mark of the protocol", () => {
-  it("is a tunnel in its own colour, marked experimental, and its apps are not the subscription's", () => {
-    const look = lookOf("trusttunnel");
-    expect(look).toMatchObject({ icon: "tunnel", tone: "sage", badge: "experimental" });
-    const others = ["hysteria2", "vless", "awg", "mtproto"].map((id) => lookOf(id).tone);
-    expect(others).not.toContain(look.tone);
+describe("the apps of the protocol", () => {
+  it("has its own apps, not the subscription's", () => {
     expect(trustTunnelOnly([App.TRUST_TUNNEL])).toBe(true);
     expect(trustTunnelOnly([App.HAPP])).toBe(false);
     expect(telegramOnly([App.TRUST_TUNNEL])).toBe(false);
