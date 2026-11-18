@@ -937,6 +937,12 @@
   },
   {
     "type": "table",
+    "name": "node_channel_measure",
+    "tbl_name": "node_channel_measure",
+    "sql": "CREATE TABLE node_channel_measure ( node_id TEXT PRIMARY KEY REFERENCES node(id) ON DELETE CASCADE, started_unix INTEGER NOT NULL, at_unix INTEGER NOT NULL DEFAULT 0, result_json TEXT NOT NULL DEFAULT '' )"
+  },
+  {
+    "type": "table",
     "name": "node_decoy_bundle",
     "tbl_name": "node_decoy_bundle",
     "sql": "CREATE TABLE node_decoy_bundle ( sha256 TEXT PRIMARY KEY, content BLOB NOT NULL CHECK (length(content) \u003c= 2621440) )"

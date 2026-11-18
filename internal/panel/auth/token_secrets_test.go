@@ -65,6 +65,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.Node.link_sealed":                                  "a bool: the node has used an encrypted link session, not a key",
 		"mistgate.admin.v1.Node.link_via_node_id":                             "the id of the entry node whose bridge the node's agent calls the panel through, not a link",
 		"mistgate.admin.v1.Device.enrol_link_stale":                           "a bool: the person's link changed after the device enrolled; no hash is returned",
+		"mistgate.ops.v1.NodeLoad.link_seen_mbps":                             "a number: the Mbit/s the node was seen to carry, not a link",
 		"mistgate.ops.v1.RetentionItem.key":                                   "the name of a retention setting (journal_days ...), not a key",
 	}
 	seen := map[protoreflect.FullName]bool{}

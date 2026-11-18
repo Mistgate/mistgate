@@ -27,6 +27,11 @@ const (
 	capProbe = "probe/1"
 	// capSpeed: SpeedTest (agent.proto "PATH SPEED").
 	capSpeed = "speed/1"
+	// capSpeedChannel: the 8-stream timed mode of SpeedTest (steps 4 and 5 of its size; agent.proto "CHANNEL MEASURE").
+	capSpeedChannel = "speed-channel/1"
+	// the size of a SpeedTest that is a channel step
+	speedStepServeChannel = 4
+	speedStepRunChannel   = 5
 	// Six seconds at 25 packets per second keeps the sample duration while reducing eight-port UDP payload from
 	// 2.88 MB to 300 KiB. At 150 packets, the 4% relative-loss floor is six packets.
 	udpCheckSendCount = 150

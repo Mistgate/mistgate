@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +53,9 @@ type speedJSON struct {
 	FirstByteMS uint32  `json:"first_byte_ms,omitempty"`
 	DurationMS  uint32  `json:"duration_ms,omitempty"`
 	Bytes       uint64  `json:"bytes,omitempty"`
+	// a channel measure (channel_measure.go): how many streams ran, and whether its volume cap ended it early
+	Streams uint32 `json:"streams,omitempty"`
+	Capped  bool   `json:"capped,omitempty"`
 }
 
 // startSpeed admits a test between two nodes: it applies the limits, records the reservation and takes both nodes. The returned
@@ -184,11 +188,43 @@ func (s probeService) PathSpeedResults(ctx context.Context, req *connect.Request
 		}
 		out.Tests = append(out.Tests, speedMessage(name(r.FromID), name(r.ToID), r.Direction, r.At, j))
 	}
+	// the last channel measure of each node: it stays when the tests of its run are gone
+	last, err := f.st.ChannelMeasures(ctx)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read channel measures", err)
+	}
+	ids := make([]string, 0, len(last))
+	for id := range last {
+		if m.NodeId == "" || id == m.NodeId {
+			ids = append(ids, id)
+		}
+	}
+	sort.Slice(ids, func(i, j int) bool { return last[ids[i]].At.After(last[ids[j]].At) })
+	for _, id := range ids {
+		var l channelLastJSON
+		if json.Unmarshal([]byte(last[id].ResultJSON), &l) != nil {
+			continue
+		}
+		out.Channels = append(out.Channels, &probev1.ChannelNodeLast{NodeName: name(id), Last: lastMessage(&l, last[id].At)})
+	}
 	return connect.NewResponse(out), nil
 }
 
 func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direction string, mb uint32) speedJSON {
+	return f.runSpeedMode(ctx, from, to, direction, mb, false)
+}
+
+// runSpeedMode is one speed test between two nodes: the target serves, the sender runs, and the target's listener is closed again
+// whatever happens. channel is the 8-stream timed mode (agent.proto "CHANNEL MEASURE"), the same steps with other codes and
+// limits, and mb is then the volume cap of the step in MiB; the sender is stopped too when the call is cancelled.
+func (f *Fleet) runSpeedMode(ctx context.Context, from, to store.NodeRow, direction string, mb uint32, channel bool) speedJSON {
 	res := speedJSON{MB: mb}
+	capability, serveStep, runStep, serveS, runS := capSpeed, uint32(1), uint32(2), uint32(speedMaxS), uint32(speedMaxS)
+	runWait := speedRunWait
+	if channel {
+		capability, serveStep, runStep, serveS, runS = capSpeedChannel, speedStepServeChannel, speedStepRunChannel, channelServeS, channelRunS
+		runWait = channelRunWait
+	}
 	liveRows, err := f.Live(ctx)
 	if err != nil {
 		f.log.Warn("read live nodes for path speed", "code", "store_failed", "err", err)
@@ -196,9 +232,9 @@ func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direct
 		return res
 	}
 	live := liveRowsByID(liveRows)
-	fromLive, code := f.probeLive(live, from.ID, capSpeed)
+	fromLive, code := f.probeLive(live, from.ID, capability)
 	if code == "" {
-		_, code = f.probeLive(live, to.ID, capSpeed)
+		_, code = f.probeLive(live, to.ID, capability)
 	}
 	if code != "" {
 		res.Error = code
@@ -212,8 +248,12 @@ func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direct
 	}
 	// the commands travel in the UdpSend message (agent.proto "PATH SPEED" says what each field means there)
 	test := func(role, host string, port uint32, reqID string) *agentv1.ConnectResponse {
-		u := &agentv1.UdpSend{RequestId: reqID, Host: host, Tag: token[:], Count: mb, Pps: speedMaxS, Df: direction == "up",
-			Size: map[string]uint32{"serve": 1, "run": 2, "stop": 3}[role]}
+		u := &agentv1.UdpSend{RequestId: reqID, Host: host, Tag: token[:], Count: mb, Df: direction == "up",
+			Size: map[string]uint32{"serve": serveStep, "run": runStep, "stop": 3}[role]}
+		u.Pps = serveS
+		if role == "run" {
+			u.Pps = runS
+		}
 		if port != 0 {
 			u.Ports = []uint32{port}
 		}
@@ -238,18 +278,30 @@ func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direct
 	}()
 	// whatever happens next, the target's listener is closed again: it lives for one connection or 30 s otherwise
 	defer func() {
-		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), speedStopWait)
-		defer cancel()
-		_, _ = f.commandWithLive(stopCtx, to.ID, speedStopWait, func(reqID string) *agentv1.ConnectResponse {
-			return test("stop", "", 0, reqID)
-		}, &toLive)
+		stop := func(id string, live *store.NodeLiveRow) {
+			stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), speedStopWait)
+			defer cancel()
+			_, _ = f.commandWithLive(stopCtx, id, speedStopWait, func(reqID string) *agentv1.ConnectResponse {
+				return test("stop", "", 0, reqID)
+			}, live)
+		}
+		if channel && ctx.Err() != nil {
+			// cancelled: the sender may still be moving data, and it does not know the panel stopped waiting; each end is told on its own,
+			// so one that does not answer does not hold the other up
+			done := make(chan struct{})
+			go func() { stop(from.ID, &fromLive); close(done) }()
+			stop(to.ID, &toLive)
+			<-done
+			return
+		}
+		stop(to.ID, &toLive)
 	}()
 	port, err := strconv.ParseUint(armed.Params["port"], 10, 16)
 	if err != nil || port == 0 {
 		res.Error = "failed"
 		return res
 	}
-	ran, err := f.commandWithLive(ctx, from.ID, speedRunWait, func(reqID string) *agentv1.ConnectResponse {
+	ran, err := f.commandWithLive(ctx, from.ID, runWait, func(reqID string) *agentv1.ConnectResponse {
 		return test("run", to.Address, uint32(port), reqID)
 	}, &fromLive)
 	if err != nil {
@@ -259,6 +311,9 @@ func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direct
 	if ran == nil || !ran.Ok {
 		res.Error = speedCommandError(ran)
 		return res
+	}
+	if channel {
+		return parseChannelResult(ran.Params, mb)
 	}
 	return parseSpeedResult(ran.Params, mb)
 }
@@ -296,6 +351,8 @@ func speedCommandError(result *agentv1.CommandResult) string {
 		return "busy"
 	case "refused":
 		return "unreachable"
+	case "too_soon":
+		return "too_soon"
 	case "timeout":
 		return "timeout"
 	case "no_route", "unsupported_host":
@@ -307,7 +364,7 @@ func speedCommandError(result *agentv1.CommandResult) string {
 
 func speedMessage(fromName, toName, direction string, at time.Time, r speedJSON) *probev1.PathSpeedResponse {
 	return &probev1.PathSpeedResponse{FromName: fromName, ToName: toName, Direction: direction, Mb: r.MB, AtUnix: at.Unix(), Error: r.Error,
-		MbitS: r.MbitS, ConnectMs: r.ConnectMS, FirstByteMs: r.FirstByteMS, DurationMs: r.DurationMS, Bytes: r.Bytes}
+		MbitS: r.MbitS, ConnectMs: r.ConnectMS, FirstByteMs: r.FirstByteMS, DurationMs: r.DurationMS, Bytes: r.Bytes, Streams: r.Streams, Capped: r.Capped}
 }
 
 // SpeedSummary is the newest stored speed test of a pair and direction, for the digest views.
