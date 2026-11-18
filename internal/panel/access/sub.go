@@ -82,7 +82,14 @@ type SubView struct {
 	// RefusalNoDeviceID or RefusalClientAPIEnrolled. "" for everyone served, for a person without access (Status says why) and for the page, which never
 	// registers a device. Lines and Servers are empty with it; the subscription handler answers with one entry that says why.
 	Refusal string
+	// Page is the state of the person's page password (the generation it is computed with, whether it was removed): the public
+	// handler decides the lock of the page and the cookie by it. It comes with the user's row, so it costs no read of its own.
+	Page PageState
 }
+
+// PageState is the state of a person's page password in the database (generation and "removed"); the password itself is computed
+// from it and the subscription token (package pagepass).
+type PageState = store.PageState
 
 // The reasons of SubView.Refusal. They are stable words: the subscription handler words them for the apps (subs.stateNote).
 const (
@@ -241,19 +248,21 @@ func (s *Service) Subscription(ctx context.Context, token string) (SubView, erro
 	return s.SubscriptionWith(ctx, token, SubOptions{})
 }
 
-// CheckSubscriptionToken checks whether a cached subscription token still exists, without building its view.
-func (s *Service) CheckSubscriptionToken(ctx context.Context, token string) error {
+// CheckSubscriptionToken checks whether a cached subscription token still exists, without building its view. It also returns
+// the state of the person's page password, which the same one-row read holds: a handler that serves the page from a cached view
+// decides its lock by the fresh state, with no read added.
+func (s *Service) CheckSubscriptionToken(ctx context.Context, token string) (PageState, error) {
 	k := tokenKey(token)
-	found, err := s.st.Access().HasUserWithTokenHash(ctx, k[:])
+	st, found, err := s.st.Access().PageStateByTokenHash(ctx, k[:])
 	if err != nil {
-		return err
+		return PageState{}, err
 	}
 	if !found {
 		s.tokens.remove(k)
-		return ErrUnknownToken
+		return PageState{}, ErrUnknownToken
 	}
 	s.tokens.add(k)
-	return nil
+	return st, nil
 }
 
 // SubscriptionWith is Subscription with a client format (see SubOptions).
@@ -375,6 +384,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		UserID: u.ID, GroupID: u.GroupID, UserName: u.Name, SubscriptionName: u.SubscriptionName, Status: status,
 		Total: u.QuotaBytes, Expires: u.ExpiresAt, QuotaReset: u.QuotaReset, NextReset: NextReset(u.QuotaReset, u.PeriodStart),
 		DeviceLimit: u.DeviceLimit, AppAmnezia: u.AppAmnezia, AppTelegram: u.AppTelegram, AppTrustTunnel: u.AppTrustTunnel,
+		Page: PageState{Gen: u.PagePassGen, Open: u.PageOpen},
 	}
 	var hash []byte // the request's device: its HWID, hashed with the user; nil = the shared device
 	if opt.Device.HWID != "" {

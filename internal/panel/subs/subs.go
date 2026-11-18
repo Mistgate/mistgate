@@ -53,8 +53,12 @@ type Source interface {
 }
 
 // TokenChecker lets a Source confirm a cached link without building the subscription view.
+//
+// The same one-row read that confirms the link also returns the state of the person's page password (generation, removed). A page
+// answered from a cached view takes its lock from that fresh state, so a changed or removed password counts at once and the
+// check costs no read more than before.
 type TokenChecker interface {
-	CheckSubscriptionToken(ctx context.Context, token string) error
+	CheckSubscriptionToken(ctx context.Context, token string) (access.PageState, error)
 }
 
 var _ TokenChecker = (*access.Service)(nil)
@@ -346,6 +350,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	token, sub, ok := routeOf(r, h.prefix)
 	checkedColdToken := false
+	var coldPage access.PageState // the page password state the cold lookup read
 	if client != "" && h.blocked(r.Context(), client) {
 		if !ok {
 			h.decoy.ServeHTTP(w, r)
@@ -359,7 +364,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				h.decoy.ServeHTTP(w, r)
 				return
 			}
-			err := checker.CheckSubscriptionToken(r.Context(), token)
+			page, err := checker.CheckSubscriptionToken(r.Context(), token)
 			if errors.Is(err, access.ErrUnknownToken) {
 				h.decoy.ServeHTTP(w, r)
 				return
@@ -368,7 +373,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "internal error", http.StatusInternalServerError)
 				return
 			}
-			checkedColdToken = true
+			checkedColdToken, coldPage = true, page
 		}
 	}
 	if !ok {
@@ -429,10 +434,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if res != nil {
 			checker, ok := h.src.(TokenChecker)
+			page := coldPage
 			if !ok {
 				res = nil // a source that cannot confirm the token cannot serve a cached view
 			} else if !checkedColdToken {
-				if err := checker.CheckSubscriptionToken(r.Context(), token); errors.Is(err, access.ErrUnknownToken) {
+				var err error
+				if page, err = checker.CheckSubscriptionToken(r.Context(), token); errors.Is(err, access.ErrUnknownToken) {
 					h.tokens.Delete(token)
 					h.miss(r.Context(), client)
 					h.decoy.ServeHTTP(w, r)
@@ -443,8 +450,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if res != nil {
+				view := *res
+				view.Page = page // the cached view may hold an older password state; the check above just read the current one
 				h.notSupported(w, r, hint, app)
-				h.respond(w, r, token, *res, set, sf, format)
+				h.respond(w, r, token, view, set, sf, format)
 				return
 			}
 		}
@@ -552,7 +561,7 @@ func (h *handler) respond(w http.ResponseWriter, r *http.Request, token string, 
 		return
 	case adminv1.SubFormat_SUB_FORMAT_USER_PAGE:
 		if h.page != nil {
-			if h.gated(set) && !h.unlocked(r, token) {
+			if h.gated(set, v.Page) && !h.unlocked(r, token, v.Page) {
 				h.writeLocked(w, r, h.link(r, token))
 				return
 			}

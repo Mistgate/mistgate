@@ -39,23 +39,29 @@ type AccessUser struct {
 	// AppMistgateOff is the Mistgate app switch of the person, stored as "off" so that the zero value (a row nobody touched) keeps
 	// what the person had before the switch existed: the app works while the subscription link (AppHapp) is on.
 	AppMistgateOff bool
+
+	// PagePassGen is the generation of the person's page password and PageOpen is "the password was removed" (package pagepass): the
+	// password is computed from the subscription token and the generation, so these two are all the database holds of it.
+	PagePassGen int
+	PageOpen    bool
 }
 
 const accUserCols = `u.id, u.name, u.subscription_name, u.group_id, g.name AS group_name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.app_telegram, u.app_trusttunnel, u.app_mistgate_off, u.all_nodes,
 	u.quota_bytes, u.quota_reset, u.period_start, u.used_bytes, u.expires_at, u.device_limit, u.speed_limit_bps, u.device_speed_limit_bps,
-	u.sub_token_hash, u.sub_token_enc, u.last_seen_at, u.last_node_id, u.created_at, u.dns_preset_id, g.dns_preset_id AS group_dns_preset_id`
+	u.sub_token_hash, u.sub_token_enc, u.last_seen_at, u.last_node_id, u.created_at, u.dns_preset_id, g.dns_preset_id AS group_dns_preset_id, u.page_pass_gen, u.page_open`
 
 const accUserFrom = ` FROM user u JOIN user_group g ON g.id = u.group_id `
 
 func scanAccessUser(r rowScanner) (AccessUser, error) {
 	var u AccessUser
-	var dis, happ, amn, tgl, trustTunnel, mgOff, all int
+	var dis, happ, amn, tgl, trustTunnel, mgOff, all, pageOpen int
 	var quota, used, speed, deviceSpeed, period, seen, created int64
 	var expires sql.NullInt64
 	var lastNode, dns, gdns sql.NullString
 	err := r.Scan(&u.ID, &u.Name, &u.SubscriptionName, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &tgl, &trustTunnel, &mgOff, &all,
 		&quota, &u.QuotaReset, &period, &used, &expires, &u.DeviceLimit, &speed, &deviceSpeed,
-		&u.SubTokenHash, &u.SubTokenEnc, &seen, &lastNode, &created, &dns, &gdns)
+		&u.SubTokenHash, &u.SubTokenEnc, &seen, &lastNode, &created, &dns, &gdns, &u.PagePassGen, &pageOpen)
+	u.PageOpen = pageOpen == 1
 	u.DNSPresetID, u.GroupDNSPresetID = dns.String, gdns.String
 	u.Disabled, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AppTrustTunnel, u.AppMistgateOff, u.AllNodes = dis == 1, happ == 1, amn == 1, tgl == 1, trustTunnel == 1, mgOff == 1, all == 1
 	u.QuotaBytes, u.UsedBytes, u.SpeedLimitBps, u.DeviceSpeedLimitBps = uint64(quota), uint64(used), uint64(speed), uint64(deviceSpeed)
@@ -361,14 +367,62 @@ func (a Access) UserByTokenHash(ctx context.Context, hash []byte) (AccessUser, e
 	return user, nil
 }
 
-// HasUserWithTokenHash checks a subscription token without loading the user's view.
-func (a Access) HasUserWithTokenHash(ctx context.Context, hash []byte) (bool, error) {
-	var found int
-	err := a.s.R.QueryRowContext(ctx, `SELECT 1 FROM user WHERE sub_token_hash = ?`, hash).Scan(&found)
+// PageState is what the public handler needs of a person's page password: the generation it is computed with and whether it was
+// removed (see AccessUser.PagePassGen).
+type PageState struct {
+	Gen  int
+	Open bool
+}
+
+// PageStateByTokenHash looks a subscription token up without loading the user's view and returns the state of the person's page
+// password. It is the one-row read that confirms a link (it replaced HasUserWithTokenHash), so asking for the state costs nothing more.
+// found is false for a token that belongs to nobody.
+func (a Access) PageStateByTokenHash(ctx context.Context, hash []byte) (st PageState, found bool, err error) {
+	var open int
+	err = a.s.R.QueryRowContext(ctx, `SELECT page_pass_gen, page_open FROM user WHERE sub_token_hash = ?`, hash).Scan(&st.Gen, &open)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
+		return PageState{}, false, nil
 	}
-	return err == nil, err
+	if err != nil {
+		return PageState{}, false, err
+	}
+	st.Open = open == 1
+	return st, true, nil
+}
+
+// The changes of a person's page password (SetPagePassword).
+const (
+	PagePassChange  = "change"  // generation + 1: a new password, the link stays
+	PagePassRemove  = "remove"  // the page opens on the link alone
+	PagePassRestore = "restore" // the password is asked again, a new one (generation + 1: the old one does not come back)
+)
+
+// SetPagePassword changes the person's page password state in one statement, so two changes at once cannot lose one. It reports
+// whether the row changed: removing a password that is already removed, restoring one that is not, and changing one that was
+// removed do nothing (changed false, a nil error); ErrNotFound for a person that does not exist.
+func (a Access) SetPagePassword(ctx context.Context, id, action string) (changed bool, err error) {
+	var q string
+	switch action {
+	case PagePassChange:
+		q = `UPDATE user SET page_pass_gen = page_pass_gen + 1 WHERE id = ? AND page_open = 0`
+	case PagePassRemove:
+		q = `UPDATE user SET page_open = 1 WHERE id = ? AND page_open = 0`
+	case PagePassRestore:
+		q = `UPDATE user SET page_open = 0, page_pass_gen = page_pass_gen + 1 WHERE id = ? AND page_open = 1`
+	default:
+		return false, errors.New("store: unknown page password action")
+	}
+	res, err := a.s.W.ExecContext(ctx, q, id)
+	if err != nil {
+		return false, err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return true, nil
+	}
+	if _, err := a.User(ctx, id); err != nil {
+		return false, err
+	}
+	return false, nil
 }
 
 // SubTokenHashes returns the subscription token hashes (sha256) of every user.
@@ -744,9 +798,11 @@ func (a Access) ResetUserTraffic(ctx context.Context, id, status string) error {
 	return err
 }
 
-// SetSubToken replaces the subscription token of a user.
+// SetSubToken replaces the subscription token of a user. The page password is computed from the token and the generation, so the
+// new token is already a new password; the generation starts again at 0 (it counts changes of one link), and page_open stays as the
+// owner left it: it is his decision about this person's page, not about this link.
 func (a Access) SetSubToken(ctx context.Context, id string, hash, enc []byte) error {
-	res, err := a.s.W.ExecContext(ctx, `UPDATE user SET sub_token_hash = ?, sub_token_enc = ? WHERE id = ?`, hash, enc, id)
+	res, err := a.s.W.ExecContext(ctx, `UPDATE user SET sub_token_hash = ?, sub_token_enc = ?, page_pass_gen = 0 WHERE id = ?`, hash, enc, id)
 	if err != nil {
 		return err
 	}

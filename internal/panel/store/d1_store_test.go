@@ -2523,6 +2523,11 @@ func TestD1ExtraGroups(t *testing.T) {
 	extraGroupStoreProof(t, openD1Store)
 }
 
+// The state of a person's page password on D1: the same proof as on SQLite (page_password_store_test.go).
+func TestD1PagePassword(t *testing.T) {
+	pagePasswordStoreProof(t, openD1Store)
+}
+
 func TestD1RelaysStorage(t *testing.T) {
 	relayStoreProof(t, openD1Store(t))
 }

@@ -97,7 +97,7 @@ func TestPasswordShapeOnTheRPC(t *testing.T) {
 	if !regexp.MustCompile(`^[2-9a-km-np-z]{4}-[2-9a-km-np-z]{4}$`).MatchString(pw) {
 		t.Fatalf("password %q is not xxxx-xxxx of the unambiguous alphabet", pw)
 	}
-	if pw != pagepass.Password(pageKey(t), tok) {
+	if pw != pagepass.Password(pageKey(t), tok, 0) {
 		t.Error("the RPC's password is not the one the page checks")
 	}
 	if again := g.password(uid); again != pw {
@@ -106,7 +106,7 @@ func TestPasswordShapeOnTheRPC(t *testing.T) {
 	// the user-created dialog gets it too
 	c := must(g.svc.CreateUser(g.ctx, connect.NewRequest(&adminv1.CreateUserRequest{Name: "bob", GroupId: g.group2})))
 	bobTok := strings.TrimPrefix(c.Msg.SubscriptionUrl, "https://sub.example.com/k3xq8/")
-	if c.Msg.PagePassword == "" || c.Msg.PagePassword != pagepass.Password(pageKey(t), bobTok) {
+	if c.Msg.PagePassword == "" || c.Msg.PagePassword != pagepass.Password(pageKey(t), bobTok, 0) {
 		t.Errorf("CreateUser page password %q", c.Msg.PagePassword)
 	}
 }
@@ -244,7 +244,7 @@ func TestWrongPasswordsAreCountedPerTokenAndLimited(t *testing.T) {
 }
 
 // Once a counter has run out, the answer comes before any lookup of the token: even a link that was rotated away since
-// (identify would say "unknown": the decoy) is told to wait, and the locked device calls need no lookup either.
+// (identify would say "unknown": the decoy) is told to wait.
 func TestALockedOutEntryIsRefusedBeforeTheTokenIsLookedUp(t *testing.T) {
 	g := newGate(t, nil)
 	uid, tok := g.newUser("alice", nil)
@@ -259,8 +259,10 @@ func TestALockedOutEntryIsRefusedBeforeTheTokenIsLookedUp(t *testing.T) {
 	if rec := g.unlock(t, "nosuchtoken0123456789", "aaaa-bbbb"); rec.Code == 429 || rec.Code == 200 {
 		t.Errorf("unknown token: %d", rec.Code)
 	}
-	if rec := (call{g.h, t, tok}).post("/devices", g.addBody("phone")); rec.Code != 401 || decodeAnswer(t, rec).Error != "locked" {
-		t.Errorf("devices without the cookie: %d %s", rec.Code, rec.Body.String())
+	// A device call without a cookie looks the person up (their password may have been removed, which only the row says), so the
+	// link that was rotated away is the decoy there, as everywhere else, not "locked".
+	if rec := (call{g.h, t, tok}).post("/devices", g.addBody("phone")); rec.Code != 404 || strings.Contains(rec.Body.String(), "locked") {
+		t.Errorf("devices without the cookie on a rotated-away link: %d %s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -805,6 +805,21 @@ type userUpdateArgs struct {
 	// DeviceSpeedLimitBps is the per-device limit: each device of the user alone.
 	DeviceSpeedLimitBps *uint64 `json:"device_speed_limit_bps,omitempty" jsonschema:"per device: no single device goes faster than this; 0 = remove the limit"`
 	DNSPresetID         *string `json:"dns_preset_id,omitempty" jsonschema:"empty string = inherit"`
+	// PagePassword changes the password of the person's own page. The password is never shown to you or stored: the owner reads a new one in the admin panel.
+	PagePassword *string `json:"page_password,omitempty" jsonschema:"what to do with the password the person's own page asks for: change (a new password, the link and the apps stay the same; the old password and every browser that entered it stop working), remove (the page opens on the link alone, with no question) or restore (ask for a password again, a new one). You never see the password; the owner reads it in the admin panel"`
+}
+
+// pagePasswordAction is the API's word for what user_update does to the page password.
+func pagePasswordAction(word string) (adminv1.PagePasswordAction, error) {
+	switch word {
+	case "change":
+		return adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_CHANGE, nil
+	case "remove":
+		return adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_REMOVE, nil
+	case "restore":
+		return adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_RESTORE, nil
+	}
+	return 0, errors.New("page_password must be change, remove or restore")
 }
 
 func checkSubscriptionName(name string) error {
@@ -818,7 +833,7 @@ func checkSubscriptionName(name string) error {
 var userUpdate = changeSpec[userUpdateArgs]{
 	name: "user_update", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceUpdateUserProcedure, adminv1connect.GroupServiceListGroupsProcedure, adminv1connect.NodeServiceListNodesProcedure),
-	desc:  "Change a user's account name, public subscription-page name, main group, extra groups (add_group_ids, remove_group_ids: the person gets what all their groups give; the plan lists the profiles and nodes they gain and lose), quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy, Mistgate app), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too. " + tokenUserChangeDescription,
+	desc:  "Change a user's account name, public subscription-page name, main group, extra groups (add_group_ids, remove_group_ids: the person gets what all their groups give; the plan lists the profiles and nodes they gain and lose), quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy, Mistgate app), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too. The password of the person's own page can be changed, removed or restored (page_password); you never see it. " + tokenUserChangeDescription,
 	plan: func(c *call, a userUpdateArgs) (*planned, error) {
 		cur, err := c.getUser(a.UserID)
 		if err != nil {
@@ -981,6 +996,27 @@ var userUpdate = changeSpec[userUpdateArgs]{
 			add("dns_preset", clean(u.GetDnsPresetId(), 80)+" -> "+clean(*a.DNSPresetID, 80), false)
 			n++
 		}
+		if a.PagePassword != nil {
+			if _, err := pagePasswordAction(*a.PagePassword); err != nil {
+				return nil, err
+			}
+			switch word := *a.PagePassword; {
+			case word == "change" && u.GetPageOpen():
+				return nil, errors.New("the person's page has no password now (it was removed): use page_password restore to ask for one again")
+			case word == "remove" && u.GetPageOpen(), word == "restore" && !u.GetPageOpen():
+				return nil, errors.New("nothing to change: the page password is already " + map[string]string{"remove": "removed", "restore": "asked for"}[word])
+			}
+			// The password is computed from the link and a number, so the plan has none to show; the owner copies a new one in the admin panel.
+			switch *a.PagePassword {
+			case "change":
+				facts = append(facts, codedFact("page_password", "change", "page_password_change"))
+			case "remove":
+				facts = append(facts, codedFact("page_password", "remove", "page_password_remove"))
+			default:
+				facts = append(facts, codedFact("page_password", "restore", "page_password_restore"))
+			}
+			n++
+		}
 		if n == 0 {
 			return nil, errors.New("nothing to change: give at least one field")
 		}
@@ -999,6 +1035,9 @@ var userUpdate = changeSpec[userUpdateArgs]{
 		if a.QuotaReset != nil {
 			q, _ := quotaReset(*a.QuotaReset)
 			req.QuotaReset = &q
+		}
+		if a.PagePassword != nil {
+			req.PagePasswordAction, _ = pagePasswordAction(*a.PagePassword)
 		}
 		if _, err := c.cl.User.UpdateUser(c.ctx, connect.NewRequest(req)); err != nil {
 			return done{}, apiError(err)
