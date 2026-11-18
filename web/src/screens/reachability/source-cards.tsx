@@ -193,7 +193,7 @@ function GlobalpingBody({ s, act }: { s: GlobalpingSettings; act: Actions }) {
       <ProblemBox
         action={
           l.tag === "gp.token" && (
-            <Button size="md" onClick={() => setReplace((n) => n + 1)}>
+            <Button size="md" data-act="replace" onClick={() => setReplace((n) => n + 1)}>
               {t("rp.pb.replaceToken")}
             </Button>
           )
@@ -570,7 +570,7 @@ function CheburBody({ s, act, onSwitchOn }: { s: CheburcheckSettings; act: Chebu
       <ProblemBox
         action={
           l.tag === "cc.token" && (
-            <Button size="md" onClick={() => setReplace((n) => n + 1)}>
+            <Button size="md" data-act="replace" onClick={() => setReplace((n) => n + 1)}>
               {t("rp.pb.replaceToken")}
             </Button>
           )
@@ -780,7 +780,7 @@ function BsbordBody({ s, act, price, setPrice, onSwitchOn }: { s: BsbordSettings
       <ProblemBox
         action={
           l.tag === "bb.key" && (
-            <Button size="md" onClick={() => setReplace((n) => n + 1)}>
+            <Button size="md" data-act="replace" onClick={() => setReplace((n) => n + 1)}>
               {t("rp.pb.replaceKey")}
             </Button>
           )

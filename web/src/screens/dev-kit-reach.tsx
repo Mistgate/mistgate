@@ -39,7 +39,7 @@ import { ShellLayout } from "./shell";
 //   /dev-kit?only=reach-page&state=<tab>[.<word>…][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
 // <tab>: nodes | events | sources. The words of the board: the data nosrc | nonodes | first | load | err; the fi1 row allok | bad | reg | tcp (the
 // default is "some networks"); the sources' trouble gperr | gplim | bsbud | tsoff; the choices src.<id> (gp bl ts cc bs kl pr) | open.<node> |
-// filter.<state> (ok part tcp bad reg nd); what a hand did dlgoff | toast | check | enable. The product's own: v6 | dark | probes | kz | edge | ro, and
+// filter.<state> (ok part tcp bad reg nd); what a hand did dlgoff | toast | check | test | replace | enable. The product's own: v6 | dark | probes | kz | edge | ro, and
 // the windows of the own probes dlgadd | dlgupd | dlgrev. Made-up data: the nodes de1, fi1, msk1, nl1, the operators A to E, the documentation networks.
 // The scene's own "panel" answers the page's calls (nothing leaves the page) and keeps what a click changes, so a switch moves the page.
 
@@ -62,6 +62,8 @@ export function fakePanel(f: Flags, srv: Srv) {
     }
   };
   let retried = false;
+  // the week's alerts fail the same way: once, and the retry shows the grey cards for a moment
+  let alertsFirst = f.v.has("err");
   patch(countryReach, {
     getCountryReachability: async () => ({ settings: { country: srv.country } }),
     updateCountryReachability: async (req: { country: string }) => {
@@ -81,6 +83,12 @@ export function fakePanel(f: Flags, srv: Srv) {
     getChecks: async () => checksOf(f, srv),
     listAlerts: async () => {
       if (slow) return never();
+      if (alertsFirst) {
+        alertsFirst = false;
+        await wait(150);
+        throw new ConnectError("unavailable", Code.Unavailable);
+      }
+      if (f.v.has("err")) await wait(1400);
       return alertsOf(f, srv);
     },
   });
@@ -300,7 +308,9 @@ const presses = (f: Flags): [string, string][] => {
   const src = f.src ?? "globalping";
   const out: [string, string][] = [];
   if (f.v.has("gperr")) out.push(["globalping", "test"]);
-  if (f.v.has("check")) out.push([src, "test"]);
+  if (f.v.has("check") || f.v.has("test")) out.push([src, "test"]);
+  // the problem box's button comes once the failed Test has been answered (a second and a half)
+  if (f.v.has("replace")) out.push(["globalping", "replace"]);
   if (f.v.has("dlgoff")) out.push([src, "disconnect"]);
   if (f.v.has("toast")) out.push([src, "pause"]);
   if (f.v.has("enable")) out.push([src, "enable"]);
@@ -325,7 +335,7 @@ export function ReachScenePage() {
   // a hand's first moves, a moment after the page is drawn
   const [moves] = useState(() => presses(f));
   useEffect(() => {
-    const timers = moves.map(([source, act], i) => window.setTimeout(() => document.querySelector<HTMLElement>(`[data-source="${source}"] [data-act="${act}"]`)?.click(), 700 + i * 500));
+    const timers = moves.map(([source, act], i) => window.setTimeout(() => document.querySelector<HTMLElement>(`[data-source="${source}"] [data-act="${act}"]`)?.click(), 700 + i * 500 + (act === "replace" ? 1000 : 0)));
     return () => timers.forEach((x) => window.clearTimeout(x));
   }, [moves]);
   return (
@@ -365,7 +375,13 @@ export const frames: Frame[] = [
   // the board's states: the data
   frame("reach-nosrc", "nodes.nosrc", "Data: no sources are connected", 1440, 700),
   frame("reach-nosrc-events", "events.nosrc", "No sources: the Events tab says so", 1440, 600),
+  frame("reach-events-first", "events.first", "Events while the first round runs", 1440, 600),
+  frame("reach-events-nonodes", "events.nonodes", "Events with no nodes yet", 1440, 600),
+  frame("reach-events-allok", "events.allok", "Events: nothing in the week (every node opens)", 1440, 600),
+  frame("reach-events-load", "events.load", "Events: loading (the grey cards)", 1440, 600),
+  frame("reach-events-err", "events.err", "Events: the week did not load (and Try again works)", 1440, 600),
   frame("reach-nosrc-sources", "sources.nosrc", "No sources: every one is off, none has a token", 1440, 1000),
+  frame("reach-first-sources", "sources.first", "Sources while the first round runs: every one is on, none has said anything", 1440, 1000),
   frame("reach-nosrc-enable", "sources.nosrc.src.gp.enable", "No sources: Globalping is switched on, the toast, the first round", 1440, 1000),
   frame("reach-nonodes", "nodes.nonodes", "Data: no nodes yet", 1440, 700),
   frame("reach-first", "nodes.first", "Data: the first round of checks is running", 1440, 1000),
@@ -383,6 +399,7 @@ export const frames: Frame[] = [
   frame("reach-filter-none", "nodes.filter.part.allok", "...and nobody is in that state (no such nodes)", 1440, 800),
   // the board's states: the sources' trouble
   frame("reach-gperr", "sources.gperr.src.gp", "Sources: Globalping does not take the token (a Test fails)", 1440, 1200),
+  frame("reach-gperr-replace", "sources.gperr.src.gp.replace", "...and \"Replace the token\" opens the field", 1440, 1300),
   frame("reach-gplim", "nodes.gplim", "Sources: the hourly limit is used up: the note over the nodes", 1440, 1200),
   frame("reach-gplim-src", "sources.gplim.src.gp", "...and the problem in the source", 1440, 1200),
   frame("reach-bsbud", "sources.bsbud.src.bs", "Sources: the month's budget is spent", 1440, 1500),
@@ -399,6 +416,7 @@ export const frames: Frame[] = [
   frame("reach-dlgoff", "sources.src.gp.dlgoff", "\"Disconnect Globalping?\"", 1440, 900),
   frame("reach-dlgoff-phone", "sources.src.gp.dlgoff", "The same window on a phone (a sheet)", 400, 900),
   frame("reach-toast", "sources.src.bl.toast", "Pause: the toast with Undo", 1440, 900),
+  frame("reach-test-done", "sources.src.gp.test", "A Test went through: the toast, the line of the source", 1440, 1000),
   frame("reach-check", "sources.src.gp.check", "A Test is running: the spinner in the button", 1440, 1000),
   frame("reach-check-ts", "sources.src.ts.check", "A TSPU run takes minutes: the spinner, the pill", 1440, 1000),
   frame("reach-ro", "nodes.ro", "An observer: the table and the events, no country, no sources", 1440, 1000),

@@ -92,7 +92,7 @@ const langs: Lang[] = ["en", "ru", "zh", "fa", "tr"];
 describe("the scenes of the Reachability page", () => {
   it("lists a frame for every state of the board and of the product, with no duplicate id", () => {
     expect(new Set(frames.map((fr) => fr.id)).size).toBe(frames.length);
-    for (const word of ["nosrc", "nonodes", "first", "load", "err", "allok", "bad", "reg", "tcp", "gperr", "gplim", "bsbud", "tsoff", "dlgoff", "toast", "check", "ro", "edge", "v6", "dark", "probes", "kz", "dlgadd", "dlgupd", "dlgrev"])
+    for (const word of ["nosrc", "nonodes", "first", "load", "err", "allok", "bad", "reg", "tcp", "gperr", "gplim", "bsbud", "tsoff", "dlgoff", "toast", "check", "test", "replace", "ro", "edge", "v6", "dark", "probes", "kz", "dlgadd", "dlgupd", "dlgrev"])
       expect(frames.some((fr) => fr.state.split(".").includes(word)), word).toBe(true);
     for (const id of ["gp", "bl", "ts", "cc", "bs", "kl", "pr"]) expect(frames.some((fr) => fr.state.includes(`src.${id}`)), id).toBe(true);
     for (const tab of ["nodes", "events", "sources"]) expect(frames.some((fr) => fr.state.startsWith(tab)), tab).toBe(true);
@@ -136,6 +136,34 @@ describe("the scenes of the Reachability page", () => {
     act(() => root?.unmount());
     host?.remove();
     await draw("nodes.err", Role.OWNER);
+    await act(async () => void (await new Promise((r) => setTimeout(r, 300))));
+    expect(document.querySelector(".pv-qe")).not.toBeNull();
+  });
+
+  it("says on the Events tab what the board says of the week in each state of the data", async () => {
+    const said: [string, string][] = [
+      ["events.allok", "All nodes opened from Russia in the last 7 days"],
+      ["events.first", "No events yet: the first round is running"],
+      ["events.nosrc", "No events: no sources are connected"],
+      ["events.nonodes", "All nodes opened from Russia in the last 7 days"],
+    ];
+    for (const [state, words] of said) {
+      await draw(state, Role.OWNER);
+      expect(document.querySelector(".rc-evn")?.textContent, state).toBe(words);
+      expect(document.querySelectorAll("[data-testid=reach-event]"), state).toHaveLength(0);
+      act(() => root?.unmount());
+      host?.remove();
+    }
+    // the default week has fi1 open and nl1 closed, each a row with its pill
+    await draw("events", Role.OWNER);
+    expect([...document.querySelectorAll("[data-testid=reach-event] .pv-pill")].map((p) => p.textContent)).toEqual(["Open", "Closed"]);
+    act(() => root?.unmount());
+    host?.remove();
+    await draw("events.load", Role.OWNER);
+    expect(document.querySelector(".hl-skl")).not.toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await draw("events.err", Role.OWNER);
     await act(async () => void (await new Promise((r) => setTimeout(r, 300))));
     expect(document.querySelector(".pv-qe")).not.toBeNull();
   });
