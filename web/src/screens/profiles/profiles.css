@@ -14,6 +14,12 @@
   gap: 16px;
   min-width: 0;
 }
+/* the board's .mono (pn.css): JetBrains Mono at 500 with tabular figures, for the list and the page of a profile (the wizard has its own) */
+.pf .mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
 .pf-ph {
   display: flex;
   align-items: center;
@@ -310,7 +316,7 @@
   color: var(--text);
 }
 .pv-chips .pv-t {
-  margin-inline-end: -2px;
+  margin-inline-end: 2px;
 }
 .pv-dv {
   flex: 0 0 1px;
