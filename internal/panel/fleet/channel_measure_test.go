@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -68,6 +69,10 @@ func (e *channelEnv) status(t *testing.T) *probev1.ChannelMeasureStatusResponse 
 	if err != nil {
 		t.Fatal(err)
 	}
+	// what a client that sees "done" reads next: the stored last measure has to be there already
+	if r.Msg.State == "done" && (r.Msg.Result == nil || r.Msg.Last == nil) {
+		t.Errorf("a status that says done has result %v and stored last %v", r.Msg.Result, r.Msg.Last)
+	}
 	return r.Msg
 }
 
@@ -80,18 +85,27 @@ func (e *channelEnv) plan(t *testing.T) *probev1.ChannelMeasurePlanResponse {
 	return r.Msg
 }
 
-// finished waits until the run is no longer running.
+// finished reads the status again and again (every read checks that "done" comes with the stored result: see status) until the
+// run's goroutine is over, and returns the last one. It waits on no clock: the deadline only keeps a stuck run from hanging the suite.
 func (e *channelEnv) finished(t *testing.T) *probev1.ChannelMeasureStatusResponse {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	e.x.f.probes.mu.Lock()
+	run := e.x.f.probes.channel.runs[e.node.nodeID]
+	e.x.f.probes.mu.Unlock()
+	if run == nil {
+		t.Fatal("no run to wait for")
+	}
+	deadline := time.After(30 * time.Second)
 	for {
-		if st := e.status(t); st.State != "running" {
-			return st
-		}
-		if time.Now().After(deadline) {
+		select {
+		case <-run.done:
+			return e.status(t)
+		case <-deadline:
 			t.Fatal("the channel measure did not finish")
+		default:
+			e.status(t)
+			runtime.Gosched()
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 }
 

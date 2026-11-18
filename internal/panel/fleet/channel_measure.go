@@ -385,29 +385,35 @@ func (f *Fleet) runChannelJob(ctx context.Context, run *channelRun, n store.Node
 			step.State, step.Error = "failed", "canceled"
 		}
 	}
+	var state, runErr string
 	switch {
 	case canceled:
-		run.state = "canceled"
+		state = "canceled"
 	case result.Down.MbitS <= 0 && result.Up.MbitS <= 0:
-		run.state, run.err = "failed", firstErr
-		if run.err == "" {
-			run.err = "failed"
+		state, runErr = "failed", firstErr
+		if runErr == "" {
+			runErr = "failed"
 		}
 	default:
-		run.state = "done"
+		state = "done"
 	}
-	state, runErr := run.state, run.err
 	run.mu.Unlock()
 
 	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
+	// "done" is said only once the result is stored: whoever sees it reads the node's last measure from the store, and a result that
+	// could not be stored is a failed run, not a finished one without data
 	if state == "done" {
-		if b, err := json.Marshal(result); err == nil {
-			if err := f.st.SetChannelMeasure(saveCtx, n.ID, f.now(), string(b)); err != nil {
-				f.log.Warn("store the channel measure", "code", "store_failed", "err", err)
-			}
+		b, err := json.Marshal(result)
+		if err == nil {
+			err = f.st.SetChannelMeasure(saveCtx, n.ID, f.now(), string(b))
+		}
+		if err != nil {
+			f.log.Warn("store the channel measure", "code", "store_failed", "err", err)
+			state, runErr = "failed", "failed" // the web shows its own text for that code
 		}
 	}
+	run.update(func() { run.state, run.err = state, runErr })
 	names := make([]string, len(partners))
 	for i, c := range partners {
 		names[i] = c.node.Name
