@@ -1,9 +1,10 @@
-import "./sub-dlg.css";
 import { deviceModal, deviceModalLabel, deviceModalStage } from "./add";
 import { confirmHas, confirmWindow, menuHas, menuWindow, renameHas, renameWindow, staleHas, staleWindow, who } from "./dlg-device";
 import { dnsHas, dnsLabel, dnsStage, dnsWindow } from "./dlg-dns";
 import type { Kid } from "./dom";
 import type { Ctx } from "./state";
+// after the styles of the windows it builds on (add.ts brings sub-a.css): this one may override them
+import "./sub-dlg.css";
 
 // Which window is open over the page, what it holds and how it closes. One function each, so main.ts does not know the
 // windows: the page's state (the dns, amz parts) decides. The windows, over each other in this order: "New device" (the add form,

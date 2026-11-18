@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { amzActions } from "./amz-actions";
+import { awgConfig, awgDevice } from "./logic";
 import { dialogClosed, dialogOpen, dialogView } from "./dialogs";
+import { dnsActions } from "./dns-actions";
 import { dict } from "./i18n";
 import { genitive } from "./i18n-dlg";
 import { LINK } from "./logic";
@@ -228,7 +231,7 @@ describe("delete and replace the key", () => {
   it("delete a device of an app on the link: the same question by its meaning, with what the app said about itself", () => {
     const box = draw(ctx("hwid-full", { amz: { confirm: { id: "l1", kind: "remove" } } }));
     expect(text(q(box, ".a-h .t"))).toBe("Удалить iPhone 15");
-    expect(text(q(box, ".a-lead"))).toBe("Приложение на этом устройстве перестанет подключаться, а место освободится. Вернуть устройство можно будет, заново добавив подписку в приложении");
+    expect(text(q(box, ".a-lead"))).toBe("Приложение на этом устройстве перестанет подключаться, а место освободится");
     expect(text(q(box, ".u-hint"))).toContain("Happ");
   });
 
@@ -434,9 +437,9 @@ describe("DNS changed", () => {
     expect(text(q(draw(stale.c), ".a-lead"))).toBe("Теперь на всех серверах Cloudflare + Google, Cloudflare и Google для всего. Сами ключи остались прежними, но каждое устройство с ключом должно получить его заново");
   });
 
-  it("no key to fetch again: the short word about new keys, for one server and for the link apps its own", () => {
+  it("no key to fetch again: the short word about new keys; the link apps have their own", () => {
     const one = done({ dns: { open: "nod_fra", done: { nod_fra: true }, all: false } }, "return");
-    expect(text(q(one.box, ".a-lead"))).toBe("DNS сохранён — его получат новые ключи этого сервера");
+    expect(text(q(one.box, ".a-lead"))).toBe("DNS сохранён — его получат новые ключи");
     expect(one.box.querySelector(".a-opts")).toBeNull();
     const link = done({ dns: { open: LINK, done: { [LINK]: true } } }, "dns-both");
     expect(text(q(link.box, ".a-lead"))).toBe("Приложения по ссылке получат новый DNS при обновлении подписки (до 12 ч). Чтобы сразу — обновите подписку в приложении");
@@ -528,5 +531,98 @@ describe("the entrance of a window plays once per stage", () => {
     modal.sync(false, []);
     modal.sync(true, body(), "rename:d3"); // opened again: plays
     expect(modal.el.querySelector(".mbox")!.classList.contains("still")).toBe(false);
+  });
+});
+
+describe("the windows with the page's real actions", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+  const cfg = awgConfig({ node_id: "de1", label: "Германия", country_code: "DE", version: "3.1", conf: "[Interface]\n", vpn_key: "vpn://k", filename: "a.conf", warnings: [] });
+  function page(name: string) {
+    const d = data(name);
+    const s = state("android", { returning: true });
+    const a = actions();
+    const render = () => {};
+    const api = {
+      addDevice: async () => ({ device: awgDevice({ id: "dev_new" }), configs: [cfg] }),
+      getConfigs: async () => ({ configs: [cfg] }),
+      rotateKey: async () => ({ configs: [cfg] }),
+      revokeDevice: async () => {},
+      renameDevice: async (_e: string, id: string, label: string) => ({ device: awgDevice({ id, label, platform: "android", profile_id: "p31" }), configs: [] }),
+    };
+    a.amz = amzActions({ data: d, st: s, render, api, reveal: () => {} });
+    a.dns = dnsActions({ data: d, st: s, render, api: { setDns: async () => ({ server: undefined, stale_devices: ["d3"] }) } });
+    const c: Ctx = { d, s, a, t: dict.ru, support: "" };
+    return { c, d, s, a };
+  }
+  const stage = (c: Ctx) => (dialogOpen(c) ? dialogView(c).stage : "-");
+
+  it("menu, rename, save: the menu gives way to the name, the name to nothing; the device has its new name", async () => {
+    const { c, a, d } = page("many");
+    a.amz.menu("d3");
+    expect(stage(c)).toBe("menu:d3");
+    a.amz.renameStart("d3");
+    expect(stage(c)).toBe("rename:d3");
+    a.amz.renameInput("Phone");
+    a.amz.renameSave();
+    expect(c.s.amz.busy).toBe("rename:d3");
+    await settle();
+    expect(stage(c)).toBe("-");
+    expect(d.amnezia!.devices[0]!.label).toBe("Phone");
+  });
+
+  it("menu, delete: asked, then the device is gone and no window is left; cancelling closes it too", async () => {
+    const { c, a, d } = page("many");
+    a.amz.menu("d4");
+    a.amz.ask({ id: "d4", kind: "remove" });
+    expect(stage(c)).toBe("confirm:remove:d4");
+    a.amz.ask(null);
+    expect(stage(c)).toBe("-");
+    a.amz.ask({ id: "d4", kind: "remove" });
+    a.amz.remove("d4");
+    await settle();
+    expect(stage(c)).toBe("-");
+    expect(d.amnezia!.devices.map((x) => x.id)).not.toContain("d4");
+  });
+
+  it("replace the key: asked, then the new key is in the window of the key", async () => {
+    const { c, a } = page("many");
+    a.amz.ask({ id: "d3", kind: "rotate" });
+    a.amz.rotate("d3");
+    await settle();
+    expect(c.s.amz).toMatchObject({ confirm: null, open: "d3" });
+    expect(stage(c)).toBe("ready:d3:shown");
+  });
+
+  it("a stale key: the question, then the key's window once it is fetched", async () => {
+    const { c, a } = page("stale");
+    a.amz.stale("d3");
+    expect(stage(c)).toBe("stale:d3");
+    a.amz.renew("d3");
+    await settle();
+    expect(stage(c)).toBe("ready:d3:renew");
+    a.amz.add(false);
+    expect(stage(c)).toBe("-");
+  });
+
+  it("DNS: the choice for all servers, saved, becomes the result; 'Get' opens the key, and closing it brings the result back with the rest", async () => {
+    const { c, a, d } = page("dns-both");
+    a.dns.open("de1");
+    expect(stage(c)).toBe("dns:pick");
+    a.dns.pick("dns_builtin_family");
+    a.dns.apply();
+    expect(stage(c)).toBe("dns:pick"); // in flight: the window stays and shows it
+    expect(c.s.dns.busy).toBe("de1");
+    await settle();
+    expect(stage(c)).toBe("dns:done");
+    expect(d.servers.map((x) => x.dns?.choice)).toEqual(["dns_builtin_family", "dns_builtin_family"]);
+    expect(all(draw(c), ".a-opts .a-opt")).toHaveLength(1);
+    a.amz.renew("d3");
+    await settle();
+    expect(stage(c)).toBe("ready:d3:renew"); // the key window is over the result
+    a.amz.add(false);
+    expect(stage(c)).toBe("dns:done");
+    expect(draw(c).querySelector(".a-opts")).toBeNull(); // the key was fetched: nothing left to fetch again
+    a.dns.open(null);
+    expect(stage(c)).toBe("-");
   });
 });

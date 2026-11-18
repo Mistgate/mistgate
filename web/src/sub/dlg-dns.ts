@@ -167,7 +167,7 @@ function done(c: Ctx): Kid[] {
   const desc = p ? presetDescription(p, s.lang) : "";
   let lead: string;
   if (link) lead = t.dgDoneLink(d.dns!.refresh_hours);
-  else if (stale.length === 0) lead = all ? t.dgDoneNoneAll : t.dgDoneNoneOne;
+  else if (stale.length === 0) lead = t.dgDoneNone;
   else lead = all ? t.dgDoneAll(name, desc) : t.dgDoneOne(placeOf(c, srv!), name, desc);
   const skipped = s.dns.skipped.map((id) => server(c, id)).filter((x): x is ServerEntry => !!x);
   const renewFail = s.amz.error && s.amz.errorAt.startsWith("renew:") && stale.some((x) => `renew:${x.id}` === s.amz.errorAt) ? errLine(t.err(s.amz.error, s.amz.retryMin)) : null;
