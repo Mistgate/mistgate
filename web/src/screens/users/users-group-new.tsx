@@ -60,7 +60,7 @@ export function useWayOf() {
 export function NewGroupModal({ open, onOpenChange, initialProfiles, initialName, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; initialProfiles?: string[]; initialName?: string; onCreated?: (g: Group) => void }) {
   const t = useTx();
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={t("users.newGroup")} closeLabel={t("common.close")} className="md:max-w-[920px]!" shot="new-group">
+    <Modal open={open} onOpenChange={onOpenChange} title={t("users.newGroup")} closeLabel={t("common.close")} className="md:max-w-[920px]! [&>div:first-child]:min-h-16! md:[&>div:first-child]:min-h-[72px]! [&>div:first-child]:items-center! [&_h2]:leading-5!" shot="new-group">
       <GroupWindow initialProfiles={initialProfiles} initialName={initialName} onClose={() => onOpenChange(false)} onCreated={onCreated} />
     </Modal>
   );
@@ -73,7 +73,7 @@ export type GroupEditDemo = { impact?: AccessImpact; held?: string };
 export function GroupEditModal({ group, open, onOpenChange, demo }: { group: Group | undefined; open: boolean; onOpenChange: (o: boolean) => void; demo?: GroupEditDemo }) {
   const t = useTx();
   return (
-    <Modal open={open && !!group} onOpenChange={onOpenChange} title={t("users.groupEdit")} closeLabel={t("common.close")} className="md:max-w-[920px]!" shot="edit-group">
+    <Modal open={open && !!group} onOpenChange={onOpenChange} title={t("users.groupEdit")} closeLabel={t("common.close")} className="md:max-w-[920px]! [&>div:first-child]:min-h-16! md:[&>div:first-child]:min-h-[72px]! [&>div:first-child]:items-center! [&_h2]:leading-5!" shot="edit-group">
       {group && <GroupWindow group={group} demo={demo} onClose={() => onOpenChange(false)} />}
     </Modal>
   );
@@ -375,7 +375,7 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
           {error !== null && <Notice tone="danger">{error}</Notice>}
         </div>
       )}
-      <div className="sticky -bottom-px -mx-4 -mb-5 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
+      <div className="sticky -bottom-5 -mx-4 -mb-5 flex flex-wrap md:-bottom-6 items-center gap-2 border-t border-line bg-surface px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
         <span className="me-auto min-w-0 text-xs text-muted @max-[672px]/usd:basis-full">{summary}</span>
         <Button variant="secondary" size="lg" onClick={onClose}>
           {t("users.cancel")}

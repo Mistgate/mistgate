@@ -70,7 +70,7 @@ export const en = {
   "users.speedDeviceHint": "each device on its own",
   "users.unitD": "d",
 
-  "users.new": "New user",
+  "users.new": "New person",
   "users.name": "Name",
   "users.subscriptionPage": "Subscription page",
   "users.subscriptionName": "Name shown on the subscription page",
@@ -378,7 +378,7 @@ export const ru: typeof en = {
   "users.speedDeviceHint": "каждое устройство отдельно",
   "users.unitD": "дн",
 
-  "users.new": "Новый пользователь",
+  "users.new": "Новый человек",
   "users.name": "Имя",
   "users.subscriptionPage": "Страница подписки",
   "users.subscriptionName": "Имя на странице подписки",
@@ -688,7 +688,7 @@ export const zh: typeof en = {
   "users.speedDeviceHint": "每台设备单独计算",
   "users.unitD": "天",
 
-  "users.new": "新建用户",
+  "users.new": "新用户",
   "users.name": "名称",
   "users.subscriptionPage": "订阅页面",
   "users.subscriptionName": "订阅页面上显示的名称",
@@ -1300,7 +1300,7 @@ export const tr: typeof en = {
   "users.speedDevice": "Cihaz başına hız",
   "users.speedDeviceHint": "her cihaz ayrı",
   "users.unitD": "gün",
-  "users.new": "Yeni kullanıcı",
+  "users.new": "Yeni kişi",
   "users.name": "Ad",
   "users.subscriptionPage": "Abonelik sayfası",
   "users.subscriptionName": "Abonelik sayfasında görünen ad",
