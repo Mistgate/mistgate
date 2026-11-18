@@ -84,22 +84,6 @@ export function SectionLabel({
 }
 
 /**
- * "Danger zone" at the end of a page (node, user, profile, DNS preset): the same pink section everywhere, its heading in
- * the danger colour. It holds the page's own rows and buttons.
- */
-export function DangerZone({ title, children, className }: { title: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section className={cx("flex min-w-0 flex-col gap-3 rounded-card border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-danger-soft p-4", className)}>
-      <h2 className="flex items-center gap-2 text-base leading-6 font-medium text-danger-text">
-        <IconChip icon="warn" tone="rose" />
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-/**
  * A block of a card under a small heading, a hairline above it (an open Reachability source, a node's forms); `flush` is
  * the first one, right under the card's header.
  */

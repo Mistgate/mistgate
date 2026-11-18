@@ -44,25 +44,6 @@ export function Panel({
   );
 }
 
-/**
- * A settings line: label and hint on the left, the control on the right, a hairline above all but the first. A line
- * narrower than 15rem (the right column of a person's page at 720–900 px) puts the control under the label instead of
- * squeezing the label under it; wider lines (desktop, phone) are not touched.
- */
-export function SettingRow({ label, hint, children, className }: { label: ReactNode; hint?: ReactNode; children?: ReactNode; className?: string }) {
-  return (
-    <div className="@container border-t border-line first:border-t-0">
-      <div className={cx("flex min-h-[52px] items-center gap-3 @max-[15rem]:flex-col @max-[15rem]:items-start @max-[15rem]:gap-2 @max-[15rem]:py-2.5", className)}>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5 @max-[15rem]:self-stretch">
-          <span className="text-[13px] font-bold">{label}</span>
-          {hint && <span className="text-[11px] leading-snug text-muted">{hint}</span>}
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 const resetCodes = { [QuotaReset.DAY]: "day", [QuotaReset.WEEK]: "week", [QuotaReset.MONTH]: "month", [QuotaReset.ROLLING_MONTH]: "rolling", [QuotaReset.NONE]: "none" } as const;
 /** The word of a quota period in keys ("users.quotaPer.<code>"); unspecified is the server's default, the month. */
 export const resetCode = (r: QuotaReset) => resetCodes[r as keyof typeof resetCodes] ?? "month";

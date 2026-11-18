@@ -1,9 +1,6 @@
-import { Link } from "@tanstack/react-router";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
-import { type IconName, type Tone } from "@/components/ui/icons";
-import { cx } from "@/lib/cx";
 import { useTx } from "./t";
 
 // The Groups tab of the users screen and the pieces every screen shows about a group: what it gives (the two ways,
@@ -13,7 +10,6 @@ import { useTx } from "./t";
 
 /** How a person gets a profile: by the subscription link (in any app that takes it) or by an AmneziaVPN key per device. */
 export type Way = "sub" | "awg";
-export const wayMark: Record<Way, { icon: IconName; tone: Tone }> = { sub: { icon: "link", tone: "mint" }, awg: { icon: "key", tone: "sage" } };
 
 type ProtocolApps = { id: string; apps: readonly App[] };
 
@@ -22,22 +18,6 @@ export function wayOf(protocol: string, protocols: readonly ProtocolApps[] | und
   const apps = protocols?.find((p) => p.id === protocol)?.apps;
   if (apps) return apps.includes(App.AMNEZIA) && !apps.includes(App.HAPP) ? "awg" : "sub";
   return protocol === "awg" ? "awg" : "sub";
-}
-
-/** A profile, named, as a link to its page. */
-export function ProfileLink({ id, name, className }: { id: string; name: string; className?: string }) {
-  return (
-    <Link
-      to="/profiles/$id"
-      params={{ id }}
-      className={cx(
-        "inline-flex h-[26px] max-w-full items-center gap-1 rounded-ctl border border-line bg-surface-2 px-2 font-mono text-[11px] font-semibold text-fg transition-colors hover:border-accent-line hover:bg-accent-soft focus-visible:border-accent-line",
-        className,
-      )}
-    >
-      <span className="truncate">{name}</span>
-    </Link>
-  );
 }
 
 /** Lost and gained profiles of a group change, in words: "alice loses: “AWG 3.1” (2 AmneziaVPN keys stop working)". */

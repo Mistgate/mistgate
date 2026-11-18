@@ -4,9 +4,6 @@ import { cx } from "@/lib/cx";
 import { profileInfo } from "@/lib/integrations";
 import type { TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 
-/** The card every section of the screen is drawn in (same as the Updates cards). */
-export const card = "flex min-w-0 flex-col gap-3 rounded-card-lg border border-line bg-surface p-4 md:p-[18px]";
-
 /** What a token may do, as a 22px chip: grey for reads, accent for day-to-day work, red for admin. */
 export function ProfileChip({ profile }: { profile: TokenProfile }) {
   const t = useT();
