@@ -14,6 +14,20 @@
   gap: 16px;
   min-width: 0;
 }
+/* the board's .card (pn.css): the surface with a hairline, 16 round. The list's table and matrix and the page's sections (pp-sec) are cards;
+   without this rule they drew flat on the page */
+.pf .card {
+  position: relative;
+  border: 1px solid var(--pf-hair);
+  border-radius: 16px;
+  background: var(--surface);
+}
+/* the board's .mono (pn.css): JetBrains Mono at 500 with tabular figures, for the list and the page of a profile (the wizard has its own) */
+.pf .mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
 .pf-ph {
   display: flex;
   align-items: center;
@@ -159,8 +173,8 @@
 }
 .pv-pill.ok {
   background: var(--tone-mint-bg);
-  color: var(--accent-text);
-  color: var(--ok);
+  /* the text mint: the mark's --ok is 2.3 : 1 on this wash on the light theme (the same value on the dark one) */
+  color: var(--tone-mint);
 }
 .pv-pill.part,
 .pv-pill.nogr {
@@ -310,7 +324,7 @@
   color: var(--text);
 }
 .pv-chips .pv-t {
-  margin-inline-end: -2px;
+  margin-inline-end: 2px;
 }
 .pv-dv {
   flex: 0 0 1px;

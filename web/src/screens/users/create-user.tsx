@@ -48,27 +48,49 @@ export function CreateUserModal({ open, onOpenChange, onCreated, startName, star
   const [done, setDone] = useState<Created | null>(startDone ?? null);
   // "Add another": the form is mounted anew (a new round), the done screen goes
   const [round, setRound] = useState(0);
+  const [qr, setQr] = useState(false);
   return (
     <Modal
       open={open}
       onOpenChange={(o) => {
-        if (!o) setDone(null);
+        if (!o) {
+          setDone(null);
+          setQr(false);
+        }
         onOpenChange(o);
       }}
       title={done ? t("ul.new.done") : t("users.new")}
       closeLabel={t("common.close")}
-      className={cx("transition-[transform,opacity,max-width]", done ? "md:max-w-[520px]!" : "md:max-w-[880px]!")}
+      // the done window is 520 wide, under the board's 720: its children take the narrow numbers (header 16 and 12, body 16, the foot 12 and 16)
+      className={cx("transition-[transform,opacity,max-width] [&>div:first-child]:items-center! [&_h2]:leading-5!", done ? "md:max-w-[520px]! [&>div:last-child]:justify-start! [&>div:last-child]:px-4! [&>div:last-child]:py-3! [&>div:first-child]:min-h-16! [&>div:first-child]:pt-4! [&>div:first-child]:pb-2! [&>div:first-child]:ps-4! [&>div:first-child]:pe-3! [&>div:nth-child(2)]:px-4! [&>div:nth-child(2)]:pt-2! [&>div:nth-child(2)]:pb-5!" : "md:max-w-[880px]! [&>div:first-child]:min-h-16! md:[&>div:first-child]:min-h-[72px]!")}
       shot="create-user"
+      footer={
+        done ? (
+          <>
+            {/* the board's foot opens with an empty line (footer>span takes the whole row on a narrow window), which is what its 8 more are */}
+            <span aria-hidden className="basis-full" />
+            <Button variant="secondary" size="lg" onClick={() => setQr(true)}>
+              {t("ul.act.link")}
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => {
+                setDone(null);
+                setRound((r) => r + 1);
+              }}
+            >
+              {t("ul.new.again")}
+            </Button>
+            <Button variant="primary" size="lg" onClick={() => onOpenChange(false)}>
+              {t("ul.done")}
+            </Button>
+          </>
+        ) : undefined
+      }
     >
       {done ? (
-        <Done
-          created={done}
-          onAgain={() => {
-            setDone(null);
-            setRound((r) => r + 1);
-          }}
-          onClose={() => onOpenChange(false)}
-        />
+        <Done created={done} qr={qr} onQr={setQr} />
       ) : (
         <CreateForm
           key={round}
@@ -86,7 +108,8 @@ export function CreateUserModal({ open, onOpenChange, onCreated, startName, star
 }
 
 const box = "rounded-xl border border-line";
-const seg = "w-auto max-w-full flex-wrap [&_button]:px-2.5 [&_button]:text-xs [&_button]:font-mono";
+// the items of a Segmented are span[role=radio], not buttons
+const seg = "w-auto max-w-full flex-wrap [&_[role=radio]]:px-2.5 [&_[role=radio]]:text-xs [&_[role=radio]]:font-mono";
 
 /** A limit as the board draws it: its name and a line of where the value comes from, presets in a segment, and a stepper for a value of its own. */
 function LimitRow<V extends number>({
@@ -558,7 +581,7 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
         </aside>
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
-      <div className="sticky -bottom-px -mx-4 -mb-5 flex flex-wrap items-center gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
+      <div className="sticky -bottom-5 -mx-4 -mb-5 flex flex-wrap md:-bottom-6 items-center gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
         <span className="me-auto min-w-0 text-xs text-muted @max-[672px]/usd:basis-full">{name.trim() ? t("ul.new.enter") : t("ul.new.footEmpty")}</span>
         <Button variant="secondary" size="lg" onClick={onClose}>
           {t("users.cancel")}
@@ -612,24 +635,23 @@ function facts({ quotaGb, termDays, devices, sel, total, allNodes, t }: { quotaG
 }
 
 /** The done screen: a tick, the link with its copy button (and the page password), the facts, "Add another" and "Done". */
-function Done({ created, onAgain, onClose }: { created: Created; onAgain: () => void; onClose: () => void }) {
+function Done({ created, qr, onQr }: { created: Created; qr: boolean; onQr: (open: boolean) => void }) {
   const t = useTx();
   const { user, url, password } = created;
   const groupList = useQuery(groupsQuery);
   const target = linkTargetOf(user, groupList.data?.find((g) => g.id === user.groupId));
   const nothing = !target.access.happ && !target.access.amnezia;
-  const [qr, setQr] = useState(false);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   // the effects' halo plays inside the window (data-fx-halo keeps it there), once, when the screen is there
   useEffect(() => {
     if (host) halo("create", { target: host });
   }, [host]);
   return (
-    <div ref={setHost} data-fx-halo className="relative flex flex-col items-center gap-2 pt-4 text-center">
+    <div ref={setHost} data-fx-halo className="relative flex flex-col items-center gap-2 text-center">
       <span aria-hidden className="grid size-14 animate-[fz-pop_0.45s_var(--ease-spring)_both] place-items-center rounded-full bg-accent text-on-accent">
         <Icon name="check" size={28} strokeWidth={2.5} />
       </span>
-      <h3 className="mt-2 text-xl font-medium">{t("ul.new.added", { name: user.name })}</h3>
+      <h3 className="mt-2 text-xl leading-5 font-medium">{t("ul.new.added", { name: user.name })}</h3>
       <p className="mb-2 max-w-[380px] text-sm leading-5 text-sec">{t("ul.new.sendLink")}</p>
       <div className="flex w-full min-w-0 items-center gap-2 rounded-field border border-line bg-canvas py-1 ps-3 pe-1">
         <code className="min-w-0 flex-1 truncate text-start font-mono text-[13px] text-sec select-all" title={url}>
@@ -654,7 +676,7 @@ function Done({ created, onAgain, onClose }: { created: Created; onAgain: () => 
           </span>
         </Notice>
       )}
-      <dl className="m-0 mt-2 grid w-full grid-cols-4 justify-between gap-3 px-1 pt-3 text-start @max-[480px]:grid-cols-2">
+      <dl className="m-0 grid w-full grid-cols-2 gap-3 px-1 pt-3 text-start">
         {[
           [t("users.group"), user.groupName],
           [t("ul.new.traffic"), user.quotaBytes === 0 ? t("ul.noLimit") : t("ul.new.perMonth", { n: Math.round(user.quotaBytes / GB) })],
@@ -662,23 +684,12 @@ function Done({ created, onAgain, onClose }: { created: Created; onAgain: () => 
           [t("users.devices"), String(user.deviceLimit)],
         ].map(([l, v]) => (
           <div key={l}>
-            <dt className="text-xs text-muted">{l}</dt>
+            <dt className="text-xs leading-5 text-muted">{l}</dt>
             <dd className="m-0 mt-0.5 text-sm">{v}</dd>
           </div>
         ))}
       </dl>
-      <div className="sticky -bottom-px -mx-4 -mb-5 mt-5 flex w-[calc(100%+2rem)] items-center justify-end gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-4 py-3 md:-mx-6 md:-mb-6 md:w-[calc(100%+3rem)] md:px-6 md:py-3.5">
-        <Button variant="secondary" size="lg" onClick={() => setQr(true)}>
-          {t("ul.act.link")}
-        </Button>
-        <Button variant="secondary" size="lg" onClick={onAgain}>
-          {t("ul.new.again")}
-        </Button>
-        <Button variant="primary" size="lg" onClick={onClose}>
-          {t("ul.done")}
-        </Button>
-      </div>
-      <LinkModal target={qr ? target : null} initialUrl={url} initialPassword={password} onClose={() => setQr(false)} />
+      <LinkModal target={qr ? target : null} initialUrl={url} initialPassword={password} onClose={() => onQr(false)} />
     </div>
   );
 }

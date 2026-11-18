@@ -11,12 +11,15 @@ import { UsersScreen } from "./users/list";
 
 // The scenes of /dev-kit?only=pn-users draw the real screen on made-up data: every state a scene names must draw, in every language.
 
+// the address of the scene: only the order of the list lives there (?sort=traffic&desc=1)
+let search: Record<string, unknown> = {};
+
 // the scene's own calls are put on these objects by `seeded`
 vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, users: {}, groups: {} }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: ReactNode; className?: string }) => <a className={className}>{children}</a>,
   useBlocker: () => ({ status: "idle" }),
-  useSearch: () => ({}),
+  useSearch: () => search,
   useNavigate: () => vi.fn(),
 }));
 
@@ -39,6 +42,7 @@ const states = [...new Set(frames.map((f) => f.state))].filter((s) => !s.startsW
 const groupsTab = (s: string) => s.startsWith("groups") || s === "group-new" || s in editOf;
 
 async function draw(state: string, role = Role.OWNER) {
+  search = state === "sorted" ? { sort: "traffic", desc: 1 } : {};
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -66,7 +70,21 @@ describe("the scenes of the People screen", () => {
     expect(document.querySelector("h1")?.textContent).toBeTruthy();
     expect(document.body.textContent).not.toContain("undefined");
     if (state === "list") expect(rows()).toHaveLength(3);
-    if (state === "many" || state === "open-erin") expect(rows()).toHaveLength(10);
+    if (state === "many" || state === "open-erin" || state === "open-heidi" || state === "open-ten" || state === "ten" || state === "sorted") expect(rows()).toHaveLength(10);
+    if (state.startsWith("filter-")) expect([...document.querySelectorAll("[role=radio][aria-checked=true]")].map((e) => e.textContent).join(" ")).toMatch(state === "filter-over" ? /Over quota/ : /Expiring/);
+    if (state === "ten") {
+      // ten places each: a bar after the figure instead of the dots, and the figures of the board (alice 10/10, heidi 0/10)
+      expect(document.querySelectorAll("section .us-e i.h-1.w-12")).toHaveLength(10);
+      expect(rows()[0]!.textContent).toContain("10/10");
+      expect(rows()[7]!.textContent).toContain("0/10");
+    }
+    if (state === "sorted") {
+      expect(document.querySelector("[role=columnheader][aria-sort=descending]")?.textContent).toContain("Traffic");
+      expect(document.querySelectorAll("[role=columnheader][aria-sort=ascending]")).toHaveLength(0);
+    }
+    if (state === "open-heidi") expect(document.querySelector("button[aria-label='heidi'][aria-expanded=true]")).not.toBeNull();
+    if (state === "open-heidi") expect(document.body.textContent).toContain("None yet. They appear when the person opens the link");
+    if (state === "open-ten") expect(document.body.textContent).toContain("Show all 10");
     if (state === "none") expect(document.querySelectorAll("ol li")).toHaveLength(3);
     if (state === "search") expect(rows()).toHaveLength(1);
     if (state === "nomatch") expect(document.body.textContent).toContain("Nobody found");

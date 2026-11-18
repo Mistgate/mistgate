@@ -18,3 +18,11 @@
     animation: none;
   }
 }
+
+/* what a tab of the group opens sits 32 under the strip (pn.css: the page's gap 16 and the margin-top 16 of .up-g and .up-one) */
+.grp-tabs [role="tabpanel"] {
+  padding-top: 32px;
+}
+.grp-tabs {
+  margin-top: 4px;
+}

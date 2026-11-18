@@ -96,7 +96,7 @@ export function PeopleTable({
   const selecting = !!select?.on;
   const now = nowSec();
   return (
-    <section data-select={selecting} className="@container/ust relative rounded-card border border-line bg-surface [--cb:0px] data-[select=true]:[--cb:20px]">
+    <section data-select={selecting} className="@container/ust relative mt-4 rounded-card border border-line bg-surface [--cb:0px] data-[select=true]:[--cb:20px]">
       {rows.length > 0 && (
         <div role="row" className={cx("min-h-10 text-[13px] text-muted @max-[520px]/ust:hidden", rowBase)}>
           <span aria-hidden />

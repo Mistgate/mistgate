@@ -70,7 +70,7 @@ export function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
         </div>
         <div className="up-trr">
           <b>{user.nextResetUnix > 0 ? t("up.resetOn", { date: dayFmt(t, user.nextResetUnix, { day: "numeric", month: "long" }) }) : t("users.reset.none")}</b>
-          {reset !== null && <span>{t("up.resetIn", { n: Math.max(0, Math.ceil((user.nextResetUnix - now) / DAY)) })}</span>}
+          {reset !== null && <span>{t.n("up.resetIn", Math.max(0, Math.ceil((user.nextResetUnix - now) / DAY)))}</span>}
         </div>
       </div>
       <i className="up-bar" style={{ "--w": `${pct.toFixed(1)}%` } as React.CSSProperties} aria-hidden />

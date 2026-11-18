@@ -201,7 +201,7 @@ export function GroupsTab({
                   </div>
                 ))}
               </dl>
-              <div className="flex items-center gap-4 border-t border-line px-6 py-3 text-[13px]">
+              <div className="flex items-center gap-4 border-t border-line px-6 py-3 text-[13px] [&>a]:text-sec">
                 <AppLink to="/users/groups/$id" params={{ id: g.id }} className={buttonClass("secondary", "md")}>
                   {t("ul.g.open")}
                 </AppLink>

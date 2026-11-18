@@ -52,13 +52,13 @@ export function UserExpand({ u, group, manage, onLink }: { u: User; group: Group
             <b className="font-mono font-medium text-sec">{dev.text}</b>
             {left && <em className={cx("text-xs not-italic", dev.full ? "text-warn-text" : "text-muted")}>{left}</em>}
           </span>
-          <ul className={cx("flex flex-col gap-0.5", all && "grid grid-cols-2 gap-x-10 @max-[520px]/ust:grid-cols-1")}>
+          <ul className={cx("flex flex-col gap-0.5", all && "grid animate-[mg-up_0.25s_var(--e)_both] grid-cols-2 gap-x-10 @max-[520px]/ust:grid-cols-1")}>
             {shown.map((d) => (
               <DeviceLine key={d.id} d={d} t={t} />
             ))}
           </ul>
           {devs.length > 4 && (
-            <button type="button" onClick={() => setAll(!all)} className="mt-1 self-start text-[13px] text-sec underline decoration-line underline-offset-4 hover:text-fg">
+            <button type="button" onClick={() => setAll(!all)} className="mt-1 self-start text-[13px] text-fg underline decoration-line underline-offset-4 hover:decoration-current">
               {all ? t("ul.dev.fold") : t("ul.dev.showAll", { n: devs.length })}
             </button>
           )}
@@ -160,7 +160,8 @@ function Actions({ u, manage, onLink }: { u: User; manage: boolean; onLink: () =
     onError: (e) => toast.error(errorText(e, t)),
   });
   return (
-    <div className="flex flex-wrap items-center gap-2 [&_button]:h-9">
+    // the board's .btn: 36 high, 10 round, 14px, 16 of padding (the base sizes are 32 and 40)
+    <div className="flex flex-wrap items-center gap-2 [&_button]:h-9 [&_button]:rounded-[10px] [&_button]:px-4 [&_button]:text-sm">
       {manage && (
         <>
           <Button disabled={run.isPending || u.expiresUnix === 0} title={u.expiresUnix === 0 ? t("bulk.people.skip.noTerm") : undefined} onClick={() => run.mutate("extend")}>
@@ -175,7 +176,7 @@ function Actions({ u, manage, onLink }: { u: User; manage: boolean; onLink: () =
           <Button onClick={onLink}>{t("ul.act.link")}</Button>
         </>
       )}
-      <AppLink to="/users/$id" params={{ id: u.id }} className="ms-auto text-[13px] text-sec underline decoration-line underline-offset-4 hover:text-fg">
+      <AppLink to="/users/$id" params={{ id: u.id }} className="ms-auto text-[13px] text-fg underline decoration-line underline-offset-4 hover:decoration-current">
         {t("ul.act.page")}
       </AppLink>
     </div>

@@ -13,7 +13,7 @@ import { ProfilePage } from "./profiles/page";
 // The scenes of /dev-kit?only=pn-profile that are the page's own (the head, the verdict, the Settings tab, the window "Save changes?"): every
 // state a scene names must draw, in every language, and say what it is made to say. The tabs' and windows' scenes are tested beside theirs.
 
-vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, profiles: {}, groups: {}, users: {}, nodes: {}, health: {}, relays: {} }));
+vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, profiles: {}, awg: {}, groups: {}, users: {}, nodes: {}, health: {}, relays: {} }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, params: _p, search: _s, to: _t, render: _r, ...rest }: { children?: ReactNode; className?: string; params?: unknown; search?: unknown; to?: string; render?: unknown }) => (
     <a className={className} {...rest}>
@@ -80,6 +80,10 @@ describe("the scenes of the profile page's Settings tab", () => {
       expect(document.querySelector(".pf-save button:last-child")?.getAttribute("aria-disabled")).toBe("true");
     }
     if (state === "hy1.settings.saved") expect(document.querySelector(".pf-save.ok")?.textContent).toContain("Saved");
+    if (state === "hy1.settings.panelold") {
+      expect(document.querySelector(".pf-save.on")?.textContent).toContain("The panel was updated: the page is the old version");
+      expect(document.querySelector(".pf-save button:last-child")?.textContent).toBe("Reload");
+    }
     if (state === "hy1.settings.stale") expect(body()).toContain("The profile was changed elsewhere");
     if (state === "hy3.settings") expect(body()).toContain("Not on any node");
     if (state === "vl3.settings") expect(body()).toContain("In no group");

@@ -5,7 +5,7 @@ import { LangToggle, ThemeToggle } from "@/components/prefs";
 import { PageTitle } from "@/components/ui/bits";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { App, NodeShareMode, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { isLang, setLang, useLang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
@@ -28,7 +28,7 @@ import { groupsQuery, profileListQuery, protocolsQuery } from "./users/rpc";
 //   /dev-kit?only=group-page&state=<state>[&tab=access|settings][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
 // states: people (friends: bob, carol, dave) | empty (nobody in the group) | pick (the panel "Who to move in", one ticked) | find (a
 // search that finds nobody) | menu (the menu of carol's row) | access | access-dirty (a profile turned off: the save bar) |
-// access-saving | access-saved | nothing (a group with no profile: gives nothing) | settings | settings-dirty (a name typed) |
+// access-saving | access-saved | access-held (a node the owner holds back, locked) | nothing (a group with no profile: gives nothing) | settings | settings-dirty (a name typed) |
 // settings-ask-mv | settings-ask-del (a button pressed once; the empty group) | deleted | missing.
 // Made-up data of the board: the groups family and friends, alice to erin, the nodes de1, fi1, nl1 and msk1.
 
@@ -78,8 +78,8 @@ const counts = (all: number, online: number) => ({ all, online, expiring: all > 
 const profile = (id: string, name: string, protocol: string) => ({ id, name, protocol, summary: "", nodeCount: 3, userCount: 5, warnings: [], version: 1, formats: [] });
 const profileList = [profile("p_vless", "VLESS Reality", "vless"), profile("p_hy", "Hysteria2 main", "hysteria2"), profile("p_awg", "AWG 3.1", "awg"), profile("p_mt", "MTProto", "mtproto")];
 
-const node = (name: string, cc: string, city: string, protocols: string[]) => ({ id: `nod_${name}`, name, countryCode: cc, location: city, provider: "Example Cloud", status: NodeStatus.ONLINE, protocols, online: [], notes: "" });
-const nodes = [node("de1", "DE", "Frankfurt", ["vless", "hysteria2", "awg", "mtproto"]), node("fi1", "FI", "Helsinki", ["vless", "awg", "mtproto"]), node("nl1", "NL", "Amsterdam", ["vless", "hysteria2"]), node("msk1", "RU", "Moscow", ["vless", "mtproto"])];
+const node = (name: string, cc: string, city: string, protocols: string[], sharing?: object) => ({ id: `nod_${name}`, name, countryCode: cc, location: city, provider: "Example Cloud", status: NodeStatus.ONLINE, protocols, online: [], notes: "", sharing });
+const nodeList = (held: boolean) => [node("de1", "DE", "Frankfurt", ["vless", "hysteria2", "awg", "mtproto"]), node("fi1", "FI", "Helsinki", ["vless", "awg", "mtproto"]), node("nl1", "NL", "Amsterdam", ["vless", "hysteria2"]), node("msk1", "RU", "Moscow", ["vless", "mtproto"], held ? { mode: NodeShareMode.NONE, groupsReceiving: 0, groupsTotal: 2, changedUnix: now - 3 * D, idle: false } : undefined)];
 
 const group = (id: "friends" | "family", over: Record<string, unknown> = {}) => ({
   id: `grp_${id}`,
@@ -101,6 +101,9 @@ const preset = (id: string, name: string) => ({ id, name, description: "", built
 export function seeded(state: string, role: Role) {
   const empty = state === "empty" || state === "settings-ask-del";
   const nothing = state === "nothing";
+  // msk1 is marked "nobody gets it": it is on the group's disabled list and the panel would refuse to switch it on
+  const held = state === "access-held";
+  const nodes = nodeList(held);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0 } as never);
   c.setQueryData(nodesQuery.queryKey, { nodes, expectedAgentVersion: "0.1.71" } as never);
@@ -108,7 +111,7 @@ export function seeded(state: string, role: Role) {
   c.setQueryData(userCountQuery.queryKey, { counts: { all: 5, online: 3 } } as never);
   c.setQueryData(awaitingQuery.queryKey, { awaiting: 0 } as never);
   c.setQueryData(groupsQuery.queryKey, [
-    group("friends", { ...(empty && { userCount: 0 }), ...(nothing && { profileIds: [], happNodes: 0, amneziaNodes: 0 }) }),
+    group("friends", { ...(empty && { userCount: 0 }), ...(nothing && { profileIds: [], happNodes: 0, amneziaNodes: 0 }), ...(held && { disabledNodeIds: ["nod_msk1"], happNodes: 3 }) }),
     group("family"),
   ] as never);
   c.setQueryData(profileListQuery.queryKey, profileList as never);
@@ -187,6 +190,9 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "group-access-dirty", state: "access-dirty", title: "A profile turned off: the bar slides out", w: 1440, h: 1000, params: "&tab=access" },
   { id: "group-access-saving", state: "access-saving", title: "The bar while the call runs", w: 1440, h: 1000, params: "&tab=access" },
   { id: "group-access-saved", state: "access-saved", title: "The bar after the save", w: 1440, h: 1000, params: "&tab=access" },
+  { id: "group-access-held", state: "access-held", title: "A node the owner holds back (nobody gets it): off for the group and locked, with the reason in the row", w: 1440, h: 1000, params: "&tab=access" },
+  { id: "group-access-held-light", state: "access-held", title: "The same on the light theme", w: 1440, h: 1000, params: "&tab=access&theme=light" },
+  { id: "group-access-held-phone", state: "access-held", title: "The same on a phone", w: 400, h: 1700, params: "&tab=access" },
   { id: "group-nothing", state: "nothing", title: "A group that gives nothing", w: 1440, h: 1000, params: "&tab=access" },
   { id: "group-settings", state: "settings", title: "Settings: the name and the colour, the danger zone", w: 1440, h: 780, params: "&tab=settings" },
   { id: "group-settings-light", state: "settings", title: "Settings on the light theme", w: 1440, h: 780, params: "&tab=settings&theme=light" },

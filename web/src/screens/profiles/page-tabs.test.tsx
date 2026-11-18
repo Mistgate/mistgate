@@ -15,7 +15,7 @@ import { ProfilePage } from "./page";
 // What the Servers and People tabs and their windows do with the panel: the calls they make, with what, and what they say of the answers. The
 // page is the real one on the dev kit's made-up data (its scenes also draw every state: dev-kit-profile-tabs.test.tsx).
 
-vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, profiles: {}, groups: {}, users: {}, nodes: {}, health: {}, relays: {} }));
+vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, profiles: {}, awg: {}, groups: {}, users: {}, nodes: {}, health: {}, relays: {} }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, params: _p, search: _s, to: _t, render: _r, ...rest }: { children?: ReactNode; className?: string; params?: unknown; search?: unknown; to?: string; render?: unknown }) => (
     <a className={className} {...rest}>
