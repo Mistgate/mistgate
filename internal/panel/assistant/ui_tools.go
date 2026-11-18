@@ -3,10 +3,12 @@
 package assistant
 
 import (
+	"context"
 	"encoding/json"
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 )
@@ -17,15 +19,23 @@ import (
 // on the plan's own card, where the secrets are typed. The pages are a whitelist; web/src/lib/ui-actions.ts holds the same
 // whitelist and maps a page to the router's route.
 
-// uiPages: the pages ui_open knows, and whether each needs an id.
-var uiPages = map[string]bool{
-	"overview": false, "nodes": false, "node": true, "node_ways": true, "node_profiles": true, "node_history": true, "node_server": true,
-	"users": false, "groups": false, "user": true, "profiles": false, "profile": true, "subscriptions": false,
-	"health": false, "health_people": false, "reachability": false, "updates": false,
-	"ai": false, "ai_memory": false, "ai_mcp": false, "ai_waiting": false,
-	"settings_interface": false, "settings_system": false, "settings_security": false, "settings_sessions": false,
-	"settings_audit": false, "settings_admins": false, "settings_domains": false, "settings_backups": false,
+// uiPages: the pages ui_open knows, and the kind of thing each one needs (a node, a person, a profile, a group, a decoy site)
+// named by id or by its name; "" is a page without a target.
+var uiPages = map[string]string{
+	"overview": "", "nodes": "", "node": "node", "node_ways": "node", "node_profiles": "node", "node_history": "node", "node_server": "node",
+	"users": "", "groups": "", "group": "group", "user": "user", "profiles": "", "profile": "profile", "subscriptions": "",
+	"decoys": "", "decoy": "decoy",
+	"health": "", "health_people": "", "reachability": "", "updates": "",
+	"ai": "", "ai_memory": "", "ai_mcp": "", "ai_waiting": "",
+	"settings_interface": "", "settings_system": "", "settings_security": "", "settings_sessions": "", "settings_audit": "",
+	"settings_admins": "", "settings_domains": "", "settings_backups": "",
 }
+
+// uiTargetTable: where each kind of target lives; every one has an id and a unique name.
+var uiTargetTable = map[string]string{"node": "node", "user": "user", "profile": "profile", "group": "user_group", "decoy": "decoy_site"}
+
+// uiBuiltinDecoys: the two entries of the decoy library that are not rows (the panel's built-in site and its directory).
+var uiBuiltinDecoys = map[string]bool{"builtin": true, "panel_dir": true}
 
 var uiIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
@@ -39,14 +49,16 @@ func uiToolSchemas() []mcp.AssistantTool {
 	return []mcp.AssistantTool{
 		{
 			Name:        "ui_open",
-			Description: "Offer to open a page of the panel. The person sees a card with a button and clicks it; nothing opens by itself. Use it when asked where something is. The node, node_ways, node_profiles, node_history, node_server, user and profile pages need their id.",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{"page":{"type":"string","enum":` + string(pagesJSON) + `},"id":{"type":"string","maxLength":64}},"required":["page"],"additionalProperties":false}`),
+			Description: "Offer to open a page of the panel. The person sees a card with a button and clicks it; nothing opens by itself. Use it when asked where something is. The node, node_ways, node_profiles, node_history, node_server, user, group, profile and decoy pages need the target: its id or its exact name (the card opens the real one; a target that does not exist is refused, so never guess).",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{"page":{"type":"string","enum":` + string(pagesJSON) + `},"id":{"type":"string","maxLength":64,"description":"the id or the exact name of the node, person, group, profile or decoy site"}},"required":["page"],"additionalProperties":false}`),
 		},
 	}
 }
 
-// uiOpenTool checks a ui_open call and answers with its canonical arguments (what the card is drawn from).
-func uiOpenTool(raw []byte) toolExecution {
+// uiOpenTool checks a ui_open call and answers with its canonical arguments (what the card is drawn from). A page that needs a
+// target is given its id or its name: the panel looks the target up and the card carries the real id (and the name to show),
+// so the Open button never leads to "no such node"; a target that does not exist is a failed call, not a card.
+func (s *Service) uiOpenTool(ctx context.Context, raw []byte) toolExecution {
 	var args struct {
 		Page string `json:"page"`
 		ID   string `json:"id"`
@@ -54,23 +66,39 @@ func uiOpenTool(raw []byte) toolExecution {
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return toolExecution{output: toolOutput{err: true, text: "invalid tool input JSON"}}
 	}
-	needsID, known := uiPages[args.Page]
+	kind, known := uiPages[args.Page]
 	if !known {
 		return toolExecution{output: toolOutput{err: true, text: "unknown page"}}
 	}
-	id := strings.TrimSpace(args.ID)
-	if needsID && !uiIDPattern.MatchString(id) {
-		return toolExecution{output: toolOutput{err: true, text: "this page needs the id of the node, user or profile"}}
+	ref := strings.TrimSpace(args.ID)
+	if kind != "" && (ref == "" || utf8.RuneCountInString(ref) > 64) {
+		return toolExecution{output: toolOutput{err: true, text: "this page needs the id or the exact name of the node, person, group, profile or decoy site"}}
 	}
-	if !needsID && id != "" {
+	if kind == "" && ref != "" {
 		return toolExecution{output: toolOutput{err: true, text: "this page takes no id"}}
 	}
 	canonical := map[string]string{"page": args.Page}
-	if id != "" {
+	if kind != "" {
+		id, name, found := s.uiTarget(ctx, kind, ref)
+		if !found {
+			return toolExecution{output: toolOutput{err: true, text: "not found: no " + kind + " has this id or name, so nothing is opened. Look it up with a read tool and try again; do not guess"}}
+		}
 		canonical["id"] = id
+		if name != "" {
+			canonical["name"] = name
+		}
 	}
 	b, _ := json.Marshal(canonical)
 	return toolExecution{output: toolOutput{text: `{"shown":true,"note":"a card with an Open button is shown; the page opens only when the person clicks it"}`}, args: string(b)}
+}
+
+// uiTarget finds a node, person, group, profile or decoy site by id, else by exact name (names are unique, case-blind).
+func (s *Service) uiTarget(ctx context.Context, kind, ref string) (id, name string, found bool) {
+	if kind == "decoy" && uiBuiltinDecoys[ref] {
+		return ref, "", true
+	}
+	err := s.st.R.QueryRowContext(ctx, `SELECT id,name FROM `+uiTargetTable[kind]+` WHERE id=?1 OR name=?1 ORDER BY id=?1 DESC LIMIT 1`, ref).Scan(&id, &name)
+	return id, name, err == nil
 }
 
 // uiSecretKinds: the secrets the panel can take in a secure field in the chat, with the context each needs (never the value).

@@ -10,7 +10,7 @@ import { I } from "./as-icons";
 // The assistant's ui_open as a card in the thread: which page will open and one button. The card navigates nothing by itself.
 // Whether it was used or dismissed is this browser's own note (the card itself is the persisted tool call).
 
-const sectionOf = (page: string) => (page.startsWith("node") ? "nodes" : page.startsWith("user") || page === "groups" ? "users" : page.startsWith("profile") ? "profiles" : page.startsWith("health") ? "health" : page.startsWith("settings") ? "settings" : page.startsWith("ai") ? "ai" : page);
+const sectionOf = (page: string) => (page.startsWith("node") ? "nodes" : page.startsWith("user") || page.startsWith("group") ? "users" : page.startsWith("profile") ? "profiles" : page.startsWith("health") ? "health" : page.startsWith("settings") ? "settings" : page.startsWith("ai") ? "ai" : page);
 
 export function ActionCard({ toolId, action, onNavigate }: { toolId: string; action: OpenAction; onNavigate?: () => void }) {
   const t = useT();
@@ -36,7 +36,7 @@ export function ActionCard({ toolId, action, onNavigate }: { toolId: string; act
         </span>
       </div>
       <b>{title}</b>
-      {action.id && <span className="as-sub">{action.id}</span>}
+      {action.id && <span className="as-sub">{action.name || action.id}</span>}
       {state ? (
         <div className="as-ps">
           <I g={done ? "check" : "info"} />

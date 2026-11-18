@@ -47,3 +47,12 @@ describe("a persisted tool call as a card", () => {
     expect(actionOf({ ...base, argsJson: "{nope" })).toBeNull();
   });
 });
+
+describe("ui_open cards", () => {
+  it("opens a group, the decoy library and a decoy site, and shows the name the panel found", () => {
+    expect(parseOpen({ page: "group", id: "grp_1" })?.target).toEqual({ to: "/users/groups/$id", params: { id: "grp_1" } });
+    expect(parseOpen({ page: "decoys" })?.target).toEqual({ to: "/decoys" });
+    expect(parseOpen({ page: "decoy", id: "dsi_1" })?.target).toEqual({ to: "/decoys/$id", params: { id: "dsi_1" } });
+    expect(parseOpen({ page: "node", id: "nod_1", name: "be" })?.name).toBe("be");
+  });
+});

@@ -23,10 +23,13 @@ const pages: Record<string, PageSpec> = {
   node_server: { needsId: true, target: (id) => ({ to: "/nodes/$id", params: { id }, search: { tab: "server" } }) },
   users: { needsId: false, target: () => ({ to: "/users" }) },
   groups: { needsId: false, target: () => ({ to: "/users", search: { tab: "groups" } }) },
+  group: { needsId: true, target: (id) => ({ to: "/users/groups/$id", params: { id } }) },
   user: { needsId: true, target: (id) => ({ to: "/users/$id", params: { id } }) },
   profiles: { needsId: false, target: () => ({ to: "/profiles" }) },
   profile: { needsId: true, target: (id) => ({ to: "/profiles/$id", params: { id } }) },
   subscriptions: { needsId: false, target: () => ({ to: "/subscriptions" }) },
+  decoys: { needsId: false, target: () => ({ to: "/decoys" }) },
+  decoy: { needsId: true, target: (id) => ({ to: "/decoys/$id", params: { id } }) },
   health: { needsId: false, target: () => ({ to: "/health" }) },
   health_people: { needsId: false, target: () => ({ to: "/health", search: { tab: "people" } }) },
   reachability: { needsId: false, target: () => ({ to: "/reachability" }) },
@@ -38,7 +41,7 @@ const pages: Record<string, PageSpec> = {
   ...Object.fromEntries(settingsPages.map((p) => [`settings_${p}`, { needsId: false, target: () => ({ to: "/settings/$section", params: { section: p } }) } satisfies PageSpec])),
 };
 
-export type OpenAction = { kind: "open"; page: string; id: string; target: Target };
+export type OpenAction = { kind: "open"; page: string; id: string; name: string; target: Target };
 
 /** A ui_open call as a card: the page and the id it needs, checked, with where it goes; null when it is not on the whitelist. */
 export function parseOpen(args: unknown): OpenAction | null {
@@ -49,7 +52,9 @@ export function parseOpen(args: unknown): OpenAction | null {
   if (!spec) return null;
   const id = typeof a.id === "string" ? a.id : "";
   if (spec.needsId ? !idPattern.test(id) : id !== "") return null;
-  return { kind: "open", page, id, target: spec.target(id) };
+  // the name is only what the card shows; the panel found the id from it before the card was made
+  const name = typeof a.name === "string" ? a.name.slice(0, 64) : "";
+  return { kind: "open", page, id, name, target: spec.target(id) };
 }
 
 export type SecretKind = "provider_key" | "telegram_token" | "warp_license";

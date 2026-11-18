@@ -13,7 +13,26 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 )
 
+// seedUITargets puts a node, a group, a person, a profile and a decoy site in the panel's store, under invented names.
+func seedUITargets(t *testing.T, f *assistantFixture) {
+	t.Helper()
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO node(id,name,address,created_at) VALUES('nod_x1','be','203.0.113.7',1)`,
+		`INSERT INTO user_group(id,name,created_at) VALUES('grp_x1','friends',1)`,
+		`INSERT INTO user(id,name,group_id,period_start,sub_token_hash,sub_token_enc,created_at) VALUES('usr_x1','alice','grp_x1',1,x'01',x'01',1)`,
+		`INSERT INTO profile(id,protocol,name,settings_json,created_at,updated_at) VALUES('prf_x1','hysteria2','main','{}',1,1)`,
+		`INSERT INTO decoy_site(id,name,source,state,bundle_hash,created_at,updated_at) VALUES('dsi_x1','Studio','upload','ready','h',1,1)`,
+	} {
+		if _, err := f.st.W.ExecContext(ctx, q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+}
+
 func TestUIOpenWhitelist(t *testing.T) {
+	f := newAssistantFixture(t)
+	seedUITargets(t, f)
 	cases := []struct {
 		name string
 		in   string
@@ -21,18 +40,30 @@ func TestUIOpenWhitelist(t *testing.T) {
 		want string
 	}{
 		{"a page without an id", `{"page":"nodes"}`, true, `{"page":"nodes"}`},
-		{"a page with the id it needs", `{"page":"node_ways","id":"nod_de1"}`, true, `{"id":"nod_de1","page":"node_ways"}`},
+		{"a page with the id it needs", `{"page":"node_ways","id":"nod_x1"}`, true, `{"id":"nod_x1","name":"be","page":"node_ways"}`},
+		// the card must carry the real id: a name gives the id of the node, in any letter case
+		{"a node by its name", `{"page":"node","id":"be"}`, true, `{"id":"nod_x1","name":"be","page":"node"}`},
+		{"a node by its name in other case", `{"page":"node_history","id":"BE"}`, true, `{"id":"nod_x1","name":"be","page":"node_history"}`},
+		{"a person by name", `{"page":"user","id":"alice"}`, true, `{"id":"usr_x1","name":"alice","page":"user"}`},
+		{"a group by name", `{"page":"group","id":"friends"}`, true, `{"id":"grp_x1","name":"friends","page":"group"}`},
+		{"a profile by name", `{"page":"profile","id":"main"}`, true, `{"id":"prf_x1","name":"main","page":"profile"}`},
+		{"a decoy site by name", `{"page":"decoy","id":"Studio"}`, true, `{"id":"dsi_x1","name":"Studio","page":"decoy"}`},
+		{"the panel's built-in decoy entry", `{"page":"decoy","id":"panel_dir"}`, true, `{"id":"panel_dir","page":"decoy"}`},
+		{"the decoy library", `{"page":"decoys"}`, true, `{"page":"decoys"}`},
 		{"a settings page", `{"page":"settings_backups"}`, true, `{"page":"settings_backups"}`},
 		{"the approvals tab", `{"page":"ai_waiting"}`, true, `{"page":"ai_waiting"}`},
+		{"a node that does not exist", `{"page":"node","id":"nl9"}`, false, ""},
+		{"a person that does not exist", `{"page":"user","id":"nobody"}`, false, ""},
+		{"a name of another kind", `{"page":"node","id":"alice"}`, false, ""},
 		{"unknown page", `{"page":"delete_everything"}`, false, ""},
 		{"a node page without its id", `{"page":"node"}`, false, ""},
-		{"an id on a page that takes none", `{"page":"nodes","id":"nod_1"}`, false, ""},
+		{"an id on a page that takes none", `{"page":"nodes","id":"nod_x1"}`, false, ""},
 		{"an id with a path in it", `{"page":"node","id":"../../etc"}`, false, ""},
 		{"an id that is too long", `{"page":"user","id":"` + strings.Repeat("a", 65) + `"}`, false, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := uiOpenTool([]byte(c.in))
+			got := f.service.uiOpenTool(context.Background(), []byte(c.in))
 			if got.output.err == c.ok {
 				t.Fatalf("err=%v for %s: %s", got.output.err, c.in, got.output.text)
 			}
@@ -114,14 +145,15 @@ func TestUISecretFormKindsAndContext(t *testing.T) {
 func TestAssistantInterfaceCardsArePersistedWithoutValues(t *testing.T) {
 	f := newAssistantFixture(t,
 		modelResponse{Tools: []modelToolCall{
-			scriptedTool("ui_open", "call_open", `{"page":"node_ways","id":"nod_de1"}`),
+			scriptedTool("ui_open", "call_open", `{"page":"node_ways","id":"be"}`),
 			scriptedTool("ui_secret_form", "call_key", `{"kind":"provider_key","provider":"anthropic"}`),
 			scriptedTool("ui_open", "call_bad", `{"page":"https://evil.example"}`),
 		}},
 		modelResponse{Text: "Open the page, and enter the key in the field."},
 		modelResponse{Text: `{"title":"t","summary":"s"}`},
 	)
-	stream, err := f.client.Chat(context.Background(), connect.NewRequest(&adminv1.ChatRequest{Text: "where are the ways of de1? and add my anthropic key"}))
+	seedUITargets(t, f)
+	stream, err := f.client.Chat(context.Background(), connect.NewRequest(&adminv1.ChatRequest{Text: "where are the ways of be? and add my anthropic key"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +167,7 @@ func TestAssistantInterfaceCardsArePersistedWithoutValues(t *testing.T) {
 			finished[tf.Id] = tf
 		}
 	}
-	if o := finished["call_open"]; o == nil || !o.Ok || o.ArgsJson != `{"id":"nod_de1","page":"node_ways"}` {
+	if o := finished["call_open"]; o == nil || !o.Ok || o.ArgsJson != `{"id":"nod_x1","name":"be","page":"node_ways"}` {
 		t.Fatalf("the open call: %+v", o)
 	}
 	if k := finished["call_key"]; k == nil || !k.Ok || k.ArgsJson != `{"kind":"provider_key","provider":"anthropic"}` {
