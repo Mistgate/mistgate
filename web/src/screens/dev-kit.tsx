@@ -5,7 +5,6 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { groupsQuery } from "@/screens/users/rpc";
-import { AccentPicker } from "@/components/accent-picker";
 import { Avatar, Card, Chip, Kbd, PageTitle, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -354,10 +353,6 @@ export default function DevKit() {
           </SectionLabel>
         ))}
         <SyntaxSample />
-      </Block>
-
-      <Block title="Accent">
-        <AccentPicker />
       </Block>
 
       <Block title="Toast, modal, brand">
