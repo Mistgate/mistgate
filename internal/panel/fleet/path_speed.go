@@ -137,8 +137,6 @@ func (s probeService) PathSpeed(ctx context.Context, req *connect.Request[probev
 	defer release()
 
 	res := f.runPathSpeed(ctx, from, to, m.Direction, m.Mb)
-	f.noteSpeedTest(ctx, from.ID)
-	f.noteSpeedTest(ctx, to.ID)
 	at := f.now().UTC()
 	if res.Error == "" {
 		if b, err := json.Marshal(res); err == nil {
@@ -196,6 +194,12 @@ func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direct
 		res.Error = speedCommandError(armed)
 		return res
 	}
+	// The test fills the link of both nodes from here on, whoever started it (the owner, the assistant or a relay's own
+	// proof): the capacity report must not read that hour's traffic as people's.
+	defer func() {
+		f.noteSpeedTest(ctx, from.ID)
+		f.noteSpeedTest(ctx, to.ID)
+	}()
 	// whatever happens next, the target's listener is closed again: it lives for one connection or 30 s otherwise
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), speedStopWait)
