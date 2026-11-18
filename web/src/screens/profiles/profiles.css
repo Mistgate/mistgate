@@ -14,6 +14,14 @@
   gap: 16px;
   min-width: 0;
 }
+/* the board's .card (pn.css): the surface with a hairline, 16 round. The list's table and matrix and the page's sections (pp-sec) are cards;
+   without this rule they drew flat on the page */
+.pf .card {
+  position: relative;
+  border: 1px solid var(--pf-hair);
+  border-radius: 16px;
+  background: var(--surface);
+}
 /* the board's .mono (pn.css): JetBrains Mono at 500 with tabular figures, for the list and the page of a profile (the wizard has its own) */
 .pf .mono {
   font-family: var(--font-mono);

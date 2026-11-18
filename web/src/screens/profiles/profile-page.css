@@ -795,6 +795,41 @@
   border-radius: 10px;
   background: var(--step);
 }
+/* the verdict card (pn.css .pp-vd2): a surface with a hairline tinted by the verdict, a little roomier than the bar it grew from, and its
+   one button at 36 */
+.pf .pp-vd2,
+.pf .pp-vd2.bad,
+.pf .pp-vd2.part {
+  gap: 12px;
+  min-height: 60px;
+  padding-block: 10px;
+  padding-inline: 14px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--pf-hair);
+  background: var(--surface);
+}
+.pf .pp-vd2.bad {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--pf-hair));
+}
+.pf .pp-vd2.part {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--pf-hair));
+}
+.pf .pp-vd2 > button,
+.pf .pp-vd2 > a {
+  height: 36px;
+  padding-inline: 14px;
+}
+@media (max-width: 720px) {
+  .pf .pp-vd2 {
+    align-items: flex-start;
+  }
+  .pf .pp-vd2 > button,
+  .pf .pp-vd2 > a {
+    margin-block: 2px;
+    margin-inline: 44px 0;
+    flex: 0 0 auto;
+  }
+}
 /* L4798 */
 .pf .pp-vd2.bad .pp-vdi {
   background: var(--danger-soft);
@@ -937,7 +972,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-top: 0;
+  /* the page's gap (16) and the column's own margin-top (16, .pp-col) put what a tab opens 32 under the strip */
+  padding-top: 16px;
 }
 .pp-tabs [role="tab"] .pp-n {
   display: grid;
