@@ -220,3 +220,19 @@ func TestAssistantPromptAddressesRussianAsTy(t *testing.T) {
 		t.Fatal("the prompt does not tell the assistant to address a Russian speaker as ты")
 	}
 }
+
+// What the model may say about a measurement: only what was read, never telemetry passed off as the result.
+func TestAssistantPromptKeepsIndirectDataApartFromMeasurements(t *testing.T) {
+	for _, rule := range []string{
+		"Never present indirect data",
+		"A Panel note in the conversation",
+		"read it with the reading tool (path_speed_results for a speed test) instead of guessing",
+		"one stream: its figure is a lower bound",
+		"Do not queue a new paid or traffic plan",
+		"until you have read the result of the previous one",
+	} {
+		if !strings.Contains(assistantFixedPrompt, rule) {
+			t.Fatalf("the prompt lacks %q", rule)
+		}
+	}
+}
