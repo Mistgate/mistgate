@@ -1143,7 +1143,7 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
         {arrow}
         <span className="inline-flex flex-none items-center gap-2 text-[13px] whitespace-nowrap">
           <Flag code={node.countryCode} size={14} className="rounded-[3px]" />
-          <b className="font-mono font-medium">{node.name}</b>
+          <b title={node.name} className="max-w-[22ch] truncate font-mono font-medium">{node.name}</b>
         </span>
         <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "ways" }} className="ms-auto flex flex-none items-center gap-1 ps-2 text-[13px] text-sec hover:text-fg">
           {t("ways.back")}
