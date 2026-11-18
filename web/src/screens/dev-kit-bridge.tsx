@@ -4,7 +4,6 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { setLang, isLang } from "@/i18n";
-import { relays as relaysApi } from "@/lib/api";
 import { countryQuery } from "@/lib/globalping";
 import { checksQuery } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
@@ -13,7 +12,7 @@ import { meQuery } from "@/lib/session";
 import { setTheme } from "@/lib/theme";
 import { baseNode, facts, inbound, metrics, Mock, nodeFill } from "@/screens/dev-kit-node";
 import { NodeDetail } from "@/screens/node/index";
-import { AddRelayDialog, useRelayRuns } from "@/screens/node/relays";
+import { useRelayRuns } from "@/screens/node/relays";
 import { RelayRows } from "@/screens/node/relay-rows";
 import { ChangeWay, LinkViaLine } from "@/screens/node/relay-way";
 import { settingsQuery } from "@/screens/subscriptions/queries";
@@ -30,8 +29,6 @@ import { settingsQuery } from "@/screens/subscriptions/queries";
 //   old-agent     the exit's agent has no bridge: the reason, the node to update
 //   change        "Change" of a TCP relay (direct picked: the drop note)
 //   udp           "Change" of a UDP relay: the bridge greyed with the reason
-//   add           "Relay through msk1": notes under the servers, the way opened
-//   check         the check window after "Check and turn on": direct fails, the bridge carries
 //   link-via      the exit's page: the agent reaches the panel through msk1
 //   reader        a helper's view: the state without the buttons
 // Open each at 1440 and at 390 px, in both themes.
@@ -179,21 +176,6 @@ function useEnsure(actions: (() => void)[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
-const box = (i: number) => dlg()?.querySelectorAll<HTMLInputElement>("input[type=checkbox]")[i];
-/** Ticks the i-th server of the dialog. */
-const tick = (i: number) => () => {
-  const b = box(i);
-  if (b && !b.checked) b.click();
-};
-/** Opens the way's choice in the dialog. */
-const openWay = () => {
-  const b = dlg()?.querySelector<HTMLElement>("button[aria-expanded=false]");
-  if (b && document.querySelectorAll("input[type=checkbox]:checked").length > 0) b.click();
-};
-const scrollDown = () => {
-  const el = dlg()?.querySelector(".overflow-y-auto");
-  if (el && dlg()?.querySelector("[data-testid=way-choice]")) el.scrollTop = el.scrollHeight;
-};
 const dlg = () => document.querySelector("[role=dialog]");
 
 function Change({ udp = false, pick }: { udp?: boolean; pick?: string }) {
@@ -202,28 +184,6 @@ function Change({ udp = false, pick }: { udp?: boolean; pick?: string }) {
   return (
     <Mock fill={common(scenes.direct!.relays)}>
       <ChangeWay r={r} onClose={() => {}} />
-    </Mock>
-  );
-}
-
-/** The check window's calls answer from here, no server. */
-function stubChecks() {
-  const found = check(443, { ...legDown, reverseReach: stage({ port: 443 }), verified: false });
-  const api = relaysApi as unknown as Record<string, unknown>;
-  const made = vless({ id: "rly_new", enabled: false, state: InboundState.PENDING, check: undefined, monitor: undefined, modeChangedUnix: 0 });
-  api.createRelay = async () => ({ relay: made });
-  api.checkRelay = async () => ({ relay: { ...made, check: found } });
-  api.updateRelay = async () => ({ relay: vless({ id: "rly_new", ...onBridge(443) }) });
-}
-
-function Add({ run }: { run?: boolean }) {
-  useEffect(() => {
-    if (run) stubChecks();
-  }, [run]);
-  useEnsure(run ? [tick(0), () => { const b = [...(dlg()?.querySelectorAll("button") ?? [])].find((x) => x.className.includes("text-on-accent")); if (b && !dlg()?.querySelector("[data-testid=relay-runs]") && box(0)?.checked) b.click(); }] : [tick(0), tick(2), openWay, scrollDown]);
-  return (
-    <Mock fill={common(scenes.direct!.relays)}>
-      <AddRelayDialog open onOpenChange={() => {}} entry={{ id: "nod_msk1", name: "msk1", cc: "RU" }} />
     </Mock>
   );
 }
@@ -257,10 +217,6 @@ export function BridgeKit() {
       return <Change pick="dnat" />;
     case "udp":
       return <Change udp />;
-    case "add":
-      return <Add />;
-    case "check":
-      return <Add run />;
     case "link-via":
       return <Shot id="bridge-link-via"><Page relays={scenes.direct!.relays} viaNodeId="nod_msk1" /></Shot>;
     case "reader":
