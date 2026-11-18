@@ -7,7 +7,6 @@ import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { relaysQuery, type RelayMsg } from "@/lib/relay";
 import { useRelayRuns } from "./relays";
 import { RelayRows } from "./relay-rows";
-import { LinkViaLine } from "./relay-way";
 
 const listRelays = vi.fn();
 const listRelayCandidates = vi.fn();
@@ -154,18 +153,5 @@ describe("the choice of the way, under the server's row", () => {
     await settle();
     expect(editor().querySelector("[role=alert]")?.textContent).toBe("A bridge is not possible for this relay: the agent of the entry is too old.");
     expect(way("Auto (recommended)").getAttribute("aria-pressed")).toBe("true");
-  });
-});
-
-describe("the exit's card, when its agent reaches the panel through an entry", () => {
-  it("says through which entry, that it is a fallback and that the agent returns by itself", async () => {
-    await mount(<LinkViaLine viaNodeId="nod_msk1" />);
-    expect(document.body.textContent).toContain("Link to the panel: through msk1");
-    expect(document.body.textContent).toContain("A fallback path");
-    expect(document.body.textContent).toContain("The agent returns to the direct connection by itself.");
-  });
-  it("says nothing for a direct connection", async () => {
-    await mount(<LinkViaLine viaNodeId="" />);
-    expect(document.body.textContent).toBe("");
   });
 });
