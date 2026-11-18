@@ -158,14 +158,23 @@ func TestChannelListenerAcceptsNothingWithoutTheToken(t *testing.T) {
 	}
 }
 
+// tokenCap is far above what the socket buffers of the first stream can swallow while the other seven connect (a few MB on Linux), so
+// the shared volume is still there for them.
+const tokenCap = 64 << 20
+
 func TestChannelTokenWorksOncePerIndexAndForEightStreams(t *testing.T) {
 	ln := channelListener(t)
 	done := make(chan int64, 1)
 	go func() {
-		moved, _ := serveChannel(context.Background(), ln, channelToken, true, 4<<20, 5*time.Second, 2*time.Second)
+		moved, _ := serveChannel(context.Background(), ln, channelToken, true, tokenCap, 5*time.Second, 2*time.Second)
 		done <- moved
 	}()
 	first := channelDial(t, ln, channelToken, 3)
+	// the first stream is in once it is served (the two are handled at the same time, so the replay waits for that)
+	first.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if n, err := first.Read(make([]byte, 4096)); n == 0 {
+		t.Fatalf("the first stream got nothing: %v", err)
+	}
 	// the same token with the index of a stream that is already in: closed, no data
 	replay := channelDial(t, ln, channelToken, 3)
 	replay.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
@@ -177,10 +186,6 @@ func TestChannelTokenWorksOncePerIndexAndForEightStreams(t *testing.T) {
 	bad.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
 	if n, _ := bad.Read(make([]byte, 1)); n != 0 {
 		t.Fatal("stream index 8 was served")
-	}
-	first.SetReadDeadline(time.Now().Add(2 * time.Second))
-	if n, err := first.Read(make([]byte, 4096)); n == 0 {
-		t.Fatalf("the first stream got nothing: %v", err)
 	}
 	// seven more streams fill the eight; after them the listener is gone
 	var conns []net.Conn
@@ -212,8 +217,8 @@ func TestChannelTokenWorksOncePerIndexAndForEightStreams(t *testing.T) {
 	for _, c := range append(conns, first) {
 		io.Copy(io.Discard, c)
 	}
-	if moved := <-done; moved > 4<<20 {
-		t.Fatalf("the target sent %d bytes, its cap is %d", moved, 4<<20)
+	if moved := <-done; moved > tokenCap {
+		t.Fatalf("the target sent %d bytes, its cap is %d", moved, int64(tokenCap))
 	}
 }
 
