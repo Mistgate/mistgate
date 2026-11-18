@@ -54,20 +54,23 @@ export function useLook(look: Look | null) {
   }, [report, state, kind, word, detail, tag]);
 }
 
+const tagChip: Record<string, MessageKey> = { "gp.limit": "rp.chip.limit", "bb.cap": "rp.chip.stopped", "tp.node": "rp.tp.offline" };
 /** The list's word for a state, short enough for a row: works, off, an error, needs setup; and a few words on why or when. */
 export function chipOf(t: T, look: Look): { kind: StatusKind; word: string; note: string } {
   const head = look.detail.split(" · ")[0] ?? "";
+  // the board's own words for the cases it draws a problem for: an hourly limit, a spent month, a probe node out of touch
+  const own = look.tag && tagChip[look.tag];
   // a state line says "Does not work · why" or names its status itself ("The site asked to slow down · …"): the row takes the why
   const why = [t("cr.state.works"), t("cr.state.fails"), t("cr.state.on"), t("cr.testing")].includes(look.word) ? head : look.word;
   switch (look.kind) {
     case "ok":
       return { kind: "ok", word: t("cr.state.works"), note: head };
     case "off":
-      return { kind: "off", word: look.word, note: "" };
+      return { kind: "off", word: look.word === t("cr.state.off") ? t("rp.chip.off") : look.word, note: "" };
     case "bad":
-      return { kind: "bad", word: t("src.chip.error"), note: why };
+      return { kind: "bad", word: own ? t(own) : t("src.chip.error"), note: why };
     case "warn":
-      return { kind: "warn", word: t("status.warn"), note: why };
+      return { kind: "warn", word: own ? t(own) : t("status.warn"), note: why };
     case "busy":
       return { kind: "busy", word: t("src.chip.busy"), note: why };
     case "blip":
@@ -165,9 +168,12 @@ export function problemOf(t: T, look: Look | null): Problem | null {
     "bb.cap": "rp.pb.bbCap",
     "tp.node": "rp.pb.tpNode",
   };
+  // the board's titles: what is wrong in a few words (the probe node's one is its own state line)
+  const own: Record<string, MessageKey> = { "gp.token": "rp.pbt.gpToken", "gp.limit": "rp.pbt.gpLimit", "bb.cap": "rp.pbt.bbCap" };
+  const title = look.tag && own[look.tag] ? t(own[look.tag]!) : look.tag === "tp.node" ? head.charAt(0).toLocaleUpperCase() + head.slice(1) : generic ? head || look.word : look.word;
   return {
     tone: look.kind === "bad" ? "bad" : "part",
-    title: generic ? head || look.word : look.word,
+    title,
     body: look.tag && special[look.tag] ? t(special[look.tag]!) : t(look.kind === "bad" ? "rp.pb.bad" : "rp.pb.warn"),
   };
 }

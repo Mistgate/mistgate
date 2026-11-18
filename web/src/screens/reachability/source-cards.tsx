@@ -193,7 +193,7 @@ function GlobalpingBody({ s, act }: { s: GlobalpingSettings; act: Actions }) {
       <ProblemBox
         action={
           l.tag === "gp.token" && (
-            <Button size="md" onClick={() => setReplace((n) => n + 1)}>
+            <Button size="md" data-act="replace" onClick={() => setReplace((n) => n + 1)}>
               {t("rp.pb.replaceToken")}
             </Button>
           )
@@ -570,7 +570,7 @@ function CheburBody({ s, act, onSwitchOn }: { s: CheburcheckSettings; act: Chebu
       <ProblemBox
         action={
           l.tag === "cc.token" && (
-            <Button size="md" onClick={() => setReplace((n) => n + 1)}>
+            <Button size="md" data-act="replace" onClick={() => setReplace((n) => n + 1)}>
               {t("rp.pb.replaceToken")}
             </Button>
           )
@@ -780,7 +780,7 @@ function BsbordBody({ s, act, price, setPrice, onSwitchOn }: { s: BsbordSettings
       <ProblemBox
         action={
           l.tag === "bb.key" && (
-            <Button size="md" onClick={() => setReplace((n) => n + 1)}>
+            <Button size="md" data-act="replace" onClick={() => setReplace((n) => n + 1)}>
               {t("rp.pb.replaceKey")}
             </Button>
           )
@@ -844,7 +844,8 @@ function Spend({ s, test }: { s: BsbordSettings; test?: BsbordTest }) {
   const fmt = useFmt();
   const used = s.spentCredits + s.reservedCredits;
   const share = Math.min(1, used / Math.max(1, s.capCredits));
-  const tone = share >= 1 || s.lastStatus === "cap_reached" ? "bad" : share >= 0.8 ? "warn" : "";
+  // the board fills a spent month in the warn tone, as the pill and the problem box of the source say it
+  const tone = share >= 0.8 || s.lastStatus === "cap_reached" ? "warn" : "";
   const words = t("bb.spend.of", { spent: rub(fmt, s.spentCredits), cap: rub(fmt, s.capCredits) });
   const notes = [s.reservedCredits > 0 ? t("bb.spend.held", { held: rub(fmt, s.reservedCredits) }) : "", test ? balanceText(t, fmt, test) : ""].filter(Boolean);
   return (

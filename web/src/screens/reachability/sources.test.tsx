@@ -1074,7 +1074,7 @@ describe("the bsbord card", () => {
     expect(spend.textContent).toBe("This month100\u00a0₽ of 100\u00a0₽0\u00a0₽ left");
     const meter = spend.querySelector("[role=meter]")!;
     expect(["aria-valuenow", "aria-valuemax", "aria-valuetext"].map((a) => meter.getAttribute(a))).toEqual(["10000", "10000", "100\u00a0₽ of 100\u00a0₽"]);
-    expect(meter.className).toContain("bad");
+    expect(meter.className).toContain("warn");
   });
 
   it("puts every status in plain words, holds back what a round under way reserves, and shows the balance from Test", async () => {
@@ -1196,7 +1196,9 @@ describe("the open source in the board's frame", () => {
     await click(button("Test"));
     const box = section("Globalping")!.querySelector<HTMLElement>("[data-testid=source-problem]")!;
     expect(box.className).toContain("bad");
-    expect(box.textContent).toContain("Globalping refused the token. Paste a new one or disconnect.");
+    // the board's title says what is wrong in a few words; the state's line under the head has the panel's own
+    expect(box.querySelector("b")?.textContent).toBe("Globalping did not accept the token");
+    expect(section("Globalping")!.querySelector(".rc-last")?.textContent).toContain("Globalping refused the token. Paste a new one or disconnect.");
     expect(box.textContent).toContain("In-country checks are stopped. Replace the token and the rounds resume by themselves.");
     expect(section("Globalping")!.querySelector("input[type=password]")).toBeNull();
     await click([...box.querySelectorAll("button")].find((b) => b.textContent === "Replace the token"));
@@ -1215,16 +1217,21 @@ describe("the open source in the board's frame", () => {
     getBsbord.mockResolvedValue({ settings: ready({ enabled: true, spentCredits: 10000, lastStatus: "cap_reached" }) });
     await mount(settings({ enabled: true, hasToken: true }));
     expect(section("Globalping")!.querySelector("[data-testid=source-problem]")?.className).toContain("part");
+    expect(section("Globalping")!.querySelector("[data-testid=source-problem] b")?.textContent).toBe("The hourly test limit is used up");
+    expect(tab("Globalping")?.querySelector(".pv-pill")?.textContent).toBe("Limit");
     expect(section("Globalping")!.querySelector("[data-testid=source-problem]")?.textContent).toContain("The next round goes when the limit renews.");
+    expect(section("bsbord")!.querySelector("[data-testid=source-problem] b")?.textContent).toBe("Spending has reached the limit");
+    expect(tab("bsbord")?.querySelector(".pv-pill")?.textContent).toBe("Stopped");
     expect(section("bsbord")!.querySelector("[data-testid=source-problem]")?.textContent).toContain("Rounds are stopped until the end of the month. Raise the limit to continue sooner.");
-    expect(section("bsbord")!.querySelector(".rc-bud .rw-pg")?.className).toContain("bad");
+    expect(section("bsbord")!.querySelector(".rc-bud .rw-pg")?.className).toContain("warn");
   });
 
   it("says the probe node is not in touch, and leads to it", async () => {
     getTspuProbe.mockResolvedValue({ settings: tspu({ enabled: true, probeNodeId: "nod_probe", nodes: [{ id: "nod_probe", name: "msk1", online: false, declares: true, countryCode: "RU" }] }) });
     await mount(settings());
     const box = section("TSPU probe")!.querySelector<HTMLElement>("[data-testid=source-problem]")!;
-    expect(box.textContent).toContain("No link");
+    expect(box.querySelector("b")?.textContent).toBe("The probe node msk1 is not in touch");
+    expect(tab("TSPU probe")?.querySelector(".pv-pill")?.textContent).toBe("No link");
     expect(box.textContent).toContain("The probe starts by itself when the node is back.");
     expect(section("TSPU probe")!.querySelector(".rc-last")?.textContent).toBe("the probe node msk1 is not in touch");
     expect(box.querySelector("a")?.textContent).toBe("Open the node");

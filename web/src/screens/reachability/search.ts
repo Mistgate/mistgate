@@ -9,8 +9,8 @@ export const reachTabs = ["nodes", "events", "sources"] as const;
 export type ReachTab = (typeof reachTabs)[number];
 export const isReachTab = (v: unknown): v is ReachTab => reachTabs.includes(v as ReachTab);
 
-/** The tab a link leads to by the old anchors of the one-page version (`#reach-nodes`, `#reach-events`, `#sources`). */
-export const tabOfHash = (hash: string): ReachTab | undefined => ({ "reach-nodes": "nodes", "reach-events": "events", sources: "sources" } as Record<string, ReachTab>)[hash.replace(/^#/, "")];
+/** The tab a link leads to by the old anchors of the one-page version (`#reach-nodes`, `#reach-events`, `#reach-sources`, `#sources`). */
+export const tabOfHash = (hash: string): ReachTab | undefined => ({ "reach-nodes": "nodes", "reach-events": "events", "reach-sources": "sources", sources: "sources" } as Record<string, ReachTab>)[hash.replace(/^#/, "")];
 
 export type ReachSearch = { tab?: Exclude<ReachTab, "nodes">; source?: SourceId };
 

@@ -230,7 +230,7 @@ export function alertsOf(f: Flags, srv: Srv) {
   const fi = fiState(f);
   const word = { part: "partial", bad: "blocked", tcp: "tcp_blocked", reg: "tcp_blocked", ok: "" }[fi as "part" | "bad" | "tcp" | "reg" | "ok"];
   const open = fi === "ok" || none ? [] : [alert("alt_fi1", "fi1", word, 20 * H, 0, f.v.has("v6") ? { params: { verdict: word, country: "RU", ipv6: "open" } } : {})];
-  const closed = none ? [] : [alert("alt_nl1", "nl1", "tcp_blocked", 3 * DAY + 4 * H, 3 * DAY - 14 * H)];
+  const closed = none || f.v.has("allok") ? [] : [alert("alt_nl1", "nl1", "tcp_blocked", 3 * DAY + 4 * H, 3 * DAY - 14 * H)];
   return { nowUnix: NOW, active: open, history: closed };
 }
 

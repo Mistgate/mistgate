@@ -298,6 +298,7 @@ describe("the tabs", () => {
 
   it.each([
     ["#sources", { tab: "sources" }],
+    ["#reach-sources", { tab: "sources" }],
     ["#reach-events", { tab: "events" }],
     ["#reach-nodes", {}],
   ])("lead the old anchor %s to its tab and take it off the address", async (hash, to) => {
@@ -674,6 +675,10 @@ describe("the states of the load", () => {
     expect(document.querySelector(".rc-sumh b")?.textContent).toBe("—");
     expect(document.querySelector(".rc-sumh span")?.textContent).toBe("waiting for the first round of checks");
     expect(rows().every((r) => words(r.querySelector(".pv-pill")).startsWith("no data"))).toBe(true);
+    // each source waits for its round, in the quiet tone (the board's "ждёт круга")
+    const cells = [...document.querySelectorAll("[data-testid^=cell-]")];
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((c) => c.textContent === "waits for a round" && c.className.includes("mut"))).toBe(true);
   });
 
   it("says there are no nodes yet", async () => {
@@ -742,6 +747,9 @@ describe("the sources in the Nodes tab, for the owner", () => {
     const note = document.querySelector("[data-testid=source-warn]")!;
     expect(note.textContent).toContain("Globalping");
     expect(note.className).toContain("part");
+    // the source in trouble says its data is old on every node; the others keep their words
+    expect([...document.querySelectorAll("[data-testid=cell-globalping]")].every((c) => c.textContent === "no fresh data" && c.className.includes("mut"))).toBe(true);
+    expect(document.querySelector("[data-testid=cell-lists]")?.textContent).not.toBe("no fresh data");
     await click(note.querySelector("button"));
     expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { source: "globalping" }, replace: true, resetScroll: false });
   });
