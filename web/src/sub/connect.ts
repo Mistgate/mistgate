@@ -1,4 +1,4 @@
-import { logoSrc } from "./brand";
+import { qrLogoSrc } from "./brand";
 import { h, type Kid } from "./dom";
 import { icon, type IconName } from "./icons";
 import { appKey, appList, chosenApp, hasLinkApp, isPhone, platformOrder, platformWord, safeAddUrl, safeUrl, storeLabel } from "./logic";
@@ -139,7 +139,7 @@ function stepsOf(c: Ctx, app: AppEntry): HTMLElement {
 /** The QR code of this page: a phone's camera opens the page there. On a computer only (the phone is the device). */
 function qrSide(c: Ctx): HTMLElement | null {
   const { d, t } = c;
-  const card = qrOn(c) ? qrCard(d.qr, t.qrAlt, logoSrc(d)) : null;
+  const card = qrOn(c) ? qrCard(d.qr, t.qrAlt, qrLogoSrc(d)) : null;
   return card && h("div", { class: "a-side pg" }, card, h("p", { class: "u-hint" }, t.adQrHint));
 }
 

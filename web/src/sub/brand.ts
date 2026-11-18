@@ -1,4 +1,5 @@
 import badge from "../assets/mistgate-badge.svg?raw";
+import { monoBadgeSrc } from "../lib/qr-mark";
 import type { MgData } from "./types";
 
 // The name and the mark the page wears: the instance's own (the admin's settings), else the built-in badge.
@@ -19,3 +20,6 @@ export function logoSrc(d: MgData): string {
   else if (!/xmlns\s*=/.test(svg)) svg = svg.replace(/^<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
   return "data:image/svg+xml," + encodeURIComponent(svg);
 }
+
+/** src for the logo in the middle of a QR code: the instance's own logo as it is, else the built-in badge in tonal grey (lib/qr-mark.ts). */
+export const qrLogoSrc = (d: MgData) => (hasCustomLogo(d) ? logoSrc(d) : monoBadgeSrc());
