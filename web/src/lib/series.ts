@@ -92,16 +92,3 @@ export function niceCeil(v: number): number {
   for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p;
   return 10 * p;
 }
-
-/** SVG path through the points with cubic segments whose control points sit at the midpoints in x. */
-export function smoothPath(xs: readonly number[], ys: readonly number[]): string {
-  if (xs.length === 0) return "";
-  let d = `M${r(xs[0]!)},${r(ys[0]!)}`;
-  for (let i = 1; i < xs.length; i++) {
-    const cx = (xs[i - 1]! + xs[i]!) / 2;
-    d += ` C${r(cx)},${r(ys[i - 1]!)} ${r(cx)},${r(ys[i]!)} ${r(xs[i]!)},${r(ys[i]!)}`;
-  }
-  return d;
-}
-
-const r = (n: number) => Math.round(n * 100) / 100;
