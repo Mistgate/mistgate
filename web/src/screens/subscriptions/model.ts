@@ -649,6 +649,12 @@ export function presetSubtitle(
   return parts.join(" · ");
 }
 
+/** The first thing a preset's split sends direct: a suffix, else (a rule of country lists only) the country; "" when it has no rule (what a row of the list says under its servers). */
+export function splitFirst(split: readonly SplitRuleN[], country: (code: string) => string): string {
+  const rule = split.find((r) => r.suffixes.length > 0 || r.geo.length > 0);
+  return rule?.suffixes[0] !== undefined ? unicodeSuffix(rule.suffixes[0]) : rule?.geo[0] ? country(rule.geo[0]) : "";
+}
+
 // ---- the owner's own response headers ("Response headers" tab) ----
 
 export type ResponseHeader = Settings["responseHeaders"][number];
@@ -668,6 +674,12 @@ export function reservedHeaderName(name: string, reserved: readonly string[]): b
   const l = name.toLowerCase();
   return reserved.some((r) => (r.endsWith("*") ? l.startsWith(r.slice(0, -1).toLowerCase()) : l === r.toLowerCase()));
 }
+
+/** The entry of the panel's list of kept names that holds this name (a trailing * is a family): what the message names. */
+export const reservedEntry = (name: string, reserved: readonly string[]): string | undefined => {
+  const l = name.toLowerCase();
+  return reserved.find((r) => (r.endsWith("*") ? l.startsWith(r.slice(0, -1).toLowerCase()) : l === r.toLowerCase()));
+};
 
 export function headerNameProblem(name: string, reserved: readonly string[]): HeaderProblem | null {
   const n = name.trim();
@@ -700,6 +712,18 @@ export function headerToSave(h: ResponseHeader, known: readonly string[] | null)
   const formats = h.formats.length === headerFormats.length ? [] : [...h.formats];
   const groupIds = !h.onlyGroups ? [] : known === null ? [...h.groupIds] : h.groupIds.filter((g) => known.includes(g));
   return { ...h, name: h.name.trim(), value: h.value.trim(), formats, groupIds };
+}
+
+/**
+ * Whether an entry above this one with the same name (any case) is sent where this one would be too, so that this one is not (only the first
+ * of two goes). Checked for every format and every group in `groupIds`, and for a person in none of them ("").
+ */
+export function headerShadowed(rows: readonly ResponseHeader[], i: number, groupIds: readonly string[]): boolean {
+  const name = rows[i]!.name.trim().toLowerCase();
+  if (name === "") return false;
+  const fits = (h: ResponseHeader, f: SubFormat, g: string) => (h.formats.length === 0 || h.formats.includes(f)) && (!h.onlyGroups || h.groupIds.includes(g));
+  const above = rows.slice(0, i).filter((q) => q.name.trim().toLowerCase() === name);
+  return above.length > 0 && headerFormats.some((f) => ["", ...groupIds].some((g) => fits(rows[i]!, f, g) && above.some((q) => fits(q, f, g))));
 }
 
 // ---- the owner's own Mihomo templates ("Mihomo templates" tab) ----
