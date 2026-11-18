@@ -43,7 +43,8 @@ import { RelayStrip } from "./relay-strip";
 import { RelayWizard } from "./relay-wizard";
 import { PairWay } from "./relay-pair";
 import { RelayRows } from "./relay-rows";
-import { AddRelayDialog, useCountryOf, useRelayRuns } from "./relays";
+import { useOpenWizard } from "./relay-open";
+import { useCountryOf, useRelayRuns } from "./relays";
 import { InSubscriptions } from "./subs-switches";
 import type { NodeSearch, WaysView } from "./tabs";
 import "./ways.css";
@@ -508,7 +509,6 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
     setLastOut(id);
     go({ way: id });
   };
-  const [relayOther, setRelayOther] = useState(false);
 
   if (!w.ready) return <Pending />;
   const unread = w.readError && !w.readError.stale ? w.readError : null;
@@ -536,7 +536,6 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
       {w.owner && (
         <EntryDialog open={search.add === "ipv6" && entryOffered(w.v6)} onClose={() => go({ way: "ipv6" })} node={node} v6={w.v6} awg={data.inbounds.some((i) => i.protocol === "awg")} />
       )}
-      {w.owner && <AddRelayDialog open={relayOther} onOpenChange={setRelayOther} entry={{ id: node.id, name: node.name, cc: node.countryCode }} />}
     </>
   );
 
@@ -578,7 +577,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
       <RelayStrip w={w} node={node} onOpen={(id) => go({ way: search.way, add: `via:${id}` })} />
       {entry && (
         <div className={cx("wy-in wy-in2", view === "graph" && "graph")}>
-          <PassList data={data} w={w} open={openOut} onPick={pickOut} onMore={() => setRelayOther(true)} view={view} onView={setView} />
+          <PassList data={data} w={w} open={openOut} onPick={pickOut} onMore={() => void navigate({ to: "/nodes", search: { view: "ways" } })} view={view} onView={setView} />
           {pair && <PairCard key={pair.id} data={data} w={w} lane={pair} onOther={make} />}
         </div>
       )}
@@ -736,7 +735,7 @@ function PairCard({ data, w, lane, onOther }: { data: Data; w: WaysModel; lane: 
   const peer = lane.peer!;
   const look = lookOf(lane, w);
   const rs = lane.relays;
-  const [adding, setAdding] = useState(false);
+  const openWizard = useOpenWizard();
   const [removing, setRemoving] = useState(false);
   const bps = rs.reduce((a, r) => a + Number(r.bps), 0);
   const at = checkedAt(rs);
@@ -783,7 +782,7 @@ function PairCard({ data, w, lane, onOther }: { data: Data; w: WaysModel; lane: 
             {runs.checking && <Spin />}
             {t("ways.checkAll")}
           </Button>
-          <Button size="md" onClick={() => setAdding(true)}>
+          <Button size="md" onClick={() => openWizard(peer.id, node.id)}>
             {t("nw.a.more")}
           </Button>
           <Link to="/nodes/$id" params={{ id: peer.id }} search={{ tab: "ways", way: `via:${node.id}` }} className="wy-lk">
@@ -811,7 +810,6 @@ function PairCard({ data, w, lane, onOther }: { data: Data; w: WaysModel; lane: 
           </span>
         )}
       </p>
-      <AddRelayDialog open={adding} onOpenChange={setAdding} entry={{ id: node.id, name: node.name, cc: node.countryCode }} exitId={peer.id} />
     </section>
   );
 }

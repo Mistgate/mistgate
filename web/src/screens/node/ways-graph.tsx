@@ -25,7 +25,8 @@ import { readPref, writePref } from "@/lib/storage";
 import type { WayId } from "@/lib/ways";
 import { relayRefusal } from "@/lib/ways-graph";
 import { TurnOffDialog } from "./ipv6-entry";
-import { AddRelayDialog, ChangeRelayPort, RemoveRelay, useCountryOf, useRelayRuns, type Entry } from "./relays";
+import { useOpenWizard } from "./relay-open";
+import { ChangeRelayPort, RemoveRelay, useCountryOf, useRelayRuns, type Entry } from "./relays";
 import { useInSubscriptions } from "./subs-switches";
 import type { WaysModel } from "./ways";
 import { Badge, Dot, MoreButton, Pop, PopItem, ServerChip, type ChipKind } from "./ways-map-parts";
@@ -50,7 +51,6 @@ const wayOfCard = (id: string): WayId | undefined => (id.startsWith("fwd:") ? (`
 export const say = (t: T, s: Say) => (s.n !== undefined ? t.n(s.key as MessageKey, s.n, s.params) : t(s.key as MessageKey, s.params));
 
 type Dialog =
-  | { kind: "draw"; entry: Entry; inboundId?: string }
   | { kind: "remove"; r: RelayMsg }
   | { kind: "port"; r: RelayMsg }
   | { kind: "removeWay"; entry: { id: string; name: string }; relays: RelayMsg[] }
@@ -88,6 +88,7 @@ export function WaysGraph({
   const nodesList = useQuery({ ...nodesQuery, enabled: owner }).data?.nodes ?? [];
   const [extra, setExtra] = useState<{ id: string; name: string }[]>(initialExtra ?? []);
   const [dlg, setDlg] = useState<Dialog | null>(null);
+  const openWizard = useOpenWizard();
   const [help, setHelp] = useState<HelpTab | "">(() => (readPref("mg.graph.help") === "legend" ? "legend" : readPref("mg.graph.help") === "shortcuts" ? "shortcuts" : ""));
   const cc = w.cc;
 
@@ -282,7 +283,7 @@ export function WaysGraph({
                 {x.relays.length > 0 && (
                   <PopItem onClick={pick(() => x.relays.filter((r) => r.enabled === !anyOff).forEach((r) => (anyOff ? runs.on(r) : runs.off(r))))}>{anyOff ? t("rm.menu.onAll") : t("rm.menu.offAll")}</PopItem>
                 )}
-                <PopItem onClick={pick(() => setDlg({ kind: "draw", entry }))}>{t("rm.menu.addRelay")}</PopItem>
+                <PopItem onClick={pick(() => openWizard(node.id, entry.id))}>{t("rm.menu.addRelay")}</PopItem>
                 {x.relays.length > 0 ? (
                   <PopItem danger onClick={pick(() => setDlg({ kind: "removeWay", entry: peer, relays: x.relays }))}>
                     {t("rm.menu.removeWay")}
@@ -345,7 +346,7 @@ export function WaysGraph({
     const s = serverOf(id);
     const why = s ? relayRefusal(x.peer.id, node.id, s, w.lanes.flatMap((l) => (l.kind === "via" ? l.relays : []))) : "net";
     if (why) return toast.error(`${t("rm.drag.refused")}: ${t(`wg.refuse.${why}` as MessageKey)}`);
-    setDlg({ kind: "draw", entry: { id: x.peer.id, name: x.peer.name, cc: ccOf(x.peer.id) }, inboundId: id });
+    openWizard(node.id, x.peer.id, id);
   };
   const wayOver = (x: RmWay) => (e: DragEvent) => {
     if (owner && x.kind === "via" && e.dataTransfer.types.includes(SERVER)) e.preventDefault();
@@ -434,7 +435,7 @@ export function WaysGraph({
             icon={<Icon name="server" size={14} />}
             onClick={() => {
               close();
-              setDlg({ kind: "draw", entry: { id: n.id, name: n.name, cc: ccOf(n.id) } });
+              openWizard(node.id, n.id);
             }}
           >
             {t("rm.add.node", { node: n.name })}
@@ -593,9 +594,6 @@ export function WaysGraph({
 
   const dialogs = (
     <>
-      {owner && dlg?.kind === "draw" && (
-        <AddRelayDialog key={`${dlg.entry.id}/${dlg.inboundId ?? ""}`} open onOpenChange={() => setDlg(null)} entry={dlg.entry} exitId={node.id} preselect={dlg.inboundId} />
-      )}
       {owner && dlg?.kind === "remove" && <RemoveRelay r={dlg.r} onClose={() => setDlg(null)} />}
       {owner && dlg?.kind === "port" && <ChangeRelayPort r={dlg.r} onClose={() => setDlg(null)} />}
       {owner && dlg?.kind === "removeWay" && <RemoveWay entry={dlg.entry} exit={node.name} relays={dlg.relays} onClose={() => setDlg(null)} />}

@@ -336,6 +336,24 @@ describe("the wizard Make reachable", () => {
     expect(createRelay).toHaveBeenCalledWith(expect.objectContaining({ inboundId: "inb_x" }));
   });
 
+  it("a server dragged onto the entry on the graph opens the wizard with that server alone ticked: via:<entry>/<server>", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    listRelayCandidates.mockResolvedValue({
+      agentSupported: true,
+      entryCountry: { verdict: "ok", dark: [], atUnix: now },
+      candidates: [cand({}), cand({ inboundId: "inb_y", profileName: "Hysteria2", protocol: "hysteria2", network: "udp", port: 443 })],
+    });
+    search = { tab: "ways", add: "via:nod_msk1/inb_y" };
+    await mount(de1());
+    expect(step()).toBe("3");
+    expect(dialog().textContent).toContain("1 of 2 servers");
+    const on = [...dialog().querySelectorAll("[data-testid=wizard-server]")].filter((s) => s.getAttribute("aria-checked") === "true");
+    expect(on.map((s) => s.textContent)).toEqual([expect.stringContaining("Hysteria2")]);
+    // the others can still be ticked
+    await click([...dialog().querySelectorAll("[data-testid=wizard-server]")].find((s) => !s.textContent?.includes("Hysteria2")));
+    expect(dialog().textContent).toContain("2 of 2 servers");
+  });
+
   it("a pair that the entry reaches only over a bridge says so: the bridge chip, the note, and the UDP server that cannot go", async () => {
     listRelays.mockResolvedValue({ relays: [] });
     const cut = { verdict: "blocked", source: "tspu_row", atUnix: now };

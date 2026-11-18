@@ -105,7 +105,6 @@ const menuItem = async (row: HTMLElement, label: string) => {
   await click(row.querySelector("button[aria-haspopup=menu]"));
   await click([...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find((b) => b.textContent === label));
 };
-const dialog = () => document.querySelector<HTMLElement>("[role=dialog]")!;
 
 /** The way and the measurements of the pair of the relays on the list. */
 function Pair({ readOnly, onOther }: { readOnly?: boolean; onOther?: () => void }) {
@@ -199,14 +198,23 @@ describe("the servers of a pair", () => {
     expect(rowOf("VLESS · TCP").querySelector("[role=alert]")).toBeNull();
   });
 
-  it("the menu asks before removing, and says who loses what", async () => {
+  it("the menu asks “Really remove?” in itself, with no window; the second click removes, closing the menu takes the question back", async () => {
     listRelays.mockResolvedValue({ relays: [relay()] });
     await mount(<Rows />);
     await menuItem(rowOf("VLESS · TCP"), "Remove…");
-    expect(dialog().textContent).toContain("Remove the relay msk1 → de1?");
-    await click(buttonIn(dialog(), "Remove"));
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    const ask = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find((b) => b.textContent === "Really remove?")!;
+    expect(ask.className).toBe("ask");
+    expect(deleteRelay).not.toHaveBeenCalled();
+    await click(ask);
     await settle();
     expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
+    expect(document.querySelector("[role=menu]")).toBeNull();
+    // the question does not outlive the menu: asked, the menu closed on its scrim, opened again
+    await menuItem(rowOf("VLESS · TCP"), "Remove…");
+    await click(document.querySelector(".wy-mnb"));
+    await click(rowOf("VLESS · TCP").querySelector("button[aria-haspopup=menu]"));
+    expect([...document.querySelectorAll<HTMLElement>("[role=menuitem]")].some((b) => b.textContent === "Really remove?")).toBe(false);
   });
 
   it("a failed server dropping forwarded traffic points to the Doctor of the entry", async () => {

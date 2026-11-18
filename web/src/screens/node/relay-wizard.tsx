@@ -82,7 +82,9 @@ function Body({ data, w, start, demo, onClose }: { data: Data; w: WaysModel; sta
   const exit = { id: node.id, name: node.name, cc: node.countryCode };
   const job = useJob(node.id);
   const hours = useQuery(settingsQuery).data?.settings.updateIntervalHours || 12;
-  const startEntry = start?.startsWith("via:") ? start.slice(4) : "";
+  const [startEntry = "", startOnly = ""] = start?.startsWith("via:") ? start.slice(4).split("/") : [];
+  // a server the owner dragged onto the entry: it is the one ticked, the others wait to be ticked
+  const [only] = useState(startOnly);
   const [step, setStep] = useState<Step>(demo?.step ?? (job ? 4 : startEntry ? 3 : 2));
   const [pk, setPk] = useState(demo?.entry ?? job?.entry.id ?? startEntry);
   const [offs, setOffs] = useState<Record<string, boolean>>({});
@@ -150,7 +152,7 @@ function Body({ data, w, start, demo, onClose }: { data: Data; w: WaysModel; sta
                 : "";
     return { c, relay, why, warn: !!c.hop && !c.unsupported && !live && !blocked && !relay, off: !!c.unsupported || live || blocked };
   });
-  const picked = (r: Row) => !r.off && !offs[r.c.inboundId];
+  const picked = (r: Row) => !r.off && (offs[r.c.inboundId] === undefined ? !only || r.c.inboundId === only : !offs[r.c.inboundId]);
   const go = rows.filter(picked);
   // the people who are given any of the servers: each server's count has the same people in it, so the most of them, not their sum
   const people = Math.max(0, ...go.map((r) => r.c.audience?.people ?? 0));
