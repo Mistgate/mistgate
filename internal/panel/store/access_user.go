@@ -1229,6 +1229,9 @@ type AccessDesiredCred struct {
 // and take them again when it is switched on. The credentials themselves are kept. Needs u (user) and d (device) in scope.
 const accMistgateAppOn = `(d.key_hash IS NULL OR u.app_mistgate_off = 0)`
 
+// accGroupGetsNode is GroupGetsNode in SQL: needs u (user) and i (inbound) in scope.
+const accGroupGetsNode = `NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)`
+
 // DesiredCreds returns the candidate credentials of every enabled inbound of a node.
 func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
 	rows, err := a.s.R.QueryContext(ctx,
@@ -1242,7 +1245,7 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 		      AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
 		 WHERE i.node_id = ? AND i.enabled = 1
-		   AND NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)
+		   AND `+accGroupGetsNode+`
 		   AND `+accMistgateAppOn+`
 		 ORDER BY i.id, c.id`, nodeID)
 	if err != nil {
@@ -1280,7 +1283,7 @@ func (a Access) HasUserCredentialOnNode(ctx context.Context, nodeID, userID stri
 			     AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
 			JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
 			WHERE i.node_id = ? AND i.enabled = 1
-			  AND NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)
+			  AND `+accGroupGetsNode+`
 			  AND `+accMistgateAppOn+`
 		)`, userID, nodeID).Scan(&found)
 	return found, err

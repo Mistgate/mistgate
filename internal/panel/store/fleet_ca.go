@@ -191,7 +191,7 @@ func (s *Store) CertStatus(ctx context.Context, serial string, now time.Time) (C
 // non-retired node (re-enrollment). Older unused tokens of the node stop working.
 // The returned node is the current row.
 func (s *Store) CreateEnrollment(ctx context.Context, n *NodeRow, nodeID string, tokenHash []byte, createdBy string, now, expires time.Time) (NodeRow, error) {
-	stmts := make([]Stmt, 0, 5)
+	stmts := make([]Stmt, 0, 8)
 	if n != nil {
 		nodeID = n.ID
 		if n.DecoyMode == "" {
@@ -201,6 +201,7 @@ func (s *Store) CreateEnrollment(ctx context.Context, n *NodeRow, nodeID string,
 			INSERT INTO node (id, name, address, country_code, location, provider, state, created_at, decoy_mode)
 			VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
 			Args: []any{n.ID, n.Name, n.Address, n.CountryCode, n.Location, n.Provider, unix(now), n.DecoyMode}})
+		stmts = append(stmts, nodeShareStmts(n.ID, n.Share, now)...)
 	}
 	stmts = append(stmts,
 		guard(`EXISTS (SELECT 1 FROM node WHERE id = ? AND state <> 'retired')`, nodeID),
