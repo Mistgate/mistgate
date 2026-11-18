@@ -81,7 +81,7 @@ function statusLine(c: Ctx, now: number): { tone: Tone; st: string; sy: string }
 
 /** The subscription card: the state, the name, the three figures; beside them (a subscription that works) the new device: the QR code and two buttons. */
 export function heroCard(c: Ctx, now = Date.now() / 1000): HTMLElement {
-  const { d, s, a, t } = c;
+  const { d, a, t } = c;
   const live = d.user.status === "active";
   const f = figures(c, now);
   const st = statusLine(c, now);

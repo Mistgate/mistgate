@@ -404,20 +404,20 @@ button.u-stat:hover .n { color: var(--text); }
   --sp-fade: linear(0, 0.024, 0.079, 0.159, 0.246, 0.343, 0.435, 0.522, 0.607, 0.681, 0.748, 0.804, 0.854, 0.893, 0.925, 0.952, 0.972, 0.988, 1, 1.008, 1.014, 1.017, 1.019, 1.019, 1.018, 1.017, 1.016, 1.014, 1.012, 1.011, 1.009, 1.007, 1.006, 1.005, 1.004, 1.003, 1);
   --sp-fade-t: 0.39s;
 }
-.u-anim .u-ann { animation: u-in var(--sp-settle-t) var(--sp-settle) both; }
-.u-anim .u-hero { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.06s both; }
-.u-anim .u-hero .u-h1 { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.14s both; }
-.u-anim .u-stat { animation: u-in var(--sp-settle-t) var(--sp-settle) both; }
-.u-anim .u-stat:nth-child(1) { animation-delay: 0.2s; } .u-anim .u-stat:nth-child(2) { animation-delay: 0.26s; } .u-anim .u-stat:nth-child(3) { animation-delay: 0.32s; }
-.u-anim .u-qrrow { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.22s both; }
-.u-anim .u-hero-c .u-acts > * { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.3s both; }
-.u-anim .u-hero-c .u-acts > *:nth-child(2) { animation-delay: 0.36s; }
-.u-anim .u-tabs { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.18s both; }
-.u-anim .u-tbl, .u-anim .u-tabs ~ section, .u-anim .u-tabs ~ div { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.24s both; }
-.u-anim .u-tbl .u-tr:not(.u-th) { animation: u-in var(--sp-settle-t) var(--sp-settle) both; animation-delay: calc(0.28s + min(var(--ri, 12), 12) * 35ms); }
-.u-anim .u-tbl .u-tr:nth-of-type(2) { --ri: 0; } .u-anim .u-tbl .u-tr:nth-of-type(3) { --ri: 1; } .u-anim .u-tbl .u-tr:nth-of-type(4) { --ri: 2; } .u-anim .u-tbl .u-tr:nth-of-type(5) { --ri: 3; } .u-anim .u-tbl .u-tr:nth-of-type(6) { --ri: 4; } .u-anim .u-tbl .u-tr:nth-of-type(7) { --ri: 5; } .u-anim .u-tbl .u-tr:nth-of-type(8) { --ri: 6; } .u-anim .u-tbl .u-tr:nth-of-type(9) { --ri: 7; } .u-anim .u-tbl .u-tr:nth-of-type(10) { --ri: 8; } .u-anim .u-tbl .u-tr:nth-of-type(11) { --ri: 9; } .u-anim .u-tbl .u-tr:nth-of-type(12) { --ri: 10; }
-.u-anim .u-meter i { transform-origin: 0 50%; animation: u-grow var(--sp-pop-t) var(--sp-pop) both; animation-delay: calc(0.45s + min(var(--ri, 12), 12) * 35ms); }
-.u-anim .u-meter i:nth-child(2) { animation-delay: calc(0.5s + min(var(--ri, 12), 12) * 35ms); } .u-anim .u-meter i:nth-child(3) { animation-delay: calc(0.55s + min(var(--ri, 12), 12) * 35ms); }
+.u-anim .ea .u-ann { animation: u-in var(--sp-settle-t) var(--sp-settle) both; }
+.u-anim .ea .u-hero { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.06s both; }
+.u-anim .ea .u-hero .u-h1 { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.14s both; }
+.u-anim .ea .u-stat { animation: u-in var(--sp-settle-t) var(--sp-settle) both; }
+.u-anim .ea .u-stat:nth-child(1) { animation-delay: 0.2s; } .u-anim .ea .u-stat:nth-child(2) { animation-delay: 0.26s; } .u-anim .ea .u-stat:nth-child(3) { animation-delay: 0.32s; }
+.u-anim .ea .u-qrrow { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.22s both; }
+.u-anim .ea .u-hero-c .u-acts > * { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.3s both; }
+.u-anim .ea .u-hero-c .u-acts > *:nth-child(2) { animation-delay: 0.36s; }
+.u-anim .ea .u-tabs { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.18s both; }
+.u-anim :is(.ea, .et) .u-tbl, .u-anim :is(.ea, .et) .u-tabs ~ section, .u-anim :is(.ea, .et) .u-tabs ~ div { animation: u-in var(--sp-settle-t) var(--sp-settle) 0.24s both; }
+.u-anim :is(.ea, .et) .u-tbl .u-tr:not(.u-th) { animation: u-in var(--sp-settle-t) var(--sp-settle) both; animation-delay: calc(0.28s + min(var(--ri, 12), 12) * 35ms); }
+.u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(2) { --ri: 0; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(3) { --ri: 1; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(4) { --ri: 2; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(5) { --ri: 3; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(6) { --ri: 4; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(7) { --ri: 5; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(8) { --ri: 6; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(9) { --ri: 7; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(10) { --ri: 8; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(11) { --ri: 9; } .u-anim :is(.ea, .et) .u-tbl .u-tr:nth-of-type(12) { --ri: 10; }
+.u-anim :is(.ea, .et) .u-meter i { transform-origin: 0 50%; animation: u-grow var(--sp-pop-t) var(--sp-pop) both; animation-delay: calc(0.45s + min(var(--ri, 12), 12) * 35ms); }
+.u-anim :is(.ea, .et) .u-meter i:nth-child(2) { animation-delay: calc(0.5s + min(var(--ri, 12), 12) * 35ms); } .u-anim :is(.ea, .et) .u-meter i:nth-child(3) { animation-delay: calc(0.55s + min(var(--ri, 12), 12) * 35ms); }
 .u-anim .u-tab { transition: background-color var(--sp-fade-t) var(--sp-fade), color var(--sp-fade-t) var(--sp-fade), transform var(--sp-pop-t) var(--sp-pop); }
 .u-anim .u-tab:active, .u-anim .u-btn:active { transform: scale(0.97); }
 .u-anim .u-btn { transition: background-color var(--sp-fade-t) var(--sp-fade), border-color var(--sp-fade-t) var(--sp-fade), color var(--sp-fade-t) var(--sp-fade), transform var(--sp-pop-t) var(--sp-pop); }
