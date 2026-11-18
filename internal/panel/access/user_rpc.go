@@ -452,12 +452,17 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 	for _, d := range awgDevs {
 		awgByID[d.ID] = d
 	}
+	lastOnline, err := a.DeviceLastOnline(ctx, u.ID)
+	if err != nil {
+		return nil, s.internal("devices last online", err)
+	}
 	onlineDevices := s.online.OnlineDevices()
 	for _, d := range devs {
 		if ad, ok := awgByID[d.ID]; ok {
 			dev := s.deviceProto(ad)
 			dev.UsedBytes = d.UsedBytes
 			dev.Idle, dev.IdleSinceUnix = d.Idle, unixOrZero(d.IdleSinceAt)
+			dev.LastOnlineUnix = unixOrZero(lastOnline[d.ID])
 			resp.Devices = append(resp.Devices, dev)
 			continue
 		}
@@ -474,7 +479,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 		resp.Devices = append(resp.Devices, &adminv1.Device{
 			Id: d.ID, Platform: d.Platform, Model: d.Model, FirstSeenUnix: unixOrZero(d.FirstSeenAt), LastSeenUnix: unixOrZero(d.LastSeenAt),
 			Online: len(nodes) > 0, Protocols: d.Protocols, Kind: kind, OsVersion: d.OSVersion, Client: d.Client, UsedBytes: d.UsedBytes,
-			OnlineNodeIds: nodes, Fingerprint: d.Fingerprint, Idle: d.Idle, IdleSinceUnix: unixOrZero(d.IdleSinceAt),
+			OnlineNodeIds: nodes, Fingerprint: d.Fingerprint, Idle: d.Idle, IdleSinceUnix: unixOrZero(d.IdleSinceAt), LastOnlineUnix: unixOrZero(lastOnline[d.ID]),
 			Enrolled: len(d.KeyHash) > 0, EnrolLinkStale: len(d.KeyHash) > 0 && !bytes.Equal(d.EnrolTokenHash, u.SubTokenHash),
 		})
 	}

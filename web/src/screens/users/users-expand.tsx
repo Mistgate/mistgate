@@ -10,7 +10,7 @@ import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
-import { agoText, devicesView, nowSec, warnOf } from "./format";
+import { agoText, devicesView, lastOnlineOf, nowSec, warnOf } from "./format";
 import { detailN, type DeviceN, type UserN as User } from "./model";
 import { AppLink } from "./nav";
 import { platformLabel } from "./awg-devices";
@@ -78,7 +78,7 @@ function DeviceLine({ d, t }: { d: DeviceN; t: Tx }) {
       <i aria-hidden className={cx("size-1.5 rounded-full", d.online ? "bg-accent-mark" : "bg-[color-mix(in_srgb,var(--text)_20%,transparent)]")} />
       <b className="truncate font-medium">{name}</b>
       <span className="whitespace-nowrap text-sec @max-[520px]/ust:hidden">{app}</span>
-      <em className="text-end text-xs whitespace-nowrap text-muted not-italic">{d.online ? t("users.now") : agoText(d.lastSeenUnix, t, nowSec())}</em>
+      <em className="text-end text-xs whitespace-nowrap text-muted not-italic">{d.online ? t("users.now") : agoText(lastOnlineOf(d), t, nowSec())}</em>
     </li>
   );
 }

@@ -12,7 +12,7 @@ import { useFmt, type Fmt } from "@/lib/format";
 import { badgeOf, openRequestOf } from "@/lib/client-debug";
 import { deviceError, platformLabel } from "./awg-devices";
 import { LogsBadge, type LogsCtl } from "./client-logs";
-import { agoText } from "./format";
+import { agoText, lastOnlineOf } from "./format";
 import type { BlockedN, DeviceN as Device } from "./model";
 import { useTx, type Tx } from "./t";
 import { ConfirmModal } from "./ui";
@@ -125,15 +125,29 @@ export function Secondary({ text, details = [] }: { text: ReactNode; details?: s
 /**
  * The status on the right of a row (the board's .up-seen): the dot and "online" with the servers (two of them are the sign of a
  * copied config, which the tooltip says), or how long ago, quiet. In a narrow row the word steps aside for the servers.
+ * A link device passes `sync` (its last subscription fetch): its `lastSeen` is then the last time the nodes counted a connection
+ * ("was online 3 h ago", "never online"), and the fetch, which is not a connection, stays in the tooltip.
  */
-export function Seen({ online, nodes = [], lastSeen, never, t, now }: { online: boolean; nodes?: string[]; lastSeen: number; never?: string; t: Tx; now: number }) {
-  if (!online)
-    return (
-      <span className={cx("up-seen", lastSeen <= 0 && !never && "none")}>
+export function Seen({ online, nodes = [], lastSeen, sync, never, t, now }: { online: boolean; nodes?: string[]; lastSeen: number; sync?: number; never?: string; t: Tx; now: number }) {
+  if (!online) {
+    const link = sync !== undefined;
+    const text = lastSeen > 0 ? (link ? t("users.dev.wasOnline", { when: agoText(lastSeen, t, now) }) : agoText(lastSeen, t, now)) : link ? t("users.dev.neverOnline") : (never ?? "—");
+    const quiet = (
+      <span className={cx("up-seen", lastSeen <= 0 && !never && !link && "none")}>
         <i aria-hidden />
-        {lastSeen > 0 ? agoText(lastSeen, t, now) : (never ?? "—")}
+        {text}
       </span>
     );
+    if (!link || sync <= 0) return quiet;
+    const why = t("users.dev.syncTip", { when: agoText(sync, t, now) });
+    return (
+      <Tip label={why}>
+        <span tabIndex={0} aria-label={`${text}. ${why}`} className="cursor-default rounded-sm">
+          {quiet}
+        </span>
+      </Tip>
+    );
+  }
   const status = (
     <span className="up-seen on">
       <i aria-hidden />
@@ -296,7 +310,7 @@ export function LinkDeviceRows({ devices, nodeName, now, onChanged, logs }: { de
                 <IdleNote d={d} t={t} />
               </>
             }
-            right={<Seen online={d.online} nodes={nodes} lastSeen={d.lastSeenUnix} t={t} now={now} />}
+            right={<Seen online={d.online} nodes={nodes} lastSeen={lastOnlineOf(d)} sync={d.lastSeenUnix} t={t} now={now} />}
             menu={
               <RowMenu
                 label={t("users.dev.menu", { name: n })}
@@ -367,7 +381,7 @@ export function SharedRow({ d, mode, now, onDisconnect }: { d: Device; mode: Lin
           <IdleNote d={d} t={t} />
         </>
       }
-      right={<Seen online={d.online} lastSeen={d.lastSeenUnix} t={t} now={now} />}
+      right={<Seen online={d.online} lastSeen={lastOnlineOf(d)} sync={d.lastSeenUnix} t={t} now={now} />}
       menu={<RowMenu label={t("users.dev.menu", { name })} items={[{ label: t("users.dev.disconnect"), onClick: onDisconnect }]} />}
     />
   );

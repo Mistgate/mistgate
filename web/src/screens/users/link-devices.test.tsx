@@ -104,3 +104,31 @@ describe("an inactive device", () => {
     expect(row("Pixel")?.textContent).toContain("Takes no place in the limit");
   });
 });
+
+describe("the status on the right of a link device", () => {
+  const now = Math.floor(Date.now() / 1000);
+  const seen = (name: string) => row(name)?.querySelector(".up-seen");
+
+  it("says when the nodes last counted a connection, not when the subscription was fetched", async () => {
+    // fetched 5 minutes ago, last connected 3 hours ago
+    await mount([device("d1", "Quiet PC", { lastSeenUnix: now - 300, lastOnlineUnix: now - 3 * 3600 })]);
+    expect(seen("Quiet PC")?.textContent).toBe("was online 3 h ago");
+    // the fetch is in the tooltip, as a fetch
+    expect(row("Quiet PC")?.querySelector("span[tabindex][aria-label^='was online']")?.getAttribute("aria-label")).toContain("Subscription refreshed 5 min ago");
+  });
+
+  it("says 'never online' for a device that only fetched, and keeps the fetch in the tooltip", async () => {
+    await mount([device("d1", "Fetch PC", { lastSeenUnix: now - 120, lastOnlineUnix: 0 })]);
+    expect(seen("Fetch PC")?.textContent).toBe("never online");
+    expect(row("Fetch PC")?.querySelector("span[tabindex][aria-label^='never online']")?.getAttribute("aria-label")).toContain("Subscription refreshed 2 min ago");
+  });
+
+  it("says 'online' for a live device and leaves a key's own handshake as its time", async () => {
+    await mount([
+      device("d1", "Live PC", { online: true, onlineNodeIds: [], lastSeenUnix: now - 300, lastOnlineUnix: now - 60 }),
+      device("k1", "Pixel", { kind: DeviceKind.KEY, awgProfileId: "p1", awgProfileName: "AWG 3.1", platform: "android", lastSeenUnix: now - 2 * 3600, lastHandshakeUnix: now - 2 * 3600 }),
+    ]);
+    expect(seen("Live PC")?.textContent).toContain("online");
+    expect(seen("Pixel")?.textContent).toBe("2 h ago");
+  });
+});
