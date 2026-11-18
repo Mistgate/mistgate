@@ -659,7 +659,19 @@
   }
 }
 
-/* just connected: the rows come up one after another */
+/* just connected: the card's border lights and a ring goes out of it (the board's nx-ok), the rows come up one after another */
+.nx-warp.just {
+  animation: nx-ok 2.2s var(--e) both;
+}
+@keyframes nx-ok {
+  0% {
+    border-color: var(--accent-mark);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-mark) 22%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
 .nx-warp.just .nx-li {
   animation: mg-up 0.4s var(--e) both;
 }
@@ -861,6 +873,7 @@
   .nx-reg::before,
   .nx-st2 li.now .m,
   .nx-det,
+  .nx-warp.just,
   .nx-warp.just .nx-li {
     animation: none;
   }

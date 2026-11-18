@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { nodePageData, type NState } from "../dev-kit-node-page";
 import { NodeDoctorTab } from "./doctor";
 
@@ -111,6 +112,25 @@ describe("the Doctor tab", () => {
     expect(buttons("Inspecting")[0]!.hasAttribute("disabled") || buttons("Inspecting")[0]!.getAttribute("data-disabled") !== null).toBe(true);
     expect(health.runDoctor).toHaveBeenCalledWith({ nodeId: "nod_de1" });
     await act(async () => answer({ nowUnix: 1, nodes: [] }));
+  });
+
+  it("with the reveal animation the card's edge has the look going round while the node is looked at, and a wave from the icon at the start (the board's dr-loop and dr-wave); without it, neither", async () => {
+    let answer: (v: unknown) => void = () => {};
+    health.runDoctor.mockReturnValue(new Promise((r) => (answer = r)));
+    setEffectsEnabled(true);
+    await mount("alerts");
+    const card = () => host!.querySelector(".nd-dr-sum")!;
+    expect(card().querySelector(".fl-loop, .fl-wv")).toBeNull();
+    await act(async () => buttons("Run again")[0]!.click());
+    await act(async () => vi.waitFor(() => expect(card().querySelector(".fl-loop")).not.toBeNull(), { timeout: 3000 }));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    expect(card().querySelector(".fl-wv")).not.toBeNull();
+    expect(card().querySelectorAll(".fl-eg")).toHaveLength(2);
+    await act(async () => answer({ nowUnix: 1, nodes: [] }));
+    expect(host!.querySelector(".fl-loop")).toBeNull();
+    setEffectsEnabled(false);
+    await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(host!.querySelector(".fl-wv, .fl-eg, .fl-loop")).toBeNull();
   });
 
   it("shakes the card of a repair that failed, once", async () => {

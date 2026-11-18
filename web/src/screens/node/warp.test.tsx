@@ -6,6 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { WarpSource, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
 import { fill } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { en } from "@/i18n/en";
 import { describeWarpError } from "@/lib/warp-error";
 import { WarpCard } from "./warp";
@@ -210,6 +211,22 @@ describe("what the owner can do with a node's WARP", () => {
     await click(dialog().querySelector('[role="checkbox"]'));
     await click(button("Register again", dialog()));
     expect(registerWarp).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "nod_1", acceptTos: true, replaceExisting: true }));
+  });
+
+  it("a registration that went through lights the card (the board's nx-ok) and sends a wave and two glints over it, with the reveal animation on", async () => {
+    registerWarp.mockResolvedValue({});
+    setEffectsEnabled(true);
+    await mount(data({ state: WarpState.DOWN, lastError: "warp_flag_off" }, { needsAttention: true, attentionReason: "revoked" }));
+    await click(button("Register again"));
+    await click(dialog().querySelector('[role="checkbox"]'));
+    await click(button("Register again", dialog()));
+    expect(document.querySelector(".fl-wv")).toBeNull();
+    await act(async () => void (await new Promise((r) => setTimeout(r, 900))));
+    const card = document.querySelector(".nx-warp")!;
+    expect(card.classList.contains("just")).toBe(true);
+    expect(card.querySelector(".fl-wv")).not.toBeNull();
+    expect(card.querySelectorAll(".fl-eg")).toHaveLength(2);
+    setEffectsEnabled(false);
   });
 
   it("a refused registration says what Cloudflare answered, and offers the import", async () => {

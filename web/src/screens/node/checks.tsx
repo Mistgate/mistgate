@@ -1,6 +1,6 @@
 import { Scramble } from "@/components/fx/scramble-react";
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { EditionNotice } from "@/components/edition-notice";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Pending, QueryError } from "@/components/ui/query-error";
@@ -79,7 +79,9 @@ export function CheckRows({ row, columns, onRun, running }: { row: Plain<CheckRo
 export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: readonly { id: string; port: number; protocol: string }[] }) {
   const t = useT();
   const fmt = useFmt();
-  const run = useRunChecks(nodeId);
+  const [from, setFrom] = useState<number | null>(null); // the newest cell at the press: null while no round is waited for
+  // a round that was scheduled starts the wait for a newer cell; the cell that is the newest now is the one to beat
+  const run = useRunChecks(nodeId, (scheduled) => scheduled > 0 && setFrom((f) => f ?? newest));
   const noChecks = useEdition().off("health_checks"); // no rounds there: no "every 5 min"
   const q = useQuery(checksQuery(nodeId));
   const [open, setOpen] = useState<string | null>(null);
@@ -88,6 +90,31 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
   const entries = (row?.cells ?? []).map((cell, i) => ({ cell, col: q.data?.columns[i] })).filter((x): x is { cell: CheckCell; col: Plain<CheckColumn> } => !!x.col && x.cell.deployed);
   const newest = Math.max(0, ...entries.map((e) => e.cell.last?.atUnix ?? 0));
   const country = countryColumn(q.data?.countryChecks);
+  // The asked round answers at once ("scheduled") and the cells come a few seconds later (the panel looks again at 4 s and 14 s): the rows are being
+  // looked at from the press until a newer cell is there (or 16 s have passed), and then for two seconds the strips slide one cell along with the new one
+  // jumping out and the times come up (the board's nd-pr.now, nd-scan, nd-dots, then nd-adv, nd-new, nd-fresh).
+  const [came, setCame] = useState(false);
+  useEffect(() => {
+    if (from === null) return;
+    const give = setTimeout(() => setFrom(null), 16_000);
+    const got =
+      newest > from
+        ? setTimeout(() => {
+            setFrom(null);
+            setCame(true);
+          }, 0)
+        : undefined;
+    return () => {
+      clearTimeout(give);
+      clearTimeout(got);
+    };
+  }, [from, newest]);
+  useEffect(() => {
+    if (!came) return;
+    const off = setTimeout(() => setCame(false), 2000);
+    return () => clearTimeout(off);
+  }, [came]);
+  const busy = run.running || from !== null;
 
   return (
     <section className="rounded-card border border-line bg-surface">
@@ -125,8 +152,8 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
         const ticks = nodeTicks({ cells: [cell] });
         return (
           <Fragment key={col.profileId}>
-            <div className="grid grid-cols-[28px_minmax(0,200px)_minmax(0,1fr)_96px] items-center gap-3 border-t border-line px-6 py-2.5 max-[720px]:grid-cols-[28px_minmax(0,1fr)_auto] max-[720px]:px-4">
-              <ProtocolTag protocol={col.protocol} compact className="w-7 justify-center px-0" />
+            <div className={cx("nd-pr grid grid-cols-[28px_minmax(0,200px)_minmax(0,1fr)_96px] items-center gap-3 border-t border-line px-6 py-2.5 max-[720px]:grid-cols-[28px_minmax(0,1fr)_auto] max-[720px]:px-4", busy && "now")}>
+              <ProtocolTag protocol={col.protocol} compact className="nd-pf w-7 justify-center px-0" />
               <button
                 type="button"
                 aria-expanded={on}
@@ -137,17 +164,17 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
                 <b className="truncate font-medium">{col.profileName}</b>
                 {inbound && <span className="font-mono text-[11px] font-normal text-muted">{`${transportOf(inbound.protocol)}/${inbound.port}`}</span>}
               </button>
-              <span role="img" aria-label={t("ov.tick.aria")} className="nd-tk max-[720px]:order-3 max-[720px]:col-span-full">
+              <span role="img" aria-label={t("ov.tick.aria")} className={cx("nd-tk max-[720px]:order-3 max-[720px]:col-span-full", busy && "scan", came && "adv")}>
                 {ticks.map((k, i) => (
                   <i
                     key={i}
-                    className={k.state === "ok" ? undefined : k.state}
+                    className={cx(k.state !== "ok" && k.state, came && i === ticks.length - 1 && "new") || undefined}
                     data-t={k.from ? `${fmt.clock(k.from)}–${fmt.clock(k.to)}` : t("ov.tick.none")}
                     data-s={k.state === "none" ? (k.from ? t("ov.tick.none") : "") : k.state === "ok" ? t("ov.tick.ok", { ms: k.ms || "–" }) : k.state === "warn" ? t("ov.tick.part", { failed: k.failed, total: k.ok + k.failed }) : t("ov.tick.fail")}
                   />
                 ))}
               </span>
-              <span className={cx("text-end font-mono text-[13px] font-medium whitespace-nowrap tabular-nums", kind === "warn" && "text-warn-text", kind === "bad" && "text-danger-text")}>{look.label && <Scramble value={look.label} once />}</span>
+              <span className={cx("nd-ms text-end font-mono text-[13px] font-medium whitespace-nowrap tabular-nums", kind === "warn" && "text-warn-text warn", kind === "bad" && "text-danger-text crit", busy && "dots", came && "fresh")}>{!busy && look.label && <Scramble value={look.label} once />}</span>
             </div>
             {on && (
               <div className="flex flex-col gap-2 border-t border-line px-6 py-3 max-[720px]:px-4">

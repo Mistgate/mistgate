@@ -176,6 +176,184 @@
     color: var(--text);
   }
 }
+/* the round runs: the rows are looked at (a quiet tint, a ring off the protocol's mark, a glint over the strip, dots for the time); when it is over the strip
+   slides one cell and the new one jumps out, the time comes up (the board's nd-pr.now, nd-ping, nd-scan, nd-dots, nd-adv, nd-new, nd-fresh) */
+.nd-pr {
+  transition: background-color 0.3s var(--e);
+}
+.nd-pr.now {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.nd-pf {
+  position: relative;
+}
+.nd-pr.now .nd-pf::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: nk-ping 0.62s var(--e) infinite;
+}
+@keyframes nk-ping {
+  from {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 0.7;
+  }
+  to {
+    box-shadow: 0 0 0 8px currentColor;
+    opacity: 0;
+  }
+}
+.nd-pr .nd-tk {
+  position: relative;
+}
+.nd-tk.scan i {
+  opacity: 0.45;
+}
+.nd-tk.scan::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  inset-inline-start: 0;
+  width: 22%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 55%, transparent), transparent);
+  mix-blend-mode: overlay;
+  animation: nk-scan 0.62s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+@keyframes nk-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(455%);
+  }
+}
+.nd-tk.adv {
+  animation: nk-adv 0.45s var(--e) both;
+}
+@keyframes nk-adv {
+  from {
+    transform: translateX(4.17%);
+  }
+  to {
+    transform: none;
+  }
+}
+.nd-tk.adv i.new {
+  opacity: 1;
+  transform-origin: 50% 100%;
+  animation: nk-new 0.7s var(--ease-spring) both;
+}
+.nd-tk.adv i.new.warn {
+  animation-name: nk-new-w;
+}
+.nd-tk.adv i.new.bad {
+  animation-name: nk-new-c;
+}
+@keyframes nk-new {
+  0% {
+    transform: scaleY(0);
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  45% {
+    transform: scaleY(1.6);
+    box-shadow: 0 0 12px 2px var(--accent-mark);
+  }
+  100% {
+    transform: none;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+@keyframes nk-new-w {
+  0% {
+    transform: scaleY(0);
+  }
+  45% {
+    transform: scaleY(1.6);
+    box-shadow: 0 0 12px 2px var(--warning);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes nk-new-c {
+  0% {
+    transform: scaleY(0);
+  }
+  45% {
+    transform: scaleY(1.6);
+    box-shadow: 0 0 12px 2px var(--danger);
+  }
+  100% {
+    transform: none;
+  }
+}
+.nd-ms.dots::after {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: radial-gradient(circle, var(--sec) 1.5px, transparent 2px) 0 0 / 6px 4px;
+  animation: nk-dots 0.62s steps(4, jump-none) infinite;
+}
+@keyframes nk-dots {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.nd-ms.fresh {
+  animation: nk-fresh 0.9s var(--e) both;
+}
+.nd-ms.warn.fresh,
+.nd-ms.crit.fresh {
+  animation-name: nk-fresh2;
+}
+@keyframes nk-fresh {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+    color: var(--accent-mark);
+  }
+  40% {
+    opacity: 1;
+    transform: none;
+    color: var(--accent-mark);
+  }
+  100% {
+    color: inherit;
+  }
+}
+@keyframes nk-fresh2 {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  40% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nd-tk.scan::after,
+  .nd-pr.now .nd-pf::after {
+    animation: none;
+    display: none;
+  }
+  .nd-tk.adv,
+  .nd-tk.adv i.new,
+  .nd-ms.fresh {
+    animation: none;
+  }
+}
+
 /* a round of checks runs: the line under the head fills, the numbers shuffle */
 .nd-pg {
   display: block;

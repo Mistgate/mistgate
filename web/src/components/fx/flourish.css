@@ -1,0 +1,177 @@
+/*
+ * The end of an action on one card (the board's .as-wv with .nx-wave, .dr-wave, .sv-wave, and .as-eg.nx-eg): a wave from a point of the card and two
+ * glints running along its edge. The card is position: relative; it plays once, only with the reveal animation (Settings -> Interface), and reduced
+ * motion hides it. The wizard's own (relay-wizard.css, wy-wv and wy-eg) is the same effect from the top of its window.
+ */
+@property --asa {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 135deg;
+}
+@property --r {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.fl-wv {
+  --w1: rgb(80 220 175 / 0.42);
+  --w2: rgb(70 195 225 / 0.38);
+  --w3: rgb(180 240 150 / 0.34);
+  --w4: rgb(235 255 245 / 0.22);
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+:root[data-theme="light"] .fl-wv {
+  --w1: rgb(40 190 150 / 0.3);
+  --w2: rgb(50 170 210 / 0.26);
+  --w3: rgb(140 210 90 / 0.24);
+  --w4: rgb(180 235 215 / 0.2);
+}
+.fl-wv i {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle at var(--fl-x) var(--fl-y),
+    transparent calc(var(--r) - 220px),
+    var(--w1) calc(var(--r) - 130px),
+    var(--w2) calc(var(--r) - 40px),
+    var(--w3) calc(var(--r) + 40px),
+    var(--w4) calc(var(--r) + 120px),
+    transparent calc(var(--r) + 220px)
+  );
+  animation:
+    fl-r 1.9s cubic-bezier(0.25, 0.6, 0.3, 1) 0.1s both,
+    fl-a 1.9s ease-out 0.1s both;
+}
+:root[data-theme="light"] .fl-wv i {
+  mix-blend-mode: normal;
+}
+.fl-eg {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  opacity: 0;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+.fl-eg:dir(rtl) {
+  transform: scaleX(-1);
+}
+.fl-eg.a {
+  background: conic-gradient(from calc(var(--asa) - 40deg), transparent 0, rgb(120 235 190 / 0.2) 20deg, rgb(160 245 210) 40deg, rgb(110 200 235 / 0.5) 60deg, transparent 80deg, transparent 360deg);
+  animation: fl-ea 2.8s cubic-bezier(0.16, 0.7, 0.2, 1) 0.1s both;
+}
+.fl-eg.b {
+  background: conic-gradient(from calc(var(--asa) - 40deg), transparent 0, rgb(110 200 235 / 0.5) 20deg, rgb(160 245 210) 40deg, rgb(120 235 190 / 0.2) 60deg, transparent 80deg, transparent 360deg);
+  animation: fl-eb 1.9s cubic-bezier(0.16, 0.7, 0.2, 1) 0.1s both;
+}
+@keyframes fl-r {
+  from {
+    --r: 30px;
+  }
+  to {
+    --r: 1400px;
+  }
+}
+@keyframes fl-a {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 0.7;
+  }
+  70% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes fl-ea {
+  0% {
+    --asa: 315deg;
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.85;
+  }
+  100% {
+    --asa: 740deg;
+    opacity: 0;
+  }
+}
+@keyframes fl-eb {
+  0% {
+    --asa: 315deg;
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  45% {
+    opacity: 0.6;
+  }
+  100% {
+    --asa: 60deg;
+    opacity: 0;
+  }
+}
+
+/* the doctor's look goes round the card's edge while it runs (the board's .dr-sum .as-eg.dr-loop) */
+.fl-loop {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  opacity: 1;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  background: conic-gradient(from var(--asa), transparent 0, rgb(110 200 235 / 0.15) 20deg, rgb(150 215 245) 46deg, rgb(120 235 190 / 0.5) 66deg, transparent 90deg, transparent 360deg);
+  animation: fl-loop 1.8s linear infinite;
+}
+.fl-loop:dir(rtl) {
+  transform: scaleX(-1);
+}
+@keyframes fl-loop {
+  from {
+    --asa: 0deg;
+  }
+  to {
+    --asa: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-wv,
+  .fl-eg,
+  .fl-loop {
+    display: none;
+  }
+}
