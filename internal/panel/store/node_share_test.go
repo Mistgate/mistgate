@@ -126,8 +126,9 @@ func TestNodeShareMigrationKeepsExistingNodes(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := p.UpTo(ctx, 146); err != nil {
-		t.Fatalf("up to 146: %v", err)
+	// all the way up, not to 146: the reads below are the current code's, which needs the tables of the later migrations
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatalf("up: %v", err)
 	}
 	shares, groups := shareT(t, s)
 	for _, id := range []string{"nod_de1", "nod_nl1"} {

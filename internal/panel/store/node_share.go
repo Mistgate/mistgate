@@ -128,23 +128,28 @@ func (s *Store) NodeShares(ctx context.Context) (map[string]NodeShare, error) {
 	return out, rows.Err()
 }
 
-// NodeAudience counts, per group, the active people who would see a node when their group receives it: those who use every
-// node or picked this one. The panel's own cache of what a share change does to people.
-func (a Access) NodeAudience(ctx context.Context, nodeID string) (map[string]int, error) {
-	rows, err := a.s.R.QueryContext(ctx, `SELECT u.group_id, count(*) FROM user u WHERE u.status = 'active'
-		AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = ?)) GROUP BY u.group_id`, nodeID)
+// NodeAudience lists, per person, the groups of the active people who would see a node when one of their groups receives it:
+// those who use every node or picked this one. A person is one entry whatever the number of their groups (the main one
+// first). The panel's own cache of what a share change does to people.
+func (a Access) NodeAudience(ctx context.Context, nodeID string) (map[string][]string, error) {
+	rows, err := a.s.R.QueryContext(ctx, `SELECT u.id, u.group_id, 0 AS extra FROM user u WHERE u.status = 'active'
+		AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = ?1))
+		UNION ALL
+		SELECT x.user_id, x.group_id, 1 FROM user_extra_group x JOIN user u ON u.id = x.user_id WHERE u.status = 'active'
+		AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = ?1))
+		ORDER BY 1, 3, 2`, nodeID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]int{}
+	out := map[string][]string{}
 	for rows.Next() {
-		var id string
-		var n int
-		if err := rows.Scan(&id, &n); err != nil {
+		var userID, groupID string
+		var extra int
+		if err := rows.Scan(&userID, &groupID, &extra); err != nil {
 			return nil, err
 		}
-		out[id] = n
+		out[userID] = append(out[userID], groupID)
 	}
 	return out, rows.Err()
 }

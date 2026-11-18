@@ -631,7 +631,7 @@ func TestD1FleetBatchSmoke(t *testing.T) {
 		if err != nil || len(pairs) != 1 || pairs[0] != [2]string{"dev_d1_stats", node.ID} {
 			t.Fatalf("D1 OnlineDevices = %v, %v", pairs, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, "usr_d1_stats", "grp_d1_stats", now, false, now, nil)
+		data, err := st.Access().SubscriptionData(ctx, "usr_d1_stats", now, false, now, nil)
 		if err != nil || len(data.OnlineDevices["dev_d1_stats"]) != 1 || data.OnlineDevices["dev_d1_stats"][0] != node.ID {
 			t.Fatalf("D1 SubscriptionData.OnlineDevices = %v, %v", data.OnlineDevices, err)
 		}
@@ -1478,7 +1478,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if got, err := st.Access().User(ctx, "usr_user"); err != nil || got.Name != "User" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_user" {
 			t.Fatalf("user = %+v, %v", got, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, u.ID, "grp_user", now, true, now, nil)
+		data, err := st.Access().SubscriptionData(ctx, u.ID, now, true, now, nil)
 		if err != nil || data.Device.ID != dev.ID || len(data.DeviceCreds) != 1 || data.DeviceCreds[0].ID != cred.ID {
 			t.Fatalf("user implicit credentials = %+v, %+v", data, err)
 		}
@@ -1493,7 +1493,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatal(err)
 		}
 		u.Name, u.AllNodes, u.NodeIDs = "After", false, []string{"nod_update_user"}
-		if err := st.Access().UpdateUser(ctx, u, true); err != nil {
+		if err := st.Access().UpdateUser(ctx, u, true, AccessGroupChange{}); err != nil {
 			t.Fatal(err)
 		}
 		if got, err := st.Access().User(ctx, u.ID); err != nil || got.Name != "After" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_update_user" {
@@ -1509,7 +1509,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if err != nil || created || got.ID != "" || len(live) != 0 {
 			t.Fatalf("EnsureImplicitDevice without credentials = %+v, %+v, %v, %v", got, live, created, err)
 		}
-		if data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_device", now, false, now, nil); err != nil || data.Device.ID != "" || len(data.Devices) != 0 {
+		if data, err := st.Access().SubscriptionData(ctx, dev.UserID, now, false, now, nil); err != nil || data.Device.ID != "" || len(data.Devices) != 0 {
 			t.Fatalf("device after empty ensure = %+v, %v, want none", data.Device, err)
 		}
 	})
@@ -1523,7 +1523,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if err != nil || !created || got.ID != dev.ID || len(live) != 1 || live[0].ID != cred.ID {
 			t.Fatalf("EnsureImplicitDevice = %+v, %+v, %v, %v", got, live, created, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_add_creds", now, false, now, nil)
+		data, err := st.Access().SubscriptionData(ctx, dev.UserID, now, false, now, nil)
 		if err != nil || len(data.Devices) != 1 || data.Devices[0].ID != dev.ID || len(data.Devices[0].Protocols) != 1 || data.Devices[0].Protocols[0] != cred.Protocol {
 			t.Fatalf("subscription devices after add credentials = %+v, %v", data.Devices, err)
 		}
@@ -1613,7 +1613,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatalf("a device over the ceiling: %v", err)
 		}
 		for hash, want := range map[string]string{string(hashA): "dev_link_shared", string(hashB): "dev_link_b", string(hashC): ""} {
-			data, err := st.Access().SubscriptionData(ctx, userID, "grp_link_hwid", now, false, now, []byte(hash))
+			data, err := st.Access().SubscriptionData(ctx, userID, now, false, now, []byte(hash))
 			if err != nil || data.Device.ID != want || len(data.Devices) != 2 {
 				t.Fatalf("SubscriptionData by hash: device %q of %d, %v; want %q", data.Device.ID, len(data.Devices), err, want)
 			}
@@ -1690,7 +1690,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if _, err := ensure("b"); !errors.Is(err, ErrAccessBlocked) {
 			t.Fatalf("the blocked HWID = %v, want ErrAccessBlocked", err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, userID, "grp_link_limit", now, false, now, hash("b"))
+		data, err := st.Access().SubscriptionData(ctx, userID, now, false, now, hash("b"))
 		if err != nil || !data.Blocked || data.LinkMode != LinkModeEnforce {
 			t.Fatalf("snapshot: blocked %v, mode %q, %v", data.Blocked, data.LinkMode, err)
 		}
@@ -1733,7 +1733,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if userID, err := st.Access().RevokeDevice(ctx, dev.ID, now); err != nil || userID != dev.UserID {
 			t.Fatalf("revoke = %q, %v", userID, err)
 		}
-		data, err := st.Access().SubscriptionData(ctx, dev.UserID, "grp_revoke_device", now, false, now, nil)
+		data, err := st.Access().SubscriptionData(ctx, dev.UserID, now, false, now, nil)
 		if err != nil || len(data.Devices) != 0 {
 			t.Fatalf("subscription devices after revoke = %+v, %v", data.Devices, err)
 		}
@@ -2516,6 +2516,11 @@ func TestD1OwnProbeEnrollUsesOneStatement(t *testing.T) {
 	if calls.queries != 1 || calls.batches != 0 {
 		t.Fatalf("EnrollOwnProbe used %d sequential D1 calls and %d batches, want one UPDATE RETURNING", calls.queries, calls.batches)
 	}
+}
+
+// The extra groups of a person on D1: the same proof as on SQLite (extra_group_test.go).
+func TestD1ExtraGroups(t *testing.T) {
+	extraGroupStoreProof(t, openD1Store)
 }
 
 func TestD1RelaysStorage(t *testing.T) {

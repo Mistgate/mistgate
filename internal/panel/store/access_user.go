@@ -29,8 +29,12 @@ type AccessUser struct {
 	LastNodeID                                       string
 	CreatedAt                                        time.Time
 	NodeIDs                                          []string // rows of user_node; meaningful while AllNodes is false
-	DNSPresetID                                      string   // "" = inherit (group, then the instance default)
-	GroupDNSPresetID                                 string   // the user's group's preset, read-only here ("" = none)
+	// ExtraGroupIDs are the person's extra groups (user_extra_group), ordered by id; GroupID is the main one and never among them.
+	// They only add access (see AccessGroups). Every reader of a whole person fills them: User, UsersByIDs, ListUsers,
+	// UserByTokenHash, AWGDeviceScope and RelayAudienceUsers.
+	ExtraGroupIDs    []string
+	DNSPresetID      string // "" = inherit (group, then the instance default)
+	GroupDNSPresetID string // the user's group's preset, read-only here ("" = none)
 
 	// AppMistgateOff is the Mistgate app switch of the person, stored as "off" so that the zero value (a row nobody touched) keeps
 	// what the person had before the switch existed: the app works while the subscription link (AppHapp) is on.
@@ -272,7 +276,25 @@ func (a Access) RelayAudienceUsers(ctx context.Context, nodeIDs []string) ([]Acc
 		out = append(out, u)
 	}
 	rows.Close()
-	if err := rows.Err(); err != nil || len(out) == 0 || len(nodeIDs) == 0 {
+	if err := rows.Err(); err != nil || len(out) == 0 {
+		return out, err
+	}
+	xrows, err := a.s.R.QueryContext(ctx, `SELECT user_id, group_id FROM user_extra_group ORDER BY group_id`)
+	if err != nil {
+		return nil, err
+	}
+	for xrows.Next() {
+		var userID, groupID string
+		if err := xrows.Scan(&userID, &groupID); err != nil {
+			xrows.Close()
+			return nil, err
+		}
+		if i, ok := idx[userID]; ok {
+			out[i].ExtraGroupIDs = append(out[i].ExtraGroupIDs, groupID)
+		}
+	}
+	xrows.Close()
+	if err := xrows.Err(); err != nil || len(nodeIDs) == 0 {
 		return out, err
 	}
 	nrows, err := a.s.R.QueryContext(ctx, `SELECT user_id, node_id FROM user_node
@@ -324,17 +346,18 @@ func (a Access) RelayStaticAWGDeviceCounts(ctx context.Context, profileIDs []str
 // UserByTokenHash finds the user of a subscription token hash (sha256), or ErrNotFound.
 func (a Access) UserByTokenHash(ctx context.Context, hash []byte) (AccessUser, error) {
 	var user AccessUser
-	var nodeIDs []string
+	var nodeIDs, extraGroupIDs []string
 	r := reads{}
 	r.add(maybeOneRow(&user, scanAccessUser), `SELECT `+accUserCols+accUserFrom+`WHERE u.sub_token_hash = ?`, hash)
 	r.add(appendRows(&nodeIDs, scanString), `SELECT node_id FROM user_node WHERE user_id = (SELECT id FROM user WHERE sub_token_hash = ?) ORDER BY node_id`, hash)
+	r.add(appendRows(&extraGroupIDs, scanString), `SELECT group_id FROM user_extra_group WHERE user_id = (SELECT id FROM user WHERE sub_token_hash = ?) ORDER BY group_id`, hash)
 	if err := r.run(ctx, a.s); err != nil {
 		return AccessUser{}, err
 	}
 	if user.ID == "" {
 		return AccessUser{}, ErrNotFound
 	}
-	user.NodeIDs = nodeIDs
+	user.NodeIDs, user.ExtraGroupIDs = nodeIDs, extraGroupIDs
 	return user, nil
 }
 
@@ -402,7 +425,23 @@ func (a Access) collectUsers(ctx context.Context, rows *sql.Rows) ([]AccessUser,
 		}
 		out[idx[uid]].NodeIDs = append(out[idx[uid]].NodeIDs, nid)
 	}
-	return out, nrows.Err()
+	if err := nrows.Err(); err != nil {
+		return nil, err
+	}
+	xrows, err := a.s.R.QueryContext(ctx,
+		`SELECT user_id, group_id FROM user_extra_group WHERE user_id IN (SELECT value FROM json_each(?)) ORDER BY group_id`, accJSON(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer xrows.Close()
+	for xrows.Next() {
+		var uid, gid string
+		if err := xrows.Scan(&uid, &gid); err != nil {
+			return nil, err
+		}
+		out[idx[uid]].ExtraGroupIDs = append(out[idx[uid]].ExtraGroupIDs, gid)
+	}
+	return out, xrows.Err()
 }
 
 // AccessUserQuery is a list request. Filter is "", "online", "expiring", "over_quota", "over_device_limit" or "telegram".
@@ -537,13 +576,17 @@ func accUserListQuery(q AccessUserQuery, base string, baseArgs []any, lconds str
 	return query, queryArgs
 }
 
+// accGroupMemberCond is the list filter "a member of the group" (two placeholders, both the group id): the main group or an extra
+// one, each person once.
+const accGroupMemberCond = `u.id IN (SELECT id FROM user WHERE group_id = ? UNION SELECT user_id FROM user_extra_group WHERE group_id = ?)`
+
 // ListUsers returns one page in the requested total order (up to Limit users plus a flag telling whether more
 // follow) and the chip counts. LIKE is case-insensitive for ASCII only.
 func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser, bool, AccessUserCounts, error) {
 	conds, args := []string{"1 = 1"}, []any{}
 	if q.GroupID != "" {
-		conds = append(conds, "u.group_id = ?")
-		args = append(args, q.GroupID)
+		conds = append(conds, accGroupMemberCond)
+		args = append(args, q.GroupID, q.GroupID)
 	}
 	if q.Query != "" {
 		conds = append(conds, `(u.name LIKE ? ESCAPE '\' OR g.name LIKE ? ESCAPE '\')`)
@@ -623,10 +666,32 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 	return users, more, counts, nil
 }
 
+// AccessGroupChange is what UpdateUser does to a person's extra groups: it adds the groups of Add and removes the groups of
+// Remove (ids), as deltas on the rows that are stored when the batch runs, so two changes made at once do not lose each other
+// and a repeat does nothing. An id of Add that is the person's main group (as stored when the batch runs) is not added.
+type AccessGroupChange struct{ Add, Remove []string }
+
+// accExtraGroupStmts are the statements that keep user_extra_group right after user.group_id was written for userID: the
+// person's main group is never among their extra groups, then the change. The one place that holds that invariant for
+// UpdateUser; DeleteGroup holds it for the people it moves.
+func accExtraGroupStmts(userID string, change AccessGroupChange) []Stmt {
+	stmts := []Stmt{{Query: `DELETE FROM user_extra_group WHERE user_id = ?1 AND group_id = (SELECT group_id FROM user WHERE id = ?1)`, Args: []any{userID}}}
+	for _, id := range change.Remove {
+		stmts = append(stmts, Stmt{Query: `DELETE FROM user_extra_group WHERE user_id = ? AND group_id = ?`, Args: []any{userID, id}})
+	}
+	for _, id := range change.Add {
+		stmts = append(stmts, Stmt{Query: `INSERT OR IGNORE INTO user_extra_group (user_id, group_id)
+			SELECT ?1, ?2 WHERE NOT EXISTS (SELECT 1 FROM user WHERE id = ?1 AND group_id = ?2)`, Args: []any{userID, id}})
+	}
+	return stmts
+}
+
 // UpdateUser writes every admin-editable column of u (matched by ID) and its status. setNodes also
-// replaces the explicit node list with u.NodeIDs. Usage counters are left alone (the fleet increments them).
+// replaces the explicit node list with u.NodeIDs. Usage counters are left alone (the fleet increments them). The main group
+// is u.GroupID; the extra groups change by change only (u.ExtraGroupIDs is not written), and the group that becomes the main
+// one leaves them in the same batch.
 // ErrAccessExists on a name clash, ErrNotFound when the user, group or a node does not exist.
-func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool) error {
+func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool, change AccessGroupChange) error {
 	stmts := []Stmt{
 		guard(`EXISTS (SELECT 1 FROM user WHERE id = ?)`, u.ID),
 		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, app_telegram = ?, app_trusttunnel = ?, app_mistgate_off = ?, all_nodes = ?,
@@ -636,6 +701,7 @@ func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool) err
 			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AppTrustTunnel)), int64(accBool(u.AppMistgateOff)), int64(accBool(u.AllNodes)),
 				int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps), accNullStr(u.DNSPresetID), u.ID}},
 	}
+	stmts = append(stmts, accExtraGroupStmts(u.ID, change)...)
 	if setNodes {
 		stmts = append(stmts, accSetUserNodeStmts(u.ID, u.NodeIDs)...)
 	}
@@ -767,9 +833,10 @@ type SubscriptionData struct {
 	TrustTunnelCred AccessCred
 	// LinkMode is the stored mode of the device limit (LinkModeTrack, LinkModeEnforce or LinkModeStrict), read in the same batch.
 	// Blocked: the owner blocked the HWID this request reports (always false for a request without one).
-	LinkMode  string
-	Blocked   bool
-	Group     AccessGroup
+	LinkMode string
+	Blocked  bool
+	// Groups are the person's groups, the main one first; read for an active user only.
+	Groups    AccessGroups
 	Inbounds  []AccessInboundFull
 	LiveNodes []NodeLiveRow
 	// Relays are the relays that are switched on, with both ends (a person's twin servers follow them, access.relayUsable); read
@@ -951,7 +1018,7 @@ func scanLinkDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) 
 
 // SubscriptionData reads everything a subscription view needs in one read batch. hwidHash selects the request's own device
 // (SubscriptionData.Device): nil for an app that sends no HWID.
-func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool, now time.Time, hwidHash []byte) (SubscriptionData, error) {
+func (a Access) SubscriptionData(ctx context.Context, userID string, since time.Time, active bool, now time.Time, hwidHash []byte) (SubscriptionData, error) {
 	var traffic subscriptionTraffic
 	var devices []AccessDevice
 	var awgDevices []AccessAWGDevice
@@ -959,9 +1026,8 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var specialKeys []AccessCred
 	var mode string
 	var blocked int
-	var group AccessGroup
-	var groupProfileIDs []string
-	var groupDisabledNodeIDs []string
+	var groups []AccessGroup
+	var groupProfileIDs, groupDisabledNodeIDs []groupItem
 	var inbounds []AccessInboundFull
 	var liveNodes []NodeLiveRow
 	var relays []RelayLink
@@ -989,10 +1055,11 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		r.add(oneRow(&blocked, scanCount), `SELECT count(*) AS n FROM device WHERE user_id = ? AND hwid_hash = ? AND blocked_at IS NOT NULL`, userID, hwidHash)
 	}
 	if active {
-		r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
-			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, groupID)
-		r.add(appendRows(&groupProfileIDs, scanString), `SELECT profile_id FROM user_group_profile WHERE group_id = ? ORDER BY profile_id`, groupID)
-		r.add(appendRows(&groupDisabledNodeIDs, scanString), `SELECT node_id FROM user_group_disabled_node WHERE group_id = ? ORDER BY node_id`, groupID)
+		r.add(appendRows(&groups, scanAccessGroup), `SELECT g.id, g.name, g.created_at, 0 AS user_count,
+			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id IN (`+accUserGroupIDs("?1")+`)
+			ORDER BY g.id = (SELECT group_id FROM user WHERE id = ?1) DESC, g.name, g.id`, userID)
+		r.add(appendRows(&groupProfileIDs, scanGroupItem), `SELECT group_id, profile_id FROM user_group_profile WHERE group_id IN (`+accUserGroupIDs("?1")+`) ORDER BY profile_id`, userID)
+		r.add(appendRows(&groupDisabledNodeIDs, scanGroupItem), `SELECT group_id, node_id FROM user_group_disabled_node WHERE group_id IN (`+accUserGroupIDs("?1")+`) ORDER BY node_id`, userID)
 		r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
@@ -1023,7 +1090,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		}
 	}
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Relays: relays, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
+		Inbounds: inbounds, LiveNodes: liveNodes, Relays: relays, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
 		TelegramCred: telegram, TrustTunnelCred: trustTunnel,
 		LinkMode: LinkModeOf(mode), Blocked: blocked > 0}
 	if len(online) > 0 {
@@ -1033,8 +1100,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		}
 	}
 	if active {
-		out.Group.ProfileIDs = groupProfileIDs
-		out.Group.DisabledNodeIDs = groupDisabledNodeIDs
+		out.Groups = groupsWithLists(groups, groupProfileIDs, groupDisabledNodeIDs)
 	}
 	return out, nil
 }
@@ -1257,25 +1323,41 @@ type AccessDesiredCred struct {
 // and take them again when it is switched on. The credentials themselves are kept. Needs u (user) and d (device) in scope.
 const accMistgateAppOn = `(d.key_hash IS NULL OR u.app_mistgate_off = 0)`
 
-// accGroupGetsNode is GroupGetsNode in SQL: needs u (user) and i (inbound) in scope.
-const accGroupGetsNode = `NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)`
+// accUserInGroup says that the person u is a member of the group of gp (a user_group_profile row): the main group or an extra one.
+const accUserInGroup = `(u.group_id = gp.group_id OR EXISTS (SELECT 1 FROM user_extra_group x WHERE x.user_id = u.id AND x.group_id = gp.group_id))`
 
-// DesiredCreds returns the candidate credentials of every enabled inbound of a node.
-func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
-	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.device_speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia, u.app_telegram, u.app_trusttunnel, CAST(d.key_hash IS NOT NULL AS INTEGER)
-		 FROM inbound i
+// accGroupGetsNode is GroupGetsNode in SQL, for the group of gp (a user_group_profile row): needs gp and i (inbound) in scope.
+const accGroupGetsNode = `NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = gp.group_id AND gd.node_id = i.node_id)`
+
+// accDesiredCredsSQL lists the candidate credentials of every enabled inbound of the node (?1). granted holds the pairs (inbound,
+// person) that a group of the person gives, each pair once whatever the number of groups that give it, so that a credential
+// is never listed twice for one inbound.
+const accDesiredCredsSQL = `WITH granted(inbound_id, user_id) AS MATERIALIZED (
+			SELECT i.id, u.id FROM inbound i
+			JOIN user_group_profile gp ON gp.profile_id = i.profile_id
+			JOIN user u ON u.group_id = gp.group_id
+			WHERE i.node_id = ?1 AND i.enabled = 1 AND ` + accGroupGetsNode + `
+			UNION
+			SELECT i.id, x.user_id FROM inbound i
+			JOIN user_group_profile gp ON gp.profile_id = i.profile_id
+			JOIN user_extra_group x ON x.group_id = gp.group_id
+			WHERE i.node_id = ?1 AND i.enabled = 1 AND ` + accGroupGetsNode + `
+		 )
+		 SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.device_speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia, u.app_telegram, u.app_trusttunnel, CAST(d.key_hash IS NOT NULL AS INTEGER)
+		 FROM granted g
+		 JOIN inbound i ON i.id = g.inbound_id
 		 JOIN profile p ON p.id = i.profile_id
-		 JOIN user_group_profile gp ON gp.profile_id = p.id
-		 JOIN user u ON u.group_id = gp.group_id AND u.status = 'active'
+		 CROSS JOIN user u ON u.id = g.user_id AND u.status = 'active'
 		      AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = i.node_id))
 		 JOIN device_credential c ON c.user_id = u.id AND c.protocol = p.protocol AND c.revoked_at IS NULL
 		      AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
-		 WHERE i.node_id = ? AND i.enabled = 1
-		   AND `+accGroupGetsNode+`
-		   AND `+accMistgateAppOn+`
-		 ORDER BY i.id, c.id`, nodeID)
+		 WHERE ` + accMistgateAppOn + `
+		 ORDER BY i.id, c.id`
+
+// DesiredCreds returns the candidate credentials of every enabled inbound of a node.
+func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
+	rows, err := a.s.R.QueryContext(ctx, accDesiredCredsSQL, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -1296,24 +1378,26 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 	return out, rows.Err()
 }
 
-// HasUserCredentialOnNode checks the desired-access joins for one user without building the node's full credential list.
-func (a Access) HasUserCredentialOnNode(ctx context.Context, nodeID, userID string) (bool, error) {
-	var found bool
-	err := a.s.R.QueryRowContext(ctx,
-		`SELECT EXISTS (
+// accHasCredentialSQL is the desired-access joins for one user (?2) on one node (?1).
+const accHasCredentialSQL = `SELECT EXISTS (
 			SELECT 1
 			FROM inbound i
 			JOIN profile p ON p.id = i.profile_id
 			JOIN user_group_profile gp ON gp.profile_id = p.id
-			JOIN user u ON u.id = ? AND u.group_id = gp.group_id AND u.status = 'active'
+			JOIN user u ON u.id = ?2 AND ` + accUserInGroup + ` AND u.status = 'active'
 			     AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = i.node_id))
 			JOIN device_credential c ON c.user_id = u.id AND c.protocol = p.protocol AND c.revoked_at IS NULL
 			     AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
 			JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
-			WHERE i.node_id = ? AND i.enabled = 1
-			  AND `+accGroupGetsNode+`
-			  AND `+accMistgateAppOn+`
-		)`, userID, nodeID).Scan(&found)
+			WHERE i.node_id = ?1 AND i.enabled = 1
+			  AND ` + accGroupGetsNode + `
+			  AND ` + accMistgateAppOn + `
+		)`
+
+// HasUserCredentialOnNode checks the desired-access joins for one user without building the node's full credential list.
+func (a Access) HasUserCredentialOnNode(ctx context.Context, nodeID, userID string) (bool, error) {
+	var found bool
+	err := a.s.R.QueryRowContext(ctx, accHasCredentialSQL, nodeID, userID).Scan(&found)
 	return found, err
 }
 

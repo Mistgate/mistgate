@@ -437,7 +437,7 @@ func TestUpdateUserRaceKeepsUniqueName(t *testing.T) {
 			}
 			u.Name = "Shared"
 			<-start
-			results <- a.UpdateUser(ctx, u, false)
+			results <- a.UpdateUser(ctx, u, false, AccessGroupChange{})
 		}(id)
 	}
 	close(start)

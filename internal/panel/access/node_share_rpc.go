@@ -45,18 +45,34 @@ func (s *Service) SetNodeSharing(ctx context.Context, req *connect.Request[admin
 	}
 	// what each group does after the change; ALL and NONE name no group
 	resp := &adminv1.SetNodeSharingResponse{Mode: m.Mode}
+	willGet := func(g store.AccessGroup) bool {
+		return choice.Mode == store.ShareAll || slices.Contains(choice.GroupIDs, g.ID)
+	}
 	for _, g := range groups {
-		was, will := g.GetsNode(m.NodeId), choice.Mode == store.ShareAll || slices.Contains(choice.GroupIDs, g.ID)
-		people := uint32(audience[g.ID])
+		if willGet(g) {
+			resp.GroupIds = append(resp.GroupIds, g.ID)
+		}
+	}
+	// a person is counted once, whatever the number of their groups: they have the node when one of their groups gets it
+	byID := make(map[string]store.AccessGroup, len(groups))
+	for _, g := range groups {
+		byID[g.ID] = g
+	}
+	for _, ids := range audience {
+		var was, will bool
+		for _, id := range ids {
+			if g, ok := byID[id]; ok {
+				was, will = was || g.GetsNode(m.NodeId), will || willGet(g)
+			}
+		}
 		switch {
 		case will:
-			resp.GroupIds = append(resp.GroupIds, g.ID)
-			resp.PeopleReceiving += people
+			resp.PeopleReceiving++
 			if !was {
-				resp.PeopleGain += people
+				resp.PeopleGain++
 			}
 		case was:
-			resp.PeopleLose += people
+			resp.PeopleLose++
 		}
 	}
 	if m.DryRun {

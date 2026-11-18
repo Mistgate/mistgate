@@ -259,7 +259,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		}, `SELECT c.id, c.user_id, c.device_id, c.protocol, u.speed_limit_bps, u.device_speed_limit_bps,
 				(EXISTS (SELECT 1 FROM inbound i
 					JOIN profile p ON p.id = i.profile_id AND p.protocol = c.protocol AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
-					JOIN user_group_profile gp ON gp.profile_id = p.id AND gp.group_id = u.group_id
+					JOIN user_group_profile gp ON gp.profile_id = p.id AND `+accUserInGroup+`
 					WHERE i.node_id = ?1 AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = ?1)))
 				OR EXISTS (SELECT 1 FROM traffic_bucket t WHERE t.user_id = c.user_id AND t.node_id = ?1 AND t.protocol = c.protocol AND t.hour_start >= ?2)) AS on_node
 			FROM device_credential c JOIN user u ON u.id = c.user_id

@@ -134,7 +134,7 @@ func TestAWGPathCredentialsDoNotChangeDeviceViews(t *testing.T) {
 		t.Fatalf("path credentials changed device views:\nbefore: %+v\nafter:  %+v", before, after)
 	}
 
-	data, err := s.Access().SubscriptionData(ctx, "usr_alice", "grp_alice", linkNow, false, linkNow, nil)
+	data, err := s.Access().SubscriptionData(ctx, "usr_alice", linkNow, false, linkNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

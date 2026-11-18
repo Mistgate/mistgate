@@ -51,7 +51,7 @@ func TestSubscriptionReportsCapacityUtilization(t *testing.T) {
 	e.sql(`UPDATE node_live SET devices = ? WHERE node_id = ?`, string(devices), f.nodeID)
 	e.sql(`UPDATE node_live SET devices = ? WHERE node_id = 'nod_nl1'`, `{"`+foreign+`":1}`)
 	user := must(e.st.Access().User(e.ctx, created.Id))
-	data, err := e.st.Access().SubscriptionData(e.ctx, user.ID, user.GroupID, user.PeriodStart, true, e.clock, nil)
+	data, err := e.st.Access().SubscriptionData(e.ctx, user.ID, user.PeriodStart, true, e.clock, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

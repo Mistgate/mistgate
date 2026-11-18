@@ -741,9 +741,10 @@ type AccessAWGDevice struct {
 
 // AccessAWGDeviceScope is the read-only state needed to render one device's configs.
 type AccessAWGDeviceScope struct {
-	Device   AccessAWGDevice
-	User     AccessUser
-	Group    AccessGroup
+	Device AccessAWGDevice
+	User   AccessUser
+	// Groups are the person's groups, the main one first.
+	Groups   AccessGroups
 	Profile  AccessProfile
 	Inbounds []AccessInboundFull
 	// Relays are the relays that are on, and PathCreds the live extra-path keys of the device (path <> ''), read in the same batch:
@@ -845,14 +846,16 @@ func (a Access) AWGDevice(ctx context.Context, deviceID string) (AccessAWGDevice
 	return ds[0], nil
 }
 
+// awgDeviceUser is the SQL of the owner of device ?1.
+const awgDeviceUser = `(SELECT user_id FROM device WHERE id = ?1)`
+
 // AWGDeviceScope reads the device and the related user, group, profile and live inbounds in one fixed batch.
 func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGDeviceScope, error) {
 	var device awgDeviceProfile
 	var user AccessUser
-	var userNodeIDs []string
-	var group AccessGroup
-	groupProfileIDs := []string{}
-	groupDisabledNodeIDs := []string{}
+	var userNodeIDs, userExtraGroupIDs []string
+	var groups []AccessGroup
+	var groupProfileIDs, groupDisabledNodeIDs []groupItem
 	var inbounds []AccessInboundFull
 	var relays []RelayLink
 	var pathCreds []AccessCred
@@ -871,11 +874,13 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.id = ?`, deviceID)
 	r.add(oneRow(&user, scanAccessUser), `SELECT `+accUserCols+accUserFrom+`WHERE u.id = (SELECT user_id FROM device WHERE id = ?)`, deviceID)
 	r.add(appendRows(&userNodeIDs, scanString), `SELECT node_id FROM user_node WHERE user_id = (SELECT user_id FROM device WHERE id = ?) ORDER BY node_id`, deviceID)
-	r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
+	r.add(appendRows(&userExtraGroupIDs, scanString), `SELECT group_id FROM user_extra_group WHERE user_id = `+awgDeviceUser+` ORDER BY group_id`, deviceID)
+	r.add(appendRows(&groups, scanAccessGroup), `SELECT g.id, g.name, g.created_at, 0 AS user_count,
 			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color
-			FROM user_group g WHERE g.id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?))`, deviceID)
-	r.add(appendRows(&groupProfileIDs, scanString), `SELECT profile_id FROM user_group_profile WHERE group_id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?)) ORDER BY profile_id`, deviceID)
-	r.add(appendRows(&groupDisabledNodeIDs, scanString), `SELECT node_id FROM user_group_disabled_node WHERE group_id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?)) ORDER BY node_id`, deviceID)
+			FROM user_group g WHERE g.id IN (`+accUserGroupIDs(awgDeviceUser)+`)
+			ORDER BY g.id = (SELECT group_id FROM user WHERE id = `+awgDeviceUser+`) DESC, g.name, g.id`, deviceID)
+	r.add(appendRows(&groupProfileIDs, scanGroupItem), `SELECT group_id, profile_id FROM user_group_profile WHERE group_id IN (`+accUserGroupIDs(awgDeviceUser)+`) ORDER BY profile_id`, deviceID)
+	r.add(appendRows(&groupDisabledNodeIDs, scanGroupItem), `SELECT group_id, node_id FROM user_group_disabled_node WHERE group_id IN (`+accUserGroupIDs(awgDeviceUser)+`) ORDER BY node_id`, deviceID)
 	r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' AND i.profile_id = (
@@ -887,10 +892,8 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 	if err := r.run(ctx, a.s); err != nil {
 		return AccessAWGDeviceScope{}, err
 	}
-	user.NodeIDs = userNodeIDs
-	group.ProfileIDs = groupProfileIDs
-	group.DisabledNodeIDs = groupDisabledNodeIDs
-	return AccessAWGDeviceScope{Device: device.Device, User: user, Group: group, Profile: device.Profile, Inbounds: inbounds,
+	user.NodeIDs, user.ExtraGroupIDs = userNodeIDs, userExtraGroupIDs
+	return AccessAWGDeviceScope{Device: device.Device, User: user, Groups: groupsWithLists(groups, groupProfileIDs, groupDisabledNodeIDs), Profile: device.Profile, Inbounds: inbounds,
 		Relays: relays, PathCreds: pathCreds}, nil
 }
 
@@ -963,15 +966,16 @@ func (a Access) ProfileLiveAWG(ctx context.Context, profileID string, limit int)
 	return n, users, rows.Err()
 }
 
-// AWGDevicesPerProfile counts the live explicit AWG devices (AmneziaVPN keys) per profile, of the users of a group
-// (groupID) or of one user (userID); the other argument is "".
+// AWGDevicesPerProfile counts the live explicit AWG devices (AmneziaVPN keys) per profile, of the members of a group (groupID:
+// the main group or an extra one) or of one user (userID); the other argument is "".
 func (a Access) AWGDevicesPerProfile(ctx context.Context, groupID, userID string) (map[string]int, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT c.profile_id, count(*) FROM device_credential c
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.kind = 'key'
 		 JOIN user u ON u.id = c.user_id
-		 WHERE c.path = '' AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND (? = '' OR u.group_id = ?) AND (? = '' OR u.id = ?)
-		 GROUP BY c.profile_id`, groupID, groupID, userID, userID)
+		 WHERE c.path = '' AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND (?1 = '' OR u.group_id = ?1 OR EXISTS (SELECT 1 FROM user_extra_group x WHERE x.user_id = u.id AND x.group_id = ?1))
+		   AND (?2 = '' OR u.id = ?2)
+		 GROUP BY c.profile_id`, groupID, userID)
 	if err != nil {
 		return nil, err
 	}

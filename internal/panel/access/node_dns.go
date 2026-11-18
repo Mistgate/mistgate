@@ -112,14 +112,14 @@ func dnsSig(servers []string) string {
 // markDNSStale sets DNSStale of AWG devices of the person u: the nodes where the DNS that applies now is not the one the key
 // was issued with. Whatever changed it counts (the person's pick or its removal, the owner's offer or default, an edited
 // or deleted preset). A key with nothing recorded, or on a node the person no longer uses, is not stale.
-func (s *Service) markDNSStale(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, n *nodeDNS, devs []store.AccessAWGDevice) {
+func (s *Service) markDNSStale(u store.AccessUser, gs store.AccessGroups, full []store.AccessInboundFull, n *nodeDNS, devs []store.AccessAWGDevice) {
 	now := map[string]string{} // node id -> the pair that applies to the person now ("" = unknown)
 	for i := range devs {
 		d := &devs[i]
 		d.DNSStale = nil
 		for _, f := range full {
 			held, ok := d.DNSSig[f.Node.ID]
-			if !ok || f.Profile.ID != d.ProfileID || !s.usable(f, g, u) || slices.Contains(d.DNSStale, f.Node.ID) {
+			if !ok || f.Profile.ID != d.ProfileID || !s.usable(f, gs, u) || slices.Contains(d.DNSStale, f.Node.ID) {
 				continue
 			}
 			cur, seen := now[f.Node.ID]
@@ -256,7 +256,7 @@ func (s *Service) SetPageDNS(ctx context.Context, userID string, c PageDNSChoice
 	if c.Link {
 		return s.setLinkDNS(ctx, u, c.PresetID)
 	}
-	g, err := a.Group(ctx, u.GroupID)
+	gs, err := a.UserGroups(ctx, u)
 	if err != nil {
 		return s.internal("get group", err)
 	}
@@ -266,7 +266,7 @@ func (s *Service) SetPageDNS(ctx context.Context, userID string, c PageDNSChoice
 	}
 	var node *store.AccessNode
 	for _, f := range full {
-		if f.Node.ID == c.NodeID && s.usable(f, g, u) {
+		if f.Node.ID == c.NodeID && s.usable(f, gs, u) {
 			node = &f.Node
 			break
 		}

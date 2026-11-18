@@ -541,7 +541,7 @@ func TestEnsureImplicitAWGCredsConcurrentSameUserCommitsBothProfiles(t *testing.
 		t.Fatalf("outer call returned %+v after the concurrent call committed both profiles", result)
 	}
 
-	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_multi", now, true, now, nil)
+	data, err := s.Access().SubscriptionData(ctx, userID, now, true, now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -598,7 +598,7 @@ func TestEnsureImplicitAWGCredsReturnsFullLiveSetAfterWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := s.Access().SubscriptionData(ctx, userID, "grp_implicit_live_set", now, true, now, nil)
+	data, err := s.Access().SubscriptionData(ctx, userID, now, true, now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -864,11 +864,11 @@ func TestAWGDeviceScopeAndConfigRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if scope.Device.ID != "dev_scope" || scope.User.ID != u.ID || scope.Group.ID != "grp_scope" || scope.Profile.ID != profile {
-		t.Fatalf("scope identifiers = device %q user %q group %q profile %q", scope.Device.ID, scope.User.ID, scope.Group.ID, scope.Profile.ID)
+	if scope.Device.ID != "dev_scope" || scope.User.ID != u.ID || len(scope.Groups) != 1 || scope.Groups[0].ID != "grp_scope" || scope.Profile.ID != profile {
+		t.Fatalf("scope identifiers = device %q user %q groups %v profile %q", scope.Device.ID, scope.User.ID, scope.Groups, scope.Profile.ID)
 	}
-	if len(scope.Group.ProfileIDs) != 1 || scope.Group.ProfileIDs[0] != profile || len(scope.Inbounds) != 1 {
-		t.Fatalf("group profiles = %v, inbounds = %d", scope.Group.ProfileIDs, len(scope.Inbounds))
+	if len(scope.Groups[0].ProfileIDs) != 1 || scope.Groups[0].ProfileIDs[0] != profile || len(scope.Inbounds) != 1 {
+		t.Fatalf("group profiles = %v, inbounds = %d", scope.Groups[0].ProfileIDs, len(scope.Inbounds))
 	}
 
 	sig := map[string]string{"nod_scope": "1.1.1.1|2606:4700:4700::1111"}

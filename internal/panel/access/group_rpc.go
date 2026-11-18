@@ -193,12 +193,12 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 	var impact *adminv1.AccessImpact
 	if profiles != nil {
 		awg := map[string]int{}
-		if before.UserCount > 0 {
+		if before.UserCount+before.ExtraUserCount > 0 {
 			if awg, err = a.AWGDevicesPerProfile(ctx, before.ID, ""); err != nil {
 				return nil, s.internal("awg devices", err)
 			}
 		}
-		if impact, err = s.impactOf(ctx, before.ProfileIDs, *profiles, before.UserCount, awg); err != nil {
+		if impact, err = s.impactOf(ctx, before.ProfileIDs, *profiles, before.UserCount+before.ExtraUserCount, awg); err != nil {
 			return nil, err
 		}
 	}
@@ -217,7 +217,7 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 		if got, err = a.Group(ctx, m.GroupId); err != nil {
 			return nil, s.internal("get group", err)
 		}
-		if got.UserCount > 0 && (!slices.Equal(before.ProfileIDs, got.ProfileIDs) || !slices.Equal(before.DisabledNodeIDs, got.DisabledNodeIDs)) {
+		if got.UserCount+got.ExtraUserCount > 0 && (!slices.Equal(before.ProfileIDs, got.ProfileIDs) || !slices.Equal(before.DisabledNodeIDs, got.DisabledNodeIDs)) {
 			s.notify.StateChanged() // the users of the group gained or lost access
 		}
 		s.audit(ctx, actor(ctx), "group_update", map[string]any{"group": got.ID, "name": got.Name, "disabled_nodes": got.DisabledNodeIDs})
@@ -236,7 +236,7 @@ func groupUpdateUserChangeCount(before store.AccessGroup, profiles, disabledNode
 	}
 	if profiles != nil && !slices.Equal(before.ProfileIDs, *profiles) ||
 		disabledNodeIDs != nil && !slices.Equal(before.DisabledNodeIDs, *disabledNodeIDs) {
-		return before.UserCount
+		return before.UserCount + before.ExtraUserCount
 	}
 	return 0
 }
@@ -251,9 +251,10 @@ func (s *Service) DeleteGroup(ctx context.Context, req *connect.Request[adminv1.
 	if err != nil {
 		return nil, groupErr(s, "get group", err)
 	}
-	asked := 0
+	// the people it moves (the ones that have it as their main group) and the ones that just leave it (extra group) are asked for
+	asked := g.ExtraUserCount
 	if m.MoveUsersTo != "" {
-		asked = g.UserCount
+		asked += g.UserCount
 	}
 	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.GroupServiceDeleteGroupProcedure, asked)
 	if err != nil {
@@ -267,8 +268,9 @@ func (s *Service) DeleteGroup(ctx context.Context, req *connect.Request[adminv1.
 		return nil, groupErr(s, "delete group", err)
 	}
 	reservation.markTouched(asked)
-	// DeleteGroup may move a user created after the count was read, so notify from the move request rather than g.UserCount.
-	if m.MoveUsersTo != "" {
+	// DeleteGroup may move a user created after the count was read, so notify from the move request rather than g.UserCount; the
+	// people that had it as an extra group lose what it gave them.
+	if m.MoveUsersTo != "" || g.ExtraUserCount > 0 {
 		s.notify.StateChanged()
 	}
 	s.audit(ctx, actor(ctx), "group_delete", map[string]any{"group": m.GroupId, "name": g.Name})

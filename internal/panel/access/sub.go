@@ -383,7 +383,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	if opt.EnrolledDevice != nil {
 		hash = slices.Clone(opt.EnrolledDevice.HWIDHash)
 	}
-	data, err := a.SubscriptionData(ctx, u.ID, u.GroupID, u.PeriodStart, v.Status == StatusActive, now, hash)
+	data, err := a.SubscriptionData(ctx, u.ID, u.PeriodStart, v.Status == StatusActive, now, hash)
 	if err != nil {
 		return SubView{}, err
 	}
@@ -466,12 +466,12 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 
 	rd := requestDevice{dev: data.Device, creds: data.DeviceCreds, hash: hash}
-	g, full := data.Group, data.Inbounds
+	gs, full := data.Groups, data.Inbounds
 	format := opt.Format
 	if format == "" {
 		format = plugin.FormatURIList
 	}
-	relaysOf := s.subRelays(data.Relays, full, g, u, format)
+	relaysOf := s.subRelays(data.Relays, full, gs, u, format)
 	if touch && opt.EnrolledDevice != nil {
 		// The client API's device, known by its key: the one place where the credentials of an enrolled device are issued.
 		// The basic path below refuses such a device by design, so it is never reached from here.
@@ -480,7 +480,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			return v, nil
 		}
 		wasIdle := rd.dev.Idle && len(rd.dev.Protocols) > 0
-		rd, err = s.ensureClientAPICreds(ctx, u, g, full, relaysOf, opt, rd)
+		rd, err = s.ensureClientAPICreds(ctx, u, gs, full, relaysOf, opt, rd)
 		if err != nil {
 			if refusal, _ := s.refusalOf(u, err); refusal != "" {
 				v.Refusal = refusal
@@ -519,7 +519,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			}
 			changed = changed || dropped > 0
 		} else if v.Refusal == "" && opt.Format == plugin.FormatMihomo {
-			rd, v.Refusal = s.ensureMihomoAWG(ctx, u, g, full, relaysOf, opt.Device, rd, data)
+			rd, v.Refusal = s.ensureMihomoAWG(ctx, u, gs, full, relaysOf, opt.Device, rd, data)
 			changed = rd.added
 		}
 		if v.Refusal != "" {
@@ -570,7 +570,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	var networkNodeIDs []string
 	capacityMbps := map[string]int{}
 	for _, f := range full {
-		if !s.usableForFormat(f, g, u, format) {
+		if !s.usableForFormat(f, gs, u, format) {
 			continue
 		}
 		if _, exists := s.reg.Get(f.Profile.Protocol); exists {
@@ -580,7 +580,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	if u.AppTrustTunnel {
 		for _, f := range full {
-			if s.usableForFormat(f, g, u, plugin.FormatTTLink) {
+			if s.usableForFormat(f, gs, u, plugin.FormatTTLink) {
 				v.AccessTrustTunnel = true
 				break
 			}
@@ -616,7 +616,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		return &v.Nodes[i]
 	}
 	for _, f := range full {
-		if !s.usableForFormat(f, g, u, format) {
+		if !s.usableForFormat(f, gs, u, format) {
 			continue
 		}
 		proto, _ := s.reg.Get(f.Profile.Protocol)
@@ -789,7 +789,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if err != nil {
 			return SubView{}, err
 		}
-		v.TrustTunnel, err = s.trustTunnelServers(ctx, u, g, full, data.Relays, string(pt), opt)
+		v.TrustTunnel, err = s.trustTunnelServers(ctx, u, gs, full, data.Relays, string(pt), opt)
 		if err != nil {
 			return SubView{}, err
 		}
@@ -806,7 +806,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		return v, nil
 	}
 	n := dnsOf()
-	s.markDNSStale(u, g, full, n, awgDevs)
+	s.markDNSStale(u, gs, full, n, awgDevs)
 	for _, ad := range awgDevs {
 		if i := slices.IndexFunc(v.Devices, func(d SubDevice) bool { return d.ID == ad.ID }); i >= 0 && v.Devices[i].AWG != nil {
 			v.Devices[i].AWG.DNSStale = ad.DNSStale
@@ -848,11 +848,11 @@ func ipv6Egress(n store.AccessNode, exit string) bool {
 
 // subRelays are the relays that give the person a twin server, by the exit's inbound: the ones relayUsable accepts, in the
 // order of the relays. The caller drops the ones the protocol cannot carry (relayUnsupported).
-func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) map[string][]store.RelayLink {
+func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser, format plugin.ClientFormat) map[string][]store.RelayLink {
 	var out map[string][]store.RelayLink
 	for _, l := range relays {
 		i := slices.IndexFunc(full, func(f store.AccessInboundFull) bool { return f.Inbound.ID == l.InboundID })
-		if i < 0 || l.ViaNodeAddress == "" || !s.relayUsableFor(l, full[i], g, u, format) {
+		if i < 0 || l.ViaNodeAddress == "" || !s.relayUsableFor(l, full[i], gs, u, format) {
 			continue
 		}
 		if out == nil {
@@ -1065,14 +1065,14 @@ func (s *Service) placeholderSecrets(u store.AccessUser, protocolsHeld []string,
 // announced, in one guarded store batch that re-checks the device's key and the link it was enrolled under; unlike basic link
 // fetches this path is tied to the key that authorised the request. When the snapshot of the request shows nothing missing the
 // store is not called at all (nothing would be written, and the snapshot is as fresh as any basic fetch's).
-func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, relays map[string][]store.RelayLink, opt SubOptions, rd requestDevice) (requestDevice, error) {
+func (s *Service) ensureClientAPICreds(ctx context.Context, u store.AccessUser, gs store.AccessGroups, full []store.AccessInboundFull, relays map[string][]store.RelayLink, opt SubOptions, rd requestDevice) (requestDevice, error) {
 	dev := *opt.EnrolledDevice
 	dev.UserID, dev.HWIDHash = u.ID, slices.Clone(rd.hash)
 	if dev.ID == "" || len(dev.KeyHash) == 0 {
 		return rd, store.ErrNotFound
 	}
 	// AmneziaWG does not follow the owner's link switch (opt.NoLinkAWG): the app asks for it with its caps and gets it while it may.
-	want := s.awgWants(u, g, full, relays, dev.ID, func(version string) bool { return protocols.HasCapability(opt.Capabilities, "awg", version) })
+	want := s.awgWants(u, gs, full, relays, dev.ID, func(version string) bool { return protocols.HasCapability(opt.Capabilities, "awg", version) })
 	if s.enrolledDeviceComplete(u, dev, rd, want, opt.Capabilities, !u.AppMistgateOff) {
 		return rd, nil
 	}
@@ -1143,7 +1143,7 @@ func (s *Service) mistgateTrustTunnelWanted(caps []string, enabled bool) bool {
 // awgWants lists the AmneziaWG profiles the user can use, each with the way to issue its credential to deviceID. keep, when set,
 // decides by the version of a profile whether the device is to get it. A profile whose secrets cannot be opened or whose network
 // is invalid is logged and left out; the subscription itself must not fail for it.
-func (s *Service) awgWants(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, relays map[string][]store.RelayLink, deviceID string, keep func(version string) bool) []store.AWGImplicitWant {
+func (s *Service) awgWants(u store.AccessUser, gs store.AccessGroups, full []store.AccessInboundFull, relays map[string][]store.RelayLink, deviceID string, keep func(version string) bool) []store.AWGImplicitWant {
 	proto, ok := s.reg.Get(awg.ID)
 	if !ok {
 		return nil
@@ -1152,7 +1152,7 @@ func (s *Service) awgWants(u store.AccessUser, g store.AccessGroup, full []store
 	seen := map[string]bool{}
 	skipped := map[string]bool{} // profiles that are left out: logged once, not once for each of their inbounds
 	for _, f := range full {
-		if f.Profile.Protocol != awg.ID || skipped[f.Profile.ID] || !s.usable(f, g, u) {
+		if f.Profile.Protocol != awg.ID || skipped[f.Profile.ID] || !s.usable(f, gs, u) {
 			continue
 		}
 		merged, err := s.mergedSettings(f.Profile)
@@ -1215,7 +1215,7 @@ func (s *Service) awgMinClients(settings string) []protocols.ClientReq {
 // proxy is skipped; the subscription itself must not fail for it, nor for the ceiling of devices in TRACK (the shared device
 // then). The device may be born here (a person with only the AmneziaVPN access has no link credential to be born with): it
 // is refused like in ensureLinkCreds, and refusal says so.
-func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull, relays map[string][]store.RelayLink, hint DeviceHint, rd requestDevice, data store.SubscriptionData) (requestDevice, string) {
+func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, gs store.AccessGroups, full []store.AccessInboundFull, relays map[string][]store.RelayLink, hint DeviceHint, rd requestDevice, data store.SubscriptionData) (requestDevice, string) {
 	if _, ok := s.reg.Get(awg.ID); !ok {
 		return rd, ""
 	}
@@ -1225,7 +1225,7 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 	if template.ID == "" {
 		template.ID = store.NewID("dev_")
 	}
-	want := s.awgWants(u, g, full, relays, template.ID, nil)
+	want := s.awgWants(u, gs, full, relays, template.ID, nil)
 	if len(want) == 0 {
 		return rd, ""
 	}
@@ -1241,7 +1241,7 @@ func (s *Service) ensureMihomoAWG(ctx context.Context, u store.AccessUser, g sto
 		} else if fallback {
 			// No device of its own for this HWID: the shared device holds the proxies, as for an app without a HWID.
 			hint.HWID = ""
-			return s.ensureMihomoAWG(ctx, u, g, full, relays, hint, requestDevice{added: rd.added}, data)
+			return s.ensureMihomoAWG(ctx, u, gs, full, relays, hint, requestDevice{added: rd.added}, data)
 		}
 		s.log.Warn("access: cannot issue AWG credentials for a Mihomo subscription", "code", "mihomo_awg_credential_issue_failed", "user", u.ID, "err", err)
 		return rd, ""
@@ -1304,17 +1304,16 @@ func (s *Service) SetSnapshotHookForTest(hook func()) { s.snapshotHookForTest = 
 // SetTouchHookForTest observes when an asynchronous subscription touch starts and finishes.
 func (s *Service) SetTouchHookForTest(hook func(started bool)) { s.touchHookForTest = hook }
 
-// usable is the subscription half of the effective-access rule: the user's group holds the profile, the
+// usable is the subscription half of the effective-access rule: one of the user's groups holds the profile and gets the node, the
 // node is selected and live, the inbound is on and not failed, and an enabled app consumes the protocol.
-func (s *Service) usable(f store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return s.usableForFormat(f, g, u, plugin.FormatURIList)
+func (s *Service) usable(f store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser) bool {
+	return s.usableForFormat(f, gs, u, plugin.FormatURIList)
 }
 
 // usableForFormat is usable for a subscription of the given format: the Mistgate app's format also carries the protocols that
 // only that app consumes (while the person's Mistgate switch is on); every other format leaves them out.
-func (s *Service) usableForFormat(f store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
-	if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) ||
-		!g.GetsNode(f.Node.ID) || !(u.AllNodes || slices.Contains(u.NodeIDs, f.Node.ID)) {
+func (s *Service) usableForFormat(f store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser, format plugin.ClientFormat) bool {
+	if !liveInbound(f) || !gs.Gives(f.Profile.ID, f.Node.ID) || !(u.AllNodes || slices.Contains(u.NodeIDs, f.Node.ID)) {
 		return false
 	}
 	if format == plugin.FormatTTLink {
@@ -1333,10 +1332,10 @@ func liveInbound(f store.AccessInboundFull) bool {
 
 // accessOf is what the user's page offers by app (User.access_happ / access_amnezia): SubView's AccessHapp and
 // AccessAmnezia, without the status.
-func (s *Service) accessOf(u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull) (happ, amnezia, telegram, trustTunnel bool) {
+func (s *Service) accessOf(u store.AccessUser, gs store.AccessGroups, full []store.AccessInboundFull) (happ, amnezia, telegram, trustTunnel bool) {
 	for _, f := range full {
-		linkUsable := s.usable(f, g, u)
-		ttUsable := s.usableForFormat(f, g, u, plugin.FormatTTLink)
+		linkUsable := s.usable(f, gs, u)
+		ttUsable := s.usableForFormat(f, gs, u, plugin.FormatTTLink)
 		if !linkUsable && !ttUsable {
 			continue
 		}

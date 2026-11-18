@@ -675,8 +675,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 			}
 			audience := &adminv1.RelayAudience{}
 			for _, u := range active {
-				g, ok := groupOf[u.GroupID]
-				if !ok || !s.relayRecipientUsableFor(store.RelayLink{ViaNodeID: entry.ID}, f, g, u, plugin.FormatMistgate) {
+				if !s.relayRecipientUsableFor(store.RelayLink{ViaNodeID: entry.ID}, f, store.GroupsOf(u, groupOf), u, plugin.FormatMistgate) {
 					continue
 				}
 				if audience.People < ^uint32(0) {

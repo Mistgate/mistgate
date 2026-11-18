@@ -30,7 +30,7 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 	}
 	now := s.now().UTC()
 	since := now.Add(-time.Duration(store.LinkWindowHours(req.Msg.Hours)) * time.Hour)
-	g, err := a.Group(ctx, u.GroupID)
+	gs, err := a.UserGroups(ctx, u)
 	if err != nil {
 		return nil, s.internal("group", err)
 	}
@@ -43,7 +43,7 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 	links2ByNode := map[string]bool{}
 	capsByNode := map[string][]string{}
 	for _, f := range full {
-		if seen[f.Node.ID] || !s.usable(f, g, u) {
+		if seen[f.Node.ID] || !s.usable(f, gs, u) {
 			continue
 		}
 		seen[f.Node.ID] = true
