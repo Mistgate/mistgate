@@ -153,7 +153,3 @@ export interface View {
 }
 
 export const portKey = (r: PortRef) => `${r.node}\u0001${r.port}`;
-export const keyRef = (k: string): PortRef => {
-  const [node = "", port = ""] = k.split("\u0001");
-  return { node, port };
-};

@@ -112,11 +112,6 @@ export function Block({ title, flush, className, children }: { title?: ReactNode
   );
 }
 
-/** A card's last row of buttons: the main ones at the start, a destructive one (or Save) pushed to the end with `ms-auto`. */
-export function ActionBar({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 md:px-5", className)}>{children}</div>;
-}
-
 /**
  * The avatar colours of the board (UCOL): eight solid pastels, the initial in near-black. One list for the whole panel
  * (the people lists, the command palette), so a person keeps their colour everywhere.

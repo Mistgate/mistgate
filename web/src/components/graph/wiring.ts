@@ -1,5 +1,4 @@
 import type { PortRef } from "./types";
-import { portKey } from "./types";
 
 /** The keyboard wiring state machine: Enter on a port starts, Tab/arrows cycle through the valid targets, Enter connects, Esc cancels. */
 export type WiringState = { phase: "idle" } | { phase: "picking"; source: PortRef; candidates: PortRef[]; index: number };
@@ -35,7 +34,3 @@ export function wiringStep(state: WiringState, action: WiringAction): { state: W
 }
 
 export const currentTarget = (s: WiringState): PortRef | null => (s.phase === "picking" ? (s.candidates[s.index] ?? null) : null);
-export const currentTargetKey = (s: WiringState) => {
-  const t = currentTarget(s);
-  return t ? portKey(t) : null;
-};

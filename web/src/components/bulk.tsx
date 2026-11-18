@@ -1,13 +1,11 @@
 import { Menu } from "@base-ui/react/menu";
 import { Link, useBlocker } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { selectItemClass, selectPopupClass } from "@/components/ui/select";
 import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
-import { Tip } from "@/components/ui/tooltip";
 import { dirOf, useLang, useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import type { Job, Row, Skipped, Target } from "@/lib/batch";
@@ -27,25 +25,6 @@ export type MenuEntry<A extends string> = { id: A; meta: ActionMeta; avail: Avai
 
 /** A link to a row's own page: the router's `to`, its params and search. */
 export type RowLink = { to: string; params?: Record<string, string>; search?: Record<string, unknown> };
-
-/**
- * The bar and, while it shows, the room at the page's foot (so it never covers the last row): the bar itself is a portal on
- * the body, in the look of the phone's dock.
- */
-export function BulkFloat({ show, wide, region, children }: { show: boolean; wide?: boolean; region: string; children: ReactNode }) {
-  if (!show) return null;
-  return (
-    <>
-      <div aria-hidden className="h-20 flex-none" />
-      {createPortal(
-        <BulkDock wide={wide} region={region}>
-          {children}
-        </BulkDock>,
-        document.body,
-      )}
-    </>
-  );
-}
 
 /**
  * The dock's material: translucent, blurred, the dock radius and its one shadow. Floating, it sits at the foot of the
@@ -106,37 +85,6 @@ export function useNarrow(ref: RefObject<HTMLElement | null>): boolean {
 
 export const barButton =
   "inline-flex h-10 flex-none items-center gap-2 rounded-ctl px-2.5 text-[13px] font-bold whitespace-nowrap text-fg outline-none transition-[background-color,transform] duration-150 ease-out-soft hover:bg-surface-2 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-surface-2 disabled:pointer-events-none disabled:opacity-35";
-
-/** The bar's first button: clear the selection (Esc does the same). */
-export function ClearButton({ onClear }: { onClear: () => void }) {
-  const t = useT();
-  return (
-    <button type="button" aria-label={t("bulk.clear")} title={`${t("bulk.clear")} (Esc)`} onClick={onClear} className={cx(barButton, "w-10 justify-center px-0 text-muted hover:text-fg")}>
-      <Icon name="x" size={16} />
-    </button>
-  );
-}
-
-/** A direct action of the bar: its section chip, its name, how many it takes; off with the reason in a tooltip when none. */
-export function BarAction({ meta, avail, busy, count, onClick }: { meta: ActionMeta; avail: Avail; busy: boolean; count?: boolean; onClick: () => void }) {
-  const t = useT();
-  const off = busy || avail.count === 0;
-  const button = (
-    <button type="button" disabled={off} onClick={onClick} className={barButton}>
-      <IconChip icon={meta.icon} tone={meta.tone} />
-      {t(meta.label)}
-      {count && avail.count > 0 && <span className="font-mono text-xs font-medium text-muted tabular-nums">· {avail.count}</span>}
-    </button>
-  );
-  if (!off || busy || !avail.why) return button;
-  return (
-    <Tip label={avail.why}>
-      <span tabIndex={0} className="flex rounded-ctl outline-none focus-visible:ring-2 focus-visible:ring-accent">
-        {button}
-      </span>
-    </Tip>
-  );
-}
 
 /** "Check ▾" and "More ▾": they open upwards, each row its chip, its name, how many it takes, or why none. */
 export function ActionMenu<A extends string>({
