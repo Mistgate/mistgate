@@ -9,6 +9,7 @@ import { EdgeLayer, routeFor, wireInk, type RenderEdge } from "./edges";
 import { readPref, writePref } from "@/lib/storage";
 import { accumulate, glideStopped, inertiaStep, releaseVelocity, smoothStep, wheelFactor } from "./motion";
 import { GraphHelp, modKey, type HelpTab } from "./help";
+import "./graph.css";
 import { decideDrop, grabIdle, grabStep, grabTargets, handleAt, handlePoint, type End, type GrabState, type Handle } from "./reconnect";
 import { MAX_ZOOM, MIN_ZOOM, boundsOf, clamp, dragWire, fitView, nearestPoint, rectsIntersect, snapTo, zoomAround, type Rect } from "./geometry";
 import { clearOf, computeLayout, tabOrder } from "./layout";

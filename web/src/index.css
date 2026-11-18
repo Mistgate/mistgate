@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "./fonts/fonts.css";
 @import "./assets/mark-motion.css";
-@import "./components/graph/graph.css";
 @import "./screens/shell.css";
 
 /*
@@ -826,4 +825,16 @@
     opacity: 0;
     transform: translateY(4px);
   }
+}
+
+/* the switch's thumb stretches to 20px while it is pressed, and a checked one keeps its far edge where it is (pn.css .fz-sw:active i;
+   the board's rule grows it past the track by 2px, which looks like a slip) */
+[role="switch"]:active:not([data-disabled]) > span {
+  width: 1.25rem;
+}
+[role="switch"][data-checked]:active:not([data-disabled]) > span {
+  translate: 0.75rem 0;
+}
+[dir="rtl"] [role="switch"][data-checked]:active:not([data-disabled]) > span {
+  translate: -0.75rem 0;
 }
