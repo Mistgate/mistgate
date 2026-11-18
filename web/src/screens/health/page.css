@@ -1,0 +1,708 @@
+/*
+ * What the Health and Reachability pages share (screens/health/*, screens/reachability/*), in the board's own numbers (PnHealth, PnReach +
+ * pn.css: the head and tabs of the page, the card with its icon head, the pill, the dot of a state, the empty, load and error cards, the
+ * notes and the line of buttons). Every rule hangs on .hlp, the board's own class of both pages, so nothing here reaches another screen;
+ * the windows and the toast are the base components' and need none. Tokens are the product's: --border is the board's hairline, --ok is
+ * its mint "works", --accent-mark its line, --warning/--danger (-text, -soft) its warn and crit. A container query of the board (the
+ * whole panel is its container) is a media query here. Motion: the sweep and the pop of a check, the spinner and the pulse of a skeleton
+ * always play (a hand's answer); reduced motion turns them off, as on the board.
+ */
+@keyframes hlp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hlp-sweep {
+  from {
+    background-position: -80% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+@keyframes hlp-pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes hlp-skp {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes hlp-flash {
+  0%,
+  40% {
+    background: color-mix(in srgb, var(--accent-mark) 12%, transparent);
+  }
+  100% {
+    background: none;
+  }
+}
+
+/* ---- the page: a column of 16 (the board's .page); its head, its tabs ---- */
+/* L84 */
+.hlp {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* L17 */
+.hlp .mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+/* L15 */
+.hlp .i {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* L4838 */
+.hlp .sb-h {
+  margin-top: 4px;
+}
+.hlp .sb-h h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.hlp .sb-h p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--sec);
+}
+/* the tab strip is the base Tabs: the board's .nd-tabs.sb-tabs sit 20 under the head, the tab's body 20 under the strip (16 of the column's gap) */
+/* L4839-4840 */
+.hlp [role="tablist"] {
+  margin-top: 20px;
+  gap: 0;
+}
+/* L6677-6678: .sb-tabs{gap:0} button{padding:0 10px}; the line under the chosen tab stays 12 in from its edge (L1662) */
+.hlp [role="tab"] {
+  padding-inline: 10px;
+}
+.hlp [role="tabpanel"] {
+  padding-top: 36px;
+  min-width: 0;
+}
+/* L1664, L3591: every tab counter of the board carries .up-n, the later rule: the step of grey with the second text, not L1664's amber (TabLabel's tone stays the caller's word) */
+.hlp .bdg {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--step);
+  color: var(--sec);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: inherit;
+}
+
+/* ---- the card with its icon head (the board's .card.pp-sec.sb-sec) ---- */
+/* L35 */
+.hlp .card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+/* L4586-4592, L4843 */
+.hlp .pp-sec {
+  padding: 0;
+  overflow: visible;
+}
+.hlp .sb-sec {
+  padding-bottom: 4px;
+}
+.hlp .pp-sh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 12px 20px 4px;
+}
+.hlp .pp-sh h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--sec);
+}
+.hlp .pp-sh h3 .mono {
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.hlp .pp-sh > :nth-child(3) {
+  margin-inline-start: auto;
+}
+.hlp .sb-sec .pp-sh .btn {
+  margin-inline-start: auto;
+  gap: 8px;
+}
+.hlp .sb-sec .pp-sh .btn .i {
+  width: 16px;
+  height: 16px;
+}
+.hlp .pp-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--step);
+  color: var(--sec);
+}
+.hlp .pp-ic .i {
+  width: 15px;
+  height: 15px;
+}
+.hlp .pp-ic.sand {
+  background: var(--tone-sand-bg);
+  color: var(--tone-sand);
+}
+.hlp .pp-ic.sage {
+  background: var(--tone-sage-bg);
+  color: var(--tone-sage);
+}
+.hlp .pp-ic.sky {
+  background: var(--tone-sky-bg);
+  color: var(--tone-sky);
+}
+.hlp .pp-ic.mint {
+  background: var(--tone-mint-bg);
+  color: var(--ok);
+}
+.hlp .pp-ic.lav {
+  background: var(--tone-lavender-bg);
+  color: var(--tone-lavender);
+}
+.hlp .pp-ic.rose {
+  background: var(--tone-rose-bg);
+  color: var(--tone-rose);
+}
+/* L4844, L4842, L4933, L4843, L4894 */
+.hlp .sb-cnt2 {
+  margin-inline-start: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hlp .sb-lead {
+  margin: 0;
+  padding: 0 20px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.hlp .sb-emp {
+  margin: 0;
+  padding: 0 20px 12px;
+  font-size: 13px;
+  color: var(--sec);
+}
+.hlp .sb-pad {
+  padding: 0 20px 16px;
+}
+.hlp .sb-vfoot {
+  margin: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--muted);
+}
+/* L4614 */
+.hlp .pp-q1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.hlp .sb-pad > .pp-q1 + .pp-q1 {
+  margin-top: 8px;
+}
+/* L4918 */
+.hlp .sb-chev {
+  margin-inline-start: auto;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transition: transform 0.2s var(--e);
+}
+[dir="rtl"] .hlp .sb-chev {
+  transform: scaleX(-1);
+}
+/* the open row turns its chevron a quarter (L5001, L5025, L5047) */
+.hlp [aria-expanded="true"] > .sb-chev {
+  transform: rotate(90deg);
+}
+[dir="rtl"] .hlp [aria-expanded="true"] > .sb-chev {
+  transform: rotate(90deg) scaleX(-1);
+}
+/* the head of a card: a count after the title, the button at the far end (L4993) */
+.hlp .sb-sec .pp-sh .hl-cn {
+  margin-inline-start: 0;
+}
+.hlp .sb-sec .pp-sh .hl-cn + .btn {
+  margin-inline-start: auto;
+}
+.hlp .sbp .btn .i,
+.hlp .sbp .an-lk .i {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- the two columns of a tab: the main one and the side one (L4251, L4583, L4665, L4722) ---- */
+.hlp .pf-g {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+.hlp .pf-g > .col {
+  min-width: 0;
+}
+/* L148: .col is a column of 16 (a margin of a card under it adds to the gap, as on the board) */
+.hlp .col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hlp .sb-tab > .pf-g {
+  margin-top: 0;
+}
+.hlp .pp-as {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hlp .sb-tab {
+  min-width: 0;
+}
+@media (max-width: 1040px) {
+  .hlp .pf-g {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hlp .pp-as {
+    position: static;
+  }
+}
+/* in a tab's own block flow the legend card sits 12 under the table (L4895) */
+.hlp .sb-tab > .card + .sb-mv2 {
+  margin-top: 12px;
+}
+/* a fold in a column (the muted alerts, the product's) keeps the column's 16 */
+.hlp .col > .sb-mv2 {
+  margin-top: 0;
+}
+
+/* ---- the pill of a verdict and the dot of a state (L4513, L4165-4169, L4049) ---- */
+.hlp .pv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 11px;
+  background: var(--step);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sec);
+  white-space: nowrap;
+}
+.hlp .pv-pill.ok {
+  background: var(--tone-mint-bg);
+  color: var(--ok);
+}
+.hlp .pv-pill.part {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+.hlp .pv-pill.bad {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+.hlp .pv-pill.busy {
+  background: var(--tone-sky-bg);
+  color: var(--tone-sky);
+}
+.hlp .rw-gl {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  background: none;
+  font-size: 0;
+  line-height: 0;
+  font-style: normal;
+}
+.hlp .rw-gl.ok {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+.hlp .rw-gl.part {
+  border-color: var(--warning);
+  background: linear-gradient(90deg, var(--warning) 50%, transparent 50%);
+}
+[dir="rtl"] .hlp .rw-gl.part {
+  background: linear-gradient(270deg, var(--warning) 50%, transparent 50%);
+}
+.hlp .rw-gl.bad {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, var(--danger) 42% 58%, transparent 58%);
+}
+.hlp .rw-gl.busy {
+  border-color: var(--tone-sky);
+  border-inline-end-color: transparent;
+  background: none;
+  animation: hlp-spin 1s linear infinite;
+}
+.hlp .rw-gl.shut {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(45deg, transparent 42%, var(--muted) 42% 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, var(--muted) 42% 58%, transparent 58%);
+}
+/* L4143, L5903-5904 */
+.hlp .rw-pg {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--ok) var(--w), var(--step) 0);
+  transition: background 0.3s;
+}
+[dir="rtl"] .hlp .rw-pg {
+  background: linear-gradient(270deg, var(--ok) var(--w), var(--step) 0);
+}
+.hlp .rw-pg.warn {
+  background: linear-gradient(90deg, var(--warning) var(--w), var(--step) 0);
+}
+[dir="rtl"] .hlp .rw-pg.warn {
+  background: linear-gradient(270deg, var(--warning) var(--w), var(--step) 0);
+}
+/* the spinner of a button that waits (L722) */
+.hlp .an-sp {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  animation: hlp-spin 0.7s linear infinite;
+}
+/* L769-770 */
+.hlp .an-lk {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 4px;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+.hlp .an-lk:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ---- the quiet card: nothing here, all calm, no nodes (L4811-4817, L5016) ---- */
+.hlp .us-none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.hlp .us-none > .g {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: var(--step);
+  color: var(--sec);
+}
+.hlp .us-none > .g .i {
+  width: 20px;
+  height: 20px;
+}
+.hlp .us-none > .g.ok {
+  background: var(--tone-mint-bg);
+  color: var(--ok);
+}
+.hlp .us-none > .g.bad {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+.hlp .us-none > b {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+.hlp .us-none > span:not(.g) {
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--sec);
+}
+.hlp .us-none .btn {
+  margin-top: 14px;
+}
+.hlp .hl-calm {
+  margin-bottom: 16px;
+}
+.hlp .hl-top {
+  margin-top: 20px;
+}
+/* L4829, L5090 */
+.hlp .pv-qe {
+  margin-top: 16px;
+}
+.hlp .rc-emp {
+  margin-top: 4px;
+}
+.hlp .rc-emp .btn {
+  display: inline-flex;
+  text-decoration: none;
+}
+/* L4523 */
+.hlp .pv-nf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+.hlp .pv-nf p {
+  margin: 0;
+}
+
+/* ---- the load: two cards of grey bars (L4820-4823, L4832, L5039) ---- */
+.hlp .sk {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--step);
+  animation: hlp-skp 1.4s ease-in-out infinite;
+}
+.hlp .sk.b {
+  width: 100%;
+  height: 44px;
+  border-radius: 10px;
+}
+.hlp .pp-skc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+.hlp .hl-skl {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+/* ---- a note over the cards, and a problem inside one (L5091-5092, L5095-5096, L5111) ---- */
+.hlp .rc-nt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--sec);
+}
+.hlp .rc-nt span {
+  flex: 1;
+  min-width: 0;
+}
+.hlp .rc-nt b {
+  font-weight: 500;
+  color: var(--text);
+}
+.hlp .rc-nt .rw-gl {
+  flex: none;
+}
+.hlp .rc-nt.bad {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+.hlp .rc-nt.part {
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+}
+.hlp .rc-pb {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 20px 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--warning-soft);
+}
+.hlp .rc-pb.bad {
+  background: var(--danger-soft);
+}
+.hlp .rc-pb .rw-gl {
+  flex: none;
+  margin-top: 4px;
+}
+.hlp .rc-pb > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hlp .rc-pb b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.hlp .rc-pb span {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--sec);
+}
+.hlp .rc-pb .btn {
+  flex: none;
+  align-self: center;
+}
+@media (max-width: 720px) {
+  /* L4723, L4944: the head of a card and the lines under it step in to 16 */
+  .hlp .pp-sh {
+    padding: 12px 16px 4px;
+  }
+  .hlp .sb-lead,
+  .hlp .sb-pad,
+  .hlp .sb-emp {
+    padding-inline: 16px;
+  }
+  .hlp .rc-pb {
+    flex-wrap: wrap;
+  }
+  .hlp .rc-pb .btn {
+    margin-inline-start: 20px;
+  }
+  .hlp .rc-nt {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- the line of buttons under a thing, the state tag of a node, the "who" tag (L5003-5004, L5023, L4994, L5109) ---- */
+.hlp .hl-act {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.hlp .hl-act .btn {
+  text-decoration: none;
+}
+.hlp .hl-sp {
+  flex: 1;
+}
+.hlp .hl-act .an-lk {
+  color: var(--muted);
+}
+.hlp .hl-act .an-lk:hover {
+  color: var(--text);
+}
+.hlp .hl-run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px !important;
+  color: var(--tone-sky) !important;
+}
+.hlp .hl-cnode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.hlp .hl-cnode .fl {
+  width: 18px;
+  height: 13px;
+  border-radius: 3px;
+}
+.hlp .hl-cnode b {
+  font-weight: 500;
+}
+.hlp .hl-who {
+  flex: none;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--step);
+  font-size: 12px;
+  line-height: 24px;
+  color: var(--sec);
+}
+.hlp .hl-fail {
+  margin: 12px 0 0;
+}
+.hlp .hl-ro {
+  margin-top: 12px !important;
+  font-size: 13px !important;
+  color: var(--muted) !important;
+}
+/* L193: the board stills everything under "reduce motion" */
+@media (prefers-reduced-motion: reduce) {
+  .hlp *,
+  .hlp *::after,
+  .hlp *::before {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .hlp .sk {
+    animation: none;
+  }
+}

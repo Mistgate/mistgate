@@ -32,7 +32,12 @@ func backgroundJobs(c Config, s jobServices) []BackgroundJob {
 		}},
 		{Name: "fleet", Run: func(ctx context.Context) { _ = s.fleet.Run(ctx) }},
 		{Name: "access", Run: s.access.Run},
-		{Name: "health", Run: s.health.Run},
+		// the WARP reach check is health work (it ends in the Health alert warp_reach), so it runs with the health loop and is
+		// deferred on the edge with it (edgeDeferred)
+		{Name: "health", Run: func(ctx context.Context) {
+			go s.warp.RunReach(ctx)
+			s.health.Run(ctx)
+		}},
 		{Name: "blocklist", Run: s.blocklist.Run},
 		{Name: "tspu-probe", Run: s.probe.Run},
 		{Name: "cheburcheck", Run: s.cheburcheck.Run},

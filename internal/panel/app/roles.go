@@ -267,6 +267,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	k.addTasks(&cfg)
 	k.addTrustTunnel(&cfg)
 	k.addDecoySite(&cfg)
+	k.addWarpReach(&cfg)
 	return cfg
 }
 
@@ -328,7 +329,7 @@ func (k *core) finish(cfg httpserver.Config, prov *nodeprovision.Service, bkp *b
 	p.Handler, p.Server, p.Provision, p.Backup, p.Surface = srv.Public(), srv, prov, bkp, surfaceOf(cfg)
 	if jobs {
 		p.BackgroundJobs = backgroundJobs(k.c, jobServices{fleet: k.fl, access: k.acc, health: k.hl, blocklist: k.bl, probe: k.cp,
-			cheburcheck: k.cc, bsbord: k.bs, update: k.upd, backup: bkp, telegram: k.tg, assistant: k.assistantRetention, tasks: k.sched, provision: prov, store: k.st, log: k.log})
+			cheburcheck: k.cc, bsbord: k.bs, update: k.upd, warp: k.wsv, backup: bkp, telegram: k.tg, assistant: k.assistantRetention, tasks: k.sched, provision: prov, store: k.st, log: k.log})
 	}
 	return p, nil
 }

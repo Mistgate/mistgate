@@ -1,0 +1,51 @@
+HTTP/1.1 403 Forbidden
+Date: Tue, 17 Nov 2026 12:00:00 GMT
+Content-Type: text/html; charset=UTF-8
+Server: cloudflare
+CF-RAY: 8a1b2c3d4e5f6a7b-FRA
+Cache-Control: private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0
+X-Frame-Options: SAMEORIGIN
+Connection: close
+
+<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+<title>Access denied | www.example.com used Cloudflare to restrict access</title>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/cf.errors.css" />
+</head>
+<body>
+<div id="cf-wrapper">
+    <div class="cf-alert cf-alert-error cf-cookie-error" id="cookie-alert" data-translate="enable_cookies">Please enable cookies.</div>
+    <div id="cf-error-details" class="cf-error-details-wrapper">
+        <div class="cf-wrapper cf-header cf-error-overview">
+            <h1>
+                <span class="cf-error-type" data-translate="error">Error</span>
+                <span class="cf-error-code">1020</span>
+                <small class="heading-ray-id">Ray ID: 8a1b2c3d4e5f6a7b &bull; 2026-11-17 12:00:00 UTC</small>
+            </h1>
+            <h2 class="cf-subheadline" data-translate="error_desc">Access denied</h2>
+        </div>
+        <section></section>
+        <div class="cf-section cf-wrapper">
+            <div class="cf-columns two">
+                <div class="cf-column">
+                    <h2 data-translate="what_happened">What happened?</h2>
+                    <p>This website is using a security service to protect itself from online attacks.</p>
+                </div>
+            </div>
+        </div>
+        <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+            <p class="text-13">
+                <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">8a1b2c3d4e5f6a7b</strong></span>
+                <span class="cf-footer-item sm:block sm:mb-1"><span>Your IP</span>: 192.0.2.10</span>
+                <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

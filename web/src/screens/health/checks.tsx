@@ -1,36 +1,30 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { EditionNotice } from "@/components/edition-notice";
-import { SectionLabel } from "@/components/ui/bits";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
-import { Notice } from "@/components/ui/notice";
-import { StatusDot } from "@/components/ui/status";
+import { Scramble } from "@/components/fx/scramble-react";
+import { Button, buttonClass } from "@/components/ui/button";
+import { Flag } from "@/components/ui/flag";
+import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { CheckStatus, type GetChecksResponse } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
-import { cellLook, countryColumn, listOf, SLOW_CONNECT_MS, type CheckCell, type CountryColumn } from "@/lib/health";
-import type { GetChecksResponse } from "@/gen/mistgate/admin/v1/health_pb";
-import type { Plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
+import { cellLook, checkError, countryColumn, countryLook, listOf, SLOW_CONNECT_MS, type CellLook, type CheckCell, type CountryCheck, type CountryLook } from "@/lib/health";
+import type { Plain } from "@/lib/plain";
 import { protocolName } from "@/lib/series";
 import { runLook } from "@/lib/tspu";
-import { CheckRows } from "@/screens/node/checks";
-import { CountryCell, CountryHead, CountryRow } from "./country";
-import { CellTip, HistoryCard, SlowMark, useRunChecks } from "./history";
+import { OwnPoints, PartialBreakdown, useCountryTitle } from "./country";
+import { Bars, ResultLine, useRunChecks } from "./history";
+import { Calm, Dot, Gl, P, Sec, type DotKind } from "./page-parts";
+import "./health.css";
 
 type Checks = Plain<GetChecksResponse>;
 
-// One tone per cell: the pill colours of the status dots, in the soft tint of the 44 px cells.
-const toneCls: Record<string, string> = {
-  ok: "tone-ok tint tone-text",
-  warn: "tone-warn tint tone-text",
-  bad: "tone-bad tint tone-text",
-  busy: "tone-busy tint tone-text",
-  blip: "tone-blip tint tone-text",
-  off: "border border-line bg-surface-2 text-muted",
-  none: "border border-line text-faint",
-};
+// The client-eye checks as the board draws them (PnHealth, "Проверки"): a card with the table of nodes, a row a node with the verdict of each profile (and,
+// when the country check is on, of the country), a press opens the row into a box per profile with its last result and its day. "Check now" walks the rows one
+// after another (the row being asked sweeps, the rest wait, the last ones flash once with their tick popping), and the numbers settle into place with the
+// reveal animation on. The columns are the profiles deployed on the nodes, not the board's three: the table takes as many as there are.
 
 /**
  * "The panel's server loses UDP" (GetChecksResponse.udp_loss): the UDP checks of some nodes keep paying for lost packets
@@ -55,18 +49,21 @@ export function UdpLossNotice({ data }: { data: Checks }) {
         : "",
   });
   return (
-    <Notice tone="quiet">
-      {/* no space after a full-width colon (zh) */}
-      <b>{title}</b>
-      {title.endsWith("：") ? "" : " "}
-      {body}
-    </Notice>
+    <p className="rc-nt hl-udp">
+      <Dot kind="none" />
+      <span>
+        {/* no space after a full-width colon (zh) */}
+        <b>{title}</b>
+        {title.endsWith("：") ? "" : " "}
+        {body}
+      </span>
+    </p>
   );
 }
 
 /**
- * The newest run of the TSPU probe (GetChecksResponse.tspu_run), under the matrix: on which node it ran, when, and where the
- * box sits, or why it gave no verdicts. A run that found nothing has no rows, so this line is the only trace of it here.
+ * The newest run of the TSPU probe (GetChecksResponse.tspu_run), the foot of the table: on which node it ran, when, and where the box sits, or why it gave
+ * no verdicts. A run that found nothing has no rows, so this line is the only trace of it here.
  */
 export function TspuRunLine({ data }: { data: Checks }) {
   const t = useT();
@@ -76,196 +73,330 @@ export function TspuRunLine({ data }: { data: Checks }) {
   const look = runLook(t, fmt, run);
   const node = data.rows.find((r) => r.nodeId === run.nodeId)?.nodeName || data.countryChecks.find((c) => c.tspuVantageId === run.nodeId)?.tspuVantageName || run.nodeId;
   return (
-    <p data-testid="tspu-run" className="flex items-start gap-2 text-[11px] leading-snug text-muted">
-      <span className="mt-[3px] flex">
-        <StatusDot kind={look.kind} />
-      </span>
-      <span className="min-w-0 text-pretty">
-        <b className="text-fg">
-          {t("tp.title")} · {node}
-        </b>
-        {look.kind === "ok" ? ` · ${look.detail}` : ` · ${look.word} · ${look.detail}`}
-      </span>
+    <p data-testid="tspu-run" className="sb-vfoot">
+      {t("tp.title")} · <span className="mono">{node}</span>
+      {look.kind === "ok" ? ` · ${look.detail}` : ` · ${look.word} · ${look.detail}`}
     </p>
   );
 }
 
-/** What the words in the cells mean, under the matrix: the tooltip says it too, but a phone has no hover. */
-export function CheckLegend({ slow = false }: { slow?: boolean }) {
+/** What the words in the cells mean, under the table: the tooltip says it too, but a phone has no hover. Folded, as the board folds it. */
+export function CheckLegend({ slow = false, defaultOpen = false }: { slow?: boolean; defaultOpen?: boolean }) {
   const t = useT();
-  const items: [string, "hl.legend.ms" | "hl.legend.fail" | "hl.legend.failed" | "hl.legend.off" | "hl.legend.offline" | "hl.legend.na"][] = [
-    ["ok", "hl.legend.ms"],
-    ["bad", "hl.legend.fail"],
-    ["bad", "hl.legend.failed"],
-    ["off", "hl.legend.off"],
-    ["blip", "hl.legend.offline"],
-    ["none", "hl.legend.na"],
-  ];
+  const id = useId();
+  const [open, setOpen] = useState(defaultOpen);
+  const items = [
+    ["hlp.leg.fail", "hlp.leg.fail.d"],
+    ["hlp.leg.failed", "hlp.leg.failed.d"],
+    ["hlp.leg.off", "hlp.leg.off.d"],
+    ["hlp.leg.offline", "hlp.leg.offline.d"],
+    ["hlp.leg.na", "hlp.leg.na.d"],
+  ] as const;
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] leading-snug text-muted">
-      {items.map(([tone, key]) => (
-        <li key={key} className="flex items-center gap-1.5">
-          <span aria-hidden className={cx("size-2.5 flex-none rounded-[3px]", toneCls[tone])} />
-          {t(key)}
-        </li>
-      ))}
-      {slow && (
-        <li className="flex items-center gap-1.5">
-          <Icon name="clock" size={10} aria-hidden className="flex-none" />
-          {t("hl.legend.slow")}
-        </li>
+    <section className="card sb-mv2">
+      <button type="button" className="sb-mvh" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        <Gl d={P.chev} />
+        <span>
+          <b>{t("hlp.leg.title")}</b>
+          <em>{t("hl.legend.ms")}</em>
+        </span>
+      </button>
+      {open && (
+        <div id={id} className="hl-leg">
+          {items.map(([b, d]) => (
+            <div key={b}>
+              <b>{t(b)}</b>
+              <span>{t(d)}</span>
+            </div>
+          ))}
+          {slow && (
+            <div>
+              <b>{t("hlp.leg.slow")}</b>
+              <span>{t("hl.legend.slow")}</span>
+            </div>
+          )}
+        </div>
       )}
-    </ul>
+    </section>
   );
 }
 
-/**
- * Node × profile matrix of the synthetic checks; a click opens the 24 h history of that cell under it. A phone gets a card per
- * node. With the country check on, a last column (a last row on the phone) says what the sources inside that country saw, and
- * the TSPU probe's last run is a line under the matrix.
- */
-export function ChecksTab({ data }: { data: Checks }) {
-  const t = useT();
-  const fmt = useFmt();
-  const run = useRunChecks();
-  const noChecks = useEdition().off("health_checks"); // no rounds there: no "every 5 min"
-  const [sel, setSel] = useState<{ node: string; col: number } | null>(null);
-  const cols = data.columns;
-  const country = countryColumn(data.countryChecks);
-  const min = 90 + cols.length * 102 + (country ? 128 : 0);
+/** The walk of "Check now" over the rows (the board's ckr): the one asked is "run", the rest "wait", the done ones "done"; when the last is done they flash. */
+function useCheckWalk(ids: readonly string[], frozen: "" | "run" | "flash" = "") {
+  // a scene fixes the walk at its first step ("run") or at the flash after it ("flash"); a real page starts at rest
+  const [step, setStep] = useState(frozen === "run" ? 1 : 0);
+  const [flash, setFlash] = useState(frozen === "flash");
+  const timer = useRef<ReturnType<typeof setInterval>>(undefined);
+  const wait = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(
+    () => () => {
+      clearInterval(timer.current);
+      clearTimeout(wait.current);
+    },
+    [],
+  );
+  const start = () => {
+    if (step > 0 || frozen) return;
+    clearTimeout(wait.current);
+    setFlash(true);
+    if (ids.length === 0) {
+      wait.current = setTimeout(() => setFlash(false), 1600);
+      return;
+    }
+    setStep(1);
+    let k = 1;
+    timer.current = setInterval(() => {
+      k += 1;
+      if (k > ids.length) {
+        clearInterval(timer.current);
+        setStep(0);
+        wait.current = setTimeout(() => setFlash(false), 1600);
+      } else setStep(k);
+    }, 650);
+  };
+  const phase = (id: string): "" | "run" | "wait" | "done" => {
+    const at = ids.indexOf(id);
+    if (at < 0 || step === 0) return "";
+    return at === step - 1 ? "run" : at > step - 1 ? "wait" : "done";
+  };
+  return { busy: step > 0, flash: flash && step === 0, start, phase };
+}
 
-  const picked = sel && data.rows.find((r) => r.nodeId === sel.node);
-  const cell: CheckCell | undefined = sel ? picked?.cells[sel.col] : undefined;
-  const newest = Math.max(0, ...data.rows.flatMap((r) => r.cells.map((c) => c.last?.atUnix ?? 0)));
-  const slow = data.rows.some((r) => r.cells.some((c) => c.connectHourMs >= SLOW_CONNECT_MS));
+/** The board writes a failing value without its cross ("не проходит"): the dot in front of it is the cross (the legend keeps the "✕"). */
+const bare = (s: string) => s.replace(/^✕\s*/, "");
 
-  if (cols.length === 0)
-    return <p className="rounded-card border border-dashed border-line px-4 py-6 text-center text-[13px] text-muted">{t("hl.checks.noProfiles")}</p>;
+/** What a cell says in the row, as a state of the dot and a colour of the text. */
+function cellView(look: CellLook): { dot: DotKind; tone: "" | "bad" | "part" | "dim" } {
+  switch (look.kind) {
+    case "ok":
+      return { dot: "ok", tone: "" };
+    case "warn":
+      return { dot: "part", tone: "part" };
+    case "bad":
+    case "blip":
+      return { dot: "bad", tone: "bad" };
+    case "busy":
+      return { dot: "busy", tone: "" };
+    default:
+      return { dot: "none", tone: "dim" };
+  }
+}
 
+/** What the country makes of the node, as a state of the dot and a colour of the text. */
+function countryView(look: CountryLook | null): { dot: DotKind; tone: "" | "bad" | "part" | "dim"; text: string } {
+  if (!look) return { dot: "none", tone: "dim", text: "—" };
+  const view = { ok: ["ok", ""], partial: ["part", "part"], warn: ["part", "part"], listed: ["part", "part"], bad: ["bad", "bad"], unknown: ["none", "dim"] } as const;
+  const [dot, tone] = view[look.kind];
+  return { dot, tone, text: look.label };
+}
+
+type Row = Checks["rows"][number];
+
+/** One cell of a row: the dot, the figure (settling into place), the slow mark; while the walk is at the row it says so. */
+function Cell({ label, dot, tone, text, slow, tip }: { label: string; dot: DotKind; tone: string; text: string; slow?: string; tip?: string }) {
   return (
-    <div className="flex flex-col gap-3.5">
-      <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <SectionLabel as="h2" className="flex-1" icon="pulse" tone="rose">
-            {t("hl.checks.title")}
-          </SectionLabel>
-          {!noChecks && (
-            <span className="text-xs text-muted">
-              {t("hl.checks.how", { min: Math.max(1, Math.round(data.intervalS / 60)) })}
-              {newest > 0 && ` · ${t("hl.checks.checkedAgo", { ago: fmt.ago(newest) })}`}
-            </span>
-          )}
-          {run.can && (
-            <Button variant="secondary" size="sm" onClick={run.run} disabled={run.running}>
-              {t("hl.checks.now")}
-            </Button>
-          )}
-        </div>
-        <EditionNotice feature="health_checks" />
-        <UdpLossNotice data={data} />
-        {/* the padding gives the selection ring and the hover scale room inside the scrolling box */}
-        <div className="no-scrollbar -m-1 overflow-x-auto p-1 max-md:hidden">
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: `90px repeat(${cols.length}, minmax(90px, 1fr))${country ? " minmax(122px, 1.2fr)" : ""}`, minWidth: min }}>
-            <span />
-            {cols.map((c) => (
-              <span key={c.profileId} className="line-clamp-2 self-end px-1 pb-1 font-mono text-[11px] leading-tight font-bold break-words text-muted" title={c.profileName}>
-                {c.profileName}
-              </span>
-            ))}
-            {country && <CountryHead code={country.code} />}
-            {data.rows.map((r) => (
-              <Row key={r.nodeId} row={r} cols={cols} country={country} selected={sel?.node === r.nodeId ? sel.col : -1} onPick={(col) => setSel({ node: r.nodeId, col })} />
-            ))}
-          </div>
-        </div>
-        {/* the phone: a card per node, the history opens right under its row */}
-        <div className="flex flex-col gap-4 md:hidden">
-          {data.rows.map((r) => (
-            <div key={r.nodeId} className="flex flex-col gap-2">
-              <Link to="/nodes/$id" params={{ id: r.nodeId }} className="flex w-fit items-center gap-2 text-sm font-bold hover:text-accent-text">
-                <span className="font-mono text-[10px] font-bold text-muted">{r.countryCode}</span>
-                <span className="font-mono">{r.nodeName}</span>
-              </Link>
-              <CheckRows row={r} columns={cols} onRun={run.can ? () => run.run() : undefined} running={run.running} />
-              {country && <CountryRow check={country.byNode.get(r.nodeId)} code={country.code} />}
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col gap-2.5 border-t border-line pt-3">
-          <TspuRunLine data={data} />
-          <CheckLegend slow={slow} />
-        </div>
-      </section>
-      {picked && cell?.deployed && (
-        <div className="max-md:hidden">
-          <HistoryCard
-            title={t("hl.hist.title", { node: picked.nodeName, profile: cols[sel.col]?.profileName ?? "" })}
-            cell={cell}
-            onRun={run.can ? () => run.run() : undefined}
-            running={run.running}
-          />
+    <span className={cx("hl-cv", tone)} data-l={label} title={tip}>
+      <Dot kind={dot} />
+      <Scramble value={text} className="mono" />
+      {slow && (
+        <span className="hl-slow">
+          <Gl d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" />
+          {slow}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** The opened row's "check this node now": one node, its own call. */
+function NodeRun({ nodeId }: { nodeId: string }) {
+  const t = useT();
+  const run = useRunChecks(nodeId);
+  if (!run.can) return null;
+  return (
+    <Button variant="secondary" size="md" className="btn sm" disabled={run.running} onClick={run.run}>
+      {t("hl.checks.nowOne")}
+    </Button>
+  );
+}
+
+/** One profile's box of an opened row: its name, how it looks now, the last result, the day. */
+function ProfileBox({ name, cell, look }: { name: string; cell: CheckCell | undefined; look: CellLook | null }) {
+  const t = useT();
+  const view = look ? cellView(look) : { dot: "none" as DotKind, tone: "" as const };
+  const last = cell?.last;
+  const failed = last?.status === CheckStatus.FAILED;
+  return (
+    <div>
+      <span>{name}</span>
+      <b className={view.tone === "dim" ? "" : view.tone}>{look && look.kind !== "none" ? bare(look.label) : "—"}</b>
+      {look?.slow && <em>{t("hl.cell.connect", { time: look.slow })}</em>}
+      {cell && cell.deployed && last && <em>{failed ? checkError(t, last.errorCode) : <ResultLine cell={cell} />}</em>}
+      {failed && last?.errorDetail && <em className="mono">{last.errorDetail}</em>}
+      {failed && cell && cell.failStreak > 1 && <em>{t("hl.hist.streak", { n: cell.failStreak })}</em>}
+      {!cell?.deployed && look && <em>{look.state}</em>}
+      {cell && cell.deployed && last && (
+        <div className="hl-bars">
+          <Bars cell={cell} />
         </div>
       )}
     </div>
   );
 }
 
-function Row({
-  row,
-  cols,
-  country,
-  selected,
-  onPick,
-}: {
-  row: Checks["rows"][number];
-  cols: Checks["columns"];
-  country: CountryColumn | null;
-  selected: number;
-  onPick: (col: number) => void;
-}) {
+/** The box of the country in an opened row: the verdict, the line under it, the points of the owner's own probes, the networks of a partial block, the way to the page. */
+function CountryBox({ title, look }: { title: string; look: CountryLook | null }) {
+  const t = useT();
+  const view = countryView(look);
+  return (
+    <div>
+      <span>{title}</span>
+      <b className={view.tone === "dim" ? "" : view.tone}>{view.text}</b>
+      <em>{look ? look.line : t("cr.v.notYet")}</em>
+      {look?.breakdown && <PartialBreakdown breakdown={look.breakdown} className="hl-bars" />}
+      {look && !look.breakdown && look.ownPoints.length > 0 && <OwnPoints points={look.ownPoints} className="hl-bars" />}
+      <Link to="/reachability" className="an-lk hl-bars">
+        {t("rc.open")}
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Node × profile table of the synthetic checks, in the board's rows; a press opens a row into a box per profile (and one for the country, with the country check
+ * on) with its last result and the 24 h strip, the way to the node and "check this node now". A phone stacks a row's cells under its node. The TSPU probe's
+ * last run is the foot of the table, the UDP notice stands over it; the legend folds under the card.
+ */
+/** What a scene of the dev kit starts the tab with: the row that is open, the walk of "Check now" fixed at a step, the legend opened. */
+export type ChecksInit = { open?: string; walk?: "run" | "flash"; legend?: boolean };
+
+export function ChecksTab({ data, first = false, init }: { data: Checks; first?: boolean; init?: ChecksInit }) {
   const t = useT();
   const fmt = useFmt();
-  return (
-    <>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="w-5 flex-none font-mono text-[10px] font-bold text-muted">{row.countryCode}</span>
-        <Link to="/nodes/$id" params={{ id: row.nodeId }} className="truncate font-mono text-[13px] font-bold hover:text-accent-text hover:underline">
-          {row.nodeName}
-        </Link>
+  const noChecks = useEdition().off("health_checks"); // no rounds there: no "every 5 min"
+  const cols = data.columns;
+  const country = countryColumn(data.countryChecks);
+  const countryTitle = useCountryTitle(country?.code ?? "");
+  // the row that opens by itself: the first node with a profile that fails
+  const worst = data.rows.find((r) => r.cells.some((c) => c.last?.status === CheckStatus.FAILED))?.nodeId ?? "";
+  const [chosen, setChosen] = useState<string | null>(init?.open ?? null);
+  const open = chosen ?? worst;
+  const online = data.rows.filter((r) => r.cells.some((c) => c.deployed) && (r.nodeStatus === NodeStatus.ONLINE || r.nodeStatus === NodeStatus.NO_TRAFFIC)).map((r) => r.nodeId);
+  const walk = useCheckWalk(online, init?.walk ?? "");
+  // the rows walk once the panel says it has something to ask (not while the nodes are offline or were checked a moment ago)
+  const run = useRunChecks("", (scheduled) => scheduled > 0 && walk.start());
+  const newest = Math.max(0, ...data.rows.flatMap((r) => r.cells.map((c) => c.last?.atUnix ?? 0)));
+  const slow = data.rows.some((r) => r.cells.some((c) => c.connectHourMs >= SLOW_CONNECT_MS));
+  const n = cols.length + (country ? 1 : 0);
+
+  if (cols.length === 0)
+    return (
+      <div className="sb-tab">
+        <Calm className="hl-calm" icon={P.eye} title={t("hl.checks.title")} text={t("hl.checks.noProfiles")} />
       </div>
-      {cols.map((col, i) => {
-        const c = row.cells[i];
-        if (!c) return <span key={col.profileId} />;
-        const look = cellLook(t, fmt, c, row.nodeStatus);
-        const inert = look.kind === "none";
-        const button = (
-          <button
-            key={col.profileId}
-            type="button"
-            disabled={inert}
-            onClick={() => onPick(i)}
-            title={inert ? look.state : undefined}
-            aria-label={t("hl.cell.aria", { node: row.nodeName, profile: col.profileName, state: look.state })}
-            aria-pressed={selected === i}
-            className={cx(
-              "box-border flex h-11 flex-col items-center justify-center rounded-[11px] border px-1.5 text-center font-mono text-xs leading-tight font-bold transition-transform duration-200 ease-spring",
-              toneCls[look.kind],
-              inert ? "cursor-default" : "cursor-pointer hover:scale-[1.03]",
-              selected === i && "outline-2 outline-offset-2 outline-accent",
-            )}
-          >
-            {look.label}
-            {look.slow && <SlowMark text={look.slow} />}
-          </button>
-        );
-        // a disabled button gets no pointer events: the dash keeps its plain title
-        return inert ? button : (
-          <CellTip key={col.profileId} look={look}>
-            {button}
-          </CellTip>
-        );
-      })}
-      {country && <CountryCell check={country.byNode.get(row.nodeId)} node={row.nodeName} code={country.code} />}
-    </>
+    );
+
+  const go = () => {
+    if (walk.busy || run.running) return;
+    run.run();
+  };
+  const cellOf = (r: Row, i: number) => {
+    const c = r.cells[i];
+    return c ? { cell: c, look: cellLook(t, fmt, c, r.nodeStatus) } : null;
+  };
+  const checkOf = (r: Row): CountryCheck | undefined => country?.byNode.get(r.nodeId);
+
+  return (
+    <div className="sb-tab">
+      <EditionNotice feature="health_checks" className="mb-4" />
+      <Sec
+        tone="mint"
+        icon={P.eye}
+        title={t("hl.checks.title")}
+        className="hl-ck"
+        action={
+          run.can && (
+            <Button variant="secondary" size="md" className={cx("btn sm", walk.busy && "busy")} aria-disabled={walk.busy || run.running} onClick={go}>
+              {walk.busy && <span className="an-sp" aria-hidden="true" />}
+              {walk.busy ? t("hlp.ck.busy") : t("hl.checks.now")}
+            </Button>
+          )
+        }
+      >
+        {!noChecks && (
+          <p className="sb-lead">
+            {t("hl.checks.how", { min: Math.max(1, Math.round(data.intervalS / 60)) })}
+            {walk.busy ? ` · ${t("hl.checks.checkedAgo", { ago: t("hlp.ck.running") })}` : newest > 0 ? ` · ${t("hl.checks.checkedAgo", { ago: fmt.ago(newest) })}` : ""}
+          </p>
+        )}
+        <UdpLossNotice data={data} />
+        <div className="hl-ct">
+          <div className="hl-cs" style={{ "--n": n } as React.CSSProperties}>
+            <div className="hl-cr hl-ch">
+              <span>{t("hl.checks.node")}</span>
+              {cols.map((c) => (
+                <span key={c.profileId} title={c.profileName}>
+                  {c.profileName}
+                </span>
+              ))}
+              {country && <span>{countryTitle}</span>}
+              <span />
+            </div>
+            {data.rows.map((r) => {
+              const isOpen = open === r.nodeId;
+              // the first round has not come: every row waits in the queue (the board's "first round")
+              const ph = first ? "wait" : walk.phase(r.nodeId);
+              const check = checkOf(r);
+              const clook = country && check ? countryLook(t, fmt, check) : null;
+              const cview = countryView(clook);
+              return (
+                <div key={r.nodeId} className={cx("hl-cw", isOpen && "open", ph === "run" && "cking", ph === "wait" && "ckw", !ph && walk.flash && "ckn")}>
+                  <button type="button" className="hl-cr" aria-expanded={isOpen} onClick={() => setChosen(isOpen ? "" : r.nodeId)}>
+                    <span className="hl-cnode">
+                      <Flag code={r.countryCode ?? ""} size={13} />
+                      <b className="mono">{r.nodeName}</b>
+                    </span>
+                    {cols.map((col, i) => {
+                      const v = cellOf(r, i);
+                      if (!v) return <span key={col.profileId} className="hl-cv dim" data-l={col.profileName} />;
+                      const view = cellView(v.look);
+                      if (ph === "run") return <Cell key={col.profileId} label={col.profileName} dot="busy" tone="" text={t("hlp.ck.checking")} />;
+                      if (ph === "wait" && (!first || v.cell.deployed)) return <Cell key={col.profileId} label={col.profileName} dot="none" tone="" text={t("hlp.ck.queued")} />;
+                      return <Cell key={col.profileId} label={col.profileName} dot={view.dot} tone={view.tone} text={bare(v.look.label)} slow={v.look.slow} tip={v.look.tip.join("\n")} />;
+                    })}
+                    {country &&
+                      (ph === "run" ? (
+                        <Cell label={countryTitle} dot="busy" tone="" text={t("hlp.ck.checking")} />
+                      ) : ph === "wait" ? (
+                        <Cell label={countryTitle} dot="none" tone="" text={t("hlp.ck.queued")} />
+                      ) : (
+                        <Cell label={countryTitle} dot={cview.dot} tone={cview.tone} text={cview.text} tip={clook?.head} />
+                      ))}
+                    <Gl d={P.chev} className="sb-chev" />
+                  </button>
+                  {isOpen && (
+                    <div className="hl-cd">
+                      {cols.map((col, i) => {
+                        const v = cellOf(r, i);
+                        return <ProfileBox key={col.profileId} name={col.profileName} cell={v?.cell} look={v?.look ?? null} />;
+                      })}
+                      {country && <CountryBox title={countryTitle} look={clook} />}
+                      <div className="hl-cda">
+                        <Link to="/nodes/$id" params={{ id: r.nodeId }} className={cx(buttonClass("secondary", "md"), "btn sm")}>
+                          {t("hl.alerts.openNode")}
+                        </Link>
+                        <NodeRun nodeId={r.nodeId} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <TspuRunLine data={data} />
+      </Sec>
+      <CheckLegend slow={slow} defaultOpen={init?.legend} />
+    </div>
   );
 }

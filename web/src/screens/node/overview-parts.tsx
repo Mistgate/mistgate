@@ -11,7 +11,7 @@ import { alertTitle, groupFact, resolutionWord, severityWord, type Alert } from 
 import { plain } from "@/lib/plain";
 import { pollMs } from "@/lib/queries";
 import { useNow } from "@/lib/time";
-import { AlertBody } from "@/screens/health/alerts";
+import { AlertBody } from "@/screens/health/alert-body";
 import { useFixFlow, type FixFlow } from "@/screens/health/fix";
 import { CardFoot, CardHead, Glyph, glyphs, OvDot } from "@/screens/overview-parts";
 
@@ -64,8 +64,8 @@ function AlertRow({ a, now, flow, open, onToggle }: { a: Alert; now: number; flo
         </button>
       </h3>
       {open && (
-        <div id={body} className="nd-alb px-6 pb-4 ps-[68px] max-[720px]:px-4 [&_p]:max-w-[640px]">
-          <AlertBody a={a} now={now} flow={flow} onNodePage part="fold" />
+        <div id={body} className="nd-alb px-6 pb-4 ps-[68px] max-[720px]:px-4">
+          <AlertBody a={a} now={now} flow={flow} onNodePage part="fold" className="hl-flush" />
         </div>
       )}
     </div>

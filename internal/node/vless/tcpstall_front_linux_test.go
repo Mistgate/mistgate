@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/front"
 )
 
@@ -50,7 +51,7 @@ func TestTCPInfoThroughTheFrontsConnection(t *testing.T) {
 	}); err != nil || info == nil || info.State != unix.BPF_TCP_ESTABLISHED {
 		t.Fatalf("TCP_INFO through the front's connection: %+v, %v", info, err)
 	}
-	if stalled, first := tcpStallOf(conn); stalled || first {
+	if stalled, first := engine.TCPStallOf(conn); stalled || first {
 		t.Fatalf("a healthy connection reads as a stall: %v %v", stalled, first)
 	}
 }
@@ -101,7 +102,7 @@ func TestTCPStallOfAFreezeAfter16KThroughTheFront(t *testing.T) {
 		go func() { _, _ = conn.Write(make([]byte, 1<<20)) }()
 		_, _ = io.Copy(io.Discard, conn) // until the client's FIN, which still gets through
 		time.Sleep(4 * time.Second)      // the retransmissions of the frozen data go on
-		stalled, first := tcpStallOf(conn)
+		stalled, first := engine.TCPStallOf(conn)
 		_ = conn.Close()
 		got <- [2]bool{stalled, first}
 	}()

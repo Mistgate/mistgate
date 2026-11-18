@@ -68,7 +68,6 @@ export const en = {
   "audit.retention_set": "changed how long the panel keeps its data",
   "audit.metrics_set": "turned the metrics endpoint {state}",
   "audit.export_data": "exported panel data ({rows} rows)",
-  "audit.warp_reach_settings": "changed the sites WARP is checked against",
 };
 
 export const ru: Record<keyof typeof en, string> = {
@@ -138,7 +137,6 @@ export const ru: Record<keyof typeof en, string> = {
   "audit.retention_set": "изменил сроки хранения данных панели",
   "audit.metrics_set": "переключил выдачу метрик: {state}",
   "audit.export_data": "выгрузил данные панели (строк: {rows})",
-  "audit.warp_reach_settings": "изменил список сайтов для проверки WARP",
 };
 
 export const zh: Record<keyof typeof en, string> = {
@@ -208,7 +206,6 @@ export const zh: Record<keyof typeof en, string> = {
   "audit.retention_set": "更改了面板的数据保留时间",
   "audit.metrics_set": "切换了指标端点：{state}",
   "audit.export_data": "导出了面板数据（{rows} 行）",
-  "audit.warp_reach_settings": "更改了 WARP 检测的网站列表",
 };
 
 export const fa: Record<keyof typeof en, string> = {
@@ -278,7 +275,6 @@ export const fa: Record<keyof typeof en, string> = {
   "audit.retention_set": "مدت نگهداری داده‌های پنل را تغییر داد",
   "audit.metrics_set": "ارائهٔ متریک‌ها را تغییر داد: {state}",
   "audit.export_data": "داده‌های پنل را خروجی گرفت ({rows} ردیف)",
-  "audit.warp_reach_settings": "فهرست سایت‌های بررسی WARP را تغییر داد",
 };
 
 export const tr: Record<keyof typeof en, string> = {
@@ -348,5 +344,4 @@ export const tr: Record<keyof typeof en, string> = {
   "audit.retention_set": "panelin verileri saklama sürelerini değiştirdi",
   "audit.metrics_set": "metrik uç noktasını değiştirdi: {state}",
   "audit.export_data": "panel verilerini dışa aktardı ({rows} satır)",
-  "audit.warp_reach_settings": "WARP denetiminin site listesini değiştirdi",
 };

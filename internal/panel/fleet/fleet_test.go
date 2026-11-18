@@ -1202,9 +1202,20 @@ func TestSweepUsesStaleNodeLiveProjection(t *testing.T) {
 	if err != nil || !liveRowsByID(rows)[a.nodeID].Exists || liveRowsByID(rows)[a.nodeID].Connected {
 		t.Fatalf("stale node_live row = %+v, %v; want an existing offline row", rows, err)
 	}
+	hour := time.Now().UTC().Truncate(time.Hour).Unix()
+	e.exec(`INSERT INTO node_traffic_hour (node_id, protocol, hour_start, bytes_up, bytes_down) VALUES (?, 'vless', ?, 100, 200), (?, 'vless', ?, 1000, 2000)`,
+		a.nodeID, hour-2*3600, a.nodeID, hour-48*3600)
 	e.f.sweep(e.ctx)
 	if got := e.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'node_down'`, a.nodeID); got != 1 {
 		t.Fatalf("node_down events after stale projection = %d, want 1", got)
+	}
+	// the event says how busy the node was: the last day and the last week
+	var params string
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT params_json FROM event WHERE node_id = ? AND code = 'node_down'`, a.nodeID).Scan(&params); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(params, `"traffic_24h_bytes":"300"`) || !strings.Contains(params, `"traffic_7d_bytes":"3300"`) {
+		t.Fatalf("node_down event params = %s, want the traffic of the last 24 hours (300) and 7 days (3300)", params)
 	}
 }
 

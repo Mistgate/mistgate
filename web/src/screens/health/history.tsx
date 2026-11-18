@@ -45,7 +45,7 @@ export function Bars({ cell }: { cell: CheckCell }) {
           />
         ))}
       </div>
-      <div className="flex justify-between font-mono text-[10px] text-muted">
+      <div className="flex justify-between font-mono text-[11px] text-muted">
         <span>{t("hl.hist.h24")}</span>
         <span>{t("hl.hist.h12")}</span>
         <span>{t("hl.hist.now")}</span>
@@ -71,7 +71,7 @@ export function CellTip({ look, children }: { look: CellLook; children: ReactEle
 /** The second line of a cell whose connect is slow: a clock, not a colour, because the tunnel itself works. */
 export function SlowMark({ text, className }: { text: string; className?: string }) {
   return (
-    <span className={cx("flex items-center gap-0.5 font-sans text-[10px] font-semibold text-muted", className)}>
+    <span className={cx("flex items-center gap-0.5 font-sans text-[11px] font-semibold text-muted", className)}>
       <Icon name="clock" size={10} aria-hidden />
       {text}
     </span>
@@ -144,7 +144,8 @@ export function HistoryCard({
 }
 
 /** "Check now": schedule an immediate round, then look at the results after a few seconds. The server limits it to one round per profile per 30 s. */
-export function useRunChecks(nodeId = "") {
+/** `onDone` hears how many profiles the panel scheduled (none: the nodes are offline or were checked a moment ago). */
+export function useRunChecks(nodeId = "", onDone?: (scheduled: number) => void) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
@@ -153,6 +154,7 @@ export function useRunChecks(nodeId = "") {
   const m = useMutation({
     mutationFn: async () => plain(await health.runChecksNow({ nodeId })),
     onSuccess: (r) => {
+      onDone?.(r.scheduled);
       toast(r.scheduled > 0 ? t.n("hl.checks.nowToast", r.scheduled) : t("hl.checks.nowNone"));
       // the round takes a few seconds (a failing one up to 25 s): look twice
       for (const ms of [4000, 14000]) setTimeout(() => void qc.invalidateQueries({ queryKey: ["health", "checks"] }), ms);

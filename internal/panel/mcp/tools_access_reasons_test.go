@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -133,6 +134,60 @@ func TestReasonsVLESSFreezeAfter16K(t *testing.T) {
 	c = classOf(buildAccess(f.in), "fi1", clsTCPThrottled)
 	if c == nil || c.Confidence != confHigh || len(c.Unknown) != 0 || c.Detail["tcp_stalls_16k"] != "5" || !hasSignal(c.Evidence, "conn:"+v) {
 		t.Fatalf("kl!ck and the node agree: %+v", c)
+	}
+}
+
+// TrustTunnel counts the stalls of its HTTP/2 connections on the inbound's row (trusttunnel-tcp-stalls/1): the same freeze
+// after 16 KiB names the class for it, and an agent without the capability says what is not known instead of a zero.
+func TestReasonsTrustTunnelFreezeAfter16K(t *testing.T) {
+	f, _, h, _ := reasonsFx()
+	tt := f.inbound("fi1", "prf_tt", "trusttunnel", 9443)
+	f.in.Totals[h] = hy2Good()
+	ttCaps := append(slices.Clone(caps3), connectiondiag.TrustTunnelCapability, connectiondiag.TrustTunnelTCPStallsCapability)
+	unsupported := connectiondiag.UnsupportedCountersFor("trusttunnel", ttCaps, connectiondiag.Variant{})
+	f.in.Totals[tt] = accTotals{Protocol: "trusttunnel", Connects: 10, TCPStalls: 8, TCPStalls16K: 7, Unsupported: unsupported}
+	r := buildAccess(f.in)
+	c := classOf(r, "fi1", clsTCPThrottled)
+	if c == nil || c.protocol != "trusttunnel" || c.Scope != "protocol:trusttunnel" || c.Confidence != confHigh || c.Detail["tcp_stalls_16k"] != "7" ||
+		!strings.Contains(c.Explain, "TrustTunnel connections") {
+		t.Fatalf("TrustTunnel frozen after 16 KiB: %+v", c)
+	}
+	for _, cell := range r.Matrix {
+		if cell.Protocol == "trusttunnel" && (cell.TCPStalls16K != 7 || !hasSignal(cell.Signals, "tcp_freeze_16k")) {
+			t.Fatalf("trusttunnel cell: %+v", cell)
+		}
+	}
+	// stalls late in the stream are no freeze
+	f.in.Totals[tt] = accTotals{Protocol: "trusttunnel", Connects: 10, TCPStalls: 8, TCPStalls16K: 1, Unsupported: unsupported}
+	if c := classOf(buildAccess(f.in), "fi1", clsTCPThrottled); c != nil {
+		t.Fatalf("late stalls read as the 16 KiB freeze: %+v", c)
+	}
+	// an agent without the capability: kl!ck sees the freeze, the node cannot confirm it, and the class says so
+	old := connectiondiag.UnsupportedCountersFor("trusttunnel", append(slices.Clone(caps3), connectiondiag.TrustTunnelCapability), connectiondiag.Variant{})
+	f.in.Totals[tt] = accTotals{Protocol: "trusttunnel", Connects: 10, Unsupported: old}
+	f.in.Klick["nod_fi1"] = &accKlick{accKlickTally: accKlickTally{Reports: 6, OK: 2, Freeze: 4}, Kinds: []accKlickKind{
+		{Kind: "trusttunnel", accKlickTally: accKlickTally{Reports: 5, OK: 1, Freeze: 4}, DLChecked: 5, DLStalled: 4}}}
+	c = classOf(buildAccess(f.in), "fi1", clsTCPThrottled)
+	if c == nil || len(c.Unknown) == 0 || !strings.Contains(c.Unknown[0], "TrustTunnel servers count no TCP stalls") {
+		t.Fatalf("kl!ck with an agent that does not count stalls: %+v", c)
+	}
+}
+
+// VLESS behind its own TLS front (XHTTP or WebSocket, reached directly) counts the stalls on the inbound row like REALITY does,
+// so the freeze after 16 KiB names the class for it too; behind a CDN the connection is the CDN's and nothing is counted.
+func TestReasonsVLESSTLSFrontFreezeAfter16K(t *testing.T) {
+	f, _, h, v := reasonsFx()
+	f.in.Totals[h] = hy2Good()
+	direct := connectiondiag.Variant{Security: "tls", Transport: "xhttp"}
+	f.in.Totals[v] = accTotals{Protocol: "vless", Hellos: 12, TCPStalls: 6, TCPStalls16K: 5, OnlineS: 900, Unsupported: un3("vless", direct)}
+	c := classOf(buildAccess(f.in), "fi1", clsTCPThrottled)
+	if c == nil || c.protocol != "vless" || c.Confidence != confMedium || c.Detail["tcp_stalls_16k"] != "5" {
+		t.Fatalf("VLESS over a direct TLS front frozen after 16 KiB: %+v", c)
+	}
+	cdn := connectiondiag.Variant{Security: "tls", Transport: "xhttp", CDN: true}
+	f.in.Totals[v] = accTotals{Protocol: "vless", Hellos: 12, OnlineS: 900, Unsupported: un3("vless", cdn)}
+	if c := classOf(buildAccess(f.in), "fi1", clsTCPThrottled); c != nil {
+		t.Fatalf("a CDN path, whose stalls are not counted, named the freeze: %+v", c)
 	}
 }
 

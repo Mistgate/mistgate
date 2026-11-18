@@ -427,7 +427,7 @@ describe("the fleet Doctor tab", () => {
     const t = text();
     expect(t.indexOf("Server resolver")).toBeGreaterThan(-1);
     expect(t.indexOf("Server resolver")).toBeLessThan(t.indexOf("Clock")); // FAIL before WARN, whatever the node order
-    expect(t).toContain("found: 2");
+    expect(t).toContain("Found2"); // the sum of the head
     const lines = [...document.querySelectorAll("li")].map((li) => li.textContent);
     expect(lines).toContain("de2 — agent 0.2.7 is too old for the doctor · Updates");
     expect(lines.some((l) => /^nl1 — offline since .*17:26, its last report is shown$/.test(l ?? ""))).toBe(true);
@@ -442,6 +442,6 @@ describe("the fleet Doctor tab", () => {
   it("says all is green when nothing is wrong", async () => {
     const data = { nowUnix: 1, nodes: [node({ items: [item({})] })] };
     await mount(<Fleet data={data as never} />);
-    expect(text()).toContain("All items are green");
+    expect(text()).toContain("Doctor found nothing");
   });
 });

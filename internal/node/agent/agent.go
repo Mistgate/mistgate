@@ -1585,6 +1585,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.countryProbe(s, m.CountryProbe) })
 	case *pb.ConnectResponse_SetDecoy:
 		a.goBusy(func() { a.setDecoy(s, m.SetDecoy) })
+	case *pb.ConnectResponse_WarpReach:
+		a.goBusy(func() { a.warpReach(s, m.WarpReach) })
 	case *pb.ConnectResponse_UpdateAgent:
 		a.goBusy(func() { a.applyUpdate(s, m.UpdateAgent) })
 	case *pb.ConnectResponse_RollbackAgent:

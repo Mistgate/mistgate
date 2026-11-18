@@ -878,6 +878,9 @@ func requestOfflineError(frame *agentv1.ConnectResponse) error {
 
 // capDebug: the agent can capture its debug log on request (agent.proto "DEBUG CAPTURE").
 const capDebug = "debug/1"
+
+// capWarpReach: the agent answers WarpReach (agent.proto "WARP REACH").
+const capWarpReach = "warp-reach/1"
 const capDebug2 = "debug/2"
 
 func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capability, message string) {
@@ -917,6 +920,8 @@ func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capabilit
 		return capCountryProbe, "agent too old"
 	case frame.GetSetDecoy() != nil:
 		return capDecoy, "agent too old"
+	case frame.GetWarpReach() != nil:
+		return capWarpReach, "agent too old"
 	default:
 		return "", ""
 	}

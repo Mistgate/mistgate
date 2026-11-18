@@ -23,6 +23,9 @@ var passwordDigest = func(password string) [sha256.Size]byte { return sha256.Sum
 
 func (in *inbound) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	isH2 := r.ProtoMajor == 2
+	if isH2 {
+		markThrough(r)
+	}
 	isH3 := r.ProtoMajor == 3 && in.h3Enabled
 	if (!isH2 && !isH3) || r.Method != http.MethodConnect {
 		in.serveMasquerade(w, r)

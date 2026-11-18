@@ -144,6 +144,9 @@ type fakeWarp struct {
 	health       *warp.Health
 	findings     []warp.Finding
 	ran          chan struct{}
+	// Reach: what the fake answers and the lists it was asked about.
+	reach      func(domains []string) (warp.ReachReport, error)
+	reachAsked [][]string
 }
 
 func newFakeWarp(ord *order) *fakeWarp { return &fakeWarp{ord: ord, ran: make(chan struct{}, 1)} }
@@ -175,6 +178,16 @@ func (w *fakeWarp) CheckNow(context.Context) (bool, bool, error) {
 	defer w.mu.Unlock()
 	w.checks++
 	return w.checkErr == nil, false, w.checkErr
+}
+
+func (w *fakeWarp) Reach(_ context.Context, domains []string) (warp.ReachReport, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.reachAsked = append(w.reachAsked, append([]string(nil), domains...))
+	if w.reach == nil {
+		return warp.ReachReport{}, errors.New("not wired")
+	}
+	return w.reach(domains)
 }
 
 func (w *fakeWarp) reconnectCount() int {

@@ -133,6 +133,39 @@ message GetWarpResponse {
   // The node's enabled profiles that exit through WARP: they stop while WARP is down or paused (the pause dialog
   // names them and how many are connected through them now).
   repeated WarpInbound inbounds = 9;
+  // What the sites of the reach settings showed through this node's WARP the last time the node checked; unset while it has no
+  // result (see reach_state).
+  WarpReachView reach = 10;
+  // Why reach is, or is not, set: "ready" (reach is the node's latest result), "waiting" (the check is on and the node has
+  // not answered yet: it is offline, its WARP is not up, or the first round has not come), "disabled" (the owner's list is
+  // empty, or the Cloudflare edition, which runs no check: reach is then unset) or "agent_too_old" (the node's agent lacks
+  // "warp-reach/1", so the panel sends it nothing; the rest of this response is unaffected).
+  string reach_state = 11;
+}
+
+// One site's answer in WarpReachView.
+message WarpReachDomain {
+  string domain = 1;
+  // "ok" | "blocked" | "unreachable" | "error". blocked: a block page (451, or a 403 page of Cloudflare error 1006-1012/1020,
+  // Akamai, CloudFront's country block, a site's own "not available in your country"); unreachable: no answer (DNS, connect,
+  // TLS, time); error: an answer that is neither (a server error, a rate limit, a challenge, a 403 the node cannot place).
+  string verdict = 2;
+  // HTTP status of the page the verdict is about; 0 = no answer.
+  uint32 http_status = 3;
+  uint32 latency_ms = 4;
+  // How many checks of this node said "blocked" since the last "ok" (a timeout or an error between them does not end it). The
+  // Health alert WARP_REACH is open from 2 until the next "ok".
+  uint32 blocked_streak = 5;
+}
+
+// The node's latest reach check.
+message WarpReachView {
+  // When the panel stored it.
+  int64 checked_unix = 1 [jstype = JS_NUMBER];
+  // The Cloudflare colo of the node's WARP exit at that run ("" = the trace failed).
+  string colo = 2;
+  // In the order of the settings at that time.
+  repeated WarpReachDomain domains = 3;
 }
 
 // A profile on the node whose traffic leaves through WARP.

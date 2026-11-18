@@ -141,6 +141,16 @@ async function mount(props: { people?: Alert[]; alerts?: Alert[] }) {
 }
 const text = () => host?.textContent ?? "";
 const cards = () => [...document.querySelectorAll("article")];
+const click = (el: Element | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+/** The rows open one at a time, as on the board: opens each in turn and gives back what `read` sees in it. */
+async function eachOpen<T>(read: () => T[]): Promise<T[]> {
+  const out: T[] = [];
+  for (const toggle of [...document.querySelectorAll("[data-alert-toggle]")]) {
+    if (toggle.getAttribute("aria-expanded") !== "true") await click(toggle);
+    out.push(...read());
+  }
+  return out;
+}
 
 describe("Health ▸ People", () => {
   it("lists the alerts about people, warnings first, and none about nodes", async () => {
@@ -180,19 +190,19 @@ describe("Health ▸ People", () => {
 
   it("opens the user from the button, by params.user_id (a device alert's subject is the device)", async () => {
     await mount({ people: [ended(), connection()] });
-    const hrefs = [...document.querySelectorAll("a")].filter((a) => a.textContent === "Open user").map((a) => a.getAttribute("href"));
+    const hrefs = await eachOpen(() => [...document.querySelectorAll("a")].filter((a) => a.textContent === "Open user").map((a) => a.getAttribute("href")));
     expect(hrefs).toEqual(["/users/usr_masha", "/users/usr_oleg"]);
   });
 
   it("opens the assistant with the access question in the composer, only when the assistant is on", async () => {
     assistantOn = false;
     await mount({ people: [ended()] });
-    expect(text()).not.toContain("Work out what does not open");
+    expect(text()).not.toContain("Sort out reachability");
     act(() => root?.unmount());
     host?.remove();
     assistantOn = true;
     await mount({ people: [ended()] });
-    const button = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Work out what does not open")!;
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Ask the assistant")!;
     expect(button).toBeTruthy();
     const seen: unknown[] = [];
     const listen = (e: Event) => seen.push((e as CustomEvent).detail);
@@ -210,8 +220,9 @@ describe("Health ▸ People", () => {
 
   it("offers Close on each card and «Close all shown» for the list, asking with the count", async () => {
     await mount({ people: [connection({ id: "c1" }), connection({ id: "c2", params: { user_name: "Ira", user_id: "usr_ira" } }), ended()] });
-    const buttons = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
-    expect(buttons.filter((b) => b === "Close")).toHaveLength(3);
+    // a row's own Close is in its open body, one row at a time
+    const closes = await eachOpen(() => [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Close"));
+    expect(closes.length).toBe(3);
     const all = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Close all shown")!;
     await act(async () => void all.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(document.body.textContent).toContain("Close 3 alerts?");
@@ -225,7 +236,8 @@ describe("Health ▸ People", () => {
   it("says so when nothing is open, even with node alerts around", async () => {
     await mount({ people: [node(), impacted] });
     expect(cards()).toHaveLength(0);
-    expect(text()).toContain("Nobody has trouble connecting.");
+    expect(text()).toContain("All quiet");
+    expect(text()).toContain("No open alerts about people");
   });
 });
 
@@ -242,6 +254,7 @@ describe("Health ▸ Alerts", () => {
   it("is quiet when only people have alerts", async () => {
     await mount({ alerts: [ended(), connection()] });
     expect(cards()).toHaveLength(0);
-    expect(text()).toContain("All quiet.");
+    expect(text()).toContain("All quiet");
+    expect(text()).toContain("No alert in the last 7 days");
   });
 });

@@ -1,0 +1,24 @@
+HTTP/1.1 403 Forbidden
+Date: Tue, 17 Nov 2026 12:00:00 GMT
+Content-Type: text/html; charset=UTF-8
+Server: cloudflare
+CF-Mitigated: challenge
+CF-RAY: 8a1b2c3d4e5f6a7f-FRA
+Connection: close
+
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<title>Just a moment...</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="robots" content="noindex,nofollow">
+</head>
+<body>
+<div class="main-wrapper" role="main">
+  <h1>example.com</h1>
+  <h2 id="challenge-running">Checking if the site connection is secure</h2>
+  <noscript>Enable JavaScript and cookies to continue</noscript>
+</div>
+<script>(function(){window._cf_chl_opt={cvId:'3',cZone:'example.com',cType:'managed',cRay:'8a1b2c3d4e5f6a7f'};})();</script>
+</body>
+</html>

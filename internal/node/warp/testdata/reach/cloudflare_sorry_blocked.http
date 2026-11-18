@@ -1,0 +1,30 @@
+HTTP/1.1 403 Forbidden
+Date: Tue, 17 Nov 2026 12:00:00 GMT
+Content-Type: text/html; charset=UTF-8
+Server: cloudflare
+CF-RAY: 8a1b2c3d4e5f6a7e-CDG
+Connection: close
+
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<title>Attention Required! | Cloudflare</title>
+<meta charset="UTF-8" />
+<meta name="robots" content="noindex, nofollow" />
+</head>
+<body>
+<div class="cf-wrapper">
+  <div id="cf-error-details" class="cf-error-details-wrapper">
+    <h1 data-translate="block_headline">Sorry, you have been blocked</h1>
+    <h2 class="cf-subheadline"><span data-translate="unable_to_access">You are unable to access</span> example.com</h2>
+    <div class="cf-section cf-highlight">
+      <div class="cf-wrapper">
+        <h2 data-translate="blocked_why_headline">Why have I been blocked?</h2>
+        <p data-translate="blocked_why_detail">This website is using a security service to protect itself from online attacks. The action you just performed triggered the security solution.</p>
+      </div>
+    </div>
+    <div class="cf-error-footer">Cloudflare Ray ID: <strong>8a1b2c3d4e5f6a7e</strong> &bull; Your IP: 192.0.2.10 &bull; Performance &amp; security by Cloudflare</div>
+  </div>
+</div>
+</body>
+</html>

@@ -46,8 +46,18 @@ func (t accTotals) answerLost(proto string) (bool, map[string]string) {
 	return false, nil
 }
 
-// tcpFreeze reports VLESS connections that stall after the first 8 to 32 KiB, the TSPU's freeze: high when half of the
-// connections or more froze that way.
+// countsTCPStalls says which TCP engines count the stalls of their connections (agent.proto LinkCounters tcp_stalls).
+func countsTCPStalls(proto string) bool { return proto == "vless" || proto == "trusttunnel" }
+
+func tcpStallProtocolName(proto string) string {
+	if proto == "trusttunnel" {
+		return "TrustTunnel"
+	}
+	return "VLESS"
+}
+
+// tcpFreeze reports VLESS or TrustTunnel connections that stall after the first 8 to 32 KiB, the TSPU's freeze: high when
+// half of the connections or more froze that way.
 func (t accTotals) tcpFreeze() (bool, string, map[string]string) {
 	if !t.known("tcp_stalls_16k") || t.TCPStalls16K < minReasonCount || t.TCPStalls16K*2 < t.TCPStalls {
 		return false, "", nil
@@ -77,6 +87,9 @@ func (t accTotals) reasonsUnknown(proto string) []string {
 	case "trusttunnel":
 		if !t.known("auth_failed") {
 			return []string{"TrustTunnel authentication failures are not known: the node agent does not list trusttunnel/1"}
+		}
+		if !t.known("tcp_stalls") {
+			return []string{"TrustTunnel TCP stalls are not known: the node agent does not list trusttunnel-tcp-stalls/1"}
 		}
 	}
 	return nil

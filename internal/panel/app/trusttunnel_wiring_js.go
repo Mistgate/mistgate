@@ -3,10 +3,6 @@
 package app
 
 import (
-	"net/http"
-
-	"connectrpc.com/connect"
-
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
 )
@@ -17,7 +13,5 @@ import (
 const trustTunnelServicePath = "/mistgate.trusttunnel.v1.TrustTunnelService/"
 
 func (k *core) addTrustTunnel(cfg *httpserver.Config) {
-	cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: trustTunnelServicePath, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = connect.NewErrorWriter().Write(w, r, edition.Refuse(edition.TrustTunnel))
-	})})
+	refuseInEdition(cfg, trustTunnelServicePath, edition.TrustTunnel)
 }

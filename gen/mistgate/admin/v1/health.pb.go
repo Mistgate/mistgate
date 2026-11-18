@@ -173,6 +173,14 @@ const (
 	// (os.step.err.*), code the node's own code (os.job.err.*). Open while the rollout is PAUSED; closes when the owner cancels it.
 	// Produced from the updates module through a health condition source.
 	AlertKind_ALERT_KIND_OS_UPDATE_FAILED AlertKind = 24
+	// A site that the owner's WARP reach list names showed a block page through this node's WARP in two runs, with no "ok" between them (WarpReachService.
+	// GetWarpReachSettings; the node fetches the sites through its tunnel, GetWarpResponse.reach). WARNING. node_id = the node,
+	// subject = the domain, params{domain, colo, http_status, streak}: colo is the Cloudflare colo of the node's WARP exit at the
+	// run that said so. Some sites refuse WARP at one colo and not at another; the owner can restart WARP to get another exit.
+	// Closes when a run says "ok" for that domain (a timeout or an error does not close it), when the owner takes the domain off the list or turns
+	// the check off. It also closes when no run renews the result for 3 hours (the node is offline, or its WARP is not up). One
+	// alert per node and domain.
+	AlertKind_ALERT_KIND_WARP_REACH AlertKind = 25
 )
 
 // Enum value maps for AlertKind.
@@ -203,6 +211,7 @@ var (
 		22: "ALERT_KIND_SCHEDULED_CHECK",
 		23: "ALERT_KIND_SCHEDULED_TASK_FAILING",
 		24: "ALERT_KIND_OS_UPDATE_FAILED",
+		25: "ALERT_KIND_WARP_REACH",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -230,6 +239,7 @@ var (
 		"ALERT_KIND_SCHEDULED_CHECK":             22,
 		"ALERT_KIND_SCHEDULED_TASK_FAILING":      23,
 		"ALERT_KIND_OS_UPDATE_FAILED":            24,
+		"ALERT_KIND_WARP_REACH":                  25,
 	}
 )
 
@@ -3898,7 +3908,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xee\x05\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\x89\x06\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -3925,7 +3935,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1bALERT_KIND_AGENT_CRASH_LOOP\x10\x15\x12\x1e\n" +
 	"\x1aALERT_KIND_SCHEDULED_CHECK\x10\x16\x12%\n" +
 	"!ALERT_KIND_SCHEDULED_TASK_FAILING\x10\x17\x12\x1f\n" +
-	"\x1bALERT_KIND_OS_UPDATE_FAILED\x10\x18*\x8e\x01\n" +
+	"\x1bALERT_KIND_OS_UPDATE_FAILED\x10\x18\x12\x19\n" +
+	"\x15ALERT_KIND_WARP_REACH\x10\x19*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

@@ -1,0 +1,882 @@
+/*
+ * The Health page of the redesign (screens/health/*): what ./page.css (the parts both Health and Reachability share) does not say, in the board's own
+ * numbers (PnHealth + pn.css, the hl-/hlp rules at L4993-5193 and L6064, in the board's order, so the last rule of a selector still wins). The whole
+ * panel is the board's container, so a container query of the board is a media query on the window here. Tokens are the product's: --border is the
+ * board's hairline, --danger-text / --warning-text its crit / warn text, --tone-sky its sky, --ease-spring its spring. Motion: the sweep over the
+ * row that is being checked, the pop of its tick, the spinner dots, the open row's wash and the chevron's turn play by themselves (a hand's answer,
+ * short); the shake of a card whose fix failed too; reduced motion stills all of it (page.css L193).
+ * The body of an alert, shared with a node's Overview, is in ./alert-body.css; everything here hangs on .hlp.
+ */
+/* ---- the open alerts: one line each that opens into its body (L4994-5002, L5133-5136, L5172) ---- */
+.hlp .hl-als {
+  border-top: 1px solid var(--border);
+}
+.hlp .hl-al {
+  position: relative;
+  border-top: 1px solid var(--border);
+  transition: background-color 0.2s var(--e);
+  scroll-margin-top: 80px;
+}
+.hlp .hl-als > .hl-al:first-child {
+  border-top: 0;
+}
+.hlp .hl-al.hit {
+  animation: hlp-flash 2.4s var(--e) both;
+}
+.hlp .hl-al.open {
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
+.hlp .hl-al.mu .hl-alh b {
+  color: var(--sec);
+}
+/* the line of the product is a heading around the board's button: the heading takes no room of its own */
+.hlp .hl-al > h3 {
+  margin: 0;
+  font: inherit;
+}
+.hlp .hl-alh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 56px;
+  padding-block: 8px;
+  padding-inline: 20px 16px;
+  text-align: start;
+  border-radius: inherit;
+}
+.hlp .hl-alh b {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hlp .hl-alh b .hl-tag {
+  margin-inline-start: 8px;
+  vertical-align: 1px;
+}
+.hlp .hl-meta {
+  flex: none;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--warning-soft);
+  font-size: 12px;
+  line-height: 24px;
+  color: var(--warning-text);
+  white-space: nowrap;
+}
+.hlp .hl-alh em {
+  flex: none;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.hlp .hl-alh .sb-chev {
+  flex: none;
+  margin-inline-start: 4px;
+}
+/* the mark of IPv6 after a title (the product's, in the board's tag) */
+.hlp .hl-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--step);
+  font-size: 11px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--sec);
+}
+.hlp .hl-tag.ok {
+  background: var(--tone-mint-bg);
+  color: var(--ok);
+}
+.hlp .hl-tag .i {
+  width: 11px;
+  height: 11px;
+}
+.hlp .hl-emp {
+  padding-top: 4px;
+}
+/* a card of several alerts on one node: the rows of it, and the table of its ports */
+.hlp .hl-sub {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.hlp .hl-sub > li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.hlp .hl-sub > li:first-child {
+  border-top: 0;
+}
+.hlp .hl-sub > li > b {
+  font-size: 13px;
+  font-weight: 500;
+}
+.hlp .hl-sub .hl-alb {
+  padding: 0;
+}
+.hlp .hl-sub .hl-alb .hl-act {
+  margin-top: 8px;
+}
+.hlp .hl-alb .hl-tbl {
+  margin-top: 12px;
+}
+
+/* ---- the history: the days, the lines (L5006-5009) ---- */
+.hlp .hl-hist {
+  border-top: 1px solid var(--border);
+}
+.hlp .hl-hist:empty {
+  display: none;
+}
+.hlp .hl-day {
+  padding: 12px 20px 8px;
+  border-top: 1px solid var(--border);
+}
+.hlp .hl-hist > .hl-day:first-child {
+  border-top: 0;
+}
+.hlp .hl-dl {
+  display: block;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.hlp .hl-hl {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hlp .hl-hl > li {
+  scroll-margin-top: 80px;
+  border-top: 1px solid var(--border);
+}
+.hlp .hl-hl > li:first-child {
+  border-top: 0;
+}
+.hlp .hl-hr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 14px;
+}
+.hlp .hl-hrb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  text-align: start;
+}
+.hlp .hl-hrb > .mono:first-child {
+  flex: 0 0 44px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hlp .hl-hrb .pv-pill {
+  flex: none;
+}
+.hlp .hl-hrb b {
+  flex: 1;
+  min-width: 0;
+  font-weight: 400;
+  color: var(--sec);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hlp .hl-hrb b .hl-tag {
+  margin-inline-start: 8px;
+  vertical-align: 1px;
+}
+.hlp .hl-hrb em {
+  flex: none;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hlp .hl-hrb .sb-chev {
+  margin-inline-start: 0;
+}
+.hlp .hl-hr .hl-end {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.hlp .hl-hr .hl-end.ok {
+  color: var(--ok);
+}
+.hlp .hl-hr .hl-end .i {
+  width: 13px;
+  height: 13px;
+}
+.hlp .hl-hs {
+  list-style: none;
+  margin: 0 0 8px;
+  margin-inline-start: 52px;
+  padding: 0 12px;
+  border-inline-start: 1px solid var(--border);
+}
+.hlp .hl-hs > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  scroll-margin-top: 80px;
+}
+.hlp .hl-hs > li > .when {
+  margin-inline-start: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hlp .hl-hs > li > .what {
+  color: var(--muted);
+}
+.hlp .hl-more {
+  padding: 8px 20px 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---- by node: the filter, and the doctor's list of nodes (L5010-5015, L5037, L5110) ---- */
+.hlp .hl-nodes {
+  border-top: 1px solid var(--border);
+}
+.hlp .hl-nodes > button,
+.hlp .hl-nodes > a,
+.hlp .hl-nodes > div {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 20px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  text-align: start;
+  transition: background-color 0.15s var(--e);
+}
+.hlp .hl-nodes > :first-child {
+  border-top: 0;
+}
+.hlp .hl-nodes button:hover {
+  background: var(--step);
+}
+.hlp .hl-nodes button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+[dir="rtl"] .hlp .hl-nodes button[aria-pressed="true"] {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+.hlp .hl-nodes svg:first-child,
+.hlp .hl-cnode svg:first-child {
+  flex: none;
+  width: 18px;
+  height: 13px;
+  border-radius: 3px;
+}
+.hlp .hl-nodes b {
+  font-weight: 500;
+}
+.hlp .hl-nodes span:not(:first-child) {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hlp .hl-nodes span.warn {
+  color: var(--warning-text);
+}
+.hlp .hl-nodes span.crit {
+  color: var(--danger-text);
+}
+.hlp .hl-nodes span.sky {
+  color: var(--tone-sky);
+}
+/* the node that is being asked: the sweep over its row (L5015) */
+.hlp .hl-nodes .cking::before,
+.hlp .hl-cw.cking::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--tone-sky) 12%, transparent) 50%, transparent);
+  background-size: 60% 100%;
+  background-repeat: no-repeat;
+  animation: hlp-sweep 0.7s var(--e) both;
+}
+.hlp .hl-cw.cking::before {
+  animation-duration: 0.65s;
+}
+[dir="rtl"] .hlp .hl-nodes .cking::before,
+[dir="rtl"] .hlp .hl-cw.cking::before {
+  transform: scaleX(-1);
+}
+.hlp .hl-nodes .cking span {
+  color: var(--tone-sky);
+}
+/* the card "Checks" on the side: its lines are the board's .pp-q1 in a padded block */
+.hlp .hl-side-ck .pp-q1 {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* ---- the client-eye table (L5019-5031, L5133-5147) ---- */
+.hlp .hl-ct {
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.hlp .hl-cs {
+  min-width: calc(136px + var(--n, 3) * 92px + 56px);
+}
+.hlp .hl-cr {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) repeat(var(--n, 3), minmax(0, 1fr)) 16px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 20px;
+  text-align: start;
+  font-size: 14px;
+}
+.hlp .hl-ch {
+  min-height: 40px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hlp .hl-ch > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hlp .hl-cw {
+  position: relative;
+  border-top: 1px solid var(--border);
+}
+.hlp .hl-cw.open {
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
+.hlp .hl-cw {
+  transition: background-color 0.2s var(--e);
+}
+.hlp .hl-cnode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hlp .hl-cnode b {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hlp .hl-cv {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--sec);
+  white-space: nowrap;
+}
+.hlp .hl-cv > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hlp .hl-cv .hl-slow {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.hlp .hl-cv .hl-slow .i {
+  width: 10px;
+  height: 10px;
+}
+.hlp .hl-cv.bad {
+  color: var(--danger-text);
+}
+.hlp .hl-cv.part {
+  color: var(--warning-text);
+}
+.hlp .hl-cv.dim {
+  color: var(--muted);
+}
+.hlp .hl-cr[aria-expanded="true"] .sb-chev {
+  transform: rotate(90deg);
+}
+[dir="rtl"] .hlp .hl-cr[aria-expanded="true"] .sb-chev {
+  transform: rotate(90deg) scaleX(-1);
+}
+.hlp .hl-cw.cking .hl-cv {
+  color: var(--tone-sky);
+}
+.hlp .hl-cw.ckw .hl-cv {
+  color: var(--muted);
+}
+.hlp .hl-cw.ckn .hl-cv .rw-gl {
+  animation: hlp-pop 0.5s var(--ease-spring) both;
+}
+.hlp .hl-cd {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 0 20px 16px;
+}
+.hlp .hl-cd > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--step);
+  min-width: 0;
+}
+.hlp .hl-cd span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hlp .hl-cd b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.hlp .hl-cd b.bad {
+  color: var(--danger-text);
+}
+.hlp .hl-cd b.part {
+  color: var(--warning-text);
+}
+.hlp .hl-cd em {
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sec);
+  overflow-wrap: anywhere;
+}
+.hlp .hl-cd .hl-bars {
+  margin-top: 8px;
+}
+.hlp .hl-cd > .hl-cda {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  background: none;
+}
+.hlp .hl-cd .an-lk {
+  align-self: flex-start;
+  font-size: 13px;
+}
+/* the sources under the table: the probe's run and the legend */
+.hlp .btn.busy {
+  pointer-events: none;
+}
+.hlp .hl-ck > .rc-nt {
+  margin: 0 20px 12px;
+}
+.hlp .sb-mv2 {
+  padding: 0;
+}
+.hlp .sb-mvh {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 20px;
+  text-align: start;
+  border-radius: inherit;
+}
+.hlp .sb-mvh > .i {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+  color: var(--muted);
+  transition: transform 0.2s var(--e);
+}
+.hlp .sb-mvh[aria-expanded="true"] > .i {
+  transform: rotate(90deg);
+}
+[dir="rtl"] .hlp .sb-mvh > .i {
+  transform: scaleX(-1);
+}
+[dir="rtl"] .hlp .sb-mvh[aria-expanded="true"] > .i {
+  transform: rotate(90deg) scaleX(-1);
+}
+.hlp .sb-mvh > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hlp .sb-mvh b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.hlp .sb-mvh em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hlp .hl-leg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 24px;
+  padding-block: 0 16px;
+  padding-inline: 48px 20px;
+}
+.hlp .hl-leg > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 13px;
+}
+.hlp .hl-leg b {
+  font-weight: 500;
+}
+.hlp .hl-leg span {
+  color: var(--muted);
+}
+.hlp .hl-udp {
+  margin: 0 20px 12px;
+}
+
+/* ---- the doctor: the sum, the findings, the nodes (L5032-5037, L5079) ---- */
+.hlp .hl-dsum {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  overflow: hidden;
+}
+.hlp .hl-dsum > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hlp .hl-dsum span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hlp .hl-dsum b {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 28px;
+}
+.hlp .hl-dsum b.warn {
+  color: var(--warning-text);
+}
+.hlp .hl-dsum .btn {
+  margin-inline-start: auto;
+  gap: 8px;
+}
+.hlp .hl-dsum .btn .an-sp {
+  color: var(--tone-sky);
+}
+.hlp .hl-dsum .rw-pg {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+  bottom: 0;
+  margin: 0;
+  border-radius: 0;
+}
+.hlp .hl-find .pp-sh {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hlp .hl-find .pp-sh .hl-ft {
+  flex: 1 1 auto;
+  margin: 0;
+  text-align: start;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.hlp .hl-find .pp-sh .hl-who a {
+  color: inherit;
+  text-decoration: none;
+}
+.hlp .hl-find .pp-sh .hl-who a:hover {
+  text-decoration: underline;
+}
+.hlp .hl-find.stale {
+  opacity: 0.6;
+}
+.hlp .hl-acc {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.hlp .hl-acc .an-lk {
+  color: var(--text);
+}
+.hlp .hl-steps {
+  margin-top: 12px;
+}
+/* what the board does not draw, in its words: the steps by hand are a box of the step grey (as the raw line, L5036, and the box of a problem, L5095), a command a raw line */
+.hlp .hl-steps > ol {
+  margin-inline-start: 0;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--step);
+}
+.hlp .hl-steps code,
+.hlp .hl-act code {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--step);
+  color: var(--sec);
+}
+.hlp .hl-steps > ol code {
+  background: var(--surface);
+}
+.hlp .hl-dn > div span {
+  margin-inline-start: auto;
+}
+.hlp .hl-dn span.mut {
+  color: var(--muted);
+}
+.hlp .hl-quiet {
+  margin: 0;
+  padding: 0 20px 16px;
+  list-style: none;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.hlp .hl-quiet li + li {
+  margin-top: 6px;
+}
+.hlp .hl-quiet a {
+  color: var(--text);
+}
+
+/* ---- the card that asks the assistant, the two buttons of "no nodes" (L5188-5193) ---- */
+.hlp .hl-ask {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 20px;
+}
+.hlp .hl-ask .pp-ic {
+  flex: none;
+}
+.hlp .hl-ask > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hlp .hl-ask b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.hlp .hl-ask span {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.hlp .hl-ask .btn {
+  flex: none;
+  gap: 8px;
+  text-decoration: none;
+}
+.hlp .hl-ask .btn .i {
+  width: 16px;
+  height: 16px;
+}
+.hlp .hl-two {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.hlp .hl-two .btn {
+  margin-top: 0;
+}
+.hlp .hl-lead {
+  padding-top: 4px;
+}
+
+/* ---- the states before the tabs (the order of the board's: the skeleton, the error and the quiet card keep their place under the tabs) ---- */
+.hlp [role="tabpanel"] > .hl-skl {
+  margin-top: 0;
+}
+.hlp [role="tabpanel"] > .pv-qe {
+  margin-top: -4px;
+}
+.hlp [role="tabpanel"] > .hl-top {
+  margin-top: 0;
+}
+.hlp .sb-tab > .rc-nt {
+  margin-bottom: 16px;
+}
+.hlp .sb-tab > .hl-calm,
+.hlp .col > .hl-calm {
+  margin-bottom: 16px;
+}
+/* the quiet card brings its own gap under it (the board's); in a block flow the next card's margin merges with it, in a column it adds (L148, L5016) */
+.hlp .sb-tab > .hl-calm + .card {
+  margin-top: 0;
+}
+
+/* ---- narrow: ≤720 the card's paddings step in (L5075-5077); ≤600 the lines fold (L5114-5147, L5172, L5192-5193) ---- */
+@media (max-width: 720px) {
+  .hlp .hl-day {
+    padding: 12px 16px 8px;
+  }
+  .hlp .hl-leg {
+    padding-inline-start: 16px;
+  }
+}
+.hlp .hl-nodes > a:hover {
+  background: var(--step);
+}
+.hlp .hl-np span {
+  margin-inline-start: auto;
+}
+.hlp .hl-np .sb-chev {
+  margin-inline-start: 0;
+}
+@media (max-width: 600px) {
+  .hlp .hl-alh .sb-chev {
+    display: none;
+  }
+  .hlp .hl-alh {
+    flex-wrap: wrap;
+    padding-block: 12px;
+    padding-inline: 16px 12px;
+    gap: 8px;
+  }
+  .hlp .hl-alh b {
+    flex: 1 1 100%;
+    order: 5;
+    white-space: normal;
+  }
+  .hlp .hl-alh em {
+    margin-inline-start: auto;
+  }
+  .hlp .hl-sp {
+    display: none;
+  }
+  .hlp .hl-hrb {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 8px 0;
+  }
+  .hlp .hl-hrb b {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+  .hlp .hl-ch {
+    display: none;
+  }
+  .hlp .hl-cs {
+    min-width: 0;
+  }
+  .hlp .hl-cr {
+    grid-template-columns: 1fr 1fr 16px;
+    gap: 8px 12px;
+    padding: 12px 16px;
+  }
+  .hlp .hl-cr > .hl-cnode {
+    grid-column: 1 / 3;
+  }
+  .hlp .hl-cr > .sb-chev {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .hlp .hl-cv::before {
+    content: attr(data-l);
+    color: var(--muted);
+    margin-inline-end: 2px;
+  }
+  .hlp .hl-cv {
+    grid-column: 1 / 3;
+    flex-wrap: wrap;
+  }
+  .hlp .hl-cd {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px;
+  }
+  .hlp .hl-dsum {
+    gap: 16px 24px;
+  }
+  .hlp .hl-dsum .btn {
+    margin-inline-start: 0;
+    flex: 1 1 100%;
+  }
+  .hlp .hl-ask {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .hlp .hl-ask > div {
+    flex: 1 1 calc(100% - 64px);
+  }
+  .hlp .hl-ask .btn {
+    margin-inline-start: 48px;
+  }
+  .hlp .hl-hs {
+    margin-inline-start: 16px;
+  }
+  .hlp .hl-udp {
+    margin-inline: 16px;
+  }
+  .hlp .hl-ck > .rc-nt {
+    margin-inline: 16px;
+  }
+  .hlp .hl-more {
+    padding-inline: 16px;
+  }
+  .hlp .hl-quiet {
+    padding-inline: 16px;
+  }
+}

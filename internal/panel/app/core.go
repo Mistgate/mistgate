@@ -431,6 +431,7 @@ func wireCore(c Config) (*core, error) {
 		return nil, err
 	}
 	fl.SetWarp(warpForFleet{k.wsv})
+	k.addWarpReachConditions(hl) // WARP_REACH: a site that shows a block page through a node's WARP
 	k.own = newOwnProbes(k)
 	return k, nil
 }

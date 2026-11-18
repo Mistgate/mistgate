@@ -41,6 +41,9 @@ const (
 	// capTrustTunnelRefusals marks the TrustTunnel engine that counts the tunnel requests it refused, by reason, on the
 	// inbound's row (agent.proto LinkCounters tunnel_*). A panel without it ignores the fields; an agent without it sends none.
 	capTrustTunnelRefusals = "trusttunnel-refusals/1"
+	// capTrustTunnelTCPStalls marks the TrustTunnel engine that counts the HTTP/2 connections that ended with data the client
+	// never acknowledged (agent.proto LinkCounters tcp_stalls, tcp_stalls_16k), on the inbound's row.
+	capTrustTunnelTCPStalls = "trusttunnel-tcp-stalls/1"
 	// capVLESSTLS: the VLESS engine terminates TLS through its certificate source before Xray receives a connection.
 	capVLESSTLS = "vless-tls/1"
 	// capVLESSSelf: the VLESS engine serves the node's own site behind REALITY (reality.target "self", design/vless.md
@@ -112,6 +115,8 @@ type WarpManager interface {
 	Run(ctx context.Context)
 	// Cleanup removes everything the manager installed on the host.
 	Cleanup(ctx context.Context) error
+	// Reach fetches the sites through the tunnel and says which show a block page (agent.proto "WARP REACH").
+	Reach(ctx context.Context, domains []string) (warp.ReachReport, error)
 }
 
 // SettingsAware is implemented by an engine whose configuration comes from NodeSettings (awg: the backend). The worker
@@ -193,7 +198,7 @@ func (a *Agent) capabilities() []string {
 		}
 	}
 	if _, ok := a.engines["trusttunnel"]; ok {
-		caps = append(caps, capTrustTunnel, capTrustTunnelH3, capTrustTunnelRefusals)
+		caps = append(caps, capTrustTunnel, capTrustTunnelH3, capTrustTunnelRefusals, capTrustTunnelTCPStalls)
 	}
 	if a.sharesTCP() {
 		caps = append(caps, capTCPShare)
@@ -202,7 +207,7 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, capUserRateLimit)
 	}
 	if a.cfg.Warp != nil {
-		caps = append(caps, capWarp)
+		caps = append(caps, capWarp, capWarpReach)
 	}
 	if rh, ok := a.host.(hostctl.RelayHost); ok && rh.RelaySupported() {
 		caps = append(caps, plugin.CapRelayForward)

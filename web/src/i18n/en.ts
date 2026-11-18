@@ -58,6 +58,8 @@ import { en as subsdnsEn } from "./subsdns";
 import { en as usersgroupEn } from "./usersgroup";
 import { en as decoysitesEn } from "./decoysites";
 import { en as profilespageEn } from "./profilespage";
+import { en as healthpageEn } from "./healthpage";
+import { en as reachpageEn } from "./reachpage";
 import { en as updatespageEn } from "./updatespage";
 import { en as profilesrvEn } from "./profilesrv";
 
@@ -336,7 +338,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...decoysitesEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...profilesrvEn, ...profilenewEn, ...subspnEn, ...subshxEn, ...subsdnsEn, ...updatespageEn, ...settingspageEn, ...aipageEn, ...igpageEn, ...aspageEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...decoysitesEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...healthpageEn, ...reachpageEn, ...profilesrvEn, ...profilenewEn, ...subspnEn, ...subshxEn, ...subsdnsEn, ...updatespageEn, ...settingspageEn, ...aipageEn, ...igpageEn, ...aspageEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

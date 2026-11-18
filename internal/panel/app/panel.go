@@ -198,6 +198,7 @@ type jobServices struct {
 	cheburcheck *cheburcheck.Service
 	bsbord      *bsbord.Service
 	update      *update.Service
+	warp        *warp.Service
 	backup      *backup.Service
 	telegram    *telegram.Service
 	assistant   assistantRetention

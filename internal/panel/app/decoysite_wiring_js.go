@@ -3,10 +3,6 @@
 package app
 
 import (
-	"net/http"
-
-	"connectrpc.com/connect"
-
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
 )
@@ -17,7 +13,5 @@ import (
 const decoySiteServicePath = "/mistgate.decoysite.v1.DecoySiteService/"
 
 func (k *core) addDecoySite(cfg *httpserver.Config) {
-	cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: decoySiteServicePath, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = connect.NewErrorWriter().Write(w, r, edition.Refuse(edition.DecoyOwn))
-	})})
+	refuseInEdition(cfg, decoySiteServicePath, edition.DecoyOwn)
 }

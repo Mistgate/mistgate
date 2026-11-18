@@ -239,6 +239,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("UDP packets are being lost", "Теряются UDP-пакеты", "UDP 正在丢包")
 	case "agent_crash_loop":
 		return l.pick("The node agent keeps crashing", "Агент ноды постоянно падает", "节点 Agent 反复崩溃")
+	case "warp_reach":
+		return warpReachTitle(l)
 	case "scheduled_check":
 		return l.pick("Scheduled check found a problem", "Задача по расписанию нашла проблему", "计划任务发现了问题")
 	case "scheduled_task_failing":
@@ -389,6 +391,8 @@ func alertReason(l L, a store.HealthAlert) string {
 		task, n, reason := data(p["task"], 80), data(p["count"], 4), data(p["reason"], 40)
 		return l.pick("Task "+task+" failed "+n+" runs in a row ("+reason+").", "Задача "+task+" не выполнилась "+n+" раз подряд ("+reason+").",
 			"任务 "+task+" 连续 "+n+" 次运行失败（"+reason+"）。")
+	case "warp_reach":
+		return warpReachReason(l, p)
 	case "agent_crash_loop":
 		n, w := data(p["count"], 4), data(p["window_min"], 4)
 		return l.pick("The agent crashed and restarted "+n+" times in "+w+" minutes.", "Агент упал и перезапустился "+n+" раз за "+w+" минут.", "Agent 在 "+w+" 分钟内崩溃并重启了 "+n+" 次。")
