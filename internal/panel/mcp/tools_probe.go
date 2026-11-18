@@ -31,6 +31,7 @@ const probeLimits = "It sends real traffic between your nodes, so it is rate lim
 
 func probeTools() []toolDef {
 	return append(change(pathSpeed), []toolDef{
+		pathSpeedResultsTool(),
 		probeTool("path_probe", probeToolTimeout, procs(adminv1connect.NodeServiceListNodesProcedure, probev1connect.ProbeServicePathProbeProcedure),
 			"Probe the path from one of your nodes (from) to another (to) now, to tell a bad node from a bad path or a filtered port. Both are node ids or exact names; the targets are always the ports the to node itself serves, never a host you name. "+
 				"kind udp: the sender sends 150 tagged 256-byte datagrams per port at 25 a second and the target counts them (about 6 s): per port sent, got and a verdict ok, lossy or broken. "+

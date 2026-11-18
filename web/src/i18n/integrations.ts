@@ -328,6 +328,7 @@ export const en = {
   "approval.fail.plan_unreadable": "the stored plan cannot be read",
   "approval.fail.fix_not_applied": "the node did not apply the fix",
   "approval.fail.changed_since_plan": "things changed after the plan, the agent has to make a new one",
+  "approval.fail.decoy_site_changed": "the site changed after the plan was made: make a new plan",
   "approval.fail.interrupted": "the panel restarted while applying it",
   "approval.fail.no_trusted_bundle": "no trusted update bundle",
 
@@ -720,6 +721,7 @@ export const ru: Record<keyof typeof en, string> = {
   "approval.fail.plan_unreadable": "сохранённый план не читается",
   "approval.fail.fix_not_applied": "нода не применила исправление",
   "approval.fail.changed_since_plan": "после плана всё изменилось, агенту нужен новый план",
+  "approval.fail.decoy_site_changed": "сайт изменился после создания плана: создай план заново",
   "approval.fail.interrupted": "панель перезапустилась во время применения",
   "approval.fail.no_trusted_bundle": "нет проверенного пакета обновлений",
 
@@ -1112,6 +1114,7 @@ export const zh: typeof en = {
   "approval.fail.plan_unreadable": "无法读取已保存的计划",
   "approval.fail.fix_not_applied": "节点未应用该修复",
   "approval.fail.changed_since_plan": "计划生成后情况有变，智能体需要重新生成计划",
+  "approval.fail.decoy_site_changed": "站点在生成计划后发生了变化：请重新生成计划",
   "approval.fail.interrupted": "应用过程中面板重启了",
   "approval.fail.no_trusted_bundle": "没有可信的更新包",
 
@@ -1482,6 +1485,7 @@ export const fa: Record<keyof typeof en, string> = {
   "approval.fail.plan_unreadable": "برنامهٔ ذخیره‌شده خوانده نمی‌شود",
   "approval.fail.fix_not_applied": "نود اصلاح را اعمال نکرد",
   "approval.fail.changed_since_plan": "بعد از برنامه‌ریزی اوضاع عوض شده، ایجنت باید برنامهٔ تازه‌ای بسازد",
+  "approval.fail.decoy_site_changed": "سایت پس از ساخت برنامه تغییر کرده است: برنامهٔ تازه‌ای بسازید",
   "approval.fail.interrupted": "پنل هنگام اجرا دوباره راه‌اندازی شد",
   "approval.fail.no_trusted_bundle": "بستهٔ به‌روزرسانی معتبری نیست",
   "approval.value.disable": "اتصال‌هایشان قطع می‌شود و دستگاه‌هایشان از نودها حذف می‌شوند.",
@@ -1849,6 +1853,7 @@ export const tr: Record<keyof typeof en, string> = {
   "approval.fail.plan_unreadable": "kayıtlı plan okunamıyor",
   "approval.fail.fix_not_applied": "düğüm düzeltmeyi uygulamadı",
   "approval.fail.changed_since_plan": "plandan sonra bir şeyler değişti, ajanın yeni bir plan yapması gerekiyor",
+  "approval.fail.decoy_site_changed": "site plan yapıldıktan sonra değişti: yeni bir plan oluştur",
   "approval.fail.interrupted": "panel uygularken yeniden başladı",
   "approval.fail.no_trusted_bundle": "güvenilir bir güncelleme paketi yok",
   "approval.value.disable": "Bağlantıları kesilir ve cihazları düğümlerden çıkarılır.",

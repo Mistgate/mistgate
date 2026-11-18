@@ -128,6 +128,9 @@ export function DecoysScreen({ demo }: { demo?: DecoysDemo } = {}) {
 
 // ---- showing now
 
+/** The columns of the "showing now" grid (decoys.css .dz-now). */
+export const nowColumns = 5;
+
 /**
  * What each node and the panel show now: the site, the built-in page or the panel's directory, with the delivery where it is not done.
  * The panel says itself what it shows: a chosen site that is gone or is a draft is not shown, and the card says what stands instead.
@@ -141,6 +144,8 @@ export function Showing({ nodes, sites, panelSource, panel: panelState, ready }:
     ...nodes.map((n) => ({ key: n.id, node: n, serves: nodeServes(n) })),
     { key: "panel", node: undefined, serves: { kind: panel.kind, siteId: panel.siteId } },
   ];
+  // the grid is five cells wide: the last row is filled up with blank cells, so its lines run as far as the others' (see .dz-now)
+  const blanks = (nowColumns - (cells.length % nowColumns)) % nowColumns;
   const own = cells.some((c) => c.serves.kind === "site" && byId.has(c.serves.siteId));
   const sum = nodes.length > 0 ? t(own ? "dz.now.sum" : "dz.now.sumBi", { nodes: t.n("dz.now.nodes", nodes.length) }) : "";
   if (!ready) return null;
@@ -205,6 +210,9 @@ export function Showing({ nodes, sites, panelSource, panel: panelState, ready }:
             </SiteLink>
           );
         })}
+        {Array.from({ length: blanks }, (_, i) => (
+          <span key={`blank${i}`} className="dz-nw dz-nb" aria-hidden />
+        ))}
       </section>
     </>
   );

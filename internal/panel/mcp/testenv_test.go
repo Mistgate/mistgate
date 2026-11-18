@@ -420,6 +420,7 @@ type world struct {
 	traceReqs           []*probev1.NodeTraceRequest
 	dnsReqs             []*probev1.NodeDnsCheckRequest
 	speedReqs           []*probev1.PathSpeedRequest
+	speedResultReqs     []*probev1.PathSpeedResultsRequest
 	speedCode           string // the error code PathSpeed answers with
 	probeRateLimited    bool   // PathProbe answers resource exhausted
 	clientAPIEnabled    bool

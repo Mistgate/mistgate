@@ -151,6 +151,42 @@ func (s probeService) PathSpeed(ctx context.Context, req *connect.Request[probev
 	return connect.NewResponse(speedMessage(from.Name, to.Name, m.Direction, at, res)), nil
 }
 
+// PathSpeedResults lists the speed tests kept in the last 7 days, newest first: what an approved path_speed plan measured.
+// Node names and figures only, never an address.
+func (s probeService) PathSpeedResults(ctx context.Context, req *connect.Request[probev1.PathSpeedResultsRequest]) (*connect.Response[probev1.PathSpeedResultsResponse], error) {
+	f, m := s.f, req.Msg
+	limit := int(m.Limit)
+	if limit == 0 {
+		limit = 20
+	}
+	limit = min(limit, 50)
+	rows, err := f.st.PathSpeeds(ctx, f.now().Add(-store.PathSpeedKeepHours*time.Hour), m.NodeId, limit)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "read path speeds", err)
+	}
+	names := map[string]string{}
+	name := func(id string) string {
+		if n, ok := names[id]; ok {
+			return n
+		}
+		n, err := f.st.Node(ctx, id)
+		if err != nil {
+			return id
+		}
+		names[id] = n.Name
+		return n.Name
+	}
+	out := &probev1.PathSpeedResultsResponse{}
+	for _, r := range rows {
+		var j speedJSON
+		if json.Unmarshal([]byte(r.ResultJSON), &j) != nil {
+			continue
+		}
+		out.Tests = append(out.Tests, speedMessage(name(r.FromID), name(r.ToID), r.Direction, r.At, j))
+	}
+	return connect.NewResponse(out), nil
+}
+
 func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direction string, mb uint32) speedJSON {
 	res := speedJSON{MB: mb}
 	liveRows, err := f.Live(ctx)

@@ -441,7 +441,7 @@ func nodeServerKeyAddPlanTool() toolDef {
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
 					}
-					danger := []string{dangerStepUp, "The panel edits only this login user's ~/.ssh/authorized_keys and verifies the result."}
+					danger := []string{dangerStepUp, dangerSSHKeyEdit}
 					planned := &planned{
 						Summary: "Add one public SSH key to the selected node after owner approval.",
 						Facts: []Fact{{Key: "node", Value: nm(p.Name), Untrusted: true}, {Key: "login", Value: login},
@@ -531,7 +531,7 @@ func nodeServerKeysAddPlanTool() toolDef {
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
 					}
-					danger := []string{dangerStepUp, "The panel adds the key to each selected login's SSH keys and verifies it."}
+					danger := []string{dangerStepUp, dangerSSHKeysAdd}
 					if len(nodes) > 1 {
 						danger = mergeDanger(danger, dangerBulk)
 					}
@@ -722,9 +722,9 @@ func nodeServerKeyRemovePlanTool() toolDef {
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
 					}
-					danger := []string{dangerStepUp, "The panel edits only this login user's ~/.ssh/authorized_keys."}
+					danger := []string{dangerStepUp, dangerSSHKeyEdit}
 					if p.PanelKey {
-						danger = append(danger, "The panel will log in with the saved password after removing its key; the panel proves that password first.")
+						danger = append(danger, dangerSSHPassword)
 					}
 					planned := &planned{
 						Summary: "Remove one public SSH key from the selected node after owner approval.",

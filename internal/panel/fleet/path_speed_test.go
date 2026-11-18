@@ -121,6 +121,40 @@ func TestPathSpeedServesRunsStopsAndStoresWithoutAnAddress(t *testing.T) {
 	}
 }
 
+// The figures of a finished test can be read back (path_speed_results): names and numbers, newest first, no address.
+func TestPathSpeedResultsReadsBackTheStoredTests(t *testing.T) {
+	x, sender, target, senderConn, targetConn := speedPair(t)
+	result := startPathSpeed(x, sender.nodeID, target.nodeID, 24, "down")
+	serve := waitSpeed(targetConn, 1)
+	replyPortCommand(targetConn, serve.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"port": "40123"}})
+	run := waitSpeed(senderConn, 2)
+	replyPortCommand(senderConn, run.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{
+		"mbit_s": "308.3", "connect_ms": "37", "first_byte_ms": "37", "duration_ms": "870", "bytes": strconv.Itoa(24 << 20)}})
+	stop := waitSpeed(targetConn, 3)
+	replyPortCommand(targetConn, stop.RequestId, &agentv1.CommandResult{Ok: true})
+	awaitSpeed(t, result)
+
+	got, err := (probeService{x.f}).PathSpeedResults(x.ctx, connect.NewRequest(&probev1.PathSpeedResultsRequest{}))
+	if err != nil || len(got.Msg.Tests) != 1 {
+		t.Fatalf("results = %+v, %v", got, err)
+	}
+	r := got.Msg.Tests[0]
+	if r.FromName != "sender" || r.ToName != "nodea" || r.Direction != "down" || r.Mb != 24 || r.MbitS != 308.3 || r.DurationMs != 870 || r.ConnectMs != 37 || r.AtUnix == 0 {
+		t.Fatalf("the stored test = %+v", r)
+	}
+	noAddress(t, "the results", prototext.Format(got.Msg))
+	// a node that took no part has none
+	other, err := (probeService{x.f}).PathSpeedResults(x.ctx, connect.NewRequest(&probev1.PathSpeedResultsRequest{NodeId: "nod_other"}))
+	if err != nil || len(other.Msg.Tests) != 0 {
+		t.Fatalf("another node's results = %+v, %v", other, err)
+	}
+	// the sender's own list has it
+	mine, err := (probeService{x.f}).PathSpeedResults(x.ctx, connect.NewRequest(&probev1.PathSpeedResultsRequest{NodeId: sender.nodeID, Limit: 5}))
+	if err != nil || len(mine.Msg.Tests) != 1 {
+		t.Fatalf("the sender's results = %+v, %v", mine, err)
+	}
+}
+
 func TestPathSpeedUpDirectionAndTheTargetStopsAfterAFailure(t *testing.T) {
 	x, sender, target, senderConn, targetConn := speedPair(t)
 	result := startPathSpeed(x, sender.nodeID, target.nodeID, 8, "up")

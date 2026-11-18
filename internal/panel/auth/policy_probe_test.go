@@ -17,6 +17,8 @@ func TestPathProbeProcedurePolicy(t *testing.T) {
 		NodeTraceProcedure:    probev1connect.ProbeServiceNodeTraceProcedure,
 		NodeDnsCheckProcedure: probev1connect.ProbeServiceNodeDnsCheckProcedure,
 		PathSpeedProcedure:    probev1connect.ProbeServicePathSpeedProcedure,
+
+		PathSpeedResultsProcedure: probev1connect.ProbeServicePathSpeedResultsProcedure,
 	} {
 		if got != want {
 			t.Errorf("policy constant %q differs from the generated procedure %q", got, want)
@@ -36,6 +38,17 @@ func TestPathProbeProcedurePolicy(t *testing.T) {
 		if NeedsStepUp(path) {
 			t.Errorf("%s needs a step-up", path)
 		}
+	}
+}
+
+// The kept figures of a speed test move nothing: any signed-in admin reads them, and a token reads them directly.
+func TestPathSpeedResultsAreReadOnly(t *testing.T) {
+	path := probev1connect.ProbeServicePathSpeedResultsProcedure
+	if got := ProcedureRole(path); got != store.RoleReadonly {
+		t.Errorf("ProcedureRole = %q, want readonly", got)
+	}
+	if got, ok := TokenAccess(path); !ok || got != TokenAccessDirect {
+		t.Errorf("TokenAccess = %v, %v; want direct", got, ok)
 	}
 }
 

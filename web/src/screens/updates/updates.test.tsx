@@ -948,13 +948,18 @@ describe("What's new", () => {
     security: false,
     ...over,
   });
-  const behind = (over: Record<string, unknown> = {}) =>
-    page({
+  // the notes belong to the panel's own tab (the board has no "What's new" on the agents tab)
+  const releaseUpdate = { version: "v0.1.40", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.1.40", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
+  const behind = (over: Record<string, unknown> = {}) => {
+    route.search = { tab: "panel" };
+    return page({
       bundle: bundle({ version: "v0.1.40" }),
       nodes: [node({ nodeId: "nod_1", name: "de1", version: "v0.1.37", state: NodeUpdateState.OUTDATED })],
-      agentNotes: [note("v0.1.40"), note("v0.1.39"), note("v0.1.38")],
+      panel: { ...page().panel, update: releaseUpdate },
+      panelNotes: [note("v0.1.40"), note("v0.1.39"), note("v0.1.38")],
       ...over,
     });
+  };
   const remount = async (data: unknown) => {
     await act(async () => root!.unmount());
     host!.remove();
@@ -962,7 +967,7 @@ describe("What's new", () => {
   };
   const article = (version: string) => [...document.querySelectorAll("article")].find((x) => x.getAttribute("aria-label") === version);
 
-  it("shows the newest release in the node card and folds the earlier ones", async () => {
+  it("shows the newest release in the panel card and folds the earlier ones", async () => {
     await mount(behind());
     expect(text()).toContain("What’s new");
     expect(text()).toContain("Fix in v0.1.40.");
@@ -983,7 +988,7 @@ describe("What's new", () => {
   });
 
   it("badges a release with security fixes and says so plainly", async () => {
-    await mount(behind({ agentNotes: [note("v0.1.40"), note("v0.1.39", { security: true, en: "## Security\n\n- Fixed a hole." })] }));
+    await mount(behind({ panelNotes: [note("v0.1.40"), note("v0.1.39", { security: true, en: "## Security\n\n- Fixed a hole." })] }));
     expect(text()).toContain("There are security fixes — better update soon");
     // the fixes are in the release that is folded here: its line carries the word "Security"
     expect(text()).not.toContain("Fixed a hole.");
@@ -995,7 +1000,7 @@ describe("What's new", () => {
 
   it("puts every bullet on a line of its own, with the word of its section in front, and a nested bullet under it", async () => {
     const en = ["## Features", "", "- **Node page:** keeps the filters.", "  - the choice is kept per device", "", "## Fixes", "", "- A fix.", "", "## Docs", "", "- A page."].join("\n");
-    await mount(behind({ agentNotes: [note("v0.1.40", { en })] }));
+    await mount(behind({ panelNotes: [note("v0.1.40", { en })] }));
     const lines = [...document.querySelectorAll("article li")].map((li) => li.textContent);
     expect(lines).toEqual(["NewNode page: keeps the filters.– the choice is kept per device", "FixedA fix.", "DocsA page."]);
     expect([...document.querySelectorAll("article .uq-tg")].map((e) => e.className)).toEqual(["uq-tg new", "uq-tg fix", "uq-tg"]);
@@ -1012,22 +1017,27 @@ describe("What's new", () => {
     expect(text()).not.toContain("What’s new");
   });
 
-  it("is absent without notes (the edition, nothing behind) and while a rollout runs", async () => {
-    await mount(behind({ agentNotes: [] }));
+  it("is absent without notes, and is not on the agents tab (the board has it on the panel's tab only)", async () => {
+    await mount(behind({ panelNotes: [] }));
     expect(text()).not.toContain("What’s new");
-    await remount(behind({ rollout: rollout({ steps: [step()] }) }));
+    await act(async () => root!.unmount());
+    host!.remove();
+    route.search = { tab: "agents" };
+    await mount(page({ bundle: bundle({ version: "v0.1.40" }), nodes: [node({ nodeId: "nod_1", name: "de1", version: "v0.1.37", state: NodeUpdateState.OUTDATED })], agentNotes: [note("v0.1.40")] }));
+    expect(button("Update 1 node")).toBeTruthy();
     expect(text()).not.toContain("What’s new");
+    expect(text()).not.toContain("Fix in v0.1.40.");
   });
 
   it("reads the notes in the interface language, with English as the fallback", async () => {
     const { setLang } = await import("@/i18n");
     try {
       act(() => setLang("ru"));
-      await mount(behind({ agentNotes: [note("v0.1.40")] }));
+      await mount(behind({ panelNotes: [note("v0.1.40")] }));
       expect(text()).toContain("Что нового");
       expect(text()).toContain("Исправление в v0.1.40.");
       act(() => setLang("zh"));
-      await remount(behind({ agentNotes: [note("v0.1.40")] }));
+      await remount(behind({ panelNotes: [note("v0.1.40")] }));
       expect(text()).toContain("更新内容");
       expect(text()).toContain("Fix in v0.1.40."); // the release has no Chinese text: English
     } finally {

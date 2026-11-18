@@ -112,9 +112,9 @@ var nodeIPv6 = changeSpec[nodeIPv6Args]{
 			}
 			summary = "Turn on the IPv6 entry of one node: everyone who may use the node gets one more server, \"<node> · IPv6\", next to each of its servers. The owner has to approve it first."
 			facts = append(facts,
-				Fact{Key: "address", Value: "the IPv6 address the server itself uses for outbound IPv6 (not shown)"},
+				codedFact("address", "the IPv6 address the server itself uses for outbound IPv6 (not shown)", "ipv6_address"),
 				Fact{Key: "profiles", Value: strings.Join(servers, ", "), Untrusted: true},
-				Fact{Key: "check", Value: "before it is turned on the address is checked from outside, by another node with working IPv6 (else the panel, else Globalping); if the check does not pass, nothing changes"})
+				codedFact("check", "before it is turned on the address is checked from outside, by another node with working IPv6 (else the panel, else Globalping); if the check does not pass, nothing changes", "ipv6_check"))
 			effect = "At the next subscription refresh (every 12 hours by default) every person who may use this node gets the extra servers marked IPv6; apps without IPv6 skip them and the node's main address does not change. " +
 				"Static AmneziaWG keys, servers behind a CDN and servers with a certificate for the IPv4 address get none."
 		default:
@@ -124,7 +124,7 @@ var nodeIPv6 = changeSpec[nodeIPv6Args]{
 			summary = "Turn off the IPv6 entry of one node: its \"· IPv6\" servers leave the subscriptions. The owner has to approve it first."
 			effect = "At the next subscription refresh the \"· IPv6\" servers of the node leave everyone's subscription; anyone connected through one has to pick another server."
 		}
-		facts = append(facts, Fact{Key: "effect", Value: effect})
+		facts = append(facts, codedFact("effect", effect, "ipv6_effect_"+a.Action))
 		stored := nodeIPv6StoredArgs{Node: id, Action: a.Action}
 		if a.Action == ipv6Enable {
 			stored.Address = ipv6PlanAddress(x)

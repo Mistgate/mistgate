@@ -625,6 +625,18 @@ func standingFacts(s *decoysitev1.DecoySite, nodes []*decoysitev1.DecoySiteNode)
 	return append(facts, Fact{Key: "standing_on_panel", Value: fmt.Sprint(s.GetOnPanel())})
 }
 
+// replacesFact is "what the target shows now, which the site replaces". The line is for the model; the owner's card words it from the
+// code: the target (the panel, or a node's name) and the site's name come from data and stand on plates of their own.
+func replacesFact(target, key, line, previous, site string) Fact {
+	f := Fact{Key: "replaces", Value: key + ": " + line, Untrusted: true, Code: "replaces", Params: map[string]string{"previous": previous, "site": site}}
+	f.UntrustedParams = []string{"site"}
+	if target != "panel" {
+		f.Params["target"] = key
+		f.UntrustedParams = append(f.UntrustedParams, "target")
+	}
+	return f
+}
+
 func decoyTargetKey(id string, names map[string]string) string {
 	if id == "panel" {
 		return "the panel"
@@ -651,6 +663,7 @@ func decoySiteTools() []toolDef {
 type decoyReadyArgs struct {
 	ReasonField
 	SiteID string `json:"site_id" jsonschema:"the id of the draft to mark ready"`
+	decoyPinned
 }
 
 var decoySiteReady = changeSpec[decoyReadyArgs]{
@@ -671,16 +684,59 @@ var decoySiteReady = changeSpec[decoyReadyArgs]{
 		}
 		return &planned{
 			Summary: "Mark a decoy site ready. It stands on no node or on the panel until it is assigned. The owner must approve this change before it is applied.",
-			Facts:   facts, Danger: []string{dangerFleet}, Params: decoyReadyArgs{SiteID: a.SiteID},
+			Facts:   facts, Danger: decoyDangers(0, false), Params: decoyReadyArgs{SiteID: a.SiteID, decoyPinned: pinOf(r.GetSite())},
 			AuditParams: map[string]any{"site_id": a.SiteID},
 		}, nil
 	},
 	apply: func(c *call, a decoyReadyArgs, _ Plan) (done, error) {
+		if err := c.decoyUnchanged(a.SiteID, a.decoyPinned); err != nil {
+			return done{}, err
+		}
 		if _, err := c.cl.DecoySite.SetDecoySiteReady(c.ctx, connect.NewRequest(&decoysitev1.SetDecoySiteReadyRequest{SiteId: a.SiteID, Ready: true})); err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: "The decoy site is ready."}, nil
+		return doneWith("decoy_site_ready", "The decoy site is ready."), nil
 	},
+}
+
+// decoyPinned is the version of a site a plan showed (set by the plan, never by the caller): its files' hash and number. The apply
+// refuses a site that has been saved again, reverted or re-uploaded since, instead of quietly putting a different one.
+type decoyPinned struct {
+	PlanBundle  string `json:"plan_bundle_sha256,omitempty" jsonschema:"-"`
+	PlanVersion uint32 `json:"plan_version,omitempty" jsonschema:"-"`
+}
+
+// decoyDangers says what a decoy change touches, so the owner's card warns about that and not about the nodes when there is none:
+// the nodes (fleet), the panel's own address (panel_site) or only the library (decoy_library). Any of them waits for the owner.
+func decoyDangers(nodes int, panel bool) []string {
+	var out []string
+	if nodes > 0 {
+		out = append(out, dangerFleet)
+	}
+	if panel {
+		out = append(out, dangerPanelSite)
+	}
+	if len(out) == 0 {
+		out = append(out, dangerLibrary)
+	}
+	return out
+}
+
+func pinOf(s *decoysitev1.DecoySite) decoyPinned {
+	return decoyPinned{PlanBundle: s.GetBundleSha256(), PlanVersion: s.GetVersion()}
+}
+
+// decoyUnchanged reads the site again and refuses when it is not the version the plan showed.
+func (c *call) decoyUnchanged(siteID string, p decoyPinned) error {
+	r, err := c.decoyGet(siteID)
+	if err != nil {
+		return err
+	}
+	if p.PlanBundle != "" && r.GetSite().GetBundleSha256() != p.PlanBundle {
+		return failure("decoy_site_changed", fmt.Sprintf("the site changed after the plan: the plan was for version %d, it is version %d now. Make a new plan", p.PlanVersion, r.GetSite().GetVersion()),
+			"planned", fmt.Sprint(p.PlanVersion), "now", fmt.Sprint(r.GetSite().GetVersion()))
+	}
+	return nil
 }
 
 func warnPaths(paths []string) string {
@@ -698,6 +754,7 @@ type decoyAssignArgs struct {
 	Nodes     []string `json:"nodes,omitempty" jsonschema:"node ids or exact names to put the site on, at most 20; their own site is replaced"`
 	Panel     bool     `json:"panel,omitempty" jsonschema:"also put the site on the panel's own public address"`
 	MarkReady bool     `json:"mark_ready,omitempty" jsonschema:"the site is a draft: mark it ready first and put it on the targets, in this one plan"`
+	decoyPinned
 }
 
 var decoySiteAssign = changeSpec[decoyAssignArgs]{
@@ -742,7 +799,7 @@ var decoySiteAssign = changeSpec[decoyAssignArgs]{
 			if rp.GetPreviousSiteName() != "" {
 				now += " " + nm(rp.GetPreviousSiteName())
 			}
-			facts = append(facts, Fact{Key: "replaces", Value: decoyTargetKey(rp.GetTarget(), names) + ": " + now, Untrusted: true})
+			facts = append(facts, replacesFact(rp.GetTarget(), decoyTargetKey(rp.GetTarget(), names), now, rp.GetPrevious(), rp.GetPreviousSiteName()))
 		}
 		for _, w := range dry.Msg.GetWarnings() {
 			facts = append(facts, Fact{Key: "warning", Value: clean(w.GetCode(), 40) + warnPaths(w.GetPaths()), Untrusted: true})
@@ -756,9 +813,14 @@ var decoySiteAssign = changeSpec[decoyAssignArgs]{
 			summary = "The site already stands on every target: nothing would change. " + summary
 		}
 		a.Nodes = ids
-		return &planned{Summary: summary, Facts: facts, Danger: []string{dangerFleet}, Params: a, AuditParams: map[string]any{"site_id": a.SiteID, "nodes": ids, "panel": a.Panel}}, nil
+		a.decoyPinned = pinOf(site)
+		return &planned{Summary: summary, Facts: facts, Danger: decoyDangers(len(ids), a.Panel), Params: a, AuditParams: map[string]any{"site_id": a.SiteID, "nodes": ids, "panel": a.Panel}}, nil
 	},
 	apply: func(c *call, a decoyAssignArgs, _ Plan) (done, error) {
+		// what is put on the targets is exactly the version the card showed
+		if err := c.decoyUnchanged(a.SiteID, a.decoyPinned); err != nil {
+			return done{}, err
+		}
 		if a.MarkReady {
 			r, err := c.decoyGet(a.SiteID)
 			if err != nil {
@@ -774,7 +836,8 @@ var decoySiteAssign = changeSpec[decoyAssignArgs]{
 		if err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: fmt.Sprintf("The decoy site is on %d node(s)%s; the nodes are being sent its files. Warnings: %d.", len(a.Nodes), map[bool]string{true: " and the panel", false: ""}[a.Panel], len(r.Msg.GetWarnings()))}, nil
+		return doneWith("decoy_site_assigned", fmt.Sprintf("The decoy site is on %d node(s)%s; the nodes are being sent its files. Warnings: %d.", len(a.Nodes), map[bool]string{true: " and the panel", false: ""}[a.Panel], len(r.Msg.GetWarnings())),
+			"n", fmt.Sprint(len(a.Nodes)), "panel", fmt.Sprint(a.Panel), "warnings", fmt.Sprint(len(r.Msg.GetWarnings()))), nil
 	},
 }
 
@@ -830,14 +893,14 @@ var decoySiteUnassign = changeSpec[decoyUnassignArgs]{
 		a.Nodes = ids
 		return &planned{
 			Summary: fmt.Sprintf("Take a decoy site off %d node(s)%s. The owner must approve this change before it is applied.", len(ids), map[bool]string{true: " and the panel", false: ""}[a.Panel]),
-			Facts:   facts, Danger: []string{dangerFleet}, Params: a, AuditParams: map[string]any{"site_id": a.SiteID, "nodes": ids, "panel": a.Panel},
+			Facts:   facts, Danger: decoyDangers(len(ids), a.Panel), Params: a, AuditParams: map[string]any{"site_id": a.SiteID, "nodes": ids, "panel": a.Panel},
 		}, nil
 	},
 	apply: func(c *call, a decoyUnassignArgs, _ Plan) (done, error) {
 		if _, err := c.cl.DecoySite.UnassignDecoySite(c.ctx, connect.NewRequest(&decoysitev1.UnassignDecoySiteRequest{SiteId: a.SiteID, NodeIds: a.Nodes, Panel: a.Panel, Fallback: a.Fallback})); err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: "The decoy site is off the targets."}, nil
+		return doneWith("decoy_site_unassigned", "The decoy site is off the targets."), nil
 	},
 }
 
@@ -892,7 +955,7 @@ var decoySiteVersion = changeSpec[decoyVersionArgs]{
 		a.decoyContentArgs = decoyContentArgs{BundleBase64: base64.StdEncoding.EncodeToString(next.Archive())}
 		a.BaseSHA256 = base.Hash()
 		return &planned{
-			Summary: summary, Facts: facts, Danger: []string{dangerFleet}, Params: a,
+			Summary: summary, Facts: facts, Danger: decoyDangers(len(r.GetNodes()), site.GetOnPanel()), Params: a,
 			AuditParams: map[string]any{"site_id": a.SiteID, "bundle": decoyShortHash(next.Hash()), "nodes": len(r.GetNodes())},
 		}, nil
 	},
@@ -912,7 +975,8 @@ var decoySiteVersion = changeSpec[decoyVersionArgs]{
 		if err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: fmt.Sprintf("Saved version %d of the decoy site; %d node(s) are being sent the new files.", out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds()))}, nil
+		return doneWith("decoy_site_version_saved", fmt.Sprintf("Saved version %d of the decoy site; %d node(s) are being sent the new files.", out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds())),
+			"version", fmt.Sprint(out.Msg.GetSite().GetVersion()), "n", fmt.Sprint(len(out.Msg.GetUpdatedNodeIds()))), nil
 	},
 }
 
@@ -962,7 +1026,7 @@ var decoySiteRevert = changeSpec[decoyRevertArgs]{
 			standingFacts(r.GetSite(), r.GetNodes()), diff)
 		return &planned{
 			Summary: fmt.Sprintf("Make version %d of a decoy site the current one again; %d node(s) that stand on it are sent its files. The owner must approve this change before it is applied.", a.Version, len(r.GetNodes())),
-			Facts:   facts, Danger: []string{dangerFleet}, Params: decoyRevertArgs{SiteID: a.SiteID, Version: a.Version},
+			Facts:   facts, Danger: decoyDangers(len(r.GetNodes()), r.GetSite().GetOnPanel()), Params: decoyRevertArgs{SiteID: a.SiteID, Version: a.Version},
 			AuditParams: map[string]any{"site_id": a.SiteID, "version": a.Version},
 		}, nil
 	},
@@ -971,7 +1035,8 @@ var decoySiteRevert = changeSpec[decoyRevertArgs]{
 		if err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: fmt.Sprintf("The decoy site is back to version %d (saved as version %d); %d node(s) are being sent the files.", a.Version, out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds()))}, nil
+		return doneWith("decoy_site_reverted", fmt.Sprintf("The decoy site is back to version %d (saved as version %d); %d node(s) are being sent the files.", a.Version, out.Msg.GetSite().GetVersion(), len(out.Msg.GetUpdatedNodeIds())),
+			"version", fmt.Sprint(a.Version), "saved_as", fmt.Sprint(out.Msg.GetSite().GetVersion()), "n", fmt.Sprint(len(out.Msg.GetUpdatedNodeIds()))), nil
 	},
 }
 
@@ -997,13 +1062,13 @@ var decoySiteDelete = changeSpec[decoyDeleteArgs]{
 		facts := slices.Concat(siteFacts(r.GetSite()), []Fact{{Key: "versions", Value: fmt.Sprint(len(r.GetVersions()))}, {Key: "files", Value: fmt.Sprint(r.GetSite().GetFileCount())}})
 		return &planned{
 			Summary: "Delete a decoy site of the library with all its versions. This cannot be undone. The owner must approve this change before it is applied.",
-			Facts:   facts, Danger: []string{dangerFleet}, Params: decoyDeleteArgs{SiteID: a.SiteID}, AuditParams: map[string]any{"site_id": a.SiteID},
+			Facts:   facts, Danger: []string{dangerIrreversible}, Params: decoyDeleteArgs{SiteID: a.SiteID}, AuditParams: map[string]any{"site_id": a.SiteID},
 		}, nil
 	},
 	apply: func(c *call, a decoyDeleteArgs, _ Plan) (done, error) {
 		if _, err := c.cl.DecoySite.DeleteDecoySite(c.ctx, connect.NewRequest(&decoysitev1.DeleteDecoySiteRequest{SiteId: a.SiteID})); err != nil {
 			return done{}, decoyAPIError(err)
 		}
-		return done{text: "The decoy site is deleted."}, nil
+		return doneWith("decoy_site_deleted", "The decoy site is deleted."), nil
 	},
 }

@@ -56,6 +56,7 @@ import { fa as subshxFa } from "./subshx";
 import { fa as subsdnsFa } from "./subsdns";
 import { fa as usersgroupFa } from "./usersgroup";
 import { fa as decoysitesFa } from "./decoysites";
+import { fa as planwordsFa } from "./planwords";
 import { fa as profilespageFa } from "./profilespage";
 import { fa as healthpageFa } from "./healthpage";
 import { fa as reachpageFa } from "./reachpage";
@@ -313,4 +314,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "گواهی Let’s Encrypt برای نشانی IP هنوز در دسترس نیست: دامنه یا گواهی خودامضا را انتخاب کن",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...shellFa, ...overviewFa, ...nodesviewFa, ...windowsFa, ...nodepageFa, ...userslistFa, ...userspageFa, ...usersgroupFa, ...decoysitesFa, ...nodeswaysFa, ...nodewaysFa, ...profilespageFa, ...healthpageFa, ...reachpageFa, ...profilesrvFa, ...profilenewFa, ...subspnFa, ...subshxFa, ...subsdnsFa, ...updatespageFa, ...settingspageFa, ...aipageFa, ...igpageFa, ...aspageFa, ...nodeshareFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...shellFa, ...overviewFa, ...nodesviewFa, ...windowsFa, ...nodepageFa, ...userslistFa, ...userspageFa, ...usersgroupFa, ...decoysitesFa, ...planwordsFa, ...nodeswaysFa, ...nodewaysFa, ...profilespageFa, ...healthpageFa, ...reachpageFa, ...profilesrvFa, ...profilenewFa, ...subspnFa, ...subshxFa, ...subsdnsFa, ...updatespageFa, ...settingspageFa, ...aipageFa, ...igpageFa, ...aspageFa, ...nodeshareFa };

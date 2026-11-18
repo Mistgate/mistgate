@@ -379,14 +379,14 @@ func mihomoTemplateFacts(ch *mihomoChange, groups map[string]string, autoOn bool
 	facts = append(facts, Fact{Key: "groups", Value: groupList(t.GetGroupIds(), groups), Untrusted: true})
 	switch action {
 	case "remove":
-		facts = append(facts, Fact{Key: "effect", Value: "the people of these groups get the panel's own Mihomo profile instead"})
+		facts = append(facts, codedFact("effect", "the people of these groups get the panel's own Mihomo profile instead", "mihomo_removed"))
 		return facts
 	case "update":
 		if ch.before.Yaml != t.Yaml {
 			facts = append(facts, changeFact("bytes", strconv.Itoa(len(ch.before.Yaml))+" -> "+strconv.Itoa(len(t.Yaml)), strconv.Itoa(len(ch.before.Yaml)), strconv.Itoa(len(t.Yaml))),
 				changeFact("sha256_12", hashText(ch.before.Yaml)[:12]+" -> "+hashText(t.Yaml)[:12], hashText(ch.before.Yaml)[:12], hashText(t.Yaml)[:12]))
 		} else {
-			facts = append(facts, Fact{Key: "text", Value: "unchanged, " + strconv.Itoa(len(t.Yaml)) + " bytes, sha256 " + hashText(t.Yaml)[:12]})
+			facts = append(facts, codedFact("text", "unchanged, "+strconv.Itoa(len(t.Yaml))+" bytes, sha256 "+hashText(t.Yaml)[:12], "text_unchanged", "bytes", strconv.Itoa(len(t.Yaml)), "sha", hashText(t.Yaml)[:12]))
 		}
 	default:
 		facts = append(facts, Fact{Key: "bytes", Value: strconv.Itoa(len(t.Yaml))}, Fact{Key: "sha256_12", Value: hashText(t.Yaml)[:12]})
@@ -404,7 +404,7 @@ func mihomoTemplateFacts(ch *mihomoChange, groups map[string]string, autoOn bool
 	if w := warningWords(templateWarnings(t, autoOn), 40); len(w) > 0 {
 		facts = append(facts, Fact{Key: "warnings", Value: strings.Join(w, ", "), Untrusted: true})
 	}
-	return append(facts, Fact{Key: "effect", Value: "the people of these groups get this template in the Mihomo YAML answer of their link; the text is not shown here. The panel does not open the addresses in it: the apps of the people do."})
+	return append(facts, codedFact("effect", "the people of these groups get this template in the Mihomo YAML answer of their link; the text is not shown here. The panel does not open the addresses in it: the apps of the people do.", "mihomo_template"))
 }
 
 func groupList(ids []string, names map[string]string) string {

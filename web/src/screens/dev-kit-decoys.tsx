@@ -27,7 +27,7 @@ import { ShellLayout } from "./shell";
 // (an iframe, so the window's breakpoints answer to the frame); each frame is a page of its own, for the screenshot script and for the
 // side-by-side with the boards (PnDecoys, PnDecoy):
 //   /dev-kit?only=decoys-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&fx=1]
-// list states: list | list-delivery | list-panel-fb | list-empty | list-full | list-load | list-err | list-deny | list-edge | list-draft |
+// list states: list | list-delivery | list-panel-fb | list-empty | list-many | list-full | list-load | list-err | list-deny | list-edge | list-draft |
 //   list-used | list-free | list-find | list-nomatch
 // the windows of the list: dlg-new | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
 //   dlg-up-many | dlg-up-unsafe | dlg-up-fmt | dlg-up-noindex | dlg-mcp
@@ -55,7 +55,11 @@ type World = {
   edge: boolean;
   hang: "" | "list" | "site";
   fail: "" | "list" | "site-nf";
+  /** Twelve nodes in all (the grid of "showing now" with a last row that is not full). */
+  many: boolean;
 };
+
+const moreNodes = ["be1", "se1", "pl1", "fr1", "uk1", "at1", "cz1", "no1"].map((name, i) => ({ id: `nod_${name}`, name, cc: ["BE", "SE", "PL", "FR", "GB", "AT", "CZ", "NO"][i]!, address: `${name}.example.com` }));
 
 function worldOf(state: string): World {
   const w: World = {
@@ -68,6 +72,7 @@ function worldOf(state: string): World {
     edge: state === "list-edge" || state === "site-edge",
     hang: state === "list-load" ? "list" : state === "site-load" ? "site" : "",
     fail: state === "list-err" ? "list" : state === "site-nf" ? "site-nf" : "",
+    many: state === "list-many",
   };
   if (state === "list-empty" || state === "dlg-new" || state === "dlg-mcp") {
     if (state === "list-empty") {
@@ -233,7 +238,7 @@ function seeded(w: World) {
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role: w.role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0, ...(w.edge ? { edition: "edge", unavailable: ["decoy_own"] } : {}) } as never);
   c.setQueryData(accessQuery.queryKey, { available: true, unread: 0, readOnly: false, model: "", provider: undefined } as never);
-  c.setQueryData(nodesQuery.queryKey, { nodes: demoNodes.map((n) => nodeRow(n, w)), expectedAgentVersion: "0.1.71" } as never);
+  c.setQueryData(nodesQuery.queryKey, { nodes: (w.many ? [...demoNodes, ...moreNodes] : demoNodes).map((n) => nodeRow(n, w)), expectedAgentVersion: "0.1.71" } as never);
   if (!w.hang && !w.fail) {
     c.setQueryData(sitesQuery.queryKey, libraryOf(w) as never);
     for (const s of w.sites.slice(0, 12)) {
@@ -340,6 +345,8 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "decoys-list-rail", state: "list", title: "A 900 window: the rail, two columns of cards", w: 900, h: 1700 },
   { id: "decoys-list-phone", state: "list", title: "A phone, 400 wide", w: 400, h: 2400 },
   { id: "decoys-list-fa", state: "list", title: "Right to left (fa)", w: 1440, h: 1500, params: "&lang=fa" },
+  { id: "decoys-list-many", state: "list-many", title: "Showing now: twelve nodes and the panel, the last row is not full", w: 1440, h: 1500 },
+  { id: "decoys-list-many-phone", state: "list-many", title: "The same on a phone, 400 wide", w: 400, h: 2000 },
   { id: "decoys-list-delivery", state: "list-delivery", title: "Showing now with a delivery on its way, failed, offline", w: 1440, h: 900 },
   { id: "decoys-list-panel-fb", state: "list-panel-fb", title: "Showing now: the site chosen for the panel is a draft, the directory is shown", w: 1440, h: 900 },
   { id: "decoys-list-empty", state: "list-empty", title: "No own site yet: the three ways", w: 1440, h: 900 },

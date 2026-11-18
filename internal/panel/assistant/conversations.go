@@ -342,10 +342,11 @@ func (s *Service) currentPlanCard(ctx context.Context, id string) (*adminv1.Plan
 		case plan.Status == store.PlanApplied:
 			card.State = adminv1.PlanState_PLAN_STATE_APPLIED
 			card.Result = plan.Result
+			setCardOutcome(&card, plan)
 		case plan.Status == store.PlanFailed:
 			card.State = adminv1.PlanState_PLAN_STATE_FAILED
 			card.Error = plan.Error
-			card.OutcomeCode = plan.OutcomeCode
+			setCardOutcome(&card, plan)
 		case plan.Status == store.PlanRejected:
 			card.State = adminv1.PlanState_PLAN_STATE_REJECTED
 		case plan.Status == store.PlanExpired:
@@ -362,6 +363,15 @@ func (s *Service) currentPlanCard(ctx context.Context, id string) (*adminv1.Plan
 		_, _ = s.st.W.ExecContext(ctx, `UPDATE assistant_plan SET card_enc=?,state=?,updated_at=? WHERE id=?`, sealed, planStateString(card.State), s.now().Unix(), id)
 	}
 	return &card, nil
+}
+
+// setCardOutcome gives a card what came of its plan as a code with values, so the owner's screen words it in its language; the
+// English line (card.Result, card.Error) stays for the model and for a code the screen has no words for.
+func setCardOutcome(card *adminv1.PlanCard, plan store.MCPPlan) {
+	card.OutcomeCode, card.OutcomeParams = plan.OutcomeCode, nil
+	if plan.OutcomeParams != "" {
+		_ = json.Unmarshal([]byte(plan.OutcomeParams), &card.OutcomeParams)
+	}
 }
 
 func planStateString(s adminv1.PlanState) string {

@@ -552,7 +552,7 @@ func dnsApprovalWithBeforeFacts(after []Fact, beforeGroups [][]Fact, omittedBefo
 		}
 		omitted := omittedBefore + len(beforeGroups) - shown
 		if omitted > 0 {
-			facts = append(facts, Fact{Key: "before", Value: fmt.Sprintf("%d more before", omitted)})
+			facts = append(facts, codedFact("before", fmt.Sprintf("%d more before", omitted), "more_before", "n", strconv.Itoa(omitted)))
 		}
 		if err := approvalFactsSize(facts, limit, "DNS settings"); err == nil {
 			return facts, nil

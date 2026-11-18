@@ -26,6 +26,9 @@ service ProbeService {
   // connection with a one-time token, the sender pulls (or pushes) it and measures. It moves bulk traffic, so the MCP tool is
   // plan/apply with the owner's approval. At most one test per node at a time and a few per node per day. Kept 7 days.
   rpc PathSpeed(PathSpeedRequest) returns (PathSpeedResponse);
+  // The speed tests kept in the last 7 days, newest first (for the MCP tool path_speed_results): what an approved path_speed plan
+  // measured, so a later question is answered from the figures and not from a guess. Names and figures only.
+  rpc PathSpeedResults(PathSpeedResultsRequest) returns (PathSpeedResultsResponse);
 }
 
 message PathProbeRequest {
@@ -157,4 +160,16 @@ message PathSpeedResponse {
   uint32 first_byte_ms = 9;
   uint32 duration_ms = 10;
   uint64 bytes = 11;
+}
+
+message PathSpeedResultsRequest {
+  // Only the tests that had this node as the sender or the target; empty = every node.
+  string node_id = 1;
+  // At most this many, newest first; 0 = 20, at most 50.
+  uint32 limit = 2;
+}
+
+message PathSpeedResultsResponse {
+  // Newest first. Only tests that ran are kept: error is always empty here.
+  repeated PathSpeedResponse tests = 1;
 }

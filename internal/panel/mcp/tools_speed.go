@@ -87,7 +87,7 @@ var pathSpeed = changeSpec[pathSpeedArgs]{
 				{Key: "target", Value: nm(toName), Untrusted: true},
 				codedFact("direction", flow, "path_speed_"+dir),
 				codedFact("size", strconv.Itoa(mb)+" MB", "bytes", "bytes", strconv.Itoa(mb<<20)),
-				{Key: "effect", Value: "The target opens a listener on a free port for one connection (a one-time token, closed after 30 seconds at most); the sender connects to it. Nothing else runs, nothing is changed on either node, and no public server is used. Both nodes carry the traffic once; the figure is kept for 7 days."},
+				codedFact("effect", "The target opens a listener on a free port for one connection (a one-time token, closed after 30 seconds at most); the sender connects to it. Nothing else runs, nothing is changed on either node, and no public server is used. Both nodes carry the traffic once; the figure is kept for 7 days.", "path_speed_effect"),
 			},
 			Danger: []string{dangerTraffic},
 			Params: pathSpeedStored{From: from, To: to, MB: mb, Direction: dir},
@@ -150,5 +150,63 @@ func speedDone(m *probev1.PathSpeedResponse) (done, error) {
 	if m.GetDirection() != "up" {
 		text += fmt.Sprintf(", first byte after %d ms", m.GetFirstByteMs())
 	}
-	return doneWith("path_speed_done", text+"."), nil
+	return doneWith("path_speed_done", text+".",
+		"from", nm(m.GetFromName()), "to", nm(m.GetToName()), "direction", m.GetDirection(), "mb", strconv.FormatUint(uint64(m.GetMb()), 10),
+		"mbit_s", strconv.FormatFloat(m.GetMbitS(), 'f', 1, 64), "duration_ms", strconv.FormatUint(uint64(m.GetDurationMs()), 10),
+		"connect_ms", strconv.FormatUint(uint64(m.GetConnectMs()), 10), "first_byte_ms", strconv.FormatUint(uint64(m.GetFirstByteMs()), 10)), nil
+}
+
+type pathSpeedResultsArg struct {
+	Node  string `json:"node,omitempty" jsonschema:"only the tests that had this node as the sender or the target: id or exact name; empty = every node"`
+	Limit int    `json:"limit,omitempty" jsonschema:"at most this many, newest first; empty = 10, at most 30"`
+}
+
+type speedResultV struct {
+	From       string  `json:"from"`
+	To         string  `json:"to"`
+	Direction  string  `json:"direction"`
+	MB         uint32  `json:"mb"`
+	At         string  `json:"at"`
+	MbitS      float64 `json:"mbit_s"`
+	ConnectMs  uint32  `json:"connect_ms"`
+	FirstByte  uint32  `json:"first_byte_ms,omitempty"`
+	DurationMs uint32  `json:"duration_ms"`
+}
+
+// pathSpeedResultsView is what path_speed_results returns: the kept tests, newest first, and how to read a figure.
+type pathSpeedResultsView struct {
+	Tests []speedResultV `json:"tests"`
+	Note  string         `json:"note"`
+}
+
+const speedResultsNote = "Each test is ONE TCP stream of 8 to 32 MB, so its figure is a lower bound of what the path can carry, not its ceiling: a path that shows 300 Mbit/s here may carry more with several streams. Do not call it the capacity of the node or of the link. Tests are kept 7 days."
+
+// pathSpeedResultsTool reads back what path_speed measured. It is a read: nothing is sent between the nodes.
+func pathSpeedResultsTool() toolDef {
+	return readTool("path_speed_results", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, probev1connect.ProbeServicePathSpeedResultsProcedure),
+		"The speed tests between your nodes kept for 7 days (what path_speed measured after the owner approved it), newest first: sender, target, direction, size, time and the figures (megabits per second over the whole transfer, connect time, time to the first byte, duration). "+
+			"Read it after an approved path_speed plan, to answer from the figure and not from a guess; never take a number from telemetry as the result of a test. Each test is ONE stream, so it shows a lower bound of the path, never its ceiling. It sends nothing between the nodes. Node names only, never addresses.",
+		func(c *call, in pathSpeedResultsArg) (any, error) {
+			var id string
+			if in.Node != "" {
+				var err error
+				if id, _, err = c.nodeRef(in.Node); err != nil {
+					return nil, err
+				}
+			}
+			limit := in.Limit
+			if limit <= 0 {
+				limit = 10
+			}
+			r, err := c.cl.Probe.PathSpeedResults(c.ctx, connect.NewRequest(&probev1.PathSpeedResultsRequest{NodeId: id, Limit: uint32(min(limit, 30))}))
+			if err != nil {
+				return nil, probeError(err)
+			}
+			out := pathSpeedResultsView{Tests: []speedResultV{}, Note: speedResultsNote}
+			for _, t := range r.Msg.GetTests() {
+				out.Tests = append(out.Tests, speedResultV{From: nm(t.GetFromName()), To: nm(t.GetToName()), Direction: t.GetDirection(), MB: t.GetMb(), At: fmtTime(t.GetAtUnix()),
+					MbitS: t.GetMbitS(), ConnectMs: t.GetConnectMs(), FirstByte: t.GetFirstByteMs(), DurationMs: t.GetDurationMs()})
+			}
+			return out, nil
+		})
 }

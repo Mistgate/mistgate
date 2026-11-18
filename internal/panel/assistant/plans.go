@@ -183,6 +183,9 @@ func (s *Service) ApplyPlan(ctx context.Context, req *connect.Request[adminv1.Ap
 		card.State = adminv1.PlanState_PLAN_STATE_APPLIED
 		card.Result = cleanContextText(applied.Result, 300)
 		card.Error = ""
+		if done, e := s.st.GetMCPPlan(ctx, p.id); e == nil {
+			setCardOutcome(card, done)
+		}
 		if err = s.savePlanCard(ctx, p.id, card, "applied"); err != nil {
 			return nil, err
 		}
@@ -205,6 +208,7 @@ func (s *Service) syncApplyCardFromMCP(ctx context.Context, planID string, card 
 		card.State = adminv1.PlanState_PLAN_STATE_APPLIED
 		card.Result = cleanContextText(current.Result, 300)
 		card.Error = ""
+		setCardOutcome(card, current)
 		state, stored = "applied", true
 	case store.PlanFailed:
 		card.State = adminv1.PlanState_PLAN_STATE_FAILED
@@ -215,6 +219,7 @@ func (s *Service) syncApplyCardFromMCP(ctx context.Context, planID string, card 
 		if card.Error == "" {
 			card.Error = "plan apply failed"
 		}
+		setCardOutcome(card, current)
 		state, stored = "failed", true
 	case store.PlanRejected:
 		card.State = adminv1.PlanState_PLAN_STATE_REJECTED

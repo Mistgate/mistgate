@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -15,7 +15,7 @@ import { nodes as nodesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { doctorQuery, isIssue } from "@/lib/health";
 import { agentLinked } from "@/lib/node-status";
-import { nodeQuery } from "@/lib/queries";
+import { nodeQuery, nodesQuery } from "@/lib/queries";
 import "./node.css";
 import { StateBanner } from "./banner";
 import { NodeDoctorTab } from "./doctor";
@@ -32,6 +32,14 @@ export function NodeScreen() {
   const t = useT();
   const { id = "" } = useParams({ strict: false });
   const q = useQuery(nodeQuery(id));
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as NodeSearch;
+  // an address with the node's name instead of its id (a link made by hand, the assistant's old card): go to the node whose name it is
+  const list = useQuery({ ...nodesQuery, enabled: q.isError });
+  const byName = q.isError ? list.data?.nodes.find((n) => n.name.toLowerCase() === id.toLowerCase())?.id : undefined;
+  useEffect(() => {
+    if (byName && byName !== id) void navigate({ to: "/nodes/$id", params: { id: byName }, search, replace: true });
+  }, [byName, id, navigate, search]);
 
   if (q.data) return <NodeDetail data={q.data} />;
   return (
@@ -40,7 +48,7 @@ export function NodeScreen() {
         <Icon name="back" size={14} />
         {t("nav.nodes")}
       </Link>
-      {q.isError ? (
+      {q.isError && !byName && !list.isLoading ? (
         <div className="rounded-card-lg border border-dashed border-line">
           <EmptyState title={t("node.notFound")}>{t("node.notFoundBody")}</EmptyState>
         </div>

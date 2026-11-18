@@ -4,6 +4,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -23,6 +24,51 @@ func (w *world) PathSpeed(_ context.Context, r *connect.Request[probev1.PathSpee
 		out.MbitS, out.ConnectMs, out.FirstByteMs, out.DurationMs, out.Bytes = 412.3, 12, 31, 311, uint64(r.Msg.GetMb())<<20
 	}
 	return connect.NewResponse(out), nil
+}
+
+func (w *world) PathSpeedResults(_ context.Context, r *connect.Request[probev1.PathSpeedResultsRequest]) (*connect.Response[probev1.PathSpeedResultsResponse], error) {
+	w.mu.Lock()
+	w.speedResultReqs = append(w.speedResultReqs, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&probev1.PathSpeedResultsResponse{Tests: []*probev1.PathSpeedResponse{
+		{FromName: "nl1", ToName: "de1", Direction: "down", Mb: 32, AtUnix: 1700000000, MbitS: 308.3, ConnectMs: 37, FirstByteMs: 37, DurationMs: 870, Bytes: 32 << 20},
+	}}), nil
+}
+
+// The figure of an approved test can be read back by anyone who reads the fleet, and it says what the figure is: one stream, a lower bound.
+func TestPathSpeedResultsReadsTheKeptFigures(t *testing.T) {
+	e := newTestEnv(t)
+	for _, p := range []Profile{ProfileReadonly, ProfileOperator, ProfileAdmin} {
+		_, secret := e.token(p)
+		if !slices.Contains(toolNames(t, e.session(secret)), "path_speed_results") {
+			t.Errorf("%s does not see path_speed_results", p)
+		}
+	}
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+	out := mustOK(t, s, "path_speed_results", map[string]any{"node": "nl1"})
+	noCanary(t, "path_speed_results", out)
+	v := decode[pathSpeedResultsView](t, out)
+	if len(v.Tests) != 1 || v.Tests[0].From != "nl1" || v.Tests[0].To != "de1" || v.Tests[0].MbitS != 308.3 || v.Tests[0].DurationMs != 870 || v.Tests[0].MB != 32 {
+		t.Fatalf("tests = %+v", v.Tests)
+	}
+	if !strings.Contains(v.Note, "ONE TCP stream") || !strings.Contains(v.Note, "lower bound") {
+		t.Errorf("the note does not say what the figure is: %q", v.Note)
+	}
+	e.w.mu.Lock()
+	reqs := e.w.speedResultReqs
+	e.w.mu.Unlock()
+	if len(reqs) != 1 || reqs[0].NodeId != nodeB {
+		t.Errorf("the node was not resolved to its id: %+v", reqs)
+	}
+	for tool, err := range s.Tools(context.Background(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tool.Name == "path_speed_results" && !strings.Contains(tool.Description, "lower bound") {
+			t.Errorf("the description does not say the figure is a lower bound: %s", tool.Description)
+		}
+	}
 }
 
 // path_speed moves bulk traffic: admin profile only, always a plan the owner approves, and the arguments are node references
@@ -84,6 +130,15 @@ func TestPathSpeedIsAdminOnlyAndWaitsForTheOwner(t *testing.T) {
 		t.Fatalf("apply: %+v", ap)
 	}
 	noCanary(t, "path_speed_apply", ap.Result)
+	// the owner's screen words the result from its code and values, in its language: the names, the size, the figures
+	pl := storedPlan(t, e, p.PlanID)
+	var params map[string]string
+	if err := json.Unmarshal([]byte(pl.OutcomeParams), &params); err != nil {
+		t.Fatal(err)
+	}
+	if pl.OutcomeCode != "path_speed_done" || params["from"] != "nl1" || params["to"] != "de1" || params["direction"] != "up" || params["mb"] != "24" || params["mbit_s"] != "412.3" || params["duration_ms"] != "311" || params["connect_ms"] != "12" {
+		t.Errorf("outcome: %q %v", pl.OutcomeCode, params)
+	}
 	if len(e.w.speedReqs) != 1 {
 		t.Fatalf("the panel was asked %d times", len(e.w.speedReqs))
 	}
