@@ -144,14 +144,15 @@ describe("the new user form", () => {
     expect(switches().slice(1, 3)).toEqual(["true", "false"]);
   });
 
-  it("shows the group form inline only when there is no group at all, without a DNS of the group, and its button is not the main one", async () => {
+  it("offers the new-group window only when there is no group at all, and asks no DNS of a group", async () => {
     await mount([]);
     expect(text()).toContain("Create a group first");
-    const add = button("Add group")!;
-    expect(add.className).not.toContain("bg-accent");
     // one DNS choice, the person's own, waiting under "More" (the group's is not asked here)
     await click(button("More"));
     expect(document.querySelectorAll("[aria-label='DNS']")).toHaveLength(1);
+    expect(document.querySelector("[data-shot=new-group]")).toBeNull();
+    await click(button("New group"));
+    expect(document.querySelector("[data-shot=new-group]")).not.toBeNull();
   });
 
   it("offers the two speed limits under “More”, both off by default, and sends them in bit/s", async () => {

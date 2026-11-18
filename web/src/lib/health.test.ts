@@ -175,6 +175,13 @@ describe("alerts", () => {
     // an inbound the panel could not name is still said, by its id
     expect(alertWhy(t, fmt, alert({ kind: AlertKind.CERT_EXPIRY, whyKey: "health.alert.cert_expiry.why.expired", params: { inbound_id: "inb_9", reason: "expired" } }))).toContain("“inb_9” has expired");
   });
+  it("reads a site that shows a block page through WARP in words, also when the trace gave no exit", () => {
+    const reach = (params: Record<string, string>) => alert({ kind: AlertKind.WARP_REACH, whyKey: "health.alert.warp_reach.why", params: { domain: "example.com", http_status: "403", streak: "3", ...params } });
+    expect(alertWhy(t, fmt, reach({ colo: "AMS" }))).toContain("answered with a block page (HTTP 403) at the Cloudflare exit AMS.");
+    const unnamed = alertWhy(tRu, fmtRu, reach({ colo: "" }));
+    expect(unnamed).toContain("на выходе Cloudflare (не определён).");
+    expect(unnamed).not.toMatch(/[{}]/);
+  });
   it("says how long a node has been down in the coarsest unit, and a paused rollout's reason once", () => {
     expect(alertWhy(t, fmt, alert({ kind: AlertKind.NODE_DOWN, whyKey: "health.alert.node_down.why", params: { minutes: "185" } }))).toContain("for 3 h and");
     const paused = alert({ kind: AlertKind.UPDATE_FAILED, whyKey: "health.alert.update_failed.why.gate_failed", params: { node: "de2", reason: "probe_failed" } });

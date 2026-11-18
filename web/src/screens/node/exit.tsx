@@ -16,6 +16,7 @@ import { DnsOptionsCard } from "./dns-options";
 import { useNodeForm, useSaveSection } from "./node-form";
 import { SvSave } from "./server-parts";
 import { WarpCard } from "./warp";
+import { WarpReachCard } from "./warp-reach";
 import "./exit.css";
 
 const resolverPattern = /^[0-9a-fA-F.:]{2,45}$/;
@@ -24,14 +25,18 @@ const iconIpv6 = "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18";
 const iconTorrent = "M5 5l14 14M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z";
 
 /**
- * Exit: where people's traffic leaves the node. WARP first (every "Open WARP" of the panel lands on its `#warp`), the node's own
- * traffic settings and DNS beside it, then the DNS the node offers on people's pages. Not shown for a retired node.
+ * Exit: where people's traffic leaves the node. WARP first (every "Open WARP" of the panel lands on its `#warp`) with the sites it is
+ * checked against under it, the node's own traffic settings and DNS beside it, then the DNS the node offers on people's pages. Not shown
+ * for a retired node.
  */
 export function ExitTab({ data }: { data: Plain<GetNodeResponse> }) {
   const node = data.node!;
   return (
     <div className="nx">
-      <WarpCard nodeId={node.id} nodeName={node.name} retired={false} down={!agentLinked(node.status)} profiles={data.inbounds.length} />
+      <div className="nx-col">
+        <WarpCard nodeId={node.id} nodeName={node.name} retired={false} down={!agentLinked(node.status)} profiles={data.inbounds.length} />
+        <WarpReachCard nodeId={node.id} down={!agentLinked(node.status)} />
+      </div>
       {/* keyed by the node: switching nodes starts from that node's values */}
       <TrafficCards key={node.id} data={data} />
       <DnsOptionsCard nodeId={node.id} />

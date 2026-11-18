@@ -18,6 +18,7 @@ vi.mock("@/lib/api", () => ({
   auth: { me: (...a: unknown[]) => me(...a) },
 }));
 vi.mock("./warp", () => ({ WarpCard: () => <section id="warp">WARP card</section> }));
+vi.mock("./warp-reach", () => ({ WarpReachCard: () => null }));
 vi.mock("./dns-options", () => ({ DnsOptionsCard: () => null }));
 
 beforeAll(() => {

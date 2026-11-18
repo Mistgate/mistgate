@@ -25,6 +25,7 @@ import type { Avail } from "@/components/bulk";
 import { panelFor, type ActionId } from "@/screens/users/bulk-actions";
 import { UsersScreen, type UsersDemo } from "@/screens/users/list";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
+import { GroupEditModal, type GroupEditDemo } from "@/screens/users/groups";
 import { useTx } from "@/screens/users/t";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { ShellLayout } from "./shell";
@@ -37,6 +38,7 @@ import { ShellLayout } from "./shell";
 // finds nobody) | open (alice's row open) | open-erin (a person over the quota) | select (selecting, two ticked: the bulk bar) |
 // select-ask (the bar asks "Sure?") | job-running | job-done | job-failed (the bar's batch states) | groups (the board's two groups) |
 // groups-many (ten) | groups-none (a search that finds no group) | groups-empty (no group at all) | group-new (the window) |
+// group-edit (the edit window of a group; -lose: the panel says who loses a profile, -held: it refuses a node the owner holds back) |
 // person-new | person-name (a name typed) | person-done | person-done-pw (with a page password).
 // Made-up data of the board: alice, bob, carol, dave, erin, frank, grace, heidi, ivan, judy; the groups family and friends; the nodes de1,
 // fi1, nl1, msk1; documentation addresses.
@@ -193,6 +195,19 @@ const bar = (state: string) => {
   return state === "job-running" ? run : state === "job-done" ? done : failed;
 };
 
+/** The edit window of a group that a scene opens over the Groups tab (the app opens it from the user card, the profile page and "New person"). */
+export const editOf: Record<string, { group: G; demo?: GroupEditDemo }> = {
+  "group-edit": { group: twoGroups[0]! },
+  "group-edit-lose": { group: twoGroups[0]!, demo: { impact: { users: 6, lost: [{ id: "p_awg", name: "AmneziaWG 3.1", protocol: "awg", awgDevices: 3 }], gained: [] } as never } },
+  // msk1 is held back and this group was not given it: it is off here, and a save that switches it on is refused
+  "group-edit-held": { group: { ...twoGroups[0]!, disabledNodeIds: ["nod_msk1"] }, demo: { held: "nod_msk1" } },
+};
+
+export function SceneEdit({ state }: { state: string }) {
+  const e = editOf[state];
+  return e ? <GroupEditModal group={e.group as never} open onOpenChange={() => {}} demo={e.demo} /> : null;
+}
+
 /** One whole page of the scene: the screen in the real shell, at the window's own width. */
 export function UsersPage() {
   const tx = useTx();
@@ -211,7 +226,7 @@ export function UsersPage() {
   const picked = ["alice", "bob", "carol"].map((n) => ({ id: `usr_${n}`, name: n }));
   const avail = Object.fromEntries((["extend", "disable", "enable", "reset", "delete"] as ActionId[]).map((a) => [a, { count: 3 }])) as Record<ActionId, Avail>;
   const noop = () => {};
-  const grp = state.startsWith("groups") || state === "group-new";
+  const grp = state.startsWith("groups") || state === "group-new" || state in editOf;
   return (
     <QueryClientProvider client={qc}>
       <ToastProvider>
@@ -219,6 +234,7 @@ export function UsersPage() {
           <ShellLayout current="users" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
             <UsersScreen demo={job ? { selecting: true, ticked: ["usr_alice", "usr_bob", "usr_carol"] } : { ...demoOf[state], ...(grp && { tab: "groups" as const }) }} />
           </ShellLayout>
+          <SceneEdit state={state} />
           {job && (
             <UsersBulkBar people={picked} offPage={0} allShown={false} total={3} avail={avail} toggle="disable" busy={state === "job-running"} job={bar(state)} panel={panelFor(tx, "extend")} onAction={noop} onClear={noop} onAll={noop} onStop={noop} onRetry={noop} onCloseJob={noop} />
           )}
@@ -260,6 +276,12 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "groups-readonly", state: "groups", title: "Groups for an observer: no tile, no Delete", w: 1440, h: 860, params: "&role=readonly" },
   { id: "group-new", state: "group-new", title: "The new-group window", w: 1440, h: 860 },
   { id: "group-new-phone", state: "group-new", title: "The new-group window on a phone", w: 400, h: 900 },
+  { id: "group-edit", state: "group-edit", title: "The edit-group window: the group's own values in the new-group window", w: 1440, h: 900 },
+  { id: "group-edit-light", state: "group-edit", title: "The edit-group window, light", w: 1440, h: 900, params: "&theme=light" },
+  { id: "group-edit-phone", state: "group-edit", title: "The edit-group window on a phone (a sheet)", w: 400, h: 900 },
+  { id: "group-edit-lose", state: "group-edit-lose", title: "The edit-group window: a profile taken away from six people, what they lose, the red button", w: 1440, h: 900 },
+  { id: "group-edit-held", state: "group-edit-held", title: "The edit-group window: the panel refuses a node that is held back, and says where to give it", w: 1440, h: 900 },
+  { id: "group-edit-held-phone", state: "group-edit-held", title: "The same on a phone", w: 400, h: 900 },
   { id: "person-new", state: "person-new", title: "The new-person window", w: 1440, h: 900 },
   { id: "person-name", state: "person-name", title: "The new-person window, a name typed", w: 1440, h: 900 },
   { id: "person-new-phone", state: "person-new", title: "The new-person window on a phone (a sheet)", w: 400, h: 900 },

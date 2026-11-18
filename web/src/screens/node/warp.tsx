@@ -40,7 +40,7 @@ const iconPlay = "M8 5l11 7-11 7z";
 const iconChevron = "M7 10l5 5 5-5";
 const iconInfo = "M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 11v5M12 8v.01";
 
-function useAge() {
+export function useAge() {
   const t = useTx();
   const now = Math.floor(useNow(5_000) / 1000);
   return (unix: number) => {

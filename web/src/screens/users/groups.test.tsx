@@ -6,7 +6,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
-import { DeleteGroupModal, defaultGroup, GroupEditModal, GroupsTab, wayOf } from "./groups";
+import { defaultGroup, GroupEditModal, GroupsTab, wayOf } from "./groups";
 
 const listGroups = vi.fn();
 const createGroup = vi.fn();
@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 const group = (over: Record<string, unknown> = {}) =>
-  ({ id: "grp_all", name: "Everyone", profileIds: ["p_hy", "p_awg"], userCount: 5, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, ...over }) as unknown as Group;
+  ({ id: "grp_all", name: "Everyone", profileIds: ["p_hy", "p_awg"], disabledNodeIds: [], userCount: 5, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, ...over }) as unknown as Group;
 
 async function mount(groups: Group[], props: { creating?: boolean; focus?: string; query?: string; children?: ReactNode } = {}) {
   listGroups.mockResolvedValue({ groups });
@@ -232,7 +232,7 @@ describe("the window of a new group", () => {
   });
 });
 
-describe("editing and deleting a group in their windows", () => {
+describe("editing a group in its window", () => {
   it("asks before taking a profile away from its people, with what they lose, and then saves", async () => {
     updateGroup.mockImplementation(async (r: { dryRun?: boolean }) =>
       r.dryRun
@@ -251,34 +251,6 @@ describe("editing and deleting a group in their windows", () => {
     await settle();
     expect(updateGroup).toHaveBeenCalledTimes(2);
     expect(updateGroup.mock.calls[1]![0]).not.toHaveProperty("dryRun");
-  });
-
-  it("asks where the people of a group go, “Everyone” first, and moves them in the same call", async () => {
-    deleteGroup.mockResolvedValue({});
-    const all = [group(), group({ id: "grp_f", name: "friends", userCount: 3 }), group({ id: "grp_x", name: "work", userCount: 0 })];
-    await mount(all, { children: <DeleteGroupModal group={all[1]!} groups={all} onClose={() => {}} /> });
-    expect(dialog().textContent).toContain("3 people are in the group. Where to move them?");
-    await click(button("Move 3 people and delete"));
-    await settle();
-    expect(deleteGroup).toHaveBeenCalledWith({ groupId: "grp_f", moveUsersTo: "grp_all" });
-  });
-
-  it("says there is nowhere to move them when it is the only group", async () => {
-    const all = [group()];
-    await mount(all, { children: <DeleteGroupModal group={all[0]!} groups={all} onClose={() => {}} /> });
-    expect(dialog().textContent).toContain("Make another group first");
-    expect((button("Move 5 people and delete") as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("deletes an empty group after one ask", async () => {
-    deleteGroup.mockResolvedValue({});
-    const all = [group({ id: "grp_t", name: "test", userCount: 0 }), group()];
-    await mount(all, { children: <DeleteGroupModal group={all[0]!} groups={all} onClose={() => {}} /> });
-    expect(dialog().textContent).toContain("Delete the group “test”?");
-    expect(dialog().textContent).toContain("Nobody is in it");
-    await click(button("Delete group"));
-    await settle();
-    expect(deleteGroup).toHaveBeenCalledWith({ groupId: "grp_t", moveUsersTo: "" });
   });
 });
 

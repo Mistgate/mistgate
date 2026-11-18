@@ -24,7 +24,7 @@ import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { avatarIndex, GB, groupTone } from "./format";
 import { big, userN, type UserN as User } from "./model";
 import { DnsSelect, useInheritedDns } from "./dns-select";
-import { defaultGroup, GroupEditModal, GroupForm } from "./groups";
+import { defaultGroup, GroupEditModal, NewGroupModal } from "./groups";
 import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
 import { InfoTip, ResetSelect, resetCode } from "./ui";
@@ -203,6 +203,7 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
   const [allNodes, setAllNodes] = useState(true);
   const [picked, setPicked] = useState<string[]>([]);
   const [editingGroup, setEditingGroup] = useState(false);
+  const [makingGroup, setMakingGroup] = useState(false);
   const [dnsPreset, setDnsPreset] = useState(""); // "" = inherit
   const [speed, setSpeed] = useState(0); // bit/s, 0 = no limit
   const [devSpeed, setDevSpeed] = useState(0);
@@ -317,15 +318,12 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
           <div className="flex flex-col gap-1.5 text-[13px] text-sec">
             <span id="ul-group">{t("users.group")}</span>
             {groupList.data && groups.length === 0 ? (
-              <div className={cx(box, "px-3.5")}>
-                <GroupForm
-                  first
-                  dns={false}
-                  quiet
-                  profiles={(profileList.data ?? []).map((p) => ({ id: p.id, name: p.name }))}
-                  onCancel={() => {}}
-                  onCreated={(g) => setGroupId(g.id)}
-                />
+              // nobody can be added before there is a group: the new-group window opens from here and the person lands in it
+              <div className={cx(box, "flex flex-col items-start gap-2.5 p-3.5")}>
+                <p className="text-xs leading-normal text-muted">{t("users.groupFirst")}</p>
+                <Button variant="secondary" size="lg" onClick={() => setMakingGroup(true)}>
+                  {t("users.newGroup")}
+                </Button>
               </div>
             ) : groups.length <= 6 ? (
               <div role="group" aria-labelledby="ul-group" className="grid grid-cols-2 gap-2 @max-[420px]/usd:grid-cols-1">
@@ -571,6 +569,7 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
         </Button>
       </div>
       <GroupEditModal group={group} open={editingGroup} onOpenChange={setEditingGroup} />
+      <NewGroupModal open={makingGroup} onOpenChange={setMakingGroup} onCreated={(g) => setGroupId(g.id)} />
     </form>
   );
 }

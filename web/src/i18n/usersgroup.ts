@@ -99,6 +99,10 @@ export const en = {
   "grp.del.subEmpty": "The group is empty; deleting it breaks nothing",
   "grp.del.sure": "Really delete?",
   "grp.readOnly": "You can look at the group, only the owner and a helper change it",
+  "grp.held.title": "“{node}” is not handed out to this group",
+  "grp.held.titleAny": "This node is not handed out to this group",
+  "grp.held.body": "The node is held back: marked “nobody gets it”, or handed out to chosen groups only. A group’s page cannot switch it on. Open the node and give it to this group under “Who gets it”.",
+  "grp.held.open": "Open the node",
 };
 
 export const ru: typeof en = {
@@ -199,6 +203,10 @@ export const ru: typeof en = {
   "grp.del.subEmpty": "Группа пустая, удаление ничего не сломает",
   "grp.del.sure": "Точно удалить?",
   "grp.readOnly": "Группу можно смотреть, менять её могут владелец и помощник",
+  "grp.held.title": "Нода «{node}» не раздаётся этой группе",
+  "grp.held.titleAny": "Эта нода не раздаётся этой группе",
+  "grp.held.body": "Нода придержана: помечена «никому не раздаётся» или раздаётся только выбранным группам. Со страницы группы её не включить. Открой страницу ноды и отдай её этой группе в блоке «Кому раздаётся».",
+  "grp.held.open": "Открыть ноду",
 };
 
 export const zh: typeof en = {
@@ -299,6 +307,10 @@ export const zh: typeof en = {
   "grp.del.subEmpty": "分组为空，删除不会影响任何内容",
   "grp.del.sure": "确定删除？",
   "grp.readOnly": "你可以查看该分组，只有所有者和协助者能修改",
+  "grp.held.title": "节点“{node}”未分发给此分组",
+  "grp.held.titleAny": "该节点未分发给此分组",
+  "grp.held.body": "该节点被保留：标记为“不分发给任何人”，或只分发给所选分组。分组页面无法将其开启。请打开该节点，在“分发给谁”中把它分给此分组。",
+  "grp.held.open": "打开节点",
 };
 
 export const fa: typeof en = {
@@ -399,6 +411,10 @@ export const fa: typeof en = {
   "grp.del.subEmpty": "گروه خالی است؛ حذف آن چیزی را خراب نمی‌کند",
   "grp.del.sure": "واقعاً حذف شود؟",
   "grp.readOnly": "می‌توانی گروه را ببینی؛ فقط مالک و دستیار آن را تغییر می‌دهند",
+  "grp.held.title": "نود «{node}» به این گروه داده نمی‌شود",
+  "grp.held.titleAny": "این نود به این گروه داده نمی‌شود",
+  "grp.held.body": "این نود نگه داشته شده است: علامت «به هیچ‌کس داده نمی‌شود» دارد یا فقط به گروه‌های انتخابی داده می‌شود. از صفحهٔ گروه نمی‌توان آن را روشن کرد. صفحهٔ نود را باز کن و در بخش «به چه کسانی داده می‌شود» آن را به این گروه بده.",
+  "grp.held.open": "باز کردن نود",
 };
 
 export const tr: typeof en = {
@@ -499,4 +515,8 @@ export const tr: typeof en = {
   "grp.del.subEmpty": "Grup boş; silmek hiçbir şeyi bozmaz",
   "grp.del.sure": "Gerçekten silinsin mi?",
   "grp.readOnly": "Grubu görebilirsin, yalnızca sahip ve yardımcı değiştirebilir",
+  "grp.held.title": "“{node}” düğümü bu gruba verilmiyor",
+  "grp.held.titleAny": "Bu düğüm bu gruba verilmiyor",
+  "grp.held.body": "Düğüm tutuluyor: “kimseye verilmiyor” olarak işaretli ya da yalnızca seçili gruplara veriliyor. Grup sayfası onu açamaz. Düğümü aç ve “Kime verilir” bölümünden bu gruba ver.",
+  "grp.held.open": "Düğümü aç",
 };

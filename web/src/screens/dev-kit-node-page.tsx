@@ -43,7 +43,8 @@ import { osUpdatesQuery } from "@/lib/os-updates";
 // each in a frame of its own width (an iframe, so the window's breakpoints answer to the frame), inside the real shell. Each frame is
 // a page of its own: /dev-kit?only=nodepage-frame&tab=<tab>&state=<state>
 //   calm | alerts | many | high | limit | down | new | retired | viewer | edge | via | entry
-// `fx=1` turns the reveal animation on. The decoy site card (?tab=server&sv=site) takes `ds=panel|own|pending|offline|failed|old|none|pick|warn|
+// `fx=1` turns the reveal animation on. The Exit tab takes `wp=ok|pause|bad|none|revoked` (the WARP card) and `rc=ok|mixed|wait|old|off|stale` (the sites it is
+// checked against: all reachable, a mix, waiting for the first answer, an agent without the check, the check off, a result hours old). The decoy site card (?tab=server&sv=site) takes `ds=panel|own|pending|offline|failed|old|none|pick|warn|
 // empty` for the states of its choice and its delivery. Made-up data: nodes de1, nl1, fi1, msk1, people alice, dave, bob, a panel called owner.
 
 const NOW = Math.floor(Date.now() / 1000);
@@ -211,11 +212,32 @@ function fakeHistory(state: NState) {
 }
 
 export type WarpKind = "ok" | "pause" | "bad" | "none" | "revoked";
+/** What the reach card under the WARP card says (?rc=): every site reachable, a mix (a block page, a bare 403, no answer), nothing yet, an agent without the check, the check off, an old result. */
+export type ReachKind = "ok" | "mixed" | "wait" | "old" | "off" | "stale";
+const reachKinds: readonly string[] = ["ok", "mixed", "wait", "old", "off", "stale"];
+export const reachKindOf = (s: string | null): ReachKind | undefined => (reachKinds.includes(s ?? "") ? (s as ReachKind) : undefined);
+
+/** One site's answer, as the panel stores it (WarpReachDomain). */
+const site = (domain: string, verdict: string, httpStatus: number, latencyMs: number, blockedStreak = 0) => ({ domain, verdict, httpStatus, latencyMs, blockedStreak });
+
+/** GetWarpResponse.reach and reach_state for a scene: the four default sites of the panel, made-up answers. A node whose tunnel is down has none yet. */
+function reachOf(kind: ReachKind, wp: WarpKind) {
+  const ago = kind === "stale" ? 5 * H : 240;
+  const domains =
+    kind === "mixed"
+      ? [site("notion.com", "ok", 200, 240), site("discord.com", "blocked", 403, 180, 3), site("chatgpt.com", "error", 403, 310), site("claude.ai", "unreachable", 0, 12000)]
+      : [site("notion.com", "ok", 200, 240), site("discord.com", "ok", 200, 180), site("chatgpt.com", "ok", 200, 310), site("claude.ai", "ok", 200, 150)];
+  if (kind === "old") return { reach: undefined, reachState: "agent_too_old" };
+  if (kind === "off") return { reach: undefined, reachState: "disabled" };
+  if (kind === "wait" || wp === "bad" || wp === "revoked") return { reach: undefined, reachState: "waiting" };
+  return { reach: { checkedUnix: NOW - ago, colo: "FRA", domains }, reachState: "ready" };
+}
 
 /** The WARP card of the board's states: working, paused, not answering, none connected (the registration then plays on a press), revoked. */
-function warpOf(kind: WarpKind) {
+function warpOf(kind: WarpKind, rc: ReachKind = "ok") {
   const shake = kind === "ok" ? NOW - 20 : NOW - 3 * H;
   return {
+    ...reachOf(rc, kind),
     account: kind === "none" ? undefined : { enabled: kind !== "pause", source: WarpSource.REGISTERED, accountType: "free", hasToken: true, useReserved: true, endpointV4: "198.51.100.1" },
     health:
       kind === "none"
@@ -232,7 +254,7 @@ function warpOf(kind: WarpKind) {
   };
 }
 
-export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind } = {}) {
+export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind; rc?: ReachKind } = {}) {
   const sp = specs[state];
   const lo = sp.load;
   const status = sp.retired ? NodeStatus.RETIRED : sp.down ? NodeStatus.DOWN : sp.fresh ? NodeStatus.ONLINE : NodeStatus.ONLINE;
@@ -361,7 +383,7 @@ export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | 
   qc.setQueryData(relaysQuery("nod_de1").queryKey, (sp.entry ? [] : []) as never);
   // the Exit tab: the WARP account, the DNS presets of the people's page
   const wp = extra.wp ?? "ok";
-  qc.setQueryData(warpQuery("nod_de1").queryKey, warpOf(wp) as never);
+  qc.setQueryData(warpQuery("nod_de1").queryKey, warpOf(wp, extra.rc) as never);
   const dnsPreset = (id: string, name: string, over: object = {}) => ({ id, name, servers: [], split: [], splitDirect: false, isDefault: false, blockAds: false, ...over });
   qc.setQueryData(dnsPresetsQuery.queryKey, { presets: [dnsPreset("dns_cf", "Cloudflare"), dnsPreset("dns_q9", "Quad9"), dnsPreset("dns_ag", "AdGuard", { blockAds: true }), dnsPreset("dns_fm", "Family"), dnsPreset("dns_ru", "Russia: Yandex + split")], providers: [], clientSupport: [] } as never);
   qc.setQueryData(nodeDnsOptionsQuery.queryKey, [{ nodeId: "nod_de1", presetIds: ["dns_cf", "dns_q9", "dns_ag"], defaultPresetId: "dns_cf" }] as never);
@@ -438,7 +460,8 @@ export function NodePageFrame() {
     const wp = params.get("wp");
     const kind = wp === "ok" || wp === "pause" || wp === "bad" || wp === "none" || wp === "revoked" ? wp : undefined;
     if (params.get("tab") === "history") fakeHistory(state);
-    const made = nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind });
+    const rc = reachKindOf(params.get("rc"));
+    const made = nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind, rc });
     // the Ways in tab: the scene's relays, checks and ports (w=1 and the switches of dev-kit-node-ways.tsx)
     if (params.get("w")) made.data = seedWays(made.qc, made.data as never, waysSceneOf(params), (made.data.node as { status: NodeStatus }).status) as never;
     // no WARP yet: the registration the scene plays takes nine seconds (four steps), then the account is there
@@ -532,6 +555,15 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-exit-dead", state: "down", tab: "exit", q: "wp=ok", title: "Exit: the node is silent, WARP is unknown", w: 1440, h: 1500 },
   { id: "node-exit-none", state: "calm", tab: "exit", q: "wp=none", title: "Exit: no WARP yet (Enable WARP plays the registration, nine seconds)", w: 1440, h: 1300 },
   { id: "node-exit-viewer", state: "viewer", tab: "exit", q: "wp=ok", title: "Exit: a read-only role", w: 1440, h: 1500 },
+  { id: "node-exit-reach-mixed", state: "calm", tab: "exit", q: "wp=ok&rc=mixed", title: "Exit, the sites: a block page, a bare 403 (an error, not a block), no answer", w: 1440, h: 1600 },
+  { id: "node-exit-reach-wait", state: "calm", tab: "exit", q: "wp=ok&rc=wait", title: "Exit, the sites: the tunnel is up, the first answer is on its way", w: 1440, h: 1500 },
+  { id: "node-exit-reach-nodata", state: "alerts", tab: "exit", q: "wp=bad", title: "Exit, the sites: the tunnel is down, nothing to show", w: 1440, h: 1600 },
+  { id: "node-exit-reach-old", state: "calm", tab: "exit", q: "wp=ok&rc=old", title: "Exit, the sites: the node's agent has no such check", w: 1440, h: 1500 },
+  { id: "node-exit-reach-off", state: "calm", tab: "exit", q: "wp=ok&rc=off", title: "Exit, the sites: the check is off (the list is empty)", w: 1440, h: 1500 },
+  { id: "node-exit-reach-stale", state: "calm", tab: "exit", q: "wp=ok&rc=stale", title: "Exit, the sites: the result is hours old", w: 1440, h: 1500 },
+  { id: "node-exit-reach-pause", state: "calm", tab: "exit", q: "wp=pause&rc=mixed", title: "Exit, the sites: WARP is paused, the last result is dimmed", w: 1440, h: 1500 },
+  { id: "node-exit-reach-dead", state: "down", tab: "exit", q: "wp=ok&rc=mixed", title: "Exit, the sites: the node is silent, the last result is dimmed", w: 1440, h: 1500 },
+  { id: "node-exit-reach-phone", state: "calm", tab: "exit", q: "wp=ok&rc=mixed", title: "Exit, the sites, on a phone, 400 wide", w: 400, h: 3600 },
   { id: "node-exit-1100", state: "calm", tab: "exit", q: "wp=ok", title: "Exit at 1100 wide: one column", w: 1100, h: 1900 },
   { id: "node-exit-phone", state: "calm", tab: "exit", q: "wp=ok", title: "Exit on a phone, 400 wide", w: 400, h: 3000 },
   { id: "node-history-events", state: "calm", tab: "history", title: "History: the week at a glance and the timeline of events", w: 1440, h: 1200 },

@@ -20,7 +20,7 @@ import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta"
 import { catalogOf, presetName, presetSubtitle, transportKey } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppList } from "@/screens/subscriptions/queries";
 import { useInheritedDns } from "./dns-select";
-import { barState, GlyphTile, Note, padClass, SaveBar, SvCard, Tick, type GroupDemo } from "./group-bits";
+import { barState, GlyphTile, heldNodeOf, HeldNote, Note, padClass, SaveBar, SvCard, Tick, type GroupDemo } from "./group-bits";
 import { ImpactText, wayOf } from "./groups";
 import { profileListQuery, protocolsQuery } from "./rpc";
 import { useTx } from "./t";
@@ -194,6 +194,8 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
   const disabled = off ?? base;
   const dirty = !same(disabled, base);
   const [error, setError] = useState<string | null>(null);
+  // the panel refused to switch on a node the owner holds back (node_held): the node's id, for the way to its page
+  const [held, setHeld] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const items = (nodeList.data?.nodes ?? []).filter((n) => n.status !== NodeStatus.RETIRED).slice().sort((a, b) => a.name.localeCompare(b.name));
   const protocolsOfGroup = new Set((profiles.data ?? []).filter((p) => group.profileIds.includes(p.id)).map((p) => p.protocol));
@@ -207,7 +209,11 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
       toast(t("users.groupSaved", { name: group.name }));
       halo("save");
     },
-    onError: (e) => setError(errorText(e, t)),
+    onError: (e) => {
+      const node = heldNodeOf(e);
+      if (node !== undefined) setHeld(node);
+      else setError(errorText(e, t));
+    },
   });
   const all = !unlocked && disabled.length === 0;
   const set = (next: string[]) => {
@@ -280,6 +286,7 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
           })}
         </div>
       )}
+      {held !== null && <HeldNote nodeId={held} className="mx-6 mb-4 max-md:mx-4" />}
       {error && <Notice tone="danger" className="mx-6 mb-4 max-md:mx-4">{error}</Notice>}
       <SaveBar
         state={manage ? barState(dirty, save.isPending, ok) : "idle"}
@@ -288,9 +295,11 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
           setOff(null);
           setUnlocked(base.length > 0);
           setError(null);
+          setHeld(null);
         }}
         onSave={() => {
           setError(null);
+          setHeld(null);
           save.mutate();
         }}
       />
