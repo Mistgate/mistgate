@@ -1,0 +1,9 @@
+HTTP/1.1 403 Forbidden
+Content-Type: text/html; charset=utf-8
+Server: nginx
+Connection: close
+
+<!doctype html>
+<html lang="en"><head><title>Not available</title></head>
+<body><main><h1>Sorry, this content is not available in your country</h1>
+<p>Due to licensing restrictions we cannot show this page from your location.</p></main></body></html>

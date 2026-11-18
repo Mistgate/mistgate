@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package mistgate.warpreach.v1;
+
+// The sites each node's WARP is checked against ("WARP reach": every 15 minutes the panel asks each node to fetch them through its
+// tunnel and say which show a block page; the result is in admin.v1 GetWarpResponse.reach, the Health alert is WARP_REACH). A
+// package of its own on purpose, like mistgate.decoysite.v1: the Cloudflare edition runs no such check, so its Workers link none of
+// this code and answer every procedure with unavailable_in_edition: feature=health_checks. Owner only (internal/panel/auth
+// policy_warpreach.go); a change is audited as warp_reach_settings.
+//
+// ERRORS. INVALID_ARGUMENT: reach_domains_too_many (more than 8), reach_domain_invalid (not a lower-case host name with at least two
+// labels, no address, port or path), reach_domain_duplicate.
+service WarpReachService {
+  // The effective list, the built-in one and whether the owner changed it. Built-in short list unless the owner changed it; an
+  // empty list switches the check off.
+  rpc GetWarpReachSettings(GetWarpReachSettingsRequest) returns (GetWarpReachSettingsResponse);
+  rpc UpdateWarpReachSettings(UpdateWarpReachSettingsRequest) returns (UpdateWarpReachSettingsResponse);
+}
+
+message WarpReachSettings {
+  // Lower-case host names (at least two labels, no address, port or path), at most 8. Empty = the check is off.
+  repeated string domains = 1;
+}
+
+message GetWarpReachSettingsRequest {}
+
+message GetWarpReachSettingsResponse {
+  WarpReachSettings settings = 1;
+  // The built-in list: what "use the built-in list" gives.
+  WarpReachSettings defaults = 2;
+  // The owner changed the list (it is stored, even when it equals the built-in one or is empty).
+  bool customised = 3;
+}
+
+message UpdateWarpReachSettingsRequest {
+  WarpReachSettings settings = 1;
+  // true: forget the owner's list and use the built-in one again (settings is ignored).
+  bool use_defaults = 2;
+}
+
+message UpdateWarpReachSettingsResponse {
+  WarpReachSettings settings = 1;
+  bool customised = 2;
+}

@@ -1,0 +1,7 @@
+HTTP/1.1 503 Service Unavailable
+Server: nginx
+Content-Type: text/html
+Retry-After: 120
+Connection: close
+
+<html><body><h1>Service Temporarily Unavailable</h1></body></html>

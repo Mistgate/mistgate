@@ -2,6 +2,7 @@ package warp
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -83,6 +84,13 @@ type Manager struct {
 	h          Health // last measured fields (State and Backend are filled in by Health())
 
 	egAuto, egV4 *egress.Direct
+
+	// Reach (reach.go): one run at a time, and one per health interval. reachDial and reachTLS are a test's seams;
+	// production dials through the guarded probeDialContext and verifies certificates against the system roots.
+	reachMu   sync.Mutex
+	reachAt   time.Time // when the last run began (mu)
+	reachDial func(ctx context.Context, network, address string) (net.Conn, error)
+	reachTLS  *tls.Config
 }
 
 // New builds the manager for this OS.

@@ -16,6 +16,10 @@ const TrustTunnelCapability = "trusttunnel/1"
 // (agent.proto LinkCounters tunnel_*), on the inbound's row.
 const TrustTunnelRefusalsCapability = "trusttunnel-refusals/1"
 
+// TrustTunnelTCPStallsCapability marks agents whose TrustTunnel engine counts the HTTP/2 connections that ended with data the
+// client never acknowledged (agent.proto LinkCounters tcp_stalls, tcp_stalls_16k), on the inbound's row.
+const TrustTunnelTCPStallsCapability = "trusttunnel-tcp-stalls/1"
+
 // TunnelRefusalFields are those counters, in the order of plugin.TunnelRefusal. Only TrustTunnel has them: for another protocol
 // they are zero and left out of the views, and unsupported does not name them.
 var TunnelRefusalFields = []string{"tunnel_blocked", "tunnel_no_ipv4", "tunnel_conn_refused", "tunnel_conn_unreachable", "tunnel_conn_dns",
@@ -109,6 +113,10 @@ func UnsupportedCountersFor(protocol string, agentCaps []string, v Variant) []st
 		if protocol == "trusttunnel" && f == "auth_failed" && slices.Contains(agentCaps, TrustTunnelCapability) {
 			supported = true
 		}
+		// The TCP stalls of TrustTunnel have a capability of their own: an agent with links/3 but without it counts none.
+		if protocol == "trusttunnel" && (f == "tcp_stalls" || f == "tcp_stalls_16k") {
+			supported = slices.Contains(agentCaps, TrustTunnelTCPStallsCapability)
+		}
 		if !supported {
 			out = append(out, f)
 		}
@@ -161,7 +169,7 @@ func link3Supported(protocol, field string, v Variant) bool {
 	return false
 }
 
-// keyLink3 says whether the counter is put on the key (VLESS behind its TLS front counts the stall on the inbound row).
+// keyLink3 says whether the counter is put on the key (VLESS behind its TLS front and TrustTunnel count the stall on the inbound row).
 func keyLink3(protocol, field string, v Variant) bool {
 	switch field {
 	case "tcp_stalls", "tcp_stalls_16k":
@@ -177,5 +185,5 @@ func SupportsHysteria2Links2(protocol string, supportsLinks2 bool) bool {
 
 // UnsupportedDescription is the common note used by MCP descriptions and tests.
 func UnsupportedDescription() string {
-	return "unsupported names counters the current protocol, its transport, the AWG backend or the agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: unknown_keys is supported with vless-unknown-keys/1, hellos, hellos_foreign and over REALITY TCP connects with links/3, and every other connection counter except online_s is unsupported; TrustTunnel: only connects and the inbound-only unknown_keys, and with trusttunnel/1 the inbound-only auth_failed, and with trusttunnel-refusals/1 the inbound-only tunnel_* refusal reasons, are reported; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms, loss_permille, rtt_samples and pkts_sent; links/3 reasons only where the engine sees them: Hysteria2 hs_unfinished and the tls_* alerts, VLESS REALITY reality_fallback, auth_failed and hs_unfinished, VLESS tls hs_unfinished and the tls_* alerts, VLESS tcp_stalls over REALITY TCP or a direct TLS front, AWG initiations, responses and responses_unmatched on the userspace backend only (the kernel backend cannot tell them apart))."
+	return "unsupported names counters the current protocol, its transport, the AWG backend or the agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: unknown_keys is supported with vless-unknown-keys/1, hellos, hellos_foreign and over REALITY TCP connects with links/3, and every other connection counter except online_s is unsupported; TrustTunnel: only connects and the inbound-only unknown_keys, and with trusttunnel/1 the inbound-only auth_failed, and with trusttunnel-refusals/1 the inbound-only tunnel_* refusal reasons, and with trusttunnel-tcp-stalls/1 the inbound-only tcp_stalls and tcp_stalls_16k, are reported; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms, loss_permille, rtt_samples and pkts_sent; links/3 reasons only where the engine sees them: Hysteria2 hs_unfinished and the tls_* alerts, VLESS REALITY reality_fallback, auth_failed and hs_unfinished, VLESS tls hs_unfinished and the tls_* alerts, VLESS tcp_stalls over REALITY TCP or a direct TLS front, TrustTunnel tcp_stalls over HTTP/2, AWG initiations, responses and responses_unmatched on the userspace backend only (the kernel backend cannot tell them apart))."
 }

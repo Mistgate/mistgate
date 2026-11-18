@@ -71,6 +71,30 @@ func TestTrustTunnelCounters(t *testing.T) {
 	}
 }
 
+// trusttunnel-tcp-stalls/1: the TCP stalls are the inbound's own, on the agents that count them; no other protocol gains them.
+func TestTrustTunnelTCPStallCounters(t *testing.T) {
+	without := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, Links3Capability})
+	with := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, Links3Capability, TrustTunnelTCPStallsCapability})
+	for _, f := range []string{"tcp_stalls", "tcp_stalls_16k"} {
+		if !slices.Contains(without, f) || slices.Contains(with, f) {
+			t.Errorf("%s: unsupported without the capability %v, with it %v", f, slices.Contains(without, f), slices.Contains(with, f))
+		}
+	}
+	if len(with) != len(without)-2 {
+		t.Fatalf("the stall capability changed other counters: %v vs %v", with, without)
+	}
+	// never on a key's row: a stall is told apart per connection, and a connection is not a key's
+	keys := UnsupportedKeyCounters("trusttunnel", []string{TrustTunnelCapability, Links3Capability, TrustTunnelTCPStallsCapability}, Variant{})
+	if !slices.Contains(keys, "tcp_stalls") {
+		t.Fatalf("a TrustTunnel key row claims TCP stalls: %v", keys)
+	}
+	for _, protocol := range []string{"hysteria2", "awg"} {
+		if !slices.Contains(UnsupportedCountersForNode(protocol, []string{Links3Capability, TrustTunnelTCPStallsCapability}), "tcp_stalls") {
+			t.Errorf("%s gained tcp_stalls from the TrustTunnel capability", protocol)
+		}
+	}
+}
+
 // trusttunnel-refusals/1: the refusal reasons are TrustTunnel's, on the agents that count them; nobody else lists them.
 func TestTrustTunnelRefusalCounters(t *testing.T) {
 	without := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, Links3Capability})

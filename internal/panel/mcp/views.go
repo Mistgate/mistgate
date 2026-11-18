@@ -538,6 +538,24 @@ type WarpStatusV struct {
 	RegisteredUnix    int64       `json:"registered_unix,omitempty"`
 	HasToken          bool        `json:"has_token"`
 	Profiles          []string    `json:"profiles"`
+	// ReachState says why Reach is, or is not, there: ready, waiting, disabled (the owner's list is empty) or agent_too_old.
+	ReachState string      `json:"reach_state,omitempty"`
+	Reach      *warpReachV `json:"reach,omitempty"`
+}
+
+// warpReachV is the node's latest WARP reach run: which of the owner's sites showed a block page through its WARP.
+type warpReachV struct {
+	CheckedUnix int64              `json:"checked_unix"`
+	Colo        string             `json:"colo,omitempty"`
+	Domains     []warpReachDomainV `json:"domains"`
+}
+
+type warpReachDomainV struct {
+	Domain        string `json:"domain"`
+	Verdict       string `json:"verdict"`
+	HTTPStatus    uint32 `json:"http_status,omitempty"`
+	LatencyMS     uint32 `json:"latency_ms,omitempty"`
+	BlockedStreak uint32 `json:"blocked_streak,omitempty"`
 }
 
 type warpProbeV struct {
@@ -583,6 +601,14 @@ func warpStatusView(nodeID, nodeName string, r *adminv1.GetWarpResponse, now tim
 	}
 	for _, in := range r.GetInbounds() {
 		v.Profiles = append(v.Profiles, nm(in.GetProfileName()))
+	}
+	v.ReachState = clean(r.GetReachState(), 20)
+	if rv := r.GetReach(); rv != nil {
+		v.Reach = &warpReachV{CheckedUnix: rv.GetCheckedUnix(), Colo: clean(rv.GetColo(), 8), Domains: []warpReachDomainV{}}
+		for _, d := range rv.GetDomains() {
+			v.Reach.Domains = append(v.Reach.Domains, warpReachDomainV{Domain: clean(d.GetDomain(), 80), Verdict: clean(d.GetVerdict(), 20),
+				HTTPStatus: d.GetHttpStatus(), LatencyMS: d.GetLatencyMs(), BlockedStreak: d.GetBlockedStreak()})
+		}
 	}
 	return v
 }

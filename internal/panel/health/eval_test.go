@@ -2103,3 +2103,52 @@ func TestDismissedAlertStaysClosedUntilTheProblemStops(t *testing.T) {
 		t.Fatalf("the new alert was not announced: %+v", seen)
 	}
 }
+
+// A node_down alert says how busy the node was when it went silent, and keeps those numbers while the silence goes on.
+func TestNodeDownAlertCarriesTheTrafficOfItsOpening(t *testing.T) {
+	e := newEnv(t)
+	e.node("node-a", "provider", false)
+	now := e.clock.Now()
+	stale := now.Add(-2 * time.Hour)
+	e.exec(`UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = 'node-a'`, stale.Unix(), stale.Unix())
+	e.fl.set("node-a", liveState{lastSeen: stale})
+	hour := now.Truncate(time.Hour).Unix()
+	e.exec(`INSERT INTO node_traffic_hour (node_id, protocol, hour_start, bytes_up, bytes_down) VALUES
+		('node-a', 'vless', ?, 100, 200), ('node-a', 'vless', ?, 1000, 2000), ('node-a', 'vless', ?, 10000, 20000)`,
+		hour-3*3600, hour-30*3600, hour-200*3600)
+
+	e.evaluate()
+	got := e.active()["node_down/node-a/"]
+	if got.Kind != kNodeDown || got.Params[paramTraffic24h] != "300" || got.Params[paramTraffic7d] != "3300" {
+		t.Fatalf("node_down alert params = %v, want traffic_24h_bytes 300 and traffic_7d_bytes 3300", got.Params)
+	}
+
+	// hours pass and more traffic is recorded: the alert keeps the numbers of its opening
+	e.clock.Advance(30 * time.Hour)
+	e.exec(`INSERT INTO node_traffic_hour (node_id, protocol, hour_start, bytes_up, bytes_down) VALUES ('node-a', 'vless', ?, 50, 50)`, hour+3600)
+	e.evaluate()
+	got = e.active()["node_down/node-a/"]
+	if got.Params[paramTraffic24h] != "300" || got.Params[paramTraffic7d] != "3300" {
+		t.Fatalf("node_down alert params after 30 hours = %v, want the numbers of its opening", got.Params)
+	}
+}
+
+// Only the alerts that say a node is silent or cut off from a country get the numbers; an alert of another kind, and one
+// that no node owns (the panel's own link), do not.
+func TestTrafficVolumeIsOnlyForTheNodeAlertsItNames(t *testing.T) {
+	e := newEnv(t)
+	e.node("node-a", "provider", false)
+	hour := e.clock.Now().Truncate(time.Hour).Unix()
+	e.exec(`INSERT INTO node_traffic_hour (node_id, protocol, hour_start, bytes_up, bytes_down) VALUES ('node-a', 'vless', ?, 7, 8)`, hour)
+	d := &derived{conds: map[key]cond{}}
+	for _, k := range []key{{kCountryBlocked, "node-a", ""}, {kCountryBlocked, "node-a", "partial"}, {kCheckFailed, "node-a", "inb"}, {kNodeDown, "", panelLinkSubject}} {
+		d.conds[k] = cond{key: k, params: map[string]string{"node": "de1"}}
+	}
+	e.s.withTrafficVolume(e.ctx, e.clock.Now(), d, nil)
+	for k, c := range d.conds {
+		has := c.params[paramTraffic24h] == "15" && c.params[paramTraffic7d] == "15"
+		if want := k.kind == kCountryBlocked; has != want || c.params["node"] != "de1" {
+			t.Errorf("%v: params %v, traffic numbers wanted %v", k, c.params, want)
+		}
+	}
+}

@@ -174,7 +174,9 @@ type inbound struct {
 	conns  map[any]*connectionState
 
 	unknownKeys atomic.Uint32
-	refused     refusals
+	// trusttunnel-tcp-stalls/1: HTTP/2 connections that ended with data the client never acknowledged (stall.go).
+	tcpStalls, tcpStalls16K atomic.Uint32
+	refused                 refusals
 
 	mu       sync.Mutex
 	state    plugin.RunState
@@ -371,7 +373,7 @@ func (in *inbound) start(ctx context.Context) error {
 			return err
 		}
 	}
-	tlsListener := tls.NewListener(ln, in.srv.TLSConfig)
+	tlsListener := tls.NewListener(stallListener{Listener: ln, count: in.countStall}, in.srv.TLSConfig)
 	in.mu.Lock()
 	in.state, in.detail, in.since, in.everServe = plugin.RunRunning, "", in.e.now(), true
 	in.mu.Unlock()

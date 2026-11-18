@@ -152,3 +152,6 @@ func TestNewClientOnEdition(t *testing.T) {
 		t.Error("an unknown tls spec id must be refused as on a VPS")
 	}
 }
+
+// reachFn stands in for the fake of the reach check, which this build does not have.
+type reachFn = func()

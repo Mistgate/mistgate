@@ -165,6 +165,10 @@ type env struct {
 	secret []string // secrets the test knows besides what the fake issued (private keys)
 	paused bool     // the node confirmed a state with WARP paused (WarpPauseApplied); under mu
 	mu     sync.Mutex
+
+	// WarpReach: what the fake node answers (nil = an error) and the lists it was asked about, in order; under mu.
+	reach      reachFn
+	reachAsked [][]string
 }
 
 func newEnv(t *testing.T) *env {

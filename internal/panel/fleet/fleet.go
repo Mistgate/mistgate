@@ -579,7 +579,9 @@ func (f *Fleet) sweep(ctx context.Context) {
 		if err != nil || code == "node_down" {
 			continue
 		}
-		f.event(ctx, 3, "node_down", n.ID, map[string]string{"minutes": fmt.Sprint(int(now.Sub(last).Minutes()))})
+		params := map[string]string{"minutes": fmt.Sprint(int(now.Sub(last).Minutes()))}
+		_ = f.st.AddTrafficParams(ctx, n.ID, now, params) // how busy the node was when it went silent, as the node_down alert says
+		f.event(ctx, 3, "node_down", n.ID, params)
 	}
 }
 

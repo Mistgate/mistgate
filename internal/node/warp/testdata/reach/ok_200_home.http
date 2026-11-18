@@ -1,0 +1,11 @@
+HTTP/1.1 200 OK
+Server: cloudflare
+Content-Type: text/html; charset=utf-8
+CF-RAY: 8a1b2c3d4e5f6a81-FRA
+Connection: close
+
+<!doctype html>
+<html lang="en"><head><title>Example - a workspace for your team</title></head>
+<body><header><a href="/">Example</a></header>
+<main><h1>One workspace. Zero busywork.</h1>
+<p>Get started for free.</p></main></body></html>
