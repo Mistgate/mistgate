@@ -662,6 +662,11 @@ export type CountryLook = {
   alsoListed: boolean;
   /** The quiet line of a row, where a phone has no tooltip: who saw it, the lists, and when, or why there is no verdict. */
   line: string;
+  /**
+   * The same line in its pieces, the networks as the node page's row says them ("4 networks: A, B, C and D": a partial block's
+   * dark ones are under the row, not here), the last one the time; the row keeps the node of the probe and the time as units.
+   */
+  row: string[];
   /** Two live sources that disagree: what each said ("Globalping: reachable · probe: TCP blocked"); empty when they do not. */
   conflict: string;
   /** What each live source said on its own, with its reason and age: "bsbord: no data, the node has no TCP port to test · 3 h ago". */
@@ -811,7 +816,8 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
     .sort(([a], [b]) => sourceRank(a) - sourceRank(b))
     .map(([s, at]) => t("cr.part.when", { source: sourceName(t, s), ago: fmt.ago(at) }))
     .join(" · ");
-  const networks = dark || (fromGp ? [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ") : "");
+  const nets = fromGp ? [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))] : [];
+  const networks = dark || nets.join(", ");
   const ports = tspuPortsText(t, c.tspuPorts);
   const vantage = c.tspuVantageName || c.tspuVantageId;
   const ago = fmt.ago(c.atUnix);
@@ -823,7 +829,11 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
     ? [t("cr.note.conflict"), conflict]
     : [icmp ? t("cr.icmpPasses") : "", networks, tspuOnly ? ports : "", fromTspu ? t("cr.line.probe", { node: vantage }) : ""];
   const lineOf = (...first: string[]) => [...first, cdn, ago].filter(Boolean).join(" · ");
-  const look = (kind: CountryLook["kind"], label: string, head: string, line: string): CountryLook => {
+  // the row of the node page: the networks counted and named (more than five: the first four and "and N more"), the lists, the time
+  const netsRow = nets.length ? t.n("cr.nets", nets.length, { list: nets.length > 5 ? t("hl.nets.short", { names: nets.slice(0, 4).join(", "), n: nets.length - 4 }) : listOf(fmt.locale, nets) }) : "";
+  const seenRow = conflict ? seen : [icmp ? t("cr.icmpPasses") : "", netsRow, tspuOnly ? ports : "", fromTspu ? t("cr.line.probe", { node: vantage }) : ""];
+  const rowOf = (...first: string[]) => [...first, cdn, ago].filter(Boolean);
+  const look = (kind: CountryLook["kind"], label: string, head: string, line: string, row: string[]): CountryLook => {
     const note = conflict ? t("cr.note.conflict") : icmp ? t("cr.icmpPasses") : partial ? darkNames : tspuOnly && kind !== "ok" ? t("tp.title") : "";
     return {
       kind,
@@ -834,6 +844,7 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
       state: [head, conflict ? `${t("cr.tip.conflict")} · ${conflict}` : icmp ? "" : dark || note, listed && kind !== "listed" ? t("cr.line.listed") : ""].filter(Boolean).join(" · "),
       alsoListed: listed && kind !== "listed",
       line,
+      row,
       conflict,
       dark,
       noProbe: c.noProbe.length ? t("cr.tip.noProbe", { networks: c.noProbe.join(t("cr.tip.sep")) }) : "",
@@ -882,19 +893,19 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
   const inList = listed ? t("cr.line.listed") : "";
   switch (c.verdict) {
     case CountryVerdict.OK:
-      return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), lineOf(...seen, inList));
+      return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), lineOf(...seen, inList), rowOf(...seenRow, inList));
     case CountryVerdict.PARTIAL:
-      return look("partial", t("cr.v.partial"), t("cr.tip.partial", { country: countryIn(t, c.country) }), lineOf(...seen, inList));
+      return look("partial", t("cr.v.partial"), t("cr.tip.partial", { country: countryIn(t, c.country) }), lineOf(...seen, inList), rowOf(...seenRow, inList));
     case CountryVerdict.TCP_BLOCKED:
-      return look("warn", t("cr.v.tcp"), t(icmp ? "cr.tip.tcp" : "cr.tip.tcpOnly"), lineOf(...seen, inList));
+      return look("warn", t("cr.v.tcp"), t(icmp ? "cr.tip.tcp" : "cr.tip.tcpOnly"), lineOf(...seen, inList), rowOf(...seenRow, inList));
     case CountryVerdict.BLOCKED:
-      return look("bad", t("cr.v.blocked"), t("cr.tip.blocked"), lineOf(...seen, inList));
+      return look("bad", t("cr.v.blocked"), t("cr.tip.blocked"), lineOf(...seen, inList), rowOf(...seenRow, inList));
     case CountryVerdict.LISTED:
-      return look("listed", t("cr.v.listed"), t("cr.tip.listed"), lineOf(names.join(t("cr.tip.sep"))));
+      return look("listed", t("cr.v.listed"), t("cr.tip.listed"), lineOf(names.join(t("cr.tip.sep"))), rowOf(names.join(t("cr.tip.sep"))));
     default:
       // with neither a round nor a run the row is the lists' alone, and they do not hold the address
-      if (!live && !probed) return look("unknown", t("cr.v.unknown"), t("cr.tip.notListed"), lineOf(t("cr.line.notListed")));
-      return look("unknown", t("cr.v.unknown"), reason ? t("cr.tip.unknown", { reason }) : t("cr.tip.unknownBare"), lineOf(reason));
+      if (!live && !probed) return look("unknown", t("cr.v.unknown"), t("cr.tip.notListed"), lineOf(t("cr.line.notListed")), rowOf(t("cr.line.notListed")));
+      return look("unknown", t("cr.v.unknown"), reason ? t("cr.tip.unknown", { reason }) : t("cr.tip.unknownBare"), lineOf(reason), rowOf(reason));
   }
 }
 

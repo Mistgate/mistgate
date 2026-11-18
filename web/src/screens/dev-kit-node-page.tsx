@@ -17,6 +17,7 @@ import { relaysQuery } from "@/lib/relay";
 import { meQuery } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { seeded } from "./dev-kit-overview";
+import { ruChecksOf, ruKindOf, ruKinds, type RuKind } from "./dev-kit-node-ru";
 import { seedWays, waysFrames, waysSceneOf } from "./dev-kit-node-ways";
 import { Shot } from "./dev-kit-redesign";
 import { ShellLayout } from "./shell";
@@ -28,7 +29,7 @@ import { OsUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { WarpSource } from "@/gen/mistgate/admin/v1/common_pb";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { LogLevel } from "@/gen/mistgate/admin/v1/node_pb";
-import { fleet as fleetApi, nodes as nodesApi, warp as warpApi } from "@/lib/api";
+import { fleet as fleetApi, health, nodes as nodesApi, warp as warpApi } from "@/lib/api";
 import { sitesQuery } from "@/lib/decoysites";
 import { cardDemo } from "./node/decoy";
 import { installLibrary } from "./dev-kit-decoys";
@@ -44,7 +45,7 @@ import { osUpdatesQuery } from "@/lib/os-updates";
 // each in a frame of its own width (an iframe, so the window's breakpoints answer to the frame), inside the real shell. Each frame is
 // a page of its own: /dev-kit?only=nodepage-frame&tab=<tab>&state=<state>
 //   calm | alerts | many | high | limit | down | new | retired | viewer | edge | via | entry
-// `fx=1` turns the reveal animation on. The Exit tab takes `wp=ok|pause|bad|none|revoked` (the WARP card) and `rc=ok|mixed|wait|old|off|stale` (the sites it is
+// `fx=1` turns the reveal animation on. `long=1` gives the node, its profiles, people and devices the long names of live data. `ru=<kind>` seeds what the checks card says from Russia (dev-kit-node-ru.ts: ok | partial | tcp | bad | listed | unknown | none | probe | points | conflict | old | long). The Exit tab takes `wp=ok|pause|bad|none|revoked` (the WARP card) and `rc=ok|mixed|wait|old|off|stale` (the sites it is
 // checked against: all reachable, a mix, waiting for the first answer, an agent without the check, the check off, a result hours old). The decoy site card (?tab=server&sv=site) takes `ds=panel|own|pending|offline|failed|old|none|pick|warn|
 // empty` for the states of its choice and its delivery. Made-up data: nodes de1, nl1, fi1, msk1, people alice, dave, bob, a panel called owner.
 
@@ -255,7 +256,7 @@ function warpOf(kind: WarpKind, rc: ReachKind = "ok") {
   };
 }
 
-export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind; rc?: ReachKind } = {}) {
+export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind; rc?: ReachKind; ru?: RuKind; long?: boolean } = {}) {
   const sp = specs[state];
   const lo = sp.load;
   const status = sp.retired ? NodeStatus.RETIRED : sp.down ? NodeStatus.DOWN : sp.fresh ? NodeStatus.ONLINE : NodeStatus.ONLINE;
@@ -325,12 +326,19 @@ export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | 
         { ...inbound("inb_2", "vless", "VLESS · Reality", 443, broken ? InboundState.FAILED : InboundState.ACTIVE), lastError: broken ? "listen tcp :443: bind: address already in use" : "", certNotAfterUnix: 0 },
         { ...inbound("inb_3", "amneziawg", "AmneziaWG 3.1", 51820), certNotAfterUnix: 0, tlsServerName: "", egress: "warp", awg: { backend: "kernel", backendVersion: "amneziawg kernel module", ifaceUp: true, peers: 3, peersOnline: 1, peersHandshaken: 2, newestHandshakeUnix: NOW - 70, udpRxPackets: 900 } },
       ];
+  if (extra.long) {
+    // live names: a node, profiles, devices and people with long names
+    node.name = "frankfurt-primary-edge-node-eu-central-1";
+    node.location = "Frankfurt am Main, Hesse, Germany";
+    node.provider = "Example Cloud International Hosting Limited";
+    for (const i of inbounds) i.profileName = i.protocol === "hysteria2" ? "Hysteria2 · 443 · salamander obfuscation, port hopping 20000-50000" : i.protocol === "vless" ? "VLESS · Reality · www.example-long-domain-name.com" : "AmneziaWG 3.1 · junk packets, magic headers";
+  }
   const data = {
     node,
     metrics: sp.fresh ? undefined : metrics,
     facts: { hostname: "de1", os: "Ubuntu 24.04", kernel: "6.8.0-45", arch: "amd64", cpuCount: 2, ramTotalBytes: 4 * 2 ** 30, diskTotalBytes: 40 * 2 ** 30, virt: "kvm", hasIpv6: true, bootUnix: NOW - 31 * D, engines: ["hysteria2: hysteria core v2.6.1"] },
     inbounds,
-    onlineUsers: people ? [{ userId: "usr_alice", userName: "alice", protocol: "hysteria2", deviceModel: "Desktop-Alice", connectedAtUnix: NOW - 3600, downBps: 31e6 }, { userId: "usr_alice", userName: "alice", protocol: "hysteria2", deviceModel: "iPad", connectedAtUnix: NOW - 3000, downBps: 31e6 }, { userId: "usr_dave", userName: "dave", protocol: "amneziawg", deviceModel: "Pixel 9", connectedAtUnix: NOW - 900, downBps: 2e6 }] : [],
+    onlineUsers: people ? [{ userId: "usr_alice", userName: extra.long ? "alice-with-a-very-long-account-name" : "alice", protocol: "hysteria2", deviceModel: extra.long ? "Desktop-Alice-Workstation-Living-Room-Model-2024" : "Desktop-Alice", connectedAtUnix: NOW - 3600, downBps: 31e6 }, { userId: "usr_alice", userName: "alice", protocol: "hysteria2", deviceModel: "iPad", connectedAtUnix: NOW - 3000, downBps: 31e6 }, { userId: "usr_dave", userName: "dave", protocol: "amneziawg", deviceModel: "Pixel 9", connectedAtUnix: NOW - 900, downBps: 2e6 }] : [],
     topToday: sp.fresh ? [] : [{ userId: "usr_alice", userName: "alice", bytes: 5.0 * GB }, { userId: "usr_dave", userName: "dave", bytes: 1.2 * GB }, { userId: "usr_bob", userName: "bob", bytes: 322e6 }],
     notes: "",
     dnsResolvers: [],
@@ -357,22 +365,22 @@ export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | 
     {
       nowUnix: NOW,
       intervalS: 300,
-      columns: sp.fresh ? [] : columns,
+      columns: sp.fresh ? [] : extra.long ? columns.map((c, i) => ({ ...c, profileName: ["Hysteria2 · 443 · salamander obfuscation, port hopping 20000-50000", "VLESS · Reality · www.example-long-domain-name.com", "AmneziaWG 3.1 · junk packets, magic headers"][i]! })) : columns,
       rows: sp.fresh
         ? []
         : [
             {
               nodeId: "nod_de1",
-              nodeName: "de1",
+              nodeName: extra.long ? "frankfurt-primary-edge-node-eu-central-1" : "de1",
               countryCode: "DE",
               nodeStatus: status,
               cells: [cell("inb_1", 31), cell("inb_2", 29, (i) => (failing ? i > 38 : false), failing ? CheckStatus.FAILED : CheckStatus.OK), cell("inb_3", 34)],
             },
           ],
-      countryChecks: [],
+      countryChecks: extra.ru ? ruChecksOf(extra.ru, NOW) : [],
     } as never,
   );
-  qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns, rows: [], countryChecks: [] } as never);
+  qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns, rows: [], countryChecks: extra.ru ? ruChecksOf(extra.ru, NOW) : [] } as never);
   qc.setQueryData(doctorQuery("nod_de1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_de1", nodeName: "de1", nodeStatus: status, agentSupported: true, hasReport: !sp.fresh, receivedUnix: sp.down ? NOW - 14 * 60 : NOW - 5 * 60, ageS: sp.down ? 14 * 60 : 5 * 60, stale: false, items: sp.fresh ? [] : doctorItems(state) }] } as never);
   qc.setQueryData(overviewQuery().queryKey, { nowUnix: NOW, nodes: [{ id: "nod_de1", name: "de1", sparkBytes: Array.from({ length: 24 }, (_, i) => Math.round((0.4 + Math.sin(i / 3.2) * 0.3 + (i > 17 ? 0.5 : 0)) * 2.1e9)) }], traffic: [], online: [], events: [], topConsumers: [] } as never);
   qc.setQueryData(overviewQuery(OverviewRange.OVERVIEW_RANGE_24H).queryKey, qc.getQueryData(overviewQuery().queryKey) as never);
@@ -463,7 +471,9 @@ export function NodePageFrame() {
     const kind = wp === "ok" || wp === "pause" || wp === "bad" || wp === "none" || wp === "revoked" ? wp : undefined;
     if (params.get("tab") === "history") fakeHistory(state);
     const rc = reachKindOf(params.get("rc"));
-    const made = nodePageData(state, { os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind, rc });
+    const made = nodePageData(state, { long: params.get("long") === "1", os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind, rc, ru: ruKindOf(params.get("ru")) });
+    // "Check now": the round is scheduled, and the cells do not change (the card keeps looking until the panel gives up waiting)
+    (health as unknown as Record<string, unknown>).runChecksNow = async () => ({ scheduled: 3, skipped: 0 });
     // the Ways in tab: the scene's relays, checks and ports (w=1 and the switches of dev-kit-node-ways.tsx)
     if (params.get("w")) made.data = seedWays(made.qc, made.data as never, waysSceneOf(params), (made.data.node as { status: NodeStatus }).status) as never;
     // no WARP yet: the registration the scene plays takes nine seconds (four steps), then the account is there
@@ -581,6 +591,27 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-overview-phone", state: "alerts", tab: "overview", title: "Overview on a phone, 400 wide", w: 400, h: 3400 },
 ];
 
+// the last row of the checks card, from Russia, in each state of its own; the long data of live networks, on a phone and with the node silent
+const ruTitles: Record<RuKind, string> = {
+  ok: "reachable, four networks",
+  partial: "not visible from all networks: the breakdown under the row",
+  tcp: "TCP blocked, ICMP passes",
+  bad: "unreachable",
+  listed: "in a block list, not checked live",
+  unknown: "no data: too few probes answered",
+  none: "not checked yet (the column has other nodes)",
+  probe: "the networks, the probe node, the registry, when",
+  points: "own probes: one reaches, one has no clear answer",
+  conflict: "the sources disagree",
+  old: "a result three days old",
+  long: "live data: twelve networks, long names, four ports, three own probes",
+};
+frames.push(...ruKinds.map((k) => ({ id: `node-overview-ru-${k}`, state: "calm" as NState, tab: "overview", title: `Overview, from Russia: ${ruTitles[k]}`, w: 1440, h: 2000, q: `ru=${k}` })));
+frames.push(
+  { id: "node-overview-ru-down", state: "down", tab: "overview", title: "Overview, from Russia: the node is silent", w: 1440, h: 1800, q: "ru=ok" },
+  { id: "node-overview-ru-long-phone", state: "calm", tab: "overview", title: "Overview, from Russia: the long data on a phone, 400 wide", w: 400, h: 3600, q: "ru=long" },
+  { id: "node-overview-ru-points-phone", state: "calm", tab: "overview", title: "Overview, from Russia: own probes on a phone, 400 wide", w: 400, h: 3400, q: "ru=points" },
+);
 frames.push(...waysFrames.map((f) => ({ id: f.id, state: (f.state ?? "calm") as NState, tab: "ways", title: f.title, w: f.w, h: f.h, q: f.q })));
 
 export function NodePageKit() {
