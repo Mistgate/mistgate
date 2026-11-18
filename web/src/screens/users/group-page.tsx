@@ -128,6 +128,7 @@ function GroupPage({ group, groups, manage, onDeleted, demo }: { group: Group; g
       </header>
       {!manage && <Notice tone="quiet">{t("grp.readOnly")}</Notice>}
       <Tabs
+        className="grp-tabs"
         aria-label={t("grp.tabs")}
         value={tab}
         onValueChange={setTab}

@@ -260,7 +260,7 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
               <Segmented
                 variant="flat"
                 aria-label={t("ul.g.baseLabel")}
-                className="w-full [&_button]:flex-1 [&_button]:truncate"
+                className="w-full [&_[role=radio]]:flex-1 [&_[role=radio]]:truncate"
                 value={base}
                 onValueChange={(v) => fromGroup(all.find((g) => g.id === v))}
                 options={[{ value: "", label: t("ul.g.scratch") }, ...all.slice(0, 2).map((g) => ({ value: g.id, label: g.name }))]}

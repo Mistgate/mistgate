@@ -177,9 +177,9 @@ a.up-gtag:hover {
   background: var(--warning-soft);
   color: var(--warning-text);
 }
-/* the tab's own panel starts at once: the page's gap does the spacing */
+/* what a tab opens sits 32 under the strip (pn.css: the page's gap 16 and the content's own margin-top 16: .up-g, .up-one, .up-ban) */
 .up-tabs [role="tabpanel"] {
-  padding-top: 0;
+  padding-top: 32px;
 }
 
 /* ---- the banner under the tabs ---- */
@@ -1860,6 +1860,7 @@ a.up-gtag:hover {
 }
 .up-gnf {
   display: flex;
+  animation: mg-up 0.2s var(--e) both;
   flex-direction: column;
   gap: 10px;
   margin-top: 4px;

@@ -87,6 +87,8 @@ export const en = {
   "up.ownValue": "own value",
   "up.pageLine": "What the person sees at their link",
   "up.pill.never": "Never connected",
+  "up.pill.expired": "Term expired",
+  "up.pill.quota": "Quota used up",
   "up.plus30": "+30 days",
   "up.plus90": "+90 days",
   "up.pwChange": "Change",
@@ -126,6 +128,7 @@ export const en = {
   "up.gone": "{name} is deleted",
   "up.goneBody": "The link and keys no longer work; everything is removed from the nodes",
   "up.goneBack": "To users",
+  "up.back": "Users",
 };
 
 export const ru: typeof en = {
@@ -215,6 +218,8 @@ export const ru: typeof en = {
   "up.ownValue": "своё значение",
   "up.pageLine": "То, что человек видит по своей ссылке",
   "up.pill.never": "Не подключался",
+  "up.pill.expired": "Срок истёк",
+  "up.pill.quota": "Квота кончилась",
   "up.plus30": "+30 дней",
   "up.plus90": "+90 дней",
   "up.pwChange": "Сменить",
@@ -254,6 +259,7 @@ export const ru: typeof en = {
   "up.gone": "{name} удалён",
   "up.goneBody": "Ссылка и ключи больше не работают, с нод всё убрано",
   "up.goneBack": "К пользователям",
+  "up.back": "Пользователи",
 };
 
 export const zh: typeof en = {
@@ -343,6 +349,8 @@ export const zh: typeof en = {
   "up.ownValue": "自定义值",
   "up.pageLine": "用户通过自己的链接看到的内容",
   "up.pill.never": "未连接过",
+  "up.pill.expired": "已到期",
+  "up.pill.quota": "配额已用完",
   "up.plus30": "+30 天",
   "up.plus90": "+90 天",
   "up.pwChange": "更改",
@@ -382,6 +390,7 @@ export const zh: typeof en = {
   "up.gone": "{name} 已删除",
   "up.goneBody": "链接和密钥已失效，节点上的相关内容已全部移除",
   "up.goneBack": "返回用户列表",
+  "up.back": "用户",
 };
 
 export const fa: typeof en = {
@@ -471,6 +480,8 @@ export const fa: typeof en = {
   "up.ownValue": "مقدار دلخواه",
   "up.pageLine": "آن‌چه کاربر با لینک خودش می‌بیند",
   "up.pill.never": "وصل نشده",
+  "up.pill.expired": "مدت تمام شد",
+  "up.pill.quota": "سهمیه تمام شد",
   "up.plus30": "+۳۰ روز",
   "up.plus90": "+۹۰ روز",
   "up.pwChange": "تغییر",
@@ -510,6 +521,7 @@ export const fa: typeof en = {
   "up.gone": "{name} حذف شد",
   "up.goneBody": "پیوند و کلیدها دیگر کار نمی‌کنند و همه‌چیز از نودها برداشته شده",
   "up.goneBack": "به کاربران",
+  "up.back": "کاربران",
 };
 
 export const tr: typeof en = {
@@ -599,6 +611,8 @@ export const tr: typeof en = {
   "up.ownValue": "özel değer",
   "up.pageLine": "Kişinin bağlantısında gördüğü",
   "up.pill.never": "Bağlanmadı",
+  "up.pill.expired": "Süre doldu",
+  "up.pill.quota": "Kota bitti",
   "up.plus30": "+30 gün",
   "up.plus90": "+90 gün",
   "up.pwChange": "Değiştir",
@@ -638,4 +652,5 @@ export const tr: typeof en = {
   "up.gone": "{name} silindi",
   "up.goneBody": "Bağlantı ve anahtarlar artık çalışmıyor; düğümlerden her şey kaldırıldı",
   "up.goneBack": "Kullanıcılara",
+  "up.back": "Kullanıcılar",
 };

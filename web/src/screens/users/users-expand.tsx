@@ -52,7 +52,7 @@ export function UserExpand({ u, group, manage, onLink }: { u: User; group: Group
             <b className="font-mono font-medium text-sec">{dev.text}</b>
             {left && <em className={cx("text-xs not-italic", dev.full ? "text-warn-text" : "text-muted")}>{left}</em>}
           </span>
-          <ul className={cx("flex flex-col gap-0.5", all && "grid grid-cols-2 gap-x-10 @max-[520px]/ust:grid-cols-1")}>
+          <ul className={cx("flex flex-col gap-0.5", all && "grid animate-[mg-up_0.25s_var(--e)_both] grid-cols-2 gap-x-10 @max-[520px]/ust:grid-cols-1")}>
             {shown.map((d) => (
               <DeviceLine key={d.id} d={d} t={t} />
             ))}
@@ -160,7 +160,8 @@ function Actions({ u, manage, onLink }: { u: User; manage: boolean; onLink: () =
     onError: (e) => toast.error(errorText(e, t)),
   });
   return (
-    <div className="flex flex-wrap items-center gap-2 [&_button]:h-9">
+    // the board's .btn: 36 high, 10 round, 14px, 16 of padding (the base sizes are 32 and 40)
+    <div className="flex flex-wrap items-center gap-2 [&_button]:h-9 [&_button]:rounded-[10px] [&_button]:px-4 [&_button]:text-sm">
       {manage && (
         <>
           <Button disabled={run.isPending || u.expiresUnix === 0} title={u.expiresUnix === 0 ? t("bulk.people.skip.noTerm") : undefined} onClick={() => run.mutate("extend")}>

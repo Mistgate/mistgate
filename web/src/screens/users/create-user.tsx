@@ -86,7 +86,8 @@ export function CreateUserModal({ open, onOpenChange, onCreated, startName, star
 }
 
 const box = "rounded-xl border border-line";
-const seg = "w-auto max-w-full flex-wrap [&_button]:px-2.5 [&_button]:text-xs [&_button]:font-mono";
+// the items of a Segmented are span[role=radio], not buttons
+const seg = "w-auto max-w-full flex-wrap [&_[role=radio]]:px-2.5 [&_[role=radio]]:text-xs [&_[role=radio]]:font-mono";
 
 /** A limit as the board draws it: its name and a line of where the value comes from, presets in a segment, and a stepper for a value of its own. */
 function LimitRow<V extends number>({

@@ -87,7 +87,9 @@ describe("the scenes of the person's page", () => {
     root = createRoot(host);
     await act(async () => root!.render(<GoneCard name="alice" />));
     expect(host.textContent).toContain("alice is deleted");
-    expect(host.textContent).toContain("Back to users");
+    // the back link says "Users" (the board), the card's button "To users"
+    expect(host.querySelector(".up-back")?.textContent).toBe("Users");
+    expect(host.textContent).toContain("To users");
   });
 
   it("keeps the write buttons from an observer", async () => {
