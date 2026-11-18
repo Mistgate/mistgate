@@ -17,7 +17,7 @@ import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { plain, type Plain } from "@/lib/plain";
 import { backupTime, formatBytes } from "./backup-format";
-import { BusyButton, CmdRow, ICONS, Pb, Sec, Spin, SxRoot } from "./sx-bits";
+import { BusyButton, CmdRow, ICONS, Pb, Sec, Spin } from "./sx-bits";
 import { SxWindow } from "./sx-dlg";
 
 // Settings -> Backups -> "Restore from a backup" (ADR 0013): the window that checks a backup and then hands it to the restore
@@ -62,33 +62,6 @@ export function NewServerCard({ identityFile, archiveFile, dataDir }: { identity
         <CmdRow value={t("set.backups.restoreCommand", { identity: identityFile, archive: archiveFile, dataDir })} wrap />
       </div>
     </Sec>
-  );
-}
-
-/**
- * The cards of the restore on Settings -> Backups, together with the window (the old section, kept for the scene /dev-kit?only=restore):
- * the start with the last result and the data kept, the recovery key and the new server's commands. r2: the R2 backups listed above
- * (empty when R2 is not set up); pick: one to start with.
- */
-export function RestoreSection({ r2, pick, onPicked, identityFile, archiveFile, dataDir }: { r2: Plain<Backup>[]; pick?: string; onPicked?: () => void; identityFile: string; archiveFile: string; dataDir: string }) {
-  const [manual, setManual] = useState(false);
-  const open = manual || pick !== undefined; // a backup picked in the history opens the window with it
-  return (
-    <SxRoot>
-      <RestoreCard onStart={() => setManual(true)} />
-      <KeygenCard identityFile={identityFile} />
-      <NewServerCard identityFile={identityFile} archiveFile={archiveFile} dataDir={dataDir} />
-      <RestoreDialog
-        key={pick ?? "manual"}
-        open={open}
-        onOpenChange={(v) => {
-          setManual(v && pick === undefined);
-          if (!v) onPicked?.();
-        }}
-        r2={r2}
-        initialR2={pick}
-      />
-    </SxRoot>
   );
 }
 

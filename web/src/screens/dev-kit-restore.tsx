@@ -1,5 +1,6 @@
 import { Shot } from "./dev-kit-redesign";
-import { RestoreDialog, RestoreSection, type RestoreDemo } from "./settings-pages/restore";
+import { KeygenCard, NewServerCard, RestoreCard, RestoreDialog, type RestoreDemo } from "./settings-pages/restore";
+import { SxRoot } from "./settings-pages/sx-bits";
 
 // Development only, /dev-kit?only=restore&state=…: restore from a backup (ADR 0013). "section" is the part of Settings ->
 // Backups (the last result, the data kept from before a restore, the way on a new server); the other states are the window,
@@ -46,7 +47,11 @@ export function RestoreKit() {
         ]}
       >
         <div className="max-w-[860px]">
-          <RestoreSection r2={r2 as never} identityFile="./mistgate-recovery.txt" archiveFile="./backup.tar.gz.age" dataDir="/var/lib/mistgate-restored" />
+          <SxRoot>
+            <RestoreCard onStart={() => {}} />
+            <KeygenCard identityFile="./mistgate-recovery.txt" />
+            <NewServerCard identityFile="./mistgate-recovery.txt" archiveFile="./backup.tar.gz.age" dataDir="/var/lib/mistgate-restored" />
+          </SxRoot>
         </div>
       </Shot>
     );
