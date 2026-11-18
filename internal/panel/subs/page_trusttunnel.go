@@ -17,7 +17,7 @@ func pageTrustTunnelOf(v access.SubView, lang string) *pageTrustTunnel {
 		}
 		link := pageTrustTunnelLink{
 			Label: labels[srv.NodeID] + markText(srv.Mark, lang), CountryCode: strings.ToUpper(strings.TrimSpace(srv.CountryCode)),
-			Place: place(srv.Location), HasIPv6: srv.IPv6Egress, Note: srv.Note, URL: srv.URI,
+			Place: place(srv.Location), HasIPv6: srv.IPv6Egress, Note: srv.Note, URL: srv.URI, QR: pageQROf(srv.URI),
 		}
 		if cc, ok := strings.CutPrefix(srv.Mark, access.MarkVia); ok {
 			link.Relay, link.Via = true, cc

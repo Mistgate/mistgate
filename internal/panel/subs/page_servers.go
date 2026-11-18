@@ -167,7 +167,7 @@ func pageTelegramOf(v access.SubView, lang string) *pageTelegram {
 		}
 		l := pageTelegramLink{
 			Label: labels[srv.NodeID] + markText(srv.Mark, lang), CountryCode: strings.ToUpper(strings.TrimSpace(srv.CountryCode)),
-			Place: place(srv.Location), IPv6: srv.Mark == access.MarkIPv6, URL: srv.URI,
+			Place: place(srv.Location), IPv6: srv.Mark == access.MarkIPv6, URL: srv.URI, QR: pageQROf(srv.URI),
 		}
 		if cc, ok := strings.CutPrefix(srv.Mark, access.MarkVia); ok {
 			l.Relay, l.Via = true, cc

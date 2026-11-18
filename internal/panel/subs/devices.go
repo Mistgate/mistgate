@@ -168,6 +168,7 @@ type configJSON struct {
 	Stale       bool            `json:"stale"`
 	Warnings    []string        `json:"warnings"` // codes the page translates: amnezia_desktop_mtu, dns_fallback, dns_no_split
 	MinClients  []pageMinClient `json:"min_clients"`
+	QR          *pageQR         `json:"qr"` // the code of Conf (null when it is too long for a QR code)
 }
 
 type deviceAnswer struct {
@@ -197,7 +198,7 @@ func configsOf(cfgs []access.DeviceConfig) []configJSON {
 		out = append(out, configJSON{
 			NodeID: c.NodeID, ViaNodeID: c.ViaNodeID, Label: c.Server, CountryCode: c.CountryCode, ViaCountry: c.ViaCountry,
 			Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
-			Filename: c.ConfFilename, Stale: c.Stale, Warnings: nonNil(c.Warnings), MinClients: minClientsJSON(c.MinClients),
+			Filename: c.ConfFilename, Stale: c.Stale, Warnings: nonNil(c.Warnings), MinClients: minClientsJSON(c.MinClients), QR: pageQROf(c.Conf),
 		})
 	}
 	return out

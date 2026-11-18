@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cases } from "./dev-data";
+import { cases, sampleQr } from "./dev-data";
 import { dict, langs } from "./i18n";
 import { normalize, safeTtUrl } from "./logic";
 import { actions, data, state, text } from "./test-kit";
@@ -9,7 +9,7 @@ import { view } from "./view";
 // The TrustTunnel key on the person's own page (subs/page_trusttunnel.go): the panel of the proxies (telegram.ts) with its own words, a place per tt:// link, the marks, a pane with no link
 // for a self-signed server, the key among the devices (nothing to remove), and the words in all five languages.
 
-const link = (over: object = {}) => ({ label: "Germany · Frankfurt", country_code: "DE", place: "Frankfurt", has_ipv6: false, relay: false, via: "", note: "", url: "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20", ...over });
+const link = (over: object = {}) => ({ label: "Germany · Frankfurt", country_code: "DE", place: "Frankfurt", has_ipv6: false, relay: false, via: "", note: "", url: "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20", qr: sampleQr, ...over });
 const withTt = (links: object[]) => normalize({ ...cases.first, access: { happ: true, amnezia: false, trust_tunnel: true }, trust_tunnel: { links } });
 
 describe("the TrustTunnel links of the page data", () => {
@@ -122,14 +122,11 @@ describe("the TrustTunnel block", () => {
     expect(text(el)).toContain("TrustTunnel key");
   });
 
-  it("draws a QR code for a link as long as a real one, of a size a phone camera reads", () => {
+  it("draws the code the server drew for the link, and none for a link it drew none for", () => {
     const real = "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDANkZTENFgoxOTIuMC4yLjUzCjE5Mi4wLjIuNTQ";
     const svg = pane(tt(withTt([link({ url: real })]))).querySelector(".u-qr.big svg");
-    expect(svg).not.toBeNull();
-    const modules = Number(svg!.getAttribute("viewBox")!.split(" ")[2]);
-    // about 60 modules: at the 216 px of the big card (less its padding) a module is about 3 px
-    expect(modules).toBeGreaterThan(40);
-    expect(modules).toBeLessThanOrEqual(69);
+    expect(Number(svg!.getAttribute("viewBox")!.split(" ")[2])).toBe(sampleQr.n);
+    expect(pane(tt(withTt([link({ url: real, qr: null })]))).querySelector(".u-qr")).toBeNull();
   });
 });
 

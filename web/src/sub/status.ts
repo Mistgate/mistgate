@@ -93,7 +93,7 @@ export function heroCard(c: Ctx, now = Date.now() / 1000): HTMLElement {
     const kids: Kid[] = [h("span", { class: "k" }, label), fig(key, x.v, `v${x.tone ? ` ${x.tone}` : ""}`), h("span", { class: "n" }, x.n)];
     return button ? h("button", { class: "u-stat", type: "button", "data-k": "stat-devices", on: { click: button } }, ...kids) : h("div", { class: "u-stat" }, ...kids);
   };
-  const qr = live && qrOk(d) ? qrCard(d.subscription_url, t.qrAlt, logoSrc(d)) : null;
+  const qr = live && qrOk(d) ? qrCard(d.qr, t.qrAlt, logoSrc(d)) : null;
   if (qr) {
     qr.classList.add("u-tilt");
     qr.prepend(h("i", { class: "u-glare", "aria-hidden": "true" }));

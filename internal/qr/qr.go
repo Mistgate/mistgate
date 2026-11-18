@@ -1,5 +1,6 @@
 // Package qr is a small QR Code encoder (ISO/IEC 18004, Model 2): byte mode, versions 1-40, error correction
-// levels L/M/Q/H. It exists so the CLI can print a QR code to a terminal without a dependency.
+// levels L/M/Q/H. It exists so the CLI can print a QR code to a terminal and the panel can draw one as an SVG (svg.go)
+// without a dependency.
 package qr
 
 import "errors"
@@ -20,8 +21,11 @@ var ErrTooLong = errors.New("qr: data too long for a QR code")
 
 // Code is an encoded symbol, without the quiet zone.
 type Code struct {
-	Size int // modules per side, 4*version+17
-	mods []bool
+	Size  int // modules per side, 4*version+17
+	mods  []bool
+	fn    []bool // function patterns (finders, timing, alignment, format and version information)
+	ver   int
+	level Level
 }
 
 // Black reports whether the module at column x, row y is dark. Outside the symbol it is false.
@@ -30,6 +34,19 @@ func (c *Code) Black(x, y int) bool {
 		return false
 	}
 	return c.mods[y*c.Size+x]
+}
+
+// Packed is the modules row by row, eight to a byte with the first module in the high bit, a dark module a 1 bit; the last
+// byte is padded with zeros. A caller that draws the code itself takes this: it is Size*Size/8 bytes where an SVG of the same
+// code is about thirty times that.
+func (c *Code) Packed() []byte {
+	out := make([]byte, (len(c.mods)+7)/8)
+	for i, dark := range c.mods {
+		if dark {
+			out[i/8] |= 0x80 >> (i % 8)
+		}
+	}
+	return out
 }
 
 // Encode encodes data in byte mode in the smallest version that fits at level.
@@ -91,7 +108,7 @@ func build(data []byte, ver int, level Level, mask int) *Code {
 	}
 	m.applyMask(mask)
 	m.drawFormat(level, mask)
-	return &Code{Size: m.size, mods: m.dark}
+	return &Code{Size: m.size, mods: m.dark, fn: m.fn, ver: ver, level: level}
 }
 
 // encodeData returns the data codewords: mode, count, bytes, terminator, then the pad codewords 0xEC 0x11.
@@ -315,20 +332,29 @@ func (m *matrix) drawVersion() {
 // modules. Remainder bits stay light.
 func (m *matrix) placeData(cw []byte) {
 	i := 0
-	for right := m.size - 1; right >= 1; right -= 2 {
+	zigzag(m.size, m.fn, func(pos int) {
+		if i < len(cw)*8 {
+			m.dark[pos] = cw[i/8]>>(7-i%8)&1 == 1
+			i++
+		}
+	})
+}
+
+// zigzag calls visit with the position (y*size+x) of every non-function module in the order the codeword bits take.
+func zigzag(size int, fn []bool, visit func(pos int)) {
+	for right := size - 1; right >= 1; right -= 2 {
 		if right == 6 { // the vertical timing pattern takes a column
 			right = 5
 		}
-		for v := 0; v < m.size; v++ {
+		for v := 0; v < size; v++ {
 			for j := 0; j < 2; j++ {
 				x := right - j
 				y := v
 				if (right+1)&2 == 0 { // this strip runs upward
-					y = m.size - 1 - v
+					y = size - 1 - v
 				}
-				if !m.fn[y*m.size+x] && i < len(cw)*8 {
-					m.dark[y*m.size+x] = cw[i/8]>>(7-i%8)&1 == 1
-					i++
+				if !fn[y*size+x] {
+					visit(y*size + x)
 				}
 			}
 		}

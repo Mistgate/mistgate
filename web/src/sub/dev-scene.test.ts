@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { amzActions, type Api } from "./amz-actions";
 import { dialogOpen, dialogView } from "./dialogs";
-import { devPage } from "./dev-data";
+import { devPage, sampleQr } from "./dev-data";
 import { devLockScene, devScene } from "./dev-scene";
 import { dnsActions } from "./dns-actions";
 import { dict } from "./i18n";
@@ -138,7 +138,7 @@ export const scenes: Scene[] = [
 // ---- the page as main.ts puts it together ----
 
 const cfg = (node: string, cc: string) =>
-  awgConfig({ node_id: `nod_${node}`, label: cc, country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: `mistgate-${cc.toLowerCase()}.conf`, warnings: [] });
+  awgConfig({ node_id: `nod_${node}`, label: cc, country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: `mistgate-${cc.toLowerCase()}.conf`, warnings: [], qr: sampleQr });
 const api: Api = {
   addDevice: async (_e, b) => ({ device: awgDevice({ id: "dev_new", platform: b.platform, label: b.label, profile_id: b.profile_id, profile_name: "Main", version: "3.1" }), configs: [cfg("de1", "DE")] }),
   getConfigs: async () => ({ configs: [cfg("de1", "DE"), cfg("fi1", "FI")] }),

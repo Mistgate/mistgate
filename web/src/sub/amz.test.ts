@@ -3,7 +3,7 @@ import { deviceModal } from "./add";
 import { defaultWhere, keyView, newAmzState, whereOptions, type AmzState } from "./amnezia";
 import { amzActions, type Api } from "./amz-actions";
 import { ApiError, endpoint } from "./api";
-import { cases } from "./dev-data";
+import { cases, sampleQr } from "./dev-data";
 import { dict } from "./i18n";
 import { awgConfig, awgDevice, defaultLabel, mainProfile, normalize, otherDevices, profileChoices, selfServe, versionsFor } from "./logic";
 import { actions, amzNoop, data, dialog, plain, state, text } from "./test-kit";
@@ -12,7 +12,7 @@ import { view } from "./view";
 
 const t = dict.ru;
 const cfg = (node: string, cc = "DE", label = ({ DE: "Германия · Франкфурт", FI: "Финляндия" } as Record<string, string>)[cc] ?? cc) =>
-  awgConfig({ node_id: node, label, country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: `mistgate-${cc.toLowerCase()}.conf`, warnings: ["amnezia_desktop_mtu"] });
+  awgConfig({ node_id: node, label, country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: `mistgate-${cc.toLowerCase()}.conf`, warnings: ["amnezia_desktop_mtu"], qr: sampleQr });
 
 function fakeApi(over: Partial<Api> = {}): Api & { calls: string[] } {
   const calls: string[] = [];

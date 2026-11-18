@@ -14,7 +14,7 @@ export type AppEntry = { platform: Platform; kind: Kind; name: string; download_
 export type LinkMode = "track" | "enforce" | "strict";
 
 /** One tt:// link of the page: the server as the page names it (country, place), its marks, and the link itself ("" with a note). */
-export type TrustTunnelLink = { label: string; country_code: string; place: string; has_ipv6: boolean; relay: boolean; via: string; note: string; url: string };
+export type TrustTunnelLink = { label: string; country_code: string; place: string; has_ipv6: boolean; relay: boolean; via: string; note: string; url: string; qr: Qr | null };
 
 export type Device = {
   id: string;
@@ -123,6 +123,12 @@ export type AmneziaData = {
   endpoints: string; // base URL of the self-service calls ("" = none)
 };
 /** One config of a device on one node, as the endpoints answer. */
+/**
+ * A QR code the server drew (internal/qr): `n` modules a side, `bits` the modules row by row (eight to a byte, the first in the high
+ * bit) as base64, `window` the side in modules of the clear square for the logo in the middle (0: no logo).
+ */
+export type Qr = { n: number; bits: string; window: number };
+
 export type AwgConfig = {
   node_id: string;
   /** A config through an entry node (a relay): that node's id and country code ("" for the direct config, which shares node_id). */
@@ -138,6 +144,8 @@ export type AwgConfig = {
   stale: boolean;
   warnings: string[];
   min_clients: MinClient[];
+  /** The code of `conf`; null when the text is too long for a QR code. */
+  qr: Qr | null;
 };
 
 export type MgData = {
@@ -146,6 +154,8 @@ export type MgData = {
   brand: { parts: [string, string]; logo_svg: string; accent: string };
   title: string;
   subscription_url: string;
+  /** The code of `subscription_url` (null when the owner has the QR code off, or there is no link). */
+  qr: Qr | null;
   /** Servers (nodes) the link carries ("all your servers (3) are already there"); 0 when unknown. */
   server_count: number;
   /** Nodes with a set capacity and a fresh sample, in subscription order: the level only. The old way to list servers. */
@@ -172,7 +182,7 @@ export type MgData = {
   apps: AppEntry[];
   access: { happ: boolean; amnezia: boolean; telegram?: boolean; trust_tunnel?: boolean };
   /** The tg://proxy links of the person, when Telegram is on; null when it is off. */
-  telegram?: { links: { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string }[] } | null;
+  telegram?: { links: { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string; qr: Qr | null }[] } | null;
   /**
    * The tt:// links of the person for the official TrustTunnel apps, when it is on; null when it is off. A server whose certificate
    * is self-signed is a row with a `note` ("self_signed") and no url.
