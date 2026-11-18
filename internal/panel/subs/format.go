@@ -60,3 +60,21 @@ func IsLinkPreview(ua string) bool {
 
 // isHapp reports a Happ-like client, the ones that read the `routing` header.
 func isHapp(ua string) bool { return strings.Contains(strings.ToLower(ua), "happ") }
+
+// isIncy reports the INCY app: its User-Agent is `INCY/<version>/<platform>`, so the first token names it (a substring would catch
+// any other name that ends in the same letters).
+func isIncy(ua string) bool {
+	name, _, _ := strings.Cut(strings.TrimSpace(ua), "/")
+	return strings.EqualFold(name, "incy")
+}
+
+// routingApp is the app whose link scheme a User-Agent gets in the `routing` answer: "happ", "incy", or "" for any other client.
+func routingApp(ua string) string {
+	switch {
+	case isHapp(ua):
+		return "happ"
+	case isIncy(ua):
+		return "incy"
+	}
+	return ""
+}

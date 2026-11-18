@@ -665,9 +665,8 @@ func linkPresetOf(ctx context.Context, v access.SubView, e Effective, log *slog.
 var happPing = map[adminv1.HappPing]string{adminv1.HappPing_HAPP_PING_TCP: "tcp"}
 
 // headers sets what every subscription answer carries: the name, usage and term the apps show, the refresh
-// interval, the user's page and the announcement and support link. format is the one of the answer: the Happ `routing` header goes
-// out with the link list only (the other formats carry their own DNS, and Happ's routing profile is global: it would act on the
-// person's other subscriptions too).
+// interval, the user's page and the announcement and support link. format is the one of the answer (the Happ and INCY `routing`
+// header is set by writeList: it goes out with the link list only).
 func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings, b instance.Settings, format plugin.ClientFormat) {
 	ctx := r.Context()
 	hd := w.Header()
@@ -725,13 +724,6 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 			onOpen = "1"
 		}
 		hd.Set(subhdr.SubscriptionPingOnopenEnabled, onOpen)
-	}
-	if format == plugin.FormatURIList && h.cfg.Routing != nil && v.Status == access.StatusActive && v.UserID != "" && isHapp(r.UserAgent()) {
-		if val, err := h.cfg.Routing.HappRouting(ctx, v.UserID); err != nil {
-			h.cfg.Log.Warn("happ routing header skipped", "code", "subscription_happ_routing_unavailable", "err", err) // no user id, no token in the log
-		} else if val != "" {
-			hd.Set(subhdr.Routing, val)
-		}
 	}
 	if v.Status == access.StatusActive && v.Refusal == "" {
 		// The owner's own headers go with an answer that serves the person, never with a refusal or a note that says why there are no
@@ -816,8 +808,18 @@ func (h *handler) writeDocument(w http.ResponseWriter, r *http.Request, token st
 func (h *handler) writeList(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
 	h.headers(w, r, token, v, set, b, plugin.FormatURIList)
+	// The Happ and INCY routing profile goes with the link list only (the other formats carry their own DNS, and the app's routing
+	// profile is global: it would act on the person's other subscriptions too). A link too long for the header is a line after the servers.
+	rt := h.routing(r, v, set)
+	if rt.Header != "" {
+		w.Header().Set(subhdr.Routing, rt.Header)
+	}
+	lines := h.lines(v, set, b, isHapp(r.UserAgent()))
+	if rt.Body != "" && v.Refusal == "" {
+		lines = append(lines[:len(lines):len(lines)], rt.Body)
+	}
 	w.Header()[subhdr.ContentType] = headerContentTypePlainText[:1:1]
-	w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(h.lines(v, set, b, isHapp(r.UserAgent())), "\n")))))
+	w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(lines, "\n")))))
 }
 
 // lines are the share links with their remarks (server names) rendered from the template; a view without

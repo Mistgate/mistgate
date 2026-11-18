@@ -763,3 +763,35 @@ export function templateRefusal(raw: string): { text: string; line?: number; ind
   const line = /(?:^|: )line (\d+):/.exec(s)?.[1];
   return { text: s, ...(line && { line: Number(line) }), ...(index !== undefined && { index }) };
 }
+
+// ---- the owner's own routing profiles for Happ and INCY ("Routing" tab) ----
+
+export type RoutingProfile = Settings["routingProfiles"][number];
+export type RoutingInfo = NonNullable<RoutingProfile["info"]>;
+/** What the panel enforces on save (internal/panel/subsettings/routing.go); the panel is the one that refuses, this only says why early. `header` is the longest link the `routing` header holds: a longer one goes on a line of the subscription. */
+export const routingLimit = { count: 20, profile: 32 << 10, input: 128 << 10, header: 3000 } as const;
+
+/** What the panel's refusal of a profile says: the words without the field's path, and which profile (an index of the list sent). */
+export function routingRefusal(raw: string): { text: string; index?: number } {
+  const s = raw.replace(/^invalid subscription settings:\s*/, "");
+  const m = /^routing_profiles\[(\d+)\]\.(?:profile|group_ids):\s*/.exec(s);
+  return { text: m ? s.slice(m[0].length) : s, ...(m && { index: Number(m[1]) }) };
+}
+
+/** The mode a pasted link says: `routing/add/` adds only, `routing/onadd/` adds and turns on; null for text that is no such link. */
+export function linkMode(text: string): "add" | "onadd" | null {
+  const m = /:\/\/routing\/(onadd|add)\//i.exec(text.trim());
+  return m ? (m[1]!.toLowerCase() as "add" | "onadd") : null;
+}
+
+/** The hosts a profile's geo files come from, in the words of a list ("geo.example.com"); empty when it has none. */
+export function geoHosts(info: Pick<RoutingInfo, "geoipAddress" | "geositeAddress">): string[] {
+  const host = (u: string) => {
+    try {
+      return new URL(u).host;
+    } catch {
+      return u;
+    }
+  };
+  return [...new Set([info.geoipAddress, info.geositeAddress].filter(Boolean).map(host))];
+}

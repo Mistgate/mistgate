@@ -104,3 +104,15 @@ export function useSaveSettings() {
     },
   });
 }
+
+/**
+ * What the panel makes of a pasted profile (a link, base64 or JSON): the entry it would store, with what it holds, or its refusal as an
+ * error (InvalidArgument) that says what is wrong. The key carries a short hash of the text; nothing is written.
+ */
+export const routingPreviewQuery = (input: string) =>
+  queryOptions({
+    queryKey: ["subs", "rt-preview", textKey(input)],
+    queryFn: async ({ signal }) => plain((await subscriptions.previewRoutingProfile({ input }, { signal })).profile!),
+    staleTime: 60_000,
+    retry: false,
+  });

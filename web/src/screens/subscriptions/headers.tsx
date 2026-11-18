@@ -31,7 +31,7 @@ const utf8 = new TextEncoder();
 const shortKey: Partial<Record<SubFormat, Key>> = { [SubFormat.BASE64_URIS]: "sx.hx.h.fs.base64", [SubFormat.MIHOMO_YAML]: "sx.hx.h.fs.mihomo", [SubFormat.XRAY_JSON]: "sx.hx.h.fs.xray", [SubFormat.SINGBOX_JSON]: "sx.hx.h.fs.singbox" };
 const fullKey: Partial<Record<SubFormat, Key>> = { [SubFormat.BASE64_URIS]: "sx.hx.h.fm.base64", [SubFormat.MIHOMO_YAML]: "sx.hx.h.fm.mihomo", [SubFormat.XRAY_JSON]: "sx.hx.h.fm.xray", [SubFormat.SINGBOX_JSON]: "sx.hx.h.fm.singbox" };
 /** The apps the preview offers, by the User-Agent they send (the first is the one the board starts with: the app that reads the flclashx-* headers). */
-const apps: readonly (readonly [string, string])[] = [["Happ", samples[0][1]], ["FlClashX", "FlClashX/0.4.2 Clash.Meta"], ["sing-box", samples[3][1]], ["v2rayNG", samples[4][1]], ["Safari", samples[5][1]]];
+const apps: readonly (readonly [string, string])[] = [["Happ", samples[0][1]], ["FlClashX", "FlClashX/0.4.2 Clash.Meta"], ["sing-box", samples[3][1]], ["v2rayNG", samples[4][1]], ["Safari", samples[5][1]], ["INCY", "INCY/1.4.0/ios"]];
 /** Names of the panel's list shown at once (the families the board names); the rest unfold. */
 const firstNames = ["X-Hwid-*", "Profile-*", "Subscription-*", "Content-*"];
 
@@ -377,8 +377,10 @@ function Preview({ t, rows, valid, known, groups, settings }: { t: Tx; rows: Row
             ))}
           </div>
         )}
+        {valid && r && !why && r.routingInBody && <p className="hx-note">{t("sx.rt.pvBody")}</p>}
         {valid && q.isError && r && <p className="hx-note">{errorText(q.error, t)}</p>}
         <p className="hx-note">{t("sx.hx.h.pvNote")}</p>
+        <p className="hx-note">{t("sx.rt.pvSaved")}</p>
         <p className="hx-note">{t("subs.hdr.pv.note")}</p>
       </div>
     </section>

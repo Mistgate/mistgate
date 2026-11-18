@@ -195,6 +195,7 @@ export const planTitleVariants: Record<string, { names: string[]; pick: (get: (k
   node_ipv6: { names: ["enable", "disable"], pick: (g) => g("action") },
   relay: { names: ["create", "enable", "disable", "port", "delete"], pick: (g) => g("action") },
   subscription_mihomo_template_set: { names: ["create", "remove"], pick: (g) => g("action") },
+  subscription_routing_set: { names: ["create", "remove"], pick: (g) => g("action") },
   user_disable: { names: ["many"], pick: manyUsers },
   user_enable: { names: ["many"], pick: manyUsers },
   user_reset_traffic: { names: ["many"], pick: manyUsers },

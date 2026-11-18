@@ -646,3 +646,22 @@
     animation: none;
   }
 }
+
+/* ---- the tab Routing: the box the profile is pasted in, built from the Mihomo template's rules */
+.sbp .rt-tab textarea.an-i.rt-y {
+  height: auto;
+  min-height: 112px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 20px;
+  resize: vertical;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  direction: ltr;
+  text-align: left;
+}
+.sbp .rt-tab .hx-out > div > span + b + span {
+  margin-block-start: 2px;
+}

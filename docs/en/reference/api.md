@@ -227,7 +227,8 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `ProvisioningService.ListNodeServerAccess` (connection metadata, never a password) | no | no | yes |
 | `ProvisioningService.GetSSHFingerprint` | no | no | only while the MCP server makes a `node_install` plan |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | no | no | only through an approved MCP plan |
-| `SubscriptionService.UpdateSubscriptionSettings` (the shared settings: an app of the user page, texts, own response headers, own Mihomo templates; a save that changes a template is the owner's: a helper gets `PERMISSION_DENIED` `mihomo_templates_owner_only`, a token only through the owner's approval of a `subscription_mihomo_template_set` plan) | no | only through an approved MCP plan | only through an approved MCP plan |
+| `SubscriptionService.UpdateSubscriptionSettings` (the shared settings: an app of the user page, texts, own response headers, own Mihomo templates, own routing profiles for Happ and INCY; a save that changes a template is the owner's: a helper gets `PERMISSION_DENIED` `mihomo_templates_owner_only`, a token only through the owner's approval of a `subscription_mihomo_template_set` plan) | no | only through an approved MCP plan | only through an approved MCP plan |
+| `SubscriptionService.PreviewRoutingProfile` | no | no | no (the admin's reading of a pasted profile; an agent sees the profiles in `subscription_settings_get` and which one a person gets in `subscription_preview`) |
 | `SubscriptionService.PreviewMihomoTemplate` | no | no | no (the admin's preview; an agent reads a template with `subscription_mihomo_template_get` and sees which one a person gets in `subscription_preview`) |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | no | no | only through an approved MCP plan |
 

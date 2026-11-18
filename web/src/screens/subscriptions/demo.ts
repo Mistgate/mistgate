@@ -1,4 +1,4 @@
-import type { MihomoTemplate, ResponseHeader } from "./model";
+import type { MihomoTemplate, ResponseHeader, RoutingInfo } from "./model";
 
 /**
  * Development only (the dev kit's scenes, dev-kit-subs-hx.tsx): what the two tabs start with besides the saved settings, for the
@@ -11,6 +11,8 @@ export type HxDemo = {
   /** The rows of the form instead of the saved ones (a change that is not saved yet). */
   headers?: ResponseHeader[];
   templates?: MihomoTemplate[];
+  /** The profiles of the Routing form instead of the saved ones (a pasted text that is not saved yet). */
+  routing?: { text: string; text0: string; onlyAdd: boolean; onlyGroups: boolean; groupIds: string[]; info0?: RoutingInfo | undefined }[];
   busy?: boolean;
   saved?: boolean;
   /** The template whose delete is being asked about (an index). */
