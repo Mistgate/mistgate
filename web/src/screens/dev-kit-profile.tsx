@@ -16,6 +16,7 @@ import { awaitingQuery } from "@/lib/integrations";
 import { nodesQuery, overviewQuery, userCountQuery } from "@/lib/queries";
 import { relaysQuery } from "@/lib/relay";
 import { meQuery } from "@/lib/session";
+import { noteServerVersion, setLoadedVersion } from "@/lib/stale";
 import { setTheme, useTheme } from "@/lib/theme";
 import { updatesQuery } from "@/lib/updates";
 import { Shot } from "@/screens/dev-kit-redesign";
@@ -35,7 +36,7 @@ import { ShellLayout } from "./shell";
 //   /dev-kit?only=profile-page&state=<profile>.<tab>[.<variant>][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
 // <profile>: hy1 (Hysteria2, one server did not start) | hy2 (through WARP) | hy3 (on no node) | vl1 (VLESS XHTTP) | vl2 (VLESS TCP, a check fails,
 // one server starts) | vl3 (behind a CDN, in no group) | aw1 (AmneziaWG 3.1) | aw2 (2.0, one node off) | tt1 (TrustTunnel) | tg1 (MTProto, on no node).
-// <tab>: settings | servers | people. <variant> is what a scene adds: dirty (changes typed) | stale (saved elsewhere) | gone (deleted) |
+// <tab>: settings | servers | people. <variant> is what a scene adds: dirty (changes typed) | panelold (the panel was updated, the page is old) | stale (saved elsewhere) | gone (deleted) |
 // load | err | nf (the page's own load states) | the windows put, take, twin, del and what the tabs name (dev-kit-profile-tabs.tsx).
 // Made-up data of the board: de1 … spb1, the groups family and friends, documentation addresses.
 
@@ -138,6 +139,9 @@ const fleetOf = (variant: string): Fleet => ({ out: variant.split(".").includes(
 /** The panel's calls of the page's own load states (the scene is its own page, so patching the shared client is safe). */
 function fakeCalls(variant: string) {
   const p = profilesApi as unknown as Record<string, unknown>;
+  // the panel was updated while this page stayed open: the page is the old version, the API answers as the new one
+  setLoadedVersion(variant.split(".").includes("panelold") ? "0.1.70" : "");
+  if (variant.split(".").includes("panelold")) noteServerVersion(new Headers({ "x-mistgate-version": "0.1.71" }));
   const errors = variant.split(".").includes("errors") ? [{ pointer: "/port", code: "invalid", message: "Port must be from 1 to 65535", params: {} }] : [];
   const warnings = variant.split(".").includes("warns") ? [{ pointer: "/port", code: "preset_port", message: "The look of DNS is usually on port 53", params: { preset: "dns" } }] : [];
   p.previewProfile = async () => ({ errors, warnings, clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined });
@@ -204,6 +208,8 @@ export const frames: Frame[] = [
   { id: "profile-hy1-errors", state: "hy1.settings.errors", title: "A field the server refuses: the remark, the red row, Save cannot be pressed", w: 1440, h: 1100 },
   { id: "profile-aw1-warns", state: "aw1.settings.warns", title: "A warning of the server: the remark with \"To the field\"", w: 1440, h: 1400 },
   { id: "profile-hy1-saved", state: "hy1.settings.saved", title: "Saved: the bar says so", w: 1440, h: 1100 },
+  { id: "profile-hy1-panelold", state: "hy1.settings.panelold", title: "The panel was updated while the page was open: the bar says so and offers Reload", w: 1440, h: 1100 },
+  { id: "profile-hy1-panelold-phone", state: "hy1.settings.panelold", title: "The same on a phone", w: 400, h: 1700 },
   { id: "profile-hy1-stale", state: "hy1.settings.stale", title: "Saved in another window", w: 1440, h: 1100 },
   { id: "profile-hy1-readonly", state: "hy1.settings", title: "An observer: the form reads, nothing changes", w: 1440, h: 1100, params: "&role=readonly" },
   { id: "profile-hy3", state: "hy3.settings", title: "On no node: the verdict says so", w: 1440, h: 1000 },

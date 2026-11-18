@@ -80,6 +80,10 @@ describe("the scenes of the profile page's Settings tab", () => {
       expect(document.querySelector(".pf-save button:last-child")?.getAttribute("aria-disabled")).toBe("true");
     }
     if (state === "hy1.settings.saved") expect(document.querySelector(".pf-save.ok")?.textContent).toContain("Saved");
+    if (state === "hy1.settings.panelold") {
+      expect(document.querySelector(".pf-save.on")?.textContent).toContain("The panel was updated: the page is the old version");
+      expect(document.querySelector(".pf-save button:last-child")?.textContent).toBe("Reload");
+    }
     if (state === "hy1.settings.stale") expect(body()).toContain("The profile was changed elsewhere");
     if (state === "hy3.settings") expect(body()).toContain("Not on any node");
     if (state === "vl3.settings") expect(body()).toContain("In no group");

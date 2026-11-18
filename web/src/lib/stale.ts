@@ -10,13 +10,19 @@ const metaName = "mistgate-version";
 const header = "x-mistgate-version";
 
 /** The version of the panel that served this page's index.html; "" when it did not say. */
-export const loadedVersion = (() => {
+export let loadedVersion = (() => {
   try {
     return document.querySelector<HTMLMetaElement>(`meta[name="${metaName}"]`)?.content.trim() ?? "";
   } catch {
     return "";
   }
 })();
+
+/** Dev kit only: draw a tab older than the panel (the scene of the stale bar); "" puts it right again. */
+export function setLoadedVersion(v: string) {
+  loadedVersion = v;
+  listeners.forEach((l) => l());
+}
 
 /** The panel version the page is stale against (the one the server reports now), or "" when it is not stale or cannot tell. */
 export function staleVersion(loaded: string, seen: string): string {
