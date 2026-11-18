@@ -996,6 +996,105 @@ func (x *PathSpeedResponse) GetBytes() uint64 {
 	return 0
 }
 
+type PathSpeedResultsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Only the tests that had this node as the sender or the target; empty = every node.
+	NodeId string `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// At most this many, newest first; 0 = 20, at most 50.
+	Limit         uint32 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PathSpeedResultsRequest) Reset() {
+	*x = PathSpeedResultsRequest{}
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PathSpeedResultsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PathSpeedResultsRequest) ProtoMessage() {}
+
+func (x *PathSpeedResultsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PathSpeedResultsRequest.ProtoReflect.Descriptor instead.
+func (*PathSpeedResultsRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_probe_v1_probe_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PathSpeedResultsRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *PathSpeedResultsRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type PathSpeedResultsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Newest first. Only tests that ran are kept: error is always empty here.
+	Tests         []*PathSpeedResponse `protobuf:"bytes,1,rep,name=tests,proto3" json:"tests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PathSpeedResultsResponse) Reset() {
+	*x = PathSpeedResultsResponse{}
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PathSpeedResultsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PathSpeedResultsResponse) ProtoMessage() {}
+
+func (x *PathSpeedResultsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PathSpeedResultsResponse.ProtoReflect.Descriptor instead.
+func (*PathSpeedResultsResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_probe_v1_probe_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PathSpeedResultsResponse) GetTests() []*PathSpeedResponse {
+	if x != nil {
+		return x.Tests
+	}
+	return nil
+}
+
 var File_mistgate_probe_v1_probe_proto protoreflect.FileDescriptor
 
 const file_mistgate_probe_v1_probe_proto_rawDesc = "" +
@@ -1086,12 +1185,18 @@ const file_mistgate_probe_v1_probe_proto_rawDesc = "" +
 	"\vduration_ms\x18\n" +
 	" \x01(\rR\n" +
 	"durationMs\x12\x14\n" +
-	"\x05bytes\x18\v \x01(\x04R\x05bytes2\xf7\x02\n" +
+	"\x05bytes\x18\v \x01(\x04R\x05bytes\"H\n" +
+	"\x17PathSpeedResultsRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\rR\x05limit\"V\n" +
+	"\x18PathSpeedResultsResponse\x12:\n" +
+	"\x05tests\x18\x01 \x03(\v2$.mistgate.probe.v1.PathSpeedResponseR\x05tests2\xe4\x03\n" +
 	"\fProbeService\x12V\n" +
 	"\tPathProbe\x12#.mistgate.probe.v1.PathProbeRequest\x1a$.mistgate.probe.v1.PathProbeResponse\x12V\n" +
 	"\tNodeTrace\x12#.mistgate.probe.v1.NodeTraceRequest\x1a$.mistgate.probe.v1.NodeTraceResponse\x12_\n" +
 	"\fNodeDnsCheck\x12&.mistgate.probe.v1.NodeDnsCheckRequest\x1a'.mistgate.probe.v1.NodeDnsCheckResponse\x12V\n" +
-	"\tPathSpeed\x12#.mistgate.probe.v1.PathSpeedRequest\x1a$.mistgate.probe.v1.PathSpeedResponseB\xc5\x01\n" +
+	"\tPathSpeed\x12#.mistgate.probe.v1.PathSpeedRequest\x1a$.mistgate.probe.v1.PathSpeedResponse\x12k\n" +
+	"\x10PathSpeedResults\x12*.mistgate.probe.v1.PathSpeedResultsRequest\x1a+.mistgate.probe.v1.PathSpeedResultsResponseB\xc5\x01\n" +
 	"\x15com.mistgate.probe.v1B\n" +
 	"ProbeProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/probe/v1;probev1\xa2\x02\x03MPX\xaa\x02\x11Mistgate.Probe.V1\xca\x02\x11Mistgate\\Probe\\V1\xe2\x02\x1dMistgate\\Probe\\V1\\GPBMetadata\xea\x02\x13Mistgate::Probe::V1b\x06proto3"
 
@@ -1107,20 +1212,22 @@ func file_mistgate_probe_v1_probe_proto_rawDescGZIP() []byte {
 	return file_mistgate_probe_v1_probe_proto_rawDescData
 }
 
-var file_mistgate_probe_v1_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_mistgate_probe_v1_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_mistgate_probe_v1_probe_proto_goTypes = []any{
-	(*PathProbeRequest)(nil),     // 0: mistgate.probe.v1.PathProbeRequest
-	(*PathProbePort)(nil),        // 1: mistgate.probe.v1.PathProbePort
-	(*PathProbeSize)(nil),        // 2: mistgate.probe.v1.PathProbeSize
-	(*PathProbeResponse)(nil),    // 3: mistgate.probe.v1.PathProbeResponse
-	(*NodeTraceRequest)(nil),     // 4: mistgate.probe.v1.NodeTraceRequest
-	(*TraceHop)(nil),             // 5: mistgate.probe.v1.TraceHop
-	(*NodeTraceResponse)(nil),    // 6: mistgate.probe.v1.NodeTraceResponse
-	(*NodeDnsCheckRequest)(nil),  // 7: mistgate.probe.v1.NodeDnsCheckRequest
-	(*DnsRun)(nil),               // 8: mistgate.probe.v1.DnsRun
-	(*NodeDnsCheckResponse)(nil), // 9: mistgate.probe.v1.NodeDnsCheckResponse
-	(*PathSpeedRequest)(nil),     // 10: mistgate.probe.v1.PathSpeedRequest
-	(*PathSpeedResponse)(nil),    // 11: mistgate.probe.v1.PathSpeedResponse
+	(*PathProbeRequest)(nil),         // 0: mistgate.probe.v1.PathProbeRequest
+	(*PathProbePort)(nil),            // 1: mistgate.probe.v1.PathProbePort
+	(*PathProbeSize)(nil),            // 2: mistgate.probe.v1.PathProbeSize
+	(*PathProbeResponse)(nil),        // 3: mistgate.probe.v1.PathProbeResponse
+	(*NodeTraceRequest)(nil),         // 4: mistgate.probe.v1.NodeTraceRequest
+	(*TraceHop)(nil),                 // 5: mistgate.probe.v1.TraceHop
+	(*NodeTraceResponse)(nil),        // 6: mistgate.probe.v1.NodeTraceResponse
+	(*NodeDnsCheckRequest)(nil),      // 7: mistgate.probe.v1.NodeDnsCheckRequest
+	(*DnsRun)(nil),                   // 8: mistgate.probe.v1.DnsRun
+	(*NodeDnsCheckResponse)(nil),     // 9: mistgate.probe.v1.NodeDnsCheckResponse
+	(*PathSpeedRequest)(nil),         // 10: mistgate.probe.v1.PathSpeedRequest
+	(*PathSpeedResponse)(nil),        // 11: mistgate.probe.v1.PathSpeedResponse
+	(*PathSpeedResultsRequest)(nil),  // 12: mistgate.probe.v1.PathSpeedResultsRequest
+	(*PathSpeedResultsResponse)(nil), // 13: mistgate.probe.v1.PathSpeedResultsResponse
 }
 var file_mistgate_probe_v1_probe_proto_depIdxs = []int32{
 	1,  // 0: mistgate.probe.v1.PathProbeResponse.ports:type_name -> mistgate.probe.v1.PathProbePort
@@ -1128,19 +1235,22 @@ var file_mistgate_probe_v1_probe_proto_depIdxs = []int32{
 	5,  // 2: mistgate.probe.v1.NodeTraceResponse.hops:type_name -> mistgate.probe.v1.TraceHop
 	8,  // 3: mistgate.probe.v1.NodeDnsCheckResponse.latest:type_name -> mistgate.probe.v1.DnsRun
 	8,  // 4: mistgate.probe.v1.NodeDnsCheckResponse.history:type_name -> mistgate.probe.v1.DnsRun
-	0,  // 5: mistgate.probe.v1.ProbeService.PathProbe:input_type -> mistgate.probe.v1.PathProbeRequest
-	4,  // 6: mistgate.probe.v1.ProbeService.NodeTrace:input_type -> mistgate.probe.v1.NodeTraceRequest
-	7,  // 7: mistgate.probe.v1.ProbeService.NodeDnsCheck:input_type -> mistgate.probe.v1.NodeDnsCheckRequest
-	10, // 8: mistgate.probe.v1.ProbeService.PathSpeed:input_type -> mistgate.probe.v1.PathSpeedRequest
-	3,  // 9: mistgate.probe.v1.ProbeService.PathProbe:output_type -> mistgate.probe.v1.PathProbeResponse
-	6,  // 10: mistgate.probe.v1.ProbeService.NodeTrace:output_type -> mistgate.probe.v1.NodeTraceResponse
-	9,  // 11: mistgate.probe.v1.ProbeService.NodeDnsCheck:output_type -> mistgate.probe.v1.NodeDnsCheckResponse
-	11, // 12: mistgate.probe.v1.ProbeService.PathSpeed:output_type -> mistgate.probe.v1.PathSpeedResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	11, // 5: mistgate.probe.v1.PathSpeedResultsResponse.tests:type_name -> mistgate.probe.v1.PathSpeedResponse
+	0,  // 6: mistgate.probe.v1.ProbeService.PathProbe:input_type -> mistgate.probe.v1.PathProbeRequest
+	4,  // 7: mistgate.probe.v1.ProbeService.NodeTrace:input_type -> mistgate.probe.v1.NodeTraceRequest
+	7,  // 8: mistgate.probe.v1.ProbeService.NodeDnsCheck:input_type -> mistgate.probe.v1.NodeDnsCheckRequest
+	10, // 9: mistgate.probe.v1.ProbeService.PathSpeed:input_type -> mistgate.probe.v1.PathSpeedRequest
+	12, // 10: mistgate.probe.v1.ProbeService.PathSpeedResults:input_type -> mistgate.probe.v1.PathSpeedResultsRequest
+	3,  // 11: mistgate.probe.v1.ProbeService.PathProbe:output_type -> mistgate.probe.v1.PathProbeResponse
+	6,  // 12: mistgate.probe.v1.ProbeService.NodeTrace:output_type -> mistgate.probe.v1.NodeTraceResponse
+	9,  // 13: mistgate.probe.v1.ProbeService.NodeDnsCheck:output_type -> mistgate.probe.v1.NodeDnsCheckResponse
+	11, // 14: mistgate.probe.v1.ProbeService.PathSpeed:output_type -> mistgate.probe.v1.PathSpeedResponse
+	13, // 15: mistgate.probe.v1.ProbeService.PathSpeedResults:output_type -> mistgate.probe.v1.PathSpeedResultsResponse
+	11, // [11:16] is the sub-list for method output_type
+	6,  // [6:11] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_probe_v1_probe_proto_init() }
@@ -1154,7 +1264,7 @@ func file_mistgate_probe_v1_probe_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_probe_v1_probe_proto_rawDesc), len(file_mistgate_probe_v1_probe_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

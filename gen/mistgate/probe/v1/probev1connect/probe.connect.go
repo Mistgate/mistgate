@@ -42,6 +42,9 @@ const (
 	ProbeServiceNodeDnsCheckProcedure = "/mistgate.probe.v1.ProbeService/NodeDnsCheck"
 	// ProbeServicePathSpeedProcedure is the fully-qualified name of the ProbeService's PathSpeed RPC.
 	ProbeServicePathSpeedProcedure = "/mistgate.probe.v1.ProbeService/PathSpeed"
+	// ProbeServicePathSpeedResultsProcedure is the fully-qualified name of the ProbeService's
+	// PathSpeedResults RPC.
+	ProbeServicePathSpeedResultsProcedure = "/mistgate.probe.v1.ProbeService/PathSpeedResults"
 )
 
 // ProbeServiceClient is a client for the mistgate.probe.v1.ProbeService service.
@@ -59,6 +62,9 @@ type ProbeServiceClient interface {
 	// connection with a one-time token, the sender pulls (or pushes) it and measures. It moves bulk traffic, so the MCP tool is
 	// plan/apply with the owner's approval. At most one test per node at a time and a few per node per day. Kept 7 days.
 	PathSpeed(context.Context, *connect.Request[v1.PathSpeedRequest]) (*connect.Response[v1.PathSpeedResponse], error)
+	// The speed tests kept in the last 7 days, newest first (for the MCP tool path_speed_results): what an approved path_speed plan
+	// measured, so a later question is answered from the figures and not from a guess. Names and figures only.
+	PathSpeedResults(context.Context, *connect.Request[v1.PathSpeedResultsRequest]) (*connect.Response[v1.PathSpeedResultsResponse], error)
 }
 
 // NewProbeServiceClient constructs a client for the mistgate.probe.v1.ProbeService service. By
@@ -96,15 +102,22 @@ func NewProbeServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(probeServiceMethods.ByName("PathSpeed")),
 			connect.WithClientOptions(opts...),
 		),
+		pathSpeedResults: connect.NewClient[v1.PathSpeedResultsRequest, v1.PathSpeedResultsResponse](
+			httpClient,
+			baseURL+ProbeServicePathSpeedResultsProcedure,
+			connect.WithSchema(probeServiceMethods.ByName("PathSpeedResults")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // probeServiceClient implements ProbeServiceClient.
 type probeServiceClient struct {
-	pathProbe    *connect.Client[v1.PathProbeRequest, v1.PathProbeResponse]
-	nodeTrace    *connect.Client[v1.NodeTraceRequest, v1.NodeTraceResponse]
-	nodeDnsCheck *connect.Client[v1.NodeDnsCheckRequest, v1.NodeDnsCheckResponse]
-	pathSpeed    *connect.Client[v1.PathSpeedRequest, v1.PathSpeedResponse]
+	pathProbe        *connect.Client[v1.PathProbeRequest, v1.PathProbeResponse]
+	nodeTrace        *connect.Client[v1.NodeTraceRequest, v1.NodeTraceResponse]
+	nodeDnsCheck     *connect.Client[v1.NodeDnsCheckRequest, v1.NodeDnsCheckResponse]
+	pathSpeed        *connect.Client[v1.PathSpeedRequest, v1.PathSpeedResponse]
+	pathSpeedResults *connect.Client[v1.PathSpeedResultsRequest, v1.PathSpeedResultsResponse]
 }
 
 // PathProbe calls mistgate.probe.v1.ProbeService.PathProbe.
@@ -127,6 +140,11 @@ func (c *probeServiceClient) PathSpeed(ctx context.Context, req *connect.Request
 	return c.pathSpeed.CallUnary(ctx, req)
 }
 
+// PathSpeedResults calls mistgate.probe.v1.ProbeService.PathSpeedResults.
+func (c *probeServiceClient) PathSpeedResults(ctx context.Context, req *connect.Request[v1.PathSpeedResultsRequest]) (*connect.Response[v1.PathSpeedResultsResponse], error) {
+	return c.pathSpeedResults.CallUnary(ctx, req)
+}
+
 // ProbeServiceHandler is an implementation of the mistgate.probe.v1.ProbeService service.
 type ProbeServiceHandler interface {
 	// An on-demand probe from one fleet node to another: UDP (optionally an MTU sweep), TCP connect or TLS handshake with the
@@ -142,6 +160,9 @@ type ProbeServiceHandler interface {
 	// connection with a one-time token, the sender pulls (or pushes) it and measures. It moves bulk traffic, so the MCP tool is
 	// plan/apply with the owner's approval. At most one test per node at a time and a few per node per day. Kept 7 days.
 	PathSpeed(context.Context, *connect.Request[v1.PathSpeedRequest]) (*connect.Response[v1.PathSpeedResponse], error)
+	// The speed tests kept in the last 7 days, newest first (for the MCP tool path_speed_results): what an approved path_speed plan
+	// measured, so a later question is answered from the figures and not from a guess. Names and figures only.
+	PathSpeedResults(context.Context, *connect.Request[v1.PathSpeedResultsRequest]) (*connect.Response[v1.PathSpeedResultsResponse], error)
 }
 
 // NewProbeServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -175,6 +196,12 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(probeServiceMethods.ByName("PathSpeed")),
 		connect.WithHandlerOptions(opts...),
 	)
+	probeServicePathSpeedResultsHandler := connect.NewUnaryHandler(
+		ProbeServicePathSpeedResultsProcedure,
+		svc.PathSpeedResults,
+		connect.WithSchema(probeServiceMethods.ByName("PathSpeedResults")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.probe.v1.ProbeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProbeServicePathProbeProcedure:
@@ -185,6 +212,8 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 			probeServiceNodeDnsCheckHandler.ServeHTTP(w, r)
 		case ProbeServicePathSpeedProcedure:
 			probeServicePathSpeedHandler.ServeHTTP(w, r)
+		case ProbeServicePathSpeedResultsProcedure:
+			probeServicePathSpeedResultsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -208,4 +237,8 @@ func (UnimplementedProbeServiceHandler) NodeDnsCheck(context.Context, *connect.R
 
 func (UnimplementedProbeServiceHandler) PathSpeed(context.Context, *connect.Request[v1.PathSpeedRequest]) (*connect.Response[v1.PathSpeedResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.PathSpeed is not implemented"))
+}
+
+func (UnimplementedProbeServiceHandler) PathSpeedResults(context.Context, *connect.Request[v1.PathSpeedResultsRequest]) (*connect.Response[v1.PathSpeedResultsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.PathSpeedResults is not implemented"))
 }

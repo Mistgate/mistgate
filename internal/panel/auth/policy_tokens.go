@@ -94,6 +94,8 @@ var tokenProcedures = map[string]int{
 	NodeDnsCheckProcedure: TokenAccessDirect,
 	// path_speed moves bulk traffic between two nodes (up to 32 MB, once per node at a time, a few a day): only through the owner's approval.
 	PathSpeedProcedure: TokenAccessApproved,
+	// the kept figures of those tests (node names and numbers): read directly, so a later turn can read what the owner approved
+	PathSpeedResultsProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,
