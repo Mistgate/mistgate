@@ -148,6 +148,7 @@ function type(input: Element | null, value: string) {
     input?.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
+const buttonsOf = (label: string) => document.querySelector(`button[aria-label='${label}']`);
 const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.includes(label));
 
 describe("the Integrations screen: tokens", () => {
@@ -179,17 +180,17 @@ describe("the Integrations screen: tokens", () => {
   it("creates a token, shows its secret once and forgets it when the dialog is closed", async () => {
     createApiToken.mockResolvedValue({ token: token({ id: "tok_9", name: "grafana" }), secret: "tk1_exampleexampleexampleexampleexampleexample1" });
     await mount(tokens([]));
-    expect(text()).toContain("No tokens yet");
+    expect(text()).toContain("No tokens");
     await click(button("New token"));
     expect(radio("Read only")?.getAttribute("aria-checked")).toBe("true"); // the safest access is preselected
-    await type(document.querySelector("input[placeholder^='e.g.']"), "  grafana ");
+    await type(document.querySelector("input[placeholder='claude-ops']"), "  grafana ");
     await click(radio("Operator"));
     await click([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent === "180 days"));
     await click(button("Create token"));
     await settle();
     // the hourly limit of user changes stays on unless the owner switches it off for this token
     expect(createApiToken).toHaveBeenCalledWith({ name: "grafana", profile: TokenProfile.OPERATOR, ttlDays: 180, rateLimitPerMin: 120, allowBulkUserChanges: false });
-    expect(dialog()!.textContent).toContain("Copy the token now");
+    expect(dialog()!.textContent).toContain("Token created");
     expect(document.querySelector("[data-testid=token-secret]")?.textContent).toBe("tk1_exampleexampleexampleexampleexampleexample1");
 
     // Esc does not lose it; only the button closes it
@@ -209,7 +210,7 @@ describe("the Integrations screen: tokens", () => {
     expect(labels.filter((l) => /^(never|no expiry|forever|unlimited)/i.test(l ?? ""))).toEqual([]);
     await click(button("Create token"));
     expect(text()).toContain("Give the token a name");
-    await type(document.querySelector("input[placeholder^='e.g.']"), "x");
+    await type(document.querySelector("input[placeholder='claude-ops']"), "x");
     await type(document.querySelector("input[inputmode=numeric]"), "601");
     await click(button("Create token"));
     expect(text()).toContain("Enter a whole number from 1 to 600");
@@ -220,12 +221,13 @@ describe("the Integrations screen: tokens", () => {
     createApiToken.mockRejectedValue(new ConnectError("name taken", Code.AlreadyExists));
     await mount(tokens([token()]));
     await click(button("New token"));
-    await type(document.querySelector("input[placeholder^='e.g.']"), "claude-ops");
+    await type(document.querySelector("input[placeholder='claude-ops']"), "claude-ops");
     await click(button("Create token"));
     await settle();
     expect(createApiToken).toHaveBeenCalledTimes(1);
-    expect(dialog()).toBeNull();
-    expect(button("Create token")).toBeDefined();
+    // the create window stays open: nothing the owner typed is lost
+    expect(dialog()).not.toBeNull();
+    expect(inDialog("Create token")).toBeDefined();
   });
 
   it("asks before revoking, then revokes that token", async () => {
@@ -245,22 +247,22 @@ describe("the Integrations screen: tokens", () => {
     await mount(tokens([token(), token({ id: "tok_2", name: "billing", allowBulkUserChanges: true }), token({ id: "tok_3", name: "grafana", profile: TokenProfile.READONLY })]));
     expect(text()).toContain("up to 10 user changes an hour");
     expect(text()).toContain("bulk user changes allowed");
-    expect(text()).toContain("No hourly limit"); // the pill of the exempt token
+    expect(buttonsOf("User change limit of token billing")?.textContent).toContain("Restore the limit"); // the exempt token offers to put it back
     // a read-only token changes nobody: no limit line and no control
     expect(document.querySelector("button[aria-label='User change limit of token grafana']")).toBeNull();
 
     await click(document.querySelector("button[aria-label='User change limit of token claude-ops']"));
     expect(dialog()!.textContent).toContain("at most 10 people in an hour");
     expect(dialog()!.textContent).toContain("Every person in every call counts");
-    expect(dialog()!.textContent).toContain("Without the limit"); // what lifting the limit risks, before the button
+    expect(dialog()!.textContent).toContain("Without a limit"); // what lifting the limit risks, before the button
     expect(setApiTokenBulk).not.toHaveBeenCalled();
     await click(inDialog("Allow bulk changes"));
     await settle();
     expect(setApiTokenBulk).toHaveBeenCalledWith({ id: "tok_1", allow: true });
     expect(dialog()).toBeNull();
 
+    // putting the limit back is one press, no window
     await click(document.querySelector("button[aria-label='User change limit of token billing']"));
-    await click(inDialog("Put the limit back"));
     await settle();
     expect(setApiTokenBulk).toHaveBeenLastCalledWith({ id: "tok_2", allow: false });
   });
@@ -270,7 +272,7 @@ describe("the Integrations screen: tokens", () => {
     await mount(tokens([]));
     await click(button("New token"));
     expect(document.querySelector("[role=switch][aria-label='Bulk user changes without approval']")).toBeNull(); // read only is preselected
-    await type(document.querySelector("input[placeholder^='e.g.']"), "billing");
+    await type(document.querySelector("input[placeholder='claude-ops']"), "billing");
     await click(radio("Operator"));
     await click(document.querySelector("[role=switch][aria-label='Bulk user changes without approval']"));
     await click(button("Create token"));
@@ -331,7 +333,7 @@ describe("the Integrations screen: approvals", () => {
     expect(text()).toContain("Drops connections");
     expect(text()).toMatch(/Drops connections\s*yes/);
     expect(text()).toContain("It changes what runs on your nodes.");
-    expect(text()).toMatch(/\d:\d\d left/);
+    expect(text()).toMatch(/left\s*\d:\d\d/);
     // the node name and the agent's reason are quoted, not mixed into the panel's wording
     expect(text()).toContain("“de1”");
     expect(text()).toContain("“the engine looks stuck”");
@@ -460,9 +462,10 @@ describe("the Integrations screen: approvals", () => {
 
   it("refuses to approve what has run out of time", async () => {
     await mount(tokens([]), inbox([approval({ expiresUnix: NOW - 1 })]));
-    expect(text()).toContain("expired");
-    expect((document.querySelector("button[aria-label='Approve: Fix a node']") as HTMLButtonElement).hasAttribute("data-disabled")).toBe(true);
-    expect((document.querySelector("button[aria-label='Reject: Fix a node']") as HTMLButtonElement).hasAttribute("data-disabled")).toBe(true);
+    // the board's answer: the card goes, and the tab says the request lapsed
+    expect(text()).toContain("Request expired");
+    expect(document.querySelector("button[aria-label='Approve: Fix a node']")).toBeNull();
+    expect(document.querySelector("button[aria-label='Reject: Fix a node']")).toBeNull();
   });
 
   it("keeps decided changes in a history below, and no queue when nothing waits", async () => {

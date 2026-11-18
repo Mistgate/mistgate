@@ -189,14 +189,18 @@ export function AiKit() {
   if (state === "settings") {
     return (
       <Shot id="ai-settings" title="AI → Assistant" seed={[[["assistant", "settings"], settings], [["assistant", "models", AssistantProvider.ANTHROPIC], models], [["assistant", "models", AssistantProvider.OLLAMA_CLOUD], []]]}>
-        <AssistantTab />
+        <div className="aip">
+          <AssistantTab />
+        </div>
       </Shot>
     );
   }
   if (state === "memory") {
     return (
       <Shot id="ai-memory" title="AI → Memory" seed={[[["assistant", "memory"], notes], [["assistant", "conversations", ""], conversations]]}>
-        <MemoryTab />
+        <div className="aip">
+          <MemoryTab />
+        </div>
       </Shot>
     );
   }
