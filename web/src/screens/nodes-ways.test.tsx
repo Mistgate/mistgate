@@ -14,13 +14,14 @@ import { NodesScreen } from "./nodes";
 // The ways out of the country on the real screen, on the dev kit's made-up data (every state of the board's toggles has a scene): the
 // "From Russia" column of the list, the Paths view and the pair's sheet.
 
+const nav = vi.hoisted(() => vi.fn());
 const api = vi.hoisted(() => ({ checkRelay: vi.fn(async () => ({})), updateRelay: vi.fn(async () => ({})), deleteRelay: vi.fn(async () => ({})) }));
 vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, relays: api }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, to, params }: { children?: ReactNode; className?: string; to?: string; params?: { id: string } }) => <a className={className} href={(to ?? "").replace("$id", params?.id ?? "")}>{children}</a>,
   useBlocker: () => ({ status: "idle" }),
   useSearch: () => ({}),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => nav,
 }));
 
 beforeAll(() => {
@@ -36,6 +37,7 @@ afterEach(() => {
   root = host = null;
   localStorage.clear();
   Object.values(api).forEach((f) => f.mockClear());
+  nav.mockClear();
   delete (window as { matchMedia?: unknown }).matchMedia;
 });
 
@@ -92,7 +94,9 @@ describe("the list's column: From Russia", () => {
     expect(text(ru("de2"))).toContain("no path");
     expect(text(ru("de2"))).toContain("direct is blocked");
     await click(button(en["nw.fix"], ru("de2")!));
-    expect(document.body.textContent).toContain("Relay through msk1");
+    // the wizard of de2's page, at the choice of the entry (the old dialog is gone)
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    expect(nav).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_de2" }, search: { tab: "ways", add: "1" } });
   });
   it("a node of the board in each of its states: partly, two entries, no data", async () => {
     await draw("ru-twelve");
@@ -217,8 +221,11 @@ describe("the Paths view", () => {
     expect(text(de2[1])).toBe("＋ Route through msk2…");
     expect(text(de2[2])).toBe("＋ Route through spb1…");
     expect([...row("fi1")!.querySelectorAll(".rw-c button")]).toHaveLength(0);
+    // the entry named on the button is the one the wizard opens at (its servers)
     await click(de2[0]!.querySelector("button"));
-    expect(document.body.textContent).toContain("Relay through msk1");
+    expect(nav).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_de2" }, search: { tab: "ways", add: "via:nod_msk1" } });
+    await click(de2[1]!.querySelector("button"));
+    expect(nav).toHaveBeenLastCalledWith({ to: "/nodes/$id", params: { id: "nod_de2" }, search: { tab: "ways", add: "via:nod_msk2" } });
   });
   it("shows an entry's trouble once, in its head: the column's cells are dashes", async () => {
     await draw("rw-entoff");
@@ -281,10 +288,10 @@ describe("the Paths view", () => {
     expect(document.querySelector(".rw-mx.cf")).not.toBeNull();
     expect(document.body.textContent).toContain(en["nw.note.cf"]);
   });
-  it("the wizard button opens the relay dialog through the best entry, for every exit", async () => {
+  it("the wizard button opens the wizard of the exit that needs a way most (the one with no path)", async () => {
     await draw("rw-twelve");
     await click(button("Make reachable from Russia…"));
-    expect(document.body.textContent).toContain("Relay through msk1");
+    expect(nav).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_de2" }, search: { tab: "ways", add: "1" } });
   });
   it("filters the rows by No path, Partly, Over the bridge; the chips that count nothing are not there", async () => {
     await draw("rw-twelve");
@@ -427,10 +434,10 @@ describe("the pair's sheet", () => {
     expect(sheet()!.textContent).not.toContain("Remove 3 relays");
     expect(api.deleteRelay).not.toHaveBeenCalled();
   });
-  it("More servers opens the relay dialog of this entry", async () => {
+  it("More servers opens the wizard of the exit at the servers of this entry", async () => {
     await draw("rw-sheet-fwd");
     await click(button(en["nw.a.more"], sheet()!));
-    expect(document.body.textContent).toContain("Relay through msk1");
+    expect(nav).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_de1" }, search: { tab: "ways", add: "via:nod_msk1" } });
   });
   it("links to both nodes' pages on the ways tab", async () => {
     await draw("rw-sheet-fwd");

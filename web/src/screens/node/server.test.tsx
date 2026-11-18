@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
+import { setEffectsEnabled } from "@/lib/effects";
 import { en as np } from "@/i18n/nodepage";
 import { ServerTab } from "./server";
 import type { ServerSection } from "./tabs";
@@ -163,6 +164,19 @@ describe("measuring the network capacity", () => {
     for (let i = 0; i < 3; i++) await settle();
     expect(button(en["node.settings.bandwidthMeasuring"])).toBeUndefined();
     expect(button(np["np.sv.ch.again"])).toBeDefined();
+  });
+
+  it("the answer of the measurement sends a wave and two glints over the card for three seconds (the board's sv-wave), with the reveal animation on", async () => {
+    measureBandwidth.mockResolvedValue(measured());
+    setEffectsEnabled(true);
+    await mount(NodeStatus.ONLINE, undefined, "ch");
+    expect(document.querySelector(".fl-wv")).toBeNull();
+    await click(button(en["node.settings.bandwidthMeasure"]));
+    for (let i = 0; i < 3; i++) await settle();
+    const card = document.querySelector('[aria-label="' + np["np.sv.nav.ch"] + '"]')!;
+    expect(card.querySelector(".fl-wv")).not.toBeNull();
+    expect(card.querySelectorAll(".fl-eg")).toHaveLength(2);
+    setEffectsEnabled(false);
   });
 
   it("shows the result and fills the field with the rounded download figure only when asked, leaving the saving to the form", async () => {

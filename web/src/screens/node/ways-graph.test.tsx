@@ -241,10 +241,10 @@ describe("the owner's edits", () => {
     await click(more("Through msk1"));
     await click(item("Add servers to this relay…"));
     await settle();
-    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_msk1" }, expect.anything());
-    expect(dialog()?.textContent).toContain("msk1");
-    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel" || b.textContent === "Close"));
-    await settle();
+    // the wizard of this page, at the servers of msk1 (the old dialog is gone; the toast of "Turn off" is a dialog of its own, not a modal)
+    expect(document.querySelector('[role="dialog"][aria-modal="true"]')).toBeNull();
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_msk1" }) }));
 
     await click(more("Through msk1"));
     await click(item("Remove…"));
@@ -298,14 +298,13 @@ describe("the owner's edits", () => {
     expect(document.querySelectorAll('[role="switch"]').length).toBeGreaterThanOrEqual(2);
   });
 
-  it("dragging a server onto a through-card opens the relay dialog prefilled; one the entry already relays is refused", async () => {
+  it("dragging a server onto a through-card opens the wizard at that server alone; one the entry already relays is refused", async () => {
     await mount();
     await drop(wayBody("way:via:nod_msk1"), "application/x-mg-server", "inb_h");
     await settle();
-    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_msk1" }, expect.anything());
-    expect(dialog()!.querySelector<HTMLInputElement>('input[aria-label="Relay Hysteria2 of de1"]')?.checked).toBe(true);
-    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel" || b.textContent === "Close"));
-    await settle();
+    expect(dialog()).toBeNull();
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_msk1/inb_h" }) }));
     await drop(wayBody("way:via:nod_msk1"), "application/x-mg-server", "inb_v");
     expect(document.body.textContent).toContain("Cannot relay this server here");
   });
@@ -320,17 +319,16 @@ describe("the owner's edits", () => {
     expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
   });
 
-  it("the add-a-way card lists the other nodes; a node picked opens the relay dialog at once, prefilled, and cancelling changes nothing", async () => {
+  it("the add-a-way card lists the other nodes; a node picked opens the wizard at its servers, and the graph itself changes nothing", async () => {
     await mount();
     expect(card("way:via:nod_spb1")).toBeNull();
     await click(more("Add a way in: through a node, CDN, IPv6"));
     expect(item("Through spb1")).toBeTruthy();
     await click(item("Through spb1"));
     await settle();
-    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_spb1" }, expect.anything());
-    expect(dialog()?.textContent).toContain("spb1");
-    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel" || b.textContent === "Close"));
-    await settle();
+    expect(dialog()).toBeNull();
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_spb1" }) }));
     expect(card("way:via:nod_spb1")).toBeNull();
   });
 
@@ -348,7 +346,9 @@ describe("the owner's edits", () => {
     await click(more("Add a way in"));
     await click(item("Through msk1"));
     await settle();
-    expect(dialog()?.textContent).toContain("msk1");
+    expect(dialog()).toBeNull();
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_msk1" }) }));
   });
 
   it("node names on the cards link to that node's Ways in graph", async () => {

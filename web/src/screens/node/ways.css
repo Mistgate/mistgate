@@ -1255,7 +1255,8 @@ button.wy-nm:hover b {
 .wy-mn button:focus-visible {
   background: var(--step);
 }
-.wy-mn button.risk {
+.wy-mn button.risk,
+.wy-mn button.ask {
   color: var(--danger);
 }
 .wy-mw {

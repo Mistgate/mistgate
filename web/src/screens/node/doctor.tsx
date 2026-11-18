@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { meQuery } from "@/lib/session";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { EdgeLoop, Flourish } from "@/components/fx/flourish";
 import { halo } from "@/components/fx/halo";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -198,6 +199,18 @@ export function NodeDoctorTab({ nodeId, nodeName }: { nodeId: string; nodeName: 
   }, [running, n]);
   const step = running ? turn : 0;
 
+  // the board's wave from the icon: when the look starts (it goes in two seconds), and again when it came back with nothing to do
+  const [wave, setWave] = useState(false);
+  useEffect(() => {
+    if (!running) return;
+    const on = setTimeout(() => setWave(true), 0);
+    const off = setTimeout(() => setWave(false), 2000);
+    return () => {
+      clearTimeout(on);
+      clearTimeout(off);
+    };
+  }, [running]);
+
   // the answer is in: the halo of a save plays over the card, and what came back fine is marked
   useEffect(() => {
     if (running) {
@@ -211,7 +224,17 @@ export function NodeDoctorTab({ nodeId, nodeName }: { nodeId: string; nodeName: 
     const now = new Set(groupDoctor(items).issues.map((i) => i.id));
     setFresh(new Set([...before.current].filter((id) => !now.has(id))));
     const timer = setTimeout(() => setFresh(new Set()), 2000);
-    return () => clearTimeout(timer);
+    // the wave of the start is taken back, a new one plays if nothing is left to do
+    const clean = now.size === 0;
+    const stop = setTimeout(() => setWave(false), 0);
+    const on = clean ? setTimeout(() => setWave(true), 30) : undefined;
+    const off = clean ? setTimeout(() => setWave(false), 3000) : undefined;
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(stop);
+      clearTimeout(on);
+      clearTimeout(off);
+    };
   }, [running, items]);
 
   if (!node) return q.isError ? <QueryError error={q.error} onRetry={() => void q.refetch()} /> : <Pending />;
@@ -266,6 +289,8 @@ export function NodeDoctorTab({ nodeId, nodeName }: { nodeId: string; nodeName: 
   return (
     <div className="flex flex-col gap-3">
       <section ref={card} className={cx("nd-dr-sum rounded-card border border-line bg-surface", tone === "ok" && "ok", tone, "grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-4 px-6 py-5 max-[720px]:grid-cols-[40px_minmax(0,1fr)] max-[720px]:p-4")}>
+        {running && <EdgeLoop />}
+        {wave && <Flourish x={48} y={44} />}
         <span aria-hidden className={cx("nd-dr-ic grid size-12 place-items-center rounded-[14px] transition-[background-color,color] duration-300 ease-out max-[720px]:size-10 max-[720px]:rounded-xl", iconTone[tone], tone === "run" && "run")}>
           <Glyph d={icon} size={24} stroke={1.5} />
         </span>

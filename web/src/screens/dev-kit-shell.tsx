@@ -11,6 +11,7 @@ import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb
 import { LangToggle, ThemeToggle } from "@/components/prefs";
 import { useLang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
+import { applyScene, SceneKeep } from "./dev-kit-scene";
 import { awaitingQuery } from "@/lib/integrations";
 import { overviewQuery, userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
@@ -103,15 +104,18 @@ export function ShellPage() {
   const params = new URLSearchParams(location.search);
   const state = (params.get("state") ?? "full") as State;
   const [qc] = useState(() => {
+    applyScene(params);
     if (params.get("fx") === "1") setEffectsEnabled(true);
     return seeded();
   });
   return (
     <QueryClientProvider client={qc}>
       <ToastProvider>
-        <ShellLayout current="nodes" demo={demos[state]} fab={<ChatButton onClick={() => {}} running={false} unread={2} />}>
-          <PageBody state={state} />
-        </ShellLayout>
+        <SceneKeep>
+          <ShellLayout current="nodes" demo={demos[state]} fab={<ChatButton onClick={() => {}} running={false} unread={2} />}>
+            <PageBody state={state} />
+          </ShellLayout>
+        </SceneKeep>
       </ToastProvider>
     </QueryClientProvider>
   );

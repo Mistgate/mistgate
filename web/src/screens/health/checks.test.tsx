@@ -149,6 +149,35 @@ describe("the country row on the node page", () => {
   }
   const own = { ...checks, rows: [checks.rows[1]!] };
 
+  it("a round asked for: the rows are looked at (tint, glint over the strip, dots for the time) until a newer cell is there, then the strip slides and the new cell jumps out", async () => {
+    const one = { ...checks, rows: [checks.rows[0]!], columns: [checks.columns[0]!] };
+    getChecks.mockResolvedValue(one);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_1" /></QueryClientProvider>));
+    for (let i = 0; i < 4; i++) await settle();
+    const row = () => host!.querySelector(".nd-pr")!;
+    expect(row().classList.contains("now")).toBe(false);
+    expect(host!.querySelector(".nd-tk.scan, .nd-ms.dots")).toBeNull();
+    await act(async () => [...host!.querySelectorAll("button")].find((b) => b.textContent === "Check now")!.click());
+    for (let i = 0; i < 4; i++) await settle();
+    expect(row().classList.contains("now")).toBe(true);
+    expect(row().querySelector(".nd-tk.scan")).not.toBeNull();
+    expect(row().querySelector(".nd-ms.dots")?.textContent).toBe("");
+    // the new cell comes
+    const first = one.rows[0]!.cells[0] as ReturnType<typeof cell>;
+    const newer = { ...one, rows: [{ ...one.rows[0]!, cells: [{ ...first, last: { ...first.last, atUnix: 400 } }] }] };
+    getChecks.mockResolvedValue(newer);
+    await act(async () => void (await qc.invalidateQueries({ queryKey: ["health", "checks"] })));
+    for (let i = 0; i < 4; i++) await settle();
+    expect(row().classList.contains("now")).toBe(false);
+    expect(row().querySelector(".nd-tk.adv")).not.toBeNull();
+    expect(row().querySelectorAll(".nd-tk i.new")).toHaveLength(1);
+    expect(row().querySelector(".nd-ms.fresh")?.textContent).toContain("42");
+  });
+
   it("comes after the checks with the same verdict and tooltip, and is not there while the integration is off", async () => {
     await mountNode({ ...own, countryChecks: [countryChecks[1]] });
     expect(getChecks).toHaveBeenCalledWith({ nodeId: "nod_2" }, expect.anything());

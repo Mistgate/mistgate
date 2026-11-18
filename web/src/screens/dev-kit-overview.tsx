@@ -18,6 +18,7 @@ import { nodesQuery, overviewQuery, userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { Shot } from "./dev-kit-redesign";
+import { applyScene, SceneKeep } from "./dev-kit-scene";
 import { ShellLayout } from "./shell";
 import { OverviewScreen, OverviewFailure, OverviewLoading } from "./overview";
 import { settingsQuery } from "./subscriptions/queries";
@@ -268,6 +269,7 @@ export function OverviewPage() {
   const params = new URLSearchParams(location.search);
   const state = (params.get("state") ?? "calm") as State;
   const [qc] = useState(() => {
+    applyScene(params);
     if (params.get("fx") === "1") setEffectsEnabled(true);
     return seeded(state);
   });
@@ -275,9 +277,11 @@ export function OverviewPage() {
     <QueryClientProvider client={qc}>
       <ToastProvider>
         <AddNodeProvider>
-          <ShellLayout current="overview" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
-            {state === "loading" ? <OverviewLoading /> : state === "error" ? <OverviewFailure error={new Error("503 Service Unavailable")} onRetry={() => {}} /> : <OverviewScreen />}
-          </ShellLayout>
+          <SceneKeep>
+            <ShellLayout current="overview" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
+              {state === "loading" ? <OverviewLoading /> : state === "error" ? <OverviewFailure error={new Error("503 Service Unavailable")} onRetry={() => {}} /> : <OverviewScreen />}
+            </ShellLayout>
+          </SceneKeep>
         </AddNodeProvider>
       </ToastProvider>
     </QueryClientProvider>

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAddNode } from "@/components/add-node";
+import { Flourish } from "@/components/fx/flourish";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
 import { Modal } from "@/components/ui/modal";
@@ -254,10 +255,23 @@ function ChannelSection({ data, form }: { data: Plain<GetNodeResponse>; form: Fo
   const retired = node.status === NodeStatus.RETIRED;
   const { f, set, changed } = form;
   const m = useBandwidthMeasure(node.id);
+  // the measurement is in: the board's wave from the card's head, for three seconds
+  const [wave, setWave] = useState(false);
+  const answer = m.measure.data;
+  useEffect(() => {
+    if (!answer) return;
+    const on = setTimeout(() => setWave(true), 0);
+    const off = setTimeout(() => setWave(false), 3000);
+    return () => {
+      clearTimeout(on);
+      clearTimeout(off);
+    };
+  }, [answer]);
   const error = f.bandwidth.trim() === "" || (/^\d+$/.test(f.bandwidth.trim()) && Number(f.bandwidth) <= 1_000_000) ? undefined : t("node.settings.bandwidthError");
   const sec = useSaveSection(node.id, form, channelFields, () => ({ bandwidthMbps: changed("bandwidth") ? Number(f.bandwidth || "0") : undefined }));
   return (
     <SvCard aria-label={t("np.sv.nav.ch")}>
+      {wave && <Flourish x={160} y={110} />}
       <SvHead title={t("np.sv.ch.title")} hint={t("np.sv.ch.hint")} />
       <div className="sv-ch">
         <label className="flex min-w-0 flex-col gap-1.5">

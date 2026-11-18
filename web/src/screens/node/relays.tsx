@@ -109,6 +109,23 @@ export type RelayRuns = ReturnType<typeof useRelayRuns>;
 
 const stageDot: Record<StageLook, StatusKind> = { ok: "ok", fail: "bad", skipped: "off", running: "busy", waiting: "off" };
 
+/** Removes a relay at once (the row menu has asked "Really remove?" already): the toast says it, a failure is the toast's too. */
+export function useRemoveRelay() {
+  const t = useT();
+  const toast = useToast();
+  const qc = useQueryClient();
+  return async (r: RelayMsg) => {
+    try {
+      await relaysApi.deleteRelay({ id: r.id });
+      toast(t("relay.removed"));
+    } catch (e) {
+      toast.error(errorText(e, t));
+    } finally {
+      void qc.invalidateQueries({ queryKey: ["relays"] });
+    }
+  };
+}
+
 export function RemoveRelay({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
   const t = useT();
   const toast = useToast();

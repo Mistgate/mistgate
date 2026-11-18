@@ -36,7 +36,7 @@ import { meQuery } from "@/lib/session";
 import { readPref, writePref } from "@/lib/storage";
 import { useNow } from "@/lib/time";
 import { useOlderNodes } from "@/lib/updates";
-import { AddRelayDialog, type Entry } from "./node/relays";
+import { useOpenWizard } from "./node/relay-open";
 import { passwordOnly, useBulkRun } from "./nodes-bulk-actions";
 import { NodesBulk } from "./nodes-bulk";
 import { NodesFirst } from "./nodes-first";
@@ -116,19 +116,19 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
   );
   const checking = checksQ.isPending && checksQ.fetchStatus !== "idle";
   const waysData: WaysData = owner && relaysQ.isError && relays === undefined ? "error" : (owner && relays === undefined) || checking ? "load" : "ready";
-  // "Get around…" and "＋ Pass through …": the dialog of a relay, until the wizard takes this over
-  const [dlg, setDlg] = useState<{ entry: Entry; exitId?: string } | null>(null);
+  // "Get around…" and "＋ Pass through …": the wizard of the exit's page ("Make reachable from…")
+  const openWizard = useOpenWizard();
   const byId = (id: string) => nodes.find((n) => n.id === id);
   /** The entry an exit would best go through, other than `except`: one that is up and seen, in another country than the exit, that the panel accepts for it. */
   const entryFor = (exitId?: string, except?: string): string | undefined => {
     const ok = ways.entries.filter((e) => e.nodeId !== except && !e.entry!.offline && !e.entry!.hidden && (!exitId || (!relayPairRefusal(e.nodeId, exitId, nodesIn) && byId(e.nodeId)?.countryCode !== byId(exitId)?.countryCode)));
     return (ok.find((e) => e.direct.tone === "ok") ?? ok[0])?.nodeId;
   };
+  // the entry is the owner's pick or, with none, left to the wizard's first step; with no exit it is the one that needs a way most
   const openWay = (exitId?: string, entryId?: string) => {
-    const eid = entryId ?? entryFor(exitId);
-    const entry = eid ? byId(eid) : undefined;
-    if (!entry) return void toast.error(t("nw.noEntry"));
-    setDlg({ entry: { id: entry.id, name: entry.name, cc: entry.countryCode }, exitId });
+    const exit = exitId ?? (ways.exits.find((x) => x.tone === "bad") ?? ways.exits.find((x) => x.tone !== "ok"))?.nodeId;
+    if (!exit || !(entryId ?? entryFor(exit))) return void toast.error(t("nw.noEntry"));
+    openWizard(exit, entryId);
   };
   // the exits with no way in: closed, and nothing carries them
   const noWayIds = useMemo(() => new Set(ways.exits.filter((x) => x.tone === "bad").map((x) => x.nodeId)), [ways]);
@@ -346,7 +346,6 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
           )}
         </>
       )}
-      {dlg && <AddRelayDialog open entry={dlg.entry} exitId={dlg.exitId} onOpenChange={(o) => !o && setDlg(null)} />}
     </div>
   );
 }

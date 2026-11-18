@@ -18,7 +18,7 @@ import { modeOf } from "@/lib/relay-bridge";
 import { useNow } from "@/lib/time";
 import { ModeEditor, PortEditor } from "./relay-editors";
 import { waysDemo } from "./ways-demo";
-import { RemoveRelay, useCountryOf, type RelayRuns } from "./relays";
+import { useCountryOf, useRemoveRelay, type RelayRuns } from "./relays";
 
 // The servers of a relay pair (the board's .nq-sv rows): the profile and its port on the entry, its state, a menu of what to do with it,
 // the reason when it does not work, and on a click the line from people through the entry to the exit. The way of the whole pair and
@@ -62,7 +62,10 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
   const t = useT();
   const fmt = useFmt();
   const [open, setOpen] = useState(!!start);
-  const [menu, setMenu] = useState(false);
+  // "Remove…" asks "Really remove?" in the menu itself, the way the board has it; closing the menu takes the question back
+  const [menu, setMenu] = useState<"" | "open" | "ask">("");
+  const ask = menu === "ask";
+  const menuOpen = menu !== "";
   // a relay that was just made grows into its row and sweeps (the board's nd-new): decided when the row first appears, the sweep takes the mark
   const [grow] = useState(() => effectsFor("create") && isFresh("relay", r.id));
   const fresh = useFresh<HTMLLIElement>("relay", r.id);
@@ -103,14 +106,14 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
   const chk = r.check?.leg?.status === "fail" && reverse ? { ...h2, cls: "" as const, word: t("wy.hop.bridge") } : h2;
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!menu) return;
-    const off = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    if (!menuOpen) return;
+    const off = (e: KeyboardEvent) => e.key === "Escape" && setMenu("");
     document.addEventListener("keydown", off);
     menuRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
     return () => document.removeEventListener("keydown", off);
-  }, [menu]);
+  }, [menuOpen]);
   const pick = (f: (() => void) | undefined) => () => {
-    setMenu(false);
+    setMenu("");
     f?.();
   };
 
@@ -134,15 +137,15 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
               type="button"
               aria-label={t("wy.mn.aria", { name: r.profileName })}
               aria-haspopup="menu"
-              aria-expanded={menu}
-              onClick={() => setMenu((x) => !x)}
+              aria-expanded={menuOpen}
+              onClick={() => setMenu((x) => (x ? "" : "open"))}
               className="grid size-8 place-items-center rounded-ctl text-sec transition-colors duration-150 ease-out hover:bg-step hover:text-fg aria-expanded:bg-step aria-expanded:text-fg"
             >
               <Icon name="ellipsis" size={18} />
             </button>
-            {menu && (
+            {menuOpen && (
               <>
-                <div className="wy-mnb" onClick={() => setMenu(false)} />
+                <div className="wy-mnb" onClick={() => setMenu("")} />
                 <div ref={menuRef} className="wy-mn" role="menu">
                   <button type="button" role="menuitem" disabled={!!busy} onClick={pick(onCheck)}>
                     {t("relay.check")}
@@ -162,8 +165,8 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
                   <button type="button" role="menuitem" onClick={pick(() => setEdit("mode"))}>
                     {t("wy.mn.way")}
                   </button>
-                  <button type="button" role="menuitem" className="risk" disabled={!!busy} onClick={pick(onRemove)}>
-                    {t("wy.mn.remove")}
+                  <button type="button" role="menuitem" className={ask ? "ask" : "risk"} disabled={!!busy} onClick={ask ? pick(onRemove) : () => setMenu("ask")}>
+                    {ask ? t("wy.mn.sure") : t("wy.mn.remove")}
                   </button>
                 </div>
               </>
@@ -246,7 +249,7 @@ export function RelayRows({ list, runs, readOnly, people, onOther }: { list: rea
   const t = useT();
   const ccOf = useCountryOf();
   const nowS = Math.floor(useNow(15_000) / 1000);
-  const [removing, setRemoving] = useState<RelayMsg | null>(null);
+  const remove = useRemoveRelay();
   return (
     <>
       {/* the owner's calls: a reader (helper, observer) sees the state, with one line saying who changes it */}
@@ -266,13 +269,12 @@ export function RelayRows({ list, runs, readOnly, people, onOther }: { list: rea
             onCheck={() => runs.check(r)}
             onOn={() => runs.on(r)}
             onOff={() => runs.off(r)}
-            onRemove={() => setRemoving(r)}
+            onRemove={() => void remove(r)}
             onOther={onOther}
             readOnly={readOnly}
           />
         ))}
       </ul>
-      {removing && <RemoveRelay r={removing} onClose={() => setRemoving(null)} />}
     </>
   );
 }

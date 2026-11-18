@@ -345,7 +345,7 @@ export function WaysView(p: WaysViewProps) {
               other={p.entryFor(openPair.exit.nodeId, openPair.pair.entryId)}
               onClose={() => setOpen("")}
               onMore={() => p.openWay(openPair.exit.nodeId, openPair.pair.entryId)}
-              onOther={() => p.openWay(openPair.exit.nodeId, p.entryFor(openPair.exit.nodeId, openPair.pair.entryId))}
+              onOther={() => p.openWay(openPair.exit.nodeId)}
             />
           )}
         </div>

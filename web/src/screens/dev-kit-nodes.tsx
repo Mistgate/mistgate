@@ -9,15 +9,16 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { InboundState, NodeShareMode, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
-import { isLang, setLang, useLang, useT } from "@/i18n";
+import { useLang, useT } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
+import { applyScene, SceneKeep } from "./dev-kit-scene";
 import { countryQuery } from "@/lib/globalping";
 import { checksQuery, doctorQuery } from "@/lib/health";
 import { awaitingQuery } from "@/lib/integrations";
 import { nodeQuery, nodesQuery, overviewQuery, userCountQuery } from "@/lib/queries";
 import { relaysQuery } from "@/lib/relay";
 import { meQuery } from "@/lib/session";
-import { setTheme, useTheme } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 import { updatesQuery } from "@/lib/updates";
 import type { WayFilter } from "@/lib/fleet-map";
 import { AddNodeProvider } from "@/components/add-node";
@@ -337,10 +338,7 @@ export function NodesPage() {
   const params = new URLSearchParams(location.search);
   const state = params.get("state") ?? "list";
   const [qc] = useState(() => {
-    const lang = params.get("lang");
-    if (isLang(lang)) setLang(lang);
-    const theme = params.get("theme");
-    if (theme === "light" || theme === "dark") setTheme(theme);
+    applyScene(params);
     if (params.get("fx") === "1") setEffectsEnabled(true);
     return seeded(state, roleOfScene(state, params.get("role")), edgeOfScene(state));
   });
@@ -352,9 +350,11 @@ export function NodesPage() {
     <QueryClientProvider client={qc}>
       <ToastProvider>
         <AddNodeProvider>
-          <ShellLayout current="nodes" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
-            <NodesScreen demo={job ? { selecting: true, ticked: picked } : demoFor(state)} />
-          </ShellLayout>
+          <SceneKeep>
+            <ShellLayout current="nodes" fab={<ChatButton onClick={() => {}} running={false} unread={0} />}>
+              <NodesScreen demo={job ? { selecting: true, ticked: picked } : demoFor(state)} />
+            </ShellLayout>
+          </SceneKeep>
           {job && (
             <BulkBar
               nodes={picked.map((p) => ({ id: p, countryCode: all.find((x) => id(x.n) === p)!.cc }))}

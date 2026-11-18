@@ -7,6 +7,7 @@ import { FleetShowcase } from "./dev-kit-fleet-map";
 // The fleet map on the dev kit's 11-node fleet (ru and ru2 are entries relaying to be and tr): the cards, the drawers and
 // the relay drawing, with the calls the owner would make. What a pointer does on the canvas is checked in a real browser.
 
+const nav = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, params, search, className }: { children?: React.ReactNode; to: string; params?: { id: string }; search?: Record<string, string>; className?: string }) => (
     <a href={`${to.replace("$id", params?.id ?? "")}${search ? `?${new URLSearchParams(search)}` : ""}`} className={className}>
@@ -14,7 +15,7 @@ vi.mock("@tanstack/react-router", () => ({
     </a>
   ),
   useSearch: () => ({}),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => nav,
 }));
 
 beforeAll(() => {
@@ -30,6 +31,7 @@ beforeEach(() => {
   window.history.replaceState({}, "", "/");
 });
 afterEach(() => {
+  nav.mockClear();
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
@@ -119,7 +121,9 @@ describe("the fleet map", () => {
     expect(aside()!.textContent).toContain("Turn off");
     await click([...aside()!.querySelectorAll("button")].find((b) => b.textContent === "Add a server…"));
     await settle();
-    expect(dialog()!.textContent).toContain("Relay through ru");
+    // the wizard of be's page, at the servers of ru (the old dialog is gone)
+    expect(dialog()).toBeNull();
+    expect(nav).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_be" }, search: { tab: "ways", add: "via:nod_ru" } });
   });
 
   it("the search box finds a node by name and selects it", async () => {
@@ -149,12 +153,12 @@ describe("the fleet map", () => {
 });
 
 describe("the owner draws and detaches relays", () => {
-  it("dragging Relay from here onto another node opens the relay dialog with the entry and that exit's servers", async () => {
+  it("dragging Relay from here onto another node opens the wizard of the node dropped on (the exit), at the servers of the one dragged (the entry)", async () => {
     await mount();
     await drop(body("node:nod_nl"), "nod_ru");
     await settle();
-    expect(dialog()!.textContent).toContain("Relay through ru");
-    expect(dialog()!.textContent).toContain("nl");
+    expect(dialog()).toBeNull();
+    expect(nav).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_nl" }, search: { tab: "ways", add: "via:nod_ru" } });
   });
 
   it("refuses the same node, a node with nothing deployed, and says why", async () => {
@@ -163,18 +167,17 @@ describe("the owner draws and detaches relays", () => {
     expect(document.body.textContent).toContain("A relay goes to another node.");
     await drop(body("node:nod_fresh"), "nod_ru");
     expect(document.body.textContent).toContain("Nothing is deployed on that node yet.");
-    expect(dialog()?.textContent ?? "").not.toContain("Relay through ru");
+    expect(nav).not.toHaveBeenCalled();
   });
 
-  it("the drawer's Add a relay from this node opens the dialog for it, a relay is removed after a confirm", async () => {
+  it("the drawer's Add a relay from this node goes to the list of the ways, a relay is removed after a confirm", async () => {
     await mount();
     await act(async () => card("node:nod_nl")!.focus());
     await settle();
     await click([...aside()!.querySelectorAll("button")].find((b) => b.textContent === "Add a relay from this node…"));
     await settle();
-    expect(dialog()!.textContent).toContain("Relay through nl");
-    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel" || b.textContent === "Close"));
-    await settle();
+    expect(dialog()).toBeNull();
+    expect(nav).toHaveBeenCalledWith({ to: "/nodes", search: { view: "ways" } });
     await click(document.querySelector('[data-gedge="relay:nod_ru2:nod_tr"]'));
     await settle();
     await click([...aside()!.querySelectorAll("button")].find((b) => b.textContent === "Remove…"));

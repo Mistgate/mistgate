@@ -13,6 +13,9 @@ describe("validateNodeSearch", () => {
     expect(validateNodeSearch({ tab: "ways", way: "direct", add: "1" })).toEqual({ tab: "ways", way: "direct", add: "1" });
     expect(validateNodeSearch({ tab: "ways", add: 1 })).toEqual({ tab: "ways", add: "1" });
     expect(validateNodeSearch({ tab: "ways", add: "via:nod_msk1" })).toEqual({ tab: "ways", add: "via:nod_msk1" });
+    // one server of that entry, dragged on the graph
+    expect(validateNodeSearch({ tab: "ways", add: "via:nod_msk1/inb_h" })).toEqual({ tab: "ways", add: "via:nod_msk1/inb_h" });
+    expect(validateNodeSearch({ tab: "ways", add: "via:nod_msk1/inb_h/x" })).toEqual({ tab: "ways" });
     // the IPv6 entry's dialog: Reachability and the alerts link here
     expect(validateNodeSearch({ tab: "ways", way: "ipv6", add: "ipv6" })).toEqual({ tab: "ways", way: "ipv6", add: "ipv6" });
     expect(validateNodeSearch({ tab: "ways", way: "sideways", add: "prf_1" })).toEqual({ tab: "ways" });

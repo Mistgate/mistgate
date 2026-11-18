@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { halo } from "@/components/fx/halo";
+import { Flourish } from "@/components/fx/flourish";
 import { Button } from "@/components/ui/button";
 import { QueryError } from "@/components/ui/query-error";
 import { StatusPill } from "@/components/ui/status";
@@ -167,6 +168,7 @@ function WarpCardBody({ nodeId, nodeName, retired, down, profiles }: { nodeId: s
 
   return (
     <section ref={card} className={cx(frame, just && "just")} aria-label="WARP" aria-busy={reg !== null}>
+      {just && <Flourish x={43} y={39} />}
       <Head
         title={t("np.wp.title")}
         sub={sub}

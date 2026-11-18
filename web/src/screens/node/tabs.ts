@@ -20,7 +20,7 @@ export type NodeSearch = { tab?: NodeTab; sv?: Exclude<ServerSection, "node">; w
  * Search-param validation of /nodes/$id: only a known tab other than the first is kept in the URL. `add` (a profile id,
  * on the profiles tab) opens the add-profile dialog with that profile chosen: the profile page links here. On the ways
  * tab `way` is the open lane (direct, ipv6, via:<entry>, out:<exit>) and `add` the "New way in" dialog: "1", or
- * "via:<entry>" straight at that entry's servers, or "ipv6" the IPv6 entry's dialog (Reachability and the alerts link there). The history
+ * "via:<entry>" straight at that entry's servers ("via:<entry>/<server>" with that one server only), or "ipv6" the IPv6 entry's dialog (Reachability and the alerts link there). The history
  * tab keeps its part (`view`, the events without one) and, on the events, where their log is read from (`before`) and
  * the rows per page (`size`).
  */
@@ -37,7 +37,7 @@ const validateTab = (s: Record<string, unknown>): NodeSearch => {
     return { tab, ...(before ? { before } : {}), ...(size ? { size } : {}) };
   }
   if (tab === "ways") {
-    const add = s.add === "1" || s.add === 1 ? "1" : typeof s.add === "string" && (s.add === "ipv6" || /^via:[\w-]+$/.test(s.add)) ? s.add : undefined;
+    const add = s.add === "1" || s.add === 1 ? "1" : typeof s.add === "string" && (s.add === "ipv6" || /^via:[\w-]+(\/[\w-]+)?$/.test(s.add)) ? s.add : undefined;
     return { tab, ...(isWayId(s.way) ? { way: s.way } : {}), ...(add ? { add } : {}), ...(s.view === "graph" || s.view === "list" ? { view: s.view } : {}), ...(s.map === "1" || s.map === 1 ? { map: "1" as const } : {}), ...(s.full === "1" || s.full === 1 ? { full: "1" as const } : {}) };
   }
   if (tab === "server") return serverSections.includes(s.sv as ServerSection) && s.sv !== "node" ? { tab, sv: s.sv as Exclude<ServerSection, "node"> } : { tab };

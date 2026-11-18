@@ -28,7 +28,8 @@ import { nodeQuery } from "@/lib/queries";
 import { relaysQuery, type RelayMsg } from "@/lib/relay";
 import { routeMap } from "@/lib/route-map";
 import { hintOf } from "@/lib/ways";
-import { AddRelayDialog, RemoveRelay, ChangeRelayPort, useRelayRuns, type Entry } from "@/screens/node/relays";
+import { useOpenWizard } from "@/screens/node/relay-open";
+import { RemoveRelay, ChangeRelayPort, useRelayRuns, type Entry } from "@/screens/node/relays";
 import { usePortCheck } from "@/screens/node/ports";
 import { useInSubscriptions } from "@/screens/node/subs-switches";
 import { useWays } from "@/screens/node/ways";
@@ -57,7 +58,10 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
   const relaysQ = useQuery({ ...relaysQuery(""), enabled: owner });
   const checks = useQuery(checksQuery(""));
   const asked = useQuery({ ...countryQuery, enabled: owner }).data?.country;
-  const [dlg, setDlg] = useState<Dialog | null>(null);
+  const [dlg, setDlg] = useState<Exclude<Dialog, { kind: "draw" }> | null>(null);
+  // a relay is drawn in the wizard on the exit's page; an entry with no exit chosen goes to the list of the ways, where the exits wait for one
+  const openWizard = useOpenWizard();
+  const onDialog = (d: Dialog) => (d.kind !== "draw" ? setDlg(d) : d.exitId ? openWizard(d.exitId, d.entry.id) : void navigate({ to: "/nodes", search: { view: "ways" } }));
   const [multi, setMulti] = useState<string[]>([]);
   const [wireId, setWireId] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -95,7 +99,7 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
     const why = relayPairRefusal(id, target.nodeId, nodesIn);
     if (why) return toast.error(t(`fm.refuse.${why}` as MessageKey));
     const entry = nodeById(id)!;
-    setDlg({ kind: "draw", entry: { id, name: entry.name, cc: entry.countryCode }, exitId: target.nodeId });
+    onDialog({ kind: "draw", entry: { id, name: entry.name, cc: entry.countryCode }, exitId: target.nodeId });
   };
   const overNode = (e: DragEvent) => {
     if (owner && e.dataTransfer.types.includes(NODE)) e.preventDefault();
@@ -256,14 +260,13 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
           // over the canvas's right edge, under its toolbar: the map keeps its size and its fit
           <aside className="absolute inset-e-3 top-16 z-20 flex max-h-[calc(100%-76px)] w-80 max-w-[calc(100%-24px)] animate-[mg-up_0.25s_var(--e)_both] flex-col overflow-hidden rounded-card border border-line bg-surface-2 max-md:inset-s-3 max-md:top-auto max-md:bottom-11 max-md:w-auto" aria-label={t("fm.d.actions")}>
             {wire && wire.kind === "relay" && wire.relays ? (
-              <WireDrawer key={wire.id} wire={wire} nodes={nodes} owner={owner} onDialog={setDlg} onClose={() => setWireId(null)} />
+              <WireDrawer key={wire.id} wire={wire} nodes={nodes} owner={owner} onDialog={onDialog} onClose={() => setWireId(null)} />
             ) : selected ? (
-              <NodeDrawer key={selected.nodeId} id={selected.nodeId} node={nodeById(selected.nodeId)!} fm={selected} country={country} owner={owner} relays={relaysQ.data ?? []} onDialog={setDlg} onClose={() => go({ view: "map" })} />
+              <NodeDrawer key={selected.nodeId} id={selected.nodeId} node={nodeById(selected.nodeId)!} fm={selected} country={country} owner={owner} relays={relaysQ.data ?? []} onDialog={onDialog} onClose={() => go({ view: "map" })} />
             ) : null}
           </aside>
         )}
       </div>
-      {owner && dlg?.kind === "draw" && <AddRelayDialog key={`${dlg.entry.id}/${dlg.exitId ?? ""}`} open onOpenChange={() => setDlg(null)} entry={dlg.entry} exitId={dlg.exitId} />}
       {owner && dlg?.kind === "remove" && <RemoveRelay r={dlg.r} onClose={() => setDlg(null)} />}
       {owner && dlg?.kind === "port" && <ChangeRelayPort r={dlg.r} onClose={() => setDlg(null)} />}
     </div>
