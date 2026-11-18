@@ -104,7 +104,8 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   useEffect(() => {
     const el = list.current;
     if (el && growth >= 0) el.scrollTop = el.scrollHeight;
-  }, [growth]);
+    // coming back from the list of conversations lands on the end of the one that is open
+  }, [growth, history]);
 
   // the answer is revealed word by word after its text has arrived (useSmoothText): stay at the bottom while it grows,
   // unless the admin has scrolled up to read

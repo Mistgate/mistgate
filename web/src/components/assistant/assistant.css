@@ -1132,11 +1132,6 @@ button.as-rs[aria-expanded="true"] .as-i {
   text-decoration: underline dotted var(--faint);
   text-underline-offset: 4px;
 }
-.as-pl .as-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 .as-w {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
@@ -1154,12 +1149,6 @@ button.as-rs[aria-expanded="true"] .as-i {
   gap: 8px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
-}
-.as-pa .as-ex {
-  margin-inline-end: auto;
-  align-self: center;
-  font-size: 11px;
-  color: var(--muted);
 }
 .as-ps {
   display: flex;
