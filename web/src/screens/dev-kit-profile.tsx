@@ -7,6 +7,7 @@ import { PageTitle } from "@/components/ui/bits";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { isLang, setLang, useLang } from "@/i18n";
 import { awg as awgApi, profiles as profilesApi } from "@/lib/api";
@@ -44,18 +45,7 @@ const SCHEMAS: Record<string, string> = {
   hysteria2: fixture.hy2,
   vless: fixture.vless,
   trusttunnel: fixture.trusttunnel,
-  awg: JSON.stringify({
-    type: "object",
-    properties: {
-      name: { type: "string", title: "Name", "x-group": "basics", "x-order": 5 },
-      version: { type: "string", enum: ["2.0", "3.1"], title: "Protocol version", "x-group": "basics", "x-widget": "segmented", "x-order": 10, "x-critical": true },
-      port: { type: "integer", title: "UDP port", "x-group": "basics", "x-order": 20, "x-critical": true },
-      mtu: { type: "integer", title: "MTU", "x-group": "advanced", "x-order": 30 },
-      keepalive: { type: "integer", title: "Keepalive", "x-unit": "s", "x-group": "advanced", "x-order": 40 },
-      egress: { type: "string", enum: ["direct", "warp"], "x-enum-labels": { direct: "From the node's address", warp: "Through WARP" }, title: "Exit", "x-group": "basics", "x-widget": "segmented", "x-order": 25 },
-      obfuscation: { type: "object", title: "Obfuscation", "x-group": "obfuscation", "x-order": 50, properties: { preset: { type: "string", enum: ["dns", "quic"], title: "Mimicry" }, jc: { type: "integer", title: "Jc" } } },
-    },
-  }),
+  awg: fixture.awg,
   mtproto: JSON.stringify({
     type: "object",
     properties: {
@@ -65,12 +55,57 @@ const SCHEMAS: Record<string, string> = {
   }),
 };
 
+/** AmneziaWG's settings as the panel hands them out (the values are made up: the header protection key is the mask the panel sends instead of a secret). */
+function awgSettings(version: "3.1" | "2.0") {
+  const v31 = version === "3.1";
+  return {
+    version,
+    port: v31 ? 47213 : 33183,
+    mtu: 1280,
+    egress: "direct",
+    subnet4: "10.66.4.0/22",
+    subnet6: "fd66:66:0:1::/64",
+    obfuscation: {
+      preset: "dns",
+      domain: "",
+      jc: 5,
+      jmin: 24,
+      jmax: 71,
+      s1: 21,
+      s2: 21,
+      s3: v31 ? 21 : 0,
+      s4: v31 ? 21 : 0,
+      h1: v31 ? "1" : "1180000-1190000",
+      h2: v31 ? "2" : "1200000-1210000",
+      h3: v31 ? "3" : "1220000-1230000",
+      h4: v31 ? "4" : "1240000-1250000",
+      i1: "<b 0x1a2b3c4d><r 16><t>",
+      i2: "",
+      i3: "",
+      i4: "",
+      i5: "",
+      per_device_signature: true,
+      signature_seed: "9f2c",
+      header_protection_key: v31 ? "••••" : "",
+      random_trailers: v31,
+      disable_cookies: false,
+      content_padding_addition: v31 ? "16-64" : "",
+      rekey_after_time: v31 ? "100-140" : "",
+      rekey_timeout: v31 ? "4-6" : "",
+      reject_after_time: v31 ? "170-190" : "",
+      keepalive_timeout: v31 ? "9-11" : "",
+      max_handshake_attempts: v31 ? "18-22" : "",
+      persistent_keepalive: v31 ? "31" : "25",
+    },
+  };
+}
+
 const SETTINGS: Record<string, string> = {
   hy1: JSON.stringify({ port: 443, hop: { from: 0, to: 0 }, tls_mode: "acme_domain", obfs: { type: "salamander", password: "••••" }, masquerade: { type: "decoy" }, up_mbps: 0, udp: true }),
   hy2: JSON.stringify({ port: 8443, hop: { from: 0, to: 0 }, tls_mode: "acme_domain", obfs: { type: "salamander", password: "••••" }, masquerade: { type: "decoy" }, up_mbps: 0, udp: true }),
   hy3: JSON.stringify({ port: 2053, hop: { from: 0, to: 0 }, tls_mode: "self_signed", obfs: { type: "none", password: "" }, masquerade: { type: "decoy" }, up_mbps: 0, udp: true }),
-  aw1: JSON.stringify({ name: "AWG 3.1", version: "3.1", port: 47213, mtu: 1280, keepalive: 31, egress: "direct", obfuscation: { preset: "dns", jc: 5 } }),
-  aw2: JSON.stringify({ name: "AWG 2.0", version: "2.0", port: 33183, mtu: 1280, keepalive: 25, egress: "direct", obfuscation: { preset: "quic", jc: 5 } }),
+  aw1: JSON.stringify(awgSettings("3.1")),
+  aw2: JSON.stringify(awgSettings("2.0")),
   tg1: JSON.stringify({ port: 8443, fake_tls: { kind: "own", domain: "" } }),
 };
 
@@ -144,13 +179,68 @@ function fakeCalls(variant: string) {
   if (variant.split(".").includes("panelold")) noteServerVersion(new Headers({ "x-mistgate-version": "0.1.71" }));
   const errors = variant.split(".").includes("errors") ? [{ pointer: "/port", code: "invalid", message: "Port must be from 1 to 65535", params: {} }] : [];
   const warnings = variant.split(".").includes("warns") ? [{ pointer: "/port", code: "preset_port", message: "The look of DNS is usually on port 53", params: { preset: "dns" } }] : [];
-  p.previewProfile = async () => ({ errors, warnings, clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined });
+  // AmneziaWG's preview is the .conf of a device, the remarks and the score of what the form holds now (the panel computes them; here the board's rules)
+  const awgView = (json: string) => {
+    const st = JSON.parse(json) as Record<string, unknown>;
+    const ob = (st.obfuscation ?? {}) as Record<string, unknown>;
+    const v31 = st.version !== "2.0";
+    const ka = Number(String(ob.persistent_keepalive ?? "").split("-")[0]) || 0;
+    const dnsOff = ob.preset === "dns" && Number(st.port) !== 53;
+    const warns = [
+      ...(ka > 30 ? [{ pointer: "/obfuscation/persistent_keepalive", code: "keepalive_over_nat", message: "A keepalive of 30 s is longer than the UDP timeout of many NATs", params: { max: String(ka) } }] : []),
+      ...(dnsOff ? [{ pointer: "/port", code: "preset_port", message: "DNS traffic is normally on port 53", params: { preset: "dns", ports: "53" } }] : []),
+    ];
+    const items = [
+      ...(ob.per_device_signature === true ? [{ code: "per_device_signature", delta: 3, pointer: "/obfuscation/per_device_signature", params: {} }] : []),
+      ...(ka > 30 ? [{ code: "keepalive_over_nat", delta: -5, pointer: "/obfuscation/persistent_keepalive", params: {} }] : []),
+      ...(dnsOff ? [{ code: "preset_port", delta: -5, pointer: "/port", params: { preset: "dns", ports: "53" } }] : []),
+    ];
+    const base = v31 ? 95 : 65;
+    const conf = `[Interface]
+PrivateKey = ••••
+Address = 10.66.4.x/32
+MTU = ${String(st.mtu)}
+Jc = ••••
+Jmin … I5 = ••••
+
+[Peer]
+PublicKey = ••••
+Endpoint = de1.example.org:${String(st.port)}
+PersistentKeepalive = ${String(ob.persistent_keepalive ?? "")}`;
+    return {
+      errors,
+      warnings: warns,
+      clientPreview: conf,
+      clientLabel: "AmneziaVPN · .conf",
+      formats: [{ format: SubFormat.MIHOMO_YAML, ok: true, note: "" }],
+      obfuscationScore: { value: items.reduce((n, i) => n + i.delta, base), base, tier: v31 ? "header_protection" : "ranges", items },
+    };
+  };
+  p.previewProfile = async (req: { protocol: string; settingsJson: string }) =>
+    req.protocol === "awg"
+      ? awgView(req.settingsJson)
+      : { errors, warnings, clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined };
   p.updateProfile = async () => ({ profile: undefined, impact: undefined });
   // AmneziaWG's panel asks for the mimicry cards (without an answer the page says it cannot reach the panel)
   const a = awgApi as unknown as Record<string, unknown>;
   const preset = (id: string, name: string, usesDomain: boolean, ports: number[], varies: boolean) => ({ id, name, versions: ["3.1", "2.0"], usesDomain, naturalPorts: ports, variesPerDevice: varies });
-  a.listMimicryPresets = async () => ({ presets: [preset("quic", "QUIC", true, [443], true), preset("dns", "DNS", true, [53], true), preset("stun", "STUN", false, [], false), preset("custom", "Custom", false, [], false)], domains: ["cloudflare.com", "example.com"] });
-  a.generateObfuscation = async () => ({ obfuscationJson: JSON.stringify({ preset: "dns", per_device_signature: true }) });
+  a.listMimicryPresets = async () => ({
+    presets: [
+      preset("dns", "DNS", true, [53], true),
+      preset("quic", "QUIC", true, [443], true),
+      preset("curl_quic", "QUIC (curl)", true, [443], true),
+      preset("stun", "STUN", false, [], false),
+      preset("webrtc", "WebRTC", false, [], false),
+      preset("sip", "SIP", true, [5060], true),
+      preset("ntp", "NTP", false, [], false),
+      preset("rtp", "RTP", false, [], false),
+      preset("ssdp", "SSDP", false, [], false),
+      preset("dtls", "DTLS", false, [], false),
+      preset("custom", "Custom", false, [], false),
+    ],
+    domains: ["cdn.example.org", "static.example.net", "www.example.com"],
+  });
+  a.generateObfuscation = async () => ({ obfuscationJson: JSON.stringify({ preset: "dns", per_device_signature: true, jc: 7, jmin: 30, jmax: 80, s1: 24, s2: 24, s3: 24, s4: 24, i1: "<b 0x5e6f7a8b><r 16><t>", signature_seed: "4d1e" }) });
 }
 
 /** The private query cache of a scene (exported for its smoke test). */
@@ -220,7 +310,20 @@ export const frames: Frame[] = [
   { id: "profile-hy3", state: "hy3.settings", title: "On no node: the verdict says so", w: 1440, h: 1000 },
   { id: "profile-vl3", state: "vl3.settings", title: "In no group: the verdict says so", w: 1440, h: 1200 },
   { id: "profile-vl2", state: "vl2.settings", title: "VLESS TCP", w: 1440, h: 1400 },
-  { id: "profile-aw1", state: "aw1.settings", title: "AmneziaWG 3.1", w: 1440, h: 1400 },
+  { id: "profile-aw1", state: "aw1.settings", title: "AmneziaWG 3.1: Основное, Маскировка и обход, Сеть; the remarks have their buttons, the score is a pill in the second card", w: 1440, h: 2000 },
+  { id: "profile-aw1-light", state: "aw1.settings", title: "AmneziaWG on the light theme", w: 1440, h: 2000, params: "&theme=light" },
+  { id: "profile-aw1-phone", state: "aw1.settings", title: "AmneziaWG on a phone, 400 wide", w: 400, h: 3400 },
+  { id: "profile-aw1-fa", state: "aw1.settings", title: "AmneziaWG right to left (fa)", w: 1440, h: 2000, params: "&lang=fa" },
+  { id: "profile-aw2", state: "aw2.settings", title: "AmneziaWG 2.0: the version's card is picked and says what 2.0 is for, the score is lower, the oldest clients are other ones", w: 1440, h: 2000 },
+  { id: "profile-aw1-score", state: "aw1.settings.score", title: "AmneziaWG: what the score is made of (the pill opens the card over the form)", w: 1440, h: 1500 },
+  { id: "profile-aw1-adv", state: "aw1.settings.adv", title: "AmneziaWG: the fold of the block, the values are dots", w: 1440, h: 2600 },
+  { id: "profile-aw1-show", state: "aw1.settings.adv.show", title: "AmneziaWG: \"Show values\" brings the values into boxes", w: 1440, h: 2600 },
+  { id: "profile-aw1-conf", state: "aw1.settings.adv.conf", title: "AmneziaWG: \"Fill from .conf\"", w: 1440, h: 2700 },
+  { id: "profile-aw1-net", state: "aw1.settings.net", title: "AmneziaWG: the fold of the network, the client networks are kept", w: 1440, h: 1700 },
+  { id: "profile-aw-free", state: "aw1.settings.net.free", title: "AmneziaWG on no node: the client networks can be typed", w: 1440, h: 1700 },
+  { id: "profile-aw1-warp", state: "aw1.settings.warp", title: "AmneziaWG through WARP: the nodes without it are named, the copy is \"without WARP\"", w: 1440, h: 1700 },
+  { id: "profile-aw1-dirty", state: "aw1.settings.dirty", title: "AmneziaWG: a change typed", w: 1440, h: 2000 },
+  { id: "profile-aw1-readonly", state: "aw1.settings", title: "AmneziaWG seen by an observer", w: 1440, h: 2000, params: "&role=readonly" },
   { id: "profile-tt1", state: "tt1.settings", title: "TrustTunnel", w: 1440, h: 1200 },
   { id: "profile-tg1", state: "tg1.settings", title: "MTProto", w: 1440, h: 1000 },
   ...tabFrames,

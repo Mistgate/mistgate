@@ -1,18 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { FieldError, ProfileImpact } from "@/gen/mistgate/admin/v1/profile_pb";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { reloadPage, useStaleVersion } from "@/lib/stale";
-import { randomPort } from "@/lib/awg";
 import { VlessHy2Docs } from "@/screens/node/inbound-check";
 import { LossyNotice } from "@/screens/node/port-lossy";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { wayOf } from "@/screens/users/groups";
 import { useTx, type Tx } from "@/screens/users/t";
 import { G } from "@/screens/users/user-bits";
-import { AwgPanel, awgHidden, handTyped, warnText } from "./awg-panel";
+import { handTyped, warnText } from "./awg-panel";
+import { AwgSettings } from "./awg-settings";
+import { asVersion, minClients, type AwgVersion } from "@/lib/awg";
 import { ConfLine } from "./conf-preview";
 import { EgressNote } from "./egress-note";
 import { dropsOf, dropWords, nameOf } from "./formats";
@@ -31,7 +32,7 @@ import "./profiles.css";
 import "./profile-page.css";
 import "./profile-settings.css";
 
-type Remark = { id: string; g: "bad" | "part"; text: string; pointer: string };
+type Remark = { id: string; g: "bad" | "part"; text: string; pointer: string; why?: string; fix?: { label: string; crit?: boolean; apply: () => void } };
 
 /** Where a remark's "To the field" goes: the row of the field whose pointer it is (or the closest one above it). */
 function goField(fields: readonly Field[], pointer: string) {
@@ -39,7 +40,7 @@ function goField(fields: readonly Field[], pointer: string) {
   while (p) {
     const f = fields.find((x) => x.key === p);
     if (f) {
-      const el = document.querySelector<HTMLElement>(`.pp-row[data-k="${CSS.escape(f.id)}"]`);
+      const el = document.querySelector<HTMLElement>(`.pp-row[data-k="${CSS.escape(f.id)}"], .pp-hgr [data-k="${CSS.escape(f.id)}"], .pf-nets [data-k="${CSS.escape(f.id)}"]`);
       if (el) {
         el.scrollIntoView({ block: "center", behavior: "smooth" });
         el.classList.remove("flash");
@@ -63,14 +64,21 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
   const { info } = ctx.data;
   const { settings, groups, fields, problems, preview, count } = form;
 
+  const [why, setWhy] = useState("");
+  // AmneziaWG keeps most of its fields in folds: a remark's "To the field" opens the fold first
+  const reveal = useRef<((pointer: string) => boolean) | null>(null);
+  const toField = (pointer: string) => {
+    const wait = reveal.current?.(pointer) ?? false;
+    if (wait) setTimeout(() => goField(fields, pointer), 120);
+    else goField(fields, pointer);
+  };
   const isAwg = info.id === "awg";
   const locked = isAwg && ctx.data.inbounds.length > 0;
-  const readOnlyIds = useMemo<ReadonlySet<string>>(() => (locked ? new Set(["subnet4", "subnet6"]) : new Set()), [locked]);
   const isVless = info.id === "vless";
   const vlessHiddenIds = useMemo<ReadonlySet<string>>(() => (isVless ? vlessHidden(fields, settings) : new Set()), [isVless, fields, settings]);
   const isMtproto = info.id === "mtproto";
   const mtprotoHiddenIds = useMemo<ReadonlySet<string>>(() => (isMtproto ? mtprotoHidden(fields, settings) : new Set()), [isMtproto, fields, settings]);
-  const hidden = isAwg ? awgHidden : isVless && vlessHiddenIds.size > 0 ? vlessHiddenIds : isMtproto && mtprotoHiddenIds.size > 0 ? mtprotoHiddenIds : undefined;
+  const hidden = isVless && vlessHiddenIds.size > 0 ? vlessHiddenIds : isMtproto && mtprotoHiddenIds.size > 0 ? mtprotoHiddenIds : undefined;
   const nodeIds = [...new Set(ctx.data.inbounds.map((i) => i.nodeId))];
   const extra = (f: Field): ReactNode => {
     const note = (text: ReactNode, tone?: "warn") => <span className={cx("pp-q1", tone === "warn" && "part")}>{text}</span>;
@@ -82,14 +90,6 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
         </>
       );
     }
-    if (isAwg && f.id === "port") {
-      return (
-        <button type="button" className="an-lk pp-more" onClick={() => form.edit(setAt(settings, ["port"], randomPort()))}>
-          {t("awg.port.random")}
-        </button>
-      );
-    }
-    if (locked && (f.id === "subnet4" || f.id === "subnet6")) return note(t("awg.subnet.locked"), "warn");
     if (f.id === "egress" && getAt(settings, f.path) === "warp") return <EgressNote nodeIds={nodeIds} />;
     // behind a CDN the mode "auto" is sent to clients as packet-up (the panel does it too)
     if (isVless && f.id === "xhttp.mode" && getAt(settings, ["security"]) === "tls" && String(getAt(settings, ["cdn", "host"]) ?? "").trim() !== "" && getAt(settings, f.path) === "auto") return note(t("profiles.vless.mode.cdn"));
@@ -110,7 +110,17 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
   const onChange = isAwg ? (n: typeof settings) => form.edit(handTyped(settings, n)) : isVless ? (n: typeof settings) => form.edit(vlessEdited(settings, n)) : form.edit;
 
   // the remarks: what the form cannot be saved with, then what the server only warns about
-  const warns: Remark[] = (preview.data?.warnings ?? []).map((w: FieldError, i) => ({ id: `w${i}`, g: "part", text: warnText(t, w), pointer: w.pointer }));
+  const warns: Remark[] = (preview.data?.warnings ?? []).map((w: FieldError, i) => {
+    const r: Remark = { id: `w${i}`, g: "part", text: warnText(t, w), pointer: w.pointer };
+    // AmneziaWG's two remarks the board has a button for: the keepalive under the NAT timeout, the look's own port
+    if (isAwg && w.code === "keepalive_over_nat") return { ...r, why: t("awg.why.keepalive_over_nat"), fix: { label: t("awg.fix.set", { n: 25 }), apply: () => form.edit(setAt(settings, ["obfuscation", "persistent_keepalive"], "25")) } };
+    if (isAwg && w.code === "preset_port") {
+      const port = String(w.params.ports ?? "").split(",")[0]?.trim() ?? "";
+      const preset = t.opt(`awg.preset.${w.params.preset}`) ?? w.params.preset ?? "";
+      return { ...r, why: t("awg.why.preset_port", { preset, ports: port }), fix: port ? { label: t("awg.fix.port", { n: port }), crit: true, apply: () => form.edit(setAt(settings, ["port"], Number(port))) } : undefined };
+    }
+    return r;
+  });
   const errs: Remark[] = problems.map((p: Problem, i) => ({ id: `e${i}`, g: "bad", text: ((p.code && (t.opt(`field.${info.id}${p.pointer.replaceAll("/", ".")}.${p.code}`) ?? undefined)) || p.message), pointer: p.pointer }));
   const remarks = [...errs, ...warns];
 
@@ -149,7 +159,8 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
   const barOn = !readOnly && (count > 0 || stale || saved);
   const onNodes = ctx.servers.length > 0;
   const view = preview.data;
-  const fmts = view?.formats ?? [];
+  // AmneziaWG's apps are the board's two chips (the formats it works in, and the AmneziaVPN keys); what does not carry it is in the list's marks
+  const fmts = (view?.formats ?? []).filter((f) => !isAwg || f.ok);
   const drops = dropsOf(fmts);
   const noteLines: { c: string; text: string }[] = [];
   if (trustTunnelOnly(info.apps)) noteLines.push({ c: "", text: t("profiles.tt.previewHint") });
@@ -187,8 +198,20 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
                 <Gl k={r.g} />
                 <div>
                   <span>{r.text}</span>
+                  {r.why && why === r.id && <em>{r.why}</em>}
                 </div>
-                <button type="button" className="an-lk" onClick={() => goField(fields, r.pointer)}>
+                {r.fix && !readOnly && (
+                  <button type="button" className="btn sm" onClick={r.fix.apply}>
+                    {r.fix.label}
+                    {r.fix.crit && <i className="pp-crit">{t("pf.st.crit")}</i>}
+                  </button>
+                )}
+                {r.why && (
+                  <button type="button" className="an-lk" onClick={() => setWhy(why === r.id ? "" : r.id)}>
+                    {t("pf.st.why")}
+                  </button>
+                )}
+                <button type="button" className="an-lk" onClick={() => toField(r.pointer)}>
                   {t("pf.st.toField")}
                 </button>
               </div>
@@ -196,11 +219,45 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
           </section>
         )}
         <div className={cx("pp-form", readOnly && "ro")} inert={readOnly}>
-          {isAwg && (
-            <AwgPanel settings={settings} onChange={form.edit} advice={view && view.errors.length === 0 ? { warnings: view.warnings, score: view.obfuscationScore } : undefined} />
+          {isAwg ? (
+            <AwgSettings
+              fields={fields}
+              settings={settings}
+              base={form.base}
+              problems={problems}
+              onChange={form.edit}
+              onRow={onChange}
+              lead={nameRow}
+              locked={locked}
+              egressNote={extra}
+              twin={{ word: t(ctx.egress === "warp" ? "awg.twin.direct" : "awg.twin.warp"), dirty: form.count > 0, open: () => ctx.openDlg("twin") }}
+              score={view && view.errors.length === 0 ? view.obfuscationScore : undefined}
+              onGo={toField}
+              register={(fn) => {
+                reveal.current = fn;
+              }}
+              scene={ctx.variant ? new Set(ctx.variant.split(".")) : undefined}
+            />
+          ) : (
+            <PageFields protocol={info.id} groups={groups} settings={settings} base={form.base} problems={problems} onChange={onChange} hidden={hidden} offers={isVless ? vlessOffers : undefined} extra={extra} lead={nameRow} />
           )}
-          <PageFields protocol={info.id} groups={groups} settings={settings} base={form.base} problems={problems} onChange={onChange} hidden={hidden} readOnly={readOnlyIds} offers={isVless ? vlessOffers : undefined} extra={extra} lead={nameRow} />
         </div>
+        {ctx.owner && (
+          <section className="card pp-sec up-dz pp-dz">
+            <div className="pp-sh">
+              <h3>{t("pf.st.danger")}</h3>
+            </div>
+            <div className="pf-dz">
+              <div>
+                <b>{t("profiles.delete")}</b>
+                <span>{onNodes ? t.n("pf.st.delSum", new Set(ctx.servers.map((s) => s.nodeId)).size) : t("pf.st.delSumNone")}</span>
+              </div>
+              <button type="button" className="btn up-del" onClick={() => ctx.openDlg("del")}>
+                {t("users.delete")}…
+              </button>
+            </div>
+          </section>
+        )}
         {!readOnly && (
           <div className={cx("pf-save pp-save", barOn && "on", saved && count === 0 && !stale && "ok")} role="status">
             <span>{saved && count === 0 && !stale ? t("pf.st.saved") : bar}</span>
@@ -220,22 +277,6 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
               {stale ? t("stale.reload") : onNodes ? t("pf.st.saveAsk") : t("pf.st.save")}
             </Button>
           </div>
-        )}
-        {ctx.owner && (
-          <section className="card pp-sec up-dz pp-dz">
-            <div className="pp-sh">
-              <h3>{t("pf.st.danger")}</h3>
-            </div>
-            <div className="pf-dz">
-              <div>
-                <b>{t("profiles.delete")}</b>
-                <span>{onNodes ? t.n("pf.st.delSum", new Set(ctx.servers.map((s) => s.nodeId)).size) : t("pf.st.delSumNone")}</span>
-              </div>
-              <Button variant="danger" size="lg" className="up-del" onClick={() => ctx.openDlg("del")}>
-                {t("users.delete")}
-              </Button>
-            </div>
-          </section>
         )}
       </div>
       <aside className="col pp-as">
@@ -280,14 +321,20 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
                     </span>
                   );
                 })}
+                {isAwg && fmts.length > 0 && (
+                  <span>
+                    <G d="M5 12.5l4.5 4.5L19 7.5" size={14} stroke={2} />
+                    {t("profiles.fmt.keys").charAt(0).toLocaleUpperCase() + t("profiles.fmt.keys").slice(1)}
+                  </span>
+                )}
               </div>
             )}
-            {noteLines.map((l, i) => (
+            {(isAwg ? [] : noteLines).map((l, i) => (
               <p key={i} className={cx("pp-q1", l.c)}>
                 {l.text}
               </p>
             ))}
-            {isAwg && <p className="pp-q1">{t("pf.st.awgOld")}</p>}
+            {isAwg && <OldestClients version={asVersion(settings.version)} />}
           </div>
         </section>
       </aside>
@@ -418,5 +465,30 @@ function ImpactDialog({ ctx, form, t }: { ctx: TabCtx; form: ProfileForm; t: Tx 
         </div>
       )}
     </DlgFrame>
+  );
+}
+
+/** The oldest client of each app that understands the version (the board's chips in "Apps"): four first, the rest on a click. */
+const firstApps = ["AmneziaVPN", "AmneziaWG Android", "Mihomo", "Keenetic"];
+function OldestClients({ version }: { version: AwgVersion }) {
+  const t = useTx();
+  const [all, setAll] = useState(false);
+  const list = [...minClients[version]].sort((a, b) => (firstApps.indexOf(a.app) + 1 || 99) - (firstApps.indexOf(b.app) + 1 || 99));
+  const shown = all ? list : list.slice(0, 4);
+  return (
+    <>
+      <span className="pr-l">{t("awg.clients.title")}</span>
+      <div className="pf-cl">
+        {shown.map((c) => (
+          <span key={c.app}>{c.min === "2.0 only" ? `${c.app} · ${t("awg.clients.only20")}` : `${c.app} ${c.min}`}</span>
+        ))}
+        {list.length > 4 && (
+          <button type="button" className="an-lk" onClick={() => setAll(!all)}>
+            {all ? t("awg.clients.less") : t("awg.clients.more", { n: list.length - 4 })}
+          </button>
+        )}
+      </div>
+      <p className="pp-q1">{t("pf.st.awgOld")}</p>
+    </>
   );
 }

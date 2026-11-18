@@ -362,3 +362,40 @@
 .pf .pp-asb .pp-pre > div {
   white-space: pre-wrap;
 }
+
+/* L148 the column of cards (the remarks over the form) keeps the board's 16px between them */
+.pf .pp-grid > .col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* L4298-4300 the danger zone: what it does and the button */
+.pf .pf-dz {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px 20px;
+}
+.pf .pf-dz b {
+  display: block;
+  font-weight: 500;
+}
+.pf .pf-dz span {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.pf .pf-dz .btn.ask {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+/* L3253-3254 a segmented choice fills its box, each part the same width */
+.pf .pp-seg {
+  width: 100%;
+}
+.pf .pp-seg > * {
+  flex: 1;
+  text-align: center;
+}

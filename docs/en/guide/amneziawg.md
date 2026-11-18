@@ -34,9 +34,11 @@ This list follows a community compatibility matrix dated 2026-11-05 and will age
 
 ## The profile editor
 
-Above the usual form, an AmneziaWG profile has two cards of its own.
+The settings of an AmneziaWG profile are three cards: **Basics** (the name, the protocol version as two cards, the UDP port), **Masquerade and bypass** (the look of the first packets, the domain, a signature of its own for every device, and a fold with the whole block of keys) and **Network** (the exit, the MTU, and a fold with the keepalive and the client networks). The oldest clients that understand the chosen version are under **Apps** on the right. Every setting of the schema is in one of the cards.
 
-**Protocol version** holds the version choice, the oldest clients, and **Paste .conf**: paste a config from AmneziaVPN or another AmneziaWG client, and the form takes its version, MTU and obfuscation values. This happens in the browser; the keys of the pasted config are neither used nor stored. A 1.5 or 1.0 config switches the form to 2.0; a plain WireGuard config has nothing to take.
+**Protocol version** is two cards, 3.1 and 2.0. Picking the other one builds the whole block again for it.
+
+**Fill from .conf** (at the foot of the fold of the block): paste a config from AmneziaVPN or another AmneziaWG client, and the form takes its version, MTU and obfuscation values. This happens in the browser; the keys of the pasted config are neither used nor stored. A 1.5 or 1.0 config switches the form to 2.0; a plain WireGuard config has nothing to take.
 
 **Look of the first packets** decides what a handshake looks like to an observer:
 
@@ -56,10 +58,11 @@ Above the usual form, an AmneziaWG profile has two cards of its own.
 
 A look on a port where that traffic is not normal stands out, and the editor says so. Picking a look changes only the signature packets I1–I5, which the client sends before a handshake and the node ignores: no issued config breaks.
 
-- **Domain in the packets**: the host name that QUIC, DNS and SIP packets carry. Empty: every device draws its own from a built-in list (**Random**, **List**).
+- **Domain in the packets**: the host name that QUIC, DNS and SIP packets carry. Empty: every device draws its own from a built-in list (**Random**; the built-in list is offered as you type).
 - **A signature of its own for every device**: each device gets different signature packets of the look, the same every time its config is shown. Off: all devices share one set. STUN, WebRTC and DTLS are the same bytes for everyone, so the switch changes nothing for them.
 - **New values for the whole block** replaces junk, S, H, timers and the header protection key with fresh random values. Clients then need new parameters, so saving reissues the configs of the devices.
-- **Disguise N/100** rates the settings, not a censor: a high number means no known tell is left in them. A click shows the starting point of the version and each reason it lost or gained points.
+- **Disguise N/100**, a pill in the head of the card, rates the settings, not a censor: a high number means no known tell is left in them. A click opens the card **What the score is made of** over the form: the starting point of the version and each reason it lost or gained points, each with a way to its field.
+- **Advanced: junk, S, H, I1–I5, key, timers**: the whole block of the node and the clients in cards of three, in the groups junk, sizes, headers, signature and timers. The values are dots until **Show values**, so they stay out of a screen share. A remark of the editor can bring a button: **Set 25** for a keepalive over the NAT timeout, **Port 53** for the DNS look on another port.
 
 ## Settings
 

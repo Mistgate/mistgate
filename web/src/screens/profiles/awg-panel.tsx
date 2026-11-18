@@ -181,11 +181,11 @@ function DomainField({ value, pool, busy, t, onCommit }: { value: string; pool: 
 }
 
 /**
- * The AmneziaWG part of the profile editor: version cards, mimicry cards, the warnings and the score of the current
- * numbers (the server's preview) and the oldest client that understands the chosen version. Everything else is the
- * schema form. Picking a look fetches only the signature packets (not critical); the big button replaces the whole block.
+ * What the AmneziaWG form does with the panel (the mimicry cards, the generator and the .conf import), apart from how it is drawn: the cards of the
+ * wizard (AwgPanel) and the board's rows of the profile page (awg-settings.tsx) take the same calls and the same rules. Picking a look fetches only
+ * the signature packets (not critical); "generate" replaces the whole block.
  */
-export function AwgPanel({ settings, onChange, advice }: { settings: Settings; onChange: (next: Settings) => void; advice?: AwgAdvice }) {
+export function useAwgBlock(settings: Settings, onChange: (next: Settings) => void) {
   const t = useTx();
   const toast = useToast();
   const meta = useQuery(presetsQuery);
@@ -194,7 +194,6 @@ export function AwgPanel({ settings, onChange, advice }: { settings: Settings; o
   const preset = typeof ob.preset === "string" && ob.preset ? ob.preset : "dns";
   const domain = typeof ob.domain === "string" ? ob.domain : "";
   const [busy, setBusy] = useState(false);
-  const [showScore, setShowScore] = useState(false);
   // what the last "new values" did; stays until the next pick
   const [note, setNote] = useState<{ n: number } | null>(null);
   // an answer arrives after the owner may have typed on: it goes onto what the form holds then
@@ -262,10 +261,20 @@ export function AwgPanel({ settings, onChange, advice }: { settings: Settings; o
     if (v !== version) void generate(asVersion(v));
   };
   const shown = presets.filter((p) => p.versions.length === 0 || p.versions.includes(version));
+  return { meta, version, ob, preset, domain, busy, note, presets, shown, current, varies: current?.variesPerDevice ?? true, perDevice: ob.per_device_signature === true, generate, signature, importConf, pickVersion };
+}
+
+/**
+ * The AmneziaWG part of the new-profile wizard: version cards, mimicry cards, the warnings and the score of the current numbers (the server's
+ * preview) and the oldest client that understands the chosen version. Everything else is the schema form. (The profile page draws the same
+ * choices as the board's rows: awg-settings.tsx.)
+ */
+export function AwgPanel({ settings, onChange, advice }: { settings: Settings; onChange: (next: Settings) => void; advice?: AwgAdvice }) {
+  const t = useTx();
+  const { meta, version, ob, preset, domain, busy, note, shown, current, varies, perDevice, generate, signature, importConf, pickVersion } = useAwgBlock(settings, onChange);
+  const [showScore, setShowScore] = useState(false);
   const warnings = advice?.warnings ?? [];
   const score = advice?.score;
-  const varies = current?.variesPerDevice ?? true;
-  const perDevice = ob.per_device_signature === true;
 
   return (
     <>
