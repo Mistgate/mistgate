@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -731,7 +732,8 @@ func settingsSig(s *agentv1.NodeSettings) string {
 		sig += "|os-status=1"
 	}
 	if s.PanelLinkUrl != "" { // absent unless a panel link address is set: other signatures stay as they were
-		sig += "|panel-link=" + s.PanelLinkUrl
+		h := sha256.Sum256([]byte(s.PanelLinkUrl)) // the address holds a secret prefix; the signature stays in session state
+		sig += "|panel-link=" + hex.EncodeToString(h[:])
 	}
 	return sig
 }
