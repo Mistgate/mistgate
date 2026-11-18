@@ -119,6 +119,29 @@ func TestSettingsCarryServerSamples(t *testing.T) {
 	}
 }
 
+// A node the owner holds back is not in the preview of server names: nobody receives it.
+func TestSettingsServerSamplesLeaveOutAHeldNode(t *testing.T) {
+	m := newM3Rig(t)
+	m.st.W.Exec(`INSERT INTO node (id, name, address, country_code, state, created_at) VALUES ('nod_2', 'nl1', 'nl1.example.com', 'NL', 'active', 1)`)
+	must(m.svc.CreateInbound(m.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: m.profile, NodeId: "nod_2"})))
+	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
+		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, nil, nil)
+	names := func() []string {
+		var out []string
+		for _, s := range must(svc.GetSubscriptionSettings(m.ctx, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.ServerSamples {
+			out = append(out, s.Node)
+		}
+		return out
+	}
+	if got := names(); len(got) != 2 {
+		t.Fatalf("before: %v", got)
+	}
+	must(m.svc.SetNodeSharing(m.ctx, connect.NewRequest(&adminv1.SetNodeSharingRequest{NodeId: "nod_2", Mode: adminv1.NodeShareMode_NODE_SHARE_MODE_NONE})))
+	if got := names(); len(got) != 1 || got[0] != "de1" {
+		t.Fatalf("with nl1 held: %v", got)
+	}
+}
+
 // The offer of DNS presets for the link apps is a subscription setting the DNS module keeps: saved with the settings, kept when a
 // request leaves it out, refused when it names a preset that does not exist; never part of the stored document.
 func TestSettingsCarryTheLinkDNSOffer(t *testing.T) {

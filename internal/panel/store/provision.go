@@ -25,6 +25,8 @@ type NodeProvisionJob struct {
 	Secret                                                     []byte
 	State, Phase, ErrorCode, CreatedBy                         string
 	CreatedAt, UpdatedAt                                       time.Time
+	// Sharing is who the node is handed out to once installed; the zero value lets the panel decide (migration 00146).
+	Sharing NodeShareChoice
 }
 
 // NodeProvisionEvent is a redacted, stable-code progress event.
@@ -81,15 +83,16 @@ func (s *Store) CreatePanelSSHKeyIfAbsent(ctx context.Context, key PanelSSHKey) 
 }
 
 const nodeProvisionJobCols = `id, node_id, name, address, country_code, location, provider,
-	ssh_host, ssh_port, host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at`
+	ssh_host, ssh_port, host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at, sharing`
 
 func scanNodeProvisionJob(row rowScanner) (NodeProvisionJob, error) {
 	var job NodeProvisionJob
 	var port int
 	var created, updated int64
+	var sharing string
 	err := row.Scan(&job.ID, &job.NodeID, &job.Name, &job.Address, &job.CountryCode, &job.Location, &job.Provider,
 		&job.SSHHost, &port, &job.HostFingerprint, &job.Secret, &job.State, &job.Phase, &job.ErrorCode,
-		&job.CreatedBy, &created, &updated)
+		&job.CreatedBy, &created, &updated, &sharing)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeProvisionJob{}, ErrNotFound
 	}
@@ -97,6 +100,7 @@ func scanNodeProvisionJob(row rowScanner) (NodeProvisionJob, error) {
 		return NodeProvisionJob{}, err
 	}
 	job.SSHPort = uint16(port)
+	job.Sharing = ParseNodeShareChoice(sharing)
 	job.CreatedAt, job.UpdatedAt = fromUnix(created), fromUnix(updated)
 	return job, nil
 }
@@ -109,11 +113,11 @@ func (s *Store) CreateNodeProvisionJob(ctx context.Context, job NodeProvisionJob
 func (s *Store) createNodeProvisionJob(ctx context.Context, job NodeProvisionJob, eventCode string) error {
 	stmts := []Stmt{{Query: `INSERT INTO node_provision_job (
 		id, node_id, name, address, country_code, location, provider, ssh_host, ssh_port,
-		host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`,
+		host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at, sharing
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`,
 		Args: []any{job.ID, job.NodeID, job.Name, job.Address, job.CountryCode, job.Location, job.Provider,
 			job.SSHHost, int64(job.SSHPort), job.HostFingerprint, job.Secret, "queued", "queued", job.CreatedBy,
-			unix(job.CreatedAt), unix(job.UpdatedAt)}}}
+			unix(job.CreatedAt), unix(job.UpdatedAt), job.Sharing.JSON()}}}
 	if eventCode != "" {
 		stmts = append(stmts, Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at) VALUES (?, 'queued', ?, ?)`,
 			Args: []any{job.ID, eventCode, unix(job.CreatedAt)}})

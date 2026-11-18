@@ -114,7 +114,7 @@ func (r RelayReachability) UserHasHealthyRelay(userID, inboundID string) bool {
 	}
 	for _, relay := range r.relaysByInbound[inboundID] {
 		if relay.ExitID != x.NodeID || !relayReachabilityHealthy(relay, r.Input.NowUnix, r.Input.HealthIntervalS) || !relay.EntryUsable ||
-			slices.Contains(g.DisabledNodeIDs, relay.EntryID) || !relayUserCanUseNode(u, relay.EntryID) {
+			!GroupGetsNode(g.DisabledNodeIDs, relay.EntryID) || !relayUserCanUseNode(u, relay.EntryID) {
 			continue
 		}
 		return true
@@ -133,7 +133,7 @@ func (r RelayReachability) UserGiven(userID, inboundID string) bool {
 	}
 	x, ok := r.inboundsByID[inboundID]
 	if !ok || !x.Enabled || x.State == "disabled" || !slices.Contains(g.ProfileIDs, x.ProfileID) ||
-		slices.Contains(g.DisabledNodeIDs, x.NodeID) || !relayUserCanUseNode(u, x.NodeID) {
+		!GroupGetsNode(g.DisabledNodeIDs, x.NodeID) || !relayUserCanUseNode(u, x.NodeID) {
 		return false
 	}
 	return x.Direct || x.CDN || r.UserHasHealthyRelay(userID, inboundID)

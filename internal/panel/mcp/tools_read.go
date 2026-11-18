@@ -207,8 +207,8 @@ func readTools() []toolDef {
 				return fleetStatusView(r.Msg), nil
 			}),
 
-		readTool("node_get", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"One node: status and reason, host facts, inbounds with their state, direct_in_subscriptions and cdn, up to 10 online users, the owner's notes and ipv6 (whether its IPv6 entry is on, whether the node can take one and why not, and the latest check of the address). No addresses, keys or certificate pins.",
+		readTool("node_get", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.GroupServiceListGroupsProcedure),
+			"One node: status and reason, host facts, inbounds with their state, direct_in_subscriptions and cdn, up to 10 online users, the owner's notes and ipv6 (whether its IPv6 entry is on, whether the node can take one and why not, and the latest check of the address) and sharing (who the node is handed out to: the mode all, listed or none, the groups that receive it with their people, and idle when nobody has had a node with a running server for over a day). No addresses, keys or certificate pins.",
 			func(c *call, in nodeArg) (any, error) {
 				id, _, err := c.nodeRef(in.Node)
 				if err != nil {
@@ -218,7 +218,13 @@ func readTools() []toolDef {
 				if err != nil {
 					return nil, apiError(err)
 				}
-				return nodeGetView(r.Msg), nil
+				groups, err := c.groups()
+				if err != nil {
+					return nil, err
+				}
+				v := nodeGetView(r.Msg)
+				v.Sharing = nodeSharingView(r.Msg.GetNode(), groups)
+				return v, nil
 			}),
 
 		readTool("warp_status", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.WarpServiceGetWarpProcedure),

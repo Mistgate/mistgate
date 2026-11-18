@@ -451,13 +451,16 @@ type NodeGetV struct {
 	Notes         string            `json:"notes,omitempty"`
 	// IPv6 is the node's IPv6 entry (an extra "· IPv6" server in the subscriptions): whether it is on, whether the node can take
 	// one, and the latest check of the address. Never the address.
-	IPv6      *ipv6EntryV `json:"ipv6,omitempty"`
-	Truncated bool        `json:"truncated,omitempty"`
+	IPv6 *ipv6EntryV `json:"ipv6,omitempty"`
+	// Sharing is who the node is handed out to: its mode (all, listed or none), the groups that receive it with their people, and
+	// idle when nobody has received a node with a running server for more than a day.
+	Sharing   *nodeSharingV `json:"sharing,omitempty"`
+	Truncated bool          `json:"truncated,omitempty"`
 }
 
 func (v *NodeGetV) shrink() bool {
 	v.Truncated = true
-	return cut(&v.OnlineUsers) || cut(&v.Inbounds)
+	return cut(&v.OnlineUsers) || cut(&v.Inbounds) || v.Sharing != nil && cut(&v.Sharing.Groups)
 }
 
 func nodeGetView(r *adminv1.GetNodeResponse) *NodeGetV {

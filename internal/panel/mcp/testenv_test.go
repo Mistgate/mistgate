@@ -115,6 +115,7 @@ var tokenApproved = map[string]bool{
 	adminv1connect.ProfileServiceCreateInboundProcedure:                   true,
 	adminv1connect.ProfileServiceDeleteInboundProcedure:                   true,
 	adminv1connect.GroupServiceUpdateGroupProcedure:                       true,
+	adminv1connect.GroupServiceSetNodeSharingProcedure:                    true,
 	adminv1connect.ProfileServiceUpdateInboundProcedure:                   true,
 	adminv1connect.DnsServiceCreateDnsPresetProcedure:                     true,
 	adminv1connect.DnsServiceUpdateDnsPresetProcedure:                     true,
@@ -471,6 +472,8 @@ type world struct {
 	users                  map[string]*adminv1.GetUserResponse
 	profiles               map[string]*worldProfile
 	groups                 map[string]*adminv1.Group
+	shareReqs              []*adminv1.SetNodeSharingRequest
+	shares                 map[string]*worldShare // who a node is handed out to (node_sharing_tools_test.go)
 	dnsPresets             map[string]*adminv1.DnsPreset
 	nodePatches            map[string]*adminv1.UpdateNodeRequest
 	inboundDirect          map[string]bool
@@ -683,8 +686,8 @@ func (w *world) ListNodes(context.Context, *connect.Request[adminv1.ListNodesReq
 		countryB = *p.CountryCode
 	}
 	return connect.NewResponse(&adminv1.ListNodesResponse{Nodes: []*adminv1.Node{
-		{Id: nodeA, Name: nameA, CountryCode: countryA, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true, DecoySiteId: w.lib.siteOf(nodeA)},
-		{Id: nodeB, Name: nameB, CountryCode: countryB, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true, DecoySiteId: w.lib.siteOf(nodeB)},
+		{Id: nodeA, Name: nameA, CountryCode: countryA, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true, DecoySiteId: w.lib.siteOf(nodeA), Sharing: w.shareSummaryLocked(nodeA)},
+		{Id: nodeB, Name: nameB, CountryCode: countryB, Address: canaryAddr, DecoyPanelAvailable: true, DecoyOwnAvailable: true, DecoySiteId: w.lib.siteOf(nodeB), Sharing: w.shareSummaryLocked(nodeB)},
 	}}), nil
 }
 
@@ -749,7 +752,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 			AwgBackend: awgMode,
 			Id:         r.Msg.GetNodeId(), Name: name, Address: canaryAddr, CountryCode: country, Location: location, Provider: provider, Status: w.nodeStatuses[r.Msg.GetNodeId()],
 			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: !w.noOwnDecoy,
-			Ipv6: w.ipv6Of(r.Msg.GetNodeId()),
+			Ipv6: w.ipv6Of(r.Msg.GetNodeId()), Sharing: w.shareSummary(r.Msg.GetNodeId()),
 		},
 		Metrics:  w.metricsOf(r.Msg.GetNodeId()),
 		Facts:    &adminv1.NodeFacts{Hostname: "de1.example.com", Os: "linux"},

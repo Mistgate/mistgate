@@ -17,7 +17,7 @@ func (f *Fleet) CreateProvisionEnrollment(ctx context.Context, spec provision.No
 	}
 	newNode := &store.NodeRow{
 		ID: spec.ID, Name: spec.Name, Address: spec.Address,
-		CountryCode: spec.CountryCode, Location: spec.Location, Provider: spec.Provider,
+		CountryCode: spec.CountryCode, Location: spec.Location, Provider: spec.Provider, Share: spec.Sharing,
 	}
 	_, err := f.st.Node(ctx, spec.ID)
 	if err == nil {
