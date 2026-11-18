@@ -146,7 +146,7 @@ export function GroupsTab({
           </section>
         )
       )}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(380px,1fr))] items-start gap-4 max-md:grid-cols-1">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(380px,1fr))] gap-4 max-md:grid-cols-1">
         {shown.map((g) => {
           const ps = g.profileIds.map((id) => profiles.data?.find((p) => p.id === id)).filter((p) => p !== undefined);
           const waysOf = (w: "sub" | "awg" | "tg" | "tt") => ps.filter((p) => wayOf(p) === w);
@@ -165,7 +165,7 @@ export function GroupsTab({
           ];
           const asking = ask === g.id;
           return (
-            <Fresh key={g.id} kind="group" id={g.id} className="relative overflow-hidden rounded-card border border-line bg-surface">
+            <Fresh key={g.id} kind="group" id={g.id} className="relative flex flex-col overflow-hidden rounded-card border border-line bg-surface">
               <AppLink to="/users/groups/$id" params={{ id: g.id }} className="flex items-center justify-between gap-3 rounded-t-card px-6 pt-5 pb-3 transition-colors hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]">
                 <span className="flex min-w-0 flex-col">
                   <h3 className="flex min-w-0 items-center text-lg font-medium">
@@ -176,7 +176,7 @@ export function GroupsTab({
                 </span>
                 <Stack groupId={g.id} />
               </AppLink>
-              <div className="flex flex-col">
+              <div className="flex flex-1 flex-col">
                 {gives.length === 0 ? (
                   <p className="border-t border-line px-6 py-3 text-[13px] text-warn-text">{t("users.groupNoProfilesRow")}</p>
                 ) : (
