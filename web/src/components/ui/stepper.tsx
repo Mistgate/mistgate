@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { IconButton } from "./icon-button";
+import { Icon } from "./icons";
 
 type Props = {
   /** What is shown between the buttons, e.g. "100 GB". */
@@ -22,7 +23,10 @@ export function Infinite({ label }: { label: string }) {
   );
 }
 
-/** - value + with the plus in the accent. The bars are drawn, not glyphs. */
+/**
+ * "-" value "+" in a capsule (the board's .sv-step): 36px, a 10px radius, the page colour inside, two 32px buttons and the
+ * value in the middle (56px at least, longer text widens it). The bars are drawn, not glyphs.
+ */
 export function Stepper({
   children,
   onDecrement,
@@ -33,18 +37,13 @@ export function Stepper({
   incrementLabel,
 }: Props) {
   return (
-    <div role="group" className="flex h-[26px] items-center gap-2">
-      <IconButton variant="round" aria-label={decrementLabel} disabled={decrementDisabled} onClick={onDecrement}>
-        <span aria-hidden className="h-0.5 w-2.5 rounded-[1px] bg-fg" />
+    <div role="group" className="inline-flex h-9 items-center gap-0.5 rounded-field border border-line bg-canvas px-0.5">
+      <IconButton variant="compact" aria-label={decrementLabel} disabled={decrementDisabled} onClick={onDecrement}>
+        <Icon name="minus" size={16} />
       </IconButton>
-      <output className="flex min-w-0 flex-1 items-center justify-center text-sm font-medium whitespace-nowrap tabular-nums">
-        {children}
-      </output>
-      <IconButton variant="roundAccent" aria-label={incrementLabel} disabled={incrementDisabled} onClick={onIncrement}>
-        <span aria-hidden className="relative block size-2.5">
-          <span className="absolute top-1/2 inset-s-0 h-0.5 w-full -translate-y-1/2 rounded-[1px] bg-on-accent" />
-          <span className="absolute top-0 left-1/2 h-full w-0.5 -translate-x-1/2 rounded-[1px] bg-on-accent" />
-        </span>
+      <output className="flex min-w-14 items-center justify-center text-[13px] font-medium whitespace-nowrap tabular-nums">{children}</output>
+      <IconButton variant="compact" aria-label={incrementLabel} disabled={incrementDisabled} onClick={onIncrement}>
+        <Icon name="plus" size={16} />
       </IconButton>
     </div>
   );

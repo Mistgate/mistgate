@@ -185,7 +185,7 @@ export function GroupsTab({
                       <b className="font-medium">{x.title}</b>
                       <span className="flex flex-wrap justify-end gap-1 max-md:row-auto max-md:mt-1.5 max-md:justify-start md:col-start-2 md:row-span-2 md:row-start-1">
                         {[...new Set(x.list.map((p) => p.protocol))].map((p) => (
-                          <ProtocolTag key={p} protocol={p} />
+                          <ProtocolTag key={p} protocol={p} className="font-medium" />
                         ))}
                       </span>
                       <span className={cx("text-[13px]", x.warn ? "text-warn-text" : "text-muted")}>{x.sub}</span>
@@ -245,7 +245,7 @@ function Stack({ groupId }: { groupId: string }) {
     <span aria-hidden className="flex flex-none ps-2">
       {q.data.map((u) => (
         <span key={u.id} className="-ms-2 flex animate-[fz-pop_0.3s_var(--ease-spring)_both] rounded-full shadow-[0_0_0_2px_var(--surface)]">
-          <Avatar name={u.name} index={avatarIndex(u.id)} size={28} fontSize={12} />
+          <Avatar name={u.name} index={avatarIndex(u.name)} size={28} fontSize={12} />
         </span>
       ))}
     </span>

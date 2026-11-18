@@ -382,7 +382,7 @@ export default function DevKit() {
         <Button variant="secondary" size="xs">XS 22</Button>
         <Button variant="primary" disabled>Disabled</Button>
         <IconButton aria-label="Back">‹</IconButton>
-        <IconButton variant="close" aria-label="Close">×</IconButton>
+        <IconButton variant="compact" aria-label="Close">×</IconButton>
         <Stepper decrementLabel="Less" incrementLabel="More" onDecrement={() => setN(n - 10)} onIncrement={() => setN(n + 10)}>
           {n} GB
         </Stepper>

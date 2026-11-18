@@ -144,7 +144,7 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
       <div className="flex items-center gap-3 px-6 pt-4 pb-3 max-md:flex-wrap max-md:px-4">
         <h3 className="me-auto text-base leading-6 font-medium">{t("grp.pick.title", { name: group.name })}</h3>
         <SearchBox className="flex-[0_1_240px] max-md:order-3 max-md:flex-[1_1_100%]" value={find} onChange={(v) => setFind(v)} label={t("grp.find")} placeholder={t("grp.findPh")} />
-        <IconButton variant="close" aria-label={t("common.close")} onClick={onClose}>
+        <IconButton variant="compact" aria-label={t("common.close")} onClick={onClose}>
           <Icon name="x" size={16} />
         </IconButton>
       </div>
@@ -177,7 +177,7 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
                 className="grid min-h-12 w-full grid-cols-[20px_28px_auto_auto_minmax(0,1fr)] items-center gap-3 border-t border-line px-6 text-start text-[13px] transition-colors duration-150 ease-(--e) hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)] max-md:grid-cols-[20px_28px_minmax(0,1fr)_auto] max-md:px-4"
               >
                 <Tick on={on} />
-                <Avatar name={u.name} index={avatarIndex(u.id)} size={28} />
+                <Avatar name={u.name} index={avatarIndex(u.name)} size={28} />
                 <b className="truncate font-mono text-sm font-medium">{u.name}</b>
                 <span data-tone={groupTone(u.groupId, g?.color ?? u.groupColor)} className="tone-chip inline-flex h-[22px] max-w-40 items-center rounded-chip px-2 text-[11px]">
                   <span className="truncate">{u.groupName}</span>
@@ -228,7 +228,7 @@ function Member({ u, group, groups, manage, fresh, open0, style, onMove, t, fmt,
   return (
     <div style={style} className={cx(cols, "min-h-[60px] border-t border-line transition-colors duration-150 ease-(--e) hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]", fresh && "grp-fresh")}>
       <Link to="/users/$id" params={{ id: u.id }} className="group/n flex min-w-0 items-center gap-3 text-inherit no-underline">
-        <Avatar name={u.name} index={avatarIndex(u.id)} size={32} />
+        <Avatar name={u.name} index={avatarIndex(u.name)} size={32} />
         <span className="flex min-w-0 flex-col">
           <b className="truncate font-mono font-medium group-hover/n:underline group-hover/n:underline-offset-[3px]">{u.name}</b>
           <span className="truncate text-xs leading-4 text-muted">{t(shownKey[status])}</span>
@@ -276,7 +276,7 @@ function Member({ u, group, groups, manage, fresh, open0, style, onMove, t, fmt,
         defaultOpen={open0}
         aria-label={t("grp.actions")}
         trigger={
-          <IconButton variant="close" aria-label={`${t("grp.actions")}: ${u.name}`} className="data-popup-open:bg-step data-popup-open:text-fg">
+          <IconButton variant="compact" aria-label={`${t("grp.actions")}: ${u.name}`} className="data-popup-open:bg-step data-popup-open:text-fg">
             <Icon name="ellipsis" size={18} />
           </IconButton>
         }

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState, type CSSProperties } from "react";
 import { useAddNode } from "@/components/add-node";
-import { Avatar, PageTitle } from "@/components/ui/bits";
+import { Avatar, avatarIndex, PageTitle } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/notice";
@@ -230,9 +230,9 @@ function TopCard({ data }: { data: OverviewResponse }) {
   return (
     <section className="rounded-card border border-line bg-surface">
       <CardHead title={t("ov.top.title")} count={data.usersOnline} />
-      {top.map((u, i) => (
+      {top.map((u) => (
         <div key={`${u.userId}/${u.nodeId}`} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-t border-line px-6 py-2.5 max-md:px-4">
-          <Avatar name={u.userName} index={i} size={28} />
+          <Avatar name={u.userName} index={avatarIndex(u.userName)} size={28} />
           <div className="min-w-0">
             <Link to="/users/$id" params={{ id: u.userId }} className="block truncate font-medium transition-colors hover:text-accent-text">
               {u.userName}

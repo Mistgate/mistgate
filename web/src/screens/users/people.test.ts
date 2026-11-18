@@ -50,9 +50,10 @@ describe("user display helpers", () => {
     expect(daysLeft(1000 - 10, 1000)).toBeLessThanOrEqual(0);
   });
 
-  it("gives a stable avatar slot per id", () => {
-    expect(avatarIndex("usr_a")).toBe(avatarIndex("usr_a"));
-    expect(avatarIndex("usr_a")).toBeLessThan(9);
+  it("gives an avatar slot from the name, as the board does: the first letter's code plus the length, around the 8 colours", () => {
+    expect(avatarIndex("carol")).toBe((99 + 5) % 8);
+    expect(avatarIndex("carol")).toBe(avatarIndex("carol"));
+    expect(avatarIndex("")).toBeLessThan(8);
   });
 
   it("formats usage against a quota: whole numbers from 10 up, the quota apart, red once it is used up", () => {

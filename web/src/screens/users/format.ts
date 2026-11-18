@@ -6,6 +6,8 @@ import { agoOf, scaleBytes, type Fmt } from "@/lib/format";
 import type { UserN as User } from "./model";
 import type { Key, Tx } from "./t";
 
+export { avatarIndex } from "@/components/ui/bits";
+
 // Traffic is decimal across the panel (lib/format.ts), so a quota of "100 GB" is 100e9 bytes.
 export const GB = 1e9;
 export const DAY = 86400;
@@ -15,13 +17,6 @@ export const nowSec = () => Math.floor(Date.now() / 1000);
 /** Whole days until `expiresUnix` (rounded up; <= 0 once it has passed); null = never expires. */
 export function daysLeft(expiresUnix: number, now = nowSec()): number | null {
   return expiresUnix === 0 ? null : Math.ceil((expiresUnix - now) / DAY);
-}
-
-/** Stable colour slot for an avatar, so a user keeps their colour in the list and on their page. */
-export function avatarIndex(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return h % 9;
 }
 
 /**

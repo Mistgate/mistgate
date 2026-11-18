@@ -94,19 +94,16 @@ export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: 
   const mbit = Math.round(bps / 1e6);
   return (
     <SettingRow label={label} hint={hint} className="py-1.5">
-      {/* a little wider than the other steppers: "50 Мбит/с" is longer than "100 GB" */}
-      <div className="w-[150px] flex-none">
-        <Stepper
-          decrementLabel={t("users.less", { what: label })}
-          incrementLabel={t("users.more", { what: label })}
-          onDecrement={() => onChange(Math.max(0, mbit - 5) * 1e6)}
-          onIncrement={() => onChange(Math.min(10000, mbit + 5) * 1e6)}
-          decrementDisabled={mbit <= 0}
-          incrementDisabled={mbit >= 10000}
-        >
-          {mbit === 0 ? <Infinite label={t("users.unlimited")} /> : `${mbit} ${t("users.unitMbit")}`}
-        </Stepper>
-      </div>
+      <Stepper
+        decrementLabel={t("users.less", { what: label })}
+        incrementLabel={t("users.more", { what: label })}
+        onDecrement={() => onChange(Math.max(0, mbit - 5) * 1e6)}
+        onIncrement={() => onChange(Math.min(10000, mbit + 5) * 1e6)}
+        decrementDisabled={mbit <= 0}
+        incrementDisabled={mbit >= 10000}
+      >
+        {mbit === 0 ? <Infinite label={t("users.unlimited")} /> : `${mbit} ${t("users.unitMbit")}`}
+      </Stepper>
     </SettingRow>
   );
 }

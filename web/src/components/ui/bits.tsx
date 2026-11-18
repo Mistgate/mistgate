@@ -117,30 +117,31 @@ export function ActionBar({ children, className }: { children: ReactNode; classN
   return <div className={cx("flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 md:px-5", className)}>{children}</div>;
 }
 
-// Solid pastel circles, the initial in near-black, cycling in this order.
-const avatarColors = [
-  "var(--accent-lavender)",
-  "var(--accent-sky)",
-  "var(--accent-sand)",
-  "var(--accent-rose)",
-  "var(--accent-mint)",
-  "var(--accent-sage)",
-  "#c9b8e8",
-  "#9fd6cf",
-  "#e8b98f",
-];
+/**
+ * The avatar colours of the board (UCOL): eight solid pastels, the initial in near-black. One list for the whole panel
+ * (the people lists, the command palette), so a person keeps their colour everywhere.
+ */
+export const avatarColors = ["#c9b8e8", "#9fd6cf", "#e8c9a0", "#a9c8ec", "#e6a6b0", "#b8e0a8", "#d8b8e8", "#e0d49a"] as const;
 
 /**
- * `index` picks the colour (the row number in a list); the name only supplies the initial: its first letter,
- * upper-case. A flex box with line-height 1 centres the line; Onest (ascent 0.97, descent 0.305, cap height 0.707)
- * then puts the middle of a capital 0.02em above the middle of the circle, so the letter moves down by that much.
+ * The colour slot of a person's avatar, the board's: the first letter's code plus the length of the name, around the palette.
+ * It comes from the name alone, so the preview in the new-person window and the lists show the same colour.
+ */
+export function avatarIndex(name: string): number {
+  return ((name.charCodeAt(0) || 0) + name.length) % avatarColors.length;
+}
+
+/**
+ * `index` picks the colour (a slot from `avatarIndex`, or a row number) in a list, or a number made from the person's id); the name only supplies the
+ * initial: its first letter, upper-case. It is the board's .ava: a grid that centres the letter, 600 weight, near-black
+ * on the pastel; on the light theme a 1px inner hairline keeps the pale ones from melting into the page.
  */
 export function Avatar({ name, index = 0, size = 28, fontSize }: { name: string; index?: number; size?: number; fontSize?: number }) {
   const lang = useLang();
   return (
     <span
       aria-hidden
-      className="flex flex-none items-center justify-center rounded-full leading-none font-extrabold text-[#0c0c0e] select-none"
+      className="grid flex-none place-items-center rounded-full leading-none font-[600] text-on-accent select-none [:root[data-theme=light]_&]:shadow-[inset_0_0_0_1px_rgb(22_22_26/0.06)]"
       style={{
         width: size,
         height: size,
@@ -148,7 +149,7 @@ export function Avatar({ name, index = 0, size = 28, fontSize }: { name: string;
         background: avatarColors[index % avatarColors.length],
       }}
     >
-      <span className="block translate-y-[0.02em] leading-none">{initialOf(name, lang)}</span>
+      {initialOf(name, lang)}
     </span>
   );
 }
@@ -192,7 +193,7 @@ export function Check({ label, className, ...rest }: Omit<ComponentProps<typeof 
   const box = (
     <Checkbox.Root
       className={cx(
-        "grid size-5 flex-none cursor-pointer place-items-center rounded-chip border border-[color-mix(in_srgb,var(--text)_28%,transparent)] text-transparent transition-[background-color,border-color,transform] duration-150 ease-out hover:border-(--border-hover) data-checked:scale-[1.06] data-checked:border-accent-mark data-checked:bg-accent-mark data-checked:text-on-accent data-disabled:cursor-default data-disabled:opacity-45",
+        "grid size-5 flex-none cursor-pointer place-items-center rounded-chip border border-[color-mix(in_srgb,var(--text)_28%,transparent)] text-transparent [transition:background-color_.15s_var(--e),border-color_.15s_var(--e),transform_.2s_var(--ease-spring)] hover:border-(--border-hover) data-checked:scale-[1.06] data-checked:border-accent-mark data-checked:bg-accent-mark data-checked:text-on-accent data-disabled:cursor-default data-disabled:opacity-45",
         !label && className,
       )}
       {...rest}

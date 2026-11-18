@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { Avatar, SectionLabel } from "./bits";
+import { Avatar, avatarColors, avatarIndex, SectionLabel } from "./bits";
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -30,19 +30,26 @@ describe("Avatar", () => {
     expect(host!.textContent).toBe("A");
   });
 
-  it("centres the letter with flex and a line height of one, at every size", () => {
+  it("is the board's .ava: a grid that centres the letter, weight 600, one of the 8 pastels, at every size", () => {
     for (const size of [24, 26, 28, 32, 40]) {
-      const el = mount(<Avatar name="Б" size={size} />);
-      expect(el.className).toContain("flex");
-      expect(el.className).toContain("items-center");
-      expect(el.className).toContain("justify-center");
+      const el = mount(<Avatar name="Б" size={size} index={9} />);
+      expect(el.className).toContain("grid");
+      expect(el.className).toContain("place-items-center");
       expect(el.className).toContain("leading-none");
+      expect(el.className).toContain("font-[600]");
       expect(el.style.width).toBe(`${size}px`);
       expect(el.style.height).toBe(`${size}px`);
-      expect(el.firstElementChild!.className).toContain("leading-none");
+      // index 9 wraps around the eight colours to the second one
+      expect(el.style.background).toBe("rgb(159, 214, 207)");
+      expect(avatarColors).toHaveLength(8);
       act(() => root?.unmount());
       host?.remove();
     }
+  });
+
+  it("takes its colour slot from the name as the board does: the first letter's code plus the length", () => {
+    expect(avatarIndex("carol")).toBe((99 + 5) % 8);
+    expect(avatarIndex("")).toBe(0);
   });
 });
 

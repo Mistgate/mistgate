@@ -3,11 +3,16 @@ import { Button, type ButtonVariant } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { plainText, useT } from "@/i18n";
+import { cx } from "@/lib/cx";
 
 /**
- * Copies `value` to the clipboard. The button says "Copied" for two seconds; if the browser refuses
- * (insecure origin, blocked permission) a toast asks for a manual copy instead of failing silently.
- * `variant` and `full` make it the main action of a window (the install command).
+ * Copies `value` to the clipboard (the board's .cpb). Both words ("Copy" and "Copied") are always in the button, stacked in
+ * one grid cell (the one that is not showing as a pseudo-element, so the button's text is the shown word only), so it keeps
+ * the width of the longer one and the swap never moves the layout; the idle word slides up and out
+ * while the other rises in, the icon turns into the tick (which draws itself), all on the board's springs. A framed button
+ * also takes the accent frame and tint while it says "Copied" (two seconds). If the browser refuses (insecure origin, blocked
+ * permission) a toast asks for a manual copy instead of failing silently. `variant` and `full` make it the main action of a
+ * window (the install command).
  */
 export function CopyButton({
   value,
@@ -41,18 +46,45 @@ export function CopyButton({
   }
 
   const idle = label ?? t("common.copy");
-  const now = done ? t("common.copied") : idle;
-  // the icon turns into the tick and the words swap with a short rise; the button keeps the width of the longer word
-  // (the other word is a hidden ::after sizer, not text of the button)
+  const icon = "absolute inset-0 size-4 transition-[scale,rotate,opacity] duration-(--sp-pop-t) ease-(--sp-pop)";
+  const word = "col-start-1 row-start-1 whitespace-nowrap transition-[translate,opacity] duration-(--sp-settle-t) ease-(--sp-settle)";
   return (
-    <Button variant={variant} size={size} full={full} onClick={copy}>
-      <Icon key={done ? "ok" : "copy"} name={done ? "check" : "copy"} size={16} strokeWidth={done ? 2.6 : 1.5} className="animate-[mg-ui-pop_0.35s_var(--e)_both]" />
-      <span
-        key={done ? "ok" : "copy"}
-        data-w={done ? idle : t("common.copied")}
-        className="animate-[mg-up_0.3s_var(--e)_both] after:invisible after:block after:h-0 after:overflow-hidden after:content-[attr(data-w)]"
-      >
-        {now}
+    <Button
+      variant={variant}
+      size={size}
+      full={full}
+      onClick={copy}
+      data-copied={done ? "" : undefined}
+      className={cx(
+        // these win over the button's own quick transition and press (the board's .btn.cpb)
+        "transition-[border-color,color,background-color,transform]! duration-(--sp-fade-t)! ease-(--sp-fade)! active:scale-[0.97]!",
+        variant === "secondary" && "data-copied:border-accent-line data-copied:bg-[color-mix(in_srgb,var(--accent-mark)_8%,transparent)] data-copied:text-accent-text",
+      )}
+    >
+      <span aria-hidden className="relative size-4 flex-none">
+        <Icon name="copy" size={16} className={cx(icon, done && "scale-30 rotate-[30deg] opacity-0")} />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={cx(icon, !done && "scale-30 -rotate-[30deg] opacity-0")}
+        >
+          <path d="M5 12.5l4.5 4.5L19 7.5" strokeDasharray="24" strokeDashoffset={done ? 0 : 24} style={{ transition: "stroke-dashoffset var(--sp-settle-t) var(--sp-settle)" }} />
+        </svg>
+      </span>
+      <span className="grid text-start [clip-path:inset(-3px_-2px)]">
+        {/* the word that is not showing is drawn by its ::before (not text of the button): it holds the width, and a reader or a test sees one word */}
+        <span data-t={idle} aria-hidden={done || undefined} className={cx(word, done ? "-translate-y-[90%] opacity-0 before:content-[attr(data-t)]" : undefined)}>
+          {done ? null : idle}
+        </span>
+        <span data-t={t("common.copied")} aria-hidden={!done || undefined} className={cx(word, done ? undefined : "translate-y-[90%] opacity-0 before:content-[attr(data-t)]")}>
+          {done ? t("common.copied") : null}
+        </span>
       </span>
     </Button>
   );

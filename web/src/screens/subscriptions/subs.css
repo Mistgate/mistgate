@@ -2242,10 +2242,6 @@
     transition: none;
   }
 }
-/* the update interval stepper is a field-sized control */
-.sbp .sb-step {
-  width: 130px;
-}
 .sbp .sb-ta {
   color: var(--text);
   font-family: inherit;

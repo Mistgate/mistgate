@@ -49,7 +49,11 @@ export function StatusDot({ kind }: { kind: StatusKind }) {
   );
 }
 
-/** Tinted pill, 32px with a full round: glyph, then the word. `label` overrides the default word; `sm` is the 24px size. */
+/**
+ * Tinted pill, 32px with a full round: a dot in the text colour, then the word (the board's .pill). `label` overrides the
+ * default word; `sm` is the 24px size. A busy one blinks its dot. The word always names the state, so colour is never alone.
+ * `glyphOnly` is the exception: just the round glyph in a 20px pill (the fleet health strip), whose surrounding text says the rest.
+ */
 export function StatusPill({
   kind,
   label,
@@ -74,10 +78,10 @@ export function StatusPill({
       aria-label={glyphOnly ? t(word) : undefined}
       className={cx(
         `tone-${kind} pill inline-flex flex-none items-center font-medium whitespace-nowrap leading-none transition-colors duration-[400ms] ease-out`,
-        glyphOnly ? "h-5 gap-1.5 rounded-xl px-0.5" : bar ? "h-bar gap-2 rounded-field pe-3 ps-2.5 text-[13px]" : sm ? "h-6 gap-1.5 rounded-xl pe-2.5 ps-2 text-xs" : "h-8 gap-2 rounded-2xl pe-3 ps-2.5 text-[13px]",
+        glyphOnly ? "h-5 gap-1.5 rounded-xl px-0.5" : bar ? "h-bar gap-2 rounded-field px-3 text-[13px]" : sm ? "h-6 gap-1.5 rounded-xl px-2.5 text-xs" : "h-8 gap-2 rounded-2xl px-3 text-[13px]",
       )}
     >
-      <StatusGlyph kind={kind} />
+      {glyphOnly ? <StatusGlyph kind={kind} /> : <i aria-hidden className={cx("size-2 flex-none rounded-full bg-current", kind === "busy" && "animate-[mg-ui-blink_1.2s_var(--e)_infinite]")} />}
       {text}
     </span>
   );

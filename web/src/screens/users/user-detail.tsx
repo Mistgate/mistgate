@@ -246,7 +246,7 @@ export function UserDetail({ data, scene, onDeleted }: { data: DetailN; scene?: 
         {t("up.back")}
       </AppLink>
       <header className="up-h">
-        <Avatar name={user.name} index={avatarIndex(user.id)} size={48} />
+        <Avatar name={user.name} index={avatarIndex(user.name)} size={48} />
         <div className="up-ht">
           <div className="up-h1">
             <h1>{user.name}</h1>
