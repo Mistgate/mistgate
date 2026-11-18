@@ -1,5 +1,5 @@
 import { Checkbox } from "@base-ui/react/checkbox";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
@@ -105,24 +105,6 @@ export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: 
         {mbit === 0 ? <Infinite label={t("users.unlimited")} /> : `${mbit} ${t("users.unitMbit")}`}
       </Stepper>
     </SettingRow>
-  );
-}
-
-/**
- * The two speed limits under one quiet caption with the "experimental" mark: per person (all their devices on one node
- * together) and per device. The user card and the new-user form both show them this way.
- */
-export function SpeedPair({ person, device, onPerson, onDevice }: { person: number; device: number; onPerson: (bps: number) => void; onDevice: (bps: number) => void }) {
-  const t = useTx();
-  return (
-    <div className="flex flex-col border-t border-line first:border-t-0">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 pb-0.5">
-        <span className="text-[11px] font-bold tracking-[0.06em] text-muted uppercase">{t("users.speedT")}</span>
-        <span className="rounded-md border border-line px-1.5 py-px text-[10px] font-semibold text-muted">{t("users.experimental")}</span>
-      </div>
-      <SpeedRow label={t("users.speedUser")} hint={t("users.speedUserHint")} bps={person} onChange={onPerson} />
-      <SpeedRow label={t("users.speedDevice")} hint={t("users.speedDeviceHint")} bps={device} onChange={onDevice} />
-    </div>
   );
 }
 
@@ -295,37 +277,4 @@ export function useDebounced<V>(value: V, ms: number): V {
     return () => clearTimeout(id);
   }, [value, ms]);
   return v;
-}
-
-/**
- * A control that edits a server value with steppers and toggles: clicks show at once (the draft) and one save goes
- * out `delay` ms after the last click, so five clicks on "+" are one request. The draft is dropped when the server
- * value moves after the save went out (or someone else changed it), and when the save fails. Clicks made while a
- * save is in flight start a new draft that survives that save's refresh.
- */
-export function useDraft<V>(server: V, save: (v: V) => Promise<unknown>, delay = 450): [V, (v: V) => void] {
-  const [draft, setDraft] = useState<{ v: V; sent: boolean } | null>(null);
-  const saveRef = useRef(save);
-  useEffect(() => {
-    saveRef.current = save;
-  });
-
-  // "adjust state while rendering" (react.dev): when the server value changes, forget a draft that was already sent
-  const key = JSON.stringify(server);
-  const [seen, setSeen] = useState(key);
-  if (key !== seen) {
-    setSeen(key);
-    if (draft?.sent) setDraft(null);
-  }
-
-  useEffect(() => {
-    if (!draft || draft.sent) return;
-    const id = setTimeout(() => {
-      setDraft({ v: draft.v, sent: true });
-      saveRef.current(draft.v).catch(() => setDraft(null));
-    }, delay);
-    return () => clearTimeout(id);
-  }, [draft, delay]);
-
-  return [draft ? draft.v : server, (v) => setDraft({ v, sent: false })];
 }

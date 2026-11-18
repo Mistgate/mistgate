@@ -13,7 +13,6 @@ import { FormatDrops } from "@/screens/profiles/formats";
 import { useLinkAppList } from "@/screens/subscriptions/queries";
 import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta";
 import { protocolsQuery } from "./rpc";
-import { groupTone } from "./format";
 import { useTx } from "./t";
 
 // The Groups tab of the users screen and the pieces every screen shows about a group: what it gives (the two ways,
@@ -69,32 +68,6 @@ export function ProfileLink({ id, name, className }: { id: string; name: string;
         "inline-flex h-[26px] max-w-full items-center gap-1 rounded-ctl border border-line bg-surface-2 px-2 font-mono text-[11px] font-semibold text-fg transition-colors hover:border-accent-line hover:bg-accent-soft focus-visible:border-accent-line",
         className,
       )}
-    >
-      <span className="truncate">{name}</span>
-    </Link>
-  );
-}
-
-/** A group, named, as a link: its page. */
-export function GroupLink({ id, name, className, children }: { id: string; name: string; className?: string; children?: ReactNode }) {
-  const t = useTx();
-  return (
-    <Link to="/users/groups/$id" params={{ id }} aria-label={t("users.groupOpen", { name })} className={cx("font-bold text-accent-text hover:underline", className)}>
-      {children ?? name}
-    </Link>
-  );
-}
-
-/** A group as a small tinted chip that opens it, in the colour stored on the group (`color`; without one, a tone picked from its id). */
-export function GroupChip({ id, name, color, className }: { id: string; name: string; color?: string; className?: string }) {
-  const t = useTx();
-  return (
-    <Link
-      to="/users/groups/$id"
-      params={{ id }}
-      data-tone={groupTone(id, color)}
-      aria-label={t("users.groupOpen", { name })}
-      className={cx("tone-chip inline-flex h-6 max-w-full min-w-0 items-center px-2.5 text-xs font-medium hover:underline", className)}
     >
       <span className="truncate">{name}</span>
     </Link>

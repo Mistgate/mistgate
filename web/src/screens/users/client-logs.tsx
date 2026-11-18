@@ -4,12 +4,11 @@ import { LogViewer } from "@/components/log-viewer";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
-import { GlyphMark, StatusGlyph, type StatusKind } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { Tip } from "@/components/ui/tooltip";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { clientLogPage, clientLogsQuery, logView, useClientLogActions, type ClientLog, type LogView } from "@/lib/client-debug";
+import { clientLogPage, clientLogsQuery, logView, useClientLogActions, type ClientLog } from "@/lib/client-debug";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { isUnavailable } from "@/lib/ops";
@@ -31,27 +30,6 @@ export type LogsCtl = {
   download: (id: string) => void;
   remove: (log: ClientLog) => void;
 };
-
-const stateStyle: Record<LogView, { kind: StatusKind; mark?: string }> = {
-  open: { kind: "warn", mark: "M1.5 4h.01M4 4h.01M6.5 4h.01" },
-  received: { kind: "ok" },
-  unasked: { kind: "blip", mark: "M4 6.6V1.6M1.9 3.6 4 1.5l2.1 2.1" },
-  declined: { kind: "bad" },
-  cancelled: { kind: "off" },
-  expired: { kind: "off" },
-};
-
-/** The coloured pill of a request or bundle: what it is, in a word and a glyph (never colour alone). */
-export function LogStatePill({ view }: { view: LogView }) {
-  const t = useTx();
-  const { kind, mark } = stateStyle[view];
-  return (
-    <span className={cx(`tone-${kind} pill inline-flex h-[22px] flex-none items-center gap-1.5 rounded-xl pe-2 ps-1 text-[11px] leading-none font-bold whitespace-nowrap`)}>
-      <StatusGlyph kind={kind} glyph={mark && <GlyphMark d={mark} />} />
-      {t(`clientlogs.state.${view}`)}
-    </span>
-  );
-}
 
 const badgeClass = "flex-none cursor-default rounded-md pill px-1.5 py-px text-[10px] font-extrabold whitespace-nowrap";
 

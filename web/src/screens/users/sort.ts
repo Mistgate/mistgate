@@ -9,17 +9,6 @@ export type SortSearch = { sort?: SortId; desc?: 1 };
 /** The direction a first click sorts in: the biggest, the latest and the most recent first; the soonest term and A→Z. */
 export const firstDesc: Record<SortId, boolean> = { name: false, status: false, group: false, devices: true, traffic: true, expiry: false, seen: true };
 
-/** The column header's text key of each sort (the term column is sorted by the expiry time). */
-export const sortLabel = {
-  name: "users.col.name",
-  status: "users.col.status",
-  group: "users.col.group",
-  devices: "users.col.devices",
-  traffic: "users.col.traffic",
-  expiry: "users.col.term",
-  seen: "users.col.seen",
-} as const satisfies Record<SortId, string>;
-
 /** Search-param validation: only a known sort and `desc` survive; the default (name, ascending) is the bare URL. */
 export function validateSort(s: Record<string, unknown>): SortSearch {
   const sort = sortIds.find((id) => id === s.sort);

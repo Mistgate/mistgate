@@ -20,16 +20,6 @@ import { countryIn, countryLook, type BreakdownNet, type CountryCheck, type Coun
 
 type Kind = CountryLook["kind"] | "none";
 
-const cellCls: Record<Kind, string> = {
-  ok: "border border-line text-muted",
-  partial: "tone-warn tint tone-text",
-  warn: "tone-warn tint tone-text",
-  bad: "tone-bad tint tone-text",
-  listed: "tone-warn tint tint-dashed tone-text",
-  unknown: "border border-dashed border-line text-muted",
-  none: "border border-line text-faint",
-};
-
 const rowCls: Record<Kind, string> = {
   ok: "border border-line bg-surface-2",
   partial: "tone-warn tint",
@@ -139,57 +129,6 @@ export function CountryTip({ look, children }: { look: CountryLook; children: Re
 export function useCountryTitle(code: string): string {
   const t = useT();
   return t("cr.from", { country: countryIn(t, code) });
-}
-
-/** The column's head in the matrix, set apart from the profiles: it is not a client check from the panel's server. It leads to the Reachability page. */
-export function CountryHead({ code }: { code: string }) {
-  const t = useT();
-  const title = useCountryTitle(code);
-  return (
-    <Link
-      to="/reachability"
-      title={t("rc.open")}
-      className="ms-2 flex items-end gap-1 self-end px-1 pb-1 text-[11px] leading-tight font-medium text-muted underline-offset-2 transition-colors hover:text-fg hover:underline"
-    >
-      <Icon name="globe" size={12} aria-hidden className="mb-px flex-none" />
-      {title}
-    </Link>
-  );
-}
-
-/**
- * A node's cell in the matrix. A node with no round yet (new, or offline when the rounds ran) gets a dash. A live verdict
- * whose address is in a block list as well keeps its own look and gets the list mark in the corner.
- */
-export function CountryCell({ check, node, code }: { check: CountryCheck | undefined; node: string; code: string }) {
-  const t = useT();
-  const fmt = useFmt();
-  const title = useCountryTitle(code);
-  const box = "relative ms-2 box-border flex h-11 flex-col items-center justify-center rounded-[11px] px-1.5 text-center text-xs leading-tight font-medium";
-  if (!check)
-    return (
-      <span className={cx(box, cellCls.none)} title={t("cr.v.notYet")}>
-        <span aria-hidden>{t("hl.cell.none")}</span>
-        <span className="sr-only">{t("hl.cell.aria", { node, profile: title, state: t("cr.v.notYet") })}</span>
-      </span>
-    );
-  const look = countryLook(t, fmt, check);
-  return (
-    <CountryTip look={look}>
-      <span role="img" tabIndex={0} aria-label={t("hl.cell.aria", { node, profile: title, state: look.state })} className={cx(box, cellCls[look.kind])}>
-        <span className="flex items-center gap-1">
-          <CountryMark kind={look.kind} />
-          {look.label}
-        </span>
-        {look.note && <span className="max-w-full truncate text-[11px] font-semibold text-muted">{look.note}</span>}
-        {look.alsoListed && (
-          <span data-testid="also-listed" className="absolute top-1 inset-e-1 flex">
-            <ListedGlyph />
-          </span>
-        )}
-      </span>
-    </CountryTip>
-  );
 }
 
 /** The board's pill of a verdict (`.pv-pill` and its dot): the tone and the dot of each look; a block on some networks and TCP blocked are both the warn pill. */

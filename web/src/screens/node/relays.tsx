@@ -27,10 +27,6 @@ export function useCountryOf(): (id: string) => string {
   return (id) => by.get(id) ?? "";
 }
 
-export const ccChip = (cc: string) => (
-  <span className="flex h-[22px] min-w-[30px] flex-none items-center justify-center rounded-[7px] bg-surface-2 px-[7px] font-mono text-[11px] font-bold text-muted">{cc || "—"}</span>
-);
-
 type Busy = "check" | "on" | "off";
 
 /** The record without one key. */
@@ -82,7 +78,6 @@ export function useRelayRuns() {
   };
 }
 export type RelayRuns = ReturnType<typeof useRelayRuns>;
-
 
 /** Removes a relay at once (the row menu has asked "Really remove?" already): the toast says it, a failure is the toast's too. */
 export function useRemoveRelay() {
