@@ -23,7 +23,7 @@ import { clampPage, usePaging } from "@/lib/paging";
 import { profileListQuery } from "./rpc";
 import { avatarIndex, daysLeft, groupTone, nowSec, seenText, shownKey, shownStatus, usage } from "./format";
 import { Tick, type GroupDemo } from "./group-bits";
-import { groupMemberIds, lostProfileIds, moveUsers } from "./group-move";
+import { lostProfileIds, moveUsers } from "./group-move";
 import { usersPageN, type UserN } from "./model";
 import { useTx, type Tx } from "./t";
 import { ConfirmModal, useDebounced } from "./ui";
@@ -434,5 +434,3 @@ export function PeopleTab({ group, groups, manage, pick, setPick, demo }: { grou
   );
 }
 
-/** Everyone of the group, for the danger zone's "move all". */
-export { groupMemberIds };

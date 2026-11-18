@@ -1,13 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
 import type { ProfileFormat } from "@/gen/mistgate/admin/v1/profile_pb";
-import { SectionLabel } from "@/components/ui/bits";
 import { IconChip, type IconName, type Tone } from "@/components/ui/icons";
-import { Notice } from "@/components/ui/notice";
 import { cx } from "@/lib/cx";
 import { FormatDrops } from "@/screens/profiles/formats";
 import { useLinkAppList } from "@/screens/subscriptions/queries";
@@ -17,24 +14,6 @@ import { useTx } from "./t";
 
 // The Groups tab of the users screen and the pieces every screen shows about a group: what it gives (the two ways,
 // "Подписка" and "Ключ AmneziaVPN"), its profiles as links. The windows to make and edit one are users-group-new.tsx.
-
-/** A 30px pill that is on or off (node chips, profile chips of a group). */
-export function PillToggle({ on, onClick, children, mono }: { on: boolean; onClick: () => void; children: ReactNode; mono?: boolean }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cx(
-        "flex h-[30px] items-center gap-1.5 rounded-[15px] border px-2.5 text-xs font-bold transition-colors duration-200",
-        mono && "font-mono",
-        on ? "border-accent-line bg-accent-soft text-fg" : "border-line bg-transparent text-muted",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 // ---- the two ways ----
 
@@ -166,38 +145,6 @@ export function WaysOfGroup({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * "Gets": what a person of this group receives, by way, before anything is created. Nothing at all is a red line: a
- * friend must never open an empty page.
- */
-export function ReachLine({ group, action }: { group: Group; action?: ReactNode }) {
-  const t = useTx();
-  const sub = useSubLabel();
-  const nothing = group.happNodes === 0 && group.amneziaNodes === 0;
-  const item = (w: Way, n: number) => (
-    <li key={w} className="flex items-start gap-2 text-xs leading-snug">
-      <span aria-hidden className={cx("mt-px grid size-4 flex-none place-items-center rounded-full text-[10px] font-extrabold", n > 0 ? "bg-accent-soft text-accent-text" : "bg-surface-2 text-muted")}>
-        {n > 0 ? "✓" : "–"}
-      </span>
-      <span className={n > 0 ? "text-fg" : "text-muted"}>
-        <b>{w === "sub" ? sub : t("users.reachAwg")}</b> — {n > 0 ? t.n("users.reachNodes", n) : t("common.labeled", { label: t("users.reachNo"), value: t(w === "sub" ? "users.reachNoSub" : "users.reachNoAwg") })}
-      </span>
-    </li>
-  );
-  return (
-    <div className="flex flex-col gap-2 py-2.5">
-      <div className="flex items-center gap-2">
-        <SectionLabel as="span" className="flex-1">
-          {t("users.reach")}
-        </SectionLabel>
-        {action}
-      </div>
-      <ul className="flex flex-col gap-1.5">{[item("sub", group.happNodes), item("awg", group.amneziaNodes)]}</ul>
-      {nothing && <Notice tone="danger">{t("users.reachNothing", { group: group.name })}</Notice>}
     </div>
   );
 }

@@ -35,12 +35,9 @@ import "./health.css";
 
 // The alerts of the Health page in the board's own rows (PnHealth: .hl-al > .hl-alh + .hl-alb). One line per problem that opens into what it says and what can be
 // done about it; the open one is one at a time, as on the board. The per-profile alerts of one node are one row, the muted ones their own fold at the end, the
-// closed ones a history by event. What other screens take from here keeps its name: AlertBody (a node's Overview), AlertCard, CloseAll, Ipv6Tag, useMute, useClose,
-// MuteMenu (Reachability).
+// closed ones a history by event. What other screens take from here keeps its name: AlertCard, Ipv6Tag.
 
-export { CloseAll, MuteMenu, useClose, useMute } from "./alerts-parts";
 export { Ipv6Tag } from "./alert-bits";
-export { AlertBody } from "./alert-body";
 
 const anchors = (g: readonly Alert[]) => g.map((a) => `alert-${a.id}`);
 

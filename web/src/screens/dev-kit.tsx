@@ -32,7 +32,7 @@ import { PortsKit } from "@/screens/dev-kit-ports";
 import { useT } from "@/i18n";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
-import { GroupsTab, ReachLine } from "@/screens/users/groups";
+import { GroupsTab } from "@/screens/users/groups";
 import { profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 import { DevicesPanel } from "@/screens/users/user-devices";
 import { dnsPresetsQuery } from "@/screens/subscriptions/queries";
@@ -426,14 +426,9 @@ export default function DevKit() {
       />
 
       <section className="flex flex-col gap-3">
-        <SectionLabel>Groups tab (users screen) and what a person of a group gets (create-user form)</SectionLabel>
+        <SectionLabel>Groups tab (users screen)</SectionLabel>
         <KitCache>
           <GroupsTab creating={false} onCreatingChange={() => {}} />
-          <Card className="flex flex-col divide-y divide-line px-4">
-            {kitGroups.map((g) => (
-              <ReachLine key={g.id} group={g} />
-            ))}
-          </Card>
         </KitCache>
       </section>
 

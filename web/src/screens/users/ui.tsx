@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { Infinite, Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { Tip } from "@/components/ui/tooltip";
@@ -82,29 +81,6 @@ export function ResetSelect({ value, onChange }: { value: QuotaReset; onChange: 
       onValueChange={(v) => onChange(Number(v) as QuotaReset)}
       options={list.map((r) => ({ value: String(r), label: t(`users.resetOpt.${resetCode(r)}`), hint: t(`users.resetHint.${resetCode(r)}`) }))}
     />
-  );
-}
-
-/**
- * A speed limit in Mbit/s on a stepper, 5 at a time: 0 is "no limit" (∞), the first "+" sets 5. The person limit and the
- * device limit both use it, on the user card and in the new-user form.
- */
-export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: string; bps: number; onChange: (bps: number) => void }) {
-  const t = useTx();
-  const mbit = Math.round(bps / 1e6);
-  return (
-    <SettingRow label={label} hint={hint} className="py-1.5">
-      <Stepper
-        decrementLabel={t("users.less", { what: label })}
-        incrementLabel={t("users.more", { what: label })}
-        onDecrement={() => onChange(Math.max(0, mbit - 5) * 1e6)}
-        onIncrement={() => onChange(Math.min(10000, mbit + 5) * 1e6)}
-        decrementDisabled={mbit <= 0}
-        incrementDisabled={mbit >= 10000}
-      >
-        {mbit === 0 ? <Infinite label={t("users.unlimited")} /> : `${mbit} ${t("users.unitMbit")}`}
-      </Stepper>
-    </SettingRow>
   );
 }
 
