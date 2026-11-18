@@ -128,7 +128,7 @@ export const ru: typeof en = {
   "aip.tab.memory": "Память",
   "aip.tab.tasks": "Задачи по расписанию",
   "aip.tab.mcp": "MCP и токены",
-  "aip.tab.approvals": "Ждут вас",
+  "aip.tab.approvals": "Ждут тебя",
   "aip.sum.load": "Загружаю…",
   "aip.sum.err": "Нет данных",
   "aip.sum.on": "Ассистент включён · ничего не ждёт решения",
