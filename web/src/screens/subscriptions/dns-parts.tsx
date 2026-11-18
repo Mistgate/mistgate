@@ -1,28 +1,27 @@
-import type { ReactNode } from "react";
-import { DnsServerKind, DnsTransport, type DnsCategory } from "@/gen/mistgate/admin/v1/dns_pb";
+import { useQuery } from "@tanstack/react-query";
+import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { Flag } from "@/components/ui/flag";
-import { Icon, type IconName } from "@/components/ui/icons";
-import { cx } from "@/lib/cx";
+import { meQuery } from "@/lib/session";
 import type { Tx } from "@/screens/users/t";
-import { chipCountry, chipLabel, countryName, presetLook, shortAddress, type DnsServerN } from "./model";
+import { chipCountry, chipLabel } from "./model";
+import { Svg } from "./parts";
 
-/** The square glyph of a preset: a pastel tile that hints at what the preset is for (map, globe, shield, family…). */
-export function PresetGlyph({ preset, size = 40, className }: { preset: { id: string; category?: DnsCategory }; size?: number; className?: string }) {
-  const { glyph, tone } = presetLook(preset);
-  const style =
-    tone === "muted"
-      ? { width: size, height: size }
-      : {
-          width: size,
-          height: size,
-          background: `color-mix(in oklch, var(--accent-${tone}) 16%, var(--surface))`,
-          color: `color-mix(in oklch, var(--accent-${tone}) var(--_text-pct), #000)`,
-        };
-  return (
-    <span aria-hidden className={cx("grid flex-none place-items-center rounded-xl", tone === "muted" && "bg-surface-2 text-muted", className)} style={style}>
-      {glyph === "letter" ? <span className="text-[19px] leading-none font-extrabold">Я</span> : <Icon name={glyph as IconName} size={Math.round(size * 0.5)} />}
-    </span>
-  );
+/** The pieces of the DNS tab that both the list and the editor draw (their rules are in subs-dns.css, under .sbp). */
+
+/** The icon paths of the tab that the board does not name in parts.tsx. */
+export const dnsPath = {
+  back: "M15 6l-6 6 6 6",
+  split: "M4 6h5l6 12h5M4 18h5l2-4M20 6h-5l-1 2",
+  trash: "M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5",
+} as const;
+
+/**
+ * What the signed-in admin may do here (internal/panel/auth/policy.go): presets are made, changed and deleted by the owner only,
+ * the default for everyone is a setting that the helper changes too, a read-only admin does neither.
+ */
+export function useDnsRole(): { owner: boolean; write: boolean } {
+  const role = useQuery(meQuery).data?.admin?.role;
+  return { owner: role === Role.OWNER, write: role === Role.OWNER || role === Role.HELPER };
 }
 
 /** The text of a category chip, a regional one with its country's flag in front. */
@@ -36,56 +35,12 @@ export function ChipText({ chip, t }: { chip: string; t: Tx }) {
   );
 }
 
-/** The country of a regional preset as a pill: its flag and its name. */
-export function CountryPill({ code, t }: { code: string; t: Tx }) {
+/** The back button of the editor: the arrow and "Presets". */
+export function Back({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <Pill>
-      <Flag code={code} size={9} />
-      {countryName(code, t)}
-    </Pill>
-  );
-}
-
-/** Small uppercase pill (built-in, direct): neutral, or accent for the state that matters. */
-export function Pill({ children, accent, icon, className }: { children: ReactNode; accent?: boolean; icon?: IconName; className?: string }) {
-  return (
-    <span
-      className={cx(
-        "inline-flex h-[20px] flex-none items-center gap-1 rounded-md px-1.5 text-[10px] font-bold tracking-wide whitespace-nowrap uppercase",
-        accent ? "border border-accent-line bg-accent-soft text-accent-text" : "bg-surface-2 text-muted",
-        className,
-      )}
-    >
-      {icon && <Icon name={icon} size={10} strokeWidth={3} />}
-      {children}
-    </span>
-  );
-}
-
-const kindIcon: Partial<Record<DnsServerKind, IconName>> = { [DnsServerKind.PLAIN]: "server", [DnsServerKind.DOH]: "lock", [DnsServerKind.DOT]: "shield" };
-const transportIcon: Partial<Record<DnsTransport, IconName>> = { [DnsTransport.PLAIN]: "server", [DnsTransport.DOH]: "lock", [DnsTransport.DOT]: "shield" };
-
-/** A resolver as a chip: the icon tells the transport (plain / DoH lock / DoT shield), the text is what the server is. */
-export function ServerChip({ icon, text, title }: { icon: IconName; text: string; title: string }) {
-  return (
-    <span title={title} className="inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-ctl bg-surface-2 px-2 font-mono text-[11px] text-muted">
-      <Icon name={icon} size={11} />
-      <span className="truncate">{text}</span>
-    </span>
-  );
-}
-
-/** The chip of a custom server: its own kind and address, a DoH URL cut to its host. */
-export const customChip = (server: DnsServerN, kindLabel: string) => ({ icon: kindIcon[server.kind] ?? "server", text: shortAddress(server.kind, server.address), title: `${kindLabel}: ${server.address}` });
-/** The icon a catalog server gets on a card: the transport of its preset. */
-export const transportChipIcon = (t: DnsTransport): IconName => transportIcon[t] ?? "server";
-
-/** "N users" as a chip: a people icon and the count; grey and quiet at zero. */
-export function UsersChip({ count, label }: { count: number; label: string }) {
-  return (
-    <span title={label} aria-label={label} className={cx("inline-flex h-[22px] flex-none items-center gap-1 rounded-ctl px-2 font-mono text-[11px] font-bold", count > 0 ? "bg-accent-soft text-accent-text" : "bg-surface-2 text-faint")}>
-      <Icon name="people" size={12} />
-      {count}
-    </span>
+    <button type="button" className="nd-back sb-back" onClick={onClick}>
+      <Svg d={dnsPath.back} />
+      {label}
+    </button>
   );
 }

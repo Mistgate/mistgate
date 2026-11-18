@@ -68,9 +68,9 @@ describe("the device limit mode", () => {
   it("offers the three modes with one short line each, the saved one checked", async () => {
     await mount(LinkDeviceLimit.TRACK);
     expect([...document.querySelectorAll("[role=radio]")].map((r) => r.textContent)).toEqual([
-      "Only countNobody is refused; the users list shows who is over.",
-      "LimitA new device over the limit cannot connect.",
-      "StrictAs “Limit”, and apps without a device ID cannot connect.",
+      "Only countNobody is refused; the users list shows who is over",
+      "LimitA new device over the limit cannot connect",
+      "StrictAs “Limit”, and apps without a device ID cannot connect",
     ]);
     expect(radio("Only count").getAttribute("aria-checked")).toBe("true");
   });

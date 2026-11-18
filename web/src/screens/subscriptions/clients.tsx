@@ -2,18 +2,16 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Card } from "@/components/ui/bits";
-import { Icon } from "@/components/ui/icons";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { StatusPill } from "@/components/ui/status";
 import { cx } from "@/lib/cx";
-import { ClientCompatActual, ClientCompatState, outdatedDevicesQuery, pageSizes, stateKind, stateWord, windowDays, type CompatDevices } from "@/lib/clientcompat";
+import { ClientCompatActual, ClientCompatState, outdatedDevicesQuery, pageSizes, stateWord, windowDays, type CompatDevices } from "@/lib/clientcompat";
 import { clampPage } from "@/lib/paging";
 import { useTx } from "@/screens/users/t";
 import { ActualBar } from "./clients-actual";
 import { MinimumsCard } from "./clients-rules";
 import { DevicesTable } from "./clients-table";
-import { Lead } from "./ui";
+import { path, Svg } from "./parts";
+import { sbDemo } from "./demo-sb";
 
 type Pick = "attention" | "ok" | "below" | "unsupported" | "unknown";
 const picks: Pick[] = ["attention", "ok", "below", "unsupported", "unknown"];
@@ -36,7 +34,7 @@ const countOf = (data: CompatDevices, state: ClientCompatState) => data.counts.f
  */
 export function ClientsTab({ userId = "", onClearUser, rulesOpen, initialActual = ClientCompatActual.UNSPECIFIED }: { userId?: string; onClearUser?: () => void; rulesOpen?: boolean; initialActual?: ClientCompatActual }) {
   const t = useTx();
-  const [pick, setPick] = useState<Pick>("attention");
+  const [pick, setPick] = useState<Pick>(() => sbDemo.pick ?? "attention");
   const [actual, setActual] = useState(initialActual);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState<number>(50);
@@ -62,53 +60,37 @@ export function ClientsTab({ userId = "", onClearUser, rulesOpen, initialActual 
   const anyDevices = !!data && data.counts.some((c) => c.devices > 0);
 
   return (
-    <div className="@container flex flex-col gap-3.5">
-      <Lead>
+    <div data-shot="subs-clients">
+      <p className="sb-intro">
         {t("cc.lead")} {data && t("cc.leadActual", { days: windowDays(data.helloWindowHours) })}
-      </Lead>
+      </p>
       {list.isPending ? (
         <Pending />
       ) : !data ? (
         <QueryError error={list.error} onRetry={() => void list.refetch()} />
       ) : !anyDevices ? (
-        <Card lg className="border-dashed">
-          <p className="p-8 text-center text-[13px] text-muted">{t("cc.empty.none")}</p>
-        </Card>
+        <section className="card">
+          <div className="sb-nf">
+            <p>{t("cc.empty.none")}</p>
+          </div>
+        </section>
       ) : (
         <>
           <Summary data={data} pick={pick === "attention" && actual !== ClientCompatActual.UNSPECIFIED ? null : pick} onPick={choose} />
           <ActualBar data={data} actual={actual} onPick={chooseActual} />
-          {(userId || data.fingerprints.length > 0) && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              {userId && (
-                <button
-                  type="button"
-                  aria-label={t("cc.userClear")}
-                  onClick={onClearUser}
-                  className="flex h-[30px] items-center gap-1.5 rounded-[15px] border border-accent-line bg-accent-soft px-2.5 text-xs font-bold"
-                >
-                  <span className="truncate">{t("cc.userChip", { name: data.devices[0]?.userName || userId })}</span>
-                  <Icon name="x" size={12} />
-                </button>
-              )}
-              {data.fingerprints.length > 0 && <p className="min-w-0 text-xs text-muted">{t("cc.fingerprints", { list: data.fingerprints.join(", ") })}</p>}
-            </div>
+          {userId && (
+            <p className="sb-vf">
+              <button type="button" className="sb-who" aria-label={t("cc.userClear")} onClick={onClearUser}>
+                <span className="truncate">{t("cc.userChip", { name: data.devices[0]?.userName || userId })}</span>
+                <Svg d={path.x} />
+              </button>
+            </p>
           )}
           {list.isError && <QueryError compact error={list.error} onRetry={() => void list.refetch()} />}
-          {data.devices.length > 0 ? (
-            <DevicesTable rows={data.devices} windowHours={data.helloWindowHours} pager={pager} />
-          ) : (
-            <Card lg className="flex flex-col items-center gap-2 p-8 text-center">
-              {pick === "attention" && actual === ClientCompatActual.UNSPECIFIED ? (
-                <StatusPill kind="ok" label={t("cc.empty.ok")} />
-              ) : (
-                <p className="text-[13px] text-muted">{t("cc.empty.state")}</p>
-              )}
-            </Card>
-          )}
+          <DevicesTable rows={data.devices} windowHours={data.helloWindowHours} pager={pager} fingerprints={data.fingerprints} empty={pick === "attention" && actual === ClientCompatActual.UNSPECIFIED ? "ok" : "state"} />
         </>
       )}
-      <MinimumsCard initialOpen={rulesOpen} />
+      <MinimumsCard initialOpen={rulesOpen ?? sbDemo.minOpen} />
     </div>
   );
 }
@@ -121,25 +103,15 @@ function Summary({ data, pick, onPick }: { data: CompatDevices; pick: Pick | nul
   const t = useTx();
   const attention = [ClientCompatState.BELOW_MINIMUM, ClientCompatState.UNSUPPORTED, ClientCompatState.UNKNOWN].reduce((n, s) => n + countOf(data, s).devices, 0);
   return (
-    <RadioGroup aria-label={t("cc.sum.label")} value={pick ?? ""} onValueChange={(v) => onPick(v as Pick)} className="grid grid-cols-2 gap-2 @min-[640px]:grid-cols-5">
+    <RadioGroup aria-label={t("cc.sum.label")} value={pick ?? ""} onValueChange={(v) => onPick(v as Pick)} className="sb-tiles">
       {picks.map((p) => {
         const state = stateOf[p];
         const c = p === "attention" ? { devices: attention, people: 0 } : countOf(data, state);
         return (
-          <Radio.Root
-            key={p}
-            value={p}
-            onClick={() => pick === p && p !== "attention" && onPick("attention")}
-            className={cx(
-              "group flex min-h-[92px] min-w-0 cursor-pointer flex-col items-start justify-between gap-2 rounded-card-lg border border-line bg-surface p-3.5 text-start transition-colors duration-200 hover:bg-surface-2 data-checked:border-accent-line data-checked:bg-accent-soft",
-              p === "attention" && "col-span-2 @max-[639px]:min-h-0 @max-[639px]:flex-row @max-[639px]:items-center @max-[639px]:justify-between @min-[640px]:col-span-1",
-            )}
-          >
-            {p === "attention" ? <span className="flex h-[22px] items-center text-xs font-bold">{t(stateWord[state])}</span> : <StatusPill sm kind={stateKind(state)} label={t(stateWord[state])} />}
-            <span className={cx("flex flex-col gap-1", p === "attention" && "@max-[639px]:flex-row @max-[639px]:items-baseline @max-[639px]:gap-2")}>
-              <span className={cx("text-[26px] leading-none font-extrabold tracking-[-0.03em] tabular-nums", c.devices === 0 && "text-faint")}>{c.devices}</span>
-              <span className="text-[11px] text-muted">{p === "attention" ? t("cc.sum.attentionSub") : t.n("cc.people", c.people)}</span>
-            </span>
+          <Radio.Root key={p} value={p} onClick={() => pick === p && p !== "attention" && onPick("attention")} className={cx(p === "attention" && "warn")}>
+            <span>{t(stateWord[state])}</span>
+            <b className="mono">{c.devices}</b>
+            <em>{p === "attention" ? t("cc.sum.attentionSub") : t.n("cc.people", c.people)}</em>
           </Radio.Root>
         );
       })}

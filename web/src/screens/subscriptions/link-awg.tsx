@@ -1,13 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { halo } from "@/components/fx/halo";
-import { Card, SectionLabel } from "@/components/ui/bits";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import { errorText } from "@/lib/errors";
 import { useTx } from "@/screens/users/t";
 import { ConfirmModal } from "@/screens/users/ui";
 import type { Settings } from "./model";
+import { Toggle } from "./parts";
 import { settingsQuery, useSaveSettings } from "./queries";
 
 /** Whether the apps on the link get the AmneziaWG servers: absent (settings saved before the switch existed) is on. */
@@ -48,19 +47,10 @@ export function LinkAwgCard({ settings }: { settings: Settings }) {
   }
 
   return (
-    <section id="link-awg">
-      <Card lg className="flex min-w-0 items-start gap-4 p-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <SectionLabel icon="shield" tone="sky" as="h2">
-            {t("subs.linkAwg.title")}
-          </SectionLabel>
-          <p className="text-xs leading-snug text-pretty text-muted">{t(on ? "subs.linkAwg.on" : "subs.linkAwg.off")}</p>
-          <p className="text-xs leading-snug text-pretty text-muted">{t("subs.linkAwg.mistgate")}</p>
-        </div>
-        <Switch checked={on} disabled={save.isPending} onCheckedChange={flip} aria-label={t("subs.linkAwg.title")} className="mt-0.5" />
-      </Card>
+    <>
+      <Toggle id="link-awg" title={t("subs.linkAwg.title")} hint={`${t(on ? "subs.linkAwg.on" : "subs.linkAwg.off")} ${t(on ? "sx.rules.awgMg" : "subs.linkAwg.mistgate")}`} checked={on} disabled={save.isPending} onChange={flip} />
       <LinkAwgOffDialog open={open} onOpenChange={setOpen} keys={keys} onConfirm={() => apply(false)} />
-    </section>
+    </>
   );
 }
 

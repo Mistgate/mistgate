@@ -4,13 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { halo } from "@/components/fx/halo";
 import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { Card, SectionLabel } from "@/components/ui/bits";
 import { useToast } from "@/components/ui/toast";
 import { errorText } from "@/lib/errors";
 import { userCountQuery } from "@/lib/queries";
 import { useTx, type Key } from "@/screens/users/t";
 import { ConfirmModal } from "@/screens/users/ui";
 import type { Settings } from "./model";
+import { path, Section } from "./parts";
 import { settingsQuery, useSaveSettings } from "./queries";
 
 const modes: { value: LinkDeviceLimit; label: Key; hint: Key }[] = [
@@ -72,28 +72,23 @@ export function DeviceLimitCard({ settings }: { settings: Settings }) {
 
   return (
     <section id="device-limit">
-      <Card lg className="flex min-w-0 flex-col gap-3 p-4">
-        <SectionLabel icon="phone" tone="mint" as="h2">
-          {t("subs.devLimit.title")}
-        </SectionLabel>
-        <RadioGroup aria-label={t("subs.devLimit.title")} value={String(mode)} onValueChange={(v) => pick(Number(v) as LinkDeviceLimit)} disabled={save.isPending} className="grid gap-1.5 md:grid-cols-3">
-          {modes.map((m) => (
-            <Radio.Root
-              key={m.value}
-              value={String(m.value)}
-              className="group flex cursor-pointer items-start gap-3 rounded-field border border-line bg-surface p-3 text-start transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft data-disabled:cursor-default"
-            >
-              <span aria-hidden className="mt-0.5 grid size-4 flex-none place-items-center rounded-full border-[1.5px] border-faint group-data-checked:border-accent">
-                <Radio.Indicator className="size-2 rounded-full bg-accent" />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[13px] font-bold">{t(m.label)}</span>
-                <span className="text-xs leading-snug text-pretty text-muted">{t(m.hint)}</span>
-              </span>
-            </Radio.Root>
-          ))}
-        </RadioGroup>
-      </Card>
+      <Section tone="rose" icon={path.monitor} title={t("subs.devLimit.title")} shot="subs-device-limit">
+        <div className="sb-pad">
+          <RadioGroup aria-label={t("subs.devLimit.title")} value={String(mode)} onValueChange={(v) => pick(Number(v) as LinkDeviceLimit)} disabled={save.isPending} className="pf-opt pp-cards sb-lim3">
+            {modes.map((m) => (
+              <Radio.Root key={m.value} value={String(m.value)}>
+                <span className="nx-rad" aria-hidden="true" aria-checked={String(m.value) === String(mode)}>
+                  <i />
+                </span>
+                <div>
+                  <b>{t(m.label)}</b>
+                  <span>{t(m.hint)}</span>
+                </div>
+              </Radio.Root>
+            ))}
+          </RadioGroup>
+        </div>
+      </Section>
       <ConfirmModal
         open={open}
         onOpenChange={setOpen}

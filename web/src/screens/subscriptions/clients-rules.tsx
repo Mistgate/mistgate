@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Select } from "@/components/ui/select";
@@ -10,6 +9,7 @@ import { useIsOwner } from "@/lib/updates";
 import { clientCompatQuery, coreName, cores, platformName, platforms, ruleKey, rulesEqual, sameRule, useClientCompatSave, type CompatRule } from "@/lib/clientcompat";
 import { useTx, type Tx } from "@/screens/users/t";
 import { ConfirmModal } from "@/screens/users/ui";
+import { path, Svg } from "./parts";
 import { inputCls, SaveBar } from "./ui";
 
 // The columns of the table once the card is wide enough; narrower, a row stacks into a small form.
@@ -52,25 +52,19 @@ export function MinimumsCard({ initialOpen = false }: { initialOpen?: boolean })
 
   return (
     <div className="flex flex-col gap-3.5">
-      <Card lg className="flex min-w-0 flex-col gap-3 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex min-w-0 flex-col gap-1">
-            <SectionLabel icon="sliders" tone="sand" as="h2">
-              {t("cc.min.title")}
-            </SectionLabel>
-            <p className="text-xs leading-snug text-pretty text-muted">{t("cc.min.sub")}</p>
-          </div>
-          {q.data && (
-            <Button variant="secondary" size="sm" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((o) => !o)}>
-              {open ? t("cc.min.hide") : t("cc.min.show", { n: rules.length })}
-            </Button>
-          )}
-        </div>
+      <section className="card sb-mv2" data-shot="subs-minimums">
+        <button type="button" className="sb-mvh" aria-expanded={open} aria-controls={bodyId} onClick={() => q.data && setOpen((o) => !o)}>
+          <Svg d={path.chevR} />
+          <span>
+            <b>{q.data ? `${t("cc.min.title")} · ${rules.length}` : t("cc.min.title")}</b>
+            <em>{t("cc.min.sub")}</em>
+          </span>
+        </button>
         {q.isPending && <Pending compact />}
         {q.isError && !q.data && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
         {q.data && open && (
-          <div id={bodyId} className="@container flex flex-col gap-3">
-            <ul className="-mx-4 flex flex-col border-y border-line">
+          <div id={bodyId} className="@container flex flex-col gap-3 px-5 pb-4">
+            <ul className="-mx-5 flex flex-col border-y border-line">
               <li aria-hidden className={`hidden h-10 items-center gap-x-3 px-4 text-[11px] font-bold tracking-[0.06em] text-muted uppercase @min-[720px]:grid ${cols}`}>
                 <span>{t("cc.min.col.app")}</span>
                 <span>{t("cc.min.col.core")}</span>
@@ -106,7 +100,7 @@ export function MinimumsCard({ initialOpen = false }: { initialOpen?: boolean })
             )}
           </div>
         )}
-      </Card>
+      </section>
       {dirty && <SaveBar busy={save.isPending} canSave onSave={onSave} onDiscard={() => setDraft(null)} />}
       <ConfirmModal
         open={resetting}

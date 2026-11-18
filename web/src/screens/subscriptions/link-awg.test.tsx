@@ -65,7 +65,7 @@ describe("AmneziaWG in apps on the link", () => {
     await mount(undefined);
     expect(toggle().getAttribute("aria-checked")).toBe("true");
     expect(text()).toContain("kl!ck and the other Mihomo apps get the AmneziaWG servers");
-    expect(text()).toContain("The Mistgate app is not affected by this switch");
+    expect(text()).toContain("The switch does not affect the Mistgate app");
   });
 
   it("asks before taking it out while the link apps hold keys, with how many, and saves only on confirm", async () => {
