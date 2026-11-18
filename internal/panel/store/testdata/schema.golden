@@ -1021,6 +1021,12 @@
   },
   {
     "type": "table",
+    "name": "node_speed_test",
+    "tbl_name": "node_speed_test",
+    "sql": "CREATE TABLE node_speed_test ( node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, at INTEGER NOT NULL, PRIMARY KEY (node_id, at) )"
+  },
+  {
+    "type": "table",
     "name": "node_tcp_check",
     "tbl_name": "node_tcp_check",
     "sql": "CREATE TABLE node_tcp_check ( node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, port INTEGER NOT NULL, role TEXT NOT NULL, alpn INTEGER NOT NULL DEFAULT 0, profile TEXT NOT NULL DEFAULT '', verdict TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', sender TEXT NOT NULL, checked_at INTEGER NOT NULL, PRIMARY KEY (node_id, port) )"
