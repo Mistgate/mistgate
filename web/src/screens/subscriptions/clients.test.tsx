@@ -256,7 +256,7 @@ describe("In fact (what the nodes saw)", () => {
 
   it("has a column 'In fact' with the pill of each class and the counts under it", async () => {
     await mount({ list: () => page() });
-    expect([...document.querySelectorAll("table thead th")].map((h) => h.textContent)).toEqual(["Person", "Device", "App", "State", "In fact", "What is missing"]);
+    expect([...document.querySelectorAll("table thead th")].map((h) => h.textContent)).toEqual(["Person", "Device", "App", "By the table", "In fact"]);
     const [alice, bob, carol, dave, erin, frank] = rows();
     expect(cell(alice!)).toContain("Old-style");
     expect(cell(alice!)).toContain("new 0 · old 5");
@@ -267,12 +267,12 @@ describe("In fact (what the nodes saw)", () => {
     expect(cell(dave!)).toContain("new 3 · old 2");
     expect(cell(erin!)).toBe("No data");
     expect(cell(frank!)).toContain("4 unreadable");
-    // the pill of the class sits next to the pill of the state, in the same shape
-    expect(alice!.querySelectorAll("td")[3]!.querySelector(".pill")).toBeTruthy();
-    expect(alice!.querySelectorAll("td")[4]!.querySelector(".pill.tone-bad")).toBeTruthy();
-    expect(bob!.querySelectorAll("td")[4]!.querySelector(".pill.tone-ok")).toBeTruthy();
-    expect(dave!.querySelectorAll("td")[4]!.querySelector(".pill.tone-warn")).toBeTruthy();
-    expect(erin!.querySelectorAll("td")[4]!.querySelector(".pill.tone-blip")).toBeTruthy();
+    // the verdict of the table is a pill, what the nodes saw is a word (warm when old-style or mixed)
+    expect(alice!.querySelectorAll("td")[3]!.querySelector(".pv-pill")).toBeTruthy();
+    expect(alice!.querySelectorAll("td")[4]!.querySelector("b.warn")).toBeTruthy();
+    expect(bob!.querySelectorAll("td")[4]!.querySelector("b.warn")).toBeNull();
+    expect(dave!.querySelectorAll("td")[4]!.querySelector("b.warn")).toBeTruthy();
+    expect(erin!.querySelectorAll("td")[4]!.querySelector("b.warn")).toBeNull();
   });
 
   it("marks where the table and the nodes disagree, in both directions, and says why", async () => {
@@ -280,15 +280,11 @@ describe("In fact (what the nodes saw)", () => {
     const [alice, bob, carol] = rows();
     const worse = alice!.querySelector<HTMLElement>("[data-mismatch=worse]")!;
     expect(worse.getAttribute("aria-label")).toBe("Differs from the table: The table says OK, but the nodes saw old-style handshakes: the table is wrong here.");
-    expect(worse.className).toContain("tone-warn");
+    expect(worse.className).toContain("part");
     const better = bob!.querySelector<HTMLElement>("[data-mismatch=better]")!;
     expect(better.getAttribute("aria-label")).toContain("nothing to worry about");
-    expect(better.className).toContain("tone-ok");
+    expect(better.className).toContain("ok");
     expect(carol!.querySelector("[data-mismatch]")).toBeNull();
-    // a card says it in words
-    const cards = [...document.querySelectorAll<HTMLElement>("p[data-mismatch]")];
-    expect(cards.map((c) => c.getAttribute("data-mismatch"))).toEqual(["worse", "better"]);
-    expect(cards[0]!.textContent).toContain("the table is wrong here");
   });
 
   it("counts the classes in chips and the disagreements and the silent nodes in quiet lines", async () => {
@@ -410,16 +406,16 @@ describe("In fact, the pure parts", () => {
 describe("minimum versions", () => {
   it("is folded until asked for, with the number of rows on the button", async () => {
     await mount();
-    expect(button("Show the table (2)")).toBeTruthy();
+    expect(button("Minimum versions · 2")).toBeTruthy();
     expect(document.querySelector("input[type=text]")).toBeNull();
-    await click(button("Show the table (2)"));
-    expect(button("Hide")).toBeTruthy();
+    await click(button("Minimum versions · 2"));
+    expect(button("Minimum versions")!.getAttribute("aria-expanded")).toBe("true");
     expect(text()).toContain("Mihomo");
   });
 
   it("is read only for a helper: values as text, an unknown version as '?', no fields, no buttons, one line about the owner", async () => {
     await mount({ role: Role.HELPER });
-    await click(button("Show the table"));
+    await click(button("Minimum versions"));
     expect(document.querySelector("input[type=text]")).toBeNull();
     expect(document.querySelector("[role=switch]")).toBeNull();
     expect(text()).toContain("3.1.1");
@@ -432,7 +428,7 @@ describe("minimum versions", () => {
 
   it("is edited by the owner: a changed row gets Revert, Save sends the whole table once", async () => {
     await mount();
-    await click(button("Show the table"));
+    await click(button("Minimum versions"));
     expect(text()).not.toContain("Unsaved changes");
     const field = document.querySelector<HTMLInputElement>("input[aria-label='Happ: version for chrome']")!;
     expect(field.value).toBe("3.1.1");
@@ -457,7 +453,7 @@ describe("minimum versions", () => {
 
   it("takes the word never in the firefox/safari field only, and keeps nothing else that is not a version", async () => {
     await mount();
-    await click(button("Show the table"));
+    await click(button("Minimum versions"));
     const other = document.querySelector<HTMLInputElement>("input[aria-label='Mihomo: version for firefox/safari']")!;
     await typeInto(other, "never");
     expect(other.value).toBe("never");
@@ -472,7 +468,7 @@ describe("minimum versions", () => {
 
   it("takes a change back with Revert and shows no bar for an edit that ends where it began", async () => {
     await mount();
-    await click(button("Show the table"));
+    await click(button("Minimum versions"));
     const field = document.querySelector<HTMLInputElement>("input[aria-label='Mihomo: version for firefox/safari']")!;
     await typeInto(field, "1.20");
     expect(text()).toContain("Unsaved changes");
@@ -483,7 +479,7 @@ describe("minimum versions", () => {
 
   it("adds an app of the owner's own, which can be removed, and refuses a duplicate", async () => {
     await mount();
-    await click(button("Show the table"));
+    await click(button("Minimum versions"));
     const name = document.querySelector<HTMLInputElement>("input[placeholder=happ]")!;
     await typeInto(name, "Happ");
     expect(name.value).toBe("happ");
@@ -501,7 +497,7 @@ describe("minimum versions", () => {
   it("sends the built-in table to reset everything, after a confirmation", async () => {
     const edited = [rule("happ", "9.9", "3.1.1", { title: "Happ" }), defaults[1]!];
     await mount({ rules: edited });
-    await click(button("Show the table"));
+    await click(button("Minimum versions"));
     await click(button("Reset everything to the built-in table"));
     await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent === "Reset"));
     await settle();

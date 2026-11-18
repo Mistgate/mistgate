@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/bits";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { Switch } from "@/components/ui/switch";
 import { clientApiQuery, useClientApiUpdate } from "@/lib/clientapi";
 import { useIsOwner } from "@/lib/updates";
-import { MistgateTile } from "@/screens/users/mistgate-app";
+import { DefaultMark } from "@/components/brand";
 import { useTx } from "@/screens/users/t";
+import { Section, Toggle } from "./parts";
 
 /**
  * "The Mistgate app" for the whole panel: whether the Mistgate desktop app may find the panel and connect to it directly, each device
@@ -23,32 +22,29 @@ export function ClientApiCard() {
 
   return (
     <section id="client-api">
-      <Card lg className="flex min-w-0 flex-col gap-3 p-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <MistgateTile dim={q.data !== undefined && !on} />
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <h2 className="text-[13px] font-bold">{t("subs.clientApi.title")}</h2>
-            {q.isPending && <Pending compact />}
-            {q.data && <p className="text-xs leading-snug text-pretty text-muted">{t(on ? "subs.clientApi.on" : "subs.clientApi.off")}</p>}
-            {q.data && <p className="text-xs leading-snug text-pretty text-muted">{t("subs.clientApi.perPerson")}</p>}
-            {q.data && !owner && <p className="text-xs leading-snug text-pretty text-muted">{t("subs.clientApi.ownerOnly")}</p>}
-            {q.isError && !q.data && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+      <Section tone="mint" icon={<DefaultMark size={18} />} title={t("subs.clientApi.title")} shot="subs-client-api">
+        {q.isPending && <Pending compact />}
+        {q.isError && !q.data && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+        {q.data && (
+          <div className="sb-tgs">
+            <Toggle title={t("sx.mg.on")} label={t("subs.clientApi.title")} hint={t(on ? "subs.clientApi.on" : "subs.clientApi.off")} checked={on} disabled={!owner || save.isPending} onChange={(v) => save.mutate(v)} />
           </div>
-          {q.data && <Switch checked={on} disabled={!owner || save.isPending} onCheckedChange={(v) => save.mutate(v)} aria-label={t("subs.clientApi.title")} className="mt-0.5" />}
-        </div>
-        {stats && (
-          <dl data-stats className="ms-12 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line pt-3">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <dt className="text-[11px] leading-snug text-muted">{t("subs.clientApi.statPeople")}</dt>
-              <dd className="text-[15px] font-bold tabular-nums">{t("subs.clientApi.statPeopleValue", { on: stats.peopleOn, all: stats.people })}</dd>
-            </div>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <dt className="text-[11px] leading-snug text-muted">{t("subs.clientApi.statDevices")}</dt>
-              <dd className="text-[15px] font-bold tabular-nums">{stats.devices}</dd>
-            </div>
-          </dl>
         )}
-      </Card>
+        {stats && (
+          <div className="sb-st2" data-stats>
+            <div>
+              <span>{t("subs.clientApi.statPeople")}</span>
+              <b className="mono">{t("subs.clientApi.statPeopleValue", { on: stats.peopleOn, all: stats.people })}</b>
+            </div>
+            <div>
+              <span>{t("subs.clientApi.statDevices")}</span>
+              <b className="mono">{stats.devices}</b>
+            </div>
+          </div>
+        )}
+        {q.data && <p className="pp-q1 sb-pad">{t("subs.clientApi.perPerson")}</p>}
+        {q.data && !owner && <p className="pp-q1 sb-pad">{t("subs.clientApi.ownerOnly")}</p>}
+      </Section>
     </section>
   );
 }

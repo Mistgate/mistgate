@@ -99,13 +99,13 @@ describe("the Mistgate app for the whole panel", () => {
   it("speaks Russian", async () => {
     setLang("ru");
     await mount(false);
-    expect(document.querySelector("h2")?.textContent).toBe("Приложение Mistgate");
+    expect(document.querySelector("h3")?.textContent).toBe("Приложение Mistgate");
     expect(text()).toContain("Выключено: приложение Mistgate не находит панель");
   });
 
   it("carries the name and the mark of the app, one name for the card and the person's row", async () => {
     await mount(true);
-    expect(document.querySelector("h2")?.textContent).toBe("Mistgate app");
+    expect(document.querySelector("h3")?.textContent).toBe("Mistgate app");
     expect(document.querySelector("[aria-label=Mistgate]")).not.toBeNull(); // the panel's own mark
     expect(toggle().getAttribute("aria-label")).toBe("Mistgate app");
     expect(text()).toContain("set on each person's card");
