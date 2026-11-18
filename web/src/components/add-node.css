@@ -113,14 +113,6 @@
     transform: translate(-50%, -62%) scale(1);
   }
 }
-@keyframes an-sk {
-  from {
-    opacity: 0.5;
-  }
-  to {
-    opacity: 1;
-  }
-}
 
 /* ---- the rail: the way to install, the steps with what was entered, the note */
 .an-s {

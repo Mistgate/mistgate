@@ -30,10 +30,6 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
-@keyframes aip-in {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: none; }
-}
 
 /* ---- the page (L84, L5863-5865, L6063) ---- */
 .aip {
@@ -475,8 +471,7 @@
 .ai-dlg .ai-cs { margin: 0; font-size: 12px; line-height: 16px; color: var(--muted); }
 .ai-dlg .ai-step { display: flex; align-items: center; gap: 12px; }
 .ai-dlg .ai-step > span { font-size: 13px; color: var(--sec); }
-.ai-dlg .ai-step select, .ai-dlg .ai-step .sb-fix { height: 36px; font-size: 13px; color: var(--text); }
-.ai-dlg .sb-fix { display: inline-flex; align-items: center; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); font-size: 14px; color: var(--sec); }
+.ai-dlg .ai-step select { height: 36px; font-size: 13px; color: var(--text); }
 .ai-dlg .ai-sx { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); }
 .ai-dlg .ai-sx + .ai-sx { margin-top: 0; }
 .ai-dlg .ai-cd { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }

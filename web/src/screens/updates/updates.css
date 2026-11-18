@@ -47,10 +47,6 @@
   60% { transform: scale(1.04); }
   100% { transform: none; }
 }
-@keyframes uq-dpop {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: none; }
-}
 
 /* ---- the page ---- */
 .uq {
@@ -249,7 +245,7 @@
 .uq .rc-pb > div { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .uq .rc-pb b { font-size: 14px; font-weight: 500; }
 .uq .rc-pb span { font-size: 13px; line-height: 20px; color: var(--sec); }
-.uq .rc-pb > .uq-btn, .uq .rc-pb > a, .uq .rc-pb > button { flex: none; align-self: center; }
+.uq .rc-pb > a, .uq .rc-pb > button { flex: none; align-self: center; }
 /* L5090, L4811-4816, L5016 */
 .uq .us-none { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 40px 24px; text-align: center; }
 .uq .us-none > .g { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 14px; background: var(--step); color: var(--sec); }
@@ -257,7 +253,6 @@
 .uq .us-none > .g.bad { background: var(--danger-soft); color: var(--danger-text); }
 .uq .us-none > b { font-size: 16px; font-weight: 500; color: var(--text); }
 .uq .us-none > span:not(.g) { max-width: 420px; font-size: 14px; line-height: 20px; color: var(--sec); }
-.uq .us-none .uq-btn { margin-top: 14px; }
 .uq .us-none.hl-calm { margin-bottom: 16px; }
 .uq .us-none.rc-emp { margin-top: 4px; }
 .uq .pv-qe { margin-top: 16px; }
@@ -272,7 +267,6 @@
 .uq .nd-lk { font-size: 13px; color: var(--sec); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 4px; }
 .uq .nd-lk:hover { color: var(--text); }
 /* the board's .btn, for what is not a Button (a link that looks like one) */
-.uq .uq-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 
 /* ---- the panel: the hero ---- */
 /* L5373-5374, L5502-5504 */
@@ -386,12 +380,11 @@
 .uq .uq-now b { font-size: 14px; font-weight: 500; }
 .uq .uq-now span:not(.an-sp) { font-size: 13px; line-height: 18px; color: var(--muted); }
 .uq .uq-now em { font-style: normal; font-size: 12px; color: var(--muted); }
-.uq .uq-now .uq-btn, .uq .uq-now button { flex: none; }
+.uq .uq-now button { flex: none; }
 .uq.uq-fx .uq-now, .uq.uq-fx .uq-hero .rc-pb, .uq.uq-fx .uq-ag .rc-pb { animation: uq-up 0.25s var(--e) both; }
 .uq .uq-hero .rc-pb, .uq .uq-ag .rc-pb { margin: 0 24px 16px; align-items: center; }
 .uq .uq-ag .rc-pb { margin-bottom: 24px; }
 .uq .uq-ha { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 16px 24px; border-top: 1px solid var(--border); justify-content: flex-end; align-items: center; }
-.uq .uq-ha .uq-btn, .uq .uq-pk .uq-btn, .uq .uq-oa .uq-btn { display: inline-flex; align-items: center; gap: 8px; }
 .uq .uq-ha .uq-ro { margin: 0 auto 0 0; padding: 0; }
 [dir="rtl"] .uq .uq-ha .uq-ro { margin: 0 0 0 auto; }
 .uq .uq-ro { margin: 0; padding: 0 24px 16px; font-size: 13px; color: var(--muted); }
@@ -505,9 +498,7 @@
 .uq .uq-ft.just .uq-fd { animation: uq-pop 0.5s var(--ease-spring) both; }
 .uq .uq-ft.just::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--accent-mark) 8%, transparent); animation: uq-fade 1.4s var(--e) both; }
 .uq .uq-ft .rw-pg { margin-top: 4px; }
-.uq .uq-ft .uq-fpg { display: flex; flex-direction: column; gap: 2px; }
 .uq .uq-ag .uq-now { margin-top: -8px; }
-.uq .uq-ag .uq-now .uq-btn { flex: none; }
 /* L5399-5441: the tables */
 .uq .uq-t { display: flex; flex-direction: column; }
 .uq .uq-r {
@@ -531,7 +522,7 @@
 .uq .uq-up b.part { color: var(--warning-text); }
 .uq .uq-last { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 13px; color: var(--sec); }
 .uq .uq-last > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.uq .uq-last .uq-btn, .uq .uq-last button { flex: none; }
+.uq .uq-last button { flex: none; }
 /* a schedule that waits is plain, as on the board (the same colour as the rest of the line); only a missed one is told apart */
 .uq .uq-last .uq-lw.miss, .uq .uq-last .uq-lw.warn { color: var(--warning-text); }
 .uq .uq-last .uq-lb { color: var(--danger-text); }
@@ -556,7 +547,6 @@
 .uq .uq-ls .uq-lq small.bad { color: var(--danger-text); }
 .uq .uq-ls .uq-lq .rw-pg { margin-top: 2px; }
 .uq .uq-lsn { margin: 0; padding: 8px 20px 16px; font-size: 12px; line-height: 20px; color: var(--muted); }
-.uq .uq-of { margin: 0 20px 12px; }
 .uq .uq-bf { margin: 0 20px 12px; display: flex; flex-direction: column; gap: 12px; }
 
 /* ---- the servers' operating system ---- */
@@ -589,8 +579,6 @@
 .uq .uq-oa .nd-lk { margin-inline-start: auto; }
 .uq .uq-ob { display: flex; flex-direction: column; gap: 10px; padding: 0 20px 14px; min-width: 0; }
 .uq .uq-ob:empty { display: none; }
-.uq .uq-oy { display: flex; flex-direction: column; gap: 4px; padding: 0 20px 12px; }
-.uq .uq-oy p { margin: 0; font-size: 12px; line-height: 16px; color: var(--muted); }
 .uq .uq-w.cking::before {
   content: "";
   position: absolute;
@@ -731,20 +719,20 @@
   .uq .uq-now { padding: 12px 16px; flex-wrap: wrap; }
   .uq .uq-now > div { flex: 1 1 200px; }
   .uq .uq-now > .an-sp { align-self: flex-start; margin-top: 2px; }
-  .uq .uq-ag .uq-now .uq-btn, .uq .uq-ag .uq-now button { margin-inline-start: auto; }
+  .uq .uq-ag .uq-now button { margin-inline-start: auto; }
   .uq .uq-ha { padding: 12px 16px; flex-wrap: wrap; }
-  .uq .uq-ha .uq-btn, .uq .uq-ha button { flex: 1; justify-content: center; }
+  .uq .uq-ha button { flex: 1; justify-content: center; }
   .uq .uq-ha > * { width: auto; }
   .uq .uq-ha .uq-ro { flex: 1 1 100%; }
   .uq .uq-ro { padding: 0 16px 16px; }
   .uq .uq-hero .rc-pb, .uq .uq-ag .rc-pb { margin: 0 16px 12px; flex-wrap: wrap; }
-  .uq .uq-hero .rc-pb .uq-btn, .uq .uq-ag .rc-pb .uq-btn, .uq .uq-hero .rc-pb button, .uq .uq-ag .rc-pb button, .uq .uq-ag .rc-pb a { margin-inline-start: 18px; }
+  .uq .uq-hero .rc-pb button, .uq .uq-ag .rc-pb button, .uq .uq-ag .rc-pb a { margin-inline-start: 18px; }
   .uq .uq-hint { margin: 0 16px 12px; }
   .uq .uq-hero.upto { display: block; }
   .uq .uq-hero.upto .uq-vs { flex-wrap: wrap; }
   .uq .uq-hero.upto .uq-ok { margin-inline-start: 0; text-align: start; flex-direction: row; align-items: center; flex: 1 1 100%; flex-wrap: wrap; }
   .uq .uq-hero.upto .uq-ha { padding: 0 16px 16px; }
-  .uq .uq-hero.upto .uq-ha .uq-btn, .uq .uq-hero.upto .uq-ha button { flex: 1; }
+  .uq .uq-hero.upto .uq-ha button { flex: 1; }
   .uq .uq-rel { grid-template-columns: 1fr; padding: 12px 16px; }
   .uq .uq-rh { flex-direction: row; align-items: baseline; gap: 8px; }
   .uq .uq-rel li { grid-template-columns: 1fr; gap: 0; }
@@ -754,7 +742,7 @@
   .uq .uq-dl > div { grid-template-columns: 1fr; gap: 2px; }
   .uq .uq-dp, .uq .uq-dx { padding: 4px 16px 16px; }
   .uq .uq-agh { padding: 16px 16px 12px; }
-  .uq .uq-agh .uq-btn, .uq .uq-agh button { width: 100%; justify-content: center; }
+  .uq .uq-agh button { width: 100%; justify-content: center; }
   .uq .uq-fleet { padding: 0 16px 16px; }
   .uq .uq-fc { flex-wrap: wrap; row-gap: 4px; }
   .uq .uq-fr { order: 3; flex: 0 0 auto; overflow: visible; }
@@ -769,10 +757,10 @@
   .uq .uq-ls { padding: 0 16px 12px; }
   .uq .uq-lsn { padding-inline: 16px; }
   .uq .uq-oa { padding: 4px 16px 16px; }
-  .uq .uq-oa .uq-btn, .uq .uq-oa button { width: 100%; justify-content: center; }
+  .uq .uq-oa button { width: 100%; justify-content: center; }
   .uq .uq-oa .nd-lk { margin-inline-start: 0; }
-  .uq .uq-ob, .uq .uq-oy { padding-inline: 16px; }
-  .uq .uq-of, .uq .uq-bf, .uq .uq-how { margin-inline: 16px; }
+  .uq .uq-ob { padding-inline: 16px; }
+  .uq .uq-bf, .uq .uq-how { margin-inline: 16px; }
   .uq .uq-os .uq-r, .uq .uq-os.tick .uq-r { grid-template-columns: minmax(0, 1fr) 16px; }
   .uq .uq-os.tick .uq-r { grid-template-columns: 20px minmax(0, 1fr) 16px; }
   .uq .uq-os .uq-r > * { grid-column: 1 !important; grid-row: auto !important; justify-self: start !important; text-align: start; margin: 0; align-items: flex-start; }

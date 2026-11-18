@@ -276,14 +276,10 @@
 .sv-runs .now {
   border-color: var(--tone-sky);
 }
-.sv-runs .now i,
-.sv-os.run .sv-prog i {
+.sv-runs .now i {
   background: linear-gradient(90deg, var(--step) 0, var(--tone-sky) 50%, var(--step) 100%);
   background-size: 200% 100%;
   animation: sv-sweep 1s linear infinite;
-}
-.sv-os.run .sv-prog i {
-  animation-duration: 1.2s;
 }
 @keyframes sv-sweep {
   from {
@@ -334,11 +330,6 @@
 }
 .sv-row > div > span.mono {
   font-size: 12px;
-}
-.sv-row > div > span.sv-pw {
-  color: var(--text);
-  font-size: 13px;
-  animation: mg-up 0.2s var(--e) both;
 }
 .sv-row .btn,
 .sv-row button.btn {
@@ -453,9 +444,6 @@
 .sv .sv-host {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
-.sv-fp {
-  font-size: 12px;
-}
 .nx-row {
   display: flex;
   flex-wrap: wrap;
@@ -534,10 +522,6 @@
 .sv-lk:hover {
   color: var(--danger);
   text-decoration-color: currentColor;
-}
-.sv-lock {
-  font-size: 12px;
-  color: var(--muted);
 }
 .sv-foot {
   display: flex;
@@ -753,30 +737,6 @@
   font-size: 13px;
   color: var(--sec);
 }
-.sv-ask {
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: center;
-  margin: 0 24px 16px;
-  animation: mg-up 0.25s var(--e) both;
-}
-.sv-prog {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 0 24px 16px;
-  animation: mg-up 0.25s var(--e) both;
-}
-.sv-prog i {
-  display: block;
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--tone-sky) var(--w), var(--step) 0);
-  transition: background 0.25s;
-}
-.sv-prog span {
-  font-size: 12px;
-  color: var(--muted);
-}
 .sv-eng {
   display: flex;
   flex-wrap: wrap;
@@ -856,14 +816,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sv-runs .now i,
-  .sv-os.run .sv-prog i,
   .sv-os .dr-ic.run svg,
   .sv-c,
   .sv-runs,
   .sv-key,
   .sv-code,
-  .sv-prog,
-  .sv-ask,
   .sv-drop,
   .sv-nav em.rec,
   .sv-rec > .dot {
@@ -974,16 +931,6 @@
   }
   .sv-oh {
     padding: 16px;
-  }
-  .sv-ask {
-    grid-template-columns: 32px minmax(0, 1fr);
-    margin: 0 16px 16px;
-  }
-  .sv-ask .nx-row {
-    grid-column: 1 / -1;
-  }
-  .sv-prog {
-    padding: 0 16px 16px;
   }
   .sv-eng {
     padding: 14px 16px 16px;

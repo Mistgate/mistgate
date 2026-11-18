@@ -189,10 +189,6 @@
   background: var(--tone-sky-bg);
   color: var(--tone-sky);
 }
-.pv-pill.dn-wl {
-  background: var(--tone-sand-bg);
-  color: var(--tone-sand);
-}
 
 /* ---- the line over the list: the count words, the search and the view ---- */
 .pv-top {

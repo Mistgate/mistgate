@@ -533,13 +533,6 @@
   color: var(--muted);
   text-wrap: pretty;
 }
-.sx.sx-dlg .sx-pw2 {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
 
 /* the buttons in a window's footer: the board's red one is a filled red (L5866) */
 .sx.sx-dfoot {
@@ -595,53 +588,6 @@
   line-height: 16px;
   color: var(--muted);
 }
-.sx .sx-rs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 16px;
-  padding: 0 20px 16px;
-}
-.sx .sx-rs>span {
-  flex: 1;
-  min-width: 14rem;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--muted);
-  text-wrap: pretty;
-}
-.sx .sx-fb {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 4px 20px 16px;
-  border-top: 1px solid var(--border);
-  margin-top: 4px;
-  padding-top: 16px;
-}
-.sx .sx-fb>div {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-.sx .sx-fb>div>span {
-  display: flex;
-  flex: 1;
-  min-width: 12rem;
-  flex-direction: column;
-  gap: 2px;
-}
-.sx .sx-fb b {
-  font-weight: 500;
-}
-.sx .sx-fb em {
-  font-style: normal;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--muted);
-  text-wrap: pretty;
-}
 .sx.sx-dlg .sx-fine {
   font-size: 11px;
   line-height: 16px;
@@ -670,8 +616,6 @@
   .sx .sx-aud,
   .sx .sx-aud-pg,
   .sx .sx-kept,
-  .sx .sx-rs,
-  .sx .sx-fb,
   .sx .sx-ks {
     padding-inline: 16px;
   }

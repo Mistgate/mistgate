@@ -398,16 +398,6 @@
 }
 
 /* Motion: screens fade + rise in, cards lift on hover, buttons press. Reduced motion is honoured below. */
-@keyframes mg-ui-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 /* a floating thing (a menu, a toast) rises 8px as it appears */
 @keyframes mg-up {
   from {
@@ -487,15 +477,6 @@
   }
 }
 /* the line of a node's ways in draws itself from people down to the node, once */
-@keyframes mg-ways-draw {
-  from {
-    transform: scaleY(0);
-  }
-}
-.ways-draw {
-  transform-origin: top;
-  animation: mg-ways-draw 0.3s var(--ease-out-soft) both;
-}
 .pop-in {
   animation: mg-ui-pop 0.4s both;
 }
@@ -697,48 +678,8 @@
 }
 
 /* a new message or tool row: fades in with a 4px rise */
-@keyframes mg-chat-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.chat-in {
-  animation: mg-chat-in 0.16s ease-out both;
-}
 
 /* The assistant chat's typing dots: three dots that rise in turn; still and half-lit with reduced motion. */
-@keyframes mg-typing {
-  0%,
-  60%,
-  100% {
-    opacity: 0.35;
-    transform: translateY(0);
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-.chat-dot {
-  animation: mg-typing 1.2s ease-in-out infinite;
-}
-.chat-dot:nth-child(2) {
-  animation-delay: 0.15s;
-}
-.chat-dot:nth-child(3) {
-  animation-delay: 0.3s;
-}
-@media (prefers-reduced-motion: reduce) {
-  .chat-dot {
-    animation: none !important;
-    opacity: 0.6;
-  }
-}
 
 /* A word of an answer as it streams in (useSmoothText in components/assistant/markdown.tsx): from clear and a little soft to
    sharp. Only the words that just arrived are animating at any moment. */
@@ -824,12 +765,6 @@
 }
 
 /* a screen's list rows on their first data: a fade with a 4px rise (components/fx/page.tsx) */
-@keyframes mg-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-}
 
 /* the switch's thumb stretches to 20px while it is pressed, and a checked one keeps its far edge where it is (pn.css .fz-sw:active i;
    the board's rule grows it past the track by 2px, which looks like a slip) */

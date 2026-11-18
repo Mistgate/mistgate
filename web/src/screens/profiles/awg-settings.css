@@ -200,11 +200,6 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.pf .pp-advg {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
 /* L4428-4430 the box that takes a client's .conf */
 .pf .pf-conf {
   display: flex;
