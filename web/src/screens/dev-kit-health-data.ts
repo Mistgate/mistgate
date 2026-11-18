@@ -31,6 +31,7 @@ export type Flags = {
   muted: boolean;
   grouped: boolean;
   loss: boolean;
+  warpreach: boolean;
   history: boolean;
   nodeproblems: boolean;
   edge: boolean;
@@ -52,6 +53,7 @@ export const flagsOf = (variant: string[]): Flags => {
     muted: has("muted"),
     grouped: has("grouped"),
     loss: has("loss"),
+    warpreach: has("warpreach"),
     history: has("history"),
     nodeproblems: has("nodeproblems"),
     edge: has("edge"),
@@ -209,8 +211,9 @@ export function alertsOf(f: Flags) {
     : [];
   const muted = f.muted ? [{ ...lossy("mu1", "de1", "8443", "250", { actions: ["open_profiles", "open_node", "mute"] }), mutedUntilUnix: NOW + 5 * H }] : [];
   const loss = f.loss ? [alert({ id: "pl", ...at("fi1"), kind: AlertKind.PATH_LOSSY, nodeId: nid("fi1"), subject: "nod_nl1", titleKey: "health.alert.path_lossy.title", whyKey: "health.alert.path_lossy.why", params: { node: "fi1", target: "nl1", target_id: "nod_nl1", ports: "2053, 2083", sent: "300", got: "236", other: "de1", other_got: "299", region: "cis", other_region: "other" } })] : [];
+  const warp = f.warpreach ? [alert({ id: "wr", ...at("nl1"), kind: AlertKind.WARP_REACH, subject: "example.com", titleKey: "health.alert.warp_reach.title", whyKey: "health.alert.warp_reach.why", params: { domain: "example.com", colo: "AMS", http_status: "403", streak: "3" }, actions: ["open_warp", "mute"] })] : [];
   const hist = f.history ? [mtproto("e1", "de1", 33), mtproto("e2", "nl1", 21), mtproto("e3", "fi1", 9), mtproto("e4", "msk1", 0), ...many] : board;
-  return { nowUnix: NOW, active: [...nodes, ...grouped, ...muted, ...loss, bob, alice, limit], history: hist };
+  return { nowUnix: NOW, active: [...nodes, ...grouped, ...muted, ...loss, ...warp, bob, alice, limit], history: hist };
 }
 
 const history48 = (fail: boolean) => Array.from({ length: 48 }, (_, i) => ({ startUnix: NOW - (47 - i) * 1800, ok: fail && i > 40 ? 0 : 6, failed: fail && i > 40 ? 6 : 0, latencyMs: 30 + ((i * 7) % 25) }));

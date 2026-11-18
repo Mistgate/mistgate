@@ -105,6 +105,7 @@ describe("the scenes of the Health page", () => {
       expect(body()).toContain("Items checked54");
     }
     if (state === "doctor.docbusy") expect(document.querySelector(".hl-dsum .an-sp")).not.toBeNull();
+    if (state === "alerts.warpreach.open.wr") expect(document.querySelector(".hl-al.open")?.textContent).toContain("example.com shows a block page through WARP");
     if (state === "alerts.edge") expect(body()).toContain("Not available in the Cloudflare edition");
   });
 

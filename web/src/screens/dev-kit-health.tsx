@@ -34,7 +34,7 @@ import { ShellLayout } from "./shell";
 // fixfail · nock · off; Role: ro, the same as role=readonly) and what its script does by a click: open.<id> (the row that is open: j r x u m c, p1 p2 p3; on Checks the node,
 // open.fi1) · dlg (the window of the journal fix) · dlgx (of the restart) · busy (the fix runs) · closeall (the window "Close all shown") · toast (the toast with Undo) ·
 // node.<name> (the filter "By node") · ckrun (the walk of "Check now" at its first step) · ckdone (its flash) · legend (the fold opened) · docbusy ("Run again" going);
-// and the product's states that the board does not draw: muted · grouped · loss · history · nodeproblems · edge (· mskclean: msk1 has no alert).
+// and the product's states that the board does not draw: muted · grouped · loss · warpreach · history · nodeproblems · edge (· mskclean: msk1 has no alert).
 // Made-up data of the board: de1 fi1 nl1 msk1, alice, bob, documentation addresses; no call leaves the page (the panel's answers are the scene's own).
 
 type Parts = { tab: HealthTab; variant: string[]; flags: Flags; at: (key: string) => string };
@@ -231,6 +231,7 @@ export const frames: Frame[] = [
   { id: "health-muted", state: "alerts.muted", title: "Product: a muted alert in its fold", w: 1440, h: 1100 },
   { id: "health-grouped", state: "alerts.grouped.open.g1", title: "Product: profiles that fail on one node, one row", w: 1440, h: 1100 },
   { id: "health-loss", state: "alerts.loss.open.pl", title: "Product: a lossy path, the table of two senders", w: 1440, h: 1100 },
+  { id: "health-warpreach", state: "alerts.warpreach.open.wr", title: "Product: a site that shows a block page through a node's WARP", w: 1440, h: 1100 },
   { id: "health-history", state: "alerts.history", title: "Product: a long history, its events and episodes", w: 1440, h: 1300 },
   { id: "health-nodeproblems", state: "alerts.nodeproblems", title: "Product: a node that is a problem with no alert", w: 1440, h: 1100 },
   { id: "health-edge", state: "alerts.edge", title: "Product: the Cloudflare edition (no checks)", w: 1440, h: 1000 },

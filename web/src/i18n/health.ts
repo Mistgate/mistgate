@@ -358,6 +358,8 @@ export const en = {
   "health.alert.path_lossy.why":
     "UDP from {node} ({region}) to {target} loses {lost} % on ports {ports}, while {arrived} arrive from {other} ({other_region}). The loss is on the way from {node}, not on {target}: its ports are fine. Port checks send from other nodes first for a day; the alert closes 30 hours after the last check that saw the loss.",
   // a filter, not a lossy line ({open}: the ports that got through whole; the lost ones got nothing): {target} itself is fine
+  "health.alert.warp_reach.title": "{domain} shows a block page through WARP",
+  "health.alert.warp_reach.why": "Through this node's WARP, {domain} answered with a block page (HTTP {http_status}) at the Cloudflare exit {colo}. Runs in a row that said so: {streak}. Some sites refuse WARP at one exit and not at another: restart WARP on the node's Exit tab to get a different one. The alert closes by itself when a run gets through.",
   "health.alert.path_lossy.title.filtered": "UDP filtered on the way to {target}",
   "health.alert.path_lossy.why.filtered":
     "UDP from {node} ({region}) reaches {target} only on {open}; ports {ports} get nothing, while from {other} ({other_region}) everything arrives. This is a filter on the way, often the hoster’s DDoS protection against data-centre traffic: {target} itself is fine and people on home networks usually connect, but port checks (and a relay) from {node} cannot pass.",
@@ -983,6 +985,8 @@ export const ru: typeof en = {
   "health.alert.agent_crash_loop.why": "Агент ноды упал и перезапустился {count} раз за последние {window_min} минут. Каждый перезапуск — событие agent_started, где прошлый запуск закончился не штатно; в его параметрах видно, что сообщил systemd: код выхода, сигнал или нехватку памяти. Тревога закроется, когда в окне останется меньше трёх аварийных перезапусков.",
   "health.alert.path_lossy.why":
     "UDP от {node} ({region}) до {target} теряет {lost} % на портах {ports}, а с {other} ({other_region}) доходит {arrived}. Потери на пути от {node}, а не на {target}: его порты в порядке. Сутки проверки портов шлют сначала с других нод; алерт закроется через 30 часов после последней проверки, которая видела потери.",
+  "health.alert.warp_reach.title": "{domain} показывает страницу блокировки через WARP",
+  "health.alert.warp_reach.why": "Через WARP этой ноды {domain} отвечает страницей блокировки (HTTP {http_status}) на выходе Cloudflare {colo}. Проверок подряд с таким ответом: {streak}. Часть сайтов не пускает WARP на одном выходе и пускает на другом: перезапусти WARP на вкладке «Выход» ноды, чтобы получить другой. Замечание закроется само, когда проверка пройдёт.",
   "health.alert.path_lossy.title.filtered": "Фильтр UDP по пути к {target}",
   "health.alert.path_lossy.why.filtered":
     "От {node} ({region}) UDP доходит до {target} только на {open}; на порты {ports} — ничего, а с {other} ({other_region}) доходит всё. Это фильтр по пути, часто защита хостера от DDoS из датацентров: сама {target} в порядке, люди из домашних сетей обычно подключаются, но проверки портов (и ретрансляция) с {node} проходить не будут.",
@@ -1568,6 +1572,8 @@ export const zh: typeof en = {
   "health.alert.agent_crash_loop.title": "节点 Agent 反复崩溃",
   "health.alert.agent_crash_loop.why": "节点 Agent 在最近 {window_min} 分钟内崩溃并重启了 {count} 次。每次重启都是一个 agent_started 事件，且上一次运行不是正常退出；事件参数会说明 systemd 看到的是退出码、信号还是内存不足被杀。窗口内的崩溃重启少于三次时，告警关闭。",
   "health.alert.path_lossy.why": "从 {node}（{region}）发往 {target} 的 UDP 在端口 {ports} 上丢失 {lost}%，而来自 {other}（{other_region}）的到达 {arrived}。丢包发生在从 {node} 出发的路上，不在 {target} 上：它的端口正常。一天内端口检测会优先从其他节点发送；最后一次发现丢包的检测过去 30 小时后，告警会关闭。",
+  "health.alert.warp_reach.title": "{domain} 通过 WARP 显示拦截页",
+  "health.alert.warp_reach.why": "通过此节点的 WARP，{domain} 在 Cloudflare 出口 {colo} 返回了拦截页（HTTP {http_status}）。连续这样回应的检查次数：{streak}。有些网站在一个出口拒绝 WARP，在另一个出口却不会：请在节点的“出口”标签页重启 WARP，换一个出口。检查通过后，此提醒会自动关闭。",
   "health.alert.path_lossy.title.filtered": "发往 {target} 的 UDP 在途中被过滤",
   "health.alert.path_lossy.why.filtered":
     "从 {node}（{region}）发往 {target} 的 UDP 只有 {open} 能到达；端口 {ports} 完全收不到，而来自 {other}（{other_region}）的全部到达。这是路径上的过滤，常见于服务商针对数据中心流量的 DDoS 防护：{target} 本身正常，家庭网络的用户通常能连接，但来自 {node} 的端口检测（以及中转）无法通过。",
@@ -2113,6 +2119,8 @@ export const fa: typeof en = {
   "health.alert.agent_crash_loop.title": "ایجنت نود مدام از کار می‌افتد",
   "health.alert.agent_crash_loop.why": "ایجنت نود در {window_min} دقیقهٔ اخیر {count} بار از کار افتاد و دوباره راه‌اندازی شد. هر راه‌اندازی یک رویداد agent_started است که اجرای قبلی‌اش به‌طور عادی تمام نشده بود؛ پارامترهایش می‌گویند systemd کد خروج، سیگنال یا کشته‌شدن به دلیل کمبود حافظه را دیده است. وقتی کمتر از سه راه‌اندازی ناشی از خرابی در بازه بماند، هشدار بسته می‌شود.",
   "health.alert.path_lossy.why": "UDP از {node} ({region}) به {target} روی پورت‌های {ports}، {lost}% گم می‌شود، در حالی که از {other} ({other_region}) {arrived} می‌رسد. گم شدن در مسیر از {node} است، نه روی {target}: پورت‌هایش سالم‌اند. تا یک روز بررسی پورت‌ها اول از نودهای دیگر فرستاده می‌شود؛ هشدار 30 ساعت پس از آخرین بررسی‌ای که گم شدن را دید بسته می‌شود.",
+  "health.alert.warp_reach.title": "{domain} از طریق WARP صفحهٔ مسدودسازی نشان می‌دهد",
+  "health.alert.warp_reach.why": "از طریق WARP این نود، {domain} در خروجی Cloudflare با نام {colo} صفحهٔ مسدودسازی برگرداند (HTTP {http_status}). تعداد بررسی‌های پیاپی با این پاسخ: {streak}. بعضی سایت‌ها WARP را در یک خروجی رد می‌کنند و در خروجی دیگر نه: WARP را در برگهٔ «خروجی» نود دوباره راه‌اندازی کن تا خروجی دیگری بگیری. وقتی یک بررسی بگذرد، این هشدار خودش بسته می‌شود.",
   "health.alert.path_lossy.title.filtered": "UDP در مسیر به {target} فیلتر می‌شود",
   "health.alert.path_lossy.why.filtered":
     "UDP از {node} ({region}) فقط روی {open} به {target} می‌رسد؛ به پورت‌های {ports} هیچ چیز نمی‌رسد، در حالی که از {other} ({other_region}) همه چیز می‌رسد. این فیلتری در مسیر است، اغلب محافظت سرویس‌دهنده در برابر DDoS از دیتاسنترها: خود {target} سالم است و کاربران شبکه‌های خانگی معمولاً وصل می‌شوند، اما بررسی پورت‌ها (و رله) از {node} رد نمی‌شود.",
@@ -2648,6 +2656,8 @@ export const tr: typeof en = {
   "health.alert.agent_crash_loop.title": "Düğüm ajanı sürekli çöküyor",
   "health.alert.agent_crash_loop.why": "Düğüm ajanı son {window_min} dakikada {count} kez çöküp yeniden başladı. Her yeniden başlatma, önceki çalışması düzgün bitmemiş bir agent_started olayıdır; parametreleri systemd'nin çıkış kodu, sinyal veya bellek yetersizliği nedeniyle sonlandırma görüp görmediğini söyler. Pencerede üçten az çöküş kalınca uyarı kapanır.",
   "health.alert.path_lossy.why": "{node} ({region}) düğümünden {target} düğümüne giden UDP, {ports} portlarında %{lost} kaybediyor; oysa {other} ({other_region}) tarafından gönderilenlerden {arrived} ulaşıyor. Kayıp {node} çıkışlı yolda, {target} düğümünde değil: portları sağlam. Port kontrolleri bir gün boyunca önce diğer düğümlerden gönderilir; uyarı, kaybı gören son kontrolden 30 saat sonra kapanır.",
+  "health.alert.warp_reach.title": "{domain} WARP üzerinden engel sayfası gösteriyor",
+  "health.alert.warp_reach.why": "Bu düğümün WARP'ı üzerinden {domain}, Cloudflare çıkışı {colo} üzerinde engel sayfası döndürdü (HTTP {http_status}). Art arda bu yanıtı veren kontrol sayısı: {streak}. Bazı siteler WARP'ı bir çıkışta reddedip başka çıkışta reddetmeyebilir: başka bir çıkış almak için düğümün “Çıkış” sekmesinde WARP'ı yeniden başlat. Bir kontrol geçtiğinde uyarı kendiliğinden kapanır.",
   "health.alert.path_lossy.title.filtered": "{target} düğümüne giden UDP yolda filtreleniyor",
   "health.alert.path_lossy.why.filtered":
     "{node} ({region}) düğümünden gelen UDP, {target} düğümüne yalnızca {open} üzerinden ulaşıyor; {ports} portlarına hiçbir şey ulaşmıyor, oysa {other} ({other_region}) tarafından gönderilenlerin hepsi ulaşıyor. Bu, yoldaki bir filtre; çoğu zaman sağlayıcının veri merkezi trafiğine karşı DDoS koruması: {target} düğümünün kendisi sağlam ve ev ağlarındaki kişiler genellikle bağlanır, ancak {node} düğümünden port kontrolleri (ve aktarıcı) geçemez.",

@@ -249,9 +249,9 @@ describe("the Reachability page with every source on", () => {
     await mount();
     const days = (name: string) => [...row(name).querySelectorAll<HTMLElement>(".rc-days i")].map((i) => i.className);
     expect(days("de1")).toEqual(Array(7).fill("ok"));
-    // fi1: the probe saw TCP blocked 30 h ago, so the last days are warned and the first are well
-    expect(days("fi1").slice(0, 5)).toEqual(Array(5).fill("ok"));
-    expect(days("fi1").slice(5)).toContain("part");
+    // fi1: the probe saw TCP blocked 30 h ago: that is yesterday, or the day before it in the small hours; the first four days are well whatever the clock says
+    expect(days("fi1").slice(0, 4)).toEqual(Array(4).fill("ok"));
+    expect(days("fi1").slice(4)).toContain("part");
     expect(row("de1").querySelector(".rc-days")?.getAttribute("aria-label")).toBe("reachable: no problems in 7 days");
     expect(row("de1").querySelector(".rc-days i")?.getAttribute("title")).toMatch(/: reachable$/);
   });
