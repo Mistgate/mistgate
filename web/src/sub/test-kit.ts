@@ -1,4 +1,6 @@
+import { deviceModal, deviceModalLabel, deviceModalStage } from "./add";
 import { cases } from "./dev-data";
+import { dict } from "./i18n";
 import { normalize } from "./logic";
 import { newAmzState, newDnsState, type Actions, type State } from "./state";
 import type { Lang, MgData } from "./types";
@@ -89,3 +91,21 @@ export const data = (name: keyof typeof cases | string, f: (d: MgData) => void =
 export const plain = (s: string | undefined | null) => (s ?? "").replace(/ /g, " ");
 
 export const text = (el: Element | null | undefined) => plain(el?.textContent);
+
+/**
+ * The window "New device" for a person on `platform`: what the page hands the modal (`box`), its name and step. `amz` and `over`
+ * change the state of the keys and of the page; `support` is the link of the page ("" = none).
+ */
+export function dialog(
+  d: MgData,
+  o: { platform?: State["platform"]; lang?: Lang; amz?: Partial<State["amz"]>; over?: Partial<State>; a?: ReturnType<typeof actions>; support?: string } = {},
+) {
+  const platform = o.platform ?? "ios";
+  const a = o.a ?? actions();
+  const s = state(platform, { ...o.over }, o.lang ?? "ru");
+  Object.assign(s.amz, { adding: true, pane: "pick" }, o.amz);
+  const c = { d, s, a, t: dict[s.lang], support: o.support ?? "https://t.me/example_support" };
+  const box = document.createElement("div");
+  box.append(...(deviceModal(c) as Node[]));
+  return { box, a, c, label: deviceModalLabel(c), stage: deviceModalStage(c) };
+}
