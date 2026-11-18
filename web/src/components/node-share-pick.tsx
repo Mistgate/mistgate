@@ -82,7 +82,7 @@ export function SharePick({ share, onChange }: { share: NodeShare; onChange: (c:
                 <Check checked={choice.groupIds.includes(g.id)} onCheckedChange={(on) => toggle(g.id, on)} aria-label={g.name} />
                 <i aria-hidden data-tone={groupTone(g.id, g.color)} className="size-2 flex-none rounded-full bg-(--t)" />
                 <span className="min-w-0 flex-1 truncate">{g.name}</span>
-                <span className="flex-none text-xs text-muted">{t.n("users.groupPeople", g.userCount)}</span>
+                <span className="flex-none text-xs text-muted">{t.n("users.groupPeople", g.userCount + g.extraUserCount)}</span>
               </label>
             ))}
           </div>

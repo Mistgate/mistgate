@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 const group = (over: Record<string, unknown> = {}) =>
-  ({ id: "grp_all", name: "Everyone", profileIds: ["p_hy", "p_awg"], disabledNodeIds: [], userCount: 5, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, ...over }) as unknown as Group;
+  ({ id: "grp_all", name: "Everyone", profileIds: ["p_hy", "p_awg"], disabledNodeIds: [], userCount: 5, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, ...over }) as unknown as Group;
 
 async function mount(groups: Group[], props: { creating?: boolean; focus?: string; query?: string; children?: ReactNode } = {}) {
   listGroups.mockResolvedValue({ groups });
@@ -97,7 +97,7 @@ const card = (name: string) => [...document.querySelectorAll("h3")].find((h) => 
 
 describe("the Groups tab", () => {
   it("shows each group as a card: its people, what it gives with the protocols and where it works, four facts, Open and Delete", async () => {
-    await mount([group(), group({ id: "grp_t", name: "test", profileIds: [], userCount: 0, happNodes: 0 })]);
+    await mount([group(), group({ id: "grp_t", name: "test", profileIds: [], userCount: 0, extraUserCount: 0, happNodes: 0 })]);
     const c = card("Everyone");
     expect(c.textContent).toContain("5 people");
     const open = [...c.querySelectorAll<HTMLAnchorElement>("a")].filter((a) => a.getAttribute("href") === "/users/groups/$id");
@@ -157,6 +157,27 @@ describe("the Groups tab", () => {
     await mount([group()], { focus: "grp_all" });
     expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: "/users/groups/$id", params: { id: "grp_all" }, replace: true }));
     expect(navigate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the people of a group are of both kinds", () => {
+  it("adds the extra members to the count of the card, and says how many of them are extra", async () => {
+    await mount([group({ id: "grp_f", name: "friends", userCount: 3, extraUserCount: 2 }), group()]);
+    expect(card("friends").textContent).toContain("5 people · 2 extra");
+    expect(card("friends").textContent).toContain("5"); // the fact "People"
+    expect(card("Everyone").textContent).toContain("5 people");
+    expect(card("Everyone").textContent).not.toContain("extra");
+  });
+
+  it("lets a group that only has extra members be deleted: they just leave, and the link says so", async () => {
+    deleteGroup.mockResolvedValue({});
+    await mount([group({ id: "grp_t", name: "test", userCount: 0, extraUserCount: 2 }), group()]);
+    const del = () => [...card("test").querySelectorAll("button")].find((b) => b.textContent === "Delete" || b.textContent?.startsWith("Sure?"))!;
+    await click(del());
+    expect(del().textContent).toBe("Sure? The extra members leave");
+    await click(del());
+    await settle();
+    expect(deleteGroup).toHaveBeenCalledWith({ groupId: "grp_t" });
   });
 });
 
@@ -236,7 +257,7 @@ describe("editing a group in its window", () => {
   it("asks before taking a profile away from its people, with what they lose, and then saves", async () => {
     updateGroup.mockImplementation(async (r: { dryRun?: boolean }) =>
       r.dryRun
-        ? { group: group(), impact: { users: 5, lost: [{ id: "p_awg", name: "AWG 3.1", protocol: "awg", awgDevices: 2 }], gained: [] } }
+        ? { group: group(), impact: { users: 5, lost: [{ id: "p_awg", name: "AWG 3.1", protocol: "awg", awgDevices: 2 }], gained: [], gainedNodeIds: [], lostNodeIds: [] } }
         : { group: group({ profileIds: ["p_hy"] }) },
     );
     await mount([group()], { children: <GroupEditModal group={group()} open onOpenChange={() => {}} /> });

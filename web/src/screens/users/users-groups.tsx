@@ -158,7 +158,7 @@ export function GroupsTab({
           ].filter((x) => x.list.length > 0);
           const reach = liveNodes.length - liveNodes.filter((n) => g.disabledNodeIds.includes(n.id)).length;
           const facts = [
-            [t("ul.fact.people"), String(g.userCount)],
+            [t("ul.fact.people"), String(g.userCount + g.extraUserCount)],
             [t("ul.fact.profiles"), String(g.profileIds.length)],
             [t("ul.fact.nodes"), nodes.data ? `${reach}/${liveNodes.length}` : "—"],
             ["DNS", (g.dnsPresetId && dnsName(g.dnsPresetId)) || t("ul.fact.dnsDefault")],
@@ -172,7 +172,10 @@ export function GroupsTab({
                     <i aria-hidden data-tone={groupTone(g.id, g.color)} className="me-2 size-2 flex-none rounded-full bg-(--t)" />
                     <span className="truncate">{g.name}</span>
                   </h3>
-                  <span className="text-[13px] text-muted">{t.n("users.groupPeople", g.userCount)}</span>
+                  <span className="text-[13px] text-muted">
+                    {t.n("users.groupPeople", g.userCount + g.extraUserCount)}
+                    {g.extraUserCount > 0 && ` · ${t("grp.countExtra", { n: g.extraUserCount })}`}
+                  </span>
                 </span>
                 <Stack groupId={g.id} />
               </AppLink>
@@ -207,7 +210,7 @@ export function GroupsTab({
                 </AppLink>
                 {manage && (
                   <button type="button" onClick={() => ask1(g)} className={cx("transition-colors hover:text-danger-text", asking ? "text-danger-text" : "text-muted")}>
-                    {asking ? (g.userCount > 0 ? t("ul.g.movePeople") : t("ul.g.sure")) : t("users.delete")}
+                    {asking ? (g.userCount > 0 ? t("ul.g.movePeople") : g.extraUserCount > 0 ? t("ul.g.sureExtra") : t("ul.g.sure")) : t("users.delete")}
                   </button>
                 )}
               </div>

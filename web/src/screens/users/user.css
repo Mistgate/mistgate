@@ -150,6 +150,13 @@
   color: var(--t-fg);
   transition: filter 0.15s var(--e);
 }
+.up-gtag.sm {
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 14px;
+}
 a.up-gtag:hover {
   filter: brightness(1.12);
 }
@@ -1690,6 +1697,98 @@ a.up-gtag:hover {
   stroke-width: 2.5;
 }
 .up-gnew b {
+  color: var(--accent-text);
+}
+/* the person's extra groups: a row of chips in the groups' colours (28 px, as the filter chips), "Add to a group" as a dashed chip */
+.up-xl {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.up-xg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.up-xc,
+.up-xa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 100%;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 16px;
+  white-space: nowrap;
+  transition:
+    filter 0.15s var(--e),
+    border-color 0.15s var(--e),
+    color 0.15s var(--e);
+}
+.up-xc {
+  padding: 0 6px 0 10px;
+  background: var(--t-bg);
+  color: var(--t-fg);
+}
+.up-xc span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.up-xc:hover,
+.up-xc[data-popup-open] {
+  filter: brightness(1.12);
+}
+.up-xc:disabled {
+  opacity: 0.6;
+}
+.up-xa {
+  padding: 0 10px 0 8px;
+  border: 1px dashed color-mix(in srgb, var(--text) 24%, transparent);
+  color: var(--sec);
+}
+.up-xa:hover:not(:disabled),
+.up-xa[aria-expanded="true"] {
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+.up-xa:disabled {
+  opacity: 0.5;
+}
+.up-fx .up-xc {
+  animation: mg-up 0.2s var(--e) both;
+}
+.up-xt {
+  margin-inline-start: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--step);
+  color: var(--sec);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  vertical-align: 1px;
+}
+.up-sell .up-gadd {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  text-align: start;
+  transition: background-color 0.15s var(--e);
+}
+.up-gadd > .g {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--tone-mint-bg);
   color: var(--accent-text);
 }
 .up-gnf {

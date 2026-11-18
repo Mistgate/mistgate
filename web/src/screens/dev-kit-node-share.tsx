@@ -58,6 +58,7 @@ export const groupRows = (receiving: readonly string[], nodeId = node) =>
     name,
     profileIds: ["p_vless", "p_hy"],
     userCount: people,
+    extraUserCount: 0,
     dnsPresetId: "",
     happNodes: 4,
     amneziaNodes: 0,

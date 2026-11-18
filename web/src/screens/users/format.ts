@@ -1,3 +1,4 @@
+import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { DeviceKind, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Tone } from "@/components/ui/icons";
@@ -57,6 +58,18 @@ export function shownStatus(u: User): Shown {
 }
 
 /** Active in the API's eyes, yet the person's page would give nothing: no subscription link, no AmneziaVPN keys, no Telegram. */
+/**
+ * What the groups of a person reach together, for the hint "the group gives nothing": the nodes of the main group and of the extra
+ * ones added up (it is 0 only when none of them reaches a node). Undefined while the main group is not in the list.
+ */
+export type Reach = { happNodes: number; amneziaNodes: number };
+export function reachOf(u: Pick<User, "groupId" | "extraGroupIds">, groups: readonly Pick<Group, "id" | "happNodes" | "amneziaNodes">[]): Reach | undefined {
+  const main = groups.find((g) => g.id === u.groupId);
+  if (!main) return undefined;
+  const mine = [main, ...u.extraGroupIds.map((id) => groups.find((g) => g.id === id)).filter((g) => g !== undefined)];
+  return { happNodes: mine.reduce((n, g) => n + g.happNodes, 0), amneziaNodes: mine.reduce((n, g) => n + g.amneziaNodes, 0) };
+}
+
 export const noAccess = (u: Pick<User, "accessHapp" | "accessAmnezia" | "accessTelegram">) => !u.accessHapp && !u.accessAmnezia && !u.accessTelegram;
 
 export const shownKey: Record<Shown, Key> = {
@@ -144,7 +157,7 @@ export function trafficTone(u: Pick<User, "usedBytes" | "quotaBytes" | "status">
 /** The line at the head of an open row: what is wrong with the person (or what to do), and in which tone. `info` is the quiet one. */
 export type RowWarn = { tone: "crit" | "warn" | "info"; text: string };
 
-export function warnOf(u: User, group: { happNodes: number; amneziaNodes: number } | undefined, t: Tx, fmt: Fmt, now = nowSec()): RowWarn | null {
+export function warnOf(u: User, group: Reach | undefined, t: Tx, fmt: Fmt, now = nowSec()): RowWarn | null {
   const d = daysLeft(u.expiresUnix, now);
   if (u.status === UserStatus.DISABLED) return { tone: "crit", text: t("ul.warn.off") };
   if (u.status === UserStatus.EXPIRED) return { tone: "crit", text: t.n("ul.warn.expired", Math.max(0, -(d ?? 0)) || 0) };

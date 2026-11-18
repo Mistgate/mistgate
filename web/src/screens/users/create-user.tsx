@@ -21,7 +21,7 @@ import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { nodesQuery } from "@/lib/queries";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
-import { avatarIndex, GB, groupTone } from "./format";
+import { avatarIndex, GB, groupTone, reachOf } from "./format";
 import { big, userN, type UserN as User } from "./model";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { defaultGroup, GroupEditModal, NewGroupModal } from "./groups";
@@ -602,7 +602,7 @@ function GroupButton({ g, on, t, onClick }: { g: Group; on: boolean; t: Tx; onCl
         <i aria-hidden data-tone={groupTone(g.id, g.color)} className="size-2 flex-none rounded-full bg-(--t)" />
         <span className="truncate">{g.name}</span>
       </b>
-      <span className="text-xs text-muted">{t.n("users.groupPeople", g.userCount)}</span>
+      <span className="text-xs text-muted">{t.n("users.groupPeople", g.userCount + g.extraUserCount)}</span>
       <em className="mt-1.5 truncate font-mono text-xs text-sec not-italic">{t("ul.new.reach", { a: g.happNodes, b: g.amneziaNodes })}</em>
       <i aria-hidden className={cx("absolute end-3 top-3 grid size-5 place-items-center rounded-full border text-transparent transition-[background-color,border-color] duration-150", on ? "border-accent-mark bg-accent-mark text-on-accent" : "border-[color-mix(in_srgb,var(--text)_22%,transparent)]")}>
         <Icon name="check" size={12} strokeWidth={3} />
@@ -637,7 +637,7 @@ function Done({ created, qr, onQr }: { created: Created; qr: boolean; onQr: (ope
   const t = useTx();
   const { user, url, password } = created;
   const groupList = useQuery(groupsQuery);
-  const target = linkTargetOf(user, groupList.data?.find((g) => g.id === user.groupId));
+  const target = linkTargetOf(user, reachOf(user, groupList.data ?? []));
   const nothing = !target.access.happ && !target.access.amnezia;
   return (
     <div className="relative flex flex-col items-center gap-2 text-center">

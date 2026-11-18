@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
-import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
-import { agoText, devicesView, lastOnlineOf, nowSec, warnOf } from "./format";
+import { agoText, devicesView, lastOnlineOf, nowSec, warnOf, type Reach } from "./format";
 import { detailN, type DeviceN, type UserN as User } from "./model";
 import { AppLink } from "./nav";
 import { platformLabel } from "./awg-devices";
@@ -27,7 +26,7 @@ const warnTone = {
   info: "bg-step [--c:var(--muted)]",
 } as const;
 
-export function UserExpand({ u, group, manage, onLink }: { u: User; group: Group | undefined; manage: boolean; onLink: () => void }) {
+export function UserExpand({ u, group, manage, onLink }: { u: User; group: Reach | undefined; manage: boolean; onLink: () => void }) {
   const t = useTx();
   const fmt = useFmt();
   const detail = useQuery({ queryKey: ["users", "detail", u.id], queryFn: ({ signal }) => users.getUser({ userId: u.id }, { signal }).then(detailN), staleTime: 10_000 });

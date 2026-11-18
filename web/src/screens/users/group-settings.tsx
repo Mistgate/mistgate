@@ -193,6 +193,9 @@ function DangerZone({ group, groups, onDeleted, demo }: { group: Group; groups: 
       setBusy("");
     }
   };
+  // only the people that have the group as their MAIN group have to be moved first; the extra members just leave it, and this says so
+  const extra = group.extraUserCount;
+  const deleteSub = (people > 0 ? t.n("grp.del.sub", people) : extra > 0 ? "" : t("grp.del.subEmpty")) + (extra > 0 ? `${people > 0 ? " " : ""}${t.n("grp.del.extraNote", extra)}` : "");
   // the button that asks again turns red; the plain button of its kind has its own colours, so these win with `!`
   const asking = "border-danger! text-danger-text! hover:border-danger! hover:text-danger-text!";
   return (
@@ -237,7 +240,7 @@ function DangerZone({ group, groups, onDeleted, demo }: { group: Group; groups: 
           </div>
         )}
       </ZoneRow>
-      <ZoneRow title={t("grp.del.title")} sub={people > 0 ? t.n("grp.del.sub", people) : t("grp.del.subEmpty")}>
+      <ZoneRow title={t("grp.del.title")} sub={deleteSub}>
         <Button size="lg" aria-disabled={people > 0 || undefined} disabled={busy !== ""} className={cx("hover:border-danger! hover:text-danger-text!", people > 0 && "opacity-45", ask === "del" && asking)} onClick={() => void remove()}>
           {ask === "del" ? t("grp.del.sure") : t("grp.del.title")}
         </Button>

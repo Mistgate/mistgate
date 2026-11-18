@@ -5,7 +5,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
-import { cacheOf, detailOf, frames } from "./dev-kit-user";
+import { cacheOf, changeDemoOf, detailOf, frames } from "./dev-kit-user";
+import { changeDemo } from "./users/group-membership";
 import { GoneCard } from "./users/user-detail";
 import { userTabs, UserDetail, type UserTab } from "./users/user-detail";
 
@@ -39,7 +40,7 @@ const sceneOf = (f: (typeof frames)[number]) => {
   const q = new URLSearchParams(f.params ?? "");
   const tab = (userTabs.includes(q.get("tab") as UserTab) ? q.get("tab") : "overview") as UserTab;
   const role = q.get("role") === "helper" ? Role.HELPER : q.get("role") === "readonly" ? Role.READONLY : Role.OWNER;
-  return { state: f.state, tab, role, ui: "" };
+  return { state: f.state, tab, role, ui: q.get("ui") ?? "" };
 };
 const marker: Record<UserTab, string> = { overview: ".up-tr", devices: ".up-sum", access: ".up-lim", logs: "#client-logs", settings: ".up-dz" };
 
@@ -47,6 +48,7 @@ async function draw(scene: ReturnType<typeof sceneOf>) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
+  changeDemo.current = changeDemoOf(scene.ui); // the scenes whose window is open from the start
   const qc = cacheOf(scene);
   await act(async () =>
     root!.render(
@@ -70,10 +72,44 @@ describe("the scenes of the person's page", () => {
     expect(host!.querySelectorAll("[role=tab]")).toHaveLength(5);
   });
 
+  it("draws the main group and the extra ones as chips, with the hint when there is none", async () => {
+    const access = (state: string, ui = "") => ({ state, tab: "access" as UserTab, role: Role.OWNER, ui });
+    await draw(access("extra"));
+    const chips = [...host!.querySelectorAll("[data-testid=extra-groups] .up-xc")];
+    expect(chips.map((c) => c.textContent)).toEqual(["colleagues", "friends"]);
+    expect(chips.every((c) => c.getAttribute("data-tone"))).toBe(true);
+    expect(host!.querySelector("[data-testid=extra-groups] small")).toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(access("ok"));
+    expect(host!.querySelectorAll("[data-testid=extra-groups] .up-xc")).toHaveLength(0);
+    expect(host!.querySelector("[data-testid=extra-groups] small")?.textContent).toContain("Extra groups add their servers");
+  });
+
+  it.each([
+    ["extra-confirm-add", "Add alice to “parents”?", "New nodes: msk1"],
+    ["extra-confirm-remove", "Remove alice from “friends”?", "Nodes that go away: fi1"],
+    ["extra-confirm-main", "Make “friends” the main group of alice?", "What the person gets stays the same"],
+    ["extra-confirm-none", "Add alice to “parents”?", "What alice gets stays the same"],
+  ])("opens the window %s on made-up impact", async (ui, title, line) => {
+    await draw({ state: "extra", tab: "access", role: Role.OWNER, ui });
+    const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!;
+    expect(dialog.textContent).toContain(title);
+    expect(dialog.textContent).toContain(line);
+  });
+
+  it.each(["ru", "zh", "fa", "tr"] as const)("the window of a removal speaks %s with no bare key", async (lang) => {
+    setLang(lang);
+    await draw({ state: "extra", tab: "access", role: Role.OWNER, ui: "extra-confirm-remove" });
+    const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!;
+    expect(dialog.textContent).toContain("friends");
+    expect(dialog.textContent).not.toMatch(/\b(up|users|grp)\.\w+/);
+  });
+
   it.each(["ru", "zh", "fa", "tr"] as const)("every tab draws in %s", async (lang) => {
     for (const tab of userTabs) {
       setLang(lang);
-      await draw({ state: "logs", tab, role: Role.OWNER, ui: "" });
+      await draw({ state: tab === "access" ? "extra" : "logs", tab, role: Role.OWNER, ui: "" });
       expect(host!.querySelector(marker[tab]), `${lang} ${tab}`).not.toBeNull();
       expect(host!.textContent).not.toContain("up.");
       act(() => root?.unmount());

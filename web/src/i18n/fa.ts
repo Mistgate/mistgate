@@ -56,6 +56,7 @@ import { fa as subspnFa } from "./subspn";
 import { fa as subshxFa } from "./subshx";
 import { fa as subsdnsFa } from "./subsdns";
 import { fa as usersgroupFa } from "./usersgroup";
+import { fa as usersextraFa } from "./usersextra";
 import { fa as decoysitesFa } from "./decoysites";
 import { fa as planwordsFa } from "./planwords";
 import { fa as profilespageFa } from "./profilespage";
@@ -258,6 +259,9 @@ const core: CoreMessages = {
   "err.guard": "پنل بارگذاری نمی‌شود",
   "err.name_taken": "این نام قبلاً گرفته شده. نام دیگری انتخاب کن.",
   "err.group_not_empty": "هنوز این کاربران در گروه هستند: {users}. آن‌ها را به گروه دیگری ببر، بعد این گروه را حذف کن.",
+  "err.group_in_both": "یک گروه در هر دو فهرست است: یا اضافه‌اش کن یا بردار، نه هر دو.",
+  "err.main_group": "گروه اصلی را نمی‌شود برداشت: به‌جایش گروه دیگری را اصلی کن.",
+  "err.too_many_groups": "هر فرد حداکثر در ۱۶ گروه می‌تواند باشد.",
   "err.profile_deployed": "پروفایل روی نودهای {nodes} است. اول آن را از آن‌ها بردار.",
   "err.stale_version": "پروفایل در زبانهٔ دیگری تغییر کرده. صفحه را دوباره بارگذاری کن.",
   "err.node_offline": "نود متصل نیست. وقتی ایجنتش برگشت دوباره تلاش کن.",
@@ -315,4 +319,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "گواهی Let’s Encrypt برای نشانی IP هنوز در دسترس نیست: دامنه یا گواهی خودامضا را انتخاب کن",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...shellFa, ...overviewFa, ...nodesviewFa, ...windowsFa, ...nodepageFa, ...userslistFa, ...userspageFa, ...usersgroupFa, ...decoysitesFa, ...planwordsFa, ...nodeswaysFa, ...nodewaysFa, ...profilespageFa, ...healthpageFa, ...reachpageFa, ...profilesrvFa, ...profilenewFa, ...subspnFa, ...subshxFa, ...subsdnsFa, ...updatespageFa, ...settingspageFa, ...aipageFa, ...igpageFa, ...aspageFa, ...nodeshareFa, ...channelFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...shellFa, ...overviewFa, ...nodesviewFa, ...windowsFa, ...nodepageFa, ...userslistFa, ...userspageFa, ...usersgroupFa, ...usersextraFa, ...decoysitesFa, ...planwordsFa, ...nodeswaysFa, ...nodewaysFa, ...profilespageFa, ...healthpageFa, ...reachpageFa, ...profilesrvFa, ...profilenewFa, ...subspnFa, ...subshxFa, ...subsdnsFa, ...updatespageFa, ...settingspageFa, ...aipageFa, ...igpageFa, ...aspageFa, ...nodeshareFa, ...channelFa };

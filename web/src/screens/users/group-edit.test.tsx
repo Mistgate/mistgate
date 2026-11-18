@@ -55,7 +55,7 @@ const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
-const group = { id: "grp_1", name: "тест", profileIds: ["p1"], disabledNodeIds: [], userCount: 3, dnsPresetId: "", color: "rose" } as unknown as Group;
+const group = { id: "grp_1", name: "тест", profileIds: ["p1"], disabledNodeIds: [], userCount: 3, extraUserCount: 0, dnsPresetId: "", color: "rose" } as unknown as Group;
 
 describe("editing a group from the user card", () => {
   it("opens prefilled, shows the user count and saves the profile set with UpdateGroup", async () => {
@@ -134,7 +134,7 @@ describe("editing a group from the user card", () => {
 });
 
 describe("the Devices section of a user without an AmneziaWG profile", () => {
-  const user = { id: "u1", name: "alice", groupName: "тест", deviceLimit: 5, devicesUsed: 0, apps: { happ: true, amnezia: true } } as unknown as UserN;
+  const user = { id: "u1", name: "alice", groupName: "тест", extraGroupIds: [], extraGroupNames: [], extraGroupColors: [], deviceLimit: 5, devicesUsed: 0, apps: { happ: true, amnezia: true } } as unknown as UserN;
   const panel = (u: UserN, profiles: { protocol: string }[], onEditGroup = vi.fn()) => (
     <DevicesPanel user={u} devices={[]} profiles={profiles as never} actions={{ refresh: vi.fn() } as never} onEditGroup={onEditGroup} />
   );

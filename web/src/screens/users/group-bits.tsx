@@ -10,6 +10,7 @@ import { NodeShareMode } from "@/gen/mistgate/admin/v1/common_pb";
 import { errorCode, errorVars } from "@/lib/errors";
 import { nodesQuery } from "@/lib/queries";
 import { useTx } from "./t";
+import type { ChangeDemo } from "./group-membership";
 import "./group.css";
 
 // The pieces the group page's tabs share: the card with a title and a line under it, the save bar that slides out of its foot,
@@ -20,8 +21,13 @@ export type GroupDemo = {
   pick?: boolean;
   /** How many of the people in the panel are ticked. */
   tick?: number;
+  /** The panel opens on "Move" instead of "Add". */
+  mode?: "add" | "move";
   find?: string;
-  menu?: boolean;
+  /** A menu of a row is open: the second row's, or the first extra member's ("extra"). */
+  menu?: boolean | "extra";
+  /** The window of a change of an extra member's group, opened on made-up impact. */
+  change?: ChangeDemo;
   /** The profile card's draft: the first profile off. */
   dirty?: boolean;
   saving?: boolean;

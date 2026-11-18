@@ -155,7 +155,7 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
         ...(color !== null && color !== group.color && { color }),
       };
       // taking a profile away from people: the panel's dry run says who loses what before anything is written
-      if (!confirmed && group.userCount > 0 && lost.length > 0) {
+      if (!confirmed && group.userCount + group.extraUserCount > 0 && lost.length > 0) {
         const dry = await groupsApi.updateGroup({ ...req, dryRun: true });
         if (dry.impact && dry.impact.lost.length > 0) {
           setImpact(dry.impact);
@@ -189,7 +189,7 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
     setHeld(null);
     save.mutate(confirmed);
   };
-  const summary = !name.trim() ? t("ul.g.enterName") : taken ? t("ul.g.fixName") : needWay && !hasWay ? t("ul.g.needWay") : group ? t.n("users.groupEditUsers", group.userCount) : t.n("ul.g.sum", ids.length);
+  const summary = !name.trim() ? t("ul.g.enterName") : taken ? t("ul.g.fixName") : needWay && !hasWay ? t("ul.g.needWay") : group ? t.n("users.groupEditUsers", group.userCount + group.extraUserCount) : t.n("ul.g.sum", ids.length);
   const hint = !name.trim() ? t("ul.g.nameHint") : taken ? t("ul.g.dup") : t("ul.g.free");
 
   return (

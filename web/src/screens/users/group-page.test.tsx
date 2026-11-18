@@ -70,6 +70,9 @@ const person = (name: string, groupId: string, over: Record<string, unknown> = {
   name,
   groupId,
   groupName: groupId === "grp_friends" ? "friends" : "family",
+  extraGroupIds: [] as string[],
+  extraGroupNames: [] as string[],
+  extraGroupColors: [] as string[],
   groupColor: "",
   status: UserStatus.ACTIVE,
   devicesUsed: 1,
@@ -87,8 +90,8 @@ const person = (name: string, groupId: string, over: Record<string, unknown> = {
   ...over,
 });
 let everyone: ReturnType<typeof person>[] = [];
-const friends = () => ({ id: "grp_friends", name: "friends", profileIds: ["p_hy"], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, telegramNodes: 0, color: "sand", disabledNodeIds: [] });
-const family = () => ({ id: "grp_family", name: "family", profileIds: ["p_hy", "p_awg"], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, telegramNodes: 0, color: "lavender", disabledNodeIds: [] });
+const friends = () => ({ id: "grp_friends", name: "friends", profileIds: ["p_hy"], userCount: 2, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, telegramNodes: 0, color: "sand", disabledNodeIds: [] });
+const family = () => ({ id: "grp_family", name: "family", profileIds: ["p_hy", "p_awg"], userCount: 2, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, telegramNodes: 0, color: "lavender", disabledNodeIds: [] });
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -99,7 +102,7 @@ beforeEach(() => {
   everyone = [person("bob", "grp_friends", { online: true, currentNodeName: "nl1" }), person("carol", "grp_friends"), person("alice", "grp_family"), person("erin", "grp_family")];
   listGroups.mockResolvedValue({ groups: [friends(), family()] });
   listUsers.mockImplementation(async (req: { groupId?: string; query?: string; pageSize: number; offset?: number }) => {
-    let list = req.groupId ? everyone.filter((u) => u.groupId === req.groupId) : everyone;
+    let list = req.groupId ? everyone.filter((u) => u.groupId === req.groupId || u.extraGroupIds.includes(req.groupId!)) : everyone;
     if (req.query) list = list.filter((u) => u.name.includes(req.query!));
     const counts = { all: list.length, online: list.filter((u) => u.online).length, expiring: 0, overQuota: 0, devicesUsed: list.length, devicesOnline: 1, overDeviceLimit: 0 };
     const from = req.offset ?? 0;
@@ -186,7 +189,7 @@ describe("the page of a group", () => {
     listGroups.mockResolvedValue({ groups: [{ ...friends(), userCount: 0 }, family()] });
     await mount();
     expect(text()).toContain("Nobody in the group yet");
-    expect(button("Move people here")).toBeTruthy();
+    expect(button("Add people here")).toBeTruthy();
   });
 
   it("a group that does not exist says so", async () => {
@@ -204,14 +207,39 @@ describe("the page of a group", () => {
 });
 
 describe("moving people in", () => {
-  it("lists the people of the other groups, ticks them and moves them with UpdateUser", async () => {
-    everyone = [person("bob", "grp_friends"), person("alice", "grp_family"), person("erin", "grp_family")];
+  it("adds people as an extra group by default: nothing is lost, so there is no second question", async () => {
+    everyone = [person("bob", "grp_friends"), person("alice", "grp_family"), person("erin", "grp_family"), person("dave", "grp_family", { extraGroupIds: ["grp_friends"], extraGroupNames: ["friends"], extraGroupColors: [""] })];
+    await mount();
+    await click(button("Add people here"));
+    const box = by("group", "Who to add to “friends”")!;
+    expect(by("radio", "Add")?.getAttribute("aria-checked")).toBe("true");
+    expect(box.textContent).toContain("alice");
+    expect(box.textContent).toContain("erin");
+    expect(box.textContent).not.toContain("bob"); // the main group
+    expect(box.textContent).not.toContain("dave"); // an extra member already
+    expect(button("Add")?.className).toContain("opacity-45");
+    await click(by("checkbox", "alice"));
+    await click(by("checkbox", "erin"));
+    expect(text()).toContain("They stay in their groups and also get what “friends” gives");
+    // family gives AmneziaWG, friends do not: adding takes nothing away
+    await click(button("Add 2"));
+    expect(updateUser.mock.calls.map(([r]) => r).sort((a, b) => a.userId.localeCompare(b.userId))).toEqual([
+      { userId: "usr_alice", addGroupIds: ["grp_friends"] },
+      { userId: "usr_erin", addGroupIds: ["grp_friends"] },
+    ]);
+    expect(text()).toContain("2 people added to “friends”");
+  });
+
+  it("moves people when Move is chosen, and asks once more when they lose something", async () => {
+    everyone = [person("bob", "grp_friends"), person("alice", "grp_family"), person("erin", "grp_family"), person("dave", "grp_family", { extraGroupIds: ["grp_friends"], extraGroupNames: ["friends"], extraGroupColors: [""] })];
     // family gives AmneziaWG too, friends do not: the move takes it away, and the panel asks once more
     await mount();
-    await click(button("Move people here"));
+    await click(button("Add people here"));
+    await click(by("radio", "Move"));
     const box = by("group", "Who to move to “friends”")!;
     expect(box.textContent).toContain("alice");
     expect(box.textContent).toContain("erin");
+    expect(box.textContent).toContain("dave"); // an extra member of friends can be moved: the group becomes their main one
     expect(box.textContent).not.toContain("bob");
     expect(button("Move")?.className).toContain("opacity-45");
     await click(by("checkbox", "alice"));
@@ -257,6 +285,100 @@ describe("moving people in", () => {
   });
 });
 
+// dave is in family; friends is an extra group of his (the group page lists the people of a group of either kind)
+const withExtraMember = () => {
+  everyone = [person("bob", "grp_friends"), person("carol", "grp_friends"), person("dave", "grp_family", { extraGroupIds: ["grp_friends"], extraGroupNames: ["friends"], extraGroupColors: [""] })];
+  listGroups.mockResolvedValue({ groups: [{ ...friends(), userCount: 2, extraUserCount: 1 }, family()] });
+};
+const openMenu = async (name: string) => {
+  const trigger = document.querySelector<HTMLElement>(`button[aria-label="Actions: ${name}"]`)!;
+  await act(async () => {
+    trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+    trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+    trigger.click();
+  });
+  for (let i = 0; i < 40 && !document.querySelector("[role=menuitem]"); i++) await settle();
+  return [...document.querySelectorAll("[role=menuitem]")];
+};
+
+describe("the extra members of a group", () => {
+  it("counts them in the head and the figures, and marks their rows", async () => {
+    withExtraMember();
+    await mount();
+    expect(text()).toContain("3 people");
+    expect(text()).toContain("1 extra");
+    expect(text()).toContain("dave");
+    // the pill is on dave's row only
+    const rows = [...document.querySelectorAll("a[href='/users/$id']")].filter((a) => a.closest(".grid")).map((a) => a.textContent ?? "");
+    expect(rows.find((r) => r.includes("dave"))).toContain("extra");
+    expect(rows.filter((r) => r.includes("extra"))).toHaveLength(1);
+  });
+
+  it("offers an extra member to make the group main or to remove them, and moves only the main members elsewhere", async () => {
+    withExtraMember();
+    await mount();
+    const extra = await openMenu("dave");
+    expect(extra.map((i) => i.textContent)).toEqual(expect.arrayContaining(["Make “friends” their main group", "Remove from the group"]));
+    expect(extra.some((i) => i.textContent?.startsWith("Move to"))).toBe(false);
+  });
+
+  it("asks the server what taking an extra member out costs, shows it, and does it on confirmation", async () => {
+    withExtraMember();
+    updateUser.mockImplementation(async (req: { dryRun?: boolean }) =>
+      req.dryRun ? { user: {}, impact: { users: 1, lost: [{ id: "p_hy", name: "hy2 · 443", protocol: "hysteria2", awgDevices: 0 }], gained: [], gainedNodeIds: [], lostNodeIds: ["nod_nl1"] } } : { user: {} },
+    );
+    await mount();
+    const items = await openMenu("dave");
+    await click(items.find((i) => i.textContent === "Remove from the group"));
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_dave", removeGroupIds: ["grp_friends"], dryRun: true });
+    expect(text()).toContain("Remove dave from “friends”?");
+    expect(text()).toContain("hy2 · 443");
+    expect(text()).toContain("Nodes that go away:");
+    expect(text()).toContain("nl1");
+    expect(updateUser).toHaveBeenCalledTimes(1);
+    await click(button("Remove"));
+    expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_dave", removeGroupIds: ["grp_friends"] });
+    expect(text()).toContain("dave left “friends”");
+  });
+
+  it("makes the group the main one of an extra member and keeps the old main group as an extra one", async () => {
+    withExtraMember();
+    updateUser.mockResolvedValue({ user: {} });
+    await mount();
+    const items = await openMenu("dave");
+    await click(items.find((i) => i.textContent?.startsWith("Make “friends”")));
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_dave", groupId: "grp_friends", addGroupIds: ["grp_family"], dryRun: true });
+    expect(text()).toContain("Make “friends” the main group of dave?");
+    await click(button("Make main"));
+    expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_dave", groupId: "grp_friends", addGroupIds: ["grp_family"] });
+  });
+
+  it("lets a group nobody has as the main group be deleted, and says the extra members just leave", async () => {
+    listGroups.mockResolvedValue({ groups: [{ ...friends(), userCount: 0, extraUserCount: 2 }, family()] });
+    search = { tab: "settings" };
+    await mount();
+    expect(text()).toContain("2 extra members just leave the group, nobody has to move them");
+    expect(text()).not.toContain("deleting it breaks nothing");
+    await click(button("Delete group"));
+    await click(button("Really delete?"));
+    expect(deleteGroup).toHaveBeenCalledWith({ groupId: "grp_friends", moveUsersTo: "" });
+  });
+
+  it("moves everybody of the group without touching the extra members", async () => {
+    search = { tab: "settings" };
+    withExtraMember();
+    await mount();
+    await click(button("Move to “family”"));
+    await click(button("Really move 2?"));
+    expect(updateUser.mock.calls.map(([r]) => r.userId).sort()).toEqual(["usr_bob", "usr_carol"]);
+  });
+
+  it("knows that the extra groups of a person stay when the main one changes", () => {
+    expect(lostProfileIds([{ profileIds: ["a", "b"] }], { profileIds: ["a"] }, [{ profileIds: ["b"] }])).toEqual([]);
+    expect(lostProfileIds([{ profileIds: ["a", "b"] }], { profileIds: ["a"] }, [{ profileIds: ["c"] }])).toEqual(["b"]);
+  });
+});
+
 describe("the Access tab", () => {
   beforeEach(() => {
     search = { tab: "access" };
@@ -288,7 +410,7 @@ describe("the Access tab", () => {
 
   it("asks the server what a profile taken away does to the people, and takes it once the red button is pressed", async () => {
     updateGroup.mockImplementation(async (req: { dryRun?: boolean }) =>
-      req.dryRun ? { group: friends(), impact: { users: 2, lost: [{ id: "p_hy", name: "hy2 · 443", protocol: "hysteria2", awgDevices: 0 }], gained: [] } } : { group: friends() },
+      req.dryRun ? { group: friends(), impact: { users: 2, lost: [{ id: "p_hy", name: "hy2 · 443", protocol: "hysteria2", awgDevices: 0 }], gained: [], gainedNodeIds: [], lostNodeIds: [] } } : { group: friends() },
     );
     await mount();
     await click(document.querySelector('[role=switch][aria-label="hy2 · 443"]'));
@@ -451,7 +573,7 @@ describe("an observer", () => {
     role = Role.READONLY;
     await mount();
     expect(text()).toContain("only the owner and a helper change it");
-    expect(button("Move people here")).toBeFalsy();
+    expect(button("Add people here")).toBeFalsy();
     expect([...document.querySelectorAll<HTMLAnchorElement>("a")].some((a) => a.textContent?.includes("New person"))).toBe(false);
   });
 

@@ -105,16 +105,17 @@ const approvals = {
 
 // The people list on mock rows: who is online, what each used (link, keys, both, nothing), four groups with their chips.
 const listGroups = [
-  { id: "grp_7kq2m4xw3vbf", name: "SIMG", profileIds: [], userCount: 3, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "lavender" },
-  { id: "grp_c3ndr5e2p6ha", name: "family", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, color: "sand" },
-  { id: "grp_x9tf4gjn2k7f", name: "friends", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "sage" },
-  { id: "grp_q5w8zr6y3m2e", name: "my", profileIds: [], userCount: 1, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "rose" },
+  { id: "grp_7kq2m4xw3vbf", name: "SIMG", profileIds: [], userCount: 3, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "lavender" },
+  { id: "grp_c3ndr5e2p6ha", name: "family", profileIds: [], userCount: 2, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, color: "sand" },
+  { id: "grp_x9tf4gjn2k7f", name: "friends", profileIds: [], userCount: 2, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "sage" },
+  { id: "grp_q5w8zr6y3m2e", name: "my", profileIds: [], userCount: 1, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: "rose" },
 ];
 const listUser = (id: string, name: string, group: number, over: object) => ({
   id: `usr_${id}`,
   name,
   groupId: listGroups[group]!.id,
   groupName: listGroups[group]!.name,
+  extraGroupIds: [], extraGroupNames: [], extraGroupColors: [],
   groupColor: listGroups[group]!.color,
   status: UserStatus.ACTIVE,
   devicesUsed: 2,

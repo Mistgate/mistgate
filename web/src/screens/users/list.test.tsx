@@ -36,8 +36,8 @@ vi.mock("@/lib/api", async (orig) => ({
     listGroups: () =>
       Promise.resolve({
         groups: [
-          { id: "grp_empty", name: "empty", profileIds: [], userCount: 2, dnsPresetId: "", happNodes: 0, amneziaNodes: 0 },
-          { id: "grp_ok", name: "ok", profileIds: ["p_hy"], userCount: 1, dnsPresetId: "", happNodes: 1, amneziaNodes: 0 },
+          { id: "grp_empty", name: "empty", profileIds: [], userCount: 2, extraUserCount: 0, dnsPresetId: "", happNodes: 0, amneziaNodes: 0 },
+          { id: "grp_ok", name: "ok", profileIds: ["p_hy"], userCount: 1, extraUserCount: 0, dnsPresetId: "", happNodes: 1, amneziaNodes: 0 },
         ],
       }),
   },
@@ -68,6 +68,9 @@ const person = (over: Record<string, unknown>) => ({
   name: "x",
   groupId: "grp_empty",
   groupName: "empty",
+  extraGroupIds: [] as string[],
+  extraGroupNames: [] as string[],
+  extraGroupColors: [] as string[],
   status: UserStatus.ACTIVE,
   apps: { happ: true, amnezia: false },
   via: [],
@@ -171,6 +174,36 @@ describe("the people table", () => {
     expect(groupTone("grp_ok")).not.toBe("rose");
     expect(tag("alice").dataset.tone).toBe("mint");
     expect(tag("carol").dataset.tone).toBe(groupTone("grp_old")); // none stored: the id's tone
+  });
+
+  it("adds +N after the main group of a person who is in more groups, and names them for a reader of the screen", async () => {
+    listUsers.mockResolvedValue({
+      users: [
+        person({ id: "usr_a", name: "alice", groupId: "grp_ok", groupName: "ok", accessHapp: true, extraGroupIds: ["grp_x", "grp_y"], extraGroupNames: ["friends", "work"], extraGroupColors: ["sky", ""] }),
+        person({ id: "usr_b", name: "bob", groupId: "grp_ok", groupName: "ok", accessHapp: true }),
+      ],
+      nextPageToken: "",
+      counts: { all: 2, online: 0, expiring: 0, overQuota: 0 },
+    });
+    await mount();
+    const more = (name: string) => rowOf(name).querySelector<HTMLElement>("[aria-label$='friends, work']");
+    expect(more("alice")?.textContent).toBe("+2");
+    expect(more("alice")?.getAttribute("aria-label")).toBe("2 more groups: friends, work");
+    expect(rowOf("bob").textContent).not.toContain("+");
+    // the main group is still its own link
+    expect(rowOf("alice").querySelector("a[data-tone]")?.textContent).toBe("ok");
+  });
+
+  it("does not say a person with an extra group that reaches something gets nothing", async () => {
+    listUsers.mockResolvedValue({
+      users: [person({ id: "usr_a", name: "alice", extraGroupIds: ["grp_ok"], extraGroupNames: ["ok"], extraGroupColors: [""], accessHapp: false })],
+      nextPageToken: "",
+      counts: { all: 1, online: 0, expiring: 0, overQuota: 0 },
+    });
+    await mount();
+    // the server says the person gets nothing (accessHapp false), and the reason is the apps, not the groups: the extra group reaches a node
+    expect(rowOf("alice").textContent).toContain("No access");
+    expect(rowOf("alice").textContent).not.toContain("no profile of the group runs on a node");
   });
 
   it("says in the line under the name that an active person gets nothing, and why", async () => {

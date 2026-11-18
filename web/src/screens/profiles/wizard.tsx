@@ -280,10 +280,10 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
   const lacking = gs.filter((g) => !hasProto(g));
   const having = gs.filter(hasProto);
   const groupOn = (id: string) => groupPick[id] ?? (id === "" ? true : lacking.some((g) => g.id === id));
-  const groupVMs: GroupVM[] = gs.length === 0 ? [{ id: "", name: t("users.everyone"), color: "sky", people: 0, on: groupOn("") }] : gs.map((g) => ({ id: g.id, name: g.name, color: g.color, people: g.userCount, on: groupOn(g.id) }));
+  const groupVMs: GroupVM[] = gs.length === 0 ? [{ id: "", name: t("users.everyone"), color: "sky", people: 0, on: groupOn("") }] : gs.map((g) => ({ id: g.id, name: g.name, color: g.color, people: g.userCount + g.extraUserCount, on: groupOn(g.id) }));
   const chosenGroups = gs.filter((g) => groupOn(g.id));
   const everyone = gs.length === 0 && groupOn("");
-  const people = chosenGroups.reduce((a, g) => a + g.userCount, 0);
+  const people = chosenGroups.reduce((a, g) => a + g.userCount + g.extraUserCount, 0);
   const way = info ? wayOf(info.id, [{ id: info.id, apps: info.apps }]) : "sub";
   const deliv = !info ? "" : telegramOnly(info.apps) ? t("wiz.deliv.tg") : trustTunnelOnly(info.apps) ? t("wiz.deliv.tt") : way === "awg" ? t("wiz.deliv.awg") : t("wiz.deliv.sub", { h: sub?.settings.updateIntervalHours || 12 });
   const touchedGroups = Object.keys(groupPick).length > 0;

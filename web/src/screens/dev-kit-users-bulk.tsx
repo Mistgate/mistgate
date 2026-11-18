@@ -36,6 +36,7 @@ const person = (i: number, over: Partial<UserN> = {}): UserN =>
     subscriptionName: "",
     groupId: i % 3 === 0 ? "grp_friends" : "grp_family",
     groupName: i % 3 === 0 ? "friends" : "family",
+    extraGroupIds: [], extraGroupNames: [], extraGroupColors: [],
     groupColor: i % 3 === 0 ? "sand" : "lavender",
     status: i % 6 === 0 ? UserStatus.DISABLED : i % 9 === 4 ? UserStatus.EXPIRED : UserStatus.ACTIVE,
     apps: { happ: true, amnezia: i % 4 === 1, telegram: false },
@@ -233,8 +234,8 @@ function fakeCalls() {
   };
   (groupsApi as unknown as Record<string, unknown>).listGroups = async () => ({
     groups: [
-      { id: "grp_family", name: "family", color: "lavender", profileIds: [], userCount: 80, dnsPresetId: "", happNodes: 3, amneziaNodes: 1 },
-      { id: "grp_friends", name: "friends", color: "sand", profileIds: [], userCount: 40, dnsPresetId: "", happNodes: 2, amneziaNodes: 0 },
+      { id: "grp_family", name: "family", color: "lavender", profileIds: [], userCount: 80, extraUserCount: 0, dnsPresetId: "", happNodes: 3, amneziaNodes: 1 },
+      { id: "grp_friends", name: "friends", color: "sand", profileIds: [], userCount: 40, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 0 },
     ],
   });
 }
