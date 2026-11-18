@@ -134,7 +134,7 @@ describe("what a scene shows", () => {
     expect(card.textContent).toContain("Proposed change");
     expect(card.textContent).toContain("expires in");
     // the title is what the change does (the board's), and the owner's own button says what the line would
-    expect(card.querySelector("b")?.textContent).toBe("Turn the relay on for fi1 through msk1");
+    expect(card.querySelector("b")?.textContent).toBe("Change a relay");
     expect(card.textContent).not.toContain("Needs the owner's approval");
     expect(all("[data-slot=plan] button").map((b) => b.textContent)).toEqual(["Dismiss", "Approve and apply"]);
     expect($(".as-day")?.textContent).toBe("Today");
@@ -322,7 +322,7 @@ describe("what a scene shows", () => {
     expect($("textarea")?.getAttribute("placeholder")).toBe("Спроси или попроси что-то изменить");
     await clear();
     await draw("answer", Role.OWNER, "ru");
-    expect($("[data-slot=plan]")?.textContent).toContain("Включить ретрансляцию fi1 через msk1");
+    expect($("[data-slot=plan]")?.textContent).toContain("Изменить ретрансляцию");
     expect($("[data-slot=plan]")?.textContent).toContain("истекает через");
   });
 });

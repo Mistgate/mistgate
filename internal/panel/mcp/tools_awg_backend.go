@@ -97,17 +97,17 @@ var nodeAWGBackend = changeSpec[nodeAWGBackendArgs]{
 			{Key: "awg_devices_online", Value: fmt.Sprint(online)},
 		}
 		if hasAWG {
-			facts = append(facts, Fact{Key: "reconnect", Value: "the node's AmneziaWG interfaces are rebuilt; connected devices reconnect within about 20 seconds"})
+			facts = append(facts, codedFact("reconnect", "the node's AmneziaWG interfaces are rebuilt; connected devices reconnect within about 20 seconds", "awg_rebuilt"))
 		} else {
-			facts = append(facts, Fact{Key: "reconnect", Value: "the node has no AmneziaWG profile: only the setting changes"})
+			facts = append(facts, codedFact("reconnect", "the node has no AmneziaWG profile: only the setting changes", "awg_no_profile"))
 		}
 		if a.Backend != "kernel" && hasAWG {
 			// The agent keeps every device in its own memory in userspace.
-			facts = append(facts, Fact{Key: "userspace_memory", Value: fmt.Sprintf("about %d MiB for the %d devices on the node (%d KiB each), taken from the agent's memory budget",
-				(devices*userspacePeerKiB+1023)/1024, devices, userspacePeerKiB)})
+			facts = append(facts, codedFact("userspace_memory", fmt.Sprintf("about %d MiB for the %d devices on the node (%d KiB each), taken from the agent's memory budget",
+				(devices*userspacePeerKiB+1023)/1024, devices, userspacePeerKiB), "awg_memory", "mib", fmt.Sprint((devices*userspacePeerKiB+1023)/1024), "devices", fmt.Sprint(devices), "kib", fmt.Sprint(userspacePeerKiB)))
 		}
 		if a.Backend == "kernel" {
-			facts = append(facts, Fact{Key: "module", Value: "the module has to be loaded on the node; an up-to-date agent serves userspace until it is, an older one stops AmneziaWG on that node"})
+			facts = append(facts, codedFact("module", "the module has to be loaded on the node; an up-to-date agent serves userspace until it is, an older one stops AmneziaWG on that node", "awg_module"))
 		}
 		a.Node, a.BeforeMode = id, mode
 		return &planned{Summary: "Change how one node runs AmneziaWG. The owner has to approve it first.", Facts: facts,

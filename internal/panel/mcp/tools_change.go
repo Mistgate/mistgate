@@ -27,10 +27,16 @@ import (
 // for its approved grant. A summary never embeds untrusted text: names go in the facts, marked untrusted.
 
 const (
-	dangerStepUp          = "step_up"           // the operation itself asks for a step-up
-	dangerFleet           = "fleet"             // it changes what runs on the nodes
-	dangerBulk            = "bulk"              // many users at once
-	dangerUserChangeLimit = "user_change_limit" // this plan exceeds the token's unattended user-change limit
+	dangerStepUp          = "step_up"            // the operation itself asks for a step-up
+	dangerFleet           = "fleet"              // it changes what runs on the nodes
+	dangerBulk            = "bulk"               // many users at once
+	dangerUserChangeLimit = "user_change_limit"  // this plan exceeds the token's unattended user-change limit
+	dangerPanelSite       = "panel_site"         // it changes the site the panel shows at its own address (no node)
+	dangerLibrary         = "decoy_library"      // it changes the library of decoy sites only: nothing running moves yet
+	dangerIrreversible    = "irreversible"       // it cannot be undone
+	dangerSSHKeyEdit      = "ssh_key_edit"       // the panel edits one login's authorized_keys and checks the result
+	dangerSSHKeysAdd      = "ssh_keys_add"       // the panel adds a key to each selected login and checks it
+	dangerSSHPassword     = "ssh_password_login" // the panel logs in with the saved password after removing its own key
 	maxMCPNodeTargets     = 20
 )
 

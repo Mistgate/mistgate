@@ -87,7 +87,7 @@ var pathSpeed = changeSpec[pathSpeedArgs]{
 				{Key: "target", Value: nm(toName), Untrusted: true},
 				codedFact("direction", flow, "path_speed_"+dir),
 				codedFact("size", strconv.Itoa(mb)+" MB", "bytes", "bytes", strconv.Itoa(mb<<20)),
-				{Key: "effect", Value: "The target opens a listener on a free port for one connection (a one-time token, closed after 30 seconds at most); the sender connects to it. Nothing else runs, nothing is changed on either node, and no public server is used. Both nodes carry the traffic once; the figure is kept for 7 days."},
+				codedFact("effect", "The target opens a listener on a free port for one connection (a one-time token, closed after 30 seconds at most); the sender connects to it. Nothing else runs, nothing is changed on either node, and no public server is used. Both nodes carry the traffic once; the figure is kept for 7 days.", "path_speed_effect"),
 			},
 			Danger: []string{dangerTraffic},
 			Params: pathSpeedStored{From: from, To: to, MB: mb, Direction: dir},

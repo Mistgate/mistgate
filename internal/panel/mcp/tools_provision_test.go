@@ -93,7 +93,7 @@ func TestNodeServerKeysUseOwnerApprovedPlans(t *testing.T) {
 	}
 
 	remove := planOf(t, s, "node_server_key_remove", map[string]any{"node": nodeA, "key": keyID})
-	if !remove.NeedsApproval || !strings.Contains(strings.Join(remove.Danger, " "), "saved password") {
+	if !remove.NeedsApproval || !slices.Contains(remove.Danger, dangerSSHPassword) {
 		t.Fatalf("panel key removal did not explain recovery and require approval: %+v", remove)
 	}
 	if err := e.plans.decide(remove.PlanID, true); err != nil {

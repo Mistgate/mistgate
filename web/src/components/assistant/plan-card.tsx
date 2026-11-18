@@ -5,7 +5,7 @@ import { useT } from "@/i18n";
 import type { Plan } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { dangerText, factLabel, factWords, toolTitle, type Fact } from "@/lib/integrations";
+import { dangerText, factLabel, factWords, planTitle, toolTitle, type Fact } from "@/lib/integrations";
 import { I, type Glyph } from "./as-icons";
 
 /**
@@ -37,8 +37,8 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
           </span>
         )}
       </div>
-      {/* the board's title is what the change does; the tool's own name stands in when the plan has no summary */}
-      <b>{plan.summary || toolTitle(t, plan.tool)}</b>
+      {/* the board's title is what the change does, in the interface language: the tool's own words (the panel's English summary is for the model) */}
+      <b>{planTitle(t, plan.tool) ?? (plan.summary || toolTitle(t, plan.tool))}</b>
       {plan.facts.length > 0 && (
         <ul>
           {plan.facts.map((f, i) => {

@@ -659,6 +659,33 @@ func TestDecoyAssignPlanApplyThroughTheOwner(t *testing.T) {
 	}
 }
 
+// The warning of a decoy plan names what it touches: a site put only on the panel's address is no change to the nodes, so it must not
+// say "changes what runs on your nodes"; with nodes it still does.
+func TestDecoyDangerNamesWhatThePlanTouches(t *testing.T) {
+	e := newTestEnv(t)
+	site := e.w.lib.put("Tea", "n", "ready", bakery(t))
+	_, ad := e.token(ProfileAdmin)
+	s := e.session(ad)
+	for _, c := range []struct {
+		name string
+		args map[string]any
+		want []string
+	}{
+		{"the panel only", map[string]any{"site_id": site.id, "panel": true}, []string{dangerPanelSite}},
+		{"a node only", map[string]any{"site_id": site.id, "nodes": []any{"de1"}}, []string{dangerFleet}},
+		{"a node and the panel", map[string]any{"site_id": site.id, "nodes": []any{"de1"}, "panel": true}, []string{dangerFleet, dangerPanelSite}},
+	} {
+		p := planOf(t, s, "decoy_site_assign", c.args)
+		if !p.NeedsApproval || !slices.Equal(p.Danger, c.want) {
+			t.Errorf("%s: danger = %v, want %v", c.name, p.Danger, c.want)
+		}
+	}
+	draft := e.w.lib.put("Draft", "n", "draft", bakery(t))
+	if p := planOf(t, s, "decoy_site_ready", map[string]any{"site_id": draft.id}); !p.NeedsApproval || !slices.Equal(p.Danger, []string{dangerLibrary}) {
+		t.Errorf("ready: danger = %v", p.Danger)
+	}
+}
+
 // The plan applies exactly the version its card showed: a draft saved again between the plan and the owner's approval is refused at the
 // apply (nothing is marked ready, nothing is put anywhere) with a reason that says so, and a fresh plan then goes through.
 func TestDecoyAssignAppliesOnlyTheVersionThePlanShowed(t *testing.T) {

@@ -201,7 +201,10 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 					break
 				}
 			}
-			facts = append(facts, Fact{Key: "direct_in_subscriptions", Value: nm(profile) + " / " + nm(inName) + " (" + clean(item.InboundID, 60) + ") -> " + strconvBool(item.Included), Untrusted: true})
+			df := codedFact("direct_in_subscriptions", nm(profile)+" / "+nm(inName)+" ("+clean(item.InboundID, 60)+") -> "+strconvBool(item.Included), "direct_in_subscriptions",
+				"profile", nm(profile), "protocol", nm(inName), "included", strconvBool(item.Included))
+			df.Untrusted, df.UntrustedParams = true, []string{"profile", "protocol"}
+			facts = append(facts, df)
 		}
 		facts = append(facts, warningFacts...)
 		// NodeService.UpdateNode also accepts runtime-changing fields at the API boundary. The MCP tool keeps its

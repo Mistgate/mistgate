@@ -160,7 +160,7 @@ describe("the assistant's chat", () => {
     await mount();
     await send("Disable anna");
     expect(text()).toContain("Proposed change");
-    expect(text()).toContain("Disable 1 user: their connections end.");
+    expect(text()).toContain("Disable users");
     expect(applyPlan).not.toHaveBeenCalled();
     await click(button("Apply"));
     await settle();
