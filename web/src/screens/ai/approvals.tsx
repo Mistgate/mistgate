@@ -1,12 +1,14 @@
 import { Fragment, useState } from "react";
 import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
+import { Flag } from "@/components/ui/flag";
 import { Pagination } from "@/components/ui/pagination";
 import { ApprovalState, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { clampPage, usePaging } from "@/lib/paging";
+import { useNodes } from "@/lib/queries";
 import { safeHttpUrl } from "@/lib/warp";
 import {
   approvalStateInfo,
@@ -71,6 +73,8 @@ function Card({ a, data, nowMs, focused }: { a: Approval; data: Approvals; nowMs
   const soon = left < 60;
   const tool = toolTitle(t, a.tool);
   const [done, setDone] = useState(false);
+  // a node of the panel is drawn with its flag, as the board does; a name the panel does not know stays on its plate of "data"
+  const flags = new Map((useNodes().data?.nodes ?? []).map((n) => [n.name, n.countryCode]));
   return (
     <section
       id={`approval-${a.id}`}
@@ -112,6 +116,11 @@ function Card({ a, data, nowMs, focused }: { a: Approval; data: Approvals; nowMs
                     <a href={termsUrl} target="_blank" rel="noopener noreferrer">
                       {t("warp.tosLink")}
                     </a>
+                  ) : f.key === "node" && flags.has(f.value) ? (
+                    <span className="hl-cnode">
+                      <Flag code={flags.get(f.value) ?? ""} size={12} />
+                      <b className="mono">{f.value}</b>
+                    </span>
                   ) : (
                     factWords(t, fmt, f).map((p, j) =>
                       typeof p === "string" ? (

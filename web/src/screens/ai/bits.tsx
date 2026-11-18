@@ -157,6 +157,7 @@ export function Empty({ d, title, body, action, calm }: { d: string; title: Reac
 export function Dd({ label, value, options, onChange, disabled, defaultOpen }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; disabled?: boolean; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const list = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const chosen = options.find((o) => o.value === value);
   useEffect(() => {
     if (open) list.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
@@ -164,6 +165,7 @@ export function Dd({ label, value, options, onChange, disabled, defaultOpen }: {
   const move = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       setOpen(false);
+      trigger.current?.focus();
       return;
     }
     const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
@@ -176,7 +178,7 @@ export function Dd({ label, value, options, onChange, disabled, defaultOpen }: {
   return (
     <div className="ai-dd" onKeyDown={move}>
       {open && <div className="ai-ddx" onClick={() => setOpen(false)} />}
-      <button type="button" className="ai-ddb" aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-disabled={disabled || undefined} onClick={() => !disabled && setOpen((v) => !v)}>
+      <button ref={trigger} type="button" className="ai-ddb" aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-disabled={disabled || undefined} onClick={() => !disabled && setOpen((v) => !v)}>
         <span>{chosen?.label ?? ""}</span>
         <Gl d={ICONS.down} />
       </button>

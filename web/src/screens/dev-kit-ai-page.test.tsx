@@ -165,6 +165,7 @@ describe("what a scene shows", () => {
     await draw("ap");
     expect($(".ai-ap .ai-left b")?.textContent).toMatch(/^[67]:\d\d$/);
     expect($(".ai-left.soon")).toBeNull();
+    expect($(".ai-ap .hl-cnode")?.textContent).toBe("de1"); // a node of the panel is drawn with its flag
     expect(all(".ai-rec")).toHaveLength(5);
     expect($("[role=tab] .bdg")?.textContent).toBe("1");
     await clear();
