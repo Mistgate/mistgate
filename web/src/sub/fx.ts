@@ -12,7 +12,7 @@ export const animated = () => typeof matchMedia === "function" && matchMedia("(m
 
 type Spring = { x: number; v: number; k: number; c: number };
 type Cell = { ch: string; k: number; el: HTMLElement; t: number; dur: number; w: number; done: boolean; y: Spring; o: Spring };
-type Live = HTMLElement & { __scr?: { to: string; cs: Cell[] } };
+type Live = HTMLElement & { scrRun?: { to: string; cs: Cell[] } };
 
 const digits = "0123456789";
 const letters = "abcdefghijklmnopqrstuvwxyz";
@@ -32,7 +32,7 @@ function tick(now: number) {
   const dt = Math.min(1 / 30, (now - last) / 1000 || 1 / 60);
   last = now;
   live.forEach((el) => {
-    const a = el.__scr;
+    const a = el.scrRun;
     if (!el.isConnected || !a) {
       live.delete(el);
       return;
@@ -93,7 +93,7 @@ function play(el: Live, delay: number) {
     el.append(sp);
     return { ch, k, el: sp, t: -delay - i * gap, dur: k ? 0.3 : 0, w: 0, done: false, y: spring(280, 22), o: spring(420, 32) };
   });
-  el.__scr = { to, cs };
+  el.scrRun = { to, cs };
   live.add(el);
   if (!raf) {
     last = performance.now();

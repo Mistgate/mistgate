@@ -7,8 +7,9 @@ import { h } from "./dom";
 import { scramble } from "./fx";
 import { dict, dirOf, htmlLang, isLang } from "./i18n";
 import { icon } from "./icons";
+import { pickProxy } from "./telegram";
 import { lockActions, lockView, type LockState } from "./lock";
-import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
+import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, LINK, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
 import { createModal } from "./modal";
 import { newAmzState, newDnsState, type Actions, type Ctx, type State, type Tab } from "./state";
 import type { Lang, Theme } from "./types";
@@ -259,30 +260,12 @@ if (data.locked) {
     (e) => {
       const el = e.target as Element;
       lastKey = el.closest?.("[data-k]")?.getAttribute("data-k") ?? "";
-      // a click anywhere but the open menu (or the button that opens it) closes the menu
-      if (st.amz.menu && !el.closest?.(".menu") && !el.closest?.('[data-k^="amz-more-"]')) actions.amz.menu(null);
     },
     true,
   );
   // a tooltip goes away with Esc and stays away until the next tap or focus
   document.addEventListener("keydown", (e) => e.key === "Escape" && document.documentElement.classList.add("tips-off"));
   for (const ev of ["pointerdown", "focusin"]) document.addEventListener(ev, () => document.documentElement.classList.remove("tips-off"));
-  document.addEventListener("keydown", (e) => {
-    if (!st.amz.menu) return;
-    if (e.key === "Escape") {
-      const id = st.amz.menu;
-      actions.amz.menu(null);
-      focusKey(`amz-more-${id}`);
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
-      // a menu is walked with the arrows
-      const items = [...root.querySelectorAll<HTMLElement>(".menu [role=menuitem]")];
-      if (items.length === 0) return;
-      e.preventDefault();
-      const i = items.indexOf(document.activeElement as HTMLElement);
-      const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
-      items[next]!.focus();
-    }
-  });
 
   const ctx = (): Ctx => ({ d: data, s: st, a: actions, t: dict[st.lang], support: data.options.show_support ? safeUrl(data.support_url) : "" });
 
@@ -309,29 +292,52 @@ if (data.locked) {
     if (key) root.querySelector<HTMLElement>(`[data-k="${key}"]`)?.focus({ preventScroll: true });
     scramble(root);
     const c = ctx();
-    modal.sync(dialogOpen(c), dialogOpen(c) ? dialogView(c).content : []);
+    const open = dialogOpen(c);
+    const dlg = open ? dialogView(c) : null;
+    modal.sync(open, dlg?.content ?? [], dlg?.stage);
   };
 
-  // `vite -c vite.sub.config.ts` only: &way=key picks the key way of the first-visit steps, &sheet=pick|link|key opens the "add a device" sheet, &menu=<device id> a row's menu, &open=<device id> its details, &key=<device id>[&country=<n>] its key sheet, &ask=remove:<id>|rotate:<id> its question
+  // `vite -c vite.sub.config.ts` only (the scenes of the page; every state and every window opens on its own page):
+  //   &tab=servers|telegram|trusttunnel|devices   the open tab;  &more=1 the long list of devices unfolded;  &proxy=<n> the n-th proxy of the Telegram and TrustTunnel panels
+  //   &sheet=pick|link|conn|key|full   the "add a device" window at that step (full: the places are used up);  &key=<device id>[&country=<n>] the key of a device
+  //   &menu=<id> the menu of a device;  &rename=<id>;  &ask=remove:<id>|rotate:<id>;  &stale=<id> the question of a stale key
+  //   &dns=<server id>|link the DNS choice [&dnsall=0|1 the scope];  &dnsdone=1 its result
   if (import.meta.env.DEV) {
-    const sheet = devQuery.get("sheet");
-    if (sheet === "pick" || sheet === "link" || sheet === "key") {
+    const q = (k: string) => devQuery.get(k);
+    const tab = q("tab");
+    if (tab === "servers" || tab === "telegram" || tab === "trusttunnel" || tab === "devices") st.tab = tab as Tab;
+    if (q("more") === "1") st.devicesOpen = true;
+    const proxy = Number(q("proxy"));
+    if (proxy > 0) for (const k of ["tg", "tt"] as const) pickProxy(k, proxy);
+    const sheet = q("sheet");
+    if (sheet === "pick" || sheet === "link" || sheet === "conn" || sheet === "key") {
       st.amz.adding = true;
       st.amz.pane = sheet;
+    } else if (sheet === "full") {
+      st.amz.adding = true;
+      st.amz.pane = "pick";
+      st.amz.error = "device_limit";
+      st.amz.errorAt = "add";
     }
-    const tab = devQuery.get("tab");
-    if (tab === "servers" || tab === "telegram" || tab === "trusttunnel" || tab === "devices") st.tab = tab as Tab;
-    st.amz.menu = devQuery.get("menu");
-    st.details = devQuery.get("open");
-    if (devQuery.get("way") === "key") st.way = "key";
+    st.amz.menu = q("menu");
     // &key=<device id> opens the key of a device, &country=<n> on the n-th config of its list (0 = the first)
-    const key = devQuery.get("key");
+    const key = q("key");
     if (key) {
-      st.amz.node[key] = Number(devQuery.get("country")) || 0;
+      st.amz.node[key] = Number(q("country")) || 0;
       actions.amz.show(key);
     }
-    const [kind, id] = (devQuery.get("ask") ?? "").split(":");
+    const rename = q("rename");
+    const label = data.amnezia?.devices.find((x) => x.id === rename)?.label ?? data.devices.find((x) => x.id === rename)?.model;
+    if (rename && label !== undefined) st.amz.rename = { id: rename, value: label };
+    const [kind, id] = (q("ask") ?? "").split(":");
     if ((kind === "remove" || kind === "rotate") && id) st.amz.confirm = { id, kind };
+    st.amz.stale = q("stale");
+    const dns = q("dns");
+    if (dns) {
+      actions.dns.open(dns === "link" ? LINK : dns);
+      if (q("dnsall") === "0" || q("dnsall") === "1") actions.dns.scope(q("dnsall") === "1");
+      if (q("dnsdone") === "1") st.dns.done[st.dns.open ?? ""] = true;
+    }
   }
   render("all");
 }

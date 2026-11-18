@@ -93,11 +93,11 @@ type TabInfo = { id: Tab; label: string; short: string; n: string; nShort: strin
 export function tabsOf({ d, t }: Pick<Ctx, "d" | "t">): TabInfo[] {
   const used = d.user.devices_used;
   const limit = d.user.device_limit;
-  const tabs: TabInfo[] = [{ id: "servers", label: t.tabServers, short: t.tabServers, n: String(serversOf(d).length), nShort: String(serversOf(d).length), scr: true }];
-  if (d.access.telegram) tabs.push({ id: "telegram", label: t.tabTelegram, short: t.tabTelegramShort, n: String(d.telegram?.links.length ?? 0), nShort: String(d.telegram?.links.length ?? 0), scr: false });
-  if (d.access.trust_tunnel) tabs.push({ id: "trusttunnel", label: t.tabTrustTunnel, short: t.tabTrustTunnel, n: String(d.trust_tunnel?.links.length ?? 0), nShort: String(d.trust_tunnel?.links.length ?? 0), scr: false });
-  tabs.push({ id: "devices", label: t.tabDevices, short: t.tabDevices, n: limit > 0 ? `${used}/${limit}` : String(used), nShort: String(used), scr: false });
-  return tabs;
+  const list: TabInfo[] = [{ id: "servers", label: t.tabServers, short: t.tabServers, n: String(serversOf(d).length), nShort: String(serversOf(d).length), scr: true }];
+  if (d.access.telegram) list.push({ id: "telegram", label: t.tabTelegram, short: t.tabTelegramShort, n: String(d.telegram?.links.length ?? 0), nShort: String(d.telegram?.links.length ?? 0), scr: false });
+  if (d.access.trust_tunnel) list.push({ id: "trusttunnel", label: t.tabTrustTunnel, short: t.tabTrustTunnel, n: String(d.trust_tunnel?.links.length ?? 0), nShort: String(d.trust_tunnel?.links.length ?? 0), scr: false });
+  list.push({ id: "devices", label: t.tabDevices, short: t.tabDevices, n: limit > 0 ? `${used}/${limit}` : String(used), nShort: String(used), scr: false });
+  return list;
 }
 
 /** The open tab: the one asked for if this person has it, else the first. */
