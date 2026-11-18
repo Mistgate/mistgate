@@ -35,7 +35,6 @@ const put = (job: Job) => {
 };
 
 export const jobOf = (exitId: string): Job | undefined => jobs.get(exitId);
-export const jobsRunning = (): Job[] => [...jobs.values()].filter((j) => j.state === "running" || j.state === "stopping");
 
 const watchers = new Map<string, number>();
 /** A window is on the run's last step and shows how it goes: the end of the run is no news to tell in a toast. Returns what takes it back. */

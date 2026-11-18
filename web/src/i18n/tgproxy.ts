@@ -1,7 +1,6 @@
 // The Telegram proxy of one person, on their page: the toggle, the key (a device that is not counted in the limit) and the
 // tg://proxy links of their MTProto profiles.
 export const en = {
-  "users.appsWithTg": "{apps} + Telegram",
   "users.telegramHint": "Separate links for the Telegram app",
   "tgproxy.toggle": "Telegram Proxy",
   "tgproxy.title": "Telegram proxy",
@@ -35,7 +34,6 @@ export const en = {
 };
 
 export const ru: typeof en = {
-  "users.appsWithTg": "{apps} + Telegram",
   "users.telegramHint": "Отдельные ссылки для приложения Telegram",
   "tgproxy.toggle": "Telegram-прокси",
   "tgproxy.title": "Telegram-прокси",
@@ -69,7 +67,6 @@ export const ru: typeof en = {
 };
 
 export const zh: typeof en = {
-  "users.appsWithTg": "{apps} + Telegram",
   "users.telegramHint": "供 Telegram 应用使用的独立链接",
   "tgproxy.toggle": "Telegram 代理",
   "tgproxy.title": "Telegram 代理",
@@ -103,7 +100,6 @@ export const zh: typeof en = {
 };
 
 export const fa: typeof en = {
-  "users.appsWithTg": "{apps} + Telegram",
   "users.telegramHint": "لینک‌های جداگانه برای برنامهٔ Telegram",
   "tgproxy.toggle": "پروکسی Telegram",
   "tgproxy.title": "پروکسی Telegram",
@@ -137,7 +133,6 @@ export const fa: typeof en = {
 };
 
 export const tr: typeof en = {
-  "users.appsWithTg": "{apps} + Telegram",
   "users.telegramHint": "Telegram uygulaması için ayrı bağlantılar",
   "tgproxy.toggle": "Telegram proxy'si",
   "tgproxy.title": "Telegram proxy'si",

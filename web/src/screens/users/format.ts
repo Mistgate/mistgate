@@ -1,7 +1,6 @@
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Tone } from "@/components/ui/icons";
-import type { StatusKind } from "@/components/ui/status";
 import { agoOf, scaleBytes, type Fmt } from "@/lib/format";
 import type { UserN as User } from "./model";
 import type { Key, Tx } from "./t";
@@ -60,20 +59,12 @@ export function shownStatus(u: User): Shown {
 /** Active in the API's eyes, yet the person's page would give nothing: no subscription link, no AmneziaVPN keys, no Telegram. */
 export const noAccess = (u: Pick<User, "accessHapp" | "accessAmnezia" | "accessTelegram">) => !u.accessHapp && !u.accessAmnezia && !u.accessTelegram;
 
-export const shownKind: Record<Shown, StatusKind> = { active: "ok", expired: "bad", quota: "warn", devices: "warn", disabled: "off" };
 export const shownKey: Record<Shown, Key> = {
   active: "users.status.active",
   expired: "users.status.expired",
   quota: "users.status.quota",
   devices: "users.status.devices",
   disabled: "users.status.disabled",
-};
-export const shownText: Record<Shown, string> = {
-  active: "text-muted",
-  expired: "text-danger-text",
-  quota: "text-warn-text",
-  devices: "text-warn-text",
-  disabled: "text-faint",
 };
 
 /**
@@ -91,12 +82,6 @@ export function usage(used: number, quota: number, fmt: Fmt) {
   return { used: n, of, text: `${n} / ${of}`, pct, tone: pct >= 1 ? ("over" as const) : pct >= 0.8 ? ("high" as const) : ("ok" as const) };
 }
 
-export const barTone = {
-  ok: "bg-[color-mix(in_oklch,var(--muted)_70%,var(--surface))]",
-  high: "bg-warn",
-  over: "bg-danger",
-} as const;
-
 /** The panel's short "5 min ago / 3 h ago / 2 d ago" (fmt.ago) for a Unix time; "—" when it is 0 (never). */
 export function agoText(unix: number, t: Tx, now = nowSec()): string {
   return unix === 0 ? "—" : agoOf(t, unix, now);
@@ -107,24 +92,9 @@ export function seenText(u: User, t: Tx, now = nowSec()): string {
   return u.online ? t("users.now") : agoText(u.lastSeenUnix, t, now);
 }
 
-/** Term column: days left ("0 d", red, once expired), or "∞" for no expiry; a week or less is in the text colour. */
-export function termText(u: User, t: Tx, now = nowSec()): { text: string; tone: "muted" | "fg" | "bad" } {
-  const d = daysLeft(u.expiresUnix, now);
-  if (d === null) return { text: "∞", tone: "muted" };
-  if (u.expiresUnix <= now) return { text: t("users.days", { n: 0 }), tone: "bad" };
-  return { text: t("users.days", { n: d }), tone: d <= 7 ? "fg" : "muted" };
-}
-
 /** What the user actually connected with in the last 7 days: by the subscription link, by an AmneziaVPN key, by a TrustTunnel key, or several. */
 export function viaOf(u: User): { link: boolean; keys: boolean; trustTunnel: boolean } {
   return { link: u.via.includes(App.HAPP), keys: u.via.includes(App.AMNEZIA), trustTunnel: u.via.includes(App.TRUST_TUNNEL) };
-}
-
-/** "Link + AmneziaVPN keys", "Subscription link" or "AmneziaVPN keys": the ways the admin switched on. */
-export function appsText(u: User, t: Tx): string {
-  const ways = u.apps?.happ && u.apps.amnezia ? t("users.appsBoth") : u.apps?.amnezia ? t("users.appsAwg") : t("users.appsHapp");
-  const withTg = u.apps?.telegram ? t("users.appsWithTg", { apps: ways }) : ways;
-  return u.apps?.trustTunnel ? t("users.appsWithTt", { apps: withTg }) : withTg;
 }
 
 // ---------------------------------------------------------------------------------------------------

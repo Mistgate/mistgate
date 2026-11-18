@@ -1,6 +1,6 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { StatusKind } from "@/components/ui/status";
-import { OsRolloutStatus, OsUpdateState, type GetOsUpdatesResponse, type NodeOs, type OsRollout, type OsStep } from "@/gen/mistgate/admin/v1/update_pb";
+import { OsRolloutStatus, OsUpdateState, type GetOsUpdatesResponse, type OsRollout, type OsStep } from "@/gen/mistgate/admin/v1/update_pb";
 import type { OsStatus } from "@/gen/mistgate/agent/v1/agent_pb";
 import type { MessageKey } from "@/i18n/en";
 import type { T } from "@/i18n";
@@ -11,7 +11,6 @@ import { plain, type Plain } from "./plain";
 // the run of one OS update on one node lives in os-run.ts. The VPS edition only.
 
 export type OsUpdates = Plain<GetOsUpdatesResponse>;
-export type OsNode = Plain<NodeOs>;
 export type Os = Plain<OsStatus>;
 export type OsRun = Plain<OsRollout>;
 export type OsStepRow = Plain<OsStep>;

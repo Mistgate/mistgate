@@ -204,8 +204,6 @@ export const en = {
   "np.hi.log.allSources": "All",
   "np.hi.log.copy": "Copy",
   "np.hi.log.copied": "Copied",
-  "np.hi.log.follow": "Follow",
-  "np.hi.log.stopped": "Stopped",
 };
 
 export const ru: typeof en = {
@@ -411,8 +409,6 @@ export const ru: typeof en = {
   "np.hi.log.allSources": "Все",
   "np.hi.log.copy": "Копировать",
   "np.hi.log.copied": "Скопировано",
-  "np.hi.log.follow": "Следить",
-  "np.hi.log.stopped": "Остановлено",
 };
 
 export const zh: typeof en = {
@@ -618,8 +614,6 @@ export const zh: typeof en = {
   "np.hi.log.allSources": "全部",
   "np.hi.log.copy": "复制",
   "np.hi.log.copied": "已复制",
-  "np.hi.log.follow": "跟随",
-  "np.hi.log.stopped": "已停止",
 };
 
 export const fa: typeof en = {
@@ -825,8 +819,6 @@ export const fa: typeof en = {
   "np.hi.log.allSources": "همه",
   "np.hi.log.copy": "کپی",
   "np.hi.log.copied": "کپی شد",
-  "np.hi.log.follow": "دنبال‌کردن",
-  "np.hi.log.stopped": "متوقف",
 };
 
 export const tr: typeof en = {
@@ -1032,6 +1024,4 @@ export const tr: typeof en = {
   "np.hi.log.allSources": "Tümü",
   "np.hi.log.copy": "Kopyala",
   "np.hi.log.copied": "Kopyalandı",
-  "np.hi.log.follow": "Takip et",
-  "np.hi.log.stopped": "Durduruldu",
 };

@@ -12,17 +12,15 @@ import { alertsQuery, checksQuery, doctorQuery } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
 import { candidatesQuery, relaysQuery } from "@/lib/relay";
 import { meQuery } from "@/lib/session";
-import { AddRelayDialog, ChangeRelayPort } from "@/screens/node/relays";
+import { ChangeRelayPort } from "@/screens/node/relays";
 import { useWays, WaysTab } from "@/screens/node/ways";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { DeviceConfigsModal, type DeviceRef } from "@/screens/users/awg-devices";
-import { ConnectionPanel } from "@/screens/users/user-detail";
+import { ConnectionAlerts, ConnectionCounts } from "@/screens/users/user-connection";
 
 // Development only, /dev-kit?only=awg-relay&state=…: AmneziaWG through a relay (awg-relay-plan §2.3, §9), on made-up data and a
 // private query cache (no server). Names: exits de1, nl1, de2 (also in Germany), the entry msk1 (RU), the exit ru2 in Russia as
 // the entry's own country, the person alice.
-//   dialog         "Relay through msk1": an AmneziaWG server picked, with the note about the keys
-//   same-country   the same dialog: ru2 sits in the entry's country, so it is under "Other nodes" with its reason
 //   pick           de1's "New way in" → "Through another node": de2 is in the exit's country, so it is no good fit
 //   port           "Change port" of an AmneziaWG relay with its warning
 //   device         the key of a device in AmneziaVPN: the direct config, with the path through RU in its list
@@ -42,7 +40,6 @@ const nodes = [
   { id: "nod_fi1", name: "fi1", countryCode: "FI", status: NodeStatus.ONLINE },
   { id: "nod_ru2", name: "ru2", countryCode: "RU", status: NodeStatus.ONLINE },
 ];
-const entry = { id: "nod_msk1", name: "msk1", cc: "RU" };
 
 const cut = { verdict: "partial", dark: ["MTS"], atUnix: now };
 const cand = (over: Record<string, unknown>) => ({
@@ -87,13 +84,6 @@ function Mock({ fill = [], children }: { fill?: [readonly unknown[], unknown][];
       <ToastProvider>{children}</ToastProvider>
     </QueryClientProvider>
   );
-}
-
-// ---- the relay dialog ----
-
-function Dialog({ same = false }: { same?: boolean }) {
-  // the AmneziaWG server of de1 is ticked from the start: its note is what the scene is about
-  return <AddRelayDialog open onOpenChange={() => {}} entry={entry} preselect={same ? undefined : "inb_awg_de1"} />;
 }
 
 // ---- "New way in" of de1, the step with the entries ----
@@ -157,16 +147,9 @@ function Shot({ id, children }: { id: string; children: ReactNode }) {
 }
 
 export function AwgRelayKit() {
-  const state = params.get("state") ?? "dialog";
+  const state = params.get("state") ?? "pick";
   switch (state) {
-    case "same-country":
-      return (
-        <Mock>
-          <Shot id="awg-relay-same-country">
-            <Dialog same />
-          </Shot>
-        </Mock>
-      );
+    default:
     case "pick":
       return (
         <Mock fill={[[checksQuery("").queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: pickChecks }], [checksQuery("nod_de1").queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: pickChecks.slice(0, 1) }], [doctorQuery("nod_de1").queryKey, { nowUnix: now, nodes: [] }]]}>
@@ -193,16 +176,11 @@ export function AwgRelayKit() {
         <Mock fill={[[userConnectionQuery("usr_alice").queryKey, connection]]}>
           <Shot id="awg-relay-history">
             <div className="max-w-xl">
-              <ConnectionPanel userId="usr_alice" devices={aliceDevices} nodeName={(id) => id.replace("nod_", "")} />
+              <div className="up-one">
+                <ConnectionAlerts userId="usr_alice" />
+                <ConnectionCounts userId="usr_alice" devices={aliceDevices} nodeName={(id) => id.replace("nod_", "")} />
+              </div>
             </div>
-          </Shot>
-        </Mock>
-      );
-    default:
-      return (
-        <Mock>
-          <Shot id="awg-relay-dialog">
-            <Dialog />
           </Shot>
         </Mock>
       );

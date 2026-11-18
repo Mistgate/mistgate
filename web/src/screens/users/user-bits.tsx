@@ -104,17 +104,6 @@ export function Rad() {
   );
 }
 
-/** The 20×20 tick box of a list of nodes (the board's .fz-cb). */
-export function Cb({ on }: { on: boolean }) {
-  return (
-    <span aria-hidden className={cx("up-cb", on && "on")}>
-      <i>
-        <G d={P.check} size={14} stroke={2.5} />
-      </i>
-    </span>
-  );
-}
-
 /**
  * The board's copy button (.cpb): the icon turns into a tick and the words swap. The value is copied as it is; a refusing browser
  * says so in a toast; `note` is a toast on success (what a link that holds a key asks of whoever sends it). Nothing is printed.

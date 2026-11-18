@@ -1,6 +1,5 @@
 import { Field } from "@base-ui/react/field";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AccentPicker } from "@/components/accent-picker";
 import { CopyButton } from "@/components/copy-button";
 import { LangToggle, ThemeToggle } from "@/components/prefs";
 import { Avatar, Card, Check, Chip, Kbd, PageTitle, SectionLabel } from "@/components/ui/bits";
@@ -279,9 +278,6 @@ function Controls() {
           ]}
         />
       </div>
-      <Group title="accent picker (changes the accent of the whole page)">
-        <AccentPicker />
-      </Group>
     </Card>
   );
 }

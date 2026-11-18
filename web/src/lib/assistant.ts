@@ -1,6 +1,6 @@
 import { ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
-import { AssistantErrorSchema, AssistantProvider, ChatRole, PlanState, type ChatMessage, type FollowUp as FollowUpPb, type GetAssistantAccessResponse, type MemoryNote, type PageContext, type PlanCard, type ToolCall } from "@/gen/mistgate/admin/v1/assistant_pb";
+import { AssistantErrorSchema, AssistantProvider, type ChatMessage, type FollowUp as FollowUpPb, type GetAssistantAccessResponse, type MemoryNote, type PageContext, type PlanCard, type ToolCall } from "@/gen/mistgate/admin/v1/assistant_pb";
 import type { MessageKey } from "@/i18n/en";
 import { assistant } from "./api";
 import { plain, type Plain } from "./plain";
@@ -55,13 +55,6 @@ export const recentQuestionsQuery = queryOptions({
   queryFn: async ({ signal }) => (await assistant.recentQuestions({}, { signal })).questions,
   staleTime: 60_000,
 });
-
-export const conversationQuery = (id: string) =>
-  queryOptions({
-    queryKey: ["assistant", "conversation", id],
-    queryFn: async ({ signal }) => plain(await assistant.getConversation({ id }, { signal })),
-    enabled: id !== "",
-  });
 
 /** The provider's i18n name key and data line, in the order the settings show them. */
 export const providers = [
@@ -140,6 +133,3 @@ export function splitText(m: Msg): { interim: string; answer: string } {
 
 /** Opens the assistant chat as a new conversation with `text` in the composer (the person reads it and sends it). */
 export const askAssistant = (text: string) => window.dispatchEvent(new CustomEvent("mistgate:assistant-open", { detail: { text } }));
-
-export const isAssistant =(m: Msg) => m.role === ChatRole.ASSISTANT;
-export const planOpen = (p: Plan) => p.state === PlanState.PROPOSED;

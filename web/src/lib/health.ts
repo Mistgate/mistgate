@@ -90,12 +90,6 @@ export function lookup(t: T, key: string, params: Params = {}): string | null {
 // ---------------------------------------------------------------------------------------------------
 // Alerts
 
-export function severityKind(s: AlertSeverity): StatusKind {
-  if (s === AlertSeverity.CRITICAL) return "bad";
-  if (s === AlertSeverity.WARNING) return "warn";
-  return "blip"; // info: grey-blue, never red
-}
-
 export const severityWord = (s: AlertSeverity): MessageKey =>
   s === AlertSeverity.CRITICAL ? "hl.sev.critical" : s === AlertSeverity.WARNING ? "hl.sev.warning" : "hl.sev.info";
 

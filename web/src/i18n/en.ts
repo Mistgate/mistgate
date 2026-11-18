@@ -67,7 +67,6 @@ import { en as profilesrvEn } from "./profilesrv";
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
 // settings), users.ts and profiles.ts; `en` below is all of it, so `MessageKey` covers every key.
 const core = {
-  "app.name": "Mistgate",
   "common.loading": "Loading…",
   "common.retry": "Try again",
   "common.undo": "Undo",
@@ -151,7 +150,6 @@ const core = {
   "palette.users": "People",
   "palette.places": "Sections",
   "palette.actions": "Actions",
-  "palette.addNode": "Add node",
   "palette.createUser": "Add a person",
   "palette.newToken": "New API token",
   "palette.newProfile": "New profile",

@@ -1,12 +1,11 @@
 import { Checkbox } from "@base-ui/react/checkbox";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { Infinite, Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { Tip } from "@/components/ui/tooltip";
@@ -45,25 +44,6 @@ export function Panel({
   );
 }
 
-/**
- * A settings line: label and hint on the left, the control on the right, a hairline above all but the first. A line
- * narrower than 15rem (the right column of a person's page at 720–900 px) puts the control under the label instead of
- * squeezing the label under it; wider lines (desktop, phone) are not touched.
- */
-export function SettingRow({ label, hint, children, className }: { label: ReactNode; hint?: ReactNode; children?: ReactNode; className?: string }) {
-  return (
-    <div className="@container border-t border-line first:border-t-0">
-      <div className={cx("flex min-h-[52px] items-center gap-3 @max-[15rem]:flex-col @max-[15rem]:items-start @max-[15rem]:gap-2 @max-[15rem]:py-2.5", className)}>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5 @max-[15rem]:self-stretch">
-          <span className="text-[13px] font-bold">{label}</span>
-          {hint && <span className="text-[11px] leading-snug text-muted">{hint}</span>}
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 const resetCodes = { [QuotaReset.DAY]: "day", [QuotaReset.WEEK]: "week", [QuotaReset.MONTH]: "month", [QuotaReset.ROLLING_MONTH]: "rolling", [QuotaReset.NONE]: "none" } as const;
 /** The word of a quota period in keys ("users.quotaPer.<code>"); unspecified is the server's default, the month. */
 export const resetCode = (r: QuotaReset) => resetCodes[r as keyof typeof resetCodes] ?? "month";
@@ -82,47 +62,6 @@ export function ResetSelect({ value, onChange }: { value: QuotaReset; onChange: 
       onValueChange={(v) => onChange(Number(v) as QuotaReset)}
       options={list.map((r) => ({ value: String(r), label: t(`users.resetOpt.${resetCode(r)}`), hint: t(`users.resetHint.${resetCode(r)}`) }))}
     />
-  );
-}
-
-/**
- * A speed limit in Mbit/s on a stepper, 5 at a time: 0 is "no limit" (∞), the first "+" sets 5. The person limit and the
- * device limit both use it, on the user card and in the new-user form.
- */
-export function SpeedRow({ label, hint, bps, onChange }: { label: string; hint: string; bps: number; onChange: (bps: number) => void }) {
-  const t = useTx();
-  const mbit = Math.round(bps / 1e6);
-  return (
-    <SettingRow label={label} hint={hint} className="py-1.5">
-      <Stepper
-        decrementLabel={t("users.less", { what: label })}
-        incrementLabel={t("users.more", { what: label })}
-        onDecrement={() => onChange(Math.max(0, mbit - 5) * 1e6)}
-        onIncrement={() => onChange(Math.min(10000, mbit + 5) * 1e6)}
-        decrementDisabled={mbit <= 0}
-        incrementDisabled={mbit >= 10000}
-      >
-        {mbit === 0 ? <Infinite label={t("users.unlimited")} /> : `${mbit} ${t("users.unitMbit")}`}
-      </Stepper>
-    </SettingRow>
-  );
-}
-
-/**
- * The two speed limits under one quiet caption with the "experimental" mark: per person (all their devices on one node
- * together) and per device. The user card and the new-user form both show them this way.
- */
-export function SpeedPair({ person, device, onPerson, onDevice }: { person: number; device: number; onPerson: (bps: number) => void; onDevice: (bps: number) => void }) {
-  const t = useTx();
-  return (
-    <div className="flex flex-col border-t border-line first:border-t-0">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 pb-0.5">
-        <span className="text-[11px] font-bold tracking-[0.06em] text-muted uppercase">{t("users.speedT")}</span>
-        <span className="rounded-md border border-line px-1.5 py-px text-[10px] font-semibold text-muted">{t("users.experimental")}</span>
-      </div>
-      <SpeedRow label={t("users.speedUser")} hint={t("users.speedUserHint")} bps={person} onChange={onPerson} />
-      <SpeedRow label={t("users.speedDevice")} hint={t("users.speedDeviceHint")} bps={device} onChange={onDevice} />
-    </div>
   );
 }
 
@@ -295,37 +234,4 @@ export function useDebounced<V>(value: V, ms: number): V {
     return () => clearTimeout(id);
   }, [value, ms]);
   return v;
-}
-
-/**
- * A control that edits a server value with steppers and toggles: clicks show at once (the draft) and one save goes
- * out `delay` ms after the last click, so five clicks on "+" are one request. The draft is dropped when the server
- * value moves after the save went out (or someone else changed it), and when the save fails. Clicks made while a
- * save is in flight start a new draft that survives that save's refresh.
- */
-export function useDraft<V>(server: V, save: (v: V) => Promise<unknown>, delay = 450): [V, (v: V) => void] {
-  const [draft, setDraft] = useState<{ v: V; sent: boolean } | null>(null);
-  const saveRef = useRef(save);
-  useEffect(() => {
-    saveRef.current = save;
-  });
-
-  // "adjust state while rendering" (react.dev): when the server value changes, forget a draft that was already sent
-  const key = JSON.stringify(server);
-  const [seen, setSeen] = useState(key);
-  if (key !== seen) {
-    setSeen(key);
-    if (draft?.sent) setDraft(null);
-  }
-
-  useEffect(() => {
-    if (!draft || draft.sent) return;
-    const id = setTimeout(() => {
-      setDraft({ v: draft.v, sent: true });
-      saveRef.current(draft.v).catch(() => setDraft(null));
-    }, delay);
-    return () => clearTimeout(id);
-  }, [draft, delay]);
-
-  return [draft ? draft.v : server, (v) => setDraft({ v, sent: false })];
 }

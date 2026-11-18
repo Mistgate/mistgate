@@ -8,6 +8,3 @@ export const countryCodes = [
   "KZ", "LT", "LU", "LV", "MD", "MX", "MY", "NL", "NO", "PL", "PT", "RO", "RS", "RU", "SE", "SG", "SI", "SK",
   "TH", "TR", "TW", "UA", "US", "UZ", "VN", "ZA",
 ] as const; // prettier-ignore
-
-/** Region indicator flags would draw on some systems and not on Windows, so the UI shows the code itself. */
-export const isCountryCode = (v: string) => /^[A-Za-z]{2}$/.test(v);

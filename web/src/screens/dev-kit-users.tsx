@@ -11,7 +11,9 @@ import { dnsPresetsQuery, settingsQuery } from "@/screens/subscriptions/queries"
 import { CreateUserModal } from "@/screens/users/create-user";
 import type { DetailN } from "@/screens/users/model";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
-import { AccessPanel, DevicesPanel, LimitsPanel, TrafficPanel } from "@/screens/users/user-detail";
+import { GivesCard, LimitsPanel, NodesCard } from "@/screens/users/user-access";
+import { DevicesPanel } from "@/screens/users/user-devices";
+import { TrafficPanel } from "@/screens/users/user-overview";
 import type { DeviceN, UserN } from "@/screens/users/model";
 
 // Development only (the dev kit): the quota period in the new-user form and on the user card, on a private query cache
@@ -88,7 +90,10 @@ function AppsShot({ id, title, apps, panel = true }: { id: string; title: string
     <QueryClientProvider client={qc}>
       <Shot id={id} title={title}>
         <div className="max-w-md">
-          <AccessPanel data={withApps(apps)} actions={actions as never} />
+          <div className="up-one">
+            <GivesCard data={withApps(apps)} actions={actions as never} />
+            <NodesCard data={withApps(apps)} actions={actions as never} />
+          </div>
         </div>
       </Shot>
     </QueryClientProvider>

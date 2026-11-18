@@ -148,9 +148,6 @@ const special: Record<string, ReactNode> = {
   ),
 };
 
-/** True when the flag is drawn here (otherwise the two letters are shown). */
-export const hasFlag = (code: string) => code.toUpperCase() in stripes || code.toUpperCase() in special;
-
 /** A small rounded flag of an ISO 3166 country code; an unknown code shows its letters in a grey tile. `size` is the height. */
 export function Flag({ code, size = 16, className }: { code: string; size?: number; className?: string }) {
   const c = code.toUpperCase();

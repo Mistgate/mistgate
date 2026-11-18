@@ -745,14 +745,3 @@ export function AccessTab({ data, actions }: { data: DetailN; actions: Actions }
     </div>
   );
 }
-
-/** The two cards that decide what the person receives (older scenes drew them as one panel). */
-export function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
-  return (
-    <div className="up-one">
-      <GivesCard data={data} actions={actions} />
-      <NodesCard data={data} actions={actions} />
-    </div>
-  );
-}
-

@@ -16,17 +16,6 @@ describe("pickForm", () => {
     expect(pickForm(en["auth.attemptsLeft"], 1, "en")).toBe("{n} attempt left");
     expect(pickForm(en["auth.attemptsLeft"], 2, "en")).toBe("{n} attempts left");
   });
-  it("Overview health strip: Russian plurals, one node, nobody online", () => {
-    const pick = (k: "ov.allOk" | "ov.onlineNow", n: number) => pickForm(ru[k], n, "ru").replace("{n}", String(n));
-    expect(pick("ov.allOk", 2)).toBe("Все 2 ноды работают");
-    expect(pick("ov.allOk", 5)).toBe("Все 5 нод работают");
-    expect(pick("ov.onlineNow", 1)).toBe("1 человек онлайн");
-    expect(pick("ov.onlineNow", 3)).toBe("3 человека онлайн");
-    expect(pick("ov.onlineNow", 12)).toBe("12 человек онлайн");
-    expect(pickForm(en["ov.allOk"], 4, "en")).toBe("All {n} nodes are up");
-    expect(ru["ov.oneUp"]).toBe("Нода {name} работает");
-    expect(ru["ov.onlineNone"]).toBe("Сейчас никого онлайн");
-  });
   it("returns a single form as it is", () => {
     expect(pickForm("Hello", 3, "en")).toBe("Hello");
   });
@@ -118,6 +107,5 @@ describe("dictionaries", () => {
     expect(dictionaries.zh["common.quoted"]).toBe("「{name}」");
     expect(en["common.labeled"]).toBe("{label}: {value}");
     expect(dictionaries.zh["common.labeled"]).toBe("{label}：{value}");
-    expect(dictionaries.zh["hl.strip.headline"]).toBe("{count}：{names}{more}");
   });
 });

@@ -94,17 +94,6 @@ export function runKind(s: RunStatus): StatusKind {
   }
 }
 
-export const runWord = (s: RunStatus): MessageKey =>
-  s === RunStatus.OK
-    ? "task.run.ok"
-    : s === RunStatus.PROBLEM
-      ? "task.run.problem"
-      : s === RunStatus.FAILED
-        ? "task.run.failed"
-        : s === RunStatus.RUNNING
-          ? "task.run.running"
-          : "task.run.skipped";
-
 /** The words of a run's reason code ("provider_unreachable"); an unknown code reads as sent. */
 export function reasonText(t: T, code: string): string {
   if (!code) return "";

@@ -19,8 +19,7 @@ import { ChecksTab } from "@/screens/health/checks";
 import { HealthScreen } from "@/screens/health";
 import { NodeChecks } from "@/screens/node/checks";
 import { IntegrationsScreen } from "@/screens/integrations";
-import { McpCard } from "@/screens/integrations/mcp";
-import { TokensCard } from "@/screens/integrations/tokens";
+import { TokensTab } from "@/screens/ai/tokens";
 import { AwgStatusLine } from "@/screens/node/awg-status";
 import { LogsTab } from "@/screens/node/logs";
 import { BackupsPage } from "@/screens/settings-pages/backups";
@@ -142,13 +141,12 @@ describe("EditionNotice", () => {
   });
 });
 
-// Telegram stays on Integrations; MCP and the API tokens moved to AI (ADR 0014): the cards render the same on either page.
+// Telegram stays on Integrations; MCP and the API tokens moved to AI (ADR 0014): the AI page's cards read the edition the same way.
 function IntegrationsAndAgents() {
   return (
     <>
       <IntegrationsScreen />
-      <TokensCard />
-      <McpCard />
+      <TokensTab />
     </>
   );
 }

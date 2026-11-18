@@ -65,7 +65,6 @@ import { zh as profilesrvZh } from "./profilesrv";
 // Simplified Chinese (zh-CN). Typed against the English shape: a missing or extra key fails `pnpm typecheck`. Plurals: one form, no "|".
 // `core` is the shell, auth and navigation copy (what ru.ts keeps in its own `core`).
 const core: CoreMessages = {
-  "app.name": "Mistgate",
   "common.loading": "正在加载…",
   "common.retry": "重试",
   "common.undo": "撤销",
@@ -145,7 +144,6 @@ const core: CoreMessages = {
   "palette.users": "用户",
   "palette.places": "页面",
   "palette.actions": "操作",
-  "palette.addNode": "添加节点",
   "palette.createUser": "添加用户",
   "palette.newToken": "新建 API 令牌",
   "palette.newProfile": "新建协议配置",

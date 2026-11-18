@@ -87,7 +87,6 @@ export const pillOf: Record<StatusKind, { kind: "ok" | "part" | "bad" | "busy" |
   busy: { kind: "busy", glyph: "busy" },
   blip: { kind: "busy", glyph: "busy" },
 };
-export const dotOf = (k: StatusKind): DotKind => pillOf[k].glyph;
 
 export function SrcPill({ look, className }: { look: Look; className?: string }) {
   const t = useT();

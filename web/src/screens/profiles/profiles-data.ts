@@ -3,7 +3,7 @@ import type { ProfileSummary } from "@/gen/mistgate/admin/v1/profile_pb";
 import { nodes } from "@/lib/api";
 import type { InboundConn } from "@/lib/connections";
 import { checksQuery, countryColumn } from "@/lib/health";
-import { plain, type Plain } from "@/lib/plain";
+import { plain } from "@/lib/plain";
 import { pollMs } from "@/lib/queries";
 import { relaysQuery } from "@/lib/relay";
 import { useIsOwner } from "@/lib/updates";
@@ -15,8 +15,6 @@ export const fleetConnectionsQuery = queryOptions({
   queryFn: async ({ signal }) => plain(await nodes.getFleetConnections({ hours: 24 }, { signal })),
   refetchInterval: 60_000,
 });
-
-export type FleetConns = Plain<Awaited<ReturnType<typeof nodes.getFleetConnections>>>;
 
 /**
  * Everything the list and the matrix draw beyond the profiles themselves: each profile's servers (from the checks), the people's

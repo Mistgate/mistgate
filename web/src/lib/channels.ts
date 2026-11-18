@@ -11,9 +11,6 @@ export const asChannel = (s: string | undefined): Channel => (s === "testing" ||
 /** How early a channel is: stable 0, testing 1, dev 2. A panel on a channel sees the releases of every lower rank too. */
 export const channelRank: Record<Channel, number> = { stable: 0, testing: 1, dev: 2 };
 
-/** The colour of a channel's dot (the same tone classes as the status dots): stable calm, testing amber, dev lavender. */
-export const channelTone: Record<Channel, string> = { stable: "tone-ok", testing: "tone-warn", dev: "tone-busy" };
-
 /**
  * The command that makes `channel` the one the root update helper may install from (the file the installer creates and the
  * helper trusts: /etc/mistgate/panel-update-channel, root:root 0644, replaced by rename). Same text as the update docs.

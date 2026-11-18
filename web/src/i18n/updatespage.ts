@@ -96,7 +96,6 @@ export const en = {
   "uq.os.openNode": "Open node",
   "uq.opt.nowSub": "the node is unavailable for a few seconds, then it is checked for 5 minutes",
   "uq.opt.laterSub": "the panel updates the node by itself",
-  "uq.os.rebootBtn": "Reboot…",
 };
 export const ru: typeof en = {
   "uq.sum.load": "Загружаю…",
@@ -194,7 +193,6 @@ export const ru: typeof en = {
   "uq.os.openNode": "Открыть ноду",
   "uq.opt.nowSub": "нода недоступна несколько секунд, потом её проверяют 5 минут",
   "uq.opt.laterSub": "панель обновит ноду сама",
-  "uq.os.rebootBtn": "Перезагрузить…",
 };
 export const zh: typeof en = {
   "uq.sum.load": "正在加载…",
@@ -292,7 +290,6 @@ export const zh: typeof en = {
   "uq.os.openNode": "打开节点",
   "uq.opt.nowSub": "节点会有几秒不可用，之后会被检查 5 分钟",
   "uq.opt.laterSub": "面板会自动更新节点",
-  "uq.os.rebootBtn": "重启…",
 };
 export const fa: typeof en = {
   "uq.sum.load": "در حال بارگیری…",
@@ -390,7 +387,6 @@ export const fa: typeof en = {
   "uq.os.openNode": "باز کردن نود",
   "uq.opt.nowSub": "نود چند ثانیه در دسترس نیست و سپس ۵ دقیقه بررسی می‌شود",
   "uq.opt.laterSub": "پنل خودش نود را به‌روز می‌کند",
-  "uq.os.rebootBtn": "راه‌اندازی مجدد…",
 };
 export const tr: typeof en = {
   "uq.sum.load": "Yükleniyor…",
@@ -488,5 +484,4 @@ export const tr: typeof en = {
   "uq.os.openNode": "Düğümü aç",
   "uq.opt.nowSub": "düğüm birkaç saniye kullanılamaz, sonra 5 dakika denetlenir",
   "uq.opt.laterSub": "panel düğümü kendisi günceller",
-  "uq.os.rebootBtn": "Yeniden başlat…",
 };

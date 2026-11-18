@@ -77,10 +77,6 @@ export const en = {
   "igp.t.replaced": "Token replaced",
   "igp.t.mute": "Alerts to this chat are off",
   "igp.t.unmute": "Alerts are on",
-  "igp.t.tested": "Test message sent",
-  "igp.t.failed": "Telegram rejected the message",
-  "igp.t.botGone": "Bot removed",
-  "igp.t.unlinked": "Chat unlinked",
   "igp.role.helper": "You’re a helper, so you get only node and health alerts",
 };
 export const ru: typeof en = {
@@ -160,10 +156,6 @@ export const ru: typeof en = {
   "igp.t.replaced": "Токен заменён",
   "igp.t.mute": "Алерты в этот чат выключены",
   "igp.t.unmute": "Алерты включены",
-  "igp.t.tested": "Проверочное сообщение отправлено",
-  "igp.t.failed": "Telegram не принял сообщение",
-  "igp.t.botGone": "Бот убран",
-  "igp.t.unlinked": "Чат отвязан",
   "igp.role.helper": "Ты помощник, поэтому получаешь только алерты по нодам и здоровью",
 };
 export const zh: typeof en = {
@@ -243,10 +235,6 @@ export const zh: typeof en = {
   "igp.t.replaced": "令牌已替换",
   "igp.t.mute": "发往此聊天的告警已关闭",
   "igp.t.unmute": "告警已开启",
-  "igp.t.tested": "测试消息已发送",
-  "igp.t.failed": "Telegram 未接受消息",
-  "igp.t.botGone": "机器人已移除",
-  "igp.t.unlinked": "聊天已解绑",
   "igp.role.helper": "你是协助者，因此只会收到节点和健康告警",
 };
 export const fa: typeof en = {
@@ -326,10 +314,6 @@ export const fa: typeof en = {
   "igp.t.replaced": "توکن جایگزین شد",
   "igp.t.mute": "هشدارها به این گفت‌وگو خاموش است",
   "igp.t.unmute": "هشدارها روشن است",
-  "igp.t.tested": "پیام آزمایشی ارسال شد",
-  "igp.t.failed": "Telegram پیام را نپذیرفت",
-  "igp.t.botGone": "ربات حذف شد",
-  "igp.t.unlinked": "اتصال گفت‌وگو قطع شد",
   "igp.role.helper": "تو کمک‌کاری، پس فقط هشدارهای نود و سلامت را دریافت می‌کنی",
 };
 export const tr: typeof en = {
@@ -409,9 +393,5 @@ export const tr: typeof en = {
   "igp.t.replaced": "Belirteç değiştirildi",
   "igp.t.mute": "Bu sohbete uyarılar kapalı",
   "igp.t.unmute": "Uyarılar açık",
-  "igp.t.tested": "Test mesajı gönderildi",
-  "igp.t.failed": "Telegram mesajı kabul etmedi",
-  "igp.t.botGone": "Bot kaldırıldı",
-  "igp.t.unlinked": "Sohbetin bağlantısı kaldırıldı",
   "igp.role.helper": "Yardımcısın, bu yüzden yalnızca düğüm ve sağlık uyarılarını alırsın",
 };

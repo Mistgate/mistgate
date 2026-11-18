@@ -76,7 +76,6 @@ import { tr as profilesrvTr } from "./profilesrv";
 // passkey geçiş anahtarı · backup yedek · Reachability Erişilebilirlik · verdict sonuç · egress çıkış ·
 // handshake el sıkışma · approve onayla · rule kural · wizard sihirbaz.
 const core: CoreMessages = {
-  "app.name": "Mistgate",
   "common.loading": "Yükleniyor…",
   "common.retry": "Yeniden dene",
   "common.undo": "Geri al",
@@ -150,7 +149,6 @@ const core: CoreMessages = {
   "palette.users": "Kişiler",
   "palette.places": "Bölümler",
   "palette.actions": "İşlemler",
-  "palette.addNode": "Düğüm ekle",
   "palette.createUser": "Kişi ekle",
   "palette.newToken": "Yeni API token'ı",
   "palette.newProfile": "Yeni profil",

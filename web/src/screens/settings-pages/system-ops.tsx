@@ -72,16 +72,6 @@ export function OpsSide({ demo }: { demo?: OpsDemo }) {
   );
 }
 
-/** Both, one after the other (for a page that does not split them in two columns). */
-export function OpsCards() {
-  return (
-    <>
-      <OpsLogs />
-      <OpsSide />
-    </>
-  );
-}
-
 const levelLabel = (t: T, l: string) => t(`obs.level.${isLogLevel(l) ? l : "info"}` as MessageKey);
 
 const windows = [

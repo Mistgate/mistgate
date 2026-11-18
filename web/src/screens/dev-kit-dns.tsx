@@ -10,7 +10,7 @@ import { DnsOptionsCard, nodeDnsOptionsQuery } from "@/screens/node/dns-options"
 import type { DnsData, Preset, Settings } from "@/screens/subscriptions/model";
 import { PageTab } from "@/screens/subscriptions/page";
 import { dnsPresetsQuery, pickerUsersQuery, settingsQuery } from "@/screens/subscriptions/queries";
-import { DnsChoicesPanel } from "@/screens/users/user-detail";
+import { DnsChoicesPanel } from "@/screens/users/user-access";
 
 // Development only (the /dev-kit page): the DNS of the apps on the link, as the owner offers it (Subscriptions → User page) and as
 // the user card shows a person's picks. Made-up data: alice, nodes de1 and nl1, the built-in presets.

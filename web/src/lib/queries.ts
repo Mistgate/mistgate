@@ -46,10 +46,6 @@ export const userSearchQuery = (q: string) =>
     staleTime: 10_000,
   });
 
-export function useOverview(range: OverviewRange = OverviewRange.OVERVIEW_RANGE_24H) {
-  return useQuery(overviewQuery(range));
-}
-
 export function useNodes() {
   return useQuery(nodesQuery);
 }

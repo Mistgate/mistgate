@@ -32,8 +32,6 @@ import { MistgateAppRow } from "./mistgate-app";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { AppLink } from "./nav";
 
-export { GroupEditModal, PillToggle } from "./groups";
-
 export type Created = { user: User; url: string; password: string };
 
 /**

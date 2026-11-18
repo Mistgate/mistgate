@@ -1,5 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { useToast } from "@/components/ui/toast";
 import type { GetTelegramResponse } from "@/gen/mistgate/admin/v1/telegram_pb";
@@ -24,8 +24,6 @@ export const telegramQuery = queryOptions({
   queryFn: async ({ signal }) => plain((await telegram.getTelegram({}, { signal })).status!),
   refetchInterval: telegramPollMs,
 });
-
-export const useTelegram = () => useQuery(telegramQuery);
 
 /** The shape of a bot token ("123456789:AA..."): the server checks it again, this only saves a round trip. */
 export const looksLikeBotToken = (s: string) => /^\d{5,16}:[A-Za-z0-9_-]{30,100}$/.test(s.trim());

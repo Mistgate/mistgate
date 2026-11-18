@@ -38,8 +38,6 @@ const pages: Record<string, PageSpec> = {
   ...Object.fromEntries(settingsPages.map((p) => [`settings_${p}`, { needsId: false, target: () => ({ to: "/settings/$section", params: { section: p } }) } satisfies PageSpec])),
 };
 
-export const uiPageIds = Object.keys(pages);
-
 export type OpenAction = { kind: "open"; page: string; id: string; target: Target };
 
 /** A ui_open call as a card: the page and the id it needs, checked, with where it goes; null when it is not on the whitelist. */

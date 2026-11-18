@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { en } from "@/i18n/en";
-import { OpsCards } from "./system-ops";
+import { OpsLogs, OpsSide } from "./system-ops";
 
 // Settings -> System: the panel's logs, retention, export and metrics cards.
 
@@ -73,7 +73,8 @@ async function mount() {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <OpsCards />
+          <OpsLogs />
+          <OpsSide />
         </ToastProvider>
       </QueryClientProvider>,
     ),

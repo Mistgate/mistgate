@@ -13,7 +13,7 @@ import type { Approvals } from "@/lib/integrations";
 import { instanceQuery } from "@/lib/instance";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
-import { ApprovalHistory, ApprovalQueue } from "@/screens/integrations/approvals";
+import { ApprovalsTab } from "@/screens/ai/approvals";
 import { SettingsLayout } from "@/screens/settings";
 import { AdminsPage } from "@/screens/settings-pages/admins";
 import { AuditPage } from "@/screens/settings-pages/audit";
@@ -275,7 +275,7 @@ export function ProfileApprovalsKit() {
     <>
       {profileQueues.map(({ tool, data }) => (
         <Demo key={tool} id={`demo-ap-${tool}`} title={`Integrations → ${tool}`}>
-          <ApprovalQueue data={data} />
+          <ApprovalsTab data={data} />
         </Demo>
       ))}
     </>
@@ -370,8 +370,7 @@ export function SettingsDemos() {
         </div>
       </Demo>
       <Demo id="demo-int-approvals" title="Integrations → what an agent asks, and what came of it">
-        <ApprovalQueue data={{ ...approvals, awaiting: 4, approvals: [...approvals.approvals.slice(0, 2), muteFacts, createFacts] as never }} />
-        <ApprovalHistory data={approvals} />
+        <ApprovalsTab data={{ ...approvals, awaiting: 4, approvals: [...approvals.approvals.slice(0, 2), muteFacts, createFacts, ...approvals.approvals.slice(2)] as never }} />
       </Demo>
       <Demo id="demo-palette" title="Command palette" seed={[[nodesQuery.queryKey, { nodes: [{ id: "n1", name: "de1", countryCode: "DE", location: "Frankfurt", provider: "", address: "", status: NodeStatus.ONLINE }] }]]}>
         <Button onClick={() => setPalette(true)}>Open the palette</Button>

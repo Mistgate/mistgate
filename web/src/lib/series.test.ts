@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { foldDays, niceCeil, protocolName, protocolShort, smoothPath, sortProtocols, tail, toSeries } from "./series";
+import { foldDays, niceCeil, protocolName, protocolShort, sortProtocols, tail, toSeries } from "./series";
 
 describe("protocolShort", () => {
   it("writes the tags the owner uses, never a cut word", () => {
@@ -60,18 +60,6 @@ describe("niceCeil", () => {
     [0.0031, 0.005],
   ])("%s -> %s", (v, want) => {
     expect(niceCeil(v)).toBeCloseTo(want, 10);
-  });
-});
-
-describe("smoothPath", () => {
-  it("starts at the first point and ends at the last, with one cubic per step", () => {
-    const d = smoothPath([0, 10, 20], [5, 1, 3]);
-    expect(d.startsWith("M0,5 ")).toBe(true);
-    expect(d.endsWith("20,3")).toBe(true);
-    expect(d.match(/C/g)).toHaveLength(2);
-  });
-  it("is empty for no points", () => {
-    expect(smoothPath([], [])).toBe("");
   });
 });
 

@@ -13,16 +13,6 @@ type Props = {
   incrementLabel: string;
 };
 
-/** "No limit" as ∞: short enough for a stepper; the word stays for screen readers and as a tooltip. */
-export function Infinite({ label }: { label: string }) {
-  return (
-    <span title={label} className="text-lg leading-none">
-      <span aria-hidden>∞</span>
-      <span className="sr-only">{label}</span>
-    </span>
-  );
-}
-
 /**
  * "-" value "+" in a capsule (the board's .sv-step): 36px, a 10px radius, the page colour inside, two 32px buttons and the
  * value in the middle (56px at least, longer text widens it). The bars are drawn, not glyphs.

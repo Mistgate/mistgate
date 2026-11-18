@@ -1,6 +1,6 @@
 import { ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
-import type { DecoyBuiltinItem, DecoyCheck, DecoyFileInfo, DecoyPanelState, DecoySite, DecoySiteNode, DecoyVersion, GetDecoySiteResponse, ListDecoySitesResponse } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
+import type { DecoyCheck, DecoyFileInfo, DecoyPanelState, DecoySite, DecoyVersion } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
 import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
@@ -17,11 +17,7 @@ export type Site = Plain<DecoySite>;
 export type SiteVersion = Plain<DecoyVersion>;
 export type SiteCheck = Plain<DecoyCheck>;
 export type SiteFile = Plain<DecoyFileInfo>;
-export type SiteNode = Plain<DecoySiteNode>;
-export type BuiltinItem = Plain<DecoyBuiltinItem>;
 export type PanelState = Plain<DecoyPanelState>;
-export type Library = Plain<ListDecoySitesResponse>;
-export type SiteDetail = Plain<GetDecoySiteResponse>;
 export type Node = Plain<NodeMsg>;
 
 /** The two entries of the library that are not sites: they have no id of their own in the route, these are their words. */
@@ -213,8 +209,6 @@ export function treeRows(files: readonly SiteFile[], open: ReadonlySet<string> =
   return rows;
 }
 
-export const htmlPageCount = (files: readonly SiteFile[]) => files.filter((f) => isHtmlPath(f.path)).length;
-
 // ---- the names
 
 /** A name for a new site from a file's name: no extension, trimmed to the limit, and "2", "3" … after it while it is taken. */
@@ -306,4 +300,3 @@ export function saveBytes(filename: string, bytes: Uint8Array, type = "applicati
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
-

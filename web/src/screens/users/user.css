@@ -892,9 +892,6 @@ a.up-gtag:hover {
 .up-dv.up-key {
   grid-template-columns: 36px minmax(0, 1fr) auto auto auto auto;
 }
-.up-dv.mo {
-  z-index: 6;
-}
 .up-dv > .g {
   display: grid;
   place-items: center;
@@ -1067,27 +1064,6 @@ a.up-gtag:hover {
 .up-mn [role="menuitem"].risk svg {
   color: var(--danger-text);
 }
-.up-ren {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.up-ren input {
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: 280px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid var(--up-hair);
-  background: var(--bg);
-  font-size: 14px;
-  outline: none;
-}
-.up-ren input:focus {
-  border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
 .up-blk .up-dv > .g {
   color: var(--muted);
 }
@@ -1095,22 +1071,6 @@ a.up-gtag:hover {
   color: var(--sec);
 }
 /* the new key's form */
-.up-add {
-  display: grid;
-  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
-  gap: 16px 24px;
-  align-items: start;
-  padding: 16px 24px;
-  border-top: 1px solid var(--up-hair);
-  background: color-mix(in srgb, var(--text) 2%, transparent);
-}
-.up-fx .up-add {
-  animation: mg-up 0.2s var(--e) both;
-}
-.up-add .a1,
-.up-add .a4 {
-  grid-column: 1 / -1;
-}
 .up-f {
   display: flex;
   flex-direction: column;
@@ -1160,86 +1120,6 @@ a.up-gtag:hover {
 .up-f.bad .up-i {
   border-color: var(--danger);
 }
-.up-tp {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 40px;
-  align-items: center;
-}
-.up-tp button {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 16px;
-  border: 1px solid var(--up-hair);
-  font-size: 13px;
-  color: var(--sec);
-  transition: border-color 0.15s var(--e), color 0.15s var(--e), background-color 0.15s var(--e);
-}
-.up-tp button:hover {
-  color: var(--text);
-}
-.up-tp button[aria-pressed="true"] {
-  border-color: var(--accent-line);
-  background: color-mix(in srgb, var(--accent-mark) 8%, transparent);
-  color: var(--text);
-}
-.up-a4 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.up-a4 p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--muted);
-}
-.up-a4 p.up-warn {
-  color: var(--warning-text);
-}
-.up-ver {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.up-ver button {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--up-hair);
-  text-align: start;
-  transition: border-color 0.15s var(--e), background-color 0.15s var(--e);
-}
-.up-ver button:hover {
-  border-color: color-mix(in srgb, var(--text) 22%, transparent);
-}
-.up-ver button[aria-checked="true"] {
-  border-color: var(--accent-line);
-  background: color-mix(in srgb, var(--accent-mark) 5%, transparent);
-}
-.up-ver b {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 500;
-}
-.up-ver div > span {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--muted);
-}
-.up-ver .up-tag {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
-}
 /* a radio dot (the board's .nx-rad) */
 .up-rad {
   display: grid;
@@ -1265,50 +1145,6 @@ a.up-gtag:hover {
   transform: scale(1);
 }
 /* a key's nodes */
-.up-kv {
-  grid-column: 2 / -1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-bottom: 8px;
-}
-.up-fx .up-kv {
-  animation: mg-up 0.2s var(--e) both;
-}
-.up-kv small {
-  font-size: 12px;
-  color: var(--muted);
-}
-.up-kper {
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  border: 1px solid var(--up-hair);
-  background: var(--bg);
-}
-.up-kper > div {
-  display: grid;
-  grid-template-columns: 18px 44px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding-block: 6px;
-  padding-inline: 12px 6px;
-  font-size: 12px;
-}
-.up-kper > div + div {
-  border-top: 1px solid var(--up-hair);
-}
-.up-kper b {
-  font-family: var(--font-mono);
-  font-weight: 500;
-}
-.up-kper code {
-  font-family: var(--font-mono);
-  color: var(--sec);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 /* the Telegram links */
 .up-tg {
   display: grid;
@@ -2102,9 +1938,7 @@ a.up-gtag:hover {
 }
 
 /* ---- Settings: the danger zone ---- */
-.up-dz .up-del:hover,
-.up-ask,
-.up-ask:hover {
+.up-dz .up-del:hover {
   border-color: var(--danger);
   color: var(--danger-text);
 }
@@ -2204,15 +2038,6 @@ a.up-gtag:hover {
   }
   .up-tg {
     grid-template-columns: 1fr;
-  }
-  .up-add {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .up-ver {
-    grid-template-columns: 1fr;
-  }
-  .up-a4 {
-    flex-wrap: wrap;
   }
 }
 @media (width <= 720px) {
@@ -2323,19 +2148,6 @@ a.up-gtag:hover {
   }
   .up-dv.up-key {
     grid-template-columns: 36px minmax(0, 1fr) auto auto;
-  }
-  .up-ren {
-    flex-wrap: wrap;
-  }
-  .up-ren input {
-    max-width: none;
-    flex: 1 1 100%;
-  }
-  .up-kv {
-    grid-column: 1 / -1;
-  }
-  .up-add {
-    padding: 16px;
   }
   .up-tg {
     padding: 0 16px 8px;

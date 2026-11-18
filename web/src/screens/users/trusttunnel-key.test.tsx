@@ -10,11 +10,10 @@ import { DeviceKind, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { dictionaries, fill, setLang, type T } from "@/i18n";
 import { errorText } from "@/lib/errors";
 import { meQuery } from "@/lib/session";
-import { WaysOfGroup } from "./groups";
 import { isTrustTunnelKey, splitDevices } from "./link-devices";
 import type { DeviceN, UserN } from "./model";
 import { TrustTunnelSection, pauseOf, trustTunnelShown } from "./trusttunnel-key";
-import { DevicesPanel } from "./user-detail";
+import { DevicesPanel } from "./user-devices";
 
 // The TrustTunnel key of a person on their card: the nine states of the brief, the refusals in words, a confirmation before
 // the key is revoked, the key told apart from an AmneziaVPN key, and no secret left behind.
@@ -328,18 +327,5 @@ describe("the key among the devices", () => {
     expect([...document.querySelectorAll("button")].filter((b) => b.getAttribute("aria-label") === "Show key")).toHaveLength(1);
     expect(text()).toContain("TrustTunnel key");
     expect(text()).not.toContain("Delete…");
-  });
-});
-
-describe("the ways a person's group gives", () => {
-  it("lists a TrustTunnel profile in a row of its own, not in the subscription", async () => {
-    const profiles = [
-      { id: "p_hy", name: "Main · 443", protocol: "hysteria2" },
-      { id: "p_tt", name: "TrustTunnel · 443", protocol: "trusttunnel" },
-    ];
-    await mount(<WaysOfGroup profiles={profiles} compact />);
-    const lines = [...document.querySelectorAll(".items-start")].map((r) => r.textContent);
-    expect(lines[0]).toBe("SubscriptionMain · 443");
-    expect(lines.at(-1)).toBe("TrustTunnelTrustTunnel · 443");
   });
 });

@@ -6,7 +6,6 @@
 export const en = {
   // ---- the card on the node's Server tab
   "os.card.title": "Operating system",
-  "os.card.body": "Packages and kernel as the server reads them. You can install the updates and reboot it from here; several nodes at once from the Updates page.",
   "os.card.noStatus": "The node has not reported its system yet.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -207,13 +206,6 @@ export const en = {
   "os.dlg.online.none": "Nobody is online on {node} now.",
   "os.dlg.online.drop": "During a reboot they are disconnected for about two minutes and reconnect by themselves.",
   "os.dlg.reboot.lead.online": "{n} person online on {node} will be disconnected for about two minutes|{n} people online on {node} will be disconnected for about two minutes",
-  "os.dlg.after": "After installing",
-  "os.dlg.reboot.ifRequired": "Reboot if required (recommended)",
-  "os.dlg.reboot.never": "Do not reboot",
-  "os.dlg.reboot.ifRequired.hint": "The node reboots only if the updates need it. Before that it checks that a reboot is safe, and refuses if it is not.",
-  "os.dlg.reboot.never.hint": "The updates are installed and the server keeps running as it is. Reboot it later, from here.",
-  "os.dlg.fact.kernels": "Old kernels stay installed.",
-  "os.dlg.fact.profiles": "After a reboot the panel checks the node's profiles. If one does not work, the update stops and you get an alert.",
   "os.dlg.warn.autoReboot": "Automatic updates on this server are set to reboot it by themselves, which would bypass the checks. The node will refuse until you turn off Automatic-Reboot in unattended-upgrades.",
   "os.dlg.warn.awgMissing": "The AmneziaWG module is not built for the new kernel. The node refuses to reboot until it is: people on AmneziaWG would lose their connection.",
   "os.dlg.warn.half": "Interrupted installs: {names}. The node tries to repair them first.",
@@ -270,7 +262,6 @@ export const en = {
 
 export const ru: Record<keyof typeof en, string> = {
   "os.card.title": "Операционная система",
-  "os.card.body": "Пакеты и ядро в том виде, как их читает сервер. Отсюда можно поставить обновления и перезагрузить сервер; сразу несколько нод — на странице «Обновления».",
   "os.card.noStatus": "Нода ещё не прислала данные о своей системе.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -465,13 +456,6 @@ export const ru: Record<keyof typeof en, string> = {
   "os.dlg.online.none": "Сейчас на {node} никого нет онлайн.",
   "os.dlg.online.drop": "На время перезагрузки они отключатся примерно на две минуты и переподключатся сами.",
   "os.dlg.reboot.lead.online": "{n} человек онлайн на {node} отключится примерно на две минуты|{n} человека онлайн на {node} отключатся примерно на две минуты|{n} человек онлайн на {node} отключатся примерно на две минуты",
-  "os.dlg.after": "После установки",
-  "os.dlg.reboot.ifRequired": "Перезагрузить, если потребуется (рекомендуется)",
-  "os.dlg.reboot.never": "Не перезагружать",
-  "os.dlg.reboot.ifRequired.hint": "Нода перезагрузится, только если этого требуют обновления. Перед этим она проверит, что перезагрузка безопасна, и откажет, если нет.",
-  "os.dlg.reboot.never.hint": "Обновления будут установлены, а сервер продолжит работать как есть. Перезагрузить его можно позже, отсюда же.",
-  "os.dlg.fact.kernels": "Старые ядра остаются установленными.",
-  "os.dlg.fact.profiles": "После перезагрузки панель проверит профили ноды. Если какой-то не работает, обновление остановится и придёт тревога.",
   "os.dlg.warn.autoReboot": "Автообновления на этом сервере сами перезагружают его, а это обошло бы проверки. Нода откажется, пока ты не выключишь Automatic-Reboot в unattended-upgrades.",
   "os.dlg.warn.awgMissing": "Модуль AmneziaWG не собран под новое ядро. Нода откажется перезагружаться, пока модуля нет: люди на AmneziaWG потеряли бы связь.",
   "os.dlg.warn.half": "Прерванные установки: {names}. Нода сначала попробует их починить.",
@@ -526,7 +510,6 @@ export const ru: Record<keyof typeof en, string> = {
 
 export const zh: Record<keyof typeof en, string> = {
   "os.card.title": "操作系统",
-  "os.card.body": "服务器自己读取到的软件包和内核。你可以在这里安装更新并重启服务器；要一次处理多个节点，请到“更新”页面。",
   "os.card.noStatus": "节点还没有上报它的系统信息。",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -721,13 +704,6 @@ export const zh: Record<keyof typeof en, string> = {
   "os.dlg.online.none": "现在 {node} 上没有人在线。",
   "os.dlg.online.drop": "重启期间他们会断开约两分钟，然后自动重新连接。",
   "os.dlg.reboot.lead.online": "{node} 上在线的 {n} 人将断开约两分钟",
-  "os.dlg.after": "安装之后",
-  "os.dlg.reboot.ifRequired": "需要时重启（推荐）",
-  "os.dlg.reboot.never": "不重启",
-  "os.dlg.reboot.ifRequired.hint": "只有更新需要时节点才会重启。重启前它会检查重启是否安全，不安全就会拒绝。",
-  "os.dlg.reboot.never.hint": "更新会被安装，服务器保持现状运行。之后可以在这里再重启它。",
-  "os.dlg.fact.kernels": "旧内核会保留。",
-  "os.dlg.fact.profiles": "重启后面板会检查节点的配置。如果有配置不工作，更新会停止并发出警报。",
   "os.dlg.warn.autoReboot": "此服务器上的自动更新被设置为自行重启，这会绕过检查。在你关闭 unattended-upgrades 中的 Automatic-Reboot 之前，节点会拒绝执行。",
   "os.dlg.warn.awgMissing": "尚未为新内核构建 AmneziaWG 模块。在构建完成之前，节点会拒绝重启：使用 AmneziaWG 的人会断线。",
   "os.dlg.warn.half": "中断的安装：{names}。节点会先尝试修复它们。",
@@ -782,7 +758,6 @@ export const zh: Record<keyof typeof en, string> = {
 
 export const fa: Record<keyof typeof en, string> = {
   "os.card.title": "سیستم‌عامل",
-  "os.card.body": "بسته‌ها و هسته همان‌طور که خود سرور می‌خواند. از اینجا می‌توانی به‌روزرسانی‌ها را نصب کنی و سرور را راه‌اندازی مجدد کنی؛ چند نود با هم را از صفحهٔ «به‌روزرسانی‌ها» انجام بده.",
   "os.card.noStatus": "نود هنوز اطلاعات سیستمش را نفرستاده است.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -977,13 +952,6 @@ export const fa: Record<keyof typeof en, string> = {
   "os.dlg.online.none": "الان کسی روی {node} آنلاین نیست.",
   "os.dlg.online.drop": "هنگام راه‌اندازی مجدد حدود دو دقیقه قطع می‌شوند و خودشان دوباره وصل می‌شوند.",
   "os.dlg.reboot.lead.online": "{n} نفر که الان روی {node} آنلاین‌اند حدود دو دقیقه قطع می‌شوند",
-  "os.dlg.after": "بعد از نصب",
-  "os.dlg.reboot.ifRequired": "در صورت نیاز راه‌اندازی مجدد شود (پیشنهادی)",
-  "os.dlg.reboot.never": "راه‌اندازی مجدد نشود",
-  "os.dlg.reboot.ifRequired.hint": "نود فقط وقتی به‌روزرسانی‌ها لازم بدانند راه‌اندازی مجدد می‌شود. پیش از آن بررسی می‌کند که این کار امن باشد و اگر نبود رد می‌کند.",
-  "os.dlg.reboot.never.hint": "به‌روزرسانی‌ها نصب می‌شوند و سرور همان‌طور که هست کار می‌کند. بعداً از همین‌جا راه‌اندازی مجددش کن.",
-  "os.dlg.fact.kernels": "هسته‌های قدیمی نصب می‌مانند.",
-  "os.dlg.fact.profiles": "پس از راه‌اندازی مجدد، پنل پروفایل‌های نود را بررسی می‌کند. اگر یکی کار نکند، به‌روزرسانی متوقف می‌شود و هشدار می‌گیری.",
   "os.dlg.warn.autoReboot": "به‌روزرسانی‌های خودکار این سرور طوری تنظیم شده‌اند که خودشان آن را راه‌اندازی مجدد کنند و این بررسی‌ها را دور می‌زند. تا Automatic-Reboot را در unattended-upgrades خاموش نکنی، نود رد می‌کند.",
   "os.dlg.warn.awgMissing": "ماژول AmneziaWG برای هستهٔ جدید ساخته نشده. تا وقتی ساخته نشود، نود از راه‌اندازی مجدد خودداری می‌کند: کسانی که با AmneziaWG وصل‌اند ارتباطشان قطع می‌شد.",
   "os.dlg.warn.half": "نصب‌های نیمه‌تمام: {names}. نود اول سعی می‌کند آن‌ها را ترمیم کند.",
@@ -1038,7 +1006,6 @@ export const fa: Record<keyof typeof en, string> = {
 
 export const tr: Record<keyof typeof en, string> = {
   "os.card.title": "İşletim sistemi",
-  "os.card.body": "Paketler ve çekirdek, sunucunun kendi okuduğu haliyle. Güncellemeleri buradan kurabilir ve sunucuyu yeniden başlatabilirsin; birden çok düğüm için «Güncellemeler» sayfasını kullan.",
   "os.card.noStatus": "Düğüm sistemi hakkında henüz bir şey bildirmedi.",
 
   // the kernels of a node (OsStatus.kernels): five checks per kernel and whether a reboot would go through
@@ -1233,13 +1200,6 @@ export const tr: Record<keyof typeof en, string> = {
   "os.dlg.online.none": "Şu an {node} üzerinde çevrimiçi kimse yok.",
   "os.dlg.online.drop": "Yeniden başlatma sırasında yaklaşık iki dakika bağlantıları kopar ve kendiliğinden yeniden bağlanırlar.",
   "os.dlg.reboot.lead.online": "{node} üzerinde çevrimiçi olan {n} kişinin bağlantısı yaklaşık iki dakika kopacak",
-  "os.dlg.after": "Kurulumdan sonra",
-  "os.dlg.reboot.ifRequired": "Gerekirse yeniden başlat (önerilir)",
-  "os.dlg.reboot.never": "Yeniden başlatma",
-  "os.dlg.reboot.ifRequired.hint": "Düğüm yalnızca güncellemeler gerektiriyorsa yeniden başlar. Öncesinde bunun güvenli olduğunu denetler, değilse reddeder.",
-  "os.dlg.reboot.never.hint": "Güncellemeler kurulur, sunucu olduğu gibi çalışmaya devam eder. Sonra yine buradan yeniden başlatabilirsin.",
-  "os.dlg.fact.kernels": "Eski çekirdekler kurulu kalır.",
-  "os.dlg.fact.profiles": "Yeniden başlatmadan sonra panel düğümün profillerini denetler. Biri çalışmazsa güncelleme durur ve bir uyarı alırsın.",
   "os.dlg.warn.autoReboot": "Bu sunucudaki otomatik güncellemeler onu kendi kendine yeniden başlatacak şekilde ayarlı, bu da denetimleri atlatırdı. unattended-upgrades içinde Automatic-Reboot’u kapatana kadar düğüm reddeder.",
   "os.dlg.warn.awgMissing": "AmneziaWG modülü yeni çekirdek için derlenmedi. Derlenene kadar düğüm yeniden başlatmayı reddeder: AmneziaWG kullananların bağlantısı kopardı.",
   "os.dlg.warn.half": "Yarım kalan kurulumlar: {names}. Düğüm önce bunları onarmayı dener.",

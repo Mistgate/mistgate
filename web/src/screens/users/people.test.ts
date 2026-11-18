@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { en as profilesEn, ru as profilesRu } from "@/i18n/profiles";
 import { en as usersEn, ru as usersRu } from "@/i18n/users";
-import { avatarIndex, daysLeft, shownStatus, termText, usage } from "./format";
+import { avatarIndex, daysLeft, shownStatus, usage } from "./format";
 import type { UserN } from "./model";
 import { useTx } from "./t";
 
@@ -66,12 +66,5 @@ describe("user display helpers", () => {
     expect(usage(100e9, 100e9, fmt).tone).toBe("over"); // the quota is used up: the server limits the person
     expect(usage(101e9, 100e9, fmt).tone).toBe("over");
     expect(usage(5e9, 0, fmt)).toMatchObject({ used: "5 GB", of: "", text: "5 GB", pct: 0 });
-  });
-
-  it("shows the term as days, expired or unlimited", () => {
-    const t = ((k: string, v?: Record<string, number>) => (k === "users.days" ? `${v!.n} d` : k)) as never;
-    expect(termText(user({ expiresUnix: 0 }), t, 100).text).toBe("∞");
-    expect(termText(user({ expiresUnix: 50 }), t, 100)).toMatchObject({ text: "0 d", tone: "bad" });
-    expect(termText(user({ expiresUnix: 100 + 86400 * 3 }), t, 100)).toMatchObject({ text: "3 d", tone: "fg" });
   });
 });

@@ -612,9 +612,6 @@ button.wy-wn.ghost {
   line-height: 18px;
   color: var(--muted);
 }
-.wy-pt .wy-run {
-  white-space: nowrap;
-}
 
 /* the servers of a relay and the way it works: one row per server, the way and what was measured above */
 .wy-sv {

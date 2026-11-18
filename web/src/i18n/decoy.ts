@@ -34,7 +34,6 @@ export const en = {
   "decoy.lib.dropText": "ZIP, TAR or TAR.GZ, up to 2 MiB. The site appears in the library and goes onto this node at once",
   "decoy.own.tooBig": "{name} is {size} MiB: the limit is 2 MiB.",
   "decoy.apply": "Apply",
-  "decoy.saved": "Decoy site saved",
 
   "decoy.state.ok": "Applied: the node shows this site.",
   // decoy_reason_code; the panel_* ones read as the refusals above (err.panel_*)
@@ -82,7 +81,6 @@ export const ru: typeof en = {
   "decoy.lib.dropText": "ZIP, TAR или TAR.GZ, до 2 МиБ. Сайт появится в библиотеке и сразу встанет на эту ноду",
   "decoy.own.tooBig": "{name} — {size} МиБ: предел 2 МиБ.",
   "decoy.apply": "Применить",
-  "decoy.saved": "Сайт-ширма сохранён",
 
   "decoy.state.ok": "Применено: нода показывает этот сайт.",
   "decoy.reason.agent_too_old": "Агент ноды ещё не знает сайты-ширмы (decoy/1), поэтому показывает встроенную страницу. Обнови агент.",
@@ -128,7 +126,6 @@ export const zh: typeof en = {
   "decoy.lib.dropText": "ZIP、TAR 或 TAR.GZ，最大 2 MiB。站点会出现在站点库中，并立即部署到此节点",
   "decoy.own.tooBig": "{name} 为 {size} MiB，上限是 2 MiB。",
   "decoy.apply": "应用",
-  "decoy.saved": "伪装站点已保存",
 
   "decoy.state.ok": "已应用：节点正在展示此站点。",
   "decoy.reason.agent_too_old": "节点的 Agent 尚不支持伪装站点（decoy/1），因此显示内置页面。请更新 Agent。",
@@ -172,7 +169,6 @@ export const fa: typeof en = {
   "decoy.lib.dropText": "ZIP، TAR یا TAR.GZ، حداکثر 2 MiB. سایت در کتابخانه ظاهر می‌شود و بلافاصله روی این نود قرار می‌گیرد",
   "decoy.own.tooBig": "{name} برابر {size} MiB است: حد مجاز 2 MiB است.",
   "decoy.apply": "اعمال",
-  "decoy.saved": "سایت پوششی ذخیره شد",
   "decoy.state.ok": "اعمال شد: نود این سایت را نشان می‌دهد.",
   "decoy.reason.agent_too_old": "ایجنت نود هنوز سایت پوششی (decoy/1) را نمی‌شناسد، برای همین صفحهٔ داخلی را نشان می‌دهد. ایجنت را به‌روز کن.",
   "decoy.reason.node_offline": "نود آفلاین است: وقتی دوباره وصل شود سایت را می‌گیرد و تا آن موقع صفحهٔ داخلی را نشان می‌دهد.",
@@ -214,7 +210,6 @@ export const tr: typeof en = {
   "decoy.lib.dropText": "ZIP, TAR veya TAR.GZ, en fazla 2 MiB. Site kütüphanede görünür ve hemen bu düğümde yayına girer",
   "decoy.own.tooBig": "{name} dosyası {size} MiB: sınır 2 MiB.",
   "decoy.apply": "Uygula",
-  "decoy.saved": "Kamuflaj sitesi kaydedildi",
   "decoy.state.ok": "Uygulandı: düğüm bu siteyi gösteriyor.",
   "decoy.reason.agent_too_old": "Düğümün ajanı kamuflaj sitelerini (decoy/1) henüz bilmiyor, bu yüzden yerleşik sayfayı gösteriyor. Ajanı güncelle.",
   "decoy.reason.node_offline": "Düğüm çevrimdışı: yeniden bağlandığında siteyi alır, o zamana kadar yerleşik sayfayı gösterir.",

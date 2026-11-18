@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionOf, parseOpen, parseSecret, uiPageIds } from "./ui-actions";
+import { actionOf, parseOpen, parseSecret } from "./ui-actions";
 
 describe("ui_open pages", () => {
   it("maps each whitelisted page to the router's route and its search", () => {
@@ -10,7 +10,6 @@ describe("ui_open pages", () => {
     expect(parseOpen({ page: "health_people" })?.target).toEqual({ to: "/health", search: { tab: "people" } });
     expect(parseOpen({ page: "settings_backups" })?.target).toEqual({ to: "/settings/$section", params: { section: "backups" } });
     expect(parseOpen({ page: "ai_waiting" })?.target).toEqual({ to: "/ai", search: { tab: "approvals" } });
-    expect(uiPageIds.length).toBeGreaterThan(25);
   });
 
   it("refuses an unknown page, a missing or odd id, and an id where none belongs", () => {

@@ -97,9 +97,6 @@
   grid-row: span 3;
   min-width: 0;
 }
-.nd-rm.nob i {
-  visibility: hidden;
-}
 @media (width <= 720px) {
   .nd-rm {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -422,15 +419,6 @@
 }
 
 /* the number of a closed alert, the check that comes in: a quiet fade */
-@keyframes nd-blip {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .nd-sbar i,

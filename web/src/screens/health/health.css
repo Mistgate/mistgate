@@ -639,15 +639,6 @@
 .hlp .hl-find.stale {
   opacity: 0.6;
 }
-.hlp .hl-acc {
-  margin: 12px 0 0;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--muted);
-}
-.hlp .hl-acc .an-lk {
-  color: var(--text);
-}
 .hlp .hl-steps {
   margin-top: 12px;
 }
@@ -736,9 +727,6 @@
 }
 .hlp .hl-two .btn {
   margin-top: 0;
-}
-.hlp .hl-lead {
-  padding-top: 4px;
 }
 
 /* ---- the states before the tabs (the order of the board's: the skeleton, the error and the quiet card keep their place under the tabs) ---- */

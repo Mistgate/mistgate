@@ -1,19 +1,13 @@
-import { useState, type ReactNode } from "react";
-import { EditionNotice } from "@/components/edition-notice";
-import { Button } from "@/components/ui/button";
-import { SectionLabel } from "@/components/ui/bits";
-import { Icon } from "@/components/ui/icons";
+import { type ReactNode } from "react";
 import { Notice } from "@/components/ui/notice";
-import { StatusPill, type StatusKind } from "@/components/ui/status";
+import { type StatusKind } from "@/components/ui/status";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
-import { bundleErrorText, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
+import { bundleErrorText, type Bundle, type Updates } from "@/lib/updates";
 import { Command } from "./nodes";
 import { asChannel, panelChannelCommand } from "@/lib/channels";
-import { PanelUpdateWindow } from "./update-dialog";
 
 export const bundleStates: Record<BundleStatus, { kind: StatusKind; key: MessageKey }> = {
   [BundleStatus.UNSPECIFIED]: { kind: "off", key: "up.bundle.status.missing" },
@@ -22,8 +16,6 @@ export const bundleStates: Record<BundleStatus, { kind: StatusKind; key: Message
   [BundleStatus.UNTRUSTED]: { kind: "bad", key: "up.bundle.status.untrusted" },
   [BundleStatus.NO_KEY]: { kind: "warn", key: "up.bundle.status.noKey" },
 };
-
-const card = "flex min-w-0 flex-col gap-3 rounded-card-lg border border-line bg-surface p-4 md:p-[18px]";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -193,85 +185,5 @@ export function EdgeDeploy({ version }: { version?: string }) {
       <p className="text-xs leading-normal text-pretty text-muted">{t("up.panel.edgeHint")}</p>
       <Command value={`mistgate edge deploy --host ${location.hostname} --version ${version || "<version>"}`} />
     </div>
-  );
-}
-
-/** This panel's build, its release key and GitHub self-update controls (Settings → System). */
-export function PanelCard({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
-  const t = useT();
-  const fmt = useFmt();
-  const edition = useEdition();
-  const off = edition.off("panel_update"); // the edition has no binary to swap: no install, no systemd steps
-  const { p, update, label, kind } = panelUpdate(t, data, edition.edge);
-  const [win, setWin] = useState(false);
-  return (
-    <section className={card}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <SectionLabel as="h2" icon="server" tone="lavender">
-          {t("up.panel.title")}
-        </SectionLabel>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill kind={kind} label={label} sm />
-          {update?.checkedUnix ? <span className="text-xs text-faint">{t("up.panel.checkedAt", { ago: fmt.ago(update.checkedUnix) })}</span> : null}
-        </div>
-      </div>
-
-      <dl className="grid gap-2 sm:grid-cols-2">
-        <div className="min-w-0 rounded-field border border-line bg-surface-2 p-3.5">
-          <dt className="text-xs text-muted">{t("up.panel.version")}</dt>
-          <dd className="mt-1 break-words font-mono text-base font-bold text-fg">{p?.version || "—"}</dd>
-          <p className="mt-1 text-xs text-muted">{t("up.panel.built")}: {p?.built ? fmt.dateTime(p.built) : "—"}</p>
-        </div>
-        <div className="min-w-0 rounded-field border border-line bg-surface-2 p-3.5">
-          <dt className="text-xs text-muted">{t("up.panel.latest")}</dt>
-          <dd className="mt-1 break-words font-mono text-base font-bold text-fg">
-            {update?.version && update.url ? (
-              <a href={update.url} target="_blank" rel="noreferrer" className="cursor-pointer text-accent underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                {update.version}
-              </a>
-            ) : label}
-          </dd>
-          {update?.built ? (
-            <p className="mt-1 text-xs text-muted">
-              {t("up.panel.built")}: {fmt.dateTime(update.built)}
-              {update.sha256 && (
-                <>
-                  {" · "}
-                  {t("up.panel.sha")}{" "}
-                  <span className="font-mono text-fg" title={update.sha256}>
-                    {shortHash(update.sha256)}
-                  </span>
-                </>
-              )}
-            </p>
-          ) : null}
-          <p className="mt-1 text-xs text-muted">
-            {t("up.panel.key")}: {p?.hasReleaseKey ? <span className="font-mono text-fg">{p.releaseKeyFingerprint}</span> : <span className="font-semibold text-warn-text">{t("up.panel.noKey")}</span>}
-          </p>
-        </div>
-      </dl>
-
-      <div className="flex flex-col gap-2.5 border-t border-line pt-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" disabled={actions.busy} onClick={() => void actions.checkPanel()}>
-            <Icon name="refresh" size={12} />
-            {t("up.panel.check")}
-          </Button>
-          {owner && !off && update?.available && update.installable && (
-            <Button variant="primary" size="sm" disabled={actions.busy || update.installing} onClick={() => setWin(true)}>
-              {t("up.panel.install")}
-            </Button>
-          )}
-          {owner && !off && <PanelUpdateWindow open={win} onOpenChange={setWin} data={data} actions={actions} />}
-        </div>
-        {edition.edge ? <EdgeDeploy version={update?.version} /> : off ? <EditionNotice feature="panel_update" /> : <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
-        {!off && <ChannelPolicy data={data} owner={owner} />}
-      </div>
-      {!update?.supported && !off && (
-        <div className="border-t border-line pt-3">
-          <PanelHow />
-        </div>
-      )}
-    </section>
   );
 }

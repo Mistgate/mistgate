@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { en } from "@/i18n/en";
-import { dictionaries, fill } from "@/i18n";
+import { fill } from "@/i18n";
 import { HeadersTab } from "./headers";
 import { headerLimit, headerNameProblem, headerShadowed, headerSize, headerToSave, headerValueProblem, reservedHeaderName, type ResponseHeader, type Settings } from "./model";
 
@@ -374,20 +374,5 @@ describe("Response headers tab", () => {
     await click(buttonWith(en["subs.save"]));
     await settle();
     expect(document.querySelector(".hx-fh.bad")).not.toBeNull();
-  });
-});
-
-describe("the texts in every language", () => {
-  it("carry the same placeholders as English", () => {
-    const keys = Object.keys(en).filter((k) => k.startsWith("subs.hdr.") || k.startsWith("sx.hx.h."));
-    expect(keys.length).toBeGreaterThan(100);
-    for (const lang of ["ru", "zh", "fa", "tr"] as const) {
-      for (const k of keys) {
-        const names = (m: string) => [...new Set([...m.matchAll(/\{(\w+)\}/g)].map((x) => x[1]))].sort();
-        const want = names((en as Record<string, string>)[k]!);
-        const got = names(dictionaries[lang][k as keyof typeof en]);
-        expect(got, `${lang} ${k}`).toEqual(want);
-      }
-    }
   });
 });

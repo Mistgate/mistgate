@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { DeviceKind } from "@/gen/mistgate/admin/v1/user_pb";
 import type { DeviceN } from "./model";
-import { DevicesPanel } from "./user-detail";
+import { DevicesPanel } from "./user-devices";
 
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),

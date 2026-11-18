@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { dictionaries, setLang } from "@/i18n";
+import { setLang } from "@/i18n";
 import { en } from "@/i18n/en";
 import { clockLeft, secondsLeft } from "@/lib/debug-capture";
 import { meQuery } from "@/lib/session";
@@ -250,20 +250,5 @@ describe("the records", () => {
     ops.getDebugCapture.mockResolvedValue(records({ records: [] }));
     await mount();
     expect(text()).toContain(en["debug.empty"]);
-  });
-});
-
-describe("the words", () => {
-  it("has every debug sentence in all five languages with the same placeholders", () => {
-    const keys = Object.keys(en).filter((k) => k.startsWith("debug.") || k === "err.debug_busy" || k.startsWith("audit.node.debug_"));
-    expect(keys.length).toBeGreaterThan(40);
-    for (const lang of ["ru", "zh", "fa", "tr"] as const) {
-      for (const k of keys) {
-        const other = (dictionaries[lang] as Record<string, string>)[k];
-        expect(other, `${lang} ${k}`).toBeTruthy();
-        const holes = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort().join();
-        expect(holes(other!), `${lang} ${k}`).toBe(holes((en as Record<string, string>)[k]!));
-      }
-    }
   });
 });

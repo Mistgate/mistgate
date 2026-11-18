@@ -64,7 +64,6 @@ import { ru as profilesrvRu } from "./profilesrv";
 
 // Typed against the English shape: a missing or extra key fails `pnpm typecheck`. The admin UI speaks «ты».
 const core: CoreMessages = {
-  "app.name": "Mistgate",
   "common.loading": "Загрузка…",
   "common.retry": "Повторить",
   "common.undo": "Откатить",
@@ -144,7 +143,6 @@ const core: CoreMessages = {
   "palette.users": "Люди",
   "palette.places": "Разделы",
   "palette.actions": "Действия",
-  "palette.addNode": "Добавить ноду",
   "palette.createUser": "Добавить человека",
   "palette.newToken": "Новый API-токен",
   "palette.newProfile": "Новый профиль",

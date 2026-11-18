@@ -60,20 +60,3 @@ export function GraphValue({ children, tone, className }: { children: ReactNode;
     </span>
   );
 }
-
-/** A row for edge menus: an icon-less text button, danger tone for destructive ones. */
-export function GraphMenuItem({ children, onClick, danger, icon }: { children: ReactNode; onClick: () => void; danger?: boolean; icon?: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-start text-[13px] font-medium transition-colors hover:bg-surface-2 focus-visible:bg-surface-2",
-        danger ? "text-danger-text" : "text-fg",
-      )}
-    >
-      {icon && <span className="flex size-4 items-center justify-center text-muted">{icon}</span>}
-      {children}
-    </button>
-  );
-}

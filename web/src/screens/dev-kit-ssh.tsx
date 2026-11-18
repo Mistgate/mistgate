@@ -9,7 +9,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { ApprovalState, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { approvals as approvalsApi, provisioning } from "@/lib/api";
 import type { Approvals } from "@/lib/integrations";
-import { ApprovalQueue } from "@/screens/integrations/approvals";
+import { ApprovalsTab } from "@/screens/ai/approvals";
 import { SSHAccessCard } from "@/screens/node/ssh-access";
 import { PanelKeyOffer } from "@/screens/nodes-panel-key";
 
@@ -232,7 +232,7 @@ export function SSHKit() {
       </Shot>
       <Shot id="ssh-approval" title="node_install approval: the owner picks the login" wide>
         <StepUpProvider>
-          <ApprovalQueue data={installApproval} />
+          <ApprovalsTab data={installApproval} />
         </StepUpProvider>
       </Shot>
       <Shot id="ssh-idle" title="SSH access: password only, the panel key offered">

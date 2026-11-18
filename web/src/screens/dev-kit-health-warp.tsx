@@ -13,7 +13,7 @@ import { AlertsTab } from "@/screens/health/alerts";
 import { DoctorTab } from "@/screens/health/doctor";
 import { useFixFlow } from "@/screens/health/fix";
 import { PeopleTab } from "@/screens/health/people";
-import { ConnectionPanel } from "@/screens/users/user-detail";
+import { ConnectionAlerts } from "@/screens/users/user-connection";
 import { NodeDoctorTab } from "@/screens/node/doctor";
 import { ExitTab } from "@/screens/node/exit";
 import { ServerTab } from "@/screens/node/server";
@@ -631,8 +631,8 @@ export function HealthWarpKit() {
       <Shot id="user-connection" title="A user's page ▸ Connection: the open alerts of this person (nothing open: no block)">
         <Mock fill={(c) => c.setQueryData(alertsQuery.queryKey, { nowUnix: NOW, active: [...activeAlerts, ...peopleAlerts], history: [] } as never)}>
           <div className="flex max-w-xl flex-col gap-3">
-            <ConnectionPanel userId="usr_masha" />
-            <ConnectionPanel userId="usr_nobody" />
+            <ConnectionAlerts userId="usr_masha" />
+            <ConnectionAlerts userId="usr_nobody" />
           </div>
         </Mock>
       </Shot>
