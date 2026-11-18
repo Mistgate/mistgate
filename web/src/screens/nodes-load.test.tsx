@@ -48,7 +48,7 @@ const load = {
     {
       nodeId: "nod_1", nodeName: "de1", connected: true, cpus: 2, status: "overloaded", bottleneck: "cpu", hoursWithData: 168, extHours: 100,
       busyHourUnix: 1_799_990_000n, busyHourCpuPct: 86, peopleBusyHour: 120, peoplePeak: 140, cpuPeakP95Pct: 99, cpuPeakTypicalPct: 91, stealP95Pct: 3, ramPeakPct: 60,
-      rxPeakBps: 300e6, txPeakBps: 280e6, capacityMbps: 500, capacitySource: "configured", bandwidthPeakPct: 60, fit: "ok", cpuPctPerHundredPeople: 55,
+      rxPeakBps: 300e6, txPeakBps: 280e6, capacityMbps: 500, capacitySource: "configured", bandwidthPeakPct: 60, bandwidthTypicalPct: 40, fit: "ok", cpuPctPerHundredPeople: 55,
       mbpsPerPerson: 1.2, headroomPeople: 0, agentCpuAvgPct: 12, agentCpuMaxPct: 30, agentRssMaxBytes: 300n * 1024n * 1024n, agentRssGrowthPctPerDay: 0.4,
       recommendations: [
         { code: "cpu_busy", severity: "crit", params: { cpu_pct: "86", peak_pct: "99", target: "nl1", target_headroom: "80" } },
@@ -61,13 +61,19 @@ const load = {
       cpuPctPerHundredPeople: 50, headroomPeople: 80, recommendations: [{ code: "update_agent", severity: "info", params: {} }],
     },
     {
+      // connected a few hours ago: its first hours are the install, so it is not read yet
+      nodeId: "nod_4", nodeName: "se1", connected: true, cpus: 1, status: "unknown", bottleneck: "", hoursWithData: 19, extHours: 19, busyHourUnix: 0n,
+      busyHourCpuPct: 0, peopleBusyHour: 0, peoplePeak: 0, cpuPeakP95Pct: 0, rxPeakBps: 0n, txPeakBps: 0n, capacityMbps: 0, capacitySource: "", fit: "few_hours",
+      recommendations: [],
+    },
+    {
       nodeId: "nod_3", nodeName: "fi1", connected: false, cpus: 0, status: "unknown", bottleneck: "", hoursWithData: 0, extHours: 0, busyHourUnix: 0n,
       busyHourCpuPct: 0, peopleBusyHour: 0, peoplePeak: 0, cpuPeakP95Pct: 0, rxPeakBps: 0n, txPeakBps: 0n, capacityMbps: 0, capacitySource: "", fit: "few_hours",
       recommendations: [],
     },
   ],
   summary: {
-    ok: 1, busy: 0, overloaded: 1, unknown: 1, headroomPeople: 80, headroomNodes: 2,
+    ok: 1, busy: 0, overloaded: 1, unknown: 2, headroomPeople: 80, headroomNodes: 2,
     mostLoaded: [{ nodeId: "nod_1", nodeName: "de1", status: "overloaded", busyHourCpuPct: 86, headroomPeople: 0 }],
     mostFree: [{ nodeId: "nod_2", nodeName: "nl1", status: "ok", busyHourCpuPct: 20, headroomPeople: 80 }],
   },
@@ -79,9 +85,9 @@ describe("the Load view", () => {
     await mount(<FleetLoad />);
     expect(ops.getFleetLoad).toHaveBeenCalledWith({ hours: 168 }, expect.anything());
     const text = host!.textContent!;
-    for (const s of ["Fleet headroom", "room for about 80 more people", "Most room: nl1 (+80)", "Loaded", "closest to the limit", "1 without data", "Overloaded", "OK", "No data"]) expect(text).toContain(s);
+    for (const s of ["Fleet headroom", "room for about 80 more people", "Most room: nl1 (+80)", "Loaded", "closest to the limit", "2 without data", "Overloaded", "OK", "No data"]) expect(text).toContain(s);
     const rows = [...host!.querySelectorAll("button[aria-expanded] b")].map((b) => b.textContent);
-    expect(rows).toEqual(["de1", "nl1", "fi1"]);
+    expect(rows).toEqual(["de1", "nl1", "se1", "fi1"]);
     expect(text).toContain("86%");
     expect(text).toContain("No room"); // de1 is overloaded
     expect(text).toContain("80 more people"); // nl1
@@ -94,7 +100,7 @@ describe("the Load view", () => {
     expect(after).toContain("The busy hour runs at 86% CPU. Move people to nl1: it has room for about 80 more.");
     expect(after).toContain("a_code_from_a_newer_panel"); // a code this page does not know is shown as it is
     expect(after).toContain("55%"); // CPU per 100 people
-    expect(after).toContain("60% of your 500 Mbit/s");
+    expect(after).toContain("usually 40%, highest 60% of your 500 Mbit/s");
     expect(after).toContain("12% mean, 30% peak");
     expect(after).toContain("usually 91%, highest 99%"); // the peaks the status reads, then the highest
     expect(after).toContain("not known"); // de1's conntrack peak: absent, not zero
@@ -102,6 +108,8 @@ describe("the Load view", () => {
     // an old agent says what it lacks; a node without hours says it has none
     await click(host!.querySelector("button[aria-label='Show what to do about nl1']")!);
     expect(host!.textContent).toContain("Update the agent: it does not report steal");
+    await click(host!.querySelector("button[aria-label='Show what to do about se1']")!);
+    expect(host!.textContent).toContain("Too early to judge");
     await click(host!.querySelector("button[aria-label='Show what to do about fi1']")!);
     expect(host!.textContent).toContain("No hour of host load in this period yet");
 

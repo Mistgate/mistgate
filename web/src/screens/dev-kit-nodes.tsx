@@ -182,12 +182,13 @@ const loadRows = (rows: ReturnType<typeof fleetOf>) =>
   rows.map((r, i) => {
     const s = all.find((x) => x.n === r.name)!;
     const p = period(s);
-    const status = r.status !== NodeStatus.ONLINE ? "unknown" : p.cpuPk >= 35 ? "busy" : "ok";
+    const young = i === 3 && r.status === NodeStatus.ONLINE; // connected a few hours ago: not read yet
+    const status = r.status !== NodeStatus.ONLINE || young ? "unknown" : p.cpuPk >= 35 ? "busy" : "ok";
     const known = status !== "unknown";
     return {
-      nodeId: r.id, nodeName: r.name, connected: r.status === NodeStatus.ONLINE, cpus: 2, status, bottleneck: !known ? "" : i === 0 ? "cpu" : i === 2 ? "bandwidth" : "", hoursWithData: known ? 150 + i : 0, extHours: 120,
+      nodeId: r.id, nodeName: r.name, connected: r.status === NodeStatus.ONLINE, cpus: 2, status, bottleneck: !known ? "" : i === 0 ? "cpu" : i === 2 ? "bandwidth" : "", hoursWithData: known ? 150 + i : young ? 19 : 0, extHours: 120,
       busyHourUnix: now - 7200, busyHourCpuPct: known ? p.cpuPk : 0, peopleBusyHour: known ? p.peak : 0, peoplePeak: known ? p.peak : 0, cpuPeakP95Pct: p.cpuPk + 2, cpuPeakTypicalPct: Math.round(p.cpuPk / 5),
-      stealP95Pct: 0.4, ramPeakPct: 31 + i * 3, rxPeakBps: 60e6, txPeakBps: 70e6, capacityMbps: 250, capacitySource: "configured", bandwidthPeakPct: i === 2 ? 62 : 14 + i, fit: "ok", cpuPctPerHundredPeople: 40,
+      stealP95Pct: 0.4, ramPeakPct: 31 + i * 3, rxPeakBps: 60e6, txPeakBps: 70e6, capacityMbps: 250, capacitySource: "configured", bandwidthPeakPct: i === 2 ? 62 : 14 + i, bandwidthTypicalPct: i === 2 ? 38 : 7 + i, bandwidthBusyHourPct: i === 2 ? 20 : 4, fit: "ok", cpuPctPerHundredPeople: 40,
       mbpsPerPerson: 0.21, conntrackPeakPct: 1.8, diskUsedPct: 18 + i * 2, swapUsedMaxBytes: 0, headroomPeople: known ? p.spare : undefined, agentCpuAvgPct: 0.4, agentCpuMaxPct: 1.1, agentRssMaxBytes: 92e6, agentRssGrowthPctPerDay: 0.2,
       recommendations: status === "busy" ? [{ code: "cpu_busy", severity: "warn", params: { cpu_pct: String(p.cpuPk), peak_pct: String(p.cpuPk + 2), target: "fi1", target_headroom: "140" } }] : [],
     };
