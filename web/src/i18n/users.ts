@@ -381,7 +381,7 @@ export const ru: typeof en = {
   "users.new": "Новый человек",
   "users.name": "Имя",
   "users.subscriptionPage": "Страница подписки",
-  "users.subscriptionName": "Имя на странице подписки",
+  "users.subscriptionName": "Имя на странице",
   "users.subscriptionNameHint": "Его увидит каждый, у кого есть ссылка на подписку. Если оставить поле пустым, покажем имя пользователя из панели.",
   "users.subscriptionNamePreview": "Приветствие на странице: {name}",
   "users.subscriptionNameSave": "Сохранить имя",
@@ -607,7 +607,7 @@ export const ru: typeof en = {
   "users.resetTrafficBody": "Израсходованный трафик {name} за текущий период станет 0. Пользователь, остановленный квотой, снова сможет подключаться. Вернуть счётчик нельзя.",
   "users.resetTrafficDone": "Трафик сброшен: {name}",
   "users.deleteT": "Удалить пользователя",
-  "users.deleteHint": "Навсегда убирает пользователя и его ключи со всех нод.",
+  "users.deleteHint": "Навсегда убирает человека и его ключи со всех нод.",
   "users.deleteBody":
     "{name} навсегда потеряет доступ: ключи уберутся со всех нод, подключения оборвутся, ссылка перестанет работать, а история трафика этого пользователя будет удалена.",
   "users.deleteType": "Введи {name}, чтобы подтвердить",

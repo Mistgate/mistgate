@@ -243,7 +243,7 @@ With no group at all, the tab offers **Create "Everyone" with all profiles** and
 
 - **Name**, up to 64 characters.
 - **Profiles in the group**: every profile is ticked for a new group; untick what the group should not give.
-- **Nodes enabled for the group**: every node is on for a new group; turn one off to take it away from everyone in the group — its servers leave every subscription format and the devices' keys stop going to it. A node you hold back (see [Who gets a node](nodes.md#the-nodes-list)) is off for a new group, and a group page cannot switch it on: give it from the node. Other new nodes stay on. A node is switched off at once, without a confirmation: no key stops working, those people just stop reaching that node.
+- **Nodes enabled for the group**: every node is on for a new group; turn one off to take it away from everyone in the group — its servers leave every subscription format and the devices' keys stop going to it. A node you hold back (see [Who gets a node](nodes.md#the-nodes-list)) is off for a new group, and a group page cannot switch it on: the node is shown locked, with the reason in its row, and the All nodes switch stays off while one is held back; give it from the node. Other new nodes stay on. A node is switched off at once, without a confirmation: no key stops working, those people just stop reaching that node.
 - **More** → **DNS**: the group's preset; empty means the instance default.
 
 Editing a group changes access for everyone in it ("3 users are in this group; the change applies to all of them"). Taking a profile away from a group with people first shows what they lose, with the AmneziaVPN keys that stop working, and the button turns into "Take it away from 3 people".
