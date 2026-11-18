@@ -18,7 +18,6 @@ export const networkOf = (protocol: string): Net | undefined =>
 /** A port's type: a relay joins a network to the same network; people and exits join anything of theirs. */
 export type PortType = Net | "people" | "egress";
 export type WireState = "ok" | "warn" | "bad" | "off" | "pending" | "unknown";
-export type Column = 0 | 1 | 2 | 3 | 4;
 
 /** What a port says of the way through it: a working way, a way that works only in part, none, or one a country cuts. */
 export type PortStatus = "ok" | "warn" | "none" | "blocked";

@@ -30,8 +30,6 @@ export function setTheme(theme: Theme) {
 /** The theme in use right now (outside a render). */
 export const themeNow = (): Theme => current;
 
-export const toggleTheme = () => setTheme(current === "dark" ? "light" : "dark");
-
 function subscribe(cb: () => void) {
   listeners.add(cb);
   return () => listeners.delete(cb);

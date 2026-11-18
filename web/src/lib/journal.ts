@@ -1,6 +1,6 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
-import type { GetNodeJournalResponse, NodeJournalEntry } from "@/gen/mistgate/admin/v1/node_pb";
+import type { NodeJournalEntry } from "@/gen/mistgate/admin/v1/node_pb";
 import { nodes } from "./api";
 import { plain, type Plain } from "./plain";
 
@@ -8,7 +8,6 @@ import { plain, type Plain } from "./plain";
 // grouped per hour, kept 7 days, client addresses cut out. Unlike the live tail it is open to every admin and exists on the
 // Cloudflare edition too. The words are in i18n/journal.ts.
 
-export type NodeJournal = Plain<GetNodeJournalResponse>;
 export type JournalEntry = Plain<NodeJournalEntry>;
 
 export type JournalFilter = { hours: 24 | 168; errorsOnly: boolean; query: string };

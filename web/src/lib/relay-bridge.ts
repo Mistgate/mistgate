@@ -36,7 +36,6 @@ export function blockedText(t: T, blocked: Blocked, n: { entry: string; exit: st
 
 /** The reasons the panel gives for the way it stands in (Relay.mode_reason); "" is a relay that never changed. */
 export const modeReasons = ["leg_failed", "direct_back", "bridge_failed", "owner", "reverse_unsupported", "udp"] as const;
-export type ModeReason = (typeof modeReasons)[number];
 
 /** The reason in words: why the relay is in the way it is, or "" when there is nothing to say (never changed, a UDP server). */
 export function reasonText(t: T, r: Pick<RelayMsg, "modeReason" | "mode" | "activeMode" | "viaNodeName" | "exitNodeName" | "reverseBlocked" | "network">): string {
@@ -75,9 +74,6 @@ export function bridgeLoad(b?: Pick<NonNullable<RelayMsg["bridge"]>, "clients" |
 
 /** What an agent says when the bridge turns a person away: the bridge is at its limit. */
 const limitErrors = new Set(["stream_unavailable", "queue_full", "stream_limit"]);
-
-/** At pool 4 the bridge cannot grow: the way to more room is a second entry. */
-export const bridgeMaxPool = 4;
 
 // ---- the words of the bridge's errors and stages ----
 

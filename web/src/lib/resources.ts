@@ -1,5 +1,5 @@
 import type { HostHour, NodeMetrics, ProcessUsage } from "@/gen/mistgate/admin/v1/node_pb";
-import type { LoadRecommendation, NodeLoad } from "@/gen/mistgate/ops/v1/ops_pb";
+import type { LoadRecommendation } from "@/gen/mistgate/ops/v1/ops_pb";
 import type { StatusKind } from "@/components/ui/status";
 import type { MessageKey } from "@/i18n/en";
 import type { Plain } from "./plain";
@@ -122,6 +122,3 @@ export const severityKind = (s: string): StatusKind => (s === "crit" ? "bad" : s
 /** Why the per-person costs are not known, as a key; null when they are (fit "ok"). */
 export const fitKey = (fit: string): MessageKey | null =>
   fit === "few_hours" || fit === "flat" || fit === "no_trend" ? (`load.fit.${fit}` as MessageKey) : fit === "ok" ? null : "load.fit.few_hours";
-
-/** Most pressing first, as the panel sends them; a stable order for nodes the panel ranks equal. */
-export const loadRank = (n: Pick<Plain<NodeLoad>, "status">) => ({ overloaded: 0, busy: 1, ok: 2, unknown: 3 })[isLoadStatus(n.status) ? n.status : "unknown"];

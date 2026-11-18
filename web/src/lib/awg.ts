@@ -85,12 +85,6 @@ export function changedCount(before: unknown, after: unknown): number {
 
 // ---- import of a client .conf ----
 
-/** The 3.x-only keys of the obfuscation block: a 2.0 profile refuses them. */
-export const v31Only = [
-  "header_protection_key", "random_trailers", "disable_cookies", "content_padding_addition",
-  "rekey_after_time", "rekey_timeout", "reject_after_time", "keepalive_timeout", "max_handshake_attempts",
-] as const;
-
 export type ConfKind = "3.1" | "2.0" | "1.5" | "1.0" | "wg" | "none";
 
 export type ConfImport = {

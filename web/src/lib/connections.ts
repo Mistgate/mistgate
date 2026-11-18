@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
-import type { GetNodeConnectionsResponse, InboundConnections } from "@/gen/mistgate/admin/v1/node_pb";
-import type { DeviceConnection, GetUserConnectionResponse } from "@/gen/mistgate/admin/v1/user_pb";
+import type { InboundConnections } from "@/gen/mistgate/admin/v1/node_pb";
+import type { DeviceConnection } from "@/gen/mistgate/admin/v1/user_pb";
 import type { T } from "@/i18n";
 import { nodes, users } from "./api";
 import type { Fmt } from "./format";
@@ -11,9 +11,7 @@ import { viaLabel } from "./relay";
 // block of the person's card and a line under every profile on the node's Profiles tab. Counts only, never an address.
 // The words are in i18n/connections.ts.
 
-export type UserConnection = Plain<GetUserConnectionResponse>;
 export type DeviceConn = Plain<DeviceConnection>;
-export type NodeConnections = Plain<GetNodeConnectionsResponse>;
 export type InboundConn = Plain<InboundConnections>;
 
 export const userConnectionQuery = (userId: string) =>
