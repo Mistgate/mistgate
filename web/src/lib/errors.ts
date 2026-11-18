@@ -217,8 +217,10 @@ function permissionDenied(c: ConnectError, t: T): string {
       return t("err.apiOwnerApprovalRequired");
     case "your role cannot do this":
       return t("err.denied");
-    default:
-      return errorCode(c.rawMessage) === "mihomo_templates_owner_only" ? t("err.mihomo_templates_owner_only") : t("err.permissionDenied");
+    default: {
+      const code = errorCode(c.rawMessage);
+      return code === "mihomo_templates_owner_only" ? t("err.mihomo_templates_owner_only") : code === "routing_profiles_owner_only" ? t("err.routing_profiles_owner_only") : t("err.permissionDenied");
+    }
   }
 }
 

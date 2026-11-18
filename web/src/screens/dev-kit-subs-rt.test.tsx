@@ -67,6 +67,11 @@ const says: Record<string, () => void> = {
     expect(text()).toContain(fill(en["sx.rt.inHeader"], { n: heads().length > 0 ? text().match(/routing header \((\d+) bytes\)/)![1]! : "" }));
   },
   "rt-empty": () => expect(text()).toContain(en["sx.rt.noneT"]),
+  "rt-ro-helper": () => {
+    expect(text()).toContain(en["sx.rt.ro"]);
+    expect(disabled(en["subs.save"])).toBeUndefined();
+    expect(document.querySelector<HTMLTextAreaElement>("textarea.rt-y")!.readOnly).toBe(true);
+  },
   "rt-closed": () => expect(document.querySelector("textarea.rt-y")).toBeNull(),
   "rt-second": () => expect(heads()[1]!.textContent).toContain(en["sx.rt.modeAdd"]),
   "rt-new": () => {

@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
+import { useIsOwner } from "@/lib/updates";
 import { groupsQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
 import { useDebounced } from "@/screens/users/ui";
@@ -49,6 +50,7 @@ function RoutingForm({ settings, carry, onCarry }: { settings: Settings; carry: 
   const t = useTx();
   const toast = useToast();
   const save = useSaveSettings();
+  const owner = useIsOwner(); // the routing profiles are the owner's: a helper reads them (the panel refuses their save)
   const groups = useQuery(groupsQuery);
   const groupList: Group[] = (groups.data ?? []).map((g) => ({ id: g.id, name: g.name }));
   const known = groups.data ? groupList.map((g) => g.id) : null;
@@ -139,12 +141,12 @@ function RoutingForm({ settings, carry, onCarry }: { settings: Settings; carry: 
   }
 
   // leaving the tab (the strip, a link in the tab) while the form holds changes asks first: the screen does that, told here. Leaving the page, or closing it, the router asks.
-  useLeaveGuard(dirty);
+  useLeaveGuard(dirty && owner);
   const held = useRef(false);
   const leaving = useRef(false);
   useEffect(() => {
-    held.current = dirty;
-  }, [dirty]);
+    held.current = dirty && owner;
+  }, [dirty, owner]);
   const blocker = useBlocker({
     shouldBlockFn: ({ current: here, next }) => held.current && !leaving.current && next.pathname !== here.pathname,
     enableBeforeUnload: () => held.current,
@@ -176,6 +178,7 @@ function RoutingForm({ settings, carry, onCarry }: { settings: Settings; carry: 
                   row={r}
                   n={i + 1}
                   open={open === r.k}
+                  owner={owner}
                   name={names[i]!}
                   info={infoOf(r)}
                   check={checkOf(r)}
@@ -197,17 +200,20 @@ function RoutingForm({ settings, carry, onCarry }: { settings: Settings; carry: 
                 <Msg kind="bad">{`${t("sx.rt.refusedSave")}: ${refusal.text}`}</Msg>
               </div>
             )}
-            <Foot
-              addLabel={t("sx.rt.add")}
-              onAdd={add}
-              addOff={rows.length >= routingLimit.count}
-              hint={hint}
-              bad={bad || !!fail}
-              saveLabel={busy ? t("sx.hx.h.saving") : t("subs.save")}
-              saveOff={bad || busy || waiting || !dirty || known === null}
-              onSave={onSave}
-              {...(dirty && !busy && { onDiscard: discard, discardLabel: t("subs.discard") })}
-            />
+            {owner && (
+              <Foot
+                addLabel={t("sx.rt.add")}
+                onAdd={add}
+                addOff={rows.length >= routingLimit.count}
+                hint={hint}
+                bad={bad || !!fail}
+                saveLabel={busy ? t("sx.hx.h.saving") : t("subs.save")}
+                saveOff={bad || busy || waiting || !dirty || known === null}
+                onSave={onSave}
+                {...(dirty && !busy && { onDiscard: discard, discardLabel: t("subs.discard") })}
+              />
+            )}
+            {!owner && <p className="hx-rs">{t("sx.rt.ro")}</p>}
             <p className="hx-rs">{t("sx.rt.rewrite")}</p>
           </section>
         </div>
@@ -250,6 +256,7 @@ type RowProps = {
   row: Row;
   n: number;
   open: boolean;
+  owner: boolean;
   name: string;
   info: RoutingInfo | undefined;
   check: Check | undefined;
@@ -262,7 +269,7 @@ type RowProps = {
   onRemove: () => void;
 };
 
-function RoutingRow({ t, row, n, open, name, info, check, messages, groups, known, onToggle, onPaste, onChange, onRemove }: RowProps) {
+function RoutingRow({ t, row, n, open, owner, name, info, check, messages, groups, known, onToggle, onPaste, onChange, onRemove }: RowProps) {
   const failed = messages.find((m) => m.bad);
   const where = !row.onlyGroups ? t("sx.rt.allGroups") : groups.filter((g) => row.groupIds.includes(g.id)).map((g) => g.name).join(", ") || t("sx.rt.noGroups");
   const meta = `${where} · ${t(row.onlyAdd ? "sx.rt.modeAdd" : "sx.rt.modeOn")}`;
@@ -282,25 +289,25 @@ function RoutingRow({ t, row, n, open, name, info, check, messages, groups, know
         <div className="hx-ed">
           <label className="hx-f">
             <span>{t("sx.rt.paste")}</span>
-            <textarea className="an-i mono rt-y" placeholder={t("sx.rt.pastePh")} autoComplete="off" autoCapitalize="off" spellCheck={false} value={row.text} onChange={(e) => onPaste(e.target.value)} />
+            <textarea className="an-i mono rt-y" placeholder={t("sx.rt.pastePh")} autoComplete="off" autoCapitalize="off" spellCheck={false} value={row.text} readOnly={!owner} onChange={(e) => onPaste(e.target.value)} />
           </label>
           <Opt label={t("sx.rt.mode")}>
             <Chips label={t("sx.rt.mode")}>
-              <HxChip on={!row.onlyAdd} onClick={() => onChange({ onlyAdd: false })}>
+              <HxChip on={!row.onlyAdd} off={!owner} onClick={() => onChange({ onlyAdd: false })}>
                 {t("sx.rt.mOn")}
               </HxChip>
-              <HxChip on={row.onlyAdd} onClick={() => onChange({ onlyAdd: true })}>
+              <HxChip on={row.onlyAdd} off={!owner} onClick={() => onChange({ onlyAdd: true })}>
                 {t("sx.rt.mAdd")}
               </HxChip>
             </Chips>
           </Opt>
           <Opt label={t("sx.rt.groups")}>
             <Chips label={t("sx.rt.groups")}>
-              <HxChip on={!row.onlyGroups} onClick={() => onChange({ onlyGroups: false, groupIds: [] })}>
+              <HxChip on={!row.onlyGroups} off={!owner} onClick={() => onChange({ onlyGroups: false, groupIds: [] })}>
                 {t("sx.rt.gAll")}
               </HxChip>
               {groups.map((g) => (
-                <HxChip key={g.id} on={row.onlyGroups && row.groupIds.includes(g.id)} onClick={() => toggleGroup(g.id)}>
+                <HxChip key={g.id} on={row.onlyGroups && row.groupIds.includes(g.id)} off={!owner} onClick={() => toggleGroup(g.id)}>
                   {g.name}
                 </HxChip>
               ))}
@@ -312,12 +319,14 @@ function RoutingRow({ t, row, n, open, name, info, check, messages, groups, know
               {m.text}
             </Msg>
           ))}
-          <div className="hx-ea">
-            <span />
-            <Button className="sb-btn hx-del" onClick={onRemove}>
-              {t("sx.rt.del")}
-            </Button>
-          </div>
+          {owner && (
+            <div className="hx-ea">
+              <span />
+              <Button className="sb-btn hx-del" onClick={onRemove}>
+                {t("sx.rt.del")}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

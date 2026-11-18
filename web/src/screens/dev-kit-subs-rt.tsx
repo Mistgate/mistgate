@@ -53,6 +53,7 @@ const rtHasScene = profiles("rt", "Routing: two profiles, the first open", rtHas
 export const rtScenes: SceneDef[] = [
   rtHasScene,
   profiles("rt-empty", "Routing: no profile", []),
+  profiles("rt-ro-helper", "Routing: a helper reads the profiles, changes nothing", rtHas, { demo: { open: 0 } }),
   profiles("rt-closed", "Routing: all folded", rtHas, { demo: { open: null } }),
   profiles("rt-second", "Routing: the second open (add only, for Друзья)", rtHas, { demo: { open: 1 } }),
   profiles("rt-one", "Routing: one profile for all groups", rtOne, { demo: { open: 0 } }),

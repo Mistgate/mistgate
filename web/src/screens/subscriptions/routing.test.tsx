@@ -4,6 +4,9 @@ import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
+import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { en } from "@/i18n/en";
+import { meQuery } from "@/lib/session";
 import { LeaveGuard } from "./guard";
 import { geoHosts, linkMode, routingLimit, routingRefusal, type RoutingInfo, type RoutingProfile, type Settings } from "./model";
 import { RoutingTab } from "./routing";
@@ -62,7 +65,7 @@ function Renewed({ settings }: { settings: Settings }) {
   return <RoutingTab data={{ settings: now }} />;
 }
 
-async function mount(list: RoutingProfile[]) {
+async function mount(list: RoutingProfile[], role: Role = Role.OWNER) {
   const settings = doc(list);
   getSubscriptionSettings.mockResolvedValue({ settings, effectiveTitle: "", reservedHeaderNames: [] });
   updateSubscriptionSettings.mockImplementation(async (r: { settings: Settings }) => ({ settings: r.settings }));
@@ -70,6 +73,7 @@ async function mount(list: RoutingProfile[]) {
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role } } as never);
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
@@ -228,5 +232,33 @@ describe("the form after a save and changes not saved", () => {
     await click(buttonWith("Discard"));
     expect(heads()[0]!.textContent).toContain("add and turn on");
     expect(renew).toBeTruthy();
+  });
+});
+
+describe("who can change it", () => {
+  it("a helper reads the profiles and changes nothing", async () => {
+    await mount([prof(FAMILY, { onlyGroups: true, groupIds: ["grp_family"] })], Role.HELPER);
+    expect(text()).toContain(en["sx.rt.ro"]);
+    expect(heads()).toHaveLength(1);
+    expect(box().readOnly).toBe(true);
+    expect(buttonWith(en["sx.rt.add"])).toBeUndefined();
+    expect(buttonWith("Save")).toBeUndefined();
+    expect(buttonWith(en["sx.rt.del"])).toBeUndefined();
+    expect(chip("Groups", "All groups").getAttribute("aria-disabled")).toBe("true");
+    await click(chip("The app", "Only adds it"));
+    expect(updateSubscriptionSettings).not.toHaveBeenCalled();
+    expect(heads()[0]!.textContent).toContain("add and turn on");
+  });
+  it("a helper sees no add button on an empty list, and the note says why", async () => {
+    await mount([], Role.HELPER);
+    expect(text()).toContain(en["sx.rt.noneT"]);
+    expect(buttonWith(en["sx.rt.add"])).toBeUndefined();
+    expect(text()).toContain(en["sx.rt.ro"]);
+  });
+  it("the owner has them", async () => {
+    await mount([prof(FAMILY)]);
+    expect(buttonWith(en["sx.rt.add"])).toBeTruthy();
+    expect(text()).not.toContain(en["sx.rt.ro"]);
+    expect(box().readOnly).toBe(false);
   });
 });

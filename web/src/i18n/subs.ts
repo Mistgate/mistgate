@@ -31,6 +31,7 @@ export const en = {
   // Mihomo templates
   "subs.tab.mihomo": "Mihomo templates",
   "err.mihomo_templates_owner_only": "Only the owner can change the Mihomo templates.",
+  "err.routing_profiles_owner_only": "Only the owner can change the routing profiles.",
   "subs.mt.defaultName": "Template {n}",
   "subs.mt.err.noName": "Give the template a name.",
   "subs.mt.err.nameLong": "The name is up to {max} characters.",
@@ -409,6 +410,7 @@ export const ru: Record<keyof typeof en, string> = {
   // Mihomo templates
   "subs.tab.mihomo": "Шаблоны Mihomo",
   "err.mihomo_templates_owner_only": "Менять шаблоны Mihomo может только владелец.",
+  "err.routing_profiles_owner_only": "Менять профили маршрутизации может только владелец.",
   "subs.mt.defaultName": "Шаблон {n}",
   "subs.mt.err.noName": "Дай шаблону название.",
   "subs.mt.err.nameLong": "Название — до {max} символов.",
@@ -780,6 +782,7 @@ export const zh: typeof en = {
   // Mihomo templates
   "subs.tab.mihomo": "Mihomo 模板",
   "err.mihomo_templates_owner_only": "只有所有者可以修改 Mihomo 模板。",
+  "err.routing_profiles_owner_only": "只有所有者可以修改路由配置。",
   "subs.mt.defaultName": "模板 {n}",
   "subs.mt.err.noName": "请为模板命名。",
   "subs.mt.err.nameLong": "名称最多 {max} 个字符。",
@@ -1151,6 +1154,7 @@ export const fa: Record<keyof typeof en, string> = {
   // Mihomo templates
   "subs.tab.mihomo": "قالب‌های Mihomo",
   "err.mihomo_templates_owner_only": "فقط مالک می‌تواند قالب‌های Mihomo را تغییر دهد.",
+  "err.routing_profiles_owner_only": "فقط مالک می‌تواند پروفایل‌های مسیریابی را تغییر دهد.",
   "subs.mt.defaultName": "قالب {n}",
   "subs.mt.err.noName": "برای قالب نامی بگذارید.",
   "subs.mt.err.nameLong": "نام حداکثر {max} نویسه است.",
@@ -1514,6 +1518,7 @@ export const tr: Record<keyof typeof en, string> = {
   // Mihomo templates
   "subs.tab.mihomo": "Mihomo şablonları",
   "err.mihomo_templates_owner_only": "Mihomo şablonlarını yalnızca sahip değiştirebilir.",
+  "err.routing_profiles_owner_only": "Yönlendirme profillerini yalnızca sahip değiştirebilir.",
   "subs.mt.defaultName": "Şablon {n}",
   "subs.mt.err.noName": "Şablona bir ad ver.",
   "subs.mt.err.nameLong": "Ad en çok {max} karakter olabilir.",
