@@ -103,8 +103,8 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   const growth = chat.messages.length * 100_000 + (tail ? tail.text.length + tail.tools.length + tail.plans.length * 10 : 0);
   useEffect(() => {
     const el = list.current;
-    if (el && growth >= 0) el.scrollTop = el.scrollHeight;
-    // coming back from the list of conversations lands on the end of the one that is open
+    // (coming back from the list of conversations lands on the end of the one that is open)
+    if (el && !history && growth >= 0) el.scrollTop = el.scrollHeight;
   }, [growth, history]);
 
   // the answer is revealed word by word after its text has arrived (useSmoothText): stay at the bottom while it grows,
