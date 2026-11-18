@@ -37,11 +37,17 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 		if cfg.reality.dialAddr != "" {
 			dest, network = cfg.reality.dialAddr, cfg.reality.dialNet
 		}
-		stream.SecurityType = serial.GetMessageType(&reality.Config{})
-		stream.SecuritySettings = []*serial.TypedMessage{serial.ToTypedMessage(&reality.Config{
+		rc := &reality.Config{
 			Dest: dest, Type: network, ServerNames: append([]string(nil), cfg.reality.serverNames...),
 			PrivateKey: append([]byte(nil), cfg.reality.privateKey...), ShortIds: cloneByteSlices(cfg.reality.shortIDs),
-		})}
+		}
+		if cfg.reality.self {
+			// The node's own site learns the visitor's address from a PROXY v2 header (startSite reads it). A foreign
+			// target gets none: it would not understand it.
+			rc.Xver = 2
+		}
+		stream.SecurityType = serial.GetMessageType(&reality.Config{})
+		stream.SecuritySettings = []*serial.TypedMessage{serial.ToTypedMessage(rc)}
 	}
 	shared := tracker != nil && tracker.shared != nil
 	if tracker != nil {

@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pires/go-proxyproto"
 	utls "github.com/refraction-networking/utls"
 	xtlsreality "github.com/xtls/reality"
 	"golang.org/x/crypto/acme"
@@ -50,16 +51,22 @@ type site struct {
 // startSite listens on a fresh internal socket and serves the site. It must be up before the REALITY listener starts: the
 // first thing that listener does is to measure the target's post-handshake records, and a target that does not answer
 // leaves empty lengths for the life of the process (design/vless.md section 7.5).
+//
+// REALITY opens every connection it passes on with a PROXY v2 header of the visitor's address (Xver 2 in buildCoreConfig),
+// whether its inbound binds the port or accepts from a shared one, and the site reads it: its handler sees the visitor, not
+// the internal socket. Only this socket trusts the header, and only REALITY and measureSiteRecords (which sends none) dial
+// it; a header a visitor sends itself comes after REALITY's and reaches TLS as garbage.
 func startSite(id string, cert func(*tls.ClientHelloInfo) (*tls.Certificate, error), h http.Handler) (*site, error) {
 	network, addr, cleanup, err := siteSocketFn(id)
 	if err != nil {
 		return nil, err
 	}
-	ln, err := net.Listen(network, addr)
+	raw, err := net.Listen(network, addr)
 	if err != nil {
 		cleanup()
 		return nil, fmt.Errorf("site listener: %w", err)
 	}
+	ln := &proxyproto.Listener{Listener: raw, ConnPolicy: func(proxyproto.ConnPolicyOptions) (proxyproto.Policy, error) { return proxyproto.USE, nil }}
 	srv := &http.Server{
 		Handler: h,
 		TLSConfig: &tls.Config{

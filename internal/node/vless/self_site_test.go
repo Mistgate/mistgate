@@ -19,10 +19,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pires/go-proxyproto"
 	xtlsreality "github.com/xtls/reality"
 
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/front"
+	"github.com/mistgate/mistgate/internal/node/front/fronttest"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -174,6 +177,66 @@ func TestSelfSiteServesBehindREALITY(t *testing.T) {
 	}
 	if strings.Contains(f.logs.String(), "probe") {
 		t.Fatalf("a self inbound probed a target:\n%s", f.logs.String())
+	}
+}
+
+// The site learns who the visitor is, not the internal socket REALITY reaches it on: REALITY puts the visitor's address in a
+// PROXY v2 header and the site reads it, both when the inbound binds its port and when it accepts from a shared one.
+func TestSelfSiteSeesTheVisitor(t *testing.T) {
+	checkLoopbackSourceBinding(t)
+	for _, shared := range []bool{false, true} {
+		t.Run("shared="+strconv.FormatBool(shared), func(t *testing.T) {
+			f := newSelfFixture(t)
+			f.e.env.Masquerade = func(string) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, r.RemoteAddr) })
+			}
+			spec := f.spec("node-a-visitor")
+			if shared {
+				f.e.env.SharedListener = fronttest.New(t, front.Route{ID: spec.ID, Names: []string{selfName}}).Listener
+			}
+			f.apply(t, spec, testCredential("c1", "66ad4540-b58c-4ad2-9926-ea63445a9b57"))
+
+			var visitor net.Addr
+			dialer := &net.Dialer{LocalAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.2")}, Timeout: 5 * time.Second}
+			client := &http.Client{
+				Timeout: 10 * time.Second,
+				Transport: &http.Transport{
+					DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						c, err := dialer.DialContext(ctx, network, addr)
+						if err == nil {
+							visitor = c.LocalAddr()
+						}
+						return c, err
+					},
+					TLSClientConfig:   &tls.Config{ServerName: selfName, InsecureSkipVerify: true, NextProtos: []string{"http/1.1"}},
+					DisableKeepAlives: true,
+				},
+			}
+			resp, err := client.Get("https://127.0.0.1:" + strconv.Itoa(int(spec.Listen.Port)) + "/")
+			if err != nil {
+				t.Fatalf("visit: %v", err)
+			}
+			b, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if got := string(b); visitor == nil || got != visitor.String() {
+				t.Fatalf("the site sees the visitor at %q, want %v", got, visitor)
+			}
+
+			// A visitor's own header is not trusted: it reaches the site after REALITY's, where TLS expects a ClientHello.
+			conn, err := dialer.Dial("tcp", "127.0.0.1:"+strconv.Itoa(int(spec.Listen.Port)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close()
+			forged := proxyproto.HeaderProxyFromAddrs(2, &net.TCPAddr{IP: net.ParseIP("203.0.113.9"), Port: 4242}, conn.RemoteAddr())
+			if _, err := forged.WriteTo(conn); err != nil {
+				t.Fatal(err)
+			}
+			_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+			if err := tls.Client(conn, &tls.Config{ServerName: selfName, InsecureSkipVerify: true}).Handshake(); err == nil {
+				t.Fatal("the site took a PROXY header the visitor sent")
+			}
+		})
 	}
 }
 
