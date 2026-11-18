@@ -13,7 +13,6 @@ import { useT } from "@/i18n";
 import { approvalsQuery, tokensQuery } from "@/lib/integrations";
 import { meQuery } from "@/lib/session";
 import { IntegrationsScreen } from "@/screens/integrations";
-import { TokensCard } from "@/screens/integrations/tokens";
 import { NodesScreen } from "@/screens/nodes";
 import { AuditPage } from "@/screens/settings-pages/audit";
 import { passkeysQuery, SecurityPage } from "@/screens/settings-pages/security";
@@ -187,12 +186,6 @@ export function PolishKit() {
       </Shot>
       <Shot id="polish-int" title="Integrations: one card header, history in sand, “Новый токен”" seed={[owner, [tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals]]}>
         <IntegrationsScreen />
-      </Shot>
-      <Shot id="polish-int-empty" title="Tokens: none yet, one action" seed={[[tokensQuery.queryKey, { nowUnix: now, tokens: [] }]]}>
-        <TokensCard />
-      </Shot>
-      <Shot id="polish-int-error" title="Tokens: the load failed (compact, inside the card)">
-        <TokensCard />
       </Shot>
       <Shot id="polish-danger" title="Danger zone: the user and the profile (the node's is in “Node settings” above)">
         <DangerZones />
