@@ -105,7 +105,16 @@ describe("the scenes of the Updates screen", () => {
       if (mods.has("dlg-upd")) expect(document.querySelector("[data-shot=updates-update-dialog]")?.textContent).toContain("Update the panel to v0.1.86");
       if (mods.has("dlg-ch-test")) expect(document.querySelector("[data-shot=updates-channel] [role=radio][aria-checked=true]")?.textContent).toContain("Testing");
       if (tab === "agents" && kind === "fail") expect($(".uq-ag .rc-pb.bad")?.textContent).toContain("fi1");
-      if (tab === "agents" && kind === "many") expect(all(".uq-ft")).toHaveLength(12);
+      // a bigger fleet: up to six nodes a card each, from seven the lead's card (none when all are up to date) and a cell for every other node
+      const nodes = Number([...mods].find((m) => /^n\d+$/.test(m))?.slice(1));
+      if (tab === "agents" && nodes >= 7) {
+        expect(all(".uq-fleet.many")).toHaveLength(1);
+        expect(all(".uq-ft").length + all(".uq-mc").length).toBe(nodes);
+        expect(all(".uq-ft")).toHaveLength(kind === "cur" || kind === "curjust" ? 0 : 1);
+        expect(all(".uq-t .uq-r:not(.uq-h)")).toHaveLength(nodes);
+      }
+      if (tab === "agents" && nodes === 6) expect(all(".uq-ft")).toHaveLength(6);
+      if (tab === "agents" && mods.has("mix")) expect(new Set(all(".uq-mc").map((c) => [...c.classList].find((x) => x !== "uq-mc" && x !== "just"))).size).toBeGreaterThanOrEqual(5);
       if (tab === "agents" && kind === "none") expect($(".us-none")?.textContent).toContain("No nodes yet");
       if (tab === "agents" && /^roll[0-2]$/.test(kind)) expect($(".uq-now")?.textContent).toMatch(/Canary fi1|Checking fi1|Waiting for the next stage/);
       if (tab === "os") expect(all(".uq-w")).toHaveLength(5);
@@ -116,7 +125,7 @@ describe("the scenes of the Updates screen", () => {
     }
   });
 
-  it.each(["pn.new", "pn.run1", "pn.back", "ag.new", "ag.fail", "ag.new.dlg-sch", "os.new", "os.fail"])("%s draws in every language", async (state) => {
+  it.each(["pn.new", "pn.run1", "pn.back", "ag.new", "ag.fail", "ag.new.dlg-sch", "ag.new.n12.mix", "os.new", "os.fail"])("%s draws in every language", async (state) => {
     for (const lang of ["en", "ru", "zh", "fa", "tr"] as Lang[]) {
       setLang(lang);
       await draw(state);

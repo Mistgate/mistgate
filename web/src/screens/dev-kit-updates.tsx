@@ -23,7 +23,9 @@ import {
   agentNotes,
   bundle,
   CUR,
+  extraNodes,
   fi1Old,
+  flagOf,
   NEW,
   NOW,
   osData,
@@ -52,7 +54,9 @@ import { ShellLayout } from "./shell";
 //   what is open: det (the details) | more (earlier versions) | ghbusy (asking GitHub) | dlg-upd | dlg-upd-busy | dlg-upd-done (the window; a backup running; made) |
 //   dlg-ch | dlg-ch-test | dlg-ch-dev (the channel window, a channel picked).
 // ag.<state>: new (one node to update, the canary leads) | roll0 … roll2 (the rollout at its step) | fail (the canary did not pass) | cur (all up to date)
-//   | curjust (the canary has just finished) | off (a node is offline) | none (no nodes) | many (twelve) | paused (the owner paused) | nobundle | untrusted | manual | edge.
+//   | curjust (the canary has just finished) | off (a node is offline) | none (no nodes) | paused (the owner paused) | nobundle | untrusted | manual | edge.
+//   n<count> (any of them with more nodes: the board's twelve are "ag.new.n12"; from seven nodes the cards give way to the matrix) | wait (every third node of the
+//   extra ones waits for the update) | mix (one of each state a node can be in, a rollout running) | open (the matrix unfolded).
 //   what is open: last (the stages of the last rollout) | pkbusy (the folder is read) | dlg-roll | dlg-sch (the window of fi1: its schedule) | dlg-sch-now | dlg-sch-new
 //   (no schedule yet, "now") | dlg-sch-new-at | dlg-rollback | dlg-cancel | howto.
 // os.<state>: new (de1 needs a reboot, nl1 has security updates; de1 open) | calm | fail (the install stopped) | off (nl1 offline) | busy (installing) | just (just done)
@@ -71,9 +75,10 @@ const POOL = [
   ["de1", "DE"], ["fi1", "FI"], ["nl1", "NL"], ["msk1", "RU"], ["de2", "DE"], ["fr1", "FR"], ["se1", "SE"], ["pl1", "PL"], ["no1", "NO"], ["lv1", "LV"], ["lt1", "LT"], ["at1", "AT"],
 ] as const;
 
-/** The nodes of the shell (the menu's counter, the fleet button) and the alerts under it: the board's "fleet" and "issues". */
-function shellSeed(qc: QueryClient, fleet: number, issues: number) {
-  const cards = POOL.slice(0, fleet).map(([name, cc], i) => ({
+/** The nodes of the shell (the menu's counter, the fleet button) and the alerts under it: the board's "fleet" and "issues". Nodes the page itself names (a big fleet) join them. */
+function shellSeed(qc: QueryClient, fleet: number, issues: number, more: readonly string[] = []) {
+  const named: (readonly [string, string])[] = [...POOL.slice(0, fleet), ...more.filter((n) => !POOL.slice(0, fleet).some(([p]) => p === n)).map((n) => [n, flagOf(n)] as const)];
+  const cards = named.map(([name, cc], i) => ({
     id: `nod_${name}`,
     name,
     countryCode: cc,
@@ -83,7 +88,7 @@ function shellSeed(qc: QueryClient, fleet: number, issues: number) {
     sparkBytes: [],
   }));
   qc.setQueryData(nodesQuery.queryKey, { nodes: cards.map((c) => ({ ...c, address: `${c.name}.example.com`, version: CUR })), expectedAgentVersion: "0.1.71" } as never);
-  qc.setQueryData(overviewQuery().queryKey, { nodesTotal: fleet, nodes: cards, alertsActive: issues, alertsCritical: issues > 0 ? 1 : 0 } as never);
+  qc.setQueryData(overviewQuery().queryKey, { nodesTotal: cards.length, nodes: cards, alertsActive: issues, alertsCritical: issues > 0 ? 1 : 0 } as never);
 }
 
 /** What the page is given for a state: the panel's answer, the servers' answer and the page's own scene. */
@@ -168,11 +173,6 @@ export function build(p: Parsed): { data: unknown; os: unknown; scene: UpdatesSc
     } else if (kind === "none") {
       d.nodes = [];
       d.rollout = null;
-    } else if (kind === "many") {
-      const more = [["de2", "nod_de2"], ["fr1", "nod_fr1"], ["se1", "nod_se1"], ["pl1", "nod_pl1"], ["no1", "nod_no1"], ["lv1", "nod_lv1"], ["lt1", "nod_lt1"], ["at1", "nod_at1"]].map(([name], i) =>
-        upNode(name!, name!, i % 3 === 0 ? { version: "v0.1.70", state: NodeUpdateState.OUTDATED, built: 0, lastUpdate: undefined } : {}),
-      );
-      d.nodes = [...d.nodes, ...more];
     } else if (kind === "paused") {
       d.nodes = [others[0], { ...fi1, state: NodeUpdateState.OUTDATED }, others[1], others[2]];
       d.rollout = rollout(RolloutStatus.PAUSED, [step("nl1", "nl1", 0, StepState.PASSED), step("fi1", "fi1", 1, StepState.PENDING)], { pauseKey: "updates.pause.owner", createdUnix: NOW - 20 * 60 });
@@ -188,6 +188,17 @@ export function build(p: Parsed): { data: unknown; os: unknown; scene: UpdatesSc
     } else if (kind === "notes") {
       (d as unknown as { agentNotes: unknown }).agentNotes = agentNotes;
     }
+    // a bigger fleet: more nodes after the four of the board (up to date, or waiting, or one of each state)
+    const total = Number([...mods].find((m) => /^n\d+$/.test(m))?.slice(1));
+    if (total > d.nodes.length) {
+      const how = mods.has("mix") ? "mix" : mods.has("wait") ? "wait" : "up";
+      d.nodes = [...d.nodes, ...extraNodes(total - d.nodes.length, new Set(d.nodes.map((n) => (n as { name: string }).name)), how)];
+      if (how === "mix") {
+        const waiting = d.nodes.filter((n) => (n as { state: NodeUpdateState }).state === NodeUpdateState.OUTDATED && (n as { name: string }).name !== "fi1") as { name: string; nodeId: string }[];
+        d.rollout = rollout(RolloutStatus.RUNNING, [fiStep(StepState.GATING), ...waiting.slice(0, 3).map((n) => step(n.nodeId.slice(4), n.name, 1, StepState.PENDING))], { createdUnix: NOW - 600 });
+      }
+    }
+    if (mods.has("open")) scene.agents!.matrixOpen = true;
     if (mods.has("last")) scene.agents!.last = true;
     if (mods.has("pkbusy")) scene.agents!.reading = true;
     const fiNode = d.nodes.find((n) => (n as { name: string }).name === "fi1") as never;
@@ -245,7 +256,7 @@ export function seeded(state: string, role: Role, fleet = 4, issues = 1) {
   fakeCalls(built, p.mods);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0, ...built.edition } as never);
-  shellSeed(c, fleet, issues);
+  shellSeed(c, fleet, issues, ((built.data as { nodes?: { name: string }[] }).nodes ?? []).map((n) => n.name));
   c.setQueryData(userCountQuery.queryKey, { counts: { all: 140, online: 31, devicesUsed: 0, devicesOnline: 0 } } as never);
   c.setQueryData(awaitingQuery.queryKey, { awaiting: 0 } as never);
   if (!built.broken) c.setQueryData(updatesQuery.queryKey, built.data as never);
@@ -341,7 +352,26 @@ export const frames: Frame[] = [
   f("ag-curjust", "ag.curjust", "The canary has just finished: its card flashes", 1440, 1300),
   f("ag-off", "ag.off", "A node is offline", 1440, 1500),
   f("ag-none", "ag.none", "No nodes", 1440, 700),
-  f("ag-many", "ag.many", "Twelve nodes: the cards wrap", 1440, 1900),
+  f("ag-n6", "ag.new.n6", "Six nodes: still a card each", 1440, 1500),
+  f("ag-n7", "ag.new.n7", "Seven nodes: the lead's card and the matrix of the rest", 1440, 1500),
+  f("ag-n12", "ag.new.n12", "Twelve nodes (the board's 12): fi1 waits, the others are cells", 1440, 1500),
+  f("ag-n12-light", "ag.new.n12", "The same on the light theme", 1440, 1500, "&theme=light"),
+  f("ag-n12-1000", "ag.new.n12", "A 1000 window: the card above the matrix", 1000, 1700),
+  f("ag-n12-phone", "ag.new.n12", "A phone: two columns of cells", 400, 2800),
+  f("ag-n12-fa", "ag.new.n12", "Right to left (fa)", 1440, 1500, "&lang=fa"),
+  f("ag-n12-roll0", "ag.roll0.n12", "Twelve nodes, the canary is being installed", 1440, 1500),
+  f("ag-n12-roll1", "ag.roll1.n12", "Twelve nodes, the canary is checked for 5 minutes", 1440, 1500),
+  f("ag-n12-fail", "ag.fail.n12", "Twelve nodes, the canary did not pass", 1440, 1500),
+  f("ag-n12-off", "ag.off.n12", "Twelve nodes, the canary is offline", 1440, 1500),
+  f("ag-n12-cur", "ag.cur.n12", "Twelve nodes, all up to date: the matrix across the card", 1440, 1300),
+  f("ag-n12-curjust", "ag.curjust.n12", "Twelve nodes, the canary has just finished: its cell flashes", 1440, 1300),
+  f("ag-n12-wait", "ag.new.n12.wait", "Twelve nodes, every third waits: the others wait in the matrix", 1440, 1500),
+  f("ag-n12-mix", "ag.new.n12.mix", "Twelve nodes in every state: waiting, updating, failed, offline, by hand, in the queue", 1440, 1500),
+  f("ag-n12-mix-light", "ag.new.n12.mix", "The same on the light theme", 1440, 1500, "&theme=light"),
+  f("ag-n40", "ag.new.n40.wait", "Forty nodes: the matrix folds to eight rows", 1440, 1900),
+  f("ag-n40-phone", "ag.new.n40.wait", "Forty nodes on a phone", 400, 2800),
+  f("ag-n120", "ag.new.n120.mix", "A hundred and twenty nodes: folded, Show all", 1440, 2200),
+  f("ag-n120-open", "ag.new.n120.mix.open", "A hundred and twenty nodes: unfolded", 1440, 3200),
   f("ag-paused", "ag.paused", "The owner paused the rollout", 1440, 1500),
   f("ag-nobundle", "ag.nobundle", "No release bundle: the steps to make one", 1440, 1500),
   f("ag-untrusted", "ag.untrusted", "A bundle the panel does not trust", 1440, 1500),

@@ -913,6 +913,89 @@ describe("the nodes of a rollout in progress", () => {
   });
 });
 
+describe("the fleet of the agents tab", () => {
+  const fleetOf = (n: number, over: (i: number) => Record<string, unknown> = () => ({})) => Array.from({ length: n }, (_, i) => node({ nodeId: `nod_${i + 1}`, name: `n${i + 1}`, ...over(i) }));
+  const wordOf = (cell: Element) => cell.querySelector(".sr-only")?.textContent;
+
+  it("keeps a card per node up to six nodes, and draws no matrix", async () => {
+    await mount(page({ nodes: fleetOf(6) }));
+    expect(document.querySelectorAll(".uq-ft")).toHaveLength(6);
+    expect(document.querySelector(".uq-fleet.many")).toBeNull();
+    expect(document.querySelector(".uq-mc")).toBeNull();
+  });
+
+  it("gives the canary a card and every other node a cell from seven nodes, with the board's two headers", async () => {
+    await mount(page({ nodes: fleetOf(12, (i) => (i === 3 ? { state: NodeUpdateState.OUTDATED } : {})) }));
+    const fleet = document.querySelector(".uq-fleet.many")!;
+    expect(fleet.classList.contains("all")).toBe(false);
+    expect(fleet.querySelectorAll(".uq-ft")).toHaveLength(1);
+    expect(fleet.querySelector(".uq-ft")!.textContent).toContain("n4");
+    expect(fleet.querySelector(".uq-ft")!.classList.contains("can")).toBe(true);
+    const heads = [...fleet.querySelectorAll(".uq-mh")].map((h) => h.textContent);
+    expect(heads).toEqual(["Awaiting update1", "Up to date110.2.0-bbb"]);
+    const cells = [...fleet.querySelectorAll(".uq-mc")];
+    expect(cells).toHaveLength(11);
+    expect(cells.every((c) => c.classList.contains("ok") && wordOf(c) === "up to date" && c.querySelector("svg.i"))).toBe(true);
+    expect(cells[0]!.getAttribute("title")).toBe("n1: up to date");
+    // the table below still lists every node
+    expect(document.querySelectorAll(".uq-t .uq-r:not(.uq-h)")).toHaveLength(12);
+  });
+
+  it("lets the cells of the nodes that are not up to date speak in the card's colours, the ones that need a look first", async () => {
+    const states = [NodeUpdateState.UP_TO_DATE, NodeUpdateState.UP_TO_DATE, NodeUpdateState.OUTDATED, NodeUpdateState.OFFLINE, NodeUpdateState.FAILED, NodeUpdateState.UPDATING, NodeUpdateState.ROLLED_BACK, NodeUpdateState.UNSUPPORTED];
+    await mount(page({ nodes: fleetOf(8, (i) => ({ state: states[i], onlineUsers: 1 })) }));
+    expect(document.querySelector(".uq-fleet.many .uq-ft")!.classList.contains("bad")).toBe(true);
+    const look = (c: Element) => [[...c.classList].filter((x) => x !== "uq-mc")[0], c.querySelector(".mk") ? "mark" : c.querySelector("svg") ? "glyph" : ""];
+    expect([...document.querySelectorAll(".uq-mc")].map(look)).toEqual([
+      ["bad", "glyph"],
+      ["now", "mark"],
+      ["part", "mark"],
+      ["part", "mark"],
+      ["off", "mark"],
+      ["ok", "glyph"],
+      ["ok", "glyph"],
+    ]);
+    // the matrix is no longer only the nodes that are up to date: its header says "The rest"
+    expect([...document.querySelectorAll(".uq-mh")].map((h) => h.textContent)).toEqual(["Awaiting update6", "The rest70.2.0-bbb"]);
+    expect(wordOf(document.querySelectorAll(".uq-mc")[0]!)).toMatch(/rolled back|update failed/);
+  });
+
+  it("spreads the matrix over the card when every node is up to date, and flashes the node that has just finished", async () => {
+    setEffectsEnabled(true);
+    const done = rollout({ status: RolloutStatus.DONE, steps: [step({ nodeId: "nod_2", nodeName: "n2", state: StepState.PASSED, finishedUnix: 990 })] });
+    await mount(page({ nowUnix: 1000, nodes: fleetOf(9), rollout: done }));
+    expect(document.querySelector(".uq-fleet.many.all")).not.toBeNull();
+    expect(document.querySelector(".uq-fleet .uq-ft")).toBeNull();
+    expect(document.querySelector(".uq-mh1")).toBeNull();
+    expect(document.querySelectorAll(".uq-mc")).toHaveLength(9);
+    expect([...document.querySelectorAll(".uq-mc.just")].map((c) => c.textContent)).toEqual(["n2up to date"]);
+    expect(document.querySelector(".uq")!.classList.contains("uq-fx")).toBe(true);
+    expect(document.querySelector(".uq-mh")!.textContent).toBe("Up to date90.2.0-bbb");
+  });
+
+  it("folds a long matrix to eight rows and opens the rest on Show all", async () => {
+    // jsdom has no layout: the grid says it is taller than eight rows of 44px
+    const h = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(1000);
+    await mount(page({ nodes: fleetOf(40) }));
+    const grid = document.querySelector(".uq-mcs")!;
+    expect(grid.classList.contains("fold")).toBe(true);
+    const more = button("Show all 40")!;
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    await click(more);
+    expect(grid.classList.contains("fold")).toBe(false);
+    expect(button("Show fewer")!.getAttribute("aria-expanded")).toBe("true");
+    await click(button("Show fewer"));
+    expect(grid.classList.contains("fold")).toBe(true);
+    h.mockRestore();
+  });
+
+  it("offers no Show all when the rows fit", async () => {
+    await mount(page({ nodes: fleetOf(12) }));
+    expect(document.querySelector(".uq-mcs")!.classList.contains("fold")).toBe(false);
+    expect(buttons().some((b) => /^Show (all|fewer)/.test(b.textContent ?? ""))).toBe(false);
+  });
+});
+
 describe("the rollout window follows the server's batch plan", () => {
   const many = (n: number) => Array.from({ length: n }, (_, i) => node({ nodeId: `nod_${i + 1}`, name: `n${i + 1}`, state: NodeUpdateState.OUTDATED, onlineUsers: i }));
 

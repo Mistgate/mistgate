@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { BundleStatus, NodeUpdateState, RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import type { Updates } from "@/lib/updates";
-import { fleetCards, rolloutNow } from "./fleet";
+import { fleetCards, fleetMatrix, MATRIX_FROM, rolloutNow } from "./fleet";
 import { runMatrix } from "./matrix";
 import { releaseItems } from "./notes";
 import { trackOf } from "./track";
@@ -90,6 +90,57 @@ describe("fleetCards", () => {
 
   it("says a node that needs a hand is waiting for one", () => {
     expect(fleetCards(data([node("old1", NodeUpdateState.UNSUPPORTED)]))[0]).toMatchObject({ kind: "part", word: "manual" });
+  });
+});
+
+describe("fleetMatrix", () => {
+  const up = (n: number) => Array.from({ length: n }, (_, i) => node(`up${i + 1}`, NodeUpdateState.UP_TO_DATE));
+  const cards = (nodes: unknown[], rollout: unknown = null) => fleetCards(data(nodes, rollout));
+  const names = (cs: { name: string }[]) => cs.map((c) => c.name);
+
+  it("goes to a matrix from seven nodes", () => {
+    expect(MATRIX_FROM).toBe(7);
+  });
+
+  it("gives the card to the canary when it is the only node that is not up to date, and every other node a cell (the board's twelve)", () => {
+    const m = fleetMatrix(cards([...up(11), node("fi1", NodeUpdateState.OUTDATED, { onlineUsers: 0 })]));
+    expect(m.lead).toMatchObject({ name: "fi1", kind: "part", canary: true });
+    expect(m.waiting).toBe(1);
+    expect(m.cells).toHaveLength(11);
+    expect(m.cells.every((c) => c.kind === "ok")).toBe(true);
+  });
+
+  it("has no lead when every node is up to date: the matrix is the whole fleet", () => {
+    const m = fleetMatrix(cards(up(8)));
+    expect(m.lead).toBeNull();
+    expect(m.waiting).toBe(0);
+    expect(m.cells).toHaveLength(8);
+  });
+
+  it("gives the card to the worst state (failed, then updating, then the canary, then offline) and puts the other nodes that need a look first in the cells", () => {
+    const nodes = [
+      node("ok1", NodeUpdateState.UP_TO_DATE),
+      node("off1", NodeUpdateState.OFFLINE),
+      node("wait1", NodeUpdateState.OUTDATED, { onlineUsers: 3 }),
+      node("canary", NodeUpdateState.OUTDATED, { onlineUsers: 0 }),
+      node("busy1", NodeUpdateState.UPDATING),
+      node("bad1", NodeUpdateState.FAILED),
+      node("ok2", NodeUpdateState.UP_TO_DATE),
+    ];
+    const m = fleetMatrix(cards(nodes));
+    expect(m.lead!.name).toBe("bad1");
+    expect(m.waiting).toBe(5);
+    expect(names(m.cells)).toEqual(["busy1", "canary", "wait1", "off1", "ok1", "ok2"]);
+    // without the failed node the node being updated leads, and without that the canary
+    expect(fleetMatrix(cards(nodes.filter((n) => n.name !== "bad1"))).lead!.name).toBe("busy1");
+    expect(fleetMatrix(cards(nodes.filter((n) => n.name !== "bad1" && n.name !== "busy1"))).lead!.name).toBe("canary");
+  });
+
+  it("puts a node that waits its turn in the running rollout after the ones that are offline", () => {
+    const nodes = [node("canary", NodeUpdateState.UPDATING), node("queued", NodeUpdateState.OUTDATED), node("off1", NodeUpdateState.OFFLINE)];
+    const m = fleetMatrix(cards(nodes, run([step("canary", 0, StepState.SENT), step("queued", 1, StepState.PENDING)])));
+    expect(m.lead!.name).toBe("canary");
+    expect(m.cells.map((c) => [c.name, c.kind])).toEqual([["off1", "off"], ["queued", ""]]);
   });
 });
 
