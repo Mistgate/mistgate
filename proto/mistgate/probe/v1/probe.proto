@@ -29,6 +29,19 @@ service ProbeService {
   // The speed tests kept in the last 7 days, newest first (for the MCP tool path_speed_results): what an approved path_speed plan
   // measured, so a later question is answered from the figures and not from a guess. Names and figures only.
   rpc PathSpeedResults(PathSpeedResultsRequest) returns (PathSpeedResultsResponse);
+  // What "measure the channel" of a node would do now, and whether it can: the partners (the nodes with the widest known channel), the
+  // most data it may move and how long it takes, how long the pause lasts when the last measure is recent. Moves nothing.
+  rpc ChannelMeasurePlan(ChannelMeasurePlanRequest) returns (ChannelMeasurePlanResponse);
+  // Starts the channel measure of one node: 8 parallel TCP streams for 10 seconds in each direction (receive, send) against up to
+  // three partner nodes, the same mechanism as PathSpeed (a one-time listener on the partner, a token), capped at 2 GiB and 15 seconds
+  // per direction on both ends. It fills the links of the node and its partners, so it is the owner's alone (and an MCP token's only
+  // through an approved plan). It runs on in the panel after the call returns; read it with ChannelMeasureStatus. One per node at a time
+  // and not more often than once in 10 minutes per node.
+  rpc ChannelMeasureStart(ChannelMeasureStartRequest) returns (ChannelMeasureStartResponse);
+  // The run of a node now or last (steps with their figures) and its last stored measure. Moves nothing.
+  rpc ChannelMeasureStatus(ChannelMeasureStatusRequest) returns (ChannelMeasureStatusResponse);
+  // Stops the run of a node: both ends close their streams at once.
+  rpc ChannelMeasureCancel(ChannelMeasureCancelRequest) returns (ChannelMeasureCancelResponse);
 }
 
 message PathProbeRequest {
@@ -160,6 +173,10 @@ message PathSpeedResponse {
   uint32 first_byte_ms = 9;
   uint32 duration_ms = 10;
   uint64 bytes = 11;
+  // 0 for a test of one stream (PathSpeed); 1 to 8 for a channel measure, whose figure is the sum of its streams over the window.
+  uint32 streams = 12;
+  // A channel measure that reached its volume cap before the window ended: the figure is at least that.
+  bool capped = 13;
 }
 
 message PathSpeedResultsRequest {
@@ -172,4 +189,117 @@ message PathSpeedResultsRequest {
 message PathSpeedResultsResponse {
   // Newest first. Only tests that ran are kept: error is always empty here.
   repeated PathSpeedResponse tests = 1;
+  // The last channel measure of each node that has one (only the asked node when node_id is set), newest first. They are also in
+  // `tests`, one per direction and partner, while those are kept (7 days); this is the answer that stays.
+  repeated ChannelNodeLast channels = 2;
+}
+
+message ChannelNodeLast {
+  string node_name = 1;
+  ChannelLast last = 2;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The channel measure: how much a node can carry, measured against the fleet's own nodes.
+
+message ChannelMeasurePlanRequest {
+  string node_id = 1;
+}
+
+message ChannelPartner {
+  string name = 1;
+  // The widest channel known for it: the owner's number or the fastest kept speed test, Mbit/s; 0 = unknown.
+  uint32 known_mbps = 2;
+}
+
+// The figure of one direction of a channel measure.
+message ChannelDirection {
+  // Megabits per second of all the streams together over the window; 0 = this direction did not work.
+  double mbit_s = 1;
+  // The partner node that gave the best figure.
+  string partner = 2;
+  uint32 streams = 3;
+  // The volume cap was reached before the window ended: the figure is a lower bound.
+  bool capped = 4;
+}
+
+// The last channel measure of a node that gave a figure.
+message ChannelLast {
+  int64 at_unix = 1 [jstype = JS_NUMBER];
+  // The node receives (it pulls from the partner).
+  ChannelDirection down = 2;
+  // The node sends (it pushes to the partner).
+  ChannelDirection up = 3;
+  // How many partners were tried.
+  uint32 partners = 4;
+}
+
+message ChannelMeasurePlanResponse {
+  string node_name = 1;
+  // Empty when a measure can start now. Otherwise node_offline, agent_too_old, busy (the node, or a partner that was the only one,
+  // is running a test), no_partner (no other node is connected with a new enough agent), too_soon (see retry_after_s), limit.
+  string error = 2;
+  // The nodes it would measure against, widest known channel first, at most three. Names only.
+  repeated ChannelPartner partners = 3;
+  // The channel the owner wrote for this node, Mbit/s; 0 = none.
+  uint32 configured_mbps = 4;
+  // The most one direction against one partner may move, MiB (the cap both ends hold).
+  uint32 max_mb = 5;
+  // The most the whole measure may move, GB (every partner, both directions, at the cap), rounded up.
+  uint32 max_gb = 6;
+  // About how long the channel stays busy, seconds.
+  uint32 est_seconds = 7;
+  uint32 retry_after_s = 8;
+  ChannelLast last = 9;
+}
+
+message ChannelMeasureStartRequest {
+  string node_id = 1;
+}
+
+message ChannelMeasureStatusRequest {
+  string node_id = 1;
+}
+
+message ChannelMeasureCancelRequest {
+  string node_id = 1;
+}
+
+// The status right after the call.
+message ChannelMeasureStartResponse {
+  ChannelMeasureStatusResponse status = 1;
+}
+
+message ChannelMeasureCancelResponse {
+  ChannelMeasureStatusResponse status = 1;
+}
+
+// One direction against one partner.
+message ChannelStep {
+  string partner = 1;
+  // "down" (the node receives) or "up" (the node sends).
+  string direction = 2;
+  // "waiting", "running", "done" or "failed".
+  string state = 3;
+  double mbit_s = 4;
+  // Set when state is failed: node_offline, agent_too_old, busy, too_soon, unreachable, timeout, no_route, failed.
+  string error = 5;
+  uint32 streams = 6;
+  bool capped = 7;
+}
+
+message ChannelMeasureStatusResponse {
+  string node_name = 1;
+  // "idle" (no run since the panel started), "running", "done", "failed" (nothing was measured) or "canceled".
+  string state = 2;
+  // Set when the call could not start or the run failed as a whole (the codes of ChannelMeasurePlanResponse.error, or failed).
+  string error = 3;
+  uint32 retry_after_s = 4;
+  int64 started_unix = 5 [jstype = JS_NUMBER];
+  repeated ChannelStep steps = 6;
+  // The best figure per direction of the run now or last, the same as `last` once it is stored.
+  ChannelLast result = 7;
+  // The last stored measure of the node (this run included once it is done); unset when there is none.
+  ChannelLast last = 8;
+  uint32 configured_mbps = 9;
 }

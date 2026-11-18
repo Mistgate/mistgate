@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/probe/v1/probe.proto.
  */
 export const file_mistgate_probe_v1_probe: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9wcm9iZS92MS9wcm9iZS5wcm90bxIRbWlzdGdhdGUucHJvYmUudjEiaAoQUGF0aFByb2JlUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIMCgRraW5kGAMgASgJEg0KBXBvcnRzGAQgAygNEg0KBXNpemVzGAUgAygNIlUKDVBhdGhQcm9iZVBvcnQSDAoEcG9ydBgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDRIPCgd2ZXJkaWN0GAQgASgJEgoKAm1zGAUgASgNIjgKDVBhdGhQcm9iZVNpemUSDAoEc2l6ZRgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDSLhAQoRUGF0aFByb2JlUmVzcG9uc2USEQoJZnJvbV9uYW1lGAEgASgJEg8KB3RvX25hbWUYAiABKAkSDAoEa2luZBgDIAEoCRITCgdhdF91bml4GAQgASgDQgIwAhINCgVlcnJvchgFIAEoCRIvCgVwb3J0cxgGIAMoCzIgLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVBvcnQSLwoFc2l6ZXMYByADKAsyIC5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVTaXplEhQKDGxhcmdlc3Rfc2l6ZRgIIAEoDSI8ChBOb2RlVHJhY2VSZXF1ZXN0EhQKDGZyb21fbm9kZV9pZBgBIAEoCRISCgp0b19ub2RlX2lkGAIgASgJIkgKCFRyYWNlSG9wEgsKA3R0bBgBIAEoDRIOCgZydHRfbXMYAiABKA0SEAoIYW5zd2VyZWQYAyABKAgSDQoFbGFiZWwYBCABKAki5gEKEU5vZGVUcmFjZVJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhMKB2F0X3VuaXgYAyABKANCAjACEg0KBWVycm9yGAQgASgJEg8KB3JlYWNoZWQYBSABKAgSKQoEaG9wcxgGIAMoCzIbLm1pc3RnYXRlLnByb2JlLnYxLlRyYWNlSG9wEhYKDmNoYW5nZWRfYXRfaG9wGAcgASgNEgwKBGRpZmYYCCABKAkSGQoNcHJldmlvdXNfdW5peBgJIAEoA0ICMAISDAoEa2VwdBgKIAEoDSIzChNOb2RlRG5zQ2hlY2tSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSCwoDcnVuGAIgASgIIl4KBkRuc1J1bhITCgdhdF91bml4GAEgASgDQgIwAhIOCgZwNTBfbXMYAiABKA0SDgoGcDk1X21zGAMgASgNEg4KBmZhaWxlZBgEIAEoDRIPCgdkb21haW5zGAUgASgNIp4BChROb2RlRG5zQ2hlY2tSZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSKQoGbGF0ZXN0GAMgASgLMhkubWlzdGdhdGUucHJvYmUudjEuRG5zUnVuEioKB2hpc3RvcnkYBCADKAsyGS5taXN0Z2F0ZS5wcm9iZS52MS5EbnNSdW4SDQoFdHJlbmQYBSABKAkiWwoQUGF0aFNwZWVkUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIKCgJtYhgDIAEoDRIRCglkaXJlY3Rpb24YBCABKAki2QEKEVBhdGhTcGVlZFJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhEKCWRpcmVjdGlvbhgDIAEoCRIKCgJtYhgEIAEoDRITCgdhdF91bml4GAUgASgDQgIwAhINCgVlcnJvchgGIAEoCRIOCgZtYml0X3MYByABKAESEgoKY29ubmVjdF9tcxgIIAEoDRIVCg1maXJzdF9ieXRlX21zGAkgASgNEhMKC2R1cmF0aW9uX21zGAogASgNEg0KBWJ5dGVzGAsgASgEIjkKF1BhdGhTcGVlZFJlc3VsdHNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDQoFbGltaXQYAiABKA0iTwoYUGF0aFNwZWVkUmVzdWx0c1Jlc3BvbnNlEjMKBXRlc3RzGAEgAygLMiQubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVzcG9uc2Uy5AMKDFByb2JlU2VydmljZRJWCglQYXRoUHJvYmUSIy5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVSZXF1ZXN0GiQubWlzdGdhdGUucHJvYmUudjEuUGF0aFByb2JlUmVzcG9uc2USVgoJTm9kZVRyYWNlEiMubWlzdGdhdGUucHJvYmUudjEuTm9kZVRyYWNlUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVUcmFjZVJlc3BvbnNlEl8KDE5vZGVEbnNDaGVjaxImLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVEbnNDaGVja1JlcXVlc3QaJy5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlRG5zQ2hlY2tSZXNwb25zZRJWCglQYXRoU3BlZWQSIy5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoU3BlZWRSZXF1ZXN0GiQubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVzcG9uc2USawoQUGF0aFNwZWVkUmVzdWx0cxIqLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3VsdHNSZXF1ZXN0GisubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVzdWx0c1Jlc3BvbnNlQsUBChVjb20ubWlzdGdhdGUucHJvYmUudjFCClByb2JlUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvcHJvYmUvdjE7cHJvYmV2MaICA01QWKoCEU1pc3RnYXRlLlByb2JlLlYxygIRTWlzdGdhdGVcUHJvYmVcVjHiAh1NaXN0Z2F0ZVxQcm9iZVxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpQcm9iZTo6VjFiBnByb3RvMw");
+  fileDesc("Ch1taXN0Z2F0ZS9wcm9iZS92MS9wcm9iZS5wcm90bxIRbWlzdGdhdGUucHJvYmUudjEiaAoQUGF0aFByb2JlUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIMCgRraW5kGAMgASgJEg0KBXBvcnRzGAQgAygNEg0KBXNpemVzGAUgAygNIlUKDVBhdGhQcm9iZVBvcnQSDAoEcG9ydBgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDRIPCgd2ZXJkaWN0GAQgASgJEgoKAm1zGAUgASgNIjgKDVBhdGhQcm9iZVNpemUSDAoEc2l6ZRgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDSLhAQoRUGF0aFByb2JlUmVzcG9uc2USEQoJZnJvbV9uYW1lGAEgASgJEg8KB3RvX25hbWUYAiABKAkSDAoEa2luZBgDIAEoCRITCgdhdF91bml4GAQgASgDQgIwAhINCgVlcnJvchgFIAEoCRIvCgVwb3J0cxgGIAMoCzIgLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVBvcnQSLwoFc2l6ZXMYByADKAsyIC5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVTaXplEhQKDGxhcmdlc3Rfc2l6ZRgIIAEoDSI8ChBOb2RlVHJhY2VSZXF1ZXN0EhQKDGZyb21fbm9kZV9pZBgBIAEoCRISCgp0b19ub2RlX2lkGAIgASgJIkgKCFRyYWNlSG9wEgsKA3R0bBgBIAEoDRIOCgZydHRfbXMYAiABKA0SEAoIYW5zd2VyZWQYAyABKAgSDQoFbGFiZWwYBCABKAki5gEKEU5vZGVUcmFjZVJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhMKB2F0X3VuaXgYAyABKANCAjACEg0KBWVycm9yGAQgASgJEg8KB3JlYWNoZWQYBSABKAgSKQoEaG9wcxgGIAMoCzIbLm1pc3RnYXRlLnByb2JlLnYxLlRyYWNlSG9wEhYKDmNoYW5nZWRfYXRfaG9wGAcgASgNEgwKBGRpZmYYCCABKAkSGQoNcHJldmlvdXNfdW5peBgJIAEoA0ICMAISDAoEa2VwdBgKIAEoDSIzChNOb2RlRG5zQ2hlY2tSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSCwoDcnVuGAIgASgIIl4KBkRuc1J1bhITCgdhdF91bml4GAEgASgDQgIwAhIOCgZwNTBfbXMYAiABKA0SDgoGcDk1X21zGAMgASgNEg4KBmZhaWxlZBgEIAEoDRIPCgdkb21haW5zGAUgASgNIp4BChROb2RlRG5zQ2hlY2tSZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSKQoGbGF0ZXN0GAMgASgLMhkubWlzdGdhdGUucHJvYmUudjEuRG5zUnVuEioKB2hpc3RvcnkYBCADKAsyGS5taXN0Z2F0ZS5wcm9iZS52MS5EbnNSdW4SDQoFdHJlbmQYBSABKAkiWwoQUGF0aFNwZWVkUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIKCgJtYhgDIAEoDRIRCglkaXJlY3Rpb24YBCABKAki+gEKEVBhdGhTcGVlZFJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhEKCWRpcmVjdGlvbhgDIAEoCRIKCgJtYhgEIAEoDRITCgdhdF91bml4GAUgASgDQgIwAhINCgVlcnJvchgGIAEoCRIOCgZtYml0X3MYByABKAESEgoKY29ubmVjdF9tcxgIIAEoDRIVCg1maXJzdF9ieXRlX21zGAkgASgNEhMKC2R1cmF0aW9uX21zGAogASgNEg0KBWJ5dGVzGAsgASgEEg8KB3N0cmVhbXMYDCABKA0SDgoGY2FwcGVkGA0gASgIIjkKF1BhdGhTcGVlZFJlc3VsdHNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDQoFbGltaXQYAiABKA0ihQEKGFBhdGhTcGVlZFJlc3VsdHNSZXNwb25zZRIzCgV0ZXN0cxgBIAMoCzIkLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3BvbnNlEjQKCGNoYW5uZWxzGAIgAygLMiIubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE5vZGVMYXN0IlIKD0NoYW5uZWxOb2RlTGFzdBIRCglub2RlX25hbWUYASABKAkSLAoEbGFzdBgCIAEoCzIeLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxMYXN0IiwKGUNoYW5uZWxNZWFzdXJlUGxhblJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSIyCg5DaGFubmVsUGFydG5lchIMCgRuYW1lGAEgASgJEhIKCmtub3duX21icHMYAiABKA0iVAoQQ2hhbm5lbERpcmVjdGlvbhIOCgZtYml0X3MYASABKAESDwoHcGFydG5lchgCIAEoCRIPCgdzdHJlYW1zGAMgASgNEg4KBmNhcHBlZBgEIAEoCCKYAQoLQ2hhbm5lbExhc3QSEwoHYXRfdW5peBgBIAEoA0ICMAISMQoEZG93bhgCIAEoCzIjLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxEaXJlY3Rpb24SLwoCdXAYAyABKAsyIy5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsRGlyZWN0aW9uEhAKCHBhcnRuZXJzGAQgASgNIoYCChpDaGFubmVsTWVhc3VyZVBsYW5SZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSMwoIcGFydG5lcnMYAyADKAsyIS5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsUGFydG5lchIXCg9jb25maWd1cmVkX21icHMYBCABKA0SDgoGbWF4X21iGAUgASgNEg4KBm1heF9nYhgGIAEoDRITCgtlc3Rfc2Vjb25kcxgHIAEoDRIVCg1yZXRyeV9hZnRlcl9zGAggASgNEiwKBGxhc3QYCSABKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTGFzdCItChpDaGFubmVsTWVhc3VyZVN0YXJ0UmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIi4KG0NoYW5uZWxNZWFzdXJlU3RhdHVzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIi4KG0NoYW5uZWxNZWFzdXJlQ2FuY2VsUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIl4KG0NoYW5uZWxNZWFzdXJlU3RhcnRSZXNwb25zZRI/CgZzdGF0dXMYASABKAsyLy5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVN0YXR1c1Jlc3BvbnNlIl8KHENoYW5uZWxNZWFzdXJlQ2FuY2VsUmVzcG9uc2USPwoGc3RhdHVzGAEgASgLMi8ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGF0dXNSZXNwb25zZSKAAQoLQ2hhbm5lbFN0ZXASDwoHcGFydG5lchgBIAEoCRIRCglkaXJlY3Rpb24YAiABKAkSDQoFc3RhdGUYAyABKAkSDgoGbWJpdF9zGAQgASgBEg0KBWVycm9yGAUgASgJEg8KB3N0cmVhbXMYBiABKA0SDgoGY2FwcGVkGAcgASgIIqYCChxDaGFubmVsTWVhc3VyZVN0YXR1c1Jlc3BvbnNlEhEKCW5vZGVfbmFtZRgBIAEoCRINCgVzdGF0ZRgCIAEoCRINCgVlcnJvchgDIAEoCRIVCg1yZXRyeV9hZnRlcl9zGAQgASgNEhgKDHN0YXJ0ZWRfdW5peBgFIAEoA0ICMAISLQoFc3RlcHMYBiADKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsU3RlcBIuCgZyZXN1bHQYByABKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTGFzdBIsCgRsYXN0GAggASgLMh4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbExhc3QSFwoPY29uZmlndXJlZF9tYnBzGAkgASgNMr8HCgxQcm9iZVNlcnZpY2USVgoJUGF0aFByb2JlEiMubWlzdGdhdGUucHJvYmUudjEuUGF0aFByb2JlUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVJlc3BvbnNlElYKCU5vZGVUcmFjZRIjLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVUcmFjZVJlcXVlc3QaJC5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlVHJhY2VSZXNwb25zZRJfCgxOb2RlRG5zQ2hlY2sSJi5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlRG5zQ2hlY2tSZXF1ZXN0GicubWlzdGdhdGUucHJvYmUudjEuTm9kZURuc0NoZWNrUmVzcG9uc2USVgoJUGF0aFNwZWVkEiMubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3BvbnNlEmsKEFBhdGhTcGVlZFJlc3VsdHMSKi5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoU3BlZWRSZXN1bHRzUmVxdWVzdBorLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3VsdHNSZXNwb25zZRJxChJDaGFubmVsTWVhc3VyZVBsYW4SLC5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVBsYW5SZXF1ZXN0Gi0ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVQbGFuUmVzcG9uc2USdAoTQ2hhbm5lbE1lYXN1cmVTdGFydBItLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxNZWFzdXJlU3RhcnRSZXF1ZXN0Gi4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGFydFJlc3BvbnNlEncKFENoYW5uZWxNZWFzdXJlU3RhdHVzEi4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGF0dXNSZXF1ZXN0Gi8ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGF0dXNSZXNwb25zZRJ3ChRDaGFubmVsTWVhc3VyZUNhbmNlbBIuLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxNZWFzdXJlQ2FuY2VsUmVxdWVzdBovLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxNZWFzdXJlQ2FuY2VsUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5wcm9iZS52MUIKUHJvYmVQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9wcm9iZS92MTtwcm9iZXYxogIDTVBYqgIRTWlzdGdhdGUuUHJvYmUuVjHKAhFNaXN0Z2F0ZVxQcm9iZVxWMeICHU1pc3RnYXRlXFByb2JlXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OlByb2JlOjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message mistgate.probe.v1.PathProbeRequest
@@ -526,6 +526,20 @@ export type PathSpeedResponse = Message<"mistgate.probe.v1.PathSpeedResponse"> &
    * @generated from field: uint64 bytes = 11;
    */
   bytes: bigint;
+
+  /**
+   * 0 for a test of one stream (PathSpeed); 1 to 8 for a channel measure, whose figure is the sum of its streams over the window.
+   *
+   * @generated from field: uint32 streams = 12;
+   */
+  streams: number;
+
+  /**
+   * A channel measure that reached its volume cap before the window ended: the figure is at least that.
+   *
+   * @generated from field: bool capped = 13;
+   */
+  capped: boolean;
 };
 
 /**
@@ -571,6 +585,14 @@ export type PathSpeedResultsResponse = Message<"mistgate.probe.v1.PathSpeedResul
    * @generated from field: repeated mistgate.probe.v1.PathSpeedResponse tests = 1;
    */
   tests: PathSpeedResponse[];
+
+  /**
+   * The last channel measure of each node that has one (only the asked node when node_id is set), newest first. They are also in
+   * `tests`, one per direction and partner, while those are kept (7 days); this is the answer that stays.
+   *
+   * @generated from field: repeated mistgate.probe.v1.ChannelNodeLast channels = 2;
+   */
+  channels: ChannelNodeLast[];
 };
 
 /**
@@ -579,6 +601,426 @@ export type PathSpeedResultsResponse = Message<"mistgate.probe.v1.PathSpeedResul
  */
 export const PathSpeedResultsResponseSchema: GenMessage<PathSpeedResultsResponse> = /*@__PURE__*/
   messageDesc(file_mistgate_probe_v1_probe, 13);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelNodeLast
+ */
+export type ChannelNodeLast = Message<"mistgate.probe.v1.ChannelNodeLast"> & {
+  /**
+   * @generated from field: string node_name = 1;
+   */
+  nodeName: string;
+
+  /**
+   * @generated from field: mistgate.probe.v1.ChannelLast last = 2;
+   */
+  last?: ChannelLast | undefined;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelNodeLast.
+ * Use `create(ChannelNodeLastSchema)` to create a new message.
+ */
+export const ChannelNodeLastSchema: GenMessage<ChannelNodeLast> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 14);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelMeasurePlanRequest
+ */
+export type ChannelMeasurePlanRequest = Message<"mistgate.probe.v1.ChannelMeasurePlanRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasurePlanRequest.
+ * Use `create(ChannelMeasurePlanRequestSchema)` to create a new message.
+ */
+export const ChannelMeasurePlanRequestSchema: GenMessage<ChannelMeasurePlanRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 15);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelPartner
+ */
+export type ChannelPartner = Message<"mistgate.probe.v1.ChannelPartner"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * The widest channel known for it: the owner's number or the fastest kept speed test, Mbit/s; 0 = unknown.
+   *
+   * @generated from field: uint32 known_mbps = 2;
+   */
+  knownMbps: number;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelPartner.
+ * Use `create(ChannelPartnerSchema)` to create a new message.
+ */
+export const ChannelPartnerSchema: GenMessage<ChannelPartner> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 16);
+
+/**
+ * The figure of one direction of a channel measure.
+ *
+ * @generated from message mistgate.probe.v1.ChannelDirection
+ */
+export type ChannelDirection = Message<"mistgate.probe.v1.ChannelDirection"> & {
+  /**
+   * Megabits per second of all the streams together over the window; 0 = this direction did not work.
+   *
+   * @generated from field: double mbit_s = 1;
+   */
+  mbitS: number;
+
+  /**
+   * The partner node that gave the best figure.
+   *
+   * @generated from field: string partner = 2;
+   */
+  partner: string;
+
+  /**
+   * @generated from field: uint32 streams = 3;
+   */
+  streams: number;
+
+  /**
+   * The volume cap was reached before the window ended: the figure is a lower bound.
+   *
+   * @generated from field: bool capped = 4;
+   */
+  capped: boolean;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelDirection.
+ * Use `create(ChannelDirectionSchema)` to create a new message.
+ */
+export const ChannelDirectionSchema: GenMessage<ChannelDirection> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 17);
+
+/**
+ * The last channel measure of a node that gave a figure.
+ *
+ * @generated from message mistgate.probe.v1.ChannelLast
+ */
+export type ChannelLast = Message<"mistgate.probe.v1.ChannelLast"> & {
+  /**
+   * @generated from field: int64 at_unix = 1 [jstype = JS_NUMBER];
+   */
+  atUnix: bigint;
+
+  /**
+   * The node receives (it pulls from the partner).
+   *
+   * @generated from field: mistgate.probe.v1.ChannelDirection down = 2;
+   */
+  down?: ChannelDirection | undefined;
+
+  /**
+   * The node sends (it pushes to the partner).
+   *
+   * @generated from field: mistgate.probe.v1.ChannelDirection up = 3;
+   */
+  up?: ChannelDirection | undefined;
+
+  /**
+   * How many partners were tried.
+   *
+   * @generated from field: uint32 partners = 4;
+   */
+  partners: number;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelLast.
+ * Use `create(ChannelLastSchema)` to create a new message.
+ */
+export const ChannelLastSchema: GenMessage<ChannelLast> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 18);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelMeasurePlanResponse
+ */
+export type ChannelMeasurePlanResponse = Message<"mistgate.probe.v1.ChannelMeasurePlanResponse"> & {
+  /**
+   * @generated from field: string node_name = 1;
+   */
+  nodeName: string;
+
+  /**
+   * Empty when a measure can start now. Otherwise node_offline, agent_too_old, busy (the node, or a partner that was the only one,
+   * is running a test), no_partner (no other node is connected with a new enough agent), too_soon (see retry_after_s), limit.
+   *
+   * @generated from field: string error = 2;
+   */
+  error: string;
+
+  /**
+   * The nodes it would measure against, widest known channel first, at most three. Names only.
+   *
+   * @generated from field: repeated mistgate.probe.v1.ChannelPartner partners = 3;
+   */
+  partners: ChannelPartner[];
+
+  /**
+   * The channel the owner wrote for this node, Mbit/s; 0 = none.
+   *
+   * @generated from field: uint32 configured_mbps = 4;
+   */
+  configuredMbps: number;
+
+  /**
+   * The most one direction against one partner may move, MiB (the cap both ends hold).
+   *
+   * @generated from field: uint32 max_mb = 5;
+   */
+  maxMb: number;
+
+  /**
+   * The most the whole measure may move, GB (every partner, both directions, at the cap), rounded up.
+   *
+   * @generated from field: uint32 max_gb = 6;
+   */
+  maxGb: number;
+
+  /**
+   * About how long the channel stays busy, seconds.
+   *
+   * @generated from field: uint32 est_seconds = 7;
+   */
+  estSeconds: number;
+
+  /**
+   * @generated from field: uint32 retry_after_s = 8;
+   */
+  retryAfterS: number;
+
+  /**
+   * @generated from field: mistgate.probe.v1.ChannelLast last = 9;
+   */
+  last?: ChannelLast | undefined;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasurePlanResponse.
+ * Use `create(ChannelMeasurePlanResponseSchema)` to create a new message.
+ */
+export const ChannelMeasurePlanResponseSchema: GenMessage<ChannelMeasurePlanResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 19);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelMeasureStartRequest
+ */
+export type ChannelMeasureStartRequest = Message<"mistgate.probe.v1.ChannelMeasureStartRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasureStartRequest.
+ * Use `create(ChannelMeasureStartRequestSchema)` to create a new message.
+ */
+export const ChannelMeasureStartRequestSchema: GenMessage<ChannelMeasureStartRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 20);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelMeasureStatusRequest
+ */
+export type ChannelMeasureStatusRequest = Message<"mistgate.probe.v1.ChannelMeasureStatusRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasureStatusRequest.
+ * Use `create(ChannelMeasureStatusRequestSchema)` to create a new message.
+ */
+export const ChannelMeasureStatusRequestSchema: GenMessage<ChannelMeasureStatusRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 21);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelMeasureCancelRequest
+ */
+export type ChannelMeasureCancelRequest = Message<"mistgate.probe.v1.ChannelMeasureCancelRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasureCancelRequest.
+ * Use `create(ChannelMeasureCancelRequestSchema)` to create a new message.
+ */
+export const ChannelMeasureCancelRequestSchema: GenMessage<ChannelMeasureCancelRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 22);
+
+/**
+ * The status right after the call.
+ *
+ * @generated from message mistgate.probe.v1.ChannelMeasureStartResponse
+ */
+export type ChannelMeasureStartResponse = Message<"mistgate.probe.v1.ChannelMeasureStartResponse"> & {
+  /**
+   * @generated from field: mistgate.probe.v1.ChannelMeasureStatusResponse status = 1;
+   */
+  status?: ChannelMeasureStatusResponse | undefined;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasureStartResponse.
+ * Use `create(ChannelMeasureStartResponseSchema)` to create a new message.
+ */
+export const ChannelMeasureStartResponseSchema: GenMessage<ChannelMeasureStartResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 23);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelMeasureCancelResponse
+ */
+export type ChannelMeasureCancelResponse = Message<"mistgate.probe.v1.ChannelMeasureCancelResponse"> & {
+  /**
+   * @generated from field: mistgate.probe.v1.ChannelMeasureStatusResponse status = 1;
+   */
+  status?: ChannelMeasureStatusResponse | undefined;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasureCancelResponse.
+ * Use `create(ChannelMeasureCancelResponseSchema)` to create a new message.
+ */
+export const ChannelMeasureCancelResponseSchema: GenMessage<ChannelMeasureCancelResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 24);
+
+/**
+ * One direction against one partner.
+ *
+ * @generated from message mistgate.probe.v1.ChannelStep
+ */
+export type ChannelStep = Message<"mistgate.probe.v1.ChannelStep"> & {
+  /**
+   * @generated from field: string partner = 1;
+   */
+  partner: string;
+
+  /**
+   * "down" (the node receives) or "up" (the node sends).
+   *
+   * @generated from field: string direction = 2;
+   */
+  direction: string;
+
+  /**
+   * "waiting", "running", "done" or "failed".
+   *
+   * @generated from field: string state = 3;
+   */
+  state: string;
+
+  /**
+   * @generated from field: double mbit_s = 4;
+   */
+  mbitS: number;
+
+  /**
+   * Set when state is failed: node_offline, agent_too_old, busy, too_soon, unreachable, timeout, no_route, failed.
+   *
+   * @generated from field: string error = 5;
+   */
+  error: string;
+
+  /**
+   * @generated from field: uint32 streams = 6;
+   */
+  streams: number;
+
+  /**
+   * @generated from field: bool capped = 7;
+   */
+  capped: boolean;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelStep.
+ * Use `create(ChannelStepSchema)` to create a new message.
+ */
+export const ChannelStepSchema: GenMessage<ChannelStep> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 25);
+
+/**
+ * @generated from message mistgate.probe.v1.ChannelMeasureStatusResponse
+ */
+export type ChannelMeasureStatusResponse = Message<"mistgate.probe.v1.ChannelMeasureStatusResponse"> & {
+  /**
+   * @generated from field: string node_name = 1;
+   */
+  nodeName: string;
+
+  /**
+   * "idle" (no run since the panel started), "running", "done", "failed" (nothing was measured) or "canceled".
+   *
+   * @generated from field: string state = 2;
+   */
+  state: string;
+
+  /**
+   * Set when the call could not start or the run failed as a whole (the codes of ChannelMeasurePlanResponse.error, or failed).
+   *
+   * @generated from field: string error = 3;
+   */
+  error: string;
+
+  /**
+   * @generated from field: uint32 retry_after_s = 4;
+   */
+  retryAfterS: number;
+
+  /**
+   * @generated from field: int64 started_unix = 5 [jstype = JS_NUMBER];
+   */
+  startedUnix: bigint;
+
+  /**
+   * @generated from field: repeated mistgate.probe.v1.ChannelStep steps = 6;
+   */
+  steps: ChannelStep[];
+
+  /**
+   * The best figure per direction of the run now or last, the same as `last` once it is stored.
+   *
+   * @generated from field: mistgate.probe.v1.ChannelLast result = 7;
+   */
+  result?: ChannelLast | undefined;
+
+  /**
+   * The last stored measure of the node (this run included once it is done); unset when there is none.
+   *
+   * @generated from field: mistgate.probe.v1.ChannelLast last = 8;
+   */
+  last?: ChannelLast | undefined;
+
+  /**
+   * @generated from field: uint32 configured_mbps = 9;
+   */
+  configuredMbps: number;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.ChannelMeasureStatusResponse.
+ * Use `create(ChannelMeasureStatusResponseSchema)` to create a new message.
+ */
+export const ChannelMeasureStatusResponseSchema: GenMessage<ChannelMeasureStatusResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 26);
 
 /**
  * On-demand probes between fleet nodes, for the MCP tools path_probe, node_trace and node_dns_check and for an operator.
@@ -650,6 +1092,51 @@ export const ProbeService: GenService<{
     methodKind: "unary";
     input: typeof PathSpeedResultsRequestSchema;
     output: typeof PathSpeedResultsResponseSchema;
+  },
+  /**
+   * What "measure the channel" of a node would do now, and whether it can: the partners (the nodes with the widest known channel), the
+   * most data it may move and how long it takes, how long the pause lasts when the last measure is recent. Moves nothing.
+   *
+   * @generated from rpc mistgate.probe.v1.ProbeService.ChannelMeasurePlan
+   */
+  channelMeasurePlan: {
+    methodKind: "unary";
+    input: typeof ChannelMeasurePlanRequestSchema;
+    output: typeof ChannelMeasurePlanResponseSchema;
+  },
+  /**
+   * Starts the channel measure of one node: 8 parallel TCP streams for 10 seconds in each direction (receive, send) against up to
+   * three partner nodes, the same mechanism as PathSpeed (a one-time listener on the partner, a token), capped at 2 GiB and 15 seconds
+   * per direction on both ends. It fills the links of the node and its partners, so it is the owner's alone (and an MCP token's only
+   * through an approved plan). It runs on in the panel after the call returns; read it with ChannelMeasureStatus. One per node at a time
+   * and not more often than once in 10 minutes per node.
+   *
+   * @generated from rpc mistgate.probe.v1.ProbeService.ChannelMeasureStart
+   */
+  channelMeasureStart: {
+    methodKind: "unary";
+    input: typeof ChannelMeasureStartRequestSchema;
+    output: typeof ChannelMeasureStartResponseSchema;
+  },
+  /**
+   * The run of a node now or last (steps with their figures) and its last stored measure. Moves nothing.
+   *
+   * @generated from rpc mistgate.probe.v1.ProbeService.ChannelMeasureStatus
+   */
+  channelMeasureStatus: {
+    methodKind: "unary";
+    input: typeof ChannelMeasureStatusRequestSchema;
+    output: typeof ChannelMeasureStatusResponseSchema;
+  },
+  /**
+   * Stops the run of a node: both ends close their streams at once.
+   *
+   * @generated from rpc mistgate.probe.v1.ProbeService.ChannelMeasureCancel
+   */
+  channelMeasureCancel: {
+    methodKind: "unary";
+    input: typeof ChannelMeasureCancelRequestSchema;
+    output: typeof ChannelMeasureCancelResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_probe_v1_probe, 0);
