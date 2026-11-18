@@ -8,7 +8,6 @@ const rect = (x: number, y: number, width: number, height: number, rx: number): 
 const circle = (cx: number, cy: number, r: number): Shape => ["circle", { cx, cy, r }];
 
 const paths = {
-  download: ["M12 4v11", "m7 10 5 5 5-5", "M5 20h14"],
   external: ["M7 17 17 7M9 7h8v8"],
   plus: ["M12 5v14M5 12h14"],
   check: ["m5 12.5 4.5 4.5L19 7.5"],
@@ -26,21 +25,16 @@ const paths = {
   exit: ["M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4", "m10 16 4-4-4-4M14 12H4"],
   refresh: ["M20 11a8 8 0 0 0-14.3-4.3L4 8.5", "M4 4v4.5h4.5", "M4 13a8 8 0 0 0 14.3 4.3L20 15.5", "M20 20v-4.5h-4.5"],
   pencil: ["M4.5 19.5h3.6L19 8.6a2.2 2.2 0 0 0-3.1-3.1L5 16.4z", "m14.5 7 3 3"],
-  trash: ["M4 7h16", "M10 11v6M14 11v6", "M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12", "M9 7V4.5h6V7"],
   file: ["M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z", "M14 3v5h5", "M12 11.5v5.5M9.5 14.5 12 17l2.5-2.5"],
   eye: ["M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z", circle(12, 12, 3)],
-  power: ["M12 3.5v8", "M6.6 7.2a7.5 7.5 0 1 0 10.8 0"],
   send: ["M20.5 4 3.5 10.6l5.6 2 2 5.9 3-3.6 4.3 3.1z", "m9.1 12.6 6.4-4.4"],
   shield: ["M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6z"],
-  qr: [rect(4, 4, 6, 6, 1.2), rect(14, 4, 6, 6, 1.2), rect(4, 14, 6, 6, 1.2), "M14 14h2.5v2.5H14zM20 14v.01M14 20h.01M17.5 20H20v-2.5"],
   info: [circle(12, 12, 9), "M12 11v5.5M12 7.6v.01"],
   warn: ["M10.3 4.2 2.8 17.5A2 2 0 0 0 4.5 20.5h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z", "M12 9.5v4M12 17v.01"],
-  lock: [rect(5, 10.5, 14, 10, 2.5), "M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"],
   dots: ["M5.5 12h.01M12 12h.01M18.5 12h.01"],
   chev: ["m6 9 6 6 6-6"],
   next: ["m9 6 6 6-6 6"],
   back: ["m15 6-6 6 6 6"],
-  clock: [circle(12, 12, 9), "M12 7.5V12l3 2"],
   tunnel: ["M4 20v-9a8 8 0 0 1 16 0v9", "M8.5 20v-8.5a3.5 3.5 0 0 1 7 0V20", "M2.5 20h19"],
   /** the device list of the boards: a computer, a router; the page's announcement; the theme switch (system, light, dark) */
   pc: ["M3.5 6.7A2.2 2.2 0 0 1 5.7 4.5h12.6a2.2 2.2 0 0 1 2.2 2.2v7.1a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2zM9 20h6M12 16v4"],

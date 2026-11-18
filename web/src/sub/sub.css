@@ -7,7 +7,7 @@
  * 1104). Fonts are inline subsets (fonts/README.md): the whole page is a single file, the CSP allows font-src data: only.
  *
  * Rules that exist only for what the boards do not draw (a password page, TrustTunnel, the stale-key mark, ...) are in
- * sub-more.css, built from the same pieces.
+ * sub-a.css (the window "New device" and what it builds on), sub-b.css (the lists) and sub-dlg.css (the small windows).
  */
 @import "../assets/mark-motion.css";
 @font-face{font-family:"Onest";font-style:normal;font-weight:400 800;font-display:swap;src:url("./fonts/onest-cyrillic.woff2") format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
@@ -22,22 +22,18 @@
   color-scheme: dark light;
   --accent: #b8acf2;
   --mint: #7dd3a0;
-  --sky: #8ec8ea;
   --ink: #0c0c0e; /* text on the accent, both themes */
   --warning: #febc2e;
   --danger: #ff5a5f;
   --bg: light-dark(#f8f8f6, #0c0c0e);
   --surface: light-dark(#ffffff, #141417);
   --surface-2: light-dark(#efefec, #1d1d22);
-  --raise: light-dark(#ffffff, #2c2c33);
   --border: light-dark(#e3e3df, #25252b);
   --text: light-dark(#16161a, #f3f3f5);
   --muted: light-dark(#6b6b73, #8b8b94);
   --faint: light-dark(#c4c4c8, #4a4a52);
-  --track: light-dark(rgb(22 22 26 / 0.09), rgb(255 255 255 / 0.09));
   --warning-text: light-dark(#63470b, #febc2e);
   --danger-text: light-dark(#8f2427, #ff5a5f);
-  --ok-text: light-dark(#00582f, #7dd3a0);
   --tone-sky: light-dark(#174e6a, #8ec8ea);
   --tone-sky-bg: light-dark(#e0f0fa, #263037);
   --tone-mint: light-dark(#00582f, #7dd3a0);
@@ -46,15 +42,11 @@
   --tone-lav-bg: light-dark(#eae8fc, #2d2b38);
   --tone-sand: light-dark(#5c4a12, #dcc68c);
   --tone-sand-bg: light-dark(#f5efdf, #332f25);
-  --tone-rose: light-dark(#67343e, #e6a6b0);
-  --tone-rose-bg: light-dark(#f9e6e8, #362a2c);
-  --backdrop: light-dark(rgb(22 22 26 / 0.36), rgb(0 0 0 / 0.62));
   --accent-soft: light-dark(color-mix(in oklch, var(--accent) 24%, var(--bg)), color-mix(in oklch, var(--accent) 14%, var(--bg)));
   --accent-line: light-dark(color-mix(in oklch, var(--accent) 65%, var(--border)), color-mix(in oklch, var(--accent) 50%, var(--border)));
   --accent-text: light-dark(color-mix(in oklch, var(--accent) 50%, #000), var(--accent));
   --warning-soft: rgb(254 188 46 / 0.12);
   --warning-line: rgb(254 188 46 / 0.38);
-  --danger-soft: color-mix(in oklch, var(--danger) 12%, var(--bg));
   --danger-line: color-mix(in oklch, var(--danger) 45%, var(--border));
   /* the board's three text roles and its hairline (.v2) */
   --sec: color-mix(in srgb, var(--text) 66%, var(--bg));
@@ -100,9 +92,7 @@ a { color: inherit; }
 /* the page: .wrap of the boards (1104, 32 gutters, 16 gap) */
 .wrap { position: relative; max-width: 1104px; margin: 0 auto; padding: 0 32px 64px; display: flex; flex-direction: column; gap: 16px; }
 .enter { animation: u-rise 0.36s var(--e) both; }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .q { white-space: nowrap; }
-.sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 /* the header: .u-hd */
 .u-hd { display: flex; align-items: center; gap: 12px; height: 72px; }
@@ -444,17 +434,6 @@ button.u-stat:hover .n { color: var(--text); }
 .u-tilt .u-qt { transform: translate(-50%, -50%) translateZ(calc(var(--hv, 0) * 12px)) scale(calc(1 + var(--hv, 0) * 0.06)); }
 .u-glare { position: absolute; inset: 0; z-index: 2; border-radius: inherit; pointer-events: none; opacity: calc(var(--hv, 0) * 0.5); background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), color-mix(in srgb, var(--accent) 55%, #fff) 0, transparent 55%); mix-blend-mode: multiply; }
 .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; flex: none; opacity: 0.8; animation: spin 0.8s linear infinite; }
-
-/* a tooltip: only where there is a pointer that hovers; shown after a moment on hover or keyboard focus, never moving the layout,
-   gone with Esc (main.ts sets .tips-off until the next tap or focus) */
-.tipwrap { position: relative; display: inline-flex; flex: none; }
-.tip { display: none; }
-@media (hover: hover) {
-  .tip { display: block; position: absolute; z-index: 4; padding: 6px 10px; border-radius: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--hair); font: 400 12px/16px var(--sans); white-space: nowrap; opacity: 0; visibility: hidden; transition: opacity 0.12s, visibility 0s linear 0.12s; }
-  :is(:hover, :focus-visible) + .tip, .tip:hover { opacity: 1; visibility: visible; transition-delay: 0.35s, 0.35s; }
-  .tips-off .tip { opacity: 0; visibility: hidden; }
-  .tipwrap > .tip { inset-inline-end: 0; bottom: calc(100% + 6px); }
-}
 
 /* the phone: the boards at 390 (.phone .*), from 360 up; the content is the full width minus the 16 gutters */
 @media (max-width: 719.98px) {

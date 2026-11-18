@@ -51,7 +51,7 @@ function langMenu(t: Dict, lang: Lang, setLang: (l: Lang) => void): HTMLElement 
       ck(),
     );
   menu.append(
-    h("summary", { class: "u-btn", "aria-label": `${t.langGroup}: ${langNames[lang]}`, "data-k": "lang-menu" }, icon("globe"), h("span", { class: "lb", lang: htmlLang(lang) }, langNames[lang]), h("span", { class: "cd", lang: htmlLang(lang) }, langShort[lang]), icon("chev")),
+    h("summary", { class: "u-btn", "aria-haspopup": "listbox", "aria-label": `${t.langGroup}: ${langNames[lang]}`, "data-k": "lang-menu" }, icon("globe"), h("span", { class: "lb", lang: htmlLang(lang) }, langNames[lang]), h("span", { class: "cd", lang: htmlLang(lang) }, langShort[lang]), icon("chev")),
     h("div", { class: "u-menu", role: "listbox", "aria-label": t.langGroup }, ...langs.map(row)),
   );
   return menu;
@@ -138,8 +138,9 @@ function panel(c: Ctx): Kid[] {
 // ---- the end of the page ----
 
 /** The help card (the board's "Не нашли ответ" row): the way to the support, when the page has one. */
-function help({ t, support }: Ctx): HTMLElement | null {
-  if (!support) return null;
+function help({ d, t, support }: Ctx): HTMLElement | null {
+  // the board draws it under the tabs, so only for a subscription that works (the other states have the button in the note)
+  if (!support || d.user.status !== "active") return null;
   return h(
     "div",
     { class: "u-below" },

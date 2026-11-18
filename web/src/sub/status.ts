@@ -50,12 +50,13 @@ const fig = (key: string, text: string, cls = "v") => h("span", { class: cls, "d
 /** The announcement of the owner (the board's .u-ann: a tile, the text, the cross). The first line is the title, the rest the line under it. */
 export function announcement(c: Ctx): HTMLElement | null {
   const { d, s, a, t } = c;
-  if (!d.options.show_announcement || !d.announcement || s.annClosed) return null;
+  // the board shows it above a subscription that works only (.u-ann is not drawn in the states without tabs)
+  if (d.user.status !== "active" || !d.options.show_announcement || !d.announcement || s.annClosed) return null;
   const [first = "", ...rest] = d.announcement.split("\n");
   const more = rest.join("\n").trim();
   return h(
     "section",
-    { class: "u-ann", role: "note", "aria-label": t.annAria },
+    { class: "u-ann", role: "status", "aria-label": t.annAria },
     h("span", { class: "tl", "aria-hidden": "true" }, icon("megaphone", 20)),
     h("div", { class: "tx" }, h("p", { class: "t" }, h("b", null, first)), more && h("p", { class: "m" }, more)),
     h("button", { class: "u-ic", type: "button", "data-k": "ann-x", "aria-label": t.hideAnn, on: { click: () => a.closeAnn() } }, icon("close", 16)),

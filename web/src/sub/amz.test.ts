@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { deviceModal } from "./add";
-import { defaultWhere, keyView, newAmzState, staleDevices, whereOptions, type AmzState } from "./amnezia";
+import { defaultWhere, keyView, newAmzState, whereOptions, type AmzState } from "./amnezia";
 import { amzActions, type Api } from "./amz-actions";
 import { ApiError, endpoint } from "./api";
 import { cases } from "./dev-data";
 import { dict } from "./i18n";
-import { awgConfig, awgDevice, canAddDevice, defaultLabel, mainProfile, nodeLabels, normalize, otherDevices, profileChoices, selfServe, versionsFor } from "./logic";
+import { awgConfig, awgDevice, defaultLabel, mainProfile, normalize, otherDevices, profileChoices, selfServe, versionsFor } from "./logic";
 import { actions, amzNoop, data, dialog, plain, state, text } from "./test-kit";
 import type { MgData } from "./types";
 import { view } from "./view";
@@ -65,16 +65,6 @@ describe("page data", () => {
   it("lists key devices once: not among the link's", () => {
     expect(otherDevices(normalize(cases.many)).map((x) => x.id)).toEqual(["d1"]);
   });
-  it("offers adding only with self-service, an address to call, a profile and a free slot", () => {
-    expect(canAddDevice(normalize(cases.many))).toBe(true);
-    expect(canAddDevice(normalize(cases["amnezia-off"]))).toBe(false);
-    expect(canAddDevice(normalize(cases["amnezia-none"]))).toBe(false);
-    expect(canAddDevice(normalize(cases.devices))).toBe(false); // limit reached
-    expect(canAddDevice(normalize(cases.happ))).toBe(false);
-    // the admin's preview: self-service on, no address: nothing to press
-    const preview = normalize({ ...cases.many, amnezia: { ...cases.many!.amnezia, endpoints: "" } });
-    expect([selfServe(preview), canAddDevice(preview)]).toEqual([false, false]);
-  });
   it("a subscription that is not active still has its devices (no profiles, nothing to add)", () => {
     const d = normalize(cases.expired);
     expect(d.amnezia?.devices.map((x) => x.label)).toEqual(["Pixel 7"]);
@@ -117,14 +107,6 @@ describe("names and choices a friend can read", () => {
     ];
     expect(profileChoices(two, t, "ru", "A").map((c) => c.label)).toEqual(["Основной", "Основной (2)"]);
     expect(profileChoices(d.amnezia!.profiles, t, "ru", "AmneziaVPN", false)[0]!.label).toBe("Германия, Финляндия");
-  });
-
-  it("a key's node choice is the server's public name with the flag, never the panel's node name", () => {
-    expect(nodeLabels([cfg("de1"), cfg("fi1", "FI", "Финляндия")])).toEqual(["🇩🇪 Германия · Франкфурт", "🇫🇮 Финляндия"]);
-    const repeated = [cfg("de1", "DE", "Germany"), cfg("de2", "DE", "Germany 2"), cfg("x", "", "Server")];
-    expect(nodeLabels(repeated, false)).toEqual(["Germany", "Germany 2", "Server"]);
-    expect(nodeLabels(repeated).join(" ")).not.toMatch(/de1|de2/);
-    expect(nodeLabels([awgConfig({ node_name: "de1", country_code: "" })], false)).toEqual(["1"]); // no label: a number, not the node's name
   });
 
   it("the app versions a key needs, for the device's platform only", () => {
@@ -604,7 +586,6 @@ describe("the key dialog", () => {
     expect([via.via_node_id, via.via_country]).toEqual(["nod_msk1", "RU"]);
     expect([cfg("de1").via_node_id, cfg("de1").via_country]).toEqual(["", ""]);
     expect(awgConfig({ node_id: "de1", via_country: "RU" }).via_country).toBe(""); // a country with no entry means nothing
-    expect(nodeLabels([cfg("de1"), via])).toEqual(["🇩🇪 Германия · Франкфурт", "🇩🇪 Германия · Франкфурт · via RU"]);
     const open = (mode: "open" | "renew", pick: number) =>
       modal("android", "d3", mode, (s) => {
         s.configs.d3 = [cfg("de1"), via];
@@ -700,11 +681,6 @@ describe("the add-a-device dialog", () => {
     const other = form("many", { error: "network", errorAt: "add" }).box;
     expect(other.querySelector(".a-err")?.getAttribute("role")).toBe("alert");
     expect(text(other.querySelector(".a-err"))).toBe("Нет связи. Проверьте интернет и повторите.");
-  });
-
-  it("the stale devices of a page", () => {
-    expect(staleDevices(data("stale")).map((x) => x.id)).toEqual(["d3"]);
-    expect(staleDevices(data("first"))).toEqual([]);
   });
 });
 

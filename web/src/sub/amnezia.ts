@@ -233,7 +233,3 @@ export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
 export const readyFoot = (c: AmzCtx, mode: KeyMode): HTMLElement =>
   h("footer", { class: "a-f" }, h("p", { class: "u-hint" }, mode === "renew" ? c.t.renewS : c.t.keyAgain), h("button", { class: "u-btn", type: "button", "data-k": "modal-done", on: { click: () => c.a.amz.add(false) } }, c.t.awgDone));
 
-// ---- "new key needed" ----
-
-/** The devices that need a new key. */
-export const staleDevices = (d: MgData): AwgDevice[] => d.amnezia?.devices.filter((x) => x.stale) ?? [];

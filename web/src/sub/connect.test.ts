@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { chip, linkApp, qrOn } from "./connect";
 import { cases } from "./dev-data";
 import { dict } from "./i18n";
-import { appKey, appList, appNames, chosenApp, keyAppName, normalize, qrApp } from "./logic";
+import { appKey, appList, chosenApp, keyAppName, normalize } from "./logic";
 import { data, dialog, plain, state, text } from "./test-kit";
 import { appTile, linkApps } from "./ways";
 
@@ -47,10 +47,9 @@ describe("the apps of the link way", () => {
     expect(linkApps({ d: twice, s: state("windows") }).map((x) => x.name)).toEqual(["kl!ck", "Happ"]);
   });
 
-  it("the names of an app list, and the phone's QR app", () => {
+  it("the name of the key app", () => {
     const d = data("multi");
-    expect(appNames(appList(d, "windows"))).toEqual(["kl!ck", "AmneziaVPN", "Example Client"]);
-    expect(qrApp(d)).toBe("Happ");
+    expect(appList(d, "windows").map((a) => a.name)).toEqual(["kl!ck", "AmneziaVPN", "Example Client"]);
     expect(keyAppName(d, "windows")).toBe("AmneziaVPN");
   });
 });

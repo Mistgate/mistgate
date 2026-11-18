@@ -151,7 +151,7 @@ const zh: CoreDict = {
 };
 
 const fa: CoreDict = {
-  subOf: (n) => `اشتراک ${n}`,
+  subOf: (n) => `اشتراک \u2068${n}\u2069`,
   subAnon: "اشتراک شما",
   supportBtn: "پشتیبانی",
   tabsAria: "بخش‌ها",
