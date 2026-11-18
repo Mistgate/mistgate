@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+
 import { useId, useState, type ReactElement } from "react";
 import { Icon } from "@/components/ui/icons";
 import { StatusDot, StatusGlyph } from "@/components/ui/status";
@@ -19,16 +19,6 @@ import { countryIn, countryLook, type BreakdownNet, type CountryCheck, type Coun
 // networks a partial block cuts off), the probe node with its ports, the times, the lists, and where the verdict comes from.
 
 type Kind = CountryLook["kind"] | "none";
-
-const rowCls: Record<Kind, string> = {
-  ok: "border border-line bg-surface-2",
-  partial: "tone-warn tint",
-  warn: "tone-warn tint",
-  bad: "tone-bad tint",
-  listed: "tone-warn tint tint-dashed",
-  unknown: "border border-dashed border-line",
-  none: "border border-dashed border-line",
-};
 
 /** "In a block list": three lines of a list in the round warn glyph, apart from the "!" of TCP blocked. */
 function ListedGlyph() {
@@ -173,54 +163,6 @@ export function CountryPill({ check, node, code, tag = "", inButton = false }: {
   return <CountryTip look={look}>{pill}</CountryTip>;
 }
 
-/**
- * The same verdict as a row (a node's card on the phone, the node page): its words are what a screen reader reads on focus,
- * and the quiet line says what the tooltip would, for a phone that has no hover. A block on some networks has its breakdown
- * under the row instead of the line, in the same tinted box but outside the tooltip's trigger.
- */
-export function CountryRow({ check, code }: { check: CountryCheck | undefined; code: string }) {
-  const t = useT();
-  const fmt = useFmt();
-  const title = useCountryTitle(code);
-  const look = check ? countryLook(t, fmt, check) : null;
-  const kind: Kind = look?.kind ?? "none";
-  const breakdown = look?.breakdown;
-  const row = (
-    <div
-      tabIndex={look ? 0 : undefined}
-      data-testid="country-row"
-      className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-[13px]", !breakdown && rowCls[kind])}
-    >
-      <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
-        <CountryMark kind={kind} />
-        {/* the title leads to the Reachability page, where the sources and the week are */}
-        <Link to="/reachability" title={t("rc.open")} className="font-medium break-words underline-offset-2 hover:underline">
-          {title}
-        </Link>
-      </span>
-      <span className={cx("flex items-center gap-1.5 text-xs font-medium", kind === "ok" || kind === "unknown" || kind === "none" ? "text-muted" : "tone-text")}>
-        {look?.label ?? t("hl.cell.none")}
-        {look?.alsoListed && <ListedGlyph />}
-      </span>
-      {!breakdown && <span className="min-w-0 flex-[2_1_160px] text-[11px] leading-snug text-muted">{look ? <AgeLast line={look.line} /> : t("cr.v.notYet")}</span>}
-    </div>
-  );
-  const tipped = look ? <CountryTip look={look}>{row}</CountryTip> : row;
-  if (!breakdown)
-    return (
-      <>
-        {tipped}
-        {look && look.ownPoints.length > 0 && <OwnPoints points={look.ownPoints} className="px-3 text-xs" />}
-      </>
-    );
-  return (
-    <div className={cx("flex min-w-0 flex-col rounded-field", rowCls[kind])}>
-      {tipped}
-      <PartialBreakdown breakdown={breakdown} className="mx-3 border-t border-[color-mix(in_oklch,var(--c)_35%,var(--border))] pt-2.5 pb-3" />
-    </div>
-  );
-}
-
 const pointMark = { ok: ["✓", "tone-ok tone-text"], dark: ["✕", "tone-bad tone-text"], unsure: ["?", "text-muted"] } as const;
 
 /**
@@ -246,26 +188,6 @@ export function OwnPoints({ points, className }: { points: readonly OwnPoint[]; 
         );
       })}
     </ul>
-  );
-}
-
-/**
- * A row's quiet line, its last piece (when it was checked) kept on one line with the word before it: "…MegaFon, / MTS · 7
- * min ago", so a line never starts with the "·" nor splits the time.
- */
-function AgeLast({ line }: { line: string }) {
-  const parts = line.split(" · ");
-  const age = parts.pop() ?? "";
-  const head = parts.join(" · ");
-  const cut = head.lastIndexOf(" ");
-  if (!head) return <span className="whitespace-nowrap">{age}</span>;
-  return (
-    <>
-      {cut > 0 && `${head.slice(0, cut)} `}
-      <span className="whitespace-nowrap">
-        {head.slice(cut + 1)} · {age}
-      </span>
-    </>
   );
 }
 

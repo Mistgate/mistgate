@@ -166,7 +166,7 @@ export function historyOf(f: Flags, srv: Srv, family: 4 | 6 = 4) {
       let points = pts([start, OK]);
       if (bad && s === "globalping" && (fi === "part" || fi === "bad")) points = pts([start, OK], [since20, verdictOf[fi]]);
       if (bad && s === "lists" && fi === "reg") points = pts([start, OK], [since20, CountryVerdict.LISTED]);
-      if (bad && s === "tspu" && (fi === "tcp" || fi === "bad")) points = pts([start, OK], [since20, CountryVerdict.TCP_BLOCKED]);
+      if (bad && s === "tspu" && (fi === "tcp" || fi === "bad")) points = pts([start, OK], [since20, fi === "bad" ? CountryVerdict.BLOCKED : CountryVerdict.TCP_BLOCKED]);
       if (s === "cheburcheck" || s === "bsbord" || s === "probes") points = pts([NOW - 3 * DAY, OK]);
       out.push(lane(s, points));
     }
@@ -177,28 +177,43 @@ export function historyOf(f: Flags, srv: Srv, family: 4 | 6 = 4) {
 
 const vantage = (over: object) => ({ source: "globalping", key: "gp:x", network: "", region: "", asn: "", kind: "home", state: "reach", atUnix: NOW - 9 * 60, dpiHop: 0, icmpOk: true, tcpOk: true, why: "", probeName: "", port: 0, ...over });
 
+const nets = [
+  { source: "globalping", key: "gp:a", network: "Operator A", region: "Moscow", asn: "64496", kind: "mobile" },
+  { source: "globalping", key: "gp:b", network: "Operator B", region: "Novosibirsk", asn: "64497", kind: "home" },
+  { source: "bsbord", key: "bs:c", network: "Operator C", region: "Kazan", asn: "64498", kind: "mobile" },
+  { source: "globalping", key: "gp:d", network: "Operator D", region: "Yekaterinburg", asn: "64499", kind: "home" },
+];
+/** `many`: twelve networks; `long`: the names of live data (an operator with its legal name, a city with its district, an own probe with a story) */
+const netsOf = (f: Flags) => {
+  if (!f.v.has("many") && !f.v.has("long")) return nets;
+  const names = f.v.has("long")
+    ? ["Example Telecom of the Central Federal District", "Operator Mobile Communications Limited", "Operator C", "Operator D", "Sample Cable and Broadband Services of the Volga Region", "Operator F"]
+    : ["Operator A", "Operator B", "Operator C", "Operator D", "Operator E", "Operator F", "Operator G", "Operator H", "Operator I", "Operator J", "Operator K", "Operator L"];
+  const cities = ["Moscow", "Novosibirsk", "Kazan", "Yekaterinburg", "Saint Petersburg", "Samara", "Perm", "Omsk", "Ufa", "Chelyabinsk", "Rostov-on-Don", "Krasnodar"];
+  const more = names.map((network, i) => ({ source: i % 3 === 2 ? "bsbord" : "globalping", key: `x:${i}`, network, region: f.v.has("long") ? `${cities[i]} Federal District, Example Region` : cities[i]!, asn: String(64500 + i), kind: i % 2 ? "home" : "mobile" }));
+  return f.v.has("long") ? [...more, { source: "probes", key: "probe:long", network: "Example Telecom of the Central Federal District", region: "", asn: "", kind: "home", probeName: "dacha-in-the-village-with-a-long-name", why: "", state: "reach" }] : more;
+};
+
 function checkOf(n: string, f: Flags, srv: Srv) {
   const on = historyOf(f, srv).sources;
   const fi = n === "fi1" ? fiState(f) : "ok";
   const verdict = verdictOf[fi];
   const live = fi !== "reg";
   const sources = on.filter((s) => s === "globalping" || s === "lists" || (s === "tspu" && n !== "msk1"));
-  const vantages =
-    fi === "part"
-      ? [
-          vantage({ key: "gp:a", network: "Operator A", region: "Moscow", asn: "64496" }),
-          vantage({ key: "gp:b", network: "Operator B", region: "Saint Petersburg", asn: "64497", state: "dark", icmpOk: false, tcpOk: false, kind: "mobile" }),
-          vantage({ key: "gp:c", network: "Operator C", region: "Kazan", asn: "64498" }),
-        ]
-      : [];
+  // the networks that saw the node this round: the board's A to D (B and D do not see fi1 on "some networks", none sees it when it is unreachable)
+  const all = netsOf(f);
+  const dark = fi === "bad" ? all.map((x) => x.network) : fi === "part" ? all.filter((_, i) => i % 5 === 1 || i % 5 === 3).map((x) => x.network) : [];
+  const vantages = all
+    .filter((x) => on.includes(x.source) || x.source === "probes")
+    .map((x) => vantage({ ...x, ...(dark.includes(x.network) ? { state: "dark", icmpOk: false, tcpOk: false } : {}) }));
   return {
     nodeId: nid(n), country: srv.country, verdict, atUnix: NOW - 9 * 60,
     probes: live && sources.includes("globalping") ? [{ network: "Operator A", city: "Moscow", valid: true, dark: false, icmpOk: true, icmpMs: 38, tcp: [{ port: 443, ok: true }] }] : [],
     reason: live ? "" : "too_few_probes", eyeball: true, confidence: "eyeball", listedBy: fi === "reg" ? ["antifilter_ipsum"] : [], cdnProvider: "", cdnRegion: "",
     sources, globalpingVerdict: live ? (fi === "tcp" || fi === "bad" ? OK : verdict) : CountryVerdict.UNKNOWN,
-    tspuVerdict: sources.includes("tspu") ? (fi === "tcp" || fi === "bad" ? CountryVerdict.TCP_BLOCKED : OK) : CountryVerdict.UNSPECIFIED,
+    tspuVerdict: sources.includes("tspu") ? (fi === "bad" ? CountryVerdict.BLOCKED : fi === "tcp" ? CountryVerdict.TCP_BLOCKED : OK) : CountryVerdict.UNSPECIFIED,
     tspuPorts: sources.includes("tspu") ? [{ port: 443, verdict: fi === "tcp" || fi === "bad" ? "blocked" : "open" }] : [], dpiHop: sources.includes("tspu") ? 6 : 0,
-    tspuVantageId: nid("msk1"), tspuVantageName: "msk1", tspuAtUnix: sources.includes("tspu") ? NOW - 48 * 60 : 0, noProbe: [], vantages, sourceVerdicts: [],
+    tspuVantageId: nid("msk1"), tspuVantageName: "msk1", tspuAtUnix: sources.includes("tspu") ? NOW - 48 * 60 : 0, noProbe: ["Operator E"], vantages, sourceVerdicts: [],
     ...(f.v.has("v6") ? { ipv6: v6Check(n) } : {}),
   };
 }
@@ -243,7 +258,7 @@ export function clientProbeOf(f: Flags, srv: Srv) {
   const nodes = srv.klick.enabled
     ? [
         { nodeId: nid("de1"), tally: tally(38, { freeze: 1, ok: 37 }), operators: [group("Operator A", 14), group("Operator B", 11), group("Operator C", 8)], regions: [group("Moscow", 19), group("Saint Petersburg", 9)] },
-        { nodeId: nid("fi1"), tally: tally(32, trouble), operators: [group("Operator A", 14), group("Operator B", 11, { ok: 6, tcpBlocked: 4, noAnswer: 1 }), group("Operator C", 8)], regions: [group("Moscow", 19), group("Saint Petersburg", 9)] },
+        ...(f.v.has("noreports") ? [] : [{ nodeId: nid("fi1"), tally: tally(32, trouble), operators: [group("Operator A", 14), group("Operator B", 11, { ok: 6, tcpBlocked: 4, noAnswer: 1 }), group("Operator C", 8)], regions: [group("Moscow", 19), group("Saint Petersburg", 9)] }]),
         { nodeId: nid("msk1"), tally: tally(20, { freeze: 1, ok: 19 }), operators: [group("Operator A", 14)], regions: [group("Moscow", 19)] },
         { nodeId: nid("nl1"), tally: tally(26, { freeze: 1, ok: 25 }), operators: [group("Operator A", 14), group("Operator C", 8)], regions: [group("Moscow", 19)] },
       ]

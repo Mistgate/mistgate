@@ -184,7 +184,7 @@ describe("the line of a node dark on part of the country", () => {
     // the first lane with a problem is open: direct, with the ports and the country row
     expect(lane("direct").getAttribute("aria-selected")).toBe("true");
     expect(panel().textContent).toContain("People connect to 203.0.113.7.");
-    expect(panel().textContent).toContain("Is de1 seen from Russia");
+    expect(panel().textContent).toContain("From Russia it does not open for everyone");
   });
 
   it("opens the lane the URL names, and arrows walk the list", async () => {

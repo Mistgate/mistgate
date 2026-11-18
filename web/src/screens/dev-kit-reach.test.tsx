@@ -140,6 +140,40 @@ describe("the scenes of the Reachability page", () => {
     expect(document.querySelector(".pv-qe")).not.toBeNull();
   });
 
+  it("opens the row of fi1 in every state of the board: the verdict in words, the facts, the networks, the hint", async () => {
+    const say = async (state: string) => {
+      await draw(state, Role.OWNER);
+      const d = document.querySelector(".rc-w.open .r3");
+      const out = { v: d?.querySelector(".r3-v b")?.textContent, sub: d?.querySelector(".r3-v span")?.textContent, facts: [...(d?.querySelectorAll(".r3-f dt") ?? [])].map((x) => x.textContent), tip: !!d?.querySelector(".r3-tip"), alert: !!d?.querySelector(".hl-act a:nth-child(2)"), bad: d?.querySelector("[data-testid=nets-bad] .r3-nt em")?.textContent ?? null, ok: d?.querySelector("[data-testid=nets-ok] .r3-nt em")?.textContent ?? null, kl: !!d?.querySelector(".r3-kl") };
+      act(() => root?.unmount());
+      host?.remove();
+      root = host = null;
+      return out;
+    };
+    expect(await say("nodes.open.fi1")).toMatchObject({ v: "Reachable from Russia, but not from every network", sub: "Dark on Operator B (Novosibirsk) and Operator D (Yekaterinburg)", facts: ["Networks", "Started", "Checked"], tip: true, alert: true, bad: "2", ok: "3" });
+    expect(await say("nodes.allok.open.fi1")).toMatchObject({ v: "Reachable from Russia", facts: ["Networks", "Checked"], tip: false, alert: false, bad: null, ok: "5" });
+    expect(await say("nodes.tcp.open.fi1")).toMatchObject({ v: "Opens, but TCP connections are dropped", tip: true, bad: "1", ok: "4" });
+    expect(await say("nodes.bad.open.fi1")).toMatchObject({ v: "Unreachable from Russia", tip: true, bad: "5", ok: null });
+    expect(await say("nodes.reg.open.fi1")).toMatchObject({ v: "Reachable, but the address is in the RKN registry", tip: false, alert: true });
+    // the first round: nothing to say yet, no facts, no alert
+    expect(await say("nodes.first.open.fi1")).toMatchObject({ v: "No data yet", sub: "The sources have not checked this node yet", facts: [], tip: false, alert: false, kl: true });
+    // kl!ck with nothing on the node: its own line says so
+    await draw("nodes.noreports.open.fi1", Role.OWNER);
+    expect(document.querySelector(".rc-w.open .r3-kl")?.textContent).toContain("no reports yet");
+    expect(document.querySelectorAll(".rc-w.open .r3-kl .rc-ch")).toHaveLength(0);
+  });
+
+  it("keeps twelve networks and the names of live data in the row", async () => {
+    await draw("nodes.many.open.fi1", Role.OWNER);
+    expect(document.querySelectorAll(".rc-w.open .r3-ni").length).toBeGreaterThanOrEqual(12);
+    act(() => root?.unmount());
+    host?.remove();
+    await draw("nodes.long.open.fi1", Role.OWNER);
+    const names = [...document.querySelectorAll(".rc-w.open .r3-ni b")].map((b) => b.getAttribute("title"));
+    expect(names).toContain("Example Telecom of the Central Federal District");
+    expect(document.querySelector(".rc-w.open .r3-ni span[title*='dacha-in-the-village-with-a-long-name']")).not.toBeNull();
+  });
+
   it("says on the Events tab what the board says of the week in each state of the data", async () => {
     const said: [string, string][] = [
       ["events.allok", "All nodes opened from Russia in the last 7 days"],

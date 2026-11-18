@@ -1,20 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { Fragment, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { useState } from "react";
 import { buttonClass } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
-import { Tip } from "@/components/ui/tooltip";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { clientProbeQuery, groupText, troubleText, type ClientProbeNode } from "@/lib/clientprobe";
+import { clientProbeQuery } from "@/lib/clientprobe";
 import { cx } from "@/lib/cx";
-import { useFmt, type Fmt } from "@/lib/format";
-import { countryIn, countryLook, ipv6Why, type Alert, type CountryCheck, type CountryLook } from "@/lib/health";
-import { ipv6Helps, ipv6State, laneNow, midnights, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
-import { entryOffered, type Ipv6Entry } from "@/lib/ways";
-import { CountryMark, CountryPill, OwnPoints, PartialBreakdown } from "@/screens/health/country";
+import { useFmt } from "@/lib/format";
+import { countryLook, type Alert, type CountryCheck, type CountryLook } from "@/lib/health";
+import { ipv6State, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource } from "@/lib/reachability";
+import type { Ipv6Entry } from "@/lib/ways";
+import { CountryPill } from "@/screens/health/country";
 import { Gl, P } from "@/screens/health/page-parts";
+import { sayOf, sourceKey, verdictWord, type Hold } from "./detail-model";
+import { NodeDetail } from "./node-detail";
 import { Scope } from "./source-ui";
 import "./reach.css";
 
@@ -34,42 +34,13 @@ export const stateOf: Record<CountryLook["kind"], State> = { ok: "ok", partial: 
 /** The chip's word: the verdict's own words, the short one for a block on some networks. */
 export const stateWord: Record<State, MessageKey> = { ok: "rc.sum.ok", part: "rp.chip.part", tcp: "rc.sum.warn", bad: "rc.sum.bad", reg: "rc.sum.listed", nd: "rc.sum.unknown" };
 
-const sourceKey: Record<ReachSource, MessageKey> = {
-  globalping: "rc.src.globalping",
-  lists: "rc.src.lists",
-  tspu: "rc.src.tspu",
-  cheburcheck: "rc.src.cheburcheck",
-  cheburcheck_own: "rc.src.cheburcheck_own",
-  bsbord: "rc.src.bsbord",
-  probes: "rc.src.probes",
-};
-
-/**
- * What one source calls a verdict: the lists say "listed" or "not listed", the live sources what they saw. `short`: the narrow
- * column of the word now, where a block on some networks is "some networks".
- */
-function verdictWord(t: T, source: ReachSource, v: CountryVerdict, short = false): string {
-  if (source === "lists") return v === CountryVerdict.LISTED ? t("cr.v.listed") : t("rc.st.notListed");
-  if (v === CountryVerdict.PARTIAL) return t(short ? "cr.v.partial" : "cr.v.partialLong");
-  return v === CountryVerdict.OK ? t("cr.v.ok") : v === CountryVerdict.TCP_BLOCKED ? t("cr.v.tcp") : v === CountryVerdict.BLOCKED ? t("cr.v.blocked") : v === CountryVerdict.LISTED ? t("cr.v.listed") : t("cr.v.unknown");
-}
-
 /** The columns of Globalping, the lists and the probe: what each says of the node now, in the board's three tones (the warn, the quiet, the plain). */
 const columns = ["globalping", "lists", "tspu"] as const;
 
-/**
- * What holds a source's word back, in the board's order: a source in trouble ("no fresh data"), then the first round still running
- * ("waits for a round"). Neither says anything of the node, so both are the quiet tone.
- */
-export type Hold = "stale" | "wait" | "";
-
+/** A cell of the row: the source's word now; the quiet tone says nothing of the node, the warn one is a block on some networks or of TCP. */
 function cellOf(t: T, source: ReachSource, on: boolean, lane: Lane | undefined, probe: boolean, now: number, hold: Hold = ""): { word: string; cls: "" | "part" | "mut" } {
-  if (!on) return { word: t("rc.st.off"), cls: "mut" };
-  if (hold) return { word: t(hold === "stale" ? "rp.st.stale" : "rp.st.wait"), cls: "mut" };
-  const v = laneNow(lane, now);
-  if (v == null) return { word: probe ? t("rc.st.probeNode") : t("hl.cell.none"), cls: "mut" };
-  const kind = verdictKind(v);
-  return { word: verdictWord(t, source, v, true), cls: kind === "partial" || kind === "warn" ? "part" : kind === "unknown" ? "mut" : "" };
+  const say = sayOf(t, source, on, lane, probe, now, hold);
+  return { word: say.word, cls: say.tone === "part" ? "part" : say.tone === "mut" ? "mut" : "" };
 }
 
 /** One of the seven days of the strip: the worst verdict any source had on it; nothing seen is an empty cell. */
@@ -274,268 +245,5 @@ export function NodesTable({
         </p>
       </section>
     </Scope>
-  );
-}
-
-/**
- * The open row (the board's `.rc-d`): the sources and their words (a narrow window has no columns for them), the verdict in full, what the
- * reports of kl!ck users say (their trouble, the operators, the regions), the week of each source, the IPv6 hint, the networks, the buttons.
- */
-function NodeDetail(p: {
-  n: NodeRow;
-  check: CountryCheck | undefined;
-  look: CountryLook | null;
-  state: State;
-  lanes: ReadonlyMap<string, Lane> | undefined;
-  lane6: Lane | undefined;
-  v6: ReturnType<typeof ipv6State>;
-  sources: readonly string[];
-  probe: boolean;
-  country: string;
-  since: number;
-  now: number;
-  owner: boolean;
-  report: ClientProbeNode | undefined;
-  reportsOn: boolean;
-  holdOf: (s: ReachSource) => Hold;
-  alert: Alert | undefined;
-}) {
-  const t = useT();
-  const fmt = useFmt();
-  const { n, check: c, look, v6 } = p;
-  const x = p.report?.tally;
-  const trouble = x ? troubleText(t, x) : "";
-  const groups = (g: ClientProbeNode["operators"]) => g.map((o) => ({ key: o.name, text: groupText(t, o.name, o.tally!), bad: !!troubleText(t, o.tally!) }));
-  const trouble6 = p.state !== "ok" && p.state !== "nd";
-  return (
-    <div id={`rc-d-${n.id}`} className="rc-d">
-      <div className="rc-dk rc-dsrc">
-        <span className="rc-dt">{t("rc.col.source")}</span>
-        <div className="rc-ch">
-          {columns.map((s) => {
-            const cell = cellOf(t, s, p.sources.includes(s), p.lanes?.get(s), s === "tspu" && p.probe, p.now, p.holdOf(s));
-            return (
-              <i key={s} className={cell.cls}>
-                {t(sourceKey[s])}: {cell.word}
-              </i>
-            );
-          })}
-        </div>
-      </div>
-      {look && (
-        <div className="rc-dk" data-testid="reach-verdict">
-          <span className="rc-dt">{t("rp.verdict")}</span>
-          <b>{look.head}</b>
-          {(look.note || look.line) && <em>{look.conflict ? `${t("cr.tip.conflict")} · ${look.conflict}` : [look.note, look.line].filter(Boolean).join(" · ")}</em>}
-        </div>
-      )}
-      {p.reportsOn && (
-        <>
-          <div className="rc-dk">
-            <span className="rc-dt">{t("rp.klick")}</span>
-            <b>{x ? trouble || t("kc.ok") : t("rp.klick.none")}</b>
-            {x && <em>{[t.n("kc.reports", x.reports), fmt.ago(x.lastUnix)].join(" · ")}</em>}
-          </div>
-          {p.report && p.report.operators.length > 0 && (
-            <div className="rc-dk">
-              <span className="rc-dt">{t("kc.operators")}</span>
-              <div className="rc-ch">
-                {groups(p.report.operators).map((g) => (
-                  <i key={g.key} className={g.bad ? "bad" : ""}>
-                    {g.text}
-                  </i>
-                ))}
-              </div>
-            </div>
-          )}
-          {p.report && p.report.regions.length > 0 && (
-            <div className="rc-dk">
-              <span className="rc-dt">{t("kc.regions")}</span>
-              <div className="rc-ch">
-                {groups(p.report.regions).map((g) => (
-                  <i key={g.key} className={g.bad ? "bad" : ""}>
-                    {g.text}
-                  </i>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-      <div className="rc-dk rc-wkh">
-        <span className="rc-dt">{t("rp.week")}</span>
-        <div className="rc-wk">
-          {shownSources(p.sources).map((src) => (
-            <Fragment key={src}>
-              <SourceLine source={src} on={p.sources.includes(src)} lane={p.lanes?.get(src)} probe={src === "tspu" && p.probe} since={p.since} now={p.now} />
-              {src === "globalping" && v6 === "data" && <SourceLine source={src} v6 on lane={p.lane6} probe={false} since={p.since} now={p.now} />}
-              {src === "globalping" && v6 === "reason" && c?.ipv6 && <Ipv6None check={c.ipv6} />}
-            </Fragment>
-          ))}
-          <div aria-hidden className="rc-ln rc-axis">
-            <span />
-            <span />
-            <span className="rc-ax">
-              <span>{t("rc.axis.ago")}</span>
-              <span>{t("rc.axis.now")}</span>
-            </span>
-          </div>
-        </div>
-      </div>
-      {ipv6Helps(c) && n.ipv6 && !n.ipv6.entry && <EntryHint node={n} country={p.country} offer={p.owner && entryOffered(n.ipv6)} />}
-      <Breakdown look={look} />
-      <div className="hl-act">
-        <Link to="/nodes/$id" params={{ id: n.id }} className={buttonClass("secondary", "md")}>
-          {t("rp.openNode")}
-        </Link>
-        {trouble6 && (
-          <Link to="/health" hash={p.alert ? `alert-${p.alert.id}` : undefined} className={buttonClass("secondary", "md")}>
-            {t("rp.openAlert")}
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * "IPv4 is blocked from Russia, IPv6 gets through." under a node whose IPv6 entry is off (ipv6 plan §2.6, §3.8); `offer`: with
- * "Add IPv6 entry…", which opens the entry's dialog on the node's Ways in.
- */
-function EntryHint({ node, country, offer }: { node: NodeRow; country: string; offer: boolean }) {
-  const t = useT();
-  return (
-    <div data-testid="reach-v6-hint" className="rc-hint">
-      <span>
-        <Gl d={P.check} />
-        {t("ways.ipv6.helps", { country: countryIn(t, country) })}
-      </span>
-      {offer && (
-        <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "ways", way: "ipv6", add: "ipv6" }} className={buttonClass("secondary", "md")}>
-          {t("ways.ipv6.add")}
-        </Link>
-      )}
-    </div>
-  );
-}
-
-/** A verdict with networks that do not see the node: every source's networks, in full under the row; the points of an own probe where there is no breakdown. */
-function Breakdown({ look }: { look: CountryLook | null }) {
-  if (look && !look.breakdown && look.ownPoints.length > 0) return <OwnPoints points={look.ownPoints} className="rc-bk" />;
-  if (!look?.breakdown) return null;
-  return <PartialBreakdown breakdown={look.breakdown} className={cx("rc-bk", look.kind === "bad" ? "bad" : "part")} />;
-}
-
-/** The name of the IPv6 twin of Globalping's line, under it: "IPv6", the source said to a screen reader. */
-function Ipv6Label() {
-  const t = useT();
-  return (
-    <span className="rc-nm rc-v6 mono">
-      <span className="sr-only">{t("rc.src.globalping")} · </span>IPv6
-    </span>
-  );
-}
-
-/** A node Globalping does not check over IPv6: why, on one quiet line under Globalping's lane ("The server has no IPv6"). */
-function Ipv6None({ check }: { check: CountryCheck }) {
-  return (
-    <div data-testid="line-ipv6-none" className="rc-ln none">
-      <Ipv6Label />
-      <span className="rc-why">{ipv6Why(useT(), check)}</span>
-    </div>
-  );
-}
-
-/** One source of one node: its name, what it says now, and its week. Off, the line is dimmed and the lane is an empty dashed track. `v6`: Globalping's IPv6 lane, under its IPv4 one. */
-function SourceLine(p: { source: ReachSource; v6?: boolean; on: boolean; lane: Lane | undefined; probe: boolean; since: number; now: number }) {
-  const { source, v6 = false, on, lane, probe, since, now } = p;
-  const t = useT();
-  const v = on ? laneNow(lane, now) : null;
-  const kind = v == null ? "unknown" : verdictKind(v);
-  return (
-    <div data-testid={`line-${source}${v6 ? "6" : ""}`} data-on={on} className={cx("rc-ln", !on && "off")}>
-      {v6 ? <Ipv6Label /> : <span className="rc-nm">{t(sourceKey[source])}</span>}
-      <span className={cx("rc-wd", on ? kind : "off")}>
-        {!on ? (
-          t("rc.st.off")
-        ) : v != null ? (
-          <>
-            <CountryMark kind={kind} />
-            <span>{verdictWord(t, source, v, true)}</span>
-          </>
-        ) : probe ? (
-          t("rc.st.probeNode")
-        ) : (
-          <span title={t("cr.v.notYet")}>{t("hl.cell.none")}</span>
-        )}
-      </span>
-      <div className="rc-lw">
-        <LaneView source={source} v6={v6} on={on} lane={lane} since={since} now={now} />
-      </div>
-    </div>
-  );
-}
-
-/** The time of a segment: "14 Oct, 09:15 – 15 Oct, 08:00", or "– now" when it lasts. */
-function rangeOf(t: T, fmt: Fmt, s: Segment, now: number) {
-  return s.to >= now - 60 ? t("rc.seg.toNow", { from: fmt.dateTime(s.from) }) : t("rc.seg.range", { from: fmt.dateTime(s.from), to: fmt.dateTime(s.to) });
-}
-
-/**
- * A source's week of one node: the segments in their colours over an empty track, a hair of the background at every midnight.
- * Each segment is focusable and says its verdict and time in a tooltip; the arrows walk the lane, Tab leaves it (one stop, on
- * the newest segment).
- */
-export function LaneView({ source, v6 = false, on, lane, since, now }: { source: ReachSource; v6?: boolean; on: boolean; lane: Lane | undefined; since: number; now: number }) {
-  const t = useT();
-  const fmt = useFmt();
-  const segs = on && lane ? segmentsOf(lane, since, now) : [];
-  const [current, setCurrent] = useState(-1);
-  const at = current >= 0 && current < segs.length ? current : segs.length - 1;
-  const span = Math.max(1, now - since);
-
-  // the segment that has focus is the lane's one Tab stop; the arrows, Home and End move it
-  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    const next = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: segs.length - 1 }[e.key];
-    if (next === undefined || next < 0 || next >= segs.length) return;
-    e.preventDefault();
-    e.currentTarget.querySelector<HTMLElement>(`[data-seg="${next}"]`)?.focus();
-  }
-  const onFocus = (e: FocusEvent<HTMLDivElement>) => {
-    const i = Number((e.target as HTMLElement).dataset.seg);
-    if (!Number.isNaN(i)) setCurrent(i);
-  };
-
-  return (
-    <div role="group" aria-label={t("rc.lane", { source: v6 ? `${t(sourceKey[source])} · IPv6` : t(sourceKey[source]) })} data-testid={`lane-${source}${v6 ? "6" : ""}`} onKeyDown={onKeyDown} onFocus={onFocus} className="rc-lane">
-      <div aria-hidden className={cx("rc-track", on ? "on" : "off")}>
-        {segs.map((s, i) => (
-          <span key={i} data-verdict={verdictKind(s.verdict)} className="rc-seg" style={{ insetInlineStart: `${s.left}%`, width: `${s.width}%` }} />
-        ))}
-        {on && midnights(since, now).map((m) => <span key={m} className="rc-mid" style={{ insetInlineStart: `${((m - since) / span) * 100}%` }} />)}
-      </div>
-      {segs.map((s, i) => {
-        const word = verdictWord(t, source, s.verdict);
-        const range = rangeOf(t, fmt, s, now);
-        const kind = verdictKind(s.verdict);
-        return (
-          <Tip
-            key={i}
-            label={
-              <span className="flex flex-col gap-0.5">
-                <span className="flex items-center gap-1.5">
-                  <CountryMark kind={kind} />
-                  {word}
-                </span>
-                <span className="font-medium text-muted">{range}</span>
-                <span className="font-medium text-muted">{fmt.duration(s.to - s.from)}</span>
-              </span>
-            }
-          >
-            <span data-seg={i} role="img" tabIndex={i === at ? 0 : -1} aria-label={t("rc.seg", { verdict: word, range })} className="rc-hit" style={{ insetInlineStart: `${s.left}%`, width: `${s.width}%` }} />
-          </Tip>
-        );
-      })}
-    </div>
   );
 }
