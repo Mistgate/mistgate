@@ -166,20 +166,27 @@ func TestUserUpdatePlansThePagePassword(t *testing.T) {
 	_, secret := e.token(ProfileOperator)
 	s := e.session(secret)
 
-	for word, want := range map[string]adminv1.PagePasswordAction{
-		"change": adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_CHANGE,
-		"remove": adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_REMOVE,
+	for _, c := range []struct {
+		word string
+		want adminv1.PagePasswordAction
+	}{
+		{"change", adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_CHANGE},
+		{"remove", adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_REMOVE},
 	} {
-		p := planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "page_password": word})
-		if f := factOf(t, p, "page_password"); f.Code != "page_password_"+word || f.Untrusted {
-			t.Errorf("%s: fact %+v", word, f)
+		before := len(e.w.updateReq)
+		p := planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "page_password": c.word})
+		if f := factOf(t, p, "page_password"); f.Code != "page_password_"+c.word || f.Untrusted {
+			t.Errorf("%s: fact %+v", c.word, f)
 		}
-		if len(e.w.updateReq) != 0 && e.w.updateReq[len(e.w.updateReq)-1].GetPagePasswordAction() != adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_UNSPECIFIED && word == "change" {
-			t.Fatal("the plan changed the password")
+		if len(e.w.updateReq) != before {
+			t.Fatalf("%s: the plan changed the password", c.word)
 		}
 		applyOf(t, s, "user_update", p.ConfirmToken)
-		if got := e.w.updateReq[len(e.w.updateReq)-1]; got.GetPagePasswordAction() != want || got.Name != nil {
-			t.Errorf("%s: the applied request: %+v", word, got)
+		if len(e.w.updateReq) != before+1 {
+			t.Fatalf("%s: the apply made %d updates", c.word, len(e.w.updateReq)-before)
+		}
+		if got := e.w.updateReq[len(e.w.updateReq)-1]; got.GetPagePasswordAction() != c.want || got.Name != nil {
+			t.Errorf("%s: the applied request: %+v", c.word, got)
 		}
 	}
 	// restore needs a person whose password was removed, change needs one who has it
