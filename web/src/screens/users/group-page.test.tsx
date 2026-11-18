@@ -232,7 +232,8 @@ describe("moving people in", () => {
       trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
       trigger.click();
     });
-    await settle();
+    // the menu mounts through a portal after its trigger settles: under a loaded run six ticks are not always enough
+    for (let i = 0; i < 40 && !document.querySelector("[role=menuitem]"); i++) await settle();
     const item = [...document.querySelectorAll("[role=menuitem]")].find((i) => i.textContent?.includes("Move to “family”"))!;
     expect(item).toBeTruthy();
     expect([...document.querySelectorAll("[role=menuitem]")].some((i) => i.textContent === "Open page")).toBe(true);
