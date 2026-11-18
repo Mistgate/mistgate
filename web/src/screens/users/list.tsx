@@ -68,6 +68,8 @@ export type UsersDemo = {
   /** The bar's button that asks "Sure?" at the start. */
   ask?: "disable" | "reset";
   open?: string;
+  /** The person whose send window ("QR and send") is open at the start. */
+  send?: string;
   creating?: boolean;
   /** The name typed into the new-person window, and whether it starts on the done screen. */
   name?: string;
@@ -249,6 +251,13 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
   if (!demoTicked && demo?.ticked && rows.length > 0) {
     setDemoTicked(true);
     setPicked(Object.fromEntries(rows.filter((u) => demo.ticked!.includes(u.id)).map((u) => [u.id, u])));
+  }
+  // the demo opens the send window of a person, once they are there
+  const [demoSent, setDemoSent] = useState(false);
+  if (!demoSent && demo?.send && rows.length > 0) {
+    setDemoSent(true);
+    const u = rows.find((r) => r.id === demo.send);
+    if (u) setLink(linkTargetOf(u, groupList.data?.find((g) => g.id === u.groupId)));
   }
   const clear = useCallback(() => setPicked({}), []);
   const finishSelecting = () => {

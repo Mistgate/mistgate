@@ -15,7 +15,7 @@ import { UsersScreen } from "./users/list";
 let search: Record<string, unknown> = {};
 
 // the scene's own calls are put on these objects by `seeded`
-vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, users: {}, groups: {} }));
+vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, users: {}, groups: {}, instance: { encodeQr: () => Promise.reject(new Error("no server in a scene test")) } }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: ReactNode; className?: string }) => <a className={className}>{children}</a>,
   useBlocker: () => ({ status: "idle" }),
@@ -89,6 +89,8 @@ describe("the scenes of the People screen", () => {
     if (state === "search") expect(rows()).toHaveLength(1);
     if (state === "nomatch") expect(document.body.textContent).toContain("Nobody found");
     if (state === "open") expect(document.querySelector("button[aria-label='alice'][aria-expanded=true]")).not.toBeNull();
+    if (state === "send") expect(document.querySelector("[data-shot=link-modal]")?.textContent).toContain("lake-2718-moss");
+    if (state === "send-plain") expect(document.querySelector("[data-shot=link-modal]")?.textContent).toContain("not set, anyone with the link can open the page");
     if (state === "select") expect(document.querySelector("[role=toolbar]")?.textContent).toContain("2 people");
     if (state === "select-ask") expect(document.querySelector("[role=toolbar]")?.textContent).toContain("Links stop working. Sure?");
     if (state === "groups") expect(document.querySelectorAll("h3")).toHaveLength(2);

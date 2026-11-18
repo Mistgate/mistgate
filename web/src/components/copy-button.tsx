@@ -20,6 +20,7 @@ export function CopyButton({
   size = "sm",
   variant = "secondary",
   full,
+  iconOnly,
   onFail,
 }: {
   value: string;
@@ -27,6 +28,8 @@ export function CopyButton({
   size?: "sm" | "md" | "lg";
   variant?: ButtonVariant;
   full?: boolean;
+  /** Only the glyph (36 wide, the board's .btn.sm.ic2.cpb next to a value): `label` is its name, and it says "Copied" while it does. */
+  iconOnly?: boolean;
   /** The browser refused: the caller can select the text for the person to copy by hand. */
   onFail?: () => void;
 }) {
@@ -46,6 +49,7 @@ export function CopyButton({
   }
 
   const idle = label ?? t("common.copy");
+  const name = done ? t("common.copied") : idle;
   const icon = "absolute inset-0 size-4 transition-[scale,rotate,opacity] duration-(--sp-pop-t) ease-(--sp-pop)";
   const word = "col-start-1 row-start-1 whitespace-nowrap transition-[translate,opacity] duration-(--sp-settle-t) ease-(--sp-settle)";
   return (
@@ -55,10 +59,12 @@ export function CopyButton({
       full={full}
       onClick={copy}
       data-copied={done ? "" : undefined}
+      {...(iconOnly ? { "aria-label": name, title: name } : {})}
       className={cx(
+        iconOnly && "w-9 px-0",
         // these win over the button's own quick transition and press (the board's .btn.cpb)
         "transition-[border-color,color,background-color,transform]! duration-(--sp-fade-t)! ease-(--sp-fade)! active:scale-[0.97]!",
-        variant === "secondary" && "data-copied:border-accent-line data-copied:bg-[color-mix(in_srgb,var(--accent-mark)_8%,transparent)] data-copied:text-accent-text",
+        (variant === "secondary" || variant === "outline") && "data-copied:border-accent-line data-copied:bg-[color-mix(in_srgb,var(--accent-mark)_8%,transparent)] data-copied:text-accent-text",
       )}
     >
       <span aria-hidden className="relative size-4 flex-none">
@@ -77,15 +83,17 @@ export function CopyButton({
           <path d="M5 12.5l4.5 4.5L19 7.5" strokeDasharray="24" strokeDashoffset={done ? 0 : 24} style={{ transition: "stroke-dashoffset var(--sp-settle-t) var(--sp-settle)" }} />
         </svg>
       </span>
-      <span className="grid text-start [clip-path:inset(-3px_-2px)]">
-        {/* the word that is not showing is drawn by its ::before (not text of the button): it holds the width, and a reader or a test sees one word */}
-        <span data-t={idle} aria-hidden={done || undefined} className={cx(word, done ? "-translate-y-[90%] opacity-0 before:content-[attr(data-t)]" : undefined)}>
-          {done ? null : idle}
+      {!iconOnly && (
+        <span className="grid text-start [clip-path:inset(-3px_-2px)]">
+          {/* the word that is not showing is drawn by its ::before (not text of the button): it holds the width, and a reader or a test sees one word */}
+          <span data-t={idle} aria-hidden={done || undefined} className={cx(word, done ? "-translate-y-[90%] opacity-0 before:content-[attr(data-t)]" : undefined)}>
+            {done ? null : idle}
+          </span>
+          <span data-t={t("common.copied")} aria-hidden={!done || undefined} className={cx(word, done ? undefined : "translate-y-[90%] opacity-0 before:content-[attr(data-t)]")}>
+            {done ? t("common.copied") : null}
+          </span>
         </span>
-        <span data-t={t("common.copied")} aria-hidden={!done || undefined} className={cx(word, done ? undefined : "translate-y-[90%] opacity-0 before:content-[attr(data-t)]")}>
-          {done ? t("common.copied") : null}
-        </span>
-      </span>
+      )}
     </Button>
   );
 }

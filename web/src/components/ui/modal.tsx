@@ -18,6 +18,8 @@ type Props = {
   closeLabel?: string;
   /** 760 wide instead of 520 (a form in two columns). */
   wide?: boolean;
+  /** Something before the title (a person's avatar), which makes the window the board's snug one (the send window): the header starts at the top with a 4px-tight title and a 13px quiet line, and the body has 8px between its blocks and 4px above the first. */
+  lead?: ReactNode;
   /** `data-shot` of the window, the handle the dev kit's screenshots find it by. */
   shot?: string;
 };
@@ -33,7 +35,7 @@ type Props = {
  * It opens the way the board's window does: a spring from 90% on a desktop, a slide up on the phone. That motion is part of
  * the effects (Settings -> Interface); with them off, or with reduced motion, the window just fades in.
  */
-export function Modal({ open, onOpenChange, title, description, children, footer, className, closeLabel, wide, shot }: Props) {
+export function Modal({ open, onOpenChange, title, description, children, footer, className, closeLabel, wide, lead, shot }: Props) {
   const fx = useEffectsEnabled();
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -53,11 +55,12 @@ export function Modal({ open, onOpenChange, title, description, children, footer
               className,
             )}
           >
-            <div className={cx("flex flex-none items-center gap-3 ps-6 pe-4 pt-5 pb-3 @max-[720px]/win:ps-4 @max-[720px]/win:pe-3 @max-[720px]/win:pt-4 @max-[720px]/win:pb-2", !children && !footer && "pb-6 @max-[720px]/win:pb-5")}>
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <Dialog.Title className="text-xl leading-5 font-medium">{title}</Dialog.Title>
+            <div className={cx("flex flex-none ps-6 pe-4 pt-5 pb-3 @max-[720px]/win:ps-4 @max-[720px]/win:pe-3 @max-[720px]/win:pt-4 @max-[720px]/win:pb-2", lead ? "items-start" : "items-center gap-3", !children && !footer && "pb-6 @max-[720px]/win:pb-5")}>
+              {lead && <span className="me-3 mt-0.5 flex-none">{lead}</span>}
+              <div className={cx("flex min-w-0 flex-1 flex-col", lead ? "gap-1" : "gap-1.5")}>
+                <Dialog.Title className={cx("text-xl font-medium", lead ? "leading-7" : "leading-5")}>{title}</Dialog.Title>
                 {description && (
-                  <Dialog.Description className="text-sm leading-5 text-sec">{description}</Dialog.Description>
+                  <Dialog.Description className={lead ? "text-[13px] leading-[18px] text-pretty text-muted" : "text-sm leading-5 text-sec"}>{description}</Dialog.Description>
                 )}
               </div>
               {closeLabel && (
@@ -67,7 +70,9 @@ export function Modal({ open, onOpenChange, title, description, children, footer
               )}
             </div>
             {/* the scrolling part reaches the edges, so its scrollbar sits on the border and focus rings are not cut */}
-            {children && <div className="flex min-h-0 flex-col gap-5 overflow-y-auto [scrollbar-width:thin] px-6 pt-2 pb-6 @max-[720px]/win:px-4 @max-[720px]/win:pb-5">{children}</div>}
+            {children && (
+              <div className={cx("flex min-h-0 flex-col overflow-y-auto [scrollbar-width:thin] px-6 pb-6 @max-[720px]/win:px-4 @max-[720px]/win:pb-5", lead ? "gap-2 pt-1" : "gap-5 pt-2")}>{children}</div>
+            )}
             {footer && (
               <div className="flex flex-none flex-wrap items-center justify-end gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,transparent)] px-6 py-3.5 @max-[720px]/win:px-4 @max-[720px]/win:py-3">
                 {footer}

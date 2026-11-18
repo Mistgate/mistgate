@@ -116,6 +116,7 @@ const dev = (id: string, over: Partial<DeviceN>): DeviceN =>
   ({
     id, kind: DeviceKind.LINK, model: "", platform: "ios", client: "", osVersion: "", awgProfileId: "", awgProfileName: "", awgVersion: "", address: "", stale: false, online: false, onlineNodeIds: [],
     firstSeenUnix: NOW - 90 * DAY, lastSeenUnix: NOW - 60, lastHandshakeUnix: 0, usedBytes: 4 * GB, fingerprint: "", enrolled: false, enrolLinkStale: false, idle: false, idleSinceUnix: 0, ...over,
+    lastOnlineUnix: over.lastOnlineUnix ?? over.lastSeenUnix ?? NOW - 60,
   }) as unknown as DeviceN;
 const idleDevices = [
   dev("dev_1", { model: "iPhone 15", client: "Happ/3.4.2", osVersion: "18.1", online: true, onlineNodeIds: ["nod_de1"] }),

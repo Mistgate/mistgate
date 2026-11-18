@@ -579,7 +579,7 @@ describe("the devices of the user card", () => {
     devices: [
       dev({ id: "dev_a", platform: "ios", model: "iPhone 15", osVersion: "iOS 18.1", client: "Happ/3.4.2", online: true, onlineNodeIds: ["nod_1", "nod_2"], fingerprint: "a1b2c3", usedBytes: 2_400_000_000n, firstSeenUnix: BigInt(T - 30 * 86_400), lastSeenUnix: BigInt(T - 20) }),
       dev({ id: "dev_b", platform: "android", model: "Pixel 8", osVersion: "Android 15", client: "Happ/3.4.0", online: true, onlineNodeIds: ["nod_1"], fingerprint: "d4e5f6" }),
-      dev({ id: "dev_c", platform: "macos", model: "MacBook", osVersion: "macOS 15", client: "FlClash/0.8", lastSeenUnix: BigInt(T - 300), fingerprint: "0a0b0c" }),
+      dev({ id: "dev_c", platform: "macos", model: "MacBook", osVersion: "macOS 15", client: "FlClash/0.8", lastSeenUnix: BigInt(T - 60), lastOnlineUnix: BigInt(T - 300), fingerprint: "0a0b0c" }),
       dev({ id: "dev_s", kind: DeviceKind.LINK_SHARED, client: "Hiddify/2.5", lastSeenUnix: BigInt(T - 7200) }),
       dev({ id: "dev_k", kind: DeviceKind.KEY, platform: "android", model: "Router", protocols: ["awg"], awgProfileId: "p_awg", awgProfileName: "AWG 3.1", awgVersion: "3.1" }),
     ],
@@ -620,7 +620,10 @@ describe("the devices of the user card", () => {
     expect(details).toContain("updated just now");
     expect(row("Pixel 8").textContent).toContain("online · de1");
     expect(row("Pixel 8").textContent).not.toContain("servers");
-    expect(row("MacBook").textContent).toContain("5 min ago");
+    // the right column says when the nodes last counted a connection; the fetch of the subscription is in its tooltip
+    expect(row("MacBook").textContent).toContain("was online 5 min ago");
+    expect(row("MacBook").querySelector("[aria-label^='was online 5 min ago']")?.getAttribute("aria-label")).toContain("Subscription refreshed 1 min ago");
+    expect(row("Apps without a device ID").textContent).toContain("never online");
     expect(document.querySelectorAll("[aria-label*='The same keys are connected']")).toHaveLength(1);
     expect(row("Apps without a device ID").textContent).toContain("Hiddify 2.5 · share one place");
     expect(row("Router").querySelector(".g")).not.toBeNull(); // a key: the same row

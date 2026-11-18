@@ -382,7 +382,7 @@ describe("an open row", () => {
     await mount();
     await click(opener("bob"));
     await settle();
-    await click([...rowOf("bob").parentElement!.querySelectorAll("button")].find((b) => b.textContent === "Link and QR"));
+    await click([...rowOf("bob").parentElement!.querySelectorAll("button")].find((b) => b.textContent === "QR and send"));
     await settle();
     expect(document.querySelector("[role=dialog]")?.textContent).toContain("bob");
   });
@@ -395,7 +395,7 @@ describe("an open row", () => {
     const card = rowOf("bob").parentElement!;
     expect(getSubscriptionLink).not.toHaveBeenCalled();
     expect(card.textContent).not.toContain("Subscription link");
-    for (const label of ["Extend by 30 days", "Reset traffic", "Disable", "Link and QR"]) expect([...card.querySelectorAll("button")].some((b) => b.textContent === label)).toBe(false);
+    for (const label of ["Extend by 30 days", "Reset traffic", "Disable", "QR and send"]) expect([...card.querySelectorAll("button")].some((b) => b.textContent === label)).toBe(false);
     expect([...card.querySelectorAll("a")].some((a) => a.textContent === "Person’s page")).toBe(true);
   });
 });

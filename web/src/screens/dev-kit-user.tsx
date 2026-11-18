@@ -45,6 +45,8 @@ const GB = 1e9;
 const dev = (over: object) => ({
   id: "", platform: "", model: "", firstSeenUnix: 0, lastSeenUnix: 0, online: false, protocols: ["vless"], awgProfileId: "", awgProfileName: "", awgVersion: "", stale: false, address: "", lastHandshakeUnix: 0,
   kind: DeviceKind.LINK, osVersion: "", client: "", usedBytes: 0, onlineNodeIds: [] as string[], fingerprint: "", enrolled: false, enrolLinkStale: false, idle: false, idleSinceUnix: 0, ...over,
+  // the nodes' last connection: the scenes' devices were last seen when they last connected, unless a scene says otherwise
+  lastOnlineUnix: (over as { lastOnlineUnix?: number; lastSeenUnix?: number }).lastOnlineUnix ?? (over as { lastSeenUnix?: number }).lastSeenUnix ?? 0,
 });
 const fmts = (...rows: [boolean, string][]) => rows.map(([ok, note], i) => ({ format: [SubFormat.BASE64_URIS, SubFormat.MIHOMO_YAML, SubFormat.XRAY_JSON, SubFormat.SINGBOX_JSON][i]!, ok, note }));
 const allOk = fmts([true, ""], [true, ""], [true, ""], [true, ""]);
@@ -139,9 +141,9 @@ export function detailOf(state: string): DetailN {
     ? []
     : [
         dev({ id: "dev_pc", platform: "windows", model: "Desktop-Alice", osVersion: "Windows 11 24H2", client: "Klick/0.8.2", online: !off && !exp && !over, onlineNodeIds: !off && !exp && !over ? [id("de1")] : [], fingerprint: "3ef1d8", usedBytes: 21.4 * GB, firstSeenUnix: NOW - 28 * D, lastSeenUnix: NOW - 60, enrolled: logs }),
-        dev({ id: "dev_ph", platform: "ios", model: "iPhone 15", osVersion: "iOS 19.1", client: "Happ/3.4.2", fingerprint: "a07c42", usedBytes: 11.9 * GB, firstSeenUnix: NOW - 27 * D, lastSeenUnix: NOW - 3 * H, enrolled: logs }),
+        dev({ id: "dev_ph", platform: "ios", model: "iPhone 15", osVersion: "iOS 19.1", client: "Happ/3.4.2", fingerprint: "a07c42", usedBytes: 11.9 * GB, firstSeenUnix: NOW - 27 * D, lastSeenUnix: NOW - 20 * 60, lastOnlineUnix: NOW - 3 * H, enrolled: logs }),
         ...(full ? [] : [dev({ id: "dev_px", platform: "android", model: "Pixel 8", osVersion: "Android 16", client: "Happ/3.4.1", fingerprint: "5b9e10", usedBytes: 3.1 * GB, firstSeenUnix: NOW - 24 * D, lastSeenUnix: NOW - D, enrolled: logs })]),
-        ...(full ? [dev({ id: "dev_sh", kind: DeviceKind.LINK_SHARED, platform: "", model: "", client: "Happ/3.3.0", lastSeenUnix: NOW - 5 * D })] : []),
+        ...(full ? [dev({ id: "dev_sh", kind: DeviceKind.LINK_SHARED, platform: "", model: "", client: "Happ/3.3.0", lastSeenUnix: NOW - 5 * D, lastOnlineUnix: 0 })] : []),
         dev({ id: "dev_ipad", kind: DeviceKind.KEY, platform: "ios", model: "iPad Alice", osVersion: "iPadOS 19", protocols: ["awg"], awgProfileId: "p_awg", awgProfileName: "AmneziaWG 3.1", awgVersion: "3.1", address: "10.66.4.2", lastHandshakeUnix: NOW - 420, firstSeenUnix: NOW - 20 * D }),
         ...(ttKey ? [dev({ id: "dev_tt", kind: DeviceKind.KEY, protocols: ["trusttunnel"], model: "TrustTunnel key", firstSeenUnix: NOW - 5 * D })] : []),
       ];

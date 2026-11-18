@@ -85,7 +85,7 @@ describe("the link modal and the page password", () => {
   it("never truncates the password; the link is cut in the middle and keeps its tail", async () => {
     const long = "https://sub.example.com/p/Y4pt5Qm8ZrLw3VcXnB7d2Ke9HsAf";
     await mount({ initialUrl: long, initialPassword: "rrgu-k3m9" });
-    const pw = [...document.querySelectorAll("span")].find((s) => s.textContent === "rrgu-k3m9")!;
+    const pw = [...document.querySelectorAll("code")].find((s) => s.textContent === "rrgu-k3m9")!;
     expect(pw).toBeDefined();
     for (let el: Element | null = pw; el && el.getAttribute("role") !== "dialog"; el = el.parentElement) {
       expect(el.className).not.toMatch(/truncate|text-ellipsis|overflow-hidden/);
@@ -102,26 +102,43 @@ describe("the link modal and the page password", () => {
     expect(text()).toContain("aaaa-2345");
   });
 
-  it("without a password (the setting is off) there is no password row and the primary button copies just the link", async () => {
+  it("without a password (the setting is off) the row says anyone with the link opens the page, and the primary button copies just the link", async () => {
     getSubscriptionLink.mockResolvedValue({ url, pagePassword: "" });
     await mount();
-    expect(text()).not.toContain("Page password");
+    expect(text()).toContain("Page password");
+    expect(text()).toContain("not set, anyone with the link can open the page");
     expect(byLabel("Copy the page password")).toBeNull();
-    expect(text()).not.toContain("once per device");
+    expect(text()).toContain("Send the link in a private message");
+    expect(text()).not.toContain("carry the link and the password");
     await click(button("Copy to send"));
     expect(written).toEqual([url]);
   });
 
-  it("explains how it works in a disclosure, with the Amnezia line only for a user who has Amnezia", async () => {
+  it("with a password says what the message carries", async () => {
+    await mount({ initialUrl: url, initialPassword: "aaaa-2345" });
+    expect(text()).toContain("The message will carry the link and the password. Send it in a private message.");
+  });
+
+  it("explains how it works in a disclosure of three steps, the Amnezia one only for a user who has Amnezia", async () => {
     await mount({ initialUrl: url, initialPassword: "aaaa-2345" });
     expect(document.querySelector("details summary")?.textContent).toContain("How it works");
-    expect(text()).toContain("once per device");
-    expect(text()).toContain("A new link means a new password");
-    expect(text()).not.toContain("Devices on the page");
+    expect(document.querySelectorAll("details ol li")).toHaveLength(2);
+    expect(text()).toContain("The person opens the link in a browser");
+    expect(text()).not.toContain("For AmneziaVPN, makes a key");
     act(() => root?.unmount());
     host?.remove();
     await mount({ initialUrl: url, initialPassword: "aaaa-2345", amnezia: true });
-    expect(text()).toContain("Devices on the page");
+    expect(document.querySelectorAll("details ol li")).toHaveLength(3);
+    expect(text()).toContain("For AmneziaVPN, makes a key for the device on the same page");
+  });
+
+  it("opens with the person's avatar, name and what the page is, and the page and the new link in the footer", async () => {
+    await mount({ initialUrl: url, initialPassword: "aaaa-2345" });
+    const dialog = document.querySelector("[role=dialog]")!;
+    expect(dialog.querySelector("h2")?.textContent).toBe("carol");
+    expect(dialog.textContent).toContain("Subscription: opens in an app on the link");
+    expect(dialog.querySelector<HTMLAnchorElement>("a[href='" + url + "']")?.textContent).toBe("Open the page");
+    expect(button("New link")).toBeDefined();
   });
 
   it("offers Share only where the browser has it, with the same message", async () => {
@@ -133,30 +150,46 @@ describe("the link modal and the page password", () => {
     Object.assign(navigator, { share: (d: unknown) => (shared.push(d), Promise.resolve()) });
     await mount({ initialUrl: url, initialPassword: "aaaa-2345" });
     await click(byLabel("Share"));
-    expect(shared).toEqual([{ text: `Your link: ${url}\nPage password: aaaa-2345` }]);
+    expect(shared).toEqual([{ text: `Your link: ${url}
+Page password: aaaa-2345` }]);
     expect(written).toEqual([]);
   });
 
-  it("a new link asks first, and only the confirmation issues it and shows the new password", async () => {
+  it("a new link asks first, in the window, and only the confirmation issues it, shows the new password and says the old link is gone", async () => {
     getSubscriptionLink.mockImplementation(async (req: { rotate?: boolean }) => (req.rotate ? { url: `${url}2`, pagePassword: "new1-new2" } : { url, pagePassword: "old1-old2" }));
     await mount();
     expect(text()).toContain("old1-old2");
 
     await click(button("New link"));
-    expect(text()).toContain("Issue a new link?");
+    const ask = document.querySelector("[role=alert]")!;
+    expect(ask.textContent).toContain("Replace the link?");
+    // a password page: the new link brings a new password
+    expect(ask.textContent).toContain("the page password changes with it");
+    expect(document.querySelectorAll("[role=dialog]")).toHaveLength(1);
+    expect(button("New link")?.getAttribute("aria-disabled")).toBe("true");
     expect(getSubscriptionLink).not.toHaveBeenCalledWith({ userId: "usr_1", rotate: true });
 
     await click(button("Cancel"));
     await settle();
+    expect(document.querySelector("[role=alert]")).toBeNull();
     expect(getSubscriptionLink).not.toHaveBeenCalledWith({ userId: "usr_1", rotate: true });
     expect(text()).toContain("old1-old2");
 
     await click(button("New link"));
-    await click(button("Issue new link"));
+    await click(button("Replace"));
     await settle();
     expect(getSubscriptionLink).toHaveBeenLastCalledWith({ userId: "usr_1", rotate: true });
     expect(text()).toContain("new1-new2");
     expect(text()).not.toContain("old1-old2");
+    expect(document.querySelector("[role=alert]")).toBeNull();
+    expect(text()).toContain("Link replaced. The old one no longer works.");
+  });
+
+  it("a page without a password asks about the link alone", async () => {
+    getSubscriptionLink.mockResolvedValue({ url, pagePassword: "" });
+    await mount();
+    await click(button("New link"));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain("A new link replaces the old one at once. Everyone who had the old one needs the new one.");
   });
 });
 
