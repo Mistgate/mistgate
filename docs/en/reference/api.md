@@ -179,6 +179,16 @@ The [MTProto](../guide/mtproto.md) profiles and a person's Telegram key use thes
 
 All four calls are for the owner and helpers, and closed to API tokens, like the other calls that return a credential.
 
+## A person in several groups
+
+A person has one main group (`User.group_id`, with `group_name` and `group_color`) and any number of extra groups: `User.extra_group_ids`, with `extra_group_names` and `extra_group_colors` in step with them (ordered by name). The main group alone decides the DNS preset, the Mihomo template, the response headers and the colour; an extra group only adds access, by the rule of [A person in several groups](../guide/users-and-groups.md#a-person-in-several-groups).
+
+- `UpdateUserRequest.add_group_ids` and `remove_group_ids` change the extra groups by deltas, so two changes made at once do not undo each other and a repeat does nothing. `group_id` is still the main group; with `group_id` = B and `add_group_ids` = [A] the person gets B as the main group and keeps A as an extra one, and without A the old main group is left. The refusals are `INVALID_ARGUMENT` with `group_in_both`, `main_group` (the main group cannot be removed) and `too_many_groups` (16 groups at most, the main one counted), and `NOT_FOUND` for a group that does not exist.
+- `UpdateUserResponse.impact` (with `dry_run` too) says what the new set of groups does: the profiles gained and lost, and `AccessImpact.gained_node_ids` and `lost_node_ids`, the nodes where the person starts to get something and where they stop getting anything. A change counts as one change of the person against a token's [limit](#limits).
+- `ListUsersRequest.group_id` finds the people who have the group as the main or as an extra group, each once.
+- `Group.user_count` counts the people whose main group it is and `Group.extra_user_count` the people who have it as an extra group. `DeleteGroup` is refused (`group_not_empty`) only while people have the group as their main one; the extra members just leave it. The audit row `user_update` carries `groups_added` and `groups_removed`, `group_delete` the number of extra members who left (`extra_left`).
+- Old clients keep working: a client that only knows `group_id` changes the main group, as before. A script that walks `ListUsers(group_id=X)` and sets `group_id=Y` on everybody now moves the extra members as well and makes Y their main group: filter on `User.group_id` in such a script.
+
 ## TrustTunnel
 
 The [TrustTunnel](../guide/trusttunnel.md) profiles and a person's key use `ProfileService`, `UserService` and a service of their own, `mistgate.trusttunnel.v1.TrustTunnelService`:

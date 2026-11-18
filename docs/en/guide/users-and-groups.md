@@ -3,15 +3,14 @@ title: Users and groups
 description: How to create and manage users (limits, term, traffic, devices, access), what a group gives, and how to move people between groups.
 ---
 
-A user is a person who gets access. Each user is in one group, and the group decides which profiles they get. On top of that, every user has their own limits (traffic quota, term, device limit), their own app switches and their own choice of nodes. The **Users** section has two tabs: **People** and **Groups**.
+A user is a person who gets access. Each user has one **main group** and can be in more groups as **extra groups**; the groups decide which profiles they get, and where. On top of that, every user has their own limits (traffic quota, term, device limit), their own app switches and their own choice of nodes. The **Users** section has two tabs: **People** and **Groups**.
 
 ## What a person gets
 
 A person gets a server when all of this holds:
 
 - the person is active (not disabled, not past their term, not over their quota);
-- the profile is in the person's group;
-- the node is enabled for the person's group (a group can leave nodes out);
+- one group of the person holds the profile **and** gets the node: the same group for both (a group can leave nodes out), see [A person in several groups](#a-person-in-several-groups);
 - the profile is on a node the person may use (all nodes, or the ones picked for them);
 - that profile on the node is switched on and running or starting;
 - one of the person's app switches allows the protocol (the **Telegram proxy** switch is the one for MTProto, and **TrustTunnel** the one for the official TrustTunnel apps).
@@ -19,6 +18,19 @@ A person gets a server when all of this holds:
 Any change to these is pushed to the nodes at once.
 
 ![An example: Alice is active, in the group Family with the profiles Hysteria2 and AmneziaWG, with the Happ switch on and AmneziaVPN off; she gets Hysteria2 on de1, not Hysteria2 on nl1, which is switched off there, and not AmneziaWG, which none of her apps reads](../diagrams/who-gets-what.svg)
+
+## A person in several groups
+
+A person has one **main group** and any number of **extra groups** (16 groups in all at most). The main group decides everything that is not access: the DNS preset, the Mihomo template, the response headers and the colour of the person's tag. An extra group only adds access: the person also gets what it gives.
+
+The rule is by pairs: the profile P on the node N reaches the person when **one and the same group** of theirs holds P and gets N. A profile does not go to a node that only another group of theirs gets. Example: *family* (the main group) holds Hysteria2 and keeps the node own1 back; *alice-home* holds AmneziaWG and gets own1. Alice, in both, gets Hysteria2 on de1 and nl1, and on own1 only AmneziaWG, not Hysteria2. A person's own choice of nodes still filters what the groups give. The person's credentials stay one per inbound, however many groups hold the profile.
+
+On the person's page, **Access** → **What they get**:
+
+- **Main group** is the select it always was. Picking a group the person is an extra member of makes it the main one and keeps the old main group as an extra one, so nothing is lost; picking any other group replaces the main group, as before.
+- **Also in** lists the extra groups as chips (the chip's menu: **Make main**, **Open the group**, **Remove from the group**) and has **Add to a group**.
+
+Every change first asks the server what it does and shows the answer: the profiles the person gains and loses (with the AmneziaVPN keys that stop working) and the nodes that come and go. Only then does **Add**, **Remove** or **Make main** change anything. In the list of people the group column shows the main group and "+2" for two extra ones (the names in the hint); the group filter finds people by the main group and by the extra ones. The new-person form has no extra groups: add them on the person's page.
 
 ## Two ways to connect
 
@@ -190,8 +202,8 @@ The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
 
 ### Access
 
-- **Group**: picking another group first asks the server what changes and shows it: "Alice loses: "AWG 3.1" (2 AmneziaVPN keys stop working)", "Gets: …". **Change group** confirms. An AmneziaVPN key belongs to one profile, so the keys of a lost profile stop working.
-- The group's profiles, in the two ways, each a link to its page.
+- **Main group** and **Also in**: picking another group first asks the server what changes and shows it: "Alice loses: "AWG 3.1" (2 AmneziaVPN keys stop working)", "Gets: …", "New nodes: …". **Change group** confirms. An AmneziaVPN key belongs to one profile, so the keys of a lost profile stop working. Adding and removing extra groups works the same way, see [A person in several groups](#a-person-in-several-groups).
+- The profiles of all the person's groups, in the two ways, each a link to its page.
 - **DNS**: the user's own preset, or empty for the group's or the default. The line under it says which applies and where it comes from.
 - The app switches, with **Telegram proxy** and **TrustTunnel**.
 - **All nodes**, or per-node checkboxes. A node where nothing fits the person is greyed out; "Hysteria2 only" marks a node with one protocol. A node's name opens its **Profiles** tab, where its own port and domain are set.
@@ -235,7 +247,7 @@ A person can also delete and rename their own devices on their page, when **Devi
 
 ## The Groups tab
 
-A group is a set of profiles that its people get, and the nodes it leaves out. Each group is a card: its name, how many people are in it (a link to the filtered list), its profiles in the two ways with the number of nodes they run on for it, and its DNS preset when it has one. **Edit** and **Delete** are on the card.
+A group is a set of profiles that its people get, and the nodes it leaves out. Each group is a card: its name, how many people are in it (a link to the filtered list), its profiles in the two ways with the number of nodes they run on for it, and its DNS preset when it has one. The count adds the people who have it as the main group and the ones who have it as an extra group ("12 people · 3 extra"). **Edit** and **Delete** are on the card.
 
 With no group at all, the tab offers **Create "Everyone" with all profiles** and **New group**.
 
@@ -250,15 +262,16 @@ Editing a group changes access for everyone in it ("3 users are in this group; t
 
 Profiles can also be added to a group from the profile's page (**Add to a group**).
 
-### Moving people between groups
+### Adding and moving people
 
-- One person: user card → **Access** → **Group**, with the preview of what they lose and get.
-- Everyone of a group: delete the group and move its people (below). There is no bulk group change in the list.
+- One person: user card → **Access** → **Main group** (move) or **Also in** (add or remove), with the preview of what they lose and get.
+- Several people into a group: the group's page → **People** → **Add people here**. [Add | Move] sits at the top of the panel and **Add** is on when it opens: the group becomes an extra group of each ticked person, nothing is lost and their main group stays. **Move** makes it their main group and, before it does, says what they lose (what their extra groups give stays). The group's **People** list says who has it as an extra group ("extra"); an extra member's menu has **Make main** and **Remove from the group**.
+- Everyone who has the group as the main group: **Settings** → **Move everyone** (extra members stay), or delete the group and move them (below).
 
 ### Deleting a group
 
-- An empty group goes at once: its profiles stay, only the group is removed.
-- A group with people asks where they go ("3 people are in the group. Where to move them?"), with "Everyone" preselected when it exists. **Move 3 people and delete** moves them and deletes the group in one step.
+- A group nobody has as the main group goes at once, even with extra members: they just leave it (the window says how many) and lose what it gave them; their main groups stay. Its profiles stay, only the group is removed.
+- A group that is the main group of somebody asks where they go ("3 people are in the group. Where to move them?"), with "Everyone" preselected when it exists. **Move 3 people and delete** moves them and deletes the group in one step.
 - With no other group, there is nowhere to move them: make another group first.
 
 ## Who can do what

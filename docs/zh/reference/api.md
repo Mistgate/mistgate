@@ -179,6 +179,16 @@ func main() {
 
 这四个调用面向所有者和协作者，并对 API 令牌关闭，与其他返回凭据的调用一样。
 
+## 用户属于多个分组
+
+用户有一个主分组（`User.group_id`，以及 `group_name` 和 `group_color`）和任意多个附加分组：`User.extra_group_ids`，以及与之按顺序对应的 `extra_group_names` 和 `extra_group_colors`（按名称排序）。只有主分组决定 DNS 预设、Mihomo 模板、响应头和颜色；附加分组只按[用户属于多个分组](../guide/users-and-groups.md#用户属于多个分组)中的规则增加访问权限。
+
+- `UpdateUserRequest.add_group_ids` 和 `remove_group_ids` 以增量方式更改附加分组：同时发生的两次修改不会互相覆盖，重复执行不会有任何效果。`group_id` 仍是主分组；`group_id` = B 且 `add_group_ids` = [A] 时，用户的主分组变为 B，并保留 A 作为附加分组；不带 A 则旧的主分组被移出。拒绝情形为 `INVALID_ARGUMENT`：`group_in_both`、`main_group`（不能移出主分组）和 `too_many_groups`（最多 16 个分组，主分组计入），分组不存在时为 `NOT_FOUND`。
+- `UpdateUserResponse.impact`（`dry_run` 时也有）说明新的分组组合会造成什么：用户获得和失去的协议配置，以及 `AccessImpact.gained_node_ids` 和 `lost_node_ids`——用户开始获得内容的节点和不再获得任何内容的节点。一次更改计为令牌[限制](#限制)中对该用户的一次更改。
+- `ListUsersRequest.group_id` 会找到以该分组为主分组或附加分组的用户，每人只出现一次。
+- `Group.user_count` 是以其为主分组的用户数，`Group.extra_user_count` 是以其为附加分组的用户数。只有仍有人以该分组为主分组时，`DeleteGroup` 才会被拒绝（`group_not_empty`）；附加成员只是离开。审计记录 `user_update` 带有 `groups_added` 和 `groups_removed`，`group_delete` 带有离开的附加成员数（`extra_left`）。
+- 旧客户端仍可使用：只认识 `group_id` 的客户端像以前一样更改主分组。遍历 `ListUsers(group_id=X)` 并给所有人设置 `group_id=Y` 的脚本，现在也会移动附加成员并使 Y 成为他们的主分组：这类脚本应按 `User.group_id` 过滤。
+
 ## TrustTunnel
 
 [TrustTunnel](../guide/trusttunnel.md) 协议配置和用户的密钥使用 `ProfileService`、`UserService` 和独立的服务 `mistgate.trusttunnel.v1.TrustTunnelService`：
