@@ -201,7 +201,7 @@
 }
 /* L4304 */
 .pf .pf-save.ok>span {
-  color: var(--ok);
+  color: var(--tone-mint);
 }
 /* L4304 */
 .pf .pf-save.ok .btn {
@@ -533,7 +533,7 @@
 }
 /* L4615 */
 .pf .pp-q1.ok {
-  color: var(--ok);
+  color: var(--tone-mint);
 }
 /* L4615 */
 .pf .pp-q1.bad {

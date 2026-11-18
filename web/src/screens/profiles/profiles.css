@@ -173,8 +173,8 @@
 }
 .pv-pill.ok {
   background: var(--tone-mint-bg);
-  color: var(--accent-text);
-  color: var(--ok);
+  /* the text mint: the mark's --ok is 2.3 : 1 on this wash on the light theme (the same value on the dark one) */
+  color: var(--tone-mint);
 }
 .pv-pill.part,
 .pv-pill.nogr {

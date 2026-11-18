@@ -562,9 +562,7 @@ a.up-gtag:hover {
   color: var(--muted);
   transition: opacity 0.15s var(--e), color 0.15s var(--e);
 }
-.up-ch > span.we em {
-  color: color-mix(in srgb, var(--text) 26%, transparent);
-}
+/* the board dims the weekend labels (26 %) only on its second chart (.up-c2), not on this one: they are --muted like the others */
 .up-ch > span.now em {
   color: var(--accent-text);
 }
