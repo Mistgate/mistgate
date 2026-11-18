@@ -12,7 +12,6 @@ import { countryReach, health, nodes, ownProbe } from "@/lib/api";
 import { checksQuery } from "@/lib/health";
 import { ownProbeQuery, useOwnProbeActions, type Issued } from "@/lib/ownprobe";
 import { meQuery } from "@/lib/session";
-import { CountryRow } from "@/screens/health/country";
 import { ReachabilityScreen } from "@/screens/reachability";
 import { AddProbeModal, RevokeModal, UpdateModal } from "@/screens/reachability/probes";
 import { ProbesCard } from "@/screens/reachability/sources";
@@ -206,21 +205,6 @@ const scenes: { id: string; title: string; seed: Seed; render: () => ReactNode; 
   },
   { id: "revoke", title: "Revoke asks first", seed: { probes: [kitchen] }, render: () => <RevokeModal probe={kitchen as never} busy={false} onClose={() => {}} onConfirm={() => {}} /> },
   { id: "update", title: "The update command", seed: { probes: [kitchen, office] }, render: () => <UpdateModal probe={office as never} onClose={() => {}} /> },
-  {
-    id: "points",
-    title: "The probes' points in the rows of a node (the node's card and page)",
-    seed: {},
-    render: () => (
-      <div className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
-        {countryChecks.map((c) => (
-          <div key={c.nodeId} className="flex flex-col gap-1.5">
-            <span className="font-mono text-[13px] font-bold">{c.nodeId.replace("nod_", "")}</span>
-            <CountryRow check={c as never} code="RU" />
-          </div>
-        ))}
-      </div>
-    ),
-  },
   { id: "assistant", title: "The helper's view: the Reachability page, the sources are the owner's", seed: { role: Role.HELPER, probes: [kitchen], checks: countryChecks }, wide: true, render: () => <ReachabilityScreen /> },
   { id: "edge", title: "The Cloudflare edition", seed: { edge: true }, render: () => <ProbesCard /> },
 ];

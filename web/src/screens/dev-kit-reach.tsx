@@ -38,7 +38,7 @@ import { ShellLayout } from "./shell";
 // width (an iframe, so the window's breakpoints answer to the frame). /dev-kit?only=pn-reach lists the frames; each is a page of its own:
 //   /dev-kit?only=reach-page&state=<tab>[.<word>…][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
 // <tab>: nodes | events | sources. The words of the board: the data nosrc | nonodes | first | load | err; the fi1 row allok | bad | reg | tcp (the
-// default is "some networks"); the sources' trouble gperr | gplim | bsbud | tsoff; the choices src.<id> (gp bl ts cc bs kl pr) | open.<node> |
+// default is "some networks"); the networks of the open row many (twelve) | long (the names of live data); noreports (kl!ck has nothing on fi1); the sources' trouble gperr | gplim | bsbud | tsoff; the choices src.<id> (gp bl ts cc bs kl pr) | open.<node> |
 // filter.<state> (ok part tcp bad reg nd); what a hand did dlgoff | toast | check | test | replace | enable. The product's own: v6 | dark | probes | kz | edge | ro, and
 // the windows of the own probes dlgadd | dlgupd | dlgrev. Made-up data: the nodes de1, fi1, msk1, nl1, the operators A to E, the documentation networks.
 // The scene's own "panel" answers the page's calls (nothing leaves the page) and keeps what a click changes, so a switch moves the page.
@@ -395,6 +395,21 @@ export const frames: Frame[] = [
   frame("reach-open", "nodes.open.fi1", "A row opened: the sources, the reports of kl!ck, the operators, the regions, the week", 1440, 1500),
   frame("reach-open-phone", "nodes.open.fi1", "The opened row on a phone", 400, 2200),
   frame("reach-open-1000", "nodes.open.fi1", "The opened row, 1000: the sources as words in it", 1000, 1500),
+  // the open row (the board's r3) in every state of the fi1 row, in both themes, narrow, and with the long data
+  frame("reach-open-allok", "nodes.allok.open.fi1", "The opened row: every network sees the node", 1440, 1400),
+  frame("reach-open-tcp", "nodes.tcp.open.fi1", "The opened row: TCP is cut, the probe node does not see it", 1440, 1500),
+  frame("reach-open-bad", "nodes.bad.open.fi1", "The opened row: no network sees the node", 1440, 1500),
+  frame("reach-open-reg", "nodes.reg.open.fi1", "The opened row: reachable, the address is in the registry", 1440, 1500),
+  frame("reach-open-nd", "nodes.first.open.fi1", "The opened row: no data yet (the first round)", 1440, 1100),
+  frame("reach-open-noreports", "nodes.noreports.open.fi1", "The opened row: kl!ck has no reports on the node", 1440, 1300),
+  frame("reach-open-light", "nodes.open.fi1", "The opened row on the light theme", 1440, 1500, "&theme=light"),
+  frame("reach-open-bad-light", "nodes.bad.open.fi1", "The opened row, unreachable, on the light theme", 1440, 1500, "&theme=light"),
+  frame("reach-open-many", "nodes.many.open.fi1", "The opened row: twelve networks", 1440, 2000),
+  frame("reach-open-long", "nodes.long.open.fi1", "The opened row: long names of operators, cities and probes", 1440, 1900),
+  frame("reach-open-long-phone", "nodes.long.open.fi1", "The opened row, long names, on a phone, 400 wide", 400, 3400),
+  frame("reach-open-many-phone", "nodes.many.open.fi1", "The opened row, twelve networks, on a phone, 400 wide", 400, 3400),
+  frame("reach-open-bad-phone", "nodes.bad.open.fi1", "The opened row, unreachable, on a phone, 400 wide", 400, 3000),
+  frame("reach-open-fa", "nodes.open.fi1", "The opened row, right to left (fa)", 1440, 1500, "&lang=fa"),
   frame("reach-filter", "nodes.filter.part", "A chip of the summary is pressed: only the nodes in that state", 1440, 800),
   frame("reach-filter-none", "nodes.filter.part.allok", "...and nobody is in that state (no such nodes)", 1440, 800),
   // the board's states: the sources' trouble

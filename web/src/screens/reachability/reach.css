@@ -331,23 +331,7 @@
   gap: 12px;
   padding: 4px 20px 16px;
 }
-.rcp .rc-dk {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 4px 12px;
-  align-items: baseline;
-  font-size: 14px;
-}
 .rcp .rc-dt {
-  font-size: 12px;
-  color: var(--muted);
-}
-.rcp .rc-dk b {
-  font-weight: 500;
-}
-.rcp .rc-dk em {
-  grid-column: 2;
-  font-style: normal;
   font-size: 12px;
   color: var(--muted);
 }
@@ -377,137 +361,339 @@
 .rcp .rc-ch i.mut {
   color: var(--muted);
 }
-/* L5179: the sources as words, only where the table has no columns for them (below) */
-.rcp .rc-dsrc {
-  display: none;
+/* the open row of a node (pn.css L7010-7063): the verdict and its facts, the week of each source with the networks beside it, the reports of kl!ck, the footer */
+.rcp .rc-d.r3 {
+  gap: 0;
+  padding-top: 0;
 }
-/* what the page has besides the board: the week of each source as lanes, with their moments */
-.rcp .rc-wkh {
+.rcp .r3-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px 32px;
+  flex-wrap: wrap;
+  padding: 16px 0 20px;
+}
+.rcp .r3-v {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
 }
-.rcp .rc-wk {
+.rcp .r3-v > .rw-gl {
+  margin-top: 6px;
+}
+.rcp .r3-v > div {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
-.rcp .rc-ln {
-  display: grid;
-  grid-template-columns: 88px 120px minmax(0, 1fr);
-  align-items: center;
-  gap: 4px 12px;
-  font-size: 13px;
-}
-.rcp .rc-ln.off {
-  opacity: 0.55;
-}
-.rcp .rc-nm {
-  overflow: hidden;
-  font-size: 12px;
+.rcp .r3 .r3-v b {
+  font-size: 20px;
+  line-height: 28px;
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--text);
 }
-.rcp .rc-nm.rc-v6 {
-  padding-inline-start: 12px;
-  color: var(--muted);
-}
-.rcp .rc-wd {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 500;
+.rcp .r3-v span {
+  font-size: 14px;
+  line-height: 20px;
   color: var(--sec);
 }
-.rcp .rc-wd > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.rcp .r3-f {
+  display: flex;
+  gap: 32px;
+  margin: 0;
+  padding-top: 4px;
 }
-.rcp .rc-wd.partial,
-.rcp .rc-wd.warn,
-.rcp .rc-wd.listed {
-  color: var(--warning-text);
+.rcp .r3-f > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.rcp .rc-wd.bad {
-  color: var(--danger-text);
-}
-.rcp .rc-wd.off {
-  color: var(--faint);
-}
-.rcp .rc-ln.none {
-  align-items: baseline;
-}
-.rcp .rc-why {
-  grid-column: 2 / -1;
+.rcp .r3-f dt {
   font-size: 12px;
   line-height: 16px;
   color: var(--muted);
 }
-.rcp .rc-lw {
+.rcp .r3-f dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.rcp .r3-g {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  border-top: 1px solid var(--border);
+}
+.rcp .r3 h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.rcp .r3-wk {
+  padding: 16px 32px 16px 0;
   min-width: 0;
 }
-.rcp .rc-axis {
-  font-size: 10px;
-  color: var(--faint);
+[dir="rtl"] .rcp .r3-wk {
+  padding: 16px 0 16px 32px;
 }
-.rcp .rc-ax {
-  grid-column: 3;
-  display: flex;
-  justify-content: space-between;
+.rcp .r3-net {
+  padding: 16px 0 16px 32px;
+  border-inline-start: 1px solid var(--border);
+  min-width: 0;
 }
-.rcp .rc-lane {
-  position: relative;
-  height: 16px;
+[dir="rtl"] .rcp .r3-net {
+  padding: 16px 32px 16px 0;
 }
-.rcp .rc-track {
-  position: absolute;
-  inset-inline: 0;
-  top: 50%;
-  height: 8px;
+.rcp .r3-r {
+  display: grid;
+  grid-template-columns: 104px 132px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  height: 32px;
+  font-size: 13px;
+}
+.rcp .r3-r b {
+  font-weight: 400;
+  color: var(--text);
+  white-space: nowrap;
   overflow: hidden;
-  border-radius: 4px;
-  transform: translateY(-50%);
+  text-overflow: ellipsis;
+}
+.rcp .r3-r.sub b {
+  padding-inline-start: 12px;
+  color: var(--muted);
+}
+.rcp .r3-s {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--sec);
+  white-space: nowrap;
+}
+.rcp .r3-s > span:not(.sr-only) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rcp .r3-s.part {
+  color: var(--warning-text);
+}
+.rcp .r3-s.bad {
+  color: var(--danger-text);
+}
+.rcp .r3-s.mut {
+  color: var(--muted);
+}
+.rcp .r3-b {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+.rcp .r3-b i {
+  min-width: 2px;
+  border-radius: 2px;
   background: var(--step);
 }
-.rcp .rc-track.off {
-  border: 1px dashed var(--border);
-  background: none;
+.rcp .r3-b i:first-child {
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
 }
-.rcp .rc-seg,
-.rcp .rc-hit {
-  position: absolute;
-  inset-block: 0;
-  min-width: 3px;
+.rcp .r3-b i:last-child {
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
 }
-.rcp .rc-hit {
-  border-radius: 3px;
+.rcp .r3-b i.ok {
+  background: color-mix(in srgb, var(--ok) 45%, transparent);
 }
-.rcp .rc-seg[data-verdict="ok"] {
-  background: color-mix(in srgb, var(--ok) 55%, transparent);
-}
-.rcp .rc-seg[data-verdict="partial"] {
-  background: linear-gradient(var(--warning) 50%, color-mix(in srgb, var(--ok) 40%, transparent) 50%);
-}
-.rcp .rc-seg[data-verdict="warn"] {
+.rcp .r3-b i.part {
   background: var(--warning);
 }
-.rcp .rc-seg[data-verdict="bad"] {
+.rcp .r3-b i.bad {
   background: var(--danger);
 }
-.rcp .rc-seg[data-verdict="listed"] {
-  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--warning) 70%, transparent) 0 2px, color-mix(in srgb, var(--warning) 18%, transparent) 2px 6px);
+.rcp .r3-b i.reg {
+  background: repeating-linear-gradient(115deg, var(--warning) 0 3px, transparent 3px 6px);
 }
-.rcp .rc-seg[data-verdict="unknown"] {
-  background: color-mix(in srgb, var(--muted) 35%, transparent);
+.rcp .r3-ax {
+  display: flex;
+  justify-content: space-between;
+  margin-inline-start: 260px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
 }
-.rcp .rc-mid {
-  position: absolute;
-  inset-block: 0;
-  width: 1px;
-  background: var(--surface);
+.rcp .r3-ng {
+  display: flex;
+  flex-direction: column;
+}
+.rcp .r3-ng + .r3-ng {
+  margin-top: 12px;
+}
+.rcp .r3-nt {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  height: 24px;
+  font-size: 13px;
+  color: var(--sec);
+}
+.rcp .r3-nt.bad {
+  color: var(--danger-text);
+}
+.rcp .r3-nt em {
+  font-style: normal;
+  font-size: 12px;
+}
+.rcp .r3-ni {
+  display: grid;
+  grid-template-columns: 16px minmax(0, max-content) minmax(72px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  font-size: 13px;
+}
+.rcp .r3-ni b {
+  font-weight: 400;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rcp .r3-ni span {
+  color: var(--sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rcp .r3-ni em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.rcp .r3-nn {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.rcp .r3-kl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+.rcp .r3-kr {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.rcp .r3-kr .rc-dt {
+  white-space: nowrap;
+}
+.rcp .r3-kr p {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+.rcp .r3-kr b {
+  font-weight: 400;
+  color: var(--text);
+}
+.rcp .r3-kr em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* the hint for the IPv6 entry takes the place of a footer line of its own (the product's, the board has none) */
+.rcp .r3-v6 {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+.rcp .r3-ft {
+  display: flex;
+  align-items: center;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.rcp .r3-tip {
+  flex: 1 1 320px;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--sec);
+}
+.rcp .r3-tip a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 4px;
+}
+.rcp .r3-tip a:hover {
+  text-decoration-color: currentColor;
+}
+.rcp .r3-ft .hl-act {
+  margin: 0;
+  margin-inline-start: auto;
+}
+@media (max-width: 900px) {
+  .rcp .r3-g {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rcp .r3-wk,
+  [dir="rtl"] .rcp .r3-wk {
+    padding-inline: 0;
+  }
+  .rcp .r3-net,
+  [dir="rtl"] .rcp .r3-net {
+    padding-inline: 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
+  }
+  .rcp .r3-f {
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .rcp .r3-r {
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: auto;
+    gap: 4px 12px;
+    padding: 8px 0;
+  }
+  .rcp .r3-b {
+    grid-column: 1 / -1;
+  }
+  .rcp .r3-ax {
+    margin-inline-start: 0;
+  }
+  .rcp .r3-kr {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .rcp .r3-ft .hl-act {
+    margin-inline-start: 0;
+  }
 }
 /* the hint for the IPv6 entry and the networks of a partial block */
 .rcp .rc-hint {
@@ -532,19 +718,6 @@
 }
 .rcp .rc-hint > span .i {
   margin-top: 0;
-}
-.rcp .rc-bk {
-  max-width: 560px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--warning-soft);
-}
-.rcp .rc-bk.bad {
-  background: var(--danger-soft);
-}
-.rcp ul.rc-bk {
-  background: none;
-  padding: 0;
 }
 
 /* ---- the events and the sources of the Nodes tab (L5055-5060, L5105, L5112-5113) ---- */
@@ -1190,9 +1363,6 @@
   .rcp .rc-h > :nth-child(n + 3):nth-child(-n + 5) {
     display: none;
   }
-  .rcp .rc-dsrc {
-    display: grid;
-  }
 }
 /* L5099 (1100): the list of the sources is a row of tiles above the open one */
 @media (max-width: 1100px) {
@@ -1310,31 +1480,11 @@
     padding-block: 0;
     align-items: flex-end;
   }
-  .rcp .rc-dk {
-    grid-template-columns: 1fr;
-  }
-  .rcp .rc-dk em {
-    grid-column: 1;
-  }
   .rcp .rc-kl > li {
     grid-template-columns: 72px minmax(0, 1fr);
     padding: 8px 16px;
   }
   .rcp .rc-kl em {
-    grid-column: 2;
-  }
-  .rcp .rc-ln {
-    grid-template-columns: 88px minmax(0, 1fr);
-  }
-  .rcp .rc-lw,
-  .rcp .rc-ax {
-    grid-column: 1 / -1;
-  }
-  .rcp .rc-axis > span:first-child,
-  .rcp .rc-axis > span:nth-child(2) {
-    display: none;
-  }
-  .rcp .rc-why {
     grid-column: 2;
   }
 }
