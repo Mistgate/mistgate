@@ -91,7 +91,7 @@ describe("the scenes of the assistant's window", () => {
 
   it("draws every state in every language, with no raw key", async () => {
     for (const lang of ["ru", "zh", "fa", "tr"] as Lang[]) {
-      for (const state of ["empty", "empty.md", "empty.md.seen-2", "think", "answer", "answer.tools", "done", "err", "off", "hist", "hist.ask", "hist.wipe", "hist.hq", "hist.none", "empty.fu", "empty.cards", "empty.install", "empty.warn"]) {
+      for (const state of ["empty", "empty.md", "empty.md.seen-2", "think", "answer", "answer.tools", "done", "err", "off", "hist", "hist.ask", "hist.wipe", "hist.hq", "hist.none", "empty.fu", "empty.cards", "empty.install", "empty.warn", "answer.big", "hist.big", "answer.plans"]) {
         setLang(lang);
         await draw(state, Role.OWNER, lang);
         expect(body(), `${lang} ${state}`).not.toMatch(/\b(as|ai|aip|approval|int)\.[a-zA-Z]+[.a-zA-Z]*/);
@@ -137,7 +137,7 @@ describe("what a scene shows", () => {
     expect(card.textContent).toContain("Proposed change");
     expect(card.textContent).toContain("expires in");
     // the title is what the change does (the board's), and the owner's own button says what the line would
-    expect(card.querySelector("b")?.textContent).toBe("Change a relay");
+    expect(card.querySelector("b")?.textContent).toBe("Turn on the relay of fi1 through msk1");
     expect(card.textContent).not.toContain("Needs the owner's approval");
     expect(all("[data-slot=plan] button").map((b) => b.textContent)).toEqual(["Dismiss", "Approve and apply"]);
     expect($(".as-day")?.textContent).toBe("Today");
@@ -330,7 +330,44 @@ describe("what a scene shows", () => {
     expect($("textarea")?.getAttribute("placeholder")).toBe("Спроси или попроси что-то изменить");
     await clear();
     await draw("answer", Role.OWNER, "ru");
-    expect($("[data-slot=plan]")?.textContent).toContain("Изменить ретрансляцию");
+    // the board's title: what it does, with the names
+    expect($("[data-slot=plan] > b")?.textContent).toBe("Включить ретрансляцию fi1 через msk1");
     expect($("[data-slot=plan]")?.textContent).toContain("истекает через");
+  });
+});
+
+describe("the big window and the plans' titles", () => {
+  it("the big window: the same window in the middle of the page, with the button that says Collapse", async () => {
+    await draw("answer.big");
+    expect($("section.as")?.classList.contains("big")).toBe(true);
+    expect($(".as-fr")?.classList.contains("as-bigw")).toBe(true);
+    expect($("button.as-xp")?.getAttribute("aria-label")).toBe("Collapse");
+    expect($("button.as-xp")?.getAttribute("aria-pressed")).toBe("true");
+    // everything of the small window is in it
+    expect($("[data-slot=plan]")).not.toBeNull();
+    expect($(".as-md")).not.toBeNull();
+    await clear();
+    await draw("hist.big");
+    expect($("section.as.big .as-hs")).not.toBeNull();
+    await clear();
+    await draw("answer");
+    expect($("section.as")?.classList.contains("big")).toBe(false);
+    expect($("button.as-xp")?.getAttribute("aria-label")).toBe("Expand");
+  });
+
+  it("the plans' titles say the names of their facts, in English and in Russian", async () => {
+    const titles = () => all("[data-slot=plan] > b").map((b) => b.textContent);
+    await draw("answer.plans");
+    expect(titles()).toEqual(["Turn on the relay of fi1 through msk1", "Create the group “Family”", "Put the decoy site “Bakery” on nl1", "Change the Mihomo template “Family”", "Disable 3 users"]);
+    // a name is a plate of its own: the panel's words around it, the name apart
+    expect(
+      all("[data-slot=plan] > b span")
+        .map((s) => s.textContent)
+        .slice(0, 2),
+    ).toEqual(["fi1", "msk1"]);
+    await clear();
+    setLang("ru");
+    await draw("answer.plans", Role.OWNER, "ru");
+    expect(titles()).toEqual(["Включить ретрансляцию fi1 через msk1", "Создать группу «Семья»", "Поставить сайт-ширму «Bakery» на nl1", "Изменить шаблон Mihomo «Для семьи»", "Отключить 3 пользователей"]);
   });
 });

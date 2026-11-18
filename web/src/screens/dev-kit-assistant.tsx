@@ -37,7 +37,8 @@ import { ShellLayout } from "./shell";
 //   busy (the plan waits for the confirmation) | rej (the plan was turned down) | tools (six calls, one failed, open) | row (the calls open to their input) | think-open (what the
 //   model said between the calls) | long (a heading, a table, code) | fu (follow-ups) | cards (an opened page, a secret field) | install (the
 //   inline approval of a node install) | ask (a row of the list asks) | wipe (delete all asks) | hq (a search with no match) | none (no
-//   conversations).
+//   conversations) | big (the big window: in the middle of the page over a dimmed one; a phone keeps the card) | plans (more plans after the relay: a group, a site on a node, a template,
+//   three people: the title says the names).
 // Made-up data of the board: the nodes de1, fi1, nl1 and msk1, the people alice and bob, documentation addresses and not-a-real-key secrets.
 
 export type View = "hist" | "empty" | "think" | "answer" | "done" | "err" | "off";
@@ -54,6 +55,8 @@ const MIN = 60;
 const H = 3600;
 const D = 86_400;
 const fact = (key: string, value: string) => ({ key, value, untrusted: false, code: "", params: {}, untrustedParams: [] });
+/** A fact whose value is a name from data (a node, a person, a group): the panel marks it untrusted, the card puts it on a plate of its own. */
+const named = (key: string, value: string) => ({ ...fact(key, value), untrusted: true });
 const at = (minutesAgo: number) => NOW - minutesAgo * MIN;
 /** Midnight of today (the list groups by calendar day, so the rows of "today" and "yesterday" are put on the right side of it at any hour). */
 const MIDNIGHT = (() => {
@@ -100,7 +103,7 @@ const relayPlan = (say: Say, state: PlanState, over: Record<string, unknown> = {
   planId: "pln_relay",
   tool: "relay",
   summary: say("Turn the relay on for fi1 through msk1", "Включить ретрансляцию fi1 через msk1"),
-  facts: [fact("entry", "msk1"), fact("exit", "fi1"), fact("node", say("three checks in a row fail from some networks", "три проверки подряд не проходят из части сетей"))],
+  facts: [fact("action", "enable"), named("entry", "msk1"), named("exit", "fi1"), fact("node", say("three checks in a row fail from some networks", "три проверки подряд не проходят из части сетей"))],
   danger: ["fleet"],
   needsApproval: true,
   inboxOnly: false,
@@ -111,6 +114,15 @@ const relayPlan = (say: Say, state: PlanState, over: Record<string, unknown> = {
   outcomeCode: "",
   ...over,
 });
+
+/** The other plans the board's scripts prepare, each with the names of its facts (a group, a site on a node, a template, three people): the title of the card says them. */
+const plain = (id: string, kind: string, summary: string, facts: unknown[], over: Record<string, unknown> = {}) => ({ planId: id, tool: kind, summary, facts, danger: [], needsApproval: false, inboxOnly: false, expiresUnix: NOW + 10 * MIN, state: PlanState.PROPOSED, result: "", error: "", outcomeCode: "", ...over });
+const morePlans = (say: Say) => [
+  plain("pln_group", "group_create", say("Create the group Family", "Создать группу «Семья»"), [named("name", say("Family", "Семья")), named("profile_ids", "Hysteria2 · 443 de1"), fact("color", say("automatic", "автоматически"))]),
+  plain("pln_site", "decoy_site_assign", say("Put a site on nl1", "Поставить на nl1 свой сайт"), [named("site", "Bakery"), fact("state", "ready"), fact("version", "2"), named("nodes", "nl1"), fact("panel", "false")], { needsApproval: true }),
+  plain("pln_tpl", "subscription_mihomo_template_set", say("Change the Mihomo template Family", "Изменить шаблон Mihomo «Для семьи»"), [named("template", say("Family", "Для семьи")), fact("action", "update"), fact("bytes", "300")], { needsApproval: true }),
+  plain("pln_users", "user_disable", say("Disable 3 users", "Отключить 3 людей"), [fact("count", "3"), named("users", "alice"), named("users", "bob"), named("users", "carol")], { needsApproval: true }),
+];
 
 const question = (say: Say, page: string) => msg({ role: ChatRole.USER, createdUnix: at(2), text: say("Which nodes had problems today?", "У каких нод сегодня были проблемы?"), context: { kind: "overview", id: "", label: page, route: "/" } as never });
 
@@ -139,7 +151,7 @@ export function messagesOf(view: View, mods: ReadonlySet<string>, say: Say, page
   const interim = mods.has("think-open") ? say("Let me look at the fleet digest first.", "Сначала посмотрю сводку по флоту.") : "";
   const text = (body: string) => (interim ? `${interim}\n\n${body}` : body);
   const interimEnd = interim ? interim.length + 2 : undefined;
-  const plan = (s: PlanState, over: Record<string, unknown> = {}) => [relayPlan(say, s, over)] as never;
+  const plan = (s: PlanState, over: Record<string, unknown> = {}) => [relayPlan(say, s, over), ...(mods.has("plans") ? morePlans(say) : [])] as never;
   const long = mods.has("long")
     ? say(
         "## In short\n\nIn the last 24 hours **three nodes** had notes, nothing is down.\n\n| Node | What happened | Until |\n|---|---|--:|\n| **fi1** | Reachability from Russia: `blocked` for part of the networks | now |\n| **nl1** | Gone for 2 minutes at 11:20 | now |\n| **de1** | The journal took 3.8 GB | 4 days |\n\n1. Turn on the relay for fi1.\n2. Renew the certificate of nl1: the plan is below.\n3. Clean the journal of de1:\n   - `journalctl --vacuum-size=500M`\n   - then look again in a day\n\n```\nnl1  cert  expires in 9 days\n```\n\n> The relay changes what runs on fi1, so it waits for you.",
@@ -379,6 +391,27 @@ export const frames: Frame[] = [
   // other roles, other pages
   f("off-helper", "off", "Not connected, seen by a helper: whom to ask", 1440, 900, "&role=helper"),
   f("nodes", "answer", "On top of the Nodes page", 1440, 900, "&behind=nodes"),
+  // the big window (the board's "Развернуть"): the same states, in the middle of the page over the dimmed one
+  f("big-empty", "empty.big", "Big: the start, the column of 720 in a window of 960"),
+  f("big-think", "think.big", "Big: it thinks"),
+  f("big-answer", "answer.big", "Big: the answer and the plan in the column; the button says Collapse"),
+  f("big-plans", "answer.big.plans", "Big: more plans, each titled with the names of its facts"),
+  f("big-done", "done.big", "Big: applied"),
+  f("big-err", "err.big", "Big: the month's budget is spent"),
+  f("big-off", "off.big", "Big: not connected"),
+  f("big-hist", "hist.big", "Big: the conversations in the column"),
+  f("big-md", "empty.md.big", "Big: the choice of the agent"),
+  f("big-short", "answer.big", "Big, a low page: the window is as high as the page less its edges", 1180, 560),
+  f("big-tablet", "answer.big", "Big on a tablet, 800 wide", 800, 900),
+  f("big-light", "answer.big", "Big, light theme", 1440, 900, "&theme=light"),
+  f("big-empty-light", "empty.big", "Big, light theme", 1440, 900, "&theme=light"),
+  f("big-ru", "answer.big.plans", "Big, Russian", 1440, 900, "&lang=ru"),
+  f("big-fa", "answer.big", "Big, right to left (fa)", 1440, 900, "&lang=fa"),
+  f("big-zh", "answer.big", "Big, Chinese", 1440, 900, "&lang=zh"),
+  f("big-tr", "answer.big", "Big, Turkish", 1440, 900, "&lang=tr"),
+  f("big-fx", "empty.big", "Big, with the reveal animation on: the wave and the glints", 1440, 900, "&fx=1"),
+  f("plans", "answer.plans", "More plans, each titled with the names of its facts", 1440, 900),
+  f("plans-ru", "answer.plans", "More plans, Russian", 1440, 900, "&lang=ru"),
   // the other theme, the other direction
   f("empty-light", "empty", "Light theme", 1440, 900, "&theme=light"),
   f("answer-light", "answer", "Light theme", 1440, 900, "&theme=light"),
@@ -402,6 +435,8 @@ export const frames: Frame[] = [
   f("phone-off", "off", "A phone: not connected", P, PH),
   f("phone-light", "answer", "A phone, light theme", P, PH, "&theme=light"),
   f("phone-fa", "empty.md", "A phone, right to left", P, PH, "&lang=fa"),
+  f("phone-big", "answer.big", "A phone asked for the big window: it stays a card, with no button for it", P, PH),
+  f("phone-plans", "answer.plans", "A phone: more plans", P, PH),
 ];
 
 export function PnAssistantKit() {
