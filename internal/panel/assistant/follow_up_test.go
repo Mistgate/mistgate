@@ -600,6 +600,9 @@ func TestFollowUpStartsWhenItsPlanIsApplied(t *testing.T) {
 	if err = json.Unmarshal([]byte(hint), &parsed); err != nil || !strings.Contains(parsed["follow_up_hint"], "plan_id pln_cap") || !strings.Contains(parsed["follow_up_hint"], "about 660") {
 		t.Fatalf("hint: %s %v", hint, err)
 	}
+	if h := withFollowUpHint(`{"plan_id":"pln_ch"}`, &adminv1.PlanCard{PlanId: "pln_ch", Tool: "channel_measure"}); !strings.Contains(h, "plan_id pln_ch") || !strings.Contains(h, "path_speed_results") || !strings.Contains(h, "about 100") {
+		t.Fatalf("a channel measure ends later and has no follow-up hint: %s", h)
+	}
 	if plain := withFollowUpHint(`{"plan_id":"p"}`, &adminv1.PlanCard{Tool: "user_disable"}); plain != `{"plan_id":"p"}` {
 		t.Fatalf("a plan that ends at once got a hint: %s", plain)
 	}

@@ -171,21 +171,26 @@ type speedResultV struct {
 	ConnectMs  uint32  `json:"connect_ms"`
 	FirstByte  uint32  `json:"first_byte_ms,omitempty"`
 	DurationMs uint32  `json:"duration_ms"`
+	// 0 = one stream (path_speed); 1 to 8 = a channel measure's step; Capped: its volume cap ended it early, so the figure is at least that
+	Streams uint32 `json:"streams,omitempty"`
+	Capped  bool   `json:"capped,omitempty"`
 }
 
 // pathSpeedResultsView is what path_speed_results returns: the kept tests, newest first, and how to read a figure.
 type pathSpeedResultsView struct {
 	Tests []speedResultV `json:"tests"`
-	Note  string         `json:"note"`
+	// ChannelMeasures are the last channel measure of each node that has one (it stays after its tests are gone), newest first
+	ChannelMeasures []channelLastV `json:"channel_measures"`
+	Note            string         `json:"note"`
 }
 
-const speedResultsNote = "Each test is ONE TCP stream of 8 to 32 MB, so its figure is a lower bound of what the path can carry, not its ceiling: a path that shows 300 Mbit/s here may carry more with several streams. Do not call it the capacity of the node or of the link. Tests are kept 7 days."
+const speedResultsNote = "A test without streams is ONE TCP stream of 8 to 32 MB, so its figure is a lower bound of what the path can carry, not its ceiling: a path that shows 300 Mbit/s here may carry more with several streams. Do not call it the capacity of the node or of the link. A test with streams (up to 8) and channel_measures come from channel_measure: all streams together over 10 seconds, the best of up to three partner nodes per direction (receive = the node downloads, send = it uploads). That is an estimate at the moment it ran, not a guarantee of the tariff: other traffic on the link counts against it, a partner's own link may be the narrower one, and capped = true means the volume cap ended it early, so it is at least that. Say 'measured about N Mbit/s at that time', not 'the provider gives N'. Tests are kept 7 days; channel_measures stay until the next measure."
 
 // pathSpeedResultsTool reads back what path_speed measured. It is a read: nothing is sent between the nodes.
 func pathSpeedResultsTool() toolDef {
 	return readTool("path_speed_results", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, probev1connect.ProbeServicePathSpeedResultsProcedure),
-		"The speed tests between your nodes kept for 7 days (what path_speed measured after the owner approved it), newest first: sender, target, direction, size, time and the figures (megabits per second over the whole transfer, connect time, time to the first byte, duration). "+
-			"Read it after an approved path_speed plan, to answer from the figure and not from a guess; never take a number from telemetry as the result of a test. Each test is ONE stream, so it shows a lower bound of the path, never its ceiling. It sends nothing between the nodes. Node names only, never addresses.",
+		"The speed tests between your nodes kept for 7 days (what path_speed and channel_measure measured after the owner approved them), newest first: sender, target, direction, size, time and the figures (megabits per second over the whole transfer, connect time, time to the first byte, duration, and streams for a channel measure), and the last channel measure of each node (channel_measures: receive and send, with the partner that gave the best figure). "+
+			"Read it after an approved path_speed or channel_measure plan, to answer from the figure and not from a guess; never take a number from telemetry as the result of a test. A path_speed test is ONE stream, so it shows a lower bound of the path, never its ceiling; a channel measure fills the link with 8 streams and is the closest to what the node can carry, but it is still an estimate at that moment, not a guarantee of the tariff. It sends nothing between the nodes. Node names only, never addresses.",
 		func(c *call, in pathSpeedResultsArg) (any, error) {
 			var id string
 			if in.Node != "" {
@@ -205,8 +210,9 @@ func pathSpeedResultsTool() toolDef {
 			out := pathSpeedResultsView{Tests: []speedResultV{}, Note: speedResultsNote}
 			for _, t := range r.Msg.GetTests() {
 				out.Tests = append(out.Tests, speedResultV{From: nm(t.GetFromName()), To: nm(t.GetToName()), Direction: t.GetDirection(), MB: t.GetMb(), At: fmtTime(t.GetAtUnix()),
-					MbitS: t.GetMbitS(), ConnectMs: t.GetConnectMs(), FirstByte: t.GetFirstByteMs(), DurationMs: t.GetDurationMs()})
+					MbitS: t.GetMbitS(), ConnectMs: t.GetConnectMs(), FirstByte: t.GetFirstByteMs(), DurationMs: t.GetDurationMs(), Streams: t.GetStreams(), Capped: t.GetCapped()})
 			}
+			out.ChannelMeasures = channelViews(r.Msg.GetChannels())
 			return out, nil
 		})
 }

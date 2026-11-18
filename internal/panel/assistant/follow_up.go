@@ -507,6 +507,8 @@ func followUpHint(card *adminv1.PlanCard) string {
 		}
 	case "path_speed":
 		seconds, what = 60, "read the result"
+	case "channel_measure":
+		seconds, what = 100, "read the result with path_speed_results (the figures are an estimate at that moment, not a guarantee of the tariff)"
 	case "node_update", "node_rollback":
 		seconds, what = 300, "check that the node is back and on the right version"
 	case "rollout_start":

@@ -30,7 +30,7 @@ var sweepSizes = []uint32{256, 576, 1200, 1350, 1452}
 const probeLimits = "It sends real traffic between your nodes, so it is rate limited: one probe per node pair at a time, at most 6 per node in 5 minutes and 12 per token in 10 minutes (a refused call says when to retry); do not repeat it to watch a number move. "
 
 func probeTools() []toolDef {
-	return append(change(pathSpeed), []toolDef{
+	return append(append(change(pathSpeed), change(channelMeasure)...), []toolDef{
 		pathSpeedResultsTool(),
 		probeTool("path_probe", probeToolTimeout, procs(adminv1connect.NodeServiceListNodesProcedure, probev1connect.ProbeServicePathProbeProcedure),
 			"Probe the path from one of your nodes (from) to another (to) now, to tell a bad node from a bad path or a filtered port. Both are node ids or exact names; the targets are always the ports the to node itself serves, never a host you name. "+
