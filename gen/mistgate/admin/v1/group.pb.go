@@ -37,7 +37,9 @@ type Group struct {
 	// The colour of the group's chip: a tone name of the admin's palette (lavender, sand, sage, rose, sky, mint), "" = none
 	// picked (the admin then derives one from the id).
 	Color string `protobuf:"bytes,8,opt,name=color,proto3" json:"color,omitempty"`
-	// Nodes that are disabled for users in this group. Empty = every node is available, including future nodes.
+	// Nodes that are disabled for users in this group. Empty = every node is available, including future nodes. A node the
+	// owner holds back (Node.sharing) is here while the group was not given it. Changing it with UpdateGroup follows the rule
+	// at UpdateGroupRequest.disabled_node_ids.
 	DisabledNodeIds []string `protobuf:"bytes,9,rep,name=disabled_node_ids,json=disabledNodeIds,proto3" json:"disabled_node_ids,omitempty"`
 	// Nodes where the group's MTProto profiles give a Telegram proxy right now (same rule as happ_nodes and amnezia_nodes).
 	TelegramNodes uint32 `protobuf:"varint,10,opt,name=telegram_nodes,json=telegramNodes,proto3" json:"telegram_nodes,omitempty"`
@@ -358,7 +360,10 @@ type UpdateGroupRequest struct {
 	DryRun bool `protobuf:"varint,5,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
 	// Presence = set the colour (a tone of the palette, see Group.color; "" = none picked). INVALID_ARGUMENT for a name outside it.
 	Color *string `protobuf:"bytes,6,opt,name=color,proto3,oneof" json:"color,omitempty"`
-	// Presence = replace the group's disabled node set.
+	// Presence = replace the group's disabled node set. A node that is held back (Node.sharing mode LISTED or NONE) and that
+	// the group was not given cannot be switched on here: FAILED_PRECONDITION "node_held: node=<id>", so a form that was
+	// loaded before the node was made cannot hand it out by saving. Give it from the node's side (SetNodeSharing). Switching
+	// such a node off for a group that was given it works.
 	DisabledNodeIds *NodeIds `protobuf:"bytes,7,opt,name=disabled_node_ids,json=disabledNodeIds,proto3,oneof" json:"disabled_node_ids,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -675,11 +680,163 @@ func (*DeleteGroupResponse) Descriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{10}
 }
 
+type SetNodeSharingRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// ALL, LISTED or NONE (UNSPECIFIED is INVALID_ARGUMENT).
+	Mode NodeShareMode `protobuf:"varint,2,opt,name=mode,proto3,enum=mistgate.admin.v1.NodeShareMode" json:"mode,omitempty"`
+	// LISTED: the groups that receive the node, at least one. Empty for ALL and NONE.
+	GroupIds []string `protobuf:"bytes,3,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
+	// Say what would change; nothing is written and the nodes hear nothing.
+	DryRun        bool `protobuf:"varint,4,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNodeSharingRequest) Reset() {
+	*x = SetNodeSharingRequest{}
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNodeSharingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNodeSharingRequest) ProtoMessage() {}
+
+func (x *SetNodeSharingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNodeSharingRequest.ProtoReflect.Descriptor instead.
+func (*SetNodeSharingRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SetNodeSharingRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *SetNodeSharingRequest) GetMode() NodeShareMode {
+	if x != nil {
+		return x.Mode
+	}
+	return NodeShareMode_NODE_SHARE_MODE_UNSPECIFIED
+}
+
+func (x *SetNodeSharingRequest) GetGroupIds() []string {
+	if x != nil {
+		return x.GroupIds
+	}
+	return nil
+}
+
+func (x *SetNodeSharingRequest) GetDryRun() bool {
+	if x != nil {
+		return x.DryRun
+	}
+	return false
+}
+
+type SetNodeSharingResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The mode after the change; with dry_run, as it would be.
+	Mode NodeShareMode `protobuf:"varint,1,opt,name=mode,proto3,enum=mistgate.admin.v1.NodeShareMode" json:"mode,omitempty"`
+	// The groups that receive the node after the change, by id.
+	GroupIds []string `protobuf:"bytes,2,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
+	// Active people of those groups who see the node: those who use every node or picked this one.
+	PeopleReceiving uint32 `protobuf:"varint,3,opt,name=people_receiving,json=peopleReceiving,proto3" json:"people_receiving,omitempty"`
+	// People who start to receive the node and people who stop (active people, counted as people_receiving), for the
+	// confirmation window. A person in a group that receives it before and after is in neither.
+	PeopleGain    uint32 `protobuf:"varint,4,opt,name=people_gain,json=peopleGain,proto3" json:"people_gain,omitempty"`
+	PeopleLose    uint32 `protobuf:"varint,5,opt,name=people_lose,json=peopleLose,proto3" json:"people_lose,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNodeSharingResponse) Reset() {
+	*x = SetNodeSharingResponse{}
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNodeSharingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNodeSharingResponse) ProtoMessage() {}
+
+func (x *SetNodeSharingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNodeSharingResponse.ProtoReflect.Descriptor instead.
+func (*SetNodeSharingResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SetNodeSharingResponse) GetMode() NodeShareMode {
+	if x != nil {
+		return x.Mode
+	}
+	return NodeShareMode_NODE_SHARE_MODE_UNSPECIFIED
+}
+
+func (x *SetNodeSharingResponse) GetGroupIds() []string {
+	if x != nil {
+		return x.GroupIds
+	}
+	return nil
+}
+
+func (x *SetNodeSharingResponse) GetPeopleReceiving() uint32 {
+	if x != nil {
+		return x.PeopleReceiving
+	}
+	return 0
+}
+
+func (x *SetNodeSharingResponse) GetPeopleGain() uint32 {
+	if x != nil {
+		return x.PeopleGain
+	}
+	return 0
+}
+
+func (x *SetNodeSharingResponse) GetPeopleLose() uint32 {
+	if x != nil {
+		return x.PeopleLose
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_group_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1cmistgate/admin/v1/user.proto\"\xbc\x02\n" +
+	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1cmistgate/admin/v1/user.proto\"\xbc\x02\n" +
 	"\x05Group\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
@@ -732,13 +889,27 @@ const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\x12DeleteGroupRequest\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\"\n" +
 	"\rmove_users_to\x18\x02 \x01(\tR\vmoveUsersTo\"\x15\n" +
-	"\x13DeleteGroupResponse2\x83\x03\n" +
+	"\x13DeleteGroupResponse\"\x9c\x01\n" +
+	"\x15SetNodeSharingRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x124\n" +
+	"\x04mode\x18\x02 \x01(\x0e2 .mistgate.admin.v1.NodeShareModeR\x04mode\x12\x1b\n" +
+	"\tgroup_ids\x18\x03 \x03(\tR\bgroupIds\x12\x17\n" +
+	"\adry_run\x18\x04 \x01(\bR\x06dryRun\"\xd8\x01\n" +
+	"\x16SetNodeSharingResponse\x124\n" +
+	"\x04mode\x18\x01 \x01(\x0e2 .mistgate.admin.v1.NodeShareModeR\x04mode\x12\x1b\n" +
+	"\tgroup_ids\x18\x02 \x03(\tR\bgroupIds\x12)\n" +
+	"\x10people_receiving\x18\x03 \x01(\rR\x0fpeopleReceiving\x12\x1f\n" +
+	"\vpeople_gain\x18\x04 \x01(\rR\n" +
+	"peopleGain\x12\x1f\n" +
+	"\vpeople_lose\x18\x05 \x01(\rR\n" +
+	"peopleLose2\xea\x03\n" +
 	"\fGroupService\x12Y\n" +
 	"\n" +
 	"ListGroups\x12$.mistgate.admin.v1.ListGroupsRequest\x1a%.mistgate.admin.v1.ListGroupsResponse\x12\\\n" +
 	"\vCreateGroup\x12%.mistgate.admin.v1.CreateGroupRequest\x1a&.mistgate.admin.v1.CreateGroupResponse\x12\\\n" +
 	"\vUpdateGroup\x12%.mistgate.admin.v1.UpdateGroupRequest\x1a&.mistgate.admin.v1.UpdateGroupResponse\x12\\\n" +
-	"\vDeleteGroup\x12%.mistgate.admin.v1.DeleteGroupRequest\x1a&.mistgate.admin.v1.DeleteGroupResponseB\xc5\x01\n" +
+	"\vDeleteGroup\x12%.mistgate.admin.v1.DeleteGroupRequest\x1a&.mistgate.admin.v1.DeleteGroupResponse\x12e\n" +
+	"\x0eSetNodeSharing\x12(.mistgate.admin.v1.SetNodeSharingRequest\x1a).mistgate.admin.v1.SetNodeSharingResponseB\xc5\x01\n" +
 	"\x15com.mistgate.admin.v1B\n" +
 	"GroupProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
@@ -754,20 +925,23 @@ func file_mistgate_admin_v1_group_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_group_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_group_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_mistgate_admin_v1_group_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_mistgate_admin_v1_group_proto_goTypes = []any{
-	(*Group)(nil),               // 0: mistgate.admin.v1.Group
-	(*ListGroupsRequest)(nil),   // 1: mistgate.admin.v1.ListGroupsRequest
-	(*ListGroupsResponse)(nil),  // 2: mistgate.admin.v1.ListGroupsResponse
-	(*CreateGroupRequest)(nil),  // 3: mistgate.admin.v1.CreateGroupRequest
-	(*CreateGroupResponse)(nil), // 4: mistgate.admin.v1.CreateGroupResponse
-	(*UpdateGroupRequest)(nil),  // 5: mistgate.admin.v1.UpdateGroupRequest
-	(*ProfileIds)(nil),          // 6: mistgate.admin.v1.ProfileIds
-	(*NodeIds)(nil),             // 7: mistgate.admin.v1.NodeIds
-	(*UpdateGroupResponse)(nil), // 8: mistgate.admin.v1.UpdateGroupResponse
-	(*DeleteGroupRequest)(nil),  // 9: mistgate.admin.v1.DeleteGroupRequest
-	(*DeleteGroupResponse)(nil), // 10: mistgate.admin.v1.DeleteGroupResponse
-	(*AccessImpact)(nil),        // 11: mistgate.admin.v1.AccessImpact
+	(*Group)(nil),                  // 0: mistgate.admin.v1.Group
+	(*ListGroupsRequest)(nil),      // 1: mistgate.admin.v1.ListGroupsRequest
+	(*ListGroupsResponse)(nil),     // 2: mistgate.admin.v1.ListGroupsResponse
+	(*CreateGroupRequest)(nil),     // 3: mistgate.admin.v1.CreateGroupRequest
+	(*CreateGroupResponse)(nil),    // 4: mistgate.admin.v1.CreateGroupResponse
+	(*UpdateGroupRequest)(nil),     // 5: mistgate.admin.v1.UpdateGroupRequest
+	(*ProfileIds)(nil),             // 6: mistgate.admin.v1.ProfileIds
+	(*NodeIds)(nil),                // 7: mistgate.admin.v1.NodeIds
+	(*UpdateGroupResponse)(nil),    // 8: mistgate.admin.v1.UpdateGroupResponse
+	(*DeleteGroupRequest)(nil),     // 9: mistgate.admin.v1.DeleteGroupRequest
+	(*DeleteGroupResponse)(nil),    // 10: mistgate.admin.v1.DeleteGroupResponse
+	(*SetNodeSharingRequest)(nil),  // 11: mistgate.admin.v1.SetNodeSharingRequest
+	(*SetNodeSharingResponse)(nil), // 12: mistgate.admin.v1.SetNodeSharingResponse
+	(*AccessImpact)(nil),           // 13: mistgate.admin.v1.AccessImpact
+	(NodeShareMode)(0),             // 14: mistgate.admin.v1.NodeShareMode
 }
 var file_mistgate_admin_v1_group_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.ListGroupsResponse.groups:type_name -> mistgate.admin.v1.Group
@@ -775,20 +949,24 @@ var file_mistgate_admin_v1_group_proto_depIdxs = []int32{
 	6,  // 2: mistgate.admin.v1.UpdateGroupRequest.profile_ids:type_name -> mistgate.admin.v1.ProfileIds
 	7,  // 3: mistgate.admin.v1.UpdateGroupRequest.disabled_node_ids:type_name -> mistgate.admin.v1.NodeIds
 	0,  // 4: mistgate.admin.v1.UpdateGroupResponse.group:type_name -> mistgate.admin.v1.Group
-	11, // 5: mistgate.admin.v1.UpdateGroupResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
-	1,  // 6: mistgate.admin.v1.GroupService.ListGroups:input_type -> mistgate.admin.v1.ListGroupsRequest
-	3,  // 7: mistgate.admin.v1.GroupService.CreateGroup:input_type -> mistgate.admin.v1.CreateGroupRequest
-	5,  // 8: mistgate.admin.v1.GroupService.UpdateGroup:input_type -> mistgate.admin.v1.UpdateGroupRequest
-	9,  // 9: mistgate.admin.v1.GroupService.DeleteGroup:input_type -> mistgate.admin.v1.DeleteGroupRequest
-	2,  // 10: mistgate.admin.v1.GroupService.ListGroups:output_type -> mistgate.admin.v1.ListGroupsResponse
-	4,  // 11: mistgate.admin.v1.GroupService.CreateGroup:output_type -> mistgate.admin.v1.CreateGroupResponse
-	8,  // 12: mistgate.admin.v1.GroupService.UpdateGroup:output_type -> mistgate.admin.v1.UpdateGroupResponse
-	10, // 13: mistgate.admin.v1.GroupService.DeleteGroup:output_type -> mistgate.admin.v1.DeleteGroupResponse
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	13, // 5: mistgate.admin.v1.UpdateGroupResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
+	14, // 6: mistgate.admin.v1.SetNodeSharingRequest.mode:type_name -> mistgate.admin.v1.NodeShareMode
+	14, // 7: mistgate.admin.v1.SetNodeSharingResponse.mode:type_name -> mistgate.admin.v1.NodeShareMode
+	1,  // 8: mistgate.admin.v1.GroupService.ListGroups:input_type -> mistgate.admin.v1.ListGroupsRequest
+	3,  // 9: mistgate.admin.v1.GroupService.CreateGroup:input_type -> mistgate.admin.v1.CreateGroupRequest
+	5,  // 10: mistgate.admin.v1.GroupService.UpdateGroup:input_type -> mistgate.admin.v1.UpdateGroupRequest
+	9,  // 11: mistgate.admin.v1.GroupService.DeleteGroup:input_type -> mistgate.admin.v1.DeleteGroupRequest
+	11, // 12: mistgate.admin.v1.GroupService.SetNodeSharing:input_type -> mistgate.admin.v1.SetNodeSharingRequest
+	2,  // 13: mistgate.admin.v1.GroupService.ListGroups:output_type -> mistgate.admin.v1.ListGroupsResponse
+	4,  // 14: mistgate.admin.v1.GroupService.CreateGroup:output_type -> mistgate.admin.v1.CreateGroupResponse
+	8,  // 15: mistgate.admin.v1.GroupService.UpdateGroup:output_type -> mistgate.admin.v1.UpdateGroupResponse
+	10, // 16: mistgate.admin.v1.GroupService.DeleteGroup:output_type -> mistgate.admin.v1.DeleteGroupResponse
+	12, // 17: mistgate.admin.v1.GroupService.SetNodeSharing:output_type -> mistgate.admin.v1.SetNodeSharingResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_group_proto_init() }
@@ -796,6 +974,7 @@ func file_mistgate_admin_v1_group_proto_init() {
 	if File_mistgate_admin_v1_group_proto != nil {
 		return
 	}
+	file_mistgate_admin_v1_common_proto_init()
 	file_mistgate_admin_v1_user_proto_init()
 	file_mistgate_admin_v1_group_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
@@ -804,7 +983,7 @@ func file_mistgate_admin_v1_group_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_group_proto_rawDesc), len(file_mistgate_admin_v1_group_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

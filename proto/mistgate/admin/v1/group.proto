@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
+import "mistgate/admin/v1/common.proto";
 import "mistgate/admin/v1/user.proto";
 
 // Access groups (a group is a set of profiles, with optional nodes disabled for its users). The users screen has a
@@ -12,6 +13,16 @@ service GroupService {
   rpc UpdateGroup(UpdateGroupRequest) returns (UpdateGroupResponse);
   // FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
   rpc DeleteGroup(DeleteGroupRequest) returns (DeleteGroupResponse);
+  // Hands a node out as asked, in one transaction: ALL clears every group's switch for the node and lets groups made later
+  // have it, LISTED gives it to the listed groups only (groups made later do not get it), NONE to no group. The groups' own
+  // disabled lists change with it (Group.disabled_node_ids), so the group pages show the new state. dry_run says what would
+  // change without writing; asked with the node's current mode and groups, it says how many people get the node now. The
+  // mode of every node and how many groups receive it are in Node.sharing, and which ones in Group.disabled_node_ids.
+  // Same rights as UpdateGroup (owner and helper; for a token, approved with the plan); the people who gain or lose the
+  // node count against the token's user-change limit like a group update does. Audited as node_sharing_set. NOT_FOUND
+  // for a node or group that does not exist, FAILED_PRECONDITION "node_retired" for a retired node, INVALID_ARGUMENT for
+  // group_ids with ALL or NONE and for LISTED with none.
+  rpc SetNodeSharing(SetNodeSharingRequest) returns (SetNodeSharingResponse);
 }
 
 message Group {
@@ -29,7 +40,9 @@ message Group {
   // The colour of the group's chip: a tone name of the admin's palette (lavender, sand, sage, rose, sky, mint), "" = none
   // picked (the admin then derives one from the id).
   string color = 8;
-  // Nodes that are disabled for users in this group. Empty = every node is available, including future nodes.
+  // Nodes that are disabled for users in this group. Empty = every node is available, including future nodes. A node the
+  // owner holds back (Node.sharing) is here while the group was not given it. Changing it with UpdateGroup follows the rule
+  // at UpdateGroupRequest.disabled_node_ids.
   repeated string disabled_node_ids = 9;
   // Nodes where the group's MTProto profiles give a Telegram proxy right now (same rule as happ_nodes and amnezia_nodes).
   uint32 telegram_nodes = 10;
@@ -65,7 +78,10 @@ message UpdateGroupRequest {
   bool dry_run = 5;
   // Presence = set the colour (a tone of the palette, see Group.color; "" = none picked). INVALID_ARGUMENT for a name outside it.
   optional string color = 6;
-  // Presence = replace the group's disabled node set.
+  // Presence = replace the group's disabled node set. A node that is held back (Node.sharing mode LISTED or NONE) and that
+  // the group was not given cannot be switched on here: FAILED_PRECONDITION "node_held: node=<id>", so a form that was
+  // loaded before the node was made cannot hand it out by saving. Give it from the node's side (SetNodeSharing). Switching
+  // such a node off for a group that was given it works.
   optional NodeIds disabled_node_ids = 7;
 }
 
@@ -92,3 +108,26 @@ message DeleteGroupRequest {
 }
 
 message DeleteGroupResponse {}
+
+message SetNodeSharingRequest {
+  string node_id = 1;
+  // ALL, LISTED or NONE (UNSPECIFIED is INVALID_ARGUMENT).
+  NodeShareMode mode = 2;
+  // LISTED: the groups that receive the node, at least one. Empty for ALL and NONE.
+  repeated string group_ids = 3;
+  // Say what would change; nothing is written and the nodes hear nothing.
+  bool dry_run = 4;
+}
+
+message SetNodeSharingResponse {
+  // The mode after the change; with dry_run, as it would be.
+  NodeShareMode mode = 1;
+  // The groups that receive the node after the change, by id.
+  repeated string group_ids = 2;
+  // Active people of those groups who see the node: those who use every node or picked this one.
+  uint32 people_receiving = 3;
+  // People who start to receive the node and people who stop (active people, counted as people_receiving), for the
+  // confirmation window. A person in a group that receives it before and after is in neither.
+  uint32 people_gain = 4;
+  uint32 people_lose = 5;
+}

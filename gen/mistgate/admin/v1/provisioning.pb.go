@@ -526,8 +526,10 @@ type StartNodeProvisionRequest struct {
 	// An owner's private key is used for this install only; the worker replaces it with the panel key for saved access.
 	PrivateKey           string `protobuf:"bytes,15,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
 	PrivateKeyPassphrase string `protobuf:"bytes,16,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Who the new node is handed out to once installed (see CreateEnrollmentRequest.sharing); unset = the panel decides.
+	Sharing       *NodeSharing `protobuf:"bytes,17,opt,name=sharing,proto3" json:"sharing,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartNodeProvisionRequest) Reset() {
@@ -670,6 +672,13 @@ func (x *StartNodeProvisionRequest) GetPrivateKeyPassphrase() string {
 		return x.PrivateKeyPassphrase
 	}
 	return ""
+}
+
+func (x *StartNodeProvisionRequest) GetSharing() *NodeSharing {
+	if x != nil {
+		return x.Sharing
+	}
+	return nil
 }
 
 type RetryNodeProvisionRequest struct {
@@ -2442,7 +2451,7 @@ var File_mistgate_admin_v1_provisioning_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/provisioning.proto\x12\x11mistgate.admin.v1\"\x17\n" +
+	"$mistgate/admin/v1/provisioning.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x17\n" +
 	"\x15GetPanelSSHKeyRequest\"Y\n" +
 	"\x16GetPanelSSHKeyResponse\x12\x1d\n" +
 	"\n" +
@@ -2480,7 +2489,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	" \x01(\bR\x0epanelReachable\x12\x1a\n" +
 	"\bnftables\x18\v \x01(\bR\bnftables\"R\n" +
 	"\x10CheckSSHResponse\x12>\n" +
-	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xa4\x04\n" +
+	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xde\x04\n" +
 	"\x19StartNodeProvisionRequest\x12'\n" +
 	"\x0fconfirm_install\x18\x01 \x01(\bR\x0econfirmInstall\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -2499,7 +2508,8 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x11install_panel_key\x18\x0e \x01(\bR\x0finstallPanelKey\x12\x1f\n" +
 	"\vprivate_key\x18\x0f \x01(\tR\n" +
 	"privateKey\x124\n" +
-	"\x16private_key_passphrase\x18\x10 \x01(\tR\x14privateKeyPassphrase\"\xc1\x02\n" +
+	"\x16private_key_passphrase\x18\x10 \x01(\tR\x14privateKeyPassphrase\x128\n" +
+	"\asharing\x18\x11 \x01(\v2\x1e.mistgate.admin.v1.NodeSharingR\asharing\"\xc1\x02\n" +
 	"\x19RetryNodeProvisionRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12'\n" +
 	"\x0fconfirm_install\x18\x02 \x01(\bR\x0econfirmInstall\x12\x1a\n" +
@@ -2699,55 +2709,57 @@ var file_mistgate_admin_v1_provisioning_proto_goTypes = []any{
 	(*RevealNodeServerPasswordResponse)(nil), // 34: mistgate.admin.v1.RevealNodeServerPasswordResponse
 	(*ForgetNodeServerAccessRequest)(nil),    // 35: mistgate.admin.v1.ForgetNodeServerAccessRequest
 	(*ForgetNodeServerAccessResponse)(nil),   // 36: mistgate.admin.v1.ForgetNodeServerAccessResponse
+	(*NodeSharing)(nil),                      // 37: mistgate.admin.v1.NodeSharing
 }
 var file_mistgate_admin_v1_provisioning_proto_depIdxs = []int32{
 	5,  // 0: mistgate.admin.v1.CheckSSHResponse.preflight:type_name -> mistgate.admin.v1.NodePreflight
-	15, // 1: mistgate.admin.v1.StartNodeProvisionResponse.job:type_name -> mistgate.admin.v1.NodeProvisionJob
-	15, // 2: mistgate.admin.v1.RetryNodeProvisionResponse.job:type_name -> mistgate.admin.v1.NodeProvisionJob
-	15, // 3: mistgate.admin.v1.GetNodeProvisionResponse.job:type_name -> mistgate.admin.v1.NodeProvisionJob
-	15, // 4: mistgate.admin.v1.ListNodeProvisionsResponse.jobs:type_name -> mistgate.admin.v1.NodeProvisionJob
-	17, // 5: mistgate.admin.v1.ListNodeProvisionEventsResponse.events:type_name -> mistgate.admin.v1.NodeProvisionEvent
-	19, // 6: mistgate.admin.v1.ListNodeServerAccessResponse.access:type_name -> mistgate.admin.v1.NodeServerAccess
-	22, // 7: mistgate.admin.v1.ListNodeServerKeysResponse.keys:type_name -> mistgate.admin.v1.NodeServerKey
-	22, // 8: mistgate.admin.v1.AddNodeServerKeyResponse.key:type_name -> mistgate.admin.v1.NodeServerKey
-	19, // 9: mistgate.admin.v1.AttachNodeServerAccessResponse.access:type_name -> mistgate.admin.v1.NodeServerAccess
-	2,  // 10: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:input_type -> mistgate.admin.v1.GetSSHFingerprintRequest
-	0,  // 11: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:input_type -> mistgate.admin.v1.GetPanelSSHKeyRequest
-	4,  // 12: mistgate.admin.v1.ProvisioningService.CheckSSH:input_type -> mistgate.admin.v1.CheckSSHRequest
-	7,  // 13: mistgate.admin.v1.ProvisioningService.StartNodeProvision:input_type -> mistgate.admin.v1.StartNodeProvisionRequest
-	8,  // 14: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:input_type -> mistgate.admin.v1.RetryNodeProvisionRequest
-	11, // 15: mistgate.admin.v1.ProvisioningService.GetNodeProvision:input_type -> mistgate.admin.v1.GetNodeProvisionRequest
-	13, // 16: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:input_type -> mistgate.admin.v1.ListNodeProvisionsRequest
-	16, // 17: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:input_type -> mistgate.admin.v1.ListNodeProvisionEventsRequest
-	20, // 18: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:input_type -> mistgate.admin.v1.ListNodeServerAccessRequest
-	23, // 19: mistgate.admin.v1.ProvisioningService.ListNodeServerKeys:input_type -> mistgate.admin.v1.ListNodeServerKeysRequest
-	25, // 20: mistgate.admin.v1.ProvisioningService.AddNodeServerKey:input_type -> mistgate.admin.v1.AddNodeServerKeyRequest
-	27, // 21: mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey:input_type -> mistgate.admin.v1.RemoveNodeServerKeyRequest
-	29, // 22: mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess:input_type -> mistgate.admin.v1.AttachNodeServerAccessRequest
-	31, // 23: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:input_type -> mistgate.admin.v1.RotateNodeServerPasswordRequest
-	33, // 24: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:input_type -> mistgate.admin.v1.RevealNodeServerPasswordRequest
-	35, // 25: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:input_type -> mistgate.admin.v1.ForgetNodeServerAccessRequest
-	3,  // 26: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
-	1,  // 27: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:output_type -> mistgate.admin.v1.GetPanelSSHKeyResponse
-	6,  // 28: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
-	9,  // 29: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
-	10, // 30: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
-	12, // 31: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
-	14, // 32: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
-	18, // 33: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
-	21, // 34: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:output_type -> mistgate.admin.v1.ListNodeServerAccessResponse
-	24, // 35: mistgate.admin.v1.ProvisioningService.ListNodeServerKeys:output_type -> mistgate.admin.v1.ListNodeServerKeysResponse
-	26, // 36: mistgate.admin.v1.ProvisioningService.AddNodeServerKey:output_type -> mistgate.admin.v1.AddNodeServerKeyResponse
-	28, // 37: mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey:output_type -> mistgate.admin.v1.RemoveNodeServerKeyResponse
-	30, // 38: mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess:output_type -> mistgate.admin.v1.AttachNodeServerAccessResponse
-	32, // 39: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:output_type -> mistgate.admin.v1.RotateNodeServerPasswordResponse
-	34, // 40: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:output_type -> mistgate.admin.v1.RevealNodeServerPasswordResponse
-	36, // 41: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:output_type -> mistgate.admin.v1.ForgetNodeServerAccessResponse
-	26, // [26:42] is the sub-list for method output_type
-	10, // [10:26] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	37, // 1: mistgate.admin.v1.StartNodeProvisionRequest.sharing:type_name -> mistgate.admin.v1.NodeSharing
+	15, // 2: mistgate.admin.v1.StartNodeProvisionResponse.job:type_name -> mistgate.admin.v1.NodeProvisionJob
+	15, // 3: mistgate.admin.v1.RetryNodeProvisionResponse.job:type_name -> mistgate.admin.v1.NodeProvisionJob
+	15, // 4: mistgate.admin.v1.GetNodeProvisionResponse.job:type_name -> mistgate.admin.v1.NodeProvisionJob
+	15, // 5: mistgate.admin.v1.ListNodeProvisionsResponse.jobs:type_name -> mistgate.admin.v1.NodeProvisionJob
+	17, // 6: mistgate.admin.v1.ListNodeProvisionEventsResponse.events:type_name -> mistgate.admin.v1.NodeProvisionEvent
+	19, // 7: mistgate.admin.v1.ListNodeServerAccessResponse.access:type_name -> mistgate.admin.v1.NodeServerAccess
+	22, // 8: mistgate.admin.v1.ListNodeServerKeysResponse.keys:type_name -> mistgate.admin.v1.NodeServerKey
+	22, // 9: mistgate.admin.v1.AddNodeServerKeyResponse.key:type_name -> mistgate.admin.v1.NodeServerKey
+	19, // 10: mistgate.admin.v1.AttachNodeServerAccessResponse.access:type_name -> mistgate.admin.v1.NodeServerAccess
+	2,  // 11: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:input_type -> mistgate.admin.v1.GetSSHFingerprintRequest
+	0,  // 12: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:input_type -> mistgate.admin.v1.GetPanelSSHKeyRequest
+	4,  // 13: mistgate.admin.v1.ProvisioningService.CheckSSH:input_type -> mistgate.admin.v1.CheckSSHRequest
+	7,  // 14: mistgate.admin.v1.ProvisioningService.StartNodeProvision:input_type -> mistgate.admin.v1.StartNodeProvisionRequest
+	8,  // 15: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:input_type -> mistgate.admin.v1.RetryNodeProvisionRequest
+	11, // 16: mistgate.admin.v1.ProvisioningService.GetNodeProvision:input_type -> mistgate.admin.v1.GetNodeProvisionRequest
+	13, // 17: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:input_type -> mistgate.admin.v1.ListNodeProvisionsRequest
+	16, // 18: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:input_type -> mistgate.admin.v1.ListNodeProvisionEventsRequest
+	20, // 19: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:input_type -> mistgate.admin.v1.ListNodeServerAccessRequest
+	23, // 20: mistgate.admin.v1.ProvisioningService.ListNodeServerKeys:input_type -> mistgate.admin.v1.ListNodeServerKeysRequest
+	25, // 21: mistgate.admin.v1.ProvisioningService.AddNodeServerKey:input_type -> mistgate.admin.v1.AddNodeServerKeyRequest
+	27, // 22: mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey:input_type -> mistgate.admin.v1.RemoveNodeServerKeyRequest
+	29, // 23: mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess:input_type -> mistgate.admin.v1.AttachNodeServerAccessRequest
+	31, // 24: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:input_type -> mistgate.admin.v1.RotateNodeServerPasswordRequest
+	33, // 25: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:input_type -> mistgate.admin.v1.RevealNodeServerPasswordRequest
+	35, // 26: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:input_type -> mistgate.admin.v1.ForgetNodeServerAccessRequest
+	3,  // 27: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
+	1,  // 28: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:output_type -> mistgate.admin.v1.GetPanelSSHKeyResponse
+	6,  // 29: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
+	9,  // 30: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
+	10, // 31: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
+	12, // 32: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
+	14, // 33: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
+	18, // 34: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
+	21, // 35: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:output_type -> mistgate.admin.v1.ListNodeServerAccessResponse
+	24, // 36: mistgate.admin.v1.ProvisioningService.ListNodeServerKeys:output_type -> mistgate.admin.v1.ListNodeServerKeysResponse
+	26, // 37: mistgate.admin.v1.ProvisioningService.AddNodeServerKey:output_type -> mistgate.admin.v1.AddNodeServerKeyResponse
+	28, // 38: mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey:output_type -> mistgate.admin.v1.RemoveNodeServerKeyResponse
+	30, // 39: mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess:output_type -> mistgate.admin.v1.AttachNodeServerAccessResponse
+	32, // 40: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:output_type -> mistgate.admin.v1.RotateNodeServerPasswordResponse
+	34, // 41: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:output_type -> mistgate.admin.v1.RevealNodeServerPasswordResponse
+	36, // 42: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:output_type -> mistgate.admin.v1.ForgetNodeServerAccessResponse
+	27, // [27:43] is the sub-list for method output_type
+	11, // [11:27] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_provisioning_proto_init() }
@@ -2755,6 +2767,7 @@ func file_mistgate_admin_v1_provisioning_proto_init() {
 	if File_mistgate_admin_v1_provisioning_proto != nil {
 		return
 	}
+	file_mistgate_admin_v1_common_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

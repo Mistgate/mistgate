@@ -330,6 +330,68 @@ func (WarpSource) EnumDescriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{4}
 }
 
+// How a node is handed out to groups. A group receives every node that is not on its disabled list (Group.disabled_node_ids).
+// A node the owner holds back is on that list of every group that was not given it, and a group made later starts with it
+// there too; so the mode is read off the node: ALL when nothing is held back, LISTED while some group receives it, NONE when
+// no group does. Set with GroupService.SetNodeSharing, or at the node's creation (CreateEnrollmentRequest.sharing,
+// StartNodeProvisionRequest.sharing); read in Node.sharing and, per group, in Group.disabled_node_ids.
+type NodeShareMode int32
+
+const (
+	// Only in a request that makes a node: the panel decides. The first node of the panel that is not retired goes to every group
+	// (ALL), each later one to no group (NONE). Never in a response.
+	NodeShareMode_NODE_SHARE_MODE_UNSPECIFIED NodeShareMode = 0
+	// Every group, groups made later too. A group can still turn the node off for itself (UpdateGroup.disabled_node_ids).
+	NodeShareMode_NODE_SHARE_MODE_ALL NodeShareMode = 1
+	// Only the listed groups; a group made later does not get the node.
+	NodeShareMode_NODE_SHARE_MODE_LISTED NodeShareMode = 2
+	// No group, and no group made later, until the owner gives the node to one. A legitimate state: nothing alerts on it.
+	NodeShareMode_NODE_SHARE_MODE_NONE NodeShareMode = 3
+)
+
+// Enum value maps for NodeShareMode.
+var (
+	NodeShareMode_name = map[int32]string{
+		0: "NODE_SHARE_MODE_UNSPECIFIED",
+		1: "NODE_SHARE_MODE_ALL",
+		2: "NODE_SHARE_MODE_LISTED",
+		3: "NODE_SHARE_MODE_NONE",
+	}
+	NodeShareMode_value = map[string]int32{
+		"NODE_SHARE_MODE_UNSPECIFIED": 0,
+		"NODE_SHARE_MODE_ALL":         1,
+		"NODE_SHARE_MODE_LISTED":      2,
+		"NODE_SHARE_MODE_NONE":        3,
+	}
+)
+
+func (x NodeShareMode) Enum() *NodeShareMode {
+	p := new(NodeShareMode)
+	*p = x
+	return p
+}
+
+func (x NodeShareMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NodeShareMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_common_proto_enumTypes[5].Descriptor()
+}
+
+func (NodeShareMode) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_common_proto_enumTypes[5]
+}
+
+func (x NodeShareMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NodeShareMode.Descriptor instead.
+func (NodeShareMode) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{5}
+}
+
 // Why a status is what it is. The UI localizes `code`; `params` fill the placeholders.
 // Codes: agent_silent {minutes}, host_blip {minutes}, enrollment_pending {expires_in_minutes, expires_unix},
 // enrollment_expired (PENDING without a usable install command), inbound_failed {inbound, error, profile, failed,
@@ -1626,6 +1688,59 @@ func (x *HelloKexDevice) GetLastHourUnix() int64 {
 	return 0
 }
 
+// A share asked for: the mode, and for LISTED the groups that receive the node (at least one; empty for ALL and NONE).
+type NodeSharing struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Mode          NodeShareMode          `protobuf:"varint,1,opt,name=mode,proto3,enum=mistgate.admin.v1.NodeShareMode" json:"mode,omitempty"`
+	GroupIds      []string               `protobuf:"bytes,2,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeSharing) Reset() {
+	*x = NodeSharing{}
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeSharing) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeSharing) ProtoMessage() {}
+
+func (x *NodeSharing) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeSharing.ProtoReflect.Descriptor instead.
+func (*NodeSharing) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *NodeSharing) GetMode() NodeShareMode {
+	if x != nil {
+		return x.Mode
+	}
+	return NodeShareMode_NODE_SHARE_MODE_UNSPECIFIED
+}
+
+func (x *NodeSharing) GetGroupIds() []string {
+	if x != nil {
+		return x.GroupIds
+	}
+	return nil
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -1767,7 +1882,10 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\bhello_pq\x18\x06 \x01(\rR\ahelloPq\x12#\n" +
 	"\rhello_classic\x18\a \x01(\rR\fhelloClassic\x12#\n" +
 	"\rhello_unknown\x18\b \x01(\rR\fhelloUnknown\x12(\n" +
-	"\x0elast_hour_unix\x18\t \x01(\x03B\x020\x02R\flastHourUnix*\xd5\x01\n" +
+	"\x0elast_hour_unix\x18\t \x01(\x03B\x020\x02R\flastHourUnix\"`\n" +
+	"\vNodeSharing\x124\n" +
+	"\x04mode\x18\x01 \x01(\x0e2 .mistgate.admin.v1.NodeShareModeR\x04mode\x12\x1b\n" +
+	"\tgroup_ids\x18\x02 \x03(\tR\bgroupIds*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
@@ -1803,7 +1921,12 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"WarpSource\x12\x1b\n" +
 	"\x17WARP_SOURCE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16WARP_SOURCE_REGISTERED\x10\x01\x12\x18\n" +
-	"\x14WARP_SOURCE_IMPORTED\x10\x02B\xc6\x01\n" +
+	"\x14WARP_SOURCE_IMPORTED\x10\x02*\x7f\n" +
+	"\rNodeShareMode\x12\x1f\n" +
+	"\x1bNODE_SHARE_MODE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13NODE_SHARE_MODE_ALL\x10\x01\x12\x1a\n" +
+	"\x16NODE_SHARE_MODE_LISTED\x10\x02\x12\x18\n" +
+	"\x14NODE_SHARE_MODE_NONE\x10\x03B\xc6\x01\n" +
 	"\x15com.mistgate.admin.v1B\vCommonProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -1818,36 +1941,39 @@ func file_mistgate_admin_v1_common_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_common_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_mistgate_admin_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(NodeStatus)(0),          // 0: mistgate.admin.v1.NodeStatus
 	(App)(0),                 // 1: mistgate.admin.v1.App
 	(InboundState)(0),        // 2: mistgate.admin.v1.InboundState
 	(WarpState)(0),           // 3: mistgate.admin.v1.WarpState
 	(WarpSource)(0),          // 4: mistgate.admin.v1.WarpSource
-	(*StatusReason)(nil),     // 5: mistgate.admin.v1.StatusReason
-	(*ProtocolCount)(nil),    // 6: mistgate.admin.v1.ProtocolCount
-	(*Inbound)(nil),          // 7: mistgate.admin.v1.Inbound
-	(*AwgInboundStatus)(nil), // 8: mistgate.admin.v1.AwgInboundStatus
-	(*WarpSummary)(nil),      // 9: mistgate.admin.v1.WarpSummary
-	(*PortCheck)(nil),        // 10: mistgate.admin.v1.PortCheck
-	(*TcpCheck)(nil),         // 11: mistgate.admin.v1.TcpCheck
-	(*LinkHour)(nil),         // 12: mistgate.admin.v1.LinkHour
-	(*HelloKexDevice)(nil),   // 13: mistgate.admin.v1.HelloKexDevice
-	nil,                      // 14: mistgate.admin.v1.StatusReason.ParamsEntry
+	(NodeShareMode)(0),       // 5: mistgate.admin.v1.NodeShareMode
+	(*StatusReason)(nil),     // 6: mistgate.admin.v1.StatusReason
+	(*ProtocolCount)(nil),    // 7: mistgate.admin.v1.ProtocolCount
+	(*Inbound)(nil),          // 8: mistgate.admin.v1.Inbound
+	(*AwgInboundStatus)(nil), // 9: mistgate.admin.v1.AwgInboundStatus
+	(*WarpSummary)(nil),      // 10: mistgate.admin.v1.WarpSummary
+	(*PortCheck)(nil),        // 11: mistgate.admin.v1.PortCheck
+	(*TcpCheck)(nil),         // 12: mistgate.admin.v1.TcpCheck
+	(*LinkHour)(nil),         // 13: mistgate.admin.v1.LinkHour
+	(*HelloKexDevice)(nil),   // 14: mistgate.admin.v1.HelloKexDevice
+	(*NodeSharing)(nil),      // 15: mistgate.admin.v1.NodeSharing
+	nil,                      // 16: mistgate.admin.v1.StatusReason.ParamsEntry
 }
 var file_mistgate_admin_v1_common_proto_depIdxs = []int32{
-	14, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
+	16, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
 	2,  // 1: mistgate.admin.v1.Inbound.state:type_name -> mistgate.admin.v1.InboundState
-	8,  // 2: mistgate.admin.v1.Inbound.awg:type_name -> mistgate.admin.v1.AwgInboundStatus
+	9,  // 2: mistgate.admin.v1.Inbound.awg:type_name -> mistgate.admin.v1.AwgInboundStatus
 	3,  // 3: mistgate.admin.v1.WarpSummary.state:type_name -> mistgate.admin.v1.WarpState
 	4,  // 4: mistgate.admin.v1.WarpSummary.source:type_name -> mistgate.admin.v1.WarpSource
-	5,  // [5:5] is the sub-list for method output_type
-	5,  // [5:5] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	5,  // 5: mistgate.admin.v1.NodeSharing.mode:type_name -> mistgate.admin.v1.NodeShareMode
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_common_proto_init() }
@@ -1860,8 +1986,8 @@ func file_mistgate_admin_v1_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_common_proto_rawDesc), len(file_mistgate_admin_v1_common_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   10,
+			NumEnums:      6,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
