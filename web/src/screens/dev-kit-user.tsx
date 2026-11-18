@@ -9,7 +9,8 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { LinkDeviceLimit, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { DeviceKind, QuotaReset, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { DeviceKind, PagePasswordAction, QuotaReset, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { users as usersApi } from "@/lib/api";
 import { isLang, setLang, useLang } from "@/i18n";
 import { clientApiQuery } from "@/lib/clientapi";
 import { clientLogsQuery } from "@/lib/client-debug";
@@ -32,8 +33,8 @@ import { GoneCard, UserDetail, userTabs, type UserTab } from "./users/user-detai
 //   /dev-kit?only=user-page&state=<state>[&tab=overview|devices|access|logs|settings][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1][&ui=<what is open>]
 // state: ok (alice: active, 38 GB of 100) | over (the quota is used up) | exp (the term ended) | off (disabled) | new (never connected) | full (every place
 //   is taken) | groups (ten groups) | tt-off | tt-none | tt-nol (a key and no link) | tt-paused (a key on hold) | track (over the limit, only counted) |
-//   alert (an open alert about alice) | logs (devices of the Mistgate app and what came of their logs) | gone (the person was just deleted)
-// ui: dirty (a limit changed: the save bar) | group | newgroup | dns | menu | qr (the TrustTunnel QR) | link-qr | pw (the page password shown) | rotate |
+//   pw-removed (alice's page password was removed) | pw-off (the instance asks for no page password) | alert (an open alert about alice) | logs (devices of the Mistgate app and what came of their logs) | gone (the person was just deleted)
+// ui: dirty (a limit changed: the save bar) | group | newgroup | dns | menu | qr (the TrustTunnel QR) | link-qr | pw (the page password shown) | pw-change | pw-remove (the question in the block) | pw-changed (a change made: the new password) | pw-restored (brought back) |
 //   reset | delete | add (add a key) | hover (a day of the chart) | tgqr | extra-add (the list of groups to add) | extra-menu (the menu of a chip) |
 //   extra-confirm-add | extra-confirm-remove | extra-confirm-main | extra-confirm-none (the window of a change of groups, on made-up impact)
 // state extra: alice is in family as the main group and in colleagues and friends as extra groups.
@@ -178,7 +179,7 @@ export function detailOf(state: string): DetailN {
     apps: { happ: true, amnezia: true, telegram: true, mistgate: true, trustTunnel: state !== "tt-off" },
     via: [], devicesUsed: isNew ? 0 : full ? 5 : used2, deviceLimit: 5, devicesIdle: 0, usedBytes: used * GB, quotaBytes: 100 * GB, quotaReset: QuotaReset.MONTH, nextResetUnix: NOW + 17 * D,
     expiresUnix: NOW + days * D, lastSeenUnix: isNew ? 0 : NOW - (off || exp || over ? 2 * D : 60), online: !isNew && !off && !exp && !over, currentNodeId: id("de1"), currentNodeName: "de1", speedLimitBps: 0, deviceSpeedLimitBps: 0,
-    nodes: { all: true, nodeIds: [] as string[] }, createdUnix: NOW - 28 * D, dnsPresetId: "", effectiveDnsPresetId: "dns_builtin_standard", effectiveDnsPresetName: "Cloudflare + Google", dnsSource: 3,
+    nodes: { all: true, nodeIds: [] as string[] }, pageOpen: state === "pw-removed", createdUnix: NOW - 28 * D, dnsPresetId: "", effectiveDnsPresetId: "dns_builtin_standard", effectiveDnsPresetName: "Cloudflare + Google", dnsSource: 3,
     accessHapp: true, accessAmnezia: true, accessTelegram: true, telegramIssued: true,
   };
   return {
@@ -204,6 +205,28 @@ const logInfo = (over: Record<string, unknown>) => ({
   requestedUnix: NOW - 1800, expiresUnix: NOW + 70 * H, closedUnix: 0, records: 0, bytes: 0, droppedAttrs: 0, firstUnixMs: 0, lastUnixMs: 0, app: "", readUnix: 0, ...over,
 });
 
+/**
+ * The password buttons of a scene (change, remove, bring back) answered here: the scene is its own page, so patching the shared client is
+ * safe. Each change gives the next made-up password; the state starts as the scene's.
+ */
+function fakePasswordCalls(s: Scene) {
+  const api = usersApi as unknown as Record<string, unknown> | undefined;
+  if (!api) return; // the unit test of the scenes mocks the client without it
+  const words = ["lake-2718-moss", "fern-4409-dune", "reed-9051-wave", "moss-3376-lark"];
+  let n = 0;
+  let open = s.state === "pw-removed";
+  api.updateUser = async ({ pagePasswordAction }: { pagePasswordAction: PagePasswordAction }) => {
+    if (pagePasswordAction === PagePasswordAction.CHANGE) n++;
+    else if (pagePasswordAction === PagePasswordAction.REMOVE) open = true;
+    else if (pagePasswordAction === PagePasswordAction.RESTORE) {
+      open = false;
+      n++;
+    }
+    return { user: { ...detailOf(s.state).user, pageOpen: open } };
+  };
+  api.getSubscriptionLink = async () => ({ url: "https://sub.example.com/s/alice-7f3k9q", pagePassword: open || s.state === "pw-off" ? "" : words[n % words.length] });
+}
+
 /** The private query cache of a scene: the shell of the Nodes scene (the same fleet) and everything the person's page reads. */
 export function cacheOf(s: Scene) {
   const edge = s.state === "edge";
@@ -216,7 +239,9 @@ export function cacheOf(s: Scene) {
   c.setQueryData(settingsQuery.queryKey, settings(s.state === "track") as never);
   c.setQueryData(dnsPresetsQuery.queryKey, dnsPresets as never);
   c.setQueryData(clientApiQuery.queryKey, { enabled: true } as never);
-  c.setQueryData(["users", "link", "usr_alice"], { url: "https://sub.example.com/s/alice-7f3k9q", password: "lake-2718-moss" });
+  // the page password: pw-removed (alice's was removed) and pw-off (the instance asks for none) give the link no password to show
+  c.setQueryData(["users", "link", "usr_alice"], { url: "https://sub.example.com/s/alice-7f3k9q", password: s.state === "pw-removed" || s.state === "pw-off" ? "" : "lake-2718-moss" });
+  fakePasswordCalls(s);
   c.setQueryData(["users", "dns-choices", "usr_alice"], {
     choices: [{ nodeId: id("de1"), nodeName: "de1", presetId: "dns_builtin_standard", presetName: "Cloudflare + Google", offered: true, effectivePresetId: "dns_builtin_standard", effectivePresetName: "Cloudflare + Google", updatedUnix: 0 }],
     link: { nodeId: "", nodeName: "", presetId: "dns_builtin_standard", presetName: "Cloudflare + Google", offered: true, effectivePresetId: "dns_builtin_standard", effectivePresetName: "Cloudflare + Google", updatedUnix: 0 },
@@ -286,8 +311,14 @@ function useUi(ui: string) {
       qr: () => press([...document.querySelectorAll<HTMLElement>(".tq-sv > div:first-child button")].at(-1)),
       tgqr: () => press([...document.querySelectorAll<HTMLElement>(".up-tg > div:first-child button")].at(-1)),
       "link-qr": () => press([...document.querySelectorAll<HTMLElement>(".up-lkc .up-code button")].at(-1)),
-      pw: () => press(q(".up-pw .a button")),
-      rotate: () => press([...document.querySelectorAll<HTMLElement>(".up-pw .a button")].at(-1)),
+      pw: () => press(q("[data-pw] [data-act=show]")),
+      "pw-change": () => press(q("[data-pw] [data-act=change]")),
+      "pw-remove": () => press(q("[data-pw] [data-act=remove]")),
+      "pw-changed": () => {
+        press(q("[data-pw] [data-act=change]"));
+        window.setTimeout(() => press(q("[data-pw] [data-act=yes]")), 250);
+      },
+      "pw-restored": () => press(q("[data-pw] [data-act=restore]")),
       reset: () => press(q(".up-sv-row button")),
       delete: () => press([...document.querySelectorAll<HTMLElement>(".up-sv-row button")].at(-1)),
       add: () => press(q("[data-testid=add-key]")),
@@ -345,7 +376,15 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "user-gone-phone", state: "gone", title: "Deleted, a phone", w: 400, h: 600 },
   { id: "user-ov-qr", state: "ok", title: "The link and its QR window", w: 1440, h: 900, params: "&ui=link-qr" },
   { id: "user-ov-pw", state: "ok", title: "The page password shown", w: 1440, h: 900, params: "&ui=pw" },
-  { id: "user-ov-rotate", state: "ok", title: "A new link and password: the question", w: 1440, h: 900, params: "&ui=rotate" },
+  { id: "user-ov-pw-change", state: "ok", title: "The page password: Change asks first, in the block", w: 1440, h: 900, params: "&ui=pw-change" },
+  { id: "user-ov-pw-remove", state: "ok", title: "The page password: Remove asks first, in the block", w: 1440, h: 900, params: "&ui=pw-remove" },
+  { id: "user-ov-pw-changed", state: "ok", title: "The page password just changed: the new one, \"the old one no longer works\"", w: 1440, h: 900, params: "&ui=pw-changed" },
+  { id: "user-ov-pw-removed", state: "pw-removed", title: "The page password removed: anyone with the link opens the page, Bring the password back", w: 1440, h: 900 },
+  { id: "user-ov-pw-restored", state: "pw-removed", title: "The password brought back: a new one is shown", w: 1440, h: 900, params: "&ui=pw-restored" },
+  { id: "user-ov-pw-off", state: "pw-off", title: "The instance asks for no page password: said so, with the way to the setting", w: 1440, h: 900 },
+  { id: "user-ov-pw-phone", state: "ok", title: "The password block on a phone, the question open", w: 400, h: 1400, params: "&ui=pw-remove" },
+  { id: "user-ov-pw-changed-light", state: "ok", title: "The page password just changed, light theme", w: 1440, h: 900, params: "&ui=pw-changed&theme=light" },
+  { id: "user-ov-pw-changed-fa", state: "ok", title: "The page password just changed, right to left (fa)", w: 1440, h: 900, params: "&ui=pw-changed&lang=fa" },
   { id: "user-dv", state: "ok", title: "Devices (1440)", w: 1440, h: 1500, params: "&tab=devices" },
   { id: "user-dv-light", state: "ok", title: "Devices on the light theme", w: 1440, h: 1500, params: "&tab=devices&theme=light" },
   { id: "user-dv-phone", state: "ok", title: "Devices on a phone", w: 400, h: 2400, params: "&tab=devices" },

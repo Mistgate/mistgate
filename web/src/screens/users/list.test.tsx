@@ -5,7 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
-import { UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { PagePasswordAction, UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { setLang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
 import { groupTone } from "./format";
@@ -15,6 +15,7 @@ const listUsers = vi.fn();
 const createUser = vi.fn();
 const getUser = vi.fn();
 const getSubscriptionLink = vi.fn();
+const updateUser = vi.fn();
 const extendUsers = vi.fn();
 const resetUserTraffic = vi.fn();
 const setUsersEnabled = vi.fn();
@@ -28,6 +29,7 @@ vi.mock("@/lib/api", async (orig) => ({
     createUser: (...a: unknown[]) => createUser(...a),
     getUser: (...a: unknown[]) => getUser(...a),
     getSubscriptionLink: (...a: unknown[]) => getSubscriptionLink(...a),
+    updateUser: (...a: unknown[]) => updateUser(...a),
     extendUsers: (...a: unknown[]) => extendUsers(...a),
     resetUserTraffic: (...a: unknown[]) => resetUserTraffic(...a),
     setUsersEnabled: (...a: unknown[]) => setUsersEnabled(...a),
@@ -85,6 +87,7 @@ const person = (over: Record<string, unknown>) => ({
   createdUnix: 0n,
   accessHapp: false,
   accessAmnezia: false,
+  pageOpen: false,
   ...over,
 });
 
@@ -118,7 +121,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [listUsers, createUser, getUser, getSubscriptionLink, extendUsers, resetUserTraffic, setUsersEnabled, navigate]) m.mockReset();
+  for (const m of [listUsers, createUser, getUser, getSubscriptionLink, updateUser, extendUsers, resetUserTraffic, setUsersEnabled, navigate]) m.mockReset();
   written.length = 0;
 });
 
@@ -358,12 +361,72 @@ describe("an open row", () => {
     expect(JSON.parse(page.dataset.params!)).toEqual({ id: "usr_b" });
   });
 
-  it("says the page asks for no password when the link has none", async () => {
+  it("says the page passwords are off for everyone when the instance asks for none, with the way to the setting", async () => {
     getSubscriptionLink.mockResolvedValue({ url: "https://sub.example.com/s/bob-7f3k9q", pagePassword: "" });
     await mount();
     await click(opener("bob"));
     await settle();
-    expect(rowOf("bob").parentElement!.textContent).toContain("not set, anyone with the link can open the page");
+    const card = rowOf("bob").parentElement!;
+    expect(card.textContent).toContain("Page passwords are switched off for everyone.");
+    expect(card.textContent).not.toContain("anyone with the link can open the page");
+    expect([...card.querySelectorAll("button")].find((b) => b.textContent === "Change")).toBeUndefined();
+    const setting = [...card.querySelectorAll<HTMLAnchorElement>("a")].find((a) => a.textContent === "Setting")!;
+    expect(setting.getAttribute("href")).toBe("/subscriptions");
+    expect(JSON.parse(setting.dataset.search!)).toEqual({ tab: "page" });
+  });
+
+  it("a person whose password was removed: says anyone with the link opens the page and offers to bring the password back", async () => {
+    getSubscriptionLink.mockResolvedValue({ url: "https://sub.example.com/s/bob-7f3k9q", pagePassword: "" });
+    listUsers.mockResolvedValue({
+      users: [person({ id: "usr_b", name: "bob", groupId: "grp_ok", groupName: "ok", accessHapp: true, pageOpen: true })],
+      nextPageToken: "",
+      counts: { all: 1, online: 0, expiring: 0, overQuota: 0, devicesUsed: 0, devicesOnline: 0, overDeviceLimit: 0, telegram: 0 },
+    });
+    await mount();
+    await click(opener("bob"));
+    await settle();
+    const card = rowOf("bob").parentElement!;
+    expect(card.textContent).toContain("not set, anyone with the link can open the page");
+    expect(card.textContent).not.toContain("switched off for everyone");
+    expect([...card.querySelectorAll("button")].find((b) => b.textContent === "Bring the password back")).toBeDefined();
+    expect([...card.querySelectorAll("button")].find((b) => b.textContent === "Show")).toBeUndefined();
+  });
+
+  it("changes the password only after the question in the block, shows the new one with the hint, and refreshes the people", async () => {
+    updateUser.mockResolvedValue({ user: person({ id: "usr_b", name: "bob" }) });
+    await mount();
+    await click(opener("bob"));
+    await settle();
+    const card = () => rowOf("bob").parentElement!;
+    const inCard = (label: string) => [...card().querySelectorAll("button")].find((b) => b.textContent === label);
+    await click(inCard("Change"));
+    expect(card().querySelector("[role=alert]")?.textContent).toContain("Change the page password?");
+    expect(updateUser).not.toHaveBeenCalled();
+    await click(inCard("Cancel"));
+    expect(card().querySelector("[role=alert]")).toBeNull();
+    getSubscriptionLink.mockResolvedValue({ url: "https://sub.example.com/s/bob-7f3k9q", pagePassword: "fern-4409" });
+    await click(inCard("Change"));
+    await click([...card().querySelectorAll("[role=alert] button")].find((b) => b.textContent === "Change"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_b", pagePasswordAction: PagePasswordAction.CHANGE });
+    expect(card().textContent).toContain("fern-4409");
+    expect(card().textContent).toContain("A new password. The old one no longer works");
+    expect(card().textContent).not.toContain("lake-2718-moss");
+  });
+
+  it("removes the password after the question: the line says anyone with the link opens the page", async () => {
+    updateUser.mockResolvedValue({ user: person({ id: "usr_b", name: "bob", pageOpen: true }) });
+    await mount();
+    await click(opener("bob"));
+    await settle();
+    const card = () => rowOf("bob").parentElement!;
+    await click([...card().querySelectorAll("button")].find((b) => b.textContent === "Remove"));
+    expect(card().querySelector("[role=alert]")?.textContent).toContain("Remove the page password?");
+    getSubscriptionLink.mockResolvedValue({ url: "https://sub.example.com/s/bob-7f3k9q", pagePassword: "" });
+    await click([...card().querySelectorAll("[role=alert] button")].find((b) => b.textContent === "Remove"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_b", pagePasswordAction: PagePasswordAction.REMOVE });
+    expect(card().textContent).toContain("not set, anyone with the link can open the page");
   });
 
   it("leads with a line about what is wrong: disabled, expired, over the quota, device places full", async () => {

@@ -1,6 +1,6 @@
 /*
  * The person's page of the redesign (screens/users/user-*.tsx): what utilities cannot say, in the board's own numbers (PnUser + pn.css:
- * the up-, nd-, tq-, sv- and us-pw/us-lim rules; the last rule of a selector wins). A container query of the board (the whole panel is its
+ * the up-, nd-, tq-, sv- and us-lim rules; the last rule of a selector wins). A container query of the board (the whole panel is its
  * container) is a media query here. Entrance motion (rows, bars, the chart) only runs under .up-fx (the effects switch).
  */
 
@@ -792,65 +792,8 @@ a.up-gtag:hover {
   text-align: end;
   color: var(--text);
 }
-/* the page password */
-.up-pw {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px 12px;
-  margin-top: 4px;
-  padding-block: 8px;
-  padding-inline: 10px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--up-hair);
-}
-.up-pw > .g {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--step);
-  color: var(--sec);
-}
-.up-pw.set > .g {
-  background: var(--tone-mint-bg);
-  color: var(--tone-mint);
-}
-.up-pw > .t {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.up-pw > .t b {
-  font-size: 13px;
-  font-weight: 500;
-}
-.up-pw > .t > span {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.up-pw > .t > span.mono {
-  font-family: var(--font-mono);
-  color: var(--sec);
-}
-.up-lkc .up-pw {
-  grid-template-columns: 28px minmax(0, 1fr);
-}
-.up-lkc .up-pw > .a {
-  grid-column: 1 / -1;
-}
 [dir="rtl"] .up-chw {
   direction: ltr;
-}
-.up-pw > .a {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 /* ---- Devices ---- */
@@ -2307,13 +2250,6 @@ a.up-gtag:hover {
   .up-save.on {
     padding-inline: 16px;
     max-height: 120px;
-  }
-  .up-pw {
-    grid-template-columns: 28px minmax(0, 1fr);
-  }
-  .up-pw > .a {
-    grid-column: 1 / -1;
-    flex-wrap: wrap;
   }
   .up-sum .up-dots {
     display: none;

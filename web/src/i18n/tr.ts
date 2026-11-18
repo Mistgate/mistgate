@@ -260,6 +260,7 @@ const core: CoreMessages = {
   "err.guard": "Panel yüklenemiyor",
   "err.name_taken": "Bu ad zaten kullanımda. Başka bir ad seç.",
   "err.group_not_empty": "Bu grupta hâlâ kullanıcılar var: {users}. Onları başka bir gruba taşı, sonra grubu sil.",
+  "err.page_password_removed": "Bu kişinin sayfasında şu an parola yok. Önce parolayı geri getir.",
   "err.group_in_both": "Aynı grup iki listede de var: ya ekle ya çıkar, ikisini birden yapma.",
   "err.main_group": "Ana grup çıkarılamaz: onun yerine başka bir grubu ana grup yap.",
   "err.too_many_groups": "Bir kişi en fazla 16 grupta olabilir.",

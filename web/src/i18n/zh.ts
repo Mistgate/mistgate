@@ -261,6 +261,7 @@ const core: CoreMessages = {
 
   "err.name_taken": "此名称已被占用。请换一个。",
   "err.group_not_empty": "分组中仍有用户：{users}。先把他们移到其他分组，再删除此分组。",
+  "err.page_password_removed": "此人的页面目前没有密码。请先恢复密码。",
   "err.group_in_both": "同一个分组同时出现在两个列表中：请只选择加入或移出其中一种。",
   "err.main_group": "不能移出主分组：请改为将另一个分组设为主分组。",
   "err.too_many_groups": "一个用户最多属于 16 个分组。",

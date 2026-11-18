@@ -83,7 +83,7 @@ function PageCard({ user, actions }: { user: User; actions: Actions }) {
           <input className="up-i" aria-label={t("users.subscriptionName")} value={name} maxLength={64} autoComplete="off" spellCheck={false} placeholder={user.name} disabled={busy || readonly} onChange={(e) => setDraft({ server: user.subscriptionName, value: e.target.value })} />
           <small>{t("users.subscriptionNamePreview", { name: trimmed || user.name })}</small>
         </label>
-        {!readonly && <PagePassword link={link} />}
+        {!readonly && <PagePassword user={user} link={link} />}
       </div>
       <div className={cx("up-save", (dirty || ok) && "on", ok && !dirty && "ok")}>
         <span>{dirty ? t("up.nameUnsaved") : t("up.saved")}</span>

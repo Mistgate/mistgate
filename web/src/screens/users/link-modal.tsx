@@ -15,6 +15,7 @@ import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { settingsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import type { UserN } from "./model";
+import { PagePasswordBlock, type PwNow } from "./page-password";
 import { G, P } from "./user-bits";
 import { QueryError } from "@/components/ui/query-error";
 import { plainText } from "@/i18n";
@@ -32,6 +33,8 @@ export type LinkTarget = {
   /** Active and the page offers nothing: the red line. Absent = unknown, nothing is said. */
   access?: { happ: boolean; amnezia: boolean };
   active?: boolean;
+  /** The person's page password was removed: their page opens on the link alone. Absent = it was not. */
+  pageOpen?: boolean;
   group?: { id: string; name: string; givesNothing: boolean };
 };
 
@@ -42,6 +45,7 @@ export const linkTargetOf = (u: UserN, group?: { happNodes: number; amneziaNodes
   amnezia: !!u.apps?.amnezia,
   access: { happ: u.accessHapp, amnezia: u.accessAmnezia },
   active: u.status === UserStatus.ACTIVE,
+  pageOpen: u.pageOpen,
   group: { id: u.groupId, name: u.groupName, givesNothing: !group || (group.happNodes === 0 && group.amneziaNodes === 0) },
 });
 
@@ -57,8 +61,9 @@ const glyph = (d: string) => <G d={d} size={16} stroke={1.5} />;
 
 /**
  * "QR and send" (the board's send window): the job of this window is "send the friend what they need". The QR is for a phone in
- * the room, the two rows copy one value each, the primary button copies a ready-to-paste message (the link, and the page password
- * when the instance asks for one; Share where the browser has it), and "New link" (asks first, in the window) replaces the pair.
+ * the room, the link row copies the link, the password block shows, changes, removes and brings back the page password (each asks first,
+ * in the block), the primary button copies a ready-to-paste message (the link, and the page password when the person has one; Share where
+ * the browser has it), and "New link" (asks first, in the window) replaces the pair.
  * `initialUrl` and `initialPassword` are passed right after creating a user (the create call already returned them); otherwise both
  * are fetched when the window opens and never cached (gcTime 0): they are secrets.
  */
@@ -85,6 +90,9 @@ function LinkWindow({ open, target, initialUrl, initialPassword, onClose }: { op
   const [rotated, setRotated] = useState<{ url: string; password: string } | null>(null);
   const [ask, setAsk] = useState(false);
   const [replaced, setReplaced] = useState(false);
+  // the password block's own changes (change, remove, bring back) in this window: the state they gave, until a new link replaces the password
+  const [pwOpen, setPwOpen] = useState<boolean | undefined>(undefined);
+  const [pwText, setPwText] = useState<string | undefined>(undefined);
 
   const fetched = useQuery({
     queryKey: ["users", "link", target.id],
@@ -103,14 +111,21 @@ function LinkWindow({ open, target, initialUrl, initialPassword, onClose }: { op
     },
     onSuccess: (r) => {
       setRotated(r);
+      setPwText(undefined); // the new link has its own password (and the person's removed state stays as it was)
       setAsk(false);
       setReplaced(true);
     },
     onError: (e) => toast.error(errorText(e, t)),
   });
   const url = rotated?.url ?? initialUrl ?? fetched.data?.url ?? "";
-  // "" when the instance does not ask for a password (the setting is off): then there is nothing to show
-  const password = rotated ? rotated.password : initialUrl ? (initialPassword ?? "") : (fetched.data?.password ?? "");
+  // "" when the instance does not ask for a password (the setting is off) or the person's password was removed: then there is nothing to show
+  const password = pwText ?? (rotated ? rotated.password : initialUrl ? (initialPassword ?? "") : (fetched.data?.password ?? ""));
+  const pageOpen = pwOpen ?? target.pageOpen ?? false;
+  const passwordDone = (r: PwNow) => {
+    setPwOpen(r.open);
+    setPwText(r.password);
+    setReplaced(false);
+  };
 
   // what the friend gets: both lines when there is a page password, else the bare link
   const message = password ? t("users.shareText", { url, password }) : url;
@@ -171,18 +186,7 @@ function LinkWindow({ open, target, initialUrl, initialPassword, onClose }: { op
           <Row icon={D.link} label={t("users.linkQr")} action={<CopyButton iconOnly variant="outline" size="md" label={t("users.copyUrl")} value={url} />}>
             <MiddleText text={url} />
           </Row>
-          <Row
-            icon={P.lock}
-            set={!!password}
-            label={t("users.pagePassword")}
-            action={password ? <CopyButton iconOnly variant="outline" size="md" label={t("users.copyPassword")} value={password} /> : <span aria-hidden />}
-          >
-            {password ? (
-              <code className="font-mono text-sm leading-[18px] font-medium tracking-[0.04em] break-all text-fg select-all">{password}</code>
-            ) : (
-              <span className="text-xs leading-[18px] text-muted">{t("ul.pw.none")}</span>
-            )}
-          </Row>
+          <PagePasswordBlock userId={target.id} open={pageOpen} password={password} ready={!!url} onDone={passwordDone} stacked revealed className="bg-canvas" />
           <Nothing target={target} />
           <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
             <CopyButton variant="primary" size="lg" full label={t("users.copyShare")} value={message} />
