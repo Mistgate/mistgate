@@ -151,6 +151,18 @@ describe("the list", () => {
     expect(panel.textContent).not.toContain("Studio");
   });
 
+  it("fills the last row of the grid of nodes up to five cells, for any count of nodes and the panel", async () => {
+    for (const count of [1, 4, 5, 9, 12, 13]) {
+      document.body.innerHTML = "";
+      await mountUi(list(), { lib: library(sites), nodes: Array.from({ length: count }, (_, i) => node(`n${i + 1}`)) });
+      const now = document.querySelector("[data-shot=decoy-now]")!;
+      const real = now.querySelectorAll(".dz-nw:not(.dz-nb)").length;
+      expect(real, `${count} nodes`).toBe(count + 1); // the nodes and the panel
+      expect(now.querySelectorAll(".dz-nw").length % 5, `${count} nodes`).toBe(0);
+      expect(now.querySelectorAll(".dz-nb").length, `${count} nodes`).toBeLessThan(5);
+    }
+  });
+
   it("shows what stands on each node, the built-in entries and the own sites", async () => {
     await mountUi(list(), { lib: library(sites, { panelSource: "site:dsi_wd" }), nodes });
     expect(text()).toContain(en["dz.now"]);

@@ -113,11 +113,14 @@
   color: var(--muted);
 }
 
-/* showing now */
+/* showing now: the lines are the 1px gaps of a grid on the border colour, so every cell has all its lines at any count of nodes;
+   the last row is filled up with blank cells (.dz-nb) so the gap colour never shows as a block */
 .dz-now {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
   overflow: hidden;
+  background: var(--border);
 }
 .dz-nw {
   display: grid;
@@ -125,14 +128,8 @@
   gap: 2px;
   min-width: 0;
   padding: 14px 16px;
-  border-inline-start: 1px solid var(--border);
+  background: var(--surface);
   transition: background-color 0.15s var(--e);
-}
-.dz-nw:nth-child(5n + 1) {
-  border-inline-start: 0;
-}
-.dz-nw:nth-child(n + 6) {
-  border-top: 1px solid var(--border);
 }
 .dz-nw:hover {
   background: var(--step);
@@ -1443,14 +1440,8 @@
   .dz-ws {
     display: none;
   }
-  .dz-nw:nth-child(n + 6) {
-    border-top: 0;
-  }
-  .dz-nw:nth-child(5n + 1) {
-    border-inline-start: 1px solid var(--border);
-  }
-  .dz-nw:first-child {
-    border-inline-start: 0;
+  .dz-nb {
+    display: none;
   }
   .dz-now {
     grid-template-columns: none;

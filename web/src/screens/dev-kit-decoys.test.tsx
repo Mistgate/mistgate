@@ -55,6 +55,11 @@ describe("the scenes of the Decoy sites screens", () => {
     const cards = () => document.querySelectorAll("a.dz-c").length;
     if (state === "list") expect(cards()).toBe(7);
     if (state === "list-full") expect(cards()).toBe(100);
+    if (state === "list-many") {
+      // twelve nodes and the panel: thirteen cells, filled up to fifteen so the last row has all its lines
+      expect(document.querySelectorAll("[data-shot=decoy-now] .dz-nw:not(.dz-nb)").length).toBe(13);
+      expect(document.querySelectorAll("[data-shot=decoy-now] .dz-nb").length).toBe(2);
+    }
     if (state === "list-draft") expect(cards()).toBe(3);
     if (state === "list-find") expect(cards()).toBe(1);
     if (state === "list-nomatch") expect(text()).toContain(en["dz.none.title"]);
