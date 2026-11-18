@@ -213,3 +213,10 @@ func TestAssistantPromptDecidesDetailsAndKeepsSecretsOut(t *testing.T) {
 		t.Fatal("the prompt still mentions ui_prefill")
 	}
 }
+
+// The panel speaks to its owner as "ты"; the assistant must too, not "вы".
+func TestAssistantPromptAddressesRussianAsTy(t *testing.T) {
+	if !strings.Contains(assistantFixedPrompt, `address them as "ты" (never "вы")`) {
+		t.Fatal("the prompt does not tell the assistant to address a Russian speaker as ты")
+	}
+}
