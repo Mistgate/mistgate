@@ -532,7 +532,7 @@
 .uq .uq-last { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 13px; color: var(--sec); }
 .uq .uq-last > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .uq .uq-last .uq-btn, .uq .uq-last button { flex: none; }
-.uq .uq-last .uq-lw { color: var(--accent-text); }
+/* a schedule that waits is plain, as on the board (the same colour as the rest of the line); only a missed one is told apart */
 .uq .uq-last .uq-lw.miss, .uq .uq-last .uq-lw.warn { color: var(--warning-text); }
 .uq .uq-last .uq-lb { color: var(--danger-text); }
 .uq .uq-last .uq-lq { font-size: 12px; line-height: 16px; color: var(--muted); }

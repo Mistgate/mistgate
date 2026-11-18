@@ -177,8 +177,10 @@ const text = () => document.body.textContent ?? "";
 const rows = () => [...document.querySelectorAll<HTMLElement>("[data-testid=reach-node]")];
 const row = (name: string) => rows().find((r) => r.querySelector(".hl-cnode b")?.textContent === name)!;
 const trigger = (name: string) => row(name).querySelector<HTMLElement>("button.rc-r")!;
-/** opens the row of a node (one at a time, as a click does) */
-const open = (name: string) => click(trigger(name));
+/** opens the row of a node (one at a time, as a click does); the board starts with one open (the first that is not all right), so a row that is open stays */
+const open = async (name: string) => {
+  if (trigger(name).getAttribute("aria-expanded") !== "true") await click(trigger(name));
+};
 const detail = (name: string) => row(name).querySelector<HTMLElement>(".rc-d")!;
 const line = (name: string, source: string) => detail(name).querySelector<HTMLElement>(`[data-testid=line-${source}]`)!;
 const segs = (name: string, source: string) => [...line(name, source).querySelectorAll<HTMLElement>("[data-seg]")];
@@ -324,8 +326,17 @@ describe("a row of the table", () => {
     await open("fi1");
     expect(detail("de1")).toBeNull();
     expect(trigger("fi1").getAttribute("aria-expanded")).toBe("true");
-    await open("fi1");
+    await click(trigger("fi1"));
     expect(detail("fi1")).toBeNull();
+  });
+
+  it("starts as the board does, with one row open: the first that is not all right", async () => {
+    await mount();
+    const opened = rows().filter((r) => r.querySelector("button.rc-r")?.getAttribute("aria-expanded") === "true");
+    expect(opened).toHaveLength(1);
+    expect(opened[0]).toBe(rows().find((r) => r.getAttribute("data-state") !== "ok"));
+    await click(trigger(opened[0]!.querySelector(".hl-cnode b")!.textContent!));
+    expect(rows().some((r) => r.querySelector("button.rc-r")?.getAttribute("aria-expanded") === "true")).toBe(false);
   });
 
   it("says in the open row what the sources said, the verdict in full, and leads to the node and to its alert", async () => {
@@ -470,7 +481,8 @@ describe("a block on some networks", () => {
 
   it("opens its breakdown with the row, in full, on that node only", async () => {
     await mount();
-    expect(document.querySelectorAll("[data-testid=partial-breakdown]")).toHaveLength(0);
+    // the board starts with one row open: the first that is not all right, here de1 (some networks)
+    expect(document.querySelectorAll("[data-testid=partial-breakdown]")).toHaveLength(1);
     await open("de1");
     const more = detail("de1").querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
     const lists = [...more.querySelectorAll("ul")];

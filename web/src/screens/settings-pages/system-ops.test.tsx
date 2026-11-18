@@ -108,6 +108,14 @@ describe("Settings → System → the panel's diagnostics", () => {
     expect(ops.getPanelLogs.mock.calls[0]?.[0]).toMatchObject({ minLevel: "info", limit: 100 });
   });
 
+  it("gives the log level its own row, the four choices sharing it (the board's .us-seg), and the search below", async () => {
+    await mount();
+    const levels = document.querySelector<HTMLElement>(`[role=radiogroup][aria-label="${en["obs.logs.show"]}"]`)!;
+    expect(levels.className).toContain("w-full");
+    expect(levels.className).toContain("[&>*]:flex-1");
+    expect(levels.querySelectorAll("[role=radio]")).toHaveLength(4);
+  });
+
   it("shows nothing to a helper: the procedures are the owner's", async () => {
     role = Role.HELPER;
     await mount();

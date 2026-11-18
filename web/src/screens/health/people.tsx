@@ -20,7 +20,7 @@ export function PeopleTab({ active, now, flow, first = false, init }: { active: 
   const rows = peopleOrder(active);
   const groups = rows.map((a) => [a]);
   const access = useQuery(accessQuery);
-  const [open, setOpen] = useOpenRow(groups, init?.open ?? null);
+  const [open, setOpen] = useOpenRow(groups, init?.open ?? null, false);
   return (
     <div className="sb-tab">
       {rows.length > 0 && (

@@ -16,6 +16,8 @@
 }
 .sx .mono {
   font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 /* L35 */

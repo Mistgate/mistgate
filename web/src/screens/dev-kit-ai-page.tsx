@@ -77,7 +77,7 @@ export function settingsData(mods: ReadonlySet<string>) {
   const key = mods.has("key");
   const on = (p: AssistantProvider, hint: string, over: Status = {}) => status(p, { connected: !noProv, keyHint: hint, addedUnix: NOW - 3 * D, ...over });
   return {
-    settings: { enabled: !mods.has("off"), provider: AssistantProvider.ANTHROPIC, fallbackProvider: AssistantProvider.UNSPECIFIED, effort: AssistantEffort.NORMAL, audience: AssistantAudience.OWNER, panelNotes: "nl1 is the test node for new profiles; msk1 sits in Moscow and is only for people in Russia.", retentionDays: 90 },
+    settings: { enabled: !mods.has("off"), provider: AssistantProvider.ANTHROPIC, fallbackProvider: AssistantProvider.UNSPECIFIED, effort: AssistantEffort.NORMAL, audience: AssistantAudience.ADMINS, panelNotes: "nl1 is the test node for new profiles; msk1 sits in Moscow and is only for people in Russia.", retentionDays: 90 },
     providers: [
       on(AssistantProvider.ANTHROPIC, "Qx7d", { choice: { provider: AssistantProvider.ANTHROPIC, model: "claude-sonnet-5-5", budgetUsdMonth: 20 }, spentUsdMonth: bud ? 20 : 3.41, lastErrorCode: key ? "bad_key" : "" }),
       on(AssistantProvider.DEEPSEEK, "k3Rt"),

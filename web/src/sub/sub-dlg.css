@@ -9,6 +9,8 @@
 
 /* a long server name wraps inside its chip instead of pushing it off a narrow window */
 .a-seg .a-chip { max-width: 100%; height: auto; min-height: 40px; padding-block: 8px; white-space: normal; text-align: start; }
+/* the phone window's chips are 44 tall (the board's .a-phone .a-chip), the rule above would keep them at 40 */
+@media (max-width: 719.98px) { .a-seg .a-chip { min-height: 44px; } }
 
 /* the key rows of "DNS changed": the name and the line take the room, the button stays at the end */
 .a-opt .tx .d { overflow-wrap: anywhere; }

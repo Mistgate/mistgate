@@ -157,7 +157,7 @@ export function NodesTable({
 }) {
   const t = useT();
   const fmt = useFmt();
-  const [opened, setOpened] = useState(openGiven ?? "");
+  const [chosen, setChosen] = useState<string | null>(openGiven ?? null);
   const holdOf = (s: ReachSource): Hold => (stale?.has(s) ? "stale" : first ? "wait" : "");
   const klick = useQuery({ ...clientProbeQuery, enabled: owner });
   const reports = klick.data?.settings?.enabled ? new Map((klick.data.nodes ?? []).map((n) => [n.nodeId, n])) : null;
@@ -180,6 +180,8 @@ export function NodesTable({
     return c ? countryLook(t, fmt, c) : null;
   };
   const shown = nodes.filter((n) => !filter || stateOf[lookOf(n.id)?.kind ?? "unknown"] === filter);
+  // until a row is chosen the board has one open: the first that is not all right (else the first), as Health opens its first critical
+  const opened = chosen ?? (shown.find((n) => stateOf[lookOf(n.id)?.kind ?? "unknown"] !== "ok") ?? shown[0])?.id ?? "";
   return (
     <Scope>
       <section className="card pp-sec sb-sec rc-main">
@@ -203,7 +205,7 @@ export function NodesTable({
             const label = daysLabel(t, days);
             return (
               <div key={n.id} role="listitem" data-testid="reach-node" data-state={state} className={cx("rc-w", isOpen && "open")}>
-                <button type="button" className="rc-r" aria-expanded={isOpen} aria-controls={`rc-d-${n.id}`} onClick={() => setOpened(isOpen ? "" : n.id)}>
+                <button type="button" className="rc-r" aria-expanded={isOpen} aria-controls={`rc-d-${n.id}`} onClick={() => setChosen(isOpen ? "" : n.id)}>
                   <span className="hl-cnode">
                     {n.countryCode && <Flag code={n.countryCode} size={12} className="fl" />}
                     <b className="mono">{n.name}</b>

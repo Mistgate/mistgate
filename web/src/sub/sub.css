@@ -478,7 +478,8 @@ button.u-stat:hover .n { color: var(--text); }
   .u-lang > .u-btn .lb { display: none; }
   .u-lang > .u-btn .cd { display: inline; font-size: 13px; color: var(--text); }
   /* dialogs are pages of their own on a phone (.a-phone) */
-  .modal[open] { display: block; padding: 0; }
+  /* place-items back to normal: a block container now honours justify-items (Chrome 133+), the sheet would shrink to its content and sit in the middle */
+  .modal[open] { display: block; padding: 0; place-items: normal; }
   .a-dlg, .a-dlg.sm { width: auto; max-width: none; min-height: 100dvh; margin: 0; border: 0; border-radius: 0; }
   .a-b { flex: 1; padding: 20px 16px; }
   .a-ways, .a-two, .a-vers { grid-template-columns: 1fr; }

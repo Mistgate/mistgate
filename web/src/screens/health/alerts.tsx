@@ -212,13 +212,13 @@ export function AlertRows({ groups, now, flow, open, setOpen, onNodePage = false
 
 /**
  * Which row is open: the board opens one at a time. Until the person chooses, it is the one a link points at, else the first critical, else the first
- * (as the board opens its first); once chosen, that (or none).
+ * (as the board opens its first; on People the board keeps its "open" on a node alert, so no row there: openFirst=false); once chosen, that (or none).
  */
-export function useOpenRow(groups: Alert[][], start: string | null = null): [string, (id: string) => void] {
+export function useOpenRow(groups: Alert[][], start: string | null = null, openFirst = true): [string, (id: string) => void] {
   const [chosen, setChosen] = useState<string | null>(start);
   const hash = groups.find((g) => targeted(anchors(g)));
   const crit = groups.find((g) => groupSeverity(g) === AlertSeverity.CRITICAL);
-  const first = hash?.[0]?.id ?? crit?.[0]?.id ?? groups[0]?.[0]?.id ?? "";
+  const first = hash?.[0]?.id ?? crit?.[0]?.id ?? (openFirst ? groups[0]?.[0]?.id : "") ?? "";
   return [chosen ?? first, setChosen];
 }
 
