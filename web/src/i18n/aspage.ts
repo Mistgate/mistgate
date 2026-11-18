@@ -3,6 +3,8 @@
 // Texts are the board's (pn.i18n.js). The last block sets what the window shows from the older AI texts to «ты» in Russian (the other languages keep their words).
 export const en = {
   "as.back": "Back to the conversation",
+  "as.big.expand": "Expand",
+  "as.big.collapse": "Collapse",
   "as.ph": "Ask or request a change",
   "as.foot": "The assistant only prepares changes, you apply them",
   "as.hello.t": "Ask about nodes and people",
@@ -58,6 +60,8 @@ export const en = {
 
 export const ru: typeof en = {
   "as.back": "Назад к разговору",
+  "as.big.expand": "Развернуть",
+  "as.big.collapse": "Свернуть",
   "as.ph": "Спроси или попроси что-то изменить",
   "as.foot": "Изменения ассистент только готовит, применяешь их ты",
   "as.hello.t": "Спроси про ноды и людей",
@@ -113,6 +117,8 @@ export const ru: typeof en = {
 
 export const zh: typeof en = {
   "as.back": "返回对话",
+  "as.big.expand": "展开",
+  "as.big.collapse": "收起",
   "as.ph": "提问或请求更改",
   "as.foot": "助手只准备更改，由你来应用",
   "as.hello.t": "询问节点和用户相关问题",
@@ -168,6 +174,8 @@ export const zh: typeof en = {
 
 export const fa: typeof en = {
   "as.back": "بازگشت به گفت‌وگو",
+  "as.big.expand": "بزرگ کردن",
+  "as.big.collapse": "جمع کردن",
   "as.ph": "بپرسید یا تغییری بخواهید",
   "as.foot": "دستیار فقط تغییرات را آماده می‌کند؛ اعمالش با شماست",
   "as.hello.t": "درباره نودها و کاربران بپرسید",
@@ -223,6 +231,8 @@ export const fa: typeof en = {
 
 export const tr: typeof en = {
   "as.back": "Konuşmaya dön",
+  "as.big.expand": "Genişlet",
+  "as.big.collapse": "Daralt",
   "as.ph": "Sor ya da bir değişiklik iste",
   "as.foot": "Asistan değişiklikleri yalnızca hazırlar, uygulayan sensin",
   "as.hello.t": "Düğümler ve kişiler hakkında sor",

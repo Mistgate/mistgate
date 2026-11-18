@@ -7,6 +7,7 @@ import { setLang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
 import { ChatDock, useChat } from "./chat";
 import { ChatPanel } from "./panel";
+import { SceneContext } from "./scene";
 
 // The window of the redesign: the list of conversations (open, delete one after asking, delete all after asking), the button and the states it
 // shows for (a provider missing: the window says so; the assistant off: no button), the keyboard of the picker and the slider.
@@ -124,8 +125,8 @@ describe("the conversations in the window", () => {
     expect($(".as-ht .as-sb")?.textContent).toBe("2 conversations");
     expect(all(".as-hr")).toHaveLength(2);
     expect($(".as-ud")).not.toBeNull();
-    // the header holds only the way back, a new conversation and close here
-    expect(all(".as-h button, .as-h a").map((b) => b.getAttribute("aria-label"))).toEqual(["Back to the conversation", "New conversation", "Close"]);
+    // the header holds the way back, a new conversation, the big window and close here
+    expect(all(".as-h button, .as-h a").map((b) => b.getAttribute("aria-label"))).toEqual(["Back to the conversation", "New conversation", "Expand", "Close"]);
     await click($(".as-bk"));
     expect($(".as-ht b")?.textContent).toBe("Assistant");
   });
@@ -318,5 +319,109 @@ describe("the reveal animation", () => {
     } finally {
       window.matchMedia = real;
     }
+  });
+});
+
+describe("the big window (the board's Развернуть)", () => {
+  const big = () => $("section.as")?.classList.contains("big");
+  const button = () => $("button.as-xp");
+  const phoneScreen = (matches: boolean) => {
+    const real = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: matches && q.includes("720"), media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false })) as never;
+    return () => void (window.matchMedia = real);
+  };
+  it("sits between the settings and close, says what it will do, and turns the window big and small again", async () => {
+    access = on;
+    await mount(<Window />);
+    expect(all(".as-h button, .as-h a").map((b) => b.getAttribute("aria-label"))).toEqual(["Conversations", "New conversation", "Assistant settings", "Expand", "Close"]);
+    expect(big()).toBe(false);
+    expect(button()?.getAttribute("aria-pressed")).toBe("false");
+    expect(button()?.getAttribute("title")).toBe("Expand");
+    const small = button()?.querySelector("path")?.getAttribute("d");
+    await click(button());
+    expect(big()).toBe(true);
+    expect($(".as-fr")?.classList.contains("as-bigw")).toBe(true);
+    expect(button()?.getAttribute("aria-pressed")).toBe("true");
+    expect(button()?.getAttribute("aria-label")).toBe("Collapse");
+    expect(button()?.querySelector("path")?.getAttribute("d")).not.toBe(small);
+    await click(button());
+    expect(big()).toBe(false);
+    expect(button()?.getAttribute("aria-label")).toBe("Expand");
+  });
+  it("keeps the same window: what was typed and the focus stay when it grows", async () => {
+    access = on;
+    await mount(<Window />);
+    const box = $(".as-ti");
+    const section = $("section.as");
+    button()?.focus();
+    await click(button());
+    expect($("section.as")).toBe(section);
+    expect(document.activeElement).toBe(button());
+    expect($(".as-ti")).toBe(box);
+  });
+  it("is the admin's choice for this device: a window opened again is as it was left", async () => {
+    access = on;
+    await mount(<Window />);
+    await click(button());
+    expect(localStorage.getItem("as-big")).toBe("1");
+    unmount();
+    await mount(<Window />);
+    expect(big()).toBe(true);
+    await click(button());
+    expect(localStorage.getItem("as-big")).toBeNull();
+    unmount();
+    await mount(<Window />);
+    expect(big()).toBe(false);
+  });
+  it("is left by a click on the dimmed page, not by one inside the window; the focus goes back to its button", async () => {
+    access = on;
+    await mount(<Window />);
+    await click(button());
+    await click($(".as-h"));
+    await click($(".as-b"));
+    expect(big()).toBe(true);
+    await click($(".as-fr"));
+    expect(big()).toBe(false);
+    expect(document.activeElement).toBe(button());
+    // a window that is small has nothing to dismiss: a click on its frame does nothing
+    await click($(".as-fr"));
+    expect(big()).toBe(false);
+    expect(localStorage.getItem("as-big")).toBeNull();
+  });
+  it("shows the conversations in the big window too", async () => {
+    access = on;
+    await mount(<Window />);
+    await click(button());
+    await click($("button[aria-label=Conversations]"));
+    await settle();
+    expect(big()).toBe(true);
+    expect(all(".as-hr")).toHaveLength(2);
+    expect(button()?.getAttribute("aria-label")).toBe("Collapse");
+  });
+  it("is not for a phone: the window stays a card whatever was chosen, and the choice is kept", async () => {
+    access = on;
+    localStorage.setItem("as-big", "1");
+    const restore = phoneScreen(true);
+    try {
+      await mount(<Window />);
+      expect(big()).toBe(false);
+      expect($(".as-fr")?.classList.contains("as-bigw")).toBe(false);
+      expect(localStorage.getItem("as-big")).toBe("1");
+    } finally {
+      restore();
+    }
+  });
+  it("a scene of the dev kit decides for itself and leaves the device's choice alone", async () => {
+    access = on;
+    localStorage.setItem("as-big", "1");
+    await mount(
+      <SceneContext.Provider value={new Set(["empty"])}>
+        <Window />
+      </SceneContext.Provider>,
+    );
+    expect(big()).toBe(false);
+    await click(button());
+    expect(big()).toBe(true);
+    expect(localStorage.getItem("as-big")).toBe("1");
   });
 });

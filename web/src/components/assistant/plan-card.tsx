@@ -6,7 +6,7 @@ import { useT } from "@/i18n";
 import type { Plan } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { dangerText, factLabel, factWords, outcomeText, planTitle, toolTitle, type Fact } from "@/lib/integrations";
+import { dangerText, factLabel, factWords, outcomeText, planTitle, planTitleWords, toolTitle, type Fact, type Piece } from "@/lib/integrations";
 import { I, type Glyph } from "./as-icons";
 
 /**
@@ -19,6 +19,7 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
   const t = useT();
   const fmt = useFmt();
   const open = plan.state === PlanState.PROPOSED;
+  const title: Piece[] = planTitleWords(t, fmt, plan.tool, plan.facts as unknown as Fact[]) ?? [planTitle(t, plan.tool) ?? (plan.summary || toolTitle(t, plan.tool))];
   const status = statusLine(t, fmt, plan);
   // a plan that waits for the owner is decided on the approval screen (for an install, where the host key is compared and the
   // password typed: never in the chat): this button opens that screen at this plan
@@ -38,8 +39,19 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
           </span>
         )}
       </div>
-      {/* the board's title is what the change does, in the interface language: the tool's own words (the panel's English summary is for the model) */}
-      <b>{planTitle(t, plan.tool) ?? (plan.summary || toolTitle(t, plan.tool))}</b>
+      {/* the board's title is what the change does, in the interface language, with the names it is about ("Turn on the relay of fi1 through msk1"); a plan with none says it in the tool's general words (the panel's English summary is for the model) */}
+      <b>
+        {title.map((p, i) =>
+          typeof p === "string" ? (
+            p
+          ) : (
+            // a name from data: plain in the title, with the panel's note that it is untrusted on hover
+            <span key={i} title={t("int.ap.untrusted")}>
+              {p.data}
+            </span>
+          ),
+        )}
+      </b>
       {plan.facts.length > 0 && (
         <ul>
           {plan.facts.map((f, i) => {

@@ -7,6 +7,8 @@ export const P = {
   plus: "M12 5v14M5 12h14",
   gear: navPaths.settings[0],
   x: "M6 6l12 12M18 6L6 18",
+  expand: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
+  collapse: "M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5",
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4",
   trash: "M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7",
   out: "M7 17L17 7M9 7h8v8",

@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { navKey, sections, type SectionId } from "@/components/nav";
 import { Button, buttonClass } from "@/components/ui/button";
 import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
 import { accessQuery, conversationsQuery, looksSecret, providerName, recentQuestionsQuery, type Context } from "@/lib/assistant";
+import { cx } from "@/lib/cx";
 import { prefersReducedMotion, useEffectsEnabled } from "@/lib/effects";
+import { readPref, writePref } from "@/lib/storage";
 import { useIsOwner } from "@/lib/updates";
 import { usePick } from "./agent-picker";
 import { I } from "./as-icons";
@@ -60,7 +62,24 @@ function usePageContext(): Context | null {
 const EXAMPLES = ["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3", "ai.chat.ex9", "ai.chat.ex10", "ai.chat.ex4", "ai.chat.ex5", "ai.chat.ex6", "ai.chat.ex7", "ai.chat.ex8"] as const;
 const SHOWN = 5;
 
-const phone = () => typeof matchMedia === "function" && matchMedia("(max-width: 720px)").matches;
+const PHONE = "(max-width: 720px)";
+const phone = () => typeof matchMedia === "function" && matchMedia(PHONE).matches;
+/** The window is on a phone: there it is a card, and the board hides the button of the big window. Follows the screen turning or the browser window being dragged. */
+function usePhone() {
+  return useSyncExternalStore(
+    (cb) => {
+      if (typeof matchMedia !== "function") return () => {};
+      const mq = matchMedia(PHONE);
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    phone,
+    () => false,
+  );
+}
+
+/** The big window (the board's "Развернуть"): the admin's choice is kept on this device. A scene of the dev kit decides for itself and leaves the choice alone. */
+const BIG = "as-big";
 
 export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, initialContext, pickerOpen, draft }: { chat: ChatApi; readOnly: boolean; providerLabel: string; provider?: number; onClose: () => void; initialContext?: Context | null; pickerOpen?: boolean; draft?: { text: string; n: number } }) {
   const t = useT();
@@ -76,6 +95,19 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   // opened with an answer that came while the admin was away and no conversation in front: the list, where it is marked
   const [history, setHistory] = useState(() => scene.has("hist") || (!chat.conversationId && (access.data?.unread ?? 0) > 0));
   const [hq, setHq] = useState(scene.has("hq") ? "zz" : "");
+  // the big window: in the middle of the page over a dimmed page; not on a phone, where the window is a card already
+  const inScene = scene.size > 0;
+  const [bigPref, setBigPref] = useState(() => (inScene ? scene.has("big") : readPref(BIG) === "1"));
+  const narrow = usePhone();
+  const big = bigPref && !narrow;
+  const bigButton = useRef<HTMLButtonElement>(null);
+  const setBig = useCallback(
+    (on: boolean) => {
+      setBigPref(on);
+      if (!inScene) writePref(BIG, on ? "1" : null);
+    },
+    [inScene],
+  );
   useServerTurns(chat);
   // opened again on a conversation that had follow-ups waiting (or an unread answer): it may have moved on meanwhile
   const reopen = useRef({ chat, unread: access.data?.unread ?? 0 });
@@ -144,107 +176,121 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
 
   return (
     <div className="as-dock">
-      <section data-fx={fx ? "1" : undefined} role="dialog" aria-label={t("ai.chat.title")} className="as">
-        {fx && (
-          <>
-            <div className="as-wv" aria-hidden>
-              <i />
+      {/* what is behind the big window is the dock itself, dimmed: a click on it (not on the window) makes the window small again, and the focus goes back to the button */}
+      <div
+        className={cx("as-fr", big && "as-bigw")}
+        onClick={(e) => {
+          if (big && e.target === e.currentTarget) {
+            setBig(false);
+            bigButton.current?.focus();
+          }
+        }}
+      >
+        <section data-fx={fx ? "1" : undefined} role="dialog" aria-label={t("ai.chat.title")} className={cx("as", big && "big")}>
+          {fx && (
+            <>
+              <div className="as-wv" aria-hidden>
+                <i />
+              </div>
+              <span className="as-eg a" aria-hidden />
+              <span className="as-eg b" aria-hidden />
+            </>
+          )}
+          <header className="as-h">
+            {history ? (
+              <button type="button" className="as-ic as-bk" aria-label={t("as.back")} title={t("as.back")} onClick={() => setHistory(false)}>
+                <I g="back" flip />
+              </button>
+            ) : (
+              <span className="as-lg" aria-hidden>
+                <CatMark size={22} />
+              </span>
+            )}
+            <div className="as-ht">
+              <b>{history ? t("ai.chat.history") : t("ai.chat.title")}</b>
+              {history ? <span className="as-sb">{convs.data ? (count > 0 ? t.n("as.hist.count", count) : t("as.hist.none")) : " "}</span> : sub && <span className="as-mn">{sub}</span>}
             </div>
-            <span className="as-eg a" aria-hidden />
-            <span className="as-eg b" aria-hidden />
-          </>
-        )}
-        <header className="as-h">
-          {history ? (
-            <button type="button" className="as-ic as-bk" aria-label={t("as.back")} title={t("as.back")} onClick={() => setHistory(false)}>
-              <I g="back" flip />
+            {!history && (
+              <button type="button" className="as-ic" aria-label={t("ai.chat.history")} title={t("ai.chat.history")} aria-pressed={history} onClick={() => setHistory(true)}>
+                <I g="list" />
+              </button>
+            )}
+            <button type="button" className="as-ic" aria-label={t("ai.chat.new")} title={t("ai.chat.new")} onClick={fresh}>
+              <I g="plus" />
             </button>
-          ) : (
-            <span className="as-lg" aria-hidden>
-              <CatMark size={22} />
-            </span>
-          )}
-          <div className="as-ht">
-            <b>{history ? t("ai.chat.history") : t("ai.chat.title")}</b>
-            {history ? <span className="as-sb">{convs.data ? (count > 0 ? t.n("as.hist.count", count) : t("as.hist.none")) : " "}</span> : sub && <span className="as-mn">{sub}</span>}
-          </div>
-          {!history && (
-            <button type="button" className="as-ic" aria-label={t("ai.chat.history")} title={t("ai.chat.history")} aria-pressed={history} onClick={() => setHistory(true)}>
-              <I g="list" />
+            {!history && owner && (
+              <Link to="/ai" className="as-ic" aria-label={t("ai.chat.settings")} title={t("ai.chat.settings")} onClick={onNavigate}>
+                <I g="gear" />
+              </Link>
+            )}
+            <button ref={bigButton} type="button" className="as-ic as-xp" aria-label={t(big ? "as.big.collapse" : "as.big.expand")} title={t(big ? "as.big.collapse" : "as.big.expand")} aria-pressed={big} onClick={() => setBig(!big)}>
+              <I g={big ? "collapse" : "expand"} />
             </button>
-          )}
-          <button type="button" className="as-ic" aria-label={t("ai.chat.new")} title={t("ai.chat.new")} onClick={fresh}>
-            <I g="plus" />
-          </button>
-          {!history && owner && (
-            <Link to="/ai" className="as-ic" aria-label={t("ai.chat.settings")} title={t("ai.chat.settings")} onClick={onNavigate}>
-              <I g="gear" />
-            </Link>
-          )}
-          <button type="button" className="as-ic" aria-label={t("ai.chat.close")} title={t("ai.chat.close")} onClick={onClose}>
-            <I g="x" />
-          </button>
-        </header>
+            <button type="button" className="as-ic" aria-label={t("ai.chat.close")} title={t("ai.chat.close")} onClick={onClose}>
+              <I g="x" />
+            </button>
+          </header>
 
-        {history ? (
-          <History
-            list={convs.data ?? []}
-            loaded={!!convs.data}
-            failed={convs.isError}
-            query={hq}
-            onQuery={setHq}
-            current={chat.conversationId}
-            tz={tz}
-            onPick={(id) => {
-              setHistory(false);
-              void chat.open(id);
-            }}
-            onGone={(id) => {
-              if (id === "all" || id === chat.conversationId) chat.reset();
-            }}
-          />
-        ) : (
-          <>
-            <div ref={list} className="as-b">
-              <div className="as-bi">
-                {off ? <Off owner={owner} onNavigate={onNavigate} /> : chat.messages.length === 0 && <Hello onPick={(q) => void chat.send(q, attach ? context : null, { provider: pick.provider, effort: pick.effort })} />}
-                <Thread chat={chat} owner={owner} onNavigate={onNavigate} />
-              </div>
-            </div>
-            <footer className="as-f">
-              {askSecret && (
-                <div className="as-wn">
-                  <span>{t("ai.chat.secretWarn", { provider: provName || "—" })}</span>
-                  <Button type="button" size="md" onClick={() => submit(true)}>
-                    {t("ai.chat.sendAnyway")}
-                  </Button>
+          {history ? (
+            <History
+              list={convs.data ?? []}
+              loaded={!!convs.data}
+              failed={convs.isError}
+              query={hq}
+              onQuery={setHq}
+              current={chat.conversationId}
+              tz={tz}
+              onPick={(id) => {
+                setHistory(false);
+                void chat.open(id);
+              }}
+              onGone={(id) => {
+                if (id === "all" || id === chat.conversationId) chat.reset();
+              }}
+            />
+          ) : (
+            <>
+              <div ref={list} className="as-b">
+                <div className="as-bi">
+                  {off ? <Off owner={owner} onNavigate={onNavigate} /> : chat.messages.length === 0 && <Hello onPick={(q) => void chat.send(q, attach ? context : null, { provider: pick.provider, effort: pick.effort })} />}
+                  <Thread chat={chat} owner={owner} onNavigate={onNavigate} />
                 </div>
-              )}
-              <Composer
-                text={text}
-                onText={setText}
-                onSubmit={() => submit()}
-                running={chat.running}
-                onStop={() => void chat.stop()}
-                context={context}
-                attached={attach}
-                onAttach={setAttach}
-                pick={pick}
-                owner={owner}
-                onNavigate={onNavigate}
-                pickerOpen={pickerOpen}
-                suggestions={suggestions}
-                off={off}
-                placeholder={off ? t("as.off.ph") : undefined}
-                focusOnMount
-              />
-              <div className="as-fm">
-                <span>{readOnly ? t("ai.chat.readOnly") : t("as.foot")}</span>
               </div>
-            </footer>
-          </>
-        )}
-      </section>
+              <footer className="as-f">
+                {askSecret && (
+                  <div className="as-wn">
+                    <span>{t("ai.chat.secretWarn", { provider: provName || "—" })}</span>
+                    <Button type="button" size="md" onClick={() => submit(true)}>
+                      {t("ai.chat.sendAnyway")}
+                    </Button>
+                  </div>
+                )}
+                <Composer
+                  text={text}
+                  onText={setText}
+                  onSubmit={() => submit()}
+                  running={chat.running}
+                  onStop={() => void chat.stop()}
+                  context={context}
+                  attached={attach}
+                  onAttach={setAttach}
+                  pick={pick}
+                  owner={owner}
+                  onNavigate={onNavigate}
+                  pickerOpen={pickerOpen}
+                  suggestions={suggestions}
+                  off={off}
+                  placeholder={off ? t("as.off.ph") : undefined}
+                  focusOnMount
+                />
+                <div className="as-fm">
+                  <span>{readOnly ? t("ai.chat.readOnly") : t("as.foot")}</span>
+                </div>
+              </footer>
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
