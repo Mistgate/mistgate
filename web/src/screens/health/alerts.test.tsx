@@ -330,9 +330,18 @@ describe("muting and accepting", () => {
     expect(text()).toContain("2 alerts closed");
   });
 
-  it("a list of one has no «Close all shown»", async () => {
+  it("a list of one has «Close all shown» too, as the board draws it", async () => {
+    await mountTab([alert()]);
+    expect(button("Close all shown")).toBeDefined();
+    await click(button("Close all shown"));
+    expect(text()).toContain("Close 1 alert?");
+  });
+
+  it("a role that cannot close has no «Close all shown»", async () => {
+    role = Role.READONLY;
     await mountTab([alert()]);
     expect(button("Close all shown")).toBeUndefined();
+    expect(text()).toContain("Only the owner can fix and close alerts");
   });
 
   it("a doctor warning can be accepted as normal for the node", async () => {
@@ -342,9 +351,10 @@ describe("muting and accepting", () => {
     expect(acceptDoctorItem).toHaveBeenCalledWith({ nodeId: "nod_1", checkId: "foreign_vpn" });
   });
 
-  it("names the node as a link", async () => {
+  it("names the node on the row and leads to it with a button", async () => {
     await mount(alert());
-    expect(link("de1")?.getAttribute("href")).toBe("/nodes/nod_1");
+    expect(document.querySelector(".hl-who")?.textContent).toBe("de1");
+    expect(link("Open node")?.getAttribute("href")).toBe("/nodes/nod_1");
   });
 });
 
@@ -364,7 +374,7 @@ describe("a country alert and IPv6", () => {
   it("says that the node is reachable over IPv6 when the IPv6 rounds reach it", async () => {
     await mount(country({ ipv6: "open" }));
     expect(open6()?.textContent).toBe("Over IPv6 the node is reachable from there.");
-    expect(document.querySelector("h3")?.textContent).toBe("Unreachable from Russia");
+    expect(document.querySelector("h3 b")?.textContent).toBe("Unreachable from Russia");
   });
 
   it("says nothing of IPv6 when IPv6 is cut too or not known", async () => {
@@ -379,7 +389,7 @@ describe("a country alert and IPv6", () => {
 
   it("tags the IPv6 alert itself after its title", async () => {
     await mount(country({ family: "6" }, { subject: "ipv6" }));
-    expect(document.querySelector("h3")?.textContent).toBe("Unreachable from RussiaIPv6");
+    expect(document.querySelector("h3 b")?.textContent).toBe("Unreachable from RussiaIPv6");
     expect(open6()).toBeNull();
   });
 
@@ -470,6 +480,10 @@ describe("the Alerts tab", () => {
   const nl1 = () => [lossy("a", "nl1", "2083", "207"), lossy("b", "nl1", "33183", "264"), lossy("c", "nl1", "4443", "276")];
   const toggles = () => [...document.querySelectorAll<HTMLButtonElement>("[data-alert-toggle]")];
   const expanded = (el: Element | undefined | null) => el?.getAttribute("aria-expanded");
+  // the rows open one at a time and the first opens by itself (the board's): a test that wants a row open presses it only if it is shut
+  const openRow = async (i = 0) => {
+    if (expanded(toggles()[i]) !== "true") await click(toggles()[i]);
+  };
   afterEach(() => {
     history.replaceState(null, "", location.pathname);
   });
@@ -479,10 +493,13 @@ describe("the Alerts tab", () => {
     await mountTab([...nl1(), lossy("d", "msk1", "443", "243")]);
     expect(toggles()).toHaveLength(2);
     const [card] = toggles();
-    expect(expanded(card)).toBe("false");
+    // the first opens by itself, one at a time
+    expect([expanded(card), expanded(toggles()[1])]).toEqual(["true", "false"]);
     expect(card!.textContent).toContain("Warningnl1UDP loses packets on 3 ports");
     expect(card!.textContent).toContain("up to 31 % lost");
     expect(toggles()[1]!.textContent).toContain("msk1UDP to port 443 loses packets");
+    await click(toggles()[1]);
+    expect([expanded(card), expanded(toggles()[1])]).toEqual(["false", "true"]);
     expect(text()).not.toContain("get lost on the way");
     await click(card);
     expect(expanded(card)).toBe("true");
@@ -542,7 +559,7 @@ describe("the Alerts tab", () => {
       }),
     ]);
     expect(toggles()[0]!.textContent).toContain("Unreachable from some networks in Russia6 networks");
-    await click(toggles()[0]);
+    await openRow();
     expect(text()).toContain("Home or mobile probes on MTS, Beeline, MegaFon and 2 more get no answer");
     const all = document.querySelector("[data-nets-toggle]");
     expect([all?.textContent, expanded(all)]).toEqual(["Show all 6", "false"]);
@@ -568,7 +585,7 @@ describe("the Alerts tab", () => {
         params: { country: "RU", verdict: "blocked", confidence: "conflict", sources: "globalping,tspu,cheburcheck", networks },
       }),
     ]);
-    await click(toggles()[0]);
+    await openRow();
     expect(text()).toContain("the probes of cheburcheck and Globalping inside Russia (MTS, ER-Telecom Holding, Rostelecom and 1 more)");
     await click(document.querySelector("[data-nets-toggle]"));
     const rows = [...document.querySelectorAll("dl > div")].map((r) => [...r.children].map((c) => c.textContent));
@@ -594,11 +611,10 @@ describe("the Alerts tab", () => {
       }),
     ]);
     const [card] = toggles();
-    expect(expanded(card)).toBe("false");
+    expect(expanded(card)).toBe("true");
     expect(card!.textContent).toContain("Warningminsk1Loses UDP on the way to nl1");
     expect(card!.textContent).toContain("21 % lost");
-    expect(document.querySelector("[data-testid=path-runs]")).toBeNull();
-    await click(card);
+    await openRow();
     expect(text()).toContain("UDP from minsk1 (CIS) to nl1 loses 21 % on ports 2053, 2083, while 299/300 arrive from de1 (outside the CIS).");
     expect([...document.querySelectorAll("[data-testid=path-runs] tbody tr")].map((r) => [...(r as HTMLTableRowElement).cells].map((c) => c.textContent))).toEqual([
       ["minsk1CIS", "236/300", "21 %"],
@@ -625,7 +641,7 @@ describe("the Alerts tab", () => {
     expect(card!.textContent).toContain("Warningde1UDP filtered on the way to fi1");
     expect(card!.textContent).toContain("only 443 gets through");
     expect(card!.textContent).not.toContain("%");
-    await click(card);
+    await openRow();
     expect(text()).toContain("UDP from de1 (outside the CIS) reaches fi1 only on 443; ports 2053, 8443 get nothing, while from msk1 (CIS) everything arrives.");
     // no share lost: what got through, in words
     expect([...document.querySelectorAll("[data-testid=path-runs] th")].map((c) => c.textContent)).toEqual(["Checked from", "Arrived"]);
@@ -653,10 +669,10 @@ describe("the Alerts tab", () => {
       act(() => root?.unmount());
       host?.remove();
       await mountTab(active);
-      await click(toggles()[0]);
+      await openRow();
     };
     await mountTab([both("a", "2083", "241", "238"), both("b", "4443", "262", "259")]);
-    await click(toggles()[0]);
+    await openRow();
     expect(text()).toContain("The test packets to these ports got lost from both sides, so this node’s ports lose them.");
     // a line per sender in both cells: the shares next to who measured them
     const lines = (cell: number) => [...document.querySelectorAll("tbody tr")].map((r) => [...(r as HTMLTableRowElement).cells[cell]!.children].map((s) => s.textContent));
@@ -679,7 +695,7 @@ describe("the Alerts tab", () => {
     act(() => root?.unmount());
     host?.remove();
     await mountTab([both("c", "2083", "241", "238")]);
-    await click(toggles()[0]);
+    await openRow();
     expect(text()).toContain("The test packets to port 2083 of “TUIC · 2083” got lost from both sides: 20 % from msk1, 21 % from fi1, so this node’s port loses them.");
   });
 
@@ -701,7 +717,7 @@ describe("the Alerts tab", () => {
 
   it("shows one history row per event under its day, its episodes under it, and how it ended as a glyph", async () => {
     await mountTab([], [...mtproto(), fixed]);
-    expect([...document.querySelectorAll("section h3")].map((h) => h.textContent)).toEqual(["Today", "Yesterday"]);
+    expect([...document.querySelectorAll(".hl-dl")].map((h) => h.textContent)).toEqual(["Today", "Yesterday"]);
     const row = document.querySelector("[data-history-toggle]")!;
     expect(row.textContent).toContain("Warningsg1nl1fi1de1“MTProto · 443” fails the client-eye checklasted 6 min");
     expect([...document.querySelectorAll('[role="img"][aria-label]')].map((g) => g.getAttribute("aria-label"))).toEqual(["cleared by itself", "fixed"]);
@@ -744,7 +760,7 @@ describe("the Alerts tab", () => {
     const b = mtproto()[1]!;
     history.replaceState(null, "", `#alert-${b.id}-${b.resolvedAtUnix}`);
     await mountTab(nl1(), mtproto());
-    expect(expanded(toggles()[0])).toBe("false");
+    expect(expanded(toggles()[0])).toBe("true"); // the first opens by itself, the link does not point at it
     expect(expanded(document.querySelector("[data-history-toggle]"))).toBe("true");
     act(() => root?.unmount());
     host?.remove();

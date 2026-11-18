@@ -382,7 +382,7 @@ describe("the Health page on the edge", () => {
     expect(text()).toContain("No problems · alerts evaluated every minute");
     expect(text()).not.toContain("checks every");
     expect(text()).toContain(edgeAlerts);
-    expect(text()).toContain("All quiet.");
+    expect(text()).toContain("All quiet");
     expect(text()).toContain("No alert in the last 7 days.");
     expect(document.querySelectorAll('[role="status"]')).toHaveLength(1); // the one notice
   });
@@ -390,10 +390,10 @@ describe("the Health page on the edge", () => {
   it("shows an open alert like the VPS does, and counts it in the line", async () => {
     alertsPage = { nowUnix: 1000, active: [alertOf({})], history: [] };
     await mount(<HealthScreen />);
-    expect(text()).toContain("1 problem · alerts evaluated every minute");
+    expect(text()).toContain("1 problem · 1 critical · alerts evaluated every minute");
     expect(text()).toContain("Node is unreachable");
     expect(text()).toContain(edgeAlerts);
-    expect(text()).not.toContain("All quiet.");
+    expect(text()).not.toContain("All quiet");
   });
 
   it("says it in Russian and Chinese too", async () => {
@@ -414,28 +414,28 @@ describe("the Health page on the edge", () => {
     await mount(<HealthScreen />);
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     expect(text()).not.toContain(notice("health_checks"));
-    expect(text()).toContain("Nobody has trouble connecting.");
+    expect(text()).toContain("No open alerts about people");
     act(() => root?.unmount());
     host?.remove();
     alertsPage = { nowUnix: 1000, active: [torrentAlert], history: [] };
     await mount(<HealthScreen />);
     expect(text()).toContain("Torrent attempts");
     expect(text()).toContain("alice");
-    expect(text()).not.toContain("Nobody has trouble connecting.");
+    expect(text()).not.toContain("No open alerts about people");
   });
 
   it("is unchanged on the VPS", async () => {
     edition = "vps";
     await mount(<HealthScreen />);
     expect(text()).toContain("No problems · checks every 5 min");
-    expect(text()).toContain("All quiet.");
+    expect(text()).toContain("All quiet");
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     expect(text()).not.toContain("evaluated every minute");
     act(() => root?.unmount());
     host?.remove();
     alertsPage = { nowUnix: 1000, active: [alertOf({})], history: [] };
     await mount(<HealthScreen />);
-    expect(text()).toContain("1 problem · checks every 5 min");
+    expect(text()).toContain("1 problem · 1 critical · checks every 5 min");
     expect(text()).toContain("Node is unreachable");
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     act(() => root?.unmount());
@@ -443,7 +443,7 @@ describe("the Health page on the edge", () => {
     alertsPage = { nowUnix: 1000, active: [], history: [] };
     search = { tab: "people" };
     await mount(<HealthScreen />);
-    expect(text()).toContain("Nobody has trouble connecting.");
+    expect(text()).toContain("No open alerts about people");
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
   });
 });
