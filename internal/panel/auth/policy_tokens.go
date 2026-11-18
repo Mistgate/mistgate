@@ -283,6 +283,7 @@ var grantProcedures = map[string][]string{
 	"subscription_texts_set":       {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
 	"subscription_link_limits_set": {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
 	"subscription_page_set":        {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_routing_set":     {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
 	"dns_settings_set":             {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
 	"group_update":                 {adminv1connect.GroupServiceUpdateGroupProcedure},
 	"node_sharing_set":             {adminv1connect.GroupServiceSetNodeSharingProcedure},
