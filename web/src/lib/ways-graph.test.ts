@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import type { RelayMsg } from "./relay";
 import type { Ipv6Entry } from "./ways";
-import { ipv6StateOf, networkOf, relayRefusal, wayOf, type GServer } from "./ways-graph";
+import { ipv6StateOf, networkOf, relayRefusal, type GServer } from "./ways-graph";
 
 const relay = (over: Partial<RelayMsg>) =>
   ({ id: "r1", inboundId: "hy2", exitNodeId: "be", exitNodeName: "be", viaNodeId: "msk1", viaNodeName: "msk1", network: "udp", port: 443, enabled: true, state: InboundState.ACTIVE, ...over }) as RelayMsg;
@@ -22,17 +22,7 @@ describe("relay rules", () => {
 
 const v6 = (over: Partial<Ipv6Entry> = {}): Ipv6Entry => ({ entry: "", entrySupported: true, unavailableReason: "", addresses: [], src: "", ...over });
 
-describe("the way of a server and the IPv6 row", () => {
-  it("wayOf: an offline node's lane is off, a CDN server is never 'blocked'", () => {
-    const s = { on: true, failed: false, listed: true, cdn: false };
-    const lane = (over: object) => ({ ring: "ok", state: "ok", seen: "all", ...over }) as never;
-    expect(wayOf(s, lane({ ring: "off", state: "off" }))).toBe("off");
-    expect(wayOf(s, lane({ ring: "bad", state: "bad" }))).toBe("failed");
-    expect(wayOf(s, lane({ ring: "bad", state: "ok", seen: "none" }))).toBe("blocked");
-    expect(wayOf({ ...s, cdn: true }, lane({ ring: "bad", state: "ok", seen: "none" }))).toBe("partial");
-    expect(wayOf(s, undefined)).toBe("unknown");
-  });
-
+describe("the IPv6 row and the refusals", () => {
   it("the IPv6 row: on and working, on but broken, can be turned on, none here, broken here, unavailable", () => {
     expect(ipv6StateOf("ok", v6({ entry: "2001:db8::1" }))).toMatchObject({ state: "on" });
     expect(ipv6StateOf("broken", v6({ entry: "2001:db8::1", unavailableReason: "ipv6_broken" }))).toMatchObject({ state: "on_down" });

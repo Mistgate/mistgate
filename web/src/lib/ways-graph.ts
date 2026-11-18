@@ -1,6 +1,6 @@
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { type RelayMsg } from "./relay";
-import { entryOffered, entryState, type Ipv6Entry, type Ipv6Fact, type Lane, type Ways } from "./ways";
+import { entryOffered, entryState, type Ipv6Entry, type Ipv6Fact, type Ways } from "./ways";
 
 // What the node page's "Ways in" says of each server (the lanes and relays the list draws), for the route map and the relay
 // refusals: the network of a protocol, the way people have to a server, the IPv6 entry row. Pure.
@@ -74,20 +74,6 @@ export function ipv6StateOf(fact: Ipv6Fact, v6: Ipv6Entry): { state: Ipv6State; 
   return { state: "unavailable", reason: v6.unavailableReason };
 }
 
-/** The way people have to a server from the lane that carries it. */
-export function wayOf(s: Pick<GServer, "on" | "failed" | "listed" | "cdn">, lane: Lane | undefined): ServerWay {
-  if (!s.on) return "off";
-  if (s.failed) return "failed";
-  if (!s.listed) return "hidden";
-  if (!lane) return "unknown";
-  if (lane.ring === "off") return "off";
-  if (lane.ring === "busy") return "unknown";
-  if (lane.state === "bad") return "failed";
-  // the country sees a CDN host, not the node: its lane has no verdict of its own
-  if (!s.cdn && lane.seen === "none") return "blocked";
-  return lane.ring === "ok" ? "works" : "partial";
-}
-
 export function serverOf(i: GraphInput["inbounds"][number]): GServer {
   const net = networkOf(i.protocol);
   // GetNode gives a switched-off server as state DISABLED (older panels never filled enabled): the state decides
@@ -112,7 +98,7 @@ export const serverOrder = (a: GServer, b: GServer) => (a.net ?? "").localeCompa
 
 /**
  * Whether a new relay may be drawn from an entry to a server of this node: why not, or undefined when it may. The same
- * rules the relay dialog applies before the panel's own (one relay per server and entry, the entry is another node, the
+ * rules the panel applies on its own (one relay per server and entry, the entry is another node, the
  * server can be forwarded).
  */
 export function relayRefusal(entryNodeId: string, nodeId: string, server: GServer, relays: readonly RelayMsg[]): "same_node" | "exists" | NonNullable<GServer["noRelay"]> | undefined {
