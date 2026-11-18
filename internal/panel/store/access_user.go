@@ -1172,6 +1172,34 @@ func (a Access) devices(ctx context.Context, userID string, withCredsOnly bool, 
 	return out, rows.Err()
 }
 
+// DeviceLastOnline is, per device of a user, when the nodes last counted a connection of it: the newer of the last session a
+// node saw (device.last_connected_at) and the newest hour of the connection counters with connects or online time (the hour's
+// start, so at most an hour older than the truth). A device with neither is not in the map. last_seen_at is not this: for a link
+// device it is the last subscription fetch.
+func (a Access) DeviceLastOnline(ctx context.Context, userID string) (map[string]time.Time, error) {
+	rows, err := a.s.R.QueryContext(ctx,
+		`SELECT d.id, max(d.last_connected_at, coalesce((SELECT max(l.hour_start) FROM link_hour l
+			JOIN device_credential c ON c.id = l.cred_id
+			WHERE l.user_id = ? AND c.device_id = d.id AND (l.connects > 0 OR l.online_s > 0)), 0)) AS last_online
+		 FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL`, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]time.Time{}
+	for rows.Next() {
+		var id string
+		var at int64
+		if err := rows.Scan(&id, &at); err != nil {
+			return nil, err
+		}
+		if at > 0 {
+			out[id] = fromUnix(at)
+		}
+	}
+	return out, rows.Err()
+}
+
 // TouchDevice sets last_seen_at unless it is already newer than `not`: a throttle for write-on-read. A fetch that reports
 // an OS version or a client records them too (the empty ones leave the stored values).
 func (a Access) TouchDevice(ctx context.Context, id string, now, not time.Time, osVersion, client string) error {

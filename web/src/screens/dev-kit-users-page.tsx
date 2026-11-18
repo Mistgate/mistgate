@@ -147,7 +147,7 @@ function fakeCalls(state: string, count: number) {
     const s = tenOf(state, crowd.find((x) => `usr_${x.n}` === userId) ?? crowd[0]!);
     return {
       user: userOf(s),
-      devices: s.devs.map(([model, client, online], i) => ({ id: `dev_${s.n}_${i}`, platform: "other", model, firstSeenUnix: BigInt(now - 30 * DAY), lastSeenUnix: BigInt(online ? now - 30 : now - (i + 1) * 5 * 3600), online: !!online, protocols: [], awgProfileId: "", awgProfileName: "", awgVersion: "", stale: false, address: "", lastHandshakeUnix: 0n, kind: 1, osVersion: "", client, usedBytes: 0n, onlineNodeIds: [], fingerprint: "", enrolled: false, enrolLinkStale: false, idle: false, idleSinceUnix: 0n })),
+      devices: s.devs.map(([model, client, online], i) => ({ id: `dev_${s.n}_${i}`, platform: "other", model, firstSeenUnix: BigInt(now - 30 * DAY), lastSeenUnix: BigInt(online ? now - 30 : now - (i + 1) * 5 * 3600), lastOnlineUnix: BigInt(online ? now - 30 : now - (i + 1) * 5 * 3600), online: !!online, protocols: [], awgProfileId: "", awgProfileName: "", awgVersion: "", stale: false, address: "", lastHandshakeUnix: 0n, kind: 1, osVersion: "", client, usedBytes: 0n, onlineNodeIds: [], fingerprint: "", enrolled: false, enrolLinkStale: false, idle: false, idleSinceUnix: 0n })),
       dailyTraffic: [], nodeTraffic: [], profiles: [], nodeAccess: [], blockedDevices: [],
     };
   };
@@ -185,6 +185,9 @@ export const demoOf: Record<string, UsersDemo> = {
   search: { find: "ali" },
   nomatch: { find: "zzz" },
   open: { open: "usr_alice" },
+  // the send window ("QR and send") over alice's open row: her page asks for a password; bob's does not
+  send: { open: "usr_alice", send: "usr_alice" },
+  "send-plain": { open: "usr_bob", send: "usr_bob" },
   "open-erin": { open: "usr_erin" },
   // a person who never connected: no devices to list ("None yet")
   "open-heidi": { open: "usr_heidi" },
@@ -278,6 +281,11 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "users-search", state: "search", title: "A search that finds alice", w: 1440, h: 520 },
   { id: "users-nomatch", state: "nomatch", title: "A search that finds nobody", w: 1440, h: 520 },
   { id: "users-open", state: "open", title: "alice's row open: the link, the password, four devices", w: 1440, h: 860 },
+  { id: "users-send", state: "send", title: "The send window over alice's row: the QR, the link, the page password, Copy to send", w: 1440, h: 860 },
+  { id: "users-send-light", state: "send", title: "The same on the light theme", w: 1440, h: 860, params: "&theme=light" },
+  { id: "users-send-plain", state: "send-plain", title: "bob: no page password, the row says anyone with the link opens the page", w: 1440, h: 860 },
+  { id: "users-send-phone", state: "send", title: "The send window on a phone (a sheet)", w: 400, h: 900 },
+  { id: "users-send-fa", state: "send", title: "The send window, right to left (fa)", w: 1440, h: 860, params: "&lang=fa" },
   { id: "users-open-phone", state: "open", title: "alice's row open on a phone", w: 400, h: 1100 },
   { id: "users-open-heidi", state: "open-heidi", title: "heidi: never connected, no devices yet", w: 1440, h: 1100 },
   { id: "users-open-ten", state: "open-ten", title: "alice with ten devices: four listed, the rest behind Show all", w: 1440, h: 900 },

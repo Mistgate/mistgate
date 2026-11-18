@@ -1647,8 +1647,11 @@ type Device struct {
 	Idle bool `protobuf:"varint,23,opt,name=idle,proto3" json:"idle,omitempty"`
 	// When it crossed the idle threshold (last node connection, else last fetch/sync, else creation time); 0 when not idle.
 	IdleSinceUnix int64 `protobuf:"varint,24,opt,name=idle_since_unix,json=idleSinceUnix,proto3" json:"idle_since_unix,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// When the nodes last counted a connection of the device (a session they saw, or the newest hour with connections or online time
+	// in the connection counters); 0 = none counted. For a link device last_seen_unix is its last subscription fetch, not this.
+	LastOnlineUnix int64 `protobuf:"varint,25,opt,name=last_online_unix,json=lastOnlineUnix,proto3" json:"last_online_unix,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -1838,6 +1841,13 @@ func (x *Device) GetIdle() bool {
 func (x *Device) GetIdleSinceUnix() int64 {
 	if x != nil {
 		return x.IdleSinceUnix
+	}
+	return 0
+}
+
+func (x *Device) GetLastOnlineUnix() int64 {
+	if x != nil {
+		return x.LastOnlineUnix
 	}
 	return 0
 }
@@ -4129,7 +4139,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x125\n" +
 	"\x06counts\x18\x03 \x01(\v2\x1d.mistgate.admin.v1.UserCountsR\x06counts\")\n" +
 	"\x0eGetUserRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x88\x06\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xb6\x06\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x14\n" +
@@ -4157,7 +4167,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\benrolled\x18\x15 \x01(\bR\benrolled\x12(\n" +
 	"\x10enrol_link_stale\x18\x16 \x01(\bR\x0eenrolLinkStale\x12\x12\n" +
 	"\x04idle\x18\x17 \x01(\bR\x04idle\x12*\n" +
-	"\x0fidle_since_unix\x18\x18 \x01(\x03B\x020\x02R\ridleSinceUnix\"E\n" +
+	"\x0fidle_since_unix\x18\x18 \x01(\x03B\x020\x02R\ridleSinceUnix\x12,\n" +
+	"\x10last_online_unix\x18\x19 \x01(\x03B\x020\x02R\x0elastOnlineUnix\"E\n" +
 	"\n" +
 	"DayTraffic\x12\x1d\n" +
 	"\bday_unix\x18\x01 \x01(\x03B\x020\x02R\adayUnix\x12\x18\n" +

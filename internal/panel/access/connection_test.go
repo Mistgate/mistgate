@@ -173,3 +173,53 @@ func TestGetUserConnectionHelloKex(t *testing.T) {
 		t.Errorf("bob's hello counts = %+v, %v", resp.Msg.GetHelloKex(), err)
 	}
 }
+
+// A person's card says when the nodes last counted a connection of each device (Device.last_online_unix): the newer of the
+// last session a node saw and the newest hour with connects or online time. The device's last_seen_unix (a link device's last
+// subscription fetch) and counters that are not a connection (rejects only) do not count.
+func TestGetUserDeviceLastOnline(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	g := e.group("one", f.profile)
+	alice := e.user("alice", g, nil).User
+	var cred, device string
+	if err := e.st.R.QueryRow(`SELECT id, device_id FROM device_credential WHERE user_id = ? ORDER BY id LIMIT 1`, alice.Id).Scan(&cred, &device); err != nil {
+		t.Fatal(err)
+	}
+	lastOnline := func() int64 {
+		t.Helper()
+		for _, d := range must(e.s.GetUser(e.ctx, req(&adminv1.GetUserRequest{UserId: alice.Id}))).Msg.Devices {
+			if d.Id == device {
+				return d.LastOnlineUnix
+			}
+		}
+		t.Fatalf("device %s is not in the card", device)
+		return 0
+	}
+	hour := e.clock.Unix() / 3600 * 3600
+	counters := func(at int64, cols string) {
+		e.sql(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, `+cols+`) VALUES ('nod_de1', ?, ?, ?, ?, 1)`, at, f.inbound, cred, alice.Id)
+	}
+
+	e.sql(`UPDATE device SET last_seen_at = ? WHERE id = ?`, e.clock.Unix(), device)
+	if got := lastOnline(); got != 0 {
+		t.Errorf("a fetch only: last_online = %d, want 0 (never counted)", got)
+	}
+	counters(hour-2*3600, "rejects")
+	if got := lastOnline(); got != 0 {
+		t.Errorf("a refused key only: last_online = %d, want 0", got)
+	}
+	counters(hour-3*3600, "online_s")
+	counters(hour-5*3600, "connects")
+	if got := lastOnline(); got != hour-3*3600 {
+		t.Errorf("counter hours: last_online = %d, want the newest hour with online time %d", got, hour-3*3600)
+	}
+	e.sql(`UPDATE device SET last_connected_at = ? WHERE id = ?`, hour-3600+120, device)
+	if got := lastOnline(); got != hour-3600+120 {
+		t.Errorf("a newer session: last_online = %d, want %d", got, hour-3600+120)
+	}
+	e.sql(`UPDATE device SET last_connected_at = ? WHERE id = ?`, hour-10*3600, device)
+	if got := lastOnline(); got != hour-3*3600 {
+		t.Errorf("an older session than the counters: last_online = %d, want %d", got, hour-3*3600)
+	}
+}

@@ -27,7 +27,7 @@ import {
 import { ApprovalCard as InstallCard } from "@/screens/integrations/approvals";
 import { Empty, Gl, ICONS, Pill, Sec, useFresh, useScene, type Kind } from "./bits";
 
-// What an agent asked for and waits on the owner for, and what was decided lately, as the board draws them (PnAI "Ждут вас"): one card per
+// What an agent asked for and waits on the owner for, and what was decided lately, as the board draws them (PnAI "Ждут тебя"): one card per
 // change with the time left, the facts in the panel's words, the agent's reason apart, and Reject / Approve (Approve asks for a passkey or
 // a code once more). A node install (the host key, the server's login) is the Integrations screen's own card, put in the same frame.
 

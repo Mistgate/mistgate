@@ -10,11 +10,12 @@ import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
-import { agoText, devicesView, nowSec, warnOf } from "./format";
+import { agoText, devicesView, lastOnlineOf, nowSec, warnOf } from "./format";
 import { detailN, type DeviceN, type UserN as User } from "./model";
 import { AppLink } from "./nav";
 import { platformLabel } from "./awg-devices";
 import { useTx, type Tx } from "./t";
+import { G, P } from "./user-bits";
 
 // What a person's row opens into (the board's us-x): a line about what is wrong or what to do, the subscription link and the
 // page password (to the owner and the helper), the devices, and the quick actions. The devices come from the person's card
@@ -45,12 +46,12 @@ export function UserExpand({ u, group, manage, onLink }: { u: User; group: Group
         </div>
       )}
       <div className={cx("grid gap-x-10 gap-y-4 @max-[760px]/ust:grid-cols-1", manage && !all ? "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]" : "grid-cols-1")}>
-        {manage && <LinkBlock u={u} />}
+        {manage && <LinkBlock u={u} onLink={onLink} />}
         <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="flex items-baseline gap-1.5 text-xs text-muted">
+          <span className="flex items-baseline gap-1.5 text-xs leading-5 text-muted">
             {t("ul.col.devices")}
             <b className="font-mono font-medium text-sec">{dev.text}</b>
-            {left && <em className={cx("text-xs not-italic", dev.full ? "text-warn-text" : "text-muted")}>{left}</em>}
+            {left && <em className={cx("text-xs leading-5 not-italic", dev.full ? "text-warn-text" : "text-muted")}>{left}</em>}
           </span>
           <ul className={cx("flex flex-col gap-0.5", all && "grid animate-[mg-up_0.25s_var(--e)_both] grid-cols-2 gap-x-10 @max-[520px]/ust:grid-cols-1")}>
             {shown.map((d) => (
@@ -65,7 +66,7 @@ export function UserExpand({ u, group, manage, onLink }: { u: User; group: Group
           {devs.length === 0 && !detail.isPending && <p className="mt-1 text-[13px] text-muted">{t("ul.dev.none")}</p>}
         </div>
       </div>
-      <Actions u={u} manage={manage} onLink={onLink} />
+      <Actions u={u} manage={manage} />
     </div>
   );
 }
@@ -78,17 +79,18 @@ function DeviceLine({ d, t }: { d: DeviceN; t: Tx }) {
       <i aria-hidden className={cx("size-1.5 rounded-full", d.online ? "bg-accent-mark" : "bg-[color-mix(in_srgb,var(--text)_20%,transparent)]")} />
       <b className="truncate font-medium">{name}</b>
       <span className="whitespace-nowrap text-sec @max-[520px]/ust:hidden">{app}</span>
-      <em className="text-end text-xs whitespace-nowrap text-muted not-italic">{d.online ? t("users.now") : agoText(d.lastSeenUnix, t, nowSec())}</em>
+      <em className="text-end text-xs leading-5 whitespace-nowrap text-muted not-italic">{d.online ? t("users.now") : agoText(lastOnlineOf(d), t, nowSec())}</em>
     </li>
   );
 }
 
 /**
- * The subscription link (one for all devices) with its copy button, and the page password under it. The password is the
- * link's own (derived from its token): there is nothing to set here, "new link" in the link window changes both. An instance
- * that asks for none has no password: the line says that anyone with the link opens the page.
+ * The subscription link (one for all devices) with its copy button and "QR and send" (the send window), and the page password under
+ * it. The password is the link's own (derived from its token): the server can neither set one nor remove it, so the board's
+ * "Change" and "Remove" are not drawn; "new link" in the send window changes both. An instance that asks for none has no password:
+ * the line says that anyone with the link opens the page.
  */
-function LinkBlock({ u }: { u: User }) {
+function LinkBlock({ u, onLink }: { u: User; onLink: () => void }) {
   const t = useTx();
   const q = useQuery({
     queryKey: ["users", "link", u.id],
@@ -105,14 +107,18 @@ function LinkBlock({ u }: { u: User }) {
   const pw = q.data?.password ?? "";
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-xs text-muted">{t("ul.link")}</span>
+      <span className="text-xs leading-5 text-muted">{t("ul.link")}</span>
       <div className="flex min-w-0 items-center gap-2 rounded-field border border-line bg-canvas py-1 ps-3 pe-1">
         <code className="min-w-0 flex-1 truncate font-mono text-xs leading-5 text-sec select-all" title={url}>
           {q.isError ? "—" : url || "…"}
         </code>
         <CopyButton value={url} size="md" label={t("common.copy")} />
+        <Button size="md" className="gap-1.5!" onClick={onLink}>
+          <G d={P.qr} size={16} stroke={1.5} />
+          {t("ul.qrSend")}
+        </Button>
       </div>
-      <small className="text-xs text-muted">{t("ul.link.hint")}</small>
+      <small className="text-xs leading-5 text-muted">{t("ul.link.hint")}</small>
       {!q.isPending && (
         <div className="mt-2.5 grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-field border border-line py-2 ps-2.5 pe-2 @max-[520px]/ust:grid-cols-[28px_minmax(0,1fr)]">
           <span aria-hidden className={cx("grid size-7 place-items-center rounded-ctl", pw ? "bg-tone-mint-bg text-accent-text" : "bg-step text-sec")}>
@@ -120,14 +126,14 @@ function LinkBlock({ u }: { u: User }) {
           </span>
           <div className="flex min-w-0 flex-col">
             <b className="text-[13px] font-medium">{t("users.pagePassword")}</b>
-            <span className={cx("truncate text-xs leading-4", pw ? "font-mono text-sec" : "text-muted")}>{pw ? (shown ? pw : "••••••••••••") : t("ul.pw.none")}</span>
+            <span className={cx("truncate text-xs leading-4", pw ? "font-mono font-medium text-sec" : "text-muted")}>{pw ? (shown ? pw : "••••••••••••") : t("ul.pw.none")}</span>
           </div>
           {pw && (
             <div className="flex items-center gap-1.5 @max-[520px]/ust:col-span-full">
               <Button size="md" onClick={() => setShown(!shown)}>
                 {shown ? t("ul.pw.hide") : t("ul.pw.show")}
               </Button>
-              <CopyButton value={pw} size="md" label={t("users.copyPassword")} />
+              <CopyButton iconOnly value={pw} size="md" label={t("users.copyPassword")} />
             </div>
           )}
         </div>
@@ -136,8 +142,8 @@ function LinkBlock({ u }: { u: User }) {
   );
 }
 
-/** Extend by 30 days, reset the traffic, switch off (with a way back) or on; the card's page and the link window. */
-function Actions({ u, manage, onLink }: { u: User; manage: boolean; onLink: () => void }) {
+/** Extend by 30 days, reset the traffic, switch off (with a way back) or on; the card's page. */
+function Actions({ u, manage }: { u: User; manage: boolean }) {
   const t = useTx();
   const toast = useToast();
   const qc = useQueryClient();
@@ -173,10 +179,9 @@ function Actions({ u, manage, onLink }: { u: User; manage: boolean; onLink: () =
           <Button variant={off ? "primary" : "secondary"} disabled={run.isPending} className={cx(!off && "hover:border-danger hover:text-danger-text")} onClick={() => run.mutate(off ? "on" : "off")}>
             {off ? t("ul.act.on") : t("ul.act.off")}
           </Button>
-          <Button onClick={onLink}>{t("ul.act.link")}</Button>
         </>
       )}
-      <AppLink to="/users/$id" params={{ id: u.id }} className="ms-auto text-[13px] text-fg underline decoration-line underline-offset-4 hover:decoration-current">
+      <AppLink to="/users/$id" params={{ id: u.id }} className="ms-auto @max-[520px]/ust:ms-0 text-[13px] text-fg underline decoration-line underline-offset-4 hover:decoration-current">
         {t("ul.act.page")}
       </AppLink>
     </div>

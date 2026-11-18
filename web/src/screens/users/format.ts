@@ -1,8 +1,8 @@
-import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { DeviceKind, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Tone } from "@/components/ui/icons";
 import { agoOf, scaleBytes, type Fmt } from "@/lib/format";
-import type { UserN as User } from "./model";
+import type { DeviceN, UserN as User } from "./model";
 import type { Key, Tx } from "./t";
 
 export { avatarIndex } from "@/components/ui/bits";
@@ -85,6 +85,16 @@ export function usage(used: number, quota: number, fmt: Fmt) {
 /** The panel's short "5 min ago / 3 h ago / 2 d ago" (fmt.ago) for a Unix time; "—" when it is 0 (never). */
 export function agoText(unix: number, t: Tx, now = nowSec()): string {
   return unix === 0 ? "—" : agoOf(t, unix, now);
+}
+
+/**
+ * When the nodes last counted a connection of a device (0 = never). For an app on the link `lastSeenUnix` is its last subscription
+ * fetch, not a connection, so the panel sends the connection time apart; a key (AmneziaVPN, Telegram, TrustTunnel) has its own
+ * last handshake or session in `lastSeenUnix`, which may be newer than the counters.
+ */
+export function lastOnlineOf(d: Pick<DeviceN, "kind" | "lastSeenUnix" | "lastHandshakeUnix" | "lastOnlineUnix">): number {
+  const link = d.kind === DeviceKind.LINK || d.kind === DeviceKind.LINK_SHARED;
+  return Math.max(d.lastOnlineUnix ?? 0, link ? 0 : Math.max(d.lastSeenUnix, d.lastHandshakeUnix));
 }
 
 /** Last-seen column: "now" while online, else how long ago. */

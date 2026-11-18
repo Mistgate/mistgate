@@ -368,6 +368,9 @@ message Device {
   bool idle = 23;
   // When it crossed the idle threshold (last node connection, else last fetch/sync, else creation time); 0 when not idle.
   int64 idle_since_unix = 24 [jstype = JS_NUMBER];
+  // When the nodes last counted a connection of the device (a session they saw, or the newest hour with connections or online time
+  // in the connection counters); 0 = none counted. For a link device last_seen_unix is its last subscription fetch, not this.
+  int64 last_online_unix = 25 [jstype = JS_NUMBER];
 }
 
 enum DeviceKind {
