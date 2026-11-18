@@ -37,8 +37,8 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
           </span>
         )}
       </div>
-      <b>{toolTitle(t, plan.tool)}</b>
-      {plan.summary && <p className="as-sum">{plan.summary}</p>}
+      {/* the board's title is what the change does; the tool's own name stands in when the plan has no summary */}
+      <b>{plan.summary || toolTitle(t, plan.tool)}</b>
       {plan.facts.length > 0 && (
         <ul>
           {plan.facts.map((f, i) => {
@@ -63,7 +63,8 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
           })}
         </ul>
       )}
-      {plan.needsApproval && (
+      {/* the owner's own button says "Approve and apply"; the line is for the one who cannot approve */}
+      {plan.needsApproval && !owner && (
         <p className="as-w">
           <I g="warn" />
           {t("ai.plan.needsOwner")}
@@ -121,7 +122,7 @@ function statusLine(t: ReturnType<typeof useT>, p: Plan): string {
     case PlanState.REJECTED:
       return t("ai.plan.rejected");
     case PlanState.DISMISSED:
-      return t("ai.plan.dismissed");
+      return t("as.plan.no");
     case PlanState.EXPIRED:
       return t("ai.plan.expired");
     default:

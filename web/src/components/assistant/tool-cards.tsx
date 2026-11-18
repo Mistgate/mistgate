@@ -208,12 +208,13 @@ export function ToolGroup({ tools, running, workedMs }: { tools: LiveTool[]; run
   const live = running || tools.some((x) => !x.done);
   const failed = tools.filter((x) => x.done && !x.ok).length;
   const isOpen = open ?? live;
+  // the ring is for a call that still works; the words say "Using" while the turn runs (the board: the tick shows as soon as the calls are done)
   const fold = tools.length > 5 && !all;
   const shown = fold ? tools.slice(-3) : tools;
   return (
     <div data-slot="tools" className={cx("as-tc", isOpen && "open")}>
       <button type="button" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen} className="as-tch">
-        <span aria-hidden className={cx("as-ts", live ? "now" : "done")}>
+        <span aria-hidden className={cx("as-ts", tools.some((x) => !x.done) ? "now" : "done")}>
           <I g="check" />
         </span>
         <span>

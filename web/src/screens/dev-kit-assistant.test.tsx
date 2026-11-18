@@ -104,13 +104,16 @@ describe("what a scene shows", () => {
     await draw("empty");
     expect($(".as-e b")?.textContent).toBe("Ask about nodes and people");
     expect(all(".as-sg button")).toHaveLength(5);
+    // the board's five: two questions, a change, a site for a node, a template
+    expect(all(".as-sg button").map((b) => b.textContent)).toEqual(["Which nodes had problems today?", "Who is over the device limit?", "Make a group for the family with the Hysteria2 profile", "Make an own decoy site for the node alpha", "Add ad blocking to the family template"]);
     expect($(".as-cx")?.textContent).toContain("Page: Overview");
     expect($(".as-fm")?.textContent).toBe("The assistant only prepares changes, you apply them");
     expect($(".as-lg .cat")).not.toBeNull();
     // the model button names the provider and its model, the header says the same
     expect($(".as-md")?.textContent).toContain("Anthropic · claude-sonnet-5-5");
     expect($(".as-ht .as-mn")?.textContent).toBe("Anthropic · claude-sonnet-5-5");
-    expect($(".as-go")?.hasAttribute("disabled")).toBe(true);
+    // the board draws the send button the same whatever the box holds: it is not dimmed
+    expect($(".as-go")?.getAttribute("aria-disabled")).toBe("true");
   });
 
   it("it thinks: a call is done, the seconds, the dots", async () => {
@@ -130,9 +133,21 @@ describe("what a scene shows", () => {
     const card = $("[data-slot=plan]")!;
     expect(card.textContent).toContain("Proposed change");
     expect(card.textContent).toContain("expires in");
-    expect(card.textContent).toContain("Needs the owner's approval");
+    // the title is what the change does (the board's), and the owner's own button says what the line would
+    expect(card.querySelector("b")?.textContent).toBe("Turn the relay on for fi1 through msk1");
+    expect(card.textContent).not.toContain("Needs the owner's approval");
     expect(all("[data-slot=plan] button").map((b) => b.textContent)).toEqual(["Dismiss", "Approve and apply"]);
     expect($(".as-day")?.textContent).toBe("Today");
+  });
+
+  it("a helper sees why the plan is not theirs to apply; a plan turned down says nothing was changed", async () => {
+    await draw("answer", Role.HELPER);
+    expect($("[data-slot=plan]")?.textContent).toContain("Needs the owner's approval");
+    await clear();
+    await draw("answer.rej");
+    expect($(".as-pl.no")).not.toBeNull();
+    expect($(".as-ps")?.textContent).toBe("Rejected, nothing was changed");
+    expect(all("[data-slot=plan] button")).toHaveLength(0);
   });
 
   it("applied: the card quiets down and says how it ended", async () => {
@@ -150,7 +165,9 @@ describe("what a scene shows", () => {
 
   it("the trouble: the budget, what to do, the way to the settings for the owner and not for a helper", async () => {
     await draw("err");
-    expect($("[data-slot=error]")?.textContent).toContain("This month's budget for the provider is spent.");
+    expect($("[data-slot=error]")?.textContent).toContain("Monthly budget used up");
+    // under the assistant's name line, as the board has it
+    expect($("[data-slot=trouble] .as-ah")?.textContent).toContain("Assistant");
     expect($("[data-slot=error]")?.textContent).toContain("Raise “Monthly budget, $” or wait for next month");
     expect($("[data-slot=error] a")?.getAttribute("href")).toBe("/ai");
     await clear();
@@ -184,6 +201,11 @@ describe("what a scene shows", () => {
     expect($(".as-hr.on")?.textContent).toContain("now");
     expect($(".as-ud")).not.toBeNull();
     expect(body()).toContain("Scheduled");
+    // the time of a row is the board's: the clock for today and yesterday, the date before that (never "3 h ago")
+    const times = all(".as-h1 > span").map((x) => x.textContent ?? "");
+    expect(times[0]).toBe("now");
+    expect(times.slice(1, 4).every((x) => /^\d\d:\d\d$/.test(x))).toBe(true);
+    expect(times[4]).not.toMatch(/ago|\d\d:\d\d/);
     expect($(".as-hf")?.textContent).toContain("Encrypted, visible only to you");
     expect($(".as-hf")?.textContent).toContain("Delete all");
     // the way back, the search and the trash can are named
@@ -219,7 +241,7 @@ describe("what a scene shows", () => {
     expect($("[role=tab][aria-selected=true]")?.textContent).toBe("Anthropic");
     expect($("[role=tab].as-cur")?.textContent).toBe("Anthropic");
     expect($("[role=option]")?.getAttribute("aria-selected")).toBe("true");
-    expect($(".as-m2n")?.textContent).toContain("Processed in the United States");
+    expect($(".as-m2n")?.textContent).toBe("US, not for training");
     expect(all("[role=radio]").map((x) => x.getAttribute("aria-label"))).toEqual(["Quick", "Normal", "Thorough"]);
     expect($(".as-sl")?.className).toContain("d1");
     expect($(".as-dpl b")?.textContent).toBe("Normal");

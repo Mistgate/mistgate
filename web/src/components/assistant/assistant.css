@@ -3,8 +3,9 @@
  * last rule of a selector wins, light theme and phone included). It loads with the window (chat.tsx opens it by import()), not with the first page.
  * The board's names are the product's: --acc is --accent (a fill), --accent-mark (a line, a mark) or --accent-text (text), --hair is --border,
  * --raise is --surface-2, --crit is --danger, --warn is --warning, --mint-bg is --tone-mint-bg, --ink is --ink-on-accent. Everything sits under .as
- * (the window) or .as-dock (its frame). The motion of the window opening (the wave, the glints at the edge), the dotted halo of the empty chat and the
- * glow of the depth slider belong to the reveal animation (Settings -> Interface): they sit under [data-fx] and are not drawn without it.
+ * (the window) or .as-dock (its frame). The motion of the window opening (the wave, the glints at the edge) and what moves in the depth slider (the dots
+ * running through the fill, the rings, the particles) belong to the reveal animation (Settings -> Interface): they sit under [data-fx] and are not
+ * drawn without it. The still parts of the board's look (the dotted halo of the empty chat, the slider's dots and glow) are always there.
  * Logical properties only, so right-to-left mirrors; the slider and the wave are given the side by the direction.
  */
 
@@ -408,6 +409,10 @@
   height: 0;
 }
 /* the thread: one column, a message after a message */
+/* the dots that go on in the same bubble as the calls above them (the board has them in it, 8px under the group, not a message's 16px) */
+.as-a.as-cont {
+  margin-top: -8px;
+}
 .as-bi {
   display: flex;
   flex-direction: column;
@@ -424,7 +429,7 @@
   padding: 8px;
   text-align: center;
 }
-.as[data-fx] .as-e::before {
+.as-e::before {
   content: "";
   position: absolute;
   /* centred on the column, so the physical side is the right one in both directions */
@@ -518,7 +523,6 @@
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  line-height: 16px;
   color: var(--muted);
 }
 .as-day::before,
@@ -717,7 +721,7 @@ button.as-rs[aria-expanded="true"] .as-i {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 40px;
+  min-height: 39px;
   padding: 0 12px;
   text-align: start;
 }
@@ -888,6 +892,11 @@ button.as-rs[aria-expanded="true"] .as-i {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+/* a list of the answer: the board's lines are the answer's own, 8px apart like every line of it (a list in a list is closer) */
+.as-mk > ul,
+.as-mk > ol {
+  gap: 8px;
 }
 .as-mk ol {
   counter-reset: as-n;
@@ -1100,11 +1109,6 @@ button.as-rs[aria-expanded="true"] .as-i {
   font-size: 15px;
   line-height: 20px;
   font-weight: 500;
-}
-.as-pl > .as-sum {
-  font-size: 13px;
-  color: var(--sec);
-  text-wrap: pretty;
 }
 .as-pl ul {
   display: grid;
@@ -1541,10 +1545,6 @@ button.as-rs[aria-expanded="true"] .as-i {
 .as-go:hover {
   transform: scale(1.06);
 }
-.as-go:disabled {
-  opacity: 0.4;
-  transform: none;
-}
 .as-go .as-i {
   stroke-width: 2;
 }
@@ -1875,8 +1875,9 @@ button.as-rs[aria-expanded="true"] .as-i {
   border-radius: 50%;
   background: var(--accent-mark);
 }
-/* the dots that run through the fill, the ring where the thumb stops, the particles and the glow: the reveal animation's */
-.as[data-fx] .as-slf::before {
+/* the dots in the fill, the glow at its tip and the thumb's glow at the deepest place are the board's look and are always there; what moves (the dots running
+   through the fill, the ring where the thumb stops, the particles) is the reveal animation's */
+.as-slf::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1887,9 +1888,11 @@ button.as-rs[aria-expanded="true"] .as-i {
   mask-image: linear-gradient(100deg, rgb(0 0 0 / 0.25) 0, rgb(0 0 0 / 0.25) 30%, #000 50%, rgb(0 0 0 / 0.25) 70%, rgb(0 0 0 / 0.25) 100%);
   -webkit-mask-size: 220% 100%;
   mask-size: 220% 100%;
+}
+.as[data-fx] .as-slf::before {
   animation: sl-wave 3.2s linear infinite;
 }
-.as[data-fx] .as-slf::after {
+.as-slf::after {
   content: "";
   position: absolute;
   top: 0;
@@ -1900,15 +1903,18 @@ button.as-rs[aria-expanded="true"] .as-i {
   opacity: 0.5;
   transition: opacity 0.4s var(--e);
 }
-.as[data-fx] .as-sl .as-slf:dir(rtl)::after {
+.as-sl .as-slf:dir(rtl)::after {
   transform: scaleX(-1);
 }
-.as[data-fx] .as-sl.d0 .as-slf::before { animation-duration: 5s; opacity: 0.6; }
-.as[data-fx] .as-sl.d0 .as-slf::after { opacity: 0.25; }
-.as[data-fx] .as-sl.d1 .as-slf::before { animation-duration: 2.6s; opacity: 0.85; }
-.as[data-fx] .as-sl.d2 .as-slf::before { animation-duration: 1.5s; opacity: 1; }
-.as[data-fx] .as-sl.d2 .as-slf::after { opacity: 0.9; }
-.as[data-fx] .as-slt::before {
+.as-sl.d0 .as-slf::before { opacity: 0.6; }
+.as-sl.d0 .as-slf::after { opacity: 0.25; }
+.as-sl.d1 .as-slf::before { opacity: 0.85; }
+.as-sl.d2 .as-slf::before { opacity: 1; }
+.as-sl.d2 .as-slf::after { opacity: 0.9; }
+.as[data-fx] .as-sl.d0 .as-slf::before { animation-duration: 5s; }
+.as[data-fx] .as-sl.d1 .as-slf::before { animation-duration: 2.6s; }
+.as[data-fx] .as-sl.d2 .as-slf::before { animation-duration: 1.5s; }
+.as-slt::before {
   content: "";
   position: absolute;
   inset: -1px;
@@ -1919,7 +1925,7 @@ button.as-rs[aria-expanded="true"] .as-i {
 .as[data-fx] .as-sl.d0 .as-slt::before { animation: sl-r0 0.7s var(--e); }
 .as[data-fx] .as-sl.d1 .as-slt::before { animation: sl-r1 0.7s var(--e); }
 .as[data-fx] .as-sl.d2 .as-slt::before { animation: sl-r2 0.7s var(--e); }
-.as[data-fx] .as-sl.d2 .as-slt {
+.as-sl.d2 .as-slt {
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.4), 0 0 0 4px color-mix(in srgb, var(--accent-mark) 22%, transparent), 0 0 18px color-mix(in srgb, var(--accent-mark) 50%, transparent);
 }
 .as-spt {
@@ -2020,7 +2026,6 @@ button.as-rs[aria-expanded="true"] .as-i {
   padding: 12px 10px 6px;
   background: var(--surface);
   font-size: 12px;
-  line-height: 16px;
   color: var(--muted);
 }
 .as-hr {
@@ -2051,6 +2056,7 @@ button.as-rs[aria-expanded="true"] .as-i {
 }
 .as-h1 {
   display: flex;
+  font-size: 13px;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
