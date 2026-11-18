@@ -130,6 +130,7 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["log_level_set", { from: "info", to: "debug", req: "abc12345" }],
   ["retention_set", { audit_days: "100", req: "abc12345" }],
   ["metrics_set", { state: "on", token_rotated: "true" }],
+  ["warp_reach_settings", { customised: "true", domains: "example.com,example.org" }],
   ["export_data", { since: "2026-11-06T00:00:00Z", until: "2026-11-07T00:00:00Z", rows: "12" }],
   ["token_create", { token_id: "tok_1", name: "ci", profile: "operator", ttl_days: 30 }],
   ["token_revoke", { token_id: "tok_1" }],

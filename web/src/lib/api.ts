@@ -34,6 +34,7 @@ import { WarpService } from "@/gen/mistgate/admin/v1/warp_pb";
 import { OpsService } from "@/gen/mistgate/ops/v1/ops_pb";
 import { OwnProbeService } from "@/gen/mistgate/ownprobe/v1/own_probe_pb";
 import { TasksService } from "@/gen/mistgate/tasks/v1/tasks_pb";
+import { WarpReachService } from "@/gen/mistgate/warpreach/v1/warpreach_pb";
 import type { MessageKey } from "@/i18n/en";
 import { versionInterceptor } from "./stale";
 
@@ -89,6 +90,8 @@ export const bsbord = createClient(BsbordService, transport);
 export const ops = createClient(OpsService, transport);
 // The owner's scheduled tasks (the VPS edition; the edge answers UNIMPLEMENTED).
 export const tasks = createClient(TasksService, transport);
+// The sites each node's WARP is checked against (a package of its own, owner only: the Cloudflare edition answers unavailable_in_edition: feature=health_checks).
+export const warpReach = createClient(WarpReachService, transport);
 // CheckRelay and switching a relay on wait for probes and for the entry to install the forward (up to ~40 s): no deadline here either.
 export const relays = createClient(RelayService, transport);
 

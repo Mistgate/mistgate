@@ -9,7 +9,7 @@ import { addressOf, scenes, seeded, SettingsSceneBody, variantOf } from "./dev-k
 // The scenes of /dev-kit?only=pn-settings draw the real screen on made-up data: every state a scene names must draw, in every language.
 
 // the scene's own calls are put on these objects by `seeded`
-vi.mock("@/lib/api", () => ({ basepath: "/", assetUrl: (p: string) => p, auth: {}, instance: {}, ops: {}, updates: {}, backups: {}, webauthnSupported: () => true }));
+vi.mock("@/lib/api", () => ({ basepath: "/", assetUrl: (p: string) => p, auth: {}, instance: {}, ops: {}, updates: {}, backups: {}, warpReach: {}, webauthnSupported: () => true }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, params: _p, search: _s, to, ...rest }: { children?: ReactNode; className?: string; params?: unknown; search?: unknown; to?: string }) => (
     <a className={className} href={to} {...rest}>
@@ -136,6 +136,57 @@ describe("the scenes of Settings", () => {
     host?.remove();
     await draw(addressOf(states("settings-sys-token")));
     expect(document.querySelector("[role=dialog]")?.textContent).toContain("The old token stops working at once");
+  });
+
+  it("System draws the sites WARP is checked against: built-in, own, off, and the hints on a list the panel would refuse", async () => {
+    const chips = () => [...document.querySelectorAll(".sx-wl li b")].map((b) => b.textContent);
+    const again = async (id: string) => {
+      act(() => root?.unmount());
+      host?.remove();
+      await draw(addressOf(states(id)));
+    };
+    await draw(addressOf(states("settings-sys")));
+    expect(body()).toContain("WARP reach check");
+    expect(body()).toContain("built-in list");
+    expect(chips()).toEqual(["example.com", "example.org", "example.net", "docs.example.com"]);
+    expect(document.querySelectorAll(".sx-wl li.bad")).toHaveLength(0);
+    // nothing to go back to while the built-in list is what is in force
+    expect([...document.querySelectorAll<HTMLButtonElement>("[data-card=warp-reach] button")].find((b) => b.textContent === "Restore the built-in list")?.disabled).toBe(true);
+    await again("settings-sys-warp-own");
+    expect(chips()).toEqual(["news.example.org", "video.example.net", "chat.example.com"]);
+    expect(body()).toContain("your list");
+    await again("settings-sys-warp-off");
+    expect(chips()).toEqual([]);
+    expect(body()).toContain("No sites. The check is off");
+    expect(body()).toContain("check off");
+    await again("settings-sys-warp-bad");
+    expect(document.querySelectorAll(".sx-wl li.bad")).toHaveLength(2);
+    expect(body()).toContain("A site must be a lower-case host name");
+    await again("settings-sys-warp-many");
+    expect(body()).toContain("At most 8 sites can be checked");
+    expect(document.querySelector(".sx-wh em.bad")?.textContent).toBe("9 of 8");
+    await again("settings-sys-warp-refused");
+    expect(document.querySelector("[data-card=warp-reach] small[role=alert]")?.textContent).toContain("A site must be a lower-case host name");
+    await again("settings-sys-warp-busy");
+    expect(document.querySelector("[data-card=warp-reach] button[aria-busy=true]")?.textContent).toBe("Save");
+  });
+
+  it("the WARP card waits for its data, says so when it fails, and is not there for a helper or on the Cloudflare edition", async () => {
+    await draw(addressOf(states("settings-sys-warp-load")));
+    expect(document.querySelector("[data-card=warp-reach] [data-fx-pending]")).not.toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(addressOf(states("settings-sys-warp-err")));
+    expect(document.querySelector("[data-card=warp-reach] [role=alert]")).not.toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(addressOf(states("settings-sys-helper")));
+    expect(document.querySelector("[data-card=warp-reach]")).toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(addressOf(states("settings-sys-warp-edge")));
+    expect(document.querySelector("[data-card=warp-reach]")?.textContent).toContain("Not available in the Cloudflare edition yet: Tunnel checks.");
+    expect(document.querySelector("[data-card=warp-reach] input")).toBeNull();
   });
 
   it("the tab picked inside a scene is drawn from the same cache", async () => {

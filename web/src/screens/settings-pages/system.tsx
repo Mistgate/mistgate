@@ -9,15 +9,16 @@ import { useFmt } from "@/lib/format";
 import { updateTimezoneName, useIsOwner, useUpdateActions, useUpdates, type Updates } from "@/lib/updates";
 import { PanelResourcesCard } from "./panel-resources";
 import { OpsLogs, OpsSide, type OpsDemo } from "./system-ops";
+import { WarpReachCard, type ReachDemo } from "./warp-reach";
 import { Foot, ICONS, Otg, Row, Rows, Sec, SxGate, SxRoot } from "./sx-bits";
 import "./settings-sys.css";
 
 /**
  * Settings -> System (the board's sxIs_sys): what the panel costs this server across the page, then two columns: the logs and the
- * node updates' settings on the left; this panel, retention, export, metrics and "About" on the right. The updates' settings and
- * the version come from GetUpdates (the tab's gate); the diagnostics are the owner's and load their own.
+ * node updates' settings and the sites WARP is checked against on the left; this panel, retention, export, metrics and "About" on the
+ * right. The updates' settings and the version come from GetUpdates (the tab's gate); the diagnostics are the owner's and load their own.
  */
-export function SystemPage({ demo }: { demo?: OpsDemo } = {}) {
+export function SystemPage({ demo }: { demo?: OpsDemo & { reach?: ReachDemo } } = {}) {
   const q = useUpdates();
   const owner = useIsOwner();
   const actions = useUpdateActions();
@@ -31,6 +32,7 @@ export function SystemPage({ demo }: { demo?: OpsDemo } = {}) {
             <div className="col">
               <OpsLogs />
               <NodeUpdatesCard data={data} owner={owner} busy={actions.busy} actions={actions} />
+              <WarpReachCard demo={demo?.reach} />
             </div>
             <aside className="col pp-as">
               <ThisPanelCard panel={data.panel} />

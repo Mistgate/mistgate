@@ -108,6 +108,7 @@ const keys: Record<string, MessageKey> = {
   log_level_set: "audit.log_level_set",
   retention_set: "audit.retention_set",
   metrics_set: "audit.metrics_set",
+  warp_reach_settings: "audit.warp_reach_settings",
   export_data: "audit.export_data",
   token_create: "audit.token_create",
   token_revoke: "audit.token_revoke",

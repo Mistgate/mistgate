@@ -37,6 +37,10 @@ export const errorCodes = [
   "no_clean_port",
   // an RPC that would start work the Cloudflare edition does not run yet (internal/panel/edition), "feature=<id>"
   "unavailable_in_edition",
+  // the owner's list of sites WARP is checked against (InvalidArgument)
+  "reach_domains_too_many",
+  "reach_domain_invalid",
+  "reach_domain_duplicate",
   // an own decoy archive the panel refuses (InvalidArgument): "decoy_bundle_<reason>" or "decoy_bundle_<reason>: path=<entry>"
   "decoy_bundle_empty",
   "decoy_bundle_bad_archive",

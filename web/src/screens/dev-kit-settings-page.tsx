@@ -10,7 +10,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { isLang, setLang, useLang } from "@/i18n";
-import { instance as instanceApi, ops as opsApi, updates as updatesApi, auth as authApi, backups as backupsApi } from "@/lib/api";
+import { instance as instanceApi, ops as opsApi, updates as updatesApi, auth as authApi, backups as backupsApi, warpReach as warpReachApi } from "@/lib/api";
 import { sanitizeLogo } from "@/lib/brand";
 import { setEffectsEnabled } from "@/lib/effects";
 import { instanceQuery } from "@/lib/instance";
@@ -21,6 +21,7 @@ import { nodesQuery, overviewQuery, userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { setTheme, useTheme } from "@/lib/theme";
 import { updatesQuery } from "@/lib/updates";
+import { warpReachQuery } from "@/lib/warpreach";
 import { NODES, NOW, nodeRows, checksOf } from "@/screens/dev-kit-profiles-data";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { SettingsFrame, SettingsTab, isPage, type PageId } from "@/screens/settings";
@@ -33,6 +34,7 @@ import { passwordLoginQuery } from "@/screens/settings-pages/password";
 import { passkeysQuery, SecurityPage, type SecurityDemo } from "@/screens/settings-pages/security";
 import { SessionsPage, sessionsQuery, type SessionsDemo } from "@/screens/settings-pages/sessions";
 import { SystemPage } from "@/screens/settings-pages/system";
+import type { ReachDemo } from "@/screens/settings-pages/warp-reach";
 import type { AuditKind, AuditSource } from "@/gen/mistgate/admin/v1/auth_pb";
 import { auditDemo, auditFilter, auditPage, backupList, backupSettings, backupsDemo, keptData, passkeys, passwordLogin, restoreResult, securityDemo, securitySettings, sessions, sessionsDemo } from "./dev-kit-settings-b";
 import { ShellLayout } from "./shell";
@@ -44,7 +46,8 @@ import { ShellLayout } from "./shell";
 //   /dev-kit?only=settings-page&tab=<if|sys|sec|ses|aud|adm|dom|bk>[&state=…][&role=owner|helper|readonly][&lang=en|ru|zh|fa|tr][&theme=light|dark][&fx=1][&copy=fail][&edge=1]
 // The tab is the board's id: if (Interface), sys (System), sec (Security), ses (Sessions), aud (Audit), adm (Admins), dom (Domains), bk (Backups).
 // The state is the tab's own. Interface: load | err | big | bad | busy | new | dirty | saving | saved. System: load | err | hot | none (a panel that
-// is not Linux) | nologs (a Cloudflare panel) | token (the metrics window) | made (the new token). Admins: load | err. Domains: load | err | nosub.
+// is not Linux) | nologs (a Cloudflare panel) | token (the metrics window) | made (the new token) | warp-own | warp-off | warp-full | warp-bad |
+// warp-many | warp-typed | warp-refused | warp-busy | warp-load | warp-err (the card of the sites WARP is checked against; the built-in list otherwise). Admins: load | err. Domains: load | err | nosub.
 // Part B adds its states in `partB` below (Security: lock | nosec, Sessions: one, Audit: none, Backups: none | fail | r2bad, and the windows).
 // Made-up data: a panel called owner, the documentation addresses, nodes de1 … spb1.
 
@@ -56,12 +59,12 @@ const SAMPLE_LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 export type Variant = { tab: PageId; state: string; role: Role; edge: boolean };
 
 /** What a scene's page is told besides its data: the board's states that come from a click. */
-export const demoOf = (tab: PageId, state: string): { interface?: InterfaceDemo; token?: "form" | "made"; security?: SecurityDemo; sessions?: SessionsDemo; audit?: AuditDemo; backups?: BackupsDemo } => {
+export const demoOf = (tab: PageId, state: string): { interface?: InterfaceDemo; token?: "form" | "made"; reach?: ReachDemo; security?: SecurityDemo; sessions?: SessionsDemo; audit?: AuditDemo; backups?: BackupsDemo } => {
   if (tab === "interface") {
     const logo = state === "new" ? { svg: SAMPLE_LOGO, preview: sanitizeLogo(SAMPLE_LOGO)! } : state === "big" || state === "bad" || state === "busy" ? state : undefined;
     return { interface: { ...(logo && { logo }), ...(state === "dirty" && { tail: "gates" }), ...(state === "new" && { tail: "gate" }), ...(state === "saving" && { tail: "gates", saving: true }), ...(state === "saved" && { saved: true }) } };
   }
-  if (tab === "system") return { token: state === "token" ? "form" : state === "made" ? "made" : undefined };
+  if (tab === "system") return { token: state === "token" ? "form" : state === "made" ? "made" : undefined, reach: reachDemo(state) };
   if (tab === "security") return { security: securityDemo(state) };
   if (tab === "sessions") return { sessions: sessionsDemo(state) };
   if (tab === "audit") return { audit: auditDemo(state) };
@@ -140,6 +143,29 @@ const logPage = (req: { minLevel?: string; query?: string; component?: string; c
   return { level: "info", buffered: 1840, capacity: 5000, nextCursor: 0n, entries };
 };
 
+// the sites WARP is checked against: made-up names (the real built-in list is the panel's)
+const REACH_BUILTIN = ["example.com", "example.org", "example.net", "docs.example.com"];
+const REACH_OWN = ["news.example.org", "video.example.net", "chat.example.com"];
+const REACH_FULL = ["a.example.com", "b.example.com", "c.example.com", "d.example.com", "e.example.com", "f.example.com", "g.example.com", "h.example.com"];
+/** The panel's answer of GetWarpReachSettings in a scene: the built-in list unless the scene's state says the owner changed it. */
+export const reachData = (state: string) => {
+  const own = state === "warp-own" || state === "warp-bad" || state === "warp-refused" || state === "warp-busy" || state === "warp-typed";
+  return {
+    settings: { domains: state === "warp-off" ? [] : state === "warp-full" ? REACH_FULL : own ? REACH_OWN : REACH_BUILTIN },
+    defaults: { domains: REACH_BUILTIN },
+    customised: own || state === "warp-off" || state === "warp-full",
+  };
+};
+/** What the card is opened with besides its data (a list edited, a name typed, a refusal, a call under way). */
+const reachDemo = (state: string): ReachDemo | undefined => {
+  if (state === "warp-bad") return { draft: [...REACH_OWN, "https://example.com/x", "example"] };
+  if (state === "warp-many") return { draft: [...REACH_FULL, "i.example.com"] };
+  if (state === "warp-typed") return { typed: "mail.example.com" };
+  if (state === "warp-refused") return { draft: [...REACH_OWN, "https://example.com/x"], refused: "reach_domain_invalid" };
+  if (state === "warp-busy") return { draft: [...REACH_OWN, "mail.example.com"], busy: "save" };
+  return undefined;
+};
+
 /** What the panel's calls of this screen answer in a scene (the scene is its own page, so patching the shared client is safe), and which ones never do. */
 function fakeCalls(v: Variant, nosub: boolean, hot: boolean, none: boolean) {
   const set = (api: unknown, fns: Record<string, unknown>) => Object.assign(api as object, fns);
@@ -170,6 +196,10 @@ function fakeCalls(v: Variant, nosub: boolean, hot: boolean, none: boolean) {
     exportData: async function* () {
       yield { data: new TextEncoder().encode('{"event":"example"}\n') };
     },
+  });
+  set(warpReachApi, {
+    getWarpReachSettings: v.state === "warp-load" ? hang : v.state === "warp-err" ? fail : async () => reachData(v.state),
+    updateWarpReachSettings: async (r: { settings?: { domains: string[] }; useDefaults?: boolean }) => (r.useDefaults ? { settings: { domains: REACH_BUILTIN }, customised: false } : { settings: { domains: r.settings?.domains ?? [] }, customised: true }),
   });
   set(authApi, {
     listPasskeys: stalls("admins") ?? stalls("security") ?? (async () => ({ passkeys: passkeys(v.state) })),
@@ -212,7 +242,7 @@ export function seeded(v: Variant) {
   const nosub = v.state === "nosub";
   fakeCalls(v, nosub, hot, none);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, retryDelay: 0, refetchOnWindowFocus: false, refetchInterval: false } } });
-  c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role: v.role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0, ...(v.edge && { edition: "edge", unavailable: ["backups", "panel_update"] }) } as never);
+  c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role: v.role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0, ...(v.edge && { edition: "edge", unavailable: ["backups", "panel_update", "health_checks"] }) } as never);
   c.setQueryData(nodesQuery.queryKey, { nodes: nodeRows(), expectedAgentVersion: "0.1.71" } as never);
   c.setQueryData(overviewQuery().queryKey, { nodesTotal: NODES.length, nodes: nodeRows().map((n) => ({ id: n.id, name: n.name, countryCode: n.countryCode, location: n.location, status: NodeStatus.ONLINE, online: [], sparkBytes: [] })), alertsActive: 0, alertsCritical: 0 } as never);
   c.setQueryData(userCountQuery.queryKey, { counts: { all: 140, online: 31, devicesUsed: 0, devicesOnline: 0 } } as never);
@@ -223,6 +253,7 @@ export function seeded(v: Variant) {
   if (!stalled("system")) c.setQueryData(updatesQuery.queryKey, updatesData() as never);
   if (v.state !== "nologs") c.setQueryData(logSettingsQuery.queryKey, { level: "info", defaultLevel: "info", format: "text", buffered: 1840, capacity: 5000 } as never);
   c.setQueryData(logsQuery(defaultLogFilter, false).queryKey, logPage({ minLevel: "info" }) as never);
+  if (v.state !== "warp-load" && v.state !== "warp-err") c.setQueryData(warpReachQuery.queryKey, reachData(v.state) as never);
   c.setQueryData(retentionQuery.queryKey, { items: RETENTION } as never);
   c.setQueryData(metricsQuery.queryKey, { enabled: true, hasToken: true } as never);
   c.setQueryData(panelResourcesQuery.queryKey, resources(hot, none) as never);
@@ -250,7 +281,7 @@ export function SettingsSceneBody({ tab, state }: { tab: PageId; state: string }
       {section === "interface" ? (
         <InterfacePage demo={demo.interface} />
       ) : section === "system" ? (
-        <SystemPage demo={{ token: demo.token }} />
+        <SystemPage demo={{ token: demo.token, reach: demo.reach }} />
       ) : section === "security" ? (
         <SecurityPage demo={demo.security} />
       ) : section === "sessions" ? (
@@ -336,6 +367,20 @@ export const frames: Frame[] = [
   f("settings-sys-readonly", "sys", "Role: an observer", 1400, "", 1440, "&role=readonly"),
   f("settings-sys-none", "sys", "A server that is not Linux: no CPU, memory, disk", 2000, "none"),
   f("settings-sys-nologs", "sys", "The Cloudflare edition: the diagnostics are not there", 1500, "nologs", 1440, "&edge=1"),
+  f("settings-sys-warp-own", "sys", "WARP sites: the owner's own list", 2000, "warp-own"),
+  f("settings-sys-warp-off", "sys", "WARP sites: an empty list (the check is off)", 2000, "warp-off"),
+  f("settings-sys-warp-full", "sys", "WARP sites: eight names (the most)", 2000, "warp-full"),
+  f("settings-sys-warp-bad", "sys", "WARP sites: names the panel would refuse (hints)", 2000, "warp-bad"),
+  f("settings-sys-warp-many", "sys", "WARP sites: nine names (hint)", 2000, "warp-many"),
+  f("settings-sys-warp-typed", "sys", "WARP sites: a name typed, not added yet", 2000, "warp-typed"),
+  f("settings-sys-warp-refused", "sys", "WARP sites: the panel refused the list (by its code)", 2000, "warp-refused"),
+  f("settings-sys-warp-busy", "sys", "WARP sites: saving", 2000, "warp-busy"),
+  f("settings-sys-warp-load", "sys", "WARP sites: loading", 2000, "warp-load"),
+  f("settings-sys-warp-err", "sys", "WARP sites: failed to load", 2000, "warp-err"),
+  f("settings-sys-warp-edge", "sys", "WARP sites: the Cloudflare edition (not available there)", 1500, "nologs", 1440, "&edge=1"),
+  f("settings-sys-warp-phone", "sys", "WARP sites on a phone, 400 wide", 3800, "warp-own", 400),
+  f("settings-sys-warp-fa", "sys", "WARP sites, right to left (fa)", 2100, "warp-own", 1440, "&lang=fa"),
+  f("settings-sys-warp-light", "sys", "WARP sites on the light theme", 2000, "warp-own", 1440, "&theme=light"),
   f("settings-sys-token", "sys", "Window: a new metrics token", 1000, "token"),
   f("settings-sys-made", "sys", "Window: the token made, shown once", 1000, "made"),
   f("settings-adm", "adm", "Admins (owner, 1440)", 640),

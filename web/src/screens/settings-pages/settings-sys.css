@@ -507,3 +507,110 @@
     animation: none;
   }
 }
+
+/* The sites WARP is checked against (screens/settings-pages/warp-reach.tsx): not on the board, so it is made of the board's own parts:
+   the rows of "where a node fetches the update from" (sx-so: a bordered 12px block), the field of the retention card, the foot. */
+.sx .sx-wr {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px 12px;
+}
+.sx .sx-wh {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sx .sx-wh em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx .sx-wh em.bad {
+  color: var(--danger-text);
+}
+.sx .sx-wl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sx .sx-wl li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  height: 36px;
+  padding-inline: 12px 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.sx .sx-wl li.bad {
+  border-color: var(--danger);
+}
+.sx .sx-wl li b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  unicode-bidi: plaintext;
+}
+.sx .sx-wx {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--muted);
+  transition: background-color .15s var(--e), color .15s var(--e);
+}
+.sx .sx-wx:hover:not(:disabled) {
+  background: var(--step);
+  color: var(--text);
+}
+.sx .sx-wx:disabled {
+  opacity: .45;
+}
+.sx .sx-wo {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--sec);
+  text-wrap: pretty;
+}
+.sx .sx-wi {
+  display: flex;
+  gap: 8px;
+}
+.sx .sx-wi .an-i {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.sx .sx-wi .btn,
+.sx .sx-wi button {
+  flex: none;
+  height: 40px;
+}
+.sx .sx-wtag.off {
+  background: var(--tone-sand-bg);
+}
+.sx .sx-wtag.custom {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+@media (max-width: 640px) {
+  .sx .sx-wr {
+    padding-inline: 16px;
+  }
+}
