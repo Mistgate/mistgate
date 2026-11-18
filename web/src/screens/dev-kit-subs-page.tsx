@@ -27,6 +27,7 @@ import type { SubsTab } from "./subscriptions/tabs";
 import { demoNodes } from "./dev-kit-decoys-data";
 import { dnsScenes } from "./dev-kit-subs-dns";
 import { hxScenes } from "./dev-kit-subs-hx";
+import { rtScenes } from "./dev-kit-subs-rt";
 import { baseScenes } from "./dev-kit-subs-scenes";
 import { ShellLayout } from "./shell";
 
@@ -65,7 +66,7 @@ export type SceneDef = {
   user?: string;
 };
 
-export const allScenes: SceneDef[] = [...baseScenes, ...hxScenes, ...dnsScenes];
+export const allScenes: SceneDef[] = [...baseScenes, ...hxScenes, ...rtScenes, ...dnsScenes];
 
 const clients = [
   { id: "happ", name: "Happ", protocols: ["vless", "hysteria2"], formats: [SubFormat.BASE64_URIS, SubFormat.XRAY_JSON] },
@@ -115,6 +116,7 @@ const baseSettings = (): Settings =>
     happPingOnOpen: false,
     responseHeaders: [],
     mihomoTemplates: [],
+    routingProfiles: [],
   }) as unknown as Settings;
 
 function worldOf(def: SceneDef, role: Role, edge: boolean): World {
@@ -161,7 +163,7 @@ export function sceneOf(state: string, tab?: string) {
   const t = (tab && isTab(tab) ? tab : def.tab) as SubsTab;
   return { qc: c, def, tab: t, user: def.user };
 }
-const isTab = (s: string) => ["formats", "rules", "clients", "texts", "headers", "mihomo", "page", "dns"].includes(s);
+const isTab = (s: string) => ["formats", "rules", "clients", "texts", "headers", "mihomo", "routing", "page", "dns"].includes(s);
 
 /** One whole page of the scene: the screen in the real shell, at the window's own width. */
 export function SubsPage() {

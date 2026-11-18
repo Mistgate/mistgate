@@ -15,6 +15,7 @@ import { MihomoTab } from "./mihomo";
 import { PageTab } from "./page";
 import { SbTabs } from "./parts";
 import { settingsQuery } from "./queries";
+import { RoutingTab } from "./routing";
 import { RulesTab } from "./rules";
 import { subsTabs, type SubsTab } from "./tabs";
 import { TextsTab } from "./texts";
@@ -83,6 +84,8 @@ export function SubscriptionsScreen({ demo }: { demo?: SubsDemo }) {
                 <HeadersTab data={d} />
               ) : tab === "mihomo" ? (
                 <MihomoTab data={d} />
+              ) : tab === "routing" ? (
+                <RoutingTab data={d} />
               ) : (
                 <PageTab settings={d.settings} />
               ),
