@@ -11,6 +11,7 @@ import { fieldClass } from "@/components/ui/text-field";
 import { Glyph, glyphs } from "@/components/windows";
 import { plainText, useT } from "@/i18n";
 import { countryCodes } from "@/lib/countries";
+import type { ShareChoice } from "@/lib/node-share";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import "./add-node.css";
@@ -318,5 +319,5 @@ export function CountryField({ value, onChange, label, hint, className, defaultO
 
 export { none as noCountry };
 
-/** The three things the first step shares with the by-command flow, kept when the person switches between them. */
-export type NodeDraft = { name: string; address: string; country: string };
+/** The things the first step shares with the by-command flow, kept when the person switches between them. `share` is who gets the node (undefined: not touched, the window's own default). */
+export type NodeDraft = { name: string; address: string; country: string; share?: ShareChoice };

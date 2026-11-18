@@ -6,6 +6,7 @@ import { CloseX, CodeBox, CopyChip, CountryField, FootNote, noCountry, Panel, Pa
 import { markFresh } from "@/components/fx/registry";
 import { authorizedKeysFile, usePanelKeyInUse, usePanelSSHKey } from "@/components/panel-ssh-key";
 import { Fingerprint, OwnKeyField, useSSHLogin, type LoginMethod } from "@/components/ssh-login";
+import { SharePick, useNodeShare } from "@/components/node-share-pick";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Chip, Check } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import { prefersReducedMotion } from "@/lib/effects";
 import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { rememberShare } from "@/lib/node-share";
 import { plain } from "@/lib/plain";
 
 // The SSH install of a node, the board's PnAddNode (.an): four steps (the server, the way in, the check, the install) in the
@@ -218,6 +220,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
   const [algorithm, setAlgorithm] = useState(seed?.algorithm ?? "");
   const [confirmedKey, setConfirmedKey] = useState(seed?.confirmedKey ?? false);
   const { name, address, country } = draft;
+  const share = useNodeShare(draft.share);
   const [location, setLocation] = useState(seed?.location ?? "");
   const [provider, setProvider] = useState(seed?.provider ?? "");
   const [username, setUsername] = useState(seed?.username ?? "root");
@@ -365,6 +368,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
       setFailure(t("node.ssh.confirmInstall"));
       return;
     }
+    if (!share.valid) return;
     setBusy("start");
     try {
       const response = await guard(
@@ -382,10 +386,12 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
             ...login.request(),
             sshUsername: username.trim(),
             ...login.install(),
+            ...share.request,
           }),
         t("win.node.whatInstall", { host: host.trim() }),
       );
       if (!response.job?.id) throw new Error("provision_job_missing");
+      if (share.ask) rememberShare(share.choice);
       login.clearSecrets(); // the job holds them now, sealed; a retry asks again
       setJobId(response.job.id);
       qc.setQueryData(["node-provision", response.job.id], response.job);
@@ -743,6 +749,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                     </div>
                   </div>
                   <p className="text-xs leading-4 text-muted">{t("node.ssh.firewallHint")}</p>
+                  <SharePick share={share} onChange={(c) => onDraft({ share: c })} />
                   {login.method === "password" && (
                     <TextField
                       className="an-f"
@@ -767,7 +774,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                 {t("node.ssh.back")}
               </Button>
               <FootNote end />
-              <Button type="submit" variant="primary" size="lg" disabled={busy !== null || !checked || !confirmedInstall || !login.ready}>
+              <Button type="submit" variant="primary" size="lg" disabled={busy !== null || !checked || !confirmedInstall || !login.ready || !share.valid}>
                 {busy === "start" && <Spinner />}
                 {busy === "start" ? t("node.ssh.starting") : t("node.ssh.startInstall")}
               </Button>

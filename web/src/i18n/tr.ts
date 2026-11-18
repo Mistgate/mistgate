@@ -46,6 +46,7 @@ import { tr as settingspageTr } from "./settingspage";
 import { tr as aipageTr } from "./aipage";
 import { tr as igpageTr } from "./igpage";
 import { tr as aspageTr } from "./aspage";
+import { tr as nodeshareTr } from "./nodeshare";
 import { tr as overviewTr } from "./overview";
 import { tr as windowsTr } from "./windows";
 import { tr as nodepageTr } from "./nodepage";
@@ -321,4 +322,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "IP adresi için Let’s Encrypt sertifikası henüz yok: bir alan adı ya da kendi imzalı sertifikayı seç",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...shellTr, ...overviewTr, ...nodesviewTr, ...windowsTr, ...nodepageTr, ...userslistTr, ...userspageTr, ...usersgroupTr, ...decoysitesTr, ...nodeswaysTr, ...nodewaysTr, ...profilespageTr, ...healthpageTr, ...reachpageTr, ...profilesrvTr, ...profilenewTr, ...subspnTr, ...subshxTr, ...subsdnsTr, ...updatespageTr, ...settingspageTr, ...aipageTr, ...igpageTr, ...aspageTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...shellTr, ...overviewTr, ...nodesviewTr, ...windowsTr, ...nodepageTr, ...userslistTr, ...userspageTr, ...usersgroupTr, ...decoysitesTr, ...nodeswaysTr, ...nodewaysTr, ...profilespageTr, ...healthpageTr, ...reachpageTr, ...profilesrvTr, ...profilenewTr, ...subspnTr, ...subshxTr, ...subsdnsTr, ...updatespageTr, ...settingspageTr, ...aipageTr, ...igpageTr, ...aspageTr, ...nodeshareTr };

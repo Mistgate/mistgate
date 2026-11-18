@@ -5,6 +5,7 @@ import { CloseX, CodeBox, CountryField, FootNote, noCountry, Panel, PanelFoot, P
 import { AddNodeShell } from "@/components/add-node-frame";
 import { markFresh } from "@/components/fx/registry";
 import { NodeReady, SSHNodeInstall, type InstallSeed } from "@/components/ssh-node-install";
+import { SharePick, useNodeShare } from "@/components/node-share-pick";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
@@ -18,6 +19,7 @@ import { nodes as nodesApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
+import { rememberShare } from "@/lib/node-share";
 import { useNodeStatus } from "@/lib/node-status";
 
 // New nodes can be installed automatically over SSH or enrolled with the manual one-time command. The window is the board's
@@ -174,6 +176,7 @@ function CommandInstall({
   const [touched, setTouched] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const { name, address, country } = draft;
+  const share = useNodeShare(draft.share);
 
   const nameBad = !!name && !namePattern.test(name);
   const nameError = !reenroll && !namePattern.test(name) ? t("node.add.nameError") : undefined;
@@ -185,14 +188,17 @@ function CommandInstall({
     mutationFn: (again?: boolean) =>
       reenroll || (again && issued?.node?.id)
         ? nodesApi.createEnrollment({ nodeId: reenroll?.id ?? issued?.node?.id ?? "" })
-        : nodesApi.createEnrollment({ name, address: address.trim(), countryCode: country === noCountry ? "" : country }),
-    onSuccess: (r) => onIssued(plain(r)),
+        : nodesApi.createEnrollment({ name, address: address.trim(), countryCode: country === noCountry ? "" : country, ...share.request }),
+    onSuccess: (r, again) => {
+      if (!reenroll && !again && share.ask) rememberShare(share.choice);
+      onIssued(plain(r));
+    },
   });
 
   function submit(e?: FormEvent, again?: boolean) {
     e?.preventDefault();
     setTouched(true);
-    if (!again && (nameError || addressError)) return;
+    if (!again && (nameError || addressError || !share.valid)) return;
     create.mutate(again);
   }
 
@@ -288,12 +294,13 @@ function CommandInstall({
                     hint={t("node.add.addressHint")}
                   />
                   {ip && <Notice title={t("node.add.ipTitle")}>{t("node.add.ipBody")}</Notice>}
+                  <SharePick share={share} onChange={(c) => onDraft({ share: c })} />
                 </>
               )}
             </div>
             <PanelFoot>
               <FootNote />
-              <Button type="submit" variant="primary" size="lg" disabled={create.isPending || (!reenroll && (!name || !address.trim() || !!nameError || !!addressError))}>
+              <Button type="submit" variant="primary" size="lg" disabled={create.isPending || (!reenroll && (!name || !address.trim() || !!nameError || !!addressError || !share.valid))}>
                 {create.isPending && <Spinner />}
                 {create.isPending ? t("common.creating") : t("node.add.create")}
               </Button>

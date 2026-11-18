@@ -6,13 +6,14 @@ import { LoadHistory } from "./load-history";
 import { NodeLimits } from "./limits";
 import { NodeAlerts, NodeClosed } from "./overview-parts";
 import { ResourcesCard } from "./resources";
+import { ShareCard } from "./share";
 import { OnlineNow, TopToday } from "./users";
 import { WaysStrip, type WaysModel } from "./ways";
 
 /**
  * The Overview of a node (the board's first tab): the ways in on one line, then two columns. On the left what waits for you here,
  * the resources (CPU, memory, disk and the link with what took them), the load over the hours with the traffic, and the checks as a
- * client sees them; on the right who is on the node, the traffic of the day, what can run out, and what closed lately.
+ * client sees them, and who gets the node (a card of its own); on the right who is on the node, the traffic of the day, what can run out, and what closed lately.
  */
 export function OverviewTab({ data, ways }: { data: Plain<GetNodeResponse>; ways?: WaysModel }) {
   const node = data.node!;
@@ -25,6 +26,7 @@ export function OverviewTab({ data, ways }: { data: Plain<GetNodeResponse>; ways
       <div className="mt-1 grid grid-cols-[minmax(0,1fr)_400px] items-start gap-4 max-[1360px]:grid-cols-[minmax(0,1fr)_340px] max-[1200px]:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-4">
           <NodeAlerts nodeId={node.id} nodeName={node.name} />
+          {!retired && <ShareCard node={node} />}
           {!retired && <ResourcesCard metrics={data.metrics} cpus={data.facts?.cpuCount ?? 0} offlineSince={dead ? node.lastSeenUnix : undefined} />}
           {!retired && <LoadHistory nodeId={node.id} dead={dead} />}
           <NodeChecks nodeId={node.id} inbounds={data.inbounds} />

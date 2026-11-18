@@ -16,7 +16,9 @@ import { setEffectsEnabled } from "@/lib/effects";
 import { nodesQuery, userSearchQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
+import { groupRows } from "./dev-kit-node-share";
 import { Shot } from "./dev-kit-redesign";
+import { groupsQuery } from "./users/rpc";
 import { LoginPage, type LoginPageProps } from "./login";
 
 const Palette = lazy(() => import("@/components/palette"));
@@ -97,6 +99,8 @@ const baseSeed: Seed = [
   [nodesQuery.queryKey, fleet],
   [["panel-ssh-key"], panelKey],
   [["node-server-access"], { access: [] }],
+  // the choice of who gets the node (the window asks from the second node on)
+  [groupsQuery.queryKey, groupRows([])],
 ];
 
 type Scene = { id: string; group: string; title: string; w: number; h: number; seed?: Seed; render: (t: T) => ReactNode };

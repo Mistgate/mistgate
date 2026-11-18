@@ -237,7 +237,7 @@ export function seeded(state: State) {
   qc.setQueryData(nodesQuery.queryKey, { nodes: cards.map((c) => ({ ...c, address: `${c.name}.example.com`, protocols: [], notes: "", trafficTodayBytes: 0, ramPct: 40, agentVersion: "0.3.1", uptimeS: 86400, lastSeenUnix: NOW, awgBackend: "auto" })), expectedAgentVersion: "0.3.1" } as never);
   const done = state === "done";
   qc.setQueryData(profileListQuery.queryKey, (done || dk >= 4 ? [{ id: "prf_1", name: "hy2 · 443", protocol: "hysteria2", nodeCount: 3, userCount: 12 }] : []) as never);
-  qc.setQueryData(groupsQuery.queryKey, [{ id: "grp_all", name: "Everyone", profileIds: done || dk >= 4 ? ["prf_1"] : [], userCount: people[1]!, dnsPresetId: "" }] as never);
+  qc.setQueryData(groupsQuery.queryKey, [{ id: "grp_all", name: "Everyone", profileIds: done || dk >= 4 ? ["prf_1"] : [], userCount: people[1]!, dnsPresetId: "", disabledNodeIds: [] }] as never);
   qc.setQueryData(userCountQuery.queryKey, { counts: { all: people[1]!, online: people[0]! } } as never);
   qc.setQueryData(settingsQuery.queryKey, { settings: { apps: [] }, serverSamples: [] } as never);
   const down = downName
