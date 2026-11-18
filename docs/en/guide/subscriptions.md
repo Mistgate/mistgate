@@ -395,6 +395,8 @@ A panel rolled back to a version without templates drops them from the settings 
 
 Happ and INCY have their own routing: what goes out directly, what goes through the VPN and what is blocked. The **Routing** tab gives them a profile of yours, for the groups you choose. Without one they get what they got before: the DNS of the person's preset as a profile (Happ since the DNS presets came, INCY too, with its own `incy://` scheme: the two apps read the same fields).
 
+Only the owner changes the profiles, as with the [Mihomo templates](#mihomo-templates). A profile decides what goes outside the VPN for everybody in its groups. A helper reads the tab and sees what each profile holds, but a save of theirs that adds, deletes or changes a profile (its text, mode or groups) is refused with `routing_profiles_owner_only`; the rest of the settings stay open to them. The same holds for a token: an agent changes a profile only through the owner's approval of its plan.
+
 ### Getting the profile in
 
 Make the profile where you already have it: in 3x-ui (the routing rules of a subscription), in Happ or in INCY. They give you a link like `happ://routing/onadd/eyJ…` or `incy://routing/onadd/eyJ…`. Paste it into **Link, base64 or JSON** of a new profile. These work as well:
@@ -531,4 +533,4 @@ Rules are saved as soon as you add, move or remove one. On **Names & texts**, **
 
 ## Who can do what
 
-Every admin can read these settings, including the Mihomo templates, and try a User-Agent or a template preview. The owner and helpers change them, except the Mihomo templates, which only the owner changes. The routing profiles are changed by the owner and helpers like the response headers. The DNS tab is described in [DNS](dns.md).
+Every admin can read these settings, including the Mihomo templates, and try a User-Agent or a template preview. The owner and helpers change them, except the Mihomo templates and the routing profiles, which only the owner changes. The DNS tab is described in [DNS](dns.md).
