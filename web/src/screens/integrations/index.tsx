@@ -1,36 +1,44 @@
 import { Link } from "@tanstack/react-router";
-import { Card, PageTitle } from "@/components/ui/bits";
-import { Icon, NavIcon } from "@/components/ui/icons";
 import { useT } from "@/i18n";
 import { useIsOwner } from "@/lib/updates";
-import { TelegramCard } from "./telegram";
+import { Gl } from "../ai/bits";
+import { TelegramCard, type LinkCode } from "./telegram";
 
 /**
- * Integrations: the Telegram alerts (every admin links their own chat). MCP, the API tokens and the approval inbox moved to
- * the AI section (ADR 0014); the owner gets a line that says so, with the way there.
+ * Integrations, as the board draws it (PnIntegrations): the Telegram alerts, where every admin links their own chat. MCP, the API tokens and the
+ * approval inbox moved to the AI section (ADR 0014); the owner gets a card that says so, with the way there.
  */
 export function IntegrationsScreen() {
+  return <IntegrationsView />;
+}
+
+/** What a scene of the dev kit puts in place of what the page would find out by itself (the link code the chat waits on). */
+export type IntegrationsScene = { code?: LinkCode };
+
+export function IntegrationsView({ scene }: { scene?: IntegrationsScene }) {
   const t = useT();
   const owner = useIsOwner();
   return (
-    <div className="flex flex-col gap-3.5">
-      <div className="flex flex-col gap-[3px]">
-        <PageTitle>{t("int.title")}</PageTitle>
-        <span className="text-xs text-muted">{t("int.sub")}</span>
-      </div>
-      {owner && (
-        <Card lg className="flex flex-wrap items-center gap-3 p-4">
-          <span className="grid size-9 flex-none place-items-center rounded-xl bg-accent-soft">
-            <NavIcon name="ai" size={18} />
-          </span>
-          <span className="min-w-[14rem] flex-1 text-[13px] leading-snug text-pretty">{t("int.moved")}</span>
-          <Link to="/ai" search={{ tab: "mcp" } as never} className="inline-flex items-center gap-1 text-[13px] font-bold text-accent-text">
-            {t("int.moved.go")}
-            <Icon name="chevronRight" size={14} className="rtl:-scale-x-100" />
-          </Link>
-        </Card>
-      )}
-      <TelegramCard owner={owner} />
+    <div className="aip igp">
+      <header className="sb-h">
+        <h1>{t("int.title")}</h1>
+        <p>{t("igp.sum")}</p>
+      </header>
+      <TelegramCard
+        owner={owner}
+        initialCode={scene?.code}
+        extra={
+          owner && (
+            <Link to="/ai" search={{ tab: "mcp" } as never} className="card ig-ai">
+              <span>
+                <b>{t("igp.ai.t")}</b>
+                <em>{t("igp.ai.s")}</em>
+              </span>
+              <Gl d="M5 12h14M13 6l6 6-6 6" />
+            </Link>
+          )
+        }
+      />
     </div>
   );
 }

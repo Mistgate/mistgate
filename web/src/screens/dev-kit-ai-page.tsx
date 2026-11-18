@@ -219,7 +219,7 @@ export function approvalsData(mods: ReadonlySet<string>) {
 const POOL = [["de1", "DE"], ["fi1", "FI"], ["nl1", "NL"], ["msk1", "RU"], ["de2", "DE"], ["fr1", "FR"], ["se1", "SE"], ["pl1", "PL"], ["no1", "NO"], ["lv1", "LV"], ["lt1", "LT"], ["at1", "AT"]] as const;
 
 /** The nodes of the shell (the menu's counter, the fleet button) and the alerts under it: the board's "fleet" and "issues". */
-function shellSeed(qc: QueryClient, fleet: number, issues: number) {
+export function shellSeed(qc: QueryClient, fleet: number, issues: number) {
   const cards = POOL.slice(0, fleet).map(([name, cc], i) => ({ id: `nod_${name}`, name, countryCode: cc, location: "", status: i < Math.min(issues, fleet) && i === 0 ? NodeStatus.DOWN : NodeStatus.ONLINE, online: [], sparkBytes: [] }));
   qc.setQueryData(nodesQuery.queryKey, { nodes: cards.map((c) => ({ ...c, address: `${c.name}.example.com`, version: "v0.1.71" })), expectedAgentVersion: "0.1.71" } as never);
   qc.setQueryData(overviewQuery().queryKey, { nodesTotal: fleet, nodes: cards, alertsActive: issues, alertsCritical: issues > 0 ? 1 : 0 } as never);

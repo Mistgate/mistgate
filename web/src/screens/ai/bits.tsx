@@ -111,17 +111,17 @@ export function Skeleton() {
 }
 
 /** The board's failure of a tab: what did not load, that nothing was changed, and Retry. */
-export function ErrCard({ onRetry }: { onRetry: () => void }) {
+export function ErrCard({ onRetry, title, body, retry }: { onRetry: () => void; title?: ReactNode; body?: ReactNode; retry?: ReactNode }) {
   const t = useT();
   return (
     <section className="card us-none pv-qe" role="alert">
       <span className="g bad" aria-hidden="true">
         <Gl d={ICONS.warn} />
       </span>
-      <b>{t("aip.err.title")}</b>
-      <span>{t("aip.err.body")}</span>
+      <b>{title ?? t("aip.err.title")}</b>
+      <span>{body ?? t("aip.err.body")}</span>
       <Button size="lg" onClick={onRetry}>
-        {t("aip.err.retry")}
+        {retry ?? t("aip.err.retry")}
       </Button>
     </section>
   );

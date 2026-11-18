@@ -83,6 +83,7 @@ import { PnProfileKit, ProfileScenePage } from "./dev-kit-profile";
 import { PnProfileNewKit, ProfileNewPage } from "./dev-kit-profile-new";
 import { SettingsKit, SettingsScenePage } from "./dev-kit-settings-page";
 import { AiScenePage, PnAiKit } from "./dev-kit-ai-page";
+import { IntegrationsScenePage, PnIntegrationsKit } from "./dev-kit-integrations-page";
 import { AssistantScenePage, PnAssistantKit } from "./dev-kit-assistant";
 import { PnUpdatesKit, UpdatesScenePage } from "./dev-kit-updates";
 import { UserKit, UserPage } from "./dev-kit-user";
@@ -320,7 +321,7 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=profile-delete|dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge|foundation|shell|overview|nodes|windows|nodepage|pn-group|decoys|pn-profiles|pn-settings|pn-updates|pn-ai|pn-assistant: one kit alone, for its screenshots;
+  // ?only=profile-delete|dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|os|os-fleet|os-page|client-logs|bulk|bulk-users|graph|awg-relay|probes|trusttunnel|bridge|foundation|shell|overview|nodes|windows|nodepage|pn-group|decoys|pn-profiles|pn-settings|pn-updates|pn-ai|pn-assistant|pn-integrations: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "halo") return <HaloKit />;
@@ -334,6 +335,7 @@ export default function DevKit() {
   if (which === "settings-page") return <SettingsScenePage />;
   if (which === "pn-updates-page") return <UpdatesScenePage />;
   if (which === "pn-ai-page") return <AiScenePage />;
+  if (which === "pn-integrations-page") return <IntegrationsScenePage />;
   if (which === "pn-assistant-page") return <AssistantScenePage />;
   if (which === "user-page") return <UserPage />;
   if (which === "group-page") return <GroupScenePage />;
@@ -343,7 +345,7 @@ export default function DevKit() {
   if (which === "nodepage-frame") return <NodePageFrame />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, decoys: DecoysKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit, subs: SubsScenesKit, "subs-scenes": SubsScenesKit, "pn-settings": SettingsKit, "pn-updates": PnUpdatesKit, "pn-ai": PnAiKit, "pn-assistant": PnAssistantKit }[which];
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit, "awg-relay": AwgRelayKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, decoys: DecoysKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit, subs: SubsScenesKit, "subs-scenes": SubsScenesKit, "pn-settings": SettingsKit, "pn-updates": PnUpdatesKit, "pn-ai": PnAiKit, "pn-assistant": PnAssistantKit, "pn-integrations": PnIntegrationsKit }[which];
   if (only) {
     const Kit = only;
     return (

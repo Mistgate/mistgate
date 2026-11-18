@@ -291,7 +291,7 @@ describe("the Integrations screen: tokens", () => {
 
   it("offers Telegram alerts (the card has its own tests) and no webhooks", async () => {
     await mount(tokens([]), inbox([]), "integrations");
-    expect(text()).toContain("Telegram alerts");
+    expect(text()).toContain("Telegram notifications");
     expect(text()).not.toMatch(/webhook/i);
   });
 

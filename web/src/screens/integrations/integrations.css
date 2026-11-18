@@ -1,0 +1,144 @@
+/*
+ * The Integrations screen of the redesign (screens/integrations/*): the board's own numbers (PnIntegrations + pn.css: the ig- block L5703-5857, the last rule of a
+ * selector wins; the v3 block at the end of it is the one that draws). The page is the AI screen's (.aip, ai.css: the cards, the rows, the pills, the
+ * window), so only what Integrations adds is here, under .aip.igp. Colours: the board's --acc is --accent-mark (a fill, a line) or --accent-text (text),
+ * --hair is --border, --crit is --danger (--danger-text for words). The board plays its motion always; it is off with reduced motion.
+ */
+
+@keyframes ig-flow {
+  from { transform: translateX(-36px); }
+  to { transform: translateX(420px); }
+}
+@keyframes ig-dash {
+  to { background-position: 12px 0; }
+}
+@keyframes ig-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ig-pop {
+  0% { transform: scale(0.2); opacity: 0; }
+  60% { transform: scale(1.5); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes ig-flash {
+  0%, 40% { background: color-mix(in srgb, var(--accent-mark) 12%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-mark) 12%, transparent); }
+  100% { background: none; box-shadow: 0 0 0 8px transparent; }
+}
+
+/* ---- the card on top: the chain, its verdict, the rows (L5753-5754, L5808-5857) ---- */
+.aip.igp .ig-hero { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.aip.igp .ig-hero > .pp-rows { padding: 0 40px 12px; }
+.aip.igp .ig-chain { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 32px 40px 0; }
+.aip.igp .ig-track { display: flex; align-items: center; }
+.aip.igp .ig-nt {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--step);
+  color: var(--muted);
+  transition: color 0.3s var(--e), background 0.3s var(--e), border-color 0.3s var(--e);
+}
+.aip.igp .ig-nt svg { width: 22px; height: 22px; }
+.aip.igp .ig-nt .mark, .aip.igp .ig-nt > span { display: block; }
+.aip.igp .ig-nt.on { background: var(--tone-mint-bg); border-color: var(--accent-line); color: var(--accent-text); }
+.aip.igp .ig-nt.bad { background: var(--danger-soft); border-color: transparent; color: var(--danger-text); }
+.aip.igp .ig-nt.wait { background: var(--tone-sky-bg); border-color: transparent; color: var(--tone-sky); }
+.aip.igp .ig-nt.mute { color: var(--sec); }
+/* the wire between two nodes: a pulse runs along it while the alerts can flow, dashes mean "not yet", red means the test did not arrive */
+.aip.igp .ig-w { position: relative; display: block; flex: 1; min-width: 16px; height: 2px; margin: 0 10px; border-radius: 1px; background: var(--accent-line); overflow: hidden; }
+.aip.igp .ig-w > i { position: absolute; top: 0; inset-inline-start: 0; width: 36px; height: 2px; border-radius: 1px; background: linear-gradient(90deg, transparent, var(--accent-mark)); animation: ig-flow 2.2s linear infinite; }
+[dir="rtl"] .aip.igp .ig-w > i { animation-direction: reverse; background: linear-gradient(270deg, transparent, var(--accent-mark)); }
+.aip.igp .ig-w.off, .aip.igp .ig-w.wait, .aip.igp .ig-w.mute { background: repeating-linear-gradient(90deg, var(--border) 0 6px, transparent 6px 12px); background-size: 12px 2px; }
+.aip.igp .ig-w.off > i, .aip.igp .ig-w.mute > i, .aip.igp .ig-w.bad > i, .aip.igp .ig-w.wait > i { display: none; }
+.aip.igp .ig-w.wait { background-image: repeating-linear-gradient(90deg, var(--tone-sky) 0 6px, transparent 6px 12px); animation: ig-dash 0.6s linear infinite; opacity: 0.7; }
+.aip.igp .ig-w.bad { background: var(--danger); opacity: 0.6; }
+.aip.igp .ig-lbls { display: grid; grid-template-columns: 1fr 1fr 1fr; margin: 0 -24px; }
+.aip.igp .ig-lbls > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; align-items: center; text-align: center; }
+.aip.igp .ig-lbls > span:first-child { align-items: flex-start; text-align: start; padding-inline-start: 24px; }
+.aip.igp .ig-lbls > span:last-child { align-items: flex-end; text-align: end; padding-inline-end: 24px; }
+.aip.igp .ig-lbls b { font-size: 13px; font-weight: 500; }
+.aip.igp .ig-lbls em { font-style: normal; font-size: 11px; line-height: 16px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aip.igp .ig-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 24px 40px; text-align: start; border-bottom: 1px solid var(--border); }
+.aip.igp .ig-head > b { font-size: 20px; line-height: 28px; font-weight: 600; }
+.aip.igp .ig-head > span { max-width: 560px; font-size: 13px; line-height: 20px; color: var(--muted); text-wrap: pretty; }
+.aip.igp .ig-head.bad > b { color: var(--text); }
+.aip.igp .ig-head.bad > span { color: var(--danger-text); }
+
+/* ---- a row of the card: the label, the line, the form (L5709-5741, L5828-5841) ---- */
+.aip.igp .ig-hero .pp-row.ig-row { grid-template-columns: 120px minmax(0, 1fr); gap: 16px; padding: 14px 0; align-items: start; }
+.aip.igp .ig-hero .pp-row.ig-row .pp-lb { padding-top: 6px; }
+.aip.igp .ig-hero .pp-row.ig-row .pp-lb b { font-weight: 400; color: var(--sec); font-size: 13px; }
+.aip.igp .ig-row .pp-ct { gap: 6px; }
+.aip.igp .ig-row.flash { animation: ig-flash 1.4s var(--e); }
+.aip.igp .ig-line { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: nowrap; min-height: 32px; }
+.aip.igp .ig-line .btn, .aip.igp .ig-form .btn, .aip.igp .ig-line button, .aip.igp .ig-form button { gap: 8px; }
+.aip.igp .ig-line .ig-act > button.done { color: var(--accent-text); border-color: var(--accent-line); animation: ig-pop 0.4s var(--ease-spring); }
+.aip.igp .ig-id { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.aip.igp .ig-id > b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aip.igp .ig-id > em { font-style: normal; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.aip.igp .ig-id > b.ig-off { color: var(--sec); font-weight: 400; }
+.aip.igp .ig-act { display: inline-flex; align-items: center; gap: 16px; flex: none; }
+.aip.igp .ig-lk { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--sec); text-decoration: none; cursor: pointer; transition: color 0.2s var(--e); }
+.aip.igp .ig-lk:hover { color: var(--danger-text); }
+.aip.igp .ig-lk:disabled { opacity: 0.45; cursor: default; }
+.aip.igp .ig-mut { margin: 0; font-size: 12px; line-height: 16px; color: var(--muted); }
+.aip.igp .ig-note { padding: 4px 0 8px; }
+.aip.igp .ig-mut.ig-bad, .aip.igp .ig-code .ig-bad { color: var(--danger-text); }
+.aip.igp .ig-form { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; animation: ig-up 0.25s var(--e); }
+.aip.igp .ig-form > p { margin: 0; font-size: 13px; line-height: 20px; color: var(--sec); text-wrap: pretty; }
+.aip.igp .ig-form > p.ig-mut { font-size: 12px; line-height: 16px; color: var(--muted); }
+.aip.igp .ig-form .ai-na { justify-content: flex-end; }
+/* the one-time code while the chat waits for Start (the board does not draw it: the panel needs it to hear who pressed Start) */
+.aip.igp .ig-open { align-self: flex-start; gap: 8px; text-decoration: none; }
+.aip.igp .ig-start { display: flex; flex-direction: column; gap: 6px; }
+.aip.igp .ig-start > span { font-size: 12px; line-height: 16px; color: var(--muted); }
+.aip.igp .ig-start > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.aip.igp .ig-start code { min-width: 0; font-size: 13px; overflow-wrap: anywhere; user-select: all; }
+
+/* ---- who linked, what comes to you, the way to the AI screen (L5739-5741, L5780-5795) ---- */
+.aip.igp .ig-adm.ai-recs .ai-rec { grid-template-columns: minmax(0, 1fr) auto; }
+.aip.igp .ig-ad { flex-direction: row !important; align-items: center; gap: 12px !important; }
+.aip.igp .ig-ad > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aip.igp .ig-gets { display: flex; flex-direction: column; padding: 0 20px 4px; }
+.aip.igp .ig-get { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.aip.igp .ig-gets > .ig-get:first-child { border-top: 0; }
+.aip.igp .ig-get > b { font-weight: 400; line-height: 20px; }
+.aip.igp .ig-get .pp-ic { width: 28px; height: 28px; border-radius: 8px; }
+.aip.igp .ig-get .pp-ic svg { width: 14px; height: 14px; }
+.aip.igp .ig-get.idle .pp-ic, .aip.igp .ig-get.no .pp-ic { background: var(--step); color: var(--muted); }
+.aip.igp .ig-get.idle > b { color: var(--sec); }
+.aip.igp .ig-get.no > b { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
+.aip.igp .ig-get.no .rw-gl, .aip.igp .ig-get.idle .rw-gl { visibility: hidden; }
+.aip.igp .ig-ai { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 14px; padding-inline: 20px 16px; color: inherit; text-decoration: none; transition: border-color 0.2s var(--e); }
+.aip.igp .ig-ai:hover { border-color: var(--accent-line); }
+.aip.igp .ig-ai > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aip.igp .ig-ai b { font-weight: 500; }
+.aip.igp .ig-ai em { font-style: normal; font-size: 12px; line-height: 16px; color: var(--muted); }
+.aip.igp .ig-ai svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+[dir="rtl"] .aip.igp .ig-ai svg { transform: scaleX(-1); }
+
+/* ---- a narrow window (the board's 640 container; L5742-5751, L5799-5805, L5844-5854) ---- */
+@media (max-width: 640px) {
+  .aip.igp .ig-chain { padding: 20px 16px 0; }
+  .aip.igp .ig-lbls { margin: 0; }
+  .aip.igp .ig-lbls > span:first-child { padding-inline-start: 0; }
+  .aip.igp .ig-lbls > span:last-child { padding-inline-end: 0; }
+  .aip.igp .ig-head { padding: 16px; }
+  .aip.igp .ig-head > b { font-size: 17px; line-height: 24px; }
+  .aip.igp .ig-hero > .pp-rows { padding: 0 16px 8px; }
+  .aip.igp .ig-hero .pp-row.ig-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .aip.igp .ig-hero .pp-row.ig-row .pp-lb { padding-top: 0; }
+  .aip.igp .ig-line { flex-wrap: wrap; }
+  .aip.igp .ig-gets { padding: 0 16px 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aip.igp .ig-w > i, .aip.igp .ig-w.wait, .aip.igp .ig-row.flash, .aip.igp .ig-form, .aip.igp .ig-line .ig-act > button.done { animation: none; }
+  .aip.igp .ig-nt { transition: none; }
+}

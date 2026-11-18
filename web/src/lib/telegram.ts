@@ -77,7 +77,8 @@ export function useTelegramActions() {
   // Setting the bot and starting a link each ask for a fresh step-up. The token is in the call and nowhere else.
   const setBot = useMutation({
     mutationFn: async (token: string) => plain((await guard(() => telegram.setTelegramBot({ token }))).status!),
-    onSuccess: (s) => toast(t("tg.bot.saved", { name: s.bot?.username ?? "" })),
+    // the board says "Bot connected" the first time and "Token replaced" after; the row of a bot that was there before the call is the second
+    onSuccess: () => toast(t(qc.getQueryData<TelegramStatus>(telegramQuery.queryKey)?.bot?.configured ? "igp.t.replaced" : "igp.t.bot")),
     onError: fail,
     onSettled: refresh,
   });

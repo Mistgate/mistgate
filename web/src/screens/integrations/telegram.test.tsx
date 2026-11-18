@@ -85,12 +85,12 @@ describe("the Telegram card: the bot (owner)", () => {
   it("asks for the token when no bot is set, checks its shape, and sends it once", async () => {
     setTelegramBot.mockResolvedValue({ status: withBot() });
     await mount(true, status());
-    expect(text()).toContain("Make a bot with @BotFather");
+    expect(text()).toContain("Create a bot with @BotFather");
     expect(document.querySelector("[data-testid=tg-bot]")).toBeNull();
-    expect(text()).not.toContain("Your Telegram"); // nothing to link before there is a bot
+    expect(button("Link chat")).toBeUndefined(); // nothing to link before there is a bot
 
     await click(button("Save bot"));
-    expect(text()).toContain("does not look like a bot token");
+    expect(text()).toContain("look like a bot token");
     await type(document.querySelector("input[type=password]"), "not a token");
     await click(button("Save bot"));
     expect(setTelegramBot).not.toHaveBeenCalled();
@@ -105,10 +105,9 @@ describe("the Telegram card: the bot (owner)", () => {
   it("shows only “set” and the bot's name once it is saved, never the token", async () => {
     await mount(true, withBot());
     expect(document.querySelector("[data-testid=tg-bot]")?.textContent).toBe("@mist_alert_bot");
-    expect(text()).toContain("Token is set");
-    expect(document.querySelector("input[type=password]")).toBeNull();
+        expect(document.querySelector("input[type=password]")).toBeNull();
     expect(document.body.innerHTML).not.toContain("AAFake");
-    expect(text()).toContain("panel watcher (a Cloudflare Worker)"); // the Worker may use the same bot
+    expect(text()).toContain("panel watchdog (a Worker on Cloudflare)"); // the Worker may use the same bot
   });
 
   it("replaces the token on request, and cancel puts the row back", async () => {
@@ -124,10 +123,10 @@ describe("the Telegram card: the bot (owner)", () => {
   it("asks before removing the bot, then clears it", async () => {
     setTelegramBot.mockResolvedValue({ status: status() });
     await mount(true, withBot());
-    await click(button("Remove bot"));
-    expect(dialog()!.textContent).toContain("every linked chat is unlinked");
+    await click(button("Remove"));
+    expect(dialog()!.textContent).toContain("linked chats are unlinked");
     expect(setTelegramBot).not.toHaveBeenCalled();
-    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Remove"));
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Remove bot"));
     await settle();
     expect(setTelegramBot).toHaveBeenCalledWith({ clear: true });
   });
@@ -166,8 +165,8 @@ describe("the Telegram card: your own chat (every admin)", () => {
   it("links a chat with a one-time code and a deep link, and notices when it is bound", async () => {
     beginTelegramLink.mockResolvedValue({ code: "abcd2345wxyz", deepLink: "https://t.me/mist_alert_bot?start=abcd2345wxyz", expiresUnix: NOW + 600 });
     await mount(false, withBot());
-    expect(text()).toContain("No chat is linked yet");
-    await click(button("Link my Telegram"));
+    expect(text()).toContain("Not linked");
+    await click(button("Link chat"));
     await settle();
     expect(beginTelegramLink).toHaveBeenCalledTimes(1);
     expect(document.querySelector<HTMLAnchorElement>("[data-testid=tg-deeplink]")?.getAttribute("href")).toBe("https://t.me/mist_alert_bot?start=abcd2345wxyz");
@@ -185,7 +184,7 @@ describe("the Telegram card: your own chat (every admin)", () => {
   it("offers a new code when the old one has run out, and lets the admin give up", async () => {
     beginTelegramLink.mockResolvedValue({ code: "oldcode00000", deepLink: "https://t.me/mist_alert_bot?start=oldcode00000", expiresUnix: NOW - 1 });
     await mount(false, withBot());
-    await click(button("Link my Telegram"));
+    await click(button("Link chat"));
     await settle();
     expect(text()).toContain("The code has expired");
     expect(document.querySelector("[data-testid=tg-deeplink]")).toBeNull();
@@ -193,7 +192,7 @@ describe("the Telegram card: your own chat (every admin)", () => {
     await settle();
     expect(beginTelegramLink).toHaveBeenCalledTimes(2);
     await click(button("Cancel"));
-    expect(button("Link my Telegram")).toBeDefined();
+    expect(button("Link chat")).toBeDefined();
   });
 
   it("switches alerts, sends a test and unlinks", async () => {
@@ -202,23 +201,25 @@ describe("the Telegram card: your own chat (every admin)", () => {
     unlinkTelegram.mockResolvedValue({});
     await mount(false, withBot({ mine: link({ adminName: "Me", role: "helper" }) }));
     expect(text()).toContain("Linked");
-    expect(text()).toContain("You get the health alerts"); // a helper's share
+    expect(text()).toContain("only node and health alerts"); // a helper's share (the first line, the others struck out)
     expect(document.querySelector("[data-testid=tg-chat-id]")?.textContent).toBe("424242"); // for the Worker
-    expect(text()).not.toContain("Linked admins");
+    expect(document.querySelectorAll(".ai-rec")).toHaveLength(1); // the card of linked admins holds only their own line
     expect(document.querySelector("input[type=password]")).toBeNull(); // only the owner sets the bot
 
     await click(document.querySelector("[role=switch]"));
     expect(setTelegramAlerts).toHaveBeenCalledWith({ enabled: false });
     await click(button("Send test"));
     expect(sendTelegramTest).toHaveBeenCalledTimes(1);
-    await click(button("Unlink"));
+    await click(button("Unlink")); // asks first
+    expect(unlinkTelegram).not.toHaveBeenCalled();
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Unlink"));
     expect(unlinkTelegram).toHaveBeenCalledTimes(1);
   });
 
   it("tells a non-owner to wait for the owner while no bot is set", async () => {
     await mount(false, status());
-    expect(text()).toContain("The owner has not set the Telegram bot up yet");
-    expect(button("Link my Telegram")).toBeUndefined();
+    expect(text()).toContain("The owner sets it up");
+    expect(button("Link chat")).toBeUndefined();
     expect(document.querySelector("input[type=password]")).toBeNull();
   });
 
@@ -233,6 +234,6 @@ describe("the Telegram card: your own chat (every admin)", () => {
 
   it("tells the owner what they get", async () => {
     await mount(true, withBot());
-    expect(text()).toContain("As the owner you get everything");
+    expect(text()).toContain("so you get everything");
   });
 });
