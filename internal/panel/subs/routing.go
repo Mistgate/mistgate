@@ -109,6 +109,9 @@ func (h *handler) routing(r *http.Request, v access.SubView, set *adminv1.Subscr
 	if app == "" || v.Status != access.StatusActive || v.UserID == "" {
 		return routingAnswer{}
 	}
+	if v.Refusal != "" && subsettings.RoutingProfileFor(set, v.GroupID) != nil {
+		return routingAnswer{} // a refused device is not handed the owner's rules (the DNS profile of its preset it always got)
+	}
 	ctx := r.Context()
 	return routingFor(ctx, set, v.GroupID, v.UserID, app, h.cfg.Routing, func() *dns.Preset { return h.linkPreset(ctx, v) }, h.cfg.Log)
 }

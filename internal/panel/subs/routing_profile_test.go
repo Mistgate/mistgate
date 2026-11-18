@@ -10,6 +10,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
@@ -319,5 +320,30 @@ func TestPreviewRoutingProfile(t *testing.T) {
 		if _, err := ask(bad); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%q: %v", bad, err)
 		}
+	}
+}
+
+// A device the limit turns away gets the note and the DNS profile it always got, never the owner's rules.
+func TestOwnRoutingProfileIsNotSentOnARefusal(t *testing.T) {
+	r := newRig(t, "/k3xq8")
+	h, cache := r.handler(func(c *subs.Config) {
+		c.Routing = subs.HappRouting(dns.New(r.st))
+		c.MinInterval, c.MaxPerHour, c.AfterResponse = -1, -1, func(f func()) { f() }
+	})
+	_, tok := r.user("alice", func(m *adminv1.CreateUserRequest) { m.DeviceLimit = 1 })
+	r.setLinkMode(store.LinkModeEnforce)
+	set := subsettings.Defaults()
+	set.RoutingProfiles = []*adminv1.RoutingProfile{routingEntry(ownProfile, false)}
+	set.LinkDeviceLimit = adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_ENFORCE.Enum()
+	if _, err := cache.Update(r.ctx, set); err != nil {
+		t.Fatal(err)
+	}
+	_, _, prof := routingLink(t, fetch(h, "/"+tok, happUA, "X-HWID", hwidA).Header().Get("Routing"))
+	if prof["Name"] != "family" {
+		t.Fatalf("the first device gets the owner's profile: %v", prof["Name"])
+	}
+	rec := fetch(h, "/"+tok, happUA, "X-HWID", hwidB, "X-Device-OS", "Android")
+	if rec.Header().Get("X-Hwid-Max-Devices-Reached") != "true" || rec.Header().Get("Routing") != "" {
+		t.Errorf("a refused device: max-devices %q, routing %q", rec.Header().Get("X-Hwid-Max-Devices-Reached"), rec.Header().Get("Routing"))
 	}
 }
