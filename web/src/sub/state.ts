@@ -5,20 +5,26 @@ import type { AwgConfig, Lang, MgData, Platform, Theme } from "./types";
 
 export type Confirm = { id: string; kind: "remove" | "rotate" } | null;
 
-/** The panes of the "add a device" dialog: "pick" asks how the device will connect, "link" is the app-with-the-link branch, "key" the AmneziaVPN key form. */
-export type AddPane = "pick" | "link" | "key";
+/**
+ * The panes of the "add a device" dialog (the steps of the board): "pick" asks how the device will connect, "link" is the device and
+ * the app of the app-with-the-link branch, "conn" its connecting step, "key" the AmneziaVPN key form. The key itself and "no free
+ * slot" are not panes: the state of the keys and of the limit says so.
+ */
+export type AddPane = "pick" | "link" | "conn" | "key";
 
 export type AmzState = {
   /** The device whose key the dialog shows ("Show key"). */
   open: string | null;
   /** The "add a device" dialog is open. */
   adding: boolean;
-  /** What the open "add a device" dialog shows: the choice of the way (link app or key), the link branch, or the key form. */
+  /** What the open "add a device" dialog shows: the choice of the way (link app or key), the device and app, the connecting step, or the key form. */
   pane: AddPane;
   /** The device this dialog just created: the dialog then shows its key instead of the form. */
   created: string | null;
   /** The stale device whose new key the dialog shows ("new key needed"). */
   renew: string | null;
+  /** The stale device the "new key needed" question (its own small window) is open for. */
+  stale: string | null;
   /** "add", a device id, "rename:<id>" or "renew:<id>" while a call is in flight; "" otherwise. */
   busy: string;
   /** The last failure, as the panel's code; "" when none. `errorAt` is the busy key of the call that failed. */
@@ -45,6 +51,7 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
   pane: "key",
   created: null,
   renew: null,
+  stale: null,
   busy: "",
   error: "",
   errorAt: "",
@@ -60,19 +67,23 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
 });
 
 export type DnsState = {
-  /** The server whose DNS picker is open, or LINK (logic.ts) for the one of the apps that use the link. */
+  /** The server whose DNS window is open, or LINK (logic.ts) for the one of the apps that use the link. */
   open: string | null;
   /** The preset picked in it ("" = the default). */
   pick: string;
+  /** The window's scope: the choice is made for every server that has a DNS of its keys (true), or for the open one only (false). Not for LINK. */
+  all: boolean;
   /** The server (or LINK) whose choice is being saved. */
   busy: string;
   /** The last failure, where it happened. */
   error: { server: string; code: string; retryMin: number; preset: string } | null;
-  /** Servers (and LINK) whose choice was just saved: the card says what happens next. */
+  /** The servers of "all" that do not offer the picked preset: left as they were, and the result says so. */
+  skipped: string[];
+  /** The target (server id or LINK) whose choice was just saved: the window turns into "DNS changed" and stays open until it is closed. */
   done: Record<string, true>;
 };
 
-export const newDnsState = (): DnsState => ({ open: null, pick: "", busy: "", error: null, done: {} });
+export const newDnsState = (): DnsState => ({ open: null, pick: "", all: false, busy: "", error: null, skipped: [], done: {} });
 
 export type AmzActions = {
   /** Opens (true) the "add a device" dialog, at `pane` or where the person's ways say (the choice, or the only way), or closes (false) whichever dialog is open. */
@@ -86,6 +97,8 @@ export type AmzActions = {
   show(id: string | null): void;
   /** "New key needed": fetches the key of a stale device and shows it in the dialog. */
   renew(id: string): void;
+  /** Opens (id) or closes (null) the "new key needed" question of a stale device. */
+  stale(id: string | null): void;
   node(id: string, i: number): void;
   where(id: string, w: string): void;
   ask(c: Confirm): void;
@@ -105,35 +118,32 @@ export type DnsActions = {
   apply(): void;
   /** Saves a choice again after a failure. */
   retry(): void;
+  /** The scope of the open window: every server with a DNS of its keys (true) or the open one only (false). */
+  scope(all: boolean): void;
 };
 
 /** What the page offers its parts: copy (with a callback for the button's own "copied" state) and download. */
-export type Tools = { copy(text: string, message: string, done?: () => void): void; download(filename: string, text: string): void };
+export type Tools = { copy(text: string, message: string, done?: () => void, from?: HTMLElement): void; download(filename: string, text: string): void };
+
+/** The tabs under the status: the servers, the Telegram proxies, TrustTunnel, the devices. */
+export type Tab = "servers" | "telegram" | "trusttunnel" | "devices";
 
 export type State = {
   lang: Lang;
+  /** The open tab (the one that is not there for this person is never open: view.ts falls back to the first). */
+  tab: Tab;
   /** The device step: the chosen platform. */
   platform: Platform;
   /** What the browser says it is (null = could not tell). */
   detected: Platform | null;
   /** The chosen app of the platform (appKey), "" = the first. */
   app: string;
-  /** The first-visit steps are for this way (the choice of the two; the link is the recommended one). */
-  way: "link" | "key";
   theme: Theme;
-  /** The "connect another device" row (the QR code of the link) is open. */
-  qrOpen: boolean;
-  /** The done step shows its three steps again. */
-  stepsAgain: boolean;
   /** A long list of devices is unfolded (it shows three rows otherwise). */
   devicesOpen: boolean;
-  /** The device row whose details are open ("iOS 18.1 · Happ 3.4.2"): one at a time. */
-  details: string | null;
   annClosed: boolean;
   /** A returning visitor (computed once when the page opens: the page does not reorder itself while it is read). */
   returning: boolean;
-  /** This device pressed "add" or "copy" before. */
-  marked: boolean;
   amz: AmzState;
   dns: DnsState;
 };
@@ -143,15 +153,11 @@ export type Ctx = { d: MgData; s: State; a: Actions; t: Dict; support: string };
 
 export type Actions = {
   lang(l: Lang): void;
+  tab(t: Tab): void;
   platform(p: Platform): void;
   app(key: string): void;
-  way(way: "link" | "key"): void;
   theme(t: Theme): void;
-  qrOpen(open: boolean): void;
-  stepsAgain(): void;
   devicesOpen(open: boolean): void;
-  /** Opens the details of a device row (null closes them). */
-  details(id: string | null): void;
   closeAnn(): void;
   /** This device set a connection up: remembered (the "returning" mark). */
   mark(): void;

@@ -1,4 +1,6 @@
+import { deviceModal, deviceModalLabel, deviceModalStage } from "./add";
 import { cases } from "./dev-data";
+import { dict } from "./i18n";
 import { normalize } from "./logic";
 import { newAmzState, newDnsState, type Actions, type State } from "./state";
 import type { Lang, MgData } from "./types";
@@ -14,6 +16,7 @@ export const amzNoop = {
   create: noop,
   show: noop,
   renew: noop,
+  stale: noop,
   node: noop,
   where: noop,
   ask: noop,
@@ -32,14 +35,11 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
   return {
     log,
     lang: (l) => log.push(`lang ${l}`),
+    tab: (t) => log.push(`tab ${t}`),
     platform: (p) => log.push(`platform ${p}`),
     app: (k) => log.push(`app ${k}`),
-    way: (w) => log.push(`way ${w}`),
     theme: (t) => log.push(`theme ${t}`),
-    qrOpen: (o) => log.push(`qr ${o}`),
-    stepsAgain: () => log.push("steps-again"),
     devicesOpen: (o) => log.push(`devices-open ${o}`),
-    details: (id) => log.push(`details ${id}`),
     closeAnn: () => log.push("closed"),
     mark: () => log.push("mark"),
     copy: (text, _m, done) => {
@@ -48,7 +48,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
     },
     download: (f) => log.push(`download ${f}`),
     amz: { ...amzNoop, add: (o, pane) => log.push(pane ? `add ${o} ${pane}` : `add ${o}`), pane: (p) => log.push(`pane ${p}`) },
-    dns: { open: (s) => log.push(`dns-open ${s}`), pick: (p) => log.push(`dns-pick ${p}`), apply: () => log.push("dns-apply"), retry: () => log.push("dns-retry") },
+    dns: { open: (s) => log.push(`dns-open ${s}`), pick: (p) => log.push(`dns-pick ${p}`), apply: () => log.push("dns-apply"), retry: () => log.push("dns-retry"), scope: (all) => log.push(`dns-scope ${all}`) },
     ...over,
   };
 }
@@ -57,18 +57,14 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
 export function state(platform: State["platform"] = "ios", over: Partial<State> = {}, lang: Lang = "ru"): State {
   return {
     lang,
+    tab: "servers",
     platform,
     detected: platform,
     app: "",
-    way: "link",
     theme: "auto",
-    qrOpen: false,
-    stepsAgain: false,
     devicesOpen: false,
-    details: null,
     annClosed: false,
     returning: false,
-    marked: false,
     amz: newAmzState(platform, "p31", platform),
     dns: newDnsState(),
     ...over,
@@ -86,3 +82,21 @@ export const data = (name: keyof typeof cases | string, f: (d: MgData) => void =
 export const plain = (s: string | undefined | null) => (s ?? "").replace(/ /g, " ");
 
 export const text = (el: Element | null | undefined) => plain(el?.textContent);
+
+/**
+ * The window "New device" for a person on `platform`: what the page hands the modal (`box`), its name and step. `amz` and `over`
+ * change the state of the keys and of the page; `support` is the link of the page ("" = none).
+ */
+export function dialog(
+  d: MgData,
+  o: { platform?: State["platform"]; lang?: Lang; amz?: Partial<State["amz"]>; over?: Partial<State>; a?: ReturnType<typeof actions>; support?: string } = {},
+) {
+  const platform = o.platform ?? "ios";
+  const a = o.a ?? actions();
+  const s = state(platform, { ...o.over }, o.lang ?? "ru");
+  Object.assign(s.amz, { adding: true, pane: "pick" }, o.amz);
+  const c = { d, s, a, t: dict[s.lang], support: o.support ?? "https://t.me/example_support" };
+  const box = document.createElement("div");
+  box.append(...(deviceModal(c) as Node[]));
+  return { box, a, c, label: deviceModalLabel(c), stage: deviceModalStage(c) };
+}

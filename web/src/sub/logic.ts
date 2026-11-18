@@ -310,11 +310,6 @@ export function detectPlatform(ua: string, touchPoints = 0): Platform | null {
 export const asPlatform = (v: string | null | undefined): Platform | null => (platformOrder.includes(v as Platform) ? (v as Platform) : null);
 export const asTheme = (v: string | null | undefined): Theme => (v === "light" || v === "dark" ? v : "auto");
 
-/** Kinds the user may use (access) and the instance has an app for, in display order (Happ first). */
-export function kinds(d: MgData): Kind[] {
-  return kindOrder.filter((k) => d.access[k] && d.apps.some((a) => a.kind === k));
-}
-
 /** The apps the user may use, in the settings' order. */
 export const usableApps = (d: MgData): AppEntry[] => d.apps.filter((a) => d.access[a.kind]);
 
@@ -331,9 +326,6 @@ export const appsOn = (d: MgData, platform: Platform): AppEntry[] => usableApps(
 export function pickPlatform(d: MgData, remembered: Platform | null, detected: Platform | null): Platform {
   return remembered ?? detected ?? platformsOf(d)[0] ?? platformOrder[0]!;
 }
-
-/** How an app connects: by the subscription link ("link") or by a per-device AmneziaWG key ("key"). */
-export const connectBy = (a: AppEntry): "link" | "key" => (a.kind === "amnezia" ? "key" : "link");
 
 /** The two ways to connect: the subscription link (every server, it updates itself) and the AmneziaVPN key (one per device). */
 export type Way = "link" | "key";
@@ -370,9 +362,6 @@ export function chosenApp(d: MgData, platform: Platform, key: string, kind?: Kin
   return all.find((a) => appKey(a) === key) ?? all[0];
 }
 
-/** The names of an app list, without repeats. */
-export const appNames = (apps: AppEntry[]) => [...new Set(apps.map((a) => a.name).filter(Boolean))];
-
 /** The apps of one kind on a platform: the recommended one first, the rest in the settings' order. */
 export function appsFor(d: MgData, platform: Platform | null, kind: Kind): AppEntry[] {
   return platform ? appList(d, platform).filter((a) => a.kind === kind) : [];
@@ -381,12 +370,6 @@ export function appsFor(d: MgData, platform: Platform | null, kind: Kind): AppEn
 /** The key app's name: the platform's, else any in the settings; AmneziaVPN when the settings name none. */
 export function keyAppName(d: MgData, platform: Platform | null): string {
   return appsFor(d, platform, "amnezia")[0]?.name || d.apps.find((a) => a.kind === "amnezia")?.name || "AmneziaVPN";
-}
-
-/** The name of the link app a phone would scan the QR code in: the recommended one, else the first, on iPhone or Android. "" when there is none. */
-export function qrApp(d: MgData): string {
-  const phone = usableApps(d).filter((a) => a.kind === "happ" && (a.platform === "ios" || a.platform === "android") && a.name !== "");
-  return (phone.find((a) => a.recommended) ?? phone[0])?.name ?? "";
 }
 
 /** The subscription link is shown as a QR code when the page has the option on and some link app is usable. */
@@ -403,8 +386,6 @@ export function storeLabel(url: string, t: Dict): string {
   if (host === "play.google.com") return t.store.play;
   return t.store.site;
 }
-
-export const isTelegram = (url: string) => /^(tg:|https?:\/\/(t\.me|telegram\.me|telegram\.dog)\/)/i.test(url);
 
 /** What a device row draws: a phone, a Mac (laptop), a computer, or a plain device. */
 export function deviceIcon(platform: string): "phone" | "android" | "monitor" | "laptop" | "terminal" | "other" {
@@ -470,19 +451,6 @@ export function serversOf(d: MgData): ServerEntry[] {
   return d.server_loads.map((s) => ({ id: "", country_code: "", place: "", label: s.name, app_names: [], connections: [], online: true, load: s.level, dns: null }));
 }
 
-/**
- * The choices of a device's configs, one per node: the panel's public name of the server, as the server list and the
- * user's app name it ("Germany 2", "Germany · Frankfurt", "Server"), with the country's flag where the system draws flags.
- * The page never shows the panel's node name.
- */
-export function nodeLabels(configs: AwgConfig[], flags = true): string[] {
-  return configs.map((c, k) => {
-    const name = c.label || String(k + 1);
-    const cc = c.country_code.trim().toUpperCase();
-    return flags && validCc(cc) ? `${flagOf(cc)} ${name}` : name;
-  });
-}
-
 const profileRank = (p: AwgProfile) => (p.version === "2.0" ? 2 : p.egress === "warp" ? 1 : 0);
 
 /**
@@ -521,11 +489,6 @@ export const dnsPresetOf = (d: MgData, id: string): DnsPreset | undefined => d.d
 export const presetName = (p: DnsPreset, lang: Lang): string => p.names?.[lang] || p.name;
 /** A preset's description in the language of the page. */
 export const presetDescription = (p: DnsPreset, lang: Lang): string => p.descriptions?.[lang] ?? describePreset(p.description, lang);
-/** A preset's name for the page; "" when the id is unknown. */
-export const dnsName = (d: MgData, id: string, lang: Lang): string => {
-  const p = dnsPresetOf(d, id);
-  return p ? presetName(p, lang) : "";
-};
 
 /** The preset a server falls back to when nothing was chosen: what the server says, else what applies now when nothing is chosen, else the first allowed. */
 export function dnsDefault(s: ServerDns): string {
@@ -617,7 +580,6 @@ export function fmtNum(n: number, lang: Lang): string {
   return new Intl.NumberFormat(locale(lang), { maximumFractionDigits: n < 1 ? 2 : n < 10 ? 1 : 0 }).format(n);
 }
 
-
 export function fmtDate(unix: number, lang: Lang, now = Date.now() / 1000): string {
   const d = new Date(unix * 1000);
   // the year of the page's calendar (the Persian one starts in March)
@@ -638,34 +600,20 @@ export function fmtAgo(unix: number, lang: Lang, now = Date.now() / 1000): strin
 }
 
 export type Hero = {
-  state: Status;
-  tone: "ok" | "warn" | "bad" | "off";
   /** active, and the term ends within a week */
   soon: boolean;
-  /** the term tile ("Осталось" / "Срок"): the number, its unit, the date under it; shown for an active subscription only */
-  showTerm: boolean;
-  termL: string;
-  big: string;
-  unit: string;
-  sub: string;
-  /** the traffic tile: shown for an active subscription and for used-up traffic */
-  showTraffic: boolean;
-  usedN: string;
-  usedOf: string;
-  /** the bar, 0-100 (null = no quota, no bar) */
-  pct: number | null;
-  /** "resets on 14 October" ("" = none) */
-  reset: string;
-  /** traffic is 90 % used or more (or all of it): the tile is a warning */
-  low: boolean;
-  /** the one line about what is left when traffic is nearly used up ("" otherwise) */
-  left: string;
   /** days left, at least 1 while it is soon */
   days: number;
+  /** the used traffic with its unit ("17 GB"), and the quota without one ("100"; "" when unlimited): the board's figure and its line */
+  usedQ: string;
+  quotaN: string;
+  /** "resets on 14 October" ("" = none or no quota) */
+  reset: string;
+  /** traffic is 90 % used or more (or all of it): the figure is a warning */
+  low: boolean;
 };
 
-const tones: Record<Status, Hero["tone"]> = { active: "ok", expired: "bad", limited: "warn", disabled: "off" };
-
+/** What the subscription card reads off the data: the term's days, the traffic in the unit of its quota, the warnings. */
 export function hero(d: MgData, lang: Lang, now = Date.now() / 1000): Hero {
   const t = dict[lang];
   const u = d.user;
@@ -673,35 +621,21 @@ export function hero(d: MgData, lang: Lang, now = Date.now() / 1000): Hero {
   const noExpiry = !u.expires_unix;
   const days = noExpiry ? 0 : Math.max(0, Math.ceil((u.expires_unix - now) / day));
   const soon = active && !noExpiry && u.expires_unix - now <= soonDays * day;
-  const shown = soon ? Math.max(1, days) : days;
 
   // traffic, in the unit of the quota (or of the usage when there is no quota)
   const ref = u.quota_bytes || u.used_bytes;
   const i = Math.max(0, Math.min(units.ru.length - 1, Math.floor(Math.log(Math.max(ref, 1)) / Math.log(1024))));
   const unit = units[lang][i] ?? "";
-  const quota = u.quota_bytes ? qty(fmtNum(u.quota_bytes / 1024 ** i, lang), unit, lang) : "";
   const pct = u.quota_bytes ? Math.min(100, (u.used_bytes / u.quota_bytes) * 100) : null;
-  const low = u.status === "limited" || (active && pct !== null && pct >= lowTraffic);
   const resetDate = u.quota_reset !== "none" && u.next_reset_unix ? fmtDate(u.next_reset_unix, lang, now) : "";
-  const rest = u.quota_bytes ? qty(fmtNum(Math.max(0, u.quota_bytes - u.used_bytes) / 1024 ** i, lang), unit, lang) : "";
 
   return {
-    state: u.status,
-    tone: soon || low ? "warn" : tones[u.status],
     soon,
-    showTerm: active,
-    termL: noExpiry ? t.termL : t.leftL,
-    big: noExpiry ? "∞" : String(shown),
-    unit: noExpiry ? t.noExpiry : t.dayWord(shown),
-    sub: noExpiry ? "" : t.until(fmtDate(u.expires_unix, lang, now)),
-    showTraffic: active || u.status === "limited",
-    usedN: fmtNum(u.used_bytes / 1024 ** i, lang),
-    usedOf: quota ? t.of(quota) : `${unit} · ${t.unlimited}`,
-    pct,
+    days: soon ? Math.max(1, days) : days,
+    usedQ: qty(fmtNum(u.used_bytes / 1024 ** i, lang), unit, lang),
+    quotaN: u.quota_bytes ? fmtNum(u.quota_bytes / 1024 ** i, lang) : "",
     reset: !u.quota_bytes ? "" : resetDate ? t.resets(resetDate) : "",
-    low,
-    left: active && low && rest ? (resetDate ? t.leftUntil(rest, resetDate) : t.leftOnly(rest)) : "",
-    days: shown,
+    low: u.status === "limited" || (active && pct !== null && pct >= lowTraffic),
   };
 }
 
@@ -710,9 +644,6 @@ export const atDeviceLimit = (d: MgData) => d.user.device_limit > 0 && d.user.de
 
 /** The page may call the self-service endpoints: the admin allows it and this is not the admin's preview (no address). */
 export const selfServe = (d: MgData) => !!d.amnezia && d.amnezia.self_service && d.amnezia.endpoints !== "";
-
-/** "Add a device" is offered: self-service, the user is active, there is a profile to add on and a free slot. */
-export const canAddDevice = (d: MgData) => selfServe(d) && d.user.status === "active" && (d.amnezia?.profiles.length ?? 0) > 0 && !atDeviceLimit(d);
 
 /** Why a key cannot be added, in the order the page checks: the owner issues the keys, the admin's preview, no profile, no free slot. "none": no key way at all. */
 export type KeyAvailability = "ok" | "none" | "admin" | "preview" | "noprofile" | "limit";
@@ -777,17 +708,3 @@ export const isPhone = (platform: string) => platform === "ios" || platform === 
 /** The platforms "add a device" offers, in display order. */
 export const addPlatforms = ["ios", "android", "windows", "macos", "linux", "other"] as const;
 
-/** What the status card says for a state that is not "active": [the bold first sentence, what happened, what to do]. The "what to do" is dropped without support. */
-export function stateText(d: MgData, lang: Lang, brand: string): { head: string; body: string; call: string } | null {
-  const t = dict[lang].txt;
-  switch (d.user.status) {
-    case "expired":
-      return { head: d.user.expires_unix ? t.expiredOn(fmtDate(d.user.expires_unix, lang)) : "", ...t.expired(brand) };
-    case "limited":
-      return { head: "", ...(d.user.next_reset_unix && d.user.quota_reset !== "none" ? t.limitedReset(fmtDate(d.user.next_reset_unix, lang), d.user.quota_reset) : t.limited()) };
-    case "disabled":
-      return { head: "", ...t.disabled() };
-    default:
-      return null;
-  }
-}

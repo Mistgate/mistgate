@@ -1,45 +1,24 @@
-import badge from "../assets/mistgate-badge.svg?raw";
-import { connectCard, qrSide } from "./connect";
+import { brandName, hasCustomLogo, logoSrc } from "./brand";
 import { devicesSection } from "./devices";
 import { h, type Kid } from "./dom";
 import { dict, htmlLang, langNames, langs, langShort, type Dict } from "./i18n";
-import { staleCard } from "./amnezia";
-import { icon } from "./icons";
-import { fetchedUnix, fmtAgo, hero, isTelegram, safeUrl, stateText, type Hero } from "./logic";
+import { icon, type IconName } from "./icons";
+import { safeUrl, serversOf } from "./logic";
 import { serversSection } from "./servers";
+import { alertCard, announcement, heroCard } from "./status";
+import type { Actions, Ctx, State, Tab } from "./state";
 import { telegramSection } from "./telegram";
 import { trustTunnelSection } from "./trusttunnel";
-import type { Actions, Ctx, State } from "./state";
-import { bar, dot } from "./ui";
 import type { Lang, MgData, Theme } from "./types";
 
-// The user page as DOM. Two layouts from one tree: elements marked only-m / only-w are shown below / from 720 px
-// (sub.css); the rest is shared and restyled by the same media query.
-//
-// Top to bottom: the status, then (a first visit) the three steps of connecting, the servers, the person's devices, help
-// and the footer; a returning visitor has the servers and devices first: "Add a device" on the devices card holds the way
-// to connect one more (with an app and the link, or with a key; add.ts).
-// A subscription that is not active shows the reason and "write to support", then the devices (they can be removed and renamed).
+// The user page as DOM, after the boards. Top to bottom: the bar (logo, name, language, support), the owner's announcement, the
+// subscription card, the note under it, the tabs (servers, the Telegram proxies, TrustTunnel, the devices) and the open tab, the
+// help card and the footer. Two layouts from one tree: elements marked only-m / only-w are shown below / from 720 px (sub.css);
+// the rest is restyled by the same media query. A subscription that is not active shows its reason and the devices (they can be
+// removed and renamed), no tabs.
 
 export type { Actions, State } from "./state";
-
-export const brandName = (d: MgData) =>
-  d.title.trim() || (d.brand.parts.join("") || "VPN").replace(/^./, (c) => c.toUpperCase());
-
-// The built-in Mistgate badge (the admin's one). An <img> sees no page CSS variables, so the instance accent
-// (a validated hex, see logic.ts) is written into the badge, which derives its other tones from it.
-const builtin = (accent: string) => badge.replace("var(--mg-accent,#c3b2fd)", accent);
-
-/** The instance uploaded its own logo (otherwise the page wears the built-in badge). */
-export const hasCustomLogo = (d: MgData) => /^<svg[\s>]/i.test(d.brand.logo_svg.trim());
-
-/** src for the logo <img> and the favicon: the instance's (server-sanitised) SVG, else the built-in badge. Never inlined as markup. */
-export function logoSrc(d: MgData): string {
-  let svg = d.brand.logo_svg.trim();
-  if (!hasCustomLogo(d)) svg = builtin(d.brand.accent || "#b8acf2");
-  else if (!/xmlns\s*=/.test(svg)) svg = svg.replace(/^<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
-  return "data:image/svg+xml," + encodeURIComponent(svg);
-}
+export { brandName, hasCustomLogo, logoSrc };
 
 // The language menu is a native <details>: it opens without script. The page closes it on a click outside and on Esc
 // (the focus goes back to its summary); one pair of listeners for the whole page, however often the tree is rebuilt.
@@ -48,48 +27,54 @@ function watchLangMenu() {
   if (watching) return;
   watching = true;
   document.addEventListener("click", (e) => {
-    for (const m of document.querySelectorAll<HTMLDetailsElement>("details.lang-menu[open]")) if (!m.contains(e.target as Node)) m.open = false;
+    for (const m of document.querySelectorAll<HTMLDetailsElement>("details.u-lang[open]")) if (!m.contains(e.target as Node)) m.open = false;
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const m = document.querySelector<HTMLDetailsElement>("details.lang-menu[open]");
+    const m = document.querySelector<HTMLDetailsElement>("details.u-lang[open]");
     if (!m) return;
     m.open = false;
     m.querySelector("summary")?.focus();
   });
 }
 
-/** The language menu: a globe, the short code of the current language and a chevron; the card lists every language by its own name. */
+/** The language menu (the board's .u-lang): a globe, the name of the language (its short code on a phone) and a chevron; the card lists every language by its own name. */
 function langMenu(t: Dict, lang: Lang, setLang: (l: Lang) => void): HTMLElement {
   watchLangMenu();
-  const menu = h("details", { class: "lang-menu" });
+  const menu = h("details", { class: "u-lang" });
   const row = (l: Lang) =>
     h(
       "button",
-      { type: "button", "data-k": `lang-${l}`, "aria-pressed": lang === l, lang: htmlLang(l), on: { click: () => (lang !== l ? setLang(l) : (menu.open = false)) } },
-      h("span", { class: "ln" }, langNames[l]),
-      h("span", { class: "lc", "aria-hidden": "true" }, langShort[l]),
-      h("span", { class: "lk", "aria-hidden": "true" }, lang === l && icon("check", 16)),
+      { class: lang === l ? "on" : "", type: "button", role: "option", "aria-selected": lang === l, "data-k": `lang-${l}`, lang: htmlLang(l), on: { click: () => (lang !== l ? setLang(l) : (menu.open = false)) } },
+      h("span", null, langNames[l]),
+      h("span", { class: "cd", "aria-hidden": "true" }, langShort[l]),
+      ck(),
     );
   menu.append(
-    h("summary", { "aria-label": `${t.langGroup}: ${langNames[lang]}`, "data-k": "lang-menu" }, icon("globe", 18), h("span", { lang: htmlLang(lang) }, langShort[lang]), icon("chev", 14)),
-    h("div", { class: "pop menu lang-card", role: "group", "aria-label": t.langGroup }, ...langs.map(row)),
+    h("summary", { class: "u-btn", "aria-haspopup": "listbox", "aria-label": `${t.langGroup}: ${langNames[lang]}`, "data-k": "lang-menu" }, icon("globe"), h("span", { class: "lb", lang: htmlLang(lang) }, langNames[lang]), h("span", { class: "cd", lang: htmlLang(lang) }, langShort[lang]), icon("chev")),
+    h("div", { class: "u-menu", role: "listbox", "aria-label": t.langGroup }, ...langs.map(row)),
   );
   return menu;
 }
 
-/** The top bar: logo, name and the language menu. Shared by the page and the password form. */
-export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void): HTMLElement {
+function ck(): SVGSVGElement {
+  const i = icon("check");
+  i.classList.add("ck");
+  return i;
+}
+
+/** The top bar (the board's .u-hd): logo, name, the language menu and (when the page has one) the way to the support. Shared by the page and the password form. */
+export function pageHeader(d: MgData, lang: Lang, setLang: (l: Lang) => void, support = ""): HTMLElement {
   const t = dict[lang];
   const wordmark = d.title.trim().toLowerCase() === d.brand.parts.join("").toLowerCase() || !d.title.trim();
   return h(
     "header",
-    { class: "hd" },
-    h("img", { class: "logo", src: logoSrc(d), alt: "", width: 32, height: 32, draggable: "false" }),
-    wordmark && d.brand.parts[0]
-      ? h("div", { class: "wm" }, d.brand.parts[0], h("b", null, d.brand.parts[1]))
-      : h("div", { class: "wm plain" }, brandName(d)),
+    { class: "u-hd" },
+    h("img", { class: "logo", src: logoSrc(d), alt: "", width: 28, height: 28, draggable: "false" }),
+    wordmark && d.brand.parts[0] ? h("div", { class: "u-wm" }, d.brand.parts[0], h("b", null, d.brand.parts[1])) : h("div", { class: "u-wm plain" }, brandName(d)),
     langMenu(t, lang, setLang),
+    support && h("a", { class: "u-btn only-w", href: support, target: "_blank", rel: "noopener noreferrer", "data-k": "support" }, icon("chat"), t.supportBtn),
+    support && h("a", { class: "u-ic line only-m", href: support, target: "_blank", rel: "noopener noreferrer", "data-k": "support-m", "aria-label": t.supportBtn }, icon("chat")),
   );
 }
 
@@ -100,211 +85,90 @@ export function annKey(text: string): string {
   return `ann:${n.toString(36)}`;
 }
 
-const sendBtn = (href: string, label: string, cls = "pri") => h("a", { class: `btn ${cls}`, href, target: "_blank", rel: "noopener noreferrer" }, icon("send"), label);
+// ---- the tabs ----
 
-export function view(d: MgData, s: State, a: Actions): HTMLElement {
-  const t = dict[s.lang];
-  const active = d.user.status === "active";
-  const support = d.options.show_support ? safeUrl(d.support_url) : "";
-  const c: Ctx = { d, s, a, t, support };
+type TabInfo = { id: Tab; label: string; short: string; n: string; nShort: string; scr: boolean };
 
-  const ann =
-    d.options.show_announcement &&
-    d.announcement &&
-    !s.annClosed &&
-    h(
-      "div",
-      { class: "ann", role: "note" },
-      h("span", { class: "dot" }),
-      h("p", null, d.announcement),
-      h("button", { class: "x", type: "button", "data-k": "ann-x", "aria-label": t.hideAnn, on: { click: () => a.closeAnn() } }, icon("close", 16)),
-    );
-
-  const children: Kid[] = [pageHeader(d, s.lang, a.lang), ann, ...statusCards(c)];
-
-  if (!active) {
-    // a state with a problem: the reason, the way to write, and the devices (they can still be removed and renamed)
-    children.push(...devicesSection(c));
-  } else {
-    const stale = staleCard({ d, s, a, t, support });
-    const servers = serversSection(c);
-    const devices = devicesSection(c);
-    // the help card stands in two places on a first visit (beside the steps on a computer, at the end on a phone): one element each
-    const qr = qrSide(c);
-    const hasHelp = support !== "";
-    const hasConnect = connectNeeded(d);
-    if (stale) children.push(stale);
-    if (s.returning) {
-      children.push(...servers, ...telegramSection(c), ...trustTunnelSection(c), ...devices);
-    } else {
-      if (hasConnect) {
-        children.push(
-          h("div", { class: "shead" }, h("h2", { class: "h2" }, t.connectT), h("p", { class: "hint sec-sub" }, t.connectH)),
-          h("div", { class: "cols" }, h("div", { class: "main" }, connectCard(c)), (qr || hasHelp) && h("aside", { class: "side only-w" }, qr, hasHelp && helpCard(c))),
-        );
-      }
-      children.push(...servers, ...telegramSection(c), ...trustTunnelSection(c), ...devices);
-    }
-    if (hasHelp) children.push(h("div", { class: s.returning ? "" : "only-m" }, helpCard(c)));
-  }
-  children.push(footer(c));
-  return h("main", { class: "wrap" }, ...children);
+/** The tabs this person has: the servers, the Telegram proxies and TrustTunnel when they are on, the devices. */
+export function tabsOf({ d, t }: Pick<Ctx, "d" | "t">): TabInfo[] {
+  const used = d.user.devices_used;
+  const limit = d.user.device_limit;
+  const list: TabInfo[] = [{ id: "servers", label: t.tabServers, short: t.tabServers, n: String(serversOf(d).length), nShort: String(serversOf(d).length), scr: true }];
+  if (d.access.telegram) list.push({ id: "telegram", label: t.tabTelegram, short: t.tabTelegramShort, n: String(d.telegram?.links.length ?? 0), nShort: String(d.telegram?.links.length ?? 0), scr: false });
+  if (d.access.trust_tunnel) list.push({ id: "trusttunnel", label: t.tabTrustTunnel, short: t.tabTrustTunnel, n: String(d.trust_tunnel?.links.length ?? 0), nShort: String(d.trust_tunnel?.links.length ?? 0), scr: false });
+  list.push({ id: "devices", label: t.tabDevices, short: t.tabDevices, n: limit > 0 ? `${used}/${limit}` : String(used), nShort: String(used), scr: false });
+  return list;
 }
 
-/** There is something to connect with: a link or a key. */
-const connectNeeded = (d: MgData) => d.access.happ || (d.access.amnezia && d.amnezia !== null) || d.apps.length > 0;
+/** The open tab: the one asked for if this person has it, else the first. */
+export const openTab = (c: Pick<Ctx, "d" | "s" | "t">): Tab => (tabsOf(c).some((x) => x.id === c.s.tab) ? c.s.tab : "servers");
 
-function helpCard({ t, support }: Ctx): HTMLElement | null {
-  if (!support) return null;
+function tabs(c: Ctx): HTMLElement {
+  const { a, t } = c;
+  const on = openTab(c);
   return h(
-    "section",
-    { class: "card row g12 help", "aria-label": t.helpT },
-    h("span", { class: "tile s36 lav only-m", "aria-hidden": "true" }, icon("chat")),
-    h("div", { class: "stack grow" }, h("p", { class: "b" }, t.helpT), h("p", { class: "hint" }, isTelegram(support) ? t.helpTg : t.helpAny)),
-    h("a", { class: "btn sec sm", href: support, target: "_blank", rel: "noopener noreferrer" }, t.write),
-  );
-}
-
-function footer({ s, a, t }: Ctx): HTMLElement {
-  const themes: Theme[] = ["auto", "light", "dark"];
-  return h(
-    "footer",
-    { class: "foot" },
-    h("p", { class: "priv" }, icon("shield", 16), t.privacy),
-    h(
-      "div",
-      { class: "foot-row" },
-      h("span", { class: "lbl" }, t.themeL),
+    "nav",
+    { class: "u-tabs", "aria-label": t.tabsAria },
+    ...tabsOf(c).map((x) =>
       h(
-        "div",
-        { class: "seg sm", role: "radiogroup", "aria-label": t.themeL },
-        ...themes.map((x) =>
-          h("button", { class: s.theme === x ? "on" : "", type: "button", role: "radio", "aria-checked": s.theme === x, "data-k": `theme-${x}`, on: { click: () => a.theme(x) } }, t.theme[x]),
-        ),
+        "button",
+        { class: `u-tab${x.id === on ? " on" : ""}`, type: "button", "aria-pressed": x.id === on, "data-k": `tab-${x.id}`, on: { click: () => a.tab(x.id) } },
+        h("span", { class: "only-w" }, x.label),
+        h("span", { class: "only-m" }, x.short),
+        h("span", { class: "n only-w", ...(x.scr ? { "data-scr": x.n, "data-scr-k": `tab-${x.id}` } : {}) }, x.n),
+        h("span", { class: "n only-m" }, x.nShort),
       ),
     ),
   );
 }
 
-// ---- the status ----
+function panel(c: Ctx): Kid[] {
+  switch (openTab(c)) {
+    case "telegram":
+      return telegramSection(c);
+    case "trusttunnel":
+      return trustTunnelSection(c);
+    case "devices":
+      return devicesSection(c);
+    default:
+      return serversSection(c);
+  }
+}
 
-const pillOf = (hr: Hero, t: Dict) => {
-  const key = hr.soon ? "soon" : hr.state;
-  const tone = hr.soon ? "warn" : hr.state === "expired" ? "bad" : hr.state === "limited" ? "warn" : hr.state === "disabled" ? "off" : "";
-  const live = hr.state === "active" && !hr.soon;
-  return h("span", { class: `pill${tone ? ` ${tone}` : ""}` }, dot(live ? "live" : tone === "off" ? "off" : tone || "ok"), t.chip[key]);
-};
+// ---- the end of the page ----
 
-const termStat = (hr: Hero, cls = "stat") =>
-  h(
-    "div",
-    { class: cls },
-    h("span", { class: "eb" }, hr.termL),
-    h("div", { class: "num" }, h("b", { class: hr.soon ? "warn-t" : "" }, hr.big), h("span", null, hr.unit)),
-    hr.sub && h("span", { class: "hint", style: { "margin-top": "auto" } }, hr.sub),
-  );
-
-function trafficStat(hr: Hero, t: Dict, cls = "stat", headReset = false) {
-  const limited = hr.state === "limited";
-  const label = t.barAria(hr.usedN, hr.usedOf);
+/** The help card (the board's "Не нашли ответ" row): the way to the support, when the page has one. */
+function help({ d, t, support }: Ctx): HTMLElement | null {
+  // the board draws it under the tabs, so only for a subscription that works (the other states have the button in the note)
+  if (!support || d.user.status !== "active") return null;
   return h(
     "div",
-    { class: `${cls}${hr.low && !limited && cls === "stat" ? " warn" : ""}` },
-    headReset
-      ? h("div", { class: "stat-h" }, h("span", { class: "eb" }, t.trafficL), hr.reset && h("span", { class: "hint" }, hr.reset))
-      : h("span", { class: "eb" }, t.trafficL),
-    h("div", { class: "num" }, h("b", { class: hr.low ? "warn-t" : "" }, hr.usedN), h("span", null, hr.usedOf)),
-    hr.pct !== null && bar(hr.pct, hr.low, label),
-    !headReset && hr.reset && h("span", { class: "hint" }, hr.reset),
+    { class: "u-below" },
+    h("section", { class: "u-card u-ask", "aria-label": t.helpT }, h("p", null, t.askNo), h("a", { class: "u-btn", href: support, target: "_blank", rel: "noopener noreferrer", "data-k": "help-write" }, icon("chat"), t.writeSupport)),
   );
 }
 
-/** The one sentence under the status card: what happened (the date bold), what to do (only with support). */
-function whyText(c: Ctx, hr: Hero): { lead: string; rest: string } | null {
-  const { d, s, t, support } = c;
-  if (hr.soon) {
-    const [a, b] = t.soon(hr.days);
-    return { lead: "", rest: support ? `${a} — ${b}.` : `${a}.` };
-  }
-  const why = stateText(d, s.lang, brandName(d));
-  if (!why) return null;
-  return { lead: why.head, rest: [why.body, support ? why.call : ""].filter(Boolean).join(" ") };
-}
+const themeIcon: Record<Theme, IconName> = { auto: "system", light: "sun", dark: "moon" };
 
-function gotSub(c: Ctx, cls = "row g8 sm"): HTMLElement | null {
-  const at = fetchedUnix(c.d);
-  if (!at || c.d.user.status !== "active") return null;
-  return h("p", { class: `${cls}` }, icon("check", 16), h("span", null, c.t.appGot, " ", h("b", null, fmtAgo(at, c.s.lang))));
-}
-
-function whyEl(w: { lead: string; rest: string }): HTMLElement {
-  return h("p", { class: "why" }, w.lead && h("b", null, w.lead), w.lead && " ", w.rest);
-}
-
-function statusCards(c: Ctx): Kid[] {
-  return [heroMobile(c), heroWeb(c)];
-}
-
-function heroMobile(c: Ctx): HTMLElement {
-  const { d, s, t, support } = c;
-  const hr = hero(d, s.lang);
-  const active = hr.state === "active";
-  const hello = d.user.name ? t.hi(d.user.name) : t.hiAnon;
-  const w = whyText(c, hr);
-  const problem = !active || hr.soon;
-  const tone = hr.soon ? "warn" : hr.state === "expired" ? "bad" : hr.state === "limited" ? "warn" : hr.state === "disabled" ? "off" : "";
-  const sup = support ? sendBtn(support, active ? t.write : t.writeSupport) : null;
-  const left = hr.left && h("p", { class: "sm row g8", style: { "align-items": "flex-start" } }, h("span", { class: "dot warn", style: { "margin-top": "6px" } }), h("span", null, hr.left));
-  const got = gotSub(c);
+function footer({ s, a, t }: Ctx): HTMLElement {
+  const themes: Theme[] = ["auto", "light", "dark"];
   return h(
-    "section",
-    { class: `card hero only-m${tone ? ` ${tone}` : ""}`, "aria-label": t.statusAria },
-    problem
-      ? h("div", { class: "hero-top stackd" }, pillOf(hr, t), h("h1", { class: "h1" }, hello))
-      : h("div", { class: "hero-top" }, h("h1", { class: "h1" }, hello), pillOf(hr, t)),
-    hr.showTerm && hr.showTraffic && h("div", { class: "stats" }, termStat(hr), trafficStat(hr, t)),
-    hr.state === "limited" && trafficStat(hr, t, "stat", true),
-    left,
-    got && h("div", { class: "div", style: { margin: "0 -18px" } }),
-    got,
-    w && whyEl(w),
-    problem && sup,
-    !active && h("p", { class: "hint row g8" }, icon("info", 16), t.sameInApp),
-  );
-}
-
-function heroWeb(c: Ctx): HTMLElement {
-  const { d, s, t, support } = c;
-  const hr = hero(d, s.lang);
-  const active = hr.state === "active";
-  const hello = d.user.name ? t.hi(d.user.name) : t.hiAnon;
-  const w = whyText(c, hr);
-  const tone = hr.soon ? "warn" : hr.state === "expired" ? "bad" : hr.state === "limited" ? "warn" : hr.state === "disabled" ? "off" : "";
-  const sup = support ? sendBtn(support, active ? t.write : t.writeSupport) : null;
-  const got = gotSub(c, "row g8 sm mut");
-  const two = !hr.showTraffic;
-  const cells: Kid[] = [];
-  if (hr.showTerm) cells.push(termStat(hr, "hw-cell"));
-  if (hr.showTraffic) {
-    const cell = trafficStat(hr, t, "hw-cell", hr.state === "limited");
-    if (hr.left) cell.append(h("p", { class: "sm row g8", style: { "align-items": "flex-start" } }, h("span", { class: "dot warn", style: { "margin-top": "6px" } }), h("span", null, hr.left)));
-    cells.push(cell);
-  }
-  if (!active) {
-    cells.push(h("div", { class: "hw-cell", style: { gap: "12px" } }, sup, h("p", { class: "hint row g8", style: { "align-items": "flex-start" } }, icon("info", 16), t.sameInApp)));
-  }
-  return h(
-    "section",
-    { class: `card hero-w only-w${two ? " two" : ""}${tone ? ` ${tone}` : ""}`, "aria-label": t.statusAria },
+    "footer",
+    { class: "u-ft" },
+    h("p", { class: "u-priv" }, icon("shield"), t.privacy),
     h(
       "div",
-      { class: "hw-main" },
-      pillOf(hr, t),
-      h("h1", { class: "h1" }, hello),
-      got && h("p", { class: "row g8 sm mut" }, icon("check", 16), h("span", null, t.appGot, " ", h("b", { style: { color: "var(--text)" } }, fmtAgo(fetchedUnix(d), s.lang)))),
-      w && whyEl(w),
-      active && hr.soon && sup && h("div", null, sup),
+      { class: "u-theme", role: "radiogroup", "aria-label": t.themeL },
+      ...themes.map((x) => h("button", { class: s.theme === x ? "on" : "", type: "button", role: "radio", "aria-checked": s.theme === x, "aria-label": t.themeAria[x], "data-k": `theme-${x}`, on: { click: () => a.theme(x) } }, icon(themeIcon[x]))),
     ),
-    ...cells,
   );
+}
+
+export function view(d: MgData, s: State, a: Actions): HTMLElement {
+  const t = dict[s.lang];
+  const support = d.options.show_support ? safeUrl(d.support_url) : "";
+  const c: Ctx = { d, s, a, t, support };
+  const active = d.user.status === "active";
+  const children: Kid[] = [pageHeader(d, s.lang, a.lang, support), announcement(c), heroCard(c), alertCard(c), ...(active ? [tabs(c), ...panel(c)] : devicesSection(c)), help(c), footer(c)];
+  return h("main", { class: "wrap" }, ...children);
 }

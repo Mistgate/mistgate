@@ -1,21 +1,21 @@
 import "./sub.css";
-import { deviceModal, deviceModalLabel } from "./add";
 import { amzActions } from "./amz-actions";
 import * as api from "./api";
+import { dialogClosed, dialogOpen, dialogView } from "./dialogs";
 import { dnsActions } from "./dns-actions";
 import { h } from "./dom";
+import { scramble } from "./fx";
 import { dict, dirOf, htmlLang, isLang } from "./i18n";
 import { icon } from "./icons";
 import { lockActions, lockView, type LockState } from "./lock";
 import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
 import { createModal } from "./modal";
-import { dnsLabel, dnsModal } from "./servers";
 import { newAmzState, newDnsState, type Actions, type Ctx, type State } from "./state";
 import type { Lang, Theme } from "./types";
 import { annKey, brandName, logoSrc, view } from "./view";
 
 // Entry of the public user page. All state is here: the language, the theme and the picked device (remembered on this
-// device), the chosen app, whether the QR code is open and whether the announcement was closed. The page data is embedded by
+// device), the chosen app, the open tab and whether the announcement was closed. The page data is embedded by
 // the server, there is no network I/O except the self-service calls (and the password form's one). A page whose password was
 // not entered is the form and nothing else.
 
@@ -65,21 +65,33 @@ const devApi = import.meta.env.DEV ? (await import("./dev-api")).devApi : (undef
 const want = asPlatform(devQuery.get("as")) ?? detectPlatform(navigator.userAgent, navigator.maxTouchPoints);
 if (isHex(data.brand.accent)) document.documentElement.style.setProperty("--accent", data.brand.accent);
 
+// the entrance of the boards (.u-anim): from the computer layout up, not for people who asked for calm; a phone has none
+const calm = matchMedia("(prefers-reduced-motion: reduce)");
+const wide = matchMedia("(min-width: 720px)");
+const syncAnim = () => document.documentElement.classList.toggle("u-anim", wide.matches && !calm.matches);
+syncAnim();
+wide.addEventListener("change", syncAnim);
+calm.addEventListener("change", syncAnim);
+
 const root = document.getElementById("root") as HTMLElement;
-const toast = h("div", { class: "toast", role: "status", "aria-live": "polite" });
+const toast = h("div", { class: "u-toast", role: "status", "aria-live": "polite" });
 document.body.append(toast);
 let toastTimer = 0;
-function flash(message: string) {
+// the board's toast stands 56 px above the control that was pressed (top of the page when there is none)
+function flash(message: string, from?: HTMLElement) {
   toast.replaceChildren(icon("check", 16), message);
+  toast.style.top = `${from?.isConnected ? Math.max(16, Math.round(from.getBoundingClientRect().top + window.scrollY - 56)) : 16}px`;
+  toast.classList.remove("show");
+  void toast.offsetWidth; // the toast rises again when it is shown again
   toast.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => toast.classList.remove("show"), 1800);
 }
 
 // Clipboard API needs a secure context and a user gesture; the textarea path covers plain http and old WebViews.
-function copy(text: string, message: string, done?: () => void) {
+function copy(text: string, message: string, done?: () => void, from?: HTMLElement) {
   const ok = () => {
-    flash(message);
+    flash(message, from);
     done?.();
   };
   const fallback = () => {
@@ -115,6 +127,8 @@ function setDocument(lang: Lang) {
 if (data.locked) {
   // ---- the password form ----
   const st: LockState = { lang: savedLang() ?? data.lang, pw: "", busy: false, error: "", note: "" };
+  // `vite -c vite.sub.config.ts` only: &lockerr=wrong|short|latin|later|net shows the form with that error (dev-scene.ts)
+  if (import.meta.env.DEV) (await import("./dev-scene")).devLockScene(devQuery, st);
   const actions = lockActions({
     st,
     endpoint: data.unlock_url,
@@ -138,18 +152,14 @@ if (data.locked) {
   const here = want && (addPlatforms as readonly string[]).includes(want) ? want : "";
   const st: State = {
     lang: savedLang() ?? data.lang,
+    tab: "servers",
     platform: pickPlatform(data, asPlatform(stored("platform")), want),
     detected: want,
     app: "",
-    way: "link",
     theme: startTheme,
-    qrOpen: false,
-    stepsAgain: false,
     devicesOpen: false,
-    details: null,
     annClosed: stored(ann) === "1",
     returning: isReturning(data, stored("setup") === "1"),
-    marked: stored("setup") === "1",
     amz: newAmzState(here || "other", mainProfile(data.amnezia?.profiles ?? []), here),
     dns: newDnsState(),
   };
@@ -169,6 +179,11 @@ if (data.locked) {
       saveLang(l);
       render();
     },
+    tab(t) {
+      if (st.tab === t) return;
+      st.tab = t;
+      render("tab");
+    },
     platform(p) {
       st.platform = p;
       st.app = "";
@@ -179,30 +194,14 @@ if (data.locked) {
       st.app = key;
       render();
     },
-    way(w) {
-      st.way = w;
-      render();
-    },
     theme(t) {
       st.theme = t;
       store("theme", t);
       applyTheme(t);
       render();
     },
-    qrOpen(open) {
-      st.qrOpen = open;
-      render();
-    },
-    stepsAgain() {
-      st.stepsAgain = true;
-      render();
-    },
     devicesOpen(open) {
       st.devicesOpen = open;
-      render();
-    },
-    details(id) {
-      st.details = id;
       render();
     },
     closeAnn() {
@@ -211,7 +210,6 @@ if (data.locked) {
       render();
     },
     mark() {
-      st.marked = true;
       store("setup", "1");
     },
     copy,
@@ -241,79 +239,43 @@ if (data.locked) {
     (e) => {
       const el = e.target as Element;
       lastKey = el.closest?.("[data-k]")?.getAttribute("data-k") ?? "";
-      // a click anywhere but the open menu (or the button that opens it) closes the menu
-      if (st.amz.menu && !el.closest?.(".menu") && !el.closest?.('[data-k^="amz-more-"]')) actions.amz.menu(null);
     },
     true,
   );
-  // a tooltip goes away with Esc and stays away until the next tap or focus
-  document.addEventListener("keydown", (e) => e.key === "Escape" && document.documentElement.classList.add("tips-off"));
-  for (const ev of ["pointerdown", "focusin"]) document.addEventListener(ev, () => document.documentElement.classList.remove("tips-off"));
-  document.addEventListener("keydown", (e) => {
-    if (!st.amz.menu) return;
-    if (e.key === "Escape") {
-      const id = st.amz.menu;
-      actions.amz.menu(null);
-      focusKey(`amz-more-${id}`);
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
-      // a menu is walked with the arrows
-      const items = [...root.querySelectorAll<HTMLElement>(".menu [role=menuitem]")];
-      if (items.length === 0) return;
-      e.preventDefault();
-      const i = items.indexOf(document.activeElement as HTMLElement);
-      const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
-      items[next]!.focus();
-    }
-  });
 
   const ctx = (): Ctx => ({ d: data, s: st, a: actions, t: dict[st.lang], support: data.options.show_support ? safeUrl(data.support_url) : "" });
-  // the "add a device" dialog needs no Amnezia data for its link branch; a key sheet does
-  const dialogOpen = () => st.dns.open !== null || st.amz.adding || (data.amnezia !== null && (st.amz.renew !== null || st.amz.open !== null));
 
   // the dialog lives outside the tree the page rebuilds
   const modal = createModal({
-    label: () => (st.dns.open ? dnsLabel(ctx()) : deviceModalLabel(ctx())),
+    label: () => dialogView(ctx()).label,
     lastUsed: () => lastKey,
-    onClose: () => {
-      // Esc or the backdrop: the state follows the dialog
-      if (st.dns.open) actions.dns.open(null);
-      else if (st.amz.adding || st.amz.renew || st.amz.open) actions.amz.add(false);
-    },
+    onClose: () => dialogClosed(ctx()),
     refocus: (key) => root.querySelector<HTMLElement>(`[data-k="${key}"]`)?.focus({ preventScroll: true }),
   });
 
-  const render = (animate = false) => {
+  // `enter`: "all" = the first drawing (every part comes in), "tab" = a tab was opened (its panel comes in), "" = nothing moves
+  const render = (enter: "all" | "tab" | "" = "") => {
     // the tree is rebuilt on every change; keep keyboard focus on the control that was used
     const key = modal.el.contains(document.activeElement) ? undefined : (document.activeElement as HTMLElement | null)?.dataset?.k;
     const tree = view(data, st, actions);
-    if (animate) tree.classList.add("enter");
+    if (enter) tree.classList.add(enter === "tab" ? "et" : "ea");
     root.replaceChildren(tree);
     setDocument(st.lang);
+    // a tab that is out of sight in the scrolling bar is brought into it (the board's tabIn)
+    const bar = root.querySelector<HTMLElement>(".u-tabs");
+    const on = bar?.querySelector<HTMLElement>(".u-tab.on");
+    if (bar && on && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, on.offsetLeft - 48);
     if (key) root.querySelector<HTMLElement>(`[data-k="${key}"]`)?.focus({ preventScroll: true });
-    const open = dialogOpen();
-    modal.sync(open, open ? (st.dns.open ? dnsModal(ctx()) : deviceModal(ctx())) : []);
+    scramble(root);
+    const c = ctx();
+    const open = dialogOpen(c);
+    const dlg = open ? dialogView(c) : null;
+    modal.sync(open, dlg?.content ?? [], dlg?.stage);
   };
 
-  // `vite -c vite.sub.config.ts` only: &way=key picks the key way of the first-visit steps, &sheet=pick|link|key opens the "add a device" sheet, &menu=<device id> a row's menu, &open=<device id> its details, &key=<device id>[&country=<n>] its key sheet, &ask=remove:<id>|rotate:<id> its question
-  if (import.meta.env.DEV) {
-    const sheet = devQuery.get("sheet");
-    if (sheet === "pick" || sheet === "link" || sheet === "key") {
-      st.amz.adding = true;
-      st.amz.pane = sheet;
-    }
-    st.amz.menu = devQuery.get("menu");
-    st.details = devQuery.get("open");
-    if (devQuery.get("way") === "key") st.way = "key";
-    // &key=<device id> opens the key of a device, &country=<n> on the n-th config of its list (0 = the first)
-    const key = devQuery.get("key");
-    if (key) {
-      st.amz.node[key] = Number(devQuery.get("country")) || 0;
-      actions.amz.show(key);
-    }
-    const [kind, id] = (devQuery.get("ask") ?? "").split(":");
-    if ((kind === "remove" || kind === "rotate") && id) st.amz.confirm = { id, kind };
-  }
-  render(true);
+  // `vite -c vite.sub.config.ts` only: the scenes (every state of the page and every window opens on a page of its own; dev-scene.ts)
+  if (import.meta.env.DEV) (await import("./dev-scene")).devScene(devQuery, data, st, actions);
+  render("all");
 }
 // the static favicon in sub.html is a placeholder (so the browser never asks for /favicon.ico); show the brand
 document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.setAttribute("href", logoSrc(data));

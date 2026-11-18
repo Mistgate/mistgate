@@ -1,13 +1,20 @@
-import { describe, expect, it } from "vitest";
-import { cases } from "./dev-data";
-import { dict, dirOf, htmlLang, isLang, langs } from "./i18n";
-import { asPlatform, asTheme, atDeviceLimit, awgConfig, awgDevice, describePreset, detectPlatform, fmtAgo, fmtDate, fmtNum, hero, isReturning, kinds, normalize, pickPlatform, safeAddUrl, safeUrl, stateText } from "./logic";
-import { actions, data, plain, state, text } from "./test-kit";
 import { readFileSync } from "node:fs";
-import { annKey, view } from "./view";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { dialogOpen, dialogView } from "./dialogs";
+import { cases } from "./dev-data";
+import { scramble } from "./fx";
+import { dict, dirOf, htmlLang, isLang, langNames, langs } from "./i18n";
+import { asPlatform, asTheme, atDeviceLimit, awgConfig, awgDevice, describePreset, detectPlatform, fmtAgo, fmtDate, fmtNum, hero, isReturning, normalize, pickPlatform, safeAddUrl, safeUrl } from "./logic";
+import { figures } from "./status";
+import type { Ctx, State } from "./state";
+import { actions, amzNoop, data, plain, state, text } from "./test-kit";
+import type { Lang, MgData } from "./types";
+import { copyButton } from "./ui";
+import { annKey, openTab, pageHeader, tabsOf, view } from "./view";
 
 const now = 1_800_000_000;
 const day = 86400;
+const GB = 1024 ** 3;
 
 describe("platform", () => {
   it("detects from the user agent", () => {
@@ -31,11 +38,6 @@ describe("platform", () => {
   it("reads what storage gave back: a platform or a theme of the page, nothing else", () => {
     expect([asPlatform("macos"), asPlatform("beos"), asPlatform(null)]).toEqual(["macos", null, null]);
     expect([asTheme("dark"), asTheme("light"), asTheme("pink"), asTheme(null)]).toEqual(["dark", "light", "auto", "auto"]);
-  });
-
-  it("only offers kinds the user has access to", () => {
-    expect(kinds(normalize({ ...cases.first!, access: { happ: true, amnezia: false } }))).toEqual(["happ"]);
-    expect(kinds(normalize(cases.first))).toEqual(["happ", "amnezia"]);
   });
 });
 
@@ -122,37 +124,31 @@ describe("normalize", () => {
 
 describe("hero", () => {
   const user = (u: object) => normalize({ user: { name: "A", ...u } });
-  it("active: days, date and traffic of the quota", () => {
-    const h = hero(user({ status: "active", expires_unix: now + 76 * day - 100, used_bytes: 12 * 1024 ** 3, quota_bytes: 100 * 1024 ** 3, quota_reset: "month", next_reset_unix: now + 9 * day }), "en", now);
-    expect([h.big, h.unit, h.termL, h.soon, h.low, h.tone]).toEqual(["76", "days", "Left", false, false, "ok"]);
-    expect([h.usedN, h.usedOf, h.pct, h.showTerm, h.showTraffic]).toEqual(["12", "of 100 GB", 12, true, true]);
+  it("active: days, the traffic in the unit of the quota, the quota, the day it resets", () => {
+    const h = hero(user({ status: "active", expires_unix: now + 76 * day - 100, used_bytes: 12 * GB, quota_bytes: 100 * GB, quota_reset: "month", next_reset_unix: now + 9 * day }), "en", now);
+    expect([h.days, h.soon, h.low, h.usedQ, h.quotaN]).toEqual([76, false, false, "12 GB", "100"]);
     expect(h.reset).toMatch(/^resets /);
   });
-  it("a week or less to go is 'soon', a warning with the days in it", () => {
-    const h = hero(user({ status: "active", expires_unix: now + 3 * day - 600 }), "ru", now);
-    expect([h.soon, h.tone, h.big, h.unit]).toEqual([true, "warn", "3", "дня"]);
+  it("a week or less to go is 'soon', and says at least one day", () => {
+    expect(hero(user({ status: "active", expires_unix: now + 3 * day - 600 }), "ru", now)).toMatchObject({ soon: true, days: 3 });
     expect(hero(user({ status: "active", expires_unix: now + 7 * day - 600 }), "ru", now).soon).toBe(true);
+    expect(hero(user({ status: "active", expires_unix: now + 600 }), "ru", now)).toMatchObject({ soon: true, days: 1 });
     expect(hero(user({ status: "active", expires_unix: now + 8 * day }), "ru", now).soon).toBe(false);
-    expect(hero(user({ status: "active", expires_unix: 0 }), "ru", now).soon).toBe(false);
+    expect(hero(user({ status: "active", expires_unix: 0 }), "ru", now)).toMatchObject({ soon: false, days: 0 });
+    expect(hero(user({ status: "expired", expires_unix: now - day }), "ru", now).soon).toBe(false); // an ended term is not "soon"
   });
-  it("90 % of the traffic or more is a warning that says how much is left and until when", () => {
-    const h = hero(user({ status: "active", used_bytes: 92 * 1024 ** 3, quota_bytes: 100 * 1024 ** 3, quota_reset: "month", next_reset_unix: now + 9 * day }), "ru", now);
-    expect([h.low, h.tone]).toEqual([true, "warn"]);
-    expect(h.left).toMatch(/^Осталось 8 ГБ до \d+ /);
-    expect(hero(user({ status: "active", used_bytes: 92 * 1024 ** 3, quota_bytes: 100 * 1024 ** 3 }), "ru", now).left).toBe("Осталось 8 ГБ");
-    expect(hero(user({ status: "active", used_bytes: 89 * 1024 ** 3, quota_bytes: 100 * 1024 ** 3 }), "ru", now).low).toBe(false);
+  it("90 % of the traffic or more is a warning; used-up traffic always is", () => {
+    const used = (gb: number, status = "active") => hero(user({ status, used_bytes: gb * GB, quota_bytes: 100 * GB }), "ru", now).low;
+    expect([used(92), used(90), used(89)]).toEqual([true, true, false]);
+    expect(used(100, "limited")).toBe(true);
+    expect(hero(user({ status: "active", used_bytes: 5 * GB }), "ru", now).low).toBe(false); // no quota, nothing to run out
   });
-  it("ended and disabled show no numbers; used-up traffic shows the traffic only", () => {
-    expect(hero(user({ status: "expired", expires_unix: now - day }), "ru", now)).toMatchObject({ tone: "bad", showTerm: false, showTraffic: false });
-    expect(hero(user({ status: "disabled" }), "ru", now)).toMatchObject({ tone: "off", showTerm: false, showTraffic: false });
-    expect(hero(user({ status: "limited", used_bytes: 5, quota_bytes: 5, expires_unix: now + day }), "ru", now)).toMatchObject({ tone: "warn", showTerm: false, showTraffic: true, pct: 100, low: true });
-  });
-  it("no limit has no bar, no term is a sign", () => {
+  it("no limit: the usage in its own unit, no quota, no reset day", () => {
     const h = hero(user({ status: "active", used_bytes: 300 * 1024 ** 2 }), "ru", now);
-    expect([h.pct, h.usedN, h.usedOf, h.big, h.unit, h.termL, h.reset]).toEqual([null, "300", "МБ · без лимита", "∞", "без срока", "Срок", ""]);
+    expect([h.usedQ, h.quotaN, h.reset]).toEqual(["300 МБ", "", ""]);
   });
-  it("uses the Russian plural forms", () => {
-    const u = (n: number) => hero(user({ status: "active", expires_unix: now + n * day - 10 }), "ru", now).unit;
+  it("the Russian plural forms of the days", () => {
+    const u = (n: number) => dict.ru.dayWord(n);
     expect([u(1), u(2), u(5), u(21), u(11)]).toEqual(["день", "дня", "дней", "день", "дней"]);
   });
   it("device limit", () => {
@@ -163,19 +159,44 @@ describe("hero", () => {
     expect(fmtAgo(now - 3 * day, "en", now)).toBe("3 days ago");
     expect(fmtAgo(now - 5, "en", now)).toBe("now");
   });
-  it("what the status says about a state that is not active", () => {
-    const limited = (reset: string) => normalize({ user: { status: "limited", quota_reset: reset, next_reset_unix: now + 9 * day } });
-    expect(plain(stateText(limited("month"), "ru", "X")?.body)).toMatch(/^Трафик на этот месяц закончился — до \d+ .+ VPN не работает\.$/);
-    expect(plain(stateText(limited("month"), "ru", "X")?.call)).toBe("Нужно раньше — напишите.");
-    expect(stateText(limited("day"), "ru", "X")?.body).toMatch(/^Трафик на сегодня закончился/);
-    expect(stateText(limited("week"), "en", "X")?.body).toMatch(/^The traffic for this week is used up/);
-    expect(plain(stateText(normalize({ user: { status: "limited" } }), "ru", "X")?.call)).toBe("Напишите — увеличим.");
-    expect(stateText(normalize({ user: { status: "limited" } }), "ru", "X")?.body).toBe("Лимит трафика исчерпан.");
-    const gone = stateText(normalize({ user: { status: "expired", expires_unix: now - day } }), "ru", "Mistgate");
-    expect([gone?.body, plain(gone?.call)]).toEqual(["Интернет через Mistgate сейчас не работает.", "Напишите — продлим."]);
-    expect(stateText(normalize({ user: { status: "expired", expires_unix: now - day } }), "ru", "X")?.head).toMatch(/^Подписка закончилась \d+ /);
-    expect(stateText(normalize({ user: { status: "disabled" } }), "ru", "X")?.body).toBe("Администратор приостановил доступ.");
-    expect(stateText(normalize(cases.first), "ru", "X")).toBeNull();
+});
+
+describe("the three figures of the card", () => {
+  const c = (u: object, lang: Lang = "ru") => {
+    const d = normalize({ user: { name: "A", device_limit: 20, devices_used: 16, ...u } });
+    return { d, s: state("ios", {}, lang), t: dict[lang] };
+  };
+  const GBq = { used_bytes: 64 * GB, quota_bytes: 100 * GB, quota_reset: "month", next_reset_unix: now + 4 * day };
+
+  it("active: the term in days with its date, the traffic of its quota, the places left", () => {
+    const f = figures(c({ status: "active", expires_unix: now + 33 * day - 100, ...GBq }), now);
+    expect(f.term).toMatchObject({ v: "33 дня", tone: "" });
+    expect(f.traffic).toMatchObject({ v: "64 ГБ", tone: "" });
+    expect(f.traffic.n).toMatch(/^из 100, обнулится /);
+    expect(f.devices).toEqual({ v: "16 из 20", n: "свободно 4 места", tone: "" });
+  });
+  it("a term of a week or less and traffic of nine tenths are warnings", () => {
+    const f = figures(c({ status: "active", expires_unix: now + 3 * day - 600, used_bytes: 95 * GB, quota_bytes: 100 * GB }), now);
+    expect([f.term.v, f.term.tone, f.traffic.tone]).toEqual(["3 дня", "warn", "warn"]);
+  });
+  it("no end and no limit: said so, not a number", () => {
+    const f = figures(c({ status: "active", expires_unix: 0, used_bytes: 17 * GB, quota_bytes: 0, device_limit: 0, devices_used: 2 }), now);
+    expect(f.term).toEqual({ v: "Без срока", n: "дата окончания не задана", tone: "" });
+    expect(f.traffic).toMatchObject({ v: "17 ГБ", n: "без лимита" });
+    expect(f.devices).toMatchObject({ v: "2", n: "без ограничения" });
+  });
+  it("no free place is said in words", () => {
+    expect(figures(c({ status: "active", device_limit: 3, devices_used: 3 }), now).devices).toMatchObject({ v: "3 из 3", n: "свободных мест нет" });
+    expect(figures(c({ status: "active", device_limit: 20, devices_used: 20 }, "en"), now).devices.n).toBe("no free slots");
+  });
+  it("ended: the word with the date, grey; turned off: by the owner; used up: the traffic warns", () => {
+    const gone = figures(c({ status: "expired", expires_unix: now - 4 * day }), now);
+    expect(gone.term).toMatchObject({ v: "Закончилась", tone: "off" });
+    expect(gone.term.n).not.toBe("");
+    expect(figures(c({ status: "disabled" }), now).term).toEqual({ v: "Отключена", n: "владельцем сервиса", tone: "off" });
+    const used = figures(c({ status: "limited", expires_unix: now + 33 * day, used_bytes: 100 * GB, quota_bytes: 100 * GB }), now);
+    expect([used.traffic.v, used.traffic.tone, used.traffic.n]).toEqual(["100 ГБ", "warn", "из 100, лимит исчерпан"]);
+    expect(used.term.tone).toBe("");
   });
 });
 
@@ -202,232 +223,477 @@ describe("languages", () => {
   });
 });
 
+// ---- the page: the shell (the bar, the card, the note, the tabs, the end), after the boards of Main.dc.html and V2Phone.dc.html ----
+
+/** The page of a case as main.ts draws it: a returning visit unless it is the first one. */
+function page(name: string, o: { lang?: Lang; over?: Partial<State>; f?: (d: MgData) => void; a?: ReturnType<typeof actions>; platform?: State["platform"] } = {}) {
+  const d = data(name, o.f);
+  const a = o.a ?? actions();
+  const s = state(o.platform ?? "ios", { returning: isReturning(d, false), ...o.over }, o.lang ?? "ru");
+  const c: Ctx = { d, s, a, t: dict[s.lang], support: d.options.show_support ? safeUrl(d.support_url) : "" };
+  return { el: view(d, s, a), d, s, a, c };
+}
+const $ = (el: ParentNode, sel: string) => el.querySelector<HTMLElement>(sel);
+const $$ = (el: ParentNode, sel: string) => [...el.querySelectorAll<HTMLElement>(sel)];
+const word = (el: ParentNode, sel: string) => text($(el, sel));
+
 describe("view", () => {
   for (const [name, raw] of Object.entries(cases)) {
     it(`renders ${name} in every language, with nothing the page must never show`, () => {
       for (const lang of langs) {
         const d = normalize(raw);
         const el = view(d, state("ios", { returning: isReturning(d, false) }, lang), actions());
-        expect(el.querySelector(".hero")).not.toBeNull();
-        if (lang !== "zh") expect(el.querySelector(".priv")?.textContent).toContain("—"); // Chinese has no spaced dash
-        const all = el.textContent ?? "";
-        // nothing the page shows is the panel's jargon, a tunnel address, a node name, a profile name, or the secret link
-        expect(all).not.toMatch(/AWG|10\.66\.|fd66:|Old apps|Main ·|nod_|vpn:\/\/|3f9k2v8q/); // the link and the key are copied or scanned, never written out
+        expect($(el, ".u-hd"), `${lang} bar`).not.toBeNull();
+        expect($(el, ".u-hero"), `${lang} card`).not.toBeNull();
+        expect($(el, ".u-ft .u-priv")?.textContent, lang).toBeTruthy();
+        // nothing the page shows is the panel's jargon, a tunnel address, a node name, a profile name, or the secret link ...
+        const shown = [el.textContent ?? "", ...$$(el, "[aria-label], [title], [alt]").flatMap((x) => [x.getAttribute("aria-label"), x.getAttribute("title"), x.getAttribute("alt")])].join("\n");
+        expect(shown).not.toMatch(/AWG(?! [23]\.\d)|10\.66\.|fd66:|Old apps|Main ·|nod_|vpn:\/\/|3f9k2v8q/); // ... the link and the key are copied or scanned, never written out; the version of a key ("AWG 3.1") is a word of the boards
       }
     });
   }
 
-  it("a problem has the way to write in the status and no connect card; the devices stay", () => {
-    const expired = view(data("expired"), state("ios"), actions());
-    expect(expired.querySelector(".card[aria-label=Подключение]")).toBeNull();
-    expect(expired.querySelector(".srv")).toBeNull();
-    const status = expired.querySelector(".hero")!;
-    expect(status.classList.contains("bad")).toBe(true);
-    expect(text(status.querySelector(".pill"))).toBe("Закончилась");
-    expect(text(status.querySelector(".btn"))).toBe("Написать в поддержку");
-    expect(text(status.querySelector(".why b"))).toMatch(/^Подписка закончилась \d+ /);
-    expect(text(status.querySelector(".why"))).toMatch(/Интернет через Mistgate сейчас не работает\. Напишите — продлим\.$/);
-    expect(text(status)).toContain("В приложении вы увидите то же сообщение");
-    expect(status.querySelector(".stats")).toBeNull();
-    expect(expired.querySelector("section[aria-label='Мои устройства']")).not.toBeNull();
-    expect(expired.querySelector(".help")).toBeNull();
-  });
-
-  it("without support there is no button and no second sentence", () => {
-    const el = view(data("expired-plain"), state("ios"), actions());
-    expect(el.querySelector(".hero a.btn")).toBeNull();
-    expect(text(el.querySelector(".hero .why"))).toMatch(/^Подписка закончилась \d+ \S+\. Интернет через Mistgate сейчас не работает\.$/);
-    // used up with no reset rule: the plain words, and (with support) the offer to raise the limit
-    expect(text(view(data("quota-plain"), state("ios"), actions()).querySelector(".hero .why"))).toBe("Лимит трафика исчерпан. Напишите — увеличим.");
-    expect(text(view(data("quota-plain", (d) => (d.support_url = "")), state("ios"), actions()).querySelector(".hero .why"))).toBe("Лимит трафика исчерпан.");
-  });
-
-  it("used-up traffic: a warning, the traffic only, the reset date, and the way to write", () => {
-    const status = view(data("quota"), state("ios"), actions()).querySelector(".hero")!;
-    expect(status.classList.contains("warn")).toBe(true);
-    expect(text(status.querySelector(".pill"))).toBe("Трафик исчерпан");
-    expect(status.querySelectorAll(".stat")).toHaveLength(1);
-    expect(text(status.querySelector(".stat-h .hint"))).toMatch(/^обнулится \d+ /);
-    expect(text(status.querySelector(".why"))).toMatch(/^Трафик на этот месяц закончился — до \d+ \S+ VPN не работает\. Нужно раньше — напишите\.$/);
-    expect(text(status.querySelector(".btn"))).toBe("Написать в поддержку");
-  });
-
-  it("disabled: grey, the admin's words", () => {
-    const status = view(data("disabled"), state("ios"), actions()).querySelector(".hero")!;
-    expect(text(status.querySelector(".pill"))).toBe("Отключена");
-    expect(text(status.querySelector(".why"))).toBe("Администратор приостановил доступ. Если это ошибка — напишите.");
-  });
-
-  it("ends within a week: a warning with the days and a way to write; 90 % of the traffic: the tile warns and says what is left", () => {
-    const soon = view(data("soon"), state("ios"), actions()).querySelector(".hero")!;
-    expect(soon.classList.contains("warn")).toBe(true);
-    expect(text(soon.querySelector(".pill"))).toBe("Скоро закончится");
-    expect(text(soon.querySelector(".why"))).toBe("Осталось 3 дня — напишите, чтобы продлить.");
-    expect(text(soon.querySelector("a.btn"))).toBe("Написать");
-    const low = view(data("low-traffic"), state("ios"), actions()).querySelector(".hero")!;
-    expect(low.classList.contains("warn")).toBe(false);
-    expect(low.querySelectorAll(".stat.warn")).toHaveLength(1);
-    expect(text(low.querySelector(".sm.row"))).toMatch(/^Осталось 8 ГБ до /);
-    expect(text(view(data("plain"), state("ios"), actions()).querySelector(".hero .stats"))).toContain("312");
-    const noSupport = view(data("soon", (d) => (d.support_url = "")), state("ios"), actions()).querySelector(".hero")!;
-    expect(text(noSupport.querySelector(".why"))).toBe("Осталось 3 дня.");
-    expect(noSupport.querySelector("a.btn")).toBeNull();
-  });
-
-  it("the status of a calm subscription: the term and the traffic; 'the app got the subscription' once an app did", () => {
-    const first = view(data("first"), state("ios"), actions()).querySelector(".hero")!;
-    expect([...first.querySelectorAll(".stat .eb")].map(text)).toEqual(["Осталось", "Трафик"]);
-    expect(text(first.querySelector(".pill"))).toBe("Активна");
-    expect(text(first)).not.toContain("Приложение получило подписку");
-    const back = view(data("return"), state("ios", { returning: true }), actions()).querySelector(".hero")!;
-    expect(text(back)).toMatch(/Приложение получило подписку 3 часа назад/);
-  });
-
-  it("first visit: steps, servers, devices; a returning visit: servers, devices (and the way to connect one more is in them)", () => {
-    const heads = (el: HTMLElement) => [...el.querySelectorAll(".shead .h2")].map(text);
-    expect(heads(view(data("first"), state("ios"), actions()))).toEqual(["Подключите VPN", "Серверы", "Мои устройства"]);
-    const back = view(data("return"), state("ios", { returning: true }), actions());
-    expect(heads(back)).toEqual(["Серверы", "Мои устройства"]);
-    expect(back.querySelector("[data-k=more]")).toBeNull(); // no block of its own under the devices
-    expect(back.querySelector(".step")).toBeNull();
-    expect(back.querySelector("[data-k=dev-add]")).not.toBeNull();
-  });
-
-  it("puts server text in as text and drops unsafe links", () => {
-    const evil = normalize({ ...cases.first, announcement: "<img src=x onerror=alert(1)>", support_url: "javascript:alert(1)", user: { ...cases.first!.user, name: "<b>x</b>" } });
-    const el = view(evil, state("ios", {}, "en"), actions());
-    expect(el.querySelector("img[onerror]")).toBeNull();
-    expect(el.querySelector(".hero h1 b")).toBeNull();
-    expect(text(el.querySelector(".hero h1"))).toBe("Hi, <b>x</b>");
-    expect(el.querySelector("a[href^='javascript']")).toBeNull();
-    expect(el.querySelector(".help")).toBeNull();
-  });
-
-  it("opens a tg:// support link as a Telegram link", () => {
-    const tg = "tg://resolve?domain=example_support";
-    const el = view(data("first", (d) => (d.support_url = tg)), state("ios", {}, "en"), actions());
-    expect(text(el.querySelector(".help"))).toContain("We reply in Telegram");
-    expect(el.querySelector(`.help a[href='${tg}']`)).not.toBeNull();
-  });
-
-  it("lists a Telegram link by its label alone, never by a node or profile name", () => {
-    const d = normalize({
-      ...cases.first,
-      access: { happ: true, amnezia: false, telegram: true },
-      telegram: {
-        links: [
-          { label: "Germany · Frankfurt", country_code: "DE", place: "Frankfurt", url: "tg://proxy?server=de1.example.com&port=443&secret=ee00", node: "fra-edge-07", profile: "private-profile" },
-          { label: "Germany · Frankfurt · IPv6", country_code: "DE", place: "Frankfurt", ipv6: true, url: "tg://proxy?server=2001%3Adb8%3A%3A5&port=443&secret=ee00" },
-          { label: "evil", url: "https://example.com/not-telegram" },
-        ],
-      },
+  describe("the bar (.u-hd)", () => {
+    it("the logo of 28 px, the name in two weights, the language menu, and the way to the support", () => {
+      const { el } = page("return");
+      const bar = $(el, "header.u-hd")!;
+      expect([...bar.children].map((x) => x.tagName.toLowerCase() + (x.className ? `.${x.className.split(" ").join(".")}` : ""))).toEqual(["img.logo", "div.u-wm", "details.u-lang", "a.u-btn.only-w", "a.u-ic.line.only-m"]);
+      expect([$(bar, ".logo")!.getAttribute("width"), $(bar, ".logo")!.getAttribute("height"), $(bar, ".logo")!.getAttribute("alt")]).toEqual(["28", "28", ""]);
+      expect([$(bar, ".u-wm")!.firstChild?.textContent, word(bar, ".u-wm b")]).toEqual(["mist", "gate"]);
+      expect(word(bar, "a.only-w")).toBe("Поддержка");
+      expect($(bar, "a.only-w")!.getAttribute("href")).toBe("https://t.me/example_support");
+      expect($(bar, "a.only-m")!.getAttribute("aria-label")).toBe("Поддержка"); // the phone's icon alone
+      expect($$(bar, "a").every((x) => x.getAttribute("rel") === "noopener noreferrer" && x.getAttribute("target") === "_blank")).toBe(true);
     });
-    const el = view(d, state("ios", {}, "en"), actions());
-    const cards = [...el.querySelectorAll(".srv.tg")];
-    expect(cards.map((c) => text(c.querySelector(".srv-name")))).toEqual(["Germany · Frankfurt", "Germany · Frankfurt"]);
-    expect(text(el)).not.toContain("fra-edge-07");
-    expect(text(el)).not.toContain("private-profile");
-  });
-
-  it("gives every Telegram link a card: the twin marked, Open in Telegram, a QR code for a computer, and one line on what happens", () => {
-    const url = "tg://proxy?server=198.51.100.20&port=8443&secret=ee00";
-    const d = normalize({
-      ...cases.first,
-      access: { happ: true, amnezia: false, telegram: true },
-      telegram: { links: [{ label: "Germany · Frankfurt", country_code: "DE", place: "Frankfurt", relay: true, via: "RU", url }] },
+    it("a title that is not the brand's name is written whole; no support link, no way to it", () => {
+      const { el } = page("long");
+      expect(word(el, ".u-wm")).toBe("Мой очень длинный VPN для друзей и семьи");
+      expect($(el, ".u-wm b")).toBeNull();
+      expect($(el, ".u-wm.plain")).not.toBeNull();
+      expect($(page("plain").el, "header a")).toBeNull();
+      expect($(page("return", { f: (d) => (d.options.show_support = false) }).el, "header a")).toBeNull();
     });
-    const el = view(d, state("windows", {}, "en"), actions());
-    const card = el.querySelector(".srv.tg")!;
-    expect(text(card.querySelector(".srv-top .chip"))).toBe("via RU");
-    expect(card.querySelector<HTMLAnchorElement>(".btn.pri")!.getAttribute("href")).toBe(url);
-    expect(card.querySelector(".tg-qr svg")?.getAttribute("aria-label")).toBe("QR code of the Telegram proxy: Germany");
-    expect(text(el)).toContain("Telegram offers to connect the proxy.");
-    // on, but no MTProto profile runs yet
-    const none = view(normalize({ ...cases.first, access: { happ: true, amnezia: false, telegram: true }, telegram: { links: [] } }), state("windows", {}, "en"), actions());
-    expect(none.querySelector(".srv.tg")).toBeNull();
-    expect(text(none.querySelector(".tg-empty"))).toBe("The proxy is still being prepared — message the admin.");
+    it("a tg:// support link opens as a Telegram link", () => {
+      const tg = "tg://resolve?domain=example_support";
+      const { el } = page("return", { f: (d) => (d.support_url = tg) });
+      expect($(el, `header a.only-w[href='${tg}']`)).not.toBeNull();
+      expect($(el, `.u-ask a[href='${tg}']`)).not.toBeNull();
+    });
   });
 
-  it("a closed announcement stays closed through redraws; a new text shows again", () => {
-    const a = actions();
-    const d = data("first");
-    const el = view(d, state("ios"), a);
-    el.querySelector<HTMLButtonElement>(".ann .x")!.click();
-    expect(a.log).toEqual(["closed"]);
-    expect(view(d, state("ios", { annClosed: true }), actions()).querySelector(".ann")).toBeNull();
-    expect(annKey("a")).not.toBe(annKey("b"));
-    expect(annKey(d.announcement)).toBe(annKey(d.announcement));
+  describe("the six states of the subscription", () => {
+    const status = (el: ParentNode) => ({
+      dot: $(el, ".u-hero .u-status .u-dot")!.className,
+      word: word(el, ".u-hero .u-status b"),
+      sy: word(el, ".u-hero .u-status .sy"),
+      h1: word(el, ".u-hero .u-h1"),
+      solo: $(el, ".u-hero")!.classList.contains("solo"),
+      term: [...$(el, ".u-stat:nth-child(1) .v")!.classList].slice(1).join(" "),
+      traffic: [...$(el, ".u-stat:nth-child(2) .v")!.classList].slice(1).join(" "),
+      alert: $(el, ".u-alert") && { tone: $(el, ".u-alert")!.className.replace("u-card u-alert", "").trim(), title: word(el, ".u-alert b"), body: word(el, ".u-alert span"), button: word(el, ".u-alert a") },
+    });
+
+    it("active: green, no note; a way to connect (the card of the new device), the tabs", () => {
+      const { el } = page("return");
+      expect(status(el)).toMatchObject({ dot: "u-dot", word: "Активна", h1: "Подписка: Alice", solo: false, alert: null });
+      expect(status(el).sy).toMatch(/^приложение получило подписку /);
+      expect($(el, "nav.u-tabs")).not.toBeNull();
+      expect($(el, "aside.u-hero-c.only-w .u-qr")).not.toBeNull();
+    });
+    it("the first visit: green, 'the app has not fetched', the note that says what to do (no button: nothing is wrong)", () => {
+      const { el } = page("first", { over: { returning: false } });
+      expect(status(el)).toMatchObject({ dot: "u-dot", word: "Активна", sy: "приложение ещё не получало подписку", alert: { tone: "", title: "Подключите первое устройство", button: "" } });
+      expect(status(el).alert!.body).toBe("Нажмите «Добавить устройство»: выберите приложение, и серверы появятся в нём сами");
+      expect(word(el, ".u-stat:nth-child(3) .v")).toBe("0 из 3");
+      expect(word(el, ".u-tab[data-k=tab-devices] .n.only-w")).toBe("0/3");
+    });
+    it("the first visit with nothing to connect with has no note", () => {
+      expect(page("noapps", { over: { returning: false } }).el.querySelector(".u-alert")).toBeNull();
+    });
+    it("ends soon: amber, the days in the status, the note with the date and the way to write", () => {
+      const { el } = page("soon");
+      const s = status(el);
+      expect([s.dot, s.term]).toEqual(["u-dot warn", "warn"]);
+      expect(s.word).toMatch(/^Заканчивается через [1-3] (день|дня)$/);
+      expect(s.alert).toMatchObject({ tone: "warn", button: "Написать в поддержку" });
+      expect(s.alert!.title).toMatch(/^Подписка заканчивается \d+ /);
+      expect(s.alert!.body).toBe("После этой даты серверы перестанут работать. Чтобы продлить, напишите в поддержку");
+      expect($(el, ".u-alert a.u-btn.pri")!.getAttribute("href")).toBe("https://t.me/example_support");
+      expect($(el, "nav.u-tabs")).not.toBeNull(); // still a working subscription
+    });
+    it("traffic used up: amber, the card alone, the day it works again", () => {
+      const { el } = page("quota");
+      const s = status(el);
+      expect([s.dot, s.word, s.solo, s.traffic, s.term]).toEqual(["u-dot warn", "Трафик исчерпан", true, "warn", ""]);
+      expect(s.sy).toMatch(/^лимит обнулится /);
+      expect(s.alert).toMatchObject({ tone: "warn", title: "Трафик закончился", button: "Написать в поддержку" });
+      expect(s.alert!.body).toMatch(/^Серверы снова заработают .+, когда лимит обнулится\. Если нужно раньше, напишите в поддержку$/);
+      expect([$(el, "nav.u-tabs"), $(el, ".u-hero-c"), $(el, ".u-qr")]).toEqual([null, null, null]);
+    });
+    it("traffic used up with no reset day: no day in the words", () => {
+      const s = status(page("quota-plain").el);
+      expect(s.sy).toBe("");
+      expect(s.alert!.body).toBe("Серверы снова заработают, когда лимит обнулится. Если нужно раньше, напишите в поддержку");
+    });
+    it("ended: grey, the date, the note keeps the devices and keys", () => {
+      const s = status(page("expired").el);
+      expect([s.dot, s.word, s.solo, s.term]).toEqual(["u-dot off", "Закончилась", true, "off"]);
+      expect(s.sy).toMatch(/^\d+ /);
+      expect(s.alert).toMatchObject({ tone: "", button: "Написать в поддержку" });
+      expect(s.alert!.title).toMatch(/^Подписка закончилась \d+ /);
+      expect(s.alert!.body).toBe("Серверы и прокси не работают. Устройства и ключи сохранены и вернутся после продления");
+    });
+    it("turned off: grey, 'by the owner of the service'", () => {
+      const { el } = page("disabled");
+      const s = status(el);
+      expect([s.dot, s.word, s.sy, s.solo, s.term]).toEqual(["u-dot off", "Отключена", "серверы и прокси не работают", true, "off"]);
+      expect(word(el, ".u-stat:nth-child(1) .n")).toBe("владельцем сервиса");
+      expect(s.alert).toMatchObject({ tone: "", title: "Подписку отключил владелец сервиса", body: "Устройства и ключи сохранены. Напишите в поддержку, чтобы узнать причину", button: "Написать в поддержку" });
+    });
+    it("no way to write: the notes keep their words without the call, and have no button", () => {
+      const gone = status(page("expired-plain").el);
+      expect(gone.alert).toMatchObject({ button: "" });
+      expect(gone.alert!.body).not.toContain("напишите");
+      const off = status(page("disabled", { f: (d) => (d.support_url = "") }).el);
+      expect([off.alert!.body, off.alert!.button]).toEqual(["Устройства и ключи сохранены.", ""]);
+      const quota = status(page("quota", { f: (d) => (d.options.show_support = false) }).el);
+      expect(quota.alert!.body).not.toContain("напишите");
+      expect(quota.alert!.button).toBe("");
+      const soon = status(page("soon", { f: (d) => (d.support_url = "") }).el);
+      expect(soon.alert!.body).toBe("После этой даты серверы перестанут работать.");
+    });
+
+    it("every state says its own word in every language", () => {
+      const want = (lang: Lang) => {
+        const t = dict[lang];
+        return { return: t.chip.active, first: t.chip.active, soon: t.endsIn(3), quota: t.chip.limited, expired: t.chip.expired, disabled: t.chip.disabled } as Record<string, string>;
+      };
+      for (const lang of langs) {
+        for (const [name, w] of Object.entries(want(lang))) {
+          const { el } = page(name, { lang, over: { returning: name !== "first" } });
+          expect(word(el, ".u-hero .u-status b"), `${lang} ${name}`).toBe(w);
+          const notes = $(el, ".u-alert");
+          expect(!!notes, `${lang} ${name} note`).toBe(name !== "return");
+          if (notes) expect($(notes, "b")!.textContent, `${lang} ${name} note title`).toBeTruthy();
+        }
+      }
+    });
   });
 
-  it("the language menu: the summary names the current language, a row per language (English, Русский, 简体中文, فارسی, Türkçe), the current one checked", () => {
-    const a = actions();
-    const el = view(data("first"), state("ios"), a);
-    const menu = el.querySelector<HTMLDetailsElement>("details.lang-menu")!;
-    expect(menu.open).toBe(false);
-    const summary = menu.querySelector("summary")!;
-    expect(text(summary)).toBe("RU");
-    expect(summary.getAttribute("aria-label")).toBe("Язык: Русский");
-    const rows = [...menu.querySelectorAll("button")];
-    expect(rows.map((b) => [text(b), b.getAttribute("aria-pressed"), b.getAttribute("lang")])).toEqual([
-      ["EnglishEN", "false", "en"],
-      ["РусскийRU", "true", "ru"],
-      ["简体中文中文", "false", "zh-CN"],
-      ["فارسیFA", "false", "fa"],
-      ["TürkçeTR", "false", "tr"],
-    ]);
-    expect(rows.map((b) => b.querySelectorAll("svg").length)).toEqual([0, 1, 0, 0, 0]);
-    rows[0]!.click();
-    rows[1]!.click(); // already this one: nothing but closing
-    expect(a.log).toEqual(["lang en"]);
+  describe("the card of the new device (.u-hero-c)", () => {
+    it("a computer: the QR code with its title and hint, then the two buttons; a phone: the two buttons only", () => {
+      const { el } = page("return");
+      const side = $(el, "aside.u-hero-c.only-w")!;
+      expect(side.getAttribute("aria-label")).toBe("Новое устройство");
+      expect([...side.children].map((x) => x.className)).toEqual(["u-qrrow", "u-acts col"]);
+      expect($(side, ".u-qr.u-tilt .u-glare")).not.toBeNull();
+      expect($(side, ".u-qi svg[role=img]")!.getAttribute("aria-label")).toBe("QR-код со ссылкой на эту страницу");
+      expect($(side, ".u-qi .u-qt img")).not.toBeNull();
+      expect([word(side, ".u-t"), word(side, ".u-hint")]).toEqual(["Новое устройство", "Наведите камеру телефона, и эта страница откроется на нём"]);
+      expect($$(side, ".u-acts button").map((b) => text(b.querySelector(".u-cpt span:first-child") ?? b))).toEqual(["Добавить устройство", "Скопировать ссылку подписки"]);
+      const m = $(el, "div.u-hero-c.only-m")!;
+      expect([...m.children].map((x) => x.className)).toEqual(["u-acts"]);
+      expect($$(m, "button").map((b) => [b.className, text(b.querySelector(".u-cpt span:first-child") ?? b)])).toEqual([["u-btn pri grow", "Добавить устройство"], ["u-btn u-cpb", "Ссылка"]]);
+    });
+    it("the buttons add a device and copy the link of the page", () => {
+      const a = actions();
+      const { el } = page("return", { a });
+      $(el, "aside [data-k=hero-add]")!.click();
+      $(el, "aside [data-k=hero-copy]")!.click();
+      expect(a.log).toEqual(["add true", `copy ${cases.return!.subscription_url}`, "mark"]);
+    });
+    it("no QR code (the owner's choice, or no link app): the buttons stand alone", () => {
+      const { el } = page("noqr");
+      expect($(el, "aside .u-qrrow")).toBeNull();
+      expect($$(el, "aside .u-acts button")).toHaveLength(2);
+      expect($(page("keys-only").el, ".u-qr")).toBeNull();
+    });
+    it("nothing to connect with: no card, the figures stand alone", () => {
+      const { el } = page("noapps", { f: (d) => (d.subscription_url = "") });
+      expect($(el, ".u-hero-c")).toBeNull();
+      expect($(el, ".u-hero")!.classList.contains("solo")).toBe(true);
+    });
+    it("the devices figure is a button to the tab of the devices while the subscription works", () => {
+      const a = actions();
+      $(page("return", { a }).el, "button.u-stat")!.click();
+      expect(a.log).toEqual(["tab devices"]);
+      expect($(page("expired").el, "button.u-stat")).toBeNull();
+    });
+    it("the figures are written in letter by letter on a computer: the text and the aria-label are there from the start", () => {
+      const v = $$(page("return").el, ".u-stat .v");
+      expect(v).toHaveLength(3);
+      for (const x of v) expect([x.dataset.scr, x.getAttribute("aria-label"), x.dataset.scrK]).toEqual([x.textContent, x.textContent, expect.any(String)]);
+    });
   });
 
-  it("the language menu closes on a click outside and on Esc, which gives the focus back to the summary", () => {
-    const el = view(data("first"), state("ios"), actions());
-    document.body.append(el);
-    const menu = el.querySelector<HTMLDetailsElement>("details.lang-menu")!;
-    menu.open = true;
-    el.querySelector<HTMLElement>(".hero")!.click();
-    expect(menu.open).toBe(false);
-    menu.open = true;
-    menu.querySelector("summary")!.click(); // inside: the browser's own toggle, the page stays out of it
-    menu.open = true;
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(menu.open).toBe(false);
-    expect(document.activeElement).toBe(menu.querySelector("summary"));
-    el.remove();
+  describe("an inactive subscription: the card, the note, the devices (no tabs)", () => {
+    for (const name of ["expired", "disabled", "quota"]) {
+      it(`${name}: no tabs, no help card, the devices are there, the menu of a key opens`, () => {
+        const calls: string[] = [];
+        const a = actions({ amz: { ...amzNoop, menu: (id) => calls.push(`menu ${id}`) } });
+        const { el, d } = page(name, { a });
+        expect([$(el, ".u-tabs"), $(el, ".u-ask"), $(el, ".u-ann")]).toEqual([null, null, null]);
+        expect($(el, ".u-dvh")).not.toBeNull();
+        expect($(el, ".u-dvl")).not.toBeNull();
+        const key = d.amnezia!.devices[0]!.id;
+        $(el, `[data-k=amz-more-${key}]`)!.click();
+        expect(calls).toEqual([`menu ${key}`]);
+      });
+    }
+    it("the menu of a device offers the name and the removal; the name window and the question open from the state", () => {
+      for (const name of ["expired", "disabled"]) {
+        const d = data(name);
+        const id = d.amnezia!.devices[0]!.id;
+        const log: string[] = [];
+        const a = actions({ amz: { ...amzNoop, renameStart: (x) => log.push(`rename ${x}`), ask: (c) => log.push(`ask ${c?.kind} ${c?.id}`) } });
+        const s = state("ios", {}, "ru");
+        s.amz.menu = id;
+        const c: Ctx = { d, s, a, t: dict.ru, support: "https://t.me/example_support" };
+        expect(dialogOpen(c)).toBe(true);
+        const box = document.createElement("div");
+        box.append(...(dialogView(c).content as Node[]));
+        expect($$(box, ".a-act").map((b) => b.dataset.k)).toEqual(["dlg-m-ren", "dlg-m-del"]); // no "show key" and no "replace": the subscription is off
+        $(box, "[data-k=dlg-m-ren]")!.click();
+        $(box, "[data-k=dlg-m-del]")!.click();
+        expect(log).toEqual([`rename ${id}`, `ask remove ${id}`]);
+        s.amz.menu = null;
+        s.amz.rename = { id, value: "x" };
+        expect(dialogView(c).stage).toBe(`rename:${id}`);
+        s.amz.rename = null;
+        s.amz.confirm = { id, kind: "remove" };
+        expect(dialogView(c).stage).toBe(`confirm:remove:${id}`);
+      }
+    });
+    it("a working subscription: the tabs", () => {
+      expect($(page("return").el, ".u-tabs")).not.toBeNull();
+    });
   });
 
-  it("the theme switch in the footer: Auto, Light, Dark", () => {
-    const a = actions();
-    const el = view(data("first"), state("ios", { theme: "light" }), a);
-    const radios = [...el.querySelectorAll(".foot [role=radio]")];
-    expect(radios.map((b) => [text(b), b.getAttribute("aria-checked")])).toEqual([["Авто", "false"], ["Светлая", "true"], ["Тёмная", "false"]]);
-    (el.querySelector("[data-k=theme-dark]") as HTMLButtonElement).click();
-    expect(a.log).toEqual(["theme dark"]);
-    expect(text(el.querySelector(".foot .priv"))).toBe("Ссылка личная — не пересылайте её. Работает, пока подписка активна.");
+  describe("the tabs (.u-tabs)", () => {
+    it("the servers and the devices; the Telegram proxies and TrustTunnel only when they are on", () => {
+      const ids = (name: string, f?: (d: MgData) => void) => {
+        const d = data(name, f);
+        return tabsOf({ d, t: dict.ru }).map((x) => x.id);
+      };
+      expect(ids("return")).toEqual(["servers", "devices"]);
+      expect(ids("telegram")).toEqual(["servers", "telegram", "devices"]);
+      expect(ids("trusttunnel")).toEqual(["servers", "trusttunnel", "devices"]);
+      expect(ids("telegram", (d) => ((d.access.trust_tunnel = true), (d.trust_tunnel = { links: [] })))).toEqual(["servers", "telegram", "trusttunnel", "devices"]);
+      expect(ids("return", (d) => (d.access.telegram = false))).toEqual(["servers", "devices"]);
+    });
+    it("the counts: the servers, the proxies, the places taken of the limit (the number alone without one)", () => {
+      const t = dict.ru;
+      const count = (d: MgData) => Object.fromEntries(tabsOf({ d, t }).map((x) => [x.id, [x.n, x.nShort]]));
+      expect(count(data("telegram"))).toEqual({ servers: ["3", "3"], telegram: [String(data("telegram").telegram!.links.length), String(data("telegram").telegram!.links.length)], devices: ["3/4", "3"] });
+      expect(count(data("dev-16")).devices).toEqual(["16/20", "16"]);
+      expect(count(data("dev-nolimit")).devices).toEqual(["5", "5"]);
+      expect(count(data("servers-30")).servers).toEqual(["30", "30"]);
+    });
+    it("the bar: a button per tab, the open one pressed; a computer has the full names, a phone the short ones", () => {
+      const { el } = page("telegram", { over: { tab: "telegram" } });
+      const bar = $(el, "nav.u-tabs")!;
+      expect(bar.getAttribute("aria-label")).toBe("Разделы");
+      expect($$(bar, ".u-tab").map((b) => [b.dataset.k, b.getAttribute("aria-pressed"), b.classList.contains("on")])).toEqual([
+        ["tab-servers", "false", false],
+        ["tab-telegram", "true", true],
+        ["tab-devices", "false", false],
+      ]);
+      const tg = $(bar, "[data-k=tab-telegram]")!;
+      expect([word(tg, ".only-w"), word(tg, ".only-m")]).toEqual(["Telegram-прокси", "Telegram"]);
+      expect([word(tg, ".n.only-w"), word(tg, ".n.only-m")]).toEqual(["4", "4"]);
+      // the count of the servers is the figure the page writes in (data-scr); the others are plain
+      expect($(bar, "[data-k=tab-servers] .n.only-w")!.dataset.scr).toBe("3");
+      expect($(bar, "[data-k=tab-devices] .n.only-w")!.dataset.scr).toBeUndefined();
+    });
+    it("a tab that is not there is the servers; a click asks for its tab", () => {
+      const asked = (name: string, tab: State["tab"]) => openTab(page(name, { over: { tab } }).c);
+      expect([asked("return", "telegram"), asked("return", "trusttunnel"), asked("telegram", "telegram"), asked("trusttunnel", "trusttunnel"), asked("return", "devices")]).toEqual(["servers", "servers", "telegram", "trusttunnel", "devices"]);
+      const a = actions();
+      const { el } = page("telegram", { a });
+      $(el, "[data-k=tab-telegram]")!.click();
+      $(el, "[data-k=tab-devices]")!.click();
+      expect(a.log).toEqual(["tab telegram", "tab devices"]);
+    });
+    it("each tab draws its own part under the bar", () => {
+      const open = (name: string, tab: State["tab"]) => page(name, { over: { tab } }).el;
+      expect($(open("return", "servers"), ".u-tbl")).not.toBeNull();
+      expect($(open("return", "devices"), ".u-dvl")).not.toBeNull();
+      expect($(open("telegram", "telegram"), ".u-tg")).not.toBeNull();
+      expect($(open("trusttunnel", "trusttunnel"), ".u-tg, .u-prow, .u-pane")).not.toBeNull();
+      expect($(open("return", "telegram"), ".u-tbl")).not.toBeNull(); // not on: the servers
+    });
   });
 
-  it("the help card is a card with 'Write' where there is support, and the status has the button only when something is wrong", () => {
-    const el = view(data("first"), state("ios"), actions());
-    expect(el.querySelectorAll(".help")).toHaveLength(2); // beside the steps on a computer, at the end on a phone
-    expect(text(el.querySelector(".help .b"))).toBe("Что-то не работает?");
-    expect(el.querySelector(".hero a.btn")).toBeNull();
-    expect(view(data("plain"), state("ios"), actions()).querySelector(".help")).toBeNull();
+  describe("the announcement of the owner (.u-ann)", () => {
+    it("a tile, the first line as the title, the rest under it, the cross", () => {
+      const { el } = page("long");
+      const ann = $(el, "section.u-ann")!;
+      expect(ann.getAttribute("role")).toBe("status");
+      expect([...ann.children].map((x) => x.className)).toEqual(["tl", "tx", "u-ic"]);
+      expect(word(ann, ".t b")).toBe("Первая строка объявления.");
+      expect(word(ann, ".m")).toMatch(/^Вторая строка: длинный текст/);
+      expect($(ann, ".u-ic")!.getAttribute("aria-label")).toBe("Скрыть объявление");
+      const one = $(page("first").el, ".u-ann")!;
+      expect(word(one, ".t b")).toBe("В субботу с 02:00 до 03:00 обновляю серверы — может моргнуть на пару минут.");
+      expect($(one, ".m")).toBeNull();
+    });
+    it("it is text, never markup", () => {
+      const { el } = page("first", { f: (d) => (d.announcement = "<img src=x onerror=alert(1)>") });
+      expect($(el, ".u-ann img")).toBeNull();
+      expect(word(el, ".u-ann .t b")).toBe("<img src=x onerror=alert(1)>");
+    });
+    it("a cross closes it; a closed one stays closed through the redraws, a new text shows again", () => {
+      const a = actions();
+      const d = data("first");
+      $(view(d, state("ios"), a), ".u-ann .u-ic")!.click();
+      expect(a.log).toEqual(["closed"]);
+      expect($(view(d, state("ios", { annClosed: true }), actions()), ".u-ann")).toBeNull();
+      expect(annKey("a")).not.toBe(annKey("b"));
+      expect(annKey(d.announcement)).toBe(annKey(d.announcement));
+      expect(annKey(d.announcement)).toMatch(/^ann:[0-9a-z]+$/);
+    });
+    it("none when the owner has none or turned it off; and not above a subscription that does not work (the boards draw it only there)", () => {
+      expect($(page("return").el, ".u-ann")).toBeNull();
+      expect($(page("first", { f: (d) => (d.options.show_announcement = false) }).el, ".u-ann")).toBeNull();
+      for (const name of ["expired", "disabled", "quota"]) expect($(page(name, { f: (d) => (d.announcement = "x") }).el, ".u-ann"), name).toBeNull();
+    });
+  });
+
+  describe("the language menu (.u-lang)", () => {
+    it("the button names the language (a phone shows its code), the list has every language by its own name, the current one checked", () => {
+      const a = actions();
+      const { el } = page("return", { a });
+      const menu = $(el, "details.u-lang") as HTMLDetailsElement;
+      expect(menu.open).toBe(false);
+      const sum = $(menu, "summary.u-btn")!;
+      expect([word(sum, ".lb"), word(sum, ".cd")]).toEqual(["Русский", "RU"]);
+      expect([sum.getAttribute("aria-label"), sum.getAttribute("aria-haspopup")]).toEqual(["Язык: Русский", "listbox"]);
+      expect($$(sum, "svg")).toHaveLength(2); // the globe and the chevron
+      const list = $(menu, ".u-menu")!;
+      expect([list.getAttribute("role"), list.getAttribute("aria-label")]).toEqual(["listbox", "Язык"]);
+      const rows = $$(list, "button");
+      expect(rows.map((b) => [text(b), b.getAttribute("role"), b.getAttribute("aria-selected"), b.getAttribute("lang"), b.className])).toEqual([
+        ["EnglishEN", "option", "false", "en", ""],
+        ["РусскийRU", "option", "true", "ru", "on"],
+        ["简体中文中文", "option", "false", "zh-CN", ""],
+        ["فارسیFA", "option", "false", "fa", ""],
+        ["TürkçeTR", "option", "false", "tr", ""],
+      ]);
+      expect(rows.every((b) => $(b, "svg.ck"))).toBe(true);
+    });
+    it("a row asks for its language (the same one only closes the menu)", () => {
+      const a = actions();
+      const { el } = page("return", { a });
+      const menu = $(el, "details.u-lang") as HTMLDetailsElement;
+      menu.open = true;
+      $(menu, "[data-k=lang-ru]")!.click();
+      expect(a.log).toEqual([]);
+      expect(menu.open).toBe(false);
+      for (const l of langs.filter((x) => x !== "ru")) $(menu, `[data-k=lang-${l}]`)!.click();
+      expect(a.log).toEqual(["lang en", "lang zh", "lang fa", "lang tr"]);
+    });
+    it("it closes on a click outside and on Esc, which gives the focus back to its button", () => {
+      const { el } = page("return");
+      document.body.append(el);
+      const menu = $(el, "details.u-lang") as HTMLDetailsElement;
+      menu.open = true;
+      $(el, ".u-hero")!.click();
+      expect(menu.open).toBe(false);
+      menu.open = true;
+      $(menu, "summary")!.click(); // inside: the browser's own toggle, the page stays out of it
+      menu.open = true;
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(menu.open).toBe(false);
+      expect(document.activeElement).toBe($(menu, "summary"));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); // nothing open: nothing happens
+      el.remove();
+    });
+    it("every language is in every language's list under its own name", () => {
+      for (const lang of langs) {
+        const rows = $$(page("return", { lang }).el, ".u-menu button span:first-child").map((x) => x.textContent);
+        expect(rows, lang).toEqual(langs.map((l) => langNames[l]));
+      }
+    });
+    it("the password form has the same bar", () => {
+      const a = actions();
+      const bar = pageHeader(data("locked"), "en", (l) => a.lang(l));
+      expect($(bar, ".u-lang")).not.toBeNull();
+      expect($(bar, "a")).toBeNull(); // no support link given
+      $(bar, "[data-k=lang-tr]")!.click();
+      expect(a.log).toEqual(["lang tr"]);
+    });
+  });
+
+  describe("the end of the page", () => {
+    it("the footer: the privacy line and the three buttons of the theme, the chosen one checked", () => {
+      const a = actions();
+      const { el } = page("return", { a, over: { theme: "light" } });
+      const foot = $(el, "footer.u-ft")!;
+      expect(word(foot, ".u-priv")).toBe("Ссылка личная — не пересылайте её. Работает, пока подписка активна.");
+      expect($(foot, ".u-priv svg")).not.toBeNull();
+      const group = $(foot, ".u-theme")!;
+      expect([group.getAttribute("role"), group.getAttribute("aria-label")]).toEqual(["radiogroup", "Тема"]);
+      expect($$(group, "[role=radio]").map((b) => [b.getAttribute("aria-label"), b.getAttribute("aria-checked"), b.className, b.textContent])).toEqual([
+        ["Как в системе", "false", "", ""],
+        ["Светлая", "true", "on", ""],
+        ["Тёмная", "false", "", ""],
+      ]);
+      $(group, "[data-k=theme-dark]")!.click();
+      $(group, "[data-k=theme-auto]")!.click();
+      expect(a.log).toEqual(["theme dark", "theme auto"]);
+    });
+    it("the theme says it for every language and every choice", () => {
+      for (const lang of langs) {
+        for (const theme of ["auto", "light", "dark"] as const) {
+          const radios = $$(page("return", { lang, over: { theme } }).el, ".u-theme [role=radio]");
+          expect(radios.map((b) => b.getAttribute("aria-checked")), `${lang} ${theme}`).toEqual((["auto", "light", "dark"] as const).map((x) => String(x === theme)));
+          expect(radios.map((b) => b.getAttribute("aria-label"))).toEqual([dict[lang].themeAria.auto, dict[lang].themeAria.light, dict[lang].themeAria.dark]);
+        }
+      }
+    });
+    it("the help card 'Did not find the answer' only where there is a way to write, under a subscription that works", () => {
+      const { el } = page("return");
+      const ask = $(el, ".u-below > .u-card.u-ask")!;
+      expect(word(ask, "p")).toBe("Не нашли ответ");
+      expect(word(ask, "a.u-btn")).toBe("Написать в поддержку");
+      expect($(ask, "a.u-btn svg")).not.toBeNull();
+      expect($(ask, "a")!.getAttribute("href")).toBe("https://t.me/example_support");
+      expect($(page("plain").el, ".u-ask")).toBeNull();
+      expect($(page("nosupport").el, ".u-ask")).toBeNull();
+      expect($(page("return", { f: (d) => (d.options.show_support = false) }).el, ".u-ask")).toBeNull();
+      for (const name of ["expired", "disabled", "quota"]) expect($(page(name).el, ".u-ask"), name).toBeNull(); // there the note has the button
+    });
+    it("the last parts are the help card and the footer, in that order", () => {
+      const kids = [...page("return").el.children].map((x) => x.className.split(" ")[0]);
+      expect(kids.slice(-2)).toEqual(["u-below", "u-ft"]);
+    });
+  });
+
+  describe("what comes from the data is text, and only safe links are links", () => {
+    it("a name, an announcement and a link that are markup or script stay text or are dropped", () => {
+      const evil = normalize({ ...cases.first, announcement: "<img src=x onerror=alert(1)>", support_url: "javascript:alert(1)", user: { ...cases.first!.user, name: "<b>x</b>" } });
+      const el = view(evil, state("ios", {}, "en"), actions());
+      expect($(el, "img[onerror]")).toBeNull();
+      expect($(el, ".u-hero h1 b")).toBeNull();
+      expect(word(el, ".u-hero h1")).toBe("<b>x</b>’s subscription");
+      expect($(el, "a[href^='javascript']")).toBeNull();
+      expect([$(el, ".u-ask"), $(el, "header a")]).toEqual([null, null]);
+    });
+    it("a subscription without a name has a word of its own", () => {
+      expect(word(page("return", { f: (d) => (d.user.name = "  ") }).el, ".u-hero .u-h1")).toBe("Ваша подписка");
+    });
   });
 
   it("no dash starts a line: the space before it does not break", () => {
     for (const lang of langs) {
       const t = dict[lang];
-      for (const s of [t.linkD, t.privacy, t.limit(3, 3, true), t.txt.expired("X").call, t.staleSteps("A").join(" "), t.dnsLinkNote("A", "B"), t.dnsDoneLink(12).join(" "), t.soon(3).join(" ")]) expect(s).not.toMatch(/ —/);
+      for (const s of [t.privacy, t.alFirstD, t.alSoonD(true), t.alLimD("1 Jan", true), t.alOffD(true), t.alExpD, t.newDevH, t.syOff]) expect(s).not.toMatch(/ —/);
     }
   });
 });
 
-describe("Persian and Turkish", () => {
-  const GB = 1024 ** 3;
-  const t0 = Date.UTC(2026, 11, 1, 12) / 1000; // 10 Azar 1405
-
-  it("Persian is read right to left, the others left to right", () => {
+describe("right to left (Persian) and the others", () => {
+  it("only Persian is read right to left", () => {
     expect(langs.map((l) => [l, dirOf(l)])).toEqual([
       ["en", "ltr"],
       ["ru", "ltr"],
@@ -435,11 +701,29 @@ describe("Persian and Turkish", () => {
       ["fa", "rtl"],
       ["tr", "ltr"],
     ]);
-    expect([htmlLang("fa"), htmlLang("tr")]).toEqual(["fa", "tr"]);
+    expect([htmlLang("zh"), htmlLang("fa"), htmlLang("tr")]).toEqual(["zh-CN", "fa", "tr"]);
     expect([normalize({ lang: "fa" }).lang, normalize({ lang: "tr" }).lang]).toEqual(["fa", "tr"]);
   });
 
+  it("each language row carries its own lang, so a foreign script is set in its own face and direction", () => {
+    const rows = $$(page("return", { lang: "fa" }).el, ".u-menu button").map((b) => b.getAttribute("lang"));
+    expect(rows).toEqual(["en", "ru", "zh-CN", "fa", "tr"]);
+    const sum = $(page("return", { lang: "fa" }).el, "summary")!;
+    expect($$(sum, ".lb, .cd").map((x) => x.getAttribute("lang"))).toEqual(["fa", "fa"]);
+  });
+
+  it("the Persian page: the name isolated, the figures in their own direction, the icons that point along the line marked", () => {
+    const { el } = page("return", { lang: "fa" });
+    expect(word(el, ".u-hero .u-h1")).toBe("اشتراک ⁨Alice⁩");
+    expect(word(el, ".u-status b")).toBe(dict.fa.chip.active);
+    expect(word(el, ".u-stat:nth-child(2) .v")).toBe("⁦64 GB⁩"); // "64 GB" is one left-to-right piece
+    expect($$(el, ".u-hero svg.flip, header svg.flip").length).toBeGreaterThan(0);
+    expect($$(el, "svg.flip").length).toBeLessThan($$(el, "svg").length);
+    expect($$(el, ".u-tbl bdi").some((n) => n.textContent === "Франкфурт")).toBe(true); // the owner's place, as the owner wrote it
+  });
+
   it("Persian dates are in the Persian calendar, with the Latin digits of the rest of the page; the year shows when it is another Persian year", () => {
+    const t0 = Date.UTC(2026, 11, 1, 12) / 1000; // 10 Azar 1405
     expect(fmtDate(t0, "fa", t0)).toBe("10 آذر");
     expect(fmtDate(Date.UTC(2027, 1, 10, 12) / 1000, "fa", t0)).toBe("21 بهمن"); // a new Gregorian year, still 1405
     expect(fmtDate(Date.UTC(2027, 2, 25, 12) / 1000, "fa", t0)).toBe("5 فروردین 1406");
@@ -450,26 +734,11 @@ describe("Persian and Turkish", () => {
     expect(fmtNum(1.5, "tr")).toBe("1,5");
   });
 
-  it("Persian keeps a number with its Latin unit, and a name from data, in their own direction", () => {
-    const h = hero(normalize({ user: { status: "active", used_bytes: 96 * GB, quota_bytes: 100 * GB, expires_unix: t0 + 40 * day } }), "fa", t0);
-    expect(h.usedOf).toBe("از \u2066100 GB\u2069"); // "100 GB" is one left-to-right piece
-    expect(h.left).toBe("\u20664 GB\u2069 باقی مانده");
-    expect(hero(normalize({ user: { status: "active", used_bytes: 96 * GB, quota_bytes: 100 * GB } }), "en", t0).usedOf).toBe("of 100 GB"); // no marks elsewhere
-    expect(dict.fa.hi("Alice (old)")).toBe("سلام، \u2068Alice (old)\u2069");
-    expect(dict.fa.removeT("Mum’s phone")).toBe("«\u2068Mum’s phone\u2069» حذف شود؟");
-    expect(dict.fa.qrHow("")).toContain("برنامه‌ای که با لینک کار می‌کند"); // no empty isolate stands for a missing name
-    // a name with a Persian letter is right to left even when it starts with a Latin brand: «AdGuard» stays first
-    expect(plain(dict.fa.dnsDefault("AdGuard: بدون تبلیغات"))).toBe("پیش‌فرض — \u2067AdGuard: بدون تبلیغات\u2069");
-  });
-
-  it("the Persian page: names from data in <bdi>, the icons that point along the line marked to turn round, nothing of the panel shown", () => {
-    const el = view(data("return"), state("ios", { returning: true }, "fa"), actions());
-    expect(text(el.querySelector(".hero .h1"))).toBe("سلام، \u2068Alice\u2069");
-    expect([...el.querySelectorAll(".dev-n bdi")].map((n) => n.textContent)).toEqual(expect.arrayContaining(["Pixel 7", "MacBook"]));
-    expect(el.querySelector(".srv-name span bdi")?.textContent).toBe("Франкфурт"); // the owner's place, as the owner wrote it
-    expect([...el.querySelectorAll(".srv-app .mono")].map((n) => n.textContent)).toContain("DE · Hysteria2"); // as the apps write it, left to right (sub.css)
-    expect(el.querySelectorAll("svg.flip").length).toBeGreaterThan(0);
-    expect([...el.querySelectorAll("svg.flip")].length).toBeLessThan(el.querySelectorAll("svg").length);
+  it("Persian keeps a number with its Latin unit in its own direction, and the other languages do not mark it", () => {
+    const u = { status: "active", used_bytes: 96 * GB, quota_bytes: 100 * GB };
+    expect(hero(normalize({ user: u }), "fa", now).usedQ).toBe("⁦96 GB⁩");
+    expect(hero(normalize({ user: u }), "en", now).usedQ).toBe("96 GB");
+    expect(dict.fa.subOf("Alice (old)")).toBe("اشتراک ⁨Alice (old)⁩");
   });
 
   it("one stylesheet for both directions: no left or right, the right-to-left rules are there", () => {
@@ -477,20 +746,148 @@ describe("Persian and Turkish", () => {
     // the spinner's open side and the centred toast are the same either way
     const physical = rules.match(/(?:margin|padding|border)-(?:left|right)\b(?!-color: transparent)|[\s;{](?:left|right)\s*:(?! 50%)|text-align:\s*(?:left|right)|float\s*:/g);
     expect(physical).toBeNull();
-    expect(rules).toContain('[dir="rtl"] .i.flip { transform: scaleX(-1); }');
-    expect(rules).toContain('[dir="rtl"] :is(.mono, .inp.pw) { direction: ltr; unicode-bidi: isolate; }');
+    expect(rules).toContain(':root[dir="rtl"] .i.flip { transform: scaleX(-1); }');
     expect(rules).toMatch(/--sans: "Onest", "Vazirmatn",/);
-    expect(rules).toMatch(/:lang\(fa\) body \{ line-height: 1\.7; \}/);
   });
 
-  it("the Turkish page renders in Turkish: the polite «siz», dates without a case ending", () => {
-    const el = view(data("return"), state("ios", { returning: true }, "tr"), actions());
-    expect(text(el.querySelector(".hero .h1"))).toBe("Merhaba, Alice");
-    expect(text(el.querySelector(".hero .pill"))).toBe("Etkin");
-    // The year is shown when the term ends in another year (45 days from mid-November is 1 January).
-    expect(text(el.querySelector(".hero"))).toMatch(/\d+ \S+( \d{4})? tarihine kadar/);
-    expect(text(el.querySelector("section[aria-label='Cihazlarım']"))).toContain("Cihaz ekle");
-    expect(plain(dict.tr.txt.limitedReset("1 Aralık", "month").body)).toBe("Bu ayki trafik bitti — VPN 1 Aralık tarihine kadar çalışmıyor.");
-    expect(plain(dict.tr.txt.limitedReset("1 Aralık", "none").body)).toBe("Trafik bitti — VPN 1 Aralık tarihine kadar çalışmıyor.");
+  it("the Turkish page: the polite «siz», the term in its own words, dates without a case ending", () => {
+    const { el } = page("return", { lang: "tr" });
+    expect(word(el, ".u-hero .u-h1")).toBe("Alice aboneliği");
+    expect(word(el, ".u-status b")).toBe("Etkin");
+    expect(word(el, ".u-stat:nth-child(1) .n")).toMatch(/^\d+ \S+( \d{4})? tarihine kadar$/);
+    expect(word(el, ".u-hero-c [data-k=hero-add]")).toBe("Cihaz ekle");
+    expect(plain(dict.tr.alLimD("1 Aralık", true))).toBe("Limit 1 Aralık tarihinde sıfırlanınca sunucular yeniden çalışır. Daha erken gerekiyorsa destek ekibine yazın");
+  });
+
+  it("Chinese and English say the states in their own words", () => {
+    expect(word(page("expired", { lang: "zh" }).el, ".u-status b")).toBe(dict.zh.chip.expired);
+    expect(word(page("quota", { lang: "en" }).el, ".u-alert b")).toBe("The traffic has run out");
+  });
+});
+
+// ---- the motion of the boards that CSS cannot do (fx.ts) ----
+
+describe("the figures written in letter by letter", () => {
+  let queue: ((t: number) => void)[] = [];
+  let calm = false;
+  let wide = true;
+  const old = { raf: globalThis.requestAnimationFrame, mm: globalThis.matchMedia };
+  beforeEach(() => {
+    queue = [];
+    calm = false;
+    wide = true;
+    globalThis.requestAnimationFrame = ((cb: (t: number) => void) => queue.push(cb)) as typeof requestAnimationFrame;
+    globalThis.matchMedia = ((q: string) => ({ matches: q.includes("reduced-motion") ? calm : wide, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof matchMedia;
+  });
+  afterEach(() => {
+    globalThis.requestAnimationFrame = old.raf;
+    globalThis.matchMedia = old.mm;
+    document.body.replaceChildren();
+  });
+
+  /** The page drawn under .u-anim, as main.ts has it. */
+  const drawn = (key: string, value = "64 ГБ") => {
+    const box = document.createElement("div");
+    box.className = "u-anim";
+    box.innerHTML = `<span class="v" data-scr="${value}" data-scr-k="${key}" aria-label="${value}">${value}</span>`;
+    document.body.append(box);
+    return { box, v: box.querySelector<HTMLElement>(".v")! };
+  };
+  /** Frames until the page is at rest. */
+  const run = () => {
+    let t = performance.now();
+    for (let i = 0; i < 400 && queue.length; i++) {
+      const q = queue;
+      queue = [];
+      t += 20;
+      for (const cb of q) cb(t);
+    }
+  };
+
+  it("on a computer it plays: letters come in one by one, and the text ends as the figure says, with the aria-label there all along", () => {
+    const { box, v } = drawn("t-play");
+    scramble(box);
+    expect(v.querySelectorAll(".scr-c").length).toBe("64 ГБ".length);
+    expect(v.getAttribute("aria-label")).toBe("64 ГБ");
+    run();
+    expect(v.textContent).toBe("64 ГБ");
+    expect(v.querySelectorAll(".scr-c")).toHaveLength(0); // at rest it is plain text again
+  });
+  it("a figure drawn again with the same value is not played again; one that changed is", () => {
+    const first = drawn("t-again");
+    scramble(first.box);
+    run();
+    const again = drawn("t-again");
+    scramble(again.box);
+    expect(again.v.querySelectorAll(".scr-c")).toHaveLength(0);
+    expect(again.v.textContent).toBe("64 ГБ");
+    const changed = drawn("t-again", "65 ГБ");
+    scramble(changed.box);
+    expect(changed.v.querySelectorAll(".scr-c").length).toBeGreaterThan(0);
+    run();
+    expect(changed.v.textContent).toBe("65 ГБ");
+  });
+  it("not at all for a person who asked for calm", () => {
+    calm = true;
+    const { box, v } = drawn("t-calm");
+    scramble(box);
+    expect([v.querySelectorAll(".scr-c").length, v.textContent, queue.length]).toEqual([0, "64 ГБ", 0]);
+  });
+  it("not at all on a phone", () => {
+    wide = false;
+    const { box, v } = drawn("t-phone");
+    scramble(box);
+    expect([v.querySelectorAll(".scr-c").length, v.textContent, queue.length]).toEqual([0, "64 ГБ", 0]);
+  });
+  it("the text of a figure is its data-scr whenever it is looked at: the page's own figures too", () => {
+    const { el } = page("return");
+    document.body.append(el);
+    el.classList.add("u-anim");
+    scramble(el);
+    run();
+    for (const v of $$(el, "[data-scr]")) expect(v.textContent, v.dataset.scrK).toBe(v.dataset.scr);
+  });
+});
+
+describe("the copy button", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("is an icon that turns into a tick and a label that rolls up into the done word", () => {
+    const a = actions();
+    const btn = copyButton(a, { text: "https://x", label: "Скопировать", done: "Скопировано", toast: "Ссылка скопирована" });
+    expect([btn.className, btn.dataset.cp]).toEqual(["u-btn u-cpb", ""]);
+    expect(btn.querySelector(".u-cpi")!.getAttribute("aria-hidden")).toBe("true");
+    expect([...btn.querySelectorAll(".u-cpi svg")].map((s) => s.getAttribute("class"))).toEqual(["i", "i ck"]);
+    expect([...btn.querySelectorAll(".u-cpt > span")].map((s) => s.textContent)).toEqual(["Скопировать", "Скопировано"]);
+  });
+  it("a click copies, tells the page with the button in hand, rolls the label over and, after a moment, back", () => {
+    const seen: unknown[] = [];
+    const after = vi.fn();
+    const a = actions({ copy: (value, message, done, from) => (seen.push([value, message, from]), done?.()) });
+    const btn = copyButton(a, { text: "https://x", label: "Скопировать", done: "Скопировано", toast: "Ссылка скопирована", after });
+    btn.click();
+    expect(seen).toEqual([["https://x", "Ссылка скопирована", btn]]);
+    expect(btn.dataset.cp).toBe("done");
+    expect(after).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1799);
+    expect(btn.dataset.cp).toBe("done");
+    vi.advanceTimersByTime(2);
+    expect(btn.dataset.cp).toBe("");
+  });
+  it("when the clipboard refuses, nothing rolls over", () => {
+    const after = vi.fn();
+    const a = actions({ copy: () => {} });
+    const btn = copyButton(a, { text: "x", label: "L", toast: "T", after });
+    btn.click();
+    expect([btn.dataset.cp, after.mock.calls.length]).toEqual(["", 0]);
+  });
+  it("without a label it is the icon alone and its name is given", () => {
+    const btn = copyButton(actions(), { text: "x", toast: "T", cls: "u-ic", aria: "Copy the link" });
+    expect([btn.className, btn.getAttribute("aria-label"), btn.querySelector(".u-cpt")]).toEqual(["u-ic u-cpb", "Copy the link", null]);
+  });
+  it("the card's buttons are such buttons", () => {
+    const btn = $(page("return").el, "aside [data-k=hero-copy]")!;
+    expect([btn.classList.contains("u-cpb"), btn.dataset.cp]).toEqual([true, ""]);
   });
 });

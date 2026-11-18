@@ -9,8 +9,12 @@ import { h, type Kid } from "./dom";
 
 export type Modal = {
   el: HTMLDialogElement;
-  /** Opens or closes the dialog to match `open` and puts `content` in it (the page's state decides, never the dialog). */
-  sync(open: boolean, content: Kid[]): void;
+  /**
+   * Opens or closes the dialog to match `open` and puts `content` in it (the page's state decides, never the dialog). `stage` names
+   * the step the window is on ("menu", "rename:d3", "dns:done"): the page draws the whole window again on every change, and while
+   * the stage stays the same the window is `still` (its entrance does not play again); a new stage plays it, as an opening does.
+   */
+  sync(open: boolean, content: Kid[], stage?: string): void;
 };
 
 export type ModalDeps = {
@@ -30,6 +34,7 @@ export function createModal({ onClose, refocus, label, lastUsed }: ModalDeps): M
   const el = h("dialog", { class: "modal" });
   let opener = "";
   let downOnBackdrop = false;
+  let shown = "";
 
   // showModal is missing in very old WebViews: the dialog then opens non-modally, which still works
   const show = () => (typeof el.showModal === "function" ? el.showModal() : el.setAttribute("open", ""));
@@ -50,7 +55,7 @@ export function createModal({ onClose, refocus, label, lastUsed }: ModalDeps): M
 
   return {
     el,
-    sync(open, content) {
+    sync(open, content, stage = "") {
       if (!open) {
         if (el.open) hide();
         return;
@@ -60,7 +65,9 @@ export function createModal({ onClose, refocus, label, lastUsed }: ModalDeps): M
       const key = had && el.contains(document.activeElement) ? ((document.activeElement as HTMLElement).dataset?.k ?? "") : "";
       // "scrolled": the sticky title gets its hairline once something has gone under it
       const scrolled = (e: Event) => (e.currentTarget as HTMLElement).classList.toggle("scrolled", (e.currentTarget as HTMLElement).scrollTop > 0);
-      el.replaceChildren(h("div", { class: "mbox", on: { scroll: scrolled } }, ...content));
+      const still = had && stage === shown;
+      shown = stage;
+      el.replaceChildren(h("div", { class: `mbox${still ? " still" : ""}`, on: { scroll: scrolled } }, ...content));
       if (!el.isConnected) document.body.append(el);
       if (!had) {
         opener = (document.activeElement as HTMLElement | null)?.dataset?.k || lastUsed?.() || "";

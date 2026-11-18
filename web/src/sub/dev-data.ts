@@ -6,6 +6,13 @@ import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, Dns
 // ships in web/dist/sub.html. The shapes are what the server sends (subs/page.go, subs/devices.go): the link apps share
 // one device without platform or model, a device added without a name comes back as the page named it.
 //
+// The scenes (dev-scene.ts has the parameters, dev-scene.test.ts the whole list of URLs, with the width to look at each in: 1280 a computer, 390 a phone):
+//   states   ?case=return | first | soon | quota (quota-plain: no reset day) | expired | disabled | plain
+//   pieces   first (announcement) | long | nosupport | noqr | keys-only | happ | both        lists  servers-2 | -11 | -30;  dev-0 | -3 | -16 | -20 | -nolimit &tab=devices[&more=1]
+//   tabs     &tab=telegram|trusttunnel (cases telegram, trusttunnel, and -soon for none yet) [&proxy=2]
+//   windows  &sheet=pick|link|conn|key|full|made   &key=d3[&country=1]   &renew=d3 (stale)   &menu=d3|l1   &rename=d3   &ask=remove:d3|rotate:d3   &stale=d3
+//            &dns=de1|link [&dnsall=0|1] [&dnsdone=1 [&dnsskip=nl1]]   (cases dns-both, dns-link, stale-dns)       password: case=locked[&lockerr=wrong|short|latin|later|net]
+//   all      &lang=en|ru|zh|fa|tr  &theme=light|dark  &as=ios|android|windows|macos|linux
 // Dev only, besides ?case: `&as=ios|android|windows|macos|linux` pretends the page is open on that device (main.ts), `&fail=<code>`
 // makes every self-service and DNS call fail with that code (dev-api.ts).
 
@@ -453,6 +460,57 @@ cases["trusttunnel-first"] = { ...base, access: { ...base.access, trust_tunnel: 
 cases["trusttunnel-soon"] = { ...returning, access: { ...returning.access, trust_tunnel: true }, trust_tunnel: { links: [] } };
 // the subscription is off: the page shows the devices only, the key among them (no block, no links)
 cases["trusttunnel-disabled"] = { ...off({ status: "disabled" }), access: { happ: false, amnezia: false, trust_tunnel: true }, trust_tunnel: { links: [] }, devices: [...shared(2 * day), ttKey] };
+
+// ---- the scenes: lists of every size, and the pieces a page may lack (dev-scene.ts has the URL parameters, dev-scene.test.ts the list of URLs) ----
+// 2, 11 and 30 servers (de1, nl1, fi1, ...; every third has a WARP exit, one in four comes through the entry in Russia, the last of eleven is down)
+const lands = ["DE", "NL", "FI", "EE", "PL", "RO", "SE", "FR", "GB", "ES"];
+const crowdServer = (i: number): ServerEntry => {
+  const cc = lands[i % lands.length]!;
+  const n = Math.floor(i / lands.length) + 1;
+  const id = `${cc.toLowerCase()}${n}`;
+  const name = `${cc} · Hysteria2${n > 1 ? ` ${n}` : ""}`;
+  const key = i % 5 !== 4;
+  return {
+    id,
+    country_code: cc,
+    place: "",
+    label: n > 1 ? `${cc} ${n}` : cc,
+    app_names: [name, ...(i % 3 === 1 ? [`${name} WARP`] : [])],
+    connections: [
+      { way: "link", exit: "direct", app_name: name, profile_id: "" },
+      ...(i % 3 === 1 ? [{ way: "link" as const, exit: "warp" as const, app_name: `${name} WARP`, profile_id: "" }] : []),
+      ...(i % 4 === 2 ? [{ way: "link" as const, exit: "direct" as const, app_name: `${name} · через RU`, profile_id: "", relay: true, via: "RU" }] : []),
+      ...(key ? [{ way: "key" as const, exit: "direct" as const, app_name: "", profile_id: "p31" }] : []),
+    ],
+    online: i % 11 !== 10,
+    load: (["low", "medium", "high", null] as const)[i % 4]!,
+    dns: key ? dnsOf("dns_standard", ["dns_standard", "dns_family", "dns_adblock"]) : null,
+  };
+};
+const crowdServers = (n: number): MgData => ({ ...returning, servers: Array.from({ length: n }, (_, i) => crowdServer(i)), server_count: n, server_loads: [] });
+cases["servers-2"] = crowdServers(2);
+cases["servers-11"] = crowdServers(11);
+cases["servers-30"] = crowdServers(30);
+
+// 0, 3, 16 and 20 of 20 devices on the link apps (made-up models), and a subscription without a limit
+const gadgets: [string, string][] = [
+  ["ios", "iPhone 15"], ["android", "Pixel 8"], ["windows", "DESKTOP-4F7K2LM"], ["ios", "iPad"], ["macos", "MacBook Air"], ["android", "Galaxy Tab"], ["windows", "Work laptop"], ["android", "Fold 5"],
+  ["ios", "Spare iPhone"], ["windows", "Mini PC"], ["android", "Kitchen tablet"], ["macos", "Mac mini"], ["ios", "iPhone 13"], ["windows", "Game PC"], ["android", "Travel phone"], ["linux", "Steam Deck"],
+  ["android", "Guest phone"], ["windows", "Surface"], ["ios", "iPad mini"], ["android", "Old Android"],
+];
+const crowd = (n: number): Device[] => gadgets.slice(0, n).map(([p, m], i) => dev(`c${i + 1}`, p, m, "happ", (i + 1) * 7 * hour, i === 0, "link", "18.1", "Happ/3.4.2"));
+const linkSide = { access: { happ: true, amnezia: false }, amnezia: null };
+const withDevices = (n: number, limit: number, extra: Partial<MgData> = {}): MgData => ({ ...returning, ...linkSide, user: withUser({ device_limit: limit, devices_used: n }), devices: crowd(n), ...extra });
+cases["dev-0"] = withDevices(0, 20, { announcement: "" });
+cases["dev-3"] = withDevices(3, 20);
+cases["dev-16"] = withDevices(16, 20);
+// every place taken and a new app refused (ENFORCE): "no place left" in the window "New device"
+cases["dev-20"] = withDevices(20, 20, { link_device_limit: "enforce" });
+cases["dev-nolimit"] = withDevices(5, 0);
+
+// a page without the way to the support, and one without the QR code of the page
+cases.nosupport = { ...returning, support_url: "", options: { show_announcement: true, show_support: false, show_qr: true } };
+cases.noqr = { ...base, options: { show_announcement: true, show_support: true, show_qr: false } };
 
 export function devPage(query: string): MgData {
   const p = new URLSearchParams(query);

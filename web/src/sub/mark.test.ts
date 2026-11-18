@@ -38,12 +38,18 @@ describe("the password form's mark", () => {
   const st: LockState = { lang: "ru", pw: "", busy: false, error: "", note: "" };
   const a = { lang: () => {}, input: () => {}, submit: () => {} };
 
-  it("sits on top of the card with the padlock on its corner; the intro plays on the first build only", () => {
+  it("is the round 48 px logo on top of the window; the intro plays on the first build only", () => {
     const first = lockView(data(), st, a);
-    const mark = first.querySelector<HTMLElement>(".lock-mark .mg-motion")!;
+    const mark = first.querySelector<HTMLElement>(".a-lock > .mg-motion")!;
     expect(mark.dataset.mode).toBe("intro");
-    expect(first.querySelector(".lock-mark .lock-ico")).not.toBeNull();
+    expect([mark.style.width, mark.style.height]).toEqual(["48px", "48px"]);
     // the form is redrawn on an error or a language change: the same mark, at rest
-    expect(lockView(data(), { ...st, error: "x" }, a).querySelector<HTMLElement>(".lock-mark .mg-motion")!.dataset.mode).toBe("rest");
+    expect(lockView(data(), { ...st, error: "x" }, a).querySelector<HTMLElement>(".a-lock > .mg-motion")!.dataset.mode).toBe("rest");
+  });
+
+  it("an uploaded logo stays an image there", () => {
+    const view = lockView(data('<svg viewBox="0 0 8 8"><path d="M0 0h8v8z"/></svg>'), st, a);
+    expect(view.querySelector(".a-lock .mg-motion")?.getAttribute("data-kind")).toBe("custom");
+    expect(view.querySelector(".a-lock img")?.getAttribute("src")).toMatch(/^data:image\/svg\+xml,/);
   });
 });

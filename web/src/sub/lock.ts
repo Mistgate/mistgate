@@ -3,7 +3,6 @@ import { dict } from "./i18n";
 import { icon } from "./icons";
 import { logoMark } from "./mark";
 import { ApiError } from "./api";
-import { note as noteBox } from "./ui";
 import { pageHeader } from "./view";
 import type { Lang, MgData } from "./types";
 
@@ -34,27 +33,30 @@ const complete = (v: string) => typed(v) === 8;
 // The page is built again on every change (an error, the language); the mark's intro plays on the first build only.
 let introPlayed = false;
 
+/**
+ * The page of a password (V2DlgLock, V2DlgLockerr): the page's header (the language), and on the page itself the board's small
+ * window without a head: the logo, "This page is password-protected", the field with the error under it, "Open". The line under
+ * the field (the Latin hint) and the one under the button ("No password?") are what the boards do not have and the page needs.
+ */
 export function lockView(d: MgData, s: LockState, a: LockActions): HTMLElement {
   const t = dict[s.lang];
-  // the brand's mark with the padlock on its corner
-  const mark = h("span", { class: "lock-mark" }, logoMark(d, 72, !introPlayed), h("span", { class: "lock-ico" }, icon("lock")));
+  const mark = logoMark(d, 48, !introPlayed);
   introPlayed = true;
-  // never disabled: a button that does nothing and says nothing is the dead end this form must not have
-  const go = h("button", { class: `btn pri${s.busy ? " busy" : ""}`, type: "submit", "data-k": "pw-go", disabled: s.busy }, s.busy ? t.lockBusy : t.lockGo);
-  const note = h("p", { class: "pw-note", id: "pw-note", role: "status" }, s.note);
+  // never disabled unless a call is in flight: a button that does nothing and says nothing is the dead end this form must not have
+  const go = h("button", { class: `u-btn pri${s.busy ? " busy" : ""}`, type: "submit", "data-k": "pw-go", disabled: s.busy, "aria-busy": s.busy ? "true" : false }, s.busy && h("span", { class: "spin", "aria-hidden": "true" }), s.busy ? t.lockBusy : t.lockGo);
+  const note = h("p", { class: "u-hint", id: "pw-note", role: "status", hidden: !s.note }, s.note);
   const input = h("input", {
-    class: `inp pw${s.error ? " err" : ""}`,
+    class: `a-inp${s.error ? " err" : ""}`,
     id: "pw",
     "data-k": "pw",
     "data-autofocus": "",
-    type: "text",
+    type: "password",
     name: "password",
     value: s.pw,
-    placeholder: "xxxx-xxxx",
     maxlength: 24,
     inputmode: "text",
     enterkeyhint: "go",
-    autocomplete: "off",
+    autocomplete: "current-password",
     autocapitalize: "none",
     autocorrect: "off",
     spellcheck: "false",
@@ -68,6 +70,7 @@ export function lockView(d: MgData, s: LockState, a: LockActions): HTMLElement {
         el.value = formatPassword(el.value);
         // no redraw while typing: it would drop the cursor
         note.textContent = foreign ? t.lockLatin : "";
+        note.hidden = !foreign;
         a.input(el.value);
         s.note = note.textContent;
       },
@@ -75,28 +78,31 @@ export function lockView(d: MgData, s: LockState, a: LockActions): HTMLElement {
   });
   return h(
     "main",
-    { class: "wrap" },
+    { class: "wrap lockpg" },
     pageHeader(d, s.lang, a.lang),
     h(
-      "section",
-      { class: "card lock", "aria-labelledby": "pw-t" },
-      mark,
-      h("div", { class: "lock-head" }, h("h1", { class: "h1 ct", id: "pw-t" }, t.lockT), h("p", { class: "txt mut" }, t.lockH)),
+      "div",
+      { class: "a-desk a-plain" },
       h(
-        "form",
-        {
-          class: "lock-f",
-          on: {
-            submit: (e) => {
-              e.preventDefault();
-              if (!s.busy) a.submit();
+        "section",
+        { class: "a-dlg sm", "aria-labelledby": "pw-t" },
+        h(
+          "form",
+          {
+            class: "a-b",
+            on: {
+              submit: (e) => {
+                e.preventDefault();
+                if (!s.busy) a.submit();
+              },
             },
           },
-        },
-        h("div", { class: "fld" }, h("label", { for: "pw" }, t.lockLabel), input, note, s.error && noteBox("bad", "warn", s.error, { id: "pw-err" })),
-        go,
+          h("div", { class: "a-lock" }, mark, h("h2", { id: "pw-t" }, t.dgLockT), h("p", { class: "a-lead" }, t.dgLockH)),
+          h("div", { class: "a-fld" }, h("label", { class: "a-lbl", for: "pw" }, t.lockLabel), input, s.error && h("p", { class: "a-err", id: "pw-err", role: "alert" }, icon("warn"), s.error), note),
+          go,
+          h("p", { class: "u-hint lock-none" }, t.lockNone),
+        ),
       ),
-      h("p", { class: "hint lock-none" }, t.lockNone),
     ),
   );
 }
@@ -123,7 +129,9 @@ export function lockActions({ st, endpoint, unlock, render, reload, save }: Deps
       if (st.error) {
         st.error = "";
         document.getElementById("pw-err")?.remove();
-        document.getElementById("pw")?.classList.remove("err");
+        const field = document.getElementById("pw");
+        field?.classList.remove("err");
+        field?.removeAttribute("aria-invalid");
       }
     },
     async submit() {
@@ -144,7 +152,7 @@ export function lockActions({ st, endpoint, unlock, render, reload, save }: Deps
         reload();
         return;
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) st.error = t.lockWrong(e.left);
+        if (e instanceof ApiError && e.status === 401) st.error = t.dgLockWrong(e.left);
         else if (e instanceof ApiError && e.status === 429) st.error = t.lockLater(Math.ceil(e.retryAfter / 60));
         else if (e instanceof ApiError && e.code === "network") st.error = t.lockNet;
         else st.error = t.lockFail;
