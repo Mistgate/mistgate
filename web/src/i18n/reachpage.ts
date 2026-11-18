@@ -57,6 +57,14 @@ export const en = {
   "rp.pb.openNode": "Open the node",
   "rp.tp.offline": "No link",
   "rp.tp.offline.detail": "the probe node {node} is not in touch",
+  "rp.st.wait": "waits for a round",
+  "rp.st.stale": "no fresh data",
+  "rp.pbt.gpToken": "Globalping did not accept the token",
+  "rp.pbt.gpLimit": "The hourly test limit is used up",
+  "rp.pbt.bbCap": "Spending has reached the limit",
+  "rp.chip.limit": "Limit",
+  "rp.chip.stopped": "Stopped",
+  "rp.chip.off": "Off",
 };
 export const ru: typeof en = {
   "rp.tabs": "Разделы доступности",
@@ -115,6 +123,14 @@ export const ru: typeof en = {
   "rp.pb.openNode": "Открыть ноду",
   "rp.tp.offline": "Нет связи",
   "rp.tp.offline.detail": "нода-зонд {node} не на связи",
+  "rp.st.wait": "ждёт круга",
+  "rp.st.stale": "нет свежих данных",
+  "rp.pbt.gpToken": "Globalping не принял токен",
+  "rp.pbt.gpLimit": "Часовой лимит тестов исчерпан",
+  "rp.pbt.bbCap": "Траты дошли до лимита",
+  "rp.chip.limit": "Лимит",
+  "rp.chip.stopped": "Остановлен",
+  "rp.chip.off": "Выключен",
 };
 export const zh: typeof en = {
   "rp.tabs": "可达性板块",
@@ -173,6 +189,14 @@ export const zh: typeof en = {
   "rp.pb.openNode": "打开节点",
   "rp.tp.offline": "无连接",
   "rp.tp.offline.detail": "探针节点 {node} 已失联",
+  "rp.st.wait": "等待检测轮次",
+  "rp.st.stale": "暂无最新数据",
+  "rp.pbt.gpToken": "Globalping 不接受该令牌",
+  "rp.pbt.gpLimit": "每小时检测额度已用完",
+  "rp.pbt.bbCap": "花费已达上限",
+  "rp.chip.limit": "额度用尽",
+  "rp.chip.stopped": "已停止",
+  "rp.chip.off": "已关闭",
 };
 export const fa: typeof en = {
   "rp.tabs": "بخش‌های دسترس‌پذیری",
@@ -231,6 +255,14 @@ export const fa: typeof en = {
   "rp.pb.openNode": "باز کردن نود",
   "rp.tp.offline": "ارتباطی نیست",
   "rp.tp.offline.detail": "نود پروب {node} در دسترس نیست",
+  "rp.st.wait": "منتظر دور بررسی",
+  "rp.st.stale": "داده تازه‌ای نیست",
+  "rp.pbt.gpToken": "Globalping توکن را نپذیرفت",
+  "rp.pbt.gpLimit": "سقف آزمایش‌های ساعتی تمام شده است",
+  "rp.pbt.bbCap": "هزینه به سقف رسیده است",
+  "rp.chip.limit": "سقف",
+  "rp.chip.stopped": "متوقف",
+  "rp.chip.off": "خاموش",
 };
 export const tr: typeof en = {
   "rp.tabs": "Erişilebilirlik bölümleri",
@@ -289,4 +321,12 @@ export const tr: typeof en = {
   "rp.pb.openNode": "Düğümü aç",
   "rp.tp.offline": "Bağlantı yok",
   "rp.tp.offline.detail": "sonda düğümü {node} ile bağlantı yok",
+  "rp.st.wait": "bir tur bekliyor",
+  "rp.st.stale": "güncel veri yok",
+  "rp.pbt.gpToken": "Globalping belirteci kabul etmedi",
+  "rp.pbt.gpLimit": "Saatlik test sınırı doldu",
+  "rp.pbt.bbCap": "Harcama sınıra ulaştı",
+  "rp.chip.limit": "Sınır",
+  "rp.chip.stopped": "Durduruldu",
+  "rp.chip.off": "Kapalı",
 };

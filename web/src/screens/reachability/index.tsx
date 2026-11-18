@@ -72,7 +72,13 @@ export function ReachabilityScreen({ scene }: { scene?: { filter?: State; open?:
   const loading = !h && !history.isError;
   const failed = !h && history.isError;
   const ready = !!h;
-  const none = alerts.data && sources.length === 0 ? t("rp.ev.none.off") : checks.data && checks.data.countryChecks.length === 0 && sources.length > 0 ? t("rp.ev.none.first") : t("rc.ev.none");
+  // the board's words of an empty week: no sources, the first round still running, else "every node opened" (no nodes yet: the same last one)
+  const none =
+    alerts.data && sources.length === 0
+      ? t("rp.ev.none.off")
+      : checks.data && checks.data.countryChecks.length === 0 && sources.length > 0 && (nodes.length > 0 || nodesQ.isPending)
+        ? t("rp.ev.none.first")
+        : t("rc.ev.none", { country: countryIn(t, code) });
   const onSources = owner ? Object.values(looks).filter(isOn).length : sources.length;
   const problem = owner && Object.values(looks).some(isProblem);
 
@@ -269,6 +275,8 @@ function NodesTab(p: {
         onShowAll={() => setFilter("")}
         alerts={p.events}
         open={p.scene?.open}
+        first={p.first}
+        stale={new Set(warns.map(([id]) => id))}
       />
       <div className="rc-two">
         <EventsCard code={p.country} events={p.events} noneText={p.noEvents} />

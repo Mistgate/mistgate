@@ -57,8 +57,15 @@ function verdictWord(t: T, source: ReachSource, v: CountryVerdict, short = false
 /** The columns of Globalping, the lists and the probe: what each says of the node now, in the board's three tones (the warn, the quiet, the plain). */
 const columns = ["globalping", "lists", "tspu"] as const;
 
-function cellOf(t: T, source: ReachSource, on: boolean, lane: Lane | undefined, probe: boolean, now: number): { word: string; cls: "" | "part" | "mut" } {
+/**
+ * What holds a source's word back, in the board's order: a source in trouble ("no fresh data"), then the first round still running
+ * ("waits for a round"). Neither says anything of the node, so both are the quiet tone.
+ */
+export type Hold = "stale" | "wait" | "";
+
+function cellOf(t: T, source: ReachSource, on: boolean, lane: Lane | undefined, probe: boolean, now: number, hold: Hold = ""): { word: string; cls: "" | "part" | "mut" } {
   if (!on) return { word: t("rc.st.off"), cls: "mut" };
+  if (hold) return { word: t(hold === "stale" ? "rp.st.stale" : "rp.st.wait"), cls: "mut" };
   const v = laneNow(lane, now);
   if (v == null) return { word: probe ? t("rc.st.probeNode") : t("hl.cell.none"), cls: "mut" };
   const kind = verdictKind(v);
@@ -120,6 +127,8 @@ export function NodesTable({
   onShowAll,
   alerts = [],
   open: openGiven,
+  first = false,
+  stale,
 }: {
   nodes: readonly NodeRow[];
   checks: ReadonlyMap<string, CountryCheck>;
@@ -141,10 +150,15 @@ export function NodesTable({
   alerts?: readonly Alert[];
   /** The node whose row is open from the start (a link, the dev kit). */
   open?: string;
+  /** The first round of checks is still running: the sources wait for it. */
+  first?: boolean;
+  /** The sources in trouble: their last words are old. */
+  stale?: ReadonlySet<string>;
 }) {
   const t = useT();
   const fmt = useFmt();
   const [opened, setOpened] = useState(openGiven ?? "");
+  const holdOf = (s: ReachSource): Hold => (stale?.has(s) ? "stale" : first ? "wait" : "");
   const klick = useQuery({ ...clientProbeQuery, enabled: owner });
   const reports = klick.data?.settings?.enabled ? new Map((klick.data.nodes ?? []).map((n) => [n.nodeId, n])) : null;
   const head = (
@@ -199,7 +213,7 @@ export function NodesTable({
                     {v6 === "data" && c?.ipv6 && <CountryPill check={c.ipv6} node={n.name} code={country} tag="IPv6" inButton />}
                   </span>
                   {columns.map((s) => {
-                    const cell = cellOf(t, s, sources.includes(s), nodeLanes?.get(s), s === "tspu" && n.id === probeNode, now);
+                    const cell = cellOf(t, s, sources.includes(s), nodeLanes?.get(s), s === "tspu" && n.id === probeNode, now, holdOf(s));
                     return (
                       <span key={s} className={cx("rc-v", cell.cls)} data-l={t(sourceKey[s])} data-testid={`cell-${s}`}>
                         {cell.word}
@@ -230,6 +244,7 @@ export function NodesTable({
                     owner={owner}
                     report={reports?.get(n.id)}
                     reportsOn={!!reports}
+                    holdOf={holdOf}
                     alert={alerts.find((a) => a.nodeId === n.id && a.resolvedAtUnix === 0)}
                   />
                 )}
@@ -280,6 +295,7 @@ function NodeDetail(p: {
   owner: boolean;
   report: ClientProbeNode | undefined;
   reportsOn: boolean;
+  holdOf: (s: ReachSource) => Hold;
   alert: Alert | undefined;
 }) {
   const t = useT();
@@ -295,7 +311,7 @@ function NodeDetail(p: {
         <span className="rc-dt">{t("rc.col.source")}</span>
         <div className="rc-ch">
           {columns.map((s) => {
-            const cell = cellOf(t, s, p.sources.includes(s), p.lanes?.get(s), s === "tspu" && p.probe, p.now);
+            const cell = cellOf(t, s, p.sources.includes(s), p.lanes?.get(s), s === "tspu" && p.probe, p.now, p.holdOf(s));
             return (
               <i key={s} className={cell.cls}>
                 {t(sourceKey[s])}: {cell.word}
