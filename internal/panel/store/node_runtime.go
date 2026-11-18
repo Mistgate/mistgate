@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"math"
 	"time"
 )
@@ -244,6 +245,14 @@ func (s *Store) NodeHostHours(ctx context.Context, nodeID string, now time.Time,
 		out = append(out, h)
 	}
 	return out, rows.Err()
+}
+
+// NodeFirstHostHour is the start of the node's earliest hour of host load still kept (0 = none): for a node younger than the
+// retention it is the hour its first reading landed in.
+func (s *Store) NodeFirstHostHour(ctx context.Context, nodeID string) (int64, error) {
+	var first sql.NullInt64
+	err := s.R.QueryRowContext(ctx, `SELECT MIN(hour_start) FROM node_host_hour WHERE node_id = ? AND samples > 0`, nodeID).Scan(&first)
+	return first.Int64, err
 }
 
 const nodeHostHourPruneBatch = 1000

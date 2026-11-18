@@ -43,11 +43,24 @@ func TestCapacityNodes(t *testing.T) {
 	if n.Name != "nodea" || n.BandwidthMbps != 500 || !n.Connected || n.DiskUsed != 30<<30 || n.DiskTotal != 40<<30 {
 		t.Fatalf("node = %+v", n)
 	}
+	if n.WindowHours != 24 || n.FirstHour != n.Hours[0].HourStart || nodes[got[quiet]].FirstHour != 0 {
+		t.Fatalf("window %d, first hour %d (hours %d)", n.WindowHours, n.FirstHour, n.Hours[0].HourStart)
+	}
 	if h := n.Hours[0]; h.CPUAvg != 42 || h.ExtSamples != 1 || h.StealAvg != 4 || h.ConntrackLimit != 100 || h.AgentRSSMax != 64<<20 {
 		t.Fatalf("hour = %+v", h)
 	}
 	q, ok := got[quiet]
 	if !ok || len(nodes[q].Hours) != 0 || nodes[q].Connected {
 		t.Fatalf("the quiet node: %+v (present %v)", nodes, ok)
+	}
+	// a stored speed test proves both its ends' links are that wide; a failed one and a slower one change nothing
+	for _, js := range []string{`{"mb":8,"mbit_s":308.4}`, `{"mb":8,"mbit_s":120}`, `{"mb":8,"error":"timeout"}`} {
+		if err := e.st.AddPathSpeed(e.ctx, a.nodeID, quiet, "down", time.Now(), js); err != nil {
+			t.Fatal(err)
+		}
+	}
+	nodes, _ = e.f.CapacityNodes(e.ctx, 24)
+	if nodes[got[a.nodeID]].MeasuredMbps != 308 || nodes[got[quiet]].MeasuredMbps != 308 {
+		t.Fatalf("measured: %d and %d", nodes[got[a.nodeID]].MeasuredMbps, nodes[got[quiet]].MeasuredMbps)
 	}
 }

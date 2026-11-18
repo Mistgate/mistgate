@@ -4,6 +4,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/capacity"
@@ -38,17 +39,37 @@ func (f *Fleet) CapacityNodes(ctx context.Context, hours int) ([]capacity.Node, 
 		if err != nil {
 			return nil, err
 		}
+		first, err := f.st.NodeFirstHostHour(ctx, n.ID)
+		if err != nil {
+			return nil, err
+		}
 		tests, err := f.st.SpeedTestTimes(ctx, n.ID, now.Add(-time.Duration(store.HostMaxHours+1)*time.Hour))
+		if err != nil {
+			return nil, err
+		}
+		speeds, err := f.st.PathSpeeds(ctx, now.Add(-store.PathSpeedKeepHours*time.Hour), n.ID, 500)
 		if err != nil {
 			return nil, err
 		}
 		l := liveBy[n.ID]
 		c := capacity.Node{ID: n.ID, Name: n.Name, CPUs: facts.CPUCount, RAMTotal: facts.RAMTotal,
-			BandwidthMbps: uint32(min(max(n.BandwidthMbps, 0), 1_000_000)), Connected: l.Connected, Hours: hrs, SpeedTests: tests}
+			BandwidthMbps: uint32(min(max(n.BandwidthMbps, 0), 1_000_000)), Connected: l.Connected, Hours: hrs, SpeedTests: tests, FirstHour: first, MeasuredMbps: fastest(speeds), WindowHours: min(max(hours, 1), store.HostMaxHours)}
 		if v := decodeLiveView(l); v.Metrics != nil {
 			c.DiskUsed, c.DiskTotal = v.Metrics.DiskUsedBytes, v.Metrics.DiskTotalBytes
 		}
 		out = append(out, c)
 	}
 	return out, nil
+}
+
+// fastest is the highest rate, in Mbit/s, a stored speed test went: it proves both its nodes' links are at least that wide.
+func fastest(rows []store.PathSpeedRow) uint32 {
+	var top float64
+	for _, r := range rows {
+		var res speedJSON
+		if json.Unmarshal([]byte(r.ResultJSON), &res) == nil && res.Error == "" && res.MbitS > top && res.MbitS <= maxBandwidthMbps {
+			top = res.MbitS
+		}
+	}
+	return uint32(top)
 }

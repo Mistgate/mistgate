@@ -2365,9 +2365,11 @@ type LoadRecommendation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// update_agent (the agent predates the resource fields: steal, swap, conntrack and its own cost are not known),
 	// steal_high (steal_pct: the provider oversells the host; move the node), conntrack_near_limit (fill_pct, limit),
-	// cpu_busy (cpu_pct, peak_pct, target, target_headroom: move people to the node with the most headroom),
-	// cpu_busy_add_node (cpu_pct, peak_pct: no other node has room), bandwidth_busy (peak_pct, link_mbps, and target,
-	// target_headroom when another node has room), ram_high (ram_pct), swap_in_use (swap_mb), disk_filling (disk_pct),
+	// cpu_busy (cpu_pct, peak_pct, target, target_headroom: move people to the node with the most headroom; only with at least
+	// 3 people online in the busy hour), cpu_busy_add_node (cpu_pct, peak_pct: no other node has room), cpu_busy_few_people
+	// (cpu_pct, people: busy with hardly anyone online, so the load is not people's), bandwidth_limit_low (link_mbps: the number set, seen_mbps: what the node carried; check the number in the node's settings,
+	// and bandwidth_busy is not given), bandwidth_busy (peak_pct: the typical
+	// hourly peak, hour_pct: the busiest hour's mean, link_mbps, and target, target_headroom when another node has room), ram_high (ram_pct), swap_in_use (swap_mb), disk_filling (disk_pct),
 	// agent_memory_growing (growth_pct_day, rss_mb, days: the agent's daily peak memory climbs faster than its people).
 	Code string `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	// "info", "warn" or "crit".
@@ -2437,7 +2439,8 @@ type NodeLoad struct {
 	NodeName  string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
 	Connected bool                   `protobuf:"varint,3,opt,name=connected,proto3" json:"connected,omitempty"`
 	Cpus      uint32                 `protobuf:"varint,4,opt,name=cpus,proto3" json:"cpus,omitempty"`
-	// "ok", "busy", "overloaded", or "unknown" (no hour of host load in the window).
+	// "ok", "busy", "overloaded", or "unknown": no hour of host load in the window, or a node whose history is under a day (the
+	// install is not a pattern; then hours_with_data is above 0 and only a full disk is advised).
 	Status string `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
 	// What runs out first once it is at least halfway to its limit: cpu, steal, bandwidth, ram, conntrack or disk; "" otherwise.
 	Bottleneck string `protobuf:"bytes,6,opt,name=bottleneck,proto3" json:"bottleneck,omitempty"`
@@ -2464,8 +2467,10 @@ type NodeLoad struct {
 	TxPeakBps uint64 `protobuf:"varint,20,opt,name=tx_peak_bps,json=txPeakBps,proto3" json:"tx_peak_bps,omitempty"`
 	// The capacity the traffic is set against: the owner's ("configured", Node.bandwidth_mbps) or the link speed the agent
 	// reported ("nic"); 0 and "" = not known.
-	CapacityMbps     uint32   `protobuf:"varint,21,opt,name=capacity_mbps,json=capacityMbps,proto3" json:"capacity_mbps,omitempty"`
-	CapacitySource   string   `protobuf:"bytes,22,opt,name=capacity_source,json=capacitySource,proto3" json:"capacity_source,omitempty"`
+	CapacityMbps   uint32 `protobuf:"varint,21,opt,name=capacity_mbps,json=capacityMbps,proto3" json:"capacity_mbps,omitempty"`
+	CapacitySource string `protobuf:"bytes,22,opt,name=capacity_source,json=capacitySource,proto3" json:"capacity_source,omitempty"`
+	// The highest hourly peak of the busier direction against that capacity: shown, not judged (a single burst, a download or a
+	// measurement, fills any link; hours of the panel's own speed measurements are left out).
 	BandwidthPeakPct *float32 `protobuf:"fixed32,23,opt,name=bandwidth_peak_pct,json=bandwidthPeakPct,proto3,oneof" json:"bandwidth_peak_pct,omitempty"`
 	// The agent process: mean and peak CPU in percent of the machine, peak memory, and how fast its daily peak memory grows
 	// (percent per day, from three days on).
@@ -2475,20 +2480,30 @@ type NodeLoad struct {
 	AgentRssGrowthPctPerDay *float32 `protobuf:"fixed32,27,opt,name=agent_rss_growth_pct_per_day,json=agentRssGrowthPctPerDay,proto3,oneof" json:"agent_rss_growth_pct_per_day,omitempty"`
 	// "ok" when the per-person costs could be read from the hours (a least-squares fit of the hourly CPU mean on the hourly
 	// mean people online); otherwise why not: "few_hours" (under 24 hours with samples), "flat" (people online changed by
-	// fewer than 4), "no_trend" (the CPU does not rise with the people).
+	// fewer than 4), "no_trend" (the CPU does not rise with the people, or they explain under a fifth of its changes).
 	Fit                    string   `protobuf:"bytes,28,opt,name=fit,proto3" json:"fit,omitempty"`
 	CpuPctPerHundredPeople *float32 `protobuf:"fixed32,29,opt,name=cpu_pct_per_hundred_people,json=cpuPctPerHundredPeople,proto3,oneof" json:"cpu_pct_per_hundred_people,omitempty"`
 	MbpsPerPerson          *float32 `protobuf:"fixed32,30,opt,name=mbps_per_person,json=mbpsPerPerson,proto3,oneof" json:"mbps_per_person,omitempty"`
 	// People the node could add before its busy-hour CPU mean reaches 80% (and, with a known link and per-person traffic, its
-	// busier direction 90% of the link). 0 when it is overloaded already.
+	// busier direction 90% of the link), held to 5 times the people the node has had online at once (at least 10 of them): a
+	// fit is not followed far beyond the data it was drawn from. 0 when it is overloaded already.
 	HeadroomPeople *uint32 `protobuf:"varint,31,opt,name=headroom_people,json=headroomPeople,proto3,oneof" json:"headroom_people,omitempty"`
 	// Most severe first.
 	Recommendations []*LoadRecommendation `protobuf:"bytes,32,rep,name=recommendations,proto3" json:"recommendations,omitempty"`
 	// The 75th percentile of the hourly CPU peaks: the peak most hours stay under. The status and the advice read it, not the
 	// 95th: a few spikes of a server's own upkeep do not make a node busy, and peaks alone never make it overloaded.
 	CpuPeakTypicalPct float32 `protobuf:"fixed32,33,opt,name=cpu_peak_typical_pct,json=cpuPeakTypicalPct,proto3" json:"cpu_peak_typical_pct,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The link, read like the CPU: the 75th percentile of the hourly peaks of the busier direction against the capacity (what the
+	// status and the advice read, with the busy hour's mean below), and the highest hourly mean of the busier direction. Unset
+	// with bandwidth_peak_pct when the capacity is not known.
+	BandwidthTypicalPct  *float32 `protobuf:"fixed32,34,opt,name=bandwidth_typical_pct,json=bandwidthTypicalPct,proto3,oneof" json:"bandwidth_typical_pct,omitempty"`
+	BandwidthBusyHourPct *float32 `protobuf:"fixed32,35,opt,name=bandwidth_busy_hour_pct,json=bandwidthBusyHourPct,proto3,oneof" json:"bandwidth_busy_hour_pct,omitempty"`
+	// Set (Mbit/s) when the owner's capacity (capacity_source "configured") is below what the node was seen to carry: a stored
+	// speed test or an hourly peak went faster. The number set is then wrong, the shares above are against it, and the link is
+	// judged busy at most; 0 = not the case.
+	LinkSeenMbps  uint32 `protobuf:"varint,36,opt,name=link_seen_mbps,json=linkSeenMbps,proto3" json:"link_seen_mbps,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NodeLoad) Reset() {
@@ -2748,6 +2763,27 @@ func (x *NodeLoad) GetRecommendations() []*LoadRecommendation {
 func (x *NodeLoad) GetCpuPeakTypicalPct() float32 {
 	if x != nil {
 		return x.CpuPeakTypicalPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetBandwidthTypicalPct() float32 {
+	if x != nil && x.BandwidthTypicalPct != nil {
+		return *x.BandwidthTypicalPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetBandwidthBusyHourPct() float32 {
+	if x != nil && x.BandwidthBusyHourPct != nil {
+		return *x.BandwidthBusyHourPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetLinkSeenMbps() uint32 {
+	if x != nil {
+		return x.LinkSeenMbps
 	}
 	return 0
 }
@@ -4275,7 +4311,7 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x06params\x18\x03 \x03(\v2/.mistgate.ops.v1.LoadRecommendation.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x96\r\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe7\x0e\n" +
 	"\bNodeLoad\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1c\n" +
@@ -4315,7 +4351,10 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x0fmbps_per_person\x18\x1e \x01(\x02H\vR\rmbpsPerPerson\x88\x01\x01\x12,\n" +
 	"\x0fheadroom_people\x18\x1f \x01(\rH\fR\x0eheadroomPeople\x88\x01\x01\x12M\n" +
 	"\x0frecommendations\x18  \x03(\v2#.mistgate.ops.v1.LoadRecommendationR\x0frecommendations\x12/\n" +
-	"\x14cpu_peak_typical_pct\x18! \x01(\x02R\x11cpuPeakTypicalPctB\x10\n" +
+	"\x14cpu_peak_typical_pct\x18! \x01(\x02R\x11cpuPeakTypicalPct\x127\n" +
+	"\x15bandwidth_typical_pct\x18\" \x01(\x02H\rR\x13bandwidthTypicalPct\x88\x01\x01\x12:\n" +
+	"\x17bandwidth_busy_hour_pct\x18# \x01(\x02H\x0eR\x14bandwidthBusyHourPct\x88\x01\x01\x12$\n" +
+	"\x0elink_seen_mbps\x18$ \x01(\rR\flinkSeenMbpsB\x10\n" +
 	"\x0e_steal_p95_pctB\x15\n" +
 	"\x13_conntrack_peak_pctB\x0f\n" +
 	"\r_ram_peak_pctB\x16\n" +
@@ -4328,7 +4367,9 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x1d_agent_rss_growth_pct_per_dayB\x1d\n" +
 	"\x1b_cpu_pct_per_hundred_peopleB\x12\n" +
 	"\x10_mbps_per_personB\x12\n" +
-	"\x10_headroom_people\"\xc8\x01\n" +
+	"\x10_headroom_peopleB\x18\n" +
+	"\x16_bandwidth_typical_pctB\x1a\n" +
+	"\x18_bandwidth_busy_hour_pct\"\xc8\x01\n" +
 	"\vLoadNodeRef\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x16\n" +
