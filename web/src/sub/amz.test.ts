@@ -336,13 +336,13 @@ describe("actions", () => {
 describe("the list of devices", () => {
   const rows = (name: string, over: Partial<ReturnType<typeof state>> = {}, a = actions()) => view(data(name), state("android", { returning: true, tab: "devices", devicesOpen: true, ...over }), a);
   const listOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>(".u-dvl .u-dv")];
-  const name = (r: HTMLElement) => text(r.querySelector(".nm"));
+  const nm = (r: HTMLElement) => text(r.querySelector(".nm"));
   const sub = (r: HTMLElement) => text(r.querySelector(".mt")).replace(text(r.querySelector(".mt .only-m")), "");
   const at = (r: HTMLElement) => text(r.querySelector(".when"));
 
   it("each key with what a friend needs: name, what kind of key, when; no AWG list, profile or address", () => {
     const el = rows("many");
-    expect(listOf(el).map(name)).toEqual(["Приложения без ID устройства", "Pixel 7", "MacBook", "Windows"]);
+    expect(listOf(el).map(nm)).toEqual(["Приложения без ID устройства", "Pixel 7", "MacBook", "Windows"]);
     expect(sub(row(el, "d3"))).toBe("Ключ AmneziaVPN · Германия, Финляндия · AWG 3.1");
     expect([at(row(el, "d3")), at(row(el, "d4")), at(row(el, "d5"))]).toEqual(["в сети", "подключалось 12 дней назад", "ещё не подключалось"]);
     expect(el.textContent).not.toMatch(/Main|10\.66|fd66/);
@@ -406,7 +406,7 @@ describe("the list of devices", () => {
   });
 
   it("with no keys yet the list is the link's row; keys alone get no row and the empty line", () => {
-    expect(listOf(rows("amnezia-empty")).map(name)).toEqual(["Приложения по ссылке"]);
+    expect(listOf(rows("amnezia-empty")).map(nm)).toEqual(["Приложения по ссылке"]);
     const empty = keysAlone("amnezia-empty");
     expect(listOf(empty)).toHaveLength(0);
     expect(text(empty.querySelector(".u-dvl .u-empty"))).toBe("Устройств пока нет. Добавьте первое, и оно появится здесь");
@@ -429,7 +429,7 @@ describe("the list of devices", () => {
     expect(both.querySelector("[data-k=dev-add]")).not.toBeNull();
     const el = keysAlone("amnezia-off");
     expect(el.querySelector("[data-k^=amz-more-]")).toBeNull();
-    expect(listOf(el).map(name)).toEqual(["Pixel 7", "MacBook", "Windows"]);
+    expect(listOf(el).map(nm)).toEqual(["Pixel 7", "MacBook", "Windows"]);
     expect(el.querySelector("[data-k=dev-add]")).not.toBeNull();
   });
 
@@ -452,7 +452,7 @@ describe("the list of devices", () => {
   it("only the shared place: one row, and 'Add a device' is there for the next app", () => {
     const a = actions();
     const el = rows("happ", {}, a);
-    expect(listOf(el).map(name)).toEqual(["Приложения без ID устройства"]);
+    expect(listOf(el).map(nm)).toEqual(["Приложения без ID устройства"]);
     expect(sub(listOf(el)[0]!)).toBe("одно место на всех");
     expect(at(listOf(el)[0]!)).toBe("в сети"); // online: the state, else the time
     el.querySelector<HTMLButtonElement>("[data-k=dev-add]")!.click();
