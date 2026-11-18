@@ -16,6 +16,7 @@ import { actionOf } from "@/lib/ui-actions";
 import { ActionCard } from "./action-card";
 import { I } from "./as-icons";
 import { CatMark } from "./cat";
+import { useScene } from "./scene";
 import type { ChatApi } from "./chat";
 import { ChatMarkdown, useSmoothText, type ChatEntity } from "./markdown";
 import { PlanCardView } from "./plan-card";
@@ -222,7 +223,8 @@ function AssistantBubble({ m, first, running, owner, chat, onNavigate }: { m: Ms
   const { interim, answer } = splitText(m);
   const [shown, streamed] = useSmoothText(answer, running);
   const fmt = useFmt();
-  const [busy, setBusy] = useState("");
+  const scene = useScene();
+  const [busy, setBusy] = useState(() => (scene.has("busy") ? (m.plans[0]?.planId ?? "") : ""));
   const live = m as LiveMsg;
   const navigate = useNavigate();
   // the navigation tools that passed the whitelist are cards of their own; a refused one stays in the tool group with its reason

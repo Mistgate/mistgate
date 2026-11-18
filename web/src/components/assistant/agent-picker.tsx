@@ -12,6 +12,7 @@ import { readPref, writePref } from "@/lib/storage";
 import { AUTO_OPEN_KEY } from "@/lib/ui-actions";
 import { BrandMark, customProviderBrand, providerBrand } from "./brand-icons";
 import { I } from "./as-icons";
+import { useScene } from "./scene";
 
 // The chat's agent picker (the board's "model" button and its window): which connected provider answers this turn and how hard it thinks. The
 // choice is the browser's (localStorage) and goes with every turn (ChatRequest.provider / .effort); empty means the panel's own setting. The list
@@ -53,7 +54,8 @@ export type Pick = {
 export function usePick({ provider: accessProvider, model: accessModel }: { provider?: number; model?: string }): Pick {
   const t = useT();
   const q = useQuery(accessQuery);
-  const [stored, setStored] = useState(() => ({ provider: readNum(PROVIDER_KEY), effort: readNum(EFFORT_KEY) }));
+  const scene = useScene();
+  const [stored, setStored] = useState(() => ({ provider: readNum(PROVIDER_KEY), effort: scene.has("d0") ? AssistantEffort.QUICK : scene.has("d2") ? AssistantEffort.THOROUGH : readNum(EFFORT_KEY) }));
   const choices = q.data?.choices ?? [];
   const def = choices[0]?.provider ?? accessProvider ?? 0;
   const options = choices.map((c, i) => ({ id: c.provider as number, name: c.customName || t(providerName(c.provider)), model: c.model, inUsd: c.inputUsdPerMtok, outUsd: c.outputUsdPerMtok, budgetReached: c.budgetReached, isDefault: i === 0, url: c.customUrl }));
@@ -108,7 +110,11 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
   const fmt = useFmt();
   const money = (n: number) => n.toLocaleString(fmt.locale, { maximumFractionDigits: 2 });
   const [open, setOpen] = useState(!!defaultOpen && !disabled);
-  const [seen, setSeen] = useState<number | null>(null);
+  const scene = useScene();
+  const [seen, setSeen] = useState<number | null>(() => {
+    const flag = [...scene].find((f) => f.startsWith("seen-"));
+    return flag ? Number(flag.slice(5)) : null;
+  });
   // this browser's "open pages without asking": a page the assistant opens in a turn is opened at once
   const [auto, setAuto] = useState(() => readPref(AUTO_OPEN_KEY) === "1");
   const wrap = useRef<HTMLDivElement>(null);
@@ -170,9 +176,9 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
     <div ref={wrap} className="as-mw" onKeyDown={onKey}>
       <button ref={trigger} type="button" className="as-md" aria-haspopup="listbox" aria-expanded={open} aria-label={t("ai.pick.agent")} title={t("ai.pick.agent")} disabled={disabled} onClick={() => (open ? shut(false) : setOpen(true))}>
         <span className="as-pv" aria-hidden>
-          {pick.selectedProvider ? <ProviderMark provider={pick.selectedProvider} size={14} url={cur?.option?.url} /> : "–"}
+          {pick.selectedProvider && !disabled ? <ProviderMark provider={pick.selectedProvider} size={14} url={cur?.option?.url} /> : "–"}
         </span>
-        <span>{pick.name || t("as.off.model")}</span>
+        <span>{disabled ? t("as.off.model") : pick.name || t("as.off.model")}</span>
         <I g="chev" />
       </button>
       {open && !disabled && (

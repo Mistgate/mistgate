@@ -16,6 +16,7 @@ import { CatMark } from "./cat";
 import type { ChatApi } from "./chat";
 import { Composer } from "./composer";
 import { History } from "./history";
+import { useScene } from "./scene";
 import { Thread } from "./thread";
 
 // The assistant's window as the board draws it (PnAssistant): 420 x 760 on the corner of the page, a card 12px from the edges on a phone. A head
@@ -69,12 +70,13 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   const access = useQuery(accessQuery);
   // the assistant is on and allowed but has no provider: the window says so and the box is closed
   const off = access.data?.available === false && access.data.reason === "no_provider";
-  const [attach, setAttach] = useState(true);
+  const scene = useScene();
+  const [attach, setAttach] = useState(!scene.has("nopage"));
   const [text, setText] = useState(draft?.text ?? "");
   const [askSecret, setAskSecret] = useState(false);
   // opened with an answer that came while the admin was away and no conversation in front: the list, where it is marked
-  const [history, setHistory] = useState(() => !chat.conversationId && (access.data?.unread ?? 0) > 0);
-  const [hq, setHq] = useState("");
+  const [history, setHistory] = useState(() => scene.has("hist") || (!chat.conversationId && (access.data?.unread ?? 0) > 0));
+  const [hq, setHq] = useState(scene.has("hq") ? "zz" : "");
   useServerTurns(chat);
   // opened again on a conversation that had follow-ups waiting (or an unread answer): it may have moved on meanwhile
   const reopen = useRef({ chat, unread: access.data?.unread ?? 0 });

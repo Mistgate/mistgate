@@ -10,6 +10,7 @@ import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import type { Plain } from "@/lib/plain";
 import { I } from "./as-icons";
+import { useScene } from "./scene";
 
 // The conversations as the board draws them (.as-hs): a search over a list in three groups (today, yesterday, earlier), the open one framed, a
 // trash can that shows on a row and asks once, and under the list what is kept and "Delete all". Opening a row hands the conversation to the
@@ -35,8 +36,9 @@ export function History({ list, loaded, failed, query, onQuery, current, tz, onP
   const t = useT();
   const fmt = useFmt();
   const qc = useQueryClient();
-  const [asking, setAsking] = useState("");
-  const [wipe, setWipe] = useState(false);
+  const scene = useScene();
+  const [asking, setAsking] = useState(() => (scene.has("ask") ? (list.find((c) => c.id !== current)?.id ?? "") : ""));
+  const [wipe, setWipe] = useState(scene.has("wipe"));
   const [error, setError] = useState("");
   const done = (e: unknown) => setError(assistantErrorKey(e) ? t(assistantErrorKey(e)!) : errorText(e, t));
   const refresh = () => void qc.invalidateQueries({ queryKey: ["assistant", "conversations"] });

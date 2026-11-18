@@ -6,6 +6,7 @@ import type { LiveMsg, LiveTool } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { I } from "./as-icons";
+import { useScene } from "./scene";
 
 // A turn's working as the board draws it (.as-rs, .as-tc): a "Thinking for 6s" line over what the model said between its tool rounds, and ONE
 // bordered group for the tool calls: a summary line ("Used 5 tools · 2 failed · 7s") that opens to a row per call (friendly name, the telling
@@ -153,7 +154,8 @@ function Labeled({ label, children }: { label: string; children: ReactNode }) {
 export function ToolRow({ tool }: { tool: LiveTool }) {
   const t = useT();
   const dur = useDuration();
-  const [open, setOpen] = useState(false);
+  const scene = useScene();
+  const [open, setOpen] = useState(scene.has("row"));
   const bad = tool.done && !tool.ok;
   const chips = argChips(tool.argsJson);
   const state = !tool.done ? "running" : bad ? "failed" : "ok";
@@ -200,7 +202,8 @@ export function ToolRow({ tool }: { tool: LiveTool }) {
 export function ToolGroup({ tools, running, workedMs }: { tools: LiveTool[]; running: boolean; workedMs?: number }) {
   const t = useT();
   const dur = useDuration();
-  const [open, setOpen] = useState<boolean | null>(null);
+  const scene = useScene();
+  const [open, setOpen] = useState<boolean | null>(scene.has("tools") || scene.has("row") ? true : null);
   const [all, setAll] = useState(false);
   const live = running || tools.some((x) => !x.done);
   const failed = tools.filter((x) => x.done && !x.ok).length;
@@ -256,7 +259,8 @@ function useElapsed(t0: number | undefined, live: boolean) {
 export function Thinking({ m, running, interim }: { m: LiveMsg; running: boolean; interim: string }) {
   const t = useT();
   const fmt = useFmt();
-  const [open, setOpen] = useState<boolean | null>(null);
+  const scene = useScene();
+  const [open, setOpen] = useState<boolean | null>(scene.has("think-open") ? true : null);
   const live = running && m.workedMs === undefined;
   const elapsed = useElapsed(m.t0, live);
   const ms = m.workedMs ?? elapsed;
