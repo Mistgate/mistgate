@@ -1,24 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { amzActions, type Api } from "./amz-actions";
 import { ApiError } from "./api";
-import { dict } from "./i18n";
+import { dict, langs } from "./i18n";
 import { awgDevice, deviceAbout, fetchedUnix, isReturning, normalize } from "./logic";
-import { actions, data, plain, state, text } from "./test-kit";
+import { newAmzState } from "./state";
+import { actions, amzNoop, data, plain, state, text } from "./test-kit";
 import type { Device, MgData } from "./types";
 import { view } from "./view";
 
-// The devices of the apps on the link (step 6 of the device limit): each app that reports a device ID is a device of its own,
-// with rename and remove in its "more" menu; the shared place of the apps that report none; the hint when every place is taken.
+// The devices as the board draws them: the card of the places (the figure, the bar, "Add a device", the link), then the list: a tile,
+// the name, one quiet line, when it last updated, and "more", which opens the window of the device. The devices of the apps on the
+// link (each app that reports a device ID is a device of its own), the shared place of the apps that report none, the keys.
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
-const page = (d: MgData, over: Parameters<typeof state>[1] = {}, lang: "ru" | "en" | "zh" = "ru", a = actions()) => view(d, state("ios", { returning: true, ...over }, lang), a);
-/** The card of "My devices" (the page has other cards above it). */
-const card = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>("section.card")].find((x) => x.querySelector(".dev"))!;
-const names = (el: HTMLElement) => [...card(el).querySelectorAll(".dev .dev-n")].map(text);
+const page = (d: MgData, over: Parameters<typeof state>[1] = {}, lang: "ru" | "en" | "zh" | "fa" | "tr" = "ru", a = actions()) => view(d, state("ios", { returning: true, tab: "devices", devicesOpen: true, ...over }, lang), a);
+/** The places card and the list card. */
+const places = (el: HTMLElement) => el.querySelector<HTMLElement>(".u-dvh")!;
+const list = (el: HTMLElement) => el.querySelector<HTMLElement>(".u-dvl")!;
+const rows = (el: HTMLElement) => [...list(el).querySelectorAll<HTMLElement>(".u-dv")];
+const names = (el: HTMLElement) => rows(el).map((r) => text(r.querySelector(".nm")));
 const row = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`#amz-row-${id}`)!;
-const byName = (el: HTMLElement, name: string) => [...el.querySelectorAll<HTMLElement>(".dev")].find((x) => text(x.querySelector(".dev-n")) === name)!;
-/** The line under a name, part by part. */
-const line = (r: HTMLElement) => [...r.querySelector(".dev-m")!.children].map(text).filter((x) => x !== "·" && x !== "").join(" · ");
+const byName = (el: HTMLElement, name: string) => rows(el).find((x) => text(x.querySelector(".nm")) === name)!;
+/** The quiet line under a name (the phone's copy of the time left out), and the time of a computer. */
+const meta = (r: HTMLElement) => text(r.querySelector(".mt")).replace(text(r.querySelector(".mt .only-m")), "");
+const when = (r: HTMLElement) => text(r.querySelector(".when"));
 
 function fakeApi(over: Partial<Api> = {}): Api & { calls: string[] } {
   const calls: string[] = [];
@@ -89,43 +94,127 @@ describe("the page data of the link devices", () => {
   });
 });
 
+describe("the card of the places", () => {
+  it("the figure with its words, and the bar: a computer says 'places taken', a phone shortens it", () => {
+    const el = page(data("hwid-track"));
+    const p = places(el);
+    expect(p.getAttribute("aria-label")).toBe("Места для устройств");
+    expect(text(p.querySelector(".u-fig"))).toBe("4 из 5мест занято, свободно 1 местомест, свободно 1 место");
+    expect(text(p.querySelector(".u-fig .only-w"))).toBe("мест занято, свободно 1 место");
+    expect(text(p.querySelector(".u-fig .only-m"))).toBe("мест, свободно 1 место");
+    const bar = p.querySelector(".u-prog")!;
+    expect(bar.getAttribute("role")).toBe("img");
+    expect(bar.getAttribute("aria-label")).toBe("Занято 4 из 5");
+    expect(bar.querySelector("i")?.getAttribute("style")).toContain("width: 80%");
+    expect(bar.querySelector("i")?.classList.contains("full")).toBe(false);
+    expect(text(page(data("hwid-track"), {}, "en").querySelector(".u-fig .only-w"))).toBe("slots used, 1 slot free");
+  });
+
+  it("every place taken: the bar is amber and says no place is free; with the link apps refused it says how to free one, calmly", () => {
+    const el = page(data("hwid-full"));
+    const p = places(el);
+    expect(p.querySelector(".u-prog i")?.classList.contains("full")).toBe(true);
+    expect(text(p.querySelector(".u-fig .only-w"))).toBe("мест занято, свободных мест нет");
+    const hint = p.querySelector("#dev-full")!;
+    expect(text(hint)).toBe("Все места заняты. Удалите ненужное устройство и обновите подписку в приложении.");
+    expect(hint.getAttribute("role")).toBeNull(); // not an alert: nothing went wrong
+    expect(p.getAttribute("aria-describedby")).toBe("dev-full");
+    expect(text(places(page(data("hwid-full"), {}, "en")).querySelector("#dev-full"))).toBe("All slots are used. Remove an old device, then refresh the subscription in the app.");
+    expect(text(places(page(data("hwid-full"), {}, "zh")).querySelector("#dev-full"))).toBe("名额已用完。请删除不用的设备，然后在应用中更新订阅。");
+    // "Add a device" stays: the window says what can be done
+    expect(p.querySelector<HTMLButtonElement>("[data-k=dev-add]")?.disabled).toBe(false);
+  });
+
+  it("not in TRACK (nobody is refused), not with room left, not without the link apps", () => {
+    const has = (d: MgData) => page(d).querySelector("#dev-full") !== null;
+    expect(has(data("hwid-full", (d) => (d.link_device_limit = "track")))).toBe(false);
+    expect(has(data("hwid-full", (d) => (d.user.device_limit = 5)))).toBe(false);
+    expect(has(data("hwid-full", (d) => (d.access.happ = false)))).toBe(false);
+    expect(has(data("hwid-strict", (d) => ((d.user.device_limit = 3), (d.user.devices_used = 3))))).toBe(true);
+  });
+
+  it("no limit: the number alone, 'no limit' in words, no bar", () => {
+    const el = page(data("hwid-track", (d) => (d.user.device_limit = 0)));
+    expect(text(places(el).querySelector(".u-fig"))).toBe("4устройств, без ограничения");
+    expect(places(el).querySelector(".u-prog")).toBeNull();
+  });
+
+  it("'Add a device' opens the window; the link is copied by the button (both sizes), which says it is done", () => {
+    const a = actions();
+    const el = page(data("hwid-track"), {}, "ru", a);
+    const add = [...places(el).querySelectorAll("button")].filter((b) => text(b) === "Добавить устройство");
+    expect(add).toHaveLength(1);
+    expect(add[0]!.getAttribute("data-k")).toBe("dev-add");
+    expect(add[0]!.classList.contains("pri")).toBe(true);
+    add[0]!.click();
+    const desk = places(el).querySelector<HTMLButtonElement>("[data-k=dev-link-copy]")!;
+    const small = places(el).querySelector<HTMLButtonElement>("[data-k=dev-link-copy-m]")!;
+    expect([text(desk).startsWith("Скопировать ссылку"), desk.classList.contains("only-w"), desk.classList.contains("u-cpb")]).toEqual([true, true, true]);
+    expect([text(small).startsWith("Ссылка"), small.classList.contains("only-m")]).toEqual([true, true]);
+    desk.click();
+    small.click();
+    expect(a.log).toEqual(["add true", `copy ${data("hwid-track").subscription_url}`, "mark", `copy ${data("hwid-track").subscription_url}`, "mark"]);
+    expect(desk.dataset.cp).toBe("done");
+  });
+
+  it("keys alone: no link to copy; no way to connect at all: no buttons", () => {
+    const keys = page(data("many", (d) => (d.access.happ = false)));
+    expect(places(keys).querySelector("[data-k=dev-add]")).not.toBeNull();
+    expect(places(keys).querySelector("[data-k^=dev-link-copy]")).toBeNull();
+    const none = page(data("many", (d) => ((d.access.happ = false), (d.access.amnezia = false), (d.apps = []))));
+    expect(places(none).querySelector("button")).toBeNull();
+  });
+
+  it("zero devices: the figure and one line that says to add the first", () => {
+    const el = page(data("amnezia-empty", (d) => ((d.devices = []), (d.access.happ = false), (d.user.devices_used = 0))));
+    expect(text(places(el).querySelector(".u-fig .only-w"))).toBe("мест занято, свободно 3 места");
+    expect(rows(el)).toHaveLength(0);
+    expect(text(list(el).querySelector(".u-empty"))).toBe("Устройств пока нет. Добавьте первое, и оно появится здесь");
+    expect(list(el).querySelector(".u-more")).toBeNull();
+  });
+});
+
 describe("the rows of the link devices", () => {
-  it("one row per device, the one online first, then the shared place; a name and one quiet line, no versions in the list", () => {
+  it("one row per device, the one online first, then the shared place; a tile, a name and what the app said", () => {
     const el = page(data("hwid-track"));
     expect(names(el)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM", "Приложения без ID устройства"]);
-    expect(line(row(el, "l1"))).toBe("в сети");
-    expect(line(row(el, "l2"))).toBe("обновлялось позавчера");
-    expect(row(el, "l1").querySelectorAll(".dev-m:not(.dev-det)")).toHaveLength(1);
-    // what the apps said is in the details (hidden until asked) and the tooltip, never in the list itself
-    const seen = card(el).cloneNode(true) as HTMLElement;
-    seen.querySelectorAll("[hidden], [role=tooltip]").forEach((x) => x.remove());
-    expect(seen.textContent).not.toMatch(/18\.1|Happ|mihomo|HWID/);
+    expect(meta(row(el, "l1"))).toBe("iOS 18.1 · Happ 3.4.2");
+    expect(meta(row(el, "l2"))).toBe("Android 15 · Happ 3.4.1");
+    expect(meta(row(el, "l3"))).toBe("Windows 10.0.26100 · mihomo 1.19.31");
+    expect(row(el, "l1").querySelector(".tl svg")).not.toBeNull();
+    expect(row(el, "l1").querySelector(".tl")?.getAttribute("aria-hidden")).toBe("true");
     // the one online sorts first whatever the server's order
     expect(names(page(data("hwid-track", (d) => d.devices.reverse())))[0]).toBe("iPhone 15");
+    // no device is a row of the old kind
+    expect(el.querySelector(".dev, .dev-n, .dev-m, .dev-body")).toBeNull();
   });
 
-  it("rename and remove sit in a 'more' menu, never as buttons on the row; the shared place has none", () => {
+  it("when it last updated: a computer has its own column, a phone has the time at the end of the quiet line; online has a dot", () => {
     const el = page(data("hwid-track"));
-    const more = row(el, "l2").querySelector<HTMLButtonElement>("[data-k=amz-more-l2]")!;
-    expect(more.getAttribute("aria-haspopup")).toBe("menu");
-    expect(more.getAttribute("aria-expanded")).toBe("false");
-    expect(more.getAttribute("aria-label")).toBe("Ещё: переименовать, удалить");
-    expect(more.getAttribute("aria-describedby")).toBe("dev-n-l2"); // the name of the device it belongs to
-    expect([...row(el, "l2").querySelectorAll("button")].map((b) => b.getAttribute("data-k"))).toEqual(["dev-body-l2", "amz-more-l2"]); // the row's own details, and "more"
-    expect(byName(el, "Приложения без ID устройства").querySelector("[data-k^=amz-more-]")).toBeNull();
+    expect(when(row(el, "l1"))).toBe("в сети");
+    expect(row(el, "l1").querySelector(".when .u-dot")).not.toBeNull();
+    expect(when(row(el, "l2"))).toBe("обновлялось позавчера");
+    expect(row(el, "l2").querySelector(".when")?.classList.contains("only-w")).toBe(true);
+    expect(text(row(el, "l2").querySelector(".mt .only-m"))).toBe(" · обновлялось позавчера");
+    expect(row(el, "l2").querySelector(".mt .only-m")?.classList.contains("only-m")).toBe(true);
+    expect(when(page(data("hwid-track"), {}, "en").querySelector<HTMLElement>("#amz-row-l2")!)).toBe("updated 2 days ago");
   });
 
-  it("the menu: rename, then a red remove; they start the rename and the question", () => {
+  it("'more' is one button on the row: the window of the device opens; it names the device and says it opens a window", () => {
     const a = actions();
     const log: string[] = [];
-    a.amz = { ...a.amz, renameStart: (id) => log.push(`rename ${id}`), ask: (c) => log.push(`ask ${c?.kind} ${c?.id}`) };
-    const el = page(data("hwid-track"), { amz: { ...state().amz, menu: "l2" } }, "ru", a);
-    const menu = row(el, "l2").querySelector("[role=menu]")!;
-    expect([...menu.querySelectorAll("[role=menuitem]")].map(text)).toEqual(["Переименовать", "Удалить"]);
-    expect(menu.querySelector("[data-k=amz-m-del-l2]")?.classList.contains("bad")).toBe(true);
-    menu.querySelector<HTMLButtonElement>("[data-k=amz-m-ren-l2]")!.click();
-    menu.querySelector<HTMLButtonElement>("[data-k=amz-m-del-l2]")!.click();
-    expect(log).toEqual(["rename l2", "ask remove l2"]);
+    a.amz = { ...a.amz, menu: (id) => void log.push(`menu ${id}`) };
+    const el = page(data("hwid-track"), {}, "ru", a);
+    const more = row(el, "l2").querySelector<HTMLButtonElement>("[data-k=amz-more-l2]")!;
+    expect(more.classList.contains("u-ic")).toBe(true);
+    expect(more.getAttribute("aria-label")).toBe("Ещё: Pixel 8");
+    expect(more.getAttribute("aria-haspopup")).toBe("dialog");
+    expect([...row(el, "l2").querySelectorAll("button")]).toEqual([more]);
+    more.click();
+    expect(log).toEqual(["menu l2"]);
+    // nothing of the old row is left in it: no menu, no question, no field
+    expect(el.querySelector(".menu, [role=menu], [role=alertdialog], form, input")).toBeNull();
+    expect(byName(el, "Приложения без ID устройства").querySelector("button")).toBeNull();
   });
 
   it("nothing to press where the person may not change the device (the admin's preview, self-service off)", () => {
@@ -134,22 +223,167 @@ describe("the rows of the link devices", () => {
     expect(names(el)).toHaveLength(4);
   });
 
-  it("the question says which device it is (what the app said) and what removing does; the safe answer first", () => {
-    const el = page(data("hwid-track"), { amz: { ...state().amz, confirm: { id: "l2", kind: "remove" } } });
-    const q = row(el, "l2");
-    expect(q.getAttribute("role")).toBe("alertdialog");
-    expect(text(q.querySelector(".dev-n"))).toBe("Удалить «Pixel 8»?");
-    expect(text(q.querySelector(".dev-about"))).toBe("Android 15 · Happ 3.4.1");
-    expect(text(q.querySelector(`#${q.getAttribute("aria-describedby")}`))).toBe("Android 15 · Happ 3.4.1Приложение на этом устройстве перестанет подключаться. Место освободится.");
-    expect([...q.querySelectorAll("button")].map((b) => b.getAttribute("data-k"))).toEqual(["amz-no-l2", "amz-yes-l2"]);
+  it("a device that said nothing has the platform's word instead, unless that is its name already", () => {
+    const quiet = page(data("hwid-full", (d) => d.devices.forEach((x) => ((x.os_version = ""), (x.client = "")))));
+    expect(meta(row(quiet, "l1"))).toBe("iPhone");
+    expect(meta(row(quiet, "l2"))).toBe("Android");
+    const named = page(data("hwid-full", (d) => d.devices.forEach((x) => ((x.os_version = ""), (x.client = ""), (x.model = "")))));
+    expect(names(named).slice(0, 2)).toEqual(["iPhone", "Android"]);
+    expect(meta(row(named, "l1"))).toBe("");
   });
 
-  it("rename is edited in the row, like a key's", () => {
-    const el = page(data("hwid-track"), { amz: { ...state().amz, rename: { id: "l1", value: "iPhone 15" } } });
-    const f = row(el, "l1");
-    expect(f.tagName).toBe("FORM");
-    expect(f.querySelector<HTMLInputElement>("#ren-l1")?.value).toBe("iPhone 15");
-    expect(text(f.querySelector("label"))).toBe("Название устройства");
+  it("the tile is the board's: a phone, a Mac, a computer; a device with no platform has a plain one", () => {
+    const d = data("hwid-track", (x) => ((x.devices[2]!.platform = "macos"), x.devices.push({ ...x.devices[0]!, id: "l9", platform: "", model: "", online: false, last_seen_unix: 1 })));
+    const el = page(d, { devicesOpen: true });
+    const path = (id: string) => row(el, id).querySelector(".tl svg path")?.getAttribute("d") ?? "";
+    expect(path("l1")).toBe(path("l2")); // both phones: one tile
+    expect(path("l1")).toContain("M9.3 2.5h5.4");
+    expect(path("l3")).toContain("M5 15.5v-9"); // a Mac
+    expect(names(el)).toContain("Устройство");
+  });
+});
+
+describe("the shared place, by the mode", () => {
+  const shared = (el: HTMLElement) => byName(el, "Приложения без ID устройства");
+
+  it("TRACK and ENFORCE: they share one place and the last app; when they last updated is its own column", () => {
+    for (const name of ["hwid-track", "hwid-full"]) {
+      const r = shared(page(data(name)));
+      expect(meta(r)).toBe("одно место на всех · последнее приложение: HiddifyNext 2.5.7");
+      expect(when(r)).toBe("обновлялись 9 дней назад");
+    }
+    expect(when(shared(page(data("hwid-full", (d) => (d.devices.find((x) => x.kind === "shared")!.online = true)))))).toBe("в сети");
+    expect(meta(byName(page(data("hwid-track"), {}, "en"), "Apps without a device ID"))).toBe("one slot for all · last app: HiddifyNext 2.5.7");
+    expect(meta(byName(page(data("hwid-track"), {}, "zh"), "不提供设备 ID 的应用"))).toBe("共用一个名额 · 最近的应用：HiddifyNext 2.5.7");
+  });
+
+  it("STRICT: a quiet row that is no device says the apps without a device ID do not connect, and which to use", () => {
+    const el = page(data("hwid-strict"));
+    const r = shared(el);
+    expect(meta(r)).toBe("не подключатся — нужен Happ или kl!ck");
+    expect(r.classList.contains("quiet")).toBe(true);
+    expect(r.querySelector("button")).toBeNull();
+    expect(r.querySelector(".when")).toBeNull();
+    expect(names(el).at(-1)).toBe("Приложения без ID устройства");
+    // a shared place left over says the same
+    expect(meta(shared(page(data("hwid-full", (d) => (d.link_device_limit = "strict")))))).toBe("не подключатся — нужен Happ или kl!ck");
+    // with no app at all, STRICT says it instead of "not connected yet"
+    expect(names(page(data("hwid-strict", (d) => (d.devices = []))))).toEqual(["Приложения без ID устройства"]);
+  });
+
+  it("before any app took the link: the link's own row, 'not connected yet'; the link to copy is on the card above", () => {
+    const el = page(data("hwid-track", (d) => (d.devices = [])));
+    expect(names(el)).toEqual(["Приложения по ссылке"]);
+    expect(when(byName(el, "Приложения по ссылке"))).toBe("ещё не подключались");
+    expect(byName(el, "Приложения по ссылке").querySelector("button")).toBeNull();
+    expect(el.querySelector("[data-k=dev-link-copy]")?.closest(".u-dvh")?.querySelector("[data-k=dev-add]")).not.toBeNull();
+  });
+});
+
+describe("the Telegram and TrustTunnel keys", () => {
+  const tg = (over: Partial<MgData["devices"][number]>) =>
+    data("hwid-track", (d) =>
+      d.devices.push({ ...d.devices.find((x) => x.kind === "link")!, id: "dev_tg", kind: "telegram", model: "Telegram proxy", app: "telegram", can_remove: false, can_rename: false, online: false, last_seen_unix: 0, ...over }),
+    );
+  // the list is long here: unfolded, so the key's row is on the page wherever it sorts
+  const open = { devicesOpen: true };
+
+  it("says when Telegram last used it, in its own words, with nothing to rename or remove", () => {
+    expect(when(row(page(tg({}), open), "dev_tg"))).toBe("ещё не подключался");
+    expect(when(row(page(tg({ online: true }), open), "dev_tg"))).toBe("в сети");
+    expect(when(row(page(tg({ last_seen_unix: Math.floor(Date.now() / 1000) - 9 * 86400 }), open), "dev_tg"))).toBe("подключался 9 дней назад");
+    const r = row(page(tg({}), open), "dev_tg");
+    expect(text(r.querySelector(".nm"))).toBe("Telegram-прокси");
+    expect(r.querySelector("button")).toBeNull();
+    expect(when(row(page(tg({}), open, "en"), "dev_tg"))).toBe("not connected yet");
+  });
+
+  it("keeps its kind through the page's own reading of the data", () => {
+    expect(normalize({ ...data("hwid-track"), devices: [{ id: "dev_tg", kind: "telegram", platform: "", model: "Telegram proxy", app: "telegram" }] }).devices[0]!.kind).toBe("telegram");
+  });
+
+  it("the TrustTunnel key has a name of its own and nothing to remove or rename", () => {
+    const el = page(data("trusttunnel"), { returning: true, tab: "devices" }, "en");
+    const r = byName(el, "TrustTunnel key");
+    expect(r).toBeTruthy();
+    expect(r.querySelector("button")).toBeNull();
+    expect(when(r)).toContain("connected");
+    expect(r.querySelector(".tl svg")).not.toBeNull();
+  });
+
+  it("a subscription that is not active shows the TrustTunnel key among the devices, with no tabs", () => {
+    const el = view(data("trusttunnel-disabled"), state("ios", {}, "en"), actions());
+    expect(el.querySelector(".u-tabs")).toBeNull();
+    expect(names(el)).toContain("TrustTunnel key");
+  });
+});
+
+describe("the keys of the AmneziaVPN app", () => {
+  it("each key: the name, what kind of key it is, when it last connected; no profile or address", () => {
+    const el = page(data("many"));
+    expect(names(el)).toEqual(["Приложения без ID устройства", "Pixel 7", "MacBook", "Windows"]);
+    expect(meta(row(el, "d3"))).toBe("Ключ AmneziaVPN · Германия, Финляндия · AWG 3.1");
+    expect(when(row(el, "d3"))).toBe("в сети");
+    expect(when(row(el, "d4"))).toBe("подключалось 12 дней назад");
+    expect(when(row(el, "d5"))).toBe("ещё не подключалось");
+    expect(el.textContent).not.toMatch(/Main|10\.66|fd66/);
+    expect(meta(row(page(data("many"), {}, "en"), "d3"))).toBe("AmneziaVPN key · Germany, Финляндия · AWG 3.1".replace("Финляндия", "Finland"));
+  });
+
+  it("a key of a router has the board's router tile", () => {
+    const el = page(data("devices-rich"), { devicesOpen: true });
+    expect(names(el)).toContain("Router");
+    expect(row(el, "d6").querySelector(".tl svg path")?.getAttribute("d")).toContain("M5 13h14");
+  });
+
+  it("'more' opens the window of the key, when the page may issue keys (self-service)", () => {
+    const a = actions();
+    const log: string[] = [];
+    a.amz = { ...a.amz, menu: (id) => void log.push(`menu ${id}`) };
+    const el = page(data("many"), {}, "ru", a);
+    el.querySelector<HTMLButtonElement>("[data-k=amz-more-d3]")!.click();
+    expect(log).toEqual(["menu d3"]);
+    expect(row(el, "d3").querySelector("[data-k=amz-more-d3]")?.getAttribute("aria-label")).toBe("Ещё: Pixel 7");
+    // the owner issues the keys, or the page is the admin's preview: rows without buttons
+    expect(page(data("amnezia-off")).querySelector("[data-k^=amz-more-d]")).toBeNull();
+    expect(page(data("many", (d) => (d.amnezia!.endpoints = ""))).querySelector("[data-k^=amz-more-d]")).toBeNull();
+  });
+
+  it("a stale key says so, with a button for the new key (the page's own window asks first)", () => {
+    const a = actions({ amz: { ...amzNoop, stale: (id) => void a.log.push(`stale ${id}`) } });
+    const el = page(data("stale"), {}, "ru", a);
+    const r = row(el, "d3");
+    expect(r.classList.contains("stale")).toBe(true);
+    expect(text(r.querySelector(".u-tag.work"))).toBe("нужен новый ключ");
+    const btn = r.querySelector<HTMLButtonElement>("[data-k=amz-stale-d3]")!;
+    expect([text(btn), btn.classList.contains("pri")]).toEqual(["Получить новый ключ", true]);
+    btn.click();
+    expect(a.log).toEqual(["stale d3"]);
+    expect(el.querySelector(".stale-card, .stale .h3")).toBeNull(); // the card that listed the keys is gone
+    // two stale keys: a button each, with its own key for the keyboard
+    const two = data("many");
+    two.amnezia!.devices.forEach((x) => (x.stale = true));
+    expect([...page(two).querySelectorAll("[data-k^=amz-stale-]")].map((b) => b.getAttribute("data-k"))).toEqual(["amz-stale-d3", "amz-stale-d4", "amz-stale-d5"]);
+    expect(text(page(data("stale"), {}, "en").querySelector(".u-tag.work"))).toBe("new key needed");
+  });
+
+  it("a stale key without self-service has the mark and says why there is no button; one that is not active has neither", () => {
+    const el = page(data("stale", (d) => (d.amnezia!.self_service = false)));
+    expect(el.querySelector("[data-k^=amz-stale-]")).toBeNull();
+    expect(plain(row(el, "d3").querySelector(".u-tag.work")?.getAttribute("title"))).toBe("Ключи выдаёт администратор — напишите, если нужен новый.");
+    const off = view(data("stale", (x) => (x.user.status = "expired")), state("ios", { tab: "devices" }), actions());
+    expect(off.querySelector(".u-tag.work, [data-k^=amz-stale-]")).toBeNull();
+  });
+
+  it("a busy row: a spinner on the button that was pressed, no second press; the other rows stay", () => {
+    const am = { ...newAmzState("ios", "p31", "ios"), busy: "d3" };
+    const busy = row(page(data("many"), { amz: am }), "d3");
+    const more = busy.querySelector<HTMLButtonElement>("[data-k=amz-more-d3]")!;
+    expect([more.disabled, more.getAttribute("aria-busy"), more.querySelector(".spin") !== null]).toEqual([true, "true", true]);
+    const stale = row(page(data("stale"), { amz: { ...am, busy: "renew:d3" } }), "d3");
+    expect(text(stale.querySelector("[data-k=amz-stale-d3]"))).toBe("Секунду…");
+    expect(stale.querySelector<HTMLButtonElement>("[data-k=amz-stale-d3]")?.disabled).toBe(true);
+    expect(row(page(data("many"), { amz: am }), "d4").querySelector<HTMLButtonElement>("[data-k=amz-more-d4]")?.disabled).toBe(false);
   });
 });
 
@@ -194,14 +428,17 @@ describe("remove and rename call the link's own address", () => {
 });
 
 describe("the errors, in words", () => {
-  it("the hourly budget of changes, with the minutes; the shared place; a device that is gone", async () => {
+  it("the hourly budget of changes, with the minutes, under the row; the shared place; a device that is gone", async () => {
     const { st, a } = rig("hwid-full", fakeApi({ revokeDevice: async () => Promise.reject(new ApiError(429, "too_many_requests", 1800)) }));
     a.remove("l2");
     await settle();
     expect(st.amz).toMatchObject({ error: "too_many_requests", errorAt: "l2", retryMin: 30 });
-    const el = view(data("hwid-full"), { ...state("ios", { returning: true }), amz: st.amz }, actions());
-    expect(text(row(el, "l2").querySelector(".note.bad"))).toBe("Слишком много действий подряд. Попробуйте через 30 мин.");
-    expect(row(el, "l2").querySelector(".note.bad")?.getAttribute("role")).toBe("alert");
+    const el = view(data("hwid-full"), { ...state("ios", { returning: true, tab: "devices" }), amz: st.amz }, actions());
+    const err = row(el, "l2").nextElementSibling!;
+    expect(err.classList.contains("a-err")).toBe(true);
+    expect(text(err)).toBe("Слишком много действий подряд. Попробуйте через 30 мин.");
+    expect(err.getAttribute("role")).toBe("alert");
+    expect(row(el, "l1").nextElementSibling?.classList.contains("a-err")).toBe(false);
     expect(plain(dict.ru.err("shared_device", 0))).toBe("Это место общее для приложений без ID устройства — его нельзя удалить или переименовать.");
     expect(plain(dict.en.err("shared_device", 0))).toBe("This slot is shared by the apps without a device ID — it can’t be removed or renamed.");
     expect(dict.zh.err("shared_device", 0)).toBe("这是不提供设备 ID 的应用共用的名额，无法删除或重命名。");
@@ -209,171 +446,89 @@ describe("the errors, in words", () => {
     expect(dict.ru.err("not_found", 0)).toBe("Такого устройства уже нет. Обновите страницу.");
   });
 
-  it("a failed rename keeps the editor open with the error under it", async () => {
-    const { st, a } = rig("hwid-full", fakeApi({ renameDevice: async () => Promise.reject(new ApiError(409, "shared_device")) }));
+  it("a failed rename keeps its error where it happened; the row of that device shows it", async () => {
+    const { st, a, d } = rig("hwid-full", fakeApi({ renameDevice: async () => Promise.reject(new ApiError(409, "shared_device")) }));
     a.renameStart("l1");
     a.renameInput("Другое имя");
     a.renameSave();
     await settle();
     expect(st.amz).toMatchObject({ error: "shared_device", errorAt: "rename:l1", busy: "" });
     expect(st.amz.rename).not.toBeNull();
-  });
-});
-
-describe("the shared place, by the mode", () => {
-  const shared = (el: HTMLElement) => byName(el, "Приложения без ID устройства");
-
-  it("TRACK and ENFORCE: one short line, they share one place, and when they last updated", () => {
-    for (const name of ["hwid-track", "hwid-full"]) expect(line(shared(page(data(name))))).toBe("одно место на всех · 9 дней назад");
-    expect(line(shared(page(data("hwid-full", (d) => (d.devices.find((x) => x.kind === "shared")!.online = true)))))).toBe("одно место на всех · в сети");
-    expect(line(byName(page(data("hwid-track"), {}, "en"), "Apps without a device ID"))).toBe("one slot for all · 9 days ago");
-    expect(text(byName(page(data("hwid-track"), {}, "zh"), "不提供设备 ID 的应用").querySelector(".dev-m"))).toBe("共用一个名额·9天前"); // the time is Intl's
-  });
-
-  it("STRICT: a quiet row that is no device says the apps without a device ID do not connect, and which to use", () => {
-    const el = page(data("hwid-strict"));
-    const r = shared(el);
-    expect(line(r)).toBe("не подключатся — нужен Happ или kl!ck");
-    expect(r.querySelector(".tile.dash")).not.toBeNull();
-    expect(r.querySelector("button")).toBeNull();
-    expect(names(el).at(-1)).toBe("Приложения без ID устройства");
-    // a shared place left over says the same
-    expect(line(shared(page(data("hwid-full", (d) => (d.link_device_limit = "strict")))))).toBe("не подключатся — нужен Happ или kl!ck");
-    // with no app at all, STRICT says it instead of "not connected yet"
-    expect(names(page(data("hwid-strict", (d) => (d.devices = []))))).toEqual(["Приложения без ID устройства"]);
-  });
-
-  it("before any app took the link: the link's own row (the old one); the link to copy is next to 'Add a device'", () => {
-    const el = page(data("hwid-track", (d) => (d.devices = [])));
-    expect(names(el)).toEqual(["Приложения по ссылке"]);
-    expect(line(byName(el, "Приложения по ссылке"))).toBe("ещё не подключались");
-    expect(byName(el, "Приложения по ссылке").querySelector("button")).toBeNull();
-    expect(el.querySelector("[data-k=dev-link-copy]")?.closest(".dev")?.querySelector("[data-k=dev-add]")).not.toBeNull();
-  });
-});
-
-describe("the Telegram proxy key", () => {
-  const tg = (over: Partial<MgData["devices"][number]>) =>
-    data("hwid-track", (d) =>
-      d.devices.push({ ...d.devices.find((x) => x.kind === "link")!, id: "dev_tg", kind: "telegram", model: "Telegram proxy", app: "telegram", can_remove: false, can_rename: false, online: false, last_seen_unix: 0, ...over }),
-    );
-
-  // the list is long here: unfolded, so the key's row is on the page wherever it sorts
-  const open = { devicesOpen: true };
-
-  it("says when Telegram last used it, in its own words, with nothing to rename or remove", () => {
-    expect(line(row(page(tg({}), open), "dev_tg"))).toBe("ещё не подключался");
-    expect(line(row(page(tg({ online: true }), open), "dev_tg"))).toBe("в сети");
-    expect(line(row(page(tg({ last_seen_unix: Math.floor(Date.now() / 1000) - 9 * 86400 }), open), "dev_tg"))).toBe("подключался 9 дней назад");
-    const r = row(page(tg({}), open), "dev_tg");
-    expect(text(r.querySelector(".dev-n"))).toBe("Telegram-прокси");
-    expect(r.querySelector("button")).toBeNull();
-    expect(line(row(page(tg({}), open, "en"), "dev_tg"))).toBe("not connected yet");
-  });
-
-  it("keeps its kind through the page's own reading of the data", () => {
-    expect(normalize({ ...data("hwid-track"), devices: [{ id: "dev_tg", kind: "telegram", platform: "", model: "Telegram proxy", app: "telegram" }] }).devices[0]!.kind).toBe("telegram");
-  });
-});
-
-describe("every place taken", () => {
-  const hint = (el: HTMLElement) => card(el).previousElementSibling!.querySelector(".sec-sub");
-
-  it("ENFORCE: a calm line under the title, two sentences; the card points to it; 'all slots are used' under 'Add' is not said twice", () => {
-    const el = page(data("hwid-full"));
-    expect(text(hint(el))).toBe("Все места заняты. Удалите ненужное устройство и обновите подписку в приложении.");
-    expect(hint(el)?.getAttribute("role")).toBeNull(); // not an alert: nothing went wrong
-    expect(card(el).getAttribute("aria-describedby")).toBe(hint(el)?.id);
-    expect(el.querySelector(".slots.full")).not.toBeNull();
-    expect(el.querySelector(".dev-hint")).toBeNull();
-    expect(text(hint(page(data("hwid-full"), {}, "en")))).toBe("All slots are used. Remove an old device, then refresh the subscription in the app.");
-    expect(text(hint(page(data("hwid-full"), {}, "zh")))).toBe("名额已用完。请删除不用的设备，然后在应用中更新订阅。");
-  });
-
-  it("not in TRACK (nobody is refused), not with room left, not without the link apps", () => {
-    const has = (d: MgData) => page(d).querySelector("#dev-full") !== null;
-    expect(has(data("hwid-full", (d) => (d.link_device_limit = "track")))).toBe(false);
-    expect(has(data("hwid-full", (d) => (d.user.device_limit = 5)))).toBe(false);
-    expect(has(data("hwid-full", (d) => (d.access.happ = false)))).toBe(false);
-    expect(has(data("hwid-strict", (d) => ((d.user.device_limit = 3), (d.user.devices_used = 3))))).toBe(true);
+    const el = view(d, { ...state("ios", { returning: true, tab: "devices" }), amz: st.amz }, actions());
+    expect(row(el, "l1").nextElementSibling?.classList.contains("a-err")).toBe(true);
   });
 });
 
 describe("a long list folds", () => {
-  it("more than four devices with room left: three rows and 'show N more', which unfolds and folds again", () => {
+  const fold = (el: HTMLElement) => el.querySelector<HTMLButtonElement>("[data-k=dev-fold]");
+
+  it("more than three devices: three rows and 'show N more', which unfolds and folds again", () => {
     const a = actions();
-    const el = page(data("hwid-long"), {}, "ru", a);
+    const el = page(data("hwid-long"), { devicesOpen: false }, "ru", a);
     expect(names(el)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM"]);
-    const fold = el.querySelector<HTMLButtonElement>("[data-k=dev-fold]")!;
-    expect(text(fold)).toBe("Показать ещё 3");
-    expect(fold.getAttribute("aria-expanded")).toBe("false");
-    fold.click();
+    expect(text(fold(el))).toBe("Показать ещё 3");
+    expect(fold(el)!.getAttribute("aria-expanded")).toBe("false");
+    expect(fold(el)!.closest(".u-more")).not.toBeNull();
+    fold(el)!.click();
     expect(a.log).toEqual(["devices-open true"]);
-    const open = page(data("hwid-long"), { devicesOpen: true });
+    const open = page(data("hwid-long"));
     expect(names(open)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM", "iPad", "Приложения без ID устройства", "Router"]);
-    expect(text(open.querySelector("[data-k=dev-fold]"))).toBe("Свернуть");
-    expect(open.querySelector("[data-k=dev-fold]")?.getAttribute("aria-expanded")).toBe("true");
-    expect(text(page(data("hwid-long"), {}, "en").querySelector("[data-k=dev-fold]"))).toBe("Show 3 more");
-    expect(text(page(data("hwid-long"), {}, "zh").querySelector("[data-k=dev-fold]"))).toBe("再显示 3 台");
+    expect(text(fold(open))).toBe("Свернуть");
+    expect(fold(open)!.getAttribute("aria-expanded")).toBe("true");
+    expect(text(fold(page(data("hwid-long"), { devicesOpen: false }, "en")))).toBe("Show 3 more");
+    expect(text(fold(page(data("hwid-long"), { devicesOpen: false }, "zh")))).toBe("再显示 3 台");
   });
 
-  it("never when every place is taken (that is when an old device is looked for), nor at four rows", () => {
-    const dense = page(data("hwid-dense"));
-    expect(names(dense)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM", "Приложения без ID устройства", "Router"]);
-    expect(dense.querySelector("[data-k=dev-fold]")).toBeNull();
-    expect(page(data("hwid-track")).querySelector("[data-k=dev-fold]")).toBeNull();
+  it("the board folds at four rows too, and when every place is taken; three rows are all shown", () => {
+    const dense = page(data("hwid-dense"), { devicesOpen: false });
+    expect(names(dense)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM"]);
+    expect(text(fold(dense))).toBe("Показать ещё 2");
+    expect(fold(page(data("hwid-dense"), { devicesOpen: true }))).not.toBeNull();
+    expect(fold(page(data("hwid-track", (d) => (d.devices = d.devices.slice(0, 3))), { devicesOpen: false }))).toBeNull();
   });
 });
 
-describe("the details of a row: one tap, or a hover", () => {
-  it("the row is a disclosure: a button with aria-expanded and aria-controls, the details hidden, a tooltip describing it", () => {
-    const a = actions();
-    const el = page(data("hwid-full"), {}, "ru", a);
-    const btn = row(el, "l1").querySelector<HTMLButtonElement>("button.dev-body")!;
-    expect(btn.getAttribute("data-k")).toBe("dev-body-l1");
-    expect(btn.getAttribute("aria-expanded")).toBe("false");
-    const det = el.querySelector<HTMLElement>(`#${btn.getAttribute("aria-controls")}`)!;
-    expect(det.hidden).toBe(true);
-    expect(text(det)).toBe("iOS 18.1 · Happ 3.4.2");
-    const tip = el.querySelector(`#${btn.getAttribute("aria-describedby")}`)!;
-    expect(tip.getAttribute("role")).toBe("tooltip");
-    expect(text(tip)).toBe("iOS 18.1 · Happ 3.4.2");
-    expect(btn.nextElementSibling).toBe(tip); // the CSS shows it for the button's hover and focus
-    expect(btn.querySelector(".dev-chev")?.getAttribute("aria-hidden")).toBe("true");
-    expect(text(btn.querySelector(".dev-n"))).toBe("iPhone 15");
-    btn.click();
-    expect(a.log).toEqual(["details l1"]);
+describe("a subscription that is not active", () => {
+  it("keeps the devices, with no tabs: the places card says why nothing can be added, the rows can still be changed", () => {
+    for (const name of ["expired", "quota", "disabled"]) {
+      const el = view(data(name), state("android", { returning: true }), actions());
+      expect(el.querySelector(".u-tabs")).toBeNull();
+      const add = el.querySelector<HTMLButtonElement>("[data-k=dev-add]")!;
+      expect(add.disabled).toBe(true);
+      expect(add.getAttribute("aria-describedby")).toBe("why-off");
+      expect(text(el.querySelector("#why-off"))).toBe(name === "disabled" ? "Подписка отключена, ключи не выдаются. Удалить или переименовать устройство можно." : "Подписка сейчас не активна — ключи не выдаются. Удалить или переименовать устройство можно.");
+      expect(el.querySelector("[data-k=amz-more-d3]")?.getAttribute("aria-label")).toBe("Ещё: Pixel 7");
+      expect(el.querySelector("[data-k^=dev-link-copy]")).toBeNull();
+      expect(el.querySelector(".u-tbl")).toBeNull();
+    }
   });
 
-  it("open: the second line shows in place, the chevron turns, the tooltip is gone; a tap closes it; one row at a time", () => {
-    const a = actions();
-    const el = page(data("hwid-full"), { details: "l2" }, "ru", a);
-    const btn = row(el, "l2").querySelector<HTMLButtonElement>("button.dev-body")!;
-    expect(btn.getAttribute("aria-expanded")).toBe("true");
-    expect(btn.hasAttribute("aria-describedby")).toBe(false);
-    expect(row(el, "l2").querySelector("[role=tooltip]")).toBeNull();
-    const det = row(el, "l2").querySelector<HTMLElement>(".dev-det")!;
-    expect(det.hidden).toBe(false);
-    expect(text(det)).toBe("Android 15 · Happ 3.4.1");
-    expect(row(el, "l1").querySelector<HTMLElement>(".dev-det")!.hidden).toBe(true);
-    btn.click();
-    expect(a.log).toEqual(["details null"]);
+  it("with no device at all there is nothing to show", () => {
+    const el = view(data("disabled", (d) => ((d.devices = []), (d.amnezia!.devices = []))), state("android"), actions());
+    expect(el.querySelector(".u-dvh, .u-dvl")).toBeNull();
+  });
+});
+
+describe("the page as a whole", () => {
+  it("every focus key is its own, on every tab, so the page can put the focus back after it is drawn", () => {
+    for (const name of ["hwid-long", "many", "telegram", "trusttunnel", "stale", "dns-both"]) {
+      for (const tab of ["servers", "telegram", "trusttunnel", "devices"] as const) {
+        const el = view(data(name), state("windows", { tab, returning: true, devicesOpen: true }), actions());
+        const keys = [...el.querySelectorAll("[data-k]")].map((x) => x.getAttribute("data-k")!).filter((k) => !k.startsWith("hero-"));
+        expect(keys.filter((k, i) => keys.indexOf(k) !== i), `${name} ${tab}`).toEqual([]);
+      }
+    }
   });
 
-  it("only rows with something to show: a device that said nothing, the shared place without a last app, a key, STRICT's row", () => {
-    const quiet = page(data("hwid-full", (d) => d.devices.forEach((x) => ((x.os_version = ""), (x.client = "")))));
-    expect(quiet.querySelector(".dev-body, .dev-chev, [role=tooltip]")).toBeNull();
-    expect(names(quiet)).toEqual(["iPhone 15", "Pixel 8", "DESKTOP-4F7K2LM", "Приложения без ID устройства"]);
-    expect(page(data("hwid-dense")).querySelector("#amz-row-d6 .dev-body")).toBeNull();
-    expect(page(data("hwid-strict")).querySelectorAll(".dev-body")).toHaveLength(3);
-  });
-
-  it("the shared place opens to the last app that used it", () => {
-    const el = page(data("hwid-full"), { details: "d1" });
-    const r = byName(el, "Приложения без ID устройства");
-    expect(text(r.querySelector(".dev-det"))).toBe("последнее приложение: HiddifyNext 2.5.7");
-    expect(line(r)).toBe("одно место на всех · 9 дней назад");
-    expect(text(byName(page(data("hwid-full"), { details: "d1" }, "en"), "Apps without a device ID").querySelector(".dev-det"))).toBe("last app: HiddifyNext 2.5.7");
-    expect(text(byName(page(data("hwid-full"), { details: "d1" }, "zh"), "不提供设备 ID 的应用").querySelector(".dev-det"))).toBe("最近的应用：HiddifyNext 2.5.7");
+  it("the words of the devices are in all five languages", () => {
+    for (const lang of langs) {
+      const w = dict[lang];
+      for (const k of ["dvSlotsAria", "dvUnl", "linkShort", "devNone", "srvNone", "thServer", "thRoute", "thDns"] as const) expect(w[k], `${lang} ${k}`).toBeTruthy();
+      expect(w.dvTail(true, "x")).toContain("x");
+      expect(w.dvTail(false, "x")).toContain("x");
+      expect(w.dvMoreAria("Pixel")).toContain("Pixel");
+      expect(w.keyMeta("AmneziaVPN", "AWG 3.1")).toContain("AWG 3.1");
+    }
+    expect(dict.ru.devNone).toBe("Устройств пока нет. Добавьте первое, и оно появится здесь");
   });
 });

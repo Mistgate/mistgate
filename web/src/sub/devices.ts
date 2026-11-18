@@ -4,7 +4,7 @@ import { icon, type IconName } from "./icons";
 import { countryName, deviceAbout, fmtAgo, isShared, keyAppName, linkFull, otherDevices, platformWord, selfServe } from "./logic";
 import type { Ctx } from "./state";
 import { connectNeeded } from "./status";
-import { copyButton } from "./ui";
+import { copyButton, gap } from "./ui";
 import type { AwgDevice, Device } from "./types";
 
 // The devices, as the board draws them: the card of the places (how many are taken, the bar, "Add a device" and the link), then
@@ -140,7 +140,7 @@ function sharedRow(c: Ctx, x: Device | null, strict: boolean): Kid[] {
     ico: "link",
     name: first ? t.linkApps : t.sharedT,
     meta,
-    when: strict ? undefined : when(c, x?.last_seen_unix ?? 0, x?.online ?? false, t.linkNever, x ? (w) => w : t.fetched),
+    when: strict ? undefined : when(c, x?.last_seen_unix ?? 0, x?.online ?? false, t.linkNever, t.fetched),
     quiet: strict && !x,
   });
 }
@@ -196,7 +196,7 @@ function places(c: Ctx): HTMLElement {
       h("p", { class: "u-fig" }, t.devUsed(u.devices_used, limit), ...(limit > 0 ? [h("span", { class: "only-w" }, left(true)), h("span", { class: "only-m" }, left(false))] : [h("span", null, left(true))])),
       limit > 0 && h("div", { class: "u-prog", role: "img", "aria-label": t.slotsAria(u.devices_used, limit) }, h("i", { class: full ? "full" : "", style: { width: `${Math.min(100, Math.round((u.devices_used / limit) * 1000) / 10)}%` } })),
       inactive && h("p", { class: "u-hint", id: whyOff }, u.status === "disabled" ? t.devOffDisabled : t.devOff),
-      refused && h("p", { class: "u-hint", id: "dev-full" }, h("b", null, t.fullT), " ", t.linkFullD),
+      refused && h("p", { class: "u-hint", id: "dev-full" }, h("b", null, t.fullT), gap(t.fullT), t.linkFullD),
     ),
     (canAdd || copyAble) &&
       h(
