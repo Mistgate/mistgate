@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
+import { PlanTitle } from "@/components/plan-title";
 import { useT } from "@/i18n";
 import type { Plan } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
@@ -41,16 +42,7 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
       </div>
       {/* the board's title is what the change does, in the interface language, with the names it is about ("Turn on the relay of fi1 through msk1"); a plan with none says it in the tool's general words (the panel's English summary is for the model) */}
       <b>
-        {title.map((p, i) =>
-          typeof p === "string" ? (
-            p
-          ) : (
-            // a name from data: plain in the title, with the panel's note that it is untrusted on hover
-            <span key={i} title={t("int.ap.untrusted")}>
-              {p.data}
-            </span>
-          ),
-        )}
+        <PlanTitle pieces={title} />
       </b>
       {plan.facts.length > 0 && (
         <ul>

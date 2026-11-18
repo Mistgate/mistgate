@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
+import { PlanTitle } from "@/components/plan-title";
 import { Pagination } from "@/components/ui/pagination";
 import { ApprovalState, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
@@ -11,14 +12,15 @@ import { useNodes } from "@/lib/queries";
 import { safeHttpUrl } from "@/lib/warp";
 import {
   approvalStateInfo,
+  approvalTitle,
   clockText,
   dangerText,
   factLabel,
   factWords,
   outcomeText,
+  pieceText,
   profileInfo,
   secondsLeft,
-  toolTitle,
   useApprovalActions,
   useTick,
   type Approval,
@@ -70,7 +72,9 @@ function Card({ a, data, nowMs, focused }: { a: Approval; data: Approvals; nowMs
   const left = secondsLeft(a, data, nowMs);
   const span = Math.max(1, a.expiresUnix - a.createdUnix);
   const soon = left < 60;
-  const tool = toolTitle(t, a.tool);
+  // with the names of the plan ("Turn on the relay of fi1 through msk1"), as the assistant's card says it
+  const title = approvalTitle(t, fmt, a);
+  const tool = pieceText(title);
   const [done, setDone] = useState(false);
   // a node of the panel is drawn with its flag, as the board does; a name the panel does not know stays on its plate of "data"
   const flags = new Map((useNodes().data?.nodes ?? []).map((n) => [n.name, n.countryCode]));
@@ -90,7 +94,9 @@ function Card({ a, data, nowMs, focused }: { a: Approval; data: Approvals; nowMs
           <Gl d={ICONS.shield} />
         </span>
         <div>
-          <h3>{tool}</h3>
+          <h3>
+            <PlanTitle pieces={title} />
+          </h3>
           <span>
             {t("int.ap.by", { token: a.tokenName })}
             <i className={cx("pv-pill", a.tokenProfile === TokenProfile.OPERATOR ? "part" : a.tokenProfile === TokenProfile.ADMIN ? "bad" : "")}>{t(profileInfo(a.tokenProfile).key)}</i>
@@ -209,7 +215,9 @@ function Recent({ data }: { data: Approvals }) {
           return (
             <div key={a.id} className={cx("ai-rec", a.id === fresh && "fresh")}>
               <div>
-                <b>{toolTitle(t, a.tool)}</b>
+                <b>
+                  <PlanTitle pieces={approvalTitle(t, fmt, a)} />
+                </b>
                 <em>{[a.tokenName, a.decidedByName ? t("int.ap.decidedBy", { name: a.decidedByName }) : "", fmt.ago(at)].filter(Boolean).join(" · ")}</em>
               </div>
               {res ? <code className={cx("mono", a.error && "bad")}>{res}</code> : <span />}

@@ -172,6 +172,11 @@ export const toolTitle = (t: T, tool: string) => lookup(t, `approval.tool.${tool
 /** The title of a plan in the interface language: its tool's own words, or null for a tool that has none (its English line stands in). */
 export const planTitle = (t: T, tool: string): string | null => lookup(t, `approval.tool.${tool}`);
 
+/** The title of an approval (a card, a row of the history): with the names its facts carry when the plan has them, else the tool's general title. */
+export const approvalTitle = (t: T, fmt: Fmt, a: Pick<Approval, "tool" | "facts">): Piece[] => planTitleWords(t, fmt, a.tool, a.facts) ?? [toolTitle(t, a.tool)];
+/** The pieces of a title as one plain line (a button's label for a screen reader). */
+export const pieceText = (pieces: readonly Piece[]) => pieces.map((p) => (typeof p === "string" ? p : p.data)).join("");
+
 /** The plan tools whose facts carry no name, so their title is the general one ("approval.tool.<tool>") only (plan-vocabulary.test.ts). */
 export const planTitleWithoutNames = [
   "dns_settings_set", "node_server_keys_add", "os_rollout_cancel", "os_rollout_pause", "os_rollout_resume", "os_rollout_start", "profile_deploy", "profile_update", "retention",

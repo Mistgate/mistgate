@@ -191,6 +191,20 @@ describe("what a scene shows", () => {
     expect($(".ai-rec.fresh")?.textContent).toContain("Rejected");
   });
 
+  it("approvals: a plan with names is titled with them, in the queue and the history, in every language", async () => {
+    await draw("ap.named");
+    expect(all(".ai-ap h3").map((h) => h.textContent)).toEqual(["Fix de1", "Turn on the relay of fi1 through msk1"]);
+    expect(all(".ai-ap h3")[1]?.querySelectorAll("span[title]")).toHaveLength(2); // the two names are data: marked as such
+    expect(all(".ai-rec b").map((b) => b.textContent)).toContain("Change the port of the relay of nl1 through msk1");
+    expect(document.querySelector("button[aria-label='Approve: Turn on the relay of fi1 through msk1']")).not.toBeNull();
+    await clear();
+    setLang("ru");
+    await draw("ap.named");
+    expect(all(".ai-ap h3")[1]?.textContent).toBe("Включить ретрансляцию fi1 через msk1");
+    // a plan whose facts name a node is titled with it too
+    expect(all(".ai-ap h3")[0]?.textContent).toBe("Исправить de1");
+  });
+
   it("the summary under the title follows what waits", async () => {
     await draw("ap");
     expect($(".sb-h p")?.textContent).toBe("1 change is waiting for your decision");
